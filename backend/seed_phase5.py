@@ -1,3 +1,4 @@
+import os
 """Phase 5 seed: portal accounts, service categories/requests, notices, construction photos, shared docs, SLA. Idempotent."""
 import logging
 from datetime import UTC, datetime, timedelta
@@ -36,6 +37,8 @@ async def seed_phase5():
             await db.portal_accounts.insert_one({**base_doc(None, cid), "customer_id": c["id"], "login_phone": phone, "password_hash": pw, "must_change_password": False, "failed_attempts": 0, "locked_until": None, "last_login_at": None, "read_notice_ids": []})
     if await db.service_categories.count_documents({}) == 0:
         await db.service_categories.insert_many([{**base_doc(None, cid), "name": n, "order": i} for i, n in enumerate(["Payment query", "Document request", "Construction query", "Possession", "Defect/Snag", "Agreement", "Other"])])
+    if os.environ.get("PORTAL_PUBLIC_URL"):
+        await db.site_settings.update_many({"company_id": cid, "$or": [{"portal_url": None}, {"portal_url": {"$exists": False}}]}, {"$set": {"portal_url": os.environ["PORTAL_PUBLIC_URL"]}})
     await db.settings.update_one({"key": "sla_hours"}, {"$set": {"value": {"High": 24, "Medium": 72, "Low": 168}}}, upsert=True)
     sgh = await db.projects.find_one({"code": "SGH"}, {"_id": 0, "id": 1})
     if await db.notices.count_documents({}) == 0:

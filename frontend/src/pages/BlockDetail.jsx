@@ -92,7 +92,7 @@ export default function BlockDetail() {
   };
   return (
     <div data-testid="block-detail-page">
-      <PageHeader crumbs={[{ label: "Projects", to: "/erp/projects" }, { label: block?.project_code || "…", to: `/erp/projects/${b.project_id}` }, { label: b.code }]} title={b.name}
+      <PageHeader crumbs={[{ label: "Projects", to: "/projects" }, { label: block?.project_code || "…", to: `/projects/${b.project_id}` }, { label: b.code }]} title={b.name}
         subtitle={`${block?.block_type_name || ""} · ${b.floors} floors${b.skip_floors?.length ? ` (skips ${b.skip_floors.join(", ")})` : ""}${b.refuge_floors?.length ? ` · refuge ${b.refuge_floors.join(", ")}` : ""} · pattern ${b.numbering_pattern}`}
         actions={<>
           <Button variant="outline" onClick={() => window.print()} data-testid="print-grid-btn" className="print:hidden"><Printer className="mr-1.5 h-4 w-4" />Print</Button>

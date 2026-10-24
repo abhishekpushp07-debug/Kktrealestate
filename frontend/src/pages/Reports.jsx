@@ -53,7 +53,7 @@ export default function Reports() {
     <div data-testid="reports-page">
       <PageHeader title="Reports" subtitle="Server-side aggregations with CSV / PDF export and saved presets." />
       <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
-        <aside className="card-elev h-fit p-2" data-testid="report-list">{Object.entries(groups).map(([g, items]) => <div key={g} className="mb-2"><p className="px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">{g}</p>{items.map((r) => <button key={r.key} onClick={() => nav(`/erp/reports/${r.key}`)} className={`block w-full rounded-md px-2 py-1.5 text-left text-sm ${r.key === key ? "bg-navy font-semibold text-white" : "text-navy hover:bg-slate-100"}`} data-testid={`report-${r.key}`}>{r.name}</button>)}</div>)}</aside>
+        <aside className="card-elev h-fit p-2" data-testid="report-list">{Object.entries(groups).map(([g, items]) => <div key={g} className="mb-2"><p className="px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">{g}</p>{items.map((r) => <button key={r.key} onClick={() => nav(`/reports/${r.key}`)} className={`block w-full rounded-md px-2 py-1.5 text-left text-sm ${r.key === key ? "bg-navy font-semibold text-white" : "text-navy hover:bg-slate-100"}`} data-testid={`report-${r.key}`}>{r.name}</button>)}</div>)}</aside>
         <section className="min-w-0 space-y-4">
           <div className="card-elev flex flex-wrap items-end gap-2 p-3" data-testid="report-filters">
             {FILTERS[key]?.includes("from_date") && <label className="text-xs text-slate-500">From<Input type="date" value={f.from_date || ""} onChange={set("from_date")} className="h-9" data-testid="rf-from" /></label>}

@@ -114,7 +114,7 @@ export default function Customers() {
   return (
     <div data-testid="customers-page">
       <PageHeader title="Customers" subtitle="Buyers, KYC and co-applicants." actions={<div className="flex gap-2">{can("customer.portal_manage") && <Button variant="outline" onClick={bulkEnable} data-testid="bulk-portal-enable-btn">Enable portal for active buyers</Button>}{can("customer.write") && <Button onClick={() => setOpen(true)} className="bg-navy hover:bg-navy-700" data-testid="new-customer-btn"><Plus className="mr-1 h-4 w-4" />New customer</Button>}</div>} />
-      <DataTable {...list} columns={columns} testId="customers-table" exportPath="/customers" searchPlaceholder="Name, phone, code, PAN…" onRowClick={(c) => nav(`/erp/customers/${c.id}`)}
+      <DataTable {...list} columns={columns} testId="customers-table" exportPath="/customers" searchPlaceholder="Name, phone, code, PAN…" onRowClick={(c) => nav(`/customers/${c.id}`)}
         toolbar={<Select value={kyc} onValueChange={setKyc}><SelectTrigger className="h-9 w-36" data-testid="kyc-filter"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All KYC</SelectItem>{Object.keys(KYC_TONE).map((k) => <SelectItem key={k} value={k}>{k}</SelectItem>)}</SelectContent></Select>}
         empty={{ icon: UserRound, title: "No customers yet" }} />
       {open && <CustomerForm open={open} onOpenChange={setOpen} onSaved={() => list.reload()} />}

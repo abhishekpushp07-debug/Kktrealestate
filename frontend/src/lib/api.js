@@ -26,7 +26,8 @@ api.interceptors.request.use((config) => {
 export const conflictHandler = { fn: null };
 
 let refreshing = null;
-const onLogout = { fn: () => { tokens.clear(); window.location.assign("/erp/login"); } };
+export const BASE_PATH = (process.env.REACT_APP_BASE_PATH || "/").replace(/\/$/, "");
+const onLogout = { fn: () => { tokens.clear(); window.location.assign(`${BASE_PATH}/login`); } };
 export const setLogoutHandler = (fn) => { onLogout.fn = fn; };
 
 async function doRefresh() {

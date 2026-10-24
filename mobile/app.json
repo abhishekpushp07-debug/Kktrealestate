@@ -1,22 +1,29 @@
 {
   "expo": {
-    "name": "mobile",
+    "name": "KKT Home",
     "slug": "mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "mobile",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.emergent.royalrealtyhub.dhbi8q"
+      "bundleIdentifier": "com.emergent.royalrealtyhub.dhbi8q",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Photograph site issues for your service requests",
+        "NSPhotoLibraryUsageDescription": "Attach photos to your service requests"
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#000000"
+        "backgroundColor": "#0B1F3A"
       },
-      "package": "com.emergent.royalrealtyhub.dhbi8q"
+      "package": "com.emergent.royalrealtyhub.dhbi8q",
+      "permissions": [
+        "android.permission.CAMERA"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -31,14 +38,22 @@
           "image": "./assets/images/splash-image.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#000000"
+          "backgroundColor": "#F8F6F1"
         }
       ],
       "expo-font",
       "expo-image",
       "expo-secure-store",
       "expo-web-browser",
-      "expo-status-bar"
+      "expo-status-bar",
+      "expo-sharing",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Attach photos to your service requests",
+          "cameraPermission": "Photograph site issues for your service requests"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

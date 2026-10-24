@@ -43,10 +43,10 @@ async def notification_subscriber(evt: dict):
         return
     if evt["action"].startswith("service.") and after.get("assigned_to"):
         now = now_iso()
-        link = f"/erp/service-requests/{evt['entity_id']}"
+        link = f"/service-requests/{evt['entity_id']}"
         await db.notifications.insert_one({**base_doc(None, evt["company_id"]), "user_id": after["assigned_to"], "title": res[0], "body": res[1], "kind": evt["action"], "entity_type": "service_request", "entity_id": evt["entity_id"], "link": link, "read": False, "created_at": now})
         roles = [r for r in roles if r != "Sales"]
-    link = {"lead": "/erp/leads?source=Website", "payment": "/erp/payments", "booking": f"/erp/bookings/{evt['entity_id']}", "block": f"/erp/blocks/{evt['entity_id']}", "demand": "/erp/bookings", "service_request": f"/erp/service-requests/{evt['entity_id']}"}.get(evt["entity_type"])
+    link = {"lead": "/leads?source=Website", "payment": "/payments", "booking": f"/bookings/{evt['entity_id']}", "block": f"/blocks/{evt['entity_id']}", "demand": "/bookings", "service_request": f"/service-requests/{evt['entity_id']}"}.get(evt["entity_type"])
     await notify_roles(evt["company_id"], roles, res[0], res[1], evt["action"], evt["entity_type"], evt["entity_id"], link)
 
 
@@ -58,7 +58,7 @@ async def overdue_demand_job():
     async for d in db.demands.find({"voided": False, "status": {"$in": ["Open", "Partially Paid"]}, "due_date": {"$lt": today}, "overdue_notified": {"$ne": True}}, {"_id": 0}):
         b = await db.bookings.find_one({"id": d["booking_id"]}, {"_id": 0, "customer_name": 1, "company_id": 1})
         if b:
-            await notify_roles(b["company_id"], RULES["demand.overdue"][0], "Demand overdue", f"{d['demand_number']} · {b['customer_name']} · due {d['due_date']}", "demand.overdue", "booking", d["booking_id"], f"/erp/bookings/{d['booking_id']}")
+            await notify_roles(b["company_id"], RULES["demand.overdue"][0], "Demand overdue", f"{d['demand_number']} · {b['customer_name']} · due {d['due_date']}", "demand.overdue", "booking", d["booking_id"], f"/bookings/{d['booking_id']}")
         await db.demands.update_one({"id": d["id"]}, {"$set": {"overdue_notified": True}})
 
 

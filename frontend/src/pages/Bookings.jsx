@@ -28,8 +28,8 @@ export default function Bookings() {
   ];
   return (
     <div data-testid="bookings-page">
-      <PageHeader title="Bookings" subtitle="Agreements, demands and collections per unit." actions={can("booking.create") && <Button onClick={() => nav("/erp/bookings/new")} className="bg-navy hover:bg-navy-700" data-testid="new-booking-btn"><Plus className="mr-1 h-4 w-4" />New booking</Button>} />
-      <DataTable {...list} columns={columns} testId="bookings-table" exportPath="/bookings" searchPlaceholder="Booking no., customer, flat…" onRowClick={(b) => nav(`/erp/bookings/${b.id}`)} empty={{ icon: FileSignature, title: "No bookings yet" }} />
+      <PageHeader title="Bookings" subtitle="Agreements, demands and collections per unit." actions={can("booking.create") && <Button onClick={() => nav("/bookings/new")} className="bg-navy hover:bg-navy-700" data-testid="new-booking-btn"><Plus className="mr-1 h-4 w-4" />New booking</Button>} />
+      <DataTable {...list} columns={columns} testId="bookings-table" exportPath="/bookings" searchPlaceholder="Booking no., customer, flat…" onRowClick={(b) => nav(`/bookings/${b.id}`)} empty={{ icon: FileSignature, title: "No bookings yet" }} />
     </div>
   );
 }

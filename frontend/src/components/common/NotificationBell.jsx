@@ -10,7 +10,7 @@ export function NotificationBell() {
   const nav = useNavigate();
   const load = () => api.get("/notifications", { params: { limit: 20 } }).then((r) => setData(r.data)).catch(() => {});
   useEffect(() => { load(); const t = setInterval(load, 30000); return () => clearInterval(t); }, []);
-  const open = async (n) => { if (!n.read) { await api.post(`/notifications/${n.id}/read`); } load(); if (n.link) nav(n.link); };
+  const open = async (n) => { if (!n.read) { await api.post(`/notifications/${n.id}/read`); } load(); if (n.link) nav(n.link.replace(/^\/erp(\/|$)/, "/")); };
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>

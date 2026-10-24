@@ -35,7 +35,7 @@ function Protected() {
   const { user, loading } = useAuth();
   const loc = useLocation();
   if (loading) return <div className="flex min-h-screen items-center justify-center bg-navy"><div className="h-10 w-10 animate-spin rounded-full border-4 border-gold border-t-transparent" /></div>;
-  if (!user) return <Navigate to="/erp/login" replace state={{ from: loc.pathname }} />;
+  if (!user) return <Navigate to="/login" replace state={{ from: loc.pathname }} />;
   return <AppShell />;
 }
 
@@ -48,18 +48,13 @@ function Guard({ perm, children }) {
 function PublicOnly({ children }) {
   const { user, loading } = useAuth();
   if (loading) return null;
-  return user ? <Navigate to="/erp/dashboard" replace /> : children;
-}
-
-function LegacyRedirect() {
-  const loc = useLocation();
-  return <Navigate to={`/erp${loc.pathname === "/dashboard" ? "" : loc.pathname}${loc.search}`} replace />;
+  return user ? <Navigate to="/dashboard" replace /> : children;
 }
 
 function PrintGuard({ children }) {
   const { user, loading } = useAuth();
   if (loading) return null;
-  if (!user) return <Navigate to="/erp/login" replace />;
+  if (!user) return <Navigate to="/login" replace />;
   return <div className="min-h-screen bg-white"><Suspense fallback={<div className="p-6 text-sm text-slate-400">Loading…</div>}>{children}</Suspense></div>;
 }
 
@@ -69,24 +64,19 @@ const R = [
   ["bookings", "booking.read", Bookings], ["bookings/new", "booking.create", BookingWizard], ["bookings/:id", "booking.read", BookingDetail], ["payments", "payment.read", Payments], ["roznamcha", "payment.read", Roznamcha], ["reports", "report.view", Reports], ["reports/:key", "report.view", Reports], ["service-requests", "service.read", ServiceRequests], ["service-requests/:id", "service.read", ServiceRequests],
 ];
 
-export default function ErpApp({ hostMode }) {
-  const loc = useLocation();
-  // Host mode (erp.example.com): canonical internal paths stay /erp/*; bare paths are prefixed transparently.
-  if (hostMode && !loc.pathname.startsWith("/erp")) return <Navigate to={`/erp${loc.pathname === "/" ? "" : loc.pathname}${loc.search}`} replace />;
+export default function ErpApp() {
   return (
     <AuthProvider>
       <Routes>
-        <Route path="/erp/login" element={<PublicOnly><Login /></PublicOnly>} />
-        {["login", "dashboard", "blocks/:id", "flats", "master", "master/:kind", "users", "roles", "audit", "settings", "customers", "customers/:id", "leads", "bookings", "bookings/new", "bookings/:id", "payments", "roznamcha"].map((p) => <Route key={p} path={`/${p}`} element={<LegacyRedirect />} />)}
+        <Route path="/login" element={<PublicOnly><Login /></PublicOnly>} />
         <Route element={<Protected />}>
-          <Route path="/erp" element={<Navigate to="/erp/dashboard" replace />} />
-          <Route path="/erp/master" element={<Navigate to="/erp/master/flat-types" replace />} />
-          {R.map(([p, perm, C]) => <Route key={p} path={`/erp/${p}`} element={<Guard perm={perm}><C /></Guard>} />)}
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/master" element={<Navigate to="/master/flat-types" replace />} />
+          {R.map(([p, perm, C]) => <Route key={p} path={`/${p}`} element={<Guard perm={perm}><C /></Guard>} />)}
         </Route>
-        <Route path="/erp/print/receipt/:id" element={<PrintGuard><ReceiptPrint /></PrintGuard>} />
-        <Route path="/erp/print/demand/:bookingId/:demandId" element={<PrintGuard><DemandLetterPrint /></PrintGuard>} />
-        <Route path="/erp/*" element={<Protected />}><Route path="*" element={<Navigate to="/erp/dashboard" replace />} /></Route>
-        <Route path="/*" element={<LegacyRedirect />} />
+        <Route path="/print/receipt/:id" element={<PrintGuard><ReceiptPrint /></PrintGuard>} />
+        <Route path="/print/demand/:bookingId/:demandId" element={<PrintGuard><DemandLetterPrint /></PrintGuard>} />
+        <Route path="/*" element={<Protected />}><Route path="*" element={<Navigate to="/dashboard" replace />} /></Route>
       </Routes>
     </AuthProvider>
   );

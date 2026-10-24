@@ -37,7 +37,7 @@ function Detail({ id }) {
   if (!sr) return <div className="p-6 text-sm text-slate-400">Loading…</div>;
   return (
     <div data-testid="sr-detail">
-      <PageHeader title={sr.subject} subtitle={`${sr.ticket_number} · ${sr.category} · ${sr.priority} · raised ${fmtDateTime(sr.created_at)}`} crumbs={[{ label: "Service Requests", to: "/erp/service-requests" }, { label: sr.ticket_number }]}
+      <PageHeader title={sr.subject} subtitle={`${sr.ticket_number} · ${sr.category} · ${sr.priority} · raised ${fmtDateTime(sr.created_at)}`} crumbs={[{ label: "Service Requests", to: "/service-requests" }, { label: sr.ticket_number }]}
         actions={<div className="flex flex-wrap items-center gap-2">
           <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${TONE[sr.status]}`} data-testid="sr-status">{sr.status}</span>
           {can("service.write") && <Select value={sr.status} onValueChange={(v) => post("status", { status: v }, `Status → ${v}`)}><SelectTrigger className="h-9 w-44" data-testid="sr-status-select"><SelectValue /></SelectTrigger><SelectContent>{SR_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select>}
@@ -50,8 +50,8 @@ function Detail({ id }) {
         </div>
         <div className="space-y-4">
           <div className="card-elev p-4 text-sm"><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Context</p>
-            <p><button className="font-semibold text-navy hover:underline" onClick={() => nav(`/erp/customers/${sr.customer_id}`)} data-testid="sr-customer-link">{sr.customer_name}</button> · {sr.customer_phone}</p>
-            <p><button className="text-navy hover:underline" onClick={() => nav(`/erp/bookings/${sr.booking_id}`)} data-testid="sr-booking-link">{sr.booking_number}</button> · {sr.project_name} · {sr.flat_number}</p>
+            <p><button className="font-semibold text-navy hover:underline" onClick={() => nav(`/customers/${sr.customer_id}`)} data-testid="sr-customer-link">{sr.customer_name}</button> · {sr.customer_phone}</p>
+            <p><button className="text-navy hover:underline" onClick={() => nav(`/bookings/${sr.booking_id}`)} data-testid="sr-booking-link">{sr.booking_number}</button> · {sr.project_name} · {sr.flat_number}</p>
             <p className="mt-2 text-xs text-slate-500">SLA due {fmtDateTime(sr.sla_due_at)}{sr.sla_breached ? " · breached" : ""}</p>
             {sr.rating && <p className="mt-2 text-xs">Rating: {"★".repeat(sr.rating)}{sr.rating_comment ? ` — ${sr.rating_comment}` : ""}</p>}
           </div>
@@ -79,7 +79,7 @@ export default function ServiceRequests() {
       </div>} />
       {!data ? <div className="text-sm text-slate-400">Loading…</div> : data.items.length === 0 ? <EmptyState icon={LifeBuoy} title="No service requests" /> : (
         <div className="grid gap-3 overflow-x-auto md:grid-cols-5" data-testid="sr-kanban">
-          {cols.map((s) => <div key={s} className="min-w-[220px] rounded-xl bg-surface p-2"><p className="mb-2 flex items-center justify-between px-1 text-xs font-bold uppercase tracking-wide text-slate-600">{s}<span className="rounded-full bg-white px-2 py-0.5 tabular-nums">{data.status_counts?.[s] || 0}</span></p><div className="space-y-2">{data.items.filter((x) => x.status === s).map((sr) => <SrCard key={sr.id} sr={sr} onClick={() => nav(`/erp/service-requests/${sr.id}`)} />)}</div></div>)}
+          {cols.map((s) => <div key={s} className="min-w-[220px] rounded-xl bg-surface p-2"><p className="mb-2 flex items-center justify-between px-1 text-xs font-bold uppercase tracking-wide text-slate-600">{s}<span className="rounded-full bg-white px-2 py-0.5 tabular-nums">{data.status_counts?.[s] || 0}</span></p><div className="space-y-2">{data.items.filter((x) => x.status === s).map((sr) => <SrCard key={sr.id} sr={sr} onClick={() => nav(`/service-requests/${sr.id}`)} />)}</div></div>)}
         </div>
       )}
     </div>

@@ -1,3 +1,4 @@
+import os
 """Public, unauthenticated, read-only website API. Strict output projections; cached 60 s with ETag; 300/min/IP."""
 import hashlib
 import json
@@ -66,8 +67,10 @@ def safe_embed(url: str | None) -> str | None:
 
 
 def site_public(s: dict) -> dict:
-    keys = ("brand_name", "tagline", "logo_url", "favicon_url", "phone", "whatsapp", "email", "offices", "social", "trust_stats", "footer_text", "rera_disclaimer", "seo_title", "seo_description", "og_image_url", "ga_id", "meta_pixel_id", "site_live", "home")
-    return {k: s.get(k) for k in keys}
+    keys = ("brand_name", "tagline", "logo_url", "favicon_url", "phone", "whatsapp", "email", "portal_url", "offices", "social", "trust_stats", "footer_text", "rera_disclaimer", "seo_title", "seo_description", "og_image_url", "ga_id", "meta_pixel_id", "site_live", "home")
+    out = {k: s.get(k) for k in keys}
+    out["portal_url"] = out.get("portal_url") or os.environ.get("PORTAL_PUBLIC_URL")
+    return out
 
 
 def pick(doc: dict, keys: tuple) -> dict:

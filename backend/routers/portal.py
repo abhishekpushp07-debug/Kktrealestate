@@ -1,3 +1,4 @@
+import os
 """Customer Portal: auth (aud=portal), scoped read APIs, service requests, notices, profile. Phase 5."""
 import secrets
 from datetime import UTC, date, datetime, timedelta
@@ -72,6 +73,15 @@ async def _rm(b: dict | None) -> dict | None:
         return None
     u = await db.users.find_one({"id": b["sales_user_id"]}, {"_id": 0, "name": 1, "phone": 1})
     return {"name": u["name"], "phone": u.get("phone")} if u else None
+
+
+@router.get("/config")
+async def portal_config():
+    """Public branding for the portal/Expo login screen (no auth)."""
+    from routers.cms import get_site
+    company = await db.companies.find_one({}, {"_id": 0, "id": 1})
+    s = await get_site(company["id"]) if company else {}
+    return {"brand_name": s.get("brand_name"), "logo_url": s.get("logo_url"), "primary_phone": s.get("phone"), "whatsapp": s.get("whatsapp"), "support_email": s.get("email"), "erp_url": os.environ.get("ERP_PUBLIC_URL"), "portal_url": s.get("portal_url") or os.environ.get("PORTAL_PUBLIC_URL")}
 
 
 # ---------------- Auth ----------------
@@ -257,11 +267,19 @@ async def booking_detail(b: dict = Depends(portal_booking), acc: dict = Depends(
     return present_money(card)
 
 
+def _bucket(e: dict) -> str | None:
+    if e["type"] in ("OTHER_CHARGE_DEMAND", "OTHER_CHARGE_PAYMENT"):
+        return "Other charges"
+    if e.get("category") in ("Cash", "Account"):
+        return e["category"]
+    return None
+
+
 @router.get("/bookings/{booking_id}/ledger")
 async def booking_ledger(b: dict = Depends(portal_booking)):
     rows = await db.ledger_entries.find({"booking_id": b["id"]}, {"_id": 0}).sort("seq", 1).to_list(None)
     labels = {"DEMAND": "Demand raised", "PAYMENT": "Payment received", "OTHER_CHARGE_DEMAND": "Charge demanded", "OTHER_CHARGE_PAYMENT": "Charge paid", "REVERSAL": "Payment reversed", "REVISION": "Agreement revised", "CANCELLATION": "Booking cancelled"}
-    return present_money({"items": [{"seq": e["seq"], "date": e["date"], "description": f"{labels.get(e['type'], e['type'].title())}{' — ' + e['note'] if e.get('note') else ''}", "bucket": e.get("bucket"), "amount_paise": e["amount_paise"], "type": e["type"], "ref": e.get("ref"), "cash_paid_cum_paise": e["cash_paid_cum_paise"], "account_paid_cum_paise": e["account_paid_cum_paise"],
+    return present_money({"items": [{"seq": e["seq"], "date": e["date"], "description": f"{labels.get(e['type'], e['type'].title())}{' — ' + e['note'] if e.get('note') else ''}", "bucket": _bucket(e), "amount_paise": e["amount_paise"], "type": e["type"], "ref": e.get("ref"), "cash_paid_cum_paise": e["cash_paid_cum_paise"], "account_paid_cum_paise": e["account_paid_cum_paise"],
                                      "cash_due_paise": e["cash_due_paise"], "account_due_paise": e["account_due_paise"], "total_due_paise": e["total_due_paise"], "other_charges_due_paise": e.get("other_charges_due_paise", 0)} for e in rows]})
 
 
@@ -371,7 +389,22 @@ async def read_notice(notice_id: str, acc: dict = Depends(portal_user)):
 
 # ---------------- Service requests (customer side) ----------------
 def _sr_public(sr: dict) -> dict:
-    return {k: sr.get(k) for k in ("id", "ticket_number", "booking_id", "booking_number", "flat_number", "project_name", "category", "priority", "subject", "description", "status", "created_at", "updated_at", "resolved_at", "closed_at", "rating", "attachments", "sla_due_at")} | {"thread": [{k: m.get(k) for k in ("by", "author_name", "message", "attachments", "at")} for m in sr.get("thread") or [] if not m.get("internal")], "can_reopen": sr["status"] == "Resolved" and (sr.get("resolved_at") or "") >= (datetime.now(UTC) - timedelta(days=7)).isoformat()}
+    """Customer-safe view: no storage keys, staff ids, internal notes or hidden flags."""
+    idx = 0
+    thread = []
+    for m in sr.get("thread") or []:
+        if m.get("internal"):
+            continue
+        atts = []
+        for a in m.get("attachments") or []:
+            atts.append({"idx": idx, "name": a.get("name"), "mime": a.get("mime"), "size": a.get("size"), "url": f"/api/portal/service-requests/{sr['id']}/attachments/{idx}"})
+            idx += 1
+        thread.append({"by": m.get("by"), "author_name": m.get("author_name"), "message": m.get("message"), "at": m.get("at"), "attachments": atts})
+    out = {k: sr.get(k) for k in ("id", "ticket_number", "booking_id", "booking_number", "flat_number", "project_name", "category", "priority", "subject", "description", "status", "created_at", "updated_at", "resolved_at", "closed_at", "rating", "sla_due_at")}
+    out["attachments"] = thread[0]["attachments"] if thread else []
+    out["thread"] = thread
+    out["can_reopen"] = sr["status"] == "Resolved" and (sr.get("resolved_at") or "") >= (datetime.now(UTC) - timedelta(days=7)).isoformat()
+    return out
 
 
 @router.get("/service-categories")
@@ -399,11 +432,12 @@ async def _upload_attachments(files: list[UploadFile], prefix: str) -> list[dict
         data = await f.read()
         if not data:
             continue
-        if len(data) > 8 * 1024 * 1024 or not sniff(data, f.content_type or ""):
+        kind = sniff(data, f.content_type or "") or sniff(data, "image/jpeg") or sniff(data, "image/png") or sniff(data, "image/webp") or sniff(data, "application/pdf")
+        if len(data) > 8 * 1024 * 1024 or not kind:
             raise ApiError(422, "Only JPG/PNG/WEBP/PDF up to 8 MB", "UNSUPPORTED_MEDIA")
         key = f"{prefix}/{secrets.token_hex(12)}-{f.filename}"
         res = await put_object(key, data, f.content_type)
-        out.append({"name": f.filename, "storage_key": res["path"], "mime": f.content_type, "size": len(data)})
+        out.append({"name": f.filename or f"upload-{secrets.token_hex(3)}", "storage_key": res["path"], "mime": kind if kind.startswith(("image/", "application/")) else f.content_type, "size": len(data)})
     return out
 
 
@@ -424,8 +458,23 @@ async def create_service_request(company_id: str, customer: dict, booking: dict,
     return sr
 
 
+@router.get("/service-requests/{sr_id}/attachments/{idx}")
+async def my_request_attachment(sr_id: str, idx: int, acc: dict = Depends(portal_user)):
+    from storage import get_object
+    sr = await db.service_requests.find_one({"id": sr_id, "customer_id": acc["customer_id"]}, {"_id": 0, "thread": 1})
+    if not sr:
+        raise ApiError(404, "Request not found", "NOT_FOUND")
+    atts = [a for m in sr.get("thread") or [] if not m.get("internal") for a in (m.get("attachments") or [])]
+    if idx < 0 or idx >= len(atts):
+        raise ApiError(404, "Attachment not found", "NOT_FOUND")
+    a = atts[idx]
+    data, mime = await get_object(a["storage_key"])
+    return Response(content=data, media_type=a.get("mime") or mime or "application/octet-stream", headers={"Content-Disposition": f'inline; filename="{a["name"]}"', "Cache-Control": "private, no-store"})
+
+
 @router.post("/service-requests", status_code=201)
-async def create_request(request: Request, booking_id: str = Form(...), category: str = Form(...), subject: str = Form(..., min_length=3, max_length=120), description: str = Form(..., min_length=3, max_length=4000), priority: str = Form("Medium"), files: list[UploadFile] = File(default=[]), acc: dict = Depends(portal_user)):
+async def create_request(request: Request, booking_id: str = Form(...), category: str = Form(...), subject: str = Form(..., min_length=3, max_length=120), description: str = Form(..., min_length=3, max_length=4000), priority: str = Form("Medium"), files: list[UploadFile] = File(default=[]), file: list[UploadFile] = File(default=[]), acc: dict = Depends(portal_user)):
+    files = [*files, *file]
     b = await db.bookings.find_one({"id": booking_id, **_booking_scope(acc)}, {"_id": 0})
     if not b:
         raise ApiError(404, "Booking not found", "NOT_FOUND")
@@ -439,7 +488,8 @@ async def create_request(request: Request, booking_id: str = Form(...), category
 
 
 @router.post("/service-requests/{sr_id}/reply")
-async def reply_request(sr_id: str, message: str = Form(..., min_length=1, max_length=4000), files: list[UploadFile] = File(default=[]), acc: dict = Depends(portal_user)):
+async def reply_request(sr_id: str, message: str = Form(..., min_length=1, max_length=4000), files: list[UploadFile] = File(default=[]), file: list[UploadFile] = File(default=[]), acc: dict = Depends(portal_user)):
+    files = [*files, *file]
     sr = await db.service_requests.find_one({"id": sr_id, "customer_id": acc["customer_id"]}, {"_id": 0})
     if not sr:
         raise ApiError(404, "Request not found", "NOT_FOUND")

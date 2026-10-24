@@ -42,7 +42,7 @@ export default function ProjectDetail() {
   const inv = p.inventory;
   return (
     <div data-testid="project-detail-page">
-      <PageHeader crumbs={[{ label: "Projects", to: "/erp/projects" }, { label: p.code }]} title={p.name} subtitle={`${p.project_type} · ${p.address?.city || ""} ${p.rera_number ? `· RERA ${p.rera_number}` : ""}`}
+      <PageHeader crumbs={[{ label: "Projects", to: "/projects" }, { label: p.code }]} title={p.name} subtitle={`${p.project_type} · ${p.address?.city || ""} ${p.rera_number ? `· RERA ${p.rera_number}` : ""}`}
         actions={<>
           <Pill tone={p.status === "Ready" ? "green" : p.status === "Under Construction" ? "amber" : "slate"} className="px-3 py-1 text-xs">{p.status}</Pill>
           {can("project.write") && <Button variant="outline" onClick={() => setEditOpen(true)} data-testid="edit-project-btn"><Pencil className="mr-1.5 h-4 w-4" />Edit</Button>}
@@ -114,7 +114,7 @@ export default function ProjectDetail() {
         </TabsContent>
       </Tabs>
       {editOpen && <ProjectForm open={editOpen} onOpenChange={setEditOpen} project={p} onSaved={reload} />}
-      {blockOpen && <BlockForm open={blockOpen} onOpenChange={setBlockOpen} project={p} onSaved={(b) => { reload(); navigate(`/erp/blocks/${b.id}`); }} />}
+      {blockOpen && <BlockForm open={blockOpen} onOpenChange={setBlockOpen} project={p} onSaved={(b) => { reload(); navigate(`/blocks/${b.id}`); }} />}
     </div>
   );
 }

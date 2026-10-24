@@ -67,14 +67,14 @@ export default function Dashboard() {
       {data && <Charts data={data} />}
       <RoleWidgets />
       {data?.collections && <Collections c={data.collections} />}
-      {data?.follow_ups_due && data.follow_ups_due.count > 0 && <div className="card-elev mt-6 p-5" data-testid="followups-widget"><div className="mb-3 flex items-center justify-between"><h2 className="text-base font-bold text-navy md:text-lg">Follow-ups due today</h2><Link to="/erp/leads" className="text-xs font-semibold text-gold-hover hover:underline">Open pipeline</Link></div><div className="grid gap-2 md:grid-cols-3">{data.follow_ups_due.items.map((l) => <Link key={l.id} to="/erp/leads" className="rounded-lg border bg-white p-3 text-sm hover:border-navy"><p className="font-semibold text-navy">{l.name}</p><p className="text-xs text-slate-500">{l.phone} · {l.status}</p></Link>)}</div></div>}
+      {data?.follow_ups_due && data.follow_ups_due.count > 0 && <div className="card-elev mt-6 p-5" data-testid="followups-widget"><div className="mb-3 flex items-center justify-between"><h2 className="text-base font-bold text-navy md:text-lg">Follow-ups due today</h2><Link to="/leads" className="text-xs font-semibold text-gold-hover hover:underline">Open pipeline</Link></div><div className="grid gap-2 md:grid-cols-3">{data.follow_ups_due.items.map((l) => <Link key={l.id} to="/leads" className="rounded-lg border bg-white p-3 text-sm hover:border-navy"><p className="font-semibold text-navy">{l.name}</p><p className="text-xs text-slate-500">{l.phone} · {l.status}</p></Link>)}</div></div>}
       <div className="mt-6 grid gap-6 xl:grid-cols-3">
         <div className="card-elev p-5 xl:col-span-2" data-testid="dashboard-projects">
-          <div className="mb-4 flex items-center justify-between"><h2 className="text-base font-bold text-navy md:text-lg">Projects overview</h2><Link to="/erp/projects" className="text-xs font-semibold text-gold-hover hover:underline">View all</Link></div>
+          <div className="mb-4 flex items-center justify-between"><h2 className="text-base font-bold text-navy md:text-lg">Projects overview</h2><Link to="/projects" className="text-xs font-semibold text-gold-hover hover:underline">View all</Link></div>
           {loading ? <Skeleton className="h-32" /> : data?.projects?.length === 0 ? <EmptyState title="No projects yet" description="Create your first project to begin generating inventory." /> : (
             <div className="space-y-3">
               {data?.projects?.map((p) => (
-                <Link to={`/erp/projects/${p.id}`} key={p.id} className="block rounded-lg border border-slate-100 p-4 transition-colors hover:border-gold/60 hover:bg-gold-light/30" data-testid={`dashboard-project-${p.code}`}>
+                <Link to={`/projects/${p.id}`} key={p.id} className="block rounded-lg border border-slate-100 p-4 transition-colors hover:border-gold/60 hover:bg-gold-light/30" data-testid={`dashboard-project-${p.code}`}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-3"><span className="rounded bg-navy px-2 py-0.5 text-[11px] font-bold text-gold">{p.code}</span><span className="font-bold text-navy">{p.name}</span><Pill tone="slate">{p.status}</Pill></div>
                     <div className="text-right"><p className="text-sm font-bold tabular text-navy">{inrShort(p.inventory_value)}</p><p className="text-[11px] text-slate-500">{p.inventory.total} units</p></div>
@@ -97,7 +97,7 @@ export default function Dashboard() {
           </div>
         </div>
         <div className="card-elev p-5" data-testid="dashboard-audit">
-          <div className="mb-4 flex items-center justify-between"><h2 className="text-base font-bold text-navy md:text-lg">Recent activity</h2>{can("audit.view") && <Link to="/erp/audit" className="text-xs font-semibold text-gold-hover hover:underline">Audit log</Link>}</div>
+          <div className="mb-4 flex items-center justify-between"><h2 className="text-base font-bold text-navy md:text-lg">Recent activity</h2>{can("audit.view") && <Link to="/audit" className="text-xs font-semibold text-gold-hover hover:underline">Audit log</Link>}</div>
           {!can("audit.view") ? <EmptyState icon={History} title="Audit access restricted" description="Your role does not include audit.view." /> : (
             <ol className="relative space-y-4 border-l border-slate-200 pl-4">
               {data?.recent_audit?.map((a) => (

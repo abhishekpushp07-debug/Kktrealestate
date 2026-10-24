@@ -1,3 +1,4 @@
+import os
 """Website CMS (ERP side). Permissions cms.read / cms.write. Media via object storage, streamed publicly at /api/public/media/{id}."""
 import re
 import uuid
@@ -41,7 +42,7 @@ COLLECTIONS = {
 DEFAULT_SITE = {
     "brand_name": "Shree Ganesh Builders", "tagline": "Homes built on trust", "logo_url": None, "favicon_url": None, "phone": "+916122234567", "whatsapp": "+919430000000", "email": "sales@shreeganeshbuilders.in",
     "offices": [], "social": {}, "trust_stats": [], "footer_text": "", "rera_disclaimer": "", "seo_title": "", "seo_description": "", "og_image_url": None, "ga_id": None, "meta_pixel_id": None,
-    "round_robin_assignment": True, "site_live": True, "home": {"value_props": [], "featured_project_ids": [], "walkthrough_video_url": None, "sections": {}},
+    "round_robin_assignment": True, "site_live": True, "portal_url": os.environ.get("PORTAL_PUBLIC_URL"), "home": {"value_props": [], "featured_project_ids": [], "walkthrough_video_url": None, "sections": {}},
 }
 
 

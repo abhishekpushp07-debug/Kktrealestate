@@ -32,7 +32,7 @@ export default function CustomerDetail() {
   const kv = (k) => reveal ? c[k] : c[`${k}_masked`];
   return (
     <div data-testid="customer-detail">
-      <PageHeader title={`${c.salutation || ""} ${c.full_name}`} subtitle={`${c.customer_code} · ${c.phone}${c.email ? ` · ${c.email}` : ""}`} crumbs={[{ label: "Customers", to: "/erp/customers" }, { label: c.customer_code }]}
+      <PageHeader title={`${c.salutation || ""} ${c.full_name}`} subtitle={`${c.customer_code} · ${c.phone}${c.email ? ` · ${c.email}` : ""}`} crumbs={[{ label: "Customers", to: "/customers" }, { label: c.customer_code }]}
         actions={<div className="flex gap-2"><Pill tone={KYC_TONE[c.kyc_status]}>{`KYC ${c.kyc_status}`}</Pill>{user?.role_name === "Super Admin" && c.kyc_status !== "Erased" && !c.bookings.some((b) => b.status === "Active") && <Button variant="outline" className="text-red-700" onClick={erase} data-testid="erase-customer-btn"><UserX className="mr-1 h-4 w-4" />Erase PII</Button>}{can("customer.write") && <Button variant="outline" onClick={() => setEdit(true)} data-testid="customer-edit-btn"><Pencil className="mr-1 h-4 w-4" />Edit</Button>}</div>} />
       <div className="grid gap-4 md:grid-cols-4">
         <StatCard label="Bookings" value={c.bookings.length} hint={c.bookings.filter((b) => b.status === "Active").length + " active"} />

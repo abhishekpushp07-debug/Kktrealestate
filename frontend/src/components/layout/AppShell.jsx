@@ -12,22 +12,22 @@ import { CommandPalette } from "@/components/common/CommandPalette";
 import { VersionConflictDialog } from "@/components/common/VersionConflictDialog";
 
 const NAV = [
-  { to: "/erp/dashboard", label: "Dashboard", icon: LayoutDashboard, perm: "project.read" },
-  { to: "/erp/projects", label: "Projects", icon: Building2, perm: "project.read" },
-  { to: "/erp/flats", label: "Inventory", icon: Grid3X3, perm: "project.read" },
-  { to: "/erp/customers", label: "Customers", icon: UserRound, perm: "customer.read", match: "/erp/customers" },
-  { to: "/erp/leads", label: "Leads", icon: Funnel, perm: "lead.read" },
-  { to: "/erp/bookings", label: "Bookings", icon: FileSignature, perm: "booking.read", match: "/erp/bookings" },
-  { to: "/erp/payments", label: "Payments", icon: Receipt, perm: "payment.read" },
-  { to: "/erp/roznamcha", label: "Roznamcha", icon: BookOpenText, perm: "payment.read" },
-  { to: "/erp/reports", label: "Reports", icon: BarChart3, perm: "report.view", match: "/erp/reports" },
-  { to: "/erp/service-requests", label: "Service Requests", icon: LifeBuoy, perm: "service.read", match: "/erp/service-requests" },
-  { to: "/erp/master/flat-types", label: "Master Data", icon: Database, perm: "master.read", match: "/erp/master" },
-  { to: "/erp/users", label: "Users", icon: Users, perm: "users.manage" },
-  { to: "/erp/roles", label: "Roles", icon: ShieldCheck, perm: "roles.manage" },
-  { to: "/erp/audit", label: "Audit Log", icon: History, perm: "audit.view" },
-  { to: "/erp/settings", label: "Settings", icon: Settings, perm: "settings.manage" },
-  { to: "/erp/website/settings", label: "Website", icon: Globe, perm: "cms.read", match: "/erp/website" },
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, perm: "project.read" },
+  { to: "/projects", label: "Projects", icon: Building2, perm: "project.read" },
+  { to: "/flats", label: "Inventory", icon: Grid3X3, perm: "project.read" },
+  { to: "/customers", label: "Customers", icon: UserRound, perm: "customer.read", match: "/customers" },
+  { to: "/leads", label: "Leads", icon: Funnel, perm: "lead.read" },
+  { to: "/bookings", label: "Bookings", icon: FileSignature, perm: "booking.read", match: "/bookings" },
+  { to: "/payments", label: "Payments", icon: Receipt, perm: "payment.read" },
+  { to: "/roznamcha", label: "Roznamcha", icon: BookOpenText, perm: "payment.read" },
+  { to: "/reports", label: "Reports", icon: BarChart3, perm: "report.view", match: "/reports" },
+  { to: "/service-requests", label: "Service Requests", icon: LifeBuoy, perm: "service.read", match: "/service-requests" },
+  { to: "/master/flat-types", label: "Master Data", icon: Database, perm: "master.read", match: "/master" },
+  { to: "/users", label: "Users", icon: Users, perm: "users.manage" },
+  { to: "/roles", label: "Roles", icon: ShieldCheck, perm: "roles.manage" },
+  { to: "/audit", label: "Audit Log", icon: History, perm: "audit.view" },
+  { to: "/settings", label: "Settings", icon: Settings, perm: "settings.manage" },
+  { to: "/website/settings", label: "Website", icon: Globe, perm: "cms.read", match: "/website" },
 ];
 
 function Sidebar({ collapsed, setCollapsed }) {
@@ -81,7 +81,7 @@ function TopBar({ onMenu }) {
           <DropdownMenuLabel><p className="text-sm font-semibold">{user?.name}</p><p className="text-xs font-normal text-slate-500">{user?.email}</p></DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => setPwOpen(true)} data-testid="menu-change-password"><KeyRound className="mr-2 h-4 w-4" />Change password</DropdownMenuItem>
-          <DropdownMenuItem onClick={async () => { await logout(); navigate("/erp/login"); }} data-testid="menu-logout"><LogOut className="mr-2 h-4 w-4" />Sign out</DropdownMenuItem>
+          <DropdownMenuItem onClick={async () => { await logout(); navigate("/login"); }} data-testid="menu-logout"><LogOut className="mr-2 h-4 w-4" />Sign out</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       <ChangePasswordDialog open={pwOpen} onOpenChange={setPwOpen} />

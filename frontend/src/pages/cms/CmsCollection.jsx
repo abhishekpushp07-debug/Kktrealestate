@@ -44,7 +44,7 @@ export const CMS_NAV = [["settings", "Site Settings"], ["banners", "Banners"], [
 export function CmsNav({ active }) {
   const nav = useNavigate();
   const { data } = useFetch("/leads?source=Website&page_size=1&unread=true");
-  return <div className="mb-4 flex flex-wrap gap-1 rounded-lg bg-white p-1" data-testid="cms-nav">{CMS_NAV.map(([k, l]) => <button key={k} onClick={() => nav(k === "enquiries" ? "/erp/leads?source=Website" : `/erp/website/${k}`)} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${active === k ? "bg-navy text-white" : "text-slate-600 hover:bg-surface"}`} data-testid={`cms-nav-${k}`}>{l}{k === "enquiries" && data?.total > 0 && <span className="ml-1 rounded-full bg-gold px-1.5 text-[10px] text-navy">{data.total}</span>}</button>)}</div>;
+  return <div className="mb-4 flex flex-wrap gap-1 rounded-lg bg-white p-1" data-testid="cms-nav">{CMS_NAV.map(([k, l]) => <button key={k} onClick={() => nav(k === "enquiries" ? "/leads?source=Website" : `/website/${k}`)} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${active === k ? "bg-navy text-white" : "text-slate-600 hover:bg-surface"}`} data-testid={`cms-nav-${k}`}>{l}{k === "enquiries" && data?.total > 0 && <span className="ml-1 rounded-full bg-gold px-1.5 text-[10px] text-navy">{data.total}</span>}</button>)}</div>;
 }
 
 function CmsForm({ coll, item, onClose, onSaved }) {

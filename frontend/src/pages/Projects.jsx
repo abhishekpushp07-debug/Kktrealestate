@@ -27,7 +27,7 @@ export default function Projects() {
   return (
     <div data-testid="projects-page">
       <PageHeader title="Projects" subtitle="Residential, commercial and mixed-use developments." actions={can("project.write") && <Button onClick={() => setOpen(true)} className="bg-navy hover:bg-navy-700" data-testid="new-project-btn"><Plus className="mr-1.5 h-4 w-4" />New project</Button>} />
-      <DataTable {...list} columns={columns} testId="projects-table" onRowClick={(p) => navigate(`/erp/projects/${p.id}`)} searchPlaceholder="Search name, code, city…"
+      <DataTable {...list} columns={columns} testId="projects-table" onRowClick={(p) => navigate(`/projects/${p.id}`)} searchPlaceholder="Search name, code, city…"
         empty={<EmptyState icon={Building2} title="No projects yet" description="Create a project, then add blocks to auto-generate inventory." actionLabel={can("project.write") ? "Create project" : undefined} onAction={() => setOpen(true)} testId="projects-empty" />} />
       {open && <ProjectForm open={open} onOpenChange={setOpen} onSaved={() => list.reload()} />}
     </div>

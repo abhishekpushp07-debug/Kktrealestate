@@ -61,13 +61,13 @@ export default function BookingWizard() {
       const body = { flat_id: flat.id, customer_id: customer.id, booking_date: bookingDate, agreement_value: total, cash_agreed: cash, account_agreed: account, remarks: remarks || null, parking_slot_ids: slots,
         other_charges: selCharges.map((c) => ({ charge_type_id: c.charge_type_id, amount: Number(c.amount), gst_percent: c.gst_percent || 0, demand_at: c.demand_at })) };
       const r = await api.post("/bookings", body);
-      toast.success(`Booking ${r.data.booking_number} created`); nav(`/erp/bookings/${r.data.id}`);
+      toast.success(`Booking ${r.data.booking_number} created`); nav(`/bookings/${r.data.id}`);
     } catch (e) { toast.error(errMsg(e), { duration: 8000 }); } finally { setBusy(false); }
   };
 
   return (
     <div data-testid="booking-wizard">
-      <PageHeader title="New booking" subtitle="Reserve a unit, capture the agreement and raise initial demands." crumbs={[{ label: "Bookings", to: "/erp/bookings" }, { label: "New" }]} />
+      <PageHeader title="New booking" subtitle="Reserve a unit, capture the agreement and raise initial demands." crumbs={[{ label: "Bookings", to: "/bookings" }, { label: "New" }]} />
       <ol className="mb-6 flex flex-wrap gap-2" data-testid="wizard-steps">{STEPS.map((s, i) => <li key={s} className={cn("flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold", i === step ? "border-navy bg-navy text-white" : i < step ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-slate-500")}>{i < step ? <Check className="h-3 w-3" /> : <span>{i + 1}</span>}{s}</li>)}</ol>
       <div className="card-elev p-6">
         {step === 0 && <div className="grid gap-4 md:grid-cols-2">
