@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { NotificationBell } from "@/components/common/NotificationBell";
-import { BarChart3, Building2, ChevronLeft, ChevronRight, Database, Grid3X3, LayoutDashboard, LogOut, Search, Settings, ShieldCheck, History, Users, KeyRound, Menu, UserRound, Funnel, FileSignature, Receipt, BookOpenText, Globe , LifeBuoy } from "lucide-react";
+import { BarChart3, Building2, CalendarDays, ChevronLeft, ChevronRight, Database, Grid3X3, LayoutDashboard, LogOut, Search, Settings, ShieldCheck, History, Users, KeyRound, Menu, UserRound, Funnel, FileSignature, Receipt, BookOpenText, Globe , LifeBuoy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { initials } from "@/lib/format";
@@ -17,6 +17,7 @@ const NAV = [
   { to: "/flats", label: "Inventory", icon: Grid3X3, perm: "project.read" },
   { to: "/customers", label: "Customers", icon: UserRound, perm: "customer.read", match: "/customers" },
   { to: "/leads", label: "Leads", icon: Funnel, perm: "lead.read" },
+  { to: "/site-visits", label: "Site Visits", icon: CalendarDays, perm: "visit.read" },
   { to: "/bookings", label: "Bookings", icon: FileSignature, perm: "booking.read", match: "/bookings" },
   { to: "/payments", label: "Payments", icon: Receipt, perm: "payment.read" },
   { to: "/roznamcha", label: "Roznamcha", icon: BookOpenText, perm: "payment.read" },

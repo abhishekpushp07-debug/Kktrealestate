@@ -15,9 +15,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { inrShort, fmtDate, fmtDateTime } from "@/lib/format";
+import { LeadVisits } from "@/pages/SiteVisits";
 
 const STAGE_TONE = { New: "slate", Contacted: "navy", "Site Visit Scheduled": "amber", "Site Visit Done": "amber", Negotiation: "gold", Converted: "emerald", Lost: "red" };
-const SOURCES = ["Walk-in", "Website", "Referral", "Broker", "Campaign"];
+const SOURCES = ["Walk-in", "Website", "Referral", "Broker", "Campaign", "Brochure", "Site Visit"];
 
 function LeadForm({ open, onOpenChange, onSaved }) {
   const [f, setF] = useState({ name: "", phone: "", email: "", project_id: null, budget_min: "", budget_max: "", source: "Walk-in", notes: "" });
@@ -68,6 +69,8 @@ function LeadDrawer({ lead, onClose, onChanged }) {
         <div className="flex flex-wrap items-center gap-2"><Pill tone={STAGE_TONE[l.status]}>{l.status}</Pill>{l.lost_reason && <span className="text-xs text-red-600">Lost: {l.lost_reason}</span>}{l.status !== "Converted" && l.status !== "Lost" && <Button size="sm" className="ml-auto bg-gold text-navy hover:bg-gold-hover" onClick={convert} data-testid="lead-convert-btn"><UserCheck className="mr-1 h-4 w-4" />Convert to customer</Button>}{l.converted_customer_id && <Button size="sm" variant="outline" className="ml-auto" onClick={() => nav(`/customers/${l.converted_customer_id}`)}>Open customer</Button>}</div>
         <div className="rounded-lg border p-3"><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Log follow-up</p><Textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="What was discussed…" data-testid="followup-note" /><div className="mt-2 flex gap-2"><Input type="datetime-local" value={next} onChange={(e) => setNext(e.target.value)} className="h-9" data-testid="followup-next" /><Button size="sm" onClick={follow} disabled={!note} className="bg-navy hover:bg-navy-700" data-testid="followup-submit">Save</Button></div></div>
         <div><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Follow-ups</p>{(l.follow_ups || []).length === 0 ? <p className="text-slate-500">None yet</p> : [...l.follow_ups].reverse().map((f, i) => <div key={i} className="mb-2 rounded-md bg-surface p-2 text-xs"><p>{f.note}</p><p className="mt-1 text-slate-500">{f.by_name} · {fmtDateTime(f.at)}{f.next_follow_up_at && ` · next ${fmtDateTime(f.next_follow_up_at)}`}</p></div>)}</div>
+        <LeadVisits leadId={l.id} lead={l} />
+        {(l.activities || []).length > 0 && <div><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Timeline</p><ol className="space-y-1 text-xs" data-testid="lead-timeline">{[...l.activities].reverse().map((a) => <li key={a.id} className="flex gap-2"><span className="w-28 shrink-0 text-slate-500">{fmtDateTime(a.at)}</span><span className={a.type === "brochure_downloaded" ? "text-navy" : a.type.includes("cancel") || a.type.includes("no_show") ? "text-red-700" : "text-emerald-800"} data-testid={`activity-${a.type}`}>{a.title}</span></li>)}</ol></div>}
         <div><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Stage history</p><ol className="space-y-1 text-xs">{(l.stage_history || []).map((s, i) => <li key={i} className="flex gap-2"><span className="w-28 text-slate-500">{fmtDate(s.at)}</span><Pill tone={STAGE_TONE[s.status]}>{s.status}</Pill>{s.note && <span className="text-slate-500">{s.note}</span>}</li>)}</ol></div>
       </div></SheetContent></Sheet>
   );
@@ -77,13 +80,14 @@ export default function Leads() {
   const { can } = useAuth();
   const [sp] = useSearchParams();
   const websiteOnly = sp.get("source") === "Website";
-  const [view, setView] = useState(websiteOnly ? "list" : "board");
+  const [view, setView] = useState(sp.get("view") === "list" || websiteOnly ? "list" : "board");
   const [board, setBoard] = useState(null);
   const [open, setOpen] = useState(false);
   const [sel, setSel] = useState(null);
   const [lost, setLost] = useState(null);
   const [reason, setReason] = useState("");
-  const list = useList("/leads", { source: websiteOnly ? "Website" : undefined }, { sort: "-created_at" });
+  const srcFilter = sp.get("source") || "";
+  const list = useList("/leads", { source: srcFilter || undefined }, { sort: "-created_at" });
   const loadBoard = useCallback(() => api.get("/leads/board").then((r) => setBoard(r.data)).catch((e) => toast.error(errMsg(e))), []);
   useEffect(() => { loadBoard(); }, [loadBoard]);
   const refresh = () => { loadBoard(); list.reload(); };

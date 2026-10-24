@@ -24,6 +24,8 @@ PERMISSION_GROUPS = [
         ("customer.kyc_view", "View unmasked KYC (PAN/Aadhaar)"),
         ("lead.read", "View leads"),
         ("lead.write", "Create / edit leads"),
+        ("visit.read", "View site visits"),
+        ("visit.write", "Create / manage site visits"),
     ]),
     ("Bookings", [
         ("booking.read", "View bookings"),
@@ -60,7 +62,7 @@ SYSTEM_ROLES = {
         "permissions": [
             "service.read", "service.write", "service.assign",
             "project.read", "master.read", "block.write", "flat.write", "flat.status", "construction.update",
-            "booking.read", "booking.create", "booking.cancel", "customer.read", "customer.write", "customer.kyc_view", "lead.read", "lead.write",
+            "booking.read", "booking.create", "booking.cancel", "customer.read", "customer.write", "customer.kyc_view", "lead.read", "lead.write", "visit.read", "visit.write",
             "payment.read", "receipt.print", "report.view",
         ],
     },
@@ -74,13 +76,13 @@ SYSTEM_ROLES = {
     },
     "Marketing": {
         "description": "Manages the public website, blog, gallery and enquiries",
-        "permissions": ["cms.read", "cms.write", "lead.read", "lead.write", "project.read", "master.read", "customer.read"],
+        "permissions": ["cms.read", "cms.write", "lead.read", "lead.write", "visit.read", "project.read", "master.read", "customer.read"],
     },
     "Sales": {
         "description": "Customers, leads and bookings",
         "permissions": [
             "customer.portal_manage", "service.read", "service.write", "service.assign",
-            "customer.read", "customer.write", "lead.read", "lead.write",
+            "customer.read", "customer.write", "lead.read", "lead.write", "visit.read", "visit.write",
             "booking.read", "booking.create", "project.read", "master.read", "payment.read",
         ],
     },

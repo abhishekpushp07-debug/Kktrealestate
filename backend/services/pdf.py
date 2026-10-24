@@ -181,3 +181,20 @@ class BrandedDoc:
     def build(self) -> bytes:
         self.doc.build(self.story, onFirstPage=self._header_footer, onLaterPages=self._header_footer)
         return self.buf.getvalue()
+
+
+def brochure_pdf(project: dict, company: dict | None = None) -> bytes:
+    """Simple branded brochure used when a project has no uploaded brochure."""
+    web = project.get("website") or {}
+    d = BrandedDoc(f"{project['name']} — Brochure", company or {"name": "Shree Ganesh Builders"}, subtitle=(project.get("address") or {}).get("city") or "Patna")
+    d.h1(project["name"])
+    d.p(web.get("public_description") or project.get("description") or "A thoughtfully designed residential address by Shree Ganesh Builders.")
+    d.spacer(6)
+    d.h2("Highlights")
+    for h in (web.get("highlights") or ["RERA-registered", "Construction-linked payment plan", "Vastu-compliant layouts"])[:10]:
+        d.p(f"• {h}")
+    d.spacer(6)
+    d.kv([("Project type", project.get("project_type") or "Residential"), ("Status", project.get("status") or "Under Construction"), ("RERA", project.get("rera_number") or "—"), ("Location", ", ".join(filter(None, [(project.get("address") or {}).get("line1"), (project.get("address") or {}).get("city")])) or "Patna")])
+    d.spacer(8)
+    d.small("Prices and specifications are indicative and subject to change. E&OE.")
+    return d.build()

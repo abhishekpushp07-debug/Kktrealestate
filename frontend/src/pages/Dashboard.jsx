@@ -9,6 +9,8 @@ import { RoleWidgets } from "@/components/common/RoleWidgets";
 import { StatusChip, Pill } from "@/components/common/StatusChip";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, Legend } from "recharts";
+import { TodayVisitsWidget } from "@/pages/SiteVisits";
+import { BrochureLeadsWidget } from "@/components/common/BrochureStats";
 
 const STATUS_HEX = { Available: "#10B981", Hold: "#F59E0B", Booked: "#0B1F3A", Sold: "#C9A227", Blocked: "#94A3B8" };
 
@@ -68,6 +70,8 @@ export default function Dashboard() {
       </div>
       {data && <Charts data={data} />}
       <RoleWidgets />
+      <TodayVisitsWidget />
+      <BrochureLeadsWidget />
       {data?.collections && <Collections c={data.collections} />}
       {data?.follow_ups_due && data.follow_ups_due.count > 0 && <div className="card-elev mt-6 p-5" data-testid="followups-widget"><div className="mb-3 flex items-center justify-between"><h2 className="text-base font-bold text-navy md:text-lg">Follow-ups due today</h2><Link to="/leads" className="text-xs font-semibold text-gold-hover hover:underline">Open pipeline</Link></div><div className="grid gap-2 md:grid-cols-3">{data.follow_ups_due.items.map((l) => <Link key={l.id} to="/leads" className="rounded-lg border bg-white p-3 text-sm hover:border-navy"><p className="font-semibold text-navy">{l.name}</p><p className="text-xs text-slate-500">{l.phone} · {l.status}</p></Link>)}</div></div>}
       <div className="mt-6 grid gap-6 xl:grid-cols-3">

@@ -1,13 +1,16 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowUpRight, MapPin } from "lucide-react";
+import { ArrowUpRight, MapPin, Download } from "lucide-react";
 import { usePublic, Seo, Reveal, Img, SectionTitle } from "../SiteShell";
+import { BrochureModal } from "../LeadGate";
 
 export const fmtPrice = (n) => n == null ? null : n >= 1e7 ? `₹${(n / 1e7).toFixed(2).replace(/\.?0+$/, "")} Cr` : `₹${(n / 1e5).toFixed(0)} L`;
 export const Price = ({ n, className = "" }) => { if (n == null) return null; const cr = n >= 1e7; const v = cr ? (n / 1e7).toFixed(2).replace(/\.?0+$/, "") : (n / 1e5).toFixed(0); return <span className={`price ${className}`}>₹{v}<span className="unit-lbl">{cr ? "Cr" : "L"}</span></span>; };
 
 export function ProjectCard({ p, large }) {
+  const [brochure, setBrochure] = useState(false);
   return (
+    <div className="relative">
     <Link to={`/projects/${p.slug}`} className="card-lux group block" data-testid={`project-card-${p.slug}`}>
       <div className={`relative overflow-hidden ${large ? "aspect-[16/10]" : "aspect-[4/5]"}`}>
         <Img src={p.cover_image} alt={`${p.name} — ${p.locality || p.city}`} className="h-full w-full object-cover" width={large ? "1200" : "800"} height={large ? "750" : "1000"} sizes={large ? "(max-width: 1024px) 100vw, 640px" : "(max-width: 768px) 100vw, 420px"} />
@@ -21,6 +24,9 @@ export function ProjectCard({ p, large }) {
         <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-navy/15 text-navy transition-colors group-hover:border-gold group-hover:bg-gold"><ArrowUpRight className="h-5 w-5 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" /></span>
       </div>
     </Link>
+    {p.has_brochure !== false && <button type="button" onClick={() => setBrochure(true)} className="absolute right-5 top-5 flex h-9 items-center gap-1.5 rounded-full bg-navy/80 px-3 text-[11px] font-bold uppercase tracking-widest text-white backdrop-blur transition-colors hover:bg-gold hover:text-navy" aria-label={`Download ${p.name} brochure`} data-testid={`card-brochure-${p.slug}`}><Download className="h-3.5 w-3.5" />Brochure</button>}
+    <BrochureModal project={{ slug: p.slug, name: p.name, cover: p.cover_image }} open={brochure} onClose={() => setBrochure(false)} />
+    </div>
   );
 }
 

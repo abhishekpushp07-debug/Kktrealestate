@@ -73,6 +73,9 @@ class ProjectWebsiteIn(StrictModel):
     virtual_tour_urls: list[str] | None = None
     map_embed_url: str | None = None
     brochure_document_id: str | None = None
+    brochure_gate_enabled: bool | None = None
+    brochure_download_count: int | None = None
+    site_visits: dict | None = None
     faqs: list[dict[str, str]] | None = None
     seo_title: str | None = None
     seo_description: str | None = None
@@ -206,7 +209,8 @@ async def project_website(project_id: str, user: dict = Depends(require("project
 async def update_project_website(project_id: str, body: ProjectWebsiteIn, request: Request, user: dict = Depends(require("project.write"))):
     p = await get_or_404(db.projects, project_id, "Project", {"company_id": user["company_id"]})
     ensure_project_access(user, project_id)
-    web = {**(p.get("website") or {}), **{k: v for k, v in body.model_dump(exclude_unset=True).items() if k != "version"}}
+    web = {**(p.get("website") or {}), **{k: v for k, v in body.model_dump(exclude_unset=True).items() if k not in ("version", "brochure_download_count")}}
+    ttlcache.invalidate(f"avail:{project_id}")
     web["slug"] = slugify(web.get("slug") or p["name"])
     if await db.projects.find_one({"company_id": p["company_id"], "website.slug": web["slug"], "id": {"$ne": project_id}}):
         raise ApiError(409, f"Slug '{web['slug']}' already used", "DUPLICATE_SLUG")

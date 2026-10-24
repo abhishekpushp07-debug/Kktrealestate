@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { motion } from "framer-motion";
-import { Menu, Phone, X, MessageCircle, Facebook, Instagram, Youtube, Linkedin } from "lucide-react";
+import { Menu, Phone, X, MessageCircle, Facebook, Instagram, Youtube, Linkedin, CalendarDays, Download } from "lucide-react";
 import api from "@/lib/api";
 
 const SiteCtx = createContext({ site: null, loading: true });
@@ -10,8 +10,8 @@ export const useSite = () => useContext(SiteCtx);
 export const pub = (path) => fetch(`${process.env.REACT_APP_BACKEND_URL}/api/public${path}`).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
 
 export function usePublic(path, deps = []) {
-  const [state, set] = useState({ data: null, loading: true, error: null });
-  useEffect(() => { let c = false; set((s) => ({ ...s, loading: true })); pub(path).then((d) => !c && set({ data: d, loading: false, error: null })).catch((e) => !c && set({ data: null, loading: false, error: e })); return () => { c = true; }; }, deps); // eslint-disable-line
+  const [state, set] = useState({ data: null, loading: !!path, error: null });
+  useEffect(() => { if (!path) { set({ data: null, loading: false, error: null }); return; } let c = false; set((s) => ({ ...s, loading: true })); pub(path).then((d) => !c && set({ data: d, loading: false, error: null })).catch((e) => !c && set({ data: null, loading: false, error: e })); return () => { c = true; }; }, deps); // eslint-disable-line
   return state;
 }
 
@@ -53,6 +53,7 @@ const NAV = [["/projects", "Projects"], ["/about", "About"], ["/gallery", "Galle
 export function SiteNav({ site }) {
   const [solid, setSolid] = useState(false);
   const [open, setOpen] = useState(false);
+  const [sheet, setSheet] = useState(false);
   const nav = useNavigate();
   useEffect(() => { const f = () => setSolid(window.scrollY > 40); f(); window.addEventListener("scroll", f, { passive: true }); return () => window.removeEventListener("scroll", f); }, []);
   return (
@@ -69,8 +70,14 @@ export function SiteNav({ site }) {
       <div className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-3 gap-2 border-t border-gold/30 bg-navy/95 px-3 py-2.5 backdrop-blur lg:hidden" style={{ paddingBottom: "max(0.625rem, env(safe-area-inset-bottom))" }} data-testid="mobile-cta">
         <a href={`tel:${site?.phone}`} className="btn-ghost !px-2 !text-[12px]" aria-label="Call"><Phone className="h-4 w-4" />Call</a>
         <a href={`https://wa.me/${(site?.whatsapp || "").replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="btn-ghost !px-2 !text-[12px]" aria-label="WhatsApp"><MessageCircle className="h-4 w-4" />WhatsApp</a>
-        <Link to="/contact" className="btn-gold !px-2 !text-[12px]" data-testid="mobile-enquire">Enquire</Link>
+        <button type="button" onClick={() => setSheet(true)} className="btn-gold !px-2 !text-[12px]" data-testid="mobile-enquire">Enquire</button>
       </div>
+      {sheet && <div className="fixed inset-0 z-[60] flex items-end bg-navy-950/70 backdrop-blur-sm lg:hidden" onClick={() => setSheet(false)} data-testid="mobile-sheet"><div role="dialog" aria-label="Get in touch" onClick={(e) => e.stopPropagation()} className="fade-up w-full rounded-t-3xl bg-ivory p-5 pb-8" style={{ paddingBottom: "max(2rem, env(safe-area-inset-bottom))" }}><div className="mx-auto mb-4 h-1 w-10 rounded-full bg-navy/15" /><p className="eyebrow">Get in touch</p><div className="mt-3 grid gap-2">
+        <a href={`tel:${site?.phone}`} className="flex h-12 items-center gap-3 rounded-xl bg-white px-4 text-sm font-semibold text-navy" data-testid="sheet-call"><Phone className="h-4 w-4 text-gold" />Call {site?.phone}</a>
+        <a href={`https://wa.me/${(site?.whatsapp || "").replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="flex h-12 items-center gap-3 rounded-xl bg-white px-4 text-sm font-semibold text-navy" data-testid="sheet-whatsapp"><MessageCircle className="h-4 w-4 text-gold" />WhatsApp</a>
+        <Link to="/contact?tab=visit" onClick={() => setSheet(false)} className="flex h-12 items-center gap-3 rounded-xl bg-white px-4 text-sm font-semibold text-navy" data-testid="sheet-visit"><CalendarDays className="h-4 w-4 text-gold" />Book a site visit</Link>
+        <Link to="/projects" onClick={() => setSheet(false)} className="flex h-12 items-center gap-3 rounded-xl bg-white px-4 text-sm font-semibold text-navy" data-testid="sheet-brochure"><Download className="h-4 w-4 text-gold" />Download a brochure</Link>
+        <Link to="/contact" onClick={() => setSheet(false)} className="btn-navy mt-1 w-full" data-testid="sheet-enquire">Request a call back</Link></div></div></div>}
     </>
   );
 }

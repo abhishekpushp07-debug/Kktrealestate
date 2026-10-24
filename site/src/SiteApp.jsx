@@ -14,6 +14,7 @@ const Blog = lazy(() => import("./pages/Blog"));
 const BlogPost = lazy(() => import("./pages/BlogPost"));
 const Contact = lazy(() => import("./pages/Contact"));
 const LegalPage = lazy(() => import("./pages/LegalPage"));
+const VisitPage = lazy(() => import("./VisitBooking"));
 
 function ScrollTop() {
   const { pathname } = useLocation();
@@ -46,6 +47,7 @@ function SiteInner() {
             <Route path="/blog" element={<Blog />} />
             <Route path="/blog/:slug" element={<BlogPost />} />
             <Route path="/contact" element={<Contact />} />
+            <Route path="/visit/:token" element={<VisitPage />} />
             <Route path="/privacy" element={<LegalPage slug="privacy" />} />
             <Route path="/disclaimer" element={<LegalPage slug="disclaimer" />} />
             <Route path="*" element={<div className="container-site py-32 text-center"><h1 className="display text-5xl">Page not found</h1><a href="/" className="btn-gold mt-8 inline-block">Back home</a></div>} />

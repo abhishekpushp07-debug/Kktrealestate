@@ -59,3 +59,8 @@ Master data now has **Construction Stages** and **Payment Plans** (milestone tem
 ## Preview modes (frontend/scripts/dev.js)
 - `PREVIEW_MODE=production` in `frontend/.env` (default now): `yarn start` builds (if needed) and serves the **production** builds — ERP at `/erp` (SPA fallback) and the marketing site at `/` — from one express server on :3000 with brotli/gzip, immutable hashed assets and `no-cache` index.html. Rebuild after code changes with `yarn preview:build` (then `sudo supervisorctl restart frontend`).
 - `yarn dev` (or any other `PREVIEW_MODE`): CRA dev servers with HMR (ERP :3000, site :3002 proxied).
+
+## Phase 9 — Brochure lead gate & site visits
+- Public: `POST /api/public/brochure-requests` → signed 15-min `download_url`; `GET /api/public/site-visits/availability?project_slug=`; `POST /api/public/site-visits`; `GET /api/public/site-visits/{token}(.ics)`; `POST /api/public/site-visits/{token}/cancel`.
+- ERP: `/erp/site-visits` (calendar + list), lead timeline activities, dashboard widgets; per-project settings under Project → Website → "Site visits" / "Brochure lead gate".
+- Permissions: `visit.read`, `visit.write`. Numbering: `SV-{FY}-{SEQ}`.

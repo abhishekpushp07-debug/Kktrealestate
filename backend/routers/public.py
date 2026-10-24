@@ -96,7 +96,7 @@ async def _project_card(p: dict, flat_types: dict) -> dict:
     fts = sorted({flat_types[i]["bhk"] for i in ft_ids if i in flat_types and flat_types[i].get("bhk")})
     card = {"slug": web.get("slug"), "name": p["name"], "code": p["code"], "project_type": p.get("project_type"), "status": p.get("status"), "city": (p.get("address") or {}).get("city"), "locality": (p.get("address") or {}).get("line1"),
             "cover_image": (web.get("hero_images") or [None])[0], "configurations": " & ".join(f"{b}" for b in fts) + (" BHK" if fts else ""), "bhk_options": fts, "rera_number": p.get("rera_number"), "possession": p.get("expected_possession_date"),
-            "show_prices": bool(web.get("show_prices")), "total_units": (p.get("unit_counts") or {}).get("total", 0), "towers": p.get("block_count", 0), "highlights": (web.get("highlights") or [])[:3]}
+            "show_prices": bool(web.get("show_prices")), "has_brochure": bool(web.get("brochure_document_id")) and web.get("brochure_gate_enabled") is not False, "total_units": (p.get("unit_counts") or {}).get("total", 0), "towers": p.get("block_count", 0), "highlights": (web.get("highlights") or [])[:3]}
     if web.get("show_prices"):
         if web.get("starting_price_override"):
             card["starting_price"] = web["starting_price_override"]
@@ -284,6 +284,9 @@ async def media(media_id: str, request: Request, size: str | None = None, _=Depe
 
 @router.get("/brochure/{doc_id}")
 async def brochure(doc_id: str, _=Depends(public_guard)):
+    if "." in doc_id:  # signed lead-gate token (Phase 9)
+        from routers.visits import brochure_download
+        return await brochure_download(doc_id)
     d = await db.documents.find_one({"id": doc_id, "is_active": True, "is_sensitive": {"$ne": True}}, {"_id": 0})
     p = await db.projects.find_one({"website.brochure_document_id": doc_id, "website.is_published": True}, {"_id": 0, "id": 1}) if d else None
     if not d or not p:

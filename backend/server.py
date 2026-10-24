@@ -19,6 +19,7 @@ from infra import (
     metrics_snapshot,
 )
 from routers import (
+    visits,
     admin,
     audit,
     auth,
@@ -97,6 +98,9 @@ async def lifespan(app: FastAPI):
     logging.getLogger("kkt.integrity").info("[phase7] integrity: ok=%s bookings=%s counts=%s", _ir["ok"], _ir["bookings_checked"], _ir["counts"])
     asyncio.create_task(_overdue_loop())
     asyncio.create_task(_dues_loop())
+    from routers.visits import seed_phase9, nudge_loop
+    await seed_phase9()
+    asyncio.create_task(nudge_loop())
     from services.thumbs import prewarm_variants
     async def _prewarm():
         r = await prewarm_variants(db)
@@ -207,7 +211,7 @@ async def metrics(user: dict = Depends(require("settings.manage"))):
 
 for r in (auth.router, users.router, roles.router, master.router, projects.router, rate_cards.router, blocks.router, flats.router, parking.router,
           settings.router, audit.router, dashboard.router, search.router, imports.router,
-          customers.router, leads.router, documents.router, bookings.router, milestones.router, payments.router, roznamcha.router, admin.router, cms.router, public.router, reports.router, notifications.router, pdfs.router, dashboard_widgets.router, portal.router, portal.mgmt, support.router, construction.router):
+          customers.router, leads.router, documents.router, bookings.router, milestones.router, payments.router, roznamcha.router, admin.router, cms.router, public.router, reports.router, notifications.router, pdfs.router, dashboard_widgets.router, portal.router, portal.mgmt, support.router, construction.router, visits.pub, visits.router):
     api_router.include_router(r)
 
 app.include_router(api_router)

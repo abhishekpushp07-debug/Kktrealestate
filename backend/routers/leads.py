@@ -36,7 +36,7 @@ class LeadIn(StrictModel):
     flat_type_id: str | None = None
     budget_min: float | None = Field(default=None, ge=0)
     budget_max: float | None = Field(default=None, ge=0)
-    source: Literal["Walk-in", "Website", "Referral", "Broker", "Campaign"] = "Walk-in"
+    source: Literal["Walk-in", "Website", "Referral", "Broker", "Campaign", "Brochure", "Site Visit"] = "Walk-in"
     assigned_to: str | None = None
     notes: str | None = None
 
@@ -49,7 +49,7 @@ class LeadIn(StrictModel):
 class LeadUpdate(LeadIn):
     name: str | None = Field(default=None, min_length=2, max_length=120)
     phone: str | None = None
-    source: Literal["Walk-in", "Website", "Referral", "Broker", "Campaign"] | None = None
+    source: Literal["Walk-in", "Website", "Referral", "Broker", "Campaign", "Brochure", "Site Visit"] | None = None
     version: int | None = None
 
 
