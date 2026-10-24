@@ -8,6 +8,7 @@ import { PageHeader, KV, EmptyState, StatCard } from "@/components/common/Bits";
 import { Pill } from "@/components/common/StatusChip";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PaymentPlanMatrix, StageSequenceEditor, ProjectStageList } from "@/components/common/PaymentPlanMatrix";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProjectForm } from "@/components/forms/ProjectForm";
 import { BlockForm } from "@/components/forms/BlockForm";
@@ -57,7 +58,7 @@ export default function ProjectDetail() {
       </div>
       <Tabs defaultValue="overview">
         <TabsList className="flex-wrap bg-white" data-testid="project-tabs">
-          {["overview", "blocks", "inventory", "pricing", "parking", "amenities", "documents", "website", "history", "settings"].map((t) => <TabsTrigger key={t} value={t} className="capitalize data-[state=active]:bg-navy data-[state=active]:text-white" data-testid={`project-tab-${t}`}>{t}</TabsTrigger>)}
+          {["overview", "blocks", "construction", "payment-plans", "inventory", "pricing", "parking", "amenities", "documents", "website", "history", "settings"].map((t) => <TabsTrigger key={t} value={t} className="capitalize data-[state=active]:bg-navy data-[state=active]:text-white" data-testid={`project-tab-${t}`}>{t.replace("-", " ")}</TabsTrigger>)}
         </TabsList>
         <TabsContent value="pricing" className="mt-4"><RateCardsTab projectId={p.id} onApplied={reload} /></TabsContent>
         <TabsContent value="parking" className="mt-4"><ParkingTab projectId={p.id} /></TabsContent>
@@ -69,7 +70,7 @@ export default function ProjectDetail() {
             <p className="mb-5 text-sm text-slate-600">{p.description || "No description."}</p>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
               <KV label="Code" value={p.code} /><KV label="Type" value={p.project_type} /><KV label="RERA" value={p.rera_number} />
-              <KV label="Launch" value={fmtDate(p.launch_date)} /><KV label="Possession" value={fmtDate(p.expected_possession_date)} /><KV label="Milestone template" value={p.milestone_template?.name} />
+              <KV label="Launch" value={fmtDate(p.launch_date)} /><KV label="Possession" value={fmtDate(p.expected_possession_date)} /><KV label="Construction stages" value={`${(p.construction_stage_sequence || []).length} in sequence`} />
               <KV label="Address" value={[p.address?.line1, p.address?.city, p.address?.state, p.address?.pincode].filter(Boolean).join(", ")} />
               <KV label="Land area" value={p.land_area_sqft ? `${new Intl.NumberFormat("en-IN").format(p.land_area_sqft)} sq.ft` : "—"} /><KV label="Towers / Units" value={`${p.total_towers} / ${p.total_units}`} mono /><KV label="Parking" value={`${p.parking?.total || 0} slots`} mono />
             </div>
@@ -78,8 +79,8 @@ export default function ProjectDetail() {
             {p.team_members?.length > 0 && <div className="mt-4"><p className="label-xs mb-2">Team</p><div className="flex flex-wrap gap-1.5">{p.team_members.map((u) => <Pill key={u.id} tone="gold">{u.name}</Pill>)}</div></div>}
           </div>
           <div className="card-elev p-5">
-            <h3 className="mb-4 text-base font-bold text-navy">Milestone schedule</h3>
-            {p.milestone_template ? <ol className="space-y-2 text-sm">{p.milestone_template.milestones.map((m) => <li key={m.seq} className="flex items-center justify-between border-b border-slate-100 pb-1.5"><span>{m.seq}. {m.name}</span><span className="font-bold tabular text-navy">{m.cumulative_percent}%</span></li>)}</ol> : <p className="text-sm text-slate-500">No template selected.</p>}
+            <h3 className="mb-4 text-base font-bold text-navy">Construction stage sequence</h3>
+            <ProjectStageList sequence={p.construction_stage_sequence} />
           </div>
         </TabsContent>
         <TabsContent value="blocks" className="mt-4">
@@ -104,6 +105,8 @@ export default function ProjectDetail() {
           )}
         </TabsContent>
         <TabsContent value="website" className="mt-4"><ProjectWebsiteTab projectId={p.id} slugDefault={p.code} /></TabsContent>
+        <TabsContent value="construction" className="mt-4"><StageSequenceEditor entityType="projects" entityId={p.id} sequence={p.construction_stage_sequence} onSaved={reload} /></TabsContent>
+        <TabsContent value="payment-plans" className="mt-4"><PaymentPlanMatrix projectId={p.id} blocks={p.blocks.map((b) => ({ id: b.id, name: b.name }))} /></TabsContent>
         <TabsContent value="settings" className="mt-4">
           <div className="card-elev p-5">
             <h3 className="mb-2 text-base font-bold text-navy">Website flags</h3>

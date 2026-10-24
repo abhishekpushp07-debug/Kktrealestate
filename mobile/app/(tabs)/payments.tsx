@@ -14,7 +14,8 @@ import { Empty, ErrorState, NoBooking } from "@/src/ui/states";
 import { BookingSwitcher } from "@/src/ui/booking-switcher";
 import { usePdf } from "@/src/screens/shared";
 import { Receipts, type Payment } from "@/src/screens/payments/receipts";
-import { Demands, Schedule, type Demand, type ScheduleItem } from "@/src/screens/payments/demands";
+import { Demands, type Demand } from "@/src/screens/payments/demands";
+import { Schedule, type ScheduleData } from "@/src/screens/payments/schedule";
 import { Ledger, type LedgerRow } from "@/src/screens/payments/ledger";
 
 const TABS = [
@@ -30,7 +31,7 @@ function Body({ tab, id, bn }: { tab: Tab; id: string; bn: string }) {
   const pdf = usePdf();
   const pay = useBookingSub<{ items: Payment[]; pending_cheques: Payment[] }>(id, "payments", tab === "receipts" || tab === "cheques");
   const dem = useBookingSub<{ items: Demand[] }>(id, "demands", tab === "demands");
-  const sch = useBookingSub<{ items: ScheduleItem[] }>(id, "schedule", tab === "schedule");
+  const sch = useBookingSub<ScheduleData>(id, "schedule", tab === "schedule");
   const led = useBookingSub<{ items: LedgerRow[] }>(id, "ledger", tab === "ledger");
   const q = tab === "receipts" || tab === "cheques" ? pay : tab === "demands" ? dem : tab === "schedule" ? sch : led;
   if (q.isLoading) return <SkeletonList rows={4} />;
@@ -45,7 +46,7 @@ function Body({ tab, id, bn }: { tab: Tab; id: string; bn: string }) {
     ) : (
       <Empty icon="file-text" title="No demands raised yet" hint="Demands are raised when construction milestones are certified." testID="demands-empty" />
     );
-  if (tab === "schedule") return sch.data?.items?.length ? <Schedule items={sch.data.items} /> : <Empty icon="calendar" title="No payment schedule yet" testID="schedule-empty" />;
+  if (tab === "schedule") return sch.data?.items?.length ? <Schedule data={sch.data} /> : <Empty icon="calendar" title="No payment schedule yet" testID="schedule-empty" />;
   return led.data?.items?.length ? (
     <Ledger items={led.data.items} />
   ) : (

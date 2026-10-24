@@ -4,7 +4,7 @@ import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 
 import { useAuth } from "@/src/auth";
-import { useActiveBooking, useConfig, useNotices } from "@/src/hooks";
+import { useActiveBooking, useConfig, useNotices, useNotificationCount } from "@/src/hooks";
 import { openFile } from "@/src/api/pdf";
 import { errMsg } from "@/src/api/client";
 import { firstName, greeting } from "@/src/format";
@@ -20,6 +20,7 @@ import { toast } from "@/src/ui/toast";
 import { HeroCard } from "@/src/screens/home/hero-card";
 import { NextDue, PaymentSummary } from "@/src/screens/home/payment-cards";
 import { QuickAction, RMCard } from "@/src/screens/home/widgets";
+import { PaymentPlanCard } from "@/src/screens/plan";
 
 export default function Home() {
   const s = useStyles();
@@ -30,6 +31,7 @@ export default function Home() {
   const { width } = useWindowDimensions();
   const { items, active, select, isLoading, isError, error, refetch } = useActiveBooking();
   const notices = useNotices();
+  const notifCount = useNotificationCount();
   const [pdfBusy, setPdfBusy] = useState(false);
   const unread = notices.data?.unread ?? me?.unread_notices ?? 0;
   const firstUnread = (notices.data?.items || []).find((n) => !n.read);
@@ -48,7 +50,7 @@ export default function Home() {
   };
 
   return (
-    <Screen tabbed testID="home-screen" refreshKeys={[["p-bookings"], ["p-notices"], ["p-requests"], ["p-booking"]]}>
+    <Screen tabbed testID="home-screen" refreshKeys={[["p-bookings"], ["p-notices"], ["p-requests"], ["p-booking"], ["p-notif-count"]]}>
       <View style={s.header}>
         <View style={{ flex: 1 }}>
           <T tone="muted">{greeting()},</T>
@@ -56,7 +58,7 @@ export default function Home() {
             {firstName(me?.customer?.full_name) || "Welcome"}
           </T>
         </View>
-        <IconButton icon="bell" label="Notices" badge={unread} onPress={() => router.push("/notices")} testID="home-notices-bell" />
+        <IconButton icon="bell" label="Notifications" badge={notifCount.data || 0} onPress={() => router.push("/notifications")} testID="home-notifications-bell" />
       </View>
 
       {isLoading ? (
@@ -96,6 +98,8 @@ export default function Home() {
             <PaymentSummary b={active} wide={wide} />
             <NextDue b={active} onStatement={statement} busy={pdfBusy} wide={wide} />
           </View>
+
+          <PaymentPlanCard plan={active.payment_plan} next={active.next_installment} showLink testID="home-plan-card" />
 
           <View style={s.qaRow}>
             <QuickAction icon="download" label="Download statement" onPress={statement} busy={pdfBusy} testID="home-quick-statement" />

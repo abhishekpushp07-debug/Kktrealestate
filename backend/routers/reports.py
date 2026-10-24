@@ -21,7 +21,7 @@ from utils import (
 router = APIRouter(prefix="/reports", tags=["reports"])
 REPORTS = [
     {"key": "collections", "name": "Collections", "group": "Finance"}, {"key": "outstanding", "name": "Outstanding & Ageing", "group": "Finance"},
-    {"key": "advances", "name": "Advances", "group": "Finance"}, {"key": "demand-vs-collection", "name": "Demand vs Collection", "group": "Finance"},
+    {"key": "advances", "name": "Advances", "group": "Finance"}, {"key": "demand-vs-collection", "name": "Demand vs Collection (by installment/stage)", "group": "Finance"}, {"key": "upcoming-dues", "name": "Upcoming Dues Forecast", "group": "Finance"},
     {"key": "cheques", "name": "Cheques", "group": "Finance"}, {"key": "cancellations", "name": "Cancellations & Refunds", "group": "Finance"},
     {"key": "roznamcha-range", "name": "Roznamcha Range", "group": "Finance"}, {"key": "bank-receipts", "name": "Bank-wise Receipts", "group": "Finance"},
     {"key": "inventory", "name": "Inventory", "group": "Sales"}, {"key": "sales-leads", "name": "Sales & Leads", "group": "Sales"},
@@ -174,6 +174,7 @@ async def advances(request: Request, project_id: str | None = None, format: str 
 
 # ---------- 4. Demand vs collection ----------
 @router.get("/demand-vs-collection")
+@router.get("/demand-vs-collection-installment")
 async def demand_vs_collection(request: Request, project_id: str | None = None, block_id: str | None = None, format: str | None = None, user: dict = Depends(require("report.view"))):
     _strict_params(request, {'block_id', 'project_id'})
     q = {**_scope(user, project_id, block_id), "voided": False}

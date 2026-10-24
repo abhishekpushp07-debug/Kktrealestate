@@ -14,7 +14,7 @@ import { CustomerForm } from "./Customers";
 import { inr, num } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-const STEPS = ["Project & Block", "Unit", "Customer", "Agreement", "Charges & Parking", "Review"];
+const STEPS = ["Project & Block", "Unit", "Customer", "Agreement", "Payment Plan", "Charges & Parking", "Review"];
 
 export default function BookingWizard() {
   const nav = useNavigate();
@@ -33,6 +33,11 @@ export default function BookingWizard() {
   const [slots, setSlots] = useState([]);
   const [bookingDate, setBookingDate] = useState(new Date().toISOString().slice(0, 10));
   const [remarks, setRemarks] = useState("");
+  const [plans, setPlans] = useState(null);
+  const [planId, setPlanId] = useState("");
+  const [acceptMode, setAcceptMode] = useState("In person");
+  useEffect(() => { if (projectId && blockId) api.get(`/projects/${projectId}/blocks/${blockId}/payment-plans`).then((r) => { setPlans(r.data.items); setPlanId((p) => p || r.data.items[0]?.id || ""); }).catch(() => setPlans([])); }, [projectId, blockId]);
+  const plan = plans?.find((p) => p.id === planId);
   const [busy, setBusy] = useState(false);
   const { data: projects } = useFetch("/projects?page_size=50");
   const { data: blocks } = useFetch(projectId ? `/blocks?project_id=${projectId}&page_size=50` : null, [projectId]);
@@ -53,12 +58,12 @@ export default function BookingWizard() {
   const selCharges = charges.filter((c) => c.on);
   const chargeTotal = selCharges.reduce((s, c) => s + Number(c.amount) * (1 + (c.gst_percent || 0) / 100), 0);
   const freeSlots = useMemo(() => (parking?.items || []).filter((s) => s.status === "Available"), [parking]);
-  const canNext = [!!blockId, !!flat, !!customer, sumOk, true, true][step];
+  const canNext = [!!blockId, !!flat, !!customer, sumOk, !plans?.length || !!planId, true, true][step];
 
   const submit = async () => {
     setBusy(true);
     try {
-      const body = { flat_id: flat.id, customer_id: customer.id, booking_date: bookingDate, agreement_value: total, cash_agreed: cash, account_agreed: account, remarks: remarks || null, parking_slot_ids: slots,
+      const body = { flat_id: flat.id, customer_id: customer.id, booking_date: bookingDate, agreement_value: total, cash_agreed: cash, account_agreed: account, remarks: remarks || null, parking_slot_ids: slots, payment_plan_id: planId || null, plan_acceptance_mode: acceptMode,
         other_charges: selCharges.map((c) => ({ charge_type_id: c.charge_type_id, amount: Number(c.amount), gst_percent: c.gst_percent || 0, demand_at: c.demand_at })) };
       const r = await api.post("/bookings", body);
       toast.success(`Booking ${r.data.booking_number} created`); nav(`/bookings/${r.data.id}`);
@@ -90,20 +95,26 @@ export default function BookingWizard() {
           <div className={cn("md:col-span-3 rounded-md px-3 py-2 text-sm", sumOk ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700")} data-testid="wiz-sum-check">{sumOk ? `✓ Cash ${inr(cash)} + Account ${inr(account)} = ${inr(total)}` : `Cash + Account must equal the agreement value exactly (currently ${inr(cash + account)} vs ${inr(total)})`}</div>
           <Field label="Booking date" required><Input type="date" value={bookingDate} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setBookingDate(e.target.value)} data-testid="wiz-date" /></Field>
         </div>}
-        {step === 4 && <div className="grid gap-6 lg:grid-cols-2">
+        {step === 4 && <div data-testid="wiz-plan-step">
+          {plans === null ? <p className="text-sm text-slate-500">Loading plans…</p> : plans.length === 0 ? <div className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-700" data-testid="wiz-plan-none">No payment plan assigned to this tower — assign one under Project → Payment Plans. Booking will proceed without a plan (no automatic dues).</div> : <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
+            <div className="space-y-2" data-testid="wiz-plan-list">{plans.map((p) => <button type="button" key={p.id} onClick={() => setPlanId(p.id)} className={cn("w-full rounded-lg border p-3 text-left transition-colors", planId === p.id ? "border-navy bg-navy-50" : "bg-white hover:bg-surface")} data-testid={`wiz-plan-${p.code}`}><p className="font-semibold text-navy">{p.name}{p.is_default && <span className="ml-2 rounded-full bg-gold-light px-2 py-0.5 text-[10px] font-bold text-[#8a6d12]">Default</span>}</p><p className="text-xs text-slate-500">{p.plan_type} · {p.installments.map((i) => `${i.percent}%`).join(" + ")}</p>{p.description && <p className="mt-1 text-xs text-slate-500">{p.description}</p>}</button>)}</div>
+            <div className="card-elev p-4">{plan && <><p className="mb-2 text-sm font-bold text-navy">Schedule preview — {plan.name}</p><SchedulePreview plan={plan} cash={cash} account={account} bookingDate={bookingDate} /><Field label="Plan accepted by customer via" className="mt-4"><select className="h-10 rounded-md border px-3 text-sm" value={acceptMode} onChange={(e) => setAcceptMode(e.target.value)} data-testid="wiz-plan-accept">{["In person", "Signed copy", "Portal"].map((m) => <option key={m}>{m}</option>)}</select></Field><p className="mt-2 text-xs text-slate-500">Upload the signed plan later under Booking → Documents (type “Payment Plan Acceptance”).</p></>}</div>
+          </div>}
+        </div>}
+        {step === 5 && <div className="grid gap-6 lg:grid-cols-2">
           <div><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Other charges</p>
             {charges.map((c, i) => <div key={c.charge_type_id} className="mb-2 grid grid-cols-[auto_1fr_110px_70px_130px] items-center gap-2 text-sm"><input type="checkbox" checked={c.on} onChange={(e) => setCharges(charges.map((x, j) => j === i ? { ...x, on: e.target.checked } : x))} data-testid={`wiz-charge-${c.charge_type_id}`} /><span>{c.name}</span><Input type="number" value={c.amount} onChange={(e) => setCharges(charges.map((x, j) => j === i ? { ...x, amount: e.target.value } : x))} className="h-8" /><Input type="number" value={c.gst_percent} disabled={!c.is_taxable} onChange={(e) => setCharges(charges.map((x, j) => j === i ? { ...x, gst_percent: Number(e.target.value) } : x))} className="h-8" title="GST %" /><select value={c.demand_at} onChange={(e) => setCharges(charges.map((x, j) => j === i ? { ...x, demand_at: e.target.value } : x))} className="h-8 rounded-md border bg-white px-1 text-xs"><option value="on_booking">On booking</option><option value="on_possession">On possession</option><option value="manual">Manual</option></select></div>)}
             <p className="mt-2 text-sm">Selected charges incl. GST: <b className="text-navy">{inr(chargeTotal)}</b></p></div>
           <div><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Parking ({freeSlots.length} available)</p>
             <div className="flex max-h-64 flex-wrap gap-1.5 overflow-y-auto">{freeSlots.map((s) => <button key={s.id} onClick={() => setSlots(slots.includes(s.id) ? slots.filter((x) => x !== s.id) : [...slots, s.id])} className={cn("rounded border px-2 py-1 text-xs", slots.includes(s.id) ? "border-navy bg-navy text-white" : "bg-white hover:border-navy")} title={`${s.type} · ${s.level || ""}`} data-testid={`wiz-slot-${s.number}`}>{s.number}</button>)}</div></div>
         </div>}
-        {step === 5 && <div className="grid gap-4 md:grid-cols-2">
+        {step === 6 && <div className="grid gap-4 md:grid-cols-2">
           <div><KV label="Unit" value={`${flat?.flat_number} · ${flat?.flat_type_code} · ${num(flat?.super_builtup_sqft)} sq.ft`} /><KV label="Customer" value={`${customer?.full_name} (${customer?.customer_code})`} /><KV label="Booking date" value={bookingDate} /><KV label="Agreement" value={inr(total)} /><KV label="Cash / Account" value={`${inr(cash)} / ${inr(account)}`} /></div>
           <div><KV label="Other charges" value={selCharges.length ? selCharges.map((c) => c.name).join(", ") : "None"} /><KV label="Charges total" value={inr(chargeTotal)} /><KV label="Parking" value={slots.length ? `${slots.length} slot(s)` : "None"} /><KV label="Construction" value={`${grid?.block.construction_percent ?? 0}% — demands raised on confirm`} /><Field label="Remarks"><Input value={remarks} onChange={(e) => setRemarks(e.target.value)} data-testid="wiz-remarks" /></Field></div>
         </div>}
         <div className="mt-6 flex justify-between border-t pt-4">
           <Button variant="outline" disabled={step === 0} onClick={() => setStep(step - 1)} data-testid="wiz-back"><ChevronLeft className="mr-1 h-4 w-4" />Back</Button>
-          {step < 5 ? <Button disabled={!canNext} onClick={() => setStep(step + 1)} className="bg-navy hover:bg-navy-700" data-testid="wiz-next">Next<ChevronRight className="ml-1 h-4 w-4" /></Button>
+          {step < 6 ? <Button disabled={!canNext} onClick={() => setStep(step + 1)} className="bg-navy hover:bg-navy-700" data-testid="wiz-next">Next<ChevronRight className="ml-1 h-4 w-4" /></Button>
             : <Button disabled={busy} onClick={submit} className="bg-gold text-navy hover:bg-gold-hover" data-testid="wiz-confirm">{busy ? "Booking…" : "Confirm booking"}</Button>}
         </div>
       </div>

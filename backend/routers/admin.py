@@ -23,7 +23,7 @@ class ReseedIn(StrictModel):
     confirm: str
 
 
-BUSINESS_COLLECTIONS = ["portal_accounts", "portal_refresh_tokens", "service_requests", "service_categories", "notices", "construction_photos", "notifications", "projects", "blocks", "flats", "rate_cards", "parking_slots", "customers", "leads", "bookings", "payments", "demands", "ledger_entries", "contra_entries", "documents",
+BUSINESS_COLLECTIONS = ["construction_stages", "payment_plans", "payment_plan_assignments", "portal_accounts", "portal_refresh_tokens", "service_requests", "service_categories", "notices", "construction_photos", "notifications", "projects", "blocks", "flats", "rate_cards", "parking_slots", "customers", "leads", "bookings", "payments", "demands", "ledger_entries", "contra_entries", "documents",
                         "cms_banners", "cms_testimonials", "cms_gallery", "cms_posts", "cms_pages", "cms_people", "cms_faqs", "cms_media", "site_settings", "counters", "idempotency_keys", "import_batches"]
 
 
@@ -55,6 +55,10 @@ async def reseed(body: ReseedIn, request: Request, user: dict = Depends(require(
     await seed_marketing_user()
     from seed_phase5 import seed_phase5
     await seed_phase5()
+    await db.settings.delete_many({"key": {"$in": ["migration_phase7_done", "seed_phase7_done"]}})
+    from migrate_phase7 import migrate_phase7, seed_phase7
+    await migrate_phase7()
+    await seed_phase7()
     await db.settings.update_one({"key": "roles_version"}, {"$inc": {"value": 1}}, upsert=True)
     await recompute_all()
     await write_audit(user, "admin.reseed", "system", "seed", after={"collections": BUSINESS_COLLECTIONS}, ip=client_ip(request))

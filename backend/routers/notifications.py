@@ -18,6 +18,7 @@ RULES = {
     "service.create": (["Sales", "Super Admin"], lambda a: ("New service request", f"{a.get('ticket_number', '')} · {a.get('subject', '')} · {a.get('customer_name', '')}")),
     "service.customer_reply": (["Sales", "Super Admin"], lambda a: ("Customer replied on ticket", f"{a.get('ticket_number', '')} · {a.get('customer_name', '')}")),
     "service.sla_breach": (["Sales", "Super Admin", "Project Admin"], lambda a: ("SLA breached", f"{a.get('ticket_number', '')} · {a.get('subject', '')}")),
+    "demand.create": (["Accounts", "Super Admin"], lambda a: ("Installment demand raised", f"{a.get('demand_number', '')} · {a.get('customer_name', '')} · {a.get('milestone', '')} · due {a.get('due_date', '')}")),
     "demand.overdue": (["Accounts", "Super Admin"], lambda a: ("Demand overdue", f"{a.get('demand_number', '')} · {a.get('customer_name', '')} · due {a.get('due_date', '')}")),
 }
 
@@ -56,19 +57,21 @@ async def overdue_demand_job():
     from routers.support import sla_breach_job
     await sla_breach_job()
     async for d in db.demands.find({"voided": False, "status": {"$in": ["Open", "Partially Paid"]}, "due_date": {"$lt": today}, "overdue_notified": {"$ne": True}}, {"_id": 0}):
-        b = await db.bookings.find_one({"id": d["booking_id"]}, {"_id": 0, "customer_name": 1, "company_id": 1})
+        b = await db.bookings.find_one({"id": d["booking_id"]}, {"_id": 0, "id": 1, "customer_name": 1, "company_id": 1, "customer_id": 1, "co_applicant_customer_ids": 1})
         if b:
+            from services.portal_notify import notify_booking_parties
+            await notify_booking_parties(b, "demand.overdue", f"Payment overdue: {d.get('installment_name') or d.get('milestone_name')}", f"{d['demand_number']} · ₹{(d['total_demand_paise'] - d.get('paid_paise', 0)) / 100:,.0f} outstanding · was due {d['due_date']}", "demand", d["id"])
             await notify_roles(b["company_id"], RULES["demand.overdue"][0], "Demand overdue", f"{d['demand_number']} · {b['customer_name']} · due {d['due_date']}", "demand.overdue", "booking", d["booking_id"], f"/bookings/{d['booking_id']}")
         await db.demands.update_one({"id": d["id"]}, {"$set": {"overdue_notified": True}})
 
 
 @router.get("")
 async def list_notifications(unread_only: bool = False, limit: int = 30, user: dict = Depends(require("project.read"))):
-    q = {"user_id": user["id"]}
+    q = {"user_id": user["id"], "withdrawn": {"$ne": True}}
     if unread_only:
         q["read"] = False
     items = await db.notifications.find(q, {"_id": 0}).sort("created_at", -1).limit(min(limit, 100)).to_list(None)
-    return {"items": items, "unread": await db.notifications.count_documents({"user_id": user["id"], "read": False})}
+    return {"items": items, "unread": await db.notifications.count_documents({"user_id": user["id"], "read": False, "withdrawn": {"$ne": True}})}
 
 
 @router.post("/{notification_id}/read")

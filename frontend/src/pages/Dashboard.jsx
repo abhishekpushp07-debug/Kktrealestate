@@ -44,6 +44,8 @@ function Collections({ c }) {
       <StatCard label="Collected today" value={inr(c.today.total)} hint={`Cash ${inr(c.today.Cash)} · Account ${inr(c.today.Account)}`} accent="green" testId="collections-today" />
       <StatCard label="Collected this month" value={inr(c.month.total)} hint={`${c.month.count} receipts · Cash ${inr(c.month.Cash)} · Account ${inr(c.month.Account)}`} accent="gold" testId="collections-month" />
       <StatCard label="Cheques in hand" value={inr(c.pending_cheques.amount)} hint={`${c.pending_cheques.count} pending realisation`} accent="amber" />
+      {c.dues_raised_month && <StatCard label="Dues raised this month" value={inr(c.dues_raised_month.total)} hint={`${c.dues_raised_month.count} installment(s) · paid ${inr(c.dues_raised_month.paid)}`} accent="amber" testId="dues-raised-month" />}
+      {c.upcoming_installments && <StatCard label="Upcoming installments (30d)" value={inr(c.upcoming_installments.reduce((a, x) => a + (x.total || 0), 0))} hint={`${c.upcoming_installments.length} installment(s) expected · next: ${c.upcoming_installments[0] ? `${c.upcoming_installments[0].booking_number} ${c.upcoming_installments[0].installment}` : "—"}`} accent="green" testId="upcoming-installments" />}
       <StatCard label="Outstanding dues" value={inr(c.outstanding_due)} hint={`${c.overdue_demands} overdue demand(s) · ${c.active_bookings} active bookings`} accent="navy" testId="collections-due" />
     </div>
   );

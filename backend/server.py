@@ -25,6 +25,7 @@ from routers import (
     blocks,
     bookings,
     cms,
+    construction,
     customers,
     dashboard,
     dashboard_widgets,
@@ -55,6 +56,7 @@ from seed import seed_if_empty, seed_phase15
 from seed_phase2 import seed_phase2
 from seed_phase3 import seed_marketing_user, seed_phase3
 from seed_phase5 import seed_phase5
+from migrate_phase7 import migrate_phase7, seed_phase7
 from services.counters import recompute_all
 from storage import init_storage_async
 from uow import STATE as UOW_STATE
@@ -63,7 +65,7 @@ from uow import detect_transaction_support
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logging.getLogger("uvicorn.access").disabled = True
 logger = logging.getLogger("kkt")
-VERSION = "5.0.0"
+VERSION = "7.0.0"
 
 STATUS_CODES = {400: "BAD_REQUEST", 401: "UNAUTHENTICATED", 403: "FORBIDDEN", 404: "NOT_FOUND", 409: "CONFLICT", 413: "PAYLOAD_TOO_LARGE", 422: "VALIDATION_ERROR", 423: "LOCKED", 429: "RATE_LIMITED"}
 
@@ -85,7 +87,16 @@ async def lifespan(app: FastAPI):
     await db.settings.update_one({'key': 'roles_version'}, {'$inc': {'value': 1}}, upsert=True)
     await seed_marketing_user()
     await seed_phase5()
+    await migrate_phase7()
+    await seed_phase7()
+    from services.integrity import backfill_demand_installments, integrity_report
+    await backfill_demand_installments()
+    from services.portal_notify import sweep_notifications
+    await sweep_notifications()
+    _ir = await integrity_report()
+    logging.getLogger("kkt.integrity").info("[phase7] integrity: ok=%s bookings=%s counts=%s", _ir["ok"], _ir["bookings_checked"], _ir["counts"])
     asyncio.create_task(_overdue_loop())
+    asyncio.create_task(_dues_loop())
     if not await db.settings.find_one({"key": "counters_v1"}):
         await recompute_all()
         await db.settings.update_one({"key": "counters_v1"}, {"$set": {"value": True}}, upsert=True)
@@ -133,6 +144,32 @@ async def unhandled_exc_handler(request: Request, exc: Exception):
 api_router = APIRouter(prefix="/api")
 
 
+async def _dues_loop():
+    """Daily at 00:30 IST (+ once on startup): raise time-triggered installments."""
+    from datetime import datetime, timedelta, timezone
+    from services.dues_engine import run_dues_for_all
+    ist = timezone(timedelta(hours=5, minutes=30))
+    while True:
+        try:
+            res = await run_dues_for_all()
+            if res["demands_raised"]:
+                logger.info("Dues engine raised %s demands", res["demands_raised"])
+            from services.integrity import integrity_report
+            from routers.notifications import notify_roles
+            ir = await integrity_report()
+            logger.info("[phase7] nightly integrity: ok=%s counts=%s", ir["ok"], ir["counts"])
+            if ir["findings"]:
+                for cid in {f["booking_id"] for f in ir["findings"]} and {c["id"] for c in await db.companies.find({}, {"_id": 0, "id": 1}).to_list(None)}:
+                    await notify_roles(cid, ["Super Admin", "Accounts"], "Dues integrity findings", f"{len(ir['findings'])} finding(s): " + ", ".join(f"{k} {v}" for k, v in ir["counts"].items()), "integrity.findings", "system", "dues", "/settings")
+        except Exception as e:
+            logger.warning("dues loop error: %s", e)
+        now = datetime.now(ist)
+        nxt = now.replace(hour=0, minute=30, second=0, microsecond=0)
+        if nxt <= now:
+            nxt += timedelta(days=1)
+        await asyncio.sleep((nxt - now).total_seconds())
+
+
 async def _overdue_loop():
     from routers.notifications import overdue_demand_job
     while True:
@@ -165,7 +202,7 @@ async def metrics(user: dict = Depends(require("settings.manage"))):
 
 for r in (auth.router, users.router, roles.router, master.router, projects.router, rate_cards.router, blocks.router, flats.router, parking.router,
           settings.router, audit.router, dashboard.router, search.router, imports.router,
-          customers.router, leads.router, documents.router, bookings.router, milestones.router, payments.router, roznamcha.router, admin.router, cms.router, public.router, reports.router, notifications.router, pdfs.router, dashboard_widgets.router, portal.router, portal.mgmt, support.router):
+          customers.router, leads.router, documents.router, bookings.router, milestones.router, payments.router, roznamcha.router, admin.router, cms.router, public.router, reports.router, notifications.router, pdfs.router, dashboard_widgets.router, portal.router, portal.mgmt, support.router, construction.router):
     api_router.include_router(r)
 
 app.include_router(api_router)

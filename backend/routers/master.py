@@ -117,6 +117,70 @@ class MilestoneTemplateIn(StrictModel):
         return v
 
 
+class ConstructionStageIn(StrictModel):
+    name: str = Field(min_length=1, max_length=80)
+    code: str = Field(min_length=1, max_length=30)
+    description: str | None = Field(default=None, max_length=300)
+    seq_hint: int = 0
+    is_possession: bool = False
+    applies_to_block_types: list[str] = []
+
+
+class InstallmentIn(StrictModel):
+    seq: int = Field(ge=1)
+    name: str = Field(min_length=1, max_length=80)
+    percent: float = Field(gt=0, le=100)
+    trigger_type: str
+    trigger_days: int | None = Field(default=None, ge=0)
+    trigger_stage_id: str | None = None
+    trigger_date: str | None = None
+    due_days: int | None = Field(default=None, ge=0)
+    notes: str | None = Field(default=None, max_length=200)
+
+
+class PaymentPlanIn(StrictModel):
+    name: str = Field(min_length=1, max_length=80)
+    code: str = Field(min_length=1, max_length=30)
+    description: str | None = Field(default=None, max_length=300)
+    plan_type: str = "CLP"
+    installments: list[InstallmentIn] = Field(min_length=1)
+    applies_percent_to: str = "BOTH_BUCKETS"
+    grace_days: int = Field(default=0, ge=0)
+
+    @field_validator("installments")
+    @classmethod
+    def _valid(cls, v):
+        v = sorted(v, key=lambda i: i.seq)
+        if len({i.seq for i in v}) != len(v):
+            raise ValueError("installment seq must be unique")
+        total = round(sum(round(i.percent, 2) for i in v), 2)
+        if total != 100:
+            raise ValueError(f"installment percents must sum to exactly 100.00 (got {total})")
+        kinds = [i.trigger_type for i in v]
+        allowed = {"ON_BOOKING", "DAYS_AFTER_BOOKING", "ON_STAGE", "ON_POSSESSION", "ON_DATE"}
+        if any(k not in allowed for k in kinds):
+            raise ValueError("invalid trigger_type")
+        if kinds.count("ON_BOOKING") > 1 or kinds.count("ON_POSSESSION") > 1:
+            raise ValueError("at most one ON_BOOKING and one ON_POSSESSION installment")
+        for i in v:
+            if i.trigger_type == "DAYS_AFTER_BOOKING" and i.trigger_days is None:
+                raise ValueError(f"installment {i.seq}: trigger_days required")
+            if i.trigger_type == "ON_STAGE" and not i.trigger_stage_id:
+                raise ValueError(f"installment {i.seq}: trigger_stage_id required")
+            if i.trigger_type == "ON_DATE" and not i.trigger_date:
+                raise ValueError(f"installment {i.seq}: trigger_date required")
+            i.percent = round(i.percent, 2)
+        return v
+
+
+async def _usage_stage(doc_id):
+    return await db.payment_plans.count_documents({"is_active": True, "installments.trigger_stage_id": doc_id}), "payment plan(s)"
+
+
+async def _usage_plan(doc_id):
+    return await db.bookings.count_documents({"status": "Active", "payment_plan_id": doc_id}), "active booking(s)"
+
+
 class ChargeTypeIn(StrictModel):
     name: str = Field(min_length=1, max_length=80)
     code: str = Field(min_length=1, max_length=30)
@@ -246,6 +310,8 @@ async def _usage_spec_item(doc_id):
     return await db.flat_types.count_documents({"is_active": True, "spec_item_ids": doc_id}), "flat type(s)"
 
 
+LEGACY_GONE = {"milestone-templates": "Replaced in Phase 7 by /api/master/construction-stages and /api/master/payment-plans (+ /api/payment-plan-assignments)."}
+
 MASTERS = {
     "floor-plan-templates": ("floor_plan_templates", FloorPlanTemplateIn, ["name", "code"], _usage_floor_plan, "Floor Plan Template"),
     "plc-types": ("plc_types", PlcTypeIn, ["name", "code"], _usage_plc, "PLC Type"),
@@ -256,7 +322,8 @@ MASTERS = {
     "flat-types": ("flat_types", FlatTypeIn, ["name", "code"], _usage_flat_type, "Flat Type"),
     "block-types": ("block_types", BlockTypeIn, ["name", "code"], _usage_block_type, "Block Type"),
     "amenities": ("amenities", AmenityIn, ["name", "category"], _usage_amenity, "Amenity"),
-    "milestone-templates": ("milestone_templates", MilestoneTemplateIn, ["name"], _usage_milestone_template, "Milestone Template"),
+    "construction-stages": ("construction_stages", ConstructionStageIn, ["name", "code"], _usage_stage, "Construction Stage"),
+    "payment-plans": ("payment_plans", PaymentPlanIn, ["name", "code"], _usage_plan, "Payment Plan"),
     "charge-types": ("charge_types", ChargeTypeIn, ["name", "code"], _usage_none, "Charge Type"),
     "payment-modes": ("payment_modes", PaymentModeIn, ["name", "code"], _usage_none, "Payment Mode"),
     "bank-accounts": ("bank_accounts", BankAccountIn, ["bank_name", "account_name", "ifsc"], _usage_none, "Bank Account"),
@@ -422,6 +489,12 @@ def _register(kind: str, coll_name: str, InModel, search_fields: list[str], usag
     router.add_api_route(f"/{kind}/{{item_id}}/deactivate", deactivate_item, methods=["POST"], name=f"deactivate_{coll_name}", tags=[tag])
     router.add_api_route(f"/{kind}/{{item_id}}/activate", activate_item, methods=["POST"], name=f"activate_{coll_name}", tags=[tag])
     router.add_api_route(f"/{kind}/{{item_id}}/restore", activate_item, methods=["POST"], name=f"restore_{coll_name}", tags=[tag])
+
+
+@router.api_route("/milestone-templates", methods=["GET", "POST"], include_in_schema=False)
+@router.api_route("/milestone-templates/{rest:path}", methods=["GET", "POST", "PATCH", "DELETE"], include_in_schema=False)
+async def legacy_milestone_templates(rest: str = "", user: dict = Depends(require("master.read"))):
+    raise ApiError(410, LEGACY_GONE["milestone-templates"], "LEGACY_GONE")
 
 
 for _kind, (_coll, _model, _fields, _usage, _label) in MASTERS.items():

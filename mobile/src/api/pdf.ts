@@ -8,9 +8,9 @@ import { File, Paths } from "expo-file-system";
 
 import { API, ApiError, refreshAccess, tokens } from "./client";
 import { webFetchBlob } from "./fetch-blob";
+import { pdfViewer } from "@/src/ui/pdf-viewer";
 
 export { webFetchBlob };
-import { pdfViewer } from "@/src/ui/pdf-viewer";
 
 async function nativeDownload(path: string, name: string, token: string | null) {
   const safe = name.replace(/[^A-Za-z0-9._-]/g, "-");

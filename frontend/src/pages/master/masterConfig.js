@@ -33,8 +33,12 @@ export const MASTERS = [
     { name: "name", label: "Name", type: "text", required: true }, { name: "category", label: "Category", type: "select", required: true, options: ["Lifestyle", "Sports", "Safety", "Convenience", "Green"] },
     { name: "icon", label: "Icon (lucide name)", type: "text" }, { name: "description", label: "Description", type: "textarea" }],
     columns: [{ key: "name", label: "Name", sortable: true }, { key: "category", label: "Category", sortable: true }, { key: "icon", label: "Icon" }, { key: "description", label: "Description" }] },
-  { kind: "milestone-templates", label: "Milestone Templates", custom: "milestone", columns: [
-    { key: "name", label: "Name", sortable: true }, { key: "milestones", label: "Milestones", render: (r) => r.milestones?.length }, { key: "schedule", label: "Schedule", render: (r) => r.milestones?.map((m) => `${m.cumulative_percent}%`).join(" → ") }] },
+  { kind: "construction-stages", label: "Construction Stages", fields: [
+    { name: "name", label: "Stage name", type: "text", required: true }, { name: "code", label: "Code", type: "text", required: true, upper: true }, { name: "seq_hint", label: "Default order", type: "number" },
+    { name: "is_possession", label: "Possession / handover stage", type: "switch" }, { name: "description", label: "Description", type: "textarea" }],
+    columns: [{ key: "seq_hint", label: "Order", sortable: true }, { key: "name", label: "Stage", sortable: true }, { key: "code", label: "Code" }, { key: "is_possession", label: "Possession", render: (r) => r.is_possession ? "Yes" : "" }] },
+  { kind: "payment-plans", label: "Payment Plans", custom: "paymentPlan", columns: [
+    { key: "name", label: "Plan", sortable: true }, { key: "code", label: "Code" }, { key: "plan_type", label: "Type", sortable: true }, { key: "installments", label: "Installments", render: (r) => r.installments?.map((i) => `${i.percent}%`).join(" + ") }] },
   { kind: "charge-types", label: "Charge Types", fields: [
     { name: "name", label: "Name", type: "text", required: true }, { name: "code", label: "Code", type: "text", required: true, upper: true }, { name: "default_amount", label: "Default amount ₹", type: "number" },
     { name: "is_taxable", label: "Taxable", type: "switch" }, { name: "sort_order", label: "Sort order", type: "number" }],

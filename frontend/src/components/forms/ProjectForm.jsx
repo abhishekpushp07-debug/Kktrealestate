@@ -16,7 +16,6 @@ const EMPTY = { name: "", code: "", description: "", project_type: "Residential"
 export function ProjectForm({ open, onOpenChange, project, onSaved }) {
   const [form, setForm] = useState(project ? { ...EMPTY, ...project, address: { ...EMPTY.address, ...(project.address || {}) } } : EMPTY);
   const [busy, setBusy] = useState(false);
-  const { options: mtOptions } = useMasterOptions("milestone-templates", (x) => ({ value: x.id, label: x.name }));
   const { items: amenities } = useMasterOptions("amenities");
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const setAddr = (k, v) => setForm((f) => ({ ...f, address: { ...f.address, [k]: v } }));
@@ -58,7 +57,7 @@ export function ProjectForm({ open, onOpenChange, project, onSaved }) {
             <Field label="Launch date"><Input type="date" value={form.launch_date || ""} onChange={(e) => set("launch_date", e.target.value)} /></Field>
             <Field label="Expected possession"><Input type="date" value={form.expected_possession_date || ""} onChange={(e) => set("expected_possession_date", e.target.value)} /></Field>
           </div>
-          <Field label="Milestone template"><Combobox options={mtOptions} value={form.milestone_template_id} onChange={(v) => set("milestone_template_id", v)} testId="project-milestone-combobox" /></Field>
+          
           <Field label="Cover image URL"><Input value={form.cover_image_url || ""} onChange={(e) => set("cover_image_url", e.target.value)} placeholder="https://…" /></Field>
           <Field label="Amenities">
             <div className="grid grid-cols-2 gap-2 rounded-md border p-3" data-testid="project-amenities">

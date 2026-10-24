@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { Layers, RefreshCw, IndianRupee, ArrowUpFromLine, Printer, History, Milestone } from "lucide-react";
-import { MilestonesPanel } from "@/components/common/MilestonesPanel";
-import { ConstructionPhotos } from "@/components/common/ConstructionPhotos";
+import { ConstructionStatusPanel } from "@/components/common/ConstructionStatusPanel";
 import { toast } from "sonner";
 import api, { errMsg } from "@/lib/api";
 import { useFetch } from "@/hooks/useList";
@@ -96,7 +95,7 @@ export default function BlockDetail() {
         subtitle={`${block?.block_type_name || ""} · ${b.floors} floors${b.skip_floors?.length ? ` (skips ${b.skip_floors.join(", ")})` : ""}${b.refuge_floors?.length ? ` · refuge ${b.refuge_floors.join(", ")}` : ""} · pattern ${b.numbering_pattern}`}
         actions={<>
           <Button variant="outline" onClick={() => window.print()} data-testid="print-grid-btn" className="print:hidden"><Printer className="mr-1.5 h-4 w-4" />Print</Button>
-          <Button variant="outline" onClick={() => setShowMilestones(!showMilestones)} data-testid="block-milestones-btn"><Milestone className="mr-1.5 h-4 w-4" />Milestones</Button>
+          <Button variant="outline" onClick={() => setShowMilestones(!showMilestones)} data-testid="block-milestones-btn"><Milestone className="mr-1.5 h-4 w-4" />Construction Status</Button>
           <Button variant="outline" onClick={() => setShowHistory(!showHistory)} data-testid="block-history-btn"><History className="mr-1.5 h-4 w-4" />History</Button>
           {can("flat.write") && <Button variant="outline" onClick={() => setBulkOpen(true)} data-testid="bulk-price-btn"><IndianRupee className="mr-1.5 h-4 w-4" />Bulk price</Button>}
           {can("block.write") && <Button variant="outline" onClick={() => setFloorsOpen(true)} data-testid="add-floors-btn"><ArrowUpFromLine className="mr-1.5 h-4 w-4" />Add floors</Button>}
@@ -107,8 +106,7 @@ export default function BlockDetail() {
         {["Available", "Hold", "Booked", "Sold", "Blocked"].map((s) => <div key={s} className={cn("rounded-xl border p-4", STATUS_STYLES[s].tile)} data-testid={`grid-count-${s.toLowerCase()}`}><p className="label-xs opacity-80">{s}</p><p className="mt-1 text-2xl font-extrabold tabular">{grid.counts[s]}</p></div>)}
       </div>
       {showHistory && <div className="card-elev mb-5 p-5" data-testid="block-history-panel"><h3 className="mb-3 text-base font-bold text-navy">Block history</h3><HistoryTimeline entityType="block" entityId={b.id} /></div>}
-      {showMilestones && <div className="mb-5"><MilestonesPanel blockId={b.id} onChanged={refresh} /></div>}
-      <div className="mb-5"><ConstructionPhotos blockId={b.id} milestones={b.milestones} /></div>
+      {showMilestones && <div className="mb-5"><ConstructionStatusPanel blockId={b.id} onChanged={refresh} /></div>}
       <div className="grid gap-5 xl:grid-cols-[1fr_300px]">
         <div className="card-elev overflow-auto p-4" data-testid="inventory-grid">
           <div className="mb-3 flex flex-wrap items-center gap-2 print:hidden">
@@ -154,7 +152,7 @@ export default function BlockDetail() {
             <div className="grid grid-cols-2 gap-3">
               <KV label="Status" value={b.status} /><KV label="Construction" value={`${b.construction_percent}%`} mono />
               <KV label="Rate" value={block?.rate_per_sqft ? `₹${num(block.rate_per_sqft)}/sq.ft` : "From flat type / rate card"} /><KV label="Floor rise" value={block?.floor_rise_per_sqft ? `₹${num(block.floor_rise_per_sqft)}/floor` : "—"} />
-              <KV label="Floor start" value={b.floor_start} mono /><KV label="Milestone template" value={block?.milestone_template?.name} />
+              <KV label="Floor start" value={b.floor_start} mono /><KV label="Construction" value={`${b.construction_percent ?? 0}% (${(b.construction_stages || []).filter((s) => s.status === "Completed").length}/${(b.construction_stages || []).length} stages)`} />
             </div>
             <p className="label-xs mb-2 mt-4">Floor plans</p>
             <div className="space-y-1">{block?.floor_plans?.map((p, i) => <div key={i} className="rounded bg-slate-50 px-2 py-1.5 text-xs"><div className="flex justify-between"><span className="text-slate-500">Floors {p.from_floor}–{p.to_floor}</span><b className="text-navy">{p.template_name || "Inline"}</b></div><p className="mt-0.5 text-[10px] text-slate-500">{p.resolved_positions?.map((x) => `${x.position}:${x.flat_type?.code}`).join("  ")}</p></div>)}</div>

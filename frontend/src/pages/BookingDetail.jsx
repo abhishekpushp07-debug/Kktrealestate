@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BookingScheduleTab } from "@/components/common/PaymentSchedule";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { inr, fmtDate, fmtDateTime } from "@/lib/format";
@@ -64,17 +65,18 @@ export default function BookingDetail() {
         <StatCard label="Other charges" value={inr(s.other_charges_paid)} hint={<>demanded {inr(s.other_charges_demanded)} · due <Due v={s.other_charges_due} /></>} />
       </div>
       <Tabs defaultValue="overview" className="mt-6">
-        <TabsList className="flex-wrap bg-white" data-testid="booking-tabs">{["overview", "ledger", "demands", "payments", "charges", "documents", "revisions", "history"].map((t) => <TabsTrigger key={t} value={t} className="capitalize data-[state=active]:bg-navy data-[state=active]:text-white" data-testid={`booking-tab-${t}`}>{t}</TabsTrigger>)}</TabsList>
+        <TabsList className="flex-wrap bg-white" data-testid="booking-tabs">{["overview", "schedule", "ledger", "demands", "payments", "charges", "documents", "revisions", "history"].map((t) => <TabsTrigger key={t} value={t} className="capitalize data-[state=active]:bg-navy data-[state=active]:text-white" data-testid={`booking-tab-${t}`}>{t}</TabsTrigger>)}</TabsList>
         <TabsContent value="overview" className="mt-4 grid gap-4 lg:grid-cols-3">
           <div className="card-elev p-5"><h3 className="mb-3 text-base font-bold text-navy">Customer</h3><KV label="Name" value={<Link to={`/customers/${b.customer_id}`} className="hover:underline">{b.customer?.full_name}</Link>} /><KV label="Phone" value={b.customer?.phone} /><KV label="KYC" value={b.customer?.kyc_status} />{b.co_applicants?.length > 0 && <KV label="Co-applicants" value={b.co_applicants.map((c) => c.full_name).join(", ")} />}</div>
           <div className="card-elev p-5"><h3 className="mb-3 text-base font-bold text-navy">Unit</h3><KV label="Flat" value={`${b.flat_snapshot.flat_number} · ${b.flat_snapshot.flat_type_code}`} /><KV label="Super built-up" value={`${b.flat_snapshot.super_builtup_sqft || "—"} sq.ft`} /><KV label="Rate" value={b.rate_per_sqft ? `₹${b.rate_per_sqft}/sq.ft` : "Lump sum"} /><KV label="Parking" value={b.parking_slots?.length ? b.parking_slots.map((p) => p.number).join(", ") : "None"} /><KV label="Sales" value={b.sales_user_id === b.created_by ? "—" : ""} /></div>
           <div className="card-elev p-5"><h3 className="mb-3 text-base font-bold text-navy">Milestones</h3><ol className="space-y-1 text-xs">{b.block_milestones.map((m) => <li key={m.seq} className="flex items-center gap-2"><span className={`h-2 w-2 rounded-full ${m.status === "Completed" ? "bg-emerald-500" : "bg-slate-300"}`} /><span className={m.status === "Completed" ? "text-navy" : "text-slate-500"}>{m.name}</span><span className="ml-auto tabular">{m.cumulative_percent}%</span></li>)}</ol>{b.cancellation && <div className="mt-3 rounded-md bg-red-50 p-2 text-xs text-red-700">Cancelled {fmtDate(b.cancellation.at)}: {b.cancellation.reason}. Refund {inr(b.cancellation.refund)} · deduction {inr(b.cancellation.deduction)}</div>}</div>
         </TabsContent>
+        <TabsContent value="schedule" className="mt-4"><BookingScheduleTab bookingId={id} /></TabsContent>
         <TabsContent value="ledger" className="mt-4"><LedgerTable rows={ledger} bookingId={id} bookingNumber={b.booking_number} /></TabsContent>
         <TabsContent value="demands" className="mt-4">
           <Table head={["Demand", "Milestone", "%", "Date", "Due date", { l: "Cash", r: 1 }, { l: "Account", r: 1 }, { l: "Total", r: 1 }, { l: "Paid", r: 1 }, "Status", ""]} testId="demands-table">
             {b.demands.map((d) => <tr key={d.id} className="border-t"><td className="px-3 py-2 font-mono text-xs">{d.demand_number}</td><td className="px-3 py-2">{d.milestone_name}</td><td className="px-3 py-2">{d.cumulative_percent}%</td><td className="px-3 py-2">{fmtDate(d.demand_date)}</td><td className="px-3 py-2">{fmtDate(d.due_date)}</td><td className="px-3 py-2 text-right tabular">{inr(d.cash_demand)}</td><td className="px-3 py-2 text-right tabular">{inr(d.account_demand)}</td><td className="px-3 py-2 text-right tabular font-semibold">{inr(d.total_demand)}</td><td className="px-3 py-2 text-right tabular">{inr(d.paid)}</td><td className="px-3 py-2"><Pill tone={DEM_TONE[d.status] || "slate"}>{d.status}</Pill></td><td className="px-3 py-2"><Button size="sm" variant="ghost" onClick={() => nav(`/print/demand/${id}/${d.id}`)} data-testid={`demand-letter-${d.id}`}><Printer className="h-3.5 w-3.5" /></Button><Button size="sm" variant="ghost" onClick={() => openPdf(`/bookings/${id}/demands/${d.id}/letter.pdf`)} title="Download PDF" data-testid={`demand-pdf-${d.id}`}><FileText className="h-3.5 w-3.5" /></Button></td></tr>)}
-            {b.demands.length === 0 && <tr><td colSpan={11} className="px-3 py-6 text-center text-slate-500">No demands yet — raised when block milestones complete.</td></tr>}
+            {b.demands.length === 0 && <tr><td colSpan={11} className="px-3 py-6 text-center text-slate-500">No demands yet — raised automatically by the payment plan (booking, dates, construction stages).</td></tr>}
           </Table>
         </TabsContent>
         <TabsContent value="payments" className="mt-4">

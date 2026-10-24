@@ -43,6 +43,7 @@ function Nav({ fontsReady }: { fontsReady: boolean }) {
         <Stack.Screen name="flat/[id]" />
         <Stack.Screen name="documents" />
         <Stack.Screen name="bank" />
+        <Stack.Screen name="notifications" />
         <Stack.Screen name="notices/index" />
         <Stack.Screen name="notices/[id]" />
         <Stack.Screen name="requests/new" options={{ presentation: Platform.OS === "ios" ? "modal" : "card" }} />

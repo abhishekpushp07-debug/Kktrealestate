@@ -15,8 +15,8 @@ PERMISSION_GROUPS = [
         ("block.write", "Create / edit blocks"),
         ("flat.write", "Edit flats & pricing"),
         ("flat.status", "Change flat status (Hold/Block)"),
-        ("milestone.update", "Update construction milestones"),
-        ("milestone.undo", "Undo milestone completion"),
+        ("construction.update", "Update tower construction status (alias: milestone.update)"),
+        ("construction.undo", "Undo last completed construction stage (alias: milestone.undo)"),
     ]),
     ("Customers & Leads", [
         ("customer.read", "View customers"),
@@ -59,7 +59,7 @@ SYSTEM_ROLES = {
         "description": "Manages project structure, inventory and sales for assigned projects",
         "permissions": [
             "service.read", "service.write", "service.assign",
-            "project.read", "master.read", "block.write", "flat.write", "flat.status", "milestone.update",
+            "project.read", "master.read", "block.write", "flat.write", "flat.status", "construction.update",
             "booking.read", "booking.create", "booking.cancel", "customer.read", "customer.write", "customer.kyc_view", "lead.read", "lead.write",
             "payment.read", "receipt.print", "report.view",
         ],

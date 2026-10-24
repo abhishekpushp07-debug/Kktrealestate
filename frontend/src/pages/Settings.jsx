@@ -13,6 +13,21 @@ import { MfaCard, SessionsCard, ImportCenter } from "@/components/common/Securit
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
+function IntegrityPanel() {
+  const [rep, setRep] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const run = async () => { setBusy(true); try { const r = await api.get("/admin/integrity-report"); setRep(r.data); toast[r.data.ok ? "success" : "warning"](r.data.ok ? "Integrity check clean" : `${r.data.findings.length} finding(s)`); } catch (e) { toast.error(errMsg(e)); } finally { setBusy(false); } };
+  const fix = async () => { if (window.prompt('Repair voids demands whose trigger is not met (only if no payment applied) and raises missing ones. Type REPAIR to confirm.') !== "REPAIR") return; setBusy(true); try { const r = await api.post("/admin/integrity-repair", { confirm: "REPAIR" }); toast.success(`Voided ${r.data.voided.length} · raised ${r.data.raised} · skipped ${r.data.skipped.length}`); await run(); } catch (e) { toast.error(errMsg(e)); } finally { setBusy(false); } };
+  return (
+    <div className="card-elev mb-5 p-5" data-testid="integrity-panel">
+      <div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="text-base font-bold text-navy">Data · Dues integrity</h3><p className="text-sm text-slate-500">Checks every active booking: installments raised without their trigger met, triggered but not raised, duplicates, summary mismatches.</p></div>
+        <div className="flex gap-2"><Button variant="outline" disabled={busy} onClick={run} data-testid="integrity-run-btn">Run integrity check</Button>{rep && !rep.ok && <Button className="bg-navy hover:bg-navy-700" disabled={busy} onClick={fix} data-testid="integrity-repair-btn">Repair</Button>}</div></div>
+      {rep && <div className="mt-4 text-sm" data-testid="integrity-result"><p className={`font-semibold ${rep.ok ? "text-emerald-700" : "text-amber-700"}`}>{rep.ok ? "Clean" : "Findings"} · {rep.bookings_checked} booking(s) checked · {Object.entries(rep.counts).map(([k, v]) => `${k}: ${v}`).join(", ") || "0 findings"}</p>
+        {rep.findings.length > 0 && <ul className="mt-2 max-h-64 divide-y overflow-y-auto">{rep.findings.map((f, i) => <li key={i} className="py-1.5"><span className="font-mono text-xs text-slate-500">{f.booking_number}</span> · <span className="font-semibold">{f.kind}</span> · {f.detail}{f.demand_number ? ` (${f.demand_number}${f.paid > 0 ? `, paid ₹${f.paid}` : ""})` : ""}</li>)}</ul>}</div>}
+    </div>
+  );
+}
+
 function DataPanel() {
   const { user } = useAuth();
   const [items, setItems] = useState([]);
@@ -56,6 +71,7 @@ export default function Settings() {
     <div data-testid="settings-page">
       <PageHeader title="Company Settings" subtitle="Identity, statutory registrations and banking." />
       <DataPanel />
+      <IntegrityPanel />
       <form onSubmit={save} className="grid gap-5 lg:grid-cols-2">
         <div className="card-elev space-y-4 p-5">
           <h3 className="text-base font-bold text-navy">Company identity</h3>

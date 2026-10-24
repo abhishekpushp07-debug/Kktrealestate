@@ -56,6 +56,9 @@ async def _dashboard(user: dict):
     out = {"inventory": inventory, "projects": projects, "blocks": blocks, "recent_audit": recent, "active_users": users_count}
     if "payment.read" in user["permissions"]:
         out["collections"] = await collections_widget(user)
+        from routers.dashboard_widgets import widgets as _widgets
+        w = await _widgets(user)
+        out["collections"].update({k: w[k] for k in ("dues_raised_month", "upcoming_installments") if k in w})
     if "lead.read" in user["permissions"]:
         out["follow_ups_due"] = await followups_widget(user)
     return out

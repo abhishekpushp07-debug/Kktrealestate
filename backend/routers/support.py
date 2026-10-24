@@ -92,6 +92,9 @@ async def reply_sr(sr_id: str, body: SRReplyIn, request: Request, user: dict = D
         upd["status"] = "In Progress"
         push["stage_history"] = {"from": "New", "to": "In Progress", "at": now_iso(), "by": user["name"]}
     await db.service_requests.update_one({"id": sr_id}, {"$push": push, "$set": upd, "$inc": {"version": 1}})
+    if not body.internal:
+        from services.portal_notify import notify_customer
+        await notify_customer(sr["company_id"], sr["customer_id"], "ticket.reply", f"Reply on {sr['ticket_number']}", f"{sr.get('subject', '')} · {user['name']} replied", sr.get("booking_id"), "service_request", sr_id)
     await write_audit(user, "service.internal_note" if body.internal else "service.reply", "service_request", sr_id, after={"ticket_number": sr["ticket_number"], "status": upd.get("status", sr["status"]), "customer_id": sr["customer_id"]}, ip=client_ip(request))
     return await db.service_requests.find_one({"id": sr_id}, {"_id": 0})
 
@@ -166,6 +169,14 @@ async def create_notice(body: NoticeIn, request: Request, user: dict = Depends(r
     await db.notices.insert_one(doc)
     doc.pop("_id", None)
     await write_audit(user, "notice.create", "notice", doc["id"], after={"title": doc["title"]}, ip=client_ip(request))
+    from services.portal_notify import notify_customer
+    bq = {"company_id": user["company_id"], "status": "Active", **({"project_id": {"$in": body.project_ids}} if body.project_ids else {})}
+    seen = set()
+    async for b in db.bookings.find(bq, {"_id": 0, "customer_id": 1, "co_applicant_customer_ids": 1}):
+        for cid in [b["customer_id"], *(b.get("co_applicant_customer_ids") or [])]:
+            if cid not in seen:
+                seen.add(cid)
+                await notify_customer(user["company_id"], cid, "notice.published", f"Notice: {doc['title']}", ", ".join(doc.get("project_names") or []) or "All projects", None, "notice", doc["id"])
     return doc
 
 

@@ -72,7 +72,8 @@ async def get_current_user(request: Request, creds: HTTPAuthorizationCredentials
 
 def require(permission: str):
     async def dep(user: dict = Depends(get_current_user)) -> dict:
-        if permission not in user["permissions"]:
+        alias = {"construction.update": "milestone.update", "construction.undo": "milestone.undo", "milestone.update": "construction.update", "milestone.undo": "construction.undo"}.get(permission)
+        if permission not in user["permissions"] and not (alias and alias in user["permissions"]):
             raise ApiError(403, f"Missing permission: {permission}", "FORBIDDEN")
         return user
     return dep

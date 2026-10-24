@@ -9,7 +9,7 @@ import { Chip, Press } from "@/src/ui/primitives";
 import { T } from "@/src/ui/text";
 
 export type Photo = { id: string; caption?: string | null; taken_on?: string | null; url: string };
-export type Milestone = { seq: number; name: string; cumulative_percent: number; status: string; completed_on?: string | null; update?: string | null; photos: Photo[] };
+export type Milestone = { seq: number; name: string; cumulative_percent?: number | null; status: string; completed_on?: string | null; started_on?: string | null; update?: string | null; notes?: string | null; photos: Photo[] };
 
 export const photoUri = (p: Photo) => (p.url.startsWith("http") ? p.url : `${BACKEND}${p.url}`);
 
@@ -17,23 +17,26 @@ export function TimelineItem({ m, next, last, onPhoto }: { m: Milestone; next: b
   const s = useStyles();
   const { colors } = useTheme();
   const done = m.status === "Completed";
+  const active = m.status === "In Progress";
   return (
     <View style={s.item} testID={`construction-milestone-${m.seq}`}>
       <View style={s.rail}>
-        <View style={[s.dot, done && s.dotDone, next && s.dotNext]}>
-          {done ? <Feather name="check" size={13} color={colors.onBrandSecondary} /> : <T style={[s.dotText, next && { color: colors.onSurfaceInverse }]}>{m.seq}</T>}
+        <View style={[s.dot, done && s.dotDone, (next || active) && s.dotNext]}>
+          {done ? <Feather name="check" size={13} color={colors.onBrandSecondary} /> : <T style={[s.dotText, (next || active) && { color: colors.onSurfaceInverse }]}>{m.seq}</T>}
         </View>
         {!last ? <View style={[s.line, done && s.lineDone]} /> : null}
       </View>
-      <View style={[s.body, last && { paddingBottom: 4 }]}>
+      <View style={[s.body, last && { paddingBottom: 4 }, active && s.activeBody]}>
         <View style={s.head}>
-          <T v="bodyStrong" style={!done && !next ? { color: colors.muted } : undefined}>
+          <T v="bodyStrong" style={!done && !next && !active ? { color: colors.muted } : undefined}>
             {m.name}
           </T>
-          {next ? <Chip label="Up next" tone="gold" testID="construction-up-next" /> : null}
+          <Chip label={m.status} tone={done ? "success" : active ? "gold" : "neutral"} testID={`construction-status-${m.seq}`} />
+          {next && !active ? <Chip label="Up next" tone="info" testID="construction-up-next" /> : null}
         </View>
         <T v="small" tone="muted">
-          {m.cumulative_percent}% of payment plan{done ? ` · completed ${fmtDate(m.completed_on)}` : next ? " · in progress" : " · upcoming"}
+          {done ? `Completed ${fmtDate(m.completed_on)}` : active ? `Work in progress${m.started_on ? ` since ${fmtDate(m.started_on)}` : ""}` : "Upcoming"}
+          {m.cumulative_percent != null ? ` · ${m.cumulative_percent}% of payment plan` : ""}
         </T>
         {m.update ? (
           <View style={s.note} testID={`construction-note-${m.seq}`}>
@@ -72,6 +75,7 @@ const useStyles = makeStyles((c) => ({
   line: { flex: 1, width: 2, backgroundColor: c.divider, marginVertical: 2 },
   lineDone: { backgroundColor: c.gold },
   body: { flex: 1, paddingBottom: 22, gap: 3 },
+  activeBody: { backgroundColor: c.brandTertiary, borderRadius: radius.md, padding: 12, marginBottom: 14, paddingBottom: 12 },
   head: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap", minHeight: 28 },
   note: { flexDirection: "row", gap: 8, backgroundColor: c.surface, borderRadius: radius.sm, padding: 10, marginTop: 6 },
   photos: { gap: 10, paddingTop: 10, paddingRight: 8 },

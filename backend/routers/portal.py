@@ -240,13 +240,27 @@ async def my_bookings(acc: dict = Depends(portal_user)):
     blocks = {b["id"]: b for b in await db.blocks.find({"id": {"$in": [x["block_id"] for x in bks]}}, {"_id": 0, "id": 1, "construction_percent": 1, "milestones": 1}).to_list(None)}
     projs = {p["id"]: p for p in await db.projects.find({"id": {"$in": [x["project_id"] for x in bks]}}, {"_id": 0, "id": 1, "website.hero_images": 1}).to_list(None)}
     out = []
+    from services.dues_engine import schedule
     for b in bks:
         c = _card(b, blocks.get(b["block_id"]), projs.get(b["project_id"]))
         c["is_primary"] = b["customer_id"] == acc["customer_id"]
         nd = await db.demands.find_one({"booking_id": b["id"], "voided": False, "status": {"$in": ["Open", "Partially Paid"]}}, {"_id": 0, "due_date": 1, "total_demand_paise": 1, "paid_paise": 1, "milestone_name": 1}, sort=[("due_date", 1)])
         c["next_due"] = {"due_date": nd["due_date"], "amount_paise": nd["total_demand_paise"] - nd.get("paid_paise", 0), "milestone": nd["milestone_name"]} if nd else None
+        snap = b.get("payment_plan_snapshot")
+        c["payment_plan"] = {"name": snap["name"], "plan_type": snap.get("plan_type")} if snap else None
+        c["next_installment"] = None
+        if snap and b.get("status") == "Active":
+            blk_full = await db.blocks.find_one({"id": b["block_id"]}, {"_id": 0, "construction_stages": 1}) or {}
+            nxt = next((r for r in schedule(b, blk_full, await db.demands.find({"booking_id": b["id"]}, {"_id": 0}).to_list(None)) if r["status"] == "Not yet due"), None)
+            c["next_installment"] = _next_installment(nxt)
         out.append(c)
     return present_money({"items": out})
+
+
+def _next_installment(nxt: dict | None) -> dict | None:
+    if not nxt:
+        return None
+    return {"name": nxt["name"], "percent": nxt["percent"], "trigger_label": nxt["trigger_label"], "expected_date": nxt["expected_date"], "due_date": nxt["expected_date"], "cash_expected_paise": nxt["cash_expected_paise"], "account_expected_paise": nxt["account_expected_paise"], "total_expected_paise": nxt["total_expected_paise"]}
 
 
 @router.get("/bookings/{booking_id}")
@@ -264,6 +278,15 @@ async def booking_detail(b: dict = Depends(portal_booking), acc: dict = Depends(
                  "areas": [{"area": areas.get(a.get("area_type_id")), "sqft": a.get("sqft")} for a in ft.get("areas") or []], "specifications": ft.get("specifications") or {}, "floor_plan_image": (fpt or {}).get("image_url") or ft.get("floor_plan_image_url")}, "parking": parking,
                  "price_breakup": {"agreement_value_paise": b["agreement_value_paise"], "cash_paise": b["cash_agreed_paise"], "account_paise": b["account_agreed_paise"], "other_charges": [{"name": c["name"], "amount_paise": c["amount_paise"], "gst_paise": c.get("gst_paise", 0), "total_paise": c["total_paise"], "paid_paise": c.get("paid_paise", 0)} for c in b.get("other_charges") or []]},
                  "agreement_revisions": [{"at": r.get("at") or r.get("revised_at"), "reason": r.get("reason"), "new_agreement_value_paise": r.get("new_agreement_value_paise") or (r.get("after") or {}).get("agreement_value_paise")} for r in b.get("agreement_revisions") or []], "relationship_manager": await _rm(b), "co_applicant": b["customer_id"] != acc["customer_id"]})
+    snap = b.get("payment_plan_snapshot")
+    card["payment_plan"] = {"name": snap["name"], "plan_type": snap.get("plan_type"), "accepted_on": (b.get("plan_acceptance") or {}).get("accepted_on")} if snap else None
+    card["next_installment"] = None
+    if snap:
+        from services.dues_engine import schedule
+        blk_full = await db.blocks.find_one({"id": b["block_id"]}, {"_id": 0, "construction_stages": 1}) or {}
+        rows = schedule(b, blk_full, await db.demands.find({"booking_id": b["id"]}, {"_id": 0}).to_list(None))
+        nxt = next((r for r in rows if r["status"] == "Not yet due"), None)
+        card["next_installment"] = _next_installment(nxt)
     return present_money(card)
 
 
@@ -297,7 +320,11 @@ async def booking_demands(b: dict = Depends(portal_booking)):
 
 @router.get("/bookings/{booking_id}/schedule")
 async def booking_schedule(b: dict = Depends(portal_booking)):
-    blk = await db.blocks.find_one({"id": b["block_id"]}, {"_id": 0, "milestones": 1}) or {}
+    blk = await db.blocks.find_one({"id": b["block_id"]}, {"_id": 0, "milestones": 1, "construction_stages": 1}) or {}
+    if b.get("payment_plan_snapshot"):
+        from services.dues_engine import schedule
+        rows = schedule(b, blk, await db.demands.find({"booking_id": b["id"]}, {"_id": 0}).to_list(None))
+        return present_money({"plan": {"name": b["payment_plan_snapshot"]["name"], "plan_type": b["payment_plan_snapshot"].get("plan_type")}, "items": [{"seq": r["seq"], "name": r["name"], "cumulative_percent": r["cumulative_percent"], "percent": r["percent"], "cash_paise": r["cash_expected_paise"], "account_paise": r["account_expected_paise"], "total_paise": r["total_expected_paise"], "cash_expected_paise": r["cash_expected_paise"], "account_expected_paise": r["account_expected_paise"], "cash_paid_paise": r["cash_paid_paise"], "account_paid_paise": r["account_paid_paise"], "paid_paise": r["paid_paise"], "construction_status": "Completed" if r["status"] != "Not yet due" else "Pending", "completed_on": r["raised_on"], "demanded": r["status"] != "Not yet due", "due_date": r["due_date"], "demand_status": r["status"] if r["status"] != "Not yet due" else None, "status": r["status"], "trigger_label": r["trigger_label"], "expected_date": r["expected_date"]} for r in rows]})
     done = {m["seq"]: m for m in blk.get("milestones") or []}
     dem = {d["milestone_seq"]: d for d in await db.demands.find({"booking_id": b["id"], "voided": False}, {"_id": 0, "milestone_seq": 1, "paid_paise": 1, "total_demand_paise": 1, "status": 1, "due_date": 1}).to_list(None)}
     prev = 0
@@ -335,7 +362,7 @@ async def booking_construction(b: dict = Depends(portal_booking)):
     for p in photos:
         by.setdefault(p["milestone_seq"], []).append(p)
     ms = [{"seq": m["seq"], "name": m["name"], "cumulative_percent": m["cumulative_percent"], "status": m["status"], "completed_on": m.get("completed_on"), "update": m.get("progress_note"), "photos": by.get(m["seq"], [])} for m in blk.get("milestones") or []]
-    return {"block_name": blk.get("name"), "construction_percent": blk.get("construction_percent", 0), "milestones": ms, "up_next": next((m["name"] for m in ms if m["status"] == "Pending"), None)}
+    return {"block_name": blk.get("name"), "construction_percent": blk.get("construction_percent", 0), "milestones": ms, "stages": [{"seq": m["seq"], "name": m["name"], "status": m["status"], "completed_on": m["completed_on"], "notes": m.get("update"), "photos": m["photos"]} for m in ms], "up_next": next((m["name"] for m in ms if m["status"] == "Pending"), None)}
 
 
 # ---------------- PDFs (reuse ERP builders with a synthetic staff context) ----------------
@@ -372,6 +399,38 @@ async def demand_pdf(demand_id: str, b: dict = Depends(portal_booking), acc: dic
 
 
 # ---------------- Notices ----------------
+def _nq(acc: dict, include_withdrawn: bool = False) -> dict:
+    return {"user_id": f"customer:{acc['customer_id']}", **({} if include_withdrawn else {"withdrawn": {"$ne": True}})}
+
+
+@router.get("/notifications")
+async def portal_notifications(page: int = 1, page_size: int = 20, include_withdrawn: bool = False, acc: dict = Depends(portal_user)):
+    from services.portal_notify import public_notification
+    page, page_size = max(page, 1), min(max(page_size, 1), 100)
+    q = _nq(acc, include_withdrawn)
+    rows = await db.notifications.find(q, {"_id": 0}).sort("created_at", -1).skip((page - 1) * page_size).to_list(page_size)
+    return {"items": [public_notification(n) for n in rows], "unread_count": await db.notifications.count_documents({**q, "read": False}), "total": await db.notifications.count_documents(q), "page": page, "page_size": page_size}
+
+
+@router.get("/notifications/unread-count")
+async def portal_unread(acc: dict = Depends(portal_user)):
+    return {"unread_count": await db.notifications.count_documents({**_nq(acc), "read": False})}
+
+
+@router.post("/notifications/read-all")
+async def portal_read_all(acc: dict = Depends(portal_user)):
+    r = await db.notifications.update_many({**_nq(acc), "read": False}, {"$set": {"read": True, "read_at": now_iso()}})
+    return {"ok": True, "updated": r.modified_count, "unread_count": 0}
+
+
+@router.post("/notifications/{notification_id}/read")
+async def portal_read_one(notification_id: str, acc: dict = Depends(portal_user)):
+    r = await db.notifications.update_one({"user_id": f"customer:{acc['customer_id']}", "id": notification_id}, {"$set": {"read": True, "read_at": now_iso()}})
+    if not r.matched_count:
+        raise ApiError(404, "Notification not found", "NOT_FOUND")
+    return {"ok": True, "unread_count": await db.notifications.count_documents({**_nq(acc), "read": False})}
+
+
 @router.get("/notices")
 async def notices(acc: dict = Depends(portal_user)):
     pids = {b["project_id"] for b in await db.bookings.find(_booking_scope(acc), {"_id": 0, "project_id": 1}).to_list(20)}

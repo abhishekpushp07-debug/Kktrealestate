@@ -70,6 +70,19 @@ async def widgets(user: dict = Depends(require("project.read"))):
     out["inventory_by_project"] = [{"project": p["code"], "name": p["name"], **(p.get("unit_counts") or {})} for p in projects]
     blocks = await db.blocks.find({**base, "is_active": True}, {"_id": 0, "id": 1, "name": 1, "code": 1, "project_code": 1, "construction_percent": 1, "milestones": 1, "unit_counts": 1}).sort("code", 1).to_list(None)
     out["construction"] = [{"id": b["id"], "block": f"{b.get('project_code', '')} {b['name']}", "percent": b.get("construction_percent", 0), "next_milestone": next((m["name"] for m in b.get("milestones") or [] if m["status"] == "Pending"), None), "available": (b.get("unit_counts") or {}).get("available", 0), "total": (b.get("unit_counts") or {}).get("total", 0)} for b in blocks]
+    if "payment.read" in perms or "booking.read" in perms:
+        m0 = today.replace(day=1).isoformat()
+        dm = await db.demands.aggregate([{"$match": {**base, "voided": {"$ne": True}, "demand_date": {"$gte": m0}}}, {"$group": {"_id": None, "n": {"$sum": 1}, "v": {"$sum": "$total_demand_paise"}, "p": {"$sum": "$paid_paise"}}}]).to_list(1)
+        out["dues_raised_month"] = {"count": dm[0]["n"] if dm else 0, "total_paise": dm[0]["v"] if dm else 0, "paid_paise": dm[0]["p"] if dm else 0}
+        from services.dues_engine import schedule
+        up = []
+        horizon = (today + timedelta(days=30)).isoformat()
+        async for bk in db.bookings.find({**base, "status": "Active", "payment_plan_snapshot": {"$ne": None}}, {"_id": 0}):
+            blk = await db.blocks.find_one({"id": bk["block_id"]}, {"_id": 0, "construction_stages": 1}) or {}
+            for r in schedule(bk, blk, await db.demands.find({"booking_id": bk["id"]}, {"_id": 0}).to_list(None)):
+                if r["status"] == "Not yet due" and r["expected_date"] and r["expected_date"] <= horizon:
+                    up.append({"booking_number": bk["booking_number"], "booking_id": bk["id"], "customer_name": bk.get("customer_name"), "installment": r["name"], "expected_date": r["expected_date"], "total_paise": r["total_expected_paise"]})
+        out["upcoming_installments"] = sorted(up, key=lambda x: x["expected_date"])[:20]
     if "lead.read" in perms:
         lq = {"company_id": cid, **scope}
         if role == "Sales":

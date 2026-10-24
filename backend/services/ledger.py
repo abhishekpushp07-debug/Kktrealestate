@@ -52,7 +52,7 @@ async def rebuild(booking_id: str) -> list[dict]:
             pct = src["cumulative_percent"]
             amount = src["total_demand_paise"]
             ref = src["demand_number"]
-            note = f"{src['milestone_name']} ({pct}%)"
+            note = f"{src.get('installment_name') or src['milestone_name']} ({src.get('percent') if src.get('percent') is not None else pct}%)"
         elif kind == "PAYMENT":
             amount = src["amount_paise"]
             category = src["payment_category"]
@@ -105,7 +105,7 @@ async def rebuild(booking_id: str) -> list[dict]:
             "other_charges_due_paise": oc_dem - oc_paid,
         })
     # final summary
-    pct_now = b.get("construction_percent", pct)
+    pct_now = b.get("raised_percent", b.get("construction_percent", pct))
     c_ord, a_ord = _orders(b["cash_agreed_paise"], b["account_agreed_paise"], pct_now)
     if b.get("status") == "Cancelled":
         c_ord, a_ord = cash_paid, account_paid  # ledger closed: nothing further due

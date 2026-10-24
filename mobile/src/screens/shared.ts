@@ -40,6 +40,9 @@ export const statusTone = (s?: string): Tone =>
     Reversed: "neutral",
     Closed: "neutral",
     "Partially Paid": "info",
+    "Partially paid": "info",
+    Raised: "gold",
+    "Not yet due": "neutral",
     New: "info",
     "Awaiting Customer": "gold",
   }) as Record<string, Tone>)[s || ""] || "neutral";

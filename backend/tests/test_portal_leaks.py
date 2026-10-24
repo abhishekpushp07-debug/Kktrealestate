@@ -38,7 +38,7 @@ def _get(tok, path):
 
 
 def test_portal_responses_have_no_internal_keys(tok):
-    paths = ["/config", "/me", "/bank-details", "/bookings", "/notices", "/service-categories", "/service-requests"]
+    paths = ["/config", "/me", "/bank-details", "/bookings", "/notices", "/service-categories", "/service-requests", "/notifications", "/notifications/unread-count"]
     bookings = _get(tok, "/bookings")["items"]
     for b in bookings:
         paths += [f"/bookings/{b['id']}{s}" for s in ("", "/ledger", "/payments", "/demands", "/schedule", "/documents", "/construction")]
@@ -59,3 +59,10 @@ def test_attachment_shape(tok):
             for a in m["attachments"]:
                 assert set(a) == {"idx", "name", "mime", "size", "url"}
                 assert a["url"] == f"/api/portal/service-requests/{sr['id']}/attachments/{a['idx']}"
+
+
+def test_notification_shape(tok):
+    d = _get(tok, "/notifications")
+    assert set(d) == {"items", "unread_count", "total", "page", "page_size"}
+    for n in d["items"]:
+        assert set(n) == {"id", "type", "title", "body", "booking_id", "entity_type", "entity_id", "is_read", "withdrawn", "created_at"}

@@ -1,10 +1,11 @@
 // Data hooks — same query keys/endpoints as frontend/src/apps/portal/hooks.js.
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type PropsWithChildren } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 
 import { api, ApiError, request } from "@/src/api/client";
 import { BOOKING_KEY, useAuth } from "@/src/auth";
 import { storage } from "@/src/utils/storage";
+import type { PortalNotification } from "@/src/notification-route";
 
 export type Booking = {
   id: string;
@@ -34,6 +35,17 @@ export type Booking = {
   pending_cheques: number;
   is_primary: boolean;
   next_due?: { due_date: string; amount: number; milestone: string } | null;
+  payment_plan?: { name: string; plan_type?: string | null; accepted_on?: string | null } | null;
+  next_installment?: {
+    name: string;
+    percent?: number | null;
+    trigger_label?: string | null;
+    due_date?: string | null;
+    expected_date?: string | null;
+    cash_expected?: number | null;
+    account_expected?: number | null;
+    total_expected?: number | null;
+  } | null;
 };
 
 export type PortalConfig = {
@@ -76,6 +88,30 @@ export const useNotices = () => {
     enabled: status === "in",
   });
 };
+
+// In-app notifications: unread count polled every 30 s (and on focus / foreground).
+export const useNotificationCount = () => {
+  const { status } = useAuth();
+  return useQuery({
+    queryKey: ["p-notif-count"],
+    queryFn: () => api.get<{ unread_count: number }>("/notifications/unread-count").then((r) => r.unread_count || 0),
+    enabled: status === "in",
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+    staleTime: 10_000,
+  });
+};
+
+export type NotificationPage = { items: PortalNotification[]; unread_count: number; total: number; page: number; page_size: number };
+export const NOTIF_PAGE = 20;
+export const useNotifications = () =>
+  useInfiniteQuery({
+    queryKey: ["p-notifs"],
+    queryFn: ({ pageParam }) => api.get<NotificationPage>(`/notifications?page=${pageParam}&page_size=${NOTIF_PAGE}`),
+    initialPageParam: 1,
+    getNextPageParam: (last) => (last.page * last.page_size < last.total ? last.page + 1 : undefined),
+    staleTime: 15_000,
+  });
 
 export const useRequests = () =>
   useQuery({

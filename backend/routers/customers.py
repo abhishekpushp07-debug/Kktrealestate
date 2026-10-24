@@ -180,7 +180,7 @@ async def _dup_check(company_id: str, phone: str | None, pan: str | None, exclud
 
 
 @router.get("")
-async def list_customers(params: ListParams = Depends(), kyc_status: str | None = None, source: str | None = None,
+async def list_customers(params: ListParams = Depends(), has_overdue: bool = False, kyc_status: str | None = None, source: str | None = None,
                          assigned_sales_user_id: str | None = None, user: dict = Depends(require("customer.read"))):
     q = {"company_id": user["company_id"], **search_filter(params.search, ["full_name", "phone", "customer_code", "email"])}
     if params.search and params.search.replace(" ", "").isalnum() and len(params.search) == 10:
@@ -193,8 +193,18 @@ async def list_customers(params: ListParams = Depends(), kyc_status: str | None 
         q["source"] = source
     if assigned_sales_user_id:
         q["assigned_sales_user_id"] = assigned_sales_user_id
+    today = date.today().isoformat()
+    if has_overdue:
+        q["id"] = {"$in": await db.demands.distinct("customer_id", {"voided": {"$ne": True}, "status": {"$in": ["Open", "Partially Paid"]}, "due_date": {"$lt": today}})}
     res = await paginate(db.customers, q, params, params.sort_spec(["full_name", "customer_code", "created_at", "kyc_status", "phone"], "-created_at"))
     res["items"] = [present(c) for c in res["items"]]
+    ids = [c["id"] for c in res["items"]]
+    dues = {d["_id"]: d["due"] for d in await db.bookings.aggregate([{"$match": {"customer_id": {"$in": ids}, "status": "Active"}}, {"$group": {"_id": "$customer_id", "due": {"$sum": {"$add": [{"$ifNull": ["$summary.due_paise", 0]}, {"$ifNull": ["$summary.other_charges_due_paise", 0]}]}}}}]).to_list(None)}
+    od = {d["_id"]: d["n"] for d in await db.demands.aggregate([{"$match": {"customer_id": {"$in": ids}, "voided": {"$ne": True}, "status": {"$in": ["Open", "Partially Paid"]}, "due_date": {"$lt": today}}}, {"$group": {"_id": "$customer_id", "n": {"$sum": 1}}}]).to_list(None)}
+    for c in res["items"]:
+        c["total_due_paise"] = dues.get(c["id"], 0)
+        c["total_due"] = round(c["total_due_paise"] / 100, 2)
+        c["overdue_count"] = od.get(c["id"], 0)
     if res.pop("_csv", False):
         from fastapi import Response
         return Response(to_csv(res["items"], ["customer_code", "full_name", "phone", "email", "source", "kyc_status", "pan_masked", "created_at"]), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=customers.csv"})
@@ -222,7 +232,24 @@ async def get_customer(customer_id: str, request: Request, reveal: bool = Query(
     if do_reveal:
         await write_audit(user, "customer.kyc_reveal", "customer", customer_id, after={"revealed": ["pan", "aadhaar", "bank.account_number"]}, ip=client_ip(request))
     out = present(doc, do_reveal)
-    out["bookings"] = await db.bookings.find({"$or": [{"customer_id": customer_id}, {"co_applicant_customer_ids": customer_id}]}, {"_id": 0, "id": 1, "booking_number": 1, "status": 1, "flat_snapshot": 1, "project_id": 1, "agreement_value_paise": 1, "summary": 1, "booking_date": 1}).to_list(50)
+    out["bookings"] = await db.bookings.find({"$or": [{"customer_id": customer_id}, {"co_applicant_customer_ids": customer_id}]}, {"_id": 0, "id": 1, "booking_number": 1, "status": 1, "flat_snapshot": 1, "project_id": 1, "agreement_value_paise": 1, "summary": 1, "booking_date": 1, "payment_plan_snapshot": 1, "block_id": 1, "cash_agreed_paise": 1, "account_agreed_paise": 1}).to_list(50)
+    from services.dues_engine import schedule
+    today = date.today().isoformat()
+    for bk in out["bookings"]:
+        snap = bk.pop("payment_plan_snapshot", None)
+        bk["plan_name"] = (snap or {}).get("name")
+        bk["next_installment"] = None
+        bk["overdue_count"] = await db.demands.count_documents({"booking_id": bk["id"], "voided": {"$ne": True}, "status": {"$in": ["Open", "Partially Paid"]}, "due_date": {"$lt": today}})
+        if snap and bk.get("status") == "Active":
+            blk = await db.blocks.find_one({"id": bk["block_id"]}, {"_id": 0, "construction_stages": 1}) or {}
+            rows = schedule({**bk, "payment_plan_snapshot": snap}, blk, await db.demands.find({"booking_id": bk["id"]}, {"_id": 0}).to_list(None))
+            nxt = next((r for r in rows if r["status"] == "Not yet due"), None)
+            bk["next_installment"] = {"name": nxt["name"], "trigger_label": nxt["trigger_label"], "expected_date": nxt["expected_date"], "total_paise": nxt["total_expected_paise"]} if nxt else None
+        sm = bk.get("summary") or {}
+        bk["plan_summary"] = {"plan_name": bk["plan_name"], "next_installment": bk["next_installment"], "overdue_count": bk["overdue_count"],
+                              "raised": {"cash_paise": sm.get("cash_order_raised_paise", 0), "account_paise": sm.get("account_order_raised_paise", 0), "total_paise": sm.get("total_order_raised_paise", 0)},
+                              "paid": {"cash_paise": sm.get("cash_paid_paise", 0), "account_paise": sm.get("account_paid_paise", 0), "total_paise": sm.get("paid_paise", 0)},
+                              "due": {"cash_paise": sm.get("cash_due_paise", 0), "account_paise": sm.get("account_due_paise", 0), "total_paise": sm.get("due_paise", 0)}}
     out["leads"] = await db.leads.find({"converted_customer_id": customer_id}, {"_id": 0, "id": 1, "lead_number": 1, "status": 1, "stage_history": 1}).to_list(20)
     return out
 

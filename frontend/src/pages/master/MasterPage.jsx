@@ -14,7 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { MASTERS } from "./masterConfig";
 import { GenericMasterForm } from "./GenericMasterForm";
 import { FlatTypeForm } from "./FlatTypeForm";
-import { MilestoneForm } from "./MilestoneForm";
+import { PaymentPlanForm } from "@/pages/master/PaymentPlanForm";
 import { FloorPlanForm } from "./FloorPlanForm";
 
 export default function MasterPage() {
@@ -42,7 +42,7 @@ export default function MasterPage() {
       </div>) }] : []),
   ];
 
-  const FormComp = cfg.custom === "flatType" ? FlatTypeForm : cfg.custom === "milestone" ? MilestoneForm : cfg.custom === "floorPlan" ? FloorPlanForm : GenericMasterForm;
+  const FormComp = cfg.custom === "flatType" ? FlatTypeForm : cfg.custom === "paymentPlan" ? PaymentPlanForm : cfg.custom === "floorPlan" ? FloorPlanForm : GenericMasterForm;
   return (
     <div data-testid="master-page">
       <PageHeader title="Master Data" subtitle="Canonical reference data. Structural entities always reference these by id." actions={can("master.write") && <Button onClick={() => setEditing(null)} className="bg-navy hover:bg-navy-700" data-testid="master-new-btn"><Plus className="mr-1.5 h-4 w-4" />New {cfg.label.replace(/s$/, "")}</Button>} />

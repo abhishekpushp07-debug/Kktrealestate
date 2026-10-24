@@ -15,6 +15,7 @@ import { SkeletonScreen } from "@/src/ui/skeleton";
 import { Empty, ErrorState } from "@/src/ui/states";
 import { Lightbox } from "@/src/ui/lightbox";
 import { usePdf } from "@/src/screens/shared";
+import { PaymentPlanCard } from "@/src/screens/plan";
 
 type Room = { room?: string; label?: string; length_ft?: number | null; width_ft?: number | null };
 
@@ -134,6 +135,8 @@ export default function FlatScreen() {
           <KV key={c.name} k={`${c.name}${c.gst ? " (incl. GST)" : ""}`} v={`${inr(c.total)}${c.paid ? ` · paid ${inr(c.paid)}` : ""}`} />
         ))}
       </Card>
+
+      {b.payment_plan || b.next_installment ? <PaymentPlanCard plan={b.payment_plan} next={b.next_installment} showLink testID="flat-plan-section" /> : null}
 
       <Card testID="flat-agreement-revisions">
         <SectionTitle title="Agreement & revisions" />

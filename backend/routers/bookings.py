@@ -38,6 +38,8 @@ class OtherChargeIn(StrictModel):
 
 
 class BookingIn(StrictModel):
+    payment_plan_id: str | None = None
+    plan_acceptance_mode: str = "In person"
     flat_id: str
     customer_id: str
     co_applicant_customer_ids: list[str] = []
@@ -130,6 +132,13 @@ async def create_booking(body: BookingIn, request: Request, user: dict = Depends
     if not milestones:
         mt = await db.milestone_templates.find_one({"id": block.get("milestone_template_id") or project.get("milestone_template_id")}, {"_id": 0})
         milestones = [{**m, "status": "Pending"} for m in (mt or {}).get("milestones", [])]
+    from routers.construction import applicable_plans, build_snapshot
+    plans = await applicable_plans(flat["project_id"], flat["block_id"])
+    plan = next((p for p in plans if p["id"] == body.payment_plan_id), None) if body.payment_plan_id else (plans[0] if plans else None)
+    if plans and not plan:
+        raise ApiError(409, "Chosen payment plan is not assigned to this tower", "PLAN_NOT_APPLICABLE")
+    if body.payment_plan_id and not plan:
+        raise ApiError(404, "Payment plan not found", "NOT_FOUND")
     charges = []
     if body.other_charges:
         cts = {c["id"]: c for c in await db.charge_types.find({"id": {"$in": [c.charge_type_id for c in body.other_charges]}}, {"_id": 0}).to_list(None)}
@@ -153,7 +162,8 @@ async def create_booking(body: BookingIn, request: Request, user: dict = Depends
            "agreement_value_paise": to_paise(body.agreement_value), "cash_agreed_paise": to_paise(body.cash_agreed), "account_agreed_paise": to_paise(body.account_agreed),
            "rate_per_sqft": flat.get("rate_per_sqft"), "flat_snapshot": {"flat_number": flat["flat_number"], "flat_type_code": flat.get("flat_type_code"), "flat_type_id": flat.get("flat_type_id"), "super_builtup_sqft": flat.get("super_builtup_sqft"), "floor": flat.get("floor"), "price": flat.get("price")},
            "milestone_template_snapshot": [{"seq": m["seq"], "name": m["name"], "cumulative_percent": m["cumulative_percent"]} for m in milestones],
-           "construction_percent": 0, "other_charges": charges, "parking_slot_ids": body.parking_slot_ids, "sales_user_id": body.sales_user_id or user["id"], "lead_id": body.lead_id,
+           "construction_percent": 0, "raised_percent": 0, "payment_plan_id": plan["id"] if plan else None, "payment_plan_snapshot": await build_snapshot(plan) if plan else None,
+           "plan_acceptance": {"accepted_on": body.booking_date.isoformat(), "accepted_by_user_id": user["id"], "mode": body.plan_acceptance_mode} if plan else None, "other_charges": charges, "parking_slot_ids": body.parking_slot_ids, "sales_user_id": body.sales_user_id or user["id"], "lead_id": body.lead_id,
            "broker_name": body.broker_name, "remarks": body.remarks, "status": "Active", "cancellation": None, "agreement_revisions": [], "summary": {}}
     async with unit_of_work() as uow:
         upd = await guarded_update(db.flats, {"id": flat["id"], "status": {"$in": ["Available", "Hold"]}}, {"$set": {"status": "Booked", "booking_id": doc["id"], "status_changed_at": posted_at, "status_changed_by": user["id"], "updated_at": posted_at}, "$inc": {"version": 1}}, uow)
@@ -168,16 +178,13 @@ async def create_booking(body: BookingIn, request: Request, user: dict = Depends
         await db.bookings.insert_one(doc, **uow.kw())
         uow.on_rollback(lambda: db.bookings.delete_one({"id": doc["id"]}))
         doc.pop("_id", None)
-        # catch-up demand when block already under construction
-        pct = block.get("construction_percent") or 0
-        if pct > 0:
-            done = [m for m in milestones if m.get("status") == "Completed"] or [{"seq": 0, "name": "Catch-up on booking", "cumulative_percent": pct}]
-            await create_demand(doc, company, {**done[-1], "name": f"{done[-1]['name']} (on booking)"}, body.booking_date, int(company.get("demand_due_days") or 15), posted_at)
         lines = raise_other_charges(doc, "on_booking", posted_at)
-        if pct >= 100:
-            lines = raise_other_charges(doc, "on_possession", posted_at) or lines
         if lines:
+            doc["other_charges"] = lines
             await db.bookings.update_one({"id": doc["id"]}, {"$set": {"other_charges": lines}})
+    if plan:
+        from services.dues_engine import raise_due_installments
+        await raise_due_installments(doc, posted_at=posted_at, actor=user)  # ON_BOOKING + catch-up on already-completed stages
     await rebuild(doc["id"])
     if body.lead_id:
         await db.leads.update_one({"id": body.lead_id}, {"$set": {"booking_id": doc["id"]}})

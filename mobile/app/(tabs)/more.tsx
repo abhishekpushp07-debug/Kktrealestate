@@ -5,11 +5,11 @@ import * as Application from "expo-application";
 import { Feather } from "@expo/vector-icons";
 
 import { useAuth } from "@/src/auth";
-import { useBookings, useConfig, useNotices } from "@/src/hooks";
+import { useBookings, useConfig, useNotices, useNotificationCount } from "@/src/hooks";
 import { phoneDigits } from "@/src/format";
 import { makeStyles, radius, useTheme } from "@/src/theme";
 import { Screen, PageHeader } from "@/src/ui/screen";
-import { Button, Card, Press, type IconName } from "@/src/ui/primitives";
+import { Button, Card, IconButton, Press, type IconName } from "@/src/ui/primitives";
 import { T } from "@/src/ui/text";
 import { openUrl, RMCard } from "@/src/screens/home/widgets";
 import { confirm } from "@/src/ui/confirm";
@@ -46,6 +46,7 @@ export default function More() {
   const { data: bookings } = useBookings();
   const notices = useNotices();
   const unread = notices.data?.unread ?? me?.unread_notices ?? 0;
+  const notifUnread = useNotificationCount().data || 0;
   const go = (h: Href) => () => router.push(h);
   const version = Application.nativeApplicationVersion || Constants.expoConfig?.version || "1.0.0";
   const build = Application.nativeBuildVersion;
@@ -54,7 +55,8 @@ export default function More() {
   const account: Row[] = [
     ...(bookings || []).map((b) => ({ title: `My Flat ${b.flat_number}`, sub: `${b.project_name} · ${b.booking_number}`, icon: "home" as IconName, onPress: go(`/flat/${b.id}`), testID: `more-flat-${b.booking_number}` })),
     { title: "Documents", sub: "Allotment letter, statement, shared files", icon: "folder", onPress: go("/documents"), testID: "more-documents" },
-    { title: "Notices", sub: unread ? `${unread} unread` : "Updates from the builder", icon: "bell", onPress: go("/notices"), testID: "more-notices" },
+    { title: "Notifications", sub: notifUnread ? `${notifUnread} unread` : "Dues, construction, replies", icon: "bell", onPress: go("/notifications"), testID: "more-notifications" },
+    { title: "Notices", sub: unread ? `${unread} unread` : "Updates from the builder", icon: "clipboard", onPress: go("/notices"), testID: "more-notices" },
     { title: "Bank details", sub: "Where to transfer the Account component", icon: "briefcase", onPress: go("/bank"), testID: "more-bank" },
   ];
   const security: Row[] = [
@@ -67,8 +69,12 @@ export default function More() {
   ];
 
   return (
-    <Screen tabbed testID="more-screen" refreshKeys={[["p-bookings"], ["p-notices"]]}>
-      <PageHeader title="More" sub={me?.customer ? `${me.customer.full_name} · ${me.customer.customer_code}` : undefined} />
+    <Screen tabbed testID="more-screen" refreshKeys={[["p-bookings"], ["p-notices"], ["p-notif-count"]]}>
+      <PageHeader
+        title="More"
+        sub={me?.customer ? `${me.customer.full_name} · ${me.customer.customer_code}` : undefined}
+        right={<IconButton icon="bell" label="Notifications" badge={notifUnread} onPress={go("/notifications")} testID="more-notifications-bell" />}
+      />
       <Rows rows={account} />
       <T v="label" tone="muted" style={{ marginTop: 6 }}>
         Account & security

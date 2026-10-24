@@ -21,7 +21,6 @@ export function BlockForm({ open, onOpenChange, project, onSaved }) {
   const [busy, setBusy] = useState(false);
   const { options: btOptions, items: blockTypes } = useMasterOptions("block-types");
   const { options: fpOptions, items: templates } = useMasterOptions("floor-plan-templates", (x) => ({ value: x.id, label: x.name, sub: `${x.flats_per_floor}/floor` }));
-  const { options: mtOptions } = useMasterOptions("milestone-templates", (x) => ({ value: x.id, label: x.name }));
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const bt = blockTypes.find((b) => b.id === form.block_type_id);
   const hasFloors = bt ? bt.has_floors : true;
@@ -96,7 +95,7 @@ export function BlockForm({ open, onOpenChange, project, onSaved }) {
               <Field label="Rate ₹/sq.ft" hint="Overrides flat type base rate; rate cards can re-price later"><Input type="number" min={0} value={form.rate_per_sqft} onChange={(e) => set("rate_per_sqft", e.target.value)} data-testid="block-rate-input" /></Field>
               <Field label="Floor rise ₹/sq.ft per floor"><Input type="number" min={0} value={form.floor_rise_per_sqft} onChange={(e) => set("floor_rise_per_sqft", e.target.value)} data-testid="block-floor-rise-input" /></Field>
             </div>
-            <Field label="Milestone template" hint="Defaults to project template"><Combobox options={mtOptions} value={form.milestone_template_id} onChange={(v) => set("milestone_template_id", v)} testId="block-milestone-combobox" /></Field>
+            
             <Field label="Status"><Select value={form.status} onValueChange={(v) => set("status", v)}><SelectTrigger data-testid="block-status-select"><SelectValue /></SelectTrigger><SelectContent>{["Planning", "Under Construction", "Ready", "Completed"].map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></Field>
           </>}
           {step === 3 && <>
