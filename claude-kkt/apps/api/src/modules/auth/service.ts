@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { Redis } from "ioredis";
@@ -40,7 +41,7 @@ function requestMeta(req: FastifyRequest): { ip: string; userAgent: string | nul
 
 /** Starts a new refresh-token family and signs the matching access token (sid = family id). */
 export async function createSession(tx: Executor, subject: SessionSubject, req: FastifyRequest, flags: { mfa: boolean; mustChangePassword: boolean }): Promise<IssuedTokens> {
-  const familyId = crypto.randomUUID();
+  const familyId = randomUUID();
   return issueTokens(tx, subject, familyId, req, flags);
 }
 

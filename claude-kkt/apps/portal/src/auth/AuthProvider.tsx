@@ -1,0 +1,190 @@
+// Authentication state for the portal: phone + password login, must_change_password gate,
+// logout (this device / all devices), restore on launch from the stored refresh token with a
+// cached user snapshot so the shell renders instantly, and session-expiry handling.
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { normalisePhone, PortalLoginSchema, type PortalUser } from "@kkt/contracts";
+import { Platform } from "react-native";
+import { api, ApiError, session } from "@/api/client";
+import { clearPersistedCache, queryClient, keys } from "@/api/queries";
+import { kvStorage } from "@/lib/storage";
+
+const USER_KEY = "kkt.portal.user";
+
+export type AuthStatus = "booting" | "anonymous" | "authenticated";
+
+export interface LoginFailure {
+  code: "INVALID_CREDENTIALS" | "LOCKED" | "RATE_LIMITED" | "VALIDATION" | "NETWORK" | "OTHER";
+  message: string;
+  lockedUntil?: string;
+  retryAfterSeconds?: number;
+}
+
+interface AuthContextValue {
+  status: AuthStatus;
+  user: PortalUser | null;
+  mustChangePassword: boolean;
+  login: (phone: string, password: string) => Promise<{ ok: true } | { ok: false; failure: LoginFailure }>;
+  logout: (opts?: { allDevices?: boolean }) => Promise<void>;
+  refreshUser: () => Promise<void>;
+  markPasswordChanged: () => void;
+}
+
+const AuthContext = createContext<AuthContextValue | null>(null);
+
+/** Phone input → 10 digits (drops +91 / 0 / punctuation). */
+export function toTenDigitPhone(input: string): string {
+  const out = normalisePhone(input);
+  return typeof out === "string" ? out : "";
+}
+
+function deviceName(): string {
+  if (Platform.OS === "web") {
+    const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
+    const browser = /Edg\//.test(ua) ? "Edge" : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : /Firefox\//.test(ua) ? "Firefox" : "Browser";
+    return `${browser} on web`;
+  }
+  return Platform.OS === "ios" ? "iPhone app" : "Android app";
+}
+
+function toFailure(e: unknown): LoginFailure {
+  if (e instanceof ApiError) {
+    if (e.code === "INVALID_CREDENTIALS" || e.status === 401) return { code: "INVALID_CREDENTIALS", message: "That phone number and password don't match." };
+    if (e.code === "LOCKED" || e.status === 423) {
+      const lockedUntil = typeof e.details.locked_until === "string" ? e.details.locked_until : undefined;
+      return { code: "LOCKED", message: e.message || "Too many failed attempts. Your account is locked for a while.", lockedUntil };
+    }
+    if (e.code === "RATE_LIMITED" || e.status === 429) {
+      return { code: "RATE_LIMITED", message: e.message || "Too many attempts. Please wait a minute and try again.", retryAfterSeconds: e.retryAfterSeconds };
+    }
+    if (e.code === "VALIDATION_ERROR") return { code: "VALIDATION", message: "Enter a valid 10-digit mobile number and your password." };
+    if (e.isNetwork) return { code: "NETWORK", message: e.message };
+    return { code: "OTHER", message: e.message };
+  }
+  return { code: "OTHER", message: "Something went wrong. Please try again." };
+}
+
+export function AuthProvider({ children }: { children: ReactNode }): React.JSX.Element {
+  const [status, setStatus] = useState<AuthStatus>("booting");
+  const [user, setUser] = useState<PortalUser | null>(null);
+  const alive = useRef(true);
+
+  const persistUser = useCallback(async (u: PortalUser | null) => {
+    if (u) await kvStorage.set(USER_KEY, JSON.stringify(u));
+    else await kvStorage.remove(USER_KEY);
+  }, []);
+
+  const signOutLocally = useCallback(async () => {
+    await session.clear();
+    await persistUser(null);
+    await clearPersistedCache();
+    if (alive.current) {
+      setUser(null);
+      setStatus("anonymous");
+    }
+  }, [persistUser]);
+
+  const refreshUser = useCallback(async () => {
+    try {
+      const me = await api.auth.me();
+      if (!alive.current) return;
+      setUser(me);
+      setStatus("authenticated");
+      queryClient.setQueryData(keys.me, me);
+      await persistUser(me);
+    } catch (e) {
+      if (e instanceof ApiError && e.isAuth) await signOutLocally();
+      // Offline / server trouble: keep the cached session so the app stays usable.
+    }
+  }, [persistUser, signOutLocally]);
+
+  // Restore on launch.
+  useEffect(() => {
+    alive.current = true;
+    void (async () => {
+      const hasRefresh = await session.load();
+      if (!hasRefresh) {
+        setStatus("anonymous");
+        return;
+      }
+      const cached = await kvStorage.get(USER_KEY);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached) as PortalUser;
+          if (alive.current) {
+            setUser(parsed);
+            setStatus("authenticated");
+          }
+        } catch {
+          /* ignore a corrupt snapshot */
+        }
+      }
+      await refreshUser();
+      if (alive.current && !cached) {
+        // No snapshot and /me failed without a 401 (offline): there is nothing to show → sign in.
+        setStatus((s) => (s === "booting" ? "anonymous" : s));
+      }
+    })();
+    return () => {
+      alive.current = false;
+    };
+  }, [refreshUser]);
+
+  // The client tells us when the refresh token is rejected.
+  useEffect(() => session.onExpired(() => void signOutLocally()), [signOutLocally]);
+
+  const login = useCallback<AuthContextValue["login"]>(
+    async (phoneInput, password) => {
+      const parsed = PortalLoginSchema.safeParse({ phone: phoneInput, password, device_name: deviceName() });
+      if (!parsed.success) {
+        const phoneIssue = parsed.error.issues.find((i) => i.path[0] === "phone");
+        return { ok: false, failure: { code: "VALIDATION", message: phoneIssue ? "Enter a valid 10-digit Indian mobile number." : "Enter your password." } };
+      }
+      try {
+        const res = await api.auth.login(parsed.data);
+        await session.setTokens(res);
+        await persistUser(res.user);
+        queryClient.setQueryData(keys.me, res.user);
+        setUser(res.user);
+        setStatus("authenticated");
+        return { ok: true };
+      } catch (e) {
+        return { ok: false, failure: toFailure(e) };
+      }
+    },
+    [persistUser],
+  );
+
+  const logout = useCallback<AuthContextValue["logout"]>(
+    async (opts) => {
+      try {
+        await api.auth.logout({ all_devices: opts?.allDevices ?? false });
+      } catch {
+        /* the server session may already be gone; always clear locally */
+      }
+      await signOutLocally();
+    },
+    [signOutLocally],
+  );
+
+  const markPasswordChanged = useCallback(() => {
+    setUser((u) => {
+      if (!u) return u;
+      const next = { ...u, must_change_password: false };
+      void persistUser(next);
+      return next;
+    });
+  }, [persistUser]);
+
+  const value = useMemo<AuthContextValue>(
+    () => ({ status, user, mustChangePassword: user?.must_change_password ?? false, login, logout, refreshUser, markPasswordChanged }),
+    [status, user, login, logout, refreshUser, markPasswordChanged],
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth(): AuthContextValue {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
+  return ctx;
+}
