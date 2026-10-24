@@ -1,0 +1,328 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+ * KKT design tokens — royal deep navy + gold + ivory, cinematic editorial luxury
+ * ------------------------------------------------------------------------- */
+@theme {
+  /* Navy scale (brand #0B1F3A at 900) */
+  --color-navy-50: #eef2f8;
+  --color-navy-100: #d9e1ee;
+  --color-navy-200: #b3c2dc;
+  --color-navy-300: #8197bf;
+  --color-navy-400: #52699a;
+  --color-navy-500: #2f477a;
+  --color-navy-600: #1f335e;
+  --color-navy-700: #152849;
+  --color-navy-800: #0f233f;
+  --color-navy-900: #0b1f3a;
+  --color-navy-950: #06142a;
+
+  /* Gold scale (brand #C9A227 at 500) */
+  --color-gold-50: #fbf7e8;
+  --color-gold-100: #f5ebc4;
+  --color-gold-200: #ebd98f;
+  --color-gold-300: #dfc45c;
+  --color-gold-400: #d4b23a;
+  --color-gold-500: #c9a227;
+  --color-gold-600: #a8861f;
+  --color-gold-700: #86691a;
+  --color-gold-800: #5f4a13;
+  --color-gold-900: #3d300c;
+
+  /* Ivory surfaces */
+  --color-ivory-50: #fdfcfa;
+  --color-ivory-100: #f8f6f1;
+  --color-ivory-200: #efeae0;
+  --color-ivory-300: #e3dccb;
+  --color-ivory-400: #cfc5ae;
+
+  /* Semantic */
+  --color-ink: #0b1f3a;
+  --color-ink-muted: #4a5a74;
+  --color-ink-soft: #6e7b91;
+  --color-line: #e3dccb;
+  --color-success: #1f7a4d;
+  --color-danger: #b42318;
+
+  /* Typography */
+  --font-display: var(--font-cormorant), "Cormorant Garamond", Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-manrope), Manrope, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --text-display-xl: clamp(2.75rem, 2rem + 4vw, 5.5rem);
+  --text-display-xl--line-height: 1.02;
+  --text-display-xl--letter-spacing: -0.02em;
+  --text-display-lg: clamp(2.25rem, 1.6rem + 3vw, 4rem);
+  --text-display-lg--line-height: 1.05;
+  --text-display-lg--letter-spacing: -0.015em;
+  --text-display-md: clamp(1.75rem, 1.4rem + 1.6vw, 2.75rem);
+  --text-display-md--line-height: 1.1;
+  --text-display-sm: clamp(1.375rem, 1.2rem + 0.8vw, 1.875rem);
+  --text-display-sm--line-height: 1.2;
+  --text-eyebrow: 0.75rem;
+  --text-eyebrow--line-height: 1rem;
+  --text-eyebrow--letter-spacing: 0.22em;
+
+  /* Containers */
+  --container-prose: 44rem;
+  --container-site: 80rem;
+  --container-wide: 90rem;
+
+  /* Shadows & radii */
+  --shadow-card: 0 1px 2px rgb(11 31 58 / 0.06), 0 12px 32px -12px rgb(11 31 58 / 0.18);
+  --shadow-float: 0 24px 60px -20px rgb(11 31 58 / 0.35);
+  --radius-card: 1.25rem;
+
+  /* Motion */
+  --ease-luxe: cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-fade-up: fade-up 0.9s var(--ease-luxe) both;
+  --animate-fade-in: fade-in 0.8s ease-out both;
+  --animate-ken-burns: ken-burns 14s ease-out both;
+  --animate-shimmer: shimmer 1.8s linear infinite;
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translate3d(0, 18px, 0);
+    }
+    to {
+      opacity: 1;
+      transform: translate3d(0, 0, 0);
+    }
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes ken-burns {
+    from {
+      transform: scale(1);
+    }
+    to {
+      transform: scale(1.08);
+    }
+  }
+  @keyframes shimmer {
+    from {
+      background-position: -200% 0;
+    }
+    to {
+      background-position: 200% 0;
+    }
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Base
+ * ------------------------------------------------------------------------- */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+    overflow-x: clip;
+  }
+  body {
+    @apply bg-ivory-100 text-ink font-sans antialiased;
+    overflow-x: clip;
+    min-height: 100dvh;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--color-gold-500) 35%, transparent);
+  }
+  :focus-visible {
+    outline: 3px solid var(--color-gold-500);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+  img,
+  video,
+  iframe {
+    max-width: 100%;
+  }
+  h1,
+  h2,
+  h3,
+  .font-display {
+    font-family: var(--font-display);
+    font-feature-settings: "liga", "kern";
+  }
+  details > summary {
+    list-style: none;
+  }
+  details > summary::-webkit-details-marker {
+    display: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Components & utilities
+ * ------------------------------------------------------------------------- */
+@utility container-site {
+  margin-inline: auto;
+  width: 100%;
+  max-width: var(--container-site);
+  padding-inline: 1rem;
+  @media (width >= 40rem) {
+    padding-inline: 1.5rem;
+  }
+  @media (width >= 64rem) {
+    padding-inline: 2.5rem;
+  }
+}
+
+@utility container-wide {
+  margin-inline: auto;
+  width: 100%;
+  max-width: var(--container-wide);
+  padding-inline: 1rem;
+  @media (width >= 40rem) {
+    padding-inline: 1.5rem;
+  }
+  @media (width >= 64rem) {
+    padding-inline: 2.5rem;
+  }
+}
+
+@utility eyebrow {
+  font-family: var(--font-sans);
+  font-size: var(--text-eyebrow);
+  line-height: var(--text-eyebrow--line-height);
+  letter-spacing: var(--text-eyebrow--letter-spacing);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+@utility tap {
+  min-height: 3rem;
+  min-width: 3rem;
+}
+
+@utility glass {
+  background: color-mix(in srgb, var(--color-navy-900) 35%, transparent);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+}
+
+@utility gold-rule {
+  position: relative;
+  &::after {
+    content: "";
+    display: block;
+    width: 3.5rem;
+    height: 2px;
+    margin-top: 1rem;
+    background: linear-gradient(90deg, var(--color-gold-500), var(--color-gold-300));
+  }
+}
+
+@utility hide-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility skeleton {
+  background: linear-gradient(90deg, var(--color-ivory-200) 25%, var(--color-ivory-300) 50%, var(--color-ivory-200) 75%);
+  background-size: 200% 100%;
+  animation: var(--animate-shimmer);
+}
+
+/* Reveal: hidden state is applied only after hydration, so content is never lost without JS. */
+.reveal[data-state="pending"] {
+  opacity: 0;
+  transform: translate3d(0, 18px, 0);
+}
+.reveal[data-state="visible"] {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 0.9s var(--ease-luxe),
+    transform 0.9s var(--ease-luxe);
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal[data-state="pending"] {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Hero crossfade + Ken Burns */
+.hero-slide {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 1.4s ease-in-out;
+}
+.hero-slide[data-active="true"] {
+  opacity: 1;
+}
+.hero-slide[data-active="true"] .hero-media {
+  animation: var(--animate-ken-burns);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-slide[data-active="true"] .hero-media {
+    animation: none;
+  }
+}
+
+/* Prose for markdown-rendered pages */
+.prose-kkt {
+  @apply text-[1.0625rem] leading-8 text-ink/90;
+}
+.prose-kkt > * + * {
+  margin-top: 1.25rem;
+}
+.prose-kkt h2 {
+  @apply font-display text-display-sm text-navy-900 mt-12 mb-4;
+}
+.prose-kkt h3 {
+  @apply font-display text-2xl text-navy-900 mt-10 mb-3;
+}
+.prose-kkt h4 {
+  @apply font-semibold text-navy-900 mt-8 mb-2;
+}
+.prose-kkt a {
+  @apply text-navy-700 underline decoration-gold-500 decoration-2 underline-offset-4 hover:text-gold-700;
+}
+.prose-kkt ul {
+  @apply list-disc pl-6 space-y-2;
+}
+.prose-kkt ol {
+  @apply list-decimal pl-6 space-y-2;
+}
+.prose-kkt blockquote {
+  @apply border-l-2 border-gold-500 pl-5 italic text-ink-muted font-display text-xl;
+}
+.prose-kkt img {
+  @apply rounded-card shadow-card my-8 w-full;
+}
+.prose-kkt code {
+  @apply rounded bg-ivory-200 px-1.5 py-0.5 font-mono text-[0.9em];
+}
+.prose-kkt pre {
+  @apply rounded-xl bg-navy-900 text-ivory-100 p-5 overflow-x-auto text-sm leading-6;
+}
+.prose-kkt pre code {
+  @apply bg-transparent p-0 text-inherit;
+}
+.prose-kkt hr {
+  @apply border-line my-10;
+}

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { IdSchema, ListQuerySchema, MasterRowSchema, NameSchema, TextSchema, listEnvelope, updateOf } from "../common.js";
+import { ListQuerySchema, MasterRowSchema, NameSchema, TextSchema, listEnvelope, updateOf } from "../common.js";
 import { PermissionListSchema } from "../permissions.js";
 
 const RoleBase = z.strictObject({
@@ -47,6 +47,3 @@ export type PermissionGroupResponse = z.infer<typeof PermissionGroupResponseSche
 /** Response to `GET /roles/permissions`. */
 export const PermissionCatalogResponseSchema = z.object({ groups: z.array(PermissionGroupResponseSchema) });
 export type PermissionCatalogResponse = z.infer<typeof PermissionCatalogResponseSchema>;
-
-/** Unused: keep ids referenced for symmetry with other modules. */
-export const RoleIdSchema = IdSchema;

@@ -303,7 +303,7 @@ function applyEvent(prev: LedgerSummary, event: LedgerEvent): { next: LedgerSumm
         throw new LedgerError("Ledger is already closed");
       }
       const next = withDerived({ ...prev, isClosed: true });
-      return { next, amountPaise: -event.refundPaise, bucket: null, label: event.label ?? "Booking cancelled" };
+      return { next, amountPaise: event.refundPaise === 0 ? 0 : -event.refundPaise, bucket: null, label: event.label ?? "Booking cancelled" };
     }
     default: {
       const never: never = event;

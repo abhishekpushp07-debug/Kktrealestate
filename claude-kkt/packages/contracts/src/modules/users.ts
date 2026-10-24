@@ -75,10 +75,11 @@ export const UserListResponseSchema = listEnvelope(UserRowSchema);
 export type UserListResponse = z.infer<typeof UserListResponseSchema>;
 
 /** Admin reset of a user's password; omit password to generate one. */
-export const UserResetPasswordSchema = VersionedSchema.extend({
+export const UserResetPasswordSchema = z.strictObject({
+  ...VersionedSchema.shape,
   new_password: PasswordSchema.optional(),
   must_change_password: z.boolean().default(true),
-}).strict();
+});
 export type UserResetPassword = z.infer<typeof UserResetPasswordSchema>;
 
 /** Response of a reset: temporary password shown once. */
@@ -86,12 +87,13 @@ export const UserResetPasswordResponseSchema = z.object({ id: IdSchema, temp_pas
 export type UserResetPasswordResponse = z.infer<typeof UserResetPasswordResponseSchema>;
 
 /** Unlock a locked-out user. */
-export const UserUnlockSchema = VersionedSchema.strict();
+export const UserUnlockSchema = z.strictObject(VersionedSchema.shape);
 export type UserUnlock = z.infer<typeof UserUnlockSchema>;
 
 /** Set a user's project scope. */
-export const UserProjectScopeSchema = VersionedSchema.extend({
+export const UserProjectScopeSchema = z.strictObject({
+  ...VersionedSchema.shape,
   all_projects: z.boolean(),
   project_ids: z.array(IdSchema).max(200),
-}).strict();
+});
 export type UserProjectScope = z.infer<typeof UserProjectScopeSchema>;
