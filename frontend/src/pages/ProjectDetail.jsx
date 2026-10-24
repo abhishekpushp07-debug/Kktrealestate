@@ -1,0 +1,120 @@
+import { useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { Layers, Pencil, Plus } from "lucide-react";
+import { useFetch } from "@/hooks/useList";
+import { useAuth } from "@/context/AuthContext";
+import { inrShort, fmtDate } from "@/lib/format";
+import { PageHeader, KV, EmptyState, StatCard } from "@/components/common/Bits";
+import { Pill } from "@/components/common/StatusChip";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ProjectForm } from "@/components/forms/ProjectForm";
+import { BlockForm } from "@/components/forms/BlockForm";
+import FlatsTable from "@/components/common/FlatsTable";
+import { RateCardsTab, ParkingTab } from "@/components/common/ProjectTabs";
+import { DocumentsPanel } from "@/components/common/DocumentsPanel";
+import { HistoryTimeline } from "@/components/common/HistoryTimeline";
+import { ProjectWebsiteTab } from "@/pages/cms/ProjectWebsiteTab";
+import { useMasterOptions } from "@/hooks/useList";
+
+function DocumentsTab({ appliesTo }) {
+  const { items } = useMasterOptions("document-types");
+  const docs = items.filter((d) => d.applies_to === appliesTo);
+  return (
+    <div className="card-elev p-5" data-testid="documents-tab">
+      <p className="mb-3 text-sm text-slate-600">Document checklist bound to Document Types master. Upload arrives in Phase 2 (object storage).</p>
+      <ul className="divide-y">{docs.map((d) => <li key={d.id} className="flex items-center justify-between py-2 text-sm"><span className="font-semibold text-navy">{d.name}</span><Pill tone="slate">Not uploaded</Pill></li>)}</ul>
+      {docs.length === 0 && <p className="text-sm text-slate-500">No document types apply to {appliesTo}.</p>}
+    </div>
+  );
+}
+
+export default function ProjectDetail() {
+  const { id } = useParams();
+  const { data: p, loading, reload } = useFetch(`/projects/${id}`);
+  const { can } = useAuth();
+  const navigate = useNavigate();
+  const [editOpen, setEditOpen] = useState(false);
+  const [blockOpen, setBlockOpen] = useState(false);
+  if (loading) return <div className="space-y-4"><Skeleton className="h-10 w-80" /><Skeleton className="h-40" /></div>;
+  if (!p) return <EmptyState title="Project not found" description="It may be outside your project scope." />;
+  const inv = p.inventory;
+  return (
+    <div data-testid="project-detail-page">
+      <PageHeader crumbs={[{ label: "Projects", to: "/erp/projects" }, { label: p.code }]} title={p.name} subtitle={`${p.project_type} · ${p.address?.city || ""} ${p.rera_number ? `· RERA ${p.rera_number}` : ""}`}
+        actions={<>
+          <Pill tone={p.status === "Ready" ? "green" : p.status === "Under Construction" ? "amber" : "slate"} className="px-3 py-1 text-xs">{p.status}</Pill>
+          {can("project.write") && <Button variant="outline" onClick={() => setEditOpen(true)} data-testid="edit-project-btn"><Pencil className="mr-1.5 h-4 w-4" />Edit</Button>}
+          {can("block.write") && <Button onClick={() => setBlockOpen(true)} className="bg-navy hover:bg-navy-700" data-testid="new-block-btn"><Plus className="mr-1.5 h-4 w-4" />Add block</Button>}
+        </>} />
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <StatCard label="Total units" value={inv.total} testId="project-stat-total" />
+        <StatCard label="Available" value={inv.Available} accent="green" testId="project-stat-available" />
+        <StatCard label="Hold" value={inv.Hold} accent="amber" testId="project-stat-hold" />
+        <StatCard label="Blocked" value={inv.Blocked} accent="slate" testId="project-stat-blocked" />
+        <StatCard label="Inventory value" value={inrShort(inv.inventory_value)} accent="gold" testId="project-stat-value" />
+      </div>
+      <Tabs defaultValue="overview">
+        <TabsList className="flex-wrap bg-white" data-testid="project-tabs">
+          {["overview", "blocks", "inventory", "pricing", "parking", "amenities", "documents", "website", "history", "settings"].map((t) => <TabsTrigger key={t} value={t} className="capitalize data-[state=active]:bg-navy data-[state=active]:text-white" data-testid={`project-tab-${t}`}>{t}</TabsTrigger>)}
+        </TabsList>
+        <TabsContent value="pricing" className="mt-4"><RateCardsTab projectId={p.id} onApplied={reload} /></TabsContent>
+        <TabsContent value="parking" className="mt-4"><ParkingTab projectId={p.id} /></TabsContent>
+        <TabsContent value="history" className="mt-4"><div className="card-elev p-5"><HistoryTimeline entityType="project" entityId={p.id} /></div></TabsContent>
+        <TabsContent value="documents" className="mt-4"><div className="card-elev p-5"><DocumentsPanel entityType="project" entityId={p.id} canWrite={can("project.write")} /></div></TabsContent>
+        <TabsContent value="overview" className="mt-4 grid gap-4 lg:grid-cols-3">
+          <div className="card-elev p-5 lg:col-span-2">
+            <h3 className="mb-4 text-base font-bold text-navy">Project details</h3>
+            <p className="mb-5 text-sm text-slate-600">{p.description || "No description."}</p>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+              <KV label="Code" value={p.code} /><KV label="Type" value={p.project_type} /><KV label="RERA" value={p.rera_number} />
+              <KV label="Launch" value={fmtDate(p.launch_date)} /><KV label="Possession" value={fmtDate(p.expected_possession_date)} /><KV label="Milestone template" value={p.milestone_template?.name} />
+              <KV label="Address" value={[p.address?.line1, p.address?.city, p.address?.state, p.address?.pincode].filter(Boolean).join(", ")} />
+              <KV label="Land area" value={p.land_area_sqft ? `${new Intl.NumberFormat("en-IN").format(p.land_area_sqft)} sq.ft` : "—"} /><KV label="Towers / Units" value={`${p.total_towers} / ${p.total_units}`} mono /><KV label="Parking" value={`${p.parking?.total || 0} slots`} mono />
+            </div>
+            {p.landmarks?.length > 0 && <div className="mt-5"><p className="label-xs mb-2">Landmarks</p><div className="flex flex-wrap gap-1.5">{p.landmarks.map((l, i) => <Pill key={i} tone="navy">{l.name} · {l.distance_km} km</Pill>)}</div></div>}
+            {p.approvals?.length > 0 && <div className="mt-4"><p className="label-xs mb-2">Approvals</p><div className="grid gap-2 sm:grid-cols-3">{p.approvals.map((a, i) => <div key={i} className="rounded border bg-slate-50 p-2 text-xs"><p className="font-bold text-navy">{a.name}</p><p className="text-slate-600">{a.number}</p><p className="text-slate-400">{fmtDate(a.date)}</p></div>)}</div></div>}
+            {p.team_members?.length > 0 && <div className="mt-4"><p className="label-xs mb-2">Team</p><div className="flex flex-wrap gap-1.5">{p.team_members.map((u) => <Pill key={u.id} tone="gold">{u.name}</Pill>)}</div></div>}
+          </div>
+          <div className="card-elev p-5">
+            <h3 className="mb-4 text-base font-bold text-navy">Milestone schedule</h3>
+            {p.milestone_template ? <ol className="space-y-2 text-sm">{p.milestone_template.milestones.map((m) => <li key={m.seq} className="flex items-center justify-between border-b border-slate-100 pb-1.5"><span>{m.seq}. {m.name}</span><span className="font-bold tabular text-navy">{m.cumulative_percent}%</span></li>)}</ol> : <p className="text-sm text-slate-500">No template selected.</p>}
+          </div>
+        </TabsContent>
+        <TabsContent value="blocks" className="mt-4">
+          {p.blocks.length === 0 ? <EmptyState icon={Layers} title="No blocks yet" description="Add a block to generate flats from your flat types." actionLabel={can("block.write") ? "Add block" : undefined} onAction={() => setBlockOpen(true)} testId="blocks-empty" /> : (
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {p.blocks.map((b) => (
+                <Link to={`/blocks/${b.id}`} key={b.id} className="card-elev p-5 transition-colors hover:border-gold/60" data-testid={`block-card-${b.code}`}>
+                  <div className="flex items-start justify-between"><div><p className="text-lg font-extrabold text-navy">{b.name}</p><p className="text-xs text-slate-500">Code {b.code} · {b.floors} floors × {b.flats_per_floor}</p></div><Pill tone="slate">{b.status}</Pill></div>
+                  <div className="mt-4 flex items-center gap-2"><div className="h-1.5 flex-1 rounded-full bg-slate-100"><div className="h-1.5 rounded-full bg-gold" style={{ width: `${b.construction_percent}%` }} /></div><span className="text-xs font-semibold tabular">{b.construction_percent}%</span></div>
+                  <div className="mt-3 grid grid-cols-4 gap-2 text-center text-[11px]">
+                    {[["Total", b.inventory.total, "text-navy"], ["Avail", b.inventory.Available, "text-emerald-600"], ["Hold", b.inventory.Hold, "text-amber-600"], ["Blocked", b.inventory.Blocked, "text-slate-500"]].map(([l, v, c]) => <div key={l} className="rounded bg-slate-50 py-1.5"><p className={`text-base font-extrabold tabular ${c}`}>{v}</p><p className="text-slate-500">{l}</p></div>)}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+        <TabsContent value="inventory" className="mt-4"><FlatsTable fixed={{ project_id: p.id }} blocks={p.blocks} /></TabsContent>
+        <TabsContent value="amenities" className="mt-4">
+          {p.amenities.length === 0 ? <EmptyState title="No amenities selected" description="Edit the project to pick amenities from master data." /> : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" data-testid="project-amenities-list">{p.amenities.map((a) => <div key={a.id} className="card-elev p-4"><div className="flex items-center justify-between"><p className="font-bold text-navy">{a.name}</p><Pill tone="gold">{a.category}</Pill></div><p className="mt-1 text-xs text-slate-500">{a.description}</p></div>)}</div>
+          )}
+        </TabsContent>
+        <TabsContent value="website" className="mt-4"><ProjectWebsiteTab projectId={p.id} slugDefault={p.code} /></TabsContent>
+        <TabsContent value="settings" className="mt-4">
+          <div className="card-elev p-5">
+            <h3 className="mb-2 text-base font-bold text-navy">Website flags</h3>
+            <p className="mb-4 text-sm text-slate-500">Edit these in the Website tab.</p>
+            <div className="grid grid-cols-3 gap-4">{[["is_published", "Published"], ["show_prices", "Show prices"], ["show_availability", "Show availability"]].map(([k, l]) => <KV key={k} label={l} value={p[k] ? "Yes" : "No"} />)}</div>
+            <div className="mt-6 grid grid-cols-3 gap-4"><KV label="Active" value={p.is_active ? "Yes" : "No"} /><KV label="Created" value={fmtDate(p.created_at)} /><KV label="Updated" value={fmtDate(p.updated_at)} /></div>
+          </div>
+        </TabsContent>
+      </Tabs>
+      {editOpen && <ProjectForm open={editOpen} onOpenChange={setEditOpen} project={p} onSaved={reload} />}
+      {blockOpen && <BlockForm open={blockOpen} onOpenChange={setBlockOpen} project={p} onSaved={(b) => { reload(); navigate(`/erp/blocks/${b.id}`); }} />}
+    </div>
+  );
+}

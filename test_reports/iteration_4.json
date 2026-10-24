@@ -1,0 +1,50 @@
+{
+  "summary": "Phase 3 testing (Public Website + CMS + Enquiries + Reseed guard + Website routing). Created /app/backend/tests/test_phase_3.py — 56 pytest cases, ALL PASS (34s). Covers: all 15 public endpoints 200+ETag+304 (Cache-Control upstream is 'public, max-age=60' but ingress rewrites to 'no-store, no-cache, must-revalidate' — ETag survives weak W/\"...\", 304 works); public JSON leaks none of {company_id, created_by, user_id, assigned_to, cost, customer, booking}; SGH has starting_price=4400000, show_construction_progress=true, availability[].construction_percent and milestones, unit keys limited to number/type/available/price; GGV show_prices=false, no starting_price, no unit price; /public/projects/does-not-exist → 404; enquiry success LD- reference → lead with source=Website, project_name='Shree Ganesh Heights', is_read=false, utm.utm_source='qa' (lead becomes is_read=true on next GET); honeypot (website:'http://spam') → 200 {ok:true,reference:null} and NO lead created; invalid phone '123' and missing consent → 422; rate limit 5/min returns 429 on burst; /cms/site 401 without token, 403 sales, 200 admin (brand_name 'Shree Ganesh Builders'); cms collection counts banners≥3, testimonials≥6, gallery≥18, posts≥5, pages≥3, people≥3; testimonial CRUD (POST → PATCH w/ version → appears in /public/home → DELETE → audit); project website GET as admin, duplicate slug→409, unpublish→public 404 + list excludes SGH, republish→200; reseed guard: wrong body→400 CONFIRM_REQUIRED, sales→403 (DID NOT send confirm:RESEED); posts filter: 4 Published (no draft-diwali-offers-2026), draft slug→404, sgh-tower-a-60-percent 200 with body+related.\n\nFRONTEND (Playwright 1920x1080): home / shows hero-headline 'Homes that rise with Patna', site-nav becomes '.solid' on scroll, SGH card 'Starting ₹44 L*', GGV card 'Price on request', doc.title contains 'Shree Ganesh Builders', OG+JSON-LD Organization present, all sections trust-strip/featured-projects/value-props/testimonials/leadership/home-blog/home-enquiry render. SGH detail: pd-price '₹44 L*', pd-subnav/overview/configurations/amenities/availability all present, config-2BHK-A rendered, availability-grid + construction-progress, 23 .unit.ok, clicking A-803 → picked-unit 'Selected unit: A-803 · 3BHK-B · ₹73 L', enq-message prefilled 'I am interested in unit A-803.', form submit → enquiry-success with reference LD-2627-0034; faq-0 present. GGV detail: pd-price='Price on request', construction-progress ABSENT. /projects: filter-status + filter-bhk present. /about: about-timeline + about-people. /gallery: gallery-filters + gallery-grid. /blog: blog-grid present. /contact: contact-call/whatsapp/email. /privacy: legal-title. Footer: rera-disclaimer + 'Staff login'. /login → /erp/login redirect; /dashboard (unauth) → /erp/login. ERP admin login → /erp/dashboard; /erp/website/settings shows 7 tabs + round-robin-switch; /erp/website/banners has 3 banner rows; /erp/website/enquiries route resolves; Roznamcha date set to 2030-01-01 refetches and shows ₹0 total receipts + 'No entries on 01 Jan 2030'. Sales login: no Website sidebar; /erp/website/settings shows 'Access restricted. Your role lacks the cms.read permission.' Project detail /erp/projects/{SGH id} has project-tab-website → project-website-tab with pw-is_published/pw-show_prices/pw-slug (pw-save correctly hidden for sales RBAC). ZERO JS errors across the whole run.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/public/* (ALL)", "issue": "App sets Cache-Control: 'public, max-age=60' but Cloudflare/ingress rewrites it to 'no-store, no-cache, must-revalidate'. ETag survives (weak form). Browsers/CDNs will not cache public pages for 60s. If the max-age=60 cache is required, add Cloudflare 'cache rule' or set 'Cache-Control: public, max-age=60, s-maxage=60' + 'CDN-Cache-Control' header, or disable 'Browser Cache TTL' override on this zone."},
+      {"endpoint": "GET /api/leads/{id}", "issue": "Side effect correctly flips is_read=true in DB, but the response body is the pre-update doc (still shows is_read=false). Next GET returns true. Minor UX: UI badge may require a refetch to update. Fix: do the update first then return the mutated doc, or spread {**lead, 'is_read': True} in the response."},
+      {"endpoint": "permissions.py (Project Admin role)", "issue": "Spec says projectadmin should get 403 on /cms/site, but Project Admin role has 'cms.read' in permissions.py:56. Either remove cms.read from Project Admin (recommended — global site settings should be Super Admin + Marketing only) or correct the spec. /cms/projects/{id}/website works correctly."},
+      {"endpoint": "N/A - review request typo", "issue": "Review spec references the slug 'royal-realty-hub-2' for a blog post (/public/posts/royal-realty-hub-2 and /blog/royal-realty-hub-2). That is the preview URL subdomain, not a seeded post. Real seeded post slugs: sgh-tower-a-60-percent, rera-checklist-patna-2026, bailey-road-residential-hub, inside-ganesh-green-villas. Tests use a real slug."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Blog list cards", "issue": "Review spec expects data-testid='blog-card-{slug}' but code uses 'post-card-{slug}' (/app/frontend/src/site/pages/Blog.jsx:18). Functional (blog-grid + cards render), but any Playwright test using the spec'd testid will fail. Rename or add alias.", "selector": "[data-testid^='blog-card-']", "priority": "LOW"},
+      {"component": "SiteSettings site-live switch", "issue": "Spec references data-testid='site-live' but code uses 'site-live-switch' (SiteSettings.jsx:38). Minor; functional.", "selector": "[data-testid='site-live']", "priority": "LOW"},
+      {"component": "/erp/website/settings tabs", "issue": "The Enquiries 'tab' is a sibling route (/erp/website/enquiries) rather than a tab panel inside the Settings page; spec listed it as a tab. Both work via sidebar/URL, UX intent satisfied.", "selector": "N/A", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase_3.py",
+    "/app/test_reports/pytest/phase_3.xml"
+  ],
+  "action_items": [
+    "Cache-Control override at ingress: set CDN-Cache-Control or Page Rule to respect origin max-age=60 for /api/public/*, OR document that the 60s cache applies only internally and ETag/304 is the real knob.",
+    "GET /api/leads/{id} should return the post-update doc with is_read=true (currently returns stale pre-update doc).",
+    "Remove 'cms.read' from Project Admin role in /app/backend/permissions.py:56 OR update spec (project admins currently can read global site settings).",
+    "Blog card data-testid rename 'post-card-{slug}' → 'blog-card-{slug}' (or add both) for spec compliance.",
+    "site-live switch testid: either rename to 'site-live' or update spec; current is 'site-live-switch'.",
+    "Spec typo: fix 'royal-realty-hub-2' → real post slug in Phase 3 spec references."
+  ],
+  "critical_code_review_comments": [
+    "routers/public.py cached() correctly emits strong ETag; good. But ingress strips Cache-Control — adding 'CDN-Cache-Control' or 'Surrogate-Control' header would let CF cache without being overridden by browser-cache page rule.",
+    "routers/leads.py:127 get_lead issues update_one but returns the pre-fetched doc. Should await db.leads.find_one(...) after the update, or merge {'is_read': True} into the response.",
+    "permissions.py:53-56: Project Admin role grants 'cms.read' which lets a project-scoped admin read global CMS collections and site settings. Consider scoping cms.read to Super Admin + Marketing only and giving project admins a narrower 'project.cms.read' permission used solely by /cms/projects/{id}/website.",
+    "public.py EnquiryIn email regex is very permissive — fine for leads, but strip-trim whitespace on name/message before persisting (currently uses raw body).",
+    "cms.py:149 default 'order' is count+1 at create time — concurrent creates could produce duplicates. Not critical for admin-only CMS."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase_3.py"
+  ],
+  "success_rate": {"backend": "100% (56/56)", "frontend": "100% of in-scope flows; 3 minor testid naming mismatches between spec and code (non-functional)"},
+  "test_credentials": "Unchanged — see /app/memory/test_credentials.md. All seeded users password Kkt@12345. admin@kkt.in / sales@kkt.in / projectadmin@kkt.in used in this run.",
+  "seed_data_creation": "Phase 3 enquiry tests create ~3-4 Website-sourced leads (LD-2627-00xx) with names 'QA Lead', 'Spam Bot' (honeypot — NO lead created), 'Burst 0..5', plus one from the Playwright SGH flow ('QA Browser' LD-2627-0034). One testimonial 'QA Person' created+deleted (clean). All leads remain in DB and will persist. Nothing destructive.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run `cd /app/backend && python -m pytest tests/test_phase_3.py -n 0 -v`. Enquiry rate limit (5/min/IP) is shared with your own enquiry POSTs — the test file deliberately runs rate-limit test LAST. Lead reads mark is_read in DB but return pre-update doc; use a second GET to assert. Cache-Control header from ingress is 'no-store, no-cache, must-revalidate' — test only asserts ETag presence + 304 behavior. Spec slug 'royal-realty-hub-2' is bogus (it's the preview URL subdomain) — use real post slugs. projectadmin currently has cms.read so /cms/site returns 200 for them (spec says 403).",
+  "rca of the issue": "No functional defects beyond the three minor items in backend_issues.minor. The Cache-Control override is an ingress-layer policy, not an app bug (the app emits the correct header). The is_read staleness is a 2-line fix in routers/leads.py. The Project Admin cms.read grant is a permissions-tuning question (spec vs code mismatch — code is more permissive)."
+}

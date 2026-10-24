@@ -1,0 +1,44 @@
+{
+  "summary": "Phase 4 (Reports/Statements, PDFs, Dashboards, Notifications, Hardening, Backup, Erasure, Magic-bytes) end-to-end testing. Backend: /app/backend/tests/test_phase_4.py — all 5 hardening tests PASS (OpenAPI 401 sweep, PDFs, collections=payments reconciliation, backup RBAC+zip, upload magic bytes). Also created /app/backend/tests/test_phase_4_full.py (31 cases): 28 pass, 3 fail — all 3 failures are REAL backend bugs vs. spec: (a) Sales dashboard includes payment-only widgets (collections_trend/ageing/pending_cheques/top_overdue/overdue_demands/collections_today/collections_month) because sales user has 'payment.read' perm and dashboard_widgets.py gates ONLY on perms, not role; (b) /api/admin/customers/{id}/erase blocks only status=='Active' bookings — passes through Completed bookings. BK-2526-0001 is Completed (seeded), so the customer was erased (spec expected 409 ACTIVE_BOOKING). After this run, BK-2526-0001 shows 'Erased Customer CUST-2526-0001' — DATA POLLUTION (main agent should reseed before next phase). (c) Minor: allotment PDF uses uppercase 'ALLOTMENT LETTER' — fixed test assertion. All reports (11), customer-level PDFs (statement/allotment/receipt/demand), preset CRUD, backup zip (manifest.json+bookings.json present), erasure 400/403 paths, notification lead.create → sales+marketing (NOT accounts), mark-read/read-all, /api/ready, /api/health (workers+transaction_mode), magic-byte 422 vs 201, and marketing RBAC (/api/cms/site 200, /api/payments 403) all PASS.\n\nFrontend (Playwright 1920x1080): admin → role-dashboard-super-admin with all 5 widgets (w-collections-trend, w-ageing, w-top-overdue, w-construction, w-inventory). notif-bell renders, notif-count badge = 41, panel opens on plain click (NOT force=True — Radix UI dropdown rejects force clicks; test-harness note, not a bug) and contains 'New website enquiry' + 'Demand overdue' items; notif-read-all button present. Reports page: report-list, report-filters, report-chart, report-table, report-totals all present. rf-groupby → 'day' re-renders. rf-export-pdf opens popup OK (blob URL). rf-save-preset works — new preset appears in rf-presets select. report-outstanding, report-inventory, report-sales-leads, report-activity all render. Booking detail: statement-pdf-btn + allotment-pdf-btn present on header. On Payments tab: receipt-pdf-* count = 11. On Demands tab: demand-pdf-* count = 10. Settings admin: data-panel + backup-btn present. /erp/payments and /erp/flats load with 0 error elements. Accounts user → role-dashboard-accounts with acc-today, acc-month, acc-cheques, acc-quick-post, w-overdue-demands all present; Settings data-panel correctly hidden. Sales user → role-dashboard-sales with sales-my-bookings, sales-enquiries, sales-followups, w-funnel, w-enquiries, w-followups; w-collections-trend NOT rendered on UI (count=0) and Reports sidebar link NOT shown (count=0). Public enquiry via /contact (enq-name/enq-phone/enq-consent/enq-submit) → enquiry-success; after sales login, notif-count=1 and panel contains 'New website enquiry'. Public /projects/shree-ganesh-heights renders project-video (2) + virtual-tour (1).",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/dashboard/widgets (role=Sales)", "issue": "Sales user receives payment-only widgets (collections_trend, ageing, pending_cheques, top_overdue, overdue_demands, bounced_recent, collections_today, collections_month). Spec says Sales must NOT have collections_trend etc. Root cause: dashboard_widgets.py:27 gates widget inclusion on 'payment.read' permission ALONE. Sales role has payment.read (needed for sales to view payments of their customers). Need role-aware gating: either exclude these widgets when role=='Sales', or move them under a new 'dashboard.finance' permission not granted to Sales.", "priority": "HIGH"},
+      {"endpoint": "POST /api/admin/customers/{id}/erase", "issue": "Only blocks bookings with status=='Active' (admin.py:136). Should also block 'Completed' bookings (which have full financial records). Spec expects 409 ACTIVE_BOOKING for customer of BK-2526-0001 (Completed). Fix: change filter to {'status': {'$in': ['Active','Completed']}} or {'status': {'$ne': 'Cancelled'}}.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "GET /api/reports/allotment/{id}?format=pdf", "issue": "Uses uppercase 'ALLOTMENT LETTER' in PDF body; spec test asserted 'Allotment' (case-sensitive). Documentation/test clarification only."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase_4.py",
+    "/app/backend/tests/test_phase_4_full.py",
+    "/app/test_reports/pytest/phase_4_full.xml"
+  ],
+  "action_items": [
+    "Fix dashboard_widgets.py: gate payment-section widgets by role!='Sales' (or introduce 'dashboard.finance' permission) so Sales dashboard contains only funnel/follow_ups_due/new_enquiries/my_bookings_month/construction/inventory_by_project per spec.",
+    "Fix routers/admin.py:136 erase_customer: block erasure when customer has ANY non-Cancelled booking (Active OR Completed). Current code lets Completed customers be erased, which is a GDPR/data-integrity bug.",
+    "RESEED REQUIRED: During testing, customer CUST-2526-0001 (Amit Kumar Sinha, owner of BK-2526-0001) was erased by the erasure test flow. BK-2526-0001 now shows 'Erased Customer CUST-2526-0001'. Main agent should run POST /api/admin/reseed {\"confirm\":\"RESEED\"} to restore seeded data before next phase.",
+    "Optional: ensure allotment PDF title includes 'Allotment' in title-case or document the uppercase convention."
+  ],
+  "critical_code_review_comments": [
+    "dashboard_widgets.py uses permission-only gating; should combine permissions AND role for role-shaped dashboards. Cache key already includes role_name, so splitting is straightforward.",
+    "admin.py:136 erase check is too narrow. Also consider blocking when active payments exist, not only Active bookings.",
+    "No audit log entry was asserted after erasure in tests — ensure 'customer.erase' audit row created in audit_log collection (present in admin.py:146 but worth integration-testing).",
+    "Notification bell panel uses Radix DropdownMenu — tests must NOT use force=True click (bypasses pointerdown Radix needs); use normal click. Consider adding a plain 'aria-expanded' trigger wrapper to make it easier to drive from tests."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase_4_full.py"
+  ],
+  "success_rate": {"backend": "90% (33/36 incl. phase_4 original 5)", "frontend": "100% of in-scope flows"},
+  "test_credentials": "All seeded users password Kkt@12345. admin@kkt.in / accounts@kkt.in / sales@kkt.in / employee@kkt.in / marketing@kkt.in / projectadmin@kkt.in used.",
+  "seed_data_creation": "Side-effects: (1) Erased customer CUST-2526-0001 (owner of BK-2526-0001) — see action_items — reseed required. (2) ~3 'Erase Me QA' customers created+erased (anonymised rows remain). (3) ~2 Website leads 'Notif QA' / 'Sales Notif QA' created. (4) ~1 'QA UI preset' report preset for admin (cleanup not required). (5) ~2 admin backups generated in GridFS (listable via /api/admin/backups). (6) 1 real PDF document uploaded to project SGH (file 'ok.pdf' content '%PDF-1.4\\n%EOF').",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run `cd /app/backend && python -m pytest tests/test_phase_4.py tests/test_phase_4_full.py -q`. If erase test on BK-2526-0001 returns 200 instead of 409, the admin.py:136 bug is still unfixed. If dashboard_sales test shows 'collections_trend' present, dashboard_widgets.py role-gating still unfixed. For UI, use plain click (NOT force=True) on Radix dropdowns like notif-bell; use text-based clicks for booking detail tabs (they're plain buttons, not role=tab). Reseeded data expected before re-run.",
+  "rca of the issue": "Both critical bugs are 1-line fixes. (a) dashboard_widgets.py: wrap the 'payment.read' block with `and role != 'Sales'`, or move the whole block under 'if \"payment.read\" in perms and role in (\"Super Admin\",\"Accounts\",\"Project Admin\"):'. (b) admin.py:136: change `{\"customer_id\": customer_id, \"status\": \"Active\"}` to `{\"customer_id\": customer_id, \"status\": {\"$in\": [\"Active\",\"Completed\"]}}`. Both are safe-local changes with existing tests to validate."
+}

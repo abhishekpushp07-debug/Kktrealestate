@@ -1,0 +1,35 @@
+{
+  "summary": "Phase 1.5 'Foundation Power-Up' regression. Backend: 15/15 pytest cases pass covering health+security headers, admin /auth/me, optimistic concurrency (409 VERSION_CONFLICT with stale version and successful bump with correct version), Idempotency-Key POST replay (same body/same id, Idempotent-Replayed: true header, exactly one record), ETag/If-None-Match -> 304 on /master/flat-types, cursor pagination (next_cursor + disjoint pages on /flats?limit=10), Tower C skip/refuge (56 unit flats, no C-13xx, C-101 and C-1604 present, floor-7 refuge with 0 units), rate card create/activate/apply (A-101 Hold price unchanged after apply), parking list+bulk-generate (+5) + PATCH slot status (Available/Blocked only), CSV import preview flags invalid row + withholds confirm_token (all-or-nothing), valid CSV preview+confirm succeeds, global /search returns results, /audit-logs/entity/project/{SGH} returns history, /metrics 200 admin / 403 employee, soft-delete (/deactivate) + restore of amenities, full MFA lifecycle on employee@kkt.in (enroll -> verify -> mfa_required -> login/mfa -> disable, employee left WITHOUT MFA), sessions list + revoke other session invalidates its refresh token. Frontend (Playwright): demo-super-admin login reaches /dashboard, dashboard-charts renders, Ctrl+K opens command-palette-input, typing 'Tower' yields 5 palette-result-* items, Escape closes palette; dashboard-block-C -> /blocks/{id} shows inventory-grid, grid-floor-7 has data-kind=refuge, grid-mode-type and grid-mode-price switch, Ctrl+click two C flats reveals grid-bulk-bar, 56 C-* flat tiles present; Project SGH shows Pricing/Parking/Documents/History tabs each loading without errors; Settings page renders mfa-card, import-center, sessions list; no React console errors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Dashboard", "issues": ["Recharts emits width(-1)/height(-1) warnings on initial render (4 occurrences). Non-breaking but noisy; wrap <ResponsiveContainer> with explicit min-width/min-height or ensure parent has layout before mount."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase_1_5.py",
+    "/app/backend/tests/test_kkt_erp.py",
+    "/app/test_reports/pytest/phase_1_5.xml"
+  ],
+  "action_items": [
+    "(Optional) Silence recharts width/height=-1 warnings on dashboard mount."
+  ],
+  "critical_code_review_comments": [
+    "master.py soft-delete uses POST /{id}/deactivate rather than DELETE /{id}. The latter is more REST-idiomatic; current scheme is fine but may surprise API clients expecting DELETE. Consider aliasing DELETE -> deactivate.",
+    "Parking PATCH accepts only Available/Blocked statuses; there is no path to Hold/Allocated via PATCH. If parking Hold is a product requirement (per PRD mention of 'bulk status'), expose it or document the exclusion.",
+    "/api/parking GET caps page_size at 100 but SGH already has ~125 slots after seed; UI must paginate or use cursor to show full inventory - verify Project > Parking tab paginates.",
+    "In-memory login rate-limit (routers/auth.py) and idempotency store (infra.py) will not survive multi-worker/replica; migrate to Mongo/Redis before scaling. Carried over from iteration 1."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase_1_5.py"
+  ],
+  "success_rate": {"backend": "100% (15/15 phase1.5 + 31/31 phase1 regression file still green)", "frontend": "100% of phase 1.5 flows verified"},
+  "test_credentials": "Unchanged. All seeded users password Kkt@12345. employee@kkt.in MFA explicitly disabled at end of test (verified by final plain-password login returning tokens without mfa_required).",
+  "seed_data_creation": "Phase1.5 tests leave: (a) +5 parking slots on SGH with prefix 'T<random>', one flipped to Blocked; (b) one additional active rate card on SGH named TEST_RC_<hex> (previous active was deactivated by activate flow) - A-101 (Hold) price unchanged; (c) 1 amenity in Lifestyle/Sports from valid CSV import then deactivated; (d) no users or blocks created this run. Admin had 2 extra sessions created & 1 revoked - normal.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Phase 1.5 regression file is /app/backend/tests/test_phase_1_5.py (15 tests, ~10s). Soft-delete on masters is via POST /{id}/deactivate (no DELETE verb). Parking PATCH status enum is Available|Blocked only. Rate card apply skips non-Available flats (Hold price preserved - this is correct behaviour). After my run SGH has a new active rate card TEST_RC_* - if a future test asserts the originally seeded rate card is active it will fail; use /projects/{id}/rate-cards and filter status=Active instead of hardcoding name. SGH parking total has drifted slightly above 120 due to bulk-generate.",
+  "rca of the issue": "No functional issues found. Three test-script bugs during authoring (fixed): (1) imports preview response uses invalid>=1 & confirm_token=null, not valid=false; (2) parking GET page_size max is 100 (not 500); (3) soft-delete endpoint is POST /{id}/deactivate not DELETE /{id}."
+}
