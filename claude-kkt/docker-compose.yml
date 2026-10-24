@@ -1,0 +1,75 @@
+# Local / single-VM deployment: one backend, three front doors behind Caddy.
+# Production: run the same images behind a load balancer; see docs/DEPLOY.md.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: kkt
+    command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U postgres"], interval: 5s, timeout: 3s, retries: 20 }
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--maxmemory", "512mb", "--maxmemory-policy", "allkeys-lru", "--save", ""]
+    healthcheck: { test: ["CMD", "redis-cli", "ping"], interval: 5s, timeout: 3s, retries: 20 }
+  api:
+    build: { context: ., dockerfile: apps/api/Dockerfile }
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/kkt
+      REDIS_URL: redis://redis:6379/0
+      API_PORT: 4000
+      API_PUBLIC_URL: https://erp.${DOMAIN:-kkt.local}
+      JWT_SECRET: ${JWT_SECRET}
+      FIELD_ENCRYPTION_KEY: ${FIELD_ENCRYPTION_KEY}
+      HASH_KEY: ${HASH_KEY}
+      ERP_ORIGIN: https://erp.${DOMAIN:-kkt.local}
+      WEB_ORIGIN: https://www.${DOMAIN:-kkt.local}
+      PORTAL_ORIGIN: https://my.${DOMAIN:-kkt.local}
+      STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
+      STORAGE_LOCAL_DIR: /data/storage
+      SEED_ON_BOOT: ${SEED_ON_BOOT:-true}
+      RUN_MIGRATIONS_ON_BOOT: "true"
+    volumes: [ "storage:/data/storage" ]
+    depends_on: { postgres: { condition: service_healthy }, redis: { condition: service_healthy } }
+    deploy: { replicas: 2 }
+    healthcheck: { test: ["CMD", "wget", "-qO-", "http://localhost:4000/api/v1/health"], interval: 10s, timeout: 3s, retries: 10 }
+  worker:
+    build: { context: ., dockerfile: apps/api/Dockerfile }
+    command: ["node", "dist/worker.js"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/kkt
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET}
+      FIELD_ENCRYPTION_KEY: ${FIELD_ENCRYPTION_KEY}
+      HASH_KEY: ${HASH_KEY}
+      STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
+      STORAGE_LOCAL_DIR: /data/storage
+    volumes: [ "storage:/data/storage" ]
+    depends_on: { postgres: { condition: service_healthy }, redis: { condition: service_healthy } }
+  erp:
+    build: { context: ., dockerfile: apps/erp/Dockerfile, args: { VITE_API_URL: https://erp.${DOMAIN:-kkt.local} } }
+  web:
+    build: { context: ., dockerfile: apps/web/Dockerfile }
+    environment:
+      NEXT_PUBLIC_API_URL: https://erp.${DOMAIN:-kkt.local}
+      API_INTERNAL_URL: http://api:4000
+      NEXT_PUBLIC_PORTAL_URL: https://my.${DOMAIN:-kkt.local}
+      NEXT_PUBLIC_ERP_URL: https://erp.${DOMAIN:-kkt.local}
+    depends_on: [ api ]
+  portal:
+    build: { context: ., dockerfile: apps/portal/Dockerfile, args: { EXPO_PUBLIC_API_URL: https://erp.${DOMAIN:-kkt.local} } }
+  caddy:
+    image: caddy:2-alpine
+    ports: [ "80:80", "443:443" ]
+    environment: { DOMAIN: ${DOMAIN:-kkt.local} }
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on: [ api, erp, web, portal ]
+volumes: { pgdata: {}, storage: {}, caddy_data: {} }

@@ -1,0 +1,37 @@
+name: CI
+on:
+  push: { branches: [main] }
+  pull_request:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres, POSTGRES_DB: kkt_test }
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/kkt_test
+      REDIS_URL: redis://localhost:6379/0
+      JWT_SECRET: ci-only-secret-ci-only-secret-ci-only-secret
+      FIELD_ENCRYPTION_KEY: Y2ktb25seS1rZXktY2ktb25seS1rZXktY2ktb25seS0wMQ==
+      HASH_KEY: ci-only-hash-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm --filter @kkt/contracts --filter @kkt/domain test
+      - run: pnpm --filter @kkt/db migrate && pnpm --filter @kkt/db test
+      - run: pnpm --filter @kkt/api test && pnpm --filter @kkt/api test:integration
+      - run: pnpm --filter @kkt/api build && pnpm --filter @kkt/erp build && pnpm --filter @kkt/web build
+      - name: Acceptance scenarios
+        run: pnpm --filter @kkt/api test:acceptance

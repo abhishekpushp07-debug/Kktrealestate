@@ -1,0 +1,23 @@
+# Three domains, one backend. Caddy issues TLS automatically for real domains.
+{
+  servers { protocols h1 h2 h3 }
+}
+erp.{$DOMAIN} {
+  encode zstd gzip
+  handle /api/* { reverse_proxy api:4000 { lb_policy least_conn; health_uri /api/v1/health } }
+  handle { reverse_proxy erp:80 }
+  header { Strict-Transport-Security "max-age=63072000; includeSubDomains" X-Content-Type-Options nosniff Referrer-Policy strict-origin-when-cross-origin }
+}
+www.{$DOMAIN} {
+  encode zstd gzip
+  handle /api/* { reverse_proxy api:4000 }
+  handle { reverse_proxy web:3000 }
+  header { Strict-Transport-Security "max-age=63072000; includeSubDomains" X-Content-Type-Options nosniff }
+}
+{$DOMAIN} { redir https://www.{$DOMAIN}{uri} permanent }
+my.{$DOMAIN} {
+  encode zstd gzip
+  handle /api/* { reverse_proxy api:4000 }
+  handle { reverse_proxy portal:80 }
+  header { Strict-Transport-Security "max-age=63072000; includeSubDomains" X-Content-Type-Options nosniff }
+}
