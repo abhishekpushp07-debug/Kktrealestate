@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Reveal } from "@/components/ui/Reveal";
 import { ArrowLeftIcon, ArrowRightIcon } from "@/components/ui/icons";
 import { listPosts } from "@/lib/api";
+import { closedMetadata, siteGate } from "@/lib/gate";
 import { breadcrumbJsonLd, pageMetadata } from "@/lib/seo";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -18,6 +19,8 @@ function readPage(params: Record<string, string | string[] | undefined>): number
 }
 
 export async function generateMetadata({ searchParams }: { searchParams: SearchParams }): Promise<Metadata> {
+  const closed = await closedMetadata();
+  if (closed) return closed;
   const page = readPage(await searchParams);
   return pageMetadata({
     title: page > 1 ? `Journal · Page ${page}` : "Journal",
@@ -27,6 +30,8 @@ export async function generateMetadata({ searchParams }: { searchParams: SearchP
 }
 
 export default async function BlogPage({ searchParams }: { searchParams: SearchParams }) {
+  const gate = await siteGate();
+  if (gate.closed) return gate.page;
   const page = readPage(await searchParams);
   const result = await listPosts(page);
   const totalPages = result.page_size > 0 ? Math.max(1, Math.ceil(result.total / result.page_size)) : 1;

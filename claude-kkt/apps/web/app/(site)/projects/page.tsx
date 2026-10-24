@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Reveal } from "@/components/ui/Reveal";
 import { listProjects } from "@/lib/api";
 import { statusLabel } from "@/lib/format";
+import { closedMetadata, siteGate } from "@/lib/gate";
 import { breadcrumbJsonLd, pageMetadata } from "@/lib/seo";
 import type { ProjectListFilters } from "@/lib/types";
 
@@ -31,6 +32,8 @@ function readFilters(params: SearchParams): ProjectListFilters {
 }
 
 export async function generateMetadata({ searchParams }: { searchParams: Promise<SearchParams> }): Promise<Metadata> {
+  const closed = await closedMetadata();
+  if (closed) return closed;
   const filters = readFilters(await searchParams);
   const parts = [filters.city, filters.status ? statusLabel(filters.status) : undefined, filters.bhk ? `${filters.bhk} BHK` : undefined].filter(Boolean);
   return pageMetadata({
@@ -42,6 +45,8 @@ export async function generateMetadata({ searchParams }: { searchParams: Promise
 }
 
 export default async function ProjectsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  const gate = await siteGate();
+  if (gate.closed) return gate.page;
   const filters = readFilters(await searchParams);
   const hasFilters = Boolean(filters.city || filters.status || filters.bhk || filters.q);
   const [all, filtered] = await Promise.all([listProjects(), hasFilters ? listProjects(filters) : Promise.resolve(null)]);

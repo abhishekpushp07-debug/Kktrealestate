@@ -14,12 +14,13 @@ import { Reveal } from "@/components/ui/Reveal";
 import { Section, SectionHeading } from "@/components/ui/Section";
 import { ArrowRightIcon } from "@/components/ui/icons";
 import { getSiteSettings, listPosts, listProjects } from "@/lib/api";
+import { closedMetadata, siteGate } from "@/lib/gate";
 import { Markdown } from "@/lib/markdown";
 import { brandName, breadcrumbJsonLd } from "@/lib/seo";
 import type { HomeSection, SiteSettings } from "@/lib/types";
 
 export async function generateMetadata(): Promise<Metadata> {
-  return { alternates: { canonical: "/" }, openGraph: { url: "/" } };
+  return (await closedMetadata()) ?? { alternates: { canonical: "/" }, openGraph: { url: "/" } };
 }
 
 function section(site: SiteSettings | null, ...keys: string[]): HomeSection | undefined {
@@ -34,7 +35,9 @@ function sectionText(body: HomeSection["body"]): string | null {
 }
 
 export default async function HomePage() {
-  const site = await getSiteSettings();
+  const gate = await siteGate();
+  if (gate.closed) return gate.page;
+  const site = gate.site;
   const brand = brandName(site);
   const featuredFromSite = site?.featured_projects ?? [];
   const [featured, latest] = await Promise.all([

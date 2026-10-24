@@ -5,9 +5,10 @@ import { JsonLd } from "@/components/JsonLd";
 import { Button } from "@/components/ui/Button";
 import { SmartImage } from "@/components/ui/SmartImage";
 import { ArrowLeftIcon } from "@/components/ui/icons";
-import { findPost, getPost, getSiteSettings } from "@/lib/api";
+import { findPost, getPost } from "@/lib/api";
 import { publicApiUrl } from "@/lib/env";
 import { formatDate } from "@/lib/format";
+import { closedMetadata, siteGate } from "@/lib/gate";
 import { Markdown, markdownToText } from "@/lib/markdown";
 import { resolveMediaUrl } from "@/lib/media";
 import { articleJsonLd, breadcrumbJsonLd, pageMetadata } from "@/lib/seo";
@@ -15,6 +16,8 @@ import { articleJsonLd, breadcrumbJsonLd, pageMetadata } from "@/lib/seo";
 type Params = Promise<{ slug: string }>;
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
+  const closed = await closedMetadata();
+  if (closed) return closed;
   const { slug } = await params;
   const post = await findPost(slug);
   if (!post) return { title: "Article not found", robots: { index: false, follow: false } };
@@ -29,8 +32,11 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 }
 
 export default async function BlogPostPage({ params }: { params: Params }) {
+  const gate = await siteGate();
+  if (gate.closed) return gate.page;
   const { slug } = await params;
-  const [post, site] = await Promise.all([getPost(slug), getSiteSettings()]);
+  const site = gate.site;
+  const post = await getPost(slug);
 
   return (
     <article>

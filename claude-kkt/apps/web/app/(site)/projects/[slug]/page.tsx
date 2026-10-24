@@ -15,9 +15,10 @@ import { ClickToLoadEmbed } from "@/components/ui/ClickToLoadEmbed";
 import { Reveal } from "@/components/ui/Reveal";
 import { Badge } from "@/components/ui/Section";
 import { CalendarIcon, CheckIcon, ExternalLinkIcon, MapPinIcon } from "@/components/ui/icons";
-import { findProject, getProject, getSiteSettings } from "@/lib/api";
+import { findProject, getProject } from "@/lib/api";
 import { publicApiUrl } from "@/lib/env";
 import { bhkLabel, formatDate, formatNumber, formatSqft, statusLabel, typeLabel } from "@/lib/format";
+import { closedMetadata, siteGate } from "@/lib/gate";
 import { Markdown, markdownToText } from "@/lib/markdown";
 import { resolveMediaUrl } from "@/lib/media";
 import { breadcrumbJsonLd, faqJsonLd, pageMetadata, projectJsonLd } from "@/lib/seo";
@@ -26,6 +27,8 @@ import type { Amenity, ProjectDetail } from "@/lib/types";
 type Params = Promise<{ slug: string }>;
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
+  const closed = await closedMetadata();
+  if (closed) return closed;
   const { slug } = await params;
   const project = await findProject(slug);
   if (!project) return { title: "Project not found", robots: { index: false, follow: false } };
@@ -65,8 +68,11 @@ const H2 = "font-display text-display-sm text-navy-900";
 const SECTION = "scroll-mt-32 border-t border-line pt-12 first:border-t-0 first:pt-0";
 
 export default async function ProjectPage({ params }: { params: Params }) {
+  const gate = await siteGate();
+  if (gate.closed) return gate.page;
   const { slug } = await params;
-  const [project, site] = await Promise.all([getProject(slug), getSiteSettings()]);
+  const site = gate.site;
+  const project = await getProject(slug);
   const facts = project.key_facts;
   const address = facts?.address ?? {};
   const addressLine = [address.line1, address.line2, address.locality, address.city ?? project.city, address.state, address.pincode].filter(Boolean).join(", ");

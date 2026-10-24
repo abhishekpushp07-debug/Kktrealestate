@@ -4,11 +4,15 @@ import { SiteShell } from "@/components/layout/SiteShell";
 import { Button } from "@/components/ui/Button";
 import { ArrowRightIcon } from "@/components/ui/icons";
 import { getSiteSettings } from "@/lib/api";
+import { ComingSoon } from "@/components/layout/ComingSoon";
+import { isClosed } from "@/lib/gate";
+import { brandName } from "@/lib/seo";
 
 export const metadata: Metadata = { title: "Page not found", robots: { index: false, follow: false } };
 
 export default async function NotFound() {
   const site = await getSiteSettings();
+  if (isClosed(site)) return <ComingSoon site={site} brandName={brandName(site)} />;
   return (
     <SiteShell site={site}>
       <div className="relative overflow-hidden bg-navy-900 text-ivory-100">

@@ -4,13 +4,18 @@ import { JsonLd } from "@/components/JsonLd";
 import { GalleryGrid } from "@/components/gallery/GalleryGrid";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { getGallery } from "@/lib/api";
+import { closedMetadata, siteGate } from "@/lib/gate";
 import { breadcrumbJsonLd, pageMetadata } from "@/lib/seo";
 
 export async function generateMetadata(): Promise<Metadata> {
+  const closed = await closedMetadata();
+  if (closed) return closed;
   return pageMetadata({ title: "Gallery", description: "Photographs from our projects: architecture, interiors, amenities and life on site.", path: "/gallery" });
 }
 
 export default async function GalleryPage() {
+  const gate = await siteGate();
+  if (gate.closed) return gate.page;
   const gallery = await getGallery();
   const projects =
     gallery.projects?.length

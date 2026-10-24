@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { ManageVisit } from "@/components/visit/ManageVisit";
 import { getVisit } from "@/lib/api";
+import { siteGate } from "@/lib/gate";
 
 type Params = Promise<{ token: string }>;
 
@@ -13,6 +14,8 @@ export const metadata: Metadata = {
 };
 
 export default async function VisitPage({ params }: { params: Params }) {
+  const gate = await siteGate();
+  if (gate.closed) return gate.page;
   const { token } = await params;
   const visit = await getVisit(token);
   return (

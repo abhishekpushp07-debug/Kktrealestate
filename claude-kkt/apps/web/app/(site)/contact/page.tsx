@@ -8,15 +8,21 @@ import { Section, SectionHeading } from "@/components/ui/Section";
 import { MailIcon, MapPinIcon, PhoneIcon, WhatsAppIcon } from "@/components/ui/icons";
 import { getSiteSettings, listProjects } from "@/lib/api";
 import { telHref, whatsappHref } from "@/lib/format";
+import { closedMetadata, siteGate } from "@/lib/gate";
 import { brandName, breadcrumbJsonLd, pageMetadata } from "@/lib/seo";
 
 export async function generateMetadata(): Promise<Metadata> {
+  const closed = await closedMetadata();
+  if (closed) return closed;
   const site = await getSiteSettings();
   return pageMetadata({ title: "Contact", description: `Call, WhatsApp or visit ${brandName(site)}. Request a call back or book a private site visit.`, path: "/contact" });
 }
 
 export default async function ContactPage() {
-  const [site, projects] = await Promise.all([getSiteSettings(), listProjects()]);
+  const gate = await siteGate();
+  if (gate.closed) return gate.page;
+  const site = gate.site;
+  const projects = await listProjects();
   const brand = brandName(site);
   const contacts = site?.contacts ?? {};
   const tel = telHref(contacts.phone);

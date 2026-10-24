@@ -8,11 +8,14 @@ import { Section, SectionHeading } from "@/components/ui/Section";
 import { SmartImage } from "@/components/ui/SmartImage";
 import { ArrowRightIcon } from "@/components/ui/icons";
 import { findPage, getPeople, getSiteSettings } from "@/lib/api";
+import { closedMetadata, siteGate } from "@/lib/gate";
 import { Markdown } from "@/lib/markdown";
 import { brandName, breadcrumbJsonLd, pageMetadata } from "@/lib/seo";
 import type { SiteSettings } from "@/lib/types";
 
 export async function generateMetadata(): Promise<Metadata> {
+  const closed = await closedMetadata();
+  if (closed) return closed;
   const site = await getSiteSettings();
   return pageMetadata({
     title: "About",
@@ -47,7 +50,10 @@ function readTimeline(site: SiteSettings | null): Milestone[] {
 }
 
 export default async function AboutPage() {
-  const [site, people, page] = await Promise.all([getSiteSettings(), getPeople(), findPage("about")]);
+  const gate = await siteGate();
+  if (gate.closed) return gate.page;
+  const site = gate.site;
+  const [people, page] = await Promise.all([getPeople(), findPage("about")]);
   const brand = brandName(site);
   const timeline = readTimeline(site);
   const stats = site?.trust_stats ?? [];
