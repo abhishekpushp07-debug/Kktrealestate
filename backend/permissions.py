@@ -41,7 +41,12 @@ PERMISSION_GROUPS = [
         ("report.view", "View reports"),
         ("cms.read", "View website CMS"),
         ("cms.write", "Edit website CMS"),
-        ("cms.write", "Edit website content"),
+    ]),
+    ("Customer Portal & Service", [
+        ("customer.portal_manage", "Manage customer portal access"),
+        ("service.read", "View service requests"),
+        ("service.write", "Reply / update service requests"),
+        ("service.assign", "Assign service requests"),
     ]),
 ]
 
@@ -53,6 +58,7 @@ SYSTEM_ROLES = {
     "Project Admin": {
         "description": "Manages project structure, inventory and sales for assigned projects",
         "permissions": [
+            "service.read", "service.write", "service.assign",
             "project.read", "master.read", "block.write", "flat.write", "flat.status", "milestone.update",
             "booking.read", "booking.create", "booking.cancel", "customer.read", "customer.write", "customer.kyc_view", "lead.read", "lead.write",
             "payment.read", "receipt.print", "report.view",
@@ -61,6 +67,7 @@ SYSTEM_ROLES = {
     "Accounts": {
         "description": "Payments, receipts and financial reporting",
         "permissions": [
+            "customer.portal_manage", "service.read", "service.write", "service.assign",
             "payment.read", "payment.post", "payment.reverse", "receipt.print", "booking.read",
             "customer.read", "customer.kyc_view", "project.read", "master.read", "report.view", "audit.view",
         ],
@@ -72,12 +79,13 @@ SYSTEM_ROLES = {
     "Sales": {
         "description": "Customers, leads and bookings",
         "permissions": [
+            "customer.portal_manage", "service.read", "service.write", "service.assign",
             "customer.read", "customer.write", "lead.read", "lead.write",
             "booking.read", "booking.create", "project.read", "master.read", "payment.read",
         ],
     },
     "Employee": {
         "description": "Read-only access",
-        "permissions": ["project.read", "master.read", "booking.read"],
+        "permissions": ["project.read", "master.read", "booking.read", "service.read"],
     },
 }

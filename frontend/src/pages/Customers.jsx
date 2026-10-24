@@ -110,9 +110,10 @@ export default function Customers() {
     { key: "kyc_status", label: "KYC", sortable: true, render: (c) => <Pill tone={KYC_TONE[c.kyc_status]}>{c.kyc_status}</Pill> },
     { key: "created_at", label: "Since", sortable: true, render: (c) => fmtDate(c.created_at) },
   ];
+  const bulkEnable = async () => { if (!window.confirm("Create portal logins for every customer with an Active booking who has none yet? Temporary passwords are shown once.")) return; try { const { data } = await api.post("/customers/portal/bulk-enable"); if (!data.count) return toast.info("All active buyers already have portal access"); window.alert(data.enabled.map((x) => `${x.full_name}: ${x.login_phone} / ${x.temporary_password}`).join("\n")); toast.success(`${data.count} portal account(s) created`); } catch (e) { toast.error(errMsg(e)); } };
   return (
     <div data-testid="customers-page">
-      <PageHeader title="Customers" subtitle="Buyers, KYC and co-applicants." actions={can("customer.write") && <Button onClick={() => setOpen(true)} className="bg-navy hover:bg-navy-700" data-testid="new-customer-btn"><Plus className="mr-1 h-4 w-4" />New customer</Button>} />
+      <PageHeader title="Customers" subtitle="Buyers, KYC and co-applicants." actions={<div className="flex gap-2">{can("customer.portal_manage") && <Button variant="outline" onClick={bulkEnable} data-testid="bulk-portal-enable-btn">Enable portal for active buyers</Button>}{can("customer.write") && <Button onClick={() => setOpen(true)} className="bg-navy hover:bg-navy-700" data-testid="new-customer-btn"><Plus className="mr-1 h-4 w-4" />New customer</Button>}</div>} />
       <DataTable {...list} columns={columns} testId="customers-table" exportPath="/customers" searchPlaceholder="Name, phone, code, PAN…" onRowClick={(c) => nav(`/erp/customers/${c.id}`)}
         toolbar={<Select value={kyc} onValueChange={setKyc}><SelectTrigger className="h-9 w-36" data-testid="kyc-filter"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All KYC</SelectItem>{Object.keys(KYC_TONE).map((k) => <SelectItem key={k} value={k}>{k}</SelectItem>)}</SelectContent></Select>}
         empty={{ icon: UserRound, title: "No customers yet" }} />

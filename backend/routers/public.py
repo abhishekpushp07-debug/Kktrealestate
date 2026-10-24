@@ -250,6 +250,15 @@ async def gallery(request: Request, _=Depends(public_guard)):
     return cached(request, {"items": items, "categories": sorted({i["category"] for i in items if i.get("category")})})
 
 
+@router.get("/media/photo/{photo_id}")
+async def construction_photo(photo_id: str, _=Depends(public_guard)):
+    m = await db.construction_photos.find_one({"id": photo_id, "is_active": True, "$or": [{"visible_to_customers": True}, {"show_on_website": True}]}, {"_id": 0})
+    if not m:
+        raise ApiError(404, "Not found", "NOT_FOUND")
+    data, ctype = await get_object(m["storage_key"])
+    return Response(content=data, media_type=m["mime"] or ctype, headers={"Cache-Control": "public, max-age=31536000, immutable"})
+
+
 @router.get("/media/{media_id}")
 async def media(media_id: str, _=Depends(public_guard)):
     m = await db.cms_media.find_one({"id": media_id}, {"_id": 0})

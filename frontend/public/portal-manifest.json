@@ -1,0 +1,12 @@
+{
+  "name": "KKT Home — Customer Portal",
+  "short_name": "KKT Home",
+  "start_url": "/portal/",
+  "scope": "/portal/",
+  "display": "standalone",
+  "background_color": "#F8F6F1",
+  "theme_color": "#0B1F3A",
+  "icons": [
+    { "src": "/portal-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

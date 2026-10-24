@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { NotificationBell } from "@/components/common/NotificationBell";
-import { BarChart3, Building2, ChevronLeft, ChevronRight, Database, Grid3X3, LayoutDashboard, LogOut, Search, Settings, ShieldCheck, History, Users, KeyRound, Menu, UserRound, Funnel, FileSignature, Receipt, BookOpenText, Globe } from "lucide-react";
+import { BarChart3, Building2, ChevronLeft, ChevronRight, Database, Grid3X3, LayoutDashboard, LogOut, Search, Settings, ShieldCheck, History, Users, KeyRound, Menu, UserRound, Funnel, FileSignature, Receipt, BookOpenText, Globe , LifeBuoy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { initials } from "@/lib/format";
@@ -21,6 +21,7 @@ const NAV = [
   { to: "/erp/payments", label: "Payments", icon: Receipt, perm: "payment.read" },
   { to: "/erp/roznamcha", label: "Roznamcha", icon: BookOpenText, perm: "payment.read" },
   { to: "/erp/reports", label: "Reports", icon: BarChart3, perm: "report.view", match: "/erp/reports" },
+  { to: "/erp/service-requests", label: "Service Requests", icon: LifeBuoy, perm: "service.read", match: "/erp/service-requests" },
   { to: "/erp/master/flat-types", label: "Master Data", icon: Database, perm: "master.read", match: "/erp/master" },
   { to: "/erp/users", label: "Users", icon: Users, perm: "users.manage" },
   { to: "/erp/roles", label: "Roles", icon: ShieldCheck, perm: "roles.manage" },

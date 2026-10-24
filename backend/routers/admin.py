@@ -23,7 +23,7 @@ class ReseedIn(StrictModel):
     confirm: str
 
 
-BUSINESS_COLLECTIONS = ["projects", "blocks", "flats", "rate_cards", "parking_slots", "customers", "leads", "bookings", "payments", "demands", "ledger_entries", "contra_entries", "documents",
+BUSINESS_COLLECTIONS = ["portal_accounts", "portal_refresh_tokens", "service_requests", "service_categories", "notices", "construction_photos", "notifications", "projects", "blocks", "flats", "rate_cards", "parking_slots", "customers", "leads", "bookings", "payments", "demands", "ledger_entries", "contra_entries", "documents",
                         "cms_banners", "cms_testimonials", "cms_gallery", "cms_posts", "cms_pages", "cms_people", "cms_faqs", "cms_media", "site_settings", "counters", "idempotency_keys", "import_batches"]
 
 
@@ -53,6 +53,8 @@ async def reseed(body: ReseedIn, request: Request, user: dict = Depends(require(
         if not await db.roles.find_one({"name": name}):
             await db.roles.insert_one({**base_doc(None, company["id"]), "name": name, "description": spec["description"], "permissions": spec["permissions"], "is_system": True})
     await seed_marketing_user()
+    from seed_phase5 import seed_phase5
+    await seed_phase5()
     await db.settings.update_one({"key": "roles_version"}, {"$inc": {"value": 1}}, upsert=True)
     await recompute_all()
     await write_audit(user, "admin.reseed", "system", "seed", after={"collections": BUSINESS_COLLECTIONS}, ip=client_ip(request))

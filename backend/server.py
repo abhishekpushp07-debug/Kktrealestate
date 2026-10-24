@@ -40,18 +40,21 @@ from routers import (
     projects,
     public,
     pdfs,
+    portal,
     rate_cards,
     reports,
     roles,
     roznamcha,
     search,
     settings,
+    support,
     users,
 )
 from routers.admin import reconcile_all
 from seed import seed_if_empty, seed_phase15
 from seed_phase2 import seed_phase2
 from seed_phase3 import seed_marketing_user, seed_phase3
+from seed_phase5 import seed_phase5
 from services.counters import recompute_all
 from storage import init_storage_async
 from uow import STATE as UOW_STATE
@@ -60,7 +63,7 @@ from uow import detect_transaction_support
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logging.getLogger("uvicorn.access").disabled = True
 logger = logging.getLogger("kkt")
-VERSION = "4.0.0"
+VERSION = "5.0.0"
 
 STATUS_CODES = {400: "BAD_REQUEST", 401: "UNAUTHENTICATED", 403: "FORBIDDEN", 404: "NOT_FOUND", 409: "CONFLICT", 413: "PAYLOAD_TOO_LARGE", 422: "VALIDATION_ERROR", 423: "LOCKED", 429: "RATE_LIMITED"}
 
@@ -81,6 +84,7 @@ async def lifespan(app: FastAPI):
             await db.roles.update_one({'name': name, 'is_system': True}, {'$set': {'permissions': spec['permissions']}})
     await db.settings.update_one({'key': 'roles_version'}, {'$inc': {'value': 1}}, upsert=True)
     await seed_marketing_user()
+    await seed_phase5()
     asyncio.create_task(_overdue_loop())
     if not await db.settings.find_one({"key": "counters_v1"}):
         await recompute_all()
@@ -161,7 +165,7 @@ async def metrics(user: dict = Depends(require("settings.manage"))):
 
 for r in (auth.router, users.router, roles.router, master.router, projects.router, rate_cards.router, blocks.router, flats.router, parking.router,
           settings.router, audit.router, dashboard.router, search.router, imports.router,
-          customers.router, leads.router, documents.router, bookings.router, milestones.router, payments.router, roznamcha.router, admin.router, cms.router, public.router, reports.router, notifications.router, pdfs.router, dashboard_widgets.router):
+          customers.router, leads.router, documents.router, bookings.router, milestones.router, payments.router, roznamcha.router, admin.router, cms.router, public.router, reports.router, notifications.router, pdfs.router, dashboard_widgets.router, portal.router, portal.mgmt, support.router):
     api_router.include_router(r)
 
 app.include_router(api_router)

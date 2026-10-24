@@ -36,6 +36,7 @@ export function DocumentsPanel({ entityType, entityId, canWrite = true }) {
     try { const r = await api.get(`/documents/${d.id}/download`, { responseType: "blob" }); window.open(URL.createObjectURL(r.data), "_blank"); }
     catch (e) { toast.error(e.response?.status === 403 ? "Sensitive document — KYC view permission required" : errMsg(e)); }
   };
+  const share = async (d) => { try { await api.patch(`/documents/${d.id}/share`, { shared_with_customer: !d.shared_with_customer, version: d.version ?? 0 }); toast.success(d.shared_with_customer ? "Unshared" : "Shared with customer"); load(); } catch (e) { toast.error(errMsg(e)); } };
   const remove = async (d) => { try { await api.delete(`/documents/${d.id}`); toast.success("Document removed"); load(); } catch (e) { toast.error(errMsg(e)); } };
 
   return (
@@ -55,6 +56,7 @@ export function DocumentsPanel({ entityType, entityId, canWrite = true }) {
             <button onClick={() => open(d)} className="font-medium text-navy hover:underline" data-testid={`doc-open-${d.id}`}>{d.file_name}</button>
             {d.document_type_name && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">{d.document_type_name}</span>}
             {d.is_sensitive && <span className="flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] text-amber-700"><Lock className="h-3 w-3" />KYC</span>}
+            {canWrite && can("customer.write") && !d.is_sensitive && <button onClick={() => share(d)} className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${d.shared_with_customer ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`} data-testid={`doc-share-${d.id}`}>{d.shared_with_customer ? "Shared with customer" : "Share to portal"}</button>}
             <span className="ml-auto text-xs text-slate-500">{(d.size / 1024).toFixed(0)} KB · {d.uploaded_by_name} · {fmtDateTime(d.uploaded_at)}</span>
             {canWrite && can("customer.write") && <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => remove(d)} data-testid={`doc-delete-${d.id}`}><Trash2 className="h-3.5 w-3.5 text-slate-500" /></Button>}
           </li>)}

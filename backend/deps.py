@@ -21,7 +21,7 @@ _roles_version = {"value": -1, "checked": 0.0}
 
 def create_access_token(user: dict, token_type: str = "access", minutes: int | None = None) -> str:
     now = datetime.now(UTC)
-    payload = {"sub": user["id"], "cid": user["company_id"], "type": token_type, "iat": int(now.timestamp()),
+    payload = {"sub": user["id"], "cid": user["company_id"], "type": token_type, "aud": "erp", "iat": int(now.timestamp()),
                "exp": int((now + timedelta(minutes=minutes or ACCESS_MINUTES)).timestamp())}
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALG)
 
@@ -49,7 +49,9 @@ async def get_current_user(request: Request, creds: HTTPAuthorizationCredentials
     if creds is None or creds.scheme.lower() != "bearer":
         raise ApiError(401, "Not authenticated", "UNAUTHENTICATED")
     try:
-        payload = jwt.decode(creds.credentials, JWT_SECRET, algorithms=[JWT_ALG], leeway=30)
+        payload = jwt.decode(creds.credentials, JWT_SECRET, algorithms=[JWT_ALG], leeway=30, options={"verify_aud": False})
+        if payload.get("aud") not in (None, "erp"):
+            raise ApiError(401, "Token not valid for ERP", "INVALID_AUDIENCE")
     except jwt.ExpiredSignatureError:
         raise ApiError(401, "Access token expired", "TOKEN_EXPIRED")
     except jwt.PyJWTError:

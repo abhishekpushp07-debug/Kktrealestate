@@ -10,6 +10,7 @@ import { HistoryTimeline } from "@/components/common/HistoryTimeline";
 import { DocumentsPanel } from "@/components/common/DocumentsPanel";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PortalAccessCard } from "@/components/common/PortalAccessCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { inr, fmtDate, fmtDateTime } from "@/lib/format";
@@ -42,6 +43,7 @@ export default function CustomerDetail() {
       <Tabs defaultValue="profile" className="mt-6">
         <TabsList className="flex-wrap bg-white" data-testid="customer-tabs">{["profile", "kyc", "bookings", "payments", "documents", "leads", "history"].map((t) => <TabsTrigger key={t} value={t} className="capitalize data-[state=active]:bg-navy data-[state=active]:text-white" data-testid={`customer-tab-${t}`}>{t}</TabsTrigger>)}</TabsList>
         <TabsContent value="profile" className="mt-4 grid gap-4 lg:grid-cols-3">
+          <div className="lg:col-span-3"><PortalAccessCard customerId={id} /></div>
           <div className="card-elev p-5"><h3 className="mb-3 text-base font-bold text-navy">Personal</h3><KV label="Father / spouse" value={c.father_or_spouse_name} /><KV label="DOB" value={fmtDate(c.dob)} /><KV label="Gender" value={c.gender} /><KV label="Occupation" value={c.occupation} /><KV label="Company" value={c.company_name} /><KV label="Income band" value={c.annual_income_band} /><KV label="Source" value={c.source} /></div>
           <div className="card-elev p-5"><h3 className="mb-3 text-base font-bold text-navy">Address</h3><p className="text-sm">{[c.address_current?.line1, c.address_current?.city, c.address_current?.state, c.address_current?.pincode].filter(Boolean).join(", ") || "—"}</p><h3 className="mb-3 mt-5 text-base font-bold text-navy">Nominee</h3><KV label="Name" value={c.nominee?.name} /><KV label="Relation" value={c.nominee?.relation} /></div>
           <div className="card-elev p-5"><h3 className="mb-3 text-base font-bold text-navy">Co-applicants</h3>{c.co_applicants.length === 0 ? <p className="text-sm text-slate-500">None</p> : c.co_applicants.map((a, i) => <div key={i} className="mb-2 rounded-md bg-surface p-2 text-sm"><b className="text-navy">{a.name}</b> · {a.relation} · {a.phone}<p className="font-mono text-xs text-slate-500">PAN {reveal ? a.pan : a.pan_masked || "—"} · Aadhaar {reveal ? a.aadhaar : a.aadhaar_masked || "—"}</p></div>)}{c.notes && <p className="mt-3 text-xs text-slate-500">{c.notes}</p>}</div>

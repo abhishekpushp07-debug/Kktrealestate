@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { Layers, RefreshCw, IndianRupee, ArrowUpFromLine, Printer, History, Milestone } from "lucide-react";
 import { MilestonesPanel } from "@/components/common/MilestonesPanel";
+import { ConstructionPhotos } from "@/components/common/ConstructionPhotos";
 import { toast } from "sonner";
 import api, { errMsg } from "@/lib/api";
 import { useFetch } from "@/hooks/useList";
@@ -107,6 +108,7 @@ export default function BlockDetail() {
       </div>
       {showHistory && <div className="card-elev mb-5 p-5" data-testid="block-history-panel"><h3 className="mb-3 text-base font-bold text-navy">Block history</h3><HistoryTimeline entityType="block" entityId={b.id} /></div>}
       {showMilestones && <div className="mb-5"><MilestonesPanel blockId={b.id} onChanged={refresh} /></div>}
+      <div className="mb-5"><ConstructionPhotos blockId={b.id} milestones={b.milestones} /></div>
       <div className="grid gap-5 xl:grid-cols-[1fr_300px]">
         <div className="card-elev overflow-auto p-4" data-testid="inventory-grid">
           <div className="mb-3 flex flex-wrap items-center gap-2 print:hidden">

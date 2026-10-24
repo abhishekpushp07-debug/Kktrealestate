@@ -39,7 +39,7 @@ export const CMS = {
   pages: { label: "Pages", fields: [F("title", "Title"), F("slug", "Slug"), F("body", "Body (Markdown)", "markdown")], cols: [{ key: "slug", label: "Slug" }, { key: "title", label: "Title" }, { key: "updated_at", label: "Updated", render: (r) => fmtDate(r.updated_at) }] },
   people: { label: "People", fields: [F("name", "Name"), F("designation", "Designation"), F("photo_url", "Photo", "image"), F("bio", "Bio", "textarea"), F("order", "Order", "number"), F("is_active", "Active", "bool")], cols: [{ key: "order", label: "#" }, { key: "name", label: "Name" }, { key: "designation", label: "Designation" }] },
 };
-export const CMS_NAV = [["settings", "Site Settings"], ["banners", "Banners"], ["testimonials", "Testimonials"], ["gallery", "Gallery"], ["posts", "Blog"], ["pages", "Pages"], ["people", "People"], ["enquiries", "Enquiries"]];
+export const CMS_NAV = [["settings", "Site Settings"], ["banners", "Banners"], ["testimonials", "Testimonials"], ["gallery", "Gallery"], ["posts", "Blog"], ["pages", "Pages"], ["notices", "Notices"], ["people", "People"], ["enquiries", "Enquiries"]];
 
 export function CmsNav({ active }) {
   const nav = useNavigate();

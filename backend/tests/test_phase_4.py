@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 load_dotenv("/app/frontend/.env")
 BASE = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
-PUBLIC_PREFIXES = ("/api/public", "/api/auth/login", "/api/auth/refresh", "/api/auth/forgot", "/api/auth/reset", "/api/health", "/api/ready", "/api/openapi.json", "/api/docs", "/api/admin/backups/")
+PUBLIC_PREFIXES = ("/api/public", "/api/auth/login", "/api/auth/refresh", "/api/auth/forgot", "/api/auth/reset", "/api/health", "/api/ready", "/api/openapi.json", "/api/docs", "/api/admin/backups/", "/api/portal/auth/login", "/api/portal/auth/refresh")
 
 
 @pytest.fixture(scope="module")
