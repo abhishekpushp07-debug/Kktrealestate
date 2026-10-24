@@ -70,3 +70,32 @@ POST /api/v1/public/site-visits               {project_slug, date, start, name, 
 GET  /api/v1/public/site-visits/:token        manage view · GET …/:token.ics · POST …/:token/cancel
 ```
 All public GETs: `Cache-Control: public, max-age=60, s-maxage=60, stale-while-revalidate=300`; 404 for unpublished; never return ids of users/customers, costs, storage keys or Hold/Booked/Blocked distinctions.
+
+## Appendix C — Portal API surface (fixed; `aud: portal`; implemented by the `portal` module, consumed by apps/portal). Response schemas are the `Portal*` schemas in `@kkt/contracts` (modules/portal.ts).
+```
+POST /api/v1/portal/auth/login            PortalLogin → PortalLoginResponse (TokenPair + user)          public, 10/min/IP
+POST /api/v1/portal/auth/refresh          PortalRefresh → TokenPair
+POST /api/v1/portal/auth/logout           {refresh_token?, all_devices?} → 204
+GET  /api/v1/portal/auth/me               → PortalUser
+POST /api/v1/portal/auth/change-password  PortalChangePassword → 204 (clears must_change_password)
+GET  /api/v1/portal/auth/sessions · DELETE /api/v1/portal/auth/sessions/:id · DELETE /api/v1/portal/auth/sessions
+GET  /api/v1/portal/bookings              → PortalBookingSwitcherItem[] (bookings where the customer is primary or co-applicant)
+GET  /api/v1/portal/bookings/:id/home     → PortalHomeResponse
+GET  /api/v1/portal/bookings/:id/flat     → PortalMyFlatResponse
+GET  /api/v1/portal/bookings/:id/ledger   → PortalLedgerResponse
+GET  /api/v1/portal/bookings/:id/receipts → PortalReceiptListResponse      GET …/receipts/:paymentId/pdf → PortalPdfLinkResponse (signed 15-min URL) ; GET /api/v1/portal/files/:token streams the PDF/image
+GET  /api/v1/portal/bookings/:id/demands  → PortalDemandListResponse       GET …/demands/:demandId/pdf → PortalPdfLinkResponse
+GET  /api/v1/portal/bookings/:id/schedule → PortalScheduleResponse
+GET  /api/v1/portal/bookings/:id/statement.pdf → PortalPdfLinkResponse     GET …/allotment-letter.pdf → PortalPdfLinkResponse
+GET  /api/v1/portal/bookings/:id/construction → PortalConstructionTimelineResponse (own tower only; photos visible_to_buyers only)
+GET  /api/v1/portal/bookings/:id/documents → PortalDocumentListResponse    GET …/documents/:docId/download → PortalPdfLinkResponse
+GET  /api/v1/portal/bookings/:id/bank-details → PortalBankDetails (Account bucket transfers)
+GET  /api/v1/portal/requests?status=     → PortalRequestListResponse       POST /api/v1/portal/requests (PortalRequestCreate, multipart attachments optional) → PortalRequestDetailResponse
+GET  /api/v1/portal/requests/:id         → PortalRequestDetailResponse (internal staff notes never included)
+POST /api/v1/portal/requests/:id/messages (PortalRequestMessageCreate) · POST …/reopen (PortalRequestReopen, within 7 days of RESOLVED) · POST …/rate (PortalRequestRate)
+POST /api/v1/portal/requests/:id/attachments (multipart) → PortalDocumentRow
+GET  /api/v1/portal/notices              → PortalNoticeListResponse (company-wide + the projects of the customer's bookings)
+GET  /api/v1/portal/notifications        → PortalNotificationListResponse  GET …/unread-count → {count}  POST …/mark-read (PortalMarkRead)
+GET  /api/v1/portal/profile              → PortalProfileResponse           PATCH /api/v1/portal/profile (PortalProfileUpdate; audited as CUSTOMER)
+```
+Every `:id` is checked against the customer's bookings; anything else is 404. KYC values are masked. No internal ids of staff users or storage keys are returned.
