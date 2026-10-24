@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ListQuerySchema, MasterRowSchema, NameSchema, TextSchema, listEnvelope, updateOf } from "../common.js";
+import { BoolQuerySchema, ListQuerySchema, MasterRowSchema, NameSchema, TextSchema, listEnvelope, updateOf } from "../common.js";
 import { PermissionListSchema } from "../permissions.js";
 
 const RoleBase = z.strictObject({
@@ -30,7 +30,7 @@ export const RoleRowSchema = MasterRowSchema.extend({
 export type RoleRow = z.infer<typeof RoleRowSchema>;
 
 /** List filter for roles. */
-export const RoleFilterSchema = ListQuerySchema.extend({ is_system: z.boolean().optional() });
+export const RoleFilterSchema = ListQuerySchema.extend({ is_system: BoolQuerySchema.optional() });
 export type RoleFilter = z.infer<typeof RoleFilterSchema>;
 
 export const RoleListResponseSchema = listEnvelope(RoleRowSchema);

@@ -17,7 +17,7 @@ function vendorChunk(id: string): string | undefined {
 }
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), tsconfigPaths()],
+  plugins: [react(), tailwindcss(), tsconfigPaths({ projects: ["./tsconfig.json"] })],
   server: {
     port: 5173,
     strictPort: true,

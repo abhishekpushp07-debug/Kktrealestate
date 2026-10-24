@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { GenderSchema, KycStatusSchema, LeadSourceSchema, PortalAccessActionSchema } from "../enums.js";
+import { BookingStatusSchema, GenderSchema, KycStatusSchema, LeadSourceSchema, PortalAccessActionSchema } from "../enums.js";
 import {
   AadhaarSchema,
   AddressSchema,
@@ -104,10 +104,10 @@ const CustomerBase = z.strictObject({
 });
 
 /** Create a customer with KYC fields (PAN/Aadhaar/bank are encrypted at rest). */
-export const CustomerCreateSchema = CustomerBase.refine(
-  (c) => c.same_as_current || c.address_permanent !== undefined,
-  { message: "Permanent address required when not same as current", path: ["address_permanent"] },
-);
+export const CustomerCreateSchema = CustomerBase.refine((c) => c.same_as_current || c.address_permanent != null, {
+  message: "Permanent address required when not same as current",
+  path: ["address_permanent"],
+});
 export type CustomerCreate = z.infer<typeof CustomerCreateSchema>;
 
 /** Update a customer (partial + version). */
@@ -264,7 +264,7 @@ export const Customer360ResponseSchema = z.object({
       project_name: z.string(),
       block_name: z.string(),
       flat_number: z.string(),
-      status: z.string(),
+      status: BookingStatusSchema,
       plan_name: z.string(),
       agreement_value_paise: z.int(),
       total_paid_paise: z.int(),

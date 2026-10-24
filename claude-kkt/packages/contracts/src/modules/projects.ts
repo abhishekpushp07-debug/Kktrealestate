@@ -18,12 +18,17 @@ import {
 export const LandmarkSchema = z.strictObject({ name: NameSchema, distance_km: z.number().min(0).max(999) });
 export type Landmark = z.infer<typeof LandmarkSchema>;
 
+/** Status of a statutory approval. */
+export const APPROVAL_STATUSES = ["APPLIED", "RECEIVED", "NA"] as const;
+export const ApprovalStatusSchema = z.enum(APPROVAL_STATUSES);
+export type ApprovalStatus = z.infer<typeof ApprovalStatusSchema>;
+
 /** A statutory approval (RERA, building plan, fire NOC…). */
 export const ApprovalSchema = z.strictObject({
   name: NameSchema,
   number: z.string().trim().max(80).optional().nullable(),
   issued_on: DateStringSchema.optional().nullable(),
-  status: z.enum(["APPLIED", "RECEIVED", "NA"]).default("RECEIVED"),
+  status: ApprovalStatusSchema.default("RECEIVED"),
 });
 export type Approval = z.infer<typeof ApprovalSchema>;
 
@@ -110,7 +115,7 @@ export const ProjectRowSchema = MasterRowSchema.extend({
   longitude: z.number().nullable(),
   landmarks: z.array(z.object({ name: z.string(), distance_km: z.number() })),
   approvals: z.array(
-    z.object({ name: z.string(), number: z.string().nullable(), issued_on: DateStringSchema.nullable(), status: z.string() }),
+    z.object({ name: z.string(), number: z.string().nullable(), issued_on: DateStringSchema.nullable(), status: ApprovalStatusSchema }),
   ),
   escrow_bank_account_id: IdSchema.nullable(),
   stage_sequence: z.array(IdSchema),

@@ -88,6 +88,37 @@ export const PAYMENT_MODE_CODE_LABELS: LabelMap<PaymentModeCode> = {
   LOAN_DISBURSEMENT: "Bank Loan Disbursement",
 };
 
+/** Behaviour flags of a payment mode (SPEC §3 and §11 clearing rule). */
+export interface PaymentModeRules {
+  readonly requires_instrument: boolean;
+  readonly clears_immediately: boolean;
+  readonly is_cash: boolean;
+}
+
+/** Default rules per mode code: Cash/UPI/NEFT/Loan clear immediately; Cheque/DD stay Pending until cleared or bounced. */
+export const PAYMENT_MODE_DEFAULTS: Readonly<Record<PaymentModeCode, PaymentModeRules>> = {
+  CASH: { requires_instrument: false, clears_immediately: true, is_cash: true },
+  CHEQUE: { requires_instrument: true, clears_immediately: false, is_cash: false },
+  NEFT_RTGS: { requires_instrument: true, clears_immediately: true, is_cash: false },
+  UPI: { requires_instrument: true, clears_immediately: true, is_cash: false },
+  DD: { requires_instrument: true, clears_immediately: false, is_cash: false },
+  LOAN_DISBURSEMENT: { requires_instrument: true, clears_immediately: true, is_cash: false },
+};
+
+/** Returns true when payments in this mode are Cleared the moment they are posted. */
+export function clearsImmediately(code: PaymentModeCode): boolean {
+  switch (code) {
+    case "CASH":
+    case "UPI":
+    case "NEFT_RTGS":
+    case "LOAN_DISBURSEMENT":
+      return true;
+    case "CHEQUE":
+    case "DD":
+      return false;
+  }
+}
+
 export const AREA_TYPE_CODES = ["CARPET", "BUILT_UP", "SUPER_BUILT_UP", "BALCONY", "TERRACE", "PARKING"] as const;
 export const AreaTypeCodeSchema = enumSchema(AREA_TYPE_CODES);
 export type AreaTypeCode = z.infer<typeof AreaTypeCodeSchema>;
@@ -416,6 +447,8 @@ export const VISIT_SOURCE_LABELS: LabelMap<VisitSource> = { WEBSITE: "Website", 
 
 export const SLOT_MINUTES = [30, 60] as const;
 export type SlotMinutes = (typeof SLOT_MINUTES)[number];
+/** Site-visit slot length: 30 or 60 minutes. */
+export const SlotMinutesSchema = z.union([z.literal(30), z.literal(60)]);
 
 // ---------------------------------------------------------------------------
 // Bookings & money

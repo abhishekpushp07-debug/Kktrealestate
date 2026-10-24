@@ -107,13 +107,13 @@ describe("icsForVisit", () => {
     expect(ics).toContain("BEGIN:VALARM\r\nACTION:DISPLAY");
     expect(ics).toContain("TRIGGER:-PT1H");
     expect(ics).toContain("UID:SV-2526/0001@kkt");
-    expect(ics).toContain("DESCRIPTION:Visit number SV-2526/0001\; 2 visitors\\, please carry ID");
+    expect(ics).toContain("DESCRIPTION:Visit number SV-2526/0001\\; 2 visitors\\, please carry ID");
     expect(ics).toContain("URL:https://www.example.com/visit/abc");
     expect(ics.split("\r\n").filter((l) => l.length > 0).every((l) => new TextEncoder().encode(l).length <= 75)).toBe(true);
     expect(ics).not.toMatch(/[^\r]\n/);
   });
   it("escapes and folds", () => {
-    expect(icsEscape("a;b,c\\d\ne")).toBe("a\;b\\,c\\\\d\\ne");
+    expect(icsEscape("a;b,c\\d\ne")).toBe("a\\;b\\,c\\\\d\\ne");
     const long = `DESCRIPTION:${"x".repeat(200)}`;
     const folded = icsFold(long);
     expect(folded.split("\r\n")).toHaveLength(3);

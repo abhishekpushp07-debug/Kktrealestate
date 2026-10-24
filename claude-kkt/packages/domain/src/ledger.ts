@@ -3,7 +3,7 @@
  * deriveLedger rebuilds every row from events; appendLedgerRow is the O(1) incremental step; both agree.
  */
 import { isValidDateString } from "./dates.js";
-import { toISTDateString } from "./ist.js";
+import { toEpochMs, toISTDateString } from "./ist.js";
 import { assertPaise, formatINR } from "./money.js";
 
 /** Money bucket of a booking. */
@@ -343,17 +343,28 @@ export function appendLedgerRow(prevSummary: LedgerSummary, event: LedgerEvent):
   return { row: rowFrom(summary, event, applied.amountPaise, applied.bucket, applied.label), summary };
 }
 
-/** Sorts events by (at, kind priority), stable, without mutating the input. */
+/** Epoch milliseconds of an event's `at` when it is an instant; 0 for a bare business date (sorts first within its day). */
+function instantMs(at: string): number {
+  return isValidDateString(at) ? 0 : toEpochMs(at);
+}
+
+/**
+ * Sorts events by business date, then instant (so "+05:30" and "Z" stamps of the same moment compare equal),
+ * then kind priority; stable; does not mutate the input.
+ */
 export function sortLedgerEvents<T extends LedgerEvent>(events: readonly T[]): T[] {
-  return [...events].sort((a, b) => {
-    if (a.at < b.at) {
-      return -1;
+  const keyed = events.map((event, index) => ({ event, index, date: ledgerEntryDate(event), ms: instantMs(event.at) }));
+  keyed.sort((a, b) => {
+    if (a.date !== b.date) {
+      return a.date < b.date ? -1 : 1;
     }
-    if (a.at > b.at) {
-      return 1;
+    if (a.ms !== b.ms) {
+      return a.ms - b.ms;
     }
-    return ledgerKindPriority(a.kind) - ledgerKindPriority(b.kind);
+    const byKind = ledgerKindPriority(a.event.kind) - ledgerKindPriority(b.event.kind);
+    return byKind !== 0 ? byKind : a.index - b.index;
   });
+  return keyed.map((k) => k.event);
 }
 
 export interface DerivedLedger {

@@ -312,6 +312,6 @@ export const DateRangeSchema = z
   .refine((r) => r.from <= r.to, { message: "from must be on or before to", path: ["to"] });
 export type DateRange = z.infer<typeof DateRangeSchema>;
 
-/** Record of ids → booleans, used for multi-select bulk actions. */
+/** Non-empty list of ids (≤ 500), used for multi-select bulk actions. */
 export const IdListSchema = z.array(IdSchema).min(1).max(500);
 export type IdList = z.infer<typeof IdListSchema>;

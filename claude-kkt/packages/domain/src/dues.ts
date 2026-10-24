@@ -4,7 +4,7 @@
  */
 import { normalizeLabel } from "./canonical.js";
 import { addDays, assertDateString, compareDates, formatDateLabel } from "./dates.js";
-import { assertPaise, basisPointsToPercentString, bpOfPaise, toBasisPoints } from "./money.js";
+import { MoneyError, assertPaise, basisPointsToPercentString, bpOfPaise, toBasisPoints } from "./money.js";
 import { sortBySeq, type TriggerType } from "./paymentPlan.js";
 
 /** Status of a tower's stage record. */
@@ -65,16 +65,52 @@ export interface InstallmentAmount {
 /** Default due days when neither the installment nor the caller gives one. */
 export const DEFAULT_DUE_DAYS = 15;
 
+/** The tower stage record an installment's stage trigger points at (possession stage for ON_POSSESSION), or undefined. */
+function stageFor(inst: Pick<PlanSnapshotInstallment, "triggerType" | "triggerStageId">, towerStages: readonly TowerStage[]): TowerStage | undefined {
+  switch (inst.triggerType) {
+    case "ON_POSSESSION":
+      return towerStages.find((s) => s.isPossession);
+    case "ON_STAGE":
+      return inst.triggerStageId ? towerStages.find((s) => s.stageId === inst.triggerStageId) : undefined;
+    case "ON_BOOKING":
+    case "DAYS_AFTER_BOOKING":
+    case "ON_DATE":
+      return undefined;
+    default: {
+      const never: never = inst.triggerType;
+      throw new Error(`Unknown trigger type ${String(never)}`);
+    }
+  }
+}
+
 /** Finds the completed stage record satisfying an installment's stage trigger, or null. */
 function completedStage(inst: PlanSnapshotInstallment, towerStages: readonly TowerStage[]): TowerStage | null {
-  const stage =
-    inst.triggerType === "ON_POSSESSION"
-      ? towerStages.find((s) => s.isPossession)
-      : towerStages.find((s) => s.stageId === inst.triggerStageId);
+  const stage = stageFor(inst, towerStages);
   if (!stage || stage.status !== "COMPLETED") {
     return null;
   }
   return stage;
+}
+
+/**
+ * Stage id a demand for this installment is attributed to: the installment's stage for ON_STAGE, the tower's
+ * possession stage for ON_POSSESSION (so undoing that stage can find and void the demand), else null.
+ */
+export function demandStageId(inst: Pick<PlanSnapshotInstallment, "triggerType" | "triggerStageId">, towerStages: readonly TowerStage[]): string | null {
+  switch (inst.triggerType) {
+    case "ON_STAGE":
+      return inst.triggerStageId ?? null;
+    case "ON_POSSESSION":
+      return stageFor(inst, towerStages)?.stageId ?? inst.triggerStageId ?? null;
+    case "ON_BOOKING":
+    case "DAYS_AFTER_BOOKING":
+    case "ON_DATE":
+      return null;
+    default: {
+      const never: never = inst.triggerType;
+      throw new Error(`Unknown trigger type ${String(never)}`);
+    }
+  }
 }
 
 /** Trigger date of an installment for a booking; null when the trigger is not (yet) satisfiable. */
@@ -130,6 +166,9 @@ export function installmentAmounts(
 ): InstallmentAmount[] {
   assertPaise(agreedCashPaise, "agreedCashPaise");
   assertPaise(agreedAccountPaise, "agreedAccountPaise");
+  if (agreedCashPaise < 0 || agreedAccountPaise < 0) {
+    throw new MoneyError(`Agreed amounts cannot be negative, got cash ${agreedCashPaise} / account ${agreedAccountPaise}`);
+  }
   let cumulativeBp = 0;
   let prevCash = 0;
   let prevAccount = 0;
@@ -191,9 +230,15 @@ function dueDaysOf(inst: PlanSnapshotInstallment, defaultDueDays: number): numbe
 
 /** Stage name lookup for labels. */
 function stageNameFor(inst: PlanSnapshotInstallment, towerStages: readonly TowerStage[]): string | null {
-  const stage =
-    inst.triggerType === "ON_POSSESSION" ? towerStages.find((s) => s.isPossession) : towerStages.find((s) => s.stageId === inst.triggerStageId);
-  return stage?.name ?? inst.triggerStageName ?? null;
+  return stageFor(inst, towerStages)?.name ?? inst.triggerStageName ?? null;
+}
+
+/** Whether a trigger date counts as satisfied today: ON_BOOKING always is (SPEC §10), the rest once the date arrives. */
+function isSatisfied(inst: PlanSnapshotInstallment, date: string | null, today: string): date is string {
+  if (date === null) {
+    return false;
+  }
+  return inst.triggerType === "ON_BOOKING" || compareDates(date, today) <= 0;
 }
 
 /** Installments whose trigger is satisfied as of today and have no non-void demand yet (idempotent by seq or name). */
@@ -209,7 +254,7 @@ export function evaluateDues(input: EvaluateDuesInput): DueToRaise[] {
       continue;
     }
     const date = triggerDate(inst, booking.bookingDate, towerStages);
-    if (date === null || compareDates(date, today) > 0) {
+    if (!isSatisfied(inst, date, today)) {
       continue;
     }
     const amount = amounts.get(inst.seq);
@@ -221,7 +266,7 @@ export function evaluateDues(input: EvaluateDuesInput): DueToRaise[] {
       name: inst.name,
       triggerType: inst.triggerType,
       triggerLabel: triggerLabel(inst, stageNameFor(inst, towerStages)),
-      triggerStageId: inst.triggerType === "ON_STAGE" || inst.triggerType === "ON_POSSESSION" ? (inst.triggerStageId ?? null) : null,
+      triggerStageId: demandStageId(inst, towerStages),
       triggerDate: date,
       dueDate: addDays(date, dueDaysOf(inst, defaultDueDays)),
       percent: basisPointsToPercentString(amount.percentBp),
@@ -281,7 +326,7 @@ function demandedStatus(demand: ExistingDemand, dueDate: string | null, today: s
 
 /** Forecast trigger date for a not-yet-satisfied stage trigger from the caller's expected stage dates. */
 function forecastStageDate(inst: PlanSnapshotInstallment, towerStages: readonly TowerStage[], expected: Readonly<Record<string, string>>): string | null {
-  const stageId = inst.triggerType === "ON_POSSESSION" ? towerStages.find((s) => s.isPossession)?.stageId : inst.triggerStageId;
+  const stageId = demandStageId(inst, towerStages);
   return stageId ? (expected[stageId] ?? null) : null;
 }
 

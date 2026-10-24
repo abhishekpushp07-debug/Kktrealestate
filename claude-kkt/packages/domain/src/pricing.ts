@@ -2,7 +2,7 @@
  * Pricing engine (SPEC §5): base price from a rate card (rate × super built-up or lump sum) plus PLC rules,
  * with a line-item breakup. Also the flat-type fallback price and the bulk price-edit helper.
  */
-import { assertPaise, bpOfPaise, divRoundHalfUp, formatINR, mulPaiseBySqft, toBasisPoints, bigIntToSafeNumber } from "./money.js";
+import { assertPaise, bpOfPaise, divRoundHalfUp, formatINR, mulPaiseBySqft, scaleDecimal, toBasisPoints, bigIntToSafeNumber } from "./money.js";
 
 /** Calculation mode of a PLC rule. */
 export type PlcCalcMode = "PER_SQFT" | "FIXED" | "PERCENT" | "FLOOR_RISE";
@@ -109,10 +109,14 @@ export function plcAmount(rule: PlcRule, flat: PricingFlat, basePaise: number): 
 
 /** Effective rate per sq ft for a total and an area, half-up; null when the area is zero. */
 export function effectiveRatePerSqft(totalPaise: number, sqft: number): number | null {
-  if (sqft <= 0) {
+  assertPaise(totalPaise, "totalPaise");
+  if (!Number.isFinite(sqft) || sqft <= 0) {
     return null;
   }
-  const hundredths = BigInt(Math.round(sqft * 100));
+  const hundredths = scaleDecimal(sqft, 2, "Area");
+  if (hundredths <= 0n) {
+    return null;
+  }
   return bigIntToSafeNumber(divRoundHalfUp(BigInt(totalPaise) * 100n, hundredths));
 }
 

@@ -2,6 +2,7 @@
  * Payment plan validation (SPEC §8): percents sum to exactly 100.00, unique sequences, trigger details present,
  * at most one ON_BOOKING and one ON_POSSESSION; plus the tower-stage compatibility check.
  */
+import { normalizeLabel } from "./canonical.js";
 import { isValidDateString } from "./dates.js";
 import { MoneyError, basisPointsToPercentString, toBasisPoints } from "./money.js";
 
@@ -30,6 +31,8 @@ export type PlanValidationCode =
   | "DUPLICATE_SEQ"
   | "INVALID_SEQ"
   | "EMPTY_NAME"
+  | "DUPLICATE_NAME"
+  | "UNKNOWN_STAGE"
   | "MULTIPLE_ON_BOOKING"
   | "MULTIPLE_ON_POSSESSION"
   | "TRIGGER_DAYS_REQUIRED"
@@ -92,13 +95,23 @@ function validateTrigger(inst: PlanInstallmentInput): PlanValidationError | null
   }
 }
 
-/** Validates a plan's installments and returns every problem found (empty errors means the plan is valid). */
-export function validatePlan(installments: readonly PlanInstallmentInput[]): PlanValidationResult {
+export interface ValidatePlanOptions {
+  /** When given, every ON_STAGE installment must reference one of these construction-stage ids (SPEC §8: referenced stages must exist). */
+  knownStageIds?: readonly string[] | null;
+}
+
+/**
+ * Validates a plan's installments and returns every problem found (empty errors means the plan is valid).
+ * Names must be unique (case/space-insensitive) because the dues engine de-duplicates demands by sequence OR name.
+ */
+export function validatePlan(installments: readonly PlanInstallmentInput[], options: ValidatePlanOptions = {}): PlanValidationResult {
   const errors: PlanValidationError[] = [];
   if (installments.length === 0) {
     return { ok: false, errors: [{ code: "EMPTY_PLAN", message: "A payment plan needs at least one installment" }], totalBasisPoints: 0 };
   }
+  const knownStages = options.knownStageIds ? new Set(options.knownStageIds) : null;
   const seqs = new Set<number>();
+  const names = new Set<string>();
   let total = 0;
   let onBooking = 0;
   let onPossession = 0;
@@ -110,8 +123,21 @@ export function validatePlan(installments: readonly PlanInstallmentInput[]): Pla
     } else {
       seqs.add(inst.seq);
     }
-    if (inst.name.trim() === "") {
+    const name = normalizeLabel(inst.name);
+    if (name === "") {
       errors.push({ code: "EMPTY_NAME", message: `Installment ${inst.seq} has no name`, seq: inst.seq });
+    } else if (names.has(name)) {
+      errors.push({ code: "DUPLICATE_NAME", message: `Installment name "${inst.name.trim()}" is used more than once`, seq: inst.seq });
+    } else {
+      names.add(name);
+    }
+    if (knownStages && inst.triggerType === "ON_STAGE" && inst.triggerStageId && !knownStages.has(inst.triggerStageId)) {
+      errors.push({
+        code: "UNKNOWN_STAGE",
+        message: `Installment ${inst.seq}: construction stage ${inst.triggerStageId} does not exist`,
+        seq: inst.seq,
+        details: { stageId: inst.triggerStageId },
+      });
     }
     const bp = percentToBasisPointsOrNull(inst.percent);
     if (bp === null || bp <= 0) {

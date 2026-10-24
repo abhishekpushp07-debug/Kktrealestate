@@ -9,6 +9,7 @@ import {
   PasswordSchema,
   PhoneSchema,
   TimestampSchema,
+  VersionSchema,
   VersionedSchema,
   listEnvelope,
   updateOf,
@@ -83,7 +84,7 @@ export const UserResetPasswordSchema = z.strictObject({
 export type UserResetPassword = z.infer<typeof UserResetPasswordSchema>;
 
 /** Response of a reset: temporary password shown once. */
-export const UserResetPasswordResponseSchema = z.object({ id: IdSchema, temp_password: z.string().optional(), version: z.int() });
+export const UserResetPasswordResponseSchema = z.object({ id: IdSchema, temp_password: z.string().optional(), version: VersionSchema });
 export type UserResetPasswordResponse = z.infer<typeof UserResetPasswordResponseSchema>;
 
 /** Unlock a locked-out user. */

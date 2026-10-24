@@ -48,12 +48,45 @@ export const TokenPairSchema = z.object({
 });
 export type TokenPair = z.infer<typeof TokenPairSchema>;
 
-/** Staff login response; `mfa_required` means re-submit with `mfa_code`. */
+/** Staff login success: tokens + user (`must_change_password` mirrored at the top level per API-CONVENTIONS Appendix A). */
+export const StaffLoginSuccessSchema = TokenPairSchema.extend({
+  mfa_required: z.literal(false).optional(),
+  user: AuthUserSchema,
+  must_change_password: z.boolean(),
+});
+export type StaffLoginSuccess = z.infer<typeof StaffLoginSuccessSchema>;
+
+/** Staff login response; `mfa_required` means complete the login with `POST /auth/login/mfa`. */
 export const StaffLoginResponseSchema = z.union([
   z.object({ mfa_required: z.literal(true), mfa_token: z.string() }),
-  TokenPairSchema.extend({ mfa_required: z.literal(false).optional(), user: AuthUserSchema }),
+  StaffLoginSuccessSchema,
 ]);
 export type StaffLoginResponse = z.infer<typeof StaffLoginResponseSchema>;
+
+/** Second step of an MFA login: the short-lived `mfa_token` from step one plus the TOTP code. */
+export const StaffMfaLoginSchema = z.strictObject({ mfa_token: z.string().min(16), code: z.string().regex(/^\d{6}$/) });
+export type StaffMfaLogin = z.infer<typeof StaffMfaLoginSchema>;
+
+/** Company facts every staff client needs after login. */
+export const AuthCompanySchema = z.object({
+  id: IdSchema,
+  name: z.string(),
+  legal_name: z.string().nullable(),
+  logo_url: z.string().nullable(),
+  fy_start_month: z.int().min(1).max(12),
+  settings: z.object({
+    demand_due_days: z.int().min(0),
+    default_gst_percent: z.number().min(0).max(100),
+    round_robin_enabled: z.boolean(),
+    force_mfa_for_admins: z.boolean(),
+    booking_hold_hours: z.int().min(1),
+  }),
+});
+export type AuthCompany = z.infer<typeof AuthCompanySchema>;
+
+/** `GET /auth/me`: the caller and their company. */
+export const AuthMeResponseSchema = z.object({ user: AuthUserSchema, company: AuthCompanySchema });
+export type AuthMeResponse = z.infer<typeof AuthMeResponseSchema>;
 
 /** Refresh body. */
 export const RefreshTokenSchema = z.strictObject({ refresh_token: z.string().min(16) });

@@ -216,8 +216,17 @@ export interface SystemRoleDefinition {
 
 const COMMON_STAFF: readonly Permission[] = ["dashboard.view", "notification.read", "master.read", "project.read"];
 
+/** Names of the system roles, in display order (SPEC §1). */
+export const SYSTEM_ROLE_NAMES = ["Super Admin", "Project Admin", "Accounts", "Sales", "Marketing", "Employee"] as const;
+
+/** A system role name literal. */
+export type SystemRoleName = (typeof SYSTEM_ROLE_NAMES)[number];
+
+/** Zod schema accepting exactly one system role name. */
+export const SystemRoleNameSchema = z.enum(SYSTEM_ROLE_NAMES);
+
 /** System roles (cannot be deleted) with their permission bundles, exactly per SPEC §1. */
-export const SYSTEM_ROLES: Record<string, SystemRoleDefinition> = {
+export const SYSTEM_ROLES: Readonly<Record<SystemRoleName, SystemRoleDefinition>> = {
   "Super Admin": {
     description: "Everything, including users/roles, settings, agreement edits, CMS, backups and integrity tools.",
     permissions: [...ALL_PERMISSIONS],
@@ -295,8 +304,10 @@ export const SYSTEM_ROLES: Record<string, SystemRoleDefinition> = {
   },
 };
 
-/** Names of the system roles, in display order. */
-export const SYSTEM_ROLE_NAMES = Object.keys(SYSTEM_ROLES);
+/** Returns true when the name is one of the system roles. */
+export function isSystemRoleName(name: string): name is SystemRoleName {
+  return (SYSTEM_ROLE_NAMES as readonly string[]).includes(name);
+}
 
 /** Returns true when the permission set grants the given code. */
 export function hasPermission(granted: readonly string[], code: Permission): boolean {

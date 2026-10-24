@@ -20,7 +20,6 @@ import {
   PaiseSchema,
   PercentSchema,
   PositiveSqftSchema,
-  SqftSchema,
   TextSchema,
   listEnvelope,
   updateOf,
@@ -58,9 +57,9 @@ export type AreaTypeRow = z.infer<typeof AreaTypeRowSchema>;
 export const FlatTypeRoomSchema = z.strictObject({
   room_type_id: IdSchema,
   label: NameSchema,
-  length_ft: z.number().min(0).max(999),
-  width_ft: z.number().min(0).max(999),
-  sqft: SqftSchema.optional(),
+  length_ft: z.number().gt(0).max(999),
+  width_ft: z.number().gt(0).max(999),
+  sqft: PositiveSqftSchema.optional(),
 });
 export type FlatTypeRoom = z.infer<typeof FlatTypeRoomSchema>;
 
@@ -105,7 +104,10 @@ const FlatTypeBase = z.strictObject({
 export const FlatTypeCreateSchema = FlatTypeBase.refine(
   (f) => new Set(f.areas.map((a) => a.area_type_id)).size === f.areas.length,
   { message: "Each area type once", path: ["areas"] },
-);
+).refine((f) => f.base_rate_per_sqft_paise == null || f.base_price_paise == null, {
+  message: "Give a base rate per sq ft or a lump-sum price, not both",
+  path: ["base_price_paise"],
+});
 export type FlatTypeCreate = z.infer<typeof FlatTypeCreateSchema>;
 export const FlatTypeUpdateSchema = updateOf(FlatTypeBase);
 export type FlatTypeUpdate = z.infer<typeof FlatTypeUpdateSchema>;

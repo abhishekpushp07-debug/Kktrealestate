@@ -120,20 +120,32 @@ export interface PricingContext {
 /** Function that prices a flat being generated (usually wraps resolveFlatPrice with the active rate card). */
 export type PricingFn = (ctx: PricingContext) => PriceResult;
 
-/** Physical floors of a block: exactly `floors` numbers from floorStart upwards, skipping the skip list. */
+/**
+ * Physical floors of a block (SPEC §4 step 1): every floor number from floorStart to `floors` inclusive,
+ * excluding the skip list. `floors` is the top floor number (a 15-floor tower skipping 13 has 14 physical floors).
+ */
 export function physicalFloors(block: Pick<BlockDefinition, "floors" | "floorStart" | "skipFloors">): number[] {
-  if (!Number.isInteger(block.floors) || block.floors < 1) {
-    throw new FlatGenerationError("INVALID_FLOORS", `floors must be a positive integer, got ${String(block.floors)}`);
+  if (!Number.isInteger(block.floors)) {
+    throw new FlatGenerationError("INVALID_FLOORS", `floors must be an integer, got ${String(block.floors)}`);
   }
   if (!Number.isInteger(block.floorStart)) {
     throw new FlatGenerationError("INVALID_FLOORS", `floorStart must be an integer, got ${String(block.floorStart)}`);
   }
+  if (block.floorStart > block.floors) {
+    throw new FlatGenerationError("INVALID_FLOORS", `floorStart ${block.floorStart} must be ≤ floors ${block.floors}`, {
+      floors: block.floors,
+      floorStart: block.floorStart,
+    });
+  }
   const skip = new Set(block.skipFloors);
   const out: number[] = [];
-  for (let floor = block.floorStart; out.length < block.floors; floor += 1) {
+  for (let floor = block.floorStart; floor <= block.floors; floor += 1) {
     if (!skip.has(floor)) {
       out.push(floor);
     }
+  }
+  if (out.length === 0) {
+    throw new FlatGenerationError("INVALID_FLOORS", "Every floor is in the skip list", { floors: block.floors, floorStart: block.floorStart });
   }
   return out;
 }

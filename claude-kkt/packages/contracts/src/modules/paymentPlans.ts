@@ -22,7 +22,7 @@ export const InstallmentInputSchema = z
   .strictObject({
     seq: z.int().min(1).max(100),
     name: NameSchema,
-    percent: PercentSchema,
+    percent: PercentSchema.refine((v) => v > 0, { message: "Installment percent must be greater than 0" }),
     trigger_type: TriggerTypeSchema,
     trigger_days: z.int().min(1).max(3650).optional().nullable(),
     trigger_stage_id: IdSchema.optional().nullable(),

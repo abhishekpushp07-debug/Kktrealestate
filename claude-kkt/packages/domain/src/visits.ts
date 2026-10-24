@@ -115,7 +115,7 @@ export interface VisitICSInput {
 
 /** Escapes text for an iCalendar property value. */
 export function icsEscape(text: string): string {
-  return text.replace(/\\/g, "\\\\").replace(/;/g, "\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+  return text.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
 }
 
 /** Folds a content line at 75 octets per RFC 5545 (continuation lines start with a space). */

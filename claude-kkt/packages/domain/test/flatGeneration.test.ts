@@ -24,7 +24,7 @@ const towerC: BlockDefinition = {
   podiumFloors: [],
   floorPlans: [
     { fromFloor: 1, toFloor: 5, floorPlanTemplateId: "planA" },
-    { fromFloor: 6, toFloor: 16, floorPlanTemplateId: "planB" },
+    { fromFloor: 6, toFloor: 15, floorPlanTemplateId: "planB" },
   ],
   numberingPattern: "{block}-{floor}{pos2}",
 };
@@ -89,24 +89,29 @@ const pricing: PricingFn = (ctx) => ({
 });
 
 describe("floors", () => {
-  it("builds exactly `floors` physical floors skipping the skip list", () => {
+  it("builds floorStart..floors inclusive, excluding the skip list (SPEC §4 step 1)", () => {
     const floors = physicalFloors(towerC);
-    expect(floors).toHaveLength(15);
+    expect(floors).toHaveLength(14);
     expect(floors).not.toContain(13);
     expect(floors[0]).toBe(1);
-    expect(floors[14]).toBe(16);
-    expect(physicalFloors({ floors: 3, floorStart: 0, skipFloors: [] })).toEqual([0, 1, 2]);
-    expect(physicalFloors({ floors: 3, floorStart: 1, skipFloors: [1, 2] })).toEqual([3, 4, 5]);
+    expect(floors.at(-1)).toBe(15);
+    expect(physicalFloors({ floors: 2, floorStart: 0, skipFloors: [] })).toEqual([0, 1, 2]);
+    expect(physicalFloors({ floors: 5, floorStart: 1, skipFloors: [1, 2] })).toEqual([3, 4, 5]);
+    expect(physicalFloors({ floors: 0, floorStart: 0, skipFloors: [] })).toEqual([0]);
+    expect(physicalFloors({ floors: 3, floorStart: 1, skipFloors: [99] })).toEqual([1, 2, 3]);
   });
   it("unit floors exclude refuge and podium", () => {
     const floors = unitFloors(towerC);
-    expect(floors).toHaveLength(14);
+    expect(floors).toHaveLength(13);
     expect(floors).not.toContain(7);
-    expect(unitFloors({ ...towerC, podiumFloors: [1, 2] })).toHaveLength(12);
+    expect(floors).not.toContain(13);
+    expect(unitFloors({ ...towerC, podiumFloors: [1, 2] })).toHaveLength(11);
   });
   it("rejects bad floor counts", () => {
     expect(() => physicalFloors({ floors: 0, floorStart: 1, skipFloors: [] })).toThrow(FlatGenerationError);
     expect(() => physicalFloors({ floors: 1.5, floorStart: 1, skipFloors: [] })).toThrow(FlatGenerationError);
+    expect(() => physicalFloors({ floors: 3, floorStart: 1.5, skipFloors: [] })).toThrow(FlatGenerationError);
+    expect(() => physicalFloors({ floors: 2, floorStart: 1, skipFloors: [1, 2] })).toThrow(/skip list/);
   });
   it("labels the ground floor", () => {
     expect(floorLabel(0)).toBe("G");
@@ -119,7 +124,7 @@ describe("planForFloor", () => {
   it("finds the covering range and reports gaps/overlaps", () => {
     expect(planForFloor(towerC.floorPlans, 5).floorPlanTemplateId).toBe("planA");
     expect(planForFloor(towerC.floorPlans, 6).floorPlanTemplateId).toBe("planB");
-    expect(() => planForFloor(towerC.floorPlans, 17)).toThrow(FlatGenerationError);
+    expect(() => planForFloor(towerC.floorPlans, 16)).toThrow(FlatGenerationError);
     try {
       planForFloor([{ fromFloor: 1, toFloor: 3, floorPlanTemplateId: "x" }], 4);
     } catch (error) {
@@ -136,7 +141,7 @@ describe("planForFloor", () => {
       ),
     ).toThrow(/overlap|covered by 2/i);
     expect(validateFloorPlanRanges({ ...towerC, floorPlans: [{ fromFloor: 1, toFloor: 10, floorPlanTemplateId: "planA" }] })).toEqual({
-      gaps: [11, 12, 14, 15, 16],
+      gaps: [11, 12, 14, 15],
       overlaps: [],
     });
     expect(validateFloorPlanRanges(towerC)).toEqual({ gaps: [], overlaps: [] });
@@ -170,13 +175,14 @@ describe("validateFlatType", () => {
 describe("generateFlats", () => {
   it("creates the right count, numbering, snapshots and prices for Tower C", () => {
     const flats = generateFlats(towerC, templates, flatTypes, pricing);
-    // floors 1-5 → 4 flats each (20); floors 6,8..12,14..16 → 9 floors × 2 = 18
-    expect(flats).toHaveLength(38);
+    // floors 1-5 → 4 flats each (20); floors 6,8..12,14,15 → 8 floors × 2 = 16
+    expect(flats).toHaveLength(36);
     expect(flats[0]?.flatNumber).toBe("C-101");
     expect(flats[3]?.flatNumber).toBe("C-104");
     expect(flats.map((f) => f.flatNumber)).not.toContain("C-1301");
     expect(flats.map((f) => f.flatNumber)).not.toContain("C-701");
-    expect(flats.at(-1)?.flatNumber).toBe("C-1602");
+    expect(flats.at(-1)?.flatNumber).toBe("C-1502");
+    expect(flats.map((f) => f.flatNumber)).not.toContain("C-1601");
     expect(flats.map((f) => f.seq)).toEqual(flats.map((_, i) => i + 1));
     const first = flats[0];
     expect(first?.facing).toBe("NORTH");
@@ -203,7 +209,7 @@ describe("generateFlats", () => {
   it("villa numbering with seq", () => {
     const villas: BlockDefinition = {
       code: "V",
-      floors: 1,
+      floors: 0,
       floorStart: 0,
       skipFloors: [],
       refugeFloors: [],
