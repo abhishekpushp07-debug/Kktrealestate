@@ -1,0 +1,921 @@
+{
+ "erp_login_1440": {
+  "visible": 999,
+  "idle": 1238,
+  "requests": 21,
+  "sw": [
+   1440,
+   1440,
+   1440
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "erp_login_js_1440": [
+  [
+   "https://assets.emergent.sh/scripts/emergent-main.js",
+   18987,
+   "gzip",
+   null
+  ],
+  [
+   "https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092",
+   31853,
+   "gzip",
+   null
+  ],
+  [
+   "https://royal-realty-hub-2.preview.emergentagent.com/erp/static/js/main.61f8f28b.js",
+   357873,
+   "br",
+   null
+  ],
+  [
+   "https://royal-realty-hub-2.preview.emergentagent.com/cdn-cgi/challenge-platform/scripts/jsd/main.js",
+   0,
+   null,
+   "0"
+  ],
+  [
+   "https://royal-realty-hub-2.preview.emergentagent.com/cdn-cgi/challenge-platform/h/b/scripts/jsd/d2d3316b729e/main.js?",
+   22730,
+   "gzip",
+   null
+  ],
+  [
+   "https://ap.emergent.sh/static/array.js",
+   335513,
+   "gzip",
+   null
+  ],
+  [
+   "https://royal-realty-hub-2.preview.emergentagent.com/erp/static/js/474.64e2d223.chunk.js",
+   154799,
+   "br",
+   null
+  ],
+  [
+   "https://royal-realty-hub-2.preview.emergentagent.com/erp/static/js/381.f5383cb3.chunk.js",
+   56414,
+   "br",
+   null
+  ],
+  [
+   "https://ap.emergent.sh/array/phc_DbsPb39SRc8z3EiQ6Dhj6ikv4H4rTKcht9d4sZSesceP/config.js",
+   1991,
+   "gzip",
+   null
+  ],
+  [
+   "https://ap.emergent.sh/static/1.438.21/dead-clicks-autocapture.js",
+   24085,
+   "gzip",
+   null
+  ],
+  [
+   "https://ap.emergent.sh/static/1.438.21/web-vitals-with-attribution.js",
+   27027,
+   "gzip",
+   null
+  ],
+  [
+   "https://ap.emergent.sh/static/1.438.21/surveys.js",
+   112062,
+   "gzip",
+   null
+  ],
+  [
+   "https://ap.emergent.sh/static/1.438.21/posthog-recorder.js",
+   215176,
+   "gzip",
+   null
+  ],
+  [
+   "blob:https://royal-realty-hub-2.preview.emergentagent.com/70189f27-577a-4fb4-afdf-dfb344875c65",
+   4085,
+   null,
+   "4085"
+  ]
+ ],
+ "erp_dashboard_1440": {
+  "visible": 909,
+  "idle": 1629,
+  "requests": 33,
+  "sw": [
+   1440,
+   1440,
+   1440
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "ageing_1440": "Due ageing\n\u20b92,07,40,000\nTOTAL DUE\nNot due\n\u20b90\n0-30 days\n\u20b90\n31-60 days\n\u20b90\n61-90 days\n\u20b90\n90+ days\n\u20b92,07,40,000",
+ "erp_projects_1440": {
+  "visible": 888,
+  "idle": 1450,
+  "requests": 28,
+  "sw": [
+   1440,
+   1440,
+   1440
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "erp_towerA_inventory_1440": {
+  "visible": 1379,
+  "idle": 1546,
+  "requests": 29,
+  "sw": [
+   1440,
+   1440,
+   1440
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "towerhdr_1440": false,
+ "erp_bookings_list_1440": {
+  "visible": 1384,
+  "idle": 1491,
+  "requests": 26,
+  "sw": [
+   1440,
+   1440,
+   1440
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "erp_booking_BK0001_ledger_1440": {
+  "visible": 897,
+  "idle": 1462,
+  "requests": 32,
+  "sw": [
+   1440,
+   1440,
+   1440
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "ledger_tab_sw_1440": [
+  1440,
+  1440
+ ],
+ "erp_payments_list_1440": {
+  "visible": 1372,
+  "idle": 1589,
+  "requests": 29,
+  "sw": [
+   1440,
+   1440,
+   1440
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "erp_report_outstanding_1440": {
+  "visible": 894,
+  "idle": 1495,
+  "requests": 30,
+  "sw": [
+   1440,
+   1440,
+   1440
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "erp_customer360_1440": {
+  "visible": 875,
+  "idle": 1575,
+  "requests": 33,
+  "sw": [
+   1440,
+   1440,
+   1440
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "erp_wizard_step1_1440": {
+  "visible": 2578,
+  "idle": 2578,
+  "requests": 29,
+  "sw": [
+   1440,
+   1440,
+   1440
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "wizard_1440": {
+  "step2": true,
+  "sw2": [
+   1440,
+   1440
+  ],
+  "flat": "wiz-flat-P2",
+  "step3": true,
+  "sw3": [
+   1440,
+   1440
+  ]
+ },
+ "wizard_console_1440": [],
+ "mkt_home_1440": {
+  "visible": 973,
+  "idle": 1506,
+  "requests": 22,
+  "sw": [
+   1440,
+   1440,
+   1440
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "home_weight_1440": 873154,
+ "home_reqs_full_1440": 29,
+ "home_yt_1440": [],
+ "home_dom_1440": {
+  "iframes": [
+   ""
+  ],
+  "vid": [
+   {
+    "tid": "video-section",
+    "img": true,
+    "bg": "none"
+   },
+   {
+    "tid": "walkthrough-video",
+    "img": true,
+    "bg": "none"
+   },
+   {
+    "tid": "walkthrough-video-play",
+    "img": true,
+    "bg": "none"
+   }
+  ],
+  "fixed": [],
+  "why": [
+   {
+    "qmarks": 0,
+    "svgs": 4
+   }
+  ],
+  "text": "Skip to content\nS\nShree Ganesh Builders\nPROJECTS\nABOUT\nGALLERY\nBLOG\nCONTACT\n+916122234567\nCustomer L"
+ },
+ "home_console_full_1440": [],
+ "mkt_projects_1440": {
+  "visible": 876,
+  "idle": 1263,
+  "requests": 14,
+  "sw": [
+   1440,
+   1440,
+   1440
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "mkt_project_SGH_1440": {
+  "visible": 867,
+  "idle": 1335,
+  "requests": 20,
+  "sw": [
+   1440,
+   1440,
+   1440
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "sgh_gallery_1440": {
+  "tid": "nav-gallery",
+  "imgs": 0,
+  "broken": [],
+  "notloaded": 0
+ },
+ "mkt_contact_1440": {
+  "visible": 870,
+  "idle": 1212,
+  "requests": 12,
+  "sw": [
+   1440,
+   1440,
+   1440
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "mkt_home_warm_1440": {
+  "visible": 999,
+  "idle": 1427,
+  "requests": 22,
+  "sw": [
+   1440,
+   1440,
+   1440
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "mkt_projects_warm_1440": {
+  "visible": 873,
+  "idle": 1257,
+  "requests": 14,
+  "sw": [
+   1440,
+   1440,
+   1440
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "mkt_project_SGH_warm_1440": {
+  "visible": 865,
+  "idle": 1379,
+  "requests": 20,
+  "sw": [
+   1440,
+   1440,
+   1440
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "mkt_contact_warm_1440": {
+  "visible": 864,
+  "idle": 1454,
+  "requests": 12,
+  "sw": [
+   1440,
+   1440,
+   1440
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "portal_login_1440": {
+  "visible": 1520,
+  "idle": 1799,
+  "requests": 18,
+  "sw": [
+   1440,
+   1440,
+   1440
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "portal_home_1440": {
+  "visible": 819,
+  "idle": 819,
+  "requests": 10,
+  "sw": [
+   1440,
+   1440,
+   1440
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "portal_shell_1440": {
+  "sidebar": true,
+  "tabbar": null,
+  "labels": [],
+  "clipped": []
+ },
+ "portal_payments_ledger_1440": {
+  "visible": 874,
+  "idle": 1444,
+  "requests": 18,
+  "sw": [
+   1440,
+   1440,
+   1440
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "ledger_last_1440": {
+  "rows": 11,
+  "bottom": 899.5,
+  "vh": 900,
+  "tabTop": null,
+  "hitInside": true
+ },
+ "portal_construction_1440": {
+  "visible": 1392,
+  "idle": 4986,
+  "requests": 20,
+  "sw": [
+   1440,
+   1440,
+   1440
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "portal_requests_1440": {
+  "visible": 925,
+  "idle": 1244,
+  "requests": 14,
+  "sw": [
+   1440,
+   1440,
+   1440
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "erp_login_390": {
+  "visible": 959,
+  "idle": 1262,
+  "requests": 21,
+  "sw": [
+   390,
+   390,
+   390
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "erp_login_js_390": [
+  [
+   "https://assets.emergent.sh/scripts/emergent-main.js",
+   18987,
+   "gzip",
+   null
+  ],
+  [
+   "https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092",
+   31853,
+   "gzip",
+   null
+  ],
+  [
+   "https://royal-realty-hub-2.preview.emergentagent.com/erp/static/js/main.61f8f28b.js",
+   357873,
+   "br",
+   null
+  ],
+  [
+   "https://ap.emergent.sh/static/array.js",
+   335513,
+   "gzip",
+   null
+  ],
+  [
+   "https://royal-realty-hub-2.preview.emergentagent.com/cdn-cgi/challenge-platform/scripts/jsd/main.js",
+   0,
+   null,
+   "0"
+  ],
+  [
+   "https://royal-realty-hub-2.preview.emergentagent.com/cdn-cgi/challenge-platform/h/b/scripts/jsd/d2d3316b729e/main.js?",
+   23710,
+   "gzip",
+   null
+  ],
+  [
+   "https://royal-realty-hub-2.preview.emergentagent.com/erp/static/js/381.f5383cb3.chunk.js",
+   56414,
+   "br",
+   null
+  ],
+  [
+   "https://ap.emergent.sh/array/phc_DbsPb39SRc8z3EiQ6Dhj6ikv4H4rTKcht9d4sZSesceP/config.js",
+   1991,
+   "gzip",
+   null
+  ],
+  [
+   "https://royal-realty-hub-2.preview.emergentagent.com/erp/static/js/474.64e2d223.chunk.js",
+   154799,
+   "br",
+   null
+  ],
+  [
+   "https://ap.emergent.sh/static/1.438.21/web-vitals-with-attribution.js",
+   27027,
+   "gzip",
+   null
+  ],
+  [
+   "https://ap.emergent.sh/static/1.438.21/dead-clicks-autocapture.js",
+   24085,
+   "gzip",
+   null
+  ],
+  [
+   "https://ap.emergent.sh/static/1.438.21/posthog-recorder.js",
+   215176,
+   "gzip",
+   null
+  ],
+  [
+   "blob:https://royal-realty-hub-2.preview.emergentagent.com/de9a663b-f2c5-4225-85de-2a130f964ce4",
+   4085,
+   null,
+   "4085"
+  ],
+  [
+   "https://ap.emergent.sh/static/1.438.21/surveys.js",
+   112062,
+   "gzip",
+   null
+  ]
+ ],
+ "erp_dashboard_390": {
+  "visible": 1381,
+  "idle": 1679,
+  "requests": 33,
+  "sw": [
+   390,
+   390,
+   390
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "ageing_390": "Due ageing\n\u20b92,07,40,000\nTOTAL DUE\nNot due\n\u20b90\n0-30 days\n\u20b90\n31-60 days\n\u20b90\n61-90 days\n\u20b90\n90+ days\n\u20b92,07,40,000",
+ "erp_projects_390": {
+  "visible": 1422,
+  "idle": 1581,
+  "requests": 28,
+  "sw": [
+   390,
+   390,
+   390
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "erp_towerA_inventory_390": {
+  "visible": 878,
+  "idle": 1540,
+  "requests": 29,
+  "sw": [
+   390,
+   390,
+   390
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "towerhdr_390": false,
+ "erp_bookings_list_390": {
+  "visible": null,
+  "idle": 20082,
+  "requests": 26,
+  "sw": [
+   390,
+   390,
+   390
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "erp_booking_BK0001_ledger_390": {
+  "visible": 1386,
+  "idle": 1700,
+  "requests": 32,
+  "sw": [
+   390,
+   390,
+   390
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "ledger_tab_sw_390": [
+  390,
+  390
+ ],
+ "erp_payments_list_390": {
+  "visible": null,
+  "idle": 20080,
+  "requests": 29,
+  "sw": [
+   390,
+   390,
+   390
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "erp_report_outstanding_390": {
+  "visible": 1475,
+  "idle": 1719,
+  "requests": 30,
+  "sw": [
+   390,
+   390,
+   390
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "erp_customer360_390": {
+  "visible": 4898,
+  "idle": 5464,
+  "requests": 33,
+  "sw": [
+   390,
+   390,
+   390
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "erp_wizard_step1_390": {
+  "visible": 2584,
+  "idle": 2584,
+  "requests": 29,
+  "sw": [
+   390,
+   390,
+   390
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "wizard_390": {
+  "step2": true,
+  "sw2": [
+   390,
+   390
+  ],
+  "flat": "wiz-flat-P2",
+  "step3": true,
+  "sw3": [
+   390,
+   390
+  ]
+ },
+ "wizard_console_390": [],
+ "mkt_home_390": {
+  "visible": 941,
+  "idle": 1422,
+  "requests": 22,
+  "sw": [
+   390,
+   390,
+   390
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "home_weight_390": 851901,
+ "home_reqs_full_390": 25,
+ "home_yt_390": [],
+ "home_dom_390": {
+  "iframes": [
+   ""
+  ],
+  "vid": [
+   {
+    "tid": "video-section",
+    "img": true,
+    "bg": "none"
+   },
+   {
+    "tid": "walkthrough-video",
+    "img": true,
+    "bg": "none"
+   },
+   {
+    "tid": "walkthrough-video-play",
+    "img": true,
+    "bg": "none"
+   }
+  ],
+  "fixed": [
+   {
+    "tid": "mobile-cta",
+    "l": 0,
+    "r": 390,
+    "w": 390,
+    "cw": 390
+   }
+  ],
+  "why": [
+   {
+    "qmarks": 0,
+    "svgs": 4
+   }
+  ],
+  "text": "Skip to content\nS\nShree Ganesh Builders\nCALL\nWHATSAPP\nENQUIRE\n\nSHREE GANESH BUILDERS \u00b7 PATNA\n\nHomes "
+ },
+ "home_console_full_390": [],
+ "mkt_projects_390": {
+  "visible": 920,
+  "idle": 1206,
+  "requests": 14,
+  "sw": [
+   390,
+   390,
+   390
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "mkt_project_SGH_390": {
+  "visible": 865,
+  "idle": 1357,
+  "requests": 16,
+  "sw": [
+   390,
+   390,
+   390
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "sgh_gallery_390": {
+  "tid": "nav-gallery",
+  "imgs": 0,
+  "broken": [],
+  "notloaded": 0
+ },
+ "mkt_contact_390": {
+  "visible": 913,
+  "idle": 1174,
+  "requests": 12,
+  "sw": [
+   390,
+   390,
+   390
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "mkt_home_warm_390": {
+  "visible": 986,
+  "idle": 1443,
+  "requests": 22,
+  "sw": [
+   390,
+   390,
+   390
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "mkt_projects_warm_390": {
+  "visible": 944,
+  "idle": 1315,
+  "requests": 14,
+  "sw": [
+   390,
+   390,
+   390
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "mkt_project_SGH_warm_390": {
+  "visible": 921,
+  "idle": 1321,
+  "requests": 16,
+  "sw": [
+   390,
+   390,
+   390
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "mkt_contact_warm_390": {
+  "visible": 904,
+  "idle": 1159,
+  "requests": 12,
+  "sw": [
+   390,
+   390,
+   390
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "portal_login_390": {
+  "visible": 1498,
+  "idle": 1751,
+  "requests": 17,
+  "sw": [
+   390,
+   390,
+   390
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "portal_home_390": {
+  "visible": 825,
+  "idle": 825,
+  "requests": 10,
+  "sw": [
+   390,
+   390,
+   390
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "portal_shell_390": {
+  "sidebar": null,
+  "tabbar": true,
+  "labels": [
+   {
+    "t": "\uf184",
+    "clip": false
+   },
+   {
+    "t": "Home",
+    "clip": false
+   },
+   {
+    "t": "\uf151",
+    "clip": false
+   },
+   {
+    "t": "Payments",
+    "clip": false
+   },
+   {
+    "t": "\uf18b",
+    "clip": false
+   },
+   {
+    "t": "Construction",
+    "clip": false
+   },
+   {
+    "t": "\uf19e",
+    "clip": false
+   },
+   {
+    "t": "Requests",
+    "clip": false
+   },
+   {
+    "t": "\uf17d",
+    "clip": false
+   },
+   {
+    "t": "More",
+    "clip": false
+   }
+  ],
+  "clipped": []
+ },
+ "portal_payments_ledger_390": {
+  "visible": 877,
+  "idle": 1381,
+  "requests": 16,
+  "sw": [
+   390,
+   390,
+   390
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "ledger_last_390": {
+  "rows": 11,
+  "bottom": 844,
+  "vh": 844,
+  "tabTop": 775,
+  "hitInside": true
+ },
+ "portal_construction_390": {
+  "visible": 885,
+  "idle": 2941,
+  "requests": 21,
+  "sw": [
+   390,
+   390,
+   390
+  ],
+  "overflow": false,
+  "console": []
+ },
+ "portal_requests_390": {
+  "visible": 878,
+  "idle": 1046,
+  "requests": 13,
+  "sw": [
+   390,
+   390,
+   390
+  ],
+  "overflow": false,
+  "console": []
+ }
+}

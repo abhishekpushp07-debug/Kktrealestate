@@ -118,6 +118,12 @@ async def upload_media(request: Request, file: UploadFile = File(...), caption: 
     path = f"{APP_NAME}/cms/{uuid.uuid4()}.{ext}"
     try:
         res = await put_object(path, data, mime)
+        if mime.startswith("image/"):
+            try:
+                from services.thumbs import ensure_thumb
+                await ensure_thumb(res["path"], data)
+            except Exception:
+                pass
     except Exception as e:
         raise ApiError(502, f"Object storage upload failed: {e}", "STORAGE_ERROR")
     doc = {**base_doc(user, user["company_id"]), "file_name": file.filename, "mime": mime, "size": len(data), "storage_key": res["path"], "caption": caption}

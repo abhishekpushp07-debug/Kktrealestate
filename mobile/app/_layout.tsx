@@ -4,7 +4,7 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useFonts } from "expo-font";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -18,7 +18,10 @@ import { CormorantGaramond_600SemiBold } from "@expo-google-fonts/cormorant-gara
 import { CormorantGaramond_700Bold } from "@expo-google-fonts/cormorant-garamond/700Bold";
 
 import { ErrorBoundary } from "@/src/components/error-boundary";
-import { queryClient } from "@/src/query-client";
+import { persistOptions, queryClient } from "@/src/query-client";
+import { Sidebar } from "@/src/ui/sidebar";
+import { UpdatingPill } from "@/src/ui/updating";
+import { useWide } from "@/src/ui/screen";
 import { AuthProvider, useAuth } from "@/src/auth";
 import { ActiveBookingProvider } from "@/src/hooks";
 import { ToastHost } from "@/src/ui/toast";
@@ -36,7 +39,7 @@ function Nav({ fontsReady }: { fontsReady: boolean }) {
   }, [ready]);
   if (!ready) return <View style={{ flex: 1, backgroundColor: colors.surface }} testID="app-booting" />;
   const authed = status === "in";
-  return (
+  const stack = (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.surface }, animation: Platform.OS === "android" ? "fade_from_bottom" : "default" }}>
       <Stack.Protected guard={authed}>
         <Stack.Screen name="(tabs)" />
@@ -56,6 +59,28 @@ function Nav({ fontsReady }: { fontsReady: boolean }) {
       </Stack.Protected>
     </Stack>
   );
+  return <Shell authed={authed}>{stack}</Shell>;
+}
+
+// ≥1024 px: sidebar + content area (stack screens and the PDF viewer render inside it).
+function Shell({ authed, children }: { authed: boolean; children: React.ReactNode }) {
+  const wide = useWide();
+  if (!authed || !wide)
+    return (
+      <>
+        {children}
+        <PdfViewerHost />
+      </>
+    );
+  return (
+    <View style={{ flex: 1, flexDirection: "row" }} testID="desktop-shell">
+      <Sidebar />
+      <View style={{ flex: 1, overflow: "hidden" }}>
+        {children}
+        <PdfViewerHost inline />
+      </View>
+    </View>
+  );
 }
 
 export default function RootLayout() {
@@ -73,18 +98,18 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <ErrorBoundary>
-          <QueryClientProvider client={queryClient}>
+          <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
             <KeyboardProvider>
               <AuthProvider>
                 <ActiveBookingProvider>
                   <StatusBar style="dark" />
                   <Nav fontsReady={loaded || !!error} />
-                  <PdfViewerHost />
+                  <UpdatingPill />
                   <ToastHost />
                 </ActiveBookingProvider>
               </AuthProvider>
             </KeyboardProvider>
-          </QueryClientProvider>
+          </PersistQueryClientProvider>
         </ErrorBoundary>
       </SafeAreaProvider>
     </GestureHandlerRootView>

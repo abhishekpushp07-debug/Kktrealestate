@@ -55,3 +55,7 @@ Portal API contract (`/api/portal/*`) is frozen for the Expo app — see `/app/m
 
 ## Phase 7 — Construction stages & payment plans
 Master data now has **Construction Stages** and **Payment Plans** (milestone templates are retired: `/api/master/milestone-templates*` → 410). Towers track stage completion (`/api/blocks/{id}/construction`); completing a stage auto-raises the linked plan installments for every active booking (`services/dues_engine.py`, idempotent, also daily at 00:30 IST and on startup). Migration from the old milestone model runs automatically at startup (`migrate_phase7.py`) and asserts every booking's ledger totals are unchanged.
+
+## Preview modes (frontend/scripts/dev.js)
+- `PREVIEW_MODE=production` in `frontend/.env` (default now): `yarn start` builds (if needed) and serves the **production** builds — ERP at `/erp` (SPA fallback) and the marketing site at `/` — from one express server on :3000 with brotli/gzip, immutable hashed assets and `no-cache` index.html. Rebuild after code changes with `yarn preview:build` (then `sudo supervisorctl restart frontend`).
+- `yarn dev` (or any other `PREVIEW_MODE`): CRA dev servers with HMR (ERP :3000, site :3002 proxied).

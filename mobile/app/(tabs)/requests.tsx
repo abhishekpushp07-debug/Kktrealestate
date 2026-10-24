@@ -40,7 +40,7 @@ export default function Requests() {
       ) : isError ? (
         <ErrorState message={errMsg(error)} onRetry={refetch} />
       ) : !all.length ? (
-        <Empty icon="life-buoy" title="No requests yet" hint="Raise a request for payment queries, documents or site snags. We usually reply within a day." action={{ label: "Raise a request", onPress: () => router.push("/requests/new"), testID: "requests-empty-new" }} testID="requests-empty" />
+        <Empty icon="message-square" title="No requests yet" hint="Raise a request for payment queries, documents or site snags. We usually reply within a day." action={{ label: "Raise a request", onPress: () => router.push("/requests/new"), testID: "requests-empty-new" }} testID="requests-empty" />
       ) : (
         <>
           <Pills testIDPrefix="requests-filter" items={FILTERS.map((x) => ({ key: x.key, label: x.label, count: x.key === "all" ? 0 : all.filter((r) => x.match(r.status)).length }))} value={f} onChange={setF} />

@@ -24,7 +24,7 @@ function Row({ n, onPress, last }: { n: PortalNotification; onPress: () => void;
   return (
     <Press onPress={onPress} testID={`notification-${n.id}`} style={[s.row, !n.is_read && s.unread, last && { borderBottomWidth: 0 }]}>
       <View style={[s.icon, overdue && s.iconOverdue]}>
-        <Feather name={notificationIcon(n.type) as any} size={17} color={overdue ? colors.error : colors.gold} />
+        <Feather name={notificationIcon(n.type) as any} size={17} color={overdue ? colors.error : colors.onSurface} />
       </View>
       <View style={{ flex: 1, gap: 2 }}>
         <View style={s.titleRow}>
@@ -125,7 +125,7 @@ export default function Notifications() {
 const useStyles = makeStyles((c) => ({
   row: { flexDirection: "row", gap: 12, paddingVertical: 14, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: c.divider, borderRadius: radius.sm },
   unread: { backgroundColor: c.brandTertiary, paddingHorizontal: 10, marginHorizontal: -6 },
-  icon: { width: 38, height: 38, borderRadius: 12, backgroundColor: c.surfaceInverse, alignItems: "center", justifyContent: "center" },
+  icon: { width: 36, height: 36, borderRadius: 10, backgroundColor: c.navy50, alignItems: "center", justifyContent: "center" },
   iconOverdue: { backgroundColor: c.errorSoft },
   titleRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   dot: { width: 9, height: 9, borderRadius: 5, backgroundColor: c.gold, marginTop: 6 },

@@ -21,7 +21,7 @@ export function QuickAction({ icon, label, onPress, testID, busy }: { icon: Icon
   return (
     <Press onPress={onPress} testID={testID} style={s.qa} disabled={busy}>
       <View style={s.qaIcon}>
-        <Feather name={icon} size={19} color={colors.gold} />
+        <Feather name={icon} size={20} color={colors.onSurface} />
       </View>
       <T v="small" style={s.qaLabel} numberOfLines={2}>
         {busy ? "Opening…" : label}
@@ -67,7 +67,7 @@ export function RMCard({ rm, fallbackPhone, whatsapp }: { rm: { name: string; ph
 
 const useStyles = makeStyles((c) => ({
   qa: { flexBasis: "40%", flexGrow: 1, minWidth: 140, backgroundColor: c.surfaceSecondary, borderRadius: 18, borderWidth: 1, borderColor: c.border, padding: 14, gap: 10, minHeight: 96 },
-  qaIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: c.surfaceInverse, alignItems: "center", justifyContent: "center" },
+  qaIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: c.navy50, alignItems: "center", justifyContent: "center" },
   qaLabel: { fontFamily: "Manrope_700Bold", color: c.onSurface, fontSize: 13 },
   rmRow: { flexDirection: "row", alignItems: "center", gap: 14 },
   avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: c.surfaceInverse, alignItems: "center", justifyContent: "center" },

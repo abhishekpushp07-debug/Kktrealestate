@@ -54,7 +54,7 @@ def test_reports_list_has_11(client, admin):
     # could be dict or list
     if isinstance(items, dict) and "items" in items:
         items = items["items"]
-    assert len(items) == 11, f"expected 11 reports, got {len(items)}"
+    assert len(items) == 12, f"expected 12 reports (11 + Phase 7 upcoming-dues), got {len(items)}"
 
 
 @pytest.mark.parametrize("key", REPORT_KEYS)
@@ -308,7 +308,7 @@ def test_erasure_full_flow(client, admin, accounts):
     assert r.status_code == 409
     body = r.json()
     err = body.get("detail", body)
-    err_str = str(err)
+    err_str = str(err) + " " + str(body.get("code", ""))
     assert "ACTIVE_BOOKING" in err_str
 
 

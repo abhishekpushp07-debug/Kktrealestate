@@ -45,13 +45,13 @@ export default function MasterPage() {
   const FormComp = cfg.custom === "flatType" ? FlatTypeForm : cfg.custom === "paymentPlan" ? PaymentPlanForm : cfg.custom === "floorPlan" ? FloorPlanForm : GenericMasterForm;
   return (
     <div data-testid="master-page">
-      <PageHeader title="Master Data" subtitle="Canonical reference data. Structural entities always reference these by id." actions={can("master.write") && <Button onClick={() => setEditing(null)} className="bg-navy hover:bg-navy-700" data-testid="master-new-btn"><Plus className="mr-1.5 h-4 w-4" />New {cfg.label.replace(/s$/, "")}</Button>} />
+      <PageHeader title="Master Data" subtitle="Canonical reference data. Structural entities always reference these by id." actions={can("master.write") && <Button onClick={() => setEditing(null)} className="bg-navy hover:bg-navy-700" data-testid="master-new-btn"><Plus className="mr-1.5 h-4 w-4" />New {cfg.label.replace(/ies$/, "y").replace(/s$/, "")}</Button>} />
       <div className="mb-4 flex flex-wrap gap-1.5" data-testid="master-tabs">
         {MASTERS.map((m) => <NavLink key={m.kind} to={`/master/${m.kind}`} className={({ isActive }) => cn("rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors", isActive ? "border-navy bg-navy text-white" : "border-slate-200 bg-white text-slate-600 hover:border-gold hover:text-navy")} data-testid={`master-tab-${m.kind}`}>{m.label}</NavLink>)}
       </div>
       <DataTable {...list} columns={columns} testId={`master-table`} exportPath={`/master/${cfg.kind}`} searchPlaceholder={`Search ${cfg.label.toLowerCase()}…`} onRowClick={can("master.write") ? (r) => setEditing(r) : undefined}
         toolbar={<label className="flex items-center gap-2 text-xs text-slate-600"><Switch checked={showInactive} onCheckedChange={setShowInactive} data-testid="master-show-inactive" />Show inactive</label>} />
-      {editing !== undefined && <FormComp key={editing?.id || "new"} cfg={cfg} item={editing} open onOpenChange={(o) => !o && setEditing(undefined)} onSaved={list.reload} />}
+      {editing !== undefined && <FormComp key={editing?.id || "new"} cfg={cfg} item={editing} open onOpenChange={(o) => !o && setEditing(undefined)} onSaved={list.reload} existing={list.items || list.rows || []} />}
     </div>
   );
 }

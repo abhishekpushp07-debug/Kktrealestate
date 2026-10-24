@@ -1,8 +1,10 @@
 import { useState, type PropsWithChildren, type ReactNode } from "react";
 import { ActivityIndicator, Animated, Pressable, View, type StyleProp, type ViewStyle } from "react-native";
 import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 
 import { haptic } from "@/src/haptics";
+import { inr, inrShort } from "@/src/format";
 import { fonts, makeStyles, radius, shadow, useTheme } from "@/src/theme";
 import { T } from "./text";
 
@@ -61,7 +63,9 @@ export function Button({
   testID,
   small,
   style,
+  trailingIcon,
 }: {
+  trailingIcon?: IconName;
   label: string;
   onPress?: () => void;
   kind?: BtnKind;
@@ -77,8 +81,10 @@ export function Button({
   const fg = kind === "primary" || kind === "danger" ? colors.onBrandPrimary : colors.onSurface;
   return (
     <Press testID={testID} onPress={onPress} disabled={disabled || loading} style={[s.btn, small && s.btnSm, s[kind], style]}>
+      {kind === "gold" ? <LinearGradient colors={[colors.goldGradStart, colors.goldGradEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.grad} pointerEvents="none" /> : null}
       {loading ? <ActivityIndicator color={fg} size="small" /> : icon ? <Feather name={icon} size={small ? 15 : 17} color={fg} /> : null}
       <T style={[s.btnText, small && s.btnTextSm, { color: fg }]}>{label}</T>
+      {trailingIcon && !loading ? <Feather name={trailingIcon} size={small ? 16 : 18} color={fg} /> : null}
     </Press>
   );
 }
@@ -126,20 +132,33 @@ export function KV({ k, v, testID, last, vTone }: { k: string; v?: ReactNode; te
   );
 }
 
+// Short ₹ form (₹1.2 Cr / ₹45 L) that reveals the full amount on tap.
+export function Money({ v, testID, tone, style, big }: { v?: number | null; testID?: string; tone?: "success" | "error" | "inverse" | "warning"; style?: any; big?: boolean }) {
+  const [full, setFull] = useState(false);
+  return (
+    <Pressable onPress={() => setFull((f) => !f)} accessibilityRole="button" accessibilityLabel={`${inr(v)} — tap to toggle`} hitSlop={6}>
+      <T v={big ? "moneyLg" : "money"} tone={tone} style={style} testID={testID}>
+        {full ? inr(v) : inrShort(v)}
+      </T>
+    </Pressable>
+  );
+}
+
 export function SectionTitle({ title, right }: { title: string; right?: ReactNode }) {
   const s = useStyles();
   return (
     <View style={s.section}>
-      <T v="title">{title}</T>
+      <T v="cardTitle">{title}</T>
       {right}
     </View>
   );
 }
 
 const useStyles = makeStyles((c) => ({
-  card: { backgroundColor: c.surfaceSecondary, borderRadius: radius.lg, padding: 18, borderWidth: 1, borderColor: c.border, ...shadow },
+  card: { backgroundColor: c.surfaceSecondary, borderRadius: radius.lg, padding: 20, borderWidth: 1, borderColor: c.border, ...shadow },
   cardNavy: { backgroundColor: c.surfaceInverse, borderColor: c.surfaceInverse },
-  btn: { minHeight: 50, borderRadius: radius.pill, paddingHorizontal: 22, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  btn: { minHeight: 50, borderRadius: radius.pill, paddingHorizontal: 22, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, overflow: "hidden" },
+  grad: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
   btnSm: { minHeight: 44, paddingHorizontal: 16 },
   primary: { backgroundColor: c.brandPrimary },
   gold: { backgroundColor: c.brandSecondary },
@@ -151,7 +170,7 @@ const useStyles = makeStyles((c) => ({
   iconBtnNavy: { backgroundColor: "rgba(255,255,255,0.12)" },
   badge: { position: "absolute", top: -3, right: -3, minWidth: 20, height: 20, borderRadius: 10, backgroundColor: c.gold, alignItems: "center", justifyContent: "center", paddingHorizontal: 4, borderWidth: 2, borderColor: c.surface },
   badgeText: { fontFamily: fonts.extrabold, fontSize: 10, color: c.onBrandSecondary },
-  chip: { alignSelf: "flex-start", borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4 },
+  chip: { alignSelf: "flex-start", borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 4 },
   chipText: { fontFamily: fonts.bold, fontSize: 11 },
   chip_neutral: { backgroundColor: c.surfaceTertiary },
   chipText_neutral: { color: c.onSurfaceTertiary },
@@ -166,7 +185,7 @@ const useStyles = makeStyles((c) => ({
   chip_gold: { backgroundColor: c.brandTertiary },
   chipText_gold: { color: c.onBrandTertiary },
   kv: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.divider },
-  kvK: { flexShrink: 1 },
+  kvK: { flexShrink: 1, color: c.onSurfaceTertiary },
   kvV: { textAlign: "right", flexShrink: 1, maxWidth: "62%" },
-  section: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
+  section: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
 }));

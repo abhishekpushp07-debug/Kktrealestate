@@ -78,9 +78,9 @@ export default function Login() {
             {mfa && <button type="button" onClick={() => { setMfa(null); setCode(""); }} className="w-full text-xs text-slate-500 hover:text-navy" data-testid="login-mfa-back">← Back to password</button>}
           </form>
           <div className="mt-8 rounded-lg border border-slate-200 bg-slate-50 p-3">
-            <p className="label-xs mb-2">Demo accounts · password Kkt@12345</p>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-navy">Demo accounts · password Kkt@12345</p>
             <div className="flex flex-wrap gap-1.5">
-              {DEMO.map(([r, e]) => <button key={e} type="button" onClick={() => { setEmail(e); setPassword("Kkt@12345"); }} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-navy hover:border-gold hover:bg-gold-light" data-testid={`demo-${r.toLowerCase().replace(/\s+/g, "-")}`}>{r}</button>)}
+              {DEMO.map(([r, e]) => <button key={e} type="button" onClick={() => { setEmail(e); setPassword("Kkt@12345"); }} className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-navy hover:border-gold hover:bg-gold-light" data-testid={`demo-${r.toLowerCase().replace(/\s+/g, "-")}`}>{r}</button>)}
             </div>
           </div>
         </div>

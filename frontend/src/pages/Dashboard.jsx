@@ -3,12 +3,12 @@ import { Link } from "react-router-dom";
 import { Building2, CircleDollarSign, Grid3X3, PauseCircle, History } from "lucide-react";
 import { useFetch } from "@/hooks/useList";
 import { useAuth } from "@/context/AuthContext";
-import { inr, inrShort, fmtDateTime } from "@/lib/format";
+import { inr, inrShort, fmtDateTime, fmtRelative } from "@/lib/format";
 import { PageHeader, StatCard, EmptyState } from "@/components/common/Bits";
 import { RoleWidgets } from "@/components/common/RoleWidgets";
 import { StatusChip, Pill } from "@/components/common/StatusChip";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip } from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, Legend } from "recharts";
 
 const STATUS_HEX = { Available: "#10B981", Hold: "#F59E0B", Booked: "#0B1F3A", Sold: "#C9A227", Blocked: "#94A3B8" };
 
@@ -22,11 +22,11 @@ function Charts({ data }) {
   return (
     <div className="mt-6 grid gap-4 lg:grid-cols-2" data-testid="dashboard-charts">
       <div className="card-elev p-5"><h2 className="mb-2 text-base font-bold text-navy">Inventory by status</h2>
-        <div className="h-56 min-w-0"><ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 600, height: 220 }}><PieChart><Pie data={donut} dataKey="value" nameKey="name" innerRadius={55} outerRadius={85} paddingAngle={2} isAnimationActive={false}>{donut.map((d) => <Cell key={d.name} fill={STATUS_HEX[d.name]} />)}</Pie><RTooltip /></PieChart></ResponsiveContainer></div>
+        <div className="relative h-56 min-w-0"><ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 220 }}><PieChart><Pie data={donut} dataKey="value" nameKey="name" innerRadius={62} outerRadius={88} paddingAngle={2} minAngle={6} isAnimationActive={false} stroke="#fff">{donut.map((d) => <Cell key={d.name} fill={STATUS_HEX[d.name]} />)}</Pie><RTooltip /></PieChart></ResponsiveContainer><div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center"><span className="text-2xl font-bold tabular text-navy">{donut.reduce((a, d) => a + d.value, 0)}</span><span className="label-xs">units</span></div></div>
         <div className="flex flex-wrap justify-center gap-3 text-xs">{donut.map((d) => <span key={d.name} className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full" style={{ background: STATUS_HEX[d.name] }} />{d.name} <b>{d.value}</b></span>)}</div>
       </div>
       <div className="card-elev p-5"><h2 className="mb-2 text-base font-bold text-navy">Units per project</h2>
-        <div className="h-64 min-w-0"><ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 600, height: 220 }}><BarChart data={bars}><XAxis dataKey="name" tick={{ fontSize: 12 }} /><YAxis tick={{ fontSize: 12 }} /><RTooltip /><Bar dataKey="Available" stackId="a" fill={STATUS_HEX.Available} /><Bar dataKey="Hold" stackId="a" fill={STATUS_HEX.Hold} /><Bar dataKey="Booked" stackId="a" fill={STATUS_HEX.Booked} /><Bar dataKey="Blocked" stackId="a" fill={STATUS_HEX.Blocked} radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer></div>
+        <div className="h-64 min-w-0"><ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 220 }}><BarChart data={bars} layout="vertical" margin={{ left: 8, right: 32, top: 8, bottom: 8 }} barSize={22}><XAxis type="number" allowDecimals={false} tick={{ fontSize: 12, fill: "#3C4A5E" }} /><YAxis type="category" dataKey="name" width={70} tick={{ fontSize: 12, fill: "#0B1F3A", fontWeight: 600 }} /><RTooltip cursor={{ fill: "#F7F5EF" }} /><Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: 12, paddingBottom: 8 }} /><Bar dataKey="Available" stackId="a" fill={STATUS_HEX.Available} /><Bar dataKey="Hold" stackId="a" fill={STATUS_HEX.Hold} /><Bar dataKey="Booked" stackId="a" fill={STATUS_HEX.Booked} /><Bar dataKey="Blocked" stackId="a" fill={STATUS_HEX.Blocked} radius={[0, 4, 4, 0]} label={{ position: "right", fontSize: 12, fill: "#0B1F3A", formatter: (v) => v || "" }} /></BarChart></ResponsiveContainer></div>
       </div>
     </div>
   );
@@ -35,7 +35,7 @@ function Charts({ data }) {
 function StatusBar({ inv }) {
   const t = inv.total || 1;
   const seg = [["Available", "bg-emerald-500"], ["Hold", "bg-amber-500"], ["Booked", "bg-navy"], ["Sold", "bg-gold"], ["Blocked", "bg-slate-400"]];
-  return <div className="flex h-2 w-full overflow-hidden rounded-full bg-slate-100">{seg.map(([k, c]) => inv[k] ? <div key={k} className={c} style={{ width: `${(inv[k] / t) * 100}%` }} title={`${k}: ${inv[k]}`} /> : null)}</div>;
+  return <div className="flex h-2 w-full gap-px overflow-hidden rounded-full bg-slate-100">{seg.map(([k, c]) => inv[k] ? <div key={k} className={c} style={{ width: `${(inv[k] / t) * 100}%`, minWidth: 6 }} title={`${k}: ${inv[k]}`} /> : null)}</div>;
 }
 
 function Collections({ c }) {
@@ -106,7 +106,7 @@ export default function Dashboard() {
                 <li key={a.id} className="relative text-sm">
                   <span className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-gold" />
                   <p className="font-semibold text-navy">{a.action}</p>
-                  <p className="text-xs text-slate-500">{a.actor_name} · {a.entity_type} · {fmtDateTime(a.created_at)}</p>
+                  <p className="text-xs text-slate-500">{a.actor_name} · {a.entity_type} · <span title={fmtDateTime(a.created_at)}>{fmtRelative(a.created_at)}</span></p>
                 </li>
               ))}
             </ol>

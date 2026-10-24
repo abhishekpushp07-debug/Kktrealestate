@@ -5,6 +5,7 @@ import { useMasterOptions } from "@/hooks/useList";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/common/DateInput";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Combobox } from "@/components/common/Combobox";
@@ -54,8 +55,8 @@ export function ProjectForm({ open, onOpenChange, project, onSaved }) {
           </div>
           <div className="grid grid-cols-3 gap-3">
             <Field label="RERA number"><Input value={form.rera_number || ""} onChange={(e) => set("rera_number", e.target.value)} data-testid="project-rera-input" /></Field>
-            <Field label="Launch date"><Input type="date" value={form.launch_date || ""} onChange={(e) => set("launch_date", e.target.value)} /></Field>
-            <Field label="Expected possession"><Input type="date" value={form.expected_possession_date || ""} onChange={(e) => set("expected_possession_date", e.target.value)} /></Field>
+            <Field label="Launch date"><DateInput value={form.launch_date || ""} onChange={(e) => set("launch_date", e.target.value)} /></Field>
+            <Field label="Expected possession"><DateInput value={form.expected_possession_date || ""} onChange={(e) => set("expected_possession_date", e.target.value)} /></Field>
           </div>
           
           <Field label="Cover image URL"><Input value={form.cover_image_url || ""} onChange={(e) => set("cover_image_url", e.target.value)} placeholder="https://…" /></Field>

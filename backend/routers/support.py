@@ -215,6 +215,11 @@ async def upload_photos(block_id: str, seq: int, request: Request, files: list[U
         import secrets
         key = f"construction/{blk['project_id']}/{block_id}/{seq}/{secrets.token_hex(10)}-{f.filename}"
         res = await put_object(key, data, f.content_type)
+        try:
+            from services.thumbs import ensure_thumb
+            await ensure_thumb(res["path"], data)
+        except Exception:  # thumbnails are best-effort; full image still served
+            pass
         n += 1
         doc = {**base_doc(user, user["company_id"]), "project_id": blk["project_id"], "block_id": block_id, "milestone_seq": seq, "storage_key": res["path"], "mime": f.content_type, "size": len(data), "caption": caption, "taken_on": taken_on, "visible_to_customers": visible_to_customers, "show_on_website": show_on_website, "order": n}
         doc["url"] = f"/api/public/media/photo/{doc['id']}"

@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import { api, sessionHooks, tokens } from "@/src/api/client";
 import { storage } from "@/src/utils/storage";
+import { clearPersistedCache } from "@/src/query-client";
 import { toast } from "@/src/ui/toast";
 
 export type Me = {
@@ -55,6 +56,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     await tokens.clear();
     await storage.removeItem(BOOKING_KEY);
     qc.clear();
+    await clearPersistedCache();
     setMe(null);
     setPendingName(null);
     setStatus("out");
@@ -86,6 +88,17 @@ export function AuthProvider({ children }: PropsWithChildren) {
     })();
   }, [refreshMe, reset]);
 
+  // Warm the cache so Home renders instantly after sign-in.
+  const prefetch = useCallback(async () => {
+    try {
+      const items = await qc.fetchQuery({ queryKey: ["p-bookings"], queryFn: () => api.get<{ items: any[] }>("/bookings").then((r) => r.items), staleTime: 60_000 });
+      const first = items?.[0]?.id;
+      if (first) qc.prefetchQuery({ queryKey: ["p-booking", first, ""], queryFn: () => api.get(`/bookings/${first}`), staleTime: 60_000 });
+    } catch {
+      /* screens will fetch on their own */
+    }
+  }, [qc]);
+
   const login = useCallback(
     async (phone: string, password: string) => {
       const data = await api.post<any>("/auth/login", { phone, password });
@@ -95,11 +108,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
         setStatus("pwchange");
         return data;
       }
-      await refreshMe();
+      await Promise.all([refreshMe(), prefetch()]);
       setStatus("in");
       return data;
     },
-    [refreshMe],
+    [refreshMe, prefetch],
   );
 
   const changePassword = useCallback(

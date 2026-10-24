@@ -38,9 +38,12 @@ export function Seo({ title, description, image, type = "website", jsonLd }) {
 
 export const Reveal = ({ children, delay = 0, className = "" }) => <motion.div initial={{ opacity: 0, y: 28 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-60px" }} transition={{ duration: 0.7, delay, ease: [0.2, 0.8, 0.2, 1] }} className={className}>{children}</motion.div>;
 
-export function Img({ src, alt = "", className = "", ...rest }) {
+const UNSPLASH = /images\.unsplash\.com/;
+export const imgUrl = (src, w) => (UNSPLASH.test(src || "") ? `${src.split("?")[0]}?auto=format&fit=crop&fm=webp&q=70&w=${w}` : src);
+export function Img({ src, alt = "", className = "", sizes = "(max-width: 768px) 100vw, 50vw", priority = false, ...rest }) {
   const [ok, setOk] = useState(false);
-  return <img src={src} alt={alt} loading="lazy" decoding="async" onLoad={() => setOk(true)} className={`blur-up ${ok ? "loaded" : ""} ${className}`} {...rest} />;
+  const resp = UNSPLASH.test(src || "");
+  return <img src={resp ? imgUrl(src, 960) : src} srcSet={resp ? [480, 960, 1440, 1920].map((w) => `${imgUrl(src, w)} ${w}w`).join(", ") : undefined} sizes={resp ? sizes : undefined} alt={alt} loading={priority ? "eager" : "lazy"} fetchpriority={priority ? "high" : undefined} decoding="async" onLoad={() => setOk(true)} className={`blur-up ${ok ? "loaded" : ""} ${className}`} {...rest} />;
 }
 
 export const SectionTitle = ({ eyebrow, title, sub, light, center }) => <div className={`mb-12 ${center ? "text-center" : ""}`}><p className="eyebrow">{eyebrow}</p><h2 className={`display mt-3 text-4xl sm:text-5xl ${light ? "text-white" : "text-navy"}`}>{title}</h2><div className={`hairline mt-5 ${center ? "mx-auto" : ""}`} />{sub && <p className={`mt-5 max-w-2xl text-base leading-relaxed ${light ? "text-white/70" : "text-slate-600"} ${center ? "mx-auto" : ""}`}>{sub}</p>}</div>;
@@ -57,16 +60,16 @@ export function SiteNav({ site }) {
       <header className={`glass-nav fixed inset-x-0 top-0 z-50 ${solid ? "solid" : ""}`} data-testid="site-nav">
         <div className="container-site flex h-[72px] items-center justify-between">
           <Link to="/" className="flex items-center gap-3" data-testid="site-logo">{site?.logo_url ? <img src={site.logo_url} alt={site.brand_name} className="h-9" /> : <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gold font-black text-navy">{(site?.brand_name || "S")[0]}</span>}<span className="display text-xl text-white sm:text-2xl">{site?.brand_name}</span></Link>
-          <nav className="hidden items-center gap-8 lg:flex">{NAV.map(([to, l]) => <NavLink key={to} to={to} className={({ isActive }) => `text-[13px] font-semibold uppercase tracking-[0.18em] transition-colors hover:text-gold ${isActive ? "text-gold" : "text-white/85"}`} data-testid={`nav-${l.toLowerCase()}`}>{l}</NavLink>)}</nav>
+          <nav className="hidden items-center gap-8 lg:flex">{NAV.map(([to, l]) => <NavLink key={to} to={to} onMouseEnter={() => import("./SiteApp").then((m) => m.PREFETCH[to]?.())} className={({ isActive }) => `text-[13px] font-semibold uppercase tracking-[0.18em] transition-colors hover:text-gold ${isActive ? "text-gold" : "text-white/85"}`} data-testid={`nav-${l.toLowerCase()}`}>{l}</NavLink>)}</nav>
           <div className="hidden items-center gap-3 lg:flex"><a href={`tel:${site?.phone}`} className="flex items-center gap-2 text-sm font-semibold text-white/85 hover:text-gold"><Phone className="h-4 w-4" />{site?.phone}</a><a href={site?.portal_url || process.env.REACT_APP_PORTAL_URL || "#"} className="rounded-full border border-white/25 px-4 py-2 text-sm font-semibold text-white/85 transition-colors hover:border-gold hover:text-gold" data-testid="nav-customer-login">Customer Login</a><button onClick={() => nav("/contact")} className="btn-gold !py-2.5 !px-5" data-testid="nav-enquire">Enquire Now</button></div>
-          <button className="text-white lg:hidden" onClick={() => setOpen(!open)} aria-label="Menu" data-testid="nav-menu-btn">{open ? <X /> : <Menu />}</button>
+          <button className="flex h-12 w-12 items-center justify-center text-white lg:hidden" onClick={() => setOpen(!open)} aria-label={open ? "Close menu" : "Open menu"} aria-expanded={open} data-testid="nav-menu-btn">{open ? <X /> : <Menu />}</button>
         </div>
-        {open && <div className="bg-navy px-6 pb-6 lg:hidden" data-testid="nav-mobile">{NAV.map(([to, l]) => <Link key={to} to={to} onClick={() => setOpen(false)} className="block border-b border-white/10 py-3 text-sm font-semibold uppercase tracking-widest text-white/85">{l}</Link>)}<Link to="/contact" onClick={() => setOpen(false)} className="btn-gold mt-4">Enquire Now</Link></div>}
       </header>
-      <div className="fixed inset-x-0 bottom-0 z-40 flex gap-2 border-t border-gold/30 bg-navy/95 p-3 backdrop-blur lg:hidden" data-testid="mobile-cta">
-        <a href={`tel:${site?.phone}`} className="btn-ghost flex-1 justify-center !py-3"><Phone className="h-4 w-4" />Call</a>
-        <a href={`https://wa.me/${(site?.whatsapp || "").replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="btn-ghost flex-1 justify-center !py-3"><MessageCircle className="h-4 w-4" />WhatsApp</a>
-        <Link to="/contact" className="btn-gold flex-1 justify-center !py-3">Enquire</Link>
+      {open && <div className="fixed inset-0 z-[45] flex flex-col bg-navy px-6 pb-10 pt-28 lg:hidden" data-testid="nav-mobile"><nav className="flex flex-col">{NAV.map(([to, l], k) => <Link key={to} to={to} onClick={() => setOpen(false)} style={{ animationDelay: `${k * 60}ms` }} className="display fade-up border-b border-white/10 py-4 text-3xl text-white">{l}</Link>)}</nav><div className="mt-auto space-y-3"><a href={site?.portal_url || process.env.REACT_APP_PORTAL_URL || "#"} className="btn-ghost w-full">Customer Login</a><Link to="/contact" onClick={() => setOpen(false)} className="btn-gold w-full">Enquire Now</Link><a href={`tel:${site?.phone}`} className="block text-center text-sm text-white/80">{site?.phone}</a></div></div>}
+      <div className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-3 gap-2 border-t border-gold/30 bg-navy/95 px-3 py-2.5 backdrop-blur lg:hidden" style={{ paddingBottom: "max(0.625rem, env(safe-area-inset-bottom))" }} data-testid="mobile-cta">
+        <a href={`tel:${site?.phone}`} className="btn-ghost !px-2 !text-[12px]" aria-label="Call"><Phone className="h-4 w-4" />Call</a>
+        <a href={`https://wa.me/${(site?.whatsapp || "").replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="btn-ghost !px-2 !text-[12px]" aria-label="WhatsApp"><MessageCircle className="h-4 w-4" />WhatsApp</a>
+        <Link to="/contact" className="btn-gold !px-2 !text-[12px]" data-testid="mobile-enquire">Enquire</Link>
       </div>
     </>
   );
@@ -75,15 +78,15 @@ export function SiteNav({ site }) {
 export function SiteFooter({ site }) {
   const icons = { facebook: Facebook, instagram: Instagram, youtube: Youtube, linkedin: Linkedin };
   return (
-    <footer className="bg-navy pb-24 pt-20 text-white/75 lg:pb-12" data-testid="site-footer">
-      <div className="container-site grid gap-12 md:grid-cols-5">
-        <div className="md:col-span-2"><p className="display text-3xl text-white">{site?.brand_name}</p><p className="mt-3 max-w-md text-sm leading-relaxed">{site?.footer_text}</p>
+    <footer className="bg-navy pb-28 pt-20 text-white/80 lg:pb-12" data-testid="site-footer">
+      <div className="container-site grid gap-12 sm:grid-cols-2 lg:grid-cols-4">
+        <div><p className="display text-3xl text-white">{site?.brand_name}</p><p className="mt-3 max-w-md text-sm leading-relaxed">{site?.footer_text}</p>
           <div className="mt-6 flex gap-3">{Object.entries(site?.social || {}).map(([k, v]) => { const I = icons[k]; return I && v ? <a key={k} href={v} target="_blank" rel="noreferrer" className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 transition-colors hover:border-gold hover:text-gold" aria-label={k}><I className="h-4 w-4" /></a> : null; })}</div></div>
         <div><p className="eyebrow mb-4">Quick links</p>{[...NAV, ["/privacy", "Privacy"], ["/disclaimer", "Disclaimer"]].map(([to, l]) => <Link key={to} to={to} className="block py-1 text-sm transition-colors hover:text-gold">{l}</Link>)}</div>
-        <div><p className="eyebrow mb-4">Login</p><a href={site?.portal_url || process.env.REACT_APP_PORTAL_URL || "#"} className="block py-1 text-sm transition-colors hover:text-gold" data-testid="footer-customer-login">Customer Login</a><a href={`${process.env.REACT_APP_ERP_URL || "/erp"}/login`} className="block py-1 text-sm transition-colors hover:text-gold" data-testid="footer-staff-login">Staff Login</a></div>
+        <div><p className="eyebrow mb-4">RERA</p><p className="text-sm leading-relaxed text-white/80" data-testid="footer-rera">{site?.rera_number ? <>Registration No. <b className="text-white">{site.rera_number}</b><br /></> : null}All projects are registered with Bihar RERA. Details at <a href="https://rera.bihar.gov.in" target="_blank" rel="noreferrer" className="underline hover:text-gold">rera.bihar.gov.in</a>.</p><p className="eyebrow mb-4 mt-8">Login</p><a href={site?.portal_url || process.env.REACT_APP_PORTAL_URL || "#"} className="block py-1 text-sm transition-colors hover:text-gold" data-testid="footer-customer-login">Customer Login</a><a href={`${process.env.REACT_APP_ERP_URL || "/erp"}/login`} className="block py-1 text-sm transition-colors hover:text-gold" data-testid="footer-staff-login">Staff Login</a></div>
         <div><p className="eyebrow mb-4">Offices</p>{(site?.offices || []).map((o) => <div key={o.name} className="mb-4 text-sm"><p className="font-semibold text-white">{o.name}</p><p className="leading-relaxed">{o.address}</p></div>)}<p className="text-sm"><a href={`tel:${site?.phone}`} className="hover:text-gold">{site?.phone}</a><br /><a href={`mailto:${site?.email}`} className="hover:text-gold">{site?.email}</a></p></div>
       </div>
-      <div className="container-site mt-14 border-t border-white/10 pt-6 text-xs leading-relaxed text-white/50"><p data-testid="rera-disclaimer">{site?.rera_disclaimer}</p><p className="mt-4">© {new Date().getFullYear()} {site?.brand_name}. All rights reserved.</p></div>
+      <div className="container-site mt-14 border-t border-white/10 pt-6 text-xs leading-relaxed text-white/75"><p data-testid="rera-disclaimer">{site?.rera_disclaimer}</p><p className="mt-4">© {new Date().getFullYear()} {site?.brand_name}. All rights reserved.</p></div>
     </footer>
   );
 }
@@ -107,19 +110,19 @@ export function EnquiryForm({ projectSlug, flatNumber, compact, onDone }) {
     } catch (err) { set({ busy: false, ref: null, err: err.response?.status === 429 ? "Too many enquiries from this connection. Please try again in a minute." : err.response?.data?.detail || "Please check the details and try again." }); }
   };
   if (state.ref) return <div className="rounded-2xl border border-gold/40 bg-white p-8 text-center" data-testid="enquiry-success"><p className="eyebrow">Thank you</p><h3 className="display mt-2 text-3xl text-navy">We'll call you shortly</h3><p className="mt-3 text-sm text-slate-600">Your reference number is <b className="text-navy" data-testid="enquiry-reference">{state.ref}</b>. A relationship manager will reach out within one working day.</p></div>;
-  const inp = "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-navy outline-none transition-colors focus:border-gold";
+  const phoneBad = f.phone && !/^[6-9]\d{9}$/.test(f.phone);
   return (
     <form onSubmit={submit} className={`grid gap-3 ${compact ? "" : "sm:grid-cols-2"}`} data-testid="enquiry-form">
-      <input className={inp} placeholder="Full name *" required minLength={2} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} data-testid="enq-name" />
-      <input className={inp} placeholder="Mobile (10 digits) *" required pattern="[6-9][0-9]{9}" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} data-testid="enq-phone" />
-      <input className={inp} type="email" placeholder="Email (optional)" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} data-testid="enq-email" />
-      <select className={inp} value={f.project_slug} onChange={(e) => setF({ ...f, project_slug: e.target.value })} data-testid="enq-project"><option value="">Project of interest</option>{(projects?.items || []).map((p) => <option key={p.slug} value={p.slug}>{p.name}</option>)}</select>
-      <select className={inp} value={f.flat_type_id} onChange={(e) => setF({ ...f, flat_type_id: e.target.value })} data-testid="enq-flat-type"><option value="">Configuration</option>{(fts?.items || []).map((t) => <option key={t.id} value={t.id}>{t.bhk} BHK · {t.name}</option>)}</select>
-      <textarea className={`${inp} ${compact ? "" : "sm:col-span-2"}`} rows={3} placeholder="Message" value={f.message} onChange={(e) => setF({ ...f, message: e.target.value })} data-testid="enq-message" />
+      <div className="field"><input id="enq-name" placeholder=" " required minLength={2} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} data-testid="enq-name" /><label htmlFor="enq-name">Full name *</label></div>
+      <div className="field"><input id="enq-phone" placeholder=" " required inputMode="numeric" pattern="[6-9][0-9]{9}" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value.replace(/\D/g, "").slice(0, 10) })} data-testid="enq-phone" aria-invalid={!!phoneBad} /><label htmlFor="enq-phone">Mobile (10 digits) *</label>{phoneBad && <p className="mt-1 text-xs font-semibold text-red-700" data-testid="enq-phone-error">Enter a valid 10-digit Indian mobile number</p>}</div>
+      <div className="field"><input id="enq-email" type="email" placeholder=" " value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} data-testid="enq-email" /><label htmlFor="enq-email">Email (optional)</label></div>
+      <div className="field"><select id="enq-project" value={f.project_slug} onChange={(e) => setF({ ...f, project_slug: e.target.value })} data-testid="enq-project"><option value="">Any project</option>{(projects?.items || []).map((p) => <option key={p.slug} value={p.slug}>{p.name}</option>)}</select><label htmlFor="enq-project">Project of interest</label></div>
+      <div className="field"><select id="enq-flat-type" value={f.flat_type_id} onChange={(e) => setF({ ...f, flat_type_id: e.target.value })} data-testid="enq-flat-type"><option value="">Any configuration</option>{(fts?.items || []).map((t) => <option key={t.id} value={t.id}>{t.bhk} BHK · {t.name}</option>)}</select><label htmlFor="enq-flat-type">Configuration</label></div>
+      <div className={`field ${compact ? "" : "sm:col-span-2"}`}><textarea id="enq-message" rows={3} placeholder=" " value={f.message} onChange={(e) => setF({ ...f, message: e.target.value })} data-testid="enq-message" /><label htmlFor="enq-message">Message</label></div>
       <input type="text" name="website" tabIndex={-1} autoComplete="off" value={f.website} onChange={(e) => setF({ ...f, website: e.target.value })} className="hidden" aria-hidden="true" data-testid="enq-honeypot" />
-      <label className={`flex items-start gap-2 text-xs text-slate-600 ${compact ? "" : "sm:col-span-2"}`}><input type="checkbox" checked={f.consent} onChange={(e) => setF({ ...f, consent: e.target.checked })} className="mt-0.5" data-testid="enq-consent" />I agree to be contacted about this enquiry and accept the <Link to="/privacy" className="underline">privacy policy</Link>.</label>
+      <label className={`flex items-start gap-2.5 text-xs text-slate-600 ${compact ? "" : "sm:col-span-2"}`}><input type="checkbox" checked={f.consent} onChange={(e) => setF({ ...f, consent: e.target.checked })} className="check mt-0.5" data-testid="enq-consent" />I agree to be contacted about this enquiry and accept the <Link to="/privacy" className="underline">privacy policy</Link>.</label>
       {state.err && <p className="text-sm text-red-600 sm:col-span-2" data-testid="enq-error">{state.err}</p>}
-      <button type="submit" disabled={state.busy || !f.consent} className={`btn-navy justify-center ${compact ? "" : "sm:col-span-2"}`} data-testid="enq-submit">{state.busy ? "Sending…" : "Request a call back"}</button>
+      <button type="submit" disabled={state.busy || !f.consent || !!phoneBad} className={`btn-navy justify-center disabled:opacity-60 ${compact ? "" : "sm:col-span-2"}`} data-testid="enq-submit">{state.busy ? "Sending…" : "Request a call back"}</button>
     </form>
   );
 }

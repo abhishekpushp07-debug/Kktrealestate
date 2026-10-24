@@ -4,7 +4,7 @@ import { Feather } from "@expo/vector-icons";
 import { useActiveBooking, useBookingSub } from "@/src/hooks";
 import { errMsg } from "@/src/api/client";
 import { fmtDate } from "@/src/format";
-import { makeStyles, radius, useTheme } from "@/src/theme";
+import { makeStyles, useTheme } from "@/src/theme";
 import { Screen, PageHeader } from "@/src/ui/screen";
 import { Card, SectionTitle, type IconName } from "@/src/ui/primitives";
 import { T } from "@/src/ui/text";
@@ -22,7 +22,7 @@ function DocRow({ icon, title, sub, onPress, busy, testID, last }: { icon: IconN
   return (
     <View style={[s.row, last && { borderBottomWidth: 0 }]}>
       <View style={s.icon}>
-        <Feather name={icon} size={18} color={colors.gold} />
+        <Feather name={icon} size={20} color={colors.onSurface} />
       </View>
       <View style={{ flex: 1 }}>
         <T v="bodyStrong" numberOfLines={1}>
@@ -93,5 +93,5 @@ export default function Documents() {
 
 const useStyles = makeStyles((c) => ({
   row: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.divider },
-  icon: { width: 40, height: 40, borderRadius: radius.sm, backgroundColor: c.surfaceInverse, alignItems: "center", justifyContent: "center" },
+  icon: { width: 36, height: 36, borderRadius: 10, backgroundColor: c.navy50, alignItems: "center", justifyContent: "center" },
 }));

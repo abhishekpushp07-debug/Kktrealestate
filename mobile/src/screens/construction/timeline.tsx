@@ -1,5 +1,6 @@
-import { ScrollView, View } from "react-native";
-import { Image } from "expo-image";
+import { useState } from "react";
+import { View } from "react-native";
+import { LazyImage } from "@/src/ui/lazy-image";
 import { Feather } from "@expo/vector-icons";
 
 import { BACKEND } from "@/src/api/client";
@@ -12,6 +13,44 @@ export type Photo = { id: string; caption?: string | null; taken_on?: string | n
 export type Milestone = { seq: number; name: string; cumulative_percent?: number | null; status: string; completed_on?: string | null; started_on?: string | null; update?: string | null; notes?: string | null; photos: Photo[] };
 
 export const photoUri = (p: Photo) => (p.url.startsWith("http") ? p.url : `${BACKEND}${p.url}`);
+
+// Thumbnails try the backend's `?size=thumb` variant (ignored if unsupported).
+export const thumbUri = (p: Photo) => `${photoUri(p)}${photoUri(p).includes("?") ? "&" : "?"}size=thumb`;
+
+// Responsive grid sized to the available width — nothing is clipped; extra
+// photos collapse into a "+N" tile that opens the viewer.
+function PhotoGrid({ photos, seq, alt, onPhoto }: { photos: Photo[]; seq: number; alt: string; onPhoto: (p: Photo) => void }) {
+  const s = useStyles();
+  const [w, setW] = useState(0);
+  const cols = Math.max(3, Math.min(6, Math.ceil(w / 210)));
+  const gap = 8;
+  const size = w ? Math.floor((w - gap * (cols - 1)) / cols) : 0;
+  const shown = photos.slice(0, cols * 2);
+  const extra = photos.length - shown.length;
+  return (
+    <View style={[s.grid, { gap }]} onLayout={(e) => setW(e.nativeEvent.layout.width)} testID={`construction-photos-${seq}`}>
+      {size
+        ? shown.map((p, i) => {
+            const more = extra > 0 && i === shown.length - 1;
+            return (
+              <Press key={p.id} onPress={() => onPhoto(p)} testID={`construction-photo-${p.id}`} style={[s.thumbWrap, { width: size, height: Math.round(size * 0.75) }]} accessibilityLabel={p.caption || alt}>
+                <LazyImage uri={thumbUri(p)} style={s.fill} recyclingKey={p.id} testID={`construction-thumb-${p.id}`} />
+                {more ? (
+                  <View style={s.more}>
+                    <T style={s.moreText}>+{extra + 1}</T>
+                  </View>
+                ) : p.taken_on && size >= 120 ? (
+                  <View style={s.stamp}>
+                    <T style={s.stampText}>{fmtDate(p.taken_on)}</T>
+                  </View>
+                ) : null}
+              </Press>
+            );
+          })
+        : null}
+    </View>
+  );
+}
 
 export function TimelineItem({ m, next, last, onPhoto }: { m: Milestone; next: boolean; last: boolean; onPhoto: (p: Photo) => void }) {
   const s = useStyles();
@@ -47,18 +86,7 @@ export function TimelineItem({ m, next, last, onPhoto }: { m: Milestone; next: b
           </View>
         ) : null}
         {m.photos.length ? (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.photos} testID={`construction-photos-${m.seq}`}>
-            {m.photos.map((p) => (
-              <Press key={p.id} onPress={() => onPhoto(p)} testID={`construction-photo-${p.id}`} style={s.thumbWrap} accessibilityLabel={p.caption || m.name}>
-                <Image source={{ uri: photoUri(p) }} style={s.thumb} contentFit="cover" transition={250} recyclingKey={p.id} />
-                {p.taken_on ? (
-                  <View style={s.stamp}>
-                    <T style={s.stampText}>{fmtDate(p.taken_on)}</T>
-                  </View>
-                ) : null}
-              </Press>
-            ))}
-          </ScrollView>
+          <PhotoGrid photos={m.photos} seq={m.seq} alt={m.name} onPhoto={onPhoto} />
         ) : null}
       </View>
     </View>
@@ -75,12 +103,14 @@ const useStyles = makeStyles((c) => ({
   line: { flex: 1, width: 2, backgroundColor: c.divider, marginVertical: 2 },
   lineDone: { backgroundColor: c.gold },
   body: { flex: 1, paddingBottom: 22, gap: 3 },
-  activeBody: { backgroundColor: c.brandTertiary, borderRadius: radius.md, padding: 12, marginBottom: 14, paddingBottom: 12 },
+  activeBody: { backgroundColor: c.brandTertiary, borderRadius: radius.md, paddingHorizontal: 12, paddingBottom: 12, marginBottom: 14 },
   head: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap", minHeight: 28 },
   note: { flexDirection: "row", gap: 8, backgroundColor: c.surface, borderRadius: radius.sm, padding: 10, marginTop: 6 },
-  photos: { gap: 10, paddingTop: 10, paddingRight: 8 },
-  thumbWrap: { borderRadius: radius.md, overflow: "hidden" },
-  thumb: { width: 132, height: 100, backgroundColor: c.skeleton },
+  grid: { flexDirection: "row", flexWrap: "wrap", marginTop: 10, minHeight: 60 },
+  thumbWrap: { borderRadius: radius.md, overflow: "hidden", backgroundColor: c.skeleton },
+  fill: { width: "100%", height: "100%" },
+  more: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(11,31,58,0.6)", alignItems: "center", justifyContent: "center" },
+  moreText: { fontFamily: "Manrope_800ExtraBold", fontSize: 18, color: c.onSurfaceInverse },
   stamp: { position: "absolute", left: 6, bottom: 6, backgroundColor: "rgba(11,31,58,0.75)", borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
   stampText: { fontFamily: "Manrope_700Bold", fontSize: 10, color: c.onSurfaceInverse },
 }));

@@ -253,22 +253,33 @@ async def gallery(request: Request, _=Depends(public_guard)):
     return cached(request, {"items": items, "categories": sorted({i["category"] for i in items if i.get("category")})})
 
 
+def _media_response(request: Request, data: bytes, ctype: str) -> Response:
+    from services.thumbs import etag_for
+    etag = etag_for(data)
+    headers = {"Cache-Control": "public, max-age=31536000, immutable", "ETag": etag, "Vary": "Accept"}
+    if request.headers.get("if-none-match", "").replace("W/", "") == etag:
+        return Response(status_code=304, headers=headers)
+    return Response(content=data, media_type=ctype, headers=headers)
+
+
 @router.get("/media/photo/{photo_id}")
-async def construction_photo(photo_id: str, _=Depends(public_guard)):
+async def construction_photo(photo_id: str, request: Request, size: str | None = None, _=Depends(public_guard)):
     m = await db.construction_photos.find_one({"id": photo_id, "is_active": True, "$or": [{"visible_to_customers": True}, {"show_on_website": True}]}, {"_id": 0})
     if not m:
         raise ApiError(404, "Not found", "NOT_FOUND")
-    data, ctype = await get_object(m["storage_key"])
-    return Response(content=data, media_type=m["mime"] or ctype, headers={"Cache-Control": "public, max-age=31536000, immutable"})
+    from services.thumbs import get_variant, SIZES
+    data, ctype = await get_variant(m["storage_key"], size)
+    return _media_response(request, data, ctype if size in SIZES else (m["mime"] or ctype))
 
 
 @router.get("/media/{media_id}")
-async def media(media_id: str, _=Depends(public_guard)):
+async def media(media_id: str, request: Request, size: str | None = None, _=Depends(public_guard)):
     m = await db.cms_media.find_one({"id": media_id}, {"_id": 0})
     if not m:
         raise ApiError(404, "Not found", "NOT_FOUND")
-    data, ctype = await get_object(m["storage_key"])
-    return Response(content=data, media_type=m["mime"] or ctype, headers={"Cache-Control": "public, max-age=31536000, immutable"})
+    from services.thumbs import get_variant, SIZES
+    data, ctype = await get_variant(m["storage_key"], size)
+    return _media_response(request, data, ctype if size in SIZES else (m["mime"] or ctype))
 
 
 @router.get("/brochure/{doc_id}")

@@ -17,7 +17,7 @@ export function Empty({ title, hint, icon = "inbox", action, testID = "empty-sta
         {title}
       </T>
       {hint ? (
-        <T tone="muted" style={[s.center, { marginTop: 4 }]}>
+        <T tone="secondary" style={[s.center, { marginTop: 4, maxWidth: 520 }]}>
           {hint}
         </T>
       ) : null}

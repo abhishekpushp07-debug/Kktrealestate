@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, useWindowDimensions, View } from "react-native";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 
@@ -101,36 +102,56 @@ function LoginForm() {
           </T>
         </View>
       ) : null}
-      <Button label={busy ? "Signing in…" : "Sign in"} onPress={submit} loading={busy} testID="login-submit-button" style={{ marginTop: 22 }} />
-      <T v="small" tone="muted" style={{ textAlign: "center", marginTop: 16 }} testID="login-forgot-hint">
+      <Button kind="gold" label={busy ? "Signing in…" : "Sign in"} onPress={submit} loading={busy} testID="login-submit-button" style={{ marginTop: 22 }} />
+      <T v="small" tone="secondary" style={{ textAlign: "center", marginTop: 16, alignSelf: "center", maxWidth: 300 }} testID="login-forgot-hint">
         Forgot your password? Call your Relationship Manager to reset it.
       </T>
     </Card>
   );
 }
 
+const VALUE_PROPS: [string, string][] = [
+  ["credit-card", "Every payment, receipt and due — Cash and Account, always reconciled."],
+  ["layers", "Construction progress stage by stage, with site photos."],
+  ["message-square", "Raise requests and hear back from your relationship manager."],
+];
+
 export default function Login() {
   const s = useStyles();
+  const { colors } = useTheme();
   const { status, pendingName, logout } = useAuth();
   const cfg = useConfig();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const wide = width >= 900;
+  const wide = width >= 1024;
   const forced = status === "pwchange";
   return (
     <View style={s.root} testID="login-screen">
       {wide ? (
-        <View style={s.side}>
-          <Brand name={cfg.brand} logo={cfg.logo_url} inverse />
-          <View>
-            <T style={s.sideTitle}>Your home,{"\n"}always within reach.</T>
-            <T tone="inverseMuted" style={{ marginTop: 16, maxWidth: 420, fontSize: 16, lineHeight: 24 }}>
-              Track payments, download receipts, watch construction progress and reach your relationship manager — all in one place.
+        <View style={s.side} testID="login-brand-panel">
+          <Image source={require("@/assets/images/login-hero.jpg")} style={s.sideImg} contentFit="cover" cachePolicy="memory-disk" />
+          <LinearGradient colors={["rgba(11,31,58,0.55)", "rgba(11,31,58,0.96)"]} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={s.sideImg} pointerEvents="none" />
+          <View style={s.sideInner}>
+            <Brand name={cfg.brand} logo={cfg.logo_url} inverse />
+            <View style={{ gap: 22 }}>
+              <T style={s.sideTitle}>Your home,{"\n"}always within reach.</T>
+              <View style={{ gap: 14 }}>
+                {VALUE_PROPS.map(([icon, text]) => (
+                  <View key={text} style={s.prop}>
+                    <View style={s.propIcon}>
+                      <Feather name={icon as any} size={16} color={colors.gold} />
+                    </View>
+                    <T tone="inverse" style={{ flex: 1, fontSize: 16, lineHeight: 23 }}>
+                      {text}
+                    </T>
+                  </View>
+                ))}
+              </View>
+            </View>
+            <T v="small" tone="inverseMuted">
+              {cfg.brand} · Customer portal
             </T>
           </View>
-          <T v="small" tone="inverseMuted">
-            {cfg.brand} · Customer portal
-          </T>
         </View>
       ) : null}
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
@@ -164,8 +185,12 @@ export default function Login() {
 
 const useStyles = makeStyles((c) => ({
   root: { flex: 1, flexDirection: "row", backgroundColor: c.surface },
-  side: { flex: 1, backgroundColor: c.surfaceInverse, padding: 48, justifyContent: "space-between" },
-  sideTitle: { fontFamily: "CormorantGaramond_600SemiBold", fontSize: 54, lineHeight: 58, color: c.onSurfaceInverse },
+  side: { flex: 1, maxWidth: 720, backgroundColor: c.surfaceInverse, overflow: "hidden" },
+  sideImg: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
+  sideInner: { flex: 1, padding: 56, justifyContent: "space-between", gap: 32 },
+  sideTitle: { fontFamily: "CormorantGaramond_600SemiBold", fontSize: 56, lineHeight: 60, color: c.onSurfaceInverse },
+  prop: { flexDirection: "row", alignItems: "center", gap: 14, maxWidth: 460 },
+  propIcon: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: "rgba(201,162,39,0.6)", alignItems: "center", justifyContent: "center" },
   scroll: { flexGrow: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 20 },
   col: { width: "100%", maxWidth: 420, gap: 24 },
   brand: { flexDirection: "row", alignItems: "center", gap: 12 },
@@ -174,8 +199,8 @@ const useStyles = makeStyles((c) => ({
   hero: { fontFamily: "CormorantGaramond_600SemiBold", fontSize: 38, lineHeight: 42, color: c.onSurface },
   card: { padding: 24 },
   alert: { flexDirection: "row", gap: 8, alignItems: "flex-start", backgroundColor: c.errorSoft, padding: 12, borderRadius: radius.sm, marginTop: 16 },
-  links: { flexDirection: "row", justifyContent: "center", flexWrap: "wrap", gap: 8 },
-  link: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 44, paddingHorizontal: 12 },
-  linkText: { fontFamily: "Manrope_700Bold", textDecorationLine: "underline" },
+  links: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8, paddingHorizontal: 4 },
+  link: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 44, paddingHorizontal: 8 },
+  linkText: { fontFamily: "Manrope_700Bold", color: c.onSurfaceTertiary, textDecorationLine: "underline" },
   alertLocked: { borderWidth: 1, borderColor: c.error },
 }));

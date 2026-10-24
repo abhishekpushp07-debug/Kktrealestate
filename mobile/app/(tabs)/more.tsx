@@ -7,7 +7,7 @@ import { Feather } from "@expo/vector-icons";
 import { useAuth } from "@/src/auth";
 import { useBookings, useConfig, useNotices, useNotificationCount } from "@/src/hooks";
 import { phoneDigits } from "@/src/format";
-import { makeStyles, radius, useTheme } from "@/src/theme";
+import { makeStyles, useTheme } from "@/src/theme";
 import { Screen, PageHeader } from "@/src/ui/screen";
 import { Button, Card, IconButton, Press, type IconName } from "@/src/ui/primitives";
 import { T } from "@/src/ui/text";
@@ -24,7 +24,7 @@ function Rows({ rows }: { rows: Row[] }) {
       {rows.map((r, i) => (
         <Press key={r.testID} onPress={r.onPress} testID={r.testID} style={[s.row, i === rows.length - 1 && { borderBottomWidth: 0 }]}>
           <View style={s.icon}>
-            <Feather name={r.icon} size={18} color={colors.onSurface} />
+            <Feather name={r.icon} size={20} color={colors.onSurface} />
           </View>
           <View style={{ flex: 1 }}>
             <T v="bodyStrong">{r.title}</T>
@@ -108,5 +108,5 @@ export default function More() {
 
 const useStyles = makeStyles((c) => ({
   row: { flexDirection: "row", alignItems: "center", gap: 14, minHeight: 64, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: c.divider },
-  icon: { width: 40, height: 40, borderRadius: radius.sm, backgroundColor: c.surface, alignItems: "center", justifyContent: "center" },
+  icon: { width: 36, height: 36, borderRadius: 10, backgroundColor: c.navy50, alignItems: "center", justifyContent: "center" },
 }));

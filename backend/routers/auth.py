@@ -183,7 +183,7 @@ async def login(body: LoginIn, request: Request):
 async def login_mfa(body: MfaLoginIn, request: Request):
     import jwt
     try:
-        payload = jwt.decode(body.mfa_token, JWT_SECRET, algorithms=[JWT_ALG])
+        payload = jwt.decode(body.mfa_token, JWT_SECRET, algorithms=[JWT_ALG], audience="erp")
         assert payload.get("type") == "mfa"
     except Exception:
         raise ApiError(401, "Invalid or expired MFA token", "INVALID_TOKEN")

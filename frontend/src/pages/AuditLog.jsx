@@ -6,6 +6,7 @@ import { DataTable } from "@/components/common/DataTable";
 import { Pill } from "@/components/common/StatusChip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/common/DateInput";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 const tone = (a) => a.includes("create") ? "green" : a.includes("deactivate") || a.includes("locked") ? "red" : a.includes("status") ? "amber" : "navy";
@@ -41,8 +42,8 @@ export default function AuditLog() {
       <DataTable {...list} columns={columns} testId="audit-table" onRowClick={setOpen} searchPlaceholder="Actor, action, entity…"
         toolbar={<>
           <Select value={entity} onValueChange={setEntity}><SelectTrigger className="h-9 w-44" data-testid="audit-entity-filter"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All entities</SelectItem>{types?.items?.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent></Select>
-          <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-9 w-40" data-testid="audit-date-from" />
-          <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9 w-40" data-testid="audit-date-to" />
+          <DateInput value={from} onChange={(e) => setFrom(e.target.value)} className="h-9 w-40" data-testid="audit-date-from" />
+          <DateInput value={to} onChange={(e) => setTo(e.target.value)} className="h-9 w-40" data-testid="audit-date-to" />
         </>} />
       <Sheet open={!!open} onOpenChange={(o) => !o && setOpen(null)}>
         <SheetContent className="w-full overflow-y-auto sm:max-w-xl" data-testid="audit-detail-sheet">

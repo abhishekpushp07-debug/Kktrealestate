@@ -1,4 +1,6 @@
-import { ImageBackground, View } from "react-native";
+import { View } from "react-native";
+import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 
@@ -14,11 +16,12 @@ export function HeroCard({ b }: { b: Booking }) {
   const router = useRouter();
   return (
     <Press testID="home-flat-card" onPress={() => router.push(`/flat/${b.id}`)} style={s.card}>
-      <ImageBackground source={b.cover_image ? { uri: b.cover_image } : undefined} style={s.bg} imageStyle={s.img} resizeMode="cover">
-        <View style={s.shade} />
+      <View style={s.bg}>
+        {b.cover_image ? <Image source={{ uri: b.cover_image }} style={s.img} contentFit="cover" cachePolicy="memory-disk" transition={250} /> : null}
+        <LinearGradient colors={["rgba(11,31,58,0.35)", "rgba(11,31,58,0.92)"]} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={s.shade} pointerEvents="none" />
         <View style={s.inner}>
           <View style={s.topRow}>
-            <T v="label" tone="gold" style={{ flex: 1 }} numberOfLines={1}>
+            <T v="label" tone="goldBright" style={{ flex: 1 }} numberOfLines={1}>
               {b.project_name}
             </T>
             {!b.is_primary ? <Chip label="Co-applicant" tone="gold" testID="home-coapplicant-chip" /> : null}
@@ -40,11 +43,11 @@ export function HeroCard({ b }: { b: Booking }) {
                 {b.current_milestone || "Starting soon"}
               </T>
               {b.next_milestone ? (
-                <T v="small" tone="gold" style={{ marginTop: 2 }}>
+                <T v="small" tone="goldBright" style={{ marginTop: 2 }}>
                   Up next: {b.next_milestone}
                 </T>
               ) : b.construction_percent >= 100 ? (
-                <T v="small" tone="gold" style={{ marginTop: 2 }}>
+                <T v="small" tone="goldBright" style={{ marginTop: 2 }}>
                   Construction complete
                 </T>
               ) : null}
@@ -54,16 +57,16 @@ export function HeroCard({ b }: { b: Booking }) {
             </View>
           </View>
         </View>
-      </ImageBackground>
+      </View>
     </Press>
   );
 }
 
 const useStyles = makeStyles((c) => ({
   card: { borderRadius: radius.xl, overflow: "hidden", backgroundColor: c.surfaceInverse, ...shadow },
-  bg: { width: "100%" },
-  img: { opacity: 0.32 },
-  shade: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(11,31,58,0.55)" },
+  bg: { width: "100%", minHeight: 250 },
+  img: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
+  shade: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
   inner: { padding: 22 },
   topRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   progRow: { flexDirection: "row", alignItems: "center", gap: 16, marginTop: 22 },

@@ -4,7 +4,7 @@ import { useRouter } from "expo-router";
 import type { Booking } from "@/src/hooks";
 import { fmtDate, inr, inrShort, isPast } from "@/src/format";
 import { makeStyles, radius } from "@/src/theme";
-import { Button, Card, Chip, Press } from "@/src/ui/primitives";
+import { Button, Card, Chip, Money, Press } from "@/src/ui/primitives";
 import { ProgressBar } from "@/src/ui/progress";
 import { T } from "@/src/ui/text";
 
@@ -12,35 +12,53 @@ import { T } from "@/src/ui/text";
 export function Balance({ v, testID, big }: { v: number; testID?: string; big?: boolean }) {
   if (!v) return <T v={big ? "moneyLg" : "money"} testID={testID}>₹0</T>;
   return v > 0 ? (
-    <T v={big ? "moneyLg" : "money"} tone="error" testID={testID}>
-      {inrShort(v)}
-    </T>
+    <Money v={v} tone="error" big={big} testID={testID} />
   ) : (
-    <T v={big ? "moneyLg" : "money"} tone="success" testID={testID}>
-      {inrShort(-v)} <T v="small" tone="success">(advance)</T>
-    </T>
+    <View style={{ alignItems: "flex-end" }}>
+      <Money v={-v} tone="success" big={big} testID={testID} />
+      <T v="small" tone="success">(advance)</T>
+    </View>
   );
 }
 
-function Bucket({ name, agreed, paid, due, id }: { name: string; agreed: number; paid: number; due: number; id: string }) {
+// 3 rows (Agreed / Paid / Due|Advance) × 2 bucket columns, labels left, values right-aligned.
+function BucketGrid({ b }: { b: Booking }) {
   const s = useStyles();
+  const cols: { id: string; agreed: number; paid: number; due: number }[] = [
+    { id: "cash", agreed: b.cash_agreed, paid: b.cash_paid, due: b.cash_due },
+    { id: "account", agreed: b.account_agreed, paid: b.account_paid, due: b.account_due },
+  ];
+  const rows: { label: string; render: (c: (typeof cols)[number]) => React.ReactNode }[] = [
+    { label: "Agreed", render: (c) => <Money v={c.agreed} style={s.num} /> },
+    { label: "Paid", render: (c) => <Money v={c.paid} style={s.num} testID={`home-bucket-${c.id}-paid`} /> },
+    {
+      label: "Due / advance",
+      render: (c) =>
+        c.due < 0 ? (
+          <View style={{ alignItems: "flex-end" }}>
+            <Money v={-c.due} tone="success" style={s.num} testID={`home-bucket-${c.id}-due`} />
+            <T v="small" tone="success">advance</T>
+          </View>
+        ) : (
+          <Money v={c.due} tone={c.due > 0 ? "error" : undefined} style={s.num} testID={`home-bucket-${c.id}-due`} />
+        ),
+    },
+  ];
   return (
-    <View style={s.bucket} testID={`home-bucket-${id}`}>
-      <T v="label" tone="muted">
-        {name}
-      </T>
-      <View style={s.line}>
-        <T v="small" tone="muted">Agreed</T>
-        <T v="bodyStrong">{inrShort(agreed)}</T>
+    <View style={s.grid} testID="home-bucket-grid">
+      <View style={s.gRow}>
+        <View style={s.gLabel} />
+        <T v="label" tone="muted" style={s.gHead}>Cash</T>
+        <T v="label" tone="muted" style={s.gHead}>Account</T>
       </View>
-      <View style={s.line}>
-        <T v="small" tone="muted">Paid</T>
-        <T v="bodyStrong" testID={`home-bucket-${id}-paid`}>{inrShort(paid)}</T>
-      </View>
-      <View style={s.line}>
-        <T v="small" tone="muted">{due < 0 ? "Advance" : "Due"}</T>
-        <Balance v={due} testID={`home-bucket-${id}-due`} />
-      </View>
+      {rows.map((r, i) => (
+        <View key={r.label} style={[s.gRow, s.gBody, i === rows.length - 1 && { borderBottomWidth: 0 }]} testID={`home-bucket-row-${i}`}>
+          <T v="small" tone="secondary" style={s.gLabel}>{r.label}</T>
+          {cols.map((c) => (
+            <View key={c.id} style={s.gCell} testID={`home-bucket-${c.id}`}>{r.render(c)}</View>
+          ))}
+        </View>
+      ))}
     </View>
   );
 }
@@ -57,27 +75,26 @@ export function PaymentSummary({ b, wide }: { b: Booking; wide?: boolean }) {
           <T v="small" tone="gold" style={{ fontFamily: "Manrope_700Bold" }}>View all</T>
         </Press>
       </View>
-      <T v="moneyLg" style={{ marginTop: 6 }} testID="home-paid-total">
-        {inrShort(b.paid)} <T tone="muted" style={{ fontSize: 15 }}>of {inrShort(b.agreement_value)}</T>
-      </T>
+      <View style={s.hero}>
+        <T style={s.heroNum} testID="home-paid-total">
+          {inrShort(b.paid)} <T style={s.heroPaid}>paid</T>
+        </T>
+        <T v="small" tone="muted">of {inrShort(b.agreement_value)} agreement</T>
+      </View>
       <View style={{ marginTop: 10 }}>
         <ProgressBar value={pct} testID="home-paid-progress" />
       </View>
       <T v="small" tone="muted" style={{ marginTop: 6 }}>{pct}% of agreement value paid</T>
-      <View style={s.buckets}>
-        <Bucket id="cash" name="Cash" agreed={b.cash_agreed} paid={b.cash_paid} due={b.cash_due} />
-        <View style={s.vr} />
-        <Bucket id="account" name="Account" agreed={b.account_agreed} paid={b.account_paid} due={b.account_due} />
-      </View>
+      <BucketGrid b={b} />
       {b.other_charges_due > 0 ? (
         <View style={s.line}>
-          <T v="small" tone="muted">Other charges due</T>
+          <T v="small" tone="secondary" style={s.lineLabel}>Other charges due</T>
           <T v="money" tone="error" testID="home-other-charges-due">{inr(b.other_charges_due)}</T>
         </View>
       ) : null}
       {b.pending_cheques > 0 ? (
         <View style={[s.line, s.pending]}>
-          <T v="small" tone="warning">Cheques awaiting clearance</T>
+          <T v="small" tone="warning" style={s.lineLabel}>Cheques awaiting clearance</T>
           <T v="money" tone="warning" testID="home-pending-cheques">{inr(b.pending_cheques)}</T>
         </View>
       ) : null}
@@ -100,7 +117,7 @@ export function NextDue({ b, onStatement, busy, wide }: { b: Booking; onStatemen
             {nd.milestone} · due {fmtDate(nd.due_date)}
           </T>
           {isPast(nd.due_date) ? <View style={{ marginTop: 8 }}><Chip label="Overdue" tone="error" testID="home-next-due-overdue" /></View> : null}
-          <Button small kind="gold" label="View demands" icon="file-text" onPress={() => router.push({ pathname: "/payments", params: { tab: "demands" } })} testID="home-view-demand" style={{ marginTop: 16, alignSelf: "flex-start" }} />
+          <Button small kind="gold" label="View demands" trailingIcon="chevron-right" onPress={() => router.push({ pathname: "/payments", params: { tab: "demands" } })} testID="home-view-demand" style={{ marginTop: 16, alignSelf: "flex-start" }} />
         </>
       ) : (
         <>
@@ -120,9 +137,19 @@ export function NextDue({ b, onStatement, busy, wide }: { b: Booking; onStatemen
 const useStyles = makeStyles((c) => ({
   head: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   link: { minHeight: 36, justifyContent: "center", paddingHorizontal: 6 },
-  buckets: { flexDirection: "row", marginTop: 16, backgroundColor: c.surface, borderRadius: radius.md, padding: 14, gap: 12 },
-  bucket: { flex: 1, gap: 6 },
-  vr: { width: 1, backgroundColor: c.divider },
-  line: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8, marginTop: 4 },
-  pending: { marginTop: 10, backgroundColor: c.warningSoft, padding: 10, borderRadius: radius.sm },
+  buckets: { flexDirection: "row", flexWrap: "wrap", marginTop: 16, backgroundColor: c.surface, borderRadius: radius.md, padding: 14, gap: 12 },
+  bucket: { flex: 1, minWidth: 130, gap: 6 },
+  hero: { marginTop: 8, gap: 2 },
+  heroNum: { fontFamily: "Manrope_800ExtraBold", fontSize: 30, lineHeight: 36, letterSpacing: -0.6, color: c.onSurface, fontVariant: ["tabular-nums"] },
+  heroPaid: { fontFamily: "Manrope_600SemiBold", fontSize: 16, color: c.onSurfaceTertiary, letterSpacing: 0 },
+  grid: { marginTop: 16, backgroundColor: c.surface, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 8 },
+  gRow: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 36 },
+  gBody: { borderBottomWidth: 1, borderBottomColor: c.divider, paddingVertical: 8 },
+  gLabel: { flex: 1.1 },
+  gHead: { flex: 1, textAlign: "right" },
+  gCell: { flex: 1, alignItems: "flex-end" },
+  num: { textAlign: "right", fontVariant: ["tabular-nums"] },
+  line: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginTop: 4 },
+  lineLabel: { flexShrink: 1 },
+  pending: { marginTop: 12, backgroundColor: c.warningSoft, paddingHorizontal: 12, paddingVertical: 10, borderRadius: radius.sm },
 }));

@@ -46,6 +46,8 @@ function BulkPriceDialog({ block, open, onOpenChange, onDone }) {
   );
 }
 
+const previewNumber = (b) => (b.numbering_pattern || "{block}{floor}{pos2}").replace("{block}", b.code || "A").replace("{floor}", String(b.floor_start ?? 1)).replace("{pos2}", "01").replace("{pos}", "1");
+
 export default function BlockDetail() {
   const { id } = useParams();
   const [sp, setSp] = useSearchParams();
@@ -92,7 +94,7 @@ export default function BlockDetail() {
   return (
     <div data-testid="block-detail-page">
       <PageHeader crumbs={[{ label: "Projects", to: "/projects" }, { label: block?.project_code || "…", to: `/projects/${b.project_id}` }, { label: b.code }]} title={b.name}
-        subtitle={`${block?.block_type_name || ""} · ${b.floors} floors${b.skip_floors?.length ? ` (skips ${b.skip_floors.join(", ")})` : ""}${b.refuge_floors?.length ? ` · refuge ${b.refuge_floors.join(", ")}` : ""} · pattern ${b.numbering_pattern}`}
+        subtitle={`${block?.block_type_name || ""} · ${b.floors} floors${b.skip_floors?.length ? ` (skips ${b.skip_floors.join(", ")})` : ""}${b.refuge_floors?.length ? ` · refuge ${b.refuge_floors.join(", ")}` : ""} · numbering e.g. ${previewNumber(b)}`}
         actions={<>
           <Button variant="outline" onClick={() => window.print()} data-testid="print-grid-btn" className="print:hidden"><Printer className="mr-1.5 h-4 w-4" />Print</Button>
           <Button variant="outline" onClick={() => setShowMilestones(!showMilestones)} data-testid="block-milestones-btn"><Milestone className="mr-1.5 h-4 w-4" />Construction Status</Button>

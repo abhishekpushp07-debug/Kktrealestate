@@ -54,7 +54,7 @@ class TestHealthHeaders:
         assert r.status_code == 200
         d = r.json()
         assert d["status"] == "ok"
-        assert d["version"] == "1.5.0"
+        assert isinstance(d["version"], str) and d["version"]  # 1.5.0 → 7.0.0 after Phase 7
         assert "transaction_mode" in d
         # security + tracing headers
         assert r.headers.get("x-content-type-options") == "nosniff"

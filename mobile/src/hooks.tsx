@@ -58,7 +58,7 @@ export type PortalConfig = {
   portal_url?: string | null;
 };
 
-const STALE = 30_000;
+const STALE = 60_000;
 
 export const useBookings = () => {
   const { status } = useAuth();

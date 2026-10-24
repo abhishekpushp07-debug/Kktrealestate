@@ -13,7 +13,9 @@ router = APIRouter(prefix="/blocks", tags=["milestones (legacy alias)"])
 @router.get("/{block_id}/milestones")
 async def list_milestones(block_id: str, user: dict = Depends(require("project.read"))):
     res = await block_construction(block_id, user)
-    return {"block": res["block"], "construction_percent": res["construction_percent"], "milestones": [{"seq": s["seq"], "name": s["name"], "status": s["status"], "completed_on": s.get("completed_on"), "stage_id": s["stage_id"], "cumulative_percent": round(s["seq"] * 100 / len(res["stages"]), 2)} for s in res["stages"]], "stages": res["stages"]}
+    stages = res["stages"]
+    nxt = next((s["seq"] for s in stages if s["status"] != "Completed"), None)
+    return {"block": res["block"], "construction_percent": res["construction_percent"], "next_seq": nxt, "milestones": [{"seq": s["seq"], "name": s["name"], "status": s["status"], "completed_on": s.get("completed_on"), "stage_id": s["stage_id"], "cumulative_percent": round(s["seq"] * 100 / len(stages), 2)} for s in stages], "stages": stages}
 
 
 class CompleteIn(StrictModel):

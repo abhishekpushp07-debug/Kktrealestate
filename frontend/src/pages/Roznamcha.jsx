@@ -9,6 +9,7 @@ import { Pill } from "@/components/common/StatusChip";
 import { Combobox } from "@/components/common/Combobox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/common/DateInput";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { inr, fmtDate } from "@/lib/format";
 
@@ -21,7 +22,7 @@ export default function Roznamcha() {
   const postContra = async () => { try { await api.post("/roznamcha/contra", { date, kind: contra.kind, amount: Number(contra.amount), bank_account_id: contra.bank_account_id, remarks: contra.remarks || null }); toast.success("Contra entry posted"); setContra({ ...contra, amount: "", remarks: "" }); reload(); } catch (e) { toast.error(errMsg(e)); } };
   return (
     <div data-testid="roznamcha-page">
-      <PageHeader title="Roznamcha" subtitle="Day book — cash in hand, receipts by mode and bucket, bank contra." actions={<div className="flex items-center gap-2 print:hidden"><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-9 w-40" data-testid="rozn-date" /><Button variant="outline" onClick={() => window.print()} data-testid="rozn-print"><Printer className="mr-1 h-4 w-4" />Print</Button></div>} />
+      <PageHeader title="Roznamcha" subtitle="Day book — cash in hand, receipts by mode and bucket, bank contra." actions={<div className="flex items-center gap-2 print:hidden"><DateInput value={date} onChange={(e) => setDate(e.target.value)} className="h-9 w-40" data-testid="rozn-date" /><Button variant="outline" onClick={() => window.print()} data-testid="rozn-print"><Printer className="mr-1 h-4 w-4" />Print</Button></div>} />
       {loading && <p className="text-sm text-slate-500" data-testid="rozn-loading">Loading {date}…</p>}
       {d && !loading && <>
         <div className="grid gap-4 md:grid-cols-5" data-testid="rozn-summary">

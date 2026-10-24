@@ -3,10 +3,9 @@ import { View } from "react-native";
 
 import { useActiveBooking, useBookingSub } from "@/src/hooks";
 import { errMsg } from "@/src/api/client";
-import { inrShort } from "@/src/format";
 import { makeStyles } from "@/src/theme";
 import { Screen, PageHeader } from "@/src/ui/screen";
-import { Button, Card } from "@/src/ui/primitives";
+import { Button, Card, Money } from "@/src/ui/primitives";
 import { Pills } from "@/src/ui/pills";
 import { T } from "@/src/ui/text";
 import { SkeletonList, SkeletonScreen } from "@/src/ui/skeleton";
@@ -80,18 +79,16 @@ export default function Payments() {
           <BookingSwitcher items={items} active={active} select={select} />
           <Card navy testID="payments-summary" style={s.summary}>
             {[
-              ["Agreement", inrShort(active.agreement_value), "inverse"],
-              ["Paid", inrShort(active.paid), "inverse"],
-              [active.total_due < 0 ? "Advance" : "Due now", inrShort(Math.abs(active.total_due)), active.total_due > 0 ? "due" : active.total_due < 0 ? "adv" : "inverse"],
-              ["Pending cheques", inrShort(active.pending_cheques), "inverse"],
+              ["Agreement", active.agreement_value, "inverse"],
+              ["Paid", active.paid, "inverse"],
+              [active.total_due < 0 ? "Advance" : "Due now", Math.abs(active.total_due), active.total_due > 0 ? "due" : active.total_due < 0 ? "adv" : "inverse"],
+              ["Pending cheques", active.pending_cheques, "inverse"],
             ].map(([l, v, tone]) => (
               <View key={l} style={s.sumCell}>
                 <T v="label" tone="inverseMuted">
                   {l}
                 </T>
-                <T v="moneyLg" style={tone === "due" ? s.due : tone === "adv" ? s.adv : s.inv} testID={`payments-summary-${l.toLowerCase().replace(/\s+/g, "-")}`}>
-                  {v}
-                </T>
+                <Money big v={v as number} style={tone === "due" ? s.due : tone === "adv" ? s.adv : s.inv} testID={`payments-summary-${String(l).toLowerCase().replace(/\s+/g, "-")}`} />
               </View>
             ))}
           </Card>

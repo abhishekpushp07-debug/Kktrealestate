@@ -34,14 +34,14 @@ export default function CustomerDetail() {
     <div data-testid="customer-detail">
       <PageHeader title={`${c.salutation || ""} ${c.full_name}`} subtitle={`${c.customer_code} · ${c.phone}${c.email ? ` · ${c.email}` : ""}`} crumbs={[{ label: "Customers", to: "/customers" }, { label: c.customer_code }]}
         actions={<div className="flex gap-2"><Pill tone={KYC_TONE[c.kyc_status]}>{`KYC ${c.kyc_status}`}</Pill>{user?.role_name === "Super Admin" && c.kyc_status !== "Erased" && !c.bookings.some((b) => b.status === "Active") && <Button variant="outline" className="text-red-700" onClick={erase} data-testid="erase-customer-btn"><UserX className="mr-1 h-4 w-4" />Erase PII</Button>}{can("customer.write") && <Button variant="outline" onClick={() => setEdit(true)} data-testid="customer-edit-btn"><Pencil className="mr-1 h-4 w-4" />Edit</Button>}</div>} />
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <StatCard label="Bookings" value={c.bookings.length} hint={c.bookings.filter((b) => b.status === "Active").length + " active"} />
         <StatCard label="Agreement value" value={inr(c.bookings.reduce((s, b) => s + (b.agreement_value_paise || 0) / 100, 0))} accent="gold" />
         <StatCard label="Paid" value={inr(c.bookings.reduce((s, b) => s + ((b.summary?.paid_paise || 0) / 100), 0))} accent="emerald" />
         <StatCard label="Due" value={inr(c.bookings.reduce((s, b) => s + Math.max((b.summary?.due_paise || 0) / 100, 0), 0))} accent="amber" />
       </div>
       <Tabs defaultValue="profile" className="mt-6">
-        <TabsList className="flex-wrap bg-white" data-testid="customer-tabs">{["profile", "kyc", "bookings", "payments", "documents", "leads", "history"].map((t) => <TabsTrigger key={t} value={t} className="capitalize data-[state=active]:bg-navy data-[state=active]:text-white" data-testid={`customer-tab-${t}`}>{t}</TabsTrigger>)}</TabsList>
+        <TabsList className="tabs-scroll h-auto justify-start bg-white" data-testid="customer-tabs">{["profile", "kyc", "bookings", "payments", "documents", "leads", "history"].map((t) => <TabsTrigger key={t} value={t} className="capitalize data-[state=active]:bg-navy data-[state=active]:text-white" data-testid={`customer-tab-${t}`}>{t}</TabsTrigger>)}</TabsList>
         <TabsContent value="profile" className="mt-4 grid gap-4 lg:grid-cols-3">
           <div className="lg:col-span-3"><PortalAccessCard customerId={id} /></div>
           <div className="card-elev p-5"><h3 className="mb-3 text-base font-bold text-navy">Personal</h3><KV label="Father / spouse" value={c.father_or_spouse_name} /><KV label="DOB" value={fmtDate(c.dob)} /><KV label="Gender" value={c.gender} /><KV label="Occupation" value={c.occupation} /><KV label="Company" value={c.company_name} /><KV label="Income band" value={c.annual_income_band} /><KV label="Source" value={c.source} /></div>

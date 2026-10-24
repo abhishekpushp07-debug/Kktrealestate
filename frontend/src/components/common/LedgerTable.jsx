@@ -29,9 +29,9 @@ export function LedgerTable({ rows = [], bookingId, bookingNumber }) {
         </div>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full text-xs">
-          <thead className="bg-surface text-[10px] uppercase tracking-wide text-slate-500">
-            <tr>{["#", "Date", "Type", "Constr. %", "Category", "Amount", "Cash paid (cum)", "Account paid (cum)", "Cash order raised", "Account order raised", "Cash due", "Account due", "Total due", "Ref"].map((h, i) => <th key={h} className={`px-2 py-2 ${i >= 5 && i <= 12 ? "text-right" : "text-left"}`}>{h}</th>)}</tr>
+        <table className="w-full min-w-[1100px] text-[13px]">
+          <thead className="bg-surface label-xs">
+            <tr>{["#", "Date", "Type", "Construction %", "Category", "Amount", "Cash paid (cum)", "Account paid (cum)", "Cash order raised", "Account order raised", "Cash due", "Account due", "Total due", "Ref"].map((h, i) => <th key={h} className={`px-2 py-2 ${i >= 5 && i <= 12 ? "text-right" : "text-left"}`}>{h}</th>)}</tr>
           </thead>
           <tbody>
             {rows.map((r) => <tr key={r.seq} className={`border-t ${r.type === "REVERSAL" ? "bg-red-50/40" : r.type === "DEMAND" ? "bg-slate-50/60" : ""}`} data-testid={`ledger-row-${r.seq}`}>

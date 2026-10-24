@@ -65,9 +65,9 @@ function TopBar({ onMenu }) {
         <span className="text-slate-300">/</span>
         <span className="text-sm font-semibold text-slate-600" data-testid="topbar-company-name">{company?.name}</span>
       </div>
-      <button onClick={() => window.dispatchEvent(new Event("kkt:open-palette"))} className="relative ml-auto hidden w-full max-w-sm md:block" data-testid="global-search">
-        <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-        <div className="h-9 w-full rounded-md border border-slate-200 bg-slate-50 pl-9 pr-3 text-left text-sm leading-9 text-slate-400 hover:border-gold">Search projects, flats, users…<kbd className="float-right mt-2 rounded border bg-white px-1.5 text-[10px] leading-4 text-slate-500">⌘K</kbd></div>
+      <button onClick={() => window.dispatchEvent(new Event("kkt:open-palette"))} className="relative ml-auto hidden w-full max-w-md md:block" data-testid="global-search">
+        <Search className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
+        <div className="flex h-10 w-full items-center rounded-full border border-slate-200 bg-ivory pl-9 pr-2 text-left text-sm text-slate-600 transition-colors hover:border-gold"><span className="min-w-0 flex-1 truncate">Search projects, flats, customers…</span><kbd className="ml-2 shrink-0 rounded-full border border-slate-300 bg-white px-2 py-0.5 font-sans text-[10px] font-semibold leading-4 text-slate-600">⌘K</kbd></div>
       </button>
       <div className="ml-auto md:ml-2"><NotificationBell /></div>
       <DropdownMenu>

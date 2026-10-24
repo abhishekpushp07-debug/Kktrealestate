@@ -8,7 +8,7 @@ module.exports = {
       fontFamily: { sans: ["Manrope", "ui-sans-serif", "system-ui", "sans-serif"], mono: ["JetBrains Mono", "ui-monospace", "monospace"] },
       borderRadius: { lg: 'var(--radius)', md: 'calc(var(--radius) - 2px)', sm: 'calc(var(--radius) - 4px)' },
       colors: {
-        navy: { DEFAULT: '#0B1F3A', 800: '#10294D', 700: '#163866', 600: '#1C4882', 50: '#F0F4FA' },
+        navy: { DEFAULT: '#0B1F3A', 950: '#07152B', 800: '#10294D', 700: '#163866', 600: '#1C4882', 50: '#F0F4FA' },
         gold: { DEFAULT: '#C9A227', hover: '#B38F1F', light: '#FFF9E6', border: '#E2C35D' },
         surface: '#F5F7FB',
         background: 'hsl(var(--background))',

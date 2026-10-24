@@ -9,16 +9,16 @@ export type ColorScheme = "light" | "dark";
 
 const light = {
   // Surfaces
-  surface: "#F8F6F1", // ivory canvas
+  surface: "#F7F5EF", // ivory canvas
   onSurface: "#0B1F3A", // navy text
   surfaceSecondary: "#FFFFFF", // cards
   onSurfaceSecondary: "#0B1F3A",
   surfaceTertiary: "#F1EEE6", // inputs, chips, soft fills
-  onSurfaceTertiary: "#4A5568",
+  onSurfaceTertiary: "#3E4C63", // secondary text (AA on ivory/white)
   surfaceInverse: "#0B1F3A", // navy hero cards, toasts
   onSurfaceInverse: "#FFFFFF",
-  muted: "#6B7280",
-  mutedInverse: "#B8C2D3", // secondary text on navy
+  muted: "#5B6880", // minimum muted text (AA on ivory/white)
+  mutedInverse: "#C9D2E0", // secondary text on navy
   dueOnInverse: "#FDBA8C", // warm red that reads on navy
   advanceOnInverse: "#86EFAC", // green that reads on navy
 
@@ -32,16 +32,20 @@ const light = {
   brandTertiary: "#FBF4DF", // pale gold chip
   onBrandTertiary: "#7A5F0E",
   gold: "#C9A227",
+  goldDeep: "#9A7A12", // gold text on light surfaces (AA)
+  goldGradStart: "#D8B64A",
+  goldGradEnd: "#B8911C",
   navy700: "#163866",
+  navy50: "#E9EDF3", // icon tiles
 
   // Status
-  success: "#15803D",
+  success: "#13703A",
   onSuccess: "#FFFFFF",
   successSoft: "#E8F5EC",
   warning: "#B45309",
   onWarning: "#FFFFFF",
   warningSoft: "#FDF1E2",
-  error: "#C2410C", // warm red for dues
+  error: "#B4380A", // warm red for dues
   onError: "#FFFFFF",
   errorSoft: "#FDECE4",
   info: "#1D4ED8",
@@ -49,9 +53,9 @@ const light = {
   infoSoft: "#E8EEFC",
 
   // Lines
-  border: "rgba(11,31,58,0.08)",
-  borderStrong: "rgba(11,31,58,0.22)",
-  divider: "rgba(11,31,58,0.07)",
+  border: "#E8E4DA", // hairline
+  borderStrong: "#C9C3B4",
+  divider: "#EEEAE1",
   overlay: "rgba(11,31,58,0.96)",
   skeleton: "#ECE8DE",
 };
@@ -74,8 +78,10 @@ export const fonts = {
 
 export const radius = { sm: 10, md: 14, lg: 18, xl: 22, pill: 999 };
 
+export const BREAKPOINT = { table: 768, sidebar: 1024 };
+
 export const shadow = Platform.select({
-  web: { boxShadow: "0 6px 24px rgba(11,31,58,0.07)" } as object,
+  web: { boxShadow: "0 1px 2px rgba(11,31,58,0.04), 0 8px 24px rgba(11,31,58,0.06)" } as object,
   default: {
     shadowColor: "#0B1F3A",
     shadowOpacity: 0.07,

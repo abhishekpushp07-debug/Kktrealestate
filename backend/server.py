@@ -97,6 +97,11 @@ async def lifespan(app: FastAPI):
     logging.getLogger("kkt.integrity").info("[phase7] integrity: ok=%s bookings=%s counts=%s", _ir["ok"], _ir["bookings_checked"], _ir["counts"])
     asyncio.create_task(_overdue_loop())
     asyncio.create_task(_dues_loop())
+    from services.thumbs import prewarm_variants
+    async def _prewarm():
+        r = await prewarm_variants(db)
+        logging.getLogger("kkt.media").info("[media] variants prewarmed: %s", r)
+    asyncio.create_task(_prewarm())
     if not await db.settings.find_one({"key": "counters_v1"}):
         await recompute_all()
         await db.settings.update_one({"key": "counters_v1"}, {"$set": {"value": True}}, upsert=True)

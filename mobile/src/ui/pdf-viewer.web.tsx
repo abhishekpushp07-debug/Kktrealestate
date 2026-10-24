@@ -215,7 +215,8 @@ const anchor = (bg: string, fg: string, border?: string): React.CSSProperties =>
   cursor: "pointer",
 });
 
-export function PdfViewerHost() {
+// `inline`: desktop shell — render over the content column (sidebar stays visible).
+export function PdfViewerHost({ inline }: { inline?: boolean }) {
   const [req, setReq] = useState<ViewerRequest | null>(null);
   useEffect(() => {
     listener = (r) => setReq({ ...r });
@@ -223,6 +224,12 @@ export function PdfViewerHost() {
       listener = null;
     };
   }, []);
+  if (inline)
+    return req ? (
+      <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 500 }}>
+        <Viewer req={req} onClose={() => setReq(null)} />
+      </View>
+    ) : null;
   return (
     <Modal visible={!!req} animationType="fade" onRequestClose={() => setReq(null)} transparent={false}>
       {req ? <Viewer req={req} onClose={() => setReq(null)} /> : null}

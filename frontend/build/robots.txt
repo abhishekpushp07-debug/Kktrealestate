@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+Disallow: /erp/
+Sitemap: /api/public/sitemap.xml

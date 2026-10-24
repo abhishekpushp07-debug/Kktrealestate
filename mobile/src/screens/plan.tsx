@@ -39,7 +39,7 @@ export function PaymentPlanCard({ plan, next, testID = "payment-plan-card", show
     <Card testID={testID}>
       <View style={s.head}>
         <View style={s.icon}>
-          <Feather name="calendar" size={17} color={colors.gold} />
+          <Feather name="calendar" size={20} color={colors.onSurface} />
         </View>
         <View style={{ flex: 1 }}>
           <T v="label" tone="muted">
@@ -104,7 +104,7 @@ export function PaymentPlanCard({ plan, next, testID = "payment-plan-card", show
 
 const useStyles = makeStyles((c) => ({
   head: { flexDirection: "row", alignItems: "center", gap: 12 },
-  icon: { width: 38, height: 38, borderRadius: 12, backgroundColor: c.surfaceInverse, alignItems: "center", justifyContent: "center" },
+  icon: { width: 36, height: 36, borderRadius: 10, backgroundColor: c.navy50, alignItems: "center", justifyContent: "center" },
   next: { marginTop: 14, backgroundColor: c.surface, borderRadius: radius.md, padding: 14 },
   nextHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   cols: { flexDirection: "row", gap: 8, marginTop: 10 },

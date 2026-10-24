@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import api, { errMsg } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/common/DateInput";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Field } from "@/components/common/Bits";
 
@@ -46,7 +47,7 @@ export function PaymentPlanForm({ item, open, onOpenChange, onSaved }) {
                 <select className="h-9 rounded-md border px-2 text-xs" value={ins.trigger_type} onChange={(e) => setI(i, "trigger_type", e.target.value)} data-testid={`pp-row-${i}-trigger`}>{TRIGGERS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
                 {ins.trigger_type === "DAYS_AFTER_BOOKING" ? <Input className="h-9" type="number" min="0" placeholder="days" value={ins.trigger_days} onChange={(e) => setI(i, "trigger_days", e.target.value)} required data-testid={`pp-row-${i}-days`} />
                   : ins.trigger_type === "ON_STAGE" ? <select className="h-9 rounded-md border px-2 text-xs" value={ins.trigger_stage_id} onChange={(e) => setI(i, "trigger_stage_id", e.target.value)} required data-testid={`pp-row-${i}-stage`}><option value="">Select stage…</option>{stages.filter((s) => !s.is_possession).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
-                  : ins.trigger_type === "ON_DATE" ? <Input className="h-9" type="date" value={ins.trigger_date} onChange={(e) => setI(i, "trigger_date", e.target.value)} required data-testid={`pp-row-${i}-date`} />
+                  : ins.trigger_type === "ON_DATE" ? <DateInput className="h-9" value={ins.trigger_date} onChange={(e) => setI(i, "trigger_date", e.target.value)} required data-testid={`pp-row-${i}-date`} />
                   : <span className="text-xs text-slate-400">{ins.trigger_type === "ON_POSSESSION" ? "Possession stage" : "At booking"}</span>}
                 <Input className="h-9" type="number" min="0" placeholder="due d" title="Days to pay after trigger (blank = company default)" value={ins.due_days} onChange={(e) => setI(i, "due_days", e.target.value)} data-testid={`pp-row-${i}-due`} />
                 <button type="button" onClick={() => setForm((f) => ({ ...f, installments: f.installments.filter((_, idx) => idx !== i) }))} className="grid h-8 w-8 place-items-center text-slate-400 hover:text-red-600" data-testid={`pp-row-${i}-del`}><Trash2 className="h-4 w-4" /></button>

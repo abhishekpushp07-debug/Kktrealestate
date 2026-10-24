@@ -65,6 +65,11 @@ async def overdue_demand_job():
         await db.demands.update_one({"id": d["id"]}, {"$set": {"overdue_notified": True}})
 
 
+@router.get("/unread-count")
+async def unread_count(user: dict = Depends(require("project.read"))):
+    return {"unread": await db.notifications.count_documents({"user_id": user["id"], "read": False, "withdrawn": {"$ne": True}})}
+
+
 @router.get("")
 async def list_notifications(unread_only: bool = False, limit: int = 30, user: dict = Depends(require("project.read"))):
     q = {"user_id": user["id"], "withdrawn": {"$ne": True}}

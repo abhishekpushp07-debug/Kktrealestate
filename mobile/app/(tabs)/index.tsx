@@ -53,7 +53,7 @@ export default function Home() {
     <Screen tabbed testID="home-screen" refreshKeys={[["p-bookings"], ["p-notices"], ["p-requests"], ["p-booking"], ["p-notif-count"]]}>
       <View style={s.header}>
         <View style={{ flex: 1 }}>
-          <T tone="muted">{greeting()},</T>
+          <T tone="secondary">{greeting()},</T>
           <T v="display" testID="home-greeting">
             {firstName(me?.customer?.full_name) || "Welcome"}
           </T>
@@ -82,10 +82,10 @@ export default function Home() {
                   <T v="label" tone="gold">
                     {unread} new notice{unread > 1 ? "s" : ""}
                   </T>
-                  <T v="bodyStrong" numberOfLines={1}>
+                  <T v="bodyStrong" numberOfLines={2}>
                     {firstUnread.title}
                   </T>
-                  <T v="small" tone="muted" numberOfLines={1}>
+                  <T v="small" tone="secondary" numberOfLines={2}>
                     {stripMarkdown(firstUnread.body)}
                   </T>
                 </View>

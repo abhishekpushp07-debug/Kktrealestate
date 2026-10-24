@@ -1,11 +1,14 @@
 import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
-import AppShell from "@/components/layout/AppShell";
+import AppShellLoading from "@/components/layout/AppShellLoading";
 import Login from "@/pages/Login";
-import { ReceiptPrint, DemandLetterPrint } from "@/pages/PrintViews";
 import { EmptyState } from "@/components/common/Bits";
 import { ShieldAlert } from "lucide-react";
+
+const AppShell = lazy(() => import("@/components/layout/AppShell"));
+const ReceiptPrint = lazy(() => import("@/pages/PrintViews").then((m) => ({ default: m.ReceiptPrint })));
+const DemandLetterPrint = lazy(() => import("@/pages/PrintViews").then((m) => ({ default: m.DemandLetterPrint })));
 
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const Projects = lazy(() => import("@/pages/Projects"));
@@ -34,9 +37,9 @@ const ServiceRequests = lazy(() => import("@/pages/ServiceRequests"));
 function Protected() {
   const { user, loading } = useAuth();
   const loc = useLocation();
-  if (loading) return <div className="flex min-h-screen items-center justify-center bg-navy"><div className="h-10 w-10 animate-spin rounded-full border-4 border-gold border-t-transparent" /></div>;
+  if (loading) return <AppShellLoading />;
   if (!user) return <Navigate to="/login" replace state={{ from: loc.pathname }} />;
-  return <AppShell />;
+  return <Suspense fallback={<AppShellLoading />}><AppShell /></Suspense>;
 }
 
 function Guard({ perm, children }) {

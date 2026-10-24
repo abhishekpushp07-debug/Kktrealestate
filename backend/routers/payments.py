@@ -85,10 +85,23 @@ async def _check_cap(booking: dict, p: dict):
             raise ApiError(409, f"{line['name']}: total {inr(line['total_paise'])}; already received {inr(paid)}; cannot accept {inr(p['amount_paise'])}.", "CHARGE_EXCEEDS_TOTAL")
 
 
+async def _payment_totals(q: dict) -> dict:
+    agg = await db.payments.aggregate([{"$match": q}, {"$group": {"_id": "$status", "n": {"$sum": 1}, "s": {"$sum": "$amount_paise"}}}]).to_list(None)
+    return present_money({a["_id"]: {"count": a["n"], "amount_paise": a["s"]} for a in agg})
+
+
+@router.get("/summary")
+async def payments_summary(params: ListParams = Depends(), project_id: str | None = None, block_id: str | None = None, booking_id: str | None = None, customer_id: str | None = None,
+                           status: str | None = None, payment_category: str | None = None, payment_mode_id: str | None = None, date_from: Date | None = None, date_to: Date | None = None,
+                           user: dict = Depends(require("payment.read"))):
+    """Filter-wide totals by status (same filters as the list) for the totals footer."""
+    return await list_payments(params, project_id, block_id, booking_id, customer_id, status, payment_category, payment_mode_id, date_from, date_to, user, summary_only=True)
+
+
 @router.get("")
 async def list_payments(params: ListParams = Depends(), project_id: str | None = None, block_id: str | None = None, booking_id: str | None = None, customer_id: str | None = None,
                         status: str | None = None, payment_category: str | None = None, payment_mode_id: str | None = None, date_from: Date | None = None, date_to: Date | None = None,
-                        user: dict = Depends(require("payment.read"))):
+                        user: dict = Depends(require("payment.read")), summary_only: bool = False):
     q = {"company_id": user["company_id"], **project_scope_filter(user), **search_filter(params.search, ["receipt_number", "customer_name", "booking_number", "flat_number", "instrument.number"])}
     for k, v in (("project_id", project_id), ("block_id", block_id), ("booking_id", booking_id), ("customer_id", customer_id), ("payment_category", payment_category), ("payment_mode_id", payment_mode_id)):
         if v:
@@ -97,9 +110,10 @@ async def list_payments(params: ListParams = Depends(), project_id: str | None =
         q["status"] = {"$in": status.split(",")}
     if date_from or date_to:
         q["payment_date"] = {**({"$gte": date_from.isoformat()} if date_from else {}), **({"$lte": date_to.isoformat()} if date_to else {})}
+    if summary_only:
+        return await _payment_totals(q)
     res = await paginate(db.payments, q, params, params.sort_spec(["payment_date", "receipt_number", "amount_paise", "status", "created_at"], "-payment_date"))
-    agg = await db.payments.aggregate([{"$match": q}, {"$group": {"_id": "$status", "n": {"$sum": 1}, "s": {"$sum": "$amount_paise"}}}]).to_list(None)
-    res["totals"] = present_money({a["_id"]: {"count": a["n"], "amount_paise": a["s"]} for a in agg})
+    res["totals"] = await _payment_totals(q)
     res["items"] = present_money(res["items"])
     if res.pop("_csv", False):
         return Response(to_csv([{**i, "instrument_number": (i.get("instrument") or {}).get("number")} for i in res["items"]], ["receipt_number", "payment_date", "customer_name", "booking_number", "flat_number", "against", "payment_category", "payment_mode_name", "instrument_number", "amount", "status"]), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=payments.csv"})

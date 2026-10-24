@@ -5,6 +5,7 @@ import api, { errMsg } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/common/DateInput";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { fmtDate, inr } from "@/lib/format";
 import { ConstructionPhotos } from "@/components/common/ConstructionPhotos";
@@ -43,7 +44,7 @@ export function ConstructionStatusPanel({ blockId, onChanged }) {
         <ol className="mt-5 space-y-2" data-testid="cs-timeline">
           {data.stages.map((s) => <li key={s.stage_id} className={`flex flex-wrap items-center gap-3 rounded-lg border px-3 py-2 ${s.status === "Completed" ? "border-emerald-200 bg-emerald-50/50" : s.status === "In Progress" ? "border-gold-border bg-gold-light" : "bg-white"}`} data-testid={`cs-stage-${s.seq}`}>
             <span className={`grid h-7 w-7 place-items-center rounded-full text-xs font-bold ${s.status === "Completed" ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-600"}`}>{s.status === "Completed" ? <Check className="h-4 w-4" /> : s.seq}</span>
-            <div className="min-w-0 flex-1"><p className="text-sm font-semibold text-navy">{s.name}{s.is_possession && <span className="ml-2 rounded-full bg-gold-light px-2 py-0.5 text-[10px] font-bold text-[#8a6d12]">Possession</span>}</p><p className="text-xs text-slate-500">{s.status}{s.completed_on ? ` · ${fmtDate(s.completed_on)}` : ""}{s.completed_by_name ? ` · ${s.completed_by_name}` : ""}</p></div>
+            <div className="min-w-0 flex-1"><p className="text-sm font-semibold text-navy">{s.name}{s.is_possession && <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-[#6B4E00]">Possession</span>}</p><p className="text-xs text-slate-500">{s.status}{s.completed_on ? ` · ${fmtDate(s.completed_on)}` : ""}{s.completed_by_name ? ` · ${s.completed_by_name}` : ""}</p></div>
             {s.demands?.count > 0 && <span className="text-xs text-slate-600" data-testid={`cs-stage-${s.seq}-demands`}>{s.demands.count} demand(s) · {inr(s.demands.total)} · paid {inr(s.demands.paid)}</span>}
           </li>)}
         </ol>
@@ -59,7 +60,7 @@ export function ConstructionStatusPanel({ blockId, onChanged }) {
       </DialogContent></Dialog>
       <Dialog open={!!confirm} onOpenChange={(o) => !o && setConfirm(null)}><DialogContent data-testid="cs-confirm-dialog"><DialogHeader><DialogTitle>Complete up to “{confirm?.target.name}”</DialogTitle></DialogHeader>
         {confirm && <div className="space-y-3"><p className="text-sm text-slate-600">The following {confirm.rows.length} stage(s) will be marked Completed and linked installments raised for all active bookings:</p>
-          {confirm.rows.map((r, i) => <div key={r.stage_id} className="flex items-center gap-3 text-sm"><span className="w-40 font-semibold text-navy">{r.seq}. {r.name}</span><Input type="date" className="h-9 w-44" value={r.date} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setConfirm((c) => ({ ...c, rows: c.rows.map((x, idx) => (idx === i ? { ...x, date: e.target.value } : x)) }))} data-testid={`cs-confirm-date-${r.seq}`} /></div>)}
+          {confirm.rows.map((r, i) => <div key={r.stage_id} className="flex items-center gap-3 text-sm"><span className="w-40 font-semibold text-navy">{r.seq}. {r.name}</span><DateInput className="h-9 w-44" value={r.date} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setConfirm((c) => ({ ...c, rows: c.rows.map((x, idx) => (idx === i ? { ...x, date: e.target.value } : x)) }))} data-testid={`cs-confirm-date-${r.seq}`} /></div>)}
           <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setConfirm(null)}>Cancel</Button><Button className="bg-navy hover:bg-navy-700" disabled={busy} onClick={apply} data-testid="cs-confirm-btn">{busy ? "Updating…" : "Confirm"}</Button></div></div>}
       </DialogContent></Dialog>
     </div>

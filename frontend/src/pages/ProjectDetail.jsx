@@ -57,7 +57,7 @@ export default function ProjectDetail() {
         <StatCard label="Inventory value" value={inrShort(inv.inventory_value)} accent="gold" testId="project-stat-value" />
       </div>
       <Tabs defaultValue="overview">
-        <TabsList className="flex-wrap bg-white" data-testid="project-tabs">
+        <TabsList className="tabs-scroll h-auto justify-start bg-white" data-testid="project-tabs">
           {["overview", "blocks", "construction", "payment-plans", "inventory", "pricing", "parking", "amenities", "documents", "website", "history", "settings"].map((t) => <TabsTrigger key={t} value={t} className="capitalize data-[state=active]:bg-navy data-[state=active]:text-white" data-testid={`project-tab-${t}`}>{t.replace("-", " ")}</TabsTrigger>)}
         </TabsList>
         <TabsContent value="pricing" className="mt-4"><RateCardsTab projectId={p.id} onApplied={reload} /></TabsContent>

@@ -54,7 +54,7 @@ export default function ConstructionScreen() {
         <>
           <BookingSwitcher items={items} active={active} select={select} />
           <Card testID="construction-progress-card">
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 8 }}>
               <View>
                 <T v="small" tone="muted">
                   Overall progress · {data.block_name}

@@ -6,6 +6,6 @@ export const pdfViewer = {
   open: (_req: ViewerRequest) => {},
 };
 
-export function PdfViewerHost() {
+export function PdfViewerHost(_props: { inline?: boolean }) {
   return null;
 }

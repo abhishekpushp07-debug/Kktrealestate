@@ -5,6 +5,7 @@ import { useMasterOptions } from "@/hooks/useList";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/common/DateInput";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Field } from "./Bits";
 import { Combobox } from "./Combobox";
@@ -31,7 +32,7 @@ export function PaymentDialog({ open, onOpenChange, booking, onPosted }) {
         amount: Number(f.amount), payment_date: f.payment_date, payment_mode_id: f.payment_mode_id, bank_account_id: isCash ? null : f.bank_account_id, remarks: f.remarks || null,
         instrument: isCash ? null : { number: f.number || null, date: f.inst_date || null, bank_name: f.bank_name || null } };
       const r = await api.post("/payments", body);
-      toast.success(`Receipt ${r.data.receipt_number} ${r.data.status === "Pending" ? "recorded (cheque in hand)" : "posted"}`);
+      toast.success(`Receipt ${r.data.receipt_number} ${r.data.status === "Pending" ? "recorded (cheque in hand)" : "posted"}`, { action: { label: "Print receipt", onClick: () => window.open(`${process.env.REACT_APP_BASE_PATH || ""}/print/receipt/${r.data.id}`, "_blank") } });
       onPosted?.(r.data); onOpenChange(false);
     } catch (err) { toast.error(errMsg(err), { duration: 8000 }); } finally { setBusy(false); }
   };
@@ -49,13 +50,13 @@ export function PaymentDialog({ open, onOpenChange, booking, onPosted }) {
           {headroom != null && <p className="text-xs text-slate-500" data-testid="pay-headroom">{f.payment_category} bucket: agreed {inr(f.payment_category === "Cash" ? booking.cash_agreed : booking.account_agreed)} · received {inr(f.payment_category === "Cash" ? s.cash_paid : s.account_paid)} · can accept up to <b className="text-navy">{inr(headroom)}</b></p>}
           <div className="grid grid-cols-2 gap-3">
             <Field label="Amount (₹)" required><Input type="number" min="1" step="0.01" value={f.amount} onChange={(e) => set("amount", e.target.value)} required data-testid="pay-amount" /></Field>
-            <Field label="Payment date" required><Input type="date" value={f.payment_date} max={today} min={booking?.booking_date} onChange={(e) => set("payment_date", e.target.value)} required data-testid="pay-date" /></Field>
+            <Field label="Payment date" required><DateInput value={f.payment_date} max={today} min={booking?.booking_date} onChange={(e) => set("payment_date", e.target.value)} required data-testid="pay-date" /></Field>
           </div>
           <Field label="Mode" required><Combobox options={modes} value={f.payment_mode_id} onChange={(v) => set("payment_mode_id", v)} placeholder="Select mode" testId="pay-mode" /></Field>
           {!isCash && f.payment_mode_id && <>
             <div className="grid grid-cols-3 gap-3">
               <Field label={mode?.requires_reference ? "Instrument / UTR no." : "Reference"} required={mode?.requires_reference}><Input value={f.number} onChange={(e) => set("number", e.target.value)} data-testid="pay-instrument" /></Field>
-              <Field label="Instrument date"><Input type="date" value={f.inst_date} onChange={(e) => set("inst_date", e.target.value)} /></Field>
+              <Field label="Instrument date"><DateInput value={f.inst_date} onChange={(e) => set("inst_date", e.target.value)} /></Field>
               <Field label="Drawn on bank"><Input value={f.bank_name} onChange={(e) => set("bank_name", e.target.value)} /></Field>
             </div>
             <Field label="Credited to company account" required><Combobox options={banks} value={f.bank_account_id} onChange={(v) => set("bank_account_id", v)} placeholder="Select bank account" testId="pay-bank" /></Field>

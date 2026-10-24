@@ -9,6 +9,7 @@ import { inr, inrShort, fmtDate } from "@/lib/format";
 import { PageHeader } from "@/components/common/Bits";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/common/DateInput";
 
 const COLORS = ["#0B1F3A", "#C9A227", "#10B981", "#F59E0B", "#94A3B8", "#EF4444"];
 const FILTERS = {
@@ -56,8 +57,8 @@ export default function Reports() {
         <aside className="card-elev h-fit p-2" data-testid="report-list">{Object.entries(groups).map(([g, items]) => <div key={g} className="mb-2"><p className="px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">{g}</p>{items.map((r) => <button key={r.key} onClick={() => nav(`/reports/${r.key}`)} className={`block w-full rounded-md px-2 py-1.5 text-left text-sm ${r.key === key ? "bg-navy font-semibold text-white" : "text-navy hover:bg-slate-100"}`} data-testid={`report-${r.key}`}>{r.name}</button>)}</div>)}</aside>
         <section className="min-w-0 space-y-4">
           <div className="card-elev flex flex-wrap items-end gap-2 p-3" data-testid="report-filters">
-            {FILTERS[key]?.includes("from_date") && <label className="text-xs text-slate-500">From<Input type="date" value={f.from_date || ""} onChange={set("from_date")} className="h-9" data-testid="rf-from" /></label>}
-            {FILTERS[key]?.includes("to_date") && <label className="text-xs text-slate-500">To<Input type="date" value={f.to_date || ""} onChange={set("to_date")} className="h-9" data-testid="rf-to" /></label>}
+            {FILTERS[key]?.includes("from_date") && <label className="text-xs text-slate-500">From<DateInput value={f.from_date || ""} onChange={set("from_date")} className="h-9" data-testid="rf-from" /></label>}
+            {FILTERS[key]?.includes("to_date") && <label className="text-xs text-slate-500">To<DateInput value={f.to_date || ""} onChange={set("to_date")} className="h-9" data-testid="rf-to" /></label>}
             {FILTERS[key]?.includes("project_id") && <select className={sel} value={f.project_id || ""} onChange={set("project_id")} data-testid="rf-project"><option value="">All projects</option>{(projects?.items || []).map((p) => <option key={p.id} value={p.id}>{p.code}</option>)}</select>}
             {FILTERS[key]?.includes("mode") && <select className={sel} value={f.mode || ""} onChange={set("mode")} data-testid="rf-mode"><option value="">All modes</option>{["CASH", "UPI", "NEFT_RTGS", "CHEQUE", "DD", "LOAN_DISBURSEMENT"].map((m) => <option key={m}>{m}</option>)}</select>}
             {FILTERS[key]?.includes("category") && <select className={sel} value={f.category || ""} onChange={set("category")} data-testid="rf-category"><option value="">All buckets</option>{["Cash", "Account", "Other charges"].map((m) => <option key={m}>{m}</option>)}</select>}

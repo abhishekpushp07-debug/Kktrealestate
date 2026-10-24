@@ -52,7 +52,7 @@ class ListParams:
     def __init__(
         self,
         page: int = Query(1, ge=1),
-        page_size: int = Query(20, ge=1, le=1000),
+        page_size: int = Query(20, ge=1, le=200),
         search: str | None = Query(None, max_length=100),
         sort: str = Query("name"),
         include_inactive: bool = Query(False),

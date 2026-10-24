@@ -10,6 +10,7 @@ import { PageHeader, Field } from "@/components/common/Bits";
 import { Pill } from "@/components/common/StatusChip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/common/DateInput";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -47,12 +48,12 @@ export function CustomerForm({ open, onOpenChange, item, onSaved }) {
       <SheetContent className="w-full overflow-y-auto sm:max-w-2xl" data-testid="customer-form">
         <SheetHeader><SheetTitle>{item ? "Edit customer" : "New customer"}</SheetTitle><SheetDescription>KYC fields are encrypted at rest; leave PAN/Aadhaar blank to keep existing values.</SheetDescription></SheetHeader>
         <form onSubmit={submit} className="mt-4 space-y-4">
-          <div className="grid grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
             <Field label="Title" className="col-span-1"><Select value={f.salutation} onValueChange={(v) => set("salutation", v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{["Mr", "Mrs", "Ms", "Dr", "M/s"].map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></Field>
             <Field label="Full name" required className="col-span-3"><Input value={f.full_name} onChange={(e) => set("full_name", e.target.value)} required data-testid="cust-name" /></Field>
             <Field label="Gender" className="col-span-2"><Select value={f.gender} onValueChange={(v) => set("gender", v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{["Male", "Female", "Other"].map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></Field>
             <Field label="Father / spouse name" className="col-span-3"><Input value={f.father_or_spouse_name} onChange={(e) => set("father_or_spouse_name", e.target.value)} /></Field>
-            <Field label="Date of birth" className="col-span-3"><Input type="date" value={f.dob || ""} onChange={(e) => set("dob", e.target.value)} /></Field>
+            <Field label="Date of birth" className="col-span-3"><DateInput value={f.dob || ""} onChange={(e) => set("dob", e.target.value)} /></Field>
             <Field label="Mobile" required className="col-span-2"><Input value={f.phone} onChange={(e) => set("phone", e.target.value)} placeholder="10-digit" required data-testid="cust-phone" /></Field>
             <Field label="Alt. phone" className="col-span-2"><Input value={f.alt_phone} onChange={(e) => set("alt_phone", e.target.value)} /></Field>
             <Field label="Email" className="col-span-2"><Input type="email" value={f.email} onChange={(e) => set("email", e.target.value)} data-testid="cust-email" /></Field>
@@ -65,7 +66,7 @@ export function CustomerForm({ open, onOpenChange, item, onSaved }) {
           </div>
           <div className="rounded-lg border bg-surface/60 p-3">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Current address</p>
-            <div className="grid grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
               <Field label="Line 1" className="col-span-6"><Input value={f.address_current.line1 || ""} onChange={(e) => setN("address_current", "line1", e.target.value)} /></Field>
               <Field label="City" className="col-span-2"><Input value={f.address_current.city || ""} onChange={(e) => setN("address_current", "city", e.target.value)} /></Field>
               <Field label="State" className="col-span-2"><Input value={f.address_current.state || ""} onChange={(e) => setN("address_current", "state", e.target.value)} /></Field>
@@ -81,11 +82,11 @@ export function CustomerForm({ open, onOpenChange, item, onSaved }) {
             <div className="rounded-lg border p-3"><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Nominee</p>
               <Field label="Name"><Input value={f.nominee.name || ""} onChange={(e) => setN("nominee", "name", e.target.value)} /></Field>
               <Field label="Relation"><Input value={f.nominee.relation || ""} onChange={(e) => setN("nominee", "relation", e.target.value)} /></Field>
-              <Field label="DOB"><Input type="date" value={f.nominee.dob || ""} onChange={(e) => setN("nominee", "dob", e.target.value)} /></Field></div>
+              <Field label="DOB"><DateInput value={f.nominee.dob || ""} onChange={(e) => setN("nominee", "dob", e.target.value)} /></Field></div>
           </div>
           <div className="rounded-lg border p-3">
             <div className="mb-2 flex items-center justify-between"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Co-applicants</p><Button type="button" size="sm" variant="outline" onClick={() => set("co_applicants", [...f.co_applicants, { name: "", relation: "", phone: "", pan: "", aadhaar: "" }])} data-testid="cust-add-coapplicant"><Plus className="mr-1 h-3.5 w-3.5" />Add</Button></div>
-            {f.co_applicants.map((c, i) => <div key={i} className="mb-2 grid grid-cols-5 gap-2">{["name", "relation", "phone", "pan", "aadhaar"].map((k) => <Input key={k} placeholder={k} value={c[k]} onChange={(e) => set("co_applicants", f.co_applicants.map((x, j) => j === i ? { ...x, [k]: e.target.value } : x))} />)}</div>)}
+            {f.co_applicants.map((c, i) => <div key={i} className="mb-2 grid grid-cols-2 gap-2 md:grid-cols-5">{["name", "relation", "phone", "pan", "aadhaar"].map((k) => <Input key={k} placeholder={k} value={c[k]} onChange={(e) => set("co_applicants", f.co_applicants.map((x, j) => j === i ? { ...x, [k]: e.target.value } : x))} />)}</div>)}
           </div>
           <Field label="Notes"><Textarea value={f.notes || ""} onChange={(e) => set("notes", e.target.value)} rows={2} /></Field>
           <Button type="submit" disabled={busy} className="w-full bg-navy hover:bg-navy-700" data-testid="cust-submit">{busy ? "Saving…" : item ? "Save changes" : "Create customer"}</Button>

@@ -1,9 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import api, { setLogoutHandler, tokens } from "@/lib/api";
 
 const AuthCtx = createContext(null);
 
 export function AuthProvider({ children }) {
+  const qc = useQueryClient();
   const [user, setUser] = useState(null);
   const [company, setCompany] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -17,8 +19,8 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     setLogoutHandler(() => { tokens.clear(); setUser(null); });
     if (!tokens.access) { setLoading(false); return; }
-    Promise.all([api.get("/auth/me"), api.get("/settings/company")])
-      .then(([u, c]) => { setUser(u.data); setCompany(c.data); })
+    Promise.all([qc.fetchQuery({ queryKey: ["fetch", "/auth/me"], queryFn: () => api.get("/auth/me").then((r) => r.data), staleTime: 5 * 60_000 }), qc.fetchQuery({ queryKey: ["fetch", "/settings/company"], queryFn: () => api.get("/settings/company").then((r) => r.data), staleTime: 10 * 60_000 })])
+      .then(([u, c]) => { setUser(u); setCompany(c); })
       .catch(() => tokens.clear())
       .finally(() => setLoading(false));
   }, []);
@@ -29,6 +31,7 @@ export function AuthProvider({ children }) {
     tokens.set(data.access_token, data.refresh_token);
     setUser(data.user);
     const c = await api.get("/settings/company");
+    qc.setQueryData(["fetch", "/settings/company"], c.data);
     setCompany(c.data);
     return data;
   }, []);
@@ -38,6 +41,7 @@ export function AuthProvider({ children }) {
     tokens.set(data.access_token, data.refresh_token);
     setUser(data.user);
     const c = await api.get("/settings/company");
+    qc.setQueryData(["fetch", "/settings/company"], c.data);
     setCompany(c.data);
     return data;
   }, []);

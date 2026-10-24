@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { fmtDate, fmtDateTime, num } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/common/DateInput";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Pill } from "@/components/common/StatusChip";
@@ -32,7 +33,7 @@ function RateCardForm({ projectId, onClose, onSaved }) {
       <SheetContent className="w-full overflow-y-auto sm:max-w-xl" data-testid="rate-card-form">
         <SheetHeader><SheetTitle>New rate card</SheetTitle></SheetHeader>
         <div className="mt-6 space-y-4">
-          <div className="grid grid-cols-2 gap-3"><Field label="Name" required><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} data-testid="rc-name-input" /></Field><Field label="Effective from"><Input type="date" value={form.effective_from} onChange={(e) => setForm({ ...form, effective_from: e.target.value })} /></Field></div>
+          <div className="grid grid-cols-2 gap-3"><Field label="Name" required><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} data-testid="rc-name-input" /></Field><Field label="Effective from"><DateInput value={form.effective_from} onChange={(e) => setForm({ ...form, effective_from: e.target.value })} /></Field></div>
           <div className="rounded-lg border p-3"><p className="mb-2 text-sm font-bold text-navy">Rates per flat type</p>
             {flatTypes.map((f) => { const r = form.rates[f.id] || { mode: "rate", value: "" }; return (
               <div key={f.id} className="mb-2 grid grid-cols-[1fr_110px_120px] items-center gap-2"><span className="text-sm">{f.name}</span>

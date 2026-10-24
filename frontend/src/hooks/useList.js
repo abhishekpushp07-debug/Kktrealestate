@@ -3,8 +3,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api, { errMsg } from "@/lib/api";
 import { toast } from "sonner";
 
-export function useList(path, extra = {}, { pageSize = 20, sort = "name" } = {}) {
+export function useList(path, extra = {}, { pageSize: ps0 = 20, sort = "name" } = {}) {
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSizeRaw] = useState(ps0);
+  const setPageSize = (n) => { setPageSizeRaw(n); setPage(1); };
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
   const [sortKey, setSortKey] = useState(sort);
@@ -18,7 +20,7 @@ export function useList(path, extra = {}, { pageSize = 20, sort = "name" } = {})
   const qc = useQueryClient();
   const reload = useCallback(() => qc.invalidateQueries({ queryKey: ["list", path] }), [qc, path]);
   const data = q.data || { items: [], total: 0 };
-  return { ...data, loading: q.isPending || q.isFetching, page, setPage, pageSize, search, setSearch, sort: sortKey, setSort: setSortKey, reload };
+  return { ...data, loading: q.isPending || q.isFetching, page, setPage, pageSize, setPageSize, search, setSearch, sort: sortKey, setSort: setSortKey, reload };
 }
 
 export function useFetch(path, deps = []) {
