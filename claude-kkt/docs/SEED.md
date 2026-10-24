@@ -42,7 +42,7 @@ Every seeded customer has portal access enabled with password `Welcome@123` (alr
 ### SGH — Shree Ganesh Heights (Residential, Under Construction, Bailey Road, Patna; RERA BRERAP00123-1/23)
 * Tower A (TOWER, 8 floors × FP-4 = 32 flats, numbering `{block}-{floor}{pos2}`): stages completed through **3rd Slab** (7 of 14).
 * Tower B (8 floors × FP-4 = 32 flats): completed through **Foundation** (2 of 14).
-* Tower C (15 floors, skip 13, refuge floor 7, floors 1–5 FP-4, 6–15 FP-4-PREMIUM, numbering `{block}-{floor}{pos2}`): 14 unit floors × 4 = **56 flats**; completed through **Excavation**.
+* Tower C (15 floors, skip 13, refuge floor 7, floors 1–5 FP-4, 6–15 FP-4-PREMIUM, numbering `{block}-{floor}{pos2}`): 13 unit floors (1–15 minus skip 13 and refuge 7) × 4 = **52 flats**; completed through **Excavation**.
 * Rate card SGH-2025 ACTIVE: 2BHK-A ₹5,200/sq ft, 2BHK-B ₹5,400, 3BHK-A ₹5,600, 3BHK-B ₹5,800; PLCs Floor Rise, Corner, Top Floor.
 * Parking: 60 slots (COVERED B1-01…B1-40 ₹3,00,000; OPEN S-01…S-20 ₹1,50,000).
 * Website: published, slug `shree-ganesh-heights`, prices shown, availability shown, progress shown, 4 hero images, 6 highlights, 1 YouTube video, 1 360° tour, map embed, brochure PDF, 6 FAQs.

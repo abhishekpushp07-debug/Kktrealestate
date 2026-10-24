@@ -1,7 +1,7 @@
 // A. Identity & platform
 import { sql } from "drizzle-orm";
-import { boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
-import { appendOnly, citext, idColumn, mutable, paise, softDelete } from "./_common.js";
+import { bigint, boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { appendOnly, citext, idColumn, mutable, softDelete } from "./_common.js";
 import { actorTypeEnum, jobRunStatusEnum, userTypeEnum } from "./enums.js";
 import type { Address, CompanySettings, JsonObject, Letterhead, Numbering } from "./json.js";
 
@@ -196,7 +196,7 @@ export const sequences = pgTable(
       .references(() => companies.id),
     scope: text("scope").notNull(),
     fy: text("fy").notNull(),
-    value: paise("value").notNull().default(0),
+    value: bigint("value", { mode: "number" }).notNull().default(0),
   },
   (t) => [primaryKey({ name: "sequences_pk", columns: [t.companyId, t.scope, t.fy] })],
 );
