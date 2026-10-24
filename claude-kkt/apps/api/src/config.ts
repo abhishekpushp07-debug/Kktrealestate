@@ -31,6 +31,12 @@ const EnvSchema = z.object({
   LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).default("info"),
   LOG_PRETTY: z.string().default("false").transform((v) => v === "true" || v === "1"),
   TRUST_PROXY: z.string().default("true").transform((v) => v === "true" || v === "1"),
+  /** Per-IP request limit for public (unauthenticated) routes, per minute. */
+  PUBLIC_RATE_LIMIT_PER_MIN: z.coerce.number().int().min(1).default(300),
+  /** Per-user limit for staff/portal write requests (POST/PATCH/PUT/DELETE), per minute. */
+  WRITE_RATE_LIMIT_PER_MIN: z.coerce.number().int().min(1).default(120),
+  /** Version string reported by /health and /metrics. */
+  APP_VERSION: z.string().default("2.0.0"),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

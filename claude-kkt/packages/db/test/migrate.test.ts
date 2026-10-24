@@ -1,10 +1,20 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createDb, type DbHandle } from "../src/client.js";
-import { runMigrations } from "../src/migrate.js";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import postgres from "postgres";
+import { createDb, createDbCluster, type DbHandle } from "../src/client.js";
+import { listSqlFiles, MIGRATIONS_FOLDER, runMigrations, SQL_FOLDER } from "../src/migrate.js";
 import { resetDatabase, resetRefusalReason } from "../src/reset.js";
 import { TEST_DATABASE_URL } from "./env.js";
 
 const EXPECTED_TABLE_COUNT = 77;
+
+/** Replaces the database name in a postgres URL. */
+function withDatabase(url: string, name: string): string {
+  const u = new URL(url);
+  u.pathname = `/${name}`;
+  return u.toString();
+}
 
 describe("migrations", () => {
   let handle: DbHandle;
@@ -25,11 +35,57 @@ describe("migrations", () => {
     expect(rows[0]?.n).toBe(EXPECTED_TABLE_COUNT);
   });
 
+  it("migrates a brand-new, empty database (create → migrate → verify → drop)", async () => {
+    const name = `kkt_review_${Date.now().toString(36)}`;
+    const admin = postgres(withDatabase(TEST_DATABASE_URL, "postgres"), { max: 1, onnotice: () => undefined });
+    try {
+      await admin.unsafe(`CREATE DATABASE ${name}`);
+      const url = withDatabase(TEST_DATABASE_URL, name);
+      await runMigrations(url);
+      const fresh = postgres(url, { max: 1, onnotice: () => undefined });
+      try {
+        const [tables] = await fresh<{ n: number }[]>`
+          SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'`;
+        expect(tables?.n).toBe(EXPECTED_TABLE_COUNT);
+        const [ext] = await fresh<{ n: number }[]>`SELECT count(*)::int AS n FROM pg_extension WHERE extname = 'citext'`;
+        expect(ext?.n).toBe(1);
+        const [triggers] = await fresh<{ names: string[] }[]>`
+          SELECT array_agg(tgname ORDER BY tgname) AS names FROM pg_trigger
+          WHERE NOT tgisinternal AND tgname IN ('audit_logs_immutable', 'audit_logs_no_truncate', 'payments_no_delete', 'demands_no_delete')`;
+        expect(triggers?.names).toEqual(["audit_logs_immutable", "audit_logs_no_truncate", "demands_no_delete", "payments_no_delete"]);
+        const [journal] = await fresh<{ n: number }[]>`SELECT count(*)::int AS n FROM drizzle.__drizzle_migrations`;
+        expect(journal?.n).toBe(1);
+      } finally {
+        await fresh.end({ timeout: 5 });
+      }
+    } finally {
+      await admin.unsafe(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
+      await admin.end({ timeout: 5 });
+    }
+  });
+
   it("is idempotent when run again", async () => {
     await runMigrations(TEST_DATABASE_URL);
     await runMigrations(TEST_DATABASE_URL);
     const rows = await handle.sql<{ n: number }[]>`SELECT count(*)::int AS n FROM drizzle.__drizzle_migrations`;
     expect(rows[0]?.n).toBe(1);
+    const triggers = await handle.sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM pg_trigger WHERE NOT tgisinternal AND tgname LIKE 'audit_logs_%'`;
+    expect(triggers[0]?.n).toBe(2);
+  });
+
+  it("the committed journal has one entry and its SQL matches the snapshot folder", async () => {
+    const journal = JSON.parse(await readFile(join(MIGRATIONS_FOLDER, "meta", "_journal.json"), "utf8")) as { entries: { tag: string }[] };
+    expect(journal.entries.map((e) => e.tag)).toEqual(["0000_initial"]);
+    const initial = await readFile(join(MIGRATIONS_FOLDER, "0000_initial.sql"), "utf8");
+    expect((initial.match(/^CREATE TABLE /gm) ?? []).length).toBe(EXPECTED_TABLE_COUNT);
+    // The generated SQL itself must carry the partial unique indexes (not only the hand-written file).
+    for (const name of ["demands_booking_seq_nonvoid_uq", "bookings_one_active_per_flat_uq", "rate_cards_one_active_uq", "bank_accounts_one_default_uq", "construction_stages_one_possession_uq"]) {
+      expect(initial).toMatch(new RegExp(`CREATE UNIQUE INDEX "${name}" ON .* WHERE `));
+    }
+    expect(initial).toContain('UNIQUE NULLS NOT DISTINCT("plan_id","project_id","block_id")');
+    const files = await listSqlFiles(SQL_FOLDER);
+    expect(files.map((f) => f.split("/").pop())).toEqual(["0001_triggers.sql"]);
   });
 
   it("creates the partial unique indexes with the required WHERE clauses", async () => {
@@ -41,6 +97,7 @@ describe("migrations", () => {
     expect(defs.get("rate_cards_one_active_uq")).toMatch(/UNIQUE INDEX .* \(project_id\) WHERE \(status = 'ACTIVE'::rate_card_status\)/);
     expect(defs.get("bank_accounts_one_default_uq")).toMatch(/UNIQUE INDEX .* \(company_id\) WHERE is_default/);
     expect(defs.get("construction_stages_one_possession_uq")).toMatch(/UNIQUE INDEX .* \(company_id\) WHERE is_possession/);
+    expect(rows).toHaveLength(5);
   });
 
   it("creates the NULLS NOT DISTINCT constraint on payment_plan_assignments", async () => {
@@ -50,11 +107,19 @@ describe("migrations", () => {
     expect(rows[0]?.def).toBe("UNIQUE NULLS NOT DISTINCT (plan_id, project_id, block_id)");
   });
 
-  it("installs the audit trigger and an updated_at trigger on every table with updated_at", async () => {
-    const audit = await handle.sql<{ n: number }[]>`
-      SELECT count(*)::int AS n FROM pg_trigger WHERE tgname = 'audit_logs_immutable' AND NOT tgisinternal`;
-    expect(audit[0]?.n).toBe(1);
+  it("installs the audit triggers (UPDATE/DELETE row-level, TRUNCATE statement-level)", async () => {
+    const rows = await handle.sql<{ tgname: string; tgtype: number }[]>`
+      SELECT tgname, tgtype::int AS tgtype FROM pg_trigger
+      WHERE tgrelid = 'audit_logs'::regclass AND NOT tgisinternal ORDER BY tgname`;
+    expect(rows.map((r) => r.tgname)).toEqual(["audit_logs_immutable", "audit_logs_no_truncate"]);
+    // tgtype bits: 1 = ROW, 2 = BEFORE, 8 = DELETE, 16 = UPDATE, 32 = TRUNCATE
+    const byName = new Map(rows.map((r) => [r.tgname, r.tgtype]));
+    expect((byName.get("audit_logs_immutable") ?? 0) & (1 | 2 | 8 | 16)).toBe(1 | 2 | 8 | 16);
+    expect((byName.get("audit_logs_no_truncate") ?? 0) & (2 | 32)).toBe(2 | 32);
+    expect((byName.get("audit_logs_no_truncate") ?? 0) & 1).toBe(0);
+  });
 
+  it("installs an updated_at trigger on every table with updated_at and on no other table", async () => {
     const missing = await handle.sql<{ table_name: string }[]>`
       SELECT c.table_name FROM information_schema.columns c
       WHERE c.table_schema = 'public' AND c.column_name = 'updated_at'
@@ -62,6 +127,11 @@ describe("migrations", () => {
           SELECT 1 FROM pg_trigger t JOIN pg_class r ON r.oid = t.tgrelid
           WHERE r.relname = c.table_name AND t.tgname = 'set_updated_at')`;
     expect(missing.map((m) => m.table_name)).toEqual([]);
+    const extra = await handle.sql<{ relname: string }[]>`
+      SELECT r.relname FROM pg_trigger t JOIN pg_class r ON r.oid = t.tgrelid
+      WHERE t.tgname = 'set_updated_at'
+        AND NOT EXISTS (SELECT 1 FROM information_schema.columns c WHERE c.table_name = r.relname AND c.column_name = 'updated_at')`;
+    expect(extra.map((e) => e.relname)).toEqual([]);
   });
 
   it("set_updated_at bumps updated_at on UPDATE", async () => {
@@ -75,10 +145,45 @@ describe("migrations", () => {
     expect(new Date(after.updated_at).getTime()).toBeGreaterThan(new Date(company.updated_at).getTime());
   });
 
-  it("reset refuses without confirmation or in production", async () => {
+  it("reset refuses without confirmation or in production, and the refusal happens before any connection", async () => {
     expect(resetRefusalReason({ nodeEnv: "production", confirm: "yes" })).toMatch(/production/);
     expect(resetRefusalReason({ nodeEnv: "test", confirm: undefined })).toMatch(/CONFIRM_RESET/);
+    expect(resetRefusalReason({ nodeEnv: "test", confirm: "YES" })).toMatch(/CONFIRM_RESET/);
+    expect(resetRefusalReason({ nodeEnv: undefined, confirm: "yes" })).toBeNull();
     expect(resetRefusalReason({ nodeEnv: "test", confirm: "yes" })).toBeNull();
     await expect(resetDatabase(TEST_DATABASE_URL, { nodeEnv: "production", confirm: "yes" })).rejects.toThrow(/production/);
+    // An unreachable URL proves the guard runs first: no connection is attempted when refused.
+    await expect(resetDatabase("postgres://nobody:x@127.0.0.1:1/nope", { nodeEnv: "test", confirm: undefined })).rejects.toThrow(/CONFIRM_RESET/);
+    const rows = await handle.sql<{ n: number }[]>`SELECT count(*)::int AS n FROM companies`;
+    expect(rows[0]?.n).toBeGreaterThan(0);
+  });
+
+  it("createDbCluster falls back to the primary when no replica URL is configured", async () => {
+    const cluster = createDbCluster(TEST_DATABASE_URL, undefined, { max: 1 });
+    try {
+      expect(cluster.hasReplica).toBe(false);
+      expect(cluster.replica).toBe(cluster.primary);
+      const rows = await cluster.replica.sql<{ one: number }[]>`SELECT 1 AS one`;
+      expect(rows[0]?.one).toBe(1);
+    } finally {
+      await cluster.close();
+    }
+    const same = createDbCluster(TEST_DATABASE_URL, TEST_DATABASE_URL, { max: 1 });
+    expect(same.hasReplica).toBe(false);
+    await same.close();
+  });
+
+  it("createDbCluster opens a separate pool when a replica URL is given", async () => {
+    // The maintenance database stands in for a replica: a different URL, read-only use.
+    const cluster = createDbCluster(TEST_DATABASE_URL, withDatabase(TEST_DATABASE_URL, "postgres"), { max: 1 });
+    try {
+      expect(cluster.hasReplica).toBe(true);
+      expect(cluster.replica).not.toBe(cluster.primary);
+      const [a] = await cluster.primary.sql<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
+      const [b] = await cluster.replica.sql<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
+      expect(a?.pid).not.toBe(b?.pid);
+    } finally {
+      await cluster.close();
+    }
   });
 });

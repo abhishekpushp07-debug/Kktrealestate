@@ -1,9 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { sql } from "drizzle-orm";
 import { createDb, nextSequence, withAdvisoryLock, type DbHandle } from "../src/client.js";
-import { companies } from "../src/schema/index.js";
+import { companies, sequences } from "../src/schema/index.js";
 import { TEST_DATABASE_URL } from "./env.js";
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+const CONCURRENCY = 50;
 
 describe("sequences and advisory locks", () => {
   let handle: DbHandle;
@@ -11,7 +14,7 @@ describe("sequences and advisory locks", () => {
 
   beforeAll(async () => {
     // One connection per concurrent caller so the 50 calls really race.
-    handle = createDb(TEST_DATABASE_URL, { max: 50 });
+    handle = createDb(TEST_DATABASE_URL, { max: CONCURRENCY });
     const [company] = await handle.db.insert(companies).values({ name: "Sequence Co" }).returning({ id: companies.id });
     if (!company) throw new Error("company insert failed");
     companyId = company.id;
@@ -21,27 +24,60 @@ describe("sequences and advisory locks", () => {
     await handle.close();
   });
 
-  it("nextSequence is atomic under 50 concurrent transactions (no duplicates, contiguous)", async () => {
-    const calls = Array.from({ length: 50 }, () =>
+  it(`nextSequence is atomic under ${CONCURRENCY} concurrent transactions on separate connections (no duplicates, contiguous)`, async () => {
+    const calls = Array.from({ length: CONCURRENCY }, () =>
       handle.db.transaction(async (tx) => {
+        const pidRows = await tx.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`);
         const value = await nextSequence(tx, companyId, "receipt", "2526");
         await sleep(5); // hold the row lock a little so transactions overlap
-        return value;
+        return { value, pid: Number(pidRows[0]?.pid) };
       }),
     );
-    const values = (await Promise.all(calls)).sort((a, b) => a - b);
-    expect(new Set(values).size).toBe(50);
-    expect(values).toEqual(Array.from({ length: 50 }, (_, i) => i + 1));
+    const results = await Promise.all(calls);
+    const values = results.map((r) => r.value).sort((a, b) => a - b);
+    expect(new Set(values).size).toBe(CONCURRENCY);
+    expect(values).toEqual(Array.from({ length: CONCURRENCY }, (_, i) => i + 1));
+    // The race is only real if the transactions ran on distinct backend connections.
+    const pids = new Set(results.map((r) => r.pid));
+    expect(pids.size).toBe(CONCURRENCY);
+
+    const [row] = await handle.db
+      .select({ value: sequences.value })
+      .from(sequences)
+      .where(sql`${sequences.companyId} = ${companyId} AND ${sequences.scope} = 'receipt' AND ${sequences.fy} = '2526'`);
+    expect(row?.value).toBe(CONCURRENCY);
   });
 
-  it("sequences per financial year and per scope are independent", async () => {
+  it("a rolled-back transaction does not consume a number permanently (the row lock serialises callers)", async () => {
+    const before = await handle.db.transaction((tx) => nextSequence(tx, companyId, "demand", "2526"));
+    expect(before).toBe(1);
+    await expect(
+      handle.db.transaction(async (tx) => {
+        await nextSequence(tx, companyId, "demand", "2526");
+        throw new Error("boom");
+      }),
+    ).rejects.toThrow("boom");
+    const after = await handle.db.transaction((tx) => nextSequence(tx, companyId, "demand", "2526"));
+    expect(after).toBe(2);
+  });
+
+  it("sequences per financial year, per scope and per company are independent", async () => {
     const a = await handle.db.transaction((tx) => nextSequence(tx, companyId, "receipt", "2627"));
     const b = await handle.db.transaction((tx) => nextSequence(tx, companyId, "receipt", "2627"));
     const c = await handle.db.transaction((tx) => nextSequence(tx, companyId, "booking", "2526"));
     const d = await handle.db.transaction((tx) => nextSequence(tx, companyId, "receipt", "2526"));
     expect([a, b]).toEqual([1, 2]);
     expect(c).toBe(1);
-    expect(d).toBe(51);
+    expect(d).toBe(CONCURRENCY + 1);
+
+    const [other] = await handle.db.insert(companies).values({ name: "Other Co" }).returning({ id: companies.id });
+    if (!other) throw new Error("company insert failed");
+    expect(await handle.db.transaction((tx) => nextSequence(tx, other.id, "receipt", "2526"))).toBe(1);
+  });
+
+  it("nextSequence also works outside an explicit transaction (single atomic statement)", async () => {
+    expect(await nextSequence(handle.db, companyId, "ticket", "2526")).toBe(1);
+    expect(await nextSequence(handle.db, companyId, "ticket", "2526")).toBe(2);
   });
 
   it("withAdvisoryLock serialises transactions on the same key", async () => {
@@ -76,5 +112,13 @@ describe("sequences and advisory locks", () => {
       ),
     );
     expect(Date.now() - started).toBeLessThan(250);
+  });
+
+  it("withAdvisoryLock is released at COMMIT (a later transaction acquires it immediately)", async () => {
+    const key = "release-check";
+    await handle.db.transaction((tx) => withAdvisoryLock(tx, key));
+    const started = Date.now();
+    await handle.db.transaction((tx) => withAdvisoryLock(tx, key));
+    expect(Date.now() - started).toBeLessThan(100);
   });
 });

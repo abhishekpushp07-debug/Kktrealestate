@@ -143,7 +143,7 @@ export const loginEvents = pgTable(
   (t) => [index("login_events_created_idx").on(t.createdAt.desc()), index("login_events_identifier_idx").on(t.identifier)],
 );
 
-/** Append-only: the `audit_logs_immutable` trigger (src/sql/0001_triggers.sql) raises on UPDATE/DELETE. */
+/** Append-only: `audit_logs_immutable` raises on UPDATE/DELETE and `audit_logs_no_truncate` on TRUNCATE (src/sql/0001_triggers.sql). */
 export const auditLogs = pgTable(
   "audit_logs",
   {

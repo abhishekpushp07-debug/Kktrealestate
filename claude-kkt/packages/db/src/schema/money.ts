@@ -23,6 +23,7 @@ const companyId = () =>
     .notNull()
     .references(() => companies.id);
 
+/** Never deleted: the `demands_no_delete` trigger raises on DELETE; demands are VOIDed with a reason. */
 export const demands = pgTable(
   "demands",
   {
@@ -69,6 +70,7 @@ export const demands = pgTable(
   ],
 );
 
+/** Never deleted: the `payments_no_delete` trigger raises on DELETE; payments are REVERSED with a reason. */
 export const payments = pgTable(
   "payments",
   {

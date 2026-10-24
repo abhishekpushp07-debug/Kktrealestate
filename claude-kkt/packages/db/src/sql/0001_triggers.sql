@@ -1,7 +1,9 @@
 -- Hand-written SQL applied by src/migrate.ts after the drizzle-kit migrations.
 -- Everything here is idempotent (CREATE OR REPLACE / IF NOT EXISTS / DROP IF EXISTS first).
 
--- 1. audit_logs is append-only: any UPDATE or DELETE raises.
+-- 1. audit_logs is append-only: any UPDATE, DELETE or TRUNCATE raises.
+--    UPDATE/DELETE are row-level triggers; TRUNCATE never fires row triggers, so it
+--    needs its own statement-level trigger or a plain TRUNCATE would wipe the log.
 CREATE OR REPLACE FUNCTION audit_logs_immutable_fn() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
@@ -15,7 +17,33 @@ CREATE TRIGGER audit_logs_immutable
   BEFORE UPDATE OR DELETE ON audit_logs
   FOR EACH ROW EXECUTE FUNCTION audit_logs_immutable_fn();
 
--- 2. updated_at maintenance: one trigger per table that has an updated_at column.
+DROP TRIGGER IF EXISTS audit_logs_no_truncate ON audit_logs;
+CREATE TRIGGER audit_logs_no_truncate
+  BEFORE TRUNCATE ON audit_logs
+  FOR EACH STATEMENT EXECUTE FUNCTION audit_logs_immutable_fn();
+
+-- 2. Financial source records are never deleted (SPEC §2): payments are REVERSED and
+--    demands are VOIDED with a reason. ledger_entries are deliberately not guarded because
+--    the admin "recompute" rebuilds a booking's ledger from these source records.
+CREATE OR REPLACE FUNCTION financial_row_no_delete_fn() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  RAISE EXCEPTION '% rows are never deleted: reverse or void them with a reason instead', TG_TABLE_NAME
+    USING ERRCODE = 'restrict_violation';
+END;
+$$;
+
+DROP TRIGGER IF EXISTS payments_no_delete ON payments;
+CREATE TRIGGER payments_no_delete
+  BEFORE DELETE ON payments
+  FOR EACH ROW EXECUTE FUNCTION financial_row_no_delete_fn();
+
+DROP TRIGGER IF EXISTS demands_no_delete ON demands;
+CREATE TRIGGER demands_no_delete
+  BEFORE DELETE ON demands
+  FOR EACH ROW EXECUTE FUNCTION financial_row_no_delete_fn();
+
+-- 3. updated_at maintenance: one trigger per table that has an updated_at column.
 CREATE OR REPLACE FUNCTION set_updated_at_fn() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
@@ -46,7 +74,7 @@ BEGIN
 END;
 $$;
 
--- 3. Partial unique indexes (database-enforced invariants, DATA-MODEL §H).
+-- 4. Partial unique indexes (database-enforced invariants, DATA-MODEL §H).
 --    drizzle-kit emits these in the generated migration; they are repeated here with
 --    IF NOT EXISTS so a database whose migration predates them is still covered.
 CREATE UNIQUE INDEX IF NOT EXISTS demands_booking_seq_nonvoid_uq

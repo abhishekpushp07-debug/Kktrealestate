@@ -1,42 +1,71 @@
 {
   "expo": {
-    "name": "portal",
-    "slug": "portal",
-    "version": "1.0.0",
+    "name": "KKT",
+    "slug": "kkt-portal",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "portal",
-    "userInterfaceStyle": "automatic",
+    "scheme": "kkt",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#0B1F3A",
+    "primaryColor": "#0B1F3A",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "bundleIdentifier": "com.kkt.portal",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "KKT uses the camera so you can attach photos to a service request.",
+        "NSPhotoLibraryUsageDescription": "KKT needs photo access so you can attach pictures to a service request.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
+      "package": "com.kkt.portal",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#0B1F3A",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": ["android.permission.CAMERA", "android.permission.READ_MEDIA_IMAGES"]
     },
     "web": {
-      "output": "server",
-      "favicon": "./assets/images/favicon.png"
+      "output": "static",
+      "favicon": "./assets/images/favicon.png",
+      "name": "KKT — My Home",
+      "shortName": "KKT",
+      "themeColor": "#0B1F3A",
+      "backgroundColor": "#F8F6F1",
+      "bundler": "metro"
     },
     "plugins": [
       "expo-router",
+      "expo-secure-store",
+      "expo-web-browser",
+      "expo-font",
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#0B1F3A",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "imageWidth": 140,
+          "resizeMode": "contain"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "KKT needs photo access so you can attach pictures to a service request.",
+          "cameraPermission": "KKT uses the camera so you can attach photos to a service request."
         }
       ]
     ],
     "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
+      "typedRoutes": false,
+      "reactCompiler": false
+    },
+    "extra": {
+      "eas": {}
     }
   }
 }

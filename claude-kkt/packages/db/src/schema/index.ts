@@ -15,7 +15,8 @@
  *   Percent = numeric(5,2), area = numeric(10,2) sq ft, both read as `number`.
  *   Business dates are `date` (YYYY-MM-DD strings); event times are `timestamptz`.
  * - Enum values are UPPER_SNAKE strings shared with the wire contract.
- * - Database-enforced invariants: audit_logs immutable (trigger), one ACTIVE booking per flat,
+ * - Database-enforced invariants: audit_logs immutable (UPDATE/DELETE row triggers + a TRUNCATE
+ *   statement trigger), payments and demands never deleted (reverse/void instead), one ACTIVE booking per flat,
  *   one non-VOID demand per (booking, installment_seq), one ACTIVE rate card per project, one
  *   default bank account and one possession stage per company (partial unique indexes),
  *   payments.amount_paise > 0, site_visits.visitors 1..6, service_requests.rating 1..5,

@@ -30,6 +30,15 @@ export interface DbHandle {
   close(): Promise<void>;
 }
 
+/** Primary + replica handles (ARCHITECTURE §6); `replica` is the primary when no replica URL is set. */
+export interface DbCluster {
+  primary: DbHandle;
+  replica: DbHandle;
+  /** True when `replica` is a separate pool on DATABASE_REPLICA_URL. */
+  hasReplica: boolean;
+  close(): Promise<void>;
+}
+
 /** Opens a postgres.js pool on `url` and wraps it in Drizzle; `close()` ends the pool. */
 export function createDb(url: string = process.env["DATABASE_URL"] ?? DEFAULT_DATABASE_URL, options: CreateDbOptions = {}): DbHandle {
   const client = postgres(url, {
@@ -45,6 +54,28 @@ export function createDb(url: string = process.env["DATABASE_URL"] ?? DEFAULT_DA
     db,
     sql: client,
     close: () => client.end({ timeout: 5 }),
+  };
+}
+
+/** Opens the primary pool and, when `replicaUrl` is set, a read-replica pool for reports and public reads. */
+export function createDbCluster(
+  primaryUrl: string = process.env["DATABASE_URL"] ?? DEFAULT_DATABASE_URL,
+  replicaUrl: string | undefined = process.env["DATABASE_REPLICA_URL"],
+  options: CreateDbOptions = {},
+): DbCluster {
+  const primary = createDb(primaryUrl, options);
+  const hasReplica = replicaUrl !== undefined && replicaUrl !== "" && replicaUrl !== primaryUrl;
+  const replica = hasReplica ? createDb(replicaUrl, options) : primary;
+  return {
+    primary,
+    replica,
+    hasReplica,
+    close: async () => {
+      await primary.close();
+      if (hasReplica) {
+        await replica.close();
+      }
+    },
   };
 }
 
