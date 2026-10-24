@@ -5,6 +5,12 @@ import Image from "next/image";
 import { useSiteConfig } from "@/components/SiteConfigProvider";
 import { PLACEHOLDER_GRADIENT, resolveMediaUrl } from "@/lib/media";
 
+/** Build-time list from next.config.ts (`env.NEXT_PUBLIC_IMAGE_ORIGINS`), inlined into both bundles. */
+const OPTIMIZER_ORIGINS: string[] = (process.env.NEXT_PUBLIC_IMAGE_ORIGINS ?? "")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+
 interface SmartImageProps {
   src: string | null | undefined;
   alt: string;
@@ -23,7 +29,8 @@ interface SmartImageProps {
 
 /**
  * next/image with media-URL resolution. API media is optimised through the Next.js image pipeline;
- * images on other origins are rendered unoptimised so an unexpected host can never throw at runtime.
+ * images on origins the optimizer does not know are rendered unoptimised so an unexpected host can
+ * never break the page at runtime.
  * A missing source renders a navy-gold gradient instead of a broken image.
  */
 export function SmartImage({
@@ -54,10 +61,11 @@ export function SmartImage({
     );
   }
 
-  let unoptimized = false;
+  // Only origins baked into images.remotePatterns at build time may go through /_next/image.
+  let unoptimized = true;
   try {
     const origin = new URL(resolved).origin;
-    unoptimized = origin !== new URL(apiUrl).origin;
+    unoptimized = !OPTIMIZER_ORIGINS.includes(origin);
   } catch {
     unoptimized = true;
   }

@@ -45,13 +45,25 @@ const securityHeaders = [
   { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
 ];
 
+const remotePatterns = remotePatternsFromEnv();
+
+/**
+ * Origins the optimizer will accept, inlined into the bundles so <SmartImage> can fall back to an
+ * unoptimised <img> (instead of a 400 from /_next/image) when the runtime API origin differs from the
+ * build-time one, e.g. a container rebuilt without build args.
+ */
+const imageOrigins = remotePatterns
+  .map((p) => `${p.protocol ?? "https"}://${p.hostname}${p.port ? `:${p.port}` : ""}`)
+  .join(",");
+
 const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
   reactStrictMode: true,
   transpilePackages: ["@kkt/contracts"],
+  env: { NEXT_PUBLIC_IMAGE_ORIGINS: imageOrigins },
   images: {
-    remotePatterns: remotePatternsFromEnv(),
+    remotePatterns,
     formats: ["image/avif", "image/webp"],
     deviceSizes: [390, 640, 768, 1024, 1280, 1536, 1920],
     minimumCacheTTL: 3600,

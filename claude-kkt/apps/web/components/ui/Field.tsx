@@ -1,4 +1,6 @@
-import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
+"use client";
+
+import { useId, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 
 const CONTROL =
   "block w-full min-h-12 rounded-xl border border-navy-900/15 bg-white px-4 text-[1rem] text-ink placeholder:text-ink-soft/70 shadow-[inset_0_1px_2px_rgb(11_31_58/0.04)] transition focus:border-gold-500 focus:outline-none focus:ring-2 focus:ring-gold-500/40 disabled:bg-ivory-200 aria-[invalid=true]:border-danger";
@@ -73,10 +75,11 @@ export function Checkbox({ id, label, error, ...rest }: InputHTMLAttributes<HTML
 
 /** Hidden honeypot. Bots fill it; humans never see it. Must be sent as an empty string. */
 export function Honeypot({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const id = useId();
   return (
     <div aria-hidden="true" className="absolute left-[-9999px] top-auto h-px w-px overflow-hidden">
-      <label htmlFor="website-field">Website</label>
-      <input id="website-field" name="website" type="text" tabIndex={-1} autoComplete="off" value={value} onChange={(e) => onChange(e.target.value)} />
+      <label htmlFor={id}>Website</label>
+      <input id={id} name="website" type="text" tabIndex={-1} autoComplete="off" value={value} onChange={(e) => onChange(e.target.value)} />
     </div>
   );
 }
