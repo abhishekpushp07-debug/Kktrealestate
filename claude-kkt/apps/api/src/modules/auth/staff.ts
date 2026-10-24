@@ -59,40 +59,39 @@ export async function staffAuthRoutes(app: FastifyInstance): Promise<void> {
     return { ...tokenPair(tokens), mfa_required: false as const, user: view, must_change_password: user.mustChangePassword };
   }
 
+  /** Commits failure bookkeeping (attempt counter, login_events, lockout audit) in its own transaction, then throws. */
+  async function failStaffLogin(req: FastifyRequest, user: UserRow, reason: string): Promise<never> {
+    const next = await app.db.transaction(async (tx) => {
+      const n = await applyStaffFailure(tx, user);
+      await recordLoginEvent(tx, { companyId: user.companyId, subjectType: "STAFF", identifier: user.email, success: false, reason: n.justLocked ? "LOCKED" : reason, req });
+      if (n.justLocked) await writeAudit(tx, { companyId: user.companyId, actor: { type: "SYSTEM", id: null, name: "lockout" }, action: "auth.locked", entityType: "user", entityId: user.id, after: { locked_until: n.lockedUntil, failed_attempts: n.failedAttempts }, ip: req.clientIp, requestId: req.id });
+      return n;
+    });
+    if (next.justLocked) throw ApiError.locked(`Account locked for ${PASSWORD_POLICY.lockout_minutes} minutes after ${PASSWORD_POLICY.lockout_attempts} failed attempts`, { locked_until: next.lockedUntil!.toISOString() });
+    throw new ApiError(401, "INVALID_CREDENTIALS", reason === "BAD_MFA" ? "Invalid authentication code" : "Invalid email or password", { attempts_left: PASSWORD_POLICY.lockout_attempts - next.failedAttempts });
+  }
+
   route(app, {
     method: "POST", url: "/auth/login", public: true, rateLimit: { limit: 10, windowSeconds: 60 },
     schema: { body: StaffLoginSchema, response: { 200: StaffLoginResponseSchema }, summary: "Staff login (email + password)" },
     handler: async (req) => {
       const { email, password, mfa_code } = req.body;
-      return app.db.transaction(async (tx) => {
-        const [user] = await tx.select().from(users).where(eq(users.email, email)).limit(1);
-        if (!user) {
-          await recordLoginEvent(tx, { companyId: null, subjectType: "STAFF", identifier: email, success: false, reason: "UNKNOWN_USER", req });
-          throw new ApiError(401, "INVALID_CREDENTIALS", "Invalid email or password");
-        }
-        assertNotLocked(user);
-        if (!(await verifyPassword(user.passwordHash, password))) {
-          const next = await applyStaffFailure(tx, user);
-          await recordLoginEvent(tx, { companyId: user.companyId, subjectType: "STAFF", identifier: email, success: false, reason: next.justLocked ? "LOCKED" : "BAD_PASSWORD", req });
-          if (next.justLocked) {
-            await writeAudit(tx, { companyId: user.companyId, actor: { type: "SYSTEM", id: null, name: "lockout" }, action: "auth.locked", entityType: "user", entityId: user.id, after: { locked_until: next.lockedUntil, failed_attempts: next.failedAttempts }, ip: req.clientIp, requestId: req.id });
-            throw ApiError.locked(`Account locked for ${PASSWORD_POLICY.lockout_minutes} minutes after ${PASSWORD_POLICY.lockout_attempts} failed attempts`, { locked_until: next.lockedUntil!.toISOString() });
-          }
-          throw new ApiError(401, "INVALID_CREDENTIALS", "Invalid email or password", { attempts_left: PASSWORD_POLICY.lockout_attempts - next.failedAttempts });
-        }
-        if (!user.isActive) {
-          await recordLoginEvent(tx, { companyId: user.companyId, subjectType: "STAFF", identifier: email, success: false, reason: "INACTIVE", req });
-          throw ApiError.unauthenticated("User is inactive", "USER_INACTIVE");
-        }
-        if (user.mfaEnabled) {
-          if (!mfa_code) return { mfa_required: true as const, mfa_token: signPayload({ uid: user.id, cid: user.companyId, ip: req.clientIp }, MFA_TOKEN_TTL_SECONDS) };
-          if (!checkTotp(user.mfaSecretEnc, mfa_code)) {
-            await recordLoginEvent(tx, { companyId: user.companyId, subjectType: "STAFF", identifier: email, success: false, reason: "BAD_MFA", req });
-            throw new ApiError(401, "INVALID_CREDENTIALS", "Invalid authentication code");
-          }
-        }
-        return completeLogin(tx, req, user, user.mfaEnabled);
-      });
+      const [user] = await app.db.select().from(users).where(eq(users.email, email)).limit(1);
+      if (!user) {
+        await recordLoginEvent(app.db, { companyId: null, subjectType: "STAFF", identifier: email, success: false, reason: "UNKNOWN_USER", req });
+        throw new ApiError(401, "INVALID_CREDENTIALS", "Invalid email or password");
+      }
+      assertNotLocked(user);
+      if (!(await verifyPassword(user.passwordHash, password))) return failStaffLogin(req, user, "BAD_PASSWORD");
+      if (!user.isActive) {
+        await recordLoginEvent(app.db, { companyId: user.companyId, subjectType: "STAFF", identifier: email, success: false, reason: "INACTIVE", req });
+        throw ApiError.unauthenticated("User is inactive", "USER_INACTIVE");
+      }
+      if (user.mfaEnabled) {
+        if (!mfa_code) return { mfa_required: true as const, mfa_token: signPayload({ uid: user.id, cid: user.companyId, ip: req.clientIp }, MFA_TOKEN_TTL_SECONDS) };
+        if (!checkTotp(user.mfaSecretEnc, mfa_code)) return failStaffLogin(req, user, "BAD_MFA");
+      }
+      return app.db.transaction((tx) => completeLogin(tx, req, user, user.mfaEnabled));
     },
   });
 
@@ -102,18 +101,11 @@ export async function staffAuthRoutes(app: FastifyInstance): Promise<void> {
     handler: async (req) => {
       const payload = verifyPayload<{ uid: string; cid: string }>(req.body.mfa_token);
       if (!payload) throw ApiError.unauthenticated("MFA token is invalid or expired", "INVALID_TOKEN");
-      return app.db.transaction(async (tx) => {
-        const [user] = await tx.select().from(users).where(eq(users.id, payload.uid)).limit(1);
-        if (!user || !user.isActive || !user.mfaEnabled) throw ApiError.unauthenticated("MFA token is invalid", "INVALID_TOKEN");
-        assertNotLocked(user);
-        if (!checkTotp(user.mfaSecretEnc, req.body.code)) {
-          const next = await applyStaffFailure(tx, user);
-          await recordLoginEvent(tx, { companyId: user.companyId, subjectType: "STAFF", identifier: user.email, success: false, reason: "BAD_MFA", req });
-          if (next.justLocked) throw ApiError.locked("Account locked after too many failed attempts", { locked_until: next.lockedUntil!.toISOString() });
-          throw new ApiError(401, "INVALID_CREDENTIALS", "Invalid authentication code");
-        }
-        return completeLogin(tx, req, user, true);
-      });
+      const [user] = await app.db.select().from(users).where(eq(users.id, payload.uid)).limit(1);
+      if (!user || !user.isActive || !user.mfaEnabled) throw ApiError.unauthenticated("MFA token is invalid", "INVALID_TOKEN");
+      assertNotLocked(user);
+      if (!checkTotp(user.mfaSecretEnc, req.body.code)) return failStaffLogin(req, user, "BAD_MFA");
+      return app.db.transaction((tx) => completeLogin(tx, req, user, true));
     },
   });
 

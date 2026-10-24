@@ -1,10 +1,10 @@
 // Money display helpers: signed amounts with due (red) / advance (green) colouring.
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, View, type StyleProp, type TextStyle } from "react-native";
 import { formatINR } from "@/lib/format";
 import { T, type TextVariant } from "./Text";
 import { colors, space } from "./theme";
 
-export function Money({ paise, variant = "money", color, signed, style }: { paise: number; variant?: TextVariant; color?: string; signed?: boolean; style?: object }): React.JSX.Element {
+export function Money({ paise, variant = "money", color, signed, style }: { paise: number; variant?: TextVariant; color?: string; signed?: boolean; style?: StyleProp<TextStyle> }): React.JSX.Element {
   return (
     <T variant={variant} color={color ?? colors.ink} style={style} selectable>
       {formatINR(paise, { signed })}

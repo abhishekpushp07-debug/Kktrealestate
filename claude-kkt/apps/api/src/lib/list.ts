@@ -1,5 +1,5 @@
 import { and, asc, count, desc, eq, gt, ilike, lt, or, type SQL } from "drizzle-orm";
-import type { AnyPgColumn, PgSelect, PgTable } from "drizzle-orm/pg-core";
+import type { AnyPgColumn, PgSelect, PgTable, SelectedFields } from "drizzle-orm/pg-core";
 import type { ListQuery } from "@kkt/contracts";
 import { parseSort } from "@kkt/contracts";
 import type { Executor } from "@kkt/db";
@@ -20,10 +20,10 @@ export interface ListResult<T> {
 /** Options for paginate(). */
 export interface PaginateOptions {
   table: ListableTable;
-  /** Drizzle selection object; omit to select the whole table row. */
-  select?: Record<string, AnyPgColumn | SQL | SQL.Aliased>;
+  /** Drizzle selection object (columns, sql expressions or whole tables); omit to select the whole table row. */
+  select?: Record<string, unknown>;
   /** Adds joins to the dynamic query builder (applied to both the page and the count query). */
-  join?: <Q extends PgSelect>(q: Q) => Q;
+  join?: (q: PgSelect) => PgSelect;
   where?: SQL | undefined;
   /** ILIKE search across the given columns (term is escaped for %, _ and \). */
   search?: { columns: readonly (AnyPgColumn | SQL)[]; term: string | undefined };
@@ -103,11 +103,11 @@ export async function paginate<T = Record<string, unknown>>(executor: Executor, 
     conditions.push(or(cmp(sort.column, v), and(eq(sort.column, v), cmp(idCol, c.id))));
   }
   const where = and(...conditions.filter((c): c is SQL => c !== undefined));
-  const base = (opts.select ? executor.select(opts.select) : executor.select()).from(opts.table).$dynamic();
-  let pageQuery = opts.join ? opts.join(base) : base;
+  const base: PgSelect = (opts.select ? executor.select(opts.select as SelectedFields) : executor.select()).from(opts.table).$dynamic();
+  let pageQuery: PgSelect = opts.join ? opts.join(base) : base;
   pageQuery = pageQuery.where(where).orderBy(dir(sort.column), dir(idCol)).limit(pageSize + (cursorMode ? 1 : 0));
   if (!cursorMode) pageQuery = pageQuery.offset((page - 1) * pageSize);
-  const countBase = executor.select({ total: count() }).from(opts.table).$dynamic();
+  const countBase: PgSelect = executor.select({ total: count() }).from(opts.table).$dynamic();
   const countQuery = (opts.join ? opts.join(countBase) : countBase).where(and(...[opts.where, searchCondition(opts.search?.columns ?? [], opts.search?.term)].filter((c): c is SQL => c !== undefined)));
   const [rows, totals] = await Promise.all([pageQuery, countQuery]);
   const items = rows as unknown as T[];
@@ -115,10 +115,30 @@ export async function paginate<T = Record<string, unknown>>(executor: Executor, 
   if (cursorMode && items.length > pageSize) {
     items.length = pageSize;
     const last = items[items.length - 1] as Record<string, unknown>;
-    const sortKey = Object.entries(opts.select ?? {}).find(([, c]) => c === sort.column)?.[0] ?? columnKey(opts.table, sort.column) ?? sort.field;
-    nextCursor = encodeCursor({ v: rawSortValue(last[sortKey]), id: String(last["id"]) });
+    nextCursor = encodeCursor({ v: rawSortValue(readSortValue(last, opts, sort.column, sort.field)), id: String(readId(last)) });
   }
-  return { items, total: Number(totals[0]?.total ?? 0), page, page_size: pageSize, next_cursor: nextCursor };
+  const totalRow = (totals as { total?: number | string }[])[0];
+  return { items, total: Number(totalRow?.total ?? 0), page, page_size: pageSize, next_cursor: nextCursor };
+}
+
+/** Reads the sort value back from the last row: a flat select key, a nested table selection, or the full-row property. */
+function readSortValue(last: Record<string, unknown>, opts: PaginateOptions, column: AnyPgColumn, field: string): unknown {
+  for (const [k, c] of Object.entries(opts.select ?? {})) {
+    if (c === column) return last[k];
+    if (c && typeof c === "object" && !("queryChunks" in (c as object))) {
+      const nestedKey = columnKey(c as PgTable, column);
+      if (nestedKey !== undefined) return (last[k] as Record<string, unknown> | undefined)?.[nestedKey];
+    }
+  }
+  const key = columnKey(opts.table, column) ?? field;
+  return last[key];
+}
+
+/** Reads the row id from a flat or nested selection. */
+function readId(last: Record<string, unknown>): unknown {
+  if (last["id"] !== undefined) return last["id"];
+  for (const v of Object.values(last)) if (v && typeof v === "object" && "id" in (v as object)) return (v as { id: unknown }).id;
+  return undefined;
 }
 
 /** Finds the TS property name of a column on a table (for reading the sort value back from a full-row select). */
@@ -127,7 +147,7 @@ function columnKey(table: PgTable, column: AnyPgColumn): string | undefined {
   return undefined;
 }
 
-/** Maps the common ListQuery fields onto paginate() options. */
-export function fromListQuery(q: ListQuery): Pick<PaginateOptions, "page" | "page_size" | "cursor" | "limit"> & { search: string | undefined; sort: string | undefined } {
-  return { page: q.page, page_size: q.page_size, cursor: q.cursor, limit: q.limit, search: q.search, sort: q.sort };
+/** Maps the common ListQuery pagination fields onto paginate() options (search/sort are passed explicitly by the caller). */
+export function fromListQuery(q: ListQuery): Pick<PaginateOptions, "page" | "page_size" | "cursor" | "limit"> {
+  return { page: q.page, page_size: q.page_size, cursor: q.cursor, limit: q.limit };
 }

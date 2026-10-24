@@ -44,7 +44,7 @@ export function renumber(installments: readonly InstallmentValues[]): Installmen
 
 /** Payment plan: header fields, installments repeater with live 100 % footer and a sample schedule. */
 export function PaymentPlanForm(_props: MasterFormProps) {
-  const { control, getValues, formState } = useFormContext<PaymentPlanValues>();
+  const { control, getValues, setValue, formState } = useFormContext<PaymentPlanValues>();
   const installments = useFieldArray({ control, name: "installments" });
   const stages = useMasterRows<ConstructionStageRow>("construction-stages", { sort: "sort_order" });
   const watched = useWatch({ control, name: "installments" }) ?? [];
@@ -57,6 +57,14 @@ export function PaymentPlanForm(_props: MasterFormProps) {
   const onBookingCount = watched.filter((item) => item.trigger_type === "ON_BOOKING").length;
   const onPossessionCount = watched.filter((item) => item.trigger_type === "ON_POSSESSION").length;
   const listError = formState.errors.installments?.root?.message ?? formState.errors.installments?.message;
+
+  /** Switching the trigger clears the details that no longer apply (days / stage / date). */
+  const changeTrigger = (index: number, next: TriggerType | null) => {
+    setValue(`installments.${index}.trigger_type`, next, { shouldDirty: true, shouldValidate: true });
+    if (next !== "DAYS_AFTER_BOOKING") setValue(`installments.${index}.trigger_days`, null);
+    if (next !== "ON_STAGE") setValue(`installments.${index}.trigger_stage_id`, null);
+    if (next !== "ON_DATE") setValue(`installments.${index}.trigger_date`, null);
+  };
 
   const move = (from: number, to: number) => {
     if (to < 0 || to >= installments.fields.length) return;
@@ -168,7 +176,7 @@ export function PaymentPlanForm(_props: MasterFormProps) {
                       <Select
                         id={field.id}
                         value={field.value}
-                        onValueChange={field.onChange}
+                        onValueChange={(value) => changeTrigger(index, value)}
                         options={TRIGGER_OPTIONS.map((option) => ({
                           ...option,
                           disabled: (option.value === "ON_BOOKING" && onBookingCount > 0 && triggerType !== "ON_BOOKING") || (option.value === "ON_POSSESSION" && onPossessionCount > 0 && triggerType !== "ON_POSSESSION"),

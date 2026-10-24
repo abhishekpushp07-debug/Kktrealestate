@@ -1,5 +1,5 @@
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
-import type { MasterCsvImportResponse, MasterKind, MasterRow } from "@kkt/contracts";
+import type { ActiveStateResponse, MasterCsvImportResponse, MasterKind, MasterRow } from "@kkt/contracts";
 import { api, type ApiClientError, type ListEnvelope } from "@/lib/api";
 import type { MasterSlug } from "./types";
 
@@ -51,10 +51,10 @@ export interface ActiveStateBody {
   version: number;
 }
 
-export function deactivateMaster(slug: MasterSlug, id: string, version: number): Promise<MasterRow> {
-  return api.post<MasterRow>(`${masterPath(slug)}/${id}/deactivate`, { version } satisfies ActiveStateBody, { version });
+export function deactivateMaster(slug: MasterSlug, id: string, version: number): Promise<ActiveStateResponse> {
+  return api.post<ActiveStateResponse>(`${masterPath(slug)}/${id}/deactivate`, { version } satisfies ActiveStateBody, { version });
 }
 
-export function activateMaster(slug: MasterSlug, id: string, version: number): Promise<MasterRow> {
-  return api.post<MasterRow>(`${masterPath(slug)}/${id}/activate`, { version } satisfies ActiveStateBody, { version });
+export function activateMaster(slug: MasterSlug, id: string, version: number): Promise<ActiveStateResponse> {
+  return api.post<ActiveStateResponse>(`${masterPath(slug)}/${id}/activate`, { version } satisfies ActiveStateBody, { version });
 }

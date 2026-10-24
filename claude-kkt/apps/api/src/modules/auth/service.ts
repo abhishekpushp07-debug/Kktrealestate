@@ -118,6 +118,7 @@ export async function familyOfSession(db: Executor, subjectType: UserType, subje
 /**
  * Rotates a refresh token: a revoked or already-replaced token means reuse → the whole family is revoked and audited (401 TOKEN_REUSED).
  * `loadSubject` lets each audience check its user is still allowed to sign in and returns the flags for the new access token.
+ * Failure bookkeeping (family revocation, audit) is committed in its own transaction before the error is thrown.
  */
 export async function rotateRefresh(
   app: FastifyInstance,
@@ -127,10 +128,10 @@ export async function rotateRefresh(
   loadSubject: (tx: Executor, subjectId: string) => Promise<{ companyId: string; mfa: boolean; mustChangePassword: boolean; actor: AuditActor } | null>,
 ): Promise<IssuedTokens> {
   const expectedType: UserType = aud === "erp" ? "STAFF" : "CUSTOMER";
-  return app.db.transaction(async (tx) => {
-    const [row] = await tx.select().from(refreshTokens).where(eq(refreshTokens.tokenHash, sha256(rawToken))).limit(1);
-    if (!row || row.subjectType !== expectedType) throw ApiError.unauthenticated("Invalid refresh token", "INVALID_TOKEN");
-    if (row.revokedAt || row.replacedById) {
+  const [row] = await app.db.select().from(refreshTokens).where(eq(refreshTokens.tokenHash, sha256(rawToken))).limit(1);
+  if (!row || row.subjectType !== expectedType) throw ApiError.unauthenticated("Invalid refresh token", "INVALID_TOKEN");
+  const reuse = async (): Promise<never> => {
+    await app.db.transaction(async (tx) => {
       await revokeFamily(tx, app.redis, row.familyId, "REUSE_DETECTED");
       await writeAudit(tx, {
         companyId: row.companyId,
@@ -142,23 +143,27 @@ export async function rotateRefresh(
         ip: req.clientIp,
         requestId: req.id,
       });
-      throw ApiError.unauthenticated("Refresh token reuse detected; all sessions of this device family were revoked", "TOKEN_REUSED");
-    }
-    if (row.expiresAt.getTime() <= Date.now()) throw ApiError.unauthenticated("Refresh token expired", "TOKEN_EXPIRED");
+    });
+    throw ApiError.unauthenticated("Refresh token reuse detected; all sessions of this device family were revoked", "TOKEN_REUSED");
+  };
+  if (row.revokedAt || row.replacedById) return reuse();
+  if (row.expiresAt.getTime() <= Date.now()) throw ApiError.unauthenticated("Refresh token expired", "TOKEN_EXPIRED");
+  const outcome = await app.db.transaction(async (tx) => {
     const subject = await loadSubject(tx, row.subjectId);
-    if (!subject) throw ApiError.unauthenticated("Account is inactive", "USER_INACTIVE");
+    if (!subject) return { kind: "inactive" as const };
     // Atomic claim: only one concurrent refresh may rotate this token.
     const claimed = await tx
       .update(refreshTokens)
       .set({ lastUsedAt: new Date() })
       .where(and(eq(refreshTokens.id, row.id), isNull(refreshTokens.replacedById), isNull(refreshTokens.revokedAt)))
       .returning({ id: refreshTokens.id });
-    if (claimed.length === 0) {
-      await revokeFamily(tx, app.redis, row.familyId, "REUSE_DETECTED");
-      throw ApiError.unauthenticated("Refresh token reuse detected", "TOKEN_REUSED");
-    }
-    return issueTokens(tx, { type: row.subjectType, id: row.subjectId, companyId: row.companyId, aud }, row.familyId, req, { mfa: subject.mfa, mustChangePassword: subject.mustChangePassword }, { id: row.id });
+    if (claimed.length === 0) return { kind: "raced" as const };
+    const tokens = await issueTokens(tx, { type: row.subjectType, id: row.subjectId, companyId: row.companyId, aud }, row.familyId, req, { mfa: subject.mfa, mustChangePassword: subject.mustChangePassword }, { id: row.id });
+    return { kind: "ok" as const, tokens };
   });
+  if (outcome.kind === "inactive") throw ApiError.unauthenticated("Account is inactive", "USER_INACTIVE");
+  if (outcome.kind === "raced") return reuse();
+  return outcome.tokens;
 }
 
 /** Records a login attempt (success or failure) in login_events. */

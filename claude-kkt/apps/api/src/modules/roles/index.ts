@@ -23,7 +23,7 @@ import { ApiError } from "../../lib/errors.js";
 import { fromListQuery, paginate } from "../../lib/list.js";
 import { translatePgError } from "../../lib/pgErrors.js";
 import { route } from "../../lib/routes.js";
-import { applyUpdate, expectedVersion } from "../../lib/version.js";
+import { applyUpdate, expectedVersion, withOptionalVersion } from "../../lib/version.js";
 
 type DbRole = typeof roles.$inferSelect;
 interface RoleSelect { role: DbRole; userCount: number }
@@ -113,7 +113,7 @@ export async function rolesModule(app: FastifyInstance): Promise<void> {
 
   route(app, {
     method: "PATCH", url: "/roles/:id", permission: "roles.manage",
-    schema: { params: z.object({ id: IdSchema }), body: RoleUpdateSchema, response: { 200: RoleRowSchema }, summary: "Update a role (system roles: description only)" },
+    schema: { params: z.object({ id: IdSchema }), body: withOptionalVersion(RoleUpdateSchema), response: { 200: RoleRowSchema }, summary: "Update a role (system roles: description only)" },
     handler: async (req) => {
       const ctx = req.user!;
       const body = req.body;

@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
-import type { MasterRow } from "@kkt/contracts";
+import type { ActiveStateResponse, MasterRow } from "@kkt/contracts";
 import { describeError } from "@/lib/api";
 import { useMutationWithToast } from "@/lib/queries";
 import { isInUseError, usageFromDetails, type UsageBreakdown } from "@/features/shared/errors";
@@ -17,7 +17,7 @@ export function useMasterActiveToggle(config: AnyMasterConfig) {
   const path = masterPath(config.slug);
   const [inUse, setInUse] = useState<InUseState | null>(null);
 
-  const deactivate = useMutationWithToast<MasterRow, MasterRow>({
+  const deactivate = useMutationWithToast<ActiveStateResponse, MasterRow>({
     mutationFn: (row) => deactivateMaster(config.slug, row.id, row.version),
     successMessage: (_data, row) => `${config.displayName(row)} deactivated`,
     invalidate: [[path]],
@@ -33,7 +33,7 @@ export function useMasterActiveToggle(config: AnyMasterConfig) {
     },
   });
 
-  const activate = useMutationWithToast<MasterRow, MasterRow>({
+  const activate = useMutationWithToast<ActiveStateResponse, MasterRow>({
     mutationFn: (row) => activateMaster(config.slug, row.id, row.version),
     successMessage: (_data, row) => `${config.displayName(row)} restored`,
     invalidate: [[path]],

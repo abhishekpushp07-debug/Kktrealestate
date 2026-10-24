@@ -18,7 +18,7 @@ export interface IconProps {
   style?: StyleProp<ViewStyle>;
 }
 
-const abs = StyleSheet.absoluteFillObject;
+const abs = StyleSheet.absoluteFill;
 
 export function Icon({ name, size = 22, color = colors.ink, style }: IconProps): React.JSX.Element {
   const s = size;

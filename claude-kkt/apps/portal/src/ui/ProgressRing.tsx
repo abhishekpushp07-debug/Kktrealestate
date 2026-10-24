@@ -1,5 +1,6 @@
 // Construction progress ring drawn from tick marks (no SVG dependency). Gold ticks = done.
-import { StyleSheet, View, type ReactNode } from "react-native";
+import type { ReactNode } from "react";
+import { StyleSheet, View } from "react-native";
 import { T } from "./Text";
 import { colors, fonts } from "./theme";
 

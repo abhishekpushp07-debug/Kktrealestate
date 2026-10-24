@@ -1,7 +1,8 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import type { AnyPgColumn, PgTable, PgUpdateSetSource } from "drizzle-orm/pg-core";
 import type { FastifyRequest } from "fastify";
-import type { VersionConflictDetails } from "@kkt/contracts";
+import { z } from "zod";
+import { VersionSchema, type VersionConflictDetails } from "@kkt/contracts";
 import { auditLogs, type Executor } from "@kkt/db";
 import { ApiError } from "./errors.js";
 
@@ -50,4 +51,11 @@ export async function applyUpdate<T extends VersionedTable>(tx: Executor, table:
   const [cur] = (await tx.select({ version: table.version }).from(table as PgTable).where(eq(table.id, id)).limit(1)) as { version: number }[];
   if (!cur) throw ApiError.notFound();
   throw await versionConflict(tx, table, id, cur.version);
+}
+
+/** Makes `version` optional in an update body schema so the expected version may also arrive via `If-Match` (expectedVersion() enforces one of them). */
+export function withOptionalVersion<T extends z.ZodType>(schema: T): z.ZodType {
+  const shape = (schema as unknown as { shape?: Record<string, z.ZodType> }).shape;
+  if (!shape || !("version" in shape)) return schema;
+  return z.strictObject({ ...shape, version: VersionSchema.optional() });
 }

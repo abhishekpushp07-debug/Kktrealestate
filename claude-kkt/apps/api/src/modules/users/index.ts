@@ -26,7 +26,7 @@ import { fromListQuery, paginate } from "../../lib/list.js";
 import { hashPassword } from "../../lib/password.js";
 import { translatePgError } from "../../lib/pgErrors.js";
 import { route } from "../../lib/routes.js";
-import { applyUpdate, expectedVersion } from "../../lib/version.js";
+import { applyUpdate, expectedVersion, withOptionalVersion } from "../../lib/version.js";
 import { revokeAllFamilies } from "../auth/service.js";
 
 type DbUser = typeof users.$inferSelect;
@@ -142,7 +142,7 @@ export async function usersModule(app: FastifyInstance): Promise<void> {
 
   route(app, {
     method: "PATCH", url: "/users/:id", permission: "users.manage",
-    schema: { params: z.object({ id: IdSchema }), body: UserUpdateSchema, response: { 200: UserRowSchema }, summary: "Update a staff user" },
+    schema: { params: z.object({ id: IdSchema }), body: withOptionalVersion(UserUpdateSchema), response: { 200: UserRowSchema }, summary: "Update a staff user" },
     handler: async (req) => {
       const ctx = req.user!;
       const body = req.body;

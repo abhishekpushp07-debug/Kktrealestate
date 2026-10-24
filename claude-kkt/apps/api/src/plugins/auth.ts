@@ -8,6 +8,7 @@ import { loadCompany } from "../lib/company.js";
 import { ApiError } from "../lib/errors.js";
 import { verifyAccessToken, type AccessClaims, type TokenAudience } from "../lib/jwt.js";
 import { clientIp, enforceRateLimit } from "../lib/rateLimit.js";
+import { isPublicPrefix } from "../lib/routes.js";
 import type { PortalContext, StaffContext } from "../lib/scope.js";
 
 declare module "fastify" {
@@ -21,8 +22,6 @@ declare module "fastify" {
   }
 }
 
-/** Prefixes served by third-party plugins (Swagger UI) that cannot carry `config.public`. */
-const PUBLIC_PREFIXES = ["/api/v1/docs"];
 /** Routes a user who must change their password may still call. */
 const PASSWORD_CHANGE_EXEMPT = ["/auth/change-password", "/auth/logout", "/auth/me", "/auth/sessions", "/auth/password-policy"];
 /** Routes an admin without MFA may still call while MFA is being forced. */
@@ -31,13 +30,13 @@ const ADMIN_ROLES = new Set(["Super Admin", "Project Admin"]);
 const WRITE_METHODS = new Set(["POST", "PATCH", "PUT", "DELETE"]);
 const USER_CACHE_TTL = 30;
 
-interface StaffRow {
+type StaffRow = {
   id: string; company_id: string; name: string; email: string; role_id: string; is_active: boolean; must_change_password: boolean; mfa_enabled: boolean;
   all_projects: boolean; role_name: string; is_system: boolean; permissions: string[]; role_active: boolean; project_ids: string[];
-}
-interface PortalRow {
+};
+type PortalRow = {
   id: string; customer_id: string; company_id: string; phone: string; is_enabled: boolean; locked_until: string | null; must_change_password: boolean; full_name: string; customer_active: boolean;
-}
+};
 
 /** Key of the revoked-session marker set when a refresh family is revoked (logout, reuse, admin). */
 export function revokedSessionKey(sid: string): string {
@@ -110,7 +109,7 @@ export default fp(async (app) => {
     const url = req.routeOptions.url;
     if (!url) return; // unknown route: let the 404 handler answer
     const cfg = req.routeOptions.config;
-    if (cfg.public || PUBLIC_PREFIXES.some((p) => url.startsWith(p))) {
+    if (cfg.public || isPublicPrefix(url)) {
       const rl = cfg.rateLimit ?? { limit: config.PUBLIC_RATE_LIMIT_PER_MIN, windowSeconds: 60 };
       await enforceRateLimit(app.redis, `pub:${cfg.rateLimit ? url : "all"}:${req.clientIp}`, rl.limit, rl.windowSeconds);
       return;

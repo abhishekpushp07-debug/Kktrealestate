@@ -9,7 +9,7 @@ import { ApiError } from "../../lib/errors.js";
 import { fromListQuery, paginate } from "../../lib/list.js";
 import { translatePgError } from "../../lib/pgErrors.js";
 import { route } from "../../lib/routes.js";
-import { applyUpdate, expectedVersion } from "../../lib/version.js";
+import { applyUpdate, expectedVersion, withOptionalVersion } from "../../lib/version.js";
 import type { DbRow, MasterKindDef, WriteContext } from "./types.js";
 
 const idParams = z.object({ id: IdSchema });
@@ -35,9 +35,23 @@ export async function viewOne(db: Executor, def: MasterKindDef, row: DbRow, comp
   return v;
 }
 
+/** 409 DUPLICATE when another row of the company already carries the business key (case-insensitive); backs the DB unique constraints and covers name-keyed kinds. */
+export async function assertUniqueKey(tx: Executor, def: MasterKindDef, companyId: string, values: DbRow, excludeId: string | null): Promise<void> {
+  const camel = def.keyField.replace(/_([a-z0-9])/g, (_m, c: string) => c.toUpperCase());
+  const key = values[camel];
+  if (typeof key !== "string" || key === "") return;
+  const rows = await tx
+    .select({ id: def.table.id })
+    .from(def.table)
+    .where(and(eq(def.table.companyId, companyId), sql`lower(${def.keyColumn}::text) = lower(${key})`, excludeId ? sql`${def.table.id} <> ${excludeId}` : undefined))
+    .limit(1);
+  if (rows.length > 0) throw ApiError.conflict("DUPLICATE", `A ${def.entity.replace(/_/g, " ")} with this ${def.keyField} already exists`, { field: def.keyField, value: key });
+}
+
 /** Creates one master row (insert + afterWrite + audit) inside `tx`. */
 export async function createMaster(tx: Executor, def: MasterKindDef, ctx: WriteContext, input: Record<string, unknown>): Promise<DbRow> {
   const values = await def.prepare(tx, input, ctx, null);
+  await assertUniqueKey(tx, def, ctx.companyId, values, null);
   let created: DbRow | undefined;
   try {
     const rows = (await tx.insert(def.table).values({ ...values, companyId: ctx.companyId, createdBy: ctx.user.id } as never).returning()) as DbRow[];
@@ -56,6 +70,7 @@ export async function updateMaster(tx: Executor, def: MasterKindDef, ctx: WriteC
   const before = await viewOne(tx, def, existing, ctx.companyId);
   const { version: _v, ...patch } = input;
   const values = await def.prepare(tx, patch, ctx, existing);
+  await assertUniqueKey(tx, def, ctx.companyId, values, id);
   let updated: DbRow;
   try { updated = (await applyUpdate(tx, def.table, id, version, values)) as DbRow; } catch (e) { translatePgError(e, `A ${def.entity.replace(/_/g, " ")} with this ${def.keyField}`); }
   if (def.afterWrite) await def.afterWrite(tx, updated, patch, ctx, "update");
@@ -122,7 +137,7 @@ export function registerMasterKind(app: FastifyInstance, def: MasterKindDef): vo
 
   route(app, {
     method: "PATCH", url: `${base}/:id`, permission: "master.write",
-    schema: { params: idParams, body: def.updateSchema, response: { 200: def.rowSchema }, summary: `Update ${label}`, tags: ["masters"] },
+    schema: { params: idParams, body: withOptionalVersion(def.updateSchema), response: { 200: def.rowSchema }, summary: `Update ${label}`, tags: ["masters"] },
     handler: async (req) => {
       const ctx = ctxOf(app, req);
       const body = req.body as Record<string, unknown> & { version?: number };

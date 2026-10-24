@@ -1,10 +1,11 @@
-import { forwardRef, useState } from "react";
+import { useState, type ComponentProps } from "react";
 import { Pressable, StyleSheet, TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from "react-native";
 import { Icon, type IconName } from "./Icon";
 import { T } from "./Text";
 import { colors, fonts, radius, space } from "./theme";
 
 export interface FieldProps extends TextInputProps {
+  ref?: ComponentProps<typeof TextInput>["ref"];
   label?: string;
   hint?: string;
   error?: string | null;
@@ -14,7 +15,7 @@ export interface FieldProps extends TextInputProps {
   onNavy?: boolean;
 }
 
-export const Field = forwardRef<TextInput, FieldProps>(function Field({ label, hint, error, icon, secureToggle, containerStyle, onNavy, secureTextEntry, multiline, style, editable = true, ...rest }, ref) {
+export function Field({ ref, label, hint, error, icon, secureToggle, containerStyle, onNavy, secureTextEntry, multiline, style, editable = true, ...rest }: FieldProps): React.JSX.Element {
   const [focused, setFocused] = useState(false);
   const [hidden, setHidden] = useState(!!secureTextEntry);
   const borderColor = error ? colors.danger : focused ? colors.gold : onNavy ? "rgba(255,255,255,0.25)" : colors.lineStrong;
@@ -63,7 +64,7 @@ export const Field = forwardRef<TextInput, FieldProps>(function Field({ label, h
       ) : null}
     </View>
   );
-});
+}
 
 /** Read-only "select" field that opens a picker when pressed. */
 export function SelectField({ label, value, placeholder = "Choose…", onPress, error, disabled }: { label: string; value: string | null; placeholder?: string; onPress: () => void; error?: string | null; disabled?: boolean }): React.JSX.Element {

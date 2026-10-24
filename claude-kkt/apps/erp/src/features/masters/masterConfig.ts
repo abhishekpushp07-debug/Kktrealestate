@@ -120,7 +120,7 @@ const FlatTypeFormSchema = z
       ctx.addIssue({ code: "custom", path: ["base_price_paise"], message: "Required" });
     }
   })
-  .transform(({ pricing_mode, rooms, ...rest }) => ({
+  .transform(({ pricing_mode, rooms, ...rest }): unknown => ({
     ...rest,
     rooms: rooms.map((room) => ({ ...room, sqft: room.sqft ?? undefined })),
     base_rate_per_sqft_paise: pricing_mode === "RATE" ? rest.base_rate_per_sqft_paise : null,
@@ -130,7 +130,7 @@ const FlatTypeFormSchema = z
 
 const FloorPlanTemplateFormSchema = z
   .looseObject({ flats_per_floor: z.number().optional() })
-  .transform(({ flats_per_floor: _count, ...rest }) => rest)
+  .transform(({ flats_per_floor: _count, ...rest }): unknown => rest)
   .pipe(FloorPlanTemplateCreateSchema);
 
 function digitsOnly(value: string | undefined): string {
@@ -144,7 +144,7 @@ const BankAccountCreateFormSchema = z
       ctx.addIssue({ code: "custom", path: ["account_number_confirm"], message: "Account numbers do not match" });
     }
   })
-  .transform(({ account_number_confirm: _confirm, change_account_number: _change, ...rest }) => rest)
+  .transform(({ account_number_confirm: _confirm, change_account_number: _change, ...rest }): unknown => rest)
   .pipe(BankAccountCreateSchema);
 
 const BankAccountEditFormSchema = z
@@ -157,7 +157,7 @@ const BankAccountEditFormSchema = z
       ctx.addIssue({ code: "custom", path: ["account_number_confirm"], message: "Account numbers do not match" });
     }
   })
-  .transform(({ change_account_number, account_number, account_number_confirm: _confirm, ...rest }) => (change_account_number ? { ...rest, account_number } : rest))
+  .transform(({ change_account_number, account_number, account_number_confirm: _confirm, ...rest }): unknown => (change_account_number ? { ...rest, account_number } : rest))
   .pipe(BankAccountCreateSchema.partial());
 
 /* ------------------------------------------------------------------ */

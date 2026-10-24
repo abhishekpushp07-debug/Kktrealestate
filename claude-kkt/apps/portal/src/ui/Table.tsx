@@ -1,5 +1,6 @@
 // Lightweight table for desktop widths (ledger, rooms). Phones use card layouts instead.
-import { ScrollView, StyleSheet, View, type ReactNode } from "react-native";
+import type { ReactNode } from "react";
+import { ScrollView, StyleSheet, View } from "react-native";
 import { T } from "./Text";
 import { colors, radius, space } from "./theme";
 

@@ -1,6 +1,6 @@
 import { and, eq, inArray, ne, sql, type SQL } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
-import type { z } from "zod";
+import { z } from "zod";
 import {
   AmenityCreateSchema, AmenityListResponseSchema, AmenityRowSchema, AmenityUpdateSchema,
   AreaTypeCreateSchema, AreaTypeListResponseSchema, AreaTypeRowSchema, AreaTypeUpdateSchema,
@@ -342,9 +342,16 @@ function installmentLabel(i: { trigger_type: TriggerType; trigger_days: number |
   }
 }
 
+/**
+ * Plan-level rules (sum = 100.00, unique seq/name, ≤1 ON_BOOKING/ON_POSSESSION, stage exists) are enforced by @kkt/domain validatePlan
+ * so they surface as 422 BUSINESS_RULE with structured errors; the wire shape (fields, per-installment trigger details) stays the contract's.
+ */
+const PaymentPlanCreateBody = z.strictObject(PaymentPlanCreateSchema.shape);
+const PaymentPlanUpdateBody = z.strictObject(PaymentPlanUpdateSchema.shape);
+
 export const paymentPlansKind = kind({
   kind: "PAYMENT_PLANS", path: "payment-plans", entity: "payment_plan", table: paymentPlans,
-  schemas: { create: PaymentPlanCreateSchema, update: PaymentPlanUpdateSchema, row: PaymentPlanRowSchema, list: PaymentPlanListResponseSchema, filter: PaymentPlanFilterSchema },
+  schemas: { create: PaymentPlanCreateBody, update: PaymentPlanUpdateBody, row: PaymentPlanRowSchema, list: PaymentPlanListResponseSchema, filter: PaymentPlanFilterSchema },
   search: [paymentPlans.name, paymentPlans.code], sortable: { name: paymentPlans.name, code: paymentPlans.code, plan_type: paymentPlans.planType, created_at: paymentPlans.createdAt }, defaultSort: "name",
   keyField: "code", keyColumn: paymentPlans.code, csv: ["name", "code", "plan_type", "grace_days", "assignment_count", "booking_count"],
   extraWhere: (q) => and(
@@ -381,7 +388,7 @@ export const paymentPlansKind = kind({
         select p.id as plan_id,
                (select count(*)::int from payment_plan_assignments a where a.plan_id = p.id) as assignment_count,
                (select count(*)::int from bookings b where b.payment_plan_id = p.id) as booking_count
-        from payment_plans p where p.id = any(${ids}::uuid[])`),
+        from payment_plans p where p.id in (${sql.join(ids.map((id) => sql`${id}::uuid`), sql`, `)})`),
     ]);
     const byPlan = new Map<string, typeof insts>();
     for (const x of insts) { const list = byPlan.get(x.i.planId) ?? []; list.push(x); byPlan.set(x.i.planId, list); }

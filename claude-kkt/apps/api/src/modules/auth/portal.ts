@@ -43,26 +43,27 @@ export async function portalAuthRoutes(app: FastifyInstance): Promise<void> {
     schema: { body: PortalLoginSchema, response: { 200: PortalLoginResponseSchema }, summary: "Customer login (phone + password)" },
     handler: async (req) => {
       const phone = normalizeIndianPhone(req.body.phone) ?? req.body.phone;
+      const [pu] = await app.db.select().from(portalUsers).where(eq(portalUsers.phone, phone)).limit(1);
+      if (!pu) {
+        await recordLoginEvent(app.db, { companyId: null, subjectType: "CUSTOMER", identifier: phone, success: false, reason: "UNKNOWN_USER", req });
+        throw new ApiError(401, "INVALID_CREDENTIALS", "Invalid phone number or password");
+      }
+      assertNotLocked(pu);
+      if (!(await verifyPassword(pu.passwordHash, req.body.password))) {
+        const next = await app.db.transaction(async (tx) => {
+          const n = await applyPortalFailure(tx, pu);
+          await recordLoginEvent(tx, { companyId: pu.companyId, subjectType: "CUSTOMER", identifier: phone, success: false, reason: n.justLocked ? "LOCKED" : "BAD_PASSWORD", req });
+          if (n.justLocked) await writeAudit(tx, { companyId: pu.companyId, actor: { type: "SYSTEM", id: null, name: "lockout" }, action: "portal_auth.locked", entityType: "portal_user", entityId: pu.id, after: { locked_until: n.lockedUntil }, ip: req.clientIp, requestId: req.id });
+          return n;
+        });
+        if (next.justLocked) throw ApiError.locked(`Account locked for ${PASSWORD_POLICY.lockout_minutes} minutes after ${PASSWORD_POLICY.lockout_attempts} failed attempts`, { locked_until: next.lockedUntil!.toISOString() });
+        throw new ApiError(401, "INVALID_CREDENTIALS", "Invalid phone number or password");
+      }
+      if (!pu.isEnabled) {
+        await recordLoginEvent(app.db, { companyId: pu.companyId, subjectType: "CUSTOMER", identifier: phone, success: false, reason: "DISABLED", req });
+        throw ApiError.unauthenticated("Portal access is disabled", "USER_INACTIVE");
+      }
       return app.db.transaction(async (tx) => {
-        const [pu] = await tx.select().from(portalUsers).where(eq(portalUsers.phone, phone)).limit(1);
-        if (!pu) {
-          await recordLoginEvent(tx, { companyId: null, subjectType: "CUSTOMER", identifier: phone, success: false, reason: "UNKNOWN_USER", req });
-          throw new ApiError(401, "INVALID_CREDENTIALS", "Invalid phone number or password");
-        }
-        assertNotLocked(pu);
-        if (!(await verifyPassword(pu.passwordHash, req.body.password))) {
-          const next = await applyPortalFailure(tx, pu);
-          await recordLoginEvent(tx, { companyId: pu.companyId, subjectType: "CUSTOMER", identifier: phone, success: false, reason: next.justLocked ? "LOCKED" : "BAD_PASSWORD", req });
-          if (next.justLocked) {
-            await writeAudit(tx, { companyId: pu.companyId, actor: { type: "SYSTEM", id: null, name: "lockout" }, action: "portal_auth.locked", entityType: "portal_user", entityId: pu.id, after: { locked_until: next.lockedUntil }, ip: req.clientIp, requestId: req.id });
-            throw ApiError.locked(`Account locked for ${PASSWORD_POLICY.lockout_minutes} minutes after ${PASSWORD_POLICY.lockout_attempts} failed attempts`, { locked_until: next.lockedUntil!.toISOString() });
-          }
-          throw new ApiError(401, "INVALID_CREDENTIALS", "Invalid phone number or password");
-        }
-        if (!pu.isEnabled) {
-          await recordLoginEvent(tx, { companyId: pu.companyId, subjectType: "CUSTOMER", identifier: phone, success: false, reason: "DISABLED", req });
-          throw ApiError.unauthenticated("Portal access is disabled", "USER_INACTIVE");
-        }
         const tokens = await createSession(tx, { type: "CUSTOMER", id: pu.id, companyId: pu.companyId, aud: "portal" }, req, { mfa: false, mustChangePassword: pu.mustChangePassword });
         await tx.update(portalUsers).set({ failedAttempts: 0, lockedUntil: null, lastLoginAt: new Date() }).where(eq(portalUsers.id, pu.id));
         await recordLoginEvent(tx, { companyId: pu.companyId, subjectType: "CUSTOMER", identifier: phone, success: true, reason: null, req });

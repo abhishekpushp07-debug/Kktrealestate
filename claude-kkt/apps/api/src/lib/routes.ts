@@ -49,6 +49,14 @@ declare module "fastify" {
   interface FastifyInstance { routeRegistry: RegistryEntry[] }
 }
 
+/** URL prefixes served by third-party plugins (Swagger UI) that cannot carry `config.public`; treated as public everywhere. */
+export const PUBLIC_PREFIXES = ["/api/v1/docs"] as const;
+
+/** True when the url is public by prefix (docs). */
+export function isPublicPrefix(url: string): boolean {
+  return PUBLIC_PREFIXES.some((p) => url === p || url.startsWith(`${p}/`));
+}
+
 /** Tag from the first path segment after /api/v1 (for OpenAPI grouping). */
 function tagFor(url: string): string {
   const parts = url.replace(/^\/api\/v1\/?/, "").split("/").filter(Boolean);
@@ -92,11 +100,13 @@ export function route<B extends AnyZod | undefined = undefined, Q extends AnyZod
 export function installRouteRegistry(app: FastifyInstance): void {
   app.decorate("routeRegistry", []);
   app.addHook("onRoute", (r) => {
+    if (r.url === "*") return; // CORS preflight catch-all
     const methods = Array.isArray(r.method) ? r.method : [r.method];
     const cfg = (r.config ?? {}) as { permission?: string; audience?: "portal"; public?: boolean };
+    const isPublic = cfg.public === true || isPublicPrefix(r.url);
     for (const m of methods) {
       if (m === "HEAD") continue;
-      app.routeRegistry.push({ method: m, url: r.url, permission: cfg.permission ?? null, audience: cfg.public ? null : (cfg.audience ?? "erp"), public: cfg.public === true });
+      app.routeRegistry.push({ method: m, url: r.url, permission: cfg.permission ?? null, audience: isPublic ? null : (cfg.audience ?? "erp"), public: isPublic });
     }
   });
 }
