@@ -54,8 +54,8 @@ export async function applyUpdate<T extends VersionedTable>(tx: Executor, table:
 }
 
 /** Makes `version` optional in an update body schema so the expected version may also arrive via `If-Match` (expectedVersion() enforces one of them). */
-export function withOptionalVersion<T extends z.ZodType>(schema: T): z.ZodType {
+export function withOptionalVersion<T extends z.ZodType>(schema: T): T {
   const shape = (schema as unknown as { shape?: Record<string, z.ZodType> }).shape;
   if (!shape || !("version" in shape)) return schema;
-  return z.strictObject({ ...shape, version: VersionSchema.optional() });
+  return z.strictObject({ ...shape, version: VersionSchema.optional() }) as unknown as T;
 }

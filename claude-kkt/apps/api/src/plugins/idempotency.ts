@@ -63,7 +63,7 @@ export default fp(async (app) => {
         const record = { request_hash: ctx.hash, status_code: reply.statusCode, response_body: body, path: req.url };
         await app.redis.set(ctx.redisKey, JSON.stringify(record), "EX", TTL_SECONDS);
         await sql`insert into idempotency_keys (scope_key, key, method, path, request_hash, status_code, response_body, expires_at)
-                  values (${ctx.scopeKey}, ${ctx.key}, ${req.method}, ${req.url}, ${ctx.hash}, ${reply.statusCode}, ${sql.json(body as never)}, now() + interval '24 hours')
+                  values (${ctx.scopeKey}, ${ctx.key}, ${req.method}, ${req.url}, ${ctx.hash}, ${reply.statusCode}, ${JSON.stringify(body)}::jsonb, now() + interval '24 hours')
                   on conflict (scope_key, key) do nothing`;
       }
     } finally {

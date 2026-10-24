@@ -35,7 +35,8 @@ describe("audit log", () => {
     expect(byActor.body.total).toBe(1);
     const csv = await t.request("GET", "/api/v1/audit-logs?format=csv", { token: admin.access_token });
     expect(String(csv.headers["content-type"])).toContain("text/csv");
-    const today = new Date().toISOString().slice(0, 10);
+    const { todayIST } = await import("@kkt/domain");
+    const today = todayIST();
     const ranged = await t.request<{ total: number }>("GET", `/api/v1/audit-logs?from=${today}&to=${today}`, { token: admin.access_token });
     expect(ranged.body.total).toBeGreaterThan(0);
     const future = await t.request<{ total: number }>("GET", `/api/v1/audit-logs?from=2099-01-01&to=2099-01-02`, { token: admin.access_token });

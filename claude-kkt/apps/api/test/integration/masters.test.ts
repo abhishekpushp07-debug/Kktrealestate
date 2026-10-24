@@ -174,8 +174,9 @@ describe("kind-specific rules", () => {
     expect(usedBy[0]!.count).toBeGreaterThanOrEqual(1);
     const usage = await t.request<{ usage_count: number; used_by: { entity_type: string; count: number }[] }>("GET", `/api/v1/masters/flat-types/${basics.flatTypeId}/usage`, { token });
     expect(usage.body.used_by).toEqual([{ entity_type: "floor_plan_templates", count: 1 }]);
-    const stage = await t.request<ErrorBody>("POST", `/api/v1/masters/construction-stages/${basics.stageIds[0]}/deactivate`, { token, body: {} });
+    const stage = await t.request<ErrorBody>("POST", `/api/v1/masters/construction-stages/${basics.stageIds[2]}/deactivate`, { token, body: {} });
     expect(stage.status).toBe(200); // not referenced yet
+    expect((await t.request("POST", `/api/v1/masters/construction-stages/${basics.stageIds[2]}/activate`, { token, body: {} })).status).toBe(200);
   });
 
   it("construction stages: exactly one possession stage; reorder rewrites sort order", async () => {
