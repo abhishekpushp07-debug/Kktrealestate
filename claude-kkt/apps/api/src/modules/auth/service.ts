@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, ne, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { Redis } from "ioredis";
 import type { SessionRow, UserType } from "@kkt/contracts";
@@ -11,7 +11,7 @@ import { randomToken, sha256 } from "../../lib/crypto.js";
 import { ApiError } from "../../lib/errors.js";
 import { signAccessToken, type TokenAudience } from "../../lib/jwt.js";
 import { hashPassword, matchesHistory, passwordPolicyProblems } from "../../lib/password.js";
-import { markSessionRevoked } from "../../plugins/auth.js";
+import { markSessionRevoked, revokedSessionKey } from "../../plugins/auth.js";
 
 /** The subject a session belongs to. */
 export interface SessionSubject {
@@ -71,18 +71,20 @@ export async function revokeFamily(tx: Executor, redis: Redis, familyId: string,
   return rows.length;
 }
 
-/** Revokes every family of a subject except `keepFamilyId` (logout everywhere / password change / deactivation). */
+/** Revokes every family of a subject except `keepFamilyId` (logout everywhere / password change / deactivation): one UPDATE, one Redis pipeline. */
 export async function revokeAllFamilies(tx: Executor, redis: Redis, subjectType: UserType, subjectId: string, reason: string, keepFamilyId?: string): Promise<number> {
-  const live = await tx
-    .selectDistinct({ familyId: refreshTokens.familyId })
-    .from(refreshTokens)
-    .where(and(eq(refreshTokens.subjectType, subjectType), eq(refreshTokens.subjectId, subjectId), isNull(refreshTokens.revokedAt)));
-  let n = 0;
-  for (const f of live) {
-    if (keepFamilyId && f.familyId === keepFamilyId) continue;
-    n += await revokeFamily(tx, redis, f.familyId, reason);
+  const rows = await tx
+    .update(refreshTokens)
+    .set({ revokedAt: new Date(), revokeReason: reason })
+    .where(and(eq(refreshTokens.subjectType, subjectType), eq(refreshTokens.subjectId, subjectId), isNull(refreshTokens.revokedAt), keepFamilyId ? ne(refreshTokens.familyId, keepFamilyId) : undefined))
+    .returning({ familyId: refreshTokens.familyId });
+  const families = [...new Set(rows.map((r) => r.familyId))];
+  if (families.length > 0) {
+    const pipe = redis.multi();
+    for (const f of families) pipe.set(revokedSessionKey(f), "1", "EX", (config.ACCESS_TOKEN_MINUTES + 2) * 60);
+    await pipe.exec();
   }
-  return n;
+  return families.length;
 }
 
 /** Lists live sessions (one per family: the current, unreplaced token) for a subject. */

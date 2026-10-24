@@ -294,7 +294,9 @@ describe("kind-specific rules", () => {
     const r = await t.request<ErrorBody>("POST", "/api/v1/masters/room-types", { token, body: { name: "", code: "lower case!" } });
     expect(r.status).toBe(400);
     expect(r.body.error.code).toBe("VALIDATION_ERROR");
-    expect(Array.isArray(r.body.error.details?.["errors"])).toBe(true);
+    const issues = r.body.error.details?.["issues"] as { path: string; message: string }[];
+    expect(Array.isArray(issues)).toBe(true);
+    expect(issues.map((i) => i.path).sort()).toEqual(["code", "name"]);
     expect(r.body.error.request_id).toBeTruthy();
   });
 });

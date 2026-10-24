@@ -22,6 +22,9 @@ export class ApiError extends Error {
   static conflict(code: string, message: string, details?: Record<string, unknown>) { return new ApiError(409, code, message, details); }
   static rule(message: string, rule: string, details?: Record<string, unknown>) { return new ApiError(422, "BUSINESS_RULE", message, { rule, ...(details ?? {}) }); }
   static locked(message: string, details?: Record<string, unknown>) { return new ApiError(423, "LOCKED", message, details); }
+  static unavailable(message: string, retryAfterSeconds = 5) {
+    return new ApiError(503, "SERVICE_UNAVAILABLE", message, { retry_after: retryAfterSeconds }, { "Retry-After": String(retryAfterSeconds) });
+  }
   static rateLimited(retryAfterSeconds: number) {
     return new ApiError(429, "RATE_LIMITED", `Too many requests. Retry in ${retryAfterSeconds}s.`, { retry_after: retryAfterSeconds }, { "Retry-After": String(retryAfterSeconds) });
   }
@@ -34,8 +37,23 @@ export interface ApiErrorBody {
 
 const STATUS_CODES: Record<number, string> = {
   400: "VALIDATION_ERROR", 401: "UNAUTHENTICATED", 403: "FORBIDDEN", 404: "NOT_FOUND", 405: "METHOD_NOT_ALLOWED",
-  409: "CONFLICT", 413: "PAYLOAD_TOO_LARGE", 415: "UNSUPPORTED_MEDIA", 422: "BUSINESS_RULE", 423: "LOCKED", 429: "RATE_LIMITED", 503: "UNAVAILABLE",
+  409: "CONFLICT", 413: "PAYLOAD_TOO_LARGE", 415: "UNSUPPORTED_MEDIA_TYPE", 422: "BUSINESS_RULE", 423: "LOCKED", 429: "RATE_LIMITED", 503: "SERVICE_UNAVAILABLE",
 };
+
+/** One validation issue as carried in `details.issues` (contracts ValidationIssueSchema). */
+interface ValidationIssue { path: string; message: string; code?: string }
+
+/** Maps fastify-type-provider-zod validation failures onto the contract's `{ path, message, code }` issues. */
+function validationIssues(validation: readonly { instancePath?: string; message?: string; params?: Record<string, unknown> }[]): ValidationIssue[] {
+  return validation.map((v) => {
+    const issue = v.params?.["issue"] as { path?: unknown[]; message?: string; code?: string } | undefined;
+    const fromIssue = issue?.path?.map(String).join(".");
+    const fromInstance = String(v.instancePath ?? "").replace(/^\//, "").replace(/\//g, ".");
+    const out: ValidationIssue = { path: fromInstance || fromIssue || "", message: v.message ?? issue?.message ?? "Invalid value" };
+    if (issue?.code) out.code = issue.code;
+    return out;
+  });
+}
 
 /** Fastify error handler: every failure becomes `{ error: { code, message, details, request_id } }`. */
 export function errorHandler(error: FastifyError | ApiError | Error, request: FastifyRequest, reply: FastifyReply): void {
@@ -46,8 +64,8 @@ export function errorHandler(error: FastifyError | ApiError | Error, request: Fa
     return;
   }
   if (hasZodFastifySchemaValidationErrors(error)) {
-    const issues = error.validation.map((v) => ({ field: String(v.instancePath ?? "").replace(/^\//, "").replace(/\//g, ".") || String(v.params?.issue && (v.params.issue as { path?: unknown[] }).path?.join(".")) || "", message: v.message ?? "Invalid value" }));
-    reply.status(400).send({ error: { code: "VALIDATION_ERROR", message: issues.map((i) => (i.field ? `${i.field}: ${i.message}` : i.message)).slice(0, 5).join("; ") || "Validation error", details: { errors: issues }, request_id: requestId } });
+    const issues = validationIssues(error.validation as readonly { instancePath?: string; message?: string; params?: Record<string, unknown> }[]);
+    reply.status(400).send({ error: { code: "VALIDATION_ERROR", message: issues.map((i) => (i.path ? `${i.path}: ${i.message}` : i.message)).slice(0, 5).join("; ") || "Validation error", details: { issues }, request_id: requestId } } satisfies ApiErrorBody);
     return;
   }
   if (isResponseSerializationError(error)) {
@@ -57,13 +75,19 @@ export function errorHandler(error: FastifyError | ApiError | Error, request: Fa
   }
   const fe = error as FastifyError;
   const status = typeof fe.statusCode === "number" && fe.statusCode >= 400 ? fe.statusCode : 500;
-  if (status >= 500) {
-    request.log.error({ err: error }, "unhandled error");
-    reply.status(status).send({ error: { code: "INTERNAL_ERROR", message: "Internal server error", request_id: requestId } });
+  if (status === 503) {
+    // Load shedding (@fastify/under-pressure) keeps its Retry-After header; the body gets the uniform envelope.
+    if (!reply.hasHeader("Retry-After")) reply.header("Retry-After", "10");
+    reply.status(503).send({ error: { code: "SERVICE_UNAVAILABLE", message: fe.message || "Service unavailable, retry shortly", request_id: requestId } } satisfies ApiErrorBody);
     return;
   }
-  const code = fe.code === "FST_ERR_CTP_BODY_TOO_LARGE" ? "PAYLOAD_TOO_LARGE" : fe.code === "FST_ERR_CTP_INVALID_MEDIA_TYPE" ? "UNSUPPORTED_MEDIA" : (STATUS_CODES[status] ?? "ERROR");
-  reply.status(status).send({ error: { code, message: fe.message, request_id: requestId } });
+  if (status >= 500) {
+    request.log.error({ err: error }, "unhandled error");
+    reply.status(status).send({ error: { code: "INTERNAL_ERROR", message: "Internal server error", request_id: requestId } } satisfies ApiErrorBody);
+    return;
+  }
+  const code = fe.code === "FST_ERR_CTP_BODY_TOO_LARGE" ? "PAYLOAD_TOO_LARGE" : fe.code === "FST_ERR_CTP_INVALID_MEDIA_TYPE" ? "UNSUPPORTED_MEDIA_TYPE" : (STATUS_CODES[status] ?? "ERROR");
+  reply.status(status).send({ error: { code, message: fe.message, request_id: requestId } } satisfies ApiErrorBody);
 }
 
 /** 404 for unknown routes (keeps the same envelope). */

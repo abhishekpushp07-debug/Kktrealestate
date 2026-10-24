@@ -15,6 +15,7 @@ import { logger } from "./lib/logger.js";
 import { recordRequest } from "./lib/metrics.js";
 import { installRouteRegistry } from "./lib/routes.js";
 import { auditModule } from "./modules/audit/index.js";
+import { registerDiscoveredModules } from "./modules/loader.js";
 import { authModule } from "./modules/auth/index.js";
 import { mastersModule } from "./modules/masters/index.js";
 import { notificationsModule } from "./modules/notifications/index.js";
@@ -28,10 +29,10 @@ import idempotencyPlugin from "./plugins/idempotency.js";
 import redisPlugin from "./plugins/redis.js";
 import requestContextPlugin, { genReqId } from "./plugins/requestContext.js";
 
-/** 503 raised by under-pressure load shedding (mapped to the UNAVAILABLE error envelope with Retry-After). */
+/** 503 raised by under-pressure load shedding (mapped to the SERVICE_UNAVAILABLE error envelope with Retry-After). */
 class UnavailableError extends Error {
   readonly statusCode = 503;
-  readonly code = "UNAVAILABLE";
+  readonly code = "SERVICE_UNAVAILABLE";
   constructor() { super("Service under pressure, retry shortly"); this.name = "UnavailableError"; }
 }
 
@@ -112,6 +113,9 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
     await auditModule(api);
     if (opts.extraRoutes) await opts.extraRoutes(api);
   }, { prefix: "/api/v1" });
+  // Business modules (inventory, crm, money, …) live in src/modules/<name>/index.ts and are auto-discovered;
+  // KKT_MODULES=a,b restricts the set (used by per-module test runs).
+  await registerDiscoveredModules(app, "/api/v1");
 
   return app;
 }

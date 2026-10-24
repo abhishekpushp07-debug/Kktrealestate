@@ -7,9 +7,16 @@ import { normalizeIndianPhone } from "@kkt/domain";
 import { writeAudit } from "../../lib/audit.js";
 import { bumpPermVersion } from "../../lib/cache.js";
 import { ApiError } from "../../lib/errors.js";
-import { verifyPassword } from "../../lib/password.js";
+import { hashPassword, verifyPassword } from "../../lib/password.js";
 import { route } from "../../lib/routes.js";
 import { applyPortalFailure, assertNotLocked, createSession, familyOfSession, listSessions, newPasswordHash, recordLoginEvent, revokeAllFamilies, revokeFamily, rotateRefresh } from "./service.js";
+
+let dummy: Promise<string> | null = null;
+/** A throw-away argon2 hash used to equalise the timing of unknown-phone and wrong-password failures. */
+function dummyHash(): Promise<string> {
+  dummy ??= hashPassword(`dummy-${Math.random()}`);
+  return dummy;
+}
 
 /** Builds the PortalUser view for a portal user id. */
 export async function portalUserView(db: Executor, portalUserId: string): Promise<PortalUser> {
@@ -45,6 +52,7 @@ export async function portalAuthRoutes(app: FastifyInstance): Promise<void> {
       const phone = normalizeIndianPhone(req.body.phone) ?? req.body.phone;
       const [pu] = await app.db.select().from(portalUsers).where(eq(portalUsers.phone, phone)).limit(1);
       if (!pu) {
+        await verifyPassword(await dummyHash(), req.body.password); // same argon2 cost as a wrong password: no enumeration oracle
         await recordLoginEvent(app.db, { companyId: null, subjectType: "CUSTOMER", identifier: phone, success: false, reason: "UNKNOWN_USER", req });
         throw new ApiError(401, "INVALID_CREDENTIALS", "Invalid phone number or password");
       }

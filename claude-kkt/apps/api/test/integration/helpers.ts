@@ -5,7 +5,7 @@ import { runMigrations } from "@kkt/db";
 export const TEST_DATABASE_URL = process.env["TEST_DATABASE_URL"] ?? "postgres://postgres:postgres@localhost:5432/kkt_api_test";
 process.env["NODE_ENV"] = "test";
 process.env["DATABASE_URL"] = TEST_DATABASE_URL;
-process.env["REDIS_URL"] ??= "redis://localhost:6379/1";
+process.env["REDIS_URL"] = process.env["TEST_REDIS_URL"] ?? process.env["REDIS_URL"] ?? "redis://localhost:6379/1";
 process.env["WRITE_RATE_LIMIT_PER_MIN"] ??= "100000";
 process.env["PUBLIC_RATE_LIMIT_PER_MIN"] ??= "100000";
 process.env["RUN_JOBS_IN_API"] = "false";

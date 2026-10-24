@@ -4,7 +4,7 @@ import { z } from "zod";
 import { AuditLogFilterSchema, AuditLogListResponseSchema, IdSchema, ListQuerySchema, LoginEventRowSchema, UserTypeSchema, listEnvelope, type AuditLogRow, type LoginEventRow } from "@kkt/contracts";
 import { auditLogs, loginEvents } from "@kkt/db";
 import { sendCsv } from "../../lib/csv.js";
-import { fromListQuery, paginate } from "../../lib/list.js";
+import { listPaging, paginate } from "../../lib/list.js";
 import { route } from "../../lib/routes.js";
 
 type DbAudit = typeof auditLogs.$inferSelect;
@@ -36,7 +36,7 @@ export async function auditModule(app: FastifyInstance): Promise<void> {
       where: and(...where.filter((w): w is SQL => w !== undefined)),
       search: { columns: [auditLogs.action, auditLogs.actorName, auditLogs.entityType, sql`${auditLogs.entityId}::text`], term: q.search },
       sort: { allowed: { created_at: auditLogs.createdAt, action: auditLogs.action, entity_type: auditLogs.entityType }, default: "-created_at", requested: q.sort },
-      ...fromListQuery(q),
+      ...listPaging(q),
     });
   }
 
@@ -78,7 +78,7 @@ export async function auditModule(app: FastifyInstance): Promise<void> {
         where: and(...where.filter((w): w is SQL => w !== undefined)),
         search: { columns: [loginEvents.identifier, loginEvents.ip, loginEvents.reason], term: q.search },
         sort: { allowed: { created_at: loginEvents.createdAt, identifier: loginEvents.identifier }, default: "-created_at", requested: q.sort },
-        ...fromListQuery(q),
+        ...listPaging(q),
       });
       const items = r.items.map(toLogin);
       if (q.format === "csv") return sendCsv(reply, "login-events.csv", ["created_at", "subject_type", "identifier", "success", "reason", "ip", "user_agent"].map((k) => ({ key: k, header: k })), items as unknown as Record<string, unknown>[]);

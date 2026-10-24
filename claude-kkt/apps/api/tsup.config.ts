@@ -1,6 +1,8 @@
 import { defineConfig } from "tsup";
 export default defineConfig({
-  entry: { server: "src/server.ts", worker: "src/worker.ts" },
+  entry: ["src/server.ts", "src/worker.ts", "src/modules/*/index.ts"],
+  outDir: "dist",
+  splitting: true,
   format: ["esm"],
   target: "node22",
   platform: "node",

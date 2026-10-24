@@ -6,10 +6,11 @@ import type { Executor } from "@kkt/db";
 import { actorFromRequest, writeAudit } from "../../lib/audit.js";
 import { sendCsv } from "../../lib/csv.js";
 import { ApiError } from "../../lib/errors.js";
-import { fromListQuery, paginate } from "../../lib/list.js";
+import { listPaging, paginate } from "../../lib/list.js";
+import { ensureProjectAccess } from "../../lib/scope.js";
 import { translatePgError } from "../../lib/pgErrors.js";
 import { route } from "../../lib/routes.js";
-import { applyUpdate, expectedVersion, withOptionalVersion } from "../../lib/version.js";
+import { applyUpdate, expectedVersion, optionalExpectedVersion, withOptionalVersion } from "../../lib/version.js";
 import type { DbRow, MasterKindDef, WriteContext } from "./types.js";
 
 const idParams = z.object({ id: IdSchema });
@@ -72,7 +73,7 @@ export async function updateMaster(tx: Executor, def: MasterKindDef, ctx: WriteC
   const values = await def.prepare(tx, patch, ctx, existing);
   await assertUniqueKey(tx, def, ctx.companyId, values, id);
   let updated: DbRow;
-  try { updated = (await applyUpdate(tx, def.table, id, version, values)) as DbRow; } catch (e) { translatePgError(e, `A ${def.entity.replace(/_/g, " ")} with this ${def.keyField}`); }
+  try { updated = (await applyUpdate(tx, def.table, id, version, values, def.entity)) as DbRow; } catch (e) { translatePgError(e, `A ${def.entity.replace(/_/g, " ")} with this ${def.keyField}`); }
   if (def.afterWrite) await def.afterWrite(tx, updated, patch, ctx, "update");
   const after = await viewOne(tx, def, updated, ctx.companyId);
   await writeAudit(tx, { companyId: ctx.companyId, actor: actorFromRequest(ctx.req), action: `${def.entity}.update`, entityType: def.entity, entityId: id, before, after, ip: ctx.req.clientIp, requestId: ctx.req.id });
@@ -97,6 +98,8 @@ export function registerMasterKind(app: FastifyInstance, def: MasterKindDef): vo
     handler: async (req, reply) => {
       const q = req.query as z.infer<typeof MasterFilterSchema> & Record<string, unknown>;
       const companyId = req.user!.companyId;
+      // A scoped user must not learn that a foreign project exists, even through a filter: 404, never 403.
+      if (typeof q["project_id"] === "string") ensureProjectAccess(req.user!, q["project_id"]);
       const where: (SQL | undefined)[] = [eq(def.table.companyId, companyId)];
       if (!q.include_inactive) where.push(eq(def.table.isActive, true));
       if (def.extraWhere) where.push(def.extraWhere(q));
@@ -105,7 +108,7 @@ export function registerMasterKind(app: FastifyInstance, def: MasterKindDef): vo
         where: and(...where.filter((w): w is SQL => w !== undefined)),
         search: { columns: def.searchColumns, term: q.search },
         sort: { allowed: def.sortable, default: def.defaultSort, requested: q.sort },
-        ...fromListQuery(q),
+        ...listPaging(q),
       });
       const items = await def.toRows(app.dbReplica, result.items, companyId);
       if (q.format === "csv") return sendCsv(reply, `${def.path}.csv`, def.csvColumns.map((k) => ({ key: k, header: k, value: (r: Record<string, unknown>) => (Array.isArray(r[k]) && (r[k] as unknown[]).every((x) => typeof x !== "object") ? (r[k] as unknown[]).join("|") : r[k]) })), items);
@@ -171,8 +174,8 @@ export function registerMasterKind(app: FastifyInstance, def: MasterKindDef): vo
             const usage = await usageOf(tx, def, ctx.companyId, req.params.id);
             if (usage.usage_count > 0) throw ApiError.conflict("IN_USE", `This ${label} is used by ${usage.usage_count} record(s) and cannot be deactivated`, usage);
           }
-          const version = req.body?.version ?? Number(existing["version"]);
-          const updated = (await applyUpdate(tx, def.table, req.params.id, version, action === "deactivate" ? { isActive: false, deactivatedAt: new Date() } : { isActive: true, deactivatedAt: null })) as DbRow;
+          const version = optionalExpectedVersion(req, req.body, Number(existing["version"]));
+          const updated = (await applyUpdate(tx, def.table, req.params.id, version, action === "deactivate" ? { isActive: false, deactivatedAt: new Date() } : { isActive: true, deactivatedAt: null }, def.entity)) as DbRow;
           await writeAudit(tx, { companyId: ctx.companyId, actor: actorFromRequest(req), action: `${def.entity}.${action}`, entityType: def.entity, entityId: req.params.id, before: { is_active: existing["isActive"] }, after: { is_active: updated["isActive"] }, ip: req.clientIp, requestId: req.id });
           return { id: String(updated["id"]), is_active: Boolean(updated["isActive"]), version: Number(updated["version"]) };
         });

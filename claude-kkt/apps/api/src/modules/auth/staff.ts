@@ -27,7 +27,7 @@ import { loadCompany } from "../../lib/company.js";
 import { decryptField, encryptField, signPayload, verifyPayload } from "../../lib/crypto.js";
 import { writeAudit } from "../../lib/audit.js";
 import { ApiError } from "../../lib/errors.js";
-import { verifyPassword } from "../../lib/password.js";
+import { hashPassword, verifyPassword } from "../../lib/password.js";
 import { route } from "../../lib/routes.js";
 import { applyStaffFailure, assertNotLocked, createSession, familyOfSession, listSessions, newPasswordHash, recordLoginEvent, revokeAllFamilies, revokeFamily, rotateRefresh, type IssuedTokens } from "./service.js";
 import { authCompanyView, authUserView } from "./views.js";
@@ -36,6 +36,13 @@ authenticator.options = { window: 1 };
 
 const MFA_TOKEN_TTL_SECONDS = 300;
 type UserRow = typeof users.$inferSelect;
+
+let dummyHash: Promise<string> | null = null;
+/** Verifies against a throw-away hash so an unknown e-mail costs the same argon2 work as a wrong password (no user-enumeration timing oracle). */
+async function burnVerify(password: string): Promise<void> {
+  dummyHash ??= hashPassword(`dummy-${Math.random()}`);
+  await verifyPassword(await dummyHash, password);
+}
 
 function tokenPair(t: IssuedTokens) {
   return { access_token: t.access_token, refresh_token: t.refresh_token, token_type: t.token_type, expires_in: t.expires_in, audience: t.audience };
@@ -78,6 +85,7 @@ export async function staffAuthRoutes(app: FastifyInstance): Promise<void> {
       const { email, password, mfa_code } = req.body;
       const [user] = await app.db.select().from(users).where(eq(users.email, email)).limit(1);
       if (!user) {
+        await burnVerify(password);
         await recordLoginEvent(app.db, { companyId: null, subjectType: "STAFF", identifier: email, success: false, reason: "UNKNOWN_USER", req });
         throw new ApiError(401, "INVALID_CREDENTIALS", "Invalid email or password");
       }

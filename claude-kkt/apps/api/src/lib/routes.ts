@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest, HTTPMethods, RouteOptions } from "fastify";
-import type { z } from "zod";
+import { z } from "zod";
 import type { Permission } from "@kkt/contracts";
 
 /** Any Zod schema. */
@@ -57,6 +57,11 @@ export function isPublicPrefix(url: string): boolean {
   return PUBLIC_PREFIXES.some((p) => url === p || url.startsWith(`${p}/`));
 }
 
+/** Unknown query keys are 400 VALIDATION_ERROR (docs/API-CONVENTIONS.md): plain object query schemas are made strict; other shapes are left as declared. */
+function strictQuery(schema: AnyZod): AnyZod {
+  return schema instanceof z.ZodObject ? schema.strict() : schema;
+}
+
 /** Tag from the first path segment after /api/v1 (for OpenAPI grouping). */
 function tagFor(url: string): string {
   const parts = url.replace(/^\/api\/v1\/?/, "").split("/").filter(Boolean);
@@ -73,7 +78,7 @@ export function route<B extends AnyZod | undefined = undefined, Q extends AnyZod
   if (guards !== 1) throw new Error(`Route ${String(def.method)} ${def.url} must declare exactly one of permission, audience or public`);
   const schema: Record<string, unknown> = { response: def.schema.response, tags: def.schema.tags ?? [tagFor(def.url)] };
   if (def.schema.body) schema["body"] = def.schema.body;
-  if (def.schema.querystring) schema["querystring"] = def.schema.querystring;
+  if (def.schema.querystring) schema["querystring"] = strictQuery(def.schema.querystring);
   if (def.schema.params) schema["params"] = def.schema.params;
   if (def.schema.summary) schema["summary"] = def.schema.summary;
   if (def.schema.description) schema["description"] = def.schema.description;

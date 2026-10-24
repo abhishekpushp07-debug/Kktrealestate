@@ -1,4 +1,5 @@
 import type { Redis } from "ioredis";
+import { config } from "../config.js";
 import { ApiError } from "./errors.js";
 
 /**
@@ -23,10 +24,16 @@ export async function enforceRateLimit(redis: Redis, bucket: string, limit: numb
   return { remaining: Math.max(0, Math.floor(limit - weighted)) };
 }
 
-/** Client IP honouring X-Forwarded-For (first hop) when behind the reverse proxy. */
-export function clientIp(headers: Record<string, string | string[] | undefined>, fallback: string | undefined): string {
-  const fwd = headers["x-forwarded-for"];
-  const first = Array.isArray(fwd) ? fwd[0] : fwd;
-  if (first) return first.split(",")[0]!.trim();
+/**
+ * Client IP for rate limits, lockouts and audit rows. X-Forwarded-For is honoured only when TRUST_PROXY is on (the reverse proxy
+ * rewrites it for untrusted clients); otherwise the socket address is used so a direct client cannot spoof its way past per-IP limits.
+ */
+export function clientIp(headers: Record<string, string | string[] | undefined>, fallback: string | undefined, trustProxy: boolean = config.TRUST_PROXY): string {
+  if (trustProxy) {
+    const fwd = headers["x-forwarded-for"];
+    const first = Array.isArray(fwd) ? fwd[0] : fwd;
+    const hop = first?.split(",")[0]?.trim();
+    if (hop) return hop.slice(0, 64);
+  }
   return fallback ?? "unknown";
 }

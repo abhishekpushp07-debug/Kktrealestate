@@ -21,18 +21,33 @@ export function expectedVersion(req: FastifyRequest, body?: { version?: number }
   throw ApiError.badRequest("version is required (body.version or If-Match header)");
 }
 
-/** Throws 409 VERSION_CONFLICT when `current` differs from `expected`. */
-export async function assertVersion(executor: Executor, table: VersionedTable, id: string, current: number, expected: number): Promise<void> {
-  if (current === expected) return;
-  throw await versionConflict(executor, table, id, current);
+/** Like expectedVersion() but falls back to `current` when neither body.version nor If-Match is present (deactivate/restore style actions). */
+export function optionalExpectedVersion(req: FastifyRequest, body: { version?: number } | null | undefined, current: number): number {
+  if (body && typeof body.version === "number") return body.version;
+  const header = req.headers["if-match"];
+  const raw = Array.isArray(header) ? header[0] : header;
+  if (raw) {
+    const n = Number(raw.replace(/^W\//, "").replace(/"/g, "").trim());
+    if (Number.isInteger(n) && n >= 1) return n;
+  }
+  return current;
 }
 
-/** Builds the 409 with `details.current` and `details.changed_by` (from the latest audit row of the entity). */
-export async function versionConflict(executor: Executor, _table: VersionedTable, id: string, current: number): Promise<ApiError> {
+/** Throws 409 VERSION_CONFLICT when `current` differs from `expected`. */
+export async function assertVersion(executor: Executor, table: VersionedTable, id: string, current: number, expected: number, entityType?: string): Promise<void> {
+  if (current === expected) return;
+  throw await versionConflict(executor, table, id, current, entityType);
+}
+
+/**
+ * Builds the 409 with `details.current` and `details.changed_by` (from the latest audit row of the entity).
+ * Pass `entityType` whenever it is known so the lookup uses the (entity_type, entity_id, created_at) index instead of scanning audit_logs.
+ */
+export async function versionConflict(executor: Executor, _table: VersionedTable, id: string, current: number, entityType?: string): Promise<ApiError> {
   const [last] = await executor
     .select({ actorName: auditLogs.actorName, createdAt: auditLogs.createdAt })
     .from(auditLogs)
-    .where(eq(auditLogs.entityId, id))
+    .where(and(eq(auditLogs.entityId, id), entityType ? eq(auditLogs.entityType, entityType) : undefined))
     .orderBy(desc(auditLogs.createdAt))
     .limit(1);
   const details: VersionConflictDetails = { current, changed_by: last?.actorName ?? null, changed_at: last?.createdAt ? new Date(last.createdAt).toISOString() : null };
@@ -43,14 +58,14 @@ export async function versionConflict(executor: Executor, _table: VersionedTable
  * `UPDATE table SET …, version = version + 1 WHERE id = $id AND version = $expected RETURNING *`.
  * 409 VERSION_CONFLICT (with the current version and who changed it) when no row matched; 404 when the row does not exist.
  */
-export async function applyUpdate<T extends VersionedTable>(tx: Executor, table: T, id: string, expected: number, changes: Record<string, unknown>): Promise<T["$inferSelect"]> {
+export async function applyUpdate<T extends VersionedTable>(tx: Executor, table: T, id: string, expected: number, changes: Record<string, unknown>, entityType?: string): Promise<T["$inferSelect"]> {
   const set = { ...changes, version: sql`${table.version} + 1` } as unknown as PgUpdateSetSource<T>;
   const rows = (await tx.update(table).set(set).where(and(eq(table.id, id), eq(table.version, expected))).returning()) as T["$inferSelect"][];
   const row = rows[0];
   if (row) return row;
   const [cur] = (await tx.select({ version: table.version }).from(table as PgTable).where(eq(table.id, id)).limit(1)) as { version: number }[];
   if (!cur) throw ApiError.notFound();
-  throw await versionConflict(tx, table, id, cur.version);
+  throw await versionConflict(tx, table, id, cur.version, entityType);
 }
 
 /** Makes `version` optional in an update body schema so the expected version may also arrive via `If-Match` (expectedVersion() enforces one of them). */

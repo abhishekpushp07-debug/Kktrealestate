@@ -75,17 +75,30 @@ function issues(err: z.ZodError): string[] {
   return err.issues.map((i) => `${i.path.join(".") || "row"}: ${i.message}`);
 }
 
-async function existingByKey(db: Executor, def: MasterKindDef, companyId: string, key: string): Promise<DbRow | null> {
-  const rows = (await db.select().from(def.table).where(and(eq(def.table.companyId, companyId), sql`lower(${def.keyColumn}::text) = lower(${key})`)).limit(1)) as DbRow[];
-  return rows[0] ?? null;
+/** Loads the existing rows for a set of business keys in one query (case-insensitive), keyed by lower-cased key. */
+async function existingByKeys(db: Executor, def: MasterKindDef, companyId: string, keys: readonly string[]): Promise<Map<string, DbRow>> {
+  const out = new Map<string, DbRow>();
+  if (keys.length === 0) return out;
+  const lowered = [...new Set(keys.map((k) => k.toLowerCase()))];
+  const rows = (await db.select().from(def.table).where(and(eq(def.table.companyId, companyId), sql`lower(${def.keyColumn}::text) in (${sql.join(lowered.map((k) => sql`${k}`), sql`, `)})`))) as DbRow[];
+  const camel = def.keyField.replace(/_([a-z0-9])/g, (_m, c: string) => c.toUpperCase());
+  for (const r of rows) out.set(String(r[camel] ?? "").toLowerCase(), r);
+  return out;
 }
 
-/** Previews (and with commit=true applies, in one transaction) a CSV import for one master kind. */
-export async function importMasterCsv(app: FastifyInstance, ctx: WriteContext, body: z.infer<typeof MasterCsvImportRequestSchema>): Promise<MasterCsvImportResponse> {
+/** Import request as accepted by the API: the contract body plus `partial` (commit the valid rows even when some rows are in ERROR). */
+export const MasterCsvImportBodySchema = MasterCsvImportRequestSchema.extend({ partial: z.boolean().default(false) });
+export type MasterCsvImportBody = z.infer<typeof MasterCsvImportBodySchema>;
+
+/**
+ * Previews (and with commit=true applies, in one transaction) a CSV import for one master kind.
+ * With errors present a commit is refused (422 IMPORT_HAS_ERRORS) unless `partial` is set, in which case only CREATE/UPDATE rows are applied.
+ */
+export async function importMasterCsv(app: FastifyInstance, ctx: WriteContext, body: MasterCsvImportBody): Promise<MasterCsvImportResponse> {
   const def = kindDef(body.kind);
   const parsed = parseCsvObjects(body.csv);
   if (parsed.headers.length === 0) throw ApiError.badRequest("CSV has no header line");
-  const rows: (MasterCsvImportRow & { input?: Record<string, unknown>; existing?: DbRow | null })[] = [];
+  const rows: (MasterCsvImportRow & { input?: Record<string, unknown>; key?: string })[] = [];
   const seenKeys = new Map<string, number>();
   for (const rec of parsed.rows) {
     const input = csvRecordToInput(def, rec.values);
@@ -97,16 +110,21 @@ export async function importMasterCsv(app: FastifyInstance, ctx: WriteContext, b
     const dupLine = seenKeys.get(key.toLowerCase());
     if (dupLine !== undefined) { rows.push({ line: rec.line, action: "SKIP", data, errors: [`Duplicate ${def.keyField} "${key}" (first seen on line ${dupLine})`] }); continue; }
     seenKeys.set(key.toLowerCase(), rec.line);
-    const existing = await existingByKey(app.db, def, ctx.companyId, key);
-    rows.push({ line: rec.line, action: existing ? "UPDATE" : "CREATE", data, errors: [], input: data, existing });
+    rows.push({ line: rec.line, action: "CREATE", data, errors: [], input: data, key });
   }
+  const existing = await existingByKeys(app.db, def, ctx.companyId, rows.flatMap((r) => (r.key ? [r.key] : [])));
+  for (const r of rows) if (r.key && existing.has(r.key.toLowerCase())) r.action = "UPDATE";
   if (body.commit) {
-    if (rows.some((r) => r.action === "ERROR")) throw ApiError.rule("Fix the rows marked ERROR before committing the import", "IMPORT_HAS_ERRORS", { error_lines: rows.filter((r) => r.action === "ERROR").map((r) => r.line) });
+    const errorLines = rows.filter((r) => r.action === "ERROR").map((r) => r.line);
+    if (errorLines.length > 0 && !body.partial) throw ApiError.rule("Fix the rows marked ERROR before committing the import (or commit with partial=true to import the valid rows only)", "IMPORT_HAS_ERRORS", { error_lines: errorLines });
     await app.db.transaction(async (tx) => {
+      // Re-resolve inside the transaction so a row created between preview and commit becomes an update instead of a duplicate.
+      const live = await existingByKeys(tx, def, ctx.companyId, rows.flatMap((r) => (r.key ? [r.key] : [])));
       for (const r of rows) {
-        if (!r.input) continue;
-        if (r.action === "CREATE") await createMaster(tx, def, ctx, r.input);
-        else if (r.action === "UPDATE" && r.existing) await updateMaster(tx, def, ctx, String(r.existing["id"]), Number(r.existing["version"]), r.input);
+        if (!r.input || !r.key || r.action === "ERROR" || r.action === "SKIP") continue;
+        const row = live.get(r.key.toLowerCase());
+        if (row) { r.action = "UPDATE"; await updateMaster(tx, def, ctx, String(row["id"]), Number(row["version"]), r.input); }
+        else { r.action = "CREATE"; await createMaster(tx, def, ctx, r.input); }
       }
     });
   }
@@ -119,7 +137,7 @@ export async function importMasterCsv(app: FastifyInstance, ctx: WriteContext, b
 export function registerImportRoute(app: FastifyInstance): void {
   route(app, {
     method: "POST", url: "/masters/import", permission: "master.write", idempotent: true,
-    schema: { body: MasterCsvImportRequestSchema, response: { 200: MasterCsvImportResponseSchema }, summary: "Preview or commit a CSV import", tags: ["masters"] },
+    schema: { body: MasterCsvImportBodySchema, response: { 200: MasterCsvImportResponseSchema }, summary: "Preview or commit a CSV import (partial=true imports the valid rows when some are in error)", tags: ["masters"] },
     handler: async (req) => importMasterCsv(app, { app, req, user: req.user!, companyId: req.user!.companyId }, req.body),
   });
 }

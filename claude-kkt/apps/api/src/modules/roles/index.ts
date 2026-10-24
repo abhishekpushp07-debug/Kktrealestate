@@ -20,10 +20,10 @@ import { actorFromRequest, writeAudit } from "../../lib/audit.js";
 import { bumpPermVersion } from "../../lib/cache.js";
 import { sendCsv } from "../../lib/csv.js";
 import { ApiError } from "../../lib/errors.js";
-import { fromListQuery, paginate } from "../../lib/list.js";
+import { listPaging, paginate } from "../../lib/list.js";
 import { translatePgError } from "../../lib/pgErrors.js";
 import { route } from "../../lib/routes.js";
-import { applyUpdate, expectedVersion, withOptionalVersion } from "../../lib/version.js";
+import { applyUpdate, expectedVersion, optionalExpectedVersion, withOptionalVersion } from "../../lib/version.js";
 
 type DbRole = typeof roles.$inferSelect;
 interface RoleSelect { role: DbRole; userCount: number }
@@ -47,9 +47,14 @@ export async function getRoleRow(db: Executor, companyId: string, id: string): P
   return toRow(r);
 }
 
+/** `dashboard.view` gates sign-in self-service (me, logout, change-password, sessions); a role without it could never use the ERP. */
+const REQUIRED_PERMISSION = "dashboard.view";
+
 function assertKnownPermissions(codes: readonly string[]): void {
   const unknown = codes.filter((c) => !(ALL_PERMISSIONS as readonly string[]).includes(c));
   if (unknown.length > 0) throw ApiError.badRequest("Unknown permission codes", { field: "permissions", unknown });
+  if (codes.length === 0) throw ApiError.badRequest("Pick at least one permission", { field: "permissions" });
+  if (!codes.includes(REQUIRED_PERMISSION)) throw ApiError.badRequest(`Every role must include ${REQUIRED_PERMISSION} (it gates sign-in and self-service)`, { field: "permissions", required: REQUIRED_PERMISSION });
 }
 
 function meta(req: FastifyRequest) {
@@ -76,7 +81,7 @@ export async function rolesModule(app: FastifyInstance): Promise<void> {
         where: and(...where.filter((w): w is SQL => w !== undefined)),
         search: { columns: [roles.name, roles.description], term: q.search },
         sort: { allowed: { name: roles.name, created_at: roles.createdAt, is_system: roles.isSystem }, default: "name", requested: q.sort },
-        ...fromListQuery(q),
+        ...listPaging(q),
       });
       const items = result.items.map(toRow);
       if (q.format === "csv") return sendCsv(reply, "roles.csv", ["name", "description", "is_system", "is_active", "user_count", "permissions"].map((k) => ({ key: k, header: k, value: (r: Record<string, unknown>) => (Array.isArray(r[k]) ? (r[k] as string[]).join("|") : r[k]) })), items as unknown as Record<string, unknown>[]);
@@ -121,15 +126,12 @@ export async function rolesModule(app: FastifyInstance): Promise<void> {
       const row = await app.db.transaction(async (tx) => {
         const before = await getRoleRow(tx, ctx.companyId, req.params.id);
         if (before.is_system && (body.name !== undefined || body.permissions !== undefined)) throw ApiError.conflict("SYSTEM_ROLE", "System roles cannot be renamed or have their permissions changed");
-        if (body.permissions) {
-          assertKnownPermissions(body.permissions);
-          if (body.permissions.length === 0) throw ApiError.badRequest("Pick at least one permission", { field: "permissions" });
-        }
+        if (body.permissions) assertKnownPermissions(body.permissions);
         const changes: Record<string, unknown> = {};
         if (body.name !== undefined) changes["name"] = body.name;
         if (body.description !== undefined) changes["description"] = body.description;
         if (body.permissions !== undefined) changes["permissions"] = [...body.permissions];
-        try { await applyUpdate(tx, roles, req.params.id, version, changes); } catch (e) { translatePgError(e, "A role with this name"); }
+        try { await applyUpdate(tx, roles, req.params.id, version, changes, "role"); } catch (e) { translatePgError(e, "A role with this name"); }
         const after = await getRoleRow(tx, ctx.companyId, req.params.id);
         await writeAudit(tx, { companyId: ctx.companyId, ...meta(req), action: "role.update", entityType: "role", entityId: req.params.id, before: before as unknown as Record<string, unknown>, after: after as unknown as Record<string, unknown> });
         return after;
@@ -153,7 +155,7 @@ export async function rolesModule(app: FastifyInstance): Promise<void> {
             const n = Number(c?.n ?? 0);
             if (n > 0) throw ApiError.conflict("IN_USE", `Role is assigned to ${n} user(s)`, { usage_count: n, used_by: [{ entity_type: "users", count: n }] });
           }
-          const updated = await applyUpdate(tx, roles, req.params.id, req.body?.version ?? before.version, action === "deactivate" ? { isActive: false, deactivatedAt: new Date() } : { isActive: true, deactivatedAt: null });
+          const updated = await applyUpdate(tx, roles, req.params.id, optionalExpectedVersion(req, req.body, before.version), action === "deactivate" ? { isActive: false, deactivatedAt: new Date() } : { isActive: true, deactivatedAt: null }, "role");
           await writeAudit(tx, { companyId: ctx.companyId, ...meta(req), action: `role.${action}`, entityType: "role", entityId: req.params.id, before: { is_active: before.is_active }, after: { is_active: updated.isActive } });
           return { id: updated.id, is_active: updated.isActive, version: updated.version };
         });

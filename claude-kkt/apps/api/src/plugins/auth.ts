@@ -22,10 +22,10 @@ declare module "fastify" {
   }
 }
 
-/** Routes a user who must change their password may still call. */
-const PASSWORD_CHANGE_EXEMPT = ["/auth/change-password", "/auth/logout", "/auth/me", "/auth/sessions", "/auth/password-policy"];
-/** Routes an admin without MFA may still call while MFA is being forced. */
-const MFA_EXEMPT = [...PASSWORD_CHANGE_EXEMPT, "/auth/mfa/enroll", "/auth/mfa/verify", "/auth/mfa/disable"];
+/** The only routes a user who must change their password may still call (staff and portal): change-password, logout, me. */
+const PASSWORD_CHANGE_EXEMPT = ["/auth/change-password", "/auth/logout", "/auth/me"];
+/** Routes an admin without MFA may still call while MFA is being forced (self-service + enrolment). */
+const MFA_EXEMPT = [...PASSWORD_CHANGE_EXEMPT, "/auth/sessions", "/auth/mfa/enroll", "/auth/mfa/verify", "/auth/mfa/disable"];
 const ADMIN_ROLES = new Set(["Super Admin", "Project Admin"]);
 const WRITE_METHODS = new Set(["POST", "PATCH", "PUT", "DELETE"]);
 const USER_CACHE_TTL = 30;
@@ -55,9 +55,10 @@ function bearer(req: FastifyRequest): string | null {
   return scheme?.toLowerCase() === "bearer" && token ? token.trim() : null;
 }
 
+/** True when the route url (minus `:param` segments) is one of the auth self-service suffixes, under `/api/v1` or `/api/v1/portal`. */
 function endsWithAny(url: string, suffixes: readonly string[]): boolean {
   const clean = url.replace(/\/:[^/]+/g, "");
-  return suffixes.some((s) => clean.endsWith(s));
+  return suffixes.some((s) => clean === `/api/v1${s}` || clean === `/api/v1/portal${s}`);
 }
 
 /** Auth plugin: client IP, public rate limits, bearer verification per audience, staff RBAC + scope, portal identity, write rate limits. */

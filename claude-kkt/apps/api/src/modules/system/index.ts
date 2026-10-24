@@ -3,6 +3,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { HealthResponseSchema } from "@kkt/contracts";
 import { config } from "../../config.js";
+import { ApiError } from "../../lib/errors.js";
 import { renderPrometheus } from "../../lib/metrics.js";
 import { route } from "../../lib/routes.js";
 
@@ -35,11 +36,10 @@ export async function systemModule(app: FastifyInstance): Promise<void> {
     route(app, {
       method: "GET", url, public: true,
       schema: { response: { 200: z.object({ ready: z.literal(true) }) }, summary: "Readiness (503 when a dependency is down)", tags: ["system"] },
-      handler: async (_req, reply) => {
+      handler: async () => {
         const p = await probe();
         if (p.db === null || p.redis === null) {
-          reply.header("Retry-After", "5");
-          return reply.code(503).send({ error: { code: "UNAVAILABLE", message: `Not ready: ${[p.db === null ? "database" : null, p.redis === null ? "redis" : null].filter(Boolean).join(", ")} unreachable` } });
+          throw ApiError.unavailable(`Not ready: ${[p.db === null ? "database" : null, p.redis === null ? "redis" : null].filter(Boolean).join(", ")} unreachable`, 5);
         }
         return { ready: true as const };
       },

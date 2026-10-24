@@ -151,3 +151,12 @@ function columnKey(table: PgTable, column: AnyPgColumn): string | undefined {
 export function fromListQuery(q: ListQuery): Pick<PaginateOptions, "page" | "page_size" | "cursor" | "limit"> {
   return { page: q.page, page_size: q.page_size, cursor: q.cursor, limit: q.limit };
 }
+
+/** Upper bound of rows a synchronous `format=csv` export streams (larger exports belong to a worker job). */
+export const CSV_EXPORT_MAX_ROWS = 10_000;
+
+/** Pagination for a list handler: normal paging for JSON, the whole filtered list (capped at CSV_EXPORT_MAX_ROWS) for `format=csv`. */
+export function listPaging(q: ListQuery): Pick<PaginateOptions, "page" | "page_size" | "cursor" | "limit"> {
+  if (q.format === "csv") return { page: 1, page_size: CSV_EXPORT_MAX_ROWS };
+  return fromListQuery(q);
+}
