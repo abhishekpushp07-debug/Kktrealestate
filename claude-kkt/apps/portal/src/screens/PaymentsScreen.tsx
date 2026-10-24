@@ -156,33 +156,35 @@ function Ledger({ bookingId }: { bookingId: string }): React.JSX.Element {
         </View>
       ) : (
         <Table
-          minWidth={980}
+          minWidth={900}
           rows={rows}
           keyOf={(r) => String(r.seq)}
           columns={[
-            { key: "date", title: "Date", width: 104, render: (r) => <T variant="small">{formatDate(r.entry_date)}</T> },
+            { key: "date", title: "Date", width: 96, render: (r) => <T variant="small">{formatDate(r.entry_date)}</T> },
             { key: "event", title: "Event", flex: 2, render: (r) => (
               <View style={{ gap: 2 }}>
                 <T variant="bodyStrong" numberOfLines={2}>{r.label}</T>
-                <View style={styles.chips}>
+                <View style={styles.chipsLeft}>
                   <Chip label={LEDGER_EVENT_LABELS[r.event]} tone="neutral" small />
                   <BucketChip bucket={r.bucket} />
                 </View>
               </View>
             ) },
-            { key: "amount", title: "Amount", align: "right", render: (r) => <Money paise={r.amount_paise} color={r.amount_paise < 0 ? colors.danger : colors.ink} signed={r.event === "PAYMENT"} /> },
+            { key: "amount", title: "Amount", align: "right", width: 118, render: (r) => <Money paise={r.amount_paise} color={r.amount_paise < 0 ? colors.danger : isPaymentEvent(r.event) ? colors.success : colors.ink} /> },
             { key: "cashPaid", title: "Cash paid", align: "right", render: (r) => <Money paise={r.cash_paid_paise} /> },
             { key: "accPaid", title: "Account paid", align: "right", render: (r) => <Money paise={r.account_paid_paise} /> },
             { key: "cashDue", title: "Cash due", align: "right", render: (r) => <DueMoney paise={r.cash_due_paise} showZeroLabel={false} /> },
             { key: "accDue", title: "Account due", align: "right", render: (r) => <DueMoney paise={r.account_due_paise} showZeroLabel={false} /> },
             { key: "totalDue", title: "Total due", align: "right", render: (r) => <DueMoney paise={r.total_due_paise} showZeroLabel={false} /> },
-            { key: "ref", title: "Ref", width: 120, render: (r) => <T variant="caption" color={colors.inkSubtle}>{r.ref_number ?? "—"}</T> },
+            { key: "ref", title: "Ref", width: 108, render: (r) => <T variant="caption" color={colors.inkSubtle} numberOfLines={2}>{r.ref_number ?? "—"}</T> },
           ]}
         />
       )}
     </>
   );
 }
+
+const isPaymentEvent = (e: PortalLedgerRow["event"]) => e === "PAYMENT" || e === "OTHER_CHARGE_PAYMENT";
 
 function Summary({ label, value }: { label: string; value: React.ReactNode }): React.JSX.Element {
   return (
@@ -207,7 +209,7 @@ function LedgerCard({ r }: { r: PortalLedgerRow }): React.JSX.Element {
             {r.ref_number ? ` · ${r.ref_number}` : ""}
           </T>
           <T variant="bodyStrong">{r.label}</T>
-          <View style={styles.chips}>
+          <View style={styles.chipsLeft}>
             <Chip label={LEDGER_EVENT_LABELS[r.event]} tone={isPayment ? "success" : isReversal ? "danger" : "neutral"} small />
             <BucketChip bucket={r.bucket} />
           </View>
@@ -410,6 +412,7 @@ const styles = StyleSheet.create({
   rowHead: { flexDirection: "row", alignItems: "flex-start", gap: space.md },
   rowFoot: { flexDirection: "row", alignItems: "center", gap: space.md },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 4, justifyContent: "flex-end" },
+  chipsLeft: { flexDirection: "row", flexWrap: "wrap", gap: 4 },
   summaryRow: { flexDirection: "row", flexWrap: "wrap", gap: space.md },
   summaryCell: { minWidth: 120, flexGrow: 1, gap: 2 },
   ledgerGrid: { flexDirection: "row", flexWrap: "wrap", marginTop: space.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line, paddingTop: space.sm },

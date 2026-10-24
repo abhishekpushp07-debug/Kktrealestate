@@ -1,11 +1,13 @@
 import { useEffect, useRef } from "react";
-import { Animated, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
+import { Animated, Platform, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
+
+const NATIVE_DRIVER = Platform.OS !== "web";
 import { colors, radius, space } from "./theme";
 
 export function Skeleton({ width = "100%", height = 16, round, style }: { width?: number | `${number}%`; height?: number; round?: boolean; style?: StyleProp<ViewStyle> }): React.JSX.Element {
   const opacity = useRef(new Animated.Value(0.5)).current;
   useEffect(() => {
-    const loop = Animated.loop(Animated.sequence([Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: true }), Animated.timing(opacity, { toValue: 0.5, duration: 700, useNativeDriver: true })]));
+    const loop = Animated.loop(Animated.sequence([Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: NATIVE_DRIVER }), Animated.timing(opacity, { toValue: 0.5, duration: 700, useNativeDriver: NATIVE_DRIVER })]));
     loop.start();
     return () => loop.stop();
   }, [opacity]);

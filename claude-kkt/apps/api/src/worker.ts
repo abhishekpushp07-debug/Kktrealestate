@@ -53,7 +53,7 @@ export async function startWorker(existingDb?: DB): Promise<RunningWorker> {
   };
 }
 
-const isMain = process.argv[1] !== undefined && new URL(import.meta.url).pathname === process.argv[1];
+const isMain = /worker\.(ts|js)$/.test(process.argv[1] ?? "");
 if (isMain) {
   startWorker()
     .then((w) => {

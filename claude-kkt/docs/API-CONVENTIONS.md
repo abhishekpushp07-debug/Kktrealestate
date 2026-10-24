@@ -99,3 +99,5 @@ GET  /api/v1/portal/notifications        → PortalNotificationListResponse  GET
 GET  /api/v1/portal/profile              → PortalProfileResponse           PATCH /api/v1/portal/profile (PortalProfileUpdate; audited as CUSTOMER)
 ```
 Every `:id` is checked against the customer's bookings; anything else is 404. KYC values are masked. No internal ids of staff users or storage keys are returned.
+
+Appendix C additions (required by apps/portal): `GET /api/v1/portal/requests/categories` → `[{id, name, default_priority}]`; `POST /api/v1/portal/requests` is JSON (`PortalRequestCreate`, `attachment_ids: []`) and photos are uploaded afterwards one per call to `POST /api/v1/portal/requests/:id/attachments` (multipart, field `file`) which returns `PortalDocumentRow` with `document_id`; replies carry the returned ids in `attachment_ids`. `GET /portal/bookings` and `GET /portal/auth/sessions` return bare arrays. 423 LOCKED carries `details.locked_until`; 429 carries `Retry-After`.

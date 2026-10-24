@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Animated, Platform, StyleSheet, View } from "react-native";
+
+const NATIVE_DRIVER = Platform.OS !== "web";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { haptics } from "@/lib/haptics";
 import { Icon } from "./Icon";
@@ -45,8 +47,8 @@ function ToastHost({ toast, onDone }: { toast: ToastMsg | null; onDone: () => vo
   useEffect(() => {
     if (!toast) return;
     opacity.setValue(0);
-    Animated.timing(opacity, { toValue: 1, duration: 180, useNativeDriver: true }).start();
-    const t = setTimeout(() => Animated.timing(opacity, { toValue: 0, duration: 220, useNativeDriver: true }).start(onDone), 3200);
+    Animated.timing(opacity, { toValue: 1, duration: 180, useNativeDriver: NATIVE_DRIVER }).start();
+    const t = setTimeout(() => Animated.timing(opacity, { toValue: 0, duration: 220, useNativeDriver: NATIVE_DRIVER }).start(onDone), 3200);
     return () => clearTimeout(t);
   }, [toast, opacity, onDone]);
   if (!toast) return null;

@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { BOOKING_STATUS_LABELS } from "@kkt/contracts";
 import { useBooking } from "@/booking/BookingProvider";
 import { haptics } from "@/lib/haptics";
+import { useLayout } from "@/ui/Responsive";
 import { Chip } from "@/ui/Chip";
 import { Icon } from "@/ui/Icon";
 import { OptionRow, Sheet } from "@/ui/Sheet";
@@ -14,8 +15,10 @@ import { colors, radius, space } from "@/ui/theme";
 export function BookingChip({ onNavy, block }: { onNavy?: boolean; block?: boolean }): React.JSX.Element | null {
   const { bookings, current, select } = useBooking();
   const [open, setOpen] = useState(false);
+  const { isPhone } = useLayout();
   if (!current) return null;
   const multiple = bookings.length > 1;
+  const compact = isPhone && !block;
   return (
     <>
       <Pressable
@@ -31,7 +34,7 @@ export function BookingChip({ onNavy, block }: { onNavy?: boolean; block?: boole
         <Icon name="flat" size={14} color={onNavy ? colors.gold : colors.navy} />
         <View style={{ flexShrink: 1 }}>
           <T variant="caption" color={onNavy ? colors.onNavy : colors.navy} numberOfLines={1}>
-            {current.flat_number} · {current.block_name}
+            {compact ? current.flat_number : `${current.flat_number} · ${current.block_name}`}
           </T>
           {block ? (
             <T variant="caption" color={onNavy ? colors.onNavySubtle : colors.inkSubtle} numberOfLines={1} style={{ fontWeight: "400" }}>

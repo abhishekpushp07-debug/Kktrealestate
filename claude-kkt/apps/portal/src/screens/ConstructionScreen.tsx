@@ -77,7 +77,7 @@ function StageRow({ stage, isLast, onOpenPhoto }: { stage: PortalConstructionSta
   const active = stage.status === "IN_PROGRESS";
   const done = stage.status === "COMPLETED";
   const { isPhone } = useLayout();
-  const thumb = isPhone ? 92 : 120;
+  const thumbWidth = isPhone ? "31%" : "23%";
   return (
     <View style={styles.stageRow}>
       <View style={styles.rail}>
@@ -106,7 +106,7 @@ function StageRow({ stage, isLast, onOpenPhoto }: { stage: PortalConstructionSta
         {stage.photos.length ? (
           <View style={styles.photoGrid}>
             {stage.photos.map((p, i) => (
-              <Pressable key={`${p.thumb_url}-${i}`} accessibilityRole="imagebutton" accessibilityLabel={p.caption ?? `Photo ${i + 1} of ${stage.name}`} onPress={() => onOpenPhoto(i)} style={({ pressed }) => [{ width: thumb, height: thumb }, pressed ? { opacity: 0.8 } : null]}>
+              <Pressable key={`${p.thumb_url}-${i}`} accessibilityRole="imagebutton" accessibilityLabel={p.caption ?? `Photo ${i + 1} of ${stage.name}`} onPress={() => onOpenPhoto(i)} style={({ pressed }) => [{ width: thumbWidth, aspectRatio: 1 }, pressed ? { opacity: 0.8 } : null]}>
                 <Image source={{ uri: p.thumb_url }} style={styles.photo} contentFit="cover" transition={200} />
               </Pressable>
             ))}
