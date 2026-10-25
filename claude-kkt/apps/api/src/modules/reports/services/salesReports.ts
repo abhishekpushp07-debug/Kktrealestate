@@ -77,6 +77,7 @@ export async function inventoryReport(db: Executor, user: Scope, q: InventoryRep
   ]);
   const byType = new Map<string, CountRow & { flat_type_id: string }>();
   const byFloor = new Map<string, CountRow & { block_id: string; floor: number }>();
+  const floorBlock = new Map<string, string>(); // floor key → block label, so floors sort by block then numerically (not "Floor 10" < "Floor 2")
   const byBlock = new Map<string, CountRow & { block_id: string }>();
   const totals = emptyCounts("Total");
   for (const c of counts) {
@@ -85,7 +86,7 @@ export async function inventoryReport(db: Executor, user: Scope, q: InventoryRep
     addCount(t, c.status, c.n, value); byType.set(c.flatTypeId, t);
     const fk = `${c.blockId}:${c.floor}`;
     const f = byFloor.get(fk) ?? { ...emptyCounts(`${c.blockName} · Floor ${c.floor}`), block_id: c.blockId, floor: c.floor };
-    addCount(f, c.status, c.n, value); byFloor.set(fk, f);
+    addCount(f, c.status, c.n, value); byFloor.set(fk, f); floorBlock.set(fk, c.blockName);
     const b = byBlock.get(c.blockId) ?? { ...emptyCounts(c.blockName), block_id: c.blockId };
     addCount(b, c.status, c.n, value); byBlock.set(c.blockId, b);
     addCount(totals, c.status, c.n, value);
@@ -108,7 +109,7 @@ export async function inventoryReport(db: Executor, user: Scope, q: InventoryRep
   const sortCounts = <T extends CountRow>(rows: T[]): T[] => rows.sort((a, b) => a.label.localeCompare(b.label));
   return {
     by_type: sortCounts([...byType.values()]),
-    by_floor: [...byFloor.values()].sort((a, b) => a.label.localeCompare(b.label) || a.floor - b.floor),
+    by_floor: [...byFloor.entries()].sort(([ka, a], [kb, b]) => (floorBlock.get(ka) ?? "").localeCompare(floorBlock.get(kb) ?? "") || a.floor - b.floor).map(([, row]) => row),
     by_block: sortCounts([...byBlock.values()]),
     totals,
     velocity,
@@ -170,9 +171,15 @@ export async function salesFunnel(db: Executor, user: Scope, q: SalesFunnelQuery
     .where(and(eq(leadActivities.actorType, "STAFF"), inArray(leadActivities.type, ["FOLLOW_UP", "NOTE", "STAGE_CHANGED", "VISIT_BOOKED", "CONVERTED"])))
     .groupBy(leadActivities.leadId)
     .as("fr");
+  // hours from lead creation to the first staff touch (null when nobody has responded yet); negative clock skew clamps to 0
+  const responseHours = sql`greatest(0, extract(epoch from (${firstResponse.firstAt} - ${leads.createdAt})) / 3600.0)`;
   const [leadRows, visitRows, bookingRows, websiteEnquiries, brochures, visitStatus] = await Promise.all([
-    db.select({ id: leads.id, stage: leads.stage, source: leads.source, assignedUserId: leads.assignedUserId, userName: users.name, createdAt: leads.createdAt, firstAt: firstResponse.firstAt })
-      .from(leads).leftJoin(users, eq(users.id, leads.assignedUserId)).leftJoin(firstResponse, eq(firstResponse.leadId, leads.id)).where(leadWhere),
+    db.select({
+      stage: leads.stage, source: leads.source, assignedUserId: leads.assignedUserId, userName: users.name,
+      n: sql<number>`count(*)::int`, responded: sql<number>`count(${firstResponse.firstAt})::int`, hours: sql<string>`coalesce(sum(${responseHours}), 0)`,
+    })
+      .from(leads).leftJoin(users, eq(users.id, leads.assignedUserId)).leftJoin(firstResponse, eq(firstResponse.leadId, leads.id)).where(leadWhere)
+      .groupBy(leads.stage, leads.source, leads.assignedUserId, users.name),
     db.select({ userId: siteVisits.assigneeUserId, n: sql<number>`count(*)::int` }).from(siteVisits)
       .where(defined([eq(siteVisits.companyId, user.companyId), gte(siteVisits.visitDate, q.from), lte(siteVisits.visitDate, q.to), scopeFilter(user, siteVisits.projectId), q.project_id ? eq(siteVisits.projectId, q.project_id) : undefined, sql`${siteVisits.status} <> 'CANCELLED'`]))
       .groupBy(siteVisits.assigneeUserId),
@@ -187,49 +194,52 @@ export async function salesFunnel(db: Executor, user: Scope, q: SalesFunnelQuery
       .where(defined([eq(siteVisits.companyId, user.companyId), gte(siteVisits.createdAt, start), lte(siteVisits.createdAt, end), scopeFilter(user, siteVisits.projectId), q.project_id ? eq(siteVisits.projectId, q.project_id) : undefined]))
       .groupBy(siteVisits.status),
   ]);
+  type Resp = { hours: number; responded: number };
   const stageCounts = new Map<LeadStage, number>();
   const sourceCounts = new Map<LeadSource, { leads: number; converted: number }>();
-  const perUser = new Map<string, { user_id: string; user_name: string; leads: number; visits: number; bookings: number; booking_value_paise: number; responseHours: number[] }>();
-  const responseHours: number[] = [];
+  const perUser = new Map<string, { user_id: string; user_name: string; leads: number; visits: number; bookings: number; booking_value_paise: number; resp: Resp }>();
+  const overall: Resp = { hours: 0, responded: 0 };
+  let leadsTotal = 0;
   for (const l of leadRows) {
-    stageCounts.set(l.stage, (stageCounts.get(l.stage) ?? 0) + 1);
+    const n = Number(l.n);
+    leadsTotal += n;
+    stageCounts.set(l.stage, (stageCounts.get(l.stage) ?? 0) + n);
     const s = sourceCounts.get(l.source) ?? { leads: 0, converted: 0 };
-    s.leads += 1; if (l.stage === "CONVERTED") s.converted += 1; sourceCounts.set(l.source, s);
-    const hours = l.firstAt ? Math.max(0, (new Date(l.firstAt).getTime() - new Date(l.createdAt).getTime()) / 3_600_000) : null;
-    if (hours !== null) responseHours.push(hours);
+    s.leads += n; if (l.stage === "CONVERTED") s.converted += n; sourceCounts.set(l.source, s);
+    overall.hours += Number(l.hours); overall.responded += Number(l.responded);
     if (l.assignedUserId) {
-      const u = perUser.get(l.assignedUserId) ?? { user_id: l.assignedUserId, user_name: l.userName ?? "—", leads: 0, visits: 0, bookings: 0, booking_value_paise: 0, responseHours: [] };
-      u.leads += 1; if (hours !== null) u.responseHours.push(hours); perUser.set(l.assignedUserId, u);
+      const u = perUser.get(l.assignedUserId) ?? { user_id: l.assignedUserId, user_name: l.userName ?? "—", leads: 0, visits: 0, bookings: 0, booking_value_paise: 0, resp: { hours: 0, responded: 0 } };
+      u.leads += n; u.resp.hours += Number(l.hours); u.resp.responded += Number(l.responded); perUser.set(l.assignedUserId, u);
     }
   }
   for (const v of visitRows) {
     if (!v.userId) continue;
-    const u = perUser.get(v.userId) ?? { user_id: v.userId, user_name: "—", leads: 0, visits: 0, bookings: 0, booking_value_paise: 0, responseHours: [] };
+    const u = perUser.get(v.userId) ?? { user_id: v.userId, user_name: "—", leads: 0, visits: 0, bookings: 0, booking_value_paise: 0, resp: { hours: 0, responded: 0 } };
     u.visits += Number(v.n); perUser.set(v.userId, u);
   }
   let bookingsTotal = 0;
   for (const b of bookingRows) {
     bookingsTotal += Number(b.n);
     if (!b.userId) continue;
-    const u = perUser.get(b.userId) ?? { user_id: b.userId, user_name: b.userName ?? "—", leads: 0, visits: 0, bookings: 0, booking_value_paise: 0, responseHours: [] };
+    const u = perUser.get(b.userId) ?? { user_id: b.userId, user_name: b.userName ?? "—", leads: 0, visits: 0, bookings: 0, booking_value_paise: 0, resp: { hours: 0, responded: 0 } };
     if (u.user_name === "—" && b.userName) u.user_name = b.userName;
     u.bookings += Number(b.n); u.booking_value_paise += Number(b.value); perUser.set(b.userId, u);
   }
-  const avg = (xs: number[]): number | null => (xs.length ? Math.round((xs.reduce((s, x) => s + x, 0) / xs.length) * 100) / 100 : null);
+  const avg = (r: Resp): number | null => (r.responded > 0 ? Math.round((r.hours / r.responded) * 100) / 100 : null);
   const stages: LeadStage[] = ["NEW", "CONTACTED", "SITE_VISIT_SCHEDULED", "SITE_VISIT_DONE", "NEGOTIATION", "CONVERTED", "LOST"];
   const converted = stageCounts.get("CONVERTED") ?? 0;
   return {
     by_stage: stages.map((stage) => ({ stage, count: stageCounts.get(stage) ?? 0 })),
     by_source: [...sourceCounts.entries()].map(([source, s]) => ({ source, leads: s.leads, converted: s.converted, conversion_percent: percentOf(s.converted, s.leads) })).sort((a, b) => b.leads - a.leads),
-    by_salesperson: [...perUser.values()].map(({ responseHours: rh, ...u }) => ({ ...u, avg_first_response_hours: avg(rh) })).sort((a, b) => b.bookings - a.bookings || b.leads - a.leads),
+    by_salesperson: [...perUser.values()].map(({ resp, ...u }) => ({ ...u, avg_first_response_hours: avg(resp) })).sort((a, b) => b.bookings - a.bookings || b.leads - a.leads),
     website: {
       enquiries: Number(websiteEnquiries[0]?.n ?? 0),
       brochure_downloads: Number(brochures[0]?.n ?? 0),
       site_visits_booked: visitStatus.reduce((s, r) => s + Number(r.n), 0),
       site_visits_by_status: visitStatus.map((r) => ({ status: r.status as VisitStatus, count: Number(r.n) })),
     },
-    avg_response_hours: avg(responseHours),
-    totals: { leads: leadRows.length, converted, lost: stageCounts.get("LOST") ?? 0, bookings: bookingsTotal },
+    avg_response_hours: avg(overall),
+    totals: { leads: leadsTotal, converted, lost: stageCounts.get("LOST") ?? 0, bookings: bookingsTotal },
   };
 }
 

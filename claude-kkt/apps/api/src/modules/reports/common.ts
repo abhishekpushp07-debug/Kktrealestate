@@ -9,6 +9,7 @@ import type { ListQuery, ReportFormat } from "@kkt/contracts";
 import { companies, type Executor } from "@kkt/db";
 import { addDays, dateParts, dayOfWeek, formatDateLabel, makeDateString, todayIST } from "@kkt/domain";
 import { sendCsv, type CsvColumn } from "../../lib/csv.js";
+import { ApiError } from "../../lib/errors.js";
 import { listPaging } from "../../lib/list.js";
 import type { StaffContext } from "../../lib/scope.js";
 import { streamDocument } from "../documents/service.js";
@@ -26,6 +27,11 @@ export function wantedFormat(q: ExportQuery): ReportFormat | "json" {
   if (q.export === "CSV") return "csv";
   if (q.export === "PDF") return "pdf";
   return "json";
+}
+
+/** Reports whose `from`/`to` are both optional still reject an inverted range (400, like DateRangeSchema does for required ranges). */
+export function assertOptionalRange(q: { from?: string | undefined; to?: string | undefined }): void {
+  if (q.from && q.to && q.from > q.to) throw ApiError.badRequest("from must be on or before to", { issues: [{ path: "to", message: "from must be on or before to" }] });
 }
 
 /** Today's business date (IST). */

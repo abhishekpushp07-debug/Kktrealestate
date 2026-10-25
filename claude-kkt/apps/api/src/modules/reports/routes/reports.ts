@@ -1,5 +1,6 @@
 /** Routes: GET /reports (catalogue) and GET /reports/<key> with JSON, `format=csv` and `format=pdf` variants (SPEC §14). */
 import type { FastifyInstance, FastifyReply } from "fastify";
+import { z } from "zod";
 import {
   ActivityReportQuerySchema, ActivityReportResponseSchema, AdvancesReportQuerySchema, AdvancesReportResponseSchema, AllotmentLetterDataSchema, BankwiseReceiptsQuerySchema, BankwiseReceiptsResponseSchema,
   BookingDocumentQuerySchema, CancellationsReportQuerySchema, CancellationsReportResponseSchema, ChequesReportQuerySchema, ChequesReportResponseSchema, CollectionsReportQuerySchema, CollectionsReportResponseSchema,
@@ -11,7 +12,7 @@ import { formatDateLabel } from "@kkt/domain";
 import { route } from "../../../lib/routes.js";
 import { ensureProjectAccess } from "../../../lib/scope.js";
 import { roznamcha } from "../../money/services/roznamcha.js";
-import { letterheadFor, rangeFilters, sendPdf, sendRowsCsv, wantedFormat, type ExportQuery } from "../common.js";
+import { assertOptionalRange, letterheadFor, rangeFilters, sendPdf, sendRowsCsv, wantedFormat, type ExportQuery } from "../common.js";
 import { allotmentLetterData, allotmentLetterPdf, customerStatement, customerStatementPdf } from "../services/documents.js";
 import { advancesReport, bankwiseReceipts, cancellationsReport, chequesReport, collectionsReport, demandVsCollection, outstandingReport, upcomingDues } from "../services/moneyReports.js";
 import { pdfDate, reportPdfStream, type PdfColumn, type ReportTableSpec } from "../services/pdf.js";
@@ -20,6 +21,9 @@ import { loadBookingRelated, loadBookingSelect, scheduleRows } from "../../money
 import { today } from "../common.js";
 
 type Row = Record<string, unknown>;
+
+/** Routes without parameters still reject unknown query keys (docs/API-CONVENTIONS.md). */
+export const EmptyQuerySchema = z.object({});
 
 /** Report catalogue (key → path, formats, accepted parameters). */
 export const REPORT_CATALOG: readonly ReportCatalogEntry[] = [
@@ -69,7 +73,7 @@ function range(q: { from: string; to: string }): string {
 export function registerReportRoutes(app: FastifyInstance): void {
   route(app, {
     method: "GET", url: "/reports", permission: "report.view",
-    schema: { response: { 200: ReportCatalogResponseSchema }, summary: "Report catalogue: keys, paths, formats and accepted parameters" },
+    schema: { querystring: EmptyQuerySchema, response: { 200: ReportCatalogResponseSchema }, summary: "Report catalogue: keys, paths, formats and accepted parameters" },
     handler: async () => ({ reports: REPORT_CATALOG }),
   });
 
@@ -160,6 +164,7 @@ export function registerReportRoutes(app: FastifyInstance): void {
     schema: { querystring: InventoryReportQuerySchema, response: { 200: InventoryReportResponseSchema }, summary: "Inventory: availability by type/floor/block, sold vs available value, sales velocity, realised rate vs rate card" },
     handler: async (req, reply) => {
       const user = req.user!;
+      assertOptionalRange(req.query);
       const r = await inventoryReport(app.dbReplica, user, req.query);
       const countCols = [col("label", "Label", 2.4), col("available", "Available", 0.9, "right"), col("hold", "Hold", 0.8, "right"), col("blocked", "Blocked", 0.8, "right"), col("booked", "Booked", 0.8, "right"), col("sold", "Sold", 0.8, "right"), col("total", "Total", 0.8, "right"), money("available_value_paise", "Available value", 1.8), money("sold_value_paise", "Sold value", 1.8)];
       const keys = ["label", "available", "hold", "blocked", "booked", "sold", "total", "available_value_paise", "sold_value_paise"];
@@ -231,6 +236,7 @@ export function registerReportRoutes(app: FastifyInstance): void {
     schema: { querystring: ChequesReportQuerySchema, response: { 200: ChequesReportResponseSchema }, summary: "Cheques in hand (PENDING) or bounced, paged, with totals" },
     handler: async (req, reply) => {
       const user = req.user!;
+      assertOptionalRange(req.query);
       const r = await chequesReport(app.dbReplica, user, req.query);
       const rows = r.items.map((c) => ({ ...c, instrument_number: c.instrument?.number ?? null, instrument_bank: c.instrument?.bank_name ?? null }));
       const keys = ["receipt_number", "instrument_date", "payment_date", "booking_number", "customer_name", "project_name", "flat_number", "amount_paise", "mode_code", "instrument_number", "instrument_bank", "bank_account_label", "status", "bounce_reason", "days_in_hand"];
@@ -332,6 +338,7 @@ export function registerReportRoutes(app: FastifyInstance): void {
     schema: { querystring: ActivityReportQuerySchema, response: { 200: ActivityReportResponseSchema }, summary: "Activity: audit summary (kind=AUDIT), logins (LOGIN) or failed logins (FAILED_LOGIN), paged (audit.view)" },
     handler: async (req, reply) => {
       const user = req.user!;
+      assertOptionalRange(req.query);
       const r = await activityReport(app.dbReplica, user, req.query);
       const keys = ["at", "kind", "actor_type", "actor_name", "identifier", "action", "entity_type", "entity_id", "ip", "reason"];
       const sent = await exportTable(reply, wantedFormat(req.query), `activity-${req.query.kind.toLowerCase()}`, keys, r.items as unknown as Row[], () => ({

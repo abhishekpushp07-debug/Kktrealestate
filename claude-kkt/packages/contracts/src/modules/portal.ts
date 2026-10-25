@@ -439,6 +439,5 @@ export const PortalProfileUpdateSchema = z.strictObject({
   alt_phone: PhoneSchema.optional().nullable(),
   email: EmailSchema.optional().nullable(),
   address_current: AddressSchema.optional().nullable(),
-  address_permanent: AddressSchema.optional().nullable(),
 });
 export type PortalProfileUpdate = z.infer<typeof PortalProfileUpdateSchema>;
