@@ -141,8 +141,8 @@ describe("scenario 9 — jump two stages ahead", () => {
     const fresh = notesAfter.filter((n) => !notesBefore.some((o) => o.id === n.id));
     const raisedBells = fresh.filter((n) => n.type === "DEMAND_RAISED").map((n) => n.entity_id);
     expect(raisedBells).toEqual(expect.arrayContaining([plinthDemands[0]!.id, slabDemands[0]!.id]));
-    const unread = await h.request<{ unread: number }>("GET", "/api/v1/portal/notifications/unread-count", { token: vikram });
-    expect(unread.body.unread).toBeGreaterThanOrEqual(2);
+    const unread = await h.request<{ count: number }>("GET", "/api/v1/portal/notifications/unread-count", { token: vikram });
+    expect(unread.body.count).toBeGreaterThanOrEqual(2);
     // the ledger of each booking carries a DEMAND row per new demand (SPEC L149)
     const ledger = await ledgerOf(h, admin, bStd.id);
     expect(ledger.filter((row) => row.event === "DEMAND").map((row) => row.ref_number)).toEqual(expect.arrayContaining([plinthDemands[1]!.demand_number, slabDemands[1]!.demand_number]));

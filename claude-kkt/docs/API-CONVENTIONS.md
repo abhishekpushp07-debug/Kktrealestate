@@ -15,6 +15,7 @@ Base path `/api/v1`. Three surfaces on the same server:
   Envelope: `{ "items": [...], "total": n, "page": p, "page_size": s, "next_cursor": "..." | null }`. CSV responses stream `text/csv` with `Content-Disposition: attachment`.
 * Single resources return the row with `version`. Mutations return the updated row.
 * Errors: `{ "error": { "code": "UPPER_SNAKE", "message": "human text", "details": {...}, "request_id": "..." } }`.
+  Every code the API raises is registered in `packages/contracts/src/errors.ts` (`ERROR_CODES` + `ERROR_STATUS`; `apps/api/test/unit/error-registry.test.ts` scans the API source and fails on an unregistered code or a status mismatch). On the wire `ApiErrorSchema` accepts any UPPER_SNAKE code, so a client never fails to parse an error from a newer server: it shows `message` and branches only on codes it knows (`isKnownErrorCode`). One spelling per meaning: `UNSUPPORTED_MEDIA_TYPE` (415) and `CASH_INSUFFICIENT` (409).
   Status map: 400 VALIDATION_ERROR / IDEMPOTENCY_KEY_REQUIRED; 401 UNAUTHENTICATED / TOKEN_EXPIRED / INVALID_AUDIENCE; 403 FORBIDDEN (permission); 404 NOT_FOUND (also for out-of-scope); 409 VERSION_CONFLICT (`details.current`, `details.changed_by`), FLAT_NOT_AVAILABLE, BUCKET_CAP_EXCEEDED, IN_USE (`details.usage_count`), SLOT_FULL, PLAN_STAGES_MISSING (`details.missing_stages`), UNDO_BLOCKED; 413 PAYLOAD_TOO_LARGE; 422 BUSINESS_RULE (`details.rule`); 423 LOCKED; 429 RATE_LIMITED (+ `Retry-After`).
 
 ## Headers

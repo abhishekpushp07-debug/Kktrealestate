@@ -6,6 +6,7 @@
 * Access token: JWT (EdDSA Ed25519 key pair derived from `JWT_SECRET`; HS256 fallback in dev), 15 min, claims `sub`, `aud` (`erp` | `portal`), `cid` (company), `sid` (session/family id), `typ: access`.
 * Refresh token: 256-bit random, stored as SHA-256 hash with `family_id`; every refresh rotates (`replaced_by_id`). Presenting a revoked/replaced token → the whole family is revoked (`revoke_reason = REUSE_DETECTED`) and the event is audited. Sessions are listed/revoked per subject.
 * Lockout: 5 failures → 15 minutes (`locked_until`), reported as 423 LOCKED. Login endpoints are rate-limited per IP (10/min) via Redis.
+* Client IP (rate limits, lockouts, audit rows, login events) is Fastify's proxy-aware `req.ip`. `TRUST_PROXY` (default `loopback`) lists the peers allowed to set `X-Forwarded-For` (`false`, `true`, or proxy-addr names/IPs/CIDRs); the client is the right-most untrusted hop, so a caller reaching the API directly cannot choose its own IP.
 * Password policy: ≥ 10 chars, upper, lower, digit; last 5 hashes kept in `password_history`; forced change flag honoured by every protected route except `change-password`/`logout`.
 
 ## Authorisation
