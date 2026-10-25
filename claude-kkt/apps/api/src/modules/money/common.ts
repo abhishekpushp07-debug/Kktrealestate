@@ -69,8 +69,13 @@ export async function loadBooking(tx: Executor, companyId: string, id: string, f
   return row;
 }
 
-/** Serialises every money operation of a booking (ledger seq, running balances, bucket cap). */
+/**
+ * Serialises every money operation of a booking (ledger seq, running balances, bucket cap, demand raising).
+ * Lock order is always booking row (FOR UPDATE) → advisory lock, so a dues run and a payment on the same booking can never deadlock
+ * (the payment path locks the row first; a job that only took the advisory lock would then block on the row while holding the advisory lock).
+ */
 export async function lockBooking(tx: Tx, bookingId: string): Promise<void> {
+  await tx.select({ id: bookings.id }).from(bookings).where(eq(bookings.id, bookingId)).for("update");
   await withAdvisoryLock(tx, `booking:${bookingId}`);
 }
 

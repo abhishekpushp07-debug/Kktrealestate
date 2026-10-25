@@ -88,9 +88,10 @@ export interface LeadSelect {
   upcomingVisitAt: Date | string | null;
 }
 
+// "leads"."id" is spelled out: Drizzle renders selected columns unqualified for single-table queries and the sub-select has its own id.
 const upcomingVisitSql = sql<string | null>`(
   select min((v.visit_date::text || 'T' || v.slot_start::text || '+05:30')::timestamptz) from ${siteVisits} v
-  where v.lead_id = ${leads.id} and v.status in ('CONFIRMED', 'RESCHEDULED') and (v.visit_date::text || 'T' || v.slot_start::text || '+05:30')::timestamptz >= now())`;
+  where v.lead_id = "leads"."id" and v.status in ('CONFIRMED', 'RESCHEDULED') and (v.visit_date::text || 'T' || v.slot_start::text || '+05:30')::timestamptz >= now())`;
 
 /** Drizzle selection for lead rows; use with `joinLead`. */
 export const LEAD_SELECT = { l: leads, projectName: projects.name, flatTypeName: flatTypes.name, assignedName: users.name, upcomingVisitAt: upcomingVisitSql };

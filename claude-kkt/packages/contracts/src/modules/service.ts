@@ -31,6 +31,8 @@ export const ServiceMessageCreateSchema = z.strictObject({
   body: z.string().trim().min(1).max(5000),
   is_internal: z.boolean().default(false),
   attachment_ids: z.array(IdSchema).max(10).default([]),
+  /** Optional explicit status to move the ticket to with this reply (e.g. AWAITING_CUSTOMER when asking for information). */
+  status: ServiceStatusSchema.optional(),
 });
 export type ServiceMessageCreate = z.infer<typeof ServiceMessageCreateSchema>;
 
@@ -45,6 +47,16 @@ export const ServiceStatusChangeSchema = z.strictObject({
   note: NoteSchema.optional().nullable(),
 });
 export type ServiceStatusChange = z.infer<typeof ServiceStatusChangeSchema>;
+
+/** Staff edits a ticket's editable fields (priority, category, subject, description) with optimistic concurrency. */
+export const ServiceRequestUpdateSchema = z.strictObject({
+  ...VersionedSchema.shape,
+  priority: ServicePrioritySchema.optional(),
+  category_id: IdSchema.optional(),
+  subject: z.string().trim().min(3).max(200).optional(),
+  description: TextSchema.min(1).optional(),
+});
+export type ServiceRequestUpdate = z.infer<typeof ServiceRequestUpdateSchema>;
 
 /** Change priority. */
 export const ServicePriorityChangeSchema = z.strictObject({ ...VersionedSchema.shape, priority: ServicePrioritySchema });
@@ -133,6 +145,31 @@ export const ServiceKanbanResponseSchema = z.object({
   columns: z.array(z.object({ status: ServiceStatusSchema, count: z.int().min(0), tickets: z.array(ServiceRequestRowSchema) })),
 });
 export type ServiceKanbanResponse = z.infer<typeof ServiceKanbanResponseSchema>;
+
+/** Kanban filters (subset of the list filter; every column is limited to `column_limit` tickets). */
+export const ServiceBoardQuerySchema = z.object({
+  priority: ServicePrioritySchema.optional(),
+  category_id: IdSchema.optional(),
+  assignee_user_id: IdSchema.optional(),
+  project_id: IdSchema.optional(),
+  column_limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+export type ServiceBoardQuery = z.infer<typeof ServiceBoardQuerySchema>;
+
+/** Customer-facing ticket row (portal module maps it onto PortalRequestRow): staff ids are kept out, reopen/rate eligibility is computed. */
+export const CustomerTicketRowSchema = ServiceRequestRowSchema.omit({ assignee_user_id: true, assignee_name: true, sla_due_at: true, sla_breached_at: true, is_sla_breached: true }).extend({
+  can_reopen: z.boolean(),
+  can_rate: z.boolean(),
+});
+export type CustomerTicketRow = z.infer<typeof CustomerTicketRowSchema>;
+
+/** Customer-facing ticket detail: internal notes are never included. */
+export const CustomerTicketDetailSchema = CustomerTicketRowSchema.extend({ messages: z.array(ServiceMessageRowSchema) });
+export type CustomerTicketDetail = z.infer<typeof CustomerTicketDetailSchema>;
+
+/** Result of the hourly SLA breach check job. */
+export const SlaBreachCheckResultSchema = z.object({ checked_at: TimestampSchema, flagged: z.int().min(0), ticket_numbers: z.array(z.string()) });
+export type SlaBreachCheckResult = z.infer<typeof SlaBreachCheckResultSchema>;
 
 /** Days after RESOLVED during which a customer may reopen. */
 export const SERVICE_REOPEN_WINDOW_DAYS = 7;

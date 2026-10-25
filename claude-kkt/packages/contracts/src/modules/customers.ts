@@ -19,6 +19,7 @@ import {
   TextSchema,
   TimestampSchema,
   UrlSchema,
+  VersionSchema,
   VersionedSchema,
   listEnvelope,
   updateOf,
@@ -113,6 +114,21 @@ export type CustomerCreate = z.infer<typeof CustomerCreateSchema>;
 /** Update a customer (partial + version). */
 export const CustomerUpdateSchema = updateOf(CustomerBase);
 export type CustomerUpdate = z.infer<typeof CustomerUpdateSchema>;
+
+/**
+ * Wire body of `PATCH /customers/:id`: fields absent from the body stay untouched (no defaults are filled in for
+ * `tags`, `co_applicants` or `same_as_current`); `version` may also arrive through `If-Match`.
+ */
+export const CustomerPatchSchema = z
+  .strictObject({
+    ...CustomerBase.shape,
+    same_as_current: z.boolean(),
+    co_applicants: z.array(CoApplicantInputSchema).max(10),
+    tags: z.array(z.string().trim().min(1).max(30)).max(20),
+  })
+  .partial()
+  .extend({ version: VersionSchema.optional() });
+export type CustomerPatch = z.infer<typeof CustomerPatchSchema>;
 
 /** Customer row with MASKED KYC values. */
 export const CustomerRowSchema = MasterRowSchema.extend({

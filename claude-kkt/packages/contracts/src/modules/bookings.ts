@@ -460,3 +460,19 @@ export const FlatNotAvailableDetailsSchema = z.object({
   booking_number: z.string().nullable(),
 });
 export type FlatNotAvailableDetails = z.infer<typeof FlatNotAvailableDetailsSchema>;
+
+/** Raise the demand of one other-charge line (line id in the path). */
+export const OtherChargeDemandLineSchema = z.strictObject({ ...VersionedSchema.shape, due_date: DateStringSchema.optional() });
+export type OtherChargeDemandLine = z.infer<typeof OtherChargeDemandLineSchema>;
+
+/** Ledger query: JSON (default) or CSV export. */
+export const LedgerQuerySchema = z.object({ format: z.enum(["csv"]).optional() });
+export type LedgerQuery = z.infer<typeof LedgerQuerySchema>;
+
+/** Booking ledger: every row plus the booking's current summary. */
+export const LedgerResponseSchema = LedgerListResponseSchema.extend({ summary: BookingSummarySchema });
+export type LedgerResponse = z.infer<typeof LedgerResponseSchema>;
+
+/** The caller's saved wizard drafts (newest first). */
+export const BookingDraftListResponseSchema = z.object({ items: z.array(BookingDraftRowSchema) });
+export type BookingDraftListResponse = z.infer<typeof BookingDraftListResponseSchema>;

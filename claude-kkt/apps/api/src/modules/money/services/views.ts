@@ -3,6 +3,7 @@
  * (one query per related table for a whole page) so lists never run N+1 queries.
  */
 import { and, asc, eq, inArray, ne, sql } from "drizzle-orm";
+import type { PgSelect } from "drizzle-orm/pg-core";
 import type {
   AgreementRevisionRow, BookingDetailResponse, BookingRow, BookingSummary, DemandRow, LedgerRow, OtherChargeRow, PaymentRow, PlanRevisionRow, ScheduleRow,
 } from "@kkt/contracts";
@@ -38,8 +39,8 @@ export const BOOKING_SELECT = {
 };
 
 /** Joins for BOOKING_SELECT (dynamic query builder). */
-export function bookingJoins<Q extends { innerJoin: (...a: never[]) => Q; leftJoin: (...a: never[]) => Q }>(q: Q): Q {
-  return (q as unknown as { innerJoin: (t: unknown, on: unknown) => Q; leftJoin: (t: unknown, on: unknown) => Q })
+export function bookingJoins(q: PgSelect): PgSelect {
+  return q
     .innerJoin(projects, eq(projects.id, bookings.projectId))
     .innerJoin(blocks, eq(blocks.id, bookings.blockId))
     .innerJoin(flats, eq(flats.id, bookings.flatId))
@@ -49,7 +50,8 @@ export function bookingJoins<Q extends { innerJoin: (...a: never[]) => Q; leftJo
 
 /** Loads one booking's joined selection (404 when missing or out of the user's project scope). */
 export async function loadBookingSelect(db: Executor, user: Pick<StaffContext, "companyId" | "allProjects" | "projectIds">, id: string): Promise<BookingSelect> {
-  const [row] = await bookingJoins(db.select(BOOKING_SELECT).from(bookings).$dynamic()).where(and(eq(bookings.id, id), eq(bookings.companyId, user.companyId))).limit(1);
+  const rows = (await bookingJoins(db.select(BOOKING_SELECT).from(bookings).$dynamic()).where(and(eq(bookings.id, id), eq(bookings.companyId, user.companyId))).limit(1)) as unknown as BookingSelect[];
+  const row = rows[0];
   if (!row) throw ApiError.notFound("Booking");
   ensureProjectAccess(user, row.booking.projectId, "Booking");
   return row;
@@ -252,10 +254,9 @@ export const PAYMENT_SELECT = {
   modeName: paymentModes.name, receivedByName: users.name, bankName: bankAccounts.bankName, bankLast4: bankAccounts.accountNumberLast4, otherChargeName: bookingOtherCharges.name,
 };
 
-export function paymentJoins<Q>(q: Q): Q {
-  return (q as unknown as { innerJoin: (t: unknown, on: unknown) => unknown; leftJoin: (t: unknown, on: unknown) => unknown } & Record<string, unknown>)
+export function paymentJoins(q: PgSelect): PgSelect {
+  return q
     .innerJoin(bookings, eq(bookings.id, payments.bookingId))
-    // @ts-expect-error chained dynamic builder
     .innerJoin(projects, eq(projects.id, payments.projectId))
     .innerJoin(blocks, eq(blocks.id, payments.blockId))
     .innerJoin(flats, eq(flats.id, bookings.flatId))
@@ -263,7 +264,7 @@ export function paymentJoins<Q>(q: Q): Q {
     .innerJoin(paymentModes, eq(paymentModes.id, payments.paymentModeId))
     .leftJoin(users, eq(users.id, payments.receivedBy))
     .leftJoin(bankAccounts, eq(bankAccounts.id, payments.bankAccountId))
-    .leftJoin(bookingOtherCharges, eq(bookingOtherCharges.id, payments.otherChargeId)) as Q;
+    .leftJoin(bookingOtherCharges, eq(bookingOtherCharges.id, payments.otherChargeId));
 }
 
 /** Label of a company bank account for receipts and lists. */
@@ -286,10 +287,11 @@ export function toPaymentRow(s: PaymentSelect): PaymentRow {
 
 /** Loads one payment's joined selection (404 when missing / out of scope). */
 export async function loadPaymentSelect(db: Executor, user: Pick<StaffContext, "companyId" | "allProjects" | "projectIds">, id: string): Promise<PaymentSelect> {
-  const [row] = await paymentJoins(db.select(PAYMENT_SELECT).from(payments).$dynamic()).where(and(eq(payments.id, id), eq(payments.companyId, user.companyId))).limit(1);
+  const rows = (await paymentJoins(db.select(PAYMENT_SELECT).from(payments).$dynamic()).where(and(eq(payments.id, id), eq(payments.companyId, user.companyId))).limit(1)) as unknown as PaymentSelect[];
+  const row = rows[0];
   if (!row) throw ApiError.notFound("Payment");
   ensureProjectAccess(user, row.payment.projectId, "Payment");
-  return row as PaymentSelect;
+  return row;
 }
 
 // ---------------------------------------------------------------------------
@@ -307,14 +309,13 @@ export interface DemandSelect {
 
 export const DEMAND_SELECT = { demand: demands, bookingNumber: bookings.bookingNumber, projectName: projects.name, blockName: blocks.name, flatNumber: flats.flatNumber, customerName: customers.fullName };
 
-export function demandJoins<Q>(q: Q): Q {
-  return (q as unknown as { innerJoin: (t: unknown, on: unknown) => unknown })
+export function demandJoins(q: PgSelect): PgSelect {
+  return q
     .innerJoin(bookings, eq(bookings.id, demands.bookingId))
-    // @ts-expect-error chained dynamic builder
     .innerJoin(projects, eq(projects.id, demands.projectId))
     .innerJoin(blocks, eq(blocks.id, demands.blockId))
     .innerJoin(flats, eq(flats.id, bookings.flatId))
-    .innerJoin(customers, eq(customers.id, demands.customerId)) as Q;
+    .innerJoin(customers, eq(customers.id, demands.customerId));
 }
 
 export function toDemandRow(s: DemandSelect, today = todayDate()): DemandRow {

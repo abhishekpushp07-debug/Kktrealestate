@@ -256,3 +256,7 @@ export const SchedulePreviewResponseSchema = z.object({
   catch_up_paise: SignedPaiseSchema,
 });
 export type SchedulePreviewResponse = z.infer<typeof SchedulePreviewResponseSchema>;
+
+/** Query of GET /blocks/:id/applicable-plans (the block is in the path). */
+export const ApplicablePlansBlockQuerySchema = z.object({ on_date: DateStringSchema.optional() });
+export type ApplicablePlansBlockQuery = z.infer<typeof ApplicablePlansBlockQuerySchema>;

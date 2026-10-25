@@ -14,7 +14,7 @@ import { translatePgError } from "../../lib/pgErrors.js";
 import { route } from "../../lib/routes.js";
 import { ensureProjectAccess, scopeFilter, type StaffContext } from "../../lib/scope.js";
 import { applyUpdate, expectedVersion, optionalExpectedVersion, withOptionalVersion } from "../../lib/version.js";
-import { allStagesPending, assertStageSequence, loadProject, masterStageOrder, meta, refreshProjectCounts, type DbProject } from "./service.js";
+import { allStagesPending, assertStageSequence, loadProject, masterStageOrder, meta, patchBody, refreshProjectCounts, type DbProject } from "./service.js";
 
 const idParams = z.object({ id: IdSchema });
 
@@ -173,7 +173,7 @@ export function registerProjectRoutes(app: FastifyInstance): void {
 
   route(app, {
     method: "PATCH", url: "/projects/:id", permission: "project.write",
-    schema: { params: idParams, body: withOptionalVersion(ProjectUpdateSchema), response: { 200: ProjectRowSchema }, summary: "Update a project (stage sequence only while every block stage is pending)" },
+    schema: { params: idParams, body: patchBody(ProjectUpdateSchema), response: { 200: ProjectRowSchema }, summary: "Update a project (stage sequence only while every block stage is pending)" },
     handler: async (req) => {
       const user = req.user!;
       const body = req.body as ProjectUpdate & { version?: number };

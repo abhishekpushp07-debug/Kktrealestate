@@ -18,8 +18,8 @@ import {
   LeadKanbanResponseSchema,
   LeadListResponseSchema,
   LeadRowSchema,
+  LeadPatchSchema,
   LeadStageChangeBodySchema,
-  LeadUpdateSchema,
   type LeadRow,
   type LeadStage,
 } from "@kkt/contracts";
@@ -31,7 +31,7 @@ import { ApiError } from "../../lib/errors.js";
 import { listPaging, paginate } from "../../lib/list.js";
 import { route } from "../../lib/routes.js";
 import { ensureProjectAccess, type StaffContext } from "../../lib/scope.js";
-import { applyUpdate, expectedVersion, withOptionalVersion } from "../../lib/version.js";
+import { applyUpdate, expectedVersion } from "../../lib/version.js";
 import { canonicalPhone, createCustomer, loadCustomerSelect, metaOf, validationError } from "./customerService.js";
 import { LEAD_SELECT, activitiesOf, createOrTouchLead, followUpsOf, getLeadRow, joinLead, leadRow, loadLeadSelect, markLeadsRead, openLeadCondition, recordLeadActivity, setLeadStage, stageHistoryOf, toDbUtm, type LeadSelect } from "./leadService.js";
 
@@ -79,7 +79,7 @@ export function leadRoutes(app: FastifyInstance): void {
       if (q.from) where.push(gte(leads.createdAt, new Date(istDateTimeMs(q.from, "00:00"))));
       if (q.to) where.push(lte(leads.createdAt, endOfDayIST(q.to)));
       if (q.follow_up_due === true) where.push(and(openLeadCondition(), isNotNull(leads.nextFollowUpAt), lte(leads.nextFollowUpAt, endOfDayIST(todayIST()))));
-      if (q.follow_up_due === false) where.push(sql`(${leads.nextFollowUpAt} is null or ${leads.nextFollowUpAt} > ${endOfDayIST(todayIST())})`);
+      if (q.follow_up_due === false) where.push(sql`(${leads.nextFollowUpAt} is null or ${leads.nextFollowUpAt} > ${endOfDayIST(todayIST()).toISOString()}::timestamptz)`);
       const result = await paginate<LeadSelect>(app.dbReplica, {
         table: leads,
         select: LEAD_SELECT,
@@ -153,7 +153,7 @@ export function leadRoutes(app: FastifyInstance): void {
       const cond = and(eq(leads.companyId, user.companyId), openLeadCondition(), isNotNull(leads.nextFollowUpAt), lte(leads.nextFollowUpAt, end), req.query.all ? undefined : eq(leads.assignedUserId, user.id));
       const [rows, totals] = await Promise.all([
         joinLead(app.dbReplica.select(LEAD_SELECT).from(leads).$dynamic()).where(cond).orderBy(asc(leads.nextFollowUpAt)).limit(req.query.limit) as unknown as Promise<LeadSelect[]>,
-        app.dbReplica.select({ total: count(), overdue: sql<number>`count(*) filter (where ${leads.nextFollowUpAt} < ${start})` }).from(leads).where(cond),
+        app.dbReplica.select({ total: count(), overdue: sql<number>`count(*) filter (where ${leads.nextFollowUpAt} < ${start.toISOString()}::timestamptz)` }).from(leads).where(cond),
       ]);
       return { date, items: rows.map(leadRow), total: Number(totals[0]?.total ?? 0), overdue: Number(totals[0]?.overdue ?? 0) };
     },
@@ -172,7 +172,7 @@ export function leadRoutes(app: FastifyInstance): void {
 
   route(app, {
     method: "PATCH", url: "/leads/:id", permission: "lead.write",
-    schema: { params: idParams, body: withOptionalVersion(LeadUpdateSchema), response: { 200: LeadRowSchema }, summary: "Update a lead (version required)" },
+    schema: { params: idParams, body: LeadPatchSchema, response: { 200: LeadRowSchema }, summary: "Update a lead (version required)" },
     handler: async (req) => {
       const user = req.user!;
       const b = req.body;

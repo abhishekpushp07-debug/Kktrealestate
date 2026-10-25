@@ -14,8 +14,8 @@ import { listPaging, paginate } from "../../lib/list.js";
 import { translatePgError } from "../../lib/pgErrors.js";
 import { route } from "../../lib/routes.js";
 import { ensureProjectAccess, type StaffContext } from "../../lib/scope.js";
-import { applyUpdate, expectedVersion, withOptionalVersion } from "../../lib/version.js";
-import { loadProject, meta, writeAuditMany } from "./service.js";
+import { applyUpdate, expectedVersion } from "../../lib/version.js";
+import { loadProject, meta, patchBody, writeAuditMany } from "./service.js";
 
 export type DbParkingSlot = typeof parkingSlots.$inferSelect;
 
@@ -66,7 +66,7 @@ export function slotNumber(prefix: string, n: number, pad: number): string {
 }
 
 /** Update body: slot fields plus an optional manual status (full enum so ALLOTTED answers 422, not 400). */
-const UpdateBody = withOptionalVersion(ParkingSlotUpdateSchema.extend({ status: ParkingStatusSchema.optional(), reason: z.string().trim().max(1000).optional().nullable() }));
+const UpdateBody = patchBody(ParkingSlotUpdateSchema.extend({ status: ParkingStatusSchema.optional(), reason: z.string().trim().max(1000).optional().nullable() }));
 const StatusBody = z.strictObject({ ...ParkingStatusChangeSchema.shape, status: ParkingStatusSchema, version: VersionSchema.optional() });
 const CSV = ["number", "slot_type", "level", "price_paise", "status", "booking_number", "flat_number", "version"];
 

@@ -120,12 +120,12 @@ export function portalAccessRoutes(app: FastifyInstance): void {
       const scope = scopeFilter(user, bookings.projectId);
       // Customers (primary or co-applicant) with an ACTIVE booking in scope; those already enabled are counted separately.
       const candidates = await app.db
-        .select({ c: customers, enabled: sql<boolean | null>`(select pu.is_enabled from ${portalUsers} pu where pu.customer_id = ${customers.id})` })
+        .select({ c: customers, enabled: sql<boolean | null>`(select pu.is_enabled from ${portalUsers} pu where pu.customer_id = "customers"."id")` })
         .from(customers)
         .where(and(
           eq(customers.companyId, user.companyId), eq(customers.isActive, true),
           sql`exists (select 1 from ${bookings} b where b.status = 'ACTIVE' ${scope ? sql`and ${scope}` : sql``} ${req.body.project_id ? sql`and b.project_id = ${req.body.project_id}` : sql``}
-                      and (b.customer_id = ${customers.id} or exists (select 1 from ${bookingCoApplicants} bc where bc.booking_id = b.id and bc.customer_id = ${customers.id})))`,
+                      and (b.customer_id = "customers"."id" or exists (select 1 from ${bookingCoApplicants} bc where bc.booking_id = b.id and bc.customer_id = "customers"."id")))`,
         ))
         .orderBy(customers.customerCode);
       const todo = candidates.filter((r) => r.enabled !== true);

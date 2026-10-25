@@ -13,7 +13,7 @@ export {
 } from "./service.js";
 export { toProjectRows, getProjectRow } from "./projects.js";
 export { toBlockRows, getBlockRow } from "./blocks.js";
-export { toFlatRows, getFlatRow, manualStatusChanges, statusAudit, defaultHoldUntil, FLAT_SELECT, flatJoins, type FlatSelect } from "./flats.js";
+export { toFlatRows, getFlatRow, manualStatusChanges, statusAudit, defaultHoldUntil, assertHoldUntil, FLAT_SELECT, flatJoins, type FlatSelect } from "./flats.js";
 export { toParkingRows, loadParkingSlot, manualParkingStatus } from "./parking.js";
 export { toRateCardRows } from "./rateCards.js";
 

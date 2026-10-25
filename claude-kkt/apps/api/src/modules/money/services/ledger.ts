@@ -9,7 +9,7 @@ import {
   type LedgerEvent, type LedgerRow, type LedgerSummary,
 } from "@kkt/domain";
 import { agreementRevisions, bookingOtherCharges, bookingPlanRevisions, bookings, demands, ledgerEntries, payments, type AgreementValues, type Executor, type Tx } from "@kkt/db";
-import { ApiError } from "../../lib/errors.js";
+import { ApiError } from "../../../lib/errors.js";
 import { lockBooking, type BookingRecord } from "../common.js";
 
 /** A stored ledger row. */
@@ -131,14 +131,14 @@ export const events = {
   otherChargeDemand(c: Pick<OtherChargeRecord, "id" | "name" | "demandNumber" | "totalPaise">, at: Date): LedgerEvent {
     return { kind: "OTHER_CHARGE_DEMAND", at: at.toISOString(), label: c.name, refNumber: c.demandNumber, refId: c.id, amountPaise: c.totalPaise };
   },
-  payment(p: Pick<PaymentRecord, "id" | "receiptNumber" | "amountPaise" | "modeCode" | "bucket">, at: Date): LedgerEvent {
-    return { kind: "PAYMENT", at: at.toISOString(), bucket: p.bucket ?? "CASH", amountPaise: p.amountPaise, label: `Receipt ${p.receiptNumber}`, refNumber: p.receiptNumber, refId: p.id, note: p.modeCode };
+  payment(p: Pick<PaymentRecord, "id" | "receiptNumber" | "amountPaise" | "modeCode" | "bucket" | "paymentDate">, at: Date): LedgerEvent {
+    return { kind: "PAYMENT", at: at.toISOString(), entryDate: p.paymentDate, bucket: p.bucket ?? "CASH", amountPaise: p.amountPaise, label: `Receipt ${p.receiptNumber}`, refNumber: p.receiptNumber, refId: p.id, note: p.modeCode };
   },
   reversal(p: Pick<PaymentRecord, "id" | "receiptNumber" | "amountPaise" | "bucket" | "reversalReason">, at: Date): LedgerEvent {
     return { kind: "REVERSAL", at: at.toISOString(), bucket: p.bucket ?? "CASH", amountPaise: p.amountPaise, label: `Reversal of ${p.receiptNumber}`, refNumber: p.receiptNumber, refId: p.id, note: p.reversalReason ?? null };
   },
-  otherChargePayment(p: Pick<PaymentRecord, "id" | "receiptNumber" | "amountPaise" | "modeCode">, chargeName: string, at: Date): LedgerEvent {
-    return { kind: "OTHER_CHARGE_PAYMENT", at: at.toISOString(), amountPaise: p.amountPaise, label: `${chargeName} – Receipt ${p.receiptNumber}`, refNumber: p.receiptNumber, refId: p.id, note: p.modeCode };
+  otherChargePayment(p: Pick<PaymentRecord, "id" | "receiptNumber" | "amountPaise" | "modeCode" | "paymentDate">, chargeName: string, at: Date): LedgerEvent {
+    return { kind: "OTHER_CHARGE_PAYMENT", at: at.toISOString(), entryDate: p.paymentDate, amountPaise: p.amountPaise, label: `${chargeName} – Receipt ${p.receiptNumber}`, refNumber: p.receiptNumber, refId: p.id, note: p.modeCode };
   },
   otherChargeReversal(p: Pick<PaymentRecord, "id" | "receiptNumber" | "amountPaise" | "reversalReason">, at: Date): LedgerEvent {
     return { kind: "OTHER_CHARGE_REVERSAL", at: at.toISOString(), amountPaise: p.amountPaise, label: `Reversal of ${p.receiptNumber}`, refNumber: p.receiptNumber, refId: p.id, note: p.reversalReason ?? null };

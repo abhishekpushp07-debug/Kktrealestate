@@ -71,7 +71,7 @@ export function publishBlockers(project: DbProject, w: Pick<DbWebsiteSettings, "
   if (!project.description || project.description.trim().length === 0) missing.push("description");
   const hasAddress = Boolean(project.address?.line1 && project.address.city);
   const hasCoords = project.latitude !== null && project.longitude !== null;
-  if (!hasAddress && !hasCoords && !project.city) missing.push("location");
+  if (!hasAddress && !hasCoords) missing.push("location");
   return missing;
 }
 
@@ -220,7 +220,7 @@ export function registerProjectWebsiteRoutes(app: FastifyInstance): void {
       const [agg] = await app.dbReplica
         .select({
           requests: sql<number>`count(*)::int`,
-          downloads30: sql<number>`count(*) filter (where ${brochureDownloads.downloadedAt} >= ${since})::int`,
+          downloads30: sql<number>`count(*) filter (where ${brochureDownloads.downloadedAt} >= ${since.toISOString()}::timestamptz)::int`,
           last: sql<Date | string | null>`max(${brochureDownloads.downloadedAt})`,
         })
         .from(brochureDownloads)

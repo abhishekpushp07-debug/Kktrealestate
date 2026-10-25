@@ -87,6 +87,12 @@ export async function defaultHoldUntil(app: FastifyInstance, companyId: string):
 
 export interface StatusChangeInput { status: FlatStatus; reason?: string | null; holdUntil: Date | null }
 
+/** 400 when an explicit hold_until is not a future instant (a hold that has already expired makes no sense). */
+export function assertHoldUntil(holdUntil: Date | null): void {
+  if (holdUntil === null) return;
+  if (Number.isNaN(holdUntil.getTime()) || holdUntil.getTime() <= Date.now()) throw ApiError.badRequest("hold_until must be in the future", { field: "hold_until" });
+}
+
 /**
  * Validates a manual status change (AVAILABLE ↔ HOLD ↔ BLOCKED). BOOKED/SOLD are owned by the booking engine (422 whether as target or as current state).
  * Releasing another user's HOLD needs settings.manage (403). Returns the column changes to apply.
@@ -214,6 +220,7 @@ export function registerFlatRoutes(app: FastifyInstance): void {
       const body = req.body;
       const version = expectedVersion(req, body);
       const holdUntil = body.status === "HOLD" ? (body.hold_until ? new Date(body.hold_until) : await defaultHoldUntil(app, user.companyId)) : null;
+      assertHoldUntil(holdUntil);
       return app.db.transaction(async (tx) => {
         const flat = await loadFlat(tx, user, req.params.id, true);
         const changes = manualStatusChanges(user, flat, { status: body.status, reason: body.reason, holdUntil });

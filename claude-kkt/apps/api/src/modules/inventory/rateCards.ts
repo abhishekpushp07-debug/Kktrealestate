@@ -18,7 +18,7 @@ import { ensureProjectAccess, scopeFilter, type StaffContext } from "../../lib/s
 import { applyUpdate, expectedVersion, withOptionalVersion } from "../../lib/version.js";
 import { assertFilterScope } from "./projects.js";
 import {
-  flatTypeToDomain, loadActiveRateCard, loadBlock, loadFlat, loadProject, loadRateCardDomain, meta, priceWith, repriceFlats, writeAuditMany,
+  flatTypeToDomain, loadActiveRateCard, loadBlock, loadFlat, loadProject, loadRateCardDomain, meta, patchBody, priceWith, repriceFlats, writeAuditMany,
   type DbRateCard, type LoadedRateCard, type RepriceChange,
 } from "./service.js";
 
@@ -241,7 +241,7 @@ export function registerRateCardRoutes(app: FastifyInstance): void {
 
   route(app, {
     method: "PATCH", url: "/rate-cards/:id", permission: "rate_card.write",
-    schema: { params: idParams, body: withOptionalVersion(RateCardUpdateSchema), response: { 200: RateCardRowSchema }, summary: "Update a Draft rate card (name, effective date, rates, PLC rules)" },
+    schema: { params: idParams, body: patchBody(RateCardUpdateSchema), response: { 200: RateCardRowSchema }, summary: "Update a Draft rate card (name, effective date, rates, PLC rules)" },
     handler: async (req) => {
       const user = req.user!;
       const body = req.body as { version?: number; name?: string; effective_from?: string; rates?: RateCardRate[]; plc_rules?: PlcRule[] };

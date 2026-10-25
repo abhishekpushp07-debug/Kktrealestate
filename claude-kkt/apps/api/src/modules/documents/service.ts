@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { Readable } from "node:stream";
 import { and, desc, eq, inArray, or, sql, type SQL } from "drizzle-orm";
 import type { PgSelect } from "drizzle-orm/pg-core";
@@ -10,7 +10,7 @@ import {
 } from "@kkt/contracts";
 import { customers, documentTypes, documents, users, type Executor } from "@kkt/db";
 import { config } from "../../config.js";
-import { sha256, signPayload, verifyPayload } from "../../lib/crypto.js";
+import { sha256 } from "../../lib/crypto.js";
 import { ApiError } from "../../lib/errors.js";
 import { createStorage, type Storage } from "../../lib/storage.js";
 
@@ -215,19 +215,51 @@ export function safeFileName(name: string, mime?: AllowedUploadMime): string {
 // Links
 // ---------------------------------------------------------------------------
 
-interface LinkPayload extends Record<string, string | number> { d: string; v: DocumentVariant }
+const VARIANT_CODES: readonly DocumentVariant[] = ["original", "thumb", "medium"];
+const TOKEN_BODY_BYTES = 16 + 1 + 6; // uuid, variant code, expiry (seconds, 48-bit)
+const TOKEN_SIG_BYTES = 16; // HMAC-SHA256 truncated to 128 bits
+/** Key for file-link tokens, derived from the JWT secret with its own context so a token can never pass as another signed payload. */
+const linkKey = createHash("sha256").update("kkt-files-v1").update(":").update(config.JWT_SECRET).digest();
+
+/**
+ * Compact signed link token (54 chars): base64url(uuid ‖ variant ‖ exp) ‖ "." ‖ base64url(HMAC-SHA256 truncated to 128 bits).
+ * Short enough for a plain `:token` route parameter (find-my-way's 100-char default), so the stream route is a normal, documented route.
+ */
+function encodeLinkToken(documentId: string, variant: DocumentVariant, exp: number): string {
+  const body = Buffer.alloc(TOKEN_BODY_BYTES);
+  Buffer.from(documentId.replace(/-/g, ""), "hex").copy(body, 0);
+  body[16] = VARIANT_CODES.indexOf(variant);
+  body.writeUIntBE(Math.max(0, Math.min(exp, 2 ** 48 - 1)), 17, 6);
+  const sig = createHmac("sha256", linkKey).update(body).digest().subarray(0, TOKEN_SIG_BYTES);
+  return `${body.toString("base64url")}.${sig.toString("base64url")}`;
+}
 
 /** Signed, short-lived download URL for a document rendition (served by `GET /api/v1/files/:token`). */
 export function signedUrl(documentId: string, variant: DocumentVariant = "original", ttlSeconds = SIGNED_LINK_TTL_SECONDS): { url: string; expires_at: string } {
-  const token = signPayload({ d: documentId, v: variant } satisfies LinkPayload, ttlSeconds);
-  return { url: `${config.API_PUBLIC_URL}/api/v1/files/${token}`, expires_at: new Date((Math.floor(Date.now() / 1000) + ttlSeconds) * 1000).toISOString() };
+  const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
+  const token = encodeLinkToken(documentId, variant, exp);
+  return { url: `${config.API_PUBLIC_URL}/api/v1/files/${token}`, expires_at: new Date(exp * 1000).toISOString() };
 }
 
-/** Verifies a `/files/:token` token; null when forged or expired. */
+/**
+ * Verifies a `/files/:token` token; null when malformed, forged or expired. The token is re-encoded from its decoded fields and
+ * compared whole in constant time, so only the canonical spelling verifies (no base64 padding-bit twiddling, no sig truncation).
+ */
 export function verifyLinkToken(token: string): { documentId: string; variant: DocumentVariant } | null {
-  const data = verifyPayload<LinkPayload>(token);
-  if (!data || typeof data.d !== "string" || !UUID_RE.test(data.d) || !["original", "thumb", "medium"].includes(String(data.v))) return null;
-  return { documentId: data.d, variant: data.v };
+  const dot = token.lastIndexOf(".");
+  if (dot <= 0 || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token)) return null;
+  const body = Buffer.from(token.slice(0, dot), "base64url");
+  if (body.length !== TOKEN_BODY_BYTES) return null;
+  const variant = VARIANT_CODES[body[16]!];
+  if (!variant) return null;
+  const hex = body.subarray(0, 16).toString("hex");
+  const documentId = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  const exp = body.readUIntBE(17, 6);
+  const expected = Buffer.from(encodeLinkToken(documentId, variant, exp));
+  const given = Buffer.from(token);
+  if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
+  if (exp < Math.floor(Date.now() / 1000)) return null;
+  return { documentId, variant };
 }
 
 /** Long-lived public URL for CMS media (served by the web/public module through streamDocument()). */
@@ -276,6 +308,12 @@ export async function streamDocument(executor: Executor, documentId: string, var
 // Views
 // ---------------------------------------------------------------------------
 
+/**
+ * Microsecond-exact, fixed-width sort key for `created_at`. Keyset cursors built from a JS Date keep only milliseconds, so rows
+ * written in the same millisecond (concurrent uploads) would be skipped when paging by the raw column; this text key round-trips exactly.
+ */
+export const CREATED_AT_SORT = sql<string>`to_char(${documents.createdAt} at time zone 'UTC', 'YYYY-MM-DD HH24:MI:SS.US')`;
+
 /** Selection used by every documents query (row + type + uploader names) — one query, no per-row lookups. */
 export const DOCUMENT_SELECT = {
   doc: documents,
@@ -283,6 +321,7 @@ export const DOCUMENT_SELECT = {
   isKyc: documentTypes.isKyc,
   staffName: users.name,
   customerName: customers.fullName,
+  createdAtSort: CREATED_AT_SORT,
 };
 
 /** Adds the type/uploader joins to a (dynamic) documents query builder. */

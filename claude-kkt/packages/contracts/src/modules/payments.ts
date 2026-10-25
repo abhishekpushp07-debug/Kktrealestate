@@ -311,3 +311,7 @@ export const ChequeRowSchema = PaymentRowSchema.pick({
 export type ChequeRow = z.infer<typeof ChequeRowSchema>;
 export const ChequeListResponseSchema = listEnvelope(ChequeRowSchema);
 export type ChequeListResponse = z.infer<typeof ChequeListResponseSchema>;
+
+/** Roznamcha for one day (default today IST), optionally one project. */
+export const RoznamchaDayQuerySchema = z.object({ date: DateStringSchema.optional(), project_id: IdSchema.optional() });
+export type RoznamchaDayQuery = z.infer<typeof RoznamchaDayQuerySchema>;

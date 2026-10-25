@@ -17,8 +17,8 @@ import {
   CustomerKycUpdateSchema,
   CustomerListResponseSchema,
   CustomerRevealedSchema,
+  CustomerPatchSchema,
   CustomerRowSchema,
-  CustomerUpdateSchema,
   IdSchema,
   VersionedSchema,
   type Customer360Response,
@@ -33,7 +33,7 @@ import { ApiError } from "../../lib/errors.js";
 import { listPaging, paginate } from "../../lib/list.js";
 import { route } from "../../lib/routes.js";
 import { assertPermission, ensureProjectAccess, scopeFilter } from "../../lib/scope.js";
-import { applyUpdate, expectedVersion, optionalExpectedVersion, withOptionalVersion } from "../../lib/version.js";
+import { applyUpdate, expectedVersion, optionalExpectedVersion } from "../../lib/version.js";
 import { revokeAllFamilies } from "../auth/service.js";
 import { bumpPermVersion } from "../../lib/cache.js";
 import {
@@ -205,7 +205,7 @@ export function customerRoutes(app: FastifyInstance): void {
 
   route(app, {
     method: "PATCH", url: "/customers/:id", permission: "customer.write",
-    schema: { params: idParams, body: withOptionalVersion(CustomerUpdateSchema), response: { 200: CustomerRowSchema }, summary: "Update a customer (version required)" },
+    schema: { params: idParams, body: CustomerPatchSchema, response: { 200: CustomerRowSchema }, summary: "Update a customer (version required)" },
     handler: async (req) => {
       const ctx = ctxOf(app, req);
       const version = expectedVersion(req, req.body);

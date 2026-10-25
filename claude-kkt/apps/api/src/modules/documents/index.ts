@@ -3,7 +3,7 @@ import { registerDocumentRoutes } from "./routes.js";
 
 export {
   storeBuffer, signedUrl, publicMediaUrl, streamDocument, listForEntity, loadRows, documentsSharedWithCustomer, toDocumentRow, loadJoined,
-  verifyLinkToken, variantKey, variantMeta, SIGNED_LINK_TTL_SECONDS,
+  verifyLinkToken, variantKey, variantMeta, safeFileName, SIGNED_LINK_TTL_SECONDS, MAX_IMAGE_PIXELS,
   type StoreBufferInput, type DocumentRecord, type DocumentJoined, type DocumentStream,
 } from "./service.js";
 export { resolveEntity, requireEntity, assertEntityWrite, documentScopeCondition, ENTITY_WRITE_PERMISSION, type EntityRef } from "./entities.js";

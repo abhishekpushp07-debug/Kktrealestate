@@ -4,7 +4,8 @@
  */
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { FastifyRequest } from "fastify";
-import type { UnitCounts } from "@kkt/contracts";
+import { z } from "zod";
+import { VersionSchema, type UnitCounts } from "@kkt/contracts";
 import {
   auditLogs, blockStages, blocks, constructionStages, flatTypes, flats, floorPlanTemplates, plcTypes, projects, rateCardPlcRules, rateCardRates, rateCards,
   type Executor, type FlatTypeArea, type FlatTypeRoom, type PriceBreakupLine,
@@ -27,6 +28,28 @@ export type DbRateCard = typeof rateCards.$inferSelect;
 export const MANUAL_STATUSES = new Set(["AVAILABLE", "HOLD", "BLOCKED"]);
 /** Statuses owned by the booking engine. */
 export const ENGINE_STATUSES = new Set(["BOOKED", "SOLD"]);
+
+/** Unwraps optional/default wrappers of a Zod field (Zod 4 keeps `.default()` through `.partial()`, which would reset omitted PATCH fields). */
+function stripDefaults(field: z.ZodType): z.ZodType {
+  let s = field;
+  for (;;) {
+    const def = (s as unknown as { _zod?: { def?: { type?: string; innerType?: z.ZodType } } })._zod?.def;
+    if (def && (def.type === "optional" || def.type === "default") && def.innerType) s = def.innerType;
+    else return s;
+  }
+}
+
+/**
+ * PATCH body schema from an Update schema: every field plainly optional (no defaults, so an omitted key means "unchanged")
+ * and `version` optional so it may also arrive via `If-Match` (expectedVersion() enforces one of them).
+ */
+export function patchBody<T extends z.ZodType>(schema: T): T {
+  const shape = (schema as unknown as { shape?: Record<string, z.ZodType> }).shape;
+  if (!shape) return schema;
+  const out: Record<string, z.ZodType> = {};
+  for (const [k, v] of Object.entries(shape)) out[k] = k === "version" ? VersionSchema.optional() : stripDefaults(v).optional();
+  return z.strictObject(out) as unknown as T;
+}
 
 /** Request metadata for audit rows. */
 export function meta(req: FastifyRequest): Pick<AuditEntry, "actor" | "ip" | "requestId"> {
@@ -105,7 +128,7 @@ export async function refreshUnitCounts(tx: Executor, blockId: string): Promise<
              count(*) filter (where f.status = 'BOOKED')::int as booked,
              count(*) filter (where f.status = 'SOLD')::int as sold,
              count(*)::int as total
-      from flats f where f.project_id = (select project_id from ub)
+      from flats f join blocks b on b.id = f.block_id where f.project_id = (select project_id from ub) and b.is_active
     ), bcnt as (
       select count(*)::int as n from blocks where project_id = (select project_id from ub) and is_active
     )

@@ -202,13 +202,34 @@ export async function recomputeDemandStatuses(tx: Executor, bookingId: string): 
   }
 }
 
-/** Per-bucket allocation of paid money to a booking's non-void demands (used by the undo-block rule). */
-async function demandAllocations(tx: Executor, bookingId: string): Promise<Map<string, { cashPaid: number; accountPaid: number }>> {
-  const [b] = await tx.select({ cashPaid: bookings.cashPaidPaise, accountPaid: bookings.accountPaidPaise }).from(bookings).where(eq(bookings.id, bookingId)).limit(1);
-  const rows = await tx.select({ id: demands.id, cash: demands.cashDemandPaise, account: demands.accountDemandPaise }).from(demands)
-    .where(and(eq(demands.bookingId, bookingId), ne(demands.status, "VOID"))).orderBy(asc(demands.postedAt), asc(demands.installmentSeq));
-  const results = demandStatuses(rows.map((r) => ({ id: r.id, cashPaise: r.cash, accountPaise: r.account })), Math.max(0, b?.cashPaid ?? 0), Math.max(0, b?.accountPaid ?? 0));
-  return new Map(results.map((r) => [r.id, { cashPaid: r.cashPaidPaise, accountPaid: r.accountPaidPaise }]));
+/**
+ * Chronological FIFO allocation of a booking's CLEARED flat-value payments (by payment date, then posting order) to its non-void demands
+ * (in raise order), per bucket. Returns, per demand, the receipts that funded it with their payment dates – the input of the UNDO RULE.
+ */
+async function demandFunding(tx: Executor, bookingId: string): Promise<Map<string, { receipt: string; date: string }[]>> {
+  const [demandRows, paymentRows] = await Promise.all([
+    tx.select({ id: demands.id, cash: demands.cashDemandPaise, account: demands.accountDemandPaise }).from(demands)
+      .where(and(eq(demands.bookingId, bookingId), ne(demands.status, "VOID"))).orderBy(asc(demands.postedAt), asc(demands.installmentSeq)),
+    tx.select({ receipt: payments.receiptNumber, date: payments.paymentDate, bucket: payments.bucket, amount: payments.amountPaise }).from(payments)
+      .where(and(eq(payments.bookingId, bookingId), eq(payments.status, "CLEARED"), eq(payments.against, "FLAT_VALUE"))).orderBy(asc(payments.paymentDate), asc(payments.postedAt)),
+  ]);
+  const out = new Map<string, { receipt: string; date: string }[]>();
+  const open = { CASH: demandRows.map((d) => ({ id: d.id, left: d.cash })), ACCOUNT: demandRows.map((d) => ({ id: d.id, left: d.account })) };
+  for (const p of paymentRows) {
+    if (!p.bucket) continue;
+    let amount = p.amount;
+    for (const d of open[p.bucket]) {
+      if (amount <= 0) break;
+      if (d.left <= 0) continue;
+      const take = Math.min(d.left, amount);
+      d.left -= take;
+      amount -= take;
+      const list = out.get(d.id) ?? [];
+      list.push({ receipt: p.receipt, date: p.date });
+      out.set(d.id, list);
+    }
+  }
+  return out;
 }
 
 /** Result of voiding stage demands. */
@@ -216,13 +237,16 @@ export type VoidStageResult = { blocked: true; reasons: string[] } | { blocked: 
 
 /**
  * UNDO RULE (SPEC §9): demands raised by a stage (ON_STAGE on that stage, or ON_POSSESSION when it is the possession stage) are voided,
- * unless any of them has been paid by a CLEARED payment in that bucket dated on/after the demand – then the undo is blocked with reasons.
- * Voided demands lose their notifications (withdraw rule) and every affected ledger is rebuilt.
+ * unless any of them has been paid by a CLEARED payment dated on/after the demand – then the undo is blocked with reasons. Earlier advances
+ * that were auto-applied never block (they return to credit). Voided demands lose their notifications (withdraw rule) and every affected
+ * ledger is rebuilt. Each affected booking is locked (row + advisory) before anything is read, so a concurrent payment cannot slip in.
  */
 export async function voidDemandsForStage(tx: Tx, blockId: string, stageId: string, reason: string, actor: MoneyActor = SYSTEM_MONEY_ACTOR): Promise<VoidStageResult> {
   const towerStages = await loadTowerStages(tx, blockId);
   const stage = towerStages.find((s) => s.stageId === stageId);
-  const rows = await tx.select().from(demands).where(and(eq(demands.blockId, blockId), ne(demands.status, "VOID"))).orderBy(asc(demands.bookingId), asc(demands.postedAt));
+  const candidateIds = (await tx.select({ bookingId: demands.bookingId }).from(demands).where(and(eq(demands.blockId, blockId), ne(demands.status, "VOID"))).groupBy(demands.bookingId).orderBy(asc(demands.bookingId))).map((r) => r.bookingId);
+  for (const id of candidateIds) await lockBooking(tx, id);
+  const rows = candidateIds.length ? await tx.select().from(demands).where(and(inArray(demands.bookingId, candidateIds), ne(demands.status, "VOID"))).orderBy(asc(demands.bookingId), asc(demands.postedAt)) : [];
   // ON_STAGE demands carry trigger_stage_id; ON_POSSESSION ones are attributed through demandStageId (possession stage of the tower)
   const targets = rows.filter((d) => {
     if (d.triggerStageId === stageId) return true;
@@ -231,20 +255,13 @@ export async function voidDemandsForStage(tx: Tx, blockId: string, stageId: stri
   });
   if (targets.length === 0) return { blocked: false, voided: [] };
   const reasons: string[] = [];
-  const allocCache = new Map<string, Map<string, { cashPaid: number; accountPaid: number }>>();
+  const fundingCache = new Map<string, Map<string, { receipt: string; date: string }[]>>();
   for (const d of targets) {
     if (d.paidPaise <= 0) continue;
-    let alloc = allocCache.get(d.bookingId);
-    if (!alloc) { alloc = await demandAllocations(tx, d.bookingId); allocCache.set(d.bookingId, alloc); }
-    const a = alloc.get(d.id) ?? { cashPaid: 0, accountPaid: 0 };
-    const buckets: ("CASH" | "ACCOUNT")[] = [];
-    if (a.cashPaid > 0) buckets.push("CASH");
-    if (a.accountPaid > 0) buckets.push("ACCOUNT");
-    if (buckets.length === 0) continue;
-    const later = await tx.select({ receipt: payments.receiptNumber, date: payments.paymentDate }).from(payments).where(and(
-      eq(payments.bookingId, d.bookingId), eq(payments.status, "CLEARED"), eq(payments.against, "FLAT_VALUE"), inArray(payments.bucket, buckets), sql`${payments.paymentDate} >= ${d.demandDate}`,
-    )).limit(1);
-    if (later[0]) reasons.push(`Demand ${d.demandNumber} has been paid by receipt ${later[0].receipt} dated ${later[0].date} (on/after the demand)`);
+    let funding = fundingCache.get(d.bookingId);
+    if (!funding) { funding = await demandFunding(tx, d.bookingId); fundingCache.set(d.bookingId, funding); }
+    const later = (funding.get(d.id) ?? []).find((f) => f.date >= d.demandDate);
+    if (later) reasons.push(`Demand ${d.demandNumber} has been paid by receipt ${later.receipt} dated ${later.date} (on/after the demand)`);
   }
   if (reasons.length > 0) return { blocked: true, reasons };
   const voidedAt = new Date();

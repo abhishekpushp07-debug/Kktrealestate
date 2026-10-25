@@ -114,9 +114,7 @@ function registerSiteSettings(app: FastifyInstance): void {
         for (const k of Object.keys(changes)) if (changes[k] === undefined) delete changes[k];
         if (changes["seoDefaults"] === null) changes["seoDefaults"] = {};
         if (changes["offices"] === undefined && patch.offices !== undefined) changes["offices"] = patch.offices;
-        const updated = Object.keys(changes).length > 0 || round_robin_enabled === undefined
-          ? await updateByKey(tx, siteSettings, siteSettings.companyId, user.companyId, version, changes, "site_settings")
-          : await updateByKey(tx, siteSettings, siteSettings.companyId, user.companyId, version, {}, "site_settings");
+        const updated = await updateByKey(tx, siteSettings, siteSettings.companyId, user.companyId, version, changes, "site_settings");
         let rr = beforeRr;
         if (round_robin_enabled !== undefined && round_robin_enabled !== beforeRr) {
           await tx.update(companies).set({ settings: sql`${companies.settings} || jsonb_build_object('round_robin_enabled', ${round_robin_enabled}::boolean)` }).where(eq(companies.id, user.companyId));

@@ -17,11 +17,11 @@ import { translatePgError } from "../../lib/pgErrors.js";
 import { route } from "../../lib/routes.js";
 import { scopeFilter, type StaffContext } from "../../lib/scope.js";
 import { applyUpdate, expectedVersion, optionalExpectedVersion, withOptionalVersion } from "../../lib/version.js";
-import { defaultHoldUntil, manualStatusChanges, statusAudit } from "./flats.js";
+import { assertHoldUntil, defaultHoldUntil, manualStatusChanges, statusAudit } from "./flats.js";
 import { assertFilterScope } from "./projects.js";
 import {
-  allStagesPending, applyPriceUpdates, assertStageSequence, blockToDefinition, breakupToDb, draftFlats, ensureBlockStages, insertDrafts, loadBlock, loadProject, loadTemplates, masterStageOrder, maxPositions, meta,
-  refreshProjectCounts, refreshUnitCounts, snapshotBlockStages, translateDomainError, writeAuditMany, type DbBlock, type LoadedRateCard,
+  allStagesPending, applyPriceUpdates, assertStageSequence, blockToDefinition, breakupToDb, draftFlats, ensureBlockStages, insertDrafts, loadBlock, loadProject, loadTemplates, masterStageOrder, maxPositions, meta, patchBody,
+  refreshProjectCounts, refreshUnitCounts, snapshotBlockStages, translateDomainError, writeAuditMany, type DbBlock, type DbFlat, type LoadedRateCard,
 } from "./service.js";
 
 const idParams = z.object({ id: IdSchema });
@@ -205,7 +205,7 @@ export function registerBlockRoutes(app: FastifyInstance): void {
 
   route(app, {
     method: "PATCH", url: "/blocks/:id", permission: "block.write",
-    schema: { params: idParams, body: withOptionalVersion(BlockUpdateSchema), response: { 200: BlockRowSchema }, summary: "Update a block (structure only while every flat is Available; stage sequence only while every stage is pending)" },
+    schema: { params: idParams, body: patchBody(BlockUpdateSchema), response: { 200: BlockRowSchema }, summary: "Update a block (structure only while every flat is Available; stage sequence only while every stage is pending)" },
     handler: async (req) => {
       const user = req.user!;
       const body = req.body as BlockUpdate & { version?: number };
@@ -220,10 +220,14 @@ export function registerBlockRoutes(app: FastifyInstance): void {
         if (body.status !== undefined) changes["status"] = body.status;
         if (body.sort_order !== undefined) changes["sortOrder"] = body.sort_order;
         if (body.ground_floor_label !== undefined) changes["groundFloorLabel"] = body.ground_floor_label;
-        const structural = ["code", "floors", "floor_start", "skip_floors", "refuge_floors", "podium_floors", "floor_plans", "numbering_pattern"] as const;
+        // The ground-floor label is part of the flat numbers when the block has a floor 0, so it is structural there.
+        const hasGround = existing.floorStart <= 0 && existing.floors >= 0;
+        const structural = ["code", "floors", "floor_start", "skip_floors", "refuge_floors", "podium_floors", "floor_plans", "numbering_pattern", ...(hasGround ? (["ground_floor_label"] as const) : [])] as const;
         const touched = structural.filter((k) => body[k] !== undefined);
+        let flatCount = 0;
         if (touched.length > 0) {
-          const { nonAvailable } = await nonAvailableCount(tx, existing.id);
+          const { total, nonAvailable } = await nonAvailableCount(tx, existing.id);
+          flatCount = total;
           if (nonAvailable > 0) throw ApiError.rule(`Structure cannot change while ${nonAvailable} flat(s) are not Available`, "FLATS_NOT_AVAILABLE", { non_available: nonAvailable, fields: touched });
           const merged = {
             code: body.code ?? existing.code, floors: body.floors ?? existing.floors, floorStart: body.floor_start ?? existing.floorStart, groundFloorLabel: body.ground_floor_label ?? existing.groundFloorLabel,
@@ -233,6 +237,7 @@ export function registerBlockRoutes(app: FastifyInstance): void {
           };
           if (merged.floorStart > merged.floors) throw ApiError.badRequest("floor_start must be ≤ floors", { field: "floor_start" });
           if (!rangesDisjoint(merged.floorPlans)) throw ApiError.badRequest("Floor-plan ranges must not overlap", { field: "floor_plans" });
+          if (merged.floorPlans.some((r) => r.from_floor < merged.floorStart || r.to_floor > merged.floors)) throw ApiError.badRequest("Floor-plan ranges must lie within floor_start..floors", { field: "floor_plans" });
           assertStructure(blockToDefinition(merged));
           if (body.floor_plans) await loadTemplates(tx, user.companyId, merged.floorPlans.map((r) => r.floor_plan_template_id));
           Object.assign(changes, { code: merged.code, floors: merged.floors, floorStart: merged.floorStart, skipFloors: merged.skipFloors, refugeFloors: merged.refugeFloors, podiumFloors: merged.podiumFloors, floorPlans: merged.floorPlans, numberingPattern: merged.numberingPattern });
@@ -245,6 +250,12 @@ export function registerBlockRoutes(app: FastifyInstance): void {
         let updated: DbBlock;
         try { updated = await applyUpdate(tx, blocks, existing.id, version, changes, "block"); } catch (e) { translatePgError(e, "A block with this code in the project"); }
         if (body.stage_sequence) await snapshotBlockStages(tx, updated);
+        if (touched.length > 0 && flatCount > 0) {
+          // Flats must always mirror the block definition: a structural change on a block whose flats are all Available regenerates them atomically.
+          await tx.delete(flats).where(eq(flats.blockId, existing.id));
+          await generateInto(tx, req, updated, "block.regenerate_flats");
+          updated = await loadBlock(tx, user, existing.id);
+        }
         const [after] = await toBlockRows(tx, [updated]);
         await writeAudit(tx, { companyId: user.companyId, ...meta(req), action: "block.update", entityType: "block", entityId: existing.id, before: before as unknown as Record<string, unknown>, after: after as unknown as Record<string, unknown> });
         return after!;
@@ -272,7 +283,7 @@ export function registerBlockRoutes(app: FastifyInstance): void {
   });
 
   route(app, {
-    method: "POST", url: "/blocks/:id/generate-flats", permission: "block.write",
+    method: "POST", url: "/blocks/:id/generate-flats", permission: "block.write", idempotent: true,
     schema: { params: idParams, body: withOptionalVersion(BlockGenerateFlatsSchema), response: { 200: BlockGenerateFlatsResponseSchema }, summary: "Generate flats (block without flats) or regenerate (only while every flat is Available)" },
     handler: async (req) => {
       const user = req.user!;
@@ -292,7 +303,7 @@ export function registerBlockRoutes(app: FastifyInstance): void {
   });
 
   route(app, {
-    method: "POST", url: "/blocks/:id/floors", permission: "block.write",
+    method: "POST", url: "/blocks/:id/floors", permission: "block.write", idempotent: true,
     schema: { params: idParams, body: withOptionalVersion(BlockAppendFloorsSchema), response: { 200: BlockGenerateFlatsResponseSchema }, summary: "Append floors (with their floor-plan ranges) and generate only the new flats" },
     handler: async (req) => {
       const user = req.user!;
@@ -314,9 +325,10 @@ export function registerBlockRoutes(app: FastifyInstance): void {
         if (!rangesDisjoint(merged.floorPlans)) throw ApiError.badRequest("Floor-plan ranges must not overlap", { field: "floor_plans" });
         const def = blockToDefinition(merged);
         assertStructure(def);
-        // Generate with the full definition so sequence-based numbering continues, then keep only the new floors.
+        // Generate with the full definition so sequence-based numbering continues, then keep only the new floors (all of them when the block has no flats yet).
         const { drafts, rateCard } = await draftFlats(tx, block.companyId, block.projectId, def);
-        const fresh = drafts.filter((d) => d.floor > oldTop);
+        const { total: existingFlats } = await nonAvailableCount(tx, block.id);
+        const fresh = existingFlats === 0 ? drafts : drafts.filter((d) => d.floor > oldTop);
         const updated = await applyUpdate(tx, blocks, block.id, version, { floors: merged.floors, skipFloors: merged.skipFloors, refugeFloors: merged.refugeFloors, floorPlans: merged.floorPlans }, "block");
         let inserted: { id: string; flatNumber: string }[] = [];
         try { inserted = await insertDrafts(tx, updated, fresh, rateCard, user.id); } catch (e) { translatePgError(e, "A flat with this number"); }
@@ -386,20 +398,25 @@ export function registerBlockRoutes(app: FastifyInstance): void {
       const user = req.user!;
       const body = req.body;
       const holdUntil = body.status === "HOLD" ? (body.hold_until ? new Date(body.hold_until) : await defaultHoldUntil(app, user.companyId)) : null;
+      assertHoldUntil(holdUntil);
       return app.db.transaction(async (tx) => {
         const block = await loadBlock(tx, user, req.params.id, true);
-        const rows = await tx.select().from(flats).where(and(eq(flats.blockId, block.id), inArray(flats.id, body.flat_ids))).for("update");
+        const rows = await tx.select().from(flats).where(and(eq(flats.blockId, block.id), inArray(flats.id, body.flat_ids))).orderBy(asc(flats.floor), asc(flats.position)).for("update");
         if (rows.length !== new Set(body.flat_ids).size) throw ApiError.badRequest("Every flat_id must belong to this block", { field: "flat_ids" });
-        const audits: AuditEntry[] = [];
         const skipped: string[] = [];
+        const eligible: { flat: DbFlat; changes: Record<string, unknown> }[] = [];
         for (const flat of rows) {
-          let changes: Record<string, unknown>;
-          try { changes = manualStatusChanges(user, flat, { status: body.status, reason: body.reason, holdUntil }); } catch (e) {
+          try { eligible.push({ flat, changes: manualStatusChanges(user, flat, { status: body.status, reason: body.reason, holdUntil }) }); } catch (e) {
             if (e instanceof ApiError && (e.statusCode === 422 || e.statusCode === 403)) { skipped.push(flat.id); continue; }
             throw e;
           }
-          const [updated] = await tx.update(flats).set({ ...changes, version: sql`${flats.version} + 1` }).where(eq(flats.id, flat.id)).returning();
-          if (updated) audits.push(statusAudit(req, flat, updated, body.reason));
+        }
+        // The column changes are identical for every eligible flat (same target status, actor, hold window), so one UPDATE covers them all.
+        const audits: AuditEntry[] = [];
+        if (eligible.length > 0) {
+          const updatedRows = await tx.update(flats).set({ ...eligible[0]!.changes, version: sql`${flats.version} + 1` }).where(inArray(flats.id, eligible.map((e) => e.flat.id))).returning();
+          const byId = new Map(updatedRows.map((u) => [u.id, u]));
+          for (const { flat } of eligible) { const u = byId.get(flat.id); if (u) audits.push(statusAudit(req, flat, u, body.reason)); }
         }
         await writeAuditMany(tx, audits);
         await refreshUnitCounts(tx, block.id);
@@ -423,7 +440,8 @@ export function registerBlockRoutes(app: FastifyInstance): void {
         if (body.flat_type_id) where.push(eq(flats.flatTypeId, body.flat_type_id));
         const rows = await tx.select({ id: flats.id, floor: flats.floor, superBuiltupSqft: flats.superBuiltupSqft, pricePaise: flats.pricePaise, status: flats.status, flatNumber: flats.flatNumber, breakup: flats.priceBreakup }).from(flats).where(and(...where.filter((w): w is SQL => w !== undefined))).for("update");
         const eligible = rows.filter((r) => (body.only_available ? r.status === "AVAILABLE" : !["BOOKED", "SOLD"].includes(r.status)));
-        const skipped = rows.filter((r) => !eligible.includes(r)).map((r) => r.id);
+        const eligibleIds = new Set(eligible.map((r) => r.id));
+        const skipped = rows.filter((r) => !eligibleIds.has(r.id)).map((r) => r.id);
         let results: ReturnType<typeof bulkPriceEdit>;
         try {
           results = bulkPriceEdit({

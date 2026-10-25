@@ -103,13 +103,15 @@ export interface CustomerSelect {
 }
 
 const rm = users;
+// Correlated sub-selects spell the outer column as "customers"."id" on purpose: Drizzle renders selected columns unqualified
+// when the query has a single table, and an unqualified "id" inside the sub-select would bind to the inner table.
 /** Active bookings where the customer is primary or co-applicant. */
 export const activeBookingCountSql = sql<number>`(
   select count(*)::int from ${bookings} b
-  where b.status = 'ACTIVE' and (b.customer_id = ${customers.id} or exists (
-    select 1 from ${bookingCoApplicants} bc where bc.booking_id = b.id and bc.customer_id = ${customers.id})))`;
-const kycVerifierNameSql = sql<string | null>`(select u.name from ${users} u where u.id = ${customers.kycVerifiedBy})`;
-const portalEnabledSql = sql<boolean | null>`(select pu.is_enabled from ${portalUsers} pu where pu.customer_id = ${customers.id})`;
+  where b.status = 'ACTIVE' and (b.customer_id = "customers"."id" or exists (
+    select 1 from ${bookingCoApplicants} bc where bc.booking_id = b.id and bc.customer_id = "customers"."id")))`;
+const kycVerifierNameSql = sql<string | null>`(select u.name from ${users} u where u.id = "customers"."kyc_verified_by")`;
+const portalEnabledSql = sql<boolean | null>`(select pu.is_enabled from ${portalUsers} pu where pu.customer_id = "customers"."id")`;
 
 /** Drizzle selection for customer rows (join `users` as relationship manager with `joinRm`). */
 export const CUSTOMER_SELECT = { c: customers, rmName: rm.name, kycVerifierName: kycVerifierNameSql, activeBookings: activeBookingCountSql, portalEnabled: portalEnabledSql };

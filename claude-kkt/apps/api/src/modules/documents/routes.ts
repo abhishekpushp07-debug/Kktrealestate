@@ -1,4 +1,5 @@
 import { and, eq, type SQL } from "drizzle-orm";
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
@@ -16,7 +17,7 @@ import { route } from "../../lib/routes.js";
 import type { StaffContext } from "../../lib/scope.js";
 import { assertEntityWrite, documentScopeCondition, requireEntity } from "./entities.js";
 import {
-  DOCUMENT_SELECT, SIGNED_LINK_TTL_SECONDS, applyTypeRules, loadDocumentType, loadJoined, signedUrl, storage, storeBuffer, streamDocument,
+  CREATED_AT_SORT, DOCUMENT_SELECT, SIGNED_LINK_TTL_SECONDS, applyTypeRules, loadDocumentType, loadJoined, signedUrl, storage, storeBuffer, streamDocument,
   toDocumentRow, variantKey, variantMeta, verifyLinkToken, withDocumentJoins, type DocumentJoined,
 } from "./service.js";
 
@@ -62,7 +63,7 @@ async function readUpload(req: FastifyRequest): Promise<ParsedUpload> {
   try {
     for await (const part of req.parts()) {
       if (part.type === "file") {
-        if (file) throw ApiError.badRequest("Upload exactly one file per request");
+        if (file) { part.file.resume(); throw ApiError.badRequest("Upload exactly one file per request"); }
         const buffer = await part.toBuffer();
         file = { buffer, filename: part.filename || "file" };
       } else {
@@ -159,7 +160,8 @@ export function registerDocumentRoutes(app: FastifyInstance): void {
         join: withDocumentJoins,
         where: and(...where.filter((w): w is SQL => w !== undefined)),
         search: { columns: [documents.title, documents.fileName], term: q.search },
-        sort: { allowed: { created_at: documents.createdAt, title: documents.title, file_name: documents.fileName, size_bytes: documents.sizeBytes }, default: "-created_at", requested: q.sort },
+        // created_at sorts/pages on a microsecond-exact text key (see CREATED_AT_SORT) so same-millisecond rows are never skipped.
+        sort: { allowed: { created_at: CREATED_AT_SORT as unknown as AnyPgColumn, title: documents.title, file_name: documents.fileName, size_bytes: documents.sizeBytes }, default: "-created_at", requested: q.sort },
         ...listPaging(q),
       });
       const items = result.items.map(toDocumentRow);
@@ -241,12 +243,11 @@ export function registerDocumentRoutes(app: FastifyInstance): void {
     },
   });
 
-  // Wildcard rather than `:token`: signed tokens (~150 chars) exceed the router's default 100-char parameter limit, which a wildcard is exempt from.
   route(app, {
-    method: "GET", url: "/files/*", public: true,
-    schema: { params: z.object({ "*": z.string().min(16).max(4096) }), response: { 200: z.any() }, summary: "Stream a file through a signed, short-lived link (`/files/:token`)", hide: true },
+    method: "GET", url: "/files/:token", public: true,
+    schema: { params: z.object({ token: z.string().min(1).max(100) }), response: { 200: z.any() }, summary: "Stream a file through a signed, short-lived link (any malformed, forged or expired token is 404)" },
     handler: async (req, reply) => {
-      const link = verifyLinkToken(req.params["*"]);
+      const link = verifyLinkToken(req.params.token);
       if (!link) throw ApiError.notFound("File");
       const file = await streamDocument(app.dbReplica, link.documentId, link.variant);
       if (!file) throw ApiError.notFound("File");

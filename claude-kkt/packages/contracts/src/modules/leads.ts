@@ -14,6 +14,7 @@ import {
   ReasonSchema,
   TextSchema,
   TimestampSchema,
+  VersionSchema,
   VersionedSchema,
   listEnvelope,
   updateOf,
@@ -56,6 +57,13 @@ export type LeadCreate = z.infer<typeof LeadCreateSchema>;
 /** Update a lead (partial + version). */
 export const LeadUpdateSchema = updateOf(LeadBase.omit({ source: true }));
 export type LeadUpdate = z.infer<typeof LeadUpdateSchema>;
+
+/** Wire body of `PATCH /leads/:id`: absent fields stay untouched (no default for `consent`); `version` may arrive through `If-Match`. */
+export const LeadPatchSchema = z
+  .strictObject({ ...LeadBase.omit({ source: true }).shape, consent: z.boolean() })
+  .partial()
+  .extend({ version: VersionSchema.optional() });
+export type LeadPatch = z.infer<typeof LeadPatchSchema>;
 
 /** Lead row. */
 export const LeadRowSchema = AuditedRowSchema.extend({

@@ -30,7 +30,7 @@ export async function createActiveBooking(t: TestContext, customerId: string, pr
   const flatSnapshot = { flat_number: `B${seq}-101`, floor: 1, flat_type_id: ft!.id, flat_type_code: `3BHK-T${seq}`, carpet_sqft: 1050, builtup_sqft: 1250, super_builtup_sqft: 1520, price_paise: 650000000, price_breakup: [], rooms: [], areas: [] };
   const planSnapshot = { plan_id: plan!.id, name: `Plan ${seq}`, code: `PLAN${seq}`, plan_type: "CONSTRUCTION_LINKED", grace_days: 0, installments: [] };
   const [booking] = await sql<{ id: string }[]>`insert into bookings (company_id, booking_number, project_id, block_id, flat_id, customer_id, booking_date, status, agreement_value_paise, cash_agreed_paise, account_agreed_paise, flat_snapshot, payment_plan_id, plan_snapshot)
-    values (${t.companyId}, ${`BK-TEST/${String(seq).padStart(4, "0")}`}, ${projectId}, ${block!.id}, ${flat!.id}, ${customerId}, current_date, 'ACTIVE', 650000000, 400000000, 250000000, ${sql.json(flatSnapshot)}, ${plan!.id}, ${sql.json(planSnapshot)}) returning id`;
+    values (${t.companyId}, ${`BK-TEST/${String(seq).padStart(4, "0")}`}, ${projectId}, ${block!.id}, ${flat!.id}, ${customerId}, current_date, 'ACTIVE', 650000000, 400000000, 250000000, ${JSON.stringify(flatSnapshot)}::jsonb, ${plan!.id}, ${JSON.stringify(planSnapshot)}::jsonb) returning id`;
   if (opts.coApplicantId) await sql`insert into booking_co_applicants (booking_id, customer_id) values (${booking!.id}, ${opts.coApplicantId})`;
   return { bookingId: booking!.id, blockId: block!.id, flatId: flat!.id };
 }
