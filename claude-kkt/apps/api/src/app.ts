@@ -26,6 +26,7 @@ import { usersModule } from "./modules/users/index.js";
 import authPlugin from "./plugins/auth.js";
 import dbPlugin from "./plugins/db.js";
 import idempotencyPlugin from "./plugins/idempotency.js";
+import loadShedPlugin from "./plugins/loadShed.js";
 import redisPlugin from "./plugins/redis.js";
 import requestContextPlugin, { genReqId } from "./plugins/requestContext.js";
 
@@ -95,6 +96,7 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
   await app.register(dbPlugin);
   await app.register(redisPlugin);
   await app.register(requestContextPlugin);
+  await app.register(loadShedPlugin);
   await app.register(authPlugin);
   await app.register(idempotencyPlugin);
 

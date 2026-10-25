@@ -22,6 +22,55 @@ export interface CreateDbOptions {
   max?: number;
   /** Idle connection timeout in seconds. */
   idleTimeout?: number;
+  /**
+   * Run parameterised queries as named prepared statements (postgres.js caches them per connection, so Postgres plans each distinct
+   * query once per connection instead of on every execution; a five-join list page spends ~1.3 ms planning vs ~0.3 ms executing).
+   * Default: true unless DATABASE_PREPARE=false — set that behind PgBouncer in transaction mode older than 1.21.
+   */
+  prepare?: boolean;
+}
+
+/** Default for `prepare` from the environment. */
+function prepareDefault(): boolean {
+  return (process.env["DATABASE_PREPARE"] ?? "true").toLowerCase() !== "false";
+}
+
+type UnsafeFn = Sql["unsafe"];
+
+/**
+ * Makes `client.unsafe()` (what Drizzle's postgres-js driver calls for every query) default to `prepare: true`. Argument-less calls keep
+ * the simple protocol (postgres.js picks it when there are no parameters), so multi-statement migration scripts are unaffected.
+ * Transactions and savepoints hand Drizzle a fresh scoped client, so those are patched the same way as they are created.
+ */
+function withPreparedStatements<T extends Sql>(client: T): T {
+  const target = client as unknown as { unsafe: UnsafeFn; begin: Sql["begin"]; savepoint?: unknown };
+  const unsafe = target.unsafe.bind(client) as UnsafeFn;
+  // Drizzle passes `{ prepare: false }` explicitly for every unnamed query, so the flag is overridden rather than defaulted.
+  target.unsafe = ((query: string, args?: unknown, options?: Record<string, unknown>) => {
+    if (args !== undefined && !Array.isArray(args)) return unsafe(query, { ...(args as Record<string, unknown>), prepare: true } as never);
+    return unsafe(query, (args ?? []) as never, { ...(options ?? {}), prepare: true } as never);
+  }) as unknown as UnsafeFn;
+  if (typeof target.begin === "function") {
+    const begin = target.begin.bind(client) as (...a: unknown[]) => unknown;
+    target.begin = ((...args: unknown[]) => {
+      const i = args.findIndex((a) => typeof a === "function");
+      if (i === -1) return begin(...args);
+      const fn = args[i] as (tx: Sql) => unknown;
+      args[i] = (tx: Sql) => fn(withPreparedStatements(tx));
+      return begin(...args);
+    }) as unknown as Sql["begin"];
+  }
+  if (typeof target.savepoint === "function") {
+    const savepoint = (target.savepoint as (...a: unknown[]) => unknown).bind(client);
+    target.savepoint = (...args: unknown[]) => {
+      const i = args.findIndex((a) => typeof a === "function");
+      if (i === -1) return savepoint(...args);
+      const fn = args[i] as (tx: Sql) => unknown;
+      args[i] = (tx: Sql) => fn(withPreparedStatements(tx));
+      return savepoint(...args);
+    };
+  }
+  return client;
 }
 
 export interface DbHandle {
@@ -49,6 +98,7 @@ export function createDb(url: string = process.env["DATABASE_URL"] ?? DEFAULT_DA
     types: { bigint: { to: 20, from: [20], serialize: (v: number | bigint) => String(v), parse: (v: string) => Number(v) } },
     onnotice: () => undefined,
   });
+  if (options.prepare ?? prepareDefault()) withPreparedStatements(client);
   const db = drizzle(client, { schema });
   return {
     db,

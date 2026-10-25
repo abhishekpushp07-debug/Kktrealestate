@@ -21,8 +21,6 @@ RUN addgroup -S kkt && adduser -S kkt -G kkt
 COPY --from=build /repo/apps/api/dist ./dist
 COPY --from=build /repo/apps/api/package.json ./package.json
 COPY --from=build /repo/node_modules ./node_modules
-COPY --from=build /repo/packages/db/drizzle ./drizzle
-COPY --from=build /repo/packages/db/src/sql ./sql
 COPY --from=build /repo/apps/api/assets ./assets
 USER kkt
 EXPOSE 4000

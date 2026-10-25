@@ -28,6 +28,17 @@ const EnvSchema = z.object({
   SEED_ON_BOOT: z.string().default("true").transform((v) => v === "true" || v === "1"),
   RUN_MIGRATIONS_ON_BOOT: z.string().default("true").transform((v) => v === "true" || v === "1"),
   RUN_JOBS_IN_API: z.string().default("true").transform((v) => v === "true" || v === "1"),
+  /**
+   * HTTP worker processes (node:cluster). `1` = single process (default; dev/test). `auto` = one per available CPU. Each worker is a
+   * full stateless API instance sharing the port; migrations and the demo seed run once in the primary before forking, and the in-process
+   * job worker (RUN_JOBS_IN_API) runs in the first HTTP worker only.
+   */
+  API_WORKERS: z.string().default("1").transform((v, ctx) => {
+    if (v.trim().toLowerCase() === "auto") return 0;
+    const n = Number(v);
+    if (!Number.isInteger(n) || n < 1 || n > 64) { ctx.addIssue({ code: "custom", message: "API_WORKERS must be 1..64 or 'auto'" }); return z.NEVER; }
+    return n;
+  }),
   LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).default("info"),
   LOG_PRETTY: z.string().default("false").transform((v) => v === "true" || v === "1"),
   TRUST_PROXY: z.string().default("true").transform((v) => v === "true" || v === "1"),
@@ -35,6 +46,8 @@ const EnvSchema = z.object({
   PUBLIC_RATE_LIMIT_PER_MIN: z.coerce.number().int().min(1).default(300),
   /** Per-user limit for staff/portal write requests (POST/PATCH/PUT/DELETE), per minute. */
   WRITE_RATE_LIMIT_PER_MIN: z.coerce.number().int().min(1).default(120),
+  /** Max requests in flight per worker process before the excess is answered 503 + Retry-After (0 = off). */
+  API_MAX_INFLIGHT: z.coerce.number().int().min(0).max(100_000).default(0),
   /** Version string reported by /health and /metrics. */
   APP_VERSION: z.string().default("2.0.0"),
 });

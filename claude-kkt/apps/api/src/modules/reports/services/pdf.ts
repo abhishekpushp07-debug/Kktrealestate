@@ -64,7 +64,12 @@ export interface KvBlock {
   rows: readonly (readonly [string, string | number | null | undefined])[];
 }
 
-const FONT_DIR_CANDIDATES = [join(dirname(fileURLToPath(import.meta.url)), "../../../../assets/fonts"), join(process.cwd(), "assets/fonts"), join(process.cwd(), "apps/api/assets/fonts")];
+const FONT_DIR_CANDIDATES = [
+  join(dirname(fileURLToPath(import.meta.url)), "../../../../assets/fonts"), // source tree: src/modules/reports/services
+  join(dirname(fileURLToPath(import.meta.url)), "../assets/fonts"), // tsup bundle: dist/<chunk>.js
+  join(process.cwd(), "assets/fonts"),
+  join(process.cwd(), "apps/api/assets/fonts"),
+];
 
 /** First TrueType font found under apps/api/assets/fonts, or null (Helvetica fallback). */
 export function findRupeeFont(): string | null {

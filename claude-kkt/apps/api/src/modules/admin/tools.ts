@@ -3,9 +3,6 @@
  * reports mismatches", §17 guarded reseed): recompute, reconcile (dry run), job registry + run-now, system facts, reseed.
  * "Run dues now" and the integrity report/repair already live in the money module (POST /dues/run, GET /dues/integrity); the jobs view links to them.
  */
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
 import { and, desc, eq, gte, sql, type SQL } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import {
@@ -104,22 +101,13 @@ export async function reconciliationJob(db: DB): Promise<Record<string, unknown>
 /** Shape the seed module exports as `reseed(db, { app })` (the app drives the seed through its own API in-process). */
 type ReseedFn = (db: DB, opts?: { app?: FastifyInstance }) => Promise<{ counts?: Record<string, number>; integrity?: IntegrityReportResponse }>;
 
-const here = dirname(fileURLToPath(import.meta.url));
-
 /**
- * Resolves `reseed(db)` from apps/api/src/seed/run.(ts|js) when that file exports it; null otherwise. The source is inspected before
- * importing because run.ts is also the `pnpm seed` entry point and must not be executed as a side effect of an API call.
+ * Resolves `reseed(db)` from the seed module (apps/api/src/seed/run.ts) when it exports it; null otherwise. The import is static so the
+ * bundle resolves it; run.ts guards its CLI `main()` behind an argv check, so importing it never executes the seed as a side effect.
  */
 export async function loadReseed(): Promise<ReseedFn | null> {
-  for (const file of ["run.ts", "run.js"]) {
-    const path = join(here, "..", "..", "seed", file);
-    let text: string;
-    try { text = readFileSync(path, "utf8"); } catch { continue; }
-    if (!/export\s+(async\s+)?function\s+reseed\b|export\s*\{[^}]*\breseed\b/.test(text)) return null;
-    const mod = (await import(pathToFileURL(path).href)) as Record<string, unknown>;
-    return typeof mod["reseed"] === "function" ? (mod["reseed"] as ReseedFn) : null;
-  }
-  return null;
+  const mod = (await import("../../seed/run.js")) as Record<string, unknown>;
+  return typeof mod["reseed"] === "function" ? (mod["reseed"] as ReseedFn) : null;
 }
 
 // ---------------------------------------------------------------------------

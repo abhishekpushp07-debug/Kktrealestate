@@ -2,19 +2,19 @@
  * Wire-shape mappers for bookings, payments, demands, other charges, ledger rows and schedules. Everything here is batch-oriented
  * (one query per related table for a whole page) so lists never run N+1 queries.
  */
-import { and, asc, eq, inArray, ne, sql } from "drizzle-orm";
-import type { PgSelect } from "drizzle-orm/pg-core";
+import { and, asc, eq, getTableColumns, sql } from "drizzle-orm";
+import type { PgSelect, PgTable } from "drizzle-orm/pg-core";
 import type {
   AgreementRevisionRow, BookingDetailResponse, BookingRow, BookingSummary, DemandRow, LedgerRow, OtherChargeRow, PaymentRow, PlanRevisionRow, ScheduleRow,
 } from "@kkt/contracts";
 import {
-  agreementRevisions, bankAccounts, blocks, bookingCoApplicants, bookingOtherCharges, bookingPlanRevisions, bookings, customers, demands, flats, parkingSlots, paymentModes, payments, projects, users,
+  agreementRevisions, bankAccounts, blocks, blockStages, bookingCoApplicants, bookingOtherCharges, bookingPlanRevisions, bookings, customers, demands, flats, parkingSlots, paymentModes, payments, projects, users,
   type Executor,
 } from "@kkt/db";
 import { compareDates, diffDays, schedulePreview, type TowerStage } from "@kkt/domain";
 import { ApiError } from "../../../lib/errors.js";
 import { ensureProjectAccess, type StaffContext } from "../../../lib/scope.js";
-import { groupBy, iso, loadTowerStagesMany, snapshotInstallments, todayDate, type BookingRecord } from "../common.js";
+import { groupBy, iso, snapshotInstallments, todayDate, type BookingRecord } from "../common.js";
 import type { LedgerEntryRecord } from "./ledger.js";
 
 type PaymentRecord = typeof payments.$inferSelect;
@@ -139,37 +139,90 @@ export interface BookingRelated {
   completedByNames: Map<string, string>;
 }
 
+/** JSON shapes produced by the single related-data query. */
+interface RelatedJson {
+  co: { bookingId: string; customerId: string; fullName: string; phone: string }[];
+  park: { bookingId: string; id: string; number: string; slotType: "COVERED" | "OPEN" | "STILT" | "BASEMENT" }[];
+  revs: { bookingId: string; n: number }[];
+  pend: { bookingId: string; bucket: "CASH" | "ACCOUNT" | null; n: number | string }[];
+  charges: Record<string, unknown>[];
+  dem: Record<string, unknown>[];
+  stages: { blockId: string; stageId: string; name: string; isPossession: boolean; status: TowerStage["status"]; completedOn: string | null }[];
+  names: { id: string; name: string }[];
+}
+
+/**
+ * Maps a `to_jsonb(row)` object (database column names, JSON scalars) onto the record shape Drizzle would return for `table`:
+ * TS property names, `Date` for timestamp columns, numbers/strings/booleans/json as-is.
+ */
+export function recordFromJson<T extends PgTable>(table: T, json: Record<string, unknown>): T["$inferSelect"] {
+  const out: Record<string, unknown> = {};
+  for (const [key, col] of Object.entries(getTableColumns(table))) {
+    const v = json[col.name];
+    if (v != null && col.columnType === "PgTimestamp") {
+      const withTz = (col as unknown as { withTimezone?: boolean }).withTimezone === true;
+      out[key] = new Date(withTz || /[zZ]|[+-]\d\d:?\d\d$/.test(String(v)) ? String(v) : `${String(v)}Z`);
+    } else out[key] = v === undefined ? null : v;
+  }
+  return out as T["$inferSelect"];
+}
+
+/** A `uuid[]` parameter (drizzle's `sql` would spread a JS array into a tuple, so the literal form `{a,b}` is bound as one text param). */
+function uuidArray(ids: readonly string[]) {
+  return sql`${`{${ids.join(",")}}`}::uuid[]`;
+}
+
+/**
+ * Related data of a page of bookings in ONE round trip: every per-table load is a JSON-aggregated scalar subquery of the same statement
+ * (a page used to fan out eight parallel queries, each taking a pool connection, which multiplied pool contention under load).
+ */
 export async function loadBookingRelated(db: Executor, rows: readonly BookingRecord[]): Promise<BookingRelated> {
-  const ids = rows.map((b) => b.id);
+  const ids = [...new Set(rows.map((b) => b.id))];
   const empty: BookingRelated = { coApplicants: new Map(), parking: new Map(), revisionCounts: new Map(), pending: new Map(), charges: new Map(), demands: new Map(), stages: new Map(), completedByNames: new Map() };
   if (ids.length === 0) return empty;
+  const blockIds = [...new Set(rows.map((b) => b.blockId))];
   const completedBy = [...new Set(rows.map((b) => b.completedBy).filter((x): x is string => !!x))];
-  const [co, park, revs, pend, charges, dem, stages, names] = await Promise.all([
-    db.select({ bookingId: bookingCoApplicants.bookingId, customerId: customers.id, fullName: customers.fullName, phone: customers.phone }).from(bookingCoApplicants).innerJoin(customers, eq(customers.id, bookingCoApplicants.customerId)).where(inArray(bookingCoApplicants.bookingId, ids)),
-    db.select({ id: parkingSlots.id, number: parkingSlots.number, slotType: parkingSlots.slotType, bookingId: parkingSlots.bookingId }).from(parkingSlots).where(inArray(parkingSlots.bookingId, ids)),
-    db.select({ bookingId: agreementRevisions.bookingId, n: sql<number>`count(*)::int` }).from(agreementRevisions).where(inArray(agreementRevisions.bookingId, ids)).groupBy(agreementRevisions.bookingId),
-    db.select({ bookingId: payments.bookingId, bucket: payments.bucket, n: sql<number>`coalesce(sum(${payments.amountPaise}), 0)::bigint` }).from(payments).where(and(inArray(payments.bookingId, ids), eq(payments.status, "PENDING"), eq(payments.against, "FLAT_VALUE"))).groupBy(payments.bookingId, payments.bucket),
-    db.select().from(bookingOtherCharges).where(inArray(bookingOtherCharges.bookingId, ids)).orderBy(asc(bookingOtherCharges.sortOrder), asc(bookingOtherCharges.createdAt)),
-    db.select().from(demands).where(and(inArray(demands.bookingId, ids), ne(demands.status, "VOID"))).orderBy(asc(demands.postedAt), asc(demands.installmentSeq)),
-    loadTowerStagesMany(db, rows.map((b) => b.blockId)),
-    completedBy.length ? db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, completedBy)) : Promise.resolve([] as { id: string; name: string }[]),
-  ]);
+  const result = (await db.execute(sql`
+    select
+      (select coalesce(json_agg(json_build_object('bookingId', ca.booking_id, 'customerId', c.id, 'fullName', c.full_name, 'phone', c.phone)), '[]'::json)
+         from ${bookingCoApplicants} ca join ${customers} c on c.id = ca.customer_id where ca.booking_id = any(${uuidArray(ids)})) as co,
+      (select coalesce(json_agg(json_build_object('bookingId', p.booking_id, 'id', p.id, 'number', p.number, 'slotType', p.slot_type)), '[]'::json)
+         from ${parkingSlots} p where p.booking_id = any(${uuidArray(ids)})) as park,
+      (select coalesce(json_agg(json_build_object('bookingId', r.booking_id, 'n', r.n)), '[]'::json)
+         from (select booking_id, count(*)::int as n from ${agreementRevisions} where booking_id = any(${uuidArray(ids)}) group by booking_id) r) as revs,
+      (select coalesce(json_agg(json_build_object('bookingId', x.booking_id, 'bucket', x.bucket, 'n', x.n)), '[]'::json)
+         from (select booking_id, bucket, coalesce(sum(amount_paise), 0)::bigint as n from ${payments}
+               where booking_id = any(${uuidArray(ids)}) and status = 'PENDING' and against = 'FLAT_VALUE' group by booking_id, bucket) x) as pend,
+      (select coalesce(json_agg(to_jsonb(c) order by c.sort_order, c.created_at), '[]'::json) from ${bookingOtherCharges} c where c.booking_id = any(${uuidArray(ids)})) as charges,
+      (select coalesce(json_agg(to_jsonb(d) order by d.posted_at, d.installment_seq), '[]'::json) from ${demands} d where d.booking_id = any(${uuidArray(ids)}) and d.status <> 'VOID') as dem,
+      (select coalesce(json_agg(json_build_object('blockId', s.block_id, 'stageId', s.stage_id, 'name', s.name, 'isPossession', s.is_possession, 'status', s.status, 'completedOn', s.completed_on) order by s.block_id, s.sort_order), '[]'::json)
+         from ${blockStages} s where s.block_id = any(${uuidArray(blockIds)})) as stages,
+      (select coalesce(json_agg(json_build_object('id', u.id, 'name', u.name)), '[]'::json) from ${users} u where u.id = any(${uuidArray(completedBy)})) as names
+  `)) as unknown as RelatedJson[];
+  const j = result[0];
+  if (!j) return empty;
   const pending = new Map<string, { cash: number; account: number }>();
-  for (const p of pend) {
+  for (const p of j.pend) {
     const cur = pending.get(p.bookingId) ?? { cash: 0, account: 0 };
     if (p.bucket === "CASH") cur.cash += Number(p.n);
     if (p.bucket === "ACCOUNT") cur.account += Number(p.n);
     pending.set(p.bookingId, cur);
   }
+  const stages = new Map<string, TowerStage[]>();
+  for (const s of j.stages) {
+    const list = stages.get(s.blockId) ?? [];
+    list.push({ stageId: s.stageId, name: s.name, isPossession: s.isPossession, status: s.status, completedOn: s.completedOn });
+    stages.set(s.blockId, list);
+  }
   return {
-    coApplicants: groupBy(co.map((c) => ({ bookingId: c.bookingId, customer_id: c.customerId, full_name: c.fullName, phone: c.phone })), (c) => c.bookingId),
-    parking: groupBy(park.map((p) => ({ bookingId: p.bookingId ?? "", id: p.id, number: p.number, slot_type: p.slotType })), (p) => p.bookingId),
-    revisionCounts: new Map(revs.map((r) => [r.bookingId, Number(r.n)])),
+    coApplicants: groupBy(j.co.map((c) => ({ bookingId: c.bookingId, customer_id: c.customerId, full_name: c.fullName, phone: c.phone })), (c) => c.bookingId),
+    parking: groupBy(j.park.map((p) => ({ bookingId: p.bookingId, id: p.id, number: p.number, slot_type: p.slotType })), (p) => p.bookingId),
+    revisionCounts: new Map(j.revs.map((r) => [r.bookingId, Number(r.n)])),
     pending,
-    charges: groupBy(charges, (c) => c.bookingId),
-    demands: groupBy(dem, (d) => d.bookingId),
+    charges: groupBy(j.charges.map((c) => recordFromJson(bookingOtherCharges, c)), (c) => c.bookingId),
+    demands: groupBy(j.dem.map((d) => recordFromJson(demands, d)), (d) => d.bookingId),
     stages,
-    completedByNames: new Map(names.map((n) => [n.id, n.name])),
+    completedByNames: new Map(j.names.map((n) => [n.id, n.name])),
   };
 }
 

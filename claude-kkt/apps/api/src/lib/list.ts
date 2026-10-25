@@ -130,10 +130,28 @@ async function plannerEstimate(executor: Executor, query: PgSelect): Promise<num
   }
 }
 
-/** Live-row estimate of a table from pg_class (−1 when the table was never analysed). */
+/** How long a table's pg_class row estimate is reused before being re-read (it only decides exact vs estimated counting). */
+const TABLE_ESTIMATE_TTL_MS = 60_000;
+const tableEstimates = new Map<string, { n: number; at: number }>();
+
+/**
+ * Live-row estimate of a table from pg_class (−1 when the table was never analysed), cached per process for TABLE_ESTIMATE_TTL_MS so a
+ * list request costs two queries (page + count), not three. The estimate only picks the counting strategy, so staleness is harmless.
+ */
 async function tableEstimate(executor: Executor, table: PgTable): Promise<number> {
-  const rows = (await executor.execute(sql`select reltuples::float8 as n from pg_class where oid = ${`"${getTableName(table)}"`}::regclass`)) as unknown as { n: number | string }[];
-  return Number(rows[0]?.n ?? -1);
+  const name = getTableName(table);
+  const hit = tableEstimates.get(name);
+  const now = Date.now();
+  if (hit && now - hit.at < TABLE_ESTIMATE_TTL_MS) return hit.n;
+  const rows = (await executor.execute(sql`select reltuples::float8 as n from pg_class where oid = ${`"${name}"`}::regclass`)) as unknown as { n: number | string }[];
+  const n = Number(rows[0]?.n ?? -1);
+  tableEstimates.set(name, { n, at: now });
+  return n;
+}
+
+/** Forgets cached table estimates (tests that switch between exact and estimated counting). */
+export function resetTableEstimates(): void {
+  tableEstimates.clear();
 }
 
 /**

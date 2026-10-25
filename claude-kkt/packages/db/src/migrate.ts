@@ -1,5 +1,6 @@
 // Applies the committed drizzle-kit migrations, then the hand-written SQL files in src/sql
 // (triggers, functions). Every step is idempotent, so this is safe to run at every deploy.
+import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,11 +9,30 @@ import { createDb, DEFAULT_DATABASE_URL, type DbHandle } from "./client.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
-/** Folder holding drizzle-kit's generated migrations and journal. */
-export const MIGRATIONS_FOLDER = join(here, "..", "drizzle");
+/**
+ * First existing folder among `candidates` (the first one when none exists, so the error names a sensible path).
+ * The package runs from three layouts: the source tree (`packages/db/src`), the API bundle (`apps/api/dist`, where tsup copies
+ * `drizzle/` and `sql/` next to the entry) and the Docker image (`/app/dist` with `/app/drizzle` + `/app/sql`).
+ */
+function firstExisting(candidates: readonly string[]): string {
+  return candidates.find((c) => existsSync(c)) ?? candidates[0]!;
+}
 
-/** Folder holding the hand-written SQL applied after drizzle's migrations. */
-export const SQL_FOLDER = join(here, "sql");
+/** Folder holding drizzle-kit's generated migrations and journal (override with KKT_MIGRATIONS_DIR). */
+export const MIGRATIONS_FOLDER = process.env["KKT_MIGRATIONS_DIR"] ?? firstExisting([
+  join(here, "..", "drizzle"),
+  join(here, "drizzle"),
+  join(here, "..", "..", "..", "packages", "db", "drizzle"),
+  join(process.cwd(), "packages", "db", "drizzle"),
+]);
+
+/** Folder holding the hand-written SQL applied after drizzle's migrations (override with KKT_SQL_DIR). */
+export const SQL_FOLDER = process.env["KKT_SQL_DIR"] ?? firstExisting([
+  join(here, "sql"),
+  join(here, "..", "sql"),
+  join(here, "..", "..", "..", "packages", "db", "src", "sql"),
+  join(process.cwd(), "packages", "db", "src", "sql"),
+]);
 
 /** Lists the hand-written SQL files in apply order (lexicographic: 0001_…, 0002_…). */
 export async function listSqlFiles(folder: string = SQL_FOLDER): Promise<string[]> {

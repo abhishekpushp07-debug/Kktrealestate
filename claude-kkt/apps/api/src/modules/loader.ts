@@ -1,5 +1,5 @@
 import { readdirSync, statSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type { FastifyInstance, FastifyPluginAsync, FastifyPluginCallback } from "fastify";
 
@@ -8,7 +8,26 @@ export const CORE_MODULES = ["auth", "users", "roles", "masters", "notifications
 
 type Plugin = FastifyPluginAsync | FastifyPluginCallback;
 
-const here = dirname(fileURLToPath(import.meta.url));
+/**
+ * Directory holding the module folders. In the source tree this file lives in `src/modules/`; in the tsup bundle it is inlined into a
+ * chunk at `dist/`, next to the `dist/modules/<name>/index.js` entries, so the root is `<chunk dir>/modules` there.
+ */
+function resolveModulesRoot(): string {
+  const dir = dirname(fileURLToPath(import.meta.url));
+  if (basename(dir) === "modules") return dir;
+  const nested = join(dir, "modules");
+  return isDirectory(nested) ? nested : dir;
+}
+
+function isDirectory(path: string): boolean {
+  try {
+    return statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+const here = resolveModulesRoot();
 
 /** Names of module directories next to this file that contain an index.ts/index.js. */
 export function discoverModules(root = here): string[] {

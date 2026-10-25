@@ -39,5 +39,16 @@ Caddy terminates TLS for `www.kkt.in`, `erp.kkt.in`, `my.kkt.in` and proxies `/a
 ## Environment variables
 See `.env.example` (every variable documented inline). Production refuses to start without `JWT_SECRET`, `FIELD_ENCRYPTION_KEY`, `HASH_KEY`.
 
+### Runtime / performance knobs (docs/PERFORMANCE.md)
+| Variable | Default | Meaning |
+|---|---|---|
+| `API_WORKERS` | `1` | HTTP worker processes (`node:cluster`). `auto` = one per CPU. The primary runs migrations + seed once, then forks; the in-process job worker runs in worker 0 only. Set `auto` (or the container's CPU count) in production — a single Node process serves ~1.5k simple requests/s per core. |
+| `DATABASE_POOL_MAX` | `20` | Postgres pool per worker process; keep `workers × pool` under Postgres/PgBouncer `max_connections`. |
+| `DATABASE_PREPARE` | `true` | Named prepared statements for every query (postgres.js caches plans per connection). Set `false` behind PgBouncer < 1.21 in transaction mode. |
+| `API_MAX_INFLIGHT` | `0` (off) | Requests in flight per worker before the excess is answered `503 SERVICE_UNAVAILABLE` + `Retry-After: 2`. Protects latency of admitted requests when thousands of connections arrive at once; `256` is a sane production value. |
+| `PUBLIC_RATE_LIMIT_PER_MIN` / `WRITE_RATE_LIMIT_PER_MIN` | `300` / `120` | Per-IP public reads and per-user writes. Raise both when load testing from one machine (one generator looks like one user on one IP). |
+
+The production API container should run `API_WORKERS=auto`; `docker compose` scaling (`--scale api=N`) multiplies this across containers.
+
 ## Backups
 `POST /api/v1/admin/backup` (Super Admin) → signed download link to a zip (one JSON file per table + manifest). Restore with the included `restore.md` steps (psql `\copy`). Also schedule `pg_dump` at the infrastructure level.

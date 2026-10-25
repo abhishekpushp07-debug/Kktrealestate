@@ -64,7 +64,7 @@ describe("notifications", () => {
     expect(list.status).toBe(200);
     expect(list.body.total).toBe(1);
     expect(list.body.items[0]!.screen).toBe("DEMANDS");
-    expect((await t.request<{ unread: number }>("GET", "/api/v1/portal/notifications/unread-count", { token: login.body.access_token })).body.unread).toBe(1);
+    expect((await t.request<{ count: number }>("GET", "/api/v1/portal/notifications/unread-count", { token: login.body.access_token })).body.count).toBe(1); // Appendix C: {count}
     const mark = await t.request<{ updated: number }>("POST", "/api/v1/portal/notifications/mark-read", { token: login.body.access_token, body: { all: true } });
     expect(mark.body.updated).toBe(1);
     const staff = await t.loginAs("admin");
