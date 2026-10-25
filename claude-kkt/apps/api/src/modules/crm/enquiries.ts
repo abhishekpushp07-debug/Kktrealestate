@@ -9,10 +9,16 @@ import { sendCsv } from "../../lib/csv.js";
 import { ApiError } from "../../lib/errors.js";
 import { listPaging, paginate } from "../../lib/list.js";
 import { route } from "../../lib/routes.js";
-import { ensureProjectAccess } from "../../lib/scope.js";
+import { ensureProjectAccess, type StaffContext } from "../../lib/scope.js";
 import { metaOf } from "./customerService.js";
+import { leadScopeCondition } from "./leadService.js";
 
 const idParams = z.object({ id: IdSchema });
+
+/** Scope condition for enquiries (scoped users see their projects' enquiries plus those naming no project). */
+function enquiryScope(user: StaffContext): SQL | undefined {
+  return leadScopeCondition(user, enquiries.projectId);
+}
 
 type DbEnquiry = typeof enquiries.$inferSelect;
 
@@ -41,6 +47,13 @@ export function enquiryRow(r: EnquirySelect): EnquiryRow {
   };
 }
 
+/** Loads one enquiry for a staff user; 404 when missing or outside the user's project scope. */
+async function loadEnquiryFor(db: Executor, user: StaffContext, id: string): Promise<EnquirySelect> {
+  const sel = await loadEnquirySelect(db, user.companyId, id);
+  if (sel.e.projectId) ensureProjectAccess(user, sel.e.projectId, "Enquiry");
+  return sel;
+}
+
 /** Loads one enquiry of the company (joined); 404 when missing. */
 export async function loadEnquirySelect(db: Executor, companyId: string, id: string): Promise<EnquirySelect> {
   const rows = (await db
@@ -56,10 +69,10 @@ export async function loadEnquirySelect(db: Executor, companyId: string, id: str
   return row;
 }
 
-/** Marks enquiries read/unread; returns the number of rows that changed. */
-export async function markEnquiriesRead(tx: Executor, companyId: string, ids: string[], isRead: boolean): Promise<number> {
+/** Marks enquiries read/unread (optionally only those matching `scope`); returns the number of rows that changed. */
+export async function markEnquiriesRead(tx: Executor, companyId: string, ids: string[], isRead: boolean, scope?: SQL): Promise<number> {
   if (ids.length === 0) return 0;
-  const rows = await tx.update(enquiries).set({ isRead }).where(and(eq(enquiries.companyId, companyId), inArray(enquiries.id, ids), eq(enquiries.isRead, !isRead))).returning({ id: enquiries.id });
+  const rows = await tx.update(enquiries).set({ isRead }).where(and(eq(enquiries.companyId, companyId), inArray(enquiries.id, ids), eq(enquiries.isRead, !isRead), scope)).returning({ id: enquiries.id });
   return rows.length;
 }
 
@@ -71,7 +84,7 @@ export function enquiryRoutes(app: FastifyInstance): void {
     handler: async (req, reply) => {
       const q = req.query;
       const user = req.user!;
-      const where: (SQL | undefined)[] = [eq(enquiries.companyId, user.companyId)];
+      const where: (SQL | undefined)[] = [eq(enquiries.companyId, user.companyId), enquiryScope(user)];
       if (q.is_read !== undefined) where.push(eq(enquiries.isRead, q.is_read));
       if (q.project_id) { ensureProjectAccess(user, q.project_id); where.push(eq(enquiries.projectId, q.project_id)); }
       const result = await paginate<EnquirySelect>(app.dbReplica, {
@@ -96,7 +109,7 @@ export function enquiryRoutes(app: FastifyInstance): void {
     method: "GET", url: "/enquiries/unread-count", permission: "lead.read",
     schema: { response: { 200: EnquiryUnreadCountSchema }, summary: "Unread enquiries (inbox badge)" },
     handler: async (req) => {
-      const [r] = await app.dbReplica.select({ n: count() }).from(enquiries).where(and(eq(enquiries.companyId, req.user!.companyId), eq(enquiries.isRead, false)));
+      const [r] = await app.dbReplica.select({ n: count() }).from(enquiries).where(and(eq(enquiries.companyId, req.user!.companyId), enquiryScope(req.user!), eq(enquiries.isRead, false)));
       return { unread: Number(r?.n ?? 0) };
     },
   });
@@ -107,7 +120,7 @@ export function enquiryRoutes(app: FastifyInstance): void {
     handler: async (req) => {
       const user = req.user!;
       return app.db.transaction(async (tx) => {
-        const updated = await markEnquiriesRead(tx, user.companyId, req.body.ids, req.body.is_read);
+        const updated = await markEnquiriesRead(tx, user.companyId, req.body.ids, req.body.is_read, enquiryScope(user));
         if (updated > 0) await writeAudit(tx, { companyId: user.companyId, ...metaOf(req), action: req.body.is_read ? "enquiry.read" : "enquiry.unread", entityType: "enquiry", entityId: null, after: { ids: req.body.ids, updated } });
         return { updated };
       });
@@ -117,7 +130,7 @@ export function enquiryRoutes(app: FastifyInstance): void {
   route(app, {
     method: "GET", url: "/enquiries/:id", permission: "lead.read",
     schema: { params: idParams, response: { 200: EnquiryRowSchema }, summary: "One enquiry" },
-    handler: async (req) => enquiryRow(await loadEnquirySelect(app.dbReplica, req.user!.companyId, req.params.id)),
+    handler: async (req) => enquiryRow(await loadEnquiryFor(app.dbReplica, req.user!, req.params.id)),
   });
 
   route(app, {
@@ -127,7 +140,7 @@ export function enquiryRoutes(app: FastifyInstance): void {
       const user = req.user!;
       const isRead = req.body?.is_read ?? true;
       return app.db.transaction(async (tx) => {
-        const before = await loadEnquirySelect(tx, user.companyId, req.params.id);
+        const before = await loadEnquiryFor(tx, user, req.params.id);
         const updated = await markEnquiriesRead(tx, user.companyId, [before.e.id], isRead);
         if (updated > 0) {
           // Opening the enquiry also clears the unread flag of its lead (same inbox badge semantics).

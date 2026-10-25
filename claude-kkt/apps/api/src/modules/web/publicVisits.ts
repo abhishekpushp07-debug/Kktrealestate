@@ -7,14 +7,17 @@ import {
   DateStringSchema, PublicVisitAvailabilityDaysSchema, PublicVisitAvailabilityQuerySchema, PublicVisitBookingInputSchema, PublicVisitCancelInputSchema, PublicVisitManageResponseSchema,
   PublicVisitBookingResponseSchema, SlugSchema, TimeStringSchema, type PublicVisitManageResponse,
 } from "@kkt/contracts";
-import type { Executor } from "@kkt/db";
+import { eq } from "drizzle-orm";
+import { projectWebsiteSettings, type Executor } from "@kkt/db";
+import { loadCompany } from "../../lib/company.js";
+import { randomToken } from "../../lib/crypto.js";
 import { ApiError } from "../../lib/errors.js";
 import { route } from "../../lib/routes.js";
 import { FORM_RATE_LIMIT } from "./publicForms.js";
-import { publishedProjects, type PublishedProject } from "./publicContent.js";
-import { RelaxedHoneypotSchema, WEBSITE_ACTOR, bustPublicCache, clock, fakeCode, isHoneypotTripped, noStore, publicCached, publicCompanyId, publicMeta, relaxHoneypot } from "./shared.js";
+import { livePublishedProject, type PublishedProject } from "./publicContent.js";
+import { RelaxedHoneypotSchema, WEBSITE_ACTOR, bustPublicCache, clock, fakeNumber, isHoneypotTripped, noStore, publicCached, publicCompanyId, publicMeta, relaxHoneypot } from "./shared.js";
 import {
-  bookVisit, cancelVisit, clampRange, icsUrl, isPast, loadVisitByToken, loadVisitSettings, manageUrl, projectAvailability, visitIcs, type DbVisitSettings, type VisitSelect,
+  bookVisit, cancelVisit, clampRange, icsUrl, isPast, loadVisitByToken, loadVisitSettings, manageUrl, matchSlot, projectAvailability, visitIcs, type DbVisitSettings, type VisitSelect,
 } from "./visitService.js";
 
 const { website: _website, visit_date: _visitDate, slot_start: _slotStart, ...bookingShape } = PublicVisitBookingInputSchema.shape;
@@ -35,9 +38,10 @@ async function companyOr404(db: Executor): Promise<string> {
   return id;
 }
 
+/** The published project behind a slug while the site is live; 404 otherwise (unpublished projects are invisible everywhere). */
 async function publishedBySlug(db: Executor, slug: string): Promise<{ companyId: string; project: PublishedProject }> {
   const companyId = await companyOr404(db);
-  const [project] = await publishedProjects(db, companyId, slug);
+  const project = await livePublishedProject(db, companyId, slug);
   if (!project) throw ApiError.notFound("Project");
   return { companyId, project };
 }
@@ -62,9 +66,11 @@ function manageView(r: VisitSelect, settings: DbVisitSettings | null, token: str
 async function visitByToken(db: Executor, token: string): Promise<{ row: VisitSelect; settings: DbVisitSettings | null; slug: string }> {
   const row = await loadVisitByToken(db, token);
   if (!row) throw ApiError.notFound("Site visit");
-  const [settings, published] = await Promise.all([loadVisitSettings(db, row.v.projectId), publishedProjects(db, row.v.companyId)]);
-  const slug = published.find((p) => p.p.id === row.v.projectId)?.w.slug ?? "";
-  return { row, settings, slug };
+  const [settings, [w]] = await Promise.all([
+    loadVisitSettings(db, row.v.projectId),
+    db.select({ slug: projectWebsiteSettings.slug, isPublished: projectWebsiteSettings.isPublished }).from(projectWebsiteSettings).where(eq(projectWebsiteSettings.projectId, row.v.projectId)).limit(1),
+  ]);
+  return { row, settings, slug: w?.isPublished ? (w.slug ?? "") : "" };
 }
 
 export function registerPublicVisitRoutes(app: FastifyInstance): void {
@@ -88,13 +94,20 @@ export function registerPublicVisitRoutes(app: FastifyInstance): void {
       const body = req.body;
       const date = (body.visit_date ?? body.date)!;
       const start = (body.slot_start ?? body.start)!;
-      if (isHoneypotTripped(body)) {
-        const token = fakeCode("");
-        return reply.code(200).send({ visit_number: fakeCode("SV-"), project_name: "", visit_date: date, slot_start: start, slot_end: start, visitors: body.visitors, site_office_address: null, maps_link: null, instructions: null, ics_url: icsUrl(token), manage_url: manageUrl(token), date, start, end: start, address: null });
-      }
       const { companyId, project } = await publishedBySlug(app.db, body.project_slug);
       const settings = await loadVisitSettings(app.db, project.p.id);
       if (!settings || !settings.enabled) throw ApiError.rule("Site visits are not open for this project", "VISITS_DISABLED");
+      if (isHoneypotTripped(body)) {
+        // Silently dropped: same validation (422 SLOT_INVALID etc.), same 201 shape, real slot end / address / number format; nothing written.
+        const slot = matchSlot(settings, date, start, { mode: "public" });
+        const company = await loadCompany(app.db, app.redis, companyId);
+        const token = randomToken(24);
+        return reply.code(201).send({
+          visit_number: fakeNumber(company, "visit", date, "SV-"), project_name: project.p.name, visit_date: date, slot_start: slot.start, slot_end: slot.end, visitors: body.visitors,
+          site_office_address: settings.siteOfficeAddress ?? null, maps_link: settings.mapsLink ?? null, instructions: settings.instructions ?? null, ics_url: icsUrl(token), manage_url: manageUrl(token),
+          date, start: slot.start, end: slot.end, address: settings.siteOfficeAddress ?? null,
+        });
+      }
       const booked = await app.db.transaction((tx) => bookVisit(tx, {
         companyId, project: { id: project.p.id, name: project.p.name }, settings, date, start, name: body.name, phone: body.phone, email: body.email ?? null, visitors: body.visitors, message: body.message ?? null,
         source: "WEBSITE", utm: body.utm ?? null, actor: WEBSITE_ACTOR, redis: app.redis, mode: "public", ...publicMeta(req),

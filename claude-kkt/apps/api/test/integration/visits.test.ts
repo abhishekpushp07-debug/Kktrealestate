@@ -172,7 +172,7 @@ describe("public booking", () => {
 
   it("honeypot → 200 and nothing created; replays with Idempotency-Key", async () => {
     const bot = await book("9876600021", D(6), "10:00", { website: "bot" });
-    expect(bot.status).toBe(200);
+    expect(bot.status).toBe(201); // identical status and shape to a real booking
     expect((await t.app.sql<{ n: number }[]>`select count(*)::int as n from site_visits where phone = '9876600021'`)[0]!.n).toBe(0);
     expect((await t.app.sql<{ n: number }[]>`select count(*)::int as n from leads where phone = '9876600021'`)[0]!.n).toBe(0);
     const ip = freshIp();

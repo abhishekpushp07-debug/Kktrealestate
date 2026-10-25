@@ -296,6 +296,9 @@ async function assertCustomer(db: Executor, companyId: string, id: string | null
   if (!c) throw ApiError.badRequest(`customer_id: customer ${id} not found`, { field: "customer_id" });
 }
 
+/** Website routes a CMS page slug may not shadow (the sitemap and the Next.js router already own them). */
+export const RESERVED_PAGE_SLUGS = new Set(["projects", "blog", "gallery", "contact", "visit", "api", "sitemap", "robots", "admin", "portal", "public"]);
+
 const publishedWhere = (col: AnyPgColumn) => (q: Row): SQL | undefined => (typeof q["is_published"] === "boolean" ? eq(col, q["is_published"]) : undefined);
 
 const imageOf = (docs: Map<string, DocumentRecord>, id: string | null | undefined) => documentUrls(id ? docs.get(id) : undefined);
@@ -397,6 +400,7 @@ const KINDS: CmsKindDef[] = [
     filterSchema: CmsListFilterSchema, searchColumns: [cmsPages.title, cmsPages.slug], sortable: { title: cmsPages.title, slug: cmsPages.slug, created_at: cmsPages.createdAt }, defaultSort: "title",
     csvColumns: ["id", "slug", "title", "is_published", "version"], uniqueKey: { field: "slug", column: cmsPages.slug }, extraWhere: publishedWhere(cmsPages.isPublished),
     prepare: async (tx, input, companyId) => {
+      if (typeof input["slug"] === "string" && RESERVED_PAGE_SLUGS.has(input["slug"])) throw ApiError.badRequest(`slug: "${input["slug"]}" is reserved by the website`, { issues: [{ path: "slug", message: "Reserved slug" }] });
       await assertDocuments(tx, companyId, [(input["seo"] as { og_image_document_id?: string } | null | undefined)?.og_image_document_id], "image", "seo.og_image_document_id");
       const v = compact(camelRow(input));
       if (v["seo"] === null) v["seo"] = {};

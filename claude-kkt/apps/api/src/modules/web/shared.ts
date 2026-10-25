@@ -4,10 +4,12 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { companies, documents, projects, type Executor } from "@kkt/db";
+import { DEFAULT_NUMBER_PATTERN, financialYear, formatNumber } from "@kkt/domain";
 import { config } from "../../config.js";
 import type { AuditActor } from "../../lib/audit.js";
-import { cached, invalidate } from "../../lib/cache.js";
+import { cached } from "../../lib/cache.js";
 import { ApiError } from "../../lib/errors.js";
+import type { NumberingCompany, NumberingScope } from "../../lib/numbering.js";
 import { versionConflict, type VersionedTable } from "../../lib/version.js";
 
 /** Cache-Control for every public JSON GET (docs/API-CONVENTIONS.md Appendix B). */
@@ -17,6 +19,11 @@ export const IMMUTABLE_CACHE_CONTROL = "public, max-age=31536000, immutable";
 /** Redis TTL of the public read cache. */
 export const PUBLIC_CACHE_SECONDS = 60;
 const PUBLIC_CACHE_PREFIX = "pub:";
+/**
+ * Generation counter of the public cache. Every CMS / website-settings / visit write bumps it, so cached entries written under the old
+ * generation are simply never read again (no SCAN + DEL, and no race where an in-flight read repopulates a stale entry after the bust).
+ */
+export const PUBLIC_CACHE_VERSION_KEY = "pub:version";
 
 /** API origin without a trailing slash (absolute URLs in public payloads). */
 export const apiOrigin = config.API_PUBLIC_URL.replace(/\/+$/, "");
@@ -41,6 +48,17 @@ export function fakeCode(prefix: string): string {
   return `${prefix}${randomBytes(4).toString("hex").toUpperCase()}`;
 }
 
+/**
+ * A believable document number for honeypot replies: the company's real pattern for the scope (`SV-2627/0417`), FY of `businessDate`,
+ * random sequence. Bots that fill the honeypot must not be able to tell their submission was dropped (SPEC §15 "silently dropped").
+ */
+export function fakeNumber(company: Pick<NumberingCompany, "fyStartMonth" | "numbering">, scope: NumberingScope | "enquiry", businessDate: string, fallbackPrefix: string): string {
+  const fy = financialYear(businessDate, company.fyStartMonth);
+  const cfg = scope === "enquiry" ? undefined : company.numbering[scope];
+  const seq = 100 + (randomBytes(2).readUInt16BE(0) % 9000);
+  return formatNumber(cfg?.prefix ?? fallbackPrefix, fy.label, seq, cfg?.format ?? DEFAULT_NUMBER_PATTERN);
+}
+
 /** Postgres `time` values arrive as "HH:MM:SS"; the API speaks "HH:MM". */
 export function clock(value: string | null | undefined): string {
   return (value ?? "").slice(0, 5);
@@ -54,12 +72,35 @@ export function publicHeaders(reply: FastifyReply): void {
 
 type CacheEnvelope<T> = { ok: true; value: T } | { ok: false };
 
+/** Current public cache generation ("0" when unset or Redis is unavailable). */
+async function publicCacheVersion(app: FastifyInstance): Promise<string> {
+  try {
+    return (await app.redis.get(PUBLIC_CACHE_VERSION_KEY)) ?? "0";
+  } catch {
+    return "0";
+  }
+}
+
 /**
- * Read-through cache for public GETs keyed by path + query (60 s). `fn` returns null for "not found", which is cached too
- * so an unpublished slug cannot be used to hammer the database.
+ * Canonical cache key of a public GET: route pattern + validated params + validated query (sorted). Built from what the Zod schemas
+ * accepted, never from the raw URL, so `?junk=1`, `?junk=2`… on a route without a query schema cannot grow the Redis keyspace.
+ */
+export function publicCacheKey(req: FastifyRequest): string {
+  const pattern = req.routeOptions.url ?? req.url.split("?")[0] ?? req.url;
+  const params = Object.entries((req.params ?? {}) as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`);
+  const hasQuerySchema = Boolean((req.routeOptions.schema as { querystring?: unknown } | undefined)?.querystring);
+  const query = hasQuerySchema
+    ? Object.entries((req.query ?? {}) as Record<string, unknown>).filter(([, v]) => v !== undefined && v !== null).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
+    : [];
+  return `${pattern}|${params.join("&")}|${query.join("&")}`;
+}
+
+/**
+ * Read-through cache for public GETs keyed by generation + route + validated inputs (60 s). `fn` returns null for "not found", which is
+ * cached too so an unpublished slug cannot be used to hammer the database.
  */
 export async function publicCached<T>(app: FastifyInstance, req: FastifyRequest, reply: FastifyReply, fn: () => Promise<T | null>, notFoundEntity = "Resource"): Promise<T> {
-  const key = `${PUBLIC_CACHE_PREFIX}${req.url}`;
+  const key = `${PUBLIC_CACHE_PREFIX}${await publicCacheVersion(app)}:${publicCacheKey(req)}`;
   const env = await cached<CacheEnvelope<T>>(app.redis, key, PUBLIC_CACHE_SECONDS, async () => {
     const value = await fn();
     return value === null ? { ok: false } : { ok: true, value };
@@ -69,9 +110,12 @@ export async function publicCached<T>(app: FastifyInstance, req: FastifyRequest,
   return env.value;
 }
 
-/** Drops cached public responses (all of them, or those whose path starts with `pathPrefix`). Called after every CMS/website write. */
-export async function bustPublicCache(app: FastifyInstance, pathPrefix = ""): Promise<void> {
-  await invalidate(app.redis, `${PUBLIC_CACHE_PREFIX}${pathPrefix}`).catch(() => undefined);
+/**
+ * Invalidates every cached public response by bumping the generation counter. Called after every CMS / website-settings / visit-settings
+ * write and after bookings. `_pathPrefix` is accepted for call-site compatibility; invalidation is always global (entries expire in 60 s).
+ */
+export async function bustPublicCache(app: FastifyInstance, _pathPrefix = ""): Promise<void> {
+  await app.redis.incr(PUBLIC_CACHE_VERSION_KEY).catch(() => undefined);
 }
 
 /** The one company whose website this API serves (single tenant today). */

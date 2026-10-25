@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { PAYMENT_BUCKET_LABELS, PaymentCreateSchema, type BookingDetailResponse, type BookingRow, type PaymentAgainst, type PaymentBucket, type PaymentCreate, type PaymentModeRow, type PaymentRow } from "@kkt/contracts";
+import { PAYMENT_BUCKET_LABELS, PaymentCreateSchema, type BookingDetailResponse, type BookingRow, type OtherChargeRow, type PaymentAgainst, type PaymentBucket, type PaymentCreate, type PaymentModeRow, type PaymentRow } from "@kkt/contracts";
 import { z } from "zod";
 import { applyServerErrors, Badge, Button, Combobox, DateInput, Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, FormError, FormField, FormRow, Input, MoneyInput, RadioGroup, Select, Skeleton, Textarea, type ComboboxOption } from "@/components/ui";
 import { describeError, isApiClientError, type ApiClientError } from "@/lib/api";
@@ -26,6 +26,7 @@ import { downloadPdf } from "@/features/bookings/api";
 /* ------------------------------------------------------------------ */
 
 export interface PaymentFormValues {
+  booking_id: string | null;
   against: PaymentAgainst;
   bucket: PaymentBucket | null;
   other_charge_id: string | null;
@@ -41,7 +42,6 @@ export interface PaymentFormValues {
 }
 
 interface SchemaContext {
-  bookingId: string | null;
   bookingDate: string | null;
   today: string;
   modeById: ReadonlyMap<string, Pick<PaymentModeRow, "code" | "requires_instrument" | "clears_immediately" | "is_cash">>;
@@ -57,7 +57,7 @@ function buildPaymentSchema(context: SchemaContext) {
       const values = raw as unknown as PaymentFormValues;
       const mode = values.payment_mode_id ? context.modeById.get(values.payment_mode_id) : undefined;
       const rules = modeRules(mode ?? null);
-      if (!context.bookingId) ctx.addIssue({ code: "custom", message: "Pick the booking", path: ["booking_id"] });
+      if (!values.booking_id) ctx.addIssue({ code: "custom", message: "Pick the booking", path: ["booking_id"] });
       if (!values.payment_mode_id) ctx.addIssue({ code: "custom", message: "Pick the payment mode", path: ["payment_mode_id"] });
       if (!values.payment_date) ctx.addIssue({ code: "custom", message: "Enter the payment date", path: ["payment_date"] });
       else {
@@ -72,7 +72,7 @@ function buildPaymentSchema(context: SchemaContext) {
         ? { number: values.instrument_number.trim(), date: values.instrument_date ?? null, bank_name: nullable(values.instrument_bank), branch: nullable(values.instrument_branch) }
         : null;
       return {
-        booking_id: context.bookingId ?? "",
+        booking_id: values.booking_id ?? "",
         against: values.against,
         bucket: values.against === "FLAT_VALUE" ? values.bucket : null,
         other_charge_id: values.against === "OTHER_CHARGE" ? values.other_charge_id : null,
@@ -87,8 +87,13 @@ function buildPaymentSchema(context: SchemaContext) {
     .pipe(PaymentCreateSchema);
 }
 
+function hasOtherCharges(booking: BookingRow | BookingDetailResponse): booking is BookingDetailResponse {
+  return Array.isArray((booking as Partial<BookingDetailResponse>).other_charges);
+}
+
 function defaultValues(seed: Partial<PaymentFormValues> = {}): PaymentFormValues {
   return {
+    booking_id: null,
     against: "FLAT_VALUE",
     bucket: "CASH",
     other_charge_id: null,
@@ -138,12 +143,12 @@ export function PaymentDialog({ open, onOpenChange, booking: prefilled, defaultA
   const prefilledDetail = prefilled && "other_charges" in prefilled ? prefilled : null;
   const detailQuery = useBookingDetail(open && bookingId && !prefilledDetail ? bookingId : null);
   const booking: BookingDetailResponse | BookingRow | null = prefilledDetail ?? detailQuery.data ?? (prefilled && prefilled.id === bookingId ? prefilled : null);
-  const otherCharges = booking && "other_charges" in booking ? booking.other_charges : [];
+  const otherCharges: OtherChargeRow[] = booking && hasOtherCharges(booking) ? booking.other_charges : [];
 
   const modeById = useMemo(() => new Map((modes.data ?? []).map((mode) => [mode.id, mode] as const)), [modes.data]);
-  const schema = useMemo(() => buildPaymentSchema({ bookingId, bookingDate: booking?.booking_date ?? null, today, modeById }), [bookingId, booking?.booking_date, today, modeById]);
+  const schema = useMemo(() => buildPaymentSchema({ bookingDate: booking?.booking_date ?? null, today, modeById }), [booking?.booking_date, today, modeById]);
   const resolver = useMemo(() => contractResolver<PaymentFormValues, PaymentCreate>(schema), [schema]);
-  const form = useForm<PaymentFormValues, unknown, PaymentCreate>({ resolver, defaultValues: defaultValues({ against: defaultAgainst, bucket: defaultBucket, other_charge_id: defaultOtherChargeId }), mode: "onTouched" });
+  const form = useForm<PaymentFormValues, unknown, PaymentCreate>({ resolver, defaultValues: defaultValues({ booking_id: prefilled?.id ?? null, against: defaultAgainst, bucket: defaultBucket, other_charge_id: defaultOtherChargeId }), mode: "onTouched" });
   const control = controlOf(form);
 
   // Reset whenever the dialog opens.
@@ -155,7 +160,7 @@ export function PaymentDialog({ open, onOpenChange, booking: prefilled, defaultA
     idempotency.current = null;
     setBookingId(prefilled?.id ?? null);
     setBookingLabel(prefilled ? `${prefilled.booking_number} · ${prefilled.customer_name}` : undefined);
-    form.reset(defaultValues({ against: defaultAgainst, bucket: defaultBucket, other_charge_id: defaultOtherChargeId }));
+    form.reset(defaultValues({ booking_id: prefilled?.id ?? null, against: defaultAgainst, bucket: defaultBucket, other_charge_id: defaultOtherChargeId }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, prefilled?.id]);
 
@@ -222,7 +227,7 @@ export function PaymentDialog({ open, onOpenChange, booking: prefilled, defaultA
     setPhase({ kind: "form" });
     setServerError(null);
     setCapError(null);
-    form.reset(defaultValues({ against, bucket, payment_date: form.getValues("payment_date"), payment_mode_id: modeId, bank_account_id: form.getValues("bank_account_id") }));
+    form.reset(defaultValues({ booking_id: bookingId, against, bucket, payment_date: form.getValues("payment_date"), payment_mode_id: modeId, bank_account_id: form.getValues("bank_account_id") }));
   };
 
   return (
@@ -257,7 +262,7 @@ export function PaymentDialog({ open, onOpenChange, booking: prefilled, defaultA
                     onValueChange={(value, option) => {
                       setBookingId(value);
                       setBookingLabel(option?.label);
-                      form.clearErrors("booking_id");
+                      form.setValue("booking_id", value, { shouldValidate: Boolean(value) });
                       form.setValue("other_charge_id", null);
                     }}
                     onSearch={searchOptions}

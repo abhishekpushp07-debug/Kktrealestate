@@ -13,6 +13,7 @@ import { brochureDownloads, projectVisitSettings, projectWebsiteSettings, projec
 import { addDays, slugify, toISTDateString, todayIST } from "@kkt/domain";
 import { actorFromRequest, auditMeta, writeAudit } from "../../lib/audit.js";
 import { ApiError } from "../../lib/errors.js";
+import { isUniqueViolation } from "../../lib/pgErrors.js";
 import { route } from "../../lib/routes.js";
 import { camelRow } from "../../lib/rows.js";
 import { ensureProjectAccess, hasAnyPermission, type StaffContext } from "../../lib/scope.js";
@@ -56,11 +57,14 @@ export async function ensureWebsiteSettings(tx: Executor, project: DbProject): P
   const [existing] = await tx.select().from(projectWebsiteSettings).where(eq(projectWebsiteSettings.projectId, project.id)).limit(1);
   if (existing) return existing;
   const slug = await uniqueSlug(tx, project);
-  const [created] = await tx.insert(projectWebsiteSettings).values({ projectId: project.id, slug }).onConflictDoNothing().returning();
-  if (created) return created;
-  const [again] = await tx.select().from(projectWebsiteSettings).where(eq(projectWebsiteSettings.projectId, project.id)).limit(1);
-  if (!again) throw new Error("project_website_settings insert produced no row");
-  return again;
+  // Two projects with the same name created concurrently may both pick `slug`: the loser falls back to a slug derived from its id.
+  for (const candidate of [slug, `${slug}-${project.id.slice(0, 8)}`]) {
+    const [created] = await tx.insert(projectWebsiteSettings).values({ projectId: project.id, slug: candidate }).onConflictDoNothing().returning();
+    if (created) return created;
+    const [again] = await tx.select().from(projectWebsiteSettings).where(eq(projectWebsiteSettings.projectId, project.id)).limit(1);
+    if (again) return again;
+  }
+  throw new Error("project_website_settings insert produced no row");
 }
 
 /** What still blocks publishing: hero image, description, location (SPEC §15 "Cannot publish without hero image, description and location"). */
@@ -151,7 +155,13 @@ async function applyWebsitePatch(tx: Executor, user: StaffContext, project: DbPr
   if (changes["seo"] === null) changes["seo"] = {};
   if (willPublish && !existing.isPublished) changes["publishedAt"] = new Date();
   if (!willPublish && existing.isPublished) changes["publishedAt"] = null;
-  return updateByKey(tx, projectWebsiteSettings, projectWebsiteSettings.projectId, project.id, version, changes, "project_website_settings");
+  try {
+    return await updateByKey(tx, projectWebsiteSettings, projectWebsiteSettings.projectId, project.id, version, changes, "project_website_settings");
+  } catch (e) {
+    // Lost a race with another project taking the same slug between the pre-check and the UPDATE: 409, never a 500.
+    if (isUniqueViolation(e)) throw ApiError.conflict("DUPLICATE", "Another project already uses this slug", { field: "slug", value: patch["slug"] });
+    throw e;
+  }
 }
 
 export function registerProjectWebsiteRoutes(app: FastifyInstance): void {

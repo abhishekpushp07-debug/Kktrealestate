@@ -10,6 +10,7 @@ import { loadCompany } from "../../lib/company.js";
 import { decryptField, encryptField, keyedHash } from "../../lib/crypto.js";
 import { ApiError } from "../../lib/errors.js";
 import { nextNumber } from "../../lib/numbering.js";
+import { translatePgError } from "../../lib/pgErrors.js";
 import type { StaffContext } from "../../lib/scope.js";
 import { applyUpdate } from "../../lib/version.js";
 import type { Redis } from "ioredis";
@@ -198,6 +199,16 @@ export async function getCustomerRow(db: Executor, companyId: string, id: string
 // Duplicate detection (phone, PAN hash)
 // ---------------------------------------------------------------------------
 
+/**
+ * Serialises customer writes per company + phone and per company + PAN hash with transaction-scoped advisory locks
+ * (always phone first, then PAN, so concurrent writers never deadlock). The schema only indexes these columns, so without
+ * the lock two simultaneous creates of one phone would both pass the duplicate check and both insert.
+ */
+export async function lockCustomerKeys(tx: Executor, companyId: string, phone: string | null, panHash: string | null): Promise<void> {
+  if (phone) await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`customer:${companyId}:phone:${phone}`}))`);
+  if (panHash) await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`customer:${companyId}:pan:${panHash}`}))`);
+}
+
 /** 409 DUPLICATE_CUSTOMER (details.existing {id, customer_code, matched_on}) when another live customer carries the phone or PAN. */
 export async function assertNoDuplicate(tx: Executor, companyId: string, phone: string | null, panHash: string | null, excludeId: string | null): Promise<void> {
   const conds: SQL[] = [];
@@ -308,6 +319,7 @@ export interface CustomerWriteContext {
 export async function createCustomer(tx: Executor, ctx: CustomerWriteContext, body: CustomerCreate): Promise<CustomerRow> {
   const cols = customerColumns(body);
   await assertRm(tx, ctx.user.companyId, body.relationship_manager_id);
+  await lockCustomerKeys(tx, ctx.user.companyId, cols["phone"] as string, (cols["panHash"] as string | null) ?? null);
   await assertNoDuplicate(tx, ctx.user.companyId, cols["phone"] as string, (cols["panHash"] as string | null) ?? null, null);
   const company = await loadCompany(tx, ctx.redis, ctx.user.companyId);
   const code = await nextNumber(tx, company, "customer", todayIST());
@@ -330,8 +342,15 @@ export async function updateCustomer(tx: Executor, ctx: CustomerWriteContext, id
   if (patch.relationship_manager_id !== undefined) await assertRm(tx, ctx.user.companyId, patch.relationship_manager_id);
   const phone = (cols["phone"] as string | undefined) ?? null;
   const panHash = patch.pan !== undefined ? ((cols["panHash"] as string | null) ?? null) : null;
+  await lockCustomerKeys(tx, ctx.user.companyId, phone, panHash);
   await assertNoDuplicate(tx, ctx.user.companyId, phone, panHash, id);
   await applyUpdate(tx, customers, id, version, cols, "customer");
+  if (phone && phone !== sel.c.phone) {
+    // The portal login is the customer's phone: keep it in step (another portal login on that phone → 409 DUPLICATE).
+    try {
+      await tx.update(portalUsers).set({ phone }).where(eq(portalUsers.customerId, id));
+    } catch (e) { translatePgError(e, `A portal login with phone ${phone}`); }
+  }
   if (co_applicants !== undefined) await replaceCoApplicants(tx, ctx.user.companyId, id, co_applicants);
   const after = await getCustomerRow(tx, ctx.user.companyId, id);
   await writeAudit(tx, { companyId: ctx.user.companyId, ...ctx.meta, action: "customer.update", entityType: "customer", entityId: id, before: before as unknown as Record<string, unknown>, after: after as unknown as Record<string, unknown> });

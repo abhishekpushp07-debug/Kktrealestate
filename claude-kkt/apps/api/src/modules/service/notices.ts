@@ -2,11 +2,11 @@
  * Notices for buyers (SPEC §13/§15): per project or company-wide, publish/expiry window, soft delete via is_published=false.
  * Publishing notifies every customer with an ACTIVE/COMPLETED booking in the project (or all such customers) exactly once.
  */
-import { and, desc, eq, isNull, or, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, lte, or, sql, type SQL } from "drizzle-orm";
 import type { PgSelect } from "drizzle-orm/pg-core";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
-import { IdSchema, NoticeCreateSchema, NoticeFilterSchema, NoticeListResponseSchema, NoticeRowSchema, NoticeUpdateSchema, VersionedSchema, type NoticeRow, type PortalNoticeRow } from "@kkt/contracts";
+import { IdSchema, NoticeCreateSchema, NoticeFilterSchema, NoticeListResponseSchema, NoticeRowSchema, NoticeUpdateSchema, type NoticeRow, type PortalNoticeRow } from "@kkt/contracts";
 import { bookingCoApplicants, bookings, customers, notices, notifications, projects, users, type Executor } from "@kkt/db";
 import { actorFromRequest, writeAudit, type AuditActor } from "../../lib/audit.js";
 import { sendCsv } from "../../lib/csv.js";
@@ -83,7 +83,12 @@ async function noticeRecipients(tx: Executor, companyId: string, projectId: stri
  */
 export async function notifyNoticePublished(tx: Executor, n: DbNotice, projectName: string | null, now = new Date()): Promise<number> {
   if (!isLive(n, now)) return 0;
-  const [already] = await tx.select({ id: notifications.id }).from(notifications).where(and(eq(notifications.entityType, NOTICE_ENTITY), eq(notifications.entityId, n.id), eq(notifications.type, "NOTICE_PUBLISHED"))).limit(1);
+  // Withdrawn rows (left by an earlier unpublish) do not count: republishing must reach the buyers again.
+  const [already] = await tx
+    .select({ id: notifications.id })
+    .from(notifications)
+    .where(and(eq(notifications.entityType, NOTICE_ENTITY), eq(notifications.entityId, n.id), eq(notifications.type, "NOTICE_PUBLISHED"), eq(notifications.isWithdrawn, false)))
+    .limit(1);
   if (already) return 0;
   const customerIds = await noticeRecipients(tx, n.companyId, n.projectId);
   return notify(tx, {
@@ -101,9 +106,9 @@ export async function notifyDueNotices(executor: Executor, now = new Date()): Pr
     .leftJoin(users, eq(users.id, notices.createdBy))
     .where(and(
       eq(notices.isPublished, true),
-      or(isNull(notices.publishAt), sql`${notices.publishAt} <= ${now}`),
-      or(isNull(notices.expiresAt), sql`${notices.expiresAt} > ${now}`),
-      sql`not exists (select 1 from ${notifications} nt where nt.entity_type = ${NOTICE_ENTITY} and nt.entity_id = ${notices.id} and nt.type = 'NOTICE_PUBLISHED')`,
+      or(isNull(notices.publishAt), lte(notices.publishAt, now)),
+      or(isNull(notices.expiresAt), gt(notices.expiresAt, now)),
+      sql`not exists (select 1 from ${notifications} nt where nt.entity_type = ${NOTICE_ENTITY} and nt.entity_id = ${notices.id} and nt.type = 'NOTICE_PUBLISHED' and nt.is_withdrawn = false)`,
     ));
   let sent = 0;
   for (const j of due as NoticeJoined[]) {
@@ -118,7 +123,7 @@ export async function noticesForCustomer(executor: Executor, customerId: string,
   const [c] = await executor.select({ companyId: customers.companyId }).from(customers).where(eq(customers.id, customerId)).limit(1);
   if (!c) throw ApiError.notFound("Customer");
   const now = new Date();
-  const isRead = sql<boolean>`coalesce((select bool_or(nt.is_read) from ${notifications} nt where nt.recipient_type = 'CUSTOMER' and nt.recipient_id = ${customerId} and nt.entity_type = ${NOTICE_ENTITY} and nt.entity_id = ${notices.id}), false)`;
+  const isRead = sql<boolean>`coalesce((select bool_or(nt.is_read) from ${notifications} nt where nt.recipient_type = 'CUSTOMER' and nt.recipient_id = ${customerId} and nt.entity_type = ${NOTICE_ENTITY} and nt.entity_id = ${notices.id} and nt.is_withdrawn = false), false)`;
   const result = await paginate<{ n: DbNotice; projectName: string | null; isRead: boolean }>(executor, {
     table: notices,
     select: { n: notices, projectName: projects.name, isRead },
@@ -126,8 +131,8 @@ export async function noticesForCustomer(executor: Executor, customerId: string,
     where: and(
       eq(notices.companyId, c.companyId),
       eq(notices.isPublished, true),
-      or(isNull(notices.publishAt), sql`${notices.publishAt} <= ${now}`),
-      or(isNull(notices.expiresAt), sql`${notices.expiresAt} > ${now}`),
+      or(isNull(notices.publishAt), lte(notices.publishAt, now)),
+      or(isNull(notices.expiresAt), gt(notices.expiresAt, now)),
       or(isNull(notices.projectId), sql`${notices.projectId} in ${customerProjectIdsSubquery(customerId)}`),
     ),
     sort: { allowed: { publish_at: notices.publishAt }, default: "-publish_at" },
@@ -239,7 +244,8 @@ export function noticeRoutes(app: FastifyInstance): void {
         const publishAt = (changes["publishAt"] !== undefined ? changes["publishAt"] : existing.n.publishAt) as Date | null;
         const expiresAt = (changes["expiresAt"] !== undefined ? changes["expiresAt"] : existing.n.expiresAt) as Date | null;
         assertWindow(publishAt, expiresAt);
-        if (willPublish && !existing.n.isPublished && !publishAt) changes["publishAt"] = new Date();
+        // A live notice always carries a publish_at (the customer list sorts and pages by it): publishing without one, or clearing it, means "now".
+        if (willPublish && !publishAt) changes["publishAt"] = new Date();
         const updated = await applyUpdate(tx, notices, req.params.id, version, changes, NOTICE_ENTITY);
         const j = (await loadNotice(tx, user.companyId, updated.id))!;
         let notified = 0;
@@ -254,13 +260,13 @@ export function noticeRoutes(app: FastifyInstance): void {
 
   route(app, {
     method: "DELETE", url: "/notices/:id", permission: "cms.write",
-    schema: { params: idParams, body: VersionedSchema.partial().optional(), response: { 200: NoticeRowSchema }, summary: "Unpublish (soft delete) a notice; its bell notifications are withdrawn" },
+    schema: { params: idParams, response: { 200: NoticeRowSchema }, summary: "Unpublish (soft delete) a notice; its bell notifications are withdrawn (If-Match optional)" },
     handler: async (req) => {
       const user = req.user!;
       const m = meta(req);
       return app.db.transaction(async (tx) => {
         const existing = await requireNotice(tx, user, req.params.id, true);
-        const version = optionalExpectedVersion(req, req.body ?? null, existing.n.version);
+        const version = optionalExpectedVersion(req, null, existing.n.version);
         const updated = await applyUpdate(tx, notices, req.params.id, version, { isPublished: false }, NOTICE_ENTITY);
         const retracted = await withdraw(tx, NOTICE_ENTITY, updated.id);
         const view = toNoticeRow((await loadNotice(tx, user.companyId, updated.id))!);
@@ -277,7 +283,7 @@ export async function liveNotices(executor: Executor, companyId: string, project
   const rows = await withNoticeJoins(executor.select(NOTICE_SELECT).from(notices).$dynamic())
     .where(and(
       eq(notices.companyId, companyId), eq(notices.isPublished, true),
-      or(isNull(notices.publishAt), sql`${notices.publishAt} <= ${now}`), or(isNull(notices.expiresAt), sql`${notices.expiresAt} > ${now}`),
+      or(isNull(notices.publishAt), lte(notices.publishAt, now)), or(isNull(notices.expiresAt), gt(notices.expiresAt, now)),
       projectId ? or(isNull(notices.projectId), eq(notices.projectId, projectId)) : isNull(notices.projectId),
     ))
     .orderBy(desc(notices.publishAt), desc(notices.id))

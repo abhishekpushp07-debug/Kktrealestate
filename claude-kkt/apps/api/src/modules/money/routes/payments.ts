@@ -1,5 +1,5 @@
 /** Routes: /payments (post, list, cheques in hand, clear, bounce, reverse, receipt) and /demands (SPEC §11). */
-import { and, desc, eq, gte, lte, sql, type SQL } from "drizzle-orm";
+import { and, eq, gte, lte, sql, type SQL } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
@@ -29,7 +29,7 @@ function toChequeRow(p: PaymentRow, today: string): ChequeRow {
   return {
     id: p.id, receipt_number: p.receipt_number, booking_number: p.booking_number, customer_name: p.customer_name, project_name: p.project_name, flat_number: p.flat_number, amount_paise: p.amount_paise,
     payment_date: p.payment_date, mode_code: p.mode_code, instrument: p.instrument, bank_account_label: p.bank_account_label, status: p.status, bounce_reason: p.bounce_reason, version: p.version,
-    instrument_date: instrumentDate(p), days_in_hand: Math.max(0, diffDays(p.payment_date, today)),
+    instrument_date: instrumentDate(p), days_in_hand: Math.max(0, diffDays(today, p.payment_date)), // today − receipt date
   };
 }
 
@@ -67,9 +67,10 @@ export function registerPaymentRoutes(app: FastifyInstance): void {
     if (q.bank_account_id) where.push(eq(payments.bankAccountId, q.bank_account_id));
     if (q.from) where.push(gte(payments.paymentDate, q.from));
     if (q.to) where.push(lte(payments.paymentDate, q.to));
+    // the instrument date lives inside the jsonb; selecting the same expression lets paginate() read the keyset cursor value back
     const instrumentDateCol = sql<string>`(${payments.instrument} ->> 'date')`;
     const result = await paginate<PaymentSelect>(app.dbReplica, {
-      table: payments, select: PAYMENT_SELECT, join: paymentJoins,
+      table: payments, select: { ...PAYMENT_SELECT, instrumentDate: instrumentDateCol }, join: paymentJoins,
       where: and(...where.filter((w): w is SQL => w !== undefined)),
       search: { columns: [payments.receiptNumber, bookings.bookingNumber, customers.fullName, flats.flatNumber, sql`(${payments.instrument} ->> 'number')`], term: q.search },
       sort: {
@@ -173,5 +174,4 @@ export function registerPaymentRoutes(app: FastifyInstance): void {
     },
   });
 
-  void desc;
 }

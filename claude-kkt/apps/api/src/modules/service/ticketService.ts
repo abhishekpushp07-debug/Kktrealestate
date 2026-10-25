@@ -3,7 +3,7 @@
  * customer-facing functions the portal module calls (internal notes are stripped there; anything not the customer's is 404).
  * Every mutation runs inside the caller's transaction, writes an audit row, bumps `version` and notifies inside the same transaction.
  */
-import { and, asc, eq, inArray, isNull, notInArray, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, lt, notInArray, or, sql, type SQL } from "drizzle-orm";
 import type { PgSelect } from "drizzle-orm/pg-core";
 import {
   SERVICE_REOPEN_WINDOW_DAYS,
@@ -115,10 +115,7 @@ export const TICKET_SORTABLE = {
 
 /** Condition: open ticket past its SLA (flagged by the job, or simply overdue right now). */
 export function slaBreachedCondition(now: Date): SQL {
-  return or(
-    sql`${serviceRequests.slaBreachedAt} is not null`,
-    and(sql`${serviceRequests.slaDueAt} < ${now}`, notInArray(serviceRequests.status, [...TERMINAL_STATUSES])),
-  )!;
+  return or(isNotNull(serviceRequests.slaBreachedAt), and(lt(serviceRequests.slaDueAt, now), notInArray(serviceRequests.status, [...TERMINAL_STATUSES])))!;
 }
 
 /**
@@ -294,13 +291,26 @@ async function resolveAssignee(tx: Executor, companyId: string, userId: string):
   return u;
 }
 
-/** 400 unless every attachment id is a live document of the company. */
-export async function assertAttachments(tx: Executor, companyId: string, ids: readonly string[]): Promise<void> {
+/** What a thread attachment may belong to: the ticket itself, its customer or its booking. */
+export interface AttachmentOwner { ticketId?: string | null; customerId: string; bookingId: string | null }
+
+/**
+ * 400 unless every attachment id is a live, non-sensitive document of the company that belongs to this ticket (entity SERVICE_REQUEST),
+ * its customer (entity CUSTOMER) or its booking (entity BOOKING). Anything else — another customer's file, a KYC document — would leak
+ * its name and thumbnail into the thread (the customer sees public messages), so it is rejected as if it did not exist.
+ */
+export async function assertAttachments(tx: Executor, companyId: string, ids: readonly string[], owner: AttachmentOwner): Promise<void> {
   if (ids.length === 0) return;
-  const rows = await tx.select({ id: documents.id }).from(documents).where(and(eq(documents.companyId, companyId), inArray(documents.id, [...ids]), eq(documents.isDeleted, false)));
+  const belongs: SQL[] = [and(eq(documents.entityType, "CUSTOMER"), eq(documents.entityId, owner.customerId))!];
+  if (owner.ticketId) belongs.push(and(eq(documents.entityType, "SERVICE_REQUEST"), eq(documents.entityId, owner.ticketId))!);
+  if (owner.bookingId) belongs.push(and(eq(documents.entityType, "BOOKING"), eq(documents.entityId, owner.bookingId))!);
+  const rows = await tx
+    .select({ id: documents.id })
+    .from(documents)
+    .where(and(eq(documents.companyId, companyId), inArray(documents.id, [...ids]), eq(documents.isDeleted, false), eq(documents.isSensitive, false), or(...belongs)));
   const found = new Set(rows.map((r) => r.id));
   const missing = ids.filter((id) => !found.has(id));
-  if (missing.length > 0) throw ApiError.badRequest("attachment_ids references a document that does not exist", { field: "attachment_ids", missing });
+  if (missing.length > 0) throw ApiError.badRequest("attachment_ids references a document that does not exist or does not belong to this request", { field: "attachment_ids", missing });
 }
 
 /** Condition: the customer is primary applicant or co-applicant of the booking row. */
@@ -375,7 +385,7 @@ async function createTicketCore(
   const priority = input.priority ?? category.defaultPriority;
   const assignee = input.assigneeUserId ? await resolveAssignee(tx, companyId, input.assigneeUserId) : null;
   const attachmentIds = [...(input.attachmentIds ?? [])];
-  await assertAttachments(tx, companyId, attachmentIds);
+  await assertAttachments(tx, companyId, attachmentIds, { customerId: customer.id, bookingId });
 
   const company = await companyRow(tx, companyId);
   const now = new Date();
@@ -385,7 +395,7 @@ async function createTicketCore(
     .values({
       companyId, ticketNumber, customerId: customer.id, bookingId, categoryId: category.id, priority, subject: input.subject, description: input.description,
       status: "NEW", assigneeUserId: assignee?.id ?? null, slaDueAt: new Date(slaDueAt(now, priority, slaHoursOf(company))), lastMessageAt: now,
-      createdBy: actor.type === "STAFF" ? actor.id : null,
+      createdBy: actor.type === "STAFF" ? actor.id : null, createdAt: now, updatedAt: now,
     })
     .returning();
   if (!created) throw new Error("insert returned no row");
@@ -441,8 +451,9 @@ export function statusPatch(current: Pick<DbTicket, "status" | "resolvedAt">, to
   return patch;
 }
 
+/** 409 TICKET_CLOSED: a closed ticket accepts no messages, edits or assignment (state conflict, like REOPEN_WINDOW_CLOSED / ALREADY_RATED). */
 function assertOpen(t: DbTicket): void {
-  if (t.status === "CLOSED") throw ApiError.rule("Ticket is closed", "TICKET_CLOSED", { status: t.status });
+  if (t.status === "CLOSED") throw ApiError.conflict("TICKET_CLOSED", "This request is closed and can no longer be changed", { status: t.status, closed_at: iso(t.closedAt) });
 }
 
 async function notifyCustomerReply(tx: Executor, t: DbTicket, body: string): Promise<void> {
@@ -543,7 +554,7 @@ export async function addStaffMessage(
 ): Promise<ServiceRequestDetailResponse> {
   const existing = await requireStaffTicket(tx, ctx.user, id, true);
   assertOpen(existing.sr);
-  await assertAttachments(tx, ctx.user.companyId, input.attachment_ids);
+  await assertAttachments(tx, ctx.user.companyId, input.attachment_ids, { ticketId: id, customerId: existing.sr.customerId, bookingId: existing.sr.bookingId });
   const now = new Date();
   const [msg] = await tx.insert(serviceRequestMessages).values({ ticketId: id, authorType: "STAFF", authorId: ctx.user.id, authorName: ctx.user.name, body: input.body, isInternal: input.is_internal, attachmentIds: [...input.attachment_ids] }).returning({ id: serviceRequestMessages.id });
   let patch: Record<string, unknown> = { lastMessageAt: now };
@@ -600,11 +611,11 @@ export async function ticketForCustomer(executor: Executor, ticketId: string, cu
   return customerTicketDetail(executor, await requireCustomerTicket(executor, ticketId, customerId));
 }
 
-/** Customer reply: AWAITING_CUSTOMER → IN_PROGRESS, notifies the assignee (or Super Admin). 404 when not theirs, 422 when closed. */
+/** Customer reply: AWAITING_CUSTOMER → IN_PROGRESS, notifies the assignee (or Super Admin). 404 when not theirs, 409 TICKET_CLOSED when closed. */
 export async function addCustomerMessage(tx: Executor, ticketId: string, customerId: string, body: string, attachmentIds: readonly string[] = [], meta: WriteMeta = {}): Promise<CustomerTicketDetail> {
   const existing = await requireCustomerTicket(tx, ticketId, customerId, true);
   assertOpen(existing.sr);
-  await assertAttachments(tx, existing.sr.companyId, attachmentIds);
+  await assertAttachments(tx, existing.sr.companyId, attachmentIds, { ticketId, customerId, bookingId: existing.sr.bookingId });
   const now = new Date();
   const [msg] = await tx.insert(serviceRequestMessages).values({ ticketId, authorType: "CUSTOMER", authorId: customerId, authorName: existing.customerName, body, isInternal: false, attachmentIds: [...attachmentIds] }).returning({ id: serviceRequestMessages.id });
   const patch: Record<string, unknown> = { lastMessageAt: now };

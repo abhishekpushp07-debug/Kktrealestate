@@ -2,7 +2,7 @@ import { ArrowDownToLine, ArrowUpFromLine, Landmark, Printer, Plus } from "lucid
 import { useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { CONTRA_TYPE_LABELS, CONTRA_TYPES, MONEY_CATEGORY_LABELS, PAYMENT_MODE_CODE_LABELS, type ContraEntryRow, type ContraType, type RoznamchaReceiptRow, type RoznamchaResponse } from "@kkt/contracts";
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, DateInput, EmptyState, ErrorState, FieldWrapper, FormError, MoneyInput, PageHeader, Select, SimpleDialog, Skeleton, StatCard, Tabs, TabsList, TabsTrigger, Textarea } from "@/components/ui";
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle, DateInput, ErrorState, FieldWrapper, FormError, MoneyInput, PageHeader, Select, SimpleDialog, Skeleton, StatCard, Tabs, TabsList, TabsTrigger, Textarea } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 import { addDays } from "@/features/crm/api";
 import { formatDate, formatDateTime, formatINR, formatINRShort, formatNumber, todayIST } from "@/lib/format";

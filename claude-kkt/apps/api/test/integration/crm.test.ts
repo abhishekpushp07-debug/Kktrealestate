@@ -207,9 +207,14 @@ describe("leads: pipeline, round robin, follow-ups, board, convert", () => {
     expect(customer.body.pan_masked).toBe("XXXXX1234R");
     expect(customer.body.relationship_manager_id).toBe(salesA.user.id);
     expect(customer.body.source).toBe("REFERRAL");
-    const again = await t.request<ErrorBody>("POST", `/api/v1/leads/${id}/convert`, { token: salesA.access_token, body: { version: 4, customer_id: convert.body.customer_id } });
-    expect(again.status).toBe(422);
-    expect(again.body.error.details?.["rule"]).toBe("LEAD_CLOSED");
+    // converting twice is idempotent for the same customer; any other target is a closed-lead violation
+    const again = await t.request<{ customer_id: string; lead: Lead }>("POST", `/api/v1/leads/${id}/convert`, { token: salesA.access_token, body: { version: 4, customer_id: convert.body.customer_id } });
+    expect(again.status, again.text).toBe(200);
+    expect(again.body.customer_id).toBe(convert.body.customer_id);
+    expect(again.body.lead.stage).toBe("CONVERTED");
+    const other = await t.request<ErrorBody>("POST", `/api/v1/leads/${id}/convert`, { token: salesA.access_token, body: { version: 4, customer: { full_name: "Other", phone: "9811109999" } } });
+    expect(other.status).toBe(422);
+    expect(other.body.error.details?.["rule"]).toBe("LEAD_CLOSED");
     // converting another lead by linking the existing customer
     const l2 = await t.request<Lead>("POST", "/api/v1/leads", { token: admin.access_token, body: { full_name: "Kavita Roy", phone: "9811100004", source: "WALK_IN", project_id: projectB } });
     const linked = await t.request<{ customer_id: string }>("POST", `/api/v1/leads/${l2.body.id}/convert`, { token: salesA.access_token, body: { version: 1, customer_id: convert.body.customer_id } });
@@ -527,9 +532,15 @@ describe("portal access card, bulk enable, deactivate, 360", () => {
     const dry = await t.request<{ dry_run: boolean; enabled: number; already_enabled: number; credentials: unknown[] }>("POST", "/api/v1/customers/portal/bulk-enable", { token: admin.access_token, body: { dry_run: true } });
     expect(dry.status, dry.text).toBe(200);
     expect(dry.body).toEqual({ dry_run: true, enabled: 2, already_enabled: 1, credentials: [] }); // c2 (primary) + co-applicant r4; c3 already on
-    const run = await t.request<{ dry_run: boolean; enabled: number; already_enabled: number; credentials: unknown[] }>("POST", "/api/v1/customers/portal/bulk-enable", { token: admin.access_token, body: {} });
+    const run = await t.request<{ dry_run: boolean; enabled: number; already_enabled: number; credentials: { customer_id: string; temp_password: string }[] }>("POST", "/api/v1/customers/portal/bulk-enable", { token: admin.access_token, body: {} });
     expect(run.status, run.text).toBe(200);
-    expect(run.body).toEqual({ dry_run: false, enabled: 2, already_enabled: 1, credentials: [] });
+    expect(run.body).toMatchObject({ dry_run: false, enabled: 2, already_enabled: 1 });
+    // the temporary passwords are shown exactly once, here, and never reach the audit log
+    expect(run.body.credentials.map((c) => c.customer_id).sort()).toEqual([c2, r4.body.id].sort());
+    expect(run.body.credentials.every((c) => /^.{12}$/.test(c.temp_password))).toBe(true);
+    const bulkAudit = await t.app.sql<{ after: Record<string, unknown> }[]>`select after from audit_logs where action = 'customer.portal_bulk_enable'`;
+    expect(bulkAudit).toHaveLength(1);
+    for (const c of run.body.credentials) expect(JSON.stringify(bulkAudit[0]!.after)).not.toContain(c.temp_password);
     const card = await t.request<PortalCard>("GET", `/api/v1/customers/${c2}/portal`, { token: admin.access_token });
     expect(card.body.is_enabled).toBe(true);
     expect(card.body.must_change_password).toBe(true);

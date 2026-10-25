@@ -1,4 +1,4 @@
-import { and, asc, count, eq, gte, inArray, isNotNull, lt, lte, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, eq, gte, inArray, isNotNull, lte, sql, type SQL } from "drizzle-orm";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
@@ -28,14 +28,21 @@ import { istDateTimeMs, todayIST } from "@kkt/domain";
 import { actorFromRequest, writeAudit } from "../../lib/audit.js";
 import { sendCsv } from "../../lib/csv.js";
 import { ApiError } from "../../lib/errors.js";
-import { listPaging, paginate } from "../../lib/list.js";
+import { escapeLike, listPaging, paginate } from "../../lib/list.js";
 import { route } from "../../lib/routes.js";
 import { ensureProjectAccess, type StaffContext } from "../../lib/scope.js";
 import { applyUpdate, expectedVersion } from "../../lib/version.js";
 import { canonicalPhone, createCustomer, loadCustomerSelect, metaOf, validationError } from "./customerService.js";
-import { LEAD_SELECT, activitiesOf, createOrTouchLead, followUpsOf, getLeadRow, joinLead, leadRow, loadLeadSelect, markLeadsRead, openLeadCondition, recordLeadActivity, setLeadStage, stageHistoryOf, toDbUtm, type LeadSelect } from "./leadService.js";
+import { LEAD_SELECT, activitiesOf, createOrTouchLead, followUpsOf, getLeadRow, joinLead, leadRow, leadScopeCondition, loadLeadSelect, markLeadsRead, openLeadCondition, recordLeadActivity, setLeadStage, stageHistoryOf, toDbUtm, type LeadSelect } from "./leadService.js";
 
 const idParams = z.object({ id: IdSchema });
+
+/** Loads one lead for a staff user: 404 when missing or when the lead's project lies outside the user's scope. */
+async function loadLeadFor(db: Executor, user: StaffContext, id: string, forUpdate = false): Promise<LeadSelect> {
+  const sel = await loadLeadSelect(db, user.companyId, id, forUpdate);
+  if (sel.l.projectId) ensureProjectAccess(user, sel.l.projectId, "Lead");
+  return sel;
+}
 
 /** Project/flat type referenced by a lead must exist in the company; a scoped user cannot reference a foreign project (404). */
 async function assertRefs(tx: Executor, user: StaffContext, projectId: string | null | undefined, flatTypeId: string | null | undefined, assignedUserId: string | null | undefined): Promise<void> {
@@ -70,7 +77,7 @@ export function leadRoutes(app: FastifyInstance): void {
     handler: async (req, reply) => {
       const q = req.query;
       const user = req.user!;
-      const where: (SQL | undefined)[] = [eq(leads.companyId, user.companyId)];
+      const where: (SQL | undefined)[] = [eq(leads.companyId, user.companyId), leadScopeCondition(user)];
       if (q.stage) where.push(eq(leads.stage, q.stage));
       if (q.source) where.push(eq(leads.source, q.source));
       if (q.project_id) { ensureProjectAccess(user, q.project_id); where.push(eq(leads.projectId, q.project_id)); }
@@ -100,7 +107,7 @@ export function leadRoutes(app: FastifyInstance): void {
 
   route(app, {
     method: "POST", url: "/leads", permission: "lead.write", idempotent: true,
-    schema: { body: LeadCreateSchema, response: { 201: LeadRowSchema }, summary: "Create a lead (round-robin assignment to Sales when enabled)" },
+    schema: { body: LeadCreateSchema, response: { 201: LeadRowSchema }, summary: "Create a lead (round-robin assignment to Sales when enabled; an open lead for the same phone + project → 409 DUPLICATE_LEAD)" },
     handler: async (req, reply) => {
       const user = req.user!;
       const b = req.body;
@@ -110,6 +117,7 @@ export function leadRoutes(app: FastifyInstance): void {
           companyId: user.companyId, phone: canonicalPhone(b.phone), name: b.full_name, email: b.email ?? null, projectId: b.project_id ?? null, flatTypeId: b.flat_type_id ?? null, source: b.source,
           message: b.message ?? null, utm: b.utm ?? null, consent: b.consent, activityType: "CREATED", actor: actorFromRequest(req), assignedUserId: b.assigned_user_id ?? null,
           budgetMinPaise: b.budget_min_paise ?? null, budgetMaxPaise: b.budget_max_paise ?? null, nextFollowUpAt: b.next_follow_up_at ? new Date(b.next_follow_up_at) : null, createdBy: user.id, redis: app.redis, ip: req.clientIp, requestId: req.id,
+          onExisting: "conflict",
         });
         return getLeadRow(tx, user.companyId, lead.id);
       });
@@ -123,11 +131,11 @@ export function leadRoutes(app: FastifyInstance): void {
     handler: async (req) => {
       const q = req.query;
       const user = req.user!;
-      const where: (SQL | undefined)[] = [eq(leads.companyId, user.companyId)];
+      const where: (SQL | undefined)[] = [eq(leads.companyId, user.companyId), leadScopeCondition(user)];
       if (q.project_id) { ensureProjectAccess(user, q.project_id); where.push(eq(leads.projectId, q.project_id)); }
       if (q.assigned_user_id) where.push(eq(leads.assignedUserId, q.assigned_user_id));
       if (q.source) where.push(eq(leads.source, q.source));
-      if (q.search) where.push(sql`(${leads.fullName} ilike ${`%${q.search}%`} or ${leads.phone} ilike ${`${q.search}%`} or ${leads.leadNumber} ilike ${`${q.search}%`})`);
+      if (q.search) { const term = escapeLike(q.search); where.push(sql`(${leads.fullName} ilike ${`%${term}%`} or ${leads.phone} ilike ${`${term}%`} or ${leads.leadNumber} ilike ${`${term}%`})`); }
       const cond = and(...where.filter((w): w is SQL => w !== undefined));
       const db = app.dbReplica;
       // Counts per stage in one query; cards per column via a window function in one query (no per-stage round trips).
@@ -150,7 +158,7 @@ export function leadRoutes(app: FastifyInstance): void {
       const date = req.query.date ?? todayIST();
       const end = endOfDayIST(date);
       const start = new Date(istDateTimeMs(date, "00:00"));
-      const cond = and(eq(leads.companyId, user.companyId), openLeadCondition(), isNotNull(leads.nextFollowUpAt), lte(leads.nextFollowUpAt, end), req.query.all ? undefined : eq(leads.assignedUserId, user.id));
+      const cond = and(eq(leads.companyId, user.companyId), leadScopeCondition(user), openLeadCondition(), isNotNull(leads.nextFollowUpAt), lte(leads.nextFollowUpAt, end), req.query.all ? undefined : eq(leads.assignedUserId, user.id));
       const [rows, totals] = await Promise.all([
         joinLead(app.dbReplica.select(LEAD_SELECT).from(leads).$dynamic()).where(cond).orderBy(asc(leads.nextFollowUpAt)).limit(req.query.limit) as unknown as Promise<LeadSelect[]>,
         app.dbReplica.select({ total: count(), overdue: sql<number>`count(*) filter (where ${leads.nextFollowUpAt} < ${start.toISOString()}::timestamptz)` }).from(leads).where(cond),
@@ -164,7 +172,7 @@ export function leadRoutes(app: FastifyInstance): void {
     schema: { params: idParams, response: { 200: LeadDetailResponseSchema }, summary: "Lead detail with follow-ups, activities and stage history" },
     handler: async (req) => {
       const db = app.dbReplica;
-      const sel = await loadLeadSelect(db, req.user!.companyId, req.params.id);
+      const sel = await loadLeadFor(db, req.user!, req.params.id);
       const [follow_ups, activities, stage_history] = await Promise.all([followUpsOf(db, sel.l.id), activitiesOf(db, sel.l.id), stageHistoryOf(db, sel.l.id)]);
       return { ...leadRow(sel), follow_ups, activities, stage_history };
     },
@@ -178,7 +186,7 @@ export function leadRoutes(app: FastifyInstance): void {
       const b = req.body;
       const version = expectedVersion(req, b);
       return app.db.transaction(async (tx) => {
-        const before = await loadLeadSelect(tx, user.companyId, req.params.id, true);
+        const before = await loadLeadFor(tx, user, req.params.id, true);
         await assertRefs(tx, user, b.project_id, b.flat_type_id, b.assigned_user_id);
         const changes: Record<string, unknown> = {};
         if (b.full_name !== undefined) changes["fullName"] = b.full_name;
@@ -211,7 +219,7 @@ export function leadRoutes(app: FastifyInstance): void {
     handler: async (req) => {
       const user = req.user!;
       return app.db.transaction(async (tx) => {
-        const sel = await loadLeadSelect(tx, user.companyId, req.params.id, true);
+        const sel = await loadLeadFor(tx, user, req.params.id, true);
         if (sel.l.version !== req.body.version) await applyUpdate(tx, leads, req.params.id, req.body.version, {}, "lead"); // raises 409 VERSION_CONFLICT
         await setLeadStage(tx, sel.l, req.body.stage, { reason: req.body.lost_reason ?? req.body.reason ?? null, note: req.body.note ?? null, actor: actorFromRequest(req), ip: req.clientIp, requestId: req.id });
         return getLeadRow(tx, user.companyId, req.params.id);
@@ -225,7 +233,8 @@ export function leadRoutes(app: FastifyInstance): void {
     handler: async (req, reply) => {
       const user = req.user!;
       const row = await app.db.transaction(async (tx) => {
-        const sel = await loadLeadSelect(tx, user.companyId, req.params.id, true);
+        const sel = await loadLeadFor(tx, user, req.params.id, true);
+        if (sel.l.stage === "CONVERTED" || sel.l.stage === "LOST") throw ApiError.rule("Follow-ups can only be recorded on open leads; reopen a lost lead first", "LEAD_CLOSED");
         const [f] = await tx.insert(leadFollowUps).values({ leadId: sel.l.id, note: req.body.note, doneAt: req.body.done_at ? new Date(req.body.done_at) : new Date(), nextAt: req.body.next_at ? new Date(req.body.next_at) : null, byUserId: user.id }).returning();
         if (!f) throw new Error("follow-up insert returned no row");
         const patch: Record<string, unknown> = { lastActivityAt: new Date(), isRead: true };
@@ -245,7 +254,7 @@ export function leadRoutes(app: FastifyInstance): void {
     handler: async (req) => {
       const user = req.user!;
       return app.db.transaction(async (tx) => {
-        const sel = await loadLeadSelect(tx, user.companyId, req.params.id, true);
+        const sel = await loadLeadFor(tx, user, req.params.id, true);
         await assertRefs(tx, user, null, null, req.body.assigned_user_id);
         await applyUpdate(tx, leads, req.params.id, req.body.version, { assignedUserId: req.body.assigned_user_id, lastActivityAt: new Date() }, "lead");
         await recordLeadActivity(tx, sel.l.id, "ASSIGNED", { assigned_user_id: req.body.assigned_user_id, previous_user_id: sel.l.assignedUserId, via: "MANUAL" }, actorFromRequest(req));
@@ -261,7 +270,7 @@ export function leadRoutes(app: FastifyInstance): void {
     handler: async (req) => {
       const user = req.user!;
       return app.db.transaction(async (tx) => {
-        await loadLeadSelect(tx, user.companyId, req.params.id);
+        await loadLeadFor(tx, user, req.params.id);
         await markLeadsRead(tx, user.companyId, [req.params.id], req.body?.is_read ?? true);
         return getLeadRow(tx, user.companyId, req.params.id);
       });
@@ -275,13 +284,21 @@ export function leadRoutes(app: FastifyInstance): void {
       const user = req.user!;
       const b = req.body;
       return app.db.transaction(async (tx) => {
-        const sel = await loadLeadSelect(tx, user.companyId, req.params.id, true);
+        const sel = await loadLeadFor(tx, user, req.params.id, true);
+        if (sel.l.stage === "CONVERTED") {
+          // Converting twice is idempotent when it names the same customer; anything else is a closed-lead violation.
+          if (sel.l.customerId && b.customer_id === sel.l.customerId) {
+            const c = await loadCustomerSelect(tx, user.companyId, sel.l.customerId);
+            return { lead: leadRow(sel), customer_id: c.c.id, customer_code: c.c.customerCode, booking_draft_id: null };
+          }
+          throw ApiError.rule("Lead is already converted", "LEAD_CLOSED", { customer_id: sel.l.customerId });
+        }
         if (sel.l.version !== b.version) await applyUpdate(tx, leads, req.params.id, b.version, {}, "lead");
-        if (sel.l.stage === "CONVERTED") throw ApiError.rule("Lead is already converted", "LEAD_CLOSED", { customer_id: sel.l.customerId });
         let customerId: string;
         let customerCode: string;
         if (b.customer_id) {
           const c = await loadCustomerSelect(tx, user.companyId, b.customer_id);
+          if (c.c.erasedAt || !c.c.isActive) throw ApiError.rule("A lead can only be linked to an active customer", "CUSTOMER_INACTIVE");
           customerId = c.c.id;
           customerCode = c.c.customerCode;
         } else {
@@ -309,7 +326,7 @@ export function leadRoutes(app: FastifyInstance): void {
     method: "GET", url: "/leads/unread-count", permission: "lead.read",
     schema: { response: { 200: z.object({ unread: z.int().min(0) }) }, summary: "Unread leads" },
     handler: async (req) => {
-      const [r] = await app.dbReplica.select({ n: count() }).from(leads).where(and(eq(leads.companyId, req.user!.companyId), eq(leads.isRead, false), openLeadCondition(), lt(leads.createdAt, new Date(Date.now() + 1000))));
+      const [r] = await app.dbReplica.select({ n: count() }).from(leads).where(and(eq(leads.companyId, req.user!.companyId), leadScopeCondition(req.user!), eq(leads.isRead, false), openLeadCondition()));
       return { unread: Number(r?.n ?? 0) };
     },
   });
@@ -331,7 +348,7 @@ export function leadRoutes(app: FastifyInstance): void {
     method: "GET", url: "/leads/:id/customer", permission: "lead.read",
     schema: { params: idParams, response: { 200: z.object({ customer_id: IdSchema.nullable(), customer_code: z.string().nullable(), full_name: z.string().nullable() }) }, summary: "Converted customer of a lead" },
     handler: async (req) => {
-      const sel = await loadLeadSelect(app.dbReplica, req.user!.companyId, req.params.id);
+      const sel = await loadLeadFor(app.dbReplica, req.user!, req.params.id);
       if (!sel.l.customerId) return { customer_id: null, customer_code: null, full_name: null };
       const [c] = await app.dbReplica.select({ id: customers.id, code: customers.customerCode, name: customers.fullName }).from(customers).where(eq(customers.id, sel.l.customerId)).limit(1);
       return c ? { customer_id: c.id, customer_code: c.code, full_name: c.name } : { customer_id: null, customer_code: null, full_name: null };

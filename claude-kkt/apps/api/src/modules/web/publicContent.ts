@@ -13,13 +13,14 @@ import {
 } from "@kkt/contracts";
 import {
   amenities, blockStages, blockTypes, blocks, cmsBanners, cmsGallery, cmsHomeSections, cmsPages, cmsPeople, cmsPosts, cmsTestimonials, documentTypes, documents, flatTypes, flats, projectAmenities,
-  projectVisitSettings, projectWebsiteSettings, projects, specCategories, specItems, stagePhotos, users, type Executor,
+  projectWebsiteSettings, projects, specCategories, specItems, stagePhotos, users, type Executor,
 } from "@kkt/db";
+import { cached } from "../../lib/cache.js";
 import { ApiError } from "../../lib/errors.js";
 import { route } from "../../lib/routes.js";
 import { streamDocument } from "../documents/service.js";
 import { latestPosts, loadSiteSettings, publishedPostCondition, type SiteSettingsRecord } from "./cms.js";
-import { IMMUTABLE_CACHE_CONTROL, documentUrls, isPublicDocument, loadDocuments, publicCached, publicCompanyId, publicHeaders, webOrigin, type DocumentRecord } from "./shared.js";
+import { IMMUTABLE_CACHE_CONTROL, PUBLIC_CACHE_SECONDS, PUBLIC_CACHE_VERSION_KEY, documentUrls, isPublicDocument, loadDocuments, publicCached, publicCompanyId, publicHeaders, webOrigin, type DocumentRecord } from "./shared.js";
 import { loadVisitSettings } from "./visitService.js";
 
 type DbProject = typeof projects.$inferSelect;
@@ -37,6 +38,16 @@ export async function publishedProjects(db: Executor, companyId: string, slug?: 
     .where(and(eq(projects.companyId, companyId), eq(projects.isActive, true), eq(projectWebsiteSettings.isPublished, true), slug ? eq(projectWebsiteSettings.slug, slug) : undefined))
     .orderBy(asc(projects.name));
   return rows;
+}
+
+/**
+ * The published project behind a slug when the website is live; null otherwise. Public forms (enquiry project, brochure gate, visit
+ * availability/booking) resolve slugs through this so a project is "invisible everywhere" while unpublished or while the site is off.
+ */
+export async function livePublishedProject(db: Executor, companyId: string, slug: string): Promise<PublishedProject | null> {
+  if (!(await siteIsLive(db, companyId))) return null;
+  const [item] = await publishedProjects(db, companyId, slug);
+  return item ?? null;
 }
 
 /** Map project id → published slug (for gallery/testimonial cross references; unpublished projects are absent). */
@@ -169,8 +180,7 @@ async function configurationsFor(db: Executor, companyId: string, project: DbPro
     const specifications = [...groups.entries()].sort((a, b) => a[1].order - b[1].order).map(([category, g]) => ({ category, items: g.items.sort((a, b) => a.order - b.order).map((i) => i.name) }));
     const plan = floorPlans.find((fp) => {
       const title = (fp.d.title ?? fp.d.fileName).toLowerCase();
-      const isPlan = fp.typeCode === "FLOOR_PLAN" || title.includes("floor plan") || title.includes("floorplan");
-      return isPlan && (title.includes(t.code.toLowerCase()) || title.includes(t.name.toLowerCase()));
+      return isFloorPlanDocument(fp.d, fp.typeCode) && (title.includes(t.code.toLowerCase()) || title.includes(t.name.toLowerCase()));
     });
     const floorPlanUrl = plan ? documentUrls(plan.d).medium_url : null;
     return {
@@ -182,6 +192,57 @@ async function configurationsFor(db: Executor, companyId: string, project: DbPro
       available_count: w.showAvailability ? available.length : null,
     };
   });
+}
+
+/** A project document that is a floor plan (document type FLOOR_PLAN or a "floor plan" title); the only project images besides heroes/OG served publicly. */
+export function isFloorPlanDocument(doc: Pick<DocumentRecord, "title" | "fileName" | "mime">, typeCode: string | null): boolean {
+  if (!doc.mime.startsWith("image/")) return false;
+  const title = (doc.title ?? doc.fileName).toLowerCase();
+  return typeCode === "FLOOR_PLAN" || title.includes("floor plan") || title.includes("floorplan");
+}
+
+/**
+ * Allow-list for /public/media: a document is served only while published public content references it —
+ * CMS library images always; stage photos flagged show_on_website on a published project; a published project's hero / OG image / floor
+ * plans; the site's logo, favicon or default OG image. Anything else (unpublished projects, internal photos, KYC scans…) is 404 even by id.
+ */
+export async function publicMediaAllowed(db: Executor, doc: DocumentRecord): Promise<boolean> {
+  if (!isPublicDocument(doc) || !doc.mime.startsWith("image/")) return false;
+  switch (doc.entityType) {
+    case "CMS":
+      return true;
+    case "STAGE": {
+      if (!(await siteIsLive(db, doc.companyId))) return false;
+      const [hit] = await db
+        .select({ id: stagePhotos.id })
+        .from(stagePhotos)
+        .innerJoin(blockStages, eq(blockStages.id, stagePhotos.blockStageId))
+        .innerJoin(blocks, eq(blocks.id, blockStages.blockId))
+        .innerJoin(projectWebsiteSettings, eq(projectWebsiteSettings.projectId, blocks.projectId))
+        .where(and(eq(stagePhotos.documentId, doc.id), eq(stagePhotos.showOnWebsite, true), eq(blocks.isActive, true), eq(projectWebsiteSettings.isPublished, true), eq(projectWebsiteSettings.showProgress, true)))
+        .limit(1);
+      return Boolean(hit);
+    }
+    case "PROJECT": {
+      if (!(await siteIsLive(db, doc.companyId))) return false;
+      const [w] = await db
+        .select({ heroes: projectWebsiteSettings.heroDocumentIds, seo: projectWebsiteSettings.seo })
+        .from(projectWebsiteSettings)
+        .innerJoin(projects, eq(projects.id, projectWebsiteSettings.projectId))
+        .where(and(eq(projectWebsiteSettings.projectId, doc.entityId), eq(projectWebsiteSettings.isPublished, true), eq(projects.isActive, true)))
+        .limit(1);
+      if (!w) return false;
+      if (w.heroes.includes(doc.id) || w.seo.og_image_document_id === doc.id) return true;
+      const [type] = doc.documentTypeId ? await db.select({ code: documentTypes.code }).from(documentTypes).where(eq(documentTypes.id, doc.documentTypeId)).limit(1) : [];
+      return isFloorPlanDocument(doc, type?.code ?? null);
+    }
+    case "COMPANY": {
+      const site = await loadSiteSettings(db, doc.companyId);
+      return Boolean(site && (site.brand.logo_document_id === doc.id || site.brand.favicon_document_id === doc.id || site.seoDefaults.og_image_document_id === doc.id));
+    }
+    default:
+      return false;
+  }
 }
 
 interface BlockLite { id: string; name: string; floors: number; typeName: string | null; percent: number; status: DbProject["status"] }
@@ -366,6 +427,7 @@ async function sitemapEntries(db: Executor, companyId: string): Promise<{ path: 
     db.select({ slug: cmsPosts.slug, updatedAt: cmsPosts.updatedAt }).from(cmsPosts).where(and(eq(cmsPosts.companyId, companyId), publishedPostCondition())),
     db.select({ slug: cmsPages.slug, updatedAt: cmsPages.updatedAt }).from(cmsPages).where(and(eq(cmsPages.companyId, companyId), eq(cmsPages.isPublished, true))),
   ]);
+  const seen = new Set<string>();
   return [
     { path: "/", updated_at: now, priority: 1 },
     { path: "/projects", updated_at: now, priority: 0.9 },
@@ -376,7 +438,7 @@ async function sitemapEntries(db: Executor, companyId: string): Promise<{ path: 
     ...posts.map((p) => ({ path: `/blog/${p.slug}`, updated_at: p.updatedAt.toISOString(), priority: 0.6 })),
     { path: "/contact", updated_at: now, priority: 0.5 },
     ...pages.map((p) => ({ path: `/${p.slug}`, updated_at: p.updatedAt.toISOString(), priority: 0.3 })),
-  ];
+  ].filter((e) => (seen.has(e.path) ? false : (seen.add(e.path), true)));
 }
 
 function xmlEscape(s: string): string {
@@ -464,10 +526,9 @@ export function registerPublicContentRoutes(app: FastifyInstance): void {
 
   route(app, {
     method: "GET", url: "/public/pages/:slug", public: true,
-    schema: { params: slugParams, response: { 200: PublicPageSchema }, summary: "One published page (privacy, disclaimer, about…)" },
+    schema: { params: slugParams, response: { 200: PublicPageSchema }, summary: "One published page (privacy, disclaimer, about…); legal pages stay reachable while the site is not live" },
     handler: async (req, reply) => publicCached(app, req, reply, async () => {
       const companyId = await companyOr404(app);
-      if (!(await siteIsLive(app.dbReplica, companyId))) return null;
       const [r] = await app.dbReplica.select().from(cmsPages).where(and(eq(cmsPages.companyId, companyId), eq(cmsPages.slug, req.params.slug), eq(cmsPages.isPublished, true))).limit(1);
       if (!r) return null;
       return { slug: r.slug, title: r.title, body_md: r.bodyMd, seo: { title: r.seo.title ?? r.title, description: r.seo.description ?? null } };
@@ -509,9 +570,13 @@ export function registerPublicContentRoutes(app: FastifyInstance): void {
     method: "GET", url: "/public/media/:id", public: true,
     schema: { params: z.object({ id: z.uuid() }), querystring: PublicMediaQuerySchema, response: { 200: z.any() }, summary: "Immutable public image bytes (CMS media, project/stage photos)", hide: true },
     handler: async (req, reply) => {
-      const [doc] = await app.dbReplica.select().from(documents).where(eq(documents.id, req.params.id)).limit(1);
-      if (!isPublicDocument(doc) || !doc.mime.startsWith("image/")) throw ApiError.notFound("Media");
-      const file = await streamDocument(app.dbReplica, doc.id, req.query.variant ?? "original");
+      const version = (await app.redis.get(PUBLIC_CACHE_VERSION_KEY).catch(() => null)) ?? "0";
+      const allowed = await cached(app.redis, `pub:${version}:media-allowed|${req.params.id}`, PUBLIC_CACHE_SECONDS, async () => {
+        const [doc] = await app.dbReplica.select().from(documents).where(eq(documents.id, req.params.id)).limit(1);
+        return doc ? publicMediaAllowed(app.dbReplica, doc) : false;
+      });
+      if (!allowed) throw ApiError.notFound("Media");
+      const file = await streamDocument(app.dbReplica, req.params.id, req.query.variant ?? "original");
       if (!file) throw ApiError.notFound("Media");
       reply.header("Content-Type", file.mime);
       reply.header("Content-Disposition", "inline");

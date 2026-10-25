@@ -319,7 +319,8 @@ export const NoticeCreateSchema = NoticeBase.refine((n) => !n.publish_at || !n.e
   path: ["expires_at"],
 });
 export type NoticeCreate = z.infer<typeof NoticeCreateSchema>;
-export const NoticeUpdateSchema = updateOf(NoticeBase);
+/** Partial update: `is_published` is only applied when sent (the create default of `false` must not unpublish on every PATCH). */
+export const NoticeUpdateSchema = updateOf(NoticeBase).extend({ is_published: z.boolean().optional() });
 export type NoticeUpdate = z.infer<typeof NoticeUpdateSchema>;
 export const NoticeRowSchema = AuditedRowSchema.extend({
   project_id: IdSchema.nullable(),

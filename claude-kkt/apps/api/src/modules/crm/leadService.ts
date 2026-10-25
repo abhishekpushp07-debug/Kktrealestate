@@ -3,7 +3,7 @@ import type { PgSelect } from "drizzle-orm/pg-core";
 import type { Redis } from "ioredis";
 import type { LeadActivityRow, LeadActivityType, LeadFollowUpRow, LeadRow, LeadSource, LeadStage, LeadStageHistoryRow, Utm } from "@kkt/contracts";
 import { OPEN_LEAD_STAGES } from "@kkt/contracts";
-import { companies, enquiries, flatTypes, leadActivities, leadFollowUps, leadStageHistory, leads, nextSequence, projects, roles, siteVisits, users, type Executor } from "@kkt/db";
+import { companies, enquiries, flatTypes, leadActivities, leadFollowUps, leadStageHistory, leads, nextSequence, projects, roles, siteVisits, userProjectScopes, users, type Executor } from "@kkt/db";
 import { DEFAULT_NUMBER_PATTERN, financialYear, formatNumber, normalizeIndianPhone, todayIST } from "@kkt/domain";
 import { writeAudit, SYSTEM_ACTOR, type AuditActor } from "../../lib/audit.js";
 import { loadCompany, type CompanyRecord } from "../../lib/company.js";
@@ -52,15 +52,19 @@ export function roundRobinKey(companyId: string): string {
 }
 
 /**
- * Next Sales user in rotation (active users of the system role "Sales", ordered by creation). The position comes from a Redis counter
- * per company; without Redis a Postgres sequence (scope "lead_rr") keeps the rotation transactional. Null when no Sales user exists.
+ * Next Sales user in rotation (active users of the system role "Sales", ordered by creation; when the lead names a project, only Sales
+ * users whose project scope covers it). The position comes from a Redis counter per company; without Redis a Postgres sequence
+ * (scope "lead_rr") keeps the rotation transactional. Null when no eligible Sales user exists (the lead stays unassigned).
  */
-export async function nextRoundRobinUser(tx: Executor, companyId: string, redis: Redis | null | undefined): Promise<string | null> {
+export async function nextRoundRobinUser(tx: Executor, companyId: string, redis: Redis | null | undefined, projectId: string | null = null): Promise<string | null> {
   const sales = await tx
     .select({ id: users.id })
     .from(users)
     .innerJoin(roles, eq(roles.id, users.roleId))
-    .where(and(eq(users.companyId, companyId), eq(users.isActive, true), eq(roles.name, "Sales")))
+    .where(and(
+      eq(users.companyId, companyId), eq(users.isActive, true), eq(roles.name, "Sales"),
+      projectId ? sql`(${users.allProjects} or exists (select 1 from ${userProjectScopes} s where s.user_id = ${users.id} and s.project_id = ${projectId}))` : undefined,
+    ))
     .orderBy(asc(users.createdAt), asc(users.id));
   if (sales.length === 0) return null;
   let counter: number;
@@ -223,6 +227,16 @@ export interface CreateOrTouchLeadInput {
   redis?: Redis | null;
   ip?: string | null;
   requestId?: string | null;
+  /**
+   * What to do when an open lead already exists for the phone + project: "touch" (default; website sources append an activity)
+   * or "conflict" (ERP creates: 409 DUPLICATE_LEAD with `details.existing` so staff work on the existing lead instead).
+   */
+  onExisting?: "touch" | "conflict";
+}
+
+/** Serialises lead creation per company + phone + project (two simultaneous enquiries from one phone never create two open leads). */
+async function lockLeadKey(tx: Executor, companyId: string, phone: string, projectId: string | null): Promise<void> {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`lead:${companyId}:${phone}:${projectId ?? ""}`}))`);
 }
 
 /**
@@ -233,7 +247,13 @@ export async function createOrTouchLead(tx: Executor, input: CreateOrTouchLeadIn
   const phone = normalizeIndianPhone(input.phone);
   if (!phone) throw ApiError.badRequest("phone: Enter a valid 10-digit Indian mobile number", { issues: [{ path: "phone", message: "Enter a valid 10-digit Indian mobile number" }] });
   const actor = input.actor ?? SYSTEM_ACTOR;
+  await lockLeadKey(tx, input.companyId, phone, input.projectId ?? null);
   const existing = await findOpenLeadByPhone(tx, input.companyId, phone, input.projectId ?? null);
+  if (existing && input.onExisting === "conflict") {
+    throw ApiError.conflict("DUPLICATE_LEAD", `An open lead for phone ${phone} already exists (${existing.leadNumber})`, {
+      existing: { id: existing.id, lead_number: existing.leadNumber, stage: existing.stage, assigned_user_id: existing.assignedUserId },
+    });
+  }
   if (existing) {
     await recordLeadActivity(tx, existing.id, input.activityType, { source: input.source, message: input.message ?? null, email: input.email ?? null, utm: input.utm ?? null, ...(input.activityPayload ?? {}) }, actor);
     const patch: Partial<typeof leads.$inferInsert> = { isRead: false };
@@ -247,7 +267,7 @@ export async function createOrTouchLead(tx: Executor, input: CreateOrTouchLeadIn
   }
   const company = await companyFor(tx, input.redis, input.companyId);
   let assignedUserId = input.assignedUserId ?? null;
-  if (!assignedUserId && company.settings.round_robin_enabled) assignedUserId = await nextRoundRobinUser(tx, input.companyId, input.redis);
+  if (!assignedUserId && company.settings.round_robin_enabled) assignedUserId = await nextRoundRobinUser(tx, input.companyId, input.redis, input.projectId ?? null);
   const leadNumber = await nextLeadNumber(tx, company);
   const [lead] = await tx
     .insert(leads)
@@ -341,7 +361,7 @@ export interface CreateEnquiryInput {
 export async function createEnquiry(tx: Executor, input: CreateEnquiryInput): Promise<{ enquiry: typeof enquiries.$inferSelect; lead: DbLead; created: boolean }> {
   const { lead, created } = await createOrTouchLead(tx, {
     companyId: input.companyId, phone: input.phone, name: input.name, email: input.email ?? null, projectId: input.projectId ?? null, flatTypeId: input.flatTypeId ?? null, source: "WEBSITE",
-    message: input.message ?? null, utm: input.utm ?? null, consent: input.consent ?? true, activityType: "ENQUIRY", activityPayload: { source_page: input.sourcePage ?? null }, actor: SYSTEM_ACTOR,
+    message: input.message ?? null, utm: input.utm ?? null, consent: input.consent ?? false, activityType: "ENQUIRY", activityPayload: { source_page: input.sourcePage ?? null }, actor: SYSTEM_ACTOR,
     redis: input.redis ?? null, ip: input.ip ?? null, requestId: input.requestId ?? null,
   });
   const company = await companyFor(tx, input.redis, input.companyId);
@@ -369,4 +389,14 @@ export async function markLeadsRead(tx: Executor, companyId: string, ids: string
 /** SQL condition for open leads. */
 export function openLeadCondition(): SQL {
   return notInArray(leads.stage, ["LOST", "CONVERTED"]);
+}
+
+/**
+ * Project-scope condition for leads: a scoped user sees leads of their projects plus leads that name no project;
+ * undefined for users who see every project.
+ */
+export function leadScopeCondition(user: { allProjects: boolean; projectIds: string[] }, projectColumn: typeof leads.projectId | typeof enquiries.projectId = leads.projectId): SQL | undefined {
+  if (user.allProjects) return undefined;
+  if (user.projectIds.length === 0) return isNull(projectColumn);
+  return sql`(${projectColumn} is null or ${inArray(projectColumn, user.projectIds)})`;
 }

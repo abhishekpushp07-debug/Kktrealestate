@@ -215,14 +215,17 @@ export function customerRoutes(app: FastifyInstance): void {
 
   route(app, {
     method: "POST", url: "/customers/:id/kyc", permission: "customer.write",
-    schema: { params: idParams, body: CustomerKycUpdateSchema, response: { 200: CustomerRowSchema }, summary: "Set KYC status (verifier recorded)" },
+    schema: { params: idParams, body: CustomerKycUpdateSchema, response: { 200: CustomerRowSchema }, summary: "Set KYC status (verifier recorded; VERIFIED/REJECTED need customer.kyc_view)" },
     handler: async (req) => {
       const user = req.user!;
+      const status = req.body.kyc_status;
+      const verified = status === "VERIFIED" || status === "REJECTED";
+      // Only someone allowed to see the unmasked identifiers can vouch for (or reject) them.
+      if (verified) assertPermission(user, "customer.kyc_view");
       return app.db.transaction(async (tx) => {
         const sel = await loadCustomerSelect(tx, user.companyId, req.params.id, true);
-        const status = req.body.kyc_status;
+        if (sel.c.erasedAt) throw ApiError.rule("This customer record was erased and can no longer be edited", "CUSTOMER_ERASED");
         if (status === "PENDING") throw ApiError.rule("KYC can be set to SUBMITTED, VERIFIED or REJECTED", "KYC_STATUS_INVALID");
-        const verified = status === "VERIFIED" || status === "REJECTED";
         await applyUpdate(tx, customers, req.params.id, req.body.version, { kycStatus: status, kycRemarks: req.body.kyc_remarks ?? null, kycVerifiedBy: verified ? user.id : null, kycVerifiedAt: verified ? new Date() : null }, "customer");
         const after = await getCustomerRow(tx, user.companyId, req.params.id);
         await writeAudit(tx, { companyId: user.companyId, ...metaOf(req), action: "customer.kyc", entityType: "customer", entityId: req.params.id, before: { kyc_status: sel.c.kycStatus }, after: { kyc_status: status, kyc_remarks: req.body.kyc_remarks ?? null, kyc_verified_by: verified ? user.id : null } });
@@ -308,6 +311,7 @@ export function customerRoutes(app: FastifyInstance): void {
         const user = req.user!;
         const result = await app.db.transaction(async (tx) => {
           const sel = await loadCustomerSelect(tx, user.companyId, req.params.id, true);
+          if (sel.c.erasedAt) throw ApiError.rule("An erased customer record cannot be reactivated or deactivated", "CUSTOMER_ERASED");
           if (action === "deactivate") {
             const n = await activeBookingCount(tx, req.params.id);
             if (n > 0) throw ApiError.conflict("IN_USE", `This customer has ${n} active booking(s) and cannot be deactivated`, { usage_count: n, used_by: [{ entity_type: "bookings", count: n }] });
@@ -315,8 +319,12 @@ export function customerRoutes(app: FastifyInstance): void {
           const version = optionalExpectedVersion(req, req.body, sel.c.version);
           const updated = await applyUpdate(tx, customers, req.params.id, version, action === "deactivate" ? { isActive: false, deactivatedAt: new Date() } : { isActive: true, deactivatedAt: null }, "customer");
           if (action === "deactivate") {
-            const [pu] = await tx.select({ id: portalUsers.id }).from(portalUsers).where(eq(portalUsers.customerId, req.params.id)).limit(1);
-            if (pu) await revokeAllFamilies(tx, app.redis, "CUSTOMER", pu.id, "CUSTOMER_DEACTIVATED");
+            // Portal login is switched off with the customer (re-enable it explicitly after restoring); live sessions die now.
+            const [pu] = await tx.select({ id: portalUsers.id, isEnabled: portalUsers.isEnabled }).from(portalUsers).where(eq(portalUsers.customerId, req.params.id)).limit(1).for("update");
+            if (pu) {
+              await revokeAllFamilies(tx, app.redis, "CUSTOMER", pu.id, "CUSTOMER_DEACTIVATED");
+              if (pu.isEnabled) await tx.update(portalUsers).set({ isEnabled: false, disabledAt: new Date(), version: sql`${portalUsers.version} + 1` }).where(eq(portalUsers.id, pu.id));
+            }
           }
           await writeAudit(tx, { companyId: user.companyId, ...metaOf(req), action: `customer.${action}`, entityType: "customer", entityId: req.params.id, before: { is_active: sel.c.isActive }, after: { is_active: updated.isActive } });
           return { id: updated.id, is_active: updated.isActive, version: updated.version };
@@ -339,17 +347,21 @@ export function customerRoutes(app: FastifyInstance): void {
         if (n > 0) throw ApiError.conflict("IN_USE", `This customer has ${n} active booking(s); erasure is only possible without active bookings`, { usage_count: n, used_by: [{ entity_type: "bookings", count: n }] });
         const before = await getCustomerRow(tx, user.companyId, req.params.id);
         const anon = `Erased customer ${sel.c.customerCode}`;
+        const anonPhone = `0000${sel.c.customerCode.replace(/\D/g, "").slice(-6).padStart(6, "0")}`;
         await tx.update(customers).set({
-          salutation: null, fullName: anon, fatherOrSpouseName: null, dob: null, gender: null, phone: `0000${sel.c.customerCode.replace(/\D/g, "").slice(-6).padStart(6, "0")}`, altPhone: null, email: null,
+          salutation: null, fullName: anon, fatherOrSpouseName: null, dob: null, gender: null, phone: anonPhone, altPhone: null, email: null,
           addressCurrent: null, addressPermanent: null, occupation: null, companyName: null, incomeBand: null, panEnc: null, panHash: null, panLast4: null, aadhaarEnc: null, aadhaarHash: null, aadhaarLast4: null,
           bank: null, nominee: null, notes: null, tags: [], isActive: false, deactivatedAt: new Date(), erasedAt: new Date(), version: sql`${customers.version} + 1`,
         }).where(eq(customers.id, req.params.id));
         await tx.delete(coApplicants).where(eq(coApplicants.customerId, req.params.id));
-        const [pu] = await tx.select({ id: portalUsers.id }).from(portalUsers).where(eq(portalUsers.customerId, req.params.id)).limit(1);
+        const [pu] = await tx.select({ id: portalUsers.id }).from(portalUsers).where(eq(portalUsers.customerId, req.params.id)).limit(1).for("update");
         if (pu) {
+          // The portal login row would otherwise keep the real phone number (and block its re-use by a future customer).
           await revokeAllFamilies(tx, app.redis, "CUSTOMER", pu.id, "CUSTOMER_ERASED");
-          await tx.update(portalUsers).set({ isEnabled: false, disabledAt: new Date() }).where(eq(portalUsers.id, pu.id));
+          await tx.update(portalUsers).set({ isEnabled: false, disabledAt: new Date(), phone: anonPhone, version: sql`${portalUsers.version} + 1` }).where(eq(portalUsers.id, pu.id));
         }
+        // Leads that were converted into this customer carry the same PII (name, phone, email, free-text message).
+        await tx.update(leads).set({ fullName: anon, phone: anonPhone, email: null, message: null }).where(and(eq(leads.companyId, user.companyId), eq(leads.customerId, req.params.id)));
         const after = await getCustomerRow(tx, user.companyId, req.params.id);
         await writeAudit(tx, { companyId: user.companyId, ...metaOf(req), action: "customer.erase", entityType: "customer", entityId: req.params.id, before: { customer_code: before.customer_code, kyc_status: before.kyc_status }, after: { reason: req.body.reason, erased_at: after.erased_at } });
         return after;

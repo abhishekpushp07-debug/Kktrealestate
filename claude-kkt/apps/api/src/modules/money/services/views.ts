@@ -320,7 +320,8 @@ export function demandJoins(q: PgSelect): PgSelect {
 
 export function toDemandRow(s: DemandSelect, today = todayDate()): DemandRow {
   const d = s.demand;
-  const overdue = (d.status === "OPEN" || d.status === "PARTIALLY_PAID") && compareDates(today, d.dueDate) > 0 ? diffDays(d.dueDate, today) : 0;
+  // days_overdue = today − due date (diffDays(a, b) is a − b)
+  const overdue = (d.status === "OPEN" || d.status === "PARTIALLY_PAID") && compareDates(today, d.dueDate) > 0 ? diffDays(today, d.dueDate) : 0;
   return {
     id: d.id, company_id: d.companyId, booking_id: d.bookingId, booking_number: s.bookingNumber, project_id: d.projectId, project_name: s.projectName, block_id: d.blockId, block_name: s.blockName,
     flat_number: s.flatNumber, customer_id: d.customerId, customer_name: s.customerName, demand_number: d.demandNumber, installment_seq: d.installmentSeq, installment_name: d.installmentName,

@@ -391,7 +391,7 @@ describe("enquiries", () => {
   it("honeypot → 200 with a fake reference and nothing created", async () => {
     const r = await t.request<{ reference_number: string }>("POST", "/api/v1/public/enquiries", { body: { name: "Bot Botson", phone: "9876522222", consent: true, website: "http://spam.example" } });
     expect(r.status, r.text).toBe(200);
-    expect(r.body.reference_number).toMatch(/^ENQ-[0-9A-F]{8}$/);
+    expect(r.body.reference_number).toMatch(/^ENQ-\d{4}\/\d{4}$/); // same format as a real reference: the bot cannot tell it was dropped
     expect((await t.app.sql<{ n: number }[]>`select count(*)::int as n from leads where phone = '9876522222'`)[0]!.n).toBe(0);
     expect((await t.app.sql<{ n: number }[]>`select count(*)::int as n from enquiries where phone = '9876522222'`)[0]!.n).toBe(0);
   });

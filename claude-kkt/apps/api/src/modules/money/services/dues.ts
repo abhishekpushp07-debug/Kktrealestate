@@ -10,7 +10,7 @@ import { addDays, demandStageId, demandStatuses, evaluateDues, formatINR, type T
 import { writeAudit } from "../../../lib/audit.js";
 import { nextNumber } from "../../../lib/numbering.js";
 import { notify, notifyRole, withdraw } from "../../notifications/service.js";
-import { ACCOUNTS_ROLES, Clock, loadCompanyRow, lockBooking, numberingOf, snapshotInstallments, loadTowerStages, todayDate, type BookingRecord, type CompanyRecord, type MoneyActor, SYSTEM_MONEY_ACTOR } from "../common.js";
+import { ACCOUNTS_ROLES, Clock, loadCompanyRow, loadTowerStagesMany, lockBooking, numberingOf, snapshotInstallments, loadTowerStages, todayDate, type BookingRecord, type CompanyRecord, type MoneyActor, SYSTEM_MONEY_ACTOR } from "../common.js";
 import { appendEvent, events, rebuild } from "./ledger.js";
 
 export type DemandRecord = typeof demands.$inferSelect;
@@ -163,16 +163,19 @@ export async function raiseDuesForAll(db: DB, today: string = todayDate(), scope
     scope.projectId ? eq(bookings.projectId, scope.projectId) : undefined,
     scope.companyId ? eq(bookings.companyId, scope.companyId) : undefined,
   );
-  const ids = await db.select({ id: bookings.id, companyId: bookings.companyId }).from(bookings).where(where).orderBy(asc(bookings.bookingDate), asc(bookings.id));
+  const ids = await db.select({ id: bookings.id, companyId: bookings.companyId, blockId: bookings.blockId }).from(bookings).where(where).orderBy(asc(bookings.bookingDate), asc(bookings.id));
   const companies = new Map<string, CompanyRecord>();
+  // tower stages once per block for the whole run (not once per booking)
+  const stagesByBlock = await loadTowerStagesMany(db, ids.map((b) => b.blockId));
   const summary: RunSummary = { bookingsChecked: 0, demandsRaised: 0, demandNumbers: [], notifications: 0 };
-  for (const { id, companyId } of ids) {
+  for (const { id, companyId, blockId } of ids) {
     let company = companies.get(companyId);
     if (!company) { company = await loadCompanyRow(db, companyId); companies.set(companyId, company); }
+    const towerStages = stagesByBlock.get(blockId) ?? [];
     const result = await db.transaction(async (tx) => {
       const [b] = await tx.select().from(bookings).where(eq(bookings.id, id)).limit(1);
       if (!b || b.status !== "ACTIVE") return null;
-      return raiseDues(tx, b, { today, actor, company });
+      return raiseDues(tx, b, { today, actor, company, towerStages });
     });
     summary.bookingsChecked += 1;
     if (result) {

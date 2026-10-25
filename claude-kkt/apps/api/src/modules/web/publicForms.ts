@@ -8,16 +8,17 @@ import { z } from "zod";
 import { BROCHURE_LINK_MINUTES, EmailSchema, PhoneSchema, PublicBrochureResponseSchema, PublicEnquiryInputSchema, PublicEnquiryResponseSchema, SlugSchema } from "@kkt/contracts";
 import { UtmSchema } from "@kkt/contracts";
 import { brochureDownloads, flatTypes, projectWebsiteSettings, type Executor } from "@kkt/db";
-import { normalizeIndianPhone } from "@kkt/domain";
+import { normalizeIndianPhone, todayIST } from "@kkt/domain";
 import { writeAudit } from "../../lib/audit.js";
+import { loadCompany } from "../../lib/company.js";
 import { keyedHash, randomToken, safeEqual, sha256, signPayload, verifyPayload } from "../../lib/crypto.js";
 import { ApiError } from "../../lib/errors.js";
 import { route } from "../../lib/routes.js";
 import { createEnquiry, createOrTouchLead } from "../crm/leadService.js";
 import { streamDocument } from "../documents/service.js";
 import { notify, notifyRole } from "../notifications/service.js";
-import { publishedProjects } from "./publicContent.js";
-import { RelaxedHoneypotSchema, WEBSITE_ACTOR, apiOrigin, fakeCode, isHoneypotTripped, loadDocuments, noStore, publicCompanyId, publicMeta, relaxHoneypot, userAgent } from "./shared.js";
+import { livePublishedProject } from "./publicContent.js";
+import { RelaxedHoneypotSchema, WEBSITE_ACTOR, apiOrigin, fakeNumber, isHoneypotTripped, loadDocuments, noStore, publicCompanyId, publicMeta, relaxHoneypot, userAgent } from "./shared.js";
 
 /** 5 requests per minute per IP on every public form (SPEC §2). */
 export const FORM_RATE_LIMIT = { limit: 5, windowSeconds: 60 } as const;
@@ -92,12 +93,11 @@ export function registerPublicFormRoutes(app: FastifyInstance): void {
     handler: async (req, reply) => {
       noStore(reply);
       const body = req.body;
-      if (isHoneypotTripped(body)) return { reference_number: fakeCode("ENQ-"), message: "Thank you. Our team will call you shortly." };
       const companyId = await companyOr404(app.db);
       let projectId: string | null = null;
       let flatTypeId: string | null = null;
       if (body.project_slug) {
-        const [p] = await publishedProjects(app.db, companyId, body.project_slug);
+        const p = await livePublishedProject(app.db, companyId, body.project_slug);
         if (!p) throw validation("project_slug", "Unknown project");
         projectId = p.p.id;
       }
@@ -105,6 +105,11 @@ export function registerPublicFormRoutes(app: FastifyInstance): void {
         const [ft] = await app.db.select({ id: flatTypes.id }).from(flatTypes).where(and(eq(flatTypes.companyId, companyId), sql`upper(${flatTypes.code}) = upper(${body.flat_type_code})`)).limit(1);
         if (!ft) throw validation("flat_type_code", "Unknown flat type");
         flatTypeId = ft.id;
+      }
+      if (isHoneypotTripped(body)) {
+        // Silently dropped: same validation, same reply shape and number format as a real enquiry, nothing written.
+        const company = await loadCompany(app.db, app.redis, companyId);
+        return { reference_number: fakeNumber(company, "enquiry", todayIST(), "ENQ-"), message: "Thank you. Our team will call you shortly." };
       }
       const result = await app.db.transaction(async (tx) => {
         const r = await createEnquiry(tx, {
@@ -127,11 +132,8 @@ export function registerPublicFormRoutes(app: FastifyInstance): void {
       const body = req.body;
       const signed = signBrochureToken(BROCHURE_LINK_MINUTES * 60);
       const expiresAt = signed.expiresAt;
-      if (isHoneypotTripped(body)) {
-        return { download_url: `${apiOrigin}/api/v1/public/brochure/${randomToken(32)}`, expires_at: expiresAt.toISOString(), visitor_token: randomToken(32), file_name: "brochure.pdf" };
-      }
       const companyId = await companyOr404(app.db);
-      const [project] = await publishedProjects(app.db, companyId, body.project_slug);
+      const project = await livePublishedProject(app.db, companyId, body.project_slug);
       if (!project) throw ApiError.notFound("Project");
       const brochureId = project.w.brochureDocumentId;
       const docs = await loadDocuments(app.db, [brochureId]);
@@ -146,6 +148,16 @@ export function registerPublicFormRoutes(app: FastifyInstance): void {
         if (!body.phone) throw validation("phone", "Phone is required");
         if (body.consent !== true) throw validation("consent", "Consent is required");
         who = { phone: body.phone, name: body.name, email: body.email ?? null };
+      }
+      if (isHoneypotTripped(body)) {
+        // Silently dropped: a validly signed link that was never issued (404 on GET, exactly like an expired one), a real-looking visitor
+        // token and the real file name; no lead, no brochure_downloads row, no notification.
+        return {
+          download_url: `${apiOrigin}/api/v1/public/brochure/${signed.token}`,
+          expires_at: expiresAt.toISOString(),
+          visitor_token: body.visitor_token && returning ? body.visitor_token : signVisitorToken(who.phone, who.name, who.email),
+          file_name: brochure.fileName,
+        };
       }
 
       const result = await app.db.transaction(async (tx) => {

@@ -97,9 +97,11 @@ export function portalAccessRoutes(app: FastifyInstance): void {
     },
   });
 
+  // Deliberately NOT idempotent: the idempotency store would keep the one-time temporary password for 24 h. A repeated enable is
+  // refused with 422 PORTAL_ALREADY_ENABLED, which makes the action safe to retry anyway.
   for (const [path, action] of Object.entries(ACTION_PATHS)) {
     route(app, {
-      method: "POST", url: `/customers/:id/portal/${path}`, permission: "customer.portal_manage", idempotent: action === "ENABLE",
+      method: "POST", url: `/customers/:id/portal/${path}`, permission: "customer.portal_manage",
       schema: { params: idParams, body: z.object({}).strict().optional(), response: { 200: PortalAccessResponseSchema }, summary: `Portal access: ${action.toLowerCase().replace(/_/g, " ")}` },
       handler: async (req) => portalAction(app, req, req.params.id, action),
     });
@@ -112,8 +114,8 @@ export function portalAccessRoutes(app: FastifyInstance): void {
   });
 
   route(app, {
-    method: "POST", url: "/customers/portal/bulk-enable", permission: "customer.portal_manage", idempotent: true,
-    schema: { body: PortalBulkEnableSchema, response: { 200: PortalBulkEnableResponseSchema }, summary: "Enable portal access for every customer with an ACTIVE booking (passwords issued per customer via reset)" },
+    method: "POST", url: "/customers/portal/bulk-enable", permission: "customer.portal_manage",
+    schema: { body: PortalBulkEnableSchema, response: { 200: PortalBulkEnableResponseSchema }, summary: "Enable portal access for every customer with an ACTIVE booking; the temporary passwords are returned once in `credentials`" },
     handler: async (req) => {
       const user = req.user!;
       if (req.body.project_id) ensureProjectAccess(user, req.body.project_id);
@@ -131,17 +133,18 @@ export function portalAccessRoutes(app: FastifyInstance): void {
       const todo = candidates.filter((r) => r.enabled !== true);
       const alreadyEnabled = candidates.length - todo.length;
       if (req.body.dry_run) return { dry_run: true, enabled: todo.length, already_enabled: alreadyEnabled, credentials: [] };
-      let enabled = 0;
+      const credentials: { customer_id: string; customer_code: string; phone: string; temp_password: string }[] = [];
       const meta = metaOf(req);
       for (const r of todo) {
         // One short transaction per customer; argon2 runs outside the row lock.
-        const hash = await hashPassword(temporaryPassword());
+        const plain = temporaryPassword();
+        const hash = await hashPassword(plain);
         try {
           await app.db.transaction(async (tx) => {
             const [fresh] = await tx.select().from(customers).where(eq(customers.id, r.c.id)).limit(1).for("update");
             if (!fresh) return;
-            await enablePortal(tx, app, fresh, user.id, hash, meta);
-            enabled += 1;
+            const pu = await enablePortal(tx, app, fresh, user.id, hash, meta);
+            credentials.push({ customer_id: fresh.id, customer_code: fresh.customerCode, phone: pu.phone, temp_password: plain });
           });
         } catch (e) {
           // Raced (enabled meanwhile) or phone already used by another portal login: skip this customer, never fail the batch.
@@ -149,9 +152,10 @@ export function portalAccessRoutes(app: FastifyInstance): void {
           throw e;
         }
       }
-      await app.db.transaction((tx) => writeAudit(tx, { companyId: user.companyId, ...meta, action: "customer.portal_bulk_enable", entityType: "company", entityId: user.companyId, after: { enabled, already_enabled: alreadyEnabled, project_id: req.body.project_id ?? null } }));
+      // The audit row carries counts and ids only; the temporary passwords exist in this one response and nowhere else.
+      await app.db.transaction((tx) => writeAudit(tx, { companyId: user.companyId, ...meta, action: "customer.portal_bulk_enable", entityType: "company", entityId: user.companyId, after: { enabled: credentials.length, already_enabled: alreadyEnabled, project_id: req.body.project_id ?? null, customer_ids: credentials.map((c) => c.customer_id) } }));
       await bumpPermVersion(app.redis);
-      return { dry_run: false, enabled, already_enabled: alreadyEnabled, credentials: [] };
+      return { dry_run: false, enabled: credentials.length, already_enabled: alreadyEnabled, credentials };
     },
   });
 }
