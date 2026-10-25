@@ -2,7 +2,10 @@
   "name": "frontend",
   "version": "0.1.0",
   "private": true,
+  "homepage": "/erp",
   "dependencies": {
+    "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
+    "@craco/craco": "^7.1.0",
     "@hookform/resolvers": "^5.0.1",
     "@radix-ui/react-accordion": "^1.2.8",
     "@radix-ui/react-alert-dialog": "^1.1.11",
@@ -33,6 +36,7 @@
     "@radix-ui/react-tooltip": "^1.2.4",
     "@tanstack/react-query": "^5.104.5",
     "@tanstack/react-virtual": "^3.14.22",
+    "autoprefixer": "^10.4.20",
     "axios": "^1.20.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -40,10 +44,12 @@
     "cra-template": "1.2.0",
     "date-fns": "^4.1.0",
     "embla-carousel-react": "^8.6.0",
+    "eslint-plugin-react-hooks": "5.2.0",
     "framer-motion": "^14.6.0",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.507.0",
     "next-themes": "^0.4.6",
+    "postcss": "^8.4.49",
     "react": "^19.0.0",
     "react-day-picker": "8.10.1",
     "react-dom": "^19.0.0",
@@ -56,6 +62,7 @@
     "recharts": "^3.6.0",
     "sonner": "^2.0.3",
     "tailwind-merge": "^3.2.0",
+    "tailwindcss": "^3.4.17",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^1.1.2",
     "zod": "^3.24.4"
@@ -63,7 +70,7 @@
   "scripts": {
     "start": "node scripts/dev.js",
     "start:erp": "craco start",
-    "build": "craco build && node scripts/package-build.js",
+    "build": "node scripts/build.js",
     "test": "craco test",
     "dev": "PREVIEW_MODE=development node scripts/dev.js",
     "preview:build": "node scripts/dev.js --build-only",
@@ -83,20 +90,14 @@
     ]
   },
   "devDependencies": {
-    "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
-    "@craco/craco": "^7.1.0",
     "@emergentbase/overlay": "https://assets.emergent.sh/npm/emergentbase-overlay-0.1.31.tgz",
     "@emergentbase/visual-edits": "https://assets.emergent.sh/npm/emergentbase-visual-edits-1.0.16.tgz",
     "@eslint/js": "9.23.0",
-    "autoprefixer": "^10.4.20",
     "eslint": "^8.57.0",
     "eslint-plugin-import": "2.31.0",
     "eslint-plugin-jsx-a11y": "6.10.2",
     "eslint-plugin-react": "7.37.4",
-    "eslint-plugin-react-hooks": "5.2.0",
-    "globals": "15.15.0",
-    "postcss": "^8.4.49",
-    "tailwindcss": "^3.4.17"
+    "globals": "15.15.0"
   },
   "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e",
   "resolutions": {

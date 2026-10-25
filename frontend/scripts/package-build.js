@@ -86,6 +86,9 @@ function verify() {
 
 function packageBuild({ clean = true } = {}) {
   if (!has(path.join(BUILD, "index.html"))) throw new Error("build/index.html missing — run `craco build` first");
+  if (!has(path.join(BUILD, "erp", "index.html")) && !erpAtRoot()) {
+    throw new Error("CRA output is not under /erp (build/index.html references /static/ instead of /erp/static/). Set PUBLIC_URL=/erp (package.json \"homepage\" or env) and rebuild.");
+  }
   moveErp();
   copySite();
   copyPortal();

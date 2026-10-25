@@ -1,7 +1,7 @@
 import os
 """Customer Portal: auth (aud=portal), scoped read APIs, service requests, notices, profile. Phase 5."""
 import secrets
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import jwt
 from fastapi import APIRouter, Depends, File, Form, Request, Response, UploadFile
@@ -15,7 +15,7 @@ from routers.auth import _hash_token, hash_password, validate_password_policy, v
 from services.filesig import sniff
 from services.money import pct_of, present_money
 from storage import put_object
-from utils import ApiError, StrictModel, base_doc, client_ip, now_iso, write_audit
+from utils import ApiError, StrictModel, base_doc, client_ip, now_iso, public_url, write_audit
 
 router = APIRouter(prefix="/portal", tags=["portal"])
 bearer = HTTPBearer(auto_error=False)
@@ -76,12 +76,12 @@ async def _rm(b: dict | None) -> dict | None:
 
 
 @router.get("/config")
-async def portal_config():
+async def portal_config(request: Request):
     """Public branding for the portal/Expo login screen (no auth)."""
     from routers.cms import get_site
     company = await db.companies.find_one({}, {"_id": 0, "id": 1})
     s = await get_site(company["id"]) if company else {}
-    return {"brand_name": s.get("brand_name"), "logo_url": s.get("logo_url"), "primary_phone": s.get("phone"), "whatsapp": s.get("whatsapp"), "support_email": s.get("email"), "erp_url": os.environ.get("ERP_PUBLIC_URL"), "portal_url": s.get("portal_url") or os.environ.get("PORTAL_PUBLIC_URL")}
+    return {"brand_name": s.get("brand_name"), "logo_url": s.get("logo_url"), "primary_phone": s.get("phone"), "whatsapp": s.get("whatsapp"), "support_email": s.get("email"), "erp_url": public_url(request, os.environ.get("ERP_PUBLIC_URL"), "/erp"), "portal_url": public_url(request, s.get("portal_url") or os.environ.get("PORTAL_PUBLIC_URL"), "/portal/")}
 
 
 # ---------------- Auth ----------------

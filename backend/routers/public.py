@@ -15,7 +15,7 @@ from routers.cms import get_site
 from services.kyc import normalize_phone
 from services.numbering import generate_number
 from storage import get_object
-from utils import ApiError, StrictModel, base_doc, client_ip, now_iso, write_audit
+from utils import ApiError, StrictModel, base_doc, client_ip, now_iso, public_url, write_audit
 
 router = APIRouter(prefix="/public", tags=["public"])
 ALLOWED_TOUR_HOSTS = ("my.matterport.com", "kuula.co", "www.youtube.com", "youtube.com", "player.vimeo.com", "www.google.com", "maps.google.com")
@@ -39,7 +39,7 @@ def memo_public(fn):
     @functools.wraps(fn)
     async def wrapper(*args, **kwargs):
         request: Request = kwargs.get("request") or next(a for a in args if isinstance(a, Request))
-        key = "pub:" + str(request.url.path) + "?" + str(request.url.query)
+        key = "pub:" + request.headers.get("host", "") + str(request.url.path) + "?" + str(request.url.query)
         hit = ttlcache.get(key)
         if hit is not None:
             return cached(request, hit)
@@ -66,10 +66,11 @@ def safe_embed(url: str | None) -> str | None:
     return url if host in ALLOWED_TOUR_HOSTS or host.endswith(".matterport.com") else None
 
 
-def site_public(s: dict) -> dict:
+def site_public(s: dict, request: Request | None = None) -> dict:
     keys = ("brand_name", "tagline", "logo_url", "favicon_url", "phone", "whatsapp", "email", "portal_url", "offices", "social", "trust_stats", "footer_text", "rera_disclaimer", "seo_title", "seo_description", "og_image_url", "ga_id", "meta_pixel_id", "site_live", "home")
     out = {k: s.get(k) for k in keys}
-    out["portal_url"] = out.get("portal_url") or os.environ.get("PORTAL_PUBLIC_URL")
+    configured = out.get("portal_url") or os.environ.get("PORTAL_PUBLIC_URL")
+    out["portal_url"] = public_url(request, configured, "/portal/") if request else configured
     return out
 
 
@@ -110,7 +111,7 @@ async def _project_card(p: dict, flat_types: dict) -> dict:
 @memo_public
 async def site(request: Request, _=Depends(public_guard)):
     s = await get_site(await _company_id())
-    return cached(request, site_public(s))
+    return cached(request, site_public(s, request))
 
 
 @router.get("/projects")
@@ -243,7 +244,7 @@ async def home(request: Request, _=Depends(public_guard)):
     testimonials = [pick(t, ("name", "designation", "photo_url", "quote", "rating", "project_name")) for t in await db.cms_testimonials.find({"is_active": True}, {"_id": 0}).sort("order", 1).to_list(12)]
     posts_ = [pick(p, ("slug", "title", "excerpt", "cover_url", "author", "publish_at", "tags")) for p in await db.cms_posts.find({"status": "Published", "is_active": True}, {"_id": 0}).sort("publish_at", -1).limit(3).to_list(3)]
     people = [pick(p, ("name", "designation", "photo_url", "bio")) for p in await db.cms_people.find({"is_active": True}, {"_id": 0}).sort("order", 1).to_list(12)]
-    return cached(request, {"site": site_public(s), "banners": banners, "featured_projects": featured, "testimonials": testimonials, "posts": posts_, "people": people})
+    return cached(request, {"site": site_public(s, request), "banners": banners, "featured_projects": featured, "testimonials": testimonials, "posts": posts_, "people": people})
 
 
 @router.get("/gallery")

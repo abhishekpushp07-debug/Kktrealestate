@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { CheckCircle2, Printer, Search } from "lucide-react";
 import { toast } from "sonner";
-import api, { errMsg } from "@/lib/api";
+import api, { errMsg, BASE_PATH } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useFetch, useMasterOptions } from "@/hooks/useList";
 import { useCatalogues } from "@/hooks/useCatalogues";
@@ -80,7 +80,7 @@ export function PostPayment({ open, onOpenChange, bookingId, customerId, onPoste
           <div className="mt-8 space-y-6 text-center" data-testid="pp-success">
             <span className="icon-tile sage mx-auto h-16 w-16 rounded-2xl"><CheckCircle2 className="!h-8 !w-8" /></span>
             <div><p className="label">{done.status === "Pending" ? "Recorded · cheque in hand" : "Posted"}</p><p className="mt-2 font-display text-4xl text-ink-950"><Num s={inr(done.amount)} /></p><p className="mt-2 font-mono text-sm text-txt-secondary" data-testid="pp-receipt-number">{done.receipt_number}</p></div>
-            <div className="flex flex-wrap justify-center gap-2"><button type="button" onClick={() => window.open(`${process.env.REACT_APP_BASE_PATH || ""}/print/receipt/${done.id}`, "_blank")} className="btn btn-primary" data-testid="pp-print"><Printer className="h-4 w-4" />Print / download receipt</button><button type="button" onClick={() => { setDone(null); setKey(uuid()); setF((p) => ({ ...p, amount: "", number: "", remarks: "" })); }} className="btn btn-secondary" data-testid="pp-another">Post another</button></div>
+            <div className="flex flex-wrap justify-center gap-2"><button type="button" onClick={() => window.open(`${BASE_PATH}/print/receipt/${done.id}`, "_blank")} className="btn btn-primary" data-testid="pp-print"><Printer className="h-4 w-4" />Print / download receipt</button><button type="button" onClick={() => { setDone(null); setKey(uuid()); setF((p) => ({ ...p, amount: "", number: "", remarks: "" })); }} className="btn btn-secondary" data-testid="pp-another">Post another</button></div>
           </div>
         ) : (
           <form onSubmit={submit} className="mt-6 space-y-6">

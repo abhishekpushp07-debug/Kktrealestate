@@ -1,3 +1,4 @@
+import os
 import re
 import uuid
 from datetime import UTC, datetime
@@ -33,6 +34,27 @@ def now_iso() -> str:
 
 def new_id() -> str:
     return str(uuid.uuid4())
+
+
+def request_origin(request: Request) -> str:
+    host = request.headers.get("x-forwarded-host", request.headers.get("host", request.url.netloc)).split(",")[0].strip()
+    fwd_proto = request.headers.get("x-forwarded-proto")
+    local = host.split(":")[0] in ("localhost", "127.0.0.1")
+    proto = fwd_proto.split(",")[0].strip() if fwd_proto else (request.url.scheme if local else "https")
+    return f"{proto}://{host}"
+
+
+def public_url(request: Request, configured: str | None, path: str) -> str | None:
+    """Configured URL wins on the configured preview hosts (and localhost); on any other real domain use the request's own origin."""
+    from urllib.parse import urlparse
+    origin = request_origin(request)
+    req_host = urlparse(origin).hostname or ""
+    known = {urlparse(os.environ.get(k) or "").hostname for k in ("PORTAL_PUBLIC_URL", "ERP_PUBLIC_URL")} - {None}
+    if configured:
+        cfg_host = urlparse(configured).hostname or ""
+        if not req_host or req_host in ("localhost", "127.0.0.1") or cfg_host == req_host or req_host in known:
+            return configured
+    return f"{origin}{path}"
 
 
 def client_ip(request: Request) -> str:

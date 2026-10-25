@@ -34,7 +34,7 @@ api.interceptors.request.use((config) => {
 export const conflictHandler = { fn: null };
 
 let refreshing = null;
-export const BASE_PATH = (process.env.REACT_APP_BASE_PATH || "/").replace(/\/$/, "");
+export const BASE_PATH = (process.env.REACT_APP_BASE_PATH || process.env.PUBLIC_URL || "/erp").replace(/\/$/, "");
 const onLogout = { fn: () => { tokens.clear(); window.location.assign(`${BASE_PATH}/login`); } };
 export const setLogoutHandler = (fn) => { onLogout.fn = fn; };
 

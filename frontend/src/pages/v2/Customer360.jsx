@@ -4,7 +4,7 @@ import { CompletenessRing } from "@/components/v2/Completeness";
 import { BadgeCheck, CalendarDays, Download, Eye, EyeOff, FileText, FileWarning, Landmark, LifeBuoy, Lock, Mail, MapPin, MessageSquare, MoreHorizontal, Pencil, Phone, Plus, Receipt, ShieldCheck, Users } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-import api, { errMsg } from "@/lib/api";
+import api, { errMsg, BASE_PATH } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useFetch } from "@/hooks/useList";
 import { useCatalogues } from "@/hooks/useCatalogues";
@@ -152,7 +152,7 @@ export default function Customer360() {
               <DropdownMenuContent align="end" className="v2 w-52 rounded-xl border-warm-200 p-1.5">
                 <DropdownMenuItem className="md:hidden" onClick={() => setComm(true)} data-testid="more-log">Log communication</DropdownMenuItem>
                 {active[0] && <DropdownMenuItem className="md:hidden" onClick={() => openPdf(`/reports/statement/${active[0].id}?format=pdf`)} data-testid="more-statement">Download statement</DropdownMenuItem>}
-                <DropdownMenuItem className="md:hidden" onClick={() => window.location.assign(`${process.env.REACT_APP_BASE_PATH || "/erp"}/customers/${id}/edit`)} data-testid="more-edit">Edit profile</DropdownMenuItem>
+                <DropdownMenuItem className="md:hidden" onClick={() => window.location.assign(`${BASE_PATH}/customers/${id}/edit`)} data-testid="more-edit">Edit profile</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => { const el = document.querySelector("[data-testid=portal-access-card]"); el?.scrollIntoView({ behavior: "smooth" }); }} data-testid="more-portal">Share portal login</DropdownMenuItem>
                 {user?.role_name === "Super Admin" && c.kyc_status !== "Erased" && active.length === 0 && <DropdownMenuItem className="text-brick" onClick={async () => { const reason = window.prompt("Right to erasure — reason (PII anonymised; financial records kept):"); if (!reason) return; try { await api.post(`/admin/customers/${id}/erase`, { confirm: "ERASE", reason }); toast.success("Customer anonymised"); load(); } catch (e) { toast.error(errMsg(e)); } }} data-testid="erase-customer-btn">Erase PII</DropdownMenuItem>}
               </DropdownMenuContent>

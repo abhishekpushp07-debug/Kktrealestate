@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import api, { errMsg } from "@/lib/api";
+import api, { errMsg, BASE_PATH } from "@/lib/api";
 import { useMasterOptions } from "@/hooks/useList";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,7 @@ export function PaymentDialog({ open, onOpenChange, booking, onPosted }) {
         amount: Number(f.amount), payment_date: f.payment_date, payment_mode_id: f.payment_mode_id, bank_account_id: isCash ? null : f.bank_account_id, remarks: f.remarks || null,
         instrument: isCash ? null : { number: f.number || null, date: f.inst_date || null, bank_name: f.bank_name || null } };
       const r = await api.post("/payments", body);
-      toast.success(`Receipt ${r.data.receipt_number} ${r.data.status === "Pending" ? "recorded (cheque in hand)" : "posted"}`, { action: { label: "Print receipt", onClick: () => window.open(`${process.env.REACT_APP_BASE_PATH || ""}/print/receipt/${r.data.id}`, "_blank") } });
+      toast.success(`Receipt ${r.data.receipt_number} ${r.data.status === "Pending" ? "recorded (cheque in hand)" : "posted"}`, { action: { label: "Print receipt", onClick: () => window.open(`${BASE_PATH}/print/receipt/${r.data.id}`, "_blank") } });
       onPosted?.(r.data); onOpenChange(false);
     } catch (err) { toast.error(errMsg(err), { duration: 8000 }); } finally { setBusy(false); }
   };
