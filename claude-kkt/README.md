@@ -16,7 +16,8 @@ Shared packages: `packages/contracts` (Zod wire schemas, enums, permissions — 
 * [docs/DATA-MODEL.md](docs/DATA-MODEL.md) — every table, constraint and index.
 * [docs/API-CONVENTIONS.md](docs/API-CONVENTIONS.md) — envelopes, headers, idempotency, versions, fixed auth/public/portal surfaces.
 * [docs/SECURITY.md](docs/SECURITY.md), [docs/DEPLOY.md](docs/DEPLOY.md), [docs/SEED.md](docs/SEED.md) (demo logins), [docs/PERFORMANCE.md](docs/PERFORMANCE.md), [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md).
-* [docs/AUDIT-80-FACTORS.md](docs/AUDIT-80-FACTORS.md) — the 80-factor audit of the previous implementation that motivated this rebuild.
+* [docs/STATUS.md](docs/STATUS.md) — what is built, all verification evidence (439 integration + 55 acceptance tests, browser QA, load test) and the honest open-items list.
+* [docs/AUDIT-80-FACTORS.md](docs/AUDIT-80-FACTORS.md) — the 80-factor audit of the previous implementation that motivated this rebuild; [docs/AUDIT-80-FACTORS-V2.md](docs/AUDIT-80-FACTORS-V2.md) scores this implementation on the same factors.
 
 ## Run locally
 ```bash
