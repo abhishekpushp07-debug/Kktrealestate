@@ -1,12 +1,13 @@
 /**
  * Right to erasure (SPEC §2): anonymises a customer's PII once they have no ACTIVE booking (as primary or co-applicant), keeping every
- * financial row (bookings, demands, payments, ledger) intact. Co-applicants are anonymised, the portal login is disabled with its
- * sessions revoked, customer documents are soft-deleted and removed from storage, converted leads lose their copy of the PII.
+ * financial row (bookings, demands, payments, ledger) intact and never touching audit history. Co-applicants are anonymised, the portal
+ * login is disabled with its sessions revoked, customer documents are soft-deleted and removed from storage, and every other copy of the
+ * PII goes too: leads (linked or sharing the phone), site visits, website enquiries with the phone, and testimonials (unpublished).
  */
 import { and, eq, exists, inArray, or, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { AdminCustomerEraseRequestSchema, AdminCustomerEraseResponseSchema, IdSchema, type AdminCustomerEraseResponse } from "@kkt/contracts";
-import { bookingCoApplicants, bookings, coApplicants, customers, documents, leads, payments, portalUsers, type Executor } from "@kkt/db";
+import { bookingCoApplicants, bookings, cmsTestimonials, coApplicants, customers, demands, documents, enquiries, leads, ledgerEntries, payments, portalUsers, siteVisits, type Executor } from "@kkt/db";
 import { z } from "zod";
 import { writeAudit } from "../../lib/audit.js";
 import { bumpPermVersion } from "../../lib/cache.js";
@@ -95,23 +96,39 @@ export async function eraseCustomer(app: FastifyInstance, input: EraseInput): Pr
       .where(and(eq(documents.companyId, companyId), eq(documents.entityType, "CUSTOMER"), eq(documents.entityId, customerId), eq(documents.isDeleted, false)));
     if (docs.length > 0) await tx.update(documents).set({ isDeleted: true, deletedAt: now, updatedAt: now }).where(inArray(documents.id, docs.map((d) => d.id)));
 
-    const leadRows = await tx.update(leads).set({ fullName: name, phone, email: null, message: null }).where(and(eq(leads.companyId, companyId), eq(leads.customerId, customerId))).returning({ id: leads.id });
+    // Every other copy of the identity within the tenant: leads linked to the customer or carrying their phone, site visits, website
+    // enquiries by phone, testimonials (withdrawn from the site). Business facts (visit status, lead stage, ticket history) stay.
+    const phones = [c.phone, c.altPhone].filter((p): p is string => typeof p === "string" && p.length > 0);
+    const leadRows = await tx.update(leads).set({ fullName: name, phone, email: null, message: null })
+      .where(and(eq(leads.companyId, companyId), or(eq(leads.customerId, customerId), inArray(leads.phone, phones)))).returning({ id: leads.id });
+    const visitRows = await tx.update(siteVisits).set({ name, phone, email: null, message: null, notes: null })
+      .where(and(eq(siteVisits.companyId, companyId), or(eq(siteVisits.customerId, customerId), inArray(siteVisits.phone, phones)))).returning({ id: siteVisits.id });
+    const enquiryRows = await tx.update(enquiries).set({ name, phone, email: null, message: null, ip: null })
+      .where(and(eq(enquiries.companyId, companyId), inArray(enquiries.phone, phones))).returning({ id: enquiries.id });
+    const testimonialRows = await tx.update(cmsTestimonials).set({ name, quote: "Testimonial withdrawn (customer erased)", photoDocumentId: null, isPublished: false, updatedAt: now })
+      .where(and(eq(cmsTestimonials.companyId, companyId), eq(cmsTestimonials.customerId, customerId))).returning({ id: cmsTestimonials.id });
 
     const [kept] = await tx.select({
       bookings: sql<number>`(select count(*)::int from ${bookings} where ${bookings.customerId} = ${customerId})`,
       payments: sql<number>`(select count(*)::int from ${payments} where ${payments.customerId} = ${customerId})`,
+      demands: sql<number>`(select count(*)::int from ${demands} where ${demands.customerId} = ${customerId})`,
+      ledger: sql<number>`(select count(*)::int from ${ledgerEntries} where ${ledgerEntries.bookingId} in (select ${bookings.id} from ${bookings} where ${bookings.customerId} = ${customerId}))`,
     }).from(sql`(select 1) as one`);
 
     await writeAudit(tx, {
       companyId, actor: input.meta.actor, ip: input.meta.ip, requestId: input.meta.requestId, action: "customer.erased", entityType: "customer", entityId: customerId,
       before: { customer_code: c.customerCode, kyc_status: c.kycStatus, is_active: c.isActive, had_portal_access: Boolean(pu), documents: docs.length, co_applicants: cas.length },
-      after: { reason: input.reason, erased_at: now.toISOString(), full_name: name, documents_removed: docs.length, co_applicants_anonymised: cas.length, leads_anonymised: leadRows.length, portal_disabled: portalDisabled, sessions_revoked: sessionsRevoked },
+      after: {
+        reason: input.reason, erased_at: now.toISOString(), full_name: name, documents_removed: docs.length, co_applicants_anonymised: cas.length, leads_anonymised: leadRows.length,
+        site_visits_anonymised: visitRows.length, enquiries_anonymised: enquiryRows.length, testimonials_withdrawn: testimonialRows.length, portal_disabled: portalDisabled, sessions_revoked: sessionsRevoked,
+        financial_rows_kept: { bookings: Number(kept?.bookings ?? 0), payments: Number(kept?.payments ?? 0), demands: Number(kept?.demands ?? 0), ledger_entries: Number(kept?.ledger ?? 0) },
+      },
     });
 
     const response: AdminCustomerEraseResponse = {
       id: c.id, customer_code: c.customerCode, full_name: name, erased_at: now.toISOString(), version: updated?.version ?? c.version + 1,
-      anonymised: { co_applicants: cas.length, documents: docs.length, leads: leadRows.length, portal_disabled: portalDisabled, sessions_revoked: sessionsRevoked },
-      financial_rows_kept: { bookings: Number(kept?.bookings ?? 0), payments: Number(kept?.payments ?? 0) },
+      anonymised: { co_applicants: cas.length, documents: docs.length, leads: leadRows.length, site_visits: visitRows.length, enquiries: enquiryRows.length, testimonials: testimonialRows.length, portal_disabled: portalDisabled, sessions_revoked: sessionsRevoked },
+      financial_rows_kept: { bookings: Number(kept?.bookings ?? 0), payments: Number(kept?.payments ?? 0), demands: Number(kept?.demands ?? 0), ledger_entries: Number(kept?.ledger ?? 0) },
     };
     return { response, docs };
   });
@@ -132,7 +149,7 @@ export async function eraseCustomer(app: FastifyInstance, input: EraseInput): Pr
 export function registerEraseRoutes(app: FastifyInstance): void {
   route(app, {
     method: "POST", url: "/admin/customers/:id/erase", permission: "admin.tools", idempotent: true,
-    schema: { params: z.object({ id: IdSchema }), body: AdminCustomerEraseRequestSchema, response: { 200: AdminCustomerEraseResponseSchema }, summary: "Right to erasure (Super Admin): anonymise PII when no booking is ACTIVE; financial rows stay (409 HAS_ACTIVE_BOOKING)", tags: ["admin"] },
+    schema: { params: z.object({ id: IdSchema }), body: AdminCustomerEraseRequestSchema, response: { 200: AdminCustomerEraseResponseSchema }, summary: "Right to erasure (Super Admin): anonymise PII (customer, co-applicants, portal login, documents, leads, site visits, enquiries, testimonials) when no booking is ACTIVE; financial rows and audit history stay (409 HAS_ACTIVE_BOOKING)", tags: ["admin"] },
     handler: async (req) => {
       const user = staff(req);
       requireSuperAdmin(user);

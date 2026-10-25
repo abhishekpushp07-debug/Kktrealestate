@@ -129,7 +129,26 @@ export type AuditLogListResponse = z.infer<typeof AuditLogListResponseSchema>;
 // Company settings
 // ---------------------------------------------------------------------------
 
-const NumberingScopeSchema = z.strictObject({ prefix: z.string().trim().max(10), format: z.string().trim().max(40).optional() });
+/** Characters allowed in a document-number prefix (SPEC §2: CUST-, BK-, SGB/ …): letters, digits, slash, dash, underscore, dot. */
+export const NUMBER_PREFIX_RE = /^[A-Za-z0-9/_.-]*$/;
+export const NumberPrefixSchema = z.string().trim().max(10).regex(NUMBER_PREFIX_RE, "Prefix may only contain letters, digits, / - _ .");
+export type NumberPrefix = z.infer<typeof NumberPrefixSchema>;
+
+const NUMBER_FORMAT_TOKEN_RE = /\{(prefix|fy|seq(?::\d{1,2})?)\}/g;
+/**
+ * Number pattern (default `{prefix}{fy}/{seq:4}`): must contain exactly one `{seq}`/`{seq:N}` token; only `{prefix}`, `{fy}` and `{seq}`
+ * tokens plus letters, digits, / - _ . are allowed, so a saved pattern can never make the numbering engine throw.
+ */
+export const NumberFormatSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(40)
+  .refine((f) => (f.match(/\{seq(?::\d{1,2})?\}/g) ?? []).length === 1, "Pattern needs exactly one {seq} or {seq:N} token")
+  .refine((f) => NUMBER_PREFIX_RE.test(f.replace(NUMBER_FORMAT_TOKEN_RE, "")), "Pattern may only contain {prefix}, {fy}, {seq:N} and letters, digits, / - _ .");
+export type NumberFormat = z.infer<typeof NumberFormatSchema>;
+
+const NumberingScopeSchema = z.strictObject({ prefix: NumberPrefixSchema, format: NumberFormatSchema.optional() });
 
 const CompanySettingsBase = z.strictObject({
   name: NameSchema,
@@ -158,7 +177,7 @@ const CompanySettingsBase = z.strictObject({
   }),
   settings: z.strictObject({
     demand_due_days: z.int().min(0).max(365).default(15),
-    default_gst_percent: z.number().min(0).max(100).default(5),
+    default_gst_percent: z.number().min(0).max(28, "GST cannot exceed 28 %").default(5),
     round_robin_enabled: z.boolean().default(true),
     force_mfa_for_admins: z.boolean().default(false),
     sla_hours: z.strictObject({
@@ -174,6 +193,47 @@ const CompanySettingsBase = z.strictObject({
 /** Update company settings (partial + version). */
 export const CompanySettingsUpdateSchema = updateOf(CompanySettingsBase);
 export type CompanySettingsUpdate = z.infer<typeof CompanySettingsUpdateSchema>;
+
+/** SLA hours per priority, every key optional (no defaults) — for merge-style patches. */
+const SlaHoursPatchSchema = z.strictObject({
+  LOW: z.int().min(1).max(720).optional(),
+  MEDIUM: z.int().min(1).max(720).optional(),
+  HIGH: z.int().min(1).max(720).optional(),
+  URGENT: z.int().min(1).max(720).optional(),
+});
+
+/**
+ * Merge-style PATCH /settings/company body: like CompanySettingsUpdateSchema but `numbering` scopes and `settings` keys are optional with NO
+ * defaults, so `{ settings: { sla_hours: { HIGH: 12 } } }` changes one value and leaves every other stored setting untouched (the API
+ * merges onto the current row and validates the result against CompanySettingsRowSchema).
+ */
+export const CompanySettingsPatchSchema = updateOf(
+  CompanySettingsBase.extend({
+    numbering: z.strictObject({
+      customer: NumberingScopeSchema.optional(),
+      booking: NumberingScopeSchema.optional(),
+      demand: NumberingScopeSchema.optional(),
+      receipt: NumberingScopeSchema.optional(),
+      ticket: NumberingScopeSchema.optional(),
+      visit: NumberingScopeSchema.optional(),
+    }),
+    settings: z.strictObject({
+      demand_due_days: z.int().min(0).max(365).optional(),
+      default_gst_percent: z.number().min(0).max(28, "GST cannot exceed 28 %").optional(),
+      round_robin_enabled: z.boolean().optional(),
+      force_mfa_for_admins: z.boolean().optional(),
+      sla_hours: SlaHoursPatchSchema.optional(),
+      booking_hold_hours: z.int().min(1).max(720).optional(),
+    }),
+  }),
+);
+export type CompanySettingsPatch = z.infer<typeof CompanySettingsPatchSchema>;
+
+/** The complete, strict numbering + settings objects as stored on the company row (what a merged patch must satisfy). */
+export const CompanyNumberingSchema = CompanySettingsBase.shape.numbering;
+export type CompanyNumbering = z.infer<typeof CompanyNumberingSchema>;
+export const CompanySettingsValuesSchema = CompanySettingsBase.shape.settings;
+export type CompanySettingsValues = z.infer<typeof CompanySettingsValuesSchema>;
 
 export const CompanySettingsRowSchema = CompanySettingsBase.extend({
   id: IdSchema,
@@ -297,10 +357,13 @@ export const AdminCustomerEraseResponseSchema = z.object({
     co_applicants: z.int().min(0),
     documents: z.int().min(0),
     leads: z.int().min(0),
+    site_visits: z.int().min(0).default(0),
+    enquiries: z.int().min(0).default(0),
+    testimonials: z.int().min(0).default(0),
     portal_disabled: z.boolean(),
     sessions_revoked: z.int().min(0),
   }),
-  financial_rows_kept: z.object({ bookings: z.int().min(0), payments: z.int().min(0) }),
+  financial_rows_kept: z.object({ bookings: z.int().min(0), payments: z.int().min(0), demands: z.int().min(0).default(0), ledger_entries: z.int().min(0).default(0) }),
 });
 export type AdminCustomerEraseResponse = z.infer<typeof AdminCustomerEraseResponseSchema>;
 

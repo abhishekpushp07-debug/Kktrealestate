@@ -1,21 +1,24 @@
 /**
  * Construction module services (SPEC §9): tower stage records, jump-ahead completion, the UNDO RULE, photos with buyer/website flags,
  * derived construction % and the notifications that go with it. Money maths never lives here – stage completion hands the tower to
- * money.raiseDuesForBlock() and undo to money.voidDemandsForStage() inside the same transaction.
+ * money.raiseDuesForBlock() and undo to money.voidDemandsForStage() inside the same transaction; undoing the possession stage also
+ * un-demands the on-possession other charges the engine demanded (a paid one blocks the undo) and rebuilds those ledgers.
  */
-import { and, asc, eq, exists, inArray, ne, or, sql } from "drizzle-orm";
+import { and, asc, eq, exists, inArray, isNotNull, ne, or, sql } from "drizzle-orm";
 import type {
   BlockConstructionResponse, BlockStageRow, BlockStageTimeline, ConstructionStatusUpdateResponse, ConstructionUndoResponse,
   ProjectConstructionBlockRow, ProjectConstructionResponse, StagePhotoCreate, StagePhotoRow, StagePhotoUpdate, StageStatus, StageTimelinePhoto,
 } from "@kkt/contracts";
-import { blockStages, blocks, bookings, demands, documents, projects, roles, stagePhotos, userProjectScopes, users, type Executor, type Tx } from "@kkt/db";
-import { todayIST } from "@kkt/domain";
+import { blockStages, blocks, bookingOtherCharges, bookings, demands, documents, projects, roles, stagePhotos, userProjectScopes, users, type Executor, type Tx } from "@kkt/db";
+import { formatINR, todayIST } from "@kkt/domain";
 import { writeAudit, type AuditActor } from "../../lib/audit.js";
 import { ApiError } from "../../lib/errors.js";
 import { ensureProjectAccess, type StaffContext } from "../../lib/scope.js";
 import { applyUpdate, assertVersion } from "../../lib/version.js";
 import { signedUrl } from "../documents/service.js";
+import { lockBooking } from "../money/common.js";
 import { raiseDuesForBlock, voidDemandsForStage } from "../money/services/dues.js";
+import { rebuild } from "../money/services/ledger.js";
 import { notify, withdraw } from "../notifications/service.js";
 
 export type BlockRecord = typeof blocks.$inferSelect;
@@ -119,7 +122,7 @@ export async function toPhotoRows(db: Executor, photos: readonly StagePhotoRecor
   const docs = await loadPhotoDocs(db, photos.map((p) => p.documentId));
   return photos.map((p) => {
     const u = photoUrls(docs.get(p.documentId), ttl);
-    return { id: p.id, block_stage_id: p.blockStageId, document_id: p.documentId, caption: p.caption, visible_to_buyers: p.visibleToBuyers, show_on_website: p.showOnWebsite, sort_order: p.sortOrder, thumb_url: u.thumb, medium_url: u.medium, created_at: p.createdAt.toISOString() };
+    return { id: p.id, block_stage_id: p.blockStageId, document_id: p.documentId, caption: p.caption, visible_to_buyers: p.visibleToBuyers, show_on_website: p.showOnWebsite, sort_order: p.sortOrder, thumb_url: u.thumb, medium_url: u.medium, created_at: p.createdAt.toISOString(), version: p.version };
   });
 }
 
@@ -275,13 +278,19 @@ async function notifyBuyersStageCompleted(tx: Executor, block: BlockRecord, stag
   });
 }
 
-/** Staff bell: Super Admins and the Project Admins scoped to the block's project (the acting user is skipped). */
-async function notifyStaffStageCompleted(tx: Executor, block: BlockRecord, stage: BlockStageRecord, actorId: string | null): Promise<number> {
+/** Staff who get the "stage completed" bell: Super Admins and the Project Admins scoped to the block's project (the acting user is skipped). Loaded once per update. */
+async function stageStaffRecipients(tx: Executor, block: BlockRecord, actorId: string | null): Promise<{ type: "STAFF"; id: string }[]> {
   const scoped = exists(tx.select({ one: sql`1` }).from(userProjectScopes).where(and(eq(userProjectScopes.userId, users.id), eq(userProjectScopes.projectId, block.projectId))));
   const staff = await tx.select({ id: users.id }).from(users).innerJoin(roles, eq(roles.id, users.roleId))
     .where(and(eq(users.companyId, block.companyId), eq(users.isActive, true), inArray(roles.name, [...STAGE_STAFF_ROLES]), or(eq(users.allProjects, true), scoped), actorId ? ne(users.id, actorId) : undefined));
+  return staff.map((s) => ({ type: "STAFF" as const, id: s.id }));
+}
+
+/** Staff bell for one completed stage. */
+async function notifyStaffStageCompleted(tx: Executor, block: BlockRecord, stage: BlockStageRecord, recipients: { type: "STAFF"; id: string }[]): Promise<number> {
+  if (recipients.length === 0) return 0;
   return notify(tx, {
-    companyId: block.companyId, recipients: staff.map((s) => ({ type: "STAFF" as const, id: s.id })), type: "STAGE_COMPLETED",
+    companyId: block.companyId, recipients, type: "STAGE_COMPLETED",
     title: `${block.name}: ${stage.name} completed`, body: `Completed on ${stage.completedOn ?? todayIST()}.`,
     entityType: STAGE_ENTITY_TYPE, entityId: stage.id, link: `/blocks/${block.id}/construction`,
   });
@@ -293,11 +302,15 @@ async function buyersAlreadyNotified(tx: Executor, stageRowId: string): Promise<
   return rows.length > 0;
 }
 
-/** When the first buyer-visible photo lands on an already COMPLETED stage, the buyers get their bell entry then (photos usually follow the status update). */
+/**
+ * When the first buyer-visible photo lands on an already COMPLETED stage, the buyers get their bell entry then (photos usually follow the
+ * status update). The stage row is locked first so two photos arriving together cannot both ring the bell.
+ */
 async function notifyBuyersOnFirstVisiblePhoto(tx: Executor, block: BlockRecord, stage: BlockStageRecord): Promise<number> {
-  if (stage.status !== "COMPLETED") return 0;
-  if (await buyersAlreadyNotified(tx, stage.id)) return 0;
-  return notifyBuyersStageCompleted(tx, block, stage, await towerBuyers(tx, block.id));
+  const [current] = await tx.select().from(blockStages).where(eq(blockStages.id, stage.id)).for("update");
+  if (!current || current.status !== "COMPLETED") return 0;
+  if (await buyersAlreadyNotified(tx, current.id)) return 0;
+  return notifyBuyersStageCompleted(tx, block, current, await towerBuyers(tx, block.id));
 }
 
 // ---------------------------------------------------------------------------
@@ -309,7 +322,7 @@ export interface StatusUpdateInput {
   /** Stage reached (master stage id or block_stages row id). */
   stageRef: string;
   completedOn: string;
-  /** Dates of the intermediate stages (keyed by master stage id or row id); default = completedOn. */
+  /** Dates of the intermediate stages (keyed by master stage id or row id); an undated stage takes the date of the next dated one (ultimately completedOn). */
   intermediateDates: Record<string, string>;
   notes?: string | null | undefined;
   notifyBuyers: boolean;
@@ -344,7 +357,18 @@ export async function updateConstructionStatus(tx: Tx, user: StaffContext, actor
     if (!s) throw ApiError.badRequest("intermediate_dates names a stage that is not being completed", { field: "intermediate_dates", stage_id: ref });
     assertNotFuture(date, today, `intermediate_dates.${ref}`);
     if (date > input.completedOn) throw ApiError.badRequest("Intermediate stage dates cannot be after the reached stage's date", { field: "intermediate_dates", stage_id: ref });
+    if (s.id === target.id && date !== input.completedOn) throw ApiError.badRequest("intermediate_dates gives the reached stage a date different from completed_on", { field: "intermediate_dates", stage_id: ref });
     dates.set(s.id, date);
+  }
+  // stages are built in order: completion dates must be non-decreasing along the sequence; an undated stage takes the date of the next dated one
+  const resolvedDates = new Map<string, string>();
+  let nextDate = input.completedOn;
+  for (let i = toComplete.length - 1; i >= 0; i -= 1) {
+    const s = toComplete[i]!;
+    const date = s.id === target.id ? input.completedOn : dates.get(s.id) ?? nextDate;
+    if (date > nextDate) throw ApiError.badRequest(`${s.name} cannot be completed after the stage that follows it`, { field: "intermediate_dates", stage_id: s.stageId, date, next_stage_date: nextDate });
+    resolvedDates.set(s.id, date);
+    nextDate = date;
   }
   let inProgress: BlockStageRecord | undefined;
   if (input.markInProgressRef) {
@@ -355,7 +379,7 @@ export async function updateConstructionStatus(tx: Tx, user: StaffContext, actor
   const now = new Date();
   const completed: BlockStageRecord[] = [];
   for (const s of toComplete) {
-    const completedOn = s.id === target.id ? input.completedOn : dates.get(s.id) ?? input.completedOn;
+    const completedOn = resolvedDates.get(s.id) ?? input.completedOn;
     const notes = s.id === target.id && input.notes !== undefined ? input.notes : s.notes;
     const [row] = await tx.update(blockStages).set({ status: "COMPLETED", completedOn, completedBy: user.id, completedAt: now, notes, version: sql`${blockStages.version} + 1` }).where(eq(blockStages.id, s.id)).returning();
     if (!row) throw new Error("block stage vanished");
@@ -375,9 +399,10 @@ export async function updateConstructionStatus(tx: Tx, user: StaffContext, actor
   let buyersNotified = 0;
   const visible = await stagesWithVisiblePhotos(tx, completed.map((s) => s.id));
   const buyers = input.notifyBuyers && visible.size > 0 ? await towerBuyers(tx, block.id) : [];
+  const staff = await stageStaffRecipients(tx, block, user.id);
   for (const s of completed) {
     if (input.notifyBuyers && visible.has(s.id)) buyersNotified += await notifyBuyersStageCompleted(tx, block, s, buyers);
-    await notifyStaffStageCompleted(tx, block, s, user.id);
+    await notifyStaffStageCompleted(tx, block, s, staff);
   }
 
   await writeAudit(tx, {
@@ -406,10 +431,28 @@ export function parseBlockingReasons(reasons: readonly string[]): { receipt_numb
   });
 }
 
+type PossessionChargeLine = { line: typeof bookingOtherCharges.$inferSelect; booking: Pick<typeof bookings.$inferSelect, "id" | "bookingNumber" | "companyId"> };
+
+/**
+ * Other-charge lines demanded "on possession" on the tower's ACTIVE bookings (the possession stage's completion raised them through the
+ * money engine). Each booking is locked (row + advisory, in id order like money does) before the lines are read.
+ */
+async function possessionChargeLines(tx: Tx, blockId: string): Promise<PossessionChargeLine[]> {
+  const active = await tx.select({ id: bookings.id }).from(bookings).where(and(eq(bookings.blockId, blockId), eq(bookings.status, "ACTIVE"))).orderBy(asc(bookings.id));
+  for (const b of active) await lockBooking(tx, b.id);
+  if (active.length === 0) return [];
+  return tx.select({ line: bookingOtherCharges, booking: { id: bookings.id, bookingNumber: bookings.bookingNumber, companyId: bookings.companyId } }).from(bookingOtherCharges)
+    .innerJoin(bookings, eq(bookings.id, bookingOtherCharges.bookingId))
+    .where(and(inArray(bookingOtherCharges.bookingId, active.map((b) => b.id)), eq(bookingOtherCharges.demandAt, "ON_POSSESSION"), isNotNull(bookingOtherCharges.demandedAt)))
+    .orderBy(asc(bookings.id), asc(bookingOtherCharges.sortOrder), asc(bookingOtherCharges.id));
+}
+
 /**
  * UNDO RULE (SPEC §9): only the latest completed stage (409 UNDO_NOT_LATEST); money.voidDemandsForStage decides whether a payment dated
  * on/after one of its demands blocks it (409 UNDO_BLOCKED with details.reasons); otherwise demands are void, ledgers rebuilt, the stage's
  * completion data cleared, % recomputed, "stage completed" notifications withdrawn (unread deleted, read flagged) and the undo audited.
+ * For the possession stage the on-possession other charges it demanded are un-demanded as well (a paid one blocks the undo), and the
+ * affected ledgers are rebuilt from source.
  */
 export async function undoStage(tx: Tx, user: StaffContext, actor: ConstructionActor, blockId: string, input: { stageRef: string; reason: string; expectedVersion: number }): Promise<ConstructionUndoResponse> {
   const block = await loadBlockScoped(tx, user, blockId, true);
@@ -421,21 +464,36 @@ export async function undoStage(tx: Tx, user: StaffContext, actor: ConstructionA
   if (!latestCompleted || latestCompleted.id !== stage.id) {
     throw ApiError.conflict("UNDO_NOT_LATEST", `Only the latest completed stage (${latestCompleted?.name ?? "none"}) can be undone`, { latest_stage_id: latestCompleted?.stageId ?? null, latest_stage_name: latestCompleted?.name ?? null });
   }
+  const chargeLines = stage.isPossession ? await possessionChargeLines(tx, block.id) : [];
+  const chargeReasons = chargeLines.filter((c) => c.line.paidPaise > 0).map((c) => `Other charge ${c.line.name} (${c.line.demandNumber}) of ${c.booking.bookingNumber} has been paid ${formatINR(c.line.paidPaise)} since it was demanded on possession`);
   const result = await voidDemandsForStage(tx, block.id, stage.stageId, `Stage ${stage.name} undone: ${input.reason}`, actor);
-  if (result.blocked) {
-    throw ApiError.conflict("UNDO_BLOCKED", `Cannot undo ${stage.name}: a demand it raised has been paid on/after its date`, { reasons: result.reasons, blocking_payments: parseBlockingReasons(result.reasons) });
+  const reasons = [...(result.blocked ? result.reasons : []), ...chargeReasons];
+  if (result.blocked || reasons.length > 0) {
+    throw ApiError.conflict("UNDO_BLOCKED", `Cannot undo ${stage.name}: a demand it raised has been paid on/after its date`, { reasons, blocking_payments: parseBlockingReasons(reasons) });
   }
+  const undemanded: string[] = [];
+  for (const { line, booking } of chargeLines) {
+    await tx.update(bookingOtherCharges).set({ demandedAt: null, demandNumber: null, dueDate: null }).where(eq(bookingOtherCharges.id, line.id));
+    undemanded.push(line.demandNumber ?? line.id);
+    await writeAudit(tx, {
+      companyId: booking.companyId, actor, action: "other_charge.undemand", entityType: "booking_other_charge", entityId: line.id,
+      before: { demand_number: line.demandNumber, demanded_at: line.demandedAt?.toISOString() ?? null, due_date: line.dueDate },
+      after: { demand_number: null, demanded_at: null, due_date: null, booking_id: booking.id, reason: `Stage ${stage.name} undone: ${input.reason}` },
+      ip: actor.ip ?? null, requestId: actor.requestId ?? null,
+    });
+  }
+  for (const bookingId of new Set(chargeLines.map((c) => c.booking.id))) await rebuild(tx, bookingId, { write: true });
   await tx.update(blockStages).set({ status: "PENDING", completedOn: null, completedBy: null, completedAt: null, version: sql`${blockStages.version} + 1` }).where(eq(blockStages.id, stage.id));
   const updatedBlock = await recomputeBlockPercent(tx, block.id, block.version);
   const withdrawn = await withdraw(tx, STAGE_ENTITY_TYPE, stage.id);
   await writeAudit(tx, {
     companyId: block.companyId, actor, action: "construction.undo", entityType: STAGE_ENTITY_TYPE, entityId: stage.id,
     before: { status: "COMPLETED", completed_on: stage.completedOn, completed_by: stage.completedBy, construction_percent: Number(block.constructionPercent) },
-    after: { status: "PENDING", reason: input.reason, stage_id: stage.stageId, name: stage.name, block_id: block.id, voided_demand_numbers: result.voided.map((d) => d.demandNumber), notifications_deleted: withdrawn.deleted, notifications_withdrawn: withdrawn.withdrawn, construction_percent: Number(updatedBlock.constructionPercent) },
+    after: { status: "PENDING", reason: input.reason, stage_id: stage.stageId, name: stage.name, block_id: block.id, voided_demand_numbers: result.voided.map((d) => d.demandNumber), undemanded_charge_numbers: undemanded, notifications_deleted: withdrawn.deleted, notifications_withdrawn: withdrawn.withdrawn, construction_percent: Number(updatedBlock.constructionPercent) },
     ip: actor.ip ?? null, requestId: actor.requestId ?? null,
   });
   return {
-    block_id: block.id, stage_id: stage.stageId, voided_demand_numbers: result.voided.map((d) => d.demandNumber), withdrawn_notifications: withdrawn.deleted + withdrawn.withdrawn,
+    block_id: block.id, stage_id: stage.stageId, voided_demand_numbers: result.voided.map((d) => d.demandNumber), undemanded_charge_numbers: undemanded, withdrawn_notifications: withdrawn.deleted + withdrawn.withdrawn,
     construction_percent: Number(updatedBlock.constructionPercent), version: updatedBlock.version,
   };
 }

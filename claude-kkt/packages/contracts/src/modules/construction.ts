@@ -22,6 +22,8 @@ export const StagePhotoRowSchema = z.object({
   thumb_url: z.string().nullable(),
   medium_url: z.string().nullable(),
   created_at: TimestampSchema,
+  /** Optimistic-concurrency version of the photo row (If-Match on PATCH). */
+  version: z.int().optional(),
 });
 export type StagePhotoRow = z.infer<typeof StagePhotoRowSchema>;
 
@@ -137,6 +139,8 @@ export const ConstructionUndoResponseSchema = z.object({
   block_id: IdSchema,
   stage_id: IdSchema,
   voided_demand_numbers: z.array(z.string()),
+  /** Possession stage only: demand numbers of the on-possession other charges that went back to "not yet demanded". */
+  undemanded_charge_numbers: z.array(z.string()).optional(),
   withdrawn_notifications: z.int().min(0),
   construction_percent: z.number(),
   version: z.int(),

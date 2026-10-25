@@ -15,7 +15,7 @@ import { letterheadFor, today as todayDate } from "../common.js";
 import { toChequeRow } from "./moneyReports.js";
 import { BrandedPdf, pdfDate, pdfMoney, type PdfLetterhead } from "./pdf.js";
 
-type User = Pick<StaffContext, "companyId" | "allProjects" | "projectIds">;
+type User = StaffContext;
 
 /** A rendered document. */
 export interface RenderedPdf {
@@ -65,7 +65,7 @@ export async function receiptPdf(db: Executor, user: User, paymentId: string): P
   if (r.remarks) pdf.paragraph(`Remarks: ${r.remarks}`, { size: 9 });
   pdf.spacer(6);
   pdf.signature(r.company.name, r.company.signatory_name, r.company.signatory_title);
-  pdf.note("This is a computer-generated receipt and is valid without a physical signature. Payments by cheque / DD are credited subject to realisation.");
+  pdf.note("This is a computer-generated receipt and is valid without a physical signature. Cheque / DD payments are credited only once the instrument clears.");
   return { bytes: await pdf.finish(), filename: `receipt-${fileSafe(r.receipt_number)}.pdf` };
 }
 
@@ -108,7 +108,7 @@ export async function demandLetterPdf(db: Executor, user: User, bookingId: strin
     ]);
   }
   pdf.paragraph("Cheques / DDs are to be drawn in favour of the account above and are credited subject to realisation. Please quote your booking number in the transfer remarks. Kindly ignore this letter if the payment has already been made.", { size: 9 });
-  pdf.signature(lh.name, null, null);
+  pdf.signature(lh.name, lh.signatoryName, lh.signatoryTitle);
   return { bytes: await pdf.finish(), filename: `demand-${fileSafe(d.demand_number)}.pdf` };
 }
 

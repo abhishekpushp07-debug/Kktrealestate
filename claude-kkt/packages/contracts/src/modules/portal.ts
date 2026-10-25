@@ -286,7 +286,7 @@ export type PortalConstructionTimelineResponse = z.infer<typeof PortalConstructi
 
 export const PortalDocumentRowSchema = z.object({
   document_id: IdSchema,
-  kind: z.enum(["STATEMENT", "ALLOTMENT_LETTER", "SHARED", "PLAN_ACCEPTANCE"]),
+  kind: z.enum(["STATEMENT", "ALLOTMENT_LETTER", "SHARED", "PLAN_ACCEPTANCE", "ATTACHMENT"]),
   title: z.string(),
   document_type_name: z.string().nullable(),
   file_name: z.string(),
@@ -338,7 +338,9 @@ export type PortalRequestMessage = z.infer<typeof PortalRequestMessageSchema>;
 export const PortalRequestRowSchema = z.object({
   id: IdSchema,
   ticket_number: z.string(),
-  booking_id: IdSchema,
+  /** Null when staff raised the request for the customer without a booking. */
+  booking_id: IdSchema.nullable(),
+  /** Empty when the request has no booking. */
   flat_number: z.string(),
   category_name: z.string(),
   priority: ServicePrioritySchema,
@@ -359,6 +361,10 @@ export const PortalRequestFilterSchema = ListQuerySchema.extend({ booking_id: Id
 export type PortalRequestFilter = z.infer<typeof PortalRequestFilterSchema>;
 export const PortalRequestListResponseSchema = listEnvelope(PortalRequestRowSchema);
 export type PortalRequestListResponse = z.infer<typeof PortalRequestListResponseSchema>;
+
+/** A service category the customer may pick when raising a request (`GET /portal/requests/categories`). */
+export const PortalRequestCategorySchema = z.object({ id: IdSchema, name: z.string(), default_priority: ServicePrioritySchema });
+export type PortalRequestCategory = z.infer<typeof PortalRequestCategorySchema>;
 
 // ---------------------------------------------------------------------------
 // Notices & notifications
@@ -397,6 +403,14 @@ export const PortalMarkReadSchema = z
   .refine((m) => m.all || (m.ids !== undefined && m.ids.length > 0), { message: "Give ids or all=true", path: ["ids"] });
 export type PortalMarkRead = z.infer<typeof PortalMarkReadSchema>;
 
+/** `GET /portal/notifications/unread-count`. */
+export const PortalUnreadCountSchema = z.object({ count: z.int().min(0) });
+export type PortalUnreadCount = z.infer<typeof PortalUnreadCountSchema>;
+
+/** `POST /portal/notifications/mark-read`: how many were marked and how many remain unread. */
+export const PortalMarkReadResponseSchema = z.object({ marked: z.int().min(0), unread_count: z.int().min(0) });
+export type PortalMarkReadResponse = z.infer<typeof PortalMarkReadResponseSchema>;
+
 // ---------------------------------------------------------------------------
 // Profile
 // ---------------------------------------------------------------------------
@@ -409,6 +423,7 @@ export const PortalProfileResponseSchema = z.object({
   alt_phone: z.string().nullable(),
   email: z.string().nullable(),
   address_current: AddressSchema.nullable(),
+  address_permanent: AddressSchema.nullable(),
   pan_masked: z.string().nullable(),
   aadhaar_masked: z.string().nullable(),
   kyc_status: KycStatusSchema,
@@ -424,5 +439,6 @@ export const PortalProfileUpdateSchema = z.strictObject({
   alt_phone: PhoneSchema.optional().nullable(),
   email: EmailSchema.optional().nullable(),
   address_current: AddressSchema.optional().nullable(),
+  address_permanent: AddressSchema.optional().nullable(),
 });
 export type PortalProfileUpdate = z.infer<typeof PortalProfileUpdateSchema>;

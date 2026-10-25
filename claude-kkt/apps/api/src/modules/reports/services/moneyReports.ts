@@ -15,11 +15,11 @@ import type {
 } from "@kkt/contracts";
 import { bankAccounts, blockStages, blocks, bookingOtherCharges, bookings, customers, demands, flats, payments, projects, type Executor } from "@kkt/db";
 import { addDays, ageingBucket, compareDates, diffDays, formatDateLabel, schedulePreview, type TowerStage } from "@kkt/domain";
-import { listPaging, paginate } from "../../../lib/list.js";
+import { paginate } from "../../../lib/list.js";
 import { ensureProjectAccess, scopeFilter, type StaffContext } from "../../../lib/scope.js";
 import { snapshotInstallments } from "../../money/common.js";
 import { PAYMENT_SELECT, paymentJoins, toPaymentRow, type PaymentSelect } from "../../money/services/views.js";
-import { groupBy, monthKey, percentOf, sumBy, today as todayDate, weekStart } from "../common.js";
+import { groupBy, monthKey, percentOf, reportPaging, sumBy, today as todayDate, weekStart } from "../common.js";
 
 type Scope = Pick<StaffContext, "companyId" | "allProjects" | "projectIds">;
 
@@ -355,7 +355,7 @@ export async function chequesReport(db: Executor, user: Scope, q: ChequesReportQ
       table: payments, select: { ...PAYMENT_SELECT, instrumentDate: instrumentDateCol }, join: paymentJoins, where,
       search: { columns: [payments.receiptNumber, bookings.bookingNumber, customers.fullName, sql`(${payments.instrument} ->> 'number')`], term: q.search },
       sort: { allowed: { instrument_date: instrumentDateCol as unknown as typeof payments.paymentDate, payment_date: payments.paymentDate, amount_paise: payments.amountPaise, customer_name: customers.fullName, receipt_number: payments.receiptNumber }, default: q.status === "PENDING" ? "instrument_date" : "-payment_date", requested: q.sort },
-      ...listPaging(q),
+      ...reportPaging(q),
     }),
     db.select({ n: sql<number>`count(*)::int`, amount: sql<string>`coalesce(sum(${payments.amountPaise}), 0)` }).from(payments).where(where),
   ]);

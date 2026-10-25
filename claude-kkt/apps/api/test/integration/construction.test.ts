@@ -17,9 +17,11 @@ type Photo = { id: string; block_stage_id: string; document_id: string; caption:
 type Stage = { id: string; stage_id: string; sort_order: number; name: string; is_possession: boolean; status: string; started_on: string | null; completed_on: string | null; completed_by: string | null; completed_by_name: string | null; completed_at: string | null; notes: string | null; photos: Photo[]; demands_raised: number; can_undo: boolean };
 type Construction = { block_id: string; block_name: string; project_id: string; construction_percent: number; current_stage_id: string | null; next_stage_id: string | null; stages: Stage[]; version: number };
 type StatusResponse = { block_id: string; completed_stage_ids: string[]; demands_raised: number; demand_numbers: string[]; buyers_notified: number; construction_percent: number; version: number };
-type UndoResponse = { block_id: string; stage_id: string; voided_demand_numbers: string[]; withdrawn_notifications: number; construction_percent: number; version: number };
+type UndoResponse = { block_id: string; stage_id: string; voided_demand_numbers: string[]; undemanded_charge_numbers?: string[]; withdrawn_notifications: number; construction_percent: number; version: number };
 type Demand = { id: string; demand_number: string; installment_seq: number; status: string; paid_paise: number; cash_demand_paise: number; account_demand_paise: number; demand_date: string; trigger_stage_id: string | null };
-type Booking = { id: string; version: number; status: string; summary: { total_due_paise: number; cash: { due_paise: number }; account: { due_paise: number } } };
+type OtherCharge = { id: string; name: string; demand_number: string | null; demanded_at: string | null; due_date: string | null; paid_paise: number; due_paise: number };
+type Booking = { id: string; version: number; status: string; summary: { total_due_paise: number; other_charges_due_paise: number; cash: { due_paise: number; order_raised_paise: number }; account: { due_paise: number; order_raised_paise: number } }; other_charges: OtherCharge[] };
+type LedgerRow = { seq: number; event: string; ref_number: string | null; other_charges_due_paise: number };
 type List<T> = { items: T[]; total: number };
 type Notification = { recipient_type: string; recipient_id: string; type: string; is_read: boolean; is_withdrawn: boolean };
 
@@ -537,5 +539,205 @@ describe("mark-in-progress, repeat completion, photo-triggered bells, summaries"
     expect(web!.stages.find((s) => s.name === "Plinth")!.photos.map((p) => p.caption)).toEqual(["Site office view"]);
     expect(web!.stages.find((s) => s.name === "Foundation")!.photos).toHaveLength(1);
     expect(await blockStageTimeline(t.app.db, NO_ID)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Adversarial review: ordering, concurrency, display-only %, undo twice
+// ---------------------------------------------------------------------------
+
+describe("adversarial: date ordering, concurrent updates, display-only percent, undo twice", () => {
+  it("intermediate dates must be non-decreasing along the stage sequence (400 VALIDATION_ERROR); the reached stage's own entry must equal completed_on; nothing is written", async () => {
+    const before = await demandCount();
+    const version = await versionOf();
+    // 4th Slab follows 3rd Slab but is dated earlier
+    const outOfOrder = await status({ stage_id: w.stages["Top Slab"], completed_on: today, intermediate_dates: { [w.stages["3rd Slab"]]: addDays(today, -1), [w.stages["4th Slab"]]: addDays(today, -3) } });
+    expect(outOfOrder.status, outOfOrder.text).toBe(400);
+    expect(outOfOrder.body.error.code).toBe("VALIDATION_ERROR");
+    // an undated stage inherits the next dated stage's date, so an earlier stage dated after it is out of order too
+    const inherited = await status({ stage_id: w.stages["Top Slab"], completed_on: today, intermediate_dates: { [w.stages["2nd Slab"]]: today, [w.stages["4th Slab"]]: addDays(today, -2) } });
+    expect(inherited.status, inherited.text).toBe(400);
+    const targetMismatch = await status({ stage_id: w.stages["Top Slab"], completed_on: today, intermediate_dates: { [w.stages["Top Slab"]]: addDays(today, -1) } });
+    expect(targetMismatch.status, targetMismatch.text).toBe(400);
+    // a well-ordered sequence (equal dates allowed) is fine – checked by the possession jump below; here the state is untouched
+    expect(await demandCount()).toBe(before);
+    const c = await construction(w.sgh.towerId);
+    expect(c.version).toBe(version);
+    expect(c.construction_percent).toBe(28.57);
+    expect(c.stages.filter((s) => s.status === "COMPLETED")).toHaveLength(4);
+  });
+
+  it("two concurrent status updates with the same version: exactly one completes the stage and raises dues, the other is 409 VERSION_CONFLICT; a tampered display % never changes what money raises", async () => {
+    const before = await demandCount();
+    const version = await versionOf();
+    await t.app.sql`update blocks set construction_percent = 99 where id = ${w.sgh.towerId}`; // display-only figure; dues come from the stage records
+    const body = { stage_id: w.stages["2nd Slab"], completed_on: today };
+    const [a, b] = await Promise.all([status(body, { version }), status(body, { version })]);
+    const ok = [a, b].filter((r) => r.status === 200);
+    const conflict = [a, b].filter((r) => r.status === 409);
+    expect(ok, `${a.status} ${a.text} / ${b.status} ${b.text}`).toHaveLength(1);
+    expect(conflict).toHaveLength(1);
+    expect(conflict[0]!.body.error.code).toBe("VERSION_CONFLICT");
+    expect(ok[0]!.body.demands_raised).toBe(2);
+    expect(ok[0]!.body.construction_percent).toBe(35.71);
+    expect(await demandCount()).toBe(before + 2);
+    const slab2 = await stageOf("2nd Slab");
+    expect(slab2).toMatchObject({ status: "COMPLETED", completed_on: today, demands_raised: 2, can_undo: true });
+    expect(await auditRows("block_stage.complete", slab2.id)).toBe(1);
+    for (const bk of [b1, b2]) {
+      const live = (await demandsOf(bk.id)).filter((d) => d.installment_seq === 6 && d.status !== "VOID");
+      expect(live).toHaveLength(1);
+      expect(live[0]).toMatchObject({ cash_demand_paise: 6 * L, account_demand_paise: 4 * L, demand_date: today, trigger_stage_id: w.stages["2nd Slab"] });
+    }
+    const c = await construction(w.sgh.towerId);
+    expect(c.construction_percent).toBe(35.71);
+    expect(c.version).toBe(version + 1);
+  });
+
+  it("undo twice: the second undo of the same stage is 422 STAGE_NOT_COMPLETED (409 VERSION_CONFLICT with the stale version); demands are voided once and the undo audited once", async () => {
+    const slab2 = await stageOf("2nd Slab");
+    const version = await versionOf();
+    const r = await undo(w.stages["2nd Slab"], "Slab certification still pending", { version });
+    expect(r.status, r.text).toBe(200);
+    expect(r.body.voided_demand_numbers).toHaveLength(2);
+    expect(r.body.construction_percent).toBe(28.57);
+    const stale = await undo(w.stages["2nd Slab"], "Slab certification still pending", { version });
+    expect(stale.status).toBe(409);
+    expect(stale.body.error.code).toBe("VERSION_CONFLICT");
+    const again = await undo(w.stages["2nd Slab"], "Slab certification still pending");
+    expect(again.status).toBe(422);
+    expect(again.body.error.details?.["rule"]).toBe("STAGE_NOT_COMPLETED");
+    for (const bk of [b1, b2]) {
+      const seq6 = (await demandsOf(bk.id)).filter((d) => d.installment_seq === 6);
+      expect(seq6).toHaveLength(1);
+      expect(seq6[0]!.status).toBe("VOID");
+    }
+    expect(await auditRows("construction.undo", slab2.id)).toBe(1);
+    expect((await stageOf("2nd Slab"))).toMatchObject({ status: "PENDING", completed_on: null, demands_raised: 0, can_undo: false });
+    expect((await stageOf("1st Slab")).can_undo).toBe(true);
+    // put the tower back for the possession scenario below
+    const re = await status({ stage_id: w.stages["2nd Slab"], completed_on: today });
+    expect(re.status, re.text).toBe(200);
+    expect(re.body.demands_raised).toBe(2);
+  });
+});
+
+describe("possession stage: ON_POSSESSION installments and on-possession other charges (money engine) and their undo", () => {
+  let registryLine: OtherCharge;
+  const remaining = ["3rd Slab", "4th Slab", "Top Slab", "Brickwork", "Plastering", "Flooring", "Finishing", "External Development", "Possession"] as const;
+
+  it("an ON_POSSESSION other charge added to a booking stays undemanded until the possession stage completes", async () => {
+    const type = await t.request<{ id: string }>("POST", "/api/v1/masters/charge-types", { token: admin, body: { name: "Registry & Stamp Duty", code: "REGISTRY", default_amount_paise: 25 * L, demand_at: "ON_POSSESSION" } });
+    expect(type.status, type.text).toBe(201);
+    const bk = await booking(b2.id);
+    const r = await t.request<Booking>("POST", `/api/v1/bookings/${b2.id}/other-charges`, { token: admin, headers: { "if-match": `"${bk.version}"`, "idempotency-key": key() }, body: { charge_type_id: type.body.id, amount_paise: 25 * L, gst_percent: 0, demand_at: "ON_POSSESSION" } });
+    expect(r.status, r.text).toBe(201);
+    registryLine = r.body.other_charges.find((c) => c.name === "Registry & Stamp Duty")!;
+    expect(registryLine).toBeDefined();
+    expect(registryLine.demand_number).toBeNull();
+    expect(r.body.summary.other_charges_due_paise).toBe(0);
+  });
+
+  it("jumping to Possession completes every remaining stage in order, raises the remaining installments including ON_POSSESSION (attributed to the possession stage) and demands the on-possession charge", async () => {
+    const before = await demandCount();
+    const r = await status({ stage_id: w.stages.Possession, completed_on: today, intermediate_dates: { [w.stages["3rd Slab"]]: addDays(today, -1), [w.stages["Top Slab"]]: today } });
+    expect(r.status, r.text).toBe(200);
+    expect(r.body.completed_stage_ids).toEqual(remaining.map((n) => w.stages[n]));
+    expect(r.body.demands_raised).toBe(10); // seq 7–11 × 2 bookings
+    expect(r.body.construction_percent).toBe(100);
+    expect(await demandCount()).toBe(before + 10);
+    for (const bk of [b1, b2]) {
+      const live = (await demandsOf(bk.id)).filter((d) => d.status !== "VOID");
+      expect(live.map((d) => d.installment_seq).sort((x, y) => x - y)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+      const possession = live.find((d) => d.installment_seq === 11)!;
+      expect(possession).toMatchObject({ cash_demand_paise: 3 * L, account_demand_paise: 2 * L, demand_date: today, trigger_stage_id: w.stages.Possession, status: "OPEN" });
+      expect(live.reduce((a, d) => a + d.cash_demand_paise, 0)).toBe(60 * L);
+      expect(live.reduce((a, d) => a + d.account_demand_paise, 0)).toBe(40 * L);
+      const summary = (await booking(bk.id)).summary;
+      expect(summary.cash.order_raised_paise).toBe(60 * L);
+      expect(summary.account.order_raised_paise).toBe(40 * L);
+    }
+    const c = await construction(w.sgh.towerId);
+    const byName = new Map(c.stages.map((s) => [s.name, s]));
+    expect(byName.get("3rd Slab")!.completed_on).toBe(addDays(today, -1));
+    expect(byName.get("4th Slab")!.completed_on).toBe(today); // undated → the next dated stage's date
+    expect(byName.get("Possession")).toMatchObject({ status: "COMPLETED", is_possession: true, completed_on: today, demands_raised: 2, can_undo: true });
+    expect(byName.get("Plastering")!.demands_raised).toBe(0); // no installment on it
+    expect(c.current_stage_id).toBe(w.stages.Possession);
+    expect(c.next_stage_id).toBeNull();
+    expect(c.stages.every((s) => s.status === "COMPLETED")).toBe(true);
+    // money demanded the on-possession charge of b2 (b1 has none)
+    const bk2 = await booking(b2.id);
+    registryLine = bk2.other_charges.find((x) => x.id === registryLine.id)!;
+    expect(registryLine.demand_number).toMatch(/^DM-/);
+    expect(registryLine.demanded_at).toBeTruthy();
+    expect(bk2.summary.other_charges_due_paise).toBe(25 * L);
+    expect((await booking(b1.id)).summary.other_charges_due_paise).toBe(0);
+  });
+
+  it("undo Possession voids the ON_POSSESSION demands (resolved through the possession stage), un-demands the on-possession charge, rebuilds the ledger and withdraws bells; undoing again is 422", async () => {
+    const possession = await stageOf("Possession");
+    const voidedNumbers = (await Promise.all([b1, b2].map(async (bk) => (await demandsOf(bk.id)).find((d) => d.installment_seq === 11 && d.status !== "VOID")!.demand_number))).sort();
+    const r = await undo(w.stages.Possession, "Occupancy certificate not yet received", { token: paSgh });
+    expect(r.status, r.text).toBe(200);
+    expect([...r.body.voided_demand_numbers].sort()).toEqual(voidedNumbers);
+    expect(r.body.undemanded_charge_numbers).toEqual([registryLine.demand_number]);
+    expect(r.body.construction_percent).toBe(92.86);
+    for (const bk of [b1, b2]) {
+      const ds = await demandsOf(bk.id);
+      expect(ds.filter((d) => d.installment_seq === 11).every((d) => d.status === "VOID")).toBe(true);
+      expect(ds.filter((d) => d.status !== "VOID")).toHaveLength(10);
+      const summary = (await booking(bk.id)).summary;
+      expect(summary.cash.order_raised_paise).toBe(57 * L);
+      expect(summary.account.order_raised_paise).toBe(38 * L);
+    }
+    const bk2 = await booking(b2.id);
+    const line = bk2.other_charges.find((x) => x.id === registryLine.id)!;
+    expect(line).toMatchObject({ demand_number: null, demanded_at: null, due_date: null, paid_paise: 0 });
+    expect(bk2.summary.other_charges_due_paise).toBe(0);
+    const ledger = await t.request<List<LedgerRow>>("GET", `/api/v1/bookings/${b2.id}/ledger?page_size=200`, { token: admin });
+    expect(ledger.status, ledger.text).toBe(200);
+    expect(ledger.body.items.filter((row) => row.event === "OTHER_CHARGE_DEMAND")).toHaveLength(0);
+    expect(ledger.body.items.filter((row) => row.ref_number !== null && voidedNumbers.includes(row.ref_number))).toHaveLength(0);
+    expect(ledger.body.items[ledger.body.items.length - 1]!.other_charges_due_paise).toBe(0);
+    expect(await auditRows("other_charge.undemand", registryLine.id)).toBe(1);
+    expect(await auditRows("construction.undo", possession.id)).toBe(1);
+    const c = await construction(w.sgh.towerId);
+    const byName = new Map(c.stages.map((s) => [s.name, s]));
+    expect(byName.get("Possession")).toMatchObject({ status: "PENDING", completed_on: null, completed_by: null, demands_raised: 0, can_undo: false });
+    expect(byName.get("External Development")!.can_undo).toBe(true);
+    expect(c.current_stage_id).toBe(w.stages["External Development"]);
+    expect(c.next_stage_id).toBe(w.stages.Possession);
+    expect((await notificationsFor(possession.id)).filter((n) => !n.is_withdrawn)).toHaveLength(0);
+    const again = await undo(w.stages.Possession, "Occupancy certificate not yet received");
+    expect(again.status).toBe(422);
+    expect(again.body.error.details?.["rule"]).toBe("STAGE_NOT_COMPLETED");
+  });
+
+  it("once the on-possession charge has been paid, undoing Possession is blocked (409 UNDO_BLOCKED naming the charge) and nothing changes", async () => {
+    const re = await status({ stage_id: w.stages.Possession, completed_on: today });
+    expect(re.status, re.text).toBe(200);
+    expect(re.body.demands_raised).toBe(2);
+    const bk2 = await booking(b2.id);
+    const line = bk2.other_charges.find((x) => x.id === registryLine.id)!;
+    expect(line.demand_number).toMatch(/^DM-/);
+    expect(bk2.summary.other_charges_due_paise).toBe(25 * L);
+    const pay = await t.request<{ payment: { receipt_number: string; status: string } } & ErrorBody>("POST", "/api/v1/payments", {
+      token: accounts, headers: { "idempotency-key": key() },
+      body: { booking_id: b2.id, against: "OTHER_CHARGE", other_charge_id: line.id, amount_paise: 25 * L, payment_date: today, payment_mode_id: w.upiModeId, instrument: { number: "UPI-REG-1" }, bank_account_id: w.bankAccountId },
+    });
+    expect(pay.status, pay.text).toBe(201);
+    expect(pay.body.payment.status).toBe("CLEARED");
+    const blocked = await undo(w.stages.Possession, "Trying to roll back after the registry collection");
+    expect(blocked.status).toBe(409);
+    expect(blocked.body.error.code).toBe("UNDO_BLOCKED");
+    const details = blocked.body.error.details as { reasons: string[] };
+    expect(details.reasons.some((x) => x.includes(line.demand_number!))).toBe(true);
+    // untouched
+    expect((await stageOf("Possession")).status).toBe("COMPLETED");
+    for (const bk of [b1, b2]) expect((await demandsOf(bk.id)).filter((d) => d.installment_seq === 11 && d.status !== "VOID")).toHaveLength(1);
+    const after = await booking(b2.id);
+    expect(after.other_charges.find((x) => x.id === registryLine.id)).toMatchObject({ demand_number: line.demand_number, paid_paise: 25 * L, due_paise: 0 });
+    expect((await construction(w.sgh.towerId)).construction_percent).toBe(100);
   });
 });

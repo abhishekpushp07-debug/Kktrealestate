@@ -25,6 +25,8 @@ export interface PdfLetterhead {
   contactLine?: string | null;
   /** PNG or JPEG bytes (pdfkit cannot embed webp/svg); anything else is ignored. */
   logo?: Buffer | null;
+  signatoryName?: string | null;
+  signatoryTitle?: string | null;
 }
 
 /** Options of a document. */
@@ -450,6 +452,8 @@ export class BrandedPdf {
     const generated = `Generated ${pdfDateTimeIST(this.opts.generatedAt ?? new Date())} · ${this.opts.letterhead.name}`;
     for (let i = range.start; i < range.start + range.count; i += 1) {
       d.switchToPage(i);
+      // the footer sits inside the bottom margin: lift the margin so the line wrapper never starts a new page while stamping it
+      d.page.margins.bottom = 0;
       const y = this.pageHeight - MARGIN - 12;
       d.moveTo(MARGIN, y - 4).lineTo(this.pageWidth - MARGIN, y - 4).lineWidth(0.6).strokeColor(PDF_THEME.gold).stroke();
       d.font(this.fontRegular).fontSize(7.5).fillColor(PDF_THEME.muted);

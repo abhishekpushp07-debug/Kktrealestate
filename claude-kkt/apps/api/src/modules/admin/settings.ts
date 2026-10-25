@@ -4,8 +4,8 @@
  */
 import { and, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
-import { CompanySettingsResponseSchema, CompanySettingsUpdateSchema, type AdminNumberingPreview, type CompanySettingsResponse, type CompanySettingsUpdate } from "@kkt/contracts";
-import { companies, documents, sequences, type Executor, type Numbering } from "@kkt/db";
+import { CompanyNumberingSchema, CompanySettingsPatchSchema, CompanySettingsResponseSchema, CompanySettingsValuesSchema, type AdminNumberingPreview, type CompanySettingsPatch, type CompanySettingsResponse } from "@kkt/contracts";
+import { companies, documents, sequences, type CompanySettings, type Executor, type Numbering } from "@kkt/db";
 import { DEFAULT_NUMBER_PATTERN, financialYear, formatNumber, todayIST } from "@kkt/domain";
 import { config } from "../../config.js";
 import { writeAudit } from "../../lib/audit.js";
@@ -76,8 +76,8 @@ export async function loadSettings(db: Executor, companyId: string): Promise<Com
   return toSettingsResponse(c, await numberingPreview(db, c));
 }
 
-/** Maps the wire update onto company columns (only keys that were sent). */
-function changesOf(body: Partial<CompanySettingsUpdate>): Record<string, unknown> {
+/** Maps the wire update onto company columns (only keys that were sent); numbering/settings are merged onto the stored row by mergeJson(). */
+function changesOf(body: Partial<CompanySettingsPatch>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   if (body.name !== undefined) out["name"] = body.name;
   if (body.legal_name !== undefined) out["legalName"] = body.legal_name;
@@ -88,8 +88,51 @@ function changesOf(body: Partial<CompanySettingsUpdate>): Record<string, unknown
   if (body.logo_document_id !== undefined) out["logoDocumentId"] = body.logo_document_id;
   if (body.letterhead !== undefined) out["letterhead"] = body.letterhead;
   if (body.fy_start_month !== undefined) out["fyStartMonth"] = body.fy_start_month;
-  if (body.numbering !== undefined) out["numbering"] = body.numbering;
-  if (body.settings !== undefined) out["settings"] = body.settings;
+  return out;
+}
+
+/** 400 VALIDATION_ERROR with the Zod issues under `details.issues` (same shape as the request validator). */
+function invalid(prefix: string, issues: { path: PropertyKey[]; message: string }[]): ApiError {
+  const list = issues.map((i) => ({ path: [prefix, ...i.path.map(String)].join("."), message: i.message }));
+  return ApiError.badRequest(list.map((i) => `${i.path}: ${i.message}`).join("; "), { issues: list });
+}
+
+/**
+ * Merges a partial `numbering` / `settings` patch onto the stored jsonb and validates the result against the complete strict schema, so a
+ * patch of one SLA value never resets force_mfa_for_admins (or anything else) to a default, and the stored document is always complete.
+ * Every numbering pattern is additionally rendered once with the engine: a pattern the engine cannot format must never be stored
+ * (it would turn every create and GET /settings/company into a 500).
+ */
+export function mergeJson(current: Pick<CompanyRow, "numbering" | "settings">, body: Pick<CompanySettingsPatch, "numbering" | "settings">): { numbering?: Numbering; settings?: CompanySettings } {
+  const out: { numbering?: Numbering; settings?: CompanySettings } = {};
+  if (body.numbering !== undefined) {
+    const merged: Record<string, unknown> = { ...current.numbering };
+    for (const [scope, cfg] of Object.entries(body.numbering)) if (cfg !== undefined) merged[scope] = cfg;
+    const parsed = CompanyNumberingSchema.safeParse(merged);
+    if (!parsed.success) throw invalid("numbering", parsed.error.issues);
+    for (const { scope, fallback } of SCOPES) {
+      const cfg = parsed.data[scope];
+      try {
+        formatNumber(cfg.prefix || fallback, "2526", 1, cfg.format ?? DEFAULT_NUMBER_PATTERN);
+      } catch (err) {
+        throw invalid("numbering", [{ path: [scope, "format"], message: err instanceof Error ? err.message : "Invalid number pattern" }]);
+      }
+    }
+    out.numbering = parsed.data as Numbering;
+  }
+  if (body.settings !== undefined) {
+    const { sla_hours, ...rest } = body.settings;
+    const merged: Record<string, unknown> = { ...current.settings };
+    for (const [k, v] of Object.entries(rest)) if (v !== undefined) merged[k] = v;
+    if (sla_hours !== undefined) {
+      const sla: Record<string, unknown> = { ...current.settings.sla_hours };
+      for (const [k, v] of Object.entries(sla_hours)) if (v !== undefined) sla[k] = v;
+      merged["sla_hours"] = sla;
+    }
+    const parsed = CompanySettingsValuesSchema.safeParse(merged);
+    if (!parsed.success) throw invalid("settings", parsed.error.issues);
+    out.settings = parsed.data as CompanySettings;
+  }
   return out;
 }
 
@@ -101,7 +144,7 @@ function snapshot(c: CompanyRow, keys: string[]): Record<string, unknown> {
   return out;
 }
 
-const UpdateBody = withOptionalVersion(CompanySettingsUpdateSchema);
+const UpdateBody = withOptionalVersion(CompanySettingsPatchSchema);
 
 /** GET/PATCH /settings/company. */
 export function registerSettingsRoutes(app: FastifyInstance): void {
@@ -113,17 +156,20 @@ export function registerSettingsRoutes(app: FastifyInstance): void {
 
   route(app, {
     method: "PATCH", url: "/settings/company", permission: "settings.manage",
-    schema: { body: UpdateBody, response: { 200: CompanySettingsResponseSchema }, summary: "Update company settings (version via body or If-Match; audited; company cache invalidated)", tags: ["settings"] },
+    schema: { body: UpdateBody, response: { 200: CompanySettingsResponseSchema }, summary: "Update company settings (partial: numbering scopes and settings keys merge onto the stored values; version via body or If-Match; audited; company cache invalidated)", tags: ["settings"] },
     handler: async (req) => {
       const user = staff(req);
-      const body = req.body as CompanySettingsUpdate;
+      const body = req.body as CompanySettingsPatch;
       const version = expectedVersion(req, body);
       const changes = changesOf(body);
-      if (Object.keys(changes).length === 0) throw ApiError.badRequest("Nothing to update");
+      if (Object.keys(changes).length === 0 && body.numbering === undefined && body.settings === undefined) throw ApiError.badRequest("Nothing to update");
       const meta = adminMeta(req);
       const result = await app.db.transaction(async (tx) => {
         const [before] = await tx.select().from(companies).where(eq(companies.id, user.companyId)).limit(1).for("update");
         if (!before) throw ApiError.notFound("Company");
+        const merged = mergeJson(before, body);
+        if (merged.numbering) changes["numbering"] = merged.numbering;
+        if (merged.settings) changes["settings"] = merged.settings;
         if (typeof changes["logoDocumentId"] === "string") {
           const [doc] = await tx.select({ id: documents.id }).from(documents).where(and(eq(documents.id, changes["logoDocumentId"]), eq(documents.companyId, user.companyId), eq(documents.isDeleted, false))).limit(1);
           if (!doc) throw ApiError.badRequest("logo_document_id does not refer to a live document of this company", { issues: [{ path: "logo_document_id", message: "Unknown document" }] });

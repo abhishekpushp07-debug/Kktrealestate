@@ -4,10 +4,11 @@
  */
 import { eq, sql, type SQL } from "drizzle-orm";
 import type { FastifyReply } from "fastify";
-import type { ReportFormat } from "@kkt/contracts";
+import type { ListQuery, ReportFormat } from "@kkt/contracts";
 import { companies, type Executor } from "@kkt/db";
 import { addDays, dateParts, dayOfWeek, formatDateLabel, makeDateString, todayIST } from "@kkt/domain";
 import { sendCsv, type CsvColumn } from "../../lib/csv.js";
+import { listPaging } from "../../lib/list.js";
 import type { StaffContext } from "../../lib/scope.js";
 import { streamDocument } from "../documents/service.js";
 import { isPngOrJpeg, type PdfLetterhead } from "./services/pdf.js";
@@ -94,7 +95,7 @@ export async function letterheadFor(db: Executor, companyId: string, extra: { re
       logo = null; // a missing or unreadable logo never blocks a document
     }
   }
-  return { name: c.name, legalName: c.legalName, tagline: lh.tagline ?? null, addressLine, gstin: c.gstin, reraLine: extra.reraLine ?? null, contactLine: contact || null, logo };
+  return { name: c.name, legalName: c.legalName, tagline: lh.tagline ?? null, addressLine, gstin: c.gstin, reraLine: extra.reraLine ?? null, contactLine: contact || null, logo, signatoryName: lh.signatory_name ?? null, signatoryTitle: lh.signatory_title ?? null };
 }
 
 /** Sends PDF bytes as an attachment. */
@@ -105,6 +106,12 @@ export function sendPdf(reply: FastifyReply, filename: string, bytes: Buffer): F
   reply.header("Content-Length", String(bytes.length));
   reply.header("Cache-Control", "no-store");
   return reply.send(bytes);
+}
+
+/** Paging for a paged report: normal paging for JSON, every row (capped) for csv/pdf exports. */
+export function reportPaging(q: Omit<ListQuery, "format"> & ExportQuery): ReturnType<typeof listPaging> {
+  const { format: _f, export: _e, ...rest } = q;
+  return listPaging({ ...rest, ...(wantedFormat(q) === "json" ? {} : { format: "csv" as const }) });
 }
 
 /** CSV columns from a key list (header = key). */

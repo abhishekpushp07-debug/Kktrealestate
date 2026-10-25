@@ -8,9 +8,9 @@ import type {
   ActivityReportQuery, ActivityReportResponse, ActivityReportRow, InventoryReportQuery, InventoryReportResponse, LeadSource, LeadStage, SalesFunnelQuery, SalesFunnelResponse, VisitStatus,
 } from "@kkt/contracts";
 import { auditLogs, blocks, bookings, brochureDownloads, enquiries, flatTypes, flats, leadActivities, leads, loginEvents, projects, rateCardRates, rateCards, siteVisits, users, type Executor } from "@kkt/db";
-import { listPaging, paginate } from "../../../lib/list.js";
+import { paginate } from "../../../lib/list.js";
 import { ensureProjectAccess, scopeFilter, type StaffContext } from "../../../lib/scope.js";
-import { lastMonths, monthKey, percentOf, scopeSql, today as todayDate } from "../common.js";
+import { lastMonths, monthKey, percentOf, reportPaging, scopeSql, today as todayDate } from "../common.js";
 
 type Scope = Pick<StaffContext, "companyId" | "allProjects" | "projectIds">;
 
@@ -246,7 +246,7 @@ export async function activityReport(db: Executor, user: Scope, q: ActivityRepor
     ]);
     const r = await paginate<typeof auditLogs.$inferSelect>(db, {
       table: auditLogs, where, search: { columns: [auditLogs.action, auditLogs.actorName, auditLogs.entityType], term: q.search },
-      sort: { allowed: { created_at: auditLogs.createdAt, action: auditLogs.action, entity_type: auditLogs.entityType, actor_name: auditLogs.actorName }, default: "-created_at", requested: q.sort }, ...listPaging(q),
+      sort: { allowed: { created_at: auditLogs.createdAt, action: auditLogs.action, entity_type: auditLogs.entityType, actor_name: auditLogs.actorName }, default: "-created_at", requested: q.sort }, ...reportPaging(q),
     });
     const items: ActivityReportRow[] = r.items.map((a) => ({ at: a.createdAt.toISOString(), kind: "AUDIT", actor_type: a.actorType, actor_name: a.actorName, identifier: null, action: a.action, entity_type: a.entityType, entity_id: a.entityId, ip: a.ip, reason: null }));
     return { ...r, items };
@@ -263,7 +263,7 @@ export async function activityReport(db: Executor, user: Scope, q: ActivityRepor
   ]);
   const r = await paginate<typeof loginEvents.$inferSelect>(db, {
     table: loginEvents, where, search: { columns: [loginEvents.identifier, loginEvents.ip, loginEvents.reason], term: q.search },
-    sort: { allowed: { created_at: loginEvents.createdAt, identifier: loginEvents.identifier }, default: "-created_at", requested: q.sort }, ...listPaging(q),
+    sort: { allowed: { created_at: loginEvents.createdAt, identifier: loginEvents.identifier }, default: "-created_at", requested: q.sort }, ...reportPaging(q),
   });
   const items: ActivityReportRow[] = r.items.map((l) => ({
     at: l.createdAt.toISOString(), kind: success ? "LOGIN" : "FAILED_LOGIN", actor_type: l.subjectType === "CUSTOMER" ? "CUSTOMER" : "STAFF", actor_name: null, identifier: l.identifier,
