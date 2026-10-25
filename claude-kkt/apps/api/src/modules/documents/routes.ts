@@ -8,6 +8,7 @@ import {
 } from "@kkt/contracts";
 import { documents } from "@kkt/db";
 import { actorFromRequest, auditMeta, writeAudit } from "../../lib/audit.js";
+import { sha256 } from "../../lib/crypto.js";
 import { sendCsv } from "../../lib/csv.js";
 import { ApiError } from "../../lib/errors.js";
 import { listPaging, paginate } from "../../lib/list.js";
@@ -47,16 +48,22 @@ function parseUploadMeta(fields: Record<string, unknown>): DocumentUploadMeta {
   return parsed.data;
 }
 
+/** A parsed multipart upload. */
+interface ParsedUpload { buffer: Buffer; filename: string; fields: Record<string, unknown> }
+
+/** Uploads parsed by the preValidation hook, keyed by request (a WeakMap so no request decoration leaks to other modules). */
+const parsedUploads = new WeakMap<FastifyRequest, ParsedUpload>();
+
 /** Reads the single file part and the text fields of a multipart upload (413 when the 15 MB file limit is hit). */
-async function readUpload(req: FastifyRequest): Promise<{ buffer: Buffer; filename: string; fields: Record<string, unknown> }> {
+async function readUpload(req: FastifyRequest): Promise<ParsedUpload> {
   if (!req.isMultipart()) throw ApiError.badRequest("Expected a multipart/form-data upload with a `file` part");
   const fields: Record<string, unknown> = {};
   let file: { buffer: Buffer; filename: string } | null = null;
   try {
     for await (const part of req.parts()) {
       if (part.type === "file") {
-        const buffer = await part.toBuffer();
         if (file) throw ApiError.badRequest("Upload exactly one file per request");
+        const buffer = await part.toBuffer();
         file = { buffer, filename: part.filename || "file" };
       } else {
         fields[part.fieldname] = part.value;
@@ -72,6 +79,13 @@ async function readUpload(req: FastifyRequest): Promise<{ buffer: Buffer; filena
   return { ...file, fields };
 }
 
+/** The upload parsed for this request by the preValidation hook (400 when the request was not multipart). */
+function uploadOf(req: FastifyRequest): ParsedUpload {
+  const parsed = parsedUploads.get(req);
+  if (!parsed) throw ApiError.badRequest("Expected a multipart/form-data upload with a `file` part");
+  return parsed;
+}
+
 /** Loads a live document for a staff caller: 404 when missing, out of project scope, or sensitive and the caller lacks customer.kyc_view (when `hideSensitive`). */
 async function loadForStaff(app: FastifyInstance, user: StaffContext, id: string, opts: { hideSensitive: boolean; forUpdate?: boolean }): Promise<DocumentJoined> {
   const j = await loadJoined(opts.forUpdate ? app.db : app.dbReplica, user.companyId, id, { forUpdate: opts.forUpdate });
@@ -83,6 +97,16 @@ async function loadForStaff(app: FastifyInstance, user: StaffContext, id: string
 
 /** Documents routes: upload, list, meta, update, soft delete, signed link, and the public token stream. */
 export function registerDocumentRoutes(app: FastifyInstance): void {
+  // Multipart bodies are streamed, so Fastify leaves `req.body` empty and the idempotency plugin would hash every upload alike
+  // (same key + different file would replay the first document). Parsing here, before preHandler, and exposing a digest of the
+  // fields and file bytes as `req.body` makes the Idempotency-Key fingerprint cover the actual upload (422 IDEMPOTENCY_MISMATCH).
+  app.addHook("preValidation", async (req) => {
+    if (req.method !== "POST" || !req.routeOptions.url?.endsWith("/documents") || !req.isMultipart()) return;
+    const parsed = await readUpload(req);
+    parsedUploads.set(req, parsed);
+    req.body = { fields: parsed.fields, file: { name: parsed.filename, size: parsed.buffer.length, sha256: sha256(parsed.buffer) } };
+  });
+
   route(app, {
     method: "POST", url: "/documents", permission: "document.write", idempotent: true,
     schema: {
@@ -91,7 +115,7 @@ export function registerDocumentRoutes(app: FastifyInstance): void {
     },
     handler: async (req, reply) => {
       const user = req.user!;
-      const upload = await readUpload(req);
+      const upload = uploadOf(req);
       const meta = parseUploadMeta(upload.fields);
       assertEntityWrite(user, meta.entity_type);
       const view = await app.db.transaction(async (tx) => {
