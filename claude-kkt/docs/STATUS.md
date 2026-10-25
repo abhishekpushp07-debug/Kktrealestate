@@ -24,7 +24,7 @@ _Last updated at the end of the build session (see git log for commit-level deta
 | Demo seed | Built through the real API; zero integrity findings; the ₹1 Cr worked example reproduces all 10 ledger rows to the paise; Tower C = 52 flats with no 13xx/7xx | `apps/api/src/seed`, `docs/SEED.md` |
 | Load test | At 200 connections every list/detail endpoint except the 25-row bookings page meets p95 < 300 ms; at 1,000 zero-think-time connections on the shared 4-vCPU box auth/dashboard/public/search meet it, list endpoints do not (p95 0.5–1.7 s). Before/after tuning tables and the honest assessment are recorded. | `docs/PERFORMANCE.md` |
 | 80-factor audit of the previous implementation | 43,130 / 80,000 (53.9 %) | `docs/AUDIT-80-FACTORS.md` |
-| 80-factor audit of this implementation | see `docs/AUDIT-80-FACTORS-V2.md` | same 80 factors, same method |
+| 80-factor audit of this implementation | **61,365 / 80,000 (76.7 %)** | `docs/AUDIT-80-FACTORS-V2.md` (same 80 factors, same method) |
 
 ## Known open items (honest list)
 * Performance at 1,000 concurrent zero-think-time connections on one 4-vCPU box misses the 300 ms p95 for list endpoints; the design is horizontally scalable (stateless workers, Redis caches, read-replica handle) and real staff load is far lower — see `docs/PERFORMANCE.md`.
