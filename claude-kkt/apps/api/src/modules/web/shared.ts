@@ -203,6 +203,15 @@ export function noStore(reply: FastifyReply): void {
   reply.header("Cache-Control", "no-store");
 }
 
+/**
+ * Files the browser embeds or downloads from another origin (the website, the portal) – images via `<img>`, PDF attachments, .ics.
+ * Helmet's default `Cross-Origin-Resource-Policy: same-origin` makes Chromium block such loads (ERR_BLOCKED_BY_RESPONSE), so these
+ * streams opt in to cross-origin use; JSON routes keep the default and stay protected by the CORS allow-list.
+ */
+export function crossOriginFile(reply: FastifyReply): void {
+  reply.header("Cross-Origin-Resource-Policy", "cross-origin");
+}
+
 /** Request metadata for audit rows written by public routes. */
 export function publicMeta(req: FastifyRequest): { ip: string; requestId: string } {
   return { ip: req.clientIp, requestId: req.id };

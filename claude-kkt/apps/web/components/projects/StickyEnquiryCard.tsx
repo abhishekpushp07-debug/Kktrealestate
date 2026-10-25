@@ -30,7 +30,7 @@ export function StickyEnquiryCard({ projectSlug, projectName, startingPricePaise
         ) : (
           <p className="mb-5">
             <span className="block text-xs uppercase tracking-widest text-ink-soft">Pricing</span>
-            <span className="font-display text-2xl text-navy-900">On request</span>
+            <span className="font-display text-2xl text-navy-900">Price on request</span>
           </p>
         )}
         <EnquiryForm projects={[{ slug: projectSlug, name: projectName }]} defaultProjectSlug={projectSlug} flatTypes={flatTypes} compact />

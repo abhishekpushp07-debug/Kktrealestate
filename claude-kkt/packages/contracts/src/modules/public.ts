@@ -110,6 +110,7 @@ export type PublicPostCard = z.infer<typeof PublicPostCardSchema>;
 
 export const PublicPostDetailSchema = PublicPostCardSchema.extend({
   body_md: z.string(),
+  updated_at: TimestampSchema,
   author_name: z.string().nullable(),
   seo: z.object({ title: z.string().nullable(), description: z.string().nullable(), og_image_url: z.string().nullable() }),
 });
@@ -119,6 +120,7 @@ export const PublicPageSchema = z.object({
   slug: z.string(),
   title: z.string(),
   body_md: z.string(),
+  updated_at: TimestampSchema,
   seo: z.object({ title: z.string().nullable(), description: z.string().nullable() }),
 });
 export type PublicPage = z.infer<typeof PublicPageSchema>;
@@ -195,8 +197,8 @@ export const PublicAvailabilityGridSchema = z.object({
 export type PublicAvailabilityGrid = z.infer<typeof PublicAvailabilityGridSchema>;
 
 export const PublicConfigurationSchema = z.object({
-  /** Flat-type code (apps/web `Configuration.code`). */
-  code: z.string().optional(),
+  /** Flat-type code (master data; tab/anchor id on the website). */
+  code: z.string(),
   name: z.string(),
   bhk: z.number(),
   facing: z.string().nullable(),

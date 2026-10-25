@@ -67,7 +67,7 @@ function asArray<T>(raw: ListEnvelope<T> | T[] | undefined | null): T[] {
 export function useFollowUpsDue(enabled = true): UseQueryResult<LeadRow[], ApiClientError> {
   return useQuery<ListEnvelope<LeadRow> | LeadRow[], ApiClientError, LeadRow[], readonly unknown[]>({
     queryKey: crmKeys.followUpsDue,
-    queryFn: ({ signal }) => api.get<ListEnvelope<LeadRow> | LeadRow[]>(`${LEADS_PATH}/follow-ups/due`, { signal, query: { page_size: 50 } }),
+    queryFn: ({ signal }) => api.get<ListEnvelope<LeadRow> | LeadRow[]>(`${LEADS_PATH}/follow-ups/due`, { signal }),
     select: asArray,
     enabled,
     retry: false,

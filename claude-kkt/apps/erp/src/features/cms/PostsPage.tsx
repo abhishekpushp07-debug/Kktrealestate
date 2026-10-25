@@ -17,7 +17,7 @@ export default function PostsPage() {
   const { can } = useAuth();
   const canWrite = can("cms.write");
   const navigate = useNavigate();
-  const list = useListParams({ filterKeys: POST_FILTERS, defaultSort: "-updated_at" });
+  const list = useListParams({ filterKeys: POST_FILTERS, defaultSort: "-created_at" });
   const query = useList<CmsPostRow>(POSTS_PATH, list.params);
 
   const columns = useMemo<ColumnDef<CmsPostRow, unknown>[]>(
@@ -42,7 +42,7 @@ export default function PostsPage() {
       { id: "tags", header: "Tags", meta: { sortKey: false }, cell: ({ row }) => (row.original.tags.length ? <span className="flex flex-wrap gap-1">{row.original.tags.map((tag) => <Badge key={tag} variant="outline">{tag}</Badge>)}</span> : <span className="text-ink-subtle">—</span>) },
       { accessorKey: "author_name", header: "Author", cell: ({ row }) => row.original.author_name ?? "—" },
       { accessorKey: "published_at", header: "Published", cell: ({ row }) => <span className="money text-ink-muted">{row.original.published_at ? formatDateTime(row.original.published_at) : "—"}</span> },
-      { accessorKey: "updated_at", header: "Updated", meta: { hideOnMobile: true }, cell: ({ row }) => <span className="money text-ink-muted">{formatDateTime(row.original.updated_at)}</span> },
+      { accessorKey: "updated_at", header: "Updated", meta: { hideOnMobile: true, sortKey: false }, cell: ({ row }) => <span className="money text-ink-muted">{formatDateTime(row.original.updated_at)}</span> },
     ],
     [],
   );

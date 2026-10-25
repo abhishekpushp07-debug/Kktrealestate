@@ -81,6 +81,7 @@ export default async function portalModule(app: FastifyInstance): Promise<void> 
       reply.header("Content-Disposition", `${inline ? "inline" : "attachment"}; filename="${asciiName(file.fileName)}"; filename*=UTF-8''${encodeURIComponent(file.fileName)}`);
       reply.header("Cache-Control", `private, max-age=${PORTAL_FILE_TTL_SECONDS}`);
       reply.header("X-Content-Type-Options", "nosniff");
+      reply.header("Cross-Origin-Resource-Policy", "cross-origin"); // <img>/PDF viewers on the portal origin (see web/shared.ts crossOriginFile)
       if (file.size !== null) reply.header("Content-Length", String(file.size));
       return reply.send(file.stream);
     },

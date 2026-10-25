@@ -20,7 +20,7 @@ import { ApiError } from "../../lib/errors.js";
 import { route } from "../../lib/routes.js";
 import { streamDocument } from "../documents/service.js";
 import { latestPosts, loadSiteSettings, publishedPostCondition, type SiteSettingsRecord } from "./cms.js";
-import { IMMUTABLE_CACHE_CONTROL, PUBLIC_CACHE_SECONDS, PUBLIC_CACHE_VERSION_KEY, documentUrls, isPublicDocument, loadDocuments, publicCached, publicCompanyId, publicHeaders, webOrigin, type DocumentRecord } from "./shared.js";
+import { IMMUTABLE_CACHE_CONTROL, PUBLIC_CACHE_SECONDS, PUBLIC_CACHE_VERSION_KEY, crossOriginFile, documentUrls, isPublicDocument, loadDocuments, publicCached, publicCompanyId, publicHeaders, webOrigin, type DocumentRecord } from "./shared.js";
 import { loadVisitSettings } from "./visitService.js";
 
 type DbProject = typeof projects.$inferSelect;
@@ -520,7 +520,7 @@ export function registerPublicContentRoutes(app: FastifyInstance): void {
       const [docs, authors] = await Promise.all([loadDocuments(app.dbReplica, [r.coverDocumentId, r.seo.og_image_document_id]), authorNames(app.dbReplica, [r.authorUserId])]);
       const card = postCard(r, docs, authors);
       const og = r.seo.og_image_document_id ? documentUrls(docs.get(r.seo.og_image_document_id)).medium_url : null;
-      return { ...card, body_md: r.bodyMd, author_name: card.author_name ?? null, seo: { title: r.seo.title ?? r.title, description: r.seo.description ?? r.excerpt ?? null, og_image_url: og ?? card.cover_url } };
+      return { ...card, body_md: r.bodyMd, updated_at: r.updatedAt.toISOString(), author_name: card.author_name ?? null, seo: { title: r.seo.title ?? r.title, description: r.seo.description ?? r.excerpt ?? null, og_image_url: og ?? card.cover_url } };
     }, "Post"),
   });
 
@@ -531,7 +531,7 @@ export function registerPublicContentRoutes(app: FastifyInstance): void {
       const companyId = await companyOr404(app);
       const [r] = await app.dbReplica.select().from(cmsPages).where(and(eq(cmsPages.companyId, companyId), eq(cmsPages.slug, req.params.slug), eq(cmsPages.isPublished, true))).limit(1);
       if (!r) return null;
-      return { slug: r.slug, title: r.title, body_md: r.bodyMd, seo: { title: r.seo.title ?? r.title, description: r.seo.description ?? null } };
+      return { slug: r.slug, title: r.title, body_md: r.bodyMd, updated_at: r.updatedAt.toISOString(), seo: { title: r.seo.title ?? r.title, description: r.seo.description ?? null } };
     }, "Page"),
   });
 
@@ -581,6 +581,7 @@ export function registerPublicContentRoutes(app: FastifyInstance): void {
       reply.header("Content-Type", file.mime);
       reply.header("Content-Disposition", "inline");
       reply.header("Cache-Control", IMMUTABLE_CACHE_CONTROL);
+      crossOriginFile(reply);
       reply.header("X-Content-Type-Options", "nosniff");
       if (file.size !== null) reply.header("Content-Length", String(file.size));
       return reply.send(file.stream);

@@ -19,7 +19,7 @@ interface HeroProps {
 export function Hero({ banners, brandName, tagline, intervalMs = 6500 }: HeroProps) {
   const slides: Banner[] = banners.length
     ? banners
-    : [{ title: tagline ?? `Homes crafted for generations`, subtitle: `Discover the latest residences by ${brandName}.`, cta_label: "Explore projects", cta_url: "/projects", image_url: "" }];
+    : [{ title: tagline ?? `Homes crafted for generations`, subtitle: `Discover the latest residences by ${brandName}.`, cta_label: "Explore projects", cta_url: "/projects", image_url: "", image_medium_url: null }];
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
   const reduced = usePrefersReducedMotion();

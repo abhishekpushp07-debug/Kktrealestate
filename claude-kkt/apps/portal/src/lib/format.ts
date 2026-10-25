@@ -46,6 +46,15 @@ export function formatPercent(value: number): string {
 }
 
 /** Square feet: 1234.5 → "1,234.5 sq ft". */
+/** Floor label for display: bare numbers read as "Floor 8"; named floors ("Ground", "G", "Villa") pass through. */
+export function formatFloor(label: string | null | undefined): string {
+  const v = (label ?? "").trim();
+  if (!v) return "";
+  if (/^\d+$/.test(v)) return `Floor ${v}`;
+  if (/^-\d+$/.test(v)) return `Basement ${v.slice(1)}`;
+  return v;
+}
+
 export function formatSqft(value: number): string {
   return `${value.toLocaleString("en-IN", { maximumFractionDigits: 2 })} sq ft`;
 }

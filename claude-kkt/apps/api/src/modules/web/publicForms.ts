@@ -18,7 +18,7 @@ import { createEnquiry, createOrTouchLead } from "../crm/leadService.js";
 import { streamDocument } from "../documents/service.js";
 import { notify, notifyRole } from "../notifications/service.js";
 import { livePublishedProject } from "./publicContent.js";
-import { RelaxedHoneypotSchema, WEBSITE_ACTOR, apiOrigin, fakeNumber, isHoneypotTripped, loadDocuments, noStore, publicCompanyId, publicMeta, relaxHoneypot, userAgent } from "./shared.js";
+import { RelaxedHoneypotSchema, WEBSITE_ACTOR, apiOrigin, crossOriginFile, fakeNumber, isHoneypotTripped, loadDocuments, noStore, publicCompanyId, publicMeta, relaxHoneypot, userAgent } from "./shared.js";
 
 /** 5 requests per minute per IP on every public form (SPEC §2). */
 export const FORM_RATE_LIMIT = { limit: 5, windowSeconds: 60 } as const;
@@ -212,6 +212,7 @@ export function registerPublicFormRoutes(app: FastifyInstance): void {
       reply.header("Content-Disposition", `attachment; filename="${file.fileName.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "_")}"; filename*=UTF-8''${encodeURIComponent(file.fileName)}`);
       reply.header("Cache-Control", "private, no-store");
       reply.header("X-Content-Type-Options", "nosniff");
+      crossOriginFile(reply);
       if (file.size !== null) reply.header("Content-Length", String(file.size));
       return reply.send(file.stream);
     },

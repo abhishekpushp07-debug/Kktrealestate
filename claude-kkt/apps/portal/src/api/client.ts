@@ -390,8 +390,9 @@ export const api = {
     addMessage: (id: string, body: PortalRequestMessageCreate) => post<PortalRequestDetailResponse>(`/requests/${id}/messages`, body),
     reopen: (id: string, body: PortalRequestReopen) => post<PortalRequestDetailResponse>(`/requests/${id}/reopen`, body),
     rate: (id: string, body: PortalRequestRate) => post<PortalRequestDetailResponse>(`/requests/${id}/rate`, body),
-    uploadAttachment: async (id: string, file: LocalFile) =>
-      request<PortalDocumentRow>(`/requests/${id}/attachments`, { method: "POST", form: await buildMultipart("file", file), idempotencyKey: newIdempotencyKey() }),
+    /** One file per call; `messageId` (one of the customer's own messages, e.g. the opening message after create) appends it to that message. */
+    uploadAttachment: async (id: string, file: LocalFile, opts: { messageId?: string } = {}) =>
+      request<PortalDocumentRow>(`/requests/${id}/attachments`, { method: "POST", form: await buildMultipart("file", file, opts.messageId ? { message_id: opts.messageId } : {}), idempotencyKey: newIdempotencyKey() }),
     categories: async () => itemsOf<PortalRequestCategory>(await get<unknown>("/requests/categories")),
   },
   notices: {

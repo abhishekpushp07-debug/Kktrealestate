@@ -7,7 +7,7 @@ import type { AvailabilityGrid as AvailabilityGridData } from "@/lib/types";
 export function AvailabilityGrid({ grid }: { grid: AvailabilityGridData }) {
   const blocks = grid.blocks.filter((b) => b.floors.length);
   if (!blocks.length) return null;
-  const available = grid.available_count ?? blocks.reduce((n, b) => n + b.floors.reduce((m, f) => m + f.cells.filter((c) => c.status === "AVAILABLE").length, 0), 0);
+  const available = blocks.reduce((n, b) => n + b.available_count, 0);
 
   return (
     <div>
@@ -33,19 +33,19 @@ export function AvailabilityGrid({ grid }: { grid: AvailabilityGridData }) {
                 <caption className="sr-only">Availability by floor for {block.name}</caption>
                 <tbody>
                   {block.floors.map((floor) => (
-                    <tr key={floor.label}>
+                    <tr key={floor.floor_label}>
                       <th scope="row" className="whitespace-nowrap pr-3 text-left font-medium text-ink-soft">
-                        {floor.label}
+                        {floor.floor_label}
                       </th>
                       {floor.cells.map((cell) => {
-                        const open = cell.status === "AVAILABLE";
+                        const open = cell.availability === "AVAILABLE";
                         return (
                           <td key={cell.flat_number} className="p-0">
                             <span
                               className={`flex min-h-9 min-w-12 items-center justify-center rounded-md border px-1.5 font-mono text-[0.7rem] ${
                                 open ? "border-gold-600 bg-gold-500 text-navy-950 font-semibold" : "border-line bg-ivory-200 text-ink-soft/70"
                               }`}
-                              title={`${cell.flat_number}${cell.flat_type_code ? ` · ${cell.flat_type_code}` : ""} · ${open ? "Available" : "Not available"}`}
+                              title={`${cell.flat_number} · ${cell.configuration} · ${open ? "Available" : "Not available"}`}
                             >
                               {cell.flat_number}
                               <span className="sr-only">{open ? ", available" : ", not available"}</span>

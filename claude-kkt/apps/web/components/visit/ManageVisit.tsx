@@ -6,7 +6,7 @@ import { useSiteConfig } from "@/components/SiteConfigProvider";
 import { Button } from "@/components/ui/Button";
 import { FormStatus } from "@/components/ui/Field";
 import { CalendarIcon, ClockIcon, DownloadIcon, ExternalLinkIcon, MapPinIcon } from "@/components/ui/icons";
-import { absoluteApiUrl, friendlyErrorMessage, publicClient, visitIcsUrl } from "@/lib/api";
+import { absoluteApiUrl, friendlyErrorMessage, publicClient } from "@/lib/api";
 import { formatDate, formatTimeRange } from "@/lib/format";
 import type { SiteVisitManage } from "@/lib/types";
 
@@ -26,15 +26,15 @@ export function ManageVisit({ visit: initial, token }: { visit: SiteVisitManage;
   const [error, setError] = useState<string | null>(null);
 
   const upcoming = visit.status === "CONFIRMED" || visit.status === "RESCHEDULED";
-  const canCancel = upcoming && visit.can_cancel !== false;
-  const ics = visit.ics_url ? absoluteApiUrl(apiUrl, visit.ics_url) : visitIcsUrl(apiUrl, token);
+  const canCancel = upcoming && visit.can_cancel;
+  const ics = absoluteApiUrl(apiUrl, visit.ics_url);
 
   async function cancel() {
     setBusy(true);
     setError(null);
     try {
       const updated = await publicClient(apiUrl).cancelSiteVisit(token);
-      setVisit(updated && typeof updated === "object" && "status" in updated ? updated : { ...visit, status: "CANCELLED" });
+      setVisit(updated ?? { ...visit, status: "CANCELLED", can_cancel: false });
       setConfirming(false);
     } catch (err) {
       setError(friendlyErrorMessage(err));
@@ -66,14 +66,14 @@ export function ManageVisit({ visit: initial, token }: { visit: SiteVisitManage;
           <CalendarIcon className="mt-0.5 shrink-0 text-gold-600" />
           <div>
             <dt className="text-xs uppercase tracking-widest text-ink-soft">Date</dt>
-            <dd className="font-semibold text-navy-900">{formatDate(visit.date, "long")}</dd>
+            <dd className="font-semibold text-navy-900">{formatDate(visit.visit_date, "long")}</dd>
           </div>
         </div>
         <div className="flex gap-3">
           <ClockIcon className="mt-0.5 shrink-0 text-gold-600" />
           <div>
             <dt className="text-xs uppercase tracking-widest text-ink-soft">Time (IST)</dt>
-            <dd className="font-semibold text-navy-900">{formatTimeRange(visit.start, visit.end)}</dd>
+            <dd className="font-semibold text-navy-900">{formatTimeRange(visit.slot_start, visit.slot_end)}</dd>
           </div>
         </div>
         {visit.visitors ? (
@@ -88,12 +88,12 @@ export function ManageVisit({ visit: initial, token }: { visit: SiteVisitManage;
             <dd className="font-semibold text-navy-900">{visit.name}</dd>
           </div>
         ) : null}
-        {visit.address ? (
+        {visit.site_office_address ? (
           <div className="flex gap-3 sm:col-span-2">
             <MapPinIcon className="mt-0.5 shrink-0 text-gold-600" />
             <div>
               <dt className="text-xs uppercase tracking-widest text-ink-soft">Site office</dt>
-              <dd className="whitespace-pre-line text-navy-900">{visit.address}</dd>
+              <dd className="whitespace-pre-line text-navy-900">{visit.site_office_address}</dd>
               {visit.maps_link ? (
                 <a href={visit.maps_link} className="mt-1 inline-flex min-h-12 items-center gap-1 text-gold-700 underline-offset-4 hover:underline" rel="noopener noreferrer" target="_blank">
                   Open in Maps <ExternalLinkIcon size={14} />

@@ -1,0 +1,88 @@
+# Browser QA — customer portal (`apps/portal`, Expo web export)
+
+**Date:** 2026-10-25 · **Build:** `EXPO_PUBLIC_API_URL=http://localhost:4200 npx expo export --platform web` (static export, served by a 20-line Node SPA server on :8081) · **API:** `@kkt/api` on :4200 with the demo seed on a dedicated database `kkt_qa_portal` (Redis db 15) · **Browser:** Playwright Chromium (headless), viewports **1440×900** and **390×844** (mobile emulation + touch) · **Script:** `docs/qa/portal/browser-qa.cjs` (Playwright, ~600 lines).
+
+**Result of the final run: 40 screenshots, 0 defects, 0 console errors, 0 failed requests, no horizontal overflow at 390 px, 90/90 related API integration tests green** (`auth`, `portal`, `portal-adversarial`, `service`, `seed`). `pnpm --filter @kkt/contracts|@kkt/api|@kkt/portal typecheck` green; `expo export --platform web` green.
+
+## Customers walked
+
+| Customer | Phone | Why |
+|---|---|---|
+| Rajesh Kumar Sinha | 9876543210 | the ₹1 Cr worked example — Completed booking, 12 receipts, 10 demands, 24 ledger rows, 14/14 stages, closed ticket |
+| Pooja Mishra | 9876543219 | Active booking A-803 (Standard CLP) with a co-applicant, parking B1-07, two shared documents |
+| Sanjay Jha | 9876543220 | co-applicant on Pooja's booking — same screens through the co-applicant role, isolation probes |
+
+Staff actions needed by the flows (reply, internal note, resolve) were made through the ERP API as `admin@sgb.in`.
+
+## Per-page checks (every page, both widths)
+
+On every page the script asserts: zero `console.error` / page errors, zero failed requests (HTTP ≥ 400 or network failure) other than the deliberate 4xx probes listed below, `document.documentElement.scrollWidth <= window.innerWidth` at 390 px, on phones the tab bar sits at the bottom of the viewport (`[role=tablist]` 776–844 of 844) and the scrolled content ends above it, and it records every visible interactive element shorter than 44 px. Screenshots are palette-compressed PNGs of the viewport, all ≤ 73 KB (`docs/qa/portal/<page>-<width>.png`).
+
+| Page | 1440 | 390 | What was exercised |
+|---|---|---|---|
+| login | ✅ `login-1440.png` | ✅ `login-390.png` | hero + card layout; wrong password → "Sign-in failed" banner (deliberate 401); "Staff? Go to ERP" link; sign-in lands on home |
+| home | ✅ `home-1440.png` | ✅ `home-390.png` | greeting, hero card (status + role chips, flat, "Floor 1 · 4BHK Villa"), progress ring 100 % + current stage, plan card, next-installment card (none for the completed booking; "Excavation ₹3,14,987.50 · Cash/Account" for A-803), Paid/Due/Advance 3×2 grid, notices strip (count or caught-up), quick actions, RM card; desktop: sidebar + no tab bar; phone: tab bar + no sidebar |
+| home (co-applicant) | ✅ `home-coapplicant-1440.png` | ✅ (no shot, budget) | Sanjay sees A-803 with the "Co-applicant" chip and identical money/ring data |
+| my flat | ✅ `flat-1440.png` | ✅ `flat-390.png` | rooms & sizes (table / card list), area statement, parking (B1-07 for A-803), price breakup + agreement value, revisions ("No changes since booking"), specifications; floor-plan placeholder (seed has no floor-plan image, see open items) |
+| payments · receipts | ✅ `payments-receipts-1440.png`, `receipt-viewer-1440.png` | ✅ `payments-receipts-390.png` | 12 receipts incl. other charges; **View** opens the in-app viewer (iframe) and the signed link streams `200 application/pdf`; **Download** triggers a browser download (`receipt-SGB-2627-0011.pdf`) |
+| payments · ledger | ✅ `payments-ledger-1440.png` | ✅ `payments-ledger-390.png` | summary card (cash/account paid, due, total due ₹0 settled); table on desktop, card rows with "Total due after this" on phones |
+| payments · demands | ✅ `payments-demands-1440.png` | ✅ `payments-demands-390.png` | DM- rows with cash/account split, due-date copy, letter PDF streams 200 |
+| payments · schedule | ✅ `payments-schedule-1440.png` | ✅ `payments-schedule-390.png` | "100 % paid · 10 of 10 installments settled", timeline rail, status chips |
+| construction | ✅ `construction-1440.png` | ✅ `construction-390.png` | 14/14 stages timeline, 28 buyer-visible thumbnails (22 image requests, all 200 image/webp via signed links); 2-photo stages for A-803 (Tower A, 43 %) |
+| construction photo viewer | ✅ `construction-lightbox-1440.png` | ✅ `construction-lightbox-390.png` | tap thumbnail → full-screen viewer "1 / 2", next photo, zoom in, Escape / close |
+| documents | ✅ `documents-1440.png` | ✅ `documents-390.png` | statement + allotment letter (generated), shared docs (plan acceptance; "Allotment letter – A-803", "Agreement for sale – A-803"); shared doc opens via a signed link |
+| requests list | ✅ `requests-1440.png` | ✅ `requests-390.png` | status filter segments, seeded closed ticket with its rating, "New" |
+| raise request | ✅ `request-new-1440.png` | ✅ `request-new-390.png` | category sheet → default priority chip, subject/description, **photo attached through the file chooser (1/10)**, submit → `SR-2627/00xx` |
+| request detail | ✅ `request-detail-1440.png` | ✅ `request-detail-390.png` | photo on the opening message (thumb + signed full-size `url`), reply with a second photo, attachment opens in the viewer, staff public reply visible, **internal staff note never rendered**, Resolved → "Reopen request" sheet → reopened, Resolved again → 4-star rating with comment → Closed with "Your rating" |
+| notices | ✅ `notices-1440.png` | ✅ `notices-390.png` | company-wide + project notices with unread marker; detail renders the markdown body and "Published …" |
+| notifications | ✅ `notifications-1440.png` | ✅ `notifications-390.png` | unread count incl. "Reply on your request SR-…", tap navigates to the right screen (notice detail), mark-all-read → "You're all caught up", API `unread-count` = `{count: 0}` |
+| profile | ✅ `profile-1440.png` | ✅ `profile-390.png` | **PAN `XXXXX1234K`, Aadhaar `XXXX XXXX 0124` masked** (no unmasked PAN anywhere on the page), KYC chip, alternate-phone edit → "Profile updated" (audited as CUSTOMER) and reverted; co-applicants card (Pooja ↔ Sanjay, see fixes) ; RM card |
+| change password | ✅ `password-1440.png` | ✅ (no shot) | weak password refused client-side; change to a fresh password → "Password updated", old password 401, new one 200; reusing `Welcome@123` → 422 `PASSWORD_POLICY` "not used in your last 5 passwords" surfaced in the form (deliberate 4xx) |
+| devices & sessions | ✅ `sessions-1440.png` | ✅ (no shot) | current device chip, revoke one → "Signed out on that device", "Sign out all other devices" confirm → "Other devices signed out" |
+| bank details | ✅ `bank-details-1440.png` | ✅ `bank-details-390.png` | account name/bank/number/IFSC, copy IFSC → "IFSC copied" (clipboard) |
+| more hub | — (sidebar on desktop) | ✅ `more-390.png` | profile card, services, account, sign-out dialog |
+| not-found | ✅ `not-found-1440.png` | ✅ (no shot) | unknown route → "+not-found" screen with "Go home" |
+
+### Isolation (deliberate 4xx)
+* Pooja opening Rajesh's request id (`/more/requests/<id>`) → API 404 → "Not found" screen, nothing of the other customer rendered.
+* Sanjay with a **forged booking id** (Rajesh's booking injected into the `/portal/bookings` response by route interception + cleared cache): every `/portal/bookings/<foreign>/…` call answered **404**, home shows the "Not found" state, no money figures leaked.
+* The API sweep (all Appendix C endpoints × 3 customers, validated against the `Portal*` Zod schemas) also confirmed: `home`/`statement.pdf` of another customer's booking → 404; signed file links are bound to the customer.
+
+### Tap targets at 390 px (after fixes)
+All primary actions are ≥ 44 px: sign in / submit / send / save (46–54), payments segments (44), tab bar items (68), receipt/demand/document **View/Download** (46 on phones), bell (44), booking switcher chip (44), star rating (44), bank copy buttons (44), list rows (≥ 56). Remaining < 44 px elements, all secondary and all with hit-slop or a larger duplicate target: `Back`/header `sm` buttons (40 px box + 4–6 px hit-slop), lightbox icon buttons (40 + 6), card-header text links "Timeline / Schedule / Ledger" (18 px — the whole card is the tap target), "Show password" (16 px + 14 px hit-slop), "Go to ERP" (22 px + 12 px hit-slop), read-only rating stars in the list (14 px, not interactive), "Remove photo" badge (24 px). Text inputs measure 41 px for the `<input>` inside a 46 px field box.
+
+## Defects found and fixed
+
+| # | Where | Defect | Fix |
+|---|---|---|---|
+| 1 | `apps/portal/metro.config.js`, `src/api/files.ts → files.tsx` | **The web build bundled the native file module**: `files.web.tsx` never won against `files.ts` because Metro tries platform variants *per extension* (`files.web.ts → files.ts → files.web.tsx`). On web "View" opened a blank popup through `expo-web-browser` and "Download" went through `expo-file-system`; the in-app PDF viewer never existed in the bundle. | renamed the native module to `files.tsx` (same extension as its `.web.tsx` twin) and documented the rule in `metro.config.js` and the README. The viewer, "Open in new tab" and download now work (verified by the 200 PDF stream into the iframe). |
+| 2 | `apps/api/src/modules/notifications/index.ts`, `packages/contracts` | `GET /portal/notifications/unread-count` returned `{unread}`; Appendix C and the portal client read `{count}` → the bell/tab badge showed nothing outside the home screen. | new `PortalNotificationCountResponseSchema` (`{count}`), route returns it; tests updated. |
+| 3 | `apps/api/src/modules/auth/portal.ts` | `GET /portal/auth/sessions` returned `{items}`; Appendix C additions say bare array (client tolerated both). | bare array; `auth.test.ts` updated. |
+| 4 | `apps/api/src/modules/portal/requests.ts`, `queries.ts`, contracts | **Photos attached when raising a request were invisible**: the client created the ticket (JSON) and then uploaded the files, which became ticket documents nobody could see (no message carried them). | `POST /portal/requests/:id/attachments` accepts a `message_id` text part naming one of the customer's own messages (the opening message from the create response); the file is appended to it. The client passes the opening message id and refetches the detail. Integration test added (own message ✔, staff message → 404, bad id → 400); Appendix C additions updated. |
+| 5 | contracts `PortalRequestMessage.attachments`, `requests.ts`, `RequestDetailScreen` | The photo viewer for request attachments opened the ≈480 px **thumbnail** full-screen (the API only exposed `thumb_url`). | attachments now carry `url` (signed medium rendition, else original); the viewer uses it. |
+| 6 | `apps/api/src/modules/portal/profile.ts` | Profile "Co-applicants" only read the customer-record co-applicants table, so Pooja saw "None added" although Sanjay is the co-applicant on BK-2627/0010 (and Sanjay saw nothing about Pooja). | profile co-applicants now also list the other applicants of the customer's bookings ("Co-applicant on BK-…" / "Primary applicant on BK-…", name + phone only). |
+| 7 | `apps/portal/src/api/queries.ts` | After a reload the request detail showed the **stale cached status** (staff had resolved it) because a persisted entry younger than `staleTime` was never refetched; the bookings list likewise. | `refetchOnMount: "always"` (cached data renders instantly, refresh in the background per SPEC §16) and `staleTime: 0` for the bookings switcher list. |
+| 8 | `ConstructionScreen`, `MyFlatScreen` | Photo thumbnails / floor plan used `accessibilityRole="imagebutton"`, which react-native-web does not map — no `role` at all for screen readers. | `accessibilityRole="button"` (label kept). |
+| 9 | `HomeScreen` hero card | Seeded hero images carry large text; the 5 %→92 % gradient left the flat number and labels sitting on it. | firmer three-stop navy wash (45/78/97 %) so the white labels keep AA contrast on any photo. |
+| 10 | `HomeScreen`, `MyFlatScreen`, `lib/format.ts` | Floor label rendered as a bare number ("Block P · 1 · 4BHK Villa"). | `formatFloor()` → "Floor 8", "Basement 1", named floors untouched. |
+| 11 | `SegmentedControl`, `Button`, `shared.tsx` `PdfButtons`, `BellButton`, `BookingSwitcher`, `ListRow` `StarRating`, `BankDetailsScreen`, `Field`, `LoginScreen` | Phone tap targets below 44 px for primary actions (segments 32, View/Download 36, bell 40, booking chip 32, rating stars 30, copy buttons 36). | segments 44, `sm` buttons 40 + hit-slop, PDF buttons `md` (46) on phones, bell 44, chip 44, stars 44, copy buttons 44, more hit-slop on the password toggle and ERP link. |
+
+Everything else checked (money figures of the worked example to the rupee, bucket grid, schedule progress, stage timeline, receipts/demand PDFs, documents, request thread rules, notices, notifications routing, profile masking, sessions, bank details, lockout/429 copy paths, not-found, sidebar/tab-bar shell, no overflow) worked as specified without changes.
+
+## Still open
+
+* **Seed:** no floor-plan image is attached to any flat/block/project (`documents` of type FLOOR_PLAN), so "My Flat" always shows the "Floor plan will appear here once shared" placeholder and the zoomable viewer could only be exercised on construction photos / request attachments. Seeded project hero images are text placeholders ("Shree Ganesh Heights · Bailey Road, Patna"), which still look busy behind the hero card at both widths — a cosmetic seed issue, not a code one.
+* **Seed:** staff users have no phone, so the RM card shows e-mail only and the "Call"/"WhatsApp" buttons (which render when a phone exists) could not be exercised in the browser.
+* `POST /portal/auth/change-password` answers `200 {ok:true}` while Appendix C says 204 — the client accepts both; left as is.
+* Passwords: the change-password walk leaves the worked-example customer's password changed on the QA database; the script restores the seed hash afterwards (`Welcome@123` works again), but the password-history rows stay (append-only) — only on `kkt_qa_portal`.
+* Native (iOS/Android) code paths — camera picker, share sheet, SecureStore, in-app browser — are outside this browser QA.
+
+## Reproduce
+
+```bash
+su postgres -c "psql -c 'CREATE DATABASE kkt_qa_portal'"
+cd apps/api && DATABASE_URL=postgres://postgres:postgres@localhost:5432/kkt_qa_portal REDIS_URL=redis://localhost:6379/15 API_PORT=4200 API_PUBLIC_URL=http://localhost:4200 \
+  RUN_MIGRATIONS_ON_BOOT=true SEED_ON_BOOT=true PORTAL_ORIGIN=http://localhost:8081 npx tsx src/server.ts
+cd apps/portal && EXPO_PUBLIC_API_URL=http://localhost:4200 npx expo export --platform web   # then serve dist/ with an SPA fallback on :8081
+node docs/qa/portal/browser-qa.cjs   # Playwright walk, rewrites docs/qa/portal/*.png and writes report.json to a temp dir
+```

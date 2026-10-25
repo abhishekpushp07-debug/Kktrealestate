@@ -138,10 +138,11 @@ export function repairIntegrity(runId?: string | null): Promise<IntegrityRepairR
 /* Roznamcha                                                            */
 /* ------------------------------------------------------------------ */
 
-/** Day book for a date range (`GET /roznamcha?from&to[&project_id]` — a single day is `from = to`). */
+/** Day book: `GET /roznamcha?date[&project_id]` for one day, `GET /roznamcha/range?from&to[&project_id]` for a range. */
 export function useRoznamcha(from: string, to: string, projectId: string | null, enabled = true): UseQueryResult<RoznamchaResponse, ApiClientError> {
-  return useApiQuery<RoznamchaResponse>(paymentKeys.roznamcha(from, to, projectId), ROZNAMCHA_PATH, {
-    query: { from, to, project_id: projectId ?? undefined },
+  const single = from === to;
+  return useApiQuery<RoznamchaResponse>(paymentKeys.roznamcha(from, to, projectId), single ? ROZNAMCHA_PATH : `${ROZNAMCHA_PATH}/range`, {
+    query: single ? { date: from, project_id: projectId ?? undefined } : { from, to, project_id: projectId ?? undefined },
     enabled: enabled && Boolean(from && to && from <= to),
     placeholderData: (previous) => previous,
   });

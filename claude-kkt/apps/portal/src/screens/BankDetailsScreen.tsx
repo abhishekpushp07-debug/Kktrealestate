@@ -90,6 +90,6 @@ function Row({ label, value, mono, onCopy }: { label: string; value: string; mon
 
 const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: space.md, paddingVertical: space.md },
-  copyBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.navy50, alignItems: "center", justifyContent: "center" },
+  copyBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.navy50, alignItems: "center", justifyContent: "center" },
   copyAll: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: space.sm, marginTop: space.lg, paddingVertical: 12, borderRadius: 999, backgroundColor: colors.navy100 },
 });

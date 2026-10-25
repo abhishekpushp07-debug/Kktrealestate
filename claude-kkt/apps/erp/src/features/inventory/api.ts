@@ -10,7 +10,6 @@ import type {
   ProjectRow,
   ProjectWebsiteSettingsRow,
   RateCardRow,
-  UserRow,
   VisitSettingsRow,
 } from "@kkt/contracts";
 import { api, type ApiClientError, type ListEnvelope, type QueryParams } from "@/lib/api";
@@ -38,7 +37,6 @@ export const inventoryKeys = {
   brochureStats: (projectId: string) => [PROJECTS_PATH, "brochure-stats", projectId] as const,
   visitSettings: (projectId: string) => [PROJECTS_PATH, "visit-settings", projectId] as const,
   documents: (entityType: DocumentEntityType, entityId: string) => [DOCUMENTS_PATH, "entity", entityType, entityId] as const,
-  salesUsers: [USERS_PATH, "options", "sales"] as const,
 };
 
 type QueryOpts<T> = Omit<UseQueryOptions<T, ApiClientError, T, readonly unknown[]>, "queryKey" | "queryFn">;
@@ -206,24 +204,8 @@ export async function fetchDocumentLink(documentId: string, variant?: "thumb" | 
 /* Users                                                                */
 /* ------------------------------------------------------------------ */
 
-/** Sales users for RM / assignee pickers; falls back to every active user when the role filter is unsupported. */
-export function useSalesUserOptions(enabled = true): UseQueryResult<UserRow[], ApiClientError> {
-  return useQuery<UserRow[], ApiClientError, UserRow[], readonly unknown[]>({
-    queryKey: inventoryKeys.salesUsers,
-    queryFn: async ({ signal }) => {
-      try {
-        const sales = await api.list<UserRow>(USERS_PATH, { page_size: 200, sort: "name" }, { signal, query: { role: "Sales" } });
-        if (sales.items.length > 0) return sales.items;
-      } catch {
-        /* role filter not supported: fall through */
-      }
-      const all = await api.list<UserRow>(USERS_PATH, { page_size: 200, sort: "name" }, { signal });
-      return all.items;
-    },
-    staleTime: 60_000,
-    enabled,
-  });
-}
+/** Sales users for RM / assignee pickers (shared staff directory; see features/shared/options.ts). */
+export { useSalesUserOptions } from "@/features/shared/options";
 
 /* ------------------------------------------------------------------ */
 /* Misc helpers                                                         */

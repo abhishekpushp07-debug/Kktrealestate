@@ -267,9 +267,10 @@ describe("portal auth", () => {
     // refresh + sessions + logout
     const refreshed = await t.request<{ access_token: string; refresh_token: string }>("POST", "/api/v1/portal/auth/refresh", { body: { refresh_token: login.body.refresh_token } });
     expect(refreshed.status).toBe(200);
-    const sessions = await t.request<{ items: unknown[] }>("GET", "/api/v1/portal/auth/sessions", { token: refreshed.body.access_token });
+    const sessions = await t.request<unknown[]>("GET", "/api/v1/portal/auth/sessions", { token: refreshed.body.access_token });
     expect(sessions.status).toBe(200);
-    expect(sessions.body.items).toHaveLength(1);
+    expect(Array.isArray(sessions.body)).toBe(true); // Appendix C additions: bare array
+    expect(sessions.body).toHaveLength(1);
     expect((await t.request("POST", "/api/v1/portal/auth/logout", { token: refreshed.body.access_token, body: {} })).status).toBe(204);
     expect((await t.request("GET", "/api/v1/portal/auth/me", { token: refreshed.body.access_token })).status).toBe(401);
   });

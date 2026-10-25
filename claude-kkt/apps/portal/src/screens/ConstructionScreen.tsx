@@ -106,7 +106,7 @@ function StageRow({ stage, isLast, onOpenPhoto }: { stage: PortalConstructionSta
         {stage.photos.length ? (
           <View style={styles.photoGrid}>
             {stage.photos.map((p, i) => (
-              <Pressable key={`${p.thumb_url}-${i}`} accessibilityRole="imagebutton" accessibilityLabel={p.caption ?? `Photo ${i + 1} of ${stage.name}`} onPress={() => onOpenPhoto(i)} style={({ pressed }) => [{ width: thumbWidth, aspectRatio: 1 }, pressed ? { opacity: 0.8 } : null]}>
+              <Pressable key={`${p.thumb_url}-${i}`} accessibilityRole="button" accessibilityLabel={p.caption ?? `Photo ${i + 1} of ${stage.name}`} onPress={() => onOpenPhoto(i)} style={({ pressed }) => [{ width: thumbWidth, aspectRatio: 1 }, pressed ? { opacity: 0.8 } : null]}>
                 <Image source={{ uri: p.thumb_url }} style={styles.photo} contentFit="cover" transition={200} />
               </Pressable>
             ))}

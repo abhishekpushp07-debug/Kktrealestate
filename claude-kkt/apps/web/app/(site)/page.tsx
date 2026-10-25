@@ -17,7 +17,7 @@ import { getSiteSettings, listPosts, listProjects } from "@/lib/api";
 import { closedMetadata, siteGate } from "@/lib/gate";
 import { Markdown } from "@/lib/markdown";
 import { brandName, breadcrumbJsonLd } from "@/lib/seo";
-import type { HomeSection, SiteSettings } from "@/lib/types";
+import { NO_CONTACTS, type HomeSection, type SiteSettings } from "@/lib/types";
 
 export async function generateMetadata(): Promise<Metadata> {
   return (await closedMetadata()) ?? { alternates: { canonical: "/" }, openGraph: { url: "/" } };
@@ -27,10 +27,9 @@ function section(site: SiteSettings | null, ...keys: string[]): HomeSection | un
   return site?.home_sections?.find((s) => keys.includes(s.key));
 }
 
-function sectionText(body: HomeSection["body"]): string | null {
+function sectionText(body: HomeSection["body"] | undefined): string | null {
   if (!body) return null;
-  if (typeof body === "string") return body;
-  const text = body.markdown ?? body.text ?? body.body;
+  const text = body.markdown ?? body.text ?? body.body ?? body.subtitle;
   return typeof text === "string" ? text : null;
 }
 
@@ -114,7 +113,7 @@ export default async function HomePage() {
         </Section>
       ) : null}
 
-      <EnquirySection projects={featured.map((p) => ({ slug: p.slug, name: p.name }))} contacts={site?.contacts ?? {}} brandName={brand} />
+      <EnquirySection projects={featured.map((p) => ({ slug: p.slug, name: p.name }))} contacts={site?.contacts ?? NO_CONTACTS} brandName={brand} />
       <JsonLd data={breadcrumbJsonLd([{ name: "Home", path: "/" }])} />
     </>
   );

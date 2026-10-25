@@ -90,7 +90,7 @@ export function LoginScreen(): React.JSX.Element {
         <T variant="small" color={colors.inkMuted}>
           Staff?
         </T>
-        <Pressable accessibilityRole="link" onPress={() => void openExternal(ERP_URL || "http://localhost:5173")} hitSlop={6} style={styles.erpLink}>
+        <Pressable accessibilityRole="link" onPress={() => void openExternal(ERP_URL || "http://localhost:5173")} hitSlop={12} style={styles.erpLink}>
           <T variant="bodyStrong" color={colors.navy}>
             Go to ERP
           </T>

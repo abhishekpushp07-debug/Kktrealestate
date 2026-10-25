@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import type { PortalMyFlatResponse } from "@kkt/contracts";
 import { refreshBooking, useFlat } from "@/api/queries";
-import { formatDateTime, formatINR, formatSqft } from "@/lib/format";
+import { formatDateTime, formatFloor, formatINR, formatSqft } from "@/lib/format";
 import { Card, CardHeader, Divider, KeyValue } from "@/ui/Card";
 import { Chip } from "@/ui/Chip";
 import { Icon } from "@/ui/Icon";
@@ -43,7 +43,7 @@ function FlatContent({ d }: { d: PortalMyFlatResponse }): React.JSX.Element {
   return (
     <>
       <Card padded={false}>
-        <Pressable accessibilityRole={d.floor_plan_url ? "imagebutton" : undefined} accessibilityLabel="Floor plan — tap to zoom" disabled={!d.floor_plan_url} onPress={() => setPlan(0)} style={styles.planWrap}>
+        <Pressable accessibilityRole={d.floor_plan_url ? "button" : undefined} accessibilityLabel="Floor plan — tap to zoom" disabled={!d.floor_plan_url} onPress={() => setPlan(0)} style={styles.planWrap}>
           {d.floor_plan_url ? <Image source={{ uri: d.floor_plan_url }} style={StyleSheet.absoluteFill} contentFit="contain" transition={300} /> : (
             <View style={styles.planEmpty}>
               <Icon name="image" size={28} color={colors.inkSubtle} />
@@ -65,7 +65,7 @@ function FlatContent({ d }: { d: PortalMyFlatResponse }): React.JSX.Element {
           <View style={styles.chipRow}>
             <Chip label={`${d.bhk} BHK`} tone="gold" small />
             {d.facing ? <Chip label={`${d.facing} facing`} tone="neutral" small /> : null}
-            <Chip label={d.floor_label} tone="neutral" small />
+            <Chip label={formatFloor(d.floor_label)} tone="neutral" small />
           </View>
           <T variant="h2">
             {d.flat_number} · {d.flat_type_name}

@@ -25,7 +25,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
     title: post.seo?.title?.trim() || post.title,
     description: post.seo?.description?.trim() || post.excerpt?.trim() || markdownToText(post.body_md),
     path: `/blog/${post.slug}`,
-    image: resolveMediaUrl(post.seo?.og_image_url ?? post.cover_image_url, publicApiUrl()),
+    image: resolveMediaUrl(post.seo?.og_image_url ?? post.cover_url, publicApiUrl()),
     type: "article",
     publishedTime: post.published_at,
   });
@@ -41,9 +41,9 @@ export default async function BlogPostPage({ params }: { params: Params }) {
   return (
     <article>
       <header className="relative overflow-hidden bg-navy-900 pt-32 text-ivory-100 sm:pt-40">
-        {post.cover_image_url ? (
+        {post.cover_url ? (
           <>
-            <SmartImage src={post.cover_image_url} alt="" sizes="100vw" priority className="opacity-35" />
+            <SmartImage src={post.cover_url} alt="" sizes="100vw" priority className="opacity-35" />
             <div aria-hidden className="absolute inset-0 bg-gradient-to-b from-navy-950/40 via-navy-900/70 to-navy-900" />
           </>
         ) : null}

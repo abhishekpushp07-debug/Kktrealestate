@@ -17,7 +17,7 @@ export function GalleryGrid({ items, projects }: GalleryGridProps) {
   const [index, setIndex] = useState<number | null>(null);
 
   const visible = useMemo(() => (filter ? items.filter((i) => i.project_slug === filter) : items), [filter, items]);
-  const lightboxImages: LightboxImage[] = visible.map((img, i) => ({ src: img.url, alt: img.alt || img.caption || `Gallery image ${i + 1}`, caption: img.caption ?? img.project_name ?? null }));
+  const lightboxImages: LightboxImage[] = visible.map((img, i) => ({ src: img.medium_url, alt: img.alt || img.caption || `Gallery image ${i + 1}`, caption: img.caption ?? img.project_name ?? null }));
   const chip = (active: boolean) => `tap shrink-0 rounded-full border px-5 text-sm font-semibold transition ${active ? "border-navy-900 bg-navy-900 text-ivory-100" : "border-navy-900/15 bg-white text-navy-900 hover:border-gold-500"}`;
 
   return (

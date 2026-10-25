@@ -191,7 +191,7 @@ function Bubble({ m, onOpenImage }: { m: PortalRequestMessage; onOpenImage: (uri
         {m.attachments.length ? (
           <View style={styles.attachments}>
             {m.attachments.map((a) => (
-              <AttachmentThumb key={a.id} uri={a.thumb_url} name={a.file_name} onPress={a.thumb_url && a.mime.startsWith("image/") ? () => onOpenImage(a.thumb_url ?? "", a.file_name) : undefined} />
+              <AttachmentThumb key={a.id} uri={a.thumb_url} name={a.file_name} onPress={a.mime.startsWith("image/") && (a.url ?? a.thumb_url) ? () => onOpenImage(a.url ?? a.thumb_url ?? "", a.file_name) : undefined} />
             ))}
           </View>
         ) : null}

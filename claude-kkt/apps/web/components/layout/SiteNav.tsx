@@ -45,7 +45,7 @@ export function SiteNav({ brandName, logoUrl, phone, portalUrl }: SiteNavProps) 
       }`}
     >
       <nav className="container-wide flex h-18 items-center justify-between gap-4 text-ivory-100" aria-label="Primary">
-        <Link href="/" className="tap flex items-center gap-3 rounded-md py-1" aria-label={`${brandName} home`}>
+        <Link href="/" className="tap flex min-w-0 items-center gap-3 rounded-md py-1" aria-label={`${brandName} home`}>
           {logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={logoUrl} alt="" className="h-9 w-auto max-w-[9rem] object-contain" width={144} height={36} />
@@ -54,7 +54,7 @@ export function SiteNav({ brandName, logoUrl, phone, portalUrl }: SiteNavProps) 
               {brandName.charAt(0)}
             </span>
           )}
-          <span className="font-display text-2xl tracking-wide">{brandName}</span>
+          <span className="truncate font-display text-xl tracking-wide sm:text-2xl">{brandName}</span>
         </Link>
 
         <ul className="hidden items-center gap-1 lg:flex">
@@ -73,17 +73,21 @@ export function SiteNav({ brandName, logoUrl, phone, portalUrl }: SiteNavProps) 
           ))}
         </ul>
 
-        <div className="flex items-center gap-2">
-          {tel ? (
-            <a href={tel} className={buttonClasses("ghost-light", "sm", "hidden md:inline-flex")}>
-              <PhoneIcon size={18} />
-              <span className="hidden xl:inline">{phone}</span>
-              <span className="xl:hidden">Call</span>
+        <div className="flex shrink-0 items-center gap-2">
+          {/* Desktop-only actions live in their own hidden/md:flex wrapper: buttonClasses() sets `inline-flex`, which would
+              override a `hidden` on the same element, so the phone layout keeps the brand, the menu button and the sticky bar. */}
+          <div className="hidden items-center gap-2 md:flex">
+            {tel ? (
+              <a href={tel} className={buttonClasses("ghost-light", "sm")}>
+                <PhoneIcon size={18} />
+                <span className="hidden xl:inline">{phone}</span>
+                <span className="xl:hidden">Call</span>
+              </a>
+            ) : null}
+            <a href={portalUrl} className={buttonClasses("outline-light", "sm")} rel="noopener">
+              Customer Login
             </a>
-          ) : null}
-          <a href={portalUrl} className={buttonClasses("outline-light", "sm", "hidden md:inline-flex")} rel="noopener">
-            Customer Login
-          </a>
+          </div>
           <button
             type="button"
             className="tap inline-flex items-center justify-center rounded-full text-ivory-100 hover:bg-ivory-100/10 lg:hidden"

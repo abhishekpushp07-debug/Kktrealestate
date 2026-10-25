@@ -7,7 +7,7 @@ import { BOOKING_STATUS_LABELS, PLAN_TYPE_LABELS, type PortalHomeResponse } from
 import { api } from "@/api/client";
 import { refreshBooking, useHome } from "@/api/queries";
 import { useBooking } from "@/booking/BookingProvider";
-import { formatDate, formatINR, greetingForNow } from "@/lib/format";
+import { formatDate, formatFloor, formatINR, greetingForNow } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
 import { openMail, openTel, openWhatsApp } from "@/lib/links";
 import { Button } from "@/ui/Button";
@@ -96,7 +96,8 @@ function HomeContent({ data, bookingId }: { data: PortalHomeResponse; bookingId:
       <Card padded={false} onPress={() => router.navigate("/flat")} style={styles.flatCard}>
         <View style={styles.flatImageWrap}>
           {b.project_image_url ? <Image source={{ uri: b.project_image_url }} style={StyleSheet.absoluteFill} contentFit="cover" transition={300} /> : null}
-          <LinearGradient colors={["rgba(11,31,58,0.05)", "rgba(11,31,58,0.92)"]} style={StyleSheet.absoluteFill} />
+          {/* Project hero images carry their own text; a firm navy wash keeps the flat number and labels at AA contrast on any photo. */}
+          <LinearGradient colors={["rgba(11,31,58,0.45)", "rgba(11,31,58,0.78)", "rgba(11,31,58,0.97)"]} locations={[0, 0.5, 1]} style={StyleSheet.absoluteFill} />
           <View style={styles.flatText}>
             <View style={styles.chipRow}>
               <Chip label={BOOKING_STATUS_LABELS[b.status]} tone={b.status === "ACTIVE" ? "gold" : b.status === "COMPLETED" ? "success" : "danger"} small />
@@ -106,7 +107,7 @@ function HomeContent({ data, bookingId }: { data: PortalHomeResponse; bookingId:
               {b.flat_number}
             </T>
             <T variant="bodyStrong" color={colors.onNavy}>
-              {b.block_name} · {b.floor_label} · {b.flat_type_name}
+              {b.block_name} · {formatFloor(b.floor_label)} · {b.flat_type_name}
             </T>
             <T variant="small" color={colors.onNavyMuted}>
               {b.project_name} · Booking {b.booking_number} · {formatDate(b.booking_date)}

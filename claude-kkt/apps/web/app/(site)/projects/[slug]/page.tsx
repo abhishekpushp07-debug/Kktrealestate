@@ -22,7 +22,7 @@ import { closedMetadata, siteGate } from "@/lib/gate";
 import { Markdown, markdownToText } from "@/lib/markdown";
 import { resolveMediaUrl } from "@/lib/media";
 import { breadcrumbJsonLd, faqJsonLd, pageMetadata, projectJsonLd } from "@/lib/seo";
-import type { Amenity, ProjectDetail } from "@/lib/types";
+import { NO_ADDRESS, type Amenity, type ProjectDetail } from "@/lib/types";
 
 type Params = Promise<{ slug: string }>;
 
@@ -35,7 +35,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   const image = resolveMediaUrl(project.seo?.og_image_url ?? project.hero_images?.[0]?.url, publicApiUrl());
   return pageMetadata({
     title: project.seo?.title?.trim() || `${project.name}, ${project.city}`,
-    description: project.seo?.description?.trim() || markdownToText(project.overview, 160),
+    description: project.seo?.description?.trim() || markdownToText(project.description ?? "", 160),
     path: `/projects/${project.slug}`,
     image,
   });
@@ -48,7 +48,7 @@ function sectionsFor(project: ProjectDetail) {
     { id: "amenities", label: "Amenities", show: project.amenities.length > 0 },
     { id: "availability", label: "Availability", show: Boolean(project.availability?.blocks.length) },
     { id: "progress", label: "Progress", show: Boolean(project.construction_progress?.blocks.length) },
-    { id: "media", label: "Walkthrough", show: project.videos.length + project.tours.length > 0 },
+    { id: "media", label: "Walkthrough", show: project.video_urls.length + project.tour_urls.length > 0 },
     { id: "location", label: "Location", show: Boolean(project.map_embed_url || project.landmarks.length) },
     { id: "faqs", label: "FAQs", show: project.faqs.length > 0 },
     { id: "visit", label: "Site visit", show: project.visit_booking_enabled },
@@ -74,7 +74,7 @@ export default async function ProjectPage({ params }: { params: Params }) {
   const site = gate.site;
   const project = await getProject(slug);
   const facts = project.key_facts;
-  const address = facts?.address ?? {};
+  const address = facts?.address ?? NO_ADDRESS;
   const addressLine = [address.line1, address.line2, address.locality, address.city ?? project.city, address.state, address.pincode].filter(Boolean).join(", ");
   const sections = sectionsFor(project);
   const flatTypes = project.configurations.map((c) => ({ code: c.code, label: c.bhk ? `${c.bhk} BHK · ${c.name}` : c.name }));
@@ -102,7 +102,7 @@ export default async function ProjectPage({ params }: { params: Params }) {
           </nav>
           <div className="mt-4 flex flex-wrap gap-2">
             <Badge>{statusLabel(project.status)}</Badge>
-            <Badge tone="ivory">{typeLabel(project.type)}</Badge>
+            <Badge tone="ivory">{typeLabel(project.project_type)}</Badge>
             {project.rera_number ?? facts?.rera_number ? <Badge tone="ivory">RERA {project.rera_number ?? facts?.rera_number}</Badge> : null}
           </div>
           <div className="mt-6 flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
@@ -165,7 +165,7 @@ export default async function ProjectPage({ params }: { params: Params }) {
             <h2 id="overview-title" className={`${H2} mt-3`}>
               About {project.name}
             </h2>
-            <Markdown source={project.overview} className="prose-kkt mt-6" />
+            <Markdown source={project.description ?? ""} className="prose-kkt mt-6" />
             {project.highlights.length ? (
               <ul className="mt-8 grid gap-3 sm:grid-cols-2">
                 {project.highlights.map((h) => (
@@ -182,7 +182,7 @@ export default async function ProjectPage({ params }: { params: Params }) {
                 <h3 className="font-display text-2xl text-navy-900">Key facts</h3>
                 <dl className="mt-4 divide-y divide-line rounded-card border border-line bg-white">
                   {[
-                    ["Project type", typeLabel(project.type)],
+                    ["Project type", typeLabel(project.project_type)],
                     ["Status", statusLabel(project.status)],
                     ["RERA number", project.rera_number ?? facts?.rera_number ?? null],
                     ["Launched", facts?.launch_date ? formatDate(facts.launch_date, "month") : null],
@@ -212,7 +212,7 @@ export default async function ProjectPage({ params }: { params: Params }) {
                         <div className="min-w-0 text-sm">
                           <p className="font-medium text-navy-900">{a.name}</p>
                           <p className="text-ink-muted">
-                            {[a.number, a.issued_on ? formatDate(a.issued_on) : null, a.status].filter(Boolean).join(" · ")}
+                            {[a.number, a.status].filter(Boolean).join(" · ")}
                           </p>
                         </div>
                       </li>
@@ -278,7 +278,7 @@ export default async function ProjectPage({ params }: { params: Params }) {
             </section>
           ) : null}
 
-          {project.videos.length + project.tours.length > 0 ? (
+          {project.video_urls.length + project.tour_urls.length > 0 ? (
             <section id="media" className={SECTION} aria-labelledby="media-title">
               <p className="eyebrow text-gold-600">Walkthrough & virtual tour</p>
               <h2 id="media-title" className={`${H2} mt-3`}>
@@ -286,14 +286,14 @@ export default async function ProjectPage({ params }: { params: Params }) {
               </h2>
               <p className="mt-2 text-sm text-ink-muted">Players load only when you press play.</p>
               <div className="mt-6 grid gap-6">
-                {project.videos.map((url, i) => (
+                {project.video_urls.map((url, i) => (
                   <Reveal key={url}>
-                    <ClickToLoadEmbed url={url} kind="video" title={`${project.name} walkthrough ${project.videos.length > 1 ? i + 1 : ""}`.trim()} />
+                    <ClickToLoadEmbed url={url} kind="video" title={`${project.name} walkthrough ${project.video_urls.length > 1 ? i + 1 : ""}`.trim()} />
                   </Reveal>
                 ))}
-                {project.tours.map((url, i) => (
+                {project.tour_urls.map((url, i) => (
                   <Reveal key={url}>
-                    <ClickToLoadEmbed url={url} kind="tour" title={`${project.name} 360° tour ${project.tours.length > 1 ? i + 1 : ""}`.trim()} />
+                    <ClickToLoadEmbed url={url} kind="tour" title={`${project.name} 360° tour ${project.tour_urls.length > 1 ? i + 1 : ""}`.trim()} />
                   </Reveal>
                 ))}
               </div>

@@ -1,7 +1,10 @@
 /**
  * Portal service requests (SPEC §13/§16; Appendix C + additions): categories, list, JSON create, detail without internal notes, replies,
  * reopen within 7 days of RESOLVED, rating, and one-file-per-call multipart attachments stored through the documents module as
- * SERVICE_REQUEST documents uploaded by the CUSTOMER. The ticket rules live in the service module; this file maps and guards.
+ * SERVICE_REQUEST documents uploaded by the CUSTOMER. An upload may carry a `message_id` text part naming one of the customer's own
+ * messages on that ticket (the opening message right after create), in which case the document is appended to that message so the
+ * photos of a new request show in the thread; without it the document waits to be carried by a reply's `attachment_ids`.
+ * The ticket rules live in the service module; this file maps and guards.
  */
 import { and, asc, eq, inArray, or } from "drizzle-orm";
 import type { FastifyInstance, FastifyRequest } from "fastify";
@@ -11,7 +14,7 @@ import {
   PortalRequestMessageCreateSchema, PortalRequestRateSchema, PortalRequestReopenSchema,
   type CustomerTicketDetail, type CustomerTicketRow, type PortalDocumentRow, type PortalRequestCategory, type PortalRequestDetailResponse, type PortalRequestMessage, type PortalRequestRow, type ServiceMessageRow,
 } from "@kkt/contracts";
-import { documents, serviceCategories, type Executor } from "@kkt/db";
+import { documents, serviceCategories, serviceRequestMessages, type Executor } from "@kkt/db";
 import { writeAudit } from "../../lib/audit.js";
 import { ApiError } from "../../lib/errors.js";
 import type { ListResult } from "../../lib/list.js";
@@ -38,13 +41,18 @@ export function toPortalRequestRow(t: CustomerTicketRow): PortalRequestRow {
 
 /**
  * Thread message → portal message: the customer's own messages read "YOU"; staff show by name only; internal notes never reach here.
- * Attachment thumbnails are re-signed for the viewing customer (the service module's thumb_url only tells us a rendition exists).
+ * Attachment links are re-signed for the viewing customer (the service module's thumb_url only tells us a rendition exists): `thumb_url`
+ * for the thread, `url` (medium rendition when one exists, else the original bytes) for the full-screen viewer and non-image files.
  */
 export function toPortalMessage(m: ServiceMessageRow, customerId: string): PortalRequestMessage {
   const author = m.author_type === "CUSTOMER" ? "YOU" : m.author_type === "STAFF" ? "STAFF" : "SYSTEM";
   return {
     id: m.id, author, author_name: m.author_name, body: m.body, created_at: m.created_at,
-    attachments: m.attachments.map((a) => ({ id: a.id, file_name: a.file_name, mime: a.mime, thumb_url: a.thumb_url ? portalDocumentUrl(customerId, a.id, "thumb").url : null })),
+    attachments: m.attachments.map((a) => ({
+      id: a.id, file_name: a.file_name, mime: a.mime,
+      thumb_url: a.thumb_url ? portalDocumentUrl(customerId, a.id, "thumb").url : null,
+      url: portalDocumentUrl(customerId, a.id, a.thumb_url ? "medium" : "original").url,
+    })),
   };
 }
 
@@ -88,17 +96,43 @@ export async function requestCategories(db: Executor, companyId: string): Promis
   return rows.map((r) => ({ id: r.id, name: r.name, default_priority: r.defaultPriority }));
 }
 
-/** Stores one uploaded file as a SERVICE_REQUEST document of the customer's ticket (closed tickets refuse attachments). */
+const MessageIdField = z.uuid();
+
+/**
+ * Stores one uploaded file as a SERVICE_REQUEST document of the customer's ticket (closed tickets refuse attachments). With a `message_id`
+ * text part the document is also appended to that message — only a non-internal message the customer wrote on this ticket qualifies;
+ * anything else (a staff message, another ticket's message, an unknown id) is 404 so nothing can be probed.
+ */
 export async function addRequestAttachment(app: FastifyInstance, customer: PortalContext, ticketId: string, upload: ParsedUpload, m: WriteMeta): Promise<PortalDocumentRow> {
+  const rawMessageId = upload.fields["message_id"];
+  let messageId: string | null = null;
+  if (rawMessageId !== undefined && rawMessageId !== "") {
+    const parsed = MessageIdField.safeParse(rawMessageId);
+    if (!parsed.success) throw ApiError.badRequest("message_id must be a UUID", { field: "message_id" });
+    messageId = parsed.data;
+  }
   return app.db.transaction(async (tx) => {
     const t = await requireCustomerTicket(tx, ticketId, customer.customerId, true);
     if (t.sr.status === "CLOSED") throw ApiError.conflict("TICKET_CLOSED", "This request is closed and can no longer be changed", { status: t.sr.status });
+    let message: { id: string; attachmentIds: string[] } | null = null;
+    if (messageId) {
+      const [msg] = await tx
+        .select({ id: serviceRequestMessages.id, attachmentIds: serviceRequestMessages.attachmentIds })
+        .from(serviceRequestMessages)
+        .where(and(eq(serviceRequestMessages.id, messageId), eq(serviceRequestMessages.ticketId, t.sr.id), eq(serviceRequestMessages.authorType, "CUSTOMER"), eq(serviceRequestMessages.authorId, customer.customerId), eq(serviceRequestMessages.isInternal, false)))
+        .limit(1)
+        .for("update");
+      if (!msg) throw ApiError.notFound("Message");
+      message = msg;
+    }
     const row = await storeBuffer(tx, { companyId: customer.companyId, entityType: "SERVICE_REQUEST", entityId: t.sr.id, buffer: upload.buffer, filename: upload.filename, uploadedBy: customer.customerId, uploadedByType: "CUSTOMER" });
+    if (message && message.attachmentIds.length >= 10) throw ApiError.badRequest("A message may carry at most 10 attachments", { field: "message_id" });
+    if (message) await tx.update(serviceRequestMessages).set({ attachmentIds: [...message.attachmentIds, row.id] }).where(eq(serviceRequestMessages.id, message.id));
     const joined = await loadJoined(tx, customer.companyId, row.id);
     const doc = toDocumentRow(joined!);
     await writeAudit(tx, {
       companyId: customer.companyId, actor: { type: "CUSTOMER", id: customer.customerId, name: customer.name }, action: "document.upload", entityType: "document", entityId: row.id,
-      after: { entity_type: "SERVICE_REQUEST", entity_id: t.sr.id, ticket_number: t.sr.ticketNumber, file_name: doc.file_name, mime: doc.mime, size_bytes: doc.size_bytes }, ip: m.ip ?? null, requestId: m.requestId ?? null,
+      after: { entity_type: "SERVICE_REQUEST", entity_id: t.sr.id, ticket_number: t.sr.ticketNumber, message_id: message?.id ?? null, file_name: doc.file_name, mime: doc.mime, size_bytes: doc.size_bytes }, ip: m.ip ?? null, requestId: m.requestId ?? null,
     });
     return { document_id: doc.id, kind: "ATTACHMENT", title: doc.title, document_type_name: doc.document_type_name, file_name: doc.file_name, mime: doc.mime, size_bytes: doc.size_bytes, shared_at: doc.created_at };
   });
@@ -183,8 +217,8 @@ export function registerRequestRoutes(app: FastifyInstance): void {
   route(app, {
     method: "POST", url: "/portal/requests/:id/attachments", audience: "portal", idempotent: true,
     schema: {
-      params: idParams, response: { 201: PortalDocumentRowSchema }, summary: "Upload one photo / PDF for a request (multipart, field `file`)",
-      description: "multipart/form-data with a single `file` part (PDF/JPEG/PNG/WebP ≤ 15 MB, validated by file signature). The returned document_id is then carried in a reply's attachment_ids.",
+      params: idParams, response: { 201: PortalDocumentRowSchema }, summary: "Upload one photo / PDF for a request (multipart, field `file`, optional `message_id`)",
+      description: "multipart/form-data with a single `file` part (PDF/JPEG/PNG/WebP ≤ 15 MB, validated by file signature). The returned document_id is then carried in a reply's attachment_ids — or, with a `message_id` text part naming one of your own messages on this request (the opening message after create), the file is appended to that message right away.",
     },
     handler: async (req, reply) => {
       const c = customerOf(req);

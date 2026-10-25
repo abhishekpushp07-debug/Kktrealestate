@@ -22,12 +22,14 @@ interface ClickToLoadEmbedProps {
  */
 export function ClickToLoadEmbed({ url, kind = "video", title, poster, className = "" }: ClickToLoadEmbedProps) {
   const [loaded, setLoaded] = useState(false);
+  const [posterFailed, setPosterFailed] = useState(false);
   const labelId = useId();
 
   const video = kind === "video" ? parseVideoUrl(url) : null;
   const embedUrl = video ? video.embedUrl : safeEmbedUrl(url);
   if (!embedUrl) return null;
-  const posterUrl = poster ?? video?.posterUrl ?? null;
+  // A missing thumbnail (private/unlisted video, placeholder id) falls back to the branded gradient instead of a broken image.
+  const posterUrl = posterFailed ? null : (poster ?? video?.posterUrl ?? null);
 
   const Icon = kind === "map" ? MapPinIcon : kind === "tour" ? CubeIcon : PlayIcon;
   const cta = kind === "map" ? "Load map" : kind === "tour" ? "Start 360° tour" : "Play video";
@@ -55,7 +57,7 @@ export function ClickToLoadEmbed({ url, kind = "video", title, poster, className
           {posterUrl ? (
             // Plain <img>: a third-party thumbnail host is not part of the image optimiser's allow-list.
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={posterUrl} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover opacity-80 transition duration-700 group-hover:scale-[1.03] group-hover:opacity-90" />
+            <img src={posterUrl} alt="" loading="lazy" decoding="async" onError={() => setPosterFailed(true)} className="absolute inset-0 h-full w-full object-cover opacity-80 transition duration-700 group-hover:scale-[1.03] group-hover:opacity-90" />
           ) : (
             <span
               aria-hidden

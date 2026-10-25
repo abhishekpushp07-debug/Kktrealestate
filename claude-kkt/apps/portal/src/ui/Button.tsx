@@ -29,7 +29,7 @@ const palette: Record<ButtonVariant, { bg: string; fg: string; border: string; p
 };
 
 const sizes: Record<ButtonSize, { h: number; px: number; font: number; icon: number }> = {
-  sm: { h: 36, px: 12, font: 13, icon: 16 },
+  sm: { h: 40, px: 14, font: 13, icon: 16 },
   md: { h: 46, px: 18, font: 15, icon: 18 },
   lg: { h: 54, px: 22, font: 16, icon: 20 },
 };
@@ -43,6 +43,7 @@ export function Button({ title, variant = "primary", size = "md", icon, iconRigh
       accessibilityRole="button"
       accessibilityState={{ disabled: !!isDisabled, busy: !!loading }}
       disabled={isDisabled}
+      hitSlop={size === "sm" ? 4 : undefined}
       onPress={(e) => {
         if (haptic) haptics.tap();
         onPress?.(e);

@@ -2,6 +2,7 @@
 import { useRouter } from "expo-router";
 import { useCallback, useState, type ReactNode } from "react";
 import { Platform, StyleSheet, View } from "react-native";
+import { useLayout } from "@/ui/Responsive";
 import type { PortalPdfLinkResponse } from "@kkt/contracts";
 import { errorMessage } from "@/api/client";
 import { downloadAndShare, viewSignedFile } from "@/api/files";
@@ -101,10 +102,13 @@ export function FooterActions({ children }: { children: ReactNode }): React.JSX.
 
 export function PdfButtons({ keyBase, fetchLink, actions, compact }: { keyBase: string; fetchLink: PdfLinkFn; actions: ReturnType<typeof useFileActions>; compact?: boolean }): React.JSX.Element {
   const busy = actions.busyKey?.startsWith(keyBase) ?? false;
+  const { isPhone } = useLayout();
+  // These are the primary actions of a receipt / demand / document row: full 46 px buttons on phones, compact on wider screens.
+  const size = isPhone ? "md" : "sm";
   return (
     <View style={styles.pdfRow}>
-      <Button title="View" variant="outline" size="sm" icon="external" loading={busy && actions.busyKey === `${keyBase}:view`} disabled={busy} onPress={() => actions.view(`${keyBase}:view`, fetchLink)} />
-      <Button title={compact ? "Save" : Platform.OS === "web" ? "Download" : "Share"} variant="ghost" size="sm" icon={Platform.OS === "web" ? "download" : "share"} loading={busy && actions.busyKey === `${keyBase}:dl`} disabled={busy} onPress={() => actions.download(`${keyBase}:dl`, fetchLink)} />
+      <Button title="View" variant="outline" size={size} icon="external" loading={busy && actions.busyKey === `${keyBase}:view`} disabled={busy} onPress={() => actions.view(`${keyBase}:view`, fetchLink)} />
+      <Button title={compact ? "Save" : Platform.OS === "web" ? "Download" : "Share"} variant="ghost" size={size} icon={Platform.OS === "web" ? "download" : "share"} loading={busy && actions.busyKey === `${keyBase}:dl`} disabled={busy} onPress={() => actions.download(`${keyBase}:dl`, fetchLink)} />
     </View>
   );
 }

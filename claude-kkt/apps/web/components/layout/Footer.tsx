@@ -3,7 +3,7 @@ import Link from "next/link";
 import { FacebookIcon, InstagramIcon, LinkedInIcon, MailIcon, MapPinIcon, PhoneIcon, WhatsAppIcon, XIcon, YouTubeIcon } from "@/components/ui/icons";
 import { telHref, whatsappHref } from "@/lib/format";
 import { NAV_LINKS } from "@/lib/nav";
-import type { SiteSettings } from "@/lib/types";
+import { NO_CONTACTS, type SiteSettings } from "@/lib/types";
 
 interface FooterProps {
   site: SiteSettings | null;
@@ -22,7 +22,7 @@ const SOCIAL: Array<{ key: keyof SiteSettings["social"]; label: string; Icon: ty
 ];
 
 export function Footer({ site, brandName, erpUrl, portalUrl }: FooterProps) {
-  const contacts = site?.contacts ?? {};
+  const contacts = site?.contacts ?? NO_CONTACTS;
   const offices = site?.offices ?? [];
   const social = SOCIAL.filter(({ key }) => typeof site?.social?.[key] === "string" && site.social[key]);
   const tel = telHref(contacts.phone);
@@ -129,12 +129,8 @@ export function Footer({ site, brandName, erpUrl, portalUrl }: FooterProps) {
                   <p className="font-semibold text-ivory-100">{office.name}</p>
                   <p className="mt-1 flex gap-2">
                     <MapPinIcon size={16} className="mt-1 shrink-0 text-gold-300" />
-                    <span>
-                      {office.address}
-                      {office.city ? `, ${office.city}` : ""}
-                    </span>
+                    <span>{office.address}</span>
                   </p>
-                  {office.hours ? <p className="mt-1 text-ivory-100/60">{office.hours}</p> : null}
                   {office.phone ? (
                     <a href={telHref(office.phone) ?? "#"} className="mt-1 inline-flex min-h-12 items-center text-ivory-100/80 hover:text-gold-300">
                       {office.phone}

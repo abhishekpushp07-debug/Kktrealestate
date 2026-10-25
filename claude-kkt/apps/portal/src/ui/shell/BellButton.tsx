@@ -29,6 +29,6 @@ export function BellButton({ onNavy, count }: { onNavy?: boolean; count?: number
 }
 
 const styles = StyleSheet.create({
-  btn: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  btn: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   badge: { position: "absolute", top: -8, right: -10 },
 });

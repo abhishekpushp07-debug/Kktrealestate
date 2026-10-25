@@ -330,7 +330,8 @@ export const PortalRequestMessageSchema = z.object({
   author: z.enum(["YOU", "STAFF", "SYSTEM"]),
   author_name: z.string(),
   body: z.string(),
-  attachments: z.array(z.object({ id: IdSchema, file_name: z.string(), mime: z.string(), thumb_url: z.string().nullable() })),
+  /** `thumb_url` is the ≈480 px rendition for the thread; `url` is the signed full-size link the photo viewer opens (null only for files the customer may not open). */
+  attachments: z.array(z.object({ id: IdSchema, file_name: z.string(), mime: z.string(), thumb_url: z.string().nullable(), url: z.string().nullable() })),
   created_at: TimestampSchema,
 });
 export type PortalRequestMessage = z.infer<typeof PortalRequestMessageSchema>;
@@ -402,6 +403,10 @@ export const PortalMarkReadSchema = z
   .strictObject({ ids: z.array(IdSchema).max(200).optional(), all: z.boolean().default(false) })
   .refine((m) => m.all || (m.ids !== undefined && m.ids.length > 0), { message: "Give ids or all=true", path: ["ids"] });
 export type PortalMarkRead = z.infer<typeof PortalMarkReadSchema>;
+
+/** `GET /portal/notifications/unread-count` (Appendix C: `{count}`; excludes withdrawn). */
+export const PortalNotificationCountResponseSchema = z.object({ count: z.int().min(0) });
+export type PortalNotificationCountResponse = z.infer<typeof PortalNotificationCountResponseSchema>;
 
 // ---------------------------------------------------------------------------
 // Profile

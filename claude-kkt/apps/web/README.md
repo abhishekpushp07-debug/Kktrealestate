@@ -47,7 +47,7 @@ app/
   not-found.tsx · sitemap.ts · robots.ts · icon.svg · globals.css (Tailwind v4 @theme tokens)
 lib/
   api.ts        THE typed API module: server fetchers + browser client (ApiError envelope, 429/SLOT_FULL)
-  types.ts      Appendix B response/request types (to be replaced by @kkt/contracts)
+  types.ts      Website aliases of the @kkt/contracts public schemas (+ list/error envelopes, filter bag)
   env.ts        runtime env access · format.ts  ₹ Indian grouping / short forms / IST dates
   markdown.tsx  safe Markdown → React renderer (no raw HTML) · seo.ts  metadata + JSON-LD builders
   media.ts      media URL resolution, YouTube/Vimeo embed parsing · gate.tsx  site-live gate · nav.ts

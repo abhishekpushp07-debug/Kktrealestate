@@ -46,7 +46,7 @@ export function Field({ ref, label, hint, error, icon, secureToggle, containerSt
           {...rest}
         />
         {secureToggle ? (
-          <Pressable accessibilityRole="button" accessibilityLabel={hidden ? "Show password" : "Hide password"} onPress={() => setHidden((h) => !h)} hitSlop={8}>
+          <Pressable accessibilityRole="button" accessibilityLabel={hidden ? "Show password" : "Hide password"} onPress={() => setHidden((h) => !h)} hitSlop={14}>
             <T variant="caption" color={onNavy ? colors.gold200 : colors.navy}>
               {hidden ? "Show" : "Hide"}
             </T>

@@ -3,9 +3,10 @@
  * (docs/API-CONVENTIONS.md, Appendix B).
  *
  *  - Server fetchers (`get*`, `list*`) run in Server Components, use the in-cluster API_INTERNAL_URL
- *    and the Next.js Data Cache (`next: { revalidate: 60, tags }`). Network failures degrade to
- *    empty fallbacks so a build or a request never dies because the backend is briefly away;
- *    a 404 on a detail resource becomes `notFound()`.
+ *    and, for lists and site settings, the Next.js Data Cache (`next: { revalidate: 60, tags }`); detail
+ *    resources are always fetched fresh (see DETAIL). Network failures degrade to empty fallbacks so a
+ *    build or a request never dies because the backend is briefly away; a 404 on a detail resource
+ *    becomes `notFound()`.
  *  - The browser client (`publicClient(apiUrl)`) performs the form POSTs and the live availability
  *    GET, surfacing the API error envelope `{ error: { code, message } }` as `ApiError`
  *    (including 429 RATE_LIMITED with Retry-After and 409 SLOT_FULL).
@@ -173,6 +174,14 @@ async function serverGet<T>(path: string, options: ServerGetOptions): Promise<Fe
   }
 }
 
+/**
+ * Detail resources are fetched without the Next.js Data Cache. The cache only stores 200s and keeps serving the last
+ * good entry while a revalidation returns anything else, so a project/post/page that is unpublished (API → 404) would
+ * stay live on the website until the server restarts. The API answers these from its own 60 s cache, so the cost is
+ * one small request per render.
+ */
+const DETAIL: Pick<ServerGetOptions, "revalidate"> = { revalidate: 0 };
+
 /** Resolves a detail fetch: 404 → notFound(), other failures → throw (rendered by error.tsx). */
 function unwrapDetail<T>(result: FetchResult<T>): T {
   if (result.ok) return result.data;
@@ -199,14 +208,14 @@ export async function listProjects(filters: ProjectListFilters = {}): Promise<Pr
 
 export async function getProject(slug: string): Promise<ProjectDetail> {
   return unwrapDetail(
-    await serverGet<ProjectDetail>(`/projects/${encodeURIComponent(slug)}`, { tags: ["projects", `project:${slug}`] }),
+    await serverGet<ProjectDetail>(`/projects/${encodeURIComponent(slug)}`, { tags: ["projects", `project:${slug}`], ...DETAIL }),
   );
 }
 
 /** Same as getProject but never throws — used for metadata and the sitemap. */
 export async function findProject(slug: string): Promise<ProjectDetail | null> {
   return unwrapOr(
-    await serverGet<ProjectDetail>(`/projects/${encodeURIComponent(slug)}`, { tags: ["projects", `project:${slug}`] }),
+    await serverGet<ProjectDetail>(`/projects/${encodeURIComponent(slug)}`, { tags: ["projects", `project:${slug}`], ...DETAIL }),
     null,
   );
 }
@@ -230,19 +239,19 @@ export async function listPosts(page = 1): Promise<ListEnvelope<PostCard>> {
 }
 
 export async function getPost(slug: string): Promise<PostDetail> {
-  return unwrapDetail(await serverGet<PostDetail>(`/posts/${encodeURIComponent(slug)}`, { tags: ["posts", `post:${slug}`] }));
+  return unwrapDetail(await serverGet<PostDetail>(`/posts/${encodeURIComponent(slug)}`, { tags: ["posts", `post:${slug}`], ...DETAIL }));
 }
 
 export async function findPost(slug: string): Promise<PostDetail | null> {
-  return unwrapOr(await serverGet<PostDetail>(`/posts/${encodeURIComponent(slug)}`, { tags: ["posts", `post:${slug}`] }), null);
+  return unwrapOr(await serverGet<PostDetail>(`/posts/${encodeURIComponent(slug)}`, { tags: ["posts", `post:${slug}`], ...DETAIL }), null);
 }
 
 export async function getPage(slug: string): Promise<PageDetail> {
-  return unwrapDetail(await serverGet<PageDetail>(`/pages/${encodeURIComponent(slug)}`, { tags: ["pages", `page:${slug}`] }));
+  return unwrapDetail(await serverGet<PageDetail>(`/pages/${encodeURIComponent(slug)}`, { tags: ["pages", `page:${slug}`], ...DETAIL }));
 }
 
 export async function findPage(slug: string): Promise<PageDetail | null> {
-  return unwrapOr(await serverGet<PageDetail>(`/pages/${encodeURIComponent(slug)}`, { tags: ["pages", `page:${slug}`] }), null);
+  return unwrapOr(await serverGet<PageDetail>(`/pages/${encodeURIComponent(slug)}`, { tags: ["pages", `page:${slug}`], ...DETAIL }), null);
 }
 
 export async function getGallery(projectSlug?: string): Promise<GalleryResponse> {

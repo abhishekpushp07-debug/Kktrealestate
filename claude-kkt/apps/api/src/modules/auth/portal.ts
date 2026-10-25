@@ -136,8 +136,8 @@ export async function portalAuthRoutes(app: FastifyInstance): Promise<void> {
 
   route(app, {
     method: "GET", url: "/portal/auth/sessions", audience: "portal",
-    schema: { response: { 200: z.object({ items: z.array(PortalSessionRowSchema) }) }, summary: "Customer sessions" },
-    handler: async (req) => ({ items: await listSessions(app.db, "CUSTOMER", req.customer!.portalUserId, req.customer!.sessionId) }),
+    schema: { response: { 200: z.array(PortalSessionRowSchema) }, summary: "Customer sessions (bare array, Appendix C additions)" },
+    handler: async (req) => listSessions(app.db, "CUSTOMER", req.customer!.portalUserId, req.customer!.sessionId),
   });
 
   route(app, {

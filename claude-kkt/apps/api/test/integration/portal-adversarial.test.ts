@@ -429,8 +429,8 @@ describe("budget, limits and strictness", () => {
     expect(n).toBeLessThanOrEqual(6);
     // and its counters agree with the dedicated endpoints
     const home = await ok<Home>(`/api/v1/portal/bookings/${A1}/home`, tokenA);
-    const unread = await ok<{ unread: number }>("/api/v1/portal/notifications/unread-count", tokenA);
-    expect(home.notifications_unread).toBe(unread.unread);
+    const unread = await ok<{ count: number }>("/api/v1/portal/notifications/unread-count", tokenA);
+    expect(home.notifications_unread).toBe(unread.count); // Appendix C: {count}
   });
 
   it("portal login is rate limited per IP (10/min → 429 with Retry-After) without locking anybody out", async () => {

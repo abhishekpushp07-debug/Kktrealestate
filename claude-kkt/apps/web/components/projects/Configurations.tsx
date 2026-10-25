@@ -44,14 +44,19 @@ export function Configurations({ items, showPrices }: { items: Configuration[]; 
         <div>
           <div className="flex flex-wrap items-baseline justify-between gap-3">
             <h3 className="font-display text-display-sm text-navy-900">{current.name}</h3>
-            {showPrices && typeof current.price_paise === "number" ? (
+            {showPrices && typeof current.price_from_paise === "number" ? (
               <p className="text-right">
                 <span className="block text-xs uppercase tracking-widest text-ink-soft">From</span>
-                <span className="font-display text-3xl text-gold-700" title={formatINR(current.price_paise)}>
-                  {formatINRShort(current.price_paise)}
+                <span className="font-display text-3xl text-gold-700" title={formatINR(current.price_from_paise)}>
+                  {formatINRShort(current.price_from_paise)}
                 </span>
               </p>
-            ) : null}
+            ) : (
+              <p className="text-right">
+                <span className="block text-xs uppercase tracking-widest text-ink-soft">Pricing</span>
+                <span className="font-display text-xl text-navy-900">Price on request</span>
+              </p>
+            )}
           </div>
           {current.facing ? <p className="mt-1 text-sm text-ink-muted">{current.facing} facing</p> : null}
           {current.description ? <p className="mt-4 leading-7 text-ink-muted">{current.description}</p> : null}
@@ -96,8 +101,8 @@ export function Configurations({ items, showPrices }: { items: Configuration[]; 
           {current.areas.length > 3 ? (
             <ul className="mt-4 flex flex-wrap gap-2 text-sm text-ink-muted">
               {current.areas.map((a) => (
-                <li key={a.area_type_code} className="rounded-full bg-ivory-200 px-3 py-1">
-                  {a.area_type_name}: {formatSqft(a.sqft)}
+                <li key={a.code} className="rounded-full bg-ivory-200 px-3 py-1">
+                  {a.name}: {formatSqft(a.sqft)}
                 </li>
               ))}
             </ul>
@@ -105,14 +110,14 @@ export function Configurations({ items, showPrices }: { items: Configuration[]; 
         </div>
 
         <div>
-          {current.floor_plan_image_url ? (
+          {current.floor_plan_url ? (
             <button type="button" onClick={() => setPlanOpen(true)} className="group relative block aspect-[4/3] w-full overflow-hidden rounded-card border border-line bg-white" aria-label={`Enlarge floor plan for ${current.name}`}>
-              <SmartImage src={current.floor_plan_image_url} alt={`Floor plan for ${current.name}`} sizes="(min-width: 1024px) 45vw, 100vw" className="object-contain p-4 transition duration-500 group-hover:scale-[1.02]" />
+              <SmartImage src={current.floor_plan_url} alt={`Floor plan for ${current.name}`} sizes="(min-width: 1024px) 45vw, 100vw" className="object-contain p-4 transition duration-500 group-hover:scale-[1.02]" />
               <span className="absolute bottom-3 right-3 rounded-full bg-navy-900/85 px-3 py-1 text-xs text-ivory-100">Tap to enlarge</span>
             </button>
           ) : null}
           {current.specifications.length ? (
-            <div className={current.floor_plan_image_url ? "mt-6" : ""}>
+            <div className={current.floor_plan_url ? "mt-6" : ""}>
               <h4 className="font-display text-xl text-navy-900">Specifications</h4>
               <dl className="mt-3 divide-y divide-line rounded-card border border-line bg-white">
                 {current.specifications.map((group) => (
@@ -126,8 +131,8 @@ export function Configurations({ items, showPrices }: { items: Configuration[]; 
           ) : null}
         </div>
       </div>
-      {current.floor_plan_image_url ? (
-        <Lightbox images={[{ src: current.floor_plan_image_url, alt: `Floor plan for ${current.name}` }]} index={planOpen ? 0 : null} onClose={() => setPlanOpen(false)} onIndexChange={() => undefined} />
+      {current.floor_plan_url ? (
+        <Lightbox images={[{ src: current.floor_plan_url, alt: `Floor plan for ${current.name}` }]} index={planOpen ? 0 : null} onClose={() => setPlanOpen(false)} onIndexChange={() => undefined} />
       ) : null}
     </div>
   );

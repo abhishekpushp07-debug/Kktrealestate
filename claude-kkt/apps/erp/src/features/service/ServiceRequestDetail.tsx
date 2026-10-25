@@ -75,7 +75,7 @@ function TicketView({ ticket }: { ticket: ServiceRequestDetailResponse }) {
   });
 
   const priority = useMutationWithToast<ServiceRequestRow, ServicePriority>({
-    mutationFn: (next) => api.post<ServiceRequestRow>(`${SERVICE_PATH}/${ticket.id}/priority`, { version: ticket.version, priority: next }, { version: ticket.version }),
+    mutationFn: (next) => api.patch<ServiceRequestRow>(`${SERVICE_PATH}/${ticket.id}`, { version: ticket.version, priority: next }, { version: ticket.version }),
     successMessage: (saved) => `Priority set to ${SERVICE_PRIORITY_LABELS[saved.priority]}`,
     invalidate,
     entityLabel: "This ticket",

@@ -212,6 +212,8 @@ export function registerDocumentRoutes(app: FastifyInstance): void {
       reply.header("Content-Disposition", `${inline ? "inline" : "attachment"}; filename="${asciiName(file.fileName)}"; filename*=UTF-8''${encodeURIComponent(file.fileName)}`);
       reply.header("Cache-Control", `private, max-age=${SIGNED_LINK_TTL_SECONDS}`);
       reply.header("X-Content-Type-Options", "nosniff");
+      // Signed links are embedded as <img>/<iframe> by the ERP on another origin (the token is the credential).
+      reply.header("Cross-Origin-Resource-Policy", "cross-origin");
       if (file.size !== null) reply.header("Content-Length", String(file.size));
       return reply.send(file.stream);
     },

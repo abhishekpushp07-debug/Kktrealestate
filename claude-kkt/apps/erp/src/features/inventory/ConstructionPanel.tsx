@@ -356,7 +356,7 @@ function StagePhotosDialog({ open, onOpenChange, blockId, stage, canUpdate }: St
   });
 
   const toggle = useMutationWithToast<StagePhotoRow, { photo: StagePhotoRow; patch: Partial<Pick<StagePhotoRow, "visible_to_buyers" | "show_on_website">> }>({
-    mutationFn: ({ photo, patch }) => api.patch<StagePhotoRow>(`${photosPath}/${photo.id}`, patch),
+    mutationFn: ({ photo, patch }) => api.patch<StagePhotoRow>(`/construction/photos/${photo.id}`, patch),
     successMessage: "Photo updated",
     invalidate,
   });

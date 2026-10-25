@@ -10,6 +10,7 @@ import { getSiteSettings } from "@/lib/api";
 import { publicApiUrl, siteConfig, siteUrl } from "@/lib/env";
 import { resolveMediaUrl } from "@/lib/media";
 import { brandName, organizationJsonLd, websiteJsonLd } from "@/lib/seo";
+import { NO_SEO_DEFAULTS } from "@/lib/types";
 
 // Every route renders at request time (data is cached 60 s via fetch tags), so `next build`
 // never needs a running API and content changes (publish / unpublish / site_live) show within a minute.
@@ -40,7 +41,7 @@ export const viewport: Viewport = {
 export async function generateMetadata(): Promise<Metadata> {
   const site = await getSiteSettings();
   const brand = brandName(site);
-  const defaults = site?.seo_defaults ?? {};
+  const defaults = site?.seo_defaults ?? NO_SEO_DEFAULTS;
   const title = defaults.title?.trim() || `${brand} · ${site?.brand?.tagline?.trim() || "Homes crafted for generations"}`;
   const description = defaults.description?.trim() || `Discover residences by ${brand}: RERA-registered projects, transparent pricing and private site visits.`;
   const ogImage = resolveMediaUrl(defaults.og_image_url, publicApiUrl());
@@ -52,7 +53,6 @@ export async function generateMetadata(): Promise<Metadata> {
     title: { default: title, template: `%s · ${brand}` },
     description,
     applicationName: brand,
-    keywords: defaults.keywords ?? undefined,
     alternates: { canonical: "/" },
     openGraph: {
       type: "website",

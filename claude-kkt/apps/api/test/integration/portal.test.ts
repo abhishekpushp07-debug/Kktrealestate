@@ -45,7 +45,7 @@ type PdfLink = { download_url: string; expires_at: string; file_name: string };
 type Timeline = { block_name: string; percent: number; current_stage: string | null; stages: { name: string; status: string; photos: { thumb_url: string; medium_url: string; caption: string | null }[] }[] };
 type Doc = { document_id: string; kind: string; title: string; file_name: string; mime: string; shared_at: string | null };
 type Bank = { bank_name: string; branch: string | null; account_name: string; account_number: string; ifsc: string; note: string | null };
-type Message = { id: string; author: string; author_name: string; body: string; attachments: { id: string; file_name: string; mime: string; thumb_url: string | null }[] };
+type Message = { id: string; author: string; author_name: string; body: string; attachments: { id: string; file_name: string; mime: string; thumb_url: string | null; url: string | null }[] };
 type Request = { id: string; ticket_number: string; booking_id: string | null; flat_number: string; category_name: string; priority: string; subject: string; status: string; can_reopen: boolean; can_rate: boolean; rating: number | null; messages: Message[] };
 type Notice = { id: string; title: string; project_name: string | null; is_read: boolean };
 type Notification = { id: string; type: string; title: string; screen: string; entity_id: string | null; booking_id: string | null; is_read: boolean };
@@ -123,8 +123,9 @@ async function fetchFile(url: string) {
   return t.app.inject({ method: "GET", url: pathOf(url), headers: { "x-forwarded-for": freshIp() } });
 }
 
-async function uploadAttachment(token: string, requestId: string, file: { name: string; data: Buffer; type?: string } | null) {
+async function uploadAttachment(token: string, requestId: string, file: { name: string; data: Buffer; type?: string } | null, fields: Record<string, string> = {}) {
   const fd = new FormData();
+  for (const [k, v] of Object.entries(fields)) fd.append(k, v);
   if (file) fd.append("file", new Blob([new Uint8Array(file.data)], { type: file.type ?? "application/octet-stream" }), file.name);
   else fd.append("note", "no file");
   const encoded = new Response(fd);
@@ -595,6 +596,18 @@ describe("service requests", () => {
     // someone else's document cannot be smuggled into the thread
     const smuggle = await post<Request>(`/api/v1/portal/requests/${reqA.id}/messages`, tokenA, { body: "x", attachment_ids: [sensitiveSharedDocId] });
     expect(smuggle.status).toBe(400);
+    // `message_id` appends the upload to one of the customer's own messages (the opening message after create — how the portal attaches photos to a new request)
+    const before = await ok<Request>(`/api/v1/portal/requests/${reqA.id}`, tokenA);
+    const opening = before.messages[0]!;
+    expect(opening.author).toBe("YOU");
+    const staffMsg = before.messages.find((m) => m.author === "STAFF")!;
+    const linked = await uploadAttachment(tokenA, reqA.id, { name: "opening.jpg", data: jpg, type: "image/jpeg" }, { message_id: opening.id });
+    expect(linked.status, linked.text).toBe(201);
+    const after = await ok<Request>(`/api/v1/portal/requests/${reqA.id}`, tokenA);
+    expect(after.messages[0]!.attachments.map((a) => a.id)).toContain(linked.body.document_id);
+    expect(after.messages[0]!.attachments.find((a) => a.id === linked.body.document_id)!.url).toMatch(/\/api\/v1\/portal\/files\//);
+    expect((await uploadAttachment(tokenA, reqA.id, { name: "x.jpg", data: jpg }, { message_id: staffMsg.id })).status).toBe(404); // not the customer's message
+    expect((await uploadAttachment(tokenA, reqA.id, { name: "x.jpg", data: jpg }, { message_id: "not-a-uuid" })).status).toBe(400);
   });
 
   it("reopen within 7 days of RESOLVED; 409 REOPEN_WINDOW_CLOSED after; rating closes and is once-only", async () => {
@@ -675,24 +688,24 @@ describe("notices and notifications", () => {
     expect(list.items.some((n) => n.entity_id === paymentBId || n.entity_id === bookingB.id)).toBe(false);
     assertNoLeaks(list);
 
-    const unread0 = await ok<{ unread: number }>("/api/v1/portal/notifications/unread-count", tokenA);
-    expect(unread0.unread).toBe(list.items.filter((n) => !n.is_read).length);
+    const unread0 = await ok<{ count: number }>("/api/v1/portal/notifications/unread-count", tokenA);
+    expect(unread0.count).toBe(list.items.filter((n) => !n.is_read).length); // Appendix C: {count}
     const home0 = await ok<Home>(`/api/v1/portal/bookings/${bookingA.id}/home`, tokenA);
-    expect(home0.notifications_unread).toBe(unread0.unread);
-    const bBefore = (await ok<{ unread: number }>("/api/v1/portal/notifications/unread-count", tokenB)).unread;
+    expect(home0.notifications_unread).toBe(unread0.count);
+    const bBefore = (await ok<{ count: number }>("/api/v1/portal/notifications/unread-count", tokenB)).count;
     const two = list.items.filter((n) => !n.is_read).slice(0, 2).map((n) => n.id);
     const marked = await post<{ updated: number }>("/api/v1/portal/notifications/mark-read", tokenA, { ids: two });
     expect(marked.status, marked.text).toBe(200);
     expect(marked.body.updated).toBe(2);
-    expect((await ok<{ unread: number }>("/api/v1/portal/notifications/unread-count", tokenA)).unread).toBe(unread0.unread - 2);
+    expect((await ok<{ count: number }>("/api/v1/portal/notifications/unread-count", tokenA)).count).toBe(unread0.count - 2);
     // ids of someone else's notifications mark nothing
     const bIds = (await ok<List<Notification>>("/api/v1/portal/notifications", tokenB)).items.map((n) => n.id);
     const foreign = await post<{ updated: number }>("/api/v1/portal/notifications/mark-read", tokenA, { ids: bIds });
     expect(foreign.body.updated).toBe(0);
-    expect((await ok<{ unread: number }>("/api/v1/portal/notifications/unread-count", tokenB)).unread).toBe(bBefore);
+    expect((await ok<{ count: number }>("/api/v1/portal/notifications/unread-count", tokenB)).count).toBe(bBefore);
     const all = await post<{ updated: number }>("/api/v1/portal/notifications/mark-read", tokenA, { all: true });
     expect(all.status).toBe(200);
-    expect((await ok<{ unread: number }>("/api/v1/portal/notifications/unread-count", tokenA)).unread).toBe(0);
+    expect((await ok<{ count: number }>("/api/v1/portal/notifications/unread-count", tokenA)).count).toBe(0);
     // notices now read through the bell; home counts follow
     const notices = await ok<List<Notice>>("/api/v1/portal/notices", tokenA);
     expect(notices.items.every((n) => n.is_read)).toBe(true);

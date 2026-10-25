@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { siteUrl } from "@/lib/env";
 import { resolveMediaUrl } from "@/lib/media";
-import type { PostDetail, ProjectDetail, SiteSettings } from "@/lib/types";
+import { NO_ADDRESS, type PostDetail, type ProjectDetail, type SiteSettings } from "@/lib/types";
 
 export const DEFAULT_BRAND = "KKT";
 
@@ -69,7 +69,6 @@ export function organizationJsonLd(site: SiteSettings | null, apiUrl: string): J
       ? compact({
           "@type": "PostalAddress",
           streetAddress: office.address,
-          addressLocality: office.city ?? undefined,
           addressCountry: "IN",
         })
       : undefined,
@@ -93,14 +92,14 @@ export function websiteJsonLd(site: SiteSettings | null): JsonLdObject {
 
 export function projectJsonLd(project: ProjectDetail, apiUrl: string): JsonLdObject {
   const base = siteUrl();
-  const address = project.key_facts?.address ?? {};
+  const address = project.key_facts?.address ?? NO_ADDRESS;
   const images = (project.hero_images ?? []).map((img) => resolveMediaUrl(img.url, apiUrl)).filter((u): u is string => !!u);
   const listing: JsonLdObject = compact({
     "@context": "https://schema.org",
     "@type": "RealEstateListing",
     name: project.name,
     url: `${base}/projects/${project.slug}`,
-    description: project.overview,
+    description: project.description ?? undefined,
     image: images.length ? images : undefined,
     datePosted: project.key_facts?.launch_date ?? undefined,
     mainEntity: compact({
@@ -143,7 +142,7 @@ export function articleJsonLd(post: PostDetail, site: SiteSettings | null, apiUr
     "@type": "Article",
     headline: post.title,
     description: post.excerpt ?? undefined,
-    image: resolveMediaUrl(post.cover_image_url, apiUrl) ?? undefined,
+    image: resolveMediaUrl(post.cover_url, apiUrl) ?? undefined,
     datePublished: post.published_at ?? undefined,
     dateModified: post.updated_at ?? post.published_at ?? undefined,
     author: post.author_name ? { "@type": "Person", name: post.author_name } : { "@type": "Organization", name: brandName(site) },

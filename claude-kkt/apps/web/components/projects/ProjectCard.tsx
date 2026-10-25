@@ -18,7 +18,7 @@ export function ProjectCard({ project, priority = false }: { project: ProjectCar
         <div className="absolute left-4 top-4 flex flex-wrap gap-2">
           <Badge tone="ivory">{statusLabel(project.status)}</Badge>
         </div>
-        {price ? <p className="absolute bottom-4 left-4 rounded-full bg-gold-500 px-3 py-1 text-sm font-semibold text-navy-950">{price}</p> : null}
+        <p className={`absolute bottom-4 left-4 rounded-full px-3 py-1 text-sm font-semibold ${price ? "bg-gold-500 text-navy-950" : "bg-ivory-100/90 text-navy-900"}`}>{price ?? "Price on request"}</p>
       </div>
       <div className="flex flex-1 flex-col p-6">
         <p className="flex items-center gap-1.5 text-sm text-ink-muted">

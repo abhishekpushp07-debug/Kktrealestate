@@ -138,7 +138,7 @@ export function Combobox({
             disabled={disabled}
             className={cn(
               "flex w-full min-w-0 items-center justify-between gap-2 rounded-md border border-border-strong bg-card px-3 text-left text-sm transition-colors hover:border-navy-300 focus-ring focus-visible:border-gold disabled:cursor-not-allowed disabled:bg-surface disabled:text-ink-subtle aria-invalid:border-danger",
-              size === "md" ? "h-9" : "h-8 text-xs",
+              size === "md" ? "h-11 sm:h-9" : "h-11 text-xs sm:h-8",
               allowClear && value && "pr-14",
             )}
             {...aria}

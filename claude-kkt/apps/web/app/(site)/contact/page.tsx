@@ -10,6 +10,7 @@ import { getSiteSettings, listProjects } from "@/lib/api";
 import { telHref, whatsappHref } from "@/lib/format";
 import { closedMetadata, siteGate } from "@/lib/gate";
 import { brandName, breadcrumbJsonLd, pageMetadata } from "@/lib/seo";
+import { NO_CONTACTS } from "@/lib/types";
 
 export async function generateMetadata(): Promise<Metadata> {
   const closed = await closedMetadata();
@@ -24,7 +25,7 @@ export default async function ContactPage() {
   const site = gate.site;
   const projects = await listProjects();
   const brand = brandName(site);
-  const contacts = site?.contacts ?? {};
+  const contacts = site?.contacts ?? NO_CONTACTS;
   const tel = telHref(contacts.phone);
   const wa = whatsappHref(contacts.whatsapp ?? contacts.phone, `Hello ${brand}, I would like to know more about your projects.`);
   const options = projects.map((p) => ({ slug: p.slug, name: p.name }));
@@ -69,11 +70,7 @@ export default async function ContactPage() {
                 <MapPinIcon className="mt-1 shrink-0 text-gold-600" />
                 <div className="min-w-0 text-sm leading-6">
                   <p className="text-xs uppercase tracking-widest text-ink-soft">{office.name}</p>
-                  <p className="mt-1 font-medium text-navy-900">
-                    {office.address}
-                    {office.city ? `, ${office.city}` : ""}
-                  </p>
-                  {office.hours ? <p className="text-ink-muted">{office.hours}</p> : null}
+                  <p className="mt-1 font-medium text-navy-900">{office.address}</p>
                   <p className="mt-1 flex flex-wrap gap-x-4">
                     {office.phone ? (
                       <a href={telHref(office.phone) ?? "#"} className="inline-flex min-h-12 items-center text-navy-900 hover:text-gold-700">

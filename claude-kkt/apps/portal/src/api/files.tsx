@@ -1,6 +1,9 @@
 // Signed-file helpers (native): "view" opens the short-lived link in the in-app browser,
 // "download" saves it to the cache with expo-file-system and hands it to the system share sheet.
-// files.web.ts is the browser counterpart (in-app viewer modal / new tab).
+// files.web.tsx is the browser counterpart (in-app viewer modal / new tab).
+// NOTE: this file is .tsx on purpose. Metro tries platform variants PER EXTENSION in sourceExts order
+// (files.web.ts → files.ts → files.web.tsx → files.tsx), so a .web.tsx counterpart only wins when the
+// default file shares its extension; as files.ts the native module was bundled for web.
 import { Directory, File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import * as WebBrowser from "expo-web-browser";

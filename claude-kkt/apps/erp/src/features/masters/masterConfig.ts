@@ -317,7 +317,7 @@ const SPEC_CATEGORY_COLUMNS: ColumnDef<SpecCategoryRow, unknown>[] = [
 
 const SPEC_ITEM_COLUMNS: ColumnDef<SpecItemRow, unknown>[] = [
   { accessorKey: "name", header: "Item", meta: { locked: true } },
-  { accessorKey: "category_name", header: "Category" },
+  { accessorKey: "category_name", header: "Category", meta: { sortKey: false } },
   { accessorKey: "description", header: "Description", cell: ({ row }) => createElement("span", { className: "block max-w-sm truncate text-ink-muted", title: row.original.description ?? undefined }, row.original.description || "—") },
   { accessorKey: "sort_order", header: "Order", meta: { align: "right", width: 90 } },
 ];
@@ -674,7 +674,7 @@ export const MASTER_CONFIGS: Readonly<Record<MasterKind, AnyMasterConfig>> = {
     icon: ListChecks,
     group: "structure",
     columns: SPEC_ITEM_COLUMNS,
-    defaultSort: "category_name",
+    defaultSort: "sort_order",
     searchPlaceholder: "Search items…",
     csv: { columns: ["category_name", "name", "description", "sort_order"], example: "Flooring,Vitrified tiles 600×600,Kajaria or equivalent,1" },
     createSchema: SpecItemCreateSchema,

@@ -39,6 +39,8 @@ src/api/client.ts        the ONLY HTTP module: fetch, tokens (access in memory, 
 src/api/queries.ts       TanStack Query hooks (keys scoped by booking id), AsyncStorage-persisted cache (7 days),
                          networkMode "offlineFirst" → cached screens render instantly, refresh in background
 src/api/files(.web).tsx  signed PDF links: in-app viewer / new tab on web; download + share sheet on phones
+                         (platform variants MUST share the default file's extension — Metro tries x.web.ts before x.ts
+                         but x.ts before x.web.tsx — see metro.config.js)
 src/auth/                AuthProvider (login with phone normalisation, lockout/rate-limit messages, must-change gate)
 src/booking/             selected booking (persisted) for customers with several bookings
 src/screens/             one component per screen
@@ -72,7 +74,8 @@ static export (`web.output: "static"`), deployed by `apps/portal/Dockerfile` beh
   `category_id`. Priority is not part of `PortalRequestCreate` (strict object), so the form shows the category's
   default priority instead of sending one.
 * Request photos are uploaded one per call to `POST /requests/:id/attachments` as multipart field `file`; on create
-  the request is posted first (JSON, `attachment_ids: []`) and the photos follow; on reply the uploads come first and
-  their `document_id`s go into `attachment_ids`.
+  the request is posted first (JSON, `attachment_ids: []`) and the photos follow with the text field `message_id` set to
+  the opening message's id (so they show on the description bubble); on reply the uploads come first and their
+  `document_id`s go into `attachment_ids`. Thread attachments carry `thumb_url` (grid) and `url` (full-size, for the viewer).
 * `GET /auth/sessions` and `GET /bookings` are read as bare arrays, with `{ items }` tolerated.
 * Lockout (423 `LOCKED`) reads `details.locked_until` when present; 429 reads the `Retry-After` header.

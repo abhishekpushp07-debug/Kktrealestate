@@ -25,6 +25,7 @@ export function BookingChip({ onNavy, block }: { onNavy?: boolean; block?: boole
         accessibilityRole="button"
         accessibilityLabel={multiple ? "Switch booking" : "Current booking"}
         disabled={!multiple}
+        hitSlop={6}
         onPress={() => {
           haptics.tap();
           setOpen(true);
@@ -69,7 +70,7 @@ export function BookingRoleChip(): React.JSX.Element | null {
 }
 
 const styles = StyleSheet.create({
-  chip: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: radius.pill, borderWidth: 1, maxWidth: 240 },
+  chip: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 7, minHeight: 44, borderRadius: radius.pill, borderWidth: 1, maxWidth: 240 },
   chipIvory: { backgroundColor: colors.surface, borderColor: colors.line },
   chipNavy: { backgroundColor: "rgba(255,255,255,0.1)", borderColor: "rgba(255,255,255,0.18)" },
   block: { maxWidth: undefined, alignSelf: "stretch", paddingVertical: 10, gap: space.sm },

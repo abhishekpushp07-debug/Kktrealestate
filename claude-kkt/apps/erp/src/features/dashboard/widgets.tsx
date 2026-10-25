@@ -81,6 +81,7 @@ export interface MiniColumn<T> {
 export function MiniTable<T>({ rows, columns, rowKey, empty = "Nothing to show", footer, dense = false }: { rows: readonly T[]; columns: ReadonlyArray<MiniColumn<T>>; rowKey: (row: T, index: number) => string; empty?: string; footer?: ReactNode; dense?: boolean }) {
   if (rows.length === 0) return <EmptyState compact title={empty} className="py-6" />;
   return (
+    <div className="min-w-0 overflow-x-auto">
     <table className={cn("w-full min-w-[18rem] text-sm", dense && "text-xs")}>
       <thead>
         <tr className="border-b border-border text-left text-2xs uppercase tracking-wider text-ink-subtle">
@@ -104,6 +105,7 @@ export function MiniTable<T>({ rows, columns, rowKey, empty = "Nothing to show",
       </tbody>
       {footer && <tfoot>{footer}</tfoot>}
     </table>
+    </div>
   );
 }
 

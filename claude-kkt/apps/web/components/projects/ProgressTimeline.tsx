@@ -43,7 +43,7 @@ export function ProgressTimeline({ progress }: { progress: ConstructionProgress 
           {block.stages.map((stage, i) => {
             const done = stage.status === "COMPLETED";
             const now = stage.status === "IN_PROGRESS";
-            const images: LightboxImage[] = stage.photos.map((p, j) => ({ src: p.url, alt: p.alt || `${stage.name} photo ${j + 1}`, caption: p.caption ?? (p.taken_on ? formatDate(p.taken_on) : null) }));
+            const images: LightboxImage[] = stage.photos.map((p, j) => ({ src: p.medium_url, alt: p.alt || `${stage.name} photo ${j + 1}`, caption: p.caption ?? (p.taken_on ? formatDate(p.taken_on) : null) }));
             return (
               <li key={`${stage.name}-${i}`} className="relative grid grid-cols-[2rem_1fr] gap-4 pb-8 last:pb-0">
                 {i < block.stages.length - 1 ? <span aria-hidden className={`absolute left-[0.95rem] top-8 bottom-0 w-px ${done ? "bg-gold-500" : "bg-line"}`} /> : null}

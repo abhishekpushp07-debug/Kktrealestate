@@ -9,7 +9,7 @@ export function PostCard({ post, featured = false }: { post: PostCardData; featu
   return (
     <article className={`group relative flex flex-col overflow-hidden rounded-card bg-white shadow-card transition duration-500 hover:-translate-y-1 hover:shadow-float ${featured ? "lg:flex-row" : ""}`}>
       <div className={`relative overflow-hidden bg-navy-900 ${featured ? "aspect-[16/10] lg:aspect-auto lg:w-1/2" : "aspect-[16/10]"}`}>
-        <SmartImage src={post.cover_image_url ?? null} alt="" sizes={featured ? SIZES.half : SIZES.third} className="transition duration-700 ease-luxe group-hover:scale-105" />
+        <SmartImage src={post.cover_url ?? null} alt="" sizes={featured ? SIZES.half : SIZES.third} className="transition duration-700 ease-luxe group-hover:scale-105" />
       </div>
       <div className={`flex flex-1 flex-col p-6 ${featured ? "lg:p-10" : ""}`}>
         <p className="text-xs uppercase tracking-[0.2em] text-gold-600">

@@ -15,7 +15,7 @@ import { ApiError } from "../../lib/errors.js";
 import { route } from "../../lib/routes.js";
 import { FORM_RATE_LIMIT } from "./publicForms.js";
 import { livePublishedProject, type PublishedProject } from "./publicContent.js";
-import { RelaxedHoneypotSchema, WEBSITE_ACTOR, bustPublicCache, clock, fakeNumber, isHoneypotTripped, noStore, publicCached, publicCompanyId, publicMeta, relaxHoneypot } from "./shared.js";
+import { RelaxedHoneypotSchema, WEBSITE_ACTOR, bustPublicCache, clock, crossOriginFile, fakeNumber, isHoneypotTripped, noStore, publicCached, publicCompanyId, publicMeta, relaxHoneypot } from "./shared.js";
 import {
   bookVisit, cancelVisit, clampRange, icsUrl, isPast, loadVisitByToken, loadVisitSettings, manageUrl, matchSlot, projectAvailability, visitIcs, type DbVisitSettings, type VisitSelect,
 } from "./visitService.js";
@@ -130,6 +130,7 @@ export function registerPublicVisitRoutes(app: FastifyInstance): void {
       const { row, settings } = await visitByToken(app.dbReplica, req.params.token);
       noStore(reply);
       reply.header("Content-Type", "text/calendar; charset=utf-8");
+      crossOriginFile(reply);
       reply.header("Content-Disposition", `attachment; filename="site-visit-${row.v.visitNumber.replace(/[^A-Za-z0-9-]/g, "-")}.ics"`);
       return reply.send(visitIcs(row.v, row.projectName ?? "Site visit", settings, req.params.token));
     },

@@ -3,7 +3,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
   NotificationCountResponseSchema, NotificationFilterSchema, NotificationListResponseSchema, NotificationMarkReadSchema, NotificationRowSchema,
-  PortalMarkReadSchema, PortalNotificationListResponseSchema, type NotificationRecipientType, type NotificationRow, type PortalNotificationRow,
+  PortalMarkReadSchema, PortalNotificationCountResponseSchema, PortalNotificationListResponseSchema, type NotificationRecipientType, type NotificationRow, type PortalNotificationRow,
 } from "@kkt/contracts";
 import { notifications } from "@kkt/db";
 import { ApiError } from "../../lib/errors.js";
@@ -77,6 +77,6 @@ export async function notificationsModule(app: FastifyInstance): Promise<void> {
   } });
 
   route(app, { method: "GET", url: "/portal/notifications", audience: "portal", schema: { querystring: NotificationFilterSchema, response: { 200: PortalNotificationListResponseSchema }, summary: "Customer bell" }, handler: async (req) => { const r = await list(req, req.query); return { ...r, items: r.items.map(toPortalRow) }; } });
-  route(app, { method: "GET", url: "/portal/notifications/unread-count", audience: "portal", schema: { response: { 200: NotificationCountResponseSchema }, summary: "Customer unread count" }, handler: async (req) => unread(req) });
+  route(app, { method: "GET", url: "/portal/notifications/unread-count", audience: "portal", schema: { response: { 200: PortalNotificationCountResponseSchema }, summary: "Customer unread count (Appendix C: {count})" }, handler: async (req) => ({ count: (await unread(req)).unread }) });
   route(app, { method: "POST", url: "/portal/notifications/mark-read", audience: "portal", schema: { body: PortalMarkReadSchema, response: { 200: z.object({ updated: z.int() }) }, summary: "Mark customer notifications read" }, handler: async (req) => markRead(req, req.body) });
 }

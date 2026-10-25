@@ -26,6 +26,9 @@ export const queryClient = new QueryClient({
       networkMode: "offlineFirst",
       gcTime: CACHE_MAX_AGE,
       staleTime: 30_000,
+      // Cached screens render instantly from the persisted cache and ALWAYS refresh in the background when opened (SPEC §16), even
+      // when the cached copy is younger than staleTime — staff may have acted (resolved a request, posted a payment) meanwhile.
+      refetchOnMount: "always",
       retry: (count, err) => !(err instanceof ApiError && err.status >= 400 && err.status < 500) && count < 2,
       refetchOnWindowFocus: true,
       refetchOnReconnect: true,
@@ -103,7 +106,9 @@ const enabled = (id: string | null | undefined): id is string => typeof id === "
 // Queries
 // ---------------------------------------------------------------------------
 
-export const useBookings = (on = true) => useQuery({ queryKey: keys.bookings, queryFn: api.bookings.list, enabled: on });
+// The switcher list is tiny and gates every booking screen: always re-read it once the session is authenticated (enabling a query
+// does not count as a mount, so refetchOnMount alone would keep a < 30 s old cached list).
+export const useBookings = (on = true) => useQuery({ queryKey: keys.bookings, queryFn: api.bookings.list, enabled: on, staleTime: 0 });
 export const useHome = (id: string | null) => useQuery({ queryKey: keys.home(id ?? ""), queryFn: () => api.bookings.home(id ?? ""), enabled: enabled(id) });
 export const useFlat = (id: string | null) => useQuery({ queryKey: keys.flat(id ?? ""), queryFn: () => api.bookings.flat(id ?? ""), enabled: enabled(id) });
 export const useLedger = (id: string | null) => useQuery({ queryKey: keys.ledger(id ?? ""), queryFn: () => api.bookings.ledger(id ?? ""), enabled: enabled(id) });
@@ -135,15 +140,17 @@ export function useCreateRequest() {
   return useMutation({
     mutationFn: async (input: { body: PortalRequestCreate; files: LocalFile[]; idempotencyKey: string }) => {
       const created = await api.requests.create(input.body, input.idempotencyKey);
+      // Photos go on the opening message (the description the customer just wrote) so the thread shows them from the start.
+      const opening = created.messages.find((m) => m.author === "YOU");
       const failed: string[] = [];
       for (const f of input.files) {
         try {
-          await api.requests.uploadAttachment(created.id, f);
+          await api.requests.uploadAttachment(created.id, f, opening ? { messageId: opening.id } : {});
         } catch {
           failed.push(f.name ?? "photo");
         }
       }
-      const detail = failed.length ? await api.requests.get(created.id) : created;
+      const detail = input.files.length ? await api.requests.get(created.id) : created;
       return { detail, failed };
     },
     onSuccess: ({ detail }) => {

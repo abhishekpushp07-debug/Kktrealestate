@@ -68,7 +68,7 @@ export function StarRating({ value, onChange, size = 30 }: { value: number; onCh
   return (
     <View style={{ flexDirection: "row", gap: 4 }} accessibilityRole="adjustable" accessibilityValue={{ min: 1, max: 5, now: value }}>
       {[1, 2, 3, 4, 5].map((n) => (
-        <Pressable key={n} disabled={!onChange} accessibilityRole="button" accessibilityLabel={`${n} star${n > 1 ? "s" : ""}`} onPress={() => onChange?.(n)} hitSlop={4}>
+        <Pressable key={n} disabled={!onChange} accessibilityRole="button" accessibilityLabel={`${n} star${n > 1 ? "s" : ""}`} onPress={() => onChange?.(n)} hitSlop={4} style={onChange ? { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" } : null}>
           <Icon name="star" size={size} color={n <= value ? colors.gold : colors.navy200} />
         </Pressable>
       ))}

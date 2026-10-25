@@ -68,7 +68,8 @@ export function parseVideoUrl(raw: string): EmbedInfo | null {
     return {
       provider: "youtube",
       embedUrl: `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&modestbranding=1&playsinline=1`,
-      posterUrl: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+      // YouTube ids are exactly 11 characters; a placeholder id (demo content) gets the branded poster instead of a 404 thumbnail.
+      posterUrl: /^[\w-]{11}$/.test(id) ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : null,
       title: "YouTube video",
     };
   }

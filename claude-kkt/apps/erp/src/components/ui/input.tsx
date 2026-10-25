@@ -3,7 +3,7 @@ import type { InputHTMLAttributes, ReactNode, Ref, TextareaHTMLAttributes } from
 import { cn } from "@/lib/utils";
 
 export const inputClassName =
-  "h-9 w-full min-w-0 rounded-md border border-border-strong bg-card px-3 text-sm text-ink shadow-none transition-colors placeholder:text-ink-subtle hover:border-navy-300 focus-ring focus-visible:border-gold disabled:cursor-not-allowed disabled:bg-surface disabled:text-ink-subtle aria-invalid:border-danger aria-invalid:focus-visible:border-danger read-only:bg-surface";
+  "h-11 sm:h-9 w-full min-w-0 rounded-md border border-border-strong bg-card px-3 text-sm text-ink shadow-none transition-colors placeholder:text-ink-subtle hover:border-navy-300 focus-ring focus-visible:border-gold disabled:cursor-not-allowed disabled:bg-surface disabled:text-ink-subtle aria-invalid:border-danger aria-invalid:focus-visible:border-danger read-only:bg-surface";
 
 export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "size" | "prefix"> {
   ref?: Ref<HTMLInputElement>;

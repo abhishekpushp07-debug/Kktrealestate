@@ -43,7 +43,7 @@ export function SegmentedControl<K extends string>({ segments, value, onChange, 
 }
 
 const styles = StyleSheet.create({
-  track: { flexDirection: "row", backgroundColor: colors.navy100, borderRadius: radius.pill, padding: 3, gap: 2 },
-  seg: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: radius.pill, alignItems: "center", justifyContent: "center" },
+  track: { flexDirection: "row", backgroundColor: colors.navy100, borderRadius: radius.pill, padding: 2, gap: 2 },
+  seg: { minHeight: 44, paddingVertical: 8, paddingHorizontal: 14, borderRadius: radius.pill, alignItems: "center", justifyContent: "center" },
   active: { backgroundColor: colors.surface, boxShadow: "0 1px 4px rgba(11,31,58,0.12)" },
 });

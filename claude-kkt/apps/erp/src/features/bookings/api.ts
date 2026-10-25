@@ -103,10 +103,10 @@ export function bookingInvalidations(id: string): readonly (readonly unknown[])[
 /* ------------------------------------------------------------------ */
 
 /** Plans assigned to a tower on a date, default first (`GET /blocks/:id/applicable-plans`). */
-export function useApplicablePlans(projectId: string | null | undefined, blockId: string | null | undefined, onDate: string): UseQueryResult<ApplicablePlanRow[], ApiClientError> {
+export function useApplicablePlans(_projectId: string | null | undefined, blockId: string | null | undefined, onDate: string): UseQueryResult<ApplicablePlanRow[], ApiClientError> {
   return useQuery<ApplicablePlansResponse | ApplicablePlanRow[], ApiClientError, ApplicablePlanRow[], readonly unknown[]>({
     queryKey: bookingKeys.applicablePlans(blockId ?? "", onDate),
-    queryFn: ({ signal }) => api.get<ApplicablePlansResponse | ApplicablePlanRow[]>(`/blocks/${blockId}/applicable-plans`, { signal, query: { project_id: projectId ?? undefined, block_id: blockId ?? undefined, on_date: onDate || undefined } }),
+    queryFn: ({ signal }) => api.get<ApplicablePlansResponse | ApplicablePlanRow[]>(`/blocks/${blockId}/applicable-plans`, { signal, query: { on_date: onDate || undefined } }),
     select: (data) => {
       const plans = Array.isArray(data) ? data : data.plans;
       return [...plans].sort((a, b) => Number(b.is_default) - Number(a.is_default));
@@ -175,8 +175,9 @@ export function useMyDrafts(enabled = true): UseQueryResult<BookingDraftRow[], A
   });
 }
 
+/** `PUT /booking-drafts` upserts by `id` (a missing/unknown id creates a new draft). */
 export function saveDraft(body: BookingDraftUpsert): Promise<BookingDraftRow> {
-  return body.id ? api.put<BookingDraftRow>(`${DRAFTS_PATH}/${body.id}`, body) : api.post<BookingDraftRow>(DRAFTS_PATH, body);
+  return api.put<BookingDraftRow>(DRAFTS_PATH, body);
 }
 
 export function deleteDraft(id: string): Promise<void> {

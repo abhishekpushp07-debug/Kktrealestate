@@ -58,7 +58,7 @@ export function Select<V extends string = string>({
         aria-invalid={invalid || undefined}
         className={cn(
           "group flex w-full min-w-0 items-center justify-between gap-2 rounded-md border border-border-strong bg-card px-3 text-left text-sm text-ink transition-colors hover:border-navy-300 focus-ring focus-visible:border-gold disabled:cursor-not-allowed disabled:bg-surface disabled:text-ink-subtle data-[placeholder]:text-ink-subtle aria-invalid:border-danger",
-          size === "md" ? "h-9" : "h-8 text-xs",
+          size === "md" ? "h-11 sm:h-9" : "h-11 text-xs sm:h-8",
           className,
         )}
         {...aria}

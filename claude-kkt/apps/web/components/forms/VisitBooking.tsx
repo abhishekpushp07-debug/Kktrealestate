@@ -90,8 +90,8 @@ export function VisitBooking({ projects, defaultProjectSlug, fixedProject = fals
     setStatus({ kind: "submitting" });
     const body: SiteVisitRequest = {
       project_slug: projectSlug,
-      date: selectedDate,
-      start: selectedSlot.start,
+      visit_date: selectedDate,
+      slot_start: selectedSlot.start,
       name: values.name.trim(),
       phone: canonicalPhone(values.phone) ?? values.phone,
       ...(values.email.trim() ? { email: values.email.trim() } : {}),
@@ -129,7 +129,7 @@ export function VisitBooking({ projects, defaultProjectSlug, fixedProject = fals
             <h3 className="font-display text-display-sm">Your visit is confirmed</h3>
             <p className={`mt-1 ${dark ? "text-ivory-100/75" : "text-ink-muted"}`}>
               Visit number <span className="font-semibold text-gold-500">{r.visit_number}</span>
-              {r.project_name || projectName ? ` · ${r.project_name ?? projectName}` : ""}
+              {` · ${r.project_name || projectName}`}
             </p>
           </div>
         </div>
@@ -138,22 +138,22 @@ export function VisitBooking({ projects, defaultProjectSlug, fixedProject = fals
             <CalendarIcon className="mt-0.5 shrink-0 text-gold-500" />
             <div>
               <dt className="text-xs uppercase tracking-widest opacity-70">Date</dt>
-              <dd className="font-semibold">{formatDate(r.date, "long")}</dd>
+              <dd className="font-semibold">{formatDate(r.visit_date, "long")}</dd>
             </div>
           </div>
           <div className="flex gap-3">
             <ClockIcon className="mt-0.5 shrink-0 text-gold-500" />
             <div>
               <dt className="text-xs uppercase tracking-widest opacity-70">Time (IST)</dt>
-              <dd className="font-semibold">{formatTimeRange(r.start, r.end)}</dd>
+              <dd className="font-semibold">{formatTimeRange(r.slot_start, r.slot_end)}</dd>
             </div>
           </div>
-          {r.address ? (
+          {r.site_office_address ? (
             <div className="flex gap-3 sm:col-span-2">
               <MapPinIcon className="mt-0.5 shrink-0 text-gold-500" />
               <div>
                 <dt className="text-xs uppercase tracking-widest opacity-70">Site office</dt>
-                <dd className="whitespace-pre-line">{r.address}</dd>
+                <dd className="whitespace-pre-line">{r.site_office_address}</dd>
                 {r.maps_link ? (
                   <a href={r.maps_link} className="mt-1 inline-flex min-h-12 items-center gap-1 text-gold-600 underline-offset-4 hover:underline" rel="noopener noreferrer" target="_blank">
                     Open in Maps <ExternalLinkIcon size={14} />
