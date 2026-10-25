@@ -1,4 +1,4 @@
-import { useQuery, type UseQueryResult } from "@tanstack/react-query";
+import type { UseQueryResult } from "@tanstack/react-query";
 import type { CmsPostRow, DocumentRow, DocumentVariant, SiteSettingsRow } from "@kkt/contracts";
 import { api, apiBaseUrl, isApiClientError, type ApiClientError } from "@/lib/api";
 import { uploadDocument, useApiQuery } from "@/features/inventory/api";
@@ -122,14 +122,4 @@ export function localInputToIso(value: string): string | null {
 export function nullable(value: string | null | undefined): string | null {
   const text = (value ?? "").trim();
   return text ? text : null;
-}
-
-/** Shared "list that may come back as a bare array" guard. */
-export function useArrayQuery<T>(key: readonly unknown[], path: string, enabled = true): UseQueryResult<T[], ApiClientError> {
-  return useQuery<{ items: T[] } | T[], ApiClientError, T[], readonly unknown[]>({
-    queryKey: key,
-    queryFn: ({ signal }) => api.get<{ items: T[] } | T[]>(path, { signal }),
-    select: (data) => (Array.isArray(data) ? data : data.items),
-    enabled,
-  });
 }

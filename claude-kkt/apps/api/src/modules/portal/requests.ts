@@ -8,7 +8,7 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
   PortalDocumentRowSchema, PortalRequestCategorySchema, PortalRequestCreateSchema, PortalRequestDetailResponseSchema, PortalRequestFilterSchema, PortalRequestListResponseSchema,
-  PortalRequestMessageCreateSchema, PortalRequestRateSchema, PortalRequestReopenSchema, PortalRequestRowSchema,
+  PortalRequestMessageCreateSchema, PortalRequestRateSchema, PortalRequestReopenSchema,
   type CustomerTicketDetail, type CustomerTicketRow, type PortalDocumentRow, type PortalRequestDetailResponse, type PortalRequestMessage, type PortalRequestRow, type ServiceMessageRow,
 } from "@kkt/contracts";
 import { serviceCategories } from "@kkt/db";
@@ -171,5 +171,3 @@ export function registerRequestRoutes(app: FastifyInstance): void {
     },
   });
 }
-
-export { PortalRequestRowSchema };

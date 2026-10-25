@@ -4,7 +4,7 @@
  * the customer is not primary or co-applicant on is 404 everywhere, PDF links included. Money figures come from the money module's
  * materialised summary and exported views; nothing here re-implements ledger or schedule maths.
  */
-import { and, asc, eq, inArray, ne, or, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNull, lte, ne, or, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
@@ -58,8 +58,8 @@ export async function unreadNoticeCount(db: Executor, customer: Pick<PortalConte
     .from(notices)
     .where(and(
       eq(notices.companyId, customer.companyId), eq(notices.isPublished, true),
-      or(sql`${notices.publishAt} is null`, sql`${notices.publishAt} <= ${now}`), or(sql`${notices.expiresAt} is null`, sql`${notices.expiresAt} > ${now}`),
-      or(sql`${notices.projectId} is null`, sql`${notices.projectId} in ${customerProjectIdsSubquery(customer.customerId)}`),
+      or(isNull(notices.publishAt), lte(notices.publishAt, now)), or(isNull(notices.expiresAt), gt(notices.expiresAt, now)),
+      or(isNull(notices.projectId), sql`${notices.projectId} in ${customerProjectIdsSubquery(customer.customerId)}`),
       sql`not ${read}`,
     ));
   return Number(r?.n ?? 0);

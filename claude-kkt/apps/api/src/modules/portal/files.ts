@@ -11,8 +11,7 @@ import type { JobName, PortalPdfLinkResponse } from "@kkt/contracts";
 import type { Redis } from "ioredis";
 import { config } from "../../config.js";
 import { registerJob } from "../../jobs/index.js";
-import { storage } from "../documents/service.js";
-import { SIGNED_LINK_TTL_SECONDS, streamDocument, verifyLinkToken, type DocumentStream } from "../documents/service.js";
+import { SIGNED_LINK_TTL_SECONDS, storage, streamDocument, verifyLinkToken, type DocumentStream } from "../documents/service.js";
 
 /** Lifetime of a generated-PDF link (SPEC §2/§13: short-lived, 15 minutes). */
 export const PORTAL_FILE_TTL_SECONDS = SIGNED_LINK_TTL_SECONDS;

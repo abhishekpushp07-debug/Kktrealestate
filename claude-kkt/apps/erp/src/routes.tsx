@@ -6,7 +6,6 @@ import { AppShell } from "@/components/layout/AppShell";
 import { NAV_ITEMS } from "@/lib/permissions";
 import { ForbiddenPage } from "@/pages/ForbiddenPage";
 
-const Placeholder = lazy(() => import("@/pages/_Placeholder"));
 const LoginPage = lazy(() => import("@/pages/LoginPage"));
 const ChangePasswordPage = lazy(() => import("@/pages/ChangePasswordPage"));
 const NotFoundPage = lazy(() => import("@/pages/NotFoundPage"));
@@ -42,6 +41,32 @@ const NotificationsPage = lazy(() => import("@/features/admin/NotificationsPage"
 // Dashboard
 const DashboardPage = lazy(() => import("@/features/dashboard/DashboardPage"));
 
+// Inventory overviews (rate cards across projects, construction across towers)
+const RateCardsOverviewPage = lazy(() => import("@/features/inventory/RateCardsOverviewPage"));
+const ConstructionOverviewPage = lazy(() => import("@/features/inventory/ConstructionOverviewPage"));
+
+// Service requests
+const ServiceRequestsPage = lazy(() => import("@/features/service/ServiceRequestsPage"));
+const ServiceRequestDetail = lazy(() => import("@/features/service/ServiceRequestDetail"));
+
+// Website CMS
+const CmsLayout = lazy(() => import("@/features/cms/CmsLayout"));
+const SiteSettingsPage = lazy(() => import("@/features/cms/SiteSettingsPage"));
+const BannersPage = lazy(() => import("@/features/cms/BannersPage"));
+const HomeSectionsPage = lazy(() => import("@/features/cms/HomeSectionsPage"));
+const PostsPage = lazy(() => import("@/features/cms/PostsPage"));
+const PostEditorPage = lazy(() => import("@/features/cms/PostEditorPage"));
+const GalleryPage = lazy(() => import("@/features/cms/GalleryPage"));
+const TestimonialsPage = lazy(() => import("@/features/cms/TestimonialsPage"));
+const PagesPage = lazy(() => import("@/features/cms/PagesPage"));
+const PeoplePage = lazy(() => import("@/features/cms/PeoplePage"));
+const NoticesPage = lazy(() => import("@/features/cms/NoticesPage"));
+
+// Reports
+const ReportsPage = lazy(() => import("@/features/reports/ReportsPage"));
+const ReportPage = lazy(() => import("@/features/reports/ReportPage"));
+const CustomerStatementPage = lazy(() => import("@/features/reports/CustomerStatementPage"));
+
 // Bookings
 const BookingsPage = lazy(() => import("@/features/bookings/BookingsPage"));
 const BookingWizard = lazy(() => import("@/features/bookings/wizard/BookingWizard"));
@@ -56,19 +81,34 @@ const RoznamchaPage = lazy(() => import("@/features/payments/RoznamchaPage"));
 const ReceiptPrintPage = lazy(() => import("@/features/payments/ReceiptPrintPage"));
 const DemandLetterPrint = lazy(() => import("@/features/payments/DemandLetterPrint"));
 
-/** Nav items whose real screen has landed; everything else still renders the placeholder. */
+/** Flat nav items → their screen (nested modules are handled explicitly in the route tree below). */
 const PAGES_BY_NAV_ID: Readonly<Record<string, LazyExoticComponent<ComponentType>>> = {
   dashboard: DashboardPage,
   flats: FlatsPage,
+  "rate-cards": RateCardsOverviewPage,
+  construction: ConstructionOverviewPage,
   leads: LeadsPage,
   visits: SiteVisitsPage,
-  enquiries: EnquiriesInbox,
   demands: DemandsPage,
   roznamcha: RoznamchaPage,
   users: UsersPage,
   roles: RolesPage,
   audit: AuditLogPage,
   settings: SettingsPage,
+};
+
+/** Website (CMS) nav items → the page rendered inside CmsLayout's outlet. */
+const CMS_PAGES_BY_NAV_ID: Readonly<Record<string, LazyExoticComponent<ComponentType>>> = {
+  "site-settings": SiteSettingsPage,
+  banners: BannersPage,
+  "home-sections": HomeSectionsPage,
+  posts: PostsPage,
+  gallery: GalleryPage,
+  testimonials: TestimonialsPage,
+  pages: PagesPage,
+  people: PeoplePage,
+  notices: NoticesPage,
+  enquiries: EnquiriesInbox,
 };
 
 /** Every nav item gets a (lazy) route; extra account routes and error pages live inside the shell. */
@@ -215,15 +255,76 @@ export function AppRoutes() {
               </Route>
             );
           }
+          if (item.id === "service") {
+            return (
+              <Route
+                key={item.id}
+                path={item.to}
+                element={
+                  <PermissionRoute permission={item.permission}>
+                    <Outlet />
+                  </PermissionRoute>
+                }
+              >
+                <Route index element={<ServiceRequestsPage />} />
+                <Route path=":id" element={<ServiceRequestDetail />} />
+                <Route path="*" element={<NotFoundPage />} />
+              </Route>
+            );
+          }
+          if (item.id === "reports") {
+            return (
+              <Route
+                key={item.id}
+                path={item.to}
+                element={
+                  <PermissionRoute permission={item.permission}>
+                    <Outlet />
+                  </PermissionRoute>
+                }
+              >
+                <Route index element={<ReportsPage />} />
+                <Route path="customer-statement" element={<CustomerStatementPage />} />
+                <Route path=":key" element={<ReportPage />} />
+                <Route path="*" element={<NotFoundPage />} />
+              </Route>
+            );
+          }
+          const CmsPage = CMS_PAGES_BY_NAV_ID[item.id];
+          if (CmsPage) {
+            return (
+              <Route
+                key={item.id}
+                path={item.to}
+                element={
+                  <PermissionRoute permission={item.permission}>
+                    <CmsLayout />
+                  </PermissionRoute>
+                }
+              >
+                <Route index element={<CmsPage />} />
+                {item.id === "posts" && <Route path=":id" element={<PostEditorPage />} />}
+                <Route path="*" element={<NotFoundPage />} />
+              </Route>
+            );
+          }
           const Page = PAGES_BY_NAV_ID[item.id];
-          return (
-            <Route
-              key={item.id}
-              path={item.exact ? item.to : `${item.to}/*`}
-              element={<PermissionRoute permission={item.permission}>{Page ? <Page /> : <Placeholder title={item.label} />}</PermissionRoute>}
-            />
-          );
+          if (!Page) return null;
+          return <Route key={item.id} path={item.exact ? item.to : `${item.to}/*`} element={<PermissionRoute permission={item.permission}>{<Page />}</PermissionRoute>} />;
         })}
+
+        {/* CMS routes outside the nav tree. */}
+        <Route
+          path="/website"
+          element={
+            <PermissionRoute permission="cms.read">
+              <CmsLayout />
+            </PermissionRoute>
+          }
+        >
+          <Route index element={<Navigate to="/website/settings" replace />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
 
         {/* Inventory & CRM routes outside the nav tree. */}
         <Route

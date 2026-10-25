@@ -146,7 +146,7 @@ function assertNoLeaks(value: unknown, path = "$"): void {
   if (Array.isArray(value)) { value.forEach((v, i) => assertNoLeaks(v, `${path}[${i}]`)); return; }
   if (value && typeof value === "object") {
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      expect(k, `${path}.${k}`).not.toMatch(/storage_key$|^storage|_enc$|_hash$|password/i);
+      expect(k, `${path}.${k}`).not.toMatch(/storage_key$|^storage|_enc$|_hash$|password_hash|^password$|^token$|secret/i);
       if (/_id$/.test(k) && typeof v === "string") expect(staffUserIds.has(v), `${path}.${k} refers to a staff user`).toBe(false);
       assertNoLeaks(v, `${path}.${k}`);
     }
@@ -300,8 +300,10 @@ describe("home", () => {
     expect(home.next_installment).toMatchObject({ name: "On booking", cash_paise: 6 * L, account_paise: 4 * L, total_paise: 10 * L });
     expect(home.notices_unread).toBe(2); // company-wide + SGH; not GGV, not the draft
     expect(home.notifications_unread).toBeGreaterThan(0);
-    expect(home.relationship_manager).toEqual({ name: sales.user.email === "sales@sgb.in" ? expect.any(String) : expect.any(String), phone: expect.anything(), whatsapp: expect.anything(), email: "sales@sgb.in" });
-    expect(Object.keys(home.relationship_manager!)).toEqual(["name", "phone", "whatsapp", "email"]);
+    expect(home.relationship_manager).toMatchObject({ name: expect.any(String), email: "sales@sgb.in" });
+    expect(home.relationship_manager!.whatsapp).toBe(home.relationship_manager!.phone);
+    expect(Object.keys(home.relationship_manager!).sort()).toEqual(["email", "name", "phone", "whatsapp"]);
+    expect(JSON.stringify(home)).not.toContain(sales.user.id);
     assertNoLeaks(home);
   });
 
@@ -545,10 +547,10 @@ describe("service requests", () => {
 
   it("internal staff notes never appear; public staff replies do (by name, no ids); B cannot see A's request", async () => {
     const detail0 = await ok<StaffTicket>(`/api/v1/service-requests/${reqA.id}`, admin.access_token);
-    const internal = await post<StaffTicket>(`/api/v1/service-requests/${reqA.id}/messages`, admin.access_token, { body: "INTERNAL: customer is difficult", is_internal: true, version: detail0.version });
-    expect(internal.status, internal.text).toBe(200);
-    const pub = await post<StaffTicket>(`/api/v1/service-requests/${reqA.id}/messages`, admin.access_token, { body: "Our engineer visits Monday.", is_internal: false, version: internal.body.version });
-    expect(pub.status, pub.text).toBe(200);
+    const internal = await post<StaffTicket>(`/api/v1/service-requests/${reqA.id}/messages`, admin.access_token, { body: "INTERNAL: customer is difficult", is_internal: true }, { "if-match": `"${detail0.version}"` });
+    expect(internal.status, internal.text).toBe(201);
+    const pub = await post<StaffTicket>(`/api/v1/service-requests/${reqA.id}/messages`, admin.access_token, { body: "Our engineer visits Monday.", is_internal: false }, { "if-match": `"${internal.body.version}"` });
+    expect(pub.status, pub.text).toBe(201);
     const d = await ok<Request>(`/api/v1/portal/requests/${reqA.id}`, tokenA);
     expect(d.status).toBe("IN_PROGRESS");
     expect(d.messages.map((m) => m.body)).toEqual(["Water marks after the rains.", "Our engineer visits Monday."]);

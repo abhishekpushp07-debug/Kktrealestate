@@ -15,6 +15,7 @@ import {
   Inbox,
   IndianRupee,
   LayoutDashboard,
+  LayoutList,
   LifeBuoy,
   Megaphone,
   MessageSquareQuote,
@@ -104,6 +105,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     items: [
       { id: "site-settings", label: "Site settings", to: "/website/settings", icon: Settings, permission: "cms.read" },
       { id: "banners", label: "Banners", to: "/website/banners", icon: Image, permission: "cms.read" },
+      { id: "home-sections", label: "Home sections", to: "/website/home-sections", icon: LayoutList, permission: "cms.read", keywords: ["blocks", "trust strip", "value props"] },
       { id: "posts", label: "Posts", to: "/website/posts", icon: Newspaper, permission: "cms.read", keywords: ["blog", "news"] },
       { id: "gallery", label: "Gallery", to: "/website/gallery", icon: Images, permission: "cms.read" },
       { id: "testimonials", label: "Testimonials", to: "/website/testimonials", icon: MessageSquareQuote, permission: "cms.read" },
