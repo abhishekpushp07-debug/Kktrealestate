@@ -68,9 +68,14 @@ export async function applyUpdate<T extends VersionedTable>(tx: Executor, table:
   throw await versionConflict(tx, table, id, cur.version, entityType);
 }
 
-/** Makes `version` optional in an update body schema so the expected version may also arrive via `If-Match` (expectedVersion() enforces one of them). */
+/**
+ * Makes `version` optional in an update body schema so the expected version may also arrive via `If-Match` (expectedVersion() enforces
+ * one of them). The schema is extended in place (`safeExtend`), never rebuilt from `.shape`, so `.refine()` / `.superRefine()` checks survive.
+ */
 export function withOptionalVersion<T extends z.ZodType>(schema: T): T {
-  const shape = (schema as unknown as { shape?: Record<string, z.ZodType> }).shape;
-  if (!shape || !("version" in shape)) return schema;
-  return z.strictObject({ ...shape, version: VersionSchema.optional() }) as unknown as T;
+  const obj = schema as unknown as { shape?: Record<string, z.ZodType>; safeExtend?: (shape: Record<string, z.ZodType>) => z.ZodType };
+  if (!obj.shape || !("version" in obj.shape)) return schema;
+  if (typeof obj.safeExtend === "function") return obj.safeExtend({ version: VersionSchema.optional() }) as unknown as T;
+  // Zod without safeExtend: accept a missing version by pre-filling the sentinel 0 and letting the inner schema keep its refinements.
+  return z.preprocess((v) => (v && typeof v === "object" && !("version" in (v as object)) ? { ...(v as object), version: undefined } : v), schema) as unknown as T;
 }

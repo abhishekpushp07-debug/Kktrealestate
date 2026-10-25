@@ -27,7 +27,8 @@ export interface RouteSchema<B, Q, P> {
 export interface RouteDef<B extends AnyZod | undefined, Q extends AnyZod | undefined, P extends AnyZod | undefined> {
   method: HTTPMethods | HTTPMethods[];
   url: string;
-  permission?: Permission;
+  /** One permission, or a list of alternatives of which the caller needs ANY (registered as "a|b" so the registry stays truthful). */
+  permission?: Permission | readonly Permission[];
   audience?: "portal";
   public?: boolean;
   schema: RouteSchema<B, Q, P>;
@@ -55,6 +56,16 @@ export const PUBLIC_PREFIXES = ["/api/v1/docs"] as const;
 /** True when the url is public by prefix (docs). */
 export function isPublicPrefix(url: string): boolean {
   return PUBLIC_PREFIXES.some((p) => url === p || url.startsWith(`${p}/`));
+}
+
+/** Joins alternative permissions with "|" (the auth plugin accepts any of them). */
+export function permissionKey(p: Permission | readonly Permission[]): string {
+  return Array.isArray(p) ? (p as readonly string[]).join("|") : String(p);
+}
+
+/** Splits a registered permission key back into its alternatives. */
+export function permissionAlternatives(key: string): string[] {
+  return key.split("|").map((s) => s.trim()).filter(Boolean);
 }
 
 /** Unknown query keys are 400 VALIDATION_ERROR (docs/API-CONVENTIONS.md): plain object query schemas are made strict; other shapes are left as declared. */
@@ -90,7 +101,7 @@ export function route<B extends AnyZod | undefined = undefined, Q extends AnyZod
     url: def.url,
     schema,
     config: {
-      ...(def.permission ? { permission: def.permission } : {}),
+      ...(def.permission ? { permission: permissionKey(def.permission) } : {}),
       ...(def.audience ? { audience: def.audience } : {}),
       ...(def.public ? { public: true } : {}),
       ...(def.idempotent ? { idempotent: def.idempotent } : {}),

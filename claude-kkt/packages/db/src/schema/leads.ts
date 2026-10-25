@@ -133,6 +133,7 @@ export const siteVisits = pgTable(
     unique("site_visits_company_number_uq").on(t.companyId, t.visitNumber),
     index("site_visits_project_slot_idx").on(t.projectId, t.visitDate, t.slotStart, t.status),
     index("site_visits_assignee_date_idx").on(t.assigneeUserId, t.visitDate),
+    index("site_visits_lead_status_idx").on(t.leadId, t.status),
     check("site_visits_visitors_chk", sql`${t.visitors} BETWEEN 1 AND 6`),
   ],
 );

@@ -198,6 +198,8 @@ export const ListQuerySchema = z.object({
   sort: SortSchema.optional(),
   include_inactive: BoolQuerySchema.default(false),
   format: z.enum(["csv"]).optional(),
+  /** Force an exact `total` (large tables otherwise report the planner's estimate). */
+  exact: BoolQuerySchema.default(false),
 });
 export type ListQuery = z.infer<typeof ListQuerySchema>;
 
@@ -256,9 +258,22 @@ export type ActiveRow = z.infer<typeof ActiveRowSchema>;
 export const MasterRowSchema = AuditedRowSchema.extend(ActiveRowSchema.shape);
 export type MasterRow = z.infer<typeof MasterRowSchema>;
 
-/** Makes the Update schema for a Create schema: all fields optional plus `version`. */
+/** The shape of an Update schema: every field of the Create shape, optional and WITHOUT its create-time default. */
+export type UpdateShape<T extends z.ZodRawShape> = { [K in keyof T]: z.ZodOptional<T[K] extends z.ZodDefault<infer Inner extends z.ZodType> ? Inner : T[K]> };
+
+/**
+ * Makes the Update schema for a Create schema: all fields optional plus `version`.
+ * Create-time defaults are stripped first: a PATCH is a partial update, so a key the client did not send must stay untouched
+ * (Zod 4 keeps applying `.default()` inside `.partial()`, which would silently reset flags and empty arrays on every partial PATCH —
+ * e.g. unpublish a project and wipe its hero images when only `show_prices` is sent).
+ */
 export function updateOf<T extends z.ZodRawShape>(createSchema: z.ZodObject<T>) {
-  return createSchema.partial().extend({ version: VersionSchema });
+  const shape = {} as Record<string, z.ZodType>;
+  for (const [key, field] of Object.entries(createSchema.shape as unknown as Record<string, z.ZodType>)) {
+    const inner = field instanceof z.ZodDefault ? (field as z.ZodDefault<z.ZodType>).removeDefault() : field;
+    shape[key] = inner.optional();
+  }
+  return z.strictObject(shape as UpdateShape<T>).extend({ version: VersionSchema });
 }
 
 /** One labelled money line in a price or charge breakup. */

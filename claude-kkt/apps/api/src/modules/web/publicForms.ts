@@ -190,7 +190,7 @@ export function registerPublicFormRoutes(app: FastifyInstance): void {
 
   route(app, {
     method: "GET", url: "/public/brochure/:token", public: true,
-    schema: { params: z.object({ token: z.string().min(16).max(2048) }), response: { 200: z.any() }, summary: "Streams the brochure PDF as an attachment (signed 15-minute link; counted once per link)", hide: true },
+    schema: { params: z.object({ token: z.string().min(16).max(2048) }), response: { 200: z.any() }, summary: "Streams the brochure PDF as an attachment (signed 15-minute link; counted once per link)" },
     handler: async (req, reply) => {
       const token = req.params.token;
       if (!verifyBrochureToken(token)) throw ApiError.notFound("Brochure link");

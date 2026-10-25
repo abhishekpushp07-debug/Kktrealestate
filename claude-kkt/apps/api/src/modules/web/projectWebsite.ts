@@ -177,7 +177,7 @@ export function registerProjectWebsiteRoutes(app: FastifyInstance): void {
   });
 
   route(app, {
-    method: "PATCH", url: "/projects/:id/website", permission: "project.read",
+    method: "PATCH", url: "/projects/:id/website", permission: ["project.write", "cms.write"],
     schema: { params: idParams, body: withOptionalVersion(ProjectWebsiteSettingsUpdateSchema), response: { 200: ProjectWebsiteSettingsRowSchema }, summary: "Update project website settings (project.write or cms.write); publishing needs hero image, description and location" },
     handler: async (req) => {
       const user = req.user!;
@@ -258,7 +258,7 @@ export function registerProjectWebsiteRoutes(app: FastifyInstance): void {
   });
 
   route(app, {
-    method: "PATCH", url: "/projects/:id/visit-settings", permission: "project.read",
+    method: "PATCH", url: "/projects/:id/visit-settings", permission: ["project.write", "cms.write"],
     schema: { params: idParams, body: withOptionalVersion(VisitSettingsUpdateSchema), response: { 200: VisitSettingsRowSchema }, summary: "Update site-visit settings (project.write or cms.write)" },
     handler: async (req) => {
       const user = req.user!;

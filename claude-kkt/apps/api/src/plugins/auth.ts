@@ -8,7 +8,7 @@ import { loadCompany } from "../lib/company.js";
 import { ApiError } from "../lib/errors.js";
 import { verifyAccessToken, type AccessClaims, type TokenAudience } from "../lib/jwt.js";
 import { clientIp, enforceRateLimit } from "../lib/rateLimit.js";
-import { isPublicPrefix } from "../lib/routes.js";
+import { isPublicPrefix, permissionAlternatives } from "../lib/routes.js";
 import type { PortalContext, StaffContext } from "../lib/scope.js";
 
 declare module "fastify" {
@@ -142,7 +142,10 @@ export default fp(async (app) => {
         const company = await loadCompany(app.db, app.redis, user.companyId);
         if (company.settings.force_mfa_for_admins) throw new ApiError(403, "MFA_REQUIRED", "Multi-factor authentication is required for administrators");
       }
-      if (cfg.permission && !user.permissions.has(cfg.permission)) throw ApiError.forbidden(`Missing permission ${cfg.permission}`, { permission: cfg.permission });
+      if (cfg.permission) {
+        const alternatives = permissionAlternatives(cfg.permission);
+        if (!alternatives.some((p) => user.permissions.has(p))) throw ApiError.forbidden(`Missing permission ${alternatives.join(" or ")}`, { permission: alternatives[0], alternatives });
+      }
       if (WRITE_METHODS.has(req.method)) await enforceRateLimit(app.redis, `w:${user.id}`, config.WRITE_RATE_LIMIT_PER_MIN, 60);
       return;
     }

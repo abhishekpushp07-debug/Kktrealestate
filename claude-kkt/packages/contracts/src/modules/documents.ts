@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ActorTypeSchema, DocumentEntityTypeSchema } from "../enums.js";
-import { BoolQuerySchema, IdSchema, ListQuerySchema, SignedLinkSchema, TimestampSchema, listEnvelope } from "../common.js";
+import { BoolQuerySchema, IdSchema, ListQuerySchema, SignedLinkSchema, TimestampSchema, VersionSchema, listEnvelope } from "../common.js";
 
 /** Maximum upload size (15 MB). */
 export const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
@@ -41,6 +41,7 @@ export const DocumentRowSchema = z.object({
   medium_url: z.string().nullable(),
   is_sensitive: z.boolean(),
   shared_with_customer: z.boolean(),
+  version: VersionSchema,
   uploaded_by_type: ActorTypeSchema,
   uploaded_by: IdSchema.nullable(),
   uploaded_by_name: z.string().nullable(),
@@ -51,6 +52,7 @@ export type DocumentRow = z.infer<typeof DocumentRowSchema>;
 
 /** Update a document's title or sharing flags (KYC docs cannot be shared). */
 export const DocumentUpdateSchema = z.strictObject({
+  version: VersionSchema,
   title: z.string().trim().min(1).max(200).optional(),
   is_sensitive: z.boolean().optional(),
   shared_with_customer: z.boolean().optional(),

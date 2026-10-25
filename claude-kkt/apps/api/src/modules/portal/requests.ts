@@ -9,12 +9,13 @@ import { z } from "zod";
 import {
   PortalDocumentRowSchema, PortalRequestCategorySchema, PortalRequestCreateSchema, PortalRequestDetailResponseSchema, PortalRequestFilterSchema, PortalRequestListResponseSchema,
   PortalRequestMessageCreateSchema, PortalRequestRateSchema, PortalRequestReopenSchema,
-  type CustomerTicketDetail, type CustomerTicketRow, type PortalDocumentRow, type PortalRequestDetailResponse, type PortalRequestMessage, type PortalRequestRow, type ServiceMessageRow,
+  type CustomerTicketDetail, type CustomerTicketRow, type PortalDocumentRow, type PortalRequestCategory, type PortalRequestDetailResponse, type PortalRequestMessage, type PortalRequestRow, type ServiceMessageRow,
 } from "@kkt/contracts";
 import { documents, serviceCategories, type Executor } from "@kkt/db";
 import { writeAudit } from "../../lib/audit.js";
 import { ApiError } from "../../lib/errors.js";
 import type { ListResult } from "../../lib/list.js";
+import { installMultipartIdempotency, uploadOf, type ParsedUpload } from "../../lib/multipart.js";
 import { route } from "../../lib/routes.js";
 import type { PortalContext } from "../../lib/scope.js";
 import { loadJoined, storeBuffer, toDocumentRow } from "../documents/index.js";
@@ -77,31 +78,8 @@ export async function assertPortalAttachments(db: Executor, customer: Pick<Porta
   if (missing.length > 0) throw ApiError.badRequest("attachment_ids references a document that does not exist or does not belong to this request", { field: "attachment_ids", missing });
 }
 
-/** A parsed single-file multipart upload. */
-interface ParsedUpload { buffer: Buffer; filename: string }
-
-/** Reads the one `file` part of a multipart request (413 at the 15 MB limit; 400 without a file). */
-async function readSingleFile(req: FastifyRequest): Promise<ParsedUpload> {
-  if (!req.isMultipart()) throw ApiError.badRequest("Expected a multipart/form-data upload with a `file` part");
-  let file: ParsedUpload | null = null;
-  try {
-    for await (const part of req.parts()) {
-      if (part.type !== "file") continue;
-      if (file) { part.file.resume(); throw ApiError.badRequest("Upload exactly one file per request"); }
-      file = { buffer: await part.toBuffer(), filename: part.filename || "file" };
-    }
-  } catch (err) {
-    const code = (err as { code?: string }).code;
-    if (code === "FST_REQ_FILE_TOO_LARGE") throw new ApiError(413, "PAYLOAD_TOO_LARGE", "File exceeds the 15 MB limit");
-    if (code === "FST_FILES_LIMIT" || code === "FST_PARTS_LIMIT" || code === "FST_FIELDS_LIMIT") throw ApiError.badRequest("Too many parts in the upload");
-    throw err;
-  }
-  if (!file) throw ApiError.badRequest("Missing `file` part");
-  return file;
-}
-
-/** Active service categories of the company, in display order. */
-export async function requestCategories(db: FastifyInstance["db"], companyId: string): Promise<z.infer<typeof PortalRequestCategorySchema>[]> {
+/** Active service categories (id, name, default priority) the portal's "raise request" form offers. */
+export async function requestCategories(db: Executor, companyId: string): Promise<PortalRequestCategory[]> {
   const rows = await db
     .select({ id: serviceCategories.id, name: serviceCategories.name, defaultPriority: serviceCategories.defaultPriority })
     .from(serviceCategories)
@@ -110,7 +88,7 @@ export async function requestCategories(db: FastifyInstance["db"], companyId: st
   return rows.map((r) => ({ id: r.id, name: r.name, default_priority: r.defaultPriority }));
 }
 
-/** Stores one attachment on the customer's own ticket (404 when not theirs, 409 when closed) and returns its portal row. */
+/** Stores one uploaded file as a SERVICE_REQUEST document of the customer's ticket (closed tickets refuse attachments). */
 export async function addRequestAttachment(app: FastifyInstance, customer: PortalContext, ticketId: string, upload: ParsedUpload, m: WriteMeta): Promise<PortalDocumentRow> {
   return app.db.transaction(async (tx) => {
     const t = await requireCustomerTicket(tx, ticketId, customer.customerId, true);
@@ -128,6 +106,8 @@ export async function addRequestAttachment(app: FastifyInstance, customer: Porta
 
 /** Registers the /portal/requests routes. */
 export function registerRequestRoutes(app: FastifyInstance): void {
+  // Multipart attachments share the documents module's Idempotency-Key fingerprint hook (digest of the file bytes).
+  installMultipartIdempotency(app, (url) => url.endsWith("/portal/requests/:id/attachments"));
   route(app, {
     method: "GET", url: "/portal/requests/categories", audience: "portal",
     schema: { response: { 200: z.array(PortalRequestCategorySchema) }, summary: "Service categories the customer may raise a request under" },
@@ -201,14 +181,14 @@ export function registerRequestRoutes(app: FastifyInstance): void {
   });
 
   route(app, {
-    method: "POST", url: "/portal/requests/:id/attachments", audience: "portal",
+    method: "POST", url: "/portal/requests/:id/attachments", audience: "portal", idempotent: true,
     schema: {
       params: idParams, response: { 201: PortalDocumentRowSchema }, summary: "Upload one photo / PDF for a request (multipart, field `file`)",
       description: "multipart/form-data with a single `file` part (PDF/JPEG/PNG/WebP ≤ 15 MB, validated by file signature). The returned document_id is then carried in a reply's attachment_ids.",
     },
     handler: async (req, reply) => {
       const c = customerOf(req);
-      const upload = await readSingleFile(req as unknown as FastifyRequest);
+      const upload = uploadOf(req as unknown as FastifyRequest);
       return reply.code(201).send(await addRequestAttachment(app, c, req.params.id, upload, meta(req as unknown as FastifyRequest)));
     },
   });

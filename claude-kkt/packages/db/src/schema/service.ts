@@ -24,7 +24,9 @@ export const serviceRequests = pgTable(
       .notNull()
       .references(() => customers.id),
     bookingId: uuid("booking_id").references(() => bookings.id),
-    categoryId: uuid("category_id").references(() => serviceCategories.id),
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => serviceCategories.id),
     priority: servicePriorityEnum("priority").notNull().default("MEDIUM"),
     subject: text("subject").notNull(),
     description: text("description"),

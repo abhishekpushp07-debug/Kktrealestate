@@ -38,6 +38,7 @@ export const paymentPlanAssignments = pgTable(
   (t) => [
     unique("payment_plan_assignments_plan_project_block_uq").on(t.planId, t.projectId, t.blockId).nullsNotDistinct(),
     index("payment_plan_assignments_project_block_active_idx").on(t.projectId, t.blockId, t.isActive),
+    index("payment_plan_assignments_plan_idx").on(t.planId),
   ],
 );
 
@@ -114,6 +115,7 @@ export const bookings = pgTable(
     index("bookings_company_project_status_date_idx").on(t.companyId, t.projectId, t.status, t.bookingDate.desc()),
     index("bookings_block_status_idx").on(t.blockId, t.status),
     index("bookings_customer_idx").on(t.customerId),
+    index("bookings_payment_plan_idx").on(t.paymentPlanId),
   ],
 );
 

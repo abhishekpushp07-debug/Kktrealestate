@@ -130,9 +130,12 @@ describe("database-enforced invariants", () => {
       /project_visit_settings_slot_minutes_chk/,
     );
     await expect(handle.sql`INSERT INTO project_visit_settings (project_id, slot_minutes) VALUES (${fx.projectId}, 30)`).resolves.toBeDefined();
+    const [category] = await handle.sql<{ id: string }[]>`INSERT INTO service_categories (company_id, name) VALUES (${fx.companyId}, 'Defect/Snag') RETURNING id`;
     const ticket = (n: number, rating: number | null) =>
-      handle.sql`INSERT INTO service_requests (company_id, ticket_number, customer_id, subject, rating)
-                 VALUES (${fx.companyId}, ${"SR-" + String(n)}, ${fx.customerId}, 'Leak', ${rating})`;
+      handle.sql`INSERT INTO service_requests (company_id, ticket_number, customer_id, category_id, subject, rating)
+                 VALUES (${fx.companyId}, ${"SR-" + String(n)}, ${fx.customerId}, ${category!.id}, 'Leak', ${rating})`;
+    // category_id is NOT NULL (docs/TODO-integration.md item 11)
+    await rejectsWithPg(handle.sql`INSERT INTO service_requests (company_id, ticket_number, customer_id, subject) VALUES (${fx.companyId}, 'SR-0', ${fx.customerId}, 'No category')`, /category_id/);
     await rejectsWithPg(ticket(1, 0), /service_requests_rating_chk/);
     await rejectsWithPg(ticket(2, 6), /service_requests_rating_chk/);
     await expect(ticket(3, 5)).resolves.toBeDefined();

@@ -600,7 +600,7 @@ export async function listTicketsForCustomer(executor: Executor, customerId: str
     join: withTicketJoins,
     where: and(...where.filter((w): w is SQL => w !== undefined)),
     sort: { allowed: { created_at: serviceRequests.createdAt, updated_at: serviceRequests.updatedAt, last_message_at: serviceRequests.lastMessageAt, status: serviceRequests.status }, default: "-created_at", requested: q.sort },
-    ...fromListQuery({ page: q.page ?? 1, page_size: q.page_size ?? 25, cursor: q.cursor, limit: q.limit, include_inactive: false }),
+    ...fromListQuery({ page: q.page ?? 1, page_size: q.page_size ?? 25, cursor: q.cursor, limit: q.limit, include_inactive: false, exact: false }),
   });
   const now = new Date();
   return { ...result, items: result.items.map((r) => toCustomerTicketRow(r, now)) };

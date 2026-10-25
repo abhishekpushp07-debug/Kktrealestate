@@ -568,7 +568,7 @@ export function registerPublicContentRoutes(app: FastifyInstance): void {
 
   route(app, {
     method: "GET", url: "/public/media/:id", public: true,
-    schema: { params: z.object({ id: z.uuid() }), querystring: PublicMediaQuerySchema, response: { 200: z.any() }, summary: "Immutable public image bytes (CMS media, project/stage photos)", hide: true },
+    schema: { params: z.object({ id: z.uuid() }), querystring: PublicMediaQuerySchema, response: { 200: z.any() }, summary: "Immutable public image bytes (CMS media, project/stage photos)" },
     handler: async (req, reply) => {
       const version = (await app.redis.get(PUBLIC_CACHE_VERSION_KEY).catch(() => null)) ?? "0";
       const allowed = await cached(app.redis, `pub:${version}:media-allowed|${req.params.id}`, PUBLIC_CACHE_SECONDS, async () => {

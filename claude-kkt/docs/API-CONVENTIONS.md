@@ -11,7 +11,7 @@ Base path `/api/v1`. Three surfaces on the same server:
 ## Request/response shapes
 * JSON only. Money = integer **paise** (`amount_paise`). Percent = number with ≤ 2 decimals. Dates `YYYY-MM-DD`; timestamps RFC 3339 UTC.
 * Every schema comes from `@kkt/contracts` (Zod). Unknown body/query keys → 400 `VALIDATION_ERROR`.
-* List endpoints: query `page` (1-based), `page_size` (≤ 200, default 25), or `cursor`+`limit` (keyset by `(sort_field, id)`), `search`, `sort` (`field` or `-field`, allow-listed), typed filters, `format=csv`, `include_inactive`.
+* List endpoints: query `page` (1-based), `page_size` (≤ 200, default 25), or `cursor`+`limit` (keyset by `(sort_field, id)`; timestamp sorts page on a microsecond-exact key), `search`, `sort` (`field` or `-field`, allow-listed), typed filters, `format=csv`, `include_inactive`, `exact` (tables above 10 000 rows answer `total` with the planner's estimate unless `exact=true`; CSV exports are always exact).
   Envelope: `{ "items": [...], "total": n, "page": p, "page_size": s, "next_cursor": "..." | null }`. CSV responses stream `text/csv` with `Content-Disposition: attachment`.
 * Single resources return the row with `version`. Mutations return the updated row.
 * Errors: `{ "error": { "code": "UPPER_SNAKE", "message": "human text", "details": {...}, "request_id": "..." } }`.
@@ -23,7 +23,7 @@ Base path `/api/v1`. Three surfaces on the same server:
 * Responses always carry `X-Request-Id`; lists carry `ETag` and honour `If-None-Match` (304).
 
 ## Permissions
-* Every staff route declares `config: { permission: "code" }`; the registry test fails if any staff route has none. Portal routes declare `config: { audience: "portal" }`; public routes `config: { public: true }`.
+* Every staff route declares `config: { permission: "code" }` (or `"a|b"` when any of several permissions suffices, e.g. `PATCH /projects/:id/website` = `project.write|cms.write`); the registry test fails if any staff route has none. Portal routes declare `config: { audience: "portal" }`; public routes `config: { public: true }`.
 * Project scope: queries use `scopeFilter(user)`; direct lookups use `ensureProjectAccess(user, projectId)` → 404.
 * KYC reveal: `GET /customers/:id?reveal=true` requires `customer.kyc_view` and writes `customer.kyc_reveal` audit row.
 

@@ -8,6 +8,8 @@ import { resetDatabase, resetRefusalReason } from "../src/reset.js";
 import { TEST_DATABASE_URL } from "./env.js";
 
 const EXPECTED_TABLE_COUNT = 77;
+/** Committed drizzle migrations in journal order. */
+const EXPECTED_MIGRATIONS = ["0000_initial", "0001_central_fixes"] as const;
 
 /** Replaces the database name in a postgres URL. */
 function withDatabase(url: string, name: string): string {
@@ -54,7 +56,7 @@ describe("migrations", () => {
           WHERE NOT tgisinternal AND tgname IN ('audit_logs_immutable', 'audit_logs_no_truncate', 'payments_no_delete', 'demands_no_delete')`;
         expect(triggers?.names).toEqual(["audit_logs_immutable", "audit_logs_no_truncate", "demands_no_delete", "payments_no_delete"]);
         const [journal] = await fresh<{ n: number }[]>`SELECT count(*)::int AS n FROM drizzle.__drizzle_migrations`;
-        expect(journal?.n).toBe(1);
+        expect(journal?.n).toBe(EXPECTED_MIGRATIONS.length);
       } finally {
         await fresh.end({ timeout: 5 });
       }
@@ -68,15 +70,21 @@ describe("migrations", () => {
     await runMigrations(TEST_DATABASE_URL);
     await runMigrations(TEST_DATABASE_URL);
     const rows = await handle.sql<{ n: number }[]>`SELECT count(*)::int AS n FROM drizzle.__drizzle_migrations`;
-    expect(rows[0]?.n).toBe(1);
+    expect(rows[0]?.n).toBe(EXPECTED_MIGRATIONS.length);
     const triggers = await handle.sql<{ n: number }[]>`
       SELECT count(*)::int AS n FROM pg_trigger WHERE NOT tgisinternal AND tgname LIKE 'audit_logs_%'`;
     expect(triggers[0]?.n).toBe(2);
   });
 
-  it("the committed journal has one entry and its SQL matches the snapshot folder", async () => {
+  it("the committed journal lists the migrations in order and the initial SQL matches the snapshot folder", async () => {
     const journal = JSON.parse(await readFile(join(MIGRATIONS_FOLDER, "meta", "_journal.json"), "utf8")) as { entries: { tag: string }[] };
-    expect(journal.entries.map((e) => e.tag)).toEqual(["0000_initial"]);
+    expect(journal.entries.map((e) => e.tag)).toEqual([...EXPECTED_MIGRATIONS]);
+    const central = await readFile(join(MIGRATIONS_FOLDER, "0001_central_fixes.sql"), "utf8");
+    expect(central).toContain('ALTER TABLE "documents" ADD COLUMN "version" integer DEFAULT 1 NOT NULL');
+    expect(central).toContain('ALTER TABLE "service_requests" ALTER COLUMN "category_id" SET NOT NULL');
+    for (const name of ["site_visits_lead_status_idx", "flat_types_rooms_gin_idx", "flat_types_areas_gin_idx", "floor_plan_templates_positions_gin_idx", "blocks_floor_plans_gin_idx", "payment_plan_assignments_plan_idx", "bookings_payment_plan_idx", "audit_logs_company_created_idx"]) {
+      expect(central).toContain(`CREATE INDEX "${name}"`);
+    }
     const initial = await readFile(join(MIGRATIONS_FOLDER, "0000_initial.sql"), "utf8");
     expect((initial.match(/^CREATE TABLE /gm) ?? []).length).toBe(EXPECTED_TABLE_COUNT);
     // The generated SQL itself must carry the partial unique indexes (not only the hand-written file).

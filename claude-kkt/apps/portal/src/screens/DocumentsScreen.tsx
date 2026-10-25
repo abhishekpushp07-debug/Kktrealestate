@@ -16,7 +16,7 @@ export function DocumentsScreen(): React.JSX.Element {
   return <BookingGate title="Documents">{(id) => <Body bookingId={id} />}</BookingGate>;
 }
 
-const KIND_ICON: Record<PortalDocumentRow["kind"], IconName> = { STATEMENT: "rupee", ALLOTMENT_LETTER: "notice", SHARED: "document", PLAN_ACCEPTANCE: "check" };
+const KIND_ICON: Record<PortalDocumentRow["kind"], IconName> = { STATEMENT: "rupee", ALLOTMENT_LETTER: "notice", SHARED: "document", PLAN_ACCEPTANCE: "check", ATTACHMENT: "document" };
 
 function Body({ bookingId }: { bookingId: string }): React.JSX.Element {
   const q = useDocuments(bookingId);

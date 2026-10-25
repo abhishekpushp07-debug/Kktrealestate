@@ -60,7 +60,7 @@ export const flatTypes = pgTable(
     ...softDelete(),
     ...mutable(),
   },
-  (t) => [unique("flat_types_company_code_uq").on(t.companyId, t.code)],
+  (t) => [unique("flat_types_company_code_uq").on(t.companyId, t.code), index("flat_types_rooms_gin_idx").using("gin", t.rooms), index("flat_types_areas_gin_idx").using("gin", t.areas)],
 );
 
 export const blockTypes = pgTable(
@@ -89,7 +89,7 @@ export const floorPlanTemplates = pgTable(
     ...softDelete(),
     ...mutable(),
   },
-  (t) => [unique("floor_plan_templates_company_code_uq").on(t.companyId, t.code)],
+  (t) => [unique("floor_plan_templates_company_code_uq").on(t.companyId, t.code), index("floor_plan_templates_positions_gin_idx").using("gin", t.positions)],
 );
 
 export const amenities = pgTable(

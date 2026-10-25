@@ -137,7 +137,8 @@ describe("tower construction status (SPEC §9) – reading", () => {
     expect((await t.request("GET", `/api/v1/blocks/${NO_ID}/construction`, { token: admin })).status).toBe(404);
     expect((await t.request("GET", `/api/v1/blocks/${w.sgh.towerId}/construction`)).status).toBe(401);
     // every construction route is a staff route guarded by a permission (route registry)
-    const mine = t.app.routeRegistry.filter((r) => /\/construction(\/|$)/.test(r.url));
+    // staff construction routes only (the portal module registers its own /portal/bookings/:id/construction read)
+    const mine = t.app.routeRegistry.filter((r) => /\/construction(\/|$)/.test(r.url) && !r.url.startsWith("/api/v1/portal/"));
     expect(mine.length).toBe(8);
     expect(mine.every((r) => r.permission !== null && r.audience === "erp" && !r.public)).toBe(true);
     expect(new Set(mine.map((r) => r.permission))).toEqual(new Set(["project.read", "construction.update", "construction.undo"]));

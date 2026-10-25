@@ -3,6 +3,7 @@ import { buildApp } from "./app.js";
 import { config } from "./config.js";
 import { logger } from "./lib/logger.js";
 import { ensureBootstrap } from "./seed/bootstrap.js";
+import { seedDemo } from "./seed/run.js";
 import { startWorker, type RunningWorker } from "./worker.js";
 
 /** Boots the API: migrations (optional), bootstrap seed (optional), HTTP listen, in-process worker (optional), graceful shutdown. */
@@ -15,6 +16,10 @@ async function main(): Promise<void> {
   if (config.SEED_ON_BOOT) {
     const result = await ensureBootstrap(app.db);
     if (result.created) logger.info({ companyId: result.companyId }, "bootstrap seed created");
+    // Full demo data (docs/SEED.md) the first time the database has no projects; a no-op afterwards.
+    await app.ready();
+    const seeded = await seedDemo(app);
+    if (!seeded.skipped) logger.info({ counts: seeded.counts, durationMs: seeded.durationMs }, "demo seed created");
   }
   let worker: RunningWorker | null = null;
   if (config.RUN_JOBS_IN_API) worker = await startWorker(app.db);

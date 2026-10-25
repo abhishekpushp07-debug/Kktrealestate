@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gt, ilike, lt, or, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, getTableColumns, getTableName, gt, ilike, lt, or, sql, type SQL } from "drizzle-orm";
 import type { AnyPgColumn, PgSelect, PgTable, SelectedFields } from "drizzle-orm/pg-core";
 import type { ListQuery } from "@kkt/contracts";
 import { parseSort } from "@kkt/contracts";
@@ -33,6 +33,35 @@ export interface PaginateOptions {
   page_size?: number;
   cursor?: string | undefined;
   limit?: number | undefined;
+  /** `true` forces an exact `count(*)`; otherwise tables above `estimateAbove` rows answer with the planner's estimate (ARCHITECTURE §6). */
+  exact?: boolean | undefined;
+  /** Row threshold (pg_class.reltuples) above which the total is estimated; default COUNT_ESTIMATE_ABOVE. */
+  estimateAbove?: number | undefined;
+}
+
+/** Tables with more live rows than this (per pg_class) report an estimated `total` unless the caller asks for `exact=true`. */
+export const COUNT_ESTIMATE_ABOVE = 10_000;
+
+/** Name of the hidden select key carrying the microsecond-exact sort value of timestamp sorts (stripped from the items). */
+const SORT_KEY = "__kkt_sort_key";
+
+/** True for timestamp / timestamptz columns, whose JS Date values lose the microseconds Postgres stores. */
+export function isTimestampColumn(col: AnyPgColumn): boolean {
+  return col.columnType === "PgTimestamp" || col.columnType === "PgTimestampString";
+}
+
+/**
+ * Microsecond-exact text key of a timestamp column (`YYYY-MM-DD HH24:MI:SS.US`, UTC). Keyset cursors on timestamp sorts carry this
+ * text instead of a JS Date (millisecond precision), so rows written in the same millisecond are never skipped between pages.
+ */
+export function timestampSortKey(col: AnyPgColumn): SQL<string> {
+  return sql<string>`to_char(${col} at time zone 'UTC', 'YYYY-MM-DD HH24:MI:SS.US')`;
+}
+
+/** The parameter a microsecond text key compares against: the column's own type, so the comparison stays index-friendly. */
+function timestampParam(col: AnyPgColumn, key: string): SQL {
+  const withTimezone = (col as unknown as { withTimezone?: boolean }).withTimezone === true;
+  return withTimezone ? sql`(${key}::timestamp at time zone 'UTC')` : sql`${key}::timestamp`;
 }
 
 /** Escapes a search term for use inside an ILIKE pattern. */
@@ -67,6 +96,7 @@ function decodeCursor(raw: string): CursorPayload {
 
 function cursorValue(col: AnyPgColumn, v: CursorPayload["v"]): unknown {
   if (v === null) return null;
+  if (isTimestampColumn(col) && typeof v === "string") return timestampParam(col, v);
   return col.dataType === "date" && typeof v === "string" ? new Date(v) : v;
 }
 
@@ -85,14 +115,38 @@ export function resolveSort(sort: PaginateOptions["sort"]): { field: string; col
 }
 
 /**
+ * Estimated row count of a filtered select from the planner (`EXPLAIN (FORMAT JSON)`), used for big tables instead of `count(*)`.
+ * Falls back to null when the plan cannot be read, in which case the caller counts exactly.
+ */
+async function plannerEstimate(executor: Executor, query: PgSelect): Promise<number | null> {
+  try {
+    const rows = (await executor.execute(sql`explain (format json) ${query}`)) as unknown as Record<string, unknown>[];
+    const raw = rows[0]?.["QUERY PLAN"];
+    const plan = (typeof raw === "string" ? JSON.parse(raw) : raw) as { Plan?: { "Plan Rows"?: number } }[] | undefined;
+    const n = plan?.[0]?.Plan?.["Plan Rows"];
+    return typeof n === "number" && Number.isFinite(n) ? Math.max(0, Math.round(n)) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Live-row estimate of a table from pg_class (−1 when the table was never analysed). */
+async function tableEstimate(executor: Executor, table: PgTable): Promise<number> {
+  const rows = (await executor.execute(sql`select reltuples::float8 as n from pg_class where oid = ${`"${getTableName(table)}"`}::regclass`)) as unknown as { n: number | string }[];
+  return Number(rows[0]?.n ?? -1);
+}
+
+/**
  * Runs a list query: offset mode (`page`/`page_size`, total via count(*)) or keyset mode (`cursor`+`limit`, cursor = base64url(sortValue,id)),
- * with ILIKE search, allow-listed sort and optional joins. One page query + one count query.
+ * with ILIKE search, allow-listed sort and optional joins. One page query + one count query. Timestamp sorts page on a microsecond-exact
+ * key; tables above `estimateAbove` rows report the planner's estimate as `total` unless `exact` is set.
  */
 export async function paginate<T = Record<string, unknown>>(executor: Executor, opts: PaginateOptions): Promise<ListResult<T>> {
   const sort = resolveSort(opts.sort);
   const idCol = opts.table.id;
   const dir = sort.direction === "asc" ? asc : desc;
   const cmp = sort.direction === "asc" ? gt : lt;
+  const tsSort = isTimestampColumn(sort.column);
   const conditions: (SQL | undefined)[] = [opts.where, searchCondition(opts.search?.columns ?? [], opts.search?.term)];
   const cursorMode = opts.cursor !== undefined || opts.limit !== undefined;
   const pageSize = cursorMode ? (opts.limit ?? 25) : (opts.page_size ?? 25);
@@ -103,22 +157,43 @@ export async function paginate<T = Record<string, unknown>>(executor: Executor, 
     conditions.push(or(cmp(sort.column, v), and(eq(sort.column, v), cmp(idCol, c.id))));
   }
   const where = and(...conditions.filter((c): c is SQL => c !== undefined));
-  const base: PgSelect = (opts.select ? executor.select(opts.select as SelectedFields) : executor.select()).from(opts.table).$dynamic();
+  // keyset paging on a timestamp: select its microsecond text key alongside the row so the next cursor is exact
+  const withSortKey = cursorMode && tsSort;
+  const selection: SelectedFields | undefined = withSortKey
+    ? ({ ...(opts.select ?? getTableColumns(opts.table)), [SORT_KEY]: timestampSortKey(sort.column) } as SelectedFields)
+    : (opts.select as SelectedFields | undefined);
+  const base: PgSelect = (selection ? executor.select(selection) : executor.select()).from(opts.table).$dynamic();
   let pageQuery: PgSelect = opts.join ? opts.join(base) : base;
   pageQuery = pageQuery.where(where).orderBy(dir(sort.column), dir(idCol)).limit(pageSize + (cursorMode ? 1 : 0));
   if (!cursorMode) pageQuery = pageQuery.offset((page - 1) * pageSize);
+  const countWhere = and(...[opts.where, searchCondition(opts.search?.columns ?? [], opts.search?.term)].filter((c): c is SQL => c !== undefined));
   const countBase: PgSelect = executor.select({ total: count() }).from(opts.table).$dynamic();
-  const countQuery = (opts.join ? opts.join(countBase) : countBase).where(and(...[opts.where, searchCondition(opts.search?.columns ?? [], opts.search?.term)].filter((c): c is SQL => c !== undefined)));
-  const [rows, totals] = await Promise.all([pageQuery, countQuery]);
+  const countQuery = (opts.join ? opts.join(countBase) : countBase).where(countWhere);
+  const [rows, total] = await Promise.all([pageQuery, countRows(executor, opts, countQuery, countWhere)]);
   const items = rows as unknown as T[];
   let nextCursor: string | null = null;
   if (cursorMode && items.length > pageSize) {
     items.length = pageSize;
     const last = items[items.length - 1] as Record<string, unknown>;
-    nextCursor = encodeCursor({ v: rawSortValue(readSortValue(last, opts, sort.column, sort.field)), id: String(readId(last)) });
+    const v = withSortKey ? last[SORT_KEY] : readSortValue(last, opts, sort.column, sort.field);
+    nextCursor = encodeCursor({ v: rawSortValue(v), id: String(readId(last)) });
   }
-  const totalRow = (totals as { total?: number | string }[])[0];
-  return { items, total: Number(totalRow?.total ?? 0), page, page_size: pageSize, next_cursor: nextCursor };
+  if (withSortKey) for (const row of items as Record<string, unknown>[]) delete row[SORT_KEY];
+  return { items, total, page, page_size: pageSize, next_cursor: nextCursor };
+}
+
+/** Exact `count(*)` for small tables or `exact=true`; the planner's estimate of the filtered query above the threshold. */
+async function countRows(executor: Executor, opts: PaginateOptions, countQuery: PgSelect, where: SQL | undefined): Promise<number> {
+  const exact = async () => {
+    const totals = (await countQuery) as { total?: number | string }[];
+    return Number(totals[0]?.total ?? 0);
+  };
+  if (opts.exact) return exact();
+  const threshold = opts.estimateAbove ?? COUNT_ESTIMATE_ABOVE;
+  if ((await tableEstimate(executor, opts.table)) <= threshold) return exact();
+  const idsBase: PgSelect = executor.select({ id: opts.table.id }).from(opts.table).$dynamic();
+  const estimate = await plannerEstimate(executor, (opts.join ? opts.join(idsBase) : idsBase).where(where));
+  return estimate ?? exact();
 }
 
 /** Reads the sort value back from the last row: a flat select key, a nested table selection, or the full-row property. */
@@ -148,15 +223,15 @@ function columnKey(table: PgTable, column: AnyPgColumn): string | undefined {
 }
 
 /** Maps the common ListQuery pagination fields onto paginate() options (search/sort are passed explicitly by the caller). */
-export function fromListQuery(q: ListQuery): Pick<PaginateOptions, "page" | "page_size" | "cursor" | "limit"> {
-  return { page: q.page, page_size: q.page_size, cursor: q.cursor, limit: q.limit };
+export function fromListQuery(q: ListQuery): Pick<PaginateOptions, "page" | "page_size" | "cursor" | "limit" | "exact"> {
+  return { page: q.page, page_size: q.page_size, cursor: q.cursor, limit: q.limit, exact: q.exact };
 }
 
 /** Upper bound of rows a synchronous `format=csv` export streams (larger exports belong to a worker job). */
 export const CSV_EXPORT_MAX_ROWS = 10_000;
 
 /** Pagination for a list handler: normal paging for JSON, the whole filtered list (capped at CSV_EXPORT_MAX_ROWS) for `format=csv`. */
-export function listPaging(q: ListQuery): Pick<PaginateOptions, "page" | "page_size" | "cursor" | "limit"> {
-  if (q.format === "csv") return { page: 1, page_size: CSV_EXPORT_MAX_ROWS };
+export function listPaging(q: ListQuery): Pick<PaginateOptions, "page" | "page_size" | "cursor" | "limit" | "exact"> {
+  if (q.format === "csv") return { page: 1, page_size: CSV_EXPORT_MAX_ROWS, exact: true };
   return fromListQuery(q);
 }

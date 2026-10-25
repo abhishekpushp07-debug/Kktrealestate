@@ -308,11 +308,6 @@ export async function streamDocument(executor: Executor, documentId: string, var
 // Views
 // ---------------------------------------------------------------------------
 
-/**
- * Microsecond-exact, fixed-width sort key for `created_at`. Keyset cursors built from a JS Date keep only milliseconds, so rows
- * written in the same millisecond (concurrent uploads) would be skipped when paging by the raw column; this text key round-trips exactly.
- */
-export const CREATED_AT_SORT = sql<string>`to_char(${documents.createdAt} at time zone 'UTC', 'YYYY-MM-DD HH24:MI:SS.US')`;
 
 /** Selection used by every documents query (row + type + uploader names) — one query, no per-row lookups. */
 export const DOCUMENT_SELECT = {
@@ -321,7 +316,6 @@ export const DOCUMENT_SELECT = {
   isKyc: documentTypes.isKyc,
   staffName: users.name,
   customerName: customers.fullName,
-  createdAtSort: CREATED_AT_SORT,
 };
 
 /** Adds the type/uploader joins to a (dynamic) documents query builder. */
@@ -359,6 +353,7 @@ export function toDocumentRow(j: DocumentJoined): DocumentRow {
     medium_url: urlFor("medium"),
     is_sensitive: d.isSensitive,
     shared_with_customer: d.sharedWithCustomer,
+    version: d.version,
     uploaded_by_type: d.uploadedByType,
     uploaded_by: d.uploadedBy,
     uploaded_by_name: d.uploadedByType === "STAFF" ? j.staffName : d.uploadedByType === "CUSTOMER" ? j.customerName : "system",

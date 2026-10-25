@@ -251,7 +251,6 @@ const UPDATABLE_WITHOUT_VERSION = new Set([
   "booking_drafts",
   "booking_other_charges",
   "demands",
-  "documents",
 ]);
 
 interface ColumnRow {

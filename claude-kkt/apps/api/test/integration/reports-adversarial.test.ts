@@ -286,7 +286,8 @@ describe("strict queries and permissions on every route", () => {
         expect(r.body.error.code).toBe("FORBIDDEN");
       }
     }
-    const registry = t.app.routeRegistry.filter((r) => r.url.startsWith("/api/v1/reports") || r.url === "/api/v1/dashboard" || r.url.endsWith(".pdf"));
+    // staff routes only: the portal module serves its own customer-bound PDF links under /portal (audience, not permission)
+    const registry = t.app.routeRegistry.filter((r) => r.audience === "erp" && !r.public && (r.url.startsWith("/api/v1/reports") || r.url === "/api/v1/dashboard" || r.url.endsWith(".pdf")));
     expect(registry.length).toBeGreaterThanOrEqual(22);
     for (const r of registry) expect(r.permission, `${r.method} ${r.url}`).toBeTruthy();
     expect(registry.find((r) => r.url === "/api/v1/reports/activity")?.permission).toBe("audit.view");

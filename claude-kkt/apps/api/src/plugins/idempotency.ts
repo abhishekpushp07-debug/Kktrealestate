@@ -17,8 +17,25 @@ const LOCK_SECONDS = 30;
 
 interface StoredResponse { request_hash: string; status_code: number; response_body: unknown; path: string }
 
+/**
+ * Route-provided request fingerprints (docs/TODO-integration.md item 2). Multipart bodies are streamed, so `req.body` is empty and
+ * every upload would hash alike; routes that parse a multipart body before preHandler register a digest of the fields and file bytes
+ * here and the Idempotency-Key fingerprint covers the actual upload (same key + different file → 422 IDEMPOTENCY_MISMATCH).
+ */
+const fingerprints = new WeakMap<FastifyRequest, unknown>();
+
+/** Sets the value the idempotency plugin hashes for this request instead of `req.body` (call from a preValidation hook). */
+export function setIdempotencyFingerprint(req: FastifyRequest, value: unknown): void {
+  fingerprints.set(req, value);
+}
+
+/** The value the idempotency plugin hashes for this request (route fingerprint when set, else the JSON body). */
+export function idempotencyFingerprint(req: FastifyRequest): unknown {
+  return fingerprints.has(req) ? fingerprints.get(req) : (req.body ?? null);
+}
+
 function requestHash(req: FastifyRequest): string {
-  return createHash("sha256").update(req.method).update(req.url).update(JSON.stringify(req.body ?? null)).digest("hex");
+  return createHash("sha256").update(req.method).update(req.url).update(JSON.stringify(idempotencyFingerprint(req) ?? null)).digest("hex");
 }
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));

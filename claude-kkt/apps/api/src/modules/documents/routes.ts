@@ -1,5 +1,4 @@
 import { and, eq, type SQL } from "drizzle-orm";
-import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
@@ -9,15 +8,16 @@ import {
 } from "@kkt/contracts";
 import { documents } from "@kkt/db";
 import { actorFromRequest, auditMeta, writeAudit } from "../../lib/audit.js";
-import { sha256 } from "../../lib/crypto.js";
 import { sendCsv } from "../../lib/csv.js";
 import { ApiError } from "../../lib/errors.js";
 import { listPaging, paginate } from "../../lib/list.js";
+import { installMultipartIdempotency, uploadOf } from "../../lib/multipart.js";
 import { route } from "../../lib/routes.js";
 import type { StaffContext } from "../../lib/scope.js";
+import { applyUpdate, optionalExpectedVersion, withOptionalVersion } from "../../lib/version.js";
 import { assertEntityWrite, documentScopeCondition, requireEntity } from "./entities.js";
 import {
-  CREATED_AT_SORT, DOCUMENT_SELECT, SIGNED_LINK_TTL_SECONDS, applyTypeRules, loadDocumentType, loadJoined, signedUrl, storage, storeBuffer, streamDocument,
+  DOCUMENT_SELECT, SIGNED_LINK_TTL_SECONDS, applyTypeRules, loadDocumentType, loadJoined, signedUrl, storage, storeBuffer, streamDocument,
   toDocumentRow, variantKey, variantMeta, verifyLinkToken, withDocumentJoins, type DocumentJoined,
 } from "./service.js";
 
@@ -49,44 +49,6 @@ function parseUploadMeta(fields: Record<string, unknown>): DocumentUploadMeta {
   return parsed.data;
 }
 
-/** A parsed multipart upload. */
-interface ParsedUpload { buffer: Buffer; filename: string; fields: Record<string, unknown> }
-
-/** Uploads parsed by the preValidation hook, keyed by request (a WeakMap so no request decoration leaks to other modules). */
-const parsedUploads = new WeakMap<FastifyRequest, ParsedUpload>();
-
-/** Reads the single file part and the text fields of a multipart upload (413 when the 15 MB file limit is hit). */
-async function readUpload(req: FastifyRequest): Promise<ParsedUpload> {
-  if (!req.isMultipart()) throw ApiError.badRequest("Expected a multipart/form-data upload with a `file` part");
-  const fields: Record<string, unknown> = {};
-  let file: { buffer: Buffer; filename: string } | null = null;
-  try {
-    for await (const part of req.parts()) {
-      if (part.type === "file") {
-        if (file) { part.file.resume(); throw ApiError.badRequest("Upload exactly one file per request"); }
-        const buffer = await part.toBuffer();
-        file = { buffer, filename: part.filename || "file" };
-      } else {
-        fields[part.fieldname] = part.value;
-      }
-    }
-  } catch (err) {
-    const code = (err as { code?: string }).code;
-    if (code === "FST_REQ_FILE_TOO_LARGE") throw new ApiError(413, "PAYLOAD_TOO_LARGE", "File exceeds the 15 MB limit");
-    if (code === "FST_FILES_LIMIT" || code === "FST_PARTS_LIMIT" || code === "FST_FIELDS_LIMIT") throw ApiError.badRequest("Too many parts in the upload");
-    throw err;
-  }
-  if (!file) throw ApiError.badRequest("Missing `file` part");
-  return { ...file, fields };
-}
-
-/** The upload parsed for this request by the preValidation hook (400 when the request was not multipart). */
-function uploadOf(req: FastifyRequest): ParsedUpload {
-  const parsed = parsedUploads.get(req);
-  if (!parsed) throw ApiError.badRequest("Expected a multipart/form-data upload with a `file` part");
-  return parsed;
-}
-
 /** Loads a live document for a staff caller: 404 when missing, out of project scope, or sensitive and the caller lacks customer.kyc_view (when `hideSensitive`). */
 async function loadForStaff(app: FastifyInstance, user: StaffContext, id: string, opts: { hideSensitive: boolean; forUpdate?: boolean }): Promise<DocumentJoined> {
   const j = await loadJoined(opts.forUpdate ? app.db : app.dbReplica, user.companyId, id, { forUpdate: opts.forUpdate });
@@ -98,15 +60,9 @@ async function loadForStaff(app: FastifyInstance, user: StaffContext, id: string
 
 /** Documents routes: upload, list, meta, update, soft delete, signed link, and the public token stream. */
 export function registerDocumentRoutes(app: FastifyInstance): void {
-  // Multipart bodies are streamed, so Fastify leaves `req.body` empty and the idempotency plugin would hash every upload alike
-  // (same key + different file would replay the first document). Parsing here, before preHandler, and exposing a digest of the
-  // fields and file bytes as `req.body` makes the Idempotency-Key fingerprint cover the actual upload (422 IDEMPOTENCY_MISMATCH).
-  app.addHook("preValidation", async (req) => {
-    if (req.method !== "POST" || !req.routeOptions.url?.endsWith("/documents") || !req.isMultipart()) return;
-    const parsed = await readUpload(req);
-    parsedUploads.set(req, parsed);
-    req.body = { fields: parsed.fields, file: { name: parsed.filename, size: parsed.buffer.length, sha256: sha256(parsed.buffer) } };
-  });
+  // Multipart bodies are streamed, so the idempotency plugin cannot hash `req.body`; the shared hook parses the upload before
+  // preHandler and registers a digest of fields + file bytes as the Idempotency-Key fingerprint (422 IDEMPOTENCY_MISMATCH on reuse).
+  installMultipartIdempotency(app, (url) => url.endsWith("/documents"));
 
   route(app, {
     method: "POST", url: "/documents", permission: "document.write", idempotent: true,
@@ -160,8 +116,7 @@ export function registerDocumentRoutes(app: FastifyInstance): void {
         join: withDocumentJoins,
         where: and(...where.filter((w): w is SQL => w !== undefined)),
         search: { columns: [documents.title, documents.fileName], term: q.search },
-        // created_at sorts/pages on a microsecond-exact text key (see CREATED_AT_SORT) so same-millisecond rows are never skipped.
-        sort: { allowed: { created_at: CREATED_AT_SORT as unknown as AnyPgColumn, title: documents.title, file_name: documents.fileName, size_bytes: documents.sizeBytes }, default: "-created_at", requested: q.sort },
+        sort: { allowed: { created_at: documents.createdAt, title: documents.title, file_name: documents.fileName, size_bytes: documents.sizeBytes }, default: "-created_at", requested: q.sort },
         ...listPaging(q),
       });
       const items = result.items.map(toDocumentRow);
@@ -178,7 +133,7 @@ export function registerDocumentRoutes(app: FastifyInstance): void {
 
   route(app, {
     method: "PATCH", url: "/documents/:id", permission: "document.write",
-    schema: { params: idParams, body: DocumentUpdateSchema, response: { 200: DocumentRowSchema }, summary: "Update title, type or sharing flags (KYC rules enforced)" },
+    schema: { params: idParams, body: withOptionalVersion(DocumentUpdateSchema), response: { 200: DocumentRowSchema }, summary: "Update title, type or sharing flags (KYC rules enforced); If-Match / version honoured" },
     handler: async (req) => {
       const user = req.user!;
       const body = req.body;
@@ -195,7 +150,8 @@ export function registerDocumentRoutes(app: FastifyInstance): void {
         const flags = applyTypeRules(type, doc.entityType, { isSensitive: body.is_sensitive ?? doc.isSensitive, sharedWithCustomer: body.shared_with_customer ?? doc.sharedWithCustomer });
         const changes: Partial<typeof documents.$inferInsert> = { documentTypeId: type?.id ?? null, isSensitive: flags.isSensitive, sharedWithCustomer: flags.sharedWithCustomer, updatedAt: new Date() };
         if (body.title !== undefined) changes.title = body.title;
-        await tx.update(documents).set(changes).where(eq(documents.id, doc.id));
+        // Optimistic concurrency: `If-Match: "<version>"` (or body.version) is honoured; without either the current version is assumed.
+        await applyUpdate(tx, documents, doc.id, optionalExpectedVersion(req as unknown as FastifyRequest, body, doc.version), changes, ENTITY);
         const after = toDocumentRow((await loadJoined(tx, user.companyId, doc.id))!);
         await writeAudit(tx, { companyId: user.companyId, actor: actorFromRequest(req), action: `${ENTITY}.update`, entityType: ENTITY, entityId: doc.id, before: auditSnapshot(before), after: auditSnapshot(after), ...auditMeta(req) });
         return after;

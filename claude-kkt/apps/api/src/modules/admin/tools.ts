@@ -101,8 +101,8 @@ export async function reconciliationJob(db: DB): Promise<Record<string, unknown>
 // Reseed
 // ---------------------------------------------------------------------------
 
-/** Shape the seed module is expected to export as `reseed(db)`. */
-type ReseedFn = (db: DB) => Promise<{ counts?: Record<string, number>; integrity?: IntegrityReportResponse }>;
+/** Shape the seed module exports as `reseed(db, { app })` (the app drives the seed through its own API in-process). */
+type ReseedFn = (db: DB, opts?: { app?: FastifyInstance }) => Promise<{ counts?: Record<string, number>; integrity?: IntegrityReportResponse }>;
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -285,7 +285,7 @@ export function registerToolRoutes(app: FastifyInstance): void {
       const reseed = await loadReseed();
       if (!reseed) throw new ApiError(501, "NOT_IMPLEMENTED", "Reseed is not available in this build: apps/api/src/seed/run.ts does not export reseed(db) yet (the demo seed module is pending)");
       const startedAt = new Date();
-      const result = await reseed(app.db);
+      const result = await reseed(app.db, { app });
       const finishedAt = new Date();
       // Everything cached about the old rows is stale now.
       await invalidate(app.redis, "company:");

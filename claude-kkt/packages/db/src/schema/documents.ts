@@ -1,5 +1,5 @@
 // G (part). Documents — defined before inventory because stage_photos reference it.
-import { bigint, boolean, index, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { bigint, boolean, index, integer, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { idColumn, timestamps } from "./_common.js";
 import { actorTypeEnum, documentEntityTypeEnum } from "./enums.js";
 import { companies } from "./identity.js";
@@ -29,6 +29,7 @@ export const documents = pgTable(
     uploadedBy: uuid("uploaded_by"),
     isDeleted: boolean("is_deleted").notNull().default(false),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    version: integer("version").notNull().default(1),
     ...timestamps(),
   },
   (t) => [index("documents_entity_idx").on(t.entityType, t.entityId, t.isDeleted)],

@@ -206,7 +206,7 @@ export const blocks = pgTable(
     ...softDelete(),
     ...mutable(),
   },
-  (t) => [unique("blocks_project_code_uq").on(t.projectId, t.code), index("blocks_company_project_idx").on(t.companyId, t.projectId)],
+  (t) => [unique("blocks_project_code_uq").on(t.projectId, t.code), index("blocks_company_project_idx").on(t.companyId, t.projectId), index("blocks_floor_plans_gin_idx").using("gin", t.floorPlans)],
 );
 
 export const blockStages = pgTable(
