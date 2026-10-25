@@ -176,3 +176,39 @@ async def reconcile_all() -> dict:
         if diff:
             mismatches.append({"booking_id": bid, "diff": diff})
     return {"bookings": len(ids), "mismatches": mismatches}
+
+
+DOCS_DIR = "/app/docs"
+
+
+def _super_admin(user: dict):
+    if user.get("role_name") not in ("Super Admin",) and "settings.manage" not in (user.get("permissions") or []):
+        raise ApiError(403, "Super Admin only", "FORBIDDEN")
+
+
+@router.get("/docs/technical.pdf")
+async def docs_pdf(user: dict = Depends(require("settings.manage"))):
+    from fastapi.responses import FileResponse
+    import os
+    path = f"{DOCS_DIR}/KKT_Technical_Documentation.pdf"
+    if not os.path.exists(path):
+        raise ApiError(404, "Documentation not generated yet", "NOT_FOUND")
+    return FileResponse(path, media_type="application/pdf", filename="KKT_Technical_Documentation.pdf")
+
+
+@router.get("/docs/technical.md")
+async def docs_md(user: dict = Depends(require("settings.manage"))):
+    from fastapi.responses import FileResponse
+    return FileResponse(f"{DOCS_DIR}/KKT_Technical_Documentation.md", media_type="text/markdown", filename="KKT_Technical_Documentation.md")
+
+
+@router.post("/docs/regenerate")
+async def docs_regenerate(request: Request, user: dict = Depends(require("settings.manage"))):
+    import asyncio, os, sys
+    proc = await asyncio.create_subprocess_exec(sys.executable, "/app/backend/docs/build_docs_pdf.py", "--regen", cwd="/app/backend", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
+    out, _ = await asyncio.wait_for(proc.communicate(), timeout=240)
+    if proc.returncode:
+        raise ApiError(500, f"Docs build failed: {out.decode()[-400:]}", "DOCS_BUILD_FAILED")
+    pages = int((out.decode().strip().split("\n")[-1].split()[1]))
+    await write_audit(user, "docs.regenerate", "settings", "docs", None, {"pages": pages}, client_ip(request))
+    return {"ok": True, "pages": pages, "size_bytes": os.path.getsize(f"{DOCS_DIR}/KKT_Technical_Documentation.pdf")}

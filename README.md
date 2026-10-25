@@ -44,6 +44,16 @@ No code is imported across projects. `/app/frontend/src/setupProxy.js` + `script
 - Backend tests: `cd /app/backend && python -m pytest tests/ -q`. Site resolver unit tests were removed with the HOST_MAP resolver (no longer needed: each app is its own project).
 
 ## Production deployment recipe
+
+### Deploy checklist (single domain — billpe.com) ← current recipe
+ONE build from `/app/frontend` serves all three surfaces: `/` marketing site, `/erp/*` ERP, `/portal/*` customer portal (Expo web export). Static hosting with SPA fallback to the ROOT `index.html` is enough — an inline router-loader in the root `<head>` fetches `/erp/index.html` or `/portal/index.html` for nested paths.
+1. **Refresh prebuilt surfaces** (whenever `/app/site` or `/app/mobile` changed): `cd /app/frontend && yarn package:assets` → writes `deploy-assets/{site,portal}` (committed; `yarn build` fails loudly if missing). Definition of done for every phase.
+2. **Build**: `yarn build` (= `craco build` with `PUBLIC_URL=/erp REACT_APP_BASE_PATH=/erp` + `scripts/package-build.js`) → `build/` = site at root (assets `/site-assets`), `build/erp/`, `build/portal/`. Preview serves exactly this bundle (`PREVIEW_MODE=production`, `scripts/dev.js`), so preview = production 1:1.
+3. **Re-publish** the frontend + backend deployment. API is same-origin (`<origin>/api`) for all three surfaces — the site and the portal resolve `window.location.origin` (the Expo preview host keeps `EXPO_PUBLIC_BACKEND_URL`).
+Post-publish secrets (backend): `PORTAL_PUBLIC_URL=` (leave empty → `portal_url` defaults to `<origin>/portal`; set only for a separate portal host), `CORS_ORIGINS=https://billpe.com`. Smoke: `/`, `/erp/login`, `/portal/login`, `/api/health`, deep-link reload on `/erp/customers`.
+Startup is idempotent against a Phase-5-era DB (`tests/test_startup_migrations.py`: catalogues, read models, `default_cash_percent`, visit settings, portal_url).
+
+### Legacy three-deployment recipe (separate hosts)
 1. **Deployment 1 — ERP + API + DB** (`erp.kkt.in`): deploy `/app/backend` + `/app/frontend` as the main full-stack app. Set `REACT_APP_BASE_PATH=/` (or unset), `REACT_APP_BACKEND_URL=https://erp.kkt.in`, backend `CORS_ORIGINS=https://erp.kkt.in,https://www.kkt.in,https://my.kkt.in`, `PORTAL_PUBLIC_URL=https://my.kkt.in`, `ERP_PUBLIC_URL=https://erp.kkt.in`. Attach the custom domain.
 2. **Deployment 2 — Website** (`www.kkt.in`): frontend-only deploy of `/app/site` (`yarn build` → static `build/`). Env: `REACT_APP_BACKEND_URL=https://erp.kkt.in`, `REACT_APP_PORTAL_URL=https://my.kkt.in`, `REACT_APP_ERP_URL=https://erp.kkt.in`. Do **not** set `PUBLIC_URL` (that is preview-only). Attach the domain; SPA fallback to `index.html`.
 3. **Deployment 3 — Portal** (`my.kkt.in`): `/app/mobile` Expo app — web build via `npx expo export --platform web` (static `dist/`, SPA fallback), native builds via EAS (`eas build`); env `EXPO_PUBLIC_BACKEND_URL=https://erp.kkt.in`. Full instructions: `/app/mobile/README.md`. Attach the domain. Portal API additions for the app: `GET /api/portal/service-requests/{id}/attachments/{idx}` (customer-scoped, excludes internal-note attachments) and ledger rows carry `bucket` (`Cash` / `Account` / `Other charges` / `null`).

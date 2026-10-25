@@ -94,7 +94,7 @@ async def collections_md():
         purpose = PURPOSE.get(n) or PURPOSE.get("master_*" if n.startswith("master_") else "") or ""
         lines += [f"### `{n}` ({cnt} docs)", "", purpose, "", "| Field | Type | Example / note |", "|---|---|---|"]
         for k, v in list(doc.items())[:40]:
-            ex = json.dumps(v, default=str)[:60].replace("|", "\\|") if not isinstance(v, (dict, list)) else (f"{len(v)} keys" if isinstance(v, dict) else f"{len(v)} items")
+            ex = json.dumps(v, default=str, ensure_ascii=False)[:60].replace("|", "\\|") if not isinstance(v, (dict, list)) else (f"{len(v)} keys" if isinstance(v, dict) else f"{len(v)} items")
             if k in ("password_hash", "mfa_secret", "pan_enc", "aadhaar_enc", "token_hash", "account_number_enc"):
                 ex = "(secret — never returned)"
             lines.append(f"| `{k}` | {_type(v)} | {ex} |")

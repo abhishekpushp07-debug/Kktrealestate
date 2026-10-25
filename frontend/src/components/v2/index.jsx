@@ -154,8 +154,9 @@ export function EntityCard({ to, cover, title, subtitle, status, meta = [], coun
 }
 
 export function FormSection({ title, helper, children, className }) {
+  const anchor = title ? title.toLowerCase().replace(/\s+/g, "-") : undefined;
   return (
-    <section className={cn("card p-6", className)}>
+    <section id={anchor} className={cn("card scroll-mt-24 p-6 target:ring-2 target:ring-gold", className)}>
       {title && <div className="mb-5"><h3 className="font-display text-lg text-ink-950">{title}</h3>{helper && <p className="mt-1 text-sm text-txt-secondary">{helper}</p>}</div>}
       <div className="grid gap-5 md:grid-cols-2">{children}</div>
     </section>
@@ -172,13 +173,13 @@ export function Field({ label, children, hint, error, required, className, testI
   );
 }
 
-export function Stepper({ steps, current, onStep, onJump, testId, vertical }) {
+export function Stepper({ steps, current, onStep, onJump, testId, vertical, allowJump }) {
   const labelOf = (s) => (typeof s === "string" ? s : s.label);
   const jump = onJump || onStep;
   if (vertical || steps.some((s) => typeof s !== "string")) return (
     <ol className="flex gap-2 overflow-x-auto scroll-x pb-1 lg:block lg:space-y-1" data-testid={testId || "stepper"}>
       {steps.map((s, i) => { const done = i < current, active = i === current; return (
-        <li key={labelOf(s)}><button type="button" onClick={() => jump?.(i)} disabled={i > current} className={cn("flex w-full shrink-0 items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors", active ? "bg-ink-950 text-warm-50" : done ? "text-ink-950 hover:bg-warm-100" : "text-txt-muted")} data-testid={`step-${i + 1}`} aria-current={active ? "step" : undefined}>
+        <li key={labelOf(s)}><button type="button" onClick={() => jump?.(i)} disabled={!allowJump && i > current} className={cn("flex w-full shrink-0 items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors", active ? "bg-ink-950 text-warm-50" : done ? "text-ink-950 hover:bg-warm-100" : allowJump ? "text-txt-secondary hover:bg-warm-100" : "text-txt-muted")} data-testid={`step-${i + 1}`} aria-current={active ? "step" : undefined}>
           <span className={cn("mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold", active ? "bg-gold text-ink-950" : done ? "bg-sage text-white" : "bg-warm-200 text-txt-secondary")}>{done ? "✓" : i + 1}</span>
           <span className={cn("min-w-0", !active && "hidden lg:block")}><span className="block text-sm font-semibold">{labelOf(s)}</span>{s.desc && <span className={cn("hidden text-[11px] lg:block", active ? "text-warm-200/70" : "text-txt-muted")}>{s.desc}</span>}</span>
         </button></li>); })}
@@ -190,7 +191,7 @@ export function Stepper({ steps, current, onStep, onJump, testId, vertical }) {
         const done = i < current, active = i === current;
         return (
           <li key={s} className="flex shrink-0 items-center gap-2">
-            <button type="button" onClick={() => jump?.(i)} disabled={i > current} className={cn("flex items-center gap-2 rounded-full py-1.5 pl-1.5 pr-3 text-sm font-semibold transition-colors", active ? "bg-ink-950 text-warm-50" : done ? "text-ink-950 hover:bg-warm-100" : "text-txt-muted")} data-testid={`step-${i + 1}`}>
+            <button type="button" onClick={() => jump?.(i)} disabled={!allowJump && i > current} className={cn("flex items-center gap-2 rounded-full py-1.5 pl-1.5 pr-3 text-sm font-semibold transition-colors", active ? "bg-ink-950 text-warm-50" : done ? "text-ink-950 hover:bg-warm-100" : "text-txt-muted")} data-testid={`step-${i + 1}`}>
               <span className={cn("grid h-6 w-6 place-items-center rounded-full text-xs", active ? "bg-gold text-ink-950" : done ? "bg-sage text-white" : "bg-warm-200 text-txt-secondary")}>{done ? "✓" : i + 1}</span>
               <span className={cn(!active && "hidden md:inline")}>{s}</span>
             </button>

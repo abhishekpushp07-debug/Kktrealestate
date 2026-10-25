@@ -1,6 +1,6 @@
 ## A. API map (generated from the OpenAPI specification)
 
-Total endpoints: **366** across **34** routers. All paths are prefixed `/api`. Permission is the `require(...)` guard on the endpoint (blank = public or authenticated-only).
+Total endpoints: **396** across **39** routers. All paths are prefixed `/api`. Permission is the `require(...)` guard on the endpoint (blank = public or authenticated-only).
 
 ### admin
 
@@ -10,6 +10,9 @@ Total endpoints: **366** across **34** routers. All paths are prefixed `/api`. P
 | GET | `/api/admin/backups` | settings.manage | List Backups |
 | GET | `/api/admin/backups/{backup_id}/download` |  | Download Backup |
 | POST | `/api/admin/customers/{customer_id}/erase` | settings.manage | Erase Customer |
+| POST | `/api/admin/docs/regenerate` | settings.manage | Docs Regenerate |
+| GET | `/api/admin/docs/technical.md` | settings.manage | Docs Md |
+| GET | `/api/admin/docs/technical.pdf` | settings.manage | Docs Pdf |
 | POST | `/api/admin/recompute-counters` | settings.manage | Recompute Counters |
 | POST | `/api/admin/reconcile-ledgers` | settings.manage | Reconcile |
 | POST | `/api/admin/reseed` | settings.manage | Reseed |
@@ -69,6 +72,29 @@ Total endpoints: **366** across **34** routers. All paths are prefixed `/api`. P
 | POST | `/api/bookings/{booking_id}/other-charges/demand` | booking.create | Demand Other Charge |
 | POST | `/api/bookings/{booking_id}/recompute` | settings.manage | Recompute |
 
+### bootstrap
+
+| Method | Path | Permission | Purpose |
+|---|---|---|---|
+| POST | `/api/admin/recompute-read-models` | settings.manage | Recompute |
+| GET | `/api/blocks/{block_id}/summary` | payment.read | Block Summary |
+| GET | `/api/bootstrap` |  | Bootstrap |
+| GET | `/api/customers/{customer_id}/summary` | payment.read | Customer Summary |
+| GET | `/api/dashboard/snapshot` | project.read | Dashboard Snapshot |
+| GET | `/api/projects/{project_id}/summary` | payment.read | Project Summary |
+
+### catalogues
+
+| Method | Path | Permission | Purpose |
+|---|---|---|---|
+| GET | `/api/catalogues` |  | Get Bundle |
+| GET | `/api/catalogues/{ctype}` |  | Get Type |
+| GET | `/api/catalogues/{ctype}/export.csv` |  | Export Csv |
+| POST | `/api/catalogues/{ctype}/import` | catalogue.write | Import Csv |
+| POST | `/api/catalogues/{ctype}/items` | catalogue.write | Add Item |
+| PATCH | `/api/catalogues/{ctype}/items/{item_id}` | catalogue.write | Patch Item |
+| POST | `/api/catalogues/{ctype}/reorder` | catalogue.write | Reorder |
+
 ### cms
 
 | Method | Path | Permission | Purpose |
@@ -104,12 +130,24 @@ Total endpoints: **366** across **34** routers. All paths are prefixed `/api`. P
 | PATCH | `/api/projects/{project_id}/stage-sequence` | project.write | Set Project Sequence |
 | GET | `/api/reports/upcoming-dues` | report.view | Upcoming Dues |
 
+### crm
+
+| Method | Path | Permission | Purpose |
+|---|---|---|---|
+| GET | `/api/bookings/{booking_id}/ledgers` | booking.read | Booking Three Ledgers |
+| GET | `/api/communications` | customer.read | List Communications |
+| POST | `/api/communications` | customer.write | Log Communication |
+| GET | `/api/customers/{customer_id}/ledgers` | booking.read | Customer Three Ledgers |
+| PATCH | `/api/customers/{customer_id}/profile` | customer.write | Update Profile |
+| GET | `/api/customers/{customer_id}/timeline` | customer.read | Customer Timeline |
+
 ### customers
 
 | Method | Path | Permission | Purpose |
 |---|---|---|---|
 | GET | `/api/customers` |  | List Customers |
 | POST | `/api/customers` |  | Create Customer |
+| GET | `/api/customers/rm-options` | customer.read | Rm Options |
 | GET | `/api/customers/{customer_id}` | customer.read | Get Customer |
 | PATCH | `/api/customers/{customer_id}` | customer.write | Update Customer |
 | POST | `/api/customers/{customer_id}/kyc-status` | customer.kyc_view | Set Kyc Status |
@@ -139,6 +177,12 @@ Total endpoints: **366** across **34** routers. All paths are prefixed `/api`. P
 | GET | `/api/flats/{flat_id}` | project.read | Get Flat |
 | PATCH | `/api/flats/{flat_id}` | flat.write | Update Flat |
 | PATCH | `/api/flats/{flat_id}/status` | flat.status | Change Status |
+
+### home
+
+| Method | Path | Permission | Purpose |
+|---|---|---|---|
+| GET | `/api/dashboard/home` | project.read | Home |
 
 ### imports
 
@@ -305,6 +349,7 @@ Total endpoints: **366** across **34** routers. All paths are prefixed `/api`. P
 | GET | `/api/payments` |  | List Payments |
 | POST | `/api/payments` |  | Post Payment |
 | GET | `/api/payments/cheques-in-hand` | payment.read | Cheques In Hand |
+| GET | `/api/payments/demands` | payment.read | List Open Demands |
 | GET | `/api/payments/summary` | payment.read | Payments Summary |
 | GET | `/api/payments/{payment_id}` | payment.read | Get Payment |
 | POST | `/api/payments/{payment_id}/bounce` | payment.post | Bounce Payment |
@@ -334,7 +379,7 @@ Total endpoints: **366** across **34** routers. All paths are prefixed `/api`. P
 | GET | `/api/portal/bookings/{booking_id}` | booking.read | Booking Detail |
 | GET | `/api/portal/bookings/{booking_id}/allotment.pdf` |  | Allotment Pdf |
 | GET | `/api/portal/bookings/{booking_id}/construction` |  | Booking Construction |
-| GET | `/api/portal/bookings/{booking_id}/demands` |  | Booking Demands |
+| GET | `/api/portal/bookings/{booking_id}/demands` | payment.read | Booking Demands |
 | GET | `/api/portal/bookings/{booking_id}/demands/{demand_id}/letter.pdf` | booking.read | Demand Pdf |
 | GET | `/api/portal/bookings/{booking_id}/documents` |  | Booking Documents |
 | GET | `/api/portal/bookings/{booking_id}/documents/{doc_id}/download` |  | Booking Document Download |
@@ -371,6 +416,13 @@ Total endpoints: **366** across **34** routers. All paths are prefixed `/api`. P
 | POST | `/api/customers/{customer_id}/portal/enable` |  | Portal Enable |
 | POST | `/api/customers/{customer_id}/portal/revoke-sessions` |  | Portal Revoke |
 | POST | `/api/customers/{customer_id}/portal/toggle` |  | Portal Toggle |
+
+### project-setup
+
+| Method | Path | Permission | Purpose |
+|---|---|---|---|
+| GET | `/api/projects/{project_id}/setup` | project.read | Get Setup |
+| PUT | `/api/projects/{project_id}/setup/{section}` | project.write | Save Section |
 
 ### projects
 
@@ -438,6 +490,7 @@ Total endpoints: **366** across **34** routers. All paths are prefixed `/api`. P
 | GET | `/api/reports/cancellations` | report.view | Cancellations |
 | GET | `/api/reports/cheques` | report.view | Cheques |
 | GET | `/api/reports/collections` | report.view | Collections |
+| GET | `/api/reports/construction-progress` | report.view | Construction Progress |
 | GET | `/api/reports/demand-vs-collection` | report.view | Demand Vs Collection |
 | GET | `/api/reports/demand-vs-collection-installment` |  | Demand Vs Collection |
 | GET | `/api/reports/inventory` | report.view | Inventory |
@@ -445,8 +498,10 @@ Total endpoints: **366** across **34** routers. All paths are prefixed `/api`. P
 | GET | `/api/reports/presets` | report.view | List Presets |
 | POST | `/api/reports/presets` | report.view | Create Preset |
 | DELETE | `/api/reports/presets/{preset_id}` | report.view | Delete Preset |
+| PATCH | `/api/reports/presets/{preset_id}` | report.view | Rename Preset |
 | GET | `/api/reports/roznamcha-range` | report.view | Roznamcha Range |
 | GET | `/api/reports/sales-leads` | report.view | Sales Leads |
+| GET | `/api/reports/service-sla` | report.view | Service Sla |
 | GET | `/api/reports/statement/{booking_id}` | booking.read | Statement |
 
 ### roles

@@ -23,6 +23,10 @@ async def ensure_settings_defaults():
             await db.site_settings.update_one({"id": s["id"]}, {"$set": {"portal_url": None}})  # same-origin /portal
     await db.projects.update_many({"website": {"$exists": False}}, {"$set": {"website": {}}})
     await db.projects.update_many({"website.site_visits": {"$exists": False}}, {"$set": {"website.site_visits": {}, "website.brochure_gate_enabled": False, "website.brochure_download_count": 0}})
+    await db.projects.update_many({"default_cash_percent": {"$exists": False}}, {"$set": {"default_cash_percent": 0}})
+    await db.blocks.update_many({"default_cash_percent": {"$exists": False}}, {"$set": {"default_cash_percent": None}})
+    for key, value in (("visit_settings", {"slot_minutes": 60, "day_start": "10:00", "day_end": "18:00", "max_per_slot": 3}), ("density_default", "comfortable")):
+        await db.settings.update_one({"key": key}, {"$setOnInsert": {"key": key, "value": value}}, upsert=True)
     await db.customers.update_many({"lifecycle_stage": {"$exists": False}}, {"$set": {"lifecycle_stage": "Customer", "engagement_score": 0, "consent": {"marketing": False, "whatsapp": False}, "segment_ids": [], "preferences": {"bhk_ids": [], "facing_ids": [], "floor_preference_id": None, "budget_band_id": None, "project_ids": []}}})
 
 

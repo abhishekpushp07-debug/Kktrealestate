@@ -26,6 +26,7 @@ export default function CustomerForm() {
   const [dupe, setDupe] = useState(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => { if (existing) setF((p) => ({ ...p, ...Object.fromEntries(Object.entries(existing).filter(([k]) => k in EMPTY && existing[k] != null)), line1: existing.address_current?.line1 || "", pincode: existing.address_current?.pincode || "", rm_user_id: existing.assigned_sales_user_id || p.rm_user_id, preferences: { ...EMPTY.preferences, ...(existing.preferences || {}) }, consent: { ...EMPTY.consent, ...(existing.consent || {}) }, nominee: { relation_id: null, ...(existing.nominee || {}), dob: existing.nominee?.dob || "" }, co_applicants: (existing.co_applicants || []).map((c) => ({ name: c.name, relation_id: c.relation_id || null, phone: c.phone || "" })), pan: "", aadhaar: "" })); }, [existing]);
+  useEffect(() => { const h = window.location.hash.slice(1); if (h && (existing || !id)) setTimeout(() => document.getElementById(h)?.scrollIntoView({ behavior: "smooth", block: "start" }), 120); }, [existing, id]);
   useEffect(() => {
     if (f.phone.replace(/\D/g, "").length !== 10) return setDupe(null);
     const t = setTimeout(() => api.get("/customers", { params: { search: f.phone, page_size: 3 } }).then((r) => setDupe(r.data.items.find((c) => c.phone?.endsWith(f.phone.slice(-10)) && c.id !== id) || null)).catch(() => {}), 350);

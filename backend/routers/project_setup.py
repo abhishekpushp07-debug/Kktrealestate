@@ -49,7 +49,7 @@ async def get_setup(project_id: str, user: dict = Depends(require("project.read"
             "towers": towers,
             "stages": {"project_sequence": project_seq, "catalogue": await db.construction_stages.find({"is_active": True}, {"_id": 0, "id": 1, "name": 1, "code": 1, "seq_hint": 1, "is_possession": 1}).sort("seq_hint", 1).to_list(None)},
             "plans": {"assignments": assignments, "catalogue": await db.payment_plans.find({"is_active": True}, {"_id": 0, "id": 1, "name": 1, "code": 1, "plan_type": 1, "installments": 1}).to_list(None)},
-            "pricing": {"rate_card": rate_card, "block_rates": [{"block_id": b["id"], "rate_per_sqft": b.get("rate_per_sqft"), "floor_rise_per_sqft": b.get("floor_rise_per_sqft")} for b in blocks]},
+            "pricing": {"rate_card": rate_card, "block_rates": [{"block_id": b["id"], "rate_per_sqft": b.get("rate_per_sqft"), "floor_rise_per_sqft": b.get("floor_rise_per_sqft"), "default_cash_percent": b.get("default_cash_percent")} for b in blocks]},
             "parking": {"by_status": {x["_id"]: x["n"] for x in parking}, "total": sum(x["n"] for x in parking)},
             "website": {"published": bool(web.get("published")), "slug": web.get("slug"), "show_prices": bool(web.get("show_prices")), "brochure_gate_enabled": bool(web.get("brochure_gate_enabled")), "site_visits_enabled": bool((web.get("site_visits") or {}).get("enabled"))},
             "checklist": {"has_towers": bool(blocks), "has_units": bool(counts), "stages_configured": all(t["construction"]["total"] > 0 for t in towers) if towers else False,
@@ -81,6 +81,7 @@ class TowerRate(StrictModel):
     block_id: str
     rate_per_sqft: float | None = Field(default=None, ge=0)
     floor_rise_per_sqft: float | None = Field(default=None, ge=0)
+    default_cash_percent: float | None = Field(default=None, ge=0, le=100)
 
 
 class PricingIn(StrictModel):
@@ -147,7 +148,7 @@ async def save_section(project_id: str, section: str, body: dict, request: Reque
         for r in data.block_rates:
             if r.block_id not in blocks:
                 raise ApiError(404, "Tower does not belong to this project", "TOWER_NOT_IN_PROJECT")
-            await db.blocks.update_one({"id": r.block_id}, {"$set": {"rate_per_sqft": r.rate_per_sqft, "floor_rise_per_sqft": r.floor_rise_per_sqft, "updated_at": now_iso()}, "$inc": {"version": 1}})
+            await db.blocks.update_one({"id": r.block_id}, {"$set": {"rate_per_sqft": r.rate_per_sqft, "floor_rise_per_sqft": r.floor_rise_per_sqft, "default_cash_percent": r.default_cash_percent, "updated_at": now_iso()}, "$inc": {"version": 1}})
     else:  # towers: light fields only
         data = TowersIn(**body)
         for t in data.towers:

@@ -16,18 +16,26 @@ from reportlab.pdfgen import canvas
 from reportlab.graphics.shapes import Drawing, Rect, String, Line, Polygon
 from reportlab.platypus import (BaseDocTemplate, Frame, KeepTogether, NextPageTemplate, PageBreak, PageTemplate, Paragraph, Preformatted, Spacer, Table, TableStyle)
 from reportlab.platypus.tableofcontents import TableOfContents
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.lib.fonts import addMapping
+
+FONT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts")
+for _n, _f in [("Helvetica", "DejaVuSans.ttf"), ("Helvetica-Bold", "DejaVuSans-Bold.ttf"), ("Helvetica-Oblique", "DejaVuSans-Oblique.ttf"), ("Courier", "DejaVuSansMono.ttf")]:
+    pdfmetrics.registerFont(TTFont(_n, os.path.join(FONT_DIR, _f)))  # Unicode (₹) replacements under the standard names
+addMapping("Helvetica", 0, 0, "Helvetica"); addMapping("Helvetica", 1, 0, "Helvetica-Bold"); addMapping("Helvetica", 0, 1, "Helvetica-Oblique"); addMapping("Helvetica", 1, 1, "Helvetica-Bold")
 
 ROOT = "/app/docs"
 SRC = f"{ROOT}/KKT_Technical_Documentation.md"
 OUT = f"{ROOT}/KKT_Technical_Documentation.pdf"
-NAVY, GOLD, IVORY, INK = colors.HexColor("#0B1F3A"), colors.HexColor("#C9A227"), colors.HexColor("#F7F5EF"), colors.HexColor("#1F2937")
-VERSION = "9.0"
+NAVY, GOLD, IVORY, INK = colors.HexColor("#0A0C10"), colors.HexColor("#C9A227"), colors.HexColor("#F4F0E8"), colors.HexColor("#1A1F27")
+VERSION = "12.1"
 W, H = A4
 ss = getSampleStyleSheet()
 S = {
     "h1": ParagraphStyle("h1", parent=ss["Heading1"], fontName="Helvetica-Bold", fontSize=22, textColor=NAVY, spaceBefore=18, spaceAfter=12),
     "h2": ParagraphStyle("h2", parent=ss["Heading2"], fontName="Helvetica-Bold", fontSize=15, textColor=NAVY, spaceBefore=14, spaceAfter=8),
-    "h3": ParagraphStyle("h3", parent=ss["Heading3"], fontName="Helvetica-Bold", fontSize=11.5, textColor=colors.HexColor("#163866"), spaceBefore=10, spaceAfter=5),
+    "h3": ParagraphStyle("h3", parent=ss["Heading3"], fontName="Helvetica-Bold", fontSize=11.5, textColor=colors.HexColor("#2A313C"), spaceBefore=10, spaceAfter=5),
     "body": ParagraphStyle("body", parent=ss["BodyText"], fontName="Helvetica", fontSize=9.6, leading=13.5, textColor=INK, spaceAfter=5),
     "bullet": ParagraphStyle("bullet", parent=ss["BodyText"], fontName="Helvetica", fontSize=9.6, leading=13.2, textColor=INK, leftIndent=12, bulletIndent=2, spaceAfter=2),
     "cell": ParagraphStyle("cell", fontName="Helvetica", fontSize=8, leading=10, textColor=INK),
@@ -37,15 +45,20 @@ S = {
     "toc0": ParagraphStyle("toc0", fontName="Helvetica-Bold", fontSize=11, textColor=NAVY, spaceBefore=6, leading=14),
     "toc1": ParagraphStyle("toc1", fontName="Helvetica", fontSize=9.5, leftIndent=14, leading=12.5),
     "toc2": ParagraphStyle("toc2", fontName="Helvetica", fontSize=8.5, leftIndent=28, leading=11.5, textColor=colors.HexColor("#4B5563")),
+    "toc_title": ParagraphStyle("toc_title", parent=ss["Heading1"], fontName="Helvetica-Bold", fontSize=22, textColor=NAVY, spaceBefore=18, spaceAfter=12),
 }
 _section = {"title": ""}
 
 
 def inline(t: str) -> str:
     t = t.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-    t = re.sub(r"`([^`]+)`", r'<font face="Courier" size="8.5" color="#0B1F3A">\1</font>', t)
+    codes = []
+    def keep(m):
+        codes.append(m.group(1)); return f"\x00{len(codes) - 1}\x00"
+    t = re.sub(r"`([^`]+)`", keep, t)
     t = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", t)
     t = re.sub(r"(?<![\w*])\*(?!\s)(.+?)(?<!\s)\*(?!\w)", r"<i>\1</i>", t)
+    t = re.sub(r"\x00(\d+)\x00", lambda m: f'<font face="Courier" size="8.5" color="#0A0C10">{codes[int(m.group(1))]}</font>', t)
     return t
 
 
@@ -65,6 +78,10 @@ class Doc(BaseDocTemplate):
         c.drawString(18 * mm, 11 * mm, f"v{VERSION} · {dt.date.today().strftime('%d %b %Y')} · Confidential")
         c.restoreState()
 
+    def handle_documentBegin(self):
+        _section["title"] = ""
+        super().handle_documentBegin()
+
     def afterFlowable(self, f):
         if isinstance(f, Paragraph) and f.style.name in ("h1", "h2", "h3"):
             text = re.sub(r"<[^>]+>", "", f.getPlainText())
@@ -73,7 +90,8 @@ class Doc(BaseDocTemplate):
                 _section["title"] = text
             key = f"s{abs(hash(text)) % 10**9}{self.page}"
             self.canv.bookmarkPage(key)
-            self.notify("TOCEntry", (lvl, text, self.page, key))
+            if not (lvl == 2 and ("(" in text and "docs)" in text)):
+                self.notify("TOCEntry", (lvl, text, self.page, key))
 
 
 class NumberedCanvas(canvas.Canvas):
@@ -101,7 +119,7 @@ def cover():
         c.setFillColor(colors.white); c.setFont("Helvetica-Bold", 44); c.drawString(18 * mm, H - 95 * mm, "KKT")
         c.setFont("Helvetica", 20); c.drawString(18 * mm, H - 108 * mm, "Real Estate ERP · Marketing Site · Customer Portal")
         c.setFillColor(GOLD); c.setFont("Helvetica-Bold", 15); c.drawString(18 * mm, H - 128 * mm, "Technical & Functional Specification")
-        c.setFillColor(colors.HexColor("#CBD5E1")); c.setFont("Helvetica", 11)
+        c.setFillColor(colors.HexColor("#EAE4D8")); c.setFont("Helvetica", 11)
         for i, l in enumerate([f"Version {VERSION} · {dt.date.today().strftime('%d %B %Y')}", "Derived from the production code base (FastAPI · React · MongoDB · Expo)", "Audience: owners, sales leadership, IT & integration teams", "Confidential — prepared for prospective enterprise customers"]):
             c.drawString(18 * mm, H - 145 * mm - i * 7 * mm, l)
         c.setFillColor(GOLD); c.rect(0, 0, W, 6 * mm, fill=1, stroke=0)
@@ -155,7 +173,7 @@ def flow_diagram(lines):
     for i, s in enumerate(steps):
         r, c = divmod(i, per)
         x, y = 10 + c * (bw + gap), d.height - (r + 1) * (bh + 18) + 9
-        box(d, x, y, bw, bh, s, fill=IVORY if i else colors.HexColor("#E8EEF7"))
+        box(d, x, y, bw, bh, s, fill=IVORY if i else colors.HexColor("#EAE4D8"))
         if i + 1 < len(steps):
             if c + 1 < per:
                 arrow(d, x + bw, y + bh / 2, x + bw + gap - 1, y + bh / 2)
@@ -195,7 +213,7 @@ def seq_diagram(lines):
     d = Drawing(width, top + step * len(msgs) + 20)
     xs = {a: col * i + col / 2 for i, a in enumerate(actors)}
     for a in actors:
-        box(d, xs[a] - 42, d.height - 26, 84, 22, a, fill=colors.HexColor("#E8EEF7"))
+        box(d, xs[a] - 42, d.height - 26, 84, 22, a, fill=colors.HexColor("#EAE4D8"))
         d.add(Line(xs[a], d.height - 26, xs[a], 6, strokeColor=colors.HexColor("#9CA3AF"), strokeWidth=0.6, strokeDashArray=[2, 2]))
     for i, (a, b, msg) in enumerate(msgs):
         y = d.height - top - 10 - i * step
@@ -237,10 +255,12 @@ def render(md: str):
             continue
         m = re.match(r"\{\{include:(.+)\}\}", l.strip())
         if m:
-            out += render(open(f"{ROOT}/generated/{m.group(1)}").read()); i += 1; continue
+            inc = m.group(1)
+            path = f"{ROOT}/generated/{inc}" if not inc.startswith("../") else f"{ROOT}/{inc[3:]}"
+            out += render(open(path).read()); i += 1; continue
         if l.strip() == "{{toc}}":
             toc = TableOfContents(); toc.levelStyles = [S["toc0"], S["toc1"], S["toc2"]]
-            out += [Paragraph("Contents", S["h1"]), toc, PageBreak()]; i += 1; continue
+            out += [Paragraph("Contents", S["toc_title"]), toc, PageBreak()]; i += 1; continue
         if l.startswith("# "):
             out += [PageBreak(), Paragraph(inline(l[2:]), S["h1"])]
         elif l.startswith("## "):

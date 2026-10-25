@@ -8,6 +8,7 @@
 | Administration | `audit.view` | View audit log |
 | Master Data | `master.read` | View master data |
 | Master Data | `master.write` | Create / edit master data |
+| Master Data | `catalogue.write` | Add / edit dropdown catalogue values (inline '+ Add new') |
 | Projects & Inventory | `project.read` | View projects |
 | Projects & Inventory | `project.write` | Create / edit projects |
 | Projects & Inventory | `block.write` | Create / edit blocks |
@@ -38,7 +39,7 @@
 | Customer Portal & Service | `service.write` | Reply / update service requests |
 | Customer Portal & Service | `service.assign` | Assign service requests |
 
-### 3.5 Role × permission matrix (6 system roles × 35 permissions)
+### 3.5 Role × permission matrix (6 system roles × 36 permissions)
 
 | Permission | Super Admin | Project Admin | Accounts | Marketing | Sales | Employee |
 |---|---|---|---|---|---|---|
@@ -48,6 +49,7 @@
 | `audit.view` | ● |  | ● |  |  |  |
 | `master.read` | ● | ● | ● | ● | ● | ● |
 | `master.write` | ● |  |  |  |  |  |
+| `catalogue.write` | ● | ● | ● |  | ● |  |
 | `project.read` | ● | ● | ● | ● | ● | ● |
 | `project.write` | ● |  |  |  |  |  |
 | `block.write` | ● | ● |  |  |  |  |

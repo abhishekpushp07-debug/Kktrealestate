@@ -13,17 +13,11 @@ const PROD = process.env.PREVIEW_MODE === "production";
 const PORT = process.env.PORT || 3000;
 
 function build(force) {
-  const erpOut = path.join(root, "build", "index.html");
-  const siteOut = path.join(siteDir, "build", "index.html");
+  const erpOut = path.join(root, "build", "erp", "index.html");
   if (force || !fs.existsSync(erpOut)) {
-    console.log("[preview] building ERP…");
-    const r = spawnSync("yarn", ["craco", "build"], { cwd: root, stdio: "inherit", env: { ...process.env, PUBLIC_URL: "/erp", GENERATE_SOURCEMAP: "false", INLINE_RUNTIME_CHUNK: "false", DISABLE_ESLINT_PLUGIN: "true" } });
+    console.log("[preview] building packaged bundle (site + ERP + portal)…");
+    const r = spawnSync("yarn", ["craco", "build"], { cwd: root, stdio: "inherit", env: { ...process.env, PUBLIC_URL: "/erp", REACT_APP_BASE_PATH: "/erp", GENERATE_SOURCEMAP: "false", INLINE_RUNTIME_CHUNK: "false", DISABLE_ESLINT_PLUGIN: "true" } });
     if (r.status) process.exit(r.status);
-  }
-  if (fs.existsSync(path.join(siteDir, "package.json")) && (force || !fs.existsSync(siteOut))) {
-    console.log("[preview] building marketing site…");
-    const r = spawnSync("yarn", ["build"], { cwd: siteDir, stdio: "inherit", env: { ...process.env, PUBLIC_URL: "/", GENERATE_SOURCEMAP: "false", DISABLE_ESLINT_PLUGIN: "true", REACT_APP_BASE_PATH: "" } });
-    if (r.status) console.warn("[preview] site build failed; serving ERP only");
   }
 }
 
@@ -34,11 +28,20 @@ function serve() {
   const app = express();
   app.disable("x-powered-by");
   app.use(compression({ threshold: 1024, brotli: { enabled: true, zlib: { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 5 } } } }));
-  const staticOpts = { index: false, setHeaders: (res, file) => { res.setHeader("Cache-Control", /\/static\/|\.(woff2?|png|jpg|jpeg|webp|svg|ico)$/.test(file) ? "public, max-age=31536000, immutable" : "public, max-age=3600"); } };
-  const spa = (dir) => (req, res) => { res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate"); res.sendFile(path.join(dir, "index.html")); };
-  const erp = path.join(root, "build");
-  app.use("/erp", express.static(erp, staticOpts));
-  app.get(/^\/erp(\/.*)?$/, spa(erp));
+  const staticOpts = { index: false, setHeaders: (res, file) => { res.setHeader("Cache-Control", /\/static\/|\/_expo\/|\.(woff2?|png|jpg|jpeg|webp|svg|ico)$/.test(file) ? "public, max-age=31536000, immutable" : "public, max-age=3600"); } };
+  const build = path.join(root, "build");
+  const packaged = fs.existsSync(path.join(build, "erp", "index.html")) && fs.readFileSync(path.join(build, "index.html"), "utf8").includes("data-kkt-loader");
+  const noCache = (res) => res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  if (packaged) {
+    // 1:1 with static hosting: hashed assets from build/, every unknown path falls back to the ROOT index.html (router-loader picks the surface).
+    app.use(express.static(build, staticOpts));
+    app.get(/^\/(?!api\/).*/, (req, res) => { noCache(res); res.sendFile(path.join(build, "index.html")); });
+    app.listen(PORT, "0.0.0.0", () => console.log(`[preview] packaged build on :${PORT} (site /, ERP /erp, portal /portal — root-index fallback)`));
+    return;
+  }
+  const spa = (dir) => (req, res) => { noCache(res); res.sendFile(path.join(dir, "index.html")); };
+  app.use("/erp", express.static(build, staticOpts));
+  app.get(/^\/erp(\/.*)?$/, spa(build));
   const portalUrl = process.env.REACT_APP_PORTAL_URL;
   const portalRedirect = (req, res) => res.redirect(302, portalUrl ? `${portalUrl.replace(/\/$/, "")}${req.path.replace(/^\/portal/, "") || "/"}` : "/erp");
   app.get("/portal", portalRedirect);

@@ -14,6 +14,7 @@ import { StatTile, StatusPill, EmptyState } from "@/components/v2";
 import { Avatar } from "@/components/v2/CustomerBits";
 import { Clock, Star, UserRoundX } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { MoveMenu, moveKeyProps, useNarrow } from "@/components/v2/KanbanMove";
 
 export const SR_STATUSES = ["New", "In Progress", "Awaiting Customer", "Resolved", "Closed"];
 
@@ -86,10 +87,11 @@ export default function ServiceRequests() {
     setData((d) => ({ ...d, items: d.items.map((x) => (x.id === sr.id ? { ...x, status } : x)) }));
     try { await api.post(`/service-requests/${sr.id}/status`, { status, ...extra }); toast.success(`${sr.ticket_number} → ${status}`); } catch (e) { toast.error(errMsg(e)); } finally { load(); }
   };
-  const onDrop = (status) => { setOver(null); if (!drag || drag.status === status) return setDrag(null); if (status === "Resolved") { setPrompt({ sr: drag, status }); setNote(""); } else if (status === "Closed" && drag.status !== "Resolved") { toast.error("Resolve the ticket before closing it"); } else move(drag, status); setDrag(null); };
+  const onDrop = (status, card) => { setOver(null); const sr = card || drag; if (!sr || sr.status === status) return setDrag(null); if (status === "Resolved") { setPrompt({ sr, status }); setNote(""); } else if (status === "Closed" && sr.status !== "Resolved") { toast.error("Resolve the ticket before closing it"); } else move(sr, status); setDrag(null); };
+  const narrow = useNarrow();
   const Column = ({ s, list }) => <div onDragOver={(e) => { e.preventDefault(); setOver(s); }} onDragLeave={() => setOver(null)} onDrop={() => onDrop(s)} className={cn("flex w-72 shrink-0 flex-col rounded-2xl bg-warm-100/70 p-3 transition-colors", over === s && drag && drag.status !== s && "bg-gold-light ring-2 ring-gold/60")} data-testid={`sr-col-${s.replace(/\s+/g, "-").toLowerCase()}`}>
     <p className="mb-3 flex items-center justify-between px-1 text-sm font-semibold text-ink-950">{s}<span className="pill bg-white text-txt-secondary">{list.length}</span></p>
-    <div className="min-h-[80px] flex-1 space-y-3">{list.map((sr) => <div key={sr.id} draggable onDragStart={() => setDrag(sr)} onDragEnd={() => { setDrag(null); setOver(null); }} className={cn("cursor-grab active:cursor-grabbing", drag?.id === sr.id && "opacity-40")} data-testid={`sr-drag-${sr.ticket_number}`}><SrCard sr={sr} onClick={() => nav(`/service-requests/${sr.id}`)} /></div>)}{list.length === 0 && <p className="rounded-xl border border-dashed border-warm-200 px-3 py-6 text-center text-xs text-txt-muted">Drop here</p>}</div>
+    <div className="min-h-[80px] flex-1 space-y-3">{list.map((sr) => <div key={sr.id} draggable onDragStart={() => setDrag(sr)} onDragEnd={() => { setDrag(null); setOver(null); }} {...moveKeyProps(cols, s, (to) => onDrop(to, sr))} className={cn("cursor-grab rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-gold active:cursor-grabbing", drag?.id === sr.id && "opacity-40")} aria-label={`${sr.ticket_number}, ${s}. Use arrow keys to move.`} data-testid={`sr-drag-${sr.ticket_number}`}><SrCard sr={sr} onClick={() => nav(`/service-requests/${sr.id}`)} />{narrow && <div className="-mt-1 mb-1 px-1"><MoveMenu columns={cols} current={s} onMove={(to) => onDrop(to, sr)} testId={`sr-move-${sr.ticket_number}`} /></div>}</div>)}{list.length === 0 && <p className="rounded-xl border border-dashed border-warm-200 px-3 py-6 text-center text-xs text-txt-muted">Drop here</p>}</div>
   </div>;
   return (
     <div className="space-y-8" data-testid="service-requests-page">

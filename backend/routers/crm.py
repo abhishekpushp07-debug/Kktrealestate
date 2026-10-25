@@ -210,6 +210,7 @@ async def build_timeline(customer_id: str, company_id: str) -> list[dict]:
 async def customer_timeline(customer_id: str, limit: int = Query(50, ge=1, le=200), cursor: str | None = None, types: str | None = None, user: dict = Depends(require("customer.read"))):
     await get_or_404(db.customers, customer_id, "Customer", {"company_id": user["company_id"]})
     ev = await build_timeline(customer_id, user["company_id"])
+    ev = [e for e in ev if e.get("at")]
     if types:
         want = types.split(",")
         ev = [e for e in ev if any(e["type"] == w or e["type"].startswith(w + ".") for w in want)]

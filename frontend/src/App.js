@@ -18,7 +18,7 @@ export default function App() {
         <Suspense fallback={<div className={`min-h-screen ${isPortal ? "bg-[#F8F6F1]" : "bg-navy"}`} />}>
           {isPortal ? <PortalRedirect /> : <ErpApp />}
         </Suspense>
-        <Toaster position="top-right" richColors closeButton />
+        <Toaster position="top-right" richColors closeButton toastOptions={{ duration: 4500 }} containerAriaLabel="Notifications" />
       </BrowserRouter>
     </QueryClientProvider>
   );

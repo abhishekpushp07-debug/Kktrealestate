@@ -9,6 +9,8 @@ import { ChangePasswordDialog } from "@/components/common/ChangePasswordDialog";
 import { CommandPalette } from "@/components/common/CommandPalette";
 import { VersionConflictDialog } from "@/components/common/VersionConflictDialog";
 import { NotificationBell } from "@/components/common/NotificationBell";
+import { prefetchRoute } from "@/lib/prefetch";
+import { useDensity } from "@/hooks/useDensity";
 
 const NAV = [
   { to: "/dashboard", label: "Home", icon: Home, perm: "project.read" },
@@ -23,7 +25,7 @@ const NAV = [
   { to: "/settings", label: "Settings", icon: Settings, perm: "settings.manage", match: ["/settings", "/users", "/roles", "/audit", "/master"] },
 ];
 const QUICK = [["Booking", "/bookings/new", "booking.create"], ["Customer", "/customers?new=1", "customer.write"], ["Payment", "/payments?new=1", "payment.create"], ["Lead", "/leads?new=1", "lead.write"], ["Visit", "/site-visits?new=1", "visit.write"]];
-const CRUMB = { dashboard: "Home", projects: "Projects", customers: "Customers", leads: "Leads", "site-visits": "Site Visits", bookings: "Bookings", payments: "Payments", roznamcha: "Roznamcha", reports: "Reports", "service-requests": "Service", website: "Website", settings: "Settings", users: "Users", roles: "Roles", audit: "Audit log", master: "Catalogues", blocks: "Tower", flats: "Inventory", new: "New", setup: "Setup", catalogues: "Catalogues", "flat-types": "Flat types", "floor-plan-templates": "Floor plans", "plc-types": "PLC types", "spec-categories": "Spec categories", "spec-items": "Spec items", "room-types": "Room types", "area-types": "Area types", "block-types": "Block types", amenities: "Amenities", "construction-stages": "Construction stages", "payment-plans": "Payment plans", "charge-types": "Charge types", "payment-modes": "Payment modes", "bank-accounts": "Bank accounts", "document-types": "Document types" };
+const CRUMB = { dashboard: "Home", projects: "Projects", customers: "Customers", leads: "Leads", "site-visits": "Site Visits", bookings: "Bookings", payments: "Payments", roznamcha: "Roznamcha", reports: "Reports", "service-requests": "Service", website: "Website", settings: "Settings", users: "Users", roles: "Roles", audit: "Audit log", master: "Catalogues", blocks: "Tower", flats: "Inventory", new: "New", setup: "Setup", catalogues: "Catalogues", "flat-types": "Flat types", "floor-plan-templates": "Floor plans", "plc-types": "PLC types", "spec-categories": "Spec categories", "spec-items": "Spec items", "room-types": "Room types", "area-types": "Area types", "block-types": "Block types", amenities: "Amenities", "construction-stages": "Construction stages", "payment-plans": "Payment plans", "charge-types": "Charge types", "payment-modes": "Payment modes", "bank-accounts": "Bank accounts", "document-types": "Document types", "service-sla": "Service SLA", "construction-progress": "Construction progress", collections: "Collections", outstanding: "Outstanding", inventory: "Inventory", cheques: "Cheques", advances: "Advances", activity: "Activity", "sales-leads": "Sales & Leads", "upcoming-dues": "Upcoming dues", "demand-vs-collection": "Demand vs collection", cancellations: "Cancellations", "roznamcha-range": "Roznamcha range", "bank-receipts": "Bank receipts" };
 
 function Sidebar({ collapsed, setCollapsed, mobile, onClose }) {
   const { can, company, user } = useAuth();
@@ -39,7 +41,7 @@ function Sidebar({ collapsed, setCollapsed, mobile, onClose }) {
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-5">
         {NAV.filter((n) => can(n.perm)).map((n) => {
           const active = loc.pathname.startsWith(n.to) || (n.match || []).some((m) => loc.pathname.startsWith(m));
-          return <NavLink key={n.to} to={n.to} onClick={onClose} className={cn("sb-item", active && "active", collapsed && "justify-center px-0")} data-testid={`nav-${n.label.toLowerCase().replace(/[^a-z]+/g, "-")}`} title={n.label}><n.icon className="h-5 w-5 shrink-0" strokeWidth={1.75} />{!collapsed && <span>{n.label}</span>}</NavLink>;
+          return <NavLink key={n.to} to={n.to} onClick={onClose} onMouseEnter={() => prefetchRoute(n.to)} onFocus={() => prefetchRoute(n.to)} className={cn("sb-item", active && "active", collapsed && "justify-center px-0")} data-testid={`nav-${n.label.toLowerCase().replace(/[^a-z]+/g, "-")}`} title={n.label}><n.icon className="h-5 w-5 shrink-0" strokeWidth={1.75} />{!collapsed && <span>{n.label}</span>}</NavLink>;
         })}
       </nav>
       <div className="border-t border-white/5 p-3">
@@ -94,17 +96,19 @@ function TopBar({ onMenu }) {
 
 export default function AppShell() {
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("kkt_sb") === "1");
+  const { user, company } = useAuth();
   const [mobile, setMobile] = useState(false);
   const loc = useLocation();
   useEffect(() => { localStorage.setItem("kkt_sb", collapsed ? "1" : "0"); }, [collapsed]);
   useEffect(() => { setMobile(false); }, [loc.pathname]);
+  const [density] = useDensity();
   return (
-    <div className="v2 min-h-screen">
+    <div className={cn("v2 min-h-screen", density === "compact" && "density-compact")} data-density={density}>
       <div className="fixed inset-y-0 left-0 z-30 hidden md:block"><Sidebar collapsed={collapsed} setCollapsed={setCollapsed} /></div>
       {mobile && <div className="fixed inset-0 z-40 md:hidden"><div className="absolute inset-0 bg-ink-950/60" onClick={() => setMobile(false)} /><div className="absolute inset-y-0 left-0"><Sidebar mobile onClose={() => setMobile(false)} /></div></div>}
       <div className={cn("min-h-screen transition-[padding] duration-200", collapsed ? "md:pl-[72px]" : "md:pl-[260px]")}>
         <TopBar onMenu={() => setMobile(true)} />
-        <main key={loc.pathname} className="page-enter mx-auto w-full min-w-0 max-w-[1400px] overflow-x-clip p-4 md:p-8"><Outlet /></main>
+        <main key={loc.pathname} className="page-enter mx-auto w-full min-w-0 max-w-[1400px] overflow-x-clip p-4 md:p-8"><div className="print-brand"><span className="font-display text-xl">KKT · {company?.name || ""}</span><span className="text-xs text-txt-secondary">Printed {new Date().toLocaleDateString("en-IN")} by {user?.name}</span></div><Outlet /></main>
       </div>
       <CommandPalette />
       <VersionConflictDialog />

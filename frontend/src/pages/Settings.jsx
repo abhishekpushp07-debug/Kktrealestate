@@ -10,6 +10,39 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
+import { useDensity } from "@/hooks/useDensity";
+import { Segmented } from "@/components/v2/CustomerBits";
+import { BookOpen, Download, RefreshCw } from "lucide-react";
+
+function DocumentationPanel() {
+  const { user } = useAuth();
+  const [busy, setBusy] = useState(false);
+  const [info, setInfo] = useState(null);
+  if (user?.role_name !== "Super Admin") return null;
+  const download = async (ext) => { try { const r = await api.get(`/admin/docs/technical.${ext}`, { responseType: "blob" }); const a = document.createElement("a"); a.href = URL.createObjectURL(r.data); a.download = `KKT_Technical_Documentation.${ext}`; a.click(); } catch (e) { toast.error(errMsg(e)); } };
+  const regen = async () => { setBusy(true); try { const r = await api.post("/admin/docs/regenerate"); setInfo(r.data); toast.success(`Documentation rebuilt · ${r.data.pages} pages`); } catch (e) { toast.error(errMsg(e)); } finally { setBusy(false); } };
+  return (
+    <section className="card p-6" data-testid="documentation-card">
+      <div className="flex items-start gap-3"><span className="grid h-9 w-9 place-items-center rounded-[10px] bg-warm-100"><BookOpen className="h-5 w-5" strokeWidth={1.75} /></span><div><h3 className="font-display text-lg text-ink-950">Documentation</h3><p className="mt-1 text-sm text-txt-secondary">Technical & Functional Specification generated from the code base (branded A4 PDF + Markdown source).{info && <span data-testid="docs-info"> Last build: {info.pages} pages · {(info.size_bytes / 1024 / 1024).toFixed(1)} MB.</span>}</p></div></div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button className="btn btn-primary" onClick={() => download("pdf")} data-testid="docs-download-pdf"><Download className="h-4 w-4" />Download PDF</button>
+        <button className="btn btn-secondary" onClick={() => download("md")} data-testid="docs-download-md"><Download className="h-4 w-4" />Markdown</button>
+        <button className="btn btn-ghost" disabled={busy} onClick={regen} data-testid="docs-regenerate"><RefreshCw className={busy ? "h-4 w-4 animate-spin" : "h-4 w-4"} />{busy ? "Rebuilding…" : "Regenerate"}</button>
+      </div>
+    </section>
+  );
+}
+
+function Appearance() {
+  const [density, setDensity] = useDensity();
+  return (
+    <section className="card p-6" data-testid="appearance-card">
+      <h3 className="font-display text-lg text-ink-950">Appearance</h3>
+      <p className="mt-1 text-sm text-txt-secondary">Density changes spacing across the ERP for this browser profile.</p>
+      <div className="mt-4"><Segmented options={[{ value: "comfortable", label: "Comfortable" }, { value: "compact", label: "Compact" }]} value={density} onChange={setDensity} testId="density-toggle" /></div>
+    </section>
+  );
+}
 import { MfaCard, SessionsCard, ImportCenter } from "@/components/common/SecurityCards";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -72,6 +105,8 @@ export default function Settings() {
     <div data-testid="settings-page">
       <PageHeader title="Company Settings" subtitle="Identity, statutory registrations and banking." actions={<div className="flex flex-wrap gap-2"><Link to="/settings/catalogues" className="btn btn-ghost btn-sm" data-testid="settings-catalogues-link">Catalogues</Link><Link to="/users" className="btn btn-ghost btn-sm">Users</Link><Link to="/roles" className="btn btn-ghost btn-sm">Roles</Link><Link to="/audit" className="btn btn-ghost btn-sm">Audit log</Link></div>} />
       <DataPanel />
+      <Appearance />
+      <DocumentationPanel />
       <IntegrityPanel />
       <form onSubmit={save} className="grid gap-5 lg:grid-cols-2">
         <div className="card space-y-4 p-5">

@@ -1,18 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import api from "@/lib/api";
+import { idbGet, idbSet } from "@/lib/idb";
 
-const KEY = "kkt_catalogues_v1";
+const KEY = "catalogues_v1";
 let mem = null;
 const subs = new Set();
 
 export async function loadCatalogues(force = false) {
   if (mem && !force) return mem;
-  const cached = !force && JSON.parse(localStorage.getItem(KEY) || "null");
+  const cached = !force ? await idbGet(KEY) : null;
   const headers = cached?.etag ? { "If-None-Match": cached.etag } : {};
   try {
     const r = await api.get("/catalogues", { headers, validateStatus: (s) => s === 200 || s === 304 });
     mem = r.status === 304 ? cached.data : r.data;
-    localStorage.setItem(KEY, JSON.stringify({ etag: r.headers.etag, data: mem }));
+    await idbSet(KEY, { etag: r.headers.etag, version: mem?.version, data: mem });
   } catch (e) {
     if (cached) mem = cached.data; else throw e;
   }
@@ -30,7 +31,7 @@ export function useCatalogues() {
     mounted.current = true;
     const f = (d) => mounted.current && setData(d);
     subs.add(f);
-    if (!mem) loadCatalogues().catch(() => {});
+    if (!mem) { idbGet(KEY).then((c) => { if (c?.data && !mem && mounted.current) setData(c.data); }); loadCatalogues().catch(() => {}); }
     return () => { mounted.current = false; subs.delete(f); };
   }, []);
   const opts = (type, parentId) => (data?.types?.[type] || []).filter((i) => !parentId || i.parent_id === parentId).map((i) => ({ value: i.id, label: i.label, sub: i.code, meta: i.meta, parent_id: i.parent_id }));

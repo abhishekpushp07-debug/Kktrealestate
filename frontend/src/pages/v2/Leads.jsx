@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { MoveMenu, moveKeyProps, useNarrow } from "@/components/v2/KanbanMove";
 import { CalendarClock, CalendarDays, Download, Inbox, Phone, PhoneCall, Plus, TrendingUp, UserCheck, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import api, { errMsg } from "@/lib/api";
@@ -107,7 +108,10 @@ export default function Leads() {
   const all = useMemo(() => (board?.columns || []).flatMap((c) => c.leads), [board]);
   const kpis = useMemo(() => { const t = todayIso(), m30 = new Date(Date.now() - 30 * 864e5).toISOString(); const recent = all.filter((l) => l.created_at >= m30); return { newToday: all.filter((l) => l.created_at?.slice(0, 10) === t).length, due: all.filter((l) => l.next_follow_up_at && l.next_follow_up_at <= new Date().toISOString() && !["Converted", "Lost"].includes(l.status)).length, conv: recent.length ? Math.round((recent.filter((l) => l.status === "Converted").length / recent.length) * 100) : 0 }; }, [all]);
   const move = async (lead, stage, lostReason) => { try { await api.post(`/leads/${lead.id}/stage`, { status: stage, lost_reason: lostReason || null, version: lead.version }); toast.success(`${lead.name} → ${stage}`); refresh(); } catch (e) { toast.error(errMsg(e)); } };
-  const onDrop = (stage) => (e) => { e.preventDefault(); const lead = JSON.parse(e.dataTransfer.getData("lead")); if (lead.status === stage) return; if (stage === "Converted") return setSel(lead); if (stage === "Lost") return setLost(lead); move(lead, stage); };
+  const onDrop = (stage) => (e) => { e.preventDefault(); const lead = JSON.parse(e.dataTransfer.getData("lead")); moveTo(lead, stage); };
+  const moveTo = (lead, stage) => { if (lead.status === stage) return; if (stage === "Converted") return setSel(lead); if (stage === "Lost") return setLost(lead); move(lead, stage); };
+  const narrow = useNarrow();
+  const stageNames = (board?.columns || []).map((c) => c.stage);
   const Row = ({ l }) => <li onClick={() => setSel(l)} className="flex cursor-pointer flex-wrap items-center gap-3 px-6 py-3 hover:bg-warm-50 md:flex-nowrap" data-testid={`lead-row-${l.lead_number}`}><Avatar name={l.name} size={36} /><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-ink-950">{l.name} <span className="font-mono text-xs font-normal text-txt-muted">{l.lead_number}</span>{l.is_read === false && <span className="pill ml-2 bg-gold text-ink-950">unread</span>}</p><p className="truncate text-xs text-txt-secondary">{l.phone}{l.project_name ? ` · ${l.project_name}` : ""}{l.flat_number ? ` · ${l.flat_number}` : ""} · {fmtRelative(l.created_at)}</p></div><span className="pill bg-slate2-50 text-slate2">{l.source}</span><span className="hidden text-xs text-txt-secondary md:block">{l.budget_max ? `≤ ${inrShort(l.budget_max)}` : "—"}</span><StatusPill status={STAGE_STATUS[l.status] || l.status} /><span className="w-28 text-right text-xs text-txt-secondary">{l.next_follow_up_at ? fmtDate(l.next_follow_up_at) : "—"}</span></li>;
   return (
     <div className="space-y-8" data-testid="leads-page">
@@ -127,7 +131,7 @@ export default function Leads() {
       {tab === "pipeline" && <div className="flex gap-4 overflow-x-auto pb-4 scroll-x" data-testid="leads-board">
         {(board?.columns || []).map((col) => <div key={col.stage} onDragOver={(e) => e.preventDefault()} onDrop={onDrop(col.stage)} className="w-72 shrink-0 rounded-2xl bg-warm-100/70 p-3" data-testid={`lead-column-${col.stage.replace(/\s+/g, "-")}`}>
           <div className="mb-3 flex items-center justify-between px-1"><p className="text-sm font-semibold text-ink-950">{col.stage}</p><span className="pill bg-white text-txt-secondary">{col.count}</span></div>
-          <div className="min-h-[120px]">{col.leads.map((l) => <LeadCard key={l.id} lead={l} people={people} onOpen={() => setSel(l)} onDragStart={(e) => e.dataTransfer.setData("lead", JSON.stringify(l))} />)}</div>
+          <div className="min-h-[120px]">{col.leads.map((l) => <div key={l.id} {...moveKeyProps(stageNames, col.stage, (to) => moveTo(l, to))} className="rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-gold" aria-label={`${l.name}, ${col.stage}. Use arrow keys to move.`}><LeadCard lead={l} people={people} onOpen={() => setSel(l)} onDragStart={(e) => e.dataTransfer.setData("lead", JSON.stringify(l))} />{narrow && <div className="-mt-2 mb-3"><MoveMenu columns={stageNames} current={col.stage} onMove={(to) => moveTo(l, to)} testId={`lead-move-${l.id}`} /></div>}</div>)}</div>
         </div>)}
       </div>}
       {(tab === "list" || tab === "enquiries") && <Card className="!p-0" testId={tab === "list" ? "leads-table" : "enquiries-list"}>

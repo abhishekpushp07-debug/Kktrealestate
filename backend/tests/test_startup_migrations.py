@@ -15,7 +15,7 @@ from motor.motor_asyncio import AsyncIOMotorClient  # noqa: E402
 SRC = os.environ["DB_NAME"]
 DST = f"{SRC}_migtest"
 STRIP = {"bookings": ["payment_plan_snapshot", "payment_plan_id", "plan_acceptance", "raised_percent"], "demands": ["installment_seq", "installment_name", "trigger_type", "trigger_stage_id", "percent"],
-         "blocks": ["construction_stages", "construction_stage_sequence"], "projects": ["website.site_visits", "website.brochure_gate_enabled", "construction_stage_sequence"],
+         "blocks": ["construction_stages", "construction_stage_sequence", "default_cash_percent"], "projects": ["website.site_visits", "website.brochure_gate_enabled", "construction_stage_sequence", "default_cash_percent"],
          "customers": ["lifecycle_stage", "engagement_score", "segment_ids", "preferences", "consent", "profile_migrated", "occupation_id", "salutation_id"], "companies": ["demand_due_days"],
          "notifications": ["withdrawn"]}
 DROP = ["payment_plans", "payment_plan_assignments", "construction_stages", "catalogue_items", "project_summaries", "block_summaries", "customer_summaries", "dashboard_snapshots", "communications", "site_visits", "brochure_downloads", "locks", "cache"]
@@ -56,6 +56,10 @@ async def _check(cl):
     assert await d.customer_summaries.count_documents({}) == await d.customers.count_documents({})
     ss = await d.site_settings.find_one({})
     assert "portal_url" in ss  # created (env value or None → same-origin /portal)
+    assert await d.projects.count_documents({"default_cash_percent": {"$exists": False}}) == 0
+    assert await d.blocks.count_documents({"default_cash_percent": {"$exists": False}}) == 0
+    assert "visit_settings" in keys and keys["visit_settings"]["slot_minutes"] == 60
+    assert await d.catalogue_items.count_documents({"type": "lead_source"}) > 0 and await d.catalogue_items.count_documents({"type": "locality"}) > 0
 
 
 RUN = """

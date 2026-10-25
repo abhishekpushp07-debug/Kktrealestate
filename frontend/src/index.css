@@ -143,3 +143,30 @@
 @keyframes grain { 0% { background-position: 0 0; } 100% { background-position: 160px 160px; } }
 .v2 .cell { width:36px; height:36px; border-radius:8px; display:grid; place-items:center; font-size:11px; font-weight:600; transition: transform .14s, box-shadow .14s; cursor: pointer; }
 .v2 .cell:hover { transform: scale(1.08); box-shadow: 0 4px 12px rgba(20,16,8,.15); z-index:1; }
+
+/* Appearance → density (persisted per user in localStorage) */
+.density-compact .card { padding: 16px; }
+.density-compact .v2 .btn, .density-compact .btn { height: 36px; }
+.density-compact .input { height: 36px; }
+.density-compact .space-y-8 > :not([hidden]) ~ :not([hidden]) { margin-top: 1.25rem; }
+.density-compact .gap-6 { gap: 1rem; }
+.density-compact tr.h-11 { height: 38px; }
+.density-compact [data-testid^="stat-tile"], .density-compact .stat-tile { padding: 14px; }
+
+/* Print: branded paper matching the PDF templates (ink headings, warm rules, no chrome) */
+@media print {
+  @page { size: A4; margin: 14mm; }
+  body { background: #fff !important; color: #0A0C10; font-size: 11pt; }
+  .v2 aside, .v2 header[role="banner"], .v2 nav, .sb, .topbar, [data-testid="sidebar"], [data-testid="topbar"], .print\:hidden, button, .btn, [role="dialog"] { display: none !important; }
+  .v2 main, main { padding: 0 !important; margin: 0 !important; max-width: none !important; }
+  .card { box-shadow: none !important; border: 1px solid #EAE4D8 !important; break-inside: avoid; }
+  table { width: 100%; border-collapse: collapse; }
+  thead { display: table-header-group; }
+  thead th { background: #F4F0E8 !important; color: #0A0C10 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  tfoot td { background: #0A0C10 !important; color: #FBF9F4 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  tr { break-inside: avoid; }
+  .font-display, h1, h2, h3 { color: #0A0C10 !important; }
+  a { color: inherit; text-decoration: none; }
+  .print-brand { display: flex !important; justify-content: space-between; align-items: baseline; border-bottom: 2px solid #C9A227; padding-bottom: 6pt; margin-bottom: 12pt; }
+}
+.print-brand { display: none; }

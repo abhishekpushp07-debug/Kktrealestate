@@ -27,6 +27,7 @@ REPORTS = [
     {"key": "roznamcha-range", "name": "Roznamcha Range", "group": "Finance"}, {"key": "bank-receipts", "name": "Bank-wise Receipts", "group": "Finance"},
     {"key": "inventory", "name": "Inventory", "group": "Sales"}, {"key": "sales-leads", "name": "Sales & Leads", "group": "Sales"},
     {"key": "activity", "name": "Activity", "group": "Admin"},
+    {"key": "service-sla", "name": "Service SLA", "group": "Operations"}, {"key": "construction-progress", "name": "Construction progress", "group": "Operations"},
 ]
 
 
@@ -464,3 +465,76 @@ async def rename_preset(preset_id: str, body: PresetPatchIn, user: dict = Depend
     if not r:
         raise ApiError(404, "Preset not found", "NOT_FOUND")
     return r
+
+
+@router.get("/service-sla")
+async def service_sla(request: Request, from_date: str | None = None, to_date: str | None = None, project_id: str | None = None, format: str | None = None, user: dict = Depends(require("report.view"))):
+    _strict_params(request, {"to_date", "from_date", "project_id"})
+    f, t = _dates(from_date, to_date)
+    q = {"company_id": user["company_id"], "created_at": {"$gte": f, "$lte": t + "T23:59:59"}}
+    if project_id:
+        q["project_id"] = project_id
+    srs = await db.service_requests.find(q, {"_id": 0, "category": 1, "status": 1, "priority": 1, "sla_due_at": 1, "created_at": 1, "resolved_at": 1, "rating": 1}).to_list(None)
+    now = now_iso()
+    by: dict[str, dict] = {}
+    for s in srs:
+        r = by.setdefault(s.get("category") or "Other", {"category": s.get("category") or "Other", "total": 0, "open": 0, "resolved": 0, "sla_met": 0, "sla_breached": 0, "_res_h": [], "_ratings": []})
+        r["total"] += 1
+        closed = s["status"] in ("Resolved", "Closed")
+        done_at = s.get("resolved_at")
+        if closed:
+            r["resolved"] += 1
+            if done_at:
+                r["_res_h"].append((datetime.fromisoformat(done_at) - datetime.fromisoformat(s["created_at"])).total_seconds() / 3600)
+                if done_at <= (s.get("sla_due_at") or done_at):
+                    r["sla_met"] += 1
+                else:
+                    r["sla_breached"] += 1
+        else:
+            r["open"] += 1
+            if (s.get("sla_due_at") or now) < now:
+                r["sla_breached"] += 1
+        if s.get("rating"):
+            r["_ratings"].append(s["rating"])
+    rows = []
+    for r in sorted(by.values(), key=lambda x: -x["total"]):
+        judged = r["sla_met"] + r["sla_breached"]
+        rows.append({"category": r["category"], "total": r["total"], "open": r["open"], "resolved": r["resolved"], "sla_met_pct": round(100 * r["sla_met"] / judged) if judged else None,
+                     "avg_resolution_h": round(sum(r["_res_h"]) / len(r["_res_h"]), 1) if r["_res_h"] else None, "avg_rating": round(sum(r["_ratings"]) / len(r["_ratings"]), 1) if r["_ratings"] else None})
+    status_counts = {}
+    for s in srs:
+        status_counts[s["status"]] = status_counts.get(s["status"], 0) + 1
+    judged = sum(r["sla_met"] + r["sla_breached"] for r in by.values())
+    all_res = [h for r in by.values() for h in r["_res_h"]]
+    all_rt = [x for r in by.values() for x in r["_ratings"]]
+    totals = {"total": len(srs), "open": sum(r["open"] for r in by.values()), "resolved": sum(r["resolved"] for r in by.values()),
+              "sla_met_pct": round(100 * sum(r["sla_met"] for r in by.values()) / judged) if judged else None,
+              "avg_resolution_h": round(sum(all_res) / len(all_res), 1) if all_res else None, "avg_rating": round(sum(all_rt) / len(all_rt), 1) if all_rt else None}
+    cols = [("category", "Category", "str", 1.6), ("total", "Tickets", "num"), ("open", "Open", "num"), ("resolved", "Resolved", "num"), ("sla_met_pct", "SLA met %", "pct"), ("avg_resolution_h", "Avg resolution (h)", "num"), ("avg_rating", "Avg rating", "num")]
+    return respond(request, format, {"from_date": f, "to_date": t, "status_counts": [{"status": k, "count": v} for k, v in status_counts.items()]}, "Service SLA Report", await _company(user), cols, rows, totals, "service-sla")
+
+
+@router.get("/construction-progress")
+async def construction_progress(request: Request, project_id: str | None = None, format: str | None = None, user: dict = Depends(require("report.view"))):
+    _strict_params(request, {"project_id"})
+    q = {"company_id": user["company_id"]}
+    if project_id:
+        q["project_id"] = project_id
+    blocks = await db.blocks.find(q, {"_id": 0, "id": 1, "name": 1, "project_id": 1, "construction_stages": 1}).to_list(None)
+    projects = {p["id"]: p["name"] for p in await db.projects.find({"company_id": user["company_id"]}, {"_id": 0, "id": 1, "name": 1}).to_list(None)}
+    photos = {(p["_id"]["b"], p["_id"]["s"]): p["n"] for p in await db.construction_photos.aggregate([{"$group": {"_id": {"b": "$block_id", "s": "$milestone_seq"}, "n": {"$sum": 1}}}]).to_list(None)}
+    demands = {(d["_id"]["b"], d["_id"]["s"]): (d["n"], d["amt"]) for d in await db.demands.aggregate([{"$match": {"voided": {"$ne": True}, "trigger_stage_id": {"$ne": None}}}, {"$group": {"_id": {"b": "$block_id", "s": "$trigger_stage_id"}, "n": {"$sum": 1}, "amt": {"$sum": "$total_demand_paise"}}}]).to_list(None)}
+    rows, towers = [], []
+    for b in blocks:
+        stages = b.get("construction_stages") or []
+        done = sum(1 for s in stages if s.get("status") == "Completed")
+        cur = next((s for s in stages if s.get("status") == "In Progress"), None) or next((s for s in stages if s.get("status") != "Completed"), None)
+        towers.append({"block_id": b["id"], "tower": b["name"], "project": projects.get(b["project_id"], ""), "stages": len(stages), "completed": done, "pct": round(100 * done / len(stages)) if stages else 0, "current_stage": cur["name"] if cur else "Possession ready"})
+        for s in stages:
+            dn, damt = demands.get((b["id"], s["stage_id"]), (0, 0))
+            rows.append({"project": projects.get(b["project_id"], ""), "tower": b["name"], "seq": s["seq"], "stage": s["name"], "status": s.get("status") or "Pending", "planned_on": s.get("planned_on"), "completed_on": s.get("completed_on"),
+                         "variance_days": (datetime.fromisoformat(s["completed_on"]) - datetime.fromisoformat(s["planned_on"])).days if s.get("completed_on") and s.get("planned_on") else None,
+                         "photos": photos.get((b["id"], s["seq"]), 0), "demands": dn, "demand_paise": damt})
+    totals = {"photos": sum(r["photos"] for r in rows), "demands": sum(r["demands"] for r in rows), "demand_paise": sum(r["demand_paise"] for r in rows)}
+    cols = [("project", "Project", "str", 1.4), ("tower", "Tower", "str"), ("seq", "#", "num", 0.4), ("stage", "Stage", "str", 1.4), ("status", "Status", "str"), ("planned_on", "Planned", "date"), ("completed_on", "Completed", "date"), ("variance_days", "Var. days", "num"), ("photos", "Photos", "num"), ("demands", "Demands", "num"), ("demand_paise", "Demanded", "money")]
+    return respond(request, format, {"towers": towers}, "Construction Progress Report", await _company(user), cols, rows, totals, "construction-progress", landscape=True)

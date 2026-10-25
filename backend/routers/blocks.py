@@ -69,6 +69,7 @@ class BlockCreate(StrictModel):
     floor_plans: list[FloorPlanRange] | None = None
     milestone_template_id: str | None = None
     rate_per_sqft: float | None = Field(default=None, ge=0)
+    default_cash_percent: float | None = Field(default=None, ge=0, le=100)
     floor_rise_per_sqft: float | None = Field(default=None, ge=0)
     status: BlockStatus = "Planning"
 
@@ -89,6 +90,7 @@ class BlockUpdate(StrictModel):
     block_type_id: str | None = None
     milestone_template_id: str | None = None
     rate_per_sqft: float | None = Field(default=None, ge=0)
+    default_cash_percent: float | None = Field(default=None, ge=0, le=100)
     floor_rise_per_sqft: float | None = Field(default=None, ge=0)
     status: BlockStatus | None = None
     floor_plans: list[FloorPlanRange] | None = None

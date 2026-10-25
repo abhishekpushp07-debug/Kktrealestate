@@ -15,6 +15,7 @@ const COLORS = ["#0A0C10", "#C9A227", "#5B7F6A", "#B8573E", "#8E95A3", "#2A313C"
 const FILTERS = {
   collections: ["from_date", "to_date", "project_id", "mode", "category", "status", "group_by"], outstanding: ["project_id", "group_by_out"], advances: ["project_id"], "demand-vs-collection": ["project_id"], "upcoming-dues": ["project_id"],
   inventory: ["project_id", "group_by_inv"], cheques: ["project_id", "cheque_status"], cancellations: ["from_date", "to_date", "project_id"], "sales-leads": ["from_date", "to_date"], "roznamcha-range": ["from_date", "to_date"], "bank-receipts": ["from_date", "to_date"], activity: ["from_date", "to_date"],
+  "service-sla": ["from_date", "to_date", "project_id"], "construction-progress": ["project_id"],
 };
 const MAP = { group_by_out: "group_by", group_by_inv: "group_by", cheque_status: "status" };
 const GROUPS = [
@@ -22,11 +23,12 @@ const GROUPS = [
   { name: "Dues & Ageing", icon: CalendarClock, keys: ["outstanding", "advances", "demand-vs-collection", "upcoming-dues", "cancellations"] },
   { name: "Inventory", icon: Building2, keys: ["inventory"] },
   { name: "Sales & Leads", icon: Users, keys: ["sales-leads"] },
-  { name: "Operations", icon: Wrench, keys: [] },
+  { name: "Operations", icon: Wrench, keys: ["service-sla", "construction-progress"] },
   { name: "Activity", icon: Activity, keys: ["activity"] },
 ];
 const DESC = {
   collections: "Receipts by period, split across Cash, Account and Other-charges ledgers.", outstanding: "Dues by customer, block or project with ageing buckets.", advances: "Customers who have paid ahead of their demands.", "demand-vs-collection": "Demanded vs collected per milestone/installment.", "upcoming-dues": "Forecast of demands that will trigger soon.", inventory: "Available / hold / booked / sold inventory with velocity and realised rates.", cheques: "Cheques in hand, bounced or cleared.", cancellations: "Cancelled bookings and refunds.", "sales-leads": "Lead funnel, enquiries and response times.", "roznamcha-range": "Day-book totals across a date range.", "bank-receipts": "Receipts grouped by bank account.", activity: "Who did what, when.",
+  "service-sla": "Tickets by category and status, SLA met %, average resolution time and customer ratings.", "construction-progress": "Per-tower stage status, planned vs actual dates, site photos and demands raised per stage.",
 };
 const iso = (d) => d.toISOString().slice(0, 10);
 const PRESET_DATES = {
@@ -55,6 +57,8 @@ function kpis(key, d) {
   if (key === "outstanding") return [["Raised", inrShort((t.raised_paise || 0) / 100)], ["Paid", inrShort((t.paid_paise || 0) / 100)], ["Due", inrShort((t.due_paise || 0) / 100), "all ledgers", t.due_paise > 0 ? "brick" : "sage"], ["Overdue", inrShort((t.overdue_paise || 0) / 100), `${d.top_overdue?.length || 0} customers`, t.overdue_paise > 0 ? "brick" : undefined]];
   if (key === "inventory") return [["Units", String(t.total ?? 0)], ["Available", String(t.available ?? 0), inrShort((t.available_value_paise || 0) / 100)], ["Booked", String((t.booked || 0) + (t.hold || 0)), `${t.hold || 0} on hold`], ["Sold", String(t.sold ?? 0), inrShort((t.sold_value_paise || 0) / 100), "sage"]];
   if (key === "sales-leads") return [["Leads", String((d.funnel || []).reduce((a, s) => a + s.count, 0))], ["Avg response", d.avg_response_hours != null ? `${d.avg_response_hours} h` : "—"], ["Follow-ups overdue", String(d.follow_ups_overdue ?? 0), undefined, d.follow_ups_overdue ? "brick" : undefined], ["Web enquiries", String((d.enquiries_per_project || []).reduce((a, e) => a + e.count, 0))]];
+  if (key === "service-sla") return [["Tickets", String(t.total ?? 0), `${t.open ?? 0} open`], ["SLA met", t.sla_met_pct != null ? `${t.sla_met_pct}%` : "—", "resolved within SLA", t.sla_met_pct != null && t.sla_met_pct < 80 ? "brick" : "sage"], ["Avg resolution", t.avg_resolution_h != null ? `${t.avg_resolution_h} h` : "—"], ["Avg rating", t.avg_rating != null ? `${t.avg_rating} ★` : "—", "closed tickets"]];
+  if (key === "construction-progress") { const tw = d.towers || []; return [["Towers", String(tw.length), `${tw.filter((x) => x.pct === 100).length} possession ready`], ["Avg progress", tw.length ? `${Math.round(tw.reduce((a, x) => a + x.pct, 0) / tw.length)}%` : "—", "stages completed"], ["Site photos", String(t.photos ?? 0)], ["Stage demands", String(t.demands ?? 0), inrShort((t.demand_paise || 0) / 100)]]; }
   const money = Object.entries(t).filter(([k]) => k.endsWith("_paise")).slice(0, 4);
   if (money.length) return money.map(([k, v]) => [k.replace(/_paise$/, "").replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase()), inrShort((v || 0) / 100)]);
   return [["Rows", String(d.rows?.length || 0)]];
@@ -82,6 +86,8 @@ export default function Reports() {
     : key === "outstanding" ? { type: "pie", rows: data.ageing.map((a) => ({ name: a.bucket, value: a.amount_paise / 100 })) }
     : key === "sales-leads" ? { type: "bar", rows: data.funnel.map((s) => ({ name: s.stage, Leads: s.count })), keys: ["Leads"] }
     : key === "inventory" ? { type: "bar", rows: data.velocity.map((v) => ({ name: v.month, Bookings: v.bookings })), keys: ["Bookings"] }
+    : key === "service-sla" ? { type: "bar", rows: data.rows.map((r) => ({ name: r.category, Open: r.open, Resolved: r.resolved })), keys: ["Open", "Resolved"], stacked: true }
+    : key === "construction-progress" ? { type: "bar", rows: (data.towers || []).map((x) => ({ name: x.tower, Progress: x.pct })), keys: ["Progress"] }
     : key === "demand-vs-collection" ? { type: "bar", rows: data.rows.slice(0, 20).map((r) => ({ name: r.milestone.split(". ")[1] || r.milestone, Demanded: r.demand_paise / 100, Collected: r.collected_paise / 100 })), keys: ["Demanded", "Collected"] } : null);
   const download = () => api.get(`/reports/${key}`, { params: { ...params, format: "csv" }, responseType: "blob" }).then((r) => { const a = document.createElement("a"); a.href = URL.createObjectURL(r.data); a.download = `${key}.csv`; a.click(); }).catch((e) => toast.error(errMsg(e)));
   const savePreset = async () => { try { const r = await api.post("/reports/presets", { report_key: key, name: presetName.trim(), filters: f }); setPresetName(""); setActivePreset(r.data.id); reloadPresets(); toast.success("Preset saved"); } catch (e) { toast.error(errMsg(e)); } };
@@ -143,6 +149,8 @@ export default function Reports() {
             {chart.type === "pie" && <div className="mt-4 flex flex-wrap gap-2">{chart.rows.map((r, i) => <span key={r.name} className="pill bg-warm-100 text-ink-950"><i className="h-2 w-2 rounded-full" style={{ background: COLORS[i % COLORS.length] }} />{r.name} · {inrShort(r.value)}</span>)}</div>}
           </Card>}
           {data?.top_overdue?.length > 0 && <Card><h3 className="mb-3 font-display text-lg text-ink-950">Top overdue customers</h3><div className="flex flex-wrap gap-2">{data.top_overdue.map((t) => <button key={t.booking_number} onClick={() => nav(`/customers/${t.customer_id || ""}`)} className="pill bg-brick-50 text-brick hover:bg-brick/15" data-testid={`report-overdue-${t.booking_number}`}>{t.customer_name} · {inrShort(t.overdue_paise / 100)}</button>)}</div></Card>}
+          {data?.towers && <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" data-testid="report-towers">{data.towers.map((x) => <Card key={x.block_id} className="!p-5"><div className="flex items-start justify-between gap-3"><div><p className="text-[15px] font-semibold text-ink-950">{x.tower}</p><p className="text-xs text-txt-secondary">{x.project}</p></div><span className="font-display text-2xl text-ink-950">{x.pct}%</span></div><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-warm-100"><span className="block h-full rounded-full bg-sage" style={{ width: `${x.pct}%` }} /></div><p className="mt-2 text-xs text-txt-secondary">{x.completed}/{x.stages} stages · <span className="pill bg-gold-light text-[#6b5410]">Now · {x.current_stage}</span></p></Card>)}</div>}
+          {data?.status_counts && <div className="flex flex-wrap gap-2" data-testid="report-status-counts">{data.status_counts.map((m) => <span key={m.status} className="pill bg-warm-100 text-ink-950">{m.status} · {m.count}</span>)}</div>}
           {data?.by_mode && <div className="flex flex-wrap gap-2" data-testid="report-by-mode">{data.by_mode.map((m) => <span key={m.mode} className="pill bg-warm-100 text-ink-950">{m.mode.replace("_", " / ")} · {inrShort(m.total_paise / 100)} <span className="text-txt-muted">({m.count})</span></span>)}</div>}
           <Card className="!p-0 overflow-hidden" testId="report-table">
             {loading && !data ? <div className="space-y-2 p-6">{[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-10" />)}</div> : !data?.rows?.length ? <div className="p-6"><EmptyState icon={BarChart3} title="No data for these filters" description="Widen the date range or clear a filter." testId="report-empty" /></div> : (

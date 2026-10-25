@@ -147,6 +147,7 @@ function Pricing({ towers, setTowers, cats }) {
         <FormSection key={t.id || i} title={t.name} helper={sample ? `Sample: ${sample.label} (${sbu} sq.ft) on the 6th floor ≈ ${inr(price)}` : "Add flat types in Settings → Catalogues to preview prices"}>
           <Field label="Base rate (₹ / sq.ft)" hint="Blank = flat type's own rate"><input type="number" className="input" value={t.rate_per_sqft ?? ""} onChange={(e) => upd(i, { rate_per_sqft: e.target.value === "" ? null : Number(e.target.value) })} data-testid={`price-${i}-rate`} /></Field>
           <Field label="Floor rise (₹ / sq.ft / floor)"><input type="number" className="input" value={t.floor_rise_per_sqft ?? ""} onChange={(e) => upd(i, { floor_rise_per_sqft: e.target.value === "" ? null : Number(e.target.value) })} data-testid={`price-${i}-rise`} /></Field>
+          <Field label="Cash share % override" hint="Blank = project default"><input type="number" min="0" max="100" step="0.5" className="input" value={t.default_cash_percent ?? ""} onChange={(e) => upd(i, { default_cash_percent: e.target.value === "" ? null : Number(e.target.value) })} data-testid={`price-${i}-cash`} /></Field>
         </FormSection>); })}
       <Card><p className="text-sm text-txt-secondary">PLC rules (corner, facing, view) and dated rate cards live in the project's <b>Pricing</b> tab after creation — they re-price Available units in bulk.</p></Card>
     </div>
@@ -192,7 +193,7 @@ export default function ProjectSetup() {
         if (step === 2 || towers.some((t) => t.id)) await load(pid);
       } else if (step === 3) { await api.put(`/projects/${pid}/setup/stages`, { project_sequence: seq }); await load(pid); }
       else if (step === 4) { await api.put(`/projects/${pid}/setup/plans`, { assignments: assign }); await load(pid); }
-      else if (step === 5) { await api.put(`/projects/${pid}/setup/pricing`, { block_rates: towers.filter((t) => t.id).map((t) => ({ block_id: t.id, rate_per_sqft: t.rate_per_sqft ?? null, floor_rise_per_sqft: t.floor_rise_per_sqft ?? null })) }); await load(pid); }
+      else if (step === 5) { await api.put(`/projects/${pid}/setup/pricing`, { block_rates: towers.filter((t) => t.id).map((t) => ({ block_id: t.id, rate_per_sqft: t.rate_per_sqft ?? null, floor_rise_per_sqft: t.floor_rise_per_sqft ?? null, default_cash_percent: t.default_cash_percent ?? null })) }); await load(pid); }
       setStep(step + 1);
     } catch (e) { toast.error(errMsg(e)); } finally { setBusy(false); }
   };
@@ -205,7 +206,7 @@ export default function ProjectSetup() {
   const pending = setup?.towers.filter((t) => !t.units.total).length || 0;
   return (
     <div className="space-y-6" data-testid="project-setup">
-      <PageHero dark={false} crumbs={[{ label: "Projects", to: "/projects" }, ...(pid ? [{ label: p.name, to: `/projects/${pid}` }] : []), { label: "Setup" }]} eyebrow={pid ? "Edit setup" : "New project"} title={p.name || "Set up a project"} subtitle="Towers → floor plans → stages → payment plans → pricing. Every step saves; you can come back any time." testId="setup-hero"><div className="mt-6"><Stepper steps={STEPS} current={step} onStep={setStep} /></div></PageHero>
+      <PageHero dark={false} crumbs={[{ label: "Projects", to: "/projects" }, ...(pid ? [{ label: p.name, to: `/projects/${pid}` }] : []), { label: "Setup" }]} eyebrow={pid ? "Edit setup" : "New project"} title={p.name || "Set up a project"} subtitle="Towers → floor plans → stages → payment plans → pricing. Every step saves; you can come back any time." testId="setup-hero"><div className="mt-6"><Stepper steps={STEPS} current={step} onStep={setStep} allowJump={!!pid} /></div></PageHero>
       {step === 0 && <Basics p={p} setP={setP} cats={cats} />}
       {step === 1 && <Towers towers={towers} setTowers={setTowers} code={p.code} />}
       {step === 2 && <FloorPlans towers={towers} setTowers={setTowers} cats={cats} />}
