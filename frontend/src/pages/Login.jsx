@@ -1,23 +1,22 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Building2, Eye, EyeOff, LockKeyhole, ShieldCheck, Users } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { errMsg } from "@/lib/api";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Field } from "@/components/common/Bits";
+import { Field } from "@/components/v2";
 
 const DEMO = [["Super Admin", "admin@kkt.in"], ["Project Admin", "projectadmin@kkt.in"], ["Accounts", "accounts@kkt.in"], ["Sales", "sales@kkt.in"], ["Employee", "employee@kkt.in"]];
+const isDev = /preview\.emergentagent|localhost/.test(window.location.hostname);
 
 export default function Login() {
   const { login, loginMfa } = useAuth();
-  const [mfa, setMfa] = useState(null);
-  const [code, setCode] = useState("");
   const navigate = useNavigate();
   const loc = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [mfa, setMfa] = useState(null);
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -26,64 +25,54 @@ export default function Login() {
     e.preventDefault();
     setBusy(true); setError("");
     try {
-      if (mfa) { await loginMfa(mfa.mfa_token, code); }
+      if (mfa) await loginMfa(mfa.mfa_token, code);
       else {
         const d = await login(email.trim(), password);
         if (d.mfa_required) { setMfa(d); setBusy(false); return; }
         if (d.must_change_password) toast.warning("Please change your password (Profile menu → Change password).");
       }
-      toast.success("Welcome back");
+      toast.success("Signed in");
       navigate(loc.state?.from || "/dashboard", { replace: true });
     } catch (err) { setError(errMsg(err, "Login failed")); } finally { setBusy(false); }
   };
 
   return (
-    <div className="grid min-h-screen lg:grid-cols-[1.1fr_1fr]" data-testid="login-page">
-      <div className="relative hidden overflow-hidden bg-navy text-white lg:flex lg:flex-col lg:justify-between lg:p-12 grain">
-        <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full bg-navy-700/60 blur-3xl" />
-        <div className="absolute -bottom-40 left-10 h-96 w-96 rounded-full bg-gold/10 blur-3xl" />
-        <div className="relative flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gold text-xl font-extrabold text-navy">K</div>
-          <div><p className="text-xl font-extrabold tracking-wide">KKT</p><p className="text-xs text-slate-400">Real Estate ERP</p></div>
+    <div className="v2 grid min-h-screen lg:grid-cols-[1.15fr_1fr]" data-testid="login-page">
+      <div className="hero relative hidden overflow-hidden lg:flex lg:flex-col lg:justify-between lg:p-14">
+        <div className="grain absolute inset-0 opacity-70" />
+        <div className="pointer-events-none absolute -right-40 -top-40 h-[520px] w-[520px] rounded-full border border-gold/15" /><div className="pointer-events-none absolute -right-20 -top-20 h-[320px] w-[320px] rounded-full border border-gold/25" />
+        <div className="relative flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl border border-gold/40 font-display text-xl text-gold-400">K</span><span className="font-display text-2xl tracking-wide">KKT</span></div>
+        <div className="relative max-w-xl">
+          <p className="label !text-gold-400">Real estate ERP</p>
+          <h1 className="mt-4 font-display text-5xl leading-[1.08] text-warm-50">Every tower, every buyer, every rupee — <em className="not-italic text-gold-400">in one ledger of truth.</em></h1>
+          <p className="mt-6 max-w-md text-base leading-relaxed text-warm-200/70">Projects, inventory, construction-linked dues, Cash · Account · Other-charge ledgers, and customer care for builders who run on trust.</p>
         </div>
-        <div className="relative max-w-lg">
-          <p className="label-xs text-gold">Enterprise · Secure · Scalable</p>
-          <h1 className="mt-3 text-4xl font-extrabold leading-tight sm:text-5xl">Command every tower, floor and flat from one royal console.</h1>
-          <p className="mt-4 text-sm text-slate-300">Inventory, pricing, roles and audit trails built for builders who sell at scale.</p>
-          <div className="mt-10 grid grid-cols-3 gap-4">
-            {[[Building2, "Projects → Blocks → Flats"], [ShieldCheck, "Fine-grained RBAC"], [Users, "1000+ concurrent users"]].map(([Icon, t]) => (
-              <div key={t} className="rounded-lg border border-white/10 bg-white/5 p-3 backdrop-blur"><Icon className="mb-2 h-5 w-5 text-gold" /><p className="text-xs font-semibold text-slate-200">{t}</p></div>
-            ))}
-          </div>
-        </div>
-        <p className="relative text-xs text-slate-500">© {new Date().getFullYear()} KKT. Immutable audit · Encrypted PII · JWT sessions</p>
+        <div className="relative hero-hair" />
       </div>
-      <div className="flex items-center justify-center bg-white px-6 py-12">
-        <div className="w-full max-w-sm fade-up">
-          <div className="mb-8 flex items-center gap-2 lg:hidden"><div className="flex h-9 w-9 items-center justify-center rounded-lg bg-navy font-extrabold text-gold">K</div><span className="text-lg font-extrabold text-navy">KKT</span></div>
-          <h2 className="text-2xl font-extrabold text-navy">Sign in</h2>
-          <p className="mt-1 text-sm text-slate-500">Use your employee credentials to continue.</p>
-          <form onSubmit={submit} className="mt-8 space-y-4">
-            {mfa ? <Field label={`Authenticator code for ${mfa.user.email}`} required><Input autoFocus inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value)} placeholder="123456" required data-testid="login-mfa-code-input" className="h-10 tracking-widest" /></Field> : <>
-            <Field label="Email" required><Input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.in" required data-testid="login-email-input" className="h-10" /></Field>
-            <Field label="Password" required>
-              <div className="relative">
-                <Input type={show ? "text" : "password"} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required data-testid="login-password-input" className="h-10 pr-10" />
-                <button type="button" onClick={() => setShow(!show)} className="absolute right-2.5 top-2.5 text-slate-400 hover:text-navy" data-testid="toggle-password-visibility">{show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
-              </div>
-            </Field>
-            </>}
-            {error && <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" data-testid="login-error">{error}</div>}
-            <Button type="submit" disabled={busy} className="h-10 w-full bg-navy text-white hover:bg-navy-700" data-testid="login-submit-button"><LockKeyhole className="mr-2 h-4 w-4" />{busy ? "Signing in…" : mfa ? "Verify code" : "Sign in"}</Button>
-            {mfa && <button type="button" onClick={() => { setMfa(null); setCode(""); }} className="w-full text-xs text-slate-500 hover:text-navy" data-testid="login-mfa-back">← Back to password</button>}
-          </form>
-          <div className="mt-8 rounded-lg border border-slate-200 bg-slate-50 p-3">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-navy">Demo accounts · password Kkt@12345</p>
-            <div className="flex flex-wrap gap-1.5">
-              {DEMO.map(([r, e]) => <button key={e} type="button" onClick={() => { setEmail(e); setPassword("Kkt@12345"); }} className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-navy hover:border-gold hover:bg-gold-light" data-testid={`demo-${r.toLowerCase().replace(/\s+/g, "-")}`}>{r}</button>)}
-            </div>
+      <div className="flex items-center justify-center p-6 md:p-12">
+        <form onSubmit={submit} className="w-full max-w-sm" data-testid="login-form">
+          <div className="mb-8 lg:hidden"><span className="font-display text-3xl">KKT</span></div>
+          <p className="label">{mfa ? "Security" : "Sign in"}</p>
+          <h2 className="mt-2 font-display text-3xl text-ink-950">{mfa ? "Two-step verification" : "Sign in to the ERP"}</h2>
+          <div className="mt-8 space-y-5">
+            {mfa ? <Field label={`Authenticator code for ${mfa.user.email}`} required><input autoFocus inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value)} placeholder="123456" required className="input tracking-[.3em]" data-testid="login-mfa-code-input" /></Field> : (
+              <>
+                <Field label="Work email" required><input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.in" required className="input" data-testid="login-email-input" /></Field>
+                <Field label="Password" required>
+                  <div className="relative"><input type={show ? "text" : "password"} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required className="input pr-11" data-testid="login-password-input" /><button type="button" onClick={() => setShow(!show)} className="absolute right-3 top-1/2 -translate-y-1/2 text-txt-muted hover:text-ink-950" aria-label="Toggle password" data-testid="login-toggle-password">{show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div>
+                </Field>
+              </>
+            )}
+            {error && <p className="rounded-xl bg-brick-50 px-4 py-3 text-sm text-brick" role="alert" data-testid="login-error">{error}</p>}
+            <button type="submit" disabled={busy} className="btn btn-primary w-full" data-testid="login-submit-button">{busy ? "Signing in…" : mfa ? "Verify" : "Sign in"}</button>
           </div>
-        </div>
+          {isDev && !mfa && (
+            <div className="mt-10">
+              <p className="label">Demo accounts · password Kkt@12345</p>
+              <div className="mt-3 flex flex-wrap gap-2">{DEMO.map(([r, e]) => <button key={e} type="button" onClick={() => { setEmail(e); setPassword("Kkt@12345"); }} className="pill border border-warm-200 bg-white text-txt-secondary hover:border-gold hover:text-ink-950" data-testid={`demo-${r.toLowerCase().replace(" ", "-")}`}>{r}</button>)}</div>
+            </div>
+          )}
+        </form>
       </div>
     </div>
   );

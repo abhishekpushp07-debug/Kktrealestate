@@ -11,8 +11,30 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse, Response
 
 from db import db
+from dbtiming import DB_MS
 
 logger = logging.getLogger("kkt.http")
+
+
+class ETagMiddleware(BaseHTTPMiddleware):
+    """Strong ETag (sha1 of body) on every JSON GET under /api; If-None-Match → 304. Skips streams/binary/already-tagged."""
+
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        if request.method != "GET" or not request.url.path.startswith("/api") or response.status_code != 200 or "etag" in response.headers:
+            return response
+        if not (response.headers.get("content-type") or "").startswith("application/json"):
+            return response
+        body = b"".join([chunk async for chunk in response.body_iterator])
+        import hashlib
+        tag = '"' + hashlib.sha1(body).hexdigest()[:32] + '"'
+        headers = dict(response.headers)
+        headers["ETag"] = tag
+        headers.setdefault("Cache-Control", "private, no-cache")
+        headers.pop("content-length", None)
+        if request.headers.get("if-none-match") == tag:
+            return Response(status_code=304, headers={k: v for k, v in headers.items() if k.lower() not in ("content-type",)})
+        return Response(content=body, status_code=200, media_type=response.media_type, headers=headers)
 START_TIME = time.time()
 MAX_BODY = 2 * 1024 * 1024
 BUCKETS = [50, 100, 300, 1000, 3000]
@@ -32,14 +54,19 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
         if cl and cl.isdigit() and int(cl) > MAX_BODY:
             return JSONResponse(status_code=413, content={"detail": "Request body too large (max 2 MB)", "code": "PAYLOAD_TOO_LARGE"})
         t0 = time.perf_counter()
+        acc = [0.0, 0]
+        token = DB_MS.set(acc)
         try:
             response = await call_next(request)
         except Exception:
             logger.exception(json.dumps({"request_id": rid, "path": request.url.path, "error": "unhandled"}))
             response = JSONResponse(status_code=500, content={"detail": "Internal server error", "code": "INTERNAL_ERROR"})
+        finally:
+            DB_MS.reset(token)
         ms = (time.perf_counter() - t0) * 1000
         response.headers["X-Request-ID"] = rid
         response.headers["X-Response-Time"] = f"{ms:.1f}ms"
+        response.headers["Server-Timing"] = f"db;dur={acc[0]:.1f};desc=\"{acc[1]} ops\", app;dur={max(ms - acc[0], 0):.1f}"
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"

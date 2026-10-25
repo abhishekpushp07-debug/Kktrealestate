@@ -63,10 +63,12 @@
   "scripts": {
     "start": "node scripts/dev.js",
     "start:erp": "craco start",
-    "build": "craco build",
+    "build": "craco build && node scripts/package-build.js",
     "test": "craco test",
     "dev": "PREVIEW_MODE=development node scripts/dev.js",
-    "preview:build": "node scripts/dev.js --build-only"
+    "preview:build": "node scripts/dev.js --build-only",
+    "package:assets": "node scripts/package-assets.js",
+    "package:build": "node scripts/package-build.js"
   },
   "browserslist": {
     "production": [

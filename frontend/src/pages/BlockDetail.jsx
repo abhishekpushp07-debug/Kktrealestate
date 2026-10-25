@@ -20,7 +20,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { cn } from "@/lib/utils";
 
 const TYPE_COLORS = ["border-sky-300 bg-sky-50", "border-violet-300 bg-violet-50", "border-rose-300 bg-rose-50", "border-teal-300 bg-teal-50", "border-orange-300 bg-orange-50", "border-lime-300 bg-lime-50"];
-const BAND_COLORS = ["border-emerald-200 bg-emerald-50", "border-lime-300 bg-lime-50", "border-amber-300 bg-amber-50", "border-orange-300 bg-orange-100", "border-red-300 bg-red-100"];
+const BAND_COLORS = ["border-emerald-200 bg-sage-50", "border-lime-300 bg-lime-50", "border-amber-300 bg-amber2-50", "border-orange-300 bg-orange-100", "border-red-300 bg-red-100"];
 
 function BulkPriceDialog({ block, open, onOpenChange, onDone }) {
   const [form, setForm] = useState({ mode: "rate", rate_per_sqft: block.rate_per_sqft ?? "", floor_rise_per_sqft: block.floor_rise_per_sqft ?? "", price: "", floors: "", only_available: true });
@@ -35,12 +35,12 @@ function BulkPriceDialog({ block, open, onOpenChange, onDone }) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent data-testid="bulk-price-dialog">
         <DialogHeader><DialogTitle>Bulk price update · {block.name}</DialogTitle></DialogHeader>
-        <div className="flex gap-2">{[["rate", "Rate per sq.ft"], ["price", "Flat amount"]].map(([m, l]) => <button key={m} onClick={() => setForm({ ...form, mode: m })} className={cn("flex-1 rounded-md border px-3 py-2 text-sm font-semibold", form.mode === m ? "border-navy bg-navy text-white" : "hover:bg-slate-50")} data-testid={`bulk-mode-${m}`}>{l}</button>)}</div>
+        <div className="flex gap-2">{[["rate", "Rate per sq.ft"], ["price", "Flat amount"]].map(([m, l]) => <button key={m} onClick={() => setForm({ ...form, mode: m })} className={cn("flex-1 rounded-md border px-3 py-2 text-sm font-semibold", form.mode === m ? "border-ink-950 bg-ink-950 text-white" : "hover:bg-warm-50")} data-testid={`bulk-mode-${m}`}>{l}</button>)}</div>
         {form.mode === "rate" ? <div className="grid grid-cols-2 gap-3"><Field label="Rate ₹/sq.ft" required><Input type="number" value={form.rate_per_sqft} onChange={(e) => setForm({ ...form, rate_per_sqft: e.target.value })} data-testid="bulk-rate-input" /></Field><Field label="Floor rise ₹/sq.ft per floor"><Input type="number" value={form.floor_rise_per_sqft} onChange={(e) => setForm({ ...form, floor_rise_per_sqft: e.target.value })} data-testid="bulk-rise-input" /></Field></div>
           : <Field label="Price ₹ (lump sum)" required><Input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} data-testid="bulk-amount-input" /></Field>}
         <Field label="Floors (comma separated, blank = all)"><Input value={form.floors} onChange={(e) => setForm({ ...form, floors: e.target.value })} placeholder="e.g. 1,2,3" data-testid="bulk-floors-input" /></Field>
         <label className="flex items-center gap-2 text-sm"><Checkbox checked={form.only_available} onCheckedChange={(c) => setForm({ ...form, only_available: !!c })} data-testid="bulk-only-available" />Only Available flats</label>
-        <DialogFooter><Button onClick={submit} disabled={busy} className="bg-navy hover:bg-navy-700" data-testid="bulk-price-submit">Apply pricing</Button></DialogFooter>
+        <DialogFooter><Button onClick={submit} disabled={busy} className="bg-ink-950 hover:bg-ink-800" data-testid="bulk-price-submit">Apply pricing</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -104,20 +104,20 @@ export default function BlockDetail() {
           {can("block.write") && <Button variant="outline" onClick={regenerate} data-testid="regenerate-flats-btn"><RefreshCw className="mr-1.5 h-4 w-4" />Regenerate</Button>}
         </>} />
       <div className="mb-5 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <div className="card-elev p-4"><p className="label-xs">Units</p><p className="mt-1 text-2xl font-extrabold tabular text-navy" data-testid="grid-count-total">{grid.counts.total}</p></div>
+        <div className="card p-4"><p className="label-xs">Units</p><p className="mt-1 text-2xl font-extrabold tabular text-ink-950" data-testid="grid-count-total">{grid.counts.total}</p></div>
         {["Available", "Hold", "Booked", "Sold", "Blocked"].map((s) => <div key={s} className={cn("rounded-xl border p-4", STATUS_STYLES[s].tile)} data-testid={`grid-count-${s.toLowerCase()}`}><p className="label-xs opacity-80">{s}</p><p className="mt-1 text-2xl font-extrabold tabular">{grid.counts[s]}</p></div>)}
       </div>
-      {showHistory && <div className="card-elev mb-5 p-5" data-testid="block-history-panel"><h3 className="mb-3 text-base font-bold text-navy">Block history</h3><HistoryTimeline entityType="block" entityId={b.id} /></div>}
+      {showHistory && <div className="card mb-5 p-5" data-testid="block-history-panel"><h3 className="mb-3 text-base font-bold text-ink-950">Block history</h3><HistoryTimeline entityType="block" entityId={b.id} /></div>}
       {showMilestones && <div className="mb-5"><ConstructionStatusPanel blockId={b.id} onChanged={refresh} /></div>}
       <div className="grid gap-5 xl:grid-cols-[1fr_300px]">
-        <div className="card-elev overflow-auto p-4" data-testid="inventory-grid">
+        <div className="card overflow-auto p-4" data-testid="inventory-grid">
           <div className="mb-3 flex flex-wrap items-center gap-2 print:hidden">
             <span className="label-xs">Colour by</span>
-            {[["status", "Status"], ["type", "Flat type"], ["price", "Price band"]].map(([m, l]) => <button key={m} onClick={() => setMode(m)} className={cn("rounded-full border px-3 py-1 text-xs font-semibold", mode === m ? "border-navy bg-navy text-white" : "bg-white hover:border-gold")} data-testid={`grid-mode-${m}`}>{l}</button>)}
+            {[["status", "Status"], ["type", "Flat type"], ["price", "Price band"]].map(([m, l]) => <button key={m} onClick={() => setMode(m)} className={cn("rounded-full border px-3 py-1 text-xs font-semibold", mode === m ? "border-ink-950 bg-ink-950 text-white" : "bg-white hover:border-gold")} data-testid={`grid-mode-${m}`}>{l}</button>)}
             {multi.size > 0 && can("flat.status") && <div className="ml-auto flex items-center gap-2 rounded-md bg-gold-light px-3 py-1.5 text-xs" data-testid="grid-bulk-bar"><b>{multi.size} selected</b>
               {["Available", "Hold", "Blocked"].map((s) => <Button key={s} size="sm" variant="outline" className="h-7" onClick={() => bulkStatus(s)} data-testid={`grid-bulk-${s.toLowerCase()}`}>→ {s}</Button>)}
-              <button onClick={() => setMulti(new Set())} className="text-slate-500 underline">clear</button></div>}
-            {multi.size === 0 && <span className="ml-auto text-[11px] text-slate-400">Ctrl/⌘-click to multi-select · Shift for range</span>}
+              <button onClick={() => setMulti(new Set())} className="text-txt-secondary underline">clear</button></div>}
+            {multi.size === 0 && <span className="ml-auto text-[11px] text-txt-muted">Ctrl/⌘-click to multi-select · Shift for range</span>}
           </div>
           <TooltipProvider delayDuration={200}>
             <div className="min-w-max">
@@ -126,11 +126,11 @@ export default function BlockDetail() {
               </div>
               {grid.floors.map((fl) => (
                 <div key={fl.floor} className="mb-2 grid gap-2" style={{ gridTemplateColumns: `64px repeat(${grid.positions.length}, minmax(120px, 1fr))` }} data-testid={`grid-floor-${fl.floor}`} data-kind={fl.kind}>
-                  <div className={cn("sticky left-0 flex items-center justify-center rounded-lg text-sm font-extrabold", fl.kind === "units" ? "bg-navy text-gold" : "bg-slate-300 text-slate-600")}>{fl.label}</div>
-                  {fl.kind !== "units" ? <div className="flex items-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 text-xs font-semibold uppercase tracking-wider text-slate-400" style={{ gridColumn: `span ${grid.positions.length}` }}>{fl.kind} floor · no units</div>
+                  <div className={cn("sticky left-0 flex items-center justify-center rounded-lg text-sm font-extrabold", fl.kind === "units" ? "bg-ink-950 text-gold" : "bg-slate-300 text-txt-secondary")}>{fl.label}</div>
+                  {fl.kind !== "units" ? <div className="flex items-center rounded-lg border border-dashed border-slate-300 bg-warm-50 px-3 text-xs font-semibold uppercase tracking-wider text-txt-muted" style={{ gridColumn: `span ${grid.positions.length}` }}>{fl.kind} floor · no units</div>
                     : grid.positions.map((p) => {
                       const f = fl.flats.find((x) => x.position === p);
-                      if (!f) return <div key={p} className="grid-tile border-dashed border-slate-200 bg-slate-50" />;
+                      if (!f) return <div key={p} className="grid-tile border-dashed border-warm-200 bg-warm-50" />;
                       return (
                         <Tooltip key={f.id}>
                           <TooltipTrigger asChild>
@@ -149,17 +149,17 @@ export default function BlockDetail() {
           </TooltipProvider>
         </div>
         <div className="space-y-4 print:hidden">
-          <div className="card-elev p-5">
-            <h3 className="mb-3 text-base font-bold text-navy">Block details</h3>
+          <div className="card p-5">
+            <h3 className="mb-3 text-base font-bold text-ink-950">Block details</h3>
             <div className="grid grid-cols-2 gap-3">
               <KV label="Status" value={b.status} /><KV label="Construction" value={`${b.construction_percent}%`} mono />
               <KV label="Rate" value={block?.rate_per_sqft ? `₹${num(block.rate_per_sqft)}/sq.ft` : "From flat type / rate card"} /><KV label="Floor rise" value={block?.floor_rise_per_sqft ? `₹${num(block.floor_rise_per_sqft)}/floor` : "—"} />
               <KV label="Floor start" value={b.floor_start} mono /><KV label="Construction" value={`${b.construction_percent ?? 0}% (${(b.construction_stages || []).filter((s) => s.status === "Completed").length}/${(b.construction_stages || []).length} stages)`} />
             </div>
             <p className="label-xs mb-2 mt-4">Floor plans</p>
-            <div className="space-y-1">{block?.floor_plans?.map((p, i) => <div key={i} className="rounded bg-slate-50 px-2 py-1.5 text-xs"><div className="flex justify-between"><span className="text-slate-500">Floors {p.from_floor}–{p.to_floor}</span><b className="text-navy">{p.template_name || "Inline"}</b></div><p className="mt-0.5 text-[10px] text-slate-500">{p.resolved_positions?.map((x) => `${x.position}:${x.flat_type?.code}`).join("  ")}</p></div>)}</div>
+            <div className="space-y-1">{block?.floor_plans?.map((p, i) => <div key={i} className="rounded bg-warm-50 px-2 py-1.5 text-xs"><div className="flex justify-between"><span className="text-txt-secondary">Floors {p.from_floor}–{p.to_floor}</span><b className="text-ink-950">{p.template_name || "Inline"}</b></div><p className="mt-0.5 text-[10px] text-txt-secondary">{p.resolved_positions?.map((x) => `${x.position}:${x.flat_type?.code}`).join("  ")}</p></div>)}</div>
           </div>
-          <div className="card-elev p-5"><p className="label-xs mb-2">Legend</p><div className="flex flex-wrap gap-1.5">{mode === "status" ? ["Available", "Hold", "Booked", "Sold", "Blocked"].map((s) => <StatusChip key={s} status={s} />) : mode === "type" ? types.map((t, i) => <span key={t} className={cn("rounded-full border px-2 py-0.5 text-[11px] font-semibold", TYPE_COLORS[i % TYPE_COLORS.length])}>{t}</span>) : <span className="text-xs text-slate-600">{inrShort(min)} → {inrShort(max)} (5 bands)</span>}</div><p className="mt-3 text-xs text-slate-500">◆ corner unit. Click a tile for the flat drawer with price breakup.</p></div>
+          <div className="card p-5"><p className="label-xs mb-2">Legend</p><div className="flex flex-wrap gap-1.5">{mode === "status" ? ["Available", "Hold", "Booked", "Sold", "Blocked"].map((s) => <StatusChip key={s} status={s} />) : mode === "type" ? types.map((t, i) => <span key={t} className={cn("rounded-full border px-2 py-0.5 text-[11px] font-semibold", TYPE_COLORS[i % TYPE_COLORS.length])}>{t}</span>) : <span className="text-xs text-txt-secondary">{inrShort(min)} → {inrShort(max)} (5 bands)</span>}</div><p className="mt-3 text-xs text-txt-secondary">◆ corner unit. Click a tile for the flat drawer with price breakup.</p></div>
         </div>
       </div>
       <FlatDrawer flatId={selected} onClose={() => { setSelected(null); if (sp.get("flat")) setSp({}); }} onChanged={refresh} />
@@ -167,7 +167,7 @@ export default function BlockDetail() {
       <Dialog open={floorsOpen} onOpenChange={setFloorsOpen}>
         <DialogContent data-testid="add-floors-dialog"><DialogHeader><DialogTitle>Append floors</DialogTitle></DialogHeader>
           <Field label="Number of floors to add" hint="Uses the last floor-plan range's template"><Input type="number" min={1} max={50} value={floorCount} onChange={(e) => setFloorCount(e.target.value)} data-testid="add-floors-count" /></Field>
-          <DialogFooter><Button onClick={addFloors} className="bg-navy hover:bg-navy-700" data-testid="add-floors-submit"><Layers className="mr-1.5 h-4 w-4" />Add floors</Button></DialogFooter>
+          <DialogFooter><Button onClick={addFloors} className="bg-ink-950 hover:bg-ink-800" data-testid="add-floors-submit"><Layers className="mr-1.5 h-4 w-4" />Add floors</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

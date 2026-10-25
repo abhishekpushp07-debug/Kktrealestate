@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { CalendarPlus, MapPin, MessageCircle, Check, ChevronLeft } from "lucide-react";
-import api, { errMsg } from "./lib/api";
+import api, { errMsg, BACKEND } from "./lib/api";
 import { useSite, usePublic } from "./SiteShell";
 import { VisitorFields, Consent, getVisitor, saveVisitor } from "./LeadGate";
 
@@ -14,7 +14,7 @@ export function VisitSuccess({ v, projectName }) {
     <p className="eyebrow mt-5">Visit confirmed · {v.visit_number}</p><h3 className="display mt-2 text-3xl text-navy" data-testid="visit-number">{fmtLong(v.date)}</h3><p className="mt-1 text-lg font-semibold text-navy">{v.slot} IST · {projectName || v.project}</p>
     {v.address && <p className="mt-4 flex items-start gap-2 text-sm text-slate-600"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-gold" /><span>{v.address}{v.maps_url && <> · <a href={v.maps_url} target="_blank" rel="noreferrer" className="font-semibold text-navy underline" data-testid="visit-maps">Open in Maps</a></>}</span></p>}
     {v.instructions && <p className="mt-2 text-xs text-slate-500">{v.instructions}</p>}
-    <div className="mt-6 flex flex-wrap gap-3"><a href={`${process.env.REACT_APP_BACKEND_URL}${v.ics_url}`} className="btn-gold" data-testid="visit-ics"><CalendarPlus className="h-4 w-4" />Add to calendar</a><a href={`https://wa.me/${(site?.whatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(`Hi, I booked site visit ${v.visit_number} on ${v.date} at ${v.slot_start}.`)}`} target="_blank" rel="noreferrer" className="btn-navy" data-testid="visit-whatsapp"><MessageCircle className="h-4 w-4" />WhatsApp RM</a></div>
+    <div className="mt-6 flex flex-wrap gap-3"><a href={`${BACKEND}${v.ics_url}`} className="btn-gold" data-testid="visit-ics"><CalendarPlus className="h-4 w-4" />Add to calendar</a><a href={`https://wa.me/${(site?.whatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(`Hi, I booked site visit ${v.visit_number} on ${v.date} at ${v.slot_start}.`)}`} target="_blank" rel="noreferrer" className="btn-navy" data-testid="visit-whatsapp"><MessageCircle className="h-4 w-4" />WhatsApp RM</a></div>
     <Link to={v.manage_url} className="mt-5 inline-block text-sm font-semibold text-navy underline" data-testid="visit-manage">Manage this visit</Link>
   </div>;
 }

@@ -1,0 +1,36 @@
+{
+  "summary": "Phase 11B full regression — new 'Royal Black & Warm White' ERP shell + v2 pages + Project Setup wizard. BACKEND (8/8 pass, 2.4s, /app/backend/tests/test_phase_11b.py): GET /api/dashboard/home → 200 with projects/attention/totals/counts/collections_12m/recent/spark; unauth → 401. GET /api/projects/{SGH}/setup → 200 with towers/stages/plans/pricing. PUT /api/projects/{id}/setup/{stages|plans|pricing|towers} all return 200 idempotent — the previously reported 500 on plans/pricing (is_active WriteError) is FIXED. plans PUT preserves assignment count. GET /api/flats?project_id&page_size=200 → 200 (previously 500 at >200). FRONTEND (admin@kkt.in / Kkt@12345): Login v2 → /erp/dashboard with [data-testid=home-greeting]; Home v2 renders home-greeting + projects-strip + collections-chart + attention-list + recent-activity. Sidebar nav-home/projects/customers/bookings/payments/settings all present; sidebar-toggle, quick-new, user-menu + menu-logout all work. Projects v2 shows [data-testid=projects-grid] with 2 project-card-* cards; click opens /erp/projects/{id} with [data-testid=project-hero] + chip stats. Project workspace: all 10 tabs (tab-overview/towers/inventory/construction/plans/pricing/customers/bookings/collections/website) render without error; inventory tab lists 18 flat rows (page_size=200 fix confirmed). Project Setup wizard /erp/projects/{SGH}/setup: [data-testid=stepper] visible; clicking [data-testid=setup-next] 6 times walks through all 7 steps (Basics→Towers→Floor plans→Stages→Payment plans→Pricing→Review) with NO error toast — step 5 (plans) and step 6 (pricing) both save (200). Review page shows all green checklist. Settings → Catalogues: cat-items present, 27 cat-type-* buttons, switching works, CSV export control present, Settings page links to catalogues. Legacy routes /erp/customers, /erp/bookings, /erp/payments all load inside the new AppShell. Responsive @ 390px: NO horizontal overflow on /dashboard, /projects, workspace, setup, catalogues (scrollWidth==innerWidth==390). 0 console errors anywhere; only 1 harmless recharts width/height warning on initial Home paint.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Home v2 — Needs attention list", "issue": "First overdue row shows 'undefined · ₹15.8 L overdue 282 d' because the overdue demand returned by GET /api/dashboard/home has customer_name undefined. Suggest coalescing in the UI (customer_name || booking_number) or ensuring home.py populates customer_name for the overdue list the same way bounced/unassigned do.", "selector": "[data-testid=attention-list] li:first-child p.font-semibold", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Home v2 on first paint", "issues": ["Recharts logs a width(-1)/height(-1) warning while the skeleton transitions into the chart — harmless but noisy; add minWidth=0 on the ResponsiveContainer parent to silence."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase_11b.py",
+    "/app/test_reports/pytest/phase_11b.xml"
+  ],
+  "action_items": [
+    "Minor: fix 'undefined' customer name in Home needs-attention first row (data missing in /api/dashboard/home overdue entries, or coalesce in Home.jsx)",
+    "Nice-to-have: silence recharts width(-1)/height(-1) warning on Home v2 first paint"
+  ],
+  "critical_code_review_comments": [
+    "The spec called the Home v2 response 'kpis/projects/attention' but the implementation uses 'totals' + 'counts' (plus projects + attention + collections_12m + spark + recent). The frontend Home.jsx consumes totals/counts correctly, so this is just a naming divergence from the request copy — flagging only for doc consistency, no code change needed.",
+    "routers/project_setup.py: PUT with strictly-typed sections (StrictModel) means roundtripping GET→PUT with the raw bundle fails (plans has 'catalogue' key, pricing has 'rate_card', etc.). The frontend ProjectSetup.jsx handles this correctly by sending only the stripped fields ({project_sequence}, {assignments}, {block_rates}). Documented in test_phase_11b.py so future agents don't repeat my first-run mistake.",
+    "home.py builds the 'overdue' list from db.demands but relies on each demand doc carrying customer_name — some demands have it missing/null and the UI renders 'undefined'. Defend in the API or in Home.jsx.",
+    "AppShell data-testid coverage is thorough: nav-home, nav-projects, nav-customers, nav-bookings, nav-payments, nav-settings, sidebar-toggle, quick-new, user-menu, menu-logout all resolve. All 10 project tabs and all 27 cat-type-* buttons have testids.",
+    "Fixes claimed in this session all verified: FlatsTable page_size 200 (GET /flats?page_size=200 returns 200, inventory tab renders 18 rows), project_setup plans/pricing is_active WriteError (PUT returns 200 and preserves assignment count), 390px overflow (scrollWidth==innerWidth on all 5 target screens)."
+  ],
+  "updated_files": ["/app/backend/tests/test_phase_11b.py"],
+  "success_rate": {"backend": "100% (8/8)", "frontend": "100% (Login+Home+Sidebar+Projects+Workspace all 10 tabs+Setup all 7 steps+Catalogues+Legacy×3+Responsive×5, 0 console errors)"},
+  "test_credentials": "admin@kkt.in / Kkt@12345 (seeded Super Admin — Rajesh Kumar). Backend test module caches the token in a module-level dict to stay under the 10/min/IP login limiter.",
+  "seed_data_creation": "None. All PUTs were idempotent re-saves of existing SGH setup data; no new projects/towers/bookings/customers created.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Phase 11B is green on both backend and frontend. For future Phase 11B regression: `cd /app/backend && python -m pytest tests/test_phase_11b.py -v` (8 tests, ~2.5s). The IMPORTANT gotcha when writing new setup-section tests: PUT bodies must match StrictModel schemas (stages={project_sequence,tower_sequences?,version?}, plans={assignments:[{payment_plan_id,block_id?,is_default?}]}, pricing={block_rates:[{block_id,rate_per_sqft?,floor_rise_per_sqft?}]}, towers={towers:[{id,name?,status?,ground_floor_label?,version?}]}) — do NOT just echo back the GET bundle. SGH project id is f2069364-97c3-496c-a90b-58cf3d6e998b (code=SGH, 3 towers, 120 units); GGV id is c45bed54-3e4f-49a1-8a39-8da2e48a722a (code=GG, 2 towers, 18 units). Only two minor cosmetic items left: 'undefined' customer_name in Home attention first row, and a recharts width warning on first paint.",
+  "rca of the issue": "N/A — no blocking issues. The 'undefined · overdue' label on Home needs-attention row 1 is because home.py's overdue query returns some demand rows where customer_name is null/missing; the UI template plugs that straight into the title. Mitigation: either enrich the aggregate in routers/home.py (lookup customer_name from bookings) or fallback in Home.jsx: `${d.customer_name || d.booking_number || '—'}`. Low priority — functional data (amount, days, project, CTA) all render correctly."
+}

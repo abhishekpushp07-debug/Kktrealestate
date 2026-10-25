@@ -43,12 +43,12 @@ export function DataTable({ columns, items = [], total = 0, loading, page = 1, p
   const cell = (c, row) => (c.render ? c.render(row) : row[c.key] ?? "—");
   const cardCols = cardFields ? cols.filter((c) => cardFields.includes(c.key)) : cols.slice(0, 6);
   return (
-    <div className="card-elev overflow-hidden" data-testid={testId}>
+    <div className="card overflow-hidden" data-testid={testId}>
       {(setSearch || toolbar || exportPath) && (
         <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-3">
           {setSearch && (
             <div className="relative w-full sm:w-72">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-txt-secondary" />
               <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={searchPlaceholder} className="h-9 pl-8" data-testid={`${testId}-search`} />
             </div>
           )}
@@ -72,9 +72,9 @@ export function DataTable({ columns, items = [], total = 0, loading, page = 1, p
             : items.map((row, idx) => {
               const [first, ...rest] = cardCols;
               return (
-                <div key={row[rowKey] ?? idx} onClick={() => onRowClick?.(row)} className={cn("p-4", onRowClick && "cursor-pointer active:bg-slate-50")} data-testid={`${testId}-row-${row[rowKey] ?? idx}`}>
-                  <div className="mb-2 flex items-start justify-between gap-3"><div className="min-w-0 text-sm font-semibold text-navy">{cardTitle ? cardTitle(row) : first && cell(first, row)}</div>{selectable && <Checkbox checked={selected.has(row[rowKey])} onClick={(e) => e.stopPropagation()} onCheckedChange={(c) => { const n = new Set(selected); c ? n.add(row[rowKey]) : n.delete(row[rowKey]); onSelect(n); }} />}</div>
-                  <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5">{rest.map((c) => <div key={c.key} className="min-w-0"><dt className="label-xs !text-[10px]">{c.label}</dt><dd className="truncate text-sm text-navy">{cell(c, row)}</dd></div>)}</dl>
+                <div key={row[rowKey] ?? idx} onClick={() => onRowClick?.(row)} className={cn("p-4", onRowClick && "cursor-pointer active:bg-warm-50")} data-testid={`${testId}-row-${row[rowKey] ?? idx}`}>
+                  <div className="mb-2 flex items-start justify-between gap-3"><div className="min-w-0 text-sm font-semibold text-ink-950">{cardTitle ? cardTitle(row) : first && cell(first, row)}</div>{selectable && <Checkbox checked={selected.has(row[rowKey])} onClick={(e) => e.stopPropagation()} onCheckedChange={(c) => { const n = new Set(selected); c ? n.add(row[rowKey]) : n.delete(row[rowKey]); onSelect(n); }} />}</div>
+                  <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5">{rest.map((c) => <div key={c.key} className="min-w-0"><dt className="label-xs !text-[10px]">{c.label}</dt><dd className="truncate text-sm text-ink-950">{cell(c, row)}</dd></div>)}</dl>
                 </div>
               );
             })}
@@ -83,11 +83,11 @@ export function DataTable({ columns, items = [], total = 0, loading, page = 1, p
         <div className="scroll-fade" data-end={atEnd ? "true" : "false"}>
           <div ref={scrollRef} onScroll={onScroll} className="overflow-auto" style={{ maxHeight: "calc(100vh - 290px)" }} data-virtualized={virtual ? "true" : undefined}>
             <table className="w-full text-[13px]">
-              <thead className="sticky top-0 z-10 bg-slate-50">
-                <tr className="border-b border-slate-200">
+              <thead className="sticky top-0 z-10 bg-warm-50">
+                <tr className="border-b border-warm-200">
                   {selectable && <th className="w-8 px-3 py-2.5"><Checkbox checked={allSelected} onCheckedChange={(c) => onSelect(c ? new Set([...selected, ...items.map((r) => r[rowKey])]) : new Set([...selected].filter((id) => !items.some((r) => r[rowKey] === id))))} data-testid={`${testId}-select-all`} /></th>}
                   {cols.map((c, i) => (
-                    <th key={c.key} style={{ minWidth: c.minWidth || (c.align === "right" ? 120 : 110) }} className={cn("whitespace-nowrap px-4 py-2.5 text-left label-xs", c.align === "right" && "text-right", c.sortable && "cursor-pointer select-none hover:text-navy", i === 0 && "sticky left-0 z-20 bg-slate-50", c.className)} onClick={() => c.sortable && toggleSort(c.key)} data-testid={`${testId}-col-${c.key}`}>
+                    <th key={c.key} style={{ minWidth: c.minWidth || (c.align === "right" ? 120 : 110) }} className={cn("whitespace-nowrap px-4 py-2.5 text-left label-xs", c.align === "right" && "text-right", c.sortable && "cursor-pointer select-none hover:text-ink-950", i === 0 && "sticky left-0 z-20 bg-warm-50", c.className)} onClick={() => c.sortable && toggleSort(c.key)} data-testid={`${testId}-col-${c.key}`}>
                       <span className="inline-flex items-center gap-1">{c.label}
                         {c.sortable && (sort === c.key ? <ArrowUp className="h-3 w-3 text-gold" /> : sort === `-${c.key}` ? <ArrowDown className="h-3 w-3 text-gold" /> : <ArrowUpDown className="h-3 w-3 opacity-50" />)}
                       </span>
@@ -102,23 +102,23 @@ export function DataTable({ columns, items = [], total = 0, loading, page = 1, p
                   <tr><td colSpan={cols.length + (selectable ? 1 : 0)} className="p-6">{empty || <EmptyState title="No records found" description="Try adjusting your search or filters." />}</td></tr>
                 ) : <>{virtual && padTop > 0 && <tr style={{ height: padTop }} />}{(virtual ? vrows.map((v) => [items[v.index], v.index]) : items.map((row, idx) => [row, idx])).map(([row, idx]) => (
                   <tr key={row[rowKey] ?? idx} onClick={() => onRowClick?.(row)} data-testid={`${testId}-row-${row[rowKey] ?? idx}`}
-                    className={cn("group border-b border-slate-100 transition-colors hover:bg-ivory", onRowClick && "cursor-pointer", !row.is_active && row.is_active !== undefined && "opacity-60", selected.has(row[rowKey]) && "bg-gold-light/40")}>
+                    className={cn("group border-b border-slate-100 transition-colors hover:bg-warm-50", onRowClick && "cursor-pointer", !row.is_active && row.is_active !== undefined && "opacity-60", selected.has(row[rowKey]) && "bg-gold-light/40")}>
                     {selectable && <td className="px-3" onClick={(e) => e.stopPropagation()}><Checkbox checked={selected.has(row[rowKey])} onCheckedChange={(c) => { const n = new Set(selected); c ? n.add(row[rowKey]) : n.delete(row[rowKey]); onSelect(n); }} data-testid={`${testId}-select-${row[rowKey]}`} /></td>}
-                    {cols.map((c, i) => <td key={c.key} className={cn("px-4 align-middle", dense ? "py-2.5" : "py-3.5", c.align === "right" && "text-right tabular", c.nowrap !== false && "whitespace-nowrap", i === 0 && "sticky left-0 z-[1] bg-white group-hover:bg-ivory", c.className)}>{cell(c, row)}</td>)}
+                    {cols.map((c, i) => <td key={c.key} className={cn("px-4 align-middle", dense ? "py-2.5" : "py-3.5", c.align === "right" && "text-right tabular", c.nowrap !== false && "whitespace-nowrap", i === 0 && "sticky left-0 z-[1] bg-white group-hover:bg-warm-50", c.className)}>{cell(c, row)}</td>)}
                   </tr>
                 ))}{virtual && padBottom > 0 && <tr style={{ height: padBottom }} />}</>}
               </tbody>
-              {footer && !loading && items.length > 0 && <tfoot className="sticky bottom-0 z-10 bg-slate-50"><tr className="border-t-2 border-slate-200 font-semibold text-navy">{selectable && <td />}{cols.map((c, i) => <td key={c.key} className={cn("px-4 py-2.5 whitespace-nowrap", c.align === "right" && "text-right tabular", i === 0 && "sticky left-0 bg-slate-50")}>{footer[c.key] ?? (i === 0 ? "Total" : "")}</td>)}</tr></tfoot>}
+              {footer && !loading && items.length > 0 && <tfoot className="sticky bottom-0 z-10 bg-warm-50"><tr className="border-t-2 border-warm-200 font-semibold text-ink-950">{selectable && <td />}{cols.map((c, i) => <td key={c.key} className={cn("px-4 py-2.5 whitespace-nowrap", c.align === "right" && "text-right tabular", i === 0 && "sticky left-0 bg-warm-50")}>{footer[c.key] ?? (i === 0 ? "Total" : "")}</td>)}</tr></tfoot>}
             </table>
           </div>
         </div>
       )}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-4 py-2.5 text-xs text-slate-600">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-4 py-2.5 text-xs text-txt-secondary">
         <span data-testid={`${testId}-total`}>{total} record{total === 1 ? "" : "s"} · page {page} of {pages}</span>
         <div className="flex items-center gap-2">
-          {setPageSize && <select className="h-7 rounded-md border border-slate-300 bg-white px-1.5 text-xs text-navy" value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} aria-label="Rows per page" data-testid={`${testId}-page-size`}>{pageSizes.map((n) => <option key={n} value={n}>{n} / page</option>)}</select>}
-          <Button variant="outline" size="sm" className="h-7 border-slate-300 px-2 text-navy" disabled={page <= 1} onClick={() => setPage?.(page - 1)} aria-label="Previous page" data-testid={`${testId}-prev`}><ChevronLeft className="h-3.5 w-3.5" /></Button>
-          <Button variant="outline" size="sm" className="h-7 border-slate-300 px-2 text-navy" disabled={page >= pages} onClick={() => setPage?.(page + 1)} aria-label="Next page" data-testid={`${testId}-next`}><ChevronRight className="h-3.5 w-3.5" /></Button>
+          {setPageSize && <select className="h-7 rounded-md border border-slate-300 bg-white px-1.5 text-xs text-ink-950" value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} aria-label="Rows per page" data-testid={`${testId}-page-size`}>{pageSizes.map((n) => <option key={n} value={n}>{n} / page</option>)}</select>}
+          <Button variant="outline" size="sm" className="h-7 border-slate-300 px-2 text-ink-950" disabled={page <= 1} onClick={() => setPage?.(page - 1)} aria-label="Previous page" data-testid={`${testId}-prev`}><ChevronLeft className="h-3.5 w-3.5" /></Button>
+          <Button variant="outline" size="sm" className="h-7 border-slate-300 px-2 text-ink-950" disabled={page >= pages} onClick={() => setPage?.(page + 1)} aria-label="Next page" data-testid={`${testId}-next`}><ChevronRight className="h-3.5 w-3.5" /></Button>
         </div>
       </div>
     </div>

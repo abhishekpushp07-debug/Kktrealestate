@@ -2,6 +2,7 @@
 from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Request, Response
+from pymongo import ReturnDocument
 
 from db import db
 from deps import ensure_project_access, project_scope_filter, require
@@ -451,3 +452,15 @@ async def delete_preset(preset_id: str, user: dict = Depends(require("report.vie
     if not r.deleted_count:
         raise ApiError(404, "Preset not found", "NOT_FOUND")
     return {"ok": True}
+
+
+class PresetPatchIn(StrictModel):
+    name: str
+
+
+@router.patch("/presets/{preset_id}")
+async def rename_preset(preset_id: str, body: PresetPatchIn, user: dict = Depends(require("report.view"))):
+    r = await db.report_presets.find_one_and_update({"id": preset_id, "user_id": user["id"]}, {"$set": {"name": body.name.strip()}}, projection={"_id": 0}, return_document=ReturnDocument.AFTER)
+    if not r:
+        raise ApiError(404, "Preset not found", "NOT_FOUND")
+    return r

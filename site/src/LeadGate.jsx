@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { X, Download, MessageCircle, Check } from "lucide-react";
-import api, { errMsg } from "./lib/api";
+import api, { errMsg, BACKEND } from "./lib/api";
 import { useSite, Img } from "./SiteShell";
 
 const KEY = "sgb_visitor";
@@ -45,7 +45,7 @@ export function BrochureModal({ project, open, onClose }) {
     try {
       const r = await api.post("/public/brochure-requests", { project_slug: project.slug, name: f.name, phone: f.phone, email: f.email || null, consent: f.consent, utm: utm(), website: f.website || null });
       saveVisitor(f);
-      const url = `${process.env.REACT_APP_BACKEND_URL}${r.data.download_url}`;
+      const url = `${BACKEND}${r.data.download_url}`;
       setState({ busy: false, url, err: null });
       const a = document.createElement("a"); a.href = url; a.download = ""; a.rel = "noopener"; document.body.appendChild(a); a.click(); a.remove();
     } catch (err) { setState({ busy: false, url: null, err: errMsg(err, "Could not prepare the brochure") }); }

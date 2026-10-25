@@ -119,12 +119,12 @@ async def seed():
         "name": "Shree Ganesh Heights", "code": "SGH", "description": "Premium high-rise residential towers in the heart of Patna with world-class amenities.",
         "project_type": "Residential", "address": {"line1": "Bailey Road, Near Saguna More", "city": "Patna", "state": "Bihar", "pincode": "801503"},
         "rera_number": "BRERAP00123", "launch_date": "2025-10-15", "expected_possession_date": "2028-12-31", "status": "Under Construction",
-        "amenity_ids": [a["id"] for a in amenities.values()], "milestone_template_id": std_clp["id"], "cover_image_url": None,
+        "amenity_ids": [a["id"] for a in amenities.values()], "milestone_template_id": std_clp["id"], "cover_image_url": None, "default_cash_percent": 60,
         "is_published": False, "show_prices": False, "show_availability": False}, "project")
     ggv = await _insert("projects", cid, {
         "name": "Ganesh Green Villas", "code": "GGV", "description": "Gated community of 4 BHK duplex villas with private gardens.",
         "project_type": "Residential", "address": {"line1": "Danapur-Bihta Road", "city": "Patna", "state": "Bihar", "pincode": "801103"},
-        "rera_number": "BRERAP00188", "launch_date": "2026-01-10", "expected_possession_date": "2028-06-30", "status": "Planning",
+        "rera_number": "BRERAP00188", "launch_date": "2026-01-10", "expected_possession_date": "2028-06-30", "status": "Planning", "default_cash_percent": 0,
         "amenity_ids": [amenities[n]["id"] for n in ("Clubhouse", "24x7 Security", "Landscaped Garden", "Rainwater Harvesting", "Power Backup", "Children's Play Area")],
         "milestone_template_id": villa_clp["id"], "cover_image_url": None, "is_published": False, "show_prices": False, "show_availability": False}, "project")
 

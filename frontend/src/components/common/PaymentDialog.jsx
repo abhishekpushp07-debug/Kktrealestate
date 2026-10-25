@@ -47,7 +47,7 @@ export function PaymentDialog({ open, onOpenChange, booking, onPosted }) {
             {f.against === "FLAT_VALUE" ? <Field label="Bucket" required><Select value={f.payment_category} onValueChange={(v) => set("payment_category", v)}><SelectTrigger data-testid="pay-category"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Cash">Cash</SelectItem><SelectItem value="Account">Account</SelectItem></SelectContent></Select></Field>
               : <Field label="Charge line" required><Select value={f.other_charge_line_id} onValueChange={(v) => set("other_charge_line_id", v)}><SelectTrigger data-testid="pay-charge-line"><SelectValue placeholder="Select charge" /></SelectTrigger><SelectContent>{lines.map((l) => <SelectItem key={l.line_id} value={l.line_id}>{l.name} · {inr(l.total - l.paid)} due</SelectItem>)}</SelectContent></Select></Field>}
           </div>
-          {headroom != null && <p className="text-xs text-slate-500" data-testid="pay-headroom">{f.payment_category} bucket: agreed {inr(f.payment_category === "Cash" ? booking.cash_agreed : booking.account_agreed)} · received {inr(f.payment_category === "Cash" ? s.cash_paid : s.account_paid)} · can accept up to <b className="text-navy">{inr(headroom)}</b></p>}
+          {headroom != null && <p className="text-xs text-txt-secondary" data-testid="pay-headroom">{f.payment_category} bucket: agreed {inr(f.payment_category === "Cash" ? booking.cash_agreed : booking.account_agreed)} · received {inr(f.payment_category === "Cash" ? s.cash_paid : s.account_paid)} · can accept up to <b className="text-ink-950">{inr(headroom)}</b></p>}
           <div className="grid grid-cols-2 gap-3">
             <Field label="Amount (₹)" required><Input type="number" min="1" step="0.01" value={f.amount} onChange={(e) => set("amount", e.target.value)} required data-testid="pay-amount" /></Field>
             <Field label="Payment date" required><DateInput value={f.payment_date} max={today} min={booking?.booking_date} onChange={(e) => set("payment_date", e.target.value)} required data-testid="pay-date" /></Field>
@@ -62,8 +62,8 @@ export function PaymentDialog({ open, onOpenChange, booking, onPosted }) {
             <Field label="Credited to company account" required><Combobox options={banks} value={f.bank_account_id} onChange={(v) => set("bank_account_id", v)} placeholder="Select bank account" testId="pay-bank" /></Field>
           </>}
           <Field label="Remarks"><Input value={f.remarks} onChange={(e) => set("remarks", e.target.value)} data-testid="pay-remarks" /></Field>
-          {(mode?.code === "CHEQUE" || mode?.code === "DD") && <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">Cheque/DD is recorded as <b>Pending</b> (subject to realisation). Clear or bounce it from the Payments page.</p>}
-          <Button type="submit" disabled={busy || !f.payment_mode_id} className="w-full bg-navy hover:bg-navy-700" data-testid="pay-submit">{busy ? "Posting…" : "Post payment"}</Button>
+          {(mode?.code === "CHEQUE" || mode?.code === "DD") && <p className="rounded-md bg-amber2-50 px-3 py-2 text-xs text-amber2">Cheque/DD is recorded as <b>Pending</b> (subject to realisation). Clear or bounce it from the Payments page.</p>}
+          <Button type="submit" disabled={busy || !f.payment_mode_id} className="w-full bg-ink-950 hover:bg-ink-800" data-testid="pay-submit">{busy ? "Posting…" : "Post payment"}</Button>
         </form>
       </DialogContent>
     </Dialog>

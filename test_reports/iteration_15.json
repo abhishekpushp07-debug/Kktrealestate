@@ -1,0 +1,27 @@
+{
+  "summary": "Phase 11F regression (frontend only) — all 5 flagged flows verified end-to-end on the production build. (1) Add customer via v2 CustomerForm: filled cust-name/phone/email + every v2 Select (sel-salutation/gender/residency/state/city/locality/occupation/income/segments/source/bhk/facing/floor/budget) — POST /api/customers → 201 (no 422), PATCH /customers/{id}/profile → 200, lands on /erp/customers/5fd883eb-2e4c-4e31-a22b-8ea28488eb4a. Dependent dropdowns verified: sel-city empty until state picked; State=Bihar → cities = Patna/Gaya/Bhagalpur/Muzaffarpur/… (no Mumbai); City=Patna → localities = Boring Road, Kankarbagh, Bailey Road, Patliputra Colony, etc. GET /api/customers/{id} confirmed residency_id, occupation_id, income_band_id, source_id, state_id, city_id, locality_id, segment_ids and preferences.bhk_ids/facing_ids/floor_preference_id/budget_band_id are all populated with UUIDs, plus annual_income_band='Below ₹5 L' and source='Walk-in' labels present. (2) Booking wizard split prefill: SGH → Tower A → A-802 → customer Amit → Agreement step shows wiz-cash=60, wiz-cash-derived='= ₹40,23,750', wiz-account=2682500, wiz-split-hint='Project default 60% cash · 40% account', percent-mode button active (bg-ink-950 text-white), wiz-cash-slider present, wiz-cash-pct-30 present; GGV → Villa Block P (Premium) → P2 → wiz-cash=0, wiz-cash-derived='= ₹0', wiz-account=10000000, wiz-split-hint='Project default 0% cash · 100% account', slider+pct-30 present. (3) Post Payment cap: /erp/payments → pp-open → picked BK-2526-0008 (Kavita Jha) → category Cash → amount 99999999 → pp-cap turns red (ring-brick, text-brick rgb(180,66,58)) with text 'Account bucket agreed ₹50,00,000; already received ₹5,00,000; cannot accept ₹9,99,99,999. Revise agreement first.' + inline pp-revise-link (href=/erp/bookings/39b4c3ba-01f6-4d0d-b6de-377119a75c9a?revise=1). Clicking link navigates and auto-opens revision-dialog with Cash agreed / Account agreed / Reason / Save revision controls (did not save). (4) Cancel booking: BK-2526-0008 detail → cancel-booking-btn → cancel-dialog opened (cancel-reason, cancel-refund, cancel-submit) → reason 'QA UI cancel', refund 0 → cancel-submit → toast 'Booking cancelled', status pill became 'Cancelled', detail shows 'Cancelled 25 Oct 2026 · QA UI cancel. Refund ₹0 · deduction ₹0'. (5) Regression smoke: /erp/dashboard, /erp/customers, /erp/payments, /erp/service-requests, /erp/reports — 0 console errors each. Zero bugs found; all acceptance criteria met.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "v2 Select options", "issues": ["Each option label renders twice-concatenated in DOM text (e.g. 'PatnaPATNA', 'BiharBIHAR', 'MrMR') — visually fine (second string is likely a hidden search token / badge), but confuses pure textContent based automation and screen readers. Consider wrapping the code suffix in aria-hidden or visually-hidden spans so getByRole('option', {name}) matches on just the label."]}
+    ]
+  },
+  "test_report_links": ["/app/test_reports/iteration_15.json"],
+  "action_items": [
+    "LOW/DESIGN: v2 Select option DOM text is 'LabelCODE' concatenated — hide the code suffix from accessible name / textContent."
+  ],
+  "critical_code_review_comments": [
+    "customer-form POST+PATCH chain now succeeds cleanly — the Phase 11F fix for CustomerIn / ProfileIn accepting catalogue labels & ids works end-to-end.",
+    "Booking wizard default_cash_percent is applied from project setup and the UI reflects it in both input values and the split hint — SGH 60/40 and GGV 0/100 both correct.",
+    "pp-cap red-state message is a single string concatenated with the link text ('…Revise agreement first.Revise agreement'); fine functionally but splitting the link into its own node would make selector-based assertions cleaner."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped per request)", "frontend": "100% — all 5 features in the review request passed"},
+  "test_credentials": "admin@kkt.in / Kkt@12345 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "1) New customer created: id=5fd883eb-2e4c-4e31-a22b-8ea28488eb4a (CUST-2627-0004, 'QA v2 6602', +919777936602). 2) Booking BK-2526-0008 (Kavita Jha, C-301) was CANCELLED via UI with reason 'QA UI cancel', refund ₹0, deduction ₹0 — flat C-301 should now return to Available. Main agent will reseed after this run per the review note, so no cleanup action required.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All Phase 11F regression items are green. Reseed will restore BK-2526-0008 to Active and remove the new QA customer. Script notes for next agent: (a) v2 Select options have duplicated label+code text — scope the search input before clicking a role=option to avoid picking from a stale popover; (b) wizard customer step uses wiz-customer-search input + buttons with testid wiz-customer-<CODE> (not a trigger); (c) pp-pick-<BK-CODE> works directly without opening a dropdown; (d) cancel dialog testids: cancel-booking-btn → cancel-dialog, cancel-reason, cancel-refund, cancel-submit (confirm button)."
+}

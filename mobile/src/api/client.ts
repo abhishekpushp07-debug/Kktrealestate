@@ -6,7 +6,16 @@ import { fetch as expoFetch } from "expo/fetch";
 import { storage } from "@/src/utils/storage";
 import { fileNameFor, toFormDataPart, type LocalFile } from "@/src/utils/upload";
 
-export const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL ?? "";
+// Web: same-origin API (deployed at <domain>/portal) unless running on the expo preview host.
+function resolveBackend(): string {
+  const env = process.env.EXPO_PUBLIC_BACKEND_URL ?? "";
+  if (Platform.OS === "web" && typeof window !== "undefined" && window.location?.origin) {
+    if (window.location.hostname.includes("expo.preview")) return env;
+    return window.location.origin;
+  }
+  return env;
+}
+export const BACKEND = resolveBackend();
 export const API = `${BACKEND}/api/portal`;
 
 const ACCESS = "kkt_portal_token";

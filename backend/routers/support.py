@@ -117,6 +117,7 @@ async def assign_sr(sr_id: str, body: SRAssignIn, request: Request, user: dict =
 
 class SRStatusIn(StrictModel):
     status: str
+    note: str | None = None
 
 
 @router.post("/service-requests/{sr_id}/status")
@@ -127,9 +128,14 @@ async def status_sr(sr_id: str, body: SRStatusIn, request: Request, user: dict =
     upd = {"status": body.status, "updated_at": now_iso()}
     if body.status == "Resolved":
         upd["resolved_at"] = now_iso()
+        if body.note:
+            upd["resolution_note"] = body.note
     if body.status == "Closed":
         upd["closed_at"] = now_iso()
-    await db.service_requests.update_one({"id": sr_id}, {"$set": upd, "$push": {"stage_history": {"from": sr["status"], "to": body.status, "at": now_iso(), "by": user["name"]}}, "$inc": {"version": 1}})
+    push = {"stage_history": {"from": sr["status"], "to": body.status, "at": now_iso(), "by": user["name"], **({"note": body.note} if body.note else {})}}
+    if body.note:
+        push["thread"] = {"by": "staff", "author_name": user["name"], "message": body.note, "internal": True, "at": now_iso(), "attachments": []}
+    await db.service_requests.update_one({"id": sr_id}, {"$set": upd, "$push": push, "$inc": {"version": 1}})
     await write_audit(user, "service.status", "service_request", sr_id, before={"status": sr["status"]}, after={"status": body.status, "ticket_number": sr["ticket_number"], "customer_id": sr["customer_id"]}, ip=client_ip(request))
     return await db.service_requests.find_one({"id": sr_id}, {"_id": 0})
 

@@ -12,12 +12,12 @@ export function Sparkline({ series, width = 240, height = 48 }) {
 export function BrochureStats({ projectId }) {
   const { data } = useFetch(`/site-visits/brochure-stats${projectId ? `?project_id=${projectId}` : ""}`);
   if (!data) return null;
-  return <div className="rounded-xl border bg-white p-4" data-testid="brochure-stats"><div className="flex items-end justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Brochure downloads</p><p className="text-2xl font-bold tabular-nums text-navy" data-testid="brochure-total">{data.total}</p><p className="text-xs text-slate-500">{data.last_30} in the last 30 days</p></div><Sparkline series={data.series} /></div></div>;
+  return <div className="rounded-xl border bg-white p-4" data-testid="brochure-stats"><div className="flex items-end justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-wide text-txt-secondary">Brochure downloads</p><p className="text-2xl font-bold tabular-nums text-ink-950" data-testid="brochure-total">{data.total}</p><p className="text-xs text-txt-secondary">{data.last_30} in the last 30 days</p></div><Sparkline series={data.series} /></div></div>;
 }
 
 export function BrochureLeadsWidget() {
   const { can } = useAuth();
   const { data } = useFetch(can("lead.read") ? "/site-visits/brochure-stats" : null);
   if (!data) return null;
-  return <div className="card-elev mt-6 flex flex-wrap items-center gap-5 p-5" data-testid="brochure-leads-widget"><span className="flex h-11 w-11 items-center justify-center rounded-full bg-gold/15"><BookOpen className="h-5 w-5 text-navy" /></span><div className="min-w-0 flex-1"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Brochure leads this week</p><p className="text-2xl font-bold tabular-nums text-navy" data-testid="brochure-leads-week">{data.brochure_leads_week}</p><p className="text-xs text-slate-500">{data.last_30} downloads in 30 days · <Link to="/leads?source=Brochure&view=list" className="font-semibold text-navy underline">view leads</Link></p></div><Sparkline series={data.series} /></div>;
+  return <div className="card mt-6 flex flex-wrap items-center gap-5 p-5" data-testid="brochure-leads-widget"><span className="flex h-11 w-11 items-center justify-center rounded-full bg-gold/15"><BookOpen className="h-5 w-5 text-ink-950" /></span><div className="min-w-0 flex-1"><p className="text-xs font-semibold uppercase tracking-wide text-txt-secondary">Brochure leads this week</p><p className="text-2xl font-bold tabular-nums text-ink-950" data-testid="brochure-leads-week">{data.brochure_leads_week}</p><p className="text-xs text-txt-secondary">{data.last_30} downloads in 30 days · <Link to="/leads?source=Brochure&view=list" className="font-semibold text-ink-950 underline">view leads</Link></p></div><Sparkline series={data.series} /></div>;
 }

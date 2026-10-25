@@ -34,13 +34,13 @@ function RateCardForm({ projectId, onClose, onSaved }) {
         <SheetHeader><SheetTitle>New rate card</SheetTitle></SheetHeader>
         <div className="mt-6 space-y-4">
           <div className="grid grid-cols-2 gap-3"><Field label="Name" required><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} data-testid="rc-name-input" /></Field><Field label="Effective from"><DateInput value={form.effective_from} onChange={(e) => setForm({ ...form, effective_from: e.target.value })} /></Field></div>
-          <div className="rounded-lg border p-3"><p className="mb-2 text-sm font-bold text-navy">Rates per flat type</p>
+          <div className="rounded-lg border p-3"><p className="mb-2 text-sm font-bold text-ink-950">Rates per flat type</p>
             {flatTypes.map((f) => { const r = form.rates[f.id] || { mode: "rate", value: "" }; return (
               <div key={f.id} className="mb-2 grid grid-cols-[1fr_110px_120px] items-center gap-2"><span className="text-sm">{f.name}</span>
                 <Select value={r.mode} onValueChange={(v) => setForm({ ...form, rates: { ...form.rates, [f.id]: { ...r, mode: v } } })}><SelectTrigger className="h-8"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="rate">₹/sq.ft</SelectItem><SelectItem value="lump">Lump sum</SelectItem></SelectContent></Select>
                 <Input type="number" className="h-8" value={r.value} onChange={(e) => setForm({ ...form, rates: { ...form.rates, [f.id]: { ...r, value: e.target.value } } })} data-testid={`rc-rate-${f.code}`} /></div>); })}
           </div>
-          <div className="rounded-lg border p-3"><p className="mb-2 text-sm font-bold text-navy">PLC rules</p>
+          <div className="rounded-lg border p-3"><p className="mb-2 text-sm font-bold text-ink-950">PLC rules</p>
             {form.plc_rules.map((r, i) => (
               <div key={i} className="mb-2 grid grid-cols-[1fr_120px_90px_80px] items-center gap-2">
                 <Combobox options={plcOptions} value={r.plc_type_id} onChange={(v) => setForm({ ...form, plc_rules: form.plc_rules.map((x, j) => j === i ? { ...x, plc_type_id: v } : x) })} placeholder="PLC type" testId={`rc-plc-${i}`} />
@@ -52,7 +52,7 @@ function RateCardForm({ projectId, onClose, onSaved }) {
               </div>))}
             <Button type="button" variant="outline" size="sm" onClick={() => setForm({ ...form, plc_rules: [...form.plc_rules, { plc_type_id: null, value: "", applies: "all", per_floor: false }] })} data-testid="rc-add-plc"><Plus className="mr-1 h-3.5 w-3.5" />Add PLC rule</Button>
           </div>
-          <Button onClick={submit} disabled={busy} className="w-full bg-navy hover:bg-navy-700" data-testid="rc-submit">Create draft</Button>
+          <Button onClick={submit} disabled={busy} className="w-full bg-ink-950 hover:bg-ink-800" data-testid="rc-submit">Create draft</Button>
         </div>
       </SheetContent>
     </Sheet>
@@ -69,16 +69,16 @@ export function RateCardsTab({ projectId, onApplied }) {
   const items = data?.items || [];
   return (
     <div data-testid="rate-cards-tab">
-      <div className="mb-3 flex items-center justify-between"><p className="text-sm text-slate-600">Rate cards define base rates per flat type plus PLC rules. Only one is Active; applying re-prices Available flats only.</p>{can("flat.write") && <Button size="sm" onClick={() => setOpen(true)} className="bg-navy hover:bg-navy-700" data-testid="new-rate-card-btn"><Plus className="mr-1 h-4 w-4" />New rate card</Button>}</div>
+      <div className="mb-3 flex items-center justify-between"><p className="text-sm text-txt-secondary">Rate cards define base rates per flat type plus PLC rules. Only one is Active; applying re-prices Available flats only.</p>{can("flat.write") && <Button size="sm" onClick={() => setOpen(true)} className="bg-ink-950 hover:bg-ink-800" data-testid="new-rate-card-btn"><Plus className="mr-1 h-4 w-4" />New rate card</Button>}</div>
       {!loading && items.length === 0 ? <EmptyState title="No rate cards" description="Create a rate card to price inventory with PLCs." /> : (
         <div className="grid gap-3 md:grid-cols-2">
           {items.map((rc) => (
-            <div key={rc.id} className="card-elev p-4" data-testid={`rate-card-${rc.id}`}>
-              <div className="flex items-start justify-between"><div><p className="font-bold text-navy">{rc.name}</p><p className="text-xs text-slate-500">Effective {fmtDate(rc.effective_from)} · {rc.rates.length} rates · {rc.plc_rules.length} PLC rules</p></div><Pill tone={rc.status === "Active" ? "green" : rc.status === "Draft" ? "amber" : "slate"}>{rc.status}</Pill></div>
-              {rc.applied_at && <p className="mt-2 text-xs text-slate-500">Applied {fmtDateTime(rc.applied_at)} · {num(rc.applied_count)} flats</p>}
+            <div key={rc.id} className="card p-4" data-testid={`rate-card-${rc.id}`}>
+              <div className="flex items-start justify-between"><div><p className="font-bold text-ink-950">{rc.name}</p><p className="text-xs text-txt-secondary">Effective {fmtDate(rc.effective_from)} · {rc.rates.length} rates · {rc.plc_rules.length} PLC rules</p></div><Pill tone={rc.status === "Active" ? "green" : rc.status === "Draft" ? "amber" : "slate"}>{rc.status}</Pill></div>
+              {rc.applied_at && <p className="mt-2 text-xs text-txt-secondary">Applied {fmtDateTime(rc.applied_at)} · {num(rc.applied_count)} flats</p>}
               {can("flat.write") && <div className="mt-3 flex gap-2">
                 {rc.status === "Draft" && <Button size="sm" variant="outline" onClick={() => act(rc, "activate")} data-testid={`rc-activate-${rc.id}`}><CheckCircle2 className="mr-1 h-3.5 w-3.5" />Activate</Button>}
-                {rc.status === "Active" && <Button size="sm" onClick={() => act(rc, "apply")} className="bg-gold text-navy hover:bg-gold-hover" data-testid={`rc-apply-${rc.id}`}><Play className="mr-1 h-3.5 w-3.5" />Apply to Available flats</Button>}
+                {rc.status === "Active" && <Button size="sm" onClick={() => act(rc, "apply")} className="bg-gold text-ink-950 hover:bg-gold-hover" data-testid={`rc-apply-${rc.id}`}><Play className="mr-1 h-3.5 w-3.5" />Apply to Available flats</Button>}
               </div>}
             </div>
           ))}
@@ -103,24 +103,24 @@ export function ParkingTab({ projectId }) {
   return (
     <div data-testid="parking-tab">
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <div className="flex gap-2 text-xs">{["Available", "Allotted", "Blocked"].map((s) => <span key={s} className="rounded-full border bg-white px-2 py-0.5"><b className="text-navy">{counts[s] || 0}</b> {s}</span>)}</div>
+        <div className="flex gap-2 text-xs">{["Available", "Allotted", "Blocked"].map((s) => <span key={s} className="rounded-full border bg-white px-2 py-0.5"><b className="text-ink-950">{counts[s] || 0}</b> {s}</span>)}</div>
         <div className="ml-auto flex gap-2">
           <Select value={filter} onValueChange={(v) => { setFilter(v); setPage(1); }}><SelectTrigger className="h-9 w-36" data-testid="parking-type-filter"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All types</SelectItem>{["Covered", "Open", "Stilt", "Basement"].map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent></Select>
-          {can("block.write") && <Button size="sm" onClick={() => setOpen(!open)} className="bg-navy hover:bg-navy-700" data-testid="parking-generate-btn"><Plus className="mr-1 h-4 w-4" />Bulk generate</Button>}
+          {can("block.write") && <Button size="sm" onClick={() => setOpen(!open)} className="bg-ink-950 hover:bg-ink-800" data-testid="parking-generate-btn"><Plus className="mr-1 h-4 w-4" />Bulk generate</Button>}
         </div>
       </div>
-      {open && <div className="card-elev mb-4 grid grid-cols-2 gap-3 p-4 md:grid-cols-6" data-testid="parking-generate-form">
+      {open && <div className="card mb-4 grid grid-cols-2 gap-3 p-4 md:grid-cols-6" data-testid="parking-generate-form">
         <Field label="Prefix"><Input value={gen.prefix} onChange={(e) => setGen({ ...gen, prefix: e.target.value })} data-testid="parking-prefix" /></Field><Field label="Start"><Input type="number" value={gen.start} onChange={(e) => setGen({ ...gen, start: e.target.value })} /></Field>
         <Field label="Count"><Input type="number" value={gen.count} onChange={(e) => setGen({ ...gen, count: e.target.value })} data-testid="parking-count" /></Field>
         <Field label="Type"><Select value={gen.type} onValueChange={(v) => setGen({ ...gen, type: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{["Covered", "Open", "Stilt", "Basement"].map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent></Select></Field>
         <Field label="Level"><Input value={gen.level} onChange={(e) => setGen({ ...gen, level: e.target.value })} placeholder="B1" /></Field><Field label="Price ₹"><Input type="number" value={gen.price} onChange={(e) => setGen({ ...gen, price: e.target.value })} /></Field>
-        <Button onClick={generate} className="col-span-2 bg-navy hover:bg-navy-700 md:col-span-6" data-testid="parking-generate-submit">Generate slots</Button>
+        <Button onClick={generate} className="col-span-2 bg-ink-950 hover:bg-ink-800 md:col-span-6" data-testid="parking-generate-submit">Generate slots</Button>
       </div>}
       {loading ? null : <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-8 lg:grid-cols-12" data-testid="parking-grid">
-        {(data?.items || []).map((s) => <div key={s.id} title={`${s.type} · ${s.level || ""} · ₹${num(s.price)}`} className={`rounded border px-1.5 py-1.5 text-center text-[10px] font-semibold ${s.status === "Available" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : s.status === "Allotted" ? "border-navy-700 bg-navy-800 text-white" : "border-slate-300 bg-slate-100 text-slate-600"}`} data-testid={`parking-slot-${s.number}`}>{s.number}</div>)}
+        {(data?.items || []).map((s) => <div key={s.id} title={`${s.type} · ${s.level || ""} · ₹${num(s.price)}`} className={`rounded border px-1.5 py-1.5 text-center text-[10px] font-semibold ${s.status === "Available" ? "border-emerald-200 bg-sage-50 text-sage" : s.status === "Allotted" ? "border-warm-200 bg-ink-800 text-white" : "border-slate-300 bg-warm-50 text-txt-secondary"}`} data-testid={`parking-slot-${s.number}`}>{s.number}</div>)}
       </div>}
       {!loading && data?.total === 0 && <EmptyState title="No parking slots" description="Bulk-generate slots by type and level." />}
-      {!loading && (data?.total || 0) > 100 && <div className="mt-3 flex items-center justify-between text-xs text-slate-500" data-testid="parking-pagination">
+      {!loading && (data?.total || 0) > 100 && <div className="mt-3 flex items-center justify-between text-xs text-txt-secondary" data-testid="parking-pagination">
         <span>Showing {(page - 1) * 100 + 1}–{Math.min(page * 100, data.total)} of {data.total}</span>
         <div className="flex gap-2"><Button size="sm" variant="outline" disabled={page === 1} onClick={() => setPage(page - 1)} data-testid="parking-prev">Prev</Button><Button size="sm" variant="outline" disabled={page * 100 >= data.total} onClick={() => setPage(page + 1)} data-testid="parking-next">Next</Button></div>
       </div>}

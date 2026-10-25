@@ -289,7 +289,7 @@ def fmt_date(d: str) -> str:
 
 def _public_visit(v: dict, p: dict) -> dict:
     cfg = visit_settings(p)
-    token = sign({"t": "visit", "v": v["id"]}, None)
+    token = sign({"t": "visit", "v": v["id"]}, visit_link_minutes(v["date"]))
     return {"visit_number": v["visit_number"], "date": v["date"], "slot": f"{v['slot_start']}–{v['slot_end']}", "slot_start": v["slot_start"], "slot_end": v["slot_end"], "status": v["status"], "name": v["name"], "visitors_count": v["visitors_count"], "project": p["name"],
             "address": cfg["site_office_address"], "maps_url": cfg["maps_url"], "instructions": cfg["instructions"], "ics_url": f"/api/public/site-visits/{token}.ics", "manage_url": f"/visit/{token}", "token": token}
 
@@ -310,11 +310,19 @@ async def public_book(body: VisitPublicIn, request: Request):
     return _public_visit(v, p)
 
 
+def visit_link_minutes(visit_date: str) -> int:
+    """Signed manage/ICS links expire 7 days after the visit date."""
+    end = datetime.combine(date.fromisoformat(visit_date) + timedelta(days=7), datetime.min.time(), tzinfo=IST)
+    return max(1, int((end - datetime.now(IST)).total_seconds() // 60))
+
+
 async def _visit_from_token(token: str) -> tuple[dict, dict]:
     t = unsign(token)
     v = await db.site_visits.find_one({"id": t.get("v")}, {"_id": 0}) if t.get("t") == "visit" else None
     if not v:
         raise ApiError(404, "Visit not found", "NOT_FOUND")
+    if v["status"] in ("Completed", "No-show"):
+        raise ApiError(410, "This link is no longer valid", "LINK_REVOKED")
     return v, await db.projects.find_one({"id": v["project_id"]}, {"_id": 0})
 
 

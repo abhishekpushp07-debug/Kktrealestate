@@ -1,0 +1,27 @@
+Method,Name,Error,Occurrences,First Seen,Last Seen
+GET,/api/bookings?include,CatchResponseError('500'),7,2026-10-24T21:19:57Z,2026-10-24T21:19:58Z
+GET,/api/catalogues,CatchResponseError('0'),26373,2026-10-24T21:17:41Z,2026-10-24T21:22:31Z
+GET,/api/customers/{id},CatchResponseError('0'),26106,2026-10-24T21:17:41Z,2026-10-24T21:22:31Z
+GET,/api/bookings?include,CatchResponseError('0'),31319,2026-10-24T21:17:41Z,2026-10-24T21:22:31Z
+GET,/api/portal/bookings,CatchResponseError('500'),9,2026-10-24T21:19:54Z,2026-10-24T21:19:58Z
+GET,/api/customers/{id}/timeline,CatchResponseError('500'),1003,2026-10-24T21:17:33Z,2026-10-24T21:22:30Z
+GET,/api/catalogues,CatchResponseError('500'),3,2026-10-24T21:19:54Z,2026-10-24T21:19:57Z
+GET,/api/customers/{id}/ledgers,CatchResponseError('500'),6,2026-10-24T21:18:33Z,2026-10-24T21:19:58Z
+GET,/api/portal/notifications,CatchResponseError('0'),25780,2026-10-24T21:17:41Z,2026-10-24T21:22:31Z
+GET,/api/customers/{id}/ledgers,CatchResponseError('0'),25849,2026-10-24T21:17:41Z,2026-10-24T21:22:31Z
+GET,/api/dashboard/snapshot,CatchResponseError('500'),2,2026-10-24T21:19:54Z,2026-10-24T21:19:57Z
+GET,/api/portal/notifications,CatchResponseError('500'),6,2026-10-24T21:19:54Z,2026-10-24T21:19:58Z
+GET,/api/customers/{id}/timeline,CatchResponseError('0'),26149,2026-10-24T21:17:41Z,2026-10-24T21:22:31Z
+GET,/api/search,CatchResponseError('500'),3,2026-10-24T21:19:54Z,2026-10-24T21:19:58Z
+GET,/api/portal/bookings,CatchResponseError('0'),26039,2026-10-24T21:17:41Z,2026-10-24T21:22:31Z
+POST,/api/payments POST,CatchResponseError('0'),5241,2026-10-24T21:17:42Z,2026-10-24T21:22:31Z
+GET,/api/bootstrap,CatchResponseError('500'),17,2026-10-24T21:19:54Z,2026-10-24T21:19:58Z
+GET,/api/blocks/{id}/grid,CatchResponseError('500'),2,2026-10-24T21:19:57Z,2026-10-24T21:19:58Z
+GET,/api/search,CatchResponseError('0'),20754,2026-10-24T21:17:41Z,2026-10-24T21:22:31Z
+POST,/api/payments POST,CatchResponseError('500'),16,2026-10-24T21:18:31Z,2026-10-24T21:19:58Z
+GET,/api/blocks/{id}/grid,CatchResponseError('0'),21199,2026-10-24T21:17:41Z,2026-10-24T21:22:31Z
+GET,/api/bootstrap,CatchResponseError('0'),39451,2026-10-24T21:17:41Z,2026-10-24T21:22:31Z
+GET,/api/portal/me,CatchResponseError('0'),26233,2026-10-24T21:17:41Z,2026-10-24T21:22:31Z
+GET,/api/customers/{id},CatchResponseError('500'),7,2026-10-24T21:19:54Z,2026-10-24T21:19:58Z
+GET,/api/portal/me,CatchResponseError('500'),9,2026-10-24T21:19:54Z,2026-10-24T21:19:58Z
+GET,/api/dashboard/snapshot,CatchResponseError('0'),39481,2026-10-24T21:17:41Z,2026-10-24T21:22:31Z

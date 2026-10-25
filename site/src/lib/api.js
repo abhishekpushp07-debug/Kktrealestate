@@ -1,4 +1,13 @@
-export const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+// Same-origin by default: the committed site artifact must work on billpe.com and in preview.
+function resolveBackend() {
+  const env = (process.env.REACT_APP_BACKEND_URL || "").replace(/\/$/, "");
+  if (typeof window === "undefined") return env;
+  try { if (env && new URL(env).host === window.location.host) return env; } catch { /* ignore */ }
+  return window.location.origin;
+}
+export const BACKEND = resolveBackend();
+export const API = `${BACKEND}/api`;
+export const portalHref = (site) => site?.portal_url || `${typeof window !== "undefined" ? window.location.origin : ""}/portal/`;
 
 async function request(method, path, body) {
   const r = await fetch(`${API}${path}`, { method, headers: body ? { "Content-Type": "application/json" } : undefined, body: body ? JSON.stringify(body) : undefined });

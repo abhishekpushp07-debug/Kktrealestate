@@ -1,0 +1,34 @@
+{
+  "summary": "Phase 11A backend hardening + canonical ERP data model — full regression. Ran /app/backend/tests/test_phase_11a.py (10/10 PASS in 11.9s) and /app/backend/tests/test_index_audit.py + test_startup_migrations.py (42/42 PASS in 7.4s). All 52 Phase 11A backend tests pass, covering: atomic bucket cap race (1x201 + 1x409 BUCKET_EXCEEDS_AGREED, reversal restores cash_paid_paise); last_payment_at ignores reversed; document project_scope (sales user → 404 on other project booking; admin → 200; sales POST → 404); customer erasure (portal is_active=false, login_phone starts erased-, portal login rejected); site-visit signed-link lifecycle (ics_url 200 before complete, 410 after, JWT payload carries exp); catalogues bundle with ETag + 304, max-age=300 on localhost, salutation/state(>=36)/city/locality/bank(>=30)/lead_source/communication_type/projects/blocks/flat_types/payment_plans/users present, inline occupation add by sales (201 + version++), duplicate 409 DUPLICATE_NAME, employee 403; project setup hierarchy (towers/stages/plans/pricing/parking/website/checklist present, bad block_id → 404 TOWER_NOT_IN_PROJECT, unchanged pricing → 200); CRM profile patch (segment/occupation/bhk_preferences accepted; gender id as occupation_id → 422), communications create → last_contacted_at set, timeline cursor paging; three ledgers (cash/account/other_charges/combined summaries with agreed/raised/paid/due/advance/pending_cheques, cash.agreed==booking.cash_agreed_paise, cash.paid+account.paid==summary.paid_paise), customer ledgers with totals; bootstrap (me/permissions/role/project_scope/company/settings_public/catalogues_version/counts) + ETag/304 + X-Request-ID + Server-Timing; include=customer,flat,block,project embeds; limit cursor (total=null + next_cursor; with_total=true → number); fields narrowing; dashboard snapshot units>0 + X-Data-Age; search scope filter + took_ms<50; admin/recompute-read-models counts. Index audit confirms all 15 critical queries use indexes. Startup migrations idempotent against pre-Phase7 DB copy. FRONTEND SMOKE (admin@kkt.in): single login reused, /erp/dashboard renders KPIs + charts, /erp/projects (2 rows) opens project detail, /erp/bookings (10 rows) opens booking detail, /erp/payments shows 20 rows, /erp/customers (12 rows) opens 360 with Profile/KYC/Bookings/Payments/Documents/Leads/History tabs + portal card. 0 console errors across all five pages.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_phase_11a.py",
+    "/app/backend/tests/test_index_audit.py",
+    "/app/backend/tests/test_startup_migrations.py",
+    "/app/test_reports/pytest/phase_11a.xml",
+    "/app/test_reports/pytest/phase_11a_extra.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Phase 11A canonical surface is clean: ETag/304 on bootstrap and catalogues, X-Request-ID + Server-Timing on API responses, X-Data-Age on dashboard snapshot — all confirmed over the preview ingress and (where applicable) localhost for Cache-Control.",
+    "Bucket cap race test is deterministic in 2-thread run: exactly one 201 and one 409 BUCKET_EXCEEDS_AGREED. Reverse endpoint fully restores cash_paid_paise and leaves last_payment_at unchanged — good concurrency correctness.",
+    "Document scope: sales user with project_scope=[A] correctly gets 404 for both GET and POST against bookings/documents of project B; admin unaffected. Multi-tenant isolation at entity-parent level is respected.",
+    "Erasure correctly scrubs portal (is_active=false, login_phone prefixed 'erased-'), and portal login via the original phone is denied. Idempotency preserved via unique Idempotency-Key per POST.",
+    "Signed visit links carry a JWT with 'exp', and GET returns 410 after /site-visits/{id}/complete — expiry + revoke-on-terminal-state both work.",
+    "Catalogue bundle meets inventory requirements (state>=36, bank>=30, all 12 required types). Inline add respects RBAC: sales/accounts/project_admin/super_admin allowed, employee/marketing 403. Duplicate detection returns 409 DUPLICATE_NAME.",
+    "Project setup errors are specific (TOWER_NOT_IN_PROJECT) and unchanged rates return 200 (idempotent save).",
+    "CRM profile cross-catalogue validation: using a gender id where occupation_id is expected → 422 (type-mismatch guarded). Communications update last_contacted_at and surface in timeline (newest first) with correct cursor paging.",
+    "Three ledgers invariants hold: cash.agreed == booking.cash_agreed_paise, cash.paid + account.paid == summary.paid_paise. Row types restricted to {DEMAND,PAYMENT,REVERSAL,AGREEMENT_CHANGE,CANCELLATION}.",
+    "Bootstrap + list include/fields/cursor packeting works as spec'd; total=null in cursor mode unless with_total=true. Dashboard snapshot and search groups are fast (took_ms<50).",
+    "No console errors anywhere in ERP smoke; the pre-existing Phase 9 note about visit-create-dialog defaulting to a past week (iteration_10) was not re-tested here and is outside Phase 11A scope."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (52/52)", "frontend": "100% smoke (5/5 pages, 0 console errors)"},
+  "test_credentials": "admin@kkt.in / Kkt@12345 (reused one token for all frontend checks; backend tests reuse module-level token cache). sales@kkt.in, employee@kkt.in exercised for RBAC assertions in catalogues test.",
+  "seed_data_creation": "test_phase_11a.py creates ephemeral scoped Sales user, one 'Erase Me' customer (then erased), one public site visit, one occupation catalogue item per run — matches existing pattern and does not pollute core seed. Reversal test leaves booking summary.cash_paid_paise unchanged.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Phase 11A is green. Backend canonical surface (bootstrap, catalogues, project_setup, crm profile+communications+timeline, three ledgers, customer ledgers, read models, search, snapshot) is stable and index-covered. Login limiter (10/min/IP) was respected by reusing module-cached tokens. For future runs: run test_phase_11a.py, test_index_audit.py, test_startup_migrations.py individually or together — they share no login burst. ERP UI is unchanged by Phase 11A and continues to work end-to-end.",
+  "rca of the issue": "N/A — no issues found in this iteration."
+}

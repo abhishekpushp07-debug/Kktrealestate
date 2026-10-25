@@ -1,21 +1,22 @@
 import { useState } from "react";
 import { toast } from "sonner";
+import * as Icons from "lucide-react";
 import api, { errMsg } from "@/lib/api";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Field } from "@/components/common/Bits";
+import { Field } from "@/components/v2";
 import { Combobox } from "@/components/common/Combobox";
 import { useMasterOptions } from "@/hooks/useList";
+import { cn } from "@/lib/utils";
 
+const ICONS = ["Waves", "Dumbbell", "Trees", "ShieldCheck", "Camera", "Car", "Flame", "Baby", "Gamepad2", "BookOpen", "Coffee", "Bike", "Sun", "Zap", "Droplets", "Wind", "Lock", "Users", "Music", "Utensils", "Sprout", "Mountain", "Building2", "Footprints"];
+function IconPicker({ value, onChange, testId }) {
+  return <div className="grid grid-cols-8 gap-1.5 rounded-xl border border-warm-200 bg-white p-2" data-testid={testId}>{ICONS.map((n) => { const I = Icons[n]; return <button type="button" key={n} title={n} onClick={() => onChange(value === n ? "" : n)} className={cn("grid h-9 w-full place-items-center rounded-lg transition-colors", value === n ? "bg-ink-950 text-warm-50" : "text-txt-secondary hover:bg-warm-100")} data-testid={`${testId}-${n}`}><I className="h-4 w-4" strokeWidth={1.75} /></button>; })}</div>;
+}
 function MasterCombo({ field, value, onChange }) {
   const { options } = useMasterOptions(field.master);
   return <Combobox options={options} value={value || null} onChange={onChange} testId={`master-field-${field.name}`} />;
 }
-
 const singularOf = (l) => l.replace(/ies$/, "y").replace(/s$/, "");
 
 export function GenericMasterForm({ cfg, item, open, onOpenChange, onSaved, existing = [] }) {
@@ -29,10 +30,8 @@ export function GenericMasterForm({ cfg, item, open, onOpenChange, onSaved, exis
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const nameKey = cfg.fields.find((f) => ["name", "title", "code"].includes(f.name))?.name;
   const dupe = nameKey && form[nameKey] && existing.find((r) => r.id !== item?.id && String(r[nameKey] || "").trim().toLowerCase() === String(form[nameKey]).trim().toLowerCase());
-
   const submit = async (e, addAnother = false) => {
-    e.preventDefault();
-    setBusy(true);
+    e.preventDefault(); setBusy(true);
     const payload = { version: item?.version };
     cfg.fields.forEach((f) => {
       let v = form[f.name];
@@ -49,25 +48,25 @@ export function GenericMasterForm({ cfg, item, open, onOpenChange, onSaved, exis
       if (addAnother) { setForm(init); setSaved((n) => n + 1); document.querySelector('[data-testid="master-form-sheet"] input')?.focus(); } else onOpenChange(false);
     } catch (err) { toast.error(errMsg(err)); } finally { setBusy(false); }
   };
-
+  const inp = "input !h-10";
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-md" data-testid="master-form-sheet">
-        <SheetHeader><SheetTitle>{item ? `Edit ${singular}` : `New ${singular}`}{saved > 0 && <span className="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700" data-testid="master-form-saved-count">{saved} added</span>}</SheetTitle></SheetHeader>
-        <form onSubmit={(e) => submit(e, false)} className="mt-6 space-y-4">
+      <SheetContent className="v2 w-full overflow-y-auto bg-warm-50 sm:max-w-md" data-testid="master-form-sheet">
+        <SheetHeader><p className="label">{cfg.label}</p><SheetTitle className="font-display text-2xl">{item ? `Edit ${singular.toLowerCase()}` : `New ${singular.toLowerCase()}`}{saved > 0 && <span className="pill ml-2 bg-sage-50 text-sage" data-testid="master-form-saved-count">{saved} added</span>}</SheetTitle></SheetHeader>
+        <form onSubmit={(e) => submit(e, false)} className="mt-6 space-y-5">
           {cfg.fields.map((f) => (
-            <Field key={f.name} label={f.label} required={f.required && !(item && f.name === "account_number")} hint={item && f.name === "account_number" ? `Current: ${item.account_number_masked || "—"} · leave blank to keep` : f.hint}>
-              {f.type === "switch" ? <div><Switch checked={!!form[f.name]} onCheckedChange={(c) => set(f.name, c)} data-testid={`master-field-${f.name}`} /></div>
-                : f.type === "select" ? <Select value={form[f.name] || ""} onValueChange={(v) => set(f.name, v)}><SelectTrigger data-testid={`master-field-${f.name}`}><SelectValue placeholder="Select…" /></SelectTrigger><SelectContent>{f.options.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent></Select>
+            <Field key={f.name} label={f.label} required={f.required && !(item && f.name === "account_number")} hint={item && f.name === "account_number" ? `Current: ${item.account_number_masked || "—"} · leave blank to keep` : f.hint} error={f.name === nameKey && dupe ? `A ${singular.toLowerCase()} named “${dupe[nameKey]}” already exists${dupe.is_active === false ? " (inactive)" : ""}.` : undefined}>
+              {f.type === "switch" ? <div className="flex h-10 items-center"><Switch checked={!!form[f.name]} onCheckedChange={(c) => set(f.name, c)} data-testid={`master-field-${f.name}`} /></div>
+                : f.type === "select" ? <select className={inp} value={form[f.name] || ""} onChange={(e) => set(f.name, e.target.value)} data-testid={`master-field-${f.name}`}><option value="">Select…</option>{f.options.map((o) => <option key={o} value={o}>{o}</option>)}</select>
                 : f.type === "master" ? <MasterCombo field={f} value={form[f.name]} onChange={(v) => set(f.name, v)} />
-                : f.type === "textarea" ? <Textarea value={form[f.name] || ""} onChange={(e) => set(f.name, e.target.value)} data-testid={`master-field-${f.name}`} />
-                : <Input type={f.type} value={form[f.name] ?? ""} onChange={(e) => set(f.name, f.upper ? e.target.value.toUpperCase() : e.target.value)} required={f.required && !(item && f.name === "account_number")} aria-invalid={f.name === nameKey && !!dupe} data-testid={`master-field-${f.name}`} />}
-              {f.name === nameKey && dupe && <p className="mt-1 text-xs font-semibold text-amber-700" data-testid="master-dupe-warning">A {singular.toLowerCase()} named “{dupe[nameKey]}” already exists{dupe.is_active === false ? " (inactive)" : ""}.</p>}
+                : f.type === "textarea" ? <textarea className="input min-h-[72px] py-2" value={form[f.name] || ""} onChange={(e) => set(f.name, e.target.value)} data-testid={`master-field-${f.name}`} />
+                : f.name === "icon" ? <IconPicker value={form.icon} onChange={(v) => set("icon", v)} testId="master-icon-picker" />
+                : <input className={cn(inp, f.name === "account_number" && "font-mono")} type={f.type} value={form[f.name] ?? ""} onChange={(e) => set(f.name, f.upper ? e.target.value.toUpperCase() : e.target.value)} required={f.required && !(item && f.name === "account_number")} aria-invalid={f.name === nameKey && !!dupe} placeholder={f.name === "account_number" && item ? item.account_number_masked : undefined} data-testid={`master-field-${f.name}`} />}
             </Field>
           ))}
-          <div className="flex gap-2">
-            <Button type="submit" disabled={busy} className="flex-1 bg-navy hover:bg-navy-700" data-testid="master-form-submit">{item ? "Save changes" : "Create"}</Button>
-            {!item && <Button type="button" variant="outline" disabled={busy} onClick={(e) => submit(e, true)} data-testid="master-form-submit-another">Save & add another</Button>}
+          <div className="flex gap-2 pt-2">
+            <button type="submit" disabled={busy} className="btn btn-primary flex-1" data-testid="master-form-submit">{item ? "Save changes" : "Create"}</button>
+            {!item && <button type="button" className="btn btn-secondary" disabled={busy} onClick={(e) => submit(e, true)} data-testid="master-form-submit-another">Save & add another</button>}
           </div>
         </form>
       </SheetContent>

@@ -68,6 +68,7 @@ def _cap_error(category: str, agreed: int, paid: int, amount: int):
 
 
 async def _check_cap(booking: dict, p: dict):
+    """Soft pre-check (fast, friendly error). The atomic guard is `reserve_cap`."""
     if booking["status"] != "Active":
         raise ApiError(409, f"Booking is {booking['status']}; payments are not accepted", "BOOKING_NOT_ACTIVE")
     if p["against"] == "FLAT_VALUE":
@@ -85,9 +86,53 @@ async def _check_cap(booking: dict, p: dict):
             raise ApiError(409, f"{line['name']}: total {inr(line['total_paise'])}; already received {inr(paid)}; cannot accept {inr(p['amount_paise'])}.", "CHARGE_EXCEEDS_TOTAL")
 
 
+async def reserve_cap(booking: dict, p: dict) -> dict:
+    """Atomic bucket cap: a guarded conditional update on the booking's paid counters (summary.* / other_charges.$.paid_paise)
+    increments the counter only while `paid + amount <= agreed`. Two concurrent posts can never both pass. Returns the inverse
+    update (compensation) to apply if the payment insert fails."""
+    amt = p["amount_paise"]
+    if p["against"] == "FLAT_VALUE":
+        cat = p["payment_category"]
+        agreed = booking["cash_agreed_paise"] if cat == "Cash" else booking["account_agreed_paise"]
+        field = "summary.cash_paid_paise" if cat == "Cash" else "summary.account_paid_paise"
+        inc = {field: amt, "summary.paid_paise": amt}
+        res = await db.bookings.update_one({"id": booking["id"], "status": "Active", field: {"$lte": agreed - amt}}, {"$inc": inc})
+        if not res.matched_count:
+            fresh = await db.bookings.find_one({"id": booking["id"]}, {"_id": 0, "status": 1, "summary": 1})
+            if not fresh or fresh["status"] != "Active":
+                raise ApiError(409, "Booking is not active; payments are not accepted", "BOOKING_NOT_ACTIVE")
+            raise _cap_error(cat, agreed, (fresh.get("summary") or {}).get(field.split(".")[1], 0), amt)
+        return {"$inc": {k: -v for k, v in inc.items()}}
+    line = next((l for l in booking.get("other_charges") or [] if l["line_id"] == p["other_charge_line_id"]), None)
+    if not line:
+        raise ApiError(404, "Other charge line not found on booking", "NOT_FOUND")
+    res = await db.bookings.update_one({"id": booking["id"], "status": "Active", "other_charges": {"$elemMatch": {"line_id": line["line_id"], "paid_paise": {"$lte": line["total_paise"] - amt}}}},
+                                       {"$inc": {"other_charges.$.paid_paise": amt}})
+    if not res.matched_count:
+        raise ApiError(409, f"{line['name']}: total {inr(line['total_paise'])}; already received {inr(await line_paid(booking['id'], line['line_id']))}; cannot accept {inr(amt)}.", "CHARGE_EXCEEDS_TOTAL")
+    return {"$inc": {"other_charges.$[l].paid_paise": -amt}, "_af": [{"l.line_id": line["line_id"]}]}
+
+
+async def _compensate(booking_id: str, comp: dict):
+    af = comp.pop("_af", None)
+    await db.bookings.update_one({"id": booking_id}, comp, **({"array_filters": af} if af else {}))
+
+
 async def _payment_totals(q: dict) -> dict:
     agg = await db.payments.aggregate([{"$match": q}, {"$group": {"_id": "$status", "n": {"$sum": 1}, "s": {"$sum": "$amount_paise"}}}]).to_list(None)
     return present_money({a["_id"]: {"count": a["n"], "amount_paise": a["s"]} for a in agg})
+
+
+@router.get("/demands")
+async def list_open_demands(params: ListParams = Depends(), status: str | None = None, project_id: str | None = None, user: dict = Depends(require("payment.read"))):
+    q = {"company_id": user["company_id"], **project_scope_filter(user), "voided": {"$ne": True}, **search_filter(params.search, ["customer_name", "demand_number", "booking_number"])}
+    if status:
+        q["status"] = {"$in": status.split(",")}
+    if project_id:
+        q["project_id"] = project_id
+    res = await paginate(db.demands, q, params, params.sort_spec(["due_date", "demand_date", "total_demand_paise", "customer_name"], "due_date"))
+    res["items"] = present_money(res["items"])
+    return res
 
 
 @router.get("/summary")
@@ -114,7 +159,8 @@ async def list_payments(params: ListParams = Depends(), project_id: str | None =
         return await _payment_totals(q)
     res = await paginate(db.payments, q, params, params.sort_spec(["payment_date", "receipt_number", "amount_paise", "status", "created_at"], "-payment_date"))
     res["totals"] = await _payment_totals(q)
-    res["items"] = present_money(res["items"])
+    from services.includes import expand
+    res["items"] = present_money(await expand(res["items"], params.include, "payments"))
     if res.pop("_csv", False):
         return Response(to_csv([{**i, "instrument_number": (i.get("instrument") or {}).get("number")} for i in res["items"]], ["receipt_number", "payment_date", "customer_name", "booking_number", "flat_number", "against", "payment_category", "payment_mode_name", "instrument_number", "amount", "status"]), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=payments.csv"})
     return res
@@ -152,13 +198,14 @@ async def post_payment(body: PaymentIn, request: Request, user: dict = Depends(r
          "remarks": body.remarks, "received_by": user["id"], "received_by_name": user["name"], "status": status, "cleared_at": ts if status == "Cleared" else None, "bounced_at": None, "reversal": None,
          "idempotency_key": request.headers.get("idempotency-key"), "posted_at": ts}
     await _check_cap(booking, p)
-    async with unit_of_work() as uow:
-        await db.payments.insert_one(p, **uow.kw())
-        uow.on_rollback(lambda: db.payments.delete_one({"id": p["id"]}))
-        p.pop("_id", None)
-        if status == "Cleared" and body.against == "FLAT_VALUE":
-            field = "summary.cash_paid_paise" if body.payment_category == "Cash" else "summary.account_paid_paise"
-            await db.bookings.update_one({"id": booking["id"]}, {"$inc": {field: p["amount_paise"], "summary.paid_paise": p["amount_paise"]}}, **uow.kw())
+    comp = await reserve_cap(booking, p) if status == "Cleared" else None
+    try:
+        await db.payments.insert_one(p)
+    except Exception:
+        if comp:
+            await _compensate(booking["id"], comp)
+        raise
+    p.pop("_id", None)
     await rebuild(booking["id"])
     await write_audit(user, "payment.post", "payment", p["id"], after={k: p[k] for k in ("id", "receipt_number", "amount_paise", "payment_category", "against", "status", "payment_mode_name")}, ip=client_ip(request))
     await write_audit(user, "payment.post", "booking", booking["id"], after={"receipt_number": p["receipt_number"], "amount_paise": p["amount_paise"], "category": p["payment_category"], "status": status}, ip=client_ip(request))
@@ -198,8 +245,12 @@ async def clear_payment(payment_id: str, request: Request, user: dict = Depends(
         raise ApiError(409, f"Payment is {p['status']}", "NOT_PENDING")
     booking = await get_or_404(db.bookings, p["booking_id"], "Booking")
     await _check_cap(booking, p)
+    comp = await reserve_cap(booking, p)
     ts = now_iso()
-    await db.payments.update_one({"id": payment_id, "status": "Pending"}, {"$set": {"status": "Cleared", "cleared_at": ts, "cleared_by": user["id"], "posted_at": ts, "updated_at": ts}, "$inc": {"version": 1}})
+    res = await db.payments.update_one({"id": payment_id, "status": "Pending"}, {"$set": {"status": "Cleared", "cleared_at": ts, "cleared_by": user["id"], "posted_at": ts, "updated_at": ts}, "$inc": {"version": 1}})
+    if not res.matched_count:
+        await _compensate(booking["id"], comp)
+        raise ApiError(409, "Payment is no longer pending", "NOT_PENDING")
     await rebuild(p["booking_id"])
     await write_audit(user, "payment.clear", "payment", payment_id, before={"status": "Pending"}, after={"status": "Cleared", "receipt_number": p["receipt_number"]}, ip=client_ip(request))
     return present_money(await db.payments.find_one({"id": payment_id}, {"_id": 0}))

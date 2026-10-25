@@ -9,17 +9,17 @@ export function PageHeader({ title, subtitle, crumbs = [], actions, testId }) {
     <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between fade-up" data-testid={testId}>
       <div className="min-w-0">
         {crumbs.length > 0 && (
-          <nav className="mb-1.5 flex flex-wrap items-center gap-1 text-xs text-slate-500" aria-label="Breadcrumb">
+          <nav className="mb-1.5 flex flex-wrap items-center gap-1 text-xs text-txt-secondary" aria-label="Breadcrumb">
             {crumbs.map((c, i) => (
               <span key={i} className="flex items-center gap-1">
-                {c.to ? <Link to={c.to} className="hover:text-navy">{c.label}</Link> : <span className="font-medium text-navy">{c.label}</span>}
+                {c.to ? <Link to={c.to} className="hover:text-ink-950">{c.label}</Link> : <span className="font-medium text-ink-950">{c.label}</span>}
                 {i < crumbs.length - 1 && <ChevronRight className="h-3 w-3" />}
               </span>
             ))}
           </nav>
         )}
-        <h1 className="text-2xl font-semibold text-navy sm:text-[26px]">{title}</h1>
-        {subtitle && <p className="mt-1 text-sm text-slate-600">{subtitle}</p>}
+        <h1 className="font-display text-4xl text-ink-950">{title}</h1>
+        {subtitle && <p className="mt-2 text-sm text-txt-secondary">{subtitle}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
@@ -28,26 +28,27 @@ export function PageHeader({ title, subtitle, crumbs = [], actions, testId }) {
 
 export function EmptyState({ title = "Nothing here yet", description, actionLabel, onAction, icon: Icon = Inbox, testId }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white/60 px-6 py-14 text-center" data-testid={testId}>
-      <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-navy-50 text-navy-700"><Icon className="h-6 w-6" /></div>
-      <h3 className="text-[15px] font-semibold text-navy">{title}</h3>
-      {description && <p className="mt-1 max-w-sm text-sm text-slate-600">{description}</p>}
-      {actionLabel && <Button onClick={onAction} className="mt-4 bg-navy hover:bg-navy-700" data-testid={testId ? `${testId}-action` : undefined}>{actionLabel}</Button>}
+    <div className="card flex flex-col items-center justify-center px-6 py-14 text-center" data-testid={testId}>
+      <span className="icon-tile mb-3 h-14 w-14 rounded-2xl"><Icon className="!h-6 !w-6" /></span>
+      <h3 className="font-display text-lg text-ink-950">{title}</h3>
+      {description && <p className="mt-1 max-w-sm text-sm text-txt-secondary">{description}</p>}
+      {actionLabel && <Button onClick={onAction} className="mt-4 bg-ink-950 hover:bg-ink-800" data-testid={testId ? `${testId}-action` : undefined}>{actionLabel}</Button>}
     </div>
   );
 }
 
 export function StatCard({ label, value, hint, icon: Icon, accent = "navy", delta, testId, className }) {
-  const accents = { navy: "bg-navy text-white", gold: "gold-grad text-navy", green: "bg-emerald-600 text-white", amber: "bg-amber-500 text-white", slate: "bg-slate-600 text-white", red: "bg-red-600 text-white" };
+  const tones = { navy: undefined, gold: "gold", green: "sage", emerald: "sage", amber: "amber", slate: undefined, red: "brick" };
+  const str = typeof value === "string" ? value : null;
   return (
-    <div className={cn("card-elev card-hover flex items-start justify-between gap-3 p-5 fade-up", className)} data-testid={testId}>
+    <div className={cn("card flex items-center justify-between gap-4 !p-5", className)} data-testid={testId}>
       <div className="min-w-0">
-        <p className="label-xs">{label}</p>
-        <p className="mt-2 break-words text-[22px] font-bold leading-tight tabular text-navy xl:text-2xl">{value}</p>
-        {delta != null && <p className={cn("mt-1 inline-flex items-center gap-1 text-xs font-semibold", delta >= 0 ? "text-emerald-700" : "text-red-700")}>{delta >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}{delta >= 0 ? "+" : ""}{delta}% vs last month</p>}
-        {hint && <p className="mt-1 text-xs leading-snug text-slate-600">{hint}</p>}
+        <p className="stat-label">{label}</p>
+        <p className={cn("stat-value font-display text-ink-950", accent === "red" && "text-brick", (accent === "green" || accent === "emerald") && "text-sage")}>{str ? (str.startsWith("₹") ? <><span className="rs">₹</span>{str.slice(1)}</> : str) : value}</p>
+        {delta != null && <p className={cn("mt-1 inline-flex items-center gap-1 text-xs font-semibold", delta >= 0 ? "text-sage" : "text-brick")}>{delta >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}{delta >= 0 ? "+" : ""}{delta}% vs last month</p>}
+        {hint && <p className="stat-hint truncate">{hint}</p>}
       </div>
-      {Icon && <div className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl", accents[accent])}><Icon className="h-5 w-5" /></div>}
+      {Icon && <span className={cn("icon-tile", tones[accent])}><Icon /></span>}
     </div>
   );
 }
@@ -55,10 +56,10 @@ export function StatCard({ label, value, hint, icon: Icon, accent = "navy", delt
 export function Field({ label, children, hint, error, required, className }) {
   return (
     <div className={cn("space-y-1.5", className)}>
-      {label && <label className="text-xs font-semibold text-slate-600">{label}{required && <span className="text-red-600"> *</span>}</label>}
+      {label && <label className="text-xs font-semibold text-txt-secondary">{label}{required && <span className="text-brick"> *</span>}</label>}
       {children}
-      {hint && !error && <p className="text-xs text-slate-500">{hint}</p>}
-      {error && <p className="text-xs text-red-600" role="alert">{error}</p>}
+      {hint && !error && <p className="text-xs text-txt-secondary">{hint}</p>}
+      {error && <p className="text-xs text-brick" role="alert">{error}</p>}
     </div>
   );
 }
@@ -67,7 +68,7 @@ export function KV({ label, value, mono }) {
   return (
     <div className="flex flex-col gap-0.5">
       <span className="label-xs">{label}</span>
-      <span className={cn("text-sm font-semibold leading-snug text-navy", mono && "tabular")}>{value ?? "—"}</span>
+      <span className={cn("text-sm font-semibold leading-snug text-ink-950", mono && "tabular")}>{value ?? "—"}</span>
     </div>
   );
 }
@@ -79,9 +80,9 @@ export function Money({ value, short = false, className }) {
 }
 
 const BADGE = {
-  Available: "bg-emerald-100 text-emerald-900", Hold: "bg-amber-100 text-amber-900", Booked: "bg-navy text-white", Sold: "bg-gold text-navy", Blocked: "bg-slate-200 text-slate-800",
-  Active: "bg-emerald-100 text-emerald-900", Cancelled: "bg-red-100 text-red-900", Completed: "bg-navy text-white", Pending: "bg-slate-200 text-slate-800", "In Progress": "bg-amber-100 text-amber-900",
-  Open: "bg-blue-100 text-blue-900", "Partially Paid": "bg-amber-100 text-amber-900", "Partially paid": "bg-amber-100 text-amber-900", Paid: "bg-emerald-100 text-emerald-900", Overdue: "bg-red-100 text-red-900", Voided: "bg-slate-200 text-slate-700", Raised: "bg-blue-100 text-blue-900", "Not yet due": "bg-slate-200 text-slate-800",
+  Available: "bg-emerald-100 text-emerald-900", Hold: "bg-amber-100 text-amber-900", Booked: "bg-ink-950 text-white", Sold: "bg-gold text-ink-950", Blocked: "bg-slate-200 text-slate-800",
+  Active: "bg-emerald-100 text-emerald-900", Cancelled: "bg-red-100 text-red-900", Completed: "bg-ink-950 text-white", Pending: "bg-slate-200 text-slate-800", "In Progress": "bg-amber-100 text-amber-900",
+  Open: "bg-blue-100 text-blue-900", "Partially Paid": "bg-amber-100 text-amber-900", "Partially paid": "bg-amber-100 text-amber-900", Paid: "bg-emerald-100 text-emerald-900", Overdue: "bg-red-100 text-red-900", Voided: "bg-slate-200 text-txt-secondary", Raised: "bg-blue-100 text-blue-900", "Not yet due": "bg-slate-200 text-slate-800",
   Cleared: "bg-emerald-100 text-emerald-900", Bounced: "bg-red-100 text-red-900", Reversed: "bg-slate-200 text-slate-800",
   Planning: "bg-slate-200 text-slate-800", "Under Construction": "bg-amber-100 text-amber-900", "Ready to Move": "bg-emerald-100 text-emerald-900", Launched: "bg-blue-100 text-blue-900",
   "KYC Submitted": "bg-amber-100 text-amber-900", "KYC Verified": "bg-emerald-100 text-emerald-900", "KYC Pending": "bg-slate-200 text-slate-800",

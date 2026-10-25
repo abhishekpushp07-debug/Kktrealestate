@@ -24,7 +24,8 @@ class ReseedIn(StrictModel):
 
 
 BUSINESS_COLLECTIONS = ["construction_stages", "payment_plans", "payment_plan_assignments", "portal_accounts", "portal_refresh_tokens", "service_requests", "service_categories", "notices", "construction_photos", "notifications", "projects", "blocks", "flats", "rate_cards", "parking_slots", "customers", "leads", "bookings", "payments", "demands", "ledger_entries", "contra_entries", "documents",
-                        "cms_banners", "cms_testimonials", "cms_gallery", "cms_posts", "cms_pages", "cms_people", "cms_faqs", "cms_media", "site_settings", "counters", "idempotency_keys", "import_batches"]
+                        "cms_banners", "cms_testimonials", "cms_gallery", "cms_posts", "cms_pages", "cms_people", "cms_faqs", "cms_media", "site_settings", "counters", "idempotency_keys", "import_batches",
+                        "catalogue_items", "communications", "project_summaries", "block_summaries", "customer_summaries", "dashboard_snapshots", "cache", "report_cache"]
 
 
 @router.post("/reseed")
@@ -55,10 +56,15 @@ async def reseed(body: ReseedIn, request: Request, user: dict = Depends(require(
     await seed_marketing_user()
     from seed_phase5 import seed_phase5
     await seed_phase5()
-    await db.settings.delete_many({"key": {"$in": ["migration_phase7_done", "seed_phase7_done"]}})
+    await db.settings.delete_many({"key": {"$in": ["migration_phase7_done", "seed_phase7_done", "read_models_v1", "customers_profile_v1"]}})
     from migrate_phase7 import migrate_phase7, seed_phase7
     await migrate_phase7()
     await seed_phase7()
+    from routers.catalogues import seed_catalogues
+    await seed_catalogues()
+    await db.settings.delete_many({"key": {"$in": ["customers_profile_v1"]}})
+    from startup_phase11 import startup_phase11
+    await startup_phase11()
     await db.settings.update_one({"key": "roles_version"}, {"$inc": {"value": 1}}, upsert=True)
     await recompute_all()
     await write_audit(user, "admin.reseed", "system", "seed", after={"collections": BUSINESS_COLLECTIONS}, ip=client_ip(request))
@@ -149,6 +155,11 @@ async def erase_customer(customer_id: str, body: EraseIn, request: Request, user
     await db.payments.update_many({"customer_id": customer_id}, {"$set": {"customer_name": anon}})
     await db.leads.update_many({"converted_customer_id": customer_id}, {"$set": {"name": anon, "phone": pii["phone"], "email": None}})
     await db.documents.update_many({"entity_type": "customer", "entity_id": customer_id}, {"$set": {"is_active": False, "deleted_at": now_iso()}})
+    await db.portal_accounts.update_many({"customer_id": customer_id}, {"$set": {"is_active": False, "login_phone": f"erased-{c['customer_code']}", "password_hash": None, "erased_at": now_iso()}})
+    await db.portal_refresh_tokens.delete_many({"customer_id": customer_id})
+    await db.service_requests.update_many({"customer_id": customer_id}, {"$set": {"customer_name": anon, "customer_phone": pii["phone"], "thread.$[m].author_name": anon, "thread.$[m].message": "[erased]"}},
+                                          array_filters=[{"m.by": "customer"}])
+    await db.communications.update_many({"customer_id": customer_id}, {"$set": {"notes": "[erased]"}})
     await write_audit(user, "customer.erase", "customer", customer_id, before={"customer_code": c["customer_code"]}, after={"reason": body.reason, "anonymised": True}, ip=client_ip(request))
     return {"ok": True, "customer_code": c["customer_code"], "anonymised_name": anon}
 

@@ -1,113 +1,110 @@
-import { useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { NotificationBell } from "@/components/common/NotificationBell";
-import { BarChart3, Building2, CalendarDays, ChevronLeft, ChevronRight, Database, Grid3X3, LayoutDashboard, LogOut, Search, Settings, ShieldCheck, History, Users, KeyRound, Menu, UserRound, Funnel, FileSignature, Receipt, BookOpenText, Globe , LifeBuoy } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { BarChart3, Bell, Building2, CalendarDays, ChevronLeft, ChevronRight, FileSignature, Funnel, Globe, Home, KeyRound, LifeBuoy, LogOut, Menu, Plus, Receipt, Search, Settings, UserRound, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { initials } from "@/lib/format";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
 import { ChangePasswordDialog } from "@/components/common/ChangePasswordDialog";
 import { CommandPalette } from "@/components/common/CommandPalette";
 import { VersionConflictDialog } from "@/components/common/VersionConflictDialog";
+import { NotificationBell } from "@/components/common/NotificationBell";
 
 const NAV = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, perm: "project.read" },
-  { to: "/projects", label: "Projects", icon: Building2, perm: "project.read" },
-  { to: "/flats", label: "Inventory", icon: Grid3X3, perm: "project.read" },
-  { to: "/customers", label: "Customers", icon: UserRound, perm: "customer.read", match: "/customers" },
-  { to: "/leads", label: "Leads", icon: Funnel, perm: "lead.read" },
-  { to: "/site-visits", label: "Site Visits", icon: CalendarDays, perm: "visit.read" },
-  { to: "/bookings", label: "Bookings", icon: FileSignature, perm: "booking.read", match: "/bookings" },
-  { to: "/payments", label: "Payments", icon: Receipt, perm: "payment.read" },
-  { to: "/roznamcha", label: "Roznamcha", icon: BookOpenText, perm: "payment.read" },
-  { to: "/reports", label: "Reports", icon: BarChart3, perm: "report.view", match: "/reports" },
-  { to: "/service-requests", label: "Service Requests", icon: LifeBuoy, perm: "service.read", match: "/service-requests" },
-  { to: "/master/flat-types", label: "Master Data", icon: Database, perm: "master.read", match: "/master" },
-  { to: "/users", label: "Users", icon: Users, perm: "users.manage" },
-  { to: "/roles", label: "Roles", icon: ShieldCheck, perm: "roles.manage" },
-  { to: "/audit", label: "Audit Log", icon: History, perm: "audit.view" },
-  { to: "/settings", label: "Settings", icon: Settings, perm: "settings.manage" },
-  { to: "/website/settings", label: "Website", icon: Globe, perm: "cms.read", match: "/website" },
+  { to: "/dashboard", label: "Home", icon: Home, perm: "project.read" },
+  { to: "/projects", label: "Projects", icon: Building2, perm: "project.read", match: ["/projects", "/blocks", "/flats"] },
+  { to: "/customers", label: "Customers", icon: UserRound, perm: "customer.read", match: ["/customers"] },
+  { to: "/leads", label: "Leads & Visits", icon: Funnel, perm: "lead.read", match: ["/leads", "/site-visits"] },
+  { to: "/bookings", label: "Bookings", icon: FileSignature, perm: "booking.read", match: ["/bookings"] },
+  { to: "/payments", label: "Payments", icon: Receipt, perm: "payment.read", match: ["/payments", "/roznamcha"] },
+  { to: "/service-requests", label: "Service", icon: LifeBuoy, perm: "service.read", match: ["/service-requests"] },
+  { to: "/reports", label: "Reports", icon: BarChart3, perm: "report.view", match: ["/reports"] },
+  { to: "/website/settings", label: "Website", icon: Globe, perm: "cms.read", match: ["/website"] },
+  { to: "/settings", label: "Settings", icon: Settings, perm: "settings.manage", match: ["/settings", "/users", "/roles", "/audit", "/master"] },
 ];
+const QUICK = [["Booking", "/bookings/new", "booking.create"], ["Customer", "/customers?new=1", "customer.write"], ["Payment", "/payments?new=1", "payment.create"], ["Lead", "/leads?new=1", "lead.write"], ["Visit", "/site-visits?new=1", "visit.write"]];
+const CRUMB = { dashboard: "Home", projects: "Projects", customers: "Customers", leads: "Leads", "site-visits": "Site Visits", bookings: "Bookings", payments: "Payments", roznamcha: "Roznamcha", reports: "Reports", "service-requests": "Service", website: "Website", settings: "Settings", users: "Users", roles: "Roles", audit: "Audit log", master: "Catalogues", blocks: "Tower", flats: "Inventory", new: "New", setup: "Setup", catalogues: "Catalogues", "flat-types": "Flat types", "floor-plan-templates": "Floor plans", "plc-types": "PLC types", "spec-categories": "Spec categories", "spec-items": "Spec items", "room-types": "Room types", "area-types": "Area types", "block-types": "Block types", amenities: "Amenities", "construction-stages": "Construction stages", "payment-plans": "Payment plans", "charge-types": "Charge types", "payment-modes": "Payment modes", "bank-accounts": "Bank accounts", "document-types": "Document types" };
 
-function Sidebar({ collapsed, setCollapsed }) {
-  const { can, company } = useAuth();
+function Sidebar({ collapsed, setCollapsed, mobile, onClose }) {
+  const { can, company, user } = useAuth();
+  const loc = useLocation();
   return (
-    <aside className={cn("fixed inset-y-0 left-0 z-30 hidden flex-col bg-navy text-white transition-[width] duration-200 md:flex", collapsed ? "w-[72px]" : "w-[260px]")} data-testid="sidebar">
-      <div className="flex h-16 items-center gap-3 border-b border-white/10 px-4">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gold font-extrabold text-navy">K</div>
-        {!collapsed && <div className="min-w-0"><p className="truncate text-base font-extrabold tracking-wide">KKT</p><p className="truncate text-[11px] text-slate-400">{company?.name || "Real Estate ERP"}</p></div>}
+    <aside className={cn("flex h-full flex-col bg-ink-950 text-warm-50", collapsed ? "w-[72px]" : "w-[260px]")} data-testid="sidebar">
+      <div className="flex h-[72px] items-center gap-3 px-5">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-gold/40 font-display text-lg text-gold-400">K</span>
+        {!collapsed && <div className="min-w-0"><p className="font-display text-xl leading-none tracking-wide">KKT</p><p className="mt-1 truncate text-[11px] text-warm-200/50">{company?.name}</p></div>}
+        {mobile && <button onClick={onClose} className="ml-auto text-warm-200/70" aria-label="Close menu"><X className="h-5 w-5" /></button>}
       </div>
-      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-        {NAV.filter((n) => can(n.perm)).map((n) => (
-          <NavLink key={n.to} to={n.to} data-testid={`nav-${n.label.toLowerCase().replace(/\s+/g, "-")}`}
-            className={({ isActive }) => cn("nav-item", (isActive || (n.match && window.location.pathname.startsWith(n.match))) && "active", collapsed && "justify-center px-0")} title={n.label}>
-            <n.icon className="h-[18px] w-[18px] shrink-0" />{!collapsed && <span>{n.label}</span>}
-          </NavLink>
-        ))}
+      <div className="hero-hair mx-5" />
+      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-5">
+        {NAV.filter((n) => can(n.perm)).map((n) => {
+          const active = loc.pathname.startsWith(n.to) || (n.match || []).some((m) => loc.pathname.startsWith(m));
+          return <NavLink key={n.to} to={n.to} onClick={onClose} className={cn("sb-item", active && "active", collapsed && "justify-center px-0")} data-testid={`nav-${n.label.toLowerCase().replace(/[^a-z]+/g, "-")}`} title={n.label}><n.icon className="h-5 w-5 shrink-0" strokeWidth={1.75} />{!collapsed && <span>{n.label}</span>}</NavLink>;
+        })}
       </nav>
-      <button onClick={() => setCollapsed(!collapsed)} className="flex h-12 items-center justify-center border-t border-white/10 text-slate-400 hover:text-white" data-testid="sidebar-toggle">
-        {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-      </button>
+      <div className="border-t border-white/5 p-3">
+        <div className={cn("flex items-center gap-3 rounded-xl px-2 py-2", collapsed && "justify-center")}>
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-ink-700 text-xs font-bold text-gold-400">{initials(user?.name)}</span>
+          {!collapsed && <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{user?.name}</p><p className="truncate text-[11px] text-warm-200/50">{user?.role_name}</p></div>}
+        </div>
+        {!mobile && <button onClick={() => setCollapsed(!collapsed)} className="mt-1 flex h-9 w-full items-center justify-center rounded-lg text-warm-200/50 hover:bg-white/5 hover:text-warm-50" data-testid="sidebar-toggle" aria-label="Toggle sidebar">{collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}</button>}
+      </div>
     </aside>
   );
 }
 
+function Crumbs() {
+  const parts = useLocation().pathname.split("/").filter(Boolean);
+  return (
+    <nav className="hidden min-w-0 items-center gap-1 text-[13px] text-txt-secondary md:flex" aria-label="Breadcrumb">
+      {parts.slice(0, 3).map((p, i) => <span key={i} className="flex items-center gap-1">{i > 0 && <ChevronRight className="h-3.5 w-3.5 text-txt-muted" />}<Link to={"/" + parts.slice(0, i + 1).join("/")} className={cn("truncate hover:text-ink-950", i === parts.length - 1 && "font-semibold text-ink-950")}>{CRUMB[p] || (p.length > 20 ? "Detail" : p)}</Link></span>)}
+    </nav>
+  );
+}
+
 function TopBar({ onMenu }) {
-  const { user, company, logout } = useAuth();
+  const { user, logout, can } = useAuth();
   const navigate = useNavigate();
   const [pwOpen, setPwOpen] = useState(false);
   return (
-    <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-slate-200 bg-white/90 px-4 backdrop-blur md:px-6" data-testid="topbar">
-      <Button variant="ghost" size="icon" className="md:hidden" onClick={onMenu} data-testid="mobile-menu-btn"><Menu className="h-5 w-5" /></Button>
-      <div className="hidden items-center gap-2 sm:flex">
-        <span className="text-lg font-extrabold text-navy">KKT</span>
-        <span className="text-slate-300">/</span>
-        <span className="text-sm font-semibold text-slate-600" data-testid="topbar-company-name">{company?.name}</span>
+    <header className="sticky top-0 z-20 flex h-[72px] items-center gap-3 border-b border-warm-200/70 bg-warm-50/85 px-4 backdrop-blur-md md:px-8" data-testid="topbar">
+      <button onClick={onMenu} className="grid h-10 w-10 place-items-center rounded-[10px] border border-warm-200 bg-warm-100 md:hidden" aria-label="Menu" data-testid="mobile-menu"><Menu className="h-5 w-5" strokeWidth={1.75} /></button>
+      <Crumbs />
+      <div className="ml-auto flex items-center gap-2">
+        <button onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))} className="hidden h-10 w-64 items-center gap-2 rounded-[10px] border border-warm-200 bg-warm-100 px-3.5 text-sm text-txt-muted transition-colors hover:border-gold hover:bg-white md:flex" data-testid="search-pill"><Search className="h-4 w-4" strokeWidth={1.75} /><span className="flex-1 text-left">Search…</span><kbd className="rounded-md border border-warm-200 bg-white px-1.5 py-0.5 font-sans text-[10px] font-semibold text-txt-secondary">⌘K</kbd></button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild><button className="btn btn-primary h-10 !px-4" data-testid="quick-new"><Plus className="h-4 w-4" /><span className="hidden sm:inline">New</span></button></DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44 rounded-xl">{QUICK.filter((q) => can(q[2])).map(([l, to]) => <DropdownMenuItem key={l} onClick={() => navigate(to)} data-testid={`quick-${l.toLowerCase()}`}>{l}</DropdownMenuItem>)}</DropdownMenuContent>
+        </DropdownMenu>
+        <NotificationBell />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild><button className="grid h-10 w-10 place-items-center rounded-full bg-ink-950 text-xs font-bold text-gold-400" data-testid="user-menu">{initials(user?.name)}</button></DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56 rounded-xl">
+            <DropdownMenuLabel><p className="text-sm font-semibold">{user?.name}</p><p className="text-xs font-normal text-txt-muted">{user?.email} · {user?.role_name}</p></DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => setPwOpen(true)} data-testid="menu-change-password"><KeyRound className="mr-2 h-4 w-4" />Change password</DropdownMenuItem>
+            <DropdownMenuItem onClick={async () => { await logout(); navigate("/login"); }} data-testid="menu-logout"><LogOut className="mr-2 h-4 w-4" />Sign out</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
-      <button onClick={() => window.dispatchEvent(new Event("kkt:open-palette"))} className="relative ml-auto hidden w-full max-w-md md:block" data-testid="global-search">
-        <Search className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
-        <div className="flex h-10 w-full items-center rounded-full border border-slate-200 bg-ivory pl-9 pr-2 text-left text-sm text-slate-600 transition-colors hover:border-gold"><span className="min-w-0 flex-1 truncate">Search projects, flats, customers…</span><kbd className="ml-2 shrink-0 rounded-full border border-slate-300 bg-white px-2 py-0.5 font-sans text-[10px] font-semibold leading-4 text-slate-600">⌘K</kbd></div>
-      </button>
-      <div className="ml-auto md:ml-2"><NotificationBell /></div>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button className="flex items-center gap-2 rounded-full border border-slate-200 py-1 pl-1 pr-3 hover:bg-slate-50 md:ml-2" data-testid="user-menu-trigger">
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-navy text-xs font-bold text-white">{initials(user?.name)}</span>
-            <span className="hidden text-left sm:block"><span className="block text-xs font-semibold leading-none text-navy">{user?.name}</span><span className="block text-[10px] text-gold-hover">{user?.role_name}</span></span>
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuLabel><p className="text-sm font-semibold">{user?.name}</p><p className="text-xs font-normal text-slate-500">{user?.email}</p></DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => setPwOpen(true)} data-testid="menu-change-password"><KeyRound className="mr-2 h-4 w-4" />Change password</DropdownMenuItem>
-          <DropdownMenuItem onClick={async () => { await logout(); navigate("/login"); }} data-testid="menu-logout"><LogOut className="mr-2 h-4 w-4" />Sign out</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
       <ChangePasswordDialog open={pwOpen} onOpenChange={setPwOpen} />
     </header>
   );
 }
 
 export default function AppShell() {
-  const [collapsed, setCollapsed] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const { can } = useAuth();
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem("kkt_sb") === "1");
+  const [mobile, setMobile] = useState(false);
+  const loc = useLocation();
+  useEffect(() => { localStorage.setItem("kkt_sb", collapsed ? "1" : "0"); }, [collapsed]);
+  useEffect(() => { setMobile(false); }, [loc.pathname]);
   return (
-    <div className="min-h-screen bg-surface">
-      <Sidebar collapsed={collapsed} setCollapsed={setCollapsed} />
-      {mobileOpen && (
-        <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={() => setMobileOpen(false)}>
-          <div className="h-full w-64 bg-navy p-4 text-white" onClick={(e) => e.stopPropagation()}>
-            <p className="mb-4 text-lg font-extrabold">KKT</p>
-            {NAV.filter((n) => can(n.perm)).map((n) => <NavLink key={n.to} to={n.to} onClick={() => setMobileOpen(false)} className={({ isActive }) => cn("nav-item", isActive && "active")}><n.icon className="h-4 w-4" />{n.label}</NavLink>)}
-          </div>
-        </div>
-      )}
-      <div className={cn("transition-[margin] duration-200", collapsed ? "md:ml-[72px]" : "md:ml-[260px]")}>
-        <TopBar onMenu={() => setMobileOpen(true)} />
-        <main className="p-4 md:p-6 lg:p-8"><Outlet /></main>
+    <div className="v2 min-h-screen">
+      <div className="fixed inset-y-0 left-0 z-30 hidden md:block"><Sidebar collapsed={collapsed} setCollapsed={setCollapsed} /></div>
+      {mobile && <div className="fixed inset-0 z-40 md:hidden"><div className="absolute inset-0 bg-ink-950/60" onClick={() => setMobile(false)} /><div className="absolute inset-y-0 left-0"><Sidebar mobile onClose={() => setMobile(false)} /></div></div>}
+      <div className={cn("min-h-screen transition-[padding] duration-200", collapsed ? "md:pl-[72px]" : "md:pl-[260px]")}>
+        <TopBar onMenu={() => setMobile(true)} />
+        <main key={loc.pathname} className="page-enter mx-auto w-full min-w-0 max-w-[1400px] overflow-x-clip p-4 md:p-8"><Outlet /></main>
       </div>
       <CommandPalette />
       <VersionConflictDialog />

@@ -1,11 +1,11 @@
 import { cn } from "@/lib/utils";
 
 export const STATUS_STYLES = {
-  Available: { chip: "bg-emerald-100 text-emerald-900 border-emerald-200", tile: "bg-emerald-50 border-emerald-200 hover:border-emerald-400", dot: "bg-emerald-500" },
-  Hold: { chip: "bg-amber-100 text-amber-900 border-amber-200", tile: "bg-amber-50 border-amber-200 hover:border-amber-400", dot: "bg-amber-500" },
-  Booked: { chip: "bg-navy-800 text-white border-navy-700", tile: "bg-navy-800 border-navy-700 text-white hover:border-gold", dot: "bg-navy" },
-  Sold: { chip: "bg-gold text-navy border-gold", tile: "bg-gold-light border-gold hover:border-gold-hover", dot: "bg-gold" },
-  Blocked: { chip: "bg-slate-200 text-slate-800 border-slate-300", tile: "bg-slate-100 border-slate-300 hover:border-slate-400", dot: "bg-slate-500" },
+  Available: { chip: "bg-emerald-100 text-emerald-900 border-emerald-200", tile: "bg-sage-50 border-emerald-200 hover:border-emerald-400", dot: "bg-emerald-500" },
+  Hold: { chip: "bg-amber-100 text-amber-900 border-amber-200", tile: "bg-amber2-50 border-amber-200 hover:border-amber-400", dot: "bg-amber-500" },
+  Booked: { chip: "bg-ink-800 text-white border-warm-200", tile: "bg-ink-800 border-warm-200 text-white hover:border-gold", dot: "bg-ink-950" },
+  Sold: { chip: "bg-gold text-ink-950 border-gold", tile: "bg-gold-light border-gold hover:border-gold-hover", dot: "bg-gold" },
+  Blocked: { chip: "bg-slate-200 text-slate-800 border-slate-300", tile: "bg-warm-50 border-slate-300 hover:border-slate-400", dot: "bg-slate-500" },
 };
 
 export function StatusChip({ status, className, testId }) {
@@ -19,9 +19,9 @@ export function StatusChip({ status, className, testId }) {
 
 export function Pill({ children, tone = "slate", className }) {
   const tones = {
-    slate: "bg-slate-200 text-slate-800 border-slate-200", navy: "bg-navy-100 text-navy border-navy-100",
-    gold: "bg-amber-100 text-[#6B4E00] border-amber-200", green: "bg-emerald-100 text-emerald-900 border-emerald-200",
-    red: "bg-red-100 text-red-900 border-red-200", amber: "bg-amber-100 text-amber-900 border-amber-200",
+    slate: "bg-warm-100 text-txt-secondary", navy: "bg-slate2-50 text-slate2",
+    gold: "bg-gold-light text-[#8a6d12]", green: "bg-sage-50 text-sage", emerald: "bg-sage-50 text-sage",
+    red: "bg-brick-50 text-brick", amber: "bg-amber2-50 text-amber2",
   };
-  return <span className={cn("inline-flex items-center whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-semibold leading-5", tones[tone], className)}>{children}</span>;
+  return <span className={cn("pill", tones[tone] || tones.slate, className)}>{children}</span>;
 }

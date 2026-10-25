@@ -14,11 +14,17 @@ from db import client, db, ensure_indexes
 from deps import require
 from infra import (
     START_TIME,
+    ETagMiddleware,
     IdempotencyMiddleware,
     ObservabilityMiddleware,
     metrics_snapshot,
 )
 from routers import (
+    bootstrap,
+    home,
+    catalogues,
+    crm,
+    project_setup,
     visits,
     admin,
     audit,
@@ -66,7 +72,7 @@ from uow import detect_transaction_support
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logging.getLogger("uvicorn.access").disabled = True
 logger = logging.getLogger("kkt")
-VERSION = "7.0.0"
+VERSION = "11.0.0"
 
 STATUS_CODES = {400: "BAD_REQUEST", 401: "UNAUTHENTICATED", 403: "FORBIDDEN", 404: "NOT_FOUND", 409: "CONFLICT", 413: "PAYLOAD_TOO_LARGE", 422: "VALIDATION_ERROR", 423: "LOCKED", 429: "RATE_LIMITED"}
 
@@ -96,11 +102,8 @@ async def lifespan(app: FastAPI):
     await sweep_notifications()
     _ir = await integrity_report()
     logging.getLogger("kkt.integrity").info("[phase7] integrity: ok=%s bookings=%s counts=%s", _ir["ok"], _ir["bookings_checked"], _ir["counts"])
-    asyncio.create_task(_overdue_loop())
-    asyncio.create_task(_dues_loop())
     from routers.visits import seed_phase9, nudge_loop
     await seed_phase9()
-    asyncio.create_task(nudge_loop())
     from services.thumbs import prewarm_variants
     async def _prewarm():
         r = await prewarm_variants(db)
@@ -112,6 +115,11 @@ async def lifespan(app: FastAPI):
     rec = await reconcile_all()
     if rec["mismatches"]:
         logger.warning("Ledger reconciliation found %d mismatches: %s", len(rec["mismatches"]), rec["mismatches"][:3])
+    from startup_phase11 import startup_phase11
+    await startup_phase11()
+    from services.leader import run_as_leader
+    from services.read_models import sweep_loop
+    asyncio.create_task(run_as_leader("scheduler", _overdue_loop, _dues_loop, nudge_loop, sweep_loop))
     await init_storage_async()
     logger.info("KKT backend ready (uow=%s)", UOW_STATE["mode"])
     yield
@@ -211,13 +219,16 @@ async def metrics(user: dict = Depends(require("settings.manage"))):
 
 for r in (auth.router, users.router, roles.router, master.router, projects.router, rate_cards.router, blocks.router, flats.router, parking.router,
           settings.router, audit.router, dashboard.router, search.router, imports.router,
-          customers.router, leads.router, documents.router, bookings.router, milestones.router, payments.router, roznamcha.router, admin.router, cms.router, public.router, reports.router, notifications.router, pdfs.router, dashboard_widgets.router, portal.router, portal.mgmt, support.router, construction.router, visits.pub, visits.router):
+          customers.router, leads.router, documents.router, bookings.router, milestones.router, payments.router, roznamcha.router, admin.router, cms.router, public.router, reports.router, notifications.router, pdfs.router, dashboard_widgets.router, portal.router, portal.mgmt, support.router, construction.router, visits.pub, visits.router,
+          catalogues.router, project_setup.router, crm.router, bootstrap.router, home.router):
     api_router.include_router(r)
 
 app.include_router(api_router)
 
-origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "*").split(",") if o.strip()]
+DEFAULT_ORIGINS = "https://royal-realty-hub-2.preview.emergentagent.com,https://royal-realty-hub-2.expo.preview.emergentagent.com,http://localhost:3000,http://localhost:3002,http://localhost:8081"
+origins = [o.strip() for o in (os.environ.get("CORS_ORIGINS") or DEFAULT_ORIGINS).split(",") if o.strip() and o.strip() != "*"] or DEFAULT_ORIGINS.split(",")
 app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=origins, allow_methods=["*"], allow_headers=["*"], expose_headers=["X-Request-ID", "X-Response-Time", "ETag", "Idempotent-Replayed", "Retry-After"])
+app.add_middleware(ETagMiddleware)
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.add_middleware(IdempotencyMiddleware)
 app.add_middleware(ObservabilityMiddleware)

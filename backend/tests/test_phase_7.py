@@ -51,7 +51,7 @@ class TestHealthAndMigration:
         assert d.get("ok") in (True, "true") or d.get("status") == "ok"
         # version should be 7.x
         v = str(d.get("version") or "")
-        assert v.startswith("7"), f"health version = {v}"
+        assert int(v.split(".")[0]) >= 7, f"health version = {v}"
 
     def test_milestone_templates_gone(self, H):
         r = requests.get(f"{API}/master/milestone-templates", headers=H, timeout=10)
@@ -269,7 +269,7 @@ class TestDownstream:
 
     def test_customer_360_plan_summary(self, H):
         # fetch amit (CUST-2526-0001) specifically
-        r = requests.get(f"{API}/customers?q=CUST-2526-0001&limit=5", headers=H, timeout=15)
+        r = requests.get(f"{API}/customers?search=CUST-2526-0001&page_size=5", headers=H, timeout=15)
         items = r.json().get("items") or r.json()
         amit = next((c for c in items if (c.get("customer_number") or c.get("code")) == "CUST-2526-0001"), items[0] if items else None)
         if not amit:

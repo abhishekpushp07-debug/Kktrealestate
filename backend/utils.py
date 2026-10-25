@@ -59,9 +59,13 @@ class ListParams:
         cursor: str | None = Query(None, description="Cursor mode: last seen id from next_cursor"),
         limit: int | None = Query(None, ge=1, le=100, description="Cursor mode page size"),
         format: str | None = Query(None, description="csv for CSV export"),
+        with_total: bool | None = Query(None, description="Compute total (expensive). Default: yes in page mode (legacy UI), no in cursor mode"),
+        fields: str | None = Query(None, max_length=400, description="Comma-separated projection to widen/narrow list items"),
+        include: str | None = Query(None, max_length=200, description="Comma-separated related docs to embed (see PRD 'API packeting')"),
     ):
         self.page, self.page_size, self.search, self.sort = page, page_size, search, sort
         self.include_inactive, self.cursor, self.limit, self.format = include_inactive, cursor, limit, format
+        self.with_total, self.fields, self.include = with_total, fields, include
 
     def sort_spec(self, allowed: list[str], default: str = "name"):
         field = self.sort.lstrip("-")
@@ -82,12 +86,14 @@ async def paginate(coll, query: dict, params: ListParams, sort, projection: dict
     proj = {"_id": 0}
     if projection:
         proj.update(projection)
+    if params.fields:
+        proj = {"_id": 0, "id": 1, **{f.strip(): 1 for f in params.fields.split(",") if f.strip()}}
     if params.cursor is not None or params.limit is not None:
         limit = params.limit or params.page_size
         q = dict(query)
         if params.cursor:
             q["id"] = {"$gt": params.cursor}
-        total = await coll.count_documents(query)
+        total = await coll.count_documents(query) if params.with_total else None
         items = await coll.find(q, proj).sort([("id", 1)]).limit(limit + 1).to_list(limit + 1)
         nxt = items[limit]["id"] if len(items) > limit else None
         items = items[:limit]
@@ -95,10 +101,11 @@ async def paginate(coll, query: dict, params: ListParams, sort, projection: dict
     if params.format == "csv":
         items = await coll.find(query, proj).sort(sort).limit(10000).to_list(10000)
         return {"items": items, "total": len(items), "page": 1, "page_size": len(items), "next_cursor": None, "_csv": True}
-    total = await coll.count_documents(query)
-    cursor = coll.find(query, proj).sort(sort).skip((params.page - 1) * params.page_size).limit(params.page_size)
-    items = await cursor.to_list(params.page_size)
-    has_more = params.page * params.page_size < total
+    total = await coll.count_documents(query) if params.with_total is not False else None
+    cursor = coll.find(query, proj).sort(sort).skip((params.page - 1) * params.page_size).limit(params.page_size + (1 if total is None else 0))
+    items = await cursor.to_list(params.page_size + 1)
+    has_more = (params.page * params.page_size < total) if total is not None else len(items) > params.page_size
+    items = items[:params.page_size]
     return {"items": items, "total": total, "page": params.page, "page_size": params.page_size, "next_cursor": items[-1]["id"] if has_more and items else None}
 
 

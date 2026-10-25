@@ -238,3 +238,91 @@ Production-build preview (`frontend/scripts/dev.js`, `PREVIEW_MODE=production`, 
 - Seed: visit settings SGH (Mon–Sun 10–18, cap 3) / GGV (Sat–Sun 10–16); 6 upcoming + 4 past visits; 5 brochure activities; generated branded brochure PDFs (reportlab) for both projects.
 - Tests: `tests/test_phase_9.py` (5 passed) covering acceptance 1–3; UI verified at 390/1440 with 0 console errors.
 - Phase 9 follow-up: availability accepts `from` (alias; `from_` kept); cancelling a lead's only upcoming visit reverts the lead from "Site Visit Scheduled" to its previous stage (activity `stage_reverted`); Rescheduled visits count toward capacity and show a "moved" tag in the new slot. Guarded reseed restored seed state (portal_url, Tower A 45 / B 18 / C 0, integrity ok, 10 seeded visits, QA9 leftovers gone). `test_phase_9.py` → 7 tests.
+
+## Phase 11A — Canonical backend hardening + data model for ERP v2 (2026-10-25)
+
+Owner verdict: ERP rejected as "complicated, mechanical, ugly; masters not connected to projects; not dropdown-first; no customer profiling". Phase 11A is the BACKEND + DATA MODEL replan (UI untouched, all changes additive). 11B–11D rebuild the UI on top.
+
+### Code-review fixes (all with regression tests in `tests/test_phase_11a.py`)
+| # | Issue | Fix |
+|---|---|---|
+| 1a | Bucket-cap race (`payments._check_cap` read-then-insert) | `reserve_cap()` — guarded conditional `update_one({id, status:Active, "summary.cash_paid_paise": {$lte: agreed − amount}}, {$inc})`; payment inserted only if matched, compensating `$inc` if the insert fails. Same for cheque clearing and other-charge lines (`$elemMatch` on `paid_paise`). Test: 2 concurrent posts → exactly `[201, 409 BUCKET_EXCEEDS_AGREED]`. |
+| 1b | Document list/download not tenant/project scoped | `_check_parent()` loads the parent entity by `company_id`, applies `ensure_project_access`; 404 for other projects. |
+| 1c | Erasure left portal account + ticket threads | portal account disabled/anonymised (`erased-<code>`, hash cleared, refresh tokens dropped); customer-authored thread messages scrubbed; communications scrubbed. |
+| 1d | Visit manage/ICS links never expired | signed with `exp = visit date + 7 days`; `410 LINK_REVOKED` once Completed/No-show. |
+| 1e | CORS `*` with credentials | default = known preview origins; `CORS_ORIGINS` env overrides; `*` ignored. |
+| 1f | `last_payment_at` counted reversed receipts | recomputed from non-reversed payments only (max date). |
+
+### Canonical vs derived (one source of truth per fact)
+| Collection | Kind | Source / notes |
+|---|---|---|
+| companies, users, roles, settings, site_settings | canonical | |
+| catalogue_items | canonical | dropdown values; `catalogues_version` bumps on change |
+| master_* (flat_types, charge_types, payment_modes, bank_accounts, plc_types, spec_*, floor_plan_templates, document_types, service_categories), construction_stages, payment_plans | canonical | structured masters |
+| projects, blocks (tower: floor plan, numbering, stage **sequence** + stage **status**), flats (status, price breakup, snapshots) | canonical | `blocks.construction_percent`, `unit_counts` are derived caches (recomputed by `services.counters`) |
+| payment_plan_assignments | canonical | plan ↔ project/tower |
+| customers (identity, KYC, **profile ids**, preferences, consent, rm_user_id, last_contacted_at) | canonical | `lifecycle_stage`, `engagement_score` stored but **derived** by read models |
+| leads (+stage_history, activities), site_visits, brochure_tokens/brochure_downloads, communications | canonical | |
+| bookings (agreement buckets, other_charges lines, plan snapshot, revisions, cancellation) | canonical | `bookings.summary`, `other_charges[].paid_paise`, `raised_percent` are derived by `ledger.rebuild` (plus the atomic cap counters that rebuild re-derives) |
+| demands, payments | canonical | `demands.status/paid_paise` derived (FIFO allocation in rebuild) |
+| ledger_entries | derived | from demands+payments+revisions+cancellation (`ledger.rebuild`) |
+| three ledgers (`/bookings/{id}/ledgers`) | derived, not stored | projection of ledger_entries per bucket |
+| project_summaries, block_summaries, customer_summaries, dashboard_snapshots | derived | event bus (≤2 s debounce) + 60 s sweep; `POST /admin/recompute-read-models` |
+| notifications, audit_logs (immutable), login_events | canonical event logs | |
+| rate_limits, idempotency_keys, cache, locks, report_cache | infrastructure | TTL-indexed, safe to lose |
+
+### Catalogues (`routers/catalogues.py`)
+`catalogue_items {id, company_id, type, code, label, parent_id?, meta{}, sort_order, is_system, is_active, version}`; unique `(company_id,type,code)`; index `(company_id,type,is_active,sort_order)`. Seeded (351 items, India-ready): salutation, gender, residency, occupation, income_band, customer_segment, relation, lead_source, lost_reason, budget_band, facing, floor_preference, bhk_preference, state (36), city (parent=state; Bihar + metros), locality (parent=Patna), bank (40 incl. HFCs), designation, broker_channel, communication_type, communication_outcome, visit_outcome, cancellation_reason, nationality, company_type, service_category + document_type (migrated from legacy masters, `meta.legacy_id`). `GET /catalogues` returns ALL types + compact structured masters (flat_types, block_types, amenities, construction_stages, payment_plans, charge_types, payment_modes, bank_accounts, plc_types, spec_items, floor_plan_templates, document_types, service_categories, users, roles, projects, blocks — blocks carry `parent_id=project_id`) → forms open with zero extra requests. Strong ETag/304, `Cache-Control: private, max-age=300`, cached per version in Redis/Mongo cache. Inline `POST /catalogues/{type}/items` (permission `catalogue.write`: Super Admin, Project Admin, Sales, Accounts), PATCH/deactivate/reorder, CSV import/export. **Decision:** system items are never deleted, only deactivated; relabelling a system item keeps `meta.system_label` so seeds stay idempotent.
+
+### Project Setup (`routers/project_setup.py`)
+`GET /projects/{id}/setup` → project, towers (floor plans, numbering, unit counts, construction {percent, current, next, sequence_source, stages}, plans), stages {project_sequence, catalogue}, plans {assignments, catalogue}, pricing, parking, website flags, **checklist**. `PUT /projects/{id}/setup/{towers|stages|plans|pricing}` with validation + versioning. Hierarchy enforced with helpful errors: `TOWER_NOT_IN_PROJECT` (404), `STAGE_COMPLETED_LOCKED` (removing a completed stage from a tower with active bookings), `PLAN_STAGES_MISSING` (plan needs stages the tower lacks), one default plan per scope. Stage catalogue global; sequence per tower (tower override → project → master order).
+
+### Customer profiling + CRM (`routers/crm.py`)
+`PATCH /customers/{id}/profile` — catalogue-backed ids (salutation, gender, residency, occupation, income_band, state/city/locality, nationality, company_type), `segment_ids[]`, `preferences{bhk_ids, facing_ids, floor_preference_id, budget_band_id, project_ids}`, `consent{marketing, whatsapp}`, `rm_user_id`, `next_follow_up_at`; every id validated against its type (422). Migration `startup_phase11.migrate_customer_profiles` maps legacy text (salutation/gender/occupation/income band/source) to ids where labels match and keeps `legacy_*`. `communications` log (`POST/GET /communications`): type/outcome from catalogues, updates `last_contacted_at` / `next_follow_up_at`, appends a lead activity. `GET /customers/{id}/timeline` (cursor = ISO `at`, `types=` filter) merges: lead stages/activities, communications, site visits, brochure downloads, bookings, agreement revisions, cancellations, handover, demands (raised/voided), payments (posted/cleared/bounced/reversed), documents, service tickets, portal logins, notices → `{at, type, title, subtitle, amount_paise, refs}`.
+**Engagement score (0–100, nightly + on events):** recency of last contact 30 (≤7 d 30, ≤30 d 22, ≤90 d 12, else 4) + visits 20 (10 each) + brochure downloads 10 (5 each) + customer replies 10 (2 each) + payment punctuality 30 (share of paid demands settled by due date; 15 when no history). **Lifecycle:** Owner (any Completed booking) → Customer (Active) → Prospect (visit or lead beyond New) → Lead.
+
+### Three ledgers (`services/ledgers.py`)
+`GET /bookings/{id}/ledgers` → `{cash, account, other_charges, combined}` each `{summary{agreed, raised, paid, due, advance, balance, pending_cheques}, rows[]}`; rows are the bucket's events with running `raised_cum/paid_cum/due/advance`. `GET /customers/{id}/ledgers` → per booking + grand totals. Legacy `/bookings/{id}/ledger` untouched.
+
+### Read models (`services/read_models.py`)
+project_summaries / block_summaries (units by status, inventory & sold value, collections MTD/total, outstanding by bucket, overdue, progress %, upcoming stage), customer_summaries (bookings, agreement, paid, due, overdue, last payment, engagement, lifecycle), dashboard_snapshots keyed `(company_id, scope_hash)`. Event bus subscriber marks dirty by entity → debounced flush (2 s) → targeted refresh; 60 s sweep; `X-Data-Age` header; computed synchronously only when missing. Endpoints: `/dashboard/snapshot`, `/projects/{id}/summary`, `/blocks/{id}/summary`, `/customers/{id}/summary`, `POST /admin/recompute-read-models`. Existing dashboard endpoints still compute live (to be switched to snapshots in 11B).
+
+### API packeting
+- `GET /bootstrap` → me, permissions, role, project_scope, company, settings_public, catalogues_version, counts (ETag, max-age 30).
+- `include=` on bookings (customer, flat, block, project, plan, sales_user), customers (rm, summary, bookings), payments (booking, customer, project), leads (project, assigned, customer) — batched `$in`, never N+1 (`services/includes.py`).
+- `fields=` projection; cursor pagination (`limit`+`cursor` → `next_cursor`; `total=null` unless `with_total=true`); page mode keeps `total` for the current UI unless `with_total=false`; `page_size ≤ 200`.
+- `GET /search?q=&scope=all|customers|bookings|flats|projects` — prefix regexes on indexed `phone`, `customer_code`, `booking_number`, `flat_number`, `full_name`, `customer_name` (anchored → index range scan); measured 1–3 ms.
+- Strong ETags on every JSON GET (`ETagMiddleware`, sha1 of body) with 304; `Server-Timing: db;dur, app;dur` via a pymongo CommandListener + contextvar; `X-Request-ID` everywhere. Note: the preview ingress rewrites `Cache-Control` to no-store; the origin headers are verified on localhost.
+
+### Scale engineering
+- Mongo client: `maxPoolSize` 50/worker (`MONGO_MAX_POOL`), `minPoolSize` 5, serverSelection 5 s, socket 30 s, retryWrites/Reads, zlib compression, `db_ro` handle with `secondaryPreferred` for read models (no-op on standalone).
+- Multi-worker safety: rate limits & idempotency in Mongo; permission cache keyed by `roles_version`; read models/caches in Mongo (Redis when `REDIS_URL` set — `services/cache.py`); background schedulers run on ONE leader via a Mongo lease (`services/leader.py`, `locks` collection, 60 s TTL, renewed every 20 s) — verified: the 8-worker instance did not acquire the lease while the supervisor instance held it.
+- Index audit: `tests/test_index_audit.py` runs `explain()` on 41 production query shapes and fails on COLLSCAN / in-memory sort. New ESR compound indexes on customers, bookings, payments (incl. partial `status: Pending`), demands (partial open), leads, flats, site_visits, service_requests, communications, catalogue_items, summaries.
+- Workers: supervisor still runs `--reload --workers 1` (dev pod); the load test ran a separate `uvicorn --workers 8 --backlog 8192` on :8021. Production: `WEB_CONCURRENCY = 2 × CPU` gunicorn/uvicorn workers, Redis, replica set.
+
+### Capacity model (this pod: 16 vCPU shared, standalone Mongo on the same host)
+See `backend/load/locustfile.py` and `load/out/run_stats.csv`. Pod limitation found: `ip_local_port_range` is 32768–33791 (~1,000 ephemeral ports, read-only), so a single-host load generator cannot open 5,000 connections to one address; run 2 spreads the destination across 127.0.0.1–8 to lift the limit. Results are recorded in the Phase 11A finish report and below.
+
+**Run 1 (HttpUser, 4 locust procs, 5,000 users, 5 min):** 86 % client-side connection errors — the pod's ephemeral port range (1,024 ports) could not open 5,000 sockets to one address. Not a server failure.
+**Run 2 (destination spread over 127.0.0.1–8, 5,000 users, 5 min):** 10.7k established TCP connections; aggregate 246 rps, p50 2.3 s, p95 76 s, 0.5 % failures (status 0 = client timeouts; 7 × 500 from a `KeyError` in the timeline — fixed). Ramp data: 500 users → 106 rps / p95 0.6 s; 1,000 users → 181 rps / p95 2.1 s; saturation ≈ **230 rps from ~1,500 users** — with every worker at ~35 % CPU and mongod at 32 %.
+**Run 3 (FastHttpUser, 8 locust procs, 3 min):** same ceiling (193 rps).
+**Root cause analysis (isolation benchmarks):**
+1. uvicorn 0.25 without uvloop does not set `TCP_NODELAY` → every multi-segment response hit the 40 ms delayed-ACK/Nagle stall (health endpoint 43 ms single-connection vs 2 ms via curl). **Fixed:** `uvloop` + `httptools` installed (uvicorn picks them automatically); single-connection health went 43 ms → 1.7 ms (572 rps on one connection).
+2. **Pod network limit:** a *minimal* FastAPI app (one route, no middleware, no DB) also collapses on this pod from 2,240 rps at 5 connections to **240 rps at 50 concurrent connections** — identical to our app. The sandbox's loopback/network virtualisation serialises concurrent connections; it is not application code. Consequently the 5,000-user target **cannot be demonstrated on this pod**; the honest saturation figure here is ~250 rps for *any* HTTP server.
+**Per-request server cost (uvloop, unloaded, `Server-Timing`):** bootstrap 8 ms (db 2.8), catalogues 10 ms (cached bundle), dashboard snapshot 4 ms (db 0.6), bookings list w/ 3 includes 10 ms (6 ops), customer 360 6 ms, three ledgers 7 ms, timeline 10 ms (15 ops), search 6 ms (8 ops), payment post ~60 ms (write + ledger rebuild + audit). Explain plans: 41/41 query shapes index-backed.
+**Capacity model (extrapolated from per-request cost, not from the throttled pod):** one Uvicorn worker ≈ 90–120 rps for this mix (≈ 8–10 ms CPU + I/O overlap); 5,000 concurrent users with a 1–4 s think time ≈ 1,800–2,200 rps → **18–24 workers ≈ 10–12 vCPU** for the API, plus a Mongo replica set (primary ~30 % of one core per 250 rps observed → ~3–4 cores at 2,000 rps; working set fits in RAM), Redis for rate-limit/idempotency/catalogue cache. p95 targets (reads < 300 ms, payment post < 500 ms) are met with ~10× headroom at the measured per-request cost. Re-run `load/locustfile.py` on real infrastructure (distributed locust, ≥2 generator hosts) before go-live.
+
+
+### Decision log
+1. Catalogues as ONE generic collection (not 25 masters): a single bundle call, one permission, one version counter; structured masters stay separate because they carry behaviour (areas, GST, triggers).
+2. Atomic cap via guarded `$inc` on the booking (not transactions): Mongo here is standalone (no transactions); the guard is a single document write and the ledger rebuild re-derives the counter anyway.
+3. Read models in Mongo with debounce rather than synchronous recompute: writes stay cheap, dashboards read one document; `X-Data-Age` makes staleness explicit.
+4. `total` stays on in page mode: the current UI depends on it; cursor mode is total-free by default (counts are the most expensive part of list endpoints).
+5. ETag middleware hashes the body server-side (no DB cost) — the win is bandwidth and client cache, not DB time; DB time is attacked by snapshots and the catalogue cache.
+6. Scheduler leader via Mongo lease instead of a separate worker process: zero new infrastructure; any worker can take over within 60 s.
+
+## Phase 11B (2026-10-24) — Design system "Royal Black & Warm White", new shell, Login/Home/Projects v2, Project workspace, Setup wizard, Settings→Catalogues
+See `/app/memory/prd_phase11b.md`. Tested: `/app/test_reports/iteration_12.json`. Screenshots: `/app/memory/qa/v2/`.
+
+## Phase 11C (2026-10-24) — Kit refinement + Customers · Bookings · Payments v2
+See `/app/memory/prd_phase11c.md`. Tested: `/app/test_reports/iteration_13.json`. Screenshots: `/app/memory/qa/v2b/`.

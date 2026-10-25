@@ -394,7 +394,7 @@ def _register(kind: str, coll_name: str, InModel, search_fields: list[str], usag
         if await coll.find_one(q):
             raise ApiError(409, f"{label} with the same name or code already exists", "DUPLICATE")
 
-    async def list_items(request: Request, response: Response, params: ListParams = Depends(), user: dict = Depends(require("master.read"))):
+    async def list_items(request: Request, response: Response, params: ListParams = Depends(), include_usage: bool = False, user: dict = Depends(require("master.read"))):
         q = {"company_id": user["company_id"], **search_filter(params.search, search_fields)}
         if not params.include_inactive:
             q["is_active"] = True
@@ -403,6 +403,13 @@ def _register(kind: str, coll_name: str, InModel, search_fields: list[str], usag
             sort = [("sort_order", 1), ("name", 1)]
         res = await paginate(coll, q, params, sort)
         res["items"] = [present(d) for d in res["items"]]
+        if include_usage and usage_fn:
+            for d in res["items"]:
+                try:
+                    cnt, lbl = await usage_fn(d["id"])
+                    d["usage_count"], d["usage_label"] = cnt, lbl
+                except Exception:
+                    d["usage_count"] = None
         if res.pop("_csv", False):
             return Response(to_csv(res["items"]), media_type="text/csv", headers={"Content-Disposition": f"attachment; filename={coll_name}.csv"})
         etag = '"' + hashlib.md5(json.dumps(res, sort_keys=True, default=str).encode()).hexdigest() + '"'

@@ -15,9 +15,9 @@ export default function FlatsTable({ fixed = {}, blocks }) {
   const [flatType, setFlatType] = useState("all");
   const [selected, setSelected] = useState(null);
   const { options: ftOptions } = useMasterOptions("flat-types");
-  const list = useList("/flats", { ...fixed, status: status === "all" ? undefined : status, block_id: blockId === "all" ? undefined : blockId, flat_type_id: flatType === "all" ? undefined : flatType }, { pageSize: 500, sort: "floor" });
+  const list = useList("/flats", { ...fixed, status: status === "all" ? undefined : status, block_id: blockId === "all" ? undefined : blockId, flat_type_id: flatType === "all" ? undefined : flatType }, { pageSize: 200, sort: "floor" });
   const columns = [
-    { key: "flat_number", label: "Flat", sortable: true, render: (f) => <span className="font-bold text-navy">{f.flat_number}</span> },
+    { key: "flat_number", label: "Flat", sortable: true, render: (f) => <span className="font-bold text-ink-950">{f.flat_number}</span> },
     ...(fixed.project_id ? [] : [{ key: "project_name", label: "Project", render: (f) => <Link to={`/projects/${f.project_id}`} className="hover:underline" onClick={(e) => e.stopPropagation()}>{f.project_code}</Link> }]),
     { key: "block_name", label: "Block", render: (f) => <Link to={`/blocks/${f.block_id}`} className="hover:underline" onClick={(e) => e.stopPropagation()}>{f.block_name}</Link> },
     { key: "floor", label: "Floor", sortable: true, className: "tabular" },

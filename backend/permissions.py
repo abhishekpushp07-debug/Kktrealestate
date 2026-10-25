@@ -8,6 +8,7 @@ PERMISSION_GROUPS = [
     ("Master Data", [
         ("master.read", "View master data"),
         ("master.write", "Create / edit master data"),
+        ("catalogue.write", "Add / edit dropdown catalogue values (inline '+ Add new')"),
     ]),
     ("Projects & Inventory", [
         ("project.read", "View projects"),
@@ -60,6 +61,7 @@ SYSTEM_ROLES = {
     "Project Admin": {
         "description": "Manages project structure, inventory and sales for assigned projects",
         "permissions": [
+            "catalogue.write",
             "service.read", "service.write", "service.assign",
             "project.read", "master.read", "block.write", "flat.write", "flat.status", "construction.update",
             "booking.read", "booking.create", "booking.cancel", "customer.read", "customer.write", "customer.kyc_view", "lead.read", "lead.write", "visit.read", "visit.write",
@@ -69,6 +71,7 @@ SYSTEM_ROLES = {
     "Accounts": {
         "description": "Payments, receipts and financial reporting",
         "permissions": [
+            "catalogue.write",
             "customer.portal_manage", "service.read", "service.write", "service.assign",
             "payment.read", "payment.post", "payment.reverse", "receipt.print", "booking.read",
             "customer.read", "customer.kyc_view", "project.read", "master.read", "report.view", "audit.view",
@@ -81,6 +84,7 @@ SYSTEM_ROLES = {
     "Sales": {
         "description": "Customers, leads and bookings",
         "permissions": [
+            "catalogue.write",
             "customer.portal_manage", "service.read", "service.write", "service.assign",
             "customer.read", "customer.write", "lead.read", "lead.write", "visit.read", "visit.write",
             "booking.read", "booking.create", "project.read", "master.read", "payment.read",

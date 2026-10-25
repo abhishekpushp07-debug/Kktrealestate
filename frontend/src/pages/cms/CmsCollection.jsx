@@ -22,7 +22,7 @@ export function ImageUpload({ value, onChange }) {
   const up = async (f) => { if (!f) return; setBusy(true); const fd = new FormData(); fd.append("file", f); try { const r = await api.post("/cms/media", fd, { headers: { "Content-Type": "multipart/form-data" } }); onChange(r.data.url); toast.success("Uploaded"); } catch (e) { toast.error(errMsg(e)); } finally { setBusy(false); } };
   return (
     <div className="flex items-center gap-2">
-      {value ? <img src={value} alt="" className="h-12 w-16 rounded object-cover" /> : <div className="flex h-12 w-16 items-center justify-center rounded bg-surface"><ImageIcon className="h-4 w-4 text-slate-400" /></div>}
+      {value ? <img src={value} alt="" className="h-12 w-16 rounded object-cover" /> : <div className="flex h-12 w-16 items-center justify-center rounded bg-warm-50"><ImageIcon className="h-4 w-4 text-txt-muted" /></div>}
       <Input value={value || ""} onChange={(e) => onChange(e.target.value || null)} placeholder="https://… or upload" className="h-9 flex-1" data-testid="image-url-input" />
       <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => ref.current?.click()} data-testid="image-upload-btn"><Upload className="h-3.5 w-3.5" /></Button>
       <input ref={ref} type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => up(e.target.files?.[0])} />
@@ -44,7 +44,7 @@ export const CMS_NAV = [["settings", "Site Settings"], ["banners", "Banners"], [
 export function CmsNav({ active }) {
   const nav = useNavigate();
   const { data } = useFetch("/leads?source=Website&page_size=1&unread=true");
-  return <div className="mb-4 flex flex-wrap gap-1 rounded-lg bg-white p-1" data-testid="cms-nav">{CMS_NAV.map(([k, l]) => <button key={k} onClick={() => nav(k === "enquiries" ? "/leads?source=Website" : `/website/${k}`)} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${active === k ? "bg-navy text-white" : "text-slate-600 hover:bg-surface"}`} data-testid={`cms-nav-${k}`}>{l}{k === "enquiries" && data?.total > 0 && <span className="ml-1 rounded-full bg-gold px-1.5 text-[10px] text-navy">{data.total}</span>}</button>)}</div>;
+  return <div className="mb-4 flex flex-wrap gap-1 rounded-lg bg-white p-1" data-testid="cms-nav">{CMS_NAV.map(([k, l]) => <button key={k} onClick={() => nav(k === "enquiries" ? "/leads?source=Website" : `/website/${k}`)} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${active === k ? "bg-ink-950 text-white" : "text-txt-secondary hover:bg-warm-50"}`} data-testid={`cms-nav-${k}`}>{l}{k === "enquiries" && data?.total > 0 && <span className="ml-1 rounded-full bg-gold px-1.5 text-[10px] text-ink-950">{data.total}</span>}</button>)}</div>;
 }
 
 function CmsForm({ coll, item, onClose, onSaved }) {
@@ -74,14 +74,14 @@ function CmsForm({ coll, item, onClose, onSaved }) {
             : fl.type === "project" ? <Select value={f[fl.name] || "none"} onValueChange={(v) => { const p = (projects?.items || []).find((x) => x.id === v); setF({ ...f, [fl.name]: v === "none" ? null : v, project_name: p?.name || null }); }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">—</SelectItem>{(projects?.items || []).map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select>
             : <Input type={fl.type === "number" ? "number" : fl.type === "date" ? "date" : "text"} value={f[fl.name] ?? ""} onChange={(e) => set(fl.name, e.target.value)} data-testid={`cms-field-${fl.name}`} />}
         </Field>)}
-        <Button type="submit" disabled={busy} className="w-full bg-navy hover:bg-navy-700" data-testid="cms-submit">{busy ? "Saving…" : "Save"}</Button>
+        <Button type="submit" disabled={busy} className="w-full bg-ink-950 hover:bg-ink-800" data-testid="cms-submit">{busy ? "Saving…" : "Save"}</Button>
       </form></SheetContent></Sheet>
   );
 }
 
 function MarkdownPreview({ text }) {
   const [Md, setMd] = useState(null);
-  if (!Md) { import("react-markdown").then((m) => setMd(() => m.default)); return <p className="text-slate-400">Preview…</p>; }
+  if (!Md) { import("react-markdown").then((m) => setMd(() => m.default)); return <p className="text-txt-muted">Preview…</p>; }
   return <Md>{text}</Md>;
 }
 
@@ -94,10 +94,10 @@ export default function CmsCollection() {
   if (!cfg) return <p>Unknown section</p>;
   const del = async (r) => { if (!window.confirm("Delete this item?")) return; try { await api.delete(`/cms/${coll}/${r.id}`); toast.success("Deleted"); list.reload(); } catch (e) { toast.error(errMsg(e)); } };
   const columns = [...cfg.cols, { key: "is_active", label: "Active", render: (r) => <Pill tone={r.is_active !== false ? "emerald" : "slate"}>{r.is_active !== false ? "Yes" : "No"}</Pill> },
-    { key: "actions", label: "", render: (r) => can("cms.write") && <Button size="icon" variant="ghost" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); del(r); }} data-testid={`cms-delete-${r.id}`}><Trash2 className="h-3.5 w-3.5 text-slate-500" /></Button> }];
+    { key: "actions", label: "", render: (r) => can("cms.write") && <Button size="icon" variant="ghost" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); del(r); }} data-testid={`cms-delete-${r.id}`}><Trash2 className="h-3.5 w-3.5 text-txt-secondary" /></Button> }];
   return (
     <div data-testid={`cms-${coll}-page`}>
-      <PageHeader title={`Website · ${cfg.label}`} subtitle="Content shown on the public website." actions={can("cms.write") && <Button onClick={() => setEdit({})} className="bg-navy hover:bg-navy-700" data-testid="cms-new-btn"><Plus className="mr-1 h-4 w-4" />New</Button>} />
+      <PageHeader title={`Website · ${cfg.label}`} subtitle="Content shown on the public website." actions={can("cms.write") && <Button onClick={() => setEdit({})} className="bg-ink-950 hover:bg-ink-800" data-testid="cms-new-btn"><Plus className="mr-1 h-4 w-4" />New</Button>} />
       <CmsNav active={coll} />
       <DataTable {...list} columns={columns} testId="cms-table" searchPlaceholder="Search…" onRowClick={(r) => can("cms.write") && setEdit(r)} />
       {edit && <CmsForm coll={coll} item={edit.id ? edit : null} onClose={() => setEdit(null)} onSaved={() => list.reload()} />}

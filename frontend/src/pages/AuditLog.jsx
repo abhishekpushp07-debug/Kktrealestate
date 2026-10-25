@@ -13,10 +13,10 @@ const tone = (a) => a.includes("create") ? "green" : a.includes("deactivate") ||
 
 function Diff({ before, after }) {
   const keys = Array.from(new Set([...Object.keys(before || {}), ...Object.keys(after || {})])).filter((k) => JSON.stringify(before?.[k]) !== JSON.stringify(after?.[k]) && !["updated_at"].includes(k));
-  if (!before && after) return <pre className="max-h-80 overflow-auto rounded bg-slate-50 p-3 text-[11px]">{JSON.stringify(after, null, 2)}</pre>;
+  if (!before && after) return <pre className="max-h-80 overflow-auto rounded bg-warm-50 p-3 text-[11px]">{JSON.stringify(after, null, 2)}</pre>;
   return (
     <table className="w-full text-xs" data-testid="audit-diff"><thead><tr className="label-xs text-left"><th className="py-1">Field</th><th className="py-1">Before</th><th className="py-1">After</th></tr></thead>
-      <tbody>{keys.map((k) => <tr key={k} className="border-t align-top"><td className="py-1.5 pr-2 font-semibold text-navy">{k}</td><td className="py-1.5 pr-2 text-red-700"><code className="break-all">{JSON.stringify(before?.[k])}</code></td><td className="py-1.5 text-emerald-700"><code className="break-all">{JSON.stringify(after?.[k])}</code></td></tr>)}</tbody></table>
+      <tbody>{keys.map((k) => <tr key={k} className="border-t align-top"><td className="py-1.5 pr-2 font-semibold text-ink-950">{k}</td><td className="py-1.5 pr-2 text-brick"><code className="break-all">{JSON.stringify(before?.[k])}</code></td><td className="py-1.5 text-sage"><code className="break-all">{JSON.stringify(after?.[k])}</code></td></tr>)}</tbody></table>
   );
 }
 
@@ -29,12 +29,12 @@ export default function AuditLog() {
   const [open, setOpen] = useState(null);
   const columns = [
     { key: "created_at", label: "When", render: (a) => <span className="whitespace-nowrap text-xs tabular">{fmtDateTime(a.created_at)}</span> },
-    { key: "actor_name", label: "Actor", render: (a) => <span className="font-semibold text-navy">{a.actor_name}</span> },
+    { key: "actor_name", label: "Actor", render: (a) => <span className="font-semibold text-ink-950">{a.actor_name}</span> },
     { key: "action", label: "Action", render: (a) => <Pill tone={tone(a.action)}>{a.action}</Pill> },
     { key: "entity_type", label: "Entity" },
-    { key: "entity_id", label: "Entity id", render: (a) => <code className="text-[10px] text-slate-500">{a.entity_id?.slice(0, 8)}…</code> },
-    { key: "summary", label: "Summary", render: (a) => <span className="text-xs text-slate-600">{a.after?.name || a.after?.flat_number || a.after?.email || a.before?.name || ""}{a.before?.status && a.after?.status ? ` ${a.before.status} → ${a.after.status}` : ""}</span> },
-    { key: "ip", label: "IP", render: (a) => <span className="text-xs text-slate-400">{a.ip || "—"}</span> },
+    { key: "entity_id", label: "Entity id", render: (a) => <code className="text-[10px] text-txt-secondary">{a.entity_id?.slice(0, 8)}…</code> },
+    { key: "summary", label: "Summary", render: (a) => <span className="text-xs text-txt-secondary">{a.after?.name || a.after?.flat_number || a.after?.email || a.before?.name || ""}{a.before?.status && a.after?.status ? ` ${a.before.status} → ${a.after.status}` : ""}</span> },
+    { key: "ip", label: "IP", render: (a) => <span className="text-xs text-txt-muted">{a.ip || "—"}</span> },
   ];
   return (
     <div data-testid="audit-page">

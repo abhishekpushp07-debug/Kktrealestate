@@ -31,11 +31,11 @@ export default function SiteSettingsPage() {
   const ro = !can("cms.write");
   return (
     <div data-testid="site-settings-page">
-      <PageHeader title="Website · Site Settings" subtitle="Brand, contact, trust stats, SEO, tracking and go-live switch." actions={<div className="flex items-center gap-3"><a href="/" target="_blank" rel="noreferrer" className="text-sm font-semibold text-gold-hover hover:underline" data-testid="view-site-link">View website ↗</a>{!ro && <Button onClick={save} disabled={busy} className="bg-navy hover:bg-navy-700" data-testid="site-save-btn">{busy ? "Saving…" : "Save"}</Button>}</div>} />
+      <PageHeader title="Website · Site Settings" subtitle="Brand, contact, trust stats, SEO, tracking and go-live switch." actions={<div className="flex items-center gap-3"><a href="/" target="_blank" rel="noreferrer" className="text-sm font-semibold text-gold-hover hover:underline" data-testid="view-site-link">View website ↗</a>{!ro && <Button onClick={save} disabled={busy} className="bg-ink-950 hover:bg-ink-800" data-testid="site-save-btn">{busy ? "Saving…" : "Save"}</Button>}</div>} />
       <CmsNav active="settings" />
       <div className="grid gap-5 lg:grid-cols-2">
-        <div className="card-elev space-y-3 p-5"><h3 className="text-base font-bold text-navy">Brand & contact</h3>
-          <div className="flex items-center justify-between rounded-md bg-surface px-3 py-2"><div><p className="text-sm font-semibold">Site live</p><p className="text-xs text-slate-500">Off shows an elegant coming-soon page</p></div><Switch checked={!!s.site_live} onCheckedChange={(v) => set("site_live", v)} disabled={ro} data-testid="site-live-switch" /></div>
+        <div className="card space-y-3 p-5"><h3 className="text-base font-bold text-ink-950">Brand & contact</h3>
+          <div className="flex items-center justify-between rounded-md bg-warm-50 px-3 py-2"><div><p className="text-sm font-semibold">Site live</p><p className="text-xs text-txt-secondary">Off shows an elegant coming-soon page</p></div><Switch checked={!!s.site_live} onCheckedChange={(v) => set("site_live", v)} disabled={ro} data-testid="site-live-switch" /></div>
           <Field label="Brand name"><Input value={s.brand_name || ""} onChange={(e) => set("brand_name", e.target.value)} data-testid="site-brand" /></Field>
           <Field label="Tagline"><Input value={s.tagline || ""} onChange={(e) => set("tagline", e.target.value)} /></Field>
           <div className="grid grid-cols-3 gap-3"><Field label="Phone"><Input value={s.phone || ""} onChange={(e) => set("phone", e.target.value)} /></Field><Field label="WhatsApp"><Input value={s.whatsapp || ""} onChange={(e) => set("whatsapp", e.target.value)} /></Field><Field label="Email"><Input value={s.email || ""} onChange={(e) => set("email", e.target.value)} /></Field></div>
@@ -44,7 +44,7 @@ export default function SiteSettingsPage() {
           <Field label="Offices (JSON: name, address, map_embed_url)"><Textarea rows={5} className="font-mono text-xs" value={json.offices} onChange={(e) => setJson({ ...json, offices: e.target.value })} /></Field>
           <Field label="Social links (JSON)"><Textarea rows={4} className="font-mono text-xs" value={json.social} onChange={(e) => setJson({ ...json, social: e.target.value })} /></Field>
         </div>
-        <div className="card-elev space-y-3 p-5"><h3 className="text-base font-bold text-navy">Home, SEO & tracking</h3>
+        <div className="card space-y-3 p-5"><h3 className="text-base font-bold text-ink-950">Home, SEO & tracking</h3>
           <Field label="Trust stats (JSON: label, value)"><Textarea rows={4} className="font-mono text-xs" value={json.trust_stats} onChange={(e) => setJson({ ...json, trust_stats: e.target.value })} /></Field>
           <Field label="Value props (JSON: title, text, icon)"><Textarea rows={5} className="font-mono text-xs" value={json.value_props} onChange={(e) => setJson({ ...json, value_props: e.target.value })} /></Field>
           <Field label="Walkthrough video URL (YouTube embed)"><Input value={s.home?.walkthrough_video_url || ""} onChange={(e) => set("home", { ...s.home, walkthrough_video_url: e.target.value })} /></Field>
@@ -54,7 +54,7 @@ export default function SiteSettingsPage() {
           <div className="grid grid-cols-2 gap-3"><Field label="Google Analytics ID"><Input value={s.ga_id || ""} onChange={(e) => set("ga_id", e.target.value || null)} placeholder="G-XXXX" /></Field><Field label="Meta Pixel ID"><Input value={s.meta_pixel_id || ""} onChange={(e) => set("meta_pixel_id", e.target.value || null)} /></Field></div>
           <Field label="Footer text"><Textarea rows={2} value={s.footer_text || ""} onChange={(e) => set("footer_text", e.target.value)} /></Field>
           <Field label="RERA disclaimer"><Textarea rows={3} value={s.rera_disclaimer || ""} onChange={(e) => set("rera_disclaimer", e.target.value)} /></Field>
-          <div className="flex items-center justify-between rounded-md bg-surface px-3 py-2"><div><p className="text-sm font-semibold">Round-robin lead assignment</p><p className="text-xs text-slate-500">Website enquiries rotate across active Sales users</p></div><Switch checked={!!s.round_robin_assignment} onCheckedChange={(v) => set("round_robin_assignment", v)} disabled={ro} data-testid="round-robin-switch" /></div>
+          <div className="flex items-center justify-between rounded-md bg-warm-50 px-3 py-2"><div><p className="text-sm font-semibold">Round-robin lead assignment</p><p className="text-xs text-txt-secondary">Website enquiries rotate across active Sales users</p></div><Switch checked={!!s.round_robin_assignment} onCheckedChange={(v) => set("round_robin_assignment", v)} disabled={ro} data-testid="round-robin-switch" /></div>
         </div>
       </div>
     </div>

@@ -13,7 +13,7 @@ export function VersionConflictDialog() {
           <AlertDialogDescription>{data?.detail} {data?.current?.updated_at ? `Last updated ${new Date(data.current.updated_at).toLocaleString("en-IN")}.` : ""} Reload to see the latest version before editing again.</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogAction onClick={() => window.location.reload()} className="bg-navy hover:bg-navy-700" data-testid="version-conflict-reload">Reload</AlertDialogAction>
+          <AlertDialogAction onClick={() => window.location.reload()} className="bg-ink-950 hover:bg-ink-800" data-testid="version-conflict-reload">Reload</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

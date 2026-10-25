@@ -1,6 +1,14 @@
 import axios from "axios";
 
-export const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+// Same-origin unless REACT_APP_BACKEND_URL points at this very host (deployed build must work on any domain).
+function resolveBackend() {
+  const env = (process.env.REACT_APP_BACKEND_URL || "").replace(/\/$/, "");
+  try { if (env && new URL(env).host === window.location.host) return env; } catch { /* ignore */ }
+  return window.location.origin;
+}
+export const BACKEND = resolveBackend();
+export const API = `${BACKEND}/api`;
+export const portalHref = (portalUrl) => portalUrl || `${window.location.origin}/portal/`;
 export const ACCESS_KEY = "kkt_access_token";
 export const REFRESH_KEY = "kkt_refresh_token";
 

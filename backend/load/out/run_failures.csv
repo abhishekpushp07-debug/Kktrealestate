@@ -1,0 +1,4 @@
+Method,Name,Error,Occurrences,First Seen,Last Seen
+GET,/api/catalogues,CatchResponseError('500'),1,2026-10-24T21:33:22Z,2026-10-24T21:33:22Z
+POST,/api/payments POST,CatchResponseError('0'),34,2026-10-24T21:34:01Z,2026-10-24T21:34:21Z
+POST,/api/payments POST,CatchResponseError('500'),6,2026-10-24T21:33:24Z,2026-10-24T21:34:13Z

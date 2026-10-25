@@ -55,14 +55,14 @@ export function FlatDrawer({ flatId, onClose, onChanged }) {
       <SheetContent className="w-full overflow-y-auto sm:max-w-lg" data-testid="flat-drawer">
         {!flat ? <div className="space-y-3 pt-6"><SheetTitle className="sr-only">Loading flat</SheetTitle><Skeleton className="h-8 w-40" /><Skeleton className="h-32" /></div> : <>
           <SheetHeader>
-            <SheetTitle className="flex items-center gap-3 text-2xl font-extrabold text-navy"><span data-testid="flat-drawer-number">{flat.flat_number}</span><StatusChip status={flat.status} testId="flat-drawer-status" /></SheetTitle>
-            <p className="text-sm text-slate-500">{flat.project_name} · {flat.block_name} · Floor {flat.floor} · Position {flat.position}</p>
+            <SheetTitle className="flex items-center gap-3 text-2xl font-extrabold text-ink-950"><span data-testid="flat-drawer-number">{flat.flat_number}</span><StatusChip status={flat.status} testId="flat-drawer-status" /></SheetTitle>
+            <p className="text-sm text-txt-secondary">{flat.project_name} · {flat.block_name} · Floor {flat.floor} · Position {flat.position}</p>
           </SheetHeader>
-          <div className="mt-6 rounded-xl bg-navy p-5 text-white">
+          <div className="mt-6 rounded-xl bg-ink-950 p-5 text-white">
             <p className="label-xs text-gold">Listed price</p>
             <p className="mt-1 text-3xl font-extrabold tabular" data-testid="flat-drawer-price">{inrShort(flat.price)}</p>
-            <p className="text-xs text-slate-300">{inr(flat.price)}{flat.rate_per_sqft ? ` · ₹${num(flat.rate_per_sqft)}/sq.ft × ${num(flat.super_builtup_sqft)}` : " · lump sum"}{flat.rate_card?.name ? ` · ${flat.rate_card.name}` : ""}</p>
-            {flat.price_breakup?.length > 0 && <ul className="mt-3 space-y-1 border-t border-white/10 pt-2 text-xs" data-testid="flat-price-breakup">{flat.price_breakup.map((b, i) => <li key={i} className="flex justify-between"><span className="text-slate-300">{b.label}</span><span className="tabular font-semibold">{inr(b.amount)}</span></li>)}</ul>}
+            <p className="text-xs text-txt-muted">{inr(flat.price)}{flat.rate_per_sqft ? ` · ₹${num(flat.rate_per_sqft)}/sq.ft × ${num(flat.super_builtup_sqft)}` : " · lump sum"}{flat.rate_card?.name ? ` · ${flat.rate_card.name}` : ""}</p>
+            {flat.price_breakup?.length > 0 && <ul className="mt-3 space-y-1 border-t border-white/10 pt-2 text-xs" data-testid="flat-price-breakup">{flat.price_breakup.map((b, i) => <li key={i} className="flex justify-between"><span className="text-txt-muted">{b.label}</span><span className="tabular font-semibold">{inr(b.amount)}</span></li>)}</ul>}
           </div>
           <div className="mt-5 grid grid-cols-3 gap-4">
             <KV label="Type" value={`${flat.flat_type?.name} (${flat.flat_type?.bhk} BHK)`} /><KV label="Facing" value={flat.facing} /><KV label="Floor" value={flat.floor} mono />
@@ -70,10 +70,10 @@ export function FlatDrawer({ flatId, onClose, onChanged }) {
           </div>
           <div className="mt-6">
             <p className="label-xs mb-2">Rooms snapshot</p>
-            <table className="w-full text-sm" data-testid="flat-rooms-table"><tbody>{flat.rooms_snapshot?.map((r, i) => <tr key={i} className="border-b border-slate-100"><td className="py-1.5 text-slate-600">{r.label}<span className="ml-1 text-[10px] text-slate-400">{r.room_type_name}</span></td><td className="py-1.5 text-right tabular text-xs text-slate-500">{r.length_ft} × {r.width_ft} ft</td><td className="py-1.5 text-right font-semibold tabular">{num(r.area_sqft)} sq.ft</td></tr>)}</tbody></table>
+            <table className="w-full text-sm" data-testid="flat-rooms-table"><tbody>{flat.rooms_snapshot?.map((r, i) => <tr key={i} className="border-b border-slate-100"><td className="py-1.5 text-txt-secondary">{r.label}<span className="ml-1 text-[10px] text-txt-muted">{r.room_type_name}</span></td><td className="py-1.5 text-right tabular text-xs text-txt-secondary">{r.length_ft} × {r.width_ft} ft</td><td className="py-1.5 text-right font-semibold tabular">{num(r.area_sqft)} sq.ft</td></tr>)}</tbody></table>
             <p className="label-xs mb-2 mt-4">Areas snapshot</p>
-            <div className="flex flex-wrap gap-2" data-testid="flat-areas-list">{flat.areas_snapshot?.map((a, i) => <span key={i} className="rounded-md border bg-slate-50 px-2 py-1 text-xs"><b className="text-navy">{a.area_type_name}</b> {num(a.value_sqft)}</span>)}</div>
-            {flat.specifications?.length > 0 && <><p className="label-xs mb-2 mt-4">Specifications</p><div className="grid grid-cols-2 gap-1 text-xs" data-testid="flat-specs">{flat.specifications.map((s) => <div key={s.id} className="rounded border bg-white px-2 py-1"><span className="text-slate-400">{s.category}: </span><b className="text-navy">{s.name}</b>{s.brand ? <span className="text-slate-500"> · {s.brand}</span> : null}</div>)}</div></>}
+            <div className="flex flex-wrap gap-2" data-testid="flat-areas-list">{flat.areas_snapshot?.map((a, i) => <span key={i} className="rounded-md border bg-warm-50 px-2 py-1 text-xs"><b className="text-ink-950">{a.area_type_name}</b> {num(a.value_sqft)}</span>)}</div>
+            {flat.specifications?.length > 0 && <><p className="label-xs mb-2 mt-4">Specifications</p><div className="grid grid-cols-2 gap-1 text-xs" data-testid="flat-specs">{flat.specifications.map((s) => <div key={s.id} className="rounded border bg-white px-2 py-1"><span className="text-txt-muted">{s.category}: </span><b className="text-ink-950">{s.name}</b>{s.brand ? <span className="text-txt-secondary"> · {s.brand}</span> : null}</div>)}</div></>}
             <details className="mt-4"><summary className="label-xs cursor-pointer">History</summary><div className="mt-2"><HistoryTimeline entityType="flat" entityId={flat.id} /></div></details>
           </div>
           {can("flat.status") && (
@@ -82,10 +82,10 @@ export function FlatDrawer({ flatId, onClose, onChanged }) {
               {manual ? <>
                 <Input placeholder="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)} className="mb-2 h-9" data-testid="flat-status-reason" />
                 <div className="flex flex-wrap gap-2">
-                  {["Available", "Hold", "Blocked"].filter((s) => s !== flat.status).map((s) => <Button key={s} size="sm" variant="outline" disabled={busy} onClick={() => changeStatus(s)} data-testid={`flat-status-${s.toLowerCase()}-btn`} className={s === "Hold" ? "border-amber-300 text-amber-700 hover:bg-amber-50" : s === "Blocked" ? "border-slate-300 text-slate-700" : "border-emerald-300 text-emerald-700 hover:bg-emerald-50"}>Mark {s}</Button>)}
+                  {["Available", "Hold", "Blocked"].filter((s) => s !== flat.status).map((s) => <Button key={s} size="sm" variant="outline" disabled={busy} onClick={() => changeStatus(s)} data-testid={`flat-status-${s.toLowerCase()}-btn`} className={s === "Hold" ? "border-amber-300 text-amber2 hover:bg-amber2-50" : s === "Blocked" ? "border-slate-300 text-txt-secondary" : "border-emerald-300 text-sage hover:bg-sage-50"}>Mark {s}</Button>)}
                 </div>
-                <p className="mt-2 text-[11px] text-slate-400">Booked / Sold are set by the booking engine (Phase 2).</p>
-              </> : <p className="text-sm text-slate-500">Status is controlled by the booking.</p>}
+                <p className="mt-2 text-[11px] text-txt-muted">Booked / Sold are set by the booking engine (Phase 2).</p>
+              </> : <p className="text-sm text-txt-secondary">Status is controlled by the booking.</p>}
             </div>
           )}
           {can("flat.write") && (
@@ -97,7 +97,7 @@ export function FlatDrawer({ flatId, onClose, onChanged }) {
                 <Field label="Price ₹"><Input type="number" value={edit.price} onChange={(e) => setEdit({ ...edit, price: e.target.value })} data-testid="flat-edit-price" /></Field>
               </div>
               <Field label="Notes"><Textarea rows={2} value={edit.notes} onChange={(e) => setEdit({ ...edit, notes: e.target.value })} data-testid="flat-edit-notes" /></Field>
-              <Button size="sm" disabled={busy} onClick={save} className="bg-navy hover:bg-navy-700" data-testid="flat-edit-save">Save changes</Button>
+              <Button size="sm" disabled={busy} onClick={save} className="bg-ink-950 hover:bg-ink-800" data-testid="flat-edit-save">Save changes</Button>
             </div>
           )}
         </>}

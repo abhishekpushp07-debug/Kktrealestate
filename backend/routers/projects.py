@@ -68,6 +68,7 @@ class ProjectCreate(StrictModel):
     amenity_ids: list[str] = []
     milestone_template_id: str | None = None
     cover_image_url: str | None = None
+    default_cash_percent: float = Field(default=0, ge=0, le=100)
     is_published: bool = False
     show_prices: bool = False
     show_availability: bool = False
@@ -90,6 +91,7 @@ class ProjectCreate(StrictModel):
 
 class ProjectUpdate(StrictModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
+    default_cash_percent: float | None = Field(default=None, ge=0, le=100)
     description: str | None = None
     project_type: Literal["Residential", "Commercial", "Mixed"] | None = None
     address: Address | None = None

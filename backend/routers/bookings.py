@@ -106,8 +106,9 @@ async def list_bookings(params: ListParams = Depends(), project_id: str | None =
             q[k] = v
     if status:
         q["status"] = {"$in": status.split(",")}
-    res = await paginate(db.bookings, q, params, params.sort_spec(["booking_number", "booking_date", "created_at", "status", "customer_name"], "-booking_date"), {"agreement_revisions": 0, "milestone_template_snapshot": 0})
-    res["items"] = present_money(res["items"])
+    res = await paginate(db.bookings, q, params, params.sort_spec(["booking_number", "booking_date", "created_at", "status", "customer_name"], "-booking_date"), {"agreement_revisions": 0, "milestone_template_snapshot": 0, "payment_plan_snapshot": 0})
+    from services.includes import expand
+    res["items"] = present_money(await expand(res["items"], params.include, "bookings"))
     if res.pop("_csv", False):
         rows = [{**i, "flat_number": i["flat_snapshot"]["flat_number"], **{k: v for k, v in i["summary"].items() if not k.endswith("_paise")}} for i in res["items"]]
         return Response(to_csv(rows, ["booking_number", "booking_date", "customer_name", "project_code", "block_code", "flat_number", "status", "agreement_value", "cash_agreed", "account_agreed", "construction_percent", "cash_paid", "account_paid", "paid", "cash_due", "account_due", "due", "other_charges_due"]), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=bookings.csv"})
@@ -196,6 +197,9 @@ async def create_booking(body: BookingIn, request: Request, user: dict = Depends
 
 @router.get("/{booking_id}")
 async def get_booking(booking_id: str, user: dict = Depends(require("booking.read"))):
+    if booking_id.startswith("BK-"):
+        hit = await db.bookings.find_one({"booking_number": booking_id, "company_id": user["company_id"]}, {"_id": 0, "id": 1})
+        booking_id = hit["id"] if hit else booking_id
     b = await _load(booking_id, user)
     import asyncio
     b["customer"], b["co_applicants"], b["parking_slots"], b["demands"], b["payments"], blk = await asyncio.gather(

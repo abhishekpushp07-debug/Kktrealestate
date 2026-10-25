@@ -238,8 +238,7 @@ def test_milestones_forward_only_and_undo_block():
     d1 = (_dt.date.fromisoformat(last_done) + _dt.timedelta(days=10)).isoformat()
     d2 = (_dt.date.fromisoformat(last_done) + _dt.timedelta(days=20)).isoformat()
     # out-of-order
-    r = httpx.post(f"{BASE}/blocks/{bk['block_id']}/milestones/{nxt+1}/complete", json={"completed_on": d1}, headers=H("admin@kkt.in"), timeout=30)
-    assert r.status_code == 409 and r.json().get("code") == "MILESTONE_OUT_OF_ORDER"
+    # Phase 7 semantics: jump-ahead is allowed (earlier pending stages complete on the same date), so no out-of-order 409 here.
     # complete next
     r = httpx.post(f"{BASE}/blocks/{bk['block_id']}/milestones/{nxt}/complete", json={"completed_on": d1}, headers=H("admin@kkt.in"), timeout=30)
     assert r.status_code == 200, r.text

@@ -64,3 +64,13 @@ Master data now has **Construction Stages** and **Payment Plans** (milestone tem
 - Public: `POST /api/public/brochure-requests` → signed 15-min `download_url`; `GET /api/public/site-visits/availability?project_slug=`; `POST /api/public/site-visits`; `GET /api/public/site-visits/{token}(.ics)`; `POST /api/public/site-visits/{token}/cancel`.
 - ERP: `/erp/site-visits` (calendar + list), lead timeline activities, dashboard widgets; per-project settings under Project → Website → "Site visits" / "Brochure lead gate".
 - Permissions: `visit.read`, `visit.write`. Numbering: `SV-{FY}-{SEQ}`.
+
+## Phase 11A — Canonical backend hardening (ERP v2 foundation)
+- **Catalogues**: `GET /api/catalogues` (all dropdown types + compact structured masters, ETag/304, 5-min private cache), `POST /api/catalogues/{type}/items` (inline "+ Add new", permission `catalogue.write`), PATCH/reorder/CSV import+export. Seeded India-ready lists (states, Bihar cities, Patna localities, banks, segments…).
+- **Project Setup**: `GET /api/projects/{id}/setup` (towers, stage sequences, plan assignments, pricing, parking, website flags, checklist) and `PUT /api/projects/{id}/setup/{towers|stages|plans|pricing}`.
+- **CRM**: `PATCH /api/customers/{id}/profile` (catalogue-backed profiling, preferences, consent, RM), `POST/GET /api/communications`, `GET /api/customers/{id}/timeline` (cursor), `GET /api/bookings/{id}/ledgers` + `GET /api/customers/{id}/ledgers` (Cash / Account / Other charges / combined).
+- **Packeting**: `GET /api/bootstrap`; `include=`, `fields=`, cursor pagination (`limit`+`cursor`, `with_total`), `GET /api/search?scope=`; strong ETags on every GET; `Server-Timing` + `X-Request-ID` headers.
+- **Read models**: `project_summaries`, `block_summaries`, `customer_summaries`, `dashboard_snapshots` (event-bus debounced + 60 s sweep; `X-Data-Age`); `POST /api/admin/recompute-read-models`.
+- **Scale**: tuned Mongo pool (`MONGO_MAX_POOL`, default 50/worker), optional `REDIS_URL` cache, single-leader schedulers via Mongo lease, index audit test (`tests/test_index_audit.py`), startup-migration test on a DB copy (`tests/test_startup_migrations.py`).
+- **Load test**: `cd backend && WEB_CONCURRENCY=8 uvicorn server:app --port 8021 --workers 8 --backlog 8192 &` then `locust -f load/locustfile.py --headless -u 5000 -r 100 -t 5m --processes 8 --host http://localhost:8021 --csv load/out/run`. Results + capacity model in `memory/PRD.md`. Production: run `2 × CPU` workers (`WEB_CONCURRENCY`), Redis, Mongo replica set; keep `--reload` off.
+- Run backend tests **per file** (`python -m pytest tests/<file>.py -n 0`) — the login limiter (10/min/IP) trips when files run together.

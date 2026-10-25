@@ -5,9 +5,18 @@ module.exports = {
   content: ["./src/**/*.{js,jsx,ts,tsx}", "./public/index.html"],
   theme: {
     extend: {
-      fontFamily: { sans: ["Manrope", "ui-sans-serif", "system-ui", "sans-serif"], mono: ["JetBrains Mono", "ui-monospace", "monospace"] },
+      boxShadow: { warm: '0 1px 2px rgba(20,16,8,.06), 0 8px 24px rgba(20,16,8,.06)', 'warm-lg': '0 2px 4px rgba(20,16,8,.08), 0 16px 40px rgba(20,16,8,.10)' },
+      fontFamily: { display: ["Fraunces", "Georgia", "serif"], sans: ["Manrope", "ui-sans-serif", "system-ui", "sans-serif"], mono: ["JetBrains Mono", "ui-monospace", "monospace"] },
       borderRadius: { lg: 'var(--radius)', md: 'calc(var(--radius) - 2px)', sm: 'calc(var(--radius) - 4px)' },
       colors: {
+        ink: { 950: '#0A0C10', 900: '#111419', 800: '#1A1F27', 700: '#2A313C', 600: '#3B4452' },
+        warm: { 50: '#FBF9F4', 100: '#F4F0E8', 200: '#EAE4D8', 300: '#DCD4C4' },
+        paper: '#FFFFFF',
+        sage: { DEFAULT: '#2F7D5B', 50: '#EAF4EE' },
+        amber2: { DEFAULT: '#B7791F', 50: '#FBF2E1' },
+        brick: { DEFAULT: '#B4423A', 50: '#F9ECEA' },
+        slate2: { DEFAULT: '#5B6B85', 50: '#EDF0F5' },
+        txt: { secondary: '#5A5F6B', muted: '#8A8F9A' },
         navy: { DEFAULT: '#0B1F3A', 950: '#07152B', 900: '#0B1F3A', 800: '#10294D', 700: '#163866', 600: '#1C4882', 100: '#DCE4F2', 50: '#F0F4FA' },
         ivory: '#F7F5EF',
         line: '#E6E9F0',

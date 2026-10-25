@@ -95,6 +95,8 @@ async def list_leads(params: ListParams = Depends(), status: str | None = None, 
         q["next_follow_up_at"] = {"$lte": end}
         q["status"] = {"$nin": ["Converted", "Lost"]}
     res = await paginate(db.leads, q, params, params.sort_spec(["name", "lead_number", "created_at", "status", "next_follow_up_at"], "-created_at"), {"stage_history": 0})
+    from services.includes import expand
+    res["items"] = await expand(res["items"], params.include, "leads")
     return res
 
 

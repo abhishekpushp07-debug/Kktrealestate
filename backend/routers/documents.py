@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, File, Form, Query, Request, Response, Up
 
 from db import db
 from services.filesig import sniff
-from deps import get_current_user
+from deps import ensure_project_access, get_current_user
 from storage import APP_NAME, get_object, put_object
 from utils import ApiError, base_doc, client_ip, get_or_404, now_iso, write_audit
 
@@ -15,6 +15,9 @@ ENTITY_PERMS = {"customer": "customer.write", "booking": "booking.create", "proj
 READ_PERMS = {"customer": "customer.read", "booking": "booking.read", "project": "project.read", "block": "project.read", "flat": "project.read", "payment": "payment.read", "floor_plan_template": "master.read"}
 
 
+PARENT = {"customer": db.customers, "booking": db.bookings, "project": db.projects, "block": db.blocks, "flat": db.flats, "payment": db.payments, "floor_plan_template": db.floor_plan_templates}
+
+
 def _check(user: dict, entity_type: str, write: bool):
     perms = ENTITY_PERMS if write else READ_PERMS
     if entity_type not in perms:
@@ -23,10 +26,21 @@ def _check(user: dict, entity_type: str, write: bool):
         raise ApiError(403, f"Missing permission: {perms[entity_type]}", "FORBIDDEN")
 
 
+async def _check_parent(user: dict, entity_type: str, entity_id: str):
+    """Tenant + project scope: the parent entity must belong to the user's company and (when project-bound) to their scope."""
+    parent = await PARENT[entity_type].find_one({"id": entity_id, "company_id": user["company_id"]}, {"_id": 0, "id": 1, "project_id": 1})
+    if not parent:
+        raise ApiError(404, f"{entity_type.replace('_', ' ').title()} not found", "NOT_FOUND")
+    pid = parent["id"] if entity_type == "project" else parent.get("project_id")
+    if pid:
+        ensure_project_access(user, pid)
+
+
 @router.post("", status_code=201)
 async def upload(request: Request, file: UploadFile = File(...), entity_type: str = Form(...), entity_id: str = Form(...),
                  document_type_id: str | None = Form(None), is_sensitive: bool = Form(False), user: dict = Depends(get_current_user)):
     _check(user, entity_type, True)
+    await _check_parent(user, entity_type, entity_id)
     mime = (file.content_type or "").split(";")[0]
     if mime not in ALLOWED:
         raise ApiError(422, "Only PDF, JPG, PNG or WEBP files are allowed", "UNSUPPORTED_MEDIA")
@@ -59,6 +73,7 @@ async def upload(request: Request, file: UploadFile = File(...), entity_type: st
 @router.get("")
 async def list_documents(entity_type: str = Query(...), entity_id: str = Query(...), user: dict = Depends(get_current_user)):
     _check(user, entity_type, False)
+    await _check_parent(user, entity_type, entity_id)
     items = await db.documents.find({"entity_type": entity_type, "entity_id": entity_id, "is_active": True}, {"_id": 0}).sort("uploaded_at", -1).to_list(200)
     if "customer.kyc_view" not in user["permissions"]:
         for d in items:
@@ -68,8 +83,9 @@ async def list_documents(entity_type: str = Query(...), entity_id: str = Query(.
 
 @router.get("/{doc_id}/download")
 async def download(doc_id: str, request: Request, user: dict = Depends(get_current_user)):
-    doc = await get_or_404(db.documents, doc_id, "Document", {"is_active": True})
+    doc = await get_or_404(db.documents, doc_id, "Document", {"is_active": True, "company_id": user["company_id"]})
     _check(user, doc["entity_type"], False)
+    await _check_parent(user, doc["entity_type"], doc["entity_id"])
     if doc.get("is_sensitive") and "customer.kyc_view" not in user["permissions"]:
         raise ApiError(403, "Sensitive document: customer.kyc_view required", "FORBIDDEN")
     try:
@@ -84,8 +100,9 @@ async def download(doc_id: str, request: Request, user: dict = Depends(get_curre
 
 @router.delete("/{doc_id}")
 async def soft_delete(doc_id: str, request: Request, user: dict = Depends(get_current_user)):
-    doc = await get_or_404(db.documents, doc_id, "Document", {"is_active": True})
+    doc = await get_or_404(db.documents, doc_id, "Document", {"is_active": True, "company_id": user["company_id"]})
     _check(user, doc["entity_type"], True)
+    await _check_parent(user, doc["entity_type"], doc["entity_id"])
     await db.documents.update_one({"id": doc_id}, {"$set": {"is_active": False, "deleted_at": now_iso(), "deleted_by": user["id"]}})
     await write_audit(user, "document.delete", "document", doc_id, before={"file_name": doc["file_name"]}, ip=client_ip(request))
     return {"ok": True}

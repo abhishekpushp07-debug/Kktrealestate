@@ -61,7 +61,8 @@ async def rebuild(booking_id: str) -> list[dict]:
                 cash_paid += amount
             else:
                 account_paid += amount
-            last_pay = src["payment_date"]
+            if src["status"] != "Reversed":
+                last_pay = max(last_pay or "", src["payment_date"])
         elif kind == "OTHER_CHARGE_PAYMENT":
             amount = src["amount_paise"]
             ref = src["receipt_number"]
@@ -69,7 +70,8 @@ async def rebuild(booking_id: str) -> list[dict]:
             if line:
                 line["paid_paise"] += amount
                 note = line["name"]
-            last_pay = src["payment_date"]
+            if src["status"] != "Reversed":
+                last_pay = max(last_pay or "", src["payment_date"])
         elif kind == "REVERSAL":
             amount = -src["amount_paise"]
             ref = src["receipt_number"]

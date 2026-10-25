@@ -26,7 +26,7 @@ export function ChangePasswordDialog({ open, onOpenChange }) {
         <form onSubmit={submit} className="space-y-4">
           <Field label="Current password" required><Input type="password" value={form.current_password} onChange={(e) => setForm({ ...form, current_password: e.target.value })} data-testid="current-password-input" required /></Field>
           <Field label="New password" required hint="Min 8 chars, at least 1 letter and 1 number"><Input type="password" value={form.new_password} onChange={(e) => setForm({ ...form, new_password: e.target.value })} data-testid="new-password-input" required /></Field>
-          <DialogFooter><Button type="submit" disabled={busy} className="bg-navy hover:bg-navy-700" data-testid="change-password-submit">Update password</Button></DialogFooter>
+          <DialogFooter><Button type="submit" disabled={busy} className="bg-ink-950 hover:bg-ink-800" data-testid="change-password-submit">Update password</Button></DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

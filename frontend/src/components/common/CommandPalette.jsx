@@ -42,7 +42,7 @@ export function CommandPalette() {
       <CommandList data-testid="command-palette-list">
         <CommandEmpty>No results.</CommandEmpty>
         {!q.trim() && recent.length > 0 && <CommandGroup heading="Recent">
-          {recent.map((r) => <CommandItem key={r.to} value={`recent ${r.label}`} onSelect={() => go(r.to, r.label)} data-testid="palette-recent"><Clock className="mr-2 h-4 w-4 text-slate-500" />{r.label}</CommandItem>)}
+          {recent.map((r) => <CommandItem key={r.to} value={`recent ${r.label}`} onSelect={() => go(r.to, r.label)} data-testid="palette-recent"><Clock className="mr-2 h-4 w-4 text-txt-secondary" />{r.label}</CommandItem>)}
         </CommandGroup>}
         <CommandGroup heading="Pages">
           {PAGES.filter(([, , , p]) => can(p)).map(([l, to, Icon]) => <CommandItem key={to} value={`page ${l}`} onSelect={() => go(to)} data-testid={`palette-page-${l.toLowerCase().replace(/\s+/g, "-")}`}><Icon className="mr-2 h-4 w-4 text-gold-hover" />{l}</CommandItem>)}
@@ -53,9 +53,9 @@ export function CommandPalette() {
             <CommandGroup key={g.type} heading={LABEL[g.type] || g.type}>
               {g.items.map((x) => (
                 <CommandItem key={x.id} value={`${g.type} ${x.name || x.flat_number || x.email} ${x.code || ""} ${x.id}`} onSelect={() => go(href(g.type, x), `${x.name || x.flat_number || x.email}${x.code ? ` · ${x.code}` : ""}`)} data-testid={`palette-result-${x.id}`}>
-                  <Icon className="mr-2 h-4 w-4 text-navy" />
+                  <Icon className="mr-2 h-4 w-4 text-ink-950" />
                   <span className="font-semibold">{x.name || x.flat_number}</span>
-                  <span className="ml-2 text-xs text-slate-500">{x.code || x.project_code || x.email}{x.status ? ` · ${x.status}` : ""}{x.price ? ` · ${inrShort(x.price)}` : ""}</span>
+                  <span className="ml-2 text-xs text-txt-secondary">{x.code || x.project_code || x.email}{x.status ? ` · ${x.status}` : ""}{x.price ? ` · ${inrShort(x.price)}` : ""}</span>
                 </CommandItem>
               ))}
             </CommandGroup>

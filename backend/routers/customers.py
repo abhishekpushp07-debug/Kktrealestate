@@ -84,11 +84,11 @@ class CoApplicant(StrictModel):
 
 
 class CustomerIn(StrictModel):
-    salutation: Literal["Mr", "Mrs", "Ms", "Dr", "M/s"] | None = None
+    salutation: str | None = Field(default=None, max_length=20)
     full_name: str = Field(min_length=2, max_length=120)
     father_or_spouse_name: str | None = None
     dob: date | None = None
-    gender: Literal["Male", "Female", "Other"] | None = None
+    gender: str | None = Field(default=None, max_length=30)
     phone: str
     alt_phone: str | None = None
     email: str | None = Field(default=None, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -97,8 +97,13 @@ class CustomerIn(StrictModel):
     permanent_same_as_current: bool = False
     occupation: str | None = None
     company_name: str | None = None
-    annual_income_band: Literal["<5L", "5-10L", "10-25L", "25-50L", "50L-1Cr", ">1Cr"] | None = None
-    source: Literal["Walk-in", "Website", "Referral", "Broker", "Campaign"] | None = None
+    annual_income_band: str | None = Field(default=None, max_length=60)
+    source: str | None = Field(default=None, max_length=60)
+    source_id: str | None = None
+    residency_id: str | None = None
+    occupation_id: str | None = None
+    income_band_id: str | None = None
+    segment_ids: list[str] | None = None
     assigned_sales_user_id: str | None = None
     pan: str | None = None
     aadhaar: str | None = None
@@ -181,8 +186,15 @@ async def _dup_check(company_id: str, phone: str | None, pan: str | None, exclud
 
 @router.get("")
 async def list_customers(params: ListParams = Depends(), has_overdue: bool = False, kyc_status: str | None = None, source: str | None = None,
-                         assigned_sales_user_id: str | None = None, user: dict = Depends(require("customer.read"))):
+                         assigned_sales_user_id: str | None = None, segment_id: str | None = None, lifecycle_stage: str | None = None, city_id: str | None = None,
+                         user: dict = Depends(require("customer.read"))):
     q = {"company_id": user["company_id"], **search_filter(params.search, ["full_name", "phone", "customer_code", "email"])}
+    if segment_id:
+        q["segment_ids"] = segment_id
+    if lifecycle_stage:
+        q["lifecycle_stage"] = lifecycle_stage
+    if city_id:
+        q["city_id"] = city_id
     if params.search and params.search.replace(" ", "").isalnum() and len(params.search) == 10:
         q = {"company_id": user["company_id"], "$or": [*q["$or"], {"pan_hash": secure_hash(params.search.upper())}]}
     if not params.include_inactive:
@@ -196,11 +208,16 @@ async def list_customers(params: ListParams = Depends(), has_overdue: bool = Fal
     today = date.today().isoformat()
     if has_overdue:
         q["id"] = {"$in": await db.demands.distinct("customer_id", {"voided": {"$ne": True}, "status": {"$in": ["Open", "Partially Paid"]}, "due_date": {"$lt": today}})}
-    res = await paginate(db.customers, q, params, params.sort_spec(["full_name", "customer_code", "created_at", "kyc_status", "phone"], "-created_at"))
-    res["items"] = [present(c) for c in res["items"]]
+    res = await paginate(db.customers, q, params, params.sort_spec(["full_name", "customer_code", "created_at", "kyc_status", "phone", "engagement_score", "lifecycle_stage"], "-created_at"))
+    from services.includes import expand
+    res["items"] = await expand([present(c) for c in res["items"]], params.include, "customers")
     ids = [c["id"] for c in res["items"]]
     dues = {d["_id"]: d["due"] for d in await db.bookings.aggregate([{"$match": {"customer_id": {"$in": ids}, "status": "Active"}}, {"$group": {"_id": "$customer_id", "due": {"$sum": {"$add": [{"$ifNull": ["$summary.due_paise", 0]}, {"$ifNull": ["$summary.other_charges_due_paise", 0]}]}}}}]).to_list(None)}
     od = {d["_id"]: d["n"] for d in await db.demands.aggregate([{"$match": {"customer_id": {"$in": ids}, "voided": {"$ne": True}, "status": {"$in": ["Open", "Partially Paid"]}, "due_date": {"$lt": today}}}, {"$group": {"_id": "$customer_id", "n": {"$sum": 1}}}]).to_list(None)}
+    bk = {d["_id"]: d for d in await db.bookings.aggregate([{"$match": {"customer_id": {"$in": ids}, "status": {"$in": ["Active", "Completed"]}}}, {"$group": {"_id": "$customer_id", "n": {"$sum": 1}, "agreement": {"$sum": "$agreement_value_paise"}}}]).to_list(None)}
+    for c in res["items"]:
+        c["bookings_count"] = bk.get(c["id"], {}).get("n", 0)
+        c["agreement_paise"] = bk.get(c["id"], {}).get("agreement", 0)
     for c in res["items"]:
         c["total_due_paise"] = dues.get(c["id"], 0)
         c["total_due"] = round(c["total_due_paise"] / 100, 2)
@@ -223,8 +240,18 @@ async def create_customer(body: CustomerIn, request: Request, user: dict = Depen
     return present(doc)
 
 
+@router.get("/rm-options")
+async def rm_options(user: dict = Depends(require("customer.read"))):
+    rows = await db.users.find({"company_id": user["company_id"], "is_active": True}, {"_id": 0, "id": 1, "name": 1, "role_id": 1}).sort("name", 1).to_list(200)
+    roles = {r["id"]: r["name"] for r in await db.roles.find({"id": {"$in": list({u.get("role_id") for u in rows})}}, {"_id": 0, "id": 1, "name": 1}).to_list(None)}
+    return {"items": [{"id": u["id"], "name": u["name"], "role_name": roles.get(u.get("role_id"))} for u in rows]}
+
+
 @router.get("/{customer_id}")
 async def get_customer(customer_id: str, request: Request, reveal: bool = Query(False), user: dict = Depends(require("customer.read"))):
+    if customer_id.startswith("CUST-"):
+        hit = await db.customers.find_one({"customer_code": customer_id, "company_id": user["company_id"]}, {"_id": 0, "id": 1})
+        customer_id = hit["id"] if hit else customer_id
     doc = await get_or_404(db.customers, customer_id, "Customer", {"company_id": user["company_id"]})
     do_reveal = reveal and "customer.kyc_view" in user["permissions"]
     if reveal and not do_reveal:
