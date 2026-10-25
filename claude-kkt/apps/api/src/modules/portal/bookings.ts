@@ -4,7 +4,7 @@
  * the customer is not primary or co-applicant on is 404 everywhere, PDF links included. Money figures come from the money module's
  * materialised summary and exported views; nothing here re-implements ledger or schedule maths.
  */
-import { and, asc, eq, gt, inArray, isNull, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNull, lte, ne, or, sql, type SQL } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
@@ -12,11 +12,11 @@ import {
   PortalBankDetailsSchema, PortalBookingSwitcherItemSchema, PortalConstructionTimelineResponseSchema, PortalDemandListResponseSchema, PortalDocumentListResponseSchema,
   PortalHomeResponseSchema, PortalLedgerResponseSchema, PortalMyFlatResponseSchema, PortalPdfLinkResponseSchema, PortalReceiptListResponseSchema, PortalScheduleResponseSchema,
   type DocumentRow, type PortalBankDetails, type PortalBucketCard, type PortalConstructionTimelineResponse, type PortalDemandRow, type PortalDocumentRow, type PortalHomeResponse,
-  type PortalLedgerRow, type PortalMyFlatResponse, type PortalPdfLinkResponse, type PortalReceiptRow, type PortalScheduleResponse,
+  type PortalLedgerRow, type PortalMyFlatResponse, type PortalPdfLinkResponse, type PortalReceiptRow, type PortalRelationshipManager, type PortalScheduleResponse,
 } from "@kkt/contracts";
 import {
-  agreementRevisions, bankAccounts, blockStages, bookingOtherCharges, demands, documentTypes, documents, ledgerEntries, notices, notifications, parkingSlots, paymentModes, payments,
-  projectWebsiteSettings, projects, specCategories, specItems, type Executor,
+  agreementRevisions, bankAccounts, blockStages, bookingOtherCharges, customers, demands, documentTypes, documents, ledgerEntries, notices, notifications, parkingSlots, paymentModes, payments,
+  projectWebsiteSettings, projects, specCategories, specItems, users, type Executor,
 } from "@kkt/db";
 import { compareDates, todayIST, type TowerStage } from "@kkt/domain";
 import { decryptField } from "../../lib/crypto.js";
@@ -25,12 +25,12 @@ import { paginate, type ListResult } from "../../lib/list.js";
 import { route } from "../../lib/routes.js";
 import type { PortalContext } from "../../lib/scope.js";
 import { blockStageTimeline, constructionPercent, deriveProgress } from "../construction/index.js";
-import { documentsSharedWithCustomer, loadRows, publicMediaUrl, signedUrl, type DocumentRecord } from "../documents/index.js";
+import { documentsSharedWithCustomer, loadRows, publicMediaUrl, type DocumentRecord } from "../documents/index.js";
 import { nonVoidDemands, scheduleRows } from "../money/index.js";
 import { allotmentLetterPdf, customerStatementPdf, demandLetterPdf, receiptPdf } from "../reports/index.js";
 import { customerProjectIdsSubquery } from "../service/ticketService.js";
-import { PortalListQuerySchema, customerOf, idParams, listOwnedBookings, loadOwnedBooking, relationshipManagerOf, scopedReader, toReceiptRow, toSwitcherItem, type OwnedBooking } from "./common.js";
-import { storeTempFile } from "./files.js";
+import { PortalListQuerySchema, customerOf, idParams, listOwnedBookings, loadOwnedBooking, scopedReader, toReceiptRow, toSwitcherItem, type OwnedBooking } from "./common.js";
+import { portalDocumentUrl, storeTempFile } from "./files.js";
 
 const bookingParams = idParams;
 const paymentParams = z.object({ id: z.uuid(), paymentId: z.uuid() });
@@ -50,30 +50,52 @@ export async function unreadNotificationCount(db: Executor, customerId: string):
   return Number(r?.n ?? 0);
 }
 
+/** SQL: live notices the customer may see (company-wide or in a project of their bookings) that they have not read through the bell. */
+function unreadNoticesSql(customer: Pick<PortalContext, "customerId" | "companyId">, now: Date): SQL {
+  const read = sql`exists (select 1 from ${notifications} nt where nt.recipient_type = 'CUSTOMER' and nt.recipient_id = ${customer.customerId}::uuid and nt.entity_type = 'notice' and nt.entity_id = ${notices.id} and nt.is_read = true and nt.is_withdrawn = false)`;
+  return and(
+    eq(notices.companyId, customer.companyId), eq(notices.isPublished, true),
+    or(isNull(notices.publishAt), lte(notices.publishAt, now)), or(isNull(notices.expiresAt), gt(notices.expiresAt, now)),
+    or(isNull(notices.projectId), sql`${notices.projectId} in ${customerProjectIdsSubquery(customer.customerId)}`),
+    sql`not ${read}`,
+  )!;
+}
+
 /** Live notices the customer may see (company-wide or in a project of their bookings) that they have not read through the bell. */
 export async function unreadNoticeCount(db: Executor, customer: Pick<PortalContext, "customerId" | "companyId">, now = new Date()): Promise<number> {
-  const read = sql`exists (select 1 from ${notifications} nt where nt.recipient_type = 'CUSTOMER' and nt.recipient_id = ${customer.customerId}::uuid and nt.entity_type = 'notice' and nt.entity_id = ${notices.id} and nt.is_read = true and nt.is_withdrawn = false)`;
-  const [r] = await db
-    .select({ n: sql<number>`count(*)::int` })
-    .from(notices)
-    .where(and(
-      eq(notices.companyId, customer.companyId), eq(notices.isPublished, true),
-      or(isNull(notices.publishAt), lte(notices.publishAt, now)), or(isNull(notices.expiresAt), gt(notices.expiresAt, now)),
-      or(isNull(notices.projectId), sql`${notices.projectId} in ${customerProjectIdsSubquery(customer.customerId)}`),
-      sql`not ${read}`,
-    ));
+  const [r] = await db.select({ n: sql<number>`count(*)::int` }).from(notices).where(unreadNoticesSql(customer, now));
   return Number(r?.n ?? 0);
 }
 
-/** Hero image of the booking's project: the website's first hero document, public when the project is published, else a signed link. */
-async function projectImageUrl(db: Executor, projectId: string): Promise<string | null> {
-  const [w] = await db.select({ heroes: projectWebsiteSettings.heroDocumentIds, published: projectWebsiteSettings.isPublished }).from(projectWebsiteSettings).where(eq(projectWebsiteSettings.projectId, projectId)).limit(1);
-  const heroId = w?.heroes[0];
-  if (!heroId) return null;
-  const [doc] = await db.select().from(documents).where(and(eq(documents.id, heroId), eq(documents.isDeleted, false))).limit(1);
-  if (!doc || !doc.mime.startsWith("image/")) return null;
-  const variant = doc.variants?.medium_key ? "medium" : "original";
-  return w?.published ? publicMediaUrl(doc.id, variant) : signedUrl(doc.id, variant).url;
+/** The home screen's counters and the relationship manager card in ONE query (two scalar subqueries + the RM join on the customer row). */
+async function homeCounters(db: Executor, customer: PortalContext, now = new Date()): Promise<{ noticesUnread: number; notificationsUnread: number; rm: PortalRelationshipManager | null }> {
+  const noticesUnread = db.select({ n: sql<number>`count(*)::int` }).from(notices).where(unreadNoticesSql(customer, now));
+  const notificationsUnread = db.select({ n: sql<number>`count(*)::int` }).from(notifications)
+    .where(and(eq(notifications.recipientType, "CUSTOMER"), eq(notifications.recipientId, customer.customerId), eq(notifications.isRead, false), eq(notifications.isWithdrawn, false)));
+  const [row] = await db
+    .select({ noticesUnread: sql<number>`(${noticesUnread})`, notificationsUnread: sql<number>`(${notificationsUnread})`, rmName: users.name, rmPhone: users.phone, rmEmail: users.email, rmActive: users.isActive })
+    .from(customers)
+    .leftJoin(users, eq(users.id, customers.relationshipManagerId))
+    .where(eq(customers.id, customer.customerId))
+    .limit(1);
+  const rm: PortalRelationshipManager | null = row?.rmName && row.rmActive ? { name: row.rmName, phone: row.rmPhone ?? null, whatsapp: row.rmPhone ?? null, email: row.rmEmail ?? null } : null;
+  return { noticesUnread: Number(row?.noticesUnread ?? 0), notificationsUnread: Number(row?.notificationsUnread ?? 0), rm };
+}
+
+/**
+ * Hero image of the booking's project in one query: the website's first hero document (live, not sensitive, an image) — public media when
+ * the project page is published, else a link signed for this customer.
+ */
+async function projectImageUrl(db: Executor, customer: PortalContext, projectId: string): Promise<string | null> {
+  const [w] = await db
+    .select({ published: projectWebsiteSettings.isPublished, docId: documents.id, mime: documents.mime, variants: documents.variants })
+    .from(projectWebsiteSettings)
+    .leftJoin(documents, and(eq(documents.id, sql`(${projectWebsiteSettings.heroDocumentIds})[1]`), eq(documents.isDeleted, false), eq(documents.isSensitive, false)))
+    .where(eq(projectWebsiteSettings.projectId, projectId))
+    .limit(1);
+  if (!w?.docId || !w.mime?.startsWith("image/")) return null;
+  const variant = w.variants?.medium_key ? "medium" : "original";
+  return w.published ? publicMediaUrl(w.docId, variant) : portalDocumentUrl(customer.customerId, w.docId, variant).url;
 }
 
 function bucketCard(agreed: number, raised: number, paid: number): PortalBucketCard {
@@ -101,18 +123,20 @@ function flatTypeNameOf(o: OwnedBooking): string {
 // Home
 // ---------------------------------------------------------------------------
 
-/** The portal home of one booking (SPEC §16 Home). */
+/**
+ * The portal home of one booking (SPEC §16 Home) in five queries: the owned bookings (switcher AND ownership check in one), the tower's
+ * stages, the booking's demands, the hero image, and the counters + relationship manager. 404 when the booking is not the customer's.
+ */
 export async function portalHome(db: Executor, customer: PortalContext, bookingId: string): Promise<PortalHomeResponse> {
-  const owned = await loadOwnedBooking(db, customer, bookingId);
+  const all = await listOwnedBookings(db, customer);
+  const owned = all.find((o) => o.booking.id === bookingId);
+  if (!owned) throw ApiError.notFound("Booking");
   const b = owned.booking;
-  const [all, tower, nonVoid, image, noticesUnread, notificationsUnread, rm] = await Promise.all([
-    listOwnedBookings(db, customer),
+  const [tower, nonVoid, image, counters] = await Promise.all([
     towerStages(db, b.blockId),
     nonVoidDemands(db, b.id),
-    projectImageUrl(db, b.projectId),
-    unreadNoticeCount(db, customer),
-    unreadNotificationCount(db, customer.customerId),
-    relationshipManagerOf(db, customer.customerId),
+    projectImageUrl(db, customer, b.projectId),
+    homeCounters(db, customer),
   ]);
   const progress = deriveProgress(tower.rows);
   const schedule = scheduleRows(b, tower.stages, nonVoid);
@@ -134,10 +158,10 @@ export async function portalHome(db: Executor, customer: PortalContext, bookingI
     },
     plan: { name: b.planSnapshot.name, plan_type: b.planSnapshot.plan_type, accepted_on: b.planAcceptedOn },
     next_installment: next ? { name: next.name, trigger_label: next.trigger_label, expected_date: next.expected_date, cash_paise: next.cash_paise, account_paise: next.account_paise, total_paise: next.total_paise } : null,
-    notices_unread: noticesUnread,
-    notifications_unread: notificationsUnread,
+    notices_unread: counters.noticesUnread,
+    notifications_unread: counters.notificationsUnread,
     pending_cheques_paise: b.pendingChequesPaise,
-    relationship_manager: rm,
+    relationship_manager: counters.rm,
   };
 }
 
@@ -152,8 +176,8 @@ function isFloorPlan(doc: Pick<DocumentRecord, "title" | "fileName" | "mime">, t
   return /floor[\s_-]?plan/i.test(`${doc.title ?? ""} ${doc.fileName}`);
 }
 
-/** Floor-plan image of the flat: a FLAT document first, then the block's, then the project's (live, not sensitive). Signed link. */
-async function floorPlanUrl(db: Executor, b: OwnedBooking["booking"]): Promise<string | null> {
+/** Floor-plan image of the flat: a FLAT document first, then the block's, then the project's (live, not sensitive). Link signed for the customer. */
+async function floorPlanUrl(db: Executor, customer: PortalContext, b: OwnedBooking["booking"]): Promise<string | null> {
   const rows = await db
     .select({ doc: documents, typeCode: documentTypes.code })
     .from(documents)
@@ -165,7 +189,7 @@ async function floorPlanUrl(db: Executor, b: OwnedBooking["booking"]): Promise<s
     .orderBy(sql`case ${documents.entityType} when 'FLAT' then 0 when 'BLOCK' then 1 else 2 end`, asc(documents.createdAt));
   const hit = rows.find((r) => isFloorPlan(r.doc, r.typeCode));
   if (!hit) return null;
-  return signedUrl(hit.doc.id, hit.doc.variants?.medium_key ? "medium" : "original").url;
+  return portalDocumentUrl(customer.customerId, hit.doc.id, hit.doc.variants?.medium_key ? "medium" : "original").url;
 }
 
 /** Specifications of the flat type grouped by category (name – description). */
@@ -188,7 +212,7 @@ export async function portalFlat(db: Executor, customer: PortalContext, bookingI
   const b = owned.booking;
   const [parking, plan, specs, revisions] = await Promise.all([
     db.select({ number: parkingSlots.number, slotType: parkingSlots.slotType, level: parkingSlots.level }).from(parkingSlots).where(eq(parkingSlots.bookingId, b.id)).orderBy(asc(parkingSlots.number)),
-    floorPlanUrl(db, b),
+    floorPlanUrl(db, customer, b),
     specifications(db, owned.flatTypeSpecItemIds),
     db.select().from(agreementRevisions).where(eq(agreementRevisions.bookingId, b.id)).orderBy(asc(agreementRevisions.revisedAt)),
   ]);
@@ -327,25 +351,27 @@ export async function portalPdfLink(app: FastifyInstance, customer: PortalContex
       pdf = await allotmentLetterPdf(db, reader, owned.booking.id);
       break;
   }
-  return storeTempFile(app.redis, { bytes: pdf.bytes, filename: pdf.filename, mime: "application/pdf" });
+  return storeTempFile(app.redis, customer.customerId, { bytes: pdf.bytes, filename: pdf.filename, mime: "application/pdf" });
 }
 
 // ---------------------------------------------------------------------------
 // Construction
 // ---------------------------------------------------------------------------
 
-/** The buyer's own tower only; photos flagged visible to buyers only; signed image links. */
+/** The buyer's own tower only; photos flagged visible to buyers only; image links signed for the customer (webp renditions when present). */
 export async function portalConstruction(db: Executor, customer: PortalContext, bookingId: string): Promise<PortalConstructionTimelineResponse> {
   const owned = await loadOwnedBooking(db, customer, bookingId);
   const timeline = await blockStageTimeline(db, owned.booking.blockId, { visibleToBuyersOnly: true });
   if (!timeline) throw ApiError.notFound("Booking");
+  const link = (documentId: string, variant: "original" | "thumb" | "medium") => portalDocumentUrl(customer.customerId, documentId, variant).url;
   return {
     block_name: timeline.block_name, percent: timeline.construction_percent, current_stage: timeline.current_stage_name,
     stages: timeline.stages.map((s) => ({
       name: s.name, status: s.status, started_on: s.started_on, completed_on: s.completed_on, notes: s.notes, is_possession: s.is_possession,
-      photos: s.photos.map((p) => {
-        const fallback = signedUrl(p.document_id, "original").url;
-        return { thumb_url: p.thumb_url ?? p.medium_url ?? fallback, medium_url: p.medium_url ?? p.thumb_url ?? fallback, caption: p.caption, taken_on: p.taken_on };
+      photos: s.photos.filter((p) => p.visible_to_buyers).map((p) => {
+        // the timeline's own urls are documents-module links; they only tell us whether renditions exist
+        const hasVariants = p.thumb_url !== null && p.medium_url !== null;
+        return { thumb_url: link(p.document_id, hasVariants ? "thumb" : "original"), medium_url: link(p.document_id, hasVariants ? "medium" : "original"), caption: p.caption, taken_on: p.taken_on };
       }),
     })),
   };
@@ -377,7 +403,7 @@ export async function portalDocumentLink(db: Executor, customer: PortalContext, 
   const rows = await portalDocuments(db, customer, bookingId);
   const row = rows.find((r) => r.document_id === docId);
   if (!row) throw ApiError.notFound("Document");
-  const link = signedUrl(row.document_id, "original");
+  const link = portalDocumentUrl(customer.customerId, row.document_id, "original");
   return { download_url: link.url, expires_at: link.expires_at, file_name: row.file_name };
 }
 

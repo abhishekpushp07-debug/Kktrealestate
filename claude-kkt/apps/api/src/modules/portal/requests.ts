@@ -3,7 +3,7 @@
  * reopen within 7 days of RESOLVED, rating, and one-file-per-call multipart attachments stored through the documents module as
  * SERVICE_REQUEST documents uploaded by the CUSTOMER. The ticket rules live in the service module; this file maps and guards.
  */
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray, or } from "drizzle-orm";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
@@ -11,7 +11,7 @@ import {
   PortalRequestMessageCreateSchema, PortalRequestRateSchema, PortalRequestReopenSchema,
   type CustomerTicketDetail, type CustomerTicketRow, type PortalDocumentRow, type PortalRequestDetailResponse, type PortalRequestMessage, type PortalRequestRow, type ServiceMessageRow,
 } from "@kkt/contracts";
-import { serviceCategories } from "@kkt/db";
+import { documents, serviceCategories, type Executor } from "@kkt/db";
 import { writeAudit } from "../../lib/audit.js";
 import { ApiError } from "../../lib/errors.js";
 import type { ListResult } from "../../lib/list.js";
@@ -20,6 +20,7 @@ import type { PortalContext } from "../../lib/scope.js";
 import { loadJoined, storeBuffer, toDocumentRow } from "../documents/index.js";
 import { addCustomerMessage, createTicketForCustomer, listTicketsForCustomer, rateByCustomer, reopenByCustomer, requireCustomerTicket, ticketForCustomer, type WriteMeta } from "../service/index.js";
 import { customerOf, idParams } from "./common.js";
+import { portalDocumentUrl } from "./files.js";
 
 function meta(req: FastifyRequest): WriteMeta {
   return { ip: req.clientIp, requestId: req.id };
@@ -34,14 +35,46 @@ export function toPortalRequestRow(t: CustomerTicketRow): PortalRequestRow {
   };
 }
 
-/** Thread message → portal message: the customer's own messages read "YOU"; staff show by name only; internal notes never reach here. */
-export function toPortalMessage(m: ServiceMessageRow): PortalRequestMessage {
+/**
+ * Thread message → portal message: the customer's own messages read "YOU"; staff show by name only; internal notes never reach here.
+ * Attachment thumbnails are re-signed for the viewing customer (the service module's thumb_url only tells us a rendition exists).
+ */
+export function toPortalMessage(m: ServiceMessageRow, customerId: string): PortalRequestMessage {
   const author = m.author_type === "CUSTOMER" ? "YOU" : m.author_type === "STAFF" ? "STAFF" : "SYSTEM";
-  return { id: m.id, author, author_name: m.author_name, body: m.body, attachments: m.attachments.map((a) => ({ id: a.id, file_name: a.file_name, mime: a.mime, thumb_url: a.thumb_url })), created_at: m.created_at };
+  return {
+    id: m.id, author, author_name: m.author_name, body: m.body, created_at: m.created_at,
+    attachments: m.attachments.map((a) => ({ id: a.id, file_name: a.file_name, mime: a.mime, thumb_url: a.thumb_url ? portalDocumentUrl(customerId, a.id, "thumb").url : null })),
+  };
 }
 
-export function toPortalRequestDetail(d: CustomerTicketDetail): PortalRequestDetailResponse {
-  return { ...toPortalRequestRow(d), messages: d.messages.filter((m) => !m.is_internal).map(toPortalMessage) };
+export function toPortalRequestDetail(d: CustomerTicketDetail, customerId: string): PortalRequestDetailResponse {
+  return { ...toPortalRequestRow(d), messages: d.messages.filter((m) => !m.is_internal).map((m) => toPortalMessage(m, customerId)) };
+}
+
+/**
+ * Portal-side attachment rule (stricter than the service module's, which also admits any non-sensitive BOOKING document): a customer may
+ * carry only documents they uploaded themselves, or documents already visible to them in the portal (shared, non-sensitive, on their own
+ * customer record, the booking or the request). Anything else — another booking's paperwork, an internal note, another buyer's photo —
+ * is 400 VALIDATION_ERROR on attachment_ids, exactly like a non-existent id, so nothing can be probed through the thread.
+ */
+export async function assertPortalAttachments(db: Executor, customer: Pick<PortalContext, "customerId" | "companyId">, ids: readonly string[], ref: { bookingId?: string | null; ticketId?: string | null }): Promise<void> {
+  if (ids.length === 0) return;
+  const visible = [and(eq(documents.entityType, "CUSTOMER"), eq(documents.entityId, customer.customerId))!];
+  if (ref.bookingId) visible.push(and(eq(documents.entityType, "BOOKING"), eq(documents.entityId, ref.bookingId))!);
+  if (ref.ticketId) visible.push(and(eq(documents.entityType, "SERVICE_REQUEST"), eq(documents.entityId, ref.ticketId))!);
+  const rows = await db
+    .select({ id: documents.id })
+    .from(documents)
+    .where(and(
+      eq(documents.companyId, customer.companyId), inArray(documents.id, [...new Set(ids)]), eq(documents.isDeleted, false), eq(documents.isSensitive, false),
+      or(
+        and(eq(documents.uploadedByType, "CUSTOMER"), eq(documents.uploadedBy, customer.customerId)),
+        and(eq(documents.sharedWithCustomer, true), or(...visible)),
+      ),
+    ));
+  const found = new Set(rows.map((r) => r.id));
+  const missing = ids.filter((id) => !found.has(id));
+  if (missing.length > 0) throw ApiError.badRequest("attachment_ids references a document that does not exist or does not belong to this request", { field: "attachment_ids", missing });
 }
 
 /** A parsed single-file multipart upload. */
@@ -117,17 +150,21 @@ export function registerRequestRoutes(app: FastifyInstance): void {
     handler: async (req, reply) => {
       const c = customerOf(req);
       const b = req.body;
-      const detail = await app.db.transaction((tx) =>
-        createTicketForCustomer(tx, { customerId: c.customerId, bookingId: b.booking_id, categoryId: b.category_id, subject: b.subject, description: b.description, attachmentIds: b.attachment_ids }, meta(req)),
-      );
-      return reply.code(201).send(toPortalRequestDetail(detail));
+      const detail = await app.db.transaction(async (tx) => {
+        await assertPortalAttachments(tx, c, b.attachment_ids, { bookingId: b.booking_id });
+        return createTicketForCustomer(tx, { customerId: c.customerId, bookingId: b.booking_id, categoryId: b.category_id, subject: b.subject, description: b.description, attachmentIds: b.attachment_ids }, meta(req));
+      });
+      return reply.code(201).send(toPortalRequestDetail(detail, c.customerId));
     },
   });
 
   route(app, {
     method: "GET", url: "/portal/requests/:id", audience: "portal",
     schema: { params: idParams, response: { 200: PortalRequestDetailResponseSchema }, summary: "One request with its thread (internal staff notes never included)" },
-    handler: async (req) => toPortalRequestDetail(await ticketForCustomer(app.dbReplica, req.params.id, customerOf(req).customerId)),
+    handler: async (req) => {
+      const c = customerOf(req);
+      return toPortalRequestDetail(await ticketForCustomer(app.dbReplica, req.params.id, c.customerId), c.customerId);
+    },
   });
 
   route(app, {
@@ -135,8 +172,13 @@ export function registerRequestRoutes(app: FastifyInstance): void {
     schema: { params: idParams, body: PortalRequestMessageCreateSchema, response: { 201: PortalRequestDetailResponseSchema }, summary: "Reply on a request" },
     handler: async (req, reply) => {
       const c = customerOf(req);
-      const detail = await app.db.transaction((tx) => addCustomerMessage(tx, req.params.id, c.customerId, req.body.body, req.body.attachment_ids, meta(req)));
-      return reply.code(201).send(toPortalRequestDetail(detail));
+      const detail = await app.db.transaction(async (tx) => {
+        // ownership first (404 for another buyer's request), then the portal attachment rule, then the service module's own checks
+        const existing = await requireCustomerTicket(tx, req.params.id, c.customerId);
+        await assertPortalAttachments(tx, c, req.body.attachment_ids, { bookingId: existing.sr.bookingId, ticketId: existing.sr.id });
+        return addCustomerMessage(tx, req.params.id, c.customerId, req.body.body, req.body.attachment_ids, meta(req));
+      });
+      return reply.code(201).send(toPortalRequestDetail(detail, c.customerId));
     },
   });
 
@@ -145,7 +187,7 @@ export function registerRequestRoutes(app: FastifyInstance): void {
     schema: { params: idParams, body: PortalRequestReopenSchema, response: { 200: PortalRequestDetailResponseSchema }, summary: "Reopen a resolved request (within 7 days of resolution)" },
     handler: async (req) => {
       const c = customerOf(req);
-      return toPortalRequestDetail(await app.db.transaction((tx) => reopenByCustomer(tx, req.params.id, c.customerId, req.body.reason, meta(req))));
+      return toPortalRequestDetail(await app.db.transaction((tx) => reopenByCustomer(tx, req.params.id, c.customerId, req.body.reason, meta(req))), c.customerId);
     },
   });
 
@@ -154,7 +196,7 @@ export function registerRequestRoutes(app: FastifyInstance): void {
     schema: { params: idParams, body: PortalRequestRateSchema, response: { 200: PortalRequestDetailResponseSchema }, summary: "Rate a resolved request (1–5, once)" },
     handler: async (req) => {
       const c = customerOf(req);
-      return toPortalRequestDetail(await app.db.transaction((tx) => rateByCustomer(tx, req.params.id, c.customerId, req.body.rating, req.body.comment ?? null, meta(req))));
+      return toPortalRequestDetail(await app.db.transaction((tx) => rateByCustomer(tx, req.params.id, c.customerId, req.body.rating, req.body.comment ?? null, meta(req))), c.customerId);
     },
   });
 

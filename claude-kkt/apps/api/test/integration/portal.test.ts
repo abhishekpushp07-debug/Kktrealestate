@@ -338,7 +338,7 @@ describe("my flat", () => {
     const doc = await insertImageDocument(t, "BLOCK", w.sgh.towerId);
     await t.app.sql`update documents set entity_type = 'FLAT', entity_id = ${flatId}, title = 'Floor plan – 3BHK' where id = ${doc}`;
     const flat = await ok<Flat>(`/api/v1/portal/bookings/${bookingA.id}/flat`, tokenA);
-    expect(flat.floor_plan_url).toMatch(/\/api\/v1\/files\//);
+    expect(flat.floor_plan_url).toMatch(/\/api\/v1\/portal\/files\//);
     expect(flat.floor_plan_url).not.toContain(doc); // signed token, not the raw id
   });
 });
@@ -442,14 +442,18 @@ describe("PDF links", () => {
     expect(registeredJobs()).toContain("PORTAL_FILE_CLEANUP");
   });
 
-  it("the portal stream endpoint also serves documents-module links", async () => {
+  it("a shared document streams through its customer-bound portal link; documents-module tokens are not accepted by the portal endpoint", async () => {
     const png = await sharp({ create: { width: 64, height: 48, channels: 3, background: "#0B1F3A" } }).png().toBuffer();
-    const { storeBuffer } = await import("../../src/modules/documents/index.js");
+    const { storeBuffer, signedUrl } = await import("../../src/modules/documents/index.js");
     const doc = await t.app.db.transaction((tx) => storeBuffer(tx, { companyId: t.companyId, entityType: "BOOKING", entityId: bookingA.id, buffer: png, filename: "site.png", uploadedBy: admin.user.id, uploadedByType: "STAFF", sharedWithCustomer: true }));
     const link = await ok<PdfLink>(`/api/v1/portal/bookings/${bookingA.id}/documents/${doc.id}/download`, tokenA);
-    const viaPortal = await fetchFile(link.download_url.replace("/api/v1/files/", "/api/v1/portal/files/"));
+    expect(link.download_url).toMatch(/\/api\/v1\/portal\/files\//);
+    const viaPortal = await fetchFile(link.download_url);
     expect(viaPortal.statusCode).toBe(200);
     expect(viaPortal.headers["content-type"]).toBe("image/png");
+    // a documents-module (staff) link carries no customer and is refused here
+    const staffLink = signedUrl(doc.id, "original").url;
+    expect((await fetchFile(staffLink.replace("/api/v1/files/", "/api/v1/portal/files/"))).statusCode).toBe(404);
   });
 });
 
@@ -463,8 +467,8 @@ describe("construction", () => {
     expect(exc.status).toBe("COMPLETED");
     expect(exc.photos).toHaveLength(1);
     expect(exc.photos[0]).toMatchObject({ caption: "Excavation done" });
-    expect(exc.photos[0]!.thumb_url).toMatch(/\/api\/v1\/files\//);
-    expect(exc.photos[0]!.medium_url).toMatch(/\/api\/v1\/files\//);
+    expect(exc.photos[0]!.thumb_url).toMatch(/\/api\/v1\/portal\/files\//);
+    expect(exc.photos[0]!.medium_url).toMatch(/\/api\/v1\/portal\/files\//);
     expect(a.stages.every((s) => s.name !== "Excavation" ? s.photos.length === 0 : true)).toBe(true);
     const b = await ok<Timeline>(`/api/v1/portal/bookings/${bookingB.id}/construction`, tokenB);
     expect(b.block_name).toBe("Tower G");
@@ -483,7 +487,7 @@ describe("documents and bank details", () => {
     expect(ids).not.toContain(unsharedDocId);
     expect(docs.items.find((d) => d.document_id === sharedDocId)).toMatchObject({ kind: "SHARED", title: "Agreement copy", mime: "application/pdf" });
     const link = await ok<PdfLink>(`/api/v1/portal/bookings/${bookingA.id}/documents/${sharedDocId}/download`, tokenA);
-    expect(link.download_url).toMatch(/\/api\/v1\/files\//);
+    expect(link.download_url).toMatch(/\/api\/v1\/portal\/files\//);
     expect(link.file_name).toBe("Agreement copy.pdf");
     for (const hidden of [sensitiveSharedDocId, unsharedDocId, NO_ID]) {
       const r = await get(`/api/v1/portal/bookings/${bookingA.id}/documents/${hidden}/download`, tokenA);
@@ -587,7 +591,7 @@ describe("service requests", () => {
     expect(last).toMatchObject({ author: "YOU", body: "Photo of the crack attached." });
     expect(last.attachments).toHaveLength(1);
     expect(last.attachments[0]).toMatchObject({ id: up.body.document_id, file_name: "crack.jpg", mime: "image/jpeg" });
-    expect(last.attachments[0]!.thumb_url).toMatch(/\/api\/v1\/files\//);
+    expect(last.attachments[0]!.thumb_url).toMatch(/\/api\/v1\/portal\/files\//);
     // someone else's document cannot be smuggled into the thread
     const smuggle = await post<Request>(`/api/v1/portal/requests/${reqA.id}/messages`, tokenA, { body: "x", attachment_ids: [sensitiveSharedDocId] });
     expect(smuggle.status).toBe(400);

@@ -1,19 +1,26 @@
 /**
- * Portal file links. Stored documents reuse the documents module's signed `/api/v1/files/:token` links. PDFs that are generated on demand
- * (receipt, demand letter, statement, allotment letter) have no document row: they are rendered when the customer asks for the link,
- * written to object storage under a temporary key, indexed in Redis for 15 minutes and served by `GET /api/v1/portal/files/:token`
- * (which also accepts documents-module tokens, so one stream endpoint serves everything the portal links to). A cleanup sweep removes
- * expired temporary objects: it runs opportunistically on every new link and as the PORTAL_FILE_CLEANUP job.
+ * Portal file links (SPEC §16 "no internal ids or storage paths leak", §18 scenario 10 "a buyer cannot access another buyer's booking or
+ * PDFs"). Every file the portal links to — generated PDFs (receipt, demand letter, statement, allotment letter), shared documents, floor
+ * plans, construction photos, request attachments — is served by `GET /api/v1/portal/files/:token` through a signed, 15-minute token that
+ * is BOUND TO THE CUSTOMER it was issued to: the token carries the customer id under the HMAC, and the stream endpoint refuses the link
+ * (404, like every other ownership failure) when the request carries a portal bearer token of anybody else, a staff token, or a token that
+ * does not verify. A request without a bearer is served, because PDF viewers and native share sheets open links without headers; the
+ * 15-minute HMAC link is the credential there. Documents-module `/files/:token` links are NOT accepted here (they carry no customer).
+ *
+ * Generated PDFs have no document row: they are rendered when the customer asks for the link, written to object storage under a temporary
+ * key, indexed in Redis for 15 minutes and swept when expired (opportunistically on every new link and as the PORTAL_FILE_CLEANUP job).
  */
 import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { Readable } from "node:stream";
-import type { JobName, PortalPdfLinkResponse } from "@kkt/contracts";
+import { and, eq } from "drizzle-orm";
+import type { DocumentVariant, JobName, PortalPdfLinkResponse } from "@kkt/contracts";
+import { documents, type Executor } from "@kkt/db";
 import type { Redis } from "ioredis";
 import { config } from "../../config.js";
 import { registerJob } from "../../jobs/index.js";
-import { SIGNED_LINK_TTL_SECONDS, storage, streamDocument, verifyLinkToken, type DocumentStream } from "../documents/service.js";
+import { SIGNED_LINK_TTL_SECONDS, storage, streamDocument, type DocumentStream } from "../documents/service.js";
 
-/** Lifetime of a generated-PDF link (SPEC §2/§13: short-lived, 15 minutes). */
+/** Lifetime of a portal file link (SPEC §2/§13: short-lived, 15 minutes). */
 export const PORTAL_FILE_TTL_SECONDS = SIGNED_LINK_TTL_SECONDS;
 /** Job that removes expired temporary portal files. Not yet part of the contracts JOB_NAMES enum — see the module report. */
 export const PORTAL_FILE_CLEANUP_JOB = "PORTAL_FILE_CLEANUP" as JobName;
@@ -21,10 +28,28 @@ export const PORTAL_FILE_CLEANUP_JOB = "PORTAL_FILE_CLEANUP" as JobName;
 const META_KEY = (id: string) => `portal:file:${id}`;
 /** Sorted set of temporary file ids scored by their expiry (ms); the cleanup sweep pops everything below "now". */
 const EXPIRY_ZSET = "portal:files:expiry";
-const TOKEN_BODY_BYTES = 16 + 6; // uuid ‖ expiry seconds (48-bit)
+
+/** What a portal token points at: a generated temp file or a stored document rendition. */
+export type PortalFileKind = "TEMP" | "DOCUMENT";
+const KIND_CODES: readonly PortalFileKind[] = ["TEMP", "DOCUMENT"];
+const VARIANT_CODES: readonly DocumentVariant[] = ["original", "thumb", "medium"];
+/** kind (1) ‖ customer id (16) ‖ ref id (16) ‖ variant (1) ‖ expiry seconds (48-bit). */
+const TOKEN_BODY_BYTES = 1 + 16 + 16 + 1 + 6;
 const TOKEN_SIG_BYTES = 16; // HMAC-SHA256 truncated to 128 bits
 /** Key for portal file tokens, derived from the JWT secret with its own context (a token can never pass as another signed payload). */
-const tokenKey = createHash("sha256").update("kkt-portal-files-v1").update(":").update(config.JWT_SECRET).digest();
+const tokenKey = createHash("sha256").update("kkt-portal-files-v2").update(":").update(config.JWT_SECRET).digest();
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Decoded, verified portal file token. */
+export interface PortalFileToken {
+  kind: PortalFileKind;
+  /** The customer the link was issued to; the stream endpoint refuses any other authenticated viewer. */
+  customerId: string;
+  /** Temp file id (TEMP) or document id (DOCUMENT). */
+  refId: string;
+  variant: DocumentVariant;
+  exp: number;
+}
 
 /** Metadata of a temporary file (the bytes live in object storage). */
 export interface TempFileMeta {
@@ -39,28 +64,57 @@ export function tempKey(id: string, ext = "pdf"): string {
   return `portal-tmp/${id}.${ext}`;
 }
 
-function encodeToken(id: string, exp: number): string {
+function uuidBytes(id: string): Buffer {
+  return Buffer.from(id.replace(/-/g, ""), "hex");
+}
+
+function uuidFromBytes(b: Buffer): string {
+  const hex = b.toString("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+function encodeToken(t: PortalFileToken): string {
   const body = Buffer.alloc(TOKEN_BODY_BYTES);
-  Buffer.from(id.replace(/-/g, ""), "hex").copy(body, 0);
-  body.writeUIntBE(Math.max(0, Math.min(exp, 2 ** 48 - 1)), 16, 6);
+  body[0] = KIND_CODES.indexOf(t.kind);
+  uuidBytes(t.customerId).copy(body, 1);
+  uuidBytes(t.refId).copy(body, 17);
+  body[33] = VARIANT_CODES.indexOf(t.variant);
+  body.writeUIntBE(Math.max(0, Math.min(t.exp, 2 ** 48 - 1)), 34, 6);
   const sig = createHmac("sha256", tokenKey).update(body).digest().subarray(0, TOKEN_SIG_BYTES);
   return `${body.toString("base64url")}.${sig.toString("base64url")}`;
 }
 
-/** Verifies a portal temp-file token (canonical re-encoding compared in constant time); null when malformed, forged or expired. */
-export function verifyTempToken(token: string): { id: string; exp: number } | null {
+/** Signs a portal file token for a customer (exported for tests and the other portal screens). */
+export function signPortalFile(customerId: string, kind: PortalFileKind, refId: string, variant: DocumentVariant = "original", ttlSeconds = PORTAL_FILE_TTL_SECONDS): { token: string; exp: number } {
+  if (!UUID_RE.test(customerId) || !UUID_RE.test(refId)) throw new Error("portal file tokens need uuid ids");
+  const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
+  return { token: encodeToken({ kind, customerId, refId, variant, exp }), exp };
+}
+
+/**
+ * Verifies a portal file token (canonical re-encoding compared in constant time); null when malformed, forged or expired.
+ * Only the canonical spelling verifies: no base64 padding-bit twiddling, no signature truncation.
+ */
+export function verifyPortalFileToken(token: string): PortalFileToken | null {
   const dot = token.lastIndexOf(".");
   if (dot <= 0 || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token)) return null;
   const body = Buffer.from(token.slice(0, dot), "base64url");
   if (body.length !== TOKEN_BODY_BYTES) return null;
-  const hex = body.subarray(0, 16).toString("hex");
-  const id = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-  const exp = body.readUIntBE(16, 6);
-  const expected = Buffer.from(encodeToken(id, exp));
+  const kind = KIND_CODES[body[0]!];
+  const variant = VARIANT_CODES[body[33]!];
+  if (!kind || !variant) return null;
+  const decoded: PortalFileToken = { kind, customerId: uuidFromBytes(body.subarray(1, 17)), refId: uuidFromBytes(body.subarray(17, 33)), variant, exp: body.readUIntBE(34, 6) };
+  const expected = Buffer.from(encodeToken(decoded));
   const given = Buffer.from(token);
   if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
-  if (exp < Math.floor(Date.now() / 1000)) return null;
-  return { id, exp };
+  if (decoded.exp < Math.floor(Date.now() / 1000)) return null;
+  return decoded;
+}
+
+/** Verifies a temp-file token (kept for callers that only deal with generated PDFs); null for anything else. */
+export function verifyTempToken(token: string): { id: string; exp: number; customerId: string } | null {
+  const t = verifyPortalFileToken(token);
+  return t && t.kind === "TEMP" ? { id: t.refId, exp: t.exp, customerId: t.customerId } : null;
 }
 
 /** URL of the portal stream endpoint for a token. */
@@ -68,16 +122,22 @@ export function portalFileUrl(token: string): string {
   return `${config.API_PUBLIC_URL}/api/v1/portal/files/${token}`;
 }
 
+/** Signed, customer-bound, 15-minute link to a stored document rendition (shared documents, floor plans, construction photos, attachments). */
+export function portalDocumentUrl(customerId: string, documentId: string, variant: DocumentVariant = "original", ttlSeconds = PORTAL_FILE_TTL_SECONDS): { url: string; expires_at: string } {
+  const { token, exp } = signPortalFile(customerId, "DOCUMENT", documentId, variant, ttlSeconds);
+  return { url: portalFileUrl(token), expires_at: new Date(exp * 1000).toISOString() };
+}
+
 /**
- * Stores generated bytes under a temporary key, indexes them in Redis for the link lifetime and returns the signed link.
- * Expired objects from earlier links are swept in the same call (best effort), so storage never grows without a worker.
+ * Stores generated bytes under a temporary key, indexes them in Redis for the link lifetime and returns the signed link bound to the
+ * customer. Expired objects from earlier links are swept in the same call (best effort), so storage never grows without a worker.
  */
-export async function storeTempFile(redis: Redis, file: { bytes: Buffer; filename: string; mime?: string }, ttlSeconds = PORTAL_FILE_TTL_SECONDS): Promise<PortalPdfLinkResponse> {
+export async function storeTempFile(redis: Redis, customerId: string, file: { bytes: Buffer; filename: string; mime?: string }, ttlSeconds = PORTAL_FILE_TTL_SECONDS): Promise<PortalPdfLinkResponse> {
   const id = randomUUID();
   const mime = file.mime ?? "application/pdf";
   const key = tempKey(id, mime === "application/pdf" ? "pdf" : "bin");
   await storage().put(key, file.bytes, mime);
-  const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
+  const { token, exp } = signPortalFile(customerId, "TEMP", id, "original", ttlSeconds);
   const meta: TempFileMeta = { key, name: file.filename, mime, size: file.bytes.length };
   try {
     await redis.set(META_KEY(id), JSON.stringify(meta), "EX", ttlSeconds + 60);
@@ -87,7 +147,7 @@ export async function storeTempFile(redis: Redis, file: { bytes: Buffer; filenam
     throw err;
   }
   void cleanupExpiredTempFiles(redis).catch(() => undefined);
-  return { download_url: portalFileUrl(encodeToken(id, exp)), expires_at: new Date(exp * 1000).toISOString(), file_name: file.filename };
+  return { download_url: portalFileUrl(token), expires_at: new Date(exp * 1000).toISOString(), file_name: file.filename };
 }
 
 /** Opens a temporary file by its verified token id; null when the link has expired or the object is gone. */
@@ -101,16 +161,19 @@ export async function openTempFile(redis: Redis, id: string): Promise<DocumentSt
   return { stream: Readable.from([bytes]), mime: meta.mime, size: bytes.length, fileName: meta.name };
 }
 
+/** The viewer of a stream request, as far as the (optional) bearer token proves it. */
+export type PortalViewer = { customerId: string } | null;
+
 /**
- * Resolves any portal file token: a documents-module link (stored document rendition) or a portal temp-file link (generated PDF).
- * Null for malformed, forged, expired or vanished files — the route answers 404 for all of them alike.
+ * Resolves a verified portal file token to a stream. Null — the route answers 404 — when the link is for another customer than the
+ * authenticated viewer, when a stored document has since been deleted or flagged sensitive, or when a temp file has been swept.
  */
-export async function openPortalFile(db: Parameters<typeof streamDocument>[0], redis: Redis, token: string): Promise<DocumentStream | null> {
-  const doc = verifyLinkToken(token);
-  if (doc) return streamDocument(db, doc.documentId, doc.variant);
-  const tmp = verifyTempToken(token);
-  if (tmp) return openTempFile(redis, tmp.id);
-  return null;
+export async function openPortalFile(db: Executor, redis: Redis, token: PortalFileToken, viewer: PortalViewer): Promise<DocumentStream | null> {
+  if (viewer && viewer.customerId !== token.customerId) return null;
+  if (token.kind === "TEMP") return openTempFile(redis, token.refId);
+  const [doc] = await db.select({ sensitive: documents.isSensitive }).from(documents).where(and(eq(documents.id, token.refId), eq(documents.isDeleted, false))).limit(1);
+  if (!doc || doc.sensitive) return null;
+  return streamDocument(db, token.refId, token.variant);
 }
 
 /** Removes every temporary object whose link has expired (sorted-set sweep); returns how many were removed. */
