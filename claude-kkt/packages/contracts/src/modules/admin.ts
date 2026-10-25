@@ -194,3 +194,139 @@ export const HealthResponseSchema = z.object({
   checks: z.object({ database: z.boolean(), redis: z.boolean(), storage: z.boolean() }),
 });
 export type HealthResponse = z.infer<typeof HealthResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// Admin tools (module `admin`): settings preview, backup, reconcile, jobs, erasure, system — additive to the schemas above.
+// ---------------------------------------------------------------------------
+
+/** Preview of the next document number per numbering scope for the current financial year. */
+export const AdminNumberingPreviewSchema = z.object({
+  scope: z.enum(["customer", "booking", "demand", "receipt", "ticket", "visit"]),
+  fy: z.string(),
+  last_sequence: z.int().min(0),
+  next_number: z.string(),
+});
+export type AdminNumberingPreview = z.infer<typeof AdminNumberingPreviewSchema>;
+
+/** GET/PATCH /settings/company response: the company row plus the numbering preview. */
+export const CompanySettingsResponseSchema = CompanySettingsRowSchema.extend({ numbering_preview: z.array(AdminNumberingPreviewSchema) });
+export type CompanySettingsResponse = z.infer<typeof CompanySettingsResponseSchema>;
+
+/** POST /admin/backup body. */
+export const AdminBackupRequestSchema = z.strictObject({ include_sensitive: z.boolean().default(false) });
+export type AdminBackupRequest = z.infer<typeof AdminBackupRequestSchema>;
+
+/** One stored backup (kept 24 h). */
+export const AdminBackupRowSchema = z.object({
+  id: IdSchema,
+  file_name: z.string(),
+  size_bytes: z.int().min(0),
+  generated_at: TimestampSchema,
+  storage_expires_at: TimestampSchema,
+  include_sensitive: z.boolean(),
+  table_count: z.int().min(0),
+  row_count: z.int().min(0),
+  generated_by: z.string().nullable(),
+});
+export type AdminBackupRow = z.infer<typeof AdminBackupRowSchema>;
+
+/** POST /admin/backup response: the signed 15-minute link plus the stored entry. */
+export const AdminBackupCreatedResponseSchema = AdminBackupResponseSchema.extend({
+  id: IdSchema,
+  storage_expires_at: TimestampSchema,
+  include_sensitive: z.boolean(),
+  table_count: z.int().min(0),
+  row_count: z.int().min(0),
+});
+export type AdminBackupCreatedResponse = z.infer<typeof AdminBackupCreatedResponseSchema>;
+
+export const AdminBackupListResponseSchema = z.object({ items: z.array(AdminBackupRowSchema) });
+export type AdminBackupListResponse = z.infer<typeof AdminBackupListResponseSchema>;
+
+/** POST /admin/reconcile body (dry run of recompute; defaults to every booking in scope). */
+export const AdminReconcileRequestSchema = z.strictObject({
+  booking_id: IdSchema.optional(),
+  project_id: IdSchema.optional(),
+  all: z.boolean().default(true),
+});
+export type AdminReconcileRequest = z.infer<typeof AdminReconcileRequestSchema>;
+
+export const AdminReconcileResponseSchema = z.object({
+  bookings_checked: z.int().min(0),
+  bookings_with_mismatches: z.int().min(0),
+  mismatches: z.array(AdminRecomputeMismatchSchema),
+});
+export type AdminReconcileResponse = z.infer<typeof AdminReconcileResponseSchema>;
+
+/** One job as known to the registry (schedule + handler presence + last run). */
+export const AdminJobInfoSchema = z.object({
+  name: JobNameSchema,
+  registered: z.boolean(),
+  cron: z.string().nullable(),
+  tz: z.string().nullable(),
+  last_run: AdminJobRunRowSchema.nullable(),
+});
+export type AdminJobInfo = z.infer<typeof AdminJobInfoSchema>;
+
+export const AdminJobsResponseSchema = z.object({
+  jobs: z.array(AdminJobInfoSchema),
+  recent_runs: z.array(AdminJobRunRowSchema),
+  /** Related admin actions that live in other modules (e.g. the money module's "run dues now"). */
+  links: z.record(z.string(), z.string()),
+});
+export type AdminJobsResponse = z.infer<typeof AdminJobsResponseSchema>;
+
+export const AdminJobNameParamsSchema = z.object({ name: JobNameSchema });
+export type AdminJobNameParams = z.infer<typeof AdminJobNameParamsSchema>;
+
+/** POST /admin/jobs/:name/run body (optional payload handed to the handler). */
+export const AdminJobRunNowRequestSchema = z.strictObject({ data: z.record(z.string(), z.unknown()).optional() });
+export type AdminJobRunNowRequest = z.infer<typeof AdminJobRunNowRequestSchema>;
+
+/** POST /admin/customers/:id/erase body. */
+export const AdminCustomerEraseRequestSchema = z.strictObject({ confirm: z.literal("ERASE"), reason: ReasonSchema.optional() });
+export type AdminCustomerEraseRequest = z.infer<typeof AdminCustomerEraseRequestSchema>;
+
+export const AdminCustomerEraseResponseSchema = z.object({
+  id: IdSchema,
+  customer_code: z.string(),
+  full_name: z.string(),
+  erased_at: TimestampSchema,
+  version: VersionSchema,
+  anonymised: z.object({
+    co_applicants: z.int().min(0),
+    documents: z.int().min(0),
+    leads: z.int().min(0),
+    portal_disabled: z.boolean(),
+    sessions_revoked: z.int().min(0),
+  }),
+  financial_rows_kept: z.object({ bookings: z.int().min(0), payments: z.int().min(0) }),
+});
+export type AdminCustomerEraseResponse = z.infer<typeof AdminCustomerEraseResponseSchema>;
+
+/** GET /admin/system. */
+export const AdminSystemResponseSchema = z.object({
+  app_version: z.string(),
+  node_version: z.string(),
+  postgres_version: z.string().nullable(),
+  redis_version: z.string().nullable(),
+  uptime_seconds: z.number().min(0),
+  started_at: TimestampSchema,
+  modules: z.array(z.string()),
+  database: z.object({
+    name: z.string().nullable(),
+    size_bytes: z.int().min(0).nullable(),
+    size_pretty: z.string().nullable(),
+    table_count: z.int().min(0),
+    /** Planner estimates (pg_stat_user_tables.n_live_tup), not exact counts. */
+    table_rows_estimated: z.record(z.string(), z.int().min(0)),
+  }),
+  redis: z.object({ used_memory_bytes: z.int().min(0).nullable(), connected_clients: z.int().min(0).nullable() }),
+  jobs: z.object({
+    registered: z.array(z.string()),
+    runs_last_24h: z.int().min(0),
+    failed_last_24h: z.int().min(0),
+    last_runs: z.array(AdminJobRunRowSchema),
+  }),
+});
+export type AdminSystemResponse = z.infer<typeof AdminSystemResponseSchema>;

@@ -7,7 +7,6 @@ import { api } from "@/lib/api";
 import { formatDate, formatINR, formatINRShort, formatNumber } from "@/lib/format";
 import { useListParams } from "@/lib/queries";
 import { cn } from "@/lib/utils";
-import { UnitLabel } from "@/features/bookings/components";
 import { useTabParam } from "@/features/inventory/components";
 import { useProjectOptions } from "@/features/shared/options";
 import { CHEQUES_PATH, useCheques } from "./api";
@@ -46,7 +45,9 @@ function ChequeCard({ row, onAction }: { row: ChequeRow; onAction: (state: Payme
       <div className="text-sm">
         <BookingNumberLink number={row.booking_number} />
         <span className="text-ink"> · {row.customer_name}</span>
-        <UnitLabel project={row.project_name} block="" flat={row.flat_number} className="text-xs" />
+        <p className="text-xs text-ink-muted">
+          {row.project_name} · <span className="money font-semibold text-navy-950">{row.flat_number}</span>
+        </p>
       </div>
       <div className="flex items-center justify-between">
         <span className="money text-base font-bold text-navy-950">{formatINR(row.amount_paise)}</span>

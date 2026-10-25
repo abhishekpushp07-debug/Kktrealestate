@@ -39,12 +39,32 @@ const SettingsPage = lazy(() => import("@/features/admin/SettingsPage"));
 const SessionsPage = lazy(() => import("@/features/admin/SessionsPage"));
 const NotificationsPage = lazy(() => import("@/features/admin/NotificationsPage"));
 
+// Dashboard
+const DashboardPage = lazy(() => import("@/features/dashboard/DashboardPage"));
+
+// Bookings
+const BookingsPage = lazy(() => import("@/features/bookings/BookingsPage"));
+const BookingWizard = lazy(() => import("@/features/bookings/wizard/BookingWizard"));
+const BookingDetailPage = lazy(() => import("@/features/bookings/BookingDetailPage"));
+
+// Payments, demands, roznamcha
+const PaymentsPage = lazy(() => import("@/features/payments/PaymentsPage"));
+const ChequesPage = lazy(() => import("@/features/payments/ChequesPage"));
+const PaymentRedirect = lazy(() => import("@/features/payments/PaymentRedirect"));
+const DemandsPage = lazy(() => import("@/features/payments/DemandsPage"));
+const RoznamchaPage = lazy(() => import("@/features/payments/RoznamchaPage"));
+const ReceiptPrintPage = lazy(() => import("@/features/payments/ReceiptPrintPage"));
+const DemandLetterPrint = lazy(() => import("@/features/payments/DemandLetterPrint"));
+
 /** Nav items whose real screen has landed; everything else still renders the placeholder. */
 const PAGES_BY_NAV_ID: Readonly<Record<string, LazyExoticComponent<ComponentType>>> = {
+  dashboard: DashboardPage,
   flats: FlatsPage,
   leads: LeadsPage,
   visits: SiteVisitsPage,
   enquiries: EnquiriesInbox,
+  demands: DemandsPage,
+  roznamcha: RoznamchaPage,
   users: UsersPage,
   roles: RolesPage,
   audit: AuditLogPage,
@@ -68,6 +88,27 @@ export function AppRoutes() {
         element={
           <ProtectedRoute allowForcedPasswordChange>
             <ChangePasswordPage />
+          </ProtectedRoute>
+        }
+      />
+      {/* Print routes: authenticated, but outside the shell (letterhead layouts, A4 print CSS). */}
+      <Route
+        path="/print/receipt/:id"
+        element={
+          <ProtectedRoute>
+            <PermissionRoute permission={["receipt.print", "payment.read"]}>
+              <ReceiptPrintPage />
+            </PermissionRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/print/demand/:bookingId/:demandId"
+        element={
+          <ProtectedRoute>
+            <PermissionRoute permission={["payment.read", "booking.read"]}>
+              <DemandLetterPrint />
+            </PermissionRoute>
           </ProtectedRoute>
         }
       />
@@ -131,6 +172,49 @@ export function AppRoutes() {
               </Route>
             );
           }
+          if (item.id === "bookings") {
+            return (
+              <Route
+                key={item.id}
+                path={item.to}
+                element={
+                  <PermissionRoute permission={item.permission}>
+                    <Outlet />
+                  </PermissionRoute>
+                }
+              >
+                <Route index element={<BookingsPage />} />
+                <Route
+                  path="new"
+                  element={
+                    <PermissionRoute permission="booking.create">
+                      <BookingWizard />
+                    </PermissionRoute>
+                  }
+                />
+                <Route path=":id" element={<BookingDetailPage />} />
+                <Route path="*" element={<NotFoundPage />} />
+              </Route>
+            );
+          }
+          if (item.id === "payments") {
+            return (
+              <Route
+                key={item.id}
+                path={item.to}
+                element={
+                  <PermissionRoute permission={item.permission}>
+                    <Outlet />
+                  </PermissionRoute>
+                }
+              >
+                <Route index element={<PaymentsPage />} />
+                <Route path="cheques" element={<ChequesPage />} />
+                <Route path=":id" element={<PaymentRedirect />} />
+                <Route path="*" element={<NotFoundPage />} />
+              </Route>
+            );
+          }
           const Page = PAGES_BY_NAV_ID[item.id];
           return (
             <Route
@@ -160,6 +244,7 @@ export function AppRoutes() {
         />
 
         {/* Short aliases from the module briefs → canonical nav paths. */}
+        <Route path="/dashboard" element={<Navigate to="/" replace />} />
         <Route path="/master" element={<Navigate to="/masters" replace />} />
         <Route path="/master/:kind" element={<MasterAliasRedirect />} />
         <Route path="/users" element={<Navigate to="/admin/users" replace />} />

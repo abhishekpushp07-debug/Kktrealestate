@@ -6,7 +6,21 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { useAuth } from "@/lib/auth";
 import { filterNav } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
+import { useEnquiryUnreadCount } from "@/features/crm/api";
 import { BrandMark } from "./BrandMark";
+
+/** Unread website enquiries: a count pill when expanded, a gold dot when collapsed. */
+function EnquiriesBadge({ collapsed, enabled }: { collapsed: boolean; enabled: boolean }) {
+  const unread = useEnquiryUnreadCount(enabled);
+  const count = unread.data ?? 0;
+  if (!enabled || count <= 0) return null;
+  if (collapsed) return <span className="absolute right-2 top-1.5 size-2 rounded-full bg-gold ring-2 ring-navy-950" aria-label={`${count} unread enquiries`} data-testid="sidebar-enquiries-dot" />;
+  return (
+    <span className="money ml-auto rounded-full bg-gold px-1.5 text-2xs font-bold leading-4 text-navy-950" aria-label={`${count} unread enquiries`} data-testid="sidebar-enquiries-badge">
+      {count > 99 ? "99+" : count}
+    </span>
+  );
+}
 
 export interface SidebarProps {
   collapsed: boolean;
@@ -72,6 +86,7 @@ export function Sidebar({ collapsed, onToggleCollapsed, onNavigate, className }:
                             {isActive && <span className="absolute inset-y-1.5 left-0 w-1 rounded-r-full bg-gold" aria-hidden="true" />}
                             <Icon className={cn("size-[18px] shrink-0", isActive ? "text-gold" : "text-navy-200 group-hover:text-white")} aria-hidden="true" />
                             {!collapsed && <span className="truncate">{item.label}</span>}
+                            {item.id === "enquiries" && <EnquiriesBadge collapsed={collapsed} enabled={can(["lead.read", "cms.read"])} />}
                           </>
                         )}
                       </NavLink>

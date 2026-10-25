@@ -36,6 +36,10 @@ import { DemandRowSchema, LedgerRowSchema, ScheduleRowSchema, AgreementRevisionR
 export const ReportExportQuerySchema = z.object({ export: ExportFormatSchema.optional() });
 export type ReportExportQuery = z.infer<typeof ReportExportQuerySchema>;
 
+/** Lower-case `format=csv|pdf` variant of the export selector (docs/API-CONVENTIONS.md lists use `format=csv`); `export=CSV|PDF` is equivalent. */
+export const ReportFormatSchema = z.enum(["csv", "pdf"]);
+export type ReportFormat = z.infer<typeof ReportFormatSchema>;
+
 /** Totals footer for money reports. */
 export const MoneyTotalsSchema = z.object({
   cash_paise: PaiseSchema,
@@ -59,6 +63,7 @@ export const CollectionsReportQuerySchema = DateRangeSchema.safeExtend({
   category: MoneyCategorySchema.optional(),
   status: PaymentStatusSchema.default("CLEARED"),
   export: ExportFormatSchema.optional(),
+  format: ReportFormatSchema.optional(),
 });
 export type CollectionsReportQuery = z.infer<typeof CollectionsReportQuerySchema>;
 
@@ -94,6 +99,7 @@ export const OutstandingReportQuerySchema = z.object({
   customer_id: IdSchema.optional(),
   top_n: IntQuerySchema.min(1).max(100).default(10),
   export: ExportFormatSchema.optional(),
+  format: ReportFormatSchema.optional(),
 });
 export type OutstandingReportQuery = z.infer<typeof OutstandingReportQuerySchema>;
 
@@ -149,6 +155,7 @@ export const AdvancesReportQuerySchema = z.object({
   block_id: IdSchema.optional(),
   bucket: PaymentBucketSchema.optional(),
   export: ExportFormatSchema.optional(),
+  format: ReportFormatSchema.optional(),
 });
 export type AdvancesReportQuery = z.infer<typeof AdvancesReportQuerySchema>;
 
@@ -181,6 +188,7 @@ export const DemandVsCollectionQuerySchema = z.object({
   block_id: IdSchema.optional(),
   group_by: z.enum(["INSTALLMENT", "STAGE"]).default("INSTALLMENT"),
   export: ExportFormatSchema.optional(),
+  format: ReportFormatSchema.optional(),
 });
 export type DemandVsCollectionQuery = z.infer<typeof DemandVsCollectionQuerySchema>;
 
@@ -212,6 +220,7 @@ export const UpcomingDuesQuerySchema = DateRangeSchema.safeExtend({
   project_id: IdSchema.optional(),
   block_id: IdSchema.optional(),
   export: ExportFormatSchema.optional(),
+  format: ReportFormatSchema.optional(),
 });
 export type UpcomingDuesQuery = z.infer<typeof UpcomingDuesQuerySchema>;
 
@@ -251,6 +260,7 @@ export const InventoryReportQuerySchema = z.object({
   from: DateStringSchema.optional(),
   to: DateStringSchema.optional(),
   export: ExportFormatSchema.optional(),
+  format: ReportFormatSchema.optional(),
 });
 export type InventoryReportQuery = z.infer<typeof InventoryReportQuerySchema>;
 
@@ -288,7 +298,7 @@ export type InventoryReportResponse = z.infer<typeof InventoryReportResponseSche
 // Customer statement of account / schedule / allotment letter
 // ---------------------------------------------------------------------------
 
-export const BookingDocumentQuerySchema = z.object({ booking_id: IdSchema, export: ExportFormatSchema.optional() });
+export const BookingDocumentQuerySchema = z.object({ booking_id: IdSchema, export: ExportFormatSchema.optional(), format: ReportFormatSchema.optional() });
 export type BookingDocumentQuery = z.infer<typeof BookingDocumentQuerySchema>;
 
 export const CustomerStatementResponseSchema = z.object({
@@ -367,6 +377,7 @@ export const ChequesReportQuerySchema = ListQuerySchema.extend({
   from: DateStringSchema.optional(),
   to: DateStringSchema.optional(),
   export: ExportFormatSchema.optional(),
+  format: ReportFormatSchema.optional(),
 });
 export type ChequesReportQuery = z.infer<typeof ChequesReportQuerySchema>;
 
@@ -375,7 +386,7 @@ export const ChequesReportResponseSchema = listEnvelope(ChequeRowSchema).extend(
 });
 export type ChequesReportResponse = z.infer<typeof ChequesReportResponseSchema>;
 
-export const CancellationsReportQuerySchema = DateRangeSchema.safeExtend({ project_id: IdSchema.optional(), export: ExportFormatSchema.optional() });
+export const CancellationsReportQuerySchema = DateRangeSchema.safeExtend({ project_id: IdSchema.optional(), export: ExportFormatSchema.optional(), format: ReportFormatSchema.optional() });
 export type CancellationsReportQuery = z.infer<typeof CancellationsReportQuerySchema>;
 
 export const CancellationsReportRowSchema = z.object({
@@ -409,6 +420,7 @@ export const SalesFunnelQuerySchema = DateRangeSchema.safeExtend({
   source: LeadSourceSchema.optional(),
   assigned_user_id: IdSchema.optional(),
   export: ExportFormatSchema.optional(),
+  format: ReportFormatSchema.optional(),
 });
 export type SalesFunnelQuery = z.infer<typeof SalesFunnelQuerySchema>;
 
@@ -445,6 +457,7 @@ export const BankwiseReceiptsQuerySchema = DateRangeSchema.safeExtend({
   bank_account_id: IdSchema.optional(),
   project_id: IdSchema.optional(),
   export: ExportFormatSchema.optional(),
+  format: ReportFormatSchema.optional(),
 });
 export type BankwiseReceiptsQuery = z.infer<typeof BankwiseReceiptsQuerySchema>;
 
@@ -469,6 +482,7 @@ export const ActivityReportQuerySchema = ListQuerySchema.extend({
   user_id: IdSchema.optional(),
   entity_type: z.string().max(60).optional(),
   export: ExportFormatSchema.optional(),
+  format: ReportFormatSchema.optional(),
 });
 export type ActivityReportQuery = z.infer<typeof ActivityReportQuerySchema>;
 
@@ -511,6 +525,37 @@ export type ReportPresetRow = z.infer<typeof ReportPresetRowSchema>;
 
 export const ReportPresetFilterSchema = z.object({ report_key: ReportKeySchema.optional() });
 export type ReportPresetFilter = z.infer<typeof ReportPresetFilterSchema>;
+
+
+// ---------------------------------------------------------------------------
+// Roznamcha range report, catalog, preset list
+// ---------------------------------------------------------------------------
+
+/** Roznamcha (day book) for a date range as a report (JSON / csv / pdf). */
+export const RoznamchaReportQuerySchema = DateRangeSchema.safeExtend({
+  project_id: IdSchema.optional(),
+  export: ExportFormatSchema.optional(),
+  format: ReportFormatSchema.optional(),
+});
+export type RoznamchaReportQuery = z.infer<typeof RoznamchaReportQuerySchema>;
+
+/** One entry of the report catalogue (`GET /reports`). */
+export const ReportCatalogEntrySchema = z.object({
+  key: ReportKeySchema,
+  label: z.string(),
+  path: z.string(),
+  formats: z.array(ReportFormatSchema),
+  params: z.array(z.string()),
+  required_params: z.array(z.string()),
+});
+export type ReportCatalogEntry = z.infer<typeof ReportCatalogEntrySchema>;
+
+export const ReportCatalogResponseSchema = z.object({ reports: z.array(ReportCatalogEntrySchema) });
+export type ReportCatalogResponse = z.infer<typeof ReportCatalogResponseSchema>;
+
+/** Saved presets of the caller. */
+export const ReportPresetListResponseSchema = z.object({ items: z.array(ReportPresetRowSchema) });
+export type ReportPresetListResponse = z.infer<typeof ReportPresetListResponseSchema>;
 
 // ---------------------------------------------------------------------------
 // Dashboards per role

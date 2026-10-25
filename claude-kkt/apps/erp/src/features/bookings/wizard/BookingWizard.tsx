@@ -1,5 +1,5 @@
 import { ArrowLeft, ArrowRight, Check, History, Trash2, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { BookingCreateSchema, FLAT_STATUS_LABELS, type BookingCreate, type BookingDraftRow, type BookingRow, type FlatStatus } from "@kkt/contracts";
@@ -245,10 +245,9 @@ export default function BookingWizard() {
   })();
 
   const isLast = stepIndex === WIZARD_STEPS.length - 1;
-  const footerRef = useRef<HTMLDivElement>(null);
 
   return (
-    <div className="pb-28 lg:pb-20" data-testid="booking-wizard">
+    <div className="pb-16 lg:pb-0" data-testid="booking-wizard">
       <PageHeader
         title="New booking"
         description="Six steps: flat, customer, agreement, plan, charges, review. Your progress is saved automatically."
@@ -326,7 +325,7 @@ export default function BookingWizard() {
         <SummaryRail state={state} draftStatus={draft.status} lastSavedAt={draft.lastSavedAt} />
       </div>
 
-      <div ref={footerRef} className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 px-4 py-2.5 shadow-pop backdrop-blur lg:left-[var(--spacing-sidebar)] [[data-collapsed]_~_*_&]:lg:left-[var(--spacing-sidebar-collapsed)]" data-testid="wizard-footer">
+      <div className="sticky bottom-0 z-40 -mx-4 mt-4 border-t border-border bg-card/95 px-4 py-2.5 shadow-pop backdrop-blur md:-mx-6 md:px-6" data-testid="wizard-footer">
         <div className="mx-auto flex max-w-screen-2xl items-center justify-between gap-2">
           <Button variant="outline" leftIcon={ArrowLeft} disabled={stepIndex === 0 || create.isPending} onClick={() => goTo(stepIndex - 1)} data-testid="wizard-back">
             Back
