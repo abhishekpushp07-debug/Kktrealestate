@@ -248,8 +248,8 @@ export function customerRoutes(app: FastifyInstance): void {
       const user = req.user!;
       const row = await app.db.transaction(async (tx) => {
         await loadCustomerSelect(tx, user.companyId, req.params.id, true);
-        const [{ n }] = await tx.select({ n: sql<number>`coalesce(max(${coApplicants.sortOrder}), -1)::int` }).from(coApplicants).where(eq(coApplicants.customerId, req.params.id));
-        const [created] = await tx.insert(coApplicants).values({ companyId: user.companyId, customerId: req.params.id, fullName: req.body.full_name, relation: req.body.relation, ...coApplicantColumns(req.body), sortOrder: Number(n) + 1 }).returning();
+        const [agg] = await tx.select({ n: sql<number>`coalesce(max(${coApplicants.sortOrder}), -1)::int` }).from(coApplicants).where(eq(coApplicants.customerId, req.params.id));
+        const [created] = await tx.insert(coApplicants).values({ companyId: user.companyId, customerId: req.params.id, fullName: req.body.full_name, relation: req.body.relation, ...coApplicantColumns(req.body), sortOrder: Number(agg?.n ?? -1) + 1 }).returning();
         if (!created) throw new Error("co-applicant insert returned no row");
         const view = coApplicantRow(created);
         await writeAudit(tx, { companyId: user.companyId, ...metaOf(req), action: "customer.co_applicant_add", entityType: "customer", entityId: req.params.id, after: view as unknown as Record<string, unknown> });

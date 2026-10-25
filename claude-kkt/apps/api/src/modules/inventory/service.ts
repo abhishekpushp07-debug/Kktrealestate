@@ -322,23 +322,46 @@ export async function insertDrafts(tx: Executor, block: Pick<DbBlock, "id" | "co
   return out;
 }
 
-/** Re-prices the given AVAILABLE flats with a rate card (skips types the card has no rate for). Returns counts. */
-export async function repriceFlats(tx: Executor, companyId: string, card: LoadedRateCard, where: { projectId: string; blockId?: string | undefined }, dryRun: boolean): Promise<{ repriced: number; skipped_not_available: number; skipped_no_rate: number }> {
+/** One flat re-priced by repriceFlats (before/after for audit rows). */
+export interface RepriceChange {
+  id: string;
+  flatNumber: string;
+  before: { price_paise: number; rate_per_sqft_paise: number | null; price_breakup: PriceBreakupLine[]; rate_card_id: string | null };
+  after: { price_paise: number; rate_per_sqft_paise: number | null; price_breakup: PriceBreakupLine[]; rate_card_id: string };
+}
+
+/** Result of repriceFlats. */
+export interface RepriceResult { repriced: number; skipped_not_available: number; skipped_no_rate: number; changes: RepriceChange[] }
+
+/**
+ * Re-prices ONLY the AVAILABLE flats of a project (optionally one block) with a rate card (SPEC §5): Hold/Booked/Sold keep their price,
+ * types the card has no rate for are skipped. Writes nothing when `dryRun`; the caller writes the audit rows from `changes`.
+ */
+export async function repriceFlats(tx: Executor, companyId: string, card: LoadedRateCard, where: { projectId: string; blockId?: string | undefined }, dryRun: boolean): Promise<RepriceResult> {
   const conditions = [eq(flats.companyId, companyId), eq(flats.projectId, where.projectId), where.blockId ? eq(flats.blockId, where.blockId) : undefined].filter((c): c is NonNullable<typeof c> => c !== undefined);
-  const rows = await tx.select({ id: flats.id, status: flats.status, floor: flats.floor, floorStart: blocks.floorStart, superBuiltupSqft: flats.superBuiltupSqft, isCorner: flats.isCorner, facing: flats.facing, flatTypeId: flats.flatTypeId })
-    .from(flats).innerJoin(blocks, eq(blocks.id, flats.blockId)).where(and(...conditions));
+  const rows = await tx.select({
+    id: flats.id, flatNumber: flats.flatNumber, status: flats.status, floor: flats.floor, floorStart: blocks.floorStart, superBuiltupSqft: flats.superBuiltupSqft, isCorner: flats.isCorner, facing: flats.facing, flatTypeId: flats.flatTypeId,
+    pricePaise: flats.pricePaise, ratePerSqftPaise: flats.ratePerSqftPaise, priceBreakup: flats.priceBreakup, rateCardId: flats.rateCardId,
+  }).from(flats).innerJoin(blocks, eq(blocks.id, flats.blockId)).where(and(...conditions)).orderBy(asc(flats.blockId), asc(flats.floor), asc(flats.position));
   const rated = new Set(card.card.rates.map((r) => r.flatTypeId));
   const updates: { id: string; price: number; rate: number | null; breakup: PriceBreakupLine[] }[] = [];
+  const changes: RepriceChange[] = [];
   let skippedNotAvailable = 0;
   let skippedNoRate = 0;
   for (const f of rows) {
     if (f.status !== "AVAILABLE") { skippedNotAvailable += 1; continue; }
     if (!rated.has(f.flatTypeId)) { skippedNoRate += 1; continue; }
     const { price } = priceWith(card, { floor: f.floor, floorStart: f.floorStart, superBuiltupSqft: Number(f.superBuiltupSqft), isCorner: f.isCorner, facing: f.facing, flatTypeId: f.flatTypeId }, { baseRatePerSqftPaise: null, basePricePaise: null, superBuiltupSqft: Number(f.superBuiltupSqft) });
-    updates.push({ id: f.id, price: price.totalPaise, rate: price.ratePerSqftPaise, breakup: breakupToDb(price.breakup) });
+    const breakup = breakupToDb(price.breakup);
+    updates.push({ id: f.id, price: price.totalPaise, rate: price.ratePerSqftPaise, breakup });
+    changes.push({
+      id: f.id, flatNumber: f.flatNumber,
+      before: { price_paise: f.pricePaise, rate_per_sqft_paise: f.ratePerSqftPaise, price_breakup: f.priceBreakup, rate_card_id: f.rateCardId },
+      after: { price_paise: price.totalPaise, rate_per_sqft_paise: price.ratePerSqftPaise, price_breakup: breakup, rate_card_id: card.id },
+    });
   }
   if (!dryRun && updates.length > 0) await applyPriceUpdates(tx, updates, card.id);
-  return { repriced: updates.length, skipped_not_available: skippedNotAvailable, skipped_no_rate: skippedNoRate };
+  return { repriced: updates.length, skipped_not_available: skippedNotAvailable, skipped_no_rate: skippedNoRate, changes };
 }
 
 /** Applies many price updates in one statement (version bumped per flat). */

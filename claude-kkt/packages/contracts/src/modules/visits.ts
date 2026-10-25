@@ -75,8 +75,23 @@ export const VisitRowSchema = AuditedRowSchema.extend({
   notes: z.string().nullable(),
   outcome_marked_at: TimestampSchema.nullable(),
   is_past: z.boolean(),
+  /** True when the visit was rescheduled (rescheduled_from is set) — the calendar's "moved" tag. */
+  is_moved: z.boolean().optional(),
+  manage_url: z.string().nullable().optional(),
 });
 export type VisitRow = z.infer<typeof VisitRowSchema>;
+
+/** `GET /site-visits/today`: today's visits (IST) in the caller's scope with quick-outcome counts. */
+export const VisitTodayResponseSchema = z.object({
+  date: DateStringSchema,
+  items: z.array(VisitRowSchema),
+  counts: z.object({ total: z.int().min(0), pending: z.int().min(0), completed: z.int().min(0), no_show: z.int().min(0), cancelled: z.int().min(0) }),
+});
+export type VisitTodayResponse = z.infer<typeof VisitTodayResponseSchema>;
+
+/** Body of POST /site-visits/:id/complete and /no-show (version optional: If-Match is accepted too). */
+export const VisitOutcomeBodySchema = z.strictObject({ version: VersionSchema.optional(), notes: NoteSchema.optional().nullable() });
+export type VisitOutcomeBody = z.infer<typeof VisitOutcomeBodySchema>;
 
 /** List filter for visits. */
 export const VisitFilterSchema = ListQuerySchema.extend({

@@ -140,3 +140,49 @@ export const PricePreviewResponseSchema = z.object({
   total_paise: PaiseSchema,
 });
 export type PricePreviewResponse = z.infer<typeof PricePreviewResponseSchema>;
+
+/**
+ * Price preview request (POST /rate-cards/preview): either an existing flat (`flat_id`) or a hypothetical flat
+ * (`flat_type_id` + `floor` + optional `facing` / `is_corner`) within a project, against a given rate card or the Active one.
+ */
+export const RateCardPreviewRequestSchema = z
+  .strictObject({
+    project_id: IdSchema,
+    rate_card_id: IdSchema.optional().nullable(),
+    flat_id: IdSchema.optional().nullable(),
+    flat_type_id: IdSchema.optional().nullable(),
+    floor: z.int().min(-5).max(200).optional().nullable(),
+    floor_start: z.int().min(-5).max(200).optional().nullable(),
+    facing: z.string().trim().max(40).optional().nullable(),
+    is_corner: z.boolean().optional().nullable(),
+  })
+  .superRefine((p, ctx) => {
+    const hasFlat = p.flat_id !== undefined && p.flat_id !== null;
+    const hasType = p.flat_type_id !== undefined && p.flat_type_id !== null;
+    if (hasFlat === hasType) {
+      ctx.addIssue({ code: "custom", message: "Give either flat_id or flat_type_id (+ floor)", path: ["flat_id"] });
+    }
+    if (hasType && (p.floor === undefined || p.floor === null)) {
+      ctx.addIssue({ code: "custom", message: "floor is required with flat_type_id", path: ["floor"] });
+    }
+  });
+export type RateCardPreviewRequest = z.infer<typeof RateCardPreviewRequestSchema>;
+
+/** Price preview result: base line, PLC lines and total; `rate_card_id` is null when the flat type's base price was used. */
+export const RateCardPreviewResponseSchema = z.object({
+  project_id: IdSchema,
+  flat_id: IdSchema.nullable(),
+  flat_type_id: IdSchema,
+  flat_type_code: z.string(),
+  floor: z.int(),
+  facing: z.string().nullable(),
+  is_corner: z.boolean(),
+  super_builtup_sqft: z.number(),
+  rate_card_id: IdSchema.nullable(),
+  rate_card_name: z.string().nullable(),
+  base_paise: PaiseSchema,
+  rate_per_sqft_paise: PaiseSchema.nullable(),
+  breakup: z.array(MoneyBreakupLineSchema),
+  total_paise: PaiseSchema,
+});
+export type RateCardPreviewResponse = z.infer<typeof RateCardPreviewResponseSchema>;

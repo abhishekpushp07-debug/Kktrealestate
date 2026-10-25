@@ -89,3 +89,63 @@ export function iso(d: Date | null | undefined): string | null {
 export function num(v: unknown): number {
   return typeof v === "number" ? v : Number(v ?? 0);
 }
+
+// ---------------------------------------------------------------------------
+// Shared loaders / mappers used by the dues, booking, payment and integrity services
+// ---------------------------------------------------------------------------
+
+import { asc, inArray } from "drizzle-orm";
+import type { PlanSnapshotInstallment as DomainInstallment, TowerStage } from "@kkt/domain";
+import { blockStages, type PlanSnapshot } from "@kkt/db";
+
+/** Maps the stored (snake_case) plan snapshot installments onto the domain engine's shape. */
+export function snapshotInstallments(snapshot: PlanSnapshot): DomainInstallment[] {
+  return snapshot.installments.map((i) => ({
+    seq: i.seq,
+    name: i.name,
+    percent: i.percent,
+    triggerType: i.trigger_type,
+    triggerDays: i.trigger_days ?? null,
+    triggerStageId: i.trigger_stage_id ?? null,
+    triggerStageName: i.trigger_stage_name ?? null,
+    triggerDate: i.trigger_date ?? null,
+    dueDays: i.due_days,
+  }));
+}
+
+/** The tower's stage records as the dues engine reads them. */
+export async function loadTowerStages(db: Executor, blockId: string): Promise<TowerStage[]> {
+  const rows = await db.select().from(blockStages).where(eq(blockStages.blockId, blockId)).orderBy(asc(blockStages.sortOrder));
+  return rows.map((s) => ({ stageId: s.stageId, name: s.name, isPossession: s.isPossession, status: s.status, completedOn: s.completedOn }));
+}
+
+/** Tower stages for many blocks in one query, keyed by block id. */
+export async function loadTowerStagesMany(db: Executor, blockIds: readonly string[]): Promise<Map<string, TowerStage[]>> {
+  const out = new Map<string, TowerStage[]>();
+  const ids = [...new Set(blockIds)];
+  if (ids.length === 0) return out;
+  const rows = await db.select().from(blockStages).where(inArray(blockStages.blockId, ids)).orderBy(asc(blockStages.blockId), asc(blockStages.sortOrder));
+  for (const s of rows) {
+    const list = out.get(s.blockId) ?? [];
+    list.push({ stageId: s.stageId, name: s.name, isPossession: s.isPossession, status: s.status, completedOn: s.completedOn });
+    out.set(s.blockId, list);
+  }
+  return out;
+}
+
+/** Groups rows by a key into a Map of arrays. */
+export function groupBy<T, K>(rows: readonly T[], key: (row: T) => K): Map<K, T[]> {
+  const out = new Map<K, T[]>();
+  for (const r of rows) {
+    const k = key(r);
+    const list = out.get(k) ?? [];
+    list.push(r);
+    out.set(k, list);
+  }
+  return out;
+}
+
+/** Role names that receive accounts-side notifications. */
+export const ACCOUNTS_ROLES = ["Accounts"] as const;
+/** Role names that receive integrity findings. */
+export const INTEGRITY_ROLES = ["Super Admin", "Accounts"] as const;

@@ -2,7 +2,8 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import type { AnyPgColumn, PgTable, PgUpdateSetSource } from "drizzle-orm/pg-core";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { randomBytes } from "node:crypto";
-import { companies, documents, type Executor } from "@kkt/db";
+import { z } from "zod";
+import { companies, documents, projects, type Executor } from "@kkt/db";
 import { config } from "../../config.js";
 import type { AuditActor } from "../../lib/audit.js";
 import { cached, invalidate } from "../../lib/cache.js";
@@ -144,5 +145,49 @@ export function isHoneypotTripped(body: { website?: string | null | undefined })
   return typeof body.website === "string" && body.website.trim().length > 0;
 }
 
-/** Zod helper: relaxes the honeypot field so bots receive a believable 200 instead of a 400 (SPEC §15 "silently dropped"). */
-export { z as zod } from "zod";
+/** Relaxed honeypot field: bots that fill it must receive a believable 200 instead of a 400 (SPEC §15 "silently dropped"). */
+export const RelaxedHoneypotSchema = z.string().max(500).optional().nullable();
+
+/** Rebuilds a strict public form schema with the honeypot relaxed (the contract schema itself refuses a filled honeypot). */
+export function relaxHoneypot<T extends z.ZodRawShape>(schema: z.ZodObject<T>): z.ZodObject<Omit<T, "website"> & { website: typeof RelaxedHoneypotSchema }> {
+  const { website: _w, ...rest } = schema.shape;
+  return z.strictObject({ ...rest, website: RelaxedHoneypotSchema }) as unknown as z.ZodObject<Omit<T, "website"> & { website: typeof RelaxedHoneypotSchema }>;
+}
+
+/** Marks a public response as uncacheable (manage views, form replies). */
+export function noStore(reply: FastifyReply): void {
+  reply.header("Cache-Control", "no-store");
+}
+
+/** Request metadata for audit rows written by public routes. */
+export function publicMeta(req: FastifyRequest): { ip: string; requestId: string } {
+  return { ip: req.clientIp, requestId: req.id };
+}
+
+/** User agent header, bounded. */
+export function userAgent(req: FastifyRequest): string | null {
+  const ua = req.headers["user-agent"];
+  return typeof ua === "string" ? ua.slice(0, 300) : null;
+}
+
+/** ISO string of a Date or timestamp string. */
+export function iso(v: Date | string | null | undefined): string | null {
+  if (!v) return null;
+  return v instanceof Date ? v.toISOString() : new Date(v).toISOString();
+}
+
+/** Loads a project of the company; null when missing. */
+export async function loadProjectById(db: Executor, companyId: string, projectId: string): Promise<typeof projects.$inferSelect | null> {
+  const [p] = await db.select().from(projects).where(and(eq(projects.id, projectId), eq(projects.companyId, companyId))).limit(1);
+  return p ?? null;
+}
+
+/** 400 VALIDATION_ERROR unless every id is a project of the company. */
+export async function assertProjects(db: Executor, companyId: string, ids: readonly (string | null | undefined)[], field: string): Promise<void> {
+  const unique = [...new Set(ids.filter((x): x is string => typeof x === "string"))];
+  if (unique.length === 0) return;
+  const rows = await db.select({ id: projects.id }).from(projects).where(and(eq(projects.companyId, companyId), inArray(projects.id, unique)));
+  const found = new Set(rows.map((r) => r.id));
+  const missing = unique.filter((id) => !found.has(id));
+  if (missing.length > 0) throw ApiError.badRequest(`${field}: project ${missing[0]} not found`, { field, missing });
+}

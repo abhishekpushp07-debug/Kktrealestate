@@ -1,4 +1,5 @@
 import { and, desc, eq, inArray, isNull, ne, or, sql, type SQL } from "drizzle-orm";
+import type { PgSelect } from "drizzle-orm/pg-core";
 import type { FastifyRequest } from "fastify";
 import type { CoApplicantInput, CoApplicantRow, CustomerCreate, CustomerRevealed, CustomerRow, CustomerUpdate, PortalAccessResponse } from "@kkt/contracts";
 import { bookingCoApplicants, bookings, coApplicants, customers, portalUsers, refreshTokens, siteSettings, users, type Executor } from "@kkt/db";
@@ -113,8 +114,8 @@ const portalEnabledSql = sql<boolean | null>`(select pu.is_enabled from ${portal
 /** Drizzle selection for customer rows (join `users` as relationship manager with `joinRm`). */
 export const CUSTOMER_SELECT = { c: customers, rmName: rm.name, kycVerifierName: kycVerifierNameSql, activeBookings: activeBookingCountSql, portalEnabled: portalEnabledSql };
 
-/** Left-joins the relationship manager (used by list and get). */
-export function joinRm<Q extends { leftJoin: (table: typeof users, on: SQL) => Q }>(q: Q): Q {
+/** Left-joins the relationship manager (used by the dynamic list query). */
+export function joinRm(q: PgSelect): PgSelect {
   return q.leftJoin(users, eq(users.id, customers.relationshipManagerId));
 }
 
@@ -177,8 +178,8 @@ export function revealedRow(row: CustomerRow, c: DbCustomer, cas: DbCoApplicant[
 
 /** Loads the joined selection for one customer of the company; 404 when missing. */
 export async function loadCustomerSelect(db: Executor, companyId: string, id: string, forUpdate = false): Promise<CustomerSelect> {
-  const q = joinRm(db.select(CUSTOMER_SELECT).from(customers).$dynamic()).where(and(eq(customers.id, id), eq(customers.companyId, companyId))).limit(1);
-  const rows = (await (forUpdate ? q.for("update", { of: customers }) : q)) as CustomerSelect[];
+  const q = db.select(CUSTOMER_SELECT).from(customers).leftJoin(users, eq(users.id, customers.relationshipManagerId)).where(and(eq(customers.id, id), eq(customers.companyId, companyId))).limit(1);
+  const rows = (forUpdate ? await q.for("update", { of: customers }) : await q) as CustomerSelect[];
   const row = rows[0];
   if (!row) throw ApiError.notFound("Customer");
   return row;

@@ -217,11 +217,12 @@ export function registerDocumentRoutes(app: FastifyInstance): void {
     },
   });
 
+  // Wildcard rather than `:token`: signed tokens (~150 chars) exceed the router's default 100-char parameter limit, which a wildcard is exempt from.
   route(app, {
-    method: "GET", url: "/files/:token", public: true,
-    schema: { params: z.object({ token: z.string().min(16).max(4096) }), response: { 200: z.any() }, summary: "Stream a file through a signed, short-lived link", hide: true },
+    method: "GET", url: "/files/*", public: true,
+    schema: { params: z.object({ "*": z.string().min(16).max(4096) }), response: { 200: z.any() }, summary: "Stream a file through a signed, short-lived link (`/files/:token`)", hide: true },
     handler: async (req, reply) => {
-      const link = verifyLinkToken(req.params.token);
+      const link = verifyLinkToken(req.params["*"]);
       if (!link) throw ApiError.notFound("File");
       const file = await streamDocument(app.dbReplica, link.documentId, link.variant);
       if (!file) throw ApiError.notFound("File");

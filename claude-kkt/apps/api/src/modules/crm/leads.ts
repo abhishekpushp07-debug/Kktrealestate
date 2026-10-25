@@ -33,7 +33,7 @@ import { route } from "../../lib/routes.js";
 import { ensureProjectAccess, type StaffContext } from "../../lib/scope.js";
 import { applyUpdate, expectedVersion, withOptionalVersion } from "../../lib/version.js";
 import { canonicalPhone, createCustomer, loadCustomerSelect, metaOf, validationError } from "./customerService.js";
-import { LEAD_SELECT, activitiesOf, createOrTouchLead, followUpsOf, getLeadRow, joinLead, leadRow, loadLeadSelect, markLeadsRead, openLeadCondition, recordLeadActivity, setLeadStage, stageHistoryOf, type LeadSelect } from "./leadService.js";
+import { LEAD_SELECT, activitiesOf, createOrTouchLead, followUpsOf, getLeadRow, joinLead, leadRow, loadLeadSelect, markLeadsRead, openLeadCondition, recordLeadActivity, setLeadStage, stageHistoryOf, toDbUtm, type LeadSelect } from "./leadService.js";
 
 const idParams = z.object({ id: IdSchema });
 
@@ -152,7 +152,7 @@ export function leadRoutes(app: FastifyInstance): void {
       const start = new Date(istDateTimeMs(date, "00:00"));
       const cond = and(eq(leads.companyId, user.companyId), openLeadCondition(), isNotNull(leads.nextFollowUpAt), lte(leads.nextFollowUpAt, end), req.query.all ? undefined : eq(leads.assignedUserId, user.id));
       const [rows, totals] = await Promise.all([
-        joinLead(app.dbReplica.select(LEAD_SELECT).from(leads).$dynamic()).where(cond).orderBy(asc(leads.nextFollowUpAt)).limit(req.query.limit) as Promise<LeadSelect[]>,
+        joinLead(app.dbReplica.select(LEAD_SELECT).from(leads).$dynamic()).where(cond).orderBy(asc(leads.nextFollowUpAt)).limit(req.query.limit) as unknown as Promise<LeadSelect[]>,
         app.dbReplica.select({ total: count(), overdue: sql<number>`count(*) filter (where ${leads.nextFollowUpAt} < ${start})` }).from(leads).where(cond),
       ]);
       return { date, items: rows.map(leadRow), total: Number(totals[0]?.total ?? 0), overdue: Number(totals[0]?.overdue ?? 0) };
@@ -190,7 +190,7 @@ export function leadRoutes(app: FastifyInstance): void {
         if (b.budget_max_paise !== undefined) changes["budgetMaxPaise"] = b.budget_max_paise;
         if (b.assigned_user_id !== undefined) changes["assignedUserId"] = b.assigned_user_id;
         if (b.message !== undefined) changes["message"] = b.message;
-        if (b.utm !== undefined) changes["utm"] = b.utm;
+        if (b.utm !== undefined) changes["utm"] = toDbUtm(b.utm);
         if (b.next_follow_up_at !== undefined) changes["nextFollowUpAt"] = b.next_follow_up_at ? new Date(b.next_follow_up_at) : null;
         if (b.consent !== undefined) changes["consent"] = b.consent;
         const min = (changes["budgetMinPaise"] as number | null | undefined) ?? before.l.budgetMinPaise;

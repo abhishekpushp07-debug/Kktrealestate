@@ -1,4 +1,5 @@
 import { and, asc, eq, inArray, isNull, notInArray, sql, type SQL } from "drizzle-orm";
+import type { PgSelect } from "drizzle-orm/pg-core";
 import type { Redis } from "ioredis";
 import type { LeadActivityRow, LeadActivityType, LeadFollowUpRow, LeadRow, LeadSource, LeadStage, LeadStageHistoryRow, Utm } from "@kkt/contracts";
 import { OPEN_LEAD_STAGES } from "@kkt/contracts";
@@ -21,7 +22,7 @@ export const OPEN_STAGES: readonly LeadStage[] = OPEN_LEAD_STAGES;
 /** Allocates the next lead number for the FY of `businessDate` (default today IST): LD-2627/0001. */
 export async function nextLeadNumber(tx: Executor, company: Pick<CompanyRecord, "id" | "fyStartMonth" | "numbering">, businessDate = todayIST()): Promise<string> {
   const fy = financialYear(businessDate, company.fyStartMonth);
-  const cfg = (company.numbering as Record<string, { prefix?: string; format?: string } | undefined>)["lead"] ?? { prefix: "LD-" };
+  const cfg = (company.numbering as unknown as Record<string, { prefix?: string; format?: string } | undefined>)["lead"] ?? { prefix: "LD-" };
   const seq = await nextSequence(tx, company.id, "lead", fy.label);
   return formatNumber(cfg.prefix ?? "LD-", fy.label, seq, cfg.format ?? DEFAULT_NUMBER_PATTERN);
 }
@@ -94,9 +95,17 @@ const upcomingVisitSql = sql<string | null>`(
 /** Drizzle selection for lead rows; use with `joinLead`. */
 export const LEAD_SELECT = { l: leads, projectName: projects.name, flatTypeName: flatTypes.name, assignedName: users.name, upcomingVisitAt: upcomingVisitSql };
 
-/** Left-joins project, flat type and assignee. */
-export function joinLead<Q extends { leftJoin: (table: typeof projects | typeof flatTypes | typeof users, on: SQL) => Q }>(q: Q): Q {
+/** Left-joins project, flat type and assignee (dynamic query builder). */
+export function joinLead(q: PgSelect): PgSelect {
   return q.leftJoin(projects, eq(projects.id, leads.projectId)).leftJoin(flatTypes, eq(flatTypes.id, leads.flatTypeId)).leftJoin(users, eq(users.id, leads.assignedUserId));
+}
+
+/** Website UTM parameters as stored (string values only; null when nothing survives). */
+export function toDbUtm(utm: Utm | Record<string, string | null | undefined> | null | undefined): Record<string, string> | null {
+  if (!utm) return null;
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(utm)) if (typeof v === "string" && v.trim() !== "") out[k] = v.trim();
+  return Object.keys(out).length > 0 ? out : null;
 }
 
 function iso(v: Date | string | null | undefined): string | null {
@@ -118,8 +127,15 @@ export function leadRow(r: LeadSelect): LeadRow {
 
 /** Loads the joined selection of one lead in the company; 404 when missing. */
 export async function loadLeadSelect(db: Executor, companyId: string, id: string, forUpdate = false): Promise<LeadSelect> {
-  const q = joinLead(db.select(LEAD_SELECT).from(leads).$dynamic()).where(and(eq(leads.id, id), eq(leads.companyId, companyId))).limit(1);
-  const rows = (await (forUpdate ? q.for("update", { of: leads }) : q)) as LeadSelect[];
+  const q = db
+    .select(LEAD_SELECT)
+    .from(leads)
+    .leftJoin(projects, eq(projects.id, leads.projectId))
+    .leftJoin(flatTypes, eq(flatTypes.id, leads.flatTypeId))
+    .leftJoin(users, eq(users.id, leads.assignedUserId))
+    .where(and(eq(leads.id, id), eq(leads.companyId, companyId)))
+    .limit(1);
+  const rows = (forUpdate ? await q.for("update", { of: leads }) : await q) as LeadSelect[];
   const row = rows[0];
   if (!row) throw ApiError.notFound("Lead");
   return row;
@@ -236,7 +252,7 @@ export async function createOrTouchLead(tx: Executor, input: CreateOrTouchLeadIn
     .insert(leads)
     .values({
       companyId: input.companyId, leadNumber, fullName: input.name, phone, email: input.email ?? null, projectId: input.projectId ?? null, flatTypeId: input.flatTypeId ?? null,
-      budgetMinPaise: input.budgetMinPaise ?? null, budgetMaxPaise: input.budgetMaxPaise ?? null, source: input.source, stage: "NEW", assignedUserId, utm: input.utm ?? null, message: input.message ?? null,
+      budgetMinPaise: input.budgetMinPaise ?? null, budgetMaxPaise: input.budgetMaxPaise ?? null, source: input.source, stage: "NEW", assignedUserId, utm: toDbUtm(input.utm), message: input.message ?? null,
       nextFollowUpAt: input.nextFollowUpAt ?? null, isRead: false, consent: input.consent ?? false, createdBy: input.createdBy ?? null,
     })
     .returning();
@@ -331,7 +347,7 @@ export async function createEnquiry(tx: Executor, input: CreateEnquiryInput): Pr
   const referenceNumber = await nextEnquiryReference(tx, company);
   const [enquiry] = await tx
     .insert(enquiries)
-    .values({ companyId: input.companyId, leadId: lead.id, projectId: input.projectId ?? null, name: input.name, phone: lead.phone, email: input.email ?? null, flatTypeId: input.flatTypeId ?? null, message: input.message ?? null, sourcePage: input.sourcePage ?? null, utm: input.utm ?? null, ip: input.ip ?? null, referenceNumber, isRead: false })
+    .values({ companyId: input.companyId, leadId: lead.id, projectId: input.projectId ?? null, name: input.name, phone: lead.phone, email: input.email ?? null, flatTypeId: input.flatTypeId ?? null, message: input.message ?? null, sourcePage: input.sourcePage ?? null, utm: toDbUtm(input.utm), ip: input.ip ?? null, referenceNumber, isRead: false })
     .returning();
   if (!enquiry) throw new Error("enquiry insert returned no row");
   const title = `New website enquiry from ${input.name}`;

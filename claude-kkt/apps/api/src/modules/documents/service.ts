@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Readable } from "node:stream";
+import { Readable } from "node:stream";
 import { and, desc, eq, inArray, or, sql, type SQL } from "drizzle-orm";
 import type { PgSelect } from "drizzle-orm/pg-core";
 import { fileTypeFromBuffer } from "file-type";
@@ -30,7 +30,12 @@ export interface DocumentJoined {
 export const SIGNED_LINK_TTL_SECONDS = 15 * 60;
 const THUMB_WIDTH = 480;
 const MEDIUM_WIDTH = 1080;
+/** Images above this many pixels (width × height) are refused before any decoding (decompression-bomb guard). */
+export const MAX_IMAGE_PIXELS = 50_000_000;
 const EXT: Record<AllowedUploadMime, string> = { "application/pdf": "pdf", "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
+/** Filename extensions that honestly describe each accepted type (anything else gets the canonical one appended). */
+const HONEST_EXT: Record<AllowedUploadMime, readonly string[]> = { "application/pdf": ["pdf"], "image/jpeg": ["jpg", "jpeg", "jpe", "jfif"], "image/png": ["png"], "image/webp": ["webp"] };
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 let storageInstance: Storage | null = null;
 /** The process-wide storage driver (lazy so tests can point STORAGE_LOCAL_DIR elsewhere before the first upload). */
@@ -111,6 +116,8 @@ export async function storeBuffer(tx: Executor, input: StoreBufferInput): Promis
   const mime = await detectMime(input.buffer);
   const type = input.documentTypeId ? await loadDocumentType(tx, input.companyId, input.documentTypeId) : null;
   const flags = applyTypeRules(type, input.entityType, { isSensitive: input.isSensitive ?? false, sharedWithCustomer: input.sharedWithCustomer ?? false });
+  // Image bombs: refuse by declared dimensions (header only) before a single pixel is decoded.
+  const dims = mime === "application/pdf" ? null : await imageDimensions(input.buffer);
 
   const { key, base } = buildStorageKey(input.companyId, EXT[mime]);
   const written: string[] = [];
@@ -120,12 +127,17 @@ export async function storeBuffer(tx: Executor, input: StoreBufferInput): Promis
     written.push(key);
     let variants: DocumentRecord["variants"] = null;
     if (mime !== "application/pdf") {
-      const img = await makeVariants(input.buffer);
-      await store.put(`${base}_thumb.webp`, img.thumb, "image/webp");
-      written.push(`${base}_thumb.webp`);
-      await store.put(`${base}_medium.webp`, img.medium, "image/webp");
-      written.push(`${base}_medium.webp`);
-      variants = { thumb_key: `${base}_thumb.webp`, medium_key: `${base}_medium.webp`, width: img.width, height: img.height };
+      // A rendition failure (truncated/odd image) must never lose the original: the document is kept without variants.
+      const img = await makeVariants(input.buffer).catch(() => null);
+      if (img) {
+        await store.put(`${base}_thumb.webp`, img.thumb, "image/webp");
+        written.push(`${base}_thumb.webp`);
+        await store.put(`${base}_medium.webp`, img.medium, "image/webp");
+        written.push(`${base}_medium.webp`);
+        variants = { thumb_key: `${base}_thumb.webp`, medium_key: `${base}_medium.webp`, width: img.width ?? dims?.width ?? null, height: img.height ?? dims?.height ?? null };
+      } else if (dims) {
+        variants = { width: dims.width, height: dims.height };
+      }
     }
     const [row] = await tx
       .insert(documents)
@@ -135,7 +147,7 @@ export async function storeBuffer(tx: Executor, input: StoreBufferInput): Promis
         entityId: input.entityId,
         documentTypeId: type?.id ?? null,
         title: input.title?.trim() || null,
-        fileName: safeFileName(input.filename),
+        fileName: safeFileName(input.filename, mime),
         mime,
         sizeBytes: input.buffer.length,
         sha256: sha256(input.buffer),
@@ -155,25 +167,48 @@ export async function storeBuffer(tx: Executor, input: StoreBufferInput): Promis
   }
 }
 
-/** Generates the webp thumb (≈480 px wide) and medium (≈1080 px wide) renditions; 415 when the bytes are not a decodable image. */
-async function makeVariants(buffer: Buffer): Promise<{ thumb: Buffer; medium: Buffer; width: number | null; height: number | null }> {
+/** Reads the declared image dimensions from the header (no pixel decoding); 413 when they exceed MAX_IMAGE_PIXELS, 415 when unreadable. */
+async function imageDimensions(buffer: Buffer): Promise<{ width: number; height: number }> {
+  let meta: sharp.Metadata;
   try {
-    const meta = await sharp(buffer).metadata();
-    const [thumb, medium] = await Promise.all([
-      sharp(buffer).rotate().resize({ width: THUMB_WIDTH, withoutEnlargement: true }).webp({ quality: 78 }).toBuffer(),
-      sharp(buffer).rotate().resize({ width: MEDIUM_WIDTH, withoutEnlargement: true }).webp({ quality: 82 }).toBuffer(),
-    ]);
-    return { thumb, medium, width: meta.width ?? null, height: meta.height ?? null };
+    meta = await sharp(buffer, { limitInputPixels: false }).metadata();
   } catch {
     throw new ApiError(415, "UNSUPPORTED_MEDIA", "Image could not be decoded");
   }
+  const width = meta.width ?? 0;
+  const height = meta.height ?? 0;
+  if (width <= 0 || height <= 0) throw new ApiError(415, "UNSUPPORTED_MEDIA", "Image has no readable dimensions");
+  if (width * height > MAX_IMAGE_PIXELS) {
+    throw new ApiError(413, "PAYLOAD_TOO_LARGE", `Image exceeds ${MAX_IMAGE_PIXELS / 1_000_000} megapixels`, { max_pixels: MAX_IMAGE_PIXELS, width, height });
+  }
+  return { width, height };
 }
 
-/** Trims a client filename to something printable and bounded (metadata + Content-Disposition only). */
-export function safeFileName(name: string): string {
-  const base = name.split(/[\\/]/).pop() ?? "file";
-  const clean = base.replace(/[^\p{L}\p{N} ._()-]/gu, "_").trim().slice(0, 180);
-  return clean || "file";
+/** Generates the webp thumb (≈480 px wide) and medium (≈1080 px wide) renditions; throws when the bytes are not a decodable image. */
+async function makeVariants(buffer: Buffer): Promise<{ thumb: Buffer; medium: Buffer; width: number | null; height: number | null }> {
+  const opts = { limitInputPixels: MAX_IMAGE_PIXELS };
+  const meta = await sharp(buffer, opts).metadata();
+  const [thumb, medium] = await Promise.all([
+    sharp(buffer, opts).rotate().resize({ width: THUMB_WIDTH, withoutEnlargement: true }).webp({ quality: 78 }).toBuffer(),
+    sharp(buffer, opts).rotate().resize({ width: MEDIUM_WIDTH, withoutEnlargement: true }).webp({ quality: 82 }).toBuffer(),
+  ]);
+  return { thumb, medium, width: meta.width ?? null, height: meta.height ?? null };
+}
+
+/**
+ * Trims a client filename to something printable and bounded (metadata + Content-Disposition only): path components, control
+ * characters, quotes and leading dots are dropped, and when the extension does not honestly describe the detected type
+ * (`invoice.pdf.exe`, `photo.jpg` that is really a PNG) the canonical extension is appended so downloads open with the right app.
+ */
+export function safeFileName(name: string, mime?: AllowedUploadMime): string {
+  const base = name.split(/[\\/]/).filter(Boolean).pop() ?? "file";
+  let clean = base.replace(/[^\p{L}\p{N} ._()-]/gu, "_").replace(/^[. ]+/, "").trim().slice(0, 180);
+  if (!clean || /^[. _-]*$/.test(clean)) clean = "file";
+  if (mime) {
+    const ext = clean.includes(".") ? clean.slice(clean.lastIndexOf(".") + 1).toLowerCase() : "";
+    if (!HONEST_EXT[mime].includes(ext)) clean = `${clean.replace(/\.+$/, "")}.${EXT[mime]}`;
+  }
+  return clean;
 }
 
 // ---------------------------------------------------------------------------
@@ -191,7 +226,7 @@ export function signedUrl(documentId: string, variant: DocumentVariant = "origin
 /** Verifies a `/files/:token` token; null when forged or expired. */
 export function verifyLinkToken(token: string): { documentId: string; variant: DocumentVariant } | null {
   const data = verifyPayload<LinkPayload>(token);
-  if (!data || typeof data.d !== "string" || !["original", "thumb", "medium"].includes(String(data.v))) return null;
+  if (!data || typeof data.d !== "string" || !UUID_RE.test(data.d) || !["original", "thumb", "medium"].includes(String(data.v))) return null;
   return { documentId: data.d, variant: data.v };
 }
 
@@ -208,18 +243,23 @@ export function variantKey(doc: Pick<DocumentRecord, "storageKey" | "variants">,
   return key ?? null;
 }
 
-/** MIME and download filename of a rendition. */
+/** MIME and download filename of a rendition (the original's name is re-checked against its type so a stored legacy name cannot lie). */
 export function variantMeta(doc: Pick<DocumentRecord, "mime" | "fileName">, variant: DocumentVariant): { mime: string; fileName: string } {
-  if (variant === "original") return { mime: doc.mime, fileName: doc.fileName };
-  const stem = doc.fileName.replace(/\.[^.]+$/, "");
+  const honest = (ALLOWED_UPLOAD_MIME_TYPES as readonly string[]).includes(doc.mime) ? safeFileName(doc.fileName, doc.mime as AllowedUploadMime) : safeFileName(doc.fileName);
+  if (variant === "original") return { mime: doc.mime, fileName: honest };
+  const stem = honest.replace(/\.[^.]+$/, "");
   return { mime: "image/webp", fileName: `${stem}_${variant}.webp` };
 }
 
 /** What streamDocument() returns. */
 export interface DocumentStream { stream: Readable; mime: string; size: number | null; fileName: string }
 
-/** Opens a stream of a live (not deleted) document rendition; null when the document, the variant or the stored object is missing. */
+/**
+ * Opens a stream of a live (not deleted) document rendition; null when the document, the variant or the stored object is missing.
+ * The original streams from storage with its recorded size; the (small) webp renditions are read whole so Content-Length is exact.
+ */
 export async function streamDocument(executor: Executor, documentId: string, variant: DocumentVariant = "original"): Promise<DocumentStream | null> {
+  if (!UUID_RE.test(documentId)) return null;
   const [doc] = await executor.select().from(documents).where(and(eq(documents.id, documentId), eq(documents.isDeleted, false))).limit(1);
   if (!doc) return null;
   const key = variantKey(doc, variant);
@@ -227,7 +267,9 @@ export async function streamDocument(executor: Executor, documentId: string, var
   const store = storage();
   if (!(await store.exists(key))) return null;
   const { mime, fileName } = variantMeta(doc, variant);
-  return { stream: await store.stream(key), mime, size: variant === "original" ? doc.sizeBytes : null, fileName };
+  if (variant === "original") return { stream: await store.stream(key), mime, size: Number(doc.sizeBytes), fileName };
+  const bytes = await store.get(key);
+  return { stream: Readable.from([bytes]), mime, size: bytes.length, fileName };
 }
 
 // ---------------------------------------------------------------------------

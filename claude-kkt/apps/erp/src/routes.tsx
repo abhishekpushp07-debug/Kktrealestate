@@ -1,5 +1,5 @@
 import { lazy, type ComponentType, type LazyExoticComponent } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { PermissionRoute } from "@/components/auth/PermissionRoute";
 import { ProtectedRoute, PublicOnlyRoute } from "@/components/auth/ProtectedRoute";
 import { AppShell } from "@/components/layout/AppShell";
@@ -17,6 +17,20 @@ const MastersIndexRedirect = lazy(() => import("@/features/masters/MastersLayout
 const MasterAliasRedirect = lazy(() => import("@/features/masters/MastersLayout").then((module) => ({ default: module.MasterAliasRedirect })));
 const MasterListPage = lazy(() => import("@/features/masters/MasterListPage"));
 
+// Inventory
+const ProjectsPage = lazy(() => import("@/features/inventory/ProjectsPage"));
+const ProjectDetailPage = lazy(() => import("@/features/inventory/ProjectDetailPage"));
+const BlockWizard = lazy(() => import("@/features/inventory/BlockWizard"));
+const BlockDetailPage = lazy(() => import("@/features/inventory/BlockDetailPage"));
+const FlatsPage = lazy(() => import("@/features/inventory/FlatsPage"));
+
+// CRM
+const CustomersPage = lazy(() => import("@/features/crm/CustomersPage"));
+const CustomerDetailPage = lazy(() => import("@/features/crm/CustomerDetailPage"));
+const LeadsPage = lazy(() => import("@/features/crm/LeadsPage"));
+const EnquiriesInbox = lazy(() => import("@/features/crm/EnquiriesInbox"));
+const SiteVisitsPage = lazy(() => import("@/features/crm/SiteVisitsPage"));
+
 // Admin
 const UsersPage = lazy(() => import("@/features/admin/UsersPage"));
 const RolesPage = lazy(() => import("@/features/admin/RolesPage"));
@@ -27,6 +41,10 @@ const NotificationsPage = lazy(() => import("@/features/admin/NotificationsPage"
 
 /** Nav items whose real screen has landed; everything else still renders the placeholder. */
 const PAGES_BY_NAV_ID: Readonly<Record<string, LazyExoticComponent<ComponentType>>> = {
+  flats: FlatsPage,
+  leads: LeadsPage,
+  visits: SiteVisitsPage,
+  enquiries: EnquiriesInbox,
   users: UsersPage,
   roles: RolesPage,
   audit: AuditLogPage,
@@ -78,6 +96,41 @@ export function AppRoutes() {
               </Route>
             );
           }
+          if (item.id === "projects") {
+            return (
+              <Route
+                key={item.id}
+                path={item.to}
+                element={
+                  <PermissionRoute permission={item.permission}>
+                    <Outlet />
+                  </PermissionRoute>
+                }
+              >
+                <Route index element={<ProjectsPage />} />
+                <Route path=":id" element={<ProjectDetailPage />} />
+                <Route path=":id/blocks/new" element={<BlockWizard />} />
+                <Route path="*" element={<NotFoundPage />} />
+              </Route>
+            );
+          }
+          if (item.id === "customers") {
+            return (
+              <Route
+                key={item.id}
+                path={item.to}
+                element={
+                  <PermissionRoute permission={item.permission}>
+                    <Outlet />
+                  </PermissionRoute>
+                }
+              >
+                <Route index element={<CustomersPage />} />
+                <Route path=":id" element={<CustomerDetailPage />} />
+                <Route path="*" element={<NotFoundPage />} />
+              </Route>
+            );
+          }
           const Page = PAGES_BY_NAV_ID[item.id];
           return (
             <Route
@@ -87,6 +140,24 @@ export function AppRoutes() {
             />
           );
         })}
+
+        {/* Inventory & CRM routes outside the nav tree. */}
+        <Route
+          path="/blocks/:id"
+          element={
+            <PermissionRoute permission="project.read">
+              <BlockDetailPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="/enquiries"
+          element={
+            <PermissionRoute permission={["lead.read", "cms.read"]}>
+              <EnquiriesInbox />
+            </PermissionRoute>
+          }
+        />
 
         {/* Short aliases from the module briefs → canonical nav paths. */}
         <Route path="/master" element={<Navigate to="/masters" replace />} />

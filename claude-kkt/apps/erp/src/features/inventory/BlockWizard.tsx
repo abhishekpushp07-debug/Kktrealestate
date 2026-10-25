@@ -232,7 +232,7 @@ export default function BlockWizard() {
   const steps: Step[] = STEPS.map((definition, index) => ({ ...definition, error: index < step && (stepErrors[index] ?? []).length > 0 }));
 
   return (
-    <div className="pb-24">
+    <div className="flex min-h-[calc(100dvh-8rem)] flex-col">
       <PageHeader title="New block" description={`Add a tower or villa block to ${projectRow.name}. Flats are generated atomically at the end.`} breadcrumbs={[{ label: "Home", to: "/" }, { label: "Projects", to: "/projects" }, { label: projectRow.name, to: backTo }, { label: "New block" }]} backTo={backTo} />
       <div className="grid gap-4 lg:grid-cols-[16rem_1fr]">
         <Stepper steps={steps} current={step} onStepClick={(index) => index < step && setStep(index)} className="lg:sticky lg:top-20 lg:self-start" />
@@ -364,9 +364,9 @@ export default function BlockWizard() {
         </div>
       </div>
 
-      {/* Sticky footer */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 px-4 py-3 shadow-pop backdrop-blur lg:left-[var(--spacing-sidebar)]">
-        <div className="mx-auto flex max-w-screen-2xl items-center justify-between gap-2">
+      {/* Sticky footer (sticks to the viewport bottom inside the scrolling main area) */}
+      <div className="sticky bottom-0 z-30 -mx-4 mt-auto border-t border-border bg-card/95 px-4 py-3 shadow-pop backdrop-blur md:-mx-6 md:px-6">
+        <div className="flex items-center justify-between gap-2">
           <Button variant="ghost" onClick={() => (touched ? setCancelOpen(true) : navigate(backTo))} data-testid="wizard-cancel">
             Cancel
           </Button>
