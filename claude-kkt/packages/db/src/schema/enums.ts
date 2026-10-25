@@ -8,6 +8,7 @@ import {
   CONTRA_TYPES,
   DEMAND_STATUSES,
   DOCUMENT_ENTITY_TYPES,
+  EXPORT_STATUSES,
   FLAT_STATUSES,
   GENDERS,
   JOB_RUN_STATUSES,
@@ -42,6 +43,7 @@ import {
 export const userTypeEnum = pgEnum("user_type", USER_TYPES);
 export const actorTypeEnum = pgEnum("actor_type", ACTOR_TYPES);
 export const jobRunStatusEnum = pgEnum("job_run_status", JOB_RUN_STATUSES);
+export const exportStatusEnum = pgEnum("export_status", EXPORT_STATUSES);
 
 // Masters
 export const planTypeEnum = pgEnum("plan_type", PLAN_TYPES);

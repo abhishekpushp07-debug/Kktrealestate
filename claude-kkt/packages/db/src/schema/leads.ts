@@ -1,7 +1,7 @@
 // E. Leads & visits
 import { sql } from "drizzle-orm";
 import { boolean, check, date, index, integer, jsonb, pgTable, text, time, timestamp, unique, uuid } from "drizzle-orm/pg-core";
-import { appendOnly, idColumn, mutable, paise, timestamps } from "./_common.js";
+import { appendOnly, idColumn, mutable, paise, timestamps, trgm } from "./_common.js";
 import { customers } from "./customers.js";
 import { actorTypeEnum, leadSourceEnum, leadStageEnum, visitSourceEnum, visitStatusEnum } from "./enums.js";
 import { companies, users } from "./identity.js";
@@ -49,6 +49,11 @@ export const leads = pgTable(
     index("leads_company_stage_idx").on(t.companyId, t.stage),
     index("leads_assigned_follow_up_idx").on(t.assignedUserId, t.nextFollowUpAt),
     index("leads_company_source_created_idx").on(t.companyId, t.source, t.createdAt.desc()),
+    index("leads_company_created_idx").on(t.companyId, t.createdAt.desc(), t.id.desc()),
+    trgm("leads_full_name_trgm_idx", t.fullName),
+    trgm("leads_phone_trgm_idx", t.phone),
+    trgm("leads_lead_number_trgm_idx", t.leadNumber),
+    trgm("leads_email_trgm_idx", t.email),
   ],
 );
 
@@ -122,6 +127,8 @@ export const siteVisits = pgTable(
     status: visitStatusEnum("status").notNull().default("CONFIRMED"),
     assigneeUserId: uuid("assignee_user_id").references(() => users.id),
     manageTokenHash: text("manage_token_hash"),
+    /** The manage link stops working after this instant (visit end + grace); NULL only on rows created before migration 0002. */
+    manageTokenExpiresAt: timestamp("manage_token_expires_at", { withTimezone: true }),
     source: visitSourceEnum("source").notNull().default("ERP"),
     rescheduledFrom: jsonb("rescheduled_from").$type<RescheduledFrom>(),
     cancelReason: text("cancel_reason"),
@@ -134,6 +141,7 @@ export const siteVisits = pgTable(
     index("site_visits_project_slot_idx").on(t.projectId, t.visitDate, t.slotStart, t.status),
     index("site_visits_assignee_date_idx").on(t.assigneeUserId, t.visitDate),
     index("site_visits_lead_status_idx").on(t.leadId, t.status),
+    index("site_visits_company_visit_date_idx").on(t.companyId, t.visitDate.desc(), t.id.desc()),
     check("site_visits_visitors_chk", sql`${t.visitors} BETWEEN 1 AND 6`),
   ],
 );
@@ -176,5 +184,8 @@ export const enquiries = pgTable(
     isRead: boolean("is_read").notNull().default(false),
     ...timestamps(),
   },
-  (t) => [index("enquiries_company_read_created_idx").on(t.companyId, t.isRead, t.createdAt.desc())],
+  (t) => [
+    index("enquiries_company_read_created_idx").on(t.companyId, t.isRead, t.createdAt.desc()),
+    index("enquiries_company_created_idx").on(t.companyId, t.createdAt.desc(), t.id.desc()),
+  ],
 );

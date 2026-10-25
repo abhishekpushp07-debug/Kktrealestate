@@ -1,7 +1,7 @@
 // A. Identity & platform
 import { sql } from "drizzle-orm";
 import { bigint, boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
-import { appendOnly, citext, idColumn, mutable, softDelete } from "./_common.js";
+import { appendOnly, citext, idColumn, mutable, softDelete, trgm } from "./_common.js";
 import { actorTypeEnum, jobRunStatusEnum, userTypeEnum } from "./enums.js";
 import type { Address, CompanySettings, JsonObject, Letterhead, Numbering } from "./json.js";
 
@@ -86,7 +86,14 @@ export const users = pgTable(
     avatarDocumentId: uuid("avatar_document_id"),
     ...mutable(),
   },
-  (t) => [unique("users_company_email_uq").on(t.companyId, t.email), index("users_role_idx").on(t.roleId)],
+  (t) => [
+    unique("users_company_email_uq").on(t.companyId, t.email),
+    index("users_role_idx").on(t.roleId),
+    trgm("users_name_trgm_idx", t.name),
+    trgm("users_phone_trgm_idx", t.phone),
+    // citext has no trigram operator class: the index is on email::text, so searches must compare `email::text ILIKE …`.
+    index("users_email_trgm_idx").using("gin", sql`(${t.email}::text) gin_trgm_ops`),
+  ],
 );
 
 export const passwordHistory = pgTable(
@@ -167,7 +174,7 @@ export const auditLogs = pgTable(
     index("audit_logs_entity_idx").on(t.entityType, t.entityId, t.createdAt.desc()),
     index("audit_logs_actor_idx").on(t.actorId, t.createdAt.desc()),
     index("audit_logs_created_idx").on(t.createdAt.desc()),
-    index("audit_logs_company_created_idx").on(t.companyId, t.createdAt.desc()),
+    index("audit_logs_company_created_idx").on(t.companyId, t.createdAt.desc(), t.id.desc()),
   ],
 );
 

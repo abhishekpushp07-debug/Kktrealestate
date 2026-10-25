@@ -5,7 +5,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { migrate as drizzleMigrate } from "drizzle-orm/postgres-js/migrator";
-import { createDb, DEFAULT_DATABASE_URL, type DbHandle } from "./client.js";
+import { createDb, DEFAULT_DATABASE_URL, withSessionAdvisoryLock, type DbHandle } from "./client.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -43,19 +43,29 @@ export async function listSqlFiles(folder: string = SQL_FOLDER): Promise<string[
     .map((n) => join(folder, n));
 }
 
-/** Runs the full migration (drizzle journal, then src/sql/*.sql) on an already-open handle. */
+/** Advisory-lock key serialising migrations across processes (API replicas, the worker, CLI runs). */
+export const MIGRATION_LOCK_KEY = "kkt:migrate";
+
+/**
+ * Runs the full migration (extensions, drizzle journal, then src/sql/*.sql) on an already-open handle while holding the session-level
+ * advisory lock {@link MIGRATION_LOCK_KEY}: concurrent replicas queue behind the first, then find nothing left to apply. Every step is
+ * idempotent. The handle needs a pool of at least 2 connections and should be opened with `timeouts: false` (index builds can be slow).
+ */
 export async function migrateHandle(handle: DbHandle): Promise<void> {
-  await handle.sql.unsafe("CREATE EXTENSION IF NOT EXISTS citext");
-  await drizzleMigrate(handle.db, { migrationsFolder: MIGRATIONS_FOLDER });
-  for (const file of await listSqlFiles()) {
-    const text = await readFile(file, "utf8");
-    await handle.sql.unsafe(text);
-  }
+  await withSessionAdvisoryLock(handle, MIGRATION_LOCK_KEY, async () => {
+    await handle.sql.unsafe("CREATE EXTENSION IF NOT EXISTS citext");
+    await handle.sql.unsafe("CREATE EXTENSION IF NOT EXISTS pg_trgm");
+    await drizzleMigrate(handle.db, { migrationsFolder: MIGRATIONS_FOLDER });
+    for (const file of await listSqlFiles()) {
+      const text = await readFile(file, "utf8");
+      await handle.sql.unsafe(text);
+    }
+  });
 }
 
 /** Opens a connection to `url`, migrates it to the latest version and closes the connection. */
 export async function runMigrations(url: string = process.env["DATABASE_URL"] ?? DEFAULT_DATABASE_URL): Promise<void> {
-  const handle = createDb(url, { max: 1 });
+  const handle = createDb(url, { max: 2, timeouts: false });
   try {
     await migrateHandle(handle);
   } finally {

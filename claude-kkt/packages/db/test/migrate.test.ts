@@ -7,9 +7,11 @@ import { listSqlFiles, MIGRATIONS_FOLDER, runMigrations, SQL_FOLDER } from "../s
 import { resetDatabase, resetRefusalReason } from "../src/reset.js";
 import { TEST_DATABASE_URL } from "./env.js";
 
-const EXPECTED_TABLE_COUNT = 77;
+const EXPECTED_TABLE_COUNT = 78;
+/** Tables created by 0000_initial (0002 adds `exports`). */
+const INITIAL_TABLE_COUNT = 77;
 /** Committed drizzle migrations in journal order. */
-const EXPECTED_MIGRATIONS = ["0000_initial", "0001_central_fixes"] as const;
+const EXPECTED_MIGRATIONS = ["0000_initial", "0001_central_fixes", "0002_foundation_hardening"] as const;
 
 /** Replaces the database name in a postgres URL. */
 function withDatabase(url: string, name: string): string {
@@ -49,8 +51,8 @@ describe("migrations", () => {
         const [tables] = await fresh<{ n: number }[]>`
           SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'`;
         expect(tables?.n).toBe(EXPECTED_TABLE_COUNT);
-        const [ext] = await fresh<{ n: number }[]>`SELECT count(*)::int AS n FROM pg_extension WHERE extname = 'citext'`;
-        expect(ext?.n).toBe(1);
+        const [ext] = await fresh<{ names: string[] }[]>`SELECT array_agg(extname::text ORDER BY extname) AS names FROM pg_extension WHERE extname IN ('citext', 'pg_trgm')`;
+        expect(ext?.names).toEqual(["citext", "pg_trgm"]);
         const [triggers] = await fresh<{ names: string[] }[]>`
           SELECT array_agg(tgname ORDER BY tgname) AS names FROM pg_trigger
           WHERE NOT tgisinternal AND tgname IN ('audit_logs_immutable', 'audit_logs_no_truncate', 'payments_no_delete', 'demands_no_delete')`;
@@ -86,7 +88,7 @@ describe("migrations", () => {
       expect(central).toContain(`CREATE INDEX "${name}"`);
     }
     const initial = await readFile(join(MIGRATIONS_FOLDER, "0000_initial.sql"), "utf8");
-    expect((initial.match(/^CREATE TABLE /gm) ?? []).length).toBe(EXPECTED_TABLE_COUNT);
+    expect((initial.match(/^CREATE TABLE /gm) ?? []).length).toBe(INITIAL_TABLE_COUNT);
     // The generated SQL itself must carry the partial unique indexes (not only the hand-written file).
     for (const name of ["demands_booking_seq_nonvoid_uq", "bookings_one_active_per_flat_uq", "rate_cards_one_active_uq", "bank_accounts_one_default_uq", "construction_stages_one_possession_uq"]) {
       expect(initial).toMatch(new RegExp(`CREATE UNIQUE INDEX "${name}" ON .* WHERE `));
@@ -105,7 +107,12 @@ describe("migrations", () => {
     expect(defs.get("rate_cards_one_active_uq")).toMatch(/UNIQUE INDEX .* \(project_id\) WHERE \(status = 'ACTIVE'::rate_card_status\)/);
     expect(defs.get("bank_accounts_one_default_uq")).toMatch(/UNIQUE INDEX .* \(company_id\) WHERE is_default/);
     expect(defs.get("construction_stages_one_possession_uq")).toMatch(/UNIQUE INDEX .* \(company_id\) WHERE is_possession/);
-    expect(rows).toHaveLength(5);
+    // 0002: database twins of application rules
+    expect(defs.get("customers_company_phone_live_uq")).toMatch(/UNIQUE INDEX .* \(company_id, phone\) WHERE \(erased_at IS NULL\)/);
+    expect(defs.get("customers_company_pan_hash_live_uq")).toMatch(/UNIQUE INDEX .* \(company_id, pan_hash\) WHERE \(\(erased_at IS NULL\) AND \(pan_hash IS NOT NULL\)\)/);
+    expect(defs.get("payments_company_idempotency_key_uq")).toMatch(/UNIQUE INDEX .* \(company_id, idempotency_key\) WHERE \(idempotency_key IS NOT NULL\)/);
+    expect(defs.get("flats_hold_until_idx")).toMatch(/INDEX .* \(status, hold_until\) WHERE \(status = 'HOLD'::flat_status\)/);
+    expect(rows).toHaveLength(9);
   });
 
   it("creates the NULLS NOT DISTINCT constraint on payment_plan_assignments", async () => {

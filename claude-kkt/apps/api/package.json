@@ -9,7 +9,7 @@
     "worker": "tsx src/worker.ts",
     "build": "tsup",
     "typecheck": "tsc --noEmit",
-    "lint": "tsc --noEmit",
+    "lint": "eslint .",
     "seed": "tsx src/seed/run.ts",
     "test": "vitest run --dir test/unit",
     "test:integration": "vitest run --dir test/integration --no-file-parallelism",

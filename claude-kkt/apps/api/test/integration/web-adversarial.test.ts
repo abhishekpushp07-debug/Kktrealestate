@@ -202,12 +202,14 @@ describe("public cache", () => {
   });
 });
 
-describe("rate limit uses the first X-Forwarded-For hop", () => {
-  it("6th form post from one client behind the proxy → 429; a different first hop is unaffected", async () => {
+describe("rate limit keys on the proxy-aware client IP (TRUST_PROXY=loopback)", () => {
+  it("6th form post from one client → 429; prepending a spoofed hop does not escape the limit; another client is unaffected", async () => {
     const statuses: number[] = [];
-    for (let i = 0; i < 6; i++) statuses.push((await t.request("POST", "/api/v1/public/enquiries", { ip: "203.0.113.9, 10.1.1.1", body: { name: `Hop ${i}`, phone: `98766120${String(i).padStart(2, "0")}`, consent: true, website: "" } })).status);
+    for (let i = 0; i < 6; i++) statuses.push((await t.request("POST", "/api/v1/public/enquiries", { ip: "203.0.113.9", body: { name: `Hop ${i}`, phone: `98766120${String(i).padStart(2, "0")}`, consent: true, website: "" } })).status);
     expect(statuses).toEqual([200, 200, 200, 200, 200, 429]);
-    expect((await t.request("POST", "/api/v1/public/enquiries", { ip: "203.0.113.10, 10.1.1.1", body: { name: "Other", phone: "9876612099", consent: true, website: "" } })).status).toBe(200);
+    // The left-most X-Forwarded-For entry is attacker-controlled: the client is the right-most hop the trusted proxy appended.
+    expect((await t.request("POST", "/api/v1/public/enquiries", { ip: "198.51.100.77, 203.0.113.9", body: { name: "Spoof", phone: "9876612098", consent: true, website: "" } })).status).toBe(429);
+    expect((await t.request("POST", "/api/v1/public/enquiries", { ip: "203.0.113.10", body: { name: "Other", phone: "9876612099", consent: true, website: "" } })).status).toBe(200);
   });
 });
 

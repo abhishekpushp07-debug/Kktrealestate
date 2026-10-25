@@ -1,7 +1,7 @@
 // D. Customers & portal identity
 import { sql } from "drizzle-orm";
-import { boolean, date, index, integer, jsonb, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
-import { idColumn, mutable, timestamps } from "./_common.js";
+import { boolean, date, index, integer, jsonb, pgTable, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { idColumn, mutable, timestamps, trgm } from "./_common.js";
 import { genderEnum, kycStatusEnum } from "./enums.js";
 import { companies, users } from "./identity.js";
 import type { Address, BankDetails, Nominee } from "./json.js";
@@ -43,6 +43,8 @@ export const customers = pgTable(
     bank: jsonb("bank").$type<BankDetails>(),
     nominee: jsonb("nominee").$type<Nominee>(),
     kycStatus: kycStatusEnum("kyc_status").notNull().default("PENDING"),
+    kycSubmittedBy: uuid("kyc_submitted_by"),
+    kycSubmittedAt: timestamp("kyc_submitted_at", { withTimezone: true }),
     kycVerifiedBy: uuid("kyc_verified_by"),
     kycVerifiedAt: timestamp("kyc_verified_at", { withTimezone: true }),
     kycRemarks: text("kyc_remarks"),
@@ -58,6 +60,14 @@ export const customers = pgTable(
     index("customers_company_phone_idx").on(t.companyId, t.phone),
     index("customers_company_pan_hash_idx").on(t.companyId, t.panHash),
     index("customers_company_full_name_idx").on(t.companyId, t.fullName),
+    index("customers_company_created_idx").on(t.companyId, t.createdAt.desc(), t.id.desc()),
+    // Database twin of crm/customerService.ts assertNoDuplicate: one live (not erased) customer per phone and per PAN in a company.
+    uniqueIndex("customers_company_phone_live_uq").on(t.companyId, t.phone).where(sql`${t.erasedAt} IS NULL`),
+    uniqueIndex("customers_company_pan_hash_live_uq").on(t.companyId, t.panHash).where(sql`${t.erasedAt} IS NULL AND ${t.panHash} IS NOT NULL`),
+    trgm("customers_full_name_trgm_idx", t.fullName),
+    trgm("customers_phone_trgm_idx", t.phone),
+    trgm("customers_customer_code_trgm_idx", t.customerCode),
+    trgm("customers_email_trgm_idx", t.email),
   ],
 );
 
@@ -80,6 +90,7 @@ export const coApplicants = pgTable(
     aadhaarLast4: text("aadhaar_last4"),
     sortOrder: integer("sort_order").notNull().default(0),
     ...timestamps(),
+    version: integer("version").notNull().default(1),
   },
   (t) => [index("co_applicants_customer_idx").on(t.customerId, t.sortOrder)],
 );

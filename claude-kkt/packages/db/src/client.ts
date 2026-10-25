@@ -17,9 +17,54 @@ export type Tx = PgTransaction<PostgresJsQueryResultHKT, typeof schema, ExtractT
 /** Anything that can run a query: the database or a transaction. */
 export type Executor = DB | Tx;
 
+/**
+ * Per-connection safety limits (Postgres session settings sent as startup parameters). A runaway query, a lock wait or a transaction
+ * left idle by a crashed request is cut off instead of holding a pool connection (and its locks) until the HTTP client gives up.
+ */
+export interface DbTimeouts {
+  /** `statement_timeout` in ms (0 = none). Env DB_STATEMENT_TIMEOUT_MS, default 15000. */
+  statementTimeoutMs: number;
+  /** `lock_timeout` in ms (0 = none). Env DB_LOCK_TIMEOUT_MS, default 5000. */
+  lockTimeoutMs: number;
+  /** `idle_in_transaction_session_timeout` in ms (0 = none). Env DB_IDLE_IN_TX_TIMEOUT_MS, default 30000. */
+  idleInTransactionTimeoutMs: number;
+  /** TCP connect timeout in seconds. Env DB_CONNECT_TIMEOUT_S, default 10. */
+  connectTimeoutS: number;
+}
+
+/** Defaults of {@link DbTimeouts} (mirrored by the API's config validation). */
+export const DEFAULT_DB_TIMEOUTS: Readonly<DbTimeouts> = Object.freeze({
+  statementTimeoutMs: 15_000,
+  lockTimeoutMs: 5_000,
+  idleInTransactionTimeoutMs: 30_000,
+  connectTimeoutS: 10,
+});
+
+function envInt(env: Record<string, string | undefined>, name: string, fallback: number, min: number): number {
+  const raw = env[name];
+  if (raw === undefined || raw.trim() === "") return fallback;
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= min ? n : fallback;
+}
+
+/** Reads {@link DbTimeouts} from DB_STATEMENT_TIMEOUT_MS / DB_LOCK_TIMEOUT_MS / DB_IDLE_IN_TX_TIMEOUT_MS / DB_CONNECT_TIMEOUT_S. */
+export function dbTimeoutsFromEnv(env: Record<string, string | undefined> = process.env): DbTimeouts {
+  return {
+    statementTimeoutMs: envInt(env, "DB_STATEMENT_TIMEOUT_MS", DEFAULT_DB_TIMEOUTS.statementTimeoutMs, 0),
+    lockTimeoutMs: envInt(env, "DB_LOCK_TIMEOUT_MS", DEFAULT_DB_TIMEOUTS.lockTimeoutMs, 0),
+    idleInTransactionTimeoutMs: envInt(env, "DB_IDLE_IN_TX_TIMEOUT_MS", DEFAULT_DB_TIMEOUTS.idleInTransactionTimeoutMs, 0),
+    connectTimeoutS: envInt(env, "DB_CONNECT_TIMEOUT_S", DEFAULT_DB_TIMEOUTS.connectTimeoutS, 1),
+  };
+}
+
 export interface CreateDbOptions {
   /** Pool size (postgres.js `max`). */
   max?: number;
+  /**
+   * Session limits; default {@link dbTimeoutsFromEnv}. `false` sends no statement/lock/idle limits (migrations: index builds and the
+   * migration advisory lock may legitimately take long); the connect timeout still applies.
+   */
+  timeouts?: Partial<DbTimeouts> | false;
   /** Idle connection timeout in seconds. */
   idleTimeout?: number;
   /**
@@ -90,9 +135,20 @@ export interface DbCluster {
 
 /** Opens a postgres.js pool on `url` and wraps it in Drizzle; `close()` ends the pool. */
 export function createDb(url: string = process.env["DATABASE_URL"] ?? DEFAULT_DATABASE_URL, options: CreateDbOptions = {}): DbHandle {
+  const env = dbTimeoutsFromEnv();
+  const t: DbTimeouts = options.timeouts === false ? env : { ...env, ...(options.timeouts ?? {}) };
   const client = postgres(url, {
     max: options.max ?? 10,
     idle_timeout: options.idleTimeout ?? 30,
+    connect_timeout: t.connectTimeoutS,
+    connection:
+      options.timeouts === false
+        ? {}
+        : {
+            statement_timeout: t.statementTimeoutMs,
+            lock_timeout: t.lockTimeoutMs,
+            idle_in_transaction_session_timeout: t.idleInTransactionTimeoutMs,
+          },
     // bigint columns arrive as JS numbers (all amounts fit in 2^53); drizzle's
     // `bigint({ mode: "number" })` also parses them, this keeps raw `sql` results consistent.
     types: { bigint: { to: 20, from: [20], serialize: (v: number | bigint) => String(v), parse: (v: string) => Number(v) } },
@@ -127,6 +183,85 @@ export function createDbCluster(
       }
     },
   };
+}
+
+/**
+ * Runs `fn` while holding the session-level advisory lock `hashtext(key)` on a dedicated connection reserved from `handle`'s pool
+ * (so the pool needs at least two connections: one holds the lock, the others do the work). Other processes calling this with the same
+ * key wait until `fn` settles; the lock is always released, and a crashed holder's lock dies with its connection.
+ */
+export async function withSessionAdvisoryLock<T>(handle: DbHandle, key: string, fn: () => Promise<T>): Promise<T> {
+  const max = (handle.sql.options as { max?: number }).max ?? 1;
+  if (max < 2) throw new Error("withSessionAdvisoryLock needs a pool of at least 2 connections (one holds the lock)");
+  const conn = await handle.sql.reserve();
+  try {
+    // The lock wait is unbounded on purpose (another replica may be mid-migration); a connection-level lock_timeout must not abort it.
+    await conn.unsafe("SET lock_timeout = 0");
+    await conn.unsafe("SET statement_timeout = 0");
+    await conn`SELECT pg_advisory_lock(hashtext(${key}))`;
+    try {
+      return await fn();
+    } finally {
+      await conn`SELECT pg_advisory_unlock(hashtext(${key}))`.catch(() => undefined);
+      await conn.unsafe("RESET lock_timeout; RESET statement_timeout").catch(() => undefined);
+    }
+  } finally {
+    conn.release();
+  }
+}
+
+/** SQLSTATEs after which re-running the whole transaction is safe and expected to succeed: serialization_failure, deadlock_detected. */
+export const RETRYABLE_TRANSACTION_SQLSTATES: readonly string[] = ["40001", "40P01"];
+
+/** The retryable SQLSTATE carried by `err` (looking through Drizzle's `cause` wrappers), or null. */
+export function retryableTransactionError(err: unknown): string | null {
+  let e: unknown = err;
+  for (let depth = 0; depth < 8 && e !== null && typeof e === "object"; depth += 1) {
+    const code = (e as { code?: unknown }).code;
+    if (typeof code === "string" && RETRYABLE_TRANSACTION_SQLSTATES.includes(code)) return code;
+    e = (e as { cause?: unknown }).cause;
+  }
+  return null;
+}
+
+export interface TransactionRetryOptions {
+  /** Retries after the first attempt (default 3, so at most 4 attempts). */
+  retries?: number;
+  /** Backoff base in ms (default 25): attempt n waits a random 0..min(maxDelayMs, baseDelayMs·2^n) ms ("full jitter"). */
+  baseDelayMs?: number;
+  /** Backoff cap in ms (default 1000). */
+  maxDelayMs?: number;
+  /** Transaction isolation level (default: the database default, READ COMMITTED). */
+  isolationLevel?: "read committed" | "repeatable read" | "serializable";
+  /** Observer for each retry (logging/metrics). */
+  onRetry?: (info: { attempt: number; code: string; delayMs: number; error: unknown }) => void;
+  /** Sleep implementation (tests). */
+  sleep?: (ms: number) => Promise<void>;
+}
+
+/**
+ * Runs `fn` in a transaction and re-runs the WHOLE transaction when Postgres aborts it with a serialization failure (40001) or a
+ * deadlock (40P01) — the loser of a lock-order race — with jittered exponential backoff. Every other error is rethrown at once, and the
+ * last retryable error is rethrown when the retries are exhausted. `fn` may run more than once, so it must not have side effects outside
+ * the transaction (queue jobs, Redis writes, notifications) before it returns; do those after this resolves.
+ */
+export async function withTransactionRetry<T>(db: DB, fn: (tx: Tx, attempt: number) => Promise<T>, options: TransactionRetryOptions = {}): Promise<T> {
+  const retries = Math.max(0, Math.floor(options.retries ?? 3));
+  const base = options.baseDelayMs ?? 25;
+  const cap = options.maxDelayMs ?? 1000;
+  const sleep = options.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  const config = options.isolationLevel ? { isolationLevel: options.isolationLevel } : undefined;
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await db.transaction((tx) => fn(tx, attempt), config);
+    } catch (err) {
+      const code = retryableTransactionError(err);
+      if (code === null || attempt >= retries) throw err;
+      const delayMs = Math.floor(Math.random() * Math.min(cap, base * 2 ** attempt));
+      options.onRetry?.({ attempt: attempt + 1, code, delayMs, error: err });
+      await sleep(delayMs);
+    }
+  }
 }
 
 /** Takes a transaction-scoped advisory lock on `hashtext(key)`; released automatically at COMMIT/ROLLBACK. */

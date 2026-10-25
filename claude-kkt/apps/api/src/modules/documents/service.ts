@@ -93,7 +93,7 @@ export async function detectMime(buffer: Buffer): Promise<AllowedUploadMime> {
   const detected = await fileTypeFromBuffer(buffer);
   const mime = detected?.mime;
   if (!mime || !(ALLOWED_UPLOAD_MIME_TYPES as readonly string[]).includes(mime)) {
-    throw new ApiError(415, "UNSUPPORTED_MEDIA", "Only PDF, JPEG, PNG and WebP files are accepted", { detected: mime ?? null, allowed: [...ALLOWED_UPLOAD_MIME_TYPES] });
+    throw new ApiError(415, "UNSUPPORTED_MEDIA_TYPE", "Only PDF, JPEG, PNG and WebP files are accepted", { detected: mime ?? null, allowed: [...ALLOWED_UPLOAD_MIME_TYPES] });
   }
   return mime as AllowedUploadMime;
 }
@@ -173,11 +173,11 @@ async function imageDimensions(buffer: Buffer): Promise<{ width: number; height:
   try {
     meta = await sharp(buffer, { limitInputPixels: false }).metadata();
   } catch {
-    throw new ApiError(415, "UNSUPPORTED_MEDIA", "Image could not be decoded");
+    throw new ApiError(415, "UNSUPPORTED_MEDIA_TYPE", "Image could not be decoded");
   }
   const width = meta.width ?? 0;
   const height = meta.height ?? 0;
-  if (width <= 0 || height <= 0) throw new ApiError(415, "UNSUPPORTED_MEDIA", "Image has no readable dimensions");
+  if (width <= 0 || height <= 0) throw new ApiError(415, "UNSUPPORTED_MEDIA_TYPE", "Image has no readable dimensions");
   if (width * height > MAX_IMAGE_PIXELS) {
     throw new ApiError(413, "PAYLOAD_TOO_LARGE", `Image exceeds ${MAX_IMAGE_PIXELS / 1_000_000} megapixels`, { max_pixels: MAX_IMAGE_PIXELS, width, height });
   }

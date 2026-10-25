@@ -1,5 +1,4 @@
 import type { Redis } from "ioredis";
-import { config } from "../config.js";
 import { ApiError } from "./errors.js";
 
 /**
@@ -25,15 +24,10 @@ export async function enforceRateLimit(redis: Redis, bucket: string, limit: numb
 }
 
 /**
- * Client IP for rate limits, lockouts and audit rows. X-Forwarded-For is honoured only when TRUST_PROXY is on (the reverse proxy
- * rewrites it for untrusted clients); otherwise the socket address is used so a direct client cannot spoof its way past per-IP limits.
+ * Client IP for rate limits, lockouts and audit rows: Fastify's proxy-aware `req.ip`. X-Forwarded-For is honoured only for hops that
+ * TRUST_PROXY trusts (default `loopback`), and the client is the right-most untrusted hop, so a caller cannot choose its own IP by
+ * prepending addresses to the header. `_headers` is kept for call-site compatibility.
  */
-export function clientIp(headers: Record<string, string | string[] | undefined>, fallback: string | undefined, trustProxy: boolean = config.TRUST_PROXY): string {
-  if (trustProxy) {
-    const fwd = headers["x-forwarded-for"];
-    const first = Array.isArray(fwd) ? fwd[0] : fwd;
-    const hop = first?.split(",")[0]?.trim();
-    if (hop) return hop.slice(0, 64);
-  }
-  return fallback ?? "unknown";
+export function clientIp(_headers: Record<string, string | string[] | undefined>, fallback: string | undefined): string {
+  return (fallback ?? "unknown").slice(0, 64);
 }

@@ -95,7 +95,23 @@ describe("error codes", () => {
     expect(errors.statusForError("VERSION_CONFLICT")).toBe(409);
     expect(errors.statusForError("RATE_LIMITED")).toBe(429);
     expect(errors.isApiError({ error: { code: "NOT_FOUND", message: "x", request_id: "r1" } })).toBe(true);
-    expect(errors.isApiError({ error: { code: "NOPE", message: "x" } })).toBe(false);
+    // Unknown but well-formed codes parse (a newer server must never break an older client); malformed ones do not.
+    expect(errors.isApiError({ error: { code: "NOPE", message: "x" } })).toBe(true);
+    expect(errors.isKnownErrorCode("NOPE")).toBe(false);
+    expect(errors.isApiError({ error: { code: "nope", message: "x" } })).toBe(false);
+    expect(errors.isApiError({ error: { message: "x" } })).toBe(false);
+  });
+
+  it("registry has no duplicates and exactly one status per code", () => {
+    expect(new Set(errors.ERROR_CODES).size).toBe(errors.ERROR_CODES.length);
+    expect(Object.keys(errors.ERROR_STATUS).sort()).toEqual([...errors.ERROR_CODES].sort());
+    for (const code of errors.ERROR_CODES) expect(code).toMatch(/^[A-Z][A-Z0-9_]*$/);
+    for (const code of ["TICKET_CLOSED", "DUPLICATE_CUSTOMER", "REOPEN_WINDOW_CLOSED", "ALREADY_RATED", "CASH_INSUFFICIENT", "UNSUPPORTED_MEDIA_TYPE"] as const) {
+      expect(errors.isKnownErrorCode(code), code).toBe(true);
+    }
+    expect(errors.statusForError("NOT_IMPLEMENTED")).toBe(501);
+    expect(errors.statusForError("SUPER_ADMIN_ONLY")).toBe(403);
+    expect(errors.statusForError("PUBLISH_REQUIREMENTS")).toBe(422);
   });
 });
 

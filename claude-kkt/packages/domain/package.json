@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --coverage.enabled=false",
     "test:watch": "vitest",
-    "lint": "tsc --noEmit"
+    "lint": "eslint ."
   },
   "dependencies": {},
   "devDependencies": { "typescript": "~5.9.3", "vitest": "^3.2.0" }

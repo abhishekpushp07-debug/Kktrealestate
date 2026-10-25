@@ -29,7 +29,7 @@ export async function resetDatabase(
   if (refusal !== null) {
     throw new Error(refusal);
   }
-  const handle = createDb(url, { max: 1 });
+  const handle = createDb(url, { max: 2, timeouts: false });
   try {
     await handle.sql.unsafe("DROP SCHEMA IF EXISTS public CASCADE");
     await handle.sql.unsafe("DROP SCHEMA IF EXISTS drizzle CASCADE");

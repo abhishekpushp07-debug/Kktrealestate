@@ -100,7 +100,7 @@ export async function roznamcha(db: Executor, user: StaffContext, from: string, 
   };
 }
 
-/** Records a contra entry; a deposit may not exceed the cash in hand at the end of that day (409 INSUFFICIENT_CASH). */
+/** Records a contra entry; a deposit may not exceed the cash in hand at the end of that day (409 CASH_INSUFFICIENT). */
 export async function createContra(db: DB, user: StaffContext, body: ContraEntryCreate, actor: MoneyActor): Promise<string> {
   return db.transaction(async (tx) => {
     const [acct] = await tx.select({ id: bankAccounts.id, isActive: bankAccounts.isActive }).from(bankAccounts).where(and(eq(bankAccounts.id, body.bank_account_id), eq(bankAccounts.companyId, user.companyId))).limit(1);
@@ -109,7 +109,7 @@ export async function createContra(db: DB, user: StaffContext, body: ContraEntry
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`contra:${user.companyId}`}))`);
     if (body.type === "DEPOSIT") {
       const inHand = await cashInHandThrough(tx, user.companyId, body.entry_date);
-      if (body.amount_paise > inHand) throw ApiError.conflict("INSUFFICIENT_CASH", `Cash in hand on ${body.entry_date} is ${formatINR(inHand)}; cannot deposit ${formatINR(body.amount_paise)}`, { cash_in_hand_paise: inHand, amount_paise: body.amount_paise });
+      if (body.amount_paise > inHand) throw ApiError.conflict("CASH_INSUFFICIENT", `Cash in hand on ${body.entry_date} is ${formatINR(inHand)}; cannot deposit ${formatINR(body.amount_paise)}`, { cash_in_hand_paise: inHand, amount_paise: body.amount_paise });
     }
     const [row] = await tx.insert(contraEntries).values({ companyId: user.companyId, entryDate: body.entry_date, type: body.type, amountPaise: body.amount_paise, bankAccountId: acct.id, remarks: body.remarks ?? null, byUserId: user.id }).returning({ id: contraEntries.id });
     if (!row) throw new Error("contra insert returned no row");

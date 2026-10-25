@@ -22,7 +22,8 @@
     "web": "pnpm --filter @kkt/web dev",
     "portal": "pnpm --filter @kkt/portal web",
     "loadtest": "pnpm --filter @kkt/api loadtest",
-    "format": "prettier --write \"**/*.{ts,tsx,js,json,md,css}\" --ignore-path .gitignore"
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",

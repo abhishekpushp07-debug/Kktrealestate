@@ -75,21 +75,21 @@ const EXPECTED_COLUMNS: Record<string, string[]> = {
   rate_card_rates: ["rate_card_id", "flat_type_id", "rate_per_sqft_paise", "lump_sum_paise"],
   rate_card_plc_rules: ["rate_card_id", "plc_type_id", "calc_mode", "value", "applies_to", "floors_gte", "facings", "sort_order"],
   // D. Customers & portal identity
-  customers: ["company_id", "customer_code", "salutation", "full_name", "father_or_spouse_name", "dob", "gender", "phone", "alt_phone", "email", "address_current", "address_permanent", "same_as_current", "occupation", "company_name", "income_band", "source", "relationship_manager_id", "pan_enc", "pan_hash", "pan_last4", "aadhaar_enc", "aadhaar_hash", "aadhaar_last4", "bank", "nominee", "kyc_status", "kyc_verified_by", "kyc_verified_at", "kyc_remarks", "notes", "tags", "is_active", "erased_at", "version"],
-  co_applicants: ["company_id", "customer_id", "full_name", "relation", "phone", "email", "pan_enc", "pan_hash", "pan_last4", "aadhaar_enc", "aadhaar_last4", "sort_order"],
+  customers: ["company_id", "customer_code", "salutation", "full_name", "father_or_spouse_name", "dob", "gender", "phone", "alt_phone", "email", "address_current", "address_permanent", "same_as_current", "occupation", "company_name", "income_band", "source", "relationship_manager_id", "pan_enc", "pan_hash", "pan_last4", "aadhaar_enc", "aadhaar_hash", "aadhaar_last4", "bank", "nominee", "kyc_status", "kyc_submitted_by", "kyc_submitted_at", "kyc_verified_by", "kyc_verified_at", "kyc_remarks", "notes", "tags", "is_active", "erased_at", "version"],
+  co_applicants: ["company_id", "customer_id", "full_name", "relation", "phone", "email", "pan_enc", "pan_hash", "pan_last4", "aadhaar_enc", "aadhaar_last4", "sort_order", "version"],
   portal_users: ["company_id", "customer_id", "phone", "password_hash", "must_change_password", "is_enabled", "failed_attempts", "locked_until", "last_login_at", "enabled_by", "enabled_at", "disabled_at", "version"],
   // E. Leads & visits
   leads: ["company_id", "lead_number", "full_name", "phone", "email", "project_id", "flat_type_id", "budget_min_paise", "budget_max_paise", "source", "stage", "previous_stage", "lost_reason", "assigned_user_id", "customer_id", "booking_id", "utm", "message", "next_follow_up_at", "is_read", "consent", "last_activity_at", "version"],
   lead_stage_history: ["lead_id", "from_stage", "to_stage", "by_user_id", "reason", "at"],
   lead_follow_ups: ["lead_id", "note", "done_at", "next_at", "by_user_id", "created_at"],
   lead_activities: ["lead_id", "type", "payload", "actor_type", "actor_id", "at"],
-  site_visits: ["company_id", "visit_number", "project_id", "lead_id", "customer_id", "visit_date", "slot_start", "slot_end", "visitors", "name", "phone", "email", "message", "status", "assignee_user_id", "manage_token_hash", "source", "rescheduled_from", "cancel_reason", "notes", "outcome_marked_at", "version"],
+  site_visits: ["company_id", "visit_number", "project_id", "lead_id", "customer_id", "visit_date", "slot_start", "slot_end", "visitors", "name", "phone", "email", "message", "status", "assignee_user_id", "manage_token_hash", "manage_token_expires_at", "source", "rescheduled_from", "cancel_reason", "notes", "outcome_marked_at", "version"],
   brochure_downloads: ["company_id", "project_id", "lead_id", "token_hash", "expires_at", "downloaded_at", "ip", "user_agent", "created_at"],
   enquiries: ["company_id", "lead_id", "project_id", "name", "phone", "email", "flat_type_id", "message", "source_page", "utm", "ip", "reference_number", "is_read", "created_at"],
   // F. Plans ↔ towers, bookings, money
   payment_plan_assignments: ["company_id", "plan_id", "project_id", "block_id", "is_default", "effective_from", "effective_to", "is_active"],
-  booking_drafts: ["company_id", "user_id", "payload", "step", "updated_at"],
-  bookings: ["company_id", "booking_number", "project_id", "block_id", "flat_id", "customer_id", "booking_date", "status", "agreement_value_paise", "cash_agreed_paise", "account_agreed_paise", "flat_snapshot", "rate_per_sqft_paise", "payment_plan_id", "plan_snapshot", "plan_accepted_on", "plan_acceptance_mode", "plan_acceptance_document_id", "sales_user_id", "lead_id", "broker_name", "remarks", "raised_percent", "cash_order_raised_paise", "account_order_raised_paise", "cash_paid_paise", "account_paid_paise", "other_charges_demanded_paise", "other_charges_paid_paise", "pending_cheques_paise", "last_payment_at", "cancellation", "completed_at", "completed_by", "completion_notes", "version"],
+  booking_drafts: ["company_id", "user_id", "payload", "step", "updated_at", "version"],
+  bookings: ["company_id", "booking_number", "project_id", "block_id", "flat_id", "customer_id", "booking_date", "status", "agreement_value_paise", "cash_agreed_paise", "account_agreed_paise", "list_price_paise", "price_deviation_reason", "price_deviation_by", "flat_snapshot", "rate_per_sqft_paise", "payment_plan_id", "plan_snapshot", "plan_accepted_on", "plan_acceptance_mode", "plan_acceptance_document_id", "sales_user_id", "lead_id", "broker_name", "remarks", "raised_percent", "cash_order_raised_paise", "account_order_raised_paise", "cash_paid_paise", "account_paid_paise", "other_charges_demanded_paise", "other_charges_paid_paise", "pending_cheques_paise", "last_payment_at", "cancellation", "completed_at", "completed_by", "completion_notes", "version"],
   booking_co_applicants: ["booking_id", "customer_id"],
   booking_other_charges: ["company_id", "booking_id", "charge_type_id", "name", "code", "amount_paise", "gst_percent", "gst_paise", "total_paise", "demand_at", "demanded_at", "demand_number", "due_date", "paid_paise", "sort_order"],
   agreement_revisions: ["company_id", "booking_id", "revised_at", "revised_by", "revised_by_name", "reason", "before", "after"],
@@ -114,6 +114,7 @@ const EXPECTED_COLUMNS: Record<string, string[]> = {
   cms_people: ["company_id", "name", "title", "bio", "photo_document_id", "sort_order", "is_published"],
   report_presets: ["company_id", "user_id", "report_key", "name", "params"],
   integrity_runs: ["company_id", "ran_at", "triggered_by", "ok", "counts", "findings"],
+  exports: ["company_id", "user_id", "path", "query", "status", "row_count", "storage_key", "error", "created_at", "finished_at", "expires_at"],
 };
 
 interface ExpectedIndex {
@@ -138,6 +139,7 @@ const EXPECTED_INDEXES: ExpectedIndex[] = [
   { table: "audit_logs", columns: ["entity_type", "entity_id", "created_at"] },
   { table: "audit_logs", columns: ["actor_id", "created_at"] },
   { table: "audit_logs", columns: ["created_at"] },
+  { table: "audit_logs", columns: ["company_id", "created_at", "id"] },
   { table: "idempotency_keys", columns: ["scope_key", "key"], unique: true },
   { table: "idempotency_keys", columns: ["expires_at"] },
   { table: "sequences", columns: ["company_id", "scope", "fy"], unique: true },
@@ -161,6 +163,7 @@ const EXPECTED_INDEXES: ExpectedIndex[] = [
   { table: "flats", columns: ["project_id", "status"] },
   { table: "flats", columns: ["block_id", "floor", "position"] },
   { table: "flats", columns: ["company_id", "status", "flat_type_id"] },
+  { table: "flats", columns: ["status", "hold_until"], where: "'HOLD'" },
   { table: "parking_slots", columns: ["project_id", "number"], unique: true },
   { table: "parking_slots", columns: ["project_id", "status"] },
   { table: "rate_cards", columns: ["project_id"], unique: true, where: "'ACTIVE'" },
@@ -169,6 +172,9 @@ const EXPECTED_INDEXES: ExpectedIndex[] = [
   { table: "customers", columns: ["company_id", "phone"] },
   { table: "customers", columns: ["company_id", "pan_hash"] },
   { table: "customers", columns: ["company_id", "full_name"] },
+  { table: "customers", columns: ["company_id", "created_at", "id"] },
+  { table: "customers", columns: ["company_id", "phone"], unique: true, where: "erased_at IS NULL" },
+  { table: "customers", columns: ["company_id", "pan_hash"], unique: true, where: "pan_hash IS NOT NULL" },
   { table: "portal_users", columns: ["customer_id"], unique: true },
   { table: "portal_users", columns: ["company_id", "phone"], unique: true },
   { table: "leads", columns: ["company_id", "lead_number"], unique: true },
@@ -176,12 +182,15 @@ const EXPECTED_INDEXES: ExpectedIndex[] = [
   { table: "leads", columns: ["company_id", "stage"] },
   { table: "leads", columns: ["assigned_user_id", "next_follow_up_at"] },
   { table: "leads", columns: ["company_id", "source", "created_at"] },
+  { table: "leads", columns: ["company_id", "created_at", "id"] },
   { table: "lead_activities", columns: ["lead_id", "at"] },
   { table: "site_visits", columns: ["company_id", "visit_number"], unique: true },
   { table: "site_visits", columns: ["project_id", "visit_date", "slot_start", "status"] },
   { table: "site_visits", columns: ["assignee_user_id", "visit_date"] },
+  { table: "site_visits", columns: ["company_id", "visit_date", "id"] },
   { table: "brochure_downloads", columns: ["token_hash"], unique: true },
   { table: "enquiries", columns: ["company_id", "is_read", "created_at"] },
+  { table: "enquiries", columns: ["company_id", "created_at", "id"] },
   { table: "payment_plan_assignments", columns: ["plan_id", "project_id", "block_id"], unique: true },
   { table: "payment_plan_assignments", columns: ["project_id", "block_id", "is_active"] },
   { table: "booking_drafts", columns: ["user_id", "updated_at"] },
@@ -190,6 +199,7 @@ const EXPECTED_INDEXES: ExpectedIndex[] = [
   { table: "bookings", columns: ["company_id", "project_id", "status", "booking_date"] },
   { table: "bookings", columns: ["block_id", "status"] },
   { table: "bookings", columns: ["customer_id"] },
+  { table: "bookings", columns: ["company_id", "booking_date", "id"] },
   { table: "booking_co_applicants", columns: ["booking_id", "customer_id"], unique: true },
   { table: "booking_co_applicants", columns: ["customer_id"] },
   { table: "booking_other_charges", columns: ["booking_id"] },
@@ -198,9 +208,11 @@ const EXPECTED_INDEXES: ExpectedIndex[] = [
   { table: "demands", columns: ["company_id", "status", "due_date"] },
   { table: "demands", columns: ["block_id", "trigger_stage_id"] },
   { table: "demands", columns: ["booking_id", "posted_at"] },
+  { table: "demands", columns: ["company_id", "posted_at", "id"] },
   { table: "payments", columns: ["company_id", "receipt_number"], unique: true },
   { table: "payments", columns: ["booking_id", "status"] },
-  { table: "payments", columns: ["company_id", "payment_date"] },
+  { table: "payments", columns: ["company_id", "payment_date", "id"] },
+  { table: "payments", columns: ["company_id", "idempotency_key"], unique: true, where: "idempotency_key IS NOT NULL" },
   { table: "payments", columns: ["project_id", "payment_date"] },
   { table: "payments", columns: ["company_id", "status", "payment_date"] },
   { table: "ledger_entries", columns: ["booking_id", "seq"], unique: true },
@@ -210,6 +222,7 @@ const EXPECTED_INDEXES: ExpectedIndex[] = [
   { table: "service_requests", columns: ["company_id", "status", "priority"] },
   { table: "service_requests", columns: ["customer_id"] },
   { table: "service_requests", columns: ["assignee_user_id", "status"] },
+  { table: "service_requests", columns: ["company_id", "created_at", "id"] },
   { table: "service_request_messages", columns: ["ticket_id", "created_at"] },
   { table: "notifications", columns: ["recipient_type", "recipient_id", "is_read", "created_at"] },
   { table: "notifications", columns: ["entity_type", "entity_id"] },
@@ -217,6 +230,8 @@ const EXPECTED_INDEXES: ExpectedIndex[] = [
   { table: "cms_home_sections", columns: ["company_id", "key"], unique: true },
   { table: "cms_posts", columns: ["company_id", "slug"], unique: true },
   { table: "cms_pages", columns: ["company_id", "slug"], unique: true },
+  { table: "exports", columns: ["user_id", "created_at"] },
+  { table: "exports", columns: ["status", "expires_at"] },
 ];
 
 /** Tables that legitimately have no company_id (the company itself, pure children/joins keyed by a parent that has one). */
@@ -245,10 +260,8 @@ const UPDATABLE_WITHOUT_VERSION = new Set([
   "payment_plan_installments",
   "rate_card_rates",
   "rate_card_plc_rules",
-  "co_applicants",
   "enquiries",
   "lead_follow_ups",
-  "booking_drafts",
   "booking_other_charges",
   "demands",
 ]);
@@ -311,9 +324,9 @@ describe("DATA-MODEL.md conformance", () => {
     await handle.close();
   });
 
-  it("has exactly the 77 tables of DATA-MODEL.md and nothing else", () => {
+  it("has exactly the 78 tables of DATA-MODEL.md and nothing else", () => {
     const expected = Object.keys(EXPECTED_COLUMNS).sort();
-    expect(expected).toHaveLength(77);
+    expect(expected).toHaveLength(78);
     expect([...byTable.keys()].sort()).toEqual(expected);
   });
 
@@ -481,5 +494,19 @@ describe("DATA-MODEL.md conformance", () => {
     expect(defs.some((d) => /visitors >= 1\) AND \(visitors <= 6/.test(d))).toBe(true);
     expect(defs.some((d) => /rating >= 1\) AND \(rating <= 5/.test(d))).toBe(true);
     expect(defs.some((d) => /slot_minutes = ANY \(ARRAY\[30, 60\]\)/.test(d))).toBe(true);
+  });
+
+  it("the money CHECK constraints of migration 0002 exist under their documented names", async () => {
+    const rows = await handle.sql<{ conname: string; def: string }[]>`
+      SELECT conname, pg_get_constraintdef(oid) AS def FROM pg_constraint WHERE contype = 'c' AND connamespace = 'public'::regnamespace`;
+    const byName = new Map(rows.map((r) => [r.conname, r.def.replace(/\s+/g, " ")]));
+    expect(byName.get("bookings_agreement_split_chk")).toBe("CHECK (((cash_agreed_paise + account_agreed_paise) = agreement_value_paise))");
+    expect(byName.get("bookings_agreed_nonneg_chk")).toBe("CHECK (((cash_agreed_paise >= 0) AND (account_agreed_paise >= 0)))");
+    expect(byName.get("demands_split_chk")).toBe("CHECK (((cash_demand_paise + account_demand_paise) = total_demand_paise))");
+    expect(byName.get("demands_amounts_nonneg_chk")).toBe("CHECK (((cash_demand_paise >= 0) AND (account_demand_paise >= 0) AND (paid_paise >= 0)))");
+    expect(byName.get("booking_other_charges_total_chk")).toBe("CHECK ((total_paise = (amount_paise + gst_paise)))");
+    for (const name of ["bookings_list_price_nonneg_chk", "booking_other_charges_nonneg_chk", "flats_price_nonneg_chk", "parking_slots_price_nonneg_chk", "exports_row_count_nonneg_chk"]) {
+      expect(byName.has(name), name).toBe(true);
+    }
   });
 });

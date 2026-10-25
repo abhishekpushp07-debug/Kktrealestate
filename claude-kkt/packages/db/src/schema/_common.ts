@@ -1,7 +1,7 @@
 // Shared column helpers used by every schema file. Keeps the conventions of
 // docs/DATA-MODEL.md ("Conventions") in one place so tables stay uniform.
 import { sql } from "drizzle-orm";
-import { bigint, boolean, customType, integer, numeric, timestamp, uuid } from "drizzle-orm/pg-core";
+import { bigint, boolean, customType, index, integer, numeric, timestamp, uuid, type ExtraConfigColumn } from "drizzle-orm/pg-core";
 
 /** Postgres `citext` (case-insensitive text), used for e-mail addresses. */
 export const citext = customType<{ data: string; driverData: string }>({
@@ -47,6 +47,12 @@ export const percent = (name: string) => numeric(name, { precision: 5, scale: 2,
 
 /** Area column `numeric(10,2)` (sq ft) read as a number. */
 export const sqft = (name: string) => numeric(name, { precision: 10, scale: 2, mode: "number" });
+
+/**
+ * Trigram GIN index (`pg_trgm`, `gin_trgm_ops`) so `ILIKE '%term%'` and `ILIKE 'term%'` searches use an index instead of a
+ * sequential scan. Every column a list/search route ORs together needs one, or the planner falls back to a scan for the whole OR.
+ */
+export const trgm = (name: string, column: ExtraConfigColumn) => index(name).using("gin", column.op("gin_trgm_ops"));
 
 /** Business-date default of today's date. */
 export const currentDate = sql`CURRENT_DATE`;

@@ -947,7 +947,7 @@ describe("roznamcha and contra entries (SPEC §11)", () => {
     const inHand = day.body.opening_cash_paise + day.body.cash_received_paise;
     const tooMuch = await t.request<ErrorBody>("POST", "/api/v1/roznamcha/contra", { token: accounts, body: { entry_date: today, type: "DEPOSIT", amount_paise: inHand + 1, bank_account_id: w.bankAccountId } });
     expect(tooMuch.status).toBe(409);
-    expect(tooMuch.body.error.code).toBe("INSUFFICIENT_CASH");
+    expect(tooMuch.body.error.code).toBe("CASH_INSUFFICIENT");
     const forbidden = await t.request<ErrorBody>("POST", "/api/v1/roznamcha/contra", { token: sales, body: { entry_date: today, type: "DEPOSIT", amount_paise: 1, bank_account_id: w.bankAccountId } });
     expect(forbidden.status).toBe(403);
     const dep = await t.request<{ id: string; bank_account_label: string }>("POST", "/api/v1/roznamcha/contra", { token: accounts, body: { entry_date: today, type: "DEPOSIT", amount_paise: 5 * L, bank_account_id: w.bankAccountId, remarks: "Evening deposit" }, headers: { "idempotency-key": key() } });

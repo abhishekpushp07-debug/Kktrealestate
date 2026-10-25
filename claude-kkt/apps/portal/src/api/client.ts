@@ -57,7 +57,8 @@ const REFRESH_KEY = "kkt.portal.refresh";
 // Errors
 // ---------------------------------------------------------------------------
 
-export type ClientErrorCode = ErrorCode | "NETWORK" | "UNKNOWN";
+/** Documented codes, the two client-side ones, and any code a newer server may send (shown with the server's message). */
+export type ClientErrorCode = ErrorCode | "NETWORK" | "UNKNOWN" | (string & {});
 
 export class ApiError extends Error {
   readonly status: number;

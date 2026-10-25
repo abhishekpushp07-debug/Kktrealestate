@@ -97,7 +97,8 @@ export async function usersModule(app: FastifyInstance): Promise<void> {
         select: USER_SELECT,
         join: (qb) => qb.innerJoin(roles, eq(roles.id, users.roleId)),
         where: and(...where.filter((w): w is SQL => w !== undefined)),
-        search: { columns: [users.name, users.email, users.phone], term: q.search },
+        // email is citext: compare its text form so the users_email_trgm_idx expression index applies
+        search: { columns: [users.name, sql`${users.email}::text`, users.phone], term: q.search },
         sort: { allowed: { name: users.name, email: users.email, created_at: users.createdAt, last_login_at: users.lastLoginAt, role_name: roles.name }, default: "name", requested: q.sort },
         ...listPaging(q),
       });

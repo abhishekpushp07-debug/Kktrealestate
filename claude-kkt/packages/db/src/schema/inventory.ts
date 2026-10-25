@@ -17,7 +17,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { appendOnly, idColumn, mutable, paise, percent, softDelete, sqft, timestamps } from "./_common.js";
+import { appendOnly, idColumn, mutable, paise, percent, softDelete, sqft, timestamps, trgm } from "./_common.js";
 import { documents } from "./documents.js";
 import {
   flatStatusEnum,
@@ -79,7 +79,7 @@ export const projects = pgTable(
     ...softDelete(),
     ...mutable(),
   },
-  (t) => [unique("projects_company_code_uq").on(t.companyId, t.code), index("projects_company_status_idx").on(t.companyId, t.status)],
+  (t) => [unique("projects_company_code_uq").on(t.companyId, t.code), index("projects_company_status_idx").on(t.companyId, t.status), trgm("projects_name_trgm_idx", t.name)],
 );
 
 export const projectAmenities = pgTable(
@@ -206,7 +206,12 @@ export const blocks = pgTable(
     ...softDelete(),
     ...mutable(),
   },
-  (t) => [unique("blocks_project_code_uq").on(t.projectId, t.code), index("blocks_company_project_idx").on(t.companyId, t.projectId), index("blocks_floor_plans_gin_idx").using("gin", t.floorPlans)],
+  (t) => [
+    unique("blocks_project_code_uq").on(t.projectId, t.code),
+    index("blocks_company_project_idx").on(t.companyId, t.projectId),
+    index("blocks_floor_plans_gin_idx").using("gin", t.floorPlans),
+    trgm("blocks_name_trgm_idx", t.name),
+  ],
 );
 
 export const blockStages = pgTable(
@@ -299,6 +304,10 @@ export const flats = pgTable(
     index("flats_project_status_idx").on(t.projectId, t.status),
     index("flats_block_floor_position_idx").on(t.blockId, t.floor, t.position),
     index("flats_company_status_type_idx").on(t.companyId, t.status, t.flatTypeId),
+    // Expired-hold sweep: only HOLD rows, ordered by expiry.
+    index("flats_hold_until_idx").on(t.status, t.holdUntil).where(sql`${t.status} = 'HOLD'`),
+    trgm("flats_flat_number_trgm_idx", t.flatNumber),
+    check("flats_price_nonneg_chk", sql`${t.pricePaise} >= 0 AND (${t.ratePerSqftPaise} IS NULL OR ${t.ratePerSqftPaise} >= 0)`),
   ],
 );
 
@@ -318,7 +327,11 @@ export const parkingSlots = pgTable(
     bookingId: uuid("booking_id"),
     ...mutable(),
   },
-  (t) => [unique("parking_slots_project_number_uq").on(t.projectId, t.number), index("parking_slots_project_status_idx").on(t.projectId, t.status)],
+  (t) => [
+    unique("parking_slots_project_number_uq").on(t.projectId, t.number),
+    index("parking_slots_project_status_idx").on(t.projectId, t.status),
+    check("parking_slots_price_nonneg_chk", sql`${t.pricePaise} >= 0`),
+  ],
 );
 
 export const rateCards = pgTable(

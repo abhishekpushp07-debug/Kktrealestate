@@ -1,7 +1,7 @@
 // F (part). Demands, payments, ledger, contra entries
 import { sql } from "drizzle-orm";
 import { boolean, check, date, index, integer, jsonb, pgTable, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
-import { appendOnly, idColumn, mutable, paise, percent, timestamps } from "./_common.js";
+import { appendOnly, idColumn, mutable, paise, percent, timestamps, trgm } from "./_common.js";
 import { bookingOtherCharges, bookings } from "./bookings.js";
 import { customers } from "./customers.js";
 import {
@@ -67,6 +67,9 @@ export const demands = pgTable(
     index("demands_company_status_due_idx").on(t.companyId, t.status, t.dueDate),
     index("demands_block_stage_idx").on(t.blockId, t.triggerStageId),
     index("demands_booking_posted_idx").on(t.bookingId, t.postedAt),
+    index("demands_company_posted_idx").on(t.companyId, t.postedAt.desc(), t.id.desc()),
+    check("demands_split_chk", sql`${t.cashDemandPaise} + ${t.accountDemandPaise} = ${t.totalDemandPaise}`),
+    check("demands_amounts_nonneg_chk", sql`${t.cashDemandPaise} >= 0 AND ${t.accountDemandPaise} >= 0 AND ${t.paidPaise} >= 0`),
   ],
 );
 
@@ -119,10 +122,13 @@ export const payments = pgTable(
   (t) => [
     unique("payments_company_receipt_uq").on(t.companyId, t.receiptNumber),
     index("payments_booking_status_idx").on(t.bookingId, t.status),
-    index("payments_company_date_idx").on(t.companyId, t.paymentDate.desc()),
+    index("payments_company_date_idx").on(t.companyId, t.paymentDate.desc(), t.id.desc()),
     index("payments_project_date_idx").on(t.projectId, t.paymentDate.desc()),
     index("payments_company_status_date_idx").on(t.companyId, t.status, t.paymentDate),
     check("payments_amount_positive_chk", sql`${t.amountPaise} > 0`),
+    // A retried POST /payments carrying the same Idempotency-Key can never post a second receipt, even if the response cache was lost.
+    uniqueIndex("payments_company_idempotency_key_uq").on(t.companyId, t.idempotencyKey).where(sql`${t.idempotencyKey} IS NOT NULL`),
+    trgm("payments_receipt_number_trgm_idx", t.receiptNumber),
   ],
 );
 
@@ -155,7 +161,8 @@ export const ledgerEntries = pgTable(
     note: text("note"),
     ...appendOnly(),
   },
-  (t) => [unique("ledger_entries_booking_seq_uq").on(t.bookingId, t.seq), index("ledger_entries_booking_seq_idx").on(t.bookingId, t.seq)],
+  // The UNIQUE (booking_id, seq) index serves every ledger read; a second plain index on the same columns was dropped in 0002.
+  (t) => [unique("ledger_entries_booking_seq_uq").on(t.bookingId, t.seq)],
 );
 
 export const contraEntries = pgTable(

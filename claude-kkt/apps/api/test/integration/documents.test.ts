@@ -169,15 +169,15 @@ describe("upload", () => {
     expect(badVariant.status).toBe(400);
   });
 
-  it("rejects an EXE or HTML renamed .pdf by magic bytes with 415 UNSUPPORTED_MEDIA", async () => {
+  it("rejects an EXE or HTML renamed .pdf by magic bytes with 415 UNSUPPORTED_MEDIA_TYPE", async () => {
     const exe = Buffer.concat([Buffer.from("MZ\x90\x00\x03\x00\x00\x00\x04\x00\x00\x00\xff\xff\x00\x00", "latin1"), Buffer.alloc(600, 0)]);
     const r1 = await upload(admin, { entity_type: "CUSTOMER", entity_id: customerId }, { name: "invoice.pdf", data: exe, type: "application/pdf" });
     expect(r1.status, r1.text).toBe(415);
-    expect(r1.body.error.code).toBe("UNSUPPORTED_MEDIA");
+    expect(r1.body.error.code).toBe("UNSUPPORTED_MEDIA_TYPE");
     const html = Buffer.from("<!doctype html><html><body><script>alert(1)</script></body></html>");
     const r2 = await upload(admin, { entity_type: "CUSTOMER", entity_id: customerId }, { name: "report.pdf", data: html, type: "application/pdf" });
     expect(r2.status).toBe(415);
-    expect(r2.body.error.code).toBe("UNSUPPORTED_MEDIA");
+    expect(r2.body.error.code).toBe("UNSUPPORTED_MEDIA_TYPE");
     const gif = Buffer.concat([Buffer.from("GIF89a"), Buffer.alloc(64, 0)]);
     const r3 = await upload(admin, { entity_type: "CUSTOMER", entity_id: customerId }, { name: "anim.gif", data: gif });
     expect(r3.status).toBe(415);
@@ -483,7 +483,7 @@ describe("adversarial: uploads", () => {
     const svg = Buffer.from('<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><script>alert(1)</script></svg>');
     const r = await upload(admin, { entity_type: "CUSTOMER", entity_id: customerId }, { name: "logo.svg", data: svg, type: "image/svg+xml" });
     expect(r.status, r.text).toBe(415);
-    expect(r.body.error.code).toBe("UNSUPPORTED_MEDIA");
+    expect(r.body.error.code).toBe("UNSUPPORTED_MEDIA_TYPE");
     const renamed = await upload(admin, { entity_type: "CUSTOMER", entity_id: customerId }, { name: "logo.png", data: svg, type: "image/png" });
     expect(renamed.status).toBe(415);
     const jsPdf = Buffer.from("%PDF-1.4\n1 0 obj << /Type /Catalog /OpenAction << /S /JavaScript /JS (app.alert(1)) >> >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n", "latin1");

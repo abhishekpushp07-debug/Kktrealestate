@@ -769,6 +769,12 @@ export const EXPORT_FORMATS = ["CSV", "PDF"] as const;
 export const ExportFormatSchema = enumSchema(EXPORT_FORMATS);
 export type ExportFormat = z.infer<typeof ExportFormatSchema>;
 
+/** Lifecycle of an asynchronous CSV export (`exports` table). */
+export const EXPORT_STATUSES = ["QUEUED", "RUNNING", "DONE", "FAILED"] as const;
+export const ExportStatusSchema = enumSchema(EXPORT_STATUSES);
+export type ExportStatus = z.infer<typeof ExportStatusSchema>;
+export const EXPORT_STATUS_LABELS: LabelMap<ExportStatus> = { QUEUED: "Queued", RUNNING: "Running", DONE: "Ready", FAILED: "Failed" };
+
 export const SEARCH_ENTITY_TYPES = ["PROJECT", "BLOCK", "FLAT", "CUSTOMER", "BOOKING", "LEAD", "PAYMENT"] as const;
 export const SearchEntityTypeSchema = enumSchema(SEARCH_ENTITY_TYPES);
 export type SearchEntityType = z.infer<typeof SearchEntityTypeSchema>;

@@ -1,6 +1,8 @@
-// G (part). Report presets, integrity runs
-import { boolean, index, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+// G (part). Report presets, integrity runs, asynchronous exports
+import { boolean, check, index, integer, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { idColumn, mutable } from "./_common.js";
+import { exportStatusEnum } from "./enums.js";
 import { companies, users } from "./identity.js";
 import type { JsonObject } from "./json.js";
 
@@ -36,4 +38,38 @@ export const integrityRuns = pgTable(
     findings: jsonb("findings").$type<JsonObject[]>().notNull().default([]),
   },
   (t) => [index("integrity_runs_company_ran_idx").on(t.companyId, t.ranAt.desc())],
+);
+
+/**
+ * Asynchronous CSV exports: a list request with `format=csv` above the synchronous limit (or any explicit export) is queued here, a
+ * worker streams the file to storage under `storage_key`, and the requester downloads it until `expires_at`. `path` + `query` replay the
+ * list route exactly (same filters, sort and permission scope as the requesting user).
+ */
+export const exports = pgTable(
+  "exports",
+  {
+    id: idColumn(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** List route path, e.g. `/api/v1/bookings`. */
+    path: text("path").notNull(),
+    /** The list query string as parsed key → value. */
+    query: jsonb("query").$type<JsonObject>().notNull().default({}),
+    status: exportStatusEnum("status").notNull().default("QUEUED"),
+    rowCount: integer("row_count"),
+    storageKey: text("storage_key"),
+    error: text("error"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("exports_user_created_idx").on(t.userId, t.createdAt.desc()),
+    index("exports_status_expires_idx").on(t.status, t.expiresAt),
+    check("exports_row_count_nonneg_chk", sql`${t.rowCount} IS NULL OR ${t.rowCount} >= 0`),
+  ],
 );
