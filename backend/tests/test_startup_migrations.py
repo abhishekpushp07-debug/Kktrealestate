@@ -65,10 +65,12 @@ async def _check(cl):
 RUN = """
 import asyncio, os, sys
 sys.path.insert(0, %r)
-from server import lifespan, app
+from server import app, lifespan, startup_tasks
+from db import db
 async def main():
     async with lifespan(app):
-        pass
+        await db.locks.delete_many({"name": "startup"})
+        await startup_tasks()
 asyncio.run(main())
 """
 

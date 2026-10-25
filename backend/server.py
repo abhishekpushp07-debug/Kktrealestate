@@ -77,14 +77,11 @@ VERSION = "11.0.0"
 STATUS_CODES = {400: "BAD_REQUEST", 401: "UNAUTHENTICATED", 403: "FORBIDDEN", 404: "NOT_FOUND", 409: "CONFLICT", 413: "PAYLOAD_TOO_LARGE", 422: "VALIDATION_ERROR", 423: "LOCKED", 429: "RATE_LIMITED"}
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    await ensure_indexes()
-    await detect_transaction_support()
-    await seed_if_empty()
-    await seed_phase15()
-    await seed_phase2()
-    await seed_phase3()
+STARTUP = {"phase": "booting", "done": False, "essential_done": False, "started_at": None, "finished_at": None, "db": "unknown", "steps": {}}
+_BG_TASKS: set = set()
+
+
+async def _system_roles():
     for name, spec in __import__('permissions').SYSTEM_ROLES.items():
         if not await db.roles.find_one({'name': name}):
             c = await db.companies.find_one({}, {'_id': 0, 'id': 1})
@@ -92,37 +89,109 @@ async def lifespan(app: FastAPI):
         else:
             await db.roles.update_one({'name': name, 'is_system': True}, {'$set': {'permissions': spec['permissions']}})
     await db.settings.update_one({'key': 'roles_version'}, {'$inc': {'value': 1}}, upsert=True)
-    await seed_marketing_user()
-    await seed_phase5()
-    await migrate_phase7()
-    await seed_phase7()
-    from services.integrity import backfill_demand_installments, integrity_report
-    await backfill_demand_installments()
-    from services.portal_notify import sweep_notifications
-    await sweep_notifications()
-    _ir = await integrity_report()
-    logging.getLogger("kkt.integrity").info("[phase7] integrity: ok=%s bookings=%s counts=%s", _ir["ok"], _ir["bookings_checked"], _ir["counts"])
-    from routers.visits import seed_phase9, nudge_loop
-    await seed_phase9()
-    from services.thumbs import prewarm_variants
-    async def _prewarm():
-        r = await prewarm_variants(db)
-        logging.getLogger("kkt.media").info("[media] variants prewarmed: %s", r)
-    asyncio.create_task(_prewarm())
+
+
+async def _counters_once():
     if not await db.settings.find_one({"key": "counters_v1"}):
         await recompute_all()
         await db.settings.update_one({"key": "counters_v1"}, {"$set": {"value": True}}, upsert=True)
+
+
+async def _reconcile():
     rec = await reconcile_all()
     if rec["mismatches"]:
         logger.warning("Ledger reconciliation found %d mismatches: %s", len(rec["mismatches"]), rec["mismatches"][:3])
+
+
+async def _integrity():
+    from services.integrity import integrity_report
+    ir = await integrity_report()
+    logging.getLogger("kkt.integrity").info("[phase7] integrity: ok=%s bookings=%s counts=%s", ir["ok"], ir["bookings_checked"], ir["counts"])
+
+
+async def _step(name, coro_fn):
+    t0 = time.perf_counter()
+    STARTUP["phase"] = name
+    try:
+        await coro_fn()
+        STARTUP["steps"][name] = round(time.perf_counter() - t0, 2)
+        logger.info("[startup] %s ok in %.2fs", name, time.perf_counter() - t0)
+    except Exception:
+        STARTUP["steps"][name] = "failed"
+        logger.exception("[startup] %s failed (continuing)", name)
+
+
+async def startup_tasks():
+    """Heavy, idempotent work moved out of lifespan: runs once per deploy on the lease holder, never blocks serving."""
+    from services.leader import try_acquire
+    from services.integrity import backfill_demand_installments
+    from services.portal_notify import sweep_notifications
+    from routers.visits import seed_phase9
     from startup_phase11 import startup_phase11
-    await startup_phase11()
+    STARTUP["started_at"] = __import__("datetime").datetime.now(__import__("datetime").UTC).isoformat()
+    try:
+        leader = await try_acquire("startup")
+    except Exception:
+        leader = False
+    if not leader:
+        STARTUP.update(phase="follower", done=True, finished_at=STARTUP["started_at"])
+        logger.info("[startup] another replica holds the startup lease; skipping migrations here")
+        return
+    steps = [("seed_if_empty", seed_if_empty), ("seed_phase15", seed_phase15), ("seed_phase2", seed_phase2), ("seed_phase3", seed_phase3), ("system_roles", _system_roles),
+             ("seed_marketing_user", seed_marketing_user), ("seed_phase5", seed_phase5), ("migrate_phase7", migrate_phase7), ("seed_phase7", seed_phase7),
+             ("backfill_demand_installments", backfill_demand_installments), ("sweep_notifications", sweep_notifications), ("integrity_report", _integrity),
+             ("seed_phase9", seed_phase9), ("counters", _counters_once), ("reconcile", _reconcile), ("startup_phase11", startup_phase11)]
+    t0 = time.perf_counter()
+    for name, fn in steps:
+        await _step(name, fn)
+        try:
+            await try_acquire("startup")  # renew lease between steps
+        except Exception:
+            pass
+    STARTUP.update(phase="done", done=True, finished_at=__import__("datetime").datetime.now(__import__("datetime").UTC).isoformat())
+    logger.info("[startup] background tasks complete in %.1fs: %s", time.perf_counter() - t0, STARTUP["steps"])
+
+
+def _spawn(coro):
+    t = asyncio.create_task(coro)
+    _BG_TASKS.add(t)
+    t.add_done_callback(_BG_TASKS.discard)
+    return t
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    t0 = time.perf_counter()
+    try:
+        await asyncio.wait_for(db.command("ping"), timeout=3)
+        STARTUP["db"] = "ok"
+    except Exception as e:
+        STARTUP["db"] = "unreachable"
+        logger.error("[startup] MongoDB unreachable at boot (%s); serving health only until it recovers", e)
+    if STARTUP["db"] == "ok":
+        try:
+            await asyncio.wait_for(ensure_indexes(), timeout=3)
+            logger.info("[startup] indexes ensured in %.2fs", time.perf_counter() - t0)
+        except asyncio.TimeoutError:
+            logger.warning("[startup] index budget exceeded; finishing index creation in background")
+            _spawn(ensure_indexes())
+        except Exception:
+            logger.exception("[startup] ensure_indexes failed (continuing)")
+        try:
+            await asyncio.wait_for(detect_transaction_support(), timeout=2)
+        except Exception:
+            logger.warning("[startup] transaction detection skipped")
+    STARTUP["essential_done"] = True
     from services.leader import run_as_leader
     from services.read_models import sweep_loop
-    asyncio.create_task(run_as_leader("scheduler", _overdue_loop, _dues_loop, nudge_loop, sweep_loop))
-    await init_storage_async()
-    logger.info("KKT backend ready (uow=%s)", UOW_STATE["mode"])
+    from routers.visits import nudge_loop
+    _spawn(startup_tasks())
+    _spawn(run_as_leader("scheduler", _overdue_loop, _dues_loop, nudge_loop, sweep_loop))
+    _spawn(init_storage_async())
+    logger.info("KKT backend serving after %.2fs (uow=%s); background startup tasks running", time.perf_counter() - t0, UOW_STATE["mode"])
     yield
+    for t in list(_BG_TASKS):
+        t.cancel()
     client.close()
 
 
@@ -197,19 +266,38 @@ async def _overdue_loop():
         await asyncio.sleep(24 * 3600)
 
 
+async def _db_ping_ms():
+    t0 = time.perf_counter()
+    try:
+        await asyncio.wait_for(db.command("ping"), timeout=1)
+        STARTUP["db"] = "ok"
+        return round((time.perf_counter() - t0) * 1000, 2)
+    except Exception:
+        STARTUP["db"] = "unreachable"
+        return None
+
+
+def _health_payload(ping):
+    return {"status": "ok" if ping is not None else "degraded", "db": STARTUP["db"], "db_ping_ms": ping, "service": "kkt-erp", "version": VERSION,
+            "uptime_s": round(time.time() - START_TIME), "startup": {"phase": STARTUP["phase"], "done": STARTUP["done"], "started_at": STARTUP["started_at"]},
+            "transaction_mode": UOW_STATE["mode"], "transactions_supported": UOW_STATE["transactions"], "workers": os.environ.get("WEB_CONCURRENCY", "1"), "pid": os.getpid()}
+
+
 @api_router.get("/health", tags=["system"])
 async def health():
-    t0 = time.perf_counter()
-    await db.command("ping")
-    return {"status": "ok", "db_ping_ms": round((time.perf_counter() - t0) * 1000, 2), "service": "kkt-erp", "version": VERSION,
-            "uptime_s": round(time.time() - START_TIME), "transaction_mode": UOW_STATE["mode"], "transactions_supported": UOW_STATE["transactions"], "workers": __import__("os").environ.get("WEB_CONCURRENCY", "1"), "pid": __import__("os").getpid()}
+    return _health_payload(await _db_ping_ms())
 
 
 @api_router.get("/ready", tags=["system"])
 async def ready():
-    import os
-    await db.command("ping")
-    return {"ready": True, "workers_hint": os.environ.get("WEB_CONCURRENCY", "1"), "transaction_mode": UOW_STATE["mode"]}
+    ping = await _db_ping_ms()
+    body = {"ready": ping is not None and STARTUP["essential_done"], "db": STARTUP["db"], "startup": {"phase": STARTUP["phase"], "done": STARTUP["done"]}, "workers_hint": os.environ.get("WEB_CONCURRENCY", "1"), "transaction_mode": UOW_STATE["mode"]}
+    return body if body["ready"] else JSONResponse(body, status_code=503)
+
+
+@app.get("/health", include_in_schema=False)
+async def root_health():
+    return _health_payload(await _db_ping_ms())
 
 
 @api_router.get("/metrics", tags=["system"])

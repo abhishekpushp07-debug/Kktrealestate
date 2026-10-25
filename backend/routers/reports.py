@@ -7,7 +7,7 @@ from pymongo import ReturnDocument
 from db import db
 from deps import ensure_project_access, project_scope_filter, require
 from services.money import amount_in_words, present_money
-from services.pdf import SMALL, BrandedDoc, fmt_date, inr
+from services import pdf as _pdf
 from utils import (
     ApiError,
     StrictModel,
@@ -63,7 +63,7 @@ def respond(request: Request, fmt: str | None, payload: dict, title: str, compan
     if fmt == "csv":
         return Response(content=to_csv(rows, [c[0] for c in columns]), media_type="text/csv", headers={"Content-Disposition": f'attachment; filename="{filename}.csv"'})
     if fmt == "pdf":
-        d = BrandedDoc(title, company, landscape_mode=landscape, subtitle=payload.get("subtitle"))
+        d = _pdf.BrandedDoc(title, company, landscape_mode=landscape, subtitle=payload.get("subtitle"))
         d.h1(title)
         if payload.get("filters_text"):
             d.small(payload["filters_text"])
@@ -72,9 +72,9 @@ def respond(request: Request, fmt: str | None, payload: dict, title: str, compan
         num_cols = [i for i, c in enumerate(columns) if c[2] in ("money", "num", "pct")]
         def cell(c, r):
             v = r.get(c[0])
-            return inr(v) if c[2] == "money" else (f"{v}%" if c[2] == "pct" and v is not None else (fmt_date(v) if c[2] == "date" else v))
+            return _pdf.inr(v) if c[2] == "money" else (f"{v}%" if c[2] == "pct" and v is not None else (_pdf.fmt_date(v) if c[2] == "date" else v))
         d.table([c[1] for c in columns], [[cell(c, r) for c in columns] for r in rows[:2000]], widths=[c[3] if len(c) > 3 else 1 for c in columns], align_right=num_cols,
-                totals=[("TOTAL" if i == 0 else (inr(totals.get(c[0])) if i in money_cols and totals.get(c[0]) is not None else totals.get(c[0], ""))) for i, c in enumerate(columns)] if totals else None)
+                totals=[("TOTAL" if i == 0 else (_pdf.inr(totals.get(c[0])) if i in money_cols and totals.get(c[0]) is not None else totals.get(c[0], ""))) for i, c in enumerate(columns)] if totals else None)
         return Response(content=d.build(), media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="{filename}.pdf"'})
     return present_money({**payload, "columns": [{"key": c[0], "label": c[1], "type": c[2]} for c in columns], "rows": rows, "totals": totals})
 
@@ -109,7 +109,7 @@ async def collections(request: Request, from_date: str | None = None, to_date: s
     totals = {k: sum(r[k] for r in rows) for k in ("count", "total_paise", "cash_paise", "account_paise", "other_paise")}
     totals["gst_collected_paise"] = gst[0]["gst_paise"] if gst else 0
     cols = [("period", "Period", "str", 1.2), ("count", "Receipts", "num", 0.7), ("cash_paise", "Cash", "money"), ("account_paise", "Account", "money"), ("other_paise", "Other charges", "money"), ("total_paise", "Total", "money")]
-    return respond(request, format, {"from_date": f, "to_date": t, "group_by": group_by, "by_mode": [{"mode": m["_id"], **m} for m in by_mode], "filters_text": f"{fmt_date(f)} – {fmt_date(t)} · status {q['status']} · grouped by {group_by}"},
+    return respond(request, format, {"from_date": f, "to_date": t, "group_by": group_by, "by_mode": [{"mode": m["_id"], **m} for m in by_mode], "filters_text": f"{_pdf.fmt_date(f)} – {_pdf.fmt_date(t)} · status {q['status']} · grouped by {group_by}"},
                    "Collections Report", await _company(user), cols, rows, totals, "collections")
 
 
@@ -156,7 +156,7 @@ async def outstanding(request: Request, project_id: str | None = None, block_id:
     cols = [("booking_number", "Booking" if group_by == "customer" else group_by.title(), "str", 1.1), ("customer_name", "Customer", "str", 1.4), ("unit", "Unit", "str", 1), ("raised_paise", "Raised", "money"), ("paid_paise", "Paid", "money"),
             ("cash_due_paise", "Cash due", "money"), ("account_due_paise", "Account due", "money"), ("other_due_paise", "Charges due", "money"), ("due_paise", "Total due", "money"), ("overdue_paise", "Overdue", "money")]
     top = sorted([r for r in rows if r["overdue_paise"] > 0], key=lambda r: -r["overdue_paise"])[:10] if group_by == "customer" else []
-    return respond(request, format, {"ageing": [{"bucket": k, "amount_paise": v} for k, v in ageing.items()], "top_overdue": top, "filters_text": f"As of {fmt_date(today.isoformat())}"}, "Outstanding & Ageing", await _company(user), cols, rows, totals, "outstanding", landscape=True)
+    return respond(request, format, {"ageing": [{"bucket": k, "amount_paise": v} for k, v in ageing.items()], "top_overdue": top, "filters_text": f"As of {_pdf.fmt_date(today.isoformat())}"}, "Outstanding & Ageing", await _company(user), cols, rows, totals, "outstanding", landscape=True)
 
 
 # ---------- 3. Advances ----------
@@ -358,31 +358,31 @@ async def statement(booking_id: str, format: str | None = None, user: dict = Dep
     s = b.get("summary") or {}
     if format != "pdf":
         return present_money({"booking": b, "customer": customer, "demands": demands, "payments": payments, "ledger": ledger, "company": company})
-    d = BrandedDoc("Customer Statement of Account", company, landscape_mode=True, subtitle=f"Booking {b['booking_number']} · as of {fmt_date(date.today().isoformat())}")
+    d = _pdf.BrandedDoc("Customer Statement of Account", company, landscape_mode=True, subtitle=f"Booking {b['booking_number']} · as of {_pdf.fmt_date(date.today().isoformat())}")
     fs = b.get("flat_snapshot") or {}
     d.kv([("Customer", f"{customer.get('salutation') or ''} {customer['full_name']}".strip()), ("Customer code", customer.get("customer_code")), ("Phone", customer.get("phone")), ("Address", _addr(customer.get("address_current"))),
-          ("Booking no.", b["booking_number"]), ("Booking date", fmt_date(b["booking_date"])), ("Unit", f"{b['project_name']} · {b['block_name']} · {fs.get('flat_number')} ({fs.get('flat_type_code')}, {fs.get('super_builtup_sqft')} sq ft)"), ("Status", b["status"])], cols=2)
+          ("Booking no.", b["booking_number"]), ("Booking date", _pdf.fmt_date(b["booking_date"])), ("Unit", f"{b['project_name']} · {b['block_name']} · {fs.get('flat_number')} ({fs.get('flat_type_code')}, {fs.get('super_builtup_sqft')} sq ft)"), ("Status", b["status"])], cols=2)
     d.h2("Agreement")
-    d.table(["Agreement value", "Cash component", "Account component", "Revisions"], [[inr(b["agreement_value_paise"]), inr(b["cash_agreed_paise"]), inr(b["account_agreed_paise"]), str(len(b.get("agreement_revisions") or []))]], align_right=[0, 1, 2])
+    d.table(["Agreement value", "Cash component", "Account component", "Revisions"], [[_pdf.inr(b["agreement_value_paise"]), _pdf.inr(b["cash_agreed_paise"]), _pdf.inr(b["account_agreed_paise"]), str(len(b.get("agreement_revisions") or []))]], align_right=[0, 1, 2])
     for r in b.get("agreement_revisions") or []:
-        d.small(f"Revision {fmt_date(r.get('at') or r.get('revised_at'))}: {inr(r.get('old_agreement_value_paise') or r.get('before', {}).get('agreement_value_paise'))} → {inr(r.get('new_agreement_value_paise') or r.get('after', {}).get('agreement_value_paise'))} — {r.get('reason', '')}")
+        d.small(f"Revision {_pdf.fmt_date(r.get('at') or r.get('revised_at'))}: {_pdf.inr(r.get('old_agreement_value_paise') or r.get('before', {}).get('agreement_value_paise'))} → {_pdf.inr(r.get('new_agreement_value_paise') or r.get('after', {}).get('agreement_value_paise'))} — {r.get('reason', '')}")
     d.h2("Milestone schedule")
     d.table(["#", "Milestone", "Cum %", "Cash demand", "Account demand", "Total", "Due date", "Paid", "Balance", "Status"],
-            [[x["milestone_seq"], x["milestone_name"], f"{x['cumulative_percent']}%", inr(x["cash_demand_paise"]), inr(x["account_demand_paise"]), inr(x["total_demand_paise"]), fmt_date(x["due_date"]), inr(x.get("paid_paise", 0)), inr(x["total_demand_paise"] - x.get("paid_paise", 0)), x["status"]] for x in demands],
+            [[x["milestone_seq"], x["milestone_name"], f"{x['cumulative_percent']}%", _pdf.inr(x["cash_demand_paise"]), _pdf.inr(x["account_demand_paise"]), _pdf.inr(x["total_demand_paise"]), _pdf.fmt_date(x["due_date"]), _pdf.inr(x.get("paid_paise", 0)), _pdf.inr(x["total_demand_paise"] - x.get("paid_paise", 0)), x["status"]] for x in demands],
             widths=[0.4, 1.6, 0.6, 1, 1, 1, 0.9, 1, 1, 0.8], align_right=[3, 4, 5, 7, 8])
     d.h2("Ledger")
     d.table(["#", "Date", "Particulars", "Ref", "Amount", "Cash paid (cum)", "Account paid (cum)", "Cash due", "Account due", "Total due", "Charges due"],
-            [[e["seq"], fmt_date(e["date"]), f"{e['type'].replace('_', ' ').title()} — {e.get('note') or ''}", e.get("ref") or "", inr(e["amount_paise"]), inr(e["cash_paid_cum_paise"]), inr(e["account_paid_cum_paise"]), inr(e["cash_due_paise"]), inr(e["account_due_paise"]), inr(e["total_due_paise"]), inr(e.get("other_charges_due_paise", 0))] for e in ledger],
+            [[e["seq"], _pdf.fmt_date(e["date"]), f"{e['type'].replace('_', ' ').title()} — {e.get('note') or ''}", e.get("ref") or "", _pdf.inr(e["amount_paise"]), _pdf.inr(e["cash_paid_cum_paise"]), _pdf.inr(e["account_paid_cum_paise"]), _pdf.inr(e["cash_due_paise"]), _pdf.inr(e["account_due_paise"]), _pdf.inr(e["total_due_paise"]), _pdf.inr(e.get("other_charges_due_paise", 0))] for e in ledger],
             widths=[0.35, 0.8, 2, 1, 1, 1, 1, 0.9, 0.9, 1, 0.9], align_right=[4, 5, 6, 7, 8, 9, 10])
     if b.get("other_charges"):
         d.h2("Other charges")
-        d.table(["Charge", "Amount", "GST", "Total", "Demanded", "Paid", "Due"], [[c["name"], inr(c["amount_paise"]), inr(c.get("gst_paise", 0)), inr(c["total_paise"]), inr(c.get("demanded_paise", 0)), inr(c.get("paid_paise", 0)), inr(c.get("demanded_paise", 0) - c.get("paid_paise", 0))] for c in b["other_charges"]], align_right=[1, 2, 3, 4, 5, 6])
+        d.table(["Charge", "Amount", "GST", "Total", "Demanded", "Paid", "Due"], [[c["name"], _pdf.inr(c["amount_paise"]), _pdf.inr(c.get("gst_paise", 0)), _pdf.inr(c["total_paise"]), _pdf.inr(c.get("demanded_paise", 0)), _pdf.inr(c.get("paid_paise", 0)), _pdf.inr(c.get("demanded_paise", 0) - c.get("paid_paise", 0))] for c in b["other_charges"]], align_right=[1, 2, 3, 4, 5, 6])
     pend = [p for p in payments if p["status"] == "Pending"]
     if pend:
         d.h2("Pending cheques / DDs")
-        d.table(["Receipt", "Instrument", "Date", "Bank", "Amount"], [[p["receipt_number"], (p.get("instrument") or {}).get("number"), fmt_date((p.get("instrument") or {}).get("date")), (p.get("instrument") or {}).get("bank_name"), inr(p["amount_paise"])] for p in pend], align_right=[4])
+        d.table(["Receipt", "Instrument", "Date", "Bank", "Amount"], [[p["receipt_number"], (p.get("instrument") or {}).get("number"), _pdf.fmt_date((p.get("instrument") or {}).get("date")), (p.get("instrument") or {}).get("bank_name"), _pdf.inr(p["amount_paise"])] for p in pend], align_right=[4])
     d.h2("Summary")
-    d.table(["Order raised", "Paid", "Cash due", "Account due", "Charges due", "Total due", "Pending cheques"], [[inr(s.get("total_order_raised_paise")), inr(s.get("paid_paise")), inr(s.get("cash_due_paise")), inr(s.get("account_due_paise")), inr(s.get("other_charges_due_paise")), inr(s.get("due_paise", 0) + s.get("other_charges_due_paise", 0)), inr(s.get("pending_cheques_paise"))]], align_right=list(range(7)))
+    d.table(["Order raised", "Paid", "Cash due", "Account due", "Charges due", "Total due", "Pending cheques"], [[_pdf.inr(s.get("total_order_raised_paise")), _pdf.inr(s.get("paid_paise")), _pdf.inr(s.get("cash_due_paise")), _pdf.inr(s.get("account_due_paise")), _pdf.inr(s.get("other_charges_due_paise")), _pdf.inr(s.get("due_paise", 0) + s.get("other_charges_due_paise", 0)), _pdf.inr(s.get("pending_cheques_paise"))]], align_right=list(range(7)))
     d.small(f"Total due in words: {amount_in_words(s.get('due_paise', 0) + s.get('other_charges_due_paise', 0))}. This is a system generated statement; errors and omissions excepted.")
     d.signature(company.get("authorised_signatory_name") or "")
     return Response(content=d.build(), media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="statement-{b["booking_number"]}.pdf"'})
@@ -401,22 +401,22 @@ async def allotment(booking_id: str, format: str | None = None, user: dict = Dep
     terms = company.get("allotment_terms") or "1. The allotment is provisional and subject to execution of the Agreement for Sale under RERA.\n2. Payments are construction-linked and due within the demand due period from the date of each demand letter.\n3. Delayed payments attract interest as per the Agreement for Sale.\n4. Other charges (maintenance deposit, registration, taxes) are payable at possession as applicable.\n5. All disputes are subject to Patna jurisdiction."
     if format != "pdf":
         return present_money({"booking": b, "customer": customer, "schedule": sched, "terms": terms, "company": company})
-    d = BrandedDoc("Allotment Letter & Payment Schedule", company, subtitle=f"Ref {b['booking_number']} · {fmt_date(b['booking_date'])}")
+    d = _pdf.BrandedDoc("Allotment Letter & Payment Schedule", company, subtitle=f"Ref {b['booking_number']} · {_pdf.fmt_date(b['booking_date'])}")
     fs = b.get("flat_snapshot") or {}
     d.p(f"To,<br/><b>{customer.get('salutation') or ''} {customer['full_name']}</b><br/>{_addr(customer.get('address_current'))}<br/>Phone: {customer.get('phone') or '-'}")
     d.spacer(3)
     d.p(f"<b>Subject: Provisional allotment of Unit {fs.get('flat_number')} in {b['block_name']}, {b['project_name']}</b>")
     d.spacer(2)
-    d.p(f"Dear {customer.get('salutation') or ''} {customer['full_name'].split()[0]},<br/><br/>We are pleased to confirm the provisional allotment of the above unit ({fs.get('flat_type_code')}, super built-up area {fs.get('super_builtup_sqft')} sq ft) in your favour against Booking No. <b>{b['booking_number']}</b> dated {fmt_date(b['booking_date'])}, for a total agreement value of <b>{inr(b['agreement_value_paise'])}</b> ({amount_in_words(b['agreement_value_paise'])}).")
+    d.p(f"Dear {customer.get('salutation') or ''} {customer['full_name'].split()[0]},<br/><br/>We are pleased to confirm the provisional allotment of the above unit ({fs.get('flat_type_code')}, super built-up area {fs.get('super_builtup_sqft')} sq ft) in your favour against Booking No. <b>{b['booking_number']}</b> dated {_pdf.fmt_date(b['booking_date'])}, for a total agreement value of <b>{_pdf.inr(b['agreement_value_paise'])}</b> ({amount_in_words(b['agreement_value_paise'])}).")
     d.h2("Payment schedule (construction-linked)")
-    d.table(["#", "Milestone", "Cum %", "Stage %", "Cash", "Account", "Total"], [[x["seq"], x["name"], f"{x['cumulative_percent']}%", f"{x['incremental_percent']}%", inr(x["cash_paise"]), inr(x["account_paise"]), inr(x["total_paise"])] for x in sched],
-            widths=[0.4, 2, 0.7, 0.7, 1.2, 1.2, 1.2], align_right=[4, 5, 6], totals=["", "Total", "", "", inr(b["cash_agreed_paise"]), inr(b["account_agreed_paise"]), inr(b["agreement_value_paise"])])
+    d.table(["#", "Milestone", "Cum %", "Stage %", "Cash", "Account", "Total"], [[x["seq"], x["name"], f"{x['cumulative_percent']}%", f"{x['incremental_percent']}%", _pdf.inr(x["cash_paise"]), _pdf.inr(x["account_paise"]), _pdf.inr(x["total_paise"])] for x in sched],
+            widths=[0.4, 2, 0.7, 0.7, 1.2, 1.2, 1.2], align_right=[4, 5, 6], totals=["", "Total", "", "", _pdf.inr(b["cash_agreed_paise"]), _pdf.inr(b["account_agreed_paise"]), _pdf.inr(b["agreement_value_paise"])])
     if b.get("other_charges"):
         d.h2("Other charges (payable as applicable)")
-        d.table(["Charge", "Amount", "GST", "Total", "Payable"], [[c["name"], inr(c["amount_paise"]), inr(c.get("gst_paise", 0)), inr(c["total_paise"]), (c.get("demand_at") or "").replace("_", " ")] for c in b["other_charges"]], align_right=[1, 2, 3])
+        d.table(["Charge", "Amount", "GST", "Total", "Payable"], [[c["name"], _pdf.inr(c["amount_paise"]), _pdf.inr(c.get("gst_paise", 0)), _pdf.inr(c["total_paise"]), (c.get("demand_at") or "").replace("_", " ")] for c in b["other_charges"]], align_right=[1, 2, 3])
     d.h2("Terms & conditions")
     for line in terms.split("\n"):
-        d.p(line, SMALL)
+        d.p(line, _pdf.SMALL)
     d.signature(company.get("authorised_signatory_name") or "")
     return Response(content=d.build(), media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="allotment-{b["booking_number"]}.pdf"'})
 

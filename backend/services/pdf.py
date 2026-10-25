@@ -1,33 +1,36 @@
-"""Branded A4 PDF generation (reportlab). Generated on demand, never stored."""
+# ruff: noqa: F821  -- reportlab names are populated lazily by _load() (see module __getattr__)
+"""Branded A4 PDF generation (reportlab, imported lazily on first use). Generated on demand, never stored."""
 import io
 from datetime import UTC, datetime
 
-from reportlab.lib import colors
-from reportlab.lib.enums import TA_RIGHT
-from reportlab.lib.pagesizes import A4, landscape
-from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.lib.units import mm
-from reportlab.platypus import (
-    Image,
-    PageBreak,
-    Paragraph,
-    SimpleDocTemplate,
-    Spacer,
-    Table,
-    TableStyle,
-)
+_LAZY = ("colors", "TA_RIGHT", "A4", "landscape", "ParagraphStyle", "getSampleStyleSheet", "mm", "Image", "PageBreak", "Paragraph", "SimpleDocTemplate", "Spacer", "Table", "TableStyle",
+         "NAVY", "GOLD", "IVORY", "H1", "H2", "BODY", "SMALL", "RIGHT", "CELL")
 
-NAVY = colors.HexColor("#0B1F3A")
-GOLD = colors.HexColor("#C9A227")
-IVORY = colors.HexColor("#F8F6F1")
-_ss = getSampleStyleSheet()
-H1 = ParagraphStyle("h1", parent=_ss["Title"], fontName="Helvetica-Bold", fontSize=16, textColor=NAVY, alignment=0, spaceAfter=4)
-H2 = ParagraphStyle("h2", parent=_ss["Heading2"], fontName="Helvetica-Bold", fontSize=11, textColor=NAVY, spaceBefore=8, spaceAfter=4)
-BODY = ParagraphStyle("body", parent=_ss["BodyText"], fontName="Helvetica", fontSize=9, leading=12)
-SMALL = ParagraphStyle("small", parent=BODY, fontSize=7.5, leading=10, textColor=colors.HexColor("#475569"))
-RIGHT = ParagraphStyle("right", parent=BODY, alignment=TA_RIGHT)
-CELL = ParagraphStyle("cell", parent=BODY, fontSize=8, leading=10)
 
+def _load():
+    import reportlab.lib.colors as colors
+    from reportlab.lib import enums, pagesizes, styles, units
+    from reportlab import platypus
+    g = globals()
+    g.update(colors=colors, TA_RIGHT=enums.TA_RIGHT, A4=pagesizes.A4, landscape=pagesizes.landscape, ParagraphStyle=styles.ParagraphStyle, getSampleStyleSheet=styles.getSampleStyleSheet, mm=units.mm,
+             Image=platypus.Image, PageBreak=platypus.PageBreak, Paragraph=platypus.Paragraph, SimpleDocTemplate=platypus.SimpleDocTemplate, Spacer=platypus.Spacer, Table=platypus.Table, TableStyle=platypus.TableStyle)
+    g["NAVY"] = colors.HexColor("#0B1F3A")
+    g["GOLD"] = colors.HexColor("#C9A227")
+    g["IVORY"] = colors.HexColor("#F8F6F1")
+    ss = styles.getSampleStyleSheet()
+    g["H1"] = styles.ParagraphStyle("h1", parent=ss["Title"], fontName="Helvetica-Bold", fontSize=16, textColor=g["NAVY"], alignment=0, spaceAfter=4)
+    g["H2"] = styles.ParagraphStyle("h2", parent=ss["Heading2"], fontName="Helvetica-Bold", fontSize=11, textColor=g["NAVY"], spaceBefore=8, spaceAfter=4)
+    g["BODY"] = styles.ParagraphStyle("body", parent=ss["BodyText"], fontName="Helvetica", fontSize=9, leading=12)
+    g["SMALL"] = styles.ParagraphStyle("small", parent=g["BODY"], fontSize=7.5, leading=10, textColor=colors.HexColor("#475569"))
+    g["RIGHT"] = styles.ParagraphStyle("right", parent=g["BODY"], alignment=enums.TA_RIGHT)
+    g["CELL"] = styles.ParagraphStyle("cell", parent=g["BODY"], fontSize=8, leading=10)
+
+
+def __getattr__(name):
+    if name in _LAZY:
+        _load()
+        return globals()[name]
+    raise AttributeError(name)
 
 def inr(paise, blank_zero=False) -> str:
     if paise is None or (blank_zero and not paise):
@@ -59,6 +62,7 @@ def fmt_date(s) -> str:
 
 class BrandedDoc:
     def __init__(self, title: str, company: dict, landscape_mode=False, subtitle: str | None = None):
+        _load()
         self.buf = io.BytesIO()
         self.company = company or {}
         self.title = title
@@ -120,7 +124,8 @@ class BrandedDoc:
     def h2(self, text):
         self.story.append(Paragraph(text, H2))
 
-    def p(self, text, style=BODY):
+    def p(self, text, style=None):
+        style = style or BODY
         self.story.append(Paragraph(text, style))
 
     def small(self, text):

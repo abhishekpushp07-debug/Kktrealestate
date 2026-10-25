@@ -3,14 +3,13 @@ import asyncio
 import hashlib
 import io
 
-from PIL import Image, ImageOps
-
 from storage import get_object, put_object
 
 SIZES = {"thumb": 480, "medium": 1080}
 
 
 def make_variant(data: bytes, width: int) -> bytes:
+    from PIL import Image, ImageOps
     im = Image.open(io.BytesIO(data))
     im = ImageOps.exif_transpose(im)
     if im.mode not in ("RGB", "RGBA"):
@@ -65,17 +64,18 @@ def etag_for(data: bytes) -> str:
     return '"' + hashlib.sha1(data).hexdigest()[:20] + '"'
 
 
-async def prewarm_variants(db) -> dict:
-    """Generate any missing thumb/medium variants for all active photos & CMS media (startup + one-off job)."""
+async def prewarm_variants(db, concurrency: int = 2) -> dict:
+    """Generate missing thumb/medium variants for active photos & CMS media (admin one-off job; variants are otherwise created lazily on first request)."""
+    sem = asyncio.Semaphore(concurrency)
     keys = [d["storage_key"] async for d in db.construction_photos.find({"is_active": True}, {"_id": 0, "storage_key": 1})]
     keys += [d["storage_key"] async for d in db.cms_media.find({}, {"_id": 0, "storage_key": 1})]
     made, failed = 0, 0
-    for k in dict.fromkeys(keys):
-        for size in SIZES:
-            vk = variant_key(k, size)
+    async def one(k, size):
+        nonlocal made, failed
+        async with sem:
             try:
-                await get_object(vk)
-                continue
+                await get_object(variant_key(k, size))
+                return
             except Exception:
                 pass
             try:
@@ -83,4 +83,5 @@ async def prewarm_variants(db) -> dict:
                 made += 1
             except Exception:
                 failed += 1
+    await asyncio.gather(*(one(k, size) for k in dict.fromkeys(keys) for size in SIZES))
     return {"photos": len(set(keys)), "generated": made, "failed": failed}
