@@ -6,7 +6,6 @@ import { toast } from "sonner";
 import api, { errMsg } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useFetch, useList } from "@/hooks/useList";
-import { useCatalogues } from "@/hooks/useCatalogues";
 import { cn } from "@/lib/utils";
 import { fmtDate, fmtDateTime, fmtRelative, inrShort } from "@/lib/format";
 import { Card, EmptyState, Field, Skeleton, StatTile, StatusPill, Tabs } from "@/components/v2";

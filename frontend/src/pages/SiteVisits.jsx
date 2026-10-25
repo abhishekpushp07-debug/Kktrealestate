@@ -81,7 +81,7 @@ export function Calendar({ projectId, onChanged }) {
   const [start, setStart] = useState(() => { const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); return d; });
   const [view, setView] = useState("week");
   const days = view === "week" ? 7 : 1;
-  const { data, reload } = useFetch(`/site-visits/calendar?date_from=${iso(start)}&date_to=${iso(addDays(start, days - 1))}${projectId ? `&project_id=${projectId}` : ""}`);
+  const { data } = useFetch(`/site-visits/calendar?date_from=${iso(start)}&date_to=${iso(addDays(start, days - 1))}${projectId ? `&project_id=${projectId}` : ""}`);
   const projects = (data?.projects || []).filter((p) => p.settings.enabled || (data?.items || []).some((v) => v.project_id === p.id));
   const hours = useMemo(() => { const set = new Set(); projects.forEach((p) => { const [sh] = p.settings.start_time.split(":").map(Number); const [eh] = p.settings.end_time.split(":").map(Number); for (let h = sh; h < eh; h++) set.add(h); }); return [...set].sort((a, b) => a - b); }, [projects]);
   const today = iso(new Date());

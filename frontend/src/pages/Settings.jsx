@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { MfaCard, SessionsCard, ImportCenter } from "@/components/common/SecurityCards";
 import { useEffect, useState } from "react";
 import { ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
@@ -43,7 +44,6 @@ function Appearance() {
     </section>
   );
 }
-import { MfaCard, SessionsCard, ImportCenter } from "@/components/common/SecurityCards";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
@@ -96,7 +96,7 @@ export default function Settings() {
     if (acct) ba.account_number = acct;
     try {
       const r = await api.patch("/settings/company", { version: c.version, name: c.name, legal_name: c.legal_name || null, address: c.address, gstin: c.gstin || null, rera_registration: c.rera_registration || null, logo_url: c.logo_url || null, financial_year_start_month: Number(c.financial_year_start_month), receipt_prefix: c.receipt_prefix || null, bank_account: ba,
-        booking_number_format: c.booking_number_format || null, customer_number_format: c.customer_number_format || null, demand_number_format: c.demand_number_format || null, demand_due_days: c.demand_due_days ?? null, default_gst_percent: c.default_gst_percent ?? null, authorised_signatory_name: c.authorised_signatory_name || null, letterhead_tagline: c.letterhead_tagline || null, letterhead_phone: c.letterhead_phone || null, letterhead_email: c.letterhead_email || null, receipt_number_format: c.receipt_number_format || null, mfa_required_for_admin_roles: !!c.mfa_required_for_admin_roles, accent: c.accent || "gold", version: c.version });
+        booking_number_format: c.booking_number_format || null, customer_number_format: c.customer_number_format || null, demand_number_format: c.demand_number_format || null, demand_due_days: c.demand_due_days ?? null, default_gst_percent: c.default_gst_percent ?? null, authorised_signatory_name: c.authorised_signatory_name || null, letterhead_tagline: c.letterhead_tagline || null, letterhead_phone: c.letterhead_phone || null, letterhead_email: c.letterhead_email || null, receipt_number_format: c.receipt_number_format || null, mfa_required_for_admin_roles: !!c.mfa_required_for_admin_roles, accent: c.accent || "gold" });
       setC({ ...r.data, address: r.data.address || {}, bank_account: r.data.bank_account || {} }); setAcct(""); setCompany(r.data); toast.success("Settings saved");
       api.get("/settings/numbering/preview").then((n) => setNumbering(n.data)).catch(() => {});
     } catch (err) { toast.error(errMsg(err)); } finally { setBusy(false); }

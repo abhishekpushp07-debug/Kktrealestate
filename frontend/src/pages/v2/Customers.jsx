@@ -24,7 +24,7 @@ export default function Customers() {
   const nav = useNavigate();
   const { label } = useCatalogues();
   const people = usePeople();
-  const [sp, setSp] = useSearchParams();
+  const [sp] = useSearchParams();
   const [view, setView] = useState(() => localStorage.getItem("kkt_cust_view") || "cards");
   const [search, setSearch] = useState("");
   const [q, setQ] = useState("");

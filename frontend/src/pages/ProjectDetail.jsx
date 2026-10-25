@@ -19,6 +19,7 @@ import { HistoryTimeline } from "@/components/common/HistoryTimeline";
 import { ProjectWebsiteTab } from "@/pages/cms/ProjectWebsiteTab";
 import { useMasterOptions } from "@/hooks/useList";
 
+// eslint-disable-next-line no-unused-vars
 function DocumentsTab({ appliesTo }) {
   const { items } = useMasterOptions("document-types");
   const docs = items.filter((d) => d.applies_to === appliesTo);

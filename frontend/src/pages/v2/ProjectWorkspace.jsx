@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowUpRight, Building2, Pencil } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useFetch } from "@/hooks/useList";
-import { inr, inrShort, initials } from "@/lib/format";
+import { inrShort, initials } from "@/lib/format";
 import { Card, EmptyState, EntityCard, MiniBar, Money, PageHero, ProgressRing, Skeleton, StatusPill, Tabs, Timeline, CELL } from "@/components/v2";
 import { ConstructionStatusPanel } from "@/components/common/ConstructionStatusPanel";
 import { PaymentPlanMatrix } from "@/components/common/PaymentPlanMatrix";
@@ -84,7 +84,7 @@ export default function ProjectWorkspace() {
   const tab = sp.get("tab") || "overview";
   const { can } = useAuth();
   const { data: p, loading, reload } = useFetch(`/projects/${id}`);
-  const { data: s, reload: reloadSetup } = useFetch(`/projects/${id}/setup`);
+  const { data: s } = useFetch(`/projects/${id}/setup`);
   const { data: sum } = useFetch(`/projects/${id}/summary`);
   if (loading || !p || !s) return <div className="space-y-6"><Skeleton className="h-64 rounded-2xl" /><Skeleton className="h-10 w-1/2" /><Skeleton className="h-80 rounded-2xl" /></div>;
   const units = sum?.units;

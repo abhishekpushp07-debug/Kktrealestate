@@ -14,7 +14,7 @@ export function DateInput({ value, onChange, min, max, required, className, plac
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button type="button" disabled={disabled} className={cn("flex h-10 w-full items-center gap-2 rounded-md border border-input bg-white px-3 text-left text-sm text-ink-950 shadow-sm transition-colors hover:border-gold focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50", !valid && "text-txt-secondary", className)} aria-required={required} {...rest}>
+        <button type="button" disabled={disabled} className={cn("flex h-10 w-full items-center gap-2 rounded-md border border-input bg-white px-3 text-left text-sm text-ink-950 shadow-sm transition-colors hover:border-gold focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50", !valid && "text-txt-secondary", className)} {...rest}>
           <CalendarDays className="h-4 w-4 shrink-0 text-txt-secondary" />
           <span className="min-w-0 flex-1 truncate tabular">{valid ? format(d, "dd MMM yyyy") : placeholder}</span>
         </button>

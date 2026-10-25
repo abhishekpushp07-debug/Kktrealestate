@@ -6,13 +6,12 @@ import { useAuth } from "@/context/AuthContext";
 import { inr, inrShort, fmtDate } from "@/lib/format";
 import { StatCard } from "@/components/common/Bits";
 
-const COLORS = ["#10B981", "#C9A227", "#F59E0B", "#EF4444", "#7F1D1D"];
 const AGE_COLORS = { "Not due": "#10B981", "0-30": "#C9A227", "31-60": "#F59E0B", "61-90": "#EF4444", "90+": "#7F1D1D" };
 const Card = ({ title, children, testId, action }) => <div className="card min-w-0 overflow-hidden p-5" data-testid={testId}><div className="mb-3 flex items-center justify-between"><h2 className="text-base font-bold text-ink-950">{title}</h2>{action}</div>{children}</div>;
 const Empty = ({ text }) => <p className="py-6 text-center text-sm text-txt-secondary">{text}</p>;
 
 export function RoleWidgets() {
-  const { user, can } = useAuth();
+  const { can } = useAuth();
   const { data: w } = useFetch("/dashboard/widgets");
   if (!w) return null;
   const role = w.role;

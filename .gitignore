@@ -96,3 +96,6 @@ frontend/node_modules/.cache/default-development/14.pack
 credentials.json
 *.key
 .credentials
+
+# Build output (platform rebuilds)
+frontend/build/

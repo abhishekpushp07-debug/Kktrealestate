@@ -14,7 +14,7 @@ export function AuthProvider({ children }) {
     try { if (tokens.access) await api.post("/auth/logout", { refresh_token: tokens.refresh }); } catch (e) { /* ignore */ }
     tokens.clear();
     setUser(null);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     setLogoutHandler(() => { tokens.clear(); setUser(null); });
@@ -23,7 +23,7 @@ export function AuthProvider({ children }) {
       .then(([u, c]) => { setUser(u); setCompany(c); })
       .catch(() => tokens.clear())
       .finally(() => setLoading(false));
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const login = useCallback(async (email, password) => {
     const { data } = await api.post("/auth/login", { email, password });
@@ -34,7 +34,7 @@ export function AuthProvider({ children }) {
     qc.setQueryData(["fetch", "/settings/company"], c.data);
     setCompany(c.data);
     return data;
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loginMfa = useCallback(async (mfa_token, code) => {
     const { data } = await api.post("/auth/login/mfa", { mfa_token, code });
@@ -44,7 +44,7 @@ export function AuthProvider({ children }) {
     qc.setQueryData(["fetch", "/settings/company"], c.data);
     setCompany(c.data);
     return data;
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const value = useMemo(() => ({
     user, company, loading, login, loginMfa, logout, setCompany,
