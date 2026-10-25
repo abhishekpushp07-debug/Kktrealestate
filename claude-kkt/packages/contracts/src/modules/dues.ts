@@ -13,6 +13,8 @@ export type RunDuesRequest = z.infer<typeof RunDuesRequestSchema>;
 
 export const RunDuesResponseSchema = z.object({
   bookings_processed: z.int().min(0),
+  /** Alias of bookings_processed (SPEC §10 wording). */
+  bookings_checked: z.int().min(0).optional(),
   demands_raised: z.int().min(0),
   demand_numbers: z.array(z.string()),
   notifications_sent: z.int().min(0),

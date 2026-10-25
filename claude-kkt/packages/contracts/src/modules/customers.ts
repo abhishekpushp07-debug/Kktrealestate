@@ -254,9 +254,70 @@ export type PortalBulkEnableResponse = z.infer<typeof PortalBulkEnableResponseSc
 export const CustomerEraseSchema = z.strictObject({ confirm: z.literal("ERASE"), reason: ReasonSchema });
 export type CustomerErase = z.infer<typeof CustomerEraseSchema>;
 
+/** Co-applicant partial update (child row, no version). */
+export const CoApplicantUpdateSchema = CoApplicantInputSchema.omit({ id: true }).partial();
+export type CoApplicantUpdate = z.infer<typeof CoApplicantUpdateSchema>;
+
+export const CoApplicantListResponseSchema = z.object({ items: z.array(CoApplicantRowSchema) });
+export type CoApplicantListResponse = z.infer<typeof CoApplicantListResponseSchema>;
+
+/** Recent payment row on the Customer 360 page. */
+export const Customer360PaymentSchema = z.object({
+  payment_id: IdSchema,
+  booking_id: IdSchema,
+  booking_number: z.string(),
+  receipt_number: z.string(),
+  amount_paise: z.int(),
+  payment_date: DateStringSchema,
+  mode_code: z.string(),
+  bucket: z.string().nullable(),
+  against: z.string(),
+  status: z.string(),
+});
+export type Customer360Payment = z.infer<typeof Customer360PaymentSchema>;
+
+/** Document row on the Customer 360 page (no storage keys). */
+export const Customer360DocumentSchema = z.object({
+  document_id: IdSchema,
+  title: z.string().nullable(),
+  file_name: z.string(),
+  mime: z.string(),
+  document_type_name: z.string().nullable(),
+  is_sensitive: z.boolean(),
+  shared_with_customer: z.boolean(),
+  created_at: TimestampSchema,
+});
+export type Customer360Document = z.infer<typeof Customer360DocumentSchema>;
+
+/** Lead summary row on the Customer 360 page. */
+export const Customer360LeadSchema = z.object({
+  lead_id: IdSchema,
+  lead_number: z.string(),
+  stage: z.string(),
+  source: LeadSourceSchema,
+  project_name: z.string().nullable(),
+  created_at: TimestampSchema,
+});
+export type Customer360Lead = z.infer<typeof Customer360LeadSchema>;
+
+/** Service ticket summary row on the Customer 360 page. */
+export const Customer360TicketSchema = z.object({
+  ticket_id: IdSchema,
+  ticket_number: z.string(),
+  subject: z.string(),
+  status: z.string(),
+  priority: z.string(),
+  created_at: TimestampSchema,
+});
+export type Customer360Ticket = z.infer<typeof Customer360TicketSchema>;
+
 /** Customer 360 summary cards. */
 export const Customer360ResponseSchema = z.object({
   customer: CustomerRowSchema,
+  payments_recent: z.array(Customer360PaymentSchema),
+  documents: z.array(Customer360DocumentSchema),
+  leads: z.array(Customer360LeadSchema),
+  tickets: z.array(Customer360TicketSchema),
   bookings: z.array(
     z.object({
       booking_id: IdSchema,

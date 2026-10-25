@@ -77,3 +77,16 @@ export type DocumentDownloadLinkResponse = z.infer<typeof DocumentDownloadLinkRe
 /** Upload response. */
 export const DocumentUploadResponseSchema = z.object({ document: DocumentRowSchema });
 export type DocumentUploadResponse = z.infer<typeof DocumentUploadResponseSchema>;
+
+/** Stored renditions of a document: the original bytes, or the webp thumbnail (≈480 px) / medium (≈1080 px) generated for images. */
+export const DOCUMENT_VARIANTS = ["original", "thumb", "medium"] as const;
+export const DocumentVariantSchema = z.enum(DOCUMENT_VARIANTS);
+export type DocumentVariant = z.infer<typeof DocumentVariantSchema>;
+
+/** `POST /documents/:id/link?variant=` selector (defaults to the original). */
+export const DocumentLinkQuerySchema = z.object({ variant: DocumentVariantSchema.default("original") });
+export type DocumentLinkQuery = z.infer<typeof DocumentLinkQuerySchema>;
+
+/** Business-rule codes raised by the documents module (`details.rule` of a 422 BUSINESS_RULE). */
+export const DOCUMENT_RULES = ["KYC_NOT_SHAREABLE", "DOCUMENT_TYPE_NOT_APPLICABLE"] as const;
+export type DocumentRule = (typeof DOCUMENT_RULES)[number];

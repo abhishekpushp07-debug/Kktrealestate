@@ -107,18 +107,23 @@ export function validateFloorRanges(ranges: readonly RangeInput[], spec: FloorSp
     }
   }
 
-  const uncovered = unitFloors(spec).filter((floor) => templateForFloor(ranges, floor) === null);
+  const uncovered = unitFloors(spec).filter((floor) => rangeCovering(ranges, floor) === null);
   const ok = invalid.length === 0 && missingTemplate.length === 0 && outside.length === 0 && overlaps.length === 0 && uncovered.length === 0;
   return { invalid, missingTemplate, outside, overlaps, uncovered, ok };
 }
 
-/** Template id covering `floor`, or null (ranges with missing bounds are ignored). */
-export function templateForFloor(ranges: readonly RangeInput[], floor: number): string | null {
+/** The first complete range whose bounds include `floor` (its template may still be unset). */
+export function rangeCovering(ranges: readonly RangeInput[], floor: number): RangeInput | null {
   for (const range of ranges) {
     if (!isComplete(range)) continue;
-    if (floor >= range.from_floor && floor <= range.to_floor) return range.floor_plan_template_id ?? null;
+    if (floor >= range.from_floor && floor <= range.to_floor) return range;
   }
   return null;
+}
+
+/** Template id covering `floor`, or null when no range covers it or the covering range has no template yet. */
+export function templateForFloor(ranges: readonly RangeInput[], floor: number): string | null {
+  return rangeCovering(ranges, floor)?.floor_plan_template_id ?? null;
 }
 
 export interface ExpectedFlats {

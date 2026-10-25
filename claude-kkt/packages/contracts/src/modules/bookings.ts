@@ -48,7 +48,8 @@ const BookingBase = z.strictObject({
   agreement_value_paise: PaiseSchema,
   cash_agreed_paise: PaiseSchema,
   account_agreed_paise: PaiseSchema,
-  payment_plan_id: IdSchema,
+  /** Omitted → the block's default applicable plan (SPEC §8). */
+  payment_plan_id: IdSchema.optional().nullable(),
   plan_acceptance_mode: PlanAcceptanceModeSchema,
   plan_accepted_on: DateStringSchema,
   plan_acceptance_document_id: IdSchema.optional().nullable(),

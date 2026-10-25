@@ -74,8 +74,8 @@ const SiteSettingsBase = z.strictObject({
   walkthrough_video_url: UrlSchema.optional().nullable(),
 });
 
-/** Update site settings (partial + version). */
-export const SiteSettingsUpdateSchema = updateOf(SiteSettingsBase);
+/** Update site settings (partial + version). `round_robin_enabled` is mirrored to the company settings. */
+export const SiteSettingsUpdateSchema = updateOf(SiteSettingsBase).extend({ round_robin_enabled: z.boolean().optional() });
 export type SiteSettingsUpdate = z.infer<typeof SiteSettingsUpdateSchema>;
 
 /** Site settings row. */
@@ -380,6 +380,17 @@ export const ProjectWebsiteSettingsRowSchema = ProjectWebsiteSettingsBase.extend
   version: VersionSchema,
 });
 export type ProjectWebsiteSettingsRow = z.infer<typeof ProjectWebsiteSettingsRowSchema>;
+
+/** `GET /projects/:id/brochure-stats`: counts plus a 30-day daily sparkline (IST dates, zero-filled). */
+export const BrochureStatsResponseSchema = z.object({
+  project_id: IdSchema,
+  download_count: z.int().min(0),
+  requests_count: z.int().min(0),
+  downloads_30d: z.int().min(0),
+  last_download_at: TimestampSchema.nullable(),
+  sparkline: z.array(z.object({ date: z.string(), count: z.int().min(0) })),
+});
+export type BrochureStatsResponse = z.infer<typeof BrochureStatsResponseSchema>;
 
 /** Generic CMS list filter with a published flag. */
 export const CmsListFilterSchema = ListQuerySchema.extend({ is_published: BoolQuerySchema.optional() });

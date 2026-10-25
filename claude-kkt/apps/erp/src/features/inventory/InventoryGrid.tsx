@@ -39,12 +39,14 @@ const BAND_PALETTE = [
   "border-navy-900 bg-navy-900 text-white",
 ] as const;
 
-function paletteAt<T extends readonly string[]>(palette: T, index: number, total: number): string {
-  if (palette === BAND_PALETTE && total > 0) {
-    const scaled = Math.round((index / Math.max(1, total - 1)) * (palette.length - 1));
-    return palette[Math.max(0, Math.min(palette.length - 1, scaled))] ?? palette[0] ?? "";
-  }
-  return palette[index % palette.length] ?? palette[0] ?? "";
+function typeClass(index: number): string {
+  return TYPE_PALETTE[index % TYPE_PALETTE.length] ?? TYPE_PALETTE[0];
+}
+
+/** Sequential navy ramp: band index is spread across the palette so few bands still read light → dark. */
+function bandClass(index: number, total: number): string {
+  const scaled = total > 1 ? Math.round((index / (total - 1)) * (BAND_PALETTE.length - 1)) : 0;
+  return BAND_PALETTE[Math.max(0, Math.min(BAND_PALETTE.length - 1, scaled))] ?? BAND_PALETTE[0];
 }
 
 /* ------------------------------------------------------------------ */
@@ -112,9 +114,9 @@ export function InventoryGrid({ grid, colourBy, onColourByChange, onCellClick, c
       case "STATUS":
         return STATUS_CELL_CLASS[cell.status];
       case "FLAT_TYPE":
-        return paletteAt(TYPE_PALETTE, typeIndex.get(cell.flat_type_id) ?? 0, typeIndex.size);
+        return typeClass(typeIndex.get(cell.flat_type_id) ?? 0);
       case "PRICE_BAND":
-        return paletteAt(BAND_PALETTE, cell.price_band, bandCount);
+        return bandClass(cell.price_band, bandCount);
     }
   };
 
@@ -308,8 +310,8 @@ export function GridLegend({ grid, colourBy }: { grid: BlockGridResponse; colour
     colourBy === "STATUS"
       ? (Object.keys(FLAT_STATUS_LABELS) as FlatStatus[]).map((status) => ({ key: status, className: STATUS_CELL_CLASS[status], label: FLAT_STATUS_LABELS[status], count: grid.legend.by_status[status] }))
       : colourBy === "FLAT_TYPE"
-        ? grid.legend.by_flat_type.map((type, index) => ({ key: type.flat_type_id, className: paletteAt(TYPE_PALETTE, index, grid.legend.by_flat_type.length), label: `${type.code} · ${type.name}`, count: type.count }))
-        : grid.legend.price_bands.map((band) => ({ key: String(band.band), className: paletteAt(BAND_PALETTE, band.band, grid.legend.price_bands.length), label: band.label || `${formatINRShort(band.min_paise)} – ${formatINRShort(band.max_paise)}`, count: band.count }));
+        ? grid.legend.by_flat_type.map((type, index) => ({ key: type.flat_type_id, className: typeClass(index), label: `${type.code} · ${type.name}`, count: type.count }))
+        : grid.legend.price_bands.map((band) => ({ key: String(band.band), className: bandClass(band.band, grid.legend.price_bands.length), label: band.label || `${formatINRShort(band.min_paise)} – ${formatINRShort(band.max_paise)}`, count: band.count }));
   return (
     <dl className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs" aria-label="Legend">
       {items.map((item) => (

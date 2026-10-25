@@ -655,6 +655,8 @@ export const NOTIFICATION_TYPES = [
   "TICKET_SLA_BREACH",
   "INTEGRITY_FINDINGS",
   "NOTICE_PUBLISHED",
+  "PAYMENT_RECEIVED",
+  "BOOKING_CREATED",
 ] as const;
 export const NotificationTypeSchema = enumSchema(NOTIFICATION_TYPES);
 export type NotificationType = z.infer<typeof NotificationTypeSchema>;
@@ -675,6 +677,8 @@ export const NOTIFICATION_TYPE_LABELS: LabelMap<NotificationType> = {
   TICKET_SLA_BREACH: "Service request SLA breached",
   INTEGRITY_FINDINGS: "Integrity findings",
   NOTICE_PUBLISHED: "Notice published",
+  PAYMENT_RECEIVED: "Payment received",
+  BOOKING_CREATED: "Booking created",
 };
 
 export const POST_STATUSES = ["DRAFT", "PUBLISHED"] as const;

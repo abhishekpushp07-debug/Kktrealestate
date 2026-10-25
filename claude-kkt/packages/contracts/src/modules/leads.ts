@@ -117,6 +117,20 @@ export const LeadStageChangeSchema = z
   });
 export type LeadStageChange = z.infer<typeof LeadStageChangeSchema>;
 
+/**
+ * Wire body of `POST /leads/:id/stage`: the LOST-needs-a-reason rule is enforced by the API as 422 BUSINESS_RULE
+ * (rule LOST_REASON_REQUIRED) and CONVERTED is refused with 422 (use /convert), so this schema carries no refinements.
+ * `reason` is accepted as an alias of `lost_reason`.
+ */
+export const LeadStageChangeBodySchema = z.strictObject({
+  ...VersionedSchema.shape,
+  stage: LeadStageSchema,
+  lost_reason: ReasonSchema.optional().nullable(),
+  reason: ReasonSchema.optional().nullable(),
+  note: NoteSchema.optional().nullable(),
+});
+export type LeadStageChangeBody = z.infer<typeof LeadStageChangeBodySchema>;
+
 /** Add a follow-up. */
 export const LeadFollowUpCreateSchema = z.strictObject({
   note: z.string().trim().min(1).max(1000),
@@ -199,6 +213,35 @@ export const LeadKanbanResponseSchema = z.object({
   columns: z.array(z.object({ stage: LeadStageSchema, count: z.int().min(0), leads: z.array(LeadRowSchema) })),
 });
 export type LeadKanbanResponse = z.infer<typeof LeadKanbanResponseSchema>;
+
+/** Kanban board filters (`GET /leads/board`). */
+export const LeadBoardQuerySchema = z.object({
+  project_id: IdSchema.optional(),
+  assigned_user_id: IdSchema.optional(),
+  source: LeadSourceSchema.optional(),
+  search: z.string().trim().max(100).optional(),
+  /** Cards per column (counts are always complete). */
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+export type LeadBoardQuery = z.infer<typeof LeadBoardQuerySchema>;
+
+/** `GET /leads/follow-ups/due`: my open leads whose next follow-up is due today or overdue (IST). */
+export const LeadFollowUpsDueQuerySchema = z.object({
+  /** Business date (IST), defaults to today. */
+  date: DateStringSchema.optional(),
+  /** Include every user's follow-ups (managers); default = mine only. */
+  all: BoolQuerySchema.default(false),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+export type LeadFollowUpsDueQuery = z.infer<typeof LeadFollowUpsDueQuerySchema>;
+
+export const LeadFollowUpsDueResponseSchema = z.object({
+  date: DateStringSchema,
+  items: z.array(LeadRowSchema),
+  total: z.int().min(0),
+  overdue: z.int().min(0),
+});
+export type LeadFollowUpsDueResponse = z.infer<typeof LeadFollowUpsDueResponseSchema>;
 
 /** Website enquiry as seen in the ERP inbox. */
 export const EnquiryRowSchema = z.object({

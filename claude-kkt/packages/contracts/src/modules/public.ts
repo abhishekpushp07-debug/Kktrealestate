@@ -59,7 +59,20 @@ export const PublicTestimonialSchema = z.object({
 });
 export type PublicTestimonial = z.infer<typeof PublicTestimonialSchema>;
 
+/** Public image (apps/web `PublicImage`): `url` is the medium variant, alt/caption optional. */
+export const PublicImageSchema = z.object({
+  url: z.string(),
+  alt: z.string().nullable().optional(),
+  caption: z.string().nullable().optional(),
+  width: z.int().nullable().optional(),
+  height: z.int().nullable().optional(),
+});
+export type PublicImage = z.infer<typeof PublicImageSchema>;
+
 export const PublicGalleryItemSchema = z.object({
+  /** Same as medium_url (apps/web `PublicImage.url`). */
+  url: z.string().optional(),
+  alt: z.string().nullable().optional(),
   thumb_url: z.string(),
   medium_url: z.string(),
   width: z.int().nullable(),
@@ -71,6 +84,13 @@ export const PublicGalleryItemSchema = z.object({
 });
 export type PublicGalleryItem = z.infer<typeof PublicGalleryItemSchema>;
 
+/** `GET /public/gallery?project=` response: items plus the published projects that have gallery images (filter chips). */
+export const PublicGalleryResponseSchema = z.object({
+  items: z.array(PublicGalleryItemSchema),
+  projects: z.array(z.object({ slug: z.string(), name: z.string() })),
+});
+export type PublicGalleryResponse = z.infer<typeof PublicGalleryResponseSchema>;
+
 export const PublicPersonSchema = z.object({ name: z.string(), title: z.string(), bio: z.string().nullable(), photo_url: z.string().nullable() });
 export type PublicPerson = z.infer<typeof PublicPersonSchema>;
 
@@ -79,8 +99,12 @@ export const PublicPostCardSchema = z.object({
   slug: z.string(),
   excerpt: z.string().nullable(),
   cover_url: z.string().nullable(),
+  /** Same as cover_url (apps/web `PostCard.cover_image_url`). */
+  cover_image_url: z.string().nullable().optional(),
   published_at: TimestampSchema,
   tags: z.array(z.string()),
+  author_name: z.string().nullable().optional(),
+  reading_minutes: z.int().min(0).nullable().optional(),
 });
 export type PublicPostCard = z.infer<typeof PublicPostCardSchema>;
 
@@ -123,6 +147,8 @@ export const PublicProjectCardSchema = z.object({
   city: z.string(),
   locality: z.string().nullable(),
   project_type: ProjectTypeSchema,
+  /** Same as project_type (apps/web `ProjectCard.type`). */
+  type: ProjectTypeSchema.optional(),
   status: ProjectStatusSchema,
   rera_number: z.string().nullable(),
   possession_date: DateStringSchema.nullable(),
@@ -133,6 +159,7 @@ export const PublicProjectCardSchema = z.object({
   configurations: z.array(z.string()),
   construction_percent: z.number().nullable(),
   is_featured: z.boolean(),
+  tagline: z.string().nullable().optional(),
 });
 export type PublicProjectCard = z.infer<typeof PublicProjectCardSchema>;
 
@@ -141,7 +168,11 @@ export const PublicAvailabilityCellSchema = z.object({
   flat_number: z.string(),
   position: z.int(),
   availability: PublicAvailabilitySchema,
+  /** Same as availability (apps/web `AvailabilityCell.status`). */
+  status: PublicAvailabilitySchema.optional(),
   configuration: z.string(),
+  /** Same as configuration (apps/web `AvailabilityCell.flat_type_code`). */
+  flat_type_code: z.string().nullable().optional(),
   facing: z.string().nullable(),
   price_paise: PaiseSchema.nullable(),
 });
@@ -154,7 +185,7 @@ export const PublicAvailabilityGridSchema = z.object({
     z.object({
       name: z.string(),
       positions: z.int().min(0),
-      floors: z.array(z.object({ floor_label: z.string(), has_units: z.boolean(), cells: z.array(PublicAvailabilityCellSchema) })),
+      floors: z.array(z.object({ floor_label: z.string(), label: z.string().optional(), has_units: z.boolean(), cells: z.array(PublicAvailabilityCellSchema) })),
       available_count: z.int().min(0),
       total_count: z.int().min(0),
     }),
@@ -164,25 +195,57 @@ export const PublicAvailabilityGridSchema = z.object({
 export type PublicAvailabilityGrid = z.infer<typeof PublicAvailabilityGridSchema>;
 
 export const PublicConfigurationSchema = z.object({
+  /** Flat-type code (apps/web `Configuration.code`). */
+  code: z.string().optional(),
   name: z.string(),
   bhk: z.number(),
   facing: z.string().nullable(),
   description: z.string().nullable(),
-  rooms: z.array(z.object({ label: z.string(), length_ft: z.number(), width_ft: z.number(), sqft: z.number() })),
-  areas: z.array(z.object({ name: z.string(), code: z.string(), sqft: z.number() })),
+  rooms: z.array(z.object({ label: z.string(), room_type_name: z.string().nullable().optional(), length_ft: z.number(), width_ft: z.number(), sqft: z.number() })),
+  areas: z.array(z.object({ name: z.string(), code: z.string(), area_type_code: z.string().optional(), area_type_name: z.string().optional(), sqft: z.number() })),
+  carpet_sqft: z.number().nullable().optional(),
+  builtup_sqft: z.number().nullable().optional(),
+  super_builtup_sqft: z.number().nullable().optional(),
   specifications: z.array(z.object({ category: z.string(), items: z.array(z.string()) })),
   floor_plan_url: z.string().nullable(),
+  /** Same as floor_plan_url (apps/web). */
+  floor_plan_image_url: z.string().nullable().optional(),
   price_from_paise: PaiseSchema.nullable(),
+  /** Same as price_from_paise (apps/web `Configuration.price_paise`); null unless show_prices. */
+  price_paise: PaiseSchema.nullable().optional(),
   available_count: z.int().min(0).nullable(),
 });
 export type PublicConfiguration = z.infer<typeof PublicConfigurationSchema>;
 
+export const PublicStagePhotoSchema = z.object({
+  thumb_url: z.string(),
+  medium_url: z.string(),
+  /** Same as medium_url (apps/web `StagePhoto.url`). */
+  url: z.string().optional(),
+  alt: z.string().nullable().optional(),
+  caption: z.string().nullable(),
+  width: z.int().nullable().optional(),
+  height: z.int().nullable().optional(),
+  taken_on: DateStringSchema.nullable().optional(),
+});
+export type PublicStagePhoto = z.infer<typeof PublicStagePhotoSchema>;
+
 export const PublicStageProgressSchema = z.object({
   name: z.string(),
   status: StageStatusSchema,
+  started_on: DateStringSchema.nullable().optional(),
   completed_on: DateStringSchema.nullable(),
-  photos: z.array(z.object({ thumb_url: z.string(), medium_url: z.string(), caption: z.string().nullable() })),
+  photos: z.array(PublicStagePhotoSchema),
 });
+
+/** Per-block construction progress (apps/web `ConstructionProgress`). */
+export const PublicProgressBlockSchema = z.object({
+  name: z.string(),
+  percent: z.number().min(0).max(100),
+  status: ProjectStatusSchema.nullable().optional(),
+  stages: z.array(PublicStageProgressSchema),
+});
+export type PublicProgressBlock = z.infer<typeof PublicProgressBlockSchema>;
 export type PublicStageProgress = z.infer<typeof PublicStageProgressSchema>;
 
 /** Project detail page payload. */
@@ -214,6 +277,30 @@ export const PublicProjectDetailSchema = PublicProjectCardSchema.extend({
   visit_booking_enabled: z.boolean(),
   blocks: z.array(z.object({ name: z.string(), type: z.string(), floors: z.int(), total_units: z.int(), available_units: z.int().nullable() })),
   seo: z.object({ title: z.string().nullable(), description: z.string().nullable(), og_image_url: z.string().nullable() }),
+  // --- apps/web aliases (same data, the shapes the Next.js site consumes) ---
+  /** hero_urls as image objects. */
+  hero_images: z.array(PublicImageSchema).optional(),
+  /** Same as description. */
+  overview: z.string().optional(),
+  key_facts: z
+    .object({
+      project_type: ProjectTypeSchema,
+      status: ProjectStatusSchema,
+      rera_number: z.string().nullable(),
+      launch_date: DateStringSchema.nullable(),
+      possession_date: DateStringSchema.nullable(),
+      land_area_sqft: z.number().nullable(),
+      total_units: z.int().nullable(),
+      block_count: z.int().nullable(),
+      floors: z.string().nullable(),
+      address: z.object({ line1: z.string().nullable(), line2: z.string().nullable(), locality: z.string().nullable(), city: z.string().nullable(), state: z.string().nullable(), pincode: z.string().nullable() }),
+    })
+    .optional(),
+  /** Per-block progress; null unless show_progress. */
+  construction_progress: z.object({ blocks: z.array(PublicProgressBlockSchema) }).nullable().optional(),
+  /** Same as video_urls / tour_urls. */
+  videos: z.array(z.string()).optional(),
+  tours: z.array(z.string()).optional(),
 });
 export type PublicProjectDetail = z.infer<typeof PublicProjectDetailSchema>;
 
@@ -273,6 +360,10 @@ export type PublicBrochureResponse = z.infer<typeof PublicBrochureResponseSchema
 export const PublicBrochureRepeatRequestSchema = z.strictObject({ project_slug: SlugSchema, visitor_token: z.string().min(16).max(200), website: HoneypotSchema });
 export type PublicBrochureRepeatRequest = z.infer<typeof PublicBrochureRepeatRequestSchema>;
 
+/** Either a first-time request (details + consent) or a returning device (visitor_token only). */
+export const PublicBrochureAnyRequestSchema = z.union([PublicBrochureRequestSchema, PublicBrochureRepeatRequestSchema]);
+export type PublicBrochureAnyRequest = z.infer<typeof PublicBrochureAnyRequestSchema>;
+
 /** Brochure link lifetime in minutes. */
 export const BROCHURE_LINK_MINUTES = 15;
 
@@ -298,6 +389,14 @@ export const PublicVisitAvailabilityResponseSchema = z.object({
 });
 export type PublicVisitAvailabilityResponse = z.infer<typeof PublicVisitAvailabilityResponseSchema>;
 
+/** One day of availability. */
+export const PublicVisitDaySchema = z.object({ date: DateStringSchema, slots: z.array(PublicVisitSlotSchema) });
+export type PublicVisitDay = z.infer<typeof PublicVisitDaySchema>;
+
+/** Wire shape of `GET /public/projects/:slug/visit-availability` per API-CONVENTIONS Appendix B (a bare array of days, consumed by apps/web). */
+export const PublicVisitAvailabilityDaysSchema = z.array(PublicVisitDaySchema);
+export type PublicVisitAvailabilityDays = z.infer<typeof PublicVisitAvailabilityDaysSchema>;
+
 export const PublicVisitBookingInputSchema = z.strictObject({
   project_slug: SlugSchema,
   visit_date: DateStringSchema,
@@ -313,6 +412,22 @@ export const PublicVisitBookingInputSchema = z.strictObject({
 });
 export type PublicVisitBookingInput = z.infer<typeof PublicVisitBookingInputSchema>;
 
+/**
+ * Booking request as accepted on the wire: `visit_date`/`slot_start` (contracts) or the Appendix B spellings `date`/`start`
+ * (apps/web `SiteVisitRequest`). One of each pair is required.
+ */
+export const PublicVisitBookingRequestSchema = z
+  .strictObject({
+    ...PublicVisitBookingInputSchema.shape,
+    visit_date: DateStringSchema.optional(),
+    slot_start: TimeStringSchema.optional(),
+    date: DateStringSchema.optional(),
+    start: TimeStringSchema.optional(),
+  })
+  .refine((b) => Boolean(b.visit_date ?? b.date), { message: "visit_date is required", path: ["visit_date"] })
+  .refine((b) => Boolean(b.slot_start ?? b.start), { message: "slot_start is required", path: ["slot_start"] });
+export type PublicVisitBookingRequest = z.infer<typeof PublicVisitBookingRequestSchema>;
+
 export const PublicVisitBookingResponseSchema = z.object({
   visit_number: z.string(),
   project_name: z.string(),
@@ -325,6 +440,11 @@ export const PublicVisitBookingResponseSchema = z.object({
   instructions: z.string().nullable(),
   ics_url: UrlSchema,
   manage_url: UrlSchema,
+  // apps/web aliases (`SiteVisitResult`)
+  date: DateStringSchema.optional(),
+  start: TimeStringSchema.optional(),
+  end: TimeStringSchema.optional(),
+  address: z.string().nullable().optional(),
 });
 export type PublicVisitBookingResponse = z.infer<typeof PublicVisitBookingResponseSchema>;
 
@@ -344,6 +464,11 @@ export const PublicVisitManageResponseSchema = z.object({
   instructions: z.string().nullable(),
   can_cancel: z.boolean(),
   ics_url: UrlSchema,
+  // apps/web aliases (`SiteVisitManage`)
+  date: DateStringSchema.optional(),
+  start: TimeStringSchema.optional(),
+  end: TimeStringSchema.optional(),
+  address: z.string().nullable().optional(),
 });
 export type PublicVisitManageResponse = z.infer<typeof PublicVisitManageResponseSchema>;
 
