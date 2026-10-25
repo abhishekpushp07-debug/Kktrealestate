@@ -2,6 +2,7 @@
  * Shared helpers of the reports module: export-format resolution (`format=csv|pdf` ≡ `export=CSV|PDF`), project-scope SQL, period keys,
  * the company letterhead (settings/letterhead jsonb + logo through the documents module) and the csv/pdf reply helpers.
  */
+import type { Readable } from "node:stream";
 import { eq, sql, type SQL } from "drizzle-orm";
 import type { FastifyReply } from "fastify";
 import type { ListQuery, ReportFormat } from "@kkt/contracts";
@@ -98,14 +99,14 @@ export async function letterheadFor(db: Executor, companyId: string, extra: { re
   return { name: c.name, legalName: c.legalName, tagline: lh.tagline ?? null, addressLine, gstin: c.gstin, reraLine: extra.reraLine ?? null, contactLine: contact || null, logo, signatoryName: lh.signatory_name ?? null, signatoryTitle: lh.signatory_title ?? null };
 }
 
-/** Sends PDF bytes as an attachment. */
-export function sendPdf(reply: FastifyReply, filename: string, bytes: Buffer): FastifyReply {
+/** Sends a PDF (bytes, or a stream piped straight to the client) as an attachment. */
+export function sendPdf(reply: FastifyReply, filename: string, body: Buffer | Readable): FastifyReply {
   const safeName = filename.replace(/[^A-Za-z0-9._-]/g, "_");
   reply.header("Content-Type", "application/pdf");
   reply.header("Content-Disposition", `attachment; filename="${safeName}"`);
-  reply.header("Content-Length", String(bytes.length));
+  if (Buffer.isBuffer(body)) reply.header("Content-Length", String(body.length));
   reply.header("Cache-Control", "no-store");
-  return reply.send(bytes);
+  return reply.send(body);
 }
 
 /** Paging for a paged report: normal paging for JSON, every row (capped) for csv/pdf exports. */

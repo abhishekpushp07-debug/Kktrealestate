@@ -14,7 +14,7 @@ import { registerPresetRoutes } from "./routes/presets.js";
 import { registerReportRoutes } from "./routes/reports.js";
 
 export { receiptPdf, demandLetterPdf, allotmentLetterPdf, allotmentLetterData, customerStatement, customerStatementPdf, type RenderedPdf } from "./services/documents.js";
-export { BrandedPdf, reportPdf, pdfMoney, pdfDate, pdfDateTimeIST, PDF_CURRENCY_PREFIX, type PdfLetterhead, type PdfColumn, type PdfOptions, type ReportTableSpec } from "./services/pdf.js";
+export { BrandedPdf, reportPdf, reportPdfStream, buildReportPdf, pdfTruncationNote, PDF_MAX_ROWS, pdfMoney, pdfDate, pdfDateTimeIST, PDF_CURRENCY_PREFIX, type PdfLetterhead, type PdfColumn, type PdfOptions, type ReportTableSpec } from "./services/pdf.js";
 export { collectionsReport, outstandingReport, advancesReport, demandVsCollection, upcomingDues, chequesReport, cancellationsReport, bankwiseReceipts, clearedTotal, pendingChequesTotal, toChequeRow, STAGE_FORECAST_DAYS } from "./services/moneyReports.js";
 export { inventoryReport, projectInventory, salesFunnel, activityReport } from "./services/salesReports.js";
 export { dashboardFor, dashboardRoleFor, dashboardCacheKey, DASHBOARD_TTL_SECONDS } from "./services/dashboards.js";

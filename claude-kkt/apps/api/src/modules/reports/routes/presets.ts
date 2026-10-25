@@ -7,8 +7,17 @@ import { reportPresets } from "@kkt/db";
 import { actorFromRequest, auditMeta, writeAudit } from "../../../lib/audit.js";
 import { ApiError } from "../../../lib/errors.js";
 import { route } from "../../../lib/routes.js";
+import { REPORT_CATALOG } from "./reports.js";
 
 type PresetRecord = typeof reportPresets.$inferSelect;
+
+/** Preset params are the report's own query parameters: anything else is rejected the way the report route itself would (400). */
+function assertPresetParams(reportKey: string, params: Record<string, unknown>): void {
+  const entry = REPORT_CATALOG.find((r) => r.key === reportKey);
+  const allowed = [...(entry?.params ?? []), "format", "export"];
+  const unknown = Object.keys(params).filter((k) => !allowed.includes(k));
+  if (unknown.length > 0) throw ApiError.badRequest(`Unknown parameters for ${reportKey}: ${unknown.join(", ")}`, { unknown, allowed });
+}
 
 function toRow(p: PresetRecord): ReportPresetRow {
   return { id: p.id, user_id: p.userId, report_key: p.reportKey as ReportPresetRow["report_key"], name: p.name, params: p.params, created_at: p.createdAt.toISOString() };
@@ -32,6 +41,7 @@ export function registerPresetRoutes(app: FastifyInstance): void {
     schema: { body: ReportPresetCreateSchema, response: { 201: ReportPresetRowSchema }, summary: "Save a report preset (per user; same name replaces nothing – names are unique per report)" },
     handler: async (req, reply) => {
       const user = req.user!;
+      assertPresetParams(req.body.report_key, req.body.params);
       const row = await app.db.transaction(async (tx) => {
         const [dup] = await tx.select({ id: reportPresets.id }).from(reportPresets)
           .where(and(eq(reportPresets.userId, user.id), eq(reportPresets.reportKey, req.body.report_key), eq(reportPresets.name, req.body.name))).limit(1);

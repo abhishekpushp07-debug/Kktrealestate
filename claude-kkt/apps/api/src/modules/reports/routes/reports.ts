@@ -14,7 +14,7 @@ import { roznamcha } from "../../money/services/roznamcha.js";
 import { letterheadFor, rangeFilters, sendPdf, sendRowsCsv, wantedFormat, type ExportQuery } from "../common.js";
 import { allotmentLetterData, allotmentLetterPdf, customerStatement, customerStatementPdf } from "../services/documents.js";
 import { advancesReport, bankwiseReceipts, cancellationsReport, chequesReport, collectionsReport, demandVsCollection, outstandingReport, upcomingDues } from "../services/moneyReports.js";
-import { pdfDate, reportPdf, type PdfColumn, type ReportTableSpec } from "../services/pdf.js";
+import { pdfDate, reportPdfStream, type PdfColumn, type ReportTableSpec } from "../services/pdf.js";
 import { activityReport, inventoryReport, salesFunnel } from "../services/salesReports.js";
 import { loadBookingRelated, loadBookingSelect, scheduleRows } from "../../money/services/views.js";
 import { today } from "../common.js";
@@ -49,12 +49,15 @@ const money = (key: string, header: string, width = 1.6): PdfColumn<Row> => ({ k
 const col = (key: string, header: string, width = 1.5, align?: "left" | "right" | "center"): PdfColumn<Row> => ({ key, header, width, ...(align ? { align } : {}) });
 const dateCol = (key: string, header: string, width = 1.3): PdfColumn<Row> => ({ key, header, width, align: "center", render: (r) => pdfDate(r[key] as string | null) });
 
-/** Either sends csv/pdf for a tabular report or returns undefined so the handler replies with JSON. */
+/**
+ * Either sends csv/pdf for a tabular report or returns undefined so the handler replies with JSON. CSV streams every row (capped by
+ * lib/list CSV_EXPORT_MAX_ROWS for paged reports); the PDF is streamed to the client and cut at PDF_MAX_ROWS with a visible note.
+ */
 async function exportTable(reply: FastifyReply, fmt: "csv" | "pdf" | "json", filename: string, keys: readonly string[], rows: readonly Row[], pdf: () => Promise<ReportTableSpec<Row>> | ReportTableSpec<Row>, db: FastifyInstance["db"], companyId: string): Promise<FastifyReply | undefined> {
   if (fmt === "csv") return sendRowsCsv(reply, `${filename}.csv`, keys, rows);
   if (fmt === "pdf") {
     const [letterhead, spec] = await Promise.all([letterheadFor(db, companyId), Promise.resolve(pdf())]);
-    return sendPdf(reply, `${filename}.pdf`, await reportPdf(letterhead, spec));
+    return sendPdf(reply, `${filename}.pdf`, reportPdfStream(letterhead, spec));
   }
   return undefined;
 }
@@ -322,9 +325,11 @@ export function registerReportRoutes(app: FastifyInstance): void {
     },
   });
 
+  // Company-wide audit actions and staff login attempts (emails, IPs) are audit data, not project data: `audit.view` (Accounts / Super Admin),
+  // never the project-scoped `report.view`, which would let a Project Admin read every other project's activity.
   route(app, {
-    method: "GET", url: "/reports/activity", permission: "report.view",
-    schema: { querystring: ActivityReportQuerySchema, response: { 200: ActivityReportResponseSchema }, summary: "Activity: audit summary (kind=AUDIT), logins (LOGIN) or failed logins (FAILED_LOGIN), paged" },
+    method: "GET", url: "/reports/activity", permission: "audit.view",
+    schema: { querystring: ActivityReportQuerySchema, response: { 200: ActivityReportResponseSchema }, summary: "Activity: audit summary (kind=AUDIT), logins (LOGIN) or failed logins (FAILED_LOGIN), paged (audit.view)" },
     handler: async (req, reply) => {
       const user = req.user!;
       const r = await activityReport(app.dbReplica, user, req.query);

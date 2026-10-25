@@ -6,6 +6,7 @@
  */
 import { existsSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
+import type { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import PDFDocument from "pdfkit";
 import { amountInWords, formatINR, groupIndian, istParts, formatDateLabel } from "@kkt/domain";
@@ -445,8 +446,8 @@ export class BrandedPdf {
     return this;
   }
 
-  /** Stamps the footer on every page (page x of y, generated at IST) and returns the PDF bytes. */
-  finish(): Promise<Buffer> {
+  /** Stamps the footer on every page (page x of y, generated at IST); called exactly once before the document is ended. */
+  private stampFooters(): void {
     const d = this.doc;
     const range = d.bufferedPageRange();
     const generated = `Generated ${pdfDateTimeIST(this.opts.generatedAt ?? new Date())} · ${this.opts.letterhead.name}`;
@@ -460,6 +461,12 @@ export class BrandedPdf {
       d.text(generated, MARGIN, y, { width: this.contentWidth * 0.7, lineBreak: false });
       d.text(`Page ${i - range.start + 1} of ${range.count}`, MARGIN + this.contentWidth * 0.7, y, { width: this.contentWidth * 0.3, align: "right", lineBreak: false });
     }
+  }
+
+  /** Finishes the document and returns the PDF bytes (documents that are stored or re-sent, e.g. portal signed links). */
+  finish(): Promise<Buffer> {
+    const d = this.doc;
+    this.stampFooters();
     return new Promise<Buffer>((resolve, reject) => {
       const chunks: Buffer[] = [];
       d.on("data", (c: Buffer) => chunks.push(c));
@@ -467,6 +474,13 @@ export class BrandedPdf {
       d.on("error", reject);
       d.end();
     });
+  }
+
+  /** Finishes the document and returns it as a readable stream (reports are piped straight to the HTTP reply, never concatenated). */
+  finishStream(): Readable {
+    this.stampFooters();
+    this.doc.end();
+    return this.doc as unknown as Readable;
   }
 }
 
@@ -497,17 +511,43 @@ export interface ReportTableSpec<T extends Record<string, unknown>> {
   landscape?: boolean;
 }
 
-/** Generic report PDF from a table definition: title bar, filter block, table with totals footer, optional extra sections. */
-export async function reportPdf<T extends Record<string, unknown>>(letterhead: PdfLetterhead, spec: ReportTableSpec<T>): Promise<Buffer> {
+/**
+ * Upper bound of table rows rendered into one report PDF (main table and each extra section). Larger result sets are cut here with a
+ * visible "first N of M rows" note so a wide-open filter can never turn into a thousand-page document; CSV (`format=csv`) carries the full set.
+ */
+export const PDF_MAX_ROWS = 2000;
+
+/** Note printed when a table was cut at PDF_MAX_ROWS. */
+export function pdfTruncationNote(shown: number, total: number): string {
+  return `Showing the first ${groupIndian(String(shown))} of ${groupIndian(String(total))} rows. Narrow the filters or export CSV for the complete set.`;
+}
+
+/** Builds (without finishing) the generic report document: title bar, filter block, capped table with totals footer, optional extra sections. */
+export function buildReportPdf<T extends Record<string, unknown>>(letterhead: PdfLetterhead, spec: ReportTableSpec<T>): BrandedPdf {
   const pdf = new BrandedPdf({ letterhead, title: spec.title, reference: spec.subtitle ?? null, landscape: spec.landscape ?? spec.columns.length > 7 });
   if (spec.filters && spec.filters.length > 0) {
     pdf.kv([{ title: "Filters", rows: spec.filters.map(([k, v]) => [k, v] as const) }]);
   }
-  pdf.table(spec.columns, spec.rows, { totals: spec.totals ?? null });
+  const rows = spec.rows.length > PDF_MAX_ROWS ? spec.rows.slice(0, PDF_MAX_ROWS) : spec.rows;
+  pdf.table(spec.columns, rows, { totals: spec.totals ?? null });
+  if (rows.length < spec.rows.length) pdf.note(pdfTruncationNote(rows.length, spec.rows.length));
   for (const s of spec.sections ?? []) {
     pdf.heading(s.heading);
-    pdf.table(s.columns, s.rows, { totals: s.totals ?? null });
+    const sectionRows = s.rows.length > PDF_MAX_ROWS ? s.rows.slice(0, PDF_MAX_ROWS) : s.rows;
+    pdf.table(s.columns, sectionRows, { totals: s.totals ?? null });
+    if (sectionRows.length < s.rows.length) pdf.note(pdfTruncationNote(sectionRows.length, s.rows.length));
   }
-  pdf.note(`${spec.rows.length} row${spec.rows.length === 1 ? "" : "s"}. Amounts in Indian Rupees; computer-generated report.`);
-  return pdf.finish();
+  const totalsNote = spec.rows.length > PDF_MAX_ROWS ? " Totals cover every row, not only those printed." : "";
+  pdf.note(`${groupIndian(String(spec.rows.length))} row${spec.rows.length === 1 ? "" : "s"}.${totalsNote} Amounts in Indian Rupees; computer-generated report.`);
+  return pdf;
+}
+
+/** Generic report PDF as bytes (see buildReportPdf). */
+export async function reportPdf<T extends Record<string, unknown>>(letterhead: PdfLetterhead, spec: ReportTableSpec<T>): Promise<Buffer> {
+  return buildReportPdf(letterhead, spec).finish();
+}
+
+/** Generic report PDF as a readable stream (what the report routes send). */
+export function reportPdfStream<T extends Record<string, unknown>>(letterhead: PdfLetterhead, spec: ReportTableSpec<T>): Readable {
+  return buildReportPdf(letterhead, spec).finishStream();
 }

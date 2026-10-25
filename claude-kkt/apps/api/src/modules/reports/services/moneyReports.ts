@@ -183,7 +183,8 @@ export async function outstandingReport(db: Executor, user: Scope, q: Outstandin
       const bucket = ageingBucket(d.dueDate, asOf);
       addAgeing(row.ageing, bucket, d.remaining);
       addAgeing(totals.ageing, bucket, d.remaining);
-      if (compareDates(d.dueDate, asOf) < 0) {
+      // "overdue" is exactly "not in the NOT_DUE bucket", so Σ top_overdue (untruncated) = Σ ageing buckets except NOT_DUE
+      if (bucket !== "NOT_DUE") {
         overduePaise += d.remaining;
         if (!oldest || compareDates(d.dueDate, oldest) < 0) oldest = d.dueDate;
       }
