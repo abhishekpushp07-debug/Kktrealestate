@@ -159,8 +159,9 @@ const VERIFY = COMMON + '\n' + [
 ].join('\n')
 
 const stage = args && args.stage
+const RESUME = (args && args.resume) ? '\nRESUME NOTE: a previous attempt at this exact task was interrupted by a container restart after most of the work was written (it is committed as a WIP checkpoint). Read the current state (git show --stat HEAD, the files your task names), keep what is correct, finish whatever is missing, then run every verification the task asks for. Services were restarted; the test databases may hold stale data (the helpers truncate/migrate). Do not start a parallel copy of finished work.' : ''
 if (stage === 'foundation') {
-  const impl = await agent(FOUNDATION, { label: 'foundation', phase: 'Foundation', effort: 'high' })
+  const impl = await agent(FOUNDATION + RESUME, { label: 'foundation', phase: 'Foundation', effort: 'high' })
   return { foundation: impl }
 }
 if (stage === 'tracks') {
@@ -168,16 +169,16 @@ if (stage === 'tracks') {
   const selected = TRACKS.filter((t) => !only || only.has(t.key))
   const results = await pipeline(
     selected,
-    (t) => agent(trackPrompt(t), { label: 'track:' + t.key, phase: 'Tracks', effort: 'high' }),
-    (impl, t) => agent(reviewPrompt(t), { label: 'review:' + t.key, phase: 'Review', effort: 'high', schema: REVIEW_SCHEMA }).then((r) => ({ track: t.key, implementation: impl, review: r })),
+    (t) => agent(trackPrompt(t) + RESUME, { label: 'track:' + t.key, phase: 'Tracks', effort: 'high' }),
+    (impl, t) => agent(reviewPrompt(t) + RESUME, { label: 'review:' + t.key, phase: 'Review', effort: 'high', schema: REVIEW_SCHEMA }).then((r) => ({ track: t.key, implementation: impl, review: r })),
   )
   return results
 }
 if (stage === 'integrate') {
   const reports = JSON.stringify(args.reports || {}, null, 1)
-  return await agent(INTEGRATE + '\nTRACK REPORTS (JSON):\n' + reports, { label: 'integrate:frontends', phase: 'Integrate', effort: 'high' })
+  return await agent(INTEGRATE + RESUME + '\nTRACK REPORTS (JSON):\n' + reports, { label: 'integrate:frontends', phase: 'Integrate', effort: 'high' })
 }
 if (stage === 'verify') {
-  return await agent(VERIFY, { label: 'verify:all', phase: 'Verify', effort: 'high' })
+  return await agent(VERIFY + RESUME, { label: 'verify:all', phase: 'Verify', effort: 'high' })
 }
 throw new Error('args.stage must be foundation | tracks | integrate | verify')
