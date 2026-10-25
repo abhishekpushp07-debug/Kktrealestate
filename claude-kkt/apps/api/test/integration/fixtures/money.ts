@@ -8,7 +8,7 @@ export interface MoneyWorld {
   stages: Record<"EXCAVATION" | "FOUNDATION" | "PLINTH" | "FIRST_SLAB" | "TOP_SLAB" | "BRICKWORK" | "PLASTERING" | "FLOORING" | "POSSESSION", string>;
   /** A stage created after the projects, so no tower's stage sequence contains it. */
   alienStageId: string;
-  sgh: { id: string; towerId: string; flats: Map<string, Flat>; parkingIds: string[] };
+  sgh: { id: string; towerId: string; flats: Map<string, Flat>; towerUId: string; flatsU: Map<string, Flat>; parkingIds: string[] };
   ggv: { id: string; towerId: string; flats: Map<string, Flat> };
   modes: Record<"CASH" | "CHEQUE" | "NEFT" | "UPI", string>;
   bankAccountId: string;
@@ -75,6 +75,7 @@ export async function createMoneyWorld(t: TestContext, admin: string): Promise<M
   const sgh = await post<{ id: string }>(t, admin, "/api/v1/projects", projectBody("Shree Ganesh Heights", "SGH"));
   const ggv = await post<{ id: string }>(t, admin, "/api/v1/projects", projectBody("Ganesh Green Villas", "GGV"));
   const towerA = await post<{ id: string }>(t, admin, "/api/v1/blocks", towerCBody(sgh.id, basics, { name: "Tower A", code: "A", floors: 3, skip_floors: [], refuge_floors: [], floor_plans: [{ from_floor: 1, to_floor: 3, floor_plan_template_id: basics.templates.FP4 }] }));
+  const towerU = await post<{ id: string }>(t, admin, "/api/v1/blocks", towerCBody(sgh.id, basics, { name: "Tower U", code: "U", floors: 2, skip_floors: [], refuge_floors: [], floor_plans: [{ from_floor: 1, to_floor: 2, floor_plan_template_id: basics.templates.FP4 }] }));
   const towerG = await post<{ id: string }>(t, admin, "/api/v1/blocks", towerCBody(ggv.id, basics, { name: "Tower G", code: "G", floors: 2, skip_floors: [], refuge_floors: [], floor_plans: [{ from_floor: 1, to_floor: 2, floor_plan_template_id: basics.templates.FP4 }] }));
   // created after the towers: no stage sequence contains it
   const alien = await post<{ id: string }>(t, admin, "/api/v1/masters/construction-stages", { name: "Landscaping", code: "LANDSCAPING", sort_order: 80 });
@@ -130,7 +131,7 @@ export async function createMoneyWorld(t: TestContext, admin: string): Promise<M
 
   return {
     basics, stages, alienStageId: alien.id,
-    sgh: { id: sgh.id, towerId: towerA.id, flats: await loadFlats(t, admin, towerA.id), parkingIds: parking.body.items.map((p) => p.id) },
+    sgh: { id: sgh.id, towerId: towerA.id, flats: await loadFlats(t, admin, towerA.id), towerUId: towerU.id, flatsU: await loadFlats(t, admin, towerU.id), parkingIds: parking.body.items.map((p) => p.id) },
     ggv: { id: ggv.id, towerId: towerG.id, flats: await loadFlats(t, admin, towerG.id) },
     modes, bankAccountId: bank.id, bankAccountNumber, charges, plans, customers,
   };
