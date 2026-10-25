@@ -4,6 +4,7 @@ import { ACTOR_TYPE_LABELS, type AuditLogRow } from "@kkt/contracts";
 import { Button, EmptyState, ErrorState, Skeleton, Timeline, type TimelineItem, type TimelineTone } from "@/components/ui";
 import { humanize } from "@/lib/utils";
 import { diffSnapshots, formatDiffValue } from "@/features/admin/auditDiff";
+import { useAuth } from "@/lib/auth";
 import { useBookingHistory } from "../api";
 
 function toneFor(action: string): TimelineTone {
@@ -55,7 +56,10 @@ function DiffTable({ row }: { row: AuditLogRow }) {
 
 /** Audit timeline of the booking (`GET /audit-logs/entity/booking/:id`). */
 export function HistoryTab({ bookingId }: { bookingId: string }) {
-  const history = useBookingHistory(bookingId);
+  const { can } = useAuth();
+  const allowed = can("audit.view");
+  const history = useBookingHistory(bookingId, { enabled: allowed });
+  if (!allowed) return <EmptyState compact icon={Activity} title="History is hidden for your role" description="The audit trail needs the audit-view permission." />;
   if (history.isPending) return <Skeleton className="h-48" />;
   if (history.isError) return <ErrorState compact error={history.error} onRetry={() => void history.refetch()} />;
   const rows = [...(history.data ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at));

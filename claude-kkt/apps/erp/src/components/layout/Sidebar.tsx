@@ -75,7 +75,7 @@ export function Sidebar({ collapsed, onToggleCollapsed, onNavigate, className }:
                         data-testid={`sidebar-${item.id}-link`}
                         className={({ isActive }) =>
                           cn(
-                            "group relative flex h-9 items-center gap-3 rounded-md px-3 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-gold",
+                            "group relative flex h-11 items-center gap-3 rounded-md px-3 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-gold lg:h-9",
                             collapsed && "justify-center px-0",
                             isActive ? "bg-navy-900 text-white" : "text-navy-100/85 hover:bg-navy-900/70 hover:text-white",
                           )

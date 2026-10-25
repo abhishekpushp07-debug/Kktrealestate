@@ -84,12 +84,13 @@ export function useBookingPayments(id: string | null | undefined): UseQueryResul
 }
 
 /** Audit trail of one booking (`GET /audit-logs/entity/booking/:id`), envelope or bare array. */
-export function useBookingHistory(id: string | null | undefined): UseQueryResult<AuditLogRow[], ApiClientError> {
+export function useBookingHistory(id: string | null | undefined, options: { enabled?: boolean } = {}): UseQueryResult<AuditLogRow[], ApiClientError> {
   return useQuery<ListEnvelope<AuditLogRow> | AuditLogRow[], ApiClientError, AuditLogRow[], readonly unknown[]>({
     queryKey: bookingKeys.history(id ?? ""),
     queryFn: ({ signal }) => api.get<ListEnvelope<AuditLogRow> | AuditLogRow[]>(`${AUDIT_PATH}/entity/booking/${id}`, { signal, query: { page_size: 200 } }),
     select: (data) => (Array.isArray(data) ? data : data.items),
-    enabled: Boolean(id),
+    // The audit routes are guarded by audit.view; callers pass `enabled: can("audit.view")` so other roles never see a 403.
+    enabled: Boolean(id) && options.enabled !== false,
   });
 }
 

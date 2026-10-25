@@ -59,12 +59,13 @@ export function useSlaBreaches(enabled = true): UseQueryResult<ServiceRequestRow
 }
 
 /** Audit trail of one ticket (`GET /audit-logs/entity/service_request/:id`); absent endpoints degrade to an empty list. */
-export function useTicketHistory(id: string | null | undefined): UseQueryResult<AuditLogRow[], ApiClientError> {
+export function useTicketHistory(id: string | null | undefined, options: { enabled?: boolean } = {}): UseQueryResult<AuditLogRow[], ApiClientError> {
   return useQuery<ListEnvelope<AuditLogRow> | AuditLogRow[], ApiClientError, AuditLogRow[], readonly unknown[]>({
     queryKey: serviceKeys.history(id ?? ""),
     queryFn: ({ signal }) => api.get<ListEnvelope<AuditLogRow> | AuditLogRow[]>(`${AUDIT_PATH}/entity/service_request/${id}`, { signal, query: { page_size: 100 } }),
     select: asArray,
-    enabled: Boolean(id),
+    // Guarded by audit.view on the API; callers pass `enabled: can("audit.view")`.
+    enabled: Boolean(id) && options.enabled !== false,
     retry: false,
   });
 }

@@ -26,7 +26,8 @@ export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { can } = useAuth();
   const project = useProject(id);
-  const blocks = useProjectBlocks(id);
+  // Children load only once the project itself resolved: an out-of-scope / unknown project is a single 404, not a cascade.
+  const blocks = useProjectBlocks(id, { enabled: project.isSuccess });
   const [tab, setTab] = useTabParam<Tab>(TABS, "overview");
   const [editOpen, setEditOpen] = useState(false);
 

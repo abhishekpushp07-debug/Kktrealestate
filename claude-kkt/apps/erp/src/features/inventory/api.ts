@@ -59,12 +59,12 @@ export function useProject(id: string | null | undefined) {
   return useItem<ProjectRow>(PROJECTS_PATH, id);
 }
 
-export function useProjectBlocks(projectId: string | null | undefined): UseQueryResult<BlockRow[], ApiClientError> {
+export function useProjectBlocks(projectId: string | null | undefined, options: { enabled?: boolean } = {}): UseQueryResult<BlockRow[], ApiClientError> {
   return useQuery<ListEnvelope<BlockRow>, ApiClientError, BlockRow[], readonly unknown[]>({
     queryKey: inventoryKeys.projectBlocks(projectId ?? ""),
     queryFn: ({ signal }) => api.list<BlockRow>(BLOCKS_PATH, { page_size: 200, sort: "sort_order", filters: { project_id: projectId ?? "" } }, { signal }),
     select: (data) => data.items,
-    enabled: Boolean(projectId),
+    enabled: Boolean(projectId) && options.enabled !== false,
   });
 }
 

@@ -360,7 +360,7 @@ function LeadsCard({ customer, count }: { customer: Customer360Response["custome
 
 function HistoryCard({ customerId }: { customerId: string }) {
   const { can } = useAuth();
-  const enabled = can("audit.view") || can("customer.write");
+  const enabled = can("audit.view"); // GET /audit-logs is guarded by audit.view only
   const audit = useApiQuery<ListEnvelope<AuditLogRow>>([AUDIT_PATH, "customer", customerId], AUDIT_PATH, { query: { entity_type: "customer", entity_id: customerId, page_size: 50, sort: "-created_at" }, enabled, retry: false });
   const items: TimelineItem[] = (audit.data?.items ?? []).map((row) => ({
     id: row.id,

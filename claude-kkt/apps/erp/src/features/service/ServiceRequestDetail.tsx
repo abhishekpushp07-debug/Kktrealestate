@@ -455,7 +455,8 @@ function describeAudit(row: AuditLogRow): string {
 }
 
 function HistoryCard({ ticket }: { ticket: ServiceRequestDetailResponse }) {
-  const history = useTicketHistory(ticket.id);
+  const { can } = useAuth();
+  const history = useTicketHistory(ticket.id, { enabled: can("audit.view") });
   const items = useMemo<TimelineItem[]>(() => {
     const derived: TimelineItem[] = [{ id: "created", title: "Ticket raised", at: ticket.created_at, actor: ticket.customer_name, tone: "navy" }];
     if (ticket.sla_breached_at) derived.push({ id: "sla", title: "SLA breached", at: ticket.sla_breached_at, tone: "danger" });
