@@ -36,7 +36,7 @@ export function TabsTrigger({ className, children, count, icon, ...props }: Tabs
         // underline variant
         "[[data-variant=underline]_&]:-mb-px [[data-variant=underline]_&]:border-b-2 [[data-variant=underline]_&]:border-transparent [[data-variant=underline]_&]:rounded-none [[data-variant=underline]_&]:data-[state=active]:border-gold [[data-variant=underline]_&]:data-[state=active]:text-navy-950",
         // pills variant
-        "[[data-variant=pills]_&]:h-9 lg:[[data-variant=pills]_&]:h-7 [[data-variant=pills]_&]:rounded-sm [[data-variant=pills]_&]:data-[state=active]:bg-card [[data-variant=pills]_&]:data-[state=active]:text-navy-950 [[data-variant=pills]_&]:data-[state=active]:shadow-card",
+        "lg:[[data-variant=pills]_&]:h-7 [[data-variant=pills]_&]:rounded-sm [[data-variant=pills]_&]:data-[state=active]:bg-card [[data-variant=pills]_&]:data-[state=active]:text-navy-950 [[data-variant=pills]_&]:data-[state=active]:shadow-card",
         className,
       )}
       {...props}

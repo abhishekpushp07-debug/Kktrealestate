@@ -113,7 +113,11 @@ async function layout(page) {
       if (r.height < 43.5) {
         const id = el.getAttribute("data-testid") || "";
         const label = (id || el.getAttribute("aria-label") || el.textContent || "").trim().replace(/\s+/g, " ").slice(0, 40);
-        const primary = /btn$|submit|save|confirm|next|post|create|generate|publish|send|convert|login|search|new/i.test(id) || (el.tagName === "BUTTON" && /^(Save|Next|Confirm|Post|Create|Generate|Publish|Send|Sign in)/.test((el.textContent || "").trim())) || el.getAttribute("role") === "tab" || (el.tagName === "A" && Boolean(el.closest("nav")));
+        // Primary = buttons/links that carry an action, every tab, and nav links (sidebar, drawer, Back). Switches are toggled through their 44 px label row and breadcrumb crumbs are desktop-only, so they count as secondary.
+        const labelled = el.id && document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
+        const isSwitch = el.getAttribute("role") === "switch" && Boolean(labelled);
+        const crumb = el.tagName === "A" && Boolean(el.closest("ol")) && Boolean(el.closest('nav[aria-label="Breadcrumb"]'));
+        const primary = !isSwitch && !crumb && (/btn$|submit|save|confirm|next|post|create|generate|publish|send|convert|login|search|new/i.test(id) || (el.tagName === "BUTTON" && /^(Save|Next|Confirm|Post|Create|Generate|Publish|Send|Sign in)/.test((el.textContent || "").trim())) || el.getAttribute("role") === "tab" || (el.tagName === "A" && Boolean(el.closest("nav"))));
         small.push({ label, h: Math.round(r.height * 10) / 10, tag: el.tagName.toLowerCase(), primary });
       }
     }
@@ -199,6 +203,26 @@ async function comboPick(page, trigger, query, optionText) {
   await items.first().click();
   await page.waitForTimeout(150);
 }
+/** Works for both a Radix Select and a cmdk Combobox: open, then type (if a search input appears) and pick the matching option/item. */
+async function pickAny(page, trigger, text) {
+  const t = typeof trigger === "string" ? page.getByTestId(trigger) : trigger;
+  await t.scrollIntoViewIfNeeded();
+  await t.click();
+  const input = page.locator("[cmdk-input]").last();
+  const hasInput = await input.waitFor({ state: "visible", timeout: 1500 }).then(() => true).catch(() => false);
+  if (hasInput) {
+    await input.fill(typeof text === "string" ? text : "");
+    await page.waitForTimeout(700);
+    const item = page.locator("[cmdk-item]", { hasText: text }).first();
+    await item.waitFor({ state: "visible", timeout: 10000 });
+    await item.click();
+  } else {
+    const option = page.getByRole("option", { name: text, exact: false }).first();
+    await option.waitFor({ state: "visible", timeout: 8000 });
+    await option.click();
+  }
+  await page.waitForTimeout(150);
+}
 async function menuPick(page, triggerTestId, itemText) {
   await page.getByTestId(triggerTestId).click();
   const item = page.getByRole("menuitem", { name: itemText, exact: false }).first();
@@ -215,6 +239,22 @@ async function alertConfirm(page, name, reason) {
   await dlg.getByRole("button", { name, exact: false }).last().click();
 }
 async function dialogText(page) { return page.getByRole("dialog").last().innerText(); }
+/** Close a Sheet/drawer reliably: Escape first, then its Close button; waits until it is gone. */
+async function closeSheet(page, testId) {
+  const sheet = page.getByTestId(testId);
+  if (!(await sheet.isVisible().catch(() => false))) return;
+  await page.keyboard.press("Escape");
+  if (await sheet.waitFor({ state: "hidden", timeout: 3000 }).then(() => true).catch(() => false)) return;
+  const close = sheet.getByRole("button", { name: /^close$/i }).first();
+  if (await close.count()) await close.click();
+  await sheet.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+}
+/** MarkdownEditor puts the test id on its wrapper; type into the textarea inside it. */
+async function fillMarkdown(page, testId, text) {
+  const root = page.getByTestId(testId);
+  const tag = await root.evaluate((e) => e.tagName);
+  await (tag === "TEXTAREA" ? root : root.locator("textarea").first()).fill(text);
+}
 
 /* ------------------------------------------------------------------ API helpers (admin token for setup/verification) */
 
@@ -302,7 +342,7 @@ async function sectionLogin(browser) {
       await page.waitForURL(/\/login/, { timeout: 10000 });
       expect(page.url().includes("/login"), `logout returns to /login (${width})`, page);
       await check(page, "logout");
-    } catch (e) { log(`[${width}] login EXCEPTION ${e.message.slice(0, 300)}`); summary.defects.push({ page: `login-${width}`, kind: "exception", detail: e.message.slice(0, 300) }); }
+    } catch (e) { log(`[${width}] login EXCEPTION ${e.message.slice(0, 300)}`); summary.defects.push({ page: `login-${width}`, kind: "exception", detail: e.message.replace(/\x1b\[[0-9;]*m/g, "").slice(0, 900) }); }
     await context.close();
   }
 }
@@ -375,7 +415,7 @@ async function sectionRoles(browser, ids) {
             expect(r.status === 403, `API reveal as sales → 403 (${r.status})`, page);
           }
         }
-      } catch (e) { log(`[${width}] roles ${role} EXCEPTION ${e.message.slice(0, 300)}`); summary.defects.push({ page: `roles-${role}-${width}`, kind: "exception", detail: e.message.slice(0, 300) }); }
+      } catch (e) { log(`[${width}] roles ${role} EXCEPTION ${e.message.slice(0, 300)}`); summary.defects.push({ page: `roles-${role}-${width}`, kind: "exception", detail: e.message.replace(/\x1b\[[0-9;]*m/g, "").slice(0, 900) }); }
       await context.close();
     }
   }
@@ -480,7 +520,7 @@ async function sectionMasters(browser) {
         // construction stages: reorder + possession radio
         await goto(page, "/masters/construction-stages");
         const stageRows = page.locator('[data-testid^="stage-row-"]');
-        const names = async () => stageRows.evaluateAll((els) => els.map((e) => e.innerText.split("\n")[0].trim()));
+        const names = async () => (await apiGet("/masters/construction-stages?page_size=50&sort=sort_order")).body.items.map((s) => s.name);
         const before = await names();
         const firstId = (await stageRows.first().getAttribute("data-testid")).replace("stage-row-", "");
         await page.getByTestId(`stage-down-${firstId}`).click();
@@ -537,7 +577,7 @@ async function sectionMasters(browser) {
         expect(plan && plan.installments && plan.installments.length === 2, "payment plan created with 2 installments", page);
         await check(page, "masters-payment-plan-created");
       }
-    } catch (e) { log(`[${width}] masters EXCEPTION ${e.message.slice(0, 400)}`); summary.defects.push({ page: `masters-${width}`, kind: "exception", detail: e.message.slice(0, 300) }); await check(page, "masters-exception").catch(() => {}); }
+    } catch (e) { log(`[${width}] masters EXCEPTION ${e.message.slice(0, 400)}`); summary.defects.push({ page: `masters-${width}`, kind: "exception", detail: e.message.replace(/\x1b\[[0-9;]*m/g, "").slice(0, 900) }); await check(page, "masters-exception").catch(() => {}); }
     await context.close();
   }
 }
@@ -564,14 +604,14 @@ async function sectionInventory(browser, ids) {
         await page.getByTestId("project-tab-parking").click();
         await settle(page);
         await page.getByTestId("parking-bulk-btn").click();
-        const dlg = page.getByRole("dialog").last();
+        const dlg = page.locator("#parking-bulk-form");
         await dlg.waitFor({ state: "visible" });
-        await dlg.getByLabel("Prefix").fill(`Q${stamp.slice(0, 2)}-`);
-        await dlg.getByLabel("From", { exact: true }).fill("1");
-        await dlg.getByLabel("To", { exact: true }).fill("3");
-        await selectOption(page, dlg.getByLabel("Type", { exact: true }), /Open/);
-        await dlg.getByLabel("Level").fill("G");
-        await dlg.getByLabel("Price per slot").fill("150000");
+        await dlg.getByLabel(/^Prefix/).fill(`Q${stamp.slice(0, 2)}-`);
+        await dlg.getByLabel(/^From/).fill("1");
+        await dlg.getByLabel(/^To\b/).fill("3");
+        await selectOption(page, dlg.getByLabel(/^Type/), /Open/);
+        await dlg.getByLabel(/^Level/).fill("G");
+        await dlg.getByLabel(/^Price per slot/).fill("150000");
         await check(page, "parking-bulk-dialog");
         await page.getByTestId("parking-bulk-submit").click();
         await toast(page, /3 slots created/i);
@@ -627,6 +667,15 @@ async function sectionInventory(browser, ids) {
         await page.getByTestId("construction-update-submit").click();
         await toast(page, /marked complete/i);
         await settle(page);
+        // The dialog stays open to show the result (stages completed, demands raised, buyers notified); read it and close it.
+        const resultDlg = page.getByRole("dialog").last();
+        if (await resultDlg.isVisible().catch(() => false)) {
+          note(`update-status result: ${(await resultDlg.innerText()).replace(/\s+/g, " ").slice(0, 160)}`);
+          await check(page, "construction-update-result");
+          const closeBtn = resultDlg.getByRole("button", { name: /^(close|done)$/i }).last();
+          if (await closeBtn.count()) await closeBtn.click(); else await page.keyboard.press("Escape");
+          await resultDlg.waitFor({ state: "hidden", timeout: 8000 }).catch(() => {});
+        }
         const stagesAfter = (await apiGet(`/blocks/${towerB.id}/construction`)).body;
         const completedAfter = stagesAfter.stages.filter((s) => s.status === "COMPLETED");
         expect(completedAfter.length === completedBefore + 1 && /Plinth/.test(completedAfter[completedAfter.length - 1].name), `Plinth completed on Tower B (${completedBefore} → ${completedAfter.length})`, page);
@@ -634,7 +683,10 @@ async function sectionInventory(browser, ids) {
         note(`demands after Plinth on Tower B: ${demandsRaised.length} (${demandsRaised.map((d) => d.demand_number).join(",")})`);
         await check(page, "construction-updated");
         const last = completedAfter[completedAfter.length - 1];
-        await page.getByTestId(`stage-undo-${last.id}`).click();
+        const undoBtn = page.getByTestId(`stage-undo-${last.id}`);
+        await undoBtn.waitFor({ state: "visible", timeout: 15000 });
+        await undoBtn.scrollIntoViewIfNeeded();
+        await undoBtn.click({ timeout: 10000 }).catch(async () => { note("undo button needed a forced click (first click intercepted)"); await undoBtn.click({ force: true }); });
         await alertConfirm(page, /undo stage/i, "QA: slab casting postponed");
         await toast(page, /Stage undone/i);
         await settle(page);
@@ -690,18 +742,26 @@ async function sectionInventory(browser, ids) {
       const target = avail[avail.length - 1];
       await page.getByTestId(`grid-cell-${target.flat_number}`).click();
       await page.getByTestId("flat-drawer").waitFor({ state: "visible", timeout: 10000 });
-      let drawer = await page.getByTestId("flat-drawer").innerText();
-      expect(/bedroom|living|kitchen/i.test(drawer) && /carpet|built/i.test(drawer) && /₹/.test(drawer), `flat drawer for ${target.flat_number} shows rooms, areas and price`, page);
+      const drawerEl = page.getByTestId("flat-drawer");
+      await page.waitForFunction(() => /carpet/i.test(document.querySelector('[data-testid="flat-drawer"]')?.innerText || ""), null, { timeout: 15000 }).catch(() => {});
+      let drawer = await drawerEl.innerText();
+      await drawerEl.getByRole("tab", { name: /price/i }).click();
+      await page.waitForTimeout(300);
+      drawer += await drawerEl.innerText();
+      expect(/bedroom|living|kitchen/i.test(drawer) && /carpet|built/i.test(drawer) && /₹/.test(drawer), `flat drawer for ${target.flat_number} shows rooms, areas (Details) and the price breakup (Price)`, page);
+      await drawerEl.getByRole("tab", { name: /details/i }).click();
       await check(page, "flat-drawer");
       if (width === 1440) {
+        await drawerEl.getByRole("tab", { name: /actions/i }).click();
         await selectOption(page, "flat-status-select", /Hold/);
         await page.getByTestId("flat-drawer").getByLabel("Reason").fill("QA: token received");
         await page.getByTestId("flat-status-save").click();
         await toast(page, /now on hold/i);
         await settle(page);
-        drawer = await page.getByTestId("flat-drawer").innerText();
+        drawer = await drawerEl.innerText();
         expect(/On hold/i.test(drawer), "drawer shows the hold banner after the status change", page);
         await check(page, "flat-drawer-hold");
+        await drawerEl.getByRole("tab", { name: /actions/i }).click();
         await selectOption(page, "flat-status-select", /Available/);
         await page.getByTestId("flat-status-save").click();
         await toast(page, /now available/i);
@@ -774,6 +834,7 @@ async function sectionInventory(browser, ids) {
       await check(page, "block-wizard-preview");
       await page.getByTestId("wizard-create").click();
       await page.waitForURL(/\/blocks\/[0-9a-f-]+/, { timeout: 30000 });
+      await page.locator('[data-testid^="grid-cell-"]').first().waitFor({ state: "visible", timeout: 15000 }).catch(() => {});
       await settle(page);
       const cells = await page.locator('[data-testid^="grid-cell-"]').count();
       const createdBlock = (await apiGet(`/blocks?project_id=${sgh.id}&page_size=50`)).body.items.find((b) => b.code === code);
@@ -782,7 +843,7 @@ async function sectionInventory(browser, ids) {
       const f0 = flats.items[0];
       expect(f0 && f0.price_paise > 0 && f0.carpet_sqft > 0, `generated flat has a snapshot (carpet ${f0 && f0.carpet_sqft} sq ft) and a price (₹${f0 && f0.price_paise / 100})`, page);
       await check(page, "block-wizard-created");
-    } catch (e) { log(`[${width}] inventory EXCEPTION ${e.message.slice(0, 400)}`); summary.defects.push({ page: `inventory-${width}`, kind: "exception", detail: e.message.slice(0, 300) }); await check(page, "inventory-exception").catch(() => {}); }
+    } catch (e) { log(`[${width}] inventory EXCEPTION ${e.message.slice(0, 400)}`); summary.defects.push({ page: `inventory-${width}`, kind: "exception", detail: e.message.replace(/\x1b\[[0-9;]*m/g, "").slice(0, 900) }); await check(page, "inventory-exception").catch(() => {}); }
     await context.close();
   }
 }
@@ -806,7 +867,7 @@ async function sectionCrm(browser, ids) {
         await page.getByTestId("customer-phone").fill(phone);
         await page.getByTestId("customer-pan").fill(pan);
         await page.getByTestId("customer-aadhaar").fill(aadhaar());
-        await comboPick(page, "customer-rm", "Ankit");
+        await pickAny(page, "customer-rm", "Ankit");
         await check(page, "customer-form");
         await page.getByTestId("customer-form-submit").click();
         await toast(page, /created|saved/i);
@@ -840,10 +901,9 @@ async function sectionCrm(browser, ids) {
         await page.getByTestId("co-applicant-add").click();
         await page.getByTestId("co-applicant-sheet").waitFor({ state: "visible" });
         const sheet = page.getByTestId("co-applicant-sheet");
-        await sheet.getByLabel(/^Name/i).first().fill(`QA Spouse ${stamp}`);
-        const rel = sheet.getByLabel(/Relation/i).first();
-        if (await rel.count()) { const tag = await rel.evaluate((e) => e.tagName); if (tag === "BUTTON") await selectOption(page, rel, /Spouse|Wife|Husband/i); else await rel.fill("Spouse"); }
-        await sheet.getByLabel(/Phone/i).first().fill(PHONE());
+        await sheet.getByLabel(/^Full name/i).first().fill(`QA Spouse ${stamp}`);
+        await sheet.getByLabel(/^Relation/i).first().fill("Spouse");
+        await sheet.getByLabel(/^Mobile/i).first().fill(PHONE());
         await check(page, "customer-co-applicant-sheet");
         await page.getByTestId("co-applicant-submit").click();
         await toast(page, /co-applicant|added|saved/i);
@@ -871,7 +931,7 @@ async function sectionCrm(browser, ids) {
         await page.getByTestId("documents-upload-btn").click();
         await page.getByTestId("upload-document-submit").waitFor({ state: "visible" });
         await page.getByTestId("upload-document-file").setInputFiles(PDF);
-        await selectOption(page, "upload-document-type", /Agreement/);
+        await selectOption(page, "upload-document-type", /Photograph|PAN|Aadhaar|.+/); // customer-applicable types are the KYC ones
         await check(page, "customer-document-upload-dialog");
         await page.getByTestId("upload-document-submit").click();
         await toast(page, /Document uploaded/i);
@@ -889,8 +949,28 @@ async function sectionCrm(browser, ids) {
       await goto(page, "/leads");
       await check(page, "leads", { shot: true });
       if (width === 1440) {
-        const card = page.locator('[data-testid="kanban-column-NEW"] [data-testid^="lead-card-"]').first();
-        const leadId = (await card.getAttribute("data-testid")).replace("lead-card-", "");
+        // The seed's NEW leads get consumed by repeated runs, so create the leads this walk needs through the UI (sheet → drawer opens).
+        const createLead = async (name) => {
+          await page.getByTestId("lead-new-btn").click();
+          await page.getByTestId("lead-form-sheet").waitFor({ state: "visible" });
+          const phone = PHONE();
+          await page.getByTestId("lead-name").fill(name);
+          await page.getByTestId("lead-phone").fill(phone);
+          await selectOption(page, "lead-source", /Walk/);
+          await pickAny(page, "lead-project", "Heights");
+          await page.getByTestId("lead-form-submit").click();
+          await toast(page, /created|saved/i);
+          await settle(page);
+          const row = (await apiGet(`/leads?search=${phone}&page_size=1`)).body.items[0];
+          expect(Boolean(row && row.lead_number && row.stage === "NEW"), `lead ${row && row.lead_number} created as NEW (${name})`, page);
+          return { ...row, phone };
+        };
+        const leadA = await createLead(`QA Drag ${stamp}`);
+        await check(page, "lead-create");
+        await closeSheet(page, "lead-drawer");
+        const card = page.locator(`[data-testid="kanban-column-NEW"] [data-testid="lead-card-${leadA.id}"]`).first();
+        await card.waitFor({ state: "visible", timeout: 15000 });
+        const leadId = leadA.id;
         const from = await card.boundingBox();
         const target = await page.getByTestId("kanban-column-CONTACTED").boundingBox();
         await page.mouse.move(from.x + from.width / 2, from.y + 20);
@@ -914,28 +994,27 @@ async function sectionCrm(browser, ids) {
         const lost = (await apiGet(`/leads/${leadId}`)).body;
         expect(lost.stage === "LOST" && /budget mismatch/i.test(lost.lost_reason || ""), `lead marked LOST with reason (${lost.lost_reason})`, page);
         await check(page, "lead-lost");
-        await page.keyboard.press("Escape");
-        // create a lead, follow-up, convert → start booking link
-        await page.getByTestId("lead-new-btn").click();
-        await page.getByTestId("lead-form-sheet").waitFor({ state: "visible" });
-        leadPhone = PHONE();
-        await page.getByTestId("lead-name").fill(`QA Lead ${stamp}`);
-        await page.getByTestId("lead-phone").fill(leadPhone);
-        await selectOption(page, "lead-source", /Walk/);
-        await comboPick(page, "lead-project", "Heights");
-        await page.getByTestId("lead-form-submit").click();
-        await toast(page, /created|saved/i);
-        await settle(page);
-        const lead = (await apiGet(`/leads?search=${leadPhone}&page_size=1`)).body.items[0];
-        expect(Boolean(lead && lead.lead_number), `lead created ${lead && lead.lead_number}`, page);
-        await page.locator(`[data-testid="lead-card-${lead.id}"]`).first().click();
+        await closeSheet(page, "lead-drawer");
+        // second lead: follow-up, convert → start booking link
+        const lead = await createLead(`QA Lead ${stamp}`);
+        leadPhone = lead.phone;
+        if (!(await page.getByTestId("lead-drawer").isVisible().catch(() => false))) {
+          const newCard = page.locator(`[data-testid="lead-card-${lead.id}"]`).first();
+          await newCard.waitFor({ state: "visible", timeout: 15000 });
+          await newCard.scrollIntoViewIfNeeded();
+          await newCard.click();
+        } else note("creating a lead opened its drawer directly");
         await page.getByTestId("lead-drawer").waitFor({ state: "visible" });
+        await page.getByTestId("lead-drawer").getByRole("tab", { name: /follow-ups/i }).click();
         await page.getByTestId("follow-up-note").fill("QA follow-up: call back tomorrow");
         await page.getByTestId("follow-up-add").click();
         await toast(page, /Follow-up recorded/i);
         await check(page, "lead-drawer");
         await page.getByTestId("lead-convert").click();
         await page.getByTestId("lead-convert-submit").waitFor({ state: "visible" });
+        // "Link an existing customer (matched by phone)" is the default; this lead's phone is new, so create the customer.
+        const createMode = page.getByRole("dialog").last().getByRole("radio", { name: /create|new customer/i }).first();
+        if (await createMode.count()) await createMode.click();
         await check(page, "lead-convert-dialog");
         await page.getByTestId("lead-convert-submit").click();
         await toast(page, /Converted/i);
@@ -944,7 +1023,7 @@ async function sectionCrm(browser, ids) {
         const conv = (await apiGet(`/leads/${lead.id}`)).body;
         expect(conv.stage === "CONVERTED" && Boolean(conv.customer_id) && /\/bookings\/new/.test(href || ""), `lead converted (customer ${conv.customer_id}) with a start-booking link (${href})`, page);
         await check(page, "lead-converted");
-        await page.keyboard.press("Escape");
+        await closeSheet(page, "lead-drawer");
         await page.getByTestId("leads-view-list").click();
         await check(page, "leads-list");
         await page.getByTestId("leads-view-kanban").click();
@@ -953,7 +1032,7 @@ async function sectionCrm(browser, ids) {
       // enquiries inbox + unread badge
       const unread = (await apiGet("/enquiries?is_read=false&page_size=1")).body;
       await goto(page, "/website/enquiries");
-      const badge = width === 1440 ? await page.getByTestId("sidebar-enquiries-badge").innerText().catch(() => "") : "";
+      const badge = width === 1440 ? await page.getByTestId("sidebar-enquiries-badge").textContent({ timeout: 5000 }).catch(() => "") : "";
       const title = await page.locator("main").innerText();
       expect(/unread/i.test(title) || unread.total === 0, `enquiries inbox shows the unread badge (${unread.total} unread; sidebar "${badge}")`, page);
       await check(page, "enquiries");
@@ -977,7 +1056,7 @@ async function sectionCrm(browser, ids) {
         await page.getByTestId("visits-view-day").click();
         await page.getByTestId("visit-new-btn").click();
         await page.getByTestId("visit-form-sheet").waitFor({ state: "visible" });
-        await comboPick(page, "visit-project", "Heights");
+        await pickAny(page, "visit-project", "Heights");
         await comboPick(page, "visit-lead", `QA Lead ${stamp}`).catch(async () => comboPick(page, "visit-customer", `QA Buyer ${stamp}`));
         await page.getByTestId("slot-picker").waitFor({ state: "visible", timeout: 15000 });
         await page.locator('[data-testid^="slot-day-"]:not([disabled])').nth(1).click();
@@ -989,11 +1068,11 @@ async function sectionCrm(browser, ids) {
         await page.getByTestId("visit-form-submit").click();
         await toast(page, /visit|booked|created|SV-/i);
         await settle(page);
-        const visit = (await apiGet(`/site-visits?page_size=50&sort=-created_at`)).body.items.find((v) => /QA/.test(v.visitor_name || v.lead_name || v.customer_name || ""));
+        const visit = (await apiGet(`/site-visits?page_size=50&sort=-created_at`)).body.items.find((v) => /QA/.test(v.name || "") && v.status === "CONFIRMED");
         expect(Boolean(visit) && visit.status === "CONFIRMED", `site visit ${visit && visit.visit_number} created in ${slotId} (status ${visit && visit.status})`, page);
         await check(page, "site-visit-created");
-        await page.getByTestId("visits-view-list").click();
-        await settle(page);
+        // The list view keeps its own project filter (`l_project_id`, defaulting to the first project); open the SGH list directly.
+        await goto(page, `/site-visits?view=list&l_project_id=${ids.sgh.id}`);
         const chip = page.locator(`[data-testid="visit-chip-${visit.id}"]`);
         if (await chip.count()) await chip.first().click();
         else await page.locator("[data-testid=visits-table] tbody tr", { hasText: visit.visit_number }).first().click();
@@ -1021,7 +1100,7 @@ async function sectionCrm(browser, ids) {
         expect(v2.status === "COMPLETED", `visit completed (status ${v2.status}; lead stage ${lead2 && lead2.stage})`, page);
         await check(page, "site-visit-completed");
       }
-    } catch (e) { log(`[${width}] crm EXCEPTION ${e.message.slice(0, 400)}`); summary.defects.push({ page: `crm-${width}`, kind: "exception", detail: e.message.slice(0, 300) }); await check(page, "crm-exception").catch(() => {}); }
+    } catch (e) { log(`[${width}] crm EXCEPTION ${e.message.slice(0, 400)}`); summary.defects.push({ page: `crm-${width}`, kind: "exception", detail: e.message.replace(/\x1b\[[0-9;]*m/g, "").slice(0, 900) }); await check(page, "crm-exception").catch(() => {}); }
     await context.close();
   }
   return { newCustomerId };
@@ -1057,8 +1136,10 @@ async function runWizard(page, width, { towerA, customer }) {
   await page.getByTestId("wizard-next").click();
   await page.getByTestId("wizard-agreement-value").waitFor({ state: "visible" });
   const total = await page.getByTestId("wizard-agreement-value").inputValue();
+  await page.getByRole("tab", { name: /Percentages/i }).click();
   await page.getByTestId("wizard-cash-percent").fill("60");
   await page.getByTestId("wizard-cash-percent").press("Tab");
+  await page.getByRole("tab", { name: /Amounts/i }).click();
   const cash = await page.getByTestId("wizard-cash-amount").inputValue();
   const account = await page.getByTestId("wizard-account-amount").inputValue();
   expect(total.replace(/\D/g, "") === String(Math.round(flat.price_paise / 100)) && cash && account, `agreement prefilled from the flat price (${total}) and split 60/40 (${cash} / ${account})`, page);
@@ -1114,7 +1195,7 @@ async function sectionMoney(browser, ids) {
       await check(page, "bookings", { shot: true });
       await goto(page, `/bookings/${ids.bookingPriya.id}`);
       let txt = await bodyText(page);
-      expect(/Cash/.test(txt) && /Account/.test(txt) && /Standard CLP/.test(txt), "booking overview shows both bucket cards and the plan", page);
+      expect(/cash bucket/i.test(txt) && /account bucket/i.test(txt) && /Standard CLP/.test(txt), "booking overview shows both bucket cards and the plan", page);
       await check(page, "booking-detail", { shot: true });
       for (const tab of ["ledger", "schedule", "demands", "payments", "charges", "documents", "revisions", "history"]) {
         await page.getByRole("tab", { name: new RegExp(tab, "i") }).click();
@@ -1125,7 +1206,7 @@ async function sectionMoney(browser, ids) {
       expect(/60,00,000/.test(txt) && /40,00,000/.test(txt) && /advance/i.test(txt), "worked example ledger shows 60 L / 40 L cumulative and advance rows", page);
       await check(page, "booking-ledger-worked-example");
       created = await runWizard(page, 1440, { towerA, customer: ids.kavita });
-    } catch (e) { log(`[1440] bookings EXCEPTION ${e.message.slice(0, 400)}`); summary.defects.push({ page: "bookings-1440", kind: "exception", detail: e.message.slice(0, 300) }); await check(page, "bookings-exception").catch(() => {}); }
+    } catch (e) { log(`[1440] bookings EXCEPTION ${e.message.slice(0, 400)}`); summary.defects.push({ page: "bookings-1440", kind: "exception", detail: e.message.replace(/\x1b\[[0-9;]*m/g, "").slice(0, 900) }); await check(page, "bookings-exception").catch(() => {}); }
     await context.close();
   }
   {
@@ -1139,7 +1220,7 @@ async function sectionMoney(browser, ids) {
       await check(page, "booking-detail", { shot: true });
       for (const tab of ["ledger", "schedule", "payments"]) { await page.getByRole("tab", { name: new RegExp(tab, "i") }).click(); await check(page, `booking-tab-${tab}`); }
       if (!created) created = createdPhone;
-    } catch (e) { log(`[390] bookings EXCEPTION ${e.message.slice(0, 400)}`); summary.defects.push({ page: "bookings-390", kind: "exception", detail: e.message.slice(0, 300) }); await check(page, "bookings-exception").catch(() => {}); }
+    } catch (e) { log(`[390] bookings EXCEPTION ${e.message.slice(0, 400)}`); summary.defects.push({ page: "bookings-390", kind: "exception", detail: e.message.replace(/\x1b\[[0-9;]*m/g, "").slice(0, 900) }); await check(page, "bookings-exception").catch(() => {}); }
     await context.close();
   }
 
@@ -1161,9 +1242,13 @@ async function sectionMoney(browser, ids) {
           await page.getByTestId("payment-amount").fill(String(amount));
           await selectOption(page, "payment-mode", mode);
           if (await page.getByTestId("payment-bank-account").count()) await selectOption(page, "payment-bank-account", /HDFC/);
-          if (instrument && (await page.getByTestId("payment-instrument-number").count())) await page.getByTestId("payment-instrument-number").fill(instrument);
-          if (expectCap) page.col.allow.push("/payments");
+          if (instrument && (await page.getByTestId("payment-instrument-number").count())) {
+            await page.getByTestId("payment-instrument-number").fill(instrument);
+            const instrumentDate = page.getByTestId("payment-dialog").getByLabel(/^Instrument date/i);
+            if (await instrumentDate.count()) await instrumentDate.fill(new Date().toISOString().slice(0, 10));
+          }
           await check(page, `payment-dialog-${name}`);
+          if (expectCap) page.col.allow.push("/payments"); // the 409 BUCKET_CAP_EXCEEDED is the test (check() resets the allow-list)
           await page.getByTestId("payment-submit").click();
           if (expectCap) {
             await page.getByTestId("payment-cap-error").waitFor({ state: "visible", timeout: 15000 });
@@ -1188,7 +1273,7 @@ async function sectionMoney(browser, ids) {
         expect(Boolean(cash && cash.num) && cash.pending === 0, `cash receipt ${cash && cash.num} cleared immediately (no "subject to realisation")`, page);
         expect(/One Lakh/i.test(await page.getByTestId("receipt-view").innerText()), "receipt shows the amount in words (Indian system)", page);
         const [popup] = await Promise.all([page.waitForEvent("popup", { timeout: 10000 }).catch(() => null), page.getByTestId("receipt-print").click()]);
-        if (popup) { await popup.waitForLoadState("domcontentloaded").catch(() => {}); expect(/\/print\/receipt\//.test(popup.url()), `receipt print opens ${popup.url().replace(BASE, "")}`, page); await popup.close(); } else expect(false, "receipt print opened a print window", page);
+        if (popup) { await popup.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {}); expect(/\/print\/receipt\//.test(popup.url()), `receipt print opens ${popup.url().replace(BASE, "")}`, page); await popup.close(); } else expect(false, "receipt print opened a print window", page);
         const [dl1] = await Promise.all([page.waitForEvent("download", { timeout: 20000 }).catch(() => null), page.getByTestId("receipt-download").click()]);
         expect(Boolean(dl1) && /\.pdf$/i.test(dl1.suggestedFilename()), `receipt PDF download (${dl1 && dl1.suggestedFilename()})`, page);
         await page.keyboard.press("Escape");
@@ -1209,7 +1294,7 @@ async function sectionMoney(browser, ids) {
         await goto(page, "/payments/cheques");
         await check(page, "cheques");
         await page.getByTestId(`payment-clear-${chq1Row.id}`).click();
-        let dlg = page.getByRole("dialog").last();
+        let dlg = page.locator('[role="dialog"], [role="alertdialog"]').last();
         await dlg.waitFor({ state: "visible", timeout: 8000 });
         await check(page, "cheque-clear-dialog");
         await dlg.getByRole("button", { name: /clear|confirm/i }).last().click();
@@ -1217,7 +1302,7 @@ async function sectionMoney(browser, ids) {
         await settle(page);
         // bounce chq2 (reason)
         await page.getByTestId(`payment-bounce-${chq2Row.id}`).click();
-        dlg = page.getByRole("dialog").last();
+        dlg = page.locator('[role="dialog"], [role="alertdialog"]').last();
         await dlg.waitFor({ state: "visible", timeout: 8000 });
         const reason = dlg.locator("textarea").last();
         if (await reason.count()) await reason.fill("QA: insufficient funds");
@@ -1228,7 +1313,7 @@ async function sectionMoney(browser, ids) {
         // reverse NEFT from the booking payments tab
         await goto(page, `/bookings/${created.bookingId}?tab=payments`);
         await page.getByTestId(`payment-reverse-${neftRow.id}`).click();
-        dlg = page.getByRole("dialog").last();
+        dlg = page.locator('[role="dialog"], [role="alertdialog"]').last();
         await dlg.waitFor({ state: "visible", timeout: 8000 });
         await dlg.locator("textarea").last().fill("QA: posted against the wrong bucket");
         await check(page, "payment-reverse-dialog");
@@ -1239,7 +1324,9 @@ async function sectionMoney(browser, ids) {
         const after = (await apiGet(`/bookings/${created.bookingId}`)).body;
         const st = (n) => find(list, n).status;
         expect(st(chq1.num) === "CLEARED" && st(chq2.num) === "BOUNCED" && st(neft.num) === "REVERSED" && st(cash.num) === "CLEARED", `statuses: cash ${st(cash.num)}, neft ${st(neft.num)}, chq1 ${st(chq1.num)}, chq2 ${st(chq2.num)}`, page);
-        expect(after.summary.cash_paid_paise === 25000000 && after.summary.account_paid_paise === 0, `summary cash_paid ₹${after.summary.cash_paid_paise / 100} (1 L cash + 1.5 L cleared cheque; bounced and reversed excluded), account_paid ₹${after.summary.account_paid_paise / 100}`, page);
+        const cashPaid = after.summary.cash ? after.summary.cash.paid_paise : NaN;
+        const accountPaid = after.summary.account ? after.summary.account.paid_paise : NaN;
+        expect(after.summary.total_paid_paise === 25000000 && cashPaid === 25000000 && accountPaid === 0, `summary total_paid ₹${after.summary.total_paid_paise / 100} = cash ₹${cashPaid / 100} (1 L cash + 1.5 L cleared cheque; bounced and reversed excluded) + account ₹${accountPaid / 100} (NEFT reversed)`, page);
         const ledger = (await apiGet(`/bookings/${created.bookingId}/ledger?page_size=50`)).body.items;
         const events = ledger.map((r) => r.event_type || r.event);
         expect(events.includes("REVERSAL") && events.filter((e) => e === "PAYMENT").length === 3, `ledger events: ${events.join(",")}`, page);
@@ -1268,21 +1355,12 @@ async function sectionMoney(browser, ids) {
         const pays = (await apiGet(`/bookings/${created.bookingId}/payments?page_size=5`)).body.items;
         if (pays[0]) { await goto(page, `/print/receipt/${pays[0].id}`); await check(page, "receipt-print"); }
       }
-      // demands + integrity
+      // demands (accounts view; the admin-only "run dues" + integrity panel are exercised below as admin)
       await goto(page, "/demands");
       await check(page, "demands", { shot: width === 1440 });
       if (width === 1440) {
-        await page.getByTestId("demands-run-dues").click();
-        await toast(page, /dues|raised|run/i);
-        await check(page, "demands-run-dues");
-        await page.getByTestId("demands-integrity-toggle").click();
-        await page.getByTestId("integrity-panel").waitFor({ state: "visible", timeout: 20000 });
-        await settle(page, 800);
-        const panel = await page.getByTestId("integrity-panel").innerText();
-        const integrity = (await apiGet("/dues/integrity")).body;
-        const findings = integrity && Array.isArray(integrity.findings) ? integrity.findings.length : -1;
-        expect(findings === 0 && integrity.ok === true && /no findings|0 findings|clean|zero|No issues/i.test(panel), `integrity report after dues run: ok=${integrity && integrity.ok}, ${findings} findings over ${integrity && integrity.bookings_checked} bookings — panel: ${panel.replace(/\s+/g, " ").slice(0, 120)}`, page);
-        await check(page, "demands-integrity");
+        txt = await bodyText(page);
+        expect(/DM-/.test(txt) && /Open|Partially paid|Paid|Overdue/i.test(txt), "demands list shows numbered demands with statuses", page);
         await goto(page, `/print/demand/${ids.bookingPriya.id}/${ids.demand.id}`);
         txt = await bodyText(page);
         expect(/DM-/.test(txt) && /Cash/.test(txt) && /Account/.test(txt) && /IFSC|A\/c|Account number/i.test(txt), "demand letter shows both buckets and bank details", page);
@@ -1314,7 +1392,7 @@ async function sectionMoney(browser, ids) {
         expect(/50,000/.test(txt), "contra entry of ₹50,000 appears in the day book", page);
         await check(page, "roznamcha-contra-saved");
       }
-    } catch (e) { log(`[${width}] payments EXCEPTION ${e.message.slice(0, 400)}`); summary.defects.push({ page: `payments-${width}`, kind: "exception", detail: e.message.slice(0, 300) }); await check(page, "payments-exception").catch(() => {}); }
+    } catch (e) { log(`[${width}] payments EXCEPTION ${e.message.slice(0, 400)}`); summary.defects.push({ page: `payments-${width}`, kind: "exception", detail: e.message.replace(/\x1b\[[0-9;]*m/g, "").slice(0, 900) }); await check(page, "payments-exception").catch(() => {}); }
     await context.close();
   }
 
@@ -1376,7 +1454,20 @@ async function sectionMoney(browser, ids) {
         expect(bc.status === "CANCELLED" && fc.status === "AVAILABLE", `phone booking cancelled → ${bc.status}; flat ${fc.flat_number} ${fc.status}`, page);
         await check(page, "booking-cancelled");
       }
-    } catch (e) { log(`[1440] booking-actions EXCEPTION ${e.message.slice(0, 400)}`); summary.defects.push({ page: "booking-actions-1440", kind: "exception", detail: e.message.slice(0, 300) }); await check(page, "booking-actions-exception").catch(() => {}); }
+      // admin tools on the demands page: run dues now + integrity report (zero findings expected on the seed + QA data)
+      await goto(page, "/demands");
+      await page.getByTestId("demands-run-dues").click();
+      await toast(page, /dues|raised|run/i);
+      await check(page, "demands-run-dues");
+      await page.getByTestId("demands-integrity-toggle").click();
+      await page.getByTestId("integrity-panel").waitFor({ state: "visible", timeout: 20000 });
+      await settle(page, 800);
+      const panel = await page.getByTestId("integrity-panel").innerText();
+      const integrity = (await apiGet("/dues/integrity")).body;
+      const findings = integrity && Array.isArray(integrity.findings) ? integrity.findings.length : -1;
+      expect(findings === 0 && integrity.ok === true && /no findings|0 findings|clean|zero|No issues/i.test(panel), `integrity report after dues run: ok=${integrity && integrity.ok}, ${findings} findings over ${integrity && integrity.bookings_checked} bookings — panel: ${panel.replace(/\s+/g, " ").slice(0, 120)}`, page);
+      await check(page, "demands-integrity");
+    } catch (e) { log(`[1440] booking-actions EXCEPTION ${e.message.slice(0, 400)}`); summary.defects.push({ page: "booking-actions-1440", kind: "exception", detail: e.message.replace(/\x1b\[[0-9;]*m/g, "").slice(0, 900) }); await check(page, "booking-actions-exception").catch(() => {}); }
     await context.close();
   }
 }
@@ -1392,12 +1483,14 @@ async function sectionMisc(browser, ids) {
       await check(page, "service-requests", { shot: width === 1440 });
       if (width === 1440) {
         await page.getByTestId("tickets-view-kanban").click();
+        await page.getByTestId("service-kanban").waitFor({ state: "visible", timeout: 15000 });
+        await settle(page);
         expect((await page.locator('[data-testid^="service-column-"]').count()) >= 4, "service kanban renders status columns", page);
         await check(page, "service-kanban");
         await page.getByTestId("tickets-view-list").click();
         await page.getByTestId("ticket-new-btn").click();
         await page.getByTestId("ticket-submit").waitFor({ state: "visible" });
-        await comboPick(page, "ticket-customer", "Priya");
+        await pickAny(page, "ticket-customer", "Priya");
         await selectOption(page, "ticket-category", /Payment/);
         await page.getByTestId("ticket-subject").fill(`QA ticket ${stamp}: receipt copy needed`);
         await page.getByTestId("ticket-description").fill("Customer asks for a duplicate receipt for the October cheque. Please share by email.");
@@ -1419,9 +1512,9 @@ async function sectionMisc(browser, ids) {
         await page.getByTestId("reply-send").click();
         await toast(page, /Reply sent/i);
         await settle(page);
-        await comboPick(page, "ticket-assignee-select", "Ankit");
+        await pickAny(page, "ticket-assignee-select", "Ankit");
         await toast(page, /Assigned to/i);
-        await selectOption(page, "ticket-priority-select", /High/);
+        await selectOption(page, "ticket-priority-select", /Urgent/);
         await toast(page, /Priority set/i);
         const statusBtn = page.locator('[data-testid^="ticket-status-"]:not([data-testid="ticket-status-select"])').first();
         const to = (await statusBtn.getAttribute("data-testid")).replace("ticket-status-", "");
@@ -1432,13 +1525,13 @@ async function sectionMisc(browser, ids) {
         await toast(page, /Ticket is now/i);
         await settle(page);
         const t = (await apiGet(`/service-requests/${page.url().match(/service-requests\/([0-9a-f-]+)/)[1]}`)).body;
-        expect(t.status === to && t.priority === "HIGH" && /Ankit/.test(t.assignee_name || "") && (t.messages || []).filter((x) => x.is_internal).length === 1, `ticket ${t.ticket_number}: status ${t.status}, priority ${t.priority}, assignee ${t.assignee_name}, ${(t.messages || []).length} messages (1 internal)`, page);
+        expect(t.status === to && t.priority === "URGENT" && /Ankit/.test(t.assignee_name || "") && (t.messages || []).filter((x) => x.is_internal).length === 1, `ticket ${t.ticket_number}: status ${t.status}, priority ${t.priority}, assignee ${t.assignee_name}, ${(t.messages || []).length} messages (1 internal)`, page);
         await check(page, "service-request-after");
       } else {
         await goto(page, `/service-requests/${ids.ticket.id}`);
         await check(page, "service-request-detail", { shot: true });
       }
-    } catch (e) { log(`[${width}] service EXCEPTION ${e.message.slice(0, 400)}`); summary.defects.push({ page: `service-${width}`, kind: "exception", detail: e.message.slice(0, 300) }); await check(page, "service-exception").catch(() => {}); }
+    } catch (e) { log(`[${width}] service EXCEPTION ${e.message.slice(0, 400)}`); summary.defects.push({ page: `service-${width}`, kind: "exception", detail: e.message.replace(/\x1b\[[0-9;]*m/g, "").slice(0, 900) }); await check(page, "service-exception").catch(() => {}); }
     await context.close();
   }
 
@@ -1470,8 +1563,8 @@ async function sectionMisc(browser, ids) {
         let dlg = page.getByRole("dialog").last();
         await dlg.locator('input[type="file"]').first().setInputFiles(PNG);
         await toast(page, /Image uploaded/i);
-        await dlg.getByLabel("Title", { exact: true }).fill(`QA banner ${stamp}`);
-        await dlg.getByLabel("Subtitle").fill("Festive offer on 3 BHK homes");
+        await dlg.getByLabel(/^Title/).fill(`QA banner ${stamp}`);
+        await dlg.getByLabel(/^Subtitle/).fill("Festive offer on 3 BHK homes");
         await check(page, "website-banner-form");
         await page.getByTestId("cms-save").click();
         await toast(page, /Banner created/i);
@@ -1482,7 +1575,7 @@ async function sectionMisc(browser, ids) {
         // post: create draft → publish
         await goto(page, "/website/posts/new");
         await page.getByTestId("post-title").fill(`QA post ${stamp}`);
-        await page.getByTestId("post-body").fill("## Construction update\n\nTower A reached the **4th slab** this week.");
+        await fillMarkdown(page, "post-body", "## Construction update\n\nTower A reached the **4th slab** this week.");
         await check(page, "website-post-editor");
         await page.getByTestId("post-save-draft").click();
         await toast(page, /saved|draft|created/i);
@@ -1504,13 +1597,13 @@ async function sectionMisc(browser, ids) {
         await page.getByTestId("cms-new-btn").click();
         await page.getByTestId("notice-title").waitFor({ state: "visible" });
         await page.getByTestId("notice-title").fill(`QA notice ${stamp}: water supply maintenance`);
-        await page.getByTestId("notice-body").fill("Water supply will be interrupted on Sunday 10:00–13:00 for tank cleaning.");
-        await comboPick(page, "notice-project", "Heights").catch(async () => selectOption(page, "notice-project", /Heights/));
+        await fillMarkdown(page, "notice-body", "Water supply will be interrupted on Sunday 10:00–13:00 for tank cleaning.");
+        await pickAny(page, "notice-project", "Heights");
         if ((await page.getByTestId("notice-published").getAttribute("aria-checked")) !== "true") await page.getByTestId("notice-published").click();
         await page.getByTestId("cms-save").click();
         await toast(page, /Notice created|created|saved/i);
         await settle(page);
-        const notice = (await apiGet("/cms/notices?page_size=50")).body.items.find((n) => /QA notice/.test(n.title));
+        const notice = ((await apiGet("/notices?page_size=50")).body.items || []).find((n) => /QA notice/.test(n.title));
         expect(Boolean(notice && notice.is_published), `notice created and published (${notice && notice.is_published})`, page);
         await check(page, "website-notice-created");
         // gallery upload
@@ -1543,7 +1636,7 @@ async function sectionMisc(browser, ids) {
       } else {
         for (const p of ["/website/banners", "/website/posts", "/website/gallery", "/website/notices"]) { await goto(page, p); await check(page, `cms${p.replace(/\//g, "-")}`); }
       }
-    } catch (e) { log(`[${width}] cms EXCEPTION ${e.message.slice(0, 400)}`); summary.defects.push({ page: `cms-${width}`, kind: "exception", detail: e.message.slice(0, 300) }); await check(page, "cms-exception").catch(() => {}); }
+    } catch (e) { log(`[${width}] cms EXCEPTION ${e.message.slice(0, 400)}`); summary.defects.push({ page: `cms-${width}`, kind: "exception", detail: e.message.replace(/\x1b\[[0-9;]*m/g, "").slice(0, 900) }); await check(page, "cms-exception").catch(() => {}); }
     await context.close();
   }
 
@@ -1693,7 +1786,8 @@ async function sectionMisc(browser, ids) {
         await goto(page, "/admin/users"); await check(page, "admin-users");
         await goto(page, "/admin/settings"); await check(page, "admin-settings");
         await goto(page, "/notifications"); await check(page, "notifications");
-        await page.getByTestId("topbar-search-btn").click();
+        const phoneSearch = page.getByRole("button", { name: /search/i }).first();
+        if (await phoneSearch.isVisible().catch(() => false)) await phoneSearch.click(); else await page.keyboard.press("Control+k");
         const input = page.locator("[cmdk-input]").last();
         await input.waitFor({ state: "visible", timeout: 8000 });
         await input.fill("Priya");
@@ -1703,7 +1797,7 @@ async function sectionMisc(browser, ids) {
         await check(page, "command-palette");
         await page.keyboard.press("Escape");
       }
-    } catch (e) { log(`[${width}] misc EXCEPTION ${e.message.slice(0, 400)}`); summary.defects.push({ page: `misc-${width}`, kind: "exception", detail: e.message.slice(0, 300) }); await check(page, "misc-exception").catch(() => {}); }
+    } catch (e) { log(`[${width}] misc EXCEPTION ${e.message.slice(0, 400)}`); summary.defects.push({ page: `misc-${width}`, kind: "exception", detail: e.message.replace(/\x1b\[[0-9;]*m/g, "").slice(0, 900) }); await check(page, "misc-exception").catch(() => {}); }
     await context.close();
   }
 }

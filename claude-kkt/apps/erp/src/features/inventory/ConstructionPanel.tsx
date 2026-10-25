@@ -307,7 +307,7 @@ function UpdateStatusDialog({ open, onOpenChange, blockId, data, stages }: Updat
                 {intermediate.map((stage) => (
                   <li key={stage.id} className="grid grid-cols-[1fr_11rem] items-center gap-2 text-sm">
                     <span className="truncate">{stage.name}</span>
-                    <DateInput aria-label={`Completion date for ${stage.name}`} value={dateFor(stage)} onChange={(value) => setDates((prev) => ({ ...prev, [stage.stage_id]: value ?? completedOn }))} max={completedOn} className="h-8 text-xs" />
+                    <DateInput aria-label={`Completion date for ${stage.name}`} value={dateFor(stage)} onChange={(value) => setDates((prev) => ({ ...prev, [stage.stage_id]: value ?? completedOn }))} max={completedOn} className="h-11 text-xs sm:h-8" />
                   </li>
                 ))}
               </ul>

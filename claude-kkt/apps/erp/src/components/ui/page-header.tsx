@@ -27,7 +27,7 @@ export function PageHeader({ title, description, breadcrumbs, actions, backTo, t
       {(breadcrumbs?.length || backTo) && (
         <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1 text-xs text-ink-subtle">
           {backTo && (
-            <Link to={backTo} className="mr-1 inline-flex items-center gap-1 rounded-xs font-medium text-navy-700 hover:text-navy-950 focus-ring sm:hidden">
+            <Link to={backTo} className="mr-1 inline-flex min-h-11 items-center gap-1 rounded-xs font-medium text-navy-700 hover:text-navy-950 focus-ring sm:hidden">
               <ArrowLeft className="size-3.5" aria-hidden="true" /> Back
             </Link>
           )}

@@ -37,10 +37,10 @@ export async function searchModule(app: FastifyInstance): Promise<void> {
         .then((rows) => rows.map((r) => ({ type: "PROJECT" as const, id: r.id, label: r.name, sublabel: [r.code, r.city].filter(Boolean).join(" · ") || null, href: `/projects/${r.id}` }))), log, "projects"));
       if (types.has("BLOCK")) tasks.push(withBudget(db.select({ id: blocks.id, name: blocks.name, code: blocks.code, projectId: blocks.projectId, projectName: projects.name }).from(blocks).innerJoin(projects, eq(projects.id, blocks.projectId))
         .where(and(eq(blocks.companyId, company), eq(blocks.isActive, true), scoped(blocks.projectId), or(ilike(blocks.name, contains), ilike(blocks.code, prefix)))).limit(per)
-        .then((rows) => rows.map((r) => ({ type: "BLOCK" as const, id: r.id, label: r.name, sublabel: r.projectName, href: `/projects/${r.projectId}/blocks/${r.id}` }))), log, "blocks"));
+        .then((rows) => rows.map((r) => ({ type: "BLOCK" as const, id: r.id, label: r.name, sublabel: r.projectName, href: `/blocks/${r.id}` }))), log, "blocks"));
       if (types.has("FLAT")) tasks.push(withBudget(db.select({ id: flats.id, number: flats.flatNumber, status: flats.status, projectId: flats.projectId, blockId: flats.blockId, blockName: blocks.name }).from(flats).innerJoin(blocks, eq(blocks.id, flats.blockId))
         .where(and(eq(flats.companyId, company), scoped(flats.projectId), ilike(flats.flatNumber, prefix))).limit(per)
-        .then((rows) => rows.map((r) => ({ type: "FLAT" as const, id: r.id, label: r.number, sublabel: `${r.blockName} · ${r.status}`, href: `/projects/${r.projectId}/blocks/${r.blockId}?flat=${r.id}` }))), log, "flats"));
+        .then((rows) => rows.map((r) => ({ type: "FLAT" as const, id: r.id, label: r.number, sublabel: `${r.blockName} · ${r.status}`, href: `/blocks/${r.blockId}?flat=${r.id}` }))), log, "flats"));
       if (types.has("CUSTOMER")) tasks.push(withBudget(db.select({ id: customers.id, name: customers.fullName, phone: customers.phone, code: customers.customerCode }).from(customers)
         .where(and(eq(customers.companyId, company), eq(customers.isActive, true), or(ilike(customers.fullName, contains), ilike(customers.phone, prefix), ilike(customers.customerCode, prefix)))).limit(per)
         .then((rows) => rows.map((r) => ({ type: "CUSTOMER" as const, id: r.id, label: r.name, sublabel: `${r.code} · ${r.phone}`, href: `/customers/${r.id}` }))), log, "customers"));

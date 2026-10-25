@@ -63,17 +63,17 @@ export function ReportFilterBar({ filters, params, effective, onChange, onReset,
               return (
                 <div key="dateRange" className="flex min-w-0 flex-wrap items-end gap-2">
                   <FieldWrapper label={`${filter.label ?? "From"}`} className="w-full sm:w-40">
-                    {(control) => <DateInput id={control.id} value={effective.from ?? null} max={effective.to} onChange={(value) => onChange({ from: value })} disabled={disabled} className="h-8 text-xs" data-testid="report-filter-from" />}
+                    {(control) => <DateInput id={control.id} value={effective.from ?? null} max={effective.to} onChange={(value) => onChange({ from: value })} disabled={disabled} className="h-11 text-xs sm:h-8" data-testid="report-filter-from" />}
                   </FieldWrapper>
                   <FieldWrapper label="To" className="w-full sm:w-40">
-                    {(control) => <DateInput id={control.id} value={effective.to ?? null} min={effective.from} onChange={(value) => onChange({ to: value })} disabled={disabled} className="h-8 text-xs" data-testid="report-filter-to" />}
+                    {(control) => <DateInput id={control.id} value={effective.to ?? null} min={effective.from} onChange={(value) => onChange({ to: value })} disabled={disabled} className="h-11 text-xs sm:h-8" data-testid="report-filter-to" />}
                   </FieldWrapper>
                 </div>
               );
             case "date":
               return (
                 <FieldWrapper key={filter.key} label={filter.label} className="w-full sm:w-40">
-                  {(control) => <DateInput id={control.id} value={effective[filter.key] ?? null} onChange={(value) => onChange({ [filter.key]: value })} disabled={disabled} className="h-8 text-xs" data-testid={`report-filter-${filter.key}`} />}
+                  {(control) => <DateInput id={control.id} value={effective[filter.key] ?? null} onChange={(value) => onChange({ [filter.key]: value })} disabled={disabled} className="h-11 text-xs sm:h-8" data-testid={`report-filter-${filter.key}`} />}
                 </FieldWrapper>
               );
             case "project":

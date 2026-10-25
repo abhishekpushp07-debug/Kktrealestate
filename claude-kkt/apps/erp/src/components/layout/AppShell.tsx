@@ -4,7 +4,7 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { RouteErrorBoundary } from "@/components/ErrorBoundary";
 import { CommandPalette, useCommandPaletteHotkey, type CommandGroupDef, type CommandItem } from "@/components/ui/command-palette";
 import { PageSkeleton } from "@/components/ui/skeleton";
-import { api, type ListEnvelope } from "@/lib/api";
+import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { filterNav } from "@/lib/permissions";
 import { BREAKPOINTS, cn, useLocalStorageState, useMediaQuery } from "@/lib/utils";
@@ -19,10 +19,19 @@ interface SearchHit {
   label?: string;
   title?: string;
   name?: string;
+  /** `GET /search` sends `sublabel` ("Tower A · BOOKED"); older shapes used subtitle/description. */
+  sublabel?: string | null;
   subtitle?: string;
   description?: string;
   href?: string;
   url?: string;
+}
+
+/** `GET /search` answers `{results, recent}`; a list envelope or bare array is tolerated. */
+interface SearchResponse {
+  results?: SearchHit[];
+  recent?: SearchHit[];
+  items?: SearchHit[];
 }
 
 function toCommandItem(hit: SearchHit): CommandItem | null {
@@ -31,7 +40,7 @@ function toCommandItem(hit: SearchHit): CommandItem | null {
   return {
     id: `${hit.type ?? "result"}:${hit.id}`,
     label,
-    description: hit.subtitle ?? hit.description,
+    description: hit.sublabel ?? hit.subtitle ?? hit.description,
     href: hit.href ?? hit.url,
     group: hit.type ? hit.type.charAt(0).toUpperCase() + hit.type.slice(1).toLowerCase().replaceAll("_", " ") : "Results",
   };
@@ -66,8 +75,8 @@ export function AppShell() {
   );
 
   const search = useCallback(async (query: string): Promise<CommandItem[]> => {
-    const result = await api.get<ListEnvelope<SearchHit> | SearchHit[]>("/search", { query: { q: query, limit: 12 } });
-    const hits = Array.isArray(result) ? result : result.items;
+    const result = await api.get<SearchResponse | SearchHit[]>("/search", { query: { q: query, limit: 12 } });
+    const hits = Array.isArray(result) ? result : (result.results ?? result.items ?? []);
     return hits.map(toCommandItem).filter((item): item is CommandItem => item !== null);
   }, []);
 

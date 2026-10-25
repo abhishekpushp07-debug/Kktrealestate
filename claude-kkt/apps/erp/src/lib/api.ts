@@ -347,13 +347,19 @@ interface RefreshResponse {
 /** Rotates the refresh token. Single-flight: concurrent callers share one network call. */
 export function refreshSession(): Promise<boolean> {
   if (refreshInFlight) return refreshInFlight;
-  const refreshToken = tokens.getRefresh();
-  if (!refreshToken) {
+  if (!tokens.getRefresh()) {
     tokens.clear();
     emitAuthEvent("unauthenticated");
     return Promise.resolve(false);
   }
-  refreshInFlight = (async () => {
+  const rotate = async (): Promise<boolean> => {
+    // Re-read inside the lock: another tab (print window, second tab) may have rotated the token meanwhile.
+    const refreshToken = tokens.getRefresh();
+    if (!refreshToken) {
+      tokens.clear();
+      emitAuthEvent("unauthenticated");
+      return false;
+    }
     try {
       const response = await fetch(`${apiBaseUrl()}/auth/refresh`, {
         method: "POST",
@@ -377,11 +383,18 @@ export function refreshSession(): Promise<boolean> {
       return true;
     } catch {
       return false;
-    } finally {
-      refreshInFlight = null;
     }
-  })();
-  return refreshInFlight;
+  };
+  // Rotating refresh tokens are single-use and the server revokes the whole family on reuse, so tabs of the same
+  // origin (a receipt print window, a second ERP tab) must never refresh concurrently: serialise through a Web Lock.
+  const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
+  // Promises flatten at runtime; `.then` keeps the declared type honest without a cast.
+  const granted: Promise<boolean> = locks ? locks.request(`${REFRESH_TOKEN_KEY}.rotate`, () => rotate()).then((value: unknown) => value === true) : rotate();
+  const pending: Promise<boolean> = granted.finally(() => {
+    refreshInFlight = null;
+  });
+  refreshInFlight = pending;
+  return pending;
 }
 
 interface PreparedRequest {

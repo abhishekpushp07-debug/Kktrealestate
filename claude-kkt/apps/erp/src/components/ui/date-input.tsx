@@ -15,12 +15,13 @@ export interface DateInputProps extends Omit<InputProps, "value" | "onChange" | 
 }
 
 /** Native date picker bound to a YYYY-MM-DD string. */
-export function DateInput({ value, onChange, min, max, showDisplay = false, className, ...props }: DateInputProps) {
+export function DateInput({ value, onChange, min, max, showDisplay = false, className, wrapperClassName, ...props }: DateInputProps) {
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
     onChange(event.target.value ? event.target.value : null);
   };
   return (
-    <div className="w-full min-w-0">
+    // `wrapperClassName` sizes the field itself (toolbars pass `w-full sm:w-40`); without it the outer box always stretched to full width.
+    <div className={cn("w-full min-w-0", wrapperClassName)}>
       <Input
         {...props}
         type="date"
