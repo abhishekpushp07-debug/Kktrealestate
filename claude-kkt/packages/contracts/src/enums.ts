@@ -789,12 +789,14 @@ export const JOB_NAMES = [
   "VISIT_OUTCOME_NUDGE",
   "NOTIFICATION_SWEEP",
   "STARTUP_RECONCILIATION",
+  "SLA_BREACH_CHECK",
 ] as const;
 export const JobNameSchema = enumSchema(JOB_NAMES);
 export type JobName = z.infer<typeof JobNameSchema>;
 export const JOB_NAME_LABELS: LabelMap<JobName> = {
   DAILY_DUES: "Daily dues (00:30 IST)",
   NIGHTLY_INTEGRITY: "Nightly integrity report",
+  SLA_BREACH_CHECK: "Service SLA breach check (hourly)",
   OVERDUE_NOTIFICATIONS: "Overdue demand notifications",
   VISIT_OUTCOME_NUDGE: "Site visit outcome nudge",
   NOTIFICATION_SWEEP: "Notification sweep",

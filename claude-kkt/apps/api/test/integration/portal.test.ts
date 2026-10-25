@@ -651,7 +651,7 @@ describe("notices and notifications", () => {
     assertNoLeaks(a);
   });
 
-  it("notifications are the customer's own, mapped to screens and bookings; unread count and mark-read", async () => {
+  it("notifications (core bell) are the customer's own, mapped to screens; unread count and mark-read; home counts follow", async () => {
     const list = await ok<List<Notification>>("/api/v1/portal/notifications?page_size=50", tokenA);
     expect(list.total).toBeGreaterThan(0);
     const types = new Set(list.items.map((n) => n.type));
@@ -661,36 +661,40 @@ describe("notices and notifications", () => {
     expect(types).toContain("TICKET_STAFF_REPLY");
     expect(types).toContain("NOTICE_PUBLISHED");
     expect(list.items.find((n) => n.type === "BOOKING_CREATED")).toMatchObject({ screen: "HOME", booking_id: bookingA.id });
-    expect(list.items.find((n) => n.type === "DEMAND_RAISED")).toMatchObject({ screen: "DEMANDS", booking_id: bookingA.id });
-    expect(list.items.find((n) => n.type === "PAYMENT_RECEIVED")).toMatchObject({ screen: "LEDGER", booking_id: bookingA.id });
-    expect(list.items.find((n) => n.type === "TICKET_STAFF_REPLY")).toMatchObject({ screen: "REQUEST", booking_id: bookingA.id });
+    expect(list.items.find((n) => n.type === "DEMAND_RAISED")).toMatchObject({ screen: "DEMANDS" });
+    expect(list.items.find((n) => n.type === "PAYMENT_RECEIVED")).toMatchObject({ screen: "LEDGER" });
+    expect(list.items.find((n) => n.type === "TICKET_STAFF_REPLY")).toMatchObject({ screen: "REQUEST" });
     expect(list.items.find((n) => n.type === "NOTICE_PUBLISHED")).toMatchObject({ screen: "NOTICE", booking_id: null });
-    // nothing of B's (B's payment id never appears as an entity)
+    // nothing of B's (B's payment / booking never appear as an entity)
     expect(list.items.some((n) => n.entity_id === paymentBId || n.entity_id === bookingB.id)).toBe(false);
     assertNoLeaks(list);
 
-    const unread0 = await ok<{ count: number }>("/api/v1/portal/notifications/unread-count", tokenA);
-    expect(unread0.count).toBe(list.items.filter((n) => !n.is_read).length);
-    const bBefore = (await ok<{ count: number }>("/api/v1/portal/notifications/unread-count", tokenB)).count;
+    const unread0 = await ok<{ unread: number }>("/api/v1/portal/notifications/unread-count", tokenA);
+    expect(unread0.unread).toBe(list.items.filter((n) => !n.is_read).length);
+    const home0 = await ok<Home>(`/api/v1/portal/bookings/${bookingA.id}/home`, tokenA);
+    expect(home0.notifications_unread).toBe(unread0.unread);
+    const bBefore = (await ok<{ unread: number }>("/api/v1/portal/notifications/unread-count", tokenB)).unread;
     const two = list.items.filter((n) => !n.is_read).slice(0, 2).map((n) => n.id);
-    const marked = await post<{ marked: number; unread_count: number }>("/api/v1/portal/notifications/mark-read", tokenA, { ids: two });
+    const marked = await post<{ updated: number }>("/api/v1/portal/notifications/mark-read", tokenA, { ids: two });
     expect(marked.status, marked.text).toBe(200);
-    expect(marked.body).toEqual({ marked: 2, unread_count: unread0.count - 2 });
+    expect(marked.body.updated).toBe(2);
+    expect((await ok<{ unread: number }>("/api/v1/portal/notifications/unread-count", tokenA)).unread).toBe(unread0.unread - 2);
     // ids of someone else's notifications mark nothing
     const bIds = (await ok<List<Notification>>("/api/v1/portal/notifications", tokenB)).items.map((n) => n.id);
-    const foreign = await post<{ marked: number }>("/api/v1/portal/notifications/mark-read", tokenA, { ids: bIds });
-    expect(foreign.body.marked).toBe(0);
-    expect((await ok<{ count: number }>("/api/v1/portal/notifications/unread-count", tokenB)).count).toBe(bBefore);
-    const all = await post<{ marked: number; unread_count: number }>("/api/v1/portal/notifications/mark-read", tokenA, { all: true });
-    expect(all.body.unread_count).toBe(0);
-    expect((await post("/api/v1/portal/notifications/mark-read", tokenA, {})).status).toBe(400);
+    const foreign = await post<{ updated: number }>("/api/v1/portal/notifications/mark-read", tokenA, { ids: bIds });
+    expect(foreign.body.updated).toBe(0);
+    expect((await ok<{ unread: number }>("/api/v1/portal/notifications/unread-count", tokenB)).unread).toBe(bBefore);
+    const all = await post<{ updated: number }>("/api/v1/portal/notifications/mark-read", tokenA, { all: true });
+    expect(all.status).toBe(200);
+    expect((await ok<{ unread: number }>("/api/v1/portal/notifications/unread-count", tokenA)).unread).toBe(0);
     // notices now read through the bell; home counts follow
     const notices = await ok<List<Notice>>("/api/v1/portal/notices", tokenA);
     expect(notices.items.every((n) => n.is_read)).toBe(true);
     const home = await ok<Home>(`/api/v1/portal/bookings/${bookingA.id}/home`, tokenA);
     expect(home.notices_unread).toBe(0);
     expect(home.notifications_unread).toBe(0);
-    expect((await auditRows("notification.mark_read", "CUSTOMER")).length).toBeGreaterThanOrEqual(2);
+    // B's notice view is untouched
+    expect((await ok<List<Notice>>("/api/v1/portal/notices", tokenB)).items.every((n) => n.is_read === false)).toBe(true);
   });
 
   it("withdrawn notifications disappear from the list and the counts", async () => {

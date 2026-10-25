@@ -403,14 +403,6 @@ export const PortalMarkReadSchema = z
   .refine((m) => m.all || (m.ids !== undefined && m.ids.length > 0), { message: "Give ids or all=true", path: ["ids"] });
 export type PortalMarkRead = z.infer<typeof PortalMarkReadSchema>;
 
-/** `GET /portal/notifications/unread-count`. */
-export const PortalUnreadCountSchema = z.object({ count: z.int().min(0) });
-export type PortalUnreadCount = z.infer<typeof PortalUnreadCountSchema>;
-
-/** `POST /portal/notifications/mark-read`: how many were marked and how many remain unread. */
-export const PortalMarkReadResponseSchema = z.object({ marked: z.int().min(0), unread_count: z.int().min(0) });
-export type PortalMarkReadResponse = z.infer<typeof PortalMarkReadResponseSchema>;
-
 // ---------------------------------------------------------------------------
 // Profile
 // ---------------------------------------------------------------------------

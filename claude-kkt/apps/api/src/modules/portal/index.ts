@@ -3,7 +3,8 @@
  * Every route is `audience: "portal"` (the auth plugin verifies the portal token, rejects staff tokens with 401 INVALID_AUDIENCE and
  * blocks everything but change-password / logout / me while must_change_password is set). A booking is visible only when the customer
  * is its primary applicant or a co-applicant — everything else, PDF and document links included, is 404 NOT_FOUND. No staff user id
- * and no storage key ever leaves this module. Portal auth itself lives in the core auth module (/portal/auth/*).
+ * and no storage key ever leaves this module. Portal auth (/portal/auth/*) and the customer bell (/portal/notifications/*) live in the
+ * core auth and notifications modules; this module adds the unread counts the home screen shows.
  *
  * Service surface other modules may call:
  *   loadOwnedBooking(db, customer, bookingId) · listOwnedBookings(db, customer) · portalHome(db, customer, bookingId) · unreadNotificationCount(db, customerId)
@@ -23,7 +24,6 @@ import { registerRequestRoutes } from "./requests.js";
 export { loadOwnedBooking, listOwnedBookings, toSwitcherItem, scopedReader, memberCondition, type OwnedBooking } from "./common.js";
 export { portalHome, portalFlat, portalLedger, portalReceipts, portalDemands, portalSchedule, portalConstruction, portalDocuments, portalBankDetails, unreadNotificationCount, unreadNoticeCount } from "./bookings.js";
 export { storeTempFile, openPortalFile, cleanupExpiredTempFiles, verifyTempToken, PORTAL_FILE_TTL_SECONDS, PORTAL_FILE_CLEANUP_JOB } from "./files.js";
-export { portalNotifications, markNotificationsRead, screenFor } from "./notices.js";
 export { portalProfile, updatePortalProfile } from "./profile.js";
 export { toPortalRequestRow, toPortalRequestDetail, requestCategories } from "./requests.js";
 

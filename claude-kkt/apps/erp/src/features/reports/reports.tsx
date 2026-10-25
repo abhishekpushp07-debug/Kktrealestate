@@ -40,7 +40,7 @@ import {
 } from "@kkt/contracts";
 import { Badge, StatusChip, type DataTablePagination } from "@/components/ui";
 import type { QueryParams } from "@/lib/api";
-import { formatDate, formatDateTime, formatINR, formatINRShort, formatNumber, formatPercent } from "@/lib/format";
+import { formatDate, formatDateTime, formatINRShort, formatNumber, formatPercent } from "@/lib/format";
 import { humanize } from "@/lib/utils";
 import { BookingRef, Due, Money, Pct, ReportSection, ReportTable, StatGrid, TwoLine, type ReportColumn } from "./ReportSections";
 import type { FilterDef } from "./reportQuery";

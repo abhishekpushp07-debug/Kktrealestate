@@ -30,6 +30,7 @@ export const JOB_SCHEDULES: readonly JobSchedule[] = [
   { name: "NIGHTLY_INTEGRITY", cron: "45 0 * * *", tz: "Asia/Kolkata" },
   { name: "OVERDUE_NOTIFICATIONS", cron: "15 1 * * *", tz: "Asia/Kolkata" },
   { name: "VISIT_OUTCOME_NUDGE", cron: "0 9 * * *", tz: "Asia/Kolkata" },
+  { name: "SLA_BREACH_CHECK", cron: "5 * * * *", tz: "Asia/Kolkata" },
 ];
 
 const registry = new Map<string, JobHandler>();
