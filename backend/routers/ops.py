@@ -12,7 +12,7 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 
 @router.get("/ops")
-async def ops(window: int = 900, user: dict = Depends(require("settings.manage"))):
+async def ops(window: int = 900, user: dict = Depends(require("admin.system_health.view"))):
     from infra import START_TIME, ops_snapshot
     from server import STARTUP
     snap = ops_snapshot(max(60, min(window, 900)))

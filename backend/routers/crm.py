@@ -69,7 +69,7 @@ async def _validate_ids(company_id: str, data: dict):
 
 
 @router.patch("/customers/{customer_id}/profile")
-async def update_profile(customer_id: str, body: ProfileIn, request: Request, user: dict = Depends(require("customer.write"))):
+async def update_profile(customer_id: str, body: ProfileIn, request: Request, user: dict = Depends(require("sales.customer.edit"))):
     c = await get_or_404(db.customers, customer_id, "Customer", {"company_id": user["company_id"]})
     data = body.model_dump(exclude_none=True, mode="json")
     data.pop("version", None)
@@ -101,7 +101,7 @@ class CommIn(StrictModel):
 
 
 @router.post("/communications", status_code=201)
-async def log_communication(body: CommIn, request: Request, user: dict = Depends(require("customer.write"))):
+async def log_communication(body: CommIn, request: Request, user: dict = Depends(require("sales.customer.edit"))):
     if not (body.customer_id or body.lead_id):
         raise ApiError(422, "customer_id or lead_id is required", "VALIDATION_ERROR")
     cid = user["company_id"]
@@ -132,7 +132,7 @@ async def log_communication(body: CommIn, request: Request, user: dict = Depends
 
 
 @router.get("/communications")
-async def list_communications(customer_id: str | None = None, lead_id: str | None = None, booking_id: str | None = None, limit: int = Query(50, le=200), cursor: str | None = None, user: dict = Depends(require("customer.read"))):
+async def list_communications(customer_id: str | None = None, lead_id: str | None = None, booking_id: str | None = None, limit: int = Query(50, le=200), cursor: str | None = None, user: dict = Depends(require("sales.customer.view"))):
     q = {"company_id": user["company_id"], **{k: v for k, v in (("customer_id", customer_id), ("lead_id", lead_id), ("booking_id", booking_id)) if v}}
     if not any((customer_id, lead_id, booking_id)):
         raise ApiError(422, "customer_id, lead_id or booking_id is required", "VALIDATION_ERROR")
@@ -207,7 +207,7 @@ async def build_timeline(customer_id: str, company_id: str) -> list[dict]:
 
 
 @router.get("/customers/{customer_id}/timeline")
-async def customer_timeline(customer_id: str, limit: int = Query(50, ge=1, le=200), cursor: str | None = None, types: str | None = None, user: dict = Depends(require("customer.read"))):
+async def customer_timeline(customer_id: str, limit: int = Query(50, ge=1, le=200), cursor: str | None = None, types: str | None = None, user: dict = Depends(require("sales.customer.view"))):
     await get_or_404(db.customers, customer_id, "Customer", {"company_id": user["company_id"]})
     ev = await build_timeline(customer_id, user["company_id"])
     ev = [e for e in ev if e.get("at")]
@@ -221,14 +221,14 @@ async def customer_timeline(customer_id: str, limit: int = Query(50, ge=1, le=20
 
 
 @router.get("/bookings/{booking_id}/ledgers")
-async def booking_three_ledgers(booking_id: str, user: dict = Depends(require("booking.read"))):
+async def booking_three_ledgers(booking_id: str, user: dict = Depends(require("finance.ledger.view"))):
     b = await get_or_404(db.bookings, booking_id, "Booking", {"company_id": user["company_id"]})
     ensure_project_access(user, b["project_id"])
     return await booking_ledgers(b)
 
 
 @router.get("/customers/{customer_id}/ledgers")
-async def customer_three_ledgers(customer_id: str, user: dict = Depends(require("booking.read"))):
+async def customer_three_ledgers(customer_id: str, user: dict = Depends(require("finance.ledger.view"))):
     await get_or_404(db.customers, customer_id, "Customer", {"company_id": user["company_id"]})
     out = await customer_ledgers(customer_id, user["company_id"])
     if "*" not in (user.get("project_scope") or []):

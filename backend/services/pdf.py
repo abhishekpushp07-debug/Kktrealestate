@@ -3,6 +3,7 @@
 
 Output is deterministic for the same data on the same IST day (invariant PDF metadata, date-level generated stamp), so the
 ERP and portal variants of a document are byte-identical."""
+from services import clock
 import hashlib
 import hmac
 import io
@@ -106,7 +107,7 @@ def fmt_date(s) -> str:
 
 
 def today_ist() -> str:
-    return datetime.now(IST).date().isoformat()
+    return clock.now(clock.IST).date().isoformat()
 
 
 def verify_code(doc_type: str, entity_id: str) -> str:
@@ -162,7 +163,7 @@ class BrandedDoc:
         self.doc = SimpleDocTemplate(self.buf, pagesize=self.pagesize, leftMargin=14 * mm, rightMargin=14 * mm, topMargin=40 * mm, bottomMargin=20 * mm,
                                      title=f"{title} {number or ''}".strip(), author=self.company.get("legal_name") or self.company.get("name", "KKT"), subject=title, creator="KKT ERP", invariant=1)
         self.story = []
-        self.generated = datetime.now(IST).strftime("%d %b %Y")
+        self.generated = clock.now(clock.IST).strftime("%d %b %Y")
 
     def _header_footer(self, canvas, doc):
         canvas.saveState()

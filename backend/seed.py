@@ -46,7 +46,7 @@ async def seed():
     pw = hash_password(SEED_PASSWORD)
 
     def user(name, email, role, scope):
-        return {"name": name, "email": email, "phone": None, "role_id": roles[role]["id"], "project_scope": scope, "password_hash": pw, "failed_attempts": 0, "locked_until": None}
+        return {"name": name, "email": email, "phone": None, "role_id": roles[role]["id"], "project_scope": scope, "password_hash": pw, "failed_attempts": 0, "locked_until": None, "is_demo": True}
 
     # masters
     room_types = {}

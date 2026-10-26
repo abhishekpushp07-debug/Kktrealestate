@@ -46,7 +46,7 @@ async def _bootstrap(request: Request, user: dict):
 
 
 @router.get("/dashboard/snapshot")
-async def dashboard_snapshot(request: Request, response: Response, user: dict = Depends(require("project.read"))):
+async def dashboard_snapshot(request: Request, response: Response, user: dict = Depends(require("masters.project.view"))):
     snap = await get_dashboard(user["company_id"], user.get("project_scope"))
     from datetime import UTC, datetime
     age = int((datetime.now(UTC) - datetime.fromisoformat(snap["computed_at"])).total_seconds())
@@ -56,7 +56,7 @@ async def dashboard_snapshot(request: Request, response: Response, user: dict = 
 
 
 @router.get("/projects/{project_id}/summary")
-async def project_summary(project_id: str, response: Response, user: dict = Depends(require("project.read"))):
+async def project_summary(project_id: str, response: Response, user: dict = Depends(require("masters.project.view"))):
     from deps import ensure_project_access
     from services.read_models import refresh_project
     ensure_project_access(user, project_id)
@@ -69,7 +69,7 @@ async def project_summary(project_id: str, response: Response, user: dict = Depe
 
 
 @router.get("/blocks/{block_id}/summary")
-async def block_summary(block_id: str, response: Response, user: dict = Depends(require("project.read"))):
+async def block_summary(block_id: str, response: Response, user: dict = Depends(require("masters.project.view"))):
     from deps import ensure_project_access
     from services.read_models import refresh_block
     s = await db.block_summaries.find_one({"block_id": block_id}, {"_id": 0}) or await refresh_block(block_id)
@@ -82,7 +82,7 @@ async def block_summary(block_id: str, response: Response, user: dict = Depends(
 
 
 @router.get("/customers/{customer_id}/summary")
-async def customer_summary(customer_id: str, response: Response, user: dict = Depends(require("customer.read"))):
+async def customer_summary(customer_id: str, response: Response, user: dict = Depends(require("sales.customer.view"))):
     from services.read_models import refresh_customer
     s = await db.customer_summaries.find_one({"customer_id": customer_id, "company_id": user["company_id"]}, {"_id": 0}) or await refresh_customer(customer_id)
     if not s:
@@ -93,5 +93,5 @@ async def customer_summary(customer_id: str, response: Response, user: dict = De
 
 
 @router.post("/admin/recompute-read-models")
-async def recompute(user: dict = Depends(require("settings.manage"))):
+async def recompute(user: dict = Depends(require("admin.data.recompute"))):
     return await recompute_all()

@@ -465,8 +465,8 @@ class TestErpServiceRequests:
         items = (r.json().get("items") or [])
         sr4 = [s for s in items if s.get("ticket_number") == "SR-2627-0004"]
         if not sr4:
-            # try unfiltered
-            all_items = requests.get(f"{BASE}/api/service-requests", headers=_hdr(sales_tok)).json().get("items", [])
+            # try by ticket number (list has grown past one page)
+            all_items = requests.get(f"{BASE}/api/service-requests?search=SR-2627-0004&page_size=100", headers=_hdr(sales_tok)).json().get("items", [])
             sr4 = [s for s in all_items if s.get("ticket_number") == "SR-2627-0004"]
         assert sr4, "SR-2627-0004 missing"
         sid = sr4[0]["id"]
@@ -481,7 +481,7 @@ class TestErpServiceRequests:
         )
         assert rr.status_code in (200, 201), rr.text
         # assign
-        users = requests.get(f"{BASE}/api/users", headers=_hdr(admin_tok)).json()
+        users = requests.get(f"{BASE}/api/users", params={"page_size": 100}, headers=_hdr(admin_tok)).json()
         uitems = users.get("items") or users
         sales_user = [u for u in uitems if u.get("email") == "sales@kkt.in"][0]
         ra = requests.post(
@@ -591,7 +591,7 @@ class TestErpDocShare:
     def test_toggle_share_and_sensitive_block(self, admin_tok):
         # find BK-2526-0001
         bl = requests.get(
-            f"{BASE}/api/bookings?booking_number=BK-2526-0001", headers=_hdr(admin_tok)
+            f"{BASE}/api/bookings?search=BK-2526-0001", headers=_hdr(admin_tok)
         )
         if bl.status_code != 200:
             bl = requests.get(f"{BASE}/api/bookings", headers=_hdr(admin_tok))

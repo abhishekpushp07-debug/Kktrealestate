@@ -1,7 +1,9 @@
+import { JourneyButton } from "@/components/common/JourneyPanel";
 import { Suspense, lazy, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AlertTriangle, Banknote, FileWarning, Landmark, Plus, Printer, Receipt, Search } from "lucide-react";
 import { toast } from "sonner";
+import { HistoryButton } from "@/components/common/HistoryTimeline";
 import api, { errMsg, BASE_PATH } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useFetch, useList } from "@/hooks/useList";
@@ -46,6 +48,7 @@ function Row({ p, can, onAct, nav }) {
       <Money value={p.amount} className={cn("w-28 text-right text-lg", p.status === "Reversed" && "text-txt-muted line-through")} />
       <StatusPill status={p.status} />
       <div className="flex gap-1">
+        <JourneyButton entityType="payment" entityId={p.id} className="btn btn-ghost btn-sm !px-2" label="" /><HistoryButton entityType="payment" entityId={p.id} label={p.receipt_number} />
         {can("receipt.print") && <button onClick={() => window.open(`${BASE_PATH}/print/receipt/${p.id}`, "_blank")} className="btn btn-ghost btn-sm !px-2" aria-label="Print" data-testid={`print-${p.id}`}><Printer className="h-4 w-4" /></button>}
         {p.status === "Pending" && can("payment.post") && <><button onClick={() => onAct({ p, kind: "clear" })} className="btn btn-secondary btn-sm" data-testid={`clear-${p.id}`}>Clear</button><button onClick={() => onAct({ p, kind: "bounce" })} className="btn btn-ghost btn-sm text-brick" data-testid={`bounce-${p.id}`}>Bounce</button></>}
         {p.status === "Cleared" && can("payment.reverse") && <button onClick={() => onAct({ p, kind: "reverse" })} className="btn btn-ghost btn-sm text-brick" data-testid={`reverse-${p.id}`}>Reverse</button>}

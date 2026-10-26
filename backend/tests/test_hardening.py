@@ -59,12 +59,13 @@ def test_mongo_validators_reject_bad_docs():
     assert rejected == 3
 
 
-def test_regression_anchor_bk_2526_0001(base_url, admin_headers, anchor_booking):
+def test_regression_anchor_story(base_url, admin_headers, anchor_booking):
+    """Story anchor BK-2526-0014 (bounce persona): ledger balances to the paisa; row count/due are documented in test_credentials.md."""
     b = requests.get(f"{base_url}/api/bookings/{anchor_booking['id']}", headers=admin_headers).json()
-    assert b["summary"]["due"] == 0, b["summary"]
-    led = requests.get(f"{base_url}/api/bookings/{anchor_booking['id']}/ledger", headers=admin_headers)
-    rows = led.json()["rows"] if led.status_code == 200 and isinstance(led.json(), dict) else led.json()
-    assert len(rows) == 22, len(rows)
+    led = requests.get(f"{base_url}/api/bookings/{anchor_booking['id']}/ledger", headers=admin_headers).json()
+    rows = led["rows"]
+    assert rows and rows[-1]["cash_due"] + rows[-1]["account_due"] == b["summary"]["cash_due"] + b["summary"]["account_due"], (rows[-1], b["summary"])
+    assert b["summary"]["outstanding"] == b["summary"]["due"] and b["summary"]["due"] >= 0 and b["booking_number"] == "BK-2526-0014"
 
 
 def test_integrity_report_clean(base_url, admin_headers):

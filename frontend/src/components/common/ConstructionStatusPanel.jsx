@@ -9,10 +9,12 @@ import { DateInput } from "@/components/common/DateInput";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { fmtDate, inr } from "@/lib/format";
 import { ConstructionPhotos } from "@/components/common/ConstructionPhotos";
+import { JourneyPanel } from "@/components/common/JourneyPanel";
 
 export function ConstructionStatusPanel({ blockId, onChanged }) {
   const { can } = useAuth();
   const [data, setData] = useState(null);
+  const [journey, setJourney] = useState(null);
   const [target, setTarget] = useState("");
   const [confirm, setConfirm] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -26,11 +28,12 @@ export function ConstructionStatusPanel({ blockId, onChanged }) {
   const openConfirm = () => { const t = data.stages.find((s) => s.stage_id === target); if (!t) return; const today = new Date().toISOString().slice(0, 10); setConfirm({ target: t, rows: data.stages.filter((s) => s.status !== "Completed" && s.seq <= t.seq).map((s) => ({ ...s, date: today })) }); };
   const apply = async () => {
     setBusy(true);
-    try { const r = await api.post(`/blocks/${blockId}/construction/stage`, { stage_id: confirm.target.stage_id, completed_on: confirm.rows.at(-1).date, dates: Object.fromEntries(confirm.rows.map((x) => [x.stage_id, x.date])), version: data.block.version }); toast.success(`${r.data.marked.length} stage(s) completed · ${r.data.demands_raised} demand(s) raised`); setConfirm(null); setTarget(""); load(); onChanged?.(); } catch (e) { toast.error(errMsg(e)); } finally { setBusy(false); }
+    try { const r = await api.post(`/blocks/${blockId}/construction/stage`, { stage_id: confirm.target.stage_id, completed_on: confirm.rows.at(-1).date, dates: Object.fromEntries(confirm.rows.map((x) => [x.stage_id, x.date])), version: data.block.version }); toast.success(`Stage ${r.data.stage_name} completed — ${r.data.demands_raised} demand(s) raised (${inr(r.data.demands_total)})`, { action: { label: "Where did this go?", onClick: () => setJourney(r.data.audit_id) }, duration: 8000 }); setConfirm(null); setTarget(""); load(); onChanged?.(); } catch (e) { toast.error(errMsg(e)); } finally { setBusy(false); }
   };
-  const undo = async () => { if (!reason.trim()) return; try { const r = await api.post(`/blocks/${blockId}/construction/undo`, { reason, version: data.block.version }); toast.success(`Undone · ${r.data.demands_voided} demand(s) voided`); setUndoOpen(false); setReason(""); load(); onChanged?.(); } catch (e) { toast.error(errMsg(e)); } };
+  const undo = async () => { if (!reason.trim()) return; try { const r = await api.post(`/blocks/${blockId}/construction/undo`, { reason, version: data.block.version }); toast.success(`Stage ${r.data.stage_name} undone — ${r.data.demands_voided} demand(s) voided`, { action: { label: "Where did this go?", onClick: () => setJourney(r.data.audit_id) }, duration: 8000 }); setUndoOpen(false); setReason(""); load(); onChanged?.(); } catch (e) { toast.error(errMsg(e)); } };
   return (
     <div className="space-y-5" data-testid="construction-status-panel">
+      <JourneyPanel entityType="block" entityId={blockId} open={!!journey} onOpenChange={(o) => !o && setJourney(null)} initialAuditId={journey} />
       <div className="card p-5">
         <div className="flex flex-wrap items-center gap-3">
           <div><p className="label-xs">Construction status</p><p className="text-2xl font-bold text-ink-950" data-testid="cs-percent">{data.construction_percent}% <span className="text-sm font-normal text-txt-secondary">· {data.current_stage ? `current: ${data.current_stage.name}` : "not started"}{data.next_stage ? ` · next: ${data.next_stage.name}` : ""}</span></p></div>

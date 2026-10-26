@@ -8,6 +8,8 @@ class _Out(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
 class ProjectsOut(_Out):
+    cancellation_policy: Any = None
+    bounce_policy: Any = None
     _links: Any = None
     active_rate_card: Any = None
     address: Any = None
@@ -284,6 +286,11 @@ class CustomersOutPage(_Out):
 
 
 class BookingsOut(_Out):
+    transfers: Any = None
+    lead_id: Any = None
+    refund: Any = None
+    transfer: Any = None
+    rebind: Any = None
     _links: Any = None
     account_agreed: Any = None
     account_agreed_paise: Any = None
@@ -360,6 +367,7 @@ class BookingsOutPage(_Out):
 
 class PaymentsOut(_Out):
     _links: Any = None
+    customer_name_current: Any = None
     against: Any = None
     amount: Any = None
     amount_paise: Any = None
@@ -488,6 +496,8 @@ class CataloguesOutPage(_Out):
 
 
 class LeadsOut(_Out):
+    booking_id: Any = None
+    converted_customer_id: Any = None
     _links: Any = None
     activities: Any = None
     assigned_to: Any = None

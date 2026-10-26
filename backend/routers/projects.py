@@ -152,7 +152,7 @@ async def _attach_counts(projects: list[dict]):
 
 
 @router.get("", response_model=ProjectsOutPage, response_model_exclude_unset=True)
-async def list_projects(params: ListParams = Depends(), status: str | None = None, user: dict = Depends(require("project.read"))):
+async def list_projects(params: ListParams = Depends(), status: str | None = None, user: dict = Depends(require("masters.project.view"))):
     q = {"company_id": user["company_id"], **project_scope_filter(user, "id"), **search_filter(params.search, ["name", "code", "address.city"])}
     if not params.include_inactive:
         q["is_active"] = True
@@ -169,7 +169,7 @@ async def list_projects(params: ListParams = Depends(), status: str | None = Non
 
 
 @router.get("/suggest-code")
-async def suggest_code(name: str = "", user: dict = Depends(require("project.write"))):
+async def suggest_code(name: str = "", user: dict = Depends(require("masters.project.create"))):
     """Atomic counter-backed code suggestion: initials + sequence (e.g. SGH-02)."""
     initials = "".join(w[0] for w in name.upper().split() if w[0].isalnum())[:4] or "PRJ"
     seq = await next_number("project_code", initials)
@@ -181,7 +181,7 @@ async def suggest_code(name: str = "", user: dict = Depends(require("project.wri
 
 
 @router.post("", status_code=201)
-async def create_project(body: ProjectCreate, request: Request, user: dict = Depends(require("project.write"))):
+async def create_project(body: ProjectCreate, request: Request, user: dict = Depends(require("masters.project.create"))):
     if await db.projects.find_one({"company_id": user["company_id"], "code": body.code}):
         raise ApiError(409, f"Project code {body.code} already exists", "DUPLICATE_CODE")
     await _validate_refs(body.amenity_ids, body.milestone_template_id, body.team, body.escrow_bank_account_id)
@@ -193,7 +193,7 @@ async def create_project(body: ProjectCreate, request: Request, user: dict = Dep
 
 
 @router.get("/{project_id}", response_model=ProjectsOut, response_model_exclude_unset=True)
-async def get_project(project_id: str, user: dict = Depends(require("project.read"))):
+async def get_project(project_id: str, user: dict = Depends(require("masters.project.view"))):
     ensure_project_access(user, project_id)
     p = await get_or_404(db.projects, project_id, "Project", {"company_id": user["company_id"]})
     blocks = await db.blocks.find({"project_id": project_id, "is_active": True}, {"_id": 0, "position_flat_types": 0}).sort("code", 1).to_list(None)
@@ -224,7 +224,7 @@ async def get_project(project_id: str, user: dict = Depends(require("project.rea
 
 
 @router.patch("/{project_id}")
-async def update_project(project_id: str, body: ProjectUpdate, request: Request, user: dict = Depends(require("project.write"))):
+async def update_project(project_id: str, body: ProjectUpdate, request: Request, user: dict = Depends(require("masters.project.edit"))):
     ensure_project_access(user, project_id)
     before = await get_or_404(db.projects, project_id, "Project", {"company_id": user["company_id"]})
     changes = body.model_dump(exclude_unset=True)

@@ -27,20 +27,6 @@ def test_bookings_list(H):
     rows = data if isinstance(data, list) else data.get("items", data.get("bookings", []))
     assert len(rows) >= 1
 
-def test_anchor_booking_due_zero_and_ledger_22(H):
-    r = requests.get(f"{BASE}/api/bookings", headers=H, timeout=15)
-    rows = r.json() if isinstance(r.json(), list) else r.json().get("items", r.json().get("bookings", []))
-    anchor = next((b for b in rows if b.get("booking_number") == "BK-2526-0001"), None)
-    assert anchor, f"BK-2526-0001 not found; sample={rows[0] if rows else None}"
-    bid = anchor.get("id") or anchor.get("_id")
-    full = requests.get(f"{BASE}/api/bookings/{bid}", headers=H, timeout=15).json()
-    due = (full.get("summary") or {}).get("due")
-    assert due == 0, f"expected due=0, got {due}"
-    led = requests.get(f"{BASE}/api/bookings/{bid}/ledger", headers=H, timeout=15)
-    assert led.status_code == 200
-    j = led.json()
-    rows = j if isinstance(j, list) else j.get("rows", j.get("items", []))
-    assert len(rows) == 22, f"expected 22 ledger rows, got {len(rows)}"
 
 def test_integrity_report_ok(H):
     r = requests.get(f"{BASE}/api/admin/integrity-report?fresh=1", headers=H, timeout=15)

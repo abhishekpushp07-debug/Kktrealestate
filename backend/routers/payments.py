@@ -126,7 +126,7 @@ async def _payment_totals(q: dict) -> dict:
 
 
 @router.get("/demands")
-async def list_open_demands(params: ListParams = Depends(), status: str | None = None, project_id: str | None = None, user: dict = Depends(require("payment.read"))):
+async def list_open_demands(params: ListParams = Depends(), status: str | None = None, project_id: str | None = None, user: dict = Depends(require("finance.demand.view"))):
     q = {"company_id": user["company_id"], **project_scope_filter(user), "voided": {"$ne": True}, **search_filter(params.search, ["customer_name", "demand_number", "booking_number"])}
     if status:
         q["status"] = {"$in": status.split(",")}
@@ -140,7 +140,7 @@ async def list_open_demands(params: ListParams = Depends(), status: str | None =
 @router.get("/summary")
 async def payments_summary(params: ListParams = Depends(), project_id: str | None = None, block_id: str | None = None, booking_id: str | None = None, customer_id: str | None = None,
                            status: str | None = None, payment_category: str | None = None, payment_mode_id: str | None = None, date_from: Date | None = None, date_to: Date | None = None,
-                           user: dict = Depends(require("payment.read"))):
+                           user: dict = Depends(require("finance.payment.view"))):
     """Filter-wide totals by status (same filters as the list) for the totals footer."""
     return await list_payments(params, project_id, block_id, booking_id, customer_id, status, payment_category, payment_mode_id, date_from, date_to, user, summary_only=True)
 
@@ -148,7 +148,7 @@ async def payments_summary(params: ListParams = Depends(), project_id: str | Non
 @router.get("", response_model=PaymentsOutPage, response_model_exclude_unset=True)
 async def list_payments(params: ListParams = Depends(), project_id: str | None = None, block_id: str | None = None, booking_id: str | None = None, customer_id: str | None = None,
                         status: str | None = None, payment_category: str | None = None, payment_mode_id: str | None = None, date_from: Date | None = None, date_to: Date | None = None,
-                        user: dict = Depends(require("payment.read")), summary_only: bool = False):
+                        user: dict = Depends(require("finance.payment.view")), summary_only: bool = False):
     q = {"company_id": user["company_id"], **project_scope_filter(user), **search_filter(params.search, ["receipt_number", "customer_name", "booking_number", "flat_number", "instrument.number"])}
     for k, v in (("project_id", project_id), ("block_id", block_id), ("booking_id", booking_id), ("customer_id", customer_id), ("payment_category", payment_category), ("payment_mode_id", payment_mode_id)):
         if v:
@@ -169,7 +169,7 @@ async def list_payments(params: ListParams = Depends(), project_id: str | None =
 
 
 @router.post("", status_code=201)
-async def post_payment(body: PaymentIn, request: Request, user: dict = Depends(require("payment.post")), _k: None = Depends(require_idempotency_key)):
+async def post_payment(body: PaymentIn, request: Request, user: dict = Depends(require("finance.payment.create")), _k: None = Depends(require_idempotency_key)):
     booking = await get_or_404(db.bookings, body.booking_id, "Booking", {"company_id": user["company_id"]})
     ensure_project_access(user, booking["project_id"])
     if body.payment_date.isoformat() < booking["booking_date"]:
@@ -213,21 +213,21 @@ async def post_payment(body: PaymentIn, request: Request, user: dict = Depends(r
 
 
 @router.get("/cheques-in-hand")
-async def cheques_in_hand(user: dict = Depends(require("payment.read"))):
+async def cheques_in_hand(user: dict = Depends(require("finance.payment.view"))):
     q = {"company_id": user["company_id"], "status": "Pending", **project_scope_filter(user)}
     items = await db.payments.find(q, {"_id": 0}).sort("payment_date", 1).to_list(500)
     return present_money({"items": items, "total": len(items), "amount_paise": sum(i["amount_paise"] for i in items)})
 
 
 @router.get("/{payment_id}", response_model=PaymentsOut, response_model_exclude_unset=True)
-async def get_payment(payment_id: str, user: dict = Depends(require("payment.read"))):
+async def get_payment(payment_id: str, user: dict = Depends(require("finance.payment.view"))):
     p = await get_or_404(db.payments, payment_id, "Payment", {"company_id": user["company_id"]})
     ensure_project_access(user, p["project_id"])
     return present_money(p)
 
 
 @router.get("/{payment_id}/receipt")
-async def receipt(payment_id: str, user: dict = Depends(require("receipt.print"))):
+async def receipt(payment_id: str, user: dict = Depends(require("finance.receipt.print"))):
     p = await get_or_404(db.payments, payment_id, "Payment", {"company_id": user["company_id"]})
     ensure_project_access(user, p["project_id"])
     b = await db.bookings.find_one({"id": p["booking_id"]}, {"_id": 0, "booking_number": 1, "flat_snapshot": 1, "project_name": 1, "block_name": 1, "agreement_value_paise": 1, "cash_agreed_paise": 1, "account_agreed_paise": 1})
@@ -239,7 +239,7 @@ async def receipt(payment_id: str, user: dict = Depends(require("receipt.print")
 
 
 @router.post("/{payment_id}/clear")
-async def clear_payment(payment_id: str, request: Request, user: dict = Depends(require("payment.post"))):
+async def clear_payment(payment_id: str, request: Request, user: dict = Depends(require("finance.cheque.clear"))):
     p = await get_or_404(db.payments, payment_id, "Payment", {"company_id": user["company_id"]})
     if p["status"] != "Pending":
         raise ApiError(409, f"Payment is {p['status']}", "NOT_PENDING")
@@ -257,7 +257,7 @@ async def clear_payment(payment_id: str, request: Request, user: dict = Depends(
 
 
 @router.post("/{payment_id}/bounce")
-async def bounce_payment(payment_id: str, body: ReasonIn, request: Request, user: dict = Depends(require("payment.post"))):
+async def bounce_payment(payment_id: str, body: ReasonIn, request: Request, user: dict = Depends(require("finance.cheque.bounce"))):
     p = await get_or_404(db.payments, payment_id, "Payment", {"company_id": user["company_id"]})
     if p["status"] != "Pending":
         raise ApiError(409, f"Payment is {p['status']}; only pending instruments can bounce", "NOT_PENDING")
@@ -269,7 +269,7 @@ async def bounce_payment(payment_id: str, body: ReasonIn, request: Request, user
 
 
 @router.post("/{payment_id}/reverse")
-async def reverse_payment(payment_id: str, body: ReasonIn, request: Request, user: dict = Depends(require("payment.reverse"))):
+async def reverse_payment(payment_id: str, body: ReasonIn, request: Request, user: dict = Depends(require("finance.payment.reverse"))):
     p = await get_or_404(db.payments, payment_id, "Payment", {"company_id": user["company_id"]})
     if p["status"] != "Cleared":
         raise ApiError(409, f"Only cleared payments can be reversed (status {p['status']})", "NOT_CLEARED")

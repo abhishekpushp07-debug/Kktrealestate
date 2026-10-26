@@ -1,0 +1,104 @@
+yarn run v1.22.22
+$ node scripts/build.js
+[build] PUBLIC_URL=/erp REACT_APP_BASE_PATH=/erp
+(node:23819) [DEP0176] DeprecationWarning: fs.F_OK is deprecated, use fs.constants.F_OK instead
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Creating an optimized production build...
+[package] ERP → build/erp/
+[package] site → build/ (assets under /site-assets, router-loader injected)
+[package] portal → build/portal/
+[package] verified: build/index.html (site), build/erp/index.html, build/portal/index.html
+Compiled successfully.
+
+File sizes after gzip:
+
+  139.44 kB         build/static/js/5393.cb812373.chunk.js
+  114.2 kB (+77 B)  build/static/js/main.26dbe5b0.js
+  106.01 kB         build/static/js/6421.c03d3e60.chunk.js
+  35.27 kB          build/static/js/8354.f7404ce1.chunk.js
+  19.29 kB          build/static/js/5634.1f690329.chunk.js
+  18.68 kB          build/static/css/main.1fcfca0e.css
+  16.08 kB          build/static/js/7136.feabd0b5.chunk.js
+  12.56 kB (+81 B)  build/static/js/5832.f5dd60ae.chunk.js
+  12.16 kB          build/static/js/5696.a5029183.chunk.js
+  11.53 kB          build/static/js/3068.de6682af.chunk.js
+  11.49 kB          build/static/js/5240.c3b35112.chunk.js
+  11.39 kB (+77 B)  build/static/js/2288.afe72659.chunk.js
+  11.2 kB           build/static/js/8899.de1e032b.chunk.js
+  10.56 kB          build/static/js/2291.ccc99346.chunk.js
+  10.49 kB          build/static/js/225.057a08a8.chunk.js
+  10.36 kB          build/static/js/7268.309d6583.chunk.js
+  10.26 kB          build/static/js/7937.8b1d7f98.chunk.js
+  9.93 kB           build/static/js/6843.f75c81aa.chunk.js
+  9.72 kB           build/static/js/8281.ccf433d9.chunk.js
+  9.61 kB           build/static/js/2628.a8cf1bec.chunk.js
+  9.35 kB           build/static/js/3961.4c09a492.chunk.js
+  9.29 kB           build/static/js/1581.494c0475.chunk.js
+  8.64 kB           build/static/js/3796.1e5540ce.chunk.js
+  8.64 kB           build/static/js/8910.a809e3d7.chunk.js
+  8.6 kB            build/static/js/2837.e10984df.chunk.js
+  8.52 kB           build/static/js/9703.05abc80f.chunk.js
+  8.49 kB           build/static/js/5218.66a4551c.chunk.js
+  8.27 kB           build/static/js/5573.ec68c736.chunk.js
+  8.24 kB           build/static/js/11.bbfea651.chunk.js
+  8.02 kB           build/static/js/200.314e8f9d.chunk.js
+  7.94 kB           build/static/js/3430.ff8fe9c0.chunk.js
+  7.88 kB           build/static/js/9312.75863c14.chunk.js
+  7.23 kB           build/static/js/4920.5c6967a3.chunk.js
+  6.99 kB           build/static/js/108.8dfc7f38.chunk.js
+  6.95 kB           build/static/js/873.17ffb083.chunk.js
+  6.76 kB           build/static/js/6152.7beba2ba.chunk.js
+  6.17 kB           build/static/js/9945.4e17639f.chunk.js
+  6 kB              build/static/js/3095.80e5ca85.chunk.js
+  5.76 kB           build/static/js/8320.659c321b.chunk.js
+  5.67 kB           build/static/js/846.7a065f53.chunk.js
+  5.66 kB           build/static/js/2263.042846cf.chunk.js
+  5.33 kB           build/static/js/1466.3fb4850c.chunk.js
+  5.31 kB           build/static/js/6102.45dceb3a.chunk.js
+  5.28 kB           build/static/js/2937.ef38e6fc.chunk.js
+  5.11 kB           build/static/js/6791.423cdf38.chunk.js
+  5.05 kB           build/static/js/4555.fddb92e8.chunk.js
+  5.05 kB           build/static/js/5988.499291aa.chunk.js
+  4.81 kB           build/static/js/740.91f20c7e.chunk.js
+  4.78 kB           build/static/js/3607.d76ced3d.chunk.js
+  4.71 kB           build/static/js/1383.35587907.chunk.js
+  4.67 kB           build/static/js/725.0d06093b.chunk.js
+  4.37 kB           build/static/js/8465.7157e10e.chunk.js
+  4.28 kB           build/static/js/8867.ce6965a5.chunk.js
+  4.21 kB           build/static/js/7200.9d490efe.chunk.js
+  3.9 kB            build/static/js/1703.de5b680d.chunk.js
+  3.88 kB           build/static/js/4654.f7d073de.chunk.js
+  3.73 kB           build/static/js/6795.11de9c4f.chunk.js
+  3.73 kB           build/static/js/3806.5f4e62bb.chunk.js
+  3.68 kB           build/static/js/875.aee629cd.chunk.js
+  3.5 kB            build/static/js/1335.de0468f4.chunk.js
+  3.18 kB           build/static/js/6449.33679594.chunk.js
+  3.06 kB           build/static/js/7091.0dc45aa2.chunk.js
+  2.85 kB           build/static/js/3590.795c47e5.chunk.js
+  2.7 kB            build/static/js/6724.cad496fb.chunk.js
+  2.61 kB           build/static/js/9860.e1968ffc.chunk.js
+  2.51 kB           build/static/js/1735.691382f1.chunk.js
+  2.4 kB            build/static/js/6876.9eb24709.chunk.js
+  2.24 kB           build/static/js/4116.00cb215d.chunk.js
+  1.62 kB           build/static/js/2519.8be6e416.chunk.js
+  1.36 kB           build/static/js/1448.863dc6f7.chunk.js
+  1.29 kB           build/static/js/1539.aaabb5b3.chunk.js
+  1.11 kB           build/static/js/9590.114dc5e9.chunk.js
+  666 B             build/static/js/5192.f1d214ad.chunk.js
+  639 B             build/static/js/1568.8230b3ce.chunk.js
+  298 B             build/static/js/319.77cbec28.chunk.js
+
+The project was built assuming it is hosted at /erp/.
+You can control this with the homepage field in your package.json.
+
+The build folder is ready to be deployed.
+
+Find out more about deployment here:
+
+  https://cra.link/deployment
+
+[package] site → build/ (assets under /site-assets, router-loader injected)
+[package] portal → build/portal/
+[package] verified: build/index.html (site), build/erp/index.html, build/portal/index.html
+Done in 23.06s.
+cleanroom build exit 0

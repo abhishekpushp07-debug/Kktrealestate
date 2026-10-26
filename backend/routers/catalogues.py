@@ -198,7 +198,7 @@ class ItemPatch(StrictModel):
 
 
 @router.post("/{ctype}/items", status_code=201)
-async def add_item(ctype: str, body: ItemIn, request: Request, user: dict = Depends(require("catalogue.write"))):
+async def add_item(ctype: str, body: ItemIn, request: Request, user: dict = Depends(require("masters.catalogue.create"))):
     if not re.fullmatch(r"[a-z_]{2,40}", ctype):
         raise ApiError(422, "Invalid catalogue type", "VALIDATION_ERROR")
     code = _code(body.code or body.label)
@@ -216,7 +216,7 @@ async def add_item(ctype: str, body: ItemIn, request: Request, user: dict = Depe
 
 
 @router.patch("/{ctype}/items/{item_id}")
-async def patch_item(ctype: str, item_id: str, body: ItemPatch, request: Request, user: dict = Depends(require("catalogue.write"))):
+async def patch_item(ctype: str, item_id: str, body: ItemPatch, request: Request, user: dict = Depends(require("masters.catalogue.edit"))):
     before = await get_or_404(db.catalogue_items, item_id, "Catalogue item", {"company_id": user["company_id"], "type": ctype})
     changes = {k: v for k, v in body.model_dump(exclude_none=True).items() if k != "version"}
     if before.get("is_system") and "label" in changes and before["label"] != changes["label"]:
@@ -236,7 +236,7 @@ class ReorderIn(StrictModel):
 
 
 @router.post("/{ctype}/reorder")
-async def reorder(ctype: str, body: ReorderIn, request: Request, user: dict = Depends(require("catalogue.write"))):
+async def reorder(ctype: str, body: ReorderIn, request: Request, user: dict = Depends(require("masters.catalogue.edit"))):
     for i, iid in enumerate(body.ids):
         await db.catalogue_items.update_one({"id": iid, "company_id": user["company_id"], "type": ctype}, {"$set": {"sort_order": i, "updated_at": now_iso()}})
     await bump_version()
@@ -257,7 +257,7 @@ async def export_csv(ctype: str, user: dict = Depends(get_current_user)):
 
 
 @router.post("/{ctype}/import")
-async def import_csv(ctype: str, request: Request, file: UploadFile = File(...), user: dict = Depends(require("catalogue.write"))):
+async def import_csv(ctype: str, request: Request, file: UploadFile = File(...), user: dict = Depends(require("masters.catalogue.create"))):
     rows = list(csv.DictReader(io.StringIO((await file.read()).decode("utf-8-sig"))))
     added = updated = 0
     for i, r in enumerate(rows):

@@ -38,6 +38,8 @@ export const lastError = { request_id: null, at: 0 };
 export const BASE_PATH = (process.env.REACT_APP_BASE_PATH || process.env.PUBLIC_URL || "/").replace(/\/$/, "");
 const onLogout = { fn: () => { tokens.clear(); window.location.assign(`${BASE_PATH}/login`); } };
 export const setLogoutHandler = (fn) => { onLogout.fn = fn; };
+const onDenied = { fn: null };
+export const setPermissionDeniedHandler = (fn) => { onDenied.fn = fn; };
 
 async function doRefresh() {
   const rt = tokens.refresh;
@@ -54,6 +56,7 @@ api.interceptors.response.use(
     const rid = response?.data?.error?.request_id || response?.data?.request_id || response?.headers?.["x-request-id"];
     if (rid) { lastError.request_id = rid; lastError.at = Date.now(); }
     if (response?.status === 409 && response.data?.code === "VERSION_CONFLICT" && conflictHandler.fn) conflictHandler.fn(response.data);
+    if (response?.status === 403 && response.data?.code === "PERMISSION_DENIED" && onDenied.fn) onDenied.fn(response.data);
     if (response?.status === 401 && !config._retry && !config.url.includes("/auth/login") && !config.url.includes("/auth/refresh")) {
       config._retry = true;
       try {

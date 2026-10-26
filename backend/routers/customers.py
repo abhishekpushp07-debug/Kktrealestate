@@ -189,7 +189,7 @@ async def _dup_check(company_id: str, phone: str | None, pan: str | None, exclud
 @router.get("", response_model=CustomersOutPage, response_model_exclude_unset=True)
 async def list_customers(params: ListParams = Depends(), has_overdue: bool = False, kyc_status: str | None = None, source: str | None = None,
                          assigned_sales_user_id: str | None = None, segment_id: str | None = None, lifecycle_stage: str | None = None, city_id: str | None = None,
-                         user: dict = Depends(require("customer.read"))):
+                         user: dict = Depends(require("sales.customer.view"))):
     q = {"company_id": user["company_id"], **search_filter(params.search, ["full_name", "phone", "customer_code", "email"])}
     if segment_id:
         q["segment_ids"] = segment_id
@@ -231,7 +231,7 @@ async def list_customers(params: ListParams = Depends(), has_overdue: bool = Fal
 
 
 @router.post("", status_code=201)
-async def create_customer(body: CustomerIn, request: Request, user: dict = Depends(require("customer.write"))):
+async def create_customer(body: CustomerIn, request: Request, user: dict = Depends(require("sales.customer.create"))):
     await _dup_check(user["company_id"], body.phone, body.pan)
     company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0})
     doc = {**base_doc(user, user["company_id"]), **_prepare(body.model_dump()), "customer_code": await generate_number("customer", company),
@@ -243,14 +243,14 @@ async def create_customer(body: CustomerIn, request: Request, user: dict = Depen
 
 
 @router.get("/rm-options")
-async def rm_options(user: dict = Depends(require("customer.read"))):
+async def rm_options(user: dict = Depends(require("sales.customer.view"))):
     rows = await db.users.find({"company_id": user["company_id"], "is_active": True}, {"_id": 0, "id": 1, "name": 1, "role_id": 1}).sort("name", 1).to_list(200)
     roles = {r["id"]: r["name"] for r in await db.roles.find({"id": {"$in": list({u.get("role_id") for u in rows})}}, {"_id": 0, "id": 1, "name": 1}).to_list(None)}
     return {"items": [{"id": u["id"], "name": u["name"], "role_name": roles.get(u.get("role_id"))} for u in rows]}
 
 
 @router.get("/{customer_id}/panels")
-async def customer_panels(customer_id: str, user: dict = Depends(require("customer.read"))):
+async def customer_panels(customer_id: str, user: dict = Depends(require("sales.customer.view"))):
     """Phase E0 composite: communications + documents + document types for Customer 360 side panels in one round trip."""
     comms, docs, types = await asyncio.gather(
         db.communications.find({"company_id": user["company_id"], "customer_id": customer_id}, {"_id": 0}).sort("created_at", -1).limit(8).to_list(8),
@@ -260,7 +260,7 @@ async def customer_panels(customer_id: str, user: dict = Depends(require("custom
 
 
 @router.get("/{customer_id}", response_model=CustomersOut, response_model_exclude_unset=True)
-async def get_customer(customer_id: str, request: Request, reveal: bool = Query(False), user: dict = Depends(require("customer.read"))):
+async def get_customer(customer_id: str, request: Request, reveal: bool = Query(False), user: dict = Depends(require("sales.customer.view"))):
     if customer_id.startswith("CUST-"):
         hit = await db.customers.find_one({"customer_code": customer_id, "company_id": user["company_id"]}, {"_id": 0, "id": 1})
         customer_id = hit["id"] if hit else customer_id
@@ -294,7 +294,7 @@ async def get_customer(customer_id: str, request: Request, reveal: bool = Query(
 
 
 @router.patch("/{customer_id}")
-async def update_customer(customer_id: str, body: CustomerUpdate, request: Request, user: dict = Depends(require("customer.write"))):
+async def update_customer(customer_id: str, body: CustomerUpdate, request: Request, user: dict = Depends(require("sales.customer.edit"))):
     before = await get_or_404(db.customers, customer_id, "Customer", {"company_id": user["company_id"]})
     changes = body.model_dump(exclude_unset=True)
     await _dup_check(user["company_id"], changes.get("phone"), changes.get("pan"), exclude_id=customer_id)
@@ -307,7 +307,7 @@ async def update_customer(customer_id: str, body: CustomerUpdate, request: Reque
 
 
 @router.post("/{customer_id}/kyc-status")
-async def set_kyc_status(customer_id: str, body: KycStatusIn, request: Request, user: dict = Depends(require("customer.kyc_view"))):
+async def set_kyc_status(customer_id: str, body: KycStatusIn, request: Request, user: dict = Depends(require("sales.kyc.edit"))):
     before = await get_or_404(db.customers, customer_id, "Customer", {"company_id": user["company_id"]})
     changes = {"kyc_status": body.kyc_status, "kyc_note": body.note}
     if body.kyc_status == "Verified":
@@ -318,7 +318,7 @@ async def set_kyc_status(customer_id: str, body: KycStatusIn, request: Request, 
 
 
 @router.get("/{customer_id}/payments")
-async def customer_payments(customer_id: str, user: dict = Depends(require("payment.read"))):
+async def customer_payments(customer_id: str, user: dict = Depends(require("finance.payment.view"))):
     from services.money import present_money
     rows = await db.payments.find({"customer_id": customer_id, **project_scope_filter(user)}, {"_id": 0}).sort("payment_date", -1).to_list(200)
     return {"items": present_money(rows), "total": len(rows)}

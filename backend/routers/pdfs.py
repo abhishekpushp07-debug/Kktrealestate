@@ -74,26 +74,26 @@ async def build_demand_pdf(booking_id: str, demand_id: str, user: dict) -> tuple
 
 
 @router.get("/payments/{payment_id}/receipt.pdf")
-async def receipt_pdf(payment_id: str, download: int = 0, user: dict = Depends(require("receipt.print"))):
+async def receipt_pdf(payment_id: str, download: int = 0, user: dict = Depends(require("finance.receipt.download"))):
     content, name = await build_receipt_pdf(payment_id, user)
     return _pdf.pdf_response(content, name, bool(download))
 
 
 @router.get("/bookings/{booking_id}/demands/{demand_id}/letter.pdf")
-async def demand_letter_pdf(booking_id: str, demand_id: str, download: int = 0, user: dict = Depends(require("booking.read"))):
+async def demand_letter_pdf(booking_id: str, demand_id: str, download: int = 0, user: dict = Depends(require("finance.demand.export"))):
     content, name = await build_demand_pdf(booking_id, demand_id, user)
     return _pdf.pdf_response(content, name, bool(download))
 
 
 @router.get("/bookings/{booking_id}/statement.pdf")
-async def statement_pdf(booking_id: str, download: int = 0, user: dict = Depends(require("booking.read"))):
+async def statement_pdf(booking_id: str, download: int = 0, user: dict = Depends(require("finance.ledger.export"))):
     from routers.reports import build_statement_pdf
     content, name = await build_statement_pdf(booking_id, user)
     return _pdf.pdf_response(content, name, bool(download))
 
 
 @router.get("/bookings/{booking_id}/allotment.pdf")
-async def allotment_pdf(booking_id: str, download: int = 0, user: dict = Depends(require("booking.read"))):
+async def allotment_pdf(booking_id: str, download: int = 0, user: dict = Depends(require("sales.booking.export"))):
     from routers.reports import build_allotment_pdf
     content, name = await build_allotment_pdf(booking_id, user)
     return _pdf.pdf_response(content, name, bool(download))

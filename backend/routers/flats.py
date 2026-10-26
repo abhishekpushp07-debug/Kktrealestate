@@ -5,7 +5,7 @@ from pydantic import Field
 
 from db import db
 from models_out import FlatsOut, FlatsOutPage
-from deps import ensure_project_access, project_scope_filter, require
+from deps import ensure_project_access, project_scope_filter, require, require_any
 from services.flat_generation import resnapshot_flat
 from utils import (
     ApiError,
@@ -58,7 +58,7 @@ async def _enrich(items: list[dict]):
 async def list_flats(
     params: ListParams = Depends(), project_id: str | None = None, block_id: str | None = None,
     floor: int | None = None, status: str | None = None, flat_type_id: str | None = None,
-    user: dict = Depends(require("project.read")),
+    user: dict = Depends(require("masters.project.view")),
 ):
     q = {"company_id": user["company_id"], **project_scope_filter(user), **search_filter(params.search, ["flat_number", "flat_type_code"])}
     if project_id:
@@ -96,7 +96,7 @@ async def _load_flat(flat_id: str, user: dict) -> dict:
 
 
 @router.get("/{flat_id}", response_model=FlatsOut, response_model_exclude_unset=True)
-async def get_flat(flat_id: str, user: dict = Depends(require("project.read"))):
+async def get_flat(flat_id: str, user: dict = Depends(require("masters.project.view"))):
     flat = await _load_flat(flat_id, user)
     flat = (await _enrich([flat]))[0]
     ft = await db.flat_types.find_one({"id": flat["flat_type_id"]}, {"_id": 0, "id": 1, "name": 1, "code": 1, "bhk": 1})
@@ -112,7 +112,7 @@ async def get_flat(flat_id: str, user: dict = Depends(require("project.read"))):
 
 
 @router.patch("/{flat_id}")
-async def update_flat(flat_id: str, body: FlatUpdate, request: Request, user: dict = Depends(require("flat.write"))):
+async def update_flat(flat_id: str, body: FlatUpdate, request: Request, user: dict = Depends(require("masters.flat.edit"))):
     before = await _load_flat(flat_id, user)
     changes = body.model_dump(exclude_unset=True)
     changes.pop("version", None)
@@ -136,7 +136,7 @@ async def update_flat(flat_id: str, body: FlatUpdate, request: Request, user: di
 
 
 @router.patch("/{flat_id}/status")
-async def change_status(flat_id: str, body: FlatStatusIn, request: Request, user: dict = Depends(require("flat.status"))):
+async def change_status(flat_id: str, body: FlatStatusIn, request: Request, user: dict = Depends(require_any("sales.hold.create", "sales.hold.release"))):
     before = await _load_flat(flat_id, user)
     if body.status not in MANUAL_STATUSES:
         raise ApiError(409, f"Status {body.status} is set by the booking engine and cannot be set manually", "STATUS_NOT_MANUAL")

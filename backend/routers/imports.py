@@ -42,7 +42,7 @@ def _num(v, field, errors, required=False):
 
 
 @router.get("/template/{kind}")
-async def template(kind: Kind, user: dict = Depends(require("master.read"))):
+async def template(kind: Kind, user: dict = Depends(require("masters.project.view"))):
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow(TEMPLATES[kind])
@@ -166,7 +166,7 @@ async def _validate_rows(kind: str, rows: list[dict], project_id: str | None, us
 
 
 @router.post("/{kind}/preview")
-async def preview(kind: Kind, request: Request, project_id: str | None = None, file: UploadFile = File(...), user: dict = Depends(require("master.write"))):
+async def preview(kind: Kind, request: Request, project_id: str | None = None, file: UploadFile = File(...), user: dict = Depends(require("masters.flat.create"))):
     rows = await _validate_rows(kind, await _parse(file), project_id, user)
     invalid = [r for r in rows if r["errors"]]
     token = None
@@ -178,7 +178,7 @@ async def preview(kind: Kind, request: Request, project_id: str | None = None, f
 
 
 @router.post("/{kind}/confirm")
-async def confirm(kind: Kind, request: Request, confirm_token: str, user: dict = Depends(require("master.write"))):
+async def confirm(kind: Kind, request: Request, confirm_token: str, user: dict = Depends(require("masters.flat.create"))):
     batch = await db.import_batches.find_one({"id": confirm_token, "kind": kind, "user_id": user["id"]}, {"_id": 0})
     if not batch:
         raise ApiError(404, "Import batch not found or expired; run preview again", "NOT_FOUND")

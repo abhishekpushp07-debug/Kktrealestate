@@ -66,12 +66,12 @@ async def overdue_demand_job():
 
 
 @router.get("/unread-count")
-async def unread_count(user: dict = Depends(require("project.read"))):
+async def unread_count(user: dict = Depends(require("masters.project.view"))):
     return {"unread": await db.notifications.count_documents({"user_id": user["id"], "read": False, "withdrawn": {"$ne": True}})}
 
 
 @router.get("")
-async def list_notifications(unread_only: bool = False, limit: int = 30, user: dict = Depends(require("project.read"))):
+async def list_notifications(unread_only: bool = False, limit: int = 30, user: dict = Depends(require("masters.project.view"))):
     q = {"user_id": user["id"], "withdrawn": {"$ne": True}}
     if unread_only:
         q["read"] = False
@@ -80,12 +80,12 @@ async def list_notifications(unread_only: bool = False, limit: int = 30, user: d
 
 
 @router.post("/{notification_id}/read")
-async def mark_read(notification_id: str, user: dict = Depends(require("project.read"))):
+async def mark_read(notification_id: str, user: dict = Depends(require("masters.project.view"))):
     await db.notifications.update_one({"id": notification_id, "user_id": user["id"]}, {"$set": {"read": True, "read_at": now_iso()}})
     return {"ok": True}
 
 
 @router.post("/read-all")
-async def mark_all_read(user: dict = Depends(require("project.read"))):
+async def mark_all_read(user: dict = Depends(require("masters.project.view"))):
     r = await db.notifications.update_many({"user_id": user["id"], "read": False}, {"$set": {"read": True, "read_at": now_iso()}})
     return {"ok": True, "updated": r.modified_count}

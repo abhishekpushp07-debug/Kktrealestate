@@ -55,7 +55,7 @@ class BulkGenerateIn(StrictModel):
 
 
 @router.get("")
-async def list_slots(params: ListParams = Depends(), project_id: str | None = None, status: str | None = None, type: str | None = None, user: dict = Depends(require("project.read"))):
+async def list_slots(params: ListParams = Depends(), project_id: str | None = None, status: str | None = None, type: str | None = None, user: dict = Depends(require("masters.flat.view"))):
     q = {"company_id": user["company_id"], **project_scope_filter(user), **search_filter(params.search, ["number", "level"])}
     if project_id:
         ensure_project_access(user, project_id)
@@ -75,7 +75,7 @@ async def list_slots(params: ListParams = Depends(), project_id: str | None = No
 
 
 @router.post("", status_code=201)
-async def create_slot(body: SlotIn, request: Request, user: dict = Depends(require("block.write"))):
+async def create_slot(body: SlotIn, request: Request, user: dict = Depends(require("masters.flat.create"))):
     ensure_project_access(user, body.project_id)
     await get_or_404(db.projects, body.project_id, "Project", {"company_id": user["company_id"]})
     if await db.parking_slots.find_one({"project_id": body.project_id, "number": body.number}):
@@ -88,7 +88,7 @@ async def create_slot(body: SlotIn, request: Request, user: dict = Depends(requi
 
 
 @router.post("/bulk-generate", status_code=201)
-async def bulk_generate(body: BulkGenerateIn, request: Request, user: dict = Depends(require("block.write"))):
+async def bulk_generate(body: BulkGenerateIn, request: Request, user: dict = Depends(require("masters.flat.create"))):
     ensure_project_access(user, body.project_id)
     await get_or_404(db.projects, body.project_id, "Project", {"company_id": user["company_id"]})
     numbers = [f"{body.prefix}{str(body.start + i).zfill(body.pad)}" for i in range(body.count)]
@@ -102,7 +102,7 @@ async def bulk_generate(body: BulkGenerateIn, request: Request, user: dict = Dep
 
 
 @router.patch("/{slot_id}")
-async def update_slot(slot_id: str, body: SlotUpdate, request: Request, user: dict = Depends(require("block.write"))):
+async def update_slot(slot_id: str, body: SlotUpdate, request: Request, user: dict = Depends(require("masters.flat.edit"))):
     before = await get_or_404(db.parking_slots, slot_id, "Parking slot", {"company_id": user["company_id"]})
     ensure_project_access(user, before["project_id"])
     changes = body.model_dump(exclude_unset=True)

@@ -57,11 +57,6 @@ def test_brochure_rate_limit():
     # The preview ingress NATs each new connection through a different egress IP, which splits a per-IP counter;
     # exercise the limiter on a single stable path (local backend when reachable, else one keep-alive session).
     base = BASE
-    try:
-        if requests.get("http://localhost:8001/api/health", timeout=2).status_code == 200:
-            base = "http://localhost:8001/api"
-    except requests.exceptions.RequestException:
-        pass
     time.sleep(60 - time.time() % 60 + 1)  # align to a fresh 60 s window
     with requests.Session() as sess:
         codes = [sess.post(f"{base}/public/brochure-requests", json={"project_slug": "shree-ganesh-heights", "name": "RL", "phone": phone(), "consent": True, "website": "x"}, timeout=15).status_code for _ in range(7)]

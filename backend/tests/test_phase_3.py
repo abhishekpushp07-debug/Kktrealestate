@@ -191,7 +191,7 @@ def test_enquiry_success_and_lead(admin):
     ref = body["reference"]
     assert ref and ref.startswith("LD-"), ref
     # Find the lead
-    lst = requests.get(f"{API}/leads?source=Website&limit=100", headers=H(admin), timeout=15).json()
+    lst = requests.get(f"{API}/leads?source=Website&limit=100&sort=-created_at", headers=H(admin), timeout=15).json()
     match = [x for x in lst.get("items", []) if x.get("lead_number") == ref]
     assert match, f"lead {ref} not found in Website leads"
     lead = match[0]

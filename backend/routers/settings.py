@@ -60,7 +60,7 @@ class CompanyUpdate(StrictModel):
 
 
 @router.get("/numbering/preview")
-async def numbering_preview(user: dict = Depends(require("settings.manage"))):
+async def numbering_preview(user: dict = Depends(require("admin.settings.view"))):
     """Shows what the next booking/receipt numbers would look like using atomic counters (peek, no increment)."""
     c = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0})
     from datetime import datetime
@@ -98,7 +98,7 @@ async def get_company(user: dict = Depends(get_current_user)):
 
 
 @router.patch("/company")
-async def update_company(body: CompanyUpdate, request: Request, user: dict = Depends(require("settings.manage"))):
+async def update_company(body: CompanyUpdate, request: Request, user: dict = Depends(require("admin.settings.edit"))):
     before = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0})
     changes = body.model_dump(exclude_unset=True)
     changes.pop("version", None)

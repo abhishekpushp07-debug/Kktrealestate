@@ -27,7 +27,10 @@ def client():
 
 
 def _tok(client, email):
-    r = client.post("/api/auth/login", json={"email": email, "password": "Kkt@12345"})
+    for _ in range(3):  # private test backend under 4-worker load: tolerate one transient 5xx
+        r = client.post("/api/auth/login", json={"email": email, "password": "Kkt@12345"})
+        if r.status_code < 500:
+            break
     assert r.status_code == 200, f"{email} login failed: {r.text}"
     return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
@@ -103,7 +106,7 @@ def test_outstanding_totals_match_bookings(client, admin):
         for b in r["items"]:
             if b.get("status") in ("Active", "Completed"):
                 s = b.get("summary") or {}
-                total_due += s.get("due_paise", 0) + s.get("other_charges_due_paise", 0)
+                total_due += max(s.get("cash_due_paise", 0), 0) + max(s.get("account_due_paise", 0), 0) + max(s.get("other_charges_due_paise", 0), 0)  # services.definitions.outstanding
         if page * 100 >= r["total"]:
             break
         page += 1

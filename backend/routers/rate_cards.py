@@ -115,14 +115,14 @@ def price_flat(flat: dict, rc: dict, plc_types: dict, block: dict, top_floor: in
 
 
 @router.get("")
-async def list_rate_cards(project_id: str, params: ListParams = Depends(), user: dict = Depends(require("project.read"))):
+async def list_rate_cards(project_id: str, params: ListParams = Depends(), user: dict = Depends(require("masters.rate_card.view"))):
     ensure_project_access(user, project_id)
     res = await paginate(db.rate_cards, {"project_id": project_id, "is_active": True}, params, [("effective_from", -1), ("id", 1)])
     return res
 
 
 @router.post("", status_code=201)
-async def create_rate_card(project_id: str, body: RateCardIn, request: Request, user: dict = Depends(require("flat.write"))):
+async def create_rate_card(project_id: str, body: RateCardIn, request: Request, user: dict = Depends(require("masters.rate_card.create"))):
     ensure_project_access(user, project_id)
     await get_or_404(db.projects, project_id, "Project", {"company_id": user["company_id"]})
     data = body.model_dump()
@@ -135,7 +135,7 @@ async def create_rate_card(project_id: str, body: RateCardIn, request: Request, 
 
 
 @router.get("/{rc_id}")
-async def get_rate_card(project_id: str, rc_id: str, user: dict = Depends(require("project.read"))):
+async def get_rate_card(project_id: str, rc_id: str, user: dict = Depends(require("masters.rate_card.view"))):
     ensure_project_access(user, project_id)
     rc = await get_or_404(db.rate_cards, rc_id, "Rate card", {"project_id": project_id})
     fts = {f["id"]: f for f in await db.flat_types.find({"id": {"$in": [r["flat_type_id"] for r in rc["rates"]]}}, {"_id": 0, "id": 1, "name": 1, "code": 1}).to_list(None)}
@@ -148,7 +148,7 @@ async def get_rate_card(project_id: str, rc_id: str, user: dict = Depends(requir
 
 
 @router.patch("/{rc_id}")
-async def update_rate_card(project_id: str, rc_id: str, body: RateCardUpdate, request: Request, user: dict = Depends(require("flat.write"))):
+async def update_rate_card(project_id: str, rc_id: str, body: RateCardUpdate, request: Request, user: dict = Depends(require("masters.rate_card.edit"))):
     ensure_project_access(user, project_id)
     before = await get_or_404(db.rate_cards, rc_id, "Rate card", {"project_id": project_id})
     if before["status"] != "Draft":
@@ -161,7 +161,7 @@ async def update_rate_card(project_id: str, rc_id: str, body: RateCardUpdate, re
 
 
 @router.post("/{rc_id}/activate")
-async def activate_rate_card(project_id: str, rc_id: str, request: Request, user: dict = Depends(require("flat.write"))):
+async def activate_rate_card(project_id: str, rc_id: str, request: Request, user: dict = Depends(require("masters.rate_card.edit"))):
     ensure_project_access(user, project_id)
     rc = await get_or_404(db.rate_cards, rc_id, "Rate card", {"project_id": project_id})
     if rc["status"] == "Active":
@@ -173,7 +173,7 @@ async def activate_rate_card(project_id: str, rc_id: str, request: Request, user
 
 
 @router.post("/{rc_id}/apply")
-async def apply_rate_card(project_id: str, rc_id: str, request: Request, user: dict = Depends(require("flat.write"))):
+async def apply_rate_card(project_id: str, rc_id: str, request: Request, user: dict = Depends(require("masters.rate_card.apply"))):
     """Recompute price + breakup for Available flats only. Hold/Booked/Sold/Blocked keep their price."""
     ensure_project_access(user, project_id)
     rc = await get_or_404(db.rate_cards, rc_id, "Rate card", {"project_id": project_id})

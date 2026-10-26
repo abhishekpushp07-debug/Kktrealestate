@@ -11,7 +11,7 @@ router = APIRouter(prefix="/blocks", tags=["milestones (legacy alias)"])
 
 
 @router.get("/{block_id}/milestones")
-async def list_milestones(block_id: str, user: dict = Depends(require("project.read"))):
+async def list_milestones(block_id: str, user: dict = Depends(require("construction.stage.view"))):
     res = await block_construction(block_id, user)
     stages = res["stages"]
     nxt = next((s["seq"] for s in stages if s["status"] != "Completed"), None)
@@ -33,12 +33,12 @@ async def _stage_id(block_id: str, seq: int, user: dict) -> str:
 
 
 @router.post("/{block_id}/milestones/{seq}/complete")
-async def complete_milestone(block_id: str, seq: int, body: CompleteIn, request: Request, user: dict = Depends(require("construction.update"))):
+async def complete_milestone(block_id: str, seq: int, body: CompleteIn, request: Request, user: dict = Depends(require("construction.stage.update"))):
     from datetime import date
     sid = await _stage_id(block_id, seq, user)
     return await set_current_stage(block_id, StageSetIn(stage_id=sid, completed_on=date.fromisoformat(body.completed_on), notes=body.notes, version=body.version), request, user)
 
 
 @router.post("/{block_id}/milestones/{seq}/undo")
-async def undo_milestone(block_id: str, seq: int, body: UndoIn, request: Request, user: dict = Depends(require("construction.undo"))):
+async def undo_milestone(block_id: str, seq: int, body: UndoIn, request: Request, user: dict = Depends(require("construction.stage.undo"))):
     return await undo_stage(block_id, body, request, user)

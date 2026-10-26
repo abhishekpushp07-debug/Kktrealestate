@@ -1,0 +1,227 @@
+# Probe `cheque_clear` · BK-2526-0002 · 2026-10-26
+
+Action result: `{"posted_pending": {"id": "0b984c83-268c-4ecc-98f8-d86ffe4b65f5", "company_id": "502247ec-ff5e-4038-b2b6-f6d48c9aec8e", "created_at": "2026-10-26T10:25:27.917494+00:00", "updated_at": "2026-10-26T10:25:27.917494+00:00", "created_by": "d1935092-a16b-416a-ba18-48fde9c2294f", "is_active": true, "deleted_at": null, "version": 1, "receipt_number": "KKT/2627/00169", "booking_id": "51f3e43d-d67e-49e4-8f2`
+
+## Surfaces changed within 2.5 s (29)
+- **booking.detail+summary**
+  - .demands[]: 15 items, content changed
+  - .ledger_rebuilt_at: "2026-10-26T10:25:27.930257+00:00" → "2026-10-26T10:25:28.429868+00:00"
+  - .payments[]: 13 items, content changed
+  - .summary.account_due: 1636576.93 → 1626576.93
+  - .summary.account_due_paise: 163657693 → 162657693
+  - .summary.account_paid: 1700000.0 → 1710000.0
+  - .summary.account_paid_paise: 170000000 → 171000000
+  - .summary.due: 1902076.93 → 1892076.93
+- **booking.ledger(cash)**
+  - .booking.summary.account_due: 1636576.93 → 1626576.93
+  - .booking.summary.account_due_paise: 163657693 → 162657693
+  - .booking.summary.account_paid: 1700000.0 → 1710000.0
+  - .booking.summary.account_paid_paise: 170000000 → 171000000
+  - .booking.summary.due: 1902076.93 → 1892076.93
+  - .booking.summary.due_paise: 190207693 → 189207693
+  - .booking.summary.outstanding: 1902076.93 → 1892076.93
+  - .booking.summary.outstanding_paise: 190207693 → 189207693
+- **booking.ledger(account)**
+  - .booking.summary.account_due: 1636576.93 → 1626576.93
+  - .booking.summary.account_due_paise: 163657693 → 162657693
+  - .booking.summary.account_paid: 1700000.0 → 1710000.0
+  - .booking.summary.account_paid_paise: 170000000 → 171000000
+  - .booking.summary.due: 1902076.93 → 1892076.93
+  - .booking.summary.due_paise: 190207693 → 189207693
+  - .booking.summary.outstanding: 1902076.93 → 1892076.93
+  - .booking.summary.outstanding_paise: 190207693 → 189207693
+- **booking.ledger(other)**
+  - .booking.summary.account_due: 1636576.93 → 1626576.93
+  - .booking.summary.account_due_paise: 163657693 → 162657693
+  - .booking.summary.account_paid: 1700000.0 → 1710000.0
+  - .booking.summary.account_paid_paise: 170000000 → 171000000
+  - .booking.summary.due: 1902076.93 → 1892076.93
+  - .booking.summary.due_paise: 190207693 → 189207693
+  - .booking.summary.outstanding: 1902076.93 → 1892076.93
+  - .booking.summary.outstanding_paise: 190207693 → 189207693
+- **booking.ledger(combined)**
+  - .booking.summary.account_due: 1636576.93 → 1626576.93
+  - .booking.summary.account_due_paise: 163657693 → 162657693
+  - .booking.summary.account_paid: 1700000.0 → 1710000.0
+  - .booking.summary.account_paid_paise: 170000000 → 171000000
+  - .booking.summary.due: 1902076.93 → 1892076.93
+  - .booking.summary.due_paise: 190207693 → 189207693
+  - .booking.summary.outstanding: 1902076.93 → 1892076.93
+  - .booking.summary.outstanding_paise: 190207693 → 189207693
+- **customer.360**
+  - .bookings[]: 1 items, content changed
+- **customer.ledgers**
+  - .bookings[]: 1 items, content changed
+  - .ledgers[]: 1 items, content changed
+  - .totals.account.due: 1636576.93 → 1626576.93
+  - .totals.account.due_paise: 163657693 → 162657693
+  - .totals.account.paid: 1700000.0 → 1710000.0
+  - .totals.account.paid_paise: 170000000 → 171000000
+  - .totals.account.pending_cheques: 10000.0 → 0.0
+  - .totals.account.pending_cheques_paise: 1000000 → 0
+- **customer.timeline**
+  - .items[]: 13 items, content changed
+- **project.summary(read-model)**
+  - .advance: 150076.93 → 140076.93
+  - .advance_paise: 15007693 → 14007693
+  - .computed_at: "2026-10-26T10:25:18.782160+00:00" → "2026-10-26T10:25:30.475397+00:00"
+  - .outstanding.account: 3636576.93 → 3626576.93
+  - .outstanding.account_paise: 363657693 → 362657693
+  - .outstanding.total: 6868576.93 → 6858576.93
+  - .outstanding.total_paise: 686857693 → 685857693
+  - .overdue.amount: 5095350.43 → 5085350.43
+- **block.summary(read-model)**
+  - .advance: 150076.93 → 140076.93
+  - .advance_paise: 15007693 → 14007693
+  - .computed_at: "2026-10-26T10:25:18.774975+00:00" → "2026-10-26T10:25:30.468328+00:00"
+  - .outstanding.account: 3636576.93 → 3626576.93
+  - .outstanding.account_paise: 363657693 → 362657693
+  - .outstanding.total: 6868576.93 → 6858576.93
+  - .outstanding.total_paise: 686857693 → 685857693
+  - .overdue.amount: 5095350.43 → 5085350.43
+- **dashboard.home**
+  - .ageing_paise.d90: 509535043 → 508535043
+  - .attention.overdue[]: 7 items, content changed
+  - .collections_12m[]: 12 items, content changed
+  - .computed_at: "2026-10-26T10:25:18.794755+00:00" → "2026-10-26T10:25:30.488826+00:00"
+  - .greeting_date: "2026-10-26T10:25:28.141881+00:00" → "2026-10-26T10:25:31.104407+00:00"
+  - .projects[]: 3 items, content changed
+  - .recent[]: 12 items, content changed
+  - .spark.collections[]: 8 items, content changed
+- **dashboard.legacy**
+  - .collections.month.Account: 510000.0 → 520000.0
+  - .collections.month.Account_paise: 51000000 → 52000000
+  - .collections.month.count: 26 → 27
+  - .collections.month.total: 10485000.0 → 10495000.0
+  - .collections.month.total_paise: 1048500000 → 1049500000
+  - .collections.outstanding_due: 17246576.93 → 17236576.93
+  - .collections.outstanding_due_paise: 1724657693 → 1723657693
+  - .collections.pending_cheques.amount: 10000.0 → 0.0
+- **dashboard.widgets**
+  - .ageing[]: 5 items, content changed
+  - .collections_month.amount: 10485000.0 → 10495000.0
+  - .collections_month.amount_paise: 1048500000 → 1049500000
+  - .collections_month.count: 26 → 27
+  - .collections_today.amount: 9985000.0 → 9995000.0
+  - .collections_today.amount_paise: 998500000 → 999500000
+  - .collections_today.count: 25 → 26
+  - .collections_trend[]: 11 items, content changed
+- **bootstrap.counts**
+  - .cheques_pending: 1 → 0
+- **payments.summary**
+  - .Cleared.amount: 171740350.0 → 171750350.0
+  - .Cleared.amount_paise: 17174035000 → 17175035000
+  - .Cleared.count: 101 → 102
+  - .Pending: {"count": 1, "amount_paise": 1000000, "amount": 10000.0} → null
+- **roznamcha(today)**
+  - .by_category.Account.amount: 10000.0 → 20000.0
+  - .by_category.Account.amount_paise: 1000000 → 2000000
+  - .by_mode.Cheque: null → {"count": 1, "amount_paise": 1000000, "amount": 10000.0}
+  - .by_project.SGH.amount: 3975000.0 → 3985000.0
+  - .by_project.SGH.amount_paise: 397500000 → 398500000
+  - .by_project.SGH.count: 20 → 21
+  - .pending: 10000.0 → 0.0
+  - .pending_paise: 1000000 → 0
+- **cheques.in_hand**
+  - .amount: 10000.0 → 0.0
+  - .amount_paise: 1000000 → 0
+  - .items[]: len 1 → 0
+  - .total: 1 → 0
+- **report.collections(today)**
+  - .error.request_id: "2adc41ab33e346a0" → "4a4fb60d071e48a2"
+  - .request_id: "2adc41ab33e346a0" → "4a4fb60d071e48a2"
+- **report.outstanding**
+  - .ageing[]: 5 items, content changed
+  - .rows[]: 5 items, content changed
+  - .top_overdue[]: 3 items, content changed
+  - .totals.account_due: 13601576.93 → 13591576.93
+  - .totals.account_due_paise: 1360157693 → 1359157693
+  - .totals.due: 17246576.93 → 17236576.93
+  - .totals.due_paise: 1724657693 → 1723657693
+  - .totals.overdue: 5095350.43 → 5085350.43
+- **report.demand_vs_collection**
+  - .rows[]: 41 items, content changed
+  - .totals.collected: 157427523.07 → 157437523.07
+  - .totals.collected_paise: 15742752307 → 15743752307
+- **report.cheques**
+  - .by_status.Cleared.amount: 800000.0 → 810000.0
+  - .by_status.Cleared.amount_paise: 80000000 → 81000000
+  - .by_status.Cleared.count: 2 → 3
+  - .by_status.Pending: {"count": 1, "amount_paise": 1000000, "amount": 10000.0} → null
+  - .rows[]: 76 items, content changed
+- **report.roznamcha_range**
+  - .error.request_id: "9a1b56df2a1a4eac" → "a42734dac86d4acc"
+  - .request_id: "9a1b56df2a1a4eac" → "a42734dac86d4acc"
+- **report.bank_receipts**
+  - .rows[]: 6 items, content changed
+  - .totals.cleared: 147805350.0 → 147815350.0
+  - .totals.cleared_paise: 14780535000 → 14781535000
+  - .totals.pending: 10000.0 → 0.0
+  - .totals.pending_paise: 1000000 → 0
+- **report.activity**
+  - .actions[]: 103 items, content changed
+  - .rows[]: 354 items, content changed
+- **report.statement**
+  - .booking.ledger_rebuilt_at: "2026-10-26T10:25:27.930257+00:00" → "2026-10-26T10:25:28.429868+00:00"
+  - .booking.summary.account_due: 1636576.93 → 1626576.93
+  - .booking.summary.account_due_paise: 163657693 → 162657693
+  - .booking.summary.account_paid: 1700000.0 → 1710000.0
+  - .booking.summary.account_paid_paise: 170000000 → 171000000
+  - .booking.summary.due: 1902076.93 → 1892076.93
+  - .booking.summary.due_paise: 190207693 → 189207693
+  - .booking.summary.outstanding: 1902076.93 → 1892076.93
+- **audit.recent**
+  - .items[]: 3 items, content changed
+  - .next_cursor: "55d10c42-fa90-446a-b8fd-bf07f5c1a7ca" → "0ded8f6a-350c-4ab3-b1c0-94f69cf94df0"
+  - .total: 4884 → 4885
+- **search(customer name)**
+  - .took_ms: 2.5 → 2.6
+- **construction.milestones(block)**
+  - .stages[]: 11 items, content changed
+- **pdf.statement(len)**
+  - .error.request_id: "e616fa54c3054242" → "565ad9849ee046e4"
+  - .request_id: "e616fa54c3054242" → "565ad9849ee046e4"
+
+## Changed only after caches expired (stale 2.5–9 s) (0)
+
+## Unchanged (18)
+- audit.booking
+- block.detail+grid
+- booking.schedule/demands
+- customer.panels(comms/docs)
+- flat.detail
+- inventory.flats(block)
+- leads.board
+- leads.list
+- notifications(staff)
+- payments.list+totals
+- project.workspace
+- report.advances
+- report.cancellations
+- report.construction_progress
+- report.inventory
+- report.sales_leads
+- report.service_sla
+- service.list
+
+## Restore
+`[200, {"id": "0b984c83-268c-4ecc-98f8-d86ffe4b65f5", "company_id": "502247ec-ff5e-4038-b2b6-f6d48c9aec8e", "created_at": "2026-10-26T10:25:27.917494+00:00", "updated_at": "2026-10-26T10:25:37.781930+00:00", "created_by": "d1935092-a16b-416a-ba18-48fde9c2294f", "is_active": true, "deleted_at": null, `
+
+## Expected (registry) vs actual
+- _propagated_complete: True
+- audit: changed
+- blocks: changed
+- bookings: changed
+- bootstrap: changed
+- cheques: changed
+- customer360: changed
+- dashboard: changed
+- demands: MISSING
+- home: changed
+- ledgers: changed
+- notifications: MISSING
+- payments: changed
+- projects: changed
+- reports: changed
+- roznamcha: changed
+- widgets: changed

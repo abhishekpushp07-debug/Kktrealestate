@@ -30,7 +30,7 @@ async def _tower_view(b: dict, assignments: list[dict], flats_by_block: dict) ->
 
 
 @router.get("/{project_id}/setup")
-async def get_setup(project_id: str, user: dict = Depends(require("project.read"))):
+async def get_setup(project_id: str, user: dict = Depends(require("masters.project.view"))):
     ensure_project_access(user, project_id)
     p = await get_or_404(db.projects, project_id, "Project", {"company_id": user["company_id"]})
     blocks, assignments, rate_card, parking, counts = await asyncio.gather(
@@ -93,7 +93,7 @@ class TowersIn(StrictModel):
 
 
 @router.put("/{project_id}/setup/{section}")
-async def save_section(project_id: str, section: str, body: dict, request: Request, user: dict = Depends(require("project.write"))):
+async def save_section(project_id: str, section: str, body: dict, request: Request, user: dict = Depends(require("masters.project.edit"))):
     ensure_project_access(user, project_id)
     p = await get_or_404(db.projects, project_id, "Project", {"company_id": user["company_id"]})
     if section not in SECTIONS:

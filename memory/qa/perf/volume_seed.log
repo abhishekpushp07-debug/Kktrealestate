@@ -1,0 +1,6 @@
+projects=6 blocks=59 flats=3678
+customers=2000
+bookings=1500
+payments posted=17975
+TOTALS {'projects': 6, 'blocks': 59, 'flats': 3678, 'customers': 2000, 'bookings': 1500, 'payments': 20596, 'leads': 319, 'site-visits': 67, 'service-requests': 200}
+INTEGRITY ok= True {}

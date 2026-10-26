@@ -18,7 +18,7 @@ const chips = (s) => String(s || "").split(",").map((x) => parseInt(x.trim(), 10
 function Basics({ p, setP, cats }) {
   const stateId = cats.opts("state").find((s) => s.label === p.address?.state)?.value;
   const cityId = cats.opts("city").find((c) => c.label === p.address?.city)?.value;
-  return (
+  return (<>
     <FormSection title="Project basics" helper="Name, location and registration. Everything else is chosen from catalogues.">
       <Field label="Project name" required><input className="input" value={p.name} onChange={(e) => setP({ ...p, name: e.target.value, code: p.codeTouched ? p.code : codeOf(e.target.value) })} placeholder="Shree Ganesh Heights" data-testid="setup-name" /></Field>
       <Field label="Code" hint="Auto-generated; used in unit numbers" required><input className="input uppercase" value={p.code} onChange={(e) => setP({ ...p, code: e.target.value.toUpperCase(), codeTouched: true })} data-testid="setup-code" /></Field>
@@ -34,7 +34,15 @@ function Basics({ p, setP, cats }) {
       <Field label="Cover image URL" hint="Paste a hosted image URL (upload arrives with the media library)"><input className="input" value={p.cover_image_url || ""} onChange={(e) => setP({ ...p, cover_image_url: e.target.value || null })} data-testid="setup-cover" /></Field>
       <Field label="Default cash share %" hint="Pre-fills the Cash/Account split in the booking wizard"><input type="number" min="0" max="100" step="0.5" className="input" value={p.default_cash_percent ?? 0} onChange={(e) => setP({ ...p, default_cash_percent: Number(e.target.value) || 0 })} data-testid="setup-cash-percent" /></Field>
     </FormSection>
-  );
+    <FormSection title="Cancellation & bounce policy" helper="Drives refund payable on cancellation and the auto-raised bounce charge (see Settings → Definitions).">
+      <Field label="Deduction type"><Select options={[{ value: "percent", label: "% of agreement value" }, { value: "fixed", label: "Fixed ₹" }]} value={p.cancellation_policy?.deduction_type || "percent"} onChange={(v) => setP({ ...p, cancellation_policy: { ...(p.cancellation_policy || {}), deduction_type: v } })} clearable={false} testId="setup-ded-type" /></Field>
+      <Field label="Deduction value"><input type="number" min="0" className="input" value={p.cancellation_policy?.deduction_value ?? 10} onChange={(e) => setP({ ...p, cancellation_policy: { ...(p.cancellation_policy || {}), deduction_value: Number(e.target.value) } })} data-testid="setup-ded-value" /></Field>
+      <Field label="GST on deduction"><Select options={[{ value: "no", label: "No" }, { value: "yes", label: "Yes (18%)" }]} value={p.cancellation_policy?.gst_on_deduction ? "yes" : "no"} onChange={(v) => setP({ ...p, cancellation_policy: { ...(p.cancellation_policy || {}), gst_on_deduction: v === "yes" } })} clearable={false} testId="setup-ded-gst" /></Field>
+      <Field label="Refund SLA (days)"><input type="number" min="0" className="input" value={p.cancellation_policy?.refund_sla_days ?? 45} onChange={(e) => setP({ ...p, cancellation_policy: { ...(p.cancellation_policy || {}), refund_sla_days: Number(e.target.value) } })} data-testid="setup-refund-sla" /></Field>
+      <Field label="Auto bounce charge"><Select options={[{ value: "on", label: "On — raise Other-charge demand on bounce" }, { value: "off", label: "Off" }]} value={p.bounce_policy?.enabled === false ? "off" : "on"} onChange={(v) => setP({ ...p, bounce_policy: { ...(p.bounce_policy || {}), enabled: v === "on" } })} clearable={false} testId="setup-bounce-enabled" /></Field>
+      <Field label="Bounce charge ₹"><input type="number" min="0" className="input" value={p.bounce_policy?.amount ?? 500} onChange={(e) => setP({ ...p, bounce_policy: { ...(p.bounce_policy || {}), amount: Number(e.target.value) } })} data-testid="setup-bounce-amount" /></Field>
+    </FormSection>
+  </>);
 }
 
 const newTower = (code, i) => ({ _new: true, name: `Tower ${String.fromCharCode(65 + i)}`, code: String.fromCharCode(65 + i), block_type_id: null, floors: 12, floor_start: 1, skip_floors: "", refuge_floors: "", podium_floors: "", numbering_pattern: "{block}-{floor}{pos2}", flats_per_floor: 4, floor_plans: [] });
@@ -181,7 +189,7 @@ export default function ProjectSetup() {
     setBusy(true);
     try {
       if (step === 0) {
-        const body = { name: p.name, code: p.code, project_type: p.project_type, status: p.status, address: { line1: p.address?.line1 || null, city: p.address?.city || null, state: p.address?.state || null, pincode: p.address?.pincode || null }, rera_number: p.rera_number || null, launch_date: p.launch_date || null, expected_possession_date: p.expected_possession_date || null, cover_image_url: p.cover_image_url || null, default_cash_percent: Number(p.default_cash_percent) || 0 };
+        const body = { name: p.name, code: p.code, project_type: p.project_type, status: p.status, cancellation_policy: p.cancellation_policy || null, bounce_policy: p.bounce_policy || null, address: { line1: p.address?.line1 || null, city: p.address?.city || null, state: p.address?.state || null, pincode: p.address?.pincode || null }, rera_number: p.rera_number || null, launch_date: p.launch_date || null, expected_possession_date: p.expected_possession_date || null, cover_image_url: p.cover_image_url || null, default_cash_percent: Number(p.default_cash_percent) || 0 };
         if (!pid) { const r = await api.post("/projects", body); setPid(r.data.id); navigate(`/projects/${r.data.id}/setup`, { replace: true }); await load(r.data.id); toast.success("Project created as a draft — continue with towers"); }
         else { const { code, ...patch } = body; await api.patch(`/projects/${pid}`, { ...patch, version: p.version }); await load(pid); }
       } else if (step === 1 || step === 2) {

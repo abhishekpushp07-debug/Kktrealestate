@@ -29,12 +29,12 @@ async def _cash_in_hand_before(company_id: str, day: Date, scope: dict) -> int:
 
 
 @router.get("")
-async def day_book(date_: Date = Query(..., alias="date"), date_to: Date | None = None, user: dict = Depends(require("payment.read"))):
+async def day_book(date_: Date = Query(..., alias="date"), date_to: Date | None = None, user: dict = Depends(require("finance.roznamcha.view"))):
     return await _book(date_, date_to or date_, user)
 
 
 @router.get("/range")
-async def day_book_range(date_from: Date, date_to: Date, user: dict = Depends(require("payment.read"))):
+async def day_book_range(date_from: Date, date_to: Date, user: dict = Depends(require("finance.roznamcha.view"))):
     if date_to < date_from or (date_to - date_from) > timedelta(days=92):
         raise ApiError(422, "Range must be ascending and at most 92 days", "VALIDATION_ERROR")
     return await _book(date_from, date_to, user)
@@ -71,7 +71,7 @@ async def _book(d1: Date, d2: Date, user: dict) -> dict:
 
 
 @router.post("/contra", status_code=201)
-async def contra(body: ContraIn, request: Request, user: dict = Depends(require("payment.post"))):
+async def contra(body: ContraIn, request: Request, user: dict = Depends(require("finance.roznamcha.deposit"))):
     bank = await get_or_404(db.bank_accounts, body.bank_account_id, "Bank account", {"is_active": True})
     amt = to_paise(body.amount)
     if body.kind == "DEPOSIT":

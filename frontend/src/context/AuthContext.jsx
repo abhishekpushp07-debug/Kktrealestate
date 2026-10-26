@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { loadBootstrap } from "@/lib/bootstrapCache";
-import api, { setLogoutHandler, tokens } from "@/lib/api";
+import api, { setLogoutHandler, setPermissionDeniedHandler, tokens } from "@/lib/api";
+import { canonical } from "@/lib/permissions";
 
 const AuthCtx = createContext(null);
 
@@ -50,11 +51,23 @@ export function AuthProvider({ children }) {
     return data;
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const refreshMe = useCallback(async () => {
+    try { const { data } = await api.get("/auth/me"); qc.setQueryData(["fetch", "/auth/me"], data); setUser((u) => (u && JSON.stringify(u.permissions) === JSON.stringify(data.permissions) ? u : data)); } catch { /* ignore */ }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!user) return undefined;
+    setPermissionDeniedHandler(refreshMe);
+    const t = setInterval(refreshMe, 30_000);
+    window.addEventListener("focus", refreshMe);
+    return () => { clearInterval(t); window.removeEventListener("focus", refreshMe); setPermissionDeniedHandler(null); };
+  }, [!!user, refreshMe]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const value = useMemo(() => ({
-    user, company, surfaces, loading, login, loginMfa, logout, setCompany,
-    can: (perm) => !!user?.permissions?.includes(perm),
-    canAny: (...perms) => perms.some((p) => user?.permissions?.includes(p)),
-  }), [user, company, surfaces, loading, login, loginMfa, logout]);
+    user, company, surfaces, loading, login, loginMfa, logout, setCompany, refreshMe,
+    can: (perm) => !!user?.is_super_admin || !!user?.permissions?.includes(canonical(perm)),
+    canAny: (...perms) => !!user?.is_super_admin || perms.some((p) => user?.permissions?.includes(canonical(p))),
+  }), [user, company, surfaces, loading, login, loginMfa, logout, refreshMe]);
 
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
 }

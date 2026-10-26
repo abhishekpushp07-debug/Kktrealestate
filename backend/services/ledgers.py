@@ -10,17 +10,17 @@ def _row(e: dict, bucket: str) -> dict | None:
     """Project one ledger_entries row onto a bucket, with that bucket's running balances. None if it does not touch the bucket."""
     t = e["type"]
     if bucket == "cash":
-        if t in ("DEMAND", "AGREEMENT_CHANGE", "CANCELLATION") or (t in ("PAYMENT", "REVERSAL") and e.get("category") == "Cash"):
+        if t in ("DEMAND", "AGREEMENT_CHANGE", "CANCELLATION", "TRANSFER") or (t in ("PAYMENT", "REVERSAL", "REFUND") and e.get("category") == "Cash"):
             raised, paid = e["cash_order_raised_paise"], e["cash_paid_cum_paise"]
         else:
             return None
     elif bucket == "account":
-        if t in ("DEMAND", "AGREEMENT_CHANGE", "CANCELLATION") or (t in ("PAYMENT", "REVERSAL") and e.get("category") == "Account"):
+        if t in ("DEMAND", "AGREEMENT_CHANGE", "CANCELLATION", "TRANSFER") or (t in ("PAYMENT", "REVERSAL", "REFUND") and e.get("category") == "Account"):
             raised, paid = e["account_order_raised_paise"], e["account_paid_cum_paise"]
         else:
             return None
     else:
-        if t not in ("OTHER_CHARGE_DEMAND", "OTHER_CHARGE_PAYMENT") and not (t == "REVERSAL" and e.get("category") is None):
+        if t not in ("OTHER_CHARGE_DEMAND", "OTHER_CHARGE_PAYMENT") and not (t in ("REVERSAL", "REFUND") and e.get("category") in (None, "Other")):
             return None
         raised, paid = None, None
     amount = e["amount_paise"]

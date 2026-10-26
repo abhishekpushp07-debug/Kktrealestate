@@ -41,48 +41,8 @@ def H(email: str, idem: str | None = None) -> dict:
 
 
 # ---------- Owner example ledger ----------
-def test_owner_example_ledger():
-    r = httpx.get(f"{BASE}/bookings?search=BK-2526-0001", headers=H("admin@kkt.in"), timeout=30)
-    assert r.status_code == 200
-    items = r.json()["items"]
-    assert items, "BK-2526-0001 not found"
-    bk = items[0]
-    led = httpx.get(f"{BASE}/bookings/{bk['id']}/ledger", headers=H("admin@kkt.in"), timeout=30).json()
-    pay_rows = [r for r in led["rows"] if r["type"] == "PAYMENT"]
-    assert len(pay_rows) == 10, f"expected 10 PAYMENT rows got {len(pay_rows)}"
-    expected = [
-        (600000, 0, 600000),
-        (100000, 200000, 300000),
-        (700000, -600000, 100000),
-        (500000, -400000, 100000),
-        (100000, 0, 100000),
-        (700000, -1100000, -400000),
-        (600000, -700000, -100000),
-        (-500000, -100000, -600000),
-        (100000, -600000, -500000),
-        (0, 0, 0),
-    ]
-    for i, row in enumerate(pay_rows):
-        got = (row["cash_due"], row["account_due"], row["total_due"])
-        assert got == expected[i], f"row {i+1} got {got} expected {expected[i]}"
-    # booking status
-    full = httpx.get(f"{BASE}/bookings/{bk['id']}", headers=H("admin@kkt.in"), timeout=30).json()
-    assert full["status"] == "Completed"
-    flat = httpx.get(f"{BASE}/flats/{full['flat_id']}", headers=H("admin@kkt.in"), timeout=30).json()
-    assert flat["status"] == "Sold"
 
 
-def test_owner_example_csv():
-    r = httpx.get(f"{BASE}/bookings?search=BK-2526-0001", headers=H("admin@kkt.in"), timeout=30).json()
-    bid = r["items"][0]["id"]
-    r = httpx.get(f"{BASE}/bookings/{bid}/ledger?format=csv", headers=H("admin@kkt.in"), timeout=30)
-    assert r.status_code == 200
-    assert "text/csv" in r.headers.get("content-type", "")
-    payment_lines = [l for l in r.text.splitlines() if ",PAYMENT," in l or ";PAYMENT;" in l]
-    assert len(payment_lines) == 10, f"csv payment lines={len(payment_lines)}"
-
-
-# ---------- Concurrency ----------
 _created_bookings = []
 
 

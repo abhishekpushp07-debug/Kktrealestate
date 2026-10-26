@@ -93,12 +93,12 @@ async def get_site(company_id: str) -> dict:
 
 
 @router.get("/site")
-async def site(user: dict = Depends(require("cms.read"))):
+async def site(user: dict = Depends(require("website.cms.view"))):
     return await get_site(user["company_id"])
 
 
 @router.patch("/site")
-async def update_site(body: SiteSettingsIn, request: Request, user: dict = Depends(require("cms.write"))):
+async def update_site(body: SiteSettingsIn, request: Request, user: dict = Depends(require("website.cms.edit"))):
     before = await get_site(user["company_id"])
     changes = {k: v for k, v in body.data.items() if k in DEFAULT_SITE}
     after = await apply_update(db.site_settings, before, changes, expected_version(request, body.version), "Site settings")
@@ -108,7 +108,7 @@ async def update_site(body: SiteSettingsIn, request: Request, user: dict = Depen
 
 
 @router.post("/media", status_code=201)
-async def upload_media(request: Request, file: UploadFile = File(...), caption: str | None = Form(None), user: dict = Depends(require("cms.write"))):
+async def upload_media(request: Request, file: UploadFile = File(...), caption: str | None = Form(None), user: dict = Depends(require("website.cms.edit"))):
     mime = (file.content_type or "").split(";")[0]
     ext = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/svg+xml": "svg", "image/x-icon": "ico", "application/pdf": "pdf"}.get(mime)
     if not ext:
@@ -139,7 +139,7 @@ async def upload_media(request: Request, file: UploadFile = File(...), caption: 
 
 
 @router.get("/{coll}")
-async def list_items(coll: str, params: ListParams = Depends(), project_id: str | None = None, status: str | None = None, user: dict = Depends(require("cms.read"))):
+async def list_items(coll: str, params: ListParams = Depends(), project_id: str | None = None, status: str | None = None, user: dict = Depends(require("website.cms.view"))):
     if coll not in COLLECTIONS:
         raise ApiError(404, "Unknown CMS collection", "NOT_FOUND")
     sort, fields = COLLECTIONS[coll]
@@ -152,7 +152,7 @@ async def list_items(coll: str, params: ListParams = Depends(), project_id: str 
 
 
 @router.post("/{coll}", status_code=201)
-async def create_item(coll: str, body: CmsItem, request: Request, user: dict = Depends(require("cms.write"))):
+async def create_item(coll: str, body: CmsItem, request: Request, user: dict = Depends(require("website.cms.edit"))):
     if coll not in COLLECTIONS:
         raise ApiError(404, "Unknown CMS collection", "NOT_FOUND")
     data = dict(body.data)
@@ -172,7 +172,7 @@ async def create_item(coll: str, body: CmsItem, request: Request, user: dict = D
 
 
 @router.patch("/{coll}/{item_id}")
-async def update_item(coll: str, item_id: str, body: CmsItem, request: Request, user: dict = Depends(require("cms.write"))):
+async def update_item(coll: str, item_id: str, body: CmsItem, request: Request, user: dict = Depends(require("website.cms.edit"))):
     if coll not in COLLECTIONS:
         raise ApiError(404, "Unknown CMS collection", "NOT_FOUND")
     before = await get_or_404(db[f"cms_{coll}"], item_id, "Item", {"company_id": user["company_id"]})
@@ -188,7 +188,7 @@ async def update_item(coll: str, item_id: str, body: CmsItem, request: Request, 
 
 
 @router.delete("/{coll}/{item_id}")
-async def delete_item(coll: str, item_id: str, request: Request, user: dict = Depends(require("cms.write"))):
+async def delete_item(coll: str, item_id: str, request: Request, user: dict = Depends(require("website.cms.edit"))):
     if coll not in COLLECTIONS:
         raise ApiError(404, "Unknown CMS collection", "NOT_FOUND")
     before = await get_or_404(db[f"cms_{coll}"], item_id, "Item", {"company_id": user["company_id"]})
@@ -199,14 +199,14 @@ async def delete_item(coll: str, item_id: str, request: Request, user: dict = De
 
 
 @router.get("/projects/{project_id}/website")
-async def project_website(project_id: str, user: dict = Depends(require("project.read"))):
+async def project_website(project_id: str, user: dict = Depends(require("website.cms.view"))):
     p = await get_or_404(db.projects, project_id, "Project", {"company_id": user["company_id"]})
     ensure_project_access(user, project_id)
     return {"id": p["id"], "version": p["version"], "website": p.get("website") or {"is_published": False, "slug": slugify(p["name"])}}
 
 
 @router.patch("/projects/{project_id}/website")
-async def update_project_website(project_id: str, body: ProjectWebsiteIn, request: Request, user: dict = Depends(require("project.write"))):
+async def update_project_website(project_id: str, body: ProjectWebsiteIn, request: Request, user: dict = Depends(require("website.cms.edit"))):
     p = await get_or_404(db.projects, project_id, "Project", {"company_id": user["company_id"]})
     ensure_project_access(user, project_id)
     web = {**(p.get("website") or {}), **{k: v for k, v in body.model_dump(exclude_unset=True).items() if k not in ("version", "brochure_download_count")}}

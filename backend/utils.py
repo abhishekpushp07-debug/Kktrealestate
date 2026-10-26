@@ -1,5 +1,8 @@
+from services import clock
 import hashlib
 import asyncio
+import base64
+import json
 import os
 import re
 import uuid
@@ -31,7 +34,7 @@ class StrictModel(BaseModel):
 
 
 def now_iso() -> str:
-    return datetime.now(UTC).isoformat()
+    return clock.now().isoformat()
 
 
 def new_id() -> str:
@@ -88,7 +91,7 @@ class ListParams:
         sort: str = Query("name"),
         include_inactive: bool = Query(False),
         cursor: str | None = Query(None, description="Cursor mode: last seen id from next_cursor"),
-        limit: int | None = Query(None, ge=1, le=100, description="Cursor mode page size"),
+        limit: int | None = Query(None, ge=1, le=100, description="Cursor mode page size (max 100). Walk with next_cursor; the cursor is an opaque keyset token on (sort, id) and must be reused with the same sort."),
         format: str | None = Query(None, description="csv for CSV export"),
         with_total: bool | None = Query(None, description="Compute total (expensive). Default: yes in page mode (legacy UI), no in cursor mode"),
         fields: str | None = Query(None, max_length=400, description="Comma-separated projection to widen/narrow list items"),
@@ -113,6 +116,19 @@ def search_filter(search: str | None, fields: list[str]) -> dict:
     return {"$or": [{f: rx} for f in fields]}
 
 
+def _enc_cursor(item: dict, key: str) -> str:
+    return base64.urlsafe_b64encode(json.dumps([key, item.get(key), item["id"]], default=str).encode()).decode()
+
+
+def _dec_cursor(cur: str):
+    """Returns (key, sort_value, id) for a keyset cursor, or (None, None, id) for a legacy raw-id cursor."""
+    try:
+        k, v, i = json.loads(base64.urlsafe_b64decode(cur.encode()).decode())
+        return k, v, i
+    except Exception:
+        return None, None, cur
+
+
 async def paginate(coll, query: dict, params: ListParams, sort, projection: dict | None = None) -> dict:
     proj = {"_id": 0}
     if projection:
@@ -120,14 +136,26 @@ async def paginate(coll, query: dict, params: ListParams, sort, projection: dict
     if params.fields:
         proj = {"_id": 0, "id": 1, **{f.strip(): 1 for f in params.fields.split(",") if f.strip()}}
     if params.cursor is not None or params.limit is not None:
+        # Keyset pagination on (sort_key, id) — stable under equal sort values; the cursor encodes the LAST item returned.
         limit = params.limit or params.page_size
-        q = dict(query)
+        key, direction = (sort[0] if sort else ("id", 1))
+        id_dir = next((d for f, d in (sort or []) if f == "id"), direction)
+        q = query
         if params.cursor:
-            q["id"] = {"$gt": params.cursor}
+            ck, v, last_id = _dec_cursor(params.cursor)
+            if ck is None or ck != key:
+                key, direction, id_dir = "id", 1, 1  # legacy raw-id cursor (or sort changed mid-walk): fall back to id keyset
+            op, op_id = ("$gt" if direction == 1 else "$lt"), ("$gt" if id_dir == 1 else "$lt")
+            after = {"id": {op_id: last_id}} if key == "id" else {"$or": [{key: {op: v}}, {key: v, "id": {op_id: last_id}}]}
+            q = {"$and": [query, after]}
+        ks_sort = [("id", id_dir)] if key == "id" else [(key, direction), ("id", id_dir)]
+        if proj.get("id") and key not in proj:
+            proj = {**proj, key: 1}
         total = await coll.count_documents(query) if params.with_total else None
-        items = await coll.find(q, proj).sort([("id", 1)]).limit(limit + 1).to_list(limit + 1)
-        nxt = items[limit]["id"] if len(items) > limit else None
+        items = await coll.find(q, proj).sort(ks_sort).limit(limit + 1).to_list(limit + 1)
+        has_more = len(items) > limit
         items = items[:limit]
+        nxt = _enc_cursor(items[-1], key) if has_more and items else None
         return {"items": items, "total": total, "page": None, "page_size": limit, "next_cursor": nxt}
     if params.format == "csv":
         items = await coll.find(query, proj).sort(sort).limit(10000).to_list(10000)
@@ -149,7 +177,7 @@ async def _page(coll, query: dict, params: ListParams, sort, proj: dict) -> dict
         items = items[: params.page_size]
     has_more = (params.page * params.page_size < total) if total is not None else len(items) > params.page_size
     items = items[:params.page_size]
-    return {"items": items, "total": total, "page": params.page, "page_size": params.page_size, "next_cursor": items[-1]["id"] if has_more and items else None}
+    return {"items": items, "total": total, "page": params.page, "page_size": params.page_size, "next_cursor": _enc_cursor(items[-1], sort[0][0] if sort else "id") if has_more and items else None}
 
 
 def strip_private(doc: dict | None) -> dict | None:
@@ -161,10 +189,10 @@ def strip_private(doc: dict | None) -> dict | None:
 async def write_audit(actor: dict | None, action: str, entity_type: str, entity_id: str,
                       before: Any = None, after: Any = None, ip: str = "", company_id: str | None = None):
     from events import bus
-    await bus.publish("entity.changed", {"actor": actor, "action": action, "entity_type": entity_type, "entity_id": entity_id,
+    return await bus.publish("entity.changed", {"actor": actor, "action": action, "entity_type": entity_type, "entity_id": entity_id,
                                          "before": strip_private(before) if isinstance(before, dict) else before,
                                          "after": strip_private(after) if isinstance(after, dict) else after,
-                                         "ip": ip, "company_id": company_id or (actor or {}).get("company_id")})
+                                         "ip": ip, "company_id": company_id or (actor or {}).get("company_id"), **(clock.REQ_CTX.get() or {}), **({"as_of": clock.as_of_iso()} if clock.as_of_iso() else {})})
 
 
 async def get_or_404(coll, doc_id: str, entity: str, extra: dict | None = None) -> dict:

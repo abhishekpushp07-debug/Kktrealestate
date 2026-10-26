@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { MoveMenu, moveKeyProps, useNarrow } from "@/components/v2/KanbanMove";
 import { CalendarClock, CalendarDays, Download, Inbox, Phone, PhoneCall, Plus, TrendingUp, UserCheck, UserPlus } from "lucide-react";
 import { toast } from "sonner";
+import { HistoryButton } from "@/components/common/HistoryTimeline";
 import api, { errMsg } from "@/lib/api";
 import { undoToast } from "@/lib/undo";
 import { useAuth } from "@/context/AuthContext";
@@ -71,7 +72,7 @@ function LeadDrawer({ lead, onClose, onChanged }) {
   const open = l.status !== "Converted" && l.status !== "Lost";
   return (
     <Sheet open onOpenChange={(o) => !o && onClose()}><SheetContent className="v2 w-full overflow-y-auto bg-warm-50 sm:max-w-lg" data-testid="lead-drawer">
-      <SheetHeader><div className="flex items-center gap-3"><Avatar name={l.name} size={48} /><div><SheetTitle className="font-display text-2xl">{l.name}</SheetTitle><SheetDescription>{l.lead_number} · {l.phone} · {l.email || "no email"} · {l.source}</SheetDescription></div></div></SheetHeader>
+      <SheetHeader><div className="flex items-center gap-3"><Avatar name={l.name} size={48} /><div><SheetTitle className="font-display text-2xl">{l.name} <HistoryButton entityType="lead" entityId={l.id} label={l.lead_number} /></SheetTitle><SheetDescription>{l.lead_number} · {l.phone} · {l.email || "no email"} · {l.source}</SheetDescription></div></div></SheetHeader>
       <div className="mt-5 space-y-5 text-sm">
         <div className="flex flex-wrap items-center gap-2"><StatusPill status={STAGE_STATUS[l.status] || l.status} /><span className="text-xs text-txt-secondary">{l.status}</span>{l.lost_reason && <span className="text-xs text-brick">Lost: {l.lost_reason}</span>}{open && <button className="btn btn-primary btn-sm ml-auto" onClick={convert} data-testid="lead-convert-btn"><UserCheck className="h-4 w-4" />Convert to customer</button>}{l.converted_customer_id && <button className="btn btn-secondary btn-sm ml-auto" onClick={() => nav(`/customers/${l.converted_customer_id}`)} data-testid="lead-open-customer">Open customer</button>}</div>
         <Card className="!p-4"><p className="label mb-2">Log follow-up</p><textarea className="input !h-20 py-2" value={note} onChange={(e) => setNote(e.target.value)} placeholder="What was discussed…" data-testid="followup-note" /><div className="mt-2 flex gap-2"><input type="datetime-local" value={next} onChange={(e) => setNext(e.target.value)} className="input" data-testid="followup-next" /><button onClick={follow} disabled={!note} className="btn btn-primary" data-testid="followup-submit">Save</button></div></Card>

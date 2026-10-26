@@ -40,11 +40,17 @@ async def rebuild(booking_id: str) -> list[dict]:
         events.append((r["at"], 0, "AGREEMENT_CHANGE", r))
     if b.get("cancellation"):
         events.append((b["cancellation"]["at"], 3, "CANCELLATION", b["cancellation"]))
+    refunds = await db.refunds.find({"booking_id": booking_id, "status": "Paid"}, {"_id": 0}).to_list(None)
+    for rf in refunds:
+        events.append((rf["paid_at"], 4, "REFUND", rf))
+    for t in b.get("transfers") or []:
+        events.append((t["at"], 0, "TRANSFER", t))
     events.sort(key=lambda e: (e[0], e[1]))
 
     cash_agreed = revisions[0]["before"]["cash_agreed_paise"] if revisions else b["cash_agreed_paise"]
     account_agreed = revisions[0]["before"]["account_agreed_paise"] if revisions else b["account_agreed_paise"]
     pct, cash_paid, account_paid, last_pay = 0, 0, 0, None
+    closed = False
     rows = []
     for seq, (at, _, kind, src) in enumerate(events, start=1):
         amount, category, ref, note = 0, None, None, None
@@ -94,16 +100,42 @@ async def rebuild(booking_id: str) -> list[dict]:
             amount = (cash_agreed + account_agreed) - (src["before"]["cash_agreed_paise"] + src["before"]["account_agreed_paise"])
             note = src.get("reason")
         elif kind == "CANCELLATION":
-            amount = -(src.get("refund_paise") or 0)
-            note = src.get("reason")
-        c_ord, a_ord = _orders(cash_agreed, account_agreed, pct)
+            amount = 0
+            closed = True
+            note = f"{src.get('reason')} · refund payable {src.get('refund_paise', 0) / 100:,.0f} · deduction {src.get('deduction_paise', 0) / 100:,.0f}"
+        elif kind == "REFUND":
+            amount = -src["amount_paise"]
+            category = src.get("bucket")
+            ref = src.get("refund_number")
+            note = f"Refund paid · {src.get('mode') or ''} {src.get('reference') or ''}".strip()
+            if category == "Cash":
+                cash_paid += amount
+            elif category == "Account":
+                account_paid += amount
+            else:
+                for line in lines.values():
+                    if line.get("paid_paise", 0) > 0:
+                        take = min(line["paid_paise"], -amount)
+                        line["paid_paise"] -= take
+                        amount += take
+                        if amount >= 0:
+                            break
+                amount = -src["amount_paise"]
+        elif kind == "TRANSFER":
+            amount = 0
+            note = f"Transferred {src.get('from_flat')} → {src.get('to_flat')} · {src.get('reason') or ''}"
+        c_ord, a_ord = (cash_paid, account_paid) if closed else _orders(cash_agreed, account_agreed, pct)
         oc_dem, oc_paid = _oc_totals(list(lines.values()))
+        if closed:
+            oc_dem = oc_paid
         rows.append({
             "id": new_id(), "booking_id": booking_id, "seq": seq, "at": at, "date": at[:10], "type": kind, "construction_percent": pct,
             "category": category, "amount_paise": amount, "note": note, "ref": ref,
             "cash_paid_cum_paise": cash_paid, "account_paid_cum_paise": account_paid,
             "cash_order_raised_paise": c_ord, "account_order_raised_paise": a_ord,
             "cash_due_paise": c_ord - cash_paid, "account_due_paise": a_ord - account_paid, "total_due_paise": (c_ord - cash_paid) + (a_ord - account_paid),
+            "outstanding_paise": max(c_ord - cash_paid, 0) + max(a_ord - account_paid, 0) + max(oc_dem - oc_paid, 0),
+            "advance_paise": max(cash_paid - c_ord, 0) + max(account_paid - a_ord, 0) + max(oc_paid - oc_dem, 0),
             "other_charges_due_paise": oc_dem - oc_paid,
         })
     # final summary
@@ -111,6 +143,8 @@ async def rebuild(booking_id: str) -> list[dict]:
     c_ord, a_ord = _orders(b["cash_agreed_paise"], b["account_agreed_paise"], pct_now)
     if b.get("status") == "Cancelled":
         c_ord, a_ord = cash_paid, account_paid  # ledger closed: nothing further due
+        for line in lines.values():
+            line["demanded_paise"] = line.get("paid_paise", 0)
     oc_dem, oc_paid = _oc_totals(list(lines.values()))
     pending = sum(p["amount_paise"] for p in await db.payments.find({"booking_id": booking_id, "status": "Pending"}, {"_id": 0, "amount_paise": 1}).to_list(None))
     summary = {
@@ -119,7 +153,12 @@ async def rebuild(booking_id: str) -> list[dict]:
         "cash_due_paise": c_ord - cash_paid, "account_due_paise": a_ord - account_paid, "due_paise": (c_ord - cash_paid) + (a_ord - account_paid),
         "other_charges_demanded_paise": oc_dem, "other_charges_paid_paise": oc_paid, "other_charges_due_paise": oc_dem - oc_paid,
         "pending_cheques_paise": pending, "last_payment_at": last_pay,
+        # definitions.outstanding / advance — buckets never net against each other (law)
+        "outstanding_paise": max(c_ord - cash_paid, 0) + max(a_ord - account_paid, 0) + max(oc_dem - oc_paid, 0),
+        "advance_paise": max(cash_paid - c_ord, 0) + max(account_paid - a_ord, 0) + max(oc_paid - oc_dem, 0),
+        "other_charges_undemanded_paise": sum(line.get("total_paise", 0) - line.get("demanded_paise", 0) for line in lines.values()),
     }
+    summary["due_paise"] = summary["outstanding_paise"]
     # demand statuses: FIFO per bucket
     cum_c = cum_a = 0
     for d in sorted(demands, key=lambda x: x["posted_at"]):
@@ -131,6 +170,8 @@ async def rebuild(booking_id: str) -> list[dict]:
         total = d["total_demand_paise"]
         paid = paid_c + paid_a
         status = "Paid" if total and paid >= total else "Partially Paid" if paid > 0 else "Open"
+        if b.get("status") == "Cancelled" and status != "Paid":
+            status = "Cancelled"  # definition: a cancelled booking carries no live demands
         if (d.get("status") != status) or d.get("paid_paise") != paid:
             await db.demands.update_one({"id": d["id"]}, {"$set": {"status": status, "paid_paise": paid}})
     await db.ledger_entries.delete_many({"booking_id": booking_id})

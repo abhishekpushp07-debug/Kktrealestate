@@ -84,14 +84,14 @@ def respond(request: Request, fmt: str | None, payload: dict, title: str, compan
 
 
 @router.get("")
-async def list_reports(user: dict = Depends(require("report.view"))):
+async def list_reports(user: dict = Depends(require("reports.collections.view"))):
     return {"items": REPORTS}
 
 
 # ---------- 1. Collections ----------
 @router.get("/collections")
 async def collections(request: Request, from_date: str | None = None, to_date: str | None = None, project_id: str | None = None, block_id: str | None = None, mode: str | None = None,
-                      category: str | None = None, status: str | None = None, group_by: str = "day", format: str | None = None, user: dict = Depends(require("report.view"))):
+                      category: str | None = None, status: str | None = None, group_by: str = "day", format: str | None = None, user: dict = Depends(require("reports.collections.view"))):
     _strict_params(request, {'from_date', 'category', 'status', 'to_date', 'group_by', 'mode', 'block_id', 'project_id'})
     f, t = _dates(from_date, to_date)
     q = {**_scope(user, project_id, block_id), "payment_date": {"$gte": f, "$lte": t}, "status": status or "Cleared"}
@@ -127,7 +127,7 @@ def _age_bucket(due_date: str, today: date) -> str:
 
 
 @router.get("/outstanding")
-async def outstanding(request: Request, project_id: str | None = None, block_id: str | None = None, group_by: str = "customer", format: str | None = None, user: dict = Depends(require("report.view"))):
+async def outstanding(request: Request, project_id: str | None = None, block_id: str | None = None, group_by: str = "customer", format: str | None = None, user: dict = Depends(require("reports.outstanding.view"))):
     _strict_params(request, {'block_id', 'group_by', 'project_id'})
     q = {**_scope(user, project_id, block_id), "status": {"$in": ["Active", "Completed"]}}
     bks = await db.bookings.find(q, {"_id": 0, "id": 1, "booking_number": 1, "customer_name": 1, "project_code": 1, "block_code": 1, "flat_snapshot.flat_number": 1, "summary": 1, "project_id": 1, "block_id": 1}).to_list(None)
@@ -165,7 +165,7 @@ async def outstanding(request: Request, project_id: str | None = None, block_id:
 
 # ---------- 3. Advances ----------
 @router.get("/advances")
-async def advances(request: Request, project_id: str | None = None, format: str | None = None, user: dict = Depends(require("report.view"))):
+async def advances(request: Request, project_id: str | None = None, format: str | None = None, user: dict = Depends(require("reports.outstanding.view"))):
     _strict_params(request, {'project_id'})
     q = {**_scope(user, project_id), "status": {"$in": ["Active", "Completed"]}, "$or": [{"summary.cash_due_paise": {"$lt": 0}}, {"summary.account_due_paise": {"$lt": 0}}]}
     rows = []
@@ -181,7 +181,7 @@ async def advances(request: Request, project_id: str | None = None, format: str 
 # ---------- 4. Demand vs collection ----------
 @router.get("/demand-vs-collection")
 @router.get("/demand-vs-collection-installment")
-async def demand_vs_collection(request: Request, project_id: str | None = None, block_id: str | None = None, format: str | None = None, user: dict = Depends(require("report.view"))):
+async def demand_vs_collection(request: Request, project_id: str | None = None, block_id: str | None = None, format: str | None = None, user: dict = Depends(require("reports.demand_vs_collection.view"))):
     _strict_params(request, {'block_id', 'project_id'})
     q = {**_scope(user, project_id, block_id), "voided": False}
     rows = await db.demands.aggregate([{"$match": q}, {"$group": {"_id": {"block_id": "$block_id", "seq": "$milestone_seq", "name": "$milestone_name", "pct": "$cumulative_percent"}, "cash_demand_paise": {"$sum": "$cash_demand_paise"}, "account_demand_paise": {"$sum": "$account_demand_paise"}, "demand_paise": {"$sum": "$total_demand_paise"}, "collected_paise": {"$sum": "$paid_paise"}, "count": {"$sum": 1}}}, {"$sort": {"_id.block_id": 1, "_id.seq": 1}}]).to_list(None)
@@ -196,7 +196,7 @@ async def demand_vs_collection(request: Request, project_id: str | None = None, 
 
 # ---------- 5. Inventory ----------
 @router.get("/inventory")
-async def inventory(request: Request, project_id: str | None = None, group_by: str = "block", format: str | None = None, user: dict = Depends(require("report.view"))):
+async def inventory(request: Request, project_id: str | None = None, group_by: str = "block", format: str | None = None, user: dict = Depends(require("reports.inventory.view"))):
     _strict_params(request, {'group_by', 'project_id'})
     q = {**_scope(user, project_id), "is_active": True}
     key = {"project": "$project_id", "block": "$block_id", "flat_type": "$flat_type_code", "floor": {"$concat": ["$block_id", "|", {"$toString": "$floor"}]}}.get(group_by, "$block_id")
@@ -224,7 +224,7 @@ async def inventory(request: Request, project_id: str | None = None, group_by: s
 
 # ---------- 8. Cheques ----------
 @router.get("/cheques")
-async def cheques(request: Request, project_id: str | None = None, status: str = "Pending", format: str | None = None, user: dict = Depends(require("report.view"))):
+async def cheques(request: Request, project_id: str | None = None, status: str = "Pending", format: str | None = None, user: dict = Depends(require("reports.cheque_register.view"))):
     _strict_params(request, {'status', 'project_id'})
     q = {**_scope(user, project_id), "payment_mode_code": {"$in": ["CHEQUE", "DD"]}, "status": status}
     rows = [{"receipt_number": p["receipt_number"], "customer_name": p["customer_name"], "booking_number": p["booking_number"], "instrument_number": (p.get("instrument") or {}).get("number"), "instrument_date": (p.get("instrument") or {}).get("date"), "bank": (p.get("instrument") or {}).get("bank_name"), "amount_paise": p["amount_paise"], "status": p["status"], "bounced_at": p.get("bounced_at")}
@@ -235,7 +235,7 @@ async def cheques(request: Request, project_id: str | None = None, status: str =
 
 # ---------- 9. Cancellations ----------
 @router.get("/cancellations")
-async def cancellations(request: Request, from_date: str | None = None, to_date: str | None = None, project_id: str | None = None, format: str | None = None, user: dict = Depends(require("report.view"))):
+async def cancellations(request: Request, from_date: str | None = None, to_date: str | None = None, project_id: str | None = None, format: str | None = None, user: dict = Depends(require("reports.cancellations_refunds.view"))):
     _strict_params(request, {'to_date', 'from_date', 'project_id'})
     f, t = _dates(from_date, to_date)
     q = {**_scope(user, project_id), "status": "Cancelled", "cancellation.at": {"$gte": f, "$lte": t + "T23:59:59"}}
@@ -250,7 +250,7 @@ async def cancellations(request: Request, from_date: str | None = None, to_date:
 
 # ---------- 10. Sales & leads ----------
 @router.get("/sales-leads")
-async def sales_leads(request: Request, from_date: str | None = None, to_date: str | None = None, format: str | None = None, user: dict = Depends(require("report.view"))):
+async def sales_leads(request: Request, from_date: str | None = None, to_date: str | None = None, format: str | None = None, user: dict = Depends(require("reports.lead_funnel.view"))):
     _strict_params(request, {'to_date', 'from_date'})
     f, t = _dates(from_date, to_date)
     q = {"company_id": user["company_id"], **project_scope_filter(user), "created_at": {"$gte": f, "$lte": t + "T23:59:59"}}
@@ -288,7 +288,7 @@ async def sales_leads(request: Request, from_date: str | None = None, to_date: s
 
 # ---------- 11. Roznamcha range & bank receipts ----------
 @router.get("/roznamcha-range")
-async def roznamcha_range(request: Request, from_date: str | None = None, to_date: str | None = None, format: str | None = None, user: dict = Depends(require("report.view"))):
+async def roznamcha_range(request: Request, from_date: str | None = None, to_date: str | None = None, format: str | None = None, user: dict = Depends(require("reports.roznamcha.view"))):
     _strict_params(request, {'to_date', 'from_date'})
     f, t = _dates(from_date, to_date)
     base = {"company_id": user["company_id"], **project_scope_filter(user)}
@@ -306,7 +306,7 @@ async def roznamcha_range(request: Request, from_date: str | None = None, to_dat
 
 
 @router.get("/bank-receipts")
-async def bank_receipts(request: Request, from_date: str | None = None, to_date: str | None = None, format: str | None = None, user: dict = Depends(require("report.view"))):
+async def bank_receipts(request: Request, from_date: str | None = None, to_date: str | None = None, format: str | None = None, user: dict = Depends(require("reports.bank_wise.view"))):
     _strict_params(request, {'to_date', 'from_date'})
     f, t = _dates(from_date, to_date)
     rows = await db.payments.aggregate([{"$match": {"company_id": user["company_id"], **project_scope_filter(user), "payment_date": {"$gte": f, "$lte": t}, "status": {"$in": ["Cleared", "Pending"]}, "payment_mode_code": {"$ne": "CASH"}}},
@@ -319,7 +319,7 @@ async def bank_receipts(request: Request, from_date: str | None = None, to_date:
 
 # ---------- 12. Activity ----------
 @router.get("/activity")
-async def activity(request: Request, from_date: str | None = None, to_date: str | None = None, format: str | None = None, user: dict = Depends(require("audit.view"))):
+async def activity(request: Request, from_date: str | None = None, to_date: str | None = None, format: str | None = None, user: dict = Depends(require("reports.audit.view"))):
     _strict_params(request, {'to_date', 'from_date'})
     f, t = _dates(from_date, to_date)
     rng = {"$gte": f, "$lte": t + "T23:59:59"}
@@ -357,7 +357,7 @@ def _addr(a: dict | None) -> str:
 
 
 @router.get("/statement/{booking_id}")
-async def statement(booking_id: str, format: str | None = None, download: int = 0, user: dict = Depends(require("booking.read"))):
+async def statement(booking_id: str, format: str | None = None, download: int = 0, user: dict = Depends(require("finance.ledger.export"))):
     if format == "pdf":
         content, name = await build_statement_pdf(booking_id, user)
         return _pdf.pdf_response(content, name, bool(download))
@@ -403,7 +403,7 @@ async def build_statement_pdf(booking_id: str, user: dict) -> tuple[bytes, str]:
 
 
 @router.get("/allotment/{booking_id}")
-async def allotment(booking_id: str, format: str | None = None, download: int = 0, user: dict = Depends(require("booking.read"))):
+async def allotment(booking_id: str, format: str | None = None, download: int = 0, user: dict = Depends(require("sales.booking.export"))):
     if format == "pdf":
         content, name = await build_allotment_pdf(booking_id, user)
         return _pdf.pdf_response(content, name, bool(download))
@@ -458,7 +458,7 @@ class PresetIn(StrictModel):
 
 
 @router.get("/presets")
-async def list_presets(report_key: str | None = None, user: dict = Depends(require("report.view"))):
+async def list_presets(report_key: str | None = None, user: dict = Depends(require("reports.collections.view"))):
     q = {"user_id": user["id"]}
     if report_key:
         q["report_key"] = report_key
@@ -466,7 +466,7 @@ async def list_presets(report_key: str | None = None, user: dict = Depends(requi
 
 
 @router.post("/presets", status_code=201)
-async def create_preset(body: PresetIn, request: Request, user: dict = Depends(require("report.view"))):
+async def create_preset(body: PresetIn, request: Request, user: dict = Depends(require("reports.collections.view"))):
     if body.report_key not in {r["key"] for r in REPORTS}:
         raise ApiError(422, "Unknown report", "VALIDATION_ERROR")
     doc = {**base_doc(user, user["company_id"]), "user_id": user["id"], **body.model_dump()}
@@ -477,7 +477,7 @@ async def create_preset(body: PresetIn, request: Request, user: dict = Depends(r
 
 
 @router.delete("/presets/{preset_id}")
-async def delete_preset(preset_id: str, user: dict = Depends(require("report.view"))):
+async def delete_preset(preset_id: str, user: dict = Depends(require("reports.collections.view"))):
     r = await db.report_presets.delete_one({"id": preset_id, "user_id": user["id"]})
     if not r.deleted_count:
         raise ApiError(404, "Preset not found", "NOT_FOUND")
@@ -489,7 +489,7 @@ class PresetPatchIn(StrictModel):
 
 
 @router.patch("/presets/{preset_id}")
-async def rename_preset(preset_id: str, body: PresetPatchIn, user: dict = Depends(require("report.view"))):
+async def rename_preset(preset_id: str, body: PresetPatchIn, user: dict = Depends(require("reports.collections.view"))):
     r = await db.report_presets.find_one_and_update({"id": preset_id, "user_id": user["id"]}, {"$set": {"name": body.name.strip()}}, projection={"_id": 0}, return_document=ReturnDocument.AFTER)
     if not r:
         raise ApiError(404, "Preset not found", "NOT_FOUND")
@@ -497,7 +497,7 @@ async def rename_preset(preset_id: str, body: PresetPatchIn, user: dict = Depend
 
 
 @router.get("/service-sla")
-async def service_sla(request: Request, from_date: str | None = None, to_date: str | None = None, project_id: str | None = None, format: str | None = None, user: dict = Depends(require("report.view"))):
+async def service_sla(request: Request, from_date: str | None = None, to_date: str | None = None, project_id: str | None = None, format: str | None = None, user: dict = Depends(require("reports.service_sla.view"))):
     _strict_params(request, {"to_date", "from_date", "project_id"})
     f, t = _dates(from_date, to_date)
     q = {"company_id": user["company_id"], "created_at": {"$gte": f, "$lte": t + "T23:59:59"}}
@@ -544,7 +544,7 @@ async def service_sla(request: Request, from_date: str | None = None, to_date: s
 
 
 @router.get("/construction-progress")
-async def construction_progress(request: Request, project_id: str | None = None, format: str | None = None, user: dict = Depends(require("report.view"))):
+async def construction_progress(request: Request, project_id: str | None = None, format: str | None = None, user: dict = Depends(require("reports.construction_vs_plan.view"))):
     _strict_params(request, {"project_id"})
     q = {"company_id": user["company_id"]}
     if project_id:

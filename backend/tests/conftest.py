@@ -18,15 +18,79 @@ if "REACT_APP_BACKEND_URL" not in os.environ:
                 os.environ["REACT_APP_BACKEND_URL"] = line.split("=", 1)[1].strip()
 
 BASE = os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:8001").rstrip("/")
-# The preview ingress sits behind an edge that NATs egress IPs per connection and serves "Just a moment…" 429 challenge pages under
-# load; the suite therefore targets the local backend (same code, same DB) whenever it is reachable. Set KKT_TEST_EXTERNAL=1 to force the public URL.
-if not os.environ.get("KKT_TEST_EXTERNAL"):
+# ---------------------------------------------------------------------------------------------------------------------------------
+# R0d — TEST DB ISOLATION. The suite NEVER runs against the preview database. The controller process snapshots the preview story DB
+# into `kkt_test` (deterministic story output == fixture), starts a private backend on :8011 bound to it, and points every test there.
+# Opt-outs: KKT_TEST_EXTERNAL=1 (public preview URL, read-only smoke) · KKT_TEST_USE_PREVIEW=1 (legacy, forbidden in CI).
+# CI: `cd backend && python -m pytest -q` (conftest does the rest; needs mongod + LOGIN_RATE_LIMIT_BYPASS_TOKEN in the process env).
+# ---------------------------------------------------------------------------------------------------------------------------------
+PREVIEW_DB = os.environ.get("KKT_PREVIEW_DB") or os.environ["DB_NAME"]
+os.environ["KKT_PREVIEW_DB"] = PREVIEW_DB  # workers inherit DB_NAME=kkt_test; remember the real preview name for the never-touch assertion
+TEST_DB = os.environ.get("KKT_TEST_DB", "kkt_test")
+TEST_PORT = int(os.environ.get("KKT_TEST_PORT", "8021"))
+_server_proc = None
+
+
+def _snapshot_preview_into_test_db():
+    from pymongo import MongoClient
+    cli = MongoClient(os.environ["MONGO_URL"])
+    src, dst = cli[PREVIEW_DB], cli[TEST_DB]
+    cli.drop_database(TEST_DB)
+    for name in src.list_collection_names():
+        docs = list(src[name].find({}))
+        if docs:
+            dst[name].insert_many(docs, ordered=False)
+        for ix in src[name].list_indexes():
+            if ix["name"] != "_id_":
+                opts = {k: v for k, v in ix.items() if k not in ("key", "v", "ns", "name")}
+                dst[name].create_index(list(ix["key"].items()), name=ix["name"], **opts)
+    for info in src.list_collections():  # schema validators travel with the snapshot
+        v = (info.get("options") or {}).get("validator")
+        if v:
+            if info["name"] not in dst.list_collection_names():
+                dst.create_collection(info["name"])
+            dst.command("collMod", info["name"], validator=v, validationLevel=info["options"].get("validationLevel", "strict"), validationAction=info["options"].get("validationAction", "error"))
+    dst.leases.delete_many({})  # let the private backend run its own (idempotent) startup on the copy
+    dst.settings.update_one({"key": "test_db_marker"}, {"$set": {"value": True, "source": PREVIEW_DB, "at": time.time()}}, upsert=True)
+
+
+def _start_private_backend():
+    import atexit
+    import subprocess
+    global _server_proc
+    env = {**os.environ, "DB_NAME": TEST_DB, "LOGIN_RATE_LIMIT_BYPASS_TOKEN": BYPASS_TOKEN, "SEEDER_AS_OF_ENABLED": "true", "KKT_ROLE": "test"}
+    log = open("/tmp/kkt_test_backend.log", "w")
+    _server_proc = subprocess.Popen([sys.executable, "-m", "uvicorn", "server:app", "--host", "127.0.0.1", "--port", str(TEST_PORT), "--log-level", "warning"], cwd=os.path.join(os.path.dirname(__file__), ".."), env=env, stdout=log, stderr=subprocess.STDOUT)
+    atexit.register(lambda: _server_proc and _server_proc.kill())
+    for _ in range(90):
+        try:
+            if requests.get(f"http://127.0.0.1:{TEST_PORT}/api/health", timeout=2).status_code == 200:
+                return
+        except requests.exceptions.RequestException:
+            pass
+        if _server_proc.poll() is not None:
+            raise RuntimeError("private test backend died: see /tmp/kkt_test_backend.log")
+        time.sleep(1)
+    raise RuntimeError("private test backend did not become healthy")
+
+
+BYPASS_TOKEN = os.environ.get("LOGIN_RATE_LIMIT_BYPASS_TOKEN", "kkt-test-bypass-local")
+if os.environ.get("KKT_TEST_EXTERNAL"):
+    pass  # read-only smoke against the public URL (no DB assertions possible)
+elif os.environ.get("KKT_TEST_USE_PREVIEW"):
     try:
         if requests.get("http://localhost:8001/api/health", timeout=2).status_code == 200:
             BASE = "http://localhost:8001"
-            os.environ["REACT_APP_BACKEND_URL"] = BASE
     except requests.exceptions.RequestException:
         pass
+else:
+    if not os.environ.get("PYTEST_XDIST_WORKER") and os.environ.get("DB_NAME") != TEST_DB:  # controller: snapshot + start once
+        _snapshot_preview_into_test_db()
+        _start_private_backend()
+    os.environ["DB_NAME"] = TEST_DB  # inherited by xdist workers (spawned after this import)
+    BASE = f"http://127.0.0.1:{TEST_PORT}"
+    assert os.environ["DB_NAME"] != PREVIEW_DB, "tests must never target the preview DB"
+os.environ["REACT_APP_BACKEND_URL"] = BASE
 # Test-only rate-limit bypass: the token lives in the test process + local supervisor env only (asserted absent from .env in test_hardening).
 BYPASS = os.environ.get("LOGIN_RATE_LIMIT_BYPASS_TOKEN", "kkt-test-bypass-local")
 _orig_request = requests.Session.request
@@ -88,7 +152,7 @@ _real_post = requests.post
 _real_session_post = requests.Session.post
 
 
-NO_CACHE_FILES = ("test_phase_1_5.py", "test_phase_5.py", "test_phase_11a.py")  # MFA / refresh-rotation / session-revocation tests need real logins
+NO_CACHE_FILES = ("test_phase_1_5.py", "test_phase_5.py", "test_phase_11a.py", "test_owner_bootstrap.py")  # MFA / refresh-rotation / session-revocation / host-gating tests need real logins
 
 
 def _cache_key(url, kwargs):
@@ -241,4 +305,43 @@ def admin_headers():
 def anchor_booking(admin_headers):
     r = requests.get(f"{BASE}/api/bookings", params={"page_size": 50}, headers=admin_headers).json()
     items = r["items"] if isinstance(r, dict) else r
-    return next(b for b in items if b["booking_number"] == "BK-2526-0001")
+    anchor = "BK-2526-0014" if _story_mode() else "BK-2526-0001"  # Phase H story anchor
+    r = requests.get(f"{BASE}/api/bookings", params={"search": anchor, "page_size": 5}, headers=admin_headers).json()
+    items = r["items"] if isinstance(r, dict) else r
+    return next(b for b in items if b["booking_number"] == anchor)
+
+
+# Phase H: the demo seed (seed_phase2/5/9 fixtures: owner's example BK-2526-0001 table, Tower B "18 %", 6 CMS testimonials,
+# pre-switch price snapshot, Priya/Sunita/Santosh portal personas) is retired when the DB is the API-driven story dataset.
+# Those tests assert the shape of the old raw-inserted fixtures and are skipped in story mode; the story has its own anchors
+# (tests/test_story_headline.py).
+_LEGACY_DEMO_TESTS = (
+    "test_price_truth.py::test_flat_api_prices_match_pre_switch_snapshot",
+    "test_phase_2.py::test_roznamcha",
+    "test_phase_2.py::test_payment_requires_idempotency_and_bucket_cap_and_revision", "test_phase_2.py::test_milestones_forward_only_and_undo_block",
+    "test_phase_2.py::test_kyc_masking_and_reveal", "test_phase_2.py::test_concurrency_and_sum_mismatch", "test_phase_2.py::test_cheque_pending_clear_bounce_reverse",
+    "test_phase_3.py::test_cms_collection_counts[testimonials-6]", "test_phase_7.py::TestTowerBConstruction", "test_phase_7.py::TestBK0001Integrity", "test_phase_7.py::TestPortalPhase7",
+        "test_phase_5.py::TestServiceRequests::test_rate_sunita_sr3", "test_phase_5.py::TestServiceRequests::test_internal_note_hidden_on_portal",
+    "test_phase_5.py::TestChangePassword", "test_phase_5.py::TestErpDocShare::test_toggle_share_and_sensitive_block", "test_phase_5.py::TestErpPortalMgmt::test_get_portal_status_and_revoke_and_bulk",
+    "test_phase_a_print.py", "test_phase_9.py::test_brochure_gate_flow", "test_phase_9.py::test_availability_rules", "test_phase_1_5.py::TestRateCards::test_create_activate_apply",
+    "test_phase_c_refocus.py::test_receipt_pdf_text_kkt",
+    "test_phase_5.py::TestPortalAuth::test_lockout_after_5_wrong", "test_phase_5.py::TestPortalData",
+)
+
+
+def _story_mode() -> bool:
+    try:
+        from pymongo import MongoClient
+        db = MongoClient(os.environ["MONGO_URL"])[os.environ["DB_NAME"]]
+        return bool(db.settings.find_one({"key": "story_mode", "value": True}))
+    except Exception:
+        return False
+
+
+def pytest_collection_modifyitems(config, items):
+    if not _story_mode():
+        return
+    mark = pytest.mark.skip(reason="legacy demo-seed fixture retired by the Phase H story dataset")
+    for item in items:
+        if any(t in item.nodeid for t in _LEGACY_DEMO_TESTS):
+            item.add_marker(mark)

@@ -82,7 +82,7 @@ def test_last_payment_ignores_reversed():
 # ---------- 1b. document scope ----------
 def test_document_project_scope_404():
     h = H()
-    projects = requests.get(f"{BASE}/projects", headers=h, timeout=15).json()["items"]
+    projects = [p for p in requests.get(f"{BASE}/projects", headers=h, timeout=15).json()["items"] if p.get("website", {}).get("slug")]
     assert len(projects) >= 2
     a, b = projects[0], projects[1]
     bk = next(x for x in requests.get(f"{BASE}/bookings?project_id={b['id']}&page_size=5", headers=h, timeout=15).json()["items"])
@@ -122,15 +122,15 @@ def test_erasure_scrubs_portal_and_tickets():
 # ---------- 1d. visit links expire / revoke ----------
 def test_visit_links_revoked_on_completed():
     h = H()
-    pid = requests.get(f"{BASE}/projects", headers=h, timeout=15).json()["items"][0]["id"]
+    pid = next(p for p in requests.get(f"{BASE}/projects", headers=h, timeout=15).json()["items"] if p.get("website", {}).get("slug"))["id"]
     slug = requests.get(f"{BASE}/projects/{pid}", headers=h, timeout=15).json().get("website", {}).get("slug")
     d = (date.today() + timedelta(days=2)).isoformat()
     for _ in range(30):
-        av = requests.get(f"{BASE}/public/site-visits/availability?project_slug={slug}&from={d}&to={(date.today() + timedelta(days=9)).isoformat()}", timeout=15).json()
-        if any(x["slots"] for x in av.get("days", [])):
+        av = requests.get(f"{BASE}/public/site-visits/availability?project_slug={slug}&from={d}&to={(date.today() + timedelta(days=13)).isoformat()}", headers={k: v for k, v in h.items() if k.lower() == "x-rate-limit-bypass"}, timeout=15).json()
+        if any(s["available_count"] > 0 for x in av.get("days", []) for s in x["slots"]):
             break
         time.sleep(2)
-    day = next(x for x in av["days"] if x["slots"])
+    day = next(x for x in av["days"] if any(s["available_count"] > 0 for s in x["slots"]))
     slot = next(s for s in day["slots"] if s["available_count"] > 0)
     body = {"project_slug": slug, "date": day["date"], "slot_start": slot["start"], "name": "Link Test", "phone": "9876500011", "consent": True}
     r = requests.post(f"{BASE}/public/site-visits", json=body, timeout=15)
@@ -156,7 +156,7 @@ def test_catalogue_bundle_etag_and_inline_add():
     h = H()
     r = requests.get(f"{BASE}/catalogues", headers=h, timeout=15)
     assert r.status_code == 200 and r.headers.get("ETag")
-    local = requests.get("http://localhost:8001/api/catalogues", headers=h, timeout=15)  # the preview ingress rewrites Cache-Control
+    local = requests.get(os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:8001").rstrip("/") + "/api/catalogues", headers=h, timeout=15)  # the preview ingress rewrites Cache-Control
     assert "max-age=300" in local.headers["Cache-Control"]
     types = r.json()["types"]
     for t in ("salutation", "state", "city", "locality", "bank", "lead_source", "communication_type", "projects", "blocks", "flat_types", "payment_plans", "users"):
@@ -175,7 +175,7 @@ def test_catalogue_bundle_etag_and_inline_add():
 
 def test_project_setup_hierarchy_errors():
     h = H()
-    projects = requests.get(f"{BASE}/projects", headers=h, timeout=15).json()["items"]
+    projects = [p for p in requests.get(f"{BASE}/projects", headers=h, timeout=15).json()["items"] if p.get("website", {}).get("slug")]
     s = requests.get(f"{BASE}/projects/{projects[0]['id']}/setup", headers=h, timeout=15).json()
     assert s["towers"] and s["stages"]["project_sequence"] and "checklist" in s
     r = requests.put(f"{BASE}/projects/{projects[0]['id']}/setup/pricing", headers=h, json={"block_rates": [{"block_id": "not-a-tower", "rate_per_sqft": 4000}]}, timeout=15)
@@ -213,7 +213,7 @@ def test_three_ledgers_and_customer_ledgers():
         assert set(l[k]["summary"]) >= {"agreed_paise", "raised_paise", "paid_paise", "due_paise", "advance_paise", "pending_cheques_paise"}
     assert l["cash"]["summary"]["agreed_paise"] == b["cash_agreed_paise"]
     assert l["cash"]["summary"]["paid_paise"] + l["account"]["summary"]["paid_paise"] == b["summary"]["paid_paise"]
-    assert all(r["type"] in ("DEMAND", "PAYMENT", "REVERSAL", "AGREEMENT_CHANGE", "CANCELLATION") for r in l["cash"]["rows"])
+    assert all(r["type"] in ("DEMAND", "PAYMENT", "REVERSAL", "AGREEMENT_CHANGE", "CANCELLATION", "TRANSFER", "REFUND") for r in l["cash"]["rows"])
     cl = requests.get(f"{BASE}/customers/{b['customer_id']}/ledgers", headers=h, timeout=15).json()
     assert any(x["booking_id"] == b["id"] for x in cl["bookings"]) and cl["totals"]["combined"]["paid_paise"] >= b["summary"]["paid_paise"]
 

@@ -1,3 +1,4 @@
+import { HistoryButton } from "@/components/common/HistoryTimeline";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import api, { errMsg } from "@/lib/api";
@@ -65,7 +66,7 @@ export function FlatDrawer({ flatId, onClose, onChanged }) {
       <SheetContent className="w-full overflow-y-auto sm:max-w-lg" data-testid="flat-drawer">
         {!flat ? <div className="space-y-3 pt-6"><SheetTitle className="sr-only">Loading flat</SheetTitle><Skeleton className="h-8 w-40" /><Skeleton className="h-32" /></div> : <>
           <SheetHeader>
-            <SheetTitle className="flex items-center gap-3 text-2xl font-extrabold text-ink-950"><span data-testid="flat-drawer-number">{flat.flat_number}</span><StatusChip status={flat.status} testId="flat-drawer-status" /></SheetTitle>
+            <SheetTitle className="flex items-center gap-3 text-2xl font-extrabold text-ink-950"><span data-testid="flat-drawer-number">{flat.flat_number}</span><StatusChip status={flat.status} testId="flat-drawer-status" /><HistoryButton entityType="flat" entityId={flat.id} label={flat.flat_number} /></SheetTitle>
             <p className="text-sm text-txt-secondary">{flat.project_name} · {flat.block_name} · Floor {flat.floor} · Position {flat.position}</p>
           </SheetHeader>
           <div className="mt-6 rounded-xl bg-ink-950 p-5 text-white">

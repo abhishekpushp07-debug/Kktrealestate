@@ -1,3 +1,4 @@
+import { useAuth } from "@/context/AuthContext";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Plus, Lock, Trash2, Search, Check, Minus, ArrowLeft } from "lucide-react";
@@ -12,6 +13,7 @@ const ACTIONS = ["read", "view", "write", "create", "manage", "assign", "approve
 const actionOf = (code) => code.split(".").pop();
 
 function RoleEditor({ role, groups, onSaved }) {
+  const { can } = useAuth();
   const isNew = !role.id;
   const locked = role.is_system && role.name === "Super Admin";
   const [form, setForm] = useState({ name: role.name || "", description: role.description || "", permissions: role.permissions || [] });
@@ -57,7 +59,7 @@ function RoleEditor({ role, groups, onSaved }) {
           </tr>); })}</tbody>
       </table></div>
       <div className="flex items-center justify-between gap-3 border-t border-warm-100 bg-warm-50/60 px-6 py-4">
-        {!role.is_system && !isNew ? <button className="btn btn-ghost text-brick" onClick={del} data-testid="role-delete-btn"><Trash2 className="h-4 w-4" />Deactivate role</button> : <span className="text-xs text-txt-muted">{role.is_system ? "System role · name is fixed" : ""}</span>}
+        {!role.is_system && !isNew && can("roles.manage") ? <button className="btn btn-ghost text-brick" onClick={del} data-testid="role-delete-btn"><Trash2 className="h-4 w-4" />Deactivate role</button> : <span className="text-xs text-txt-muted">{role.is_system ? "System role · name is fixed" : ""}</span>}
         <div className="flex items-center gap-3">{dirty ? <span className="text-xs text-txt-secondary" data-testid="role-diff-summary">+{added.length} / −{removed.length}</span> : null}<button className="btn btn-primary" disabled={busy || (!dirty && !isNew)} onClick={() => (isNew && !added.length ? save() : setPreview(true))} data-testid="role-save-btn">{isNew ? "Create role" : "Review & save"}</button></div>
       </div>
       <Dialog open={preview} onOpenChange={setPreview}>
@@ -76,6 +78,7 @@ function RoleEditor({ role, groups, onSaved }) {
 }
 
 export default function Roles() {
+  const { can } = useAuth();
   const { data: roles, loading, reload } = useFetch("/roles?page_size=100");
   const { data: perms } = useFetch("/permissions");
   const [selected, setSelected] = useState(null);
@@ -85,7 +88,7 @@ export default function Roles() {
     <div className="space-y-8" data-testid="roles-page">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div><Link to="/users" className="mb-2 inline-flex items-center gap-1 text-[13px] text-txt-secondary hover:text-ink-950" data-testid="roles-back"><ArrowLeft className="h-3.5 w-3.5" />Users</Link><p className="label">Settings</p><h1 className="mt-1 font-display text-4xl text-ink-950">Roles & permissions</h1><p className="mt-2 text-sm text-txt-secondary">Roles bundle permission codes by area. System roles cannot be deleted.</p></div>
-        <button onClick={() => setSelected("new")} className="btn btn-primary" data-testid="new-role-btn"><Plus className="h-4 w-4" />New role</button>
+        {can("roles.manage") && <button onClick={() => setSelected("new")} className="btn btn-primary" data-testid="new-role-btn"><Plus className="h-4 w-4" />New role</button>}
       </header>
       {loading ? <div className="grid gap-6 md:grid-cols-3">{[1, 2, 3].map((i) => <Skeleton key={i} className="h-28" />)}</div> : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" data-testid="roles-list">

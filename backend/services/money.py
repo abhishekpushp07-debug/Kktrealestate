@@ -12,8 +12,16 @@ def to_rupees(paise: int | None) -> float:
     return round((paise or 0) / 100, 2)
 
 
+def rupees_whole(paise: int) -> int:
+    """System-generated amounts are whole rupees (R0b): round to the nearest ₹1; totals stay exact because the last line absorbs the remainder."""
+    return int((Decimal(int(paise)) / 100).quantize(Decimal(1), rounding=ROUND_HALF_UP)) * 100
+
+
 def pct_of(paise: int, percent: float) -> int:
-    return int((Decimal(paise) * Decimal(str(percent)) / 100).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+    """Whole-rupee share. pct_of(x, 100) == x so cumulative-difference schedules telescope exactly."""
+    if float(percent) >= 100:
+        return int(paise)
+    return rupees_whole(Decimal(paise) * Decimal(str(percent)) / 100)
 
 
 def present_money(obj):

@@ -100,7 +100,7 @@ def _present(b: dict) -> dict:
 
 @router.get("", response_model=BookingsOutPage, response_model_exclude_unset=True)
 async def list_bookings(params: ListParams = Depends(), project_id: str | None = None, block_id: str | None = None, status: str | None = None,
-                        customer_id: str | None = None, user: dict = Depends(require("booking.read"))):
+                        customer_id: str | None = None, user: dict = Depends(require("sales.booking.view"))):
     q = {"company_id": user["company_id"], **project_scope_filter(user), **search_filter(params.search, ["booking_number", "customer_name", "flat_snapshot.flat_number"])}
     for k, v in (("project_id", project_id), ("block_id", block_id), ("customer_id", customer_id)):
         if v:
@@ -117,7 +117,7 @@ async def list_bookings(params: ListParams = Depends(), project_id: str | None =
 
 
 @router.post("", status_code=201)
-async def create_booking(body: BookingIn, request: Request, user: dict = Depends(require("booking.create"))):
+async def create_booking(body: BookingIn, request: Request, user: dict = Depends(require("sales.booking.create"))):
     flat = await get_or_404(db.flats, body.flat_id, "Flat")
     ensure_project_access(user, flat["project_id"])
     if flat["status"] not in ("Available", "Hold"):
@@ -197,7 +197,7 @@ async def create_booking(body: BookingIn, request: Request, user: dict = Depends
 
 
 @router.get("/{booking_id}", response_model=BookingsOut, response_model_exclude_unset=True)
-async def get_booking(booking_id: str, user: dict = Depends(require("booking.read"))):
+async def get_booking(booking_id: str, user: dict = Depends(require("sales.booking.view"))):
     if booking_id.startswith("BK-"):
         hit = await db.bookings.find_one({"booking_number": booking_id, "company_id": user["company_id"]}, {"_id": 0, "id": 1})
         booking_id = hit["id"] if hit else booking_id
@@ -215,7 +215,7 @@ async def get_booking(booking_id: str, user: dict = Depends(require("booking.rea
 
 
 @router.get("/{booking_id}/ledger")
-async def ledger(booking_id: str, format: str | None = None, user: dict = Depends(require("booking.read"))):
+async def ledger(booking_id: str, format: str | None = None, user: dict = Depends(require("finance.ledger.view"))):
     b = await _load(booking_id, user)
     rows = await db.ledger_entries.find({"booking_id": booking_id}, {"_id": 0}).sort("seq", 1).to_list(1000)
     out = present_money(rows)
@@ -226,7 +226,7 @@ async def ledger(booking_id: str, format: str | None = None, user: dict = Depend
 
 
 @router.post("/{booking_id}/agreement-revisions")
-async def revise_agreement(booking_id: str, body: RevisionIn, request: Request, user: dict = Depends(require("agreement.edit"))):
+async def revise_agreement(booking_id: str, body: RevisionIn, request: Request, user: dict = Depends(require("sales.agreement.revise"))):
     b = await _load(booking_id, user)
     if b["status"] != "Active":
         raise ApiError(409, f"Booking is {b['status']}", "BOOKING_NOT_ACTIVE")
@@ -252,7 +252,7 @@ async def revise_agreement(booking_id: str, body: RevisionIn, request: Request, 
 
 
 @router.post("/{booking_id}/cancel")
-async def cancel_booking(booking_id: str, body: CancelIn, request: Request, user: dict = Depends(require("booking.cancel"))):
+async def cancel_booking(booking_id: str, body: CancelIn, request: Request, user: dict = Depends(require("sales.booking.cancel"))):
     b = await _load(booking_id, user)
     if b["status"] != "Active":
         raise ApiError(409, f"Booking is already {b['status']}", "BOOKING_NOT_ACTIVE")
@@ -281,7 +281,7 @@ async def cancel_booking(booking_id: str, body: CancelIn, request: Request, user
 
 
 @router.post("/{booking_id}/complete")
-async def complete_booking(booking_id: str, body: CompleteIn, request: Request, user: dict = Depends(require("booking.create"))):
+async def complete_booking(booking_id: str, body: CompleteIn, request: Request, user: dict = Depends(require("sales.booking.edit"))):
     b = await _load(booking_id, user)
     if b["status"] != "Active":
         raise ApiError(409, f"Booking is {b['status']}", "BOOKING_NOT_ACTIVE")
@@ -311,7 +311,7 @@ async def complete_booking(booking_id: str, body: CompleteIn, request: Request, 
 
 
 @router.post("/{booking_id}/other-charges/demand")
-async def demand_other_charge(booking_id: str, body: ManualChargeDemandIn, request: Request, user: dict = Depends(require("booking.create"))):
+async def demand_other_charge(booking_id: str, body: ManualChargeDemandIn, request: Request, user: dict = Depends(require("finance.demand.create"))):
     b = await _load(booking_id, user)
     lines = b.get("other_charges") or []
     line = next((l for l in lines if l["line_id"] == body.line_id), None)
@@ -327,14 +327,14 @@ async def demand_other_charge(booking_id: str, body: ManualChargeDemandIn, reque
 
 
 @router.post("/{booking_id}/recompute")
-async def recompute(booking_id: str, user: dict = Depends(require("settings.manage"))):
+async def recompute(booking_id: str, user: dict = Depends(require("admin.data.recompute"))):
     await _load(booking_id, user)
     rows = await rebuild(booking_id)
     return {"rows": len(rows), "summary": present_money((await db.bookings.find_one({"id": booking_id}, {"_id": 0, "summary": 1}))["summary"])}
 
 
 @router.get("/{booking_id}/demands/{demand_id}/letter")
-async def demand_letter(booking_id: str, demand_id: str, user: dict = Depends(require("booking.read"))):
+async def demand_letter(booking_id: str, demand_id: str, user: dict = Depends(require("finance.demand.export"))):
     from services.money import amount_in_words
     b = await _load(booking_id, user)
     d = await get_or_404(db.demands, demand_id, "Demand", {"booking_id": booking_id})

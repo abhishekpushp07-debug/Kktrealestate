@@ -1,3 +1,4 @@
+import { HistoryButton } from "@/components/common/HistoryTimeline";
 import { lazy, Suspense, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowUpRight, Building2, Pencil } from "lucide-react";
@@ -91,7 +92,7 @@ export default function ProjectWorkspace() {
   return (
     <div className="space-y-6" data-testid="project-workspace">
       <PageHero cover={p.cover_image_url} crumbs={[{ label: "Projects", to: "/projects" }, { label: p.name }]} eyebrow={p.project_type} title={p.name} subtitle={[p.address?.line1, p.address?.city].filter(Boolean).join(", ")} ring={sum?.progress_pct ?? 0}
-        chips={<>{p.rera_number && <span className="pill pill-hero">RERA {p.rera_number}</span>}<span className="pill pill-hero">{s.towers.length} towers</span><StatusPill status={p.status} /></>}
+        chips={<>{p.rera_number && <span className="pill pill-hero">RERA {p.rera_number}</span>}<HistoryButton entityType="project" entityId={p.id} label={p.code} /><span className="pill pill-hero">{s.towers.length} towers</span><StatusPill status={p.status} /></>}
         actions={<>{can("project.write") && <Link to={`/projects/${id}/setup`} className="btn btn-secondary !border-white/15 !bg-ink-800 !text-warm-50 hover:!bg-ink-700" data-testid="edit-setup-btn"><Pencil className="h-4 w-4" strokeWidth={1.75} />Edit setup</Link>}{can("booking.create") && <Link to={`/bookings/new?project_id=${id}`} className="btn btn-gold" data-testid="new-booking-btn">New booking <ArrowUpRight className="h-4 w-4" strokeWidth={1.75} /></Link>}</>}
         stats={[{ label: "Units sold", value: `${(units?.by_status?.Booked || 0) + (units?.by_status?.Sold || 0)} / ${units?.total ?? "—"}`, hint: `${units?.available ?? "—"} available` }, { label: "Collected", value: inrShort((sum?.paid_paise || 0) / 100), hint: `${inrShort((sum?.collections_mtd_paise || 0) / 100)} this month` }, { label: "Outstanding", value: inrShort((sum?.outstanding?.total_paise || 0) / 100), hint: `${sum?.overdue?.count || 0} overdue`, tone: sum?.outstanding?.total_paise ? undefined : "sage" }, { label: "Upcoming stage", value: s.towers.map((t) => t.construction.next).find(Boolean) || "—", hint: s.towers.map((t) => `${t.name} ${t.construction.percent}%`).join(" · ") }]} testId="project-hero" />
       <Tabs tabs={TABS.map(([v, l]) => ({ value: v, label: l }))} value={tab} onChange={(v) => setSp({ tab: v })} testId="project-tabs" />

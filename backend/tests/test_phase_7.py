@@ -74,7 +74,7 @@ class TestHealthAndMigration:
 # ---------- AC5 BK-2526-0001 ledger integrity ----------
 class TestBK0001Integrity:
     def test_bk_0001_due_zero_and_snapshot(self, H):
-        r = requests.get(f"{API}/bookings?q=BK-2526-0001", headers=H, timeout=15)
+        r = requests.get(f"{API}/bookings?search=BK-2526-0001", headers=H, timeout=15)
         assert r.status_code == 200, r.text
         items = r.json().get("items") or r.json()
         assert items, "BK-2526-0001 not found"

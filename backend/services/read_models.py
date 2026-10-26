@@ -1,6 +1,7 @@
 """Derived read models (recomputable, never a source of truth):
    project_summaries, block_summaries, customer_summaries, dashboard_snapshots.
    Maintained by the event bus (debounced ≤2 s) + a 60 s sweep; `recompute_all()` rebuilds everything."""
+from services import clock
 import asyncio
 import hashlib
 import logging
@@ -57,12 +58,13 @@ async def flush():
 
 
 ENTITY_LOOKUP = {"payment": (db.payments, ("project_id", "block_id", "customer_id")), "booking": (db.bookings, ("project_id", "block_id", "customer_id")), "demand": (db.demands, ("project_id", "block_id", "customer_id")),
+                 "refund": (db.refunds, ("project_id", "block_id", "customer_id")),
                  "flat": (db.flats, ("project_id", "block_id", None)), "block": (db.blocks, ("project_id", "id", None)), "project": (db.projects, ("id", None, None)), "customer": (db.customers, (None, None, "id")),
                  "lead": (db.leads, ("project_id", None, "converted_customer_id")), "site_visit": (db.site_visits, ("project_id", None, "customer_id")), "service_request": (db.service_requests, ("project_id", "block_id", "customer_id")),
                  "communication": (db.communications, (None, None, "customer_id"))}
 
 
-@bus.subscribe("entity.changed")
+@bus.subscribe("entity.changed", "read_models")
 async def _on_change(evt: dict):
     spec = ENTITY_LOOKUP.get(evt.get("entity_type"))
     if not spec:
@@ -72,22 +74,31 @@ async def _on_change(evt: dict):
     if not doc:
         return
     mark_dirty(project_id=doc.get(pf) if pf else None, block_id=doc.get(bf) if bf else None, customer_id=doc.get(cf) if cf else None)
+    if evt.get("entity_type") in ("flat", "lead", "site_visit", "service_request"):
+        mark_dirty(all_=False)  # counts on home come from the dashboard snapshot → flush recomputes it
 
 
 # ---------- computations ----------
 async def _money(match: dict) -> dict:
-    today = date.today().isoformat()
+    from services.definitions import cleared_payments_match, live_bookings_match, overdue_demands_match
+    today = clock.today().isoformat()
     month = today[:7]
-    agg = await db.bookings.aggregate([{"$match": {**match, "status": {"$in": ["Active", "Completed"]}}}, {"$group": {"_id": None, "n": {"$sum": 1}, "agreed": {"$sum": "$agreement_value_paise"}, "paid": {"$sum": "$summary.paid_paise"},
+    agg = await db.bookings.aggregate([{"$match": live_bookings_match(match)}, {"$group": {"_id": None, "n": {"$sum": 1}, "agreed": {"$sum": "$agreement_value_paise"}, "paid": {"$sum": "$summary.paid_paise"},
                                                                                                              "cash_due": {"$sum": {"$max": ["$summary.cash_due_paise", 0]}}, "acc_due": {"$sum": {"$max": ["$summary.account_due_paise", 0]}}, "oc_due": {"$sum": {"$max": ["$summary.other_charges_due_paise", 0]}},
+                                                                                                             "outstanding": {"$sum": {"$ifNull": ["$summary.outstanding_paise", {"$add": [{"$max": ["$summary.cash_due_paise", 0]}, {"$max": ["$summary.account_due_paise", 0]}, {"$max": ["$summary.other_charges_due_paise", 0]}]}]}},
+                                                                                                             "advance": {"$sum": {"$ifNull": ["$summary.advance_paise", 0]}},
                                                                                                              "oc_paid": {"$sum": "$summary.other_charges_paid_paise"}, "pending": {"$sum": "$summary.pending_cheques_paise"}}}]).to_list(1)
     a = agg[0] if agg else {}
-    col = await db.payments.aggregate([{"$match": {**match, "status": "Cleared"}}, {"$group": {"_id": None, "total": {"$sum": "$amount_paise"}, "mtd": {"$sum": {"$cond": [{"$eq": [{"$substr": ["$payment_date", 0, 7]}, month]}, "$amount_paise", 0]}}}}]).to_list(1)
+    col = await db.payments.aggregate([{"$match": cleared_payments_match(match)}, {"$group": {"_id": None, "total": {"$sum": "$amount_paise"}, "mtd": {"$sum": {"$cond": [{"$eq": [{"$substr": ["$payment_date", 0, 7]}, month]}, "$amount_paise", 0]}}}}]).to_list(1)
     c = col[0] if col else {}
-    od = await db.demands.aggregate([{"$match": {**match, "voided": {"$ne": True}, "status": {"$in": ["Open", "Partially Paid"]}, "due_date": {"$lt": today}}}, {"$group": {"_id": None, "n": {"$sum": 1}, "amt": {"$sum": {"$subtract": ["$total_demand_paise", {"$ifNull": ["$paid_paise", 0]}]}}}}]).to_list(1)
-    o = od[0] if od else {}
+    from services.definitions import ageing_for_bookings, overdue_of
+    od = await db.demands.aggregate([{"$match": overdue_demands_match(extra=match)}, {"$group": {"_id": None, "n": {"$sum": 1}}}]).to_list(1)
+    bands, _ = await ageing_for_bookings(match)
+    o = {"n": od[0]["n"] if od else 0, "amt": overdue_of(bands)}
+    rf = await db.refunds.aggregate([{"$match": {**match, "status": "Paid"}}, {"$group": {"_id": None, "s": {"$sum": "$amount_paise"}}}]).to_list(1)
     return {"bookings": a.get("n", 0), "agreement_paise": a.get("agreed", 0), "paid_paise": a.get("paid", 0) + a.get("oc_paid", 0), "collections_total_paise": c.get("total", 0), "collections_mtd_paise": c.get("mtd", 0),
-            "outstanding": {"cash_paise": a.get("cash_due", 0), "account_paise": a.get("acc_due", 0), "other_charges_paise": a.get("oc_due", 0), "total_paise": a.get("cash_due", 0) + a.get("acc_due", 0) + a.get("oc_due", 0)},
+            "outstanding": {"cash_paise": a.get("cash_due", 0), "account_paise": a.get("acc_due", 0), "other_charges_paise": a.get("oc_due", 0), "total_paise": a.get("outstanding", 0)},
+            "advance_paise": a.get("advance", 0), "refunds_paid_paise": (rf[0]["s"] if rf else 0),
             "overdue": {"count": o.get("n", 0), "amount_paise": o.get("amt", 0)}, "pending_cheques_paise": a.get("pending", 0)}
 
 
@@ -118,7 +129,7 @@ async def refresh_project(project_id: str) -> dict | None:
         await db.project_summaries.delete_one({"project_id": project_id})
         return None
     blocks = await db.block_summaries.find({"project_id": project_id}, {"_id": 0, "block_id": 1, "name": 1, "progress": 1, "units": 1}).to_list(None)
-    today = date.today().isoformat()
+    today = clock.today().isoformat()
     doc = {"project_id": project_id, "company_id": p["company_id"], "name": p["name"], "code": p["code"], "status": p.get("status"), "city": (p.get("address") or {}).get("city"), "cover_image_url": p.get("cover_image_url"), "units": await _units({"project_id": project_id}), **await _money({"project_id": project_id}),
            "progress_pct": round(sum(b["progress"]["percent"] for b in blocks) / len(blocks), 1) if blocks else 0, "towers": len(blocks),
            "leads_open": await db.leads.count_documents({"project_id": project_id, "status": {"$nin": ["Lost", "Converted"]}}), "visits_upcoming": await db.site_visits.count_documents({"project_id": project_id, "date": {"$gte": today}, "status": {"$in": ["Confirmed", "Rescheduled"]}}),
@@ -142,7 +153,7 @@ async def refresh_customer(customer_id: str) -> dict | None:
     if not c:
         await db.customer_summaries.delete_one({"customer_id": customer_id})
         return None
-    now = datetime.now(UTC)
+    now = clock.now()
     bookings = await db.bookings.find({"customer_id": customer_id}, {"_id": 0, "id": 1, "status": 1, "agreement_value_paise": 1, "summary": 1}).to_list(None)
     bids = [b["id"] for b in bookings]
     money = await _money({"customer_id": customer_id})
@@ -164,7 +175,7 @@ async def refresh_customer(customer_id: str) -> dict | None:
     stage = "Owner" if "Completed" in statuses else "Customer" if "Active" in statuses else "Prospect" if (visits or any(l["status"] not in ("New",) for l in leads)) else "Lead"
     score = engagement_score(last_contact, visits, brochures, replies, on_time, now)
     last_payment = max((b.get("summary") or {}).get("last_payment_at") or "" for b in bookings) or None if bookings else None
-    doc = {"customer_id": customer_id, "company_id": c["company_id"], "full_name": c["full_name"], "customer_code": c["customer_code"], **money, "due_paise": money["outstanding"]["total_paise"], "overdue_paise": money["overdue"]["amount_paise"],
+    doc = {"customer_id": customer_id, "company_id": c["company_id"], "full_name": c["full_name"], "customer_code": c["customer_code"], **money, "due_paise": money["outstanding"]["total_paise"], "advance_held_paise": money.get("advance_paise", 0), "overdue_paise": money["overdue"]["amount_paise"],
            "last_payment_at": last_payment, "engagement_score": score, "lifecycle_stage": stage, "visits": visits, "brochure_downloads": brochures, "last_contacted_at": last_contact, "computed_at": now_iso(), "derived": True}
     await db.customer_summaries.update_one({"customer_id": customer_id}, {"$set": doc}, upsert=True)
     await db.customers.update_one({"id": customer_id}, {"$set": {"engagement_score": score, "lifecycle_stage": stage}})
@@ -184,12 +195,12 @@ async def refresh_dashboards():
 async def compute_dashboard(company_id: str, scope: list[str] | None) -> dict:
     pf = {} if not scope or "*" in scope else {"project_id": {"$in": scope}}
     projects = await db.project_summaries.find({"company_id": company_id, **pf}, {"_id": 0}).to_list(None)
-    today = date.today().isoformat()
+    today = clock.today().isoformat()
     payload = {"projects": projects,
                "totals": {"units": sum(p["units"]["total"] for p in projects), "available": sum(p["units"]["available"] for p in projects), "bookings": sum(p["bookings"] for p in projects),
                           "agreement_paise": sum(p["agreement_paise"] for p in projects), "paid_paise": sum(p["paid_paise"] for p in projects), "collections_mtd_paise": sum(p["collections_mtd_paise"] for p in projects),
                           "outstanding_paise": sum(p["outstanding"]["total_paise"] for p in projects), "overdue_paise": sum(p["overdue"]["amount_paise"] for p in projects), "overdue_count": sum(p["overdue"]["count"] for p in projects),
-                          "pending_cheques_paise": sum(p["pending_cheques_paise"] for p in projects)},
+                          "pending_cheques_paise": sum(p["pending_cheques_paise"] for p in projects), "advance_paise": sum(p.get("advance_paise", 0) for p in projects), "refunds_paid_paise": sum(p.get("refunds_paid_paise", 0) for p in projects)},
                "counts": {"projects": await db.projects.count_documents({"company_id": company_id, **({"id": pf["project_id"]} if "project_id" in pf else {})}),
                           "leads_open": await db.leads.count_documents({"company_id": company_id, **pf, "status": {"$nin": ["Lost", "Converted"]}}),
                           "visits_today": await db.site_visits.count_documents({"company_id": company_id, **pf, "date": today, "status": {"$in": ["Confirmed", "Rescheduled"]}}),
@@ -207,7 +218,7 @@ async def get_dashboard(company_id: str, scope: list[str] | None) -> dict:
 
 
 async def recompute_all() -> dict:
-    t0 = datetime.now(UTC)
+    t0 = clock.now()
     bl = [b["id"] for b in await db.blocks.find({}, {"_id": 0, "id": 1}).to_list(None)]
     for bid in bl:
         await refresh_block(bid)
@@ -218,7 +229,7 @@ async def recompute_all() -> dict:
     for cid in cu:
         await refresh_customer(cid)
     await refresh_dashboards()
-    out = {"blocks": len(bl), "projects": len(pr), "customers": len(cu), "ms": int((datetime.now(UTC) - t0).total_seconds() * 1000)}
+    out = {"blocks": len(bl), "projects": len(pr), "customers": len(cu), "ms": int((clock.now() - t0).total_seconds() * 1000)}
     await db.settings.update_one({"key": "read_models_v1"}, {"$set": {"value": now_iso()}}, upsert=True)
     return out
 
@@ -230,7 +241,9 @@ async def sweep_loop():
             stale = now_iso()
             from infra import timed_job
             await timed_job("read_model_flush", flush)
-            for p in await db.project_summaries.find({"computed_at": {"$lt": (datetime.now(UTC) - timedelta(minutes=10)).isoformat()}}, {"_id": 0, "project_id": 1}).to_list(50):
+            from events import reconcile_outbox
+            await timed_job("outbox_reconcile", reconcile_outbox)
+            for p in await db.project_summaries.find({"computed_at": {"$lt": (clock.now() - timedelta(minutes=10)).isoformat()}}, {"_id": 0, "project_id": 1}).to_list(50):
                 await refresh_project(p["project_id"])
             await refresh_dashboards()
             log.debug("[readmodels] sweep ok %s", stale)

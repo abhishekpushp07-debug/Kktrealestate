@@ -42,7 +42,7 @@ export default function Home() {
           <StatTile label="Visits today" value={c.visits_today} hint={data.visits_today_list.slice(0, 2).map((v) => `${v.slot_start} ${v.name}`).join(" · ") || "No visits scheduled"} icon={CalendarDays} to="/site-visits" testId="tile-visits" />
           <StatTile label="Follow-ups due" value={c.followups_due} hint="Leads waiting for a call" icon={PhoneCall} iconTone={c.followups_due ? "brick" : undefined} to="/leads" testId="tile-followups" tone={c.followups_due ? "brick" : undefined} />
           <StatTile label="Cheques to clear" value={c.cheques_pending} hint={inrShort(t.pending_cheques_paise / 100) + " pending"} icon={Receipt} to="/payments?status=Pending" testId="tile-cheques" />
-          <StatTile label="Collected this month" value={inrShort(t.collections_mtd_paise / 100)} hint={`${inrShort(t.outstanding_paise / 100)} outstanding`} icon={Wallet} iconTone="gold" testId="tile-collections" />
+          <StatTile label="Collected this month" value={inrShort(t.collections_mtd_paise / 100)} hint={`${inrShort(t.outstanding_paise / 100)} outstanding${t.advance_paise ? ` · advance held ${inrShort(t.advance_paise / 100)}` : ""}`} icon={Wallet} iconTone="gold" testId="tile-collections" />
         </>}
       </section>
       <section>

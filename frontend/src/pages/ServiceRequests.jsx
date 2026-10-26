@@ -1,3 +1,4 @@
+import { HistoryButton } from "@/components/common/HistoryTimeline";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AlertTriangle, LifeBuoy, Lock, Paperclip, Send, UserRound } from "lucide-react";
@@ -43,7 +44,7 @@ function Detail({ id }) {
   return (
     <div data-testid="sr-detail">
       <PageHeader title={sr.subject} subtitle={`${sr.ticket_number} · ${sr.category} · ${sr.priority} · raised ${fmtDateTime(sr.created_at)}`} crumbs={[{ label: "Service Requests", to: "/service-requests" }, { label: sr.ticket_number }]}
-        actions={<div className="flex flex-wrap items-center gap-2">
+        actions={<div className="flex flex-wrap items-center gap-2"><HistoryButton entityType="service_request" entityId={sr.id} label={sr.ticket_number} />
           <StatusPill status={sr.status} testId="sr-status" />
           {can("service.write") && <Select value={sr.status} onValueChange={(v) => post("status", { status: v }, `Status → ${v}`)}><SelectTrigger className="h-9 w-44" data-testid="sr-status-select"><SelectValue /></SelectTrigger><SelectContent>{SR_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select>}
           {can("service.assign") && <Select value={sr.assigned_to || "none"} onValueChange={(v) => post("assign", { assigned_to: v === "none" ? null : v }, "Assigned")}><SelectTrigger className="h-9 w-48" data-testid="sr-assign-select"><UserRound className="mr-1 h-3.5 w-3.5" /><SelectValue placeholder="Assign" /></SelectTrigger><SelectContent><SelectItem value="none">Unassigned</SelectItem>{users.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}</SelectContent></Select>}

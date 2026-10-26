@@ -22,7 +22,7 @@ def _months(n=12):
 
 
 @router.get("/dashboard/home")
-async def home(request: Request, user: dict = Depends(require("project.read"))):
+async def home(request: Request, user: dict = Depends(require("masters.project.view"))):
     from services import ttlcache
     out = await ttlcache.cached(f"home:{ttlcache.scope_key(user)}:{date.today().isoformat()}", 10, lambda: _home(user))
     return etag_response(request, out, max_age=15)

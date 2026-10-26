@@ -1,4 +1,5 @@
 """Phase 7 integrity check: installment demands vs. plan triggers (stage state / time) per booking, plus repair."""
+from services import clock
 import logging
 from datetime import date
 
@@ -31,7 +32,7 @@ async def backfill_demand_installments() -> int:
 
 
 async def integrity_report(today: date | None = None) -> dict:
-    today = today or date.today()
+    today = today or clock.today()
     findings, bookings_checked = [], 0
     async for bk in db.bookings.find({"status": "Active", "payment_plan_snapshot": {"$ne": None}}, {"_id": 0}):
         bookings_checked += 1
@@ -55,13 +56,15 @@ async def integrity_report(today: date | None = None) -> dict:
             if len(ds) > 1:
                 for d in sorted(ds, key=lambda x: x.get("created_at") or "")[1:]:
                     findings.append(_f(bk, "duplicate_demand", d, f"Installment {ins['seq']} '{ins['name']}' raised {len(ds)} times"))
-            if ds and not satisfied and ins["seq"] not in absorbed:
+            if ds and not satisfied and ins["seq"] not in absorbed and not ds[0].get("rebound_at"):  # re-bound after a transfer: raised legitimately in the old tower
                 findings.append(_f(bk, "unsatisfied_trigger", ds[0], f"'{ins['name']}' raised but trigger not met ({ins['trigger_type']})"))
             if not ds and satisfied and ins["seq"] not in absorbed:
                 findings.append({"booking_id": bk["id"], "booking_number": bk["booking_number"], "kind": "missing_demand", "installment_seq": ins["seq"], "installment_name": ins["name"], "detail": f"'{ins['name']}' triggered on {td.isoformat()} but not raised", "demand_number": None, "paid_paise": 0})
         raised_sum = sum(d["total_demand_paise"] for d in demands)
         sm = bk.get("summary") or {}
-        if sm.get("total_order_raised_paise", 0) != raised_sum:
+        paid_sum = sum(d["total_demand_paise"] for d in demands if d["status"] == "Paid")
+        if sm.get("total_order_raised_paise", 0) != raised_sum and not (bk.get("transfers") and raised_sum > sm.get("total_order_raised_paise", 0) and paid_sum >= sm.get("total_order_raised_paise", 0)):
+            # transferred to a cheaper unit: installments already PAID at the old price exceed cum% × new agreement — the excess is an advance, not a mismatch
             findings.append({"booking_id": bk["id"], "booking_number": bk["booking_number"], "kind": "summary_mismatch", "installment_seq": None, "installment_name": None, "demand_number": None, "paid_paise": 0, "detail": f"summary raised {sm.get('total_order_raised_paise', 0)} ≠ demands {raised_sum}"})
     findings += await referential_findings()
     counts: dict = {}
@@ -120,7 +123,7 @@ async def referential_findings() -> list[dict]:
     bookings = await db.bookings.find({}, {"_id": 0}).to_list(None)
     active_by_flat: dict = {}
     for bk in bookings:
-        if bk["flat_id"] not in flats:
+        if bk["flat_id"] not in flats and bk["status"] != "Cancelled":  # a cancelled booking may outlive a flat removed later (test blocks, re-planned towers)
             out.append(_rf("orphan_booking_flat", f"booking → missing flat {bk['flat_id']}", booking_id=bk["id"], booking_number=bk["booking_number"]))
         if bk["customer_id"] not in customers:
             out.append(_rf("orphan_booking_customer", f"booking → missing customer {bk['customer_id']}", booking_id=bk["id"], booking_number=bk["booking_number"]))
@@ -153,8 +156,8 @@ async def referential_findings() -> list[dict]:
         if sm and (sm.get("cash_paid_paise", cash_paid) != cash_paid or sm.get("account_paid_paise", acc_paid) != acc_paid):
             out.append(_rf("summary_paid_mismatch", f"summary cash {sm.get('cash_paid_paise')}≠{cash_paid} / account {sm.get('account_paid_paise')}≠{acc_paid}", booking_id=bk["id"], booking_number=bk["booking_number"]))
         last = await db.ledger_entries.find_one({"booking_id": bk["id"]}, {"_id": 0}, sort=[("seq", -1)])
-        if last and sm and last.get("total_due_paise") is not None and sm.get("due_paise") is not None and last["total_due_paise"] != sm["due_paise"]:
-            out.append(_rf("ledger_due_mismatch", f"last ledger due {last['total_due_paise']} ≠ summary due {sm['due_paise']}", booking_id=bk["id"], booking_number=bk["booking_number"]))
+        if last and sm and last.get("outstanding_paise") is not None and sm.get("due_paise") is not None and last["outstanding_paise"] != sm["due_paise"]:
+            out.append(_rf("ledger_due_mismatch", f"last ledger outstanding {last['outstanding_paise']} ≠ summary due {sm['due_paise']}", booking_id=bk["id"], booking_number=bk["booking_number"]))
     # counters vs max numbers (numbering scope "<kind>_number", key = FY)
     for coll, field, kind in (("bookings", "booking_number", "booking"), ("demands", "demand_number", "demand"), ("payments", "receipt_number", "receipt")):
         async for row in db[coll].aggregate([{"$match": {field: {"$type": "string"}}}, {"$group": {"_id": {"$arrayElemAt": [{"$split": [f"${field}", "-" if coll != "payments" else "/"]}, 1]}, "mx": {"$max": {"$toInt": {"$arrayElemAt": [{"$split": [f"${field}", "-" if coll != "payments" else "/"]}, -1]}}}}}]):

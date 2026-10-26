@@ -1,3 +1,4 @@
+import { useAuth } from "@/context/AuthContext";
 import { Download, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { API, tokens } from "@/lib/api";
@@ -19,12 +20,13 @@ export async function downloadCsv(path, filename) {
 }
 
 export function LedgerTable({ rows = [], bookingId, bookingNumber }) {
+  const { can } = useAuth();
   return (
     <div className="card overflow-hidden" data-testid="ledger-table">
       <div className="flex items-center justify-between border-b px-4 py-2 print:hidden">
         <p className="text-sm font-semibold text-ink-950">Ledger · {rows.length} entries</p>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => downloadCsv(`/bookings/${bookingId}/ledger`, `ledger-${bookingNumber}.csv`)} data-testid="ledger-export-csv"><Download className="mr-1 h-3.5 w-3.5" />CSV</Button>
+          {can("receipt.print") && <Button size="sm" variant="outline" onClick={() => downloadCsv(`/bookings/${bookingId}/ledger`, `ledger-${bookingNumber}.csv`)} data-testid="ledger-export-csv"><Download className="mr-1 h-3.5 w-3.5" />CSV</Button>}
           <Button size="sm" variant="outline" onClick={() => window.print()} data-testid="ledger-print"><Printer className="mr-1 h-3.5 w-3.5" />Print</Button>
         </div>
       </div>

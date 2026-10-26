@@ -83,6 +83,12 @@ STARTUP = {"phase": "booting", "done": False, "essential_done": False, "started_
 _BG_TASKS: set = set()
 
 
+async def _owner_bootstrap():
+    from services.owner_bootstrap import ensure_owner, mark_demo_accounts
+    STARTUP["owner_bootstrap"] = await ensure_owner()
+    await mark_demo_accounts()
+
+
 async def _system_roles():
     for name, spec in __import__('permissions').SYSTEM_ROLES.items():
         if not await db.roles.find_one({'name': name}):
@@ -91,6 +97,9 @@ async def _system_roles():
         else:
             await db.roles.update_one({'name': name, 'is_system': True}, {'$set': {'permissions': spec['permissions']}})
     await db.settings.update_one({'key': 'roles_version'}, {'$inc': {'value': 1}}, upsert=True)
+    from services.rbac import migrate_legacy_codes, register_routes
+    STARTUP["unregistered_permissions"] = await register_routes(app)
+    STARTUP["rbac_migrated"] = await migrate_legacy_codes()
 
 
 async def _counters_once():
@@ -143,9 +152,12 @@ async def startup_tasks():
         logger.info("[startup] another replica holds the startup lease; skipping migrations here")
         return
     steps = [("seed_if_empty", seed_if_empty), ("seed_phase15", seed_phase15), ("seed_phase2", seed_phase2), ("seed_phase3", seed_phase3), ("system_roles", _system_roles),
-             ("seed_marketing_user", seed_marketing_user), ("seed_phase5", seed_phase5), ("migrate_phase7", migrate_phase7), ("seed_phase7", seed_phase7),
-             ("backfill_demand_installments", backfill_demand_installments), ("sweep_notifications", sweep_notifications), ("integrity_report", _integrity),
+             ("seed_marketing_user", seed_marketing_user), ("owner_bootstrap", _owner_bootstrap), ("seed_phase5", seed_phase5), ("migrate_phase7", migrate_phase7), ("seed_phase7", seed_phase7),
+             ("backfill_demand_installments", backfill_demand_installments), ("migrate_phase_g", _migrate_phase_g), ("sweep_notifications", sweep_notifications), ("integrity_report", _integrity),
              ("seed_phase9", seed_phase9), ("counters", _counters_once), ("reconcile", _reconcile), ("startup_phase11", startup_phase11), ("schema_validators", apply_validators), ("price_paise_backfill", backfill_price_paise)]
+    if await db.settings.find_one({"key": "story_mode", "value": True}):  # demo-data seeds are replaced by the Phase H story (admin/reseed story=true)
+        steps = [s for s in steps if s[0] not in ("seed_phase2", "seed_phase5", "seed_phase9")]
+
     t0 = time.perf_counter()
     for name, fn in steps:
         await _step(name, fn)
@@ -155,6 +167,13 @@ async def startup_tasks():
             pass
     STARTUP.update(phase="done", done=True, finished_at=__import__("datetime").datetime.now(__import__("datetime").UTC).isoformat())
     logger.info("[startup] background tasks complete in %.1fs: %s", time.perf_counter() - t0, STARTUP["steps"])
+
+
+async def _migrate_phase_g():
+    from migrate_phase_g import migrate_phase_g
+    if await db.settings.find_one({"key": "migration_phase_g"}, {"_id": 1}):
+        return {"skipped": True}
+    return await migrate_phase_g(dry_run=False)
 
 
 def _spawn(coro):
@@ -187,6 +206,13 @@ async def lifespan(app: FastAPI):
         except Exception:
             logger.warning("[startup] transaction detection skipped")
     STARTUP["essential_done"] = True
+    if STARTUP["db"] == "ok":
+        try:
+            from services.owner_bootstrap import ensure_owner, mark_demo_accounts
+            STARTUP["owner_bootstrap"] = await asyncio.wait_for(ensure_owner(), timeout=3)
+            await asyncio.wait_for(mark_demo_accounts(), timeout=2)
+        except Exception:
+            logger.exception("[startup] owner bootstrap failed (will retry after seeding)")
     from services.leader import run_as_leader
     from services.read_models import sweep_loop
     from routers.visits import nudge_loop
@@ -316,10 +342,12 @@ async def metrics(user: dict = Depends(require("settings.manage"))):
 
 
 from routers import ops as _ops
-for r in (_ops.router, auth.router, users.router, roles.router, master.router, projects.router, rate_cards.router, blocks.router, flats.router, parking.router,
+from routers import propagation
+from routers import access as _access
+for r in (_ops.router, _access.router, auth.router, users.router, roles.router, master.router, projects.router, rate_cards.router, blocks.router, flats.router, parking.router,
           settings.router, audit.router, dashboard.router, search.router, imports.router,
           customers.router, leads.router, documents.router, bookings.router, milestones.router, payments.router, roznamcha.router, admin.router, cms.router, public.router, reports.router, notifications.router, pdfs.router, dashboard_widgets.router, portal.router, portal.mgmt, support.router, construction.router, visits.pub, visits.router,
-          catalogues.router, project_setup.router, crm.router, bootstrap.router, home.router):
+          catalogues.router, project_setup.router, crm.router, bootstrap.router, home.router, propagation.router):
     api_router.include_router(r)
 
 app.include_router(api_router)

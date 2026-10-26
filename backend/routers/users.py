@@ -4,7 +4,7 @@ from pydantic import EmailStr, field_validator
 
 from db import db
 from models_out import UsersOut, UsersOutPage
-from deps import require
+from deps import require, require_any
 from routers.auth import hash_password, set_password, validate_password_policy
 from utils import (
     ApiError,
@@ -76,7 +76,7 @@ async def _enrich(items: list[dict]) -> list[dict]:
 
 
 @router.get("", response_model=UsersOutPage, response_model_exclude_unset=True)
-async def list_users(params: ListParams = Depends(), user: dict = Depends(require("users.manage"))):
+async def list_users(params: ListParams = Depends(), user: dict = Depends(require("admin.user.view"))):
     q = {"company_id": user["company_id"], **search_filter(params.search, ["name", "email", "phone"])}
     if not params.include_inactive:
         q["is_active"] = True
@@ -86,7 +86,7 @@ async def list_users(params: ListParams = Depends(), user: dict = Depends(requir
 
 
 @router.post("", status_code=201)
-async def create_user(body: UserCreate, request: Request, user: dict = Depends(require("users.manage"))):
+async def create_user(body: UserCreate, request: Request, user: dict = Depends(require("admin.user.create"))):
     email = body.email.lower()
     if await db.users.find_one({"email": email}):
         raise ApiError(409, "A user with this email already exists", "DUPLICATE_EMAIL")
@@ -102,13 +102,13 @@ async def create_user(body: UserCreate, request: Request, user: dict = Depends(r
 
 
 @router.get("/{user_id}", response_model=UsersOut, response_model_exclude_unset=True)
-async def get_user(user_id: str, user: dict = Depends(require("users.manage"))):
+async def get_user(user_id: str, user: dict = Depends(require("admin.user.view"))):
     doc = await get_or_404(db.users, user_id, "User", {"company_id": user["company_id"]})
     return (await _enrich([strip_private(doc)]))[0]
 
 
 @router.patch("/{user_id}")
-async def update_user(user_id: str, body: UserUpdate, request: Request, user: dict = Depends(require("users.manage"))):
+async def update_user(user_id: str, body: UserUpdate, request: Request, user: dict = Depends(require_any("admin.user.edit", "admin.user.deactivate"))):
     before = await get_or_404(db.users, user_id, "User", {"company_id": user["company_id"]})
     changes = body.model_dump(exclude_unset=True)
     changes.pop("version", None)
@@ -139,7 +139,7 @@ async def _guard_last_super_admin(target: dict, new_role_id: str | None):
 
 
 @router.post("/{user_id}/reset-password")
-async def reset_password(user_id: str, body: ResetPasswordIn, request: Request, user: dict = Depends(require("users.manage"))):
+async def reset_password(user_id: str, body: ResetPasswordIn, request: Request, user: dict = Depends(require("admin.user.edit"))):
     await get_or_404(db.users, user_id, "User", {"company_id": user["company_id"]})
     await set_password(user_id, body.new_password, clear_must_change=False)
     await db.users.update_one({"id": user_id}, {"$set": {"must_change_password": True}})

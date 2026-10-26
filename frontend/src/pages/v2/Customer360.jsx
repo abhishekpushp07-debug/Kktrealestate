@@ -4,6 +4,7 @@ import { CompletenessRing } from "@/components/v2/Completeness";
 import { BadgeCheck, CalendarDays, Eye, EyeOff, FileText, FileWarning, Landmark, LifeBuoy, Lock, Mail, MapPin, MessageSquare, MoreHorizontal, Pencil, Phone, Plus, Printer, Receipt, ShieldCheck, Users } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
+import { HistoryButton } from "@/components/common/HistoryTimeline";
 import api, { errMsg, BASE_PATH } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useFetch } from "@/hooks/useList";
@@ -16,7 +17,7 @@ import { PostPayment } from "@/components/v2/PostPayment";
 import { DocumentsPanel } from "@/components/common/DocumentsPanel";
 import { PortalAccessCard } from "@/components/common/PortalAccessCard";
 
-const EV = { payment: [Receipt, "sage"], demand: [FileText, "amber"], communication: [MessageSquare, undefined], visit: [CalendarDays, undefined], booking: [FileText, "gold"], service: [LifeBuoy, "brick"], lead: [Users, undefined], kyc: [ShieldCheck, "sage"] };
+const EV = { payment: [Receipt, "sage"], demand: [FileText, "amber"], communication: [MessageSquare, undefined], visit: [CalendarDays, undefined], booking: [FileText, "gold"], service: [LifeBuoy, "brick"], lead: [Users, undefined], kyc: [ShieldCheck, "sage"], refund: [Receipt, "brick"], milestone: [Landmark, "gold"], customer: [Users, undefined], transfer: [FileText, "amber"] };
 
 function BookingCard({ b }) {
   const ps = b.plan_summary || {}, due = ps.due || {}, paid = (b.summary?.paid_paise || 0), agr = b.agreement_value_paise || 1;
@@ -39,14 +40,19 @@ function BookingCard({ b }) {
   );
 }
 
+const KIND_LABEL = { transfer: "Transfers/Revisions", booking: "Bookings", payment: "Payments", demand: "Demands", lead: "Leads", visit: "Visits", service: "Tickets", refund: "Refunds", milestone: "Stages", document: "Documents", customer: "Profile", notice: "Notices", portal: "Portal" };
+const titleOf = (e) => { const a = e.after || {}; return [e.action.replace(/[._]/g, " "), a.receipt_number || a.demand_number || a.refund_number || a.booking_number || a.visit_number || a.ticket_number || a.lead_number || a.milestone_name || ""].filter(Boolean).join(" · "); };
 function TimelineCard({ id }) {
-  const [type, setType] = useState("all");
-  const { data, loading } = useFetch(`/customers/${id}/timeline?limit=60${type === "all" ? "" : `&types=${type}`}`);
-  const groups = (data?.items || []).reduce((acc, e) => { const d = fmtDate(e.at); (acc[d] = acc[d] || []).push(e); return acc; }, {});
+  const [kind, setKind] = useState("all");
+  const { data, loading } = useFetch(`/customers/${id}/events?limit=120${kind === "all" ? "" : `&kinds=${kind}`}`);
+  const items = data?.items || [];
+  const groups = items.reduce((acc, e) => { const d = fmtDate(e.created_at); (acc[d] = acc[d] || []).push(e); return acc; }, {});
+  const kinds = ["all", ...(data?.kinds || [])];
   return (
     <Card className="!p-0" testId="customer-timeline">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-warm-100 px-6 py-4"><h3 className="font-display text-lg">Timeline</h3><Segmented options={[["all", "All"], ["payment", "Payments"], ["demand", "Demands"], ["communication", "Calls"], ["visit", "Visits"]].map(([v, l]) => ({ value: v, label: l }))} value={type} onChange={setType} testId="timeline-filter" /></div>
-      <div className="px-6 py-4">{loading ? <Skeleton className="h-40" /> : Object.keys(groups).length === 0 ? <p className="py-6 text-center text-sm text-txt-muted">Nothing recorded yet.</p> : Object.entries(groups).map(([day, evs]) => <div key={day} className="mb-5 last:mb-0"><p className="label mb-2">{day}</p><ul className="space-y-2">{evs.map((e, i) => { const [I, tone] = EV[e.type.split(".")[0]] || [FileText, undefined]; return <li key={i} className="flex items-center gap-3"><IconTile icon={I} tone={tone} /><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-ink-950">{e.title}</p>{e.subtitle && <p className="truncate text-xs text-txt-secondary">{e.subtitle}</p>}</div>{e.amount_paise != null && <Money value={e.amount_paise / 100} short className={cn("text-base", tone === "sage" ? "text-sage" : "text-ink-950")} />}</li>; })}</ul></div>)}</div>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-warm-100 px-6 py-4"><h3 className="font-display text-lg">Timeline <span className="text-sm font-normal text-txt-muted">· {items.length} events</span></h3>
+        <div className="flex flex-wrap gap-1.5" data-testid="timeline-filter">{kinds.map((k) => <button key={k} onClick={() => setKind(k)} className={cn("pill", kind === k ? "bg-ink-950 text-warm-50" : "bg-warm-100 text-ink-950")} data-testid={`timeline-chip-${k}`}>{k === "all" ? "All" : KIND_LABEL[k] || k}</button>)}</div></div>
+      <div className="px-6 py-4">{loading ? <Skeleton className="h-40" /> : items.length === 0 ? <p className="py-6 text-center text-sm text-txt-muted">Nothing recorded yet.</p> : Object.entries(groups).map(([day, evs]) => <div key={day} className="mb-5 last:mb-0"><p className="label mb-2">{day}</p><ul className="space-y-2">{evs.map((e) => { const [I, tone] = EV[e.kind] || [FileText, undefined]; const amt = (e.after || {}).amount_paise ?? (e.after || {}).total_paise; return <li key={e.id} className="flex items-center gap-3" data-testid={`timeline-event-${e.kind}`}><IconTile icon={I} tone={tone} /><div className="min-w-0 flex-1"><Link to={e.link} className="block truncate text-sm font-semibold text-ink-950 hover:text-gold">{titleOf(e)}</Link><p className="truncate text-xs text-txt-secondary">{e.actor_name} · {fmtDateTime(e.created_at)}{e.booking_number && e.entity_type !== "booking" ? ` · ${e.booking_number}` : ""}</p></div>{typeof amt === "number" && <Money value={amt / 100} short className={cn("text-base", tone === "sage" ? "text-sage" : "text-ink-950")} />}</li>; })}</ul></div>)}</div>
     </Card>
   );
 }
@@ -85,7 +91,7 @@ export default function Customer360() {
         <div className="grid grid-cols-2 gap-6">
           <StatTile label="Agreement" value={inrShort(agreementTotal / 100)} hint="flat value + other charges" icon={FileText} testId="fin-agreement" />
           <StatTile label="Paid" value={inrShort(paidTotal / 100)} hint="cleared · all ledgers" icon={Receipt} iconTone="sage" tone="sage" testId="fin-paid" />
-          <StatTile label={dueTotal > 0 ? "Due" : "Due / Advance"} value={inrShort(dueTotal / 100)} hint={dueTotal > 0 ? "all ledgers" : "nothing due"} icon={FileWarning} iconTone={dueTotal > 0 ? "brick" : undefined} tone={dueTotal > 0 ? "brick" : "sage"} testId="fin-due" />
+          <StatTile label={dueTotal > 0 ? "Due" : "Due / Advance"} value={inrShort(dueTotal / 100)} hint={(T?.advance_held_paise || 0) > 0 ? `Advance held ${inrShort((T.advance_held_paise || 0) / 100)}` : dueTotal > 0 ? "all ledgers" : "nothing due"} icon={FileWarning} iconTone={dueTotal > 0 ? "brick" : undefined} tone={dueTotal > 0 ? "brick" : "sage"} testId="fin-due" />
           <StatTile label="Cheques" value={inrShort(pendingCheques / 100)} hint={pendingCheques > 0 ? "in hand" : "none in hand"} icon={Landmark} iconTone={pendingCheques > 0 ? "amber" : undefined} testId="fin-cheques" />
         </div>
       </section>}
@@ -128,7 +134,7 @@ export default function Customer360() {
             <CompletenessRing customer={c} size={64}><Avatar name={c.full_name} size={64} /></CompletenessRing>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                <h1 className="font-display text-[28px] leading-tight text-ink-950" data-testid="hero-title">{c.salutation ? `${c.salutation} ` : ""}{c.full_name}</h1>
+                <h1 className="font-display text-[28px] leading-tight text-ink-950" data-testid="hero-title">{c.salutation ? `${c.salutation} ` : ""}{c.full_name}</h1><HistoryButton entityType="customer" entityId={c.id} label={c.customer_code} />
                 <div className="flex flex-wrap items-center gap-1.5">{c.lifecycle_stage && <StatusPill status={c.lifecycle_stage} />}<span className={cn("pill", c.kyc_status === "Verified" ? "bg-gold-light text-[#8a6d12]" : "bg-warm-100 text-txt-secondary")}>{c.kyc_status === "Verified" && <BadgeCheck className="h-3.5 w-3.5" />}KYC {c.kyc_status}</span>{(c.segment_ids || []).map((s) => <span key={s} className="pill bg-warm-100 text-txt-secondary">{label("customer_segment", s)}</span>)}</div>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm leading-6 text-txt-secondary">

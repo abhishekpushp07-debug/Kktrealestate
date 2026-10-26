@@ -30,6 +30,8 @@ export default function Roznamcha({ embedded }) {
   const { data: d, loading, reload } = useFetch(`/roznamcha?date=${date}`, [date]);
   const { options: banks } = useMasterOptions("bank-accounts", (b) => ({ value: b.id, label: `${b.bank_name} ${b.account_number_masked || ""}` }));
   const postContra = async () => { try { await api.post("/roznamcha/contra", { date, kind: contra.kind, amount: Number(contra.amount), bank_account_id: contra.bank_account_id, remarks: contra.remarks || null }); toast.success("Contra entry posted"); setContra({ ...contra, amount: "", remarks: "" }); reload(); } catch (e) { toast.error(errMsg(e)); } };
+  const [opening, setOpening] = useState(null);
+  const saveOpening = async () => { try { await api.post("/roznamcha/opening", { date: opening.date, amount: Number(opening.amount), remarks: opening.remarks || null }); toast.success("Opening cash saved"); setOpening(null); reload(); } catch (e) { toast.error(errMsg(e)); } };
   const days = Array.from({ length: 7 }, (_, i) => shift(date, i - 3));
   return (
     <div className="space-y-8" data-testid="roznamcha-page">
@@ -40,8 +42,20 @@ export default function Roznamcha({ embedded }) {
           <button onClick={() => setDate(shift(date, 1))} className="btn btn-secondary !h-10 !w-10 !px-0" aria-label="Next day" data-testid="rozn-next"><ChevronRight className="h-4 w-4" /></button>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="input !w-40" data-testid="rozn-date" />
         </div>
-        <button className="btn btn-secondary" onClick={() => window.print()} data-testid="rozn-print"><Printer className="h-4 w-4" strokeWidth={1.75} />Print day book</button>
+        <div className="flex items-center gap-2">
+          {can("settings.manage") && <button className="btn btn-secondary" onClick={() => setOpening({ date, amount: "", remarks: "" })} data-testid="rozn-set-opening">Set opening cash</button>}
+          <button className="btn btn-secondary" onClick={() => window.print()} data-testid="rozn-print"><Printer className="h-4 w-4" strokeWidth={1.75} />Print day book</button>
+        </div>
       </div>
+      {opening && <Card className="print:hidden" testId="rozn-opening-form">
+        <p className="text-sm text-txt-secondary">Opening balance of the cash book (first day). Closing cash = opening + cash receipts − deposits + withdrawals − cash refunds.</p>
+        <div className="mt-3 grid gap-3 md:grid-cols-4">
+          <Field label="As on date" required><input type="date" className="input" value={opening.date} onChange={(e) => setOpening({ ...opening, date: e.target.value })} data-testid="rozn-opening-date" /></Field>
+          <Field label="Opening cash ₹" required><input type="number" min="0" className="input" value={opening.amount} onChange={(e) => setOpening({ ...opening, amount: e.target.value })} data-testid="rozn-opening-amount" /></Field>
+          <Field label="Remarks"><input className="input" value={opening.remarks} onChange={(e) => setOpening({ ...opening, remarks: e.target.value })} data-testid="rozn-opening-remarks" /></Field>
+          <div className="flex items-end gap-2"><button className="btn btn-primary" onClick={saveOpening} data-testid="rozn-opening-save">Save</button><button className="btn btn-ghost" onClick={() => setOpening(null)}>Cancel</button></div>
+        </div>
+      </Card>}
       {loading || !d ? <div className="grid gap-6 md:grid-cols-4">{[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-28 rounded-2xl" />)}</div> : <>
         <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4" data-testid="rozn-summary">
           <StatTile label="Opening cash" value={inr(d.opening_cash)} hint={`carried into ${fmtDate(date)}`} icon={ArrowUpFromLine} testId="rozn-opening" />

@@ -1,0 +1,82 @@
+{
+ "as_of": "2026-10-26",
+ "agreement_paise": 52056750000,
+ "paid_paise": 32199081000,
+ "outstanding_paise": 2060849900,
+ "overdue_paise": 1589096100,
+ "advance_paise": 116199100,
+ "refunds_paid_paise": 41816200,
+ "bands_paise": {
+  "age_Not due": 471753800,
+  "age_0-30": 75330000,
+  "age_31-60": 613172400,
+  "age_61-90": 170375000,
+  "age_90+": 730218700
+ },
+ "cash_paise": 13111363000,
+ "account_paise": 19183130500,
+ "other_paise": 20650000,
+ "inventory": {
+  "Tower A|Booked": 20,
+  "Tower A|Available": 12,
+  "Tower B|Booked": 16,
+  "Tower B|Hold": 2,
+  "Tower B|Blocked": 1,
+  "Tower B|Available": 13,
+  "Tower C|Available": 26,
+  "Tower C|Booked": 30,
+  "Villa Block V|Booked": 11,
+  "Villa Block V|Sold": 1
+ },
+ "cheque_register_paise": {
+  "Cleared": 1738861500,
+  "Bounced": 39144000,
+  "Pending": 13267500
+ },
+ "cancellations": {
+  "paid_paise": 116062500,
+  "forfeiture_paise": 74246300,
+  "refund_paise": 41816200,
+  "refund_paid_paise": 41816200
+ },
+ "cancelled_bookings": [
+  "BK-2526-0037",
+  "BK-2526-0047"
+ ],
+ "leads": {
+  "leads": 116,
+  "converted": 75
+ },
+ "bookings": 78,
+ "units": 132,
+ "available": 51,
+ "by_mode_paise": {
+  "NEFT / RTGS": 9576735500,
+  "Cash": 8677695900,
+  "UPI": 4454317100,
+  "Demand Draft": 4187349000,
+  "Loan Disbursement": 3680184500,
+  "Cheque": 1738861500
+ },
+ "collections_by_month_paise": {
+  "2025-04": 97125000,
+  "2025-05": 209870000,
+  "2025-06": 251556300,
+  "2025-07": 816581300,
+  "2025-08": 1140276300,
+  "2025-09": 1760671300,
+  "2025-10": 1872662500,
+  "2025-11": 972693700,
+  "2025-12": 1740466200,
+  "2026-01": 2559953800,
+  "2026-02": 1634378000,
+  "2026-03": 3817469400,
+  "2026-04": 2397277000,
+  "2026-05": 2810875600,
+  "2026-06": 2932151000,
+  "2026-07": 1778218000,
+  "2026-08": 2671701800,
+  "2026-09": 1586756200,
+  "2026-10": 1264460100
+ }
+}

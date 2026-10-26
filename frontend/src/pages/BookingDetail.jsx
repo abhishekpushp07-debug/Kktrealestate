@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Ban, CheckCircle2, FileEdit, FileText, IndianRupee, Printer } from "lucide-react";
 import { openPdf } from "@/pages/Reports";
 import { toast } from "sonner";
+import { HistoryButton } from "@/components/common/HistoryTimeline";
 import api, { errMsg, BASE_PATH } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { KV, Field, EmptyState } from "@/components/common/Bits";
@@ -21,8 +22,10 @@ import { cn } from "@/lib/utils";
 import { Card, Money, Num, StatusPill, Tabs } from "@/components/v2";
 import { Avatar, ThreeLedgers } from "@/components/v2/CustomerBits";
 import { PostPayment } from "@/components/v2/PostPayment";
+import { JourneyButton } from "@/components/common/JourneyPanel";
+import { RefundsTab, TransferDialog } from "@/components/common/BookingOps";
 
-const TABS = ["overview", "ledgers", "schedule", "ledger", "demands", "payments", "charges", "documents", "revisions", "history"];
+const TABS = ["overview", "ledgers", "schedule", "ledger", "demands", "payments", "charges", "refunds", "documents", "revisions", "history"];
 
 function Table({ head, children, testId }) {
   return <div className="card overflow-x-auto !p-0" data-testid={testId}><table className="w-full text-sm"><thead className="text-[11px] font-semibold uppercase tracking-wide text-txt-muted"><tr>{head.map((h, i) => <th key={i} className={`px-4 py-3 ${h.r ? "text-right" : "text-left"}`}>{h.l ?? h}</th>)}</tr></thead><tbody className="divide-y divide-warm-100">{children}</tbody></table></div>;
@@ -39,6 +42,9 @@ export default function BookingDetail() {
   const [pay, setPay] = useState(false);
   const [rev, setRev] = useState(null);
   const [cancel, setCancel] = useState(null);
+  const [transfer, setTransfer] = useState(false);
+  const [preview, setPreview] = useState(null);
+  useEffect(() => { if (!cancel) { setPreview(null); return; } const t = setTimeout(() => api.get(`/bookings/${id}/cancellation-preview`, { params: cancel.deduction !== "" && cancel.deduction != null ? { deduction: Number(cancel.deduction) } : {} }).then((r) => setPreview(r.data)).catch(() => setPreview(null)), 250); return () => clearTimeout(t); }, [cancel?.deduction, !!cancel, id]); // eslint-disable-line react-hooks/exhaustive-deps
   const [tab, setTab] = useState("overview");
   const load = useCallback(() => Promise.all([api.get(`/bookings/${id}`), api.get(`/bookings/${id}/ledger`)]).then(([r1, r2]) => { setB(r1.data); setLedger(r2.data.rows); }).catch((e) => toast.error(errMsg(e))), [id]);
   useEffect(() => { load(); }, [load]);
@@ -48,7 +54,7 @@ export default function BookingDetail() {
   const s = b.summary || {};
   const act = async (path, body, msg) => { try { await api.post(path, body); toast.success(msg); load(); } catch (e) { toast.error(errMsg(e), { duration: 8000 }); } };
   const revise = async () => act(`/bookings/${id}/agreement-revisions`, { cash_agreed: Number(rev.cash), account_agreed: Number(rev.account), reason: rev.reason, version: b.version }, "Agreement revised").then(() => setRev(null));
-  const doCancel = async () => act(`/bookings/${id}/cancel`, { reason: cancel.reason, refund: Number(cancel.refund) || 0, deduction: Number(cancel.deduction) || 0, version: b.version }, "Booking cancelled").then(() => setCancel(null));
+  const doCancel = async () => act(`/bookings/${id}/cancel`, { reason: cancel.reason, ...(cancel.deduction !== "" && cancel.deduction != null ? { deduction: Number(cancel.deduction) } : {}), version: b.version }, "Booking cancelled").then(() => setCancel(null));
   const complete = async () => act(`/bookings/${id}/complete`, { version: b.version }, "Handover complete — flat marked Sold");
   const canComplete = b.status === "Active" && b.construction_percent >= 100 && s.due <= 0 && s.other_charges_due <= 0;
 
@@ -69,10 +75,12 @@ export default function BookingDetail() {
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={() => window.open(`${BASE_PATH}/print/statement/${id}`, "_blank")} className="btn btn-secondary" data-testid="statement-pdf-btn"><FileText className="h-4 w-4" strokeWidth={1.75} />Statement</Button>
             <Button variant="outline" onClick={() => window.open(`${BASE_PATH}/print/allotment/${id}`, "_blank")} className="btn btn-ghost" data-testid="allotment-pdf-btn"><FileText className="h-4 w-4" strokeWidth={1.75} />Allotment</Button>
+            <JourneyButton entityType="booking" entityId={id} size="default" className="btn btn-ghost" /><HistoryButton entityType="booking" entityId={id} label={b.booking_number} />
+            {b.status === "Active" && can("agreement.edit") && <Button variant="outline" onClick={() => setTransfer(true)} className="btn btn-ghost" data-testid="transfer-booking-btn">Transfer unit</Button>}
             {b.status === "Active" && can("payment.post") && <Button onClick={() => setPay(true)} className="btn btn-primary" data-testid="post-payment-btn"><IndianRupee className="h-4 w-4" strokeWidth={1.75} />Post payment</Button>}
             {b.status === "Active" && can("agreement.edit") && <Button variant="outline" onClick={() => setRev({ cash: b.cash_agreed, account: b.account_agreed, reason: "" })} className="btn btn-ghost" data-testid="revise-agreement-btn"><FileEdit className="h-4 w-4" strokeWidth={1.75} />Revise</Button>}
             {b.status === "Active" && can("booking.create") && <Button variant="outline" disabled={!canComplete} onClick={complete} title={canComplete ? "" : "Needs 100% construction and zero dues"} className="btn btn-ghost" data-testid="complete-booking-btn"><CheckCircle2 className="h-4 w-4" strokeWidth={1.75} />Handover</Button>}
-            {b.status === "Active" && can("booking.cancel") && <Button variant="outline" className="btn btn-ghost text-brick" onClick={() => setCancel({ reason: "", refund: s.paid, deduction: 0 })} data-testid="cancel-booking-btn"><Ban className="h-4 w-4" strokeWidth={1.75} />Cancel</Button>}
+            {b.status === "Active" && can("booking.cancel") && <Button variant="outline" className="btn btn-ghost text-brick" onClick={() => setCancel({ reason: "", deduction: "" })} data-testid="cancel-booking-btn"><Ban className="h-4 w-4" strokeWidth={1.75} />Cancel</Button>}
           </div>
         </div>
         <div className="mt-6 border-t border-warm-200 pt-6"><div className="flex items-center justify-between text-xs text-txt-secondary"><span>Paid <Money value={s.paid} short className="text-ink-950" /> of <Money value={b.agreement_value} short className="text-ink-950" /></span><span className="font-semibold text-ink-950">{Math.round((s.paid / (b.agreement_value || 1)) * 100)}%</span></div><div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-warm-100"><span className="block h-full rounded-full bg-sage" style={{ width: `${Math.min(100, (s.paid / (b.agreement_value || 1)) * 100)}%` }} /></div></div>
@@ -81,7 +89,7 @@ export default function BookingDetail() {
         <Stat label="Agreement" value={inr(b.agreement_value)} hint={`order raised ${inr(s.total_order_raised)}`} />
         <Stat label="Cash" value={inr(s.cash_paid)} hint={`of ${inr(b.cash_agreed)} · due ${inr(Math.max(s.cash_due, 0))}`} tone={s.cash_due > 0 ? undefined : "sage"} />
         <Stat label="Account" value={inr(s.account_paid)} hint={`of ${inr(b.account_agreed)} · due ${inr(Math.max(s.account_due, 0))}`} />
-        <Stat label="Total due" value={inr(Math.max(s.due, 0))} hint={s.pending_cheques > 0 ? `${inr(s.pending_cheques)} cheques in hand` : "no pending cheques"} tone={s.due > 0 ? "brick" : "sage"} />
+        <Stat label="Outstanding" value={inr(s.outstanding ?? Math.max(s.due, 0))} hint={(s.advance ?? 0) > 0 ? `Advance held ${inr(s.advance)}` : s.pending_cheques > 0 ? `${inr(s.pending_cheques)} cheques in hand` : "no pending cheques"} tone={(s.outstanding ?? s.due) > 0 ? "brick" : "sage"} />
         <Stat label="Other charges" value={inr(s.other_charges_paid)} hint={`demanded ${inr(s.other_charges_demanded)} · due ${inr(Math.max(s.other_charges_due, 0))}`} />
       </div>
       <Tabs tabs={TABS.map((t) => ({ value: t, label: t === "ledger" ? "Statement" : t[0].toUpperCase() + t.slice(1) }))} value={tab} onChange={setTab} testId="booking-tabs" />
@@ -115,14 +123,16 @@ export default function BookingDetail() {
             {b.other_charges.length === 0 && <tr><td colSpan={9} className="px-3 py-6 text-center text-txt-secondary">No other charges.</td></tr>}
           </Table>
         )}
+      {tab === "refunds" && <RefundsTab bookingId={id} canPay={can("payment.reverse")} onChanged={load} />}
       {tab === "documents" && <Card><DocumentsPanel entityType="booking" entityId={id} canWrite={can("booking.create")} /></Card>}
       {tab === "revisions" && (b.agreement_revisions.length === 0 ? <EmptyState title="No agreement revisions" /> : <Card className="divide-y divide-warm-100 !p-0" testId="revisions-list">{b.agreement_revisions.map((r) => <div key={r.id} className="px-5 py-3 text-sm"><p className="font-semibold text-ink-950">{fmtDateTime(r.at)} · {r.by_name}</p><p className="text-xs">Cash {inr(r.before.cash_agreed)} → <b>{inr(r.after.cash_agreed)}</b> · Account {inr(r.before.account_agreed)} → <b>{inr(r.after.account_agreed)}</b> · Total {inr(r.before.agreement_value)} → <b>{inr(r.after.agreement_value)}</b></p><p className="mt-1 text-xs text-txt-muted">Reason: {r.reason}</p></div>)}</Card>)}
       {tab === "history" && <Card><HistoryTimeline entityType="booking" entityId={id} /></Card>}
       {pay && <PostPayment open={pay} onOpenChange={setPay} bookingId={id} onPosted={load} />}
+      {transfer && <TransferDialog open={transfer} onOpenChange={setTransfer} booking={b} onDone={load} />}
       <Dialog open={!!rev} onOpenChange={(o) => !o && setRev(null)}><DialogContent data-testid="revision-dialog"><DialogHeader><DialogTitle>Revise agreement</DialogTitle><DialogDescription>Each bucket must stay ≥ amount already received (Cash {inr(s.cash_paid)}, Account {inr(s.account_paid)}).</DialogDescription></DialogHeader>
         {rev && <div className="space-y-3"><div className="grid grid-cols-2 gap-3"><Field label="Cash agreed ₹"><Input type="number" value={rev.cash} onChange={(e) => setRev({ ...rev, cash: e.target.value })} data-testid="rev-cash" /></Field><Field label="Account agreed ₹"><Input type="number" value={rev.account} onChange={(e) => setRev({ ...rev, account: e.target.value })} data-testid="rev-account" /></Field></div><p className="text-sm">New agreement value: <b className="text-ink-950">{inr(Number(rev.cash) + Number(rev.account))}</b></p><Field label="Reason" required><Textarea value={rev.reason} onChange={(e) => setRev({ ...rev, reason: e.target.value })} data-testid="rev-reason" /></Field><Button disabled={rev.reason.length < 3} onClick={revise} className="w-full bg-ink-950 hover:bg-ink-800" data-testid="rev-submit">Save revision</Button></div>}</DialogContent></Dialog>
       <Dialog open={!!cancel} onOpenChange={(o) => !o && setCancel(null)}><DialogContent data-testid="cancel-dialog"><DialogHeader><DialogTitle>Cancel booking</DialogTitle><DialogDescription>Flat and parking return to Available. Refund cannot exceed {inr(s.paid + s.other_charges_paid)} received.</DialogDescription></DialogHeader>
-        {cancel && <div className="space-y-3"><Field label="Reason" required><Textarea value={cancel.reason} onChange={(e) => setCancel({ ...cancel, reason: e.target.value })} data-testid="cancel-reason" /></Field><div className="grid grid-cols-2 gap-3"><Field label="Deduction ₹"><Input type="number" value={cancel.deduction} onChange={(e) => setCancel({ ...cancel, deduction: e.target.value, refund: Math.max((s.paid + s.other_charges_paid) - Number(e.target.value), 0) })} /></Field><Field label="Refund ₹"><Input type="number" value={cancel.refund} onChange={(e) => setCancel({ ...cancel, refund: e.target.value })} data-testid="cancel-refund" /></Field></div><Button disabled={cancel.reason.length < 3} onClick={doCancel} className="w-full bg-red-600 hover:bg-red-700" data-testid="cancel-submit">Confirm cancellation</Button></div>}</DialogContent></Dialog>
+        {cancel && <div className="space-y-3"><Field label="Reason" required><Textarea value={cancel.reason} onChange={(e) => setCancel({ ...cancel, reason: e.target.value })} data-testid="cancel-reason" /></Field><Field label="Deduction ₹ (blank = project cancellation policy)"><Input type="number" value={cancel.deduction} onChange={(e) => setCancel({ ...cancel, deduction: e.target.value })} data-testid="cancel-deduction" /></Field>{preview && <div className="rounded-xl bg-warm-50 p-3 text-xs" data-testid="cancel-refund-hint"><p className="label mb-1">Refund formula ({preview.policy.deduction_base === "received" ? "% of received" : preview.policy.deduction_base === "fixed" ? "fixed" : "% of agreement"} policy)</p>{preview.lines.map((l, i) => <div key={i} className={`flex justify-between py-0.5 ${l.info ? "text-txt-muted" : ""} ${l.label.startsWith("=") ? "border-t border-warm-200 mt-1 pt-1 font-semibold text-ink-950" : ""}`} data-testid={`cancel-line-${i}`}><span>{l.label}</span><span className="font-mono">{inr(l.amount_paise / 100)}</span></div>)}<p className="mt-2 text-txt-secondary">{preview.refund_paise > 0 ? "A refund record (Pending) is created for Accounts to pay; the payout posts contra ledger rows and a Roznamcha cash-out." : "Nothing refundable → a forfeiture record is created; no payout."}</p></div>}<Button disabled={cancel.reason.length < 3} onClick={doCancel} className="w-full bg-red-600 hover:bg-red-700" data-testid="cancel-submit">Confirm cancellation</Button></div>}</DialogContent></Dialog>
     </div>
   );
 }

@@ -35,6 +35,9 @@ export default function BookingWizard() {
   const [flat, setFlat] = useState(null);
   const [flatQ, setFlatQ] = useState("");
   const [customer, setCustomer] = useState(null);
+  const [leads, setLeads] = useState([]);
+  const [leadId, setLeadId] = useState("");
+  useEffect(() => { if (!customer?.phone) { setLeads([]); setLeadId(""); return; } api.get("/leads", { params: { search: customer.phone, page_size: 20 } }).then((r) => { const open = (r.data.items || []).filter((l) => !["Converted", "Lost"].includes(l.status)); setLeads(open); setLeadId(open[0]?.id || ""); }).catch(() => setLeads([])); }, [customer?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const [custSearch, setCustSearch] = useState("");
   const [custResults, setCustResults] = useState([]);
   const [newCust, setNewCust] = useState(false);
@@ -85,7 +88,7 @@ export default function BookingWizard() {
   const submit = async () => {
     setBusy(true);
     try {
-      const body = { flat_id: flat.id, customer_id: customer.id, booking_date: bookingDate, agreement_value: total, cash_agreed: cash, account_agreed: account, remarks: remarks || null, parking_slot_ids: slots, payment_plan_id: planId || null, plan_acceptance_mode: acceptMode,
+      const body = { flat_id: flat.id, customer_id: customer.id, lead_id: leadId || null, booking_date: bookingDate, agreement_value: total, cash_agreed: cash, account_agreed: account, remarks: remarks || null, parking_slot_ids: slots, payment_plan_id: planId || null, plan_acceptance_mode: acceptMode,
         other_charges: selCharges.map((c) => ({ charge_type_id: c.charge_type_id, amount: Number(c.amount), gst_percent: c.gst_percent || 0, demand_at: c.demand_at })) };
       localStorage.removeItem(draftKey);
       const r = await api.post("/bookings", body);
@@ -114,6 +117,7 @@ export default function BookingWizard() {
           <div className="flex flex-col gap-2 sm:flex-row"><input value={custSearch} onChange={(e) => setCustSearch(e.target.value)} placeholder="Search by phone, name or code…" className="input sm:max-w-md" data-testid="wiz-customer-search" />{can("customer.write") && <button type="button" className="btn btn-secondary" onClick={() => setNewCust(true)} data-testid="wiz-new-customer"><Plus className="h-4 w-4" />New customer</button>}</div>
           <div className="mt-4 grid gap-3 md:grid-cols-2">{custResults.map((c) => <button key={c.id} onClick={() => setCustomer(c)} className={cn("card card-hover flex items-center gap-3 !p-4 text-left", customer?.id === c.id && "!border-ink-950 ring-1 ring-ink-950")} data-testid={`wiz-customer-${c.customer_code}`}><Avatar name={c.full_name} size={36} /><div className="min-w-0"><p className="truncate text-sm font-semibold text-ink-950">{c.salutation} {c.full_name}</p><p className="truncate text-xs text-txt-secondary">{c.customer_code} · {c.phone} · KYC {c.kyc_status}</p></div></button>)}</div>
           {customer && <p className="mt-4 text-sm text-txt-secondary">Selected: <b className="text-ink-950">{customer.full_name}</b> ({customer.customer_code})</p>}
+          {customer && <div className="mt-3 max-w-md"><Field label="Lead this booking converts" hint="Keeps the sales funnel truthful. Walk-in creates a Converted lead with source Walk-in."><select className="input" value={leadId} onChange={(e) => setLeadId(e.target.value)} data-testid="wiz-lead"><option value="">No lead / walk-in</option>{leads.map((l) => <option key={l.id} value={l.id}>{l.lead_number} · {l.status} · {l.source || ""}</option>)}</select></Field></div>}
           {newCust && <Suspense fallback={null}><CustomerForm open={newCust} onOpenChange={setNewCust} onSaved={(c) => { setCustomer(c); setCustResults([c]); }} /></Suspense>}
         </div>}
         {step === 3 && <div className="grid gap-4 md:grid-cols-3">

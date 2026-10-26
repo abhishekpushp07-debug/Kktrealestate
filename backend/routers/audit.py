@@ -12,7 +12,7 @@ router = APIRouter(prefix="/audit-logs", tags=["audit"])
 async def list_audit_logs(
     params: ListParams = Depends(), entity_type: str | None = None, entity_id: str | None = None, actor_id: str | None = None,
     action: str | None = None, date_from: str | None = Query(None), date_to: str | None = Query(None),
-    user: dict = Depends(require("audit.view")),
+    user: dict = Depends(require("admin.audit.view")),
 ):
     q = {"company_id": user["company_id"], **search_filter(params.search, ["actor_name", "action", "entity_type", "entity_id"])}
     for k, v in (("entity_type", entity_type), ("entity_id", entity_id), ("actor_id", actor_id), ("action", action)):
@@ -30,12 +30,12 @@ async def list_audit_logs(
 
 
 @router.get("/entity-types")
-async def entity_types(user: dict = Depends(require("audit.view"))):
+async def entity_types(user: dict = Depends(require("admin.audit.view"))):
     return {"items": sorted(await db.audit_logs.distinct("entity_type", {"company_id": user["company_id"]}))}
 
 
 @router.get("/login-events")
-async def login_events(params: ListParams = Depends(), email: str | None = None, success: bool | None = None, user: dict = Depends(require("audit.view"))):
+async def login_events(params: ListParams = Depends(), email: str | None = None, success: bool | None = None, user: dict = Depends(require("admin.audit.view"))):
     q = {**search_filter(params.search, ["email", "ip", "reason"])}
     if email:
         q["email"] = email.lower()
@@ -45,7 +45,7 @@ async def login_events(params: ListParams = Depends(), email: str | None = None,
 
 
 @router.get("/entity/{entity_type}/{entity_id}")
-async def entity_history(entity_type: str, entity_id: str, limit: int = Query(100, le=500), user: dict = Depends(require("project.read"))):
+async def entity_history(entity_type: str, entity_id: str, limit: int = Query(100, le=500), user: dict = Depends(require("admin.audit.view"))):
     """Per-record timeline; available to any authenticated reader of that entity (not only audit.view)."""
     items = await db.audit_logs.find({"company_id": user["company_id"], "entity_type": entity_type, "entity_id": entity_id}, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
     for it in items:

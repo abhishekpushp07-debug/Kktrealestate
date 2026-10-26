@@ -6,7 +6,7 @@ from pymongo import UpdateOne
 
 from db import db
 from models_out import BlocksOut, BlocksOutPage
-from deps import ensure_project_access, project_scope_filter, require
+from deps import ensure_project_access, project_scope_filter, require, require_any
 from routers.projects import STATUSES
 from services.flat_generation import floor_labels, generate_flats, unit_floors
 from utils import (
@@ -169,7 +169,7 @@ async def _load_block(block_id: str, user: dict) -> dict:
 
 
 @router.get("", response_model=BlocksOutPage, response_model_exclude_unset=True)
-async def list_blocks(params: ListParams = Depends(), project_id: str | None = None, user: dict = Depends(require("project.read"))):
+async def list_blocks(params: ListParams = Depends(), project_id: str | None = None, user: dict = Depends(require("masters.project.view"))):
     q = {"company_id": user["company_id"], **project_scope_filter(user), **search_filter(params.search, ["name", "code"])}
     if project_id:
         ensure_project_access(user, project_id)
@@ -182,7 +182,7 @@ async def list_blocks(params: ListParams = Depends(), project_id: str | None = N
 
 
 @router.post("", status_code=201)
-async def create_block(body: BlockCreate, request: Request, user: dict = Depends(require("block.write"))):
+async def create_block(body: BlockCreate, request: Request, user: dict = Depends(require("masters.tower.create"))):
     ensure_project_access(user, body.project_id)
     project = await get_or_404(db.projects, body.project_id, "Project", {"company_id": user["company_id"], "is_active": True})
     if await db.blocks.find_one({"project_id": body.project_id, "code": body.code}):
@@ -216,7 +216,7 @@ async def create_block(body: BlockCreate, request: Request, user: dict = Depends
 
 
 @router.get("/{block_id}", response_model=BlocksOut, response_model_exclude_unset=True)
-async def get_block(block_id: str, user: dict = Depends(require("project.read"))):
+async def get_block(block_id: str, user: dict = Depends(require("masters.project.view"))):
     block = await _load_block(block_id, user)
     block = (await _attach_counts([block]))[0]
     tids = [p["floor_plan_template_id"] for p in block.get("floor_plans") or [] if p.get("floor_plan_template_id")]
@@ -236,7 +236,7 @@ async def get_block(block_id: str, user: dict = Depends(require("project.read"))
 
 
 @router.patch("/{block_id}")
-async def update_block(block_id: str, body: BlockUpdate, request: Request, user: dict = Depends(require("block.write"))):
+async def update_block(block_id: str, body: BlockUpdate, request: Request, user: dict = Depends(require("masters.tower.edit"))):
     before = await _load_block(block_id, user)
     changes = body.model_dump(exclude_unset=True)
     changes.pop("version", None)
@@ -266,7 +266,7 @@ async def update_block(block_id: str, body: BlockUpdate, request: Request, user:
 
 
 @router.post("/{block_id}/generate-flats")
-async def regenerate_flats(block_id: str, request: Request, user: dict = Depends(require("block.write"))):
+async def regenerate_flats(block_id: str, request: Request, user: dict = Depends(require("masters.flat.create"))):
     block = await _load_block(block_id, user)
     non_avail = await db.flats.count_documents({"block_id": block_id, "status": {"$ne": "Available"}})
     if non_avail:
@@ -278,7 +278,7 @@ async def regenerate_flats(block_id: str, request: Request, user: dict = Depends
 
 
 @router.post("/{block_id}/floors")
-async def add_floors(block_id: str, body: AddFloorsIn, request: Request, user: dict = Depends(require("block.write"))):
+async def add_floors(block_id: str, body: AddFloorsIn, request: Request, user: dict = Depends(require("masters.tower.edit"))):
     block = await _load_block(block_id, user)
     old_labels = floor_labels(block)
     new_block = {**block, "floors": block["floors"] + body.count}
@@ -296,7 +296,7 @@ async def add_floors(block_id: str, body: AddFloorsIn, request: Request, user: d
 
 
 @router.post("/{block_id}/bulk-price")
-async def bulk_price(block_id: str, body: BulkPriceIn, request: Request, user: dict = Depends(require("flat.write"))):
+async def bulk_price(block_id: str, body: BulkPriceIn, request: Request, user: dict = Depends(require("masters.flat.edit"))):
     block = await _load_block(block_id, user)
     if body.rate_per_sqft is None and body.price is None:
         raise ApiError(422, "Provide rate_per_sqft or price", "VALIDATION_ERROR")
@@ -326,7 +326,7 @@ async def bulk_price(block_id: str, body: BulkPriceIn, request: Request, user: d
 
 
 @router.post("/{block_id}/bulk-status")
-async def bulk_status(block_id: str, body: BulkStatusIn, request: Request, user: dict = Depends(require("flat.status"))):
+async def bulk_status(block_id: str, body: BulkStatusIn, request: Request, user: dict = Depends(require_any("sales.hold.create", "sales.hold.release"))):
     await _load_block(block_id, user)
     flats = await db.flats.find({"block_id": block_id, "id": {"$in": body.flat_ids}, "status": {"$in": ["Available", "Hold", "Blocked"], "$ne": body.status}}, {"_id": 0, "id": 1, "flat_number": 1, "status": 1}).to_list(None)
     if not flats:
@@ -340,7 +340,7 @@ async def bulk_status(block_id: str, body: BulkStatusIn, request: Request, user:
 
 
 @router.get("/{block_id}/grid")
-async def block_grid(block_id: str, user: dict = Depends(require("project.read"))):
+async def block_grid(block_id: str, user: dict = Depends(require("masters.project.view"))):
     block = await _load_block(block_id, user)
     flats = await db.flats.find({"block_id": block_id, "is_active": True}, {"_id": 0, "id": 1, "flat_number": 1, "floor": 1, "floor_label": 1, "position": 1, "status": 1, "price_paise": 1, "flat_type_code": 1, "flat_type_id": 1, "super_builtup_sqft": 1, "facing": 1, "is_corner": 1, "version": 1}).sort([("floor", -1), ("position", 1)]).to_list(None)
     by_floor: dict[int, list] = {}

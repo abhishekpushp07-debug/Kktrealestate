@@ -10,7 +10,7 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 
 @router.get("")
-async def dashboard(user: dict = Depends(require("project.read"))):
+async def dashboard(user: dict = Depends(require("masters.project.view"))):
     from services import ttlcache
     ck = f"dash:{user['company_id']}:{','.join(sorted(user.get('project_scope') or []))}"
     hit = ttlcache.get(ck)

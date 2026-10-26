@@ -1,3 +1,4 @@
+import { useAuth } from "@/context/AuthContext";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Download, FileText, Printer, Save, Trash2, Pencil, BarChart3, Receipt, CalendarClock, Building2, Users, Wrench, Activity, Check, X } from "lucide-react";
@@ -65,11 +66,12 @@ function kpis(key, d) {
 }
 
 export default function Reports() {
+  const { can } = useAuth();
   const { key = "collections" } = useParams();
   const nav = useNavigate();
   const { data: list } = useFetch("/reports");
   const { data: projects } = useFetch("/projects?page_size=50");
-  const [f, setF] = useState({ group_by: "month", group_by_out: "customer", group_by_inv: "block", cheque_status: "Pending", ...PRESET_DATES.FY() });
+  const [f, setF] = useState({ group_by: "month", group_by_out: "customer", group_by_inv: "block", cheque_status: "All", ...PRESET_DATES.FY() });
   const [range, setRange] = useState("FY");
   const [presetName, setPresetName] = useState("");
   const [renaming, setRenaming] = useState(null);
@@ -97,8 +99,8 @@ export default function Reports() {
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div><p className="label">Insight</p><h1 className="mt-1 font-display text-4xl text-ink-950">Reports</h1></div>
         <div className="flex gap-2 print:hidden">
-          <button className="btn btn-secondary" onClick={download} data-testid="rf-export-csv"><Download className="h-4 w-4" />CSV</button>
-          <button className="btn btn-secondary" onClick={() => openPdf(`/reports/${key}?${qs}&format=pdf`)} data-testid="rf-export-pdf"><FileText className="h-4 w-4" />PDF</button>
+          {can("reports.collection.export") && <button className="btn btn-secondary" onClick={download} data-testid="rf-export-csv"><Download className="h-4 w-4" />CSV</button>}
+          {can("reports.collection.export") && <button className="btn btn-secondary" onClick={() => openPdf(`/reports/${key}?${qs}&format=pdf`)} data-testid="rf-export-pdf"><FileText className="h-4 w-4" />PDF</button>}
           <button className="btn btn-primary" onClick={() => window.print()} data-testid="rf-print"><Printer className="h-4 w-4" />Print</button>
         </div>
       </header>
@@ -126,7 +128,7 @@ export default function Reports() {
               {has("group_by") && <Sel value={f.group_by} onChange={set("group_by")} testId="rf-groupby">{["day", "week", "month"].map((m) => <option key={m} value={m}>By {m}</option>)}</Sel>}
               {has("group_by_out") && <Sel value={f.group_by_out} onChange={set("group_by_out")} testId="rf-groupby-out">{["customer", "block", "project"].map((m) => <option key={m} value={m}>By {m}</option>)}</Sel>}
               {has("group_by_inv") && <Sel value={f.group_by_inv} onChange={set("group_by_inv")} testId="rf-groupby-inv">{["project", "block", "flat_type", "floor"].map((m) => <option key={m} value={m}>By {m.replace("_", " ")}</option>)}</Sel>}
-              {has("cheque_status") && <Sel value={f.cheque_status} onChange={set("cheque_status")} testId="rf-cheque-status">{["Pending", "Bounced", "Cleared"].map((m) => <option key={m}>{m}</option>)}</Sel>}
+              {has("cheque_status") && <Sel value={f.cheque_status} onChange={set("cheque_status")} testId="rf-cheque-status">{["All", "Pending", "Bounced", "Cleared", "Reversed"].map((m) => <option key={m}>{m}</option>)}</Sel>}
             </div>
             <div className="flex flex-wrap items-center gap-2 border-t border-warm-100 pt-4" data-testid="rf-presets">
               <span className="label mr-1">Saved views</span>

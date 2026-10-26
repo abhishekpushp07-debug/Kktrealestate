@@ -61,7 +61,7 @@ async def _validate_seq(seq: list[dict]):
 
 
 @router.patch("/projects/{project_id}/stage-sequence")
-async def set_project_sequence(project_id: str, body: SeqIn, request: Request, user: dict = Depends(require("project.write"))):
+async def set_project_sequence(project_id: str, body: SeqIn, request: Request, user: dict = Depends(require("masters.construction_stage.edit"))):
     await get_or_404(db.projects, project_id, "Project", {"company_id": user["company_id"]})
     await _validate_seq(body.construction_stage_sequence)
     await db.projects.update_one({"id": project_id}, {"$set": {"construction_stage_sequence": body.construction_stage_sequence, "updated_at": now_iso()}, "$inc": {"version": 1}})
@@ -70,7 +70,7 @@ async def set_project_sequence(project_id: str, body: SeqIn, request: Request, u
 
 
 @router.patch("/blocks/{block_id}/stage-sequence")
-async def set_block_sequence(block_id: str, body: SeqIn, request: Request, user: dict = Depends(require("project.write"))):
+async def set_block_sequence(block_id: str, body: SeqIn, request: Request, user: dict = Depends(require("masters.construction_stage.edit"))):
     block = await get_or_404(db.blocks, block_id, "Block", {"company_id": user["company_id"]})
     if any(s["status"] != "Pending" for s in block.get("construction_stages") or []):
         raise ApiError(409, "Cannot change the sequence once stages are completed; undo them first", "SEQUENCE_LOCKED")
@@ -83,7 +83,7 @@ async def set_block_sequence(block_id: str, body: SeqIn, request: Request, user:
 
 # ---------- tower construction status ----------
 @router.get("/blocks/{block_id}/construction")
-async def block_construction(block_id: str, user: dict = Depends(require("project.read"))):
+async def block_construction(block_id: str, user: dict = Depends(require("construction.stage.view"))):
     block = await get_or_404(db.blocks, block_id, "Block", {"company_id": user["company_id"]})
     ensure_project_access(user, block["project_id"])
     stages = await ensure_block_stages(block)
@@ -108,7 +108,7 @@ class StageSetIn(StrictModel):
 
 
 @router.post("/blocks/{block_id}/construction/stage")
-async def set_current_stage(block_id: str, body: StageSetIn, request: Request, user: dict = Depends(require("construction.update"))):
+async def set_current_stage(block_id: str, body: StageSetIn, request: Request, user: dict = Depends(require("construction.stage.update"))):
     """Mark `stage_id` (and all earlier pending stages) Completed; raise plan installments for Active bookings."""
     block = await get_or_404(db.blocks, block_id, "Block", {"company_id": user["company_id"]})
     ensure_project_access(user, block["project_id"])
@@ -161,7 +161,7 @@ class UndoIn(StrictModel):
 
 
 @router.post("/blocks/{block_id}/construction/undo")
-async def undo_stage(block_id: str, body: UndoIn, request: Request, user: dict = Depends(require("construction.undo"))):
+async def undo_stage(block_id: str, body: UndoIn, request: Request, user: dict = Depends(require("construction.stage.undo"))):
     block = await get_or_404(db.blocks, block_id, "Block", {"company_id": user["company_id"]})
     stages = await ensure_block_stages(block)
     done = [s for s in stages if s["status"] == "Completed"]
@@ -221,7 +221,7 @@ async def _check_plan_fits(plan: dict, block: dict):
 
 
 @router.get("/payment-plan-assignments")
-async def list_assignments(project_id: str | None = None, payment_plan_id: str | None = None, user: dict = Depends(require("project.read"))):
+async def list_assignments(project_id: str | None = None, payment_plan_id: str | None = None, user: dict = Depends(require("masters.payment_plan.view"))):
     q = {"company_id": user["company_id"], "is_active": True}
     if project_id:
         q["project_id"] = project_id
@@ -231,7 +231,7 @@ async def list_assignments(project_id: str | None = None, payment_plan_id: str |
 
 
 @router.post("/payment-plan-assignments", status_code=201)
-async def assign_plan(body: AssignIn, request: Request, user: dict = Depends(require("master.write"))):
+async def assign_plan(body: AssignIn, request: Request, user: dict = Depends(require("masters.payment_plan.assign"))):
     plan = await get_or_404(db.payment_plans, body.payment_plan_id, "Payment plan", {"is_active": True})
     project = await get_or_404(db.projects, body.project_id, "Project", {"company_id": user["company_id"]})
     blocks = [await get_or_404(db.blocks, body.block_id, "Block", {"project_id": body.project_id})] if body.block_id else await db.blocks.find({"project_id": body.project_id, "is_active": True}, {"_id": 0}).to_list(None)
@@ -246,7 +246,7 @@ async def assign_plan(body: AssignIn, request: Request, user: dict = Depends(req
 
 
 @router.delete("/payment-plan-assignments/{assignment_id}")
-async def unassign_plan(assignment_id: str, request: Request, user: dict = Depends(require("master.write"))):
+async def unassign_plan(assignment_id: str, request: Request, user: dict = Depends(require("masters.payment_plan.assign"))):
     r = await db.payment_plan_assignments.update_one({"id": assignment_id, "company_id": user["company_id"]}, {"$set": {"is_active": False}})
     if not r.matched_count:
         raise ApiError(404, "Assignment not found", "NOT_FOUND")
@@ -268,7 +268,7 @@ async def applicable_plans(project_id: str, block_id: str) -> list[dict]:
 
 
 @router.get("/projects/{project_id}/blocks/{block_id}/payment-plans")
-async def block_payment_plans(project_id: str, block_id: str, user: dict = Depends(require("project.read"))):
+async def block_payment_plans(project_id: str, block_id: str, user: dict = Depends(require("masters.payment_plan.view"))):
     return {"items": await applicable_plans(project_id, block_id)}
 
 
@@ -280,7 +280,7 @@ async def build_snapshot(plan: dict) -> dict:
 
 
 @router.get("/bookings/{booking_id}/schedule")
-async def booking_schedule(booking_id: str, user: dict = Depends(require("booking.read"))):
+async def booking_schedule(booking_id: str, user: dict = Depends(require("sales.agreement.view"))):
     b = await get_or_404(db.bookings, booking_id, "Booking", {"company_id": user["company_id"]})
     block = await db.blocks.find_one({"id": b["block_id"]}, {"_id": 0, "construction_stages": 1}) or {}
     demands = await db.demands.find({"booking_id": booking_id}, {"_id": 0}).to_list(None)
@@ -296,7 +296,7 @@ class PlanChangeIn(StrictModel):
 
 
 @router.post("/bookings/{booking_id}/payment-plan")
-async def change_booking_plan(booking_id: str, body: PlanChangeIn, request: Request, user: dict = Depends(require("agreement.edit"))):
+async def change_booking_plan(booking_id: str, body: PlanChangeIn, request: Request, user: dict = Depends(require("masters.payment_plan.assign"))):
     b = await get_or_404(db.bookings, booking_id, "Booking", {"company_id": user["company_id"], "status": "Active"})
     if await db.demands.count_documents({"booking_id": booking_id, "voided": {"$ne": True}, "paid_paise": {"$gt": 0}}):
         raise ApiError(409, "An installment demand already has a payment; plan cannot be changed", "PLAN_LOCKED")
@@ -317,7 +317,7 @@ async def change_booking_plan(booking_id: str, body: PlanChangeIn, request: Requ
 
 # ---------- forecast report ----------
 @router.get("/reports/upcoming-dues")
-async def upcoming_dues(days: int = 90, project_id: str | None = None, format: str | None = None, user: dict = Depends(require("report.view"))):
+async def upcoming_dues(days: int = 90, project_id: str | None = None, format: str | None = None, user: dict = Depends(require("reports.receivables_forecast.view"))):
     from datetime import timedelta
     horizon = (date.today() + timedelta(days=days)).isoformat()
     q = {"company_id": user["company_id"], "status": "Active", "payment_plan_snapshot": {"$ne": None}}
@@ -340,14 +340,14 @@ async def upcoming_dues(days: int = 90, project_id: str | None = None, format: s
 
 # ---------- admin ----------
 @router.post("/admin/run-dues")
-async def run_dues(request: Request, as_of: date | None = None, user: dict = Depends(require("settings.manage"))):
+async def run_dues(request: Request, as_of: date | None = None, user: dict = Depends(require("admin.data.recompute"))):
     res = await run_dues_for_all(as_of, actor=user)
     await write_audit(user, "dues.run", "system", "dues", after=res, ip=client_ip(request))
     return res
 
 
 @router.get("/admin/integrity-report")
-async def integrity_report_route(as_of: date | None = None, fresh: bool = False, user: dict = Depends(require("settings.manage"))):
+async def integrity_report_route(as_of: date | None = None, fresh: bool = False, user: dict = Depends(require("admin.system_health.view"))):
     if user.get("role_name") != "Super Admin":
         raise ApiError(403, "Super Admin only", "FORBIDDEN")
     from services.integrity import integrity_report
@@ -365,7 +365,7 @@ class RepairIn(StrictModel):
 
 
 @router.post("/admin/integrity-repair")
-async def integrity_repair_route(body: RepairIn, request: Request, user: dict = Depends(require("settings.manage"))):
+async def integrity_repair_route(body: RepairIn, request: Request, user: dict = Depends(require("admin.data.recompute"))):
     if user.get("role_name") != "Super Admin":
         raise ApiError(403, "Super Admin only", "FORBIDDEN")
     if body.confirm != "REPAIR":
@@ -377,5 +377,5 @@ async def integrity_repair_route(body: RepairIn, request: Request, user: dict = 
 
 
 @router.get("/admin/migration-report")
-async def migration_report(user: dict = Depends(require("settings.manage"))):
+async def migration_report(user: dict = Depends(require("admin.system_health.view"))):
     return (await db.settings.find_one({"key": "migration_phase7_report"}, {"_id": 0}) or {}).get("value") or {"status": "not run"}

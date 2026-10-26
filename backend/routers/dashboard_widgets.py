@@ -11,7 +11,7 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 
 @router.get("/widgets")
-async def widgets(user: dict = Depends(require("project.read"))):
+async def widgets(user: dict = Depends(require("masters.project.view"))):
     from services import ttlcache
     ck = f"widgets:{user['company_id']}:{user.get('role_name')}:{user['id'] if user.get('role_name') == 'Sales' else ''}:{','.join(sorted(user.get('project_scope') or []))}"
     hit = ttlcache.get(ck)

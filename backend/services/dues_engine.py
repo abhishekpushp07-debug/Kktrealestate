@@ -1,4 +1,5 @@
 """Auto-dues engine (Phase 7): raise installment demands from the booking's payment-plan snapshot. Idempotent."""
+from services import clock
 from datetime import date, datetime, timedelta
 
 from db import db
@@ -50,7 +51,7 @@ def schedule(booking: dict, block: dict, demands: list[dict]) -> list[dict]:
     ins_list = sorted(snap.get("installments") or [], key=lambda x: x["seq"])
     by_seq = {d.get("installment_seq"): d for d in demands if not d.get("voided")}
     rows, cum = [], 0.0
-    today = date.today().isoformat()
+    today = clock.today().isoformat()
     for ins in ins_list:
         cum = round(cum + ins["percent"], 2)
         c_exp, a_exp = pct_of(booking["cash_agreed_paise"], ins["percent"]), pct_of(booking["account_agreed_paise"], ins["percent"])
@@ -72,7 +73,7 @@ async def raise_due_installments(booking: dict, today: date | None = None, poste
     """Evaluate every installment; raise exactly one demand per newly-triggered installment. Returns created demands."""
     if booking.get("status") != "Active" or not booking.get("payment_plan_snapshot"):
         return []
-    today = today or date.today()
+    today = today or clock.today()
     posted_at = posted_at or now_iso()
     block = await db.blocks.find_one({"id": booking["block_id"]}, {"_id": 0, "construction_stages": 1}) or {}
     company = await db.companies.find_one({"id": booking["company_id"]}, {"_id": 0})
@@ -131,4 +132,4 @@ async def run_dues_for_all(today: date | None = None, actor: dict | None = None)
     async for b in db.bookings.find({"status": "Active", "payment_plan_snapshot": {"$ne": None}}, {"_id": 0}):
         bookings += 1
         n += len(await raise_due_installments(b, today, actor=actor))
-    return {"bookings_checked": bookings, "demands_raised": n, "as_of": (today or date.today()).isoformat(), "ran_at": datetime.now().isoformat()}
+    return {"bookings_checked": bookings, "demands_raised": n, "as_of": (today or clock.today()).isoformat(), "ran_at": clock.now(None).isoformat()}

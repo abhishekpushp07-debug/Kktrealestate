@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 
 from db import db
-from deps import project_scope_filter, require
+from deps import project_scope_filter, require, require_any
 from services.filesig import sniff
 from storage import put_object
 from utils import ApiError, ListParams, StrictModel, base_doc, client_ip, get_or_404, now_iso, paginate, search_filter, write_audit
@@ -14,7 +14,7 @@ SR_STATUSES = ["New", "In Progress", "Awaiting Customer", "Resolved", "Closed"]
 
 # ---------- Service requests ----------
 @router.get("/service-requests")
-async def list_sr(params: ListParams = Depends(), status: str | None = None, priority: str | None = None, assigned_to: str | None = None, project_id: str | None = None, customer_id: str | None = None, category: str | None = None, overdue: bool = False, user: dict = Depends(require("service.read"))):
+async def list_sr(params: ListParams = Depends(), status: str | None = None, priority: str | None = None, assigned_to: str | None = None, project_id: str | None = None, customer_id: str | None = None, category: str | None = None, overdue: bool = False, user: dict = Depends(require("service.ticket.view"))):
     q = {"company_id": user["company_id"], **project_scope_filter(user), **search_filter(params.search, ["ticket_number", "subject", "customer_name", "booking_number", "flat_number"])}
     for k, v in (("status", status), ("priority", priority), ("assigned_to", assigned_to), ("project_id", project_id), ("customer_id", customer_id), ("category", category)):
         if v:
@@ -28,17 +28,17 @@ async def list_sr(params: ListParams = Depends(), status: str | None = None, pri
 
 
 @router.get("/service-requests/categories")
-async def sr_categories(user: dict = Depends(require("service.read"))):
+async def sr_categories(user: dict = Depends(require("service.ticket.view"))):
     return {"items": await db.service_categories.find({"company_id": user["company_id"], "is_active": True}, {"_id": 0}).sort("order", 1).to_list(50)}
 
 
 @router.get("/service-requests/{sr_id}")
-async def get_sr(sr_id: str, user: dict = Depends(require("service.read"))):
+async def get_sr(sr_id: str, user: dict = Depends(require("service.ticket.view"))):
     return await get_or_404(db.service_requests, sr_id, "Service request", {"company_id": user["company_id"], **project_scope_filter(user)})
 
 
 @router.get("/service-requests/{sr_id}/attachments/{idx}")
-async def sr_attachment(sr_id: str, idx: int, user: dict = Depends(require("service.read"))):
+async def sr_attachment(sr_id: str, idx: int, user: dict = Depends(require("service.ticket.view"))):
     from fastapi import Response
     from storage import get_object
     sr = await get_or_404(db.service_requests, sr_id, "Service request", {"company_id": user["company_id"], **project_scope_filter(user)})
@@ -60,7 +60,7 @@ class SRCreateIn(StrictModel):
 
 
 @router.post("/service-requests", status_code=201)
-async def create_sr(body: SRCreateIn, request: Request, user: dict = Depends(require("service.write"))):
+async def create_sr(body: SRCreateIn, request: Request, user: dict = Depends(require("service.ticket.create"))):
     from routers.portal import create_service_request
     c = await get_or_404(db.customers, body.customer_id, "Customer", {"company_id": user["company_id"]})
     b = await get_or_404(db.bookings, body.booking_id, "Booking", {"company_id": user["company_id"]})
@@ -75,7 +75,7 @@ class SRReplyIn(StrictModel):
 
 
 @router.post("/service-requests/{sr_id}/reply")
-async def reply_sr(sr_id: str, body: SRReplyIn, request: Request, user: dict = Depends(require("service.write"))):
+async def reply_sr(sr_id: str, body: SRReplyIn, request: Request, user: dict = Depends(require("service.ticket.edit"))):
     sr = await get_or_404(db.service_requests, sr_id, "Service request", {"company_id": user["company_id"]})
     msg = {"by": "staff", "author_name": user["name"], "author_id": user["id"], "message": body.message.strip(), "attachments": [], "at": now_iso(), "internal": body.internal}
     upd = {"updated_at": now_iso()}
@@ -104,7 +104,7 @@ class SRAssignIn(StrictModel):
 
 
 @router.post("/service-requests/{sr_id}/assign")
-async def assign_sr(sr_id: str, body: SRAssignIn, request: Request, user: dict = Depends(require("service.assign"))):
+async def assign_sr(sr_id: str, body: SRAssignIn, request: Request, user: dict = Depends(require("service.ticket.assign"))):
     sr = await get_or_404(db.service_requests, sr_id, "Service request", {"company_id": user["company_id"]})
     upd = {"assigned_to": body.assigned_to, "updated_at": now_iso()}
     if body.priority in ("Low", "Medium", "High"):
@@ -120,7 +120,7 @@ class SRStatusIn(StrictModel):
 
 
 @router.post("/service-requests/{sr_id}/status")
-async def status_sr(sr_id: str, body: SRStatusIn, request: Request, user: dict = Depends(require("service.write"))):
+async def status_sr(sr_id: str, body: SRStatusIn, request: Request, user: dict = Depends(require_any("service.ticket.close", "service.ticket.reopen", "service.ticket.edit"))):
     if body.status not in SR_STATUSES:
         raise ApiError(422, "Invalid status", "VALIDATION_ERROR")
     sr = await get_or_404(db.service_requests, sr_id, "Service request", {"company_id": user["company_id"]})
@@ -159,7 +159,7 @@ class NoticeIn(StrictModel):
 
 
 @router.get("/notices")
-async def list_notices(user: dict = Depends(require("cms.read"))):
+async def list_notices(user: dict = Depends(require("construction.notice.view"))):
     return {"items": await db.notices.find({"company_id": user["company_id"]}, {"_id": 0}).sort([("pinned", -1), ("publish_at", -1)]).to_list(200)}
 
 
@@ -169,7 +169,7 @@ async def _notice_doc(body: NoticeIn, user: dict) -> dict:
 
 
 @router.post("/notices", status_code=201)
-async def create_notice(body: NoticeIn, request: Request, user: dict = Depends(require("cms.write"))):
+async def create_notice(body: NoticeIn, request: Request, user: dict = Depends(require("construction.notice.create"))):
     doc = {**base_doc(user, user["company_id"]), **await _notice_doc(body, user)}
     await db.notices.insert_one(doc)
     doc.pop("_id", None)
@@ -186,7 +186,7 @@ async def create_notice(body: NoticeIn, request: Request, user: dict = Depends(r
 
 
 @router.patch("/notices/{notice_id}")
-async def update_notice(notice_id: str, body: NoticeIn, request: Request, user: dict = Depends(require("cms.write"))):
+async def update_notice(notice_id: str, body: NoticeIn, request: Request, user: dict = Depends(require("construction.notice.edit"))):
     await get_or_404(db.notices, notice_id, "Notice", {"company_id": user["company_id"]})
     await db.notices.update_one({"id": notice_id}, {"$set": {**await _notice_doc(body, user), "updated_at": now_iso()}, "$inc": {"version": 1}})
     await write_audit(user, "notice.update", "notice", notice_id, after={"title": body.title}, ip=client_ip(request))
@@ -194,7 +194,7 @@ async def update_notice(notice_id: str, body: NoticeIn, request: Request, user: 
 
 
 @router.delete("/notices/{notice_id}")
-async def delete_notice(notice_id: str, request: Request, user: dict = Depends(require("cms.write"))):
+async def delete_notice(notice_id: str, request: Request, user: dict = Depends(require("construction.notice.delete"))):
     r = await db.notices.delete_one({"id": notice_id, "company_id": user["company_id"]})
     if not r.deleted_count:
         raise ApiError(404, "Notice not found", "NOT_FOUND")
@@ -204,12 +204,12 @@ async def delete_notice(notice_id: str, request: Request, user: dict = Depends(r
 
 # ---------- Construction photos ----------
 @router.get("/blocks/{block_id}/photos")
-async def list_photos(block_id: str, user: dict = Depends(require("project.read"))):
+async def list_photos(block_id: str, user: dict = Depends(require("construction.stage.view"))):
     return {"items": await db.construction_photos.find({"block_id": block_id, "is_active": True}, {"_id": 0}).sort([("milestone_seq", 1), ("order", 1)]).to_list(500)}
 
 
 @router.post("/blocks/{block_id}/milestones/{seq}/photos", status_code=201)
-async def upload_photos(block_id: str, seq: int, request: Request, files: list[UploadFile] = File(...), caption: str = Form(""), taken_on: str | None = Form(None), visible_to_customers: bool = Form(True), show_on_website: bool = Form(False), user: dict = Depends(require("milestone.update"))):
+async def upload_photos(block_id: str, seq: int, request: Request, files: list[UploadFile] = File(...), caption: str = Form(""), taken_on: str | None = Form(None), visible_to_customers: bool = Form(True), show_on_website: bool = Form(False), user: dict = Depends(require("construction.photo.upload"))):
     blk = await get_or_404(db.blocks, block_id, "Block", {"company_id": user["company_id"]})
     out = []
     n = await db.construction_photos.count_documents({"block_id": block_id, "milestone_seq": seq})
@@ -245,7 +245,7 @@ class PhotoPatchIn(StrictModel):
 
 
 @router.patch("/photos/{photo_id}")
-async def patch_photo(photo_id: str, body: PhotoPatchIn, request: Request, user: dict = Depends(require("milestone.update"))):
+async def patch_photo(photo_id: str, body: PhotoPatchIn, request: Request, user: dict = Depends(require("construction.photo.upload"))):
     p = await get_or_404(db.construction_photos, photo_id, "Photo", {"company_id": user["company_id"]})
     upd = {k: v for k, v in body.model_dump(exclude={"version"}).items() if v is not None}
     await db.construction_photos.update_one({"id": photo_id}, {"$set": {**upd, "updated_at": now_iso()}})
@@ -254,7 +254,7 @@ async def patch_photo(photo_id: str, body: PhotoPatchIn, request: Request, user:
 
 
 @router.delete("/photos/{photo_id}")
-async def delete_photo(photo_id: str, request: Request, user: dict = Depends(require("milestone.update"))):
+async def delete_photo(photo_id: str, request: Request, user: dict = Depends(require("construction.photo.delete"))):
     p = await get_or_404(db.construction_photos, photo_id, "Photo", {"company_id": user["company_id"]})
     await db.construction_photos.update_one({"id": photo_id}, {"$set": {"is_active": False, "deleted_at": now_iso()}})
     await write_audit(user, "construction.photo_delete", "block", p["block_id"], ip=client_ip(request))
@@ -267,7 +267,7 @@ class NoteIn(StrictModel):
 
 
 @router.patch("/blocks/{block_id}/milestones/{seq}/note")
-async def milestone_note(block_id: str, seq: int, body: NoteIn, request: Request, user: dict = Depends(require("milestone.update"))):
+async def milestone_note(block_id: str, seq: int, body: NoteIn, request: Request, user: dict = Depends(require("construction.stage.update"))):
     blk = await get_or_404(db.blocks, block_id, "Block", {"company_id": user["company_id"]})
     ms = blk.get("milestones") or []
     for m in ms:
@@ -285,7 +285,7 @@ class ShareIn(StrictModel):
 
 
 @router.patch("/documents/{doc_id}/share")
-async def share_document(doc_id: str, body: ShareIn, request: Request, user: dict = Depends(require("customer.write"))):
+async def share_document(doc_id: str, body: ShareIn, request: Request, user: dict = Depends(require("sales.customer.edit"))):
     d = await get_or_404(db.documents, doc_id, "Document", {"company_id": user["company_id"]})
     if body.shared_with_customer and d.get("is_sensitive"):
         raise ApiError(409, "Sensitive KYC documents cannot be shared with the portal", "SENSITIVE_DOCUMENT")

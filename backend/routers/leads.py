@@ -7,7 +7,7 @@ from pydantic import Field, field_validator
 
 from db import db
 from models_out import LeadsOut, LeadsOutPage
-from deps import require
+from deps import require, require_any
 from services.kyc import normalize_phone
 from services.numbering import generate_number
 from utils import (
@@ -74,13 +74,13 @@ class ConvertIn(StrictModel):
 
 
 @router.get("/stages")
-async def stages(user: dict = Depends(require("lead.read"))):
+async def stages(user: dict = Depends(require("sales.lead.view"))):
     return {"stages": STAGES}
 
 
 @router.get("", response_model=LeadsOutPage, response_model_exclude_unset=True)
 async def list_leads(params: ListParams = Depends(), status: str | None = None, assigned_to: str | None = None, project_id: str | None = None,
-                     due_today: bool = False, source: str | None = None, unread: bool = False, user: dict = Depends(require("lead.read"))):
+                     due_today: bool = False, source: str | None = None, unread: bool = False, user: dict = Depends(require("sales.lead.view"))):
     q = {"company_id": user["company_id"], **search_filter(params.search, ["name", "phone", "lead_number", "email"])}
     if source:
         q["source"] = source
@@ -107,7 +107,7 @@ BOARD_FIELDS = ("id", "lead_number", "name", "phone", "email", "status", "source
 
 @router.get("/board")
 async def board(project_id: str | None = None, assigned_to: str | None = None, stage: str | None = None, page: int = 1, per_column: int = 50,
-                user: dict = Depends(require("lead.read"))):
+                user: dict = Depends(require("sales.lead.view"))):
     """Kanban columns, paged per column (Phase E0): first paint ships `per_column` newest leads per stage; `?stage=X&page=N` loads more for one column."""
     q = {"company_id": user["company_id"]}
     if project_id:
@@ -133,7 +133,7 @@ async def board(project_id: str | None = None, assigned_to: str | None = None, s
 
 
 @router.post("", status_code=201)
-async def create_lead(body: LeadIn, request: Request, user: dict = Depends(require("lead.write"))):
+async def create_lead(body: LeadIn, request: Request, user: dict = Depends(require("sales.lead.create"))):
     company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0})
     doc = {**base_doc(user, user["company_id"]), **body.model_dump(), "lead_number": await generate_number("lead", company), "status": "New",
            "stage_history": [{"status": "New", "at": now_iso(), "by": user["id"], "note": None}], "follow_ups": [], "next_follow_up_at": None,
@@ -145,7 +145,7 @@ async def create_lead(body: LeadIn, request: Request, user: dict = Depends(requi
 
 
 @router.get("/{lead_id}", response_model=LeadsOut, response_model_exclude_unset=True)
-async def get_lead(lead_id: str, user: dict = Depends(require("lead.read"))):
+async def get_lead(lead_id: str, user: dict = Depends(require("sales.lead.view"))):
     lead = await get_or_404(db.leads, lead_id, "Lead", {"company_id": user["company_id"]})
     if lead.get("is_read") is False:
         await db.leads.update_one({"id": lead_id}, {"$set": {"is_read": True}})
@@ -154,7 +154,7 @@ async def get_lead(lead_id: str, user: dict = Depends(require("lead.read"))):
 
 
 @router.patch("/{lead_id}")
-async def update_lead(lead_id: str, body: LeadUpdate, request: Request, user: dict = Depends(require("lead.write"))):
+async def update_lead(lead_id: str, body: LeadUpdate, request: Request, user: dict = Depends(require("sales.lead.edit"))):
     before = await get_or_404(db.leads, lead_id, "Lead", {"company_id": user["company_id"]})
     changes = body.model_dump(exclude_unset=True)
     if not changes or set(changes) == {"version"}:
@@ -165,7 +165,7 @@ async def update_lead(lead_id: str, body: LeadUpdate, request: Request, user: di
 
 
 @router.post("/{lead_id}/stage")
-async def move_stage(lead_id: str, body: StageIn, request: Request, user: dict = Depends(require("lead.write"))):
+async def move_stage(lead_id: str, body: StageIn, request: Request, user: dict = Depends(require("sales.lead.edit"))):
     before = await get_or_404(db.leads, lead_id, "Lead", {"company_id": user["company_id"]})
     if before["status"] == "Converted":
         raise ApiError(409, "Converted leads cannot be moved", "LEAD_CONVERTED")
@@ -186,7 +186,7 @@ async def move_stage(lead_id: str, body: StageIn, request: Request, user: dict =
 
 
 @router.post("/{lead_id}/follow-ups")
-async def add_follow_up(lead_id: str, body: FollowUpIn, request: Request, user: dict = Depends(require("lead.write"))):
+async def add_follow_up(lead_id: str, body: FollowUpIn, request: Request, user: dict = Depends(require("sales.lead.edit"))):
     await get_or_404(db.leads, lead_id, "Lead", {"company_id": user["company_id"]})
     fu = {"at": now_iso(), "note": body.note, "next_follow_up_at": body.next_follow_up_at.isoformat() if body.next_follow_up_at else None, "by": user["id"], "by_name": user["name"]}
     after = await db.leads.find_one_and_update({"id": lead_id}, {"$push": {"follow_ups": fu}, "$set": {"next_follow_up_at": fu["next_follow_up_at"], "updated_at": now_iso()}, "$inc": {"version": 1}}, projection={"_id": 0}, return_document=True)
@@ -195,7 +195,7 @@ async def add_follow_up(lead_id: str, body: FollowUpIn, request: Request, user: 
 
 
 @router.post("/{lead_id}/convert")
-async def convert(lead_id: str, body: ConvertIn, request: Request, user: dict = Depends(require("lead.write"))):
+async def convert(lead_id: str, body: ConvertIn, request: Request, user: dict = Depends(require_any("sales.lead.edit", "sales.customer.create"))):
     from routers.customers import present
     lead = await get_or_404(db.leads, lead_id, "Lead", {"company_id": user["company_id"]})
     if lead["status"] == "Converted":

@@ -65,13 +65,15 @@ async def cached(key: str, ttl: float, compute):
 def _subscribe():
     from events import bus
 
-    @bus.subscribe("entity.changed")
+    @bus.subscribe("entity.changed", "cache")
     async def _invalidate(evt: dict):
-        for p in _ENTITY_PREFIXES.get(evt.get("entity_type"), ()):
+        from event_registry import cache_prefixes
+        prefixes = cache_prefixes((evt.get("spec") or {}).get("surfaces") or []) | set(_ENTITY_PREFIXES.get(evt.get("entity_type"), ()))
+        for p in prefixes:
             invalidate(p)
         if os.environ.get("REDIS_URL"):
             from services import cache
-            for p in _ENTITY_PREFIXES.get(evt.get("entity_type"), ()):
+            for p in prefixes:
                 await cache.delete("ttl:" + p)
 
 

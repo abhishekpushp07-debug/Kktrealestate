@@ -1,7 +1,5 @@
 """Phase 7 migration + seed: milestone templates → construction stages + payment plans; bookings → plan snapshots. Idempotent, logged."""
 import logging
-import os
-from datetime import date, timedelta
 
 from db import db
 from services.ledger import rebuild
@@ -129,6 +127,9 @@ async def migrate_phase7() -> dict:
                     for i in covered[:-1]:  # mark the earlier installments as absorbed so the engine never raises them again
                         await db.demands.update_one({"id": d["id"]}, {"$addToSet": {"absorbed_installment_seqs": i["seq"]}})
             await db.bookings.update_one({"id": bk["id"]}, {"$set": {"payment_plan_id": tp[0]["id"], "payment_plan_snapshot": snap, "plan_acceptance": {"accepted_on": bk["booking_date"], "accepted_by_user_id": bk.get("created_by"), "mode": "Migrated"}, "raised_percent": bk.get("construction_percent", 0)}})
+        # no plan for this block's template: keep legacy demand rows addressable by seq so the engine/reports never see unmapped demands
+        await db.demands.update_many({"booking_id": bk["id"], "installment_seq": {"$exists": False}},
+                                     [{"$set": {"installment_seq": {"$ifNull": ["$milestone_seq", 0]}, "installment_name": {"$ifNull": ["$milestone_name", "Legacy"]}, "trigger_type": "LEGACY"}}])
         await rebuild(bk["id"])
         after = await _snapshot_totals(bk["id"])
         if before != after:

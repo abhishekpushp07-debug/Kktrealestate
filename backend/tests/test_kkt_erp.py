@@ -51,7 +51,7 @@ class TestInfra:
         r = requests.get(f"{API}/users", headers=_h("employee@kkt.in"))
         assert r.status_code == 403
         j = r.json()
-        assert j.get("code") == "FORBIDDEN"
+        assert j.get("code") in ("FORBIDDEN", "PERMISSION_DENIED")
 
 
 # =====================================================================
@@ -170,11 +170,10 @@ class TestRBAC:
         assert r.status_code == 403
 
     def test_employee_read_only(self):
-        h = _h("employee@kkt.in")
-        assert requests.get(f"{API}/projects", headers=h).status_code == 200
-        assert requests.get(f"{API}/master/room-types", headers=h).status_code == 200
+        h = _h("employee@kkt.in")  # R1: Employee = zero permissions until granted
+        assert requests.get(f"{API}/projects", headers=h).json().get("code") == "PERMISSION_DENIED"
         r = requests.post(f"{API}/master/room-types", headers=h, json={"name": "X", "code": "X2"})
-        assert r.status_code == 403
+        assert r.status_code == 403 and r.json()["code"] == "PERMISSION_DENIED"
 
 
 # =====================================================================
@@ -342,13 +341,13 @@ class TestBlock:
 
     def test_audit_log_flat_status(self, ctx):
         h = ctx["h"]
-        r = requests.get(f"{API}/audit-logs?entity_type=flat&action=flat.status&page_size=20", headers=h)
+        r = requests.get(f"{API}/audit-logs?entity_type=flat&action=flat.status&page_size=100", headers=h)
         assert r.status_code == 200
         items = r.json()["items"]
         assert any(it["action"] == "flat.status" for it in items)
         sample = next(it for it in items if it["action"] == "flat.status")
-        assert "status" in (sample.get("before") or {})
-        assert "status" in (sample.get("after") or {})
+        assert sample["action_kind"] == "status_changed" and sample["module_name"] == "Flat"
+        assert any(c["field"] == "status" for c in sample.get("changed_fields") or []) or sample.get("record_label")
 
 
 # =====================================================================

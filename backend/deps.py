@@ -62,9 +62,14 @@ async def get_current_user(request: Request, creds: HTTPAuthorizationCredentials
     user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0, "password_hash": 0, "mfa_secret": 0, "password_history": 0})
     if not user or not user.get("is_active", False):
         raise ApiError(401, "User inactive or not found", "USER_INACTIVE")
-    role = await _resolve_role(user["role_id"])
-    user["permissions"] = set(role["permissions"])
-    user["role_name"] = role["name"]
+    from services import rbac
+    from utils import now_iso
+    eff = await rbac.resolve(user, await _current_roles_version(), now_iso())
+    user["permissions"] = set(eff["permissions"])
+    user["role_name"] = eff["role_names"][0] if eff["role_names"] else None
+    user["role_names"] = eff["role_names"]
+    user["role_ids"] = eff["role_ids"]
+    user["is_super_admin"] = eff["is_super"]
     request.state.user_id = user["id"]
     if request.method in ("POST", "PATCH", "PUT", "DELETE"):
         await enforce_rate_limit(f"write:{user['id']}", 120, 60)
@@ -72,11 +77,20 @@ async def get_current_user(request: Request, creds: HTTPAuthorizationCredentials
 
 
 def require(permission: str):
+    return require_any(permission)
+
+
+def require_any(*permissions: str):
+    """Route guard: the user needs ANY of the listed specific codes. Codes are recorded on the dependency for registry auto-registration."""
+    from permissions import canonical
+    codes = [canonical(p) for p in permissions]
+
     async def dep(user: dict = Depends(get_current_user)) -> dict:
-        alias = {"construction.update": "milestone.update", "construction.undo": "milestone.undo", "milestone.update": "construction.update", "milestone.undo": "construction.undo"}.get(permission)
-        if permission not in user["permissions"] and not (alias and alias in user["permissions"]):
-            raise ApiError(403, f"Missing permission: {permission}", "FORBIDDEN")
+        if not any(c in user["permissions"] for c in codes):
+            raise ApiError(403, f"Missing permission: {' or '.join(codes)}", "PERMISSION_DENIED", {"missing": codes[0], "any_of": codes})
         return user
+    dep.perm_code = codes[0]
+    dep.perm_codes = codes
     return dep
 
 

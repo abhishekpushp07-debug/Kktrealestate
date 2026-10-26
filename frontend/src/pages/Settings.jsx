@@ -1,6 +1,8 @@
+import { HistoryButton } from "@/components/common/HistoryTimeline";
 import { Link } from "react-router-dom";
 import { MfaCard, SessionsCard, ImportCenter } from "@/components/common/SecurityCards";
 import { SystemHealthCard } from "@/components/common/SystemHealth";
+import { PropagationHealthCard } from "@/components/common/PropagationHealth";
 import { useEffect, useState } from "react";
 import { ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
@@ -104,12 +106,13 @@ export default function Settings() {
   };
   return (
     <div data-testid="settings-page">
-      <PageHeader title="Company Settings" subtitle="Identity, statutory registrations and banking." actions={<div className="flex flex-wrap gap-2"><Link to="/settings/catalogues" className="btn btn-ghost btn-sm" data-testid="settings-catalogues-link">Catalogues</Link><Link to="/users" className="btn btn-ghost btn-sm">Users</Link><Link to="/roles" className="btn btn-ghost btn-sm">Roles</Link><Link to="/audit" className="btn btn-ghost btn-sm">Audit log</Link></div>} />
+      <PageHeader title="Company Settings" subtitle="Identity, statutory registrations and banking." actions={<div className="flex flex-wrap gap-2"><HistoryButton entityType="company" entityId={c?.id} label="Company" /><Link to="/settings/definitions" className="btn btn-ghost" data-testid="definitions-link">Definitions</Link><Link to="/settings/catalogues" className="btn btn-ghost btn-sm" data-testid="settings-catalogues-link">Catalogues</Link><Link to="/users" className="btn btn-ghost btn-sm">Users</Link><Link to="/roles" className="btn btn-ghost btn-sm">Roles</Link><Link to="/audit" className="btn btn-ghost btn-sm">Audit log</Link></div>} />
       <DataPanel />
       <Appearance />
       <DocumentationPanel />
       <IntegrityPanel />
       <SystemHealthCard />
+      <PropagationHealthCard />
       <form onSubmit={save} className="grid gap-5 lg:grid-cols-2">
         <div className="card space-y-4 p-5">
           <h3 className="text-base font-bold text-ink-950">Company identity</h3>

@@ -127,7 +127,11 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
         rid = request.headers.get("x-request-id") or uuid.uuid4().hex[:16]
         from deps import _BYPASS_HDR
         _BYPASS_HDR.set(request.headers.get("x-rate-limit-bypass"))
+        from services import clock
+        from services.clock import REQ_CTX
+        clock.set_as_of(request.headers.get("x-as-of") if clock.enabled() and request.headers.get("x-as-of") and request.headers.get("x-rate-limit-bypass") == os.environ.get("LOGIN_RATE_LIMIT_BYPASS_TOKEN") else None)
         request.state.request_id = rid
+        REQ_CTX.set({"request_id": rid, "user_agent": (request.headers.get("user-agent") or "")[:200]})
         if not surfaces_enabled(request) and (request.url.path.startswith("/api/public/") or request.url.path.startswith("/api/portal/") or request.url.path in ("/api/public", "/api/portal")):
             return JSONResponse(status_code=404, content={"detail": "Not found", "code": "NOT_FOUND", "request_id": rid, "error": {"code": "NOT_FOUND", "message": "Not found", "details": [], "request_id": rid}})
         cl = request.headers.get("content-length")
@@ -209,8 +213,11 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         stored = body
         if response.headers.get("content-encoding") == "gzip":
             import gzip
-            stored = gzip.decompress(body)
-        if response.status_code < 500:
+            try:
+                stored = gzip.decompress(body)
+            except (EOFError, OSError):
+                stored = None
+        if response.status_code < 500 and stored is not None:
             from datetime import datetime
             try:
                 await db.idempotency_keys.insert_one({"user_id": owner, "key": key, "path": request.url.path, "status": response.status_code,

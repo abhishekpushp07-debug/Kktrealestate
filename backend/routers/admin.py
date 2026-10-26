@@ -10,12 +10,12 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 
 @router.post("/recompute-counters")
-async def recompute_counters(user: dict = Depends(require("settings.manage"))):
+async def recompute_counters(user: dict = Depends(require("admin.data.recompute"))):
     return await recompute_all()
 
 
 @router.post("/reconcile-ledgers")
-async def reconcile(user: dict = Depends(require("settings.manage"))):
+async def reconcile(user: dict = Depends(require("admin.data.recompute"))):
     return await reconcile_all()
 
 
@@ -29,7 +29,7 @@ BUSINESS_COLLECTIONS = ["construction_stages", "payment_plans", "payment_plan_as
 
 
 @router.post("/reseed")
-async def reseed(body: ReseedIn, request: Request, user: dict = Depends(require("settings.manage"))):
+async def reseed(body: ReseedIn, request: Request, user: dict = Depends(require("admin.data.reseed"))):
     """Wipe everything except audit logs and re-run all seeds (Super Admin only). Seeded logins are recreated; existing sessions are invalidated."""
     if user.get("role_name") != "Super Admin":
         raise ApiError(403, "Super Admin only", "FORBIDDEN")
@@ -82,7 +82,7 @@ EXCLUDE = {"refresh_tokens", "idempotency_keys", "backups", "login_events"}
 
 
 @router.post("/backup", status_code=201)
-async def create_backup(request: Request, include_sensitive: bool = False, user: dict = Depends(require("settings.manage"))):
+async def create_backup(request: Request, include_sensitive: bool = False, user: dict = Depends(require("admin.data.backup"))):
     """Super Admin: zip of JSON per collection; encrypted KYC/password fields stripped unless include_sensitive."""
     import io
     import json
@@ -117,7 +117,7 @@ async def create_backup(request: Request, include_sensitive: bool = False, user:
 
 
 @router.get("/backups")
-async def list_backups(user: dict = Depends(require("settings.manage"))):
+async def list_backups(user: dict = Depends(require("admin.data.backup"))):
     if user.get("role_name") != "Super Admin":
         raise ApiError(403, "Super Admin only", "FORBIDDEN")
     return {"items": await db.backups.find({"company_id": user["company_id"]}, {"_id": 0, "data": 0, "download_token": 0}).sort("created_at", -1).limit(20).to_list(20)}
@@ -142,7 +142,7 @@ class EraseIn(StrictModel):
 
 
 @router.post("/customers/{customer_id}/erase")
-async def erase_customer(customer_id: str, body: EraseIn, request: Request, user: dict = Depends(require("settings.manage"))):
+async def erase_customer(customer_id: str, body: EraseIn, request: Request, user: dict = Depends(require("admin.data.erase"))):
     """Anonymise PII on a customer with no Active booking; financial records (bookings/payments/ledger) are kept, keyed by customer_code."""
     from utils import get_or_404, now_iso
     if user.get("role_name") != "Super Admin":
@@ -192,7 +192,7 @@ def _super_admin(user: dict):
 
 
 @router.get("/docs/technical.pdf")
-async def docs_pdf(user: dict = Depends(require("settings.manage"))):
+async def docs_pdf(user: dict = Depends(require("admin.documentation.view"))):
     from fastapi.responses import FileResponse
     import os
     path = f"{DOCS_DIR}/KKT_Technical_Documentation.pdf"
@@ -202,13 +202,13 @@ async def docs_pdf(user: dict = Depends(require("settings.manage"))):
 
 
 @router.get("/docs/technical.md")
-async def docs_md(user: dict = Depends(require("settings.manage"))):
+async def docs_md(user: dict = Depends(require("admin.documentation.view"))):
     from fastapi.responses import FileResponse
     return FileResponse(f"{DOCS_DIR}/KKT_Technical_Documentation.md", media_type="text/markdown", filename="KKT_Technical_Documentation.md")
 
 
 @router.post("/docs/regenerate")
-async def docs_regenerate(request: Request, user: dict = Depends(require("settings.manage"))):
+async def docs_regenerate(request: Request, user: dict = Depends(require("admin.documentation.view"))):
     import asyncio, os, sys
     proc = await asyncio.create_subprocess_exec(sys.executable, "/app/backend/docs/build_docs_pdf.py", "--regen", cwd="/app/backend", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
     out, _ = await asyncio.wait_for(proc.communicate(), timeout=240)

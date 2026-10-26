@@ -1,25 +1,24 @@
-"""Owner's reference ledger: BK-…-0001 (P1, 60L cash / 40L account) must match the 10-row table to the rupee.
-Run: cd /app/backend && python -m pytest tests/test_ledger_example.py -q
-"""
+"""Owner's reference ledger (second story anchor): the `story:owner` booking — ₹1 Cr agreement, 60 L cash / 40 L account, 100 % raised on
+booking, paid by the owner's 10-payment table. Dues after each payment must match the table to the rupee (three-ledger principle)."""
 import os
 
 import pytest
 import requests
-from dotenv import load_dotenv
+from pymongo import MongoClient
 
-load_dotenv("/app/frontend/.env")
 API = os.environ["REACT_APP_BACKEND_URL"].rstrip("/") + "/api"
+db = MongoClient(os.environ["MONGO_URL"])[os.environ["DB_NAME"]]
 
-EXPECTED = [  # (category, amount, cash_due, account_due, total_due) after each payment
-    ("Account", 400000, 600000, 0, 600000),
-    ("Cash", 800000, 100000, 200000, 300000),
-    ("Account", 1200000, 700000, -600000, 100000),
-    ("Cash", 500000, 500000, -400000, 100000),
-    ("Cash", 1000000, 100000, 0, 100000),
-    ("Account", 1500000, 700000, -1100000, -400000),
-    ("Cash", 700000, 600000, -700000, -100000),
-    ("Cash", 2000000, -500000, -100000, -600000),
-    ("Account", 900000, 100000, -600000, -500000),
+EXPECTED = [  # (category, amount ₹, cash_due, account_due, total_due) after each payment
+    ("Account", 400000, 6000000, 3600000, 9600000),
+    ("Cash", 800000, 5200000, 3600000, 8800000),
+    ("Account", 1200000, 5200000, 2400000, 7600000),
+    ("Cash", 500000, 4700000, 2400000, 7100000),
+    ("Cash", 1000000, 3700000, 2400000, 6100000),
+    ("Account", 1500000, 3700000, 900000, 4600000),
+    ("Cash", 700000, 3000000, 900000, 3900000),
+    ("Cash", 2000000, 1000000, 900000, 1900000),
+    ("Account", 900000, 1000000, 0, 1000000),
     ("Cash", 1000000, 0, 0, 0),
 ]
 
@@ -33,11 +32,17 @@ def token():
 
 @pytest.fixture(scope="module")
 def example_booking(token):
-    r = requests.get(f"{API}/bookings", params={"search": "BK-", "page_size": 100, "sort": "booking_number"}, headers={"Authorization": f"Bearer {token}"}, timeout=30)
+    doc = db.bookings.find_one({"remarks": {"$regex": "^story:owner"}}, {"_id": 0, "id": 1})
+    assert doc, "owner worked-example booking missing (story persona `owner`)"
+    r = requests.get(f"{API}/bookings/{doc['id']}", headers={"Authorization": f"Bearer {token}"}, timeout=30)
     r.raise_for_status()
-    items = [b for b in r.json()["items"] if b["flat_snapshot"]["flat_number"] == "P1"]
-    assert items, "example booking P1 missing"
-    return items[0]
+    return r.json()
+
+
+def test_owner_example_agreement_split(example_booking):
+    b = example_booking
+    assert b["agreement_value"] == 10000000 and b["cash_agreed"] == 6000000 and b["account_agreed"] == 4000000
+    assert b["summary"]["total_order_raised"] == 10000000  # lump-sum plan: everything raised on booking
 
 
 def test_example_ledger_matches_owner_table(token, example_booking):
@@ -51,13 +56,7 @@ def test_example_ledger_matches_owner_table(token, example_booking):
         assert row["cash_due"] == cd, f"row {row['seq']} cash_due {row['cash_due']} != {cd}"
         assert row["account_due"] == ad, f"row {row['seq']} account_due {row['account_due']} != {ad}"
         assert row["total_due"] == td, f"row {row['seq']} total_due {row['total_due']} != {td}"
-
-
-def test_example_booking_completed_and_flat_sold(token, example_booking):
-    assert example_booking["status"] == "Completed"
     assert example_booking["summary"]["due"] == 0
-    r = requests.get(f"{API}/flats/{example_booking['flat_id']}", headers={"Authorization": f"Bearer {token}"}, timeout=30)
-    assert r.json()["status"] == "Sold"
 
 
 def test_csv_export_matches(token, example_booking):

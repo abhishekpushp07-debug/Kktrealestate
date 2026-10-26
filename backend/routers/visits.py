@@ -12,7 +12,7 @@ from pydantic import Field, field_validator
 
 from db import db
 from models_out import VisitsOut, VisitsOutPage
-from deps import JWT_SECRET, enforce_rate_limit, project_scope_filter, require
+from deps import JWT_SECRET, enforce_rate_limit, project_scope_filter, require, require_any
 from routers.notifications import notify_roles
 from services import ttlcache
 from services.kyc import normalize_phone
@@ -161,7 +161,7 @@ async def brochure_download(token: str):
 
 
 @router.get("/brochure-stats")
-async def brochure_stats(project_id: str | None = None, user: dict = Depends(require("lead.read"))):
+async def brochure_stats(project_id: str | None = None, user: dict = Depends(require("sales.lead.view"))):
     since = (date.today() - timedelta(days=29)).isoformat()
     q = {"at": {"$gte": since}, **({"project_id": project_id} if project_id else {})}
     rows = await db.brochure_downloads.aggregate([{"$match": q}, {"$group": {"_id": {"$substr": ["$at", 0, 10]}, "n": {"$sum": 1}}}]).to_list(None)
@@ -382,7 +382,7 @@ async def visit_public_cancel(token: str, body: CancelIn):
 
 # ---------- ERP ----------
 @router.get("", response_model=VisitsOutPage, response_model_exclude_unset=True)
-async def list_visits(params: ListParams = Depends(), project_id: str | None = None, status: str | None = None, assigned_to: str | None = None, date_from: str | None = None, date_to: str | None = None, lead_id: str | None = None, user: dict = Depends(require("visit.read"))):
+async def list_visits(params: ListParams = Depends(), project_id: str | None = None, status: str | None = None, assigned_to: str | None = None, date_from: str | None = None, date_to: str | None = None, lead_id: str | None = None, user: dict = Depends(require("sales.site_visit.view"))):
     q = {"company_id": user["company_id"], **project_scope_filter(user)}
     if project_id: q["project_id"] = project_id
     if status: q["status"] = status
@@ -398,7 +398,7 @@ async def list_visits(params: ListParams = Depends(), project_id: str | None = N
 
 
 @router.get("/export")
-async def export_visits(project_id: str | None = None, status: str | None = None, date_from: str | None = None, date_to: str | None = None, user: dict = Depends(require("visit.read"))):
+async def export_visits(project_id: str | None = None, status: str | None = None, date_from: str | None = None, date_to: str | None = None, user: dict = Depends(require("sales.site_visit.export"))):
     q = {"company_id": user["company_id"], **project_scope_filter(user)}
     if project_id: q["project_id"] = project_id
     if status: q["status"] = status
@@ -408,7 +408,7 @@ async def export_visits(project_id: str | None = None, status: str | None = None
 
 
 @router.get("/today")
-async def today_visits(user: dict = Depends(require("visit.read"))):
+async def today_visits(user: dict = Depends(require("sales.site_visit.view"))):
     today = datetime.now(IST).date().isoformat()
     q = {"company_id": user["company_id"], "date": today, "status": {"$nin": ["Cancelled"]}, **project_scope_filter(user)}
     if user.get("role_name") == "Sales":
@@ -419,7 +419,7 @@ async def today_visits(user: dict = Depends(require("visit.read"))):
 
 
 @router.get("/calendar")
-async def calendar(date_from: str, date_to: str, project_id: str | None = None, user: dict = Depends(require("visit.read"))):
+async def calendar(date_from: str, date_to: str, project_id: str | None = None, user: dict = Depends(require("sales.site_visit.view"))):
     q = {"company_id": user["company_id"], "date": {"$gte": date_from, "$lte": date_to}, **project_scope_filter(user)}
     if project_id: q["project_id"] = project_id
     items = await db.site_visits.find(q, {"_id": 0}).sort([("date", 1), ("slot_start", 1)]).to_list(2000)
@@ -429,7 +429,7 @@ async def calendar(date_from: str, date_to: str, project_id: str | None = None, 
 
 
 @router.get("/availability")
-async def erp_availability(project_id: str, date_from: str, date_to: str, user: dict = Depends(require("visit.read"))):
+async def erp_availability(project_id: str, date_from: str, date_to: str, user: dict = Depends(require("sales.site_visit.view"))):
     p = await get_or_404(db.projects, project_id, "Project", {"company_id": user["company_id"]})
     return {"days": await availability(p, date.fromisoformat(date_from), date.fromisoformat(date_to))}
 
@@ -448,7 +448,7 @@ class VisitIn(StrictModel):
 
 
 @router.post("", status_code=201)
-async def erp_create(body: VisitIn, request: Request, user: dict = Depends(require("visit.write"))):
+async def erp_create(body: VisitIn, request: Request, user: dict = Depends(require("sales.site_visit.create"))):
     p = await get_or_404(db.projects, body.project_id, "Project", {"company_id": user["company_id"]})
     lead = await db.leads.find_one({"id": body.lead_id}, {"_id": 0}) if body.lead_id else None
     cust = await db.customers.find_one({"id": body.customer_id}, {"_id": 0, "full_name": 1, "phone": 1, "email": 1}) if body.customer_id else None
@@ -469,7 +469,7 @@ class RescheduleIn(StrictModel):
 
 
 @router.post("/{visit_id}/reschedule")
-async def reschedule(visit_id: str, body: RescheduleIn, request: Request, user: dict = Depends(require("visit.write"))):
+async def reschedule(visit_id: str, body: RescheduleIn, request: Request, user: dict = Depends(require("sales.site_visit.edit"))):
     v = await get_or_404(db.site_visits, visit_id, "Visit", {"company_id": user["company_id"]})
     if v["status"] in ("Cancelled", "Completed", "No-show"):
         raise ApiError(409, f"Visit is {v['status']}", "INVALID_STATE")
@@ -488,7 +488,7 @@ class OutcomeIn(StrictModel):
 
 
 @router.post("/{visit_id}/{action}")
-async def visit_action(visit_id: str, action: str, body: OutcomeIn, request: Request, user: dict = Depends(require("visit.write"))):
+async def visit_action(visit_id: str, action: str, body: OutcomeIn, request: Request, user: dict = Depends(require_any("sales.site_visit.cancel", "sales.site_visit.complete", "sales.site_visit.edit"))):
     v = await get_or_404(db.site_visits, visit_id, "Visit", {"company_id": user["company_id"]})
     m = {"confirm": ("Confirmed", "site_visit_booked", "Site visit confirmed"), "cancel": ("Cancelled", "site_visit_cancelled", "Site visit cancelled"), "complete": ("Completed", "site_visit_completed", "Site visit completed"), "no-show": ("No-show", "site_visit_no_show", "Site visit no-show")}
     if action not in m:
@@ -508,7 +508,7 @@ class NoteIn(StrictModel):
 
 
 @router.patch("/{visit_id}")
-async def visit_notes(visit_id: str, body: NoteIn, user: dict = Depends(require("visit.write"))):
+async def visit_notes(visit_id: str, body: NoteIn, user: dict = Depends(require("sales.site_visit.edit"))):
     await get_or_404(db.site_visits, visit_id, "Visit", {"company_id": user["company_id"]})
     await db.site_visits.update_one({"id": visit_id}, {"$set": {"notes": body.notes, "updated_at": now_iso()}})
     return await db.site_visits.find_one({"id": visit_id}, {"_id": 0})

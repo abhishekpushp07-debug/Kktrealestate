@@ -20,7 +20,9 @@ const MasterPage = lazy(() => import("@/pages/master/MasterPage"));
 const Users = lazy(() => import("@/pages/Users"));
 const Roles = lazy(() => import("@/pages/Roles"));
 const AuditLog = lazy(() => import("@/pages/AuditLog"));
+const AccessControl = lazy(() => import("@/pages/AccessControl"));
 const Settings = lazy(() => import("@/pages/Settings"));
+const Definitions = lazy(() => import("@/pages/Definitions"));
 const SiteSettingsPage = lazy(() => import("@/pages/cms/SiteSettings"));
 const CmsCollection = lazy(() => import("@/pages/cms/CmsCollection"));
 const Notices = lazy(() => import("@/pages/cms/Notices"));
@@ -65,7 +67,7 @@ function PrintGuard({ children }) {
 
 const R = [
   ["website/settings", "cms.read", SiteSettingsPage], ["website/notices", "cms.read", Notices], ["website/:coll", "cms.read", CmsCollection], ["dashboard", "project.read", Dashboard], ["projects", "project.read", Projects], ["projects/new", "project.write", ProjectSetup], ["projects/:id/setup", "project.write", ProjectSetup], ["projects/:id", "project.read", ProjectDetail], ["settings/catalogues", "master.read", Catalogues], ["blocks/:id", "project.read", BlockDetail], ["flats", "project.read", Flats],
-  ["master/:kind", "master.read", MasterPage], ["users", "users.manage", Users], ["roles", "roles.manage", Roles], ["audit", "audit.view", AuditLog], ["settings", "settings.manage", Settings], ["customers", "customer.read", Customers], ["customers/new", "customer.write", CustomerForm], ["customers/:id/edit", "customer.write", CustomerForm], ["customers/:id", "customer.read", CustomerDetail], ["leads", "lead.read", Leads],
+  ["master/:kind", "master.read", MasterPage], ["users", "users.manage", Users], ["admin/access-control", "users.manage", AccessControl], ["admin/audit-logs", "audit.view", AuditLog], ["roles", "roles.manage", Roles], ["audit", "audit.view", AuditLog], ["settings", "settings.manage", Settings], ["settings/definitions", "project.read", Definitions], ["customers", "customer.read", Customers], ["customers/new", "customer.write", CustomerForm], ["customers/:id/edit", "customer.write", CustomerForm], ["customers/:id", "customer.read", CustomerDetail], ["leads", "lead.read", Leads],
   ["bookings", "booking.read", Bookings], ["bookings/new", "booking.create", BookingWizard], ["bookings/:id", "booking.read", BookingDetail], ["payments", "payment.read", Payments], ["roznamcha", "payment.read", Roznamcha], ["reports", "report.view", Reports], ["reports/:key", "report.view", Reports], ["service-requests", "service.read", ServiceRequests], ["service-requests/:id", "service.read", ServiceRequests],
 ];
 

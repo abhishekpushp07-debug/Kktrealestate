@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Plus, KeyRound, ShieldCheck, ShieldOff, Clock, UserX, UserCheck, Search } from "lucide-react";
 import { toast } from "sonner";
+import { HistoryButton } from "@/components/common/HistoryTimeline";
 import api, { errMsg } from "@/lib/api";
 import { useList, useFetch } from "@/hooks/useList";
 import { useAuth } from "@/context/AuthContext";
@@ -31,7 +32,7 @@ function UserSheet({ item, roles, projects, onClose, onSaved, onReset }) {
   return (
     <Sheet open onOpenChange={(o) => !o && onClose()}>
       <SheetContent className="v2 w-full overflow-y-auto bg-warm-50 sm:max-w-md" data-testid="user-form-sheet">
-        <SheetHeader><p className="label">{item ? "Team member" : "Invite"}</p><SheetTitle className="font-display text-2xl">{item ? item.name : "Invite a user"}</SheetTitle></SheetHeader>
+        <SheetHeader><p className="label">{item ? "Team member" : "Invite"}</p><SheetTitle className="font-display text-2xl">{item ? item.name : "Invite a user"} {item && <HistoryButton entityType="user" entityId={item.id} label={item.email} />}</SheetTitle></SheetHeader>
         {item && <div className="mt-4 flex flex-wrap gap-2 text-xs"><span className="pill bg-warm-100 text-txt-secondary"><Clock className="h-3 w-3" />Last login {fmtDateTime(item.last_login_at) || "never"}</span><span className={cn("pill", item.mfa_enabled ? "bg-sage-50 text-sage" : "bg-warm-100 text-txt-secondary")}>{item.mfa_enabled ? <ShieldCheck className="h-3 w-3" /> : <ShieldOff className="h-3 w-3" />}MFA {item.mfa_enabled ? "on" : "off"}</span></div>}
         <form onSubmit={submit} className="mt-6 space-y-5">
           <Field label="Full name" required><input className={inp} value={form.name} onChange={(e) => set("name", e.target.value)} required data-testid="user-name-input" /></Field>
@@ -75,7 +76,7 @@ export default function Users() {
     <div className="space-y-8" data-testid="users-page">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div><p className="label">Settings</p><h1 className="mt-1 font-display text-4xl text-ink-950">Users & Roles</h1><p className="mt-2 text-sm text-txt-secondary">Who can sign in, what they can do, and which projects they see.</p></div>
-        <div className="flex gap-2"><Link to="/roles" className="btn btn-secondary" data-testid="roles-link">Roles & permissions</Link>{can("users.manage") && <button onClick={() => setEditing(null)} className="btn btn-primary" data-testid="new-user-btn"><Plus className="h-4 w-4" />Invite user</button>}</div>
+        <div className="flex gap-2"><Link to="/admin/access-control" className="btn btn-secondary" data-testid="access-control-link">Access control</Link><Link to="/roles" className="btn btn-secondary" data-testid="roles-link">Roles & permissions</Link>{can("users.manage") && <button onClick={() => setEditing(null)} className="btn btn-primary" data-testid="new-user-btn"><Plus className="h-4 w-4" />Invite user</button>}</div>
       </header>
       <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
         <StatTile label="Active users" value={String(all.filter((u) => u.is_active).length)} hint={`${all.length} total`} icon={UserCheck} testId="users-tile-active" />

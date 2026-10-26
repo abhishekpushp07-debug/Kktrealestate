@@ -606,7 +606,7 @@ def _temp_password() -> str:
 
 
 @mgmt.get("/{customer_id}/portal")
-async def portal_status(customer_id: str, user: dict = Depends(require("customer.portal_manage"))):
+async def portal_status(customer_id: str, user: dict = Depends(require("service.portal.view"))):
     acc = await db.portal_accounts.find_one({"customer_id": customer_id, "company_id": user["company_id"]}, {"_id": 0, "password_hash": 0, "read_notice_ids": 0})
     if not acc:
         return {"enabled": False}
@@ -615,7 +615,7 @@ async def portal_status(customer_id: str, user: dict = Depends(require("customer
 
 
 @mgmt.post("/{customer_id}/portal/enable", status_code=201)
-async def portal_enable(customer_id: str, request: Request, user: dict = Depends(require("customer.portal_manage"))):
+async def portal_enable(customer_id: str, request: Request, user: dict = Depends(require("service.portal.manage"))):
     c = await db.customers.find_one({"id": customer_id, "company_id": user["company_id"]}, {"_id": 0})
     if not c:
         raise ApiError(404, "Customer not found", "NOT_FOUND")
@@ -642,7 +642,7 @@ class ToggleIn(StrictModel):
 
 
 @mgmt.post("/{customer_id}/portal/toggle")
-async def portal_toggle(customer_id: str, body: ToggleIn, request: Request, user: dict = Depends(require("customer.portal_manage"))):
+async def portal_toggle(customer_id: str, body: ToggleIn, request: Request, user: dict = Depends(require("service.portal.manage"))):
     r = await db.portal_accounts.update_one({"customer_id": customer_id, "company_id": user["company_id"]}, {"$set": {"is_active": body.is_active, "updated_at": now_iso()}})
     if not r.matched_count:
         raise ApiError(404, "No portal account", "NOT_FOUND")
@@ -654,7 +654,7 @@ async def portal_toggle(customer_id: str, body: ToggleIn, request: Request, user
 
 
 @mgmt.post("/{customer_id}/portal/revoke-sessions")
-async def portal_revoke(customer_id: str, request: Request, user: dict = Depends(require("customer.portal_manage"))):
+async def portal_revoke(customer_id: str, request: Request, user: dict = Depends(require("service.portal.manage"))):
     acc = await db.portal_accounts.find_one({"customer_id": customer_id, "company_id": user["company_id"]}, {"_id": 0, "id": 1})
     if not acc:
         raise ApiError(404, "No portal account", "NOT_FOUND")
@@ -664,7 +664,7 @@ async def portal_revoke(customer_id: str, request: Request, user: dict = Depends
 
 
 @mgmt.post("/portal/bulk-enable")
-async def portal_bulk_enable(request: Request, user: dict = Depends(require("customer.portal_manage"))):
+async def portal_bulk_enable(request: Request, user: dict = Depends(require("service.portal.manage"))):
     """Enable portal for all customers with Active bookings that have no account yet. Temp passwords are returned ONCE."""
     ids = await db.bookings.distinct("customer_id", {"company_id": user["company_id"], "status": "Active"})
     have = set(await db.portal_accounts.distinct("customer_id", {"customer_id": {"$in": ids}}))

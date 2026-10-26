@@ -64,7 +64,8 @@ async def seed_phase3():
         for i, c in enumerate(custs):
             p = sgh if i % 3 else ggv
             items.append(doc({"order": i + 1, "name": f"{c.get('salutation') or ''} {c['full_name']}".strip(), "designation": f"{'4 BHK Villa' if p is ggv else '3 BHK' if i % 2 else '2 BHK'}, {p['name']}", "photo_url": IMG["man1" if i % 2 == 0 else "woman1"], "quote": quotes[i], "rating": 5 if i % 3 else 4, "project_id": p["id"], "project_name": p["name"]}))
-        await db.cms_testimonials.insert_many(items)
+        if items:
+            await db.cms_testimonials.insert_many(items)
     if await db.cms_gallery.count_documents({}) == 0:
         g = [(sgh, "Exterior", "tower1", "Tower A & B elevation at dusk"), (sgh, "Exterior", "tower2", "Entrance plaza and drop-off"), (sgh, "Exterior", "tower3", "View from Bailey Road"), (sgh, "Interior", "int1", "3 BHK living room — sample flat"), (sgh, "Interior", "int2", "Master bedroom with park view"),
              (sgh, "Interior", "int3", "Modular kitchen — 2 BHK"), (sgh, "Amenities", "pool", "Infinity-edge swimming pool"), (sgh, "Amenities", "gym", "Fully equipped gymnasium"), (sgh, "Amenities", "lobby", "Double-height entrance lobby"), (sgh, "Construction", "cons1", "Tower A — 7th floor slab"), (sgh, "Construction", "cons2", "Tower C — foundation work"), (sgh, "Events", "event", "Bhoomi pujan ceremony"),

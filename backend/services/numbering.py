@@ -1,3 +1,4 @@
+from services import clock
 from datetime import UTC, date, datetime
 
 from db import db
@@ -5,6 +6,7 @@ from utils import next_number
 
 DEFAULT_FORMATS = {
     "booking": "BK-{FY}-{SEQ}",
+    "refund": "RF-{FY}-{SEQ}",
     "receipt": "{PREFIX}/{FY}/{SEQ}",
     "customer": "CUST-{FY}-{SEQ}",
     "demand": "DM-{FY}-{SEQ}",
@@ -13,7 +15,7 @@ DEFAULT_FORMATS = {
 
 
 def financial_year(d: date | None = None, start_month: int = 4) -> str:
-    d = d or datetime.now(UTC).date()
+    d = d or clock.now().date()
     y = d.year if d.month >= start_month else d.year - 1
     return f"{str(y)[-2:]}{str(y + 1)[-2:]}"
 

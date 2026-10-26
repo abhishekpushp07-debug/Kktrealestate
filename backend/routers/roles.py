@@ -75,7 +75,7 @@ async def list_roles(params: ListParams = Depends(), user: dict = Depends(get_cu
 
 
 @router.post("/roles", status_code=201)
-async def create_role(body: RoleCreate, request: Request, user: dict = Depends(require("roles.manage"))):
+async def create_role(body: RoleCreate, request: Request, user: dict = Depends(require("admin.role.create"))):
     if await db.roles.find_one({"company_id": user["company_id"], "name": body.name}):
         raise ApiError(409, "A role with this name already exists", "DUPLICATE_NAME")
     doc = {**base_doc(user, user["company_id"]), **body.model_dump(), "is_system": False}
@@ -86,12 +86,12 @@ async def create_role(body: RoleCreate, request: Request, user: dict = Depends(r
 
 
 @router.get("/roles/{role_id}")
-async def get_role(role_id: str, user: dict = Depends(require("roles.manage"))):
+async def get_role(role_id: str, user: dict = Depends(require("admin.role.view"))):
     return await get_or_404(db.roles, role_id, "Role", {"company_id": user["company_id"]})
 
 
 @router.patch("/roles/{role_id}")
-async def update_role(role_id: str, body: RoleUpdate, request: Request, user: dict = Depends(require("roles.manage"))):
+async def update_role(role_id: str, body: RoleUpdate, request: Request, user: dict = Depends(require("admin.role.edit"))):
     before = await get_or_404(db.roles, role_id, "Role", {"company_id": user["company_id"]})
     changes = body.model_dump(exclude_unset=True)
     changes.pop("version", None)
@@ -114,7 +114,7 @@ async def update_role(role_id: str, body: RoleUpdate, request: Request, user: di
 
 
 @router.delete("/roles/{role_id}")
-async def delete_role(role_id: str, request: Request, user: dict = Depends(require("roles.manage"))):
+async def delete_role(role_id: str, request: Request, user: dict = Depends(require("admin.role.delete"))):
     before = await get_or_404(db.roles, role_id, "Role", {"company_id": user["company_id"]})
     if before.get("is_system"):
         raise ApiError(409, "System roles cannot be deleted", "SYSTEM_ROLE")
