@@ -79,11 +79,17 @@ async def booking_ledgers(booking: dict) -> dict:
         _fill_demand_amounts(rows)
         out[bucket] = {"summary": {**_summary(booking, bucket, pending[bucket]), **_two_sided(rows)}, "rows": rows}
     s = booking.get("summary") or {}
+    from services import definitions as _d
+    for bucket in BUCKETS:
+        bs = out[bucket]["summary"]
+        bs["outstanding_paise"] = max(bs.get("due_paise", 0), 0)
+        bs["net_balance_paise"] = bs["outstanding_paise"] - bs.get("advance_paise", 0)
     out["combined"] = {"summary": {"agreed_paise": booking["agreement_value_paise"] + out["other_charges"]["summary"]["agreed_paise"],
                                    "raised_paise": s.get("total_order_raised_paise", 0) + s.get("other_charges_demanded_paise", 0),
                                    "paid_paise": s.get("paid_paise", 0) + s.get("other_charges_paid_paise", 0),
-                                   "due_paise": max(s.get("due_paise", 0), 0) + max(s.get("other_charges_due_paise", 0), 0),
-                                   "advance_paise": out["cash"]["summary"]["advance_paise"] + out["account"]["summary"]["advance_paise"],
+                                   # law (definitions): Outstanding = Σ bucket max(0, raised − paid); Advance = Σ bucket max(0, paid − raised); Net = Outstanding − Advance = Σ Udhar − Σ Jama
+                                   "due_paise": _d.outstanding(s)["total_paise"], "outstanding_paise": _d.outstanding(s)["total_paise"],
+                                   "advance_paise": _d.advance(s), "net_balance_paise": _d.net_balance(s),
                                    "pending_cheques_paise": sum(pending.values()), "last_payment_at": s.get("last_payment_at"), **_two_sided(entries)},
                        "rows": entries}
     return present_money({"booking_id": booking["id"], "booking_number": booking["booking_number"], "status": booking["status"], **out})
@@ -92,7 +98,7 @@ async def booking_ledgers(booking: dict) -> dict:
 async def customer_ledgers(customer_id: str, company_id: str) -> dict:
     bookings = await db.bookings.find({"customer_id": customer_id, "company_id": company_id}, {"_id": 0, "agreement_revisions": 0, "milestone_template_snapshot": 0, "payment_plan_snapshot": 0}).to_list(None)
     per = [await booking_ledgers(b) for b in bookings]
-    grand = {k: {"agreed_paise": 0, "raised_paise": 0, "paid_paise": 0, "due_paise": 0, "advance_paise": 0, "pending_cheques_paise": 0, "total_udhar_paise": 0, "total_jama_paise": 0, "balance_paise": 0} for k in (*BUCKETS, "combined")}
+    grand = {k: {"agreed_paise": 0, "raised_paise": 0, "paid_paise": 0, "due_paise": 0, "outstanding_paise": 0, "advance_paise": 0, "net_balance_paise": 0, "pending_cheques_paise": 0, "total_udhar_paise": 0, "total_jama_paise": 0, "balance_paise": 0} for k in (*BUCKETS, "combined")}
     for pl in per:
         for k in grand:
             for f in grand[k]:

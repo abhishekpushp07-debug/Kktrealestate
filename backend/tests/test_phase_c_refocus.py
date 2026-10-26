@@ -111,12 +111,13 @@ def test_collections_csv_no_paise(admin_headers):
     r = requests.get(f"{BASE_URL}/api/reports/collections?format=csv", headers=admin_headers, timeout=20)
     assert r.status_code == 200, r.text[:300]
     text = r.text
-    header = text.splitlines()[0] if text else ""
+    lines = [l for l in text.splitlines() if not l.startswith("#")]
+    header = lines[0] if lines else ""
     assert "paise" not in header.lower(), f"'paise' in header: {header}"
-    # columns ending in _inr expected
+    # humanised money headers carry the rupee sign (Phase I.1); legacy _inr accepted
     cols = [c.strip().lower() for c in header.split(",")]
-    inr_cols = [c for c in cols if c.endswith("_inr")]
-    assert inr_cols, f"no _inr columns found in header: {header}"
+    inr_cols = [c for c in cols if c.endswith("_inr") or c.endswith("₹")]
+    assert inr_cols, f"no rupee columns found in header: {header}"
 
 
 # ---------- health ----------

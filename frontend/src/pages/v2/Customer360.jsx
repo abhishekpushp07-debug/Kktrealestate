@@ -92,7 +92,7 @@ export default function Customer360() {
         <div className="grid grid-cols-2 gap-6">
           <StatTile label="Agreement" value={inrShort(agreementTotal / 100)} hint="flat value + other charges" icon={FileText} testId="fin-agreement" />
           <StatTile label="Paid" value={inrShort(paidTotal / 100)} hint="cleared · all ledgers" icon={Receipt} iconTone="sage" tone="sage" testId="fin-paid" />
-          <StatTile label={dueTotal > 0 ? "Due" : "Due / Advance"} value={inrShort(dueTotal / 100)} hint={(T?.advance_held_paise || 0) > 0 ? `Advance held ${inrShort((T.advance_held_paise || 0) / 100)}` : dueTotal > 0 ? "all ledgers" : "nothing due"} icon={FileWarning} iconTone={dueTotal > 0 ? "brick" : undefined} tone={dueTotal > 0 ? "brick" : "sage"} testId="fin-due" />
+          <StatTile label={dueTotal > 0 ? "Outstanding" : "Outstanding / Advance"} value={inrShort(dueTotal / 100)} hint={(T?.advance_paise || 0) > 0 ? `Advance held ${inrShort((T.advance_paise || 0) / 100)} · Net balance ${inrShort(((T.net_balance_paise ?? (dueTotal - (T.advance_paise || 0))) / 100))}` : dueTotal > 0 ? "due now · all ledgers" : "nothing due"} icon={FileWarning} iconTone={dueTotal > 0 ? "brick" : undefined} tone={dueTotal > 0 ? "brick" : "sage"} testId="fin-due" />
           <StatTile label="Cheques" value={inrShort(pendingCheques / 100)} hint={pendingCheques > 0 ? "in hand" : "none in hand"} icon={Landmark} iconTone={pendingCheques > 0 ? "amber" : undefined} testId="fin-cheques" />
         </div>
         {T && T.total_udhar_paise != null && <div className="mt-4 overflow-hidden rounded-xl border border-warm-200" data-testid="two-sided-breakdown">

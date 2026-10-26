@@ -736,6 +736,10 @@
  "PATCH /api/blocks/{block_id}": [
   "masters.tower.edit"
  ],
+ "PATCH /api/blocks/{block_id}/construction/stages/{stage_id}/planned-date": [
+  "construction.stage.update",
+  "construction.update.complete"
+ ],
  "PATCH /api/blocks/{block_id}/milestones/{seq}/note": [
   "construction.stage.update"
  ],
