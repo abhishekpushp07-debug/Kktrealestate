@@ -3,120 +3,11 @@ bringing up nodes...
 
 ........................................................................ [ 14%]
 ........................................................................ [ 29%]
-.........EEE................................F........................... [ 44%]
-...........................F............................................ [ 58%]
+........................................................................ [ 44%]
+....................s................................................... [ 58%]
 ........................................................................ [ 73%]
 ........................................................................ [ 88%]
 ......................s...................................               [100%]
-==================================== ERRORS ====================================
-__________ ERROR at setup of test_receipt_pdf_text_and_deterministic ___________
-[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
-
-admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDd...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDQyNTAzLCJleHAiOjE3OTMwNDM0MDN9.BaZade0lAI6dBEH37zBzJTAp7eY5FUY6sA1Ge8XDNJU'}
-
-    @pytest.fixture(scope="session")
-    def anchor_booking_id(admin_headers):
-        r = requests.get(f"{API}/bookings", headers=admin_headers, params={"q": ANCHOR_BK}, timeout=30)
-        assert r.status_code == 200
-        data = r.json()
-        items = data.get("items") or data if isinstance(data, dict) else data
-        if isinstance(data, dict) and "items" in data:
-            items = data["items"]
-        for b in items:
-            if b.get("booking_number") == ANCHOR_BK:
-                return b["id"]
->       pytest.fail(f"Booking {ANCHOR_BK} not found")
-E       Failed: Booking BK-2526-0001 not found
-
-tests/test_phase_b_hardening_review.py:63: Failed
-______________ ERROR at setup of test_allotment_pdf_has_signature ______________
-[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
-
-admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDd...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDQyNTAzLCJleHAiOjE3OTMwNDM0MDN9.BaZade0lAI6dBEH37zBzJTAp7eY5FUY6sA1Ge8XDNJU'}
-
-    @pytest.fixture(scope="session")
-    def anchor_booking_id(admin_headers):
-        r = requests.get(f"{API}/bookings", headers=admin_headers, params={"q": ANCHOR_BK}, timeout=30)
-        assert r.status_code == 200
-        data = r.json()
-        items = data.get("items") or data if isinstance(data, dict) else data
-        if isinstance(data, dict) and "items" in data:
-            items = data["items"]
-        for b in items:
-            if b.get("booking_number") == ANCHOR_BK:
-                return b["id"]
->       pytest.fail(f"Booking {ANCHOR_BK} not found")
-E       Failed: Booking BK-2526-0001 not found
-
-tests/test_phase_b_hardening_review.py:63: Failed
-____________ ERROR at setup of test_demand_letter_pdf_has_signature ____________
-[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
-
-admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDd...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDQyNTAzLCJleHAiOjE3OTMwNDM0MDN9.BaZade0lAI6dBEH37zBzJTAp7eY5FUY6sA1Ge8XDNJU'}
-
-    @pytest.fixture(scope="session")
-    def anchor_booking_id(admin_headers):
-        r = requests.get(f"{API}/bookings", headers=admin_headers, params={"q": ANCHOR_BK}, timeout=30)
-        assert r.status_code == 200
-        data = r.json()
-        items = data.get("items") or data if isinstance(data, dict) else data
-        if isinstance(data, dict) and "items" in data:
-            items = data["items"]
-        for b in items:
-            if b.get("booking_number") == ANCHOR_BK:
-                return b["id"]
->       pytest.fail(f"Booking {ANCHOR_BK} not found")
-E       Failed: Booking BK-2526-0001 not found
-
-tests/test_phase_b_hardening_review.py:63: Failed
-=================================== FAILURES ===================================
-_________________________ test_regression_anchor_story _________________________
-[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
-
-base_url = 'http://127.0.0.1:8021'
-admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDd...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDQyNTAzLCJleHAiOjE3OTMwNDM0MDN9.BaZade0lAI6dBEH37zBzJTAp7eY5FUY6sA1Ge8XDNJU'}
-anchor_booking = {'lead_id': 'b34f46f2-99ec-4de2-88c1-58f29d788d92', 'account_agreed': 1921500.0, 'account_agreed_paise': 192150000, 'agreement_value': 4803750.0, ...}
-
-    def test_regression_anchor_story(base_url, admin_headers, anchor_booking):
-        """Story anchor BK-2526-0014 (bounce persona): ledger balances to the paisa; row count/due are documented in test_credentials.md."""
-        b = requests.get(f"{base_url}/api/bookings/{anchor_booking['id']}", headers=admin_headers).json()
-        led = requests.get(f"{base_url}/api/bookings/{anchor_booking['id']}/ledger", headers=admin_headers).json()
-        rows = led["rows"]
-        assert rows and rows[-1]["cash_due"] + rows[-1]["account_due"] == b["summary"]["cash_due"] + b["summary"]["account_due"], (rows[-1], b["summary"])
->       assert b["summary"]["outstanding"] == b["summary"]["due"] and b["summary"]["due"] >= 0 and b["booking_number"] == "BK-2526-0014"
-E       AssertionError: assert (0.0 == 0.0 and 0.0 >= 0 and 'BK-2526-0001' == 'BK-2526-0014'
-E         
-E         - BK-2526-0014
-E         ?            -
-E         + BK-2526-0001
-E         ?           +)
-
-tests/test_hardening.py:68: AssertionError
-_________________ test_stages_forward_only_and_undo_roundtrip __________________
-[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
-
-admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDd...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDQyNTAzLCJleHAiOjE3OTMwNDM0MDN9.BaZade0lAI6dBEH37zBzJTAp7eY5FUY6sA1Ge8XDNJU'}
-
-    def test_stages_forward_only_and_undo_roundtrip(admin_headers):
-        h = admin_headers
-        blk = next(b for b in requests.get(f"{API_B}/blocks?page_size=20", headers=h).json()["items"] if b["code"] == "C")  # Tower C: mid-construction in the story
-        ms = requests.get(f"{API_B}/blocks/{blk['id']}/milestones", headers=h).json()
-        nxt = ms["next_seq"]
-        assert nxt is not None
-        # stages are sequential: completing seq+1 catches up seq too (both marked, both audited), undo walks back one at a time
-        done = requests.post(f"{API_B}/blocks/{blk['id']}/milestones/{nxt + 1}/complete", headers=h, json={"completed_on": date.today().isoformat()})
-        assert done.status_code == 200 and done.json().get("audit_id") and len(done.json()["marked"]) == 2, done.text
-        after = requests.get(f"{API_B}/blocks/{blk['id']}/milestones", headers=h).json()
-        assert after["next_seq"] in (None, nxt + 2) and after["construction_percent"] > ms["construction_percent"]
-        assert requests.post(f"{API_B}/blocks/{blk['id']}/milestones/{nxt}/complete", headers=h, json={"completed_on": date.today().isoformat()}).status_code == 409  # already completed
-        for _ in range(2):
-            undo = requests.post(f"{API_B}/blocks/{blk['id']}/construction/undo", headers=h, json={"reason": "story rewrite roundtrip"})
->           assert undo.status_code == 200 and undo.json().get("audit_id"), undo.text
-E           AssertionError: {"detail":"A demand raised by this stage already has a payment; undo is blocked","code":"UNDO_BLOCKED_BY_PAYMENTS","request_id":"7e954d06829e4037","error":{"code":"UNDO_BLOCKED_BY_PAYMENTS","message":"A demand raised by this stage already has a payment; undo is blocked","details":[],"request_id":"7e954d06829e4037"}}
-E           assert (409 == 200)
-E            +  where 409 = <Response [409]>.status_code
-
-tests/test_phase_d_perf.py:148: AssertionError
 =============================== warnings summary ===============================
 ../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
 ../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
@@ -146,10 +37,4 @@ tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources
     warnings.warn(
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-=========================== short test summary info ============================
-FAILED tests/test_hardening.py::test_regression_anchor_story - AssertionError...
-FAILED tests/test_phase_d_perf.py::test_stages_forward_only_and_undo_roundtrip
-ERROR tests/test_phase_b_hardening_review.py::test_receipt_pdf_text_and_deterministic
-ERROR tests/test_phase_b_hardening_review.py::test_allotment_pdf_has_signature
-ERROR tests/test_phase_b_hardening_review.py::test_demand_letter_pdf_has_signature
-2 failed, 484 passed, 1 skipped, 9 warnings, 3 errors in 200.76s (0:03:20)
+488 passed, 2 skipped, 9 warnings in 191.77s (0:03:11)

@@ -15,7 +15,7 @@ export default function StagePlans() {
   const [stages, setStages] = useState([]);
   const [editing, setEditing] = useState(null);
   const [q, setQ] = useState("");
-  const load = () => Promise.all([api.get("/stage-plans"), api.get("/master/construction-stages?limit=200")]).then(([a, b]) => { setItems(a.data.items); setStages(b.data.items.filter((s) => s.is_active)); }).catch((e) => toast.error(errMsg(e)));
+  const load = () => Promise.all([api.get("/stage-plans"), api.get("/master/construction-stages?page_size=100")]).then(([a, b]) => { setItems(a.data.items); setStages(b.data.items.filter((s) => s.is_active)); }).catch((e) => toast.error(errMsg(e)));
   useEffect(() => { load(); }, []);
   const shown = items.filter((p) => !q || `${p.name} ${p.project_name} ${p.block_name}`.toLowerCase().includes(q.toLowerCase()));
   return (
