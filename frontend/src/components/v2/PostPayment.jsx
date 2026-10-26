@@ -82,6 +82,12 @@ export function PostPayment({ open, onOpenChange, bookingId, customerId, onPoste
         {done ? (
           <div className="mt-8 space-y-6 text-center" data-testid="pp-success">
             <span className="icon-tile sage mx-auto h-16 w-16 rounded-2xl"><CheckCircle2 className="!h-8 !w-8" /></span>
+            {done.warnings?.length > 0 && (
+              <div role="status" data-testid="pp-headroom-warning" className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-left text-sm text-amber-900">
+                <p className="font-semibold">Pending instruments exceed the agreed amount</p>
+                {done.warnings.map((w) => <p key={w.code} className="mt-1">{w.message}</p>)}
+              </div>
+            )}
             <div><p className="label">{done.status === "Pending" ? "Recorded · cheque in hand" : "Posted"}</p><p className="mt-2 font-display text-4xl text-ink-950"><Num s={inr(done.amount)} /></p><p className="mt-2 font-mono text-sm text-txt-secondary" data-testid="pp-receipt-number">{done.receipt_number}</p></div>
             <div className="flex flex-wrap justify-center gap-2"><button type="button" onClick={() => window.open(`${BASE_PATH}/print/receipt/${done.id}`, "_blank")} className="btn btn-primary" data-testid="pp-print"><Printer className="h-4 w-4" />Print / download receipt</button><button type="button" onClick={() => { setDone(null); setKey(uuid()); setF((p) => ({ ...p, amount: "", number: "", remarks: "" })); }} className="btn btn-secondary" data-testid="pp-another">Post another</button></div>
           </div>

@@ -212,7 +212,24 @@ async def post_payment(body: PaymentIn, request: Request, user: dict = Depends(r
     await rebuild(booking["id"])
     await write_audit(user, "payment.post", "payment", p["id"], after={k: p[k] for k in ("id", "receipt_number", "amount_paise", "payment_category", "against", "status", "payment_mode_name")}, ip=client_ip(request))
     await write_audit(user, "payment.post", "booking", booking["id"], after={"receipt_number": p["receipt_number"], "amount_paise": p["amount_paise"], "category": p["payment_category"], "status": status}, ip=client_ip(request))
-    return present_money(p)
+    out = present_money(p)
+    out["warnings"] = await _headroom_warnings(booking, p)
+    return out
+
+
+async def _headroom_warnings(booking: dict, p: dict) -> list[dict]:
+    """Phase K: cap rule unchanged (blocks only when CLEARED would exceed). Warn when cleared + PENDING instruments would exceed the agreed bucket."""
+    if p["against"] != "FLAT_VALUE":
+        return []
+    cat = p["payment_category"]
+    agreed = booking["cash_agreed_paise"] if cat == "Cash" else booking["account_agreed_paise"]
+    cleared = await bucket_paid(booking["id"], cat)
+    pend = await db.payments.aggregate([{"$match": {"booking_id": booking["id"], "against": "FLAT_VALUE", "payment_category": cat, "status": "Pending"}}, {"$group": {"_id": None, "amt": {"$sum": "$amount_paise"}}}]).to_list(1)
+    pending = pend[0]["amt"] if pend else 0
+    if cleared + pending > agreed:
+        return [{"code": "PENDING_WOULD_EXCEED_CAP", "category": cat, "agreed_paise": agreed, "cleared_paise": cleared, "pending_paise": pending, "excess_paise": cleared + pending - agreed,
+                 "message": f"{cat}: cleared {inr(cleared)} + pending instruments {inr(pending)} exceed the agreed {inr(agreed)} by {inr(cleared + pending - agreed)}. A pending cheque will be blocked at clearance unless the agreement is revised."}]
+    return []
 
 
 @router.get("/cheques-in-hand")
