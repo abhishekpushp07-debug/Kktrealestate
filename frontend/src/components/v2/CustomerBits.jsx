@@ -106,18 +106,21 @@ export function ThreeLedgers({ customerId, bookingId, testId = "ledgers" }) {
         </div>
       </div>
       {sum && <div className="grid grid-cols-2 gap-3 px-6 pb-6 md:grid-cols-4" data-testid="ledger-summary">
-        <SumTile label="Agreed" value={sum.agreed_paise || 0} /><SumTile label="Raised" value={sum.raised_paise || 0} /><SumTile label="Paid" value={sum.paid_paise || 0} tone="sage" />
-        {sum.advance_paise > 0 ? <SumTile label="Advance" value={sum.advance_paise} tone="sage" /> : <SumTile label={sum.pending_cheques_paise > 0 ? "Due · cheques in hand" : "Due"} value={sum.due_paise || 0} tone={sum.due_paise > 0 ? "brick" : undefined} hint={sum.pending_cheques_paise > 0 ? `${inr(sum.pending_cheques_paise / 100)} pending` : null} />}
+        <SumTile label="Total Udhar (dues raised)" value={sum.total_udhar_paise ?? sum.raised_paise ?? 0} /><SumTile label="Total Jama (received)" value={sum.total_jama_paise ?? sum.paid_paise ?? 0} tone="sage" />
+        <SumTile label="Balance (Udhar − Jama)" value={sum.balance_paise ?? ((sum.total_udhar_paise || 0) - (sum.total_jama_paise || 0))} tone={(sum.balance_paise ?? 0) > 0 ? "brick" : undefined} hint={sum.pending_cheques_paise > 0 ? `cheques in hand ${inr(sum.pending_cheques_paise / 100)}` : undefined} />
+        <SumTile label="Advance held" value={sum.advance_paise || 0} tone="sage" />
       </div>}
       {rows.length === 0 ? <div className="flex flex-col items-center gap-2 border-t border-warm-100 px-6 py-12 text-center"><IconTile icon={FileText} /><p className="text-sm text-txt-muted">No entries in this ledger yet.</p></div> : (
-        <div className="overflow-x-auto border-t border-warm-100"><table className="w-full min-w-[640px] text-sm" data-testid="ledger-rows">
-          <thead><tr className="text-left text-[11px] font-semibold uppercase tracking-wide text-txt-muted"><th className="px-6 py-3">Date</th><th className="px-4 py-3">Entry</th><th className="px-4 py-3 text-right">Amount</th><th className="px-6 py-3 text-right">Balance due</th></tr></thead>
-          <tbody>{rows.slice(0, 80).map((r, i) => { const [lbl, Icon, tone] = TYPE[r.type] || [r.type, FileText, undefined]; const amt = r.amount_paise ?? null; const bal = r.running_due_paise ?? r.due_paise ?? r.total_due_paise; const isPay = (r.type || "").includes("PAYMENT"); return (
+        <div className="overflow-x-auto border-t border-warm-100"><table className="w-full min-w-[760px] text-sm" data-testid="ledger-rows">
+          <thead><tr className="text-left text-[11px] font-semibold uppercase tracking-wide text-txt-muted"><th className="px-6 py-3">Date</th><th className="px-4 py-3">Particulars</th><th className="px-4 py-3 text-right">Udhar (₹)</th><th className="px-4 py-3 text-right">Jama (₹)</th><th className="px-4 py-3">Mode / Instrument</th><th className="px-6 py-3 text-right">Balance (₹)</th></tr></thead>
+          <tbody>{[...rows].sort((a, b) => (a.at < b.at ? -1 : 1)).slice(-80).map((r, i) => { const [lbl, Icon, tone] = TYPE[r.type] || [r.type, FileText, undefined]; const ud = r.udhar_paise || 0, ja = r.jama_paise || 0; return (
             <tr key={`${r.booking_number}-${r.seq}-${i}`} className={cn("h-11", i % 2 === 1 && "bg-warm-50")} data-testid={`ledger-row-${r.seq}`}>
               <td className="whitespace-nowrap px-6 py-2 text-txt-secondary">{fmtDate(r.date)}</td>
-              <td className="px-4 py-2"><div className="flex items-center gap-3"><span className={cn("icon-tile !h-7 !w-7 !rounded-lg", tone)}><Icon className="!h-4 !w-4" /></span><div className="min-w-0"><p className="truncate font-semibold text-ink-950">{lbl}{r.category && bucket === "combined" ? ` · ${r.category}` : ""}</p><p className="truncate text-xs text-txt-secondary">{[perBooking.length > 1 && bk === "all" ? r.booking_number : null, r.ref, r.note].filter(Boolean).join(" · ")}</p></div></div></td>
-              <td className={cn("whitespace-nowrap px-4 py-2 text-right font-display text-base tabular-nums", isPay ? "text-sage" : r.type === "REVERSAL" ? "text-brick" : "text-ink-950")}>{amt != null && <>{isPay ? "−" : "+"}<Num s={inr(Math.abs(amt) / 100)} /></>}</td>
-              <td className="whitespace-nowrap px-6 py-2 text-right font-display text-base font-semibold tabular-nums text-ink-950">{bal != null && <Num s={inr(bal / 100)} />}</td>
+              <td className="px-4 py-2"><div className="flex items-center gap-3"><span className={cn("icon-tile !h-7 !w-7 !rounded-lg", tone)}><Icon className="!h-4 !w-4" /></span><div className="min-w-0"><p className="truncate font-semibold text-ink-950">{lbl}{r.tag && <span className="ml-2 rounded-full bg-brick-50 px-2 py-0.5 text-[10px] font-bold text-brick" data-testid={`ledger-tag-${r.seq}`}>{r.tag}</span>}</p><p className="truncate text-xs text-txt-muted">{[r.booking_number, r.note, r.ref].filter(Boolean).join(" · ")}</p></div></div></td>
+              <td className="whitespace-nowrap px-4 py-2 text-right font-display text-base tabular-nums text-ink-950" data-testid={`ledger-udhar-${r.seq}`}>{ud ? <Num s={inr(ud / 100)} /> : ""}</td>
+              <td className={cn("whitespace-nowrap px-4 py-2 text-right font-display text-base tabular-nums", ja < 0 ? "text-brick" : "text-sage")} data-testid={`ledger-jama-${r.seq}`}>{ja ? <Num s={inr(ja / 100)} /> : ""}</td>
+              <td className="whitespace-nowrap px-4 py-2 text-xs text-txt-secondary">{r.mode && r.mode !== "Due" ? r.mode : ""}{r.instrument ? ` · ${r.instrument}` : ""}</td>
+              <td className={cn("whitespace-nowrap px-6 py-2 text-right font-display text-base font-semibold tabular-nums", (r.balance_paise || 0) > 0 ? "text-brick" : "text-sage")} data-testid={`ledger-balance-${r.seq}`}>{r.balance_paise != null && <Num s={inr(r.balance_paise / 100)} />}</td>
             </tr>); })}</tbody>
         </table></div>
       )}

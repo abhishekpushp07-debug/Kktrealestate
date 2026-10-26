@@ -26,18 +26,32 @@ def _row(e: dict, bucket: str) -> dict | None:
     amount = e["amount_paise"]
     if t == "DEMAND" and bucket in ("cash", "account"):
         amount = None  # the row's own demand split is shown via raised delta below
+    if bucket == "cash":
+        udhar, jama = e.get("udhar_cash_paise", 0), (e.get("jama_paise", 0) if e.get("category") == "Cash" else 0)
+    elif bucket == "account":
+        udhar, jama = e.get("udhar_account_paise", 0), (e.get("jama_paise", 0) if e.get("category") == "Account" else 0)
+    else:
+        udhar, jama = (e.get("udhar_paise", 0) if t == "OTHER_CHARGE_DEMAND" else 0), (e.get("jama_paise", 0) if t in ("OTHER_CHARGE_PAYMENT", "REVERSAL", "REFUND") else 0)
     return {"seq": e["seq"], "at": e["at"], "date": e["date"], "type": t, "ref": e.get("ref"), "note": e.get("note"), "amount_paise": amount,
+            "udhar_paise": udhar, "jama_paise": jama, "mode": e.get("mode"), "instrument": e.get("instrument"), "tag": e.get("tag"),
             "raised_cum_paise": raised, "paid_cum_paise": paid, "due_paise": (raised - paid) if raised is not None else e.get("other_charges_due_paise"),
             "advance_paise": max(paid - raised, 0) if raised is not None else 0}
 
 
 def _fill_demand_amounts(rows: list[dict]):
-    prev = 0
+    prev, bal = 0, 0
     for r in rows:
         if r["type"] == "DEMAND":
             r["amount_paise"] = r["raised_cum_paise"] - prev
         if r["raised_cum_paise"] is not None:
             prev = r["raised_cum_paise"]
+        bal += r["udhar_paise"] - r["jama_paise"]
+        r["balance_paise"] = bal
+
+
+def _two_sided(rows: list[dict]) -> dict:
+    tu, tj = sum(r.get("udhar_paise", 0) for r in rows), sum(r.get("jama_paise", 0) for r in rows)
+    return {"total_udhar_paise": tu, "total_jama_paise": tj, "balance_paise": tu - tj}
 
 
 def _summary(b: dict, bucket: str, pending: int) -> dict:
@@ -63,14 +77,14 @@ async def booking_ledgers(booking: dict) -> dict:
     for bucket in BUCKETS:
         rows = [r for r in (_row(e, bucket) for e in entries) if r]
         _fill_demand_amounts(rows)
-        out[bucket] = {"summary": _summary(booking, bucket, pending[bucket]), "rows": rows}
+        out[bucket] = {"summary": {**_summary(booking, bucket, pending[bucket]), **_two_sided(rows)}, "rows": rows}
     s = booking.get("summary") or {}
     out["combined"] = {"summary": {"agreed_paise": booking["agreement_value_paise"] + out["other_charges"]["summary"]["agreed_paise"],
                                    "raised_paise": s.get("total_order_raised_paise", 0) + s.get("other_charges_demanded_paise", 0),
                                    "paid_paise": s.get("paid_paise", 0) + s.get("other_charges_paid_paise", 0),
                                    "due_paise": max(s.get("due_paise", 0), 0) + max(s.get("other_charges_due_paise", 0), 0),
                                    "advance_paise": out["cash"]["summary"]["advance_paise"] + out["account"]["summary"]["advance_paise"],
-                                   "pending_cheques_paise": sum(pending.values()), "last_payment_at": s.get("last_payment_at")},
+                                   "pending_cheques_paise": sum(pending.values()), "last_payment_at": s.get("last_payment_at"), **_two_sided(entries)},
                        "rows": entries}
     return present_money({"booking_id": booking["id"], "booking_number": booking["booking_number"], "status": booking["status"], **out})
 
@@ -78,7 +92,7 @@ async def booking_ledgers(booking: dict) -> dict:
 async def customer_ledgers(customer_id: str, company_id: str) -> dict:
     bookings = await db.bookings.find({"customer_id": customer_id, "company_id": company_id}, {"_id": 0, "agreement_revisions": 0, "milestone_template_snapshot": 0, "payment_plan_snapshot": 0}).to_list(None)
     per = [await booking_ledgers(b) for b in bookings]
-    grand = {k: {"agreed_paise": 0, "raised_paise": 0, "paid_paise": 0, "due_paise": 0, "advance_paise": 0, "pending_cheques_paise": 0} for k in (*BUCKETS, "combined")}
+    grand = {k: {"agreed_paise": 0, "raised_paise": 0, "paid_paise": 0, "due_paise": 0, "advance_paise": 0, "pending_cheques_paise": 0, "total_udhar_paise": 0, "total_jama_paise": 0, "balance_paise": 0} for k in (*BUCKETS, "combined")}
     for pl in per:
         for k in grand:
             for f in grand[k]:
