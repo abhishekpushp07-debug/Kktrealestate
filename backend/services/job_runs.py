@@ -35,6 +35,7 @@ async def finish(run: dict, result: dict | None = None):
     run["status"] = "FAILED" if run["failed_items"] else "OK"
     run["duration_ms"] = round((datetime.fromisoformat(run["finished_at"]) - datetime.fromisoformat(run["started_at"])).total_seconds() * 1000)
     await db.job_runs.update_one({"id": run["id"]}, {"$set": {k: v for k, v in run.items() if k != "_id"} | {"result": result or {}}})
+    run["result"] = result or {}
     return run
 
 

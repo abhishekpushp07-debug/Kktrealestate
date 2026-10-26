@@ -204,6 +204,7 @@ async def lifespan(app: FastAPI):
             logger.exception("[startup] ensure_indexes failed (continuing)")
         _spawn(__import__("services.invariants", fromlist=["ensure_invariants"]).ensure_invariants())  # Phase K: unique partial indexes + validators (idempotent, background)
         _spawn(__import__("services.loadshed", fromlist=["lag_probe"]).lag_probe())  # Phase K.7: event-loop lag probe
+        _spawn(__import__("services.alerts", fromlist=["loop"]).loop())  # Phase K.13: alert rules every minute
         try:
             await asyncio.wait_for(detect_transaction_support(), timeout=2)
         except Exception:
@@ -304,6 +305,11 @@ async def _dues_loop():
                 raise
             await _jr.sweep()
             await _jr.notify_stale_if_needed()
+            if os.environ.get("BACKUP_ENABLED", "1") == "1":
+                from tools.backup import backup_job
+                await backup_job()
+            from services.alerts import evaluate_and_notify
+            await evaluate_and_notify()
             logger.info("[phase7] nightly integrity: ok=%s counts=%s", ir["ok"], ir["counts"])
             if ir["findings"]:
                 for cid in {f["booking_id"] for f in ir["findings"]} and {c["id"] for c in await db.companies.find({}, {"_id": 0, "id": 1}).to_list(None)}:

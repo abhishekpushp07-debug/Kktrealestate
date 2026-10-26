@@ -60,6 +60,18 @@ export function SystemHealthCard() {
               <ul className="mt-2 space-y-1 text-xs">{d.requests.slow.slice(0, 8).map((s) => <li key={s.request_id} className="flex justify-between gap-2 font-mono"><span className="truncate">{s.path}</span><span className="shrink-0 text-txt-muted">{ms(s.ms)} · {s.status} · {s.request_id}</span></li>)}
                 {!d.requests.slow.length && <li className="text-txt-muted">None.</li>}</ul>
             </div>
+            {d.alerts && (
+              <div data-testid="ops-alerts"><p className="label">Alerts {d.alerts.firing?.length ? <span className="ml-1 rounded-full bg-brick/10 px-2 py-0.5 text-xs font-semibold text-brick">{d.alerts.firing.length} firing</span> : <span className="ml-1 rounded-full bg-sage/10 px-2 py-0.5 text-xs font-semibold text-sage">all clear</span>}</p>
+                <ul className="mt-2 space-y-1 text-sm">{(d.alerts.firing || []).map((a) => <li key={a.id} className="flex justify-between gap-2" data-testid={`ops-alert-${a.id}`}><span>{a.message}</span><span className="text-xs uppercase text-txt-muted">{a.severity}</span></li>)}</ul>
+                <p className="mt-2 text-xs text-txt-muted">Rules: backend/ops/alerts.yaml · evaluated {d.alerts.evaluated_at ? new Date(d.alerts.evaluated_at).toLocaleTimeString() : "not yet"}{d.load_shed ? ` · shed ${d.load_shed.shed_total} · in-flight ${d.load_shed.inflight}/${d.load_shed.cap}` : ""}</p>
+              </div>
+            )}
+            {d.backup && (
+              <div data-testid="ops-backup"><p className="label">Backup (app-level export){d.backup.stale && <span className="ml-2 rounded-full bg-brick/10 px-2 py-0.5 text-xs font-semibold text-brick" data-testid="ops-backup-stale">stale</span>}</p>
+                <p className="mt-2 text-sm">{d.backup.last_backup ? `${d.backup.last_backup.archive} · ${(d.backup.last_backup.bytes / 1048576).toFixed(1)} MB · ${d.backup.age_h} h ago` : "No backup recorded yet"}</p>
+                <p className="mt-1 text-xs text-txt-muted">{d.backup.last_restore_drill ? `Last restore drill: ${d.backup.last_restore_drill.integrity_ok ? "integrity ok" : "integrity findings"} · ${new Date(d.backup.last_restore_drill.at).toLocaleString()}` : "No restore drill yet"} · {d.backup.note}</p>
+              </div>
+            )}
           </div>
         </>
       )}

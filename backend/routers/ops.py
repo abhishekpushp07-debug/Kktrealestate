@@ -40,8 +40,20 @@ async def ops(window: int = 900, user: dict = Depends(require("admin.system_heal
         "requests": {k: snap[k] for k in ("window_s", "requests", "rps", "p50_ms", "p95_ms", "by_group", "slow", "errors_by_code")},
         "jobs": snap["jobs"],
         "load_shed": __import__("services.loadshed", fromlist=["snapshot"]).snapshot(),
+        "alerts": __import__("services.alerts", fromlist=["LAST"]).LAST,
+        "backup": await _backup_status(),
         "job_runs": await __import__("services.job_runs", fromlist=["health"]).health(),
         "read_models": {"last_full_refresh": (rm or {}).get("value"), "oldest_project_summary_age_s": staleness_s},
         "cache": __import__("services.ttlcache", fromlist=["HITS"]).HITS, "db_pool": {"config": POOL, "live": POOL_STATS, "server": {"connections": (srv.get("connections") or {}), "opcounters": (srv.get("opcounters") or {}),
                                                                    "version": srv.get("version")} if srv else None},
     }
+
+
+async def _backup_status() -> dict:
+    """Phase K.12: last app-level backup + restore drill; stale when > 26 h. (Managed Atlas keeps its own snapshots — this is the app-level export.)"""
+    from datetime import datetime, timezone
+    lb = await db.settings.find_one({"key": "last_backup"}, {"_id": 0, "value": 1})
+    rd = await db.settings.find_one({"key": "last_restore_drill"}, {"_id": 0, "value": 1})
+    v = (lb or {}).get("value")
+    age_h = round((datetime.now(timezone.utc) - datetime.fromisoformat(v["created_at"])).total_seconds() / 3600, 1) if v else None
+    return {"last_backup": v, "age_h": age_h, "stale": age_h is None or age_h > 26, "last_restore_drill": (rd or {}).get("value"), "note": "App-level mongodump export; managed Atlas snapshots are separate"}
