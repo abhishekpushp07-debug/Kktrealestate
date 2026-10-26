@@ -20,17 +20,21 @@ Shared packages: `packages/contracts` (Zod wire schemas, enums, permissions — 
 - [docs/STATUS.md](docs/STATUS.md) — what is built, all verification evidence (588 integration + 55 acceptance tests, browser QA, load test) and the honest open-items list; [docs/hardening/STATUS-after-phase5.md](docs/hardening/STATUS-after-phase5.md) summarises the hardening round.
 - [docs/AUDIT-80-FACTORS.md](docs/AUDIT-80-FACTORS.md) — the 80-factor audit of the previous implementation that motivated this rebuild; [docs/AUDIT-80-FACTORS-V2.md](docs/AUDIT-80-FACTORS-V2.md) scores this implementation on the same factors.
 
-## Run locally
+## Run locally (demo in about 5 minutes)
+
+Needs Node 22, pnpm 10 and Docker (for PostgreSQL 16 + Redis 7). No `.env` is needed for local runs: the API's development defaults point at the dev containers.
 
 ```bash
-pnpm install && cp .env.example .env
-pnpm db:migrate && pnpm api        # API on :4000 (seeds the demo builder on first boot)
-pnpm erp                           # ERP on :5173   → admin@sgb.in / Admin@12345
-pnpm web                           # website on :3000
-pnpm portal                        # portal (web) on :8081 → phone 9876543210 / Welcome@123
+git clone https://github.com/abhishekpushp07-debug/Claude-kkt.git kkt && cd kkt
+pnpm install
+docker compose -f docker-compose.dev.yml up -d   # PostgreSQL + Redis on localhost
+pnpm api      # API on http://localhost:4000 — first boot migrates and seeds the demo builder (~30 s)
+pnpm erp      # staff ERP   → http://localhost:5173   admin@sgb.in / Admin@12345
+pnpm web      # website     → http://localhost:3000
+pnpm portal   # customer portal (web) → http://localhost:8081   phone 9876543210 / Welcome@123
 ```
 
-Needs Node 22, pnpm 10, PostgreSQL 16 and Redis 7 (`docker compose up postgres redis` works). Full production recipe: `docs/DEPLOY.md`.
+Run each `pnpm` command in its own terminal. Other demo logins (Accounts, Sales, Project Admin, Marketing, Employee) are listed in `docs/SEED.md`. Screenshots of every screen are in `docs/qa/erp`, `docs/qa/web` and `docs/qa/portal`. Production deployment (one VM with Docker Compose, or Kubernetes): `docs/DEPLOY.md`.
 
 ## Quality gates
 
