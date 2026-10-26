@@ -115,7 +115,7 @@ class PlannedDateIn(StrictModel):
 
 
 @router.patch("/blocks/{block_id}/construction/stages/{stage_id}/planned-date")
-async def set_planned_date(block_id: str, stage_id: str, body: PlannedDateIn, request: Request, user: dict = Depends(require_any("construction.update.complete", "construction.stage.edit"))):
+async def set_planned_date(block_id: str, stage_id: str, body: PlannedDateIn, request: Request, user: dict = Depends(require_any("construction.update.complete", "construction.stage.update"))):
     """Optional planned completion date for a pending stage — drives the Receivables Forecast month; audited."""
     block = await get_or_404(db.blocks, block_id, "Block", {"company_id": user["company_id"]})
     ensure_project_access(user, block["project_id"])

@@ -979,6 +979,17 @@
     "report.view"
    ]
   },
+  "construction:PATCH /blocks/{block_id}/construction/stages/{stage_id}/planned-date": {
+   "any": true,
+   "codes": [
+    "construction.update.complete",
+    "construction.stage.update"
+   ],
+   "fn": "set_planned_date",
+   "legacy": [
+    "construction.update"
+   ]
+  },
   "construction:PATCH /blocks/{block_id}/stage-sequence": {
    "codes": [
     "masters.construction_stage.edit"

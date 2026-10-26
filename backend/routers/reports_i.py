@@ -204,8 +204,8 @@ def _expected_date(inst: dict, booking: dict, block: dict | None, today: date) -
         return (date.fromisoformat(booking["booking_date"]) + timedelta(days=int(inst["trigger_days"]))).isoformat(), "dated"
     if tt == "ON_DATE" and inst.get("trigger_date"):
         return inst["trigger_date"], "dated"
-    if tt == "ON_STAGE" and block:
-        st = next((s for s in block.get("construction_stages") or [] if s["stage_id"] == inst.get("trigger_stage_id")), None)
+    if tt in ("ON_STAGE", "ON_POSSESSION") and block:
+        st = next((s for s in block.get("construction_stages") or [] if s["stage_id"] == inst.get("trigger_stage_id") or (tt == "ON_POSSESSION" and not inst.get("trigger_stage_id") and s.get("is_possession"))), None)
         if st and st.get("status") == "Completed":
             return st.get("completed_on"), "completed"
         if st and st.get("planned_date"):
@@ -238,8 +238,8 @@ async def receivables_forecast(request: Request, project_id: str | None = None, 
             alloc += amt
             when, basis = _expected_date(i, b, blocks.get(b["block_id"]), today)
             cash = int(round(amt * cash_share))
-            lines.append({"booking_id": b["id"], "booking_number": b["booking_number"], "customer_name": b["customer_name"], "project_id": b["project_id"], "block_id": b["block_id"], "installment": f"{i['seq']}. {i['name']}", "basis": basis, "stage_seq": next((s["seq"] for s in (blocks.get(b["block_id"]) or {}).get("construction_stages") or [] if s["stage_id"] == i.get("trigger_stage_id")), 0) if i.get("trigger_type") == "ON_STAGE" else -1,
-                          "stage": i["name"] if i.get("trigger_type") == "ON_STAGE" else ("Booking / dated" if basis in ("booked", "dated") else i["name"]),
+            lines.append({"booking_id": b["id"], "booking_number": b["booking_number"], "customer_name": b["customer_name"], "project_id": b["project_id"], "block_id": b["block_id"], "installment": f"{i['seq']}. {i['name']}", "basis": basis, "stage_seq": next((s["seq"] for s in (blocks.get(b["block_id"]) or {}).get("construction_stages") or [] if s["stage_id"] == i.get("trigger_stage_id") or (i.get("trigger_type") == "ON_POSSESSION" and s.get("is_possession"))), 0) if i.get("trigger_type") in ("ON_STAGE", "ON_POSSESSION") else -1,
+                          "stage": i["name"] if i.get("trigger_type") in ("ON_STAGE", "ON_POSSESSION") else ("Booking / dated" if basis in ("booked", "dated") else i["name"]),
                           "expected_on": when, "month": when[:7] if when else "On completion", "cash_paise": cash, "account_paise": amt - cash, "expected_paise": amt})
         if not pend and remaining:
             lines.append({"booking_id": b["id"], "booking_number": b["booking_number"], "customer_name": b["customer_name"], "project_id": b["project_id"], "block_id": b["block_id"], "installment": "Unscheduled balance", "basis": "on completion", "expected_on": None, "month": "On completion", "stage_seq": 999, "stage": "Unscheduled balance",
