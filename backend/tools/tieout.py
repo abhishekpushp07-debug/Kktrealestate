@@ -119,6 +119,13 @@ def main(base):
             bad += 1
     tie("Σ cleared cash receipts == booking.summary.cash_paid (all active)", 0, bad, "count of bookings that differ")
 
+    bad2 = 0
+    for b in db.bookings.find({"company_id": cid}, {"summary": 1}):
+        s = b.get("summary") or {}
+        if "total_udhar_paise" in s and s["total_udhar_paise"] - s["total_jama_paise"] != s.get("outstanding_paise", 0) - s.get("advance_paise", 0):
+            bad2 += 1
+    tie("Σ Udhar − Σ Jama == outstanding − advance (every booking)", 0, bad2, "two-sided ledger law")
+
     os.makedirs("/app/memory/qa/journey", exist_ok=True)
     with open("/app/memory/qa/journey/tieout_raw.md", "w") as f:
         f.write(f"# Report tie-outs · DB `{os.environ['DB_NAME']}` · {date.today()}\n\n| Tie-out | Report value | Raw value | Result | Note |\n|---|---|---|---|---|\n")

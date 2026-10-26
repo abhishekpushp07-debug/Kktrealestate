@@ -256,8 +256,8 @@ def two_sided(rows: list[dict], events: list) -> None:
             r["tag"] = "BOUNCED"
         else:
             r["tag"] = None
-        mode = src.get("payment_mode") or src.get("mode") or ("Due" if udhar else None)
-        inst = src.get("instrument_number") or src.get("cheque_number") or src.get("reference") or src.get("utr")
+        mode = src.get("payment_mode_name") or src.get("payment_mode") or src.get("mode") or ("Due" if udhar else None)
+        inst = (src.get("instrument") or {}).get("number") if isinstance(src.get("instrument"), dict) else (src.get("instrument_number") or src.get("cheque_number") or src.get("reference") or src.get("utr"))
         bal += udhar - jama
         r.update(udhar_paise=udhar, jama_paise=jama, mode=mode, instrument=inst, balance_paise=bal,
                  udhar_cash_paise=src.get("cash_demand_paise", 0) if kind == "DEMAND" else (udhar if kind == "AGREEMENT_CHANGE" and src.get("after", {}).get("cash_agreed_paise") != src.get("before", {}).get("cash_agreed_paise") and udhar else 0),

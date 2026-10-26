@@ -6,7 +6,7 @@ SENSITIVE = re.compile(r"(pan|aadhaar|aadhar|password|passwd|secret|token|otp|ba
 SKIP = {"updated_at", "version", "created_at", "_id", "propagated", "propagated_complete", "summary", "search_text", "cache"}
 MODULES = {"project": "Project Master", "block": "Tower / Block", "flat": "Flat", "customer": "Customer", "booking": "Booking", "payment": "Payment", "demand": "Demand", "lead": "Lead",
            "visit": "Site Visit", "site_visit": "Site Visit", "ticket": "Service Request", "service_request": "Service Request", "user": "User", "role": "Role", "catalogue": "Catalogue",
-           "settings": "Settings", "setting": "Settings", "refund": "Refund", "company": "Company", "charge_type": "Charge Type", "payment_plan": "Payment Plan", "rate_card": "Rate Card",
+           "settings": "Settings", "setting": "Settings", "refund": "Refund", "company": "Company", "charge_type": "Charge Type", "payment_plan": "Payment Plan", "stage_plan": "Construction Stage Plan", "rate_card": "Rate Card",
            "parking": "Parking", "document": "Document", "notice": "Notice", "cms": "Website CMS", "stage": "Construction Stage", "roznamcha": "Roznamcha"}
 LABEL_KEYS = ("booking_number", "receipt_number", "demand_number", "visit_number", "ticket_number", "full_name", "customer_name", "flat_number", "name", "title", "email", "code")
 
