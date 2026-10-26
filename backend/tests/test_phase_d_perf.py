@@ -123,6 +123,7 @@ def test_cors_evil_origin():
     # Report-only; do not fail (ingress may inject)
 
 
+import requests
 from datetime import date
 from tests.conftest import BASE as _B
 API_B = f"{_B}/api"
