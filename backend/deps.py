@@ -85,9 +85,11 @@ def require_any(*permissions: str):
     from permissions import canonical
     codes = [canonical(p) for p in permissions]
 
-    async def dep(user: dict = Depends(get_current_user)) -> dict:
+    async def dep(request: Request, user: dict = Depends(get_current_user)) -> dict:
         if not any(c in user["permissions"] for c in codes):
             raise ApiError(403, f"Missing permission: {' or '.join(codes)}", "PERMISSION_DENIED", {"missing": codes[0], "any_of": codes})
+        request.state.perm_code = codes[0]
+        request.state.perms = user["permissions"]
         return user
     dep.perm_code = codes[0]
     dep.perm_codes = codes

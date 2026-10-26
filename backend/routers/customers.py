@@ -266,9 +266,9 @@ async def get_customer(customer_id: str, request: Request, reveal: bool = Query(
         hit = await db.customers.find_one({"customer_code": customer_id, "company_id": user["company_id"]}, {"_id": 0, "id": 1})
         customer_id = hit["id"] if hit else customer_id
     doc = await get_or_404(db.customers, customer_id, "Customer", {"company_id": user["company_id"]})
-    do_reveal = reveal and "customer.kyc_view" in user["permissions"]
+    do_reveal = reveal and "sales.kyc.reveal" in user["permissions"]
     if reveal and not do_reveal:
-        raise ApiError(403, "Missing permission: customer.kyc_view", "FORBIDDEN")
+        raise ApiError(403, "Missing permission: sales.kyc.reveal", "PERMISSION_DENIED", {"missing": "sales.kyc.reveal", "any_of": ["sales.kyc.reveal"]})
     if do_reveal:
         await write_audit(user, "customer.kyc_reveal", "customer", customer_id, after={"revealed": ["pan", "aadhaar", "bank.account_number"]}, ip=client_ip(request))
     out = present(doc, do_reveal)

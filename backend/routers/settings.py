@@ -56,6 +56,7 @@ class CompanyUpdate(StrictModel):
     mfa_required_for_admin_roles: bool | None = None
     accent: Literal["gold", "teal"] | None = None
     bank_account: BankAccount | None = None
+    audit_retention_months: int | None = Field(default=None, ge=1, le=120, description="Hot audit window; older rows move to audit_logs_archive monthly")
     version: int | None = None
 
 

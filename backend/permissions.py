@@ -10,26 +10,25 @@ ACTIONS = ("view", "create", "edit", "delete", "export", "approve", "custom")
 # module → (label, {feature: (label, [actions])}). Actions beyond the route set are UI/reserved (declared here = registered + "used").
 REGISTRY = {
     "masters": ("Master Data", {
-        "project": ("Projects", ["view", "create", "edit", "delete"]), "tower": ("Towers / blocks", ["view", "create", "edit", "delete"]), "flat": ("Flats & parking", ["view", "create", "edit", "delete"]),
-        "floor_plan": ("Floor plans", ["view", "create", "edit", "delete"]), "rate_card": ("Rate cards", ["view", "create", "edit", "delete", "apply"]), "plc": ("PLC types", ["view", "create", "edit", "delete"]),
+        "project": ("Projects", ["view", "create", "edit"]), "tower": ("Towers / blocks", ["create", "edit"]), "flat": ("Flats & parking", ["view", "create", "edit"]),
+        "floor_plan": ("Floor plans", ["view", "create", "edit", "delete"]), "rate_card": ("Rate cards", ["view", "create", "edit", "apply"]), "plc": ("PLC types", ["view", "create", "edit", "delete"]),
         "payment_plan": ("Payment plans", ["view", "create", "edit", "delete", "assign"]), "construction_stage": ("Construction stages", ["view", "create", "edit", "delete"]), "charge_type": ("Charge types", ["view", "create", "edit", "delete"]),
-        "bank_account": ("Bank accounts", ["view", "create", "edit", "delete"]), "catalogue": ("Catalogues", ["view", "create", "edit", "delete"]),
+        "bank_account": ("Bank accounts", ["view", "create", "edit", "delete"]), "catalogue": ("Catalogues", ["view", "create", "edit"]),
         "flat_type": ("Flat / room / area types", ["view", "create", "edit", "delete"]), "block_type": ("Block types", ["view", "create", "edit", "delete"]), "specification": ("Specifications", ["view", "create", "edit", "delete"]), "amenity": ("Amenities", ["view", "create", "edit", "delete"]), "payment_mode": ("Payment modes", ["view", "create", "edit", "delete"]), "document_type": ("Document types", ["view", "create", "edit", "delete"])}),
     "sales": ("Sales & CRM", {
         "lead": ("Leads", ["view", "create", "edit", "delete", "assign", "export"]), "site_visit": ("Site visits", ["view", "create", "edit", "cancel", "complete", "export"]), "customer": ("Customers", ["view", "create", "edit", "delete", "export"]),
         "kyc": ("KYC", ["view_masked", "reveal", "edit"]), "booking": ("Bookings", ["view", "create", "edit", "cancel", "transfer", "export"]), "agreement": ("Agreement", ["view", "revise"]), "hold": ("Holds / blocks", ["create", "release"])}),
     "finance": ("Finance", {
-        "payment": ("Payments", ["view", "create", "edit", "reverse", "export"]), "cheque": ("Cheques", ["clear", "bounce"]), "demand": ("Demands", ["view", "create", "void", "export"]), "refund": ("Refunds", ["view", "create", "approve", "pay"]),
+        "payment": ("Payments", ["view", "create", "reverse", "export"]), "cheque": ("Cheques", ["clear", "bounce"]), "demand": ("Demands", ["view", "create", "void", "export"]), "refund": ("Refunds", ["view", "create", "approve", "pay"]),
         "roznamcha": ("Roznamcha", ["view", "opening_balance", "deposit"]), "receipt": ("Receipts", ["print", "download"]), "ledger": ("Ledger", ["view", "export"])}),
     "construction": ("Construction", {"stage": ("Stages", ["view", "update", "undo"]), "photo": ("Photos", ["upload", "delete"]), "notice": ("Notices", ["view", "create", "edit", "delete"])}),
     "service": ("Service", {"ticket": ("Tickets", ["view", "create", "edit", "assign", "close", "reopen", "delete", "export"]), "category_sla": ("Categories & SLA", ["edit"]), "portal": ("Customer portal", ["view", "manage"])}),
     "website": ("Website", {"cms": ("Website CMS", ["view", "edit"])}),
-    "reports": ("Reports", {k: (lbl, ["view", "export"]) for k, lbl in [("collections", "Collections"), ("outstanding", "Outstanding & ageing"), ("demand_vs_collection", "Demand vs collection"), ("cash_account_split", "Cash / account split"),
-                            ("cheque_register", "Cheque register"), ("receivables_forecast", "Receivables forecast"), ("project_sales", "Project sales"), ("inventory", "Inventory"), ("construction_vs_plan", "Construction vs plan"),
-                            ("cancellations_refunds", "Cancellations & refunds"), ("lead_funnel", "Lead funnel"), ("visit_conversion", "Visit conversion"), ("sales_team", "Sales team"), ("bank_wise", "Bank-wise receipts"),
-                            ("other_charges", "Other charges"), ("roznamcha", "Roznamcha"), ("service_sla", "Service SLA"), ("audit", "Activity / audit")]}),
+    "reports": ("Reports", {k: (lbl, ["view", "export"]) for k, lbl in [("collections", "Collections"), ("outstanding", "Outstanding & ageing"), ("demand_vs_collection", "Demand vs collection"),
+                            ("cheque_register", "Cheque register"), ("receivables_forecast", "Receivables forecast"), ("inventory", "Inventory"), ("construction_vs_plan", "Construction vs plan"),
+                            ("cancellations_refunds", "Cancellations & refunds"), ("lead_funnel", "Lead funnel"), ("bank_wise", "Bank-wise receipts"), ("roznamcha", "Roznamcha"), ("service_sla", "Service SLA"), ("audit", "Activity / audit")]}),
     "admin": ("Administration", {
-        "user": ("Users", ["view", "create", "edit", "deactivate"]), "role": ("Roles", ["view", "create", "edit", "delete"]), "access_control": ("Access control", ["manage"]), "audit": ("Audit history", ["view", "export"]),
+        "user": ("Users", ["view", "create", "edit", "deactivate"]), "role": ("Roles", ["view", "create", "edit", "delete"]), "access_control": ("Access control", ["manage"]), "audit": ("Audit history", ["view", "export", "archive"]),
         "settings": ("Company settings", ["view", "edit"]), "definitions": ("Definitions", ["view"]), "system_health": ("System health", ["view"]), "data": ("Data operations", ["reseed", "recompute", "backup", "erase"]), "documentation": ("Documentation", ["view"])}),
 }
 # UI-only codes the frontend checks before showing a control (no dedicated backend route) — part of the registry, counted as used.

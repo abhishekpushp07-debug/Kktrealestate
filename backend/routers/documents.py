@@ -75,7 +75,7 @@ async def list_documents(entity_type: str = Query(...), entity_id: str = Query(.
     _check(user, entity_type, False)
     await _check_parent(user, entity_type, entity_id)
     items = await db.documents.find({"entity_type": entity_type, "entity_id": entity_id, "is_active": True}, {"_id": 0}).sort("uploaded_at", -1).to_list(200)
-    if "customer.kyc_view" not in user["permissions"]:
+    if "sales.kyc.reveal" not in user["permissions"]:
         for d in items:
             d["locked"] = d.get("is_sensitive", False)
     return {"items": items, "total": len(items)}
@@ -86,8 +86,8 @@ async def download(doc_id: str, request: Request, user: dict = Depends(get_curre
     doc = await get_or_404(db.documents, doc_id, "Document", {"is_active": True, "company_id": user["company_id"]})
     _check(user, doc["entity_type"], False)
     await _check_parent(user, doc["entity_type"], doc["entity_id"])
-    if doc.get("is_sensitive") and "customer.kyc_view" not in user["permissions"]:
-        raise ApiError(403, "Sensitive document: customer.kyc_view required", "FORBIDDEN")
+    if doc.get("is_sensitive") and "sales.kyc.reveal" not in user["permissions"]:
+        raise ApiError(403, "Sensitive document: sales.kyc.reveal required", "FORBIDDEN")
     try:
         data, ctype = await get_object(doc["storage_key"])
     except Exception as e:

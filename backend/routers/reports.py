@@ -61,6 +61,10 @@ def _scope(user, project_id=None, block_id=None):
 
 
 def respond(request: Request, fmt: str | None, payload: dict, title: str, company: dict, columns: list[tuple], rows: list[dict], totals: dict | None = None, filename="report", landscape=False):
+    if fmt in ("csv", "pdf") and getattr(request.state, "perm_code", "").startswith("reports."):
+        exp = request.state.perm_code.rsplit(".", 1)[0] + ".export"
+        if exp not in request.state.perms:
+            raise ApiError(403, f"Missing permission: {exp}", "PERMISSION_DENIED", {"missing": exp, "any_of": [exp]})
     if fmt == "csv":
         # rupees-only at the edge: *_paise columns export as rupee columns ("cash_paise" → "cash_inr", value / 100)
         def _col(c):

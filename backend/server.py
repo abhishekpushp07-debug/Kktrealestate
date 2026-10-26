@@ -217,7 +217,7 @@ async def lifespan(app: FastAPI):
     from services.read_models import sweep_loop
     from routers.visits import nudge_loop
     _spawn(startup_tasks())
-    _spawn(run_as_leader("scheduler", _overdue_loop, _dues_loop, nudge_loop, sweep_loop))
+    _spawn(run_as_leader("scheduler", _overdue_loop, _dues_loop, nudge_loop, sweep_loop, _audit_archive_loop))
     _spawn(init_storage_async())
     logger.info("KKT backend serving after %.2fs (uow=%s); background startup tasks running", time.perf_counter() - t0, UOW_STATE["mode"])
     yield
@@ -290,6 +290,21 @@ async def _dues_loop():
         if nxt <= now:
             nxt += timedelta(days=1)
         await asyncio.sleep((nxt - now).total_seconds())
+
+
+async def _audit_archive_loop():
+    from datetime import UTC, datetime, timedelta
+
+    from services.audit_archive import archive_old_rows, ensure_indexes
+    await ensure_indexes()
+    while True:
+        now = datetime.now(UTC)
+        nxt = (now.replace(day=1, hour=2, minute=0, second=0, microsecond=0) + timedelta(days=32)).replace(day=1)
+        await asyncio.sleep((nxt - now).total_seconds())
+        try:
+            await timed_job("audit_archive", archive_old_rows)
+        except Exception:
+            logging.getLogger("kkt").exception("audit archive job failed")
 
 
 async def _overdue_loop():

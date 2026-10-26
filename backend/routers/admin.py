@@ -127,6 +127,21 @@ async def reseed_status(user: dict = Depends(require("admin.data.reseed"))):
     return RESEED_JOB
 
 
+@router.post("/audit/archive")
+async def run_audit_archive(request: Request, user: dict = Depends(require("admin.audit.archive"))):
+    from services.audit_archive import archive_old_rows
+    res = await archive_old_rows()
+    await write_audit(user, "admin.audit_archive", "system", "audit", after=res, ip=client_ip(request))
+    return res
+
+
+@router.get("/audit/archive/status")
+async def audit_archive_status(user: dict = Depends(require("admin.audit.view"))):
+    from services.audit_archive import retention_months
+    last = await db.settings.find_one({"key": "audit_archive_last_run"}, {"_id": 0, "value": 1})
+    return {"retention_months": await retention_months(), "last_run": (last or {}).get("value"), "hot": await db.audit_logs.count_documents({}), "archived": await db.audit_logs_archive.count_documents({})}
+
+
 @router.get("/story-marker")
 async def story_marker(user: dict = Depends(require("admin.data.reseed"))):
     doc = await db.settings.find_one({"key": "story"}, {"_id": 0})

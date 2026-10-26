@@ -55,7 +55,9 @@
    "construction.stage.update"
   ],
   "customer.kyc_view": [
-   "sales.kyc.edit"
+   "sales.kyc.edit",
+   "sales.kyc.reveal",
+   "sales.kyc.view_masked"
   ],
   "customer.portal_manage": [
    "service.portal.manage",
@@ -166,8 +168,7 @@
    "masters.flat.view",
    "masters.payment_plan.view",
    "masters.project.view",
-   "masters.rate_card.view",
-   "website.cms.view"
+   "masters.rate_card.view"
   ],
   "project.write": [
    "masters.construction_stage.edit",
@@ -212,6 +213,7 @@
    "service.ticket.reopen"
   ],
   "settings.manage": [
+   "admin.audit.archive",
    "admin.data.backup",
    "admin.data.erase",
    "admin.data.recompute",
@@ -293,6 +295,15 @@
     "users.manage"
    ]
   },
+  "admin:GET /audit/archive/status": {
+   "codes": [
+    "admin.audit.view"
+   ],
+   "fn": "audit_archive_status",
+   "legacy": [
+    "audit.view"
+   ]
+  },
   "admin:GET /backups": {
    "codes": [
     "admin.data.backup"
@@ -341,6 +352,15 @@
     "admin.data.reseed"
    ],
    "fn": "story_marker_get",
+   "legacy": [
+    "settings.manage"
+   ]
+  },
+  "admin:POST /audit/archive": {
+   "codes": [
+    "admin.audit.archive"
+   ],
+   "fn": "run_audit_archive",
    "legacy": [
     "settings.manage"
    ]
@@ -1858,6 +1878,9 @@
    "codes": [
     "reports.collections.view"
    ],
+   "export_codes": [
+    "reports.collections.export"
+   ],
    "fn": "delete_preset",
    "legacy": [
     "report.view"
@@ -1866,6 +1889,9 @@
   "reports:GET ": {
    "codes": [
     "reports.collections.view"
+   ],
+   "export_codes": [
+    "reports.collections.export"
    ],
    "fn": "list_reports",
    "legacy": [
@@ -1876,6 +1902,9 @@
    "codes": [
     "reports.audit.view"
    ],
+   "export_codes": [
+    "reports.audit.export"
+   ],
    "fn": "activity",
    "legacy": [
     "audit.view"
@@ -1884,6 +1913,9 @@
   "reports:GET /advances": {
    "codes": [
     "reports.outstanding.view"
+   ],
+   "export_codes": [
+    "reports.outstanding.export"
    ],
    "fn": "advances",
    "legacy": [
@@ -1903,6 +1935,9 @@
    "codes": [
     "reports.bank_wise.view"
    ],
+   "export_codes": [
+    "reports.bank_wise.export"
+   ],
    "fn": "bank_receipts",
    "legacy": [
     "report.view"
@@ -1911,6 +1946,9 @@
   "reports:GET /cancellations": {
    "codes": [
     "reports.cancellations_refunds.view"
+   ],
+   "export_codes": [
+    "reports.cancellations_refunds.export"
    ],
    "fn": "cancellations",
    "legacy": [
@@ -1921,6 +1959,9 @@
    "codes": [
     "reports.cheque_register.view"
    ],
+   "export_codes": [
+    "reports.cheque_register.export"
+   ],
    "fn": "cheques",
    "legacy": [
     "report.view"
@@ -1929,6 +1970,9 @@
   "reports:GET /collections": {
    "codes": [
     "reports.collections.view"
+   ],
+   "export_codes": [
+    "reports.collections.export"
    ],
    "fn": "collections",
    "legacy": [
@@ -1939,6 +1983,9 @@
    "codes": [
     "reports.construction_vs_plan.view"
    ],
+   "export_codes": [
+    "reports.construction_vs_plan.export"
+   ],
    "fn": "construction_progress",
    "legacy": [
     "report.view"
@@ -1947,6 +1994,9 @@
   "reports:GET /demand-vs-collection": {
    "codes": [
     "reports.demand_vs_collection.view"
+   ],
+   "export_codes": [
+    "reports.demand_vs_collection.export"
    ],
    "fn": "demand_vs_collection",
    "legacy": [
@@ -1957,6 +2007,9 @@
    "codes": [
     "reports.demand_vs_collection.view"
    ],
+   "export_codes": [
+    "reports.demand_vs_collection.export"
+   ],
    "fn": "demand_vs_collection",
    "legacy": [
     "report.view"
@@ -1965,6 +2018,9 @@
   "reports:GET /inventory": {
    "codes": [
     "reports.inventory.view"
+   ],
+   "export_codes": [
+    "reports.inventory.export"
    ],
    "fn": "inventory",
    "legacy": [
@@ -1975,6 +2031,9 @@
    "codes": [
     "reports.outstanding.view"
    ],
+   "export_codes": [
+    "reports.outstanding.export"
+   ],
    "fn": "outstanding",
    "legacy": [
     "report.view"
@@ -1983,6 +2042,9 @@
   "reports:GET /presets": {
    "codes": [
     "reports.collections.view"
+   ],
+   "export_codes": [
+    "reports.collections.export"
    ],
    "fn": "list_presets",
    "legacy": [
@@ -1993,6 +2055,9 @@
    "codes": [
     "reports.roznamcha.view"
    ],
+   "export_codes": [
+    "reports.roznamcha.export"
+   ],
    "fn": "roznamcha_range",
    "legacy": [
     "report.view"
@@ -2002,6 +2067,9 @@
    "codes": [
     "reports.lead_funnel.view"
    ],
+   "export_codes": [
+    "reports.lead_funnel.export"
+   ],
    "fn": "sales_leads",
    "legacy": [
     "report.view"
@@ -2010,6 +2078,9 @@
   "reports:GET /service-sla": {
    "codes": [
     "reports.service_sla.view"
+   ],
+   "export_codes": [
+    "reports.service_sla.export"
    ],
    "fn": "service_sla",
    "legacy": [
@@ -2029,6 +2100,9 @@
    "codes": [
     "reports.collections.view"
    ],
+   "export_codes": [
+    "reports.collections.export"
+   ],
    "fn": "rename_preset",
    "legacy": [
     "report.view"
@@ -2037,6 +2111,9 @@
   "reports:POST /presets": {
    "codes": [
     "reports.collections.view"
+   ],
+   "export_codes": [
+    "reports.collections.export"
    ],
    "fn": "create_preset",
    "legacy": [

@@ -74,6 +74,8 @@ async def register_routes(app) -> list[str]:
             d = stack.pop()
             for code in getattr(d.call, "perm_codes", None) or ([d.call.perm_code] if getattr(d.call, "perm_code", None) else []):
                 refs.setdefault(canonical(code), set()).add(f"{'/'.join(sorted(r.methods))} {r.path}")
+                if code.startswith("reports.") and code.endswith(".view"):  # format=csv|pdf on the same route is gated by the sibling export code (reports.respond)
+                    refs.setdefault(code.rsplit(".", 1)[0] + ".export", set()).add(f"{'/'.join(sorted(r.methods))} {r.path}?format=csv|pdf")
             stack.extend(d.dependencies)
     known = {row["code"]: row for row in registry_rows()}
     unknown = sorted(c for c in refs if c not in known)
