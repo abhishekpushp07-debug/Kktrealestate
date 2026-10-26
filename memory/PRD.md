@@ -512,3 +512,11 @@ See `/app/memory/prd_phase11c.md`. Tested: `/app/test_reports/iteration_13.json`
 - **CSV/PDF everywhere**: humanised headers ("Cash (Jama) ₹"…), TOTAL row, first comment row with title/as-of/filters/basis; all payloads include `purpose` + server-side `kpis` (UI renders them).
 - **Data Quality**: "Active towers without a stage plan" lists which; inactive towers excluded (QA Tower no longer counted). KYC pending kept.
 - Proof: `/app/memory/qa/reports/20–26_*.jpeg`, scoreboard `tieout.py` 113/113 (82 report ties), suite 507 passed, headline unchanged.
+
+## Phase K — hardening practices ported from reference (2026-10-27) — DONE 16/18 (see "not done")
+- Entry logic untouched (bucket caps, append-only ledgers, Udhar/Jama, multi-role RBAC, changed_fields audit).
+- P0: job_runs isolation/sweep/stale (+ Super Admin notify, System Health card); Mongo invariants (unique partial indexes + money validators merged with schemas); append-only guard for audit_logs/ledger_entries (app layer — no DB role available); durable idempotency claims (409 in-progress / 422 mismatch / secret-replay 409 / abandoned 60 s / TTL 24 h); error-code registry test; PENDING_WOULD_EXCEED_CAP warning + amber banner.
+- P1: load shedding (API_MAX_INFLIGHT, loop-lag degrade), query budgets (maxTimeMS → 503 QUERY_TIMEOUT), anti-escalation R1–R4 (+ UI disabled with reason), DB-backed (identifier, IP) lockout + constant-time login, retryable DB envelopes + api.js GET retry, backup/restore drill (docs/RESTORE.md), alerts.yaml evaluated per minute, OpenAPI snapshot test, load runner.
+- P2: CSV formula neutralisation DONE. **Not done:** async large exports (>10k rows job + download), 80-factor self-score; paginate() budget parameter.
+- Proof: memory/qa/phase_k/ (3 screenshots, status.md, full_suite.log). Suite 534 passed / 2 skipped; headline 3/3; tie-outs 82/82; integrity ok; registry 0 unmapped.
+
