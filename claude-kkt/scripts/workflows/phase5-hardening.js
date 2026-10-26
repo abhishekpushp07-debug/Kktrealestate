@@ -1,6 +1,6 @@
 export const meta = {
   name: 'kkt-phase5-hardening',
-  description: 'Close the gaps found by the v2 80-factor audit: foundation (config, DB constraints/indexes, error registry, lint config), five parallel tracks with strict file ownership, then integration and full verification; args.stage = foundation | tracks | integrate | verify',
+  description: 'Close the gaps found by the v2 80-factor audit: foundation (config, DB constraints/indexes, error registry, lint config), five parallel tracks with strict file ownership, then integration and full verification; args.stage = foundation | tracks | integrate2 | verify',
   phases: [
     { title: 'Foundation', detail: 'config, migration 0002, error registry, eslint config' },
     { title: 'Tracks', detail: 'security, money rules, platform reliability, deploy/observability, frontend quality' },
@@ -159,6 +159,20 @@ const VERIFY = COMMON + '\n' + [
   'Report: final counts (tests per suite, lint 0/0, endpoints), what you fixed, and any remaining failure with its exact cause.',
 ].join('\n')
 
+const CROSSCUT = COMMON + '\n' + [
+  'TASK — CROSS-TRACK FIXES (runs in parallel with the frontend integration agent, which owns apps/erp, apps/portal and apps/web; you own apps/api/** and packages/** and must not edit the three front ends). Your databases: kkt_h7 / kkt_h7_acc; Redis index 23. The five track reports and reviews are in docs/hardening/*.md — read every "remaining gaps" list. Fix, each with a test:',
+  '1. server.ts: production first boot must run ensureBootstrap whenever the database has no company (using BOOTSTRAP_* in production; refuse to start without them), independent of SEED_ON_BOOT; the demo dataset is created only when SEED_ON_BOOT and SEED_DEMO are both true. Document the first-boot procedure in docs/DEPLOY.md.',
+  '2. One-time secrets must never be persisted by the idempotency store: POST /users (temp_password), portal enable/reset, bulk enable and any route returning a one-time password or token — either mark the route so the stored replay body has the secret redacted (and a replay returns 409 IDEMPOTENT_SECRET_REPLAY telling the client to reset again) or exclude it from storage; test that no idempotency_keys row or Redis entry contains the password.',
+  '3. API docs exposure: GET /api/v1/openapi.json and /api/v1/docs are disabled in production unless DOCS_PUBLIC=true (add to config with default false in production) or the caller presents a staff token with admin.tools; test both.',
+  '4. Observability glue: jobs/index.ts runJob calls recordJobRun(name, status, seconds) on every outcome; lib/logger.ts adds a pino mixin that injects the current trace id/span id (when OpenTelemetry is active) into every log line, including module-level loggers; job_runs rows stuck RUNNING longer than 2× the job timeout are marked ABANDONED by a sweeper (in the existing NOTIFICATION_SWEEP or a new JOB_RUN_SWEEP job — append to JOB_NAMES with a single Edit); the boot-job lock key uses DEPLOY_ID, else GIT_SHA, else the process start time (never a fixed default).',
+  '5. Redis outage latency: lib/cache.ts cached() gets a short time budget (e.g. 150 ms) after which it falls back to the loader, and the main Redis client uses enableOfflineQueue=false / short command timeouts for cache reads so /auth/me during a Redis outage answers in < 300 ms; test with a dead Redis port.',
+  '6. Reports exports: apps/api/src/modules/reports/common.ts reportPaging sets the X-Export-* headers and supports the async export job (cursor paging) for the paginated reports (cheques, audit/activity, login events); test an export above the cap with a lowered cap in tests.',
+  '7. Ledger order migration for legacy data: add an admin job LEDGER_REBUILD (append to JOB_NAMES) that rebuilds every booking ledger in canonical order in batches and reports bookings whose row order changed; run it at the end of the demo seed so seeded data is canonical; the integrity report must show zero findings on a freshly seeded database (verify).',
+  '8. The money review noted the non-writing integrity rebuild reads tables in separate snapshots — run checkBooking in a REPEATABLE READ read-only transaction so a concurrent payment cannot produce a false SUMMARY_MISMATCH; test with a concurrent payment.',
+  '9. Anything else in the remaining-gaps lists that is inside apps/api or packages and is a defect (not a product decision) — fix it; list product decisions you left for the owner.',
+  'Then run: pnpm typecheck; unit tests of api/contracts/domain/db; the full API integration suite against kkt_h7 (Redis 23) with --no-file-parallelism; the acceptance suite against kkt_h7_acc (ACCEPTANCE_REDIS_URL redis://localhost:6379/24). Fix failures. Report.',
+].join('\n')
+
 const stage = args && args.stage
 const RESUME = (args && args.resume) ? '\nRESUME NOTE: a previous attempt at this exact task was interrupted by a container restart after most of the work was written (it is committed as a WIP checkpoint). Read the current state (git show --stat HEAD, the files your task names), keep what is correct, finish whatever is missing, then run every verification the task asks for. Services were restarted; the test databases may hold stale data (the helpers truncate/migrate). Do not start a parallel copy of finished work.' : ''
 if (stage === 'foundation') {
@@ -174,6 +188,14 @@ if (stage === 'tracks') {
     (impl, t) => agent(reviewPrompt(t) + RESUME, { label: 'review:' + t.key, phase: 'Review', effort: 'high', schema: REVIEW_SCHEMA }).then((r) => ({ track: t.key, implementation: impl, review: r })),
   )
   return results
+}
+if (stage === 'integrate2') {
+  const integ = INTEGRATE.replace('Your databases: kkt_h6 / kkt_h6_acc; Redis index 22;', 'Your databases: kkt_h6 / kkt_h6_acc; Redis index 22; you own apps/erp/**, apps/portal/**, apps/web/** and docs/qa/** only (a parallel agent owns apps/api and packages — if the API itself needs a fix, describe it precisely in your report instead of editing it);') + '\nTRACK REPORTS: read docs/hardening/*.md (implementation + review reports per track) and docs/hardening/frontend-wiring.json (the frontend_wiring_needed list from every review) — every wiring item must be done or explicitly reported as not applicable.' + RESUME
+  const [i, c] = await Promise.all([
+    agent(integ, { label: 'integrate:frontends', phase: 'Integrate', effort: 'high' }),
+    agent(CROSSCUT + RESUME, { label: 'integrate:crosscut', phase: 'Integrate', effort: 'high' }),
+  ])
+  return { integrate: i, crosscut: c }
 }
 if (stage === 'integrate') {
   const reports = JSON.stringify(args.reports || {}, null, 1)
