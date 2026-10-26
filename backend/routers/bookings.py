@@ -230,7 +230,7 @@ async def ledger(booking_id: str, format: str | None = None, user: dict = Depend
     rows = await db.ledger_entries.find({"booking_id": booking_id}, {"_id": 0}).sort("seq", 1).to_list(1000)
     out = present_money(rows)
     if format == "csv":
-        return Response(to_csv(out, ["seq", "date", "type", "construction_percent", "category", "amount", "ref", "note", "cash_paid_cum", "account_paid_cum", "cash_order_raised", "account_order_raised", "cash_due", "account_due", "total_due"]),
+        return Response(to_csv(out, ["seq", "date", "type", "note", "udhar", "jama", "mode", "instrument", "balance", "tag", "construction_percent", "category", "amount", "ref", "cash_paid_cum", "account_paid_cum", "cash_order_raised", "account_order_raised", "cash_due", "account_due", "total_due"]),
                         media_type="text/csv", headers={"Content-Disposition": f"attachment; filename=ledger-{b['booking_number'].replace('/', '-')}.csv"})
     return {"booking": _present({k: b[k] for k in ("id", "booking_number", "customer_name", "flat_snapshot", "agreement_value_paise", "cash_agreed_paise", "account_agreed_paise", "construction_percent", "status", "summary")}), "rows": out, "total": len(out)}
 

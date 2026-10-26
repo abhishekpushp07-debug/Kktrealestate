@@ -138,6 +138,7 @@ async def rebuild(booking_id: str) -> list[dict]:
             "advance_paise": max(cash_paid - c_ord, 0) + max(account_paid - a_ord, 0) + max(oc_paid - oc_dem, 0),
             "other_charges_due_paise": oc_dem - oc_paid,
         })
+    two_sided(rows, events)
     # final summary
     pct_now = b.get("raised_percent", b.get("construction_percent", pct))
     c_ord, a_ord = _orders(b["cash_agreed_paise"], b["account_agreed_paise"], pct_now)
@@ -159,6 +160,11 @@ async def rebuild(booking_id: str) -> list[dict]:
         "other_charges_undemanded_paise": sum(line.get("total_paise", 0) - line.get("demanded_paise", 0) for line in lines.values()),
     }
     summary["due_paise"] = summary["outstanding_paise"]
+    summary.update(total_udhar_paise=sum(r["udhar_paise"] for r in rows), total_jama_paise=sum(r["jama_paise"] for r in rows),
+                   cash_udhar_paise=sum(r["udhar_cash_paise"] for r in rows), cash_jama_paise=sum(r["jama_paise"] for r in rows if r["category"] == "Cash"),
+                   account_udhar_paise=sum(r["udhar_account_paise"] for r in rows), account_jama_paise=sum(r["jama_paise"] for r in rows if r["category"] == "Account"),
+                   other_udhar_paise=sum(r["udhar_paise"] for r in rows if r["type"] == "OTHER_CHARGE_DEMAND"), other_jama_paise=sum(r["jama_paise"] for r in rows if r["type"] == "OTHER_CHARGE_PAYMENT"))
+    summary["balance_paise"] = summary["total_udhar_paise"] - summary["total_jama_paise"]
     # demand statuses: FIFO per bucket
     cum_c = cum_a = 0
     for d in sorted(demands, key=lambda x: x["posted_at"]):
@@ -227,3 +233,34 @@ async def line_paid(booking_id: str, line_id: str) -> int:
     rows = await db.payments.aggregate([{"$match": {"booking_id": booking_id, "against": "OTHER_CHARGE", "other_charge_line_id": line_id, "status": "Cleared"}},
                                         {"$group": {"_id": None, "s": {"$sum": "$amount_paise"}}}]).to_list(1)
     return rows[0]["s"] if rows else 0
+
+
+UDHAR_TYPES = ("DEMAND", "OTHER_CHARGE_DEMAND", "AGREEMENT_CHANGE")
+JAMA_TYPES = ("PAYMENT", "OTHER_CHARGE_PAYMENT", "REVERSAL", "REFUND")
+
+
+def two_sided(rows: list[dict], events: list) -> None:
+    """Owner's ledger law: Udhar (dues raised) | Jama (money received; reversals/refunds negative) | Mode | running Balance = Σ Udhar − Σ Jama."""
+    bal = 0
+    for r, (_, _p, kind, src) in zip(rows, events):
+        amt = r["amount_paise"]
+        udhar = amt if kind in UDHAR_TYPES else 0
+        jama = amt if kind in JAMA_TYPES else 0
+        if kind == "PAYMENT" and src.get("status") == "Reversed":
+            r["tag"] = "REVERSED"
+        elif kind == "REVERSAL":
+            r["tag"] = "REVERSED"
+        elif kind == "REFUND":
+            r["tag"] = "REFUND"
+        elif kind == "PAYMENT" and src.get("status") == "Bounced":
+            r["tag"] = "BOUNCED"
+        else:
+            r["tag"] = None
+        mode = src.get("payment_mode") or src.get("mode") or ("Due" if udhar else None)
+        inst = src.get("instrument_number") or src.get("cheque_number") or src.get("reference") or src.get("utr")
+        bal += udhar - jama
+        r.update(udhar_paise=udhar, jama_paise=jama, mode=mode, instrument=inst, balance_paise=bal,
+                 udhar_cash_paise=src.get("cash_demand_paise", 0) if kind == "DEMAND" else (udhar if kind == "AGREEMENT_CHANGE" and src.get("after", {}).get("cash_agreed_paise") != src.get("before", {}).get("cash_agreed_paise") and udhar else 0),
+                 udhar_account_paise=src.get("account_demand_paise", 0) if kind == "DEMAND" else 0)
+        if kind == "OTHER_CHARGE_DEMAND":
+            r["udhar_cash_paise"] = 0

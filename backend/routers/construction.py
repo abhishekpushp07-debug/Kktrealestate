@@ -6,7 +6,7 @@ from pydantic import Field
 
 from services import clock
 from db import db
-from deps import ensure_project_access, require
+from deps import require_any, ensure_project_access, require
 from services.dues_engine import raise_due_installments, run_dues_for_all, schedule, trigger_label
 from services.ledger import rebuild
 from services.money import present_money
@@ -109,7 +109,7 @@ class StageSetIn(StrictModel):
 
 
 @router.post("/blocks/{block_id}/construction/stage")
-async def set_current_stage(block_id: str, body: StageSetIn, request: Request, user: dict = Depends(require("construction.stage.update"))):
+async def set_current_stage(block_id: str, body: StageSetIn, request: Request, user: dict = Depends(require_any("construction.stage.update", "construction.update.complete"))):
     """Mark `stage_id` (and all earlier pending stages) Completed; raise plan installments for Active bookings."""
     block = await get_or_404(db.blocks, block_id, "Block", {"company_id": user["company_id"]})
     ensure_project_access(user, block["project_id"])
@@ -162,7 +162,7 @@ class UndoIn(StrictModel):
 
 
 @router.post("/blocks/{block_id}/construction/undo")
-async def undo_stage(block_id: str, body: UndoIn, request: Request, user: dict = Depends(require("construction.stage.undo"))):
+async def undo_stage(block_id: str, body: UndoIn, request: Request, user: dict = Depends(require_any("construction.stage.undo", "construction.update.undo"))):
     block = await get_or_404(db.blocks, block_id, "Block", {"company_id": user["company_id"]})
     stages = await ensure_block_stages(block)
     done = [s for s in stages if s["status"] == "Completed"]

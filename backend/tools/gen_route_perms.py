@@ -17,7 +17,7 @@ def routes():
             for d in fn.decorator_list:
                 if isinstance(d, ast.Call) and isinstance(d.func, ast.Attribute) and d.func.attr in ("get", "post", "patch", "put", "delete"):
                     path = d.args[0].value if d.args else ""
-                    codes = [c.args[0].value for c in ast.walk(fn.args) if isinstance(c, ast.Call) and getattr(c.func, "id", "") == "require" and c.args]
+                    codes = [a.value for c in ast.walk(fn.args) if isinstance(c, ast.Call) and getattr(c.func, "id", "") in ("require", "require_any") for a in c.args]
                     out.append((pathlib.Path(f).stem, d.func.attr.upper(), path, fn.name, codes))
     return out
 
@@ -81,6 +81,8 @@ FEATURE_OF = {"booking": "sales.booking", "customer": "sales.customer", "lead": 
 def rule(key, legacy, method, path):
     if key in OVERRIDES:
         return OVERRIDES[key]
+    if legacy and all(c.count(".") == 2 for c in legacy):
+        return tuple(legacy)
     f, m2 = key.split(":")[0], method
     if f == "reports":
         seg = path.strip("/").split("/")[0]

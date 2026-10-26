@@ -35,6 +35,7 @@ from routers import (
     bookings,
     cms,
     construction,
+    masters_plus,
     customers,
     dashboard,
     dashboard_widgets,
@@ -359,7 +360,7 @@ async def metrics(user: dict = Depends(require("admin.system_health.view"))):
 from routers import ops as _ops
 from routers import propagation
 from routers import access as _access
-for r in (_ops.router, _access.router, auth.router, users.router, roles.router, master.router, projects.router, rate_cards.router, blocks.router, flats.router, parking.router,
+for r in (_ops.router, _access.router, auth.router, users.router, roles.router, master.router, projects.router, rate_cards.router, blocks.router, masters_plus.router, flats.router, parking.router,
           settings.router, audit.router, dashboard.router, search.router, imports.router,
           customers.router, leads.router, documents.router, bookings.router, milestones.router, payments.router, roznamcha.router, admin.router, cms.router, public.router, reports.router, notifications.router, pdfs.router, dashboard_widgets.router, portal.router, portal.mgmt, support.router, construction.router, visits.pub, visits.router,
           catalogues.router, project_setup.router, crm.router, bootstrap.router, home.router, propagation.router):
