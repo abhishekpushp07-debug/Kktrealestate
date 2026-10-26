@@ -8,16 +8,18 @@ import type { SiteVisitManage } from "@/lib/types";
 import { siteGate } from "@/lib/gate";
 
 type Params = Promise<{ token: string }>;
+type Search = Promise<Record<string, string | string[] | undefined>>;
 
 export const metadata: Metadata = {
   title: "Your site visit",
   robots: { index: false, follow: false, noarchive: true },
 };
 
-export default async function VisitPage({ params }: { params: Params }) {
+export default async function VisitPage({ params, searchParams }: { params: Params; searchParams: Search }) {
   const gate = await siteGate();
   if (gate.closed) return gate.page;
   const { token } = await params;
+  const moved = (await searchParams).moved === "1";
   let visit: SiteVisitManage;
   try {
     visit = await getVisit(token);
@@ -31,7 +33,7 @@ export default async function VisitPage({ params }: { params: Params }) {
       <PageHeader eyebrow="Manage your visit" title="Your private site visit" lead="Add it to your calendar, find the site office, or cancel if your plans change." compact />
       <div className="container-site py-12 sm:py-16">
         <div className="mx-auto max-w-2xl">
-          <ManageVisit visit={visit} token={token} />
+          <ManageVisit visit={visit} token={token} justMoved={moved} />
           <div className="mt-8 text-center">
             <Button href={visit.project_slug ? `/projects/${visit.project_slug}` : "/projects"} variant="link">
               {visit.project_slug ? `About ${visit.project_name}` : "Explore our projects"}

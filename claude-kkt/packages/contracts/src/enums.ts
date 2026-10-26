@@ -31,10 +31,11 @@ export const TOKEN_AUDIENCES = ["erp", "portal"] as const;
 export const TokenAudienceSchema = enumSchema(TOKEN_AUDIENCES);
 export type TokenAudience = z.infer<typeof TokenAudienceSchema>;
 
-export const JOB_RUN_STATUSES = ["RUNNING", "OK", "FAILED"] as const;
+/** ABANDONED: the run stayed RUNNING longer than twice its job's time budget (its worker died); set by JOB_RUN_SWEEP. */
+export const JOB_RUN_STATUSES = ["RUNNING", "OK", "FAILED", "ABANDONED"] as const;
 export const JobRunStatusSchema = enumSchema(JOB_RUN_STATUSES);
 export type JobRunStatus = z.infer<typeof JobRunStatusSchema>;
-export const JOB_RUN_STATUS_LABELS: LabelMap<JobRunStatus> = { RUNNING: "Running", OK: "OK", FAILED: "Failed" };
+export const JOB_RUN_STATUS_LABELS: LabelMap<JobRunStatus> = { RUNNING: "Running", OK: "OK", FAILED: "Failed", ABANDONED: "Abandoned" };
 
 export const GENDERS = ["MALE", "FEMALE", "OTHER"] as const;
 export const GenderSchema = enumSchema(GENDERS);
@@ -661,6 +662,7 @@ export const NOTIFICATION_TYPES = [
   "BOOKING_CREATED",
   "HOLD_EXPIRED",
   "JOB_FAILED", "EXPORT_READY",
+  "SECURITY_ALERT",
 ] as const;
 export const NotificationTypeSchema = enumSchema(NOTIFICATION_TYPES);
 export type NotificationType = z.infer<typeof NotificationTypeSchema>;
@@ -685,6 +687,7 @@ export const NOTIFICATION_TYPE_LABELS: LabelMap<NotificationType> = {
   BOOKING_CREATED: "Booking created",
   HOLD_EXPIRED: "Flat hold lapsed",
   JOB_FAILED: "Background job failed", EXPORT_READY: "Export ready",
+  SECURITY_ALERT: "Security alert",
 };
 
 export const POST_STATUSES = ["DRAFT", "PUBLISHED"] as const;
@@ -807,6 +810,7 @@ export const JOB_NAMES = [
   "DUES_CATCHUP",
   "REENCRYPT_FIELDS",
   "IDEMPOTENCY_PURGE", "EXPORT_CSV", "EXPORT_CLEANUP", "BACKUP_EXPORT", "PARTITION_MAINTENANCE",
+  "JOB_RUN_SWEEP", "LEDGER_REBUILD",
 ] as const;
 export const JobNameSchema = enumSchema(JOB_NAMES);
 export type JobName = z.infer<typeof JobNameSchema>;
@@ -823,4 +827,5 @@ export const JOB_NAME_LABELS: LabelMap<JobName> = {
   DUES_CATCHUP: "Dues catch-up (boot / missed run)",
   REENCRYPT_FIELDS: "Re-encrypt PAN/Aadhaar/bank/MFA secrets to the active key",
   IDEMPOTENCY_PURGE: "Purge expired idempotency keys (hourly)", EXPORT_CSV: "Asynchronous CSV export", EXPORT_CLEANUP: "Remove expired exports and backups (daily)", BACKUP_EXPORT: "Full backup export (ZIP)", PARTITION_MAINTENANCE: "Create next month's partitions (PARTITIONING_ENABLED only)",
+  JOB_RUN_SWEEP: "Mark abandoned job runs (every 15 minutes)", LEDGER_REBUILD: "Rebuild every booking ledger in canonical order (admin)",
 };

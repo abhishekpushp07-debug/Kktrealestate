@@ -3,7 +3,6 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { type ChequeRow } from "@kkt/contracts";
 import { Badge, DataTable, PageHeader, Select, StatusChip, Tabs, TabsList, TabsTrigger, Toolbar } from "@/components/ui";
-import { api } from "@/lib/api";
 import { formatDate, formatINR, formatINRShort, formatNumber } from "@/lib/format";
 import { useListParams } from "@/lib/queries";
 import { cn } from "@/lib/utils";
@@ -67,7 +66,6 @@ export default function ChequesPage() {
   const list = useListParams({ filterKeys: ["project_id"], defaultSort: "instrument_date" });
   const projects = useProjectOptions();
   const [action, setAction] = useState<PaymentActionState | null>(null);
-  const [exporting, setExporting] = useState(false);
 
   const queryParams = useMemo(
     () => ({ status: tab, page: list.page, page_size: list.pageSize, sort: list.sort ?? undefined, search: list.search || undefined, project_id: list.filters.project_id }),
@@ -121,15 +119,8 @@ export default function ChequesPage() {
         filters={<Select aria-label="Project" size="sm" className="w-full sm:w-48" value={list.filters.project_id ?? null} onValueChange={(value) => list.setFilter("project_id", value)} options={(projects.data ?? []).map((project) => ({ value: project.id, label: project.name }))} placeholder="All projects" allowClear />}
         hasActiveFilters={list.hasActiveFilters}
         onClearFilters={list.reset}
-        exporting={exporting}
-        onExportCsv={async () => {
-          setExporting(true);
-          try {
-            await api.exportCsv(CHEQUES_PATH, { page: 1, page_size: 200, sort: list.sort, search: list.search, filters: { status: tab, project_id: list.filters.project_id } }, `cheques-${tab.toLowerCase()}.csv`);
-          } finally {
-            setExporting(false);
-          }
-        }}
+        exportSource={{ path: CHEQUES_PATH, params: { page: 1, page_size: 200, sort: list.sort, search: list.search, filters: { status: tab, project_id: list.filters.project_id } }, filename: `cheques-${tab.toLowerCase()}.csv` }}
+        exportTotal={query.data?.total}
       />
       <DataTable
         columns={columns}

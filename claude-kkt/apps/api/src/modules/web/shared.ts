@@ -7,7 +7,7 @@ import { companies, documents, projects, type Executor } from "@kkt/db";
 import { DEFAULT_NUMBER_PATTERN, financialYear, formatNumber } from "@kkt/domain";
 import { config } from "../../config.js";
 import type { AuditActor } from "../../lib/audit.js";
-import { cached } from "../../lib/cache.js";
+import { CACHE_BUDGET_MS, cached, redisUsable, withinBudget } from "../../lib/cache.js";
 import { ApiError } from "../../lib/errors.js";
 import type { NumberingCompany, NumberingScope } from "../../lib/numbering.js";
 import { versionConflict, type VersionedTable } from "../../lib/version.js";
@@ -74,8 +74,9 @@ type CacheEnvelope<T> = { ok: true; value: T } | { ok: false };
 
 /** Current public cache generation ("0" when unset or Redis is unavailable). */
 async function publicCacheVersion(app: FastifyInstance): Promise<string> {
+  if (!redisUsable(app.redis)) return "0";
   try {
-    return (await app.redis.get(PUBLIC_CACHE_VERSION_KEY)) ?? "0";
+    return (await withinBudget(app.redis.get(PUBLIC_CACHE_VERSION_KEY), CACHE_BUDGET_MS, "public cache version")) ?? "0";
   } catch {
     return "0";
   }

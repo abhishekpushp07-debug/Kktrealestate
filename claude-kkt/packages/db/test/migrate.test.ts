@@ -11,7 +11,7 @@ const EXPECTED_TABLE_COUNT = 78;
 /** Tables created by 0000_initial (0002 adds `exports`). */
 const INITIAL_TABLE_COUNT = 77;
 /** Committed drizzle migrations in journal order. */
-const EXPECTED_MIGRATIONS = ["0000_initial", "0001_central_fixes", "0002_foundation_hardening"] as const;
+const EXPECTED_MIGRATIONS = ["0000_initial", "0001_central_fixes", "0002_foundation_hardening", "0003_job_run_abandoned"] as const;
 
 /** Replaces the database name in a postgres URL. */
 function withDatabase(url: string, name: string): string {
@@ -199,6 +199,19 @@ describe("migrations", () => {
       expect(a?.pid).not.toBe(b?.pid);
     } finally {
       await cluster.close();
+    }
+  });
+});
+
+describe("migration 0003 (job run status ABANDONED)", () => {
+  it("adds ABANDONED to job_run_status, idempotently", async () => {
+    await runMigrations(TEST_DATABASE_URL);
+    const handle = postgres(TEST_DATABASE_URL, { max: 1, onnotice: () => undefined });
+    try {
+      const rows = await handle<{ v: string }[]>`SELECT unnest(enum_range(NULL::job_run_status))::text AS v`;
+      expect(rows.map((r) => r.v)).toEqual(["RUNNING", "OK", "FAILED", "ABANDONED"]);
+    } finally {
+      await handle.end({ timeout: 5 });
     }
   });
 });

@@ -3,6 +3,10 @@ import {
   BarChart3,
   BookOpenText,
   Building2,
+  Clock,
+  DatabaseBackup,
+  Activity,
+  FileDown,
   CalendarCheck2,
   ClipboardList,
   Contact,
@@ -58,7 +62,10 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   {
     id: "overview",
     label: "Overview",
-    items: [{ id: "dashboard", label: "Dashboard", to: "/", icon: LayoutDashboard, exact: true, keywords: ["home"] }],
+    items: [
+      { id: "dashboard", label: "Dashboard", to: "/", icon: LayoutDashboard, exact: true, keywords: ["home"] },
+      { id: "exports", label: "My exports", to: "/exports", icon: FileDown, permission: "notification.read", keywords: ["csv", "download", "export all"] },
+    ],
   },
   {
     id: "inventory",
@@ -128,6 +135,9 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       { id: "roles", label: "Roles", to: "/admin/roles", icon: ShieldCheck, permission: "roles.manage", keywords: ["permissions"] },
       { id: "settings", label: "Settings", to: "/admin/settings", icon: Settings, permission: "settings.manage" },
       { id: "audit", label: "Audit log", to: "/admin/audit-log", icon: ScrollText, permission: "audit.view" },
+      { id: "jobs", label: "Jobs", to: "/admin/jobs", icon: Clock, permission: "admin.tools", keywords: ["worker", "schedule", "run now"] },
+      { id: "system", label: "System health", to: "/admin/system", icon: Activity, permission: "admin.tools", keywords: ["metrics", "versions", "database"] },
+      { id: "backups", label: "Backups", to: "/admin/backups", icon: DatabaseBackup, permission: "admin.tools", keywords: ["restore", "export"] },
     ],
   },
 ];

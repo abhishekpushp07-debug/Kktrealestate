@@ -4,7 +4,38 @@ Date: 2026-10-25 · Chromium (Playwright, headless) · viewports **1440×900** a
 
 Stack under test: API `apps/api` on `:4000` with the demo seed on its own database `kkt_qa_erp` (dropped and recreated so the seed ran fresh; Redis db 13, `ERP_ORIGIN=http://localhost:5173`). API integration tests for the module I touched ran on `kkt_qa_erp_test` (Redis db 14 — db 16 is outside Redis' default 0–15 range, see open items).
 
-Runner: [`docs/qa/erp/browser-qa.cjs`](erp/browser-qa.cjs) (`ERP_URL`, `API_URL`, `OUT_DIR`, `REPORT`, `WIPE=1`, `ONLY=login,roles,masters,inventory,crm,money,misc,smoke`). On every page it asserts: zero console errors / page errors, zero failed or ≥ 400 API requests (apart from the deliberate 4xx probes listed below), `document.documentElement.scrollWidth <= window.innerWidth`, and at 390 px that every **primary** target is ≥ 44 px tall (action buttons, tabs, sidebar / drawer / Back links; switches toggle through their 44 px label row and desktop-only breadcrumb crumbs count as secondary). It records every sub-44 px element, takes one palette-quantised viewport screenshot per listed page and width (`docs/qa/erp/<page>-<width>.png`, 40 files, 13–167 KB each, 2.1 MB in all), and verifies every flow through the API afterwards (status, ledger rows, audit rows, stage records, files).
+Runner: [`docs/qa/erp/browser-qa.cjs`](erp/browser-qa.cjs) (`ERP_URL`, `API_URL`, `OUT_DIR`, `REPORT`, `WIPE=1`, `ONLY=login,roles,masters,inventory,crm,money,misc,hardening,smoke`). On every page it asserts: zero console errors / page errors, zero failed or ≥ 400 API requests (apart from the deliberate 4xx probes listed below), `document.documentElement.scrollWidth <= window.innerWidth`, and at 390 px that every **primary** target is ≥ 44 px tall (action buttons, tabs, sidebar / drawer / Back links; switches toggle through their 44 px label row and desktop-only breadcrumb crumbs count as secondary). It records every sub-44 px element, takes one palette-quantised viewport screenshot per listed page and width (`docs/qa/erp/<page>-<width>.png`, 40 files, 13–167 KB each, 2.1 MB in all), and verifies every flow through the API afterwards (status, ledger rows, audit rows, stage records, files).
+
+## Integration stage 2026-10-26 (phase 5 frontend wiring)
+
+Stack: API on `:4600` (demo seed in `kkt_h6`, Redis db 22, `ERP_ORIGIN=http://localhost:5673`), ERP built with `VITE_API_URL=http://localhost:4600` and served by `vite preview` on `:5673`; runner `ERP_URL=http://localhost:5673 API_URL=http://localhost:4600 node docs/qa/erp/browser-qa.cjs`. The runner has a new section **`hardening`** (`ONLY=hardening`), run after `money`/`misc`, and the smoke walk now includes `/admin/jobs`, `/admin/system`, `/admin/backups` and `/exports`.
+
+**Result.** Full walk (all sections, fresh seed): **551 page checks (376 at 1440 px, 176 at 390 px), 164/164 assertions, 0 console errors, 0 failed requests, no overflow, no primary target under 48 px; axe 500 scans, 499 clean.** Two defects in that run, both handled: the `crm` section still clicked the old "Verify / reject" KYC button (runner updated to the maker-checker "Submit for verification" button) and, once past it, the new "share the visitor's new link" dialog after a reschedule (runner now asserts it and closes it); the remaining axe finding is the known transient `target-size` on the cheques "Amount" header while the "bounced" toast covers it (unchanged since the frontend track). Re-runs on the final build: `crm` 34 checks / 18 of 18 assertions, 0 defects, 34 clean axe scans; `money` + `hardening` 79/79 assertions; `roles` + `hardening` + `smoke` on a fresh seed (final build): **287 page checks, 56/56 assertions, 0 defects; axe 236 scans, 0 serious/critical**.
+
+What the `hardening` section verifies (both widths unless noted; flows checked through the API afterwards):
+
+| Area | Checked |
+|---|---|
+| Jobs `/admin/jobs` | table of every job (last run / last success / failures 24 h and since success / next run); **Run now** on `NOTIFICATION_SWEEP` → 202, the run watcher polls `GET /admin/jobs/runs/:id` until OK (1440). 409 `JOB_ALREADY_RUNNING` shows "already queued or running" and watches `details.run_id` (unit-tested) |
+| System health `/admin/system` | versions, database / Redis up, metrics summary parsed from `GET /metrics` (requests, 5xx, p95, event-loop lag, payments, failed logins, queue depth) |
+| Backups `/admin/backups` | Create backup (confirm, optional "include secrets") → `BACKUP_EXPORT` runs on the worker → row DONE → **Download** through the signed link (`.zip`, 1440); restore instructions card; the button is disabled while one is queued/running (409 `JOB_ALREADY_RUNNING` message) |
+| Exports | Customers toolbar → menu → **Export all rows in the background** → `POST /exports` (toast with "My exports") → `/exports` row DONE → **Download** (`.csv`) (1440). Lists above 10,000 rows show **Export all** as the main button; a synchronous CSV cut at 10,000 rows (`X-Export-Truncated`) offers it in its toast; 429 (3 running) has its own message |
+| Users | own row offers "Change my password" and hides Reset password / Deactivate (403 `SELF_CHANGE`) |
+| Bulk portal enable | dry run counts the buyers without a login ("1 buyer gets…"), enable → one-time credentials table → closing without downloading warns → **Download CSV** (`portal-credentials-<date>.csv`, formula-safe) → login enabled (API) (1440) |
+| KYC maker-checker | PENDING file: Submit → 422 `KYC_INCOMPLETE` lists what is missing (1440); a file submitted by Sales: the panel names the submitter, the admin gets Verify / Reject, Sales (390) sees the maker-checker note and no Verify |
+| Erasure | Super Admin: "Erase personal data" → reason + type `ERASE` (button disabled until then) → erased (API `erased_at`), edit / erase / co-applicant actions gone, read-only notice (1440) |
+| Reversal on a COMPLETED booking | the reverse dialog warns that the booking reopens (admin) / is blocked (no `settings.manage`) |
+| Booking wizard | picking a flat reserves it (`POST /flats/:id/reserve`, API shows HOLD) with a live **15:00 countdown** and Extend; an agreement value below the list price asks an `agreement.edit` holder for a reason before Next (1440); for Sales (390) the value is locked to the list price; **Cancel → Discard** releases the flat (API AVAILABLE again) |
+
+New screenshots: `admin-jobs-*.png`, `admin-system-*.png`, `admin-backups-*.png`, `exports-*.png`, `customers-bulk-credentials-1440.png`, `customer-kyc-incomplete-1440.png`, `customer-erase-dialog-1440.png`, `booking-wizard-reserved-*.png`, `booking-wizard-deviation-1440.png`, `booking-wizard-locked-390.png`, `customer-kyc-maker-390.png`.
+
+Defects found and fixed while wiring:
+
+| # | Defect | Fix |
+|---|---|---|
+| 1 | The wizard's "Resume booking?" banner offered the draft the same wizard was autosaving (the autosave refreshes the drafts list). | `BookingWizard.tsx` skips the draft whose id is the current (client-generated) draft id. |
+| 2 | The KYC 422 message repeated the missing items twice (sentence + list). | `KycPanel.tsx` shows one line plus the list. |
+| 3 | A flat the wizard reserved read "On hold by <your own name> — the hold owner or an admin can book it". | `StepFlat.tsx` says "Held for you until …" for the caller's own hold. |
 
 ## Re-run 2026-10-26 (phase 5 frontend-quality track)
 

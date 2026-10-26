@@ -192,7 +192,8 @@ export default function RateCardsOverviewPage() {
         }
         hasActiveFilters={list.hasActiveFilters}
         onClearFilters={list.reset}
-        onExportCsv={() => api.exportCsv(RATE_CARDS_PATH, list.params, "rate-cards.csv")}
+        exportSource={{ path: RATE_CARDS_PATH, params: list.params, filename: "rate-cards.csv" }}
+        exportTotal={query.data?.total}
         summary={query.data ? `${formatNumber(query.data.total)} cards · ${formatNumber(activeCount)} active on this page` : undefined}
       />
       <DataTable

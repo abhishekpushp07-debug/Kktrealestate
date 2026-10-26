@@ -19,9 +19,13 @@ declare module "fastify" {
   }
 }
 
-/** Create a Redis client (lazy connect, retry with backoff). */
+/**
+ * Create a Redis client (lazy connect, retry with backoff, every command bounded by REDIS_COMMAND_TIMEOUT_MS). The offline queue stays
+ * on so a write issued during a sub-second reconnect still lands; read paths that have a fallback skip a disconnected client at once
+ * (lib/cache.ts redisUsable) and spend at most a short budget on a slow one.
+ */
 export function createRedis(url = config.REDIS_URL): Redis {
-  return new Redis(url, { maxRetriesPerRequest: 3, enableReadyCheck: true, lazyConnect: true, retryStrategy: (times) => Math.min(times * 200, 5000) });
+  return new Redis(url, { maxRetriesPerRequest: 3, enableReadyCheck: true, lazyConnect: true, commandTimeout: config.REDIS_COMMAND_TIMEOUT_MS, retryStrategy: (times) => Math.min(times * 200, 5000) });
 }
 
 /** Fastify plugin exposing `app.redis`, `app.redisSecurity` and `app.jobQueue()`; closes them on shutdown. */

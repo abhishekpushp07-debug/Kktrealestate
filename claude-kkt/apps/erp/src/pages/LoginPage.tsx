@@ -38,7 +38,7 @@ function loginErrorMessage(error: unknown): string {
       return `Too many failed attempts — this account is temporarily locked.${suffix}`;
     }
     if (error.code === "RATE_LIMITED" || error.status === 429) {
-      return error.retryAfterSeconds ? `Too many login attempts from this device. Try again in ${error.retryAfterSeconds} seconds.` : "Too many login attempts from this device. Please wait a minute.";
+      return error.retryAfterSeconds ? `Too many sign-in attempts. Try again in ${error.retryAfterSeconds} seconds.` : "Too many sign-in attempts. Try again in a moment.";
     }
   }
   return describeError(error);

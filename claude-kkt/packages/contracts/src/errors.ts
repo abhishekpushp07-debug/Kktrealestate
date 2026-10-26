@@ -72,6 +72,7 @@ export const ERROR_CODES = [
   "BOOKING_COMPLETED",
   "VERSION_REQUIRED", "LOCK_TIMEOUT", "CONFLICT_RETRY", "EXPORT_NOT_READY",
   "GONE",
+  "IDEMPOTENT_SECRET_REPLAY",
 ] as const;
 
 /** An error code literal. */
@@ -150,6 +151,7 @@ export const ERROR_STATUS: Readonly<Record<ErrorCode, number>> = {
   BOOKING_COMPLETED: 409,
   VERSION_REQUIRED: 400, LOCK_TIMEOUT: 409, CONFLICT_RETRY: 409, EXPORT_NOT_READY: 409,
   GONE: 410,
+  IDEMPOTENT_SECRET_REPLAY: 409,
 };
 
 /** Returns the HTTP status for an error code. */

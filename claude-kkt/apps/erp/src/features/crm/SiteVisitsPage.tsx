@@ -1,6 +1,6 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { CalendarCheck2, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, List, Plus, UserX } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { VISIT_SOURCE_LABELS, VISIT_STATUSES, VISIT_STATUS_LABELS, type VisitRow } from "@kkt/contracts";
 import { Badge, Button, Combobox, DataTable, DateInput, ErrorState, PageHeader, Select, Skeleton, StatusChip, Tabs, TabsList, TabsTrigger, Toolbar } from "@/components/ui";
@@ -205,7 +205,6 @@ function TodayStrip({ onOpen, canWrite }: { onOpen: (visit: VisitRow) => void; c
 function VisitsTable({ onOpen, projectId }: { onOpen: (visit: VisitRow) => void; projectId: string | null }) {
   const list = useListParams({ filterKeys: VISIT_FILTERS, defaultSort: "-visit_date", prefix: "l_" });
   const users = useSalesUserOptions();
-  const [exporting, setExporting] = useState(false);
   // Seed the project filter from the calendar's project the first time the list opens.
   useEffect(() => {
     if (projectId && !list.filters.project_id && !list.hasActiveFilters) list.setFilter("project_id", projectId);
@@ -277,15 +276,8 @@ function VisitsTable({ onOpen, projectId }: { onOpen: (visit: VisitRow) => void;
         }
         hasActiveFilters={list.hasActiveFilters}
         onClearFilters={list.reset}
-        onExportCsv={async () => {
-          setExporting(true);
-          try {
-            await api.exportCsv(VISITS_PATH, list.params, "site-visits.csv");
-          } finally {
-            setExporting(false);
-          }
-        }}
-        exporting={exporting}
+        exportSource={{ path: VISITS_PATH, params: list.params, filename: "site-visits.csv" }}
+        exportTotal={query.data?.total}
         summary={query.data ? `${formatNumber(total)} ${total === 1 ? "visit" : "visits"}` : undefined}
       />
       <DataTable

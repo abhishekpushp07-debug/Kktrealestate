@@ -21,6 +21,7 @@ export interface ErrorStateProps {
 export function ErrorState({ error, title, description, onRetry, retrying, className, compact = false }: ErrorStateProps) {
   const api = isApiClientError(error) ? error : undefined;
   const requestId = api?.requestId;
+  const traceId = api?.traceId;
   const kind = api?.status === 403 ? "forbidden" : api?.status === 404 ? "not-found" : "error";
   const Icon = kind === "forbidden" ? ShieldAlert : kind === "not-found" ? SearchX : CircleAlert;
   const heading = title ?? (kind === "forbidden" ? "You don't have access to this" : kind === "not-found" ? "Not found" : "Something went wrong");
@@ -34,7 +35,13 @@ export function ErrorState({ error, title, description, onRetry, retrying, class
       </span>
       <h3 className={cn("font-display font-bold text-navy-950", compact ? "text-sm" : "text-lg")}>{heading}</h3>
       <p className={cn("mt-1 max-w-md text-ink-subtle", compact ? "text-xs" : "text-sm")}>{text}</p>
-      {requestId && <p className="mt-1 font-mono text-2xs text-ink-subtle">Request {requestId}</p>}
+      {(requestId || traceId) && (
+        <p className="mt-1 font-mono text-2xs text-ink-subtle">
+          {requestId ? `Request ${requestId}` : ""}
+          {requestId && traceId ? " · " : ""}
+          {traceId ? `trace ${traceId}` : ""}
+        </p>
+      )}
       {canRetry && (
         <Button variant="outline" size="sm" className="mt-4" leftIcon={RefreshCw} onClick={onRetry} loading={retrying}>
           Retry

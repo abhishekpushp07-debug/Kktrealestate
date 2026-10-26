@@ -34,6 +34,8 @@ import type {
   PublicVisitBookingResponse,
   PublicVisitDay,
   PublicVisitManageResponse,
+  PublicVisitRescheduleInput,
+  PublicVisitRescheduleResponse,
   PublicVisitSlot,
   Utm,
 } from "@kkt/contracts";
@@ -94,6 +96,9 @@ export type VisitDay = PublicVisitDay;
 export type SiteVisitRequest = PublicVisitBookingRequest;
 export type SiteVisitResult = PublicVisitBookingResponse;
 export type SiteVisitManage = PublicVisitManageResponse;
+export type SiteVisitRescheduleRequest = PublicVisitRescheduleInput;
+/** The moved visit's manage view plus its NEW manage link / token (the old link answers 410 LINK_EXPIRED from now on). */
+export type SiteVisitRescheduleResult = PublicVisitRescheduleResponse;
 
 // ---------------------------------------------------------------------------
 // Enquiries & brochure gate

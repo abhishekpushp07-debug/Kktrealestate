@@ -1,10 +1,12 @@
 import { CheckCircle2, Printer, RotateCcw, Undo2, XCircle } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import type { ChequeRow, PaymentRow } from "@kkt/contracts";
 import { Button, ConfirmDialog, DateInput, FieldWrapper, Input, Textarea } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 import { formatDate, formatINR, todayIST } from "@/lib/format";
 import { useMutationWithToast } from "@/lib/queries";
+import { useBookingDetail } from "@/features/bookings/api";
+import { Notice } from "@/features/inventory/components";
 import { bouncePayment, clearPayment, PAYMENT_INVALIDATIONS, reversePayment } from "./api";
 
 /** The minimum a row needs for the action buttons (payments and cheques share them). */
@@ -43,7 +45,8 @@ export function usePaymentActions(extraInvalidate: readonly (readonly unknown[])
   const reverse = useMutationWithToast<PaymentRow, { payment: ActionablePayment; reason: string; reversal_date: string }>({
     mutationFn: ({ payment, reason, reversal_date }) => reversePayment(payment, { reason, reversal_date }),
     successMessage: (row) => `${row.receipt_number} reversed — receipt cancelled`,
-    invalidate,
+    // a reversal on a completed booking reopens it (flat SOLD → BOOKED)
+    invalidate: [...invalidate, ["/flats"], ["/blocks"]],
     entityLabel: "This payment",
   });
   return { clear, bounce, reverse };
@@ -195,20 +198,44 @@ export function PaymentActionDialogs({ state, onClose, invalidate = [] }: Paymen
     );
   }
 
+  return <ReverseDialog payment={payment} summary={summary} date={date} setDate={setDate} today={today} close={close} reverse={actions.reverse.mutateAsync} />;
+}
+
+/** Reverse confirmation; on a COMPLETED booking it warns that the booking reopens (settings.manage) or is blocked (409 BOOKING_COMPLETED). */
+function ReverseDialog({ payment, summary, date, setDate, today, close, reverse }: {
+  payment: ActionablePayment;
+  summary: ReactNode;
+  date: string;
+  setDate: (value: string) => void;
+  today: string;
+  close: (open: boolean) => void;
+  reverse: (input: { payment: ActionablePayment; reason: string; reversal_date: string }) => Promise<unknown>;
+}) {
+  const { can } = useAuth();
+  const booking = useBookingDetail(payment.booking_id ?? null);
+  const completed = booking.data?.status === "COMPLETED";
+  const canReopen = can("settings.manage");
   return (
     <ConfirmDialog
       open
       onOpenChange={close}
       title="Reverse this payment?"
       description="A negative REVERSAL row is appended to the ledger, the summary is decremented and the receipt is marked CANCELLED (never deleted)."
-      confirmLabel="Reverse payment"
+      confirmLabel={completed && canReopen ? "Reverse and reopen booking" : "Reverse payment"}
       variant="destructive"
       requireReason
       reasonLabel="Reversal reason"
       reasonPlaceholder="Why is this receipt being reversed? (audited)"
-      onConfirm={(reason) => actions.reverse.mutateAsync({ payment, reason: reason ?? "", reversal_date: date })}
+      onConfirm={(reason) => reverse({ payment, reason: reason ?? "", reversal_date: date })}
     >
       {summary}
+      {completed && (
+        <Notice tone={canReopen ? "warning" : "danger"} data-testid="reverse-completed-warning">
+          {canReopen
+            ? `Booking ${booking.data?.booking_number ?? ""} is completed (handed over). Reversing this receipt reopens it: the booking becomes Active again and the flat goes back from Sold to Booked, so its dues show again.`
+            : `Booking ${booking.data?.booking_number ?? ""} is completed (handed over). Only an administrator (Settings permission) can reverse its payments, because that reopens the booking.`}
+        </Notice>
+      )}
       <FieldWrapper label="Reversal date" required>
         {(control) => <DateInput id={control.id} value={date} onChange={(value) => setDate(value ?? today)} max={today} />}
       </FieldWrapper>

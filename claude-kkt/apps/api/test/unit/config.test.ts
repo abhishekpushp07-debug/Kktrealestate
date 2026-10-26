@@ -88,6 +88,24 @@ describe("environment-dependent defaults", () => {
     expect([explicit.SEED_ON_BOOT, explicit.SEED_DEMO, explicit.RUN_JOBS_IN_API, explicit.API_WORKERS]).toEqual([true, false, true, 2]);
   });
 
+  it("API docs are public outside production and private in production unless DOCS_PUBLIC=true", () => {
+    expect(loadConfig({ NODE_ENV: "development" }).DOCS_PUBLIC).toBe(true);
+    expect(loadConfig({ NODE_ENV: "test" }).DOCS_PUBLIC).toBe(true);
+    expect(loadConfig({ ...PROD_SECRETS }).DOCS_PUBLIC).toBe(false);
+    expect(loadConfig({ ...PROD_SECRETS, DOCS_PUBLIC: "true" }).DOCS_PUBLIC).toBe(true);
+    expect(loadConfig({ NODE_ENV: "development", DOCS_PUBLIC: "false" }).DOCS_PUBLIC).toBe(false);
+  });
+
+  it("deploy identity and the Redis command timeout", () => {
+    const c = loadConfig({ NODE_ENV: "development" });
+    expect(c.DEPLOY_ID).toBeUndefined();
+    expect(c.GIT_SHA).toBeUndefined();
+    expect(c.REDIS_COMMAND_TIMEOUT_MS).toBe(2_000);
+    const set = loadConfig({ NODE_ENV: "development", DEPLOY_ID: "2026-10-26.1", GIT_SHA: "abc123", REDIS_COMMAND_TIMEOUT_MS: "500" });
+    expect([set.DEPLOY_ID, set.GIT_SHA, set.REDIS_COMMAND_TIMEOUT_MS]).toEqual(["2026-10-26.1", "abc123", 500]);
+    expect(failure({ NODE_ENV: "development", REDIS_COMMAND_TIMEOUT_MS: "10" })).toMatch(/REDIS_COMMAND_TIMEOUT_MS/);
+  });
+
   it("production requires secrets, DATABASE_URL and REDIS_URL (no localhost fallbacks)", () => {
     const { DATABASE_URL: _d, REDIS_URL: _r, ...noUrls } = PROD_SECRETS;
     const msg = failure(noUrls);

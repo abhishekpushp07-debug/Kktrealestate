@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { PROJECT_STATUSES, PROJECT_STATUS_LABELS, PROJECT_TYPES, PROJECT_TYPE_LABELS, type ProjectRow } from "@kkt/contracts";
 import { Badge, Button, DataTable, EmptyState, ErrorState, PageHeader, ProgressRing, Select, Skeleton, StatusChip, Tabs, TabsList, TabsTrigger, Toolbar } from "@/components/ui";
-import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { formatDate, formatNumber } from "@/lib/format";
 import { useList, useListParams } from "@/lib/queries";
@@ -24,7 +23,6 @@ export default function ProjectsPage() {
   const query = useList<ProjectRow>(PROJECTS_PATH, list.params);
   const [view, setView] = useLocalStorageState<ViewMode>("kkt.erp.projects.view", "cards");
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [exporting, setExporting] = useState(false);
 
   const columns = useMemo<ColumnDef<ProjectRow, unknown>[]>(
     () => [
@@ -87,15 +85,8 @@ export default function ProjectsPage() {
         }
         hasActiveFilters={list.hasActiveFilters}
         onClearFilters={list.reset}
-        onExportCsv={async () => {
-          setExporting(true);
-          try {
-            await api.exportCsv(PROJECTS_PATH, list.params, "projects.csv");
-          } finally {
-            setExporting(false);
-          }
-        }}
-        exporting={exporting}
+        exportSource={{ path: PROJECTS_PATH, params: list.params, filename: "projects.csv" }}
+        exportTotal={query.data?.total}
         summary={query.data ? `${formatNumber(total)} ${total === 1 ? "project" : "projects"}` : undefined}
         actions={
           <Tabs value={view} onValueChange={(value) => setView(value === "table" ? "table" : "cards")}>

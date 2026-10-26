@@ -37,6 +37,8 @@ import type {
   SiteSettings,
   SiteVisitManage,
   SiteVisitRequest,
+  SiteVisitRescheduleRequest,
+  SiteVisitRescheduleResult,
   SiteVisitResult,
   VisitDay,
 } from "@/lib/types";
@@ -117,6 +119,12 @@ export function friendlyErrorMessage(error: unknown): string {
       }
       case "SLOT_FULL":
         return "That slot has just filled up. We have refreshed the available times — please pick another.";
+      case "SLOT_INVALID":
+        return "That time is not open for visits any more. Please pick another slot.";
+      case "LINK_EXPIRED":
+        return "This visit link has expired. Use the link in your latest confirmation, or book a new visit.";
+      case "GONE":
+        return error.message || "This feature has been retired. Please refresh the page.";
       case "VALIDATION_ERROR":
         return error.message || "Please check the highlighted fields and try again.";
       case "NOT_FOUND":
@@ -363,6 +371,8 @@ export interface PublicClient {
   requestBrochure(body: BrochureRequest): Promise<BrochureResult>;
   bookSiteVisit(body: SiteVisitRequest): Promise<SiteVisitResult>;
   cancelSiteVisit(token: string): Promise<SiteVisitManage | undefined>;
+  /** POST /public/site-visits/:token/reschedule — 410 LINK_EXPIRED, 409 SLOT_FULL, 422 SLOT_INVALID. */
+  rescheduleSiteVisit(token: string, body: SiteVisitRescheduleRequest): Promise<SiteVisitRescheduleResult>;
   getVisitAvailability(slug: string, from: string, to: string): Promise<VisitDay[]>;
 }
 
@@ -383,6 +393,7 @@ export function publicClient(apiUrl: string): PublicClient {
         method: "POST",
         body: JSON.stringify({}),
       }),
+    rescheduleSiteVisit: (token, body) => post<SiteVisitRescheduleRequest, SiteVisitRescheduleResult>(`/site-visits/${encodeURIComponent(token)}/reschedule`, body),
     getVisitAvailability: (slug, from, to) =>
       browserRequest<VisitDay[]>(
         apiUrl,

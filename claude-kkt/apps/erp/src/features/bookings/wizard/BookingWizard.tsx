@@ -1,18 +1,18 @@
-import { ArrowLeft, ArrowRight, Check, History, Trash2, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { ArrowLeft, ArrowRight, Check, History, Timer, Trash2, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { BookingCreateSchema, FLAT_STATUS_LABELS, type BookingCreate, type BookingDraftRow, type BookingRow, type FlatStatus } from "@kkt/contracts";
 import { Button, ConfirmDialog, PageHeader, Stepper, type Step } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { formatRelative, todayIST } from "@/lib/format";
+import { formatDateTime, formatRelative, todayIST } from "@/lib/format";
 import { useMutationWithToast } from "@/lib/queries";
 import { BREAKPOINTS, cn, useMediaQuery } from "@/lib/utils";
 import { useFlatDetail } from "@/features/inventory/api";
 import { Notice } from "@/features/inventory/components";
 import { BOOKINGS_PATH, bookingKeys, useApplicablePlans, useMyDrafts } from "../api";
-import { emptyWizardState, firstIncompleteStep, fromDraftPayload, toBookingCreatePayload, validateStep, WIZARD_STEPS, wizardHasContent, type StepErrors, type WizardState, type WizardStepId } from "../bookingMath";
+import { emptyWizardState, firstIncompleteStep, newDraftId, priceDeviationProblem, fromDraftPayload, toBookingCreatePayload, validateStep, WIZARD_STEPS, wizardHasContent, type StepErrors, type WizardState, type WizardStepId } from "../bookingMath";
 import { StepAgreement } from "./StepAgreement";
 import { StepCharges } from "./StepCharges";
 import { StepCustomer } from "./StepCustomer";
@@ -21,6 +21,7 @@ import { StepPlan } from "./StepPlan";
 import { StepReview } from "./StepReview";
 import { SummaryRail } from "./SummaryRail";
 import { clearLocalDraft, readLocalDraft, useBookingDraft, type LocalDraft } from "./useBookingDraft";
+import { formatCountdown, RESERVE_MINUTES, useFlatReservation, type UseFlatReservationResult } from "./useFlatReservation";
 import type { StepProps } from "./types";
 
 const STEP_META: Readonly<Record<WizardStepId, { label: string; description: string }>> = {
@@ -50,6 +51,38 @@ function candidateFromLocal(draft: LocalDraft): ResumeCandidate {
   return { source: "local", id: draft.id, step: draft.step, payload: draft.payload, updated_at: draft.updated_at, label: "Draft saved on this device" };
 }
 
+/** Countdown of the wizard's hold on the picked flat, with extend / reserve-again. */
+function ReservationBanner({ reservation }: { reservation: UseFlatReservationResult }) {
+  if (reservation.status === "idle" || reservation.status === "unavailable") return null;
+  const tone =
+    reservation.status === "held" && reservation.secondsLeft > 120
+      ? "border-status-available-border bg-success-bg text-success-fg"
+      : reservation.status === "error"
+        ? "border-danger/30 bg-danger-bg text-danger-fg"
+        : "border-status-hold-border bg-warning-bg text-warning-fg";
+  return (
+    <div role="status" aria-live="polite" className={cn("mb-4 flex flex-wrap items-center gap-2 rounded-md border px-3 py-2 text-sm", tone)} data-testid="wizard-reservation">
+      <Timer className="size-4 shrink-0" aria-hidden="true" />
+      <span className="min-w-0 flex-1">
+        {reservation.status === "reserving" && "Reserving this flat for you…"}
+        {reservation.status === "held" && (
+          <>
+            Flat held for you · <span className="money font-semibold" data-testid="wizard-reservation-countdown">{formatCountdown(reservation.secondsLeft)}</span> left
+            {reservation.holdUntil ? <span className="text-xs"> (until {formatDateTime(reservation.holdUntil)})</span> : null}. Nobody else can book it meanwhile.
+          </>
+        )}
+        {reservation.status === "expired" && "Your hold on this flat lapsed. Someone else may book it now — reserve it again to keep it."}
+        {reservation.status === "error" && `The flat could not be reserved: ${reservation.error ?? "unknown error"}`}
+      </span>
+      {reservation.status !== "reserving" && (
+        <Button size="xs" variant="outline" onClick={() => void reservation.extend()} data-testid="wizard-reservation-extend">
+          {reservation.status === "held" ? `Extend to ${RESERVE_MINUTES} min` : "Reserve again"}
+        </Button>
+      )}
+    </div>
+  );
+}
+
 /** `/bookings/new` — the six-step booking wizard with autosave, resume, summary rail and atomic confirm. */
 export default function BookingWizard() {
   const navigate = useNavigate();
@@ -67,14 +100,20 @@ export default function BookingWizard() {
   });
   const [stepIndex, setStepIndex] = useState(0);
   const [attempted, setAttempted] = useState<Set<number>>(() => new Set());
-  const [draftId, setDraftId] = useState<string | null>(params.get("draft"));
+  // The client owns the draft id (PUT /booking-drafts upserts by it), so a retried autosave can never create a second draft.
+  const [draftId, setDraftId] = useState<string>(() => params.get("draft") ?? newDraftId());
+  const [lastActivityAt, setLastActivityAt] = useState(() => Date.now());
+  const [draftPersisted, setDraftPersisted] = useState(false);
   const [resumed, setResumed] = useState(Boolean(params.get("draft")));
   const [dismissedResume, setDismissedResume] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [serverIssues, setServerIssues] = useState<string[]>([]);
 
-  const update = useCallback((patch: Partial<WizardState>) => setState((previous) => ({ ...previous, ...patch })), []);
+  const update = useCallback((patch: Partial<WizardState>) => {
+    setState((previous) => ({ ...previous, ...patch }));
+    setLastActivityAt(Date.now());
+  }, []);
 
   // Prefilled flat → derive project / tower.
   const prefillFlat = useFlatDetail(params.get("flat_id"));
@@ -87,12 +126,13 @@ export default function BookingWizard() {
   const drafts = useMyDrafts(!resumed);
   const resumeCandidate = useMemo<ResumeCandidate | null>(() => {
     if (resumed || dismissedResume) return null;
-    const server = drafts.data?.[0];
+    // never offer the draft this wizard is autosaving right now
+    const server = drafts.data?.find((row) => row.id !== draftId);
     if (server) return candidateFromServer(server);
     if (drafts.isPending && !drafts.isError) return null;
     const local = readLocalDraft();
-    return local ? candidateFromLocal(local) : null;
-  }, [drafts.data, drafts.isPending, drafts.isError, resumed, dismissedResume]);
+    return local && local.id !== draftId ? candidateFromLocal(local) : null;
+  }, [drafts.data, drafts.isPending, drafts.isError, resumed, dismissedResume, draftId]);
 
   // Explicit ?draft=<id> deep link.
   useEffect(() => {
@@ -106,7 +146,8 @@ export default function BookingWizard() {
   const resume = (candidate: ResumeCandidate) => {
     const restored = fromDraftPayload(candidate.payload, today);
     setState(restored);
-    setDraftId(candidate.id);
+    setDraftId(candidate.id ?? newDraftId());
+    setDraftPersisted(candidate.source === "server");
     setStepIndex(Math.min(Math.max(candidate.step - 1, 0), WIZARD_STEPS.length - 1));
     setResumed(true);
     setParams(
@@ -127,14 +168,16 @@ export default function BookingWizard() {
   const flat = useFlatDetail(state.flat_id);
   const plans = useApplicablePlans(state.project_id, state.block_id, state.booking_date);
   const flatStatus: FlatStatus | null = flat.data?.status ?? null;
-  const context = useMemo(() => ({ today, flatStatus, plansAvailable: plans.data ? plans.data.length > 0 : null }), [today, flatStatus, plans.data]);
+  const listPricePaise = flat.data?.price_paise ?? null;
+  const canEditAgreement = can("agreement.edit");
+  const context = useMemo(() => ({ today, flatStatus, plansAvailable: plans.data ? plans.data.length > 0 : null, listPricePaise, canEditAgreement }), [today, flatStatus, plans.data, listPricePaise, canEditAgreement]);
   const stepErrors = useMemo<StepErrors[]>(() => WIZARD_STEPS.map((step) => validateStep(step, state, context)), [state, context]);
   const currentStep = WIZARD_STEPS[stepIndex] ?? "flat";
   const currentErrors = stepErrors[stepIndex] ?? {};
   const completed = useMemo(() => WIZARD_STEPS.map((_, index) => index).filter((index) => index < stepIndex && Object.keys(stepErrors[index] ?? {}).length === 0), [stepIndex, stepErrors]);
 
   // Autosave.
-  const draft = useBookingDraft({ state, step: stepIndex + 1, draftId, onDraftId: setDraftId, enabled: !submitted });
+  const draft = useBookingDraft({ state, step: stepIndex + 1, draftId, onDraftId: setDraftId, enabled: !submitted, persisted: draftPersisted });
 
   // Unsaved-changes guard.
   const dirty = wizardHasContent(state) && !submitted;
@@ -150,15 +193,41 @@ export default function BookingWizard() {
 
   const steps = useMemo<Step[]>(() => WIZARD_STEPS.map((step, index) => ({ id: step, label: STEP_META[step].label, description: isCompact ? undefined : STEP_META[step].description, error: attempted.has(index) && Object.keys(stepErrors[index] ?? {}).length > 0 })), [attempted, stepErrors, isCompact]);
 
-  const goTo = (index: number) => {
+  function goTo(index: number) {
+    setLastActivityAt(Date.now());
     setStepIndex(Math.min(Math.max(index, 0), WIZARD_STEPS.length - 1));
     window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+  }
   const next = () => {
     setAttempted((previous) => new Set(previous).add(stepIndex));
     if (Object.keys(currentErrors).length > 0) return;
     goTo(stepIndex + 1);
   };
+
+  // Short hold on the picked flat (released on cancel / when another flat is picked).
+  const reservation = useFlatReservation({
+    flatId: state.flat_id,
+    enabled: !submitted,
+    lastActivityAt,
+    onUnavailable: (info) => {
+      toast.error(`That flat is no longer available${info.current_status ? ` — it is ${FLAT_STATUS_LABELS[info.current_status as FlatStatus] ?? info.current_status.toLowerCase()}${info.hold_until ? ` until ${formatDateTime(info.hold_until)}` : ""}` : ""}. Pick another flat.`);
+      update({ flat_id: null, agreement_value_paise: null, cash_agreed_paise: null, account_agreed_paise: null, price_deviation_reason: "" });
+      goTo(0);
+    },
+  });
+  const releaseRef = useRef(reservation.release);
+  const submittedRef = useRef(submitted);
+  useEffect(() => {
+    releaseRef.current = reservation.release;
+    submittedRef.current = submitted;
+  });
+  // Leaving the wizard any other way (sidebar, back button) gives the flat back too.
+  useEffect(
+    () => () => {
+      if (!submittedRef.current) void releaseRef.current("Booking wizard closed");
+    },
+    [],
+  );
 
   const create = useMutationWithToast<BookingRow, BookingCreate>({
     mutationFn: (body) => api.post<BookingRow>(BOOKINGS_PATH, body),
@@ -166,6 +235,7 @@ export default function BookingWizard() {
     errorMessage: false,
     invalidate: [[BOOKINGS_PATH], ["/flats"], ["/blocks"], ["/projects"], ["/customers"], bookingKeys.drafts],
     onSuccess: async (booking) => {
+      reservation.forget(); // the flat is BOOKED now
       setSubmitted(true);
       await draft.discard();
       clearLocalDraft();
@@ -173,10 +243,19 @@ export default function BookingWizard() {
     },
     onError: (error) => {
       if (error.status === 409 && error.code === "FLAT_NOT_AVAILABLE") {
+        reservation.forget();
         const status = typeof error.details?.current_status === "string" ? (error.details.current_status as FlatStatus) : null;
         toast.error(`That flat is no longer available${status ? ` — it is now ${FLAT_STATUS_LABELS[status] ?? status}` : ""}. Pick another flat.`);
-        update({ flat_id: null, agreement_value_paise: null, cash_agreed_paise: null, account_agreed_paise: null });
+        update({ flat_id: null, agreement_value_paise: null, cash_agreed_paise: null, account_agreed_paise: null, price_deviation_reason: "" });
         goTo(0);
+        return;
+      }
+      if (error.status === 422 && error.details?.rule === "PRICE_DEVIATION_NOT_ALLOWED") {
+        const deviation = priceDeviationProblem(error.details);
+        void flat.refetch();
+        setAttempted((previous) => new Set(previous).add(2));
+        toast.error(deviation);
+        goTo(2);
         return;
       }
       if (error.status === 409 && error.code === "PLAN_NOT_APPLICABLE") {
@@ -215,6 +294,7 @@ export default function BookingWizard() {
   const cancel = async (discard: boolean) => {
     if (discard) await draft.discard();
     else await draft.flush();
+    await reservation.release("Booking wizard cancelled");
     setSubmitted(true);
     navigate("/bookings");
   };
@@ -224,7 +304,7 @@ export default function BookingWizard() {
     update,
     errors: currentErrors,
     showErrors: attempted.has(stepIndex),
-    can: { editAgreement: can("agreement.edit"), writeCustomer: can("customer.write"), uploadDocument: can("document.write") },
+    can: { editAgreement: canEditAgreement, writeCustomer: can("customer.write"), uploadDocument: can("document.write") },
   };
 
   const stepElement = (() => {
@@ -320,6 +400,7 @@ export default function BookingWizard() {
               </ul>
             </Notice>
           )}
+          {state.flat_id && <ReservationBanner reservation={reservation} />}
           {stepElement}
         </section>
         <SummaryRail state={state} draftStatus={draft.status} lastSavedAt={draft.lastSavedAt} />

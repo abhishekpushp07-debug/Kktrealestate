@@ -40,6 +40,8 @@ export interface UseBookingDraftOptions {
   onDraftId: (id: string) => void;
   /** Pause autosave (e.g. after a successful confirm). */
   enabled: boolean;
+  /** The draft already exists on the server (resumed); otherwise discard deletes only after the first successful save. */
+  persisted?: boolean;
   delayMs?: number;
 }
 
@@ -56,7 +58,7 @@ export interface UseBookingDraftResult {
  * Debounced autosave of the wizard: the contract-shaped payload goes to `PUT/POST /booking-drafts`
  * and the full UI state to localStorage as a fallback (so an API hiccup never loses the work).
  */
-export function useBookingDraft({ state, step, draftId, onDraftId, enabled, delayMs = 1500 }: UseBookingDraftOptions): UseBookingDraftResult {
+export function useBookingDraft({ state, step, draftId, onDraftId, enabled, persisted = false, delayMs = 1500 }: UseBookingDraftOptions): UseBookingDraftResult {
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<DraftStatus>("idle");
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
@@ -65,6 +67,11 @@ export function useBookingDraft({ state, step, draftId, onDraftId, enabled, dela
   const inFlight = useRef<Promise<void> | null>(null);
   const latest = useRef({ state, step, draftId });
   latest.current = { state, step, draftId };
+  /** Whether the current draft id exists on the server (resumed, or saved at least once): discard only deletes those. */
+  const persistedRef = useRef(persisted);
+  useEffect(() => {
+    if (persisted) persistedRef.current = true;
+  }, [persisted]);
 
   const persistLocal = useCallback((current: WizardState, currentStep: number, id: string | null) => {
     writeStorage<LocalDraft>(LOCAL_DRAFT_KEY, { id, step: currentStep, payload: { ...toDraftPayload(current), split_mode: current.split_mode }, updated_at: new Date().toISOString() });
@@ -84,6 +91,7 @@ export function useBookingDraft({ state, step, draftId, onDraftId, enabled, dela
     try {
       const row: BookingDraftRow = await saveDraft({ id: id ?? undefined, step: currentStep, payload });
       lastServerSnapshot.current = snapshot;
+      persistedRef.current = true;
       if (row.id !== id) onDraftId(row.id);
       persistLocal(current, currentStep, row.id);
       setLastSavedAt(row.updated_at);
@@ -125,7 +133,7 @@ export function useBookingDraft({ state, step, draftId, onDraftId, enabled, dela
       window.clearTimeout(timer.current);
       timer.current = null;
     }
-    const id = latest.current.draftId;
+    const id = persistedRef.current ? latest.current.draftId : null;
     clearLocalDraft();
     lastServerSnapshot.current = "";
     setStatus("idle");

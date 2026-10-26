@@ -45,7 +45,7 @@ CI (`.github/workflows/ci.yml`) runs all of these plus lint, format, builds, an 
 | Command                                                            | Role                                                                                                                                                                                                                                                                                                                                        |
 | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `node --import ./dist/telemetry.js dist/server.js` (default `CMD`) | HTTP API. With `API_WORKERS` > 1 (`auto` = one per CPU) a `node:cluster` primary validates storage, serves the aggregated metrics on `METRICS_PORT` and supervises the workers (crash-looping workers back off to one restart per 30 s).                                                                                                    |
-| `node dist/server.js migrate`                                      | One-shot migrate job: migrations (advisory-locked) and, with `SEED_ON_BOOT=true`, the first-boot seed (company + one Super Admin from `BOOTSTRAP_*`; the demo dataset only with `SEED_DEMO=true`); exits 0. Connect it to Postgres **directly** as the owner role, never through PgBouncer (the migration lock is a session advisory lock). |
+| `node dist/server.js migrate`                                      | One-shot migrate job: migrations (advisory-locked), then the first boot (see "First boot" below: a database with no company is bootstrapped from `BOOTSTRAP_*` whatever `SEED_ON_BOOT` says; the demo dataset only with `SEED_ON_BOOT=true` and `SEED_DEMO=true`); exits 0, or 1 when the first boot is refused. Connect it to Postgres **directly** as the owner role, never through PgBouncer (the migration lock is a session advisory lock). |
 | `node --import ./dist/telemetry.js dist/worker.js`                 | BullMQ job worker (daily dues, integrity, notifications, exports, backups). Run exactly one.                                                                                                                                                                                                                                                |
 
 At boot every process logs `kkt api <role> starting` with its effective configuration (ports, workers, flags, database/Redis host
@@ -56,6 +56,43 @@ fails fast when the bucket is not reachable (`HeadBucket`), with the reason (mis
 in-process job worker, stops accepting connections, lets in-flight requests finish (keep-alive sockets are closed as they go idle,
 late requests get `Connection: close`), then closes the Postgres pools and Redis, flushes traces and exits 0 — or exits 1 when
 `SHUTDOWN_TIMEOUT_MS` passes. The cluster primary forwards the signal and waits for its workers.
+
+## First boot
+
+Every process that prepares the database — the migrate job (`node dist/server.js migrate`), the `node:cluster` primary and the
+single-process API — runs the same first-boot step (`apps/api/src/seed/firstBoot.ts`) after migrating:
+
+1. **Database without a company → bootstrap, always.** Independent of `SEED_ON_BOOT`. In production this creates the company named by
+   `BOOTSTRAP_COMPANY_NAME`, the six system roles and ONE Super Admin from `BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_PASSWORD`, who must
+   change the password at first sign-in. If any of the three is missing, or the password fails the policy (≥ 12 characters with an
+   upper-case letter, a lower-case letter and a digit), the process **refuses to start** (exit 1, log line "Refusing to start on a fresh
+   production database: …", nothing written). An advisory lock makes concurrent boots create exactly one company.
+2. **Database with a company → nothing to bootstrap.** Later boots and every replica need no `BOOTSTRAP_*` (the values are ignored once a
+   company exists). With `SEED_ON_BOOT=true` the bootstrap still runs, idempotently, and re-syncs the system roles' permission bundles.
+3. **Demo dataset only with `SEED_ON_BOOT=true` AND `SEED_DEMO=true`.** Only then does a boot create Shree Ganesh Builders (demo logins
+   with published passwords, projects, customers, bookings, ledgers; docs/SEED.md). `SEED_DEMO=true` alone never adds demo logins or
+   data. Outside production the bootstrap itself uses the demo company and logins (development convenience).
+
+The procedure for a new installation:
+
+```bash
+# 1. secrets + first-boot settings (Compose prod: gen-secrets.sh writes infra/secrets/bootstrap_admin_password)
+export BOOTSTRAP_COMPANY_NAME="My Builders Pvt Ltd" BOOTSTRAP_ADMIN_EMAIL=owner@example.in BOOTSTRAP_ADMIN_PASSWORD='First-Login-2026x'
+# 2. migrate job: migrations + bootstrap (exit 0); a refused first boot exits 1 with the reason in the log
+node dist/server.js migrate
+# 3. start the API replicas and the worker (no BOOTSTRAP_* needed from now on)
+# 4. sign in as BOOTSTRAP_ADMIN_EMAIL, change the password, then create the staff logins (ERP → Admin → Users)
+```
+
+If an API replica starts before the migrate job has bootstrapped the database, it refuses to start the same way (no company and no
+`BOOTSTRAP_*`) and the orchestrator restarts it until the migrate job is done.
+
+**After upgrading an installation that already holds bookings**, run the admin job `LEDGER_REBUILD` once (ERP → Admin → Jobs → Run, or
+`POST /api/v1/admin/jobs/LEDGER_REBUILD/run` with `{"data": {"dry_run": true}}` first to preview). It rewrites, in batches, every
+booking ledger whose stored rows are not in the canonical posting order (ledgers rebuilt by older versions in business-date order) and
+lists the bookings whose row order changed in the run's result (`GET /api/v1/admin/jobs/runs/:id`); each rewrite is audited
+(`booking.ledger_rebuilt`). Afterwards the integrity report (`GET /api/v1/dues/integrity`) shows no `SUMMARY_MISMATCH` for them. Running
+it again is a no-op. A freshly seeded demo database already ends with this step.
 
 ## Quick start: one VM (`docker-compose.yml`)
 
@@ -68,7 +105,7 @@ docker compose up -d --build       # add SEED_DEMO=true to load the Shree Ganesh
 
 Boot order: `postgres` (first start runs `infra/postgres/init/*`: roles `kkt_owner`/`kkt_app`, passwords) → `migrate` (as `kkt_owner`;
 exits) → two `api` replicas and the `worker` (as `kkt_app`). Replicas never migrate or seed (`RUN_MIGRATIONS_ON_BOOT=false`,
-`SEED_ON_BOOT=false`), so the first-boot race of earlier versions is gone. Redis is persistent (AOF) and `noeviction`. Caddy terminates
+`SEED_ON_BOOT=false`; they only check that a company exists, see "First boot"), so the first-boot race of earlier versions is gone. Redis is persistent (AOF) and `noeviction`. Caddy terminates
 TLS for `www.`, `erp.` and `my.` and load-balances `/api/*` over every API replica. Keep these secrets somewhere safe: losing
 `FIELD_ENCRYPTION_KEY` or `HASH_KEY` loses the encrypted KYC fields. Passwords must be URL-safe (hex) because they go into connection
 strings. Uploaded files live on the `storage` volume — fine for one VM; use S3 (`STORAGE_DRIVER=s3`, `S3_*`) to survive host loss.
@@ -198,8 +235,9 @@ whitespace is trimmed; setting both `<NAME>` and `<NAME>_FILE` is an error, as i
 
 | Variable                                           | Default outside production                                                     | Default in production | Meaning                                                                                                          |
 | -------------------------------------------------- | ------------------------------------------------------------------------------ | --------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `SEED_ON_BOOT`                                     | `true`                                                                         | `false`               | Run the first-boot seed (bootstrap company + Super Admin; the demo dataset too when `SEED_DEMO`).                |
-| `SEED_DEMO`                                        | `true`                                                                         | `false`               | The demo dataset (Shree Ganesh Builders, demo staff and customers) may be created.                               |
+| `SEED_ON_BOOT`                                     | `true`                                                                         | `false`               | Re-run the (idempotent) bootstrap at every boot and, with `SEED_DEMO`, create the demo dataset. A database without a company is bootstrapped regardless (see "First boot"). |
+| `DOCS_PUBLIC`                                      | `true`                                                                         | `false`               | Serve `GET /api/v1/openapi.json` and Swagger UI (`/api/v1/docs`) to anyone. When `false` they need a staff bearer token holding `admin.tools` (anonymous 401, other staff 403); the browser UI then needs `DOCS_PUBLIC=true` (it cannot send a bearer token). |
+| `SEED_DEMO`                                        | `true`                                                                         | `false`               | The demo dataset (Shree Ganesh Builders, demo staff and customers) is created at boot — only together with `SEED_ON_BOOT=true`. |
 | `RUN_JOBS_IN_API`                                  | `true`                                                                         | `false`               | Run BullMQ jobs inside the API; in production the `worker` service/Deployment (`node dist/worker.js`) runs them. |
 | `API_WORKERS`                                      | `1`                                                                            | `auto`                | HTTP worker processes (see below).                                                                               |
 | `DATABASE_URL` / `REDIS_URL`                       | `postgres://postgres:postgres@localhost:5432/kkt` / `redis://localhost:6379/0` | required              | Primary database / Redis.                                                                                        |
@@ -224,6 +262,7 @@ whitespace is trimmed; setting both `<NAME>` and `<NAME>_FILE` is an error, as i
 | `DB_IDLE_IN_TX_TIMEOUT_MS` | `30000`                       | `idle_in_transaction_session_timeout` (0 = none): a transaction abandoned by a crashed request releases its locks.                                  |
 | `DB_CONNECT_TIMEOUT_S`     | `10`                          | TCP connect timeout for Postgres.                                                                                                                   |
 | `DATABASE_REPLICA_URL`     | —                             | Read replica for reports and public reads.                                                                                                          |
+| `REDIS_COMMAND_TIMEOUT_MS` | `2000`                        | Upper bound of one command on the API's Redis clients (ioredis `commandTimeout`, 100–60000). Reads with a database fallback (caches, session state, idempotency fast path, rate limits) skip a disconnected Redis at once and give a slow one at most 150–250 ms, so a Redis outage costs requests no noticeable latency. |
 | `REDIS_SECURITY_URL`       | — (falls back to `REDIS_URL`) | Separate Redis configured `maxmemory-policy noeviction` for token revocation markers, locks and rate limits, so cache eviction can never drop them. |
 
 Migrations take the session-level advisory lock `pg_advisory_lock(hashtext('kkt:migrate'))`, so several replicas booting at once
@@ -247,6 +286,7 @@ apply them one after the other (the later ones find nothing to do).
 | `ERROR_WEBHOOK_URL`           | —         | Slack-compatible webhook: every 5xx (except 503) with request id, route, error class and a sanitised message, rate-limited (10/min/process) and de-duplicated; failed jobs when the job runner calls `reportJobFailure`. Off when unset. |
 | `SHUTDOWN_TIMEOUT_MS`         | `25000`   | Hard deadline of a graceful shutdown (drain in-flight requests, close pools) before the process exits 1. Keep below the orchestrator's grace period (Compose `stop_grace_period` 40 s, Kubernetes `terminationGracePeriodSeconds` 45 s). |
 | `SHUTDOWN_DRAIN_DELAY_MS`     | `0`       | After SIGTERM, `/api/v1/ready` answers 503 for this long before the server stops accepting connections, so a polling load balancer moves traffic away first (Compose prod: 6000; Kubernetes uses the `preStop` sleep instead).           |
+| `DEPLOY_ID` / `GIT_SHA`       | —         | Identity of the rollout. The worker enqueues the boot jobs (startup reconciliation, dues catch-up, notification sweep) once per `APP_VERSION` + `DEPLOY_ID` (else `GIT_SHA`, else the worker process's start time — so without either they run at every worker start; set `DEPLOY_ID` from the pipeline). Logged at boot. |
 | `S3_PREFIX`                   | —         | Optional key prefix inside the bucket (e.g. `kkt/prod`), so several environments can share one bucket.                                                                                                                                   |
 
 ### Runtime / performance knobs (docs/PERFORMANCE.md)
@@ -266,3 +306,5 @@ The production API image defaults to `API_WORKERS=auto`. `auto` counts the CPUs 
 See docs/RESTORE.md: the Compose production stack archives WAL continuously and takes nightly logical dumps (each one restored into a
 scratch database as a drill) and weekly base backups; managed Postgres on Kubernetes uses the provider's automated backups + PITR. The
 application-level export (`POST /api/v1/admin/backup`, Super Admin) and its restore CLI cover moving a company between installations.
+The CLI ships in the API image: `node dist/cli/restore.js --file <backup.zip> --database-url <empty database> --confirm` (from a
+checkout: `pnpm --filter @kkt/api restore -- …`). It needs the API's environment (secrets) because it runs the integrity report.

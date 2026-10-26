@@ -18,7 +18,7 @@ import {
 const DATA_MODEL_ENUMS: ReadonlyArray<readonly [string, readonly string[], readonly string[]]> = [
   ["password_history.user_type", contracts.USER_TYPES, ["STAFF", "CUSTOMER"]],
   ["audit_logs.actor_type", contracts.ACTOR_TYPES, ["STAFF", "CUSTOMER", "SYSTEM"]],
-  ["job_runs.status", contracts.JOB_RUN_STATUSES, ["RUNNING", "OK", "FAILED"]],
+  ["job_runs.status", contracts.JOB_RUN_STATUSES, ["RUNNING", "OK", "FAILED", "ABANDONED"]],
   ["payment_plans.plan_type", contracts.PLAN_TYPES, ["CONSTRUCTION_LINKED", "DOWN_PAYMENT", "TIME_LINKED", "FLEXI", "CUSTOM"]],
   ["payment_plan_installments.trigger_type", contracts.TRIGGER_TYPES, ["ON_BOOKING", "DAYS_AFTER_BOOKING", "ON_STAGE", "ON_POSSESSION", "ON_DATE"]],
   ["charge_types.demand_at", contracts.CHARGE_DEMAND_ATS, ["ON_BOOKING", "ON_POSSESSION", "MANUAL"]],

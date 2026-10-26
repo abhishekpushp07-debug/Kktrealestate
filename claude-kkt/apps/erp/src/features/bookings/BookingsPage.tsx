@@ -1,10 +1,9 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { FilePlus2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { BOOKING_STATUSES, BOOKING_STATUS_LABELS, type BookingRow, type PaymentPlanRow } from "@kkt/contracts";
 import { Badge, Button, DataTable, PageHeader, Select, Toolbar } from "@/components/ui";
-import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { formatDate, formatINR, formatNumber } from "@/lib/format";
 import { useList, useListParams } from "@/lib/queries";
@@ -25,7 +24,6 @@ export default function BookingsPage() {
   const projects = useProjectOptions();
   const blocks = useProjectBlocks(list.filters.project_id ?? null);
   const plans = useMasterRows<PaymentPlanRow>("payment-plans");
-  const [exporting, setExporting] = useState(false);
 
   const columns = useMemo<ColumnDef<BookingRow, unknown>[]>(
     () => [
@@ -72,15 +70,8 @@ export default function BookingsPage() {
         }
         hasActiveFilters={list.hasActiveFilters}
         onClearFilters={list.reset}
-        exporting={exporting}
-        onExportCsv={async () => {
-          setExporting(true);
-          try {
-            await api.exportCsv(BOOKINGS_PATH, { ...list.params, page: 1, page_size: 200 }, "bookings.csv");
-          } finally {
-            setExporting(false);
-          }
-        }}
+        exportSource={{ path: BOOKINGS_PATH, params: { ...list.params, page: 1, page_size: 200 }, filename: "bookings.csv" }}
+        exportTotal={query.data?.total}
       />
       <DataTable
         columns={columns}

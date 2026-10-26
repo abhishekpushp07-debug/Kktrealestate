@@ -157,7 +157,7 @@ async function takeSnapshot(p: DependencyProbes): Promise<DependencySnapshot> {
   const db = async () => {
     const [conn, jobs, integ, demands] = await Promise.all([
       p.query("select coalesce(state, 'unknown') as state, count(*)::int as n, current_setting('max_connections')::int as max from pg_stat_activity where datname = current_database() and backend_type = 'client backend' group by 1"),
-      p.query("select job_name, count(*) filter (where status = 'FAILED' and started_at > now() - interval '24 hours')::int as failures, extract(epoch from max(finished_at) filter (where status = 'OK'))::float8 as last_ok from job_runs group by job_name"),
+      p.query("select job_name, count(*) filter (where status in ('FAILED', 'ABANDONED') and started_at > now() - interval '24 hours')::int as failures, extract(epoch from max(finished_at) filter (where status = 'OK'))::float8 as last_ok from job_runs group by job_name"),
       p.query("select coalesce(sum(jsonb_array_length(findings)), 0)::int as findings, extract(epoch from max(ran_at))::float8 as last_run from (select distinct on (company_id) findings, ran_at from integrity_runs order by company_id, ran_at desc) t"),
       p.query("select count(*)::bigint as n from demands"),
     ]);

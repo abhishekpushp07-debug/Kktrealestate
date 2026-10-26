@@ -62,6 +62,8 @@ const PG_RETRYABLE = new Set(["40001", "40P01"]);
 /** Connection-level failures: Postgres refusing or dropping connections, the pool's connect timeout, sockets dying. */
 const PG_UNAVAILABLE = new Set(["53300", "53400", "57P01", "57P02", "57P03", "58000", "58030"]);
 const DRIVER_UNAVAILABLE = new Set(["CONNECT_TIMEOUT", "CONNECTION_CLOSED", "CONNECTION_ENDED", "CONNECTION_DESTROYED", "ECONNREFUSED", "ECONNRESET", "ETIMEDOUT", "EPIPE", "ENOTFOUND", "EAI_AGAIN"]);
+/** Codes only the Postgres driver (postgres.js) raises: these are database failures for sure. */
+const POSTGRES_DRIVER_UNAVAILABLE = new Set(["CONNECT_TIMEOUT", "CONNECTION_CLOSED", "CONNECTION_ENDED", "CONNECTION_DESTROYED"]);
 
 /** The SQLSTATE (5 chars) or driver/socket error code of a database failure, following Drizzle's `cause` wrappers. */
 export function databaseErrorCode(err: unknown, depth = 0): string | null {
@@ -82,7 +84,9 @@ export function mapDatabaseError(err: unknown): ApiError | null {
   if (code === PG_STATEMENT_TIMEOUT) return new ApiError(503, "SERVICE_UNAVAILABLE", "The database took too long to answer; retry shortly", { retry_after: 5, retryable: true, reason: "statement_timeout" }, { "Retry-After": "5" });
   if (code === PG_LOCK_TIMEOUT) return new ApiError(409, "LOCK_TIMEOUT", "The record is being changed by another request; retry in a moment", { retryable: true, retry_after: 1 }, { "Retry-After": "1" });
   if (PG_RETRYABLE.has(code)) return new ApiError(409, "CONFLICT_RETRY", "A concurrent change conflicted with this one; retry the request", { retryable: true, sqlstate: code }, { "Retry-After": "1" });
-  if (PG_UNAVAILABLE.has(code) || code.startsWith("08") || DRIVER_UNAVAILABLE.has(code)) return new ApiError(503, "SERVICE_UNAVAILABLE", "The database is unavailable; retry shortly", { retry_after: 5, retryable: true, reason: "database_unavailable" }, { "Retry-After": "5" });
+  if (PG_UNAVAILABLE.has(code) || code.startsWith("08") || POSTGRES_DRIVER_UNAVAILABLE.has(code)) return new ApiError(503, "SERVICE_UNAVAILABLE", "The database is unavailable; retry shortly", { retry_after: 5, retryable: true, reason: "database_unavailable" }, { "Retry-After": "5" });
+  // plain socket codes can come from any dependency (database, Redis, object store): do not blame the database
+  if (DRIVER_UNAVAILABLE.has(code)) return new ApiError(503, "SERVICE_UNAVAILABLE", "A backing service is unavailable; retry shortly", { retry_after: 5, retryable: true, reason: "dependency_unavailable" }, { "Retry-After": "5" });
   return null;
 }
 

@@ -415,6 +415,34 @@ async function visitFlow(browser) {
     await settle(page);
     want((await page.getByText(visitNumber).count()) > 0 && (await page.getByText("Confirmed").count()) > 0, "manage page shows the visit as Confirmed");
     await audit(h, "visit-manage", 390);
+    want((await page.getByTestId("visit-link-expiry").count()) > 0, "manage page says until when the link works (link_expires_at)");
+    // self-reschedule (security track): move to another open slot → the visit gets a NEW manage link; the old one answers 410
+    const oldManage = page.url();
+    const oldToken = decodeURIComponent(new URL(oldManage).pathname.split("/").pop() || "");
+    await page.getByTestId("visit-reschedule-open").click();
+    const panel = page.getByTestId("visit-reschedule-panel");
+    await panel.waitFor({ timeout: 10000 });
+    await page.waitForFunction(() => document.querySelectorAll('[aria-label="New visit time"] [role=radio]').length > 0, null, { timeout: 15000 }).catch(() => {});
+    const dates = panel.getByRole("radiogroup", { name: "New visit date" }).getByRole("radio");
+    for (let i = 0, n = await dates.count(); i < n; i++) {
+      const d = dates.nth(i);
+      if (await d.isEnabled()) { await d.click(); break; }
+    }
+    await panel.getByRole("radiogroup", { name: "New visit time" }).getByRole("radio").first().click();
+    await audit(h, "visit-reschedule", 390);
+    const submitH = await page.getByTestId("visit-reschedule-submit").evaluate((el) => el.getBoundingClientRect().height);
+    want(submitH >= 48, "reschedule submit button ≥ 48px on phone", `${submitH}px`);
+    await page.getByTestId("visit-reschedule-submit").click();
+    const movedOk = await page.getByTestId("visit-rescheduled").waitFor({ timeout: 15000 }).then(() => true).catch(() => false);
+    await page.waitForURL((u) => u.href !== oldManage, { timeout: 10000 }).catch(() => {});
+    want(movedOk && page.url() !== oldManage, "self-reschedule moves the visit and switches the page to the new manage link", page.url());
+    await audit(h, "visit-rescheduled", 390);
+    const oldStatus = (await fetch(`${API}/api/v1/public/site-visits/${encodeURIComponent(oldToken)}`)).status;
+    // the API rotates the token: the old one is unknown now (404) — 410 only for links it still knows (cancelled / past)
+    want(oldStatus === 404 || oldStatus === 410, "the previous manage link stops working after a reschedule (404/410)", String(oldStatus));
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await settle(page);
+    want((await page.getByText("Rescheduled").count()) > 0, "new manage link shows the visit as Rescheduled");
     await page.getByRole("button", { name: "Cancel this visit" }).click();
     await page.getByRole("button", { name: /Yes, cancel my visit/ }).click();
     const cancelled = await page.getByText("This visit has been cancelled").waitFor({ timeout: 10000 }).then(() => true).catch(() => false);

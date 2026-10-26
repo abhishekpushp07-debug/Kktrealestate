@@ -1,5 +1,5 @@
 import { lazy, type ComponentType, type LazyExoticComponent } from "react";
-import { Navigate, Outlet, Route, Routes } from "react-router-dom";
+import { Navigate, Outlet, Route, Routes, useParams } from "react-router-dom";
 import { PermissionRoute } from "@/components/auth/PermissionRoute";
 import { ProtectedRoute, PublicOnlyRoute } from "@/components/auth/ProtectedRoute";
 import { AppShell } from "@/components/layout/AppShell";
@@ -37,6 +37,12 @@ const AuditLogPage = lazy(() => import("@/features/admin/AuditLogPage"));
 const SettingsPage = lazy(() => import("@/features/admin/SettingsPage"));
 const SessionsPage = lazy(() => import("@/features/admin/SessionsPage"));
 const NotificationsPage = lazy(() => import("@/features/admin/NotificationsPage"));
+
+// Jobs, system health, backups, exports
+const JobsPage = lazy(() => import("@/features/system/JobsPage"));
+const SystemHealthPage = lazy(() => import("@/features/system/SystemHealthPage"));
+const BackupsPage = lazy(() => import("@/features/system/BackupsPage"));
+const ExportsPage = lazy(() => import("@/features/system/ExportsPage"));
 
 // Dashboard
 const DashboardPage = lazy(() => import("@/features/dashboard/DashboardPage"));
@@ -95,6 +101,10 @@ const PAGES_BY_NAV_ID: Readonly<Record<string, LazyExoticComponent<ComponentType
   roles: RolesPage,
   audit: AuditLogPage,
   settings: SettingsPage,
+  jobs: JobsPage,
+  system: SystemHealthPage,
+  backups: BackupsPage,
+  exports: ExportsPage,
 };
 
 /** Website (CMS) nav items → the page rendered inside CmsLayout's outlet. */
@@ -110,6 +120,12 @@ const CMS_PAGES_BY_NAV_ID: Readonly<Record<string, LazyExoticComponent<Component
   notices: NoticesPage,
   enquiries: EnquiriesInbox,
 };
+
+/** `/inventory/flats/:id` (HOLD_EXPIRED bell link) → the flats page with that flat's drawer open. */
+function FlatLinkRedirect() {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={id ? `/flats?flat=${encodeURIComponent(id)}` : "/flats"} replace />;
+}
 
 /** Every nav item gets a (lazy) route; extra account routes and error pages live inside the shell. */
 export function AppRoutes() {
@@ -352,6 +368,9 @@ export function AppRoutes() {
         <Route path="/roles" element={<Navigate to="/admin/roles" replace />} />
         <Route path="/audit" element={<Navigate to="/admin/audit-log" replace />} />
         <Route path="/settings" element={<Navigate to="/admin/settings" replace />} />
+        {/* Notification links that point at paths the API names differently. */}
+        <Route path="/inventory/flats/:id" element={<FlatLinkRedirect />} />
+        <Route path="/admin/integrity" element={<Navigate to="/demands?tab=integrity" replace />} />
 
         <Route path="/sessions" element={<SessionsPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />

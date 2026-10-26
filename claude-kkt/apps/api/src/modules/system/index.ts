@@ -70,7 +70,8 @@ export async function systemModule(app: FastifyInstance): Promise<void> {
 
   route(app, {
     method: "GET", url: "/api/v1/openapi.json", public: true,
-    schema: { response: { 200: z.record(z.string(), z.unknown()) }, summary: "OpenAPI document", tags: ["system"], hide: true },
-    handler: async (_req, reply) => { reply.header("Cache-Control", "public, max-age=60"); return app.swagger() as Record<string, unknown>; },
+    schema: { response: { 200: z.record(z.string(), z.unknown()) }, summary: "OpenAPI document (public with DOCS_PUBLIC, else admin.tools)", tags: ["system"], hide: true },
+    // public only with DOCS_PUBLIC (default off in production); otherwise plugins/auth.ts requires a staff token with admin.tools
+    handler: async (_req, reply) => { reply.header("Cache-Control", config.DOCS_PUBLIC ? "public, max-age=60" : "private, no-store"); return app.swagger() as Record<string, unknown>; },
   });
 }

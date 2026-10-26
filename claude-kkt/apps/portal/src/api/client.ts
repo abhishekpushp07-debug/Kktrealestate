@@ -39,6 +39,7 @@ import {
   type TokenPair,
 } from "@kkt/contracts";
 import { secureStorage } from "@/lib/storage";
+import { noteDeprecation } from "./deprecation";
 import { ApiError, apiErrorFromBody } from "./errors";
 import { buildMultipart, type LocalFile } from "@/lib/upload";
 
@@ -189,7 +190,8 @@ function parseJson(text: string): unknown {
 async function toApiError(res: HttpResponse): Promise<ApiError> {
   const retryAfterHeader = res.headers.get("Retry-After");
   const retryAfterSeconds = retryAfterHeader && /^\d+$/.test(retryAfterHeader) ? Number(retryAfterHeader) : undefined;
-  return apiErrorFromBody(res.status, parseJson(await res.text()), retryAfterSeconds);
+  const ids = { requestId: res.headers.get("X-Request-Id") ?? undefined, traceId: res.headers.get("X-Trace-Id") ?? undefined };
+  return apiErrorFromBody(res.status, parseJson(await res.text()), retryAfterSeconds, ids);
 }
 
 // Single-flight refresh: concurrent 401s share one refresh call.
@@ -238,6 +240,7 @@ async function request<T>(path: string, o: RequestOptions = {}): Promise<T> {
   let res: HttpResponse;
   try {
     res = await send(url, o, token);
+    noteDeprecation(path, res.headers);
     if (res.status === 401 && needsAuth && !o.noRefresh) {
       const err = await toApiError(res);
       if (err.code === "TOKEN_EXPIRED" || err.code === "UNAUTHENTICATED") {
@@ -245,6 +248,7 @@ async function request<T>(path: string, o: RequestOptions = {}): Promise<T> {
         if (refreshToken) {
           const fresh = await refreshAccessToken();
           res = await send(url, o, fresh);
+          noteDeprecation(path, res.headers);
         } else {
           notifyExpired();
           throw err;

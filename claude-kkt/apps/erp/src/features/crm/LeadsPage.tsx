@@ -115,7 +115,7 @@ export default function LeadsPage() {
         filters={filters}
         hasActiveFilters={list.hasActiveFilters}
         onClearFilters={list.reset}
-        onExportCsv={view === "list" ? () => api.exportCsv(LEADS_PATH, list.params, "leads.csv") : undefined}
+        exportSource={view === "list" ? { path: LEADS_PATH, params: list.params, filename: "leads.csv" } : undefined}
         actions={
           <Tabs value={view} onValueChange={(value) => setParam("view", value === "list" ? "list" : null)}>
             <TabsList variant="pills" aria-label="View">

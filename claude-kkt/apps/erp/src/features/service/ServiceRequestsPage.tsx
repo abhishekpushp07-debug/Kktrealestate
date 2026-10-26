@@ -152,7 +152,8 @@ export default function ServiceRequestsPage() {
         filters={filters}
         hasActiveFilters={list.hasActiveFilters}
         onClearFilters={list.reset}
-        onExportCsv={view === "list" ? () => api.exportCsv(SERVICE_PATH, list.params, "service-requests.csv") : undefined}
+        exportSource={view === "list" ? { path: SERVICE_PATH, params: list.params, filename: "service-requests.csv" } : undefined}
+        exportTotal={query.data?.total}
         summary={view === "list" && query.data ? `${formatNumber(query.data.total)} tickets` : undefined}
         actions={
           <Tabs value={view} onValueChange={(value) => setView(value === "kanban" ? "kanban" : "list")}>

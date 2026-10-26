@@ -3,7 +3,8 @@ import type { AddressInfo } from "node:net";
 import { describe, expect, it } from "vitest";
 import { postErrorWebhook, webhookPayload } from "../../src/jobs/alerts.js";
 import { defaultJobOptions, hasJob, isUuid, JOB_ATTEMPTS, JOB_SCHEDULES, jobBackoffMs, jobHandler, partitioningEnabled, publicJobData, registerJob, registeredJobs, UnregisteredJobError } from "../../src/jobs/index.js";
-import { bullConnection, deployId, lastDuesSlot } from "../../src/jobs/queue.js";
+import { bullConnection, deployId, lastDuesSlot, PROCESS_STARTED_AT } from "../../src/jobs/queue.js";
+import { config } from "../../src/config.js";
 
 const ctx = (log = { info: () => undefined }) => ({ db: {} as never, log: log as never, data: {}, app: null, runId: "r", attempt: 1, maxAttempts: 1 });
 
@@ -12,6 +13,7 @@ describe("job registry", () => {
     expect(JOB_SCHEDULES.map((s) => `${s.name}@${s.cron}`)).toEqual([
       "DAILY_DUES@30 0 * * *", "NIGHTLY_INTEGRITY@45 0 * * *", "OVERDUE_NOTIFICATIONS@15 1 * * *", "VISIT_OUTCOME_NUDGE@0 9 * * *", "SLA_BREACH_CHECK@5 * * * *",
       "PORTAL_FILE_CLEANUP@20 * * * *", "IDEMPOTENCY_PURGE@35 * * * *", "HOLD_EXPIRY@*/5 * * * *", "EXPORT_CLEANUP@10 3 * * *", "PARTITION_MAINTENANCE@20 2 * * *",
+      "JOB_RUN_SWEEP@*/15 * * * *",
     ]);
     expect(JOB_SCHEDULES.every((s) => s.tz === "Asia/Kolkata")).toBe(true);
     expect(partitioningEnabled({})).toBe(false);
@@ -56,10 +58,14 @@ describe("queue helpers", () => {
     expect(lastDuesSlot(new Date("2026-10-25T19:00:00Z")).toISOString()).toBe("2026-10-25T19:00:00.000Z");
   });
 
-  it("the boot lock is per deploy (DEPLOY_ID / GIT_SHA + APP_VERSION)", () => {
+  it("the boot lock is per deploy (DEPLOY_ID, else GIT_SHA, else the process start time; never a fixed default)", () => {
     expect(deployId({ DEPLOY_ID: "abc" })).toMatch(/:abc$/);
     expect(deployId({ GIT_SHA: "f00" })).toMatch(/:f00$/);
-    expect(deployId({})).toMatch(/:default$/);
+    expect(deployId({ DEPLOY_ID: "abc", GIT_SHA: "f00" })).toMatch(/:abc$/);
+    expect(deployId({})).toBe(`${config.APP_VERSION}:started-${PROCESS_STARTED_AT}`);
+    expect(deployId({})).not.toMatch(/default/);
+    expect(PROCESS_STARTED_AT).toBeLessThanOrEqual(Date.now());
+    expect(PROCESS_STARTED_AT).toBeGreaterThan(Date.now() - process.uptime() * 1000 - 5_000);
   });
 });
 

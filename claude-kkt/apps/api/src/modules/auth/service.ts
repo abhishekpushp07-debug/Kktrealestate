@@ -224,7 +224,7 @@ export async function failLogin(app: FastifyInstance, req: FastifyRequest, targe
       else await tx.update(portalUsers).set({ lockedUntil: st.accountLockUntil }).where(eq(portalUsers.id, account.id));
       await writeAudit(tx, { companyId: account.companyId, actor, action: `${prefix}.locked`, entityType, entityId: account.id, after: { scope: "ACCOUNT", locked_until: st.accountLockUntil.toISOString(), failures: st.accountFailures }, ip: req.clientIp, requestId: req.id });
       await notifyRole(tx, account.companyId, [SUPER_ADMIN_ROLE_NAME], {
-        type: "INTEGRITY_FINDINGS", title: `Security: ${account.type === "STAFF" ? "staff" : "customer"} account ${account.label} locked after ${st.accountFailures} failed sign-ins`,
+        type: "SECURITY_ALERT", title: `Security: ${account.type === "STAFF" ? "staff" : "customer"} account ${account.label} locked after ${st.accountFailures} failed sign-ins`,
         body: `Failed sign-ins came from several IP addresses within ${PASSWORD_POLICY.lockout_minutes} minutes; the account is locked until ${st.accountLockUntil.toISOString()}.`,
         entityType, entityId: account.id, link: account.link,
       });

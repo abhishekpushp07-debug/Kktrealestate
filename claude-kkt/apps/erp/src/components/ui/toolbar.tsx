@@ -1,8 +1,9 @@
-import { Columns3, Download, Search, SlidersHorizontal, X } from "lucide-react";
+import { Columns3, Search, SlidersHorizontal, X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { cn, useDebouncedCallback } from "@/lib/utils";
 import { Button, IconButton } from "./button";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "./dropdown-menu";
+import { ExportControl, type ExportSource } from "./export-control";
 import { Input } from "./input";
 
 export interface ColumnChoice {
@@ -23,8 +24,13 @@ export interface ToolbarProps {
   /** Shown when there are active filters. */
   onClearFilters?: () => void;
   hasActiveFilters?: boolean;
-  onExportCsv?: () => void | Promise<void>;
+  /** Custom CSV export; may return the X-Export-* facts (api.exportCsv) so a truncated file offers "Export all". */
+  onExportCsv?: () => void | Promise<unknown>;
   exporting?: boolean;
+  /** The list behind the toolbar: enables "Export all" (POST /exports) and, without onExportCsv, the CSV download itself. */
+  exportSource?: ExportSource;
+  /** Rows matching the filters; above 10,000 the export button becomes "Export all". */
+  exportTotal?: number | null;
   columns?: readonly ColumnChoice[];
   onColumnToggle?: (id: string, visible: boolean) => void;
   /** Right-aligned slot (primary action, view switch). */
@@ -45,6 +51,8 @@ export function Toolbar({
   hasActiveFilters = false,
   onExportCsv,
   exporting = false,
+  exportSource,
+  exportTotal,
   columns,
   onColumnToggle,
   actions,
@@ -143,14 +151,7 @@ export function Toolbar({
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          {onExportCsv && (
-            <>
-              <Button variant="outline" leftIcon={Download} loading={exporting} onClick={() => void onExportCsv()} className="hidden sm:inline-flex">
-                CSV
-              </Button>
-              <IconButton icon={Download} label="Export CSV" variant="outline" loading={exporting} onClick={() => void onExportCsv()} className="sm:hidden" />
-            </>
-          )}
+          {(onExportCsv || exportSource) && <ExportControl source={exportSource} total={exportTotal} onExportCsv={onExportCsv} exporting={exporting} />}
           {actions}
         </div>
       </div>

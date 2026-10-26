@@ -26,7 +26,6 @@ export default function EnquiriesInbox() {
   const [params, setParams] = useSearchParams();
   const selectedLead = params.get("lead");
   const [detail, setDetail] = useState<EnquiryRow | null>(null);
-  const [exporting, setExporting] = useState(false);
 
   const markRead = useMutationWithToast<unknown, EnquiryRow>({
     mutationFn: (row) => api.post(`${ENQUIRIES_PATH}/${row.id}/read`, {}),
@@ -117,15 +116,8 @@ export default function EnquiriesInbox() {
         }
         hasActiveFilters={list.hasActiveFilters}
         onClearFilters={list.reset}
-        onExportCsv={async () => {
-          setExporting(true);
-          try {
-            await api.exportCsv(ENQUIRIES_PATH, list.params, "enquiries.csv");
-          } finally {
-            setExporting(false);
-          }
-        }}
-        exporting={exporting}
+        exportSource={{ path: ENQUIRIES_PATH, params: list.params, filename: "enquiries.csv" }}
+        exportTotal={query.data?.total}
         summary={query.data ? `${formatNumber(total)} ${total === 1 ? "enquiry" : "enquiries"}` : undefined}
       />
       <DataTable

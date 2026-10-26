@@ -1,6 +1,8 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { ArchiveRestore, KeyRound, Lock, LockOpen, MoreHorizontal, Pencil, Plus, Power, ShieldCheck, Users } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/lib/auth";
 import type { ActiveStateResponse, UserRow } from "@kkt/contracts";
 import {
   Avatar,
@@ -21,7 +23,6 @@ import {
   Toolbar,
   Tooltip,
 } from "@/components/ui";
-import { api } from "@/lib/api";
 import { formatDateTime, formatNumber, formatRelative } from "@/lib/format";
 import { useList, useListParams, useMutationWithToast } from "@/lib/queries";
 import { CopyField } from "@/features/shared/CopyField";
@@ -36,6 +37,8 @@ interface TempPasswordState {
 
 /** `/admin/users` — staff accounts, roles, project scope and security actions. */
 export default function UsersPage() {
+  const { user: me } = useAuth();
+  const navigate = useNavigate();
   const list = useListParams({ filterKeys: ["role_id", "is_locked"], defaultSort: "name" });
   const query = useList<UserRow>(USERS_PATH, list.params);
   const roles = useRoleOptions();
@@ -43,7 +46,6 @@ export default function UsersPage() {
   const [editing, setEditing] = useState<{ open: boolean; user: UserRow | null }>({ open: false, user: null });
   const [confirm, setConfirm] = useState<{ kind: "reset" | "deactivate"; user: UserRow } | null>(null);
   const [tempPassword, setTempPassword] = useState<TempPasswordState | null>(null);
-  const [exporting, setExporting] = useState(false);
 
   const projectName = useMemo(() => new Map((projects.data ?? []).map((project) => [project.id, project.name] as const)), [projects.data]);
 
@@ -140,6 +142,8 @@ export default function UsersPage() {
         meta: { sortKey: false, width: 56, align: "right", locked: true, label: "Actions" },
         cell: ({ row }) => {
           const user = row.original;
+          // Your own account: role, scope, active state and password change elsewhere (403 SELF_CHANGE; password → Change password).
+          const self = me?.id === user.id;
           return (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -149,16 +153,22 @@ export default function UsersPage() {
                 <DropdownMenuItem onSelect={() => setEditing({ open: true, user })}>
                   <Pencil /> Edit
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setConfirm({ kind: "reset", user })}>
-                  <KeyRound /> Reset password
-                </DropdownMenuItem>
+                {self ? (
+                  <DropdownMenuItem onSelect={() => navigate("/change-password")} data-testid="user-change-own-password">
+                    <KeyRound /> Change my password
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem onSelect={() => setConfirm({ kind: "reset", user })}>
+                    <KeyRound /> Reset password
+                  </DropdownMenuItem>
+                )}
                 {isLocked(user.locked_until) && (
                   <DropdownMenuItem onSelect={() => unlock.mutate(user)}>
                     <LockOpen /> Unlock
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuSeparator />
-                {user.is_active ? (
+                {!self && <DropdownMenuSeparator />}
+                {self ? null : user.is_active ? (
                   <DropdownMenuItem destructive onSelect={() => setConfirm({ kind: "deactivate", user })}>
                     <Power /> Deactivate
                   </DropdownMenuItem>
@@ -173,7 +183,7 @@ export default function UsersPage() {
         },
       },
     ],
-    [projectName, activate, unlock],
+    [projectName, activate, unlock, me?.id, navigate],
   );
 
   const total = query.data?.total ?? 0;
@@ -225,15 +235,8 @@ export default function UsersPage() {
         }
         hasActiveFilters={list.hasActiveFilters}
         onClearFilters={list.reset}
-        onExportCsv={async () => {
-          setExporting(true);
-          try {
-            await api.exportCsv(USERS_PATH, list.params, "users.csv");
-          } finally {
-            setExporting(false);
-          }
-        }}
-        exporting={exporting}
+        exportSource={{ path: USERS_PATH, params: list.params, filename: "users.csv" }}
+        exportTotal={query.data?.total}
         summary={query.data ? `${formatNumber(total)} ${total === 1 ? "user" : "users"}` : undefined}
       />
       <DataTable

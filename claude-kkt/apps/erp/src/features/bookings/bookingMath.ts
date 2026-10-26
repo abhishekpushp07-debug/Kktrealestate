@@ -189,6 +189,8 @@ export interface WizardState {
   sales_user_id: string | null;
   broker_name: string;
   remarks: string;
+  /** Why the agreement value differs from the flat's list price (agreement.edit holders only; required then). */
+  price_deviation_reason: string;
 }
 
 export function emptyWizardState(today: string): WizardState {
@@ -213,6 +215,7 @@ export function emptyWizardState(today: string): WizardState {
     sales_user_id: null,
     broker_name: "",
     remarks: "",
+    price_deviation_reason: "",
   };
 }
 
@@ -225,6 +228,18 @@ export interface StepValidationContext {
   flatStatus?: string | null;
   /** Whether at least one applicable plan exists for the tower (null = not loaded yet). */
   plansAvailable?: boolean | null;
+  /** The chosen flat's current list price (null/undefined = not loaded yet). */
+  listPricePaise?: number | null;
+  /** Whether the user holds agreement.edit (only they may deviate from the list price, with a reason). */
+  canEditAgreement?: boolean;
+}
+
+/** Minimum length of the price-deviation reason (contracts ReasonSchema). */
+export const DEVIATION_REASON_MIN = 3;
+
+/** Agreement value − list price (0 when either is unknown). */
+export function priceDeviation(total: number | null, listPrice: number | null | undefined): number {
+  return total !== null && typeof listPrice === "number" ? total - listPrice : 0;
 }
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -259,6 +274,11 @@ export function validateStep(step: WizardStepId, state: WizardState, context: St
       const total = state.agreement_value_paise;
       if (total === null || !Number.isInteger(total)) errors.agreement_value_paise = "Enter the agreement value";
       else if (total <= 0) errors.agreement_value_paise = "Agreement value must be greater than 0";
+      const deviation = priceDeviation(total, context.listPricePaise);
+      if (deviation !== 0 && !errors.agreement_value_paise) {
+        if (context.canEditAgreement === false) errors.agreement_value_paise = "The agreement value must equal the flat's list price; changing it needs the “Edit agreement” permission";
+        else if (state.price_deviation_reason.trim().length < DEVIATION_REASON_MIN) errors.price_deviation_reason = "Give the reason for the price deviation (at least 3 characters)";
+      }
       if (state.cash_agreed_paise === null) errors.cash_agreed_paise = "Enter the cash portion";
       if (state.account_agreed_paise === null) errors.account_agreed_paise = "Enter the account portion";
       if (total !== null && total > 0 && state.cash_agreed_paise !== null && state.account_agreed_paise !== null) {
@@ -333,6 +353,7 @@ export function toBookingCreatePayload(state: WizardState) {
     sales_user_id: state.sales_user_id,
     broker_name: state.broker_name.trim() === "" ? null : state.broker_name.trim(),
     remarks: state.remarks.trim() === "" ? null : state.remarks.trim(),
+    ...(state.price_deviation_reason.trim() ? { price_deviation_reason: state.price_deviation_reason.trim() } : {}),
   };
 }
 
@@ -366,6 +387,7 @@ export function toDraftPayload(state: WizardState): Record<string, unknown> {
   put("sales_user_id", state.sales_user_id);
   put("broker_name", state.broker_name.trim() || null);
   put("remarks", state.remarks.trim() || null);
+  put("price_deviation_reason", state.price_deviation_reason.trim().length >= DEVIATION_REASON_MIN ? state.price_deviation_reason.trim() : null);
   return payload;
 }
 
@@ -420,6 +442,7 @@ export function fromDraftPayload(payload: Record<string, unknown>, today: string
     sales_user_id: str(payload.sales_user_id),
     broker_name: str(payload.broker_name) ?? "",
     remarks: str(payload.remarks) ?? "",
+    price_deviation_reason: str(payload.price_deviation_reason) ?? "",
   };
 }
 
@@ -427,3 +450,54 @@ export function fromDraftPayload(payload: Record<string, unknown>, today: string
 export function wizardHasContent(state: WizardState): boolean {
   return Boolean(state.flat_id || state.customer_id || state.agreement_value_paise || state.other_charges.length || state.parking_slot_ids.length || state.remarks.trim());
 }
+
+/* ------------------------------------------------------------------ */
+/* Server-side business-rule details                                    */
+/* ------------------------------------------------------------------ */
+
+function inr(paise: number): string {
+  return `₹${(paise / 100).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+}
+
+/**
+ * 409 HANDOVER_BLOCKED details → readable blockers: `problems[]` (strings or {message}), `unraised_installments[{seq,name}]`,
+ * `cash_short_paise` / `account_short_paise` (money still owed per bucket).
+ */
+export function handoverBlockers(details: Record<string, unknown> | undefined): string[] {
+  const out: string[] = [];
+  const problems = details?.problems;
+  if (Array.isArray(problems)) {
+    for (const entry of problems) {
+      if (typeof entry === "string") out.push(entry);
+      else if (typeof entry === "object" && entry !== null && typeof (entry as { message?: unknown }).message === "string") out.push((entry as { message: string }).message);
+    }
+  }
+  const unraised = details?.unraised_installments;
+  if (Array.isArray(unraised) && unraised.length > 0) {
+    const names = unraised.flatMap((entry) => (typeof entry === "object" && entry !== null ? [`${(entry as { seq?: unknown }).seq ?? "?"}. ${String((entry as { name?: unknown }).name ?? "")}`.trim()] : []));
+    out.push(`Installments not raised yet: ${names.join(", ")}`);
+  }
+  const cash = typeof details?.cash_short_paise === "number" ? details.cash_short_paise : 0;
+  const account = typeof details?.account_short_paise === "number" ? details.account_short_paise : 0;
+  if (cash > 0) out.push(`Cash bucket short by ${inr(cash)}`);
+  if (account > 0) out.push(`Account bucket short by ${inr(account)}`);
+  return [...new Set(out)];
+}
+
+/** Client-generated draft id (uuid v4). */
+export function newDraftId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  const hex = Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-${((parseInt(hex.charAt(16), 16) & 0x3) | 0x8).toString(16)}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
+
+/** Text for 422 BUSINESS_RULE rule PRICE_DEVIATION_NOT_ALLOWED (details: list price, agreement value, what is needed). */
+export function priceDeviationProblem(details: Record<string, unknown> | undefined): string {
+  const list = typeof details?.list_price_paise === "number" ? details.list_price_paise : null;
+  const needs = Array.isArray(details?.needs) ? details.needs.filter((item): item is string => typeof item === "string") : [];
+  const listText = list !== null ? ` The flat's list price is ${inr(list)}.` : "";
+  if (needs.some((item) => item.includes("permission"))) return `The agreement value must equal the list price; changing it needs the “Edit agreement” permission.${listText}`;
+  if (needs.includes("price_deviation_reason")) return `Give a reason for the price deviation.${listText}`;
+  return `The agreement value differs from the list price.${listText}`;
+}
+

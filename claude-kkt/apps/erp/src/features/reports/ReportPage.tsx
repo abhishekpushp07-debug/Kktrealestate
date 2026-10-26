@@ -1,11 +1,11 @@
 import { Download, FileText, Link2 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import type { ReportPresetRow } from "@kkt/contracts";
-import { Button, EmptyState, ErrorState, PageHeader, Skeleton } from "@/components/ui";
-import { describeError } from "@/lib/api";
-import { todayIST } from "@/lib/format";
+import { Button, EmptyState, ErrorState, exportErrorMessage, PageHeader, Skeleton } from "@/components/ui";
+import { api, CSV_SYNC_MAX_ROWS, describeError } from "@/lib/api";
+import { formatNumber, todayIST } from "@/lib/format";
 import { useAuth } from "@/lib/auth";
 import { ForbiddenPage } from "@/pages/ForbiddenPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
@@ -32,6 +32,7 @@ function parsePage(value: string | null, fallback: number): number {
 
 function ReportFrame({ report }: { report: ReportDefinition }) {
   const [search, setSearch] = useSearchParams();
+  const navigate = useNavigate();
   const today = todayIST();
   const params = useMemo(() => pickReportParams(report.filters, search), [report.filters, search]);
   const page = parsePage(search.get("page"), 1);
@@ -78,7 +79,22 @@ function ReportFrame({ report }: { report: ReportDefinition }) {
   const download = async (format: "csv" | "pdf") => {
     setExporting(format);
     try {
-      await exportReport(report.path, query, format, `${report.slug}-${today}`);
+      const facts = await exportReport(report.path, query, format, `${report.slug}-${today}`);
+      if (facts?.truncated) {
+        toast.warning(`This CSV holds the first ${formatNumber(facts.rows ?? CSV_SYNC_MAX_ROWS)} of ${formatNumber(facts.total ?? 0)} rows.`, {
+          description: "Export all rows in the background to get the complete file.",
+          duration: 15_000,
+          action: {
+            label: "Export all",
+            onClick: () => {
+              api.startExport(report.path, { filters: query }).then(
+                () => toast.success("Export queued. You'll get a notification when the file is ready.", { action: { label: "My exports", onClick: () => navigate("/exports") } }),
+                (error: unknown) => toast.error(exportErrorMessage(error)),
+              );
+            },
+          },
+        });
+      }
     } catch (error) {
       toast.error(describeError(error));
     } finally {

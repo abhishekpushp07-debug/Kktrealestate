@@ -626,6 +626,26 @@ const PHOTO = path.join(TMP, "snag.jpg");
     await check(page, "home-coapplicant", { noShot: report.shots >= MAX_SHOTS });
     await ctx.close();
   }
+  {
+    // Deprecated operations (deploy track, docs/VERSIONING.md): no v1 route is deprecated today, so the runner marks the portal's
+    // responses deprecated itself and expects the non-blocking "please update the app" notice, dismissible.
+    const { ctx, page } = await openPage(browser, 390, 844, "phone-update-notice");
+    await page.route(/\/api\/v1\/portal\/(home|bookings)/, async (route) => {
+      const res = await route.fetch();
+      await route.fulfill({ response: res, headers: { ...res.headers(), deprecation: "@1798761600", sunset: "Fri, 01 Jan 2027 00:00:00 GMT", link: '</api/v1/docs>; rel="deprecation"' } });
+    });
+    await login(page, "9876543220");
+    const notice = page.getByTestId("update-notice");
+    const shown = await notice.waitFor({ state: "visible", timeout: 10000 }).then(() => true).catch(() => false);
+    const noticeText = shown ? await notice.innerText() : "";
+    expect(shown && /update the app/i.test(noticeText) && /1 Jan 2027/.test(noticeText), "a Deprecation header shows the non-blocking update notice with the sunset date", page);
+    await check(page, "update-notice", { noShot: report.shots >= MAX_SHOTS });
+    if (shown) {
+      await notice.getByRole("button", { name: "Dismiss" }).click();
+      expect(await notice.waitFor({ state: "hidden", timeout: 5000 }).then(() => true).catch(() => false), "the update notice can be dismissed", page);
+    }
+    await ctx.close();
+  }
 
   await browser.close();
   // Restore the seed contract on the QA database: Welcome@123 again for the worked-example customer (any argon2 hash of it verifies).

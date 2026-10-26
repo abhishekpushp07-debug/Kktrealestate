@@ -98,6 +98,12 @@ const EnvSchema = z
     DB_CONNECT_TIMEOUT_S: int(10, 1, 300),
     /** Required in production (no localhost default there). */
     REDIS_URL: z.string({ error: "REDIS_URL is required in production" }).min(1),
+    /**
+     * Upper bound of one command on the API's Redis clients (ioredis commandTimeout), queued commands included: during an outage a write
+     * that is not budgeted (cache invalidation, permission-version bump) fails after this long instead of waiting on reconnects.
+     * Cache and auth reads have their own much shorter budgets (lib/cache.ts CACHE_BUDGET_MS, plugins/auth.ts).
+     */
+    REDIS_COMMAND_TIMEOUT_MS: int(2_000, 100, 60_000),
     /** Optional separate `noeviction` Redis for revocation markers, locks and rate limits (falls back to REDIS_URL). */
     REDIS_SECURITY_URL: z.string().min(1).optional(),
     JWT_SECRET: z.string({ error: "JWT_SECRET is required" }).min(32, "JWT_SECRET must be at least 32 characters"),
@@ -153,6 +159,11 @@ const EnvSchema = z
     BOOTSTRAP_ADMIN_EMAIL: z.string().email("BOOTSTRAP_ADMIN_EMAIL must be an e-mail address").optional(),
     BOOTSTRAP_ADMIN_PASSWORD: z.string().min(12, "BOOTSTRAP_ADMIN_PASSWORD must be at least 12 characters").optional(),
     RUN_MIGRATIONS_ON_BOOT: bool("true"),
+    /**
+     * Serve the OpenAPI document (/api/v1/openapi.json, /api/v1/docs/json) and Swagger UI (/api/v1/docs) to anyone. Default: true outside
+     * production, false in production — there only a staff bearer token holding admin.tools may read them.
+     */
+    DOCS_PUBLIC: bool("true"),
     /** Run BullMQ jobs inside the API (first HTTP worker). Default: true outside production, false in production (use the worker). */
     RUN_JOBS_IN_API: bool("true"),
     /**
@@ -197,6 +208,10 @@ const EnvSchema = z
     API_MAX_INFLIGHT: z.coerce.number().int().min(0).max(100_000).default(0),
     /** Version string reported by /health and /metrics. */
     APP_VERSION: z.string().default("2.0.0"),
+    /** Identity of this rollout (set by the deploy pipeline); keys the once-per-deploy boot-job lock. Falls back to GIT_SHA. */
+    DEPLOY_ID: z.string().min(1).max(200).optional(),
+    /** Commit of the running build (CI sets it); the boot-job lock falls back to it when DEPLOY_ID is unset. */
+    GIT_SHA: z.string().min(1).max(200).optional(),
     /** Bearer token for scraping /metrics without a staff session (unset = staff JWT only). */
     METRICS_TOKEN: z.string().min(16, "METRICS_TOKEN must be at least 16 characters").optional(),
     /** Port of the cluster-wide metrics listener. */
@@ -246,8 +261,8 @@ const DEV_DEFAULTS: Record<string, string> = {
 
 /** Defaults that differ between production and everything else. */
 const MODE_DEFAULTS: Record<"production" | "other", Record<string, string>> = {
-  production: { SEED_ON_BOOT: "false", SEED_DEMO: "false", RUN_JOBS_IN_API: "false", API_WORKERS: "auto" },
-  other: { SEED_ON_BOOT: "true", SEED_DEMO: "true", RUN_JOBS_IN_API: "true", API_WORKERS: "1" },
+  production: { SEED_ON_BOOT: "false", SEED_DEMO: "false", RUN_JOBS_IN_API: "false", API_WORKERS: "auto", DOCS_PUBLIC: "false" },
+  other: { SEED_ON_BOOT: "true", SEED_DEMO: "true", RUN_JOBS_IN_API: "true", API_WORKERS: "1", DOCS_PUBLIC: "true" },
 };
 
 /** Resolves every `<NAME>_FILE` secret into `<NAME>`; returns the problems found (never the file contents). */

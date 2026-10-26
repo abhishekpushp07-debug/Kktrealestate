@@ -108,7 +108,7 @@ export function registerPublicVisitRoutes(app: FastifyInstance): void {
   });
 
   route(app, {
-    method: "POST", url: "/public/site-visits", public: true, rateLimit: FORM_RATE_LIMIT, idempotent: true,
+    method: "POST", url: "/public/site-visits", public: true, rateLimit: FORM_RATE_LIMIT, idempotent: true, oneTimeSecrets: ["manage_url", "ics_url"],
     schema: { body: BookingBody, response: { 201: PublicVisitBookingResponseSchema, 200: PublicVisitBookingResponseSchema }, summary: "Book a site visit (capacity re-checked atomically; 409 SLOT_FULL)" },
     handler: async (req, reply) => {
       noStore(reply);
@@ -188,7 +188,7 @@ export function registerPublicVisitRoutes(app: FastifyInstance): void {
   });
 
   route(app, {
-    method: "POST", url: "/public/site-visits/:token/reschedule", public: true, rateLimit: FORM_RATE_LIMIT, idempotent: true,
+    method: "POST", url: "/public/site-visits/:token/reschedule", public: true, rateLimit: FORM_RATE_LIMIT, idempotent: true, oneTimeSecrets: ["manage_url", "manage_token", "ics_url"],
     schema: { params: tokenParams, body: RescheduleBody, response: { 200: PublicVisitRescheduleResponseSchema }, summary: "Visitor self-reschedule from the manage link (capacity re-checked: 409 SLOT_FULL; 422 SLOT_INVALID); returns the NEW manage link and .ics — the old link stops working" },
     handler: async (req, reply) => {
       noStore(reply);

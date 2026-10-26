@@ -9,6 +9,8 @@
  * - Error envelopes {error:{code,message,details,request_id}} become ApiClientError.
  */
 
+import { messageForError } from "./errorMessages";
+
 export const REFRESH_TOKEN_KEY = "kkt.erp.refresh";
 
 /* ------------------------------------------------------------------ */
@@ -21,6 +23,8 @@ export interface ApiErrorEnvelope {
     message: string;
     details?: Record<string, unknown>;
     request_id?: string;
+    /** Present when the API runs with tracing on (32-hex OpenTelemetry trace id). */
+    trace_id?: string;
   };
 }
 
@@ -30,6 +34,7 @@ export interface ApiClientErrorInit {
   message: string;
   details?: Record<string, unknown>;
   requestId?: string;
+  traceId?: string;
   retryAfterSeconds?: number;
   cause?: unknown;
 }
@@ -39,6 +44,7 @@ export class ApiClientError extends Error {
   readonly code: string;
   readonly details: Record<string, unknown> | undefined;
   readonly requestId: string | undefined;
+  readonly traceId: string | undefined;
   readonly retryAfterSeconds: number | undefined;
 
   constructor(init: ApiClientErrorInit) {
@@ -48,6 +54,7 @@ export class ApiClientError extends Error {
     this.code = init.code;
     this.details = init.details;
     this.requestId = init.requestId;
+    this.traceId = init.traceId;
     this.retryAfterSeconds = init.retryAfterSeconds;
   }
 
@@ -118,6 +125,7 @@ const FALLBACK_CODES: Readonly<Record<number, string>> = {
 export function parseErrorEnvelope(status: number, body: unknown, headers?: Headers): ApiClientError {
   const retryAfterSeconds = parseRetryAfter(headers);
   const requestId = headers?.get("X-Request-Id") ?? undefined;
+  const traceId = headers?.get("X-Trace-Id") ?? undefined;
   if (isEnvelope(body)) {
     const details =
       typeof body.error.details === "object" && body.error.details !== null ? body.error.details : undefined;
@@ -127,6 +135,7 @@ export function parseErrorEnvelope(status: number, body: unknown, headers?: Head
       message: body.error.message,
       details,
       requestId: body.error.request_id ?? requestId,
+      traceId: body.error.trace_id ?? traceId,
       retryAfterSeconds,
     });
   }
@@ -136,38 +145,29 @@ export function parseErrorEnvelope(status: number, body: unknown, headers?: Head
     code: FALLBACK_CODES[status] ?? (status >= 500 ? "INTERNAL_ERROR" : "REQUEST_FAILED"),
     message: text ?? `Request failed with status ${status}`,
     requestId,
+    traceId,
     retryAfterSeconds,
   });
 }
 
-/** Human-friendly message for any thrown value (used by toasts and forms). */
+/** Human-friendly message for any thrown value (used by toasts and forms). Codes not in lib/errorMessages.ts show the server's message. */
 export function describeError(error: unknown): string {
   if (isApiClientError(error)) {
-    switch (error.code) {
-      case "NETWORK_ERROR":
-        return "Cannot reach the server. Check your connection and try again.";
-      case "VALIDATION_ERROR": {
-        const firstIssue = error.validationIssues[0];
-        return firstIssue ? `${firstIssue.path ? `${firstIssue.path}: ` : ""}${firstIssue.message}` : error.message;
-      }
-      case "VERSION_CONFLICT":
-        return "Someone else changed this record. Reload to see the latest version.";
-      case "RATE_LIMITED":
-        return error.retryAfterSeconds
-          ? `Too many attempts. Try again in ${error.retryAfterSeconds}s.`
-          : "Too many attempts. Please wait a moment.";
-      case "LOCKED":
-        return error.message || "Account temporarily locked. Try again in 15 minutes.";
-      case "FORBIDDEN":
-        return "You don't have permission to do that.";
-      case "NOT_FOUND":
-        return "That record could not be found.";
-      default:
-        return error.message || "Something went wrong.";
+    if (error.code === "VALIDATION_ERROR") {
+      const firstIssue = error.validationIssues[0];
+      return firstIssue ? `${firstIssue.path ? `${firstIssue.path}: ` : ""}${firstIssue.message}` : error.message;
     }
+    return messageForError(error) ?? (error.message || "Something went wrong.");
   }
   if (error instanceof Error) return error.message || "Something went wrong.";
   return "Something went wrong.";
+}
+
+/** "Ref <request id> · trace <trace id>" for support (toasts and error panels); null when the error carries neither. */
+export function errorReference(error: unknown): string | null {
+  if (!isApiClientError(error)) return null;
+  const parts = [error.requestId ? `Ref ${error.requestId}` : null, error.traceId ? `trace ${error.traceId}` : null].filter(Boolean);
+  return parts.length ? parts.join(" · ") : null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -469,6 +469,50 @@ export interface DownloadResult {
   blob: Blob;
   filename: string;
   contentType: string;
+  /** Response headers (CSV lists carry X-Export-Total / X-Export-Rows / X-Export-Truncated). */
+  headers: Headers;
+}
+
+/** Rows a synchronous CSV download carries at most; above it the list must be exported in the background (POST /exports). */
+export const CSV_SYNC_MAX_ROWS = 10_000;
+
+/** Facts of a synchronous CSV download (X-Export-* headers; null when the route does not send them). */
+export interface CsvExportResult {
+  filename: string;
+  rows: number | null;
+  total: number | null;
+  /** True when the server cut the file at CSV_SYNC_MAX_ROWS: offer the background export. */
+  truncated: boolean;
+}
+
+function headerInt(headers: Headers, name: string): number | null {
+  const raw = headers.get(name);
+  if (raw === null || raw.trim() === "") return null;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : null;
+}
+
+/** Reads the X-Export-* facts of a CSV response. */
+export function csvExportFacts(headers: Headers, filename: string): CsvExportResult {
+  const rows = headerInt(headers, "X-Export-Rows");
+  const total = headerInt(headers, "X-Export-Total");
+  const truncated = headers.get("X-Export-Truncated") === "true" || (rows !== null && total !== null && total > rows);
+  return { filename, rows, total, truncated };
+}
+
+/** Query keys the export job controls itself (sending them is a 400). */
+export const EXPORT_RESERVED_KEYS: ReadonlySet<string> = new Set(["page", "page_size", "cursor", "limit", "format", "exact"]);
+
+export type ExportQuery = Record<string, string | number | boolean | string[]>;
+
+/** List parameters → the `query` of POST /exports (paging/format keys dropped, arrays as strings). */
+export function exportQueryFromParams(params: ListParams): ExportQuery {
+  const query: ExportQuery = {};
+  for (const [key, value] of Object.entries(buildListQuery(params))) {
+    if (EXPORT_RESERVED_KEYS.has(key) || value === undefined || value === null || value === "") continue;
+    query[key] = Array.isArray(value) ? value.map((item) => String(item)) : (value as string | number | boolean);
+  }
+  return query;
 }
 
 function filenameFromDisposition(header: string | null, fallback: string): string {
@@ -498,6 +542,7 @@ async function download(path: string, options: RequestOptions = {}): Promise<Dow
     blob,
     filename: filenameFromDisposition(response.headers.get("Content-Disposition"), fallback),
     contentType: response.headers.get("Content-Type") ?? blob.type,
+    headers: response.headers,
   };
 }
 
@@ -539,10 +584,21 @@ export const api = {
   list<T>(path: string, params: ListParams = {}, options?: RequestOptions): Promise<ListEnvelope<T>> {
     return request<ListEnvelope<T>>("GET", path, { ...options, query: { ...options?.query, ...buildListQuery(params) } });
   },
-  /** GET a list endpoint as CSV and hand it to the browser. */
-  async exportCsv(path: string, params: ListParams = {}, filename?: string): Promise<void> {
-    const result = await download(path, { query: { ...buildListQuery(params), format: "csv" } });
-    saveBlob(result.blob, filename ?? result.filename);
+  /**
+   * GET a list endpoint as CSV and hand it to the browser. Returns the X-Export-* facts: when `truncated` the file holds the first
+   * 10,000 rows only and the caller should offer the background export (startExport).
+   */
+  async exportCsv(path: string, params: ListParams = {}, filename?: string): Promise<CsvExportResult> {
+    const { page: _page, page_size: _pageSize, ...rest } = params;
+    const result = await download(path, { query: { ...buildListQuery(rest), format: "csv" } });
+    const name = filename ?? result.filename;
+    saveBlob(result.blob, name);
+    return csvExportFacts(result.headers, name);
+  },
+  /** Queue a background CSV export of every row of a list (POST /exports → 202 export row; poll GET /exports/:id). */
+  startExport<T = unknown>(path: string, params: ListParams = {}): Promise<T> {
+    const fullPath = `/api/v1${path.startsWith("/") ? path : `/${path}`}`;
+    return request<T>("POST", "/exports", { body: { path: fullPath, query: exportQueryFromParams(params) } });
   },
 };
 

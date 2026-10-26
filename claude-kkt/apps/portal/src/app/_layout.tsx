@@ -7,6 +7,7 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
+import { z } from "zod";
 import { StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -16,7 +17,11 @@ import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { BookingProvider } from "@/booking/BookingProvider";
 import { Icon } from "@/ui/Icon";
 import { ToastProvider } from "@/ui/Toast";
+import { UpdateNotice } from "@/ui/UpdateNotice";
 import { colors } from "@/ui/theme";
+
+// Zod's JIT probes `new Function("")`, which the web build's Content-Security-Policy (no 'unsafe-eval') reports; parse without it.
+z.config({ jitless: true });
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
 SplashScreen.setOptions?.({ fade: true, duration: 300 });
@@ -31,6 +36,7 @@ export default function RootLayout(): React.JSX.Element {
               <ToastProvider>
                 <StatusBar style="light" />
                 <Gate />
+                <UpdateNotice />
                 <FileViewerHost />
               </ToastProvider>
             </BookingProvider>

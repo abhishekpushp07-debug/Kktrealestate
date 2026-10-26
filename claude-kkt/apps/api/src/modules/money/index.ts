@@ -18,7 +18,8 @@ import { registerRoznamchaRoutes } from "./routes/roznamcha.js";
 
 export { appendEvent, rebuild, ledgerRows, sourceEvents, events, demandAmountsFor, type AppendResult, type RebuildResult, type SummaryMismatch } from "./services/ledger.js";
 export { raiseDues, raiseDuesForBlock, raiseDuesForAll, voidDemandsForStage, voidDemand, recomputeDemandStatuses, raiseOtherChargeDemand, nonVoidDemands, bookingRecipients, OTHER_CHARGE_ENTITY_TYPE, type RaiseOptions, type RaiseResult, type RunSummary, type DuesScope, type VoidStageResult } from "./services/dues.js";
-export { runReport, repair, nightlyIntegrity, listRuns, type IntegrityScope } from "./services/integrity.js";
+export { runReport, repair, nightlyIntegrity, listRuns, onSnapshot, type IntegrityScope } from "./services/integrity.js";
+export { rebuildAllLedgers, type LedgerRebuildResult, type LedgerRebuildOptions } from "./services/ledgerRebuild.js";
 export { createBooking, reviseAgreement, changePlan, cancelBooking, completeBooking, reopenCompletedBooking, priceDeviation, addOtherCharge, demandOtherChargeLine, refreshCounts } from "./services/bookings.js";
 export { postPayment, clearPayment, bouncePayment, reversePayment, receiptData, demandLetterData } from "./services/payments.js";
 export { applicablePlanRows, applicableAssignments, resolveBookingPlan, buildPlanSnapshot, previewSchedule, assertPlanFitsScope, assertAssignmentsFitBlock, assertPlanFitsActiveAssignments, loadPlan, type MissingAssignmentStage } from "./services/plans.js";

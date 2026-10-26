@@ -80,6 +80,9 @@ export const STATUS_TONES: Readonly<Record<string, StatusTone>> = {
   OK: "success",
   FAILED: "danger",
   RUNNING: "info",
+  // exports / backups
+  QUEUED: "warning",
+  DONE: "success",
   LOW: "neutral",
   MEDIUM: "info",
   HIGH: "warning",

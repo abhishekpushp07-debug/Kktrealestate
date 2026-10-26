@@ -13,7 +13,7 @@ import {
 } from "@kkt/contracts";
 import { bookings, companies, jobRuns, type DB, type Executor } from "@kkt/db";
 import { config } from "../../config.js";
-import { JOB_SCHEDULES, partitioningEnabled, registeredJobs, registerJob } from "../../jobs/index.js";
+import { JOB_SCHEDULES, partitioningEnabled, registeredJobs, registerJob, sweepAbandonedJobRuns } from "../../jobs/index.js";
 import { enqueueJob, nextRuns } from "../../jobs/queue.js";
 import { writeAudit } from "../../lib/audit.js";
 import { bumpPermVersion, invalidate } from "../../lib/cache.js";
@@ -24,7 +24,7 @@ import { listPaging, paginate } from "../../lib/list.js";
 import { route } from "../../lib/routes.js";
 import { ensureProjectAccess, scopeFilter, type StaffContext } from "../../lib/scope.js";
 import { CORE_MODULES, discoverModules, selectModules } from "../loader.js";
-import { rebuild } from "../money/index.js";
+import { onSnapshot, rebuild } from "../money/index.js";
 import { adminMeta, idParams, iso, requireSuperAdmin, staff } from "./common.js";
 
 type JobRunRecord = typeof jobRuns.$inferSelect;
@@ -68,7 +68,8 @@ export async function reconcileBookings(db: Executor, targets: readonly { id: st
   const mismatches: AdminRecomputeMismatch[] = [];
   const affected = new Set<string>();
   for (const b of targets) {
-    const r = await rebuild(db, b.id, { write: false });
+    // one consistent snapshot per booking (REPEATABLE READ, read only): a payment committing midway cannot fake a mismatch
+    const r = await onSnapshot(db, (tx) => rebuild(tx, b.id, { write: false }));
     for (const m of r.mismatches) {
       affected.add(b.id);
       mismatches.push({ booking_id: b.id, booking_number: b.bookingNumber, field: m.field, stored: m.stored, recomputed: m.recomputed });
@@ -129,7 +130,7 @@ export async function systemFacts(app: FastifyInstance): Promise<AdminSystemResp
     app.db.execute<{ name: string; size: string | number; pretty: string }>(sql`select current_database() as name, pg_database_size(current_database()) as size, pg_size_pretty(pg_database_size(current_database())) as pretty`).then((r) => r[0] ?? null).catch(() => null),
     app.db.execute<{ relname: string; n: string | number }>(sql`select relname, n_live_tup as n from pg_stat_user_tables where schemaname = 'public' order by relname`).catch(() => [] as { relname: string; n: string | number }[]),
     app.db.execute<JobRunRecord & { started_at: Date; finished_at: Date | null; job_name: string }>(sql`select distinct on (job_name) id, job_name, started_at, finished_at, status, result, error from job_runs order by job_name, started_at desc`).catch(() => []),
-    app.db.select({ total: sql<number>`count(*)::int`, failed: sql<number>`count(*) filter (where ${jobRuns.status} = 'FAILED')::int` }).from(jobRuns).where(gte(jobRuns.startedAt, since)).then((r) => r[0] ?? { total: 0, failed: 0 }),
+    app.db.select({ total: sql<number>`count(*)::int`, failed: sql<number>`count(*) filter (where ${jobRuns.status} in ('FAILED', 'ABANDONED'))::int` }).from(jobRuns).where(gte(jobRuns.startedAt, since)).then((r) => r[0] ?? { total: 0, failed: 0 }),
     app.redis.info("server").catch(() => ""),
     app.redis.info("memory").catch(() => ""),
     app.redis.info("clients").catch(() => ""),
@@ -195,6 +196,7 @@ export async function partitionMaintenance(db: DB, monthsAhead = 2): Promise<Rec
 /** Registers the admin job and the /admin/* tool routes. */
 export function registerToolRoutes(app: FastifyInstance): void {
   registerJob("STARTUP_RECONCILIATION", async ({ db }) => reconciliationJob(db));
+  registerJob("JOB_RUN_SWEEP", async ({ db }) => sweepAbandonedJobRuns(db));
   registerJob("PARTITION_MAINTENANCE", async ({ db, data }) => partitionMaintenance(db, typeof data["months_ahead"] === "number" ? data["months_ahead"] : 2));
 
   route(app, {
@@ -236,8 +238,8 @@ export function registerToolRoutes(app: FastifyInstance): void {
         app.dbReplica.execute<JobStats>(sql`
           with last_ok as (select job_name, max(started_at) as at from job_runs where status = 'OK' and job_name in ${names} group by job_name)
           select r.job_name,
-                 count(*) filter (where r.status = 'FAILED' and r.started_at >= now() - interval '24 hours')::int as failures_24h,
-                 count(*) filter (where r.status = 'FAILED' and r.started_at > coalesce(l.at, '-infinity'::timestamptz))::int as failures_since_success
+                 count(*) filter (where r.status in ('FAILED', 'ABANDONED') and r.started_at >= now() - interval '24 hours')::int as failures_24h,
+                 count(*) filter (where r.status in ('FAILED', 'ABANDONED') and r.started_at > coalesce(l.at, '-infinity'::timestamptz))::int as failures_since_success
           from job_runs r left join last_ok l on l.job_name = r.job_name
           where r.job_name in ${names} group by r.job_name`),
         withTimeout(nextRuns(app.jobQueue()), 1_500, new Map<string, string>()),

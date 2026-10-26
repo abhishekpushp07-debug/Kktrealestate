@@ -1,6 +1,6 @@
 import cluster from "node:cluster";
 import { availableParallelism } from "node:os";
-import { runMigrations } from "@kkt/db";
+import { createDb, runMigrations } from "@kkt/db";
 import { buildApp } from "./app.js";
 import { config } from "./config.js";
 import { logger } from "./lib/logger.js";
@@ -9,7 +9,7 @@ import { createStorage } from "./lib/storage.js";
 import { effectiveConfig } from "./modules/system/bootConfig.js";
 import { startMetricsServer } from "./modules/system/metricsServer.js";
 import { gracefulShutdown, shutdownSettingsFromEnv, shutdownTelemetry } from "./modules/system/shutdown.js";
-import { ensureBootstrap } from "./seed/bootstrap.js";
+import { firstBoot } from "./seed/firstBoot.js";
 import { seedDemo } from "./seed/run.js";
 import { startWorker, type RunningWorker } from "./worker.js";
 
@@ -17,11 +17,13 @@ import { startWorker, type RunningWorker } from "./worker.js";
  * API entry point.
  *
  *   node --import ./dist/telemetry.js dist/server.js            HTTP API (single process, or a node:cluster primary + workers)
- *   node dist/server.js migrate                                  one-shot: migrations (+ first-boot seed when SEED_ON_BOOT), then exit
+ *   node dist/server.js migrate                                  one-shot: migrations + first boot (seed/firstBoot.ts), then exit
  *
- * Roles: with API_WORKERS > 1 (or `auto` on a multi-core box) the primary validates storage, migrates/seeds once when enabled, serves the
- * cluster-wide metrics on METRICS_PORT and supervises the HTTP workers; a single process does all of that itself. Production replicas run
- * with RUN_MIGRATIONS_ON_BOOT=false and SEED_ON_BOOT=false — the migrate job/service owns schema changes (docs/DEPLOY.md).
+ * Roles: with API_WORKERS > 1 (or `auto` on a multi-core box) the primary validates storage, migrates when enabled, runs the first boot
+ * once, serves the cluster-wide metrics on METRICS_PORT and supervises the HTTP workers; a single process does all of that itself.
+ * Production replicas run with RUN_MIGRATIONS_ON_BOOT=false and SEED_ON_BOOT=false — the migrate job/service owns schema changes
+ * (docs/DEPLOY.md). Every one of them still bootstraps a database that has no company (BOOTSTRAP_* in production; the boot is refused
+ * without them) — independent of SEED_ON_BOOT; the demo dataset needs SEED_ON_BOOT and SEED_DEMO.
  */
 
 type App = Awaited<ReturnType<typeof buildApp>>;
@@ -52,29 +54,44 @@ async function migrate(force = false): Promise<void> {
   logger.info("migrations applied");
 }
 
-/** First-boot seed: bootstrap company/roles/admin (a no-op once a company exists) and, only when SEED_DEMO, the demo dataset. */
-async function seed(app: App): Promise<void> {
-  const result = await ensureBootstrap(app.db);
-  if (result.created) logger.info({ companyId: result.companyId }, "bootstrap seed created");
-  if (!config.SEED_DEMO) return;
+/** Demo dataset seed on a built app (only reached when SEED_ON_BOOT and SEED_DEMO). */
+async function demoSeed(app: App): Promise<Awaited<ReturnType<typeof seedDemo>>> {
   await app.ready();
-  const seeded = await seedDemo(app);
-  if (!seeded.skipped) logger.info({ counts: seeded.counts, durationMs: seeded.durationMs }, "demo seed created");
+  return seedDemo(app);
 }
 
-/** Runs seed() on a short-lived app (primary / migrate job). */
-async function seedOnce(): Promise<void> {
-  const app = await buildApp({ logger: true });
-  try { await seed(app); } finally { await app.close(); }
+/** First boot on a built app (single process): bootstrap when the database has no company, the demo dataset when asked. */
+async function prepare(app: App): Promise<void> {
+  await firstBoot({ db: app.db, config, seedDemo: () => demoSeed(app) });
+}
+
+/**
+ * First boot from the cluster primary / migrate job: a small dedicated pool answers "is there a company?" and runs the bootstrap; a full
+ * app is built only for the demo dataset (it drives the real API in-process).
+ */
+async function prepareOnce(): Promise<void> {
+  const handle = createDb(config.DATABASE_URL, { max: 2 });
+  try {
+    await firstBoot({
+      db: handle.db,
+      config,
+      seedDemo: async () => {
+        const app = await buildApp({ logger: true });
+        try { return await demoSeed(app); } finally { await app.close(); }
+      },
+    });
+  } finally {
+    await handle.close();
+  }
 }
 
 /** One HTTP process: builds the app, seeds when asked, listens, optionally runs the in-process job worker, and shuts down gracefully. */
-async function serve(opts: { index: number; runJobs: boolean; seed: boolean; standalone: boolean }): Promise<void> {
+async function serve(opts: { index: number; runJobs: boolean; prepare: boolean; standalone: boolean }): Promise<void> {
   if (cluster.isWorker) setupWorkerAggregation();
   const app = await buildApp({ logger: true });
-  if (opts.seed) await seed(app);
+  if (opts.prepare) await prepare(app);
   let jobs: RunningWorker | null = null;
-  if (opts.runJobs) jobs = await startWorker(app.db);
+  if (opts.runJobs) jobs = await startWorker({ app });
   // Database/Redis-derived gauges (job failures, integrity findings, pool usage, queue depth) from exactly one process per host.
   if (opts.index === 0) enableDependencyMetrics({ query: (text) => app.sql.unsafe(text) as unknown as Promise<Record<string, unknown>[]>, redis: app.redis });
   await app.listen({ port: config.API_PORT, host: config.API_HOST });
@@ -110,7 +127,7 @@ async function supervise(count: number): Promise<void> {
   logBoot("primary", count);
   await validateStorage();
   await migrate();
-  if (config.SEED_ON_BOOT) await seedOnce();
+  await prepareOnce();
   const { clusterMetrics } = setupPrimaryAggregation();
   const metricsServer = await startMetricsServer({ port: config.METRICS_PORT, render: clusterMetrics, contentType: METRICS_CONTENT_TYPE, token: config.METRICS_TOKEN, log: logger });
 
@@ -160,7 +177,7 @@ async function supervise(count: number): Promise<void> {
 async function migrateJob(): Promise<void> {
   logBoot("migrate", 0);
   await migrate(true);
-  if (config.SEED_ON_BOOT) await seedOnce();
+  await prepareOnce();
   logger.info("migrate job finished");
 }
 
@@ -175,12 +192,12 @@ async function main(): Promise<void> {
   if (cluster.isWorker) {
     // forked by supervise(): the primary already validated storage, migrated and seeded; only the first worker runs the in-process jobs
     const index = Number(process.env["KKT_WORKER_INDEX"] ?? "0");
-    return serve({ index, runJobs: config.RUN_JOBS_IN_API && index === 0, seed: false, standalone: false });
+    return serve({ index, runJobs: config.RUN_JOBS_IN_API && index === 0, prepare: false, standalone: false });
   }
   logBoot("single", 1);
   await validateStorage();
   await migrate();
-  return serve({ index: 0, runJobs: config.RUN_JOBS_IN_API, seed: config.SEED_ON_BOOT, standalone: true });
+  return serve({ index: 0, runJobs: config.RUN_JOBS_IN_API, prepare: true, standalone: true });
 }
 
 main().catch((err: unknown) => {

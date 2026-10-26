@@ -260,9 +260,14 @@ describe("login lockout per (account, client IP) plus an account-wide threshold"
     expect(fresh.status).toBe(423);
     const [u] = await t.app.sql<{ id: string; locked_until: string | null; version: number }[]>`select id, locked_until, version from users where email = ${email}`;
     expect(new Date(u!.locked_until!).getTime()).toBeGreaterThan(Date.now());
-    const notes = await t.app.sql<{ title: string }[]>`select n.title from notifications n join users x on x.id = n.recipient_id where x.email = ${CREDS.admin.email} and n.entity_id = ${u!.id}`;
+    const notes = await t.app.sql<{ title: string; type: string }[]>`select n.title, n.type from notifications n join users x on x.id = n.recipient_id where x.email = ${CREDS.admin.email} and n.entity_id = ${u!.id}`;
     expect(notes.length).toBe(1);
     expect(notes[0]!.title).toMatch(/locked after 20 failed sign-ins/);
+    expect(notes[0]!.type).toBe("SECURITY_ALERT"); // its own bell type, not INTEGRITY_FINDINGS
+    // the staff bell list accepts the type (its response schema validates against NOTIFICATION_TYPES)
+    const bells = await t.request<{ items: { type: string }[] }>("GET", "/api/v1/notifications?page_size=50", { token: admin });
+    expect(bells.status, bells.text).toBe(200);
+    expect(bells.body.items.some((b) => b.type === "SECURITY_ALERT")).toBe(true);
     const audit = await t.app.sql<{ n: number }[]>`select count(*)::int as n from audit_logs where action = 'auth.locked' and entity_id = ${u!.id} and after->>'scope' = 'ACCOUNT'`;
     expect(audit[0]!.n).toBe(1);
     const unlock = await t.request("POST", `/api/v1/users/${u!.id}/unlock`, { token: admin, body: { version: u!.version } });

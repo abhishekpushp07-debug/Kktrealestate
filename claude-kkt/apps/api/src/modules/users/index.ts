@@ -142,7 +142,7 @@ export async function usersModule(app: FastifyInstance): Promise<void> {
   });
 
   route(app, {
-    method: "POST", url: "/users", permission: "users.manage", idempotent: true,
+    method: "POST", url: "/users", permission: "users.manage", idempotent: true, oneTimeSecrets: ["temp_password"],
     schema: { body: UserCreateSchema, response: { 201: UserRowSchema.extend({ temp_password: z.string().optional() }) }, summary: "Create a staff user" },
     handler: async (req, reply) => {
       const ctx = req.user!;

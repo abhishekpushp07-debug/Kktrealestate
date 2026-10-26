@@ -5,11 +5,11 @@
  */
 import { and, asc, desc, eq, inArray, ne } from "drizzle-orm";
 import type { IntegrityCounts, IntegrityFinding, IntegrityFindingType, IntegrityRepairResponse, IntegrityReportResponse } from "@kkt/contracts";
-import { bookings, demands, integrityRuns, type DB, type Executor } from "@kkt/db";
+import { bookings, demands, integrityRuns, type DB, type Executor, type Tx } from "@kkt/db";
 import { evaluateDues, normalizeLabel, triggerDate, type TowerStage } from "@kkt/domain";
 import { writeAudit } from "../../../lib/audit.js";
 import { notifyRole } from "../../notifications/index.js";
-import { INTEGRITY_ROLES, loadCompanyRow, lockBooking, moneyTransaction, loadTowerStagesMany, snapshotInstallments, todayDate, type BookingRecord, type MoneyActor, SYSTEM_MONEY_ACTOR } from "../common.js";
+import { INTEGRITY_ROLES, loadCompanyRow, lockBooking, moneyTransaction, loadTowerStages, snapshotInstallments, todayDate, type BookingRecord, type MoneyActor, SYSTEM_MONEY_ACTOR } from "../common.js";
 import { raiseDues, recomputeDemandStatuses, voidDemand, type DemandRecord } from "./dues.js";
 import { rebuild } from "./ledger.js";
 
@@ -116,18 +116,42 @@ async function checkBooking(db: Executor, b: BookingRecord, towerStages: readonl
   return out;
 }
 
-/** Runs the report over the scope (no writes except the persisted run). */
+/** True for a transaction handle (it has rollback()); a plain database handle opens its own transactions. */
+function isTransaction(db: Executor): db is Tx {
+  return typeof (db as { rollback?: unknown }).rollback === "function";
+}
+
+/**
+ * Runs `fn` on ONE consistent snapshot: a REPEATABLE READ, READ ONLY transaction, so every table the check reads (booking, tower stages,
+ * demands, payments, revisions, stored ledger rows) is seen as of the same instant and a payment committing midway cannot produce a
+ * false SUMMARY_MISMATCH. Inside an existing transaction the caller's snapshot is used as is.
+ */
+export async function onSnapshot<T>(db: Executor, fn: (tx: Executor) => Promise<T>): Promise<T> {
+  if (isTransaction(db)) return fn(db);
+  return (db as DB).transaction((tx) => fn(tx), { isolationLevel: "repeatable read", accessMode: "read only" });
+}
+
+/** Checks one booking on its own consistent snapshot (re-reads the booking, its tower stages and demands); null when it left the scope. */
+async function checkBookingOnSnapshot(db: Executor, bookingId: string, today: string, defaultDueDays: number): Promise<BookingFindings | null> {
+  return onSnapshot(db, async (tx) => {
+    const [b] = await tx.select().from(bookings).where(and(eq(bookings.id, bookingId), inArray(bookings.status, ["ACTIVE", "COMPLETED"]))).limit(1);
+    if (!b) return null;
+    const stages = await loadTowerStages(tx, b.blockId);
+    const nonVoid = await tx.select().from(demands).where(and(eq(demands.bookingId, b.id), ne(demands.status, "VOID"))).orderBy(asc(demands.postedAt), asc(demands.installmentSeq));
+    return checkBooking(tx, b, stages, nonVoid, today, defaultDueDays);
+  });
+}
+
+/** Runs the report over the scope (no writes except the persisted run); each booking is checked on one consistent snapshot. */
 export async function runReport(db: Executor, scope: IntegrityScope, opts: { triggeredBy?: string | null; persist?: boolean; today?: string } = {}): Promise<{ report: IntegrityReportResponse; perBooking: BookingFindings[] }> {
   const today = opts.today ?? todayDate();
   const company = await loadCompanyRow(db, scope.companyId);
   const rows = await bookingsInScope(db, scope);
-  const stages = await loadTowerStagesMany(db, rows.map((b) => b.blockId));
-  const ids = rows.map((b) => b.id);
-  const demandRows = ids.length ? await db.select().from(demands).where(and(inArray(demands.bookingId, ids), ne(demands.status, "VOID"))).orderBy(asc(demands.postedAt), asc(demands.installmentSeq)) : [];
-  const byBooking = new Map<string, DemandRecord[]>();
-  for (const d of demandRows) byBooking.set(d.bookingId, [...(byBooking.get(d.bookingId) ?? []), d]);
   const perBooking: BookingFindings[] = [];
-  for (const b of rows) perBooking.push(await checkBooking(db, b, stages.get(b.blockId) ?? [], byBooking.get(b.id) ?? [], today, company.settings.demand_due_days));
+  for (const b of rows) {
+    const checked = await checkBookingOnSnapshot(db, b.id, today, company.settings.demand_due_days);
+    if (checked) perBooking.push(checked);
+  }
   const findings = perBooking.flatMap((p) => p.findings);
   const counts: IntegrityCounts = { ...EMPTY_COUNTS };
   for (const f of findings) counts[f.type] += 1;
@@ -138,7 +162,7 @@ export async function runReport(db: Executor, scope: IntegrityScope, opts: { tri
     runId = run?.id ?? null;
   }
   return {
-    report: { run_id: runId, ran_at: ranAt.toISOString(), triggered_by: opts.triggeredBy ?? "system", ok: findings.length === 0, bookings_checked: rows.length, counts, findings },
+    report: { run_id: runId, ran_at: ranAt.toISOString(), triggered_by: opts.triggeredBy ?? "system", ok: findings.length === 0, bookings_checked: perBooking.length, counts, findings },
     perBooking,
   };
 }

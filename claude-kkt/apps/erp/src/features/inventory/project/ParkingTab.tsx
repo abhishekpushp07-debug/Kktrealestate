@@ -56,7 +56,6 @@ export function ParkingTab({ project }: ParkingTabProps) {
   const query = useList<ParkingSlotRow>(path, list.params);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [singleOpen, setSingleOpen] = useState(false);
-  const [exporting, setExporting] = useState(false);
 
   const setStatus = useMutationWithToast<ParkingSlotRow, { slot: ParkingSlotRow; status: "AVAILABLE" | "BLOCKED" }>({
     mutationFn: ({ slot, status }) => api.patch<ParkingSlotRow>(`${path}/${slot.id}`, { status, version: slot.version }, { version: slot.version }),
@@ -126,15 +125,8 @@ export function ParkingTab({ project }: ParkingTabProps) {
         }
         hasActiveFilters={list.hasActiveFilters}
         onClearFilters={list.reset}
-        onExportCsv={async () => {
-          setExporting(true);
-          try {
-            await api.exportCsv(path, list.params, `${project.code}-parking.csv`);
-          } finally {
-            setExporting(false);
-          }
-        }}
-        exporting={exporting}
+        exportSource={{ path: path, params: list.params, filename: `${project.code}-parking.csv` }}
+        exportTotal={query.data?.total}
         summary={query.data ? `${formatNumber(total)} ${total === 1 ? "slot" : "slots"}` : undefined}
         actions={
           canWrite ? (

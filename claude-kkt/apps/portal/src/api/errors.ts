@@ -12,15 +12,18 @@ export class ApiError extends Error {
   readonly code: ClientErrorCode;
   readonly details: Record<string, unknown>;
   readonly requestId: string | undefined;
+  /** OpenTelemetry trace id (error.trace_id / X-Trace-Id) when the API runs with tracing on. */
+  readonly traceId: string | undefined;
   readonly retryAfterSeconds: number | undefined;
 
-  constructor(init: { status: number; code: ClientErrorCode; message: string; details?: Record<string, unknown>; requestId?: string; retryAfterSeconds?: number }) {
+  constructor(init: { status: number; code: ClientErrorCode; message: string; details?: Record<string, unknown>; requestId?: string; traceId?: string; retryAfterSeconds?: number }) {
     super(init.message);
     this.name = "ApiError";
     this.status = init.status;
     this.code = init.code;
     this.details = init.details ?? {};
     this.requestId = init.requestId;
+    this.traceId = init.traceId;
     this.retryAfterSeconds = init.retryAfterSeconds;
   }
 
@@ -41,9 +44,20 @@ export function isApiErrorInstance(e: unknown): e is ApiError {
 
 /** A human message for any thrown value. */
 export function errorMessage(e: unknown, fallback = "Something went wrong. Please try again."): string {
+  if (e instanceof ApiError && e.code === "GONE") {
+    // a retired operation (410): this build is too old for the server
+    return `${e.message || "This feature is no longer available."} Please update the app.`;
+  }
   if (e instanceof ApiError) return e.message || fallback;
   if (e instanceof Error && e.message) return e.message;
   return fallback;
+}
+
+/** "Ref <request id> · trace <trace id>" for support, or null. */
+export function errorReference(e: unknown): string | null {
+  if (!(e instanceof ApiError)) return null;
+  const parts = [e.requestId ? `Ref ${e.requestId}` : null, e.traceId ? `trace ${e.traceId}` : null].filter(Boolean);
+  return parts.length ? parts.join(" · ") : null;
 }
 
 /** Status-based copy used only when the server sent no usable message. */
@@ -64,17 +78,25 @@ function nonEmpty(v: unknown): string | null {
   return typeof v === "string" && v.trim() ? v.trim() : null;
 }
 
+/** Correlation ids from the response headers (used when the body does not carry them). */
+export interface ResponseIds {
+  requestId?: string;
+  traceId?: string;
+}
+
 /** ApiError from a failed response's status and parsed body (any code: unknown codes keep the server's message). */
-export function apiErrorFromBody(status: number, body: unknown, retryAfterSeconds?: number): ApiError {
+export function apiErrorFromBody(status: number, body: unknown, retryAfterSeconds?: number, ids: ResponseIds = {}): ApiError {
   if (isApiError(body)) {
     const e = body.error;
-    return new ApiError({ status, code: e.code, message: nonEmpty(e.message) ?? fallbackMessage(status), details: e.details, requestId: e.request_id, retryAfterSeconds });
+    const traceId = nonEmpty((e as { trace_id?: unknown }).trace_id) ?? ids.traceId;
+    return new ApiError({ status, code: e.code, message: nonEmpty(e.message) ?? fallbackMessage(status), details: e.details, requestId: e.request_id ?? ids.requestId, ...(traceId ? { traceId } : {}), retryAfterSeconds });
   }
   const top = record(body);
   const inner = record(top?.error);
   const message = nonEmpty(inner?.message) ?? nonEmpty(top?.message);
   const rawCode = nonEmpty(inner?.code) ?? nonEmpty(top?.code);
   const code = rawCode && /^[A-Za-z][A-Za-z0-9_]*$/.test(rawCode) ? rawCode.toUpperCase() : "UNKNOWN";
-  const requestId = nonEmpty(inner?.request_id) ?? undefined;
-  return new ApiError({ status, code, message: message ?? fallbackMessage(status), details: record(inner?.details) ?? undefined, ...(requestId ? { requestId } : {}), retryAfterSeconds });
+  const requestId = nonEmpty(inner?.request_id) ?? ids.requestId;
+  const traceId = nonEmpty(inner?.trace_id) ?? ids.traceId;
+  return new ApiError({ status, code, message: message ?? fallbackMessage(status), details: record(inner?.details) ?? undefined, ...(requestId ? { requestId } : {}), ...(traceId ? { traceId } : {}), retryAfterSeconds });
 }

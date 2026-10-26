@@ -2,6 +2,7 @@ import { Building2 } from "lucide-react";
 import { useEffect } from "react";
 import { FLAT_STATUS_LABELS } from "@kkt/contracts";
 import { DateInput, EmptyState, ErrorState, FieldWrapper, FormRow, Select, Skeleton, StatusChip } from "@/components/ui";
+import { useAuth } from "@/lib/auth";
 import { formatDateTime, formatINR, formatSqft, todayIST } from "@/lib/format";
 import { useBlockGrid, useFlatDetail, useProjectBlocks } from "@/features/inventory/api";
 import { Notice } from "@/features/inventory/components";
@@ -11,6 +12,7 @@ import type { StepProps } from "./types";
 
 /** Step 1 — Project → Tower → flat from the grid, plus the booking date. */
 export function StepFlat({ state, update, errors, showErrors }: StepProps) {
+  const { user } = useAuth();
   const projects = useProjectOptions();
   const blocks = useProjectBlocks(state.project_id);
   const grid = useBlockGrid(state.block_id, "STATUS");
@@ -87,7 +89,12 @@ export function StepFlat({ state, update, errors, showErrors }: StepProps) {
                   {flat.data.facing ? ` · ${flat.data.facing} facing` : ""}
                   {flat.data.is_corner ? " · corner" : ""}
                 </p>
-                {flat.data.status === "HOLD" && (
+                {flat.data.status === "HOLD" && flat.data.hold_by_user_id === user?.id && (
+                  <p className="mt-1 text-xs text-success-fg">
+                    Held for you{flat.data.hold_until ? ` until ${formatDateTime(flat.data.hold_until)}` : ""}.
+                  </p>
+                )}
+                {flat.data.status === "HOLD" && flat.data.hold_by_user_id !== user?.id && (
                   <p className="mt-1 text-xs text-warning-fg">
                     On hold{flat.data.hold_by_name ? ` by ${flat.data.hold_by_name}` : ""}
                     {flat.data.hold_until ? ` until ${formatDateTime(flat.data.hold_until)}` : ""} — the hold owner or an admin can book it.

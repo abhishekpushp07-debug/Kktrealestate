@@ -6,6 +6,16 @@ Stack under test: API `apps/api` on `:4100` with the demo seed in its own databa
 
 Runner: [`docs/qa/web/browser-qa.cjs`](web/browser-qa.cjs) (`WEB_URL`, `API_URL`, `OUT_DIR`, `ONLY=static,enquiry,brochure,visit,toggles`), PNGs over 300 KB are palette-quantised by [`docs/qa/web/shrink.py`](web/shrink.py). On every page it asserts: zero console errors / page errors, zero failed or ≥ 400 requests (apart from the deliberate 404 / 429 tests), `scrollWidth <= innerWidth`, every visible link/button/field ≥ 44 px tall at 390 px (stretched-link cards count their whole card), and records the time to `networkidle` plus one viewport screenshot per page and width.
 
+## Integration stage 2026-10-26 (phase 5 frontend wiring)
+
+Stack: API on `:4600` (fresh demo seed in `kkt_h6`, Redis db 22), website `next build` + `next start` on `:3600` with `NEXT_PUBLIC_API_URL=API_INTERNAL_URL=http://localhost:4600`, `NEXT_PUBLIC_SITE_URL=http://localhost:3600`; runner `WEB_URL=http://localhost:3600 API_URL=http://localhost:4600 SITE_URL=http://localhost:3600 REDIS_DB=22 node docs/qa/web/browser-qa.cjs`.
+
+**Result (full run): 42 page audits, 145/145 checks, 40 screenshots, 0 defects; axe 42 scans (19 at 1440 px, 23 at 390 px), 0 serious/critical** (6 colour-contrast nodes re-verified as axe stacking false positives, as before). A first full run right after the API had been reseeded under a running server failed 6 checks (progress photos, blog body, hero text, one slot capacity): Next.js was serving its disk fetch cache (`.next/cache/fetch-cache`) of the previous seed, and earlier visit runs had used up the slot's seats. After clearing that cache on a fresh seed the run is clean; nothing in the site changed for it.
+
+New in the visit flow (`ONLY=visit`, 390 px): the manage page says until when its link works (`link_expires_at`); **Change date or time** opens a slot picker of the next 14 days (open slots only, the visit's own slot excluded) → `POST /api/v1/public/site-visits/:token/reschedule` → the page switches to the new link (`/visit/<manage_token>?moved=1`) and shows the confirmation; the previous link stops working (the API answers 404 for a rotated token); the new link shows the visit as Rescheduled and can still cancel. 410 `LINK_EXPIRED` while rescheduling or cancelling shows the expired message and "Book a new visit"; 409 `SLOT_FULL` / 422 `SLOT_INVALID` refresh the slots. Screenshots `visit-reschedule-390.png`, `visit-rescheduled-390.png`.
+
+Fixed while wiring: the selected slot chip's "N left" caption (`text-navy-900/70` on gold, axe serious colour-contrast) now uses `text-navy-950`, in the new picker and in the booking form.
+
 ## Re-run 2026-10-26 (phase 5 frontend-quality track)
 
 Stack: API on `:4500` (fresh demo seed in `kkt_h5`, Redis db 20, `TRUST_PROXY` default `loopback`), website `next build` + `next start` on `:3500` with `NEXT_PUBLIC_API_URL=API_INTERNAL_URL=http://localhost:4500`, `NEXT_PUBLIC_SITE_URL=http://localhost:3500`. Runner env: `WEB_URL`, `API_URL`, `SITE_URL`, `REDIS_DB`, `OUT_DIR`, `REPORT` (JSON report, default a temp file), `ONLY=static,enquiry,brochure,visit,security,toggles`, `AXE=0` to skip the scans. Primary targets are now checked at **48 px** (SPEC §15).

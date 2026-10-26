@@ -8,6 +8,7 @@ import type { FastifyInstance } from "fastify";
 import { bookings, companies, demands, notifications, withAdvisoryLock, type DB, type Tx } from "@kkt/db";
 import { formatINR } from "@kkt/domain";
 import { registerJob } from "../../jobs/index.js";
+import { rebuildAllLedgers } from "./services/ledgerRebuild.js";
 import { notify, notifyRole } from "../notifications/index.js";
 import { ACCOUNTS_ROLES, moneyTransaction, todayDate } from "./common.js";
 import { bookingRecipients, raiseDuesForAll } from "./services/dues.js";
@@ -110,4 +111,12 @@ export function registerMoneyJobs(app: FastifyInstance | null): void {
   registerJob("DUES_CATCHUP", async ({ db }) => duesCatchup(db));
   registerJob("NIGHTLY_INTEGRITY", async ({ db }) => nightlyIntegrityJob(db));
   registerJob("OVERDUE_NOTIFICATIONS", async ({ db }) => overdueNotifications(db, app));
+  // admin job (POST /admin/jobs/LEDGER_REBUILD/run, data: {company_id?, dry_run?, batch_size?}); never scheduled
+  registerJob("LEDGER_REBUILD", async ({ db, data }) => ({
+    ...(await rebuildAllLedgers(db, {
+      companyId: typeof data["company_id"] === "string" ? data["company_id"] : undefined,
+      dryRun: data["dry_run"] === true,
+      ...(typeof data["batch_size"] === "number" ? { batchSize: data["batch_size"] } : {}),
+    })),
+  }));
 }

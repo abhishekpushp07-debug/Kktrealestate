@@ -275,8 +275,8 @@ describe("migration advisory lock", () => {
       const db = postgres(url, { max: 1, onnotice: () => undefined });
       try {
         const [j] = await db<{ n: number }[]>`SELECT count(*)::int AS n FROM drizzle.__drizzle_migrations`;
-        expect(j?.n).toBe(3);
-        const [locks] = await db<{ n: number }[]>`SELECT count(*)::int AS n FROM pg_locks WHERE locktype = 'advisory'`;
+        expect(j?.n).toBe(4); // 0000–0003, each applied exactly once
+        const [locks] = await db<{ n: number }[]>`SELECT count(*)::int AS n FROM pg_locks WHERE locktype = 'advisory' AND database = (SELECT oid FROM pg_database WHERE datname = current_database())`;
         expect(locks?.n).toBe(0);
       } finally {
         await db.end({ timeout: 5 });

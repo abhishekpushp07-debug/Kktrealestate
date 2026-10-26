@@ -2,13 +2,13 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { Contact, Plus, UsersRound } from "lucide-react";
 import { useMemo, useState, type KeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { KYC_STATUSES, KYC_STATUS_LABELS, type CustomerRow, type PortalBulkEnableResponse } from "@kkt/contracts";
-import { Badge, Button, Combobox, ConfirmDialog, DataTable, Input, PageHeader, Select, StatusChip, Toolbar } from "@/components/ui";
-import { api } from "@/lib/api";
+import { KYC_STATUSES, KYC_STATUS_LABELS, type CustomerRow } from "@kkt/contracts";
+import { Badge, Button, Combobox, DataTable, Input, PageHeader, Select, StatusChip, Toolbar } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 import { formatNumber, formatPhone } from "@/lib/format";
-import { useList, useListParams, useMutationWithToast } from "@/lib/queries";
+import { useList, useListParams } from "@/lib/queries";
 import { useSalesUserOptions } from "@/features/inventory/api";
+import { BulkPortalEnableDialog } from "./BulkPortalEnableDialog";
 import { CustomerFormSheet } from "./CustomerFormSheet";
 import { CUSTOMERS_PATH } from "./api";
 
@@ -39,13 +39,6 @@ export default function CustomersPage() {
   const users = useSalesUserOptions();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
-  const [exporting, setExporting] = useState(false);
-
-  const bulkEnable = useMutationWithToast<PortalBulkEnableResponse, void>({
-    mutationFn: () => api.post<PortalBulkEnableResponse>(`${CUSTOMERS_PATH}/portal/bulk-enable`, { dry_run: false }),
-    successMessage: (result) => `Portal enabled for ${formatNumber(result.enabled)} customers${result.already_enabled ? ` · ${formatNumber(result.already_enabled)} already enabled` : ""}`,
-    invalidate: [[CUSTOMERS_PATH]],
-  });
 
   const columns = useMemo<ColumnDef<CustomerRow, unknown>[]>(
     () => [
@@ -125,15 +118,8 @@ export default function CustomersPage() {
         }
         hasActiveFilters={list.hasActiveFilters}
         onClearFilters={list.reset}
-        onExportCsv={async () => {
-          setExporting(true);
-          try {
-            await api.exportCsv(CUSTOMERS_PATH, list.params, "customers.csv");
-          } finally {
-            setExporting(false);
-          }
-        }}
-        exporting={exporting}
+        exportSource={{ path: CUSTOMERS_PATH, params: list.params, filename: "customers.csv" }}
+        exportTotal={query.data?.total}
         summary={query.data ? `${formatNumber(total)} ${total === 1 ? "customer" : "customers"}` : undefined}
       />
       <DataTable
@@ -152,16 +138,7 @@ export default function CustomersPage() {
         data-testid="customers-table"
       />
       <CustomerFormSheet open={sheetOpen} onOpenChange={setSheetOpen} customer={null} onSaved={(saved) => navigate(`/customers/${saved.id}`)} />
-      <ConfirmDialog
-        open={bulkOpen}
-        onOpenChange={setBulkOpen}
-        title="Enable portal access for every buyer?"
-        description="Every customer with an active booking and no portal login gets one. Temporary passwords are issued per customer; share them from each Customer 360 page."
-        confirmLabel="Enable for all"
-        onConfirm={async () => {
-          await bulkEnable.mutateAsync();
-        }}
-      />
+      <BulkPortalEnableDialog key={bulkOpen ? "open" : "closed"} open={bulkOpen} onOpenChange={setBulkOpen} />
     </>
   );
 }

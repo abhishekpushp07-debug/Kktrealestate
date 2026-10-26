@@ -258,7 +258,7 @@ export function VisitBooking({ projects, defaultProjectSlug, fixedProject = fals
             return (
               <button key={slot.start} type="button" role="radio" aria-checked={active} onClick={() => setSelectedSlot(slot)} className={`${chip(active, false)} min-w-[7.5rem]`}>
                 <span className="font-semibold">{formatTime(slot.start)}</span>
-                <span className={`text-[0.7rem] ${active ? "text-navy-900/70" : "opacity-70"}`}>
+                <span className={`text-[0.7rem] ${active ? "text-navy-950" : "opacity-70"}`}>
                   {slot.available} left
                 </span>
               </button>

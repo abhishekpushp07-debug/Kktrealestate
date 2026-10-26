@@ -1,4 +1,4 @@
-import { ArchiveRestore, ClipboardList, CreditCard, ExternalLink, FileText, History, LifeBuoy, Pencil, Phone, Power } from "lucide-react";
+import { ArchiveRestore, ClipboardList, CreditCard, ExternalLink, FileText, History, LifeBuoy, Pencil, Phone, Power, ShieldX } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { BOOKING_STATUS_LABELS, KYC_STATUS_LABELS, LEAD_SOURCE_LABELS, LEAD_STAGE_LABELS, SERVICE_STATUS_LABELS, type ActiveStateResponse, type AuditLogRow, type Customer360Response, type LeadRow, type PaymentRow, type ServiceRequestRow } from "@kkt/contracts";
@@ -15,15 +15,17 @@ import { CustomerFormSheet } from "./CustomerFormSheet";
 import { LeadDrawer } from "./LeadDrawer";
 import { AUDIT_PATH, CUSTOMERS_PATH, LEADS_PATH, PAYMENTS_PATH, SERVICE_PATH, crmKeys, useCustomer360 } from "./api";
 import { CoApplicantsCard } from "./customer/CoApplicantsCard";
+import { EraseCustomerDialog } from "./customer/EraseCustomerDialog";
 import { KycPanel } from "./customer/KycPanel";
 import { PortalAccessCard } from "./customer/PortalAccessCard";
 
 /** `/customers/:id` — Customer 360. */
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { can } = useAuth();
+  const { can, isSuperAdmin } = useAuth();
   const data = useCustomer360(id);
   const [editOpen, setEditOpen] = useState(false);
+  const [eraseOpen, setEraseOpen] = useState(false);
   const [confirmActive, setConfirmActive] = useState(false);
 
   const toggleActive = useMutationWithToast<ActiveStateResponse, Customer360Response["customer"]>({
@@ -39,7 +41,8 @@ export default function CustomerDetailPage() {
     return <ErrorState error={data.error} onRetry={() => void data.refetch()} className="rounded-lg border border-border bg-card" />;
   }
   const { customer, bookings, payments_count, documents_count, leads_count, tickets_open, portal } = data.data;
-  const canWrite = can("customer.write");
+  const canWrite = can("customer.write") && !customer.erased_at;
+  const canErase = isSuperAdmin && !customer.erased_at;
 
   return (
     <>
@@ -65,14 +68,23 @@ export default function CustomerDetailPage() {
         breadcrumbs={[{ label: "Home", to: "/" }, { label: "Customers", to: "/customers" }, { label: customer.full_name }]}
         backTo="/customers"
         actions={
-          canWrite ? (
+          canWrite || canErase ? (
             <>
-              <Button variant="outline" leftIcon={Pencil} onClick={() => setEditOpen(true)} data-testid="customer-edit-btn">
-                Edit
-              </Button>
-              <Button variant={customer.is_active ? "danger-outline" : "outline"} leftIcon={customer.is_active ? Power : ArchiveRestore} onClick={() => setConfirmActive(true)} data-testid="customer-toggle-active">
-                {customer.is_active ? "Deactivate" : "Activate"}
-              </Button>
+              {canWrite && (
+                <>
+                  <Button variant="outline" leftIcon={Pencil} onClick={() => setEditOpen(true)} data-testid="customer-edit-btn">
+                    Edit
+                  </Button>
+                  <Button variant={customer.is_active ? "danger-outline" : "outline"} leftIcon={customer.is_active ? Power : ArchiveRestore} onClick={() => setConfirmActive(true)} data-testid="customer-toggle-active">
+                    {customer.is_active ? "Deactivate" : "Activate"}
+                  </Button>
+                </>
+              )}
+              {canErase && (
+                <Button variant="danger-outline" leftIcon={ShieldX} onClick={() => setEraseOpen(true)} data-testid="customer-erase-btn">
+                  Erase personal data
+                </Button>
+              )}
             </>
           ) : undefined
         }
@@ -85,6 +97,11 @@ export default function CustomerDetailPage() {
         </div>
       </PageHeader>
 
+      {customer.erased_at && (
+        <div role="status" className="mb-4 rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink-muted" data-testid="customer-erased-notice">
+          Personal data was erased on {formatDateTime(customer.erased_at)}. The record is read-only; its bookings, payments and ledger are kept for accounting.
+        </div>
+      )}
       <div className="grid gap-4 xl:grid-cols-3">
         <div className="space-y-4 xl:col-span-1">
           <ProfileCard customer={customer} />
@@ -105,6 +122,7 @@ export default function CustomerDetailPage() {
       </div>
 
       <CustomerFormSheet open={editOpen} onOpenChange={setEditOpen} customer={customer} />
+      {canErase && <EraseCustomerDialog key={eraseOpen ? "open" : "closed"} customer={customer} open={eraseOpen} onOpenChange={setEraseOpen} />}
       <ConfirmDialog
         open={confirmActive}
         onOpenChange={setConfirmActive}

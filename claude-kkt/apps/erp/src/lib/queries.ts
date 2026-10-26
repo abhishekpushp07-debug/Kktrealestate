@@ -12,7 +12,7 @@ import {
 import { useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { api, describeError, isApiClientError, type ApiClientError, type ListEnvelope, type ListParams, type QueryValue } from "@/lib/api";
+import { api, describeError, errorReference, isApiClientError, type ApiClientError, type ListEnvelope, type ListParams, type QueryValue } from "@/lib/api";
 import { conflictDetailsFrom, conflictStore } from "@/lib/conflict-store";
 
 export { conflictStore, useVersionConflict } from "@/lib/conflict-store";
@@ -232,7 +232,8 @@ export function useMutationWithToast<TData = unknown, TVariables = void, TContex
           },
         });
       } else if (errorMessage !== false) {
-        toast.error(typeof errorMessage === "function" ? errorMessage(error, variables) : (errorMessage ?? describeError(error)));
+        const reference = errorReference(error);
+        toast.error(typeof errorMessage === "function" ? errorMessage(error, variables) : (errorMessage ?? describeError(error)), reference ? { description: reference } : undefined);
       }
       onError?.(error, variables, context);
     },

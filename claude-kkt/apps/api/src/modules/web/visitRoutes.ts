@@ -145,7 +145,7 @@ export function registerVisitRoutes(app: FastifyInstance): void {
   });
 
   route(app, {
-    method: "POST", url: "/site-visits", permission: "visit.write", idempotent: true,
+    method: "POST", url: "/site-visits", permission: "visit.write", idempotent: true, oneTimeSecrets: ["manage_url"],
     schema: { body: VisitCreateSchema, response: { 201: VisitRowSchema }, summary: "Create a site visit for a lead or customer (capacity-checked)" },
     handler: async (req, reply) => {
       const user = req.user!;

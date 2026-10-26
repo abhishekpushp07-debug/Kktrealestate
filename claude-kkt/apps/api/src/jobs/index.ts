@@ -7,11 +7,12 @@
  */
 import { randomUUID } from "node:crypto";
 import type { JobsOptions } from "bullmq";
-import { eq } from "drizzle-orm";
+import { and, asc, eq, inArray, lt, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import type { JobName } from "@kkt/contracts";
 import { jobRuns, type DB } from "@kkt/db";
 import { logger } from "../lib/logger.js";
+import { recordJobRun } from "../lib/metrics.js";
 import { alertJobFailure } from "./alerts.js";
 
 /** Name of the BullMQ queue every scheduled/triggered job goes through. */
@@ -64,7 +65,72 @@ export const JOB_SCHEDULES: readonly JobSchedule[] = [
   { name: "HOLD_EXPIRY", cron: "*/5 * * * *", tz: "Asia/Kolkata" },
   { name: "EXPORT_CLEANUP", cron: "10 3 * * *", tz: "Asia/Kolkata" },
   { name: "PARTITION_MAINTENANCE", cron: "20 2 * * *", tz: "Asia/Kolkata", enabled: () => partitioningEnabled() },
+  { name: "JOB_RUN_SWEEP", cron: "*/15 * * * *", tz: "Asia/Kolkata" },
 ];
+
+/** Default time budget of a job run (JOB_TIMEOUT_MS overrides per job below). */
+export const DEFAULT_JOB_TIMEOUT_MS = 30 * 60_000;
+
+/**
+ * Time budget of each job: the longest a healthy run is expected to take. A run still RUNNING after TWICE its budget is considered
+ * abandoned (its worker died mid-run: BullMQ retries the job under a new run id, so nothing would ever finish that row) and
+ * JOB_RUN_SWEEP marks it ABANDONED. A run that does finish later still records its real outcome over it.
+ */
+export const JOB_TIMEOUT_MS: Partial<Record<JobName, number>> = {
+  HOLD_EXPIRY: 5 * 60_000,
+  IDEMPOTENCY_PURGE: 15 * 60_000,
+  JOB_RUN_SWEEP: 5 * 60_000,
+  DAILY_DUES: 60 * 60_000,
+  DUES_CATCHUP: 60 * 60_000,
+  NIGHTLY_INTEGRITY: 60 * 60_000,
+  STARTUP_RECONCILIATION: 60 * 60_000,
+  NOTIFICATION_SWEEP: 60 * 60_000,
+  EXPORT_CSV: 60 * 60_000,
+  BACKUP_EXPORT: 2 * 60 * 60_000,
+  REENCRYPT_FIELDS: 2 * 60 * 60_000,
+  LEDGER_REBUILD: 2 * 60 * 60_000,
+};
+
+/** Time budget of a job (JOB_TIMEOUT_MS, else DEFAULT_JOB_TIMEOUT_MS). */
+export function jobTimeoutMs(name: string): number {
+  return JOB_TIMEOUT_MS[name as JobName] ?? DEFAULT_JOB_TIMEOUT_MS;
+}
+
+/** Rows examined per JOB_RUN_SWEEP statement. */
+export const JOB_RUN_SWEEP_BATCH = 1_000;
+
+/**
+ * JOB_RUN_SWEEP: marks job_runs rows that are still RUNNING after twice their job's time budget as ABANDONED (finished_at = now, error
+ * explains why). Only rows still RUNNING are touched, so a run that finishes concurrently keeps its real outcome.
+ */
+export async function sweepAbandonedJobRuns(db: DB, now: Date = new Date()): Promise<{ abandoned: number; jobs: Record<string, number> }> {
+  const shortest = Math.min(DEFAULT_JOB_TIMEOUT_MS, ...Object.values(JOB_TIMEOUT_MS));
+  const jobs: Record<string, number> = {};
+  let abandoned = 0;
+  let cursor: { at: Date; id: string } | null = null;
+  for (;;) {
+    // oldest first, keyset pages of (started_at, id): rows younger than twice the shortest budget can never be abandoned yet
+    const rows: { id: string; jobName: string; startedAt: Date }[] = await db.select({ id: jobRuns.id, jobName: jobRuns.jobName, startedAt: jobRuns.startedAt }).from(jobRuns)
+      .where(and(
+        eq(jobRuns.status, "RUNNING"), lt(jobRuns.startedAt, new Date(now.getTime() - 2 * shortest)),
+        cursor ? sql`(${jobRuns.startedAt}, ${jobRuns.id}) > (${cursor.at.toISOString()}::timestamptz, ${cursor.id}::uuid)` : undefined,
+      ))
+      .orderBy(asc(jobRuns.startedAt), asc(jobRuns.id)).limit(JOB_RUN_SWEEP_BATCH);
+    const stale = rows.filter((r) => now.getTime() - r.startedAt.getTime() > 2 * jobTimeoutMs(r.jobName));
+    if (stale.length > 0) {
+      const updated = await db.update(jobRuns).set({
+        status: "ABANDONED", finishedAt: now, error: "Abandoned: still RUNNING after twice the job's time budget (the worker running it stopped); a retry, if any, runs under its own run id",
+      }).where(and(inArray(jobRuns.id, stale.map((r) => r.id)), eq(jobRuns.status, "RUNNING"))).returning({ jobName: jobRuns.jobName });
+      for (const u of updated) jobs[u.jobName] = (jobs[u.jobName] ?? 0) + 1;
+      abandoned += updated.length;
+    }
+    const last = rows[rows.length - 1];
+    if (!last || rows.length < JOB_RUN_SWEEP_BATCH) break;
+    cursor = { at: last.startedAt, id: last.id };
+  }
+  if (abandoned > 0) logger.warn({ abandoned, jobs }, "job runs marked ABANDONED");
+  return { abandoned, jobs };
+}
 
 /** Attempts per job (first run + 2 retries). */
 export const JOB_ATTEMPTS = 3;
@@ -179,13 +245,17 @@ export async function runJob(db: DB, name: string, data: Record<string, unknown>
     .onConflictDoUpdate({ target: jobRuns.id, set: { status: "RUNNING", startedAt: new Date(), finishedAt: null, error: null, result: null } });
   const log = logger.child({ job: name, runId, attempt });
   const app = opts.app === undefined ? boundApp : opts.app;
+  const started = performance.now();
+  const seconds = () => (performance.now() - started) / 1000;
   try {
     const handler = jobHandler(name);
     const result = await handler({ db, log, data: publicJobData(data), app: app ?? null, runId, attempt, maxAttempts });
     await db.update(jobRuns).set({ status: "OK", finishedAt: new Date(), result: { ...result, ...(attempt > 1 ? { attempt } : {}) } }).where(eq(jobRuns.id, runId));
+    recordJobRun(name, "OK", seconds());
     log.info({ result }, "job finished");
     return { runId, status: "OK", result };
   } catch (err) {
+    recordJobRun(name, "FAILED", seconds());
     const final = err instanceof UnregisteredJobError || attempt >= maxAttempts;
     const message = errorMessage(err);
     await db.update(jobRuns).set({ status: "FAILED", finishedAt: new Date(), error: message, result: { attempt, max_attempts: maxAttempts, will_retry: !final } })

@@ -29,6 +29,8 @@ export function effectiveConfig(c: Env, extra: { workers: number; role: string }
     seed_on_boot: c.SEED_ON_BOOT,
     seed_demo: c.SEED_DEMO,
     run_jobs_in_api: c.RUN_JOBS_IN_API,
+    docs_public: c.DOCS_PUBLIC,
+    deploy_id: c.DEPLOY_ID ?? c.GIT_SHA ?? null,
     database: redactUrl(c.DATABASE_URL),
     database_replica: redactUrl(c.DATABASE_REPLICA_URL),
     database_pool_max: c.DATABASE_POOL_MAX,

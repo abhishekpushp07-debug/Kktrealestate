@@ -3,13 +3,13 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import { sql } from "drizzle-orm";
 import type { Redis } from "ioredis";
 import { config } from "../config.js";
-import { PERM_VERSION_KEY } from "../lib/cache.js";
+import { PERM_VERSION_KEY, redisUsable } from "../lib/cache.js";
 import { loadCompany } from "../lib/company.js";
 import { ApiError } from "../lib/errors.js";
 import { logger } from "../lib/logger.js";
 import { verifyAccessToken, type AccessClaims, type TokenAudience } from "../lib/jwt.js";
 import { clientIp, enforceRateLimit } from "../lib/rateLimit.js";
-import { isPublicPrefix, permissionAlternatives } from "../lib/routes.js";
+import { isDocsUrl, isPublicPrefix, permissionAlternatives } from "../lib/routes.js";
 import type { PortalContext, StaffContext } from "../lib/scope.js";
 
 declare module "fastify" {
@@ -55,8 +55,12 @@ export function securityRedis(app: FastifyInstance): Redis {
 /** Budget for one Redis round trip on the authentication path before the database answers instead. */
 const REDIS_AUTH_BUDGET_MS = 250;
 
-/** Runs a Redis command with a short budget; `undefined` when Redis is down, slow or errors (the caller falls back to the database). */
-async function redisTry<T>(what: string, fn: () => Promise<T>): Promise<{ ok: true; value: T } | { ok: false }> {
+/**
+ * Runs a Redis command with a short budget; `{ok: false}` when Redis is down, slow or errors (the caller falls back to the database).
+ * A client that is known to be disconnected (`client`, lib/cache redisUsable) is skipped without waiting at all.
+ */
+async function redisTry<T>(what: string, fn: () => Promise<T>, client?: Redis): Promise<{ ok: true; value: T } | { ok: false }> {
+  if (client && !redisUsable(client)) return { ok: false };
   let timer: NodeJS.Timeout | undefined;
   try {
     const value = await Promise.race([
@@ -159,14 +163,14 @@ export default fp(async (app) => {
   async function cachedState<Row>(cacheKey: string, sid: string): Promise<{ row: Row | null; version: string | null; revoked: boolean | null }> {
     const sec = securityRedis(app);
     if (sec === app.redis) {
-      const r = await redisTry("auth mget", () => app.redis.mget(PERM_VERSION_KEY, cacheKey, revokedSessionKey(sid)));
+      const r = await redisTry("auth mget", () => app.redis.mget(PERM_VERSION_KEY, cacheKey, revokedSessionKey(sid)), app.redis);
       if (!r.ok) return { row: null, version: null, revoked: null };
       const [version, raw, revoked] = r.value;
       return { row: fromCache<Row>(raw ?? null, version ?? "0"), version: version ?? "0", revoked: Boolean(revoked) };
     }
     const [cache, marker] = await Promise.all([
-      redisTry("auth cache mget", () => app.redis.mget(PERM_VERSION_KEY, cacheKey)),
-      redisTry("revocation marker read", () => sec.get(revokedSessionKey(sid))),
+      redisTry("auth cache mget", () => app.redis.mget(PERM_VERSION_KEY, cacheKey), app.redis),
+      redisTry("revocation marker read", () => sec.get(revokedSessionKey(sid)), sec),
     ]);
     const version = cache.ok ? (cache.value[0] ?? "0") : null;
     return { row: cache.ok ? fromCache<Row>(cache.value[1] ?? null, version ?? "0") : null, version, revoked: marker.ok ? Boolean(marker.value) : null };
@@ -182,7 +186,7 @@ export default fp(async (app) => {
 
   async function storeCache(key: string, version: string | null, row: unknown): Promise<void> {
     if (version === null) return; // Redis was unreadable a moment ago: do not wait on it again
-    await redisTry("auth cache write", () => app.redis.set(key, JSON.stringify({ v: version, row }), "EX", USER_CACHE_TTL));
+    await redisTry("auth cache write", () => app.redis.set(key, JSON.stringify({ v: version, row }), "EX", USER_CACHE_TTL), app.redis);
   }
 
   /** Session revocation from the database: a family is revoked once any of its refresh tokens carries revoked_at. */
@@ -228,6 +232,7 @@ export default fp(async (app) => {
 
   /** Rate limits live in the security Redis; when it cannot be reached they fail open (logged) — the DB-backed lockout still applies. */
   async function rateLimit(bucket: string, limit: number, windowSeconds: number): Promise<void> {
+    if (!redisUsable(securityRedis(app))) return; // disconnected: fail open at once (the DB-backed login lockout still applies)
     let timer: NodeJS.Timeout | undefined;
     try {
       // Same budget as the other Redis reads on this path: a down Redis (client retrying with an offline queue) must not add seconds to
@@ -249,12 +254,16 @@ export default fp(async (app) => {
     const url = req.routeOptions.url;
     if (!url) return; // unknown route: let the 404 handler answer
     const cfg = req.routeOptions.config;
-    if (cfg.public || isPublicPrefix(url)) {
+    // API docs (audit D): with DOCS_PUBLIC off (the production default) the OpenAPI document and Swagger UI need a staff token with
+    // admin.tools; they are authenticated below exactly like a staff route that declares that permission
+    const docsGuarded = !config.DOCS_PUBLIC && isDocsUrl(url);
+    if ((cfg.public || isPublicPrefix(url)) && !docsGuarded) {
       const rl = cfg.rateLimit ?? { limit: config.PUBLIC_RATE_LIMIT_PER_MIN, windowSeconds: 60 };
       await rateLimit(`pub:${cfg.rateLimit ? url : "all"}:${req.clientIp}`, rl.limit, rl.windowSeconds);
       return;
     }
-    const audience: TokenAudience = cfg.audience ?? "erp";
+    const audience: TokenAudience = docsGuarded ? "erp" : (cfg.audience ?? "erp");
+    const permission = docsGuarded ? "admin.tools" : cfg.permission;
     const token = bearer(req);
     if (!token) throw ApiError.unauthenticated("Missing bearer token");
     const result = await verifyAccessToken(token, audience);
@@ -281,8 +290,8 @@ export default fp(async (app) => {
         const company = await loadCompany(app.db, app.redis, user.companyId);
         if (company.settings.force_mfa_for_admins) throw new ApiError(403, "MFA_REQUIRED", "Multi-factor authentication is required for administrators");
       }
-      if (cfg.permission) {
-        const alternatives = permissionAlternatives(cfg.permission);
+      if (permission) {
+        const alternatives = permissionAlternatives(permission);
         if (!alternatives.some((p) => user.permissions.has(p))) throw ApiError.forbidden(`Missing permission ${alternatives.join(" or ")}`, { permission: alternatives[0], alternatives });
       }
       if (WRITE_METHODS.has(req.method)) await rateLimit(`w:${user.id}`, config.WRITE_RATE_LIMIT_PER_MIN, 60);

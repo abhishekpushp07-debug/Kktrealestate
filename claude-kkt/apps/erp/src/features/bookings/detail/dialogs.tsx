@@ -9,7 +9,7 @@ import { useMutationWithToast } from "@/lib/queries";
 import { cn } from "@/lib/utils";
 import { Notice } from "@/features/inventory/components";
 import { BOOKINGS_PATH, bookingInvalidations, useApplicablePlans, useSchedulePreview } from "../api";
-import { rebalanceSplitForTotal, splitFromAccount, splitFromAccountPercent, splitFromCash, splitFromCashPercent, splitIsExact, splitPercents, type SplitMode } from "../bookingMath";
+import { handoverBlockers, rebalanceSplitForTotal, splitFromAccount, splitFromAccountPercent, splitFromCash, splitFromCashPercent, splitIsExact, splitPercents, type SplitMode } from "../bookingMath";
 import { DueAmount } from "../components";
 import { SchedulePreviewTable } from "../wizard/SchedulePreviewTable";
 
@@ -378,16 +378,6 @@ export function CancelBookingDialog({ open, onOpenChange, booking }: DialogProps
 /* Complete / handover                                                  */
 /* ------------------------------------------------------------------ */
 
-function problemsFrom(details: Record<string, unknown> | undefined): string[] {
-  const raw = details?.problems;
-  if (!Array.isArray(raw)) return [];
-  return raw.flatMap((entry) => {
-    if (typeof entry === "string") return [entry];
-    if (typeof entry === "object" && entry !== null && typeof (entry as { message?: unknown }).message === "string") return [(entry as { message: string }).message];
-    return [];
-  });
-}
-
 /** Marks the booking Completed (flat Sold) when possession is complete and dues ≤ 0; lists blockers from HANDOVER_BLOCKED. */
 export function CompleteBookingDialog({ open, onOpenChange, booking }: DialogProps) {
   const navigate = useNavigate();
@@ -419,7 +409,7 @@ export function CompleteBookingDialog({ open, onOpenChange, booking }: DialogPro
     onSuccess: () => onOpenChange(false),
     onError: (cause) => {
       if (cause.status === 409 && cause.code === "HANDOVER_BLOCKED") {
-        const list = problemsFrom(cause.details);
+        const list = handoverBlockers(cause.details);
         setProblems(list.length ? list : [cause.message]);
         return;
       }

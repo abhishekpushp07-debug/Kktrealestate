@@ -1,6 +1,6 @@
 // Browser QA for apps/erp — see docs/qa/erp.md. Run from the repo root with the API on :4000 (demo seed) and the ERP build served on :5173:
 //   node docs/qa/erp/browser-qa.cjs                      # full walk (wipes docs/qa/erp/*.png first)
-//   ONLY=login,roles,masters,inventory,crm,money,misc,smoke node docs/qa/erp/browser-qa.cjs
+//   ONLY=login,roles,masters,inventory,crm,money,misc,hardening,smoke node docs/qa/erp/browser-qa.cjs
 // Env: ERP_URL, API_URL, OUT_DIR, ONLY, WIPE=1 (wipe PNGs even with ONLY), REPORT (path of the JSONL results file).
 const { chromium } = require("playwright");
 const fs = require("node:fs");
@@ -909,7 +909,8 @@ async function sectionCrm(browser, ids) {
       }
       await check(page, "customer-kyc-revealed");
       if (width === 1440) {
-        await page.getByTestId("kyc-status-btn").click();
+        // maker-checker workflow (security track): a PENDING file offers "Submit for verification" (verify comes from a second person)
+        await page.getByTestId("kyc-action-submitted").click();
         await page.getByTestId("kyc-status-submit").waitFor({ state: "visible" });
         await check(page, "customer-kyc-status-dialog");
         await page.keyboard.press("Escape");
@@ -1105,7 +1106,16 @@ async function sectionCrm(browser, ids) {
         await settle(page);
         const v1 = (await apiGet(`/site-visits/${visit.id}`)).body;
         expect(v1.visit_date !== visit.visit_date || v1.slot_start !== visit.slot_start, `visit rescheduled (${visit.visit_date} ${visit.slot_start} → ${v1.visit_date} ${v1.slot_start})`, page);
+        // the reschedule rotated the visitor's manage link: the drawer shows the new one once, to share (security track)
+        const linkBox = page.getByTestId("visit-new-manage-link");
+        const linkShown = await linkBox.waitFor({ state: "visible", timeout: 10000 }).then(() => true).catch(() => false);
+        const linkText = linkShown ? await page.getByRole("dialog").last().innerText() : "";
+        expect(linkShown && /\/visit\/[A-Za-z0-9_-]{16,}/.test(linkText), "reschedule shows the visitor's new manage link once (old link stops working)", page);
         await check(page, "site-visit-rescheduled");
+        if (linkShown) {
+          await page.getByRole("dialog").last().getByRole("button", { name: /^Done$/ }).click();
+          await linkBox.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+        }
         await page.getByTestId("visit-complete").click();
         const confirm = page.getByRole("alertdialog").getByRole("button", { name: /complete|confirm|mark/i });
         if (await confirm.count()) await confirm.click();
@@ -1818,6 +1828,235 @@ async function sectionMisc(browser, ids) {
   }
 }
 
+/* ---- hardening: the phase 5 track capabilities wired into the ERP (jobs, system, backups, exports, erasure, bulk portal, KYC
+ *      maker-checker, flat reservation + price deviation, reversal on a completed booking, own-account actions) ---- */
+async function waitFor(fn, timeoutMs = 60000, everyMs = 1500) {
+  const t0 = Date.now();
+  for (;;) {
+    const v = await fn();
+    if (v) return v;
+    if (Date.now() - t0 > timeoutMs) return null;
+    await sleep(everyMs);
+  }
+}
+async function sectionHardening(browser, ids) {
+  // fixtures through the API: a buyer with an active booking whose portal login is switched off (bulk enable), a fresh customer to erase
+  const manoj = ids.customers.find((c) => c.phone === "9876543216");
+  if (manoj) await apiSend("POST", `/customers/${manoj.id}/portal/disable`, {});
+  const eraseMe = (await apiSend("POST", "/customers", { full_name: `QA Erase ${stamp}`, phone: PHONE(), source: "WALK_IN" })).body;
+  const pooja = ids.customers.find((c) => c.phone === "9876543219");
+  const sanjay = ids.customers.find((c) => c.phone === "9876543220");
+  const completed = (await apiGet("/bookings?status=COMPLETED&page_size=1")).body.items[0];
+  for (const width of [1440, 390]) {
+    const { context, page } = await newContext(browser, width);
+    try {
+      await login(page, "admin");
+      // ---- jobs
+      await goto(page, "/admin/jobs");
+      await page.getByTestId("jobs-table").waitFor({ timeout: 15000 });
+      await check(page, "admin-jobs", { shot: true });
+      if (width === 1440) {
+        await page.getByTestId("job-run-NOTIFICATION_SWEEP").click();
+        await page.getByTestId("job-run-watcher").waitFor({ timeout: 10000 });
+        const ran = await page.getByTestId("job-run-watcher").getByText(/^OK$/).waitFor({ timeout: 45000 }).then(() => true).catch(() => false);
+        expect(ran, "Run now: NOTIFICATION_SWEEP queued (202), the watcher polls the run until OK", page);
+        await check(page, "admin-jobs-run");
+      }
+      // ---- system health
+      await goto(page, "/admin/system");
+      await page.getByTestId("metrics-summary").waitFor({ timeout: 15000 });
+      const sys = await bodyText(page);
+      expect(/API version/i.test(sys) && /2\.\d+\.\d+/.test(sys) && /Up/.test(sys) && /Request p95/i.test(sys), "system health: versions, database / Redis up and the metrics summary", page);
+      await check(page, "admin-system", { shot: true });
+      // ---- backups (Super Admin)
+      await goto(page, "/admin/backups");
+      await page.getByTestId("restore-instructions").waitFor({ timeout: 15000 });
+      if (width === 1440) {
+        await page.getByTestId("backup-create-btn").click();
+        await alertConfirm(page, "Create backup");
+        const done = await waitFor(async () => (await apiGet("/admin/backups")).body.items.find((b) => b.status === "DONE" || b.status === "FAILED"), 120000);
+        expect(done && done.status === "DONE", `backup queued from the page and finished on the worker (${done ? `${done.status}, ${done.table_count} tables, ${done.row_count} rows` : "timeout"})`, page);
+        await page.getByTestId(`backup-download-${done ? done.id : "x"}`).waitFor({ timeout: 20000 }).catch(() => {});
+        const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 20000 }).catch(() => null), page.getByTestId(`backup-download-${done ? done.id : "x"}`).click().catch(() => {})]);
+        expect(dl && /\.zip$/.test(dl.suggestedFilename()), `backup download through the signed link (${dl ? dl.suggestedFilename() : "none"})`, page);
+      }
+      await check(page, "admin-backups", { shot: true });
+      // ---- background export from a list toolbar → My exports → download
+      if (width === 1440) {
+        await goto(page, "/customers");
+        await page.getByTestId("export-menu").click();
+        await page.getByTestId("export-all").click();
+        await toast(page, "Export queued");
+        const exp = await waitFor(async () => (await apiGet("/exports?page_size=5")).body.items.find((e) => e.path === "/api/v1/customers" && (e.status === "DONE" || e.status === "FAILED")), 90000);
+        expect(exp && exp.status === "DONE" && exp.row_count > 0, `"Export all" queued POST /exports for /customers → ${exp ? `${exp.status}, ${exp.row_count} rows` : "timeout"}`, page);
+        await goto(page, "/exports");
+        await page.getByTestId("exports-table").waitFor({ timeout: 15000 });
+        const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 20000 }).catch(() => null), page.getByTestId(`export-download-${exp ? exp.id : "x"}`).click().catch(() => {})]);
+        expect(dl && /\.csv$/.test(dl.suggestedFilename()), `export download from My exports (${dl ? dl.suggestedFilename() : "none"})`, page);
+      } else {
+        await goto(page, "/exports");
+        await page.getByTestId("exports-table").waitFor({ timeout: 15000 });
+      }
+      await check(page, "exports", { shot: true });
+      // ---- users: own row offers Change my password, never reset / deactivate (403 SELF_CHANGE)
+      if (width === 1440) {
+        await goto(page, "/admin/users");
+        const me = (await apiGet("/auth/me")).body.user;
+        await page.getByTestId(`user-actions-${me.id}`).click();
+        const own = await page.getByRole("menu").innerText();
+        expect(/Change my password/.test(own) && !/Reset password/.test(own) && !/Deactivate/.test(own), "users: own row shows Change my password, hides Reset password / Deactivate", page);
+        await page.keyboard.press("Escape");
+      }
+      // ---- bulk portal enable: one-time credentials + CSV
+      if (width === 1440 && manoj) {
+        await goto(page, "/customers");
+        await page.getByTestId("customers-bulk-portal").click();
+        await page.getByTestId("bulk-enable-preview").waitFor({ timeout: 15000 });
+        const preview = await page.getByTestId("bulk-enable-preview").innerText();
+        expect(/1 buyer gets/.test(preview), `bulk enable dry run counts the buyers without a login (${preview})`, page);
+        await page.getByTestId("bulk-enable-confirm").click();
+        await page.getByTestId("bulk-credentials").waitFor({ timeout: 20000 });
+        const creds = await page.getByTestId("bulk-credentials").innerText();
+        expect(creds.includes("Manoj Prasad") && /[A-Za-z0-9@#$%!-]{8,}/.test(creds), "credentials dialog lists the new login with its temporary password", page);
+        await check(page, "customers-bulk-credentials", { shot: true });
+        await page.getByTestId("bulk-credentials-close").click();
+        expect(await page.getByTestId("bulk-credentials-unsaved").isVisible().catch(() => false), "closing without downloading warns that the passwords cannot be shown again", page);
+        const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 15000 }).catch(() => null), page.getByTestId("bulk-credentials-csv").click()]);
+        const csvText = dl ? fs.readFileSync(await dl.path(), "utf8") : "";
+        expect(dl && /portal-credentials-.*\.csv$/.test(dl.suggestedFilename()) && /temporary_password/.test(csvText) && csvText.includes("Manoj Prasad"), `credentials CSV downloaded once (${dl ? dl.suggestedFilename() : "none"})`, page);
+        await page.getByTestId("bulk-credentials-close").click();
+        const after = (await apiGet(`/customers/${manoj.id}`)).body;
+        expect(after.portal_enabled === true, "Manoj Prasad has portal access again (verified through the API)", page);
+      }
+      // ---- KYC maker-checker on Customer 360
+      if (width === 1440 && sanjay) {
+        await goto(page, `/customers/${sanjay.id}`);
+        await page.getByTestId("kyc-panel").waitFor({ timeout: 15000 });
+        page.col.allow.push(`/customers/${sanjay.id}/kyc`);
+        await page.getByTestId("kyc-action-submitted").click();
+        await page.getByTestId("kyc-status-submit").click();
+        await page.getByTestId("kyc-status-problem").waitFor({ timeout: 15000 });
+        const problem = await page.getByTestId("kyc-status-problem").innerText();
+        expect(/can.t be submitted/i.test(problem) && /KYC document/i.test(problem), `KYC submit without a document shows 422 KYC_INCOMPLETE with the missing list (${problem.replace(/\s+/g, " ").slice(0, 120)})`, page);
+        await check(page, "customer-kyc-incomplete", { shot: true });
+        await page.keyboard.press("Escape");
+      }
+      if (pooja) {
+        await goto(page, `/customers/${pooja.id}`);
+        await page.getByTestId("kyc-panel").waitFor({ timeout: 15000 });
+        const trail = await page.getByTestId("kyc-trail").innerText();
+        expect(/Submitted by Ankit Verma/.test(trail) && (await page.getByTestId("kyc-action-verified").count()) === 1, "KYC panel shows the submitter and offers Verify / Reject to a different checker", page);
+        await check(page, "customer-kyc-checker");
+      }
+      // ---- erasure (Super Admin, type ERASE)
+      if (width === 1440 && eraseMe && eraseMe.id) {
+        await goto(page, `/customers/${eraseMe.id}`);
+        await page.getByTestId("customer-erase-btn").click();
+        await page.getByTestId("customer-erase-reason").fill("Written erasure request QA-" + stamp);
+        expect(await page.getByTestId("customer-erase-submit").isDisabled(), "erase stays disabled until ERASE is typed", page);
+        await page.getByTestId("customer-erase-confirm").fill("ERASE");
+        await check(page, "customer-erase-dialog", { shot: true });
+        await page.getByTestId("customer-erase-submit").click();
+        await page.getByTestId("customer-erased-notice").waitFor({ timeout: 15000 });
+        const erased = (await apiGet(`/customers/${eraseMe.id}`)).body;
+        expect(Boolean(erased.erased_at) && erased.full_name !== eraseMe.full_name && (await page.getByTestId("customer-erase-btn").count()) === 0 && (await page.getByTestId("co-applicant-add").count()) === 0, `customer erased (erased_at ${erased.erased_at}); edit / erase / co-applicant actions hidden`, page);
+        await check(page, "customer-erased");
+      }
+      // ---- reversal on a COMPLETED booking: the dialog warns that it reopens the booking
+      if (completed) {
+        await goto(page, `/bookings/${completed.id}?tab=payments`);
+        const rev = page.locator('[data-testid^="payment-reverse-"]').first();
+        if (await rev.count()) {
+          await rev.click();
+          await page.getByTestId("reverse-completed-warning").waitFor({ timeout: 15000 });
+          const warn = await page.getByTestId("reverse-completed-warning").innerText();
+          expect(/reopens it/.test(warn), `reverse dialog on completed ${completed.booking_number} warns that the booking reopens`, page);
+          await check(page, "booking-reverse-completed");
+          await page.getByRole("alertdialog").getByRole("button", { name: /^Cancel$/ }).click();
+        } else note(`[${width}] no reversible payment on ${completed.booking_number}`);
+      }
+      // ---- booking wizard: reservation countdown, deviation reason, release on cancel
+      const flat = await pickAvailableFlat(ids.towerB.id);
+      if (flat) {
+        await goto(page, "/bookings/new");
+        await page.getByTestId("booking-wizard").waitFor({ timeout: 15000 });
+        if (await page.getByTestId("discard-draft").count()) await page.getByTestId("discard-draft").click();
+        await selectOption(page, "wizard-project", /Heights/);
+        await selectOption(page, "wizard-block", new RegExp(ids.towerB.name));
+        await page.getByTestId("flat-picker").waitFor({ state: "visible", timeout: 15000 });
+        await page.getByTestId("flat-picker-find").fill(flat.flat_number);
+        await page.getByTestId(`pick-cell-${flat.flat_number}`).click();
+        await page.getByTestId("wizard-reservation-countdown").waitFor({ timeout: 15000 });
+        const held = (await apiGet(`/flats/${flat.id}`)).body;
+        const countdown = await page.getByTestId("wizard-reservation-countdown").innerText();
+        expect(held.status === "HOLD" && Boolean(held.hold_until) && /^1[45]:\d\d$/.test(countdown), `picking flat ${flat.flat_number} reserves it (HOLD until ${held.hold_until}) with a ${countdown} countdown`, page);
+        await check(page, "booking-wizard-reserved", { shot: true });
+        if (width === 1440) {
+          await page.getByTestId("wizard-next").click();
+          await page.getByTestId("wizard-customer-search").fill(ids.rajesh.phone);
+          await page.getByTestId(`customer-option-${ids.rajesh.id}`).click();
+          await page.getByTestId("wizard-next").click();
+          const value = page.getByTestId("wizard-agreement-value");
+          await value.waitFor({ timeout: 10000 });
+          await value.fill(String(Math.round(flat.price_paise / 100) - 50000));
+          await value.press("Tab");
+          await page.getByTestId("wizard-deviation-reason").waitFor({ timeout: 10000 });
+          await page.getByTestId("wizard-next").click();
+          const blocked = await bodyText(page);
+          expect(/Give the reason for the price deviation/.test(blocked) && /Step 3 of 6/i.test(blocked), "agreement below list price asks agreement.edit holders for a reason before continuing", page);
+          await page.getByTestId("wizard-deviation-reason").fill("Festive offer approved by the director");
+          await check(page, "booking-wizard-deviation", { shot: true });
+        }
+        await page.getByTestId("wizard-cancel").click();
+        await page.getByTestId("wizard-discard-leave").click();
+        await page.waitForURL(/\/bookings$/, { timeout: 15000 });
+        const released = await waitFor(async () => ((await apiGet(`/flats/${flat.id}`)).body.status === "AVAILABLE" ? true : null), 15000, 700);
+        expect(released, `cancelling the wizard releases flat ${flat.flat_number} (AVAILABLE again)`, page);
+      } else note("no AVAILABLE flat in Tower B for the reservation flow");
+    } catch (e) { log(`[${width}] hardening EXCEPTION ${e.message.slice(0, 400)}`); summary.defects.push({ page: `hardening-${width}`, kind: "exception", detail: e.message.replace(/\x1b\[[0-9;]*m/g, "").slice(0, 900) }); await check(page, "hardening-exception").catch(() => {}); }
+    await context.close();
+  }
+  // Sales: agreement value locked to the list price; maker-checker note on a file they submitted
+  {
+    const { context, page } = await newContext(browser, 390);
+    try {
+      await login(page, "sales");
+      if (pooja) {
+        await goto(page, `/customers/${pooja.id}`);
+        await page.getByTestId("kyc-panel").waitFor({ timeout: 15000 });
+        expect((await page.getByTestId("kyc-maker-checker").count()) === 1 && (await page.getByTestId("kyc-action-verified").count()) === 0, "the submitter (Sales) sees the maker-checker note and no Verify button", page);
+        await check(page, "customer-kyc-maker", { shot: true });
+      }
+      const flat = await pickAvailableFlat(ids.towerB.id);
+      if (flat) {
+        await goto(page, "/bookings/new");
+        await page.getByTestId("booking-wizard").waitFor({ timeout: 15000 });
+        if (await page.getByTestId("discard-draft").count()) await page.getByTestId("discard-draft").click();
+        await selectOption(page, "wizard-project", /Heights/);
+        await selectOption(page, "wizard-block", new RegExp(ids.towerB.name));
+        await page.getByTestId("flat-picker").waitFor({ state: "visible", timeout: 15000 });
+        await page.getByTestId("flat-picker-find").fill(flat.flat_number);
+        await page.getByTestId(`pick-cell-${flat.flat_number}`).click();
+        await page.getByTestId("wizard-reservation-countdown").waitFor({ timeout: 15000 });
+        await page.getByTestId("wizard-next").click();
+        await page.getByTestId("wizard-customer-search").fill(ids.rajesh.phone);
+        await page.getByTestId(`customer-option-${ids.rajesh.id}`).click();
+        await page.getByTestId("wizard-next").click();
+        await page.getByTestId("wizard-agreement-locked").waitFor({ timeout: 10000 });
+        const readOnly = await page.getByTestId("wizard-agreement-value").getAttribute("readonly");
+        expect(readOnly !== null, "Sales: agreement value is locked to the list price (needs agreement.edit)", page);
+        await check(page, "booking-wizard-locked", { shot: true });
+        await page.getByTestId("wizard-cancel").click();
+        await page.getByTestId("wizard-discard-leave").click();
+        await page.waitForURL(/\/bookings$/, { timeout: 15000 });
+        const released = await waitFor(async () => ((await apiGet(`/flats/${flat.id}`)).body.status === "AVAILABLE" ? true : null), 15000, 700);
+        expect(released, `Sales cancel releases flat ${flat.flat_number}`, page);
+      }
+    } catch (e) { log(`[390] hardening-sales EXCEPTION ${e.message.slice(0, 400)}`); summary.defects.push({ page: "hardening-sales-390", kind: "exception", detail: e.message.replace(/\x1b\[[0-9;]*m/g, "").slice(0, 900) }); await check(page, "hardening-sales-exception").catch(() => {}); }
+    await context.close();
+  }
+}
+
 /* ---- smoke: admin walks every route at both widths ---- */
 async function sectionSmoke(browser, ids) {
   const routes = [
@@ -1826,7 +2065,7 @@ async function sectionSmoke(browser, ids) {
     ["leads", "/leads"], ["site-visits", "/site-visits"], ["customers", "/customers"], ["customer-detail", `/customers/${ids.rajesh.id}`], ["bookings", "/bookings"], ["booking-detail", `/bookings/${ids.bookingPriya.id}`], ["booking-new", "/bookings/new"], ["payments", "/payments"], ["cheques", "/payments/cheques"], ["payment-redirect", `/payments/${ids.payment.id}`], ["demands", "/demands"], ["roznamcha", "/roznamcha"], ["construction", "/construction"], ["service-requests", "/service-requests"], ["service-request-detail", `/service-requests/${ids.ticket.id}`],
     ["website-settings", "/website/settings"], ["website-banners", "/website/banners"], ["website-home-sections", "/website/home-sections"], ["website-posts", "/website/posts"], ["website-post-editor", `/website/posts/${ids.post.id}`], ["website-gallery", "/website/gallery"], ["website-testimonials", "/website/testimonials"], ["website-pages", "/website/pages"], ["website-people", "/website/people"], ["website-notices", "/website/notices"], ["website-enquiries", "/website/enquiries"], ["enquiries-alias", "/enquiries"],
     ["reports", "/reports"], ...REPORT_KEYS.map((k) => [`report-${k}`, `/reports/${k}`]), ["customer-statement", `/reports/customer-statement?booking_id=${ids.bookingRajesh.id}`],
-    ["admin-users", "/admin/users"], ["admin-roles", "/admin/roles"], ["admin-audit", "/admin/audit-log"], ["admin-settings", "/admin/settings"], ["sessions", "/sessions"], ["notifications", "/notifications"], ["change-password", "/change-password"], ["print-receipt", `/print/receipt/${ids.payment.id}`], ["print-demand", `/print/demand/${ids.bookingPriya.id}/${ids.demand.id}`], ["not-found", "/no-such-page"], ["alias-master", "/master/flat-types"], ["alias-users", "/users"],
+    ["admin-users", "/admin/users"], ["admin-roles", "/admin/roles"], ["admin-audit", "/admin/audit-log"], ["admin-settings", "/admin/settings"], ["admin-jobs", "/admin/jobs"], ["admin-system", "/admin/system"], ["admin-backups", "/admin/backups"], ["exports", "/exports"], ["sessions", "/sessions"], ["notifications", "/notifications"], ["change-password", "/change-password"], ["print-receipt", `/print/receipt/${ids.payment.id}`], ["print-demand", `/print/demand/${ids.bookingPriya.id}/${ids.demand.id}`], ["not-found", "/no-such-page"], ["alias-master", "/master/flat-types"], ["alias-users", "/users"],
   ];
   for (const width of [1440, 390]) {
     const { context, page } = await newContext(browser, width);
@@ -1859,6 +2098,7 @@ async function sectionSmoke(browser, ids) {
   if (run("crm")) await sectionCrm(browser, ids);
   if (run("money")) await sectionMoney(browser, ids);
   if (run("misc")) await sectionMisc(browser, ids);
+  if (run("hardening")) await sectionHardening(browser, ids);
   if (run("smoke")) await sectionSmoke(browser, ids);
   await browser.close();
   const mins = ((Date.now() - t0) / 60000).toFixed(1);

@@ -6,7 +6,7 @@
  *  - every inbound HTTP request (server span, renamed to `METHOD /route/:pattern` by plugins/telemetry.ts) and outbound HTTP calls;
  *  - every Redis command (ioredis);
  *  - one child span per route handler (lib/routes.ts) carrying the route, permission and audience as attributes.
- * The trace id is added to request log lines (app.ts childLoggerFactory), to the `X-Trace-Id` response header and to error bodies
+ * The trace and span ids are added to every log line (lib/logger.ts mixin), the trace id to the `X-Trace-Id` response header and to error bodies
  * (`error.trace_id`). Health, readiness and metrics probes are not traced.
  *
  * Standard OTEL_* variables apply (OTEL_EXPORTER_OTLP_HEADERS, OTEL_TRACES_SAMPLER / OTEL_TRACES_SAMPLER_ARG — parentbased_traceidratio

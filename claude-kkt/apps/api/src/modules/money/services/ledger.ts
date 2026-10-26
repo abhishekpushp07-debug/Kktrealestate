@@ -218,7 +218,7 @@ function summaryFigures(s: { cashOrderRaisedPaise: number; accountOrderRaisedPai
  * sortLedgerEvents) — and compares it with the stored booking summary AND, row by row, with the stored ledger (integrity finding e).
  * With `write` (admin recompute / repair / revisions / undo) the stored rows and summary are replaced by the recomputation (under the booking lock).
  */
-export async function rebuild(tx: Executor, bookingId: string, opts: { write?: boolean } = {}): Promise<RebuildResult> {
+export async function rebuild(tx: Executor, bookingId: string, opts: { write?: boolean | "if-changed" } = {}): Promise<RebuildResult & { written: boolean }> {
   if (opts.write) await lockBooking(tx as Tx, bookingId);
   const [booking] = await tx.select().from(bookings).where(eq(bookings.id, bookingId)).limit(1);
   if (!booking) throw ApiError.notFound("Booking");
@@ -241,12 +241,14 @@ export async function rebuild(tx: Executor, bookingId: string, opts: { write?: b
     if (s !== r) mismatches.push({ field, stored: s, recomputed: r });
   }
   const rowMismatches = diffLedgerRows(storedRows, derived.rows);
-  if (opts.write) {
+  // "if-changed" (LEDGER_REBUILD): rewrite only a ledger/summary that differs from the canonical rebuild
+  const write = opts.write === true || (opts.write === "if-changed" && (mismatches.length > 0 || rowMismatches.length > 0));
+  if (write) {
     await tx.delete(ledgerEntries).where(eq(ledgerEntries.bookingId, bookingId));
     if (derived.rows.length > 0) await tx.insert(ledgerEntries).values(derived.rows.map((r) => rowValues(booking.companyId, bookingId, r)));
     await writeSummary(tx, bookingId, derived.summary);
   }
-  return { rows: derived.rows, summary: derived.summary, mismatches, rowMismatches, stored, recomputed };
+  return { rows: derived.rows, summary: derived.summary, mismatches, rowMismatches, stored, recomputed, written: write };
 }
 
 /** Stored ledger rows of a booking in seq order. */

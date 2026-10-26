@@ -35,6 +35,12 @@ export interface RouteDef<B extends AnyZod | undefined, Q extends AnyZod | undef
   public?: boolean;
   schema: RouteSchema<B, Q, P>;
   idempotent?: boolean | "required";
+  /**
+   * Top-level response fields that carry a ONE-TIME secret (temporary password, bearer link/token). An idempotent route must list them:
+   * the idempotency store keeps the response with these fields replaced by "[redacted]", and a replay of the key answers 409
+   * IDEMPOTENT_SECRET_REPLAY (details.redacted_fields + the redacted original) instead of re-issuing or persisting the secret.
+   */
+  oneTimeSecrets?: readonly string[];
   rateLimit?: { limit: number; windowSeconds: number; by?: "ip" | "subject" };
   /**
    * Marks the operation deprecated (docs/VERSIONING.md): every response carries `Deprecation: @<since>` (RFC 9745), `Sunset: <HTTP-date>`
@@ -119,6 +125,10 @@ export interface RegistryEntry {
   public: boolean;
   /** Sunset date when the route is deprecated. */
   sunset?: string;
+  /** Idempotent POST routes only: the idempotency mode, the declared one-time secret fields and the top-level 2xx response fields. */
+  idempotent?: boolean | "required";
+  oneTimeSecrets?: readonly string[];
+  responseFields?: readonly string[];
 }
 
 declare module "fastify" {
@@ -127,6 +137,14 @@ declare module "fastify" {
 
 /** URL prefixes served by third-party plugins (Swagger UI) that cannot carry `config.public`; treated as public everywhere. */
 export const PUBLIC_PREFIXES = ["/api/v1/docs"] as const;
+
+/** The OpenAPI document and Swagger UI: public only with DOCS_PUBLIC (default off in production), else a staff token with admin.tools. */
+export const DOCS_URLS = ["/api/v1/openapi.json", "/api/v1/docs"] as const;
+
+/** True for the OpenAPI document and every Swagger UI url (page, static assets, /json, /yaml). */
+export function isDocsUrl(url: string): boolean {
+  return DOCS_URLS.some((p) => url === p || url.startsWith(`${p}/`));
+}
 
 /** True when the url is public by prefix (docs). */
 export function isPublicPrefix(url: string): boolean {
@@ -146,6 +164,13 @@ export function permissionAlternatives(key: string): string[] {
 /** Unknown query keys are 400 VALIDATION_ERROR (docs/API-CONVENTIONS.md): plain object query schemas are made strict; other shapes are left as declared. */
 function strictQuery(schema: AnyZod): AnyZod {
   return schema instanceof z.ZodObject ? schema.strict() : schema;
+}
+
+/** Top-level fields of the 2xx response object schemas (route registry: one-time secret coverage of idempotent routes). */
+function responseFields(response: Record<number, AnyZod>): string[] {
+  const out = new Set<string>();
+  for (const schema of Object.values(response)) if (schema instanceof z.ZodObject) for (const k of Object.keys(schema.shape)) out.add(k);
+  return [...out].sort();
 }
 
 /** Tag from the first path segment after /api/v1 (for OpenAPI grouping). */
@@ -191,6 +216,8 @@ export function route<B extends AnyZod | undefined = undefined, Q extends AnyZod
       ...(def.audience ? { audience: def.audience } : {}),
       ...(def.public ? { public: true } : {}),
       ...(def.idempotent ? { idempotent: def.idempotent } : {}),
+      ...(def.oneTimeSecrets?.length ? { oneTimeSecrets: def.oneTimeSecrets } : {}),
+      ...(def.idempotent ? { responseFields: responseFields(def.schema.response) } : {}),
       ...(def.rateLimit ? { rateLimit: def.rateLimit } : {}),
       ...(def.deprecated ? { sunset: def.deprecated.sunset } : {}),
     },
@@ -225,11 +252,14 @@ export function installRouteRegistry(app: FastifyInstance): void {
   app.addHook("onRoute", (r) => {
     if (r.url === "*") return; // CORS preflight catch-all
     const methods = Array.isArray(r.method) ? r.method : [r.method];
-    const cfg = (r.config ?? {}) as { permission?: string; audience?: "portal"; public?: boolean; sunset?: string };
+    const cfg = (r.config ?? {}) as { permission?: string; audience?: "portal"; public?: boolean; sunset?: string; idempotent?: boolean | "required"; oneTimeSecrets?: readonly string[]; responseFields?: readonly string[] };
     const isPublic = cfg.public === true || isPublicPrefix(r.url);
     for (const m of methods) {
       if (m === "HEAD") continue;
-      app.routeRegistry.push({ method: m, url: r.url, permission: cfg.permission ?? null, audience: isPublic ? null : (cfg.audience ?? "erp"), public: isPublic, ...(cfg.sunset ? { sunset: cfg.sunset } : {}) });
+      app.routeRegistry.push({
+        method: m, url: r.url, permission: cfg.permission ?? null, audience: isPublic ? null : (cfg.audience ?? "erp"), public: isPublic, ...(cfg.sunset ? { sunset: cfg.sunset } : {}),
+        ...(cfg.idempotent ? { idempotent: cfg.idempotent, oneTimeSecrets: cfg.oneTimeSecrets ?? [], responseFields: cfg.responseFields ?? [] } : {}),
+      });
     }
   });
 }

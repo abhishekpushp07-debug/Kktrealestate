@@ -1,6 +1,6 @@
 # KKT v2 — Demo data ("Shree Ganesh Builders", Patna)
 
-Seeding runs once on an empty database (`SEED_ON_BOOT=true`) and on `POST /api/v1/admin/reseed` with body `{ "confirm": "RESEED" }` (Super Admin only; drops business data and restores exactly this state). Every record below is connected; the integrity report must report **zero** findings after seeding.
+Seeding runs once on an empty database when `SEED_ON_BOOT=true` and `SEED_DEMO=true` (docs/DEPLOY.md "First boot"; without them a fresh production database is bootstrapped from `BOOTSTRAP_*` instead, never with demo data) and on `POST /api/v1/admin/reseed` with body `{ "confirm": "RESEED" }` (Super Admin only; drops business data and restores exactly this state). Every record below is connected; the integrity report must report **zero** findings after seeding.
 
 ## Logins (staff, ERP)
 | Role | Email | Password |
@@ -97,5 +97,6 @@ Images are generated placeholders (SVG/PNG rendered by sharp with project/stage 
 * `POST /api/v1/admin/reseed` `{ "confirm": "RESEED" }` (Super Admin, never in production) truncates every business table – sequences and idempotency keys included – keeps companies / roles / users / audit_logs (+ staff sessions), re-bootstraps missing logins, writes an `admin.reseed` audit row and runs the seed again, so numbering restarts at `…/0001`.
 * The seed drives the **real API in-process** (`app.inject`, Idempotency-Key on every create, If-Match where required, Accounts user for money, Sales for bookings/leads, Marketing for CMS) so every rule, number, snapshot, ledger row, demand, notification and audit row comes from the production code paths. Direct SQL is used only for two historical facts no endpoint can express (back-dated brochure downloads; moving finished site visits into the past) – see `SEED_FALLBACKS` in `seed/run.ts`.
 * Dates are relative to today (IST). The worked-example booking is 150 days old, block P's fourteen stages complete between 145 and 28 days ago, the Flexi booking is 20 days old. Document numbers follow the financial year of each business date, so after March 2026 the prefixes read `…/2627/…` instead of `…/2526/…` – the sequence logic is unchanged.
+* Before validating, the seed runs the `LEDGER_REBUILD` step (`rebuildAllLedgers`, a no-op when every ledger is already in the canonical posting order), so a seeded database is canonical by construction.
 * The seed validates itself (and `test/integration/seed.test.ts` re-checks through the API): zero integrity findings, the ten SPEC §11 ledger rows to the paise, booking #1 COMPLETED and P1 SOLD, Tower C = 52 flats without 13xx/7xx, every customer's portal login sees only their bookings, and the counts above.
 * Known deviation: rating a RESOLVED ticket closes it (service rule), so the RESOLVED defect/snag ticket is left unrated (the customer can rate it from the portal) and the CLOSED possession ticket carries the rating 5.

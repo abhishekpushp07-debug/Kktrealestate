@@ -25,7 +25,7 @@ import { actorFromRequest, auditMeta, writeAudit } from "../../lib/audit.js";
 import { parseCsv } from "../../lib/csv.js";
 import { ApiError } from "../../lib/errors.js";
 import { signAccessToken } from "../../lib/jwt.js";
-import { CSV_EXPORT_MAX_ROWS, EXPORT_CURSOR_HEADER, fromListQuery, paginate } from "../../lib/list.js";
+import { csvExportLimits, EXPORT_CURSOR_HEADER, fromListQuery, paginate } from "../../lib/list.js";
 import { permissionAlternatives, route, type RegistryEntry } from "../../lib/routes.js";
 import { notify } from "../notifications/index.js";
 import { fileTokenKey, signFileToken, storeFile, verifyFileToken, withTempDir } from "./files.js";
@@ -166,7 +166,7 @@ export async function runCsvExport(ctx: Pick<JobContext, "db" | "app" | "data" |
           if (header(res.headers, "x-export-truncated") === "true") throw new Error(`${row.path} cannot page its CSV export; it stopped at its row cap`);
           // A route that reports no export facts (no paginate()/listPaging()) cannot keyset-page: a full cap's worth of rows means it may
           // have cut the list, so fail loudly instead of storing a silently truncated file.
-          if (pageRows === undefined && !next && counted >= CSV_EXPORT_MAX_ROWS) throw new Error(`${row.path} cannot page its CSV export; it returned ${counted} rows without paging facts`);
+          if (pageRows === undefined && !next && counted >= csvExportLimits.maxRows) throw new Error(`${row.path} cannot page its CSV export; it returned ${counted} rows without paging facts`);
           if (!next) break;
           cursor = next;
         }

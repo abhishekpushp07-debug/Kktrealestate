@@ -4,7 +4,6 @@ import { useMemo, useState, type KeyboardEvent } from "react";
 import { Link } from "react-router-dom";
 import { ACTOR_TYPES, ACTOR_TYPE_LABELS, USER_TYPE_LABELS, type AuditLogRow, type LoginEventRow } from "@kkt/contracts";
 import { Badge, Button, Combobox, DataTable, DateInput, Input, PageHeader, Select, Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTitle, StatusChip, Switch, Tabs, TabsContent, TabsList, TabsTrigger, Toolbar } from "@/components/ui";
-import { api } from "@/lib/api";
 import { formatDateTime, formatNumber } from "@/lib/format";
 import { useList, useListParams } from "@/lib/queries";
 import { cn, humanize } from "@/lib/utils";
@@ -64,7 +63,6 @@ function ChangesTab() {
   const query = useList<AuditLogRow>(AUDIT_PATH, list.params);
   const users = useUserOptions();
   const [selected, setSelected] = useState<AuditLogRow | null>(null);
-  const [exporting, setExporting] = useState(false);
 
   const userOptions = useMemo(() => (users.data ?? []).map((user) => ({ value: user.id, label: user.name, description: user.email, keywords: [user.email] })), [users.data]);
 
@@ -128,15 +126,8 @@ function ChangesTab() {
         }
         hasActiveFilters={list.hasActiveFilters}
         onClearFilters={list.reset}
-        onExportCsv={async () => {
-          setExporting(true);
-          try {
-            await api.exportCsv(AUDIT_PATH, list.params, "audit-log.csv");
-          } finally {
-            setExporting(false);
-          }
-        }}
-        exporting={exporting}
+        exportSource={{ path: AUDIT_PATH, params: list.params, filename: "audit-log.csv" }}
+        exportTotal={query.data?.total}
         summary={query.data ? `${formatNumber(total)} entries` : undefined}
       />
       <DataTable

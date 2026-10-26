@@ -4,6 +4,14 @@
 
 **Result of the final run: 40 screenshots, 0 defects, 0 console errors, 0 failed requests, no horizontal overflow at 390 px, 90/90 related API integration tests green** (`auth`, `portal`, `portal-adversarial`, `service`, `seed`). `pnpm --filter @kkt/contracts|@kkt/api|@kkt/portal typecheck` green; `expo export --platform web` green.
 
+## Integration stage 2026-10-26 (phase 5 frontend wiring)
+
+Stack: API on `:4600` (demo seed in `kkt_h6`, Redis db 22), `EXPO_PUBLIC_API_URL=http://localhost:4600 npx expo export --platform web` served by a static SPA server on `:8681`; runner `PORTAL_URL=http://localhost:8681 API_URL=http://localhost:4600 PORTAL_DB=kkt_h6 node docs/qa/portal/browser-qa.cjs`.
+
+**Result: 40 screenshots, 0 defects, 0 console errors, 0 failed requests, no overflow, no primary target under 48 px; axe 46 scans (23 at 1440 px, 23 at 390 px), 0 violations.** New check (390 px): the runner marks the portal's `/bookings` and `/home` responses with `Deprecation: @1798761600` / `Sunset` (no v1 route is deprecated today) and expects the non-blocking **"Update available … Please update the app"** notice with the sunset date, which can be dismissed (`update-notice`).
+
+Wired in this stage (unit tests in `apps/portal/test/hardening-wiring.test.ts`): request and trace ids on errors (`error.trace_id` / `X-Trace-Id`, `X-Request-Id`) shown under error panels as "Ref … · trace …"; 410 `GONE` asks for an app update; a 429 at sign-in (also the parallel-attempt lockout budget) reads "Too many attempts. Try again in a moment / in N seconds" (the Sign in button is disabled while a request is in flight); Zod runs JIT-less so the web build's CSP sees no `new Function` probe. Other-charge demand bells already arrive with `screen: "DEMANDS"` from the API.
+
 ## Re-run 2026-10-26 (phase 5 frontend-quality track)
 
 Stack: API on `:4500` (fresh demo seed in `kkt_h5`, Redis db 20), `EXPO_PUBLIC_API_URL=http://localhost:4500 npx expo export --platform web` served by the SPA server on `:8581`. Runner env: `PORTAL_URL`, `API_URL`, `PORTAL_DB` (database used to restore the seed password at the end), `OUT_DIR`, `AXE=0` to skip the scans. Primary targets (tab bar and main action buttons) are now checked at **48 px** on phones and reported as defects below that.

@@ -46,7 +46,8 @@ const empty = (): CoApplicantValues => ({ full_name: "", relation: "", phone: ""
 
 export function CoApplicantsCard({ customer }: { customer: CustomerRow }) {
   const { can } = useAuth();
-  const canWrite = can("customer.write");
+  // An erased customer takes no new personal data (422 CUSTOMER_ERASED): hide add / edit / remove.
+  const canWrite = can("customer.write") && !customer.erased_at;
   const [editing, setEditing] = useState<{ open: boolean; row: CoApplicantRow | null }>({ open: false, row: null });
   const [removing, setRemoving] = useState<CoApplicantRow | null>(null);
   const path = `${CUSTOMERS_PATH}/${customer.id}/co-applicants`;
@@ -151,7 +152,9 @@ function CoApplicantSheet({ customer, row, open, onOpenChange, path }: { custome
       // Blank masked KYC = keep stored values.
       if (payload.pan === null && row?.pan_masked) delete payload.pan;
       if (payload.aadhaar === null && row?.aadhaar_masked) delete payload.aadhaar;
-      return api.patch<CoApplicantRow>(`${path}/${row?.id}`, payload);
+      // The version policy needs the row version (body + If-Match); a stale one is 409 VERSION_CONFLICT.
+      if (row) payload.version = row.version;
+      return api.patch<CoApplicantRow>(`${path}/${row?.id}`, payload, row ? { version: row.version } : undefined);
     },
     successMessage: (saved) => `${saved.full_name} saved`,
     invalidate,

@@ -29,6 +29,25 @@ function otherBucket(booking: BookingDetailResponse): BucketSummary {
   };
 }
 
+/** Agreement value − list price recorded at booking (null when the list price is unknown on old bookings). */
+export function bookingDeviation(booking: Pick<BookingDetailResponse, "agreement_value_paise" | "list_price_paise">): number | null {
+  return typeof booking.list_price_paise === "number" ? booking.agreement_value_paise - booking.list_price_paise : null;
+}
+
+/** The price deviation approved at booking (agreement.edit holder + reason), shown under the flat card. */
+function PriceDeviation({ booking }: { booking: BookingDetailResponse }) {
+  const deviation = bookingDeviation(booking);
+  if (!deviation) return null;
+  return (
+    <div className="mt-2 rounded-md border border-gold-border bg-gold-light px-3 py-2 text-xs" data-testid="booking-price-deviation">
+      <p className="font-semibold text-navy-950">
+        {deviation < 0 ? "Discount" : "Premium"} of <span className="money">{formatINR(Math.abs(deviation))}</span> on the list price
+      </p>
+      <p className="text-ink-muted">{booking.price_deviation_reason ? `Reason: ${booking.price_deviation_reason}` : "No reason recorded (booked before deviations needed one)."}</p>
+    </div>
+  );
+}
+
 /** Overview: per-bucket cards, next installment, flat / plan / customer / parking cards. */
 export function OverviewTab({ booking }: { booking: BookingDetailResponse }) {
   const snapshot = booking.flat_snapshot;
@@ -94,10 +113,12 @@ export function OverviewTab({ booking }: { booking: BookingDetailResponse }) {
                 { label: "Type · Floor", value: `${snapshot.flat_type_name} · ${snapshot.floor_label}` },
                 { label: "Carpet / built-up / super", value: <span className="money">{snapshot.carpet_sqft ?? "—"} / {snapshot.builtup_sqft ?? "—"} / {formatSqft(snapshot.super_builtup_sqft)}</span> },
                 { label: "Facing", value: snapshot.facing ?? "—" },
-                { label: "Price at booking", value: formatINR(snapshot.price_paise), numeric: true },
+                { label: "List price at booking", value: formatINR(booking.list_price_paise ?? snapshot.price_paise), numeric: true },
+                { label: "Agreement value", value: formatINR(booking.agreement_value_paise), numeric: true },
                 { label: "Rate / sq ft", value: booking.rate_per_sqft_paise !== null ? formatINR(booking.rate_per_sqft_paise) : "—", numeric: true },
               ]}
             />
+            <PriceDeviation booking={booking} />
             {snapshot.price_breakup.length > 0 && (
               <details className="mt-2 text-xs">
                 <summary className="cursor-pointer font-medium text-navy-800">Price breakup ({snapshot.price_breakup.length} lines)</summary>

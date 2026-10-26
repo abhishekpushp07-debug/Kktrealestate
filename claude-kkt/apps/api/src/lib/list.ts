@@ -273,6 +273,9 @@ export const CSV_EXPORT_MAX_ROWS = 10_000;
 /** Rows per page when the export job pages a CSV list with `X-Export-Cursor`. */
 export const CSV_EXPORT_PAGE_ROWS = 5_000;
 
+/** Effective CSV export limits (default CSV_EXPORT_MAX_ROWS / CSV_EXPORT_PAGE_ROWS; integration tests lower them to exercise the cap). */
+export const csvExportLimits: { maxRows: number; pageRows: number } = { maxRows: CSV_EXPORT_MAX_ROWS, pageRows: CSV_EXPORT_PAGE_ROWS };
+
 /** Request header that switches a `format=csv` list into keyset pages (`start` for the first page, then the returned cursor). */
 export const EXPORT_CURSOR_HEADER = "x-export-cursor";
 
@@ -303,8 +306,8 @@ export function csvExportFactsOf(query: object): CsvExportFacts | undefined {
 export function listPaging(q: ListQuery, origin: object = q): Pick<PaginateOptions, "page" | "page_size" | "cursor" | "limit" | "exact" | "csvExport"> {
   if (q.format === "csv") {
     const keyset = csvExportCursors.get(origin);
-    if (keyset) return { cursor: keyset.cursor, limit: CSV_EXPORT_PAGE_ROWS, exact: true, csvExport: origin };
-    return { page: 1, page_size: CSV_EXPORT_MAX_ROWS, exact: true, csvExport: origin };
+    if (keyset) return { cursor: keyset.cursor, limit: csvExportLimits.pageRows, exact: true, csvExport: origin };
+    return { page: 1, page_size: csvExportLimits.maxRows, exact: true, csvExport: origin };
   }
   return fromListQuery(q);
 }

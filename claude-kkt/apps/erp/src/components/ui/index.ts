@@ -12,6 +12,7 @@ export * from "./dialog";
 export * from "./dropdown-menu";
 export * from "./empty-state";
 export * from "./error-state";
+export * from "./export-control";
 export * from "./form";
 export * from "./input";
 export * from "./kbd";

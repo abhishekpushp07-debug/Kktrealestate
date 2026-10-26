@@ -68,7 +68,7 @@ export default function CustomerStatementPage() {
               <Button variant="outline" leftIcon={Download} loading={busy === "allotment"} disabled={busy !== null || !data} onClick={() => void run("allotment", () => downloadPdf(`/bookings/${bookingId}/allotment-letter.pdf`, `allotment-letter-${data?.booking.booking_number ?? bookingId}.pdf`))} data-testid="statement-allotment-pdf">
                 Allotment letter
               </Button>
-              <Button variant="outline" leftIcon={Download} loading={busy === "csv"} disabled={busy !== null || !data} onClick={() => void run("csv", () => exportReport(`${REPORTS_PATH}/customer-statement`, { booking_id: bookingId }, "csv", `statement-${data?.booking.booking_number ?? bookingId}`))} data-testid="statement-csv">
+              <Button variant="outline" leftIcon={Download} loading={busy === "csv"} disabled={busy !== null || !data} onClick={() => void run("csv", async () => { await exportReport(`${REPORTS_PATH}/customer-statement`, { booking_id: bookingId }, "csv", `statement-${data?.booking.booking_number ?? bookingId}`); })} data-testid="statement-csv">
                 CSV
               </Button>
               <Button leftIcon={FileText} loading={busy === "pdf"} disabled={busy !== null || !data} onClick={() => void run("pdf", () => downloadPdf(`/bookings/${bookingId}/statement.pdf`, `statement-${data?.booking.booking_number ?? bookingId}.pdf`))} data-testid="statement-pdf">

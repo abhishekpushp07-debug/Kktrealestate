@@ -1,5 +1,6 @@
 import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { ApiError, errorMessage } from "@/api/client";
+import { errorReference } from "@/api/errors";
 import { Button } from "./Button";
 import { Icon, type IconName } from "./Icon";
 import { T } from "./Text";
@@ -39,6 +40,11 @@ export function ErrorState({ error, onRetry, title, style }: { error: unknown; o
       <T variant="small" color={colors.inkMuted} align="center" style={{ maxWidth: 360 }}>
         {errorMessage(error)}
       </T>
+      {errorReference(error) ? (
+        <T variant="caption" color={colors.inkMuted} align="center" selectable>
+          {errorReference(error)}
+        </T>
+      ) : null}
       {onRetry ? <Button title="Try again" variant="outline" size="sm" icon="refresh" onPress={onRetry} style={{ marginTop: space.sm }} /> : null}
     </View>
   );

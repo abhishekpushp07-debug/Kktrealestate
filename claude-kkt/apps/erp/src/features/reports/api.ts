@@ -1,6 +1,6 @@
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import type { CustomerStatementResponse, ReportCatalogResponse, ReportKey, ReportPresetCreate, ReportPresetRow } from "@kkt/contracts";
-import { api, saveBlob, type ApiClientError, type QueryParams } from "@/lib/api";
+import { api, csvExportFacts, saveBlob, type ApiClientError, type CsvExportResult, type QueryParams } from "@/lib/api";
 import { useApiQuery } from "@/features/inventory/api";
 
 export const REPORTS_PATH = "/reports";
@@ -34,12 +34,13 @@ export function useCustomerStatement(bookingId: string | null): UseQueryResult<C
   return useApiQuery<CustomerStatementResponse>(reportKeys.statement(bookingId ?? ""), `${REPORTS_PATH}/customer-statement`, { query: { booking_id: bookingId ?? undefined }, enabled: Boolean(bookingId) });
 }
 
-/** Streams the report as CSV or PDF and hands it to the browser. */
-export async function exportReport(path: string, query: QueryParams, format: "csv" | "pdf", fallbackName: string): Promise<void> {
+/** Streams the report as CSV or PDF and hands it to the browser; a CSV returns its X-Export-* facts (truncated at 10,000 rows → offer POST /exports). */
+export async function exportReport(path: string, query: QueryParams, format: "csv" | "pdf", fallbackName: string): Promise<CsvExportResult | null> {
   const result = await api.download(path, { query: { ...query, format } });
   const fallback = `${fallbackName}.${format}`;
   const serverName = result.filename && !result.filename.includes("?") && result.filename !== path.split("/").pop() ? result.filename : fallback;
   saveBlob(result.blob, serverName);
+  return format === "csv" ? csvExportFacts(result.headers, serverName) : null;
 }
 
 /* ------------------------------------------------------------------ */

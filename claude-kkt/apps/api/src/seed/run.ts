@@ -35,6 +35,7 @@ import { seedProjects } from "./projects.js";
 import { seedService } from "./service.js";
 import { seedVisits } from "./visits.js";
 import { validateSeed } from "./validate.js";
+import { rebuildAllLedgers } from "../modules/money/index.js";
 
 export { SEED_FALLBACKS } from "./fallbacks.js";
 
@@ -116,6 +117,9 @@ async function runDemoSeed(app: FastifyInstance, log: (msg: string) => void, sta
     await seedVisits(ctx);
     await seedCms(ctx);
     await seedService(ctx);
+    // the seeded ledgers end in the canonical posting order (LEDGER_REBUILD; a no-op when they already are), before validation
+    const canonical = await rebuildAllLedgers(app.db, { companyId: boot.companyId });
+    log(`ledgers canonical: ${canonical.bookings_checked} checked, ${canonical.bookings_rebuilt} rebuilt (${canonical.order_changed_count} reordered)`);
     const integrity = (await validateSeed(ctx)) as IntegrityReportResponse;
     await invalidate(app.redis, "pub:");
     await invalidate(app.redis, "dash:");

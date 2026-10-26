@@ -299,7 +299,7 @@ export function SectionCardTitle({ children, className }: { children: ReactNode;
 }
 
 /** Inline notice (warning / info / danger). */
-export function Notice({ tone = "info", children, className }: { tone?: "info" | "warning" | "danger" | "success"; children: ReactNode; className?: string }) {
+export function Notice({ tone = "info", children, className, "data-testid": testId }: { tone?: "info" | "warning" | "danger" | "success"; children: ReactNode; className?: string; "data-testid"?: string }) {
   const classes = {
     info: "border-info/30 bg-info-bg text-info-fg",
     warning: "border-status-hold-border bg-warning-bg text-warning-fg",
@@ -307,7 +307,7 @@ export function Notice({ tone = "info", children, className }: { tone?: "info" |
     success: "border-status-available-border bg-success-bg text-success-fg",
   }[tone];
   return (
-    <div role={tone === "danger" ? "alert" : "status"} className={cn("rounded-md border px-3 py-2 text-sm", classes, className)}>
+    <div role={tone === "danger" ? "alert" : "status"} className={cn("rounded-md border px-3 py-2 text-sm", classes, className)} data-testid={testId}>
       {children}
     </div>
   );

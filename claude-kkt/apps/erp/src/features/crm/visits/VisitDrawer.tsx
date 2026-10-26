@@ -3,10 +3,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { VISIT_SOURCE_LABELS, VISIT_STATUS_LABELS, type VisitRow } from "@kkt/contracts";
 import { Badge, Button, Combobox, ConfirmDialog, ErrorState, FieldWrapper, KeyValueList, Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTitle, SimpleDialog, Skeleton, StatusChip, Textarea } from "@/components/ui";
-import { api, type ApiClientError } from "@/lib/api";
+import { api, describeError, type ApiClientError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { formatDate, formatDateTime, formatPhone } from "@/lib/format";
 import { useItem, useMutationWithToast } from "@/lib/queries";
+import { CopyField } from "@/features/shared/CopyField";
 import { useSalesUserOptions } from "@/features/inventory/api";
 import { Notice } from "@/features/inventory/components";
 import { LEADS_PATH, VISITS_PATH, crmKeys, formatSlotTime } from "../api";
@@ -63,6 +64,7 @@ function VisitDrawerBody({ visit }: { visit: VisitRow }) {
   const { can } = useAuth();
   const canWrite = can("visit.write");
   const [reschedule, setReschedule] = useState(false);
+  const [newLink, setNewLink] = useState<string | null>(null);
   const [slot, setSlot] = useState<SlotValue | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [outcome, setOutcome] = useState<"COMPLETED" | "NO_SHOW" | null>(null);
@@ -81,10 +83,12 @@ function VisitDrawerBody({ visit }: { visit: VisitRow }) {
     successMessage: (saved) => `Moved to ${formatDate(saved.visit_date)} ${formatSlotTime(saved.slot_start)}`,
     invalidate,
     entityLabel: "This visit",
-    errorMessage: (error: ApiClientError) => (error.code === "SLOT_FULL" ? "That slot is full — pick another." : error.message),
-    onSuccess: () => {
+    errorMessage: (error: ApiClientError) => (error.code === "SLOT_FULL" ? "That slot is full — pick another." : describeError(error)),
+    onSuccess: (saved) => {
       setReschedule(false);
       setSlot(null);
+      // The visitor's manage link was rotated; the new one is returned once.
+      if (saved.manage_url) setNewLink(saved.manage_url);
     },
   });
   const cancel = useMutationWithToast<VisitRow, string>({
@@ -216,6 +220,20 @@ function VisitDrawerBody({ visit }: { visit: VisitRow }) {
         }
       >
         <SlotPicker projectId={visit.project_id} value={slot} onChange={setSlot} excludeVisitId={visit.id} />
+      </SimpleDialog>
+
+      <SimpleDialog
+        open={newLink !== null}
+        onOpenChange={(next) => !next && setNewLink(null)}
+        title="Share the visitor's new link"
+        description="Rescheduling replaced the visitor's manage link: the old one no longer works. This link is shown only now; send it to the visitor (WhatsApp / SMS) so they can see or change the visit."
+        footer={<Button onClick={() => setNewLink(null)}>Done</Button>}
+      >
+        {newLink && (
+          <div data-testid="visit-new-manage-link">
+            <CopyField value={newLink} label="Copy link" />
+          </div>
+        )}
       </SimpleDialog>
 
       <ConfirmDialog

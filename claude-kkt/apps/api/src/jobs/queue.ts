@@ -135,9 +135,17 @@ export async function lastSuccessfulDuesRun(db: DB): Promise<Date | null> {
   return row?.startedAt ?? null;
 }
 
-/** Identity of this deploy for the boot lock: DEPLOY_ID (or GIT_SHA) plus APP_VERSION. */
-export function deployId(env: Record<string, string | undefined> = process.env): string {
-  return `${config.APP_VERSION}:${env["DEPLOY_ID"] ?? env["GIT_SHA"] ?? "default"}`;
+/** Start time of this process (ms since epoch), the last-resort identity of a deploy. */
+export const PROCESS_STARTED_AT = Math.round(Date.now() - process.uptime() * 1000);
+
+/**
+ * Identity of this deploy for the boot lock: APP_VERSION plus DEPLOY_ID, else GIT_SHA, else this process's start time — never a fixed
+ * default, so a redeploy of the same version without DEPLOY_ID/GIT_SHA still runs its boot jobs (at worst once per process start).
+ * `env` overrides the configuration (tests).
+ */
+export function deployId(env?: Record<string, string | undefined>): string {
+  const id = env ? (env["DEPLOY_ID"] || env["GIT_SHA"]) : (config.DEPLOY_ID ?? config.GIT_SHA);
+  return `${config.APP_VERSION}:${id || `started-${PROCESS_STARTED_AT}`}`;
 }
 
 /** How long the once-per-deploy boot lock is held (a crash-looping worker does not re-run the boot jobs on every restart). */

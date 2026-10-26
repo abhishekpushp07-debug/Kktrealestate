@@ -32,7 +32,7 @@ import idempotencyPlugin from "./plugins/idempotency.js";
 import loadShedPlugin from "./plugins/loadShed.js";
 import redisPlugin from "./plugins/redis.js";
 import requestContextPlugin, { genReqId } from "./plugins/requestContext.js";
-import telemetryPlugin, { currentTraceId } from "./plugins/telemetry.js";
+import telemetryPlugin from "./plugins/telemetry.js";
 
 /** 503 raised by under-pressure load shedding (mapped to the SERVICE_UNAVAILABLE error envelope with Retry-After). */
 class UnavailableError extends Error {
@@ -85,11 +85,7 @@ const DOCS_CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsaf
 export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({
     ...(opts.logger === false ? { logger: false } : opts.logger === true || opts.logger === undefined ? { loggerInstance: logger } : { loggerInstance: opts.logger }),
-    // trace id on every request log line when OpenTelemetry is active (src/telemetry.ts)
-    childLoggerFactory: (parent, bindings, childOpts) => {
-      const traceId = currentTraceId();
-      return parent.child(traceId ? { ...bindings, trace_id: traceId } : bindings, childOpts);
-    },
+    // trace_id/span_id on every log line (request, module and job loggers) come from the logger's mixin (lib/logger.ts)
     genReqId: (req) => genReqId(req.headers),
     bodyLimit: 2 * 1024 * 1024,
     trustProxy: config.TRUST_PROXY,
@@ -121,7 +117,8 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
     methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Authorization", "Content-Type", "Idempotency-Key", "If-Match", "If-None-Match", "X-Request-Id"],
     // Deprecation/Sunset/Link (docs/VERSIONING.md) and X-Trace-Id must be readable by cross-origin browser clients too (dev servers)
-    exposedHeaders: ["X-Request-Id", "Idempotent-Replayed", "Retry-After", "ETag", "X-Response-Time", "X-Trace-Id", "Deprecation", "Sunset", "Link"],
+    // X-Export-* (lib/list.ts): CSV row counts / truncation, so the ERP can offer POST /exports when a download was cut
+    exposedHeaders: ["X-Request-Id", "Idempotent-Replayed", "Retry-After", "ETag", "X-Response-Time", "X-Trace-Id", "Deprecation", "Sunset", "Link", "X-Export-Total", "X-Export-Rows", "X-Export-Truncated", "X-Export-Next-Cursor", "Content-Disposition"],
     maxAge: 600,
   });
   await app.register(compress, { global: true, threshold: 1024, encodings: ["br", "gzip", "deflate"] });

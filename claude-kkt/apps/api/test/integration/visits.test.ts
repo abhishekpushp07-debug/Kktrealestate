@@ -180,9 +180,12 @@ describe("public booking", () => {
     const r1 = await t.request<Booking>("POST", "/api/v1/public/site-visits", { ip, headers: { "idempotency-key": key }, body: { project_slug: wp.slug, visit_date: D(6), slot_start: "12:00", name: "Idem Visitor", phone: "9876600022", visitors: 1, consent: true, website: "" } });
     expect(r1.status, r1.text).toBe(201);
     const r2 = await t.request<Booking>("POST", "/api/v1/public/site-visits", { ip, headers: { "idempotency-key": key }, body: { project_slug: wp.slug, visit_date: D(6), slot_start: "12:00", name: "Idem Visitor", phone: "9876600022", visitors: 1, consent: true, website: "" } });
-    expect(r2.status).toBe(201);
+    // the manage link is a one-time bearer secret: never stored by the idempotency store, so the replay is 409 with the redacted original
+    expect(r2.status, r2.text).toBe(409);
     expect(r2.headers["idempotent-replayed"]).toBe("true");
-    expect(r2.body.visit_number).toBe(r1.body.visit_number);
+    const replay = r2.body as unknown as ErrorBody;
+    expect(replay.error.code).toBe("IDEMPOTENT_SECRET_REPLAY");
+    expect(replay.error.details).toMatchObject({ redacted_fields: ["manage_url", "ics_url"], original: { visit_number: r1.body.visit_number, manage_url: "[redacted]", ics_url: "[redacted]" } });
     expect((await t.app.sql<{ n: number }[]>`select count(*)::int as n from site_visits where phone = '9876600022'`)[0]!.n).toBe(1);
   });
 

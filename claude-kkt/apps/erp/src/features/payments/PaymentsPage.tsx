@@ -3,7 +3,6 @@ import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { PAYMENT_AGAINSTS, PAYMENT_AGAINST_LABELS, PAYMENT_MODE_CODES, PAYMENT_MODE_CODE_LABELS, PAYMENT_STATUSES, PAYMENT_STATUS_LABELS, type PaymentRow } from "@kkt/contracts";
 import { Button, DateInput, PageHeader, Select, Toolbar } from "@/components/ui";
-import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { formatNumber } from "@/lib/format";
 import { useList, useListParams } from "@/lib/queries";
@@ -22,16 +21,6 @@ export default function PaymentsPage() {
   const query = useList<PaymentRow>(PAYMENTS_PATH, list.params);
   const projects = useProjectOptions();
   const [postOpen, setPostOpen] = useState(() => params.get("action") === "post");
-  const [exporting, setExporting] = useState(false);
-
-  const exportCsv = async () => {
-    setExporting(true);
-    try {
-      await api.exportCsv(PAYMENTS_PATH, { ...list.params, page: 1, page_size: 200 }, "payments.csv");
-    } finally {
-      setExporting(false);
-    }
-  };
 
   return (
     <>
@@ -69,8 +58,8 @@ export default function PaymentsPage() {
         }
         hasActiveFilters={list.hasActiveFilters}
         onClearFilters={list.reset}
-        onExportCsv={exportCsv}
-        exporting={exporting}
+        exportSource={{ path: PAYMENTS_PATH, params: list.params, filename: "payments.csv" }}
+        exportTotal={query.data?.total}
       />
       <PaymentsTable
         rows={query.data?.items ?? []}

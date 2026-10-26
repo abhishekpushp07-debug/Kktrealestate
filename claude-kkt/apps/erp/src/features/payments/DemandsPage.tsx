@@ -1,10 +1,11 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { FileText, Play, ShieldCheck, Wrench } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { DEMAND_STATUSES, DEMAND_STATUS_LABELS, INTEGRITY_FINDING_TYPE_LABELS, type DemandRow, type IntegrityFinding, type IntegrityReportResponse } from "@kkt/contracts";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, ConfirmDialog, DataTable, DateInput, EmptyState, ErrorState, PageHeader, Select, Skeleton, StatusChip, Toolbar } from "@/components/ui";
-import { api, describeError, isApiClientError } from "@/lib/api";
+import { describeError, isApiClientError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { formatDate, formatDateTime, formatINR, formatINRShort, formatNumber, formatPercent } from "@/lib/format";
 import { useList, useListParams, useMutationWithToast } from "@/lib/queries";
@@ -78,8 +79,9 @@ export default function DemandsPage() {
   const list = useListParams({ filterKeys: FILTERS, defaultSort: "due_date" });
   const query = useList<DemandRow>(DEMANDS_PATH, list.params);
   const projects = useProjectOptions();
-  const [exporting, setExporting] = useState(false);
-  const [integrityOpen, setIntegrityOpen] = useState(false);
+  const [searchParams] = useSearchParams();
+  // `/admin/integrity` (integrity bell link) lands here with the panel open.
+  const [integrityOpen, setIntegrityOpen] = useState(() => searchParams.get("tab") === "integrity");
   const isAdmin = can("admin.tools");
 
   const run = useMutationWithToast<Awaited<ReturnType<typeof runDues>>, void>({
@@ -163,15 +165,8 @@ export default function DemandsPage() {
             }
             hasActiveFilters={list.hasActiveFilters}
             onClearFilters={list.reset}
-            exporting={exporting}
-            onExportCsv={async () => {
-              setExporting(true);
-              try {
-                await api.exportCsv(DEMANDS_PATH, { ...list.params, page: 1, page_size: 200 }, "demands.csv");
-              } finally {
-                setExporting(false);
-              }
-            }}
+            exportSource={{ path: DEMANDS_PATH, params: { ...list.params, page: 1, page_size: 200 }, filename: "demands.csv" }}
+        exportTotal={query.data?.total}
           />
           <DataTable
             columns={columns}
@@ -284,6 +279,11 @@ export function IntegrityPanel({ onClose }: { onClose: () => void }) {
                 </Badge>
               ))}
             </div>
+            {(report.data.counts.PLAN_STAGE_MISSING ?? 0) > 0 && (
+              <Notice tone="warning" data-testid="integrity-plan-stage-missing">
+                {formatNumber(report.data.counts.PLAN_STAGE_MISSING ?? 0)} installment(s) wait on a construction stage their tower no longer has, so they can never be raised. Repair cannot fix this: add the stage back to the tower (Projects › tower › stage sequence) or move the booking to a plan that fits.
+              </Notice>
+            )}
             {report.data.ok ? (
               <Notice tone="success">Every demand maps to a satisfied trigger and the stored summaries match recomputation.</Notice>
             ) : (

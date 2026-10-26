@@ -12,7 +12,8 @@ export interface AuthUser {
   name: string;
   email: string;
   phone: string | null;
-  role: { id: string; name: string };
+  /** `is_system` marks the built-in roles (the Super Admin system role has powers beyond its permission list). */
+  role: { id: string; name: string; is_system: boolean };
   permissions: Permission[];
   all_projects: boolean;
   project_ids: string[];
@@ -52,6 +53,15 @@ export interface AuthContextValue {
   can: (permission: PermissionRequirement) => boolean;
   canAny: (permissions: readonly Permission[]) => boolean;
   canAll: (permissions: readonly Permission[]) => boolean;
+  /** The built-in Super Admin role (erase, backups, managing other Super Admins). */
+  isSuperAdmin: boolean;
+}
+
+export const SUPER_ADMIN_ROLE_NAME = "Super Admin";
+
+/** True for the built-in Super Admin system role (a custom role named the same is not). */
+export function isSuperAdminUser(user: Pick<AuthUser, "role"> | null | undefined): boolean {
+  return Boolean(user && user.role.name === SUPER_ADMIN_ROLE_NAME && user.role.is_system);
 }
 
 /* ------------------------------------------------------------------ */
@@ -88,6 +98,7 @@ export function normaliseUser(raw: unknown): AuthUser | null {
     role: {
       id: str(role?.id, str(record.role_id)),
       name: str(role?.name, str(record.role_name)),
+      is_system: role?.is_system === true || record.is_system_role === true,
     },
     permissions: strArray(record.permissions) as Permission[],
     all_projects: record.all_projects === true,
@@ -280,6 +291,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       can,
       canAny,
       canAll,
+      isSuperAdmin: isSuperAdminUser(user),
     }),
     [status, user, company, scope, login, completeMfa, logout, refreshMe, changePassword, can, canAny, canAll],
   );

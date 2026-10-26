@@ -3,13 +3,15 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import type { Sql } from "postgres";
 import { createHash } from "node:crypto";
 import { registerJob } from "../jobs/index.js";
+import type { Redis } from "ioredis";
+import { redisUsable } from "../lib/cache.js";
 import { ApiError } from "../lib/errors.js";
 import { logger } from "../lib/logger.js";
 import { installVersionPolicy } from "../lib/version.js";
 
 declare module "fastify" {
   interface FastifyInstance { sql: Sql }
-  interface FastifyContextConfig { idempotent?: boolean | "required"; permission?: string; audience?: "erp" | "portal"; public?: boolean; rateLimit?: { limit: number; windowSeconds: number; by?: "ip" | "subject" } }
+  interface FastifyContextConfig { idempotent?: boolean | "required"; oneTimeSecrets?: readonly string[]; permission?: string; audience?: "erp" | "portal"; public?: boolean; rateLimit?: { limit: number; windowSeconds: number; by?: "ip" | "subject" } }
 }
 
 const TTL_SECONDS = 24 * 3600;
@@ -23,6 +25,34 @@ const REDIS_BUDGET_MS = 200;
 export const IDEMPOTENCY_PURGE_BATCH = 5_000;
 
 interface StoredResponse { request_hash: string; status_code: number; response_body: unknown; path: string }
+
+/** Marker key of a stored response whose one-time secrets were redacted (the route declared `oneTimeSecrets`). */
+export const SECRET_REDACTED_MARKER = "__kkt_secret_redacted";
+/** Value written in place of a one-time secret in the idempotency store. */
+export const REDACTED_VALUE = "[redacted]";
+
+/**
+ * The body the idempotency store keeps for a route that returns one-time secrets: every listed top-level field that is present and not
+ * null is replaced by "[redacted]", and the whole body is wrapped with the redaction marker so a replay is recognised.
+ */
+export function redactOneTimeSecrets(body: unknown, fields: readonly string[]): { [SECRET_REDACTED_MARKER]: string[]; body: unknown } {
+  const redacted: string[] = [];
+  let out = body;
+  if (body && typeof body === "object" && !Array.isArray(body)) {
+    const copy: Record<string, unknown> = { ...(body as Record<string, unknown>) };
+    for (const f of fields) {
+      if (copy[f] === undefined || copy[f] === null) continue;
+      copy[f] = REDACTED_VALUE;
+      redacted.push(f);
+    }
+    out = copy;
+  }
+  return { [SECRET_REDACTED_MARKER]: redacted, body: out };
+}
+
+function isRedactedRecord(body: unknown): body is { [SECRET_REDACTED_MARKER]: string[]; body: unknown } {
+  return typeof body === "object" && body !== null && Array.isArray((body as Record<string, unknown>)[SECRET_REDACTED_MARKER]);
+}
 interface Row { request_hash: string; status_code: number | null; response_body: unknown; path: string }
 
 /**
@@ -48,8 +78,9 @@ function requestHash(req: FastifyRequest): string {
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-/** Runs a Redis call within REDIS_BUDGET_MS; undefined when Redis is down, slow or errors. */
-async function redisTry<T>(what: string, fn: () => Promise<T>): Promise<T | undefined> {
+/** Runs a Redis call within REDIS_BUDGET_MS; undefined when Redis is down (disconnected clients are skipped at once), slow or errors. */
+async function redisTry<T>(what: string, fn: () => Promise<T>, client?: Pick<Redis, "status">): Promise<T | undefined> {
+  if (client && !redisUsable(client)) return undefined;
   let timer: NodeJS.Timeout | undefined;
   try {
     return await Promise.race([fn(), new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("timeout")), REDIS_BUDGET_MS); })]);
@@ -91,7 +122,7 @@ export default fp(async (app) => {
   registerJob("IDEMPOTENCY_PURGE", async () => purgeExpiredIdempotencyKeys(sql));
 
   async function cachedResponse(redisKey: string): Promise<StoredResponse | null> {
-    const raw = await redisTry("get", () => app.redis.get(redisKey));
+    const raw = await redisTry("get", () => app.redis.get(redisKey), app.redis);
     return raw ? (JSON.parse(raw) as StoredResponse) : null;
   }
 
@@ -118,6 +149,12 @@ export default fp(async (app) => {
   function replay(reply: FastifyReply, stored: StoredResponse, hash: string): FastifyReply {
     if (stored.request_hash !== hash) throw new ApiError(422, "IDEMPOTENCY_MISMATCH", "Idempotency-Key was already used with a different request");
     reply.header("Idempotent-Replayed", "true");
+    if (isRedactedRecord(stored.response_body)) {
+      // the original response carried a one-time secret that is never stored: the request DID succeed, but its secret cannot be shown again
+      throw new ApiError(409, "IDEMPOTENT_SECRET_REPLAY", "This request already succeeded, but its one-time secret is not stored and cannot be shown again. Issue a new one (for example reset the password) instead of retrying.", {
+        original_status: stored.status_code, redacted_fields: stored.response_body[SECRET_REDACTED_MARKER], original: stored.response_body.body,
+      });
+    }
     return reply.status(stored.status_code).send(stored.response_body);
   }
 
@@ -161,11 +198,16 @@ export default fp(async (app) => {
     req.idempotency = undefined;
     try {
       if (reply.statusCode >= 200 && reply.statusCode < 300) {
-        const body: unknown = typeof payload === "string" && payload.length > 0 ? JSON.parse(payload) : null;
+        const parsed: unknown = typeof payload === "string" && payload.length > 0 ? JSON.parse(payload) : null;
+        // one-time secrets (temporary passwords, bearer links) never reach the store: neither the row nor the Redis copy
+        const secrets = req.routeOptions.config.oneTimeSecrets;
+        const redacted = secrets?.length ? redactOneTimeSecrets(parsed, secrets) : null;
+        // a response that carried no secret this time (e.g. POST /users with an explicit password) is stored and replayed normally
+        const body: unknown = redacted && redacted[SECRET_REDACTED_MARKER].length > 0 ? redacted : parsed;
         await sql`update idempotency_keys set status_code = ${reply.statusCode}, response_body = ${JSON.stringify(body)}::jsonb, path = ${req.url}
                   where scope_key = ${ctx.scopeKey} and key = ${ctx.key} and request_hash = ${ctx.hash}`;
         const record: StoredResponse = { request_hash: ctx.hash, status_code: reply.statusCode, response_body: body, path: req.url };
-        await redisTry("set", () => app.redis.set(ctx.redisKey, JSON.stringify(record), "EX", TTL_SECONDS));
+        await redisTry("set", () => app.redis.set(ctx.redisKey, JSON.stringify(record), "EX", TTL_SECONDS), app.redis);
       } else {
         // only successes are remembered: release the claim so the client may retry with the same key
         await sql`delete from idempotency_keys where scope_key = ${ctx.scopeKey} and key = ${ctx.key} and status_code is null`;

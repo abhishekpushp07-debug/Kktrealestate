@@ -7,6 +7,8 @@ import { applyServerErrors, Badge, Button, Combobox, DateInput, FormError, FormF
 import { api, type ApiClientError } from "@/lib/api";
 import { formatDateTime, formatPhone } from "@/lib/format";
 import { useMutationWithToast } from "@/lib/queries";
+import { toast } from "sonner";
+import { Notice } from "@/features/inventory/components";
 import { useSalesUserOptions } from "@/features/inventory/api";
 import { contractResolver } from "@/features/shared/contractResolver";
 import { CUSTOMERS_PATH } from "./api";
@@ -211,7 +213,8 @@ export function CustomerFormSheet({ open, onOpenChange, customer, seed, onSaved 
     invalidate: [[CUSTOMERS_PATH]],
     entityLabel: "This customer",
     errorMessage: false,
-    onSuccess: (saved) => {
+    onSuccess: (saved, { row }) => {
+      if (kycResetByEdit(row.kyc_status, saved.kyc_status)) toast.warning(`PAN / Aadhaar changed: KYC is back to Pending and must be submitted and verified again.`);
       onSaved?.(saved);
       onOpenChange(false);
     },
@@ -303,6 +306,16 @@ function TagsInput({ value, onChange, id }: { value: string[]; onChange: (tags: 
   );
 }
 
+/** KYC states in which a PAN / Aadhaar change sends the file back to PENDING (server rule, security track). */
+export function kycLocksIdentifiers(status: string): boolean {
+  return status === "SUBMITTED" || status === "VERIFIED";
+}
+
+/** True when a save turned a submitted / verified KYC back to PENDING. */
+export function kycResetByEdit(before: string, after: string): boolean {
+  return kycLocksIdentifiers(before) && after === "PENDING";
+}
+
 function CustomerFields({ open, customer }: { open: boolean; customer: CustomerRow | null }) {
   const { control, watch } = useFormContext<CustomerValues>();
   const sameAsCurrent = watch("same_as_current");
@@ -381,6 +394,11 @@ function CustomerFields({ open, customer }: { open: boolean; customer: CustomerR
             render={({ field }) => <Input {...field} value={field.value} onChange={(event) => field.onChange(formatAadhaar(event.target.value))} inputMode="numeric" maxLength={14} className={`money font-mono ${aadhaarState === false ? "border-danger" : aadhaarState ? "border-success" : ""}`} autoComplete="off" placeholder={customer?.aadhaar_masked ?? "1234 5678 9012"} data-testid="customer-aadhaar" />}
           />
         </FormRow>
+        {customer && kycLocksIdentifiers(customer.kyc_status) && (pan !== "" || aadhaarDigits !== "") && (
+          <Notice tone="warning" data-testid="customer-kyc-reset-warning">
+            Changing PAN or Aadhaar resets KYC from {customer.kyc_status === "VERIFIED" ? "Verified" : "Submitted"} to Pending; it then has to be submitted and verified again.
+          </Notice>
+        )}
         <FormRow columns={2}>
           <FormField control={control} name="bank.bank_name" label="Bank" render={({ field }) => <Input {...field} value={field.value} onChange={(event) => field.onChange(event.target.value)} maxLength={120} />} />
           <FormField control={control} name="bank.ifsc" label="IFSC" hint={stateHint(ifscState, "Valid IFSC", "Format HDFC0001234")} render={({ field }) => <Input {...field} value={field.value} onChange={(event) => field.onChange(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 11))} maxLength={11} className={`font-mono uppercase ${ifscState === false ? "border-danger" : ifscState ? "border-success" : ""}`} autoComplete="off" />} />

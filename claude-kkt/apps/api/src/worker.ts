@@ -102,6 +102,9 @@ function isOptions(x: unknown): x is StartWorkerOptions {
 /** Standalone entry point: build the full app (no listen), start the consumer, shut down on SIGTERM/SIGINT. */
 async function main(): Promise<void> {
   const { buildApp } = await import("./app.js");
+  // jobs write exports, backups and portal files: fail fast (like the API) when the object store is unusable
+  const { createStorage } = await import("./lib/storage.js");
+  await createStorage().check();
   const app = await buildApp({ logger: true });
   await app.ready();
   const running = await startWorker({ app });

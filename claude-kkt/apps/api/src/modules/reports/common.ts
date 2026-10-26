@@ -115,10 +115,14 @@ export function sendPdf(reply: FastifyReply, filename: string, body: Buffer | Re
   return reply.send(body);
 }
 
-/** Paging for a paged report: normal paging for JSON, every row (capped) for csv/pdf exports. */
+/**
+ * Paging for a paged report: normal paging for JSON, every row (capped at the CSV export limit) for csv/pdf exports. `q` must be the
+ * request's own query object (`req.query`): the derived copy is linked back to it (listPaging `origin`), so the CSV response carries the
+ * X-Export-Total / X-Export-Rows / X-Export-Truncated headers and the async export job (POST /exports) can page it with X-Export-Cursor.
+ */
 export function reportPaging(q: Omit<ListQuery, "format"> & ExportQuery): ReturnType<typeof listPaging> {
   const { format: _f, export: _e, ...rest } = q;
-  return listPaging({ ...rest, ...(wantedFormat(q) === "json" ? {} : { format: "csv" as const }) });
+  return listPaging({ ...rest, ...(wantedFormat(q) === "json" ? {} : { format: "csv" as const }) }, q);
 }
 
 /** CSV columns from a key list (header = key). */

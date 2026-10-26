@@ -4,7 +4,6 @@ import { useMemo, useState, type KeyboardEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { FLAT_STATUSES, FLAT_STATUS_LABELS, type FlatRow, type FlatTypeRow } from "@kkt/contracts";
 import { Combobox, DataTable, Input, PageHeader, Select, StatusChip, Toolbar } from "@/components/ui";
-import { api } from "@/lib/api";
 import { formatDateTime, formatINR, formatNumber, formatSqft } from "@/lib/format";
 import { useList, useListParams } from "@/lib/queries";
 import { useMasterRows } from "@/features/masters/api";
@@ -58,7 +57,6 @@ export function FlatsTable({ blockId, projectId, prefix = "" }: FlatsTableProps)
   const projects = useProjectOptions(!projectId && !blockId);
   const blocks = useProjectBlocks(blockId ? null : effectiveProject);
   const flatTypes = useMasterRows<FlatTypeRow>("flat-types");
-  const [exporting, setExporting] = useState(false);
 
   const openFlat = (id: string | null) => {
     setParams(
@@ -125,15 +123,8 @@ export function FlatsTable({ blockId, projectId, prefix = "" }: FlatsTableProps)
         }
         hasActiveFilters={list.hasActiveFilters}
         onClearFilters={list.reset}
-        onExportCsv={async () => {
-          setExporting(true);
-          try {
-            await api.exportCsv(FLATS_PATH, queryParams, "flats.csv");
-          } finally {
-            setExporting(false);
-          }
-        }}
-        exporting={exporting}
+        exportSource={{ path: FLATS_PATH, params: queryParams, filename: "flats.csv" }}
+        exportTotal={query.data?.total}
         summary={query.data ? `${formatNumber(total)} ${total === 1 ? "flat" : "flats"}` : undefined}
       />
       <DataTable

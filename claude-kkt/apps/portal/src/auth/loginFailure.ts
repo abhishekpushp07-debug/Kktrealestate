@@ -24,7 +24,9 @@ export function toLoginFailure(e: unknown): LoginFailure {
       return { code: "LOCKED", message: e.message || "Too many failed attempts. Your account is locked for a while.", lockedUntil };
     }
     if (e.code === "RATE_LIMITED" || e.status === 429) {
-      return { code: "RATE_LIMITED", message: e.message || "Too many attempts. Please wait a minute and try again.", retryAfterSeconds: e.retryAfterSeconds };
+      // also returned when parallel attempts exceed the lockout budget (security track): a fixed, calm message
+      const wait = e.retryAfterSeconds ? `Try again in ${e.retryAfterSeconds} seconds.` : "Try again in a moment.";
+      return { code: "RATE_LIMITED", message: `Too many attempts. ${wait}`, retryAfterSeconds: e.retryAfterSeconds };
     }
     if (e.code === "VALIDATION_ERROR") return { code: "VALIDATION", message: "Enter a valid 10-digit mobile number and your password." };
     if (e.isNetwork) return { code: "NETWORK", message: e.message };
