@@ -242,7 +242,11 @@ async def cancellations(request: Request, from_date: str | None = None, to_date:
     q = {**_scope(user, project_id), "status": "Cancelled", "cancellation.at": {"$gte": f, "$lte": t + "T23:59:59"}}
     rows = []
     bks = await db.bookings.find(q, {"_id": 0}).to_list(500)
-    refunds = {r["booking_id"]: r for r in await db.refunds.find({"booking_id": {"$in": [b["id"] for b in bks]}}, {"_id": 0}).to_list(None)}
+    refunds: dict[str, dict] = {}
+    for r in await db.refunds.find({"booking_id": {"$in": [b["id"] for b in bks]}, "parent_refund_id": {"$exists": False}}, {"_id": 0}).to_list(None):
+        e = refunds.setdefault(r["booking_id"], {"status": r["status"], "amount_paise": 0})
+        e["amount_paise"] += (r.get("amount_total_paise") or r["amount_paise"]) if r["status"] == "Paid" else 0
+        e["status"] = "Paid" if e["status"] == "Paid" or r["status"] == "Paid" else r["status"]
     for b in bks:
         c = b.get("cancellation") or {}
         rf = refunds.get(b["id"]) or {}
