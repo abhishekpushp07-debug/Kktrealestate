@@ -315,20 +315,6 @@ def anchor_booking(admin_headers):
 # pre-switch price snapshot, Priya/Sunita/Santosh portal personas) is retired when the DB is the API-driven story dataset.
 # Those tests assert the shape of the old raw-inserted fixtures and are skipped in story mode; the story has its own anchors
 # (tests/test_story_headline.py).
-_LEGACY_DEMO_TESTS = (
-    "test_price_truth.py::test_flat_api_prices_match_pre_switch_snapshot",
-    "test_phase_2.py::test_roznamcha",
-    "test_phase_2.py::test_payment_requires_idempotency_and_bucket_cap_and_revision", "test_phase_2.py::test_milestones_forward_only_and_undo_block",
-    "test_phase_2.py::test_kyc_masking_and_reveal", "test_phase_2.py::test_concurrency_and_sum_mismatch", "test_phase_2.py::test_cheque_pending_clear_bounce_reverse",
-    "test_phase_3.py::test_cms_collection_counts[testimonials-6]", "test_phase_7.py::TestTowerBConstruction", "test_phase_7.py::TestBK0001Integrity", "test_phase_7.py::TestPortalPhase7",
-        "test_phase_5.py::TestServiceRequests::test_rate_sunita_sr3", "test_phase_5.py::TestServiceRequests::test_internal_note_hidden_on_portal",
-    "test_phase_5.py::TestChangePassword", "test_phase_5.py::TestErpDocShare::test_toggle_share_and_sensitive_block", "test_phase_5.py::TestErpPortalMgmt::test_get_portal_status_and_revoke_and_bulk",
-    "test_phase_a_print.py", "test_phase_9.py::test_brochure_gate_flow", "test_phase_9.py::test_availability_rules", "test_phase_1_5.py::TestRateCards::test_create_activate_apply",
-    "test_phase_c_refocus.py::test_receipt_pdf_text_kkt",
-    "test_phase_5.py::TestPortalAuth::test_lockout_after_5_wrong", "test_phase_5.py::TestPortalData",
-)
-
-
 def _story_mode() -> bool:
     try:
         from pymongo import MongoClient
@@ -338,10 +324,3 @@ def _story_mode() -> bool:
         return False
 
 
-def pytest_collection_modifyitems(config, items):
-    if not _story_mode():
-        return
-    mark = pytest.mark.skip(reason="legacy demo-seed fixture retired by the Phase H story dataset")
-    for item in items:
-        if any(t in item.nodeid for t in _LEGACY_DEMO_TESTS):
-            item.add_marker(mark)

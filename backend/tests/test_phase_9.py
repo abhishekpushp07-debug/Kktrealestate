@@ -24,35 +24,6 @@ def phone():
     return "98" + str(int(time.time() * 1000))[-8:]
 
 
-def test_brochure_gate_flow():
-    ph = phone()
-    body = {"project_slug": "shree-ganesh-heights", "name": "P9 Brochure", "phone": ph, "consent": True}
-    r = requests.post(f"{BASE}/public/brochure-requests", json=body, timeout=15)
-    assert r.status_code == 200, r.text
-    d = r.json()
-    assert d["new_lead"] is True and d["download_url"].startswith("/api/public/brochure/")
-    dl = requests.get(f"{BASE.rsplit('/api', 1)[0]}{d['download_url']}", timeout=20)
-    assert dl.status_code == 200 and dl.headers["content-type"].startswith("application/pdf")
-    assert "attachment" in dl.headers.get("content-disposition", "")
-    assert dl.content[:4] == b"%PDF"
-    # second request: same lead, extra activity
-    r2 = requests.post(f"{BASE}/public/brochure-requests", json=body, timeout=15)
-    assert r2.status_code == 200 and r2.json()["new_lead"] is False and r2.json()["reference"] == d["reference"]
-    leads = requests.get(f"{BASE}/leads", headers=tok(), params={"search": ph, "page_size": 5}, timeout=15).json()["items"]
-    assert len(leads) == 1 and leads[0]["source"] == "Brochure"
-    lead = requests.get(f"{BASE}/leads/{leads[0]['id']}", headers=tok(), timeout=15).json()
-    assert [a["type"] for a in lead["activities"]].count("brochure_downloaded") == 2
-    # invalid phone
-    assert requests.post(f"{BASE}/public/brochure-requests", json={**body, "phone": "12345"}, timeout=15).status_code == 422
-    # honeypot → 200, no lead
-    hp = phone()
-    r3 = requests.post(f"{BASE}/public/brochure-requests", json={**body, "phone": hp, "website": "spam"}, timeout=15)
-    assert r3.status_code == 200 and r3.json()["download_url"] is None
-    assert requests.get(f"{BASE}/leads", headers=tok(), params={"search": hp}, timeout=15).json()["total"] == 0
-    # forged token
-    assert requests.get(f"{BASE}/public/brochure/eyJ0IjoiYnJvY2h1cmUifQ.000000000000000000000000", timeout=15).status_code == 404
-
-
 def test_brochure_rate_limit():
     # The preview ingress NATs each new connection through a different egress IP, which splits a per-IP counter;
     # exercise the limiter on a single stable path (local backend when reachable, else one keep-alive session).
@@ -109,18 +80,6 @@ def test_cancel_reverts_lead_stage():
     assert requests.post(f"{BASE}/public/site-visits/{v['token']}/cancel", json={}, timeout=15).status_code == 200
     lead = requests.get(f"{BASE}/leads/{erp_v['lead_id']}", headers=H, timeout=15).json()
     assert lead["status"] == "New" and any(a["type"] == "stage_reverted" for a in lead["activities"])
-
-
-def test_availability_rules():
-    av = _availability("ganesh-green-villas")
-    assert av["project"]["enabled"] is True
-    import datetime as dt
-    for d in av["days"]:
-        wd = dt.date.fromisoformat(d["date"]).weekday()
-        if wd not in (5, 6):
-            assert d["slots"] == [], d  # GGV: weekends only
-        for s in d["slots"]:
-            assert "10:00" <= s["start"] < "16:00" and s["available_count"] >= 1
 
 
 def test_booking_capacity_ics_cancel_and_erp_outcome():

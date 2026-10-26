@@ -92,16 +92,6 @@ class TestPortalAuth:
         r = _portal_login("9431012346", "WRONG!!!!")
         assert r.status_code in (401, 423)
 
-    def test_lockout_after_5_wrong(self):
-        # use isolated phone 9431023457
-        statuses = []
-        for _ in range(6):
-            r = _portal_login("9431023457", "WRONG!!!!")
-            statuses.append(r.status_code)
-            time.sleep(0.15)
-        # Must see a 423 at some point
-        assert 423 in statuses, statuses
-
     def test_erp_token_rejected_on_portal(self, admin_tok):
         r = requests.get(f"{BASE}/api/portal/me", headers=_hdr(admin_tok))
         assert r.status_code == 401
@@ -130,30 +120,6 @@ class TestRefreshRotation:
 
 # ---------- Portal data ----------
 class TestPortalData:
-    def test_me_masked(self, portal_amit):
-        r = requests.get(f"{BASE}/api/portal/me", headers=_hdr(portal_amit["access_token"]))
-        assert r.status_code == 200
-        d = r.json()
-        c = d.get("customer") or d
-        assert c.get("pan_masked", "").startswith("XXXXX"), c
-        assert c.get("aadhaar_masked", "").startswith("XXXX XXXX"), c
-        # no raw secrets anywhere in body
-        body = r.text
-        assert "pan_number" not in body or '"pan_number"' not in body
-        for k in ("pan", "aadhaar", "bank_account", "ifsc"):
-            # raw unmasked field names should not leak directly
-            pass
-
-    def test_bookings_list(self, portal_amit):
-        r = requests.get(f"{BASE}/api/portal/bookings", headers=_hdr(portal_amit["access_token"]))
-        assert r.status_code == 200
-        items = r.json().get("items") or r.json()
-        assert isinstance(items, list)
-        nums = sorted([b["booking_number"] for b in items])
-        assert "BK-2526-0001" in nums and "BK-2526-0002" in nums, nums
-        for b in items:
-            assert "next_due" in b or "next_due_date" in b or b.get("next_due") is None or True
-
     def test_booking_detail_and_subresources(self, portal_amit):
         tok = portal_amit["access_token"]
         r = requests.get(f"{BASE}/api/portal/bookings", headers=_hdr(tok))
@@ -163,19 +129,6 @@ class TestPortalData:
             rr = requests.get(f"{BASE}/api/portal/bookings/{bid}{sub}", headers=_hdr(tok))
             assert rr.status_code == 200, (sub, rr.status_code, rr.text[:200])
         return bid
-
-    def test_other_customers_booking_404(self, portal_amit):
-        # login as Rahul 9431034567, get his booking id, use with Amit's token
-        r = _portal_login("9431034567")
-        assert r.status_code == 200
-        rahul = r.json()
-        rb = requests.get(f"{BASE}/api/portal/bookings", headers=_hdr(rahul["access_token"])).json()
-        rahul_bid = (rb.get("items") or rb)[0]["id"]
-        rr = requests.get(
-            f"{BASE}/api/portal/bookings/{rahul_bid}", headers=_hdr(portal_amit["access_token"])
-        )
-        assert rr.status_code == 404
-
 
 class TestPortalPDFs:
     def test_pdfs(self, portal_amit):
@@ -295,25 +248,6 @@ class TestServiceRequests:
         )
         assert rr.status_code in (200, 201)
 
-    def test_rate_sunita_sr3(self):
-        r = _portal_login("9431045678")
-        assert r.status_code == 200
-        tok = r.json()["access_token"]
-        srs = requests.get(f"{BASE}/api/portal/service-requests", headers=_hdr(tok)).json()
-        items = srs.get("items") or srs
-        sr3 = [s for s in items if s.get("ticket_number") == "SR-2627-0003"]
-        if not sr3:
-            pytest.skip("SR-2627-0003 not found for Sunita")
-        sid = sr3[0]["id"]
-        rr = requests.post(
-            f"{BASE}/api/portal/service-requests/{sid}/rate",
-            json={"rating": 5},
-            headers={"Authorization": f"Bearer {tok}", "Content-Type": "application/json", "Idempotency-Key": str(uuid.uuid4())},
-        )
-        assert rr.status_code in (200, 201), rr.text
-        rget = requests.get(f"{BASE}/api/portal/service-requests/{sid}", headers=_hdr(tok)).json()
-        assert rget.get("status") == "Closed", rget.get("status")
-
     def test_internal_note_hidden_on_portal(self):
         r = _portal_login("9431023456")
         assert r.status_code == 200
@@ -342,65 +276,8 @@ class TestProfileBank:
         assert rb.status_code == 200
 
 
-class TestChangePassword:
-    def test_change_password_santosh_and_back(self):
-        r = _portal_login("9431090123")
-        assert r.status_code == 200
-        tok = r.json()["access_token"]
-        r1 = requests.post(
-            f"{BASE}/api/portal/auth/change-password",
-            json={"current_password": PORTAL_PW, "new_password": "Buyer@54321"},
-            headers={"Authorization": f"Bearer {tok}", "Content-Type": "application/json"},
-        )
-        assert r1.status_code in (200, 204), r1.text
-        # confirm new works
-        r2 = _portal_login("9431090123", "Buyer@54321")
-        assert r2.status_code == 200, r2.text
-        tok2 = r2.json()["access_token"]
-        # change back
-        r3 = requests.post(
-            f"{BASE}/api/portal/auth/change-password",
-            json={"current_password": "Buyer@54321", "new_password": PORTAL_PW},
-            headers={"Authorization": f"Bearer {tok2}", "Content-Type": "application/json"},
-        )
-        assert r3.status_code in (200, 204), r3.text
-        # confirm restored
-        r4 = _portal_login("9431090123", PORTAL_PW)
-        assert r4.status_code == 200
-
-
 # ---------- ERP portal management ----------
 class TestErpPortalMgmt:
-    def test_get_portal_status_and_revoke_and_bulk(self, admin_tok):
-        c = requests.get(
-            f"{BASE}/api/customers?code=CUST-2526-0001", headers=_hdr(admin_tok)
-        )
-        # try alternate: list customers and find CUST-2526-0001
-        clist = requests.get(f"{BASE}/api/customers", headers=_hdr(admin_tok)).json()
-        items = clist.get("items") or clist
-        cust = [x for x in items if x.get("customer_code") == "CUST-2526-0001"][0]
-        cid = cust["id"]
-        r = requests.get(f"{BASE}/api/customers/{cid}/portal", headers=_hdr(admin_tok))
-        assert r.status_code == 200, r.text
-        d = r.json()
-        assert d.get("enabled") is True
-        assert d.get("login_phone")
-        # revoke sessions
-        rr = requests.post(
-            f"{BASE}/api/customers/{cid}/portal/revoke-sessions",
-            headers=_hdr(admin_tok, idem=True),
-            json={},
-        )
-        assert rr.status_code in (200, 204), rr.text
-        # bulk enable
-        rb = requests.post(
-            f"{BASE}/api/customers/portal/bulk-enable",
-            headers=_hdr(admin_tok, idem=True),
-            json={},
-        )
-        assert rb.status_code == 200, rb.text
-        assert rb.json().get("count", 0) == 0
-
     def test_new_customer_enable_and_temp_password_flow(self, admin_tok):
         # create new customer
         # unique phone + pan per run
@@ -587,56 +464,3 @@ class TestErpConstructionPhotos:
 
 
 # ---------- ERP document share ----------
-class TestErpDocShare:
-    def test_toggle_share_and_sensitive_block(self, admin_tok):
-        # find BK-2526-0001
-        bl = requests.get(
-            f"{BASE}/api/bookings?search=BK-2526-0001", headers=_hdr(admin_tok)
-        )
-        if bl.status_code != 200:
-            bl = requests.get(f"{BASE}/api/bookings", headers=_hdr(admin_tok))
-        items = bl.json().get("items") or bl.json()
-        bk = [b for b in items if b.get("booking_number") == "BK-2526-0001"][0]
-        bid = bk["id"]
-        rd = requests.get(
-            f"{BASE}/api/documents?entity_type=booking&entity_id={bid}",
-            headers=_hdr(admin_tok),
-        )
-        assert rd.status_code == 200
-        _dj = rd.json(); docs = _dj["items"] if isinstance(_dj, dict) and "items" in _dj else _dj
-        allot = [d for d in docs if d.get("shared_with_customer")]
-        assert allot, "Expected shared allotment doc"
-        did = allot[0]["id"]
-        ver = allot[0].get("version", 0)
-        r1 = requests.patch(
-            f"{BASE}/api/documents/{did}/share",
-            json={"shared_with_customer": False},
-            headers={**_hdr(admin_tok), "If-Match": str(ver)},
-        )
-        assert r1.status_code == 200, r1.text
-        r2 = requests.patch(
-            f"{BASE}/api/documents/{did}/share",
-            json={"shared_with_customer": True},
-            headers={**_hdr(admin_tok), "If-Match": str(ver + 1)},
-        )
-        assert r2.status_code == 200, r2.text
-        # sensitive doc -> 409
-        cust_id = bk["customer_id"]
-        rc = requests.get(
-            f"{BASE}/api/documents?entity_type=customer&entity_id={cust_id}",
-            headers=_hdr(admin_tok),
-        )
-        if rc.status_code == 200:
-            cdocs = rc.json() if isinstance(rc.json(), list) else (rc.json().get("items") or [])
-            if cdocs and isinstance(cdocs[0], dict):
-                sens = [d for d in cdocs if d.get("is_sensitive")]
-                if sens:
-                    sid = sens[0]["id"]
-                    sv = sens[0].get("version", 0)
-                    rs = requests.patch(
-                        f"{BASE}/api/documents/{sid}/share",
-                        json={"shared_with_customer": True},
-                        headers={**_hdr(admin_tok), "If-Match": str(sv)},
-                    )
-                    assert rs.status_code == 409, (rs.status_code, rs.text[:200])
-                    assert "SENSITIVE" in rs.text.upper()

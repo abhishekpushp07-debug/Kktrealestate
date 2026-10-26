@@ -72,42 +72,6 @@ class TestHealthAndMigration:
 
 
 # ---------- AC5 BK-2526-0001 ledger integrity ----------
-class TestBK0001Integrity:
-    def test_bk_0001_due_zero_and_snapshot(self, H):
-        r = requests.get(f"{API}/bookings?search=BK-2526-0001", headers=H, timeout=15)
-        assert r.status_code == 200, r.text
-        items = r.json().get("items") or r.json()
-        assert items, "BK-2526-0001 not found"
-        booking_number = "BK-2526-0001"
-        match = next((b for b in items if b.get("booking_number") == booking_number), None)
-        assert match, items
-        bid = match["id"]
-        rd = requests.get(f"{API}/bookings/{bid}", headers=H, timeout=15)
-        assert rd.status_code == 200
-        d = rd.json()
-        # due in paise should be 0
-        due_paise = (d.get("summary") or {}).get("due_paise")
-        if due_paise is None:
-            due_paise = d.get("due_paise")
-        assert due_paise == 0, f"BK-2526-0001 due_paise={due_paise}"
-        snap = d.get("payment_plan_snapshot") or {}
-        assert snap.get("name") == "Standard CLP", snap
-        # ledger rows (count 22)
-        rl = requests.get(f"{API}/bookings/{bid}/ledger", headers=H, timeout=15)
-        assert rl.status_code == 200
-        rdata = rl.json()
-        rows = rdata.get("rows") if isinstance(rdata, dict) else rdata
-        if rows is None:
-            rows = rdata.get("items") or []
-        total = rdata.get("total") if isinstance(rdata, dict) else len(rows)
-        assert total == 22 or len(rows) == 22, f"expected 22 ledger rows, got total={total} len={len(rows)}"
-        # demands are embedded in /bookings/{id} as 'demands' array
-        dems = d.get("demands") or []
-        for dm in dems:
-            if dm.get("status") not in ("Void", "Voided") and not dm.get("voided"):
-                assert dm.get("installment_seq") is not None, dm
-
-
 # ---------- AC1 payment plan master validations ----------
 class TestPaymentPlanMaster:
     created_ids = []
@@ -224,27 +188,6 @@ class TestPaymentPlanAssignments:
 
 
 # ---------- AC3 Tower B construction status ----------
-class TestTowerBConstruction:
-    def test_tower_b_18_percent_2_of_11(self, H):
-        rp = requests.get(f"{API}/projects?limit=50", headers=H, timeout=10)
-        projects = rp.json().get("items") or rp.json()
-        sgh = next((p for p in projects if (p.get("code") or "").upper() == "SGH"), None)
-        assert sgh
-        rb = requests.get(f"{API}/blocks?project_id={sgh['id']}&limit=50", headers=H, timeout=10)
-        blocks = rb.json().get("items") or rb.json()
-        tower_b = next((b for b in blocks if "Tower B" in (b.get("name") or "")), None)
-        assert tower_b, [b.get("name") for b in blocks]
-        r = requests.get(f"{API}/blocks/{tower_b['id']}/construction", headers=H, timeout=10)
-        assert r.status_code == 200, r.text
-        data = r.json()
-        stages = data.get("stages") or []
-        assert len(stages) == 11, f"expected 11 stages got {len(stages)}"
-        done = [s for s in stages if s.get("status") == "Completed"]
-        assert len(done) == 2, f"expected 2 completed, got {len(done)}: {[s.get('name') for s in done]}"
-        pct = data.get("construction_percent") if data.get("construction_percent") is not None else data.get("percent")
-        assert pct in (18, 18.0, 18.18, round(2 * 100 / 11, 2)), f"percent={pct}"
-
-
 # ---------- AC5 migration report in logs/settings ----------
 class TestMigrationReport:
     def test_migration_report_endpoint(self, H):

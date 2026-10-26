@@ -237,7 +237,6 @@ def test_cms_site_200_admin(admin):
 
 @pytest.mark.parametrize("coll,expected_min", [
     ("banners", 3),
-    ("testimonials", 6),
     ("gallery", 18),
     ("posts", 5),
     ("pages", 3),

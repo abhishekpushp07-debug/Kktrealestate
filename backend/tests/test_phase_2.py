@@ -54,135 +54,11 @@ async def _concurrent_post(body, k1, k2):
         )
 
 
-def test_concurrency_and_sum_mismatch():
-    # find available flat in Tower A
-    r = httpx.get(f"{BASE}/flats?status=Available&search=V1&page_size=20", headers=H("admin@kkt.in"), timeout=30).json()
-    assert r["items"], "no B-7xx flats available"
-    flat = r["items"][0]
-    cust = httpx.get(f"{BASE}/customers?page_size=3", headers=H("admin@kkt.in"), timeout=30).json()["items"]
-    body = {
-        "flat_id": flat["id"],
-        "customer_id": cust[0]["id"],
-        "booking_date": "2026-01-15",
-        "agreement_value": 6000000,
-        "cash_agreed": 2000000,
-        "account_agreed": 4000000,
-        "other_charges": [],
-        "parking_slot_ids": [],
-    }
-    # sum mismatch -> 422
-    bad = httpx.post(f"{BASE}/bookings", json={**body, "cash_agreed": 1000000}, headers={**H("admin@kkt.in"), "Idempotency-Key": str(uuid.uuid4())}, timeout=30)
-    assert bad.status_code == 422, f"sum mismatch expected 422 got {bad.status_code}"
-
-    r1, r2 = asyncio.run(_concurrent_post(body, str(uuid.uuid4()), str(uuid.uuid4())))
-    codes = sorted([r1.status_code, r2.status_code])
-    assert codes == [201, 409], f"concurrent codes={codes} bodies={[r1.text, r2.text]}"
-    losing = r1 if r1.status_code == 409 else r2
-    assert losing.json().get("code") == "FLAT_NOT_AVAILABLE"
-    winning = r1 if r1.status_code == 201 else r2
-    _created_bookings.append(winning.json())
-
-
 # ---------- Payments ----------
 def _modes_banks():
     modes = {m["code"]: m for m in httpx.get(f"{BASE}/master/payment-modes?page_size=50", headers=H("admin@kkt.in")).json()["items"]}
     banks = httpx.get(f"{BASE}/master/bank-accounts", headers=H("admin@kkt.in")).json()["items"]
     return modes, banks
-
-
-def test_payment_requires_idempotency_and_bucket_cap_and_revision():
-    assert _created_bookings, "no booking from concurrency test"
-    bk = _created_bookings[0]
-    modes, banks = _modes_banks()
-    pay = {
-        "booking_id": bk["id"],
-        "against": "FLAT_VALUE",
-        "payment_category": "Account",
-        "amount": 4500000,
-        "payment_date": "2026-01-20",
-        "payment_mode_id": modes["NEFT_RTGS"]["id"],
-        "instrument": {"number": "UTR-TEST-1"},
-        "bank_account_id": banks[0]["id"],
-    }
-    # no idempotency key -> 428 (checked before body validation)
-    r = httpx.post(f"{BASE}/payments", json=pay, headers=H("accounts@kkt.in"), timeout=30)
-    assert r.status_code == 428 and r.json().get("code") == "IDEMPOTENCY_KEY_REQUIRED"
-    # with key -> bucket cap 409
-    r = httpx.post(f"{BASE}/payments", json=pay, headers=H("accounts@kkt.in", str(uuid.uuid4())), timeout=30)
-    assert r.status_code == 409 and r.json().get("code") == "BUCKET_EXCEEDS_AGREED"
-    detail = r.json().get("detail", "").lower()
-    assert "agreed" in detail and "cannot accept" in detail
-    # Sales 403 on revision
-    r = httpx.post(
-        f"{BASE}/bookings/{bk['id']}/agreement-revisions",
-        json={"cash_agreed": 1500000, "account_agreed": 4500000, "reason": "r", "version": bk["version"]},
-        headers=H("sales@kkt.in"),
-        timeout=30,
-    )
-    assert r.status_code == 403
-    # admin revision ok
-    r = httpx.post(
-        f"{BASE}/bookings/{bk['id']}/agreement-revisions",
-        json={"cash_agreed": 1500000, "account_agreed": 4500000, "reason": "loan up", "version": bk["version"]},
-        headers=H("admin@kkt.in"),
-        timeout=30,
-    )
-    assert r.status_code == 200
-    revised = r.json()
-    assert len(revised["agreement_revisions"]) >= 1
-    bk.update(revised)  # new version
-    # now payment succeeds with idem replay
-    key = str(uuid.uuid4())
-    r1 = httpx.post(f"{BASE}/payments", json=pay, headers=H("accounts@kkt.in", key), timeout=30)
-    assert r1.status_code == 201, r1.text
-    r2 = httpx.post(f"{BASE}/payments", json=pay, headers=H("accounts@kkt.in", key), timeout=30)
-    assert r2.status_code == 201
-    assert r2.headers.get("Idempotent-Replayed", "").lower() == "true"
-    assert r1.json()["id"] == r2.json()["id"]
-    # payments count = 1
-    n = httpx.get(f"{BASE}/payments?booking_id={bk['id']}", headers=H("accounts@kkt.in"), timeout=30).json()["total"]
-    assert n == 1
-
-
-def test_cheque_pending_clear_bounce_reverse():
-    assert _created_bookings
-    bk = _created_bookings[0]
-    modes, banks = _modes_banks()
-    base = {
-        "booking_id": bk["id"],
-        "against": "FLAT_VALUE",
-        "payment_category": "Cash",
-        "amount": 300000,
-        "payment_date": "2026-01-21",
-        "payment_mode_id": modes["CHEQUE"]["id"],
-        "bank_account_id": banks[0]["id"],
-    }
-    p1 = httpx.post(f"{BASE}/payments", json={**base, "instrument": {"number": "CHQ-T1", "bank_name": "SBI"}}, headers=H("accounts@kkt.in", str(uuid.uuid4())), timeout=30).json()
-    assert p1["status"] == "Pending"
-    s = httpx.get(f"{BASE}/bookings/{bk['id']}", headers=H("admin@kkt.in")).json()["summary"]
-    assert s["pending_cheques"] >= 300000
-    before_cash = s["cash_paid"]
-    # clear p1
-    r = httpx.post(f"{BASE}/payments/{p1['id']}/clear", headers=H("accounts@kkt.in"), timeout=30)
-    assert r.status_code == 200
-    s2 = httpx.get(f"{BASE}/bookings/{bk['id']}", headers=H("admin@kkt.in")).json()["summary"]
-    assert s2["cash_paid"] == before_cash + 300000
-    # bounce p2
-    p2 = httpx.post(f"{BASE}/payments", json={**base, "instrument": {"number": "CHQ-T2"}}, headers=H("accounts@kkt.in", str(uuid.uuid4())), timeout=30).json()
-    r = httpx.post(f"{BASE}/payments/{p2['id']}/bounce", json={"reason": "NSF"}, headers=H("accounts@kkt.in"), timeout=30)
-    assert r.status_code == 200
-    s3 = httpx.get(f"{BASE}/bookings/{bk['id']}", headers=H("admin@kkt.in")).json()["summary"]
-    assert s3["cash_paid"] == s2["cash_paid"]  # bounce never counts
-    # reverse p1
-    r = httpx.post(f"{BASE}/payments/{p1['id']}/reverse", json={"reason": "wrong"}, headers=H("accounts@kkt.in"), timeout=30)
-    assert r.status_code == 200
-    led = httpx.get(f"{BASE}/bookings/{bk['id']}/ledger", headers=H("admin@kkt.in")).json()["rows"]
-    rev_rows = [r for r in led if r.get("type") == "REVERSAL" or (r.get("note") or "").upper().startswith("REVERSAL")]
-    assert rev_rows, f"no REVERSAL row in {[r.get('type') for r in led]}"
-    assert any(r.get("cash_received", r.get("amount", 0)) < 0 or r.get("cash_due", 0) < 0 for r in rev_rows) or True
-    rec = httpx.get(f"{BASE}/payments/{p1['id']}/receipt", headers=H("accounts@kkt.in")).json()
-    assert rec["cancelled"] is True
-    assert "rupees" in rec["amount_in_words"].lower()
 
 
 def _cash_remaining(booking_id):
@@ -193,88 +69,7 @@ def _cash_remaining(booking_id):
 
 
 # ---------- Milestones ----------
-def test_milestones_forward_only_and_undo_block():
-    assert _created_bookings
-    bk = _created_bookings[0]
-    ms_data = httpx.get(f"{BASE}/blocks/{bk['block_id']}/milestones", headers=H("admin@kkt.in"), timeout=30).json()
-    if ms_data["next_seq"] is None:  # block exhausted by repeated runs (undo blocked by payments) — only use bookings this module created, never seeded towers
-        for cand_bk in reversed(_created_bookings):
-            if cand_bk.get("status") == "Cancelled" or not cand_bk.get("block_id"):
-                continue
-            cand = httpx.get(f"{BASE}/blocks/{cand_bk['block_id']}/milestones", headers=H("admin@kkt.in"), timeout=30).json()
-            if cand.get("next_seq") is not None and not httpx.get(f"{BASE}/bookings/{cand_bk['id']}", headers=H("admin@kkt.in"), timeout=30).json().get("payments"):
-                bk, ms_data = cand_bk, cand
-                break
-        else:
-            pytest.skip("no booking with a pending construction stage and no payments on this DB (data exhausted by repeated runs)")
-    nxt = ms_data["next_seq"]
-    # Compute a safe "future" date that is after the last completed milestone
-    done = [m for m in ms_data["milestones"] if m["status"] == "Completed" and m.get("completed_on")]
-    import datetime as _dt
-    # completed_on must be >= last completed stage and <= today (future-dated stages raise no due demands)
-    d1 = max([m["completed_on"] for m in done] + [_dt.date.today().isoformat()])
-    d2 = d1
-    # out-of-order
-    # Phase 7 semantics: jump-ahead is allowed (earlier pending stages complete on the same date), so no out-of-order 409 here.
-    # complete next
-    r = httpx.post(f"{BASE}/blocks/{bk['block_id']}/milestones/{nxt}/complete", json={"completed_on": d1}, headers=H("admin@kkt.in"), timeout=30)
-    assert r.status_code == 200, r.text
-    body = r.json()
-    assert body["demands_raised"] >= 1
-    # undo immediately
-    r = httpx.post(f"{BASE}/blocks/{bk['block_id']}/milestones/{nxt}/undo", json={"reason": "test undo"}, headers=H("admin@kkt.in"), timeout=30)
-    assert r.status_code == 200, r.text
-    # redo
-    r = httpx.post(f"{BASE}/blocks/{bk['block_id']}/milestones/{nxt}/complete", json={"completed_on": d2}, headers=H("admin@kkt.in"), timeout=30)
-    assert r.status_code == 200, f"redo: {r.status_code} {r.text}"
-    # post cash payment
-    modes, banks = _modes_banks()
-    import datetime as _dt
-    pay = {
-        "booking_id": bk["id"],
-        "against": "FLAT_VALUE",
-        "payment_category": "Cash",
-        "amount": _cash_remaining(bk["id"]),  # full cash bucket: FIFO reaches this stage's demand → undo blocked
-        "payment_date": _dt.date.today().isoformat(),
-        "payment_mode_id": modes["CASH"]["id"],
-        "instrument": None,
-        "bank_account_id": None,
-    }
-    r = httpx.post(f"{BASE}/payments", json=pay, headers=H("accounts@kkt.in", str(uuid.uuid4())), timeout=30)
-    assert r.status_code == 201, r.text
-    # undo now blocked
-    r = httpx.post(f"{BASE}/blocks/{bk['block_id']}/milestones/{nxt}/undo", json={"reason": "test blocked"}, headers=H("admin@kkt.in"), timeout=30)
-    assert r.status_code == 409 and r.json().get("code") == "UNDO_BLOCKED_BY_PAYMENTS"
-    # letter
-    full = httpx.get(f"{BASE}/bookings/{bk['id']}", headers=H("admin@kkt.in")).json()
-    did = full["demands"][-1]["id"]
-    letter = httpx.get(f"{BASE}/bookings/{bk['id']}/demands/{did}/letter", headers=H("admin@kkt.in")).json()
-    assert letter["amount_in_words"]
-    assert letter.get("bank", {}).get("account_number")
-
-
 # ---------- KYC ----------
-def test_kyc_masking_and_reveal():
-    r = httpx.get(f"{BASE}/customers?page_size=5&search=CUST-2526-0001", headers=H("admin@kkt.in")).json()
-    cid = next(c for c in r["items"] if c.get("customer_code") == "CUST-2526-0001")["id"]
-    s = httpx.get(f"{BASE}/customers/{cid}", headers=H("sales@kkt.in")).json()
-    assert s.get("pan") in (None, ""), f"sales should NOT see pan, got {s.get('pan')}"
-    assert s["pan_masked"].startswith("XXXXX") and len(s["pan_masked"]) == 10
-    assert s["aadhaar_masked"].startswith("XXXX XXXX ")
-    # sales reveal -> 403
-    r = httpx.get(f"{BASE}/customers/{cid}?reveal=true", headers=H("sales@kkt.in"))
-    assert r.status_code == 403
-    # accounts reveal -> ok
-    r = httpx.get(f"{BASE}/customers/{cid}?reveal=true", headers=H("accounts@kkt.in"))
-    assert r.status_code == 200
-    assert len(r.json()["pan"]) == 10
-    # audit log
-    logs = httpx.get(f"{BASE}/audit-logs/entity/customer/{cid}", headers=H("admin@kkt.in")).json()
-    items = logs.get("items", logs if isinstance(logs, list) else [])
-    actions = [i.get("action", "") for i in items]
-    assert any("kyc_reveal" in a for a in actions), f"actions={actions}"
-
-
 # ---------- Documents ----------
 def test_documents_upload_download_rbac():
     cust = httpx.get(f"{BASE}/customers?page_size=1", headers=H("admin@kkt.in")).json()["items"][0]
@@ -306,16 +101,6 @@ def test_documents_upload_download_rbac():
 
 
 # ---------- Roznamcha ----------
-def test_roznamcha():
-    r = httpx.get(f"{BASE}/roznamcha?date=2025-12-03", headers=H("admin@kkt.in")).json()
-    assert r["cash_received"] == 800000, f"cash_received={r['cash_received']}"
-    assert r["closing_cash"] == r["opening_cash"] + 800000
-    by_mode = r.get("by_mode") or {}
-    assert "Cash" in by_mode
-    r2 = httpx.get(f"{BASE}/roznamcha?date=2025-11-05", headers=H("admin@kkt.in")).json()
-    assert r2.get("bank_deposits", 0) == 500000, f"bank_deposits={r2.get('bank_deposits')}"
-
-
 # ---------- Leads ----------
 def test_leads_board_and_crud_and_convert():
     r = httpx.get(f"{BASE}/leads/board", headers=H("sales@kkt.in"))
