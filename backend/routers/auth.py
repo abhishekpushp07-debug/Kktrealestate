@@ -33,6 +33,7 @@ pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 REFRESH_DAYS = int(os.environ.get("REFRESH_TOKEN_DAYS", "7"))
 MAX_FAILED, LOCK_MINUTES, PASSWORD_HISTORY = 5, 15, 5
+_DUMMY_HASH = pwd_ctx.hash("kkt-dummy-timing-equaliser")
 
 
 def hash_password(pw: str) -> str:
@@ -166,8 +167,15 @@ async def login(body: LoginIn, request: Request):
     ip = client_ip(request)
     await enforce_rate_limit(f"login:{ip}", 10, 60)
     email = body.email.lower()
+    # Phase K.10: DB-backed lockout per (identifier, IP) and per account — works without Redis
+    since = (datetime.now(UTC) - timedelta(minutes=LOCK_MINUTES)).isoformat()
+    pair_fails = await db.login_events.count_documents({"email": email, "ip": ip, "success": False, "created_at": {"$gte": since}})
+    if pair_fails >= MAX_FAILED * 2:
+        await _login_event(email, False, request, "locked_pair")
+        raise ApiError(423, f"Too many failed attempts from this device. Try again after {LOCK_MINUTES} minutes.", "ACCOUNT_LOCKED")
     user = await db.users.find_one({"email": email}, {"_id": 0})
     if not user or not user.get("is_active"):
+        verify_password(body.password, _DUMMY_HASH)  # constant-time: same bcrypt cost as a real verify
         await _login_event(email, False, request, "invalid_credentials")
         raise ApiError(401, "Invalid email or password", "INVALID_CREDENTIALS")
     from services.owner_bootstrap import demo_login_allowed

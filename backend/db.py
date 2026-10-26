@@ -62,6 +62,7 @@ async def ensure_indexes():
     await db.rate_limits.create_index("expires_at", expireAfterSeconds=0)
     await db.login_events.create_index([("created_at", DESCENDING)])
     await db.login_events.create_index("email")
+    await db.login_events.create_index([("email", ASCENDING), ("ip", ASCENDING), ("success", ASCENDING), ("created_at", DESCENDING)])
     await db.counters.create_index([("scope", ASCENDING), ("key", ASCENDING)], unique=True)
     await db.settings.create_index("key", unique=True)
     for c in ("floor_plan_templates", "plc_types", "spec_categories", "spec_items", "rate_cards", "parking_slots"):
