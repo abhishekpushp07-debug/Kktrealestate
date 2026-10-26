@@ -1,0 +1,83 @@
+{
+  "meta": {
+    "base": "http://127.0.0.1:8001",
+    "users": 4,
+    "seconds": 5,
+    "at": "20261026T225212Z",
+    "note": "Single-process preview container; production capacity is an ESTIMATE = measured RPS \u00d7 worker count (not measured here)."
+  },
+  "results": [
+    {
+      "scenario": "health",
+      "method": "GET",
+      "path": "/api/health",
+      "users": 4,
+      "requests": 2893,
+      "rps": 578.3,
+      "p50_ms": 6.3,
+      "p95_ms": 7.7,
+      "p99_ms": 8.5,
+      "mean_ms": 6.9,
+      "errors": {},
+      "kind": "measured"
+    },
+    {
+      "scenario": "bookings_list",
+      "method": "GET",
+      "path": "/api/bookings?page_size=20",
+      "users": 4,
+      "requests": 946,
+      "rps": 188.9,
+      "p50_ms": 20.8,
+      "p95_ms": 22.3,
+      "p99_ms": 25.2,
+      "mean_ms": 21.2,
+      "errors": {},
+      "kind": "measured"
+    },
+    {
+      "scenario": "search",
+      "method": "GET",
+      "path": "/api/search?q=Sh&limit=5",
+      "users": 4,
+      "requests": 841,
+      "rps": 167.7,
+      "p50_ms": 22.0,
+      "p95_ms": 27.4,
+      "p99_ms": 53.9,
+      "mean_ms": 23.8,
+      "errors": {},
+      "kind": "measured"
+    },
+    {
+      "scenario": "report_collections",
+      "method": "GET",
+      "path": "/api/reports/collections",
+      "users": 4,
+      "requests": 391,
+      "rps": 77.8,
+      "p50_ms": 50.4,
+      "p95_ms": 62.0,
+      "p99_ms": 92.4,
+      "mean_ms": 51.3,
+      "errors": {},
+      "kind": "measured"
+    },
+    {
+      "scenario": "customer_create",
+      "method": "POST",
+      "path": "/api/customers",
+      "users": 4,
+      "requests": 971,
+      "rps": 194.0,
+      "p50_ms": 19.9,
+      "p95_ms": 25.7,
+      "p99_ms": 32.2,
+      "mean_ms": 20.6,
+      "errors": {
+        "429 RATE_LIMITED": 971
+      },
+      "kind": "measured"
+    }
+  ]
+}
