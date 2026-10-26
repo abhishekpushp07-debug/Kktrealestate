@@ -23,6 +23,9 @@ declare module "fastify" {
  * Create a Redis client (lazy connect, retry with backoff, every command bounded by REDIS_COMMAND_TIMEOUT_MS). The offline queue stays
  * on so a write issued during a sub-second reconnect still lands; read paths that have a fallback skip a disconnected client at once
  * (lib/cache.ts redisUsable) and spend at most a short budget on a slow one.
+ *
+ * No `enableAutoPipelining`: measured (docs/PERFORMANCE.md "Regression fix") it helps Redis-only routes but costs DB-heavy lists ~7 %,
+ * because commands wait for setImmediate and only one batch per client is in flight, which lengthens every request's critical path.
  */
 export function createRedis(url = config.REDIS_URL): Redis {
   return new Redis(url, {

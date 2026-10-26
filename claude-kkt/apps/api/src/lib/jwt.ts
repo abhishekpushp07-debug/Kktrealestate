@@ -41,22 +41,31 @@ function keyId(publicKey: KeyObject): string {
     .slice(0, 16);
 }
 
-let ringSource: string | null = null;
+/** The secrets the cached ring was derived from (current first). */
+let ringSecrets: readonly string[] | null = null;
 let ring: SigningKey[] = [];
+
+/** True when the configured secrets are still the ones the ring was built from (no allocation: this runs on every request). */
+function ringIsCurrent(): boolean {
+  if (ringSecrets === null || ringSecrets[0] !== config.JWT_SECRET) return false;
+  const previous = config.JWT_PREVIOUS_SECRETS;
+  if (ringSecrets.length !== previous.length + 1) return false;
+  for (let i = 0; i < previous.length; i++) if (ringSecrets[i + 1] !== previous[i]) return false;
+  return true;
+}
 
 /**
  * Signing key ring: JWT_SECRET (current, signs) followed by JWT_PREVIOUS_SECRETS (verify only), so a rotation keeps every token issued in
  * the last ACCESS_TOKEN_MINUTES valid. Rebuilt when the configuration changes (tests rotate in-process).
  */
 export function signingKeys(): SigningKey[] {
+  if (ringIsCurrent()) return ring;
   const secrets = [config.JWT_SECRET, ...config.JWT_PREVIOUS_SECRETS];
-  const source = secrets.join("\u0000");
-  if (ringSource === source) return ring;
   ring = secrets.map((secret, i) => {
     const pair = deriveKeyPair(secret);
     return { kid: keyId(pair.publicKey), ...pair, current: i === 0 };
   });
-  ringSource = source;
+  ringSecrets = secrets;
   return ring;
 }
 
@@ -81,9 +90,13 @@ export async function signAccessToken(
 export type VerifyResult =
   { ok: true; claims: AccessClaims } | { ok: false; reason: "EXPIRED" | "INVALID" | "WRONG_AUDIENCE" };
 
-/** Candidate keys for a token: the one its kid names, else (tokens minted before kids were fingerprints, e.g. `k1`) every key. */
+/**
+ * Candidate keys for a token: the one its kid names, else (tokens minted before kids were fingerprints, e.g. `k1`) every key. With a
+ * single key (no rotation in progress) that key is the only candidate either way, so the header is not decoded twice (jwtVerify parses it).
+ */
 function candidates(token: string): SigningKey[] {
   const keys = signingKeys();
+  if (keys.length === 1) return keys;
   let kid: string | undefined;
   try {
     kid = decodeProtectedHeader(token).kid;
@@ -94,16 +107,14 @@ function candidates(token: string): SigningKey[] {
   return named.length > 0 ? named : keys;
 }
 
+const VERIFY_OPTIONS = { issuer: ISSUER, clockTolerance: 30, algorithms: ["EdDSA"] };
+
 /** Verify an access token for a specific audience (current or previous key); wrong audience is reported distinctly so staff tokens can never open portal data. */
 export async function verifyAccessToken(token: string, audience: TokenAudience): Promise<VerifyResult> {
   let lastCode: string | undefined;
   for (const key of candidates(token)) {
     try {
-      const { payload } = await jwtVerify(token, key.publicKey, {
-        issuer: ISSUER,
-        clockTolerance: 30,
-        algorithms: ["EdDSA"],
-      });
+      const { payload } = await jwtVerify(token, key.publicKey, VERIFY_OPTIONS);
       if (payload.aud !== audience) return { ok: false, reason: "WRONG_AUDIENCE" };
       if (
         payload.typ !== "access" ||

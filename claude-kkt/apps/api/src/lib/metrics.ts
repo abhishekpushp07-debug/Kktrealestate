@@ -32,10 +32,29 @@ export const httpRequestsTotal = new client.Counter({
   registers: [registry],
 });
 
+/** Requests in flight in this process; read by the gauge at scrape time instead of two gauge updates per request. */
+let inFlight = 0;
+
+function inFlightDone(): void {
+  inFlight -= 1;
+}
+
+/**
+ * Counts one request as in flight until its socket response closes (`close` fires for completed and aborted requests alike, so the count
+ * is always released exactly once).
+ */
+export function trackInFlight(res: { once(event: "close", listener: () => void): unknown }): void {
+  inFlight += 1;
+  res.once("close", inFlightDone);
+}
+
 export const httpRequestsInFlight = new client.Gauge({
   name: "http_requests_in_flight",
   help: "HTTP requests currently being processed (sum over processes).",
   registers: [registry],
+  collect() {
+    this.set(inFlight);
+  },
 });
 
 /** Business counters (docs/OBSERVABILITY.md). */
@@ -106,11 +125,22 @@ export const dbPoolMax = new client.Gauge({
   registers: [registry],
 });
 
+/** Per (route, method, status) children of the request counter and histogram: label objects are built and validated once, not per request. */
+const requestSeries = new Map<string, { count: () => void; observe: (seconds: number) => void }>();
+
 /** Records one finished HTTP request. `route` is the route pattern (never the raw URL), so cardinality stays bounded. */
 export function recordRequest(route: string, method: string, status: number, seconds: number): void {
-  const labels = { route, method, status: String(status) };
-  httpRequestsTotal.inc(labels);
-  httpRequestDuration.observe(labels, seconds);
+  const key = `${status} ${method} ${route}`;
+  let series = requestSeries.get(key);
+  if (!series) {
+    const labels = { route, method, status: String(status) };
+    const counter = httpRequestsTotal.labels(labels);
+    const histogram = httpRequestDuration.labels(labels);
+    series = { count: () => counter.inc(), observe: (s) => histogram.observe(s) };
+    requestSeries.set(key, series);
+  }
+  series.count();
+  series.observe(seconds);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------

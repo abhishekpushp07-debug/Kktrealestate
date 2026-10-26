@@ -3,7 +3,7 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import { sql } from "drizzle-orm";
 import type { Redis } from "ioredis";
 import { config } from "../config.js";
-import { PERM_VERSION_KEY, redisUsable } from "../lib/cache.js";
+import { PERM_VERSION_KEY, redisUsable, withinBudget } from "../lib/cache.js";
 import { loadCompany } from "../lib/company.js";
 import { ApiError } from "../lib/errors.js";
 import { logger } from "../lib/logger.js";
@@ -91,23 +91,12 @@ async function redisTry<T>(
   client?: Redis,
 ): Promise<{ ok: true; value: T } | { ok: false }> {
   if (client && !redisUsable(client)) return { ok: false };
-  let timer: NodeJS.Timeout | undefined;
   try {
-    const value = await Promise.race([
-      fn(),
-      new Promise<never>((_, reject) => {
-        timer = setTimeout(
-          () => reject(new Error(`redis ${what} exceeded ${REDIS_AUTH_BUDGET_MS} ms`)),
-          REDIS_AUTH_BUDGET_MS,
-        );
-      }),
-    ]);
+    const value = await withinBudget(fn(), REDIS_AUTH_BUDGET_MS, `redis ${what}`);
     return { ok: true, value };
   } catch (err) {
     logger.warn({ err: (err as Error).message, what }, "redis unavailable on the auth path; using the database");
     return { ok: false };
-  } finally {
-    if (timer) clearTimeout(timer);
   }
 }
 
@@ -292,25 +281,15 @@ export default fp(
 
     /** Rate limits live in the security Redis; when it cannot be reached they fail open (logged) — the DB-backed lockout still applies. */
     async function rateLimit(bucket: string, limit: number, windowSeconds: number): Promise<void> {
-      if (!redisUsable(securityRedis(app))) return; // disconnected: fail open at once (the DB-backed login lockout still applies)
-      let timer: NodeJS.Timeout | undefined;
+      const sec = securityRedis(app);
+      if (!redisUsable(sec)) return; // disconnected: fail open at once (the DB-backed login lockout still applies)
       try {
         // Same budget as the other Redis reads on this path: a down Redis (client retrying with an offline queue) must not add seconds to
         // every request before failing open.
-        await Promise.race([
-          enforceRateLimit(securityRedis(app), bucket, limit, windowSeconds),
-          new Promise<never>((_, reject) => {
-            timer = setTimeout(
-              () => reject(new Error(`rate limit exceeded ${REDIS_AUTH_BUDGET_MS} ms`)),
-              REDIS_AUTH_BUDGET_MS,
-            );
-          }),
-        ]);
+        await withinBudget(enforceRateLimit(sec, bucket, limit, windowSeconds), REDIS_AUTH_BUDGET_MS, "rate limit");
       } catch (err) {
         if (err instanceof ApiError) throw err;
         logger.warn({ err: (err as Error).message, bucket }, "rate limit store unavailable; request allowed");
-      } finally {
-        if (timer) clearTimeout(timer);
       }
     }
 

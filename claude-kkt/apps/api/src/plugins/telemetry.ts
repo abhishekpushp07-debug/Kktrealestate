@@ -1,21 +1,26 @@
 import { createHash, timingSafeEqual } from "node:crypto";
-import { trace } from "@opentelemetry/api";
+import { trace, type Span } from "@opentelemetry/api";
 import fp from "fastify-plugin";
 import type { FastifyRequest } from "fastify";
 import { config } from "../config.js";
 import {
-  httpRequestsInFlight,
   loginsFailed,
   METRICS_CONTENT_TYPE,
   paymentsPosted,
   recordRequest,
   scrapeMetrics,
+  trackInFlight,
 } from "../lib/metrics.js";
+
+/** Trace id of `span`, or undefined for a missing span or the all-zero id of a non-recording span. */
+function traceIdOf(span: Span | undefined): string | undefined {
+  const id = span?.spanContext().traceId;
+  return id && !/^0+$/.test(id) ? id : undefined;
+}
 
 /** Trace id of the active span (OpenTelemetry), or undefined when tracing is off or no span is active. */
 export function currentTraceId(): string | undefined {
-  const ctx = trace.getActiveSpan()?.spanContext();
-  return ctx && ctx.traceId && !/^0+$/.test(ctx.traceId) ? ctx.traceId : undefined;
+  return traceIdOf(trace.getActiveSpan());
 }
 
 /** Routes that serve Prometheus metrics (staff admin.tools, or the METRICS_TOKEN bearer). */
@@ -47,16 +52,18 @@ export function isMetricsToken(header: string | undefined, token: string | undef
 export default fp(
   async (app) => {
     app.addHook("onRequest", async (req, reply) => {
-      httpRequestsInFlight.inc();
-      reply.raw.once("close", () => httpRequestsInFlight.dec());
+      trackInFlight(reply.raw);
       const url = req.routeOptions.url;
+      // one context lookup per request; without a registered OpenTelemetry SDK there is never an active span and nothing else runs
       const span = trace.getActiveSpan();
-      if (span && url) {
-        span.setAttribute("http.route", url);
-        span.updateName(`${req.method} ${url}`);
+      if (span) {
+        if (url) {
+          span.setAttribute("http.route", url);
+          span.updateName(`${req.method} ${url}`);
+        }
+        const traceId = traceIdOf(span);
+        if (traceId) reply.header("X-Trace-Id", traceId);
       }
-      const traceId = currentTraceId();
-      if (traceId) reply.header("X-Trace-Id", traceId);
       if (url && METRICS_ROUTES.has(url) && req.method === "GET" && isMetricsToken(req.headers.authorization)) {
         const body = await scrapeMetrics();
         reply.header("Content-Type", METRICS_CONTENT_TYPE).header("Cache-Control", "no-store");

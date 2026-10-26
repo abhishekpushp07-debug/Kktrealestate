@@ -20,19 +20,24 @@ export function redisUsable(redis: Pick<Redis, "status"> | null | undefined): bo
   return status === undefined || !DOWN_STATES.has(status);
 }
 
-/** Resolves with `p` or rejects once `ms` has passed (the command itself is not cancelled; its late result is ignored). */
-export async function withinBudget<T>(p: Promise<T>, ms: number, what = "redis"): Promise<T> {
-  let timer: NodeJS.Timeout | undefined;
-  try {
-    return await Promise.race([
-      p,
-      new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error(`${what} exceeded ${ms} ms`)), ms);
-      }),
-    ]);
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
+/**
+ * Resolves with `p` or rejects once `ms` has passed (the command itself is not cancelled; its late result is ignored). Hot path (every
+ * cached read and every Redis call on the authentication path): one promise and one timer, no `Promise.race` and no async wrapper.
+ */
+export function withinBudget<T>(p: Promise<T>, ms: number, what = "redis"): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${what} exceeded ${ms} ms`)), ms);
+    p.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err: unknown) => {
+        clearTimeout(timer);
+        reject(err as Error);
+      },
+    );
+  });
 }
 
 /**

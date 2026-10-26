@@ -15,6 +15,9 @@ export default fp(
   async (app) => {
     const limit = config.API_MAX_INFLIGHT;
     let inflight = 0;
+    const release = () => {
+      inflight -= 1;
+    };
     app.addHook("onRequest", async (req, reply) => {
       const url = req.routeOptions.url;
       if (url === undefined || PROBES.has(url)) return;
@@ -25,9 +28,7 @@ export default fp(
       inflight += 1;
       // `close` fires whether the response completed or the client aborted mid-flight (onResponse does not run for aborted requests),
       // so the slot is always released exactly once.
-      reply.raw.once("close", () => {
-        inflight -= 1;
-      });
+      reply.raw.once("close", release);
     });
     app.decorate("inflightRequests", () => inflight);
   },

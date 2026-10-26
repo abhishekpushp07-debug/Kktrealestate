@@ -8,6 +8,7 @@ import {
   recordRequest,
   registry,
   resetMetrics,
+  trackInFlight,
   type DependencyProbes,
 } from "../../src/lib/metrics.js";
 
@@ -125,5 +126,42 @@ describe("prometheus metrics (prom-client)", () => {
     } finally {
       disableDependencyMetrics();
     }
+  });
+});
+
+describe("per-request metric bookkeeping (hot path)", () => {
+  it("cached series keep counting after a registry reset, per route/method/status", async () => {
+    resetMetrics();
+    recordRequest("/api/v1/projects", "GET", 200, 0.01);
+    resetMetrics();
+    recordRequest("/api/v1/projects", "GET", 200, 0.01);
+    recordRequest("/api/v1/projects", "GET", 200, 0.4);
+    recordRequest("/api/v1/projects", "POST", 201, 0.01);
+    const text = await localMetrics();
+    expect(text).toContain('http_requests_total{route="/api/v1/projects",method="GET",status="200"} 2');
+    expect(text).toContain('http_requests_total{route="/api/v1/projects",method="POST",status="201"} 1');
+    expect(text).toContain(
+      'http_request_duration_seconds_bucket{le="0.3",route="/api/v1/projects",method="GET",status="200"} 1',
+    );
+    expect(text).toContain(
+      'http_request_duration_seconds_count{route="/api/v1/projects",method="GET",status="200"} 2',
+    );
+  });
+
+  it("http_requests_in_flight is read at scrape time and released once per closed response", async () => {
+    resetMetrics();
+    const { EventEmitter } = await import("node:events");
+    const inflight = async () => /http_requests_in_flight (\d+)/.exec(await localMetrics())?.[1];
+    const base = Number(await inflight());
+    const a = new EventEmitter();
+    const b = new EventEmitter();
+    trackInFlight(a);
+    trackInFlight(b);
+    expect(Number(await inflight())).toBe(base + 2);
+    a.emit("close");
+    a.emit("close"); // a second close never double-releases
+    expect(Number(await inflight())).toBe(base + 1);
+    b.emit("close");
+    expect(Number(await inflight())).toBe(base);
   });
 });
