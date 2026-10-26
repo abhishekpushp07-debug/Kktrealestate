@@ -39,7 +39,7 @@ function cell(col, v) {
 export function openPdf(path) {
   api.get(path, { responseType: "blob" }).then((r) => { const url = URL.createObjectURL(r.data); window.open(url, "_blank"); }).catch((e) => toast.error(errMsg(e)));
 }
-const Sel = ({ value, onChange, children, testId }) => <select className="input !h-10 !w-auto min-w-[130px] !py-0 text-sm" value={value} onChange={onChange} data-testid={testId}>{children}</select>;
+const Sel = ({ value, onChange, children, testId, label }) => <select className="input !h-10 !w-auto min-w-[130px] !py-0 text-sm" value={value} onChange={onChange} data-testid={testId} aria-label={label || testId}>{children}</select>;
 
 function kpis(key, d) {
   if (!d) return [];

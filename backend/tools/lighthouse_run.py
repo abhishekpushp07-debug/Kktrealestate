@@ -26,7 +26,7 @@ with sync_playwright() as p:
     blk = pg.evaluate("async () => { const r = await fetch('/api/blocks?page_size=1', {headers:{Authorization:'Bearer '+localStorage.getItem(Object.keys(localStorage).find(k => /access/i.test(k)))}}); return (await r.json()).items[0]?.id }")
     b.close()
 
-screens = {"home": "/dashboard", "customers": "/customers", "customer_360": f"/customers/{cust}", "booking_detail": f"/bookings/{bk}", "payments": "/payments", "inventory_grid": f"/blocks/{blk}"}
+screens = {"home": "/dashboard", "reports_hub": "/reports/collections-v2", "report_outstanding": "/reports/outstanding-v2", "customers": "/customers", "customer_360": f"/customers/{cust}", "booking_detail": f"/bookings/{bk}", "payments": "/payments", "inventory_grid": f"/blocks/{blk}"}
 # Lighthouse replays localStorage through a tiny setup page: use --extra-headers for API auth and seed storage via chrome flags is not supported,
 # so we inject the session by pointing Lighthouse at /login?lh=1 after writing storage with a preloaded profile dir.
 profile = "/tmp/lh/profile"
