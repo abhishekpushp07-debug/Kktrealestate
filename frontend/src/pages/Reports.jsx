@@ -74,7 +74,7 @@ export default function Reports() {
   const nav = useNavigate();
   const { data: list } = useFetch("/reports");
   const { data: projects } = useFetch("/projects?page_size=50");
-  const [f, setF] = useState({ group_by: "month", group_by_out: "customer", group_by_inv: "block", cheque_status: "All", group: "", ...PRESET_DATES.FY() });
+  const [f, setF] = useState({ group_by: "month", group_by_out: "customer", group_by_inv: "block", cheque_status: "All", group: "", date_basis: "receipt", ...PRESET_DATES.FY() });
   useEffect(() => { setF((p) => ({ ...p, group: "" })); }, [key]);
   const [range, setRange] = useState("FY");
   const [presetName, setPresetName] = useState("");
@@ -120,7 +120,7 @@ export default function Reports() {
         </aside>
         <section className="min-w-0 space-y-6">
           {!can(`${permFor(key)}.view`) ? <EmptyState icon={ShieldAlert} title="Access restricted" description={`Your role lacks the ${permFor(key)}.view permission.`} testId="forbidden-report" /> : <>
-          <div><h2 className="font-display text-2xl text-ink-950" data-testid="report-title">{meta?.name || key}</h2><p className="mt-1 text-sm text-txt-secondary" data-testid="report-purpose">{meta?.purpose || DESC[key]}</p>{data?.as_of && <p className="mt-1 text-xs text-txt-muted" data-testid="report-asof">As of {fmtDate(data.as_of)}{data.filters_text ? ` · ${data.filters_text}` : ""}</p>}</div>
+          <div><h2 className="font-display text-2xl text-ink-950" data-testid="report-title">{meta?.name || key}</h2><p className="mt-1 text-sm text-txt-secondary" data-testid="report-purpose">{meta?.purpose || DESC[key]}</p>{data?.as_of && <p className="mt-1 text-xs text-txt-muted" data-testid="report-asof">As of {fmtDate(data.as_of)}{data.filters_text ? ` · ${data.filters_text}` : ""}{data.basis_text ? ` · ${data.basis_text}` : ""}</p>}</div>
           <Card className="space-y-4 print:hidden" testId="report-filters">
             <div className="flex flex-wrap items-center gap-3">
               {has("from_date") && <Segmented options={Object.keys(PRESET_DATES).map((k) => ({ value: k, label: k }))} value={range} onChange={(v) => { setRange(v); setActivePreset(null); setF((p) => ({ ...p, ...PRESET_DATES[v]() })); }} testId="rf-range" />}
@@ -130,6 +130,7 @@ export default function Reports() {
               {has("mode") && <Sel value={f.mode || ""} onChange={set("mode")} testId="rf-mode"><option value="">All modes</option>{["CASH", "UPI", "NEFT_RTGS", "CHEQUE", "DD", "LOAN_DISBURSEMENT"].map((m) => <option key={m}>{m}</option>)}</Sel>}
               {has("category") && <Sel value={f.category || ""} onChange={set("category")} testId="rf-category"><option value="">All ledgers</option>{["Cash", "Account", "Other charges"].map((m) => <option key={m}>{m}</option>)}</Sel>}
               {has("status") && <Sel value={f.status || ""} onChange={set("status")} testId="rf-status"><option value="">Cleared</option>{["Pending", "Bounced", "Reversed"].map((m) => <option key={m}>{m}</option>)}</Sel>}
+              {has("date_basis") && <Sel value={f.date_basis || "receipt"} onChange={set("date_basis")} testId="rf-date-basis" label="Date basis"><option value="receipt">Date basis: Receipt date</option><option value="clearance">Date basis: Clearance date</option></Sel>}
               {has("group") && data?.group_options && <Sel value={f.group || data.group_by} onChange={set("group")} testId="rf-group">{data.group_options.map((m) => <option key={m} value={m}>{GROUP_LABEL[m] || m}</option>)}</Sel>}
               {has("group_by") && <Sel value={f.group_by} onChange={set("group_by")} testId="rf-groupby">{["day", "week", "month"].map((m) => <option key={m} value={m}>By {m}</option>)}</Sel>}
               {has("group_by_out") && <Sel value={f.group_by_out} onChange={set("group_by_out")} testId="rf-groupby-out">{["customer", "block", "project"].map((m) => <option key={m} value={m}>By {m}</option>)}</Sel>}
@@ -149,7 +150,7 @@ export default function Reports() {
             </div>
           </Card>
           {loading && !data ? <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">{[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-28" />)}</div> : data && (
-            <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4" data-testid="report-kpis">{kpis(key, data).map(([l, v, h, tone], i) => <StatTile key={l} label={l} value={v} hint={h} tone={tone} icon={i === 0 ? BarChart3 : undefined} testId={`report-kpi-${i}`} />)}</div>
+            <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4" data-testid="report-kpis">{(data?.kpis ? data.kpis.map((k) => [k.label, k.kind === "money" ? inrShort((k.value_paise || 0) / 100) : String(k.value ?? ""), k.hint, k.tone || undefined]) : kpis(key, data)).map(([l, v, h, tone], i) => <StatTile key={l} label={l} value={v} hint={h} tone={tone} icon={i === 0 ? BarChart3 : undefined} testId={`report-kpi-${i}`} />)}</div>
           )}
           {chart && chart.rows.length > 0 && <Card testId="report-chart"><div className="mb-4 flex items-center justify-between"><h3 className="font-display text-lg text-ink-950">{chart.type === "pie" ? "Ageing" : "Trend"}</h3>{chart.keys && <div className="flex gap-3 text-xs text-txt-secondary">{chart.keys.map((k, i) => <span key={k} className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm" style={{ background: COLORS[i] }} />{k}</span>)}</div>}</div>
             <div className="h-64 min-w-0"><ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 800, height: 250 }}>{chart.type === "pie" ? <PieChart><Pie data={chart.rows} dataKey="value" nameKey="name" innerRadius={60} outerRadius={95} paddingAngle={2} stroke="none">{chart.rows.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}</Pie><RTooltip formatter={(v) => inr(v)} contentStyle={{ borderRadius: 10, border: "1px solid #EAE4D8", fontSize: 12 }} /></PieChart>

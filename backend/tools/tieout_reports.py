@@ -40,34 +40,62 @@ def main(base):
         grouped = g(path, **params, group_by=by)
         tie(report, f"Σ by {by} == total ({total_key})", sum(r.get(total_key, 0) for r in grouped["rows"]), tot)
 
-    # 1 Collections (Jama)
-    jama = sum(r.get("jama_paise", 0) for r in db.ledger_entries.find({"booking_id": {"$in": bk_ids}, "type": {"$in": ["PAYMENT", "OTHER_CHARGE_PAYMENT", "REVERSAL"]}, "date": {"$gte": F0, "$lte": F1}}, {"jama_paise": 1}))
+    # 1 Collections (Jama) — both date bases vs raw payments
+    pays = list(db.payments.find({"company_id": cid, "booking_id": {"$in": bk_ids}, "status": {"$in": ["Cleared", "Reversed"]}}))
+    FY0, FY1 = "2025-04-01", "2026-03-31"
+    def raw_coll(basis, f0, f1):
+        tot = 0
+        for p in pays:
+            d = (p.get("cleared_at") or p["payment_date"])[:10] if basis == "clearance" else p["payment_date"]
+            if f0 <= d <= f1:
+                tot += p["amount_paise"]
+            if p["status"] == "Reversed" and f0 <= ((p.get("reversal") or {}).get("at") or p["updated_at"])[:10] <= f1:
+                tot -= p["amount_paise"]
+        return tot
     col = g("/reports/collections-v2", from_date=F0, to_date=F1)
-    tie("collections-v2", "net Jama == Σ Jama rows (receipts + reversals)", col["totals"]["total_paise"], jama)
-    cleared = sum(p["amount_paise"] for p in db.payments.find({"company_id": cid, "status": "Cleared"}, {"amount_paise": 1}))
-    tie("collections-v2", "net Jama == Σ cleared receipts", col["totals"]["total_paise"], cleared)
+    tie("collections-v2", "net Jama (receipt basis, all time) == Σ cleared receipts", col["totals"]["total_paise"], sum(p["amount_paise"] for p in pays if p["status"] == "Cleared"))
+    jama = sum(r.get("jama_paise", 0) for r in db.ledger_entries.find({"booking_id": {"$in": bk_ids}, "type": {"$in": ["PAYMENT", "OTHER_CHARGE_PAYMENT", "REVERSAL"]}}, {"jama_paise": 1}))
+    tie("collections-v2", "net Jama == Σ ledger Jama rows (receipts + reversals)", col["totals"]["total_paise"], jama)
+    for basis in ("receipt", "clearance"):
+        c = g("/reports/collections-v2", from_date=FY0, to_date=FY1, date_basis=basis)
+        tie("collections-v2", f"FY total ({basis} basis) == raw payments by {basis} date", c["totals"]["total_paise"], raw_coll(basis, FY0, FY1))
+        tie("collections-v2", f"basis label present ({basis})", c["basis_text"], f"Date basis: {basis} date")
+    legacy = g("/reports/collections", from_date=FY0, to_date=FY1)
+    tie("collections-v2", "receipt basis == legacy collections (payment_date, Cleared)", g("/reports/collections-v2", from_date=FY0, to_date=FY1)["totals"]["total_paise"], legacy["totals"]["total_paise"])
     for by in ("project", "block", "bucket", "mode", "bank", "rm", "day"):
         inv("collections-v2", "/reports/collections-v2", "total_paise", by, from_date=F0, to_date=F1)
 
-    # 2 Outstanding & ageing
-    from services.definitions import ageing_bands, overdue_of, outstanding, advance
+    # 2 Outstanding & ageing — law: Outstanding · Advance held · Net balance
+    from services.definitions import ageing_bands, overdue_of, outstanding, advance, net_balance
     o = g("/reports/outstanding-v2")
-    raw_bal = sum(outstanding(b.get("summary") or {})["total_paise"] for b in live)
+    raw_out = sum(outstanding(b.get("summary") or {})["total_paise"] for b in live)
     raw_adv = sum(advance(b.get("summary") or {}) for b in live)
-    tie("outstanding-v2", "balance == Σ definitions.outstanding(summary)", o["totals"]["balance_paise"], raw_bal)
-    tie("outstanding-v2", "Σ Udhar − Σ Jama == balance − advance", o["totals"]["udhar_paise"] - o["totals"]["jama_paise"], o["totals"]["balance_paise"] - o["totals"]["advance_paise"])
+    tie("outstanding-v2", "outstanding == Σ definitions.outstanding(summary)", o["totals"]["outstanding_paise"], raw_out)
     tie("outstanding-v2", "advance held == Σ definitions.advance", o["totals"]["advance_paise"], raw_adv)
+    tie("outstanding-v2", "net == outstanding − advance == Σ Udhar − Σ Jama", (o["totals"]["net_balance_paise"], o["totals"]["net_balance_paise"]), (o["totals"]["outstanding_paise"] - o["totals"]["advance_paise"], o["totals"]["udhar_paise"] - o["totals"]["jama_paise"]))
+    by_bk = {r["group"]: r for r in o["rows"]}
+    bad = []
+    for b in live:
+        bn = db.bookings.find_one({"id": b["id"]}, {"booking_number": 1})["booking_number"]
+        r = by_bk.get(bn)
+        led = list(db.ledger_entries.find({"booking_id": b["id"]}, {"udhar_paise": 1, "jama_paise": 1}))
+        led_net = sum(x.get("udhar_paise", 0) for x in led) - sum(x.get("jama_paise", 0) for x in led)
+        s = b.get("summary") or {}
+        if not r or r["net_balance_paise"] != led_net or r["net_balance_paise"] != net_balance(s) or r["outstanding_paise"] != outstanding(s)["total_paise"] or r["net_balance_paise"] != r["outstanding_paise"] - r["advance_paise"]:
+            bad.append(bn)
+    tie("outstanding-v2", "per booking: report net == ledger net == summary net; report outstanding == summary outstanding", bad, [])
     home = g("/dashboard/home", fresh=1)
-    tie("outstanding-v2", "balance == Home outstanding tile", o["totals"]["balance_paise"], home["totals"]["outstanding_paise"])
+    tie("outstanding-v2", "outstanding == Home outstanding tile", o["totals"]["outstanding_paise"], home["totals"]["outstanding_paise"])
     bands = {}
     for b in live:
         bb = ageing_bands(b.get("summary") or {}, list(db.demands.find({"booking_id": b["id"], "voided": {"$ne": True}})), b.get("other_charges") or [], datetime.now(IST).date())
         for k, v in bb.items():
             bands[k] = bands.get(k, 0) + v
-    tie("outstanding-v2", "bands Σ == total balance", sum(o["totals"].get(f"band_{k}", 0) for k in ("Not due", "0-30", "31-60", "61-90", "90+")), o["totals"]["balance_paise"])
+    tie("outstanding-v2", "bands Σ == outstanding", sum(o["totals"].get(f"band_{k}", 0) for k in ("Not due", "0-30", "31-60", "61-90", "90+")), o["totals"]["outstanding_paise"])
     tie("outstanding-v2", "report bands == Σ definitions.ageing_bands", {k: o["totals"].get(f"band_{k}", 0) for k in bands}, bands)
     for by in ("customer", "project", "block"):
-        inv("outstanding-v2", "/reports/outstanding-v2", "balance_paise", by)
+        inv("outstanding-v2", "/reports/outstanding-v2", "outstanding_paise", by)
+        inv("outstanding-v2", "/reports/outstanding-v2", "net_balance_paise", by)
 
     # 3 Demand vs collection
     dvc = g("/reports/demand-vs-collection")
@@ -92,8 +120,11 @@ def main(base):
     rf = g("/reports/receivables-forecast")
     tie("receivables-forecast", "Σ forecast + Σ raised == Σ agreement (live bookings)", rf["totals"]["expected_paise"] + rf["totals"]["raised_paise"], sum(b["agreement_value_paise"] for b in live))
     tie("receivables-forecast", "per booking: forecast == agreement − raised", sum(1 for p in rf["per_booking"] if p["forecast_paise"] != p["agreement_paise"] - p["raised_paise"]), 0)
-    for by in ("project", "block", "booking"):
+    for by in ("project", "block", "booking", "stage", "month"):
         inv("receivables-forecast", "/reports/receivables-forecast", "expected_paise", by)
+    rf_stage = g("/reports/receivables-forecast", group_by="stage")
+    tie("receivables-forecast", "default grouping is tower → stage when no planned dates", rf["group_by"] in ("stage", "month"), True)
+    tie("receivables-forecast", "stage grouping: one row per tower·stage, Σ == total", sum(r["expected_paise"] for r in rf_stage["rows"]), rf["totals"]["expected_paise"])
 
     # 7 Cancellations & refunds
     canc = g("/reports/cancellations", from_date=F0, to_date=F1)
@@ -150,11 +181,16 @@ def main(base):
     tie("sales-team", "collections == Σ cleared receipts of live bookings", st["totals"]["collected_paise"], sum(p["amount_paise"] for p in db.payments.find({"company_id": cid, "status": "Cleared", "booking_id": {"$in": [b["id"] for b in live]}}, {"amount_paise": 1})))
     tie("sales-team", "overdue == outstanding report overdue", st["totals"]["overdue_paise"], o["totals"]["overdue_paise"])
 
-    # 15 Construction vs plan
+    # 15 Construction vs plan — per-stage rows, subtotals excluded from totals
     cvp = g("/reports/construction-vs-plan")
-    blocks = list(db.blocks.find({"company_id": cid, "is_active": {"$ne": False}}, {"construction_stages": 1}))
-    tie("construction-vs-plan", "stages done == Σ Completed stage records", cvp["totals"]["completed"], sum(1 for b in blocks for s_ in b.get("construction_stages") or [] if s_.get("status") == "Completed"))
-    tie("construction-vs-plan", "stage demands == Σ ON_STAGE demands", cvp["totals"]["stage_demanded_paise"], sum(d["total_demand_paise"] for d in db.demands.find({"company_id": cid, "voided": {"$ne": True}, "trigger_type": "ON_STAGE"}, {"total_demand_paise": 1})))
+    blocks = list(db.blocks.find({"company_id": cid, "is_active": {"$ne": False}}, {"id": 1, "construction_stages": 1, "name": 1}))
+    stage_rows = [r for r in cvp["rows"] if not r.get("_subtotal")]
+    tie("construction-vs-plan", "stage rows == Σ stages of active towers", len(stage_rows), sum(len(b.get("construction_stages") or []) for b in blocks))
+    tie("construction-vs-plan", "stage demands == Σ ON_STAGE/ON_POSSESSION demands", cvp["totals"]["stage_demanded_paise" if "stage_demanded_paise" in cvp["totals"] else "demanded_paise"], sum(d["total_demand_paise"] for d in db.demands.find({"company_id": cid, "voided": {"$ne": True}, "trigger_type": {"$in": ["ON_STAGE", "ON_POSSESSION"]}, "block_id": {"$in": [b["id"] for b in db.blocks.find({"company_id": cid, "is_active": {"$ne": False}}, {"id": 1})]}}, {"total_demand_paise": 1})))
+    tie("construction-vs-plan", "subtotals == Σ their stage rows (demanded)", sum(r["demanded_paise"] for r in cvp["rows"] if r.get("_subtotal")), sum(r["demanded_paise"] for r in stage_rows))
+    tie("construction-vs-plan", "no tower name with leading/trailing space", [r["tower"] for r in cvp["rows"] if r["tower"] != r["tower"].strip()], [])
+    dem_block = g("/payments/demands", block_id=blocks[0]["id"], page_size=200)
+    tie("construction-vs-plan", "GET /payments/demands honours block_id", [d["block_id"] for d in dem_block["items"] if d["block_id"] != blocks[0]["id"]], [])
 
     # 16 Service SLA
     sla = g("/reports/service-sla", from_date=F0, to_date=F1)
@@ -168,6 +204,7 @@ def main(base):
     dq = g("/reports/data-quality")
     integ = g("/admin/integrity-report", fresh=1)
     tie("data-quality", "open demands on cancelled bookings == 0 (integrity)", next(r["count"] for r in dq["rows"] if r["group"].startswith("Open demands on cancelled")), 0)
+    tie("data-quality", "towers without stage plan excludes inactive towers", next(r["which"] for r in dq["rows"] if r["group"].startswith("Active towers")).count("QA Tower"), 0)
     tie("data-quality", "payment plans not summing 100 == 0", next(r["count"] for r in dq["rows"] if r["group"].startswith("Payment plans")), 0)
     tie("data-quality", "integrity report ok", integ.get("ok"), True)
 

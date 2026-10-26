@@ -108,6 +108,28 @@ class StageSetIn(StrictModel):
     version: int | None = None
 
 
+
+
+class PlannedDateIn(StrictModel):
+    planned_date: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+
+
+@router.patch("/blocks/{block_id}/construction/stages/{stage_id}/planned-date")
+async def set_planned_date(block_id: str, stage_id: str, body: PlannedDateIn, request: Request, user: dict = Depends(require_any("construction.update.complete", "construction.stage.edit"))):
+    """Optional planned completion date for a pending stage — drives the Receivables Forecast month; audited."""
+    block = await get_or_404(db.blocks, block_id, "Block", {"company_id": user["company_id"]})
+    ensure_project_access(user, block["project_id"])
+    stages = await ensure_block_stages(block)
+    st = next((s for s in stages if s["stage_id"] == stage_id), None)
+    if not st:
+        raise ApiError(404, "Stage not in this tower's sequence", "STAGE_NOT_FOUND")
+    if st.get("status") == "Completed":
+        raise ApiError(409, "Stage already completed — planned date is fixed by the completion date", "STAGE_COMPLETED")
+    before = st.get("planned_date")
+    await db.blocks.update_one({"id": block_id, "construction_stages.stage_id": stage_id}, {"$set": {"construction_stages.$.planned_date": body.planned_date, "updated_at": now_iso()}})
+    await write_audit(user, "construction.planned_date", "block", block_id, {"stage_id": stage_id, "planned_date": before}, {"stage_id": stage_id, "planned_date": body.planned_date}, client_ip(request), user["company_id"])
+    return {"stage_id": stage_id, "planned_date": body.planned_date, "previous": before}
+
 @router.post("/blocks/{block_id}/construction/stage")
 async def set_current_stage(block_id: str, body: StageSetIn, request: Request, user: dict = Depends(require_any("construction.stage.update", "construction.update.complete"))):
     """Mark `stage_id` (and all earlier pending stages) Completed; raise plan installments for Active bookings."""

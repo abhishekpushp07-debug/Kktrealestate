@@ -165,6 +165,7 @@ async def rebuild(booking_id: str) -> list[dict]:
                    account_udhar_paise=sum(r["udhar_account_paise"] for r in rows), account_jama_paise=sum(r["jama_paise"] for r in rows if r["category"] == "Account"),
                    other_udhar_paise=sum(r["udhar_paise"] for r in rows if r["type"] == "OTHER_CHARGE_DEMAND"), other_jama_paise=sum(r["jama_paise"] for r in rows if r["type"] == "OTHER_CHARGE_PAYMENT"))
     summary["balance_paise"] = summary["total_udhar_paise"] - summary["total_jama_paise"]
+    summary["net_balance_paise"] = summary["outstanding_paise"] - summary["advance_paise"]  # == balance_paise by the two-sided law
     # demand statuses: FIFO per bucket
     cum_c = cum_a = 0
     for d in sorted(demands, key=lambda x: x["posted_at"]):

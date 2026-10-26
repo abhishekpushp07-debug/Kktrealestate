@@ -1,8 +1,13 @@
-# Phase I reports — tie-out status · DB `test_database` · 2026-10-27T03:08:09+05:30
+# Phase I reports — tie-out status · DB `test_database` · 2026-10-27T03:34:34+05:30
 
 ## collections-v2 — DONE
-- **PASS** net Jama == Σ Jama rows (receipts + reversals) · report=`32365678500` raw=`32365678500`
-- **PASS** net Jama == Σ cleared receipts · report=`32365678500` raw=`32365678500`
+- **PASS** net Jama (receipt basis, all time) == Σ cleared receipts · report=`32365678500` raw=`32365678500`
+- **PASS** net Jama == Σ ledger Jama rows (receipts + reversals) · report=`32365678500` raw=`32365678500`
+- **PASS** FY total (receipt basis) == raw payments by receipt date · report=`16873703800` raw=`16873703800`
+- **PASS** basis label present (receipt) · report=`Date basis: receipt date` raw=`Date basis: receipt date`
+- **PASS** FY total (clearance basis) == raw payments by clearance date · report=`16695473800` raw=`16695473800`
+- **PASS** basis label present (clearance) · report=`Date basis: clearance date` raw=`Date basis: clearance date`
+- **PASS** receipt basis == legacy collections (payment_date, Cleared) · report=`16873703800` raw=`16873703800`
 - **PASS** Σ by project == total (total_paise) · report=`32365678500` raw=`32365678500`
 - **PASS** Σ by block == total (total_paise) · report=`32365678500` raw=`32365678500`
 - **PASS** Σ by bucket == total (total_paise) · report=`32365678500` raw=`32365678500`
@@ -12,15 +17,19 @@
 - **PASS** Σ by day == total (total_paise) · report=`32365678500` raw=`32365678500`
 
 ## outstanding-v2 — DONE
-- **PASS** balance == Σ definitions.outstanding(summary) · report=`2106464900` raw=`2106464900`
-- **PASS** Σ Udhar − Σ Jama == balance − advance · report=`1990265800` raw=`1990265800`
+- **PASS** outstanding == Σ definitions.outstanding(summary) · report=`2106464900` raw=`2106464900`
 - **PASS** advance held == Σ definitions.advance · report=`116199100` raw=`116199100`
-- **PASS** balance == Home outstanding tile · report=`2106464900` raw=`2106464900`
-- **PASS** bands Σ == total balance · report=`2106464900` raw=`2106464900`
+- **PASS** net == outstanding − advance == Σ Udhar − Σ Jama · report=`(1990265800, 1990265800)` raw=`(1990265800, 1990265800)`
+- **PASS** per booking: report net == ledger net == summary net; report outstanding == summary outstanding · report=`[]` raw=`[]`
+- **PASS** outstanding == Home outstanding tile · report=`2106464900` raw=`2106464900`
+- **PASS** bands Σ == outstanding · report=`2106464900` raw=`2106464900`
 - **PASS** report bands == Σ definitions.ageing_bands · report=`{'Not due': 517218800, '0-30': 75480000, '31-60': 613172400,` raw=`{'Not due': 517218800, '0-30': 75480000, '31-60': 613172400,`
-- **PASS** Σ by customer == total (balance_paise) · report=`2106464900` raw=`2106464900`
-- **PASS** Σ by project == total (balance_paise) · report=`2106464900` raw=`2106464900`
-- **PASS** Σ by block == total (balance_paise) · report=`2106464900` raw=`2106464900`
+- **PASS** Σ by customer == total (outstanding_paise) · report=`2106464900` raw=`2106464900`
+- **PASS** Σ by customer == total (net_balance_paise) · report=`1990265800` raw=`1990265800`
+- **PASS** Σ by project == total (outstanding_paise) · report=`2106464900` raw=`2106464900`
+- **PASS** Σ by project == total (net_balance_paise) · report=`1990265800` raw=`1990265800`
+- **PASS** Σ by block == total (outstanding_paise) · report=`2106464900` raw=`2106464900`
+- **PASS** Σ by block == total (net_balance_paise) · report=`1990265800` raw=`1990265800`
 
 ## demand-vs-collection — DONE
 - **PASS** demanded == Σ non-void demands · report=`35095931800` raw=`35095931800`
@@ -43,6 +52,10 @@
 - **PASS** Σ by project == total (expected_paise) · report=`18847418200` raw=`18847418200`
 - **PASS** Σ by block == total (expected_paise) · report=`18847418200` raw=`18847418200`
 - **PASS** Σ by booking == total (expected_paise) · report=`18847418200` raw=`18847418200`
+- **PASS** Σ by stage == total (expected_paise) · report=`18847418200` raw=`18847418200`
+- **PASS** Σ by month == total (expected_paise) · report=`18847418200` raw=`18847418200`
+- **PASS** default grouping is tower → stage when no planned dates · report=`True` raw=`True`
+- **PASS** stage grouping: one row per tower·stage, Σ == total · report=`18847418200` raw=`18847418200`
 
 ## cancellations — DONE
 - **PASS** rows == Cancelled bookings · report=`5` raw=`5`
@@ -87,8 +100,11 @@
 - **PASS** overdue == outstanding report overdue · report=`1589246100` raw=`1589246100`
 
 ## construction-vs-plan — DONE
-- **PASS** stages done == Σ Completed stage records · report=`24` raw=`24`
-- **PASS** stage demands == Σ ON_STAGE demands · report=`26881231800` raw=`26881231800`
+- **PASS** stage rows == Σ stages of active towers · report=`67` raw=`67`
+- **PASS** stage demands == Σ ON_STAGE/ON_POSSESSION demands · report=`28051231800` raw=`28051231800`
+- **PASS** subtotals == Σ their stage rows (demanded) · report=`28051231800` raw=`28051231800`
+- **PASS** no tower name with leading/trailing space · report=`[]` raw=`[]`
+- **PASS** GET /payments/demands honours block_id · report=`[]` raw=`[]`
 
 ## service-sla — DONE
 - **PASS** tickets == service_requests · report=`14` raw=`14`
@@ -98,7 +114,8 @@
 
 ## data-quality — DONE
 - **PASS** open demands on cancelled bookings == 0 (integrity) · report=`0` raw=`0`
+- **PASS** towers without stage plan excludes inactive towers · report=`0` raw=`0`
 - **PASS** payment plans not summing 100 == 0 · report=`0` raw=`0`
 - **PASS** integrity report ok · report=`True` raw=`True`
 
-**65/65 PASS**
+**82/82 PASS**

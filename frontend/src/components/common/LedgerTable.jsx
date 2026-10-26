@@ -38,14 +38,16 @@ export function sideRows(rows, ledger) {
   return out;
 }
 
-export function LedgerTotals({ rows, advance, testId = "ledger-totals" }) {
+export function LedgerTotals({ rows, advance, outstanding, testId = "ledger-totals" }) {
   const tu = rows.reduce((s, r) => s + r.udhar, 0), tj = rows.reduce((s, r) => s + r.jama, 0);
+  const adv = advance ?? Math.max(tj - tu, 0), out = outstanding ?? tu - tj + adv;
   return (
-    <div className="grid grid-cols-2 gap-3 border-t bg-warm-50/60 px-4 py-3 text-sm sm:grid-cols-4" data-testid={testId}>
+    <div className="grid grid-cols-2 gap-3 border-t bg-warm-50/60 px-4 py-3 text-sm sm:grid-cols-5" data-testid={testId}>
       <div><p className="label-xs">Total Udhar</p><p className="font-semibold tabular text-ink-950" data-testid={`${testId}-udhar`}>{inr(tu)}</p></div>
       <div><p className="label-xs">Total Jama</p><p className="font-semibold tabular text-emerald-700" data-testid={`${testId}-jama`}>{inr(tj)}</p></div>
-      <div><p className="label-xs">Balance (Udhar − Jama)</p><p className={cn("font-bold tabular", tu - tj > 0 ? "text-brick" : "text-emerald-700")} data-testid={`${testId}-balance`}>{inr(tu - tj)}</p></div>
-      <div><p className="label-xs">Advance held</p><p className="font-semibold tabular text-emerald-700" data-testid={`${testId}-advance`}>{inr(advance ?? Math.max(tj - tu, 0))}</p></div>
+      <div><p className="label-xs">Outstanding</p><p className={cn("font-semibold tabular", out > 0 ? "text-brick" : "text-ink-950")} data-testid={`${testId}-outstanding`}>{inr(out)}</p></div>
+      <div><p className="label-xs">Advance held</p><p className="font-semibold tabular text-emerald-700" data-testid={`${testId}-advance`}>{inr(adv)}</p></div>
+      <div><p className="label-xs">Net balance (Udhar − Jama)</p><p className={cn("font-bold tabular", tu - tj > 0 ? "text-brick" : "text-emerald-700")} data-testid={`${testId}-balance`}>{inr(tu - tj)}</p></div>
     </div>
   );
 }

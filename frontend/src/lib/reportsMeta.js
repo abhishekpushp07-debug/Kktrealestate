@@ -7,7 +7,7 @@ export const REPORT_CODE = {
 };
 export const permFor = (key) => `reports.${REPORT_CODE[key] || key.replace(/-/g, "_")}`;
 export const FILTERS = {
-  "collections-v2": ["from_date", "to_date", "project_id", "group"], "outstanding-v2": ["project_id", "group"], "cash-vs-account": ["project_id", "group"], "receivables-forecast": ["project_id", "group"], "other-charges": ["project_id", "group"],
+  "collections-v2": ["from_date", "to_date", "project_id", "group", "date_basis"], "outstanding-v2": ["project_id", "group"], "cash-vs-account": ["project_id", "group"], "receivables-forecast": ["project_id", "group"], "other-charges": ["project_id", "group"],
   "roznamcha-summary": ["from_date", "to_date", "group"], "site-visits": ["from_date", "to_date", "project_id", "group"], "sales-team": ["from_date", "to_date"], "construction-vs-plan": ["project_id"], "data-quality": [],
   collections: ["from_date", "to_date", "project_id", "mode", "category", "status", "group_by"], outstanding: ["project_id", "group_by_out"], advances: ["project_id"], "demand-vs-collection": ["project_id"], "upcoming-dues": ["project_id"],
   inventory: ["project_id", "group_by_inv"], cheques: ["project_id", "cheque_status"], cancellations: ["from_date", "to_date", "project_id"], "sales-leads": ["from_date", "to_date"], "roznamcha-range": ["from_date", "to_date"], "bank-receipts": ["from_date", "to_date"], activity: ["from_date", "to_date"],

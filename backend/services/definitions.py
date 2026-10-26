@@ -49,6 +49,12 @@ def advance(summary: dict) -> int:
     return s["advance_paise"] if "advance_paise" in s else sum(max(-s.get(k, 0), 0) for k in ("cash_due_paise", "account_due_paise", "other_charges_due_paise"))
 
 
+def net_balance(summary: dict) -> int:
+    """Net balance = Outstanding − Advance held = Σ Udhar − Σ Jama (the single two-sided ledger figure)."""
+    s = summary or {}
+    return s["net_balance_paise"] if "net_balance_paise" in s else outstanding(s)["total_paise"] - advance(s)
+
+
 def age_bucket(due_date: str, as_of: date | None = None) -> str:
     days = ((as_of or clock.today()) - date.fromisoformat(due_date)).days
     return "not_due" if days <= 0 else "d0_30" if days <= 30 else "d31_60" if days <= 60 else "d61_90" if days <= 90 else "d90"

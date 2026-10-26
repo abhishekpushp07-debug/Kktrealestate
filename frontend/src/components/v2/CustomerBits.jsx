@@ -105,10 +105,11 @@ export function ThreeLedgers({ customerId, bookingId, testId = "ledgers" }) {
           <Segmented options={BUCKETS.map(([v, l]) => ({ value: v, label: l }))} value={bucket} onChange={setBucket} testId="ledger-bucket" />
         </div>
       </div>
-      {sum && <div className="grid grid-cols-2 gap-3 px-6 pb-6 md:grid-cols-4" data-testid="ledger-summary">
+      {sum && <div className="grid grid-cols-2 gap-3 px-6 pb-6 md:grid-cols-5" data-testid="ledger-summary">
         <SumTile label="Total Udhar (dues raised)" value={sum.total_udhar_paise ?? sum.raised_paise ?? 0} /><SumTile label="Total Jama (received)" value={sum.total_jama_paise ?? sum.paid_paise ?? 0} tone="sage" />
-        <SumTile label="Balance (Udhar − Jama)" value={sum.balance_paise ?? ((sum.total_udhar_paise || 0) - (sum.total_jama_paise || 0))} tone={(sum.balance_paise ?? 0) > 0 ? "brick" : undefined} hint={sum.pending_cheques_paise > 0 ? `cheques in hand ${inr(sum.pending_cheques_paise / 100)}` : undefined} />
+        <SumTile label="Outstanding (due now)" value={sum.outstanding_paise ?? sum.due_paise ?? 0} tone={(sum.outstanding_paise ?? 0) > 0 ? "brick" : undefined} hint={sum.pending_cheques_paise > 0 ? `cheques in hand ${inr(sum.pending_cheques_paise / 100)}` : undefined} />
         <SumTile label="Advance held" value={sum.advance_paise || 0} tone="sage" />
+        <SumTile label="Net balance (Udhar − Jama)" value={sum.net_balance_paise ?? sum.balance_paise ?? ((sum.total_udhar_paise || 0) - (sum.total_jama_paise || 0))} tone={(sum.net_balance_paise ?? sum.balance_paise ?? 0) > 0 ? "brick" : undefined} hint="Outstanding − Advance held" />
       </div>}
       {rows.length === 0 ? <div className="flex flex-col items-center gap-2 border-t border-warm-100 px-6 py-12 text-center"><IconTile icon={FileText} /><p className="text-sm text-txt-muted">No entries in this ledger yet.</p></div> : (
         <div className="overflow-x-auto border-t border-warm-100"><table className="w-full min-w-[760px] text-sm" data-testid="ledger-rows">
@@ -122,7 +123,7 @@ export function ThreeLedgers({ customerId, bookingId, testId = "ledgers" }) {
               <td className="whitespace-nowrap px-4 py-2 text-xs text-txt-secondary">{r.mode && r.mode !== "Due" ? r.mode : ""}{r.instrument ? ` · ${r.instrument}` : ""}</td>
               <td className={cn("whitespace-nowrap px-6 py-2 text-right font-display text-base font-semibold tabular-nums", (r.balance_paise || 0) > 0 ? "text-brick" : "text-sage")} data-testid={`ledger-balance-${r.seq}`}>{r.balance_paise != null && <Num s={inr(r.balance_paise / 100)} />}</td>
             </tr>); })}</tbody>
-          <tfoot><tr className="border-t-2 border-warm-200 bg-warm-50 font-semibold text-ink-950" data-testid="ledger-footer-totals"><td className="px-6 py-2" colSpan={2}>Totals · Balance = Udhar − Jama · Advance held {inr((sum?.advance_paise || 0) / 100)}</td><td className="px-4 py-2 text-right tabular-nums" data-testid="ledger-footer-udhar">{inr(rows.reduce((s, r) => s + (r.udhar_paise || 0), 0) / 100)}</td><td className="px-4 py-2 text-right tabular-nums text-sage" data-testid="ledger-footer-jama">{inr(rows.reduce((s, r) => s + (r.jama_paise || 0), 0) / 100)}</td><td /><td className="px-6 py-2 text-right tabular-nums" data-testid="ledger-footer-balance">{inr(rows.reduce((s, r) => s + (r.udhar_paise || 0) - (r.jama_paise || 0), 0) / 100)}</td></tr></tfoot>
+          <tfoot><tr className="border-t-2 border-warm-200 bg-warm-50 font-semibold text-ink-950" data-testid="ledger-footer-totals"><td className="px-6 py-2" colSpan={2}>Totals · <span data-testid="ledger-footer-outstanding">Outstanding {inr((sum?.outstanding_paise ?? sum?.due_paise ?? 0) / 100)}</span> · <span data-testid="ledger-footer-advance">Advance held {inr((sum?.advance_paise || 0) / 100)}</span> · <span data-testid="ledger-footer-net">Net balance {inr((sum?.net_balance_paise ?? ((sum?.total_udhar_paise || 0) - (sum?.total_jama_paise || 0))) / 100)}</span></td><td className="px-4 py-2 text-right tabular-nums" data-testid="ledger-footer-udhar">{inr(rows.reduce((s, r) => s + (r.udhar_paise || 0), 0) / 100)}</td><td className="px-4 py-2 text-right tabular-nums text-sage" data-testid="ledger-footer-jama">{inr(rows.reduce((s, r) => s + (r.jama_paise || 0), 0) / 100)}</td><td /><td className="px-6 py-2 text-right tabular-nums" data-testid="ledger-footer-balance">{inr(rows.reduce((s, r) => s + (r.udhar_paise || 0) - (r.jama_paise || 0), 0) / 100)}</td></tr></tfoot>
         </table></div>
       )}
     </Card>

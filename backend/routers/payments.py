@@ -127,12 +127,14 @@ async def _payment_totals(q: dict) -> dict:
 
 
 @router.get("/demands")
-async def list_open_demands(params: ListParams = Depends(), status: str | None = None, project_id: str | None = None, user: dict = Depends(require("finance.demand.view"))):
+async def list_open_demands(params: ListParams = Depends(), status: str | None = None, project_id: str | None = None, block_id: str | None = None, user: dict = Depends(require("finance.demand.view"))):
     q = {"company_id": user["company_id"], **project_scope_filter(user), "voided": {"$ne": True}, **search_filter(params.search, ["customer_name", "demand_number", "booking_number"])}
     if status:
         q["status"] = {"$in": status.split(",")}
     if project_id:
         q["project_id"] = project_id
+    if block_id:
+        q["block_id"] = block_id
     res = await paginate(db.demands, q, params, params.sort_spec(["due_date", "demand_date", "total_demand_paise", "customer_name"], "due_date"))
     res["items"] = present_money(res["items"])
     return res

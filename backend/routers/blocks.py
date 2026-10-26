@@ -75,6 +75,14 @@ class BlockCreate(StrictModel):
     floor_rise_per_sqft: float | None = Field(default=None, ge=0)
     status: BlockStatus = "Planning"
 
+    @field_validator("name")
+    @classmethod
+    def _trim_name(cls, v):
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("name is required")
+        return v
+
     @field_validator("code")
     @classmethod
     def _code(cls, v):
@@ -89,6 +97,11 @@ class BlockCreate(StrictModel):
 
 class BlockUpdate(StrictModel):
     name: str | None = Field(default=None, min_length=1, max_length=80)
+
+    @field_validator("name")
+    @classmethod
+    def _trim_name(cls, v):
+        return v.strip() if isinstance(v, str) and v.strip() else v
     block_type_id: str | None = None
     milestone_template_id: str | None = None
     rate_per_sqft: float | None = Field(default=None, ge=0)

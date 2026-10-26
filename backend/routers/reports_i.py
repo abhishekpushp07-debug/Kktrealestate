@@ -9,7 +9,8 @@ from db import db
 from deps import project_scope_filter, require
 from services import clock, definitions
 from services import pdf as _pdf
-from routers.reports import _company, _dates, _scope, _strict_params, respond
+from utils import ApiError
+from routers.reports import REPORTS, _company, _dates, _scope, _strict_params, respond
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 LIVE = ["Active", "Completed"]
@@ -29,7 +30,7 @@ def _month(d: str) -> str:
 
 
 async def _names(cid: str):
-    blocks = {b["id"]: f"{b.get('project_code', '')} {b['name']}" for b in await db.blocks.find({"company_id": cid}, {"_id": 0, "id": 1, "name": 1, "project_code": 1}).to_list(None)}
+    blocks = {b["id"]: " ".join(x for x in [b.get("project_code"), (b.get("name") or "").strip()] if x) for b in await db.blocks.find({"company_id": cid}, {"_id": 0, "id": 1, "name": 1, "project_code": 1}).to_list(None)}
     projects = {p["id"]: p["name"] for p in await db.projects.find({"company_id": cid}, {"_id": 0, "id": 1, "name": 1}).to_list(None)}
     users = {u["id"]: u["name"] for u in await db.users.find({"company_id": cid}, {"_id": 0, "id": 1, "name": 1}).to_list(None)}
     return blocks, projects, users
@@ -37,65 +38,78 @@ async def _names(cid: str):
 
 # ---------- 1b. Collections — Jama side with every grouping ----------
 @router.get("/collections-v2")
-async def collections_v2(request: Request, from_date: str | None = None, to_date: str | None = None, project_id: str | None = None, block_id: str | None = None, group_by: str = "month", format: str | None = None,
+async def collections_v2(request: Request, from_date: str | None = None, to_date: str | None = None, project_id: str | None = None, block_id: str | None = None, group_by: str = "month", date_basis: str = "receipt", format: str | None = None,
                          user: dict = Depends(require("reports.collections.view"))):
-    _strict_params(request, {"from_date", "to_date", "project_id", "block_id", "group_by"})
+    _strict_params(request, {"from_date", "to_date", "project_id", "block_id", "group_by", "date_basis"})
     f, t = _dates(from_date, to_date)
+    if date_basis not in ("receipt", "clearance"):
+        raise ApiError(400, "date_basis must be receipt or clearance", "BAD_PARAM")
     cid = user["company_id"]
     blocks, projects, users = await _names(cid)
     bq = {**_scope(user, project_id, block_id)}
     bids = {b["id"]: b for b in await db.bookings.find(bq, {"_id": 0, "id": 1, "booking_number": 1, "project_id": 1, "block_id": 1, "sales_user_id": 1, "customer_name": 1, "customer_id": 1}).to_list(None)}
-    # Jama rows: receipts + other-charge receipts; reversals as negative Jama (tag kept)
-    rows = await db.ledger_entries.find({"booking_id": {"$in": list(bids)}, "type": {"$in": ["PAYMENT", "OTHER_CHARGE_PAYMENT", "REVERSAL"]}, "date": {"$gte": f, "$lte": t}}, {"_id": 0}).to_list(None)
-    pays = {p["receipt_number"]: p for p in await db.payments.find({"company_id": cid, "payment_date": {"$gte": f, "$lte": t}}, {"_id": 0, "receipt_number": 1, "bank_account_name": 1, "payment_mode_name": 1, "received_by_name": 1, "status": 1, "amount_paise": 1, "id": 1}).to_list(None)}
+    # Jama side from receipts: status Cleared (pending excluded) + reversed receipts (their receipt, then a negative row on the reversal date)
+    def on(p):  # effective date by basis
+        return (p.get("cleared_at") or p["payment_date"])[:10] if date_basis == "clearance" else p["payment_date"]
+    pays = await db.payments.find({"company_id": cid, "booking_id": {"$in": list(bids)}, "status": {"$in": ["Cleared", "Reversed"]}}, {"_id": 0}).to_list(None)
+    rows = []
+    for p in pays:
+        d = on(p)
+        if f <= d <= t:
+            rows.append({**p, "_date": d, "_amt": p["amount_paise"], "_rev": False})
+        if p["status"] == "Reversed" and p.get("reversal"):
+            rd = (p["reversal"].get("at") or p["updated_at"])[:10]
+            if f <= rd <= t:
+                rows.append({**p, "_date": rd, "_amt": -p["amount_paise"], "_rev": True})
 
     def gkey(r):
         b = bids[r["booking_id"]]
-        p = pays.get(r.get("ref") or "", {})
         if group_by == "day":
-            return r["date"]
+            return r["_date"]
         if group_by == "week":
-            d = date.fromisoformat(r["date"]); y, w, _ = d.isocalendar(); return f"{y}-W{w:02d}"
+            d = date.fromisoformat(r["_date"]); y, w, _ = d.isocalendar(); return f"{y}-W{w:02d}"
         if group_by == "project":
             return projects.get(b["project_id"], "?")
         if group_by == "block":
             return blocks.get(b["block_id"], "?")
         if group_by == "bucket":
-            return r.get("category") or "Other"
+            return {"CASH": "Cash", "ACCOUNT": "Account", "OTHER": "Other charges"}.get((r.get("payment_category") or "").upper(), r.get("payment_category") or "Other charges")
         if group_by == "mode":
-            return r.get("mode") or p.get("payment_mode_name") or "—"
+            return r.get("payment_mode_name") or r.get("payment_mode_code") or "—"
         if group_by == "bank":
-            return p.get("bank_account_name") or ("Cash in hand" if (r.get("mode") or "").lower() == "cash" else "Unassigned")
+            return r.get("bank_account_name") or ("Cash in hand" if r.get("payment_mode_code") == "CASH" else "Unassigned")
         if group_by == "rm":
             return users.get(b.get("sales_user_id"), "Unassigned")
         if group_by == "receipt":
-            return r.get("ref") or r["id"]
-        return _month(r["date"])
+            return r["receipt_number"] + (" (reversal)" if r["_rev"] else "")
+        return r["_date"][:7]
     g: dict[str, dict] = {}
     for r in rows:
         k = gkey(r)
         e = g.setdefault(k, {"group": k, "count": 0, "cash_paise": 0, "account_paise": 0, "other_paise": 0, "reversal_paise": 0, "total_paise": 0, "_link": None})
-        j = r.get("jama_paise", 0)
         e["count"] += 1
-        if r["type"] == "REVERSAL":
-            e["reversal_paise"] += j
+        if r["_rev"]:
+            e["reversal_paise"] += r["_amt"]
         else:
-            e[{"Cash": "cash_paise", "Account": "account_paise"}.get(r.get("category"), "other_paise")] += j
-        e["total_paise"] += j
+            e[{"CASH": "cash_paise", "ACCOUNT": "account_paise"}.get((r.get("payment_category") or "").upper(), "other_paise")] += r["_amt"]
+        e["total_paise"] += r["_amt"]
         if group_by == "receipt":
             b = bids[r["booking_id"]]
-            e.update({"customer_name": b["customer_name"], "booking_number": b["booking_number"], "tag": r.get("tag"), "date": r["date"], "_link": f"/payments?q={r.get('ref') or ''}"})
+            e.update({"customer_name": b["customer_name"], "booking_number": b["booking_number"], "tag": "Reversal: " + (r["reversal"] or {}).get("reason", "") if r["_rev"] else (r.get("payment_mode_name") or ""), "date": r["_date"], "_link": f"/payments?q={r['receipt_number']}"})
     out = sorted(g.values(), key=lambda e: (e["group"] if group_by in ("day", "week", "month") else -e["total_paise"]))
     pend = await db.payments.aggregate([{"$match": {**_scope(user, project_id, block_id), "status": "Pending"}}, {"$group": {"_id": None, "n": {"$sum": 1}, "amt": {"$sum": "$amount_paise"}}}]).to_list(1)
     totals = {k: sum(e[k] for e in out) for k in ("count", "cash_paise", "account_paise", "other_paise", "reversal_paise", "total_paise")}
     totals["pending_instruments"] = pend[0]["n"] if pend else 0
     totals["pending_paise"] = pend[0]["amt"] if pend else 0
     label = {"day": "Day", "week": "Week", "month": "Month", "project": "Project", "block": "Tower", "bucket": "Ledger", "mode": "Mode", "bank": "Bank account", "rm": "Relationship manager", "receipt": "Receipt"}.get(group_by, "Group")
-    cols = [("group", label, "str", 1.4)] + ([("date", "Date", "date"), ("customer_name", "Customer", "str", 1.3), ("booking_number", "Booking", "str")] if group_by == "receipt" else []) + \
-        [("count", "Rows", "num", 0.6), ("cash_paise", "Cash (Jama)", "money"), ("account_paise", "Account (Jama)", "money"), ("other_paise", "Other charges", "money"), ("reversal_paise", "Reversals", "money"), ("total_paise", "Net Jama", "money")]
-    payload = {"purpose": "What money came in (Jama side of the ledger), sliced any way you need. Reversals are negative with their tag.", "from_date": f, "to_date": t, "group_by": group_by, "as_of": clock.today().isoformat(),
-               "filters_text": f"{_pdf.fmt_date(f)} – {_pdf.fmt_date(t)} · grouped by {label.lower()}", "group_options": ["day", "week", "month", "project", "block", "bucket", "mode", "bank", "rm", "receipt"]}
-    return etag_respond(request, respond(request, format, payload, "Collections (Jama)", await _company(user), cols, out, totals, "collections", landscape=True))
+    cols = [("group", label, "str", 1.4)] + ([("date", "Date", "date"), ("customer_name", "Customer", "str", 1.3), ("booking_number", "Booking", "str"), ("tag", "Tag", "str", 1.2)] if group_by == "receipt" else []) + \
+        [("count", "Rows", "num", 0.6), ("cash_paise", "Cash (Jama)", "money"), ("account_paise", "Account (Jama)", "money"), ("other_paise", "Other charges (Jama)", "money"), ("reversal_paise", "Reversals", "money"), ("total_paise", "Net Jama", "money")]
+    basis_text = "Date basis: receipt date" if date_basis == "receipt" else "Date basis: clearance date"
+    payload = {"purpose": "What money came in (Jama side), sliced any way you need. Cleared receipts only; reversals appear negative on the reversal date.", "from_date": f, "to_date": t, "group_by": group_by, "date_basis": date_basis, "basis_text": basis_text, "as_of": clock.today().isoformat(),
+               "filters_text": f"{_pdf.fmt_date(f)} – {_pdf.fmt_date(t)} · grouped by {label.lower()}", "group_options": ["day", "week", "month", "project", "block", "bucket", "mode", "bank", "rm", "receipt"],
+               "kpis": [{"label": "Net Jama", "value_paise": totals["total_paise"], "kind": "money", "hint": f"{totals['count']} rows · {basis_text.lower()}"}, {"label": "Cash (Jama)", "value_paise": totals["cash_paise"], "kind": "money"}, {"label": "Account (Jama)", "value_paise": totals["account_paise"], "kind": "money"},
+                        {"label": "Pending instruments", "value_paise": totals["pending_paise"], "kind": "money", "hint": f"{totals['pending_instruments']} not yet cleared (excluded)", "tone": "brick" if totals["pending_paise"] else None}]}
+    return etag_respond(request, respond(request, format, payload, "Collections (Jama)", await _company(user), cols, out, totals, "collections-v2", landscape=True))
 
 
 # ---------- 2b. Outstanding & ageing (Udhar − Jama) with advance + bands from definitions ----------
@@ -113,27 +127,31 @@ async def outstanding_v2(request: Request, project_id: str | None = None, block_
     for b in bks:
         s = b.get("summary") or {}
         a = per_bk.get(b["id"], {})
+        o_ = definitions.outstanding(s)["total_paise"]
+        adv = definitions.advance(s)
         rows.append({"group": b["booking_number"], "customer_name": b["customer_name"], "unit": f"{blocks.get(b['block_id'], '')}-{(b.get('flat_snapshot') or {}).get('flat_number', '')}", "project_id": b["project_id"], "block_id": b["block_id"],
-                     "udhar_paise": s.get("total_udhar_paise", 0), "jama_paise": s.get("total_jama_paise", 0), "balance_paise": definitions.outstanding(s)["total_paise"], "advance_paise": definitions.advance(s),
+                     "udhar_paise": s.get("total_udhar_paise", 0), "jama_paise": s.get("total_jama_paise", 0), "outstanding_paise": o_, "advance_paise": adv, "net_balance_paise": definitions.net_balance(s),
                      **{f"band_{k}": a.get(k, 0) for k in bands}, "overdue_paise": definitions.overdue_of(a), "promise": (b.get("promise_to_pay") or {}).get("note") or "", "_link": f"/bookings/{b['id']}", "customer_id": b["customer_id"]})
     if group_by in ("customer", "project", "block"):
         g = {}
         for r in rows:
             k = r["customer_name"] if group_by == "customer" else (projects.get(r["project_id"], "?") if group_by == "project" else blocks.get(r["block_id"], "?"))
-            e = g.setdefault(k, {"group": k, "customer_name": "", "unit": "", "udhar_paise": 0, "jama_paise": 0, "balance_paise": 0, "advance_paise": 0, "overdue_paise": 0, "promise": "", **{f"band_{b}": 0 for b in bands}, "_link": f"/customers/{r['customer_id']}" if group_by == "customer" else None, "bookings": 0})
-            for kk in ("udhar_paise", "jama_paise", "balance_paise", "advance_paise", "overdue_paise", *[f"band_{b}" for b in bands]):
+            e = g.setdefault(k, {"group": k, "customer_name": "", "unit": "", "udhar_paise": 0, "jama_paise": 0, "outstanding_paise": 0, "advance_paise": 0, "net_balance_paise": 0, "overdue_paise": 0, "promise": "", **{f"band_{b}": 0 for b in bands}, "_link": f"/customers/{r['customer_id']}" if group_by == "customer" else None, "bookings": 0})
+            for kk in ("udhar_paise", "jama_paise", "outstanding_paise", "advance_paise", "net_balance_paise", "overdue_paise", *[f"band_{b}" for b in bands]):
                 e[kk] += r[kk]
             e["bookings"] += 1
         rows = list(g.values())
-    rows.sort(key=lambda r: -r["balance_paise"])
-    keys = ["udhar_paise", "jama_paise", "balance_paise", "advance_paise", "overdue_paise", *[f"band_{b}" for b in bands]]
+    rows.sort(key=lambda r: -r["outstanding_paise"])
+    keys = ["udhar_paise", "jama_paise", "outstanding_paise", "advance_paise", "net_balance_paise", "overdue_paise", *[f"band_{b}" for b in bands]]
     totals = {k: sum(r[k] for r in rows) for k in keys}
     totals["bookings"] = len(bks)
     cols = [("group", {"booking": "Booking", "customer": "Customer", "project": "Project", "block": "Tower"}[group_by if group_by in ("booking", "customer", "project", "block") else "booking"], "str", 1.2)] + ([("customer_name", "Customer", "str", 1.3), ("unit", "Unit", "str", 0.9)] if group_by == "booking" else [("bookings", "Bookings", "num", 0.6)]) + \
-        [("udhar_paise", "Udhar", "money"), ("jama_paise", "Jama", "money"), ("balance_paise", "Balance", "money"), ("advance_paise", "Advance held", "money")] + [(f"band_{b}", b, "money", 0.8) for b in bands] + [("overdue_paise", "Overdue", "money")] + ([("promise", "Promise to pay", "str", 1)] if group_by == "booking" else [])
-    payload = {"purpose": "Who owes what (Udhar − Jama) and for how long; bands per definitions.ageing_bands; advance held shown separately.", "as_of": today.isoformat(), "group_by": group_by, "group_options": ["booking", "customer", "project", "block"],
-               "ageing": [{"bucket": k, "amount_paise": v} for k, v in ageing.items()], "filters_text": f"As of {_pdf.fmt_date(today.isoformat())} · grouped by {group_by}"}
-    return etag_respond(request, respond(request, format, payload, "Outstanding & Ageing", await _company(user), cols, rows, totals, "outstanding", landscape=True))
+        [("udhar_paise", "Udhar", "money"), ("jama_paise", "Jama", "money"), ("outstanding_paise", "Outstanding", "money"), ("advance_paise", "Advance held", "money"), ("net_balance_paise", "Net balance", "money")] + [(f"band_{b}", b, "money", 0.8) for b in bands] + [("overdue_paise", "Overdue", "money")] + ([("promise", "Promise to pay", "str", 1)] if group_by == "booking" else [])
+    payload = {"purpose": "Law: Outstanding (due now) = Σ bucket max(0, raised − paid); Advance held = Σ bucket max(0, paid − raised); Net balance = Outstanding − Advance = Σ Udhar − Σ Jama. Ageing bands split the Outstanding.", "as_of": today.isoformat(), "group_by": group_by, "group_options": ["booking", "customer", "project", "block"],
+               "ageing": [{"bucket": k, "amount_paise": v} for k, v in ageing.items()], "filters_text": f"As of {_pdf.fmt_date(today.isoformat())} · grouped by {group_by}",
+               "kpis": [{"label": "Outstanding", "value_paise": totals["outstanding_paise"], "kind": "money", "hint": f"{totals['bookings']} live bookings", "tone": "brick" if totals["outstanding_paise"] else "sage"}, {"label": "Advance held", "value_paise": totals["advance_paise"], "kind": "money", "tone": "sage"},
+                        {"label": "Net balance", "value_paise": totals["net_balance_paise"], "kind": "money", "hint": "Σ Udhar − Σ Jama"}, {"label": "Overdue", "value_paise": totals["overdue_paise"], "kind": "money", "tone": "brick" if totals["overdue_paise"] else None}]}
+    return etag_respond(request, respond(request, format, payload, "Outstanding & Ageing", await _company(user), cols, rows, totals, "outstanding-v2", landscape=True))
 
 
 # ---------- 4. Cash vs Account split ----------
@@ -198,7 +216,7 @@ def _expected_date(inst: dict, booking: dict, block: dict | None, today: date) -
 
 
 @router.get("/receivables-forecast")
-async def receivables_forecast(request: Request, project_id: str | None = None, block_id: str | None = None, group_by: str = "month", format: str | None = None, user: dict = Depends(require("reports.receivables_forecast.view"))):
+async def receivables_forecast(request: Request, project_id: str | None = None, block_id: str | None = None, group_by: str = "auto", format: str | None = None, user: dict = Depends(require("reports.receivables_forecast.view"))):
     _strict_params(request, {"project_id", "block_id", "group_by"})
     cid = user["company_id"]
     blocks_n, projects, _ = await _names(cid)
@@ -220,15 +238,26 @@ async def receivables_forecast(request: Request, project_id: str | None = None, 
             alloc += amt
             when, basis = _expected_date(i, b, blocks.get(b["block_id"]), today)
             cash = int(round(amt * cash_share))
-            lines.append({"booking_id": b["id"], "booking_number": b["booking_number"], "customer_name": b["customer_name"], "project_id": b["project_id"], "block_id": b["block_id"], "installment": f"{i['seq']}. {i['name']}", "basis": basis,
+            lines.append({"booking_id": b["id"], "booking_number": b["booking_number"], "customer_name": b["customer_name"], "project_id": b["project_id"], "block_id": b["block_id"], "installment": f"{i['seq']}. {i['name']}", "basis": basis, "stage_seq": next((s["seq"] for s in (blocks.get(b["block_id"]) or {}).get("construction_stages") or [] if s["stage_id"] == i.get("trigger_stage_id")), 0) if i.get("trigger_type") == "ON_STAGE" else -1,
+                          "stage": i["name"] if i.get("trigger_type") == "ON_STAGE" else ("Booking / dated" if basis in ("booked", "dated") else i["name"]),
                           "expected_on": when, "month": when[:7] if when else "On completion", "cash_paise": cash, "account_paise": amt - cash, "expected_paise": amt})
         if not pend and remaining:
-            lines.append({"booking_id": b["id"], "booking_number": b["booking_number"], "customer_name": b["customer_name"], "project_id": b["project_id"], "block_id": b["block_id"], "installment": "Unscheduled balance", "basis": "on completion", "expected_on": None, "month": "On completion",
+            lines.append({"booking_id": b["id"], "booking_number": b["booking_number"], "customer_name": b["customer_name"], "project_id": b["project_id"], "block_id": b["block_id"], "installment": "Unscheduled balance", "basis": "on completion", "expected_on": None, "month": "On completion", "stage_seq": 999, "stage": "Unscheduled balance",
                           "cash_paise": int(round(remaining * cash_share)), "account_paise": remaining - int(round(remaining * cash_share)), "expected_paise": remaining})
         per_booking.append({"booking_number": b["booking_number"], "agreement_paise": b["agreement_value_paise"], "raised_paise": raised, "forecast_paise": remaining})
+    any_dated = any(l["expected_on"] for l in lines if l["basis"] == "scheduled")
+    if group_by == "auto":
+        group_by = "month" if any_dated else "stage"
     if group_by == "booking":
         rows = [{"group": l["installment"], **l, "_link": f"/bookings/{l['booking_id']}"} for l in lines]
         rows.sort(key=lambda r: (r["booking_number"], r["expected_on"] or "9999"))
+    elif group_by == "stage":  # tower → stage (plan order), one "On completion" (or planned month) row per stage
+        g = {}
+        for l in lines:
+            k = (blocks_n.get(l["block_id"], "?"), l["stage_seq"], l["stage"])
+            e = g.setdefault(k, {"group": f"{k[0]} · {k[2]}", "tower": k[0], "stage": k[2], "month": l["month"], "lines": 0, "bookings": set(), "cash_paise": 0, "account_paise": 0, "expected_paise": 0, "_link": f"/construction?block={l['block_id']}"})
+            e["lines"] += 1; e["bookings"].add(l["booking_id"]); e["cash_paise"] += l["cash_paise"]; e["account_paise"] += l["account_paise"]; e["expected_paise"] += l["expected_paise"]
+        rows = [{**e, "bookings": len(e["bookings"])} for k, e in sorted(g.items(), key=lambda kv: (kv[0][0], kv[0][1]))]
     else:
         g = {}
         for l in lines:
@@ -239,10 +268,13 @@ async def receivables_forecast(request: Request, project_id: str | None = None, 
     totals = {k: sum(r[k] for r in rows) for k in ("cash_paise", "account_paise", "expected_paise")}
     totals["agreement_paise"] = sum(p["agreement_paise"] for p in per_booking); totals["raised_paise"] = sum(p["raised_paise"] for p in per_booking)
     cols = ([("group", "Installment", "str", 1.3), ("booking_number", "Booking", "str"), ("customer_name", "Customer", "str", 1.2), ("expected_on", "Expected on", "date"), ("basis", "Basis", "str", 0.8)] if group_by == "booking" else
+            [("group", "Tower · stage", "str", 1.6), ("month", "Expected", "str", 0.9), ("bookings", "Bookings", "num", 0.7), ("lines", "Installments", "num", 0.7)] if group_by == "stage" else
             [("group", {"month": "Month", "project": "Project", "block": "Tower"}.get(group_by, "Group"), "str", 1.3), ("bookings", "Bookings", "num", 0.7), ("lines", "Installments", "num", 0.7)]) + \
         [("cash_paise", "Expected Cash (Udhar)", "money"), ("account_paise", "Expected Account (Udhar)", "money"), ("expected_paise", "Expected total", "money")]
-    payload = {"purpose": "Udhar still to be raised per booking = agreement − raised, spread over pending plan installments; stage-linked lines are dated from the tower schedule or shown as 'On completion'.", "as_of": today.isoformat(),
-               "group_by": group_by, "group_options": ["month", "project", "block", "booking"], "per_booking": per_booking, "filters_text": f"As of {_pdf.fmt_date(today.isoformat())} · Σ forecast + Σ raised == Σ agreement"}
+    payload = {"purpose": "Udhar still to be raised per booking = agreement − raised, spread over pending plan installments; stage-linked lines take the tower's planned date (Construction → Planned dates) else 'On completion'.", "as_of": today.isoformat(),
+               "group_by": group_by, "group_options": ["stage", "month", "project", "block", "booking"], "per_booking": per_booking, "filters_text": f"As of {_pdf.fmt_date(today.isoformat())} · Σ forecast + Σ raised == Σ agreement" + ("" if any_dated else " · no planned dates set — grouped tower → stage"),
+               "kpis": [{"label": "Still to raise", "value_paise": totals["expected_paise"], "kind": "money", "hint": "Σ forecast"}, {"label": "Expected Cash", "value_paise": totals["cash_paise"], "kind": "money"}, {"label": "Expected Account", "value_paise": totals["account_paise"], "kind": "money"},
+                        {"label": "Agreement total", "value_paise": totals["agreement_paise"], "kind": "money", "hint": f"raised {_pdf.inr(totals['raised_paise'])} · forecast + raised = agreement", "tone": "sage"}]}
     return etag_respond(request, respond(request, format, payload, "Receivables Forecast", await _company(user), cols, rows, totals, "receivables-forecast", landscape=True))
 
 
@@ -390,31 +422,48 @@ async def sales_team(request: Request, from_date: str | None = None, to_date: st
 
 # ---------- 15. Construction vs plan ----------
 @router.get("/construction-vs-plan")
-async def construction_vs_plan(request: Request, project_id: str | None = None, format: str | None = None, user: dict = Depends(require("reports.construction_vs_plan.view"))):
-    _strict_params(request, {"project_id"})
+async def construction_vs_plan(request: Request, project_id: str | None = None, block_id: str | None = None, format: str | None = None, user: dict = Depends(require("reports.construction_vs_plan.view"))):
+    _strict_params(request, {"project_id", "block_id"})
     cid = user["company_id"]
     _, projects, _ = await _names(cid)
-    q = {"company_id": cid, **project_scope_filter(user), "is_active": {"$ne": False}, **({"project_id": project_id} if project_id else {})}
-    rows = []
-    for b in await db.blocks.find(q, {"_id": 0, "id": 1, "name": 1, "project_id": 1, "project_code": 1, "construction_stages": 1}).to_list(None):
+    q = {"company_id": cid, **project_scope_filter(user), "is_active": {"$ne": False}, **({"project_id": project_id} if project_id else {}), **({"id": block_id} if block_id else {})}
+    rows, towers = [], 0
+    for b in sorted(await db.blocks.find(q, {"_id": 0, "id": 1, "name": 1, "project_id": 1, "project_code": 1, "construction_stages": 1}).to_list(None), key=lambda b: ((b.get("project_code") or ""), (b.get("name") or "").strip())):
+        towers += 1
+        tower = " ".join(x for x in [b.get("project_code"), (b.get("name") or "").strip()] if x)
         st = sorted(b.get("construction_stages") or [], key=lambda s: s["seq"])
-        done = [s for s in st if s.get("status") == "Completed"]
         nxt = next((s for s in st if s.get("status") != "Completed"), None)
-        dem = await db.demands.aggregate([{"$match": {"block_id": b["id"], "voided": {"$ne": True}, "trigger_type": "ON_STAGE"}}, {"$group": {"_id": None, "d": {"$sum": "$total_demand_paise"}, "c": {"$sum": "$paid_paise"}}}]).to_list(1)
-        exp = 0
-        if nxt:
-            async for bk in db.bookings.find({"block_id": b["id"], "status": {"$in": LIVE}}, {"_id": 0, "agreement_value_paise": 1, "payment_plan_snapshot": 1}):
-                for i in (bk.get("payment_plan_snapshot") or {}).get("installments") or []:
-                    if i.get("trigger_stage_id") == nxt["stage_id"]:
-                        exp += int(round(bk["agreement_value_paise"] * i["percent"] / 100))
+        agg = {a["_id"]: a for a in await db.demands.aggregate([{"$match": {"block_id": b["id"], "voided": {"$ne": True}, "trigger_type": {"$in": ["ON_STAGE", "ON_POSSESSION"]}}}, {"$group": {"_id": "$trigger_stage_id", "d": {"$sum": "$total_demand_paise"}, "c": {"$sum": "$paid_paise"}, "bk": {"$addToSet": "$booking_id"}}}]).to_list(None)}
+        # expected Udhar per pending stage from live bookings' plan snapshots
+        expected, affected = {}, {}
+        async for bk in db.bookings.find({"block_id": b["id"], "status": {"$in": LIVE}}, {"_id": 0, "agreement_value_paise": 1, "payment_plan_snapshot": 1}):
+            for i in (bk.get("payment_plan_snapshot") or {}).get("installments") or []:
+                sid = i.get("trigger_stage_id")
+                if sid:
+                    expected[sid] = expected.get(sid, 0) + int(round(bk["agreement_value_paise"] * i["percent"] / 100))
+                    affected[sid] = affected.get(sid, 0) + 1
         plan = await db.construction_stage_plans.find_one({"block_id": b["id"], "is_active": True}, {"_id": 0, "name": 1})
-        rows.append({"group": f"{b.get('project_code', '')} {b['name']}", "project": projects.get(b["project_id"], ""), "stage_plan": (plan or {}).get("name") or "—", "completed": len(done), "stages": len(st), "pct": round(100 * len(done) / len(st)) if st else 0,
-                     "last_completed": max((s.get("completed_on") or "" for s in done), default=None) or None, "next_stage": nxt["name"] if nxt else "All stages complete", "stage_demanded_paise": dem[0]["d"] if dem else 0, "stage_collected_paise": dem[0]["c"] if dem else 0, "next_expected_paise": exp, "_link": f"/construction?block={b['id']}"})
-    rows.sort(key=lambda r: r["group"])
-    totals = {k: sum(r[k] for r in rows) for k in ("completed", "stages", "stage_demanded_paise", "stage_collected_paise", "next_expected_paise")}
-    cols = [("group", "Tower", "str", 1.2), ("project", "Project", "str", 1.1), ("stage_plan", "Stage plan", "str", 1.1), ("completed", "Done", "num", 0.5), ("stages", "Stages", "num", 0.5), ("pct", "Progress", "pct", 0.6), ("last_completed", "Last completed", "date"), ("next_stage", "Next stage", "str", 1),
-            ("stage_demanded_paise", "Stage demands (Udhar)", "money"), ("stage_collected_paise", "Collected (Jama)", "money"), ("next_expected_paise", "Next stage expected Udhar", "money")]
-    payload = {"purpose": "Per tower: stage-plan progress, stage-linked demands raised vs collected, and the Udhar the next stage will raise.", "as_of": clock.today().isoformat()}
+        sub = {"group": f"{tower} — subtotal", "tower": tower, "project": projects.get(b["project_id"], ""), "stage": f"{sum(1 for s in st if s.get('status') == 'Completed')} / {len(st)} stages · plan: {(plan or {}).get('name') or '—'}", "status": "", "completed_on": None, "bookings": 0,
+               "demanded_paise": 0, "collected_paise": 0, "balance_paise": 0, "expected_paise": 0, "_subtotal": True, "_link": f"/construction?block={b['id']}"}
+        for s in st:
+            a = agg.get(s["stage_id"], {})
+            is_next = nxt is not None and s["stage_id"] == nxt["stage_id"]
+            exp = expected.get(s["stage_id"])
+            r = {"group": tower, "tower": tower, "project": projects.get(b["project_id"], ""), "stage": f"{s['seq']}. {s['name']}" + (" ← next" if is_next else ""), "status": s.get("status") or "Pending", "completed_on": s.get("completed_on"), "planned_on": s.get("planned_date"),
+                 "bookings": len(a.get("bk", [])) or affected.get(s["stage_id"], 0), "demanded_paise": a.get("d", 0), "collected_paise": a.get("c", 0), "balance_paise": max(a.get("d", 0) - a.get("c", 0), 0),
+                 "expected_paise": (exp if exp is not None else 0) if s.get("status") != "Completed" else 0, "expected_note": ("" if s.get("status") == "Completed" else ("no plan row for this stage" if exp is None else "")), "_link": f"/payments/demands?block_id={b['id']}&stage_id={s['stage_id']}"}
+            rows.append(r)
+            for k in ("bookings", "demanded_paise", "collected_paise", "balance_paise", "expected_paise"):
+                sub[k] += r[k]
+        rows.append(sub)
+    totals = {k: sum(r[k] for r in rows if not r.get("_subtotal")) for k in ("demanded_paise", "collected_paise", "balance_paise", "expected_paise")}
+    totals["towers"] = towers
+    nxt_exp = sum(r["expected_paise"] for r in rows if not r.get("_subtotal") and r["stage"].endswith("← next"))
+    cols = [("group", "Tower", "str", 1.1), ("stage", "Stage", "str", 1.4), ("status", "Status", "str", 0.7), ("completed_on", "Completed", "date", 0.8), ("planned_on", "Planned", "date", 0.8), ("bookings", "Bookings", "num", 0.6),
+            ("demanded_paise", "Demands raised (Udhar)", "money"), ("collected_paise", "Collected (Jama)", "money"), ("balance_paise", "Balance", "money"), ("expected_paise", "Expected Udhar (pending)", "money"), ("expected_note", "Note", "str", 0.9)]
+    payload = {"purpose": "Per tower, per stage: status and dates, stage-linked demands raised vs collected, and the Udhar each pending stage will raise from live bookings' plan snapshots (tower subtotals).", "as_of": clock.today().isoformat(),
+               "kpis": [{"label": "Towers", "value": towers, "kind": "num"}, {"label": "Stage demands (Udhar)", "value_paise": totals["demanded_paise"], "kind": "money", "hint": f"collected {_pdf.inr(totals['collected_paise'])}"}, {"label": "Stage balance", "value_paise": totals["balance_paise"], "kind": "money", "tone": "brick" if totals["balance_paise"] else "sage"},
+                        {"label": "Next-stage expected Udhar", "value_paise": nxt_exp, "kind": "money", "hint": "across towers' next pending stage"}]}
     return etag_respond(request, respond(request, format, payload, "Construction vs Plan", await _company(user), cols, rows, totals, "construction-vs-plan", landscape=True))
 
 
@@ -424,19 +473,20 @@ async def data_quality(request: Request, format: str | None = None, user: dict =
     _strict_params(request, set())
     cid = user["company_id"]
     scope = {"company_id": cid, **project_scope_filter(user)}
+    inactive_free = [b for b in await db.blocks.find({**scope, "is_active": {"$ne": False}}, {"_id": 0, "id": 1, "name": 1, "project_code": 1}).to_list(None) if not await db.construction_stage_plans.find_one({"block_id": b["id"], "is_active": True}, {"_id": 0, "id": 1})]
     checks = [
-        ("Customers without phone", await db.customers.count_documents({"company_id": cid, "is_active": {"$ne": False}, "$or": [{"phone": None}, {"phone": ""}]}), "/customers?missing=phone"),
-        ("Customers with KYC pending", await db.customers.count_documents({"company_id": cid, "is_active": {"$ne": False}, "kyc_status": {"$ne": "Verified"}}), "/customers?kyc=pending"),
-        ("Live bookings without a payment plan", await db.bookings.count_documents({**scope, "status": {"$in": LIVE}, "$or": [{"payment_plan_snapshot": None}, {"payment_plan_snapshot.installments": {"$size": 0}}]}), "/bookings?missing=plan"),
-        ("Flats without price", await db.flats.count_documents({**scope, "is_active": {"$ne": False}, "$or": [{"price_paise": None}, {"price_paise": 0}]}), "/masters/flats?missing=price"),
-        ("Active towers without a stage plan", len([b for b in await db.blocks.find({**scope, "is_active": {"$ne": False}}, {"_id": 0, "id": 1}).to_list(None) if not await db.construction_stage_plans.find_one({"block_id": b["id"], "is_active": True}, {"_id": 0, "id": 1})]), "/masters/towers"),
-        ("Payment plans not summing to 100 %", sum(1 for p in await db.payment_plans.find({"company_id": cid, "is_active": True}, {"_id": 0, "installments.percent": 1}).to_list(None) if round(sum(i["percent"] for i in p.get("installments") or []), 2) != 100), "/masters/payment-plans"),
-        ("Demands without an installment mapping", await db.demands.count_documents({**scope, "voided": {"$ne": True}, "$or": [{"installment_seq": None}, {"installment_seq": {"$exists": False}}]}), "/bookings"),
-        ("Open demands on cancelled bookings", await db.demands.count_documents({"booking_id": {"$in": [b["id"] for b in await db.bookings.find({**scope, "status": "Cancelled"}, {"_id": 0, "id": 1}).to_list(None)]}, "voided": {"$ne": True}, "status": {"$in": ["Open", "Partially Paid", "Overdue"]}}), "/bookings?status=Cancelled"),
+        ("Customers without phone", await db.customers.count_documents({"company_id": cid, "is_active": {"$ne": False}, "$or": [{"phone": None}, {"phone": ""}]}), "/customers?missing=phone", ""),
+        ("Customers with KYC pending", await db.customers.count_documents({"company_id": cid, "is_active": {"$ne": False}, "kyc_status": {"$ne": "Verified"}}), "/customers?kyc=pending", ""),
+        ("Live bookings without a payment plan", await db.bookings.count_documents({**scope, "status": {"$in": LIVE}, "$or": [{"payment_plan_snapshot": None}, {"payment_plan_snapshot.installments": {"$size": 0}}]}), "/bookings?missing=plan", ""),
+        ("Flats without price", await db.flats.count_documents({**scope, "is_active": {"$ne": False}, "$or": [{"price_paise": None}, {"price_paise": 0}]}), "/masters/flats?missing=price", ""),
+        ("Active towers without a stage plan", len(inactive_free), "/masters/towers", ", ".join(" ".join(x for x in [b.get("project_code"), (b.get("name") or "").strip()] if x) for b in inactive_free)),
+        ("Payment plans not summing to 100 %", sum(1 for p in await db.payment_plans.find({"company_id": cid, "is_active": True}, {"_id": 0, "installments.percent": 1}).to_list(None) if round(sum(i["percent"] for i in p.get("installments") or []), 2) != 100), "/masters/payment-plans", ""),
+        ("Demands without an installment mapping", await db.demands.count_documents({**scope, "voided": {"$ne": True}, "$or": [{"installment_seq": None}, {"installment_seq": {"$exists": False}}]}), "/bookings", ""),
+        ("Open demands on cancelled bookings", await db.demands.count_documents({"booking_id": {"$in": [b["id"] for b in await db.bookings.find({**scope, "status": "Cancelled"}, {"_id": 0, "id": 1}).to_list(None)]}, "voided": {"$ne": True}, "status": {"$in": ["Open", "Partially Paid", "Overdue"]}}), "/bookings?status=Cancelled", ""),
     ]
     integ = await db.integrity_reports.find_one({}, {"_id": 0, "ok": 1, "ran_at": 1, "counts": 1}, sort=[("ran_at", -1)]) if "integrity_reports" in await db.list_collection_names() else None
-    rows = [{"group": name, "count": n, "status": "OK" if n == 0 else "Review", "_link": link} for name, n, link in checks]
+    rows = [{"group": name, "count": n, "status": "OK" if n == 0 else "Review", "which": which, "_link": link} for name, n, link, which in checks]
     totals = {"count": sum(r["count"] for r in rows), "status": f"{sum(1 for r in rows if r['count'])} checks need review"}
-    cols = [("group", "Check", "str", 2), ("count", "Records", "num"), ("status", "Status", "str")]
+    cols = [("group", "Check", "str", 2), ("count", "Records", "num"), ("status", "Status", "str"), ("which", "Which", "str", 2)]
     payload = {"purpose": "Hygiene counts that should trend to zero; each drills to the list. Consistency of the ledger itself is the integrity report.", "as_of": clock.today().isoformat(), "integrity": integ}
     return etag_respond(request, respond(request, format, payload, "Data Quality", await _company(user), cols, rows, totals, "data-quality"))

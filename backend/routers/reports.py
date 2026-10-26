@@ -82,22 +82,51 @@ def _scope(user, project_id=None, block_id=None):
     return q
 
 
+def _default_kpis(payload: dict, columns: list[tuple], totals: dict | None, rows: list[dict]) -> list[dict]:
+    """Server-side KPI strip so API consumers, CSV/PDF and the UI agree. Reports may pass their own `kpis`; otherwise the money totals + row count."""
+    if payload.get("kpis"):
+        return payload["kpis"]
+    k = [{"label": c[1], "value_paise": totals.get(c[0], 0), "kind": "money"} for c in columns if c[2] == "money" and totals and c[0] in totals][:4]
+    return k or [{"label": "Rows", "value": len(rows), "kind": "num"}]
+
+
 def respond(request: Request, fmt: str | None, payload: dict, title: str, company: dict, columns: list[tuple], rows: list[dict], totals: dict | None = None, filename="report", landscape=False):
     if fmt in ("csv", "pdf") and getattr(request.state, "perm_code", "").startswith("reports."):
         exp = request.state.perm_code.rsplit(".", 1)[0] + ".export"
         if exp not in request.state.perms:
             raise ApiError(403, f"Missing permission: {exp}", "PERMISSION_DENIED", {"missing": exp, "any_of": [exp]})
+    meta = next((r for r in REPORTS if r["key"] == filename), {})
+    payload = {**payload, "purpose": payload.get("purpose") or meta.get("purpose", ""), "title": title}
+    payload["kpis"] = _default_kpis(payload, columns, totals, rows)
+    header_line = " · ".join(x for x in [title, f"as of {_pdf.fmt_date(payload['as_of'])}" if payload.get("as_of") else None, payload.get("filters_text"), payload.get("basis_text")] if x)
     if fmt == "csv":
-        # rupees-only at the edge: *_paise columns export as rupee columns ("cash_paise" → "cash_inr", value / 100)
-        def _col(c):
-            return c.replace("_paise", "_inr") if c.endswith("_paise") else c
-        rows_inr = [{_col(k): (round(v / 100, 2) if k.endswith("_paise") and isinstance(v, (int, float)) else v) for k, v in r.items()} for r in rows]
-        return Response(content=to_csv(rows_inr, [_col(c[0]) for c in columns]), media_type="text/csv", headers={"Content-Disposition": f'attachment; filename="{filename}.csv"'})
+        import csv as _csv
+        import io
+        def head(c):  # humanised headers; money columns carry ₹ (whole rupees, Indian grouping is a display concern — CSV keeps plain rupees)
+            return f"{c[1]} ₹" if c[2] == "money" else c[1]
+        def val(c, v):
+            if c[2] == "money":
+                return "" if v is None else round(v / 100, 2)
+            return "" if v is None else v
+        buf = io.StringIO()
+        buf.write(f"# {header_line}\n")
+        w = _csv.writer(buf)
+        w.writerow([head(c) for c in columns])
+        for r in rows:
+            w.writerow([val(c, r.get(c[0])) for c in columns])
+        if totals:
+            w.writerow([("TOTAL" if i == 0 else val(c, totals.get(c[0])) if c[0] in totals else "") for i, c in enumerate(columns)])
+        return Response(content=buf.getvalue(), media_type="text/csv", headers={"Content-Disposition": f'attachment; filename="{filename}.csv"'})
     if fmt == "pdf":
         d = _pdf.BrandedDoc(title, company, landscape_mode=landscape, subtitle=payload.get("subtitle"))
         d.h1(title)
-        if payload.get("filters_text"):
-            d.small(payload["filters_text"])
+        if payload.get("purpose"):
+            d.small(payload["purpose"])
+        if header_line != title:
+            d.small(header_line[len(title) + 3:] if header_line.startswith(title + " · ") else header_line)
+        kp = payload["kpis"]
+        if kp:
+            d.totals([(k["label"], _pdf.inr(k["value_paise"]) if k.get("kind") == "money" else str(k.get("value", ""))) for k in kp[:4]], emphasis_last=False)
         d.spacer(2)
         money_cols = [i for i, c in enumerate(columns) if c[2] == "money"]
         num_cols = [i for i, c in enumerate(columns) if c[2] in ("money", "num", "pct")]
