@@ -120,7 +120,7 @@ export default function Reports() {
         </aside>
         <section className="min-w-0 space-y-6">
           {!can(`${permFor(key)}.view`) ? <EmptyState icon={ShieldAlert} title="Access restricted" description={`Your role lacks the ${permFor(key)}.view permission.`} testId="forbidden-report" /> : <>
-          <div><h2 className="font-display text-2xl text-ink-950" data-testid="report-title">{meta?.name || key}</h2><p className="mt-1 text-sm text-txt-secondary" data-testid="report-purpose">{meta?.purpose || DESC[key]}</p>{data?.as_of && <p className="mt-1 text-xs text-txt-muted" data-testid="report-asof">As of {fmtDate(data.as_of)}{data.filters_text ? ` · ${data.filters_text}` : ""}{data.basis_text ? ` · ${data.basis_text}` : ""}</p>}</div>
+          <div><h2 className="font-display text-2xl text-ink-950" data-testid="report-title">{meta?.name || key}</h2><p className="mt-1 text-sm text-txt-secondary" data-testid="report-purpose">{meta?.purpose || DESC[key]}</p>{data?.as_of && <p className="mt-1 text-xs text-txt-muted" data-testid="report-asof">{data.filters_text?.startsWith("As of") ? data.filters_text : `As of ${fmtDate(data.as_of)}${data.filters_text ? ` · ${data.filters_text}` : ""}`}{data.basis_text ? ` · ${data.basis_text}` : ""}</p>}</div>
           <Card className="space-y-4 print:hidden" testId="report-filters">
             <div className="flex flex-wrap items-center gap-3">
               {has("from_date") && <Segmented options={Object.keys(PRESET_DATES).map((k) => ({ value: k, label: k }))} value={range} onChange={(v) => { setRange(v); setActivePreset(null); setF((p) => ({ ...p, ...PRESET_DATES[v]() })); }} testId="rf-range" />}

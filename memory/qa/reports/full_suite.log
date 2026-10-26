@@ -4,37 +4,11 @@ bringing up nodes...
 ........................................................................ [ 14%]
 ........................................................................ [ 28%]
 ........................................................................ [ 42%]
-....................................s................................... [ 56%]
+..................................................s..................... [ 56%]
 ........................................................................ [ 70%]
 ........................................................................ [ 84%]
-.........................................s.........................F.... [ 99%]
+.........................................s.............................. [ 99%]
 .....                                                                    [100%]
-=================================== FAILURES ===================================
-___ TestErpConstructionPhotos.test_upload_valid_and_invalid_and_patch_delete ___
-[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
-
-self = <tests.test_phase_5.TestErpConstructionPhotos object at 0xfc8bfbd0f350>
-admin_tok = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDdhOGUiLCJjaWQiOiI2MWUzNWMx...oiYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDUyOTAyLCJleHAiOjE3OTMwNTM4MDJ9.Q7hTtE_By1P3Dpq9-NV3bIKmwn5yjaXA3k38jc-mhiw'
-
-    def test_upload_valid_and_invalid_and_patch_delete(self, admin_tok):
-        blocks = requests.get(f"{BASE}/api/blocks", headers=_hdr(admin_tok)).json()
-        bitems = blocks.get("items") or blocks
-        # pick a block with completed milestones (any block)
-        block_id = bitems[0]["id"]
-        # valid upload — endpoint uses `files` (plural)
-        jpg = _small_jpeg_bytes()
-        files = {"files": ("photo.jpg", io.BytesIO(jpg), "image/jpeg")}
-        r = requests.post(
-            f"{BASE}/api/blocks/{block_id}/milestones/1/photos",
-            files=files,
-            headers={"Authorization": f"Bearer {admin_tok}", "Idempotency-Key": str(uuid.uuid4())},
-        )
->       assert r.status_code in (200, 201), f"{r.status_code} {r.text[:300]}"
-E       AssertionError: 500 {"detail":"Internal server error","code":"INTERNAL_ERROR","request_id":"e23855420506436c","error":{"code":"INTERNAL_ERROR","message":"Internal server error","details":[],"request_id":"e23855420506436c"}}
-E       assert 500 in (200, 201)
-E        +  where 500 = <Response [500]>.status_code
-
-tests/test_phase_5.py:441: AssertionError
 =============================== warnings summary ===============================
 ../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
 ../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
@@ -64,6 +38,5 @@ tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources
     warnings.warn(
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-=========================== short test summary info ============================
-FAILED tests/test_phase_5.py::TestErpConstructionPhotos::test_upload_valid_and_invalid_and_patch_delete
-1 failed, 506 passed, 2 skipped, 9 warnings in 194.80s (0:03:14)
+507 passed, 2 skipped, 9 warnings in 207.65s (0:03:27)
+SUITE_EXIT 0
