@@ -1,0 +1,22 @@
+{
+  "summary": "Phase B hardening + receipt PDF polish review — 21/21 backend regression tests PASS and all frontend print-shell checks PASS. Backend coverage (pytest tests/test_phase_b_hardening_review.py): (1) Receipt PDF /api/payments/{pid}/receipt.pdf is 200 application/pdf, extracted text contains 'Amount received', 'Authorised Signatory', 'For Shree Ganesh', 'Page 1 of'; two sequential fetches produce identical sha256 (deterministic bytes confirmed). (2) Allotment PDF /api/bookings/{bid}/allotment.pdf and demand-letter PDF /api/bookings/{bid}/demands/{did}/letter.pdf both contain 'Authorised Signatory' and 'Page 1 of'. (3) Error envelope verified on 404 unknown booking, 422 (POST /api/customers {full_name:1}), 401 anonymous (GET /api/bookings), 405 (PATCH /api/bookings/x), AND 428 (POST /api/payments with {} and no Idempotency-Key) — code=IDEMPOTENCY_KEY_REQUIRED returned BEFORE body validation. Every envelope has top-level detail/code/request_id plus error:{code,message,details,request_id}. (4) Permission guards: anonymous → 401 and portal token (phone 9431023456 / Buyer@12345) → 401/403 on /api/bookings, /api/customers, /api/payments, /api/admin/integrity-report. (5) Idempotency replay on POST /api/customers: same Idempotency-Key → same id + Idempotent-Replayed header; search confirms exactly one record persisted. (6) Optimistic concurrency: PATCH /api/customers/{id} with version+50 → 409 VERSION_CONFLICT (envelope ok). (7) Integrity: GET /api/admin/integrity-report → ok:true, counts {}. (8) Anchor booking BK-2526-0001 (id ebf64193-f49c-4c3b-a7f5-305c9c5b325c) → ledger has exactly 22 rows, summary.due == 0. (9) Health: /api/health 200 < 500 ms, response headers include Content-Security-Policy and X-Content-Type-Options. Frontend (Playwright, 1440×900): admin@kkt.in / Kkt@12345 logs in → /erp/dashboard; /erp/bookings/<anchor id> renders with 'Total due' and ₹0 present; /erp/print/receipt/<payment id 20c73739-f21f-4a55-b569-9e8a6cb43d38> shows print-doc-title 'SGB/2627/00006 · Amit Kumar Sinha · BK-2526-0001', print-doc-frame src starts with blob:, and print-action-download triggers a download named 'receipt-SGB-2627-00006.pdf'.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_phase_b_hardening_review.py",
+    "/app/test_reports/pytest/phase_b_review.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Error envelope is uniformly applied — 428 IDEMPOTENCY_KEY_REQUIRED is correctly raised BEFORE Pydantic body validation on POST /api/payments (confirmed with empty {} body).",
+    "PDF generation is deterministic (same bytes → same sha256 across requests) — important for signature/notarization workflows.",
+    "Signature block renders consistently on receipt, demand letter, and allotment PDFs."
+  ],
+  "updated_files": ["/app/backend/tests/test_phase_b_hardening_review.py"],
+  "success_rate": {"backend": "100% (21/21)", "frontend": "100% (print shell + anchor booking checks all pass)"},
+  "test_credentials": "ERP admin@kkt.in / Kkt@12345 ; Portal 9431023456 / Buyer@12345 (per /app/memory/test_credentials.md).",
+  "seed_data_creation": "Created two throwaway customers with TEST_ prefixed names ('TEST Replay User' phone 9000000001; 'TEST VersionConflict' phone 9000000002) via the idempotency / version-conflict tests. Not cleaned up (no customer DELETE in scope).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Anchor booking BK-2526-0001 id = ebf64193-f49c-4c3b-a7f5-305c9c5b325c; one of its payments id = 20c73739-f21f-4a55-b569-9e8a6cb43d38 (SGB/2627/00006). Note: there is no GET /api/bookings/{id}/demands list endpoint — demands come nested in GET /api/bookings/{id} body. The pytest file test_phase_b_hardening_review.py is a reusable regression anchor for Phase B hardening & PDF polish; it logs in once per session (session-scoped admin token) so re-runs stay within the 10/60s login rate limit."
+}

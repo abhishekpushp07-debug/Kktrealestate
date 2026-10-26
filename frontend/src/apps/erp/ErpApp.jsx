@@ -7,8 +7,7 @@ import { EmptyState } from "@/components/common/Bits";
 import { ShieldAlert } from "lucide-react";
 
 const AppShell = lazy(() => import("@/components/layout/AppShell"));
-const ReceiptPrint = lazy(() => import("@/pages/PrintViews").then((m) => ({ default: m.ReceiptPrint })));
-const DemandLetterPrint = lazy(() => import("@/pages/PrintViews").then((m) => ({ default: m.DemandLetterPrint })));
+const PrintDocument = lazy(() => import("@/pages/PrintDocument"));
 
 const Dashboard = lazy(() => import("@/pages/v2/Home"));
 const Projects = lazy(() => import("@/pages/v2/Projects"));
@@ -61,7 +60,7 @@ function PrintGuard({ children }) {
   const { user, loading } = useAuth();
   if (loading) return null;
   if (!user) return <Navigate to="/login" replace />;
-  return <div className="min-h-screen bg-white"><Suspense fallback={<div className="p-6 text-sm text-slate-400">Loading…</div>}>{children}</Suspense></div>;
+  return <Suspense fallback={<div className="min-h-screen bg-ink-950 p-6 text-sm text-warm-50/50">Loading…</div>}>{children}</Suspense>;
 }
 
 const R = [
@@ -82,8 +81,10 @@ export default function ErpApp() {
           <Route path="/roznamcha" element={<Navigate to="/payments?tab=roznamcha" replace />} />
           {R.map(([p, perm, C]) => <Route key={p} path={`/${p}`} element={<Guard perm={perm}><C /></Guard>} />)}
         </Route>
-        <Route path="/print/receipt/:id" element={<PrintGuard><ReceiptPrint /></PrintGuard>} />
-        <Route path="/print/demand/:bookingId/:demandId" element={<PrintGuard><DemandLetterPrint /></PrintGuard>} />
+        <Route path="/print/receipt/:id" element={<PrintGuard><PrintDocument kind="receipt" /></PrintGuard>} />
+        <Route path="/print/demand/:bookingId/:demandId" element={<PrintGuard><PrintDocument kind="demand" /></PrintGuard>} />
+        <Route path="/print/statement/:bookingId" element={<PrintGuard><PrintDocument kind="statement" /></PrintGuard>} />
+        <Route path="/print/allotment/:bookingId" element={<PrintGuard><PrintDocument kind="allotment" /></PrintGuard>} />
         <Route path="/*" element={<Protected />}><Route path="*" element={<Navigate to="/dashboard" replace />} /></Route>
       </Routes>
     </AuthProvider>

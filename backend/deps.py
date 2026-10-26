@@ -1,4 +1,5 @@
 import os
+from contextvars import ContextVar
 import time
 from datetime import UTC, datetime, timedelta
 
@@ -79,8 +80,19 @@ def require(permission: str):
     return dep
 
 
+_BYPASS_HDR: ContextVar[str | None] = ContextVar("rl_bypass", default=None)
+
+
+def _bypass_active() -> bool:
+    """Test-only: when LOGIN_RATE_LIMIT_BYPASS_TOKEN is set in the *process* env (never in .env) and the request carries it, skip limits."""
+    tok = os.environ.get("LOGIN_RATE_LIMIT_BYPASS_TOKEN")
+    return bool(tok) and _BYPASS_HDR.get() == tok
+
+
 async def enforce_rate_limit(bucket: str, limit: int, window_s: int):
     """Multi-worker safe sliding window in Mongo (TTL-indexed)."""
+    if bucket.split(":")[0] in ("login", "portal-login", "write", "portal-write", "public") and _bypass_active():
+        return
     now = datetime.now(UTC)
     slot = int(now.timestamp() // window_s)
     doc = await db.rate_limits.find_one_and_update(
@@ -104,3 +116,9 @@ def project_scope_filter(user: dict, field: str = "project_id") -> dict:
 def ensure_project_access(user: dict, project_id: str):
     if not has_full_scope(user) and project_id not in (user.get("project_scope") or []):
         raise ApiError(404, "Project not found", "NOT_FOUND")
+
+
+async def require_idempotency_key(request: Request):
+    """Payments must carry Idempotency-Key; checked before body validation so clients get a clear 428."""
+    if not request.headers.get("idempotency-key"):
+        raise ApiError(428, "Idempotency-Key header is required when posting payments", "IDEMPOTENCY_KEY_REQUIRED")

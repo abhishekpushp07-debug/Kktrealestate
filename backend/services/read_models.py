@@ -228,7 +228,8 @@ async def sweep_loop():
         await asyncio.sleep(60)
         try:
             stale = now_iso()
-            await flush()
+            from infra import timed_job
+            await timed_job("read_model_flush", flush)
             for p in await db.project_summaries.find({"computed_at": {"$lt": (datetime.now(UTC) - timedelta(minutes=10)).isoformat()}}, {"_id": 0, "project_id": 1}).to_list(50):
                 await refresh_project(p["project_id"])
             await refresh_dashboards()

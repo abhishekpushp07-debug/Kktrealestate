@@ -30,11 +30,11 @@ async def seed():
     from routers.auth import hash_password
 
     company = await _insert("companies", "", {
-        "name": "Shree Ganesh Builders", "brand": "KKT", "legal_name": "Shree Ganesh Builders Pvt. Ltd.",
+        "name": "KKT Constructions", "brand": "KKT", "legal_name": "KKT Constructions Pvt. Ltd.", "short_code": "KKT", "tagline": "Building trust, delivering homes",
         "address": {"line1": "Boring Road", "city": "Patna", "state": "Bihar", "pincode": "800001"},
-        "gstin": "10AABCS1234F1Z5", "rera_registration": "BRERAP00123", "logo_url": None,
-        "financial_year_start_month": 4, "receipt_prefix": "SGB",
-        "bank_account": {"bank_name": "State Bank of India", "account_name": "Shree Ganesh Builders Pvt Ltd", "account_number_enc": encrypt_field("38201234567890"), "ifsc": "SBIN0001234", "branch": "Boring Road, Patna"},
+        "gstin": "10AABCK1234F1Z5", "rera_registration": "BRERAP00123", "logo_url": None,
+        "financial_year_start_month": 4, "receipt_prefix": "KKT",
+        "bank_account": {"bank_name": "State Bank of India", "account_name": "KKT Constructions Pvt Ltd", "account_number_enc": encrypt_field("38201234567890"), "ifsc": "SBIN0001234", "branch": "Boring Road, Patna"},
     }, "company")
     cid = company["id"]
     await db.companies.update_one({"id": cid}, {"$set": {"company_id": cid}})
@@ -86,7 +86,7 @@ async def seed():
         await _insert("charge_types", cid, {"name": name, "code": code, "default_amount": amt, "is_taxable": tax, "sort_order": i + 1})
     for name, code, ref in [("Cash", "CASH", False), ("Cheque", "CHEQUE", True), ("NEFT / RTGS", "NEFT_RTGS", True), ("UPI", "UPI", True), ("Demand Draft", "DD", True), ("Loan Disbursement", "LOAN_DISBURSEMENT", True)]:
         await _insert("payment_modes", cid, {"name": name, "code": code, "requires_reference": ref})
-    await _insert("bank_accounts", cid, {"bank_name": "State Bank of India", "account_name": "Shree Ganesh Builders Pvt Ltd", "account_number_enc": encrypt_field("38201234567890"), "ifsc": "SBIN0001234", "branch": "Boring Road, Patna", "is_default": True})
+    await _insert("bank_accounts", cid, {"bank_name": "State Bank of India", "account_name": "KKT Constructions Pvt Ltd", "account_number_enc": encrypt_field("38201234567890"), "ifsc": "SBIN0001234", "branch": "Boring Road, Patna", "is_default": True})
     for name, code, applies in [("PAN Card", "PAN", "customer"), ("Aadhaar Card", "AADHAAR", "customer"), ("Passport Photo", "PHOTO", "customer"), ("Booking Form", "BOOKING_FORM", "booking"), ("Agreement to Sale", "AGREEMENT", "booking"), ("RERA Certificate", "RERA_CERT", "project")]:
         await _insert("document_types", cid, {"name": name, "code": code, "applies_to": applies})
 
@@ -249,7 +249,7 @@ async def seed_phase15():
             top = max(unit_floors(blocks[f["block_id"]]))
             total, breakup, rate = price_flat(f, rc, plc_types, blocks[f["block_id"]], top)
             if total is not None:
-                await db.flats.update_one({"id": f["id"]}, {"$set": {"price": total, "price_breakup": breakup, "rate_per_sqft": rate, "rate_card_id": rc["id"]}})
+                await db.flats.update_one({"id": f["id"]}, {"$set": {"price_paise": int(round(total * 100)), "price_breakup": breakup, "rate_per_sqft": rate, "rate_card_id": rc["id"]}})
                 n += 1
         await db.rate_cards.update_one({"id": rc["id"]}, {"$set": {"applied_count": n}})
     # Parking

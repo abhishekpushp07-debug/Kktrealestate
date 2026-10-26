@@ -84,6 +84,7 @@ async def issue_refresh_token(user: dict, request: Request) -> str:
         "id": new_id(), "user_id": user["id"], "company_id": user["company_id"], "token_hash": _hash_token(token), "revoked": False,
         "ip": client_ip(request), "user_agent": request.headers.get("user-agent", "")[:300], "created_at": now_iso(), "last_seen_at": now_iso(),
         "expires_at": (datetime.now(UTC) + timedelta(days=REFRESH_DAYS)).isoformat(),
+        "expires_dt": datetime.now(UTC) + timedelta(days=REFRESH_DAYS),
     })
     return token
 

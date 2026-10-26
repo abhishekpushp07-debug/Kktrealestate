@@ -191,7 +191,7 @@ async def apply_rate_card(project_id: str, rc_id: str, request: Request, user: d
         if total is None:
             skipped += 1
             continue
-        ops.append(UpdateOne({"id": f["id"], "status": "Available"}, {"$set": {"price": total, "price_breakup": breakup, "rate_per_sqft": rate, "rate_card_id": rc_id, "updated_at": now_iso()}, "$inc": {"version": 1}}))
+        ops.append(UpdateOne({"id": f["id"], "status": "Available"}, {"$set": {"price_paise": round(total * 100), "price_breakup": breakup, "rate_per_sqft": rate, "rate_card_id": rc_id, "updated_at": now_iso()}, "$inc": {"version": 1}}))
     updated = (await db.flats.bulk_write(ops)).modified_count if ops else 0
     await db.rate_cards.update_one({"id": rc_id}, {"$set": {"applied_at": now_iso(), "applied_count": updated}})
     await write_audit(user, "rate_card.apply", "rate_card", rc_id, after={"flats_updated": updated, "skipped_no_rate": skipped}, ip=client_ip(request))

@@ -59,7 +59,7 @@ def test_pdfs_download(client, admin):
         r = client.get(url, headers=admin)
         assert r.status_code == 200 and r.headers["content-type"] == "application/pdf" and r.content.startswith(b"%PDF")
         text = "".join(p.extract_text() for p in PdfReader(io.BytesIO(r.content)).pages)
-        assert "Shree Ganesh" in text
+        assert "KKT Constructions" in text
     pay = client.get("/api/payments", params={"booking_id": b["id"], "page_size": 1}, headers=admin).json()["items"][0]
     r = client.get(f"/api/payments/{pay['id']}/receipt.pdf", headers=admin)
     assert r.status_code == 200 and r.content.startswith(b"%PDF")

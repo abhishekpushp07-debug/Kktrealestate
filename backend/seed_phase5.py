@@ -108,7 +108,7 @@ async def seed_phase5():
             dt = await db.document_types.find_one({"name": {"$regex": "Allot", "$options": "i"}}, {"_id": 0, "id": 1, "name": 1})
             for b in await db.bookings.find({"company_id": cid, "status": {"$in": ["Active", "Completed"]}}, {"_id": 0}).sort("booking_number", 1).to_list(3):
                 try:
-                    resp = await allotment(b["id"], "pdf", admin)
+                    resp = await allotment(b["id"], "pdf", 0, admin)
                     key = f"documents/{cid}/booking/{b['id']}/allotment-{b['booking_number']}.pdf"
                     res = await put_object(key, resp.body, "application/pdf")
                     await db.documents.insert_one({**base_doc(None, cid), "entity_type": "booking", "entity_id": b["id"], "document_type_id": (dt or {}).get("id"), "document_type_name": (dt or {}).get("name") or "Allotment letter", "title": f"Allotment letter {b['booking_number']}", "file_name": f"allotment-{b['booking_number']}.pdf", "mime": "application/pdf", "size": len(resp.body), "storage_key": res["path"], "is_sensitive": False, "shared_with_customer": True, "uploaded_by": None})

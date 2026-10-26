@@ -65,6 +65,11 @@ async def reseed(body: ReseedIn, request: Request, user: dict = Depends(require(
     await db.settings.delete_many({"key": {"$in": ["customers_profile_v1"]}})
     from startup_phase11 import startup_phase11
     await startup_phase11()
+    await db.settings.delete_many({"key": {"$in": ["seed_phase9_done"]}})
+    from routers.visits import seed_phase9
+    await seed_phase9()
+    from services.validators import backfill_price_paise
+    await backfill_price_paise()
     await db.settings.update_one({"key": "roles_version"}, {"$inc": {"value": 1}}, upsert=True)
     await recompute_all()
     await write_audit(user, "admin.reseed", "system", "seed", after={"collections": BUSINESS_COLLECTIONS}, ip=client_ip(request))

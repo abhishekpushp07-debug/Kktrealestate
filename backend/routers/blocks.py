@@ -5,6 +5,7 @@ from pydantic import Field, field_validator, model_validator
 from pymongo import UpdateOne
 
 from db import db
+from models_out import BlocksOut, BlocksOutPage
 from deps import ensure_project_access, project_scope_filter, require
 from routers.projects import STATUSES
 from services.flat_generation import floor_labels, generate_flats, unit_floors
@@ -20,6 +21,7 @@ from utils import (
     now_iso,
     paginate,
     search_filter,
+    with_price,
     write_audit,
 )
 
@@ -148,7 +150,6 @@ async def _validate_block_refs(block_type_id: str | None, mt_id: str | None):
 
 async def _attach_counts(blocks: list[dict]):
     from services.counters import present_counts
-    ids = [b["id"] for b in blocks]
     pids = list({b["project_id"] for b in blocks})
     pmap = {p["id"]: p for p in await db.projects.find({"id": {"$in": pids}}, {"_id": 0, "id": 1, "name": 1, "code": 1}).to_list(None)}
     btids = list({b["block_type_id"] for b in blocks})
@@ -167,7 +168,7 @@ async def _load_block(block_id: str, user: dict) -> dict:
     return block
 
 
-@router.get("")
+@router.get("", response_model=BlocksOutPage, response_model_exclude_unset=True)
 async def list_blocks(params: ListParams = Depends(), project_id: str | None = None, user: dict = Depends(require("project.read"))):
     q = {"company_id": user["company_id"], **project_scope_filter(user), **search_filter(params.search, ["name", "code"])}
     if project_id:
@@ -214,7 +215,7 @@ async def create_block(body: BlockCreate, request: Request, user: dict = Depends
     return (await _attach_counts([doc]))[0]
 
 
-@router.get("/{block_id}")
+@router.get("/{block_id}", response_model=BlocksOut, response_model_exclude_unset=True)
 async def get_block(block_id: str, user: dict = Depends(require("project.read"))):
     block = await _load_block(block_id, user)
     block = (await _attach_counts([block]))[0]
@@ -306,14 +307,14 @@ async def bulk_price(block_id: str, body: BulkPriceIn, request: Request, user: d
     ops, rise = [], body.floor_rise_per_sqft or 0
     for f in flats:
         if body.price is not None:
-            upd = {"price": round(body.price, 2), "rate_per_sqft": None, "price_breakup": [{"label": "Bulk price (lump sum)", "amount": round(body.price, 2)}]}
+            upd = {"price_paise": int(round(body.price * 100)), "rate_per_sqft": None, "price_breakup": [{"label": "Bulk price (lump sum)", "amount": round(body.price, 2)}]}
         else:
             sbu = f.get("super_builtup_sqft") or 0
             rf = max(0, f["floor"] - block["floor_start"])
             breakup = [{"label": f"Base ₹{body.rate_per_sqft:g}/sq.ft × {sbu:g}", "amount": round(body.rate_per_sqft * sbu, 2)}]
             if rise and rf:
                 breakup.append({"label": f"Floor rise ₹{rise:g} × {rf} floors × {sbu:g}", "amount": round(rise * rf * sbu, 2)})
-            upd = {"rate_per_sqft": round(body.rate_per_sqft + rise * rf, 2), "price": round(sum(b["amount"] for b in breakup), 2), "price_breakup": breakup}
+            upd = {"rate_per_sqft": round(body.rate_per_sqft + rise * rf, 2), "price_paise": int(round(100 * sum(b["amount"] for b in breakup))), "price_breakup": breakup}
         upd.update({"updated_at": now_iso(), "rate_card_id": None})
         ops.append(UpdateOne({"id": f["id"]}, {"$set": upd, "$inc": {"version": 1}}))
     if ops:
@@ -341,16 +342,17 @@ async def bulk_status(block_id: str, body: BulkStatusIn, request: Request, user:
 @router.get("/{block_id}/grid")
 async def block_grid(block_id: str, user: dict = Depends(require("project.read"))):
     block = await _load_block(block_id, user)
-    flats = await db.flats.find({"block_id": block_id, "is_active": True}, {"_id": 0, "id": 1, "flat_number": 1, "floor": 1, "floor_label": 1, "position": 1, "status": 1, "price": 1, "flat_type_code": 1, "flat_type_id": 1, "super_builtup_sqft": 1, "facing": 1, "is_corner": 1, "version": 1}).sort([("floor", -1), ("position", 1)]).to_list(None)
+    flats = await db.flats.find({"block_id": block_id, "is_active": True}, {"_id": 0, "id": 1, "flat_number": 1, "floor": 1, "floor_label": 1, "position": 1, "status": 1, "price_paise": 1, "flat_type_code": 1, "flat_type_id": 1, "super_builtup_sqft": 1, "facing": 1, "is_corner": 1, "version": 1}).sort([("floor", -1), ("position", 1)]).to_list(None)
     by_floor: dict[int, list] = {}
     for f in flats:
+        with_price(f)
         by_floor.setdefault(f["floor"], []).append(f)
     counts = {s: 0 for s in STATUSES}
     for f in flats:
         counts[f["status"]] += 1
     refuge, podium = set(block.get("refuge_floors") or []), set(block.get("podium_floors") or [])
     labels = floor_labels(block)
-    prices = [f["price"] for f in flats if f.get("price")]
+    prices = [f["price_paise"] / 100 for f in flats if f.get("price_paise")]
     return {
         "block": {k: block.get(k) for k in ("id", "name", "code", "project_id", "floors", "flats_per_floor", "floor_start", "numbering_pattern", "status", "construction_percent", "skip_floors", "refuge_floors", "podium_floors", "ground_floor_label")},
         "positions": list(range(1, max([block.get("flats_per_floor") or 0] + [len(v) for v in by_floor.values()]) + 1)),

@@ -88,7 +88,7 @@ async def _validate_rows(kind: str, rows: list[dict], project_id: str | None, us
                 errors.append("price or rate_per_sqft required")
             if rate is not None and f:
                 price = round(rate * (f.get("super_builtup_sqft") or 0), 2)
-            out.append({"row": i, "data": {"flat_number": fn, "flat_id": f["id"] if f else None, "price": price, "rate_per_sqft": rate}, "errors": errors})
+            out.append({"row": i, "data": {"flat_number": fn, "flat_id": f["id"] if f else None, "price_paise": round(price * 100) if price is not None else None, "rate_per_sqft": rate}, "errors": errors})
     elif kind == "parking-slots":
         if not project_id:
             raise ApiError(422, "project_id is required for parking import", "VALIDATION_ERROR")

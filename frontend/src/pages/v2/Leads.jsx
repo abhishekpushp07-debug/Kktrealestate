@@ -4,6 +4,7 @@ import { MoveMenu, moveKeyProps, useNarrow } from "@/components/v2/KanbanMove";
 import { CalendarClock, CalendarDays, Download, Inbox, Phone, PhoneCall, Plus, TrendingUp, UserCheck, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import api, { errMsg } from "@/lib/api";
+import { undoToast } from "@/lib/undo";
 import { useAuth } from "@/context/AuthContext";
 import { useFetch, useList } from "@/hooks/useList";
 import { cn } from "@/lib/utils";
@@ -102,11 +103,30 @@ export default function Leads() {
   const brochure = useFetch(`/site-visits/brochure-stats${projectId ? `?project_id=${projectId}` : ""}`);
   const { data: projects } = useFetch("/projects?page_size=50");
   const loadBoard = useCallback(() => api.get("/leads/board", { params: { project_id: projectId || undefined } }).then((r) => setBoard(r.data)).catch((e) => toast.error(errMsg(e))), [projectId]);
+  const loadMore = (col) => api.get("/leads/board", { params: { project_id: projectId || undefined, stage: col.stage, page: (col.page || 1) + 1 } })
+    .then((r) => { const more = r.data.columns[0]; setBoard((b) => b && { ...b, columns: b.columns.map((c) => (c.stage === col.stage ? { ...c, leads: [...c.leads, ...more.leads], page: more.page, has_more: more.has_more } : c)) }); })
+    .catch((e) => toast.error(errMsg(e)));
   useEffect(() => { loadBoard(); }, [loadBoard]);
   const refresh = () => { loadBoard(); list.reload(); };
   const all = useMemo(() => (board?.columns || []).flatMap((c) => c.leads), [board]);
   const kpis = useMemo(() => { const t = todayIso(), m30 = new Date(Date.now() - 30 * 864e5).toISOString(); const recent = all.filter((l) => l.created_at >= m30); return { newToday: all.filter((l) => l.created_at?.slice(0, 10) === t).length, due: all.filter((l) => l.next_follow_up_at && l.next_follow_up_at <= new Date().toISOString() && !["Converted", "Lost"].includes(l.status)).length, conv: recent.length ? Math.round((recent.filter((l) => l.status === "Converted").length / recent.length) * 100) : 0 }; }, [all]);
-  const move = async (lead, stage, lostReason) => { try { await api.post(`/leads/${lead.id}/stage`, { status: stage, lost_reason: lostReason || null, version: lead.version }); toast.success(`${lead.name} → ${stage}`); refresh(); } catch (e) { toast.error(errMsg(e)); } };
+  // Optimistic stage move: the card jumps immediately, the server call follows; failure rolls back, success offers Undo (moves it back).
+  const move = async (lead, stage, lostReason) => {
+    const prev = lead.status;
+    const snapshot = board;
+    setBoard((b) => b && { ...b, columns: b.columns.map((c) => ({ ...c, leads: c.stage === stage ? [{ ...lead, status: stage }, ...c.leads.filter((l) => l.id !== lead.id)] : c.leads.filter((l) => l.id !== lead.id), count: c.stage === stage ? c.count + 1 : c.stage === prev ? Math.max(0, c.count - 1) : c.count })) });
+    try {
+      const r = await api.post(`/leads/${lead.id}/stage`, { status: stage, lost_reason: lostReason || null, version: lead.version });
+      const moved = r.data?.lead || r.data || {};
+      undoToast({ title: `${lead.name} → ${stage}`, description: `Moved from ${prev}`, testId: `lead-move-${lead.id}`, onUndo: async () => {
+        const u = await api.post(`/leads/${lead.id}/stage`, { status: prev, note: "Undo", version: moved.version ?? null });
+        setBoard((b) => b && { ...b, columns: b.columns.map((c) => ({ ...c, leads: c.stage === prev ? [{ ...lead, ...u.data, status: prev }, ...c.leads.filter((l) => l.id !== lead.id)] : c.leads.filter((l) => l.id !== lead.id) })) });
+        refresh();
+        return `Reverted · ${lead.name} back in ${prev}`;
+      } });
+      refresh();
+    } catch (e) { setBoard(snapshot); toast.error(errMsg(e)); }
+  };
   const onDrop = (stage) => (e) => { e.preventDefault(); const lead = JSON.parse(e.dataTransfer.getData("lead")); moveTo(lead, stage); };
   const moveTo = (lead, stage) => { if (lead.status === stage) return; if (stage === "Converted") return setSel(lead); if (stage === "Lost") return setLost(lead); move(lead, stage); };
   const narrow = useNarrow();
@@ -130,7 +150,7 @@ export default function Leads() {
       {tab === "pipeline" && <div className="flex gap-4 overflow-x-auto pb-4 scroll-x" data-testid="leads-board">
         {(board?.columns || []).map((col) => <div key={col.stage} onDragOver={(e) => e.preventDefault()} onDrop={onDrop(col.stage)} className="w-72 shrink-0 rounded-2xl bg-warm-100/70 p-3" data-testid={`lead-column-${col.stage.replace(/\s+/g, "-")}`}>
           <div className="mb-3 flex items-center justify-between px-1"><p className="text-sm font-semibold text-ink-950">{col.stage}</p><span className="pill bg-white text-txt-secondary">{col.count}</span></div>
-          <div className="min-h-[120px]">{col.leads.map((l) => <div key={l.id} {...moveKeyProps(stageNames, col.stage, (to) => moveTo(l, to))} className="rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-gold" aria-label={`${l.name}, ${col.stage}. Use arrow keys to move.`}><LeadCard lead={l} people={people} onOpen={() => setSel(l)} onDragStart={(e) => e.dataTransfer.setData("lead", JSON.stringify(l))} />{narrow && <div className="-mt-2 mb-3"><MoveMenu columns={stageNames} current={col.stage} onMove={(to) => moveTo(l, to)} testId={`lead-move-${l.id}`} /></div>}</div>)}</div>
+          <div className="min-h-[120px]">{col.leads.map((l) => <div key={l.id} {...moveKeyProps(stageNames, col.stage, (to) => moveTo(l, to))} className="rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-gold" aria-label={`${l.name}, ${col.stage}. Use arrow keys to move.`}><LeadCard lead={l} people={people} onOpen={() => setSel(l)} onDragStart={(e) => e.dataTransfer.setData("lead", JSON.stringify(l))} />{narrow && <div className="-mt-2 mb-3"><MoveMenu columns={stageNames} current={col.stage} onMove={(to) => moveTo(l, to)} testId={`lead-move-${l.id}`} /></div>}</div>)}{col.has_more && <button type="button" onClick={() => loadMore(col)} className="mt-2 w-full rounded-xl border border-dashed border-warm-300 py-2 text-xs font-semibold text-txt-secondary hover:bg-white" data-testid={`load-more-${col.stage}`}>Load more ({col.count - col.leads.length} more)</button>}</div>
         </div>)}
       </div>}
       {(tab === "list" || tab === "enquiries") && <Card className="!p-0" testId={tab === "list" ? "leads-table" : "enquiries-list"}>

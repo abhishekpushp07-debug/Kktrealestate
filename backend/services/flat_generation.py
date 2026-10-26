@@ -89,7 +89,7 @@ def build_flat(block: dict, ft: dict, floor: int, position: int, seq: int, user:
         "facing": pos_meta.get("facing") or ft.get("facing"), "is_corner": bool(pos_meta.get("is_corner")), "status": "Available",
         "rooms_snapshot": ft["rooms_snapshot"], "areas_snapshot": ft["areas_snapshot"],
         "carpet_sqft": ft["area_values"].get("carpet_sqft"), "builtup_sqft": ft["area_values"].get("builtup_sqft"), "super_builtup_sqft": ft["area_values"].get("super_builtup_sqft"),
-        "rate_per_sqft": rate, "price": price, "price_breakup": breakup, "rate_card_id": None, "notes": None,
+        "rate_per_sqft": rate, "price_paise": round(price * 100) if price is not None else None, "price_breakup": breakup, "rate_card_id": None, "notes": None,
     }
 
 
@@ -137,4 +137,4 @@ async def resnapshot_flat(flat: dict, flat_type_id: str, block: dict) -> dict:
     rate, price, breakup = compute_price(ft, block, flat["floor"])
     return {"flat_type_id": ft["id"], "flat_type_code": ft["code"], "facing": ft.get("facing"), "rooms_snapshot": ft["rooms_snapshot"], "areas_snapshot": ft["areas_snapshot"],
             "carpet_sqft": ft["area_values"].get("carpet_sqft"), "builtup_sqft": ft["area_values"].get("builtup_sqft"), "super_builtup_sqft": ft["area_values"].get("super_builtup_sqft"),
-            "rate_per_sqft": rate, "price": price, "price_breakup": breakup, "rate_card_id": None}
+            "rate_per_sqft": rate, "price_paise": round(price * 100) if price is not None else None, "price_breakup": breakup, "rate_card_id": None}

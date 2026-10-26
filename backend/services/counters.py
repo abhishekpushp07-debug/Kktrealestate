@@ -16,7 +16,7 @@ def _counts_from_rows(rows) -> dict:
 
 
 async def recompute_block_counts(block_id: str) -> dict:
-    rows = await db.flats.aggregate([{"$match": {"block_id": block_id, "is_active": True}}, {"$group": {"_id": "$status", "n": {"$sum": 1}, "v": {"$sum": {"$ifNull": ["$price", 0]}}}}]).to_list(None)
+    rows = await db.flats.aggregate([{"$match": {"block_id": block_id, "is_active": True}}, {"$group": {"_id": "$status", "n": {"$sum": 1}, "v": {"$sum": {"$divide": [{"$ifNull": ["$price_paise", 0]}, 100]}}}}]).to_list(None)
     c = _counts_from_rows(rows)
     c["inventory_value"] = round(sum(r["v"] for r in rows), 2)
     await db.blocks.update_one({"id": block_id}, {"$set": {"unit_counts": c}})
@@ -24,7 +24,7 @@ async def recompute_block_counts(block_id: str) -> dict:
 
 
 async def recompute_project_counts(project_id: str) -> dict:
-    rows = await db.flats.aggregate([{"$match": {"project_id": project_id, "is_active": True}}, {"$group": {"_id": "$status", "n": {"$sum": 1}, "v": {"$sum": {"$ifNull": ["$price", 0]}}}}]).to_list(None)
+    rows = await db.flats.aggregate([{"$match": {"project_id": project_id, "is_active": True}}, {"$group": {"_id": "$status", "n": {"$sum": 1}, "v": {"$sum": {"$divide": [{"$ifNull": ["$price_paise", 0]}, 100]}}}}]).to_list(None)
     c = _counts_from_rows(rows)
     c["inventory_value"] = round(sum(r["v"] for r in rows), 2)
     bc = await db.blocks.count_documents({"project_id": project_id, "is_active": True})

@@ -63,6 +63,7 @@ async def integrity_report(today: date | None = None) -> dict:
         sm = bk.get("summary") or {}
         if sm.get("total_order_raised_paise", 0) != raised_sum:
             findings.append({"booking_id": bk["id"], "booking_number": bk["booking_number"], "kind": "summary_mismatch", "installment_seq": None, "installment_name": None, "demand_number": None, "paid_paise": 0, "detail": f"summary raised {sm.get('total_order_raised_paise', 0)} ≠ demands {raised_sum}"})
+    findings += await referential_findings()
     counts: dict = {}
     for f in findings:
         counts[f["kind"]] = counts.get(f["kind"], 0) + 1
@@ -97,3 +98,67 @@ async def repair(actor: dict | None = None) -> dict:
             await rebuild(bid)
     after = await integrity_report()
     return {"voided": voided, "raised": raised, "skipped": skipped, "before": before["counts"], "after": after["counts"], "ok": after["ok"]}
+
+
+def _rf(kind: str, detail: str, **ids) -> dict:
+    return {"kind": kind, "detail": detail, "booking_id": ids.get("booking_id"), "booking_number": ids.get("booking_number"), "installment_seq": None, "installment_name": None, "demand_number": None, "paid_paise": 0, **{k: v for k, v in ids.items() if k not in ("booking_id", "booking_number")}}
+
+
+async def referential_findings() -> list[dict]:
+    """Orphans, flat↔booking status consistency, per-booking ledger invariants, bucket caps and counters vs max numbers."""
+    out: list[dict] = []
+    projects = {p["id"] for p in await db.projects.find({}, {"_id": 0, "id": 1}).to_list(None)}
+    blocks = {b["id"]: b for b in await db.blocks.find({}, {"_id": 0, "id": 1, "project_id": 1}).to_list(None)}
+    flats = {f["id"]: f for f in await db.flats.find({}, {"_id": 0, "id": 1, "block_id": 1, "project_id": 1, "status": 1, "flat_number": 1}).to_list(None)}
+    customers = {c["id"] for c in await db.customers.find({}, {"_id": 0, "id": 1}).to_list(None)}
+    for b in blocks.values():
+        if b["project_id"] not in projects:
+            out.append(_rf("orphan_block", f"block {b['id']} → missing project {b['project_id']}", block_id=b["id"]))
+    for f in flats.values():
+        if f["block_id"] not in blocks:
+            out.append(_rf("orphan_flat", f"flat {f['flat_number']} → missing block {f['block_id']}", flat_id=f["id"]))
+    bookings = await db.bookings.find({}, {"_id": 0}).to_list(None)
+    active_by_flat: dict = {}
+    for bk in bookings:
+        if bk["flat_id"] not in flats:
+            out.append(_rf("orphan_booking_flat", f"booking → missing flat {bk['flat_id']}", booking_id=bk["id"], booking_number=bk["booking_number"]))
+        if bk["customer_id"] not in customers:
+            out.append(_rf("orphan_booking_customer", f"booking → missing customer {bk['customer_id']}", booking_id=bk["id"], booking_number=bk["booking_number"]))
+        if bk["status"] in ("Active", "Completed"):
+            active_by_flat.setdefault(bk["flat_id"], []).append(bk)
+    for fid, bks in active_by_flat.items():
+        if len(bks) > 1:
+            out.append(_rf("double_booked_flat", f"flat {flats.get(fid, {}).get('flat_number', fid)} has {len(bks)} live bookings", flat_id=fid))
+        f = flats.get(fid)
+        if f and f["status"] not in ("Booked", "Sold"):
+            out.append(_rf("flat_status_mismatch", f"flat {f['flat_number']} is {f['status']} but has a live booking", flat_id=fid, booking_id=bks[0]["id"], booking_number=bks[0]["booking_number"]))
+    for f in flats.values():
+        if f["status"] in ("Booked", "Sold") and f["id"] not in active_by_flat:
+            out.append(_rf("flat_status_mismatch", f"flat {f['flat_number']} is {f['status']} without a live booking", flat_id=f["id"]))
+    booking_ids = {b["id"] for b in bookings}
+    async for p in db.payments.find({"booking_id": {"$nin": list(booking_ids)}}, {"_id": 0, "id": 1, "receipt_number": 1}):
+        out.append(_rf("orphan_payment", f"payment {p['receipt_number']} → missing booking", payment_id=p["id"]))
+    async for d in db.demands.find({"booking_id": {"$nin": list(booking_ids)}}, {"_id": 0, "id": 1, "demand_number": 1}):
+        out.append(_rf("orphan_demand", f"demand {d['demand_number']} → missing booking", demand_id=d["id"]))
+    # ledger invariants per booking (cleared flat-value payments vs summary, caps, dues = raised − paid)
+    for bk in bookings:
+        if bk["status"] != "Active":
+            continue
+        sm = bk.get("summary") or {}
+        pays = await db.payments.find({"booking_id": bk["id"], "status": "Cleared", "against": "FLAT_VALUE"}, {"_id": 0, "amount_paise": 1, "payment_category": 1}).to_list(None)
+        cash_paid = sum(p["amount_paise"] for p in pays if p.get("payment_category") == "Cash")
+        acc_paid = sum(p["amount_paise"] for p in pays if p.get("payment_category") == "Account")
+        if cash_paid > bk["cash_agreed_paise"] or acc_paid > bk["account_agreed_paise"]:
+            out.append(_rf("bucket_cap_exceeded", f"cash {cash_paid}/{bk['cash_agreed_paise']} account {acc_paid}/{bk['account_agreed_paise']}", booking_id=bk["id"], booking_number=bk["booking_number"]))
+        if sm and (sm.get("cash_paid_paise", cash_paid) != cash_paid or sm.get("account_paid_paise", acc_paid) != acc_paid):
+            out.append(_rf("summary_paid_mismatch", f"summary cash {sm.get('cash_paid_paise')}≠{cash_paid} / account {sm.get('account_paid_paise')}≠{acc_paid}", booking_id=bk["id"], booking_number=bk["booking_number"]))
+        last = await db.ledger_entries.find_one({"booking_id": bk["id"]}, {"_id": 0}, sort=[("seq", -1)])
+        if last and sm and last.get("total_due_paise") is not None and sm.get("due_paise") is not None and last["total_due_paise"] != sm["due_paise"]:
+            out.append(_rf("ledger_due_mismatch", f"last ledger due {last['total_due_paise']} ≠ summary due {sm['due_paise']}", booking_id=bk["id"], booking_number=bk["booking_number"]))
+    # counters vs max numbers (numbering scope "<kind>_number", key = FY)
+    for coll, field, kind in (("bookings", "booking_number", "booking"), ("demands", "demand_number", "demand"), ("payments", "receipt_number", "receipt")):
+        async for row in db[coll].aggregate([{"$match": {field: {"$type": "string"}}}, {"$group": {"_id": {"$arrayElemAt": [{"$split": [f"${field}", "-" if coll != "payments" else "/"]}, 1]}, "mx": {"$max": {"$toInt": {"$arrayElemAt": [{"$split": [f"${field}", "-" if coll != "payments" else "/"]}, -1]}}}}}]):
+            ctr = await db.counters.find_one({"scope": f"{kind}_number", "key": row["_id"]}, {"_id": 0, "seq": 1})
+            if ctr is not None and row["mx"] > int(ctr.get("seq") or 0):
+                out.append(_rf("counter_behind", f"{field} max {row['mx']} in FY {row['_id']} > counter {ctr.get('seq')}", counter=f"{kind}_number/{row['_id']}"))
+    return out

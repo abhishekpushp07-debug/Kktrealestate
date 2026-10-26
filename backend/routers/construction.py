@@ -347,11 +347,17 @@ async def run_dues(request: Request, as_of: date | None = None, user: dict = Dep
 
 
 @router.get("/admin/integrity-report")
-async def integrity_report_route(as_of: date | None = None, user: dict = Depends(require("settings.manage"))):
+async def integrity_report_route(as_of: date | None = None, fresh: bool = False, user: dict = Depends(require("settings.manage"))):
     if user.get("role_name") != "Super Admin":
         raise ApiError(403, "Super Admin only", "FORBIDDEN")
     from services.integrity import integrity_report
-    return present_money(await integrity_report(as_of))
+    cached = await db.settings.find_one({"key": "integrity_last_report"}, {"_id": 0, "value": 1})
+    if not fresh and not as_of and cached and cached.get("value"):
+        return present_money({**cached["value"], "cached": True})
+    rep = await integrity_report(as_of)
+    if not as_of:
+        await db.settings.update_one({"key": "integrity_last_report"}, {"$set": {"value": rep}}, upsert=True)
+    return present_money(rep)
 
 
 class RepairIn(StrictModel):

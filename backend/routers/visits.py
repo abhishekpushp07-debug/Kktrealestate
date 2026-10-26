@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, Query, Request, Response
 from pydantic import Field, field_validator
 
 from db import db
+from models_out import VisitsOut, VisitsOutPage
 from deps import JWT_SECRET, enforce_rate_limit, project_scope_filter, require
 from routers.notifications import notify_roles
 from services import ttlcache
@@ -380,7 +381,7 @@ async def visit_public_cancel(token: str, body: CancelIn):
 
 
 # ---------- ERP ----------
-@router.get("")
+@router.get("", response_model=VisitsOutPage, response_model_exclude_unset=True)
 async def list_visits(params: ListParams = Depends(), project_id: str | None = None, status: str | None = None, assigned_to: str | None = None, date_from: str | None = None, date_to: str | None = None, lead_id: str | None = None, user: dict = Depends(require("visit.read"))):
     q = {"company_id": user["company_id"], **project_scope_filter(user)}
     if project_id: q["project_id"] = project_id

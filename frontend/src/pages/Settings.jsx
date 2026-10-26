@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { MfaCard, SessionsCard, ImportCenter } from "@/components/common/SecurityCards";
+import { SystemHealthCard } from "@/components/common/SystemHealth";
 import { useEffect, useState } from "react";
 import { ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
@@ -50,7 +51,7 @@ const MONTHS = ["January", "February", "March", "April", "May", "June", "July", 
 function IntegrityPanel() {
   const [rep, setRep] = useState(null);
   const [busy, setBusy] = useState(false);
-  const run = async () => { setBusy(true); try { const r = await api.get("/admin/integrity-report"); setRep(r.data); toast[r.data.ok ? "success" : "warning"](r.data.ok ? "Integrity check clean" : `${r.data.findings.length} finding(s)`); } catch (e) { toast.error(errMsg(e)); } finally { setBusy(false); } };
+  const run = async () => { setBusy(true); try { const r = await api.get("/admin/integrity-report?fresh=1"); setRep(r.data); toast[r.data.ok ? "success" : "warning"](r.data.ok ? "Integrity check clean" : `${r.data.findings.length} finding(s)`); } catch (e) { toast.error(errMsg(e)); } finally { setBusy(false); } };
   const fix = async () => { if (window.prompt('Repair voids demands whose trigger is not met (only if no payment applied) and raises missing ones. Type REPAIR to confirm.') !== "REPAIR") return; setBusy(true); try { const r = await api.post("/admin/integrity-repair", { confirm: "REPAIR" }); toast.success(`Voided ${r.data.voided.length} · raised ${r.data.raised} · skipped ${r.data.skipped.length}`); await run(); } catch (e) { toast.error(errMsg(e)); } finally { setBusy(false); } };
   return (
     <div className="card mb-5 p-5" data-testid="integrity-panel">
@@ -108,6 +109,7 @@ export default function Settings() {
       <Appearance />
       <DocumentationPanel />
       <IntegrityPanel />
+      <SystemHealthCard />
       <form onSubmit={save} className="grid gap-5 lg:grid-cols-2">
         <div className="card space-y-4 p-5">
           <h3 className="text-base font-bold text-ink-950">Company identity</h3>

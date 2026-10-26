@@ -21,6 +21,10 @@ CITIES = {"Bihar": ["Patna", "Gaya", "Bhagalpur", "Muzaffarpur", "Darbhanga", "P
           "Delhi": ["New Delhi"], "Maharashtra": ["Mumbai", "Pune", "Nagpur", "Nashik"], "Karnataka": ["Bengaluru", "Mysuru"], "Tamil Nadu": ["Chennai", "Coimbatore"], "Telangana": ["Hyderabad"], "West Bengal": ["Kolkata"],
           "Gujarat": ["Ahmedabad", "Surat", "Vadodara"], "Uttar Pradesh": ["Lucknow", "Noida", "Ghaziabad", "Kanpur", "Varanasi"], "Haryana": ["Gurugram", "Faridabad"], "Rajasthan": ["Jaipur"], "Jharkhand": ["Ranchi", "Jamshedpur", "Dhanbad"], "Madhya Pradesh": ["Bhopal", "Indore"], "Punjab": ["Chandigarh", "Ludhiana"], "Kerala": ["Kochi", "Thiruvananthapuram"], "Odisha": ["Bhubaneswar"], "Chhattisgarh": ["Raipur"]}
 PATNA_LOCALITIES = ["Boring Road", "Kankarbagh", "Bailey Road", "Patliputra Colony", "Rajendra Nagar", "Fraser Road", "Danapur", "Gola Road", "Saguna More", "Rukanpura", "Ashiana Nagar", "Khagaul", "Phulwari Sharif", "Anisabad", "Gardanibagh", "Kidwaipuri", "Sri Krishna Puri", "Exhibition Road", "Kumhrar", "Bahadurpur", "Digha", "Kurji", "Jaganpura", "Bypass Road", "Saidpur"]
+PATNA_PINCODES = {"Boring Road": "800001", "Kankarbagh": "800020", "Bailey Road": "800014", "Patliputra Colony": "800013", "Rajendra Nagar": "800016", "Fraser Road": "800001",
+                  "Danapur": "801503", "Gola Road": "801503", "Saguna More": "801503", "Rukanpura": "800014", "Ashiana Nagar": "800025", "Khagaul": "801105", "Phulwari Sharif": "801505",
+                  "Anisabad": "800002", "Gardanibagh": "800002", "Kidwaipuri": "800001", "Sri Krishna Puri": "800001", "Exhibition Road": "800001", "Kumhrar": "800026", "Bahadurpur": "800026",
+                  "Digha": "800011", "Kurji": "800010", "Jaganpura": "800027", "Bypass Road": "800027", "Saidpur": "800004"}
 BANKS = ["State Bank of India", "Punjab National Bank", "Bank of Baroda", "Canara Bank", "Union Bank of India", "Bank of India", "Indian Bank", "Central Bank of India", "UCO Bank", "Bank of Maharashtra", "Indian Overseas Bank", "Punjab & Sind Bank",
          "HDFC Bank", "ICICI Bank", "Axis Bank", "Kotak Mahindra Bank", "IndusInd Bank", "Yes Bank", "IDFC First Bank", "Federal Bank", "RBL Bank", "Bandhan Bank", "South Indian Bank", "Karur Vysya Bank", "City Union Bank", "DCB Bank", "IDBI Bank", "AU Small Finance Bank", "Ujjivan Small Finance Bank", "Jana Small Finance Bank",
          "LIC Housing Finance", "HDFC Ltd (Housing)", "PNB Housing Finance", "Bajaj Housing Finance", "Tata Capital Housing Finance", "Aditya Birla Housing Finance", "India Post Payments Bank", "Bihar Gramin Bank", "Dakshin Bihar Gramin Bank", "Uttar Bihar Gramin Bank"]
@@ -116,7 +120,10 @@ async def seed_catalogues():
             cid_ = add("city", c, parent_id=state_ids.get(s), meta={"state": s}, order=i)
             city_ids[c] = cid_ or next((d["id"] for d in await db.catalogue_items.find({"company_id": cid, "type": "city", "code": _code(c)}, {"_id": 0, "id": 1}).to_list(1)), None)
     for i, l in enumerate(PATNA_LOCALITIES):
-        add("locality", l, parent_id=city_ids.get("Patna"), meta={"city": "Patna"}, order=i)
+        add("locality", l, parent_id=city_ids.get("Patna"), meta={"city": "Patna", "pincode": PATNA_PINCODES[l]}, order=i)
+    # backfill pincodes on already-seeded localities (idempotent)
+    for l, pin in PATNA_PINCODES.items():
+        await db.catalogue_items.update_many({"company_id": cid, "type": "locality", "code": _code(l), "meta.pincode": {"$exists": False}}, {"$set": {"meta.pincode": pin}})
     for i, sc in enumerate(await db.service_categories.find({}, {"_id": 0, "name": 1, "order": 1, "id": 1}).to_list(None)):
         add("service_category", sc["name"], meta={"legacy_id": sc["id"]}, order=sc.get("order", i))
     for i, dt in enumerate(await db.document_types.find({}, {"_id": 0, "name": 1, "code": 1, "id": 1}).to_list(None)):
@@ -161,7 +168,9 @@ def etag_response(request: Request, payload: dict, max_age: int = 300) -> Respon
 
 @router.get("")
 async def get_bundle(request: Request, user: dict = Depends(get_current_user)):
-    return etag_response(request, await bundle(user["company_id"], user))
+    from services import ttlcache
+    data = await ttlcache.cached(f"bundle:{ttlcache.scope_key(user)}:{await current_version()}", 15, lambda: bundle(user["company_id"], user))
+    return etag_response(request, data)
 
 
 @router.get("/{ctype}")

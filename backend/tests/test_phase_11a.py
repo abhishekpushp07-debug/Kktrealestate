@@ -1,3 +1,4 @@
+import pytest
 """Phase 11A — code-review fixes, canonical additions, API packeting, index audit. Run per file (login limiter)."""
 import os
 import threading
@@ -29,7 +30,12 @@ def H(email="admin@kkt.in", pwd=PWD):
 
 def active_booking():
     r = requests.get(f"{BASE}/bookings?status=Active&page_size=50", headers=H(), timeout=15).json()
-    return [b for b in r["items"] if b["cash_agreed_paise"] - b["summary"]["cash_paid_paise"] > 0]
+    # seeded bookings only (QA bookings created by other modules may be mid-milestone/undo on another xdist worker)
+    items = [b for b in r["items"] if b["cash_agreed_paise"] - b["summary"]["cash_paid_paise"] > 0]
+    seeded = [b for b in items if b.get("created_by") == "system"]
+    if not seeded and not items:
+        pytest.skip("no Active booking with cash headroom on this DB (demo data consumed by manual/QA payments)")
+    return seeded or items
 
 
 def cash_mode():
@@ -119,10 +125,18 @@ def test_visit_links_revoked_on_completed():
     pid = requests.get(f"{BASE}/projects", headers=h, timeout=15).json()["items"][0]["id"]
     slug = requests.get(f"{BASE}/projects/{pid}", headers=h, timeout=15).json().get("website", {}).get("slug")
     d = (date.today() + timedelta(days=2)).isoformat()
-    av = requests.get(f"{BASE}/public/site-visits/availability?project_slug={slug}&from={d}&to={(date.today() + timedelta(days=9)).isoformat()}", timeout=15).json()
+    for _ in range(30):
+        av = requests.get(f"{BASE}/public/site-visits/availability?project_slug={slug}&from={d}&to={(date.today() + timedelta(days=9)).isoformat()}", timeout=15).json()
+        if any(x["slots"] for x in av.get("days", [])):
+            break
+        time.sleep(2)
     day = next(x for x in av["days"] if x["slots"])
     slot = next(s for s in day["slots"] if s["available_count"] > 0)
-    r = requests.post(f"{BASE}/public/site-visits", json={"project_slug": slug, "date": day["date"], "slot_start": slot["start"], "name": "Link Test", "phone": "9876500011", "consent": True}, timeout=15)
+    body = {"project_slug": slug, "date": day["date"], "slot_start": slot["start"], "name": "Link Test", "phone": "9876500011", "consent": True}
+    r = requests.post(f"{BASE}/public/site-visits", json=body, timeout=15)
+    if r.status_code == 429:  # public visit guard is 5/60 s per IP; test_phase_9 fills it on another worker — wait for a fresh window
+        time.sleep(int(r.json().get("retry_after") or 60) + 1)
+        r = requests.post(f"{BASE}/public/site-visits", json=body, timeout=15)
     assert r.status_code in (200, 201), r.text
     v = r.json()
     vid = requests.get(f"{BASE}/site-visits?search=9876500011&page_size=1&sort=-created_at", headers=H(), timeout=15).json()["items"][0]["id"]
@@ -184,8 +198,8 @@ def test_crm_profile_communication_timeline():
     assert r.status_code == 201, r.text
     cc = requests.get(f"{BASE}/customers/{c['id']}", headers=h, timeout=15).json()
     assert cc.get("last_contacted_at")
-    tl = requests.get(f"{BASE}/customers/{c['id']}/timeline?limit=3", headers=h, timeout=15).json()
-    assert tl["items"] and tl["items"][0]["type"] == "communication"
+    tl = requests.get(f"{BASE}/customers/{c['id']}/timeline?limit=5", headers=h, timeout=15).json()
+    assert tl["items"] and any(i["type"] == "communication" for i in tl["items"])  # other workers may append newer booking events
     assert "next_cursor" in tl
     page2 = requests.get(f"{BASE}/customers/{c['id']}/timeline?limit=3&cursor={tl['next_cursor']}", headers=h, timeout=15).json() if tl["next_cursor"] else {"items": []}
     assert all(e["at"] < tl["next_cursor"] for e in page2["items"]) if tl["next_cursor"] else True

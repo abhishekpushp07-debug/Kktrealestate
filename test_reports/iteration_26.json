@@ -1,0 +1,44 @@
+{
+  "summary": "Phase E7 RETEST of the iteration_25 HIGH bug: Undo button in Sonner toast unclickable while a Radix modal (FlatDrawer / PostPayment sheet) is open. Login as admin@kkt.in → Tower A (/blocks/4e99bd2c-25eb-45b8-91a5-501b4a5295c2) → click A-801 → FlatDrawer opens → click 'Mark Hold' → bottom-right toast with Undo appears → REAL MOUSE CLICK via page.mouse.click() on Undo → handler runs, 'A-801 back to Blocked' confirmation toast fires, flat status reverts in DB. The pointer-events / z-index fix in src/index.css (last 3 lines) is working: [data-sonner-toaster] computed z-index=10000 and pointer-events=auto; [data-sonner-toast] pointer-events=auto; Toaster is in bottom-right (data-position attribute is null in current build but visual + bbox confirm bottom-right origin at (1540, 982) on a 1920×1080 viewport). CORE BUG FIX IS VERIFIED. One residual behavior noted: the FlatDrawer Sheet CLOSES immediately after the Undo click lands on the toast (likely Radix pointer-down-outside firing even with pointer-events:auto on the toast portal). The handler still completes, status still reverts, and the second toast still appears, so the user is NOT blocked — but the review stated 'drawer still open' which no longer holds.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "FlatDrawer (Radix Sheet) + Sonner Toaster",
+        "issue": "After the fix the Undo button inside the toast IS clickable with page.mouse.click() (handler runs, status reverts, follow-up toast fires). HOWEVER the Sheet now auto-closes the moment the Undo click is processed. The review's acceptance criterion ('drawer still open') is NOT met. Suspected cause: Radix Dialog's pointerDownOutside handler fires because the Sonner viewport is a portal sibling of the Dialog overlay; pointer-events:auto on the toast lets the click register on the Undo button but the event ALSO reaches the overlay/outside listener, which closes the Sheet via onOpenChange(false). Mitigation: in FlatDrawer.jsx, add  onPointerDownOutside={(e) => { if (e.target?.closest?.('[data-sonner-toast]')) e.preventDefault(); }} (or onInteractOutside) to <SheetContent>, so clicks that originate inside a toast do not dismiss the dialog. Same guard will fix PostPayment sheet too.",
+        "selector": "[data-testid=\"flat-drawer\"], [data-testid=\"post-payment-sheet\"]",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/memory/qa/frontend/e7_undo_fix_01_tower_a.jpeg",
+    "/app/memory/qa/frontend/e7_undo_fix_02_drawer_A801.jpeg",
+    "/app/memory/qa/frontend/e7_undo_fix_03_toast_hold.jpeg",
+    "/app/memory/qa/frontend/e7_undo_fix_04_after_undo.jpeg",
+    "/app/memory/qa/frontend/e7_undo_fix_09_bookings_accounts.jpeg",
+    "/app/memory/qa/frontend/e7_undo_fix_10_booking_detail_accounts.jpeg",
+    "/app/memory/qa/frontend/e7_undo_fix_11_postpay_sheet.jpeg",
+    "/app/memory/qa/frontend/e7_undo_fix_12_postpay_toast.jpeg"
+  ],
+  "action_items": [
+    "Core bug (iteration_25 HIGH) is FIXED and VERIFIED — the toast Undo button is now reachable with a real mouse click while a Radix modal is open. No further CSS work needed.",
+    "SECONDARY MEDIUM issue: the FlatDrawer Sheet closes immediately after Undo clicks are received. Add onPointerDownOutside guard to SheetContent in FlatDrawer.jsx (and PostPayment sheet) that calls e.preventDefault() when e.target.closest('[data-sonner-toast]') truthy. Then the drawer will stay open per the original acceptance criterion.",
+    "Part B (PostPayment sheet toast X) could not produce a validation-error toast because the submit button is disabled until Mode/Amount are set (client-side gating). Suggest a separate test that posts an invalid-mode payment via the sheet to force a backend error toast, so the X-click layering can be exercised. CSS-level fix is already proven in Part A so this is low priority."
+  ],
+  "critical_code_review_comments": [
+    "frontend/src/index.css lines 174-176: correct minimal fix. z-index:10000 is well above Radix Dialog overlay (z-50). pointer-events:auto on toaster AND inner toast + buttons ensures clicks reach the action button. Good.",
+    "frontend/src/App.js line 35: Toaster props updated to position='bottom-right' richColors closeButton with 6s duration — matches request. Note data-position attribute is not visible on the DOM element (Sonner may apply via inline style instead of attribute); the toast visually renders at bottom-right as expected (bbox 1540,982 on 1920×1080).",
+    "FlatDrawer.jsx line 58: <Sheet open={!!flatId} onOpenChange={(o) => !o && onClose()}>. Radix Sheet is modal by default; without onPointerDownOutside guard, any pointer-down that is NOT inside SheetContent — including inside the Sonner portal — fires onOpenChange(false) and closes the drawer. This is why real-mouse Undo clicks close the drawer today, even though the toast action handler still runs."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (not in scope)", "frontend": "Part A core fix PASS (real-mouse Undo works, status reverts, toast at bottom-right with z=10000, pe=auto). Part A acceptance criterion 'drawer still open' FAIL. Part B PostPayment X-click NOT exercisable (disabled submit prevents toast)."},
+  "test_credentials": "admin@kkt.in / Kkt@12345 (Super Admin); accounts@kkt.in / Kkt@12345 (Accounts, used for Post payment access).",
+  "seed_data_creation": "None. Flat A-801 toggled Blocked→Hold→Blocked and ended at Blocked (same as pre-test). No permanent state change.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "The Toaster CSS fix (z-index 10000 + pointer-events:auto on [data-sonner-toaster]/[data-sonner-toast] in src/index.css lines 174-176) is live and WORKING. Verified by: (1) real page.mouse.click() on Undo button at bbox (1836,1007,43,24) inside toast at (1540,982) succeeded; (2) 'A-801 back to Blocked' revert toast appeared and status reverted; (3) computed z=10000, pe=auto on toaster and inner toast; (4) Toaster rendered at bottom-right. Residual: FlatDrawer Sheet closes when Undo is clicked because Radix's onPointerDownOutside fires through the Sonner portal — fix with an onPointerDownOutside guard on <SheetContent> that checks e.target.closest('[data-sonner-toast]'). PostPayment sheet validation toast could not be forced (Post button is disabled until Mode+Amount are set), so the X-close path above a sheet was not exercised; the CSS fix however is identical and applies to all sonner toasts globally. 12 screenshots in /app/memory/qa/frontend/e7_undo_fix_*.jpeg (saved as .jpeg by browser_automation; files confirmed on disk).",
+  "rca of the issue": "iteration_25 bug (Undo click intercepted by Radix overlay) is RESOLVED by the two CSS rules in frontend/src/index.css. The remaining 'drawer closes after undo' is a different, lower-severity bug: Radix Dialog in modal mode treats a pointer-down anywhere outside the dialog subtree as an outside interaction, including into the Sonner portal (which is a sibling of the Radix overlay). Even though pointer-events:auto on the toast lets the click register on the Undo <button>, the same event also triggers Radix's internal outside-click detection and calls onOpenChange(false). Fix at the drawer level, not the toast: add onPointerDownOutside={(e) => { if (e.target?.closest?.('[data-sonner-toast]')) e.preventDefault(); }} on <SheetContent> in FlatDrawer.jsx and the PostPayment sheet. This keeps the toast interaction model (click Undo, keep working in context) consistent with the review's acceptance criteria."
+}

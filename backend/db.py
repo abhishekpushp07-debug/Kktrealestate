@@ -7,10 +7,18 @@ from pymongo import ASCENDING, DESCENDING
 
 load_dotenv(Path(__file__).parent / ".env")
 
-client = AsyncIOMotorClient(os.environ["MONGO_URL"], maxPoolSize=int(os.environ.get("MONGO_MAX_POOL", "50")), minPoolSize=int(os.environ.get("MONGO_MIN_POOL", "5")),
-                            serverSelectionTimeoutMS=5000, connectTimeoutMS=5000, socketTimeoutMS=30000, retryWrites=True, retryReads=True, compressors="zlib",
-                            event_listeners=[__import__("dbtiming").DbTimingListener()])
-db = client[os.environ["DB_NAME"]]
+# Connection pool (Atlas-compatible; all tunable via env, documented in memory/qa/perf/load_report.md):
+#   MONGO_MAX_POOL (50)  max sockets per process      MONGO_MIN_POOL (5)   warm sockets kept open
+#   MONGO_WAIT_QUEUE_MS (5000) wait for a free socket  MONGO_SST_MS (5000)  server selection timeout
+#   MONGO_CONNECT_MS (5000) TCP connect               MONGO_SOCKET_MS (30000) per-operation socket timeout
+POOL = {"maxPoolSize": int(os.environ.get("MONGO_MAX_POOL", "50")), "minPoolSize": int(os.environ.get("MONGO_MIN_POOL", "5")),
+        "waitQueueTimeoutMS": int(os.environ.get("MONGO_WAIT_QUEUE_MS", "5000")), "serverSelectionTimeoutMS": int(os.environ.get("MONGO_SST_MS", "5000")),
+        "connectTimeoutMS": int(os.environ.get("MONGO_CONNECT_MS", "5000")), "socketTimeoutMS": int(os.environ.get("MONGO_SOCKET_MS", "30000")),
+        "maxIdleTimeMS": 120000, "heartbeatFrequencyMS": 10000}
+client = AsyncIOMotorClient(os.environ["MONGO_URL"], **POOL, retryWrites=True, retryReads=True, compressors="zlib",
+                            event_listeners=[__import__("dbtiming").DbTimingListener(), __import__("dbtiming").PoolListener()])
+db = client.get_database(os.environ["DB_NAME"], write_concern=__import__("pymongo").WriteConcern(w="majority", j=True) if os.environ.get("MONGO_WRITE_MAJORITY", "1") == "1" else None)
+# reads: primary (default) for transactional truth; `db_ro` below for derived read models
 # derived read models may be served from secondaries when a replica set exists (standalone ignores the preference)
 db_ro = client.get_database(os.environ["DB_NAME"], read_preference=__import__("pymongo").ReadPreference.SECONDARY_PREFERRED)
 
@@ -26,6 +34,8 @@ async def ensure_indexes():
     await db.users.create_index("id", unique=True)
     await db.refresh_tokens.create_index("token_hash", unique=True)
     await db.refresh_tokens.create_index("user_id")
+    await db.refresh_tokens.create_index("expires_dt", expireAfterSeconds=0, name="ttl_expires_dt")  # Date mirror of ISO expires_at
+    await db.portal_refresh_tokens.create_index("expires_dt", expireAfterSeconds=0, name="ttl_expires_dt")
     await db.roles.create_index("id", unique=True)
     await db.roles.create_index([("company_id", ASCENDING), ("name", ASCENDING)])
     for c in MASTER_COLLECTIONS:
@@ -39,7 +49,7 @@ async def ensure_indexes():
     await db.flats.create_index([("block_id", ASCENDING), ("flat_number", ASCENDING)], unique=True)
     await db.flats.create_index([("project_id", ASCENDING), ("status", ASCENDING)])
     await db.flats.create_index([("block_id", ASCENDING), ("floor", ASCENDING), ("position", ASCENDING)])
-    await db.audit_logs.create_index([("entity_type", ASCENDING), ("entity_id", ASCENDING)])
+    await db.audit_logs.create_index([("entity_type", ASCENDING), ("entity_id", ASCENDING), ("created_at", DESCENDING)], name="audit_entity_created")
     await db.audit_logs.create_index([("created_at", DESCENDING)])
     await db.audit_logs.create_index("actor_id")
     await db.companies.create_index("id", unique=True)
@@ -64,6 +74,7 @@ async def ensure_indexes():
     for c in ("customers", "leads", "bookings", "payments", "demands", "documents", "ledger_entries", "contra_entries"):
         await db[c].create_index("id", unique=True)
     await db.customers.create_index([("company_id", ASCENDING), ("phone", ASCENDING)])
+    await db.customers.create_index([("company_id", ASCENDING), ("phone", ASCENDING)], unique=True, name="uniq_active_phone", partialFilterExpression={"is_active": True})
     await db.customers.create_index("pan_hash")
     await db.customers.create_index("customer_code", unique=True)
     await db.customers.create_index([("full_name", "text"), ("phone", "text"), ("customer_code", "text")])
@@ -78,7 +89,10 @@ async def ensure_indexes():
     await db.payments.create_index([("booking_id", ASCENDING), ("status", ASCENDING)])
     await db.payments.create_index([("company_id", ASCENDING), ("payment_date", DESCENDING)])
     await db.payments.create_index([("project_id", ASCENDING), ("payment_date", DESCENDING)])
+    await db.payments.create_index([("company_id", ASCENDING), ("status", ASCENDING), ("amount_paise", ASCENDING)], name="payments_totals_covered")
+    await db.payments.create_index([("company_id", ASCENDING), ("payment_category", ASCENDING), ("status", ASCENDING), ("amount_paise", ASCENDING)], name="payments_totals_by_category")
     await db.demands.create_index([("booking_id", ASCENDING), ("posted_at", ASCENDING)])
+    await db.demands.create_index("demand_number", unique=True, name="uniq_demand_number")
     await db.demands.create_index([("block_id", ASCENDING), ("milestone_seq", ASCENDING)])
     await db.demands.create_index([("booking_id", ASCENDING), ("installment_seq", ASCENDING)], unique=True, partialFilterExpression={"voided": False, "installment_seq": {"$type": "int"}})
     await db.payment_plan_assignments.create_index([("project_id", ASCENDING), ("block_id", ASCENDING), ("is_active", ASCENDING)])

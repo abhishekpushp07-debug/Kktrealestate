@@ -27,7 +27,7 @@ async def _dashboard(user: dict):
     inventory = await status_counts(base)
     projects = await db.projects.find({"company_id": user["company_id"], "is_active": True, **project_scope_filter(user, "id")}, {"_id": 0, "id": 1, "name": 1, "code": 1, "status": 1, "project_type": 1, "address.city": 1}).sort("name", 1).to_list(50)
     pids = [p["id"] for p in projects]
-    rows = await db.flats.aggregate([{"$match": {"project_id": {"$in": pids}, "is_active": True}}, {"$group": {"_id": {"p": "$project_id", "s": "$status"}, "n": {"$sum": 1}, "v": {"$sum": {"$ifNull": ["$price", 0]}}}}]).to_list(None)
+    rows = await db.flats.aggregate([{"$match": {"project_id": {"$in": pids}, "is_active": True}}, {"$group": {"_id": {"p": "$project_id", "s": "$status"}, "n": {"$sum": 1}, "v": {"$sum": {"$divide": [{"$ifNull": ["$price_paise", 0]}, 100]}}}}]).to_list(None)
     cmap = {pid: {s: 0 for s in STATUSES} for pid in pids}
     vmap = {pid: 0 for pid in pids}
     for r in rows:

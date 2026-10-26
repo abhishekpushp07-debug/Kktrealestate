@@ -5,9 +5,10 @@ from fastapi import APIRouter, Depends, Request, Response
 from pydantic import Field, model_validator
 
 from db import db
+from models_out import BookingsOut, BookingsOutPage
 from deps import ensure_project_access, project_scope_filter, require
 from services.counters import apply_status_delta
-from services.ledger import create_demand, raise_other_charges, rebuild
+from services.ledger import raise_other_charges, rebuild
 from services.money import pct_of, present_money, to_paise
 from services.numbering import generate_number
 from uow import guarded_update, unit_of_work
@@ -97,7 +98,7 @@ def _present(b: dict) -> dict:
     return present_money(b)
 
 
-@router.get("")
+@router.get("", response_model=BookingsOutPage, response_model_exclude_unset=True)
 async def list_bookings(params: ListParams = Depends(), project_id: str | None = None, block_id: str | None = None, status: str | None = None,
                         customer_id: str | None = None, user: dict = Depends(require("booking.read"))):
     q = {"company_id": user["company_id"], **project_scope_filter(user), **search_filter(params.search, ["booking_number", "customer_name", "flat_snapshot.flat_number"])}
@@ -161,7 +162,7 @@ async def create_booking(body: BookingIn, request: Request, user: dict = Depends
            "customer_id": customer["id"], "customer_name": customer["full_name"], "customer_code": customer["customer_code"], "customer_phone": customer.get("phone"),
            "co_applicant_customer_ids": body.co_applicant_customer_ids, "booking_date": body.booking_date.isoformat(),
            "agreement_value_paise": to_paise(body.agreement_value), "cash_agreed_paise": to_paise(body.cash_agreed), "account_agreed_paise": to_paise(body.account_agreed),
-           "rate_per_sqft": flat.get("rate_per_sqft"), "flat_snapshot": {"flat_number": flat["flat_number"], "flat_type_code": flat.get("flat_type_code"), "flat_type_id": flat.get("flat_type_id"), "super_builtup_sqft": flat.get("super_builtup_sqft"), "floor": flat.get("floor"), "price": flat.get("price")},
+           "rate_per_sqft": flat.get("rate_per_sqft"), "flat_snapshot": {"flat_number": flat["flat_number"], "flat_type_code": flat.get("flat_type_code"), "flat_type_id": flat.get("flat_type_id"), "super_builtup_sqft": flat.get("super_builtup_sqft"), "floor": flat.get("floor"), "price": flat["price_paise"] / 100 if flat.get("price_paise") is not None else None, "price_paise": flat.get("price_paise")},
            "milestone_template_snapshot": [{"seq": m["seq"], "name": m["name"], "cumulative_percent": m["cumulative_percent"]} for m in milestones],
            "construction_percent": 0, "raised_percent": 0, "payment_plan_id": plan["id"] if plan else None, "payment_plan_snapshot": await build_snapshot(plan) if plan else None,
            "plan_acceptance": {"accepted_on": body.booking_date.isoformat(), "accepted_by_user_id": user["id"], "mode": body.plan_acceptance_mode} if plan else None, "other_charges": charges, "parking_slot_ids": body.parking_slot_ids, "sales_user_id": body.sales_user_id or user["id"], "lead_id": body.lead_id,
@@ -195,7 +196,7 @@ async def create_booking(body: BookingIn, request: Request, user: dict = Depends
     return _present(after)
 
 
-@router.get("/{booking_id}")
+@router.get("/{booking_id}", response_model=BookingsOut, response_model_exclude_unset=True)
 async def get_booking(booking_id: str, user: dict = Depends(require("booking.read"))):
     if booking_id.startswith("BK-"):
         hit = await db.bookings.find_one({"booking_number": booking_id, "company_id": user["company_id"]}, {"_id": 0, "id": 1})

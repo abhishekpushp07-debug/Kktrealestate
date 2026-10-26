@@ -39,7 +39,7 @@ QUERIES = [
     ("tickets by customer", db.service_requests, {"customer_id": "x"}, [("created_at", -1)]),
     ("notifications unread", db.notifications, {"user_id": "u", "read": False}, [("created_at", -1)]),
     ("ledger rows", db.ledger_entries, {"booking_id": "b"}, [("seq", 1)]),
-    ("audit by entity", db.audit_logs, {"entity_type": "booking", "entity_id": "b"}, None),
+    ("audit by entity", db.audit_logs, {"entity_type": "booking", "entity_id": "b"}, [("created_at", -1)]),
     ("audit by company", db.audit_logs, {"company_id": "c"}, [("created_at", -1)]),
     ("catalogue bundle", db.catalogue_items, {"company_id": "c", "is_active": True}, [("type", 1), ("sort_order", 1)]),
     ("catalogue type", db.catalogue_items, {"company_id": "c", "type": "state", "is_active": True}, [("sort_order", 1)]),

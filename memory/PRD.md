@@ -1,4 +1,81 @@
-# KKT — Real Estate ERP · PRD (Phase 1 → 4)
+# KKT Constructions — Real Estate ERP · PRD
+
+## Phase E — ERP frontend excellence + hot-path caching + packaging (2026-10-26)
+**Independent-tester follow-ups (fixed, verified in iteration_28):**
+- Undo on Leads/Service kanban: shared `lib/undo.js` — Undo awaits the reverting POST (version from forward response), toasts "Reverted · …"; verified by API/audit after Undo (2 stage entries). Inventory uses the same helper.
+- Reports/Home Y-axis ticks now `₹1 Cr / ₹75 L` via `inrShort`; count charts untouched.
+- Pincodes: all 25 seeded localities carry `meta.pincode` (idempotent backfill at startup); `tests/test_locality_pincodes.py`; customer form shows "Auto-filled from locality" vs an explicit typed fallback ("No pincode on file — type it").
+- Wizard split step shows a visible "0% cash" warning (`wiz-zero-cash-warning`) when cash = 0; SGH (60/40) booking + ₹10,000 cash payment verified (KKT/ receipt). Tester data BK-2627-0001 / KKT/2627/00049 untouched.
+- Test-data repair: milestone test fallback had advanced seeded Tower B to 3/11 — its ₹60L test payment was reversed and the stage undone (Tower B back to 18 %, integrity 0 findings); the fallback now only uses bookings the test module created. `test_phase_11a.active_booking()` falls back to any active booking with headroom (demo seeded bookings are consumed by manual QA payments).
+
+**Not done / not met (first):**
+- Load: dashboard/bootstrap server-side p95 ≤ 300 ms at 100 users **not met** (1.1–1.3 s; CPU queueing on one uvicorn worker sharing a core with the load generator; idle 5–25 ms). RPS 101 → 115, **0 × 5xx / 0 exceptions at 100 and 300 users**. Details + root cause of the Phase D "486 × 5xx" (client keep-alive races, never server errors) in `memory/qa/perf/load_report.md`.
+- Routes still averaging > 6 queries/request: booking_detail (7.2) and global search (7.5) — intentional fan-outs; read model is the next step. crm 10.7 → 4 (board aggregation), bootstrap counts now concurrent.
+- E1 legacy-screen rebuild was done by **converging** the legacy helpers (`common/Bits`: StatCard→StatTile, EmptyState, StatusBadge→StatusPill, Field) and replacing shadcn `Button` with `.btn` on ProjectDetail/BlockDetail/SiteVisits/ServiceRequests — not a from-scratch rewrite. Still on shadcn Select/Tabs/Sheet primitives (token-styled): AuditLog, MasterPage, Roles, cms/*, SiteVisits filters. Dead legacy CSS was not audited.
+- E2 optimistic + Undo exists for lead stage, service kanban, flat status; **cheque clear/bounce has no Undo** (irreversible by design — bounce creates ledger reversals).
+- E7 Booking wizard was only verified through step 3 by automation (the 7-step flow was out of scope for the Playwright run); the earlier full-wizard regression from Phase B remains the proof for that flow.
+- Lighthouse Accessibility initially 89–93; after fixes all six screens ≥ 95 (see Done).
+
+**Done:**
+- E0: `services/ttlcache.cached()` read-through cache (Redis when `REDIS_URL`, else in-process) with event-bus invalidation + "any successful write clears list caches" middleware; applied to `/dashboard/home` (10 s), `/bootstrap` (per user 5 s), catalogue bundle (versioned), list first pages (5 s). `dbq` in Server-Timing and ops ring (`avg_queries` per group, shown in System Health). Leads board per-column paging (50 + Load more; 190 → 122 KB, 12 → 1 query). Customer 360 composite `/customers/{id}/panels` (6 → 4 browser calls, 0 duplicates). Load re-run: `load_report_e0.md`, `load_raw_e0.csv`.
+- E1/E3: Login polish (spacing, gold focus rings, demo chips with pressed state, stronger heading/eyebrow); one token set via Bits convergence; toasts bottom-right.
+- E2: Undo toasts + rollback for lead/service/flat status; `/` focuses search, Ctrl/Cmd+S submits the open form, Ctrl+K palette, Esc closes; toasts clickable above Radix modals (z-index/pointer-events fix).
+- E4: contrast token `--txt-3` darkened to AA, aria-labels on icon buttons/date filters/combobox, bell label fix, heading order, 24 px tap targets for phone links.
+- E5 Lighthouse (desktop, preview, authenticated): Home 99/96/100, Customers 100/95/100, Customer 360 100/97/100, Booking detail 99/95/100, Payments 99/97/100, Inventory grid 100/95/100 → `memory/qa/frontend/lighthouse/` (JSON+HTML, runner `backend/tools/lighthouse_run.py`).
+- E6: clean-room `CI=true yarn build` exit 0, 0 warnings; `scripts/smoke.sh` → preview PASS 6/0 (`memory/qa/frontend/smoke_preview.md`); deployment agent: no blockers (flags empty `CORS_ORIGINS` as a verify-item; intentional same-origin).
+- E7: backend suite **364 passed, 1 skipped** (milestone test self-skips when demo data is exhausted); testing-agent iterations 23–27 pass (Undo-in-modal bug found in 25 → fixed: toaster above Radix overlay + sheets/dialogs stay open on toast clicks, verified in 26/27). Screenshots: `memory/qa/frontend/e7_*.jpeg`.
+
+
+## Phase D — Backend, API & data-fetching excellence at realistic volume (2026-10-26)
+**Not done / not met (first):**
+- Load: p95 < 400 ms at 300 users **not met** in sandbox (single uvicorn worker, load client shares CPU). 0 × 5xx at every stage; ~100 rps plateau per worker. See `memory/qa/perf/load_report.md` (raw CSVs alongside). Locust/k6 not installable offline → asyncio/httpx profile `backend/tools/load_profile.py`.
+- Leads board payload 190 KB (target 150 KB) — board returns up to 500 open leads; per-column paging is the next step.
+- Customer 360 first paint = 3 API calls (API) / 6 in-browser incl. documents + document-types + communications (target ≤ 5) — no duplicates.
+- Volume DB produced 59 towers (not 36) and 67 visits (slot caps) — counts documented in `memory/qa/perf/volume_seed.log`.
+- `tests/test_hardening.py` 3 fixture errors on volume DB (looks for demo anchor BK-2526-0001) — fixture assumption, not a defect.
+
+**Done:**
+- D0 CORS: deny-by-default when `CORS_ORIGINS` empty; no regex+credentials; `tests/test_cors_deny.py` + Playwright proof (evil origin → no ACAO).
+- D1 `backend/tools/volume_seed.py --db kkt_volume` (API-driven, business rules preserved): 6 projects / 59 towers / 3,678 flats / 2,000 customers / 1,500 bookings / 20,596 payments / 319 leads / 67 visits / 200 tickets; integrity report **0 findings**. Second backend on :8002 (`DB_NAME=kkt_volume`), preview DB untouched.
+- D2 waterfall before/after: `memory/qa/perf/waterfall_{before,after,summary}.md`. Payments Σp95 197→76 ms, Settings 3442→8 ms (cached integrity report, `?fresh=1` recomputes), Customers search 64→15 ms, Leads board 281→190 KB. Concurrent count+page in `paginate()`, covered index for payment totals, leads board projection, `/api/catalogues` in-flight dedupe, Customer 360 query-key fix, React Query staleTime 30 s, IndexedDB bootstrap cache + ETag/304, optimistic lead stage move with Undo toast.
+- D3 explain audit on volume DB: 0 COLLSCAN, no in-memory sorts (audit-by-entity got compound index `audit_entity_created`); `tests/test_index_audit.py` 41 pass on both DBs; pool settings explicit in `db.py`, live pool counters via `PoolListener`.
+- D4 ORJSON default responses, PDF build off the event loop (`asyncio.to_thread`), gzip ≥ 1 KB.
+- D5 `/api/admin/ops` (Super Admin) + Settings → System Health card (30 s refresh): request rate, per-group p50/p95/p99, DB p95, 4xx/5xx, jobs (dues engine, read-model flush, integrity), read-model staleness, pool, startup phases. Request IDs shown in error-toast details.
+- D6 proofs: demo suite **359 passed**; volume DB: fuzz walker, permission matrix, leak scan, index audit pass; testing agent iterations 1 & 22 pass; deployment agent PASS; clean build.
+
+
+## Phase C — Refocus: ERP-only, company "KKT Constructions", ERP at root (2026-10-26)
+- **Product scope**: the ERP is the only frontend. Marketing site and Expo customer portal are archived (`/app/archive/*.zip` + README) and removed from the tree; `[program:mobile]` removed from supervisor. Backend public/portal routers are parked behind `PUBLIC_SURFACES_ENABLED` (default false → 404 envelope from middleware; `GET /api/bootstrap.surfaces` drives ERP nav: Website module and Customer-360 portal access hidden). Leads & Site Visits (staff-entered) remain.
+- **Identity**: company seed = KKT Constructions / KKT Constructions Pvt. Ltd., short code KKT, tagline "Building trust, delivering homes", accounts@kktconstructions.in; receipt prefix KKT → `KKT/2526/00001`; bookings stay `BK-2526-0001` (anchor unchanged: 22 ledger rows, ₹0 due after reseed). Monogram SVG (gold on royal black + mono) in `frontend/public` + `src/assets`, used on login, sidebar, favicon; PDFs embed a deterministic Pillow-rendered PNG of the same mark on the letterhead.
+- **Routing/build**: `PUBLIC_URL`/`REACT_APP_BASE_PATH` default `/`; `homepage` removed; three-surface packager + `deploy-assets` deleted; `yarn build` = `scripts/build.js` → plain `craco build` (safe defaults) → `build/index.html` + `static/`. `scripts/dev.js` preview serves the build at `/` with SPA fallback; `/erp[/…]` → 301 to the root path (client-side too for bookmarks).
+- **Proof (2026-10-26)**: full backend suite after reseed **356 passed / 0 failed** (`qa/refocus/full_suite.log`); fuzz/matrix/leak-scan/index-audit (0 COLLSCAN)/integrity (0 findings) inside it; BK-2526-0001 = 22 rows / ₹0 due; clean-room no-.env `CI=true yarn build` exit 0; health 0.17 s edge / 4 ms local; `/api/public/projects` + `/api/portal/config` → 404 envelope; deployment agent **PASS** (CORS now env-driven default `*`, no destructive startup ops). Testing agent iteration 20 verified the root-ERP Playwright flow (screenshots `qa/refocus/02…07`).
+- **Rupees-only**: `₹` glyph in `Num` made legible (.82em, was .62em — the visual "1.83 Cr / 76,700 without ₹" gap); CSV exports map `*_paise` → `*_inr` (÷100). Guard test `tests/test_rupees_only.py` (frontend source scan, 4 PDFs text, CSV headers) + `tests/test_surfaces_gate.py`.
+
+
+## Phase B — completion (2026-10-26)
+- **One price truth**: `flats.price_paise` (int) is the only stored price. Seeds (`seed.py`, `seed_phase2.py`), flat generation, rate-card apply, bulk-price, flat PATCH and imports write paise only; legacy `price` is unset by the lease-guarded `price_paise_backfill` after verification. Rupee `price` is derived at the API edge (`with_price`) so every consumer (ERP tables/drawer, wizard breakup, public starting prices, portal, dashboard, reports, search) reads one source. Proof: `tests/test_price_truth.py` (0 legacy docs, 0 double paise, 6-flat snapshot across SGH/GGV — `qa/hardening/price_snapshot_before.json`, public prices in rupees).
+- **Response models**: allow-listed Pydantic models (`backend/models_out.py`, generated from live API + collection field union, sensitive fields denied) on list+detail of projects, blocks, flats, customers, bookings, payments, users, leads, site-visits with `response_model_exclude_unset` (shape preserved, unknown keys dropped). Catalogues bundle route and service tickets (dynamic per-type shapes) stay model-less and are covered by `tests/test_erp_leak_scan.py`.
+- **422 field mapping everywhere**: `lib/formErrors.jsx` wired into customer, booking wizard, payment sheet, project setup, block form, leads, catalogues; backend `validation_exc_handler` emits dotted field paths. Evidence: `qa/hardening/forms/05_payment_cap_inline.jpeg`, `06_wizard_plan_required.jpeg` (testing-agent iteration 19).
+- **Harness**: test-only rate-limit bypass header honoured only when `LOGIN_RATE_LIMIT_BYPASS_TOKEN` is in the backend *process* env (supervisor conf, never `.env`) and never for public brochure/enquiry/visit buckets; `test_phase_2` milestones moved to Tower C so Tower B stays 2/11; `test_phase_11c` picks an Active booking; visit-availability tests wait out the concurrent SGH unpublish; SGH brochure seeded (`seed_phase3._seed_brochure`). Full suite after reseed, twice back-to-back: 344/344 then 344/344 (`qa/hardening/full_suite_run1.log`, `full_suite_run2.log`). Reseed now re-runs the Phase-9 visit/brochure seed and the price backfill (previously skipped by a kept flag).
+
+## Phase B4 (2026-10-25) — Canonical forms + leftovers
+- Forms audit under the "inherent-only typed" rule: Customer/Booking/Payment 100 %, all others ≥ 100 % (see `/app/memory/qa/hardening/forms_fields.md`). Pincode derived from locality; booking agreement value derived from list price with breakup − typed negotiated discount (editable only with `agreement.edit`); field-level 422 mapping (`lib/formErrors.jsx`) on the customer form.
+- `flats.price_paise` (int) added alongside legacy rupee `price`: written by flat generation, rate-card apply and flat PATCH; idempotent lease-guarded backfill in background startup; validator enforces int. Consumers still read `price` (switch pending).
+- ERP leak-scan test over 14 core GET routes (`tests/test_erp_leak_scan.py`); old tests updated for `with_total=true` / report count; shared login cache in conftest (MFA/refresh/session modules exempt).
+
+
+- Uniform error envelope (`error:{code,message,details,request_id}` + legacy `detail/code`) on every error incl. Starlette 404/405, 422, 413, 504, 500; `errMsg/errCode/errFields` in `lib/api.js`.
+- Payments: `Idempotency-Key` enforced as a dependency → **428 IDEMPOTENCY_KEY_REQUIRED** before body validation.
+- Mongo `$jsonSchema` validators (moderate) on 11 canonical collections, applied from the lease-guarded background startup; unique `demand_number`, unique partial active customer phone, TTL on refresh tokens (`expires_dt`); write concern majority; CSP + request-timeout middleware; slow log ≥500 ms.
+- Integrity report extended (orphans, flat↔booking status, bucket caps, summary vs ledger, counters) → 0 findings on seed.
+- Tests: fuzz walker (197 write routes × 4 payloads → 0×5xx), permission matrix (405 routes, `backend/security/permission_matrix.json`), hardening proofs (idempotency replay, 409, validators, anchor BK-2526-0001 = 22 rows/₹0 due, public leak scan); shared login cache in `tests/conftest.py`. Audit: `/app/memory/qa/hardening/audit.md`.
+- Receipt PDF polish: "Amount received" highlighted row inside the payment table; right-aligned signature block on all documents.
+
+
+- One `BrandedDoc` template for receipt / demand letter / statement / allotment (letterhead, gold rule, No./Date block, totals, "Page X of Y", generated-date IST + verification code, DejaVu ₹). Deterministic ⇒ portal and ERP bytes identical. `GET /api/public/verify/{code}`.
+- ERP PDF endpoints under `/api/payments/{id}/receipt.pdf`, `/api/bookings/{b}/{demands/{d}/letter,statement,allotment}.pdf` (inline; `?download=1` → attachment).
+- `/erp/print/{receipt,demand,statement,allotment}` render the real PDF in a branded shell (`pages/PrintDocument.jsx`); HTML re-creations removed. Tests: `tests/test_phase_a_print.py`. QA: `/app/memory/qa/print/`.
+
 
 ## Phase 4 (2026-10-24) — Reports, PDFs, Role Dashboards, Notifications, Hardening, Load Test
 **Reports (`routers/reports.py`, `report.view`, project-scoped):** `/api/reports` list + Collections (day/week/month, mode/bucket/status filters, by-mode and GST-on-charges totals), Outstanding & Ageing (customer/block/project; ageing Not due/0–30/31–60/61–90/90+ by demand due_date; top overdue), Advances, Demand vs Collection per block/milestone, Inventory (project/block/flat_type/floor; sold vs available value; monthly velocity; realised ₹/sqft vs rate card), Cheques (Pending/Bounced/Cleared), Cancellations & Refunds, Sales & Leads (funnel, conversion by source, avg response hours, overdue follow-ups, bookings per sales user, website enquiries per project), Roznamcha range (with contra deposits/withdrawals), Bank-wise receipts, Activity (audit action counts, login/failed-login per user — `audit.view`). Every report: `?format=json|csv|pdf`; totals footer; saved presets (`/api/reports/presets`, per user). Per-booking **Customer Statement** (`/api/reports/statement/{id}?format=pdf`) and **Allotment letter + payment schedule** (`/api/reports/allotment/{id}?format=pdf`, terms from `company.allotment_terms` or default).
@@ -37,7 +114,7 @@ Run 1 (before TTL caches / gather): aggregated p50 630 ms, p95 1.9 s, 580 RPS. R
 **Media:** CMS uploads go to Emergent Object Storage via `POST /api/cms/media` (image/pdf, 10 MB) and are served publicly through `GET /api/public/media/{id}` with `Cache-Control: public, max-age=31536000, immutable` (proxy approach chosen because bucket objects are private). Seed imagery uses Unsplash source URLs (allowed by spec); uploads use object storage.
 **Frontend:** `src/site/*` — route-level lazy chunks, `react-helmet-async` (title/meta/OG/Twitter/canonical), JSON-LD (Organization on home, RealEstateListing on project, BlogPosting), Cormorant Garamond + Manrope, navy/gold/ivory, Ken Burns hero with banner crossfade, glass nav → solid on scroll, Framer reveal animations, blur-up lazy images with explicit dimensions, mobile sticky Call / WhatsApp / Enquire bar, unit grid (Available → tap pre-fills enquiry with unit; Not available greyed), construction progress + milestone chips, FAQ accordion, lightbox gallery, blog tags, legal pages. ERP: sidebar **Website** (Site Settings, Banners, Testimonials, Gallery, Blog, Pages, People, Enquiries inbox with unread badge → Leads filtered `source=Website`, auto mark-read on open) and **Website** tab on Project detail. Roznamcha date change now refetches with a loading state.
 **Admin:** `POST /api/admin/reseed` (Super Admin only, body `{confirm:"RESEED"}` else 400 `CONFIRM_REQUIRED`) drops business collections and reruns all idempotent seeds (NOT executed). `POST /api/admin/recompute-counters` retained.
-**Seed (`seed_phase3.py`):** Shree Ganesh Builders site settings, 3 banners, 6 testimonials (seeded customers), 18 gallery images, 4 published 300–500-word posts + 1 draft, about/privacy/disclaimer pages, 3 leadership people, FAQs per project, SGH published with prices/availability/progress, GGV published with prices hidden ("Price on request"), YouTube video + tour embeds. Housekeeping: QA flat type + its 6 QA flats removed/deactivated, counters recomputed, SGH description restored.
+**Seed (`seed_phase3.py`):** KKT Constructions site settings, 3 banners, 6 testimonials (seeded customers), 18 gallery images, 4 published 300–500-word posts + 1 draft, about/privacy/disclaimer pages, 3 leadership people, FAQs per project, SGH published with prices/availability/progress, GGV published with prices hidden ("Price on request"), YouTube video + tour embeds. Housekeeping: QA flat type + its 6 QA flats removed/deactivated, counters recomputed, SGH description restored.
 **Deviations / honest notes:** sitemap/robots are served at `/api/public/sitemap.xml` and `/api/public/robots.txt` (ingress sends only `/api/*` to the backend; `public/robots.txt` static file points to the API sitemap). Matterport demo embed replaced by a YouTube 360 embed (Matterport returns 403 inside iframes). `/blog` uses the brand name as author (no per-user author). Draft preview = view in CMS form only.
 
 ## Phase 2 (2026-10-24) — Customers, Leads, Bookings, Milestones→Demands, Payment Ledger, Receipts, Roznamcha, Documents
@@ -101,7 +178,7 @@ System roles: Super Admin (all), Project Admin, Accounts, Sales, Employee, Marke
 - Full master data CRUD + deactivate with 409 usage checks; flat type area hierarchy validation
 - Projects/Blocks/Flats with atomic flat generation, 3 numbering patterns, snapshots, rate × SBU + floor rise pricing, regenerate guard, append floors, bulk pricing, inventory grid
 - Royal navy UI: login split, dashboard, project tabs, inventory grid + flat drawer, flats list, master pages w/ dynamic Flat Type form, users, role permission editor, audit viewer, settings
-- Seed: Shree Ganesh Builders, 5 users, full masters, SGH (Tower A/B 32 flats each), GGV (12 villas)
+- Seed: KKT Constructions, 5 users, full masters, SGH (Tower A/B 32 flats each), GGV (12 villas)
 
 ## Implemented (Phase 1.5 — 2026-10-23) "Foundation Power-Up"
 **Backend**

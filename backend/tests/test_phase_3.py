@@ -232,7 +232,7 @@ def test_cms_site_403_sales(sales):
 def test_cms_site_200_admin(admin):
     r = requests.get(f"{API}/cms/site", headers=H(admin), timeout=15)
     assert r.status_code == 200
-    assert r.json().get("brand_name") == "Shree Ganesh Builders"
+    assert r.json().get("brand_name") == "KKT Constructions"
 
 
 @pytest.mark.parametrize("coll,expected_min", [
@@ -244,7 +244,7 @@ def test_cms_site_200_admin(admin):
     ("people", 3),
 ])
 def test_cms_collection_counts(admin, coll, expected_min):
-    r = requests.get(f"{API}/cms/{coll}?limit=100", headers=H(admin), timeout=15)
+    r = requests.get(f"{API}/cms/{coll}?limit=100&with_total=true", headers=H(admin), timeout=15)
     assert r.status_code == 200, r.text
     total = r.json().get("total", 0)
     assert total >= expected_min, f"{coll}: got {total}, need >= {expected_min}"

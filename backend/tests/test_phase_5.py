@@ -243,7 +243,7 @@ class TestConstructionAndHiddenPhoto:
             block_id = blocks[0]["id"]
         rp = requests.get(f"{BASE}/api/blocks/{block_id}/photos", headers=_hdr(admin_tok))
         assert rp.status_code == 200
-        photos = rp.json().get("items") or rp.json()
+        _pj = rp.json(); photos = _pj["items"] if isinstance(_pj, dict) and "items" in _pj else _pj
         hidden = [p for p in photos if not p.get("visible_to_customers")]
         if hidden:
             hid = hidden[0]["id"]
@@ -603,7 +603,7 @@ class TestErpDocShare:
             headers=_hdr(admin_tok),
         )
         assert rd.status_code == 200
-        docs = rd.json().get("items") or rd.json()
+        _dj = rd.json(); docs = _dj["items"] if isinstance(_dj, dict) and "items" in _dj else _dj
         allot = [d for d in docs if d.get("shared_with_customer")]
         assert allot, "Expected shared allotment doc"
         did = allot[0]["id"]

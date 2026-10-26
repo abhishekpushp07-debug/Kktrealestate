@@ -16,7 +16,7 @@ module.exports = {
         amber2: { DEFAULT: '#B7791F', 50: '#FBF2E1' },
         brick: { DEFAULT: '#B4423A', 50: '#F9ECEA' },
         slate2: { DEFAULT: '#5B6B85', 50: '#EDF0F5' },
-        txt: { secondary: '#5A5F6B', muted: '#8A8F9A' },
+        txt: { secondary: '#5A5F6B', muted: '#6B7079' },
         navy: { DEFAULT: '#0B1F3A', 950: '#07152B', 900: '#0B1F3A', 800: '#10294D', 700: '#163866', 600: '#1C4882', 100: '#DCE4F2', 50: '#F0F4FA' },
         ivory: '#F7F5EF',
         line: '#E6E9F0',

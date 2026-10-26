@@ -1,9 +1,0 @@
-{
-  "name": "Shree Ganesh Builders",
-  "short_name": "KKT",
-  "start_url": "/",
-  "display": "browser",
-  "background_color": "#F8F6F1",
-  "theme_color": "#0B1F3A",
-  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
-}

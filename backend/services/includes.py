@@ -1,9 +1,10 @@
 """`include=` expansion for list/detail endpoints: batched `$in` lookups (never N+1), compact projections."""
 from db import db
+from utils import with_price
 
 COMPACT = {
     "customer": (db.customers, "customer_id", {"id": 1, "customer_code": 1, "full_name": 1, "phone": 1, "email": 1, "kyc_status": 1, "lifecycle_stage": 1, "engagement_score": 1}),
-    "flat": (db.flats, "flat_id", {"id": 1, "flat_number": 1, "floor": 1, "floor_label": 1, "flat_type_code": 1, "status": 1, "price": 1, "super_builtup_sqft": 1, "facing": 1}),
+    "flat": (db.flats, "flat_id", {"id": 1, "flat_number": 1, "floor": 1, "floor_label": 1, "flat_type_code": 1, "status": 1, "price_paise": 1, "super_builtup_sqft": 1, "facing": 1}),
     "block": (db.blocks, "block_id", {"id": 1, "name": 1, "code": 1, "construction_percent": 1, "status": 1}),
     "project": (db.projects, "project_id", {"id": 1, "name": 1, "code": 1, "status": 1, "address.city": 1}),
     "plan": (db.payment_plans, "payment_plan_id", {"id": 1, "name": 1, "code": 1, "plan_type": 1}),
@@ -45,7 +46,7 @@ async def expand(items: list[dict], include: str | None, resource: str) -> list[
                 i[inc] = None
             continue
         key = "customer_id" if inc == "summary" else "id"
-        rows = {r[key]: r for r in await coll.find({key: {"$in": ids}}, {"_id": 0, **proj}).to_list(None)}
+        rows = {r[key]: with_price(r) for r in await coll.find({key: {"$in": ids}}, {"_id": 0, **proj}).to_list(None)}
         for i in items:
             i[inc] = rows.get(i.get(fk))
     return items

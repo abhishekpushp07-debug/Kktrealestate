@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import Field
 
 from db import db
+from models_out import FlatsOut, FlatsOutPage
 from deps import ensure_project_access, project_scope_filter, require
 from services.flat_generation import resnapshot_flat
 from utils import (
@@ -17,6 +18,7 @@ from utils import (
     now_iso,
     paginate,
     search_filter,
+    with_price,
     write_audit,
 )
 
@@ -49,10 +51,10 @@ async def _enrich(items: list[dict]):
         f["block_code"] = bmap.get(f["block_id"], {}).get("code")
         f["project_name"] = pmap.get(f["project_id"], {}).get("name")
         f["project_code"] = pmap.get(f["project_id"], {}).get("code")
-    return items
+    return [with_price(i) for i in items]
 
 
-@router.get("")
+@router.get("", response_model=FlatsOutPage, response_model_exclude_unset=True)
 async def list_flats(
     params: ListParams = Depends(), project_id: str | None = None, block_id: str | None = None,
     floor: int | None = None, status: str | None = None, flat_type_id: str | None = None,
@@ -72,7 +74,7 @@ async def list_flats(
         q["flat_type_id"] = flat_type_id
     if not params.include_inactive:
         q["is_active"] = True
-    sort = params.sort_spec(["flat_number", "floor", "status", "price", "super_builtup_sqft", "created_at"], "floor")
+    sort = params.sort_spec(["flat_number", "floor", "status", "price_paise", "super_builtup_sqft", "created_at"], "floor")
     if params.sort in ("name", "floor"):
         sort = [("block_id", 1), ("floor", 1), ("position", 1)]
     res = await paginate(db.flats, q, params, sort, {"rooms_snapshot": 0, "areas_snapshot": 0})
@@ -81,18 +83,19 @@ async def list_flats(
 
         from utils import to_csv
         await _enrich(res["items"])
-        return Response(to_csv(res["items"], ["flat_number", "project_code", "block_code", "floor", "position", "flat_type_code", "facing", "status", "carpet_sqft", "builtup_sqft", "super_builtup_sqft", "rate_per_sqft", "price"]), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=flats.csv"})
+        return Response(to_csv([with_price(i) for i in res["items"]], ["flat_number", "project_code", "block_code", "floor", "position", "flat_type_code", "facing", "status", "carpet_sqft", "builtup_sqft", "super_builtup_sqft", "rate_per_sqft", "price"]), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=flats.csv"})
     res["items"] = await _enrich(res["items"])
+    res["items"] = [with_price(i) for i in res["items"]]
     return res
 
 
 async def _load_flat(flat_id: str, user: dict) -> dict:
     flat = await get_or_404(db.flats, flat_id, "Flat", {"company_id": user["company_id"]})
     ensure_project_access(user, flat["project_id"])
-    return flat
+    return with_price(flat)
 
 
-@router.get("/{flat_id}")
+@router.get("/{flat_id}", response_model=FlatsOut, response_model_exclude_unset=True)
 async def get_flat(flat_id: str, user: dict = Depends(require("project.read"))):
     flat = await _load_flat(flat_id, user)
     flat = (await _enrich([flat]))[0]
@@ -105,7 +108,7 @@ async def get_flat(flat_id: str, user: dict = Depends(require("project.read"))):
         flat["specifications"] = [{**s, "category": cats.get(s["spec_category_id"])} for s in specs]
     if flat.get("rate_card_id"):
         flat["rate_card"] = await db.rate_cards.find_one({"id": flat["rate_card_id"]}, {"_id": 0, "id": 1, "name": 1, "status": 1})
-    return flat
+    return with_price(flat)
 
 
 @router.patch("/{flat_id}")
@@ -121,13 +124,15 @@ async def update_flat(flat_id: str, body: FlatUpdate, request: Request, user: di
         block = await db.blocks.find_one({"id": before["block_id"]}, {"_id": 0})
         changes.update(await resnapshot_flat(before, changes["flat_type_id"], block))
     if "rate_per_sqft" in changes and changes["rate_per_sqft"] is not None and "price" not in changes:
-        changes["price"] = round(changes["rate_per_sqft"] * (before.get("super_builtup_sqft") or 0), 2)
-        changes["price_breakup"] = [{"label": f"Rate ₹{changes['rate_per_sqft']:g}/sq.ft × {before.get('super_builtup_sqft') or 0:g}", "amount": changes["price"]}]
+        changes["price_paise"] = round(changes["rate_per_sqft"] * (before.get("super_builtup_sqft") or 0) * 100)
+        changes["price_breakup"] = [{"label": f"Rate ₹{changes['rate_per_sqft']:g}/sq.ft × {before.get('super_builtup_sqft') or 0:g}", "amount": changes["price_paise"] / 100}]
     elif "price" in changes and changes["price"] is not None:
+        changes["price_paise"] = round(changes["price"] * 100)
         changes["price_breakup"] = [{"label": "Manual price", "amount": changes["price"]}]
+    changes.pop("price", None)
     after = await apply_update(db.flats, before, changes, expected_version(request, body.version), "Flat")
     await write_audit(user, "flat.update", "flat", flat_id, before=before, after=after, ip=client_ip(request))
-    return (await _enrich([after]))[0]
+    return with_price((await _enrich([after]))[0])
 
 
 @router.patch("/{flat_id}/status")
@@ -147,4 +152,4 @@ async def change_status(flat_id: str, body: FlatStatusIn, request: Request, user
                       before={"id": flat_id, "flat_number": before["flat_number"], "status": before["status"]},
                       after={"id": flat_id, "flat_number": after["flat_number"], "status": after["status"], "reason": body.reason},
                       ip=client_ip(request))
-    return (await _enrich([after]))[0]
+    return with_price((await _enrich([after]))[0])

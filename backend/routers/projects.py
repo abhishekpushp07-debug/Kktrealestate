@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import Field, field_validator
 
 from db import db
+from models_out import ProjectsOut, ProjectsOutPage
 from deps import ensure_project_access, project_scope_filter, require
 from utils import (
     ApiError,
@@ -131,7 +132,7 @@ async def _validate_refs(amenity_ids: list[str] | None, mt_id: str | None, team:
 
 
 async def status_counts(match: dict) -> dict:
-    rows = await db.flats.aggregate([{"$match": {**match, "is_active": True}}, {"$group": {"_id": "$status", "n": {"$sum": 1}, "value": {"$sum": {"$ifNull": ["$price", 0]}}}}]).to_list(None)
+    rows = await db.flats.aggregate([{"$match": {**match, "is_active": True}}, {"$group": {"_id": "$status", "n": {"$sum": 1}, "value": {"$sum": {"$divide": [{"$ifNull": ["$price_paise", 0]}, 100]}}}}]).to_list(None)
     counts = {s: 0 for s in STATUSES}
     value = 0
     for r in rows:
@@ -150,7 +151,7 @@ async def _attach_counts(projects: list[dict]):
     return projects
 
 
-@router.get("")
+@router.get("", response_model=ProjectsOutPage, response_model_exclude_unset=True)
 async def list_projects(params: ListParams = Depends(), status: str | None = None, user: dict = Depends(require("project.read"))):
     q = {"company_id": user["company_id"], **project_scope_filter(user, "id"), **search_filter(params.search, ["name", "code", "address.city"])}
     if not params.include_inactive:
@@ -191,7 +192,7 @@ async def create_project(body: ProjectCreate, request: Request, user: dict = Dep
     return doc
 
 
-@router.get("/{project_id}")
+@router.get("/{project_id}", response_model=ProjectsOut, response_model_exclude_unset=True)
 async def get_project(project_id: str, user: dict = Depends(require("project.read"))):
     ensure_project_access(user, project_id)
     p = await get_or_404(db.projects, project_id, "Project", {"company_id": user["company_id"]})

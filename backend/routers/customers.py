@@ -1,3 +1,4 @@
+import asyncio
 from datetime import UTC, date, datetime
 from typing import Literal
 
@@ -5,6 +6,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from pydantic import Field, field_validator
 
 from db import db
+from models_out import CustomersOut, CustomersOutPage
 from deps import project_scope_filter, require
 from services.kyc import (
     normalize_phone,
@@ -184,7 +186,7 @@ async def _dup_check(company_id: str, phone: str | None, pan: str | None, exclud
             raise ApiError(409, f"PAN already registered to {dup['full_name']} ({dup['customer_code']})", "DUPLICATE_PAN")
 
 
-@router.get("")
+@router.get("", response_model=CustomersOutPage, response_model_exclude_unset=True)
 async def list_customers(params: ListParams = Depends(), has_overdue: bool = False, kyc_status: str | None = None, source: str | None = None,
                          assigned_sales_user_id: str | None = None, segment_id: str | None = None, lifecycle_stage: str | None = None, city_id: str | None = None,
                          user: dict = Depends(require("customer.read"))):
@@ -247,7 +249,17 @@ async def rm_options(user: dict = Depends(require("customer.read"))):
     return {"items": [{"id": u["id"], "name": u["name"], "role_name": roles.get(u.get("role_id"))} for u in rows]}
 
 
-@router.get("/{customer_id}")
+@router.get("/{customer_id}/panels")
+async def customer_panels(customer_id: str, user: dict = Depends(require("customer.read"))):
+    """Phase E0 composite: communications + documents + document types for Customer 360 side panels in one round trip."""
+    comms, docs, types = await asyncio.gather(
+        db.communications.find({"company_id": user["company_id"], "customer_id": customer_id}, {"_id": 0}).sort("created_at", -1).limit(8).to_list(8),
+        db.documents.find({"entity_type": "customer", "entity_id": customer_id, "is_active": True}, {"_id": 0}).sort("uploaded_at", -1).to_list(200),
+        db.document_types.find({"is_active": True}, {"_id": 0, "id": 1, "name": 1, "code": 1}).sort("name", 1).to_list(100))
+    return {"communications": {"items": comms}, "documents": {"items": docs}, "document_types": {"items": types}}
+
+
+@router.get("/{customer_id}", response_model=CustomersOut, response_model_exclude_unset=True)
 async def get_customer(customer_id: str, request: Request, reveal: bool = Query(False), user: dict = Depends(require("customer.read"))):
     if customer_id.startswith("CUST-"):
         hit = await db.customers.find_one({"customer_code": customer_id, "company_id": user["company_id"]}, {"_id": 0, "id": 1})

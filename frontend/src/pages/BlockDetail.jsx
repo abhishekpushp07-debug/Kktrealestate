@@ -11,7 +11,6 @@ import { PageHeader, KV, Field } from "@/components/common/Bits";
 import { StatusChip, STATUS_STYLES } from "@/components/common/StatusChip";
 import { FlatDrawer } from "@/components/common/FlatDrawer";
 import { HistoryTimeline } from "@/components/common/HistoryTimeline";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -40,7 +39,7 @@ function BulkPriceDialog({ block, open, onOpenChange, onDone }) {
           : <Field label="Price ₹ (lump sum)" required><Input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} data-testid="bulk-amount-input" /></Field>}
         <Field label="Floors (comma separated, blank = all)"><Input value={form.floors} onChange={(e) => setForm({ ...form, floors: e.target.value })} placeholder="e.g. 1,2,3" data-testid="bulk-floors-input" /></Field>
         <label className="flex items-center gap-2 text-sm"><Checkbox checked={form.only_available} onCheckedChange={(c) => setForm({ ...form, only_available: !!c })} data-testid="bulk-only-available" />Only Available flats</label>
-        <DialogFooter><Button onClick={submit} disabled={busy} className="bg-ink-950 hover:bg-ink-800" data-testid="bulk-price-submit">Apply pricing</Button></DialogFooter>
+        <DialogFooter><button type="button" onClick={submit} disabled={busy} className="btn btn-primary" data-testid="bulk-price-submit">Apply pricing</button></DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -96,12 +95,12 @@ export default function BlockDetail() {
       <PageHeader crumbs={[{ label: "Projects", to: "/projects" }, { label: block?.project_code || "…", to: `/projects/${b.project_id}` }, { label: b.code }]} title={b.name}
         subtitle={`${block?.block_type_name || ""} · ${b.floors} floors${b.skip_floors?.length ? ` (skips ${b.skip_floors.join(", ")})` : ""}${b.refuge_floors?.length ? ` · refuge ${b.refuge_floors.join(", ")}` : ""} · numbering e.g. ${previewNumber(b)}`}
         actions={<>
-          <Button variant="outline" onClick={() => window.print()} data-testid="print-grid-btn" className="print:hidden"><Printer className="mr-1.5 h-4 w-4" />Print</Button>
-          <Button variant="outline" onClick={() => setShowMilestones(!showMilestones)} data-testid="block-milestones-btn"><Milestone className="mr-1.5 h-4 w-4" />Construction Status</Button>
-          <Button variant="outline" onClick={() => setShowHistory(!showHistory)} data-testid="block-history-btn"><History className="mr-1.5 h-4 w-4" />History</Button>
-          {can("flat.write") && <Button variant="outline" onClick={() => setBulkOpen(true)} data-testid="bulk-price-btn"><IndianRupee className="mr-1.5 h-4 w-4" />Bulk price</Button>}
-          {can("block.write") && <Button variant="outline" onClick={() => setFloorsOpen(true)} data-testid="add-floors-btn"><ArrowUpFromLine className="mr-1.5 h-4 w-4" />Add floors</Button>}
-          {can("block.write") && <Button variant="outline" onClick={regenerate} data-testid="regenerate-flats-btn"><RefreshCw className="mr-1.5 h-4 w-4" />Regenerate</Button>}
+          <button type="button" className="btn btn-secondary" onClick={() => window.print()} data-testid="print-grid-btn" className="print:hidden"><Printer className="mr-1.5 h-4 w-4" />Print</button>
+          <button type="button" className="btn btn-secondary" onClick={() => setShowMilestones(!showMilestones)} data-testid="block-milestones-btn"><Milestone className="mr-1.5 h-4 w-4" />Construction Status</button>
+          <button type="button" className="btn btn-secondary" onClick={() => setShowHistory(!showHistory)} data-testid="block-history-btn"><History className="mr-1.5 h-4 w-4" />History</button>
+          {can("flat.write") && <button type="button" className="btn btn-secondary" onClick={() => setBulkOpen(true)} data-testid="bulk-price-btn"><IndianRupee className="mr-1.5 h-4 w-4" />Bulk price</button>}
+          {can("block.write") && <button type="button" className="btn btn-secondary" onClick={() => setFloorsOpen(true)} data-testid="add-floors-btn"><ArrowUpFromLine className="mr-1.5 h-4 w-4" />Add floors</button>}
+          {can("block.write") && <button type="button" className="btn btn-secondary" onClick={regenerate} data-testid="regenerate-flats-btn"><RefreshCw className="mr-1.5 h-4 w-4" />Regenerate</button>}
         </>} />
       <div className="mb-5 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <div className="card p-4"><p className="label-xs">Units</p><p className="mt-1 text-2xl font-extrabold tabular text-ink-950" data-testid="grid-count-total">{grid.counts.total}</p></div>
@@ -115,7 +114,7 @@ export default function BlockDetail() {
             <span className="label-xs">Colour by</span>
             {[["status", "Status"], ["type", "Flat type"], ["price", "Price band"]].map(([m, l]) => <button key={m} onClick={() => setMode(m)} className={cn("rounded-full border px-3 py-1 text-xs font-semibold", mode === m ? "border-ink-950 bg-ink-950 text-white" : "bg-white hover:border-gold")} data-testid={`grid-mode-${m}`}>{l}</button>)}
             {multi.size > 0 && can("flat.status") && <div className="ml-auto flex items-center gap-2 rounded-md bg-gold-light px-3 py-1.5 text-xs" data-testid="grid-bulk-bar"><b>{multi.size} selected</b>
-              {["Available", "Hold", "Blocked"].map((s) => <Button key={s} size="sm" variant="outline" className="h-7" onClick={() => bulkStatus(s)} data-testid={`grid-bulk-${s.toLowerCase()}`}>→ {s}</Button>)}
+              {["Available", "Hold", "Blocked"].map((s) => <button type="button" className="btn btn-primary" key={s} size="sm" variant="outline" className="h-7" onClick={() => bulkStatus(s)} data-testid={`grid-bulk-${s.toLowerCase()}`}>→ {s}</button>)}
               <button onClick={() => setMulti(new Set())} className="text-txt-secondary underline">clear</button></div>}
             {multi.size === 0 && <span className="ml-auto text-[11px] text-txt-muted">Ctrl/⌘-click to multi-select · Shift for range</span>}
           </div>
@@ -150,7 +149,7 @@ export default function BlockDetail() {
         </div>
         <div className="space-y-4 print:hidden">
           <div className="card p-5">
-            <h3 className="mb-3 text-base font-bold text-ink-950">Block details</h3>
+            <h2 className="mb-3 text-base font-bold text-ink-950">Block details</h2>
             <div className="grid grid-cols-2 gap-3">
               <KV label="Status" value={b.status} /><KV label="Construction" value={`${b.construction_percent}%`} mono />
               <KV label="Rate" value={block?.rate_per_sqft ? `₹${num(block.rate_per_sqft)}/sq.ft` : "From flat type / rate card"} /><KV label="Floor rise" value={block?.floor_rise_per_sqft ? `₹${num(block.floor_rise_per_sqft)}/floor` : "—"} />
@@ -167,7 +166,7 @@ export default function BlockDetail() {
       <Dialog open={floorsOpen} onOpenChange={setFloorsOpen}>
         <DialogContent data-testid="add-floors-dialog"><DialogHeader><DialogTitle>Append floors</DialogTitle></DialogHeader>
           <Field label="Number of floors to add" hint="Uses the last floor-plan range's template"><Input type="number" min={1} max={50} value={floorCount} onChange={(e) => setFloorCount(e.target.value)} data-testid="add-floors-count" /></Field>
-          <DialogFooter><Button onClick={addFloors} className="bg-ink-950 hover:bg-ink-800" data-testid="add-floors-submit"><Layers className="mr-1.5 h-4 w-4" />Add floors</Button></DialogFooter>
+          <DialogFooter><button type="button" onClick={addFloors} className="btn btn-primary" data-testid="add-floors-submit"><Layers className="mr-1.5 h-4 w-4" />Add floors</button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

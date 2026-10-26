@@ -96,7 +96,7 @@ async def _concurrent_post(body, k1, k2):
 
 def test_concurrency_and_sum_mismatch():
     # find available flat in Tower A
-    r = httpx.get(f"{BASE}/flats?status=Available&search=B-7&page_size=5", headers=H("admin@kkt.in"), timeout=30).json()
+    r = httpx.get(f"{BASE}/flats?status=Available&search=V1&page_size=20", headers=H("admin@kkt.in"), timeout=30).json()
     assert r["items"], "no B-7xx flats available"
     flat = r["items"][0]
     cust = httpx.get(f"{BASE}/customers?page_size=3", headers=H("admin@kkt.in"), timeout=30).json()["items"]
@@ -144,9 +144,9 @@ def test_payment_requires_idempotency_and_bucket_cap_and_revision():
         "instrument": {"number": "UTR-TEST-1"},
         "bank_account_id": banks[0]["id"],
     }
-    # no idempotency key -> 400
+    # no idempotency key -> 428 (checked before body validation)
     r = httpx.post(f"{BASE}/payments", json=pay, headers=H("accounts@kkt.in"), timeout=30)
-    assert r.status_code == 400 and r.json().get("code") == "IDEMPOTENCY_KEY_REQUIRED"
+    assert r.status_code == 428 and r.json().get("code") == "IDEMPOTENCY_KEY_REQUIRED"
     # with key -> bucket cap 409
     r = httpx.post(f"{BASE}/payments", json=pay, headers=H("accounts@kkt.in", str(uuid.uuid4())), timeout=30)
     assert r.status_code == 409 and r.json().get("code") == "BUCKET_EXCEEDS_AGREED"
@@ -225,18 +225,35 @@ def test_cheque_pending_clear_bounce_reverse():
     assert "rupees" in rec["amount_in_words"].lower()
 
 
+def _cash_remaining(booking_id):
+    """Full remaining cash bucket so FIFO reaches this stage's demand (repeat runs already hold some cash)."""
+    full = httpx.get(f"{BASE}/bookings/{booking_id}", headers=H("admin@kkt.in"), timeout=30).json()
+    recv = sum(p.get("amount_paise", 0) for p in full.get("payments", []) if p.get("payment_category") == "Cash" and p.get("status") in ("Cleared", "Pending") and p.get("against") == "FLAT_VALUE")
+    return max(1, (full["cash_agreed_paise"] - recv) // 100)
+
+
 # ---------- Milestones ----------
 def test_milestones_forward_only_and_undo_block():
     assert _created_bookings
     bk = _created_bookings[0]
     ms_data = httpx.get(f"{BASE}/blocks/{bk['block_id']}/milestones", headers=H("admin@kkt.in"), timeout=30).json()
+    if ms_data["next_seq"] is None:  # block exhausted by repeated runs (undo blocked by payments) — only use bookings this module created, never seeded towers
+        for cand_bk in reversed(_created_bookings):
+            if cand_bk.get("status") == "Cancelled" or not cand_bk.get("block_id"):
+                continue
+            cand = httpx.get(f"{BASE}/blocks/{cand_bk['block_id']}/milestones", headers=H("admin@kkt.in"), timeout=30).json()
+            if cand.get("next_seq") is not None and not httpx.get(f"{BASE}/bookings/{cand_bk['id']}", headers=H("admin@kkt.in"), timeout=30).json().get("payments"):
+                bk, ms_data = cand_bk, cand
+                break
+        else:
+            pytest.skip("no booking with a pending construction stage and no payments on this DB (data exhausted by repeated runs)")
     nxt = ms_data["next_seq"]
     # Compute a safe "future" date that is after the last completed milestone
     done = [m for m in ms_data["milestones"] if m["status"] == "Completed" and m.get("completed_on")]
     import datetime as _dt
-    last_done = max(m["completed_on"] for m in done) if done else "2025-01-01"
-    d1 = (_dt.date.fromisoformat(last_done) + _dt.timedelta(days=10)).isoformat()
-    d2 = (_dt.date.fromisoformat(last_done) + _dt.timedelta(days=20)).isoformat()
+    # completed_on must be >= last completed stage and <= today (future-dated stages raise no due demands)
+    d1 = max([m["completed_on"] for m in done] + [_dt.date.today().isoformat()])
+    d2 = d1
     # out-of-order
     # Phase 7 semantics: jump-ahead is allowed (earlier pending stages complete on the same date), so no out-of-order 409 here.
     # complete next
@@ -257,7 +274,7 @@ def test_milestones_forward_only_and_undo_block():
         "booking_id": bk["id"],
         "against": "FLAT_VALUE",
         "payment_category": "Cash",
-        "amount": 50000,
+        "amount": _cash_remaining(bk["id"]),  # full cash bucket: FIFO reaches this stage's demand → undo blocked
         "payment_date": _dt.date.today().isoformat(),
         "payment_mode_id": modes["CASH"]["id"],
         "instrument": None,
@@ -278,8 +295,8 @@ def test_milestones_forward_only_and_undo_block():
 
 # ---------- KYC ----------
 def test_kyc_masking_and_reveal():
-    r = httpx.get(f"{BASE}/customers?page_size=1", headers=H("admin@kkt.in")).json()
-    cid = r["items"][0]["id"]
+    r = httpx.get(f"{BASE}/customers?page_size=5&search=CUST-2526-0001", headers=H("admin@kkt.in")).json()
+    cid = next(c for c in r["items"] if c.get("customer_code") == "CUST-2526-0001")["id"]
     s = httpx.get(f"{BASE}/customers/{cid}", headers=H("sales@kkt.in")).json()
     assert s.get("pan") in (None, ""), f"sales should NOT see pan, got {s.get('pan')}"
     assert s["pan_masked"].startswith("XXXXX") and len(s["pan_masked"]) == 10

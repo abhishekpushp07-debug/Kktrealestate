@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, File, Form, Request, Response, UploadFil
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from crypto import decrypt_field, mask
+from services import pdf as _pdf
 from services.kyc import mask_aadhaar, mask_pan
 from db import db
 from deps import JWT_ALG, JWT_SECRET, enforce_rate_limit, require
@@ -101,7 +102,7 @@ class ChangePwIn(StrictModel):
 
 async def _issue_refresh(acc: dict, request: Request) -> str:
     raw = secrets.token_urlsafe(48)
-    await db.portal_refresh_tokens.insert_one({"id": secrets.token_hex(8), "account_id": acc["id"], "family": secrets.token_hex(8), "token_hash": _hash_token(raw), "revoked": False, "ip": client_ip(request), "ua": request.headers.get("user-agent", "")[:200], "created_at": now_iso(), "expires_at": (datetime.now(UTC) + timedelta(days=PORTAL_REFRESH_DAYS)).isoformat()})
+    await db.portal_refresh_tokens.insert_one({"id": secrets.token_hex(8), "account_id": acc["id"], "family": secrets.token_hex(8), "token_hash": _hash_token(raw), "revoked": False, "ip": client_ip(request), "ua": request.headers.get("user-agent", "")[:200], "created_at": now_iso(), "expires_at": (datetime.now(UTC) + timedelta(days=PORTAL_REFRESH_DAYS)).isoformat(), "expires_dt": datetime.now(UTC) + timedelta(days=PORTAL_REFRESH_DAYS)})
     return raw
 
 
@@ -150,7 +151,7 @@ async def refresh(body: RefreshIn, request: Request):
         raise ApiError(401, "Account inactive", "USER_INACTIVE")
     await db.portal_refresh_tokens.update_one({"id": t["id"]}, {"$set": {"revoked": True}})
     raw = secrets.token_urlsafe(48)
-    await db.portal_refresh_tokens.insert_one({"id": secrets.token_hex(8), "account_id": acc["id"], "family": t["family"], "token_hash": _hash_token(raw), "revoked": False, "ip": client_ip(request), "created_at": now_iso(), "expires_at": (datetime.now(UTC) + timedelta(days=PORTAL_REFRESH_DAYS)).isoformat()})
+    await db.portal_refresh_tokens.insert_one({"id": secrets.token_hex(8), "account_id": acc["id"], "family": t["family"], "token_hash": _hash_token(raw), "revoked": False, "ip": client_ip(request), "created_at": now_iso(), "expires_at": (datetime.now(UTC) + timedelta(days=PORTAL_REFRESH_DAYS)).isoformat(), "expires_dt": datetime.now(UTC) + timedelta(days=PORTAL_REFRESH_DAYS)})
     return {"access_token": _mint(acc), "refresh_token": raw, "expires_in": PORTAL_ACCESS_MIN * 60}
 
 
@@ -267,7 +268,9 @@ def _next_installment(nxt: dict | None) -> dict | None:
 async def booking_detail(b: dict = Depends(portal_booking), acc: dict = Depends(portal_user)):
     blk = await db.blocks.find_one({"id": b["block_id"]}, {"_id": 0, "construction_percent": 1, "milestones": 1})
     proj = await db.projects.find_one({"id": b["project_id"]}, {"_id": 0, "website.hero_images": 1, "address": 1, "rera_number": 1})
-    flat = await db.flats.find_one({"id": b["flat_id"]}, {"_id": 0, "flat_type_id": 1, "facing": 1, "plc_ids": 1, "floor_plan_template_id": 1, "price": 1})
+    flat = await db.flats.find_one({"id": b["flat_id"]}, {"_id": 0, "flat_type_id": 1, "facing": 1, "plc_ids": 1, "floor_plan_template_id": 1, "price_paise": 1})
+    if flat and flat.get("price_paise") is not None:
+        flat["price"] = flat["price_paise"] / 100
     ft = await db.flat_types.find_one({"id": (flat or {}).get("flat_type_id")}, {"_id": 0, "name": 1, "bhk": 1, "rooms": 1, "areas": 1, "specifications": 1, "floor_plan_image_url": 1}) or {}
     fpt = await db.floor_plan_templates.find_one({"id": (flat or {}).get("floor_plan_template_id")}, {"_id": 0, "image_url": 1, "name": 1}) if (flat or {}).get("floor_plan_template_id") else None
     rooms = {r["id"]: r["name"] for r in await db.room_types.find({}, {"_id": 0, "id": 1, "name": 1}).to_list(None)}
@@ -372,30 +375,34 @@ def _staff_ctx(acc: dict) -> dict:
 
 @router.get("/bookings/{booking_id}/statement.pdf")
 async def statement_pdf(b: dict = Depends(portal_booking), acc: dict = Depends(portal_user)):
-    from routers.reports import statement
-    return await statement(b["id"], "pdf", _staff_ctx(acc))
+    from routers.reports import build_statement_pdf
+    content, name = await build_statement_pdf(b["id"], _staff_ctx(acc))
+    return _pdf.pdf_response(content, name)
 
 
 @router.get("/bookings/{booking_id}/allotment.pdf")
 async def allotment_pdf(b: dict = Depends(portal_booking), acc: dict = Depends(portal_user)):
-    from routers.reports import allotment
-    return await allotment(b["id"], "pdf", _staff_ctx(acc))
+    from routers.reports import build_allotment_pdf
+    content, name = await build_allotment_pdf(b["id"], _staff_ctx(acc))
+    return _pdf.pdf_response(content, name)
 
 
 @router.get("/bookings/{booking_id}/payments/{payment_id}/receipt.pdf")
 async def receipt_pdf(payment_id: str, b: dict = Depends(portal_booking), acc: dict = Depends(portal_user)):
-    from routers.pdfs import receipt_pdf as rp
+    from routers.pdfs import build_receipt_pdf
     if not await db.payments.find_one({"id": payment_id, "booking_id": b["id"]}, {"_id": 1}):
         raise ApiError(404, "Receipt not found", "NOT_FOUND")
-    return await rp(payment_id, _staff_ctx(acc))
+    content, name = await build_receipt_pdf(payment_id, _staff_ctx(acc))
+    return _pdf.pdf_response(content, name)
 
 
 @router.get("/bookings/{booking_id}/demands/{demand_id}/letter.pdf")
 async def demand_pdf(demand_id: str, b: dict = Depends(portal_booking), acc: dict = Depends(portal_user)):
-    from routers.pdfs import demand_letter_pdf as dp
+    from routers.pdfs import build_demand_pdf
     if not await db.demands.find_one({"id": demand_id, "booking_id": b["id"]}, {"_id": 1}):
         raise ApiError(404, "Demand not found", "NOT_FOUND")
-    return await dp(b["id"], demand_id, _staff_ctx(acc))
+    content, name = await build_demand_pdf(b["id"], demand_id, _staff_ctx(acc))
+    return _pdf.pdf_response(content, name)
 
 
 # ---------------- Notices ----------------

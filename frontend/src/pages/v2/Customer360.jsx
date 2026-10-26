@@ -1,14 +1,13 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { CompletenessRing } from "@/components/v2/Completeness";
-import { BadgeCheck, CalendarDays, Download, Eye, EyeOff, FileText, FileWarning, Landmark, LifeBuoy, Lock, Mail, MapPin, MessageSquare, MoreHorizontal, Pencil, Phone, Plus, Receipt, ShieldCheck, Users } from "lucide-react";
+import { BadgeCheck, CalendarDays, Eye, EyeOff, FileText, FileWarning, Landmark, LifeBuoy, Lock, Mail, MapPin, MessageSquare, MoreHorizontal, Pencil, Phone, Plus, Printer, Receipt, ShieldCheck, Users } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import api, { errMsg, BASE_PATH } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useFetch } from "@/hooks/useList";
 import { useCatalogues } from "@/hooks/useCatalogues";
-import { openPdf } from "@/pages/Reports";
 import { cn } from "@/lib/utils";
 import { fmtDate, fmtDateTime, fmtRelative, inr, inrShort } from "@/lib/format";
 import { Card, EmptyState, IconTile, Money, Num, Skeleton, StatTile, StatusPill, Tabs } from "@/components/v2";
@@ -55,7 +54,7 @@ function TimelineCard({ id }) {
 export default function Customer360() {
   const { id } = useParams();
   const nav = useNavigate();
-  const { can, user } = useAuth();
+  const { can, user, surfaces } = useAuth();
   const { label } = useCatalogues();
   const people = usePeople();
   const [c, setC] = useState(null);
@@ -63,8 +62,10 @@ export default function Customer360() {
   const [comm, setComm] = useState(false);
   const [pay, setPay] = useState(false);
   const [tab, setTab] = useState("overview");
-  const comms = useFetch(`/communications?customer_id=${id}&page_size=8`);
-  const ledg = useFetch(c && c.bookings.length > 0 ? `/customers/${c.id}/ledgers` : null, [c?.id]);
+  const panels = useFetch(`/customers/${id}/panels`);
+  const comms = { data: panels.data?.communications, reload: panels.reload };
+  const docInitial = useMemo(() => (panels.data ? { items: panels.data.documents.items, types: panels.data.document_types.items } : null), [panels.data]);
+  const ledg = useFetch(c && c.bookings.length > 0 ? `/customers/${c.id}/ledgers` : null);
   const load = useCallback((rev = false) => api.get(`/customers/${id}`, { params: { reveal: rev || undefined } }).then((r) => { if (r.data.id !== id) { nav(`/customers/${r.data.id}`, { replace: true }); return; } setC(r.data); setReveal(rev); }).catch((e) => toast.error(errMsg(e))), [id, nav]);
   useEffect(() => { load(false); }, [load]);
   if (!c) return <div className="space-y-6"><Skeleton className="h-56 rounded-2xl" /><Skeleton className="h-96 rounded-2xl" /></div>;
@@ -111,11 +112,11 @@ export default function Customer360() {
       <Card testId="kyc-card">
         <div className="flex items-center justify-between"><h3 className="font-display text-lg">KYC & documents</h3><StatusPill status={c.kyc_status} /></div>
         <dl className="mt-3 space-y-2 text-sm">{[["PAN", kv("pan")], ["Aadhaar", kv("aadhaar")], ["Bank", c.bank?.bank_name ? `${c.bank.bank_name} · ${(reveal ? c.bank.account_number : c.bank.account_number_masked) || "—"}` : "—"]].map(([k, v]) => <div key={k} className="flex items-baseline justify-between gap-4 leading-6"><dt className="flex items-center gap-1.5 text-txt-secondary"><Lock className="h-3.5 w-3.5 translate-y-px text-txt-muted" aria-hidden />{k}</dt><dd className="font-mono text-ink-950">{v}</dd></div>)}</dl>
-        <div className="mt-4 flex flex-wrap items-center gap-2">{can("customer.kyc_view") && <button onClick={() => load(!reveal)} className="btn btn-secondary btn-sm" data-testid="kyc-reveal-btn">{reveal ? <><EyeOff className="h-3.5 w-3.5" />Hide</> : <><Eye className="h-3.5 w-3.5" />Reveal</>}</button>}{reveal && <span className="text-[11px] text-amber2">Reveal is audit-logged</span>}{can("customer.kyc_view") && <select value={c.kyc_status} onChange={(e) => setKyc(e.target.value)} className="input !h-8 !w-auto !text-xs" data-testid="kyc-status-select">{["Pending", "Submitted", "Verified", "Rejected"].map((k) => <option key={k}>{k}</option>)}</select>}</div>
-        <div className="mt-5 border-t border-warm-100 pt-4"><DocumentsPanel entityType="customer" entityId={id} canWrite={can("customer.write")} /></div>
+        <div className="mt-4 flex flex-wrap items-center gap-2">{can("customer.kyc_view") && <button onClick={() => load(!reveal)} className="btn btn-secondary btn-sm" data-testid="kyc-reveal-btn">{reveal ? <><EyeOff className="h-3.5 w-3.5" />Hide</> : <><Eye className="h-3.5 w-3.5" />Reveal</>}</button>}{reveal && <span className="text-[11px] text-amber2">Reveal is audit-logged</span>}{can("customer.kyc_view") && <select value={c.kyc_status} onChange={(e) => setKyc(e.target.value)} className="input !h-8 !w-auto !text-xs" aria-label="KYC status" data-testid="kyc-status-select">{["Pending", "Submitted", "Verified", "Rejected"].map((k) => <option key={k}>{k}</option>)}</select>}</div>
+        <div className="mt-5 border-t border-warm-100 pt-4"><DocumentsPanel entityType="customer" entityId={id} canWrite={can("customer.write")} initial={docInitial} /></div>
       </Card>
       <Card testId="coapplicants-card"><h3 className="font-display text-lg">Co-applicants & nominee</h3>{c.co_applicants.length === 0 && !c.nominee?.name && <p className="mt-2 text-sm text-txt-muted">None recorded.</p>}<ul className="mt-3 space-y-2">{c.co_applicants.map((a, i) => <li key={i} className="flex items-center gap-3 rounded-xl bg-warm-50 p-3"><Avatar name={a.name} size={32} /><div className="min-w-0"><p className="text-sm font-semibold text-ink-950">{a.name}</p><p className="text-xs text-txt-secondary">{[a.relation, a.phone].filter(Boolean).join(" · ")}</p></div></li>)}{c.nominee?.name && <li className="flex items-center gap-3 rounded-xl border border-dashed border-warm-200 p-3"><Avatar name={c.nominee.name} size={32} /><div><p className="text-sm font-semibold text-ink-950">{c.nominee.name} <span className="pill bg-warm-100 text-txt-secondary">Nominee</span></p><p className="text-xs text-txt-secondary">{c.nominee.relation}</p></div></li>}</ul></Card>
-      <PortalAccessCard customerId={id} />
+      {surfaces?.customer_portal && <PortalAccessCard customerId={id} />}
       {c.leads.length > 0 && <Card testId="leads-card"><h3 className="font-display text-lg">Lead history</h3>{c.leads.map((l) => <div key={l.id} className="mt-3 text-sm"><p className="font-semibold text-ink-950">{l.lead_number} · {l.status}</p><div className="mt-1 flex flex-wrap gap-1">{l.stage_history.map((s, i) => <span key={i} className="pill bg-warm-100 text-txt-secondary">{s.status} · {fmtDate(s.at)}</span>)}</div></div>)}</Card>}
     </div>
   );
@@ -144,16 +145,17 @@ export default function Customer360() {
             {can("booking.create") && <Link to={`/bookings/new?customer_id=${id}`} className="btn btn-secondary" data-testid="hero-new-booking"><Plus className="h-4 w-4" strokeWidth={1.75} />New booking</Link>}
             <div className="hidden items-center gap-1 md:flex">
               {can("customer.write") && <button onClick={() => setComm(true)} className="btn btn-ghost" data-testid="hero-log-comm"><MessageSquare className="h-4 w-4" strokeWidth={1.75} />Log</button>}
-              {can("report.view") && active[0] && <button onClick={() => openPdf(`/reports/statement/${active[0].id}?format=pdf`)} className="btn btn-ghost" data-testid="hero-statement"><Download className="h-4 w-4" strokeWidth={1.75} />Statement</button>}
+              {can("report.view") && active[0] && <button onClick={() => window.open(`${BASE_PATH}/print/statement/${active[0].id}`, "_blank")} className="btn btn-ghost" data-testid="hero-statement"><Printer className="h-4 w-4" strokeWidth={1.75} />Statement</button>}
+              {can("report.view") && active[0] && <button onClick={() => window.open(`${BASE_PATH}/print/allotment/${active[0].id}`, "_blank")} className="btn btn-ghost" data-testid="hero-allotment"><FileText className="h-4 w-4" strokeWidth={1.75} />Allotment</button>}
               {can("customer.write") && <Link to={`/customers/${id}/edit`} className="btn btn-ghost" data-testid="customer-edit-btn"><Pencil className="h-4 w-4" strokeWidth={1.75} />Edit</Link>}
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild><button className="btn btn-ghost !px-2" aria-label="More actions" data-testid="hero-more"><MoreHorizontal className="h-5 w-5" strokeWidth={1.75} /></button></DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="v2 w-52 rounded-xl border-warm-200 p-1.5">
                 <DropdownMenuItem className="md:hidden" onClick={() => setComm(true)} data-testid="more-log">Log communication</DropdownMenuItem>
-                {active[0] && <DropdownMenuItem className="md:hidden" onClick={() => openPdf(`/reports/statement/${active[0].id}?format=pdf`)} data-testid="more-statement">Download statement</DropdownMenuItem>}
+                {active[0] && <DropdownMenuItem className="md:hidden" onClick={() => window.open(`${BASE_PATH}/print/statement/${active[0].id}`, "_blank")} data-testid="more-statement">Print / download statement</DropdownMenuItem>}
                 <DropdownMenuItem className="md:hidden" onClick={() => window.location.assign(`${BASE_PATH}/customers/${id}/edit`)} data-testid="more-edit">Edit profile</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => { const el = document.querySelector("[data-testid=portal-access-card]"); el?.scrollIntoView({ behavior: "smooth" }); }} data-testid="more-portal">Share portal login</DropdownMenuItem>
+                {surfaces?.customer_portal && <DropdownMenuItem onClick={() => { const el = document.querySelector("[data-testid=portal-access-card]"); el?.scrollIntoView({ behavior: "smooth" }); }} data-testid="more-portal">Share portal login</DropdownMenuItem>}
                 {user?.role_name === "Super Admin" && c.kyc_status !== "Erased" && active.length === 0 && <DropdownMenuItem className="text-brick" onClick={async () => { const reason = window.prompt("Right to erasure — reason (PII anonymised; financial records kept):"); if (!reason) return; try { await api.post(`/admin/customers/${id}/erase`, { confirm: "ERASE", reason }); toast.success("Customer anonymised"); load(); } catch (e) { toast.error(errMsg(e)); } }} data-testid="erase-customer-btn">Erase PII</DropdownMenuItem>}
               </DropdownMenuContent>
             </DropdownMenu>

@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Check, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { toast } from "sonner";
-import api, { errMsg } from "@/lib/api";
+import api from "@/lib/api";
+import { FieldError, useFieldErrors } from "@/lib/formErrors";
 import { useAuth } from "@/context/AuthContext";
 import { useFetch, useMasterOptions } from "@/hooks/useList";
 import { Field, KV } from "@/components/common/Bits";
@@ -27,6 +28,7 @@ export default function BookingWizard() {
   const nav = useNavigate();
   const [sp] = useSearchParams();
   const { can, user } = useAuth();
+  const fe = useFieldErrors();
   const [step, setStep] = useState(0);
   const [projectId, setProjectId] = useState(sp.get("project") || null);
   const [blockId, setBlockId] = useState(sp.get("block") || null);
@@ -37,6 +39,8 @@ export default function BookingWizard() {
   const [custResults, setCustResults] = useState([]);
   const [newCust, setNewCust] = useState(false);
   const [agr, setAgr] = useState({ total: "", cash: "", account: "", mode: "amount", cashPct: "" });
+  const [discount, setDiscount] = useState("");
+  const canEditAgr = can("agreement.edit") || can("settings.manage");
   const [charges, setCharges] = useState([]);
   const [slots, setSlots] = useState([]);
   const [bookingDate, setBookingDate] = useState(new Date().toISOString().slice(0, 10));
@@ -64,7 +68,8 @@ export default function BookingWizard() {
   useEffect(() => { if (custSearch.length < 2) { setCustResults([]); return; } const t = setTimeout(() => api.get("/customers", { params: { search: custSearch, page_size: 8 } }).then((r) => setCustResults(r.data.items)), 250); return () => clearTimeout(t); }, [custSearch]);
   const tower = (blocks?.items || []).find((b) => b.id === blockId);
   const defaultCashPct = tower?.default_cash_percent != null ? Number(tower.default_cash_percent) : Number((projects?.items || []).find((p) => p.id === projectId)?.default_cash_percent) || 0;
-  useEffect(() => { if (flat?.price && !agr.total) { const t = Math.round(flat.price), c = Math.round(t * defaultCashPct / 100); setAgr((a) => ({ ...a, total: String(t), cash: String(c), account: String(t - c), cashPct: String(defaultCashPct), mode: "percent" })); } }, [flat, agr.total, defaultCashPct]);
+  const listPrice = flat?.price ? Math.round(flat.price) : 0;
+  useEffect(() => { if (!listPrice) return; const t = Math.max(listPrice - (Math.round(Number(discount)) || 0), 0); if (String(t) === agr.total) return; const pct = Number(agr.cashPct) || defaultCashPct; const c = Math.round(t * pct / 100); setAgr((a) => ({ ...a, total: String(t), cash: String(c), account: String(t - c), cashPct: String(pct), mode: "percent" })); }, [listPrice, discount, defaultCashPct]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (chargeTypes.length && charges.length === 0) setCharges(chargeTypes.filter((c) => c.default_amount).map((c) => ({ charge_type_id: c.id, name: c.name, amount: c.default_amount, is_taxable: c.is_taxable, gst_percent: c.is_taxable ? gst : 0, demand_at: "on_booking", on: ["PARKING", "CLUB"].includes(c.code) }))); }, [chargeTypes, charges.length, gst]);
 
   const total = Number(agr.total) || 0, cash = Number(agr.cash) || 0, account = Number(agr.account) || 0;
@@ -85,7 +90,7 @@ export default function BookingWizard() {
       localStorage.removeItem(draftKey);
       const r = await api.post("/bookings", body);
       toast.success(`Booking ${r.data.booking_number} created`); nav(`/bookings/${r.data.id}`);
-    } catch (e) { toast.error(errMsg(e), { duration: 8000 }); } finally { setBusy(false); }
+    } catch (e) { toast.error(fe.capture(e), { duration: 8000 }); } finally { setBusy(false); }
   };
 
   return (
@@ -112,18 +117,29 @@ export default function BookingWizard() {
           {newCust && <Suspense fallback={null}><CustomerForm open={newCust} onOpenChange={setNewCust} onSaved={(c) => { setCustomer(c); setCustResults([c]); }} /></Suspense>}
         </div>}
         {step === 3 && <div className="grid gap-4 md:grid-cols-3">
-          <Field label="Agreement value ₹" required hint={`Listed price ${inr(flat?.price)}`}><Input type="number" value={agr.total} onChange={(e) => { const t = Math.round(Number(e.target.value) || 0); setAgr((a) => a.mode === "percent" ? { ...a, total: e.target.value, cash: String(Math.round(t * (Number(a.cashPct) || 0) / 100)), account: String(t - Math.round(t * (Number(a.cashPct) || 0) / 100)) } : { ...a, total: e.target.value, account: String(Math.max(t - cash, 0)) }); }} disabled={!can("agreement.edit") && !can("settings.manage")} data-testid="wiz-total" /></Field>
+          <Field label="Agreement value ₹" required hint={canEditAgr ? "Derived from list price − discount · editable (agreement.edit)" : "Derived from list price − discount"}>
+            <Input type="number" value={agr.total} readOnly={!canEditAgr} onChange={(e) => { const t = Math.round(Number(e.target.value) || 0); setAgr((a) => a.mode === "percent" ? { ...a, total: e.target.value, cash: String(Math.round(t * (Number(a.cashPct) || 0) / 100)), account: String(t - Math.round(t * (Number(a.cashPct) || 0) / 100)) } : { ...a, total: e.target.value, account: String(Math.max(t - cash, 0)) }); }} data-testid="wiz-total" />
+            <FieldError name="agreement_value" fields={fe.fields} /><FieldError name="cash_agreed" fields={fe.fields} />
+            <div className="mt-2 rounded-lg bg-warm-50 px-3 py-2 text-xs text-txt-secondary" data-testid="wiz-price-breakup">
+              {(flat?.price_breakup || []).map((b, i) => <div key={i} className="flex justify-between"><span>{b.label}</span><span>{inr(b.amount)}</span></div>)}
+              <div className="flex justify-between font-semibold text-ink-950"><span>List price</span><span>{inr(listPrice)}</span></div>
+              {Number(discount) > 0 && <div className="flex justify-between text-sage"><span>Negotiated discount</span><span>− {inr(Number(discount))}</span></div>}
+            </div>
+          </Field>
+          <Field label="Negotiated discount ₹" hint="Typed · reduces the agreement value"><Input type="number" min="0" max={listPrice || undefined} value={discount} onChange={(e) => setDiscount(e.target.value)} data-testid="wiz-discount" /></Field>
           <Field label={agr.mode === "percent" ? "Cash share %" : "Cash bucket ₹"} required>
             <div className="flex gap-2"><Input type="number" min="0" max={agr.mode === "percent" ? 100 : undefined} step={agr.mode === "percent" ? "0.5" : "1"} value={agr.mode === "percent" ? agr.cashPct : agr.cash} onChange={(e) => agr.mode === "percent" ? setCashPct(e.target.value) : setCash(e.target.value)} data-testid="wiz-cash" />
               <div className="flex shrink-0 overflow-hidden rounded-md border text-xs font-semibold" role="group" aria-label="Cash entry mode">{[["amount", "₹"], ["percent", "%"]].map(([m, l]) => <button key={m} type="button" onClick={() => setAgr((a) => ({ ...a, mode: m, cashPct: m === "percent" && total ? String(Math.round((cash / total) * 1000) / 10) : a.cashPct }))} className={cn("px-3", agr.mode === m ? "bg-ink-950 text-white" : "bg-white text-txt-secondary hover:bg-warm-50")} data-testid={`wiz-cash-mode-${m}`}>{l}</button>)}</div></div>
             <div className="mt-1 flex items-center gap-1">{[0, 20, 30, 40, 50, 60].map((p) => <button key={p} type="button" onClick={() => setCashPct(p)} className={cn("rounded border px-1.5 py-0.5 text-[10px] hover:bg-warm-50", Number(agr.cashPct) === p && "border-ink-950 bg-ink-950 text-white")} data-testid={`wiz-cash-pct-${p}`}>{p}%</button>)}{agr.mode === "percent" && <span className="ml-auto text-[11px] tabular-nums text-txt-secondary" data-testid="wiz-cash-derived">= {inr(cash)}</span>}</div>
             <input type="range" min="0" max="100" step="0.5" value={total ? Math.round((cash / total) * 1000) / 10 : 0} onChange={(e) => setCashPct(e.target.value)} className="mt-2 w-full accent-[#0A0C10]" aria-label="Cash share slider" data-testid="wiz-cash-slider" />
+{total > 0 && cash === 0 && <p className="mt-2 rounded-lg bg-amber2-50 px-3 py-2 text-xs font-semibold text-amber2" role="status" data-testid="wiz-zero-cash-warning">0% cash — the whole agreement goes to the Account bucket. Adjust the slider or % if cash is expected.</p>}
             <p className="mt-1 text-[11px] text-txt-muted" data-testid="wiz-split-hint">{tower?.default_cash_percent != null ? "Tower" : "Project"} default {defaultCashPct}% cash · {100 - defaultCashPct}% account</p></Field>
           <Field label="Account bucket ₹" required hint="Auto-balanced to the rupee"><Input type="number" value={agr.account} onChange={(e) => { const acc = Math.round(Number(e.target.value) || 0); setAgr((a) => ({ ...a, account: e.target.value, cash: String(Math.max(total - acc, 0)), cashPct: total ? String(Math.round(((total - acc) / total) * 1000) / 10) : a.cashPct })); }} data-testid="wiz-account" /></Field>
           <div className={cn("md:col-span-3 rounded-xl px-4 py-2.5 text-sm", sumOk ? "bg-sage-50 text-sage" : "bg-brick-50 text-brick")} data-testid="wiz-sum-check">{sumOk ? `✓ Cash ${inr(cash)} + Account ${inr(account)} = ${inr(total)}` : `Cash + Account must equal the agreement value exactly (currently ${inr(cash + account)} vs ${inr(total)})`}</div>
           <Field label="Booking date" required><DateInput value={bookingDate} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setBookingDate(e.target.value)} data-testid="wiz-date" /></Field>
         </div>}
         {step === 4 && <div data-testid="wiz-plan-step">
+          <FieldError name="payment_plan_id" fields={fe.fields} />
           {plans === null ? <p className="text-sm text-txt-muted">Loading plans…</p> : plans.length === 0 ? <div className="rounded-xl bg-amber2-50 px-4 py-3 text-sm text-amber2" data-testid="wiz-plan-none">No payment plan assigned to this tower — assign one under Project → Setup → Payment plans. Booking will proceed without a plan (no automatic dues).</div> : <div className="grid min-w-0 gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
             <div className="space-y-3" data-testid="wiz-plan-list">{plans.map((p) => <button type="button" key={p.id} onClick={() => setPlanId(p.id)} className={cn("card card-hover w-full !p-4 text-left", planId === p.id && "!border-ink-950 ring-1 ring-ink-950")} data-testid={`wiz-plan-${p.code}`}><div className="flex items-start justify-between gap-2"><p className="font-display text-base font-semibold text-ink-950">{p.name}</p>{p.is_default && <span className="pill bg-gold-light text-[#8a6d12]">Default</span>}</div><p className="mt-1 text-xs text-txt-secondary">{p.plan_type} · {p.installments.map((i) => `${i.percent}%`).join(" + ")}</p>{p.description && <p className="mt-1 text-xs text-txt-muted">{p.description}</p>}</button>)}</div>
             <div className="card min-w-0 overflow-x-auto !p-4">{plan && <><p className="mb-2 font-display text-base text-ink-950">Schedule preview — {plan.name}</p><Suspense fallback={<p className="text-xs text-txt-muted">Loading schedule…</p>}><SchedulePreview plan={plan} cash={cash} account={account} bookingDate={bookingDate} /></Suspense><Field label="Plan accepted by customer via" className="mt-4"><Combobox options={["In person", "Signed copy", "Portal"].map((m) => ({ value: m, label: m }))} value={acceptMode} onChange={(v) => setAcceptMode(v || "In person")} allowAdd={false} clearable={false} className="w-56" testId="wiz-plan-accept" /></Field><p className="mt-2 text-xs text-txt-muted">Upload the signed plan later under Booking → Documents (type "Payment Plan Acceptance").</p></>}</div>

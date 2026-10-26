@@ -6,8 +6,15 @@ const KEY = "catalogues_v1";
 let mem = null;
 const subs = new Set();
 
+let inflight = null;
 export async function loadCatalogues(force = false) {
   if (mem && !force) return mem;
+  if (inflight && !force) return inflight;  // dedupe: many fields mount at once on a form
+  inflight = _loadCatalogues(force).finally(() => { inflight = null; });
+  return inflight;
+}
+
+async function _loadCatalogues(force) {
   const cached = !force ? await idbGet(KEY) : null;
   const headers = cached?.etag ? { "If-None-Match": cached.etag } : {};
   try {

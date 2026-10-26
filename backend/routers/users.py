@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import EmailStr, field_validator
 
 from db import db
+from models_out import UsersOut, UsersOutPage
 from deps import require
 from routers.auth import hash_password, set_password, validate_password_policy
 from utils import (
@@ -74,7 +75,7 @@ async def _enrich(items: list[dict]) -> list[dict]:
     return items
 
 
-@router.get("")
+@router.get("", response_model=UsersOutPage, response_model_exclude_unset=True)
 async def list_users(params: ListParams = Depends(), user: dict = Depends(require("users.manage"))):
     q = {"company_id": user["company_id"], **search_filter(params.search, ["name", "email", "phone"])}
     if not params.include_inactive:
@@ -100,7 +101,7 @@ async def create_user(body: UserCreate, request: Request, user: dict = Depends(r
     return (await _enrich([out]))[0]
 
 
-@router.get("/{user_id}")
+@router.get("/{user_id}", response_model=UsersOut, response_model_exclude_unset=True)
 async def get_user(user_id: str, user: dict = Depends(require("users.manage"))):
     doc = await get_or_404(db.users, user_id, "User", {"company_id": user["company_id"]})
     return (await _enrich([strip_private(doc)]))[0]

@@ -1,0 +1,64 @@
+{
+  "summary": "Phase E7 Playwright end-to-end regression on preview (https://royal-realty-hub-2.preview.emergentagent.com) as admin@kkt.in and accounts@kkt.in. 24 screenshots saved to /app/memory/qa/frontend/e7_*.png. 10 of 12 scenario groups PASS. 1 CRITICAL interaction bug (Undo toast unclickable from inside Radix dialogs) and 1 minor flow break (full BookingWizard not completed via automation) found; wizard step 1/2/3 render correctly, but completing all 7 steps was outside this run's scope.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "FlatDrawer (Radix Dialog modal) + Toaster",
+        "issue": "After clicking 'Mark Hold' / 'Mark Available' / 'Mark Blocked' from inside the flat drawer, the success toast with an Undo button appears (correctly), but the Undo button is NOT clickable with the real mouse because the Radix Dialog overlay captures all pointer events outside the dialog content. Playwright reports: 'subtree [data-testid=flat-drawer] intercepts pointer events'. The same intercept hits [data-testid=post-payment-sheet]. A programmatic .click() via JS does work (verified: 'T2-901 back to Hold' toast fired and status reverted), confirming the handler is correct — only the pointer-event layering is wrong. Users cannot recover via Undo without first closing the drawer, which also auto-dismisses the toast after a few seconds.",
+        "selector": "[data-testid=flat-drawer], [data-testid=post-payment-sheet] (both role=dialog, modal)",
+        "priority": "HIGH",
+        "repro": "1) Login as admin. 2) Projects → Shree Ganesh Heights → Towers → TEST_Tower_T2 → click any Available flat. 3) In the drawer click 'Mark Hold' (or Available/Blocked). 4) Toast with Undo button appears top-right over the drawer. 5) Click Undo with the mouse → nothing happens; cursor acts like it's clicking on the drawer card beneath. 6) Close the drawer first → the toast disappears before you can click Undo.",
+        "likely_fix": "Either (a) render the Toaster/Viewport with a higher z-index AND pointer-events:auto on the toast action container so it beats the Radix overlay (overlay z=50; the sonner viewport needs to sit above it), or (b) when a drawer is open use Sonner's actionButton inside the drawer itself, or (c) wrap the drawer in a non-modal Dialog variant (modal=false) when the status-change hands off to a toast."
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Sidebar → Service",
+        "issue": "Direct navigation to /service (no trailing path) is NOT a route and silently redirects to /dashboard. The actual Service board lives at /service-requests. Sidebar link in the layout works, but any bookmark / deep-link to /service is lost. Minor.",
+        "affected_selectors": ["/service", "/service-requests"]
+      }
+    ],
+    "design_issues": [
+      {
+        "screen": "All visited pages",
+        "issues": [
+          "V2 shell confirmed across Home, Projects, Project workspace, Blocks, Customers, Customer 360, Bookings, Booking detail, Leads, Service, Reports, Users, Settings — dark sidebar + warm-white surface + gold accents consistent. No page observed in a different design system."
+        ]
+      },
+      {
+        "screen": "Dashboard",
+        "issues": [
+          "Console warning on first load: 'width(-1) and height(-1) of chart should be greater than 0' from Recharts (collections chart) — chart does render on screenshot, so it's a benign warm-up warning but worth suppressing."
+        ]
+      },
+      {
+        "screen": "SystemHealth card",
+        "issues": [
+          "Empty-state <td colSpan={7}> still mismatched vs 8 columns after Avg q was added (noted in iteration_24; still present)."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/test_reports/iteration_25.json",
+    "/app/memory/qa/frontend/ (screenshots e7_01..e7_50)"
+  ],
+  "action_items": [
+    "Fix Toaster/Undo click interception when a Radix Dialog (flat-drawer, post-payment-sheet, etc.) is open. Promote the Sonner viewport z-index above dialog overlay and ensure pointer-events:auto on toast actions.",
+    "Decide: either add /service → /service-requests redirect, or point every usage of /service at the correct path."
+  ],
+  "critical_code_review_comments": [
+    "FlatDrawer.jsx uses Radix Dialog in modal mode. The status-change success path emits a Sonner toast with an Undo action; because Radix locks pointer events outside the dialog content, the toast's action button is visually visible but non-interactive. Either render the drawer with modal=false, or ensure the Sonner <Toaster /> is mounted after the Dialog overlay with a higher z-index and pointer-events:auto on toast-level items. Same anti-pattern exists in PostPayment sheet (data-testid=post-payment-sheet).",
+    "SystemHealth.jsx empty-state row still colSpan=7 after Avg q column added (now 8) — carried over from iteration_24.",
+    "Booking wizard: Project / Tower combos are custom <Select…> components, but the dropdown items are rendered with the project code suffix inline (e.g. 'Shree Ganesh Heights' + 'SGH' badge in the same button text). This defeats exact-text selectors; adding data-testid='project-option-SGH' etc. would unblock reliable test automation."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (not in scope)", "frontend": "~85% (10/12 scenarios green; 1 critical interaction bug; 1 scenario truncated)"},
+  "test_credentials": "admin@kkt.in / Kkt@12345 (Super Admin); accounts@kkt.in / Kkt@12345 (Accounts, used for payment post).",
+  "seed_data_creation": "Created 1 customer CUST-2627-0055 (QA Test 81790 / +919826706296, id d9353dd8-4a08-4fbd-ad60-636cd0713e0f) via Customers → New customer. 1 cash payment of ₹1,000 attempted on BK-2526-0003 was NOT actually posted (dialog interaction got stuck on the same Radix overlay issue). Flat T2-901 is currently in Hold state (was Available originally; toggled during tests, then reverted via JS Undo once, then toggled back to Hold on a later test for the regression).",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Screenshots e7_01..e7_50 cover: login (01), dashboard (02), projects (03), SGH workspace (04), Towers tab (05), T2 block inventory (06), flat drawer (07), status→Hold toast with Undo (08), post-undo state (09), hold→available toast (10), undone back to hold (11), block after drawer close (12), customers list (13), Sinha search (14), new customer form (15,16), customer created (17), customer 360 (18), booking wizard step 1 (19,20), units step 2 (21), customer step 3 (22,22b), agreement/plan steps (23-26), booking detail (29), post-payment dialog (30-34, posting UI stuck on same Radix overlay), leads board (40), lead stage change (41,42), service kanban (43b), reports (45), users page (47), settings (48), system health after 36s refresh (49), integrity clean (50). Key open bug: Toast Undo click intercepted by Radix dialog overlay — fix once and both FlatDrawer and PostPayment flows become fully testable with the mouse.",
+  "rca of the issue": "Radix UI Dialog (modal mode) applies a backdrop that sets pointer-events:none on everything outside the dialog's role=dialog content tree. Sonner's <Toaster /> renders its viewport as a sibling of the Radix overlay in the DOM; with the current z-index stacking in the v2 theme, the Radix overlay sits above the toast viewport, so clicks on the toast's Undo action land on the Radix overlay instead. The toast handler is correct (JS .click() works), only the stacking/pointer-events contract between Dialog + Sonner is wrong. Mitigation: raise Sonner viewport z-index above the Radix overlay (overlay is z-50; Sonner needs z-[60] or higher) AND ensure the toast container has pointer-events:auto. Alternatively, mark the FlatDrawer / PostPayment dialogs as non-modal when a toast with an action is on-screen."
+}

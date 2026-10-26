@@ -3,8 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { AlertTriangle, LifeBuoy, Lock, Paperclip, Send, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import api, { errMsg } from "@/lib/api";
+import { undoToast } from "@/lib/undo";
 import { useAuth } from "@/context/AuthContext";
-import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { PageHeader } from "@/components/common/Bits";
@@ -51,7 +51,7 @@ function Detail({ id }) {
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-3">
           {(() => { let n = 0; return sr.thread.map((m, i) => <div key={i} className={cn("flex gap-3", m.by !== "customer" && "flex-row-reverse")} data-testid={`sr-msg-${i}`}><Avatar name={m.by === "customer" ? sr.customer_name : m.author_name} size={30} /><div className={cn("max-w-[80%] rounded-2xl px-4 py-3", m.internal ? "border border-dashed border-amber2/50 bg-amber2-50/60" : m.by === "customer" ? "card !rounded-tl-sm" : "rounded-tr-sm bg-ink-950 text-warm-50")}><p className={cn("flex items-center gap-2 text-[11px] font-semibold", m.by === "customer" || m.internal ? "text-txt-secondary" : "text-warm-200/70")}>{m.internal && <Lock className="h-3 w-3" />}{m.by === "customer" ? sr.customer_name : m.author_name}{m.internal ? " · internal note" : ""} · {fmtDateTime(m.at)}</p><p className="mt-1 whitespace-pre-wrap text-sm">{m.message}</p>{m.attachments?.length > 0 && <p className="mt-2 flex flex-wrap gap-2 text-xs">{m.attachments.map((a) => { const idx = n++; return <button key={idx} onClick={() => openAttachment(idx, a.name)} className="pill bg-warm-100 text-ink-950 hover:bg-warm-200" data-testid={`sr-attachment-${idx}`}><Paperclip className="h-3 w-3" />{a.name}</button>; })}</p>}</div></div>); })()}
-          {can("service.write") && sr.status !== "Closed" && <div className="card p-4"><Textarea value={msg} onChange={(e) => setMsg(e.target.value)} placeholder={internal ? "Internal note (hidden from customer)…" : "Reply to customer…"} data-testid="sr-reply-text" /><div className="mt-2 flex items-center gap-3"><label className="flex items-center gap-2 text-xs font-semibold text-txt-secondary"><input type="checkbox" checked={internal} onChange={(e) => setInternal(e.target.checked)} data-testid="sr-internal-toggle" />Internal note</label><Button size="sm" className="ml-auto bg-ink-950 hover:bg-ink-800" disabled={!msg.trim()} onClick={() => post("reply", { message: msg, internal }, internal ? "Note added" : "Reply sent")} data-testid="sr-reply-send"><Send className="mr-1 h-3.5 w-3.5" />{internal ? "Add note" : "Send"}</Button>{!internal && <Button size="sm" variant="outline" disabled={!msg.trim()} onClick={() => post("reply", { message: msg, internal: false, status: "Awaiting Customer" }, "Sent · awaiting customer")} data-testid="sr-reply-await">Send & await customer</Button>}{!internal && <Button size="sm" variant="outline" disabled={!msg.trim()} onClick={() => post("reply", { message: msg, internal: false, status: "Resolved" }, "Resolved")} data-testid="sr-reply-resolve">Send & resolve</Button>}</div></div>}
+          {can("service.write") && sr.status !== "Closed" && <div className="card p-4"><Textarea value={msg} onChange={(e) => setMsg(e.target.value)} placeholder={internal ? "Internal note (hidden from customer)…" : "Reply to customer…"} data-testid="sr-reply-text" /><div className="mt-2 flex items-center gap-3"><label className="flex items-center gap-2 text-xs font-semibold text-txt-secondary"><input type="checkbox" checked={internal} onChange={(e) => setInternal(e.target.checked)} data-testid="sr-internal-toggle" />Internal note</label><button type="button" className="btn btn-primary ml-auto !h-9" disabled={!msg.trim()} onClick={() => post("reply", { message: msg, internal }, internal ? "Note added" : "Reply sent")} data-testid="sr-reply-send"><Send className="mr-1 h-3.5 w-3.5" />{internal ? "Add note" : "Send"}</button>{!internal && <button type="button" className="btn btn-secondary !h-8 !px-3 text-xs" disabled={!msg.trim()} onClick={() => post("reply", { message: msg, internal: false, status: "Awaiting Customer" }, "Sent · awaiting customer")} data-testid="sr-reply-await">Send & await customer</button>}{!internal && <button type="button" className="btn btn-secondary !h-8 !px-3 text-xs" disabled={!msg.trim()} onClick={() => post("reply", { message: msg, internal: false, status: "Resolved" }, "Resolved")} data-testid="sr-reply-resolve">Send & resolve</button>}</div></div>}
         </div>
         <div className="space-y-4">
           <div className="card p-4 text-sm"><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-txt-secondary">Context</p>
@@ -85,8 +85,22 @@ export default function ServiceRequests() {
   const items = data?.items || [], nowIso = new Date().toISOString();
   const kp = { open: items.filter((x) => ["New", "In Progress"].includes(x.status)).length, breach: items.filter((x) => ["New", "In Progress"].includes(x.status) && x.sla_due_at < nowIso).length, await: items.filter((x) => x.status === "Awaiting Customer").length, rating: (() => { const r = items.filter((x) => x.rating); return r.length ? (r.reduce((s, x) => s + x.rating, 0) / r.length).toFixed(1) : "—"; })() };
   const move = async (sr, status, extra = {}) => {
+    const from = sr.status;
     setData((d) => ({ ...d, items: d.items.map((x) => (x.id === sr.id ? { ...x, status } : x)) }));
-    try { await api.post(`/service-requests/${sr.id}/status`, { status, ...extra }); toast.success(`${sr.ticket_number} → ${status}`); } catch (e) { toast.error(errMsg(e)); } finally { load(); }
+    try {
+      await api.post(`/service-requests/${sr.id}/status`, { status, ...extra });
+      const undoable = !["Resolved", "Closed"].includes(status);
+      if (undoable) undoToast({ title: `${sr.ticket_number} → ${status}`, description: `Moved from ${from}`, testId: `sr-move-${sr.id}`, onUndo: async () => {
+        await api.post(`/service-requests/${sr.id}/status`, { status: from, note: "Undo" });
+        setData((d) => ({ ...d, items: d.items.map((x) => (x.id === sr.id ? { ...x, status: from } : x)) }));
+        load();
+        return `Reverted · ${sr.ticket_number} back in ${from}`;
+      } });
+      else toast.success(`${sr.ticket_number} → ${status}`);
+    } catch (e) {
+      setData((d) => ({ ...d, items: d.items.map((x) => (x.id === sr.id ? { ...x, status: from } : x)) }));  // rollback
+      toast.error(errMsg(e));
+    } finally { load(); }
   };
   const onDrop = (status, card) => { setOver(null); const sr = card || drag; if (!sr || sr.status === status) return setDrag(null); if (status === "Resolved") { setPrompt({ sr, status }); setNote(""); } else if (status === "Closed" && sr.status !== "Resolved") { toast.error("Resolve the ticket before closing it"); } else move(sr, status); setDrag(null); };
   const Column = ({ s, list }) => <div onDragOver={(e) => { e.preventDefault(); setOver(s); }} onDragLeave={() => setOver(null)} onDrop={() => onDrop(s)} className={cn("flex w-72 shrink-0 flex-col rounded-2xl bg-warm-100/70 p-3 transition-colors", over === s && drag && drag.status !== s && "bg-gold-light ring-2 ring-gold/60")} data-testid={`sr-col-${s.replace(/\s+/g, "-").toLowerCase()}`}>

@@ -78,14 +78,14 @@ def test_payments_demands_open(auth):
 
 def test_payments_requires_idempotency_key(auth):
     # Pick a booking
-    rb = requests.get(f"{API}/bookings", headers=auth, params={"page_size": 1}, timeout=15)
+    rb = requests.get(f"{API}/bookings", headers=auth, params={"page_size": 1, "status": "Active"}, timeout=15)
     assert rb.status_code == 200
     r = requests.post(f"{API}/payments", headers=auth, json={
         "booking_id": rb.json()["items"][0]["id"], "against": "FLAT_VALUE",
         "payment_category": "Cash", "amount": 100, "payment_date": "2026-01-02",
         "payment_mode_id": "any",
     }, timeout=15)
-    assert r.status_code == 400
+    assert r.status_code == 428
     assert "Idempotency" in r.text or "IDEMPOTENCY" in r.text
 
 
@@ -102,7 +102,7 @@ def _active_booking(auth):
     """Return (id, booking_date_iso) of an Active booking with Cash headroom."""
     r = requests.get(f"{API}/bookings", headers=auth, params={"status": "Active", "page_size": 20}, timeout=20)
     items = r.json().get("items", [])
-    for b in items:
+    for b in sorted(items, key=lambda x: x.get("created_by") != "system"):  # seeded bookings first (QA bookings may be mid-milestone on another worker)
         if (b.get("summary") or {}).get("cash_paid_paise", 0) < b.get("cash_agreed_paise", 0):
             return b["id"], b["booking_date"]
     if items:

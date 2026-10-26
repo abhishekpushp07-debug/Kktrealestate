@@ -23,6 +23,12 @@ def _months(n=12):
 
 @router.get("/dashboard/home")
 async def home(request: Request, user: dict = Depends(require("project.read"))):
+    from services import ttlcache
+    out = await ttlcache.cached(f"home:{ttlcache.scope_key(user)}:{date.today().isoformat()}", 10, lambda: _home(user))
+    return etag_response(request, out, max_age=15)
+
+
+async def _home(user: dict):
     cid, pf = user["company_id"], project_scope_filter(user)
     today = date.today().isoformat()
     snap = await get_dashboard(cid, user.get("project_scope"))
@@ -62,4 +68,4 @@ async def home(request: Request, user: dict = Depends(require("project.read"))):
     spark = {"collections": [by[m]["Cash"] + by[m]["Account"] + by[m]["Other"] for m in months[-8:]]}
     out = {"computed_at": snap["computed_at"], **snap["payload"], "collections_12m": [by[m] for m in months], "ageing_paise": ageing, "ageing_counts": ageing_counts, "attention": {"overdue": overdue[:8], "bounced": bounced, "unassigned": unassigned},
            "visits_today_list": visits, "recent": recent, "today": {"demands_raised": demands_today}, "spark": spark, "greeting_date": datetime.now(UTC).isoformat()}
-    return etag_response(request, present_money(out), max_age=15)
+    return present_money(out)

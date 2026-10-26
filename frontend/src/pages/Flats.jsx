@@ -4,7 +4,7 @@ import FlatsTable from "@/components/common/FlatsTable";
 export default function Flats() {
   return (
     <div data-testid="flats-page">
-      <PageHeader title="Inventory" subtitle="All flats across projects. Filter by block, type and status." />
+      <PageHeader title="Inventory" subtitle="All flats across projects. Filter by block, type and status." testId="inventory-header" />
       <FlatsTable />
     </div>
   );

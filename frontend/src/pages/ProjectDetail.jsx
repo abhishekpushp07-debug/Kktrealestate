@@ -6,7 +6,6 @@ import { useAuth } from "@/context/AuthContext";
 import { inrShort, fmtDate } from "@/lib/format";
 import { PageHeader, KV, EmptyState, StatCard } from "@/components/common/Bits";
 import { Pill } from "@/components/common/StatusChip";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PaymentPlanMatrix, StageSequenceEditor, ProjectStageList } from "@/components/common/PaymentPlanMatrix";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -47,8 +46,8 @@ export default function ProjectDetail() {
       <PageHeader crumbs={[{ label: "Projects", to: "/projects" }, { label: p.code }]} title={p.name} subtitle={`${p.project_type} · ${p.address?.city || ""} ${p.rera_number ? `· RERA ${p.rera_number}` : ""}`}
         actions={<>
           <Pill tone={p.status === "Ready" ? "green" : p.status === "Under Construction" ? "amber" : "slate"} className="px-3 py-1 text-xs">{p.status}</Pill>
-          {can("project.write") && <Button variant="outline" onClick={() => setEditOpen(true)} data-testid="edit-project-btn"><Pencil className="mr-1.5 h-4 w-4" />Edit</Button>}
-          {can("block.write") && <Button onClick={() => setBlockOpen(true)} className="bg-ink-950 hover:bg-ink-800" data-testid="new-block-btn"><Plus className="mr-1.5 h-4 w-4" />Add block</Button>}
+          {can("project.write") && <button type="button" className="btn btn-secondary" onClick={() => setEditOpen(true)} data-testid="edit-project-btn"><Pencil className="mr-1.5 h-4 w-4" />Edit</button>}
+          {can("block.write") && <button type="button" className="btn btn-primary" onClick={() => setBlockOpen(true)} className="bg-ink-950 hover:bg-ink-800" data-testid="new-block-btn"><Plus className="mr-1.5 h-4 w-4" />Add block</button>}
         </>} />
       <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard label="Total units" value={inv.total} testId="project-stat-total" />

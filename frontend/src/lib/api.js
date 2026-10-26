@@ -34,7 +34,8 @@ api.interceptors.request.use((config) => {
 export const conflictHandler = { fn: null };
 
 let refreshing = null;
-export const BASE_PATH = (process.env.REACT_APP_BASE_PATH || process.env.PUBLIC_URL || "/erp").replace(/\/$/, "");
+export const lastError = { request_id: null, at: 0 };
+export const BASE_PATH = (process.env.REACT_APP_BASE_PATH || process.env.PUBLIC_URL || "/").replace(/\/$/, "");
 const onLogout = { fn: () => { tokens.clear(); window.location.assign(`${BASE_PATH}/login`); } };
 export const setLogoutHandler = (fn) => { onLogout.fn = fn; };
 
@@ -50,6 +51,8 @@ api.interceptors.response.use(
   (r) => r,
   async (error) => {
     const { config, response } = error;
+    const rid = response?.data?.error?.request_id || response?.data?.request_id || response?.headers?.["x-request-id"];
+    if (rid) { lastError.request_id = rid; lastError.at = Date.now(); }
     if (response?.status === 409 && response.data?.code === "VERSION_CONFLICT" && conflictHandler.fn) conflictHandler.fn(response.data);
     if (response?.status === 401 && !config._retry && !config.url.includes("/auth/login") && !config.url.includes("/auth/refresh")) {
       config._retry = true;
@@ -66,6 +69,12 @@ api.interceptors.response.use(
   }
 );
 
-export const errMsg = (e, fallback = "Something went wrong") => e?.response?.data?.detail || e?.message || fallback;
+export const errFields = (e) => Object.fromEntries((e?.response?.data?.error?.details || e?.response?.data?.errors || []).filter((d) => d && d.field).map((d) => [d.field, d.message]));
+export const errMsg = (e, fallback = "Something went wrong") => {
+  const base = e?.response?.data?.error?.message || e?.response?.data?.detail || e?.message || fallback;
+  const f = Object.entries(errFields(e)).slice(0, 4).map(([k, v]) => `${k.split(".").pop()}: ${v}`);
+  return f.length && !f.some(([x]) => base.includes(x)) && !base.includes(f[0]) ? `${base.split(";")[0]} — ${f.join(" · ")}` : base;
+};
+export const errCode = (e) => e?.response?.data?.error?.code || e?.response?.data?.code || null;
 
 export default api;

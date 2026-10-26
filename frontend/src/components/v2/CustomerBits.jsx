@@ -53,7 +53,7 @@ export function CustomerCard({ c, people = [] }) {
           <Avatar name={c.full_name} size={44} />
           <div className="min-w-0 flex-1">
             <p className="truncate font-display text-base font-semibold text-ink-950">{c.salutation ? `${c.salutation} ` : ""}{c.full_name}</p>
-            <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-txt-secondary"><Phone className="h-3 w-3" strokeWidth={1.75} /><a href={`tel:${c.phone}`} onClick={(e) => e.stopPropagation()} className="hover:text-ink-950" data-testid={`call-${c.customer_code}`}>{c.phone}</a>{(c.city || c.address_current?.city) && <span>· {c.city || c.address_current?.city}</span>}</p>
+            <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-txt-secondary"><Phone className="h-3 w-3" strokeWidth={1.75} /><a href={`tel:${c.phone}`} aria-label={`Call ${c.full_name || c.name || c.phone}`} onClick={(e) => e.stopPropagation()} className="inline-flex min-h-[24px] items-center rounded px-1 hover:text-ink-950" data-testid={`call-${c.customer_code}`}>{c.phone}</a>{(c.city || c.address_current?.city) && <span>· {c.city || c.address_current?.city}</span>}</p>
           </div>
           <ScoreRing value={c.engagement_score || 0} />
         </div>

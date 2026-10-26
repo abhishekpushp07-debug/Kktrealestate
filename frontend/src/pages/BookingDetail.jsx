@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Ban, CheckCircle2, FileEdit, FileText, IndianRupee, Printer } from "lucide-react";
 import { openPdf } from "@/pages/Reports";
 import { toast } from "sonner";
-import api, { errMsg } from "@/lib/api";
+import api, { errMsg, BASE_PATH } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { KV, Field, EmptyState } from "@/components/common/Bits";
 
@@ -33,7 +33,6 @@ function Stat({ label, value, hint, tone }) {
 
 export default function BookingDetail() {
   const { id } = useParams();
-  const nav = useNavigate();
   const { can } = useAuth();
   const [b, setB] = useState(null);
   const [ledger, setLedger] = useState([]);
@@ -68,8 +67,8 @@ export default function BookingDetail() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => openPdf(`/reports/statement/${id}?format=pdf`)} className="btn btn-secondary" data-testid="statement-pdf-btn"><FileText className="h-4 w-4" strokeWidth={1.75} />Statement</Button>
-            <Button variant="outline" onClick={() => openPdf(`/reports/allotment/${id}?format=pdf`)} className="btn btn-ghost" data-testid="allotment-pdf-btn"><FileText className="h-4 w-4" strokeWidth={1.75} />Allotment</Button>
+            <Button variant="outline" onClick={() => window.open(`${BASE_PATH}/print/statement/${id}`, "_blank")} className="btn btn-secondary" data-testid="statement-pdf-btn"><FileText className="h-4 w-4" strokeWidth={1.75} />Statement</Button>
+            <Button variant="outline" onClick={() => window.open(`${BASE_PATH}/print/allotment/${id}`, "_blank")} className="btn btn-ghost" data-testid="allotment-pdf-btn"><FileText className="h-4 w-4" strokeWidth={1.75} />Allotment</Button>
             {b.status === "Active" && can("payment.post") && <Button onClick={() => setPay(true)} className="btn btn-primary" data-testid="post-payment-btn"><IndianRupee className="h-4 w-4" strokeWidth={1.75} />Post payment</Button>}
             {b.status === "Active" && can("agreement.edit") && <Button variant="outline" onClick={() => setRev({ cash: b.cash_agreed, account: b.account_agreed, reason: "" })} className="btn btn-ghost" data-testid="revise-agreement-btn"><FileEdit className="h-4 w-4" strokeWidth={1.75} />Revise</Button>}
             {b.status === "Active" && can("booking.create") && <Button variant="outline" disabled={!canComplete} onClick={complete} title={canComplete ? "" : "Needs 100% construction and zero dues"} className="btn btn-ghost" data-testid="complete-booking-btn"><CheckCircle2 className="h-4 w-4" strokeWidth={1.75} />Handover</Button>}
@@ -97,14 +96,14 @@ export default function BookingDetail() {
       {tab === "ledger" && <LedgerTable rows={ledger} bookingId={id} bookingNumber={b.booking_number} />}
       {tab === "demands" && (
           <Table head={["Demand", "Milestone", "%", "Date", "Due date", { l: "Cash", r: 1 }, { l: "Account", r: 1 }, { l: "Total", r: 1 }, { l: "Paid", r: 1 }, "Status", ""]} testId="demands-table">
-            {b.demands.map((d) => <tr key={d.id} className="border-t"><td className="px-3 py-2 font-mono text-xs">{d.demand_number}</td><td className="px-3 py-2">{d.milestone_name}</td><td className="px-3 py-2">{d.cumulative_percent}%</td><td className="px-3 py-2">{fmtDate(d.demand_date)}</td><td className="px-3 py-2">{fmtDate(d.due_date)}</td><td className="px-3 py-2 text-right tabular">{inr(d.cash_demand)}</td><td className="px-3 py-2 text-right tabular">{inr(d.account_demand)}</td><td className="px-3 py-2 text-right tabular font-semibold">{inr(d.total_demand)}</td><td className="px-3 py-2 text-right tabular">{inr(d.paid)}</td><td className="px-3 py-2"><StatusPill status={d.status} /></td><td className="px-3 py-2"><Button size="sm" variant="ghost" onClick={() => nav(`/print/demand/${id}/${d.id}`)} data-testid={`demand-letter-${d.id}`}><Printer className="h-3.5 w-3.5" /></Button><Button size="sm" variant="ghost" onClick={() => openPdf(`/bookings/${id}/demands/${d.id}/letter.pdf`)} title="Download PDF" data-testid={`demand-pdf-${d.id}`}><FileText className="h-3.5 w-3.5" /></Button></td></tr>)}
+            {b.demands.map((d) => <tr key={d.id} className="border-t"><td className="px-3 py-2 font-mono text-xs">{d.demand_number}</td><td className="px-3 py-2">{d.milestone_name}</td><td className="px-3 py-2">{d.cumulative_percent}%</td><td className="px-3 py-2">{fmtDate(d.demand_date)}</td><td className="px-3 py-2">{fmtDate(d.due_date)}</td><td className="px-3 py-2 text-right tabular">{inr(d.cash_demand)}</td><td className="px-3 py-2 text-right tabular">{inr(d.account_demand)}</td><td className="px-3 py-2 text-right tabular font-semibold">{inr(d.total_demand)}</td><td className="px-3 py-2 text-right tabular">{inr(d.paid)}</td><td className="px-3 py-2"><StatusPill status={d.status} /></td><td className="px-3 py-2"><Button size="sm" variant="ghost" onClick={() => window.open(`${BASE_PATH}/print/demand/${id}/${d.id}`, "_blank")} data-testid={`demand-letter-${d.id}`}><Printer className="h-3.5 w-3.5" /></Button><Button size="sm" variant="ghost" onClick={() => openPdf(`/bookings/${id}/demands/${d.id}/letter.pdf`)} title="Download PDF" data-testid={`demand-pdf-${d.id}`}><FileText className="h-3.5 w-3.5" /></Button></td></tr>)}
             {b.demands.length === 0 && <tr><td colSpan={11} className="px-3 py-6 text-center text-txt-secondary">No demands yet — raised automatically by the payment plan (booking, dates, construction stages).</td></tr>}
           </Table>
         )}
       {tab === "payments" && (
           <Table head={["Receipt", "Date", "Towards", "Mode", "Instrument", { l: "Amount", r: 1 }, "Status", ""]} testId="booking-payments-table">
             {b.payments.map((p) => <tr key={p.id} className={`border-t ${p.status === "Reversed" ? "line-through opacity-60" : ""}`}><td className="px-3 py-2 font-mono text-xs">{p.receipt_number}</td><td className="px-3 py-2">{fmtDate(p.payment_date)}</td><td className="px-3 py-2">{p.against === "FLAT_VALUE" ? `Flat value · ${p.payment_category}` : p.other_charge_name}</td><td className="px-3 py-2">{p.payment_mode_name}</td><td className="px-3 py-2 text-xs">{p.instrument?.number || "—"}</td><td className="px-3 py-2 text-right tabular font-semibold">{inr(p.amount)}</td><td className="px-3 py-2"><StatusPill status={p.status} /></td>
-              <td className="px-3 py-2 whitespace-nowrap">{can("receipt.print") && <><Button size="sm" variant="ghost" onClick={() => nav(`/print/receipt/${p.id}`)} data-testid={`receipt-${p.id}`}><Printer className="h-3.5 w-3.5" /></Button><Button size="sm" variant="ghost" onClick={() => openPdf(`/payments/${p.id}/receipt.pdf`)} title="Download PDF" data-testid={`receipt-pdf-${p.id}`}><FileText className="h-3.5 w-3.5" /></Button></>}
+              <td className="px-3 py-2 whitespace-nowrap">{can("receipt.print") && <><Button size="sm" variant="ghost" onClick={() => window.open(`${BASE_PATH}/print/receipt/${p.id}`, "_blank")} data-testid={`receipt-${p.id}`}><Printer className="h-3.5 w-3.5" /></Button><Button size="sm" variant="ghost" onClick={() => openPdf(`/payments/${p.id}/receipt.pdf`)} title="Download PDF" data-testid={`receipt-pdf-${p.id}`}><FileText className="h-3.5 w-3.5" /></Button></>}
                 {p.status === "Pending" && can("payment.post") && <><Button size="sm" variant="ghost" className="text-sage" onClick={() => act(`/payments/${p.id}/clear`, {}, "Cheque cleared")} data-testid={`clear-${p.id}`}>Clear</Button><Button size="sm" variant="ghost" className="text-brick" onClick={() => act(`/payments/${p.id}/bounce`, { reason: "Returned unpaid" }, "Marked bounced")} data-testid={`bounce-${p.id}`}>Bounce</Button></>}
                 {p.status === "Cleared" && can("payment.reverse") && <Button size="sm" variant="ghost" className="text-brick" onClick={() => { const r = window.prompt("Reason for reversal"); if (r && r.length >= 3) act(`/payments/${p.id}/reverse`, { reason: r }, "Payment reversed"); }} data-testid={`reverse-${p.id}`}>Reverse</Button>}</td></tr>)}
             {b.payments.length === 0 && <tr><td colSpan={8} className="px-3 py-6 text-center text-txt-secondary">No payments posted.</td></tr>}

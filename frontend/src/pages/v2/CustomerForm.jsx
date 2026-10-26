@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import api, { errMsg } from "@/lib/api";
+import api from "@/lib/api";
+import { FieldError, useFieldErrors } from "@/lib/formErrors";
 import { useAuth } from "@/context/AuthContext";
 import { useFetch } from "@/hooks/useList";
 import { useCatalogues } from "@/hooks/useCatalogues";
@@ -19,10 +20,12 @@ export default function CustomerForm() {
   const nav = useNavigate();
   const { user } = useAuth();
   const { label, opts } = useCatalogues();
+  const fe = useFieldErrors();
+  const [f, setF] = useState({ ...EMPTY, rm_user_id: user?.id || null });
+  const localityPin = opts("locality", f.city_id).find((o) => o.value === f.locality_id)?.meta?.pincode || "";
   const people = usePeople();
   const { data: projects } = useFetch("/projects?page_size=100&with_total=false");
   const { data: existing } = useFetch(id ? `/customers/${id}` : null);
-  const [f, setF] = useState({ ...EMPTY, rm_user_id: user?.id || null });
   const [dupe, setDupe] = useState(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => { if (existing) setF((p) => ({ ...p, ...Object.fromEntries(Object.entries(existing).filter(([k]) => k in EMPTY && existing[k] != null)), line1: existing.address_current?.line1 || "", pincode: existing.address_current?.pincode || "", rm_user_id: existing.assigned_sales_user_id || p.rm_user_id, preferences: { ...EMPTY.preferences, ...(existing.preferences || {}) }, consent: { ...EMPTY.consent, ...(existing.consent || {}) }, nominee: { relation_id: null, ...(existing.nominee || {}), dob: existing.nominee?.dob || "" }, co_applicants: (existing.co_applicants || []).map((c) => ({ name: c.name, relation_id: c.relation_id || null, phone: c.phone || "" })), pan: "", aadhaar: "" })); }, [existing]);
@@ -53,7 +56,7 @@ export default function CustomerForm() {
       await api.patch(`/customers/${cid}/profile`, { ...Object.fromEntries(Object.entries(prof).filter(([, v]) => v != null)), version: r.data.version ?? 0 });
       toast.success(id ? "Customer updated" : `Customer ${r.data.customer_code} created`);
       nav(`/customers/${cid}`);
-    } catch (err) { toast.error(errMsg(err)); } finally { setBusy(false); }
+    } catch (err) { toast.error(fe.capture(err)); } finally { setBusy(false); }
   };
   if (id && !existing) return <Skeleton className="h-96 rounded-2xl" />;
   return (
@@ -74,15 +77,15 @@ export default function CustomerForm() {
         <FormSection title="Contact">
           <Field label="Mobile" required error={dupe ? "A customer with this phone already exists" : null}><input className="input" inputMode="numeric" value={f.phone} onChange={(e) => set("phone", e.target.value)} placeholder="10-digit" required data-testid="cust-phone" /></Field>
           <Field label="Alternate phone"><input className="input" value={f.alt_phone} onChange={(e) => set("alt_phone", e.target.value)} data-testid="cust-alt-phone" /></Field>
-          <Field label="Email"><input type="email" className="input" value={f.email} onChange={(e) => set("email", e.target.value)} data-testid="cust-email" /></Field>
+          <Field label="Email"><FieldError name="email" fields={fe.fields} /><input type="email" className="input" value={f.email} onChange={(e) => set("email", e.target.value)} data-testid="cust-email" /></Field>
           <div className="flex items-end gap-5 pb-2 text-sm"><label className="flex items-center gap-2"><input type="checkbox" checked={f.consent.whatsapp} onChange={(e) => set("consent", { ...f.consent, whatsapp: e.target.checked })} data-testid="consent-whatsapp" />WhatsApp</label><label className="flex items-center gap-2"><input type="checkbox" checked={f.consent.marketing} onChange={(e) => set("consent", { ...f.consent, marketing: e.target.checked })} data-testid="consent-marketing" />Marketing</label></div>
           {dupe && <Link to={`/customers/${dupe.id}`} className="card-hover card col-span-full flex items-center gap-3 !border-amber2/40 !bg-amber2-50/40 !p-4" data-testid="dupe-card"><Avatar name={dupe.full_name} size={36} /><div className="min-w-0 flex-1"><p className="text-sm font-semibold text-ink-950">{dupe.full_name} · {dupe.customer_code}</p><p className="text-xs text-txt-secondary">{dupe.phone} · KYC {dupe.kyc_status} · open this profile instead</p></div></Link>}
         </FormSection>
         <FormSection title="Address">
           <Field label="State"><Select type="state" value={f.state_id} onChange={(v) => setF({ ...f, state_id: v, city_id: null, locality_id: null })} testId="sel-state" /></Field>
           <Field label="City"><Select type="city" parentId={f.state_id} value={f.city_id} onChange={(v) => setF({ ...f, city_id: v, locality_id: null })} disabled={!f.state_id} testId="sel-city" /></Field>
-          <Field label="Locality"><Select type="locality" parentId={f.city_id} value={f.locality_id} onChange={(v) => set("locality_id", v)} disabled={!f.city_id} testId="sel-locality" /></Field>
-          <Field label="Pincode"><input className="input" value={f.pincode} onChange={(e) => set("pincode", e.target.value)} maxLength={6} data-testid="cust-pincode" /></Field>
+          <Field label="Locality"><Select type="locality" parentId={f.city_id} value={f.locality_id} onChange={(v) => { const pin = opts("locality", f.city_id).find((o) => o.value === v)?.meta?.pincode; setF({ ...f, locality_id: v, pincode: pin || f.pincode }); }} disabled={!f.city_id} testId="sel-locality" /></Field>
+          <Field label="Pincode" hint={localityPin ? "Auto-filled from locality" : f.locality_id ? "No pincode on file for this locality — type it" : undefined}><input className="input" value={f.pincode} onChange={(e) => set("pincode", e.target.value)} maxLength={6} inputMode="numeric" placeholder={f.locality_id && !localityPin ? "Type 6-digit pincode" : ""} readOnly={Boolean(localityPin)} data-testid="cust-pincode" /><FieldError name="address_current.pincode" fields={fe.fields} /></Field>
           <Field label="Address line" className="md:col-span-2"><input className="input" value={f.line1} onChange={(e) => set("line1", e.target.value)} data-testid="cust-line1" /></Field>
           <label className="flex items-center gap-2 text-sm md:col-span-2"><input type="checkbox" checked={f.permanent_same_as_current} onChange={(e) => set("permanent_same_as_current", e.target.checked)} data-testid="same-permanent" />Permanent address same as current</label>
         </FormSection>

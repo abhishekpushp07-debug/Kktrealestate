@@ -29,7 +29,7 @@ async def seed_phase2():
         return
     cid = company["id"]
     logger.info("Applying Phase 2 seed...")
-    await db.companies.update_one({"id": cid}, {"$set": {"demand_due_days": 15, "authorised_signatory_name": "Rajesh Kumar", "default_gst_percent": 18, "letterhead_tagline": "Building trust since 1998", "letterhead_phone": "+91 612 2234567", "letterhead_email": "accounts@shreeganeshbuilders.in",
+    await db.companies.update_one({"id": cid}, {"$set": {"demand_due_days": 15, "authorised_signatory_name": "Rajesh Kumar", "default_gst_percent": 18, "letterhead_tagline": "Building trust, delivering homes", "letterhead_phone": "+91 612 2234567", "letterhead_email": "accounts@kktconstructions.in",
                                                          "booking_number_format": "BK-{FY}-{SEQ}", "receipt_number_format": "{PREFIX}/{FY}/{SEQ}", "customer_number_format": "CUST-{FY}-{SEQ}", "demand_number_format": "DM-{FY}-{SEQ}"}})
     # role permission sync (Sales loses kyc_view; Accounts/Project Admin gain)
     from permissions import SYSTEM_ROLES
@@ -40,7 +40,6 @@ async def seed_phase2():
     a103 = await db.flats.find_one({"flat_number": "A-103"}, {"_id": 0})
     if a103 and a103["status"] in ("Hold", "Blocked"):
         await db.flats.update_one({"id": a103["id"]}, {"$set": {"status": "Available", "status_reason": None}})
-    await db.room_types.delete_many({"name": {"$regex": "^QA Room"}})
 
     users = {u["email"]: u for u in await db.users.find({}, {"_id": 0, "id": 1, "email": 1, "name": 1}).to_list(None)}
     sales, admin, accounts = users["sales@kkt.in"], users["admin@kkt.in"], users["accounts@kkt.in"]
@@ -65,7 +64,7 @@ async def seed_phase2():
         flats = []
         for i in range(1, 7):
             flats.append({**base_doc(None, cid), "project_id": ggv["id"], "block_id": p_block["id"], "flat_number": f"P{i}", "floor": 1, "floor_label": "G", "position": i, "flat_type_id": ft_villa["id"], "flat_type_code": ft_villa["code"],
-                          "status": "Available", "price": 10000000.0, "rate_per_sqft": None, "super_builtup_sqft": ft_villa.get("super_builtup_sqft") or 2400, "carpet_sqft": ft_villa.get("carpet_sqft"), "builtup_sqft": ft_villa.get("builtup_sqft"),
+                          "status": "Available", "price_paise": 1000000000, "rate_per_sqft": None, "super_builtup_sqft": ft_villa.get("super_builtup_sqft") or 2400, "carpet_sqft": ft_villa.get("carpet_sqft"), "builtup_sqft": ft_villa.get("builtup_sqft"),
                           "facing": "E" if i % 2 else "W", "is_corner": i in (1, 6), "price_breakup": [{"label": "Lump sum", "amount": 10000000.0}], "project_code": "GGV", "block_code": "P"})
         await db.flats.insert_many(flats)
         blocks["P"] = p_block
@@ -165,7 +164,7 @@ async def seed_phase2():
         doc = {**base_doc(None, cid), "booking_number": await generate_number("booking", company, booking_day), "project_id": proj["id"], "project_code": proj["code"], "project_name": proj["name"], "block_id": blk["id"], "block_code": blk["code"], "block_name": blk["name"], "flat_id": flat["id"],
                "customer_id": cust["id"], "customer_name": cust["full_name"], "customer_code": cust["customer_code"], "customer_phone": cust.get("phone"), "co_applicant_customer_ids": [], "booking_date": booking_day.isoformat(),
                "agreement_value_paise": to_paise(total), "cash_agreed_paise": to_paise(cash), "account_agreed_paise": to_paise(account), "rate_per_sqft": flat.get("rate_per_sqft"),
-               "flat_snapshot": {"flat_number": flat["flat_number"], "flat_type_code": flat.get("flat_type_code"), "flat_type_id": flat.get("flat_type_id"), "super_builtup_sqft": flat.get("super_builtup_sqft"), "floor": flat.get("floor"), "price": flat.get("price")},
+               "flat_snapshot": {"flat_number": flat["flat_number"], "flat_type_code": flat.get("flat_type_code"), "flat_type_id": flat.get("flat_type_id"), "super_builtup_sqft": flat.get("super_builtup_sqft"), "floor": flat.get("floor"), "price": (flat.get("price_paise") or 0) / 100 or None},
                "milestone_template_snapshot": [{"seq": m["seq"], "name": m["name"], "cumulative_percent": m["cumulative_percent"]} for m in ms], "construction_percent": 0, "other_charges": lines, "parking_slot_ids": slot_ids,
                "sales_user_id": sales_uid or sales["id"], "lead_id": None, "broker_name": None, "remarks": remarks, "status": "Active", "cancellation": None, "agreement_revisions": [], "summary": {}, "created_at": ts, "updated_at": ts}
         await db.bookings.insert_one(doc)

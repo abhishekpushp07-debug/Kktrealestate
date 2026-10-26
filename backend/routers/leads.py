@@ -1,3 +1,4 @@
+import asyncio
 from datetime import UTC, datetime
 from typing import Literal
 
@@ -5,6 +6,7 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import Field, field_validator
 
 from db import db
+from models_out import LeadsOut, LeadsOutPage
 from deps import require
 from services.kyc import normalize_phone
 from services.numbering import generate_number
@@ -76,7 +78,7 @@ async def stages(user: dict = Depends(require("lead.read"))):
     return {"stages": STAGES}
 
 
-@router.get("")
+@router.get("", response_model=LeadsOutPage, response_model_exclude_unset=True)
 async def list_leads(params: ListParams = Depends(), status: str | None = None, assigned_to: str | None = None, project_id: str | None = None,
                      due_today: bool = False, source: str | None = None, unread: bool = False, user: dict = Depends(require("lead.read"))):
     q = {"company_id": user["company_id"], **search_filter(params.search, ["name", "phone", "lead_number", "email"])}
@@ -100,18 +102,34 @@ async def list_leads(params: ListParams = Depends(), status: str | None = None, 
     return res
 
 
+BOARD_FIELDS = ("id", "lead_number", "name", "phone", "email", "status", "source", "project_id", "project_name", "assigned_to", "assigned_to_name", "budget_max", "next_follow_up_at", "is_read", "lost_reason", "converted_customer_id", "flat_number", "version", "created_at", "updated_at")
+
+
 @router.get("/board")
-async def board(project_id: str | None = None, assigned_to: str | None = None, user: dict = Depends(require("lead.read"))):
+async def board(project_id: str | None = None, assigned_to: str | None = None, stage: str | None = None, page: int = 1, per_column: int = 50,
+                user: dict = Depends(require("lead.read"))):
+    """Kanban columns, paged per column (Phase E0): first paint ships `per_column` newest leads per stage; `?stage=X&page=N` loads more for one column."""
     q = {"company_id": user["company_id"]}
     if project_id:
         q["project_id"] = project_id
     if assigned_to:
         q["assigned_to"] = assigned_to
-    items = await db.leads.find(q, {"_id": 0, "stage_history": 0}).sort("updated_at", -1).to_list(500)
-    cols = {s: [] for s in STAGES}
-    for l in items:
-        cols.setdefault(l["status"], []).append(l)
-    return {"columns": [{"stage": s, "leads": cols[s], "count": len(cols[s])} for s in STAGES]}
+    per_column = max(1, min(per_column, 200))
+    proj = {"_id": 0, **{k: 1 for k in BOARD_FIELDS}}
+    stages = [stage] if stage else STAGES
+
+    if stage:  # load-more for one column
+        cq = {**q, "status": stage}
+        total, items = await asyncio.gather(db.leads.count_documents(cq),
+                                            db.leads.find(cq, proj).sort("updated_at", -1).skip((page - 1) * per_column).limit(per_column).to_list(per_column))
+        return {"columns": [{"stage": stage, "leads": items, "count": total, "page": page, "has_more": page * per_column < total}]}
+    # one aggregation for the whole board: newest `per_column` per stage + per-stage totals (2 queries → 1)
+    rows = await db.leads.aggregate([{"$match": {**q, "status": {"$in": STAGES}}}, {"$sort": {"updated_at": -1}},
+                                     {"$group": {"_id": "$status", "count": {"$sum": 1}, "leads": {"$push": {k: f"${k}" for k in BOARD_FIELDS}}}},
+                                     {"$project": {"count": 1, "leads": {"$slice": ["$leads", per_column]}}}]).to_list(len(STAGES))
+    by = {r["_id"]: r for r in rows}
+    return {"columns": [{"stage": st, "leads": by.get(st, {}).get("leads", []), "count": by.get(st, {}).get("count", 0), "page": 1,
+                         "has_more": by.get(st, {}).get("count", 0) > per_column} for st in stages]}
 
 
 @router.post("", status_code=201)
@@ -126,7 +144,7 @@ async def create_lead(body: LeadIn, request: Request, user: dict = Depends(requi
     return doc
 
 
-@router.get("/{lead_id}")
+@router.get("/{lead_id}", response_model=LeadsOut, response_model_exclude_unset=True)
 async def get_lead(lead_id: str, user: dict = Depends(require("lead.read"))):
     lead = await get_or_404(db.leads, lead_id, "Lead", {"company_id": user["company_id"]})
     if lead.get("is_read") is False:

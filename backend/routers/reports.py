@@ -61,7 +61,11 @@ def _scope(user, project_id=None, block_id=None):
 
 def respond(request: Request, fmt: str | None, payload: dict, title: str, company: dict, columns: list[tuple], rows: list[dict], totals: dict | None = None, filename="report", landscape=False):
     if fmt == "csv":
-        return Response(content=to_csv(rows, [c[0] for c in columns]), media_type="text/csv", headers={"Content-Disposition": f'attachment; filename="{filename}.csv"'})
+        # rupees-only at the edge: *_paise columns export as rupee columns ("cash_paise" → "cash_inr", value / 100)
+        def _col(c):
+            return c.replace("_paise", "_inr") if c.endswith("_paise") else c
+        rows_inr = [{_col(k): (round(v / 100, 2) if k.endswith("_paise") and isinstance(v, (int, float)) else v) for k, v in r.items()} for r in rows]
+        return Response(content=to_csv(rows_inr, [_col(c[0]) for c in columns]), media_type="text/csv", headers={"Content-Disposition": f'attachment; filename="{filename}.csv"'})
     if fmt == "pdf":
         d = _pdf.BrandedDoc(title, company, landscape_mode=landscape, subtitle=payload.get("subtitle"))
         d.h1(title)
@@ -197,7 +201,7 @@ async def inventory(request: Request, project_id: str | None = None, group_by: s
     q = {**_scope(user, project_id), "is_active": True}
     key = {"project": "$project_id", "block": "$block_id", "flat_type": "$flat_type_code", "floor": {"$concat": ["$block_id", "|", {"$toString": "$floor"}]}}.get(group_by, "$block_id")
     rows = await db.flats.aggregate([{"$match": q}, {"$group": {"_id": key, "total": {"$sum": 1}, **{s.lower(): {"$sum": {"$cond": [{"$eq": ["$status", s]}, 1, 0]}} for s in ("Available", "Hold", "Booked", "Sold", "Blocked")},
-        "available_value": {"$sum": {"$cond": [{"$eq": ["$status", "Available"]}, {"$ifNull": ["$price", 0]}, 0]}}, "sold_value": {"$sum": {"$cond": [{"$in": ["$status", ["Booked", "Sold"]]}, {"$ifNull": ["$price", 0]}, 0]}}, "sqft": {"$sum": {"$ifNull": ["$super_builtup_sqft", 0]}}}}, {"$sort": {"_id": 1}}]).to_list(None)
+        "available_value": {"$sum": {"$cond": [{"$eq": ["$status", "Available"]}, {"$divide": [{"$ifNull": ["$price_paise", 0]}, 100]}, 0]}}, "sold_value": {"$sum": {"$cond": [{"$in": ["$status", ["Booked", "Sold"]]}, {"$divide": [{"$ifNull": ["$price_paise", 0]}, 100]}, 0]}}, "sqft": {"$sum": {"$ifNull": ["$super_builtup_sqft", 0]}}}}, {"$sort": {"_id": 1}}]).to_list(None)
     names = {b["id"]: f"{b.get('project_code', '')} {b['name']}" for b in await db.blocks.find({"company_id": user["company_id"]}, {"_id": 0, "id": 1, "name": 1, "project_code": 1}).to_list(None)}
     names.update({p["id"]: p["name"] for p in await db.projects.find({"company_id": user["company_id"]}, {"_id": 0, "id": 1, "name": 1}).to_list(None)})
     def label(k):
@@ -353,12 +357,21 @@ def _addr(a: dict | None) -> str:
 
 
 @router.get("/statement/{booking_id}")
-async def statement(booking_id: str, format: str | None = None, user: dict = Depends(require("booking.read"))):
+async def statement(booking_id: str, format: str | None = None, download: int = 0, user: dict = Depends(require("booking.read"))):
+    if format == "pdf":
+        content, name = await build_statement_pdf(booking_id, user)
+        return _pdf.pdf_response(content, name, bool(download))
+    b, customer, demands, payments, ledger, company = await _booking_bundle(booking_id, user)
+    return present_money({"booking": b, "customer": customer, "demands": demands, "payments": payments, "ledger": ledger, "company": company})
+
+
+async def build_statement_pdf(booking_id: str, user: dict) -> tuple[bytes, str]:
     b, customer, demands, payments, ledger, company = await _booking_bundle(booking_id, user)
     s = b.get("summary") or {}
-    if format != "pdf":
-        return present_money({"booking": b, "customer": customer, "demands": demands, "payments": payments, "ledger": ledger, "company": company})
-    d = _pdf.BrandedDoc("Customer Statement of Account", company, landscape_mode=True, subtitle=f"Booking {b['booking_number']} · as of {_pdf.fmt_date(date.today().isoformat())}")
+    as_of = _pdf.today_ist()
+    code = _pdf.verify_code("statement", f"{b['id']}:{as_of}")
+    await db.doc_verifications.update_one({"code": code}, {"$set": {"code": code, "doc_type": "statement", "entity_id": b["id"], "number": b["booking_number"], "date": as_of}}, upsert=True)
+    d = _pdf.BrandedDoc("Customer Statement of Account", company, landscape_mode=True, number=b["booking_number"], date=as_of, verify=code, subtitle="Statement as of date shown")
     fs = b.get("flat_snapshot") or {}
     d.kv([("Customer", f"{customer.get('salutation') or ''} {customer['full_name']}".strip()), ("Customer code", customer.get("customer_code")), ("Phone", customer.get("phone")), ("Address", _addr(customer.get("address_current"))),
           ("Booking no.", b["booking_number"]), ("Booking date", _pdf.fmt_date(b["booking_date"])), ("Unit", f"{b['project_name']} · {b['block_name']} · {fs.get('flat_number')} ({fs.get('flat_type_code')}, {fs.get('super_builtup_sqft')} sq ft)"), ("Status", b["status"])], cols=2)
@@ -383,13 +396,21 @@ async def statement(booking_id: str, format: str | None = None, user: dict = Dep
         d.table(["Receipt", "Instrument", "Date", "Bank", "Amount"], [[p["receipt_number"], (p.get("instrument") or {}).get("number"), _pdf.fmt_date((p.get("instrument") or {}).get("date")), (p.get("instrument") or {}).get("bank_name"), _pdf.inr(p["amount_paise"])] for p in pend], align_right=[4])
     d.h2("Summary")
     d.table(["Order raised", "Paid", "Cash due", "Account due", "Charges due", "Total due", "Pending cheques"], [[_pdf.inr(s.get("total_order_raised_paise")), _pdf.inr(s.get("paid_paise")), _pdf.inr(s.get("cash_due_paise")), _pdf.inr(s.get("account_due_paise")), _pdf.inr(s.get("other_charges_due_paise")), _pdf.inr(s.get("due_paise", 0) + s.get("other_charges_due_paise", 0)), _pdf.inr(s.get("pending_cheques_paise"))]], align_right=list(range(7)))
+    d.totals([("Total paid", _pdf.inr(s.get("paid_paise"))), ("Pending cheques", _pdf.inr(s.get("pending_cheques_paise"))), ("Total due", _pdf.inr(s.get("due_paise", 0) + s.get("other_charges_due_paise", 0)))])
     d.small(f"Total due in words: {amount_in_words(s.get('due_paise', 0) + s.get('other_charges_due_paise', 0))}. This is a system generated statement; errors and omissions excepted.")
     d.signature(company.get("authorised_signatory_name") or "")
-    return Response(content=d.build(), media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="statement-{b["booking_number"]}.pdf"'})
+    return d.build(), f"statement-{b['booking_number'].replace('/', '-')}.pdf"
 
 
 @router.get("/allotment/{booking_id}")
-async def allotment(booking_id: str, format: str | None = None, user: dict = Depends(require("booking.read"))):
+async def allotment(booking_id: str, format: str | None = None, download: int = 0, user: dict = Depends(require("booking.read"))):
+    if format == "pdf":
+        content, name = await build_allotment_pdf(booking_id, user)
+        return _pdf.pdf_response(content, name, bool(download))
+    return await _allotment_data(booking_id, user)
+
+
+async def _allotment_data(booking_id: str, user: dict, pdf: bool = False):
     b, customer, demands, payments, ledger, company = await _booking_bundle(booking_id, user)
     from services.money import pct_of
     sched = []
@@ -399,9 +420,16 @@ async def allotment(booking_id: str, format: str | None = None, user: dict = Dep
         prev = m["cumulative_percent"]
         sched.append({"seq": m["seq"], "name": m["name"], "cumulative_percent": m["cumulative_percent"], "incremental_percent": inc, "cash_paise": pct_of(b["cash_agreed_paise"], inc), "account_paise": pct_of(b["account_agreed_paise"], inc), "total_paise": pct_of(b["agreement_value_paise"], inc)})
     terms = company.get("allotment_terms") or "1. The allotment is provisional and subject to execution of the Agreement for Sale under RERA.\n2. Payments are construction-linked and due within the demand due period from the date of each demand letter.\n3. Delayed payments attract interest as per the Agreement for Sale.\n4. Other charges (maintenance deposit, registration, taxes) are payable at possession as applicable.\n5. All disputes are subject to Patna jurisdiction."
-    if format != "pdf":
+    if not pdf:
         return present_money({"booking": b, "customer": customer, "schedule": sched, "terms": terms, "company": company})
-    d = _pdf.BrandedDoc("Allotment Letter & Payment Schedule", company, subtitle=f"Ref {b['booking_number']} · {_pdf.fmt_date(b['booking_date'])}")
+    return b, customer, sched, terms, company
+
+
+async def build_allotment_pdf(booking_id: str, user: dict) -> tuple[bytes, str]:
+    b, customer, sched, terms, company = await _allotment_data(booking_id, user, pdf=True)
+    code = _pdf.verify_code("allotment", b["id"])
+    await db.doc_verifications.update_one({"code": code}, {"$set": {"code": code, "doc_type": "allotment", "entity_id": b["id"], "number": b["booking_number"], "date": b["booking_date"]}}, upsert=True)
+    d = _pdf.BrandedDoc("Allotment Letter & Payment Schedule", company, number=b["booking_number"], date=b["booking_date"], verify=code, subtitle="Provisional allotment")
     fs = b.get("flat_snapshot") or {}
     d.p(f"To,<br/><b>{customer.get('salutation') or ''} {customer['full_name']}</b><br/>{_addr(customer.get('address_current'))}<br/>Phone: {customer.get('phone') or '-'}")
     d.spacer(3)
@@ -414,11 +442,12 @@ async def allotment(booking_id: str, format: str | None = None, user: dict = Dep
     if b.get("other_charges"):
         d.h2("Other charges (payable as applicable)")
         d.table(["Charge", "Amount", "GST", "Total", "Payable"], [[c["name"], _pdf.inr(c["amount_paise"]), _pdf.inr(c.get("gst_paise", 0)), _pdf.inr(c["total_paise"]), (c.get("demand_at") or "").replace("_", " ")] for c in b["other_charges"]], align_right=[1, 2, 3])
+    d.totals([("Cash component", _pdf.inr(b["cash_agreed_paise"])), ("Account component", _pdf.inr(b["account_agreed_paise"])), ("Agreement value", _pdf.inr(b["agreement_value_paise"]))])
     d.h2("Terms & conditions")
     for line in terms.split("\n"):
         d.p(line, _pdf.SMALL)
     d.signature(company.get("authorised_signatory_name") or "")
-    return Response(content=d.build(), media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="allotment-{b["booking_number"]}.pdf"'})
+    return d.build(), f"allotment-{b['booking_number'].replace('/', '-')}.pdf"
 
 
 # ---------- Presets ----------

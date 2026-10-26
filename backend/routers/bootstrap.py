@@ -1,7 +1,9 @@
+import asyncio
 """Bootstrap (one call to open the ERP), read-model endpoints, admin recompute."""
 from fastapi import APIRouter, Depends, Request, Response
 
 from db import db
+from infra import surfaces_enabled
 from deps import get_current_user, project_scope_filter, require
 from routers.catalogues import current_version, etag_response
 from services.money import present_money
@@ -13,26 +15,34 @@ router = APIRouter(tags=["bootstrap"])
 
 @router.get("/bootstrap")
 async def bootstrap(request: Request, user: dict = Depends(get_current_user)):
+    from services import ttlcache
+    payload = await ttlcache.cached(f"boot:{user['id']}", 5, lambda: _bootstrap(request, user))
+    r = etag_response(request, payload, max_age=30)
+    r.headers["X-Server-Time"] = now_iso()
+    return r
+
+
+async def _bootstrap(request: Request, user: dict):
     cid = user["company_id"]
     pf = project_scope_filter(user)
-    company = await db.companies.find_one({"id": cid}, {"_id": 0, "id": 1, "name": 1, "legal_name": 1, "gstin": 1, "rera_number": 1, "logo_url": 1, "address": 1, "financial_year_start_month": 1, "demand_due_days": 1, "receipt_prefix": 1})
+    company = await db.companies.find_one({"id": cid}, {"_id": 0, "id": 1, "name": 1, "legal_name": 1, "tagline": 1, "short_code": 1, "gstin": 1, "rera_number": 1, "logo_url": 1, "address": 1, "financial_year_start_month": 1, "demand_due_days": 1, "receipt_prefix": 1})
     role = await db.roles.find_one({"id": user["role_id"]}, {"_id": 0, "id": 1, "name": 1, "description": 1})
     site = await db.site_settings.find_one({"company_id": cid}, {"_id": 0, "brand_name": 1, "portal_url": 1, "phone": 1, "whatsapp": 1, "email": 1}) or {}
     sla = await db.settings.find_one({"key": "sla_hours"}, {"_id": 0, "value": 1})
     today = now_iso()[:10]
-    counts = {"unread_notifications": await db.notifications.count_documents({"user_id": user["id"], "read": False, "withdrawn": {"$ne": True}}),
-              "new_enquiries": await db.leads.count_documents({"company_id": cid, **pf, "source": {"$in": ["Website", "Brochure", "Site Visit"]}, "is_read": {"$ne": True}}),
-              "cheques_pending": await db.payments.count_documents({"company_id": cid, **pf, "status": "Pending"}),
-              "visits_today": await db.site_visits.count_documents({"company_id": cid, **pf, "date": today, "status": {"$in": ["Confirmed", "Rescheduled"]}}),
-              "followups_due": await db.leads.count_documents({"company_id": cid, **pf, "next_follow_up_at": {"$lte": now_iso()}, "status": {"$nin": ["Lost", "Converted"]}})}
+    cnt = await asyncio.gather(
+        db.notifications.count_documents({"user_id": user["id"], "read": False, "withdrawn": {"$ne": True}}),
+        db.leads.count_documents({"company_id": cid, **pf, "source": {"$in": ["Website", "Brochure", "Site Visit"]}, "is_read": {"$ne": True}}),
+        db.payments.count_documents({"company_id": cid, **pf, "status": "Pending"}),
+        db.site_visits.count_documents({"company_id": cid, **pf, "date": today, "status": {"$in": ["Confirmed", "Rescheduled"]}}),
+        db.leads.count_documents({"company_id": cid, **pf, "next_follow_up_at": {"$lte": now_iso()}, "status": {"$nin": ["Lost", "Converted"]}}))
+    counts = dict(zip(("unread_notifications", "new_enquiries", "cheques_pending", "visits_today", "followups_due"), cnt))
     me = strip_private(user)
     me["permissions"] = sorted(user["permissions"])
     payload = {"me": {k: me[k] for k in me if k not in ("permissions",)}, "permissions": me["permissions"], "role": role, "project_scope": user.get("project_scope") or [], "company": company,
-               "settings_public": {"portal_url": site.get("portal_url"), "brand_name": site.get("brand_name"), "sla_hours": (sla or {}).get("value"), "demand_due_days": (company or {}).get("demand_due_days", 15)},
+               "surfaces": {"public_website": surfaces_enabled(request), "customer_portal": surfaces_enabled(request)}, "settings_public": {"portal_url": site.get("portal_url"), "brand_name": site.get("brand_name"), "sla_hours": (sla or {}).get("value"), "demand_due_days": (company or {}).get("demand_due_days", 15)},
                "catalogues_version": await current_version(), "counts": counts}
-    r = etag_response(request, payload, max_age=30)
-    r.headers["X-Server-Time"] = now_iso()
-    return r
+    return payload
 
 
 @router.get("/dashboard/snapshot")

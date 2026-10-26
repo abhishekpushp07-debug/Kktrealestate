@@ -102,8 +102,8 @@ async def _project_card(p: dict, flat_types: dict) -> dict:
         if web.get("starting_price_override"):
             card["starting_price"] = web["starting_price_override"]
         else:
-            m = await db.flats.find({"project_id": p["id"], "status": "Available", "price": {"$gt": 0}}, {"_id": 0, "price": 1}).sort("price", 1).limit(1).to_list(1)
-            card["starting_price"] = m[0]["price"] if m else None
+            m = await db.flats.find({"project_id": p["id"], "status": "Available", "price_paise": {"$gt": 0}}, {"_id": 0, "price_paise": 1}).sort("price_paise", 1).limit(1).to_list(1)
+            card["starting_price"] = m[0]["price_paise"] / 100 if m else None
     return card
 
 
@@ -159,8 +159,8 @@ async def project_detail(slug: str, request: Request, _=Depends(public_guard)):
             if s["flat_type_id"] == fid:
                 cfg["specifications"].setdefault(s.get("category_name") or "General", []).append({"name": s["name"], "value": s.get("brand") or s.get("description")})
         if show_prices:
-            m = await db.flats.find({"project_id": p["id"], "flat_type_id": fid, "status": "Available", "price": {"$gt": 0}}, {"_id": 0, "price": 1}).sort("price", 1).limit(1).to_list(1)
-            cfg["starting_price"] = m[0]["price"] if m else None
+            m = await db.flats.find({"project_id": p["id"], "flat_type_id": fid, "status": "Available", "price_paise": {"$gt": 0}}, {"_id": 0, "price_paise": 1}).sort("price_paise", 1).limit(1).to_list(1)
+            cfg["starting_price"] = m[0]["price_paise"] / 100 if m else None
         configs.append(cfg)
     availability = None
     if web.get("show_availability"):
@@ -171,7 +171,7 @@ async def project_detail(slug: str, request: Request, _=Depends(public_guard)):
             for f in flats:
                 unit = {"number": f["flat_number"], "type": f.get("flat_type_code"), "available": f["status"] == "Available"}
                 if show_prices and f["status"] == "Available":
-                    unit["price"] = f.get("price")
+                    unit["price"] = f["price_paise"] / 100 if f.get("price_paise") else None
                 floors.setdefault(f["floor"], {"floor": f["floor"], "label": f.get("floor_label") or str(f["floor"]), "units": []})["units"].append(unit)
             c = b.get("unit_counts") or {}
             availability.append({"name": b["name"], "code": b["code"], "total": c.get("total", 0), "available": c.get("available", 0), "construction_percent": b.get("construction_percent", 0) if web.get("show_construction_progress") else None,
@@ -359,3 +359,11 @@ async def sitemap(request: Request):
 @router.get("/robots.txt")
 async def robots(request: Request):
     return Response(content=f"User-agent: *\nAllow: /\nDisallow: /erp/\nSitemap: {str(request.base_url).rstrip('/')}/api/public/sitemap.xml\n", media_type="text/plain")
+
+
+@router.get("/verify/{code}")
+async def verify_document(code: str, request: Request):
+    """Verify a footer code printed on a KKT document. Returns only document type/number/date — no customer data."""
+    await enforce_rate_limit(f"public-verify:{client_ip(request)}", 30, 60)
+    doc = await db.doc_verifications.find_one({"code": code.strip().upper()}, {"_id": 0, "doc_type": 1, "number": 1, "date": 1})
+    return {"valid": bool(doc), **(doc or {})}

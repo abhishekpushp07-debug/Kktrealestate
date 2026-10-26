@@ -20,9 +20,9 @@ export function NotificationBell() {
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <button className="relative flex h-10 w-10 items-center justify-center rounded-[10px] border border-warm-200 bg-warm-100 text-ink-950 transition-colors hover:bg-white" aria-label={`Notifications${unread ? ` (${unread} unread)` : ""}`} data-testid="notif-bell">
+        <button className="relative flex h-10 w-10 items-center justify-center rounded-[10px] border border-warm-200 bg-warm-100 text-ink-950 transition-colors hover:bg-white" aria-label={unread ? `${unread} unread notifications` : "Notifications"} data-testid="notif-bell">
           <Bell className="h-5 w-5" strokeWidth={1.75} />
-          {unread > 0 && <span className="absolute -right-1.5 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-brick px-1.5 text-[10px] font-bold leading-none text-white ring-2 ring-warm-50" data-testid="notif-count">{unread > 9 ? "9+" : unread}</span>}
+          {unread > 0 && <span aria-hidden="true" className="absolute -right-1.5 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-brick px-1.5 text-[10px] font-bold leading-none text-white ring-2 ring-warm-50" data-testid="notif-count">{unread > 9 ? "9+" : unread}</span>}
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-[360px] max-w-[92vw] p-0" data-testid="notif-panel">

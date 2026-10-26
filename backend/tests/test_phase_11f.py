@@ -64,8 +64,14 @@ def test_project_default_cash_percent_seeded(H):
 
 
 def test_cancel_booking_flow(H):
-    bk = requests.get(f"{BASE}/api/bookings?status=Active&page_size=1", headers=H, timeout=20).json()["items"][0]
-    b = requests.get(f"{BASE}/api/bookings/{bk['id']}", headers=H, timeout=20).json()
+    items = requests.get(f"{BASE}/api/bookings?status=Active&page_size=50", headers=H, timeout=20).json()["items"]
+    b = None
+    for bk in items:  # pick an Active booking without pending cheques (other modules leave Pending instruments on their QA bookings)
+        cand = requests.get(f"{BASE}/api/bookings/{bk['id']}", headers=H, timeout=20).json()
+        if not any(p.get("status") == "Pending" for p in cand.get("payments", [])):
+            b = cand
+            break
+    assert b, "no cancellable Active booking"
     r = requests.post(f"{BASE}/api/bookings/{b['id']}/cancel", json={"reason": "QA regression cancel", "refund": 0, "deduction": 0, "version": b["version"]}, headers=H, timeout=20)
     assert r.status_code == 200, r.text
     assert r.json()["status"] == "Cancelled"

@@ -90,9 +90,10 @@ mobile/.metro-cache/
 frontend/node_modules/.cache/default-development/0.pack
 frontend/node_modules/.cache/default-development/15.pack
 frontend/node_modules/.cache/default-development/14.pack
-.env
 .env.*
-*.env
+*.local.env
+!backend/.env
+!frontend/.env
 credentials.json
 *.key
 .credentials

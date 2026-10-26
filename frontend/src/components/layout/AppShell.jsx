@@ -1,3 +1,4 @@
+import monogram from "@/assets/kkt-monogram.svg";
 import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { BarChart3, Building2, ChevronLeft, ChevronRight, FileSignature, Funnel, Globe, Home, KeyRound, LifeBuoy, LogOut, Menu, Plus, Receipt, Search, Settings, UserRound, X } from "lucide-react";
@@ -21,25 +22,25 @@ const NAV = [
   { to: "/payments", label: "Payments", icon: Receipt, perm: "payment.read", match: ["/payments", "/roznamcha"] },
   { to: "/service-requests", label: "Service", icon: LifeBuoy, perm: "service.read", match: ["/service-requests"] },
   { to: "/reports", label: "Reports", icon: BarChart3, perm: "report.view", match: ["/reports"] },
-  { to: "/website/settings", label: "Website", icon: Globe, perm: "cms.read", match: ["/website"] },
+  { to: "/website/settings", label: "Website", icon: Globe, perm: "cms.read", match: ["/website"], surface: "public_website" },
   { to: "/settings", label: "Settings", icon: Settings, perm: "settings.manage", match: ["/settings", "/users", "/roles", "/audit", "/master"] },
 ];
 const QUICK = [["Booking", "/bookings/new", "booking.create"], ["Customer", "/customers?new=1", "customer.write"], ["Payment", "/payments?new=1", "payment.create"], ["Lead", "/leads?new=1", "lead.write"], ["Visit", "/site-visits?new=1", "visit.write"]];
 const CRUMB = { dashboard: "Home", projects: "Projects", customers: "Customers", leads: "Leads", "site-visits": "Site Visits", bookings: "Bookings", payments: "Payments", roznamcha: "Roznamcha", reports: "Reports", "service-requests": "Service", website: "Website", settings: "Settings", users: "Users", roles: "Roles", audit: "Audit log", master: "Catalogues", blocks: "Tower", flats: "Inventory", new: "New", setup: "Setup", catalogues: "Catalogues", "flat-types": "Flat types", "floor-plan-templates": "Floor plans", "plc-types": "PLC types", "spec-categories": "Spec categories", "spec-items": "Spec items", "room-types": "Room types", "area-types": "Area types", "block-types": "Block types", amenities: "Amenities", "construction-stages": "Construction stages", "payment-plans": "Payment plans", "charge-types": "Charge types", "payment-modes": "Payment modes", "bank-accounts": "Bank accounts", "document-types": "Document types", "service-sla": "Service SLA", "construction-progress": "Construction progress", collections: "Collections", outstanding: "Outstanding", inventory: "Inventory", cheques: "Cheques", advances: "Advances", activity: "Activity", "sales-leads": "Sales & Leads", "upcoming-dues": "Upcoming dues", "demand-vs-collection": "Demand vs collection", cancellations: "Cancellations", "roznamcha-range": "Roznamcha range", "bank-receipts": "Bank receipts" };
 
 function Sidebar({ collapsed, setCollapsed, mobile, onClose }) {
-  const { can, company, user } = useAuth();
+  const { can, company, user, surfaces } = useAuth();
   const loc = useLocation();
   return (
     <aside className={cn("flex h-full flex-col bg-ink-950 text-warm-50", collapsed ? "w-[72px]" : "w-[260px]")} data-testid="sidebar">
       <div className="flex h-[72px] items-center gap-3 px-5">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-gold/40 font-display text-lg text-gold-400">K</span>
-        {!collapsed && <div className="min-w-0"><p className="font-display text-xl leading-none tracking-wide">KKT</p><p className="mt-1 truncate text-[11px] text-warm-200/50">{company?.name}</p></div>}
+        <img src={monogram} alt="KKT" className="h-9 w-9 shrink-0 rounded-xl" data-testid="sidebar-monogram" />
+        {!collapsed && <div className="min-w-0"><p className="font-display text-lg leading-none tracking-wide">KKT Constructions</p><p className="mt-1 truncate text-[11px] text-warm-200/75">{company?.tagline || "Real estate ERP"}</p></div>}
         {mobile && <button onClick={onClose} className="ml-auto text-warm-200/70" aria-label="Close menu"><X className="h-5 w-5" /></button>}
       </div>
       <div className="hero-hair mx-5" />
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-5">
-        {NAV.filter((n) => can(n.perm)).map((n) => {
+        {NAV.filter((n) => can(n.perm) && (!n.surface || surfaces?.[n.surface])).map((n) => {
           const active = loc.pathname.startsWith(n.to) || (n.match || []).some((m) => loc.pathname.startsWith(m));
           return <NavLink key={n.to} to={n.to} onClick={onClose} onMouseEnter={() => prefetchRoute(n.to)} onFocus={() => prefetchRoute(n.to)} className={cn("sb-item", active && "active", collapsed && "justify-center px-0")} data-testid={`nav-${n.label.toLowerCase().replace(/[^a-z]+/g, "-")}`} title={n.label}><n.icon className="h-5 w-5 shrink-0" strokeWidth={1.75} />{!collapsed && <span>{n.label}</span>}</NavLink>;
         })}
@@ -47,9 +48,9 @@ function Sidebar({ collapsed, setCollapsed, mobile, onClose }) {
       <div className="border-t border-white/5 p-3">
         <div className={cn("flex items-center gap-3 rounded-xl px-2 py-2", collapsed && "justify-center")}>
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-ink-700 text-xs font-bold text-gold-400">{initials(user?.name)}</span>
-          {!collapsed && <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{user?.name}</p><p className="truncate text-[11px] text-warm-200/50">{user?.role_name}</p></div>}
+          {!collapsed && <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{user?.name}</p><p className="truncate text-[11px] text-warm-200/75">{user?.role_name}</p></div>}
         </div>
-        {!mobile && <button onClick={() => setCollapsed(!collapsed)} className="mt-1 flex h-9 w-full items-center justify-center rounded-lg text-warm-200/50 hover:bg-white/5 hover:text-warm-50" data-testid="sidebar-toggle" aria-label="Toggle sidebar">{collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}</button>}
+        {!mobile && <button onClick={() => setCollapsed(!collapsed)} className="mt-1 flex h-9 w-full items-center justify-center rounded-lg text-warm-200/75 hover:bg-white/5 hover:text-warm-50" data-testid="sidebar-toggle" aria-label="Toggle sidebar">{collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}</button>}
       </div>
     </aside>
   );

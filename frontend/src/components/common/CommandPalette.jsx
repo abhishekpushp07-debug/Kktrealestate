@@ -44,7 +44,17 @@ export function CommandPalette() {
     let pendingG = 0;
     const onKey = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setOpen((o) => !o); return; }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {  // Ctrl/Cmd+S submits the nearest open form instead of "Save page"
+        const form = document.activeElement?.closest?.("form") || document.querySelector("[role=dialog] form, form[data-save-on-shortcut]");
+        if (form) { e.preventDefault(); form.requestSubmit(); }
+        return;
+      }
       if (typing(e) || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "/") {  // `/` focuses the first search box on the page
+        const s = document.querySelector("main input[type=search], main input[data-search], main input[placeholder*='Search' i], input[type=search], input[placeholder*='Search' i]");
+        if (s) { e.preventDefault(); s.focus(); s.select?.(); }
+        return;
+      }
       if (e.key === "?") { e.preventDefault(); setHelp((h) => !h); return; }
       if (e.key === "g") { pendingG = Date.now(); return; }
       if (pendingG && Date.now() - pendingG < 1200 && GO[e.key]) { e.preventDefault(); pendingG = 0; navigate(GO[e.key][0]); return; }

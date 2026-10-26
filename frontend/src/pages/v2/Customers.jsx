@@ -61,7 +61,7 @@ export default function Customers() {
       </header>
       <section className="space-y-4" data-testid="customer-filters">
         <div className="flex flex-col gap-3 md:flex-row md:items-center">
-          <label className="relative flex-1"><Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-txt-muted" strokeWidth={1.75} /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Name, phone, code, PAN…" className="input !pl-10" data-testid="customer-search" /></label>
+          <label className="relative flex-1"><Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-txt-muted" strokeWidth={1.75} /><input type="search" aria-label="Search customers" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Name, phone, code, PAN…" className="input !pl-10" data-testid="customer-search" /></label>
           <div className="flex flex-wrap gap-2">
             <Select type="customer_segment" value={f.segment_id} onChange={(v) => setF({ ...f, segment_id: v })} placeholder="Segment" allowAdd={false} className="w-40" testId="filter-segment" />
             <Select options={people} value={f.assigned_sales_user_id} onChange={(v) => setF({ ...f, assigned_sales_user_id: v })} placeholder="RM" allowAdd={false} className="w-40" testId="filter-rm" />

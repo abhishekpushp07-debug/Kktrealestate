@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { CheckCircle2, Printer, Search } from "lucide-react";
 import { toast } from "sonner";
 import api, { errMsg, BASE_PATH } from "@/lib/api";
+import { FieldError, useFieldErrors } from "@/lib/formErrors";
 import { useAuth } from "@/context/AuthContext";
 import { useFetch, useMasterOptions } from "@/hooks/useList";
 import { useCatalogues } from "@/hooks/useCatalogues";
@@ -39,6 +40,8 @@ function BookingPicker({ value, onChange, customerId }) {
 
 export function PostPayment({ open, onOpenChange, bookingId, customerId, onPosted }) {
   const { user, can } = useAuth();
+  const fe = useFieldErrors();
+  const [serverErr, setServerErr] = useState(null);
   const nav = useNavigate();
   const people = usePeople();
   const [booking, setBooking] = useState(null);
@@ -70,7 +73,7 @@ export function PostPayment({ open, onOpenChange, bookingId, customerId, onPoste
       const body = { booking_id: booking.id, against: f.against, payment_category: f.against === "FLAT_VALUE" ? f.payment_category : null, other_charge_line_id: f.against === "OTHER_CHARGE" ? f.other_charge_line_id : null, amount: amt, payment_date: f.payment_date, payment_mode_id: f.payment_mode_id, bank_account_id: isCash ? null : f.bank_account_id, remarks: f.remarks || null, instrument: isCash ? null : { number: f.number || null, date: f.inst_date || null, bank_name: banksCat.find((b) => b.value === f.inst_bank_id)?.label || null } };
       const r = await api.post("/payments", body, { headers: { "Idempotency-Key": key } });
       setDone(r.data); onPosted?.(r.data);
-    } catch (err) { const m = errMsg(err); toast.error(m, { duration: 10000, action: can("agreement.edit") && /Revise agreement/i.test(m) ? { label: "Revise agreement", onClick: () => { onOpenChange(false); nav(`/bookings/${booking.id}?revise=1`); } } : undefined }); } finally { setBusy(false); }
+    } catch (err) { const m = errMsg(err); fe.capture(err); setServerErr(/cap|exceed|Revise agreement/i.test(m) ? m.split(" — ")[0] : null); toast.error(m, { duration: 10000, action: can("agreement.edit") && /Revise agreement/i.test(m) ? { label: "Revise agreement", onClick: () => { onOpenChange(false); nav(`/bookings/${booking.id}?revise=1`); } } : undefined }); } finally { setBusy(false); }
   };
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -100,7 +103,7 @@ export function PostPayment({ open, onOpenChange, bookingId, customerId, onPoste
                 <Field label="Instrument date"><input type="date" className="input" value={f.inst_date} onChange={(e) => set("inst_date", e.target.value)} data-testid="pp-inst-date" /></Field>
               </div>}
               <div className="grid gap-4 md:grid-cols-2">
-                <Field label="Amount (₹)" required hint={cap && !over ? `Room in this bucket: ${inr(cap.room)}` : undefined} error={over ? `${cap.label} agreed ${inr(cap.agreed)}; already received ${inr(cap.received)}; cannot accept ${inr(amt)}. Revise agreement first.` : null}><input type="number" min="1" step="0.01" className={cn("input font-display text-lg", over && "!border-brick")} value={f.amount} onChange={(e) => set("amount", e.target.value)} required data-testid="pp-amount" /><p className="mt-1.5 font-display text-2xl text-ink-950" data-testid="pp-preview"><Num s={inr(amt)} /></p></Field>
+                <Field label="Amount (₹)" required hint={cap && !over ? `Room in this bucket: ${inr(cap.room)}` : undefined} error={over ? `${cap.label} agreed ${inr(cap.agreed)}; already received ${inr(cap.received)}; cannot accept ${inr(amt)}. Revise agreement first.` : null}><input type="number" min="1" step="0.01" className={cn("input font-display text-lg", over && "!border-brick")} value={f.amount} onChange={(e) => set("amount", e.target.value)} required data-testid="pp-amount" /><FieldError name="amount" fields={{ ...fe.fields, amount: fe.fields.amount || fe.fields.amount_paise || serverErr }} /><p className="mt-1.5 font-display text-2xl text-ink-950" data-testid="pp-preview"><Num s={inr(amt)} /></p></Field>
                 <div className="space-y-4"><Field label="Payment date" required><input type="date" className="input" value={f.payment_date} max={today()} min={booking.booking_date} onChange={(e) => set("payment_date", e.target.value)} data-testid="pp-date" /></Field><Field label="Received by"><Select options={people} value={f.received_by} onChange={(v) => set("received_by", v)} allowAdd={false} testId="pp-received-by" /></Field></div>
               </div>
               <Field label="Remarks"><input className="input" value={f.remarks} onChange={(e) => set("remarks", e.target.value)} data-testid="pp-remarks" /></Field>

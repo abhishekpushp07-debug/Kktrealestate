@@ -5,6 +5,7 @@ import time
 from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
@@ -13,6 +14,7 @@ from starlette.middleware.cors import CORSMiddleware
 from db import client, db, ensure_indexes
 from deps import require
 from infra import (
+    timed_job,
     START_TIME,
     ETagMiddleware,
     IdempotencyMiddleware,
@@ -104,8 +106,10 @@ async def _reconcile():
 
 
 async def _integrity():
+    from infra import timed_job
     from services.integrity import integrity_report
-    ir = await integrity_report()
+    ir = await timed_job("integrity", integrity_report)
+    await db.settings.update_one({"key": "integrity_last_report"}, {"$set": {"value": ir}}, upsert=True)
     logging.getLogger("kkt.integrity").info("[phase7] integrity: ok=%s bookings=%s counts=%s", ir["ok"], ir["bookings_checked"], ir["counts"])
 
 
@@ -128,6 +132,7 @@ async def startup_tasks():
     from services.portal_notify import sweep_notifications
     from routers.visits import seed_phase9
     from startup_phase11 import startup_phase11
+    from services.validators import apply_validators, backfill_price_paise
     STARTUP["started_at"] = __import__("datetime").datetime.now(__import__("datetime").UTC).isoformat()
     try:
         leader = await try_acquire("startup")
@@ -140,7 +145,7 @@ async def startup_tasks():
     steps = [("seed_if_empty", seed_if_empty), ("seed_phase15", seed_phase15), ("seed_phase2", seed_phase2), ("seed_phase3", seed_phase3), ("system_roles", _system_roles),
              ("seed_marketing_user", seed_marketing_user), ("seed_phase5", seed_phase5), ("migrate_phase7", migrate_phase7), ("seed_phase7", seed_phase7),
              ("backfill_demand_installments", backfill_demand_installments), ("sweep_notifications", sweep_notifications), ("integrity_report", _integrity),
-             ("seed_phase9", seed_phase9), ("counters", _counters_once), ("reconcile", _reconcile), ("startup_phase11", startup_phase11)]
+             ("seed_phase9", seed_phase9), ("counters", _counters_once), ("reconcile", _reconcile), ("startup_phase11", startup_phase11), ("schema_validators", apply_validators), ("price_paise_backfill", backfill_price_paise)]
     t0 = time.perf_counter()
     for name, fn in steps:
         await _step(name, fn)
@@ -195,16 +200,18 @@ async def lifespan(app: FastAPI):
     client.close()
 
 
-app = FastAPI(title="KKT Real Estate ERP", version=VERSION, openapi_url="/api/openapi.json", docs_url="/api/docs", redoc_url="/api/redoc", lifespan=lifespan)
+from fastapi.responses import ORJSONResponse
+app = FastAPI(default_response_class=ORJSONResponse, title="KKT Real Estate ERP", version=VERSION, openapi_url="/api/openapi.json", docs_url="/api/docs", redoc_url="/api/redoc", lifespan=lifespan)
 
 
+@app.exception_handler(StarletteHTTPException)
 @app.exception_handler(HTTPException)
 async def http_exc_handler(request: Request, exc: HTTPException):
     code = getattr(exc, "code", None) or STATUS_CODES.get(exc.status_code, "ERROR")
     detail = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
-    content = {"detail": detail, "code": code, "request_id": getattr(request.state, "request_id", None)}
+    rid = getattr(request.state, "request_id", None)
     extra = getattr(exc, "extra", None) or {}
-    content.update(extra)
+    content = {"detail": detail, "code": code, "request_id": rid, **extra, "error": {"code": code, "message": detail, "details": [extra] if extra else [], "request_id": rid}}
     headers = dict(getattr(exc, "headers", None) or {})
     if exc.status_code == 429 and extra.get("retry_after"):
         headers["Retry-After"] = str(extra["retry_after"])
@@ -218,13 +225,16 @@ async def validation_exc_handler(request: Request, exc: RequestValidationError):
         loc = ".".join(str(x) for x in e.get("loc", []) if x not in ("body", "query", "path"))
         errors.append({"field": loc, "message": e.get("msg", "").replace("Value error, ", "")})
     summary = "; ".join(f"{e['field']}: {e['message']}" if e["field"] else e["message"] for e in errors[:5])
-    return JSONResponse(status_code=422, content={"detail": summary or "Validation error", "code": "VALIDATION_ERROR", "errors": errors, "request_id": getattr(request.state, "request_id", None)})
+    rid = getattr(request.state, "request_id", None)
+    msg = summary or "Validation error"
+    return JSONResponse(status_code=422, content={"detail": msg, "code": "VALIDATION_ERROR", "errors": errors, "request_id": rid, "error": {"code": "VALIDATION_ERROR", "message": msg, "details": errors, "request_id": rid}})
 
 
 @app.exception_handler(Exception)
 async def unhandled_exc_handler(request: Request, exc: Exception):
     logger.exception("Unhandled error")
-    return JSONResponse(status_code=500, content={"detail": "Internal server error", "code": "INTERNAL_ERROR", "request_id": getattr(request.state, "request_id", None)})
+    rid = getattr(request.state, "request_id", None)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error", "code": "INTERNAL_ERROR", "request_id": rid, "error": {"code": "INTERNAL_ERROR", "message": "Internal server error", "details": [], "request_id": rid}})
 
 
 api_router = APIRouter(prefix="/api")
@@ -237,7 +247,7 @@ async def _dues_loop():
     ist = timezone(timedelta(hours=5, minutes=30))
     while True:
         try:
-            res = await run_dues_for_all()
+            res = await timed_job("dues_engine", run_dues_for_all)
             if res["demands_raised"]:
                 logger.info("Dues engine raised %s demands", res["demands_raised"])
             from services.integrity import integrity_report
@@ -260,7 +270,7 @@ async def _overdue_loop():
     from routers.notifications import overdue_demand_job
     while True:
         try:
-            await overdue_demand_job()
+            await timed_job("overdue_notifications", overdue_demand_job)
         except Exception:
             logging.getLogger("kkt").exception("overdue job failed")
         await asyncio.sleep(24 * 3600)
@@ -305,7 +315,8 @@ async def metrics(user: dict = Depends(require("settings.manage"))):
     return metrics_snapshot()
 
 
-for r in (auth.router, users.router, roles.router, master.router, projects.router, rate_cards.router, blocks.router, flats.router, parking.router,
+from routers import ops as _ops
+for r in (_ops.router, auth.router, users.router, roles.router, master.router, projects.router, rate_cards.router, blocks.router, flats.router, parking.router,
           settings.router, audit.router, dashboard.router, search.router, imports.router,
           customers.router, leads.router, documents.router, bookings.router, milestones.router, payments.router, roznamcha.router, admin.router, cms.router, public.router, reports.router, notifications.router, pdfs.router, dashboard_widgets.router, portal.router, portal.mgmt, support.router, construction.router, visits.pub, visits.router,
           catalogues.router, project_setup.router, crm.router, bootstrap.router, home.router):
@@ -313,9 +324,10 @@ for r in (auth.router, users.router, roles.router, master.router, projects.route
 
 app.include_router(api_router)
 
-DEFAULT_ORIGINS = "https://royal-realty-hub-2.preview.emergentagent.com,https://royal-realty-hub-2.expo.preview.emergentagent.com,http://localhost:3000,http://localhost:3002,http://localhost:8081"
-origins = [o.strip() for o in (os.environ.get("CORS_ORIGINS") or DEFAULT_ORIGINS).split(",") if o.strip() and o.strip() != "*"] or DEFAULT_ORIGINS.split(",")
-app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=origins, allow_methods=["*"], allow_headers=["*"], expose_headers=["X-Request-ID", "X-Response-Time", "ETag", "Idempotent-Replayed", "Retry-After"])
+_cors_list = [o.strip() for o in (os.environ.get("CORS_ORIGINS") or "").split(",") if o.strip() and o.strip() != "*"]
+# ERP is same-origin (served at `/`): default DENY. Explicit origins only via CORS_ORIGINS; "*" is ignored (never wildcard + credentials).
+if _cors_list:
+    app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=_cors_list, allow_methods=["*"], allow_headers=["*"], expose_headers=["X-Request-ID", "X-Response-Time", "ETag", "Idempotent-Replayed", "Content-Disposition"])
 app.add_middleware(ETagMiddleware)
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.add_middleware(IdempotencyMiddleware)

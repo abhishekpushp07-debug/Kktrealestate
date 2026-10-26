@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import api, { errMsg } from "@/lib/api";
+import { undoToast } from "@/lib/undo";
 import { useAuth } from "@/context/AuthContext";
 import { useMasterOptions } from "@/hooks/useList";
 import { inr, inrShort, sqft, num } from "@/lib/format";
@@ -30,11 +31,20 @@ export function FlatDrawer({ flatId, onClose, onChanged }) {
 
   const changeStatus = async (status) => {
     setBusy(true);
+    const prev = flat;
+    setFlat((f) => ({ ...f, status }));  // optimistic
     try {
       const r = await api.patch(`/flats/${flatId}/status`, { status, reason: reason || null, version: flat.version });
       setFlat((f) => ({ ...f, ...r.data })); setReason("");
-      toast.success(`${r.data.flat_number} is now ${status}`); onChanged?.();
-    } catch (e) { toast.error(errMsg(e)); } finally { setBusy(false); }
+      const revertible = ["Available", "Hold", "Blocked"].includes(prev.status);
+      if (revertible) undoToast({ title: `${r.data.flat_number} is now ${status}`, description: `Was ${prev.status}`, testId: `flat-move-${flatId}`, onUndo: async () => {
+        const u = await api.patch(`/flats/${flatId}/status`, { status: prev.status, reason: "Undo", version: r.data.version });
+        setFlat((f) => ({ ...f, ...u.data })); onChanged?.();
+        return `Reverted · ${u.data.flat_number} back to ${prev.status}`;
+      } });
+      else toast.success(`${r.data.flat_number} is now ${status}`);
+      onChanged?.();
+    } catch (e) { setFlat(prev); toast.error(errMsg(e)); } finally { setBusy(false); }
   };
 
   const save = async () => {

@@ -2,7 +2,7 @@ import { Suspense, lazy, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AlertTriangle, Banknote, FileWarning, Landmark, Plus, Printer, Receipt, Search } from "lucide-react";
 import { toast } from "sonner";
-import api, { errMsg } from "@/lib/api";
+import api, { errMsg, BASE_PATH } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useFetch, useList } from "@/hooks/useList";
 import { cn } from "@/lib/utils";
@@ -46,7 +46,7 @@ function Row({ p, can, onAct, nav }) {
       <Money value={p.amount} className={cn("w-28 text-right text-lg", p.status === "Reversed" && "text-txt-muted line-through")} />
       <StatusPill status={p.status} />
       <div className="flex gap-1">
-        {can("receipt.print") && <button onClick={() => nav(`/print/receipt/${p.id}`)} className="btn btn-ghost btn-sm !px-2" aria-label="Print" data-testid={`print-${p.id}`}><Printer className="h-4 w-4" /></button>}
+        {can("receipt.print") && <button onClick={() => window.open(`${BASE_PATH}/print/receipt/${p.id}`, "_blank")} className="btn btn-ghost btn-sm !px-2" aria-label="Print" data-testid={`print-${p.id}`}><Printer className="h-4 w-4" /></button>}
         {p.status === "Pending" && can("payment.post") && <><button onClick={() => onAct({ p, kind: "clear" })} className="btn btn-secondary btn-sm" data-testid={`clear-${p.id}`}>Clear</button><button onClick={() => onAct({ p, kind: "bounce" })} className="btn btn-ghost btn-sm text-brick" data-testid={`bounce-${p.id}`}>Bounce</button></>}
         {p.status === "Cleared" && can("payment.reverse") && <button onClick={() => onAct({ p, kind: "reverse" })} className="btn btn-ghost btn-sm text-brick" data-testid={`reverse-${p.id}`}>Reverse</button>}
       </div>
@@ -91,7 +91,7 @@ export default function Payments() {
           <div className="flex flex-wrap gap-2">
             <Select options={["Cleared", "Pending", "Bounced", "Reversed"].map((s) => ({ value: s, label: s }))} value={f.status || null} onChange={(v) => setF({ ...f, status: v || "" })} placeholder="All status" allowAdd={false} className="w-36" testId="pay-filter-status" />
             <Select options={["Cash", "Account"].map((s) => ({ value: s, label: s }))} value={f.payment_category || null} onChange={(v) => setF({ ...f, payment_category: v || "" })} placeholder="All buckets" allowAdd={false} className="w-36" testId="pay-filter-category" />
-            <input type="date" className="input !w-40" value={f.date_from} onChange={(e) => setF({ ...f, date_from: e.target.value })} data-testid="pay-from" /><input type="date" className="input !w-40" value={f.date_to} onChange={(e) => setF({ ...f, date_to: e.target.value })} data-testid="pay-to" />
+            <input type="date" aria-label="From date" className="input !w-40" value={f.date_from} onChange={(e) => setF({ ...f, date_from: e.target.value })} data-testid="pay-from" /><input type="date" aria-label="To date" className="input !w-40" value={f.date_to} onChange={(e) => setF({ ...f, date_to: e.target.value })} data-testid="pay-to" />
           </div>
         </div>
         {list.loading && list.items.length === 0 ? <div className="space-y-3 p-6">{[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-12" />)}</div> : list.items.length === 0 ? <div className="p-6"><EmptyState icon={Receipt} title="No receipts" description="Post the first payment to see it here." testId="receipts-empty" /></div> : <ul className="divide-y divide-warm-100" data-testid="receipts-list">{list.items.map((p) => <Row key={p.id} p={p} can={can} onAct={setAct} nav={nav} />)}</ul>}

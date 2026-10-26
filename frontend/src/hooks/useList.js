@@ -37,6 +37,6 @@ export function usePrefetch() {
 }
 
 export function useMasterOptions(kind, map = (x) => ({ value: x.id, label: x.name, sub: x.code })) {
-  const { data } = useFetch(`/master/${kind}?page_size=100`);
+  const { data } = useFetch(kind ? `/master/${kind}?page_size=100` : null);
   return { options: (data?.items || []).map(map), items: data?.items || [] };
 }

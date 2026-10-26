@@ -1,3 +1,4 @@
+import asyncio
 from datetime import UTC, date as Date, datetime
 from typing import Literal
 
@@ -6,7 +7,8 @@ from pydantic import Field, model_validator
 
 from crypto import decrypt_field, mask
 from db import db
-from deps import ensure_project_access, project_scope_filter, require
+from models_out import PaymentsOut, PaymentsOutPage
+from deps import require_idempotency_key, ensure_project_access, project_scope_filter, require
 from services.ledger import CLEAR_IMMEDIATELY, bucket_paid, line_paid, rebuild
 from services.money import amount_in_words, inr, present_money, to_paise
 from services.numbering import generate_number
@@ -143,7 +145,7 @@ async def payments_summary(params: ListParams = Depends(), project_id: str | Non
     return await list_payments(params, project_id, block_id, booking_id, customer_id, status, payment_category, payment_mode_id, date_from, date_to, user, summary_only=True)
 
 
-@router.get("")
+@router.get("", response_model=PaymentsOutPage, response_model_exclude_unset=True)
 async def list_payments(params: ListParams = Depends(), project_id: str | None = None, block_id: str | None = None, booking_id: str | None = None, customer_id: str | None = None,
                         status: str | None = None, payment_category: str | None = None, payment_mode_id: str | None = None, date_from: Date | None = None, date_to: Date | None = None,
                         user: dict = Depends(require("payment.read")), summary_only: bool = False):
@@ -157,8 +159,8 @@ async def list_payments(params: ListParams = Depends(), project_id: str | None =
         q["payment_date"] = {**({"$gte": date_from.isoformat()} if date_from else {}), **({"$lte": date_to.isoformat()} if date_to else {})}
     if summary_only:
         return await _payment_totals(q)
-    res = await paginate(db.payments, q, params, params.sort_spec(["payment_date", "receipt_number", "amount_paise", "status", "created_at"], "-payment_date"))
-    res["totals"] = await _payment_totals(q)
+    res, totals = await asyncio.gather(paginate(db.payments, q, params, params.sort_spec(["payment_date", "receipt_number", "amount_paise", "status", "created_at"], "-payment_date")), _payment_totals(q))
+    res["totals"] = totals
     from services.includes import expand
     res["items"] = present_money(await expand(res["items"], params.include, "payments"))
     if res.pop("_csv", False):
@@ -167,9 +169,7 @@ async def list_payments(params: ListParams = Depends(), project_id: str | None =
 
 
 @router.post("", status_code=201)
-async def post_payment(body: PaymentIn, request: Request, user: dict = Depends(require("payment.post"))):
-    if not request.headers.get("idempotency-key"):
-        raise ApiError(400, "Idempotency-Key header is required when posting payments", "IDEMPOTENCY_KEY_REQUIRED")
+async def post_payment(body: PaymentIn, request: Request, user: dict = Depends(require("payment.post")), _k: None = Depends(require_idempotency_key)):
     booking = await get_or_404(db.bookings, body.booking_id, "Booking", {"company_id": user["company_id"]})
     ensure_project_access(user, booking["project_id"])
     if body.payment_date.isoformat() < booking["booking_date"]:
@@ -219,7 +219,7 @@ async def cheques_in_hand(user: dict = Depends(require("payment.read"))):
     return present_money({"items": items, "total": len(items), "amount_paise": sum(i["amount_paise"] for i in items)})
 
 
-@router.get("/{payment_id}")
+@router.get("/{payment_id}", response_model=PaymentsOut, response_model_exclude_unset=True)
 async def get_payment(payment_id: str, user: dict = Depends(require("payment.read"))):
     p = await get_or_404(db.payments, payment_id, "Payment", {"company_id": user["company_id"]})
     ensure_project_access(user, p["project_id"])

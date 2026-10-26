@@ -1,15 +1,13 @@
-# KKT Real Estate — monorepo
+# KKT Constructions — Real Estate ERP
 
-Three independently deployable projects share one backend API:
+Single product: the **ERP** (React, `/app/frontend`, served at `/` — login at `/login`) on a **FastAPI + MongoDB** backend (`/app/backend`, `/api/*`).
+The former marketing website and Expo customer portal are parked — zipped under `/app/archive/` (see `archive/README.md`); their backend APIs
+(`/api/public/*`, `/api/portal/*`) stay in the codebase behind `PUBLIC_SURFACES_ENABLED` (default `false` → 404).
 
-| Path | What | Preview URL | Production deployment |
-|---|---|---|---|
-| `/app/backend` | FastAPI + MongoDB API (`/api/*`), serves ERP, website and portal | `https://royal-realty-hub-2.preview.emergentagent.com/api` | **Deployment 1** (with the ERP frontend) — e.g. `https://erp.kkt.in` |
-| `/app/frontend` | **ERP** React app (staff). Mounted under `REACT_APP_BASE_PATH` (`/erp` in preview, `/` in production). `/portal*` on this origin redirects to Site Settings → `portal_url` (the Expo portal). | `…/erp` | Deployment 1 |
-| `/app/site` | **Marketing website** — standalone React app, public endpoints only | `…/` (proxied from the ERP dev server) | **Deployment 2** (static) — e.g. `https://www.kkt.in` |
-| `/app/mobile` | **Customer portal** — Expo app (web + iOS/Android), owned by the Expo specialist; consumes `/api/portal/*` | `https://royal-realty-hub-2.expo.preview.emergentagent.com` | **Deployment 3** — e.g. `https://my.kkt.in` |
-
-No code is imported across projects. `/app/frontend/src/setupProxy.js` + `scripts/dev.js` are preview-only glue (see below).
+- Build: `cd frontend && yarn build` (plain `craco build` via `scripts/build.js`; no `.env` needed → `build/index.html` + `static/`).
+- Preview: `scripts/dev.js` serves the build at `/` with SPA fallback; `/erp` and `/erp/*` redirect permanently to the root path.
+- Money: integer paise in the API (`*_paise`), rupees everywhere in the UI/PDF/CSV (`₹71,00,000`, `₹1.83 Cr`).
+- Numbers: receipts `KKT/2526/00001`, bookings `BK-2526-0001`.
 
 ## Environment variables
 

@@ -1,3 +1,5 @@
+import hashlib
+import asyncio
 import os
 import re
 import uuid
@@ -34,6 +36,13 @@ def now_iso() -> str:
 
 def new_id() -> str:
     return str(uuid.uuid4())
+
+
+def with_price(doc):
+    """flats.price_paise is the only stored price; expose derived rupee `price` for display/back-compat."""
+    if isinstance(doc, dict) and "price_paise" in doc and doc.get("price_paise") is not None:
+        doc["price"] = doc["price_paise"] / 100
+    return doc
 
 
 def request_origin(request: Request) -> str:
@@ -123,9 +132,21 @@ async def paginate(coll, query: dict, params: ListParams, sort, projection: dict
     if params.format == "csv":
         items = await coll.find(query, proj).sort(sort).limit(10000).to_list(10000)
         return {"items": items, "total": len(items), "page": 1, "page_size": len(items), "next_cursor": None, "_csv": True}
-    total = await coll.count_documents(query) if params.with_total is not False else None
-    cursor = coll.find(query, proj).sort(sort).skip((params.page - 1) * params.page_size).limit(params.page_size + (1 if total is None else 0))
-    items = await cursor.to_list(params.page_size + 1)
+    if params.page == 1 and not params.search:
+        from services import ttlcache
+        ck = f"list:{coll.name}:{hashlib.md5(repr((query, sort, proj, params.page_size, params.with_total)).encode()).hexdigest()}"
+        return await ttlcache.cached(ck, 5, lambda: _page(coll, query, params, sort, proj))
+    return await _page(coll, query, params, sort, proj)
+
+
+async def _page(coll, query: dict, params: ListParams, sort, proj: dict) -> dict:
+    cursor = coll.find(query, proj).sort(sort).skip((params.page - 1) * params.page_size).limit(params.page_size + 1)
+    if params.with_total is not False:
+        total, items = await asyncio.gather(coll.count_documents(query), cursor.to_list(params.page_size + 1))  # count and page in parallel
+    else:
+        total, items = None, await cursor.to_list(params.page_size + 1)
+    if total is not None:
+        items = items[: params.page_size]
     has_more = (params.page * params.page_size < total) if total is not None else len(items) > params.page_size
     items = items[:params.page_size]
     return {"items": items, "total": total, "page": params.page, "page_size": params.page_size, "next_cursor": items[-1]["id"] if has_more and items else None}

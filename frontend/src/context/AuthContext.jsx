@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { loadBootstrap } from "@/lib/bootstrapCache";
 import api, { setLogoutHandler, tokens } from "@/lib/api";
 
 const AuthCtx = createContext(null);
@@ -8,6 +9,7 @@ export function AuthProvider({ children }) {
   const qc = useQueryClient();
   const [user, setUser] = useState(null);
   const [company, setCompany] = useState(null);
+  const [surfaces, setSurfaces] = useState({ public_website: false, customer_portal: false });
   const [loading, setLoading] = useState(true);
 
   const logout = useCallback(async () => {
@@ -19,8 +21,8 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     setLogoutHandler(() => { tokens.clear(); setUser(null); });
     if (!tokens.access) { setLoading(false); return; }
-    Promise.all([qc.fetchQuery({ queryKey: ["fetch", "/auth/me"], queryFn: () => api.get("/auth/me").then((r) => r.data), staleTime: 5 * 60_000 }), qc.fetchQuery({ queryKey: ["fetch", "/settings/company"], queryFn: () => api.get("/settings/company").then((r) => r.data), staleTime: 10 * 60_000 })])
-      .then(([u, c]) => { setUser(u); setCompany(c); })
+    Promise.all([qc.fetchQuery({ queryKey: ["fetch", "/auth/me"], queryFn: () => api.get("/auth/me").then((r) => r.data), staleTime: 5 * 60_000 }), qc.fetchQuery({ queryKey: ["fetch", "/settings/company"], queryFn: () => api.get("/settings/company").then((r) => r.data), staleTime: 10 * 60_000 }), loadBootstrap().then((b) => b?.surfaces).catch(() => null)])
+      .then(([u, c, sf]) => { setUser(u); setCompany(c); if (sf) setSurfaces(sf); })
       .catch(() => tokens.clear())
       .finally(() => setLoading(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -33,6 +35,7 @@ export function AuthProvider({ children }) {
     const c = await api.get("/settings/company");
     qc.setQueryData(["fetch", "/settings/company"], c.data);
     setCompany(c.data);
+    loadBootstrap(true).then((b) => b?.surfaces && setSurfaces(b.surfaces)).catch(() => {});
     return data;
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -43,14 +46,15 @@ export function AuthProvider({ children }) {
     const c = await api.get("/settings/company");
     qc.setQueryData(["fetch", "/settings/company"], c.data);
     setCompany(c.data);
+    loadBootstrap(true).then((b) => b?.surfaces && setSurfaces(b.surfaces)).catch(() => {});
     return data;
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const value = useMemo(() => ({
-    user, company, loading, login, loginMfa, logout, setCompany,
+    user, company, surfaces, loading, login, loginMfa, logout, setCompany,
     can: (perm) => !!user?.permissions?.includes(perm),
     canAny: (...perms) => perms.some((p) => user?.permissions?.includes(p)),
-  }), [user, company, loading, login, loginMfa, logout]);
+  }), [user, company, surfaces, loading, login, loginMfa, logout]);
 
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
 }

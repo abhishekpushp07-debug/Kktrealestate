@@ -1,0 +1,38 @@
+{
+  "summary": "Phase C refocus (ERP-only, KKT Constructions, surfaces parked) end-to-end verified on preview ROOT. BACKEND pytest (7/7 pass, /app/backend/tests/test_phase_c_refocus.py): (1) GET /api/public/projects without bypass header -> 404 with error.code='NOT_FOUND' + request_id; (2) GET /api/portal/config without bypass header -> 404 same shape; NOTE: initial failures were caused by /app/backend/tests/conftest.py auto-injecting the X-Rate-Limit-Bypass header on every requests.* call, which re-enables parked surfaces per infra.py:54; I bypassed it in the new test file by using plain urllib.request so the public/portal checks go through unauthenticated as per the task constraint. (3) GET /api/bootstrap (admin bearer, no bypass header) -> surfaces={public_website:false,customer_portal:false}, company.name='KKT Constructions'. (4) GET /api/settings/company -> receipt_prefix='KKT', tagline='Building trust, delivering homes'. (5) Latest payment receipt PDF (/api/payments/{id}/receipt.pdf) extracted via pypdf -> contains 'KKT Constructions', no 'paise'. (6) GET /api/reports/collections?format=csv -> header has no 'paise'; _inr columns present. (7) GET /api/health -> 200 in <500ms (observed ~190ms end-to-end from edge). FRONTEND (Playwright on https://royal-realty-hub-2.preview.emergentagent.com): (1) ROOT '/' -> login page at /login with [data-testid=login-monogram] AND [data-testid=login-brand] = 'KKT Constructions Building trust, delivering homes' (screenshot 02_login_root.jpeg); (2) /erp/login -> 302s to /login AND after login /erp/dashboard -> /dashboard (no /erp prefix); (3) Admin login OK -> /dashboard: [data-testid=sidebar-monogram] present, body contains 'KKT Constructions', 'Collected this month' KPI visible, 21 '₹' occurrences on dashboard, sidebar nav does NOT contain 'Website' (screenshot 03_dashboard.jpeg); (4) Customer 360 for Priya Verma: HTML does NOT contain 'Portal access' section nor 'Share portal login' anywhere; the hero kebab [data-testid=hero-more] menu items = ['Log communication','Print / download statement','Edit profile'] - no portal entry (screenshot 04_hero_more_menu.jpeg); (5) BK-2526-0002 detail page: amounts rendered with ₹ + Indian grouping (samples: ₹65,00,000 ₹32,50,000 ₹10,00,000 ₹30,00,000 ₹5,00,000 ₹12,00,000 ₹35,00,000 ₹5,50,000). NOTE: spec expected '₹71,00,000' but current seed has agreement_value ₹65,00,000 flat + ₹2.7L other charges = ₹69.6L total; grouping is correct regardless (screenshot 05_booking_bk0002.jpeg); (6) Posted ₹1,000 Cash/Cash on BK-2526-0002 via Post Payment sheet (pp-category-Cash, pp-amount=1000, pp-mode-trigger -> role=option Cash, pp-submit) -> success state showed 'POSTED ₹1,000 KKT/2627/00009'; clicking 'Print / download receipt' opened popup at /print/receipt/31448d4e-b807-40cd-9f58-0a67120e425f (NO /erp/ in URL), PDF embed element present. Receipt body text extraction is limited (PDF rendered inside <embed>) but the equivalent backend PDF test (test_receipt_pdf_text_kkt) confirms 'KKT Constructions' appears in the extracted PDF text (screenshot 06_receipt_print.jpeg - only popup inner_text captured, PDF content is inside embed); (7) /payments summary cards show ₹ (₹0 Collected this month, ₹5 L Cheques in hand, ₹1.01 Cr past due) - 24 ₹ occurrences on page (screenshot 07_payments_summary.jpeg).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase_c_refocus.py",
+    "/app/test_reports/pytest/phase_c_refocus.xml"
+  ],
+  "action_items": [
+    "SEED/SPEC MISMATCH (non-blocking): Task spec expected BK-2526-0002 agreement to show ₹71,00,000 with Indian grouping; current seed renders ₹65,00,000 (flat value) + ₹2.7L other = ₹69.6L total agreement. Indian-grouping formatting itself is correct (verified via multiple amounts). Main agent should decide whether to (a) update seed data to match the spec amount, or (b) update the task-spec assertion to match the current seed."
+  ],
+  "critical_code_review_comments": [
+    "infra.py surfaces_enabled(request) correctly returns False when PUBLIC_SURFACES_ENABLED=false AND the request does not carry the LOGIN_RATE_LIMIT_BYPASS_TOKEN header; middleware then short-circuits /api/public/* and /api/portal/* to a 404 envelope with code=NOT_FOUND and request_id. Clean design.",
+    "backend/tests/conftest.py (lines 31-38 and 70-74) auto-injects X-Rate-Limit-Bypass on all requests/httpx calls. Any new 'parked surfaces' test MUST avoid these libraries (use urllib directly) or the bypass re-enables the surfaces and the 404 assertion will fail. Consider adding a conftest fixture `raw_client` or an opt-out marker (e.g., @pytest.mark.no_bypass) to make this ergonomic for future tests.",
+    "Post Payment sheet UX: after submit, the sheet remains open on 'POSTED' state and the user must manually click 'Print / download receipt' which opens the /print/receipt/{id} page in a NEW TAB (window.open). The task spec reads 'receipt print page opens at /print/receipt/<paymentId>' which is satisfied, but automated e2e tests should expect a popup rather than same-tab navigation.",
+    "Receipt print page uses <embed>/<iframe> for the PDF so page.inner_text('body') cannot verify the KKT letterhead text from the UI alone; this is correctly covered by the backend PDF-text test. Keeping both tests is the right defense-in-depth."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase_c_refocus.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (7/7)",
+    "frontend": "100% (all 7 flow steps verified; one seed-value mismatch noted as non-blocking)"
+  },
+  "test_credentials": "admin@kkt.in / Kkt@12345 (from /app/memory/test_credentials.md).",
+  "seed_data_creation": "Posted 2 small test payments on BK-2526-0002 (₹1,000 Cash each, receipts KKT/2627/00008 and KKT/2627/00009) during manual flow verification. Does not meaningfully perturb the test seed; cash paid rose from ₹10,00,000 -> ₹10,02,000.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "To test the parked public/portal surfaces, DO NOT use the shared `requests` session that conftest.py monkeypatches - it adds X-Rate-Limit-Bypass automatically and that header is the test switch that re-enables surfaces. Use urllib.request (or a fresh requests.Session with explicit header={}, which still gets patched - urllib is safer). The Post Payment flow opens the receipt in a popup (window.open) not same-tab, so use page.expect_popup() when automating. Current BK-2526-0002 id in the seed is faf6ae4b-13cc-4672-9754-e9f43c9d07e0 and agreement_value is ₹65,00,000 flat + ₹2.7L other (total ₹69.6L); if spec says ₹71,00,000 either reseed or relax the assertion. Receipt prefix is KKT; latest receipt numbers after this run: KKT/2627/00009. All screenshots saved under /app/memory/qa/refocus/ (02..07).",
+  "rca of the issue": "No functional issue found. Original test harness friction: initial 3 pytest failures (public_projects_parked, portal_config_parked, bootstrap surfaces) were an artefact of /app/backend/tests/conftest.py auto-injecting X-Rate-Limit-Bypass on all requests.*. Mitigation applied: new test file uses urllib.request for the parked-surface and bootstrap checks so the bypass is never attached. After mitigation, 7/7 pass. Phase C requirements (ERP-only, no /erp prefix, no customer_portal UI, ₹ Indian grouping, KKT branding on login + sidebar + receipt PDF, CSV without paise, health <500ms) are all met in both backend and frontend."
+}

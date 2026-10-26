@@ -133,11 +133,6 @@ let webpackConfig = {
       if (emergentOverlay) {
         webpackConfig.plugins.push(emergentOverlay.webpackPlugin);
       }
-      // Production build: package site (/), ERP (/erp) and portal (/portal) into one build/ (scripts/package-build.js).
-      if (!isDevServer && process.env.KKT_SKIP_PACKAGE !== "true") {
-        const KktPackagePlugin = require("./scripts/package-plugin");
-        webpackConfig.plugins.push(new KktPackagePlugin());
-      }
       return webpackConfig;
     },
   },
