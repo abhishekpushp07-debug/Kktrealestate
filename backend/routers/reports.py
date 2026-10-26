@@ -457,6 +457,15 @@ async def build_allotment_pdf(booking_id: str, user: dict) -> tuple[bytes, str]:
         d.h2("Other charges (payable as applicable)")
         d.table(["Charge", "Amount", "GST", "Total", "Payable"], [[c["name"], _pdf.inr(c["amount_paise"]), _pdf.inr(c.get("gst_paise", 0)), _pdf.inr(c["total_paise"]), (c.get("demand_at") or "").replace("_", " ")] for c in b["other_charges"]], align_right=[1, 2, 3])
     d.totals([("Cash component", _pdf.inr(b["cash_agreed_paise"])), ("Account component", _pdf.inr(b["account_agreed_paise"])), ("Agreement value", _pdf.inr(b["agreement_value_paise"]))])
+    led = await db.ledger_entries.find({"booking_id": b["id"]}, {"_id": 0}).sort("seq", 1).to_list(None)
+    if led:
+        tu, tj = sum(e.get("udhar_paise", 0) for e in led), sum(e.get("jama_paise", 0) for e in led)
+        d.h2("Account position as on date (Udhar / Jama)")
+        d.table(["Date", "Particulars", "Udhar", "Jama", "Mode / Instrument", "Balance"],
+                [[_pdf.fmt_date(e["date"]), f"{e['type'].replace('_', ' ').title()} — {e.get('note') or ''}", _pdf.inr(e["udhar_paise"]) if e.get("udhar_paise") else "", _pdf.inr(e["jama_paise"]) if e.get("jama_paise") else "",
+                  " ".join(x for x in [(e.get("mode") if e.get("mode") != "Due" else None), e.get("instrument")] if x), _pdf.inr(e.get("balance_paise", 0))] for e in led] + [["", "Totals", _pdf.inr(tu), _pdf.inr(tj), "", _pdf.inr(tu - tj)]],
+                widths=[0.9, 3.2, 1.1, 1.1, 1.4, 1.1], align_right=[2, 3, 5])
+        d.totals([("Total Udhar", _pdf.inr(tu)), ("Total Jama", _pdf.inr(tj)), ("Balance (Udhar − Jama)", _pdf.inr(tu - tj)), ("Advance held", _pdf.inr((b.get("summary") or {}).get("advance_paise", 0)))])
     d.h2("Terms & conditions")
     for line in terms.split("\n"):
         d.p(line, _pdf.SMALL)

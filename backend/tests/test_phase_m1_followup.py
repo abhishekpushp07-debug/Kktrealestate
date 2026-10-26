@@ -46,3 +46,18 @@ def test_statement_pdf_two_sided():
         assert needle in t, needle
     r2 = requests.get(f"{API}/bookings/{b['id']}/statement.pdf", headers=h, timeout=60)
     assert r.content == r2.content  # deterministic bytes
+
+
+
+def test_allotment_pdf_two_sided_position():
+    from io import BytesIO
+
+    from pypdf import PdfReader
+    h = _h()
+    b = requests.get(f"{API}/bookings?status=Active&page_size=1", headers=h, timeout=30).json()["items"][0]
+    r = requests.get(f"{API}/reports/allotment/{b['id']}?format=pdf", headers=h, timeout=60)
+    assert r.status_code == 200 and r.content.startswith(b"%PDF")
+    t = "".join(p.extract_text() for p in PdfReader(BytesIO(r.content)).pages)
+    for needle in ("Account position", "Udhar", "Jama", "Total Udhar", "Total Jama", "Advance held"):
+        assert needle in t, needle
+    assert r.content == requests.get(f"{API}/reports/allotment/{b['id']}?format=pdf", headers=h, timeout=60).content
