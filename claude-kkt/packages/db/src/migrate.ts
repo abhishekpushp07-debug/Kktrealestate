@@ -19,20 +19,24 @@ function firstExisting(candidates: readonly string[]): string {
 }
 
 /** Folder holding drizzle-kit's generated migrations and journal (override with KKT_MIGRATIONS_DIR). */
-export const MIGRATIONS_FOLDER = process.env["KKT_MIGRATIONS_DIR"] ?? firstExisting([
-  join(here, "..", "drizzle"),
-  join(here, "drizzle"),
-  join(here, "..", "..", "..", "packages", "db", "drizzle"),
-  join(process.cwd(), "packages", "db", "drizzle"),
-]);
+export const MIGRATIONS_FOLDER =
+  process.env["KKT_MIGRATIONS_DIR"] ??
+  firstExisting([
+    join(here, "..", "drizzle"),
+    join(here, "drizzle"),
+    join(here, "..", "..", "..", "packages", "db", "drizzle"),
+    join(process.cwd(), "packages", "db", "drizzle"),
+  ]);
 
 /** Folder holding the hand-written SQL applied after drizzle's migrations (override with KKT_SQL_DIR). */
-export const SQL_FOLDER = process.env["KKT_SQL_DIR"] ?? firstExisting([
-  join(here, "sql"),
-  join(here, "..", "sql"),
-  join(here, "..", "..", "..", "packages", "db", "src", "sql"),
-  join(process.cwd(), "packages", "db", "src", "sql"),
-]);
+export const SQL_FOLDER =
+  process.env["KKT_SQL_DIR"] ??
+  firstExisting([
+    join(here, "sql"),
+    join(here, "..", "sql"),
+    join(here, "..", "..", "..", "packages", "db", "src", "sql"),
+    join(process.cwd(), "packages", "db", "src", "sql"),
+  ]);
 
 /** Lists the hand-written SQL files in apply order (lexicographic: 0001_…, 0002_…). */
 export async function listSqlFiles(folder: string = SQL_FOLDER): Promise<string[]> {

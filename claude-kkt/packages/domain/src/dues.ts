@@ -66,7 +66,10 @@ export interface InstallmentAmount {
 export const DEFAULT_DUE_DAYS = 15;
 
 /** The tower stage record an installment's stage trigger points at (possession stage for ON_POSSESSION), or undefined. */
-function stageFor(inst: Pick<PlanSnapshotInstallment, "triggerType" | "triggerStageId">, towerStages: readonly TowerStage[]): TowerStage | undefined {
+function stageFor(
+  inst: Pick<PlanSnapshotInstallment, "triggerType" | "triggerStageId">,
+  towerStages: readonly TowerStage[],
+): TowerStage | undefined {
   switch (inst.triggerType) {
     case "ON_POSSESSION":
       return towerStages.find((s) => s.isPossession);
@@ -96,7 +99,10 @@ function completedStage(inst: PlanSnapshotInstallment, towerStages: readonly Tow
  * Stage id a demand for this installment is attributed to: the installment's stage for ON_STAGE, the tower's
  * possession stage for ON_POSSESSION (so undoing that stage can find and void the demand), else null.
  */
-export function demandStageId(inst: Pick<PlanSnapshotInstallment, "triggerType" | "triggerStageId">, towerStages: readonly TowerStage[]): string | null {
+export function demandStageId(
+  inst: Pick<PlanSnapshotInstallment, "triggerType" | "triggerStageId">,
+  towerStages: readonly TowerStage[],
+): string | null {
   switch (inst.triggerType) {
     case "ON_STAGE":
       return inst.triggerStageId ?? null;
@@ -114,7 +120,11 @@ export function demandStageId(inst: Pick<PlanSnapshotInstallment, "triggerType" 
 }
 
 /** Trigger date of an installment for a booking; null when the trigger is not (yet) satisfiable. */
-export function triggerDate(inst: PlanSnapshotInstallment, bookingDate: string, towerStages: readonly TowerStage[]): string | null {
+export function triggerDate(
+  inst: PlanSnapshotInstallment,
+  bookingDate: string,
+  towerStages: readonly TowerStage[],
+): string | null {
   assertDateString(bookingDate, "bookingDate");
   switch (inst.triggerType) {
     case "ON_BOOKING":
@@ -167,7 +177,9 @@ export function installmentAmounts(
   assertPaise(agreedCashPaise, "agreedCashPaise");
   assertPaise(agreedAccountPaise, "agreedAccountPaise");
   if (agreedCashPaise < 0 || agreedAccountPaise < 0) {
-    throw new MoneyError(`Agreed amounts cannot be negative, got cash ${agreedCashPaise} / account ${agreedAccountPaise}`);
+    throw new MoneyError(
+      `Agreed amounts cannot be negative, got cash ${agreedCashPaise} / account ${agreedAccountPaise}`,
+    );
   }
   let cumulativeBp = 0;
   let prevCash = 0;
@@ -191,9 +203,14 @@ export function installmentAmounts(
 }
 
 /** Whether a non-void demand already covers an installment, matched by sequence OR normalised name. */
-export function hasDemandFor(inst: Pick<PlanSnapshotInstallment, "seq" | "name">, existing: readonly ExistingDemand[]): boolean {
+export function hasDemandFor(
+  inst: Pick<PlanSnapshotInstallment, "seq" | "name">,
+  existing: readonly ExistingDemand[],
+): boolean {
   const name = normalizeLabel(inst.name);
-  return existing.some((d) => d.status !== "VOID" && (d.installmentSeq === inst.seq || normalizeLabel(d.installmentName) === name));
+  return existing.some(
+    (d) => d.status !== "VOID" && (d.installmentSeq === inst.seq || normalizeLabel(d.installmentName) === name),
+  );
 }
 
 export interface DueToRaise {
@@ -247,7 +264,11 @@ export function evaluateDues(input: EvaluateDuesInput): DueToRaise[] {
   assertDateString(today, "today");
   const defaultDueDays = input.defaultDueDays ?? DEFAULT_DUE_DAYS;
   const installments = sortBySeq(booking.planSnapshot.installments);
-  const amounts = new Map(installmentAmounts(booking.cashAgreedPaise, booking.accountAgreedPaise, installments).map((a) => [a.seq, a] as const));
+  const amounts = new Map(
+    installmentAmounts(booking.cashAgreedPaise, booking.accountAgreedPaise, installments).map(
+      (a) => [a.seq, a] as const,
+    ),
+  );
   const out: DueToRaise[] = [];
   for (const inst of installments) {
     if (hasDemandFor(inst, existingDemands)) {
@@ -325,7 +346,11 @@ function demandedStatus(demand: ExistingDemand, dueDate: string | null, today: s
 }
 
 /** Forecast trigger date for a not-yet-satisfied stage trigger from the caller's expected stage dates. */
-function forecastStageDate(inst: PlanSnapshotInstallment, towerStages: readonly TowerStage[], expected: Readonly<Record<string, string>>): string | null {
+function forecastStageDate(
+  inst: PlanSnapshotInstallment,
+  towerStages: readonly TowerStage[],
+  expected: Readonly<Record<string, string>>,
+): string | null {
   const stageId = demandStageId(inst, towerStages);
   return stageId ? (expected[stageId] ?? null) : null;
 }
@@ -343,7 +368,9 @@ export function schedulePreview(input: SchedulePreviewInput): ScheduleRow[] {
     const cashPaise = amount?.cashPaise ?? 0;
     const accountPaise = amount?.accountPaise ?? 0;
     const name = normalizeLabel(inst.name);
-    const demand = existingDemands.find((d) => d.status !== "VOID" && (d.installmentSeq === inst.seq || normalizeLabel(d.installmentName) === name));
+    const demand = existingDemands.find(
+      (d) => d.status !== "VOID" && (d.installmentSeq === inst.seq || normalizeLabel(d.installmentName) === name),
+    );
     const satisfiedDate = triggerDate(inst, booking.bookingDate, towerStages);
     const expectedTriggerDate = satisfiedDate ?? forecastStageDate(inst, towerStages, expected);
     const dueDays = dueDaysOf(inst, defaultDueDays);

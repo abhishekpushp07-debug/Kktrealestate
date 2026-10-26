@@ -46,21 +46,50 @@ export function ChangePasswordScreen({ forced }: { forced: boolean }): React.JSX
     } catch (e) {
       if (e instanceof ApiError && e.code === "INVALID_CREDENTIALS") setError("Your current password is incorrect.");
       else if (e instanceof ApiError && e.code === "PASSWORD_POLICY") setError(e.message);
-      else if (e instanceof ApiError && e.code === "VALIDATION_ERROR") setError("Choose a stronger password (10+ characters with upper, lower case and a digit).");
+      else if (e instanceof ApiError && e.code === "VALIDATION_ERROR")
+        setError("Choose a stronger password (10+ characters with upper, lower case and a digit).");
       else setError(e instanceof Error ? e.message : "Could not change the password.");
     }
   };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.ivory }}>
-      <Header title={forced ? "Set your password" : "Change password"} subtitle={forced ? `Welcome, ${user?.full_name ?? ""}` : undefined} back={!forced} />
+      <Header
+        title={forced ? "Set your password" : "Change password"}
+        subtitle={forced ? `Welcome, ${user?.full_name ?? ""}` : undefined}
+        back={!forced}
+      />
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
         <Screen>
-          {forced ? <Notice tone="info" title="One quick step" body="You signed in with a temporary password. Choose your own to continue — it keeps your payments and documents private." /> : null}
+          {forced ? (
+            <Notice
+              tone="info"
+              title="One quick step"
+              body="You signed in with a temporary password. Choose your own to continue — it keeps your payments and documents private."
+            />
+          ) : null}
           <Card style={{ gap: space.lg, maxWidth: 520 }}>
             {error ? <Notice tone="danger" body={error} /> : null}
-            <Field label={forced ? "Temporary password" : "Current password"} icon="lock" value={current} onChangeText={setCurrent} secureTextEntry secureToggle textContentType="password" autoComplete="current-password" />
-            <Field label="New password" icon="lock" value={next} onChangeText={setNext} secureTextEntry secureToggle textContentType="newPassword" autoComplete="new-password" />
+            <Field
+              label={forced ? "Temporary password" : "Current password"}
+              icon="lock"
+              value={current}
+              onChangeText={setCurrent}
+              secureTextEntry
+              secureToggle
+              textContentType="password"
+              autoComplete="current-password"
+            />
+            <Field
+              label="New password"
+              icon="lock"
+              value={next}
+              onChangeText={setNext}
+              secureTextEntry
+              secureToggle
+              textContentType="newPassword"
+              autoComplete="new-password"
+            />
             <View style={styles.rules}>
               {RULES.map((r) => {
                 const ok = r.test(next);
@@ -74,9 +103,33 @@ export function ChangePasswordScreen({ forced }: { forced: boolean }): React.JSX
                 );
               })}
             </View>
-            <Field label="Confirm new password" icon="lock" value={confirm} onChangeText={setConfirm} secureTextEntry secureToggle textContentType="newPassword" autoComplete="new-password" onSubmitEditing={() => void submit()} />
-            <Button title={forced ? "Save and continue" : "Update password"} variant="gold" size="lg" block loading={mutation.isPending} onPress={() => void submit()} />
-            {forced ? <Button title="Sign out instead" variant="ghost" onPress={() => void logout()} style={{ alignSelf: "center" }} /> : null}
+            <Field
+              label="Confirm new password"
+              icon="lock"
+              value={confirm}
+              onChangeText={setConfirm}
+              secureTextEntry
+              secureToggle
+              textContentType="newPassword"
+              autoComplete="new-password"
+              onSubmitEditing={() => void submit()}
+            />
+            <Button
+              title={forced ? "Save and continue" : "Update password"}
+              variant="gold"
+              size="lg"
+              block
+              loading={mutation.isPending}
+              onPress={() => void submit()}
+            />
+            {forced ? (
+              <Button
+                title="Sign out instead"
+                variant="ghost"
+                onPress={() => void logout()}
+                style={{ alignSelf: "center" }}
+              />
+            ) : null}
           </Card>
         </Screen>
       </KeyboardAvoidingView>

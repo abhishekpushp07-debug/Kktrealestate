@@ -1,9 +1,34 @@
-import { Ban, CheckCircle2, FileDown, FileSignature, IndianRupee, MoreHorizontal, Route, ScrollText } from "lucide-react";
+import {
+  Ban,
+  CheckCircle2,
+  FileDown,
+  FileSignature,
+  IndianRupee,
+  MoreHorizontal,
+  Route,
+  ScrollText,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import type { OtherChargeRow, PaymentAgainst } from "@kkt/contracts";
-import { Badge, Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, ErrorState, PageHeader, PageSkeleton, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  ErrorState,
+  PageHeader,
+  PageSkeleton,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui";
 import { describeError, isApiClientError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { formatDate, formatINRShort } from "@/lib/format";
@@ -21,9 +46,25 @@ import { OverviewTab } from "./detail/OverviewTab";
 import { PaymentsTab } from "./detail/PaymentsTab";
 import { RevisionsTab } from "./detail/RevisionsTab";
 import { ScheduleTab } from "./detail/ScheduleTab";
-import { AgreementRevisionDialog, CancelBookingDialog, CompleteBookingDialog, PlanChangeDialog } from "./detail/dialogs";
+import {
+  AgreementRevisionDialog,
+  CancelBookingDialog,
+  CompleteBookingDialog,
+  PlanChangeDialog,
+} from "./detail/dialogs";
+import { useOnChange } from "@/lib/utils";
 
-const TABS = ["overview", "ledger", "schedule", "demands", "payments", "charges", "documents", "revisions", "history"] as const;
+const TABS = [
+  "overview",
+  "ledger",
+  "schedule",
+  "demands",
+  "payments",
+  "charges",
+  "documents",
+  "revisions",
+  "history",
+] as const;
 type Tab = (typeof TABS)[number];
 
 type DialogKind = "revise" | "plan" | "cancel" | "complete" | null;
@@ -45,14 +86,17 @@ export default function BookingDetailPage() {
   const [downloading, setDownloading] = useState<string | null>(null);
 
   // Deep links: ?action=revise | pay | plan | cancel | complete (e.g. from the payment dialog's cap error).
-  useEffect(() => {
-    const action = params.get("action");
-    if (!action || !booking.data) return;
+  // The dialog opens while rendering; the effect only strips the one-shot parameter from the URL.
+  const deepLink = booking.data ? params.get("action") : null;
+  useOnChange(deepLink, (action) => {
     if (action === "revise" && can("agreement.edit")) setDialog("revise");
     else if (action === "pay" && can("payment.post")) setPayment({ against: "FLAT_VALUE", otherChargeId: null });
     else if (action === "plan" && can("booking.create")) setDialog("plan");
     else if (action === "cancel" && can("booking.cancel")) setDialog("cancel");
     else if (action === "complete" && can("booking.complete")) setDialog("complete");
+  });
+  useEffect(() => {
+    if (!deepLink) return;
     setParams(
       (previous) => {
         const next = new URLSearchParams(previous);
@@ -61,13 +105,18 @@ export default function BookingDetailPage() {
       },
       { replace: true },
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [booking.data, params]);
+  }, [deepLink, setParams]);
 
   if (booking.isPending) return <PageSkeleton />;
   if (booking.isError) {
     if (isApiClientError(booking.error) && booking.error.status === 404) return <NotFoundPage />;
-    return <ErrorState error={booking.error} onRetry={() => void booking.refetch()} className="rounded-lg border border-border bg-card" />;
+    return (
+      <ErrorState
+        error={booking.error}
+        onRetry={() => void booking.refetch()}
+        className="rounded-lg border border-border bg-card"
+      />
+    );
   }
   const row = booking.data;
   const active = row.status === "ACTIVE";
@@ -75,7 +124,10 @@ export default function BookingDetailPage() {
   const download = async (kind: "allotment" | "statement") => {
     setDownloading(kind);
     try {
-      await downloadPdf(`/bookings/${row.id}/${kind === "allotment" ? "allotment-letter.pdf" : "statement.pdf"}`, `${row.booking_number.replace(/[\\/]/g, "-")}-${kind}.pdf`);
+      await downloadPdf(
+        `/bookings/${row.id}/${kind === "allotment" ? "allotment-letter.pdf" : "statement.pdf"}`,
+        `${row.booking_number.replace(/[\\/]/g, "-")}-${kind}.pdf`,
+      );
     } catch (cause) {
       toast.error(describeError(cause));
     } finally {
@@ -83,7 +135,10 @@ export default function BookingDetailPage() {
     }
   };
 
-  const openPayment = (line?: OtherChargeRow) => setPayment(line ? { against: "OTHER_CHARGE", otherChargeId: line.id } : { against: "FLAT_VALUE", otherChargeId: null });
+  const openPayment = (line?: OtherChargeRow) =>
+    setPayment(
+      line ? { against: "OTHER_CHARGE", otherChargeId: line.id } : { against: "FLAT_VALUE", otherChargeId: null },
+    );
 
   return (
     <>
@@ -92,8 +147,14 @@ export default function BookingDetailPage() {
         titleAddon={
           <>
             <BookingStatusChip status={row.status} />
-            {row.summary.pending_cheques_paise > 0 && <Badge variant="warning">Cheques in hand {formatINRShort(row.summary.pending_cheques_paise)}</Badge>}
-            {row.revision_count > 0 && <Badge variant="outline" numeric>{row.revision_count} revision{row.revision_count === 1 ? "" : "s"}</Badge>}
+            {row.summary.pending_cheques_paise > 0 && (
+              <Badge variant="warning">Cheques in hand {formatINRShort(row.summary.pending_cheques_paise)}</Badge>
+            )}
+            {row.revision_count > 0 && (
+              <Badge variant="outline" numeric>
+                {row.revision_count} revision{row.revision_count === 1 ? "" : "s"}
+              </Badge>
+            )}
           </>
         }
         description={
@@ -106,7 +167,12 @@ export default function BookingDetailPage() {
             </span>
           </span>
         }
-        breadcrumbs={[{ label: "Home", to: "/" }, { label: "Sales" }, { label: "Bookings", to: "/bookings" }, { label: row.booking_number }]}
+        breadcrumbs={[
+          { label: "Home", to: "/" },
+          { label: "Sales" },
+          { label: "Bookings", to: "/bookings" },
+          { label: row.booking_number },
+        ]}
         backTo="/bookings"
         actions={
           <>
@@ -116,7 +182,12 @@ export default function BookingDetailPage() {
               </Button>
             )}
             {active && can("agreement.edit") && (
-              <Button variant="outline" leftIcon={FileSignature} onClick={() => setDialog("revise")} data-testid="booking-revise">
+              <Button
+                variant="outline"
+                leftIcon={FileSignature}
+                onClick={() => setDialog("revise")}
+                data-testid="booking-revise"
+              >
                 Revise agreement
               </Button>
             )}
@@ -183,20 +254,44 @@ export default function BookingDetailPage() {
           <OverviewTab booking={row} />
         </TabsContent>
         <TabsContent value="ledger">{tab === "ledger" && <LedgerTab bookingId={row.id} />}</TabsContent>
-        <TabsContent value="schedule">{tab === "schedule" && <ScheduleTab bookingId={row.id} initial={row.schedule} />}</TabsContent>
+        <TabsContent value="schedule">
+          {tab === "schedule" && <ScheduleTab bookingId={row.id} initial={row.schedule} />}
+        </TabsContent>
         <TabsContent value="demands">{tab === "demands" && <DemandsTab bookingId={row.id} />}</TabsContent>
-        <TabsContent value="payments">{tab === "payments" && <PaymentsTab booking={row} highlightId={params.get("highlight")} onPostPayment={() => openPayment()} />}</TabsContent>
-        <TabsContent value="charges">{tab === "charges" && <OtherChargesTab booking={row} onPostPayment={openPayment} />}</TabsContent>
-        <TabsContent value="documents">{tab === "documents" && <DocumentsPanel entityType="BOOKING" entityId={row.id} appliesTo="BOOKING" />}</TabsContent>
+        <TabsContent value="payments">
+          {tab === "payments" && (
+            <PaymentsTab booking={row} highlightId={params.get("highlight")} onPostPayment={() => openPayment()} />
+          )}
+        </TabsContent>
+        <TabsContent value="charges">
+          {tab === "charges" && <OtherChargesTab booking={row} onPostPayment={openPayment} />}
+        </TabsContent>
+        <TabsContent value="documents">
+          {tab === "documents" && <DocumentsPanel entityType="BOOKING" entityId={row.id} appliesTo="BOOKING" />}
+        </TabsContent>
         <TabsContent value="revisions">{tab === "revisions" && <RevisionsTab booking={row} />}</TabsContent>
         <TabsContent value="history">{tab === "history" && <HistoryTab bookingId={row.id} />}</TabsContent>
       </Tabs>
 
-      <PaymentDialog open={payment !== null} onOpenChange={(open) => !open && setPayment(null)} booking={row} defaultAgainst={payment?.against ?? "FLAT_VALUE"} defaultOtherChargeId={payment?.otherChargeId ?? null} />
-      <AgreementRevisionDialog open={dialog === "revise"} onOpenChange={(open) => !open && setDialog(null)} booking={row} />
+      <PaymentDialog
+        open={payment !== null}
+        onOpenChange={(open) => !open && setPayment(null)}
+        booking={row}
+        defaultAgainst={payment?.against ?? "FLAT_VALUE"}
+        defaultOtherChargeId={payment?.otherChargeId ?? null}
+      />
+      <AgreementRevisionDialog
+        open={dialog === "revise"}
+        onOpenChange={(open) => !open && setDialog(null)}
+        booking={row}
+      />
       <PlanChangeDialog open={dialog === "plan"} onOpenChange={(open) => !open && setDialog(null)} booking={row} />
       <CancelBookingDialog open={dialog === "cancel"} onOpenChange={(open) => !open && setDialog(null)} booking={row} />
-      <CompleteBookingDialog open={dialog === "complete"} onOpenChange={(open) => !open && setDialog(null)} booking={row} />
+      <CompleteBookingDialog
+        open={dialog === "complete"}
+        onOpenChange={(open) => !open && setDialog(null)}
+        booking={row}
+      />
     </>
   );
 }

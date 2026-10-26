@@ -43,15 +43,30 @@ export function Timeline({ items, className, absolute = false }: TimelineProps) 
         const last = index === items.length - 1;
         return (
           <li key={item.id} className="relative flex gap-3 pb-5 last:pb-0">
-            {!last && <span className="absolute left-3.5 top-7 h-[calc(100%-1rem)] w-px bg-border" aria-hidden="true" />}
-            <span className={cn("relative z-10 mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full ring-1", TONES[item.tone ?? "neutral"])}>
-              {Icon ? <Icon className="size-3.5" aria-hidden="true" /> : <span className="size-2 rounded-full bg-current" aria-hidden="true" />}
+            {!last && (
+              <span className="absolute left-3.5 top-7 h-[calc(100%-1rem)] w-px bg-border" aria-hidden="true" />
+            )}
+            <span
+              className={cn(
+                "relative z-10 mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full ring-1",
+                TONES[item.tone ?? "neutral"],
+              )}
+            >
+              {Icon ? (
+                <Icon className="size-3.5" aria-hidden="true" />
+              ) : (
+                <span className="size-2 rounded-full bg-current" aria-hidden="true" />
+              )}
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
                 <p className="text-sm font-medium text-ink">{item.title}</p>
                 {item.at && (
-                  <time dateTime={item.at} title={formatDateTime(item.at, { zone: true })} className="money text-2xs text-ink-subtle">
+                  <time
+                    dateTime={item.at}
+                    title={formatDateTime(item.at, { zone: true })}
+                    className="money text-2xs text-ink-subtle"
+                  >
                     {absolute ? formatDateTime(item.at) : formatRelative(item.at)}
                   </time>
                 )}

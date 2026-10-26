@@ -2,7 +2,23 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { Eye, Lock, MoreHorizontal, Pencil, Plus, Power, ShieldCheck } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { ActiveStateResponse, RoleRow } from "@kkt/contracts";
-import { Badge, Button, ConfirmDialog, DataTable, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, IconButton, PageHeader, StatusChip, Switch, Toolbar, Tooltip } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  ConfirmDialog,
+  DataTable,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  IconButton,
+  PageHeader,
+  StatusChip,
+  Switch,
+  Toolbar,
+  Tooltip,
+} from "@/components/ui";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/format";
 import { useList, useListParams, useMutationWithToast } from "@/lib/queries";
@@ -13,11 +29,20 @@ import { ROLES_PATH } from "./adminApi";
 export default function RolesPage() {
   const list = useListParams({ defaultSort: "name" });
   const query = useList<RoleRow>(ROLES_PATH, list.params);
-  const [sheet, setSheet] = useState<{ open: boolean; role: RoleRow | null; readOnly: boolean }>({ open: false, role: null, readOnly: false });
+  const [sheet, setSheet] = useState<{ open: boolean; role: RoleRow | null; readOnly: boolean }>({
+    open: false,
+    role: null,
+    readOnly: false,
+  });
   const [confirmDeactivate, setConfirmDeactivate] = useState<RoleRow | null>(null);
 
   const deactivate = useMutationWithToast<ActiveStateResponse, RoleRow>({
-    mutationFn: (role) => api.post<ActiveStateResponse>(`${ROLES_PATH}/${role.id}/deactivate`, { version: role.version }, { version: role.version }),
+    mutationFn: (role) =>
+      api.post<ActiveStateResponse>(
+        `${ROLES_PATH}/${role.id}/deactivate`,
+        { version: role.version },
+        { version: role.version },
+      ),
     successMessage: (_data, role) => `Role ${role.name} deactivated`,
     invalidate: [[ROLES_PATH]],
     entityLabel: "This role",
@@ -40,7 +65,13 @@ export default function RolesPage() {
           </span>
         ),
       },
-      { accessorKey: "description", header: "Description", cell: ({ row }) => <span className="block max-w-md truncate text-ink-muted">{row.original.description || "—"}</span> },
+      {
+        accessorKey: "description",
+        header: "Description",
+        cell: ({ row }) => (
+          <span className="block max-w-md truncate text-ink-muted">{row.original.description || "—"}</span>
+        ),
+      },
       {
         id: "permissions",
         header: "Permissions",
@@ -51,8 +82,18 @@ export default function RolesPage() {
           </Badge>
         ),
       },
-      { accessorKey: "user_count", header: "Users", meta: { align: "right", width: 90 }, cell: ({ row }) => formatNumber(row.original.user_count) },
-      { accessorKey: "is_active", header: "Status", meta: { width: 110 }, cell: ({ row }) => <StatusChip status={row.original.is_active ? "ACTIVE" : "INACTIVE"} size="sm" /> },
+      {
+        accessorKey: "user_count",
+        header: "Users",
+        meta: { align: "right", width: 90 },
+        cell: ({ row }) => formatNumber(row.original.user_count),
+      },
+      {
+        accessorKey: "is_active",
+        header: "Status",
+        meta: { width: 110 },
+        cell: ({ row }) => <StatusChip status={row.original.is_active ? "ACTIVE" : "INACTIVE"} size="sm" />,
+      },
       {
         id: "actions",
         header: "",
@@ -62,7 +103,12 @@ export default function RolesPage() {
           return (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <IconButton icon={MoreHorizontal} label={`Actions for ${role.name}`} size="sm" data-testid={`role-actions-${role.id}`} />
+                <IconButton
+                  icon={MoreHorizontal}
+                  label={`Actions for ${role.name}`}
+                  size="sm"
+                  data-testid={`role-actions-${role.id}`}
+                />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onSelect={() => setSheet({ open: true, role, readOnly: true })}>
@@ -74,7 +120,11 @@ export default function RolesPage() {
                 {!role.is_system && role.is_active && (
                   <>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem destructive disabled={role.user_count > 0} onSelect={() => setConfirmDeactivate(role)}>
+                    <DropdownMenuItem
+                      destructive
+                      disabled={role.user_count > 0}
+                      onSelect={() => setConfirmDeactivate(role)}
+                    >
                       <Power /> Deactivate{role.user_count > 0 ? ` (${role.user_count} users)` : ""}
                     </DropdownMenuItem>
                   </>
@@ -97,7 +147,11 @@ export default function RolesPage() {
         description="System roles follow the specification and cannot be deleted. Custom roles bundle any set of permission codes."
         breadcrumbs={[{ label: "Home", to: "/" }, { label: "Admin" }, { label: "Roles" }]}
         actions={
-          <Button leftIcon={Plus} onClick={() => setSheet({ open: true, role: null, readOnly: false })} data-testid="role-new-btn">
+          <Button
+            leftIcon={Plus}
+            onClick={() => setSheet({ open: true, role: null, readOnly: false })}
+            data-testid="role-new-btn"
+          >
             New role
           </Button>
         }
@@ -106,7 +160,15 @@ export default function RolesPage() {
         search={list.search}
         onSearchChange={list.setSearch}
         searchPlaceholder="Search roles…"
-        filters={<Switch size="sm" label="Show inactive" checked={list.includeInactive} onCheckedChange={list.setIncludeInactive} data-testid="roles-include-inactive-switch" />}
+        filters={
+          <Switch
+            size="sm"
+            label="Show inactive"
+            checked={list.includeInactive}
+            onCheckedChange={list.setIncludeInactive}
+            data-testid="roles-include-inactive-switch"
+          />
+        }
         hasActiveFilters={list.hasActiveFilters}
         onClearFilters={list.reset}
         summary={query.data ? `${formatNumber(total)} ${total === 1 ? "role" : "roles"}` : undefined}
@@ -121,11 +183,26 @@ export default function RolesPage() {
         sort={list.sort}
         onSortChange={list.setSort}
         onRowClick={(role) => setSheet({ open: true, role, readOnly: role.is_system })}
-        pagination={{ page: list.page, pageSize: list.pageSize, total, onPageChange: list.setPage, onPageSizeChange: list.setPageSize }}
-        emptyState={{ icon: ShieldCheck, title: "No roles found", description: "System roles are seeded with the company; create a custom role for anything else." }}
+        pagination={{
+          page: list.page,
+          pageSize: list.pageSize,
+          total,
+          onPageChange: list.setPage,
+          onPageSizeChange: list.setPageSize,
+        }}
+        emptyState={{
+          icon: ShieldCheck,
+          title: "No roles found",
+          description: "System roles are seeded with the company; create a custom role for anything else.",
+        }}
         data-testid="roles-table"
       />
-      <RoleFormSheet open={sheet.open} onOpenChange={(open) => setSheet((state) => ({ ...state, open }))} role={sheet.role} readOnly={sheet.readOnly} />
+      <RoleFormSheet
+        open={sheet.open}
+        onOpenChange={(open) => setSheet((state) => ({ ...state, open }))}
+        role={sheet.role}
+        readOnly={sheet.readOnly}
+      />
       <ConfirmDialog
         open={confirmDeactivate !== null}
         onOpenChange={(open) => !open && setConfirmDeactivate(null)}

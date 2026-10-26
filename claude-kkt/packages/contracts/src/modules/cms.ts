@@ -30,7 +30,10 @@ export const SeoSchema = z.strictObject({
 export type Seo = z.infer<typeof SeoSchema>;
 
 /** One FAQ. */
-export const FaqSchema = z.strictObject({ q: z.string().trim().min(3).max(200), a: z.string().trim().min(1).max(2000) });
+export const FaqSchema = z.strictObject({
+  q: z.string().trim().min(3).max(200),
+  a: z.string().trim().min(1).max(2000),
+});
 export type Faq = z.infer<typeof FaqSchema>;
 
 // ---------------------------------------------------------------------------
@@ -57,10 +60,21 @@ const SiteSettingsBase = z.strictObject({
     email: EmailSchema.optional().nullable(),
   }),
   offices: z.array(OfficeSchema).max(20).default([]),
-  social: z.partialRecord(z.enum(["facebook", "instagram", "youtube", "linkedin", "x", "whatsapp"]), UrlSchema).default({}),
-  trust_stats: z.array(z.strictObject({ label: z.string().trim().min(1).max(60), value: z.string().trim().min(1).max(30) })).max(8).default([]),
+  social: z
+    .partialRecord(z.enum(["facebook", "instagram", "youtube", "linkedin", "x", "whatsapp"]), UrlSchema)
+    .default({}),
+  trust_stats: z
+    .array(z.strictObject({ label: z.string().trim().min(1).max(60), value: z.string().trim().min(1).max(30) }))
+    .max(8)
+    .default([]),
   value_props: z
-    .array(z.strictObject({ title: z.string().trim().min(1).max(80), body: z.string().trim().max(300), icon: z.string().trim().max(40).optional().nullable() }))
+    .array(
+      z.strictObject({
+        title: z.string().trim().min(1).max(80),
+        body: z.string().trim().max(300),
+        icon: z.string().trim().max(40).optional().nullable(),
+      }),
+    )
     .max(8)
     .default([]),
   disclaimer: TextSchema.optional().nullable(),
@@ -75,7 +89,9 @@ const SiteSettingsBase = z.strictObject({
 });
 
 /** Update site settings (partial + version). `round_robin_enabled` is mirrored to the company settings. */
-export const SiteSettingsUpdateSchema = updateOf(SiteSettingsBase).extend({ round_robin_enabled: z.boolean().optional() });
+export const SiteSettingsUpdateSchema = updateOf(SiteSettingsBase).extend({
+  round_robin_enabled: z.boolean().optional(),
+});
 export type SiteSettingsUpdate = z.infer<typeof SiteSettingsUpdateSchema>;
 
 /** Site settings row. */
@@ -128,7 +144,12 @@ export type CmsBannerRow = z.infer<typeof CmsBannerRowSchema>;
 // ---------------------------------------------------------------------------
 
 const HomeSectionBase = z.strictObject({
-  key: z.string().trim().min(1).max(40).regex(/^[a-z0-9_]+$/),
+  key: z
+    .string()
+    .trim()
+    .min(1)
+    .max(40)
+    .regex(/^[a-z0-9_]+$/),
   title: z.string().trim().max(120).optional().nullable(),
   body: z.record(z.string(), z.unknown()).default({}),
   sort_order: z.int().min(0).max(1000).default(0),
@@ -209,7 +230,11 @@ export const CmsGalleryRowSchema = AuditedRowSchema.extend({
   is_published: z.boolean(),
 });
 export type CmsGalleryRow = z.infer<typeof CmsGalleryRowSchema>;
-export const CmsGalleryFilterSchema = ListQuerySchema.extend({ project_id: IdSchema.optional(), category: z.string().max(60).optional(), is_published: BoolQuerySchema.optional() });
+export const CmsGalleryFilterSchema = ListQuerySchema.extend({
+  project_id: IdSchema.optional(),
+  category: z.string().max(60).optional(),
+  is_published: BoolQuerySchema.optional(),
+});
 export type CmsGalleryFilter = z.infer<typeof CmsGalleryFilterSchema>;
 
 // ---------------------------------------------------------------------------
@@ -246,7 +271,10 @@ export const CmsPostRowSchema = AuditedRowSchema.extend({
   tags: z.array(z.string()),
 });
 export type CmsPostRow = z.infer<typeof CmsPostRowSchema>;
-export const CmsPostFilterSchema = ListQuerySchema.extend({ status: PostStatusSchema.optional(), tag: z.string().max(30).optional() });
+export const CmsPostFilterSchema = ListQuerySchema.extend({
+  status: PostStatusSchema.optional(),
+  tag: z.string().max(30).optional(),
+});
 export type CmsPostFilter = z.infer<typeof CmsPostFilterSchema>;
 export const CmsPostListResponseSchema = listEnvelope(CmsPostRowSchema);
 export type CmsPostListResponse = z.infer<typeof CmsPostListResponseSchema>;
@@ -314,10 +342,13 @@ const NoticeBase = z.strictObject({
   expires_at: TimestampSchema.optional().nullable(),
   is_published: z.boolean().default(false),
 });
-export const NoticeCreateSchema = NoticeBase.refine((n) => !n.publish_at || !n.expires_at || n.publish_at <= n.expires_at, {
-  message: "expires_at must be after publish_at",
-  path: ["expires_at"],
-});
+export const NoticeCreateSchema = NoticeBase.refine(
+  (n) => !n.publish_at || !n.expires_at || n.publish_at <= n.expires_at,
+  {
+    message: "expires_at must be after publish_at",
+    path: ["expires_at"],
+  },
+);
 export type NoticeCreate = z.infer<typeof NoticeCreateSchema>;
 /** Partial update: `is_published` is only applied when sent (the create default of `false` must not unpublish on every PATCH). */
 export const NoticeUpdateSchema = updateOf(NoticeBase).extend({ is_published: z.boolean().optional() });
@@ -333,7 +364,10 @@ export const NoticeRowSchema = AuditedRowSchema.extend({
   created_by_name: z.string().nullable(),
 });
 export type NoticeRow = z.infer<typeof NoticeRowSchema>;
-export const NoticeFilterSchema = ListQuerySchema.extend({ project_id: IdSchema.optional(), is_published: BoolQuerySchema.optional() });
+export const NoticeFilterSchema = ListQuerySchema.extend({
+  project_id: IdSchema.optional(),
+  is_published: BoolQuerySchema.optional(),
+});
 export type NoticeFilter = z.infer<typeof NoticeFilterSchema>;
 export const NoticeListResponseSchema = listEnvelope(NoticeRowSchema);
 export type NoticeListResponse = z.infer<typeof NoticeListResponseSchema>;

@@ -12,7 +12,7 @@ import { sendCsv, type CsvColumn } from "../../lib/csv.js";
 import { ApiError } from "../../lib/errors.js";
 import { listPaging } from "../../lib/list.js";
 import type { StaffContext } from "../../lib/scope.js";
-import { streamDocument } from "../documents/service.js";
+import { streamDocument } from "../documents/index.js";
 import { isPngOrJpeg, type PdfLetterhead } from "./services/pdf.js";
 
 /** Query fields every report accepts for its export variants. */
@@ -31,7 +31,10 @@ export function wantedFormat(q: ExportQuery): ReportFormat | "json" {
 
 /** Reports whose `from`/`to` are both optional still reject an inverted range (400, like DateRangeSchema does for required ranges). */
 export function assertOptionalRange(q: { from?: string | undefined; to?: string | undefined }): void {
-  if (q.from && q.to && q.from > q.to) throw ApiError.badRequest("from must be on or before to", { issues: [{ path: "to", message: "from must be on or before to" }] });
+  if (q.from && q.to && q.from > q.to)
+    throw ApiError.badRequest("from must be on or before to", {
+      issues: [{ path: "to", message: "from must be on or before to" }],
+    });
 }
 
 /** Today's business date (IST). */
@@ -43,7 +46,10 @@ export function today(): string {
 export function scopeSql(user: Pick<StaffContext, "allProjects" | "projectIds">, projectIdExpr: SQL): SQL {
   if (user.allProjects) return sql`true`;
   if (user.projectIds.length === 0) return sql`false`;
-  return sql`${projectIdExpr} in (${sql.join(user.projectIds.map((id) => sql`${id}::uuid`), sql`, `)})`;
+  return sql`${projectIdExpr} in (${sql.join(
+    user.projectIds.map((id) => sql`${id}::uuid`),
+    sql`, `,
+  )})`;
 }
 
 /** "YYYY-MM" of a date. */
@@ -81,12 +87,18 @@ export function monthLabel(key: string): string {
 }
 
 /** The company letterhead for PDFs (name, legal name, address, GSTIN, contact line from settings/letterhead jsonb; logo via the documents module). */
-export async function letterheadFor(db: Executor, companyId: string, extra: { reraLine?: string | null } = {}): Promise<PdfLetterhead> {
+export async function letterheadFor(
+  db: Executor,
+  companyId: string,
+  extra: { reraLine?: string | null } = {},
+): Promise<PdfLetterhead> {
   const [c] = await db.select().from(companies).where(eq(companies.id, companyId)).limit(1);
   if (!c) return { name: "KKT" };
   const lh = c.letterhead;
   const a = c.address;
-  const addressLine = a ? [a.line1, a.line2, a.locality, a.city, a.state, a.pincode].filter((p) => p && String(p).trim() !== "").join(", ") : null;
+  const addressLine = a
+    ? [a.line1, a.line2, a.locality, a.city, a.state, a.pincode].filter((p) => p && String(p).trim() !== "").join(", ")
+    : null;
   const contact = [lh.phone ?? c.phone, lh.email ?? c.email, lh.website].filter((x): x is string => !!x).join(" · ");
   let logo: Buffer | null = null;
   if (c.logoDocumentId) {
@@ -94,7 +106,8 @@ export async function letterheadFor(db: Executor, companyId: string, extra: { re
       const s = await streamDocument(db, c.logoDocumentId, "original");
       if (s && (s.mime === "image/png" || s.mime === "image/jpeg")) {
         const chunks: Buffer[] = [];
-        for await (const chunk of s.stream) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as Uint8Array));
+        for await (const chunk of s.stream)
+          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as Uint8Array));
         const buf = Buffer.concat(chunks);
         if (isPngOrJpeg(buf)) logo = buf;
       }
@@ -102,7 +115,18 @@ export async function letterheadFor(db: Executor, companyId: string, extra: { re
       logo = null; // a missing or unreadable logo never blocks a document
     }
   }
-  return { name: c.name, legalName: c.legalName, tagline: lh.tagline ?? null, addressLine, gstin: c.gstin, reraLine: extra.reraLine ?? null, contactLine: contact || null, logo, signatoryName: lh.signatory_name ?? null, signatoryTitle: lh.signatory_title ?? null };
+  return {
+    name: c.name,
+    legalName: c.legalName,
+    tagline: lh.tagline ?? null,
+    addressLine,
+    gstin: c.gstin,
+    reraLine: extra.reraLine ?? null,
+    contactLine: contact || null,
+    logo,
+    signatoryName: lh.signatory_name ?? null,
+    signatoryTitle: lh.signatory_title ?? null,
+  };
 }
 
 /** Sends a PDF (bytes, or a stream piped straight to the client) as an attachment. */
@@ -131,7 +155,12 @@ export function csvColumns<T extends Record<string, unknown>>(keys: readonly str
 }
 
 /** Streams rows as CSV (keys become headers). */
-export function sendRowsCsv(reply: FastifyReply, filename: string, keys: readonly string[], rows: readonly Record<string, unknown>[]): FastifyReply {
+export function sendRowsCsv(
+  reply: FastifyReply,
+  filename: string,
+  keys: readonly string[],
+  rows: readonly Record<string, unknown>[],
+): FastifyReply {
   return sendCsv(reply, filename, csvColumns(keys), rows);
 }
 
@@ -166,7 +195,10 @@ export function num(v: unknown): number {
 }
 
 /** Date-range filter labels for the PDF filter block. */
-export function rangeFilters(q: { from?: string; to?: string; project_id?: string | undefined; block_id?: string | undefined }, names: { project?: string | null; block?: string | null } = {}): (readonly [string, string])[] {
+export function rangeFilters(
+  q: { from?: string; to?: string; project_id?: string | undefined; block_id?: string | undefined },
+  names: { project?: string | null; block?: string | null } = {},
+): (readonly [string, string])[] {
   const out: (readonly [string, string])[] = [];
   if (q.from && q.to) out.push(["Period", `${formatDateLabel(q.from)} – ${formatDateLabel(q.to)}`]);
   if (q.project_id) out.push(["Project", names.project ?? q.project_id]);

@@ -18,7 +18,10 @@ export async function readUpload(req: FastifyRequest): Promise<ParsedUpload> {
   try {
     for await (const part of req.parts()) {
       if (part.type === "file") {
-        if (file) { part.file.resume(); throw ApiError.badRequest("Upload exactly one file per request"); }
+        if (file) {
+          part.file.resume();
+          throw ApiError.badRequest("Upload exactly one file per request");
+        }
         const buffer = await part.toBuffer();
         file = { buffer, filename: part.filename || "file" };
       } else {
@@ -28,7 +31,8 @@ export async function readUpload(req: FastifyRequest): Promise<ParsedUpload> {
   } catch (err) {
     const code = (err as { code?: string }).code;
     if (code === "FST_REQ_FILE_TOO_LARGE") throw new ApiError(413, "PAYLOAD_TOO_LARGE", "File exceeds the 15 MB limit");
-    if (code === "FST_FILES_LIMIT" || code === "FST_PARTS_LIMIT" || code === "FST_FIELDS_LIMIT") throw ApiError.badRequest("Too many parts in the upload");
+    if (code === "FST_FILES_LIMIT" || code === "FST_PARTS_LIMIT" || code === "FST_FIELDS_LIMIT")
+      throw ApiError.badRequest("Too many parts in the upload");
     throw err;
   }
   if (!file) throw ApiError.badRequest("Missing `file` part");
@@ -48,7 +52,10 @@ export function installMultipartIdempotency(app: FastifyInstance, matches: (rout
     if (req.method !== "POST" || !req.routeOptions.url || !matches(req.routeOptions.url) || !req.isMultipart()) return;
     const parsed = await readUpload(req);
     parsedUploads.set(req, parsed);
-    setIdempotencyFingerprint(req, { fields: parsed.fields, file: { name: parsed.filename, size: parsed.buffer.length, sha256: sha256(parsed.buffer) } });
+    setIdempotencyFingerprint(req, {
+      fields: parsed.fields,
+      file: { name: parsed.filename, size: parsed.buffer.length, sha256: sha256(parsed.buffer) },
+    });
   });
 }
 

@@ -66,7 +66,15 @@ export function DialogBody({ className, ...props }: HTMLAttributes<HTMLDivElemen
 }
 
 export function DialogFooter({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("flex flex-col-reverse gap-2 border-t border-border bg-surface/60 px-5 py-3 sm:flex-row sm:justify-end", className)} {...props} />;
+  return (
+    <div
+      className={cn(
+        "flex flex-col-reverse gap-2 border-t border-border bg-surface/60 px-5 py-3 sm:flex-row sm:justify-end",
+        className,
+      )}
+      {...props}
+    />
+  );
 }
 
 export interface SimpleDialogProps {
@@ -86,7 +94,11 @@ export function SimpleDialog({ open, onOpenChange, title, description, children,
       <DialogContent size={size}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
-          {description ? <DialogDescription>{description}</DialogDescription> : <DialogDescription className="sr-only">{title}</DialogDescription>}
+          {description ? (
+            <DialogDescription>{description}</DialogDescription>
+          ) : (
+            <DialogDescription className="sr-only">{title}</DialogDescription>
+          )}
         </DialogHeader>
         {children && <DialogBody>{children}</DialogBody>}
         {footer && <DialogFooter>{footer}</DialogFooter>}

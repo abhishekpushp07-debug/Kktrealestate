@@ -1,4 +1,17 @@
-import { Building2, Contact, FileText, History, Image as ImageIcon, Lock, Paperclip, Pencil, Send, Star, UserRound, X } from "lucide-react";
+import {
+  Building2,
+  Contact,
+  FileText,
+  History,
+  Image as ImageIcon,
+  Lock,
+  Paperclip,
+  Pencil,
+  Send,
+  Star,
+  UserRound,
+  X,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useParams } from "react-router-dom";
@@ -19,12 +32,36 @@ import {
   type ServiceStatus,
 } from "@kkt/contracts";
 import { z } from "zod";
-import { applyServerErrors, Avatar, Badge, Button, Card, CardContent, CardHeader, CardTitle, Combobox, ErrorState, FieldWrapper, FormError, FormField, Input, KeyValueList, PageHeader, Select, SimpleDialog, Skeleton, Switch, Textarea, Timeline, type TimelineItem } from "@/components/ui";
+import {
+  applyServerErrors,
+  Avatar,
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Combobox,
+  ErrorState,
+  FieldWrapper,
+  FormError,
+  FormField,
+  Input,
+  KeyValueList,
+  PageHeader,
+  Select,
+  SimpleDialog,
+  Skeleton,
+  Switch,
+  Textarea,
+  Timeline,
+  type TimelineItem,
+} from "@/components/ui";
 import { api, describeError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { formatDateTime, formatPhone } from "@/lib/format";
 import { useMutationWithToast } from "@/lib/queries";
-import { cn, humanize } from "@/lib/utils";
+import { cn, humanize, useOnChange } from "@/lib/utils";
 import { UploadDocumentDialog } from "@/features/inventory/DocumentsPanel";
 import { fetchDocumentLink } from "@/features/inventory/api";
 import { controlOf } from "@/features/inventory/components";
@@ -53,7 +90,13 @@ export default function ServiceRequestDetail() {
   }
   if (detail.isError) {
     if (detail.error.status === 404) return <NotFoundPage />;
-    return <ErrorState error={detail.error} onRetry={() => void detail.refetch()} className="rounded-lg border border-border bg-card" />;
+    return (
+      <ErrorState
+        error={detail.error}
+        onRetry={() => void detail.refetch()}
+        className="rounded-lg border border-border bg-card"
+      />
+    );
   }
   return <TicketView ticket={detail.data} />;
 }
@@ -67,7 +110,12 @@ function TicketView({ ticket }: { ticket: ServiceRequestDetailResponse }) {
   const invalidate = serviceInvalidations(ticket.id);
 
   const status = useMutationWithToast<ServiceRequestRow, { status: ServiceStatus; note: string | null }>({
-    mutationFn: ({ status: next, note }) => api.post<ServiceRequestRow>(`${SERVICE_PATH}/${ticket.id}/status`, { version: ticket.version, status: next, note }, { version: ticket.version }),
+    mutationFn: ({ status: next, note }) =>
+      api.post<ServiceRequestRow>(
+        `${SERVICE_PATH}/${ticket.id}/status`,
+        { version: ticket.version, status: next, note },
+        { version: ticket.version },
+      ),
     successMessage: (saved) => `Ticket is now ${SERVICE_STATUS_LABELS[saved.status]}`,
     invalidate,
     entityLabel: "This ticket",
@@ -75,14 +123,24 @@ function TicketView({ ticket }: { ticket: ServiceRequestDetailResponse }) {
   });
 
   const priority = useMutationWithToast<ServiceRequestRow, ServicePriority>({
-    mutationFn: (next) => api.patch<ServiceRequestRow>(`${SERVICE_PATH}/${ticket.id}`, { version: ticket.version, priority: next }, { version: ticket.version }),
+    mutationFn: (next) =>
+      api.patch<ServiceRequestRow>(
+        `${SERVICE_PATH}/${ticket.id}`,
+        { version: ticket.version, priority: next },
+        { version: ticket.version },
+      ),
     successMessage: (saved) => `Priority set to ${SERVICE_PRIORITY_LABELS[saved.priority]}`,
     invalidate,
     entityLabel: "This ticket",
   });
 
   const assign = useMutationWithToast<ServiceRequestRow, string | null>({
-    mutationFn: (assignee) => api.post<ServiceRequestRow>(`${SERVICE_PATH}/${ticket.id}/assign`, { version: ticket.version, assignee_user_id: assignee }, { version: ticket.version }),
+    mutationFn: (assignee) =>
+      api.post<ServiceRequestRow>(
+        `${SERVICE_PATH}/${ticket.id}/assign`,
+        { version: ticket.version, assignee_user_id: assignee },
+        { version: ticket.version },
+      ),
     successMessage: (saved) => (saved.assignee_name ? `Assigned to ${saved.assignee_name}` : "Unassigned"),
     invalidate,
     entityLabel: "This ticket",
@@ -103,15 +161,30 @@ function TicketView({ ticket }: { ticket: ServiceRequestDetailResponse }) {
         }
         description={ticket.subject}
         backTo="/service-requests"
-        breadcrumbs={[{ label: "Home", to: "/" }, { label: "Service" }, { label: "Service requests", to: "/service-requests" }, { label: ticket.ticket_number }]}
+        breadcrumbs={[
+          { label: "Home", to: "/" },
+          { label: "Service" },
+          { label: "Service requests", to: "/service-requests" },
+          { label: ticket.ticket_number },
+        ]}
         actions={
           canWrite ? (
             <>
-              <Button variant="outline" leftIcon={Pencil} onClick={() => setEditOpen(true)} data-testid="ticket-edit-btn">
+              <Button
+                variant="outline"
+                leftIcon={Pencil}
+                onClick={() => setEditOpen(true)}
+                data-testid="ticket-edit-btn"
+              >
                 Edit details
               </Button>
               {transitions.map((transition) => (
-                <Button key={transition.to} variant={transition.variant} onClick={() => setStatusTarget(transition.to)} data-testid={`ticket-status-${transition.to}`}>
+                <Button
+                  key={transition.to}
+                  variant={transition.variant}
+                  onClick={() => setStatusTarget(transition.to)}
+                  data-testid={`ticket-status-${transition.to}`}
+                >
                   {transition.label}
                 </Button>
               ))}
@@ -123,7 +196,13 @@ function TicketView({ ticket }: { ticket: ServiceRequestDetailResponse }) {
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="min-w-0 space-y-4 lg:col-span-2">
           <MessageThread ticket={ticket} />
-          {canWrite ? <ReplyComposer ticket={ticket} /> : <p className="text-xs text-ink-subtle">You can read this ticket but need the “service.write” permission to reply.</p>}
+          {canWrite ? (
+            <ReplyComposer ticket={ticket} />
+          ) : (
+            <p className="text-xs text-ink-subtle">
+              You can read this ticket but need the “service.write” permission to reply.
+            </p>
+          )}
         </div>
         <aside className="min-w-0 space-y-4">
           <Card>
@@ -134,11 +213,18 @@ function TicketView({ ticket }: { ticket: ServiceRequestDetailResponse }) {
               <div className="flex items-start gap-2">
                 <Contact className="mt-0.5 size-4 shrink-0 text-gold-text" aria-hidden="true" />
                 <div className="min-w-0">
-                  <Link to={`/customers/${ticket.customer_id}`} className="inline-flex min-h-6 items-center font-semibold text-navy-800 hover:underline focus-ring rounded-xs" data-testid="ticket-customer-link">
+                  <Link
+                    to={`/customers/${ticket.customer_id}`}
+                    className="inline-flex min-h-6 items-center font-semibold text-navy-800 hover:underline focus-ring rounded-xs"
+                    data-testid="ticket-customer-link"
+                  >
                     {ticket.customer_name}
                   </Link>
                   <p className="money text-xs text-ink-muted">
-                    <a href={`tel:${ticket.customer_phone}`} className="inline-flex min-h-6 items-center hover:underline">
+                    <a
+                      href={`tel:${ticket.customer_phone}`}
+                      className="inline-flex min-h-6 items-center hover:underline"
+                    >
                       {formatPhone(ticket.customer_phone)}
                     </a>
                   </p>
@@ -149,11 +235,16 @@ function TicketView({ ticket }: { ticket: ServiceRequestDetailResponse }) {
                 <div className="min-w-0">
                   {ticket.booking_id ? (
                     <>
-                      <Link to={`/bookings/${ticket.booking_id}`} className="money font-semibold text-navy-800 hover:underline focus-ring rounded-xs" data-testid="ticket-booking-link">
+                      <Link
+                        to={`/bookings/${ticket.booking_id}`}
+                        className="money font-semibold text-navy-800 hover:underline focus-ring rounded-xs"
+                        data-testid="ticket-booking-link"
+                      >
                         {ticket.booking_number}
                       </Link>
                       <p className="text-xs text-ink-muted">
-                        {ticket.project_name} · <span className="money font-medium text-navy-950">{ticket.flat_number}</span>
+                        {ticket.project_name} ·{" "}
+                        <span className="money font-medium text-navy-950">{ticket.flat_number}</span>
                       </p>
                     </>
                   ) : (
@@ -167,9 +258,20 @@ function TicketView({ ticket }: { ticket: ServiceRequestDetailResponse }) {
                   { label: "Category", value: ticket.category_name },
                   { label: "Raised", value: <span className="money">{formatDateTime(ticket.created_at)}</span> },
                   { label: "SLA due", value: <span className="money">{formatDateTime(ticket.sla_due_at)}</span> },
-                  ...(ticket.resolved_at ? [{ label: "Resolved", value: <span className="money">{formatDateTime(ticket.resolved_at)}</span> }] : []),
-                  ...(ticket.closed_at ? [{ label: "Closed", value: <span className="money">{formatDateTime(ticket.closed_at)}</span> }] : []),
-                  ...(ticket.reopened_count > 0 ? [{ label: "Reopened", value: <span className="money">{ticket.reopened_count}×</span> }] : []),
+                  ...(ticket.resolved_at
+                    ? [
+                        {
+                          label: "Resolved",
+                          value: <span className="money">{formatDateTime(ticket.resolved_at)}</span>,
+                        },
+                      ]
+                    : []),
+                  ...(ticket.closed_at
+                    ? [{ label: "Closed", value: <span className="money">{formatDateTime(ticket.closed_at)}</span> }]
+                    : []),
+                  ...(ticket.reopened_count > 0
+                    ? [{ label: "Reopened", value: <span className="money">{ticket.reopened_count}×</span> }]
+                    : []),
                 ]}
               />
             </CardContent>
@@ -180,7 +282,12 @@ function TicketView({ ticket }: { ticket: ServiceRequestDetailResponse }) {
               <CardTitle className="text-sm">Assignment</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <AssigneeField ticket={ticket} canAssign={canAssign} pending={assign.isPending} onChange={(value) => assign.mutate(value)} />
+              <AssigneeField
+                ticket={ticket}
+                canAssign={canAssign}
+                pending={assign.isPending}
+                onChange={(value) => assign.mutate(value)}
+              />
               <FieldWrapper label="Priority">
                 {(control) => (
                   <Select<ServicePriority>
@@ -216,9 +323,21 @@ function TicketView({ ticket }: { ticket: ServiceRequestDetailResponse }) {
                 <CardTitle className="text-sm">Customer rating</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center gap-1" role="img" aria-label={`${ticket.rating} out of 5 stars`} data-testid="ticket-rating">
+                <div
+                  className="flex items-center gap-1"
+                  role="img"
+                  aria-label={`${ticket.rating} out of 5 stars`}
+                  data-testid="ticket-rating"
+                >
                   {[1, 2, 3, 4, 5].map((star) => (
-                    <Star key={star} className={cn("size-5", star <= (ticket.rating ?? 0) ? "fill-gold text-gold" : "text-border-strong")} aria-hidden="true" />
+                    <Star
+                      key={star}
+                      className={cn(
+                        "size-5",
+                        star <= (ticket.rating ?? 0) ? "fill-gold text-gold" : "text-border-strong",
+                      )}
+                      aria-hidden="true"
+                    />
                   ))}
                   <span className="money ml-1 text-sm font-semibold text-navy-950">{ticket.rating}/5</span>
                 </div>
@@ -231,7 +350,13 @@ function TicketView({ ticket }: { ticket: ServiceRequestDetailResponse }) {
         </aside>
       </div>
 
-      <StatusDialog target={statusTarget} ticket={ticket} pending={status.isPending} onClose={() => setStatusTarget(null)} onConfirm={(note) => statusTarget && status.mutate({ status: statusTarget, note })} />
+      <StatusDialog
+        target={statusTarget}
+        ticket={ticket}
+        pending={status.isPending}
+        onClose={() => setStatusTarget(null)}
+        onConfirm={(note) => statusTarget && status.mutate({ status: statusTarget, note })}
+      />
       <EditTicketDialog open={editOpen} onOpenChange={setEditOpen} ticket={ticket} />
     </>
   );
@@ -271,7 +396,13 @@ function AttachmentList({ attachments }: { attachments: ServiceMessageRow["attac
               {isImage && file.thumb_url ? (
                 <img src={file.thumb_url} alt="" className="size-12 rounded-sm object-cover" loading="lazy" />
               ) : (
-                <span className="flex size-9 items-center justify-center rounded-sm bg-navy-50 text-navy-700">{isImage ? <ImageIcon className="size-4" aria-hidden="true" /> : <FileText className="size-4" aria-hidden="true" />}</span>
+                <span className="flex size-9 items-center justify-center rounded-sm bg-navy-50 text-navy-700">
+                  {isImage ? (
+                    <ImageIcon className="size-4" aria-hidden="true" />
+                  ) : (
+                    <FileText className="size-4" aria-hidden="true" />
+                  )}
+                </span>
               )}
               <span className="max-w-40 truncate">{file.file_name}</span>
             </button>
@@ -286,7 +417,11 @@ function MessageBubble({ message }: { message: ServiceMessageRow }) {
   const mine = message.author_type === "STAFF";
   const system = message.author_type === "SYSTEM";
   return (
-    <li className={cn("flex gap-3", system && "justify-center")} data-testid={`message-${message.id}`} data-internal={message.is_internal || undefined}>
+    <li
+      className={cn("flex gap-3", system && "justify-center")}
+      data-testid={`message-${message.id}`}
+      data-internal={message.is_internal || undefined}
+    >
       {!system && <Avatar name={message.author_name} size="sm" tone={mine ? "navy" : "gold"} className="mt-1" />}
       <div className={cn("min-w-0 flex-1", system && "max-w-xl flex-none")}>
         {system ? (
@@ -294,7 +429,16 @@ function MessageBubble({ message }: { message: ServiceMessageRow }) {
             {message.body} · <span className="money">{formatDateTime(message.created_at)}</span>
           </p>
         ) : (
-          <div className={cn("rounded-lg border p-3", message.is_internal ? "border-l-4 border-status-hold-border border-l-warning bg-warning-bg/50" : mine ? "border-navy-100 bg-navy-50/50" : "border-border bg-card")}>
+          <div
+            className={cn(
+              "rounded-lg border p-3",
+              message.is_internal
+                ? "border-l-4 border-status-hold-border border-l-warning bg-warning-bg/50"
+                : mine
+                  ? "border-navy-100 bg-navy-50/50"
+                  : "border-border bg-card",
+            )}
+          >
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
               <span className="font-semibold text-navy-950">{message.author_name}</span>
               <Badge variant={mine ? "navy" : "gold"}>{ACTOR_TYPE_LABELS[message.author_type]}</Badge>
@@ -315,7 +459,10 @@ function MessageBubble({ message }: { message: ServiceMessageRow }) {
 }
 
 function MessageThread({ ticket }: { ticket: ServiceRequestDetailResponse }) {
-  const messages = useMemo(() => [...ticket.messages].sort((a, b) => a.created_at.localeCompare(b.created_at)), [ticket.messages]);
+  const messages = useMemo(
+    () => [...ticket.messages].sort((a, b) => a.created_at.localeCompare(b.created_at)),
+    [ticket.messages],
+  );
   const internalCount = messages.filter((message) => message.is_internal).length;
   return (
     <Card>
@@ -359,7 +506,13 @@ function ReplyComposer({ ticket }: { ticket: ServiceRequestDetailResponse }) {
   const [uploadOpen, setUploadOpen] = useState(false);
 
   const send = useMutationWithToast<ServiceMessageRow, void>({
-    mutationFn: () => api.post<ServiceMessageRow>(`${SERVICE_PATH}/${ticket.id}/messages`, { body: body.trim(), is_internal: internal, attachment_ids: attachments.map((doc) => doc.id), ...(nextStatus ? { status: nextStatus } : {}) }),
+    mutationFn: () =>
+      api.post<ServiceMessageRow>(`${SERVICE_PATH}/${ticket.id}/messages`, {
+        body: body.trim(),
+        is_internal: internal,
+        attachment_ids: attachments.map((doc) => doc.id),
+        ...(nextStatus ? { status: nextStatus } : {}),
+      }),
     successMessage: internal ? "Internal note added" : "Reply sent to the customer",
     invalidate: serviceInvalidations(ticket.id),
     onSuccess: () => {
@@ -370,17 +523,53 @@ function ReplyComposer({ ticket }: { ticket: ServiceRequestDetailResponse }) {
   });
 
   const closed = ticket.status === "CLOSED";
-  const statusOptions = SERVICE_STATUSES.filter((value) => value !== ticket.status).map((value) => ({ value, label: SERVICE_STATUS_LABELS[value] }));
+  const statusOptions = SERVICE_STATUSES.filter((value) => value !== ticket.status).map((value) => ({
+    value,
+    label: SERVICE_STATUS_LABELS[value],
+  }));
 
   return (
     <Card className={cn(internal && "border-status-hold-border")} data-testid="reply-composer">
-      <CardHeader actions={<Switch size="sm" checked={internal} onCheckedChange={setInternal} label={<span className="flex items-center gap-1 text-xs font-medium"><Lock className="size-3" aria-hidden="true" /> Internal note</span>} data-testid="reply-internal-toggle" />}>
+      <CardHeader
+        actions={
+          <Switch
+            size="sm"
+            checked={internal}
+            onCheckedChange={setInternal}
+            label={
+              <span className="flex items-center gap-1 text-xs font-medium">
+                <Lock className="size-3" aria-hidden="true" /> Internal note
+              </span>
+            }
+            data-testid="reply-internal-toggle"
+          />
+        }
+      >
         <CardTitle className="text-sm">{internal ? "Internal note" : "Reply to customer"}</CardTitle>
-        <p className="text-xs text-ink-subtle">{internal ? "Visible to staff only; the customer is never notified." : "The customer sees this in the portal and gets a notification."}</p>
+        <p className="text-xs text-ink-subtle">
+          {internal
+            ? "Visible to staff only; the customer is never notified."
+            : "The customer sees this in the portal and gets a notification."}
+        </p>
       </CardHeader>
       <CardContent className="space-y-3">
         {internal && <div className="h-1 rounded-full bg-warning" aria-hidden="true" />}
-        <Textarea value={body} onChange={(event) => setBody(event.target.value)} rows={4} maxLength={5000} placeholder={internal ? "Note for colleagues…" : closed ? "This ticket is closed; replying reopens the conversation for the customer." : "Write your reply…"} aria-label={internal ? "Internal note" : "Reply"} className={cn(internal && "bg-warning-bg/30")} data-testid="reply-body" />
+        <Textarea
+          value={body}
+          onChange={(event) => setBody(event.target.value)}
+          rows={4}
+          maxLength={5000}
+          placeholder={
+            internal
+              ? "Note for colleagues…"
+              : closed
+                ? "This ticket is closed; replying reopens the conversation for the customer."
+                : "Write your reply…"
+          }
+          aria-label={internal ? "Internal note" : "Reply"}
+          className={cn(internal && "bg-warning-bg/30")}
+          data-testid="reply-body"
+        />
         {attachments.length > 0 && (
           <ul className="flex flex-wrap gap-1.5">
             {attachments.map((doc) => (
@@ -388,7 +577,12 @@ function ReplyComposer({ ticket }: { ticket: ServiceRequestDetailResponse }) {
                 <Badge variant="outline" className="gap-1 pr-1">
                   <Paperclip className="size-3" aria-hidden="true" />
                   <span className="max-w-40 truncate">{doc.title || doc.file_name}</span>
-                  <button type="button" aria-label={`Remove ${doc.file_name}`} className="rounded-full p-0.5 hover:bg-navy-50 focus-ring" onClick={() => setAttachments((rows) => rows.filter((row) => row.id !== doc.id))}>
+                  <button
+                    type="button"
+                    aria-label={`Remove ${doc.file_name}`}
+                    className="rounded-full p-0.5 hover:bg-navy-50 focus-ring"
+                    onClick={() => setAttachments((rows) => rows.filter((row) => row.id !== doc.id))}
+                  >
                     <X className="size-3" aria-hidden="true" />
                   </button>
                 </Badge>
@@ -397,17 +591,50 @@ function ReplyComposer({ ticket }: { ticket: ServiceRequestDetailResponse }) {
           </ul>
         )}
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" variant="outline" size="sm" leftIcon={Paperclip} onClick={() => setUploadOpen(true)} disabled={attachments.length >= 10} data-testid="reply-attach-btn">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            leftIcon={Paperclip}
+            onClick={() => setUploadOpen(true)}
+            disabled={attachments.length >= 10}
+            data-testid="reply-attach-btn"
+          >
             Attach
           </Button>
-          <Select<ServiceStatus> aria-label="Set status with this message" size="sm" className="w-full sm:w-52" value={nextStatus} onValueChange={setNextStatus} options={statusOptions} placeholder="Keep status" allowClear data-testid="reply-status" />
+          <Select<ServiceStatus>
+            aria-label="Set status with this message"
+            size="sm"
+            className="w-full sm:w-52"
+            value={nextStatus}
+            onValueChange={setNextStatus}
+            options={statusOptions}
+            placeholder="Keep status"
+            allowClear
+            data-testid="reply-status"
+          />
           <span className="money ml-auto text-2xs text-ink-subtle">{body.length}/5000</span>
-          <Button leftIcon={Send} loading={send.isPending} disabled={body.trim().length === 0} onClick={() => send.mutate()} variant={internal ? "gold" : "primary"} data-testid="reply-send">
+          <Button
+            leftIcon={Send}
+            loading={send.isPending}
+            disabled={body.trim().length === 0}
+            onClick={() => send.mutate()}
+            variant={internal ? "gold" : "primary"}
+            data-testid="reply-send"
+          >
             {internal ? "Add note" : "Send reply"}
           </Button>
         </div>
       </CardContent>
-      <UploadDocumentDialog open={uploadOpen} onOpenChange={setUploadOpen} entityType="SERVICE_REQUEST" entityId={ticket.id} allowShare={false} title="Attach to message" onUploaded={(doc) => setAttachments((rows) => [...rows, doc])} />
+      <UploadDocumentDialog
+        open={uploadOpen}
+        onOpenChange={setUploadOpen}
+        entityType="SERVICE_REQUEST"
+        entityId={ticket.id}
+        allowShare={false}
+        title="Attach to message"
+        onUploaded={(doc) => setAttachments((rows) => [...rows, doc])}
+      />
     </Card>
   );
 }
@@ -416,14 +643,40 @@ function ReplyComposer({ ticket }: { ticket: ServiceRequestDetailResponse }) {
 /* Sidebar pieces                                                       */
 /* ------------------------------------------------------------------ */
 
-function AssigneeField({ ticket, canAssign, pending, onChange }: { ticket: ServiceRequestRow; canAssign: boolean; pending: boolean; onChange: (value: string | null) => void }) {
+function AssigneeField({
+  ticket,
+  canAssign,
+  pending,
+  onChange,
+}: {
+  ticket: ServiceRequestRow;
+  canAssign: boolean;
+  pending: boolean;
+  onChange: (value: string | null) => void;
+}) {
   const users = useUserOptions(canAssign);
-  const options = useMemo(() => (users.data ?? []).filter((user) => user.is_active || user.id === ticket.assignee_user_id).map((user) => ({ value: user.id, label: user.name, description: user.role_name, keywords: [user.email] })), [users.data, ticket.assignee_user_id]);
+  const options = useMemo(
+    () =>
+      (users.data ?? [])
+        .filter((user) => user.is_active || user.id === ticket.assignee_user_id)
+        .map((user) => ({ value: user.id, label: user.name, description: user.role_name, keywords: [user.email] })),
+    [users.data, ticket.assignee_user_id],
+  );
   return (
     <FieldWrapper label="Assignee" hint={canAssign ? undefined : "Needs the “service.assign” permission to change"}>
       {(control) =>
         canAssign ? (
-          <Combobox id={control.id} value={ticket.assignee_user_id} onValueChange={(value) => onChange(value)} options={options} selectedLabel={ticket.assignee_name ?? undefined} placeholder={users.isPending ? "Loading…" : "Unassigned"} allowClear disabled={pending} data-testid="ticket-assignee-select" />
+          <Combobox
+            id={control.id}
+            value={ticket.assignee_user_id}
+            onValueChange={(value) => onChange(value)}
+            options={options}
+            selectedLabel={ticket.assignee_name ?? undefined}
+            placeholder={users.isPending ? "Loading…" : "Unassigned"}
+            allowClear
+            disabled={pending}
+            data-testid="ticket-assignee-select"
+          />
         ) : (
           <p className="flex items-center gap-2 text-sm text-ink">
             <UserRound className="size-4 text-ink-subtle" aria-hidden="true" />
@@ -458,12 +711,31 @@ function HistoryCard({ ticket }: { ticket: ServiceRequestDetailResponse }) {
   const { can } = useAuth();
   const history = useTicketHistory(ticket.id, { enabled: can("audit.view") });
   const items = useMemo<TimelineItem[]>(() => {
-    const derived: TimelineItem[] = [{ id: "created", title: "Ticket raised", at: ticket.created_at, actor: ticket.customer_name, tone: "navy" }];
-    if (ticket.sla_breached_at) derived.push({ id: "sla", title: "SLA breached", at: ticket.sla_breached_at, tone: "danger" });
-    if (ticket.resolved_at) derived.push({ id: "resolved", title: "Resolved", at: ticket.resolved_at, tone: "success" });
+    const derived: TimelineItem[] = [
+      { id: "created", title: "Ticket raised", at: ticket.created_at, actor: ticket.customer_name, tone: "navy" },
+    ];
+    if (ticket.sla_breached_at)
+      derived.push({ id: "sla", title: "SLA breached", at: ticket.sla_breached_at, tone: "danger" });
+    if (ticket.resolved_at)
+      derived.push({ id: "resolved", title: "Resolved", at: ticket.resolved_at, tone: "success" });
     if (ticket.closed_at) derived.push({ id: "closed", title: "Closed", at: ticket.closed_at, tone: "neutral" });
-    const audits = (history.data ?? []).map<TimelineItem>((row) => ({ id: row.id, title: humanize(row.action.split(".").pop() ?? row.action), description: describeAudit(row) || undefined, at: row.created_at, actor: row.actor_name, tone: historyTone(row.action) }));
-    const merged = audits.length > 0 ? [...audits, ...derived.filter((item) => item.id === "created" && !audits.some((audit) => /create/i.test(String(audit.title))))] : derived;
+    const audits = (history.data ?? []).map<TimelineItem>((row) => ({
+      id: row.id,
+      title: humanize(row.action.split(".").pop() ?? row.action),
+      description: describeAudit(row) || undefined,
+      at: row.created_at,
+      actor: row.actor_name,
+      tone: historyTone(row.action),
+    }));
+    const merged =
+      audits.length > 0
+        ? [
+            ...audits,
+            ...derived.filter(
+              (item) => item.id === "created" && !audits.some((audit) => /create/i.test(String(audit.title))),
+            ),
+          ]
+        : derived;
     return merged.sort((a, b) => (b.at ?? "").localeCompare(a.at ?? ""));
   }, [history.data, ticket]);
 
@@ -474,9 +746,7 @@ function HistoryCard({ ticket }: { ticket: ServiceRequestDetailResponse }) {
           <History className="size-4 text-gold-text" aria-hidden="true" /> History
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        {history.isPending ? <Skeleton className="h-24" /> : <Timeline items={items} />}
-      </CardContent>
+      <CardContent>{history.isPending ? <Skeleton className="h-24" /> : <Timeline items={items} />}</CardContent>
     </Card>
   );
 }
@@ -485,18 +755,38 @@ function HistoryCard({ ticket }: { ticket: ServiceRequestDetailResponse }) {
 /* Dialogs                                                              */
 /* ------------------------------------------------------------------ */
 
-function StatusDialog({ target, ticket, pending, onClose, onConfirm }: { target: ServiceStatus | null; ticket: ServiceRequestRow; pending: boolean; onClose: () => void; onConfirm: (note: string | null) => void }) {
+function StatusDialog({
+  target,
+  ticket,
+  pending,
+  onClose,
+  onConfirm,
+}: {
+  target: ServiceStatus | null;
+  ticket: ServiceRequestRow;
+  pending: boolean;
+  onClose: () => void;
+  onConfirm: (note: string | null) => void;
+}) {
   const [note, setNote] = useState("");
-  useEffect(() => {
-    if (!target) setNote("");
-  }, [target]);
+  useOnChange(target, (next) => {
+    if (!next) setNote("");
+  });
   const needsNote = target === "RESOLVED" || target === "CLOSED";
   return (
     <SimpleDialog
       open={target !== null}
       onOpenChange={(open) => !open && !pending && onClose()}
       title={target ? `Move to ${SERVICE_STATUS_LABELS[target]}?` : ""}
-      description={target === "AWAITING_CUSTOMER" ? "The SLA clock keeps running; the customer is asked to respond." : target === "RESOLVED" ? "The customer can reopen within 7 days and rate the service." : target === "CLOSED" ? "Closes the ticket for good. The customer can still read it." : `${ticket.ticket_number} changes from ${SERVICE_STATUS_LABELS[ticket.status]}.`}
+      description={
+        target === "AWAITING_CUSTOMER"
+          ? "The SLA clock keeps running; the customer is asked to respond."
+          : target === "RESOLVED"
+            ? "The customer can reopen within 7 days and rate the service."
+            : target === "CLOSED"
+              ? "Closes the ticket for good. The customer can still read it."
+              : `${ticket.ticket_number} changes from ${SERVICE_STATUS_LABELS[ticket.status]}.`
+      }
       footer={
         <>
           <Button variant="outline" onClick={onClose} disabled={pending}>
@@ -508,8 +798,20 @@ function StatusDialog({ target, ticket, pending, onClose, onConfirm }: { target:
         </>
       }
     >
-      <FieldWrapper label={needsNote ? "Resolution note" : "Note"} hint="Optional; shown to the customer with the status change.">
-        {(control) => <Textarea id={control.id} value={note} onChange={(event) => setNote(event.target.value)} rows={3} maxLength={1000} data-testid="status-dialog-note" />}
+      <FieldWrapper
+        label={needsNote ? "Resolution note" : "Note"}
+        hint="Optional; shown to the customer with the status change."
+      >
+        {(control) => (
+          <Textarea
+            id={control.id}
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+            rows={3}
+            maxLength={1000}
+            data-testid="status-dialog-note"
+          />
+        )}
       </FieldWrapper>
     </SimpleDialog>
   );
@@ -525,24 +827,45 @@ const EditSchema = z
   .looseObject({})
   .transform((raw): unknown => {
     const values = raw as unknown as EditValues;
-    return { subject: values.subject.trim(), description: values.description.trim(), category_id: values.category_id ?? undefined };
+    return {
+      subject: values.subject.trim(),
+      description: values.description.trim(),
+      category_id: values.category_id ?? undefined,
+    };
   })
   .pipe(ServiceRequestUpdateSchema.omit({ version: true }));
 
-function EditTicketDialog({ open, onOpenChange, ticket }: { open: boolean; onOpenChange: (open: boolean) => void; ticket: ServiceRequestDetailResponse }) {
+function EditTicketDialog({
+  open,
+  onOpenChange,
+  ticket,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  ticket: ServiceRequestDetailResponse;
+}) {
   const resolver = useMemo(() => contractResolver<EditValues, unknown>(EditSchema), []);
-  const form = useForm<EditValues, unknown, unknown>({ resolver, defaultValues: { subject: ticket.subject, description: ticket.description, category_id: ticket.category_id }, mode: "onTouched" });
+  const form = useForm<EditValues, unknown, unknown>({
+    resolver,
+    defaultValues: { subject: ticket.subject, description: ticket.description, category_id: ticket.category_id },
+    mode: "onTouched",
+  });
   const control = controlOf(form);
   const categories = useServiceCategories(open);
   const [serverError, setServerError] = useState<unknown>(null);
 
   useEffect(() => {
     if (open) form.reset({ subject: ticket.subject, description: ticket.description, category_id: ticket.category_id });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-seed the form only when it opens or the ticket changes version
   }, [open, ticket.version]);
 
   const save = useMutationWithToast<ServiceRequestRow, unknown>({
-    mutationFn: (body) => api.patch<ServiceRequestRow>(`${SERVICE_PATH}/${ticket.id}`, { ...(body as Record<string, unknown>), version: ticket.version }, { version: ticket.version }),
+    mutationFn: (body) =>
+      api.patch<ServiceRequestRow>(
+        `${SERVICE_PATH}/${ticket.id}`,
+        { ...(body as Record<string, unknown>), version: ticket.version },
+        { version: ticket.version },
+      ),
     successMessage: "Ticket updated",
     invalidate: serviceInvalidations(ticket.id),
     entityLabel: "This ticket",
@@ -581,9 +904,54 @@ function EditTicketDialog({ open, onOpenChange, ticket }: { open: boolean; onOpe
         })}
       >
         <FormError error={serverError} />
-        <FormField control={control} name="subject" label="Subject" required render={({ field }) => <Input id={field.id} value={field.value} onChange={field.onChange} onBlur={field.onBlur} maxLength={200} invalid={field.invalid} />} />
-        <FormField control={control} name="category_id" label="Category" required render={({ field }) => <Select id={field.id} value={field.value} onValueChange={field.onChange} options={(categories.data ?? []).map((row) => ({ value: row.id, label: row.name }))} invalid={field.invalid} />} />
-        <FormField control={control} name="description" label="Description" required render={({ field }) => <Textarea id={field.id} value={field.value} onChange={field.onChange} onBlur={field.onBlur} rows={5} maxLength={2000} invalid={field.invalid} />} />
+        <FormField
+          control={control}
+          name="subject"
+          label="Subject"
+          required
+          render={({ field }) => (
+            <Input
+              id={field.id}
+              value={field.value}
+              onChange={field.onChange}
+              onBlur={field.onBlur}
+              maxLength={200}
+              invalid={field.invalid}
+            />
+          )}
+        />
+        <FormField
+          control={control}
+          name="category_id"
+          label="Category"
+          required
+          render={({ field }) => (
+            <Select
+              id={field.id}
+              value={field.value}
+              onValueChange={field.onChange}
+              options={(categories.data ?? []).map((row) => ({ value: row.id, label: row.name }))}
+              invalid={field.invalid}
+            />
+          )}
+        />
+        <FormField
+          control={control}
+          name="description"
+          label="Description"
+          required
+          render={({ field }) => (
+            <Textarea
+              id={field.id}
+              value={field.value}
+              onChange={field.onChange}
+              onBlur={field.onBlur}
+              rows={5}
+              maxLength={2000}
+              invalid={field.invalid}
+            />
+          )}
+        />
       </form>
     </SimpleDialog>
   );

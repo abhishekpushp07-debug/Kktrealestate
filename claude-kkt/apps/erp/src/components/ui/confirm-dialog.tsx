@@ -1,8 +1,8 @@
 import { TriangleAlert } from "lucide-react";
 import { AlertDialog } from "radix-ui";
-import { useEffect, useId, useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { describeError } from "@/lib/api";
-import { cn } from "@/lib/utils";
+import { cn, useOnChange } from "@/lib/utils";
 import { Button } from "./button";
 import { Textarea } from "./input";
 import { Label } from "./label";
@@ -47,13 +47,12 @@ export function ConfirmDialog({
   const [error, setError] = useState<string | null>(null);
   const reasonId = useId();
 
-  useEffect(() => {
-    if (!open) {
-      setReason("");
-      setBusy(false);
-      setError(null);
-    }
-  }, [open]);
+  useOnChange(open, (isOpen) => {
+    if (isOpen) return;
+    setReason("");
+    setBusy(false);
+    setError(null);
+  });
 
   const reasonValid = !requireReason || reason.trim().length >= reasonMinLength;
 
@@ -114,19 +113,32 @@ export function ConfirmDialog({
                 </div>
               )}
               {error && (
-                <p role="alert" className="rounded-md border border-danger/30 bg-danger-bg px-3 py-2 text-sm text-danger-fg">
+                <p
+                  role="alert"
+                  className="rounded-md border border-danger/30 bg-danger-bg px-3 py-2 text-sm text-danger-fg"
+                >
                   {error}
                 </p>
               )}
             </div>
           )}
-          <div className={cn("flex flex-col-reverse gap-2 border-t border-border bg-surface/60 px-5 py-3 sm:flex-row sm:justify-end", !children && !requireReason && !error && "mt-4")}>
+          <div
+            className={cn(
+              "flex flex-col-reverse gap-2 border-t border-border bg-surface/60 px-5 py-3 sm:flex-row sm:justify-end",
+              !children && !requireReason && !error && "mt-4",
+            )}
+          >
             <AlertDialog.Cancel asChild>
               <Button variant="outline" disabled={busy}>
                 {cancelLabel}
               </Button>
             </AlertDialog.Cancel>
-            <Button variant={variant === "destructive" ? "danger" : "primary"} loading={busy} disabled={!reasonValid} onClick={() => void confirm()}>
+            <Button
+              variant={variant === "destructive" ? "danger" : "primary"}
+              loading={busy}
+              disabled={!reasonValid}
+              onClick={() => void confirm()}
+            >
               {confirmLabel}
             </Button>
           </div>

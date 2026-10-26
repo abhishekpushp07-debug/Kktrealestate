@@ -16,10 +16,33 @@ const L = 10_000_000; // ₹1,00,000 in paise
 const CR = 100 * L;
 const NO_ID = "00000000-0000-4000-8000-000000000000";
 
-type Booking = { id: string; version: number; status: string; booking_number: string; flat_id: string; summary: { cash: { due_paise: number }; account: { due_paise: number } } };
-type Payment = { id: string; version: number; receipt_number: string; status: string; amount_paise: number; bucket: string | null; receipt_cancelled: boolean };
+type Booking = {
+  id: string;
+  version: number;
+  status: string;
+  booking_number: string;
+  flat_id: string;
+  summary: { cash: { due_paise: number }; account: { due_paise: number } };
+};
+type Payment = {
+  id: string;
+  version: number;
+  receipt_number: string;
+  status: string;
+  amount_paise: number;
+  bucket: string | null;
+  receipt_cancelled: boolean;
+};
 type PostResponse = { payment: Payment };
-type Demand = { id: string; demand_number: string; installment_seq: number; status: string; due_date: string; total_demand_paise: number; paid_paise: number };
+type Demand = {
+  id: string;
+  demand_number: string;
+  installment_seq: number;
+  status: string;
+  due_date: string;
+  total_demand_paise: number;
+  paid_paise: number;
+};
 type List<T> = { items: T[]; total: number };
 
 let t: TestContext;
@@ -44,17 +67,62 @@ let b3Bounced: Payment;
 let b2Cheque: Payment;
 let b1Receipt: Payment;
 
-async function createBooking(flatId: string, customerId: string, extra: Record<string, unknown> = {}): Promise<Booking> {
-  const body = { flat_id: flatId, customer_id: customerId, booking_date: today, agreement_value_paise: CR, cash_agreed_paise: 60 * L, account_agreed_paise: 40 * L, plan_acceptance_mode: "IN_PERSON", plan_accepted_on: today, ...extra };
-  const r = await t.request<Booking>("POST", "/api/v1/bookings", { token: sales, body, headers: { "idempotency-key": key() } });
+async function createBooking(
+  flatId: string,
+  customerId: string,
+  extra: Record<string, unknown> = {},
+): Promise<Booking> {
+  const body = {
+    flat_id: flatId,
+    customer_id: customerId,
+    booking_date: today,
+    agreement_value_paise: CR,
+    cash_agreed_paise: 60 * L,
+    account_agreed_paise: 40 * L,
+    plan_acceptance_mode: "IN_PERSON",
+    plan_accepted_on: today,
+    ...extra,
+  };
+  const r = await t.request<Booking>("POST", "/api/v1/bookings", {
+    token: sales,
+    body,
+    headers: { "idempotency-key": key() },
+  });
   expect(r.status, r.text).toBe(201);
   return r.body;
 }
 
-async function pay(bookingId: string, bucket: "CASH" | "ACCOUNT", amount: number, mode: "CASH" | "UPI" | "CHEQUE", extra: Record<string, unknown> = {}): Promise<Payment> {
-  const modeExtra = mode === "CASH" ? {} : mode === "UPI" ? { instrument: { number: `UPI${++keyCounter}` }, bank_account_id: w.bankAccountId } : { instrument: { number: `CHQ${++keyCounter}`, date: addDays(today, 3), bank_name: "SBI" }, bank_account_id: w.bankAccountId };
-  const body = { booking_id: bookingId, against: "FLAT_VALUE", bucket, amount_paise: amount, payment_date: today, payment_mode_id: w.modes[mode], ...modeExtra, ...extra };
-  const r = await t.request<PostResponse>("POST", "/api/v1/payments", { token: accounts, body, headers: { "idempotency-key": key() } });
+async function pay(
+  bookingId: string,
+  bucket: "CASH" | "ACCOUNT",
+  amount: number,
+  mode: "CASH" | "UPI" | "CHEQUE",
+  extra: Record<string, unknown> = {},
+): Promise<Payment> {
+  const modeExtra =
+    mode === "CASH"
+      ? {}
+      : mode === "UPI"
+        ? { instrument: { number: `UPI${++keyCounter}` }, bank_account_id: w.bankAccountId }
+        : {
+            instrument: { number: `CHQ${++keyCounter}`, date: addDays(today, 3), bank_name: "SBI" },
+            bank_account_id: w.bankAccountId,
+          };
+  const body = {
+    booking_id: bookingId,
+    against: "FLAT_VALUE",
+    bucket,
+    amount_paise: amount,
+    payment_date: today,
+    payment_mode_id: w.modes[mode],
+    ...modeExtra,
+    ...extra,
+  };
+  const r = await t.request<PostResponse>("POST", "/api/v1/payments", {
+    token: accounts,
+    body,
+    headers: { "idempotency-key": key() },
+  });
   expect(r.status, r.text).toBe(201);
   return r.body.payment;
 }
@@ -66,7 +134,9 @@ async function getBooking(id: string): Promise<Booking> {
 }
 
 async function demandsOf(id: string): Promise<Demand[]> {
-  const r = await t.request<List<Demand>>("GET", `/api/v1/bookings/${id}/demands?page_size=200&sort=posted_at`, { token: admin });
+  const r = await t.request<List<Demand>>("GET", `/api/v1/bookings/${id}/demands?page_size=200&sort=posted_at`, {
+    token: admin,
+  });
   expect(r.status, r.text).toBe(200);
   return r.body.items;
 }
@@ -78,7 +148,11 @@ async function sum(query: string): Promise<number> {
 
 /** Raw PDF bytes of a GET (asserts 200 + application/pdf + %PDF-1 header). */
 async function fetchPdf(url: string, token = admin): Promise<Buffer> {
-  const res = await t.app.inject({ method: "GET", url, headers: { authorization: `Bearer ${token}`, "x-forwarded-for": "10.9.9.9" } });
+  const res = await t.app.inject({
+    method: "GET",
+    url,
+    headers: { authorization: `Bearer ${token}`, "x-forwarded-for": "10.9.9.9" },
+  });
   expect(res.statusCode, res.body.slice(0, 300)).toBe(200);
   expect(String(res.headers["content-type"])).toContain("application/pdf");
   expect(String(res.headers["content-disposition"])).toContain("attachment");
@@ -87,7 +161,6 @@ async function fetchPdf(url: string, token = admin): Promise<Buffer> {
   expect(buf.subarray(0, 8).toString("latin1")).toMatch(/^%PDF-1\./);
   return buf;
 }
-
 
 async function json<T = Record<string, unknown>>(url: string, token = admin): Promise<T> {
   const r = await t.request<T>("GET", url, { token });
@@ -114,7 +187,10 @@ beforeAll(async () => {
   b1 = await createBooking(flats[0]!.id, w.customers[0]!, { sales_user_id: salesId });
   b1Receipt = await pay(b1.id, "ACCOUNT", 4 * L, "UPI");
   await completeStage(t, w.sgh.towerId, w.stages.EXCAVATION, addDays(today, -100));
-  const run = await t.request<{ demands_raised: number }>("POST", "/api/v1/dues/run", { token: admin, body: { block_id: w.sgh.towerId } });
+  const run = await t.request<{ demands_raised: number }>("POST", "/api/v1/dues/run", {
+    token: admin,
+    body: { block_id: w.sgh.towerId },
+  });
   expect(run.status, run.text).toBe(200);
   b1Excavation = (await demandsOf(b1.id)).find((d) => d.installment_seq === 2)!;
   expect(b1Excavation).toBeDefined();
@@ -127,11 +203,17 @@ beforeAll(async () => {
   // B3 (GGV): a UPI receipt reversed and a cheque bounced → neither counts anywhere
   b3 = await createBooking(flatsG[0]!.id, w.customers[2]!);
   b3Reversed = await pay(b3.id, "CASH", 5 * L, "UPI");
-  const rev = await t.request<Payment>("POST", `/api/v1/payments/${b3Reversed.id}/reverse`, { token: accounts, body: { version: b3Reversed.version, reason: "Posted on the wrong booking" } });
+  const rev = await t.request<Payment>("POST", `/api/v1/payments/${b3Reversed.id}/reverse`, {
+    token: accounts,
+    body: { version: b3Reversed.version, reason: "Posted on the wrong booking" },
+  });
   expect(rev.status, rev.text).toBe(200);
   b3Reversed = rev.body;
   const chq = await pay(b3.id, "ACCOUNT", 2 * L, "CHEQUE");
-  const bounced = await t.request<Payment>("POST", `/api/v1/payments/${chq.id}/bounce`, { token: accounts, body: { version: chq.version, reason: "Insufficient funds" } });
+  const bounced = await t.request<Payment>("POST", `/api/v1/payments/${chq.id}/bounce`, {
+    token: accounts,
+    body: { version: chq.version, reason: "Insufficient funds" },
+  });
   expect(bounced.status, bounced.text).toBe(200);
   b3Bounced = bounced.body;
 
@@ -139,13 +221,18 @@ beforeAll(async () => {
   b4 = await createBooking(flatsU[0]!.id, w.customers[3]!);
   await pay(b4.id, "CASH", 1 * L, "CASH");
   const fresh = await getBooking(b4.id);
-  const cancel = await t.request<Booking>("POST", `/api/v1/bookings/${b4.id}/cancel`, { token: admin, body: { version: fresh.version, reason: "Customer withdrew", deduction_paise: 50_000_00, refund_paise: 50_000_00 } });
+  const cancel = await t.request<Booking>("POST", `/api/v1/bookings/${b4.id}/cancel`, {
+    token: admin,
+    body: { version: fresh.version, reason: "Customer withdrew", deduction_paise: 50_000_00, refund_paise: 50_000_00 },
+  });
   expect(cancel.status, cancel.text).toBe(201 === cancel.status ? 201 : 200);
   b4 = cancel.body;
 
   // leads / enquiry / brochure / site visit for the funnel and the sales dashboard
   const sql = t.app.sql;
-  const [lead1] = await sql<{ id: string }[]>`insert into leads (company_id, lead_number, full_name, phone, project_id, source, stage, assigned_user_id) values (${t.companyId}, 'LD-T/0001', 'Web Lead', '9800000001', ${w.sgh.id}, 'WEBSITE', 'NEW', ${salesId}) returning id`;
+  const [lead1] = await sql<
+    { id: string }[]
+  >`insert into leads (company_id, lead_number, full_name, phone, project_id, source, stage, assigned_user_id) values (${t.companyId}, 'LD-T/0001', 'Web Lead', '9800000001', ${w.sgh.id}, 'WEBSITE', 'NEW', ${salesId}) returning id`;
   await sql`insert into lead_activities (lead_id, type, actor_type, actor_id, at) values (${lead1!.id}, 'FOLLOW_UP', 'STAFF', ${salesId}, now() + interval '2 hours')`;
   await sql`insert into leads (company_id, lead_number, full_name, phone, project_id, source, stage, assigned_user_id, next_follow_up_at) values (${t.companyId}, 'LD-T/0002', 'Brochure Lead', '9800000002', ${w.sgh.id}, 'BROCHURE', 'CONVERTED', ${salesId}, now())`;
   await sql`insert into enquiries (company_id, lead_id, project_id, name, phone, reference_number) values (${t.companyId}, ${lead1!.id}, ${w.sgh.id}, 'Web Lead', '9800000001', 'ENQ-T/0001')`;
@@ -157,12 +244,24 @@ beforeAll(async () => {
   await sql`insert into user_project_scopes (user_id, project_id) values (${pa!.id}, ${w.sgh.id})`;
   await t.app.redis.incr("perm:version");
 }, 180_000);
-afterAll(async () => { await t?.close(); });
+afterAll(async () => {
+  await t?.close();
+});
 
 // ---------------------------------------------------------------------------
 describe("reconciliation with the ledger (SPEC §18 scenario 13)", () => {
   it("collections total = Σ CLEARED payments; PENDING, BOUNCED and REVERSED never count; each period row adds up and modes sum to the total", async () => {
-    const r = await json<{ rows: { cash_paise: number; account_paise: number; other_paise: number; total_paise: number; count: number; by_mode: { amount_paise: number }[] }[]; totals: { total_paise: number; count: number; cash_paise: number; account_paise: number } }>(`/api/v1/reports/collections?from=${addDays(today, -1)}&to=${today}`);
+    const r = await json<{
+      rows: {
+        cash_paise: number;
+        account_paise: number;
+        other_paise: number;
+        total_paise: number;
+        count: number;
+        by_mode: { amount_paise: number }[];
+      }[];
+      totals: { total_paise: number; count: number; cash_paise: number; account_paise: number };
+    }>(`/api/v1/reports/collections?from=${addDays(today, -1)}&to=${today}`);
     const cleared = await sum(`select coalesce(sum(amount_paise), 0) as n from payments where status = 'CLEARED'`);
     const everything = await sum(`select coalesce(sum(amount_paise), 0) as n from payments`);
     expect(r.totals.total_paise).toBe(cleared);
@@ -174,15 +273,32 @@ describe("reconciliation with the ledger (SPEC §18 scenario 13)", () => {
       expect(row.cash_paise + row.account_paise + row.other_paise).toBe(row.total_paise);
       expect(row.by_mode.reduce((s, m) => s + m.amount_paise, 0)).toBe(row.total_paise);
     }
-    const reversedOnly = await json<{ totals: { total_paise: number } }>(`/api/v1/reports/collections?from=${today}&to=${today}&status=REVERSED`);
+    const reversedOnly = await json<{ totals: { total_paise: number } }>(
+      `/api/v1/reports/collections?from=${today}&to=${today}&status=REVERSED`,
+    );
     expect(reversedOnly.totals.total_paise).toBe(5 * L);
-    const monthly = await json<{ rows: { period: string }[] }>(`/api/v1/reports/collections?from=${today}&to=${today}&group_by=MONTH&category=CASH&mode_code=CASH`);
+    const monthly = await json<{ rows: { period: string }[] }>(
+      `/api/v1/reports/collections?from=${today}&to=${today}&group_by=MONTH&category=CASH&mode_code=CASH`,
+    );
     expect(monthly.rows[0]?.period).toBe(today.slice(0, 7));
   });
 
   it("outstanding = Σ positive bucket dues of ACTIVE bookings, advances = Σ negative parts, ageing buckets sum to outstanding, cancelled bookings excluded", async () => {
-    const r = await json<{ as_of: string; rows: { label: string; total_due_paise: number; ageing: Record<string, number> }[]; totals: { cash_due_paise: number; account_due_paise: number; total_due_paise: number; bookings: number; ageing: Record<string, number> }; top_overdue: { booking_number: string; overdue_paise: number; days_overdue: number; bucket: string }[] }>("/api/v1/reports/outstanding-ageing");
-    const expected = await sum(`select coalesce(sum(greatest(0, cash_order_raised_paise - cash_paid_paise) + greatest(0, account_order_raised_paise - account_paid_paise)), 0) as n from bookings where status = 'ACTIVE'`);
+    const r = await json<{
+      as_of: string;
+      rows: { label: string; total_due_paise: number; ageing: Record<string, number> }[];
+      totals: {
+        cash_due_paise: number;
+        account_due_paise: number;
+        total_due_paise: number;
+        bookings: number;
+        ageing: Record<string, number>;
+      };
+      top_overdue: { booking_number: string; overdue_paise: number; days_overdue: number; bucket: string }[];
+    }>("/api/v1/reports/outstanding-ageing");
+    const expected = await sum(
+      `select coalesce(sum(greatest(0, cash_order_raised_paise - cash_paid_paise) + greatest(0, account_order_raised_paise - account_paid_paise)), 0) as n from bookings where status = 'ACTIVE'`,
+    );
     expect(r.totals.total_due_paise).toBe(expected);
     // B1: cash 6L + 3L, account 2L · B2: account 4L · B3: 10L
     expect(r.totals.total_due_paise).toBe(11 * L + 4 * L + 10 * L);
@@ -196,66 +312,183 @@ describe("reconciliation with the ledger (SPEC §18 scenario 13)", () => {
     for (const row of r.rows) expect(Object.values(row.ageing).reduce((s, v) => s + v, 0)).toBe(row.total_due_paise);
     expect(r.rows.map((x) => x.label).sort()).toEqual(["Ganesh Green Villas", "Shree Ganesh Heights"]);
     expect(r.top_overdue).toHaveLength(1);
-    expect(r.top_overdue[0]).toMatchObject({ booking_number: b1.booking_number, overdue_paise: 5 * L, bucket: "D61_90" });
+    expect(r.top_overdue[0]).toMatchObject({
+      booking_number: b1.booking_number,
+      overdue_paise: 5 * L,
+      bucket: "D61_90",
+    });
     expect(r.top_overdue[0]!.days_overdue).toBe(85);
 
-    const adv = await json<{ rows: { booking_number: string; cash_advance_paise: number; account_advance_paise: number; next_installment_name: string | null }[]; totals: { total_advance_paise: number; count: number } }>("/api/v1/reports/advances");
-    const expectedAdv = await sum(`select coalesce(sum(greatest(0, cash_paid_paise - cash_order_raised_paise) + greatest(0, account_paid_paise - account_order_raised_paise)), 0) as n from bookings where status = 'ACTIVE'`);
+    const adv = await json<{
+      rows: {
+        booking_number: string;
+        cash_advance_paise: number;
+        account_advance_paise: number;
+        next_installment_name: string | null;
+      }[];
+      totals: { total_advance_paise: number; count: number };
+    }>("/api/v1/reports/advances");
+    const expectedAdv = await sum(
+      `select coalesce(sum(greatest(0, cash_paid_paise - cash_order_raised_paise) + greatest(0, account_paid_paise - account_order_raised_paise)), 0) as n from bookings where status = 'ACTIVE'`,
+    );
     expect(adv.totals.total_advance_paise).toBe(expectedAdv);
     expect(adv.totals.total_advance_paise).toBe(2 * L);
     expect(adv.rows).toHaveLength(1);
-    expect(adv.rows[0]).toMatchObject({ booking_number: b2.booking_number, cash_advance_paise: 2 * L, account_advance_paise: 0, next_installment_name: "30 days" });
-    const byCustomer = await json<{ rows: { label: string }[] }>("/api/v1/reports/outstanding-ageing?group_by=CUSTOMER&top_n=1");
+    expect(adv.rows[0]).toMatchObject({
+      booking_number: b2.booking_number,
+      cash_advance_paise: 2 * L,
+      account_advance_paise: 0,
+      next_installment_name: "30 days",
+    });
+    const byCustomer = await json<{ rows: { label: string }[] }>(
+      "/api/v1/reports/outstanding-ageing?group_by=CUSTOMER&top_n=1",
+    );
     expect(byCustomer.rows).toHaveLength(3);
   });
 
   it("demand vs collection per installment/stage reconciles with demands; cheques, cancellations and bank-wise receipts reconcile with payments", async () => {
-    const dvc = await json<{ rows: { label: string; block_name: string; demands_count: number; demanded_paise: number; collected_paise: number; outstanding_paise: number; collection_percent: number }[]; totals: { demanded_paise: number; collected_paise: number; outstanding_paise: number } }>(`/api/v1/reports/demand-vs-collection?project_id=${w.sgh.id}`);
-    const demanded = await sum(`select coalesce(sum(total_demand_paise), 0) as n from demands where project_id = '${w.sgh.id}' and status in ('OPEN','PARTIALLY_PAID','PAID')`);
-    const collected = await sum(`select coalesce(sum(paid_paise), 0) as n from demands where project_id = '${w.sgh.id}' and status in ('OPEN','PARTIALLY_PAID','PAID')`);
+    const dvc = await json<{
+      rows: {
+        label: string;
+        block_name: string;
+        demands_count: number;
+        demanded_paise: number;
+        collected_paise: number;
+        outstanding_paise: number;
+        collection_percent: number;
+      }[];
+      totals: { demanded_paise: number; collected_paise: number; outstanding_paise: number };
+    }>(`/api/v1/reports/demand-vs-collection?project_id=${w.sgh.id}`);
+    const demanded = await sum(
+      `select coalesce(sum(total_demand_paise), 0) as n from demands where project_id = '${w.sgh.id}' and status in ('OPEN','PARTIALLY_PAID','PAID')`,
+    );
+    const collected = await sum(
+      `select coalesce(sum(paid_paise), 0) as n from demands where project_id = '${w.sgh.id}' and status in ('OPEN','PARTIALLY_PAID','PAID')`,
+    );
     expect(dvc.totals.demanded_paise).toBe(demanded);
     expect(dvc.totals.collected_paise).toBe(collected);
     expect(dvc.totals.outstanding_paise).toBe(demanded - collected);
-    expect(dvc.rows.find((r) => r.label === "Excavation")).toMatchObject({ block_name: "Tower A", demands_count: 1, demanded_paise: 5 * L, collected_paise: 0, collection_percent: 0 });
-    const byStage = await json<{ rows: { label: string }[] }>(`/api/v1/reports/demand-vs-collection?project_id=${w.sgh.id}&group_by=STAGE`);
+    expect(dvc.rows.find((r) => r.label === "Excavation")).toMatchObject({
+      block_name: "Tower A",
+      demands_count: 1,
+      demanded_paise: 5 * L,
+      collected_paise: 0,
+      collection_percent: 0,
+    });
+    const byStage = await json<{ rows: { label: string }[] }>(
+      `/api/v1/reports/demand-vs-collection?project_id=${w.sgh.id}&group_by=STAGE`,
+    );
     expect(byStage.rows.map((r) => r.label)).toEqual(expect.arrayContaining(["On booking", "Excavation"]));
 
-    const pending = await json<{ items: { receipt_number: string; instrument_date: string | null; days_in_hand: number }[]; totals: { count: number; amount_paise: number } }>("/api/v1/reports/cheques");
+    const pending = await json<{
+      items: { receipt_number: string; instrument_date: string | null; days_in_hand: number }[];
+      totals: { count: number; amount_paise: number };
+    }>("/api/v1/reports/cheques");
     expect(pending.totals).toEqual({ count: 1, amount_paise: 3 * L });
-    expect(pending.items[0]).toMatchObject({ receipt_number: b2Cheque.receipt_number, instrument_date: addDays(today, 3), days_in_hand: 0 });
-    const bouncedRep = await json<{ items: { receipt_number: string; status: string; bounce_reason: string | null }[]; totals: { count: number } }>("/api/v1/reports/cheques?status=BOUNCED");
+    expect(pending.items[0]).toMatchObject({
+      receipt_number: b2Cheque.receipt_number,
+      instrument_date: addDays(today, 3),
+      days_in_hand: 0,
+    });
+    const bouncedRep = await json<{
+      items: { receipt_number: string; status: string; bounce_reason: string | null }[];
+      totals: { count: number };
+    }>("/api/v1/reports/cheques?status=BOUNCED");
     expect(bouncedRep.items.map((i) => i.receipt_number)).toEqual([b3Bounced.receipt_number]);
     expect(bouncedRep.items[0]).toMatchObject({ status: "BOUNCED", bounce_reason: "Insufficient funds" });
 
-    const canc = await json<{ rows: { booking_number: string; paid_paise: number; deduction_paise: number; refund_paise: number; reason: string }[]; totals: { count: number; refund_paise: number } }>(`/api/v1/reports/cancellations?from=${today}&to=${today}`);
+    const canc = await json<{
+      rows: {
+        booking_number: string;
+        paid_paise: number;
+        deduction_paise: number;
+        refund_paise: number;
+        reason: string;
+      }[];
+      totals: { count: number; refund_paise: number };
+    }>(`/api/v1/reports/cancellations?from=${today}&to=${today}`);
     expect(canc.totals).toMatchObject({ count: 1, refund_paise: 50_000_00 });
-    expect(canc.rows[0]).toMatchObject({ booking_number: b4.booking_number, paid_paise: 1 * L, deduction_paise: 50_000_00, refund_paise: 50_000_00, reason: "Customer withdrew" });
+    expect(canc.rows[0]).toMatchObject({
+      booking_number: b4.booking_number,
+      paid_paise: 1 * L,
+      deduction_paise: 50_000_00,
+      refund_paise: 50_000_00,
+      reason: "Customer withdrew",
+    });
 
-    const bank = await json<{ rows: { bank_account_id: string | null; bank_account_label: string; amount_paise: number; by_mode: { mode_code: string; amount_paise: number }[] }[]; totals: { amount_paise: number; count: number } }>(`/api/v1/reports/bankwise-receipts?from=${today}&to=${today}`);
+    const bank = await json<{
+      rows: {
+        bank_account_id: string | null;
+        bank_account_label: string;
+        amount_paise: number;
+        by_mode: { mode_code: string; amount_paise: number }[];
+      }[];
+      totals: { amount_paise: number; count: number };
+    }>(`/api/v1/reports/bankwise-receipts?from=${today}&to=${today}`);
     const cleared = await sum(`select coalesce(sum(amount_paise), 0) as n from payments where status = 'CLEARED'`);
     expect(bank.totals.amount_paise).toBe(cleared);
-    expect(bank.rows.find((r) => r.bank_account_id === w.bankAccountId)).toMatchObject({ amount_paise: 4 * L, by_mode: [{ mode_code: "UPI", amount_paise: 4 * L }] });
+    expect(bank.rows.find((r) => r.bank_account_id === w.bankAccountId)).toMatchObject({
+      amount_paise: 4 * L,
+      by_mode: [{ mode_code: "UPI", amount_paise: 4 * L }],
+    });
     expect(bank.rows.find((r) => r.bank_account_id === null)).toMatchObject({ amount_paise: 9 * L });
     for (const row of bank.rows) expect(row.by_mode.reduce((s, m) => s + m.amount_paise, 0)).toBe(row.amount_paise);
   });
 
   it("upcoming dues lists the time-triggered installment of the DP plan (85% at 30 days) and the roznamcha range matches cleared cash", async () => {
-    const r = await json<{ rows: { booking_number: string; installment_name: string; expected_date: string; is_estimate: boolean; total_paise: number; cash_paise: number; account_paise: number }[]; by_month: { total_paise: number }[]; totals: { total_paise: number; count: number } }>(`/api/v1/reports/upcoming-dues?from=${today}&to=${addDays(today, 60)}`);
+    const r = await json<{
+      rows: {
+        booking_number: string;
+        installment_name: string;
+        expected_date: string;
+        is_estimate: boolean;
+        total_paise: number;
+        cash_paise: number;
+        account_paise: number;
+      }[];
+      by_month: { total_paise: number }[];
+      totals: { total_paise: number; count: number };
+    }>(`/api/v1/reports/upcoming-dues?from=${today}&to=${addDays(today, 60)}`);
     const dp = r.rows.find((x) => x.booking_number === b2.booking_number);
-    expect(dp).toMatchObject({ installment_name: "30 days", expected_date: addDays(today, 30), is_estimate: false, cash_paise: 51 * L, account_paise: 34 * L, total_paise: 85 * L });
+    expect(dp).toMatchObject({
+      installment_name: "30 days",
+      expected_date: addDays(today, 30),
+      is_estimate: false,
+      cash_paise: 51 * L,
+      account_paise: 34 * L,
+      total_paise: 85 * L,
+    });
     expect(r.totals.total_paise).toBe(r.rows.reduce((s, x) => s + x.total_paise, 0));
     expect(r.by_month.reduce((s, m) => s + m.total_paise, 0)).toBe(r.totals.total_paise);
-    const none = await json<{ rows: unknown[] }>(`/api/v1/reports/upcoming-dues?from=${addDays(today, 100)}&to=${addDays(today, 120)}`);
+    const none = await json<{ rows: unknown[] }>(
+      `/api/v1/reports/upcoming-dues?from=${addDays(today, 100)}&to=${addDays(today, 120)}`,
+    );
     expect(none.rows).toHaveLength(0);
 
-    const roz = await json<{ receipts: { amount_paise: number }[]; cash_received_paise: number; totals: { receipts_paise: number; pending_cheques_paise: number } }>(`/api/v1/reports/roznamcha?from=${today}&to=${today}`);
+    const roz = await json<{
+      receipts: { amount_paise: number }[];
+      cash_received_paise: number;
+      totals: { receipts_paise: number; pending_cheques_paise: number };
+    }>(`/api/v1/reports/roznamcha?from=${today}&to=${today}`);
     expect(roz.totals.receipts_paise).toBe(13 * L);
     expect(roz.cash_received_paise).toBe(9 * L);
     expect(roz.totals.pending_cheques_paise).toBe(3 * L);
   });
 
   it("inventory, sales funnel and activity reports reflect the fixture", async () => {
-    const inv = await json<{ by_block: { label: string; booked: number; available: number; total: number; sold_value_paise: number }[]; by_type: { label: string }[]; by_floor: { floor: number }[]; totals: { total: number; booked: number }; velocity: { month: string; bookings: number; cancellations: number }[]; realised_rate: { flat_type_name: string; realised_rate_paise: number | null; rate_card_rate_paise: number | null; bookings: number }[] }>("/api/v1/reports/inventory");
+    const inv = await json<{
+      by_block: { label: string; booked: number; available: number; total: number; sold_value_paise: number }[];
+      by_type: { label: string }[];
+      by_floor: { floor: number }[];
+      totals: { total: number; booked: number };
+      velocity: { month: string; bookings: number; cancellations: number }[];
+      realised_rate: {
+        flat_type_name: string;
+        realised_rate_paise: number | null;
+        rate_card_rate_paise: number | null;
+        bookings: number;
+      }[];
+    }>("/api/v1/reports/inventory");
     const flatCount = await sum("select count(*) as n from flats");
     expect(inv.totals.total).toBe(flatCount);
     expect(inv.totals.booked).toBe(3);
@@ -271,16 +504,46 @@ describe("reconciliation with the ledger (SPEC §18 scenario 13)", () => {
     const scoped = await json<{ totals: { total: number } }>(`/api/v1/reports/inventory?project_id=${w.ggv.id}`);
     expect(scoped.totals.total).toBe(8);
 
-    const funnel = await json<{ by_stage: { stage: string; count: number }[]; by_source: { source: string; leads: number; converted: number; conversion_percent: number }[]; by_salesperson: { user_id: string; leads: number; visits: number; bookings: number; booking_value_paise: number; avg_first_response_hours: number | null }[]; website: { enquiries: number; brochure_downloads: number; site_visits_booked: number; site_visits_by_status: { status: string; count: number }[] }; avg_response_hours: number | null; totals: { leads: number; converted: number; lost: number; bookings: number } }>(`/api/v1/reports/sales-funnel?from=${today}&to=${today}`);
+    const funnel = await json<{
+      by_stage: { stage: string; count: number }[];
+      by_source: { source: string; leads: number; converted: number; conversion_percent: number }[];
+      by_salesperson: {
+        user_id: string;
+        leads: number;
+        visits: number;
+        bookings: number;
+        booking_value_paise: number;
+        avg_first_response_hours: number | null;
+      }[];
+      website: {
+        enquiries: number;
+        brochure_downloads: number;
+        site_visits_booked: number;
+        site_visits_by_status: { status: string; count: number }[];
+      };
+      avg_response_hours: number | null;
+      totals: { leads: number; converted: number; lost: number; bookings: number };
+    }>(`/api/v1/reports/sales-funnel?from=${today}&to=${today}`);
     expect(funnel.totals).toEqual({ leads: 2, converted: 1, lost: 0, bookings: 4 });
     expect(funnel.by_stage.find((s) => s.stage === "NEW")?.count).toBe(1);
-    expect(funnel.by_source.find((s) => s.source === "BROCHURE")).toMatchObject({ leads: 1, converted: 1, conversion_percent: 100 });
+    expect(funnel.by_source.find((s) => s.source === "BROCHURE")).toMatchObject({
+      leads: 1,
+      converted: 1,
+      conversion_percent: 100,
+    });
     const me = funnel.by_salesperson.find((s) => s.user_id === salesId)!;
     expect(me).toMatchObject({ leads: 2, visits: 1, bookings: 2, booking_value_paise: 2 * CR });
     expect(me.avg_first_response_hours).toBeCloseTo(2, 0);
     expect(funnel.avg_response_hours).toBeCloseTo(2, 0);
-    expect(funnel.website).toMatchObject({ enquiries: 1, brochure_downloads: 1, site_visits_booked: 1, site_visits_by_status: [{ status: "CONFIRMED", count: 1 }] });
-    const filtered = await json<{ totals: { leads: number } }>(`/api/v1/reports/sales-funnel?from=${today}&to=${today}&source=WEBSITE`);
+    expect(funnel.website).toMatchObject({
+      enquiries: 1,
+      brochure_downloads: 1,
+      site_visits_booked: 1,
+      site_visits_by_status: [{ status: "CONFIRMED", count: 1 }],
+    });
+    const filtered = await json<{ totals: { leads: number } }>(
+      `/api/v1/reports/sales-funnel?from=${today}&to=${today}&source=WEBSITE`,
+    );
     expect(filtered.totals.leads).toBe(1);
 
     await t.request("POST", "/api/v1/auth/login", { body: { email: "sales@sgb.in", password: "Wrong@12345" } });
@@ -290,10 +553,14 @@ describe("reconciliation with the ledger (SPEC §18 scenario 13)", () => {
     const logins = await json<List<{ kind: string; identifier: string | null }>>("/api/v1/reports/activity?kind=LOGIN");
     expect(logins.total).toBeGreaterThanOrEqual(5);
     expect(logins.items[0]?.kind).toBe("LOGIN");
-    const failed = await json<List<{ kind: string; identifier: string | null; reason: string | null }>>("/api/v1/reports/activity?kind=FAILED_LOGIN");
+    const failed = await json<List<{ kind: string; identifier: string | null; reason: string | null }>>(
+      "/api/v1/reports/activity?kind=FAILED_LOGIN",
+    );
     expect(failed.total).toBeGreaterThanOrEqual(1);
     expect(failed.items.some((i) => i.identifier === "sales@sgb.in")).toBe(true);
-    const paymentsAudit = await json<List<{ action: string }>>("/api/v1/reports/activity?entity_type=payment&page_size=200");
+    const paymentsAudit = await json<List<{ action: string }>>(
+      "/api/v1/reports/activity?entity_type=payment&page_size=200",
+    );
     expect(paymentsAudit.items.every((i) => i.action.startsWith("payment."))).toBe(true);
   });
 });
@@ -301,10 +568,34 @@ describe("reconciliation with the ledger (SPEC §18 scenario 13)", () => {
 // ---------------------------------------------------------------------------
 describe("formats: every report answers JSON, csv and pdf; catalogue; strict queries", () => {
   it("GET /reports lists every key with path, formats and params", async () => {
-    const r = await json<{ reports: { key: string; path: string; formats: string[]; required_params: string[] }[] }>("/api/v1/reports");
+    const r = await json<{ reports: { key: string; path: string; formats: string[]; required_params: string[] }[] }>(
+      "/api/v1/reports",
+    );
     expect(r.reports).toHaveLength(15);
-    expect(r.reports.map((x) => x.key)).toEqual(expect.arrayContaining(["COLLECTIONS", "OUTSTANDING_AGEING", "ADVANCES", "DEMAND_VS_COLLECTION", "UPCOMING_DUES", "INVENTORY", "CUSTOMER_STATEMENT", "PAYMENT_SCHEDULE", "ALLOTMENT_LETTER", "CHEQUES", "CANCELLATIONS", "SALES_FUNNEL", "ROZNAMCHA", "BANKWISE_RECEIPTS", "ACTIVITY"]));
-    expect(r.reports.find((x) => x.key === "COLLECTIONS")).toMatchObject({ path: "/reports/collections", formats: ["csv", "pdf"], required_params: ["from", "to"] });
+    expect(r.reports.map((x) => x.key)).toEqual(
+      expect.arrayContaining([
+        "COLLECTIONS",
+        "OUTSTANDING_AGEING",
+        "ADVANCES",
+        "DEMAND_VS_COLLECTION",
+        "UPCOMING_DUES",
+        "INVENTORY",
+        "CUSTOMER_STATEMENT",
+        "PAYMENT_SCHEDULE",
+        "ALLOTMENT_LETTER",
+        "CHEQUES",
+        "CANCELLATIONS",
+        "SALES_FUNNEL",
+        "ROZNAMCHA",
+        "BANKWISE_RECEIPTS",
+        "ACTIVITY",
+      ]),
+    );
+    expect(r.reports.find((x) => x.key === "COLLECTIONS")).toMatchObject({
+      path: "/reports/collections",
+      formats: ["csv", "pdf"],
+      required_params: ["from", "to"],
+    });
   });
 
   it("every report returns 200 as JSON, text/csv (format=csv and export=CSV) and application/pdf starting with %PDF-1", async () => {
@@ -349,7 +640,12 @@ describe("formats: every report answers JSON, csv and pdf; catalogue; strict que
     }
     const allot = await fetchPdf(`/api/v1/reports/allotment-letter?booking_id=${b1.id}&export=PDF`);
     expect(pdfText(allot)).toContain("ALLOTMENT LETTER");
-    const allotJson = await json<{ booking_number: string; agreement_value_words: string; schedule: unknown[]; project_address: string }>(`/api/v1/reports/allotment-letter?booking_id=${b1.id}`);
+    const allotJson = await json<{
+      booking_number: string;
+      agreement_value_words: string;
+      schedule: unknown[];
+      project_address: string;
+    }>(`/api/v1/reports/allotment-letter?booking_id=${b1.id}`);
     expect(allotJson.booking_number).toBe(b1.booking_number);
     expect(allotJson.agreement_value_words).toBe("Rupees One Crore Only");
     expect(allotJson.schedule).toHaveLength(10);
@@ -358,7 +654,9 @@ describe("formats: every report answers JSON, csv and pdf; catalogue; strict que
   it("csv exports carry the report rows with RFC 4180 headers and the totals reconcile with JSON", async () => {
     const r = await t.request("GET", "/api/v1/reports/outstanding-ageing?format=csv", { token: admin });
     const lines = r.text.trim().split("\r\n");
-    expect(lines[0]).toBe("label,bookings,cash_due_paise,account_due_paise,total_due_paise,NOT_DUE,D0_30,D31_60,D61_90,D90_PLUS");
+    expect(lines[0]).toBe(
+      "label,bookings,cash_due_paise,account_due_paise,total_due_paise,NOT_DUE,D0_30,D31_60,D61_90,D90_PLUS",
+    );
     expect(lines).toHaveLength(3);
     const total = lines.slice(1).reduce((s, l) => s + Number(l.split(",")[4]), 0);
     expect(total).toBe(25 * L);
@@ -367,14 +665,24 @@ describe("formats: every report answers JSON, csv and pdf; catalogue; strict que
   });
 
   it("unknown query parameters, bad enums and from > to are 400 VALIDATION_ERROR; required params are enforced", async () => {
-    const unknown = await t.request<ErrorBody>("GET", `/api/v1/reports/collections?from=${today}&to=${today}&foo=1`, { token: admin });
+    const unknown = await t.request<ErrorBody>("GET", `/api/v1/reports/collections?from=${today}&to=${today}&foo=1`, {
+      token: admin,
+    });
     expect(unknown.status).toBe(400);
     expect(unknown.body.error.code).toBe("VALIDATION_ERROR");
-    const badEnum = await t.request<ErrorBody>("GET", `/api/v1/reports/collections?from=${today}&to=${today}&group_by=YEAR`, { token: admin });
+    const badEnum = await t.request<ErrorBody>(
+      "GET",
+      `/api/v1/reports/collections?from=${today}&to=${today}&group_by=YEAR`,
+      { token: admin },
+    );
     expect(badEnum.status).toBe(400);
     const missing = await t.request<ErrorBody>("GET", "/api/v1/reports/collections", { token: admin });
     expect(missing.status).toBe(400);
-    const reversed = await t.request<ErrorBody>("GET", `/api/v1/reports/collections?from=${today}&to=${addDays(today, -5)}`, { token: admin });
+    const reversed = await t.request<ErrorBody>(
+      "GET",
+      `/api/v1/reports/collections?from=${today}&to=${addDays(today, -5)}`,
+      { token: admin },
+    );
     expect(reversed.status).toBe(400);
     const badFormat = await t.request<ErrorBody>("GET", "/api/v1/reports/advances?format=xlsx", { token: admin });
     expect(badFormat.status).toBe(400);
@@ -427,7 +735,11 @@ describe("branded PDFs: receipt, demand letter, allotment letter, statement (SPE
     expect(text).toContain("Rupees Five Lakh Only");
     expect(text).toContain("₹3,00,000");
     expect(text).toContain("₹2,00,000");
-    const wrongBooking = await t.request<ErrorBody>("GET", `/api/v1/bookings/${b2.id}/demands/${b1Excavation.id}/letter.pdf`, { token: accounts });
+    const wrongBooking = await t.request<ErrorBody>(
+      "GET",
+      `/api/v1/bookings/${b2.id}/demands/${b1Excavation.id}/letter.pdf`,
+      { token: accounts },
+    );
     expect(wrongBooking.status).toBe(404);
   });
 
@@ -439,9 +751,31 @@ describe("branded PDFs: receipt, demand letter, allotment letter, statement (SPE
     expect(at).toContain("Rupees One Crore Only");
     expect(at).toContain("RERA BRERAP00123-1/23");
 
-    const st = await json<{ booking: { booking_number: string; status: string; agreement_value_paise: number }; ledger: { event: string; total_due_paise: number }[]; schedule: { status: string }[]; pending_cheques: { receipt_number: string }[]; summary: { total_due_paise: number; cash_due_paise: number; account_due_paise: number; pending_cheques_paise: number }; revisions: unknown[]; other_charges: unknown[] }>(`/api/v1/reports/customer-statement?booking_id=${b2.id}`);
-    expect(st.booking).toMatchObject({ booking_number: b2.booking_number, status: "ACTIVE", agreement_value_paise: CR });
-    expect(st.summary).toMatchObject({ cash_due_paise: -2 * L, account_due_paise: 4 * L, total_due_paise: 2 * L, pending_cheques_paise: 3 * L });
+    const st = await json<{
+      booking: { booking_number: string; status: string; agreement_value_paise: number };
+      ledger: { event: string; total_due_paise: number }[];
+      schedule: { status: string }[];
+      pending_cheques: { receipt_number: string }[];
+      summary: {
+        total_due_paise: number;
+        cash_due_paise: number;
+        account_due_paise: number;
+        pending_cheques_paise: number;
+      };
+      revisions: unknown[];
+      other_charges: unknown[];
+    }>(`/api/v1/reports/customer-statement?booking_id=${b2.id}`);
+    expect(st.booking).toMatchObject({
+      booking_number: b2.booking_number,
+      status: "ACTIVE",
+      agreement_value_paise: CR,
+    });
+    expect(st.summary).toMatchObject({
+      cash_due_paise: -2 * L,
+      account_due_paise: 4 * L,
+      total_due_paise: 2 * L,
+      pending_cheques_paise: 3 * L,
+    });
     expect(st.pending_cheques.map((c) => c.receipt_number)).toEqual([b2Cheque.receipt_number]);
     expect(st.ledger.map((r) => r.event)).toEqual(["DEMAND", "PAYMENT"]);
     expect(st.ledger[st.ledger.length - 1]!.total_due_paise).toBe(st.summary.total_due_paise);
@@ -453,7 +787,9 @@ describe("branded PDFs: receipt, demand letter, allotment letter, statement (SPE
     expect(text).toContain(b2.booking_number);
     expect(text).toContain("(advance)");
     expect(text).toContain("Cheques in hand");
-    const csv = await t.request("GET", `/api/v1/reports/customer-statement?booking_id=${b2.id}&format=csv`, { token: admin });
+    const csv = await t.request("GET", `/api/v1/reports/customer-statement?booking_id=${b2.id}&format=csv`, {
+      token: admin,
+    });
     expect(csv.status).toBe(200);
     expect(csv.text.split("\r\n")[0]).toContain("total_due_paise");
   });
@@ -467,19 +803,31 @@ describe("branded PDFs: receipt, demand letter, allotment letter, statement (SPE
     expect(employeeDash.status).toBe(200);
     const missing = await t.request<ErrorBody>("GET", `/api/v1/payments/${NO_ID}/receipt.pdf`, { token: accounts });
     expect(missing.status).toBe(404);
-    const missingBooking = await t.request<ErrorBody>("GET", `/api/v1/bookings/${NO_ID}/statement.pdf`, { token: admin });
+    const missingBooking = await t.request<ErrorBody>("GET", `/api/v1/bookings/${NO_ID}/statement.pdf`, {
+      token: admin,
+    });
     expect(missingBooking.status).toBe(404);
     // Project Admin is scoped to SGH: GGV documents and reports behave as not found
-    const outOfScope = await t.request<ErrorBody>("GET", `/api/v1/bookings/${b3.id}/allotment-letter.pdf`, { token: projectsTok });
+    const outOfScope = await t.request<ErrorBody>("GET", `/api/v1/bookings/${b3.id}/allotment-letter.pdf`, {
+      token: projectsTok,
+    });
     expect(outOfScope.status).toBe(404);
     expect(outOfScope.body.error.code).toBe("NOT_FOUND");
     const inScope = await fetchPdf(`/api/v1/bookings/${b1.id}/statement.pdf`, projectsTok);
     expect(inScope.length).toBeGreaterThan(1000);
-    const stOut = await t.request<ErrorBody>("GET", `/api/v1/reports/customer-statement?booking_id=${b3.id}`, { token: projectsTok });
+    const stOut = await t.request<ErrorBody>("GET", `/api/v1/reports/customer-statement?booking_id=${b3.id}`, {
+      token: projectsTok,
+    });
     expect(stOut.status).toBe(404);
-    const dvcOut = await t.request<ErrorBody>("GET", `/api/v1/reports/demand-vs-collection?project_id=${w.ggv.id}`, { token: projectsTok });
+    const dvcOut = await t.request<ErrorBody>("GET", `/api/v1/reports/demand-vs-collection?project_id=${w.ggv.id}`, {
+      token: projectsTok,
+    });
     expect(dvcOut.status).toBe(404);
-    const collOut = await t.request<ErrorBody>("GET", `/api/v1/reports/collections?from=${today}&to=${today}&project_id=${w.ggv.id}`, { token: projectsTok });
+    const collOut = await t.request<ErrorBody>(
+      "GET",
+      `/api/v1/reports/collections?from=${today}&to=${today}&project_id=${w.ggv.id}`,
+      { token: projectsTok },
+    );
     expect(collOut.status).toBe(404);
   });
 });
@@ -487,23 +835,43 @@ describe("branded PDFs: receipt, demand letter, allotment letter, statement (SPE
 // ---------------------------------------------------------------------------
 describe("project scope filters report rows", () => {
   it("a Project Admin scoped to SGH sees only SGH rows in outstanding, inventory, cheques, collections and the funnel", async () => {
-    const out = await json<{ rows: { label: string }[]; totals: { total_due_paise: number; bookings: number } }>("/api/v1/reports/outstanding-ageing", projectsTok);
+    const out = await json<{ rows: { label: string }[]; totals: { total_due_paise: number; bookings: number } }>(
+      "/api/v1/reports/outstanding-ageing",
+      projectsTok,
+    );
     expect(out.rows.map((r) => r.label)).toEqual(["Shree Ganesh Heights"]);
     expect(out.totals.bookings).toBe(2);
     expect(out.totals.total_due_paise).toBe(15 * L);
-    const inv = await json<{ totals: { total: number }; by_block: { label: string }[] }>("/api/v1/reports/inventory", projectsTok);
+    const inv = await json<{ totals: { total: number }; by_block: { label: string }[] }>(
+      "/api/v1/reports/inventory",
+      projectsTok,
+    );
     expect(inv.by_block.map((b) => b.label).sort()).toEqual(["Tower A", "Tower U"]);
     const bounced = await json<{ totals: { count: number } }>("/api/v1/reports/cheques?status=BOUNCED", projectsTok);
     expect(bounced.totals.count).toBe(0); // the bounced cheque is on GGV
-    const coll = await json<{ totals: { total_paise: number } }>(`/api/v1/reports/collections?from=${today}&to=${today}`, projectsTok);
+    const coll = await json<{ totals: { total_paise: number } }>(
+      `/api/v1/reports/collections?from=${today}&to=${today}`,
+      projectsTok,
+    );
     expect(coll.totals.total_paise).toBe(13 * L); // GGV had no cleared money anyway; the reversed UPI never counts
-    const adminColl = await json<{ totals: { total_paise: number } }>(`/api/v1/reports/collections?from=${today}&to=${today}`, admin);
+    const adminColl = await json<{ totals: { total_paise: number } }>(
+      `/api/v1/reports/collections?from=${today}&to=${today}`,
+      admin,
+    );
     expect(adminColl.totals.total_paise).toBe(coll.totals.total_paise);
-    const schedule = await t.request<ErrorBody>("GET", `/api/v1/reports/payment-schedule?booking_id=${b3.id}`, { token: projectsTok });
+    const schedule = await t.request<ErrorBody>("GET", `/api/v1/reports/payment-schedule?booking_id=${b3.id}`, {
+      token: projectsTok,
+    });
     expect(schedule.status).toBe(404);
-    const funnel = await json<{ totals: { leads: number } }>(`/api/v1/reports/sales-funnel?from=${today}&to=${today}`, projectsTok);
+    const funnel = await json<{ totals: { leads: number } }>(
+      `/api/v1/reports/sales-funnel?from=${today}&to=${today}`,
+      projectsTok,
+    );
     expect(funnel.totals.leads).toBe(2);
-    const upcoming = await json<{ rows: { booking_number: string }[] }>(`/api/v1/reports/upcoming-dues?from=${today}&to=${addDays(today, 60)}`, projectsTok);
+    const upcoming = await json<{ rows: { booking_number: string }[] }>(
+      `/api/v1/reports/upcoming-dues?from=${today}&to=${addDays(today, 60)}`,
+      projectsTok,
+    );
     expect(upcoming.rows.every((r) => r.booking_number !== b3.booking_number)).toBe(true);
   });
 });
@@ -511,13 +879,31 @@ describe("project scope filters report rows", () => {
 // ---------------------------------------------------------------------------
 describe("saved presets (per user)", () => {
   it("create, list (own only), delete; duplicates 409; another user's preset is 404; audit rows written", async () => {
-    const create = await t.request<{ id: string; report_key: string; name: string; params: Record<string, unknown> }>("POST", "/api/v1/reports/presets", { token: accounts, body: { report_key: "COLLECTIONS", name: "This month cash", params: { group_by: "DAY", category: "CASH" } }, headers: { "idempotency-key": key() } });
+    const create = await t.request<{ id: string; report_key: string; name: string; params: Record<string, unknown> }>(
+      "POST",
+      "/api/v1/reports/presets",
+      {
+        token: accounts,
+        body: { report_key: "COLLECTIONS", name: "This month cash", params: { group_by: "DAY", category: "CASH" } },
+        headers: { "idempotency-key": key() },
+      },
+    );
     expect(create.status, create.text).toBe(201);
-    expect(create.body).toMatchObject({ report_key: "COLLECTIONS", name: "This month cash", params: { group_by: "DAY", category: "CASH" } });
-    const dup = await t.request<ErrorBody>("POST", "/api/v1/reports/presets", { token: accounts, body: { report_key: "COLLECTIONS", name: "This month cash", params: {} } });
+    expect(create.body).toMatchObject({
+      report_key: "COLLECTIONS",
+      name: "This month cash",
+      params: { group_by: "DAY", category: "CASH" },
+    });
+    const dup = await t.request<ErrorBody>("POST", "/api/v1/reports/presets", {
+      token: accounts,
+      body: { report_key: "COLLECTIONS", name: "This month cash", params: {} },
+    });
     expect(dup.status).toBe(409);
     expect(dup.body.error.code).toBe("DUPLICATE_PRESET");
-    const badKey = await t.request<ErrorBody>("POST", "/api/v1/reports/presets", { token: accounts, body: { report_key: "NOPE", name: "x", params: {} } });
+    const badKey = await t.request<ErrorBody>("POST", "/api/v1/reports/presets", {
+      token: accounts,
+      body: { report_key: "NOPE", name: "x", params: {} },
+    });
     expect(badKey.status).toBe(400);
     const mine = await json<{ items: { id: string }[] }>("/api/v1/reports/presets", accounts);
     expect(mine.items.map((p) => p.id)).toEqual([create.body.id]);
@@ -531,7 +917,9 @@ describe("saved presets (per user)", () => {
     expect(del.status).toBe(204);
     const after = await json<{ items: unknown[] }>("/api/v1/reports/presets", accounts);
     expect(after.items).toHaveLength(0);
-    const audits = await t.app.sql<{ action: string }[]>`select action from audit_logs where entity_type = 'report_preset' and entity_id = ${create.body.id} order by created_at`;
+    const audits = await t.app.sql<
+      { action: string }[]
+    >`select action from audit_logs where entity_type = 'report_preset' and entity_id = ${create.body.id} order by created_at`;
     expect(audits.map((a) => a.action)).toEqual(["report_preset.create", "report_preset.delete"]);
   });
 });
@@ -539,15 +927,62 @@ describe("saved presets (per user)", () => {
 // ---------------------------------------------------------------------------
 describe("dashboards per role (SPEC §14)", () => {
   const widgets = {
-    OWNER: ["collections_12m", "due_ageing", "inventory_by_project", "sales_velocity", "top_overdue", "pending_cheques", "enquiries_this_week", "construction_progress", "dues_raised_this_month", "upcoming_installments_30d", "totals"],
+    OWNER: [
+      "collections_12m",
+      "due_ageing",
+      "inventory_by_project",
+      "sales_velocity",
+      "top_overdue",
+      "pending_cheques",
+      "enquiries_this_week",
+      "construction_progress",
+      "dues_raised_this_month",
+      "upcoming_installments_30d",
+      "totals",
+    ],
     ACCOUNTS: ["today", "this_month", "cheques_to_clear", "overdue_demands", "bounced_recent", "demand_status_counts"],
-    SALES: ["pipeline", "follow_ups_due", "new_enquiries", "brochure_leads_this_week", "todays_visits", "availability", "my_bookings"],
-    PROJECT_ADMIN: ["projects", "construction", "upcoming_stages", "demands_raised_this_month", "bookings_this_month", "open_tickets"],
+    SALES: [
+      "pipeline",
+      "follow_ups_due",
+      "new_enquiries",
+      "brochure_leads_this_week",
+      "todays_visits",
+      "availability",
+      "my_bookings",
+    ],
+    PROJECT_ADMIN: [
+      "projects",
+      "construction",
+      "upcoming_stages",
+      "demands_raised_this_month",
+      "bookings_this_month",
+      "open_tickets",
+    ],
     EMPLOYEE: ["projects", "notices"],
   };
 
   it("Owner: 12-month collections by bucket, ageing, inventory, velocity, top overdue, cheques, enquiries, progress, dues raised, upcoming 30 days", async () => {
-    const r = await json<{ role: string; data: Record<string, unknown> & { collections_12m: { month: string; cash_paise: number; account_paise: number; total_paise: number }[]; due_ageing: Record<string, number>; top_overdue: { booking_number: string }[]; pending_cheques: { count: number; amount_paise: number }; inventory_by_project: { project_name: string; booked: number; construction_percent: number }[]; sales_velocity: { month: string; bookings: number }[]; enquiries_this_week: number; construction_progress: { block_name: string; percent: number; current_stage: string | null }[]; dues_raised_this_month: { count: number; amount_paise: number }; upcoming_installments_30d: { count: number; amount_paise: number }; totals: { total_due_paise: number; total_advance_paise: number; collected_this_month_paise: number; active_bookings: number } } }>("/api/v1/dashboard", admin);
+    const r = await json<{
+      role: string;
+      data: Record<string, unknown> & {
+        collections_12m: { month: string; cash_paise: number; account_paise: number; total_paise: number }[];
+        due_ageing: Record<string, number>;
+        top_overdue: { booking_number: string }[];
+        pending_cheques: { count: number; amount_paise: number };
+        inventory_by_project: { project_name: string; booked: number; construction_percent: number }[];
+        sales_velocity: { month: string; bookings: number }[];
+        enquiries_this_week: number;
+        construction_progress: { block_name: string; percent: number; current_stage: string | null }[];
+        dues_raised_this_month: { count: number; amount_paise: number };
+        upcoming_installments_30d: { count: number; amount_paise: number };
+        totals: {
+          total_due_paise: number;
+          total_advance_paise: number;
+          collected_this_month_paise: number;
+          active_bookings: number;
+        };
+      };
+    }>("/api/v1/dashboard", admin);
     expect(r.role).toBe("OWNER");
     expect(Object.keys(r.data).sort()).toEqual([...widgets.OWNER].sort());
     expect(r.data.collections_12m).toHaveLength(12);
@@ -557,15 +992,26 @@ describe("dashboards per role (SPEC §14)", () => {
     expect(Object.values(r.data.due_ageing).reduce((s, v) => s + v, 0)).toBe(25 * L);
     expect(r.data.top_overdue[0]?.booking_number).toBe(b1.booking_number);
     expect(r.data.pending_cheques).toEqual({ count: 1, amount_paise: 3 * L });
-    expect(r.data.inventory_by_project.find((p) => p.project_name === "Shree Ganesh Heights")).toMatchObject({ booked: 2 });
+    expect(r.data.inventory_by_project.find((p) => p.project_name === "Shree Ganesh Heights")).toMatchObject({
+      booked: 2,
+    });
     expect(r.data.sales_velocity[11]).toMatchObject({ month: today.slice(0, 7), bookings: 4 });
     expect(r.data.enquiries_this_week).toBe(1);
-    expect(r.data.construction_progress.find((b) => b.block_name === "Tower A")).toMatchObject({ current_stage: "Excavation" });
+    expect(r.data.construction_progress.find((b) => b.block_name === "Tower A")).toMatchObject({
+      current_stage: "Excavation",
+    });
     expect(r.data.construction_progress.find((b) => b.block_name === "Tower A")!.percent).toBeGreaterThan(0);
     expect(r.data.dues_raised_this_month.count).toBeGreaterThanOrEqual(3);
     expect(r.data.upcoming_installments_30d).toMatchObject({ count: 1, amount_paise: 85 * L });
-    expect(r.data.totals).toMatchObject({ total_due_paise: 25 * L, total_advance_paise: 2 * L, collected_this_month_paise: 13 * L, active_bookings: 3 });
-    const scoped = await json<{ data: { inventory_by_project: { project_name: string }[]; totals: { total_due_paise: number } } }>(`/api/v1/dashboard?project_id=${w.ggv.id}`, admin);
+    expect(r.data.totals).toMatchObject({
+      total_due_paise: 25 * L,
+      total_advance_paise: 2 * L,
+      collected_this_month_paise: 13 * L,
+      active_bookings: 3,
+    });
+    const scoped = await json<{
+      data: { inventory_by_project: { project_name: string }[]; totals: { total_due_paise: number } };
+    }>(`/api/v1/dashboard?project_id=${w.ggv.id}`, admin);
     expect(scoped.data.inventory_by_project.map((p) => p.project_name)).toEqual(["Ganesh Green Villas"]);
     expect(scoped.data.totals.total_due_paise).toBe(10 * L);
     const keys = await t.app.redis.keys("dash:*");
@@ -574,7 +1020,17 @@ describe("dashboards per role (SPEC §14)", () => {
   });
 
   it("Accounts: today/month collections, cheques to clear, overdue demands, bounced alerts, demand status counts", async () => {
-    const r = await json<{ role: string; data: Record<string, unknown> & { today: { count: number; amount_paise: number }; this_month: { amount_paise: number; by_category: { category: string; amount_paise: number }[] }; cheques_to_clear: { receipt_number: string }[]; overdue_demands: { demand_number: string; days_overdue: number }[]; bounced_recent: { receipt_number: string }[]; demand_status_counts: { status: string; count: number }[] } }>("/api/v1/dashboard", accounts);
+    const r = await json<{
+      role: string;
+      data: Record<string, unknown> & {
+        today: { count: number; amount_paise: number };
+        this_month: { amount_paise: number; by_category: { category: string; amount_paise: number }[] };
+        cheques_to_clear: { receipt_number: string }[];
+        overdue_demands: { demand_number: string; days_overdue: number }[];
+        bounced_recent: { receipt_number: string }[];
+        demand_status_counts: { status: string; count: number }[];
+      };
+    }>("/api/v1/dashboard", accounts);
     expect(r.role).toBe("ACCOUNTS");
     expect(Object.keys(r.data).sort()).toEqual([...widgets.ACCOUNTS].sort());
     expect(r.data.today).toEqual({ count: 3, amount_paise: 13 * L });
@@ -588,7 +1044,18 @@ describe("dashboards per role (SPEC §14)", () => {
   });
 
   it("Sales: pipeline, follow-ups due, new enquiries, brochure leads this week, today's site visits, availability, my bookings", async () => {
-    const r = await json<{ role: string; data: Record<string, unknown> & { pipeline: { stage: string; count: number }[]; follow_ups_due: { lead_number: string }[]; new_enquiries: number; brochure_leads_this_week: number; todays_visits: { visit_number: string; slot_start: string; status: string }[]; availability: { project_name: string }[]; my_bookings: { this_month: number; total: number; value_paise: number } } }>("/api/v1/dashboard", sales);
+    const r = await json<{
+      role: string;
+      data: Record<string, unknown> & {
+        pipeline: { stage: string; count: number }[];
+        follow_ups_due: { lead_number: string }[];
+        new_enquiries: number;
+        brochure_leads_this_week: number;
+        todays_visits: { visit_number: string; slot_start: string; status: string }[];
+        availability: { project_name: string }[];
+        my_bookings: { this_month: number; total: number; value_paise: number };
+      };
+    }>("/api/v1/dashboard", sales);
     expect(r.role).toBe("SALES");
     expect(Object.keys(r.data).sort()).toEqual([...widgets.SALES].sort());
     expect(r.data.pipeline).toHaveLength(7);
@@ -603,7 +1070,27 @@ describe("dashboards per role (SPEC §14)", () => {
   });
 
   it("Project Admin (scoped): progress, availability, upcoming stages with the installments they will raise, demands raised; Employee: projects + notices only", async () => {
-    const r = await json<{ role: string; data: Record<string, unknown> & { projects: { project_name: string }[]; construction: { block_name: string; percent: number; current_stage: string | null; next_stage: string | null }[]; upcoming_stages: { block_name: string; stage_name: string; active_bookings: number; installment_total_paise: number }[]; demands_raised_this_month: { count: number }; bookings_this_month: number; open_tickets: number } }>("/api/v1/dashboard", projectsTok);
+    const r = await json<{
+      role: string;
+      data: Record<string, unknown> & {
+        projects: { project_name: string }[];
+        construction: {
+          block_name: string;
+          percent: number;
+          current_stage: string | null;
+          next_stage: string | null;
+        }[];
+        upcoming_stages: {
+          block_name: string;
+          stage_name: string;
+          active_bookings: number;
+          installment_total_paise: number;
+        }[];
+        demands_raised_this_month: { count: number };
+        bookings_this_month: number;
+        open_tickets: number;
+      };
+    }>("/api/v1/dashboard", projectsTok);
     expect(r.role).toBe("PROJECT_ADMIN");
     expect(Object.keys(r.data).sort()).toEqual([...widgets.PROJECT_ADMIN].sort());
     expect(r.data.projects.map((p) => p.project_name)).toEqual(["Shree Ganesh Heights"]);
@@ -617,11 +1104,16 @@ describe("dashboards per role (SPEC §14)", () => {
     expect(r.data.open_tickets).toBe(0);
     expect(r.data.demands_raised_this_month.count).toBeGreaterThanOrEqual(2);
 
-    const e = await json<{ role: string; data: Record<string, unknown> & { projects: unknown[]; notices: unknown[] } }>("/api/v1/dashboard", employee);
+    const e = await json<{ role: string; data: Record<string, unknown> & { projects: unknown[]; notices: unknown[] } }>(
+      "/api/v1/dashboard",
+      employee,
+    );
     expect(e.role).toBe("EMPLOYEE");
     expect(Object.keys(e.data).sort()).toEqual([...widgets.EMPLOYEE].sort());
     expect(e.data.projects).toHaveLength(2);
-    const outOfScope = await t.request<ErrorBody>("GET", `/api/v1/dashboard?project_id=${w.ggv.id}`, { token: projectsTok });
+    const outOfScope = await t.request<ErrorBody>("GET", `/api/v1/dashboard?project_id=${w.ggv.id}`, {
+      token: projectsTok,
+    });
     expect(outOfScope.status).toBe(404);
   });
 });

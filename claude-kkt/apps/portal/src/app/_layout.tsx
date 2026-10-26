@@ -84,5 +84,14 @@ function Boot(): React.JSX.Element {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.navy },
   boot: { flex: 1, backgroundColor: colors.navy, alignItems: "center", justifyContent: "center" },
-  mark: { width: 72, height: 72, borderRadius: 20, borderWidth: 1, borderColor: "rgba(201,162,39,0.5)", backgroundColor: "rgba(201,162,39,0.12)", alignItems: "center", justifyContent: "center" },
+  mark: {
+    width: 72,
+    height: 72,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(201,162,39,0.5)",
+    backgroundColor: "rgba(201,162,39,0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });

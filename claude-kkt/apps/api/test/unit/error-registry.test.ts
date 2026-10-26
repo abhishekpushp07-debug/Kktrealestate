@@ -33,10 +33,18 @@ function lineOf(text: string, index: number): number {
 /** Every code literal raised anywhere in apps/api/src, with the status it is raised with (null when the helper fixes none). */
 function scanRaisedCodes(root: string = SRC): Raised[] {
   const out: Raised[] = [];
-  const patterns: { re: RegExp; status: (m: RegExpExecArray) => number | null; code: (m: RegExpExecArray) => string }[] = [
+  const patterns: {
+    re: RegExp;
+    status: (m: RegExpExecArray) => number | null;
+    code: (m: RegExpExecArray) => string;
+  }[] = [
     { re: /new ApiError\(\s*(\d{3})\s*,\s*"([A-Z][A-Z0-9_]*)"/g, status: (m) => Number(m[1]), code: (m) => m[2]! },
     { re: /ApiError\.conflict\(\s*"([A-Z][A-Z0-9_]*)"/g, status: () => 409, code: (m) => m[1]! },
-    { re: new RegExp(String.raw`ApiError\.unauthenticated\(\s*${STR}\s*,\s*"([A-Z][A-Z0-9_]*)"\s*\)`, "g"), status: () => 401, code: (m) => m[1]! },
+    {
+      re: new RegExp(String.raw`ApiError\.unauthenticated\(\s*${STR}\s*,\s*"([A-Z][A-Z0-9_]*)"\s*\)`, "g"),
+      status: () => 401,
+      code: (m) => m[1]!,
+    },
     // envelopes sent directly by the error handler, and Error subclasses with a fixed code (app.ts UnavailableError)
     { re: /error:\s*\{\s*code:\s*"([A-Z][A-Z0-9_]*)"/g, status: () => null, code: (m) => m[1]! },
     { re: /readonly code\s*=\s*"([A-Z][A-Z0-9_]*)"/g, status: () => null, code: (m) => m[1]! },
@@ -46,13 +54,16 @@ function scanRaisedCodes(root: string = SRC): Raised[] {
     const rel = relative(root, file);
     for (const p of patterns) {
       p.re.lastIndex = 0;
-      for (let m = p.re.exec(text); m !== null; m = p.re.exec(text)) out.push({ code: p.code(m), status: p.status(m), where: `${rel}:${lineOf(text, m.index)}` });
+      for (let m = p.re.exec(text); m !== null; m = p.re.exec(text))
+        out.push({ code: p.code(m), status: p.status(m), where: `${rel}:${lineOf(text, m.index)}` });
     }
     if (rel === join("lib", "errors.ts")) {
       // status → code fallback map of the error handler, and the Fastify content-type error mapping
       const map = /const STATUS_CODES[^{]*\{([^}]*)\}/.exec(text);
-      for (const e of map?.[1]?.matchAll(/(\d{3}):\s*"([A-Z][A-Z0-9_]*)"/g) ?? []) out.push({ code: e[2]!, status: Number(e[1]), where: `${rel} STATUS_CODES` });
-      for (const e of text.matchAll(/"FST_ERR_[A-Z_]+"\s*\?\s*"([A-Z][A-Z0-9_]*)"/g)) out.push({ code: e[1]!, status: null, where: `${rel} fastify mapping` });
+      for (const e of map?.[1]?.matchAll(/(\d{3}):\s*"([A-Z][A-Z0-9_]*)"/g) ?? [])
+        out.push({ code: e[2]!, status: Number(e[1]), where: `${rel} STATUS_CODES` });
+      for (const e of text.matchAll(/"FST_ERR_[A-Z_]+"\s*\?\s*"([A-Z][A-Z0-9_]*)"/g))
+        out.push({ code: e[1]!, status: null, where: `${rel} fastify mapping` });
     }
   }
   return out;
@@ -64,7 +75,16 @@ describe("error code registry", () => {
   it("the scan sees the API's error sites (guards against the patterns silently matching nothing)", () => {
     expect(raised.length).toBeGreaterThan(100);
     const codes = new Set(raised.map((r) => r.code));
-    for (const c of ["VALIDATION_ERROR", "NOT_FOUND", "VERSION_CONFLICT", "DUPLICATE_CUSTOMER", "TICKET_CLOSED", "INVALID_TOKEN", "INTERNAL_ERROR", "METHOD_NOT_ALLOWED"]) {
+    for (const c of [
+      "VALIDATION_ERROR",
+      "NOT_FOUND",
+      "VERSION_CONFLICT",
+      "DUPLICATE_CUSTOMER",
+      "TICKET_CLOSED",
+      "INVALID_TOKEN",
+      "INTERNAL_ERROR",
+      "METHOD_NOT_ALLOWED",
+    ]) {
       expect(codes.has(c), c).toBe(true);
     }
   });
@@ -76,7 +96,12 @@ describe("error code registry", () => {
   });
 
   it("each code is raised with the HTTP status the registry documents", () => {
-    const wrong = raised.filter((r) => r.status !== null && isKnownErrorCode(r.code) && ERROR_STATUS[r.code] !== r.status).map((r) => `${r.code}: raised ${r.status}, registry ${isKnownErrorCode(r.code) ? ERROR_STATUS[r.code] : "?"} (${r.where})`);
+    const wrong = raised
+      .filter((r) => r.status !== null && isKnownErrorCode(r.code) && ERROR_STATUS[r.code] !== r.status)
+      .map(
+        (r) =>
+          `${r.code}: raised ${r.status}, registry ${isKnownErrorCode(r.code) ? ERROR_STATUS[r.code] : "?"} (${r.where})`,
+      );
     expect(wrong).toEqual([]);
   });
 

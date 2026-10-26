@@ -35,7 +35,14 @@ export interface PermissionMatrixProps {
 }
 
 /** Grouped permission checkboxes with per-group select-all and counts. */
-export function PermissionMatrix({ groups, value, onChange, readOnly = false, invalid = false, id }: PermissionMatrixProps) {
+export function PermissionMatrix({
+  groups,
+  value,
+  onChange,
+  readOnly = false,
+  invalid = false,
+  id,
+}: PermissionMatrixProps) {
   const selected = new Set(value);
   const total = groups.reduce((sum, group) => sum + group.permissions.length, 0);
 
@@ -50,7 +57,13 @@ export function PermissionMatrix({ groups, value, onChange, readOnly = false, in
   };
 
   return (
-    <div id={id} className={cn("overflow-hidden rounded-md border", invalid ? "border-danger" : "border-border")} role="group" aria-label="Permissions" data-testid="permission-matrix">
+    <div
+      id={id}
+      className={cn("overflow-hidden rounded-md border", invalid ? "border-danger" : "border-border")}
+      role="group"
+      aria-label="Permissions"
+      data-testid="permission-matrix"
+    >
       <div className="flex items-center justify-between gap-2 border-b border-border bg-surface px-3 py-2 text-xs">
         <span className="label-caps">Permissions</span>
         <span className="money font-semibold text-navy-950">

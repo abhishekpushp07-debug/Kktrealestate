@@ -16,7 +16,13 @@ describe("audit_logs immutability", () => {
     if (!company) throw new Error("company insert failed");
     const [row] = await handle.db
       .insert(auditLogs)
-      .values({ companyId: company.id, actorType: "SYSTEM", action: "test.create", entityType: "test", after: { ok: true } })
+      .values({
+        companyId: company.id,
+        actorType: "SYSTEM",
+        action: "test.create",
+        entityType: "test",
+        after: { ok: true },
+      })
       .returning({ id: auditLogs.id });
     if (!row) throw new Error("audit insert failed");
     auditId = row.id;
@@ -32,8 +38,14 @@ describe("audit_logs immutability", () => {
   };
 
   it("rejects UPDATE through Drizzle and through raw SQL", async () => {
-    await rejectsWithPg(handle.db.update(auditLogs).set({ action: "tampered" }).where(eq(auditLogs.id, auditId)), /immutable/);
-    await rejectsWithPg(handle.sql`UPDATE audit_logs SET action = 'tampered' WHERE id = ${auditId}`, /immutable: UPDATE/);
+    await rejectsWithPg(
+      handle.db.update(auditLogs).set({ action: "tampered" }).where(eq(auditLogs.id, auditId)),
+      /immutable/,
+    );
+    await rejectsWithPg(
+      handle.sql`UPDATE audit_logs SET action = 'tampered' WHERE id = ${auditId}`,
+      /immutable: UPDATE/,
+    );
     const [row] = await handle.db.select({ action: auditLogs.action }).from(auditLogs).where(eq(auditLogs.id, auditId));
     expect(row?.action).toBe("test.create");
   });
@@ -61,15 +73,23 @@ describe("audit_logs immutability", () => {
       }),
       /immutable/,
     );
-    const rows = await handle.db.select({ id: auditLogs.id }).from(auditLogs).where(eq(auditLogs.companyId, company.id));
+    const rows = await handle.db
+      .select({ id: auditLogs.id })
+      .from(auditLogs)
+      .where(eq(auditLogs.companyId, company.id));
     expect(rows).toHaveLength(0);
   });
 
   it("still allows INSERT (append-only, not read-only)", async () => {
-    const [company] = await handle.db.insert(companies).values({ name: "Audit Append Co" }).returning({ id: companies.id });
+    const [company] = await handle.db
+      .insert(companies)
+      .values({ name: "Audit Append Co" })
+      .returning({ id: companies.id });
     if (!company) throw new Error("company insert failed");
     await expect(
-      handle.db.insert(auditLogs).values({ companyId: company.id, actorType: "CUSTOMER", action: "portal.login", entityType: "portal_user" }),
+      handle.db
+        .insert(auditLogs)
+        .values({ companyId: company.id, actorType: "CUSTOMER", action: "portal.login", entityType: "portal_user" }),
     ).resolves.toBeDefined();
   });
 });
@@ -112,7 +132,10 @@ describe("financial source rows are never deleted", () => {
     if (!demand) throw new Error("demand insert failed");
     await rejectsWithPg(handle.db.delete(demands).where(eq(demands.id, demand.id)), /demands rows are never deleted/);
     await expect(
-      handle.db.update(demands).set({ status: "VOID", voidReason: "stage undone", voidedAt: new Date() }).where(eq(demands.id, demand.id)),
+      handle.db
+        .update(demands)
+        .set({ status: "VOID", voidReason: "stage undone", voidedAt: new Date() })
+        .where(eq(demands.id, demand.id)),
     ).resolves.toBeDefined();
   });
 
@@ -139,7 +162,10 @@ describe("financial source rows are never deleted", () => {
       })
       .returning({ id: payments.id });
     if (!payment) throw new Error("payment insert failed");
-    await rejectsWithPg(handle.db.delete(payments).where(eq(payments.id, payment.id)), /payments rows are never deleted/);
+    await rejectsWithPg(
+      handle.db.delete(payments).where(eq(payments.id, payment.id)),
+      /payments rows are never deleted/,
+    );
     await expect(
       handle.db
         .update(payments)

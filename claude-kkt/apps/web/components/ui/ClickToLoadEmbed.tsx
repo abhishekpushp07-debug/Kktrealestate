@@ -35,7 +35,9 @@ export function ClickToLoadEmbed({ url, kind = "video", title, poster, className
   const cta = kind === "map" ? "Load map" : kind === "tour" ? "Start 360° tour" : "Play video";
 
   return (
-    <div className={`relative aspect-video w-full overflow-hidden rounded-card bg-navy-900 shadow-card ${className}`.trim()}>
+    <div
+      className={`relative aspect-video w-full overflow-hidden rounded-card bg-navy-900 shadow-card ${className}`.trim()}
+    >
       {loaded ? (
         <iframe
           src={embedUrl}
@@ -56,8 +58,14 @@ export function ClickToLoadEmbed({ url, kind = "video", title, poster, className
         >
           {posterUrl ? (
             // Plain <img>: a third-party thumbnail host is not part of the image optimiser's allow-list.
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={posterUrl} alt="" loading="lazy" decoding="async" onError={() => setPosterFailed(true)} className="absolute inset-0 h-full w-full object-cover opacity-80 transition duration-700 group-hover:scale-[1.03] group-hover:opacity-90" />
+            <img
+              src={posterUrl}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              onError={() => setPosterFailed(true)}
+              className="absolute inset-0 h-full w-full object-cover opacity-80 transition duration-700 group-hover:scale-[1.03] group-hover:opacity-90"
+            />
           ) : (
             <span
               aria-hidden
@@ -65,12 +73,18 @@ export function ClickToLoadEmbed({ url, kind = "video", title, poster, className
               style={{ backgroundImage: "radial-gradient(ellipse at 30% 20%, #2f477a 0%, #0b1f3a 55%, #06142a 100%)" }}
             />
           )}
-          <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-navy-950/70 via-transparent to-transparent" />
+          <span
+            aria-hidden
+            className="absolute inset-0 bg-gradient-to-t from-navy-950/70 via-transparent to-transparent"
+          />
           <span className="relative flex flex-col items-center gap-4">
             <span className="flex h-20 w-20 items-center justify-center rounded-full bg-gold-500 text-navy-950 shadow-float transition duration-300 group-hover:scale-105">
               <Icon size={30} />
             </span>
-            <span id={labelId} className="rounded-full bg-navy-950/60 px-4 py-2 text-sm font-semibold tracking-wide backdrop-blur">
+            <span
+              id={labelId}
+              className="rounded-full bg-navy-950/60 px-4 py-2 text-sm font-semibold tracking-wide backdrop-blur"
+            >
               {cta}: {title}
             </span>
           </span>

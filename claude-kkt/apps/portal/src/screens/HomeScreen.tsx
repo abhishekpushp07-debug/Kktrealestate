@@ -41,7 +41,13 @@ function HomeBody({ bookingId }: { bookingId: string }): React.JSX.Element {
   const name = data?.greeting_name ?? "";
   return (
     <View style={{ flex: 1, backgroundColor: colors.ivory }}>
-      <LinearGradient colors={[colors.navy, colors.navy800]} style={[styles.hero, { paddingTop: insets.top + (layout.isDesktop ? space.xl : space.md), paddingHorizontal: layout.gutter }]}>
+      <LinearGradient
+        colors={[colors.navy, colors.navy800]}
+        style={[
+          styles.hero,
+          { paddingTop: insets.top + (layout.isDesktop ? space.xl : space.md), paddingHorizontal: layout.gutter },
+        ]}
+      >
         <View style={[styles.heroInner, { maxWidth: layout.maxWidth }]}>
           <View style={styles.heroRow}>
             <View style={{ flex: 1, gap: 2 }}>
@@ -59,9 +65,17 @@ function HomeBody({ bookingId }: { bookingId: string }): React.JSX.Element {
           </View>
         </View>
       </LinearGradient>
-      {home.isError && data ? <StatusBar text="Showing the last saved data — we couldn't refresh just now." tone="warning" /> : null}
+      {home.isError && data ? (
+        <StatusBar text="Showing the last saved data — we couldn't refresh just now." tone="warning" />
+      ) : null}
       <Screen onRefresh={() => refreshBooking(bookingId)} contentStyle={{ paddingTop: space.lg }}>
-        {data ? <HomeContent data={data} bookingId={bookingId} /> : home.isError ? <ErrorState error={home.error} onRetry={() => void home.refetch()} /> : <HomeSkeleton />}
+        {data ? (
+          <HomeContent data={data} bookingId={bookingId} />
+        ) : home.isError ? (
+          <ErrorState error={home.error} onRetry={() => void home.refetch()} />
+        ) : (
+          <HomeSkeleton />
+        )}
       </Screen>
     </View>
   );
@@ -96,13 +110,31 @@ function HomeContent({ data, bookingId }: { data: PortalHomeResponse; bookingId:
       {/* Hero card */}
       <Card padded={false} onPress={() => router.navigate("/flat")} style={styles.flatCard}>
         <View style={styles.flatImageWrap}>
-          {b.project_image_url ? <Image source={{ uri: b.project_image_url }} style={StyleSheet.absoluteFill} contentFit="cover" transition={300} accessibilityLabel="" /> : null}
+          {b.project_image_url ? (
+            <Image
+              source={{ uri: b.project_image_url }}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              transition={300}
+              accessibilityLabel=""
+            />
+          ) : null}
           {/* Project hero images carry their own text; a firm navy wash keeps the flat number and labels at AA contrast on any photo. */}
-          <LinearGradient colors={["rgba(11,31,58,0.45)", "rgba(11,31,58,0.78)", "rgba(11,31,58,0.97)"]} locations={[0, 0.5, 1]} style={StyleSheet.absoluteFill} />
+          <LinearGradient
+            colors={["rgba(11,31,58,0.45)", "rgba(11,31,58,0.78)", "rgba(11,31,58,0.97)"]}
+            locations={[0, 0.5, 1]}
+            style={StyleSheet.absoluteFill}
+          />
           <View style={styles.flatText}>
             <View style={styles.chipRow}>
-              <Chip label={BOOKING_STATUS_LABELS[b.status]} tone={b.status === "ACTIVE" ? "gold" : b.status === "COMPLETED" ? "success" : "danger"} small />
-              {current ? <Chip label={current.role === "PRIMARY" ? "Primary applicant" : "Co-applicant"} tone="neutral" small /> : null}
+              <Chip
+                label={BOOKING_STATUS_LABELS[b.status]}
+                tone={b.status === "ACTIVE" ? "gold" : b.status === "COMPLETED" ? "success" : "danger"}
+                small
+              />
+              {current ? (
+                <Chip label={current.role === "PRIMARY" ? "Primary applicant" : "Co-applicant"} tone="neutral" small />
+              ) : null}
             </View>
             <T variant="display" color={colors.onNavy} style={{ fontSize: 40, lineHeight: 44 }}>
               {b.flat_number}
@@ -121,7 +153,19 @@ function HomeContent({ data, bookingId }: { data: PortalHomeResponse; bookingId:
         <Col>
           {/* Construction */}
           <Card onPress={() => router.navigate("/construction")}>
-            <CardHeader eyebrow="Construction" title={stage.current_stage ? stage.current_stage : "Not started"} subtitle={stage.next_stage ? `Up next: ${stage.next_stage}` : stage.percent >= 100 ? "All stages complete" : undefined} action="Timeline" onAction={() => router.navigate("/construction")} />
+            <CardHeader
+              eyebrow="Construction"
+              title={stage.current_stage ? stage.current_stage : "Not started"}
+              subtitle={
+                stage.next_stage
+                  ? `Up next: ${stage.next_stage}`
+                  : stage.percent >= 100
+                    ? "All stages complete"
+                    : undefined
+              }
+              action="Timeline"
+              onAction={() => router.navigate("/construction")}
+            />
             <View style={styles.ringRow}>
               <ProgressRing percent={stage.percent} size={120} />
               <View style={{ flex: 1, gap: space.sm }}>
@@ -139,7 +183,13 @@ function HomeContent({ data, bookingId }: { data: PortalHomeResponse; bookingId:
 
           {/* Payment plan & next installment */}
           <Card onPress={() => router.navigate("/payments?tab=schedule")}>
-            <CardHeader eyebrow="Payment plan" title={data.plan.name} subtitle={`${PLAN_TYPE_LABELS[data.plan.plan_type]}${data.plan.accepted_on ? ` · accepted ${formatDate(data.plan.accepted_on)}` : ""}`} action="Schedule" onAction={() => router.navigate("/payments?tab=schedule")} />
+            <CardHeader
+              eyebrow="Payment plan"
+              title={data.plan.name}
+              subtitle={`${PLAN_TYPE_LABELS[data.plan.plan_type]}${data.plan.accepted_on ? ` · accepted ${formatDate(data.plan.accepted_on)}` : ""}`}
+              action="Schedule"
+              onAction={() => router.navigate("/payments?tab=schedule")}
+            />
             {data.next_installment ? (
               <View style={styles.nextInst}>
                 <View style={{ flex: 1, gap: 2 }}>
@@ -149,7 +199,9 @@ function HomeContent({ data, bookingId }: { data: PortalHomeResponse; bookingId:
                   <T variant="bodyStrong">{data.next_installment.name}</T>
                   <T variant="small" color={colors.inkMuted}>
                     {data.next_installment.trigger_label}
-                    {data.next_installment.expected_date ? ` · expected ${formatDate(data.next_installment.expected_date)}` : ""}
+                    {data.next_installment.expected_date
+                      ? ` · expected ${formatDate(data.next_installment.expected_date)}`
+                      : ""}
                   </T>
                   <View style={styles.chipRow}>
                     <Chip label={`Cash ${formatINR(data.next_installment.cash_paise)}`} tone="gold" small />
@@ -169,10 +221,22 @@ function HomeContent({ data, bookingId }: { data: PortalHomeResponse; bookingId:
         <Col>
           {/* Money grid */}
           <Card>
-            <CardHeader eyebrow="Your money" title="Paid, due & advance" subtitle="By bucket — Cash and Account" action="Ledger" onAction={() => router.navigate("/payments?tab=ledger")} />
+            <CardHeader
+              eyebrow="Your money"
+              title="Paid, due & advance"
+              subtitle="By bucket — Cash and Account"
+              action="Ledger"
+              onAction={() => router.navigate("/payments?tab=ledger")}
+            />
             <MoneyGrid money={data.money} />
             {data.pending_cheques_paise > 0 ? (
-              <Notice tone="warning" icon="clock" title={`${formatINR(data.pending_cheques_paise)} in cheques pending`} body="Cheques count once they clear. Until then they appear as “cheques in hand”." style={{ marginTop: space.md }} />
+              <Notice
+                tone="warning"
+                icon="clock"
+                title={`${formatINR(data.pending_cheques_paise)} in cheques pending`}
+                body="Cheques count once they clear. Until then they appear as “cheques in hand”."
+                style={{ marginTop: space.md }}
+              />
             ) : null}
             {data.money.other_charges_due_paise !== 0 ? (
               <View style={styles.otherCharges}>
@@ -185,12 +249,20 @@ function HomeContent({ data, bookingId }: { data: PortalHomeResponse; bookingId:
           </Card>
 
           {/* Notices strip */}
-          <Pressable accessibilityRole="button" onPress={() => router.navigate("/more/notices")} style={({ pressed }) => [styles.noticeStrip, pressed ? { opacity: 0.85 } : null]}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.navigate("/more/notices")}
+            style={({ pressed }) => [styles.noticeStrip, pressed ? { opacity: 0.85 } : null]}
+          >
             <View style={styles.noticeIcon}>
               <Icon name="notice" size={18} color={colors.gold700} />
             </View>
             <View style={{ flex: 1 }}>
-              <T variant="bodyStrong">{data.notices_unread > 0 ? `${data.notices_unread} new notice${data.notices_unread > 1 ? "s" : ""}` : "Notices"}</T>
+              <T variant="bodyStrong">
+                {data.notices_unread > 0
+                  ? `${data.notices_unread} new notice${data.notices_unread > 1 ? "s" : ""}`
+                  : "Notices"}
+              </T>
               <T variant="caption" color={colors.inkMuted}>
                 {data.notices_unread > 0 ? "From your project and the company" : "You're all caught up"}
               </T>
@@ -202,9 +274,25 @@ function HomeContent({ data, bookingId }: { data: PortalHomeResponse; bookingId:
 
       {/* Quick actions */}
       <View style={styles.quickRow}>
-        <QuickAction icon="download" label="Statement" hint="Download PDF" loading={files.busyKey === "statement:dl"} onPress={() => files.download("statement:dl", () => api.bookings.statementPdf(bookingId))} />
-        <QuickAction icon="bank" label="Bank details" hint="For Account transfers" onPress={() => router.navigate("/more/bank-details")} />
-        <QuickAction icon="request" label="Raise request" hint="We're here to help" onPress={() => router.navigate("/more/requests/new")} />
+        <QuickAction
+          icon="download"
+          label="Statement"
+          hint="Download PDF"
+          loading={files.busyKey === "statement:dl"}
+          onPress={() => files.download("statement:dl", () => api.bookings.statementPdf(bookingId))}
+        />
+        <QuickAction
+          icon="bank"
+          label="Bank details"
+          hint="For Account transfers"
+          onPress={() => router.navigate("/more/bank-details")}
+        />
+        <QuickAction
+          icon="request"
+          label="Raise request"
+          hint="We're here to help"
+          onPress={() => router.navigate("/more/requests/new")}
+        />
       </View>
 
       {/* Relationship manager */}
@@ -218,7 +306,12 @@ function HomeContent({ data, bookingId }: { data: PortalHomeResponse; bookingId:
               </T>
               <T variant="h3">{rm.name}</T>
               {rm.email ? (
-                <T variant="small" color={colors.navy} onPress={() => void openMail(rm.email ?? "")} accessibilityRole="link">
+                <T
+                  variant="small"
+                  color={colors.navy}
+                  onPress={() => void openMail(rm.email ?? "")}
+                  accessibilityRole="link"
+                >
                   {rm.email}
                 </T>
               ) : null}
@@ -226,8 +319,10 @@ function HomeContent({ data, bookingId }: { data: PortalHomeResponse; bookingId:
           </View>
           <Divider style={{ marginVertical: space.md }} />
           <View style={styles.rmActions}>
-            {rm.phone ? <Button title="Call" icon="phone" variant="primary" onPress={() => void openTel(rm.phone ?? "")} /> : null}
-            {rm.whatsapp ?? rm.phone ? (
+            {rm.phone ? (
+              <Button title="Call" icon="phone" variant="primary" onPress={() => void openTel(rm.phone ?? "")} />
+            ) : null}
+            {(rm.whatsapp ?? rm.phone) ? (
               <Button
                 title="WhatsApp"
                 icon="chat"
@@ -235,7 +330,10 @@ function HomeContent({ data, bookingId }: { data: PortalHomeResponse; bookingId:
                 style={{ borderColor: "#25D366" }}
                 onPress={() => {
                   haptics.tap();
-                  void openWhatsApp(rm.whatsapp ?? rm.phone ?? "", `Hi ${rm.name}, this is ${data.greeting_name} (${b.flat_number}, ${b.block_name}).`);
+                  void openWhatsApp(
+                    rm.whatsapp ?? rm.phone ?? "",
+                    `Hi ${rm.name}, this is ${data.greeting_name} (${b.flat_number}, ${b.block_name}).`,
+                  );
                 }}
               />
             ) : null}
@@ -254,7 +352,8 @@ function MoneyGrid({ money }: { money: PortalHomeResponse["money"] }): React.JSX
   ];
   const cell = (key: (typeof rows)[number]["key"], v: number) => {
     if (key === "paid_paise") return <Money paise={v} />;
-    if (key === "due_paise") return v > 0 ? <Money paise={v} color={colors.danger} /> : <Money paise={0} color={colors.inkSubtle} />;
+    if (key === "due_paise")
+      return v > 0 ? <Money paise={v} color={colors.danger} /> : <Money paise={0} color={colors.inkSubtle} />;
     return v > 0 ? <DueMoney paise={-v} /> : <Money paise={0} color={colors.inkSubtle} />;
   };
   return (
@@ -296,9 +395,34 @@ function MoneyGrid({ money }: { money: PortalHomeResponse["money"] }): React.JSX
   );
 }
 
-function QuickAction({ icon, label, hint, onPress, loading }: { icon: IconName; label: string; hint: string; onPress: () => void; loading?: boolean }): React.JSX.Element {
+function QuickAction({
+  icon,
+  label,
+  hint,
+  onPress,
+  loading,
+}: {
+  icon: IconName;
+  label: string;
+  hint: string;
+  onPress: () => void;
+  loading?: boolean;
+}): React.JSX.Element {
   return (
-    <Pressable accessibilityRole="button" disabled={loading} onPress={() => { haptics.tap(); onPress(); }} style={({ pressed }) => [styles.quick, shadow.card, pressed ? { opacity: 0.85 } : null, loading ? { opacity: 0.6 } : null]}>
+    <Pressable
+      accessibilityRole="button"
+      disabled={loading}
+      onPress={() => {
+        haptics.tap();
+        onPress();
+      }}
+      style={({ pressed }) => [
+        styles.quick,
+        shadow.card,
+        pressed ? { opacity: 0.85 } : null,
+        loading ? { opacity: 0.6 } : null,
+      ]}
+    >
       <View style={styles.quickIcon}>
         <Icon name={icon} size={20} color={colors.navy} />
       </View>
@@ -330,12 +454,44 @@ const styles = StyleSheet.create({
   gridCell: { flex: 1, alignItems: "flex-start" },
   gridTotal: { borderTopWidth: 1, borderTopColor: colors.lineStrong, marginTop: 4, paddingTop: 12 },
   agreedRow: { paddingTop: 6 },
-  otherCharges: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: space.md, paddingTop: space.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
-  noticeStrip: { flexDirection: "row", alignItems: "center", gap: space.md, backgroundColor: colors.gold50, borderWidth: 1, borderColor: colors.gold200, borderRadius: radius.lg, padding: space.md },
-  noticeIcon: { width: 36, height: 36, borderRadius: radius.sm, backgroundColor: colors.gold100, alignItems: "center", justifyContent: "center" },
+  otherCharges: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: space.md,
+    paddingTop: space.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.line,
+  },
+  noticeStrip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.md,
+    backgroundColor: colors.gold50,
+    borderWidth: 1,
+    borderColor: colors.gold200,
+    borderRadius: radius.lg,
+    padding: space.md,
+  },
+  noticeIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.sm,
+    backgroundColor: colors.gold100,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   quickRow: { flexDirection: "row", gap: space.md },
   quick: { flex: 1, backgroundColor: colors.surface, borderRadius: radius.lg, padding: space.md, gap: 4, minWidth: 0 },
-  quickIcon: { width: 36, height: 36, borderRadius: radius.sm, backgroundColor: colors.navy50, alignItems: "center", justifyContent: "center", marginBottom: 4 },
+  quickIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.sm,
+    backgroundColor: colors.navy50,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
   rmRow: { flexDirection: "row", alignItems: "center", gap: space.md },
   rmActions: { flexDirection: "row", gap: space.sm, flexWrap: "wrap" },
 });

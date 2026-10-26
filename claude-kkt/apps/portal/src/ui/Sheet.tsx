@@ -17,14 +17,35 @@ export interface SheetProps {
   maxWidth?: number;
 }
 
-export function Sheet({ visible, onClose, title, subtitle, children, footer, maxWidth = 520 }: SheetProps): React.JSX.Element {
+export function Sheet({
+  visible,
+  onClose,
+  title,
+  subtitle,
+  children,
+  footer,
+  maxWidth = 520,
+}: SheetProps): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const { isPhone } = useLayout();
   return (
     <Modal visible={visible} transparent animationType={isPhone ? "slide" : "fade"} onRequestClose={onClose}>
       <View style={[styles.backdrop, isPhone ? styles.bottom : styles.center]}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} style={StyleSheet.absoluteFill} />
-        <View style={[styles.panel, shadow.raised, isPhone ? [styles.panelBottom, { paddingBottom: Math.max(insets.bottom, space.lg) }] : [styles.panelCenter, { maxWidth }]]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+          onPress={onClose}
+          style={StyleSheet.absoluteFill}
+        />
+        <View
+          style={[
+            styles.panel,
+            shadow.raised,
+            isPhone
+              ? [styles.panelBottom, { paddingBottom: Math.max(insets.bottom, space.lg) }]
+              : [styles.panelCenter, { maxWidth }],
+          ]}
+        >
           {isPhone ? <View style={styles.grabber} /> : null}
           {title ? (
             <View style={styles.head}>
@@ -39,7 +60,11 @@ export function Sheet({ visible, onClose, title, subtitle, children, footer, max
               {!isPhone ? <Button title="Close" variant="ghost" size="sm" onPress={onClose} /> : null}
             </View>
           ) : null}
-          <ScrollView style={{ maxHeight: 520 }} contentContainerStyle={{ gap: space.sm }} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            style={{ maxHeight: 520 }}
+            contentContainerStyle={{ gap: space.sm }}
+            keyboardShouldPersistTaps="handled"
+          >
             {children}
           </ScrollView>
           {footer ? <View style={styles.footer}>{footer}</View> : null}
@@ -49,7 +74,25 @@ export function Sheet({ visible, onClose, title, subtitle, children, footer, max
   );
 }
 
-export function ConfirmDialog({ visible, title, body, confirmLabel = "Confirm", destructive, loading, onConfirm, onClose }: { visible: boolean; title: string; body?: string; confirmLabel?: string; destructive?: boolean; loading?: boolean; onConfirm: () => void; onClose: () => void }): React.JSX.Element {
+export function ConfirmDialog({
+  visible,
+  title,
+  body,
+  confirmLabel = "Confirm",
+  destructive,
+  loading,
+  onConfirm,
+  onClose,
+}: {
+  visible: boolean;
+  title: string;
+  body?: string;
+  confirmLabel?: string;
+  destructive?: boolean;
+  loading?: boolean;
+  onConfirm: () => void;
+  onClose: () => void;
+}): React.JSX.Element {
   return (
     <Sheet visible={visible} onClose={onClose} title={title} maxWidth={440}>
       {body ? (
@@ -59,16 +102,40 @@ export function ConfirmDialog({ visible, title, body, confirmLabel = "Confirm", 
       ) : null}
       <View style={styles.confirmRow}>
         <Button title="Cancel" variant="outline" onPress={onClose} />
-        <Button title={confirmLabel} variant={destructive ? "danger" : "primary"} loading={loading} onPress={onConfirm} />
+        <Button
+          title={confirmLabel}
+          variant={destructive ? "danger" : "primary"}
+          loading={loading}
+          onPress={onConfirm}
+        />
       </View>
     </Sheet>
   );
 }
 
 /** Simple option list for pickers. */
-export function OptionRow({ label, hint, selected, onPress }: { label: string; hint?: string; selected?: boolean; onPress: () => void }): React.JSX.Element {
+export function OptionRow({
+  label,
+  hint,
+  selected,
+  onPress,
+}: {
+  label: string;
+  hint?: string;
+  selected?: boolean;
+  onPress: () => void;
+}): React.JSX.Element {
   return (
-    <Pressable accessibilityRole="button" accessibilityState={{ selected: !!selected }} onPress={onPress} style={({ pressed }) => [styles.option, selected ? styles.optionSelected : null, pressed ? { opacity: 0.8 } : null]}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: !!selected }}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.option,
+        selected ? styles.optionSelected : null,
+        pressed ? { opacity: 0.8 } : null,
+      ]}
+    >
       <View style={{ flex: 1 }}>
         <T variant="bodyStrong" color={selected ? colors.navy : colors.ink}>
           {label}
@@ -91,11 +158,27 @@ const styles = StyleSheet.create({
   panel: { backgroundColor: colors.ivory, padding: space.lg, gap: space.md },
   panelBottom: { borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, maxHeight: "88%" },
   panelCenter: { borderRadius: radius.xl, width: "100%" },
-  grabber: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: colors.lineStrong, marginTop: -4 },
+  grabber: {
+    alignSelf: "center",
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.lineStrong,
+    marginTop: -4,
+  },
   head: { flexDirection: "row", alignItems: "flex-start", gap: space.md },
   footer: { paddingTop: space.sm },
   confirmRow: { flexDirection: "row", justifyContent: "flex-end", gap: space.sm, marginTop: space.md },
-  option: { flexDirection: "row", alignItems: "center", gap: space.md, padding: space.md, borderRadius: radius.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line },
+  option: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.md,
+    padding: space.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.line,
+  },
   optionSelected: { borderColor: colors.gold, backgroundColor: colors.gold50 },
   tick: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.gold },
 });

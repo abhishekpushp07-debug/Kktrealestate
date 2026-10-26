@@ -21,7 +21,13 @@ export function TopBar({ onOpenMenu, onOpenSearch }: TopBarProps) {
 
   return (
     <header className="sticky top-0 z-40 flex h-topbar shrink-0 items-center gap-2 border-b border-border bg-card/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-card/85 sm:px-4">
-      <IconButton icon={Menu} label="Open navigation" className="lg:hidden" onClick={onOpenMenu} data-testid="topbar-menu-btn" />
+      <IconButton
+        icon={Menu}
+        label="Open navigation"
+        className="lg:hidden"
+        onClick={onOpenMenu}
+        data-testid="topbar-menu-btn"
+      />
       <div className="flex min-w-0 items-center gap-2 lg:hidden">
         <BrandMark size="sm" />
         {title && <span className="truncate font-display text-base font-bold text-navy-950">{title}</span>}

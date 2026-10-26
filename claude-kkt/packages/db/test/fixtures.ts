@@ -29,7 +29,10 @@ const short = (): string => randomUUID().slice(0, 8).toUpperCase();
 /** Inserts one of everything needed for a booking and returns the ids. */
 export async function createFixture(db: DB): Promise<Fixture> {
   const tag = short();
-  const [company] = await db.insert(companies).values({ name: `Test Builders ${tag}` }).returning({ id: companies.id });
+  const [company] = await db
+    .insert(companies)
+    .values({ name: `Test Builders ${tag}` })
+    .returning({ id: companies.id });
   if (!company) throw new Error("company insert failed");
   const companyId = company.id;
 
@@ -39,7 +42,14 @@ export async function createFixture(db: DB): Promise<Fixture> {
     .returning({ id: blockTypes.id });
   const [flatType] = await db
     .insert(flatTypes)
-    .values({ companyId, name: "3BHK", code: `3BHK-${tag}`, carpetSqft: 1000, builtupSqft: 1100, superBuiltupSqft: 1250 })
+    .values({
+      companyId,
+      name: "3BHK",
+      code: `3BHK-${tag}`,
+      carpetSqft: 1000,
+      builtupSqft: 1100,
+      superBuiltupSqft: 1250,
+    })
     .returning({ id: flatTypes.id });
   const [plan] = await db
     .insert(paymentPlans)
@@ -103,7 +113,11 @@ export async function createFixture(db: DB): Promise<Fixture> {
 export type BookingRefs = Omit<Fixture, "bookingId">;
 
 /** Inserts an ACTIVE booking (or `status`) for the given refs and returns its id. */
-export async function createBooking(db: DB, refs: BookingRefs, status: "ACTIVE" | "CANCELLED" | "COMPLETED" = "ACTIVE"): Promise<string> {
+export async function createBooking(
+  db: DB,
+  refs: BookingRefs,
+  status: "ACTIVE" | "CANCELLED" | "COMPLETED" = "ACTIVE",
+): Promise<string> {
   const [row] = await db
     .insert(bookings)
     .values({

@@ -38,7 +38,16 @@ export function ChargeTypeForm(_props: MasterFormProps) {
           name="name"
           label="Name"
           required
-          render={({ field }) => <Input {...field} value={field.value} onChange={(event) => field.onChange(event.target.value)} placeholder="Maintenance Deposit" maxLength={120} data-testid="field-name" />}
+          render={({ field }) => (
+            <Input
+              {...field}
+              value={field.value}
+              onChange={(event) => field.onChange(event.target.value)}
+              placeholder="Maintenance Deposit"
+              maxLength={120}
+              data-testid="field-name"
+            />
+          )}
         />
         <FormField
           control={control}
@@ -46,14 +55,35 @@ export function ChargeTypeForm(_props: MasterFormProps) {
           label="Code"
           required
           hint="Upper-case letters, digits, _ or -"
-          render={({ field }) => <Input {...field} value={field.value} onChange={(event) => field.onChange(event.target.value.toUpperCase())} placeholder="MAINT_DEP" maxLength={30} className="font-mono uppercase" data-testid="field-code" />}
+          render={({ field }) => (
+            <Input
+              {...field}
+              value={field.value}
+              onChange={(event) => field.onChange(event.target.value.toUpperCase())}
+              placeholder="MAINT_DEP"
+              maxLength={30}
+              className="font-mono uppercase"
+              data-testid="field-code"
+            />
+          )}
         />
         <FormField
           control={control}
           name="default_amount_paise"
           label="Default amount"
           hint="Can be overridden per booking"
-          render={({ field }) => <MoneyInput id={field.id} ref={field.ref} value={field.value} onChange={(paise) => field.onChange(paise ?? 0)} onBlur={field.onBlur} aria-invalid={field["aria-invalid"]} aria-describedby={field["aria-describedby"]} data-testid="field-default-amount" />}
+          render={({ field }) => (
+            <MoneyInput
+              id={field.id}
+              ref={field.ref}
+              value={field.value}
+              onChange={(paise) => field.onChange(paise ?? 0)}
+              onBlur={field.onBlur}
+              aria-invalid={field["aria-invalid"]}
+              aria-describedby={field["aria-describedby"]}
+              data-testid="field-default-amount"
+            />
+          )}
         />
         <FormField
           control={control}
@@ -61,7 +91,16 @@ export function ChargeTypeForm(_props: MasterFormProps) {
           label="Demand at"
           required
           hint={DEMAND_AT_HINTS[demandAt]}
-          render={({ field }) => <Select id={field.id} value={field.value} onValueChange={(value) => value && field.onChange(value)} options={DEMAND_AT_OPTIONS} invalid={field.invalid} data-testid="field-demand-at" />}
+          render={({ field }) => (
+            <Select
+              id={field.id}
+              value={field.value}
+              onValueChange={(value) => value && field.onChange(value)}
+              options={DEMAND_AT_OPTIONS}
+              invalid={field.invalid}
+              data-testid="field-demand-at"
+            />
+          )}
         />
       </FormRow>
       <div className="rounded-md border border-border bg-surface/60 p-3">
@@ -69,20 +108,42 @@ export function ChargeTypeForm(_props: MasterFormProps) {
           <FormField
             control={control}
             name="is_taxable"
-            render={({ field }) => <Switch id={field.id} checked={field.value} onCheckedChange={field.onChange} label="Taxable" description="GST is added on top of the amount" data-testid="field-is-taxable" />}
+            render={({ field }) => (
+              <Switch
+                id={field.id}
+                checked={field.value}
+                onCheckedChange={field.onChange}
+                label="Taxable"
+                description="GST is added on top of the amount"
+                data-testid="field-is-taxable"
+              />
+            )}
           />
           <FormField
             control={control}
             name="default_gst_percent"
             label="GST %"
-            render={({ field }) => <PercentInput id={field.id} ref={field.ref} value={field.value} onChange={(value) => field.onChange(value ?? 0)} onBlur={field.onBlur} disabled={!taxable} aria-invalid={field["aria-invalid"]} data-testid="field-gst-percent" />}
+            render={({ field }) => (
+              <PercentInput
+                id={field.id}
+                ref={field.ref}
+                value={field.value}
+                onChange={(value) => field.onChange(value ?? 0)}
+                onBlur={field.onBlur}
+                disabled={!taxable}
+                aria-invalid={field["aria-invalid"]}
+                data-testid="field-gst-percent"
+              />
+            )}
           />
         </FormRow>
         <p className="mt-3 text-xs text-ink-subtle">
           Demand preview: <span className="money font-medium text-ink">{formatINR(amount)}</span>
           {taxable && gst > 0 && (
             <>
-              {" "}+ GST <span className="money">{formatINR(gstPaise)}</span> = <span className="money font-semibold text-navy-950">{formatINR(amount + gstPaise)}</span>
+              {" "}
+              + GST <span className="money">{formatINR(gstPaise)}</span> ={" "}
+              <span className="money font-semibold text-navy-950">{formatINR(amount + gstPaise)}</span>
             </>
           )}
         </p>

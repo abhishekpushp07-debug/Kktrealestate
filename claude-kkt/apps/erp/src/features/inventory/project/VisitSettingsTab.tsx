@@ -1,9 +1,28 @@
 import { Plus, Save, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { SLOT_MINUTES, VisitSettingsSchema, type ProjectRow, type VisitSettingsRow } from "@kkt/contracts";
 import { z } from "zod";
-import { applyServerErrors, Button, Card, CardContent, CardHeader, CardTitle, DateInput, ErrorState, FormError, FormField, FormRow, FormSection, Input, NumberInput, Select, Skeleton, Switch, Textarea } from "@/components/ui";
+import {
+  applyServerErrors,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  DateInput,
+  ErrorState,
+  FormError,
+  FormField,
+  FormRow,
+  FormSection,
+  Input,
+  NumberInput,
+  Select,
+  Skeleton,
+  Switch,
+  Textarea,
+} from "@/components/ui";
 import { api, type ApiClientError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { formatDate } from "@/lib/format";
@@ -80,7 +99,14 @@ function toValues(row: VisitSettingsRow): VisitValues {
 export function VisitSettingsTab({ project }: { project: ProjectRow }) {
   const settings = useVisitSettings(project.id);
   if (settings.isPending) return <Skeleton className="h-96 rounded-lg" />;
-  if (settings.isError) return <ErrorState error={settings.error} onRetry={() => void settings.refetch()} className="rounded-lg border border-border bg-card" />;
+  if (settings.isError)
+    return (
+      <ErrorState
+        error={settings.error}
+        onRetry={() => void settings.refetch()}
+        className="rounded-lg border border-border bg-card"
+      />
+    );
   return <VisitSettingsForm project={project} row={settings.data} />;
 }
 
@@ -95,11 +121,16 @@ function VisitSettingsForm({ project, row }: { project: ProjectRow; row: VisitSe
 
   useEffect(() => {
     form.reset(toValues(row));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-seed the form only when the server row changes version
   }, [row.version]);
 
   const save = useMutationWithToast<VisitSettingsRow, unknown>({
-    mutationFn: (settings) => api.patch<VisitSettingsRow>(`${PROJECTS_PATH}/${project.id}/visit-settings`, { version: row.version, settings }, { version: row.version }),
+    mutationFn: (settings) =>
+      api.patch<VisitSettingsRow>(
+        `${PROJECTS_PATH}/${project.id}/visit-settings`,
+        { version: row.version, settings },
+        { version: row.version },
+      ),
     successMessage: "Site-visit settings saved",
     invalidate: [inventoryKeys.visitSettings(project.id)],
     entityLabel: "Visit settings",
@@ -110,9 +141,9 @@ function VisitSettingsForm({ project, row }: { project: ProjectRow; row: VisitSe
     },
   });
 
-  const enabled = form.watch("enabled");
-  const days = form.watch("visit_days");
-  const blackouts = form.watch("blackout_dates");
+  const enabled = useWatch({ control, name: "enabled" });
+  const days = useWatch({ control, name: "visit_days" });
+  const blackouts = useWatch({ control, name: "blackout_dates" });
 
   const toggleDay = (day: number) => {
     const next = days.includes(day) ? days.filter((value) => value !== day) : [...days, day];
@@ -137,11 +168,27 @@ function VisitSettingsForm({ project, row }: { project: ProjectRow; row: VisitSe
       <Card className="lg:col-span-2">
         <CardHeader>
           <CardTitle>Scheduler</CardTitle>
-          <p className="text-xs text-ink-subtle">Controls the public "Book a private site visit" flow and the ERP calendar for {project.name}.</p>
+          <p className="text-xs text-ink-subtle">
+            Controls the public "Book a private site visit" flow and the ERP calendar for {project.name}.
+          </p>
         </CardHeader>
         <CardContent className="space-y-6">
           {serverError !== null && <FormError error={serverError} />}
-          <FormField control={control} name="enabled" render={({ field }) => <Switch id={field.id} checked={field.value} onCheckedChange={field.onChange} disabled={!canWrite} label="Site-visit booking enabled" description="When off, the website hides the booking card; staff can still create visits here." data-testid="visit-enabled" />} />
+          <FormField
+            control={control}
+            name="enabled"
+            render={({ field }) => (
+              <Switch
+                id={field.id}
+                checked={field.value}
+                onCheckedChange={field.onChange}
+                disabled={!canWrite}
+                label="Site-visit booking enabled"
+                description="When off, the website hides the booking card; staff can still create visits here."
+                data-testid="visit-enabled"
+              />
+            )}
+          />
           {!enabled && <Notice tone="warning">Booking is switched off for visitors.</Notice>}
 
           <FormSection title="Visit days">
@@ -159,7 +206,12 @@ function VisitSettingsForm({ project, row }: { project: ProjectRow; row: VisitSe
                         aria-pressed={active}
                         disabled={!canWrite}
                         onClick={() => toggleDay(day.value)}
-                        className={cn("h-8 min-w-12 rounded-full border px-3 text-xs font-semibold transition-colors focus-ring", active ? "border-navy-950 bg-navy-950 text-white" : "border-border-strong bg-card text-ink-muted hover:border-navy-300")}
+                        className={cn(
+                          "h-8 min-w-12 rounded-full border px-3 text-xs font-semibold transition-colors focus-ring",
+                          active
+                            ? "border-navy-950 bg-navy-950 text-white"
+                            : "border-border-strong bg-card text-ink-muted hover:border-navy-300",
+                        )}
                         data-testid={`visit-day-${day.value}`}
                       >
                         {day.label}
@@ -173,22 +225,130 @@ function VisitSettingsForm({ project, row }: { project: ProjectRow; row: VisitSe
 
           <FormSection title="Slots">
             <FormRow columns={4}>
-              <FormField control={control} name="start_time" label="Start (IST)" required render={({ field }) => <Input {...field} type="time" value={field.value} onChange={(event) => field.onChange(event.target.value)} disabled={!canWrite} className="money" />} />
-              <FormField control={control} name="end_time" label="End (IST)" required render={({ field }) => <Input {...field} type="time" value={field.value} onChange={(event) => field.onChange(event.target.value)} disabled={!canWrite} className="money" />} />
-              <FormField control={control} name="slot_minutes" label="Slot length" render={({ field }) => <Select id={field.id} value={field.value} onValueChange={(value) => field.onChange(value ?? "60")} options={SLOT_MINUTES.map((minutes) => ({ value: String(minutes), label: `${minutes} min` }))} disabled={!canWrite} />} />
-              <FormField control={control} name="seats_per_slot" label="Seats per slot" render={({ field }) => <NumberInput id={field.id} value={field.value} onChange={(value) => field.onChange(value ?? 1)} onBlur={field.onBlur} decimals={0} min={1} max={50} disabled={!canWrite} />} />
-              <FormField control={control} name="min_lead_hours" label="Minimum lead time" hint="Slots sooner than this are hidden" render={({ field }) => <NumberInput id={field.id} value={field.value} onChange={(value) => field.onChange(value ?? 0)} onBlur={field.onBlur} decimals={0} min={0} max={168} suffix="hours" disabled={!canWrite} />} />
-              <FormField control={control} name="max_days_ahead" label="Book up to" render={({ field }) => <NumberInput id={field.id} value={field.value} onChange={(value) => field.onChange(value ?? 1)} onBlur={field.onBlur} decimals={0} min={1} max={90} suffix="days ahead" disabled={!canWrite} />} />
+              <FormField
+                control={control}
+                name="start_time"
+                label="Start (IST)"
+                required
+                render={({ field }) => (
+                  <Input
+                    {...field}
+                    type="time"
+                    value={field.value}
+                    onChange={(event) => field.onChange(event.target.value)}
+                    disabled={!canWrite}
+                    className="money"
+                  />
+                )}
+              />
+              <FormField
+                control={control}
+                name="end_time"
+                label="End (IST)"
+                required
+                render={({ field }) => (
+                  <Input
+                    {...field}
+                    type="time"
+                    value={field.value}
+                    onChange={(event) => field.onChange(event.target.value)}
+                    disabled={!canWrite}
+                    className="money"
+                  />
+                )}
+              />
+              <FormField
+                control={control}
+                name="slot_minutes"
+                label="Slot length"
+                render={({ field }) => (
+                  <Select
+                    id={field.id}
+                    value={field.value}
+                    onValueChange={(value) => field.onChange(value ?? "60")}
+                    options={SLOT_MINUTES.map((minutes) => ({ value: String(minutes), label: `${minutes} min` }))}
+                    disabled={!canWrite}
+                  />
+                )}
+              />
+              <FormField
+                control={control}
+                name="seats_per_slot"
+                label="Seats per slot"
+                render={({ field }) => (
+                  <NumberInput
+                    id={field.id}
+                    value={field.value}
+                    onChange={(value) => field.onChange(value ?? 1)}
+                    onBlur={field.onBlur}
+                    decimals={0}
+                    min={1}
+                    max={50}
+                    disabled={!canWrite}
+                  />
+                )}
+              />
+              <FormField
+                control={control}
+                name="min_lead_hours"
+                label="Minimum lead time"
+                hint="Slots sooner than this are hidden"
+                render={({ field }) => (
+                  <NumberInput
+                    id={field.id}
+                    value={field.value}
+                    onChange={(value) => field.onChange(value ?? 0)}
+                    onBlur={field.onBlur}
+                    decimals={0}
+                    min={0}
+                    max={168}
+                    suffix="hours"
+                    disabled={!canWrite}
+                  />
+                )}
+              />
+              <FormField
+                control={control}
+                name="max_days_ahead"
+                label="Book up to"
+                render={({ field }) => (
+                  <NumberInput
+                    id={field.id}
+                    value={field.value}
+                    onChange={(value) => field.onChange(value ?? 1)}
+                    onBlur={field.onBlur}
+                    decimals={0}
+                    min={1}
+                    max={90}
+                    suffix="days ahead"
+                    disabled={!canWrite}
+                  />
+                )}
+              />
             </FormRow>
           </FormSection>
 
           <FormSection title="Blackout dates" description="No visits on these dates (holidays, events).">
             <div className="flex flex-wrap items-center gap-1.5">
               {blackouts.map((date) => (
-                <span key={date} className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2.5 py-0.5 text-xs">
+                <span
+                  key={date}
+                  className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2.5 py-0.5 text-xs"
+                >
                   {formatDate(date)}
                   {canWrite && (
-                    <button type="button" aria-label={`Remove ${formatDate(date)}`} onClick={() => form.setValue("blackout_dates", blackouts.filter((value) => value !== date), { shouldDirty: true })} className="rounded-full p-0.5 text-ink-subtle hover:text-danger-fg focus-ring">
+                    <button
+                      type="button"
+                      aria-label={`Remove ${formatDate(date)}`}
+                      onClick={() =>
+                        form.setValue(
+                          "blackout_dates",
+                          blackouts.filter((value) => value !== date),
+                          { shouldDirty: true },
+                        )
+                      }
+                      className="rounded-full p-0.5 text-ink-subtle hover:text-danger-fg focus-ring"
+                    >
                       <X className="size-3" aria-hidden="true" />
                     </button>
                   )}
@@ -216,17 +376,71 @@ function VisitSettingsForm({ project, row }: { project: ProjectRow; row: VisitSe
             <CardTitle>Site office</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <FormField control={control} name="site_office_address" label="Address" render={({ field }) => <Textarea {...field} value={field.value} onChange={(event) => field.onChange(event.target.value)} rows={3} maxLength={300} disabled={!canWrite} />} />
-            <FormField control={control} name="maps_link" label="Google Maps link" render={({ field }) => <Input {...field} type="url" value={field.value} onChange={(event) => field.onChange(event.target.value)} placeholder="https://maps.app.goo.gl/…" maxLength={500} disabled={!canWrite} />} />
-            <FormField control={control} name="instructions" label="Instructions for visitors" hint="Included in the confirmation and the .ics invite" render={({ field }) => <Textarea {...field} value={field.value} onChange={(event) => field.onChange(event.target.value)} rows={4} maxLength={1000} disabled={!canWrite} />} />
+            <FormField
+              control={control}
+              name="site_office_address"
+              label="Address"
+              render={({ field }) => (
+                <Textarea
+                  {...field}
+                  value={field.value}
+                  onChange={(event) => field.onChange(event.target.value)}
+                  rows={3}
+                  maxLength={300}
+                  disabled={!canWrite}
+                />
+              )}
+            />
+            <FormField
+              control={control}
+              name="maps_link"
+              label="Google Maps link"
+              render={({ field }) => (
+                <Input
+                  {...field}
+                  type="url"
+                  value={field.value}
+                  onChange={(event) => field.onChange(event.target.value)}
+                  placeholder="https://maps.app.goo.gl/…"
+                  maxLength={500}
+                  disabled={!canWrite}
+                />
+              )}
+            />
+            <FormField
+              control={control}
+              name="instructions"
+              label="Instructions for visitors"
+              hint="Included in the confirmation and the .ics invite"
+              render={({ field }) => (
+                <Textarea
+                  {...field}
+                  value={field.value}
+                  onChange={(event) => field.onChange(event.target.value)}
+                  rows={4}
+                  maxLength={1000}
+                  disabled={!canWrite}
+                />
+              )}
+            />
           </CardContent>
         </Card>
         {canWrite && (
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => form.reset(toValues(row))} disabled={!form.formState.isDirty || save.isPending}>
+            <Button
+              variant="outline"
+              onClick={() => form.reset(toValues(row))}
+              disabled={!form.formState.isDirty || save.isPending}
+            >
               Reset
             </Button>
-            <Button type="submit" leftIcon={Save} loading={save.isPending} disabled={!form.formState.isDirty} data-testid="visit-settings-save">
+            <Button
+              type="submit"
+              leftIcon={Save}
+              loading={save.isPending}
+              disabled={!form.formState.isDirty}
+              data-testid="visit-settings-save"
+            >
               Save settings
             </Button>
           </div>

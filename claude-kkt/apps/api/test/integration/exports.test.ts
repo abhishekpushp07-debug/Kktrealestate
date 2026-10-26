@@ -7,7 +7,16 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildTestApp, freshIp, type ErrorBody, type TestContext } from "./helpers.js";
 import { startTestWorker, waitForExport, type TestWorker } from "./worker.js";
 
-type ExportRow = { id: string; path: string; query: Record<string, unknown>; status: string; row_count: number | null; file_name: string; error: string | null; expires_at: string | null };
+type ExportRow = {
+  id: string;
+  path: string;
+  query: Record<string, unknown>;
+  status: string;
+  row_count: number | null;
+  file_name: string;
+  error: string | null;
+  expires_at: string | null;
+};
 type Link = { download_url: string; expires_at: string; file_name: string; row_count: number };
 
 let t: TestContext;
@@ -21,13 +30,22 @@ beforeAll(async () => {
   admin = (await t.loginAs("admin")).access_token;
   sales = (await t.loginAs("sales")).access_token;
   worker = await startTestWorker(t.app);
-  await t.app.sql`insert into job_runs (job_name, status, started_at, finished_at) select 'DAILY_DUES', 'OK', now() - (g || ' seconds')::interval, now() from generate_series(1, ${BULK}) g`;
-  await t.app.sql`insert into job_runs (job_name, status, started_at, finished_at, error) select 'NIGHTLY_INTEGRITY', 'FAILED', now() - (g || ' seconds')::interval, now(), ${"=HYPERLINK(\"http://evil\",\"x\")"} from generate_series(1, 3) g`;
+  await t.app
+    .sql`insert into job_runs (job_name, status, started_at, finished_at) select 'DAILY_DUES', 'OK', now() - (g || ' seconds')::interval, now() from generate_series(1, ${BULK}) g`;
+  await t.app
+    .sql`insert into job_runs (job_name, status, started_at, finished_at, error) select 'NIGHTLY_INTEGRITY', 'FAILED', now() - (g || ' seconds')::interval, now(), ${'=HYPERLINK("http://evil","x")'} from generate_series(1, 3) g`;
 });
-afterAll(async () => { await worker?.close(); await t?.close(); });
+afterAll(async () => {
+  await worker?.close();
+  await t?.close();
+});
 
 async function download(url: string): Promise<{ status: number; headers: Record<string, unknown>; text: string }> {
-  const res = await t.app.inject({ method: "GET", url: url.replace(/^https?:\/\/[^/]+/, ""), headers: { "x-forwarded-for": freshIp() } });
+  const res = await t.app.inject({
+    method: "GET",
+    url: url.replace(/^https?:\/\/[^/]+/, ""),
+    headers: { "x-forwarded-for": freshIp() },
+  });
   return { status: res.statusCode, headers: res.headers as Record<string, unknown>, text: res.body };
 }
 
@@ -53,11 +71,24 @@ describe("asynchronous exports", () => {
   let done: ExportRow;
 
   it("POST /exports queues EXPORT_CSV (202); the worker pages through ALL rows as the caller; the user gets a bell and a signed link", async () => {
-    const r = await t.request<ExportRow>("POST", "/api/v1/exports", { token: admin, body: { path: "/api/v1/admin/jobs/runs", query: { status: "OK" } }, headers: { "idempotency-key": "exp-1" } });
+    const r = await t.request<ExportRow>("POST", "/api/v1/exports", {
+      token: admin,
+      body: { path: "/api/v1/admin/jobs/runs", query: { status: "OK" } },
+      headers: { "idempotency-key": "exp-1" },
+    });
     expect(r.status, r.text).toBe(202);
-    expect(r.body).toMatchObject({ status: "QUEUED", path: "/api/v1/admin/jobs/runs", query: { status: "OK" }, row_count: null });
+    expect(r.body).toMatchObject({
+      status: "QUEUED",
+      path: "/api/v1/admin/jobs/runs",
+      query: { status: "OK" },
+      row_count: null,
+    });
     expect(r.body.file_name).toMatch(/^admin-jobs-runs-\d{8}-[0-9a-f]{8}\.csv$/);
-    const replay = await t.request<ExportRow>("POST", "/api/v1/exports", { token: admin, body: { path: "/api/v1/admin/jobs/runs", query: { status: "OK" } }, headers: { "idempotency-key": "exp-1" } });
+    const replay = await t.request<ExportRow>("POST", "/api/v1/exports", {
+      token: admin,
+      body: { path: "/api/v1/admin/jobs/runs", query: { status: "OK" } },
+      headers: { "idempotency-key": "exp-1" },
+    });
     expect(replay.body.id).toBe(r.body.id);
     const fin = await waitForExport(t.app, r.body.id, 120_000);
     expect(fin.status, fin.error ?? "").toBe("DONE");
@@ -68,7 +99,9 @@ describe("asynchronous exports", () => {
     expect(new Date(done.expires_at!).getTime() - Date.now()).toBeGreaterThan(6.9 * 86_400_000);
     const list = await t.request<{ items: ExportRow[]; total: number }>("GET", "/api/v1/exports", { token: admin });
     expect(list.body.items.map((i) => i.id)).toEqual([done.id]);
-    const bells = await t.app.sql<{ title: string }[]>`select title from notifications where type = 'EXPORT_READY' and entity_id = ${done.id}`;
+    const bells = await t.app.sql<
+      { title: string }[]
+    >`select title from notifications where type = 'EXPORT_READY' and entity_id = ${done.id}`;
     expect(bells).toHaveLength(1);
 
     const link = await t.request<Link>("POST", `/api/v1/exports/${done.id}/link`, { token: admin });
@@ -112,7 +145,9 @@ describe("asynchronous exports", () => {
     expect((await t.request("POST", `/api/v1/exports/${done.id}/link`, { token: sales })).status).toBe(404);
     expect((await t.request<{ items: unknown[] }>("GET", "/api/v1/exports", { token: sales })).body.items).toEqual([]);
     // not ready yet → 409
-    const [queued] = await t.app.sql<{ id: string }[]>`insert into exports (company_id, user_id, path, query, status) select ${t.companyId}, id, '/api/v1/admin/jobs/runs', '{}'::jsonb, 'QUEUED' from users where email = 'admin@sgb.in' returning id`;
+    const [queued] = await t.app.sql<
+      { id: string }[]
+    >`insert into exports (company_id, user_id, path, query, status) select ${t.companyId}, id, '/api/v1/admin/jobs/runs', '{}'::jsonb, 'QUEUED' from users where email = 'admin@sgb.in' returning id`;
     const early = await t.request<ErrorBody>("POST", `/api/v1/exports/${queued!.id}/link`, { token: admin });
     expect(early.status).toBe(409);
     expect(early.body.error.code).toBe("EXPORT_NOT_READY");
@@ -120,24 +155,52 @@ describe("asynchronous exports", () => {
   });
 
   it("the export runs as the requesting user: a user deactivated (or without the permission) by then fails it, FAILED with the reason on the last attempt", async () => {
-    const role = await t.request<{ id: string }>("POST", "/api/v1/roles", { token: admin, body: { name: "Exporter", permissions: ["dashboard.view", "admin.tools", "notification.read"] } });
-    const user = await t.request<{ id: string }>("POST", "/api/v1/users", { token: admin, body: { name: "Export Person", email: "exporter@sgb.in", role_id: role.body.id, all_projects: true, password: "Exporter@2025!", must_change_password: false } });
+    const role = await t.request<{ id: string }>("POST", "/api/v1/roles", {
+      token: admin,
+      body: { name: "Exporter", permissions: ["dashboard.view", "admin.tools", "notification.read"] },
+    });
+    const user = await t.request<{ id: string }>("POST", "/api/v1/users", {
+      token: admin,
+      body: {
+        name: "Export Person",
+        email: "exporter@sgb.in",
+        role_id: role.body.id,
+        all_projects: true,
+        password: "Exporter@2025!",
+        must_change_password: false,
+      },
+    });
     expect(user.status, user.text).toBe(201);
     const { runCsvExport } = await import("../../src/modules/documents/index.js");
-    const queue = async () => (await t.app.sql<{ id: string }[]>`insert into exports (company_id, user_id, path, query, status) values (${t.companyId}, ${user.body.id}, '/api/v1/admin/jobs/runs', '{"status":"FAILED"}'::jsonb, 'QUEUED') returning id`)[0]!.id;
+    const queue = async () =>
+      (
+        await t.app.sql<
+          { id: string }[]
+        >`insert into exports (company_id, user_id, path, query, status) values (${t.companyId}, ${user.body.id}, '/api/v1/admin/jobs/runs', '{"status":"FAILED"}'::jsonb, 'QUEUED') returning id`
+      )[0]!.id;
     // the permission is gone → the route answers 403 inside the job
     await t.app.sql`update roles set permissions = '{dashboard.view,notification.read}' where id = ${role.body.id}`;
     await t.app.redis.flushdb();
     const noPerm = await queue();
-    await expect(runCsvExport({ db: t.app.db, app: t.app, data: { export_id: noPerm }, attempt: 1, maxAttempts: 3 })).rejects.toThrow(/403/);
-    expect((await t.app.sql<{ status: string }[]>`select status from exports where id = ${noPerm}`)[0]!.status).toBe("QUEUED"); // retried later
-    await expect(runCsvExport({ db: t.app.db, app: t.app, data: { export_id: noPerm }, attempt: 3, maxAttempts: 3 })).rejects.toThrow(/403/);
-    const [failed] = await t.app.sql<{ status: string; error: string }[]>`select status, error from exports where id = ${noPerm}`;
+    await expect(
+      runCsvExport({ db: t.app.db, app: t.app, data: { export_id: noPerm }, attempt: 1, maxAttempts: 3 }),
+    ).rejects.toThrow(/403/);
+    expect((await t.app.sql<{ status: string }[]>`select status from exports where id = ${noPerm}`)[0]!.status).toBe(
+      "QUEUED",
+    ); // retried later
+    await expect(
+      runCsvExport({ db: t.app.db, app: t.app, data: { export_id: noPerm }, attempt: 3, maxAttempts: 3 }),
+    ).rejects.toThrow(/403/);
+    const [failed] = await t.app.sql<
+      { status: string; error: string }[]
+    >`select status, error from exports where id = ${noPerm}`;
     expect(failed).toMatchObject({ status: "FAILED", error: expect.stringContaining("FORBIDDEN") });
     // deactivated user → no internal token is minted at all
     await t.app.sql`update users set is_active = false where id = ${user.body.id}`;
     const inactive = await queue();
-    await expect(runCsvExport({ db: t.app.db, app: t.app, data: { export_id: inactive }, attempt: 3, maxAttempts: 3 })).rejects.toThrow(/no longer active/);
+    await expect(
+      runCsvExport({ db: t.app.db, app: t.app, data: { export_id: inactive }, attempt: 3, maxAttempts: 3 }),
+    ).rejects.toThrow(/no longer active/);
   });
 
   it("EXPORT_CLEANUP removes expired exports and their files", async () => {

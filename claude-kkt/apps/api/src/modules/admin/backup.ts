@@ -17,13 +17,30 @@ import { once } from "node:events";
 import { PassThrough } from "node:stream";
 import { finished } from "node:stream/promises";
 import { ZipArchive } from "archiver";
-import { and, desc, eq, exists, getTableColumns, getTableName, inArray, is, isNull, or, sql, type SQL } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  exists,
+  getTableColumns,
+  getTableName,
+  inArray,
+  is,
+  isNull,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 import { PgDialect, PgTable, type PgColumn } from "drizzle-orm/pg-core";
 import type { FastifyInstance } from "fastify";
 import type { Sql } from "postgres";
 import { z } from "zod";
 import {
-  AdminBackupLinkResponseSchema, AdminBackupListResponseSchema, AdminBackupQueuedResponseSchema, AdminBackupRequestSchema, type AdminBackupRow,
+  AdminBackupLinkResponseSchema,
+  AdminBackupListResponseSchema,
+  AdminBackupQueuedResponseSchema,
+  AdminBackupRequestSchema,
+  type AdminBackupRow,
 } from "@kkt/contracts";
 import { exports as exportsTable, schema, type DB, type Executor } from "@kkt/db";
 import { config } from "../../config.js";
@@ -32,7 +49,14 @@ import { enqueueJobWithin } from "../../jobs/queue.js";
 import { writeAudit } from "../../lib/audit.js";
 import { ApiError } from "../../lib/errors.js";
 import { route } from "../../lib/routes.js";
-import { documentStorage, fileTokenKey, signFileToken, storeFile, verifyFileToken, withTempDir } from "../documents/index.js";
+import {
+  documentStorage,
+  fileTokenKey,
+  signFileToken,
+  storeFile,
+  verifyFileToken,
+  withTempDir,
+} from "../documents/index.js";
 import { notify } from "../notifications/index.js";
 import { adminMeta, idParams, requireSuperAdmin, staff } from "./common.js";
 
@@ -172,14 +196,29 @@ function parentExists(db: Executor, child: BackupTable, column: string, parent: 
   const childCol = child.columns[column];
   const parentId = parent.columns["id"];
   const parentCompany = parent.columns["companyId"];
-  if (!childCol || !parentId || !parentCompany) throw new Error(`backup: cannot scope ${child.name} through ${parent.name}.${column}`);
-  return exists(db.select({ one: sql`1` }).from(parent.table).where(and(eq(parentId, childCol), eq(parentCompany, companyId))));
+  if (!childCol || !parentId || !parentCompany)
+    throw new Error(`backup: cannot scope ${child.name} through ${parent.name}.${column}`);
+  return exists(
+    db
+      .select({ one: sql`1` })
+      .from(parent.table)
+      .where(and(eq(parentId, childCol), eq(parentCompany, companyId))),
+  );
 }
 
 /** Tenant restriction of one table (exported for tests). */
-export function tableScope(db: Executor, t: BackupTable, companyId: string, byName: Map<string, BackupTable>): { where: SQL | undefined; scope: BackupTableScope } {
+export function tableScope(
+  db: Executor,
+  t: BackupTable,
+  companyId: string,
+  byName: Map<string, BackupTable>,
+): { where: SQL | undefined; scope: BackupTableScope } {
   const companyCol = t.columns["companyId"];
-  if (companyCol) return { where: companyCol.notNull ? eq(companyCol, companyId) : or(eq(companyCol, companyId), isNull(companyCol)), scope: "company" };
+  if (companyCol)
+    return {
+      where: companyCol.notNull ? eq(companyCol, companyId) : or(eq(companyCol, companyId), isNull(companyCol)),
+      scope: "company",
+    };
   if (t.name === "companies") return { where: eq(t.columns["id"]!, companyId), scope: "company" };
   const via = PARENT_SCOPE[t.name];
   if (via) {
@@ -188,13 +227,24 @@ export function tableScope(db: Executor, t: BackupTable, companyId: string, byNa
     return { where: parentExists(db, t, via.column, parent, companyId), scope: "parent" };
   }
   if (t.name === "password_history") {
-    const users = byName.get("users"), portal = byName.get("portal_users");
+    const users = byName.get("users"),
+      portal = byName.get("portal_users");
     if (!users || !portal) throw new Error("backup: users/portal_users missing");
     const subject = t.columns["subjectId"]!;
     return {
       where: or(
-        exists(db.select({ one: sql`1` }).from(users.table).where(and(eq(users.columns["id"]!, subject), eq(users.columns["companyId"]!, companyId)))),
-        exists(db.select({ one: sql`1` }).from(portal.table).where(and(eq(portal.columns["id"]!, subject), eq(portal.columns["companyId"]!, companyId)))),
+        exists(
+          db
+            .select({ one: sql`1` })
+            .from(users.table)
+            .where(and(eq(users.columns["id"]!, subject), eq(users.columns["companyId"]!, companyId))),
+        ),
+        exists(
+          db
+            .select({ one: sql`1` })
+            .from(portal.table)
+            .where(and(eq(portal.columns["id"]!, subject), eq(portal.columns["companyId"]!, companyId))),
+        ),
       ),
       scope: "parent",
     };
@@ -215,14 +265,18 @@ function orderColumns(t: BackupTable): PgColumn[] {
  * exist or the role may not read it (the DML-only application role kkt_app has no rights on schema `drizzle` unless the deployment grants
  * them). The privileges are checked first: a failing statement would abort the backup's surrounding transaction.
  */
-export async function schemaVersion(pg: Sql): Promise<{ migrations_applied: number | null; latest_migration: string | null }> {
+export async function schemaVersion(
+  pg: Sql,
+): Promise<{ migrations_applied: number | null; latest_migration: string | null }> {
   try {
     const [probe] = await pg<{ ok: boolean }[]>`
       select coalesce((select has_schema_privilege(n.oid, 'USAGE') from pg_namespace n where n.nspname = 'drizzle'), false)
          and coalesce((select has_table_privilege(c.oid, 'SELECT') from pg_class c join pg_namespace n on n.oid = c.relnamespace
                        where n.nspname = 'drizzle' and c.relname = '__drizzle_migrations'), false) as ok`;
     if (!probe?.ok) return { migrations_applied: null, latest_migration: null };
-    const rows = await pg<{ n: number; latest: string | null }[]>`select count(*)::int as n, (select hash from drizzle.__drizzle_migrations order by created_at desc, id desc limit 1) as latest from drizzle.__drizzle_migrations`;
+    const rows = await pg<
+      { n: number; latest: string | null }[]
+    >`select count(*)::int as n, (select hash from drizzle.__drizzle_migrations order by created_at desc, id desc limit 1) as latest from drizzle.__drizzle_migrations`;
     return { migrations_applied: rows[0] ? Number(rows[0].n) : null, latest_migration: rows[0]?.latest ?? null };
   } catch {
     return { migrations_applied: null, latest_migration: null };
@@ -231,7 +285,9 @@ export async function schemaVersion(pg: Sql): Promise<{ migrations_applied: numb
 
 /** Public tables parents-first by foreign key (ties alphabetical); throws on a cycle. Self-references are ignored. */
 export async function fkLoadOrder(pg: Sql): Promise<string[]> {
-  const tables = (await pg<{ name: string }[]>`select tablename as name from pg_tables where schemaname = 'public' order by tablename`).map((r) => r.name);
+  const tables = (
+    await pg<{ name: string }[]>`select tablename as name from pg_tables where schemaname = 'public' order by tablename`
+  ).map((r) => r.name);
   const edges = await pg<{ child: string; parent: string }[]>`
     select c.relname as child, p.relname as parent from pg_constraint k
     join pg_class c on c.oid = k.conrelid join pg_class p on p.oid = k.confrelid
@@ -241,9 +297,14 @@ export async function fkLoadOrder(pg: Sql): Promise<string[]> {
   const order: string[] = [];
   const done = new Set<string>();
   while (order.length < tables.length) {
-    const ready = tables.filter((t) => !done.has(t) && [...(deps.get(t) ?? [])].every((p) => done.has(p) || !deps.has(p)));
+    const ready = tables.filter(
+      (t) => !done.has(t) && [...(deps.get(t) ?? [])].every((p) => done.has(p) || !deps.has(p)),
+    );
     if (ready.length === 0) throw new Error(`foreign-key cycle among ${tables.filter((t) => !done.has(t)).join(", ")}`);
-    for (const t of ready) { done.add(t); order.push(t); }
+    for (const t of ready) {
+      done.add(t);
+      order.push(t);
+    }
   }
   return order;
 }
@@ -279,12 +340,19 @@ export async function writeBackupArchive(db: DB, file: string, opts: WriteBackup
   const out = createWriteStream(file);
   const written = finished(out);
   let archiveError: Error | null = null;
-  archive.on("error", (err) => { archiveError = err; });
-  archive.on("warning", (err) => { archiveError = err; });
+  archive.on("error", (err) => {
+    archiveError = err;
+  });
+  archive.on("warning", (err) => {
+    archiveError = err;
+  });
   archive.pipe(out);
 
   /** Adds one entry fed by `produce`, waiting until archiver has consumed it (one entry in flight → bounded memory). */
-  const addEntry = async (name: string, produce: (write: (chunk: string) => Promise<void>) => Promise<void>): Promise<{ sha256: string; bytes: number }> => {
+  const addEntry = async (
+    name: string,
+    produce: (write: (chunk: string) => Promise<void>) => Promise<void>,
+  ): Promise<{ sha256: string; bytes: number }> => {
     const pass = new PassThrough();
     const consumed = once(archive, "entry");
     archive.append(pass, { name, date: now });
@@ -319,8 +387,14 @@ export async function writeBackupArchive(db: DB, file: string, opts: WriteBackup
         if (!opts.includeSensitive && isSensitiveColumn(t.name, col.name)) stripped.push(col.name);
         else keep.push(col.name);
       }
-      const cols = sql.join(keep.map((c) => sql.identifier(c)), sql`, `);
-      const order = sql.join(orderColumns(t).map((c) => sql.identifier(c.name)), sql`, `);
+      const cols = sql.join(
+        keep.map((c) => sql.identifier(c)),
+        sql`, `,
+      );
+      const order = sql.join(
+        orderColumns(t).map((c) => sql.identifier(c.name)),
+        sql`, `,
+      );
       const inner = sql`select ${cols} from ${t.table}${where ? sql` where ${where}` : sql``} order by ${order}`;
       const q = dialect.sqlToQuery(sql`select row_to_json(x)::text as j from (${inner}) x`);
       const file = `tables/${t.name}.ndjson`;
@@ -331,14 +405,32 @@ export async function writeBackupArchive(db: DB, file: string, opts: WriteBackup
           await write(`${chunk.map((r) => r.j).join("\n")}\n`);
         }
       });
-      tables.push({ name: t.name, file, rows, bytes: facts.bytes, sha256: facts.sha256, scope, columns: keep, stripped_columns: stripped });
+      tables.push({
+        name: t.name,
+        file,
+        rows,
+        bytes: facts.bytes,
+        sha256: facts.sha256,
+        scope,
+        columns: keep,
+        stripped_columns: stripped,
+      });
     }
   });
   const restoreFacts = await addEntry("RESTORE.md", async (write) => write(RESTORE_MD));
   const manifest: BackupManifest = {
-    format: BACKUP_FORMAT, generated_at: now.toISOString(), app_version: config.APP_VERSION, node_version: process.version,
-    company: { id: opts.companyId, name: opts.companyName }, include_sensitive: opts.includeSensitive, schema: version,
-    table_count: tables.length, row_count: tables.reduce((s, t) => s + t.rows, 0), batch_size: batch, load_order: loadOrder, tables,
+    format: BACKUP_FORMAT,
+    generated_at: now.toISOString(),
+    app_version: config.APP_VERSION,
+    node_version: process.version,
+    company: { id: opts.companyId, name: opts.companyName },
+    include_sensitive: opts.includeSensitive,
+    schema: version,
+    table_count: tables.length,
+    row_count: tables.reduce((s, t) => s + t.rows, 0),
+    batch_size: batch,
+    load_order: loadOrder,
+    tables,
     files: { "RESTORE.md": restoreFacts.sha256 },
   };
   archive.append(`${JSON.stringify(manifest, null, 2)}\n`, { name: "manifest.json", date: now });
@@ -376,16 +468,32 @@ interface BackupFacts {
 
 function facts(r: ExportRecord): BackupFacts {
   const q = (r.query ?? {}) as Partial<BackupFacts>;
-  return { kind: "backup", include_sensitive: q.include_sensitive === true, generated_by: q.generated_by ?? null, run_id: q.run_id ?? null, ...q } as BackupFacts;
+  return {
+    kind: "backup",
+    include_sensitive: q.include_sensitive === true,
+    generated_by: q.generated_by ?? null,
+    run_id: q.run_id ?? null,
+    ...q,
+  } as BackupFacts;
 }
 
 /** Wire row of a backup. */
 export function toBackupRow(r: ExportRecord): AdminBackupRow {
   const f = facts(r);
   return {
-    id: r.id, status: r.status, file_name: f.file_name ?? null, size_bytes: f.size_bytes ?? null, generated_at: r.createdAt.toISOString(),
-    finished_at: r.finishedAt ? r.finishedAt.toISOString() : null, storage_expires_at: r.expiresAt ? r.expiresAt.toISOString() : null,
-    include_sensitive: f.include_sensitive, table_count: f.table_count ?? null, row_count: r.rowCount, generated_by: f.generated_by, error: r.error, run_id: f.run_id,
+    id: r.id,
+    status: r.status,
+    file_name: f.file_name ?? null,
+    size_bytes: f.size_bytes ?? null,
+    generated_at: r.createdAt.toISOString(),
+    finished_at: r.finishedAt ? r.finishedAt.toISOString() : null,
+    storage_expires_at: r.expiresAt ? r.expiresAt.toISOString() : null,
+    include_sensitive: f.include_sensitive,
+    table_count: f.table_count ?? null,
+    row_count: r.rowCount,
+    generated_by: f.generated_by,
+    error: r.error,
+    run_id: f.run_id,
   };
 }
 
@@ -405,59 +513,135 @@ export function verifyBackupToken(token: string): string | null {
 /** Signed download link for a stored backup (15 minutes). */
 export function backupLink(s: Pick<AdminBackupRow, "id">): { download_url: string; expires_at: string } {
   const exp = Math.floor(Date.now() / 1000) + BACKUP_LINK_TTL_SECONDS;
-  return { download_url: `${config.API_PUBLIC_URL}/api/v1/admin/backups/download/${signBackupToken(s.id, exp)}`, expires_at: new Date(exp * 1000).toISOString() };
+  return {
+    download_url: `${config.API_PUBLIC_URL}/api/v1/admin/backups/download/${signBackupToken(s.id, exp)}`,
+    expires_at: new Date(exp * 1000).toISOString(),
+  };
 }
 
 function fileNameFor(now: Date, id: string): string {
-  const stamp = now.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z").replace("T", "-");
+  const stamp = now
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d{3}Z$/, "Z")
+    .replace("T", "-");
   return `kkt-backup-${stamp}-${id.slice(0, 8)}.zip`;
 }
 
 /** Backups of a company, newest first (50). */
 export async function listBackups(db: Executor, companyId: string): Promise<AdminBackupRow[]> {
-  const rows = await db.select().from(exportsTable).where(and(eq(exportsTable.companyId, companyId), eq(exportsTable.path, BACKUP_PATH))).orderBy(desc(exportsTable.createdAt)).limit(50);
+  const rows = await db
+    .select()
+    .from(exportsTable)
+    .where(and(eq(exportsTable.companyId, companyId), eq(exportsTable.path, BACKUP_PATH)))
+    .orderBy(desc(exportsTable.createdAt))
+    .limit(50);
   return rows.map(toBackupRow);
 }
 
 /** A live (DONE, unexpired) backup row by id; null otherwise. */
 export async function loadDoneBackup(db: Executor, id: string, companyId?: string): Promise<ExportRecord | null> {
-  const [r] = await db.select().from(exportsTable).where(and(eq(exportsTable.id, id), eq(exportsTable.path, BACKUP_PATH), companyId ? eq(exportsTable.companyId, companyId) : undefined)).limit(1);
+  const [r] = await db
+    .select()
+    .from(exportsTable)
+    .where(
+      and(
+        eq(exportsTable.id, id),
+        eq(exportsTable.path, BACKUP_PATH),
+        companyId ? eq(exportsTable.companyId, companyId) : undefined,
+      ),
+    )
+    .limit(1);
   if (!r || r.status !== "DONE" || !r.storageKey) return null;
   if (r.expiresAt && r.expiresAt.getTime() <= Date.now()) return null;
   return r;
 }
 
 /** BACKUP_EXPORT: builds the archive for the backup row in `data.backup_id`, stores it for 24 h and tells the requester. */
-export async function runBackupJob(ctx: Pick<JobContext, "db" | "data" | "attempt" | "maxAttempts" | "runId">): Promise<Record<string, unknown>> {
+export async function runBackupJob(
+  ctx: Pick<JobContext, "db" | "data" | "attempt" | "maxAttempts" | "runId">,
+): Promise<Record<string, unknown>> {
   const id = String(ctx.data["backup_id"] ?? "");
-  const [row] = await ctx.db.select().from(exportsTable).where(and(eq(exportsTable.id, id), eq(exportsTable.path, BACKUP_PATH))).limit(1);
+  const [row] = await ctx.db
+    .select()
+    .from(exportsTable)
+    .where(and(eq(exportsTable.id, id), eq(exportsTable.path, BACKUP_PATH)))
+    .limit(1);
   if (!row) return { skipped: true, reason: "backup not found" };
   if (row.status === "DONE") return { skipped: true, reason: "already done" };
   const f = facts(row);
   await ctx.db.update(exportsTable).set({ status: "RUNNING", error: null }).where(eq(exportsTable.id, row.id));
   try {
-    const [company] = await ctx.db.select({ name: schema.companies.name }).from(schema.companies).where(eq(schema.companies.id, row.companyId)).limit(1);
+    const [company] = await ctx.db
+      .select({ name: schema.companies.name })
+      .from(schema.companies)
+      .where(eq(schema.companies.id, row.companyId))
+      .limit(1);
     const now = new Date();
     const fileName = fileNameFor(now, row.id);
     const key = `backups/${row.companyId}/${fileName}`;
     const built = await withTempDir("backup", async (dir) => {
       const file = join(dir, fileName);
-      const manifest = await writeBackupArchive(ctx.db, file, { companyId: row.companyId, companyName: company?.name ?? null, includeSensitive: f.include_sensitive, now });
+      const manifest = await writeBackupArchive(ctx.db, file, {
+        companyId: row.companyId,
+        companyName: company?.name ?? null,
+        includeSensitive: f.include_sensitive,
+        now,
+      });
       const size = (await stat(file)).size;
       const sha256 = await fileSha256(file);
       await storeFile(documentStorage(), key, file, "application/zip");
       return { manifest, size, sha256 };
     });
     const done = new Date();
-    const next: BackupFacts = { ...f, file_name: fileName, size_bytes: built.size, table_count: built.manifest.table_count, sha256: built.sha256 };
+    const next: BackupFacts = {
+      ...f,
+      file_name: fileName,
+      size_bytes: built.size,
+      table_count: built.manifest.table_count,
+      sha256: built.sha256,
+    };
     await ctx.db.transaction(async (tx) => {
-      await tx.update(exportsTable).set({ status: "DONE", storageKey: key, rowCount: built.manifest.row_count, finishedAt: done, expiresAt: new Date(done.getTime() + BACKUP_TTL_SECONDS * 1000), query: next as unknown as Record<string, never>, error: null }).where(eq(exportsTable.id, row.id));
-      await notify(tx, { companyId: row.companyId, recipients: [{ type: "STAFF", id: row.userId }], type: "EXPORT_READY", title: `Backup ready: ${fileName}`, body: `${built.manifest.row_count} rows in ${built.manifest.table_count} tables`, entityType: "export", entityId: row.id, link: "/admin/backups" });
+      await tx
+        .update(exportsTable)
+        .set({
+          status: "DONE",
+          storageKey: key,
+          rowCount: built.manifest.row_count,
+          finishedAt: done,
+          expiresAt: new Date(done.getTime() + BACKUP_TTL_SECONDS * 1000),
+          query: next as unknown as Record<string, never>,
+          error: null,
+        })
+        .where(eq(exportsTable.id, row.id));
+      await notify(tx, {
+        companyId: row.companyId,
+        recipients: [{ type: "STAFF", id: row.userId }],
+        type: "EXPORT_READY",
+        title: `Backup ready: ${fileName}`,
+        body: `${built.manifest.row_count} rows in ${built.manifest.table_count} tables`,
+        entityType: "export",
+        entityId: row.id,
+        link: "/admin/backups",
+      });
     });
-    return { backup_id: row.id, file_name: fileName, size_bytes: built.size, row_count: built.manifest.row_count, table_count: built.manifest.table_count };
+    return {
+      backup_id: row.id,
+      file_name: fileName,
+      size_bytes: built.size,
+      row_count: built.manifest.row_count,
+      table_count: built.manifest.table_count,
+    };
   } catch (err) {
     const final = ctx.attempt >= ctx.maxAttempts;
-    await ctx.db.update(exportsTable).set({ status: final ? "FAILED" : "QUEUED", error: (err as Error).message.slice(0, 1000), ...(final ? { finishedAt: new Date(), expiresAt: new Date(Date.now() + BACKUP_TTL_SECONDS * 1000) } : {}) }).where(eq(exportsTable.id, row.id));
+    await ctx.db
+      .update(exportsTable)
+      .set({
+        status: final ? "FAILED" : "QUEUED",
+        error: (err as Error).message.slice(0, 1000),
+        ...(final ? { finishedAt: new Date(), expiresAt: new Date(Date.now() + BACKUP_TTL_SECONDS * 1000) } : {}),
+      })
+      .where(eq(exportsTable.id, row.id));
     throw err;
   }
 }
@@ -467,39 +651,97 @@ export function registerBackupRoutes(app: FastifyInstance): void {
   registerJob("BACKUP_EXPORT", async (ctx) => runBackupJob(ctx));
 
   route(app, {
-    method: "POST", url: "/admin/backup", permission: "admin.tools", idempotent: true,
-    schema: { body: AdminBackupRequestSchema, response: { 202: AdminBackupQueuedResponseSchema }, summary: "Queue a full backup export (Super Admin): job BACKUP_EXPORT streams every table into a ZIP (NDJSON + manifest + RESTORE.md); poll GET /admin/backups", tags: ["admin"] },
+    method: "POST",
+    url: "/admin/backup",
+    permission: "admin.tools",
+    idempotent: true,
+    schema: {
+      body: AdminBackupRequestSchema,
+      response: { 202: AdminBackupQueuedResponseSchema },
+      summary:
+        "Queue a full backup export (Super Admin): job BACKUP_EXPORT streams every table into a ZIP (NDJSON + manifest + RESTORE.md); poll GET /admin/backups",
+      tags: ["admin"],
+    },
     handler: async (req, reply) => {
       const user = staff(req);
       requireSuperAdmin(user);
       // one backup per company at a time: each one streams every table in a long repeatable-read snapshot
-      const [busy] = await app.db.select({ id: exportsTable.id }).from(exportsTable).where(and(
-        eq(exportsTable.companyId, user.companyId), eq(exportsTable.path, BACKUP_PATH), inArray(exportsTable.status, ["QUEUED", "RUNNING"]),
-        sql`${exportsTable.createdAt} > now() - interval '6 hours'`,
-      )).limit(1);
-      if (busy) throw ApiError.conflict("JOB_ALREADY_RUNNING", "A backup is already queued or running; wait for it to finish", { backup_id: busy.id });
+      const [busy] = await app.db
+        .select({ id: exportsTable.id })
+        .from(exportsTable)
+        .where(
+          and(
+            eq(exportsTable.companyId, user.companyId),
+            eq(exportsTable.path, BACKUP_PATH),
+            inArray(exportsTable.status, ["QUEUED", "RUNNING"]),
+            sql`${exportsTable.createdAt} > now() - interval '6 hours'`,
+          ),
+        )
+        .limit(1);
+      if (busy)
+        throw ApiError.conflict("JOB_ALREADY_RUNNING", "A backup is already queued or running; wait for it to finish", {
+          backup_id: busy.id,
+        });
       const id = randomUUID();
       const runId = randomUUID();
-      const f: BackupFacts = { kind: "backup", include_sensitive: req.body.include_sensitive, generated_by: user.name, run_id: runId };
-      const [row] = await app.db.insert(exportsTable).values({ id, companyId: user.companyId, userId: user.id, path: BACKUP_PATH, query: f as unknown as Record<string, never>, status: "QUEUED" }).returning();
+      const f: BackupFacts = {
+        kind: "backup",
+        include_sensitive: req.body.include_sensitive,
+        generated_by: user.name,
+        run_id: runId,
+      };
+      const [row] = await app.db
+        .insert(exportsTable)
+        .values({
+          id,
+          companyId: user.companyId,
+          userId: user.id,
+          path: BACKUP_PATH,
+          query: f as unknown as Record<string, never>,
+          status: "QUEUED",
+        })
+        .returning();
       try {
-        await enqueueJobWithin(app.jobQueue(), "BACKUP_EXPORT", { backup_id: id, company_id: user.companyId }, { runId });
+        await enqueueJobWithin(
+          app.jobQueue(),
+          "BACKUP_EXPORT",
+          { backup_id: id, company_id: user.companyId },
+          { runId },
+        );
       } catch (err) {
-        await app.db.update(exportsTable).set({ status: "FAILED", error: "could not enqueue the backup job", finishedAt: new Date() }).where(eq(exportsTable.id, id));
+        await app.db
+          .update(exportsTable)
+          .set({ status: "FAILED", error: "could not enqueue the backup job", finishedAt: new Date() })
+          .where(eq(exportsTable.id, id));
         req.log.error({ err }, "backup: enqueue failed");
         throw ApiError.unavailable("The job queue is not reachable; retry shortly");
       }
       const meta = adminMeta(req);
       await app.db.transaction(async (tx) => {
-        await writeAudit(tx, { companyId: user.companyId, actor: meta.actor, ip: meta.ip, requestId: meta.requestId, action: "backup.export", entityType: "company", entityId: user.companyId, after: { backup_id: id, include_sensitive: req.body.include_sensitive, run_id: runId, status: "QUEUED" } });
+        await writeAudit(tx, {
+          companyId: user.companyId,
+          actor: meta.actor,
+          ip: meta.ip,
+          requestId: meta.requestId,
+          action: "backup.export",
+          entityType: "company",
+          entityId: user.companyId,
+          after: { backup_id: id, include_sensitive: req.body.include_sensitive, run_id: runId, status: "QUEUED" },
+        });
       });
       return reply.status(202).send(toBackupRow(row!));
     },
   });
 
   route(app, {
-    method: "GET", url: "/admin/backups", permission: "admin.tools",
-    schema: { response: { 200: AdminBackupListResponseSchema }, summary: "Backups of the company with their status (QUEUED/RUNNING/DONE/FAILED; files kept 24 h)", tags: ["admin"] },
+    method: "GET",
+    url: "/admin/backups",
+    permission: "admin.tools",
+    schema: {
+      response: { 200: AdminBackupListResponseSchema },
+      summary: "Backups of the company with their status (QUEUED/RUNNING/DONE/FAILED; files kept 24 h)",
+      tags: ["admin"],
+    },
     handler: async (req) => {
       const user = staff(req);
       requireSuperAdmin(user);
@@ -508,28 +750,62 @@ export function registerBackupRoutes(app: FastifyInstance): void {
   });
 
   route(app, {
-    method: "POST", url: "/admin/backups/:id/link", permission: "admin.tools",
-    schema: { params: idParams, response: { 200: AdminBackupLinkResponseSchema }, summary: "Signed 15-minute download link of a finished backup (409 EXPORT_NOT_READY while queued/running/failed)", tags: ["admin"] },
+    method: "POST",
+    url: "/admin/backups/:id/link",
+    permission: "admin.tools",
+    schema: {
+      params: idParams,
+      response: { 200: AdminBackupLinkResponseSchema },
+      summary: "Signed 15-minute download link of a finished backup (409 EXPORT_NOT_READY while queued/running/failed)",
+      tags: ["admin"],
+    },
     handler: async (req) => {
       const user = staff(req);
       requireSuperAdmin(user);
-      const [r] = await app.db.select().from(exportsTable).where(and(eq(exportsTable.id, req.params.id), eq(exportsTable.path, BACKUP_PATH), eq(exportsTable.companyId, user.companyId))).limit(1);
+      const [r] = await app.db
+        .select()
+        .from(exportsTable)
+        .where(
+          and(
+            eq(exportsTable.id, req.params.id),
+            eq(exportsTable.path, BACKUP_PATH),
+            eq(exportsTable.companyId, user.companyId),
+          ),
+        )
+        .limit(1);
       if (!r) throw ApiError.notFound("Backup");
-      if (r.status !== "DONE") throw ApiError.conflict("EXPORT_NOT_READY", `Backup is ${r.status.toLowerCase()}`, { status: r.status });
+      if (r.status !== "DONE")
+        throw ApiError.conflict("EXPORT_NOT_READY", `Backup is ${r.status.toLowerCase()}`, { status: r.status });
       const live = await loadDoneBackup(app.db, r.id, user.companyId);
       if (!live) throw ApiError.notFound("Backup");
       const row = toBackupRow(live);
       const meta = adminMeta(req);
       await app.db.transaction(async (tx) => {
-        await writeAudit(tx, { companyId: user.companyId, actor: meta.actor, ip: meta.ip, requestId: meta.requestId, action: "backup.link", entityType: "company", entityId: user.companyId, after: { backup_id: r.id } });
+        await writeAudit(tx, {
+          companyId: user.companyId,
+          actor: meta.actor,
+          ip: meta.ip,
+          requestId: meta.requestId,
+          action: "backup.link",
+          entityType: "company",
+          entityId: user.companyId,
+          after: { backup_id: r.id },
+        });
       });
       return { ...backupLink(row), file_name: row.file_name ?? "backup.zip", size_bytes: row.size_bytes };
     },
   });
 
   route(app, {
-    method: "GET", url: "/admin/backups/download/:token", public: true,
-    schema: { params: z.object({ token: z.string().min(1).max(100) }), response: { 200: z.any() }, summary: "Stream a backup through its signed 15-minute link (forged/expired → 404)", tags: ["admin"] },
+    method: "GET",
+    url: "/admin/backups/download/:token",
+    public: true,
+    schema: {
+      params: z.object({ token: z.string().min(1).max(100) }),
+      response: { 200: z.any() },
+      summary: "Stream a backup through its signed 15-minute link (forged/expired → 404)",
+      tags: ["admin"],
+    },
     handler: async (req, reply) => {
       const id = verifyBackupToken(req.params.token);
       if (!id) throw ApiError.notFound("Backup");

@@ -1,12 +1,36 @@
 import { Camera, CheckCircle2, Circle, Clock3, Eye, EyeOff, Globe, RotateCcw, Upload } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { STAGE_STATUS_LABELS, type BlockConstructionResponse, type BlockStageRow, type ConstructionStatusUpdateResponse, type ConstructionUndoResponse, type DocumentRow, type StagePhotoRow } from "@kkt/contracts";
-import { Badge, Button, Checkbox, ConfirmDialog, DateInput, ErrorState, FieldWrapper, ProgressRing, Select, SimpleDialog, Skeleton, Switch, Textarea, Timeline, type TimelineItem } from "@/components/ui";
+import { useMemo, useState } from "react";
+import {
+  STAGE_STATUS_LABELS,
+  type BlockConstructionResponse,
+  type BlockStageRow,
+  type ConstructionStatusUpdateResponse,
+  type ConstructionUndoResponse,
+  type DocumentRow,
+  type StagePhotoRow,
+} from "@kkt/contracts";
+import {
+  Badge,
+  Button,
+  Checkbox,
+  ConfirmDialog,
+  DateInput,
+  ErrorState,
+  FieldWrapper,
+  ProgressRing,
+  Select,
+  SimpleDialog,
+  Skeleton,
+  Switch,
+  Textarea,
+  Timeline,
+  type TimelineItem,
+} from "@/components/ui";
 import { api, isApiClientError, type ApiClientError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { formatDate, formatDateTime, formatNumber, todayIST } from "@/lib/format";
 import { useMutationWithToast } from "@/lib/queries";
-import { cn } from "@/lib/utils";
+import { cn, useOnChange } from "@/lib/utils";
 import { UploadDocumentDialog } from "./DocumentsPanel";
 import { BLOCKS_PATH, inventoryKeys, PROJECTS_PATH, useBlockConstruction } from "./api";
 import { Notice } from "./components";
@@ -29,7 +53,13 @@ function blockingPayments(error: ApiClientError): BlockingPayment[] {
   return raw.flatMap((item) => {
     if (typeof item !== "object" || item === null) return [];
     const record = item as Record<string, unknown>;
-    return [{ receipt_number: String(record.receipt_number ?? ""), payment_date: String(record.payment_date ?? ""), demand_number: String(record.demand_number ?? "") }];
+    return [
+      {
+        receipt_number: String(record.receipt_number ?? ""),
+        payment_date: String(record.payment_date ?? ""),
+        demand_number: String(record.demand_number ?? ""),
+      },
+    ];
   });
 }
 
@@ -46,19 +76,36 @@ export function ConstructionPanel({ blockId, compact = false }: ConstructionPane
 
   const invalidate = [inventoryKeys.blockConstruction(blockId), [BLOCKS_PATH], [PROJECTS_PATH]];
 
-  const undo = useMutationWithToast<ConstructionUndoResponse, { stage: BlockStageRow; reason: string; version: number }>({
-    mutationFn: ({ stage, reason, version }) => api.post<ConstructionUndoResponse>(`${BLOCKS_PATH}/${blockId}/construction/undo`, { version, stage_id: stage.stage_id, reason }, { version }),
-    successMessage: (result) => `Stage undone${result.voided_demand_numbers.length ? ` · ${result.voided_demand_numbers.length} demands voided` : ""}`,
+  const undo = useMutationWithToast<
+    ConstructionUndoResponse,
+    { stage: BlockStageRow; reason: string; version: number }
+  >({
+    mutationFn: ({ stage, reason, version }) =>
+      api.post<ConstructionUndoResponse>(
+        `${BLOCKS_PATH}/${blockId}/construction/undo`,
+        { version, stage_id: stage.stage_id, reason },
+        { version },
+      ),
+    successMessage: (result) =>
+      `Stage undone${result.voided_demand_numbers.length ? ` · ${result.voided_demand_numbers.length} demands voided` : ""}`,
     invalidate,
     entityLabel: "Construction status",
-    errorMessage: (error) => (error.code === "UNDO_BLOCKED" ? "Undo is blocked by payments made after the demand." : error.message),
+    errorMessage: (error) =>
+      error.code === "UNDO_BLOCKED" ? "Undo is blocked by payments made after the demand." : error.message,
     onError: (error) => {
       if (error.code === "UNDO_BLOCKED") setUndoBlocked(blockingPayments(error));
     },
   });
 
   if (construction.isPending) return <Skeleton className="h-72 rounded-lg" />;
-  if (construction.isError) return <ErrorState error={construction.error} onRetry={() => void construction.refetch()} className="rounded-lg border border-border bg-card" />;
+  if (construction.isError)
+    return (
+      <ErrorState
+        error={construction.error}
+        onRetry={() => void construction.refetch()}
+        className="rounded-lg border border-border bg-card"
+      />
+    );
   const data = construction.data;
   const stages = [...data.stages].sort((a, b) => a.sort_order - b.sort_order);
   const completed = stages.filter((stage) => stage.status === "COMPLETED");
@@ -71,7 +118,11 @@ export function ConstructionPanel({ blockId, compact = false }: ConstructionPane
       <span className="flex flex-wrap items-center gap-2">
         <span>{stage.name}</span>
         {stage.is_possession && <Badge variant="gold">Possession</Badge>}
-        <Badge variant={stage.status === "COMPLETED" ? "success" : stage.status === "IN_PROGRESS" ? "warning" : "neutral"}>{STAGE_STATUS_LABELS[stage.status]}</Badge>
+        <Badge
+          variant={stage.status === "COMPLETED" ? "success" : stage.status === "IN_PROGRESS" ? "warning" : "neutral"}
+        >
+          {STAGE_STATUS_LABELS[stage.status]}
+        </Badge>
       </span>
     ),
     description: (
@@ -93,12 +144,26 @@ export function ConstructionPanel({ blockId, compact = false }: ConstructionPane
       <div className="space-y-2">
         {stage.notes && <p className="whitespace-pre-wrap text-xs text-ink-muted">{stage.notes}</p>}
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="xs" leftIcon={Camera} onClick={() => setPhotosFor(stage)} data-testid={`stage-photos-${stage.id}`}>
+          <Button
+            variant="outline"
+            size="xs"
+            leftIcon={Camera}
+            onClick={() => setPhotosFor(stage)}
+            data-testid={`stage-photos-${stage.id}`}
+          >
             Photos
-            <span className="money rounded-full bg-navy-50 px-1.5 text-[10px] font-semibold">{stage.photos.length}</span>
+            <span className="money rounded-full bg-navy-50 px-1.5 text-[10px] font-semibold">
+              {stage.photos.length}
+            </span>
           </Button>
           {canUndo && stage.can_undo && stage.status === "COMPLETED" && lastCompleted?.id === stage.id && (
-            <Button variant="danger-outline" size="xs" leftIcon={RotateCcw} onClick={() => setUndoTarget(stage)} data-testid={`stage-undo-${stage.id}`}>
+            <Button
+              variant="danger-outline"
+              size="xs"
+              leftIcon={RotateCcw}
+              onClick={() => setUndoTarget(stage)}
+              data-testid={`stage-undo-${stage.id}`}
+            >
               Undo
             </Button>
           )}
@@ -106,12 +171,33 @@ export function ConstructionPanel({ blockId, compact = false }: ConstructionPane
         {stage.photos.length > 0 && (
           <ul className="flex flex-wrap gap-1.5">
             {stage.photos.slice(0, 6).map((photo) => (
-              <li key={photo.id} className="relative size-14 overflow-hidden rounded-sm border border-border bg-navy-50">
-                {photo.thumb_url ? <img src={photo.thumb_url} alt={photo.caption ?? ""} className="size-full object-cover" loading="lazy" /> : <Camera className="m-auto size-4 text-ink-subtle" aria-hidden="true" />}
-                {photo.show_on_website && <Globe className="absolute bottom-0.5 right-0.5 size-3 rounded-full bg-card p-px text-navy-700" aria-label="On website" />}
+              <li
+                key={photo.id}
+                className="relative size-14 overflow-hidden rounded-sm border border-border bg-navy-50"
+              >
+                {photo.thumb_url ? (
+                  <img
+                    src={photo.thumb_url}
+                    alt={photo.caption ?? ""}
+                    className="size-full object-cover"
+                    loading="lazy"
+                  />
+                ) : (
+                  <Camera className="m-auto size-4 text-ink-subtle" aria-hidden="true" />
+                )}
+                {photo.show_on_website && (
+                  <Globe
+                    className="absolute bottom-0.5 right-0.5 size-3 rounded-full bg-card p-px text-navy-700"
+                    aria-label="On website"
+                  />
+                )}
               </li>
             ))}
-            {stage.photos.length > 6 && <li className="money flex size-14 items-center justify-center rounded-sm border border-dashed border-border text-xs text-ink-subtle">+{stage.photos.length - 6}</li>}
+            {stage.photos.length > 6 && (
+              <li className="money flex size-14 items-center justify-center rounded-sm border border-dashed border-border text-xs text-ink-subtle">
+                +{stage.photos.length - 6}
+              </li>
+            )}
           </ul>
         )}
       </div>
@@ -122,13 +208,27 @@ export function ConstructionPanel({ blockId, compact = false }: ConstructionPane
     <div className="space-y-4" data-testid="construction-panel">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card p-4 shadow-card">
         <div className="flex items-center gap-3">
-          {!compact && <ProgressRing value={data.construction_percent} size={56} strokeWidth={5} tone="gold" aria-label="Construction progress" />}
+          {!compact && (
+            <ProgressRing
+              value={data.construction_percent}
+              size={56}
+              strokeWidth={5}
+              tone="gold"
+              aria-label="Construction progress"
+            />
+          )}
           <div className="leading-tight">
             <p className="label-caps">Construction status</p>
             <p className="text-sm font-semibold text-navy-950">
               {completed.length}/{stages.length} stages complete{lastCompleted ? ` · ${lastCompleted.name}` : ""}
             </p>
-            <p className="text-xs text-ink-subtle">{next ? `Up next: ${next.name}` : stages.length ? "All stages complete" : "No stage sequence on this block"}</p>
+            <p className="text-xs text-ink-subtle">
+              {next
+                ? `Up next: ${next.name}`
+                : stages.length
+                  ? "All stages complete"
+                  : "No stage sequence on this block"}
+            </p>
           </div>
         </div>
         {canUpdate && next && (
@@ -138,9 +238,21 @@ export function ConstructionPanel({ blockId, compact = false }: ConstructionPane
         )}
       </div>
 
-      {stages.length === 0 ? <Notice tone="warning">This block has no construction stage sequence. Set a sequence on the project before creating blocks.</Notice> : <Timeline items={items} absolute className="rounded-lg border border-border bg-card p-4 shadow-card" />}
+      {stages.length === 0 ? (
+        <Notice tone="warning">
+          This block has no construction stage sequence. Set a sequence on the project before creating blocks.
+        </Notice>
+      ) : (
+        <Timeline items={items} absolute className="rounded-lg border border-border bg-card p-4 shadow-card" />
+      )}
 
-      <UpdateStatusDialog open={updateOpen} onOpenChange={setUpdateOpen} blockId={blockId} data={data} stages={stages} />
+      <UpdateStatusDialog
+        open={updateOpen}
+        onOpenChange={setUpdateOpen}
+        blockId={blockId}
+        data={data}
+        stages={stages}
+      />
 
       <ConfirmDialog
         open={undoTarget !== null}
@@ -155,7 +267,14 @@ export function ConstructionPanel({ blockId, compact = false }: ConstructionPane
         }}
       />
 
-      <SimpleDialog open={undoBlocked !== null} onOpenChange={(open) => !open && setUndoBlocked(null)} title="Undo blocked" description="A payment dated on or after one of this stage's demands exists. Reverse those payments first." size="sm" footer={<Button onClick={() => setUndoBlocked(null)}>Close</Button>}>
+      <SimpleDialog
+        open={undoBlocked !== null}
+        onOpenChange={(open) => !open && setUndoBlocked(null)}
+        title="Undo blocked"
+        description="A payment dated on or after one of this stage's demands exists. Reverse those payments first."
+        size="sm"
+        footer={<Button onClick={() => setUndoBlocked(null)}>Close</Button>}
+      >
         {undoBlocked && undoBlocked.length > 0 ? (
           <table className="w-full text-sm">
             <thead>
@@ -180,7 +299,15 @@ export function ConstructionPanel({ blockId, compact = false }: ConstructionPane
         )}
       </SimpleDialog>
 
-      {photosFor && <StagePhotosDialog open onOpenChange={(open) => !open && setPhotosFor(null)} blockId={blockId} stage={stages.find((stage) => stage.id === photosFor.id) ?? photosFor} canUpdate={canUpdate} />}
+      {photosFor && (
+        <StagePhotosDialog
+          open
+          onOpenChange={(open) => !open && setPhotosFor(null)}
+          blockId={blockId}
+          stage={stages.find((stage) => stage.id === photosFor.id) ?? photosFor}
+          canUpdate={canUpdate}
+        />
+      )}
     </div>
   );
 }
@@ -206,16 +333,16 @@ function UpdateStatusDialog({ open, onOpenChange, blockId, data, stages }: Updat
   const [notify, setNotify] = useState(true);
   const [result, setResult] = useState<ConstructionStatusUpdateResponse | null>(null);
 
-  useEffect(() => {
-    if (!open) return;
+  // Re-seed when the dialog opens (the first pending stage is read at that moment only).
+  useOnChange(open, (isOpen) => {
+    if (!isOpen) return;
     setTargetId(pending[0]?.stage_id ?? null);
     setCompletedOn(todayIST());
     setDates({});
     setNotes("");
     setNotify(true);
     setResult(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  });
 
   const target = stages.find((stage) => stage.stage_id === targetId) ?? null;
   const intermediate = target ? pending.filter((stage) => stage.sort_order < target.sort_order) : [];
@@ -238,11 +365,19 @@ function UpdateStatusDialog({ open, onOpenChange, blockId, data, stages }: Updat
       for (const stage of intermediate) intermediateDates[stage.stage_id] = dateFor(stage);
       return api.post<ConstructionStatusUpdateResponse>(
         `${BLOCKS_PATH}/${blockId}/construction/status`,
-        { version: data.version, stage_id: target.stage_id, completed_on: completedOn, intermediate_dates: intermediateDates, notes: notes.trim() || null, notify_buyers: notify },
+        {
+          version: data.version,
+          stage_id: target.stage_id,
+          completed_on: completedOn,
+          intermediate_dates: intermediateDates,
+          notes: notes.trim() || null,
+          notify_buyers: notify,
+        },
         { version: data.version },
       );
     },
-    successMessage: (response) => `${response.completed_stage_ids.length} ${response.completed_stage_ids.length === 1 ? "stage" : "stages"} marked complete${response.demands_raised ? ` · ${response.demands_raised} demands raised` : ""}`,
+    successMessage: (response) =>
+      `${response.completed_stage_ids.length} ${response.completed_stage_ids.length === 1 ? "stage" : "stages"} marked complete${response.demands_raised ? ` · ${response.demands_raised} demands raised` : ""}`,
     invalidate: [inventoryKeys.blockConstruction(blockId), [BLOCKS_PATH], [PROJECTS_PATH]],
     entityLabel: "Construction status",
     onSuccess: (response) => setResult(response),
@@ -262,7 +397,12 @@ function UpdateStatusDialog({ open, onOpenChange, blockId, data, stages }: Updat
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={update.isPending}>
               Cancel
             </Button>
-            <Button loading={update.isPending} disabled={!target || problems.length > 0} onClick={() => update.mutate()} data-testid="construction-update-submit">
+            <Button
+              loading={update.isPending}
+              disabled={!target || problems.length > 0}
+              onClick={() => update.mutate()}
+              data-testid="construction-update-submit"
+            >
               {intermediate.length > 0 ? `Complete ${intermediate.length + 1} stages` : "Mark complete"}
             </Button>
           </>
@@ -272,7 +412,9 @@ function UpdateStatusDialog({ open, onOpenChange, blockId, data, stages }: Updat
       {result ? (
         <div className="space-y-3">
           <Notice tone="success">
-            <p className="font-semibold">Status updated — construction now {Math.round(result.construction_percent)}%.</p>
+            <p className="font-semibold">
+              Status updated — construction now {Math.round(result.construction_percent)}%.
+            </p>
           </Notice>
           <dl className="grid grid-cols-3 gap-2 text-center">
             <div className="rounded-md bg-surface p-2">
@@ -288,15 +430,36 @@ function UpdateStatusDialog({ open, onOpenChange, blockId, data, stages }: Updat
               <dd className="money text-lg font-bold">{result.buyers_notified}</dd>
             </div>
           </dl>
-          {result.demand_numbers.length > 0 && <p className="font-mono text-xs text-ink-muted">{result.demand_numbers.join(", ")}</p>}
+          {result.demand_numbers.length > 0 && (
+            <p className="font-mono text-xs text-ink-muted">{result.demand_numbers.join(", ")}</p>
+          )}
         </div>
       ) : (
         <div className="space-y-4">
           <FieldWrapper label="Stage reached" required>
-            {(control) => <Select id={control.id} value={targetId} onValueChange={setTargetId} options={pending.map((stage) => ({ value: stage.stage_id, label: stage.name, description: stage.status === "IN_PROGRESS" ? "In progress" : undefined }))} data-testid="construction-target" />}
+            {(control) => (
+              <Select
+                id={control.id}
+                value={targetId}
+                onValueChange={setTargetId}
+                options={pending.map((stage) => ({
+                  value: stage.stage_id,
+                  label: stage.name,
+                  description: stage.status === "IN_PROGRESS" ? "In progress" : undefined,
+                }))}
+                data-testid="construction-target"
+              />
+            )}
           </FieldWrapper>
           <FieldWrapper label="Completed on" required>
-            {(control) => <DateInput id={control.id} value={completedOn} onChange={(value) => setCompletedOn(value ?? todayIST())} max={todayIST()} />}
+            {(control) => (
+              <DateInput
+                id={control.id}
+                value={completedOn}
+                onChange={(value) => setCompletedOn(value ?? todayIST())}
+                max={todayIST()}
+              />
+            )}
           </FieldWrapper>
           {intermediate.length > 0 && (
             <div className="space-y-2 rounded-md border border-status-hold-border bg-warning-bg/40 p-3">
@@ -307,7 +470,13 @@ function UpdateStatusDialog({ open, onOpenChange, blockId, data, stages }: Updat
                 {intermediate.map((stage) => (
                   <li key={stage.id} className="grid grid-cols-[1fr_11rem] items-center gap-2 text-sm">
                     <span className="truncate">{stage.name}</span>
-                    <DateInput aria-label={`Completion date for ${stage.name}`} value={dateFor(stage)} onChange={(value) => setDates((prev) => ({ ...prev, [stage.stage_id]: value ?? completedOn }))} max={completedOn} className="h-12 text-xs sm:h-8" />
+                    <DateInput
+                      aria-label={`Completion date for ${stage.name}`}
+                      value={dateFor(stage)}
+                      onChange={(value) => setDates((prev) => ({ ...prev, [stage.stage_id]: value ?? completedOn }))}
+                      max={completedOn}
+                      className="h-12 text-xs sm:h-8"
+                    />
                   </li>
                 ))}
               </ul>
@@ -320,8 +489,24 @@ function UpdateStatusDialog({ open, onOpenChange, blockId, data, stages }: Updat
               )}
             </div>
           )}
-          <FieldWrapper label="Notes">{(control) => <Textarea id={control.id} value={notes} onChange={(event) => setNotes(event.target.value)} rows={2} maxLength={1000} placeholder="Site notes visible to staff (and buyers in their timeline)" />}</FieldWrapper>
-          <Switch checked={notify} onCheckedChange={setNotify} label="Notify buyers" description="Buyers with installments on these stages get a demand and a notification" />
+          <FieldWrapper label="Notes">
+            {(control) => (
+              <Textarea
+                id={control.id}
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                rows={2}
+                maxLength={1000}
+                placeholder="Site notes visible to staff (and buyers in their timeline)"
+              />
+            )}
+          </FieldWrapper>
+          <Switch
+            checked={notify}
+            onCheckedChange={setNotify}
+            label="Notify buyers"
+            description="Buyers with installments on these stages get a demand and a notification"
+          />
         </div>
       )}
     </SimpleDialog>
@@ -349,31 +534,74 @@ function StagePhotosDialog({ open, onOpenChange, blockId, stage, canUpdate }: St
   const photosPath = `${BLOCKS_PATH}/${blockId}/construction/${stage.id}/photos`;
 
   const attach = useMutationWithToast<StagePhotoRow, DocumentRow>({
-    mutationFn: (document) => api.post<StagePhotoRow>(photosPath, { document_id: document.id, caption: caption.trim() || null, visible_to_buyers: visibleToBuyers, show_on_website: showOnWebsite, sort_order: stage.photos.length }),
+    mutationFn: (document) =>
+      api.post<StagePhotoRow>(photosPath, {
+        document_id: document.id,
+        caption: caption.trim() || null,
+        visible_to_buyers: visibleToBuyers,
+        show_on_website: showOnWebsite,
+        sort_order: stage.photos.length,
+      }),
     successMessage: "Photo added to the stage",
     invalidate,
     onSuccess: () => setCaption(""),
   });
 
-  const toggle = useMutationWithToast<StagePhotoRow, { photo: StagePhotoRow; patch: Partial<Pick<StagePhotoRow, "visible_to_buyers" | "show_on_website">> }>({
-    // Version policy: the row version goes as If-Match (the strict body takes no `version`).
-    mutationFn: ({ photo, patch }) => api.patch<StagePhotoRow>(`/construction/photos/${photo.id}`, patch, photo.version !== undefined ? { version: photo.version } : undefined),
+  const toggle = useMutationWithToast<
+    StagePhotoRow,
+    { photo: StagePhotoRow; patch: Partial<Pick<StagePhotoRow, "visible_to_buyers" | "show_on_website">> }
+  >({
+    // Version policy: the row version goes as If-Match (required; a stale one is 409 VERSION_CONFLICT).
+    mutationFn: ({ photo, patch }) =>
+      api.patch<StagePhotoRow>(`/construction/photos/${photo.id}`, patch, { version: photo.version }),
     successMessage: "Photo updated",
     invalidate,
   });
 
   return (
-    <SimpleDialog open={open} onOpenChange={onOpenChange} title={`Photos · ${stage.name}`} description="Buyers see photos flagged visible-to-buyers in their own tower timeline; the website shows those flagged for it." size="lg" footer={<Button onClick={() => onOpenChange(false)}>Close</Button>}>
+    <SimpleDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={`Photos · ${stage.name}`}
+      description="Buyers see photos flagged visible-to-buyers in their own tower timeline; the website shows those flagged for it."
+      size="lg"
+      footer={<Button onClick={() => onOpenChange(false)}>Close</Button>}
+    >
       <div className="space-y-4">
         {canUpdate && (
           <div className="space-y-3 rounded-md border border-border bg-surface/60 p-3">
             <p className="text-sm font-semibold text-navy-950">Add a photo</p>
-            <FieldWrapper label="Caption">{(control) => <Textarea id={control.id} value={caption} onChange={(event) => setCaption(event.target.value)} rows={1} maxLength={200} placeholder="Slab casting, east wing" />}</FieldWrapper>
+            <FieldWrapper label="Caption">
+              {(control) => (
+                <Textarea
+                  id={control.id}
+                  value={caption}
+                  onChange={(event) => setCaption(event.target.value)}
+                  rows={1}
+                  maxLength={200}
+                  placeholder="Slab casting, east wing"
+                />
+              )}
+            </FieldWrapper>
             <div className="flex flex-wrap gap-4">
-              <Checkbox checked={visibleToBuyers} onCheckedChange={(checked) => setVisibleToBuyers(checked === true)} label="Visible to buyers" />
-              <Checkbox checked={showOnWebsite} onCheckedChange={(checked) => setShowOnWebsite(checked === true)} label="Show on website" />
+              <Checkbox
+                checked={visibleToBuyers}
+                onCheckedChange={(checked) => setVisibleToBuyers(checked === true)}
+                label="Visible to buyers"
+              />
+              <Checkbox
+                checked={showOnWebsite}
+                onCheckedChange={(checked) => setShowOnWebsite(checked === true)}
+                label="Show on website"
+              />
             </div>
-            <Button size="sm" leftIcon={Upload} onClick={() => setUploadOpen(true)} loading={attach.isPending} data-testid="stage-photo-upload-btn">
+            <Button
+              size="sm"
+              leftIcon={Upload}
+              onClick={() => setUploadOpen(true)}
+              loading={attach.isPending}
+              data-testid="stage-photo-upload-btn"
+            >
               Upload & attach
             </Button>
           </div>
@@ -386,15 +614,53 @@ function StagePhotosDialog({ open, onOpenChange, blockId, stage, canUpdate }: St
               .sort((a, b) => a.sort_order - b.sort_order)
               .map((photo) => (
                 <li key={photo.id} className="overflow-hidden rounded-md border border-border bg-card">
-                  <div className="aspect-[4/3] bg-navy-50">{photo.medium_url || photo.thumb_url ? <img src={photo.medium_url ?? photo.thumb_url ?? ""} alt={photo.caption ?? ""} className="size-full object-cover" loading="lazy" /> : <Camera className="m-auto size-6 text-ink-subtle" aria-hidden="true" />}</div>
+                  <div className="aspect-[4/3] bg-navy-50">
+                    {photo.medium_url || photo.thumb_url ? (
+                      <img
+                        src={photo.medium_url ?? photo.thumb_url ?? ""}
+                        alt={photo.caption ?? ""}
+                        className="size-full object-cover"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <Camera className="m-auto size-6 text-ink-subtle" aria-hidden="true" />
+                    )}
+                  </div>
                   <div className="space-y-1.5 p-2">
                     <p className="truncate text-xs font-medium text-ink">{photo.caption || "Untitled"}</p>
                     <p className="text-2xs text-ink-subtle">{formatDateTime(photo.created_at)}</p>
                     <div className="flex flex-wrap gap-1">
-                      <button type="button" disabled={!canUpdate || toggle.isPending} onClick={() => toggle.mutate({ photo, patch: { visible_to_buyers: !photo.visible_to_buyers } })} className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-2xs font-semibold focus-ring disabled:cursor-default", photo.visible_to_buyers ? "border-status-available-border bg-success-bg text-success-fg" : "border-border text-ink-subtle")} aria-pressed={photo.visible_to_buyers}>
-                        {photo.visible_to_buyers ? <Eye className="size-3" aria-hidden="true" /> : <EyeOff className="size-3" aria-hidden="true" />} Buyers
+                      <button
+                        type="button"
+                        disabled={!canUpdate || toggle.isPending}
+                        onClick={() => toggle.mutate({ photo, patch: { visible_to_buyers: !photo.visible_to_buyers } })}
+                        className={cn(
+                          "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-2xs font-semibold focus-ring disabled:cursor-default",
+                          photo.visible_to_buyers
+                            ? "border-status-available-border bg-success-bg text-success-fg"
+                            : "border-border text-ink-subtle",
+                        )}
+                        aria-pressed={photo.visible_to_buyers}
+                      >
+                        {photo.visible_to_buyers ? (
+                          <Eye className="size-3" aria-hidden="true" />
+                        ) : (
+                          <EyeOff className="size-3" aria-hidden="true" />
+                        )}{" "}
+                        Buyers
                       </button>
-                      <button type="button" disabled={!canUpdate || toggle.isPending} onClick={() => toggle.mutate({ photo, patch: { show_on_website: !photo.show_on_website } })} className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-2xs font-semibold focus-ring disabled:cursor-default", photo.show_on_website ? "border-info/30 bg-info-bg text-info-fg" : "border-border text-ink-subtle")} aria-pressed={photo.show_on_website}>
+                      <button
+                        type="button"
+                        disabled={!canUpdate || toggle.isPending}
+                        onClick={() => toggle.mutate({ photo, patch: { show_on_website: !photo.show_on_website } })}
+                        className={cn(
+                          "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-2xs font-semibold focus-ring disabled:cursor-default",
+                          photo.show_on_website
+                            ? "border-info/30 bg-info-bg text-info-fg"
+                            : "border-border text-ink-subtle",
+                        )}
+                        aria-pressed={photo.show_on_website}
+                      >
                         <Globe className="size-3" aria-hidden="true" /> Website
                       </button>
                     </div>
@@ -404,7 +670,17 @@ function StagePhotosDialog({ open, onOpenChange, blockId, stage, canUpdate }: St
           </ul>
         )}
       </div>
-      <UploadDocumentDialog open={uploadOpen} onOpenChange={setUploadOpen} entityType="STAGE" entityId={stage.id} appliesTo="BLOCK" allowShare={false} imagesOnly title="Upload stage photo" onUploaded={(document) => attach.mutate(document)} />
+      <UploadDocumentDialog
+        open={uploadOpen}
+        onOpenChange={setUploadOpen}
+        entityType="STAGE"
+        entityId={stage.id}
+        appliesTo="BLOCK"
+        allowShare={false}
+        imagesOnly
+        title="Upload stage photo"
+        onUploaded={(document) => attach.mutate(document)}
+      />
     </SimpleDialog>
   );
 }
@@ -413,4 +689,3 @@ function StagePhotosDialog({ open, onOpenChange, blockId, stage, canUpdate }: St
 export function isUndoBlockedError(error: unknown): boolean {
   return isApiClientError(error) && error.code === "UNDO_BLOCKED";
 }
-

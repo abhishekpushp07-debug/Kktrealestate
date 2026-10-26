@@ -11,7 +11,11 @@ export type AnyZod = z.ZodType;
 export type Out<S> = S extends AnyZod ? z.output<S> : undefined;
 
 /** A request whose body/query/params are typed from the route's Zod schemas. */
-export type TypedRequest<B, Q, P> = Omit<FastifyRequest, "body" | "query" | "params"> & { body: Out<B>; query: Out<Q>; params: Out<P> };
+export type TypedRequest<B, Q, P> = Omit<FastifyRequest, "body" | "query" | "params"> & {
+  body: Out<B>;
+  query: Out<Q>;
+  params: Out<P>;
+};
 
 /** Route schema: Zod for body/querystring/params and a 2xx response map (compiled serialisation + OpenAPI). */
 export interface RouteSchema<B, Q, P> {
@@ -77,11 +81,17 @@ function parseDate(v: string, what: string): Date {
 /** Response headers for a deprecated route (exported for tests and gone routes). */
 export function deprecationHeaders(dep: Deprecation): Record<string, string> {
   const sunset = parseDate(dep.sunset, "deprecated.sunset");
-  const since = dep.since ? parseDate(dep.since, "deprecated.since") : new Date(sunset.getTime() - DEPRECATION_WINDOW_DAYS * 86_400_000);
+  const since = dep.since
+    ? parseDate(dep.since, "deprecated.since")
+    : new Date(sunset.getTime() - DEPRECATION_WINDOW_DAYS * 86_400_000);
   if (since.getTime() > sunset.getTime()) throw new Error("deprecated.since must not be after deprecated.sunset");
   const links = [`<${dep.link ?? VERSIONING_POLICY_URL}>; rel="deprecation"; type="text/html"`];
   if (dep.replacement) links.push(`<${dep.replacement.replace(/^[A-Z]+\s+/, "")}>; rel="successor-version"`);
-  return { Deprecation: `@${Math.floor(since.getTime() / 1000)}`, Sunset: sunset.toUTCString(), Link: links.join(", ") };
+  return {
+    Deprecation: `@${Math.floor(since.getTime() / 1000)}`,
+    Sunset: sunset.toUTCString(),
+    Link: links.join(", "),
+  };
 }
 
 function tracingEnabled(): boolean {
@@ -89,7 +99,10 @@ function tracingEnabled(): boolean {
 }
 
 /** Wraps a handler in a span named after the route (only when tracing is on, so the default path has zero overhead). */
-function traced(def: { method: HTTPMethods | HTTPMethods[]; url: string; permission?: string; audience?: string; public?: boolean }, handler: RouteOptions["handler"]): RouteOptions["handler"] {
+function traced(
+  def: { method: HTTPMethods | HTTPMethods[]; url: string; permission?: string; audience?: string; public?: boolean },
+  handler: RouteOptions["handler"],
+): RouteOptions["handler"] {
   if (!tracingEnabled()) return handler;
   const tracer = trace.getTracer("kkt-api");
   const name = `${Array.isArray(def.method) ? def.method.join(",") : def.method} ${def.url}`;
@@ -102,7 +115,11 @@ function traced(def: { method: HTTPMethods | HTTPMethods[]; url: string; permiss
   return async function tracedHandler(this: FastifyInstance, req, reply) {
     return tracer.startActiveSpan(`handler ${name}`, { attributes }, async (span) => {
       try {
-        return await (handler as (this: FastifyInstance, r: FastifyRequest, p: FastifyReply) => Promise<unknown>).call(this, req, reply);
+        return await (handler as (this: FastifyInstance, r: FastifyRequest, p: FastifyReply) => Promise<unknown>).call(
+          this,
+          req,
+          reply,
+        );
       } catch (err) {
         span.recordException(err as Error);
         const status = (err as { statusCode?: number }).statusCode ?? 500;
@@ -132,7 +149,9 @@ export interface RegistryEntry {
 }
 
 declare module "fastify" {
-  interface FastifyInstance { routeRegistry: RegistryEntry[] }
+  interface FastifyInstance {
+    routeRegistry: RegistryEntry[];
+  }
 }
 
 /** URL prefixes served by third-party plugins (Swagger UI) that cannot carry `config.public`; treated as public everywhere. */
@@ -158,7 +177,10 @@ export function permissionKey(p: Permission | readonly Permission[]): string {
 
 /** Splits a registered permission key back into its alternatives. */
 export function permissionAlternatives(key: string): string[] {
-  return key.split("|").map((s) => s.trim()).filter(Boolean);
+  return key
+    .split("|")
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 /** Unknown query keys are 400 VALIDATION_ERROR (docs/API-CONVENTIONS.md): plain object query schemas are made strict; other shapes are left as declared. */
@@ -169,13 +191,17 @@ function strictQuery(schema: AnyZod): AnyZod {
 /** Top-level fields of the 2xx response object schemas (route registry: one-time secret coverage of idempotent routes). */
 function responseFields(response: Record<number, AnyZod>): string[] {
   const out = new Set<string>();
-  for (const schema of Object.values(response)) if (schema instanceof z.ZodObject) for (const k of Object.keys(schema.shape)) out.add(k);
+  for (const schema of Object.values(response))
+    if (schema instanceof z.ZodObject) for (const k of Object.keys(schema.shape)) out.add(k);
   return [...out].sort();
 }
 
 /** Tag from the first path segment after /api/v1 (for OpenAPI grouping). */
 function tagFor(url: string): string {
-  const parts = url.replace(/^\/api\/v1\/?/, "").split("/").filter(Boolean);
+  const parts = url
+    .replace(/^\/api\/v1\/?/, "")
+    .split("/")
+    .filter(Boolean);
   if (parts[0] === "portal") return `portal-${parts[1] ?? "auth"}`;
   return parts[0] ?? "system";
 }
@@ -184,9 +210,16 @@ function tagFor(url: string): string {
  * Registers a route with Zod validation/serialisation, sets `config.permission|audience|public`, idempotency and rate limit,
  * and types the handler's body/query/params from the schemas.
  */
-export function route<B extends AnyZod | undefined = undefined, Q extends AnyZod | undefined = undefined, P extends AnyZod | undefined = undefined>(app: FastifyInstance, def: RouteDef<B, Q, P>): void {
+export function route<
+  B extends AnyZod | undefined = undefined,
+  Q extends AnyZod | undefined = undefined,
+  P extends AnyZod | undefined = undefined,
+>(app: FastifyInstance, def: RouteDef<B, Q, P>): void {
   const guards = [def.permission !== undefined, def.audience !== undefined, def.public === true].filter(Boolean).length;
-  if (guards !== 1) throw new Error(`Route ${String(def.method)} ${def.url} must declare exactly one of permission, audience or public`);
+  if (guards !== 1)
+    throw new Error(
+      `Route ${String(def.method)} ${def.url} must declare exactly one of permission, audience or public`,
+    );
   const schema: Record<string, unknown> = { response: def.schema.response, tags: def.schema.tags ?? [tagFor(def.url)] };
   if (def.schema.body) schema["body"] = def.schema.body;
   if (def.schema.querystring) schema["querystring"] = strictQuery(def.schema.querystring);
@@ -202,10 +235,18 @@ export function route<B extends AnyZod | undefined = undefined, Q extends AnyZod
     schema["deprecated"] = true;
     // machine-readable sunset for the OpenAPI compatibility gate (a deprecated operation may disappear only after this date)
     schema["x-sunset"] = parseDate(def.deprecated.sunset, "deprecated.sunset").toISOString().slice(0, 10);
-    schema["description"] = [def.schema.description, `Deprecated. Sunset: ${headers["Sunset"]}${def.deprecated.replacement ? `; use ${def.deprecated.replacement}` : ""}.`].filter(Boolean).join("\n\n");
+    schema["description"] = [
+      def.schema.description,
+      `Deprecated. Sunset: ${headers["Sunset"]}${def.deprecated.replacement ? `; use ${def.deprecated.replacement}` : ""}.`,
+    ]
+      .filter(Boolean)
+      .join("\n\n");
     // onSend (not onRequest): route-level onSend hooks also run when a global onRequest hook (authentication, rate limit, load
     // shedding) rejects the request, so a 401/403/429/503 from a deprecated operation still announces the deprecation
-    onSend = async (_req, reply, payload) => { reply.headers(headers); return payload; };
+    onSend = async (_req, reply, payload) => {
+      reply.headers(headers);
+      return payload;
+    };
   }
   const options: RouteOptions = {
     method: def.method,
@@ -223,7 +264,14 @@ export function route<B extends AnyZod | undefined = undefined, Q extends AnyZod
     },
     ...(onSend ? { onSend } : {}),
     // the span carries the full route pattern (`/api/v1/bookings/:id`), like the server span and the metrics `route` label
-    handler: traced({ ...def, url: `${app.prefix ?? ""}${def.url}`, ...(def.permission ? { permission: permissionKey(def.permission) } : {}) } as Parameters<typeof traced>[0], def.handler as unknown as RouteOptions["handler"]),
+    handler: traced(
+      {
+        ...def,
+        url: `${app.prefix ?? ""}${def.url}`,
+        ...(def.permission ? { permission: permissionKey(def.permission) } : {}),
+      } as Parameters<typeof traced>[0],
+      def.handler as unknown as RouteOptions["handler"],
+    ),
   };
   app.route(options);
 }
@@ -232,8 +280,15 @@ export function route<B extends AnyZod | undefined = undefined, Q extends AnyZod
  * A retired operation (docs/VERSIONING.md): answers 410 GONE with the replacement in `details`, keeps the Sunset/Link headers, and stays
  * in the route registry (public) so the permission-coverage test and clients can see it. Use it for one release after the sunset date.
  */
-export function goneRoute(app: FastifyInstance, def: { method: HTTPMethods; url: string; sunset: string; replacement?: string; link?: string }): void {
-  const headers = deprecationHeaders({ sunset: def.sunset, ...(def.replacement ? { replacement: def.replacement } : {}), ...(def.link ? { link: def.link } : {}) });
+export function goneRoute(
+  app: FastifyInstance,
+  def: { method: HTTPMethods; url: string; sunset: string; replacement?: string; link?: string },
+): void {
+  const headers = deprecationHeaders({
+    sunset: def.sunset,
+    ...(def.replacement ? { replacement: def.replacement } : {}),
+    ...(def.link ? { link: def.link } : {}),
+  });
   app.route({
     method: def.method,
     url: def.url,
@@ -241,7 +296,12 @@ export function goneRoute(app: FastifyInstance, def: { method: HTTPMethods; url:
     config: { public: true, sunset: def.sunset },
     handler: async (_req, reply) => {
       reply.headers(headers);
-      throw new ApiError(410, "GONE", `${def.method} ${def.url} was retired on ${headers["Sunset"]}${def.replacement ? `; use ${def.replacement}` : ""}`, { sunset: def.sunset, ...(def.replacement ? { replacement: def.replacement } : {}) });
+      throw new ApiError(
+        410,
+        "GONE",
+        `${def.method} ${def.url} was retired on ${headers["Sunset"]}${def.replacement ? `; use ${def.replacement}` : ""}`,
+        { sunset: def.sunset, ...(def.replacement ? { replacement: def.replacement } : {}) },
+      );
     },
   });
 }
@@ -252,13 +312,32 @@ export function installRouteRegistry(app: FastifyInstance): void {
   app.addHook("onRoute", (r) => {
     if (r.url === "*") return; // CORS preflight catch-all
     const methods = Array.isArray(r.method) ? r.method : [r.method];
-    const cfg = (r.config ?? {}) as { permission?: string; audience?: "portal"; public?: boolean; sunset?: string; idempotent?: boolean | "required"; oneTimeSecrets?: readonly string[]; responseFields?: readonly string[] };
+    const cfg = (r.config ?? {}) as {
+      permission?: string;
+      audience?: "portal";
+      public?: boolean;
+      sunset?: string;
+      idempotent?: boolean | "required";
+      oneTimeSecrets?: readonly string[];
+      responseFields?: readonly string[];
+    };
     const isPublic = cfg.public === true || isPublicPrefix(r.url);
     for (const m of methods) {
       if (m === "HEAD") continue;
       app.routeRegistry.push({
-        method: m, url: r.url, permission: cfg.permission ?? null, audience: isPublic ? null : (cfg.audience ?? "erp"), public: isPublic, ...(cfg.sunset ? { sunset: cfg.sunset } : {}),
-        ...(cfg.idempotent ? { idempotent: cfg.idempotent, oneTimeSecrets: cfg.oneTimeSecrets ?? [], responseFields: cfg.responseFields ?? [] } : {}),
+        method: m,
+        url: r.url,
+        permission: cfg.permission ?? null,
+        audience: isPublic ? null : (cfg.audience ?? "erp"),
+        public: isPublic,
+        ...(cfg.sunset ? { sunset: cfg.sunset } : {}),
+        ...(cfg.idempotent
+          ? {
+              idempotent: cfg.idempotent,
+              oneTimeSecrets: cfg.oneTimeSecrets ?? [],
+              responseFields: cfg.responseFields ?? [],
+            }
+          : {}),
       });
     }
   });

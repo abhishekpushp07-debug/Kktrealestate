@@ -100,7 +100,14 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
       const label = tok.slice(1, tok.indexOf("]"));
       const url = m[2] ?? "";
       out.push(
-        <T key={`${keyPrefix}-l${i++}`} variant="bodyStrong" color={colors.navy} style={styles.link} accessibilityRole="link" onPress={() => void openExternal(url)}>
+        <T
+          key={`${keyPrefix}-l${i++}`}
+          variant="bodyStrong"
+          color={colors.navy}
+          style={styles.link}
+          accessibilityRole="link"
+          onPress={() => void openExternal(url)}
+        >
           {label}
         </T>,
       );
@@ -113,7 +120,7 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
     }
     last = idx + tok.length;
   }
-  if (last < text.length) out.push(<Fragment key={`${keyPrefix}-t${i++}`}>{text.slice(last)}</Fragment>);
+  if (last < text.length) out.push(<Fragment key={`${keyPrefix}-t${i}`}>{text.slice(last)}</Fragment>);
   return out;
 }
 
@@ -126,7 +133,11 @@ export function Markdown({ source }: { source: string }): React.JSX.Element {
         switch (b.kind) {
           case "h":
             return (
-              <T key={k} variant={b.level === 1 ? "h1" : b.level === 2 ? "h2" : "h3"} style={{ marginTop: i === 0 ? 0 : space.sm }}>
+              <T
+                key={k}
+                variant={b.level === 1 ? "h1" : b.level === 2 ? "h2" : "h3"}
+                style={{ marginTop: i === 0 ? 0 : space.sm }}
+              >
                 {renderInline(b.text, k)}
               </T>
             );

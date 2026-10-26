@@ -10,7 +10,23 @@ import { addDays, demandStageId, demandStatuses, evaluateDues, formatINR, type T
 import { writeAudit } from "../../../lib/audit.js";
 import { nextNumber } from "../../../lib/numbering.js";
 import { notify, notifyRole, withdraw } from "../../notifications/index.js";
-import { ACCOUNTS_ROLES, Clock, loadCompanyRow, loadTowerStagesMany, lockBooking, lockBookingsInOrder, moneyTransaction, numberingOf, snapshotInstallments, loadTowerStages, todayDate, type BookingRecord, type CompanyRecord, type MoneyActor, SYSTEM_MONEY_ACTOR } from "../common.js";
+import {
+  ACCOUNTS_ROLES,
+  Clock,
+  loadCompanyRow,
+  loadTowerStagesMany,
+  lockBooking,
+  lockBookingsInOrder,
+  moneyTransaction,
+  numberingOf,
+  snapshotInstallments,
+  loadTowerStages,
+  todayDate,
+  type BookingRecord,
+  type CompanyRecord,
+  type MoneyActor,
+  SYSTEM_MONEY_ACTOR,
+} from "../common.js";
 import { appendEvent, events, rebuild } from "./ledger.js";
 
 export type DemandRecord = typeof demands.$inferSelect;
@@ -37,13 +53,25 @@ export interface RaiseResult {
 
 /** Non-void demands of a booking in posting order. */
 export async function nonVoidDemands(db: Executor, bookingId: string): Promise<DemandRecord[]> {
-  return db.select().from(demands).where(and(eq(demands.bookingId, bookingId), ne(demands.status, "VOID"))).orderBy(asc(demands.postedAt), asc(demands.installmentSeq));
+  return db
+    .select()
+    .from(demands)
+    .where(and(eq(demands.bookingId, bookingId), ne(demands.status, "VOID")))
+    .orderBy(asc(demands.postedAt), asc(demands.installmentSeq));
 }
 
 /** Customer recipients of a booking (primary + co-applicants). */
-export async function bookingRecipients(db: Executor, booking: Pick<BookingRecord, "id" | "customerId">): Promise<{ type: "CUSTOMER"; id: string }[]> {
-  const co = await db.execute<{ customer_id: string }>(sql`select customer_id from booking_co_applicants where booking_id = ${booking.id}::uuid`);
-  return [{ type: "CUSTOMER" as const, id: booking.customerId }, ...co.map((c) => ({ type: "CUSTOMER" as const, id: c.customer_id }))];
+export async function bookingRecipients(
+  db: Executor,
+  booking: Pick<BookingRecord, "id" | "customerId">,
+): Promise<{ type: "CUSTOMER"; id: string }[]> {
+  const co = await db.execute<{ customer_id: string }>(
+    sql`select customer_id from booking_co_applicants where booking_id = ${booking.id}::uuid`,
+  );
+  return [
+    { type: "CUSTOMER" as const, id: booking.customerId },
+    ...co.map((c) => ({ type: "CUSTOMER" as const, id: c.customer_id })),
+  ];
 }
 
 /**
@@ -61,9 +89,22 @@ export async function raiseDues(tx: Tx, booking: BookingRecord, opts: RaiseOptio
   const towerStages = opts.towerStages ?? (await loadTowerStages(tx, booking.blockId));
   const existing = await nonVoidDemands(tx, booking.id);
   const due = evaluateDues({
-    booking: { bookingDate: booking.bookingDate, cashAgreedPaise: booking.cashAgreedPaise, accountAgreedPaise: booking.accountAgreedPaise, planSnapshot: { installments: snapshotInstallments(booking.planSnapshot) } },
+    booking: {
+      bookingDate: booking.bookingDate,
+      cashAgreedPaise: booking.cashAgreedPaise,
+      accountAgreedPaise: booking.accountAgreedPaise,
+      planSnapshot: { installments: snapshotInstallments(booking.planSnapshot) },
+    },
     towerStages,
-    existingDemands: existing.map((d) => ({ installmentSeq: d.installmentSeq, installmentName: d.installmentName, status: d.status, dueDate: d.dueDate, cashPaise: d.cashDemandPaise, accountPaise: d.accountDemandPaise, paidPaise: d.paidPaise })),
+    existingDemands: existing.map((d) => ({
+      installmentSeq: d.installmentSeq,
+      installmentName: d.installmentName,
+      status: d.status,
+      dueDate: d.dueDate,
+      cashPaise: d.cashDemandPaise,
+      accountPaise: d.accountDemandPaise,
+      paidPaise: d.paidPaise,
+    })),
     today,
     defaultDueDays: company.settings.demand_due_days,
   });
@@ -75,25 +116,91 @@ export async function raiseDues(tx: Tx, booking: BookingRecord, opts: RaiseOptio
     const [row] = await tx
       .insert(demands)
       .values({
-        companyId: booking.companyId, bookingId: booking.id, projectId: booking.projectId, blockId: booking.blockId, customerId: booking.customerId,
-        demandNumber, installmentSeq: d.seq, installmentName: d.name, triggerType: d.triggerType, triggerLabel: d.triggerLabel, triggerStageId: d.triggerStageId,
-        percent: Number(d.percent), cumulativePercent: Number(d.cumulativePercent), cashDemandPaise: d.cashPaise, accountDemandPaise: d.accountPaise, totalDemandPaise: d.totalPaise,
-        demandDate: d.triggerDate, dueDate: d.dueDate, status: "OPEN", paidPaise: 0, postedAt,
+        companyId: booking.companyId,
+        bookingId: booking.id,
+        projectId: booking.projectId,
+        blockId: booking.blockId,
+        customerId: booking.customerId,
+        demandNumber,
+        installmentSeq: d.seq,
+        installmentName: d.name,
+        triggerType: d.triggerType,
+        triggerLabel: d.triggerLabel,
+        triggerStageId: d.triggerStageId,
+        percent: Number(d.percent),
+        cumulativePercent: Number(d.cumulativePercent),
+        cashDemandPaise: d.cashPaise,
+        accountDemandPaise: d.accountPaise,
+        totalDemandPaise: d.totalPaise,
+        demandDate: d.triggerDate,
+        dueDate: d.dueDate,
+        status: "OPEN",
+        paidPaise: 0,
+        postedAt,
       })
-      .onConflictDoNothing({ target: [demands.bookingId, demands.installmentSeq], where: sql`${demands.status} <> 'VOID'` })
+      .onConflictDoNothing({
+        target: [demands.bookingId, demands.installmentSeq],
+        where: sql`${demands.status} <> 'VOID'`,
+      })
       .returning();
     if (!row) continue; // raised concurrently: the unique index made double-raising impossible
-    await appendEvent(tx, booking.id, events.demand(row, { cashPaise: row.cashDemandPaise, accountPaise: row.accountDemandPaise }));
+    await appendEvent(
+      tx,
+      booking.id,
+      events.demand(row, { cashPaise: row.cashDemandPaise, accountPaise: row.accountDemandPaise }),
+    );
     raised.push(row);
     const title = `Installment demand ${row.demandNumber}: ${row.installmentName}`;
-    const body = `${row.triggerLabel ?? ""} – Cash ${formatINR(row.cashDemandPaise)}, Account ${formatINR(row.accountDemandPaise)}; due ${row.dueDate}`.trim();
-    notifications += await notify(tx, { companyId: booking.companyId, recipients: await bookingRecipients(tx, booking), type: "DEMAND_RAISED", title, body, entityType: "demand", entityId: row.id, link: `/bookings/${booking.id}/demands` });
-    notifications += await notifyRole(tx, booking.companyId, ACCOUNTS_ROLES, { type: "DEMAND_RAISED", title: `${title} (${booking.bookingNumber})`, body, entityType: "demand", entityId: row.id, link: `/bookings/${booking.id}/demands` });
-    await writeAudit(tx, { companyId: booking.companyId, actor, action: "demand.raise", entityType: "demand", entityId: row.id, after: { demand_number: row.demandNumber, booking_id: booking.id, installment_seq: row.installmentSeq, cash_demand_paise: row.cashDemandPaise, account_demand_paise: row.accountDemandPaise, due_date: row.dueDate }, ip: actor.ip ?? null, requestId: actor.requestId ?? null });
+    const body =
+      `${row.triggerLabel ?? ""} – Cash ${formatINR(row.cashDemandPaise)}, Account ${formatINR(row.accountDemandPaise)}; due ${row.dueDate}`.trim();
+    notifications += await notify(tx, {
+      companyId: booking.companyId,
+      recipients: await bookingRecipients(tx, booking),
+      type: "DEMAND_RAISED",
+      title,
+      body,
+      entityType: "demand",
+      entityId: row.id,
+      link: `/bookings/${booking.id}/demands`,
+    });
+    notifications += await notifyRole(tx, booking.companyId, ACCOUNTS_ROLES, {
+      type: "DEMAND_RAISED",
+      title: `${title} (${booking.bookingNumber})`,
+      body,
+      entityType: "demand",
+      entityId: row.id,
+      link: `/bookings/${booking.id}/demands`,
+    });
+    await writeAudit(tx, {
+      companyId: booking.companyId,
+      actor,
+      action: "demand.raise",
+      entityType: "demand",
+      entityId: row.id,
+      after: {
+        demand_number: row.demandNumber,
+        booking_id: booking.id,
+        installment_seq: row.installmentSeq,
+        cash_demand_paise: row.cashDemandPaise,
+        account_demand_paise: row.accountDemandPaise,
+        due_date: row.dueDate,
+      },
+      ip: actor.ip ?? null,
+      requestId: actor.requestId ?? null,
+    });
   }
   // other charges demanded "on possession"
   if (towerStages.some((s) => s.isPossession && s.status === "COMPLETED")) {
-    const lines = await tx.select().from(bookingOtherCharges).where(and(eq(bookingOtherCharges.bookingId, booking.id), eq(bookingOtherCharges.demandAt, "ON_POSSESSION"), isNull(bookingOtherCharges.demandedAt)));
+    const lines = await tx
+      .select()
+      .from(bookingOtherCharges)
+      .where(
+        and(
+          eq(bookingOtherCharges.bookingId, booking.id),
+          eq(bookingOtherCharges.demandAt, "ON_POSSESSION"),
+          isNull(bookingOtherCharges.demandedAt),
+        ),
+      );
     for (const line of lines) await raiseOtherChargeDemand(tx, booking, line, { today, actor, clock, company });
   }
   if (raised.length > 0) await recomputeDemandStatuses(tx, booking.id);
@@ -104,7 +211,12 @@ export async function raiseDues(tx: Tx, booking: BookingRecord, opts: RaiseOptio
 export const OTHER_CHARGE_ENTITY_TYPE = "booking_other_charge";
 
 /** Raises the demand of one other-charge line (ON_BOOKING at creation, ON_POSSESSION by the engine, MANUAL by staff). */
-export async function raiseOtherChargeDemand(tx: Tx, booking: BookingRecord, line: OtherChargeRecord, opts: RaiseOptions & { dueDate?: string } = {}): Promise<OtherChargeRecord> {
+export async function raiseOtherChargeDemand(
+  tx: Tx,
+  booking: BookingRecord,
+  line: OtherChargeRecord,
+  opts: RaiseOptions & { dueDate?: string } = {},
+): Promise<OtherChargeRecord> {
   if (line.demandedAt) return line;
   const clock = opts.clock ?? new Clock();
   await lockBooking(tx, booking.id, clock);
@@ -113,13 +225,35 @@ export async function raiseOtherChargeDemand(tx: Tx, booking: BookingRecord, lin
   const demandNumber = await nextNumber(tx, numberingOf(company), "demand", today);
   const demandedAt = clock.next();
   const dueDate = opts.dueDate ?? addDays(today, company.settings.demand_due_days);
-  const [updated] = await tx.update(bookingOtherCharges).set({ demandedAt, demandNumber, dueDate }).where(eq(bookingOtherCharges.id, line.id)).returning();
+  const [updated] = await tx
+    .update(bookingOtherCharges)
+    .set({ demandedAt, demandNumber, dueDate })
+    .where(eq(bookingOtherCharges.id, line.id))
+    .returning();
   if (!updated) throw new Error("other charge line vanished");
   await appendEvent(tx, booking.id, events.otherChargeDemand(updated, demandedAt));
   const actor = opts.actor ?? SYSTEM_MONEY_ACTOR;
-  await writeAudit(tx, { companyId: booking.companyId, actor, action: "other_charge.demand", entityType: "booking_other_charge", entityId: line.id, after: { demand_number: demandNumber, total_paise: line.totalPaise, due_date: dueDate }, ip: actor.ip ?? null, requestId: actor.requestId ?? null });
+  await writeAudit(tx, {
+    companyId: booking.companyId,
+    actor,
+    action: "other_charge.demand",
+    entityType: "booking_other_charge",
+    entityId: line.id,
+    after: { demand_number: demandNumber, total_paise: line.totalPaise, due_date: dueDate },
+    ip: actor.ip ?? null,
+    requestId: actor.requestId ?? null,
+  });
   // keyed by the charge line (TODO-integration #6) so a possession undo withdraws exactly this bell
-  await notify(tx, { companyId: booking.companyId, recipients: await bookingRecipients(tx, booking), type: "DEMAND_RAISED", title: `${line.name} demanded (${demandNumber})`, body: `${formatINR(line.totalPaise)} due ${dueDate}`, entityType: OTHER_CHARGE_ENTITY_TYPE, entityId: line.id, link: `/bookings/${booking.id}` });
+  await notify(tx, {
+    companyId: booking.companyId,
+    recipients: await bookingRecipients(tx, booking),
+    type: "DEMAND_RAISED",
+    title: `${line.name} demanded (${demandNumber})`,
+    body: `${formatINR(line.totalPaise)} due ${dueDate}`,
+    entityType: OTHER_CHARGE_ENTITY_TYPE,
+    entityId: line.id,
+    link: `/bookings/${booking.id}`,
+  });
   return updated;
 }
 
@@ -128,11 +262,36 @@ export async function raiseOtherChargeDemand(tx: Tx, booking: BookingRecord, lin
  * holds the block row. Every booking is locked first (ascending id) and only then are demand numbers allocated, so the demand
  * sequence row is always the LAST lock taken (see lockBookingsInOrder) and a concurrent dues run / booking cannot deadlock with it.
  */
-export async function raiseDuesForBlock(tx: Tx, blockId: string, opts: RaiseOptions = {}): Promise<{ bookingsChecked: number; raised: DemandRecord[]; notifications: number }> {
-  const active = await tx.select({ id: bookings.id }).from(bookings).where(and(eq(bookings.blockId, blockId), eq(bookings.status, "ACTIVE"))).orderBy(asc(bookings.id));
-  await lockBookingsInOrder(tx, active.map((b) => b.id));
+export async function raiseDuesForBlock(
+  tx: Tx,
+  blockId: string,
+  opts: RaiseOptions = {},
+): Promise<{ bookingsChecked: number; raised: DemandRecord[]; notifications: number }> {
+  const active = await tx
+    .select({ id: bookings.id })
+    .from(bookings)
+    .where(and(eq(bookings.blockId, blockId), eq(bookings.status, "ACTIVE")))
+    .orderBy(asc(bookings.id));
+  await lockBookingsInOrder(
+    tx,
+    active.map((b) => b.id),
+  );
   // re-read under the locks (a booking may have been cancelled / completed while we waited)
-  const rows = active.length ? await tx.select().from(bookings).where(and(inArray(bookings.id, active.map((b) => b.id)), eq(bookings.status, "ACTIVE"))).orderBy(asc(bookings.bookingDate), asc(bookings.id)) : [];
+  const rows = active.length
+    ? await tx
+        .select()
+        .from(bookings)
+        .where(
+          and(
+            inArray(
+              bookings.id,
+              active.map((b) => b.id),
+            ),
+            eq(bookings.status, "ACTIVE"),
+          ),
+        )
+        .orderBy(asc(bookings.bookingDate), asc(bookings.id))
+    : [];
   const towerStages = opts.towerStages ?? (await loadTowerStages(tx, blockId));
   const company = opts.company ?? (rows[0] ? await loadCompanyRow(tx, rows[0].companyId) : undefined);
   const clock = opts.clock ?? new Clock();
@@ -166,7 +325,12 @@ export interface RunSummary {
  * Daily job / admin "run dues now": every ACTIVE booking in scope, one short transaction per booking so locks stay brief.
  * Time triggers (DAYS_AFTER_BOOKING, ON_DATE) are evaluated against `today`.
  */
-export async function raiseDuesForAll(db: DB, today: string = todayDate(), scope: DuesScope = {}, actor: MoneyActor = SYSTEM_MONEY_ACTOR): Promise<RunSummary> {
+export async function raiseDuesForAll(
+  db: DB,
+  today: string = todayDate(),
+  scope: DuesScope = {},
+  actor: MoneyActor = SYSTEM_MONEY_ACTOR,
+): Promise<RunSummary> {
   const where = and(
     eq(bookings.status, "ACTIVE"),
     scope.bookingId ? eq(bookings.id, scope.bookingId) : undefined,
@@ -174,14 +338,24 @@ export async function raiseDuesForAll(db: DB, today: string = todayDate(), scope
     scope.projectId ? eq(bookings.projectId, scope.projectId) : undefined,
     scope.companyId ? eq(bookings.companyId, scope.companyId) : undefined,
   );
-  const ids = await db.select({ id: bookings.id, companyId: bookings.companyId, blockId: bookings.blockId }).from(bookings).where(where).orderBy(asc(bookings.bookingDate), asc(bookings.id));
+  const ids = await db
+    .select({ id: bookings.id, companyId: bookings.companyId, blockId: bookings.blockId })
+    .from(bookings)
+    .where(where)
+    .orderBy(asc(bookings.bookingDate), asc(bookings.id));
   const companies = new Map<string, CompanyRecord>();
   // tower stages once per block for the whole run (not once per booking)
-  const stagesByBlock = await loadTowerStagesMany(db, ids.map((b) => b.blockId));
+  const stagesByBlock = await loadTowerStagesMany(
+    db,
+    ids.map((b) => b.blockId),
+  );
   const summary: RunSummary = { bookingsChecked: 0, demandsRaised: 0, demandNumbers: [], notifications: 0 };
   for (const { id, companyId, blockId } of ids) {
     let company = companies.get(companyId);
-    if (!company) { company = await loadCompanyRow(db, companyId); companies.set(companyId, company); }
+    if (!company) {
+      company = await loadCompanyRow(db, companyId);
+      companies.set(companyId, company);
+    }
     const towerStages = stagesByBlock.get(blockId) ?? [];
     const result = await moneyTransaction(db, async (tx) => {
       const [b] = await tx.select().from(bookings).where(eq(bookings.id, id)).limit(1);
@@ -203,11 +377,28 @@ export async function raiseDuesForAll(db: DB, today: string = todayDate(), scope
  * CANCELLED demands keep their status; paid_paise is still refreshed so reports stay coherent.
  */
 export async function recomputeDemandStatuses(tx: Executor, bookingId: string): Promise<void> {
-  const [b] = await tx.select({ cashPaid: bookings.cashPaidPaise, accountPaid: bookings.accountPaidPaise, status: bookings.status }).from(bookings).where(eq(bookings.id, bookingId)).limit(1);
+  const [b] = await tx
+    .select({ cashPaid: bookings.cashPaidPaise, accountPaid: bookings.accountPaidPaise, status: bookings.status })
+    .from(bookings)
+    .where(eq(bookings.id, bookingId))
+    .limit(1);
   if (!b) return;
-  const rows = await tx.select({ id: demands.id, cash: demands.cashDemandPaise, account: demands.accountDemandPaise, status: demands.status, paid: demands.paidPaise }).from(demands)
-    .where(and(eq(demands.bookingId, bookingId), ne(demands.status, "VOID"))).orderBy(asc(demands.postedAt), asc(demands.installmentSeq));
-  const results = demandStatuses(rows.map((r) => ({ id: r.id, cashPaise: r.cash, accountPaise: r.account })), Math.max(0, b.cashPaid), Math.max(0, b.accountPaid));
+  const rows = await tx
+    .select({
+      id: demands.id,
+      cash: demands.cashDemandPaise,
+      account: demands.accountDemandPaise,
+      status: demands.status,
+      paid: demands.paidPaise,
+    })
+    .from(demands)
+    .where(and(eq(demands.bookingId, bookingId), ne(demands.status, "VOID")))
+    .orderBy(asc(demands.postedAt), asc(demands.installmentSeq));
+  const results = demandStatuses(
+    rows.map((r) => ({ id: r.id, cashPaise: r.cash, accountPaise: r.account })),
+    Math.max(0, b.cashPaid),
+    Math.max(0, b.accountPaid),
+  );
   for (const [i, r] of results.entries()) {
     const cur = rows[i]!;
     const nextStatus = cur.status === "CANCELLED" ? "CANCELLED" : r.status;
@@ -220,15 +411,32 @@ export async function recomputeDemandStatuses(tx: Executor, bookingId: string): 
  * Chronological FIFO allocation of a booking's CLEARED flat-value payments (by payment date, then posting order) to its non-void demands
  * (in raise order), per bucket. Returns, per demand, the receipts that funded it with their payment dates – the input of the UNDO RULE.
  */
-async function demandFunding(tx: Executor, bookingId: string): Promise<Map<string, { receipt: string; date: string }[]>> {
+async function demandFunding(
+  tx: Executor,
+  bookingId: string,
+): Promise<Map<string, { receipt: string; date: string }[]>> {
   const [demandRows, paymentRows] = await Promise.all([
-    tx.select({ id: demands.id, cash: demands.cashDemandPaise, account: demands.accountDemandPaise }).from(demands)
-      .where(and(eq(demands.bookingId, bookingId), ne(demands.status, "VOID"))).orderBy(asc(demands.postedAt), asc(demands.installmentSeq)),
-    tx.select({ receipt: payments.receiptNumber, date: payments.paymentDate, bucket: payments.bucket, amount: payments.amountPaise }).from(payments)
-      .where(and(eq(payments.bookingId, bookingId), eq(payments.status, "CLEARED"), eq(payments.against, "FLAT_VALUE"))).orderBy(asc(payments.paymentDate), asc(payments.postedAt)),
+    tx
+      .select({ id: demands.id, cash: demands.cashDemandPaise, account: demands.accountDemandPaise })
+      .from(demands)
+      .where(and(eq(demands.bookingId, bookingId), ne(demands.status, "VOID")))
+      .orderBy(asc(demands.postedAt), asc(demands.installmentSeq)),
+    tx
+      .select({
+        receipt: payments.receiptNumber,
+        date: payments.paymentDate,
+        bucket: payments.bucket,
+        amount: payments.amountPaise,
+      })
+      .from(payments)
+      .where(and(eq(payments.bookingId, bookingId), eq(payments.status, "CLEARED"), eq(payments.against, "FLAT_VALUE")))
+      .orderBy(asc(payments.paymentDate), asc(payments.postedAt)),
   ]);
   const out = new Map<string, { receipt: string; date: string }[]>();
-  const open = { CASH: demandRows.map((d) => ({ id: d.id, left: d.cash })), ACCOUNT: demandRows.map((d) => ({ id: d.id, left: d.account })) };
+  const open = {
+    CASH: demandRows.map((d) => ({ id: d.id, left: d.cash })),
+    ACCOUNT: demandRows.map((d) => ({ id: d.id, left: d.account })),
+  };
   for (const p of paymentRows) {
     if (!p.bucket) continue;
     let amount = p.amount;
@@ -255,16 +463,36 @@ export type VoidStageResult = { blocked: true; reasons: string[] } | { blocked: 
  * that were auto-applied never block (they return to credit). Voided demands lose their notifications (withdraw rule) and every affected
  * ledger is rebuilt. Each affected booking is locked (row + advisory) before anything is read, so a concurrent payment cannot slip in.
  */
-export async function voidDemandsForStage(tx: Tx, blockId: string, stageId: string, reason: string, actor: MoneyActor = SYSTEM_MONEY_ACTOR): Promise<VoidStageResult> {
+export async function voidDemandsForStage(
+  tx: Tx,
+  blockId: string,
+  stageId: string,
+  reason: string,
+  actor: MoneyActor = SYSTEM_MONEY_ACTOR,
+): Promise<VoidStageResult> {
   const towerStages = await loadTowerStages(tx, blockId);
   const stage = towerStages.find((s) => s.stageId === stageId);
-  const candidateIds = (await tx.select({ bookingId: demands.bookingId }).from(demands).where(and(eq(demands.blockId, blockId), ne(demands.status, "VOID"))).groupBy(demands.bookingId).orderBy(asc(demands.bookingId))).map((r) => r.bookingId);
+  const candidateIds = (
+    await tx
+      .select({ bookingId: demands.bookingId })
+      .from(demands)
+      .where(and(eq(demands.blockId, blockId), ne(demands.status, "VOID")))
+      .groupBy(demands.bookingId)
+      .orderBy(asc(demands.bookingId))
+  ).map((r) => r.bookingId);
   for (const id of candidateIds) await lockBooking(tx, id);
-  const rows = candidateIds.length ? await tx.select().from(demands).where(and(inArray(demands.bookingId, candidateIds), ne(demands.status, "VOID"))).orderBy(asc(demands.bookingId), asc(demands.postedAt)) : [];
+  const rows = candidateIds.length
+    ? await tx
+        .select()
+        .from(demands)
+        .where(and(inArray(demands.bookingId, candidateIds), ne(demands.status, "VOID")))
+        .orderBy(asc(demands.bookingId), asc(demands.postedAt))
+    : [];
   // ON_STAGE demands carry trigger_stage_id; ON_POSSESSION ones are attributed through demandStageId (possession stage of the tower)
   const targets = rows.filter((d) => {
     if (d.triggerStageId === stageId) return true;
-    if (d.triggerType === "ON_POSSESSION" && stage?.isPossession) return demandStageId({ triggerType: "ON_POSSESSION", triggerStageId: d.triggerStageId }, towerStages) === stageId;
+    if (d.triggerType === "ON_POSSESSION" && stage?.isPossession)
+      return demandStageId({ triggerType: "ON_POSSESSION", triggerStageId: d.triggerStageId }, towerStages) === stageId;
     return false;
   });
   if (targets.length === 0) return { blocked: false, voided: [] };
@@ -273,18 +501,38 @@ export async function voidDemandsForStage(tx: Tx, blockId: string, stageId: stri
   for (const d of targets) {
     if (d.paidPaise <= 0) continue;
     let funding = fundingCache.get(d.bookingId);
-    if (!funding) { funding = await demandFunding(tx, d.bookingId); fundingCache.set(d.bookingId, funding); }
+    if (!funding) {
+      funding = await demandFunding(tx, d.bookingId);
+      fundingCache.set(d.bookingId, funding);
+    }
     const later = (funding.get(d.id) ?? []).find((f) => f.date >= d.demandDate);
-    if (later) reasons.push(`Demand ${d.demandNumber} has been paid by receipt ${later.receipt} dated ${later.date} (on/after the demand)`);
+    if (later)
+      reasons.push(
+        `Demand ${d.demandNumber} has been paid by receipt ${later.receipt} dated ${later.date} (on/after the demand)`,
+      );
   }
   if (reasons.length > 0) return { blocked: true, reasons };
   const voidedAt = new Date();
   const voided: DemandRecord[] = [];
   for (const d of targets) {
-    const [v] = await tx.update(demands).set({ status: "VOID", voidedAt, voidReason: reason, paidPaise: 0 }).where(eq(demands.id, d.id)).returning();
+    const [v] = await tx
+      .update(demands)
+      .set({ status: "VOID", voidedAt, voidReason: reason, paidPaise: 0 })
+      .where(eq(demands.id, d.id))
+      .returning();
     if (v) voided.push(v);
     await withdraw(tx, "demand", d.id);
-    await writeAudit(tx, { companyId: d.companyId, actor, action: "demand.void", entityType: "demand", entityId: d.id, before: { status: d.status, paid_paise: d.paidPaise }, after: { status: "VOID", void_reason: reason }, ip: actor.ip ?? null, requestId: actor.requestId ?? null });
+    await writeAudit(tx, {
+      companyId: d.companyId,
+      actor,
+      action: "demand.void",
+      entityType: "demand",
+      entityId: d.id,
+      before: { status: d.status, paid_paise: d.paidPaise },
+      after: { status: "VOID", void_reason: reason },
+      ip: actor.ip ?? null,
+      requestId: actor.requestId ?? null,
+    });
   }
   for (const bookingId of new Set(targets.map((d) => d.bookingId))) {
     await rebuild(tx, bookingId, { write: true });
@@ -294,19 +542,40 @@ export async function voidDemandsForStage(tx: Tx, blockId: string, stageId: stri
 }
 
 /** Voids one demand (integrity repair, plan change) when it has no money applied; returns false when it has. */
-export async function voidDemand(tx: Tx, d: DemandRecord, reason: string, actor: MoneyActor = SYSTEM_MONEY_ACTOR): Promise<boolean> {
+export async function voidDemand(
+  tx: Tx,
+  d: DemandRecord,
+  reason: string,
+  actor: MoneyActor = SYSTEM_MONEY_ACTOR,
+): Promise<boolean> {
   if (d.paidPaise > 0) return false;
-  await tx.update(demands).set({ status: "VOID", voidedAt: new Date(), voidReason: reason }).where(eq(demands.id, d.id));
+  await tx
+    .update(demands)
+    .set({ status: "VOID", voidedAt: new Date(), voidReason: reason })
+    .where(eq(demands.id, d.id));
   await withdraw(tx, "demand", d.id);
-  await writeAudit(tx, { companyId: d.companyId, actor, action: "demand.void", entityType: "demand", entityId: d.id, before: { status: d.status }, after: { status: "VOID", void_reason: reason }, ip: actor.ip ?? null, requestId: actor.requestId ?? null });
+  await writeAudit(tx, {
+    companyId: d.companyId,
+    actor,
+    action: "demand.void",
+    entityType: "demand",
+    entityId: d.id,
+    before: { status: d.status },
+    after: { status: "VOID", void_reason: reason },
+    ip: actor.ip ?? null,
+    requestId: actor.requestId ?? null,
+  });
   return true;
 }
 
 /** Human label for a charge demand rule. */
 export function demandAtLabel(d: ChargeDemandAt): string {
   switch (d) {
-    case "ON_BOOKING": return "On booking";
-    case "ON_POSSESSION": return "On possession";
-    case "MANUAL": return "Manual";
+    case "ON_BOOKING":
+      return "On booking";
+    case "ON_POSSESSION":
+      return "On possession";
+    case "MANUAL":
+      return "Manual";
   }
 }

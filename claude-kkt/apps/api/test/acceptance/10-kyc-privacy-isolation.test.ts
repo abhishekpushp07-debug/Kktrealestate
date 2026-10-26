@@ -1,6 +1,17 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { verhoeffCheckDigit } from "@kkt/domain";
-import { BOOT_TIMEOUT, bookingBySeq, bootAcceptance, customerByPhone, findKeys, pathOf, type Booking, type ErrorBody, type Harness, type List } from "./harness.js";
+import {
+  BOOT_TIMEOUT,
+  bookingBySeq,
+  bootAcceptance,
+  customerByPhone,
+  findKeys,
+  pathOf,
+  type Booking,
+  type ErrorBody,
+  type Harness,
+  type List,
+} from "./harness.js";
 
 /**
  * SPEC §18 scenario 10 (L251): "KYC masked for Sales; revealed only to permitted users on explicit request and audit-logged; buyers never see
@@ -9,13 +20,25 @@ import { BOOT_TIMEOUT, bookingBySeq, bootAcceptance, customerByPhone, findKeys, 
  */
 
 // docs/SEED.md / seed/customers.ts: Rajesh Kumar Sinha — PAN ABCPS1234K, Aadhaar 23456789012 + Verhoeff check digit, HDFC account 50100123456789
-const RAJESH = { phone: "9876543210", pan: "ABCPS1234K", aadhaar: `23456789012${verhoeffCheckDigit("23456789012")}`, bank: "50100123456789" };
+const RAJESH = {
+  phone: "9876543210",
+  pan: "ABCPS1234K",
+  aadhaar: `23456789012${verhoeffCheckDigit("23456789012")}`,
+  bank: "50100123456789",
+};
 const PRIYA_PHONE = "9876543211";
 /** A real (unmasked) PAN: five letters that are not the XXXXX mask, four digits, one letter. */
 const PAN_RE = /(?<![A-Z])(?!XXXXX)[A-Z]{5}[0-9]{4}[A-Z](?![A-Z])/;
 
 type Revealed = { pan: string; aadhaar: string; bank_account_number: string; pan_masked: string; revealed_at: string };
-type Masked = { id: string; pan_masked: string | null; aadhaar_masked: string | null; bank_account_masked?: string | null; pan?: unknown; aadhaar?: unknown };
+type Masked = {
+  id: string;
+  pan_masked: string | null;
+  aadhaar_masked: string | null;
+  bank_account_masked?: string | null;
+  pan?: unknown;
+  aadhaar?: unknown;
+};
 
 let h: Harness;
 let admin: string;
@@ -28,7 +51,11 @@ let bk1: Booking; // Rajesh's booking (GGV P1)
 let bk2: Booking; // Priya's booking (SGH A-301)
 
 async function auditReveals(): Promise<{ action: string; actor_name?: string | null }[]> {
-  const r = await h.request<List<{ action: string; actor_name?: string | null }>>("GET", `/api/v1/audit-logs/entity/customer/${rajeshId}?page_size=200`, { token: admin });
+  const r = await h.request<List<{ action: string; actor_name?: string | null }>>(
+    "GET",
+    `/api/v1/audit-logs/entity/customer/${rajeshId}?page_size=200`,
+    { token: admin },
+  );
   expect(r.status, r.text).toBe(200);
   return r.body.items.filter((a) => a.action === "customer.kyc_reveal");
 }
@@ -44,7 +71,9 @@ beforeAll(async () => {
   bk1 = await bookingBySeq(h, admin, 1);
   bk2 = await bookingBySeq(h, admin, 2);
 }, BOOT_TIMEOUT);
-afterAll(async () => { await h?.close(); });
+afterAll(async () => {
+  await h?.close();
+});
 
 describe("scenario 10 — KYC masking and the audited reveal", () => {
   it("Sales sees masked PAN / Aadhaar / bank values only and cannot reveal (403, not audited)", async () => {
@@ -96,14 +125,20 @@ describe("scenario 10 — KYC masking and the audited reveal", () => {
     await h.request("GET", `/api/v1/customers/${rajeshId}?reveal=true`, { token: admin });
     expect((await auditReveals()).length).toBe(before + 2);
     // the audit rows themselves never carry the secrets (SPEC L134 API-CONVENTIONS: sensitive fields stripped)
-    const audit = await h.request("GET", `/api/v1/audit-logs/entity/customer/${rajeshId}?page_size=200`, { token: admin });
+    const audit = await h.request("GET", `/api/v1/audit-logs/entity/customer/${rajeshId}?page_size=200`, {
+      token: admin,
+    });
     expect(audit.text).not.toContain(RAJESH.pan);
     expect(audit.text).not.toContain(RAJESH.aadhaar);
     expect(audit.text).not.toContain(RAJESH.bank);
   });
 
   it("buyers never see unmasked values, not even their own", async () => {
-    const profile = await h.request<{ pan_masked: string | null; aadhaar_masked: string | null; phone: string }>("GET", "/api/v1/portal/profile", { token: rajeshPortal });
+    const profile = await h.request<{ pan_masked: string | null; aadhaar_masked: string | null; phone: string }>(
+      "GET",
+      "/api/v1/portal/profile",
+      { token: rajeshPortal },
+    );
     expect(profile.status, profile.text).toBe(200);
     // SPEC L232: "KYC values are masked even to themselves"
     expect(profile.body.pan_masked).toBe("XXXXX1234K");
@@ -129,15 +164,31 @@ describe("scenario 10 — KYC masking and the audited reveal", () => {
 describe("scenario 10 — public APIs expose no internal fields", () => {
   it("/public/site, /public/projects, the project detail, posts, gallery and people carry no ids, storage keys, costs or Hold/Booked/Blocked words", async () => {
     const bodies: [string, unknown][] = [];
-    for (const url of ["/api/v1/public/site", "/api/v1/public/projects", "/api/v1/public/projects/shree-ganesh-heights", "/api/v1/public/projects/ganesh-green-villas", "/api/v1/public/posts", "/api/v1/public/gallery", "/api/v1/public/people"]) {
+    for (const url of [
+      "/api/v1/public/site",
+      "/api/v1/public/projects",
+      "/api/v1/public/projects/shree-ganesh-heights",
+      "/api/v1/public/projects/ganesh-green-villas",
+      "/api/v1/public/posts",
+      "/api/v1/public/gallery",
+      "/api/v1/public/people",
+    ]) {
       const r = await h.request("GET", url);
       expect(r.status, url).toBe(200);
       bodies.push([url, r.body]);
     }
     for (const [url, body] of bodies) {
       // SPEC L42: "strict allow-listed output (never expose internal ids of users, customers, costs, storage paths)"
-      expect(findKeys(body, (k) => (k.endsWith("_id") && k !== "ga_id") || k === "id"), url).toEqual([]);
-      expect(findKeys(body, (k) => /storage_key|storage_path|cost|password|token_hash|assigned|customer_|user_|_enc$/i.test(k)), url).toEqual([]);
+      expect(
+        findKeys(body, (k) => (k.endsWith("_id") && k !== "ga_id") || k === "id"),
+        url,
+      ).toEqual([]);
+      expect(
+        findKeys(body, (k) =>
+          /storage_key|storage_path|cost|password|token_hash|assigned|customer_|user_|_enc$/i.test(k),
+        ),
+        url,
+      ).toEqual([]);
       const text = JSON.stringify(body);
       expect(text, url).not.toMatch(PAN_RE);
       expect(text, url).not.toContain(RAJESH.phone);
@@ -149,7 +200,9 @@ describe("scenario 10 — public APIs expose no internal fields", () => {
     expect(detail).not.toMatch(/"(HOLD|BOOKED|BLOCKED|SOLD)"/);
     expect(detail).toContain("NOT_AVAILABLE");
     // SPEC L42: public APIs are unauthenticated and read-only
-    expect((await h.request("PATCH", "/api/v1/public/projects/shree-ganesh-heights", { body: {} })).status).toBeGreaterThanOrEqual(400);
+    expect(
+      (await h.request("PATCH", "/api/v1/public/projects/shree-ganesh-heights", { body: {} })).status,
+    ).toBeGreaterThanOrEqual(400);
   });
 });
 
@@ -160,18 +213,50 @@ describe("scenario 10 — a buyer cannot reach another buyer's booking or PDFs",
     expect(mine.body.map((b) => b.booking_id)).toEqual([bk2.id]);
     const his = await h.request<{ booking_id: string }[]>("GET", "/api/v1/portal/bookings", { token: rajeshPortal });
     expect(his.body.map((b) => b.booking_id)).toEqual([bk1.id]);
-    const receipt = (await h.request<List<{ payment_id: string }>>("GET", `/api/v1/portal/bookings/${bk1.id}/receipts`, { token: rajeshPortal })).body.items[0]!;
-    const demand = (await h.request<List<{ demand_id: string }>>("GET", `/api/v1/portal/bookings/${bk1.id}/demands`, { token: rajeshPortal })).body.items[0]!;
-    for (const suffix of ["home", "flat", "ledger", "receipts", "demands", "schedule", "construction", "documents", "bank-details", "statement.pdf", "allotment-letter.pdf", `receipts/${receipt.payment_id}/pdf`, `demands/${demand.demand_id}/pdf`]) {
-      const r = await h.request<ErrorBody>("GET", `/api/v1/portal/bookings/${bk1.id}/${suffix}`, { token: priyaPortal });
+    const receipt = (
+      await h.request<List<{ payment_id: string }>>("GET", `/api/v1/portal/bookings/${bk1.id}/receipts`, {
+        token: rajeshPortal,
+      })
+    ).body.items[0]!;
+    const demand = (
+      await h.request<List<{ demand_id: string }>>("GET", `/api/v1/portal/bookings/${bk1.id}/demands`, {
+        token: rajeshPortal,
+      })
+    ).body.items[0]!;
+    for (const suffix of [
+      "home",
+      "flat",
+      "ledger",
+      "receipts",
+      "demands",
+      "schedule",
+      "construction",
+      "documents",
+      "bank-details",
+      "statement.pdf",
+      "allotment-letter.pdf",
+      `receipts/${receipt.payment_id}/pdf`,
+      `demands/${demand.demand_id}/pdf`,
+    ]) {
+      const r = await h.request<ErrorBody>("GET", `/api/v1/portal/bookings/${bk1.id}/${suffix}`, {
+        token: priyaPortal,
+      });
       // SPEC L232: "anything else behaves as not-found, including PDF routes"; Appendix C: every :id checked → 404
       expect(r.status, suffix).toBe(404);
       expect(r.body.error.code, suffix).toBe("NOT_FOUND");
     }
     // nested ids crossed between bookings are 404 too (a receipt of #1 under #2's path)
-    expect((await h.request("GET", `/api/v1/portal/bookings/${bk2.id}/receipts/${receipt.payment_id}/pdf`, { token: priyaPortal })).status).toBe(404);
+    expect(
+      (
+        await h.request("GET", `/api/v1/portal/bookings/${bk2.id}/receipts/${receipt.payment_id}/pdf`, {
+          token: priyaPortal,
+        })
+      ).status,
+    ).toBe(404);
     // the signed statement link is bound to Rajesh: no bearer / his bearer stream the PDF; Priya's, a staff token or garbage are 404
-    const link = await h.request<{ download_url: string }>("GET", `/api/v1/portal/bookings/${bk1.id}/statement.pdf`, { token: rajeshPortal });
+    const link = await h.request<{ download_url: string }>("GET", `/api/v1/portal/bookings/${bk1.id}/statement.pdf`, {
+      token: rajeshPortal,
+    });
     expect(link.status, link.text).toBe(200);
     const path = pathOf(link.body.download_url);
     const anon = await h.request("GET", path);
@@ -179,7 +264,11 @@ describe("scenario 10 — a buyer cannot reach another buyer's booking or PDFs",
     expect(anon.headers["content-type"]).toContain("application/pdf");
     expect(anon.raw.subarray(0, 4).toString("latin1")).toBe("%PDF");
     expect((await h.request("GET", path, { token: rajeshPortal })).status).toBe(200);
-    for (const [label, token] of [["priya", priyaPortal], ["admin", admin], ["garbage", "not.a.jwt"]] as const) {
+    for (const [label, token] of [
+      ["priya", priyaPortal],
+      ["admin", admin],
+      ["garbage", "not.a.jwt"],
+    ] as const) {
       const r = await h.request<ErrorBody>("GET", path, { token });
       expect(r.status, label).toBe(404);
     }

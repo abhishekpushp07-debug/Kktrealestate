@@ -33,22 +33,48 @@ interface HeadingProps {
   className?: string;
 }
 
-export function SectionHeading({ eyebrow, title, lead, align = "left", light = false, as = "h2", className = "" }: HeadingProps) {
+export function SectionHeading({
+  eyebrow,
+  title,
+  lead,
+  align = "left",
+  light = false,
+  as = "h2",
+  className = "",
+}: HeadingProps) {
   const Tag = as;
   return (
     <div className={`max-w-3xl ${align === "center" ? "mx-auto text-center" : ""} ${className}`.trim()}>
       {eyebrow ? <p className={`eyebrow mb-4 ${light ? "text-gold-300" : "text-gold-700"}`}>{eyebrow}</p> : null}
       <Tag className={`font-display text-display-md ${light ? "text-ivory-100" : "text-navy-900"}`}>{title}</Tag>
-      {lead ? <p className={`mt-5 text-lg leading-8 ${light ? "text-ivory-100/75" : "text-ink-muted"}`}>{lead}</p> : null}
+      {lead ? (
+        <p className={`mt-5 text-lg leading-8 ${light ? "text-ivory-100/75" : "text-ink-muted"}`}>{lead}</p>
+      ) : null}
     </div>
   );
 }
 
-export function Eyebrow({ children, light = false, className = "" }: { children: ReactNode; light?: boolean; className?: string }) {
+export function Eyebrow({
+  children,
+  light = false,
+  className = "",
+}: {
+  children: ReactNode;
+  light?: boolean;
+  className?: string;
+}) {
   return <p className={`eyebrow ${light ? "text-gold-300" : "text-gold-700"} ${className}`.trim()}>{children}</p>;
 }
 
-export function Badge({ children, tone = "gold", className = "" }: { children: ReactNode; tone?: "gold" | "navy" | "ivory" | "success"; className?: string }) {
+export function Badge({
+  children,
+  tone = "gold",
+  className = "",
+}: {
+  children: ReactNode;
+  tone?: "gold" | "navy" | "ivory" | "success";
+  className?: string;
+}) {
   const tones = {
     gold: "bg-gold-500 text-navy-950",
     navy: "bg-navy-900 text-ivory-100",
@@ -56,7 +82,9 @@ export function Badge({ children, tone = "gold", className = "" }: { children: R
     success: "bg-success/10 text-success",
   };
   return (
-    <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold tracking-wider uppercase ${tones[tone]} ${className}`.trim()}>
+    <span
+      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold tracking-wider uppercase ${tones[tone]} ${className}`.trim()}
+    >
       {children}
     </span>
   );

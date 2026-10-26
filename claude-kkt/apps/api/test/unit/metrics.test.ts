@@ -20,9 +20,15 @@ describe("prometheus metrics (prom-client)", () => {
     const text = await localMetrics();
     expect(text).toContain('http_requests_total{route="/api/v1/auth/me",method="GET",status="200"} 2');
     expect(text).toContain('http_requests_total{route="/api/v1/auth/me",method="GET",status="401"} 1');
-    expect(text).toContain('http_request_duration_seconds_bucket{le="0.025",route="/api/v1/auth/me",method="GET",status="200"} 1');
-    expect(text).toContain('http_request_duration_seconds_bucket{le="0.3",route="/api/v1/auth/me",method="GET",status="200"} 2');
-    expect(text).toContain('http_request_duration_seconds_bucket{le="+Inf",route="/api/v1/auth/me",method="GET",status="401"} 1');
+    expect(text).toContain(
+      'http_request_duration_seconds_bucket{le="0.025",route="/api/v1/auth/me",method="GET",status="200"} 1',
+    );
+    expect(text).toContain(
+      'http_request_duration_seconds_bucket{le="0.3",route="/api/v1/auth/me",method="GET",status="200"} 2',
+    );
+    expect(text).toContain(
+      'http_request_duration_seconds_bucket{le="+Inf",route="/api/v1/auth/me",method="GET",status="401"} 1',
+    );
     expect(text).toContain('http_request_duration_seconds_count{route="/api/v1/auth/me",method="GET",status="200"} 2');
   });
 
@@ -30,7 +36,15 @@ describe("prometheus metrics (prom-client)", () => {
     resetMetrics();
     recordJobRun("DAILY_DUES", "FAILED", 1.5);
     const text = await localMetrics();
-    for (const name of ["process_cpu_seconds_total", "nodejs_eventloop_lag_seconds", "nodejs_heap_size_used_bytes", "payments_posted_total", "logins_failed_total", "demands_raised_total", "db_pool_max_connections"]) {
+    for (const name of [
+      "process_cpu_seconds_total",
+      "nodejs_eventloop_lag_seconds",
+      "nodejs_heap_size_used_bytes",
+      "payments_posted_total",
+      "logins_failed_total",
+      "demands_raised_total",
+      "db_pool_max_connections",
+    ]) {
       expect(text, name).toContain(`# TYPE ${name}`);
     }
     expect(text).toContain('job_runs_total{job_name="DAILY_DUES",status="FAILED"} 1');
@@ -45,7 +59,11 @@ describe("prometheus metrics (prom-client)", () => {
       minIntervalSeconds: 0,
       query: async (text) => {
         queries += 1;
-        if (text.includes("pg_stat_activity")) return [{ state: "active", n: 3, max: 200 }, { state: "idle", n: 9, max: 200 }];
+        if (text.includes("pg_stat_activity"))
+          return [
+            { state: "active", n: 3, max: 200 },
+            { state: "idle", n: 9, max: 200 },
+          ];
         if (text.includes("job_runs")) return [{ job_name: "DAILY_DUES", failures: 2, last_ok: 1_760_000_000 }];
         if (text.includes("integrity_runs")) return [{ findings: 4, last_run: 1_760_000_100 }];
         if (text.includes("from demands")) return [{ n: demands }];
@@ -55,7 +73,11 @@ describe("prometheus metrics (prom-client)", () => {
         ping: async () => "PONG",
         pipeline: () => {
           const ops: number[] = [];
-          return { llen: () => ops.push(1), zcard: () => ops.push(2), exec: async () => ops.map((_, i) => [null, i] as [null, number]) };
+          return {
+            llen: () => ops.push(1),
+            zcard: () => ops.push(2),
+            exec: async () => ops.map((_, i) => [null, i] as [null, number]),
+          };
         },
       },
     };
@@ -86,8 +108,15 @@ describe("prometheus metrics (prom-client)", () => {
     resetMetrics();
     enableDependencyMetrics({
       minIntervalSeconds: 0,
-      query: async () => { throw new Error("connection refused"); },
-      redis: { ping: async () => { throw new Error("ECONNREFUSED"); }, pipeline: () => ({ llen: () => 0, zcard: () => 0, exec: async () => null }) },
+      query: async () => {
+        throw new Error("connection refused");
+      },
+      redis: {
+        ping: async () => {
+          throw new Error("ECONNREFUSED");
+        },
+        pipeline: () => ({ llen: () => 0, zcard: () => 0, exec: async () => null }),
+      },
     });
     try {
       const text = await registry.metrics();

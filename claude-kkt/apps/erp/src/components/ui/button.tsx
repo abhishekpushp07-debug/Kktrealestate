@@ -9,10 +9,12 @@ export const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary: "border-navy-950 bg-navy-950 text-white hover:bg-navy-800 hover:border-navy-800 hover:text-white active:bg-navy-900",
+        primary:
+          "border-navy-950 bg-navy-950 text-white hover:bg-navy-800 hover:border-navy-800 hover:text-white active:bg-navy-900",
         gold: "border-gold bg-gold text-navy-950 hover:bg-gold-hover hover:border-gold-hover hover:text-navy-950 active:bg-gold-hover",
         outline: "border-border-strong bg-card text-navy-950 hover:bg-navy-50 hover:text-navy-950 active:bg-navy-100",
-        ghost: "border-transparent bg-transparent text-ink-muted hover:bg-navy-50 hover:text-navy-950 active:bg-navy-100",
+        ghost:
+          "border-transparent bg-transparent text-ink-muted hover:bg-navy-50 hover:text-navy-950 active:bg-navy-100",
         danger: "border-danger bg-danger text-white hover:bg-danger-hover hover:border-danger-hover hover:text-white",
         "danger-outline": "border-danger/40 bg-card text-danger-fg hover:bg-danger-bg hover:text-danger-fg",
         link: "border-transparent bg-transparent text-navy-700 underline-offset-4 hover:underline hover:text-navy-950 h-auto px-0",
@@ -70,7 +72,12 @@ export function Button({
         <>
           {loading && (
             <span className="absolute inset-0 flex items-center justify-center" aria-hidden="true">
-              <Loader2 className={cn("animate-spin", variant === "primary" || variant === "danger" ? "text-white" : "text-navy-950")} />
+              <Loader2
+                className={cn(
+                  "animate-spin",
+                  variant === "primary" || variant === "danger" ? "text-white" : "text-navy-950",
+                )}
+              />
             </span>
           )}
           {LeftIcon && <LeftIcon aria-hidden="true" />}
@@ -90,7 +97,16 @@ export interface IconButtonProps extends Omit<ButtonProps, "leftIcon" | "rightIc
 
 const ICON_SIZES = { xs: "size-9 sm:size-7", sm: "size-12 sm:size-8", md: "size-12 sm:size-9", lg: "size-12" } as const;
 
-export function IconButton({ icon: Icon, label, className, size = "md", variant = "ghost", loading, ref, ...props }: IconButtonProps) {
+export function IconButton({
+  icon: Icon,
+  label,
+  className,
+  size = "md",
+  variant = "ghost",
+  loading,
+  ref,
+  ...props
+}: IconButtonProps) {
   return (
     <Button
       ref={ref}

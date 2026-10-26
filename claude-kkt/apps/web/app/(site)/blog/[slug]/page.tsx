@@ -44,11 +44,17 @@ export default async function BlogPostPage({ params }: { params: Params }) {
         {post.cover_url ? (
           <>
             <SmartImage src={post.cover_url} alt="" sizes="100vw" priority className="opacity-35" />
-            <div aria-hidden className="absolute inset-0 bg-gradient-to-b from-navy-950/40 via-navy-900/70 to-navy-900" />
+            <div
+              aria-hidden
+              className="absolute inset-0 bg-gradient-to-b from-navy-950/40 via-navy-900/70 to-navy-900"
+            />
           </>
         ) : null}
         <div className="container-site relative pb-16 sm:pb-24">
-          <Link href="/blog" className="inline-flex min-h-12 items-center gap-2 text-sm text-ivory-100/70 hover:text-gold-300">
+          <Link
+            href="/blog"
+            className="inline-flex min-h-12 items-center gap-2 text-sm text-ivory-100/70 hover:text-gold-300"
+          >
             <ArrowLeftIcon size={16} /> Journal
           </Link>
           <p className="mt-6 eyebrow text-gold-300">
@@ -81,7 +87,16 @@ export default async function BlogPostPage({ params }: { params: Params }) {
           </div>
         </div>
       </div>
-      <JsonLd data={[articleJsonLd(post, site, publicApiUrl()), breadcrumbJsonLd([{ name: "Home", path: "/" }, { name: "Journal", path: "/blog" }, { name: post.title, path: `/blog/${post.slug}` }])]} />
+      <JsonLd
+        data={[
+          articleJsonLd(post, site, publicApiUrl()),
+          breadcrumbJsonLd([
+            { name: "Home", path: "/" },
+            { name: "Journal", path: "/blog" },
+            { name: post.title, path: `/blog/${post.slug}` },
+          ]),
+        ]}
+      />
     </article>
   );
 }

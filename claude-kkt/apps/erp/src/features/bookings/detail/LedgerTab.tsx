@@ -11,7 +11,9 @@ import { BOOKINGS_PATH, useBookingLedger } from "../api";
 import { LEDGER_AMOUNT_CLASS, ledgerAmountTone, ledgerCategory } from "../bookingMath";
 import { DueAmount } from "../components";
 
-const EVENT_VARIANT: Readonly<Record<LedgerRow["event"], "navy" | "success" | "danger" | "warning" | "info" | "gold" | "neutral">> = {
+const EVENT_VARIANT: Readonly<
+  Record<LedgerRow["event"], "navy" | "success" | "danger" | "warning" | "info" | "gold" | "neutral">
+> = {
   DEMAND: "navy",
   PAYMENT: "success",
   REVERSAL: "danger",
@@ -26,22 +28,42 @@ const EVENT_VARIANT: Readonly<Record<LedgerRow["event"], "navy" | "success" | "d
 function CategoryChip({ row }: { row: LedgerRow }) {
   const category = ledgerCategory(row);
   if (!category) return <span className="text-ink-subtle">—</span>;
-  return <Badge variant={category === "CASH" ? "navy" : category === "ACCOUNT" ? "info" : "gold"}>{MONEY_CATEGORY_LABELS[category]}</Badge>;
+  return (
+    <Badge variant={category === "CASH" ? "navy" : category === "ACCOUNT" ? "info" : "gold"}>
+      {MONEY_CATEGORY_LABELS[category]}
+    </Badge>
+  );
 }
 
 function RefLink({ row }: { row: LedgerRow }) {
   if (!row.ref_number) return <span className="text-ink-subtle">—</span>;
-  const isPayment = row.event === "PAYMENT" || row.event === "REVERSAL" || row.event === "OTHER_CHARGE_PAYMENT" || row.event === "OTHER_CHARGE_REVERSAL";
+  const isPayment =
+    row.event === "PAYMENT" ||
+    row.event === "REVERSAL" ||
+    row.event === "OTHER_CHARGE_PAYMENT" ||
+    row.event === "OTHER_CHARGE_REVERSAL";
   if (isPayment && row.ref_id) {
     return (
-      <Link to={`/print/receipt/${row.ref_id}`} target="_blank" rel="noopener" className="money text-navy-800 underline underline-offset-2 hover:text-navy-950 focus-ring rounded-xs" onClick={(event) => event.stopPropagation()}>
+      <Link
+        to={`/print/receipt/${row.ref_id}`}
+        target="_blank"
+        rel="noopener"
+        className="money text-navy-800 underline underline-offset-2 hover:text-navy-950 focus-ring rounded-xs"
+        onClick={(event) => event.stopPropagation()}
+      >
         {row.ref_number}
       </Link>
     );
   }
   if ((row.event === "DEMAND" || row.event === "OTHER_CHARGE_DEMAND") && row.ref_id) {
     return (
-      <Link to={`/print/demand/${row.booking_id}/${row.ref_id}`} target="_blank" rel="noopener" className="money text-navy-800 underline underline-offset-2 hover:text-navy-950 focus-ring rounded-xs" onClick={(event) => event.stopPropagation()}>
+      <Link
+        to={`/print/demand/${row.booking_id}/${row.ref_id}`}
+        target="_blank"
+        rel="noopener"
+        className="money text-navy-800 underline underline-offset-2 hover:text-navy-950 focus-ring rounded-xs"
+        onClick={(event) => event.stopPropagation()}
+      >
         {row.ref_number}
       </Link>
     );
@@ -62,7 +84,9 @@ function LedgerCard({ row }: { row: LedgerRow }) {
           <p className="mt-0.5 truncate text-xs text-ink-muted">{row.label ?? row.note ?? ""}</p>
         </div>
         <div className="text-right">
-          <p className={cn("money text-base font-bold", LEDGER_AMOUNT_CLASS[tone])}>{formatINR(row.amount_paise, { signed: tone === "credit" })}</p>
+          <p className={cn("money text-base font-bold", LEDGER_AMOUNT_CLASS[tone])}>
+            {formatINR(row.amount_paise, { signed: tone === "credit" })}
+          </p>
           <p className="money text-2xs text-ink-subtle">
             #{row.seq} · {formatDate(row.entry_date)}
           </p>
@@ -89,8 +113,15 @@ function LedgerCard({ row }: { row: LedgerRow }) {
         </div>
       </dl>
       <p className="money text-2xs text-ink-subtle">
-        Paid cum. cash {formatINRShort(row.cash_paid_cum_paise)} · account {formatINRShort(row.account_paid_cum_paise)} · raised cash {formatINRShort(row.cash_order_raised_paise)} · account {formatINRShort(row.account_order_raised_paise)}
-        {row.ref_number ? <> · <RefLink row={row} /></> : null}
+        Paid cum. cash {formatINRShort(row.cash_paid_cum_paise)} · account {formatINRShort(row.account_paid_cum_paise)}{" "}
+        · raised cash {formatINRShort(row.cash_order_raised_paise)} · account{" "}
+        {formatINRShort(row.account_order_raised_paise)}
+        {row.ref_number ? (
+          <>
+            {" "}
+            · <RefLink row={row} />
+          </>
+        ) : null}
       </p>
     </div>
   );
@@ -104,19 +135,104 @@ export function LedgerTab({ bookingId }: { bookingId: string }) {
 
   const columns = useMemo<ColumnDef<LedgerRow, unknown>[]>(
     () => [
-      { accessorKey: "entry_date", header: "Date", meta: { locked: true, width: 110, sortKey: false }, cell: ({ row }) => <span className="money leading-tight"><span className="block">{formatDate(row.original.entry_date)}</span><span className="block text-2xs text-ink-subtle">#{row.original.seq}</span></span> },
-      { accessorKey: "event", header: "Event", meta: { width: 150, sortKey: false }, cell: ({ row }) => <Badge variant={EVENT_VARIANT[row.original.event]}>{LEDGER_EVENT_LABELS[row.original.event]}</Badge> },
-      { accessorKey: "label", header: "Stage / installment", meta: { sortKey: false }, cell: ({ row }) => <span className="block truncate leading-tight"><span className="block">{row.original.label ?? "—"}</span>{row.original.note && <span className="block truncate text-2xs text-ink-subtle">{row.original.note}</span>}</span> },
-      { id: "category", header: "Category", meta: { width: 110, sortKey: false }, cell: ({ row }) => <CategoryChip row={row.original} /> },
-      { accessorKey: "amount_paise", header: "Amount", meta: { align: "right", width: 130, sortKey: false }, cell: ({ row }) => <span className={cn("money font-semibold", LEDGER_AMOUNT_CLASS[ledgerAmountTone(row.original)])}>{formatINR(row.original.amount_paise, { signed: ledgerAmountTone(row.original) === "credit" })}</span> },
-      { accessorKey: "cash_paid_cum_paise", header: "Cash paid (cum.)", meta: { align: "right", width: 130, sortKey: false, label: "Cash paid" }, cell: ({ row }) => <span className="money">{formatINR(row.original.cash_paid_cum_paise)}</span> },
-      { accessorKey: "account_paid_cum_paise", header: "Account paid (cum.)", meta: { align: "right", width: 140, sortKey: false, label: "Account paid" }, cell: ({ row }) => <span className="money">{formatINR(row.original.account_paid_cum_paise)}</span> },
-      { accessorKey: "cash_order_raised_paise", header: "Cash raised", meta: { align: "right", width: 130, sortKey: false }, cell: ({ row }) => <span className="money text-ink-muted">{formatINR(row.original.cash_order_raised_paise)}</span> },
-      { accessorKey: "account_order_raised_paise", header: "Account raised", meta: { align: "right", width: 140, sortKey: false }, cell: ({ row }) => <span className="money text-ink-muted">{formatINR(row.original.account_order_raised_paise)}</span> },
-      { accessorKey: "cash_due_paise", header: "Cash due", meta: { align: "right", width: 150, sortKey: false }, cell: ({ row }) => <DueAmount paise={row.original.cash_due_paise} /> },
-      { accessorKey: "account_due_paise", header: "Account due", meta: { align: "right", width: 150, sortKey: false }, cell: ({ row }) => <DueAmount paise={row.original.account_due_paise} /> },
-      { accessorKey: "total_due_paise", header: "Total due", meta: { align: "right", width: 150, sortKey: false }, cell: ({ row }) => <DueAmount paise={row.original.total_due_paise} className="text-sm" /> },
-      { accessorKey: "ref_number", header: "Ref", meta: { width: 150, sortKey: false }, cell: ({ row }) => <RefLink row={row.original} /> },
+      {
+        accessorKey: "entry_date",
+        header: "Date",
+        meta: { locked: true, width: 110, sortKey: false },
+        cell: ({ row }) => (
+          <span className="money leading-tight">
+            <span className="block">{formatDate(row.original.entry_date)}</span>
+            <span className="block text-2xs text-ink-subtle">#{row.original.seq}</span>
+          </span>
+        ),
+      },
+      {
+        accessorKey: "event",
+        header: "Event",
+        meta: { width: 150, sortKey: false },
+        cell: ({ row }) => (
+          <Badge variant={EVENT_VARIANT[row.original.event]}>{LEDGER_EVENT_LABELS[row.original.event]}</Badge>
+        ),
+      },
+      {
+        accessorKey: "label",
+        header: "Stage / installment",
+        meta: { sortKey: false },
+        cell: ({ row }) => (
+          <span className="block truncate leading-tight">
+            <span className="block">{row.original.label ?? "—"}</span>
+            {row.original.note && <span className="block truncate text-2xs text-ink-subtle">{row.original.note}</span>}
+          </span>
+        ),
+      },
+      {
+        id: "category",
+        header: "Category",
+        meta: { width: 110, sortKey: false },
+        cell: ({ row }) => <CategoryChip row={row.original} />,
+      },
+      {
+        accessorKey: "amount_paise",
+        header: "Amount",
+        meta: { align: "right", width: 130, sortKey: false },
+        cell: ({ row }) => (
+          <span className={cn("money font-semibold", LEDGER_AMOUNT_CLASS[ledgerAmountTone(row.original)])}>
+            {formatINR(row.original.amount_paise, { signed: ledgerAmountTone(row.original) === "credit" })}
+          </span>
+        ),
+      },
+      {
+        accessorKey: "cash_paid_cum_paise",
+        header: "Cash paid (cum.)",
+        meta: { align: "right", width: 130, sortKey: false, label: "Cash paid" },
+        cell: ({ row }) => <span className="money">{formatINR(row.original.cash_paid_cum_paise)}</span>,
+      },
+      {
+        accessorKey: "account_paid_cum_paise",
+        header: "Account paid (cum.)",
+        meta: { align: "right", width: 140, sortKey: false, label: "Account paid" },
+        cell: ({ row }) => <span className="money">{formatINR(row.original.account_paid_cum_paise)}</span>,
+      },
+      {
+        accessorKey: "cash_order_raised_paise",
+        header: "Cash raised",
+        meta: { align: "right", width: 130, sortKey: false },
+        cell: ({ row }) => (
+          <span className="money text-ink-muted">{formatINR(row.original.cash_order_raised_paise)}</span>
+        ),
+      },
+      {
+        accessorKey: "account_order_raised_paise",
+        header: "Account raised",
+        meta: { align: "right", width: 140, sortKey: false },
+        cell: ({ row }) => (
+          <span className="money text-ink-muted">{formatINR(row.original.account_order_raised_paise)}</span>
+        ),
+      },
+      {
+        accessorKey: "cash_due_paise",
+        header: "Cash due",
+        meta: { align: "right", width: 150, sortKey: false },
+        cell: ({ row }) => <DueAmount paise={row.original.cash_due_paise} />,
+      },
+      {
+        accessorKey: "account_due_paise",
+        header: "Account due",
+        meta: { align: "right", width: 150, sortKey: false },
+        cell: ({ row }) => <DueAmount paise={row.original.account_due_paise} />,
+      },
+      {
+        accessorKey: "total_due_paise",
+        header: "Total due",
+        meta: { align: "right", width: 150, sortKey: false },
+        cell: ({ row }) => <DueAmount paise={row.original.total_due_paise} className="text-sm" />,
+      },
+      {
+        accessorKey: "ref_number",
+        header: "Ref",
+        meta: { width: 150, sortKey: false },
+        cell: ({ row }) => <RefLink row={row.original} />,
+      },
     ],
     [],
   );
@@ -127,7 +243,8 @@ export function LedgerTab({ bookingId }: { bookingId: string }) {
     <div className="space-y-3" data-testid="ledger-tab">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-ink-muted">
-          One row per event with running balances. <span className="font-semibold text-success-fg">Green</span> = advance (paid beyond what is raised), <span className="font-semibold text-danger-fg">red</span> = due.
+          One row per event with running balances. <span className="font-semibold text-success-fg">Green</span> =
+          advance (paid beyond what is raised), <span className="font-semibold text-danger-fg">red</span> = due.
         </p>
         <Button
           size="sm"
@@ -137,7 +254,11 @@ export function LedgerTab({ bookingId }: { bookingId: string }) {
           onClick={async () => {
             setExporting(true);
             try {
-              await api.exportCsv(`${BOOKINGS_PATH}/${bookingId}/ledger`, { page_size: 200, sort: "seq" }, "ledger.csv");
+              await api.exportCsv(
+                `${BOOKINGS_PATH}/${bookingId}/ledger`,
+                { page_size: 200, sort: "seq" },
+                "ledger.csv",
+              );
             } finally {
               setExporting(false);
             }

@@ -48,21 +48,55 @@ export type StaffOption = Pick<UserRow, "id" | "name" | "email" | "role_name" | 
  */
 export function useStaffOptions(enabled = true): UseQueryResult<StaffOption[], ApiClientError> {
   const { can } = useAuth();
-  const source = can("users.manage") ? "users" : can("lead.read") ? "assignees" : can("customer.read") ? "relationship-managers" : "none";
+  const source = can("users.manage")
+    ? "users"
+    : can("lead.read")
+      ? "assignees"
+      : can("customer.read")
+        ? "relationship-managers"
+        : "none";
   return useQuery<StaffOption[], ApiClientError, StaffOption[]>({
     queryKey: ["/users", "options", source],
     queryFn: async ({ signal }) => {
       if (source === "users") {
-        const data = await api.list<UserRow>("/users", { page_size: 200, sort: "name", include_inactive: true }, { signal });
-        return data.items.map((user) => ({ id: user.id, name: user.name, email: user.email, role_name: user.role_name, is_active: user.is_active }));
+        const data = await api.list<UserRow>(
+          "/users",
+          { page_size: 200, sort: "name", include_inactive: true },
+          { signal },
+        );
+        return data.items.map((user) => ({
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role_name: user.role_name,
+          is_active: user.is_active,
+        }));
       }
       if (source === "assignees") {
-        const data = await api.get<{ items: Array<{ id: string; name: string; role_name: string }> }>("/leads/assignees", { signal });
-        return data.items.map((user) => ({ id: user.id, name: user.name, email: "", role_name: user.role_name, is_active: true }));
+        const data = await api.get<{ items: Array<{ id: string; name: string; role_name: string }> }>(
+          "/leads/assignees",
+          { signal },
+        );
+        return data.items.map((user) => ({
+          id: user.id,
+          name: user.name,
+          email: "",
+          role_name: user.role_name,
+          is_active: true,
+        }));
       }
       if (source === "relationship-managers") {
-        const data = await api.get<{ items: Array<{ id: string; name: string; email: string }> }>("/customers/relationship-managers", { signal });
-        return data.items.map((user) => ({ id: user.id, name: user.name, email: user.email, role_name: "Sales", is_active: true }));
+        const data = await api.get<{ items: Array<{ id: string; name: string; email: string }> }>(
+          "/customers/relationship-managers",
+          { signal },
+        );
+        return data.items.map((user) => ({
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role_name: "Sales",
+          is_active: true,
+        }));
       }
       return [];
     },

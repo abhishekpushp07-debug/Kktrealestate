@@ -253,7 +253,12 @@
 }
 
 @utility skeleton {
-  background: linear-gradient(90deg, var(--color-ivory-200) 25%, var(--color-ivory-300) 50%, var(--color-ivory-200) 75%);
+  background: linear-gradient(
+    90deg,
+    var(--color-ivory-200) 25%,
+    var(--color-ivory-300) 50%,
+    var(--color-ivory-200) 75%
+  );
   background-size: 200% 100%;
   animation: var(--animate-shimmer);
 }

@@ -3,14 +3,49 @@ import { registerExportRoutes } from "./exports.js";
 import { registerDocumentRoutes } from "./routes.js";
 
 export {
-  storeBuffer, signedUrl, publicMediaUrl, streamDocument, listForEntity, loadRows, documentsSharedWithCustomer, toDocumentRow, loadJoined,
-  verifyLinkToken, variantKey, variantMeta, safeFileName, SIGNED_LINK_TTL_SECONDS, MAX_IMAGE_PIXELS,
-  type StoreBufferInput, type DocumentRecord, type DocumentJoined, type DocumentStream,
+  storeBuffer,
+  signedUrl,
+  publicMediaUrl,
+  streamDocument,
+  listForEntity,
+  loadRows,
+  documentsSharedWithCustomer,
+  toDocumentRow,
+  loadJoined,
+  withDocumentJoins,
+  DOCUMENT_SELECT,
+  verifyLinkToken,
+  variantKey,
+  variantMeta,
+  safeFileName,
+  SIGNED_LINK_TTL_SECONDS,
+  MAX_IMAGE_PIXELS,
+  type StoreBufferInput,
+  type DocumentRecord,
+  type DocumentJoined,
+  type DocumentStream,
 } from "./service.js";
 export { storeFile, withTempDir, signFileToken, verifyFileToken, fileTokenKey } from "./files.js";
-export { runCsvExport, cleanupExports, exportLink, exportFileName, toExportRow, resolveListRoute, exportUrl, EXPORT_TTL_DAYS, RESERVED_EXPORT_KEYS } from "./exports.js";
+export {
+  runCsvExport,
+  cleanupExports,
+  exportLink,
+  exportFileName,
+  toExportRow,
+  resolveListRoute,
+  exportUrl,
+  EXPORT_TTL_DAYS,
+  RESERVED_EXPORT_KEYS,
+} from "./exports.js";
 export { storage as documentStorage } from "./service.js";
-export { resolveEntity, requireEntity, assertEntityWrite, documentScopeCondition, ENTITY_WRITE_PERMISSION, type EntityRef } from "./entities.js";
+export {
+  resolveEntity,
+  requireEntity,
+  assertEntityWrite,
+  documentScopeCondition,
+  ENTITY_WRITE_PERMISSION,
+  type EntityRef,
+} from "./entities.js";
 
 /**
  * Documents & media module (SPEC §13, §2, §16): multipart uploads validated by file signature, uuid storage keys, webp variants,

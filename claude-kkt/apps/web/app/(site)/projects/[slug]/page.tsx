@@ -75,43 +75,75 @@ export default async function ProjectPage({ params }: { params: Params }) {
   const project = await getProject(slug);
   const facts = project.key_facts;
   const address = facts?.address ?? NO_ADDRESS;
-  const addressLine = [address.line1, address.line2, address.locality, address.city ?? project.city, address.state, address.pincode].filter(Boolean).join(", ");
+  const addressLine = [
+    address.line1,
+    address.line2,
+    address.locality,
+    address.city ?? project.city,
+    address.state,
+    address.pincode,
+  ]
+    .filter(Boolean)
+    .join(", ");
   const sections = sectionsFor(project);
-  const flatTypes = project.configurations.map((c) => ({ code: c.code, label: c.bhk ? `${c.bhk} BHK · ${c.name}` : c.name }));
+  const flatTypes = project.configurations.map((c) => ({
+    code: c.code,
+    label: c.bhk ? `${c.bhk} BHK · ${c.name}` : c.name,
+  }));
   const bhk = bhkLabel(project.bhk_options ?? project.configurations.map((c) => c.bhk ?? 0).filter(Boolean));
-  const mapsSearch = typeof project.latitude === "number" && typeof project.longitude === "number" ? `https://www.google.com/maps/search/?api=1&query=${project.latitude},${project.longitude}` : addressLine ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${project.name}, ${addressLine}`)}` : null;
+  const mapsSearch =
+    typeof project.latitude === "number" && typeof project.longitude === "number"
+      ? `https://www.google.com/maps/search/?api=1&query=${project.latitude},${project.longitude}`
+      : addressLine
+        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${project.name}, ${addressLine}`)}`
+        : null;
 
   return (
     <>
       {/* Header */}
       <div className="relative overflow-hidden bg-navy-900 pt-28 text-ivory-100 sm:pt-32">
-        <div aria-hidden className="absolute inset-0" style={{ background: "radial-gradient(ellipse at 10% 0%, rgb(201 162 39 / 0.14), transparent 50%)" }} />
+        <div
+          aria-hidden
+          className="absolute inset-0"
+          style={{ background: "radial-gradient(ellipse at 10% 0%, rgb(201 162 39 / 0.14), transparent 50%)" }}
+        />
         <div className="container-site relative pb-10">
           <nav aria-label="Breadcrumb" className="text-sm text-ivory-100/60">
             <ol className="flex flex-wrap items-center gap-2">
               <li>
-                <Link href="/" className="inline-flex min-h-12 items-center hover:text-gold-300">Home</Link>
+                <Link href="/" className="inline-flex min-h-12 items-center hover:text-gold-300">
+                  Home
+                </Link>
               </li>
               <li aria-hidden>/</li>
               <li>
-                <Link href="/projects" className="inline-flex min-h-12 items-center hover:text-gold-300">Projects</Link>
+                <Link href="/projects" className="inline-flex min-h-12 items-center hover:text-gold-300">
+                  Projects
+                </Link>
               </li>
               <li aria-hidden>/</li>
-              <li aria-current="page" className="inline-flex min-h-12 items-center text-ivory-100">{project.name}</li>
+              <li aria-current="page" className="inline-flex min-h-12 items-center text-ivory-100">
+                {project.name}
+              </li>
             </ol>
           </nav>
           <div className="mt-4 flex flex-wrap gap-2">
             <Badge>{statusLabel(project.status)}</Badge>
             <Badge tone="ivory">{typeLabel(project.project_type)}</Badge>
-            {project.rera_number ?? facts?.rera_number ? <Badge tone="ivory">RERA {project.rera_number ?? facts?.rera_number}</Badge> : null}
+            {(project.rera_number ?? facts?.rera_number) ? (
+              <Badge tone="ivory">RERA {project.rera_number ?? facts?.rera_number}</Badge>
+            ) : null}
           </div>
           <div className="mt-6 flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl">
               <h1 className="font-display text-display-lg text-balance">{project.name}</h1>
               <p className="mt-3 flex items-center gap-2 text-lg text-ivory-100/80">
-                <MapPinIcon className="text-gold-300" /> {[address.locality, address.city ?? project.city].filter(Boolean).join(", ")}
+                <MapPinIcon className="text-gold-300" />{" "}
+                {[address.locality, address.city ?? project.city].filter(Boolean).join(", ")}
               </p>
-              {project.tagline ? <p className="mt-4 max-w-2xl text-xl leading-8 text-ivory-100/75">{project.tagline}</p> : null}
+              {project.tagline ? (
+                <p className="mt-4 max-w-2xl text-xl leading-8 text-ivory-100/75">{project.tagline}</p>
+              ) : null}
             </div>
             <dl className="grid grid-cols-2 gap-x-8 gap-y-4 text-sm sm:grid-cols-3 lg:shrink-0">
               {bhk ? (
@@ -120,10 +152,12 @@ export default async function ProjectPage({ params }: { params: Params }) {
                   <dd className="mt-1 font-semibold">{bhk}</dd>
                 </div>
               ) : null}
-              {project.possession_date ?? facts?.possession_date ? (
+              {(project.possession_date ?? facts?.possession_date) ? (
                 <div>
                   <dt className="text-xs uppercase tracking-widest text-ivory-100/60">Possession</dt>
-                  <dd className="mt-1 font-semibold">{formatDate(project.possession_date ?? facts?.possession_date, "month")}</dd>
+                  <dd className="mt-1 font-semibold">
+                    {formatDate(project.possession_date ?? facts?.possession_date, "month")}
+                  </dd>
                 </div>
               ) : null}
               {facts?.total_units ? (
@@ -145,11 +179,18 @@ export default async function ProjectPage({ params }: { params: Params }) {
       </div>
 
       {/* In-page navigation */}
-      <nav aria-label="On this page" data-section-nav className="sticky top-18 z-30 border-b border-line bg-ivory-100/90 backdrop-blur">
+      <nav
+        aria-label="On this page"
+        data-section-nav
+        className="sticky top-18 z-30 border-b border-line bg-ivory-100/90 backdrop-blur"
+      >
         <ul className="container-site hide-scrollbar flex gap-1 overflow-x-auto">
           {sections.map((s) => (
             <li key={s.id} className="shrink-0">
-              <a href={`#${s.id}`} className="tap inline-flex items-center px-3 text-sm font-medium text-ink-muted transition hover:text-navy-900">
+              <a
+                href={`#${s.id}`}
+                className="tap inline-flex items-center px-3 text-sm font-medium text-ink-muted transition hover:text-navy-900"
+              >
                 {s.label}
               </a>
             </li>
@@ -169,7 +210,10 @@ export default async function ProjectPage({ params }: { params: Params }) {
             {project.highlights.length ? (
               <ul className="mt-8 grid gap-3 sm:grid-cols-2">
                 {project.highlights.map((h) => (
-                  <li key={h} className="flex gap-3 rounded-2xl border border-line bg-white px-4 py-3 text-[0.95rem] leading-6 text-navy-900">
+                  <li
+                    key={h}
+                    className="flex gap-3 rounded-2xl border border-line bg-white px-4 py-3 text-[0.95rem] leading-6 text-navy-900"
+                  >
                     <CheckIcon size={18} className="mt-1 shrink-0 text-gold-600" /> {h}
                   </li>
                 ))}
@@ -186,7 +230,12 @@ export default async function ProjectPage({ params }: { params: Params }) {
                     ["Status", statusLabel(project.status)],
                     ["RERA number", project.rera_number ?? facts?.rera_number ?? null],
                     ["Launched", facts?.launch_date ? formatDate(facts.launch_date, "month") : null],
-                    ["Possession", project.possession_date ?? facts?.possession_date ? formatDate(project.possession_date ?? facts?.possession_date, "month") : null],
+                    [
+                      "Possession",
+                      (project.possession_date ?? facts?.possession_date)
+                        ? formatDate(project.possession_date ?? facts?.possession_date, "month")
+                        : null,
+                    ],
                     ["Land area", facts?.land_area_sqft ? formatSqft(facts.land_area_sqft) : null],
                     ["Total homes", facts?.total_units ? formatNumber(facts.total_units) : null],
                     ["Towers / blocks", facts?.block_count ? formatNumber(facts.block_count) : null],
@@ -211,9 +260,7 @@ export default async function ProjectPage({ params }: { params: Params }) {
                         <CheckIcon size={18} className="mt-1 shrink-0 text-success" />
                         <div className="min-w-0 text-sm">
                           <p className="font-medium text-navy-900">{a.name}</p>
-                          <p className="text-ink-muted">
-                            {[a.number, a.status].filter(Boolean).join(" · ")}
-                          </p>
+                          <p className="text-ink-muted">{[a.number, a.status].filter(Boolean).join(" · ")}</p>
                         </div>
                       </li>
                     ))}
@@ -244,10 +291,15 @@ export default async function ProjectPage({ params }: { params: Params }) {
               <div className="mt-6 space-y-8">
                 {groupAmenities(project.amenities).map(([category, items]) => (
                   <div key={category}>
-                    {groupAmenities(project.amenities).length > 1 ? <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-ink-soft">{category}</h3> : null}
+                    {groupAmenities(project.amenities).length > 1 ? (
+                      <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-ink-soft">{category}</h3>
+                    ) : null}
                     <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                       {items.map((a) => (
-                        <li key={a.name} className="flex items-center gap-3 rounded-2xl border border-line bg-white px-4 py-3 text-sm text-navy-900">
+                        <li
+                          key={a.name}
+                          className="flex items-center gap-3 rounded-2xl border border-line bg-white px-4 py-3 text-sm text-navy-900"
+                        >
                           <span aria-hidden className="h-2 w-2 shrink-0 rounded-full bg-gold-500" /> {a.name}
                         </li>
                       ))}
@@ -288,12 +340,20 @@ export default async function ProjectPage({ params }: { params: Params }) {
               <div className="mt-6 grid gap-6">
                 {project.video_urls.map((url, i) => (
                   <Reveal key={url}>
-                    <ClickToLoadEmbed url={url} kind="video" title={`${project.name} walkthrough ${project.video_urls.length > 1 ? i + 1 : ""}`.trim()} />
+                    <ClickToLoadEmbed
+                      url={url}
+                      kind="video"
+                      title={`${project.name} walkthrough ${project.video_urls.length > 1 ? i + 1 : ""}`.trim()}
+                    />
                   </Reveal>
                 ))}
                 {project.tour_urls.map((url, i) => (
                   <Reveal key={url}>
-                    <ClickToLoadEmbed url={url} kind="tour" title={`${project.name} 360° tour ${project.tour_urls.length > 1 ? i + 1 : ""}`.trim()} />
+                    <ClickToLoadEmbed
+                      url={url}
+                      kind="tour"
+                      title={`${project.name} 360° tour ${project.tour_urls.length > 1 ? i + 1 : ""}`.trim()}
+                    />
                   </Reveal>
                 ))}
               </div>
@@ -308,20 +368,32 @@ export default async function ProjectPage({ params }: { params: Params }) {
               </h2>
               {addressLine ? <p className="mt-2 text-ink-muted">{addressLine}</p> : null}
               <div className="mt-6 grid gap-6 lg:grid-cols-[1.4fr_1fr]">
-                {project.map_embed_url ? <ClickToLoadEmbed url={project.map_embed_url} kind="map" title={`${project.name} on the map`} /> : null}
+                {project.map_embed_url ? (
+                  <ClickToLoadEmbed url={project.map_embed_url} kind="map" title={`${project.name} on the map`} />
+                ) : null}
                 <div>
                   {project.landmarks.length ? (
                     <ul className="divide-y divide-line rounded-card border border-line bg-white">
                       {project.landmarks.map((l, i) => (
-                        <li key={`${l.name}-${i}`} className="flex items-center justify-between gap-4 px-5 py-3 text-sm">
+                        <li
+                          key={`${l.name}-${i}`}
+                          className="flex items-center justify-between gap-4 px-5 py-3 text-sm"
+                        >
                           <span className="text-navy-900">{l.name}</span>
-                          {typeof l.distance_km === "number" ? <span className="shrink-0 text-ink-muted">{formatNumber(l.distance_km, 1)} km</span> : null}
+                          {typeof l.distance_km === "number" ? (
+                            <span className="shrink-0 text-ink-muted">{formatNumber(l.distance_km, 1)} km</span>
+                          ) : null}
                         </li>
                       ))}
                     </ul>
                   ) : null}
                   {mapsSearch ? (
-                    <a href={mapsSearch} className="mt-4 inline-flex min-h-12 items-center gap-2 font-semibold text-gold-700 underline-offset-4 hover:underline" rel="noopener noreferrer" target="_blank">
+                    <a
+                      href={mapsSearch}
+                      className="mt-4 inline-flex min-h-12 items-center gap-2 font-semibold text-gold-700 underline-offset-4 hover:underline"
+                      rel="noopener noreferrer"
+                      target="_blank"
+                    >
                       Get directions <ExternalLinkIcon size={16} />
                     </a>
                   ) : null}
@@ -331,7 +403,11 @@ export default async function ProjectPage({ params }: { params: Params }) {
           ) : null}
 
           {project.brochure_available ? (
-            <section id="brochure" className="scroll-mt-32 overflow-hidden rounded-card bg-navy-900 p-8 text-ivory-100 sm:p-10" aria-labelledby="brochure-title">
+            <section
+              id="brochure"
+              className="scroll-mt-32 overflow-hidden rounded-card bg-navy-900 p-8 text-ivory-100 sm:p-10"
+              aria-labelledby="brochure-title"
+            >
               <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="eyebrow text-gold-300">Brochure</p>
@@ -371,14 +447,21 @@ export default async function ProjectPage({ params }: { params: Params }) {
       </div>
 
       {project.visit_booking_enabled ? (
-        <section id="visit" className="scroll-mt-20 bg-navy-900 py-16 text-ivory-100 sm:py-24" aria-labelledby="visit-title">
+        <section
+          id="visit"
+          className="scroll-mt-20 bg-navy-900 py-16 text-ivory-100 sm:py-24"
+          aria-labelledby="visit-title"
+        >
           <div className="container-site grid gap-12 lg:grid-cols-[1fr_1.4fr] lg:gap-16">
             <div>
               <p className="eyebrow text-gold-300">Private site visit</p>
               <h2 id="visit-title" className="mt-4 font-display text-display-md">
                 See {project.name} in person
               </h2>
-              <p className="mt-6 text-lg leading-8 text-ivory-100/75">Choose a time that suits you. A relationship manager will walk you through the site, the show flat and every detail you want to see.</p>
+              <p className="mt-6 text-lg leading-8 text-ivory-100/75">
+                Choose a time that suits you. A relationship manager will walk you through the site, the show flat and
+                every detail you want to see.
+              </p>
               <ul className="mt-8 space-y-3 text-ivory-100/80">
                 <li className="flex gap-3">
                   <CalendarIcon className="shrink-0 text-gold-300" /> Confirmed instantly, with a calendar invite
@@ -389,7 +472,12 @@ export default async function ProjectPage({ params }: { params: Params }) {
               </ul>
             </div>
             <div className="rounded-card border border-ivory-100/10 bg-ivory-100/5 p-6 backdrop-blur-sm sm:p-8">
-              <VisitBooking projects={[{ slug: project.slug, name: project.name }]} defaultProjectSlug={project.slug} fixedProject tone="dark" />
+              <VisitBooking
+                projects={[{ slug: project.slug, name: project.name }]}
+                defaultProjectSlug={project.slug}
+                fixedProject
+                tone="dark"
+              />
             </div>
           </div>
         </section>
@@ -410,7 +498,11 @@ export default async function ProjectPage({ params }: { params: Params }) {
       <JsonLd
         data={[
           projectJsonLd(project, publicApiUrl()),
-          breadcrumbJsonLd([{ name: "Home", path: "/" }, { name: "Projects", path: "/projects" }, { name: project.name, path: `/projects/${project.slug}` }]),
+          breadcrumbJsonLd([
+            { name: "Home", path: "/" },
+            { name: "Projects", path: "/projects" },
+            { name: project.name, path: `/projects/${project.slug}` },
+          ]),
           ...(project.faqs.length ? [faqJsonLd(project.faqs)] : []),
         ]}
       />

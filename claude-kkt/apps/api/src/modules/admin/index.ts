@@ -16,10 +16,45 @@ import { registerToolRoutes } from "./tools.js";
 
 export { requireSuperAdmin, SUPER_ADMIN_ROLE } from "./common.js";
 export { numberingPreview, loadSettings, toSettingsResponse, mergeJson } from "./settings.js";
-export { writeBackupArchive, runBackupJob, listBackups, loadDoneBackup, toBackupRow, backupTables, tableScope, isSensitiveColumn, backupLink, signBackupToken, verifyBackupToken, fkLoadOrder, schemaVersion, pgClient, BACKUP_TTL_SECONDS, BACKUP_LINK_TTL_SECONDS, BACKUP_FORMAT, BACKUP_BATCH_SIZE, BACKUP_PATH, RESTORE_MD, type BackupManifest, type BackupManifestTable, type BackupTableScope, type WriteBackupOptions } from "./backup.js";
+export {
+  writeBackupArchive,
+  runBackupJob,
+  listBackups,
+  loadDoneBackup,
+  toBackupRow,
+  backupTables,
+  tableScope,
+  isSensitiveColumn,
+  backupLink,
+  signBackupToken,
+  verifyBackupToken,
+  fkLoadOrder,
+  schemaVersion,
+  pgClient,
+  BACKUP_TTL_SECONDS,
+  BACKUP_LINK_TTL_SECONDS,
+  BACKUP_FORMAT,
+  BACKUP_BATCH_SIZE,
+  BACKUP_PATH,
+  RESTORE_MD,
+  type BackupManifest,
+  type BackupManifestTable,
+  type BackupTableScope,
+  type WriteBackupOptions,
+} from "./backup.js";
 export { restoreBackup, readZipEntries, readZipText, type RestoreOptions, type RestoreResult } from "./restore.js";
 export { eraseCustomer, activeBookingsOf, erasedPhone, erasedName, type EraseInput } from "./erase.js";
-export { bookingsInScope, reconcileBookings, recomputeBookings, reconciliationJob, partitionMaintenance, systemFacts, loadReseed, toJobRunRow, type RebuildScope } from "./tools.js";
+export {
+  bookingsInScope,
+  reconcileBookings,
+  recomputeBookings,
+  reconciliationJob,
+  partitionMaintenance,
+  systemFacts,
+  loadReseed,
+  toJobRunRow,
+  type RebuildScope,
+} from "./tools.js";
 
 /** Fastify plugin: settings, backup, tools (recompute/reconcile/jobs/system/reseed) and erasure routes. */
 export default async function adminModule(app: FastifyInstance): Promise<void> {

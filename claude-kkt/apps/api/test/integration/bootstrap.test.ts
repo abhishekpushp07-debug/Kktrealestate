@@ -9,7 +9,13 @@ import { buildTestApp, truncateAll, type TestContext } from "./helpers.js";
  * production is simulated in-process by switching `config` (NODE_ENV, SEED_DEMO, BOOTSTRAP_*) and restoring it after every test.
  */
 let t: TestContext;
-const saved = { NODE_ENV: config.NODE_ENV, SEED_DEMO: config.SEED_DEMO, name: config.BOOTSTRAP_COMPANY_NAME, email: config.BOOTSTRAP_ADMIN_EMAIL, password: config.BOOTSTRAP_ADMIN_PASSWORD };
+const saved = {
+  NODE_ENV: config.NODE_ENV,
+  SEED_DEMO: config.SEED_DEMO,
+  name: config.BOOTSTRAP_COMPANY_NAME,
+  email: config.BOOTSTRAP_ADMIN_EMAIL,
+  password: config.BOOTSTRAP_ADMIN_PASSWORD,
+};
 
 function production(env: { name?: string; email?: string; password?: string; seedDemo?: boolean } = {}): void {
   config.NODE_ENV = "production";
@@ -26,7 +32,9 @@ async function counts(): Promise<{ companies: number; roles: number; users: numb
   return r!;
 }
 
-beforeAll(async () => { t = await buildTestApp(); });
+beforeAll(async () => {
+  t = await buildTestApp();
+});
 afterEach(async () => {
   config.NODE_ENV = saved.NODE_ENV;
   config.SEED_DEMO = saved.SEED_DEMO;
@@ -47,7 +55,9 @@ describe("production bootstrap", () => {
     production();
     expect(bootstrapMode()).toBe("production");
     await expect(ensureBootstrap(t.app.db)).rejects.toBeInstanceOf(BootstrapRefused);
-    await expect(ensureBootstrap(t.app.db)).rejects.toThrow(/BOOTSTRAP_COMPANY_NAME is not set; BOOTSTRAP_ADMIN_EMAIL is not set; BOOTSTRAP_ADMIN_PASSWORD is not set/);
+    await expect(ensureBootstrap(t.app.db)).rejects.toThrow(
+      /BOOTSTRAP_COMPANY_NAME is not set; BOOTSTRAP_ADMIN_EMAIL is not set; BOOTSTRAP_ADMIN_PASSWORD is not set/,
+    );
     expect(await counts()).toEqual({ companies: 0, roles: 0, users: 0, projects: 0 });
   });
 
@@ -68,13 +78,21 @@ describe("production bootstrap", () => {
     expect(boot).toMatchObject({ created: true, mode: "production", adminEmail: "owner@acme.example" });
     const [company] = await t.app.sql<{ name: string; gstin: string | null }[]>`select name, gstin from companies`;
     expect(company).toEqual({ name: "Acme Builders", gstin: null });
-    const roleNames = (await t.app.sql<{ name: string }[]>`select name from roles where is_system order by name`).map((r) => r.name);
+    const roleNames = (await t.app.sql<{ name: string }[]>`select name from roles where is_system order by name`).map(
+      (r) => r.name,
+    );
     expect(roleNames).toEqual(["Accounts", "Employee", "Marketing", "Project Admin", "Sales", "Super Admin"]);
-    const users = await t.app.sql<{ email: string; must_change_password: boolean; role: string }[]>`select u.email, u.must_change_password, r.name as role from users u join roles r on r.id = u.role_id`;
+    const users = await t.app.sql<
+      { email: string; must_change_password: boolean; role: string }[]
+    >`select u.email, u.must_change_password, r.name as role from users u join roles r on r.id = u.role_id`;
     expect(users).toEqual([{ email: "owner@acme.example", must_change_password: true, role: "Super Admin" }]);
     for (const demo of BOOTSTRAP_USERS) expect(users.some((u) => u.email === demo.email)).toBe(false);
     // the admin signs in and is forced to change the password first
-    const login = await t.request<{ must_change_password: boolean; access_token: string }>("POST", "/api/v1/auth/login", { body: { email: "owner@acme.example", password: "Strong-Owner-Pass-1" } });
+    const login = await t.request<{ must_change_password: boolean; access_token: string }>(
+      "POST",
+      "/api/v1/auth/login",
+      { body: { email: "owner@acme.example", password: "Strong-Owner-Pass-1" } },
+    );
     expect(login.status).toBe(200);
     expect(login.body.must_change_password).toBe(true);
     expect((await t.request("GET", "/api/v1/users", { token: login.body.access_token })).status).toBe(403);
@@ -88,7 +106,11 @@ describe("production bootstrap", () => {
   it("concurrent replicas booting together create exactly one company and one admin (advisory lock)", async () => {
     await truncateAll(t.app.sql);
     production({ name: "Race Builders", email: "race@acme.example", password: "Strong-Race-Pass-1" });
-    const results = await Promise.all([ensureBootstrap(t.app.db), ensureBootstrap(t.app.db), ensureBootstrap(t.app.db)]);
+    const results = await Promise.all([
+      ensureBootstrap(t.app.db),
+      ensureBootstrap(t.app.db),
+      ensureBootstrap(t.app.db),
+    ]);
     expect(results.filter((r) => r.created)).toHaveLength(1);
     expect(new Set(results.map((r) => r.companyId)).size).toBe(1);
     expect(await counts()).toMatchObject({ companies: 1, roles: 6, users: 1 });
@@ -96,7 +118,10 @@ describe("production bootstrap", () => {
 
   it("the demo bootstrap is also race-free (no duplicate company or logins)", async () => {
     await truncateAll(t.app.sql);
-    const results = await Promise.all([ensureBootstrap(t.app.db, { mode: "demo" }), ensureBootstrap(t.app.db, { mode: "demo" })]);
+    const results = await Promise.all([
+      ensureBootstrap(t.app.db, { mode: "demo" }),
+      ensureBootstrap(t.app.db, { mode: "demo" }),
+    ]);
     expect(new Set(results.map((r) => r.companyId)).size).toBe(1);
     expect(await counts()).toMatchObject({ companies: 1, roles: 6, users: BOOTSTRAP_USERS.length });
   });
@@ -117,12 +142,16 @@ describe("demo seed guards", () => {
   });
 
   it("seedDemo runs under an advisory lock: a second replica waits, then sees the data and skips", async () => {
-    await t.app.sql`insert into projects (company_id, name, code, city) values ((select id from companies limit 1), 'Locked Heights', 'LKH', 'Patna')`;
+    await t.app
+      .sql`insert into projects (company_id, name, code, city) values ((select id from companies limit 1), 'Locked Heights', 'LKH', 'Patna')`;
     const holder = await t.app.sql.reserve();
     try {
       await holder`select pg_advisory_lock(hashtext(${SEED_LOCK_KEY}))`;
       let settled = false;
-      const run = seedDemo(t.app, { log: () => undefined }).then((r) => { settled = true; return r; });
+      const run = seedDemo(t.app, { log: () => undefined }).then((r) => {
+        settled = true;
+        return r;
+      });
       await new Promise((resolve) => setTimeout(resolve, 400));
       expect(settled).toBe(false); // blocked behind the lock
       await holder`select pg_advisory_unlock(hashtext(${SEED_LOCK_KEY}))`;
@@ -138,7 +167,9 @@ describe("demo seed guards", () => {
     const truncated = await truncateBusinessTables(t.app);
     expect(truncated).toContain("projects");
     expect(truncated).not.toContain("audit_logs");
-    const [after] = await t.app.sql<{ n: number; p: number }[]>`select (select count(*)::int from audit_logs) as n, (select count(*)::int from projects) as p`;
+    const [after] = await t.app.sql<
+      { n: number; p: number }[]
+    >`select (select count(*)::int from audit_logs) as n, (select count(*)::int from projects) as p`;
     expect(before!.n).toBeGreaterThan(0);
     expect(after!.n).toBe(before!.n);
     expect(after!.p).toBe(0);

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { AgreementRevisionCreateSchema, BookingCreateSchema, PaymentCreateSchema, RateCardRateSchema } from "../src/index.js";
+import {
+  AgreementRevisionCreateSchema,
+  BookingCreateSchema,
+  PaymentCreateSchema,
+  RateCardRateSchema,
+} from "../src/index.js";
 
 const U = (n: number) => `${n.toString().padStart(8, "0")}-0000-4000-8000-000000000000`;
 
@@ -28,13 +33,23 @@ describe("BookingCreateSchema", () => {
     expect(r.error?.issues[0]?.path).toEqual(["account_agreed_paise"]);
   });
   it("rejects zero agreement value, duplicate co-applicants and the primary as co-applicant", () => {
-    expect(BookingCreateSchema.safeParse({ ...base, agreement_value_paise: 0, cash_agreed_paise: 0, account_agreed_paise: 0 }).success).toBe(false);
+    expect(
+      BookingCreateSchema.safeParse({
+        ...base,
+        agreement_value_paise: 0,
+        cash_agreed_paise: 0,
+        account_agreed_paise: 0,
+      }).success,
+    ).toBe(false);
     expect(BookingCreateSchema.safeParse({ ...base, co_applicant_ids: [U(9), U(9)] }).success).toBe(false);
     expect(BookingCreateSchema.safeParse({ ...base, co_applicant_ids: [U(2)] }).success).toBe(false);
   });
   it("requires the signed copy document for SIGNED_COPY acceptance", () => {
     expect(BookingCreateSchema.safeParse({ ...base, plan_acceptance_mode: "SIGNED_COPY" }).success).toBe(false);
-    expect(BookingCreateSchema.safeParse({ ...base, plan_acceptance_mode: "SIGNED_COPY", plan_acceptance_document_id: U(7) }).success).toBe(true);
+    expect(
+      BookingCreateSchema.safeParse({ ...base, plan_acceptance_mode: "SIGNED_COPY", plan_acceptance_document_id: U(7) })
+        .success,
+    ).toBe(true);
   });
   it("validates other charges and parking", () => {
     const ok = BookingCreateSchema.safeParse({
@@ -43,13 +58,24 @@ describe("BookingCreateSchema", () => {
       parking_slot_ids: [U(6)],
     });
     expect(ok.success).toBe(true);
-    expect(BookingCreateSchema.safeParse({ ...base, other_charges: [{ charge_type_id: U(5), amount_paise: -1, demand_at: "MANUAL" }] }).success).toBe(false);
+    expect(
+      BookingCreateSchema.safeParse({
+        ...base,
+        other_charges: [{ charge_type_id: U(5), amount_paise: -1, demand_at: "MANUAL" }],
+      }).success,
+    ).toBe(false);
   });
 });
 
 describe("AgreementRevisionCreateSchema", () => {
   it("enforces the split and a reason", () => {
-    const ok = { version: 1, agreement_value_paise: 100, cash_agreed_paise: 60, account_agreed_paise: 40, reason: "Loan sanctioned for more" };
+    const ok = {
+      version: 1,
+      agreement_value_paise: 100,
+      cash_agreed_paise: 60,
+      account_agreed_paise: 40,
+      reason: "Loan sanctioned for more",
+    };
     expect(AgreementRevisionCreateSchema.safeParse(ok).success).toBe(true);
     expect(AgreementRevisionCreateSchema.safeParse({ ...ok, cash_agreed_paise: 61 }).success).toBe(false);
     expect(AgreementRevisionCreateSchema.safeParse({ ...ok, reason: "" }).success).toBe(false);
@@ -61,13 +87,19 @@ describe("PaymentCreateSchema", () => {
   it("needs a bucket for FLAT_VALUE and a charge line for OTHER_CHARGE", () => {
     expect(PaymentCreateSchema.safeParse({ ...p, against: "FLAT_VALUE", bucket: "ACCOUNT" }).success).toBe(true);
     expect(PaymentCreateSchema.safeParse({ ...p, against: "FLAT_VALUE" }).success).toBe(false);
-    expect(PaymentCreateSchema.safeParse({ ...p, against: "FLAT_VALUE", bucket: "CASH", other_charge_id: U(8) }).success).toBe(false);
+    expect(
+      PaymentCreateSchema.safeParse({ ...p, against: "FLAT_VALUE", bucket: "CASH", other_charge_id: U(8) }).success,
+    ).toBe(false);
     expect(PaymentCreateSchema.safeParse({ ...p, against: "OTHER_CHARGE", other_charge_id: U(8) }).success).toBe(true);
     expect(PaymentCreateSchema.safeParse({ ...p, against: "OTHER_CHARGE" }).success).toBe(false);
-    expect(PaymentCreateSchema.safeParse({ ...p, against: "OTHER_CHARGE", other_charge_id: U(8), bucket: "CASH" }).success).toBe(false);
+    expect(
+      PaymentCreateSchema.safeParse({ ...p, against: "OTHER_CHARGE", other_charge_id: U(8), bucket: "CASH" }).success,
+    ).toBe(false);
   });
   it("rejects non-positive amounts", () => {
-    expect(PaymentCreateSchema.safeParse({ ...p, against: "FLAT_VALUE", bucket: "CASH", amount_paise: 0 }).success).toBe(false);
+    expect(
+      PaymentCreateSchema.safeParse({ ...p, against: "FLAT_VALUE", bucket: "CASH", amount_paise: 0 }).success,
+    ).toBe(false);
   });
 });
 
@@ -76,6 +108,8 @@ describe("RateCardRateSchema", () => {
     expect(RateCardRateSchema.safeParse({ flat_type_id: U(1), rate_per_sqft_paise: 4500_00 }).success).toBe(true);
     expect(RateCardRateSchema.safeParse({ flat_type_id: U(1), lump_sum_paise: 50_00_000_00 }).success).toBe(true);
     expect(RateCardRateSchema.safeParse({ flat_type_id: U(1) }).success).toBe(false);
-    expect(RateCardRateSchema.safeParse({ flat_type_id: U(1), rate_per_sqft_paise: 1, lump_sum_paise: 1 }).success).toBe(false);
+    expect(
+      RateCardRateSchema.safeParse({ flat_type_id: U(1), rate_per_sqft_paise: 1, lump_sum_paise: 1 }).success,
+    ).toBe(false);
   });
 });

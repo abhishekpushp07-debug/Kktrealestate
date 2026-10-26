@@ -60,7 +60,11 @@ export default async function AboutPage() {
 
   return (
     <>
-      <PageHeader eyebrow="Our story" title={page?.title && page.title.toLowerCase() !== "about" ? page.title : `The people behind ${brand}`} lead={site?.brand?.tagline ?? "Building homes with the patience of craftsmen and the discipline of engineers."} />
+      <PageHeader
+        eyebrow="Our story"
+        title={page?.title && page.title.toLowerCase() !== "about" ? page.title : `The people behind ${brand}`}
+        lead={site?.brand?.tagline ?? "Building homes with the patience of craftsmen and the discipline of engineers."}
+      />
 
       <Section tone="ivory">
         <div className="grid gap-12 lg:grid-cols-[1.2fr_1fr] lg:gap-20">
@@ -69,9 +73,19 @@ export default async function AboutPage() {
               <Markdown source={page.body_md} className="prose-kkt" />
             ) : (
               <div className="prose-kkt">
-                <p className="font-display text-2xl leading-relaxed text-navy-900 sm:text-3xl">{brand} builds homes the way they ought to be built: registered, transparent and finished with care.</p>
-                <p>From the first site visit to the day you receive your keys, you work with one relationship manager who knows your home as well as you do. Every tower follows a published construction schedule, every payment is reflected in your ledger the day it clears, and every approval sits in your documents folder.</p>
-                <p>We believe a home is the most important purchase a family makes, and that the process of buying one should feel as considered as the home itself.</p>
+                <p className="font-display text-2xl leading-relaxed text-navy-900 sm:text-3xl">
+                  {brand} builds homes the way they ought to be built: registered, transparent and finished with care.
+                </p>
+                <p>
+                  From the first site visit to the day you receive your keys, you work with one relationship manager who
+                  knows your home as well as you do. Every tower follows a published construction schedule, every
+                  payment is reflected in your ledger the day it clears, and every approval sits in your documents
+                  folder.
+                </p>
+                <p>
+                  We believe a home is the most important purchase a family makes, and that the process of buying one
+                  should feel as considered as the home itself.
+                </p>
               </div>
             )}
           </Reveal>
@@ -97,7 +111,12 @@ export default async function AboutPage() {
             {people.map((person, i) => (
               <Reveal key={`${person.name}-${i}`} as="li" delay={(i % 3) * 90} className="group">
                 <div className="relative aspect-[4/5] overflow-hidden rounded-card bg-navy-900">
-                  <SmartImage src={person.photo_url ?? null} alt={person.name} sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw" className="transition duration-700 ease-luxe group-hover:scale-105" />
+                  <SmartImage
+                    src={person.photo_url ?? null}
+                    alt={person.name}
+                    sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+                    className="transition duration-700 ease-luxe group-hover:scale-105"
+                  />
                 </div>
                 <h3 className="mt-5 font-display text-2xl text-navy-900">{person.name}</h3>
                 <p className="text-sm uppercase tracking-wider text-gold-700">{person.title}</p>
@@ -113,7 +132,12 @@ export default async function AboutPage() {
           <SectionHeading eyebrow="Milestones" title="Our journey so far" light />
           <ol className="mt-12 grid gap-8 md:grid-cols-2 lg:grid-cols-4">
             {timeline.map((m, i) => (
-              <Reveal key={`${m.label}-${i}`} as="li" delay={i * 80} className="relative border-t border-gold-500/40 pt-6">
+              <Reveal
+                key={`${m.label}-${i}`}
+                as="li"
+                delay={i * 80}
+                className="relative border-t border-gold-500/40 pt-6"
+              >
                 <span aria-hidden className="absolute -top-1.5 left-0 h-3 w-3 rounded-full bg-gold-500" />
                 <p className="font-display text-4xl text-gold-300">{m.label}</p>
                 <h3 className="mt-2 font-semibold">{m.title}</h3>
@@ -135,7 +159,12 @@ export default async function AboutPage() {
           </Button>
         </div>
       </Section>
-      <JsonLd data={breadcrumbJsonLd([{ name: "Home", path: "/" }, { name: "About", path: "/about" }])} />
+      <JsonLd
+        data={breadcrumbJsonLd([
+          { name: "Home", path: "/" },
+          { name: "About", path: "/about" },
+        ])}
+      />
     </>
   );
 }

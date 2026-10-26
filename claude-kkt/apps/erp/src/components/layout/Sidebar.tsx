@@ -14,9 +14,20 @@ function EnquiriesBadge({ collapsed, enabled }: { collapsed: boolean; enabled: b
   const unread = useEnquiryUnreadCount(enabled);
   const count = unread.data ?? 0;
   if (!enabled || count <= 0) return null;
-  if (collapsed) return <span className="absolute right-2 top-1.5 size-2 rounded-full bg-gold ring-2 ring-navy-950" aria-label={`${count} unread enquiries`} data-testid="sidebar-enquiries-dot" />;
+  if (collapsed)
+    return (
+      <span
+        className="absolute right-2 top-1.5 size-2 rounded-full bg-gold ring-2 ring-navy-950"
+        aria-label={`${count} unread enquiries`}
+        data-testid="sidebar-enquiries-dot"
+      />
+    );
   return (
-    <span className="money ml-auto rounded-full bg-gold px-1.5 text-2xs font-bold leading-4 text-navy-950" aria-label={`${count} unread enquiries`} data-testid="sidebar-enquiries-badge">
+    <span
+      className="money ml-auto rounded-full bg-gold px-1.5 text-2xs font-bold leading-4 text-navy-950"
+      aria-label={`${count} unread enquiries`}
+      data-testid="sidebar-enquiries-badge"
+    >
       {count > 99 ? "99+" : count}
     </span>
   );
@@ -38,9 +49,18 @@ export function Sidebar({ collapsed, onToggleCollapsed, onNavigate, className }:
   return (
     <aside
       data-collapsed={collapsed || undefined}
-      className={cn("flex h-full flex-col bg-navy-950 text-navy-100 transition-[width] duration-200", collapsed ? "w-sidebar-collapsed" : "w-sidebar", className)}
+      className={cn(
+        "flex h-full flex-col bg-navy-950 text-navy-100 transition-[width] duration-200",
+        collapsed ? "w-sidebar-collapsed" : "w-sidebar",
+        className,
+      )}
     >
-      <div className={cn("flex h-topbar shrink-0 items-center border-b border-navy-800 px-3", collapsed ? "justify-center" : "justify-between")}>
+      <div
+        className={cn(
+          "flex h-topbar shrink-0 items-center border-b border-navy-800 px-3",
+          collapsed ? "justify-center" : "justify-between",
+        )}
+      >
         <BrandMark withText={!collapsed} onDark subtitle={company?.name ?? "Real-estate ERP"} />
         {onToggleCollapsed && !collapsed && (
           <IconButton
@@ -60,7 +80,9 @@ export function Sidebar({ collapsed, onToggleCollapsed, onNavigate, className }:
             {collapsed ? (
               groupIndex > 0 && <div className="mx-3 my-2 h-px bg-navy-800" aria-hidden="true" />
             ) : (
-              <p className="px-3 pb-1 pt-3 text-2xs font-semibold uppercase tracking-wider text-navy-300">{group.label}</p>
+              <p className="px-3 pb-1 pt-3 text-2xs font-semibold uppercase tracking-wider text-navy-300">
+                {group.label}
+              </p>
             )}
             <ul className="space-y-0.5">
               {group.items.map((item) => {
@@ -77,16 +99,31 @@ export function Sidebar({ collapsed, onToggleCollapsed, onNavigate, className }:
                           cn(
                             "group relative flex h-12 items-center gap-3 rounded-md px-3 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-gold lg:h-9",
                             collapsed && "justify-center px-0",
-                            isActive ? "bg-navy-900 text-white" : "text-navy-100/85 hover:bg-navy-900/70 hover:text-white",
+                            isActive
+                              ? "bg-navy-900 text-white"
+                              : "text-navy-100/85 hover:bg-navy-900/70 hover:text-white",
                           )
                         }
                       >
                         {({ isActive }) => (
                           <>
-                            {isActive && <span className="absolute inset-y-1.5 left-0 w-1 rounded-r-full bg-gold" aria-hidden="true" />}
-                            <Icon className={cn("size-[18px] shrink-0", isActive ? "text-gold" : "text-navy-200 group-hover:text-white")} aria-hidden="true" />
+                            {isActive && (
+                              <span
+                                className="absolute inset-y-1.5 left-0 w-1 rounded-r-full bg-gold"
+                                aria-hidden="true"
+                              />
+                            )}
+                            <Icon
+                              className={cn(
+                                "size-[18px] shrink-0",
+                                isActive ? "text-gold" : "text-navy-200 group-hover:text-white",
+                              )}
+                              aria-hidden="true"
+                            />
                             {!collapsed && <span className="truncate">{item.label}</span>}
-                            {item.id === "enquiries" && <EnquiriesBadge collapsed={collapsed} enabled={can(["lead.read", "cms.read"])} />}
+                            {item.id === "enquiries" && (
+                              <EnquiriesBadge collapsed={collapsed} enabled={can(["lead.read", "cms.read"])} />
+                            )}
                           </>
                         )}
                       </NavLink>
@@ -104,7 +141,14 @@ export function Sidebar({ collapsed, onToggleCollapsed, onNavigate, className }:
           <>
             <Avatar name={user?.name} src={user?.avatar_url} size="sm" tone="navy" />
             {onToggleCollapsed && (
-              <IconButton icon={PanelLeftOpen} label="Expand sidebar" size="sm" className="text-navy-200 hover:bg-navy-800 hover:text-white" onClick={onToggleCollapsed} data-testid="sidebar-expand-btn" />
+              <IconButton
+                icon={PanelLeftOpen}
+                label="Expand sidebar"
+                size="sm"
+                className="text-navy-200 hover:bg-navy-800 hover:text-white"
+                onClick={onToggleCollapsed}
+                data-testid="sidebar-expand-btn"
+              />
             )}
           </>
         ) : (

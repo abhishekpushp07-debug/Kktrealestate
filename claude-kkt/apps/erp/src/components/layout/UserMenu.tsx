@@ -51,7 +51,11 @@ export function UserMenu() {
           <p className="truncate text-xs text-ink-subtle">{user?.email}</p>
           <div className="mt-1.5 flex flex-wrap gap-1">
             {user?.role.name && <Badge variant="gold">{user.role.name}</Badge>}
-            {user && !user.all_projects && <Badge variant="neutral">{user.project_ids.length} project{user.project_ids.length === 1 ? "" : "s"}</Badge>}
+            {user && !user.all_projects && (
+              <Badge variant="neutral">
+                {user.project_ids.length} project{user.project_ids.length === 1 ? "" : "s"}
+              </Badge>
+            )}
             {user?.mfa_enabled && <Badge variant="success">MFA on</Badge>}
           </div>
         </div>
@@ -64,7 +68,12 @@ export function UserMenu() {
           <MonitorSmartphone /> Devices &amp; sessions
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem destructive disabled={signingOut} onSelect={() => void handleLogout()} data-testid="user-menu-logout">
+        <DropdownMenuItem
+          destructive
+          disabled={signingOut}
+          onSelect={() => void handleLogout()}
+          data-testid="user-menu-logout"
+        >
           <LogOut /> Sign out
         </DropdownMenuItem>
       </DropdownMenuContent>

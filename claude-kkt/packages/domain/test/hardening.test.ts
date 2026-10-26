@@ -4,8 +4,16 @@
  */
 import { describe, expect, it } from "vitest";
 import {
-  appendLedgerRow, deriveLedger, diffLedgerRows, effectiveFlatStatus, emptyLedgerSummary, isHoldExpired, reserveUntil, sortLedgerEvents,
-  type LedgerEvent, type LedgerRow,
+  appendLedgerRow,
+  deriveLedger,
+  diffLedgerRows,
+  effectiveFlatStatus,
+  emptyLedgerSummary,
+  isHoldExpired,
+  reserveUntil,
+  sortLedgerEvents,
+  type LedgerEvent,
+  type LedgerRow,
 } from "../src/index.js";
 
 const L = (lakh: number) => lakh * 10_000_000;
@@ -25,22 +33,69 @@ function appendInPostingOrder(events: readonly LedgerEvent[]): LedgerRow[] {
 describe("canonical ledger order = posting order", () => {
   // Demand posted on 10 Jan; on 12 Jan Accounts posts a cheque that was received (payment_date) on 5 Jan; then another demand.
   const posted: LedgerEvent[] = [
-    { kind: "DEMAND", at: "2026-01-01T05:00:00.000Z", cashPaise: L(6), accountPaise: L(4), refNumber: "DM-1", refId: "d1" },
-    { kind: "PAYMENT", at: "2026-01-02T05:00:00.000Z", entryDate: "2026-01-02", bucket: "ACCOUNT", amountPaise: L(4), refNumber: "R-1", refId: "p1" },
-    { kind: "DEMAND", at: "2026-01-10T05:00:00.000Z", cashPaise: L(3), accountPaise: L(2), refNumber: "DM-2", refId: "d2" },
-    { kind: "PAYMENT", at: "2026-01-12T06:00:00.000Z", entryDate: "2026-01-05", bucket: "CASH", amountPaise: L(8), refNumber: "R-2", refId: "p2" },
-    { kind: "AGREEMENT_CHANGE", at: "2026-01-15T06:00:00.000Z", cashAgreedPaise: L(55), accountAgreedPaise: L(45), cashRaisedAdjustmentPaise: -L(1), accountRaisedAdjustmentPaise: L(1), refId: "r1" },
+    {
+      kind: "DEMAND",
+      at: "2026-01-01T05:00:00.000Z",
+      cashPaise: L(6),
+      accountPaise: L(4),
+      refNumber: "DM-1",
+      refId: "d1",
+    },
+    {
+      kind: "PAYMENT",
+      at: "2026-01-02T05:00:00.000Z",
+      entryDate: "2026-01-02",
+      bucket: "ACCOUNT",
+      amountPaise: L(4),
+      refNumber: "R-1",
+      refId: "p1",
+    },
+    {
+      kind: "DEMAND",
+      at: "2026-01-10T05:00:00.000Z",
+      cashPaise: L(3),
+      accountPaise: L(2),
+      refNumber: "DM-2",
+      refId: "d2",
+    },
+    {
+      kind: "PAYMENT",
+      at: "2026-01-12T06:00:00.000Z",
+      entryDate: "2026-01-05",
+      bucket: "CASH",
+      amountPaise: L(8),
+      refNumber: "R-2",
+      refId: "p2",
+    },
+    {
+      kind: "AGREEMENT_CHANGE",
+      at: "2026-01-15T06:00:00.000Z",
+      cashAgreedPaise: L(55),
+      accountAgreedPaise: L(45),
+      cashRaisedAdjustmentPaise: -L(1),
+      accountRaisedAdjustmentPaise: L(1),
+      refId: "r1",
+    },
   ];
 
   it("a payment dated before an earlier-posted demand keeps its seq and running balances after a rebuild", () => {
     const live = appendInPostingOrder(posted);
     // the rebuild reads the source tables in arbitrary order
     const shuffled = [posted[3]!, posted[0]!, posted[4]!, posted[2]!, posted[1]!];
-    const rebuilt = deriveLedger(shuffled, emptyLedgerSummary({ cashAgreedPaise: L(60), accountAgreedPaise: L(40) })).rows;
+    const rebuilt = deriveLedger(
+      shuffled,
+      emptyLedgerSummary({ cashAgreedPaise: L(60), accountAgreedPaise: L(40) }),
+    ).rows;
     expect(rebuilt.map((r) => r.refNumber ?? r.event)).toEqual(["DM-1", "R-1", "DM-2", "R-2", "AGREEMENT_CHANGE"]);
     expect(rebuilt).toEqual(live);
     // the receipt row keeps its business date for display
-    expect(rebuilt[3]).toMatchObject({ seq: 4, entryDate: "2026-01-05", cashDuePaise: L(1), accountDuePaise: L(2), totalDuePaise: L(3) });
+    expect(rebuilt[3]).toMatchObject({
+      seq: 4,
+      entryDate: "2026-01-05",
+      cashDuePaise: L(1),
+      accountDuePaise: L(2),
+      totalDuePaise: L(3),
+    });
     expect(diffLedgerRows(live, rebuilt)).toEqual([]);
   });
 
@@ -63,7 +118,11 @@ describe("diffLedgerRows (integrity finding e)", () => {
   ]).rows;
 
   it("finds swapped rows even when every aggregate agrees", () => {
-    const swapped = [rows[0]!, { ...rows[2]!, seq: 2, cashDuePaise: 150, totalDuePaise: 150, cashPaidCumPaise: 0 }, { ...rows[1]!, seq: 3, cashDuePaise: 110, totalDuePaise: 110, cashPaidCumPaise: 40 }];
+    const swapped = [
+      rows[0]!,
+      { ...rows[2]!, seq: 2, cashDuePaise: 150, totalDuePaise: 150, cashPaidCumPaise: 0 },
+      { ...rows[1]!, seq: 3, cashDuePaise: 110, totalDuePaise: 110, cashPaidCumPaise: 40 },
+    ];
     const diff = diffLedgerRows(swapped, rows);
     expect(diff.length).toBeGreaterThan(0);
     expect(diff[0]).toMatchObject({ position: 2 });
@@ -72,7 +131,9 @@ describe("diffLedgerRows (integrity finding e)", () => {
   });
 
   it("reports missing / extra rows and respects the limit", () => {
-    expect(diffLedgerRows(rows.slice(0, 2), rows)).toEqual([{ position: 3, field: "row", stored: null, recomputed: "DEMAND" }]);
+    expect(diffLedgerRows(rows.slice(0, 2), rows)).toEqual([
+      { position: 3, field: "row", stored: null, recomputed: "DEMAND" },
+    ]);
     expect(diffLedgerRows(rows, [])).toHaveLength(3);
     expect(diffLedgerRows(rows, [], 1)).toHaveLength(1);
   });

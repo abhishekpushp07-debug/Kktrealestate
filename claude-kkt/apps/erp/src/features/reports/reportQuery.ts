@@ -17,7 +17,14 @@ export type FilterDef =
   | { kind: "customer" }
   | { kind: "user"; key: string; label: string }
   | { kind: "bankAccount" }
-  | { kind: "enum"; key: string; label: string; options: readonly EnumOption[]; defaultValue?: string; clearable?: boolean }
+  | {
+      kind: "enum";
+      key: string;
+      label: string;
+      options: readonly EnumOption[];
+      defaultValue?: string;
+      clearable?: boolean;
+    }
   | { kind: "number"; key: string; label: string; min: number; max: number; defaultValue: number }
   | { kind: "text"; key: string; label: string; placeholder?: string };
 
@@ -47,7 +54,18 @@ export function filterKeys(filter: FilterDef): readonly string[] {
 /* Date presets (IST business dates)                                     */
 /* ------------------------------------------------------------------ */
 
-export const DATE_PRESETS = ["today", "yesterday", "this_week", "this_month", "last_month", "this_quarter", "this_fy", "last_fy", "last_30", "last_90"] as const;
+export const DATE_PRESETS = [
+  "today",
+  "yesterday",
+  "this_week",
+  "this_month",
+  "last_month",
+  "this_quarter",
+  "this_fy",
+  "last_fy",
+  "last_30",
+  "last_90",
+] as const;
 export type DatePresetId = (typeof DATE_PRESETS)[number];
 
 export const DATE_PRESET_LABELS: Readonly<Record<DatePresetId, string>> = {
@@ -151,7 +169,11 @@ export function missingRequired(filters: readonly FilterDef[], params: Readonly<
  * (date range preset, enum defaults, numeric defaults), empty strings are skipped and
  * numbers are parsed. The result is deterministic so it doubles as the query cache key.
  */
-export function buildReportQuery(filters: readonly FilterDef[], params: Readonly<Record<string, string>>, options: BuildQueryOptions): QueryParams {
+export function buildReportQuery(
+  filters: readonly FilterDef[],
+  params: Readonly<Record<string, string>>,
+  options: BuildQueryOptions,
+): QueryParams {
   const query: QueryParams = {};
   const read = (key: string): string | undefined => {
     const value = params[key];
@@ -199,7 +221,9 @@ export function buildReportQuery(filters: readonly FilterDef[], params: Readonly
       case "number": {
         const raw = read(filter.key);
         const parsed = raw === undefined ? Number.NaN : Number(raw);
-        const value = Number.isInteger(parsed) ? Math.min(filter.max, Math.max(filter.min, parsed)) : filter.defaultValue;
+        const value = Number.isInteger(parsed)
+          ? Math.min(filter.max, Math.max(filter.min, parsed))
+          : filter.defaultValue;
         query[filter.key] = value;
         break;
       }

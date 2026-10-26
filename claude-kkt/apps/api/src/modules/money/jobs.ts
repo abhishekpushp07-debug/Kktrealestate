@@ -25,7 +25,13 @@ export async function dailyDues(db: DB): Promise<Record<string, unknown>> {
   for (const companyId of await companyIds(db)) {
     const s = await raiseDuesForAll(db, today, { companyId });
     const report = await nightlyIntegrity(db, companyId);
-    out[companyId] = { bookings_checked: s.bookingsChecked, demands_raised: s.demandsRaised, demand_numbers: s.demandNumbers, integrity_ok: report.ok, integrity_findings: report.findings.length };
+    out[companyId] = {
+      bookings_checked: s.bookingsChecked,
+      demands_raised: s.demandsRaised,
+      demand_numbers: s.demandNumbers,
+      integrity_ok: report.ok,
+      integrity_findings: report.findings.length,
+    };
   }
   return out;
 }
@@ -49,7 +55,11 @@ export async function duesCatchup(db: DB): Promise<Record<string, unknown>> {
   const out: Record<string, unknown> = { as_of: today };
   for (const companyId of await companyIds(db)) {
     const s = await raiseDuesForAll(db, today, { companyId });
-    out[companyId] = { bookings_checked: s.bookingsChecked, demands_raised: s.demandsRaised, demand_numbers: s.demandNumbers };
+    out[companyId] = {
+      bookings_checked: s.bookingsChecked,
+      demands_raised: s.demandsRaised,
+      demand_numbers: s.demandNumbers,
+    };
   }
   return out;
 }
@@ -69,8 +79,18 @@ async function alreadyMarked(app: FastifyInstance | null, demandId: string, toda
 /** The durable once-per-day guard, inside the notification transaction (serialised per demand and day by an advisory lock). */
 async function notifiedToday(tx: Tx, demandId: string, today: string): Promise<boolean> {
   await withAdvisoryLock(tx, overdueKey(demandId, today));
-  const [row] = await tx.select({ id: notifications.id }).from(notifications)
-    .where(and(eq(notifications.entityType, "demand"), eq(notifications.entityId, demandId), eq(notifications.type, "DEMAND_OVERDUE"), sql`${notifications.createdAt} >= ((${today}::date)::timestamp at time zone 'Asia/Kolkata')`)).limit(1);
+  const [row] = await tx
+    .select({ id: notifications.id })
+    .from(notifications)
+    .where(
+      and(
+        eq(notifications.entityType, "demand"),
+        eq(notifications.entityId, demandId),
+        eq(notifications.type, "DEMAND_OVERDUE"),
+        sql`${notifications.createdAt} >= ((${today}::date)::timestamp at time zone 'Asia/Kolkata')`,
+      ),
+    )
+    .limit(1);
   return !!row;
 }
 
@@ -80,24 +100,53 @@ async function notifiedToday(tx: Tx, demandId: string, today: string): Promise<b
  */
 export async function overdueNotifications(db: DB, app: FastifyInstance | null): Promise<Record<string, unknown>> {
   const today = todayDate();
-  const rows = await db.select({ d: demands, b: bookings }).from(demands).innerJoin(bookings, eq(bookings.id, demands.bookingId))
-    .where(and(inArray(demands.status, ["OPEN", "PARTIALLY_PAID"]), lt(demands.dueDate, today), eq(bookings.status, "ACTIVE")));
+  const rows = await db
+    .select({ d: demands, b: bookings })
+    .from(demands)
+    .innerJoin(bookings, eq(bookings.id, demands.bookingId))
+    .where(
+      and(
+        inArray(demands.status, ["OPEN", "PARTIALLY_PAID"]),
+        lt(demands.dueDate, today),
+        eq(bookings.status, "ACTIVE"),
+      ),
+    );
   let sent = 0;
   let skipped = 0;
   for (const { d, b } of rows) {
-    if (await alreadyMarked(app, d.id, today)) { skipped += 1; continue; }
+    if (await alreadyMarked(app, d.id, today)) {
+      skipped += 1;
+      continue;
+    }
     const notified = await moneyTransaction(db, async (tx) => {
       if (await notifiedToday(tx, d.id, today)) return false;
       const outstanding = d.totalDemandPaise - d.paidPaise;
       const title = `Demand ${d.demandNumber} overdue (${d.installmentName})`;
       const body = `${formatINR(outstanding)} outstanding; due date was ${d.dueDate}`;
-      await notify(tx, { companyId: d.companyId, recipients: await bookingRecipients(tx, b), type: "DEMAND_OVERDUE", title, body, entityType: "demand", entityId: d.id, link: `/bookings/${b.id}/demands` });
-      await notifyRole(tx, d.companyId, ACCOUNTS_ROLES, { type: "DEMAND_OVERDUE", title: `${title} – ${b.bookingNumber}`, body, entityType: "demand", entityId: d.id, link: `/bookings/${b.id}/demands` });
+      await notify(tx, {
+        companyId: d.companyId,
+        recipients: await bookingRecipients(tx, b),
+        type: "DEMAND_OVERDUE",
+        title,
+        body,
+        entityType: "demand",
+        entityId: d.id,
+        link: `/bookings/${b.id}/demands`,
+      });
+      await notifyRole(tx, d.companyId, ACCOUNTS_ROLES, {
+        type: "DEMAND_OVERDUE",
+        title: `${title} – ${b.bookingNumber}`,
+        body,
+        entityType: "demand",
+        entityId: d.id,
+        link: `/bookings/${b.id}/demands`,
+      });
       return true;
     });
     // committed (or found already done): only now is the day claimed in Redis
     if (app) await app.redis.set(overdueKey(d.id, today), "1", "EX", 2 * 24 * 3600).catch(() => undefined);
-    if (notified) sent += 1; else skipped += 1;
+    if (notified) sent += 1;
+    else skipped += 1;
   }
   return { as_of: today, overdue_demands: rows.length, notified: sent, already_notified_today: skipped };
 }

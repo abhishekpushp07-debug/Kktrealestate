@@ -4,7 +4,14 @@ import { createDb, runMigrations } from "@kkt/db";
 import { buildApp } from "./app.js";
 import { config } from "./config.js";
 import { logger } from "./lib/logger.js";
-import { disableDependencyMetrics, enableDependencyMetrics, localMetrics, METRICS_CONTENT_TYPE, setupPrimaryAggregation, setupWorkerAggregation } from "./lib/metrics.js";
+import {
+  disableDependencyMetrics,
+  enableDependencyMetrics,
+  localMetrics,
+  METRICS_CONTENT_TYPE,
+  setupPrimaryAggregation,
+  setupWorkerAggregation,
+} from "./lib/metrics.js";
 import { createStorage } from "./lib/storage.js";
 import { effectiveConfig } from "./modules/system/bootConfig.js";
 import { startMetricsServer } from "./modules/system/metricsServer.js";
@@ -77,7 +84,11 @@ async function prepareOnce(): Promise<void> {
       config,
       seedDemo: async () => {
         const app = await buildApp({ logger: true });
-        try { return await demoSeed(app); } finally { await app.close(); }
+        try {
+          return await demoSeed(app);
+        } finally {
+          await app.close();
+        }
       },
     });
   } finally {
@@ -93,28 +104,48 @@ async function serve(opts: { index: number; runJobs: boolean; prepare: boolean; 
   let jobs: RunningWorker | null = null;
   if (opts.runJobs) jobs = await startWorker({ app });
   // Database/Redis-derived gauges (job failures, integrity findings, pool usage, queue depth) from exactly one process per host.
-  if (opts.index === 0) enableDependencyMetrics({ query: (text) => app.sql.unsafe(text) as unknown as Promise<Record<string, unknown>[]>, redis: app.redis });
+  if (opts.index === 0)
+    enableDependencyMetrics({
+      query: (text) => app.sql.unsafe(text) as unknown as Promise<Record<string, unknown>[]>,
+      redis: app.redis,
+    });
   await app.listen({ port: config.API_PORT, host: config.API_HOST });
-  logger.info({ port: config.API_PORT, pid: process.pid, worker: opts.index, docs: `${config.API_PUBLIC_URL}/api/v1/docs` }, "api listening");
+  logger.info(
+    { port: config.API_PORT, pid: process.pid, worker: opts.index, docs: `${config.API_PUBLIC_URL}/api/v1/docs` },
+    "api listening",
+  );
   const metricsServer = opts.standalone
-    ? await startMetricsServer({ port: config.METRICS_PORT, render: localMetrics, contentType: METRICS_CONTENT_TYPE, token: config.METRICS_TOKEN, log: logger })
+    ? await startMetricsServer({
+        port: config.METRICS_PORT,
+        render: localMetrics,
+        contentType: METRICS_CONTENT_TYPE,
+        token: config.METRICS_TOKEN,
+        log: logger,
+      })
     : null;
 
   let stopping = false;
   const shutdown = (signal: string) => {
     if (stopping) return;
     stopping = true;
-    void gracefulShutdown({
-      app,
-      jobs,
-      log: logger,
-      inflight: () => app.inflightRequests?.() ?? 0,
-      after: [
-        () => new Promise<void>((r) => { if (metricsServer) metricsServer.close(() => r()); else r(); }),
-        () => disableDependencyMetrics(),
-        () => shutdownTelemetry(),
-      ],
-    }, signal);
+    void gracefulShutdown(
+      {
+        app,
+        jobs,
+        log: logger,
+        inflight: () => app.inflightRequests?.() ?? 0,
+        after: [
+          () =>
+            new Promise<void>((r) => {
+              if (metricsServer) metricsServer.close(() => r());
+              else r();
+            }),
+          () => disableDependencyMetrics(),
+          () => shutdownTelemetry(),
+        ],
+      },
+      signal,
+    );
   };
   process.on("SIGTERM", () => shutdown("SIGTERM"));
   process.on("SIGINT", () => shutdown("SIGINT"));
@@ -129,7 +160,13 @@ async function supervise(count: number): Promise<void> {
   await migrate();
   await prepareOnce();
   const { clusterMetrics } = setupPrimaryAggregation();
-  const metricsServer = await startMetricsServer({ port: config.METRICS_PORT, render: clusterMetrics, contentType: METRICS_CONTENT_TYPE, token: config.METRICS_TOKEN, log: logger });
+  const metricsServer = await startMetricsServer({
+    port: config.METRICS_PORT,
+    render: clusterMetrics,
+    contentType: METRICS_CONTENT_TYPE,
+    token: config.METRICS_TOKEN,
+    log: logger,
+  });
 
   let stopping = false;
   const restarts = new Map<number, number[]>();
@@ -143,8 +180,13 @@ async function supervise(count: number): Promise<void> {
       recent.push(now);
       restarts.set(index, recent);
       const delay = recent.length >= 5 ? 30_000 : 1_000;
-      logger.error({ index, code, signal, restarts_last_minute: recent.length, restart_in_ms: delay }, "api worker exited; restarting");
-      setTimeout(() => { if (!stopping) fork(index); }, delay);
+      logger.error(
+        { index, code, signal, restarts_last_minute: recent.length, restart_in_ms: delay },
+        "api worker exited; restarting",
+      );
+      setTimeout(() => {
+        if (!stopping) fork(index);
+      }, delay);
     });
   };
   for (let i = 0; i < count; i++) fork(i);
@@ -157,14 +199,23 @@ async function supervise(count: number): Promise<void> {
     logger.info({ signal }, "stopping api cluster (workers drain in-flight requests)");
     for (const w of Object.values(cluster.workers ?? {})) w?.process.kill(signal);
     const finish = async (code: number) => {
-      await new Promise<void>((r) => { if (metricsServer) metricsServer.close(() => r()); else r(); });
+      await new Promise<void>((r) => {
+        if (metricsServer) metricsServer.close(() => r());
+        else r();
+      });
       await shutdownTelemetry();
       process.exit(code);
     };
     // workers have their own deadline; the primary waits a little longer, then gives up
-    const timer = setTimeout(() => { logger.error("api workers did not stop in time; exiting"); void finish(1); }, settings.timeoutMs + 5_000);
+    const timer = setTimeout(() => {
+      logger.error("api workers did not stop in time; exiting");
+      void finish(1);
+    }, settings.timeoutMs + 5_000);
     const check = () => {
-      if (Object.keys(cluster.workers ?? {}).length === 0) { clearTimeout(timer); void finish(0); }
+      if (Object.keys(cluster.workers ?? {}).length === 0) {
+        clearTimeout(timer);
+        void finish(0);
+      }
     };
     cluster.on("exit", check);
     check();

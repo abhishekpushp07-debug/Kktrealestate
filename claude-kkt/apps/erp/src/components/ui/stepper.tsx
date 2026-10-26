@@ -66,7 +66,15 @@ export function Stepper({ steps, current, completed, onStepClick, orientation = 
                 >
                   {circle(index, step)}
                 </button>
-                {index < steps.length - 1 && <span className={cn("mx-1 h-0.5 min-w-2 flex-1 rounded-full", done.has(index) ? "bg-navy-950" : "bg-border")} aria-hidden="true" />}
+                {index < steps.length - 1 && (
+                  <span
+                    className={cn(
+                      "mx-1 h-0.5 min-w-2 flex-1 rounded-full",
+                      done.has(index) ? "bg-navy-950" : "bg-border",
+                    )}
+                    aria-hidden="true"
+                  />
+                )}
               </li>
             );
           })}
@@ -85,7 +93,15 @@ export function Stepper({ steps, current, completed, onStepClick, orientation = 
         const last = index === steps.length - 1;
         return (
           <li key={step.id} className="relative flex gap-3 pb-6 last:pb-0">
-            {!last && <span className={cn("absolute left-3.5 top-8 h-[calc(100%-1.25rem)] w-px", done.has(index) ? "bg-navy-950" : "bg-border")} aria-hidden="true" />}
+            {!last && (
+              <span
+                className={cn(
+                  "absolute left-3.5 top-8 h-[calc(100%-1.25rem)] w-px",
+                  done.has(index) ? "bg-navy-950" : "bg-border",
+                )}
+                aria-hidden="true"
+              />
+            )}
             <button
               type="button"
               disabled={!clickable}
@@ -95,7 +111,14 @@ export function Stepper({ steps, current, completed, onStepClick, orientation = 
             >
               {circle(index, step)}
               <span className="min-w-0 pt-1">
-                <span className={cn("block text-sm font-semibold", index === current ? "text-navy-950" : done.has(index) ? "text-ink" : "text-ink-subtle")}>{step.label}</span>
+                <span
+                  className={cn(
+                    "block text-sm font-semibold",
+                    index === current ? "text-navy-950" : done.has(index) ? "text-ink" : "text-ink-subtle",
+                  )}
+                >
+                  {step.label}
+                </span>
                 {step.description && <span className="block text-xs text-ink-subtle">{step.description}</span>}
               </span>
             </button>

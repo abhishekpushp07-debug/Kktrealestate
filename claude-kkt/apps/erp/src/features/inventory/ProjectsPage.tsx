@@ -2,8 +2,29 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { Building2, Globe, LayoutGrid, List, MapPin, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { PROJECT_STATUSES, PROJECT_STATUS_LABELS, PROJECT_TYPES, PROJECT_TYPE_LABELS, type ProjectRow } from "@kkt/contracts";
-import { Badge, Button, DataTable, EmptyState, ErrorState, PageHeader, ProgressRing, Select, Skeleton, StatusChip, Tabs, TabsList, TabsTrigger, Toolbar } from "@/components/ui";
+import {
+  PROJECT_STATUSES,
+  PROJECT_STATUS_LABELS,
+  PROJECT_TYPES,
+  PROJECT_TYPE_LABELS,
+  type ProjectRow,
+} from "@kkt/contracts";
+import {
+  Badge,
+  Button,
+  DataTable,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  ProgressRing,
+  Select,
+  Skeleton,
+  StatusChip,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  Toolbar,
+} from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 import { formatDate, formatNumber } from "@/lib/format";
 import { useList, useListParams } from "@/lib/queries";
@@ -37,21 +58,68 @@ export default function ProjectsPage() {
           </span>
         ),
       },
-      { accessorKey: "status", header: "Status", meta: { width: 150 }, cell: ({ row }) => <StatusChip status={row.original.status} label={PROJECT_STATUS_LABELS[row.original.status]} size="sm" /> },
-      { accessorKey: "project_type", header: "Type", cell: ({ row }) => PROJECT_TYPE_LABELS[row.original.project_type] },
+      {
+        accessorKey: "status",
+        header: "Status",
+        meta: { width: 150 },
+        cell: ({ row }) => (
+          <StatusChip status={row.original.status} label={PROJECT_STATUS_LABELS[row.original.status]} size="sm" />
+        ),
+      },
+      {
+        accessorKey: "project_type",
+        header: "Type",
+        cell: ({ row }) => PROJECT_TYPE_LABELS[row.original.project_type],
+      },
       { accessorKey: "city", header: "City" },
-      { accessorKey: "block_count", header: "Blocks", meta: { align: "right", width: 80 }, cell: ({ row }) => formatNumber(row.original.block_count) },
+      {
+        accessorKey: "block_count",
+        header: "Blocks",
+        meta: { align: "right", width: 80 },
+        cell: ({ row }) => formatNumber(row.original.block_count),
+      },
       {
         id: "units",
         header: "Units",
         meta: { sortKey: false, width: 220 },
-        cell: ({ row }) => <UnitCountsBar counts={row.original.unit_counts} legend={false} size="sm" className="min-w-40" />,
+        cell: ({ row }) => (
+          <UnitCountsBar counts={row.original.unit_counts} legend={false} size="sm" className="min-w-40" />
+        ),
       },
-      { id: "units_total", header: "Total", meta: { sortKey: false, align: "right", width: 80 }, cell: ({ row }) => formatNumber(row.original.unit_counts.total) },
-      { id: "available", header: "Available", meta: { sortKey: false, align: "right", width: 90 }, cell: ({ row }) => formatNumber(row.original.unit_counts.available) },
-      { accessorKey: "construction_percent", header: "Construction", meta: { align: "right", width: 120 }, cell: ({ row }) => `${Math.round(row.original.construction_percent)}%` },
-      { accessorKey: "possession_date", header: "Possession", cell: ({ row }) => formatDate(row.original.possession_date) },
-      { accessorKey: "is_published", header: "Website", meta: { width: 110 }, cell: ({ row }) => (row.original.is_published ? <StatusChip status="PUBLISHED" size="sm" /> : <span className="text-xs text-ink-subtle">Unpublished</span>) },
+      {
+        id: "units_total",
+        header: "Total",
+        meta: { sortKey: false, align: "right", width: 80 },
+        cell: ({ row }) => formatNumber(row.original.unit_counts.total),
+      },
+      {
+        id: "available",
+        header: "Available",
+        meta: { sortKey: false, align: "right", width: 90 },
+        cell: ({ row }) => formatNumber(row.original.unit_counts.available),
+      },
+      {
+        accessorKey: "construction_percent",
+        header: "Construction",
+        meta: { align: "right", width: 120 },
+        cell: ({ row }) => `${Math.round(row.original.construction_percent)}%`,
+      },
+      {
+        accessorKey: "possession_date",
+        header: "Possession",
+        cell: ({ row }) => formatDate(row.original.possession_date),
+      },
+      {
+        accessorKey: "is_published",
+        header: "Website",
+        meta: { width: 110 },
+        cell: ({ row }) =>
+          row.original.is_published ? (
+            <StatusChip status="PUBLISHED" size="sm" />
+          ) : (
+            <span className="text-xs text-ink-subtle">Unpublished</span>
+          ),
+      },
     ],
     [],
   );
@@ -79,8 +147,28 @@ export default function ProjectsPage() {
         searchPlaceholder="Search name, code or city…"
         filters={
           <>
-            <Select aria-label="Status" size="sm" className="w-full sm:w-44" value={list.filters.status ?? null} onValueChange={(value) => list.setFilter("status", value)} options={PROJECT_STATUSES.map((value) => ({ value, label: PROJECT_STATUS_LABELS[value] }))} placeholder="Any status" allowClear data-testid="projects-filter-status" />
-            <Select aria-label="Type" size="sm" className="w-full sm:w-40" value={list.filters.project_type ?? null} onValueChange={(value) => list.setFilter("project_type", value)} options={PROJECT_TYPES.map((value) => ({ value, label: PROJECT_TYPE_LABELS[value] }))} placeholder="Any type" allowClear data-testid="projects-filter-type" />
+            <Select
+              aria-label="Status"
+              size="sm"
+              className="w-full sm:w-44"
+              value={list.filters.status ?? null}
+              onValueChange={(value) => list.setFilter("status", value)}
+              options={PROJECT_STATUSES.map((value) => ({ value, label: PROJECT_STATUS_LABELS[value] }))}
+              placeholder="Any status"
+              allowClear
+              data-testid="projects-filter-status"
+            />
+            <Select
+              aria-label="Type"
+              size="sm"
+              className="w-full sm:w-40"
+              value={list.filters.project_type ?? null}
+              onValueChange={(value) => list.setFilter("project_type", value)}
+              options={PROJECT_TYPES.map((value) => ({ value, label: PROJECT_TYPE_LABELS[value] }))}
+              placeholder="Any type"
+              allowClear
+              data-testid="projects-filter-type"
+            />
           </>
         }
         hasActiveFilters={list.hasActiveFilters}
@@ -91,10 +179,18 @@ export default function ProjectsPage() {
         actions={
           <Tabs value={view} onValueChange={(value) => setView(value === "table" ? "table" : "cards")}>
             <TabsList variant="pills" aria-label="View">
-              <TabsTrigger value="cards" icon={<LayoutGrid className="size-3.5" aria-hidden="true" />} data-testid="projects-view-cards">
+              <TabsTrigger
+                value="cards"
+                icon={<LayoutGrid className="size-3.5" aria-hidden="true" />}
+                data-testid="projects-view-cards"
+              >
                 <span className="sr-only sm:not-sr-only">Cards</span>
               </TabsTrigger>
-              <TabsTrigger value="table" icon={<List className="size-3.5" aria-hidden="true" />} data-testid="projects-view-table">
+              <TabsTrigger
+                value="table"
+                icon={<List className="size-3.5" aria-hidden="true" />}
+                data-testid="projects-view-table"
+              >
                 <span className="sr-only sm:not-sr-only">Table</span>
               </TabsTrigger>
             </TabsList>
@@ -113,8 +209,20 @@ export default function ProjectsPage() {
           sort={list.sort}
           onSortChange={list.setSort}
           onRowClick={(row) => navigate(`/projects/${row.id}`)}
-          pagination={{ page: list.page, pageSize: list.pageSize, total, onPageChange: list.setPage, onPageSizeChange: list.setPageSize }}
-          emptyState={{ icon: Building2, title: list.hasActiveFilters ? "No projects match" : "No projects yet", description: list.hasActiveFilters ? "Try another search or clear the filters." : "Create the first project to start adding towers and flats." }}
+          pagination={{
+            page: list.page,
+            pageSize: list.pageSize,
+            total,
+            onPageChange: list.setPage,
+            onPageSizeChange: list.setPageSize,
+          }}
+          emptyState={{
+            icon: Building2,
+            title: list.hasActiveFilters ? "No projects match" : "No projects yet",
+            description: list.hasActiveFilters
+              ? "Try another search or clear the filters."
+              : "Create the first project to start adding towers and flats.",
+          }}
           data-testid="projects-table"
         />
       ) : (
@@ -127,11 +235,22 @@ export default function ProjectsPage() {
           hasFilters={list.hasActiveFilters}
           canWrite={canWrite}
           onCreate={() => setSheetOpen(true)}
-          pagination={{ page: list.page, pageSize: list.pageSize, total, onPageChange: list.setPage, onPageSizeChange: list.setPageSize }}
+          pagination={{
+            page: list.page,
+            pageSize: list.pageSize,
+            total,
+            onPageChange: list.setPage,
+            onPageSizeChange: list.setPageSize,
+          }}
         />
       )}
 
-      <ProjectFormSheet open={sheetOpen} onOpenChange={setSheetOpen} project={null} onSaved={(saved) => navigate(`/projects/${saved.id}`)} />
+      <ProjectFormSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        project={null}
+        onSaved={(saved) => navigate(`/projects/${saved.id}`)}
+      />
     </>
   );
 }
@@ -145,10 +264,26 @@ interface ProjectCardsProps {
   hasFilters: boolean;
   canWrite: boolean;
   onCreate: () => void;
-  pagination: { page: number; pageSize: number; total: number; onPageChange: (page: number) => void; onPageSizeChange: (size: number) => void };
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    onPageChange: (page: number) => void;
+    onPageSizeChange: (size: number) => void;
+  };
 }
 
-function ProjectCards({ items, loading, refreshing, error, onRetry, hasFilters, canWrite, onCreate, pagination }: ProjectCardsProps) {
+function ProjectCards({
+  items,
+  loading,
+  refreshing,
+  error,
+  onRetry,
+  hasFilters,
+  canWrite,
+  onCreate,
+  pagination,
+}: ProjectCardsProps) {
   if (loading) {
     return (
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -165,8 +300,18 @@ function ProjectCards({ items, loading, refreshing, error, onRetry, hasFilters, 
         icon={Building2}
         className="rounded-lg border border-border bg-card"
         title={hasFilters ? "No projects match" : "No projects yet"}
-        description={hasFilters ? "Try another search or clear the filters." : "Create the first project to start adding towers and flats."}
-        action={canWrite && !hasFilters ? <Button leftIcon={Plus} onClick={onCreate}>New project</Button> : undefined}
+        description={
+          hasFilters
+            ? "Try another search or clear the filters."
+            : "Create the first project to start adding towers and flats."
+        }
+        action={
+          canWrite && !hasFilters ? (
+            <Button leftIcon={Plus} onClick={onCreate}>
+              New project
+            </Button>
+          ) : undefined
+        }
       />
     );
   }
@@ -195,7 +340,13 @@ function ProjectCards({ items, loading, refreshing, error, onRetry, hasFilters, 
                     </span>
                   </p>
                 </div>
-                <ProgressRing value={project.construction_percent} size={44} strokeWidth={4} tone="gold" aria-label="Construction progress" />
+                <ProgressRing
+                  value={project.construction_percent}
+                  size={44}
+                  strokeWidth={4}
+                  tone="gold"
+                  aria-label="Construction progress"
+                />
               </div>
               <UnitCountsBar counts={project.unit_counts} />
               <div className="mt-auto flex flex-wrap items-center gap-2 text-2xs text-ink-subtle">
@@ -219,10 +370,20 @@ function ProjectCards({ items, loading, refreshing, error, onRetry, hasFilters, 
             Page {pagination.page} / {pages} · {formatNumber(pagination.total)} projects
           </span>
           <span className="flex gap-1">
-            <Button variant="outline" size="sm" disabled={pagination.page <= 1} onClick={() => pagination.onPageChange(pagination.page - 1)}>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pagination.page <= 1}
+              onClick={() => pagination.onPageChange(pagination.page - 1)}
+            >
               Previous
             </Button>
-            <Button variant="outline" size="sm" disabled={pagination.page >= pages} onClick={() => pagination.onPageChange(pagination.page + 1)}>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pagination.page >= pages}
+              onClick={() => pagination.onPageChange(pagination.page + 1)}
+            >
               Next
             </Button>
           </span>

@@ -30,16 +30,29 @@ export type BlockNode =
 
 const SAFE_SCHEMES = new Set(["http:", "https:", "mailto:", "tel:"]);
 
+/** Drops C0 control characters (U+0000–U+001F) and DEL (U+007F), which browsers ignore inside a URL scheme. */
+function stripControlChars(value: string): string {
+  let out = "";
+  for (const ch of value) {
+    const code = ch.charCodeAt(0);
+    if (code > 0x1f && code !== 0x7f) out += ch;
+  }
+  return out;
+}
+
 /**
  * Returns the URL when it is safe to emit as an href/src, else null.
  * Absolute URLs must use http(s)/mailto/tel; relative paths (`/x`, `./x`, `#x`, `x`) are allowed;
  * `javascript:`, `data:`, `vbscript:` and anything with control characters are rejected.
  */
 export function sanitizeUrl(raw: string): string | null {
-  const url = raw.trim().replace(/[\u0000-\u001f\u007f]/g, "");
+  const url = stripControlChars(raw.trim());
   if (!url) return null;
   // Decode entities / percent-encoding that could hide a scheme (e.g. "java&#115;cript:").
-  const probe = url.replace(/&#x?[0-9a-f]+;?/gi, "").replace(/%[0-9a-f]{2}/gi, "").toLowerCase();
+  const probe = url
+    .replace(/&#x?[0-9a-f]+;?/gi, "")
+    .replace(/%[0-9a-f]{2}/gi, "")
+    .toLowerCase();
   const schemeMatch = /^([a-z][a-z0-9+.-]*):/i.exec(probe);
   if (schemeMatch) {
     const scheme = `${schemeMatch[1]?.toLowerCase() ?? ""}:`;
@@ -128,7 +141,7 @@ export function parseInline(src: string): InlineNode[] {
     // Hard line break: backslash or two spaces before a newline
     if (ch === "\n") {
       if (buffer.endsWith("  ") || buffer.endsWith("\\")) {
-        buffer = buffer.replace(/(  |\\)$/, "");
+        buffer = buffer.replace(/( {2}|\\)$/, "");
         flush();
         out.push({ type: "br" });
       } else {
@@ -146,7 +159,13 @@ export function parseInline(src: string): InlineNode[] {
       const close = src.indexOf(fence, i + run);
       if (close !== -1) {
         flush();
-        out.push({ type: "code", text: src.slice(i + run, close).replace(/\n/g, " ").trim() });
+        out.push({
+          type: "code",
+          text: src
+            .slice(i + run, close)
+            .replace(/\n/g, " ")
+            .trim(),
+        });
         i = close + run;
         continue;
       }
@@ -314,7 +333,16 @@ export function parseMarkdown(source: string): BlockNode[] {
     while (i < lines.length) {
       const current = lines[i] ?? "";
       if (current.trim() === "") break;
-      if (para.length > 0 && (HEADING.test(current) || FENCE.test(current) || HR.test(current) || UL_ITEM.test(current) || OL_ITEM.test(current) || QUOTE.test(current))) break;
+      if (
+        para.length > 0 &&
+        (HEADING.test(current) ||
+          FENCE.test(current) ||
+          HR.test(current) ||
+          UL_ITEM.test(current) ||
+          OL_ITEM.test(current) ||
+          QUOTE.test(current))
+      )
+        break;
       para.push(current);
       i += 1;
     }
@@ -328,7 +356,12 @@ export function parseMarkdown(source: string): BlockNode[] {
 /* ------------------------------------------------------------------ */
 
 export function escapeHtml(text: string): string {
-  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function inlineToHtml(nodes: readonly InlineNode[]): string {
@@ -389,7 +422,9 @@ export function renderMarkdownToHtml(source: string): string {
 export function markdownExcerpt(source: string, max = 160): string {
   const text = parseMarkdown(source)
     .filter((block) => block.type === "paragraph" || block.type === "heading")
-    .map((block) => (block.type === "paragraph" || block.type === "heading" ? block.children.map(inlinePlain).join("") : ""))
+    .map((block) =>
+      block.type === "paragraph" || block.type === "heading" ? block.children.map(inlinePlain).join("") : "",
+    )
     .join(" ")
     .replace(/\s+/g, " ")
     .trim();

@@ -37,8 +37,19 @@ function ReportFrame({ report }: { report: ReportDefinition }) {
   const params = useMemo(() => pickReportParams(report.filters, search), [report.filters, search]);
   const page = parsePage(search.get("page"), 1);
   const pageSize = Math.min(200, parsePage(search.get("page_size"), 50));
-  const query = useMemo(() => buildReportQuery(report.filters, params, { today, paginated: report.paginated, page, pageSize }), [report.filters, report.paginated, params, today, page, pageSize]);
-  const effective = useMemo(() => Object.fromEntries(Object.entries(query).filter(([, value]) => typeof value === "string" || typeof value === "number").map(([key, value]) => [key, String(value)])), [query]);
+  const query = useMemo(
+    () => buildReportQuery(report.filters, params, { today, paginated: report.paginated, page, pageSize }),
+    [report.filters, report.paginated, params, today, page, pageSize],
+  );
+  const effective = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(query)
+          .filter(([, value]) => typeof value === "string" || typeof value === "number")
+          .map(([key, value]) => [key, String(value)]),
+      ),
+    [query],
+  );
   const missing = missingRequired(report.filters, params);
   const data = useReportData<unknown>(report.path, query, missing.length === 0);
   const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
@@ -81,19 +92,25 @@ function ReportFrame({ report }: { report: ReportDefinition }) {
     try {
       const facts = await exportReport(report.path, query, format, `${report.slug}-${today}`);
       if (facts?.truncated) {
-        toast.warning(`This CSV holds the first ${formatNumber(facts.rows ?? CSV_SYNC_MAX_ROWS)} of ${formatNumber(facts.total ?? 0)} rows.`, {
-          description: "Export all rows in the background to get the complete file.",
-          duration: 15_000,
-          action: {
-            label: "Export all",
-            onClick: () => {
-              api.startExport(report.path, { filters: query }).then(
-                () => toast.success("Export queued. You'll get a notification when the file is ready.", { action: { label: "My exports", onClick: () => navigate("/exports") } }),
-                (error: unknown) => toast.error(exportErrorMessage(error)),
-              );
+        toast.warning(
+          `This CSV holds the first ${formatNumber(facts.rows ?? CSV_SYNC_MAX_ROWS)} of ${formatNumber(facts.total ?? 0)} rows.`,
+          {
+            description: "Export all rows in the background to get the complete file.",
+            duration: 15_000,
+            action: {
+              label: "Export all",
+              onClick: () => {
+                api.startExport(report.path, { filters: query }).then(
+                  () =>
+                    toast.success("Export queued. You'll get a notification when the file is ready.", {
+                      action: { label: "My exports", onClick: () => navigate("/exports") },
+                    }),
+                  (error: unknown) => toast.error(exportErrorMessage(error)),
+                );
+              },
             },
           },
-        });
+        );
       }
     } catch (error) {
       toast.error(describeError(error));
@@ -114,7 +131,15 @@ function ReportFrame({ report }: { report: ReportDefinition }) {
   const context = {
     query,
     isFetching: data.isFetching,
-    pagination: report.paginated ? { page, pageSize, total: 0, onPageChange: (next: number) => update({ page: next > 1 ? String(next) : null }, false), onPageSizeChange: (size: number) => update({ page_size: size === 50 ? null : String(size) }) } : undefined,
+    pagination: report.paginated
+      ? {
+          page,
+          pageSize,
+          total: 0,
+          onPageChange: (next: number) => update({ page: next > 1 ? String(next) : null }, false),
+          onPageSizeChange: (size: number) => update({ page_size: size === 50 ? null : String(size) }),
+        }
+      : undefined,
   };
 
   return (
@@ -123,20 +148,44 @@ function ReportFrame({ report }: { report: ReportDefinition }) {
         title={report.label}
         description={report.description}
         backTo="/reports"
-        breadcrumbs={[{ label: "Home", to: "/" }, { label: "Reports", to: "/reports" }, { label: REPORT_GROUP_LABELS[report.group] }, { label: report.label }]}
+        breadcrumbs={[
+          { label: "Home", to: "/" },
+          { label: "Reports", to: "/reports" },
+          { label: REPORT_GROUP_LABELS[report.group] },
+          { label: report.label },
+        ]}
         actions={
           <>
             <PresetsMenu reportKey={report.key} params={params} onApply={applyPreset} />
-            <Button variant="outline" leftIcon={Link2} onClick={() => void copyLink()} className="hidden sm:inline-flex" data-testid="report-copy-link">
+            <Button
+              variant="outline"
+              leftIcon={Link2}
+              onClick={() => void copyLink()}
+              className="hidden sm:inline-flex"
+              data-testid="report-copy-link"
+            >
               Copy link
             </Button>
             {report.formats.includes("csv") && (
-              <Button variant="outline" leftIcon={Download} loading={exporting === "csv"} disabled={missing.length > 0 || exporting !== null} onClick={() => void download("csv")} data-testid="report-export-csv">
+              <Button
+                variant="outline"
+                leftIcon={Download}
+                loading={exporting === "csv"}
+                disabled={missing.length > 0 || exporting !== null}
+                onClick={() => void download("csv")}
+                data-testid="report-export-csv"
+              >
                 CSV
               </Button>
             )}
             {report.formats.includes("pdf") && (
-              <Button leftIcon={FileText} loading={exporting === "pdf"} disabled={missing.length > 0 || exporting !== null} onClick={() => void download("pdf")} data-testid="report-export-pdf">
+              <Button
+                leftIcon={FileText}
+                loading={exporting === "pdf"}
+                disabled={missing.length > 0 || exporting !== null}
+                onClick={() => void download("pdf")}
+                data-testid="report-export-pdf"
+              >
                 PDF
               </Button>
             )}
@@ -144,10 +193,22 @@ function ReportFrame({ report }: { report: ReportDefinition }) {
         }
       />
 
-      <ReportFilterBar filters={report.filters} params={params} effective={effective} onChange={(patch) => update(patch)} onReset={reset} today={today} />
+      <ReportFilterBar
+        filters={report.filters}
+        params={params}
+        effective={effective}
+        onChange={(patch) => update(patch)}
+        onReset={reset}
+        today={today}
+      />
 
       {missing.length > 0 ? (
-        <EmptyState icon={report.icon} className="rounded-lg border border-border bg-card" title="Pick a project to run this report" description="This report is computed per project; choose one in the filters above." />
+        <EmptyState
+          icon={report.icon}
+          className="rounded-lg border border-border bg-card"
+          title="Pick a project to run this report"
+          description="This report is computed per project; choose one in the filters above."
+        />
       ) : data.isPending ? (
         <div className="space-y-4" aria-busy="true">
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
@@ -158,7 +219,11 @@ function ReportFrame({ report }: { report: ReportDefinition }) {
           <Skeleton className="h-80" />
         </div>
       ) : data.isError ? (
-        <ErrorState error={data.error} onRetry={() => void data.refetch()} className="rounded-lg border border-border bg-card" />
+        <ErrorState
+          error={data.error}
+          onRetry={() => void data.refetch()}
+          className="rounded-lg border border-border bg-card"
+        />
       ) : (
         <div className="space-y-4" data-testid={`report-${report.slug}`}>
           {report.render(data.data, context)}

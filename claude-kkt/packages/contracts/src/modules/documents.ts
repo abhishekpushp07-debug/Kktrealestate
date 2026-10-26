@@ -1,6 +1,14 @@
 import { z } from "zod";
 import { ActorTypeSchema, DocumentEntityTypeSchema } from "../enums.js";
-import { BoolQuerySchema, IdSchema, ListQuerySchema, SignedLinkSchema, TimestampSchema, VersionSchema, listEnvelope } from "../common.js";
+import {
+  BoolQuerySchema,
+  IdSchema,
+  ListQuerySchema,
+  SignedLinkSchema,
+  TimestampSchema,
+  VersionSchema,
+  listEnvelope,
+} from "../common.js";
 
 /** Maximum upload size (15 MB). */
 export const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;

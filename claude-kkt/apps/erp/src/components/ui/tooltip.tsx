@@ -16,7 +16,15 @@ export interface TooltipProps {
 }
 
 /** Solid navy tooltip. Children must accept a ref (wrap text in a span). */
-export function Tooltip({ content, children, side = "top", align = "center", disabled = false, className, delayDuration = 300 }: TooltipProps) {
+export function Tooltip({
+  content,
+  children,
+  side = "top",
+  align = "center",
+  disabled = false,
+  className,
+  delayDuration = 300,
+}: TooltipProps) {
   if (disabled || content === null || content === undefined || content === "") return <>{children}</>;
   return (
     <Primitive.Root delayDuration={delayDuration}>

@@ -36,7 +36,15 @@ export function toTenDigitPhone(input: string): string {
 function deviceName(): string {
   if (Platform.OS === "web") {
     const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
-    const browser = /Edg\//.test(ua) ? "Edge" : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : /Firefox\//.test(ua) ? "Firefox" : "Browser";
+    const browser = /Edg\//.test(ua)
+      ? "Edge"
+      : /Chrome\//.test(ua)
+        ? "Chrome"
+        : /Safari\//.test(ua)
+          ? "Safari"
+          : /Firefox\//.test(ua)
+            ? "Firefox"
+            : "Browser";
     return `${browser} on web`;
   }
   return Platform.OS === "ios" ? "iPhone app" : "Android app";
@@ -116,7 +124,13 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
       const parsed = PortalLoginSchema.safeParse({ phone: phoneInput, password, device_name: deviceName() });
       if (!parsed.success) {
         const phoneIssue = parsed.error.issues.find((i) => i.path[0] === "phone");
-        return { ok: false, failure: { code: "VALIDATION", message: phoneIssue ? "Enter a valid 10-digit Indian mobile number." : "Enter your password." } };
+        return {
+          ok: false,
+          failure: {
+            code: "VALIDATION",
+            message: phoneIssue ? "Enter a valid 10-digit Indian mobile number." : "Enter your password.",
+          },
+        };
       }
       try {
         const res = await api.auth.login(parsed.data);
@@ -155,7 +169,15 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
   }, [persistUser]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ status, user, mustChangePassword: user?.must_change_password ?? false, login, logout, refreshUser, markPasswordChanged }),
+    () => ({
+      status,
+      user,
+      mustChangePassword: user?.must_change_password ?? false,
+      login,
+      logout,
+      refreshUser,
+      markPasswordChanged,
+    }),
     [status, user, login, logout, refreshUser, markPasswordChanged],
   );
 

@@ -24,7 +24,12 @@ export function redisUsable(redis: Pick<Redis, "status"> | null | undefined): bo
 export async function withinBudget<T>(p: Promise<T>, ms: number, what = "redis"): Promise<T> {
   let timer: NodeJS.Timeout | undefined;
   try {
-    return await Promise.race([p, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error(`${what} exceeded ${ms} ms`)), ms); })]);
+    return await Promise.race([
+      p,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${what} exceeded ${ms} ms`)), ms);
+      }),
+    ]);
   } finally {
     if (timer) clearTimeout(timer);
   }
@@ -34,7 +39,13 @@ export async function withinBudget<T>(p: Promise<T>, ms: number, what = "redis")
  * Read-through JSON cache: returns the cached value for `key` or computes it with `fn` and stores it for `ttlSeconds`. Redis is optional
  * here: a disconnected client is skipped, and a read or write that takes longer than CACHE_BUDGET_MS is abandoned (the loader answers).
  */
-export async function cached<T>(redis: Redis, key: string, ttlSeconds: number, fn: () => Promise<T>, budgetMs = CACHE_BUDGET_MS): Promise<T> {
+export async function cached<T>(
+  redis: Redis,
+  key: string,
+  ttlSeconds: number,
+  fn: () => Promise<T>,
+  budgetMs = CACHE_BUDGET_MS,
+): Promise<T> {
   let healthy = redisUsable(redis);
   if (healthy) {
     try {
@@ -46,7 +57,11 @@ export async function cached<T>(redis: Redis, key: string, ttlSeconds: number, f
   }
   const value = await fn();
   if (healthy) {
-    try { await withinBudget(redis.set(key, JSON.stringify(value), "EX", ttlSeconds), budgetMs, "cache write"); } catch { /* best effort */ }
+    try {
+      await withinBudget(redis.set(key, JSON.stringify(value), "EX", ttlSeconds), budgetMs, "cache write");
+    } catch {
+      /* best effort */
+    }
   }
   return value;
 }

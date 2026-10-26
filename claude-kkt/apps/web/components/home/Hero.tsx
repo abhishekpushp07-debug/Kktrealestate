@@ -19,7 +19,16 @@ interface HeroProps {
 export function Hero({ banners, brandName, tagline, intervalMs = 6500 }: HeroProps) {
   const slides: Banner[] = banners.length
     ? banners
-    : [{ title: tagline ?? `Homes crafted for generations`, subtitle: `Discover the latest residences by ${brandName}.`, cta_label: "Explore projects", cta_url: "/projects", image_url: "", image_medium_url: null }];
+    : [
+        {
+          title: tagline ?? `Homes crafted for generations`,
+          subtitle: `Discover the latest residences by ${brandName}.`,
+          cta_label: "Explore projects",
+          cta_url: "/projects",
+          image_url: "",
+          image_medium_url: null,
+        },
+      ];
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
   const reduced = usePrefersReducedMotion();
@@ -45,7 +54,14 @@ export function Hero({ banners, brandName, tagline, intervalMs = 6500 }: HeroPro
       {slides.map((slide, i) => (
         <div key={`${slide.title}-${i}`} className="hero-slide" data-active={i === active} aria-hidden={i !== active}>
           <div className="hero-media absolute inset-0 will-change-transform">
-            <SmartImage src={slide.image_url || null} alt="" sizes="100vw" priority={i === 0} quality={70} objectPosition="center" />
+            <SmartImage
+              src={slide.image_url || null}
+              alt=""
+              sizes="100vw"
+              priority={i === 0}
+              quality={70}
+              objectPosition="center"
+            />
           </div>
         </div>
       ))}
@@ -56,7 +72,9 @@ export function Hero({ banners, brandName, tagline, intervalMs = 6500 }: HeroPro
         <div key={active} className="max-w-3xl animate-fade-up" aria-live="polite">
           <p className="eyebrow text-gold-300">{brandName}</p>
           <h1 className="mt-5 font-display text-display-xl text-balance">{current?.title}</h1>
-          {current?.subtitle ? <p className="mt-6 max-w-xl text-lg leading-8 text-ivory-100/80 sm:text-xl">{current.subtitle}</p> : null}
+          {current?.subtitle ? (
+            <p className="mt-6 max-w-xl text-lg leading-8 text-ivory-100/80 sm:text-xl">{current.subtitle}</p>
+          ) : null}
           <div className="mt-10 flex flex-col gap-3 sm:flex-row">
             <Button href={current?.cta_url || "/projects"} size="lg">
               {current?.cta_label || "Explore projects"} <ArrowRightIcon size={18} />
@@ -79,13 +97,18 @@ export function Hero({ banners, brandName, tagline, intervalMs = 6500 }: HeroPro
                 onClick={() => setActive(i)}
                 className="tap flex items-center justify-center"
               >
-                <span className={`block h-1 rounded-full transition-all duration-500 ${i === active ? "w-10 bg-gold-500" : "w-5 bg-ivory-100/40"}`} />
+                <span
+                  className={`block h-1 rounded-full transition-all duration-500 ${i === active ? "w-10 bg-gold-500" : "w-5 bg-ivory-100/40"}`}
+                />
               </button>
             ))}
           </div>
         ) : null}
       </div>
-      <div aria-hidden className="pointer-events-none absolute bottom-6 left-1/2 hidden -translate-x-1/2 text-[0.65rem] uppercase tracking-[0.3em] text-ivory-100/50 md:block">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute bottom-6 left-1/2 hidden -translate-x-1/2 text-[0.65rem] uppercase tracking-[0.3em] text-ivory-100/50 md:block"
+      >
         Scroll
       </div>
     </section>

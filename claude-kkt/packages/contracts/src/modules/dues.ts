@@ -1,6 +1,14 @@
 import { z } from "zod";
 import { IntegrityFindingTypeSchema } from "../enums.js";
-import { BoolQuerySchema, DateStringSchema, IdSchema, ListQuerySchema, SignedPaiseSchema, TimestampSchema, listEnvelope } from "../common.js";
+import {
+  BoolQuerySchema,
+  DateStringSchema,
+  IdSchema,
+  ListQuerySchema,
+  SignedPaiseSchema,
+  TimestampSchema,
+  listEnvelope,
+} from "../common.js";
 
 /** Run the auto-dues engine now (whole company, a project, a tower or one booking). */
 export const RunDuesRequestSchema = z.strictObject({
@@ -64,7 +72,10 @@ export const IntegrityReportResponseSchema = z.object({
 export type IntegrityReportResponse = z.infer<typeof IntegrityReportResponseSchema>;
 
 /** Scope for an on-demand integrity run. */
-export const IntegrityRunRequestSchema = z.strictObject({ project_id: IdSchema.optional(), booking_id: IdSchema.optional() });
+export const IntegrityRunRequestSchema = z.strictObject({
+  project_id: IdSchema.optional(),
+  booking_id: IdSchema.optional(),
+});
 export type IntegrityRunRequest = z.infer<typeof IntegrityRunRequestSchema>;
 
 /** Admin-confirmed repair: void unsatisfied/duplicate demands without payments, raise missing ones, rebuild ledgers. */

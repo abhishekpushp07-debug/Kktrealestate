@@ -5,13 +5,23 @@ import { ApiError } from "./errors.js";
  * Sliding-window rate limit in Redis (two fixed windows weighted), multi-instance safe.
  * Throws 429 with Retry-After when `limit` requests per `windowSeconds` is exceeded for `bucket`.
  */
-export async function enforceRateLimit(redis: Redis, bucket: string, limit: number, windowSeconds: number): Promise<{ remaining: number }> {
+export async function enforceRateLimit(
+  redis: Redis,
+  bucket: string,
+  limit: number,
+  windowSeconds: number,
+): Promise<{ remaining: number }> {
   const now = Date.now();
   const windowMs = windowSeconds * 1000;
   const current = Math.floor(now / windowMs);
   const keyNow = `rl:${bucket}:${current}`;
   const keyPrev = `rl:${bucket}:${current - 1}`;
-  const [[, countNowRaw], , [, countPrevRaw]] = (await redis.multi().incr(keyNow).expire(keyNow, windowSeconds * 2).get(keyPrev).exec()) as [[null, number], [null, number], [null, string | null]];
+  const [[, countNowRaw], , [, countPrevRaw]] = (await redis
+    .multi()
+    .incr(keyNow)
+    .expire(keyNow, windowSeconds * 2)
+    .get(keyPrev)
+    .exec()) as [[null, number], [null, number], [null, string | null]];
   const countNow = Number(countNowRaw);
   const countPrev = Number(countPrevRaw ?? 0);
   const elapsedFraction = (now % windowMs) / windowMs;

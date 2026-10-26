@@ -42,7 +42,10 @@ export function usePost(id: string | null | undefined): UseQueryResult<CmsPostRo
 /* ------------------------------------------------------------------ */
 
 /** Long-lived public URL of a CMS image rendition (`GET /public/media/:id?variant=`). */
-export function publicMediaUrl(documentId: string | null | undefined, variant: DocumentVariant = "medium"): string | null {
+export function publicMediaUrl(
+  documentId: string | null | undefined,
+  variant: DocumentVariant = "medium",
+): string | null {
   if (!documentId) return null;
   const suffix = variant === "original" ? "" : `?variant=${variant}`;
   return `${apiBaseUrl()}/public/media/${documentId}${suffix}`;
@@ -69,7 +72,14 @@ export async function uploadCmsMedia(file: File, companyId: string | null, title
   } catch (error) {
     const missingRoute = isApiClientError(error) && (error.status === 404 || error.status === 405);
     if (!missingRoute || !companyId) throw error;
-    return uploadDocument({ file, entity_type: "CMS", entity_id: companyId, title, is_sensitive: false, shared_with_customer: false });
+    return uploadDocument({
+      file,
+      entity_type: "CMS",
+      entity_id: companyId,
+      title,
+      is_sensitive: false,
+      shared_with_customer: false,
+    });
   }
 }
 

@@ -1,8 +1,26 @@
 import { CalendarClock, CheckCircle2, ExternalLink, Phone, Save, UserX, XCircle } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { VISIT_SOURCE_LABELS, VISIT_STATUS_LABELS, type VisitRow } from "@kkt/contracts";
-import { Badge, Button, Combobox, ConfirmDialog, ErrorState, FieldWrapper, KeyValueList, Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTitle, SimpleDialog, Skeleton, StatusChip, Textarea } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  Combobox,
+  ConfirmDialog,
+  ErrorState,
+  FieldWrapper,
+  KeyValueList,
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SimpleDialog,
+  Skeleton,
+  StatusChip,
+  Textarea,
+} from "@/components/ui";
 import { api, describeError, type ApiClientError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { formatDate, formatDateTime, formatPhone } from "@/lib/format";
@@ -12,6 +30,7 @@ import { useSalesUserOptions } from "@/features/inventory/api";
 import { Notice } from "@/features/inventory/components";
 import { LEADS_PATH, VISITS_PATH, crmKeys, formatSlotTime } from "../api";
 import { SlotPicker, type SlotValue } from "./SlotPicker";
+import { useOnChange } from "@/lib/utils";
 
 export interface VisitDrawerProps {
   visitId: string | null;
@@ -73,17 +92,24 @@ function VisitDrawerBody({ visit }: { visit: VisitRow }) {
   const users = useSalesUserOptions(canWrite);
   const invalidate = useMemo(() => [...VISIT_INVALIDATE, [VISITS_PATH, "item", visit.id]], [visit.id]);
 
-  useEffect(() => {
+  // A newer version of the visit (or another visit) re-seeds the editable fields.
+  useOnChange(JSON.stringify([visit.id, visit.version, visit.notes, visit.assignee_user_id]), () => {
     setNotes(visit.notes ?? "");
     setAssignee(visit.assignee_user_id);
-  }, [visit.notes, visit.assignee_user_id, visit.version]);
+  });
 
   const doReschedule = useMutationWithToast<VisitRow, SlotValue>({
-    mutationFn: (next) => api.post<VisitRow>(`${VISITS_PATH}/${visit.id}/reschedule`, { version: visit.version, visit_date: next.date, slot_start: next.start }, { version: visit.version }),
+    mutationFn: (next) =>
+      api.post<VisitRow>(
+        `${VISITS_PATH}/${visit.id}/reschedule`,
+        { version: visit.version, visit_date: next.date, slot_start: next.start },
+        { version: visit.version },
+      ),
     successMessage: (saved) => `Moved to ${formatDate(saved.visit_date)} ${formatSlotTime(saved.slot_start)}`,
     invalidate,
     entityLabel: "This visit",
-    errorMessage: (error: ApiClientError) => (error.code === "SLOT_FULL" ? "That slot is full — pick another." : describeError(error)),
+    errorMessage: (error: ApiClientError) =>
+      error.code === "SLOT_FULL" ? "That slot is full — pick another." : describeError(error),
     onSuccess: (saved) => {
       setReschedule(false);
       setSlot(null);
@@ -92,19 +118,35 @@ function VisitDrawerBody({ visit }: { visit: VisitRow }) {
     },
   });
   const cancel = useMutationWithToast<VisitRow, string>({
-    mutationFn: (reason) => api.post<VisitRow>(`${VISITS_PATH}/${visit.id}/cancel`, { version: visit.version, reason }, { version: visit.version }),
+    mutationFn: (reason) =>
+      api.post<VisitRow>(
+        `${VISITS_PATH}/${visit.id}/cancel`,
+        { version: visit.version, reason },
+        { version: visit.version },
+      ),
     successMessage: "Visit cancelled; the seat is free again",
     invalidate,
     entityLabel: "This visit",
   });
   const markOutcome = useMutationWithToast<VisitRow, "COMPLETED" | "NO_SHOW">({
-    mutationFn: (value) => api.post<VisitRow>(`${VISITS_PATH}/${visit.id}/${value === "COMPLETED" ? "complete" : "no-show"}`, { version: visit.version, notes: notes.trim() || null }, { version: visit.version }),
-    successMessage: (_saved, value) => (value === "COMPLETED" ? "Marked completed · lead moved to Site Visit Done" : "Marked no-show"),
+    mutationFn: (value) =>
+      api.post<VisitRow>(
+        `${VISITS_PATH}/${visit.id}/${value === "COMPLETED" ? "complete" : "no-show"}`,
+        { version: visit.version, notes: notes.trim() || null },
+        { version: visit.version },
+      ),
+    successMessage: (_saved, value) =>
+      value === "COMPLETED" ? "Marked completed · lead moved to Site Visit Done" : "Marked no-show",
     invalidate,
     entityLabel: "This visit",
   });
   const update = useMutationWithToast<VisitRow, void>({
-    mutationFn: () => api.patch<VisitRow>(`${VISITS_PATH}/${visit.id}`, { version: visit.version, notes: notes.trim() || null, assignee_user_id: assignee }, { version: visit.version }),
+    mutationFn: () =>
+      api.patch<VisitRow>(
+        `${VISITS_PATH}/${visit.id}`,
+        { version: visit.version, notes: notes.trim() || null, assignee_user_id: assignee },
+        { version: visit.version },
+      ),
     successMessage: "Visit updated",
     invalidate,
     entityLabel: "This visit",
@@ -124,7 +166,10 @@ function VisitDrawerBody({ visit }: { visit: VisitRow }) {
         <SheetDescription>
           <span className="flex flex-wrap items-center gap-x-3">
             <span className="font-mono">{visit.visit_number}</span>
-            <a href={`tel:${visit.phone}`} className="money inline-flex items-center gap-1 text-navy-700 hover:underline">
+            <a
+              href={`tel:${visit.phone}`}
+              className="money inline-flex items-center gap-1 text-navy-700 hover:underline"
+            >
               <Phone className="size-3" aria-hidden="true" /> {formatPhone(visit.phone)}
             </a>
             <span>{VISIT_SOURCE_LABELS[visit.source]}</span>
@@ -143,25 +188,51 @@ function VisitDrawerBody({ visit }: { visit: VisitRow }) {
           </p>
           {visit.rescheduled_from && (
             <p className="mt-1 text-2xs text-warning-fg">
-              Originally {formatDate(visit.rescheduled_from.visit_date)} {formatSlotTime(visit.rescheduled_from.slot_start)}
+              Originally {formatDate(visit.rescheduled_from.visit_date)}{" "}
+              {formatSlotTime(visit.rescheduled_from.slot_start)}
             </p>
           )}
         </div>
-        {visit.status === "CANCELLED" && <Notice tone="danger">Cancelled{visit.cancel_reason ? `: ${visit.cancel_reason}` : ""}.</Notice>}
+        {visit.status === "CANCELLED" && (
+          <Notice tone="danger">Cancelled{visit.cancel_reason ? `: ${visit.cancel_reason}` : ""}.</Notice>
+        )}
         {visit.is_past && open && <Notice tone="warning">This visit is in the past — mark its outcome.</Notice>}
 
         {canWrite && open && (
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" leftIcon={CheckCircle2} onClick={() => setOutcome("COMPLETED")} data-testid="visit-complete">
+            <Button
+              size="sm"
+              leftIcon={CheckCircle2}
+              onClick={() => setOutcome("COMPLETED")}
+              data-testid="visit-complete"
+            >
               Completed
             </Button>
-            <Button size="sm" variant="outline" leftIcon={UserX} onClick={() => setOutcome("NO_SHOW")} data-testid="visit-no-show">
+            <Button
+              size="sm"
+              variant="outline"
+              leftIcon={UserX}
+              onClick={() => setOutcome("NO_SHOW")}
+              data-testid="visit-no-show"
+            >
               No-show
             </Button>
-            <Button size="sm" variant="outline" leftIcon={CalendarClock} onClick={() => setReschedule(true)} data-testid="visit-reschedule">
+            <Button
+              size="sm"
+              variant="outline"
+              leftIcon={CalendarClock}
+              onClick={() => setReschedule(true)}
+              data-testid="visit-reschedule"
+            >
               Reschedule
             </Button>
-            <Button size="sm" variant="danger-outline" leftIcon={XCircle} onClick={() => setCancelOpen(true)} data-testid="visit-cancel">
+            <Button
+              size="sm"
+              variant="danger-outline"
+              leftIcon={XCircle}
+              onClick={() => setCancelOpen(true)}
+              data-testid="visit-cancel"
+            >
               Cancel
             </Button>
           </div>
@@ -172,30 +243,83 @@ function VisitDrawerBody({ visit }: { visit: VisitRow }) {
           items={[
             { label: "Project", value: visit.project_name },
             { label: "E-mail", value: visit.email },
-            { label: "Lead", value: visit.lead_id ? (
-                <Link to={`/leads?lead=${visit.lead_id}`} className="inline-flex items-center gap-1 text-navy-700 hover:underline">
+            {
+              label: "Lead",
+              value: visit.lead_id ? (
+                <Link
+                  to={`/leads?lead=${visit.lead_id}`}
+                  className="inline-flex items-center gap-1 text-navy-700 hover:underline"
+                >
                   {visit.lead_number ?? "Open lead"} <ExternalLink className="size-3" aria-hidden="true" />
                 </Link>
-              ) : null },
-            { label: "Customer", value: visit.customer_id ? (
-                <Link to={`/customers/${visit.customer_id}`} className="inline-flex items-center gap-1 text-navy-700 hover:underline">
+              ) : null,
+            },
+            {
+              label: "Customer",
+              value: visit.customer_id ? (
+                <Link
+                  to={`/customers/${visit.customer_id}`}
+                  className="inline-flex items-center gap-1 text-navy-700 hover:underline"
+                >
                   Customer 360 <ExternalLink className="size-3" aria-hidden="true" />
                 </Link>
-              ) : null },
+              ) : null,
+            },
             { label: "Visitor message", value: visit.message, full: true },
-            { label: "Outcome marked", value: visit.outcome_marked_at ? formatDateTime(visit.outcome_marked_at) : null },
+            {
+              label: "Outcome marked",
+              value: visit.outcome_marked_at ? formatDateTime(visit.outcome_marked_at) : null,
+            },
             { label: "Booked", value: formatDateTime(visit.created_at) },
           ]}
         />
 
         <div className="space-y-3 rounded-md border border-border p-3">
           <FieldWrapper label="Assignee">
-            {(control) => <Combobox id={control.id} value={assignee} selectedLabel={visit.assignee_name ?? undefined} onValueChange={(value) => setAssignee(value)} options={(users.data ?? []).filter((user) => user.is_active).map((user) => ({ value: user.id, label: user.name, description: user.role_name, keywords: [user.email] }))} placeholder="Unassigned" allowClear disabled={!canWrite} />}
+            {(control) => (
+              <Combobox
+                id={control.id}
+                value={assignee}
+                selectedLabel={visit.assignee_name ?? undefined}
+                onValueChange={(value) => setAssignee(value)}
+                options={(users.data ?? [])
+                  .filter((user) => user.is_active)
+                  .map((user) => ({
+                    value: user.id,
+                    label: user.name,
+                    description: user.role_name,
+                    keywords: [user.email],
+                  }))}
+                placeholder="Unassigned"
+                allowClear
+                disabled={!canWrite}
+              />
+            )}
           </FieldWrapper>
-          <FieldWrapper label="Notes">{(control) => <Textarea id={control.id} value={notes} onChange={(event) => setNotes(event.target.value)} rows={3} maxLength={1000} disabled={!canWrite} data-testid="visit-notes" />}</FieldWrapper>
+          <FieldWrapper label="Notes">
+            {(control) => (
+              <Textarea
+                id={control.id}
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                rows={3}
+                maxLength={1000}
+                disabled={!canWrite}
+                data-testid="visit-notes"
+              />
+            )}
+          </FieldWrapper>
           {canWrite && (
             <div className="flex justify-end">
-              <Button size="sm" variant="outline" leftIcon={Save} loading={update.isPending} disabled={!dirty} onClick={() => update.mutate()} data-testid="visit-save">
+              <Button
+                size="sm"
+                variant="outline"
+                leftIcon={Save}
+                loading={update.isPending}
+                disabled={!dirty}
+                onClick={() => update.mutate()}
+                data-testid="visit-save"
+              >
                 Save
               </Button>
             </div>
@@ -213,7 +337,12 @@ function VisitDrawerBody({ visit }: { visit: VisitRow }) {
             <Button variant="outline" onClick={() => setReschedule(false)} disabled={doReschedule.isPending}>
               Cancel
             </Button>
-            <Button loading={doReschedule.isPending} disabled={!slot} onClick={() => slot && doReschedule.mutate(slot)} data-testid="visit-reschedule-submit">
+            <Button
+              loading={doReschedule.isPending}
+              disabled={!slot}
+              onClick={() => slot && doReschedule.mutate(slot)}
+              data-testid="visit-reschedule-submit"
+            >
               Move visit
             </Button>
           </>
@@ -252,7 +381,11 @@ function VisitDrawerBody({ visit }: { visit: VisitRow }) {
         open={outcome !== null}
         onOpenChange={(next) => !next && setOutcome(null)}
         title={outcome === "COMPLETED" ? "Mark visit completed?" : "Mark as no-show?"}
-        description={outcome === "COMPLETED" ? "The linked lead moves to Site Visit Done." : "The seat stays used; the lead keeps its stage."}
+        description={
+          outcome === "COMPLETED"
+            ? "The linked lead moves to Site Visit Done."
+            : "The seat stays used; the lead keeps its stage."
+        }
         confirmLabel={outcome === "COMPLETED" ? "Completed" : "No-show"}
         onConfirm={async () => {
           if (outcome) await markOutcome.mutateAsync(outcome);

@@ -52,7 +52,10 @@ export function parseTrustProxy(raw: string): TrustProxy {
     .map((e) => e.trim())
     .filter((e) => e !== "");
   const bad = entries.filter((e) => !PROXY_ADDR_NAMES.has(e.toLowerCase()) && !isAddressOrCidr(e));
-  if (bad.length > 0) throw new Error(`unknown proxy entr${bad.length === 1 ? "y" : "ies"} ${bad.join(", ")} (use true, false, loopback, linklocal, uniquelocal, an IP or a CIDR)`);
+  if (bad.length > 0)
+    throw new Error(
+      `unknown proxy entr${bad.length === 1 ? "y" : "ies"} ${bad.join(", ")} (use true, false, loopback, linklocal, uniquelocal, an IP or a CIDR)`,
+    );
   return entries.map((e) => (PROXY_ADDR_NAMES.has(e.toLowerCase()) ? e.toLowerCase() : e));
 }
 
@@ -65,7 +68,10 @@ export interface FieldKey {
 /** Parses FIELD_ENCRYPTION_KEYS (`kid:secret,kid:secret`, first = active). Secrets are base64 (or raw text) of at least 32 characters. */
 export function parseFieldKeys(raw: string): FieldKey[] {
   const keys: FieldKey[] = [];
-  for (const part of raw.split(",").map((p) => p.trim()).filter((p) => p !== "")) {
+  for (const part of raw
+    .split(",")
+    .map((p) => p.trim())
+    .filter((p) => p !== "")) {
     const colon = part.indexOf(":");
     const kid = colon === -1 ? "" : part.slice(0, colon).trim();
     const secret = colon === -1 ? "" : part.slice(colon + 1).trim();
@@ -77,7 +83,11 @@ export function parseFieldKeys(raw: string): FieldKey[] {
   return keys;
 }
 
-const bool = (def: "true" | "false") => z.string().default(def).transform((v) => v === "true" || v === "1");
+const bool = (def: "true" | "false") =>
+  z
+    .string()
+    .default(def)
+    .transform((v) => v === "true" || v === "1");
 const int = (def: number, min: number, max: number) => z.coerce.number().int().min(min).max(max).default(def);
 
 /** Environment schema: the process refuses to start when a required secret is missing or weak. */
@@ -112,7 +122,10 @@ const EnvSchema = z
       .string()
       .optional()
       .transform((v, ctx) => {
-        const list = (v ?? "").split(",").map((s) => s.trim()).filter((s) => s !== "");
+        const list = (v ?? "")
+          .split(",")
+          .map((s) => s.trim())
+          .filter((s) => s !== "");
         if (list.some((s) => s.length < 32)) {
           ctx.addIssue({ code: "custom", message: "every JWT_PREVIOUS_SECRETS entry must be at least 32 characters" });
           return z.NEVER;
@@ -226,18 +239,32 @@ const EnvSchema = z
   })
   .superRefine((env, ctx) => {
     if (env.STORAGE_DRIVER === "s3") {
-      if (!env.S3_BUCKET) ctx.addIssue({ code: "custom", path: ["S3_BUCKET"], message: "S3_BUCKET is required when STORAGE_DRIVER=s3" });
-      if (!env.S3_REGION) ctx.addIssue({ code: "custom", path: ["S3_REGION"], message: "S3_REGION is required when STORAGE_DRIVER=s3" });
+      if (!env.S3_BUCKET)
+        ctx.addIssue({ code: "custom", path: ["S3_BUCKET"], message: "S3_BUCKET is required when STORAGE_DRIVER=s3" });
+      if (!env.S3_REGION)
+        ctx.addIssue({ code: "custom", path: ["S3_REGION"], message: "S3_REGION is required when STORAGE_DRIVER=s3" });
       if (Boolean(env.S3_ACCESS_KEY) !== Boolean(env.S3_SECRET_KEY)) {
-        ctx.addIssue({ code: "custom", path: ["S3_SECRET_KEY"], message: "S3_ACCESS_KEY and S3_SECRET_KEY must be set together (or both left unset for an IAM role)" });
+        ctx.addIssue({
+          code: "custom",
+          path: ["S3_SECRET_KEY"],
+          message: "S3_ACCESS_KEY and S3_SECRET_KEY must be set together (or both left unset for an IAM role)",
+        });
       }
     }
     if (Boolean(env.BOOTSTRAP_ADMIN_EMAIL) !== Boolean(env.BOOTSTRAP_ADMIN_PASSWORD)) {
-      ctx.addIssue({ code: "custom", path: ["BOOTSTRAP_ADMIN_PASSWORD"], message: "BOOTSTRAP_ADMIN_EMAIL and BOOTSTRAP_ADMIN_PASSWORD must be set together" });
+      ctx.addIssue({
+        code: "custom",
+        path: ["BOOTSTRAP_ADMIN_PASSWORD"],
+        message: "BOOTSTRAP_ADMIN_EMAIL and BOOTSTRAP_ADMIN_PASSWORD must be set together",
+      });
     }
     const k1 = env.FIELD_ENCRYPTION_KEYS.find((k) => k.kid === "k1");
     if (k1 && k1.secret !== env.FIELD_ENCRYPTION_KEY) {
-      ctx.addIssue({ code: "custom", path: ["FIELD_ENCRYPTION_KEYS"], message: "key id k1 is FIELD_ENCRYPTION_KEY; give the new key another id" });
+      ctx.addIssue({
+        code: "custom",
+        path: ["FIELD_ENCRYPTION_KEYS"],
+        message: "key id k1 is FIELD_ENCRYPTION_KEY; give the new key another id",
+      });
     }
   })
   .transform((env) => ({
@@ -261,7 +288,13 @@ const DEV_DEFAULTS: Record<string, string> = {
 
 /** Defaults that differ between production and everything else. */
 const MODE_DEFAULTS: Record<"production" | "other", Record<string, string>> = {
-  production: { SEED_ON_BOOT: "false", SEED_DEMO: "false", RUN_JOBS_IN_API: "false", API_WORKERS: "auto", DOCS_PUBLIC: "false" },
+  production: {
+    SEED_ON_BOOT: "false",
+    SEED_DEMO: "false",
+    RUN_JOBS_IN_API: "false",
+    API_WORKERS: "auto",
+    DOCS_PUBLIC: "false",
+  },
   other: { SEED_ON_BOOT: "true", SEED_DEMO: "true", RUN_JOBS_IN_API: "true", API_WORKERS: "1", DOCS_PUBLIC: "true" },
 };
 

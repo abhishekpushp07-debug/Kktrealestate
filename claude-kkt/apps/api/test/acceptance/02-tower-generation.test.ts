@@ -1,5 +1,17 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { BOOT_TIMEOUT, blockByCode, bootAcceptance, flatsOf, key, masterByCode, projectByCode, type Block, type ErrorBody, type Flat, type Harness } from "./harness.js";
+import {
+  BOOT_TIMEOUT,
+  blockByCode,
+  bootAcceptance,
+  flatsOf,
+  key,
+  masterByCode,
+  projectByCode,
+  type Block,
+  type ErrorBody,
+  type Flat,
+  type Harness,
+} from "./harness.js";
 
 /**
  * SPEC §18 scenario 2 (L243): "Creating a 15-floor tower with skip 13 and refuge 7 yields the correct flat count and numbering, with
@@ -24,7 +36,9 @@ beforeAll(async () => {
   admin = (await h.loginAs("admin")).access_token;
   sghId = (await projectByCode(h, admin, "SGH")).id;
 }, BOOT_TIMEOUT);
-afterAll(async () => { await h?.close(); });
+afterAll(async () => {
+  await h?.close();
+});
 
 /** The generation facts every 15/skip-13/refuge-7 tower built from FP-4 (1–5) + FP-4-PREMIUM (6–15) must satisfy. */
 function assertTowerFacts(code: string, flats: Map<string, Flat>): void {
@@ -36,8 +50,11 @@ function assertTowerFacts(code: string, flats: Map<string, Flat>): void {
   const numbers = [...flats.keys()];
   expect(numbers.every((n) => new RegExp(`^${code}-(\\d{1,2})(0[1-4])$`).test(n))).toBe(true);
   expect(numbers.some((n) => n.startsWith(`${code}-13`) || n.startsWith(`${code}-7`))).toBe(false);
-  for (const n of ["101", "104", "501", "601", "801", "1201", "1401", "1504"]) expect(flats.has(`${code}-${n}`), `${code}-${n}`).toBe(true);
-  for (const floor of floors) for (const pos of [1, 2, 3, 4]) expect(flats.get(`${code}-${floor}0${pos}`)?.position, `${code}-${floor}0${pos}`).toBe(pos);
+  for (const n of ["101", "104", "501", "601", "801", "1201", "1401", "1504"])
+    expect(flats.has(`${code}-${n}`), `${code}-${n}`).toBe(true);
+  for (const floor of floors)
+    for (const pos of [1, 2, 3, 4])
+      expect(flats.get(`${code}-${floor}0${pos}`)?.position, `${code}-${floor}0${pos}`).toBe(pos);
 
   // SPEC L76–77: floors 1–5 use FP-4 (3BHK-A E corner, 2BHK-A N, 2BHK-B S, 3BHK-B W corner); 6–15 use FP-4-PREMIUM (4 × 3BHK-A, corners at 1 and 4)
   for (const floor of [1, 2, 3, 4, 5]) {
@@ -47,7 +64,8 @@ function assertTowerFacts(code: string, flats: Map<string, Flat>): void {
     expect(flats.get(`${code}-${floor}04`)).toMatchObject({ flat_type_code: "3BHK-B", facing: "W", is_corner: true });
   }
   for (const floor of [6, 8, 9, 10, 11, 12, 14, 15]) {
-    for (const pos of [1, 2, 3, 4]) expect(flats.get(`${code}-${floor}0${pos}`)?.flat_type_code, `${code}-${floor}0${pos}`).toBe("3BHK-A");
+    for (const pos of [1, 2, 3, 4])
+      expect(flats.get(`${code}-${floor}0${pos}`)?.flat_type_code, `${code}-${floor}0${pos}`).toBe("3BHK-A");
     expect(flats.get(`${code}-${floor}01`)?.is_corner).toBe(true);
     expect(flats.get(`${code}-${floor}02`)?.is_corner).toBe(false);
     expect(flats.get(`${code}-${floor}04`)?.is_corner).toBe(true);
@@ -82,23 +100,44 @@ function assertTowerFacts(code: string, flats: Map<string, Flat>): void {
   expect(c1402.price_breakup.map((l) => l.label)).toEqual([expect.stringContaining("Base price"), "Floor Rise"]);
   expect(c1402.price_paise).toBe(base + RISE_PER_FLOOR * 13 * A3.superb);
   const c1504 = flats.get(`${code}-1504`)!; // top floor corner: floor rise × 14 + corner + top-floor fixed PLC
-  expect(c1504.price_breakup.map((l) => l.label)).toEqual([expect.stringContaining("Base price"), "Floor Rise", "Corner", "Top Floor"]);
+  expect(c1504.price_breakup.map((l) => l.label)).toEqual([
+    expect.stringContaining("Base price"),
+    "Floor Rise",
+    "Corner",
+    "Top Floor",
+  ]);
   expect(c1504.price_breakup.find((l) => l.label === "Floor Rise")?.amount_paise).toBe(RISE_PER_FLOOR * 14 * A3.superb);
   expect(c1504.price_breakup.find((l) => l.label === "Top Floor")?.amount_paise).toBe(TOP_FLOOR_FIXED);
   expect(c1504.price_paise).toBe(base + RISE_PER_FLOOR * 14 * A3.superb + corner + TOP_FLOOR_FIXED);
   // every flat: the line items add up to the stored total (SPEC L93 "store a line-item breakup and the total")
-  for (const f of flats.values()) expect(f.price_breakup.reduce((s, l) => s + l.amount_paise, 0), f.flat_number).toBe(f.price_paise);
+  for (const f of flats.values())
+    expect(
+      f.price_breakup.reduce((s, l) => s + l.amount_paise, 0),
+      f.flat_number,
+    ).toBe(f.price_paise);
 }
 
 /** Puts one Available flat on HOLD, proves regenerate is blocked, releases it again. */
-async function assertRegenerateGuard(block: Block, flats: Map<string, Flat>, flatNumber: string, otherNonAvailable: number): Promise<void> {
+async function assertRegenerateGuard(
+  block: Block,
+  flats: Map<string, Flat>,
+  flatNumber: string,
+  otherNonAvailable: number,
+): Promise<void> {
   const flat = flats.get(flatNumber)!;
   expect(flat.status).toBe("AVAILABLE");
-  const hold = await h.request<Flat & ErrorBody>("POST", `/api/v1/flats/${flat.id}/status`, { token: admin, body: { version: flat.version, status: "HOLD", reason: "Token advance expected" } });
+  const hold = await h.request<Flat & ErrorBody>("POST", `/api/v1/flats/${flat.id}/status`, {
+    token: admin,
+    body: { version: flat.version, status: "HOLD", reason: "Token advance expected" },
+  });
   expect(hold.status, hold.text).toBe(200);
   expect(hold.body.status).toBe("HOLD"); // SPEC L83: Available ↔ Hold is a manual transition
   const current = await h.request<Block>("GET", `/api/v1/blocks/${block.id}`, { token: admin });
-  const blocked = await h.request<ErrorBody>("POST", `/api/v1/blocks/${block.id}/generate-flats`, { token: admin, body: { version: current.body.version, regenerate: true }, headers: { "idempotency-key": key() } });
+  const blocked = await h.request<ErrorBody>("POST", `/api/v1/blocks/${block.id}/generate-flats`, {
+    token: admin,
+    body: { version: current.body.version, regenerate: true },
+    headers: { "idempotency-key": key() },
+  });
   // SPEC L81: "regenerate is blocked if any flat is not 'Available'"
   expect(blocked.status).toBe(409);
   expect(blocked.body.error.code).toBe("REGENERATE_BLOCKED");
@@ -109,7 +148,10 @@ async function assertRegenerateGuard(block: Block, flats: Map<string, Flat>, fla
   expect(after.size).toBe(52);
   expect(after.get(flatNumber)?.id).toBe(flat.id);
   expect(after.get(flatNumber)?.status).toBe("HOLD");
-  const release = await h.request<Flat>("POST", `/api/v1/flats/${flat.id}/status`, { token: admin, body: { version: hold.body.version, status: "AVAILABLE" } });
+  const release = await h.request<Flat>("POST", `/api/v1/flats/${flat.id}/status`, {
+    token: admin,
+    body: { version: hold.body.version, status: "AVAILABLE" },
+  });
   expect(release.status, release.text).toBe(200);
   expect(release.body.status).toBe("AVAILABLE");
 }
@@ -131,35 +173,66 @@ describe("scenario 2 — a new 15-floor tower generated through the API", () => 
     const fp4 = await masterByCode<{ id: string; code: string }>(h, admin, "floor-plan-templates", "FP-4");
     const fp4p = await masterByCode<{ id: string; code: string }>(h, admin, "floor-plan-templates", "FP-4-PREMIUM");
     const body = {
-      project_id: sghId, block_type_id: towerType.id, name: "Tower T", code: "T", floors: 15, floor_start: 1, ground_floor_label: "G",
-      skip_floors: [13], refuge_floors: [7], podium_floors: [],
-      floor_plans: [{ from_floor: 1, to_floor: 5, floor_plan_template_id: fp4.id }, { from_floor: 6, to_floor: 15, floor_plan_template_id: fp4p.id }],
-      numbering_pattern: "{block}-{floor}{pos2}", status: "UNDER_CONSTRUCTION",
+      project_id: sghId,
+      block_type_id: towerType.id,
+      name: "Tower T",
+      code: "T",
+      floors: 15,
+      floor_start: 1,
+      ground_floor_label: "G",
+      skip_floors: [13],
+      refuge_floors: [7],
+      podium_floors: [],
+      floor_plans: [
+        { from_floor: 1, to_floor: 5, floor_plan_template_id: fp4.id },
+        { from_floor: 6, to_floor: 15, floor_plan_template_id: fp4p.id },
+      ],
+      numbering_pattern: "{block}-{floor}{pos2}",
+      status: "UNDER_CONSTRUCTION",
     };
     // SPEC L74: generation runs when the block is created
-    const created = await h.request<Block & ErrorBody>("POST", "/api/v1/blocks", { token: admin, body, headers: { "idempotency-key": key() } });
+    const created = await h.request<Block & ErrorBody>("POST", "/api/v1/blocks", {
+      token: admin,
+      body,
+      headers: { "idempotency-key": key() },
+    });
     expect(created.status, created.text).toBe(201);
     expect(created.body.has_flats).toBe(true);
     expect(created.body.unit_counts).toEqual({ available: 52, hold: 0, blocked: 0, booked: 0, sold: 0, total: 52 });
     const flats = await flatsOf(h, admin, created.body.id);
     assertTowerFacts("T", flats);
     // SPEC L80: a failed create writes nothing — a duplicate code is refused and the project still has exactly one Tower T
-    const dup = await h.request<ErrorBody>("POST", "/api/v1/blocks", { token: admin, body, headers: { "idempotency-key": key() } });
+    const dup = await h.request<ErrorBody>("POST", "/api/v1/blocks", {
+      token: admin,
+      body,
+      headers: { "idempotency-key": key() },
+    });
     expect(dup.status).toBe(409);
     expect(dup.body.error.code).toBe("DUPLICATE");
-    const blocks = await h.request<{ items: { code: string }[] }>("GET", `/api/v1/blocks?project_id=${sghId}&page_size=50`, { token: admin });
+    const blocks = await h.request<{ items: { code: string }[] }>(
+      "GET",
+      `/api/v1/blocks?project_id=${sghId}&page_size=50`,
+      { token: admin },
+    );
     expect(blocks.body.items.filter((b) => b.code === "T")).toHaveLength(1);
     // SPEC L81 guard on the new tower, then a regenerate with every flat Available succeeds and re-creates 52
     await assertRegenerateGuard(created.body, flats, "T-1001", 0);
     const block = await h.request<Block>("GET", `/api/v1/blocks/${created.body.id}`, { token: admin });
-    const regen = await h.request<{ flats_created: number; floors_with_units: number } & ErrorBody>("POST", `/api/v1/blocks/${created.body.id}/generate-flats`, { token: admin, body: { version: block.body.version, regenerate: true }, headers: { "idempotency-key": key() } });
+    const regen = await h.request<{ flats_created: number; floors_with_units: number } & ErrorBody>(
+      "POST",
+      `/api/v1/blocks/${created.body.id}/generate-flats`,
+      { token: admin, body: { version: block.body.version, regenerate: true }, headers: { "idempotency-key": key() } },
+    );
     expect(regen.status, regen.text).toBe(200);
     expect(regen.body.flats_created).toBe(52);
     expect(regen.body.floors_with_units).toBe(13);
     assertTowerFacts("T", await flatsOf(h, admin, created.body.id));
     // SPEC L83: Booked / Sold are set only by the booking engine — a manual attempt is rejected
     const any = (await flatsOf(h, admin, created.body.id)).get("T-101")!;
-    const manual = await h.request<ErrorBody>("POST", `/api/v1/flats/${any.id}/status`, { token: admin, body: { version: any.version, status: "BOOKED" } });
+    const manual = await h.request<ErrorBody>("POST", `/api/v1/flats/${any.id}/status`, {
+      token: admin,
+      body: { version: any.version, status: "BOOKED" },
+    });
     expect(manual.status).toBe(422);
   });
 });

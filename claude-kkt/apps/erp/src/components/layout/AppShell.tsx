@@ -1,8 +1,13 @@
 import { Dialog } from "radix-ui";
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useMemo, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { RouteErrorBoundary } from "@/components/ErrorBoundary";
-import { CommandPalette, useCommandPaletteHotkey, type CommandGroupDef, type CommandItem } from "@/components/ui/command-palette";
+import {
+  CommandPalette,
+  useCommandPaletteHotkey,
+  type CommandGroupDef,
+  type CommandItem,
+} from "@/components/ui/command-palette";
 import { PageSkeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -42,7 +47,9 @@ function toCommandItem(hit: SearchHit): CommandItem | null {
     label,
     description: hit.sublabel ?? hit.subtitle ?? hit.description,
     href: hit.href ?? hit.url,
-    group: hit.type ? hit.type.charAt(0).toUpperCase() + hit.type.slice(1).toLowerCase().replaceAll("_", " ") : "Results",
+    group: hit.type
+      ? hit.type.charAt(0).toUpperCase() + hit.type.slice(1).toLowerCase().replaceAll("_", " ")
+      : "Results",
   };
 }
 
@@ -56,10 +63,12 @@ export function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
 
-  // Close the drawer on navigation.
-  useEffect(() => {
+  // Close the drawer on navigation (state adjusted while rendering, not in an effect: no extra commit with a stale open drawer).
+  const [drawerPath, setDrawerPath] = useState(location.pathname);
+  if (drawerPath !== location.pathname) {
+    setDrawerPath(location.pathname);
     setMobileOpen(false);
-  }, [location.pathname]);
+  }
 
   const togglePalette = useCallback(() => setPaletteOpen((open) => !open), []);
   useCommandPaletteHotkey(togglePalette);
@@ -69,7 +78,14 @@ export function AppShell() {
       filterNav(can).map((group) => ({
         id: group.id,
         label: group.label,
-        items: group.items.map((item) => ({ id: `nav:${item.id}`, label: item.label, href: item.to, icon: item.icon, keywords: item.keywords, description: item.to })),
+        items: group.items.map((item) => ({
+          id: `nav:${item.id}`,
+          label: item.label,
+          href: item.to,
+          icon: item.icon,
+          keywords: item.keywords,
+          description: item.to,
+        })),
       })),
     [can],
   );
@@ -91,13 +107,20 @@ export function AppShell() {
 
   return (
     <div className="min-h-dvh bg-surface">
-      <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-[80] focus:rounded-md focus:bg-gold focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-navy-950">
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-[80] focus:rounded-md focus:bg-gold focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-navy-950"
+      >
         Skip to content
       </a>
 
       {/* Desktop sidebar */}
       <div className="fixed inset-y-0 left-0 z-40 hidden lg:block">
-        <Sidebar collapsed={sidebarCollapsed} onToggleCollapsed={() => setCollapsed((value) => !value)} className="h-dvh" />
+        <Sidebar
+          collapsed={sidebarCollapsed}
+          onToggleCollapsed={() => setCollapsed((value) => !value)}
+          className="h-dvh"
+        />
       </div>
 
       {/* Off-canvas drawer (<1024 px) */}
@@ -114,9 +137,18 @@ export function AppShell() {
         </Dialog.Portal>
       </Dialog.Root>
 
-      <div className={cn("flex min-h-dvh min-w-0 flex-col transition-[padding] duration-200", sidebarCollapsed ? "lg:pl-sidebar-collapsed" : "lg:pl-sidebar")}>
+      <div
+        className={cn(
+          "flex min-h-dvh min-w-0 flex-col transition-[padding] duration-200",
+          sidebarCollapsed ? "lg:pl-sidebar-collapsed" : "lg:pl-sidebar",
+        )}
+      >
         <TopBar onOpenMenu={() => setMobileOpen(true)} onOpenSearch={() => setPaletteOpen(true)} />
-        <main id="main" tabIndex={-1} className="min-w-0 flex-1 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] outline-none md:p-6">
+        <main
+          id="main"
+          tabIndex={-1}
+          className="min-w-0 flex-1 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] outline-none md:p-6"
+        >
           <RouteErrorBoundary>
             <Suspense fallback={<PageSkeleton />}>
               <Outlet />
@@ -125,7 +157,13 @@ export function AppShell() {
         </main>
       </div>
 
-      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} groups={commandGroups} onSearch={search} onSelect={handleSelect} />
+      <CommandPalette
+        open={paletteOpen}
+        onOpenChange={setPaletteOpen}
+        groups={commandGroups}
+        onSearch={search}
+        onSelect={handleSelect}
+      />
     </div>
   );
 }

@@ -18,12 +18,24 @@ export function traceContext(): { trace_id: string; span_id: string } | Record<s
  */
 export const loggerOptions: pino.LoggerOptions = {
   level: config.LOG_LEVEL,
-  redact: { paths: ["req.headers.authorization", "req.headers.cookie", "*.password", "*.password_hash", "*.token", "*.refresh_token"], censor: "[redacted]" },
+  redact: {
+    paths: [
+      "req.headers.authorization",
+      "req.headers.cookie",
+      "*.password",
+      "*.password_hash",
+      "*.token",
+      "*.refresh_token",
+    ],
+    censor: "[redacted]",
+  },
   base: { service: "kkt-api" },
   mixin: traceContext,
 };
 
 export const logger = pino({
   ...loggerOptions,
-  ...(config.LOG_PRETTY ? { transport: { target: "pino-pretty", options: { colorize: true, translateTime: "SYS:HH:MM:ss" } } } : {}),
+  ...(config.LOG_PRETTY
+    ? { transport: { target: "pino-pretty", options: { colorize: true, translateTime: "SYS:HH:MM:ss" } } }
+    : {}),
 });

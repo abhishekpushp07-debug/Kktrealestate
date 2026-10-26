@@ -21,7 +21,10 @@ describe("numbering preview", () => {
 
 describe("audit diff", () => {
   it("classifies keys and puts changed ones first", () => {
-    const rows = diffSnapshots({ name: "A", code: "X", gone: 1, nested: { a: 1 } }, { name: "B", code: "X", added: true, nested: { a: 1 } });
+    const rows = diffSnapshots(
+      { name: "A", code: "X", gone: 1, nested: { a: 1 } },
+      { name: "B", code: "X", added: true, nested: { a: 1 } },
+    );
     expect(rows.map((row) => [row.key, row.status])).toEqual([
       ["name", "changed"],
       ["added", "added"],
@@ -51,9 +54,13 @@ describe("users helpers", () => {
   });
 
   it("accepts both catalog shapes and drops malformed entries", () => {
-    const groups = normalisePermissionCatalog({ groups: [{ key: "a", label: "A", permissions: [{ code: "x.y", label: "X" }, { nope: true }] }, { bad: true }] });
+    const groups = normalisePermissionCatalog({
+      groups: [{ key: "a", label: "A", permissions: [{ code: "x.y", label: "X" }, { nope: true }] }, { bad: true }],
+    });
     expect(groups).toEqual([{ key: "a", label: "A", permissions: [{ code: "x.y", label: "X" }] }]);
-    expect(normalisePermissionCatalog([{ key: "b", label: "B", permissions: [] }])).toEqual([{ key: "b", label: "B", permissions: [] }]);
+    expect(normalisePermissionCatalog([{ key: "b", label: "B", permissions: [] }])).toEqual([
+      { key: "b", label: "B", permissions: [] },
+    ]);
     expect(normalisePermissionCatalog("nope")).toBeNull();
   });
 });

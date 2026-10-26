@@ -31,23 +31,65 @@ export function RequestsScreen(): React.JSX.Element {
   const { bookings } = useBooking();
   const q = useRequests({});
   const all = q.data?.items ?? [];
-  const rows = all.filter((r) => (filter === "ALL" ? true : filter === "OPEN" ? OPEN.has(r.status) : r.status === filter));
+  const rows = all.filter((r) =>
+    filter === "ALL" ? true : filter === "OPEN" ? OPEN.has(r.status) : r.status === filter,
+  );
   const counts = { ALL: all.length, OPEN: all.filter((r) => OPEN.has(r.status)).length };
   return (
     <View style={{ flex: 1, backgroundColor: colors.ivory }}>
-      <Header title="Requests" subtitle="Questions, documents, snags — we track every one" back right={<Button title="New" icon="plus" variant="gold" size="sm" onPress={() => router.navigate("/more/requests/new")} />}>
-        <SegmentedControl segments={FILTERS.map((f) => ({ ...f, count: f.key === "ALL" ? counts.ALL : f.key === "OPEN" ? counts.OPEN : undefined }))} value={filter} onChange={setFilter} scroll />
+      <Header
+        title="Requests"
+        subtitle="Questions, documents, snags — we track every one"
+        back
+        right={
+          <Button
+            title="New"
+            icon="plus"
+            variant="gold"
+            size="sm"
+            onPress={() => router.navigate("/more/requests/new")}
+          />
+        }
+      >
+        <SegmentedControl
+          segments={FILTERS.map((f) => ({
+            ...f,
+            count: f.key === "ALL" ? counts.ALL : f.key === "OPEN" ? counts.OPEN : undefined,
+          }))}
+          value={filter}
+          onChange={setFilter}
+          scroll
+        />
       </Header>
       {q.isError && q.data ? <StatusBar text="Showing saved requests — couldn't refresh." tone="warning" /> : null}
       <Screen onRefresh={() => queryClient.invalidateQueries({ queryKey: ["requests"] })}>
         {!q.data ? (
-          q.isError ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : <SkeletonRows rows={4} />
+          q.isError ? (
+            <ErrorState error={q.error} onRetry={() => void q.refetch()} />
+          ) : (
+            <SkeletonRows rows={4} />
+          )
         ) : rows.length === 0 ? (
-          <EmptyState icon="request" title={all.length === 0 ? "No requests yet" : "Nothing here"} body={all.length === 0 ? "Raise a request for payment queries, documents, construction questions or snags. Our team replies right here." : "No requests match this filter."} action={all.length === 0 ? "Raise a request" : undefined} onAction={() => router.navigate("/more/requests/new")} />
+          <EmptyState
+            icon="request"
+            title={all.length === 0 ? "No requests yet" : "Nothing here"}
+            body={
+              all.length === 0
+                ? "Raise a request for payment queries, documents, construction questions or snags. Our team replies right here."
+                : "No requests match this filter."
+            }
+            action={all.length === 0 ? "Raise a request" : undefined}
+            onAction={() => router.navigate("/more/requests/new")}
+          />
         ) : (
           <View style={{ gap: space.md }}>
             {rows.map((r) => (
-              <RequestCard key={r.id} r={r} showFlat={bookings.length > 1} onPress={() => router.navigate(`/more/requests/${r.id}`)} />
+              <RequestCard
+                key={r.id}
+                r={r}
+                showFlat={bookings.length > 1}
+                onPress={() => router.navigate(`/more/requests/${r.id}`)}
+              />
             ))}
           </View>
         )}
@@ -56,7 +98,15 @@ export function RequestsScreen(): React.JSX.Element {
   );
 }
 
-function RequestCard({ r, showFlat, onPress }: { r: PortalRequestRow; showFlat: boolean; onPress: () => void }): React.JSX.Element {
+function RequestCard({
+  r,
+  showFlat,
+  onPress,
+}: {
+  r: PortalRequestRow;
+  showFlat: boolean;
+  onPress: () => void;
+}): React.JSX.Element {
   return (
     <Card onPress={onPress}>
       <View style={styles.head}>

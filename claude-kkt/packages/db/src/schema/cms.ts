@@ -30,7 +30,10 @@ export const siteSettings = pgTable("site_settings", {
   comingSoonMessage: text("coming_soon_message"),
   portalUrl: text("portal_url"),
   erpUrl: text("erp_url"),
-  featuredProjectIds: uuid("featured_project_ids").array().notNull().default(sql`'{}'::uuid[]`),
+  featuredProjectIds: uuid("featured_project_ids")
+    .array()
+    .notNull()
+    .default(sql`'{}'::uuid[]`),
   walkthroughVideoUrl: text("walkthrough_video_url"),
   ...mutable(),
 });
@@ -119,10 +122,16 @@ export const cmsPosts = pgTable(
     publishedAt: timestamp("published_at", { withTimezone: true }),
     seo: jsonb("seo").$type<Seo>().notNull().default({}),
     authorUserId: uuid("author_user_id").references(() => users.id),
-    tags: text("tags").array().notNull().default(sql`'{}'::text[]`),
+    tags: text("tags")
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
     ...mutable(),
   },
-  (t) => [unique("cms_posts_company_slug_uq").on(t.companyId, t.slug), index("cms_posts_company_status_published_idx").on(t.companyId, t.status, t.publishedAt.desc())],
+  (t) => [
+    unique("cms_posts_company_slug_uq").on(t.companyId, t.slug),
+    index("cms_posts_company_status_published_idx").on(t.companyId, t.status, t.publishedAt.desc()),
+  ],
 );
 
 export const cmsPages = pgTable(

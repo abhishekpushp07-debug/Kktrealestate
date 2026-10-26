@@ -1,11 +1,31 @@
 import { Lock, RotateCcw } from "lucide-react";
 import { useEffect } from "react";
-import { Button, FieldWrapper, FormRow, MoneyInput, PercentInput, Tabs, TabsList, TabsTrigger, Textarea } from "@/components/ui";
+import {
+  Button,
+  FieldWrapper,
+  FormRow,
+  MoneyInput,
+  PercentInput,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  Textarea,
+} from "@/components/ui";
 import { formatINR, formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useFlatDetail } from "@/features/inventory/api";
 import { Notice } from "@/features/inventory/components";
-import { priceDeviation, rebalanceSplitForTotal, splitFromAccount, splitFromAccountPercent, splitFromCash, splitFromCashPercent, splitIsExact, splitPercents, type SplitMode } from "../bookingMath";
+import {
+  priceDeviation,
+  rebalanceSplitForTotal,
+  splitFromAccount,
+  splitFromAccountPercent,
+  splitFromCash,
+  splitFromCashPercent,
+  splitIsExact,
+  splitPercents,
+  type SplitMode,
+} from "../bookingMath";
 import type { StepProps } from "./types";
 
 /** Step 3 — agreement value (prefilled from the flat) and the Cash / Account split with auto-balance. */
@@ -23,15 +43,35 @@ export function StepAgreement({ state, update, errors, showErrors, can }: StepPr
   // Without agreement.edit the value is locked to the current list price (also when the price changed after the prefill or a resumed draft).
   useEffect(() => {
     if (can.editAgreement || listPrice === null || total === null || total === listPrice) return;
-    const rebalanced = total > 0 ? rebalanceSplitForTotal({ cash_paise: state.cash_agreed_paise ?? 0, account_paise: state.account_agreed_paise ?? 0 }, total, listPrice) : splitFromCash(listPrice, listPrice);
-    update({ agreement_value_paise: listPrice, cash_agreed_paise: rebalanced.cash_paise, account_agreed_paise: rebalanced.account_paise, price_deviation_reason: "" });
+    const rebalanced =
+      total > 0
+        ? rebalanceSplitForTotal(
+            { cash_paise: state.cash_agreed_paise ?? 0, account_paise: state.account_agreed_paise ?? 0 },
+            total,
+            listPrice,
+          )
+        : splitFromCash(listPrice, listPrice);
+    update({
+      agreement_value_paise: listPrice,
+      cash_agreed_paise: rebalanced.cash_paise,
+      account_agreed_paise: rebalanced.account_paise,
+      price_deviation_reason: "",
+    });
   }, [can.editAgreement, listPrice, total, state.cash_agreed_paise, state.account_agreed_paise, update]);
 
   const deviation = priceDeviation(total, listPrice);
   const split = { cash_paise: state.cash_agreed_paise ?? 0, account_paise: state.account_agreed_paise ?? 0 };
   const percents = total ? splitPercents(total, split) : { cash: 0, account: 0 };
-  const exact = total !== null && total > 0 && state.cash_agreed_paise !== null && state.account_agreed_paise !== null && splitIsExact(total, split);
-  const difference = total !== null && state.cash_agreed_paise !== null && state.account_agreed_paise !== null ? total - state.cash_agreed_paise - state.account_agreed_paise : null;
+  const exact =
+    total !== null &&
+    total > 0 &&
+    state.cash_agreed_paise !== null &&
+    state.account_agreed_paise !== null &&
+    splitIsExact(total, split);
+  const difference =
+    total !== null && state.cash_agreed_paise !== null && state.account_agreed_paise !== null
+      ? total - state.cash_agreed_paise - state.account_agreed_paise
+      : null;
   const error = (key: string) => (showErrors ? errors[key] : undefined);
   const canEdit = can.editAgreement;
 
@@ -41,10 +81,15 @@ export function StepAgreement({ state, update, errors, showErrors, can }: StepPr
       return;
     }
     const rebalanced = total ? rebalanceSplitForTotal(split, total, next) : splitFromCash(next, next);
-    update({ agreement_value_paise: next, cash_agreed_paise: rebalanced.cash_paise, account_agreed_paise: rebalanced.account_paise });
+    update({
+      agreement_value_paise: next,
+      cash_agreed_paise: rebalanced.cash_paise,
+      account_agreed_paise: rebalanced.account_paise,
+    });
   };
 
-  const applySplit = (next: { cash_paise: number; account_paise: number }) => update({ cash_agreed_paise: next.cash_paise, account_agreed_paise: next.account_paise });
+  const applySplit = (next: { cash_paise: number; account_paise: number }) =>
+    update({ cash_agreed_paise: next.cash_paise, account_agreed_paise: next.account_paise });
 
   return (
     <div className="space-y-5">
@@ -59,7 +104,9 @@ export function StepAgreement({ state, update, errors, showErrors, can }: StepPr
                 <span className="inline-flex flex-wrap items-center gap-2">
                   List price <span className="money font-medium text-ink">{formatINR(listPrice)}</span>
                   {total !== null && total !== listPrice && (
-                    <span className={cn("money font-medium", total < listPrice ? "text-warning-fg" : "text-success-fg")}>
+                    <span
+                      className={cn("money font-medium", total < listPrice ? "text-warning-fg" : "text-success-fg")}
+                    >
                       ({total < listPrice ? "−" : "+"}
                       {formatINR(Math.abs(total - listPrice))})
                     </span>
@@ -77,8 +124,22 @@ export function StepAgreement({ state, update, errors, showErrors, can }: StepPr
           >
             {(control) => (
               <div className="relative">
-                <MoneyInput id={control.id} value={total} onChange={setTotal} invalid={control.invalid} readOnly={!canEdit} aria-readonly={!canEdit || undefined} className={cn(!canEdit && "pr-9")} data-testid="wizard-agreement-value" />
-                {!canEdit && <Lock className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-ink-subtle" aria-hidden="true" />}
+                <MoneyInput
+                  id={control.id}
+                  value={total}
+                  onChange={setTotal}
+                  invalid={control.invalid}
+                  readOnly={!canEdit}
+                  aria-readonly={!canEdit || undefined}
+                  className={cn(!canEdit && "pr-9")}
+                  data-testid="wizard-agreement-value"
+                />
+                {!canEdit && (
+                  <Lock
+                    className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-ink-subtle"
+                    aria-hidden="true"
+                  />
+                )}
               </div>
             )}
           </FieldWrapper>
@@ -90,39 +151,119 @@ export function StepAgreement({ state, update, errors, showErrors, can }: StepPr
                 <TabsTrigger value="PERCENT">Percentages</TabsTrigger>
               </TabsList>
             </Tabs>
-            {!canEdit && <p className="text-xs text-ink-subtle" data-testid="wizard-agreement-locked">The agreement value is the flat's list price; changing it needs the “Edit agreement” permission. The split is yours to set.</p>}
+            {!canEdit && (
+              <p className="text-xs text-ink-subtle" data-testid="wizard-agreement-locked">
+                The agreement value is the flat's list price; changing it needs the “Edit agreement” permission. The
+                split is yours to set.
+              </p>
+            )}
           </div>
         </FormRow>
         {canEdit && deviation !== 0 && (
-            <FieldWrapper
-              label="Reason for the price deviation"
-              required
-              error={error("price_deviation_reason")}
-              hint={`${deviation < 0 ? "Discount" : "Premium"} of ${formatINR(Math.abs(deviation))} on the list price · recorded with your name in the audit log`}
-            >
-              {(control) => <Textarea id={control.id} value={state.price_deviation_reason} invalid={control.invalid} onChange={(event) => update({ price_deviation_reason: event.target.value })} rows={2} maxLength={500} placeholder="e.g. Festive offer approved by the director" data-testid="wizard-deviation-reason" />}
-            </FieldWrapper>
-          )}
+          <FieldWrapper
+            label="Reason for the price deviation"
+            required
+            error={error("price_deviation_reason")}
+            hint={`${deviation < 0 ? "Discount" : "Premium"} of ${formatINR(Math.abs(deviation))} on the list price · recorded with your name in the audit log`}
+          >
+            {(control) => (
+              <Textarea
+                id={control.id}
+                value={state.price_deviation_reason}
+                invalid={control.invalid}
+                onChange={(event) => update({ price_deviation_reason: event.target.value })}
+                rows={2}
+                maxLength={500}
+                placeholder="e.g. Festive offer approved by the director"
+                data-testid="wizard-deviation-reason"
+              />
+            )}
+          </FieldWrapper>
+        )}
       </section>
 
       <section className="space-y-3 rounded-lg border border-border bg-surface/60 p-4">
         <FormRow columns={2}>
           {state.split_mode === "AMOUNT" ? (
             <>
-              <FieldWrapper label="Cash bucket" required error={error("cash_agreed_paise")} hint={total ? `${formatPercent(percents.cash)} of the agreement` : undefined}>
-                {(control) => <MoneyInput id={control.id} value={state.cash_agreed_paise} invalid={control.invalid} maxPaise={total ?? undefined} onChange={(value) => (total !== null ? applySplit(splitFromCash(total, value)) : update({ cash_agreed_paise: value }))} data-testid="wizard-cash-amount" />}
+              <FieldWrapper
+                label="Cash bucket"
+                required
+                error={error("cash_agreed_paise")}
+                hint={total ? `${formatPercent(percents.cash)} of the agreement` : undefined}
+              >
+                {(control) => (
+                  <MoneyInput
+                    id={control.id}
+                    value={state.cash_agreed_paise}
+                    invalid={control.invalid}
+                    maxPaise={total ?? undefined}
+                    onChange={(value) =>
+                      total !== null ? applySplit(splitFromCash(total, value)) : update({ cash_agreed_paise: value })
+                    }
+                    data-testid="wizard-cash-amount"
+                  />
+                )}
               </FieldWrapper>
-              <FieldWrapper label="Account bucket" required error={error("account_agreed_paise")} hint={total ? `${formatPercent(percents.account)} of the agreement · bank / loan / official` : undefined}>
-                {(control) => <MoneyInput id={control.id} value={state.account_agreed_paise} invalid={control.invalid} maxPaise={total ?? undefined} onChange={(value) => (total !== null ? applySplit(splitFromAccount(total, value)) : update({ account_agreed_paise: value }))} data-testid="wizard-account-amount" />}
+              <FieldWrapper
+                label="Account bucket"
+                required
+                error={error("account_agreed_paise")}
+                hint={
+                  total ? `${formatPercent(percents.account)} of the agreement · bank / loan / official` : undefined
+                }
+              >
+                {(control) => (
+                  <MoneyInput
+                    id={control.id}
+                    value={state.account_agreed_paise}
+                    invalid={control.invalid}
+                    maxPaise={total ?? undefined}
+                    onChange={(value) =>
+                      total !== null
+                        ? applySplit(splitFromAccount(total, value))
+                        : update({ account_agreed_paise: value })
+                    }
+                    data-testid="wizard-account-amount"
+                  />
+                )}
               </FieldWrapper>
             </>
           ) : (
             <>
-              <FieldWrapper label="Cash %" required error={error("cash_agreed_paise")} hint={<span className="money">{formatINR(state.cash_agreed_paise)}</span>}>
-                {(control) => <PercentInput id={control.id} value={percents.cash} invalid={control.invalid} disabled={!total} onChange={(value) => total !== null && applySplit(splitFromCashPercent(total, value))} data-testid="wizard-cash-percent" />}
+              <FieldWrapper
+                label="Cash %"
+                required
+                error={error("cash_agreed_paise")}
+                hint={<span className="money">{formatINR(state.cash_agreed_paise)}</span>}
+              >
+                {(control) => (
+                  <PercentInput
+                    id={control.id}
+                    value={percents.cash}
+                    invalid={control.invalid}
+                    disabled={!total}
+                    onChange={(value) => total !== null && applySplit(splitFromCashPercent(total, value))}
+                    data-testid="wizard-cash-percent"
+                  />
+                )}
               </FieldWrapper>
-              <FieldWrapper label="Account %" required error={error("account_agreed_paise")} hint={<span className="money">{formatINR(state.account_agreed_paise)}</span>}>
-                {(control) => <PercentInput id={control.id} value={percents.account} invalid={control.invalid} disabled={!total} onChange={(value) => total !== null && applySplit(splitFromAccountPercent(total, value))} data-testid="wizard-account-percent" />}
+              <FieldWrapper
+                label="Account %"
+                required
+                error={error("account_agreed_paise")}
+                hint={<span className="money">{formatINR(state.account_agreed_paise)}</span>}
+              >
+                {(control) => (
+                  <PercentInput
+                    id={control.id}
+                    value={percents.account}
+                    invalid={control.invalid}
+                    disabled={!total}
+                    onChange={(value) => total !== null && applySplit(splitFromAccountPercent(total, value))}
+                    data-testid="wizard-account-percent"
+                  />
+                )}
               </FieldWrapper>
             </>
           )}
@@ -130,26 +271,45 @@ export function StepAgreement({ state, update, errors, showErrors, can }: StepPr
 
         {total !== null && total > 0 && (
           <div className="space-y-1.5" data-testid="wizard-split-bar">
-            <div className="flex h-3 overflow-hidden rounded-full bg-navy-100" role="img" aria-label={`Cash ${formatPercent(percents.cash)}, account ${formatPercent(percents.account)}`}>
+            <div
+              className="flex h-3 overflow-hidden rounded-full bg-navy-100"
+              role="img"
+              aria-label={`Cash ${formatPercent(percents.cash)}, account ${formatPercent(percents.account)}`}
+            >
               <span className="bg-navy-950" style={{ width: `${percents.cash}%` }} />
               <span className="bg-gold" style={{ width: `${percents.account}%` }} />
             </div>
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
               <span className="inline-flex items-center gap-1.5 text-ink-muted">
-                <span className="size-2.5 rounded-xs bg-navy-950" /> Cash <span className="money font-semibold text-ink">{formatINR(state.cash_agreed_paise)}</span>
+                <span className="size-2.5 rounded-xs bg-navy-950" /> Cash{" "}
+                <span className="money font-semibold text-ink">{formatINR(state.cash_agreed_paise)}</span>
               </span>
               <span className="inline-flex items-center gap-1.5 text-ink-muted">
-                <span className="size-2.5 rounded-xs bg-gold" /> Account <span className="money font-semibold text-ink">{formatINR(state.account_agreed_paise)}</span>
+                <span className="size-2.5 rounded-xs bg-gold" /> Account{" "}
+                <span className="money font-semibold text-ink">{formatINR(state.account_agreed_paise)}</span>
               </span>
-              <span className={cn("money font-semibold", exact ? "text-success-fg" : "text-danger-fg")} aria-live="polite">
-                {exact ? "Sums exactly ✓" : difference !== null ? `Off by ${formatINR(Math.abs(difference))}` : "Enter both buckets"}
+              <span
+                className={cn("money font-semibold", exact ? "text-success-fg" : "text-danger-fg")}
+                aria-live="polite"
+              >
+                {exact
+                  ? "Sums exactly ✓"
+                  : difference !== null
+                    ? `Off by ${formatINR(Math.abs(difference))}`
+                    : "Enter both buckets"}
               </span>
             </div>
           </div>
         )}
         <div className="flex flex-wrap gap-2">
           {[0, 25, 50, 75, 100].map((cashPct) => (
-            <Button key={cashPct} size="xs" variant="outline" disabled={!total} onClick={() => total !== null && applySplit(splitFromCashPercent(total, cashPct))}>
+            <Button
+              key={cashPct}
+              size="xs"
+              variant="outline"
+              disabled={!total}
+              onClick={() => total !== null && applySplit(splitFromCashPercent(total, cashPct))}
+            >
               {cashPct}/{100 - cashPct}
             </Button>
           ))}
@@ -158,7 +318,8 @@ export function StepAgreement({ state, update, errors, showErrors, can }: StepPr
       </section>
 
       <Notice tone="info">
-        Each installment percent applies equally to both buckets. The customer may pay Cash or Account in any order; the system only tracks where money sits and blocks payments above a bucket's agreed amount.
+        Each installment percent applies equally to both buckets. The customer may pay Cash or Account in any order; the
+        system only tracks where money sits and blocks payments above a bucket's agreed amount.
       </Notice>
     </div>
   );

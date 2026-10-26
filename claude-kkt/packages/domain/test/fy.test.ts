@@ -22,15 +22,33 @@ import {
 
 describe("financialYear", () => {
   it("computes the Indian FY", () => {
-    expect(financialYear("2025-04-01")).toEqual({ label: "2526", start: "2025-04-01", end: "2026-03-31", startYear: 2025, endYear: 2026 });
+    expect(financialYear("2025-04-01")).toEqual({
+      label: "2526",
+      start: "2025-04-01",
+      end: "2026-03-31",
+      startYear: 2025,
+      endYear: 2026,
+    });
     expect(financialYear("2026-03-31").label).toBe("2526");
     expect(financialYear("2026-04-01").label).toBe("2627");
     expect(financialYear("2025-01-15").label).toBe("2425");
     expect(financialYear("2024-02-29").end).toBe("2024-03-31");
   });
   it("supports other start months", () => {
-    expect(financialYear("2025-06-15", 1)).toEqual({ label: "2525", start: "2025-01-01", end: "2025-12-31", startYear: 2025, endYear: 2025 });
-    expect(financialYear("2025-06-15", 7)).toEqual({ label: "2425", start: "2024-07-01", end: "2025-06-30", startYear: 2024, endYear: 2025 });
+    expect(financialYear("2025-06-15", 1)).toEqual({
+      label: "2525",
+      start: "2025-01-01",
+      end: "2025-12-31",
+      startYear: 2025,
+      endYear: 2025,
+    });
+    expect(financialYear("2025-06-15", 7)).toEqual({
+      label: "2425",
+      start: "2024-07-01",
+      end: "2025-06-30",
+      startYear: 2024,
+      endYear: 2025,
+    });
     expect(() => financialYear("2025-06-15", 13)).toThrow(NumberingError);
     expect(() => financialYear("2025-13-01")).toThrow();
   });

@@ -13,15 +13,30 @@ interface ProjectFiltersProps {
 export function ProjectFilters({ filters, cities, bhks }: ProjectFiltersProps) {
   const hasFilters = Boolean(filters.city || filters.status || filters.bhk || filters.q);
   return (
-    <form method="get" action="/projects" className="grid gap-3 rounded-card border border-line bg-white p-4 shadow-card sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr_auto] lg:items-end" aria-label="Filter projects">
+    <form
+      method="get"
+      action="/projects"
+      className="grid gap-3 rounded-card border border-line bg-white p-4 shadow-card sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr_auto] lg:items-end"
+      aria-label="Filter projects"
+    >
       <div>
         <label htmlFor="filter-q" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-ink-soft">
           Search
         </label>
-        <Input id="filter-q" name="q" type="search" placeholder="Project or locality" defaultValue={filters.q ?? ""} maxLength={80} />
+        <Input
+          id="filter-q"
+          name="q"
+          type="search"
+          placeholder="Project or locality"
+          defaultValue={filters.q ?? ""}
+          maxLength={80}
+        />
       </div>
       <div>
-        <label htmlFor="filter-city" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-ink-soft">
+        <label
+          htmlFor="filter-city"
+          className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-ink-soft"
+        >
           City
         </label>
         <Select id="filter-city" name="city" defaultValue={filters.city ?? ""}>
@@ -34,7 +49,10 @@ export function ProjectFilters({ filters, cities, bhks }: ProjectFiltersProps) {
         </Select>
       </div>
       <div>
-        <label htmlFor="filter-status" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-ink-soft">
+        <label
+          htmlFor="filter-status"
+          className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-ink-soft"
+        >
           Status
         </label>
         <Select id="filter-status" name="status" defaultValue={filters.status ?? ""}>
@@ -47,7 +65,10 @@ export function ProjectFilters({ filters, cities, bhks }: ProjectFiltersProps) {
         </Select>
       </div>
       <div>
-        <label htmlFor="filter-bhk" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-ink-soft">
+        <label
+          htmlFor="filter-bhk"
+          className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-ink-soft"
+        >
           Configuration
         </label>
         <Select id="filter-bhk" name="bhk" defaultValue={filters.bhk ?? ""}>

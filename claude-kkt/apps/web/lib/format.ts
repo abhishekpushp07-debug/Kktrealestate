@@ -15,7 +15,10 @@ const inrFull = new Intl.NumberFormat("en-IN", {
 const inrNumber = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
 
 function trimZero(n: number, digits: number): string {
-  return n.toFixed(digits).replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
+  return n
+    .toFixed(digits)
+    .replace(/\.0+$/, "")
+    .replace(/(\.\d*?)0+$/, "$1");
 }
 
 /** Full Indian grouping: 100000000 paise → ₹10,00,000 */
@@ -175,7 +178,12 @@ export function bhkLabel(options: ReadonlyArray<number> | null | undefined): str
 /** Canonical 10-digit Indian mobile: strips +91 / 0 / spaces; returns null if invalid. */
 export function canonicalPhone(input: string): string | null {
   const digits = input.replace(/\D/g, "");
-  const trimmed = digits.length === 12 && digits.startsWith("91") ? digits.slice(2) : digits.length === 11 && digits.startsWith("0") ? digits.slice(1) : digits;
+  const trimmed =
+    digits.length === 12 && digits.startsWith("91")
+      ? digits.slice(2)
+      : digits.length === 11 && digits.startsWith("0")
+        ? digits.slice(1)
+        : digits;
   return /^[6-9]\d{9}$/.test(trimmed) ? trimmed : null;
 }
 
@@ -203,6 +211,9 @@ export function slugify(input: string): string {
 
 export function excerpt(text: string | null | undefined, max = 160): string {
   if (!text) return "";
-  const clean = text.replace(/[#*_>`\[\]()]/g, "").replace(/\s+/g, " ").trim();
+  const clean = text
+    .replace(/[#*_>`[\]()]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
   return clean.length > max ? `${clean.slice(0, max - 1).trimEnd()}…` : clean;
 }

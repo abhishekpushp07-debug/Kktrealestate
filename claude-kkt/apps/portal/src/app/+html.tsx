@@ -13,10 +13,16 @@ export default function Root({ children }: PropsWithChildren): React.JSX.Element
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
         <meta name="theme-color" content="#0B1F3A" />
         <title>KKT Customer Portal</title>
-        <meta name="description" content="KKT customer portal — your flat, payments, receipts, construction updates and documents." />
+        <meta
+          name="description"
+          content="KKT customer portal — your flat, payments, receipts, construction updates and documents."
+        />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
         <ScrollViewStyleReset />
         {headNodes}
         <style dangerouslySetInnerHTML={{ __html: baseCss }} />

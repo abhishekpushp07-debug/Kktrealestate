@@ -87,19 +87,30 @@ export interface UnitCountsBarProps {
 
 /** Stacked bar of units by status (available / hold / booked / sold / blocked) with an optional legend. */
 export function UnitCountsBar({ counts, legend = true, size = "md", className }: UnitCountsBarProps) {
-  const total = Math.max(counts.total, STATUS_ORDER.reduce((sum, status) => sum + statusCount(counts, status), 0));
+  const total = Math.max(
+    counts.total,
+    STATUS_ORDER.reduce((sum, status) => sum + statusCount(counts, status), 0),
+  );
   return (
     <div className={cn("min-w-0", className)}>
       <div
         role="img"
-        aria-label={STATUS_ORDER.map((status) => `${FLAT_STATUS_LABELS[status]} ${statusCount(counts, status)}`).join(", ")}
+        aria-label={STATUS_ORDER.map((status) => `${FLAT_STATUS_LABELS[status]} ${statusCount(counts, status)}`).join(
+          ", ",
+        )}
         className={cn("flex w-full overflow-hidden rounded-full bg-navy-50", size === "md" ? "h-2" : "h-1.5")}
       >
         {total > 0 &&
           STATUS_ORDER.map((status) => {
             const value = statusCount(counts, status);
             if (value === 0) return null;
-            return <span key={status} className={cn("h-full", SEGMENT_CLASS[status])} style={{ width: `${(value / total) * 100}%` }} />;
+            return (
+              <span
+                key={status}
+                className={cn("h-full", SEGMENT_CLASS[status])}
+                style={{ width: `${(value / total) * 100}%` }}
+              />
+            );
           })}
       </div>
       {legend && (
@@ -109,7 +120,8 @@ export function UnitCountsBar({ counts, legend = true, size = "md", className }:
               <dt className="sr-only">{FLAT_STATUS_LABELS[status]}</dt>
               <dd className="money inline-flex items-center gap-1">
                 <span className={cn("size-1.5 rounded-full", DOT_CLASS[status])} aria-hidden="true" />
-                <span className="font-semibold text-ink">{formatNumber(statusCount(counts, status))}</span> {FLAT_STATUS_LABELS[status].toLowerCase()}
+                <span className="font-semibold text-ink">{formatNumber(statusCount(counts, status))}</span>{" "}
+                {FLAT_STATUS_LABELS[status].toLowerCase()}
               </dd>
             </div>
           ))}
@@ -149,9 +161,22 @@ export function Sparkline({ points, width = 120, height = 32, className, ...aria
   }, [points, width, height]);
   if (points.length === 0) return <span className="text-xs text-ink-subtle">No data</span>;
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height} className={cn("overflow-visible", className)} role="img" aria-label={aria["aria-label"] ?? "Trend"}>
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      width={width}
+      height={height}
+      className={cn("overflow-visible", className)}
+      role="img"
+      aria-label={aria["aria-label"] ?? "Trend"}
+    >
       <path d={path.area} className="fill-gold/20" />
-      <path d={path.line} className="fill-none stroke-gold" strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />
+      <path
+        d={path.line}
+        className="fill-none stroke-gold"
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
@@ -188,7 +213,15 @@ export interface SortableIdListProps {
 }
 
 /** Ordered list with drag (pointer events), up/down arrows and remove; items missing from `value` can be added back. */
-export function SortableIdList({ value, onChange, options, onResetToDefault, disabled = false, emptyText = "Nothing selected yet.", ...rest }: SortableIdListProps) {
+export function SortableIdList({
+  value,
+  onChange,
+  options,
+  onResetToDefault,
+  disabled = false,
+  emptyText = "Nothing selected yet.",
+  ...rest
+}: SortableIdListProps) {
   const byId = useMemo(() => new Map(options.map((option) => [option.id, option] as const)), [options]);
   const missing = options.filter((option) => !value.includes(option.id));
   const refs = useRef(new Map<string, HTMLLIElement>());
@@ -222,7 +255,9 @@ export function SortableIdList({ value, onChange, options, onResetToDefault, dis
   return (
     <div className="space-y-2" data-testid={rest["data-testid"]}>
       {value.length === 0 ? (
-        <p className="rounded-md border border-dashed border-border px-3 py-4 text-center text-xs text-ink-subtle">{emptyText}</p>
+        <p className="rounded-md border border-dashed border-border px-3 py-4 text-center text-xs text-ink-subtle">
+          {emptyText}
+        </p>
       ) : (
         <ol className="divide-y divide-border rounded-md border border-border bg-card">
           {value.map((id, index) => {
@@ -248,17 +283,40 @@ export function SortableIdList({ value, onChange, options, onResetToDefault, dis
                 >
                   <GripVertical className="size-4" aria-hidden="true" />
                 </button>
-                <span className="money flex size-6 shrink-0 items-center justify-center rounded-full bg-navy-50 text-2xs font-bold text-navy-950">{index + 1}</span>
+                <span className="money flex size-6 shrink-0 items-center justify-center rounded-full bg-navy-50 text-2xs font-bold text-navy-950">
+                  {index + 1}
+                </span>
                 <span className="min-w-0 flex-1">
-                  <span className={cn("block truncate text-sm font-medium", option ? "text-ink" : "text-danger-fg")}>{option?.label ?? "Unknown stage"}</span>
-                  {option?.description && <span className="block truncate text-2xs text-ink-subtle">{option.description}</span>}
+                  <span className={cn("block truncate text-sm font-medium", option ? "text-ink" : "text-danger-fg")}>
+                    {option?.label ?? "Unknown stage"}
+                  </span>
+                  {option?.description && (
+                    <span className="block truncate text-2xs text-ink-subtle">{option.description}</span>
+                  )}
                 </span>
                 {option?.badge}
                 {!disabled && (
                   <span className="flex items-center gap-0.5">
-                    <IconButton icon={ArrowUp} label="Move up" size="xs" disabled={index === 0} onClick={() => onChange(moveItem(value, index, index - 1))} />
-                    <IconButton icon={ArrowDown} label="Move down" size="xs" disabled={index === value.length - 1} onClick={() => onChange(moveItem(value, index, index + 1))} />
-                    <IconButton icon={X} label="Remove" size="xs" onClick={() => onChange(value.filter((item) => item !== id))} />
+                    <IconButton
+                      icon={ArrowUp}
+                      label="Move up"
+                      size="xs"
+                      disabled={index === 0}
+                      onClick={() => onChange(moveItem(value, index, index - 1))}
+                    />
+                    <IconButton
+                      icon={ArrowDown}
+                      label="Move down"
+                      size="xs"
+                      disabled={index === value.length - 1}
+                      onClick={() => onChange(moveItem(value, index, index + 1))}
+                    />
+                    <IconButton
+                      icon={X}
+                      label="Remove"
+                      size="xs"
+                      onClick={() => onChange(value.filter((item) => item !== id))}
+                    />
                   </span>
                 )}
               </li>
@@ -299,7 +357,17 @@ export function SectionCardTitle({ children, className }: { children: ReactNode;
 }
 
 /** Inline notice (warning / info / danger). */
-export function Notice({ tone = "info", children, className, "data-testid": testId }: { tone?: "info" | "warning" | "danger" | "success"; children: ReactNode; className?: string; "data-testid"?: string }) {
+export function Notice({
+  tone = "info",
+  children,
+  className,
+  "data-testid": testId,
+}: {
+  tone?: "info" | "warning" | "danger" | "success";
+  children: ReactNode;
+  className?: string;
+  "data-testid"?: string;
+}) {
   const classes = {
     info: "border-info/30 bg-info-bg text-info-fg",
     warning: "border-status-hold-border bg-warning-bg text-warning-fg",
@@ -307,7 +375,11 @@ export function Notice({ tone = "info", children, className, "data-testid": test
     success: "border-status-available-border bg-success-bg text-success-fg",
   }[tone];
   return (
-    <div role={tone === "danger" ? "alert" : "status"} className={cn("rounded-md border px-3 py-2 text-sm", classes, className)} data-testid={testId}>
+    <div
+      role={tone === "danger" ? "alert" : "status"}
+      className={cn("rounded-md border px-3 py-2 text-sm", classes, className)}
+      data-testid={testId}
+    >
       {children}
     </div>
   );

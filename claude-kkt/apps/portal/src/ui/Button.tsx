@@ -1,4 +1,12 @@
-import { ActivityIndicator, Pressable, StyleSheet, View, type PressableProps, type StyleProp, type ViewStyle } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  View,
+  type PressableProps,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
 import { haptics } from "@/lib/haptics";
 import { Icon, type IconName } from "./Icon";
 import { T } from "./Text";
@@ -25,7 +33,12 @@ const palette: Record<ButtonVariant, { bg: string; fg: string; border: string; p
   outline: { bg: "transparent", fg: colors.navy, border: colors.navy200, pressed: colors.navy50 },
   ghost: { bg: "transparent", fg: colors.navy, border: "transparent", pressed: colors.navy50 },
   danger: { bg: colors.dangerBg, fg: colors.danger, border: colors.dangerBg, pressed: "#F5D5D1" },
-  onNavy: { bg: "rgba(255,255,255,0.12)", fg: colors.onNavy, border: "rgba(255,255,255,0.22)", pressed: "rgba(255,255,255,0.2)" },
+  onNavy: {
+    bg: "rgba(255,255,255,0.12)",
+    fg: colors.onNavy,
+    border: "rgba(255,255,255,0.22)",
+    pressed: "rgba(255,255,255,0.2)",
+  },
 };
 
 const sizes: Record<ButtonSize, { h: number; px: number; font: number; icon: number }> = {
@@ -35,7 +48,20 @@ const sizes: Record<ButtonSize, { h: number; px: number; font: number; icon: num
   lg: { h: 54, px: 22, font: 16, icon: 20 },
 };
 
-export function Button({ title, variant = "primary", size = "md", icon, iconRight, loading, block, style, disabled, onPress, haptic = true, ...rest }: ButtonProps): React.JSX.Element {
+export function Button({
+  title,
+  variant = "primary",
+  size = "md",
+  icon,
+  iconRight,
+  loading,
+  block,
+  style,
+  disabled,
+  onPress,
+  haptic = true,
+  ...rest
+}: ButtonProps): React.JSX.Element {
   const p = palette[variant];
   const sz = sizes[size];
   const isDisabled = disabled || loading;
@@ -74,7 +100,27 @@ export function Button({ title, variant = "primary", size = "md", icon, iconRigh
 }
 
 /** Round icon-only button (header actions, close buttons). */
-export function IconButton({ name, onPress, color = colors.navy, bg = "transparent", size = 44, iconSize = 22, label, style, disabled }: { name: IconName; onPress?: () => void; color?: string; bg?: string; size?: number; iconSize?: number; label: string; style?: StyleProp<ViewStyle>; disabled?: boolean }): React.JSX.Element {
+export function IconButton({
+  name,
+  onPress,
+  color = colors.navy,
+  bg = "transparent",
+  size = 44,
+  iconSize = 22,
+  label,
+  style,
+  disabled,
+}: {
+  name: IconName;
+  onPress?: () => void;
+  color?: string;
+  bg?: string;
+  size?: number;
+  iconSize?: number;
+  label: string;
+  style?: StyleProp<ViewStyle>;
+  disabled?: boolean;
+}): React.JSX.Element {
   return (
     <Pressable
       accessibilityRole="button"
@@ -85,7 +131,18 @@ export function IconButton({ name, onPress, color = colors.navy, bg = "transpare
         onPress?.();
       }}
       hitSlop={6}
-      style={({ pressed }) => [{ width: size, height: size, borderRadius: size / 2, alignItems: "center", justifyContent: "center", backgroundColor: bg, opacity: pressed ? 0.7 : disabled ? 0.4 : 1 }, style]}
+      style={({ pressed }) => [
+        {
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: bg,
+          opacity: pressed ? 0.7 : disabled ? 0.4 : 1,
+        },
+        style,
+      ]}
     >
       <Icon name={name} size={iconSize} color={color} />
     </Pressable>
@@ -93,7 +150,13 @@ export function IconButton({ name, onPress, color = colors.navy, bg = "transpare
 }
 
 const styles = StyleSheet.create({
-  base: { borderRadius: radius.pill, borderWidth: 1, alignItems: "center", justifyContent: "center", alignSelf: "flex-start" },
+  base: {
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "flex-start",
+  },
   block: { alignSelf: "stretch" },
   disabled: { opacity: 0.55 },
   row: { flexDirection: "row", alignItems: "center", gap: space.sm },

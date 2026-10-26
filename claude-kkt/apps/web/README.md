@@ -16,13 +16,13 @@ pnpm --filter @kkt/web typecheck
 pnpm --filter @kkt/web build && pnpm --filter @kkt/web start
 ```
 
-| Variable | Purpose |
-|---|---|
-| `NEXT_PUBLIC_API_URL` | Browser-facing API origin (form POSTs, availability, media URLs, image optimizer allow-list) |
-| `API_INTERNAL_URL` | In-cluster API origin used by the Next.js server for data fetching (falls back to `NEXT_PUBLIC_API_URL`) |
-| `NEXT_PUBLIC_PORTAL_URL` | "Customer Login" target (the CMS `portal_url` wins when set) |
-| `NEXT_PUBLIC_ERP_URL` | "Staff login" link in the footer |
-| `NEXT_PUBLIC_SITE_URL` | Canonical origin: `metadataBase`, canonical URLs, sitemap |
+| Variable                 | Purpose                                                                                                  |
+| ------------------------ | -------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_API_URL`    | Browser-facing API origin (form POSTs, availability, media URLs, image optimizer allow-list)             |
+| `API_INTERNAL_URL`       | In-cluster API origin used by the Next.js server for data fetching (falls back to `NEXT_PUBLIC_API_URL`) |
+| `NEXT_PUBLIC_PORTAL_URL` | "Customer Login" target (the CMS `portal_url` wins when set)                                             |
+| `NEXT_PUBLIC_ERP_URL`    | "Staff login" link in the footer                                                                         |
+| `NEXT_PUBLIC_SITE_URL`   | Canonical origin: `metadataBase`, canonical URLs, sitemap                                                |
 
 The build never calls the API: every route is `dynamic = "force-dynamic"` (set once in `app/layout.tsx`), and server
 fetches use `next: { revalidate: 60, tags }` so data is still cached for 60 s across requests. Network failures degrade to
@@ -39,12 +39,12 @@ without it, so the Data Cache is not split per visitor. Only well-formed IPv4/IP
 The API honours `X-Forwarded-For` only from peers listed in its `TRUST_PROXY` (default `loopback`; see
 `docs/SECURITY.md`) and takes the right-most untrusted hop as the client. Deployment rules:
 
-* Put the website behind the reverse proxy (Caddy), which sets `X-Forwarded-For` to the real client address.
-* Add the **web server's address as the API sees it** to the API's `TRUST_PROXY`, e.g. `TRUST_PROXY=loopback,172.18.0.0/16`
+- Put the website behind the reverse proxy (Caddy), which sets `X-Forwarded-For` to the real client address.
+- Add the **web server's address as the API sees it** to the API's `TRUST_PROXY`, e.g. `TRUST_PROXY=loopback,172.18.0.0/16`
   for the compose network (or the web container's fixed IP / service subnet). Do not use `TRUST_PROXY=true` on an API that is
   reachable directly from the internet.
-* If the web server is not trusted, the API ignores the header and limits the web server as one client (the old behaviour).
-* Never publish the web server's port directly while its address is in the API's `TRUST_PROXY`: Next.js only fills in
+- If the web server is not trusted, the API ignores the header and limits the web server as one client (the old behaviour).
+- Never publish the web server's port directly while its address is in the API's `TRUST_PROXY`: Next.js only fills in
   `X-Forwarded-For` when the request has none (`x-forwarded-for ??= socket address`), so a visitor talking to Next.js
   directly could send any address and pick their own rate-limit bucket. Behind Caddy (which replaces a client-sent header
   with the real peer address) this cannot happen; `docker-compose.prod.yml` publishes only Caddy.
@@ -105,28 +105,28 @@ components/
 
 ## Behaviour worth knowing
 
-* **Forms** (`EnquiryForm`, `BrochureGate`, `VisitBooking`) validate client-side (10-digit Indian mobile, consent), send the
+- **Forms** (`EnquiryForm`, `BrochureGate`, `VisitBooking`) validate client-side (10-digit Indian mobile, consent), send the
   hidden honeypot `website: ""`, an `Idempotency-Key`, and UTM parameters captured from the URL; they surface
   `{ error: { code, message } }` including `429 RATE_LIMITED` (with `Retry-After`) and `409 SLOT_FULL` (availability is
   refreshed and the slot cleared).
-* **Brochure gate** remembers `visitor_token` (plus the visitor's own details) in `localStorage`; later downloads skip
+- **Brochure gate** remembers `visitor_token` (plus the visitor's own details) in `localStorage`; later downloads skip
   the form and navigate straight to the signed `download_url`. A rejected token clears the memory and shows the form.
-* **Site visits**: 14-day date strip from the live availability endpoint (IST), slot chips with "N left", 1–6 visitors;
+- **Site visits**: 14-day date strip from the live availability endpoint (IST), slot chips with "N left", 1–6 visitors;
   success shows visit number, date/time, address, maps link, `.ics` download and the manage link. `/visit/[token]` shows
   the visit, offers the `.ics`, and cancels after an inline confirmation.
-* **Availability grid** renders only `AVAILABLE | NOT_AVAILABLE` cells with a legend; prices render only when present.
-* **Embeds** (video, 360° tour, map) are poster + button; the iframe is injected only on click.
-* **Markdown** from the CMS is parsed into React elements — no `dangerouslySetInnerHTML` of user content. JSON-LD is the
+- **Availability grid** renders only `AVAILABLE | NOT_AVAILABLE` cells with a legend; prices render only when present.
+- **Embeds** (video, 360° tour, map) are poster + button; the iframe is injected only on click.
+- **Markdown** from the CMS is parsed into React elements — no `dangerouslySetInnerHTML` of user content. JSON-LD is the
   only inline script and is our own serialised JSON with `<` escaped (a data block: the CSP does not apply to it).
-* **Coming soon**: when `site_live` is false every (site) page returns the coming-soon view (also from
+- **Coming soon**: when `site_live` is false every (site) page returns the coming-soon view (also from
   `generateMetadata`, so nothing leaks via title or RSC payload); `/privacy` and `/disclaimer` stay up; robots disallows
   everything and the sitemap lists only the legal pages.
-* **SEO**: title template `%s · {brand}`, OpenGraph/Twitter, canonical per page, Organization/WebSite/RealEstateListing/
+- **SEO**: title template `%s · {brand}`, OpenGraph/Twitter, canonical per page, Organization/WebSite/RealEstateListing/
   Article/Breadcrumb/FAQ JSON-LD, sitemap and robots built from published content only.
-* **Accessibility**: skip link, visible gold focus rings, 48 px tap targets (`tap`, `min-h-12`), focus-trapped dialogs
+- **Accessibility**: skip link, visible gold focus rings, 48 px tap targets (`tap`, `min-h-12`), focus-trapped dialogs
   and lightbox (Esc closes), native `<details>` FAQs, `prefers-reduced-motion` respected everywhere. Form controls inside
   a `Field` get `aria-invalid`, `aria-required` and `aria-describedby` (→ the `role="alert"` error, else the hint)
   automatically. Text tokens meet WCAG AA (`node docs/qa/contrast.mjs web`); every page is scanned with axe-core at 1440 and
   390 px by the browser QA. Pages with the sticky "On this page" bar raise `scroll-padding-top` so focused content is never
   hidden under it.
-* **Detail fetches** are memoised per request with React `cache()`: `generateMetadata` and the page share one API call.
+- **Detail fetches** are memoised per request with React `cache()`: `generateMetadata` and the page share one API call.

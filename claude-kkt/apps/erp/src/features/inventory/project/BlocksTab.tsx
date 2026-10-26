@@ -35,7 +35,14 @@ export function BlocksTab({ project, blocks }: BlocksTabProps) {
           </span>
         ),
       },
-      { accessorKey: "status", header: "Status", meta: { sortKey: false, width: 150 }, cell: ({ row }) => <StatusChip status={row.original.status} label={BLOCK_STATUS_LABELS[row.original.status]} size="sm" /> },
+      {
+        accessorKey: "status",
+        header: "Status",
+        meta: { sortKey: false, width: 150 },
+        cell: ({ row }) => (
+          <StatusChip status={row.original.status} label={BLOCK_STATUS_LABELS[row.original.status]} size="sm" />
+        ),
+      },
       {
         id: "floors",
         header: "Floors",
@@ -48,17 +55,45 @@ export function BlocksTab({ project, blocks }: BlocksTabProps) {
         meta: { sortKey: false, width: 200 },
         cell: ({ row }) => (
           <span className="flex items-center gap-2">
-            <ProgressRing value={row.original.construction_percent} size={28} strokeWidth={3} tone="gold" label="" aria-label="Construction progress" />
+            <ProgressRing
+              value={row.original.construction_percent}
+              size={28}
+              strokeWidth={3}
+              tone="gold"
+              label=""
+              aria-label="Construction progress"
+            />
             <span className="min-w-0 leading-tight">
-              <span className="money block text-xs font-semibold">{Math.round(row.original.construction_percent)}%</span>
-              <span className="block truncate text-2xs text-ink-subtle">{row.original.current_stage_name ?? "Not started"}</span>
+              <span className="money block text-xs font-semibold">
+                {Math.round(row.original.construction_percent)}%
+              </span>
+              <span className="block truncate text-2xs text-ink-subtle">
+                {row.original.current_stage_name ?? "Not started"}
+              </span>
             </span>
           </span>
         ),
       },
-      { id: "units", header: "Units", meta: { sortKey: false, width: 220 }, cell: ({ row }) => <UnitCountsBar counts={row.original.unit_counts} legend={false} size="sm" className="min-w-40" /> },
-      { id: "total", header: "Total", meta: { sortKey: false, align: "right", width: 70 }, cell: ({ row }) => formatNumber(row.original.unit_counts.total) },
-      { id: "available", header: "Available", meta: { sortKey: false, align: "right", width: 90 }, cell: ({ row }) => formatNumber(row.original.unit_counts.available) },
+      {
+        id: "units",
+        header: "Units",
+        meta: { sortKey: false, width: 220 },
+        cell: ({ row }) => (
+          <UnitCountsBar counts={row.original.unit_counts} legend={false} size="sm" className="min-w-40" />
+        ),
+      },
+      {
+        id: "total",
+        header: "Total",
+        meta: { sortKey: false, align: "right", width: 70 },
+        cell: ({ row }) => formatNumber(row.original.unit_counts.total),
+      },
+      {
+        id: "available",
+        header: "Available",
+        meta: { sortKey: false, align: "right", width: 90 },
+        cell: ({ row }) => formatNumber(row.original.unit_counts.available),
+      },
       {
         id: "flats",
         header: "",
@@ -101,7 +136,10 @@ export function BlocksTab({ project, blocks }: BlocksTabProps) {
           ) : undefined,
         }}
         mobileCard={(row) => (
-          <Link to={`/blocks/${row.id}`} className="block rounded-lg border border-border bg-card p-3 shadow-card focus-ring">
+          <Link
+            to={`/blocks/${row.id}`}
+            className="block rounded-lg border border-border bg-card p-3 shadow-card focus-ring"
+          >
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="truncate font-semibold text-navy-950">{row.name}</p>
@@ -109,7 +147,13 @@ export function BlocksTab({ project, blocks }: BlocksTabProps) {
                   {row.code} · {row.block_type_name}
                 </p>
               </div>
-              <ProgressRing value={row.construction_percent} size={36} strokeWidth={4} tone="gold" aria-label="Construction progress" />
+              <ProgressRing
+                value={row.construction_percent}
+                size={36}
+                strokeWidth={4}
+                tone="gold"
+                aria-label="Construction progress"
+              />
             </div>
             <UnitCountsBar counts={row.unit_counts} className="mt-2" />
           </Link>

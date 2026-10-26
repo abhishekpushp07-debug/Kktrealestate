@@ -1,5 +1,11 @@
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
-import type { CustomerStatementResponse, ReportCatalogResponse, ReportKey, ReportPresetCreate, ReportPresetRow } from "@kkt/contracts";
+import type {
+  CustomerStatementResponse,
+  ReportCatalogResponse,
+  ReportKey,
+  ReportPresetCreate,
+  ReportPresetRow,
+} from "@kkt/contracts";
 import { api, csvExportFacts, saveBlob, type ApiClientError, type CsvExportResult, type QueryParams } from "@/lib/api";
 import { useApiQuery } from "@/features/inventory/api";
 
@@ -30,15 +36,29 @@ export function useReportData<T>(path: string, query: QueryParams, enabled = tru
 }
 
 /** `GET /reports/customer-statement?booking_id=` */
-export function useCustomerStatement(bookingId: string | null): UseQueryResult<CustomerStatementResponse, ApiClientError> {
-  return useApiQuery<CustomerStatementResponse>(reportKeys.statement(bookingId ?? ""), `${REPORTS_PATH}/customer-statement`, { query: { booking_id: bookingId ?? undefined }, enabled: Boolean(bookingId) });
+export function useCustomerStatement(
+  bookingId: string | null,
+): UseQueryResult<CustomerStatementResponse, ApiClientError> {
+  return useApiQuery<CustomerStatementResponse>(
+    reportKeys.statement(bookingId ?? ""),
+    `${REPORTS_PATH}/customer-statement`,
+    { query: { booking_id: bookingId ?? undefined }, enabled: Boolean(bookingId) },
+  );
 }
 
 /** Streams the report as CSV or PDF and hands it to the browser; a CSV returns its X-Export-* facts (truncated at 10,000 rows → offer POST /exports). */
-export async function exportReport(path: string, query: QueryParams, format: "csv" | "pdf", fallbackName: string): Promise<CsvExportResult | null> {
+export async function exportReport(
+  path: string,
+  query: QueryParams,
+  format: "csv" | "pdf",
+  fallbackName: string,
+): Promise<CsvExportResult | null> {
   const result = await api.download(path, { query: { ...query, format } });
   const fallback = `${fallbackName}.${format}`;
-  const serverName = result.filename && !result.filename.includes("?") && result.filename !== path.split("/").pop() ? result.filename : fallback;
+  const serverName =
+    result.filename && !result.filename.includes("?") && result.filename !== path.split("/").pop()
+      ? result.filename
+      : fallback;
   saveBlob(result.blob, serverName);
   return format === "csv" ? csvExportFacts(result.headers, serverName) : null;
 }
@@ -54,7 +74,8 @@ interface PresetList {
 export function usePresets(reportKey: ReportKey, enabled = true): UseQueryResult<ReportPresetRow[], ApiClientError> {
   return useQuery<PresetList | ReportPresetRow[], ApiClientError, ReportPresetRow[], readonly unknown[]>({
     queryKey: reportKeys.presets(reportKey),
-    queryFn: ({ signal }) => api.get<PresetList | ReportPresetRow[]>(PRESETS_PATH, { signal, query: { report_key: reportKey } }),
+    queryFn: ({ signal }) =>
+      api.get<PresetList | ReportPresetRow[]>(PRESETS_PATH, { signal, query: { report_key: reportKey } }),
     select: (data) => (Array.isArray(data) ? data : (data.items ?? [])).filter((row) => row.report_key === reportKey),
     enabled,
     retry: false,

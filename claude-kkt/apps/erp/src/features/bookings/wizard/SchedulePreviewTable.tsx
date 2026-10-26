@@ -16,7 +16,15 @@ export function SchedulePreviewTable({ preview, loading = false, compact = false
   const satisfied = preview.rows.filter((row) => row.already_satisfied).length;
   return (
     <div className={cn("space-y-2", loading && "opacity-60")} data-testid="schedule-preview">
-      <div className={cn("hidden overflow-x-auto rounded-lg border border-border bg-card focus-ring md:block", compact && "md:hidden")} tabIndex={0} role="region" aria-label="Payment schedule preview">
+      <div
+        className={cn(
+          "hidden overflow-x-auto rounded-lg border border-border bg-card focus-ring md:block",
+          compact && "md:hidden",
+        )}
+        tabIndex={0}
+        role="region"
+        aria-label="Payment schedule preview"
+      >
         <table className="w-full min-w-[40rem] text-sm">
           <thead>
             <tr className="border-b border-border bg-surface text-left text-2xs uppercase tracking-wider text-ink-subtle">
@@ -32,7 +40,10 @@ export function SchedulePreviewTable({ preview, loading = false, compact = false
           </thead>
           <tbody>
             {preview.rows.map((row) => (
-              <tr key={row.seq} className={cn("border-b border-border last:border-0", row.already_satisfied && "bg-gold-light/60")}>
+              <tr
+                key={row.seq}
+                className={cn("border-b border-border last:border-0", row.already_satisfied && "bg-gold-light/60")}
+              >
                 <td className="money px-3 py-2 text-ink-subtle">{row.seq}</td>
                 <td className="px-3 py-2 font-medium">
                   {row.name}
@@ -43,7 +54,13 @@ export function SchedulePreviewTable({ preview, loading = false, compact = false
                   )}
                 </td>
                 <td className="px-3 py-2 text-ink-muted">{row.trigger_label}</td>
-                <td className="money px-3 py-2">{row.expected_date ? formatDate(row.expected_date) : <span className="text-ink-subtle">on stage</span>}</td>
+                <td className="money px-3 py-2">
+                  {row.expected_date ? (
+                    formatDate(row.expected_date)
+                  ) : (
+                    <span className="text-ink-subtle">on stage</span>
+                  )}
+                </td>
                 <td className="money px-3 py-2 text-right">{formatPercent(row.percent)}</td>
                 <td className="money px-3 py-2 text-right">{formatINR(row.cash_paise)}</td>
                 <td className="money px-3 py-2 text-right">{formatINR(row.account_paise)}</td>
@@ -67,7 +84,13 @@ export function SchedulePreviewTable({ preview, loading = false, compact = false
       {/* Phone cards */}
       <ul className={cn("space-y-2", !compact && "md:hidden")}>
         {preview.rows.map((row) => (
-          <li key={row.seq} className={cn("rounded-md border border-border bg-card p-3", row.already_satisfied && "border-gold-border bg-gold-light/60")}>
+          <li
+            key={row.seq}
+            className={cn(
+              "rounded-md border border-border bg-card p-3",
+              row.already_satisfied && "border-gold-border bg-gold-light/60",
+            )}
+          >
             <div className="flex items-start justify-between gap-2">
               <p className="text-sm font-semibold">
                 <span className="money text-ink-subtle">{row.seq}.</span> {row.name}
@@ -75,7 +98,8 @@ export function SchedulePreviewTable({ preview, loading = false, compact = false
               <span className="money text-sm font-bold text-navy-950">{formatINRShort(row.total_paise)}</span>
             </div>
             <p className="text-xs text-ink-muted">
-              {row.trigger_label} · {row.expected_date ? formatDate(row.expected_date) : "on stage"} · {formatPercent(row.percent)}
+              {row.trigger_label} · {row.expected_date ? formatDate(row.expected_date) : "on stage"} ·{" "}
+              {formatPercent(row.percent)}
             </p>
             <p className="money mt-1 text-xs">
               Cash {formatINRShort(row.cash_paise)} · Account {formatINRShort(row.account_paise)}
@@ -87,7 +111,8 @@ export function SchedulePreviewTable({ preview, loading = false, compact = false
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-muted">
         {satisfied > 0 && (
           <span>
-            <span className="money font-semibold text-gold-text">{satisfied}</span> installment{satisfied === 1 ? "" : "s"} already triggered — demanded on confirm
+            <span className="money font-semibold text-gold-text">{satisfied}</span> installment
+            {satisfied === 1 ? "" : "s"} already triggered — demanded on confirm
           </span>
         )}
         {preview.catch_up_paise !== 0 && (

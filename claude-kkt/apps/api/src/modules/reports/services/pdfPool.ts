@@ -34,7 +34,8 @@ function envInt(name: string, fallback: number, min: number, max: number): numbe
   const raw = process.env[name];
   if (raw === undefined || raw === "") return fallback;
   const n = Number(raw);
-  if (!Number.isInteger(n) || n < min || n > max) throw new Error(`${name} must be an integer between ${min} and ${max} (got "${raw}")`);
+  if (!Number.isInteger(n) || n < min || n > max)
+    throw new Error(`${name} must be an integer between ${min} and ${max} (got "${raw}")`);
   return n;
 }
 
@@ -43,7 +44,11 @@ export function pdfWorkerLocation(): WorkerLocation {
   const self = fileURLToPath(import.meta.url);
   if (self.endsWith(".ts")) {
     const require = createRequire(import.meta.url);
-    return { filename: join(dirname(self), "pdfWorker.ts"), name: "default", execArgv: ["--import", pathToFileURL(require.resolve("tsx")).href] };
+    return {
+      filename: join(dirname(self), "pdfWorker.ts"),
+      name: "default",
+      execArgv: ["--import", pathToFileURL(require.resolve("tsx")).href],
+    };
   }
   // bundle: this code sits in dist/<chunk>.js or dist/modules/reports/index.js — look upwards for the dist root
   const ancestors: string[] = [];
@@ -90,7 +95,8 @@ export async function closePdfPool(): Promise<void> {
 
 function mapPoolError(err: unknown): Error {
   const message = err instanceof Error ? err.message : String(err);
-  if (/queue is at limit/i.test(message)) return ApiError.unavailable("PDF rendering is busy. Try again in a few seconds.", 5);
+  if (/queue is at limit/i.test(message))
+    return ApiError.unavailable("PDF rendering is busy. Try again in a few seconds.", 5);
   return err instanceof Error ? err : new Error(message);
 }
 
@@ -147,16 +153,13 @@ export function renderPdfStream(task: PdfRenderTask): Promise<Readable> {
       fail(err);
       return;
     }
-    run.then(
-      () => {
-        // the result travels on piscina's own channel and may overtake the last port message: the stream ends on `{ end: true }` only
-        if (!ended) {
-          setTimeout(() => {
-            if (!ended) fail(new Error("PDF worker finished without ending the stream"));
-          }, 5_000).unref();
-        }
-      },
-      fail,
-    );
+    run.then(() => {
+      // the result travels on piscina's own channel and may overtake the last port message: the stream ends on `{ end: true }` only
+      if (!ended) {
+        setTimeout(() => {
+          if (!ended) fail(new Error("PDF worker finished without ending the stream"));
+        }, 5_000).unref();
+      }
+    }, fail);
   });
 }

@@ -83,9 +83,22 @@ describe("SPEC §11 worked example, every one of the 20 rows", () => {
     const events: LedgerEvent[] = [];
     amounts.forEach((amount, i) => {
       const at = `2026-${String(i + 1).padStart(2, "0")}-01T05:00:00Z`;
-      events.push({ kind: "DEMAND", at, label: `Installment ${i + 1}`, cashPaise: amount.cashPaise, accountPaise: amount.accountPaise, refNumber: `DM-${i + 1}` });
+      events.push({
+        kind: "DEMAND",
+        at,
+        label: `Installment ${i + 1}`,
+        cashPaise: amount.cashPaise,
+        accountPaise: amount.accountPaise,
+        refNumber: `DM-${i + 1}`,
+      });
       const payment = payments[i] as { bucket: Bucket; lakh: number };
-      events.push({ kind: "PAYMENT", at, bucket: payment.bucket, amountPaise: L(payment.lakh), refNumber: `RC-${i + 1}` });
+      events.push({
+        kind: "PAYMENT",
+        at,
+        bucket: payment.bucket,
+        amountPaise: L(payment.lakh),
+        refNumber: `RC-${i + 1}`,
+      });
     });
     const { rows, summary } = deriveLedger(events);
     expect(rows).toHaveLength(20);
@@ -135,29 +148,54 @@ describe("SPEC §11 worked example, every one of the 20 rows", () => {
         refNumber: `RC-${i + 1}`,
       });
     }
-    expect(summary).toMatchObject({ cashOrderRaisedPaise: L(60), accountOrderRaisedPaise: L(40), cashPaidPaise: L(60), accountPaidPaise: L(40), totalDuePaise: 0, isClosed: false });
+    expect(summary).toMatchObject({
+      cashOrderRaisedPaise: L(60),
+      accountOrderRaisedPaise: L(40),
+      cashPaidPaise: L(60),
+      accountPaidPaise: L(40),
+      totalDuePaise: 0,
+      isClosed: false,
+    });
   });
 
   it("the advance rows are negative dues, and a payment beyond raised but within agreed passes the cap", () => {
     // Row #3: account raised 10 L, paid 16 L → advance 6 L; cap is agreed 40 L so it is fine.
-    expect(bucketCapCheck({ bucket: "ACCOUNT", bucketAgreedPaise: L(40), bucketPaidPaise: L(4), amountPaise: L(12) })).toEqual({ ok: true });
+    expect(
+      bucketCapCheck({ bucket: "ACCOUNT", bucketAgreedPaise: L(40), bucketPaidPaise: L(4), amountPaise: L(12) }),
+    ).toEqual({ ok: true });
     // Row #8 would push cash to 50 L paid; still within 60 L agreed.
-    expect(bucketCapCheck({ bucket: "CASH", bucketAgreedPaise: L(60), bucketPaidPaise: L(30), amountPaise: L(20) })).toEqual({ ok: true });
+    expect(
+      bucketCapCheck({ bucket: "CASH", bucketAgreedPaise: L(60), bucketPaidPaise: L(30), amountPaise: L(20) }),
+    ).toEqual({ ok: true });
     // One paisa beyond agreed is the only block.
-    const blocked = bucketCapCheck({ bucket: "CASH", bucketAgreedPaise: L(60), bucketPaidPaise: L(50), amountPaise: L(10) + 1 });
+    const blocked = bucketCapCheck({
+      bucket: "CASH",
+      bucketAgreedPaise: L(60),
+      bucketPaidPaise: L(50),
+      amountPaise: L(10) + 1,
+    });
     expect(blocked.ok).toBe(false);
     if (!blocked.ok) {
       expect(blocked.details.headroomPaise).toBe(L(10));
-      expect(blocked.message).toBe("Cash agreed ₹60,00,000; already received ₹50,00,000; cannot accept ₹10,00,000.01 – revise the agreement first");
+      expect(blocked.message).toBe(
+        "Cash agreed ₹60,00,000; already received ₹50,00,000; cannot accept ₹10,00,000.01 – revise the agreement first",
+      );
     }
     // Headroom never goes negative even when paid already exceeds agreed (e.g. after a downward revision was refused).
-    const over = bucketCapCheck({ bucket: "ACCOUNT", bucketAgreedPaise: L(10), bucketPaidPaise: L(12), amountPaise: 1 });
+    const over = bucketCapCheck({
+      bucket: "ACCOUNT",
+      bucketAgreedPaise: L(10),
+      bucketPaidPaise: L(12),
+      amountPaise: 1,
+    });
     expect(over.ok).toBe(false);
     if (!over.ok) {
       expect(over.details.headroomPaise).toBe(0);
     }
     // Zero-amount is accepted by the cap (amount > 0 is enforced by the ledger/API, not the cap).
-    expect(bucketCapCheck({ bucket: "ACCOUNT", bucketAgreedPaise: L(10), bucketPaidPaise: L(10), amountPaise: 0 })).toEqual({ ok: true });
+    expect(
+      bucketCapCheck({ bucket: "ACCOUNT", bucketAgreedPaise: L(10), bucketPaidPaise: L(10), amountPaise: 0 }),
+    ).toEqual({ ok: true });
   });
 
   it("demand statuses derived FIFO from the worked example after row #3 (account advance)", () => {
@@ -237,12 +275,21 @@ describe("SPEC §10 trigger evaluation edge cases", () => {
     { seq: 3, name: "Slab", percent: 30, triggerType: "ON_STAGE", triggerStageId: "slab1" },
     { seq: 4, name: "Possession", percent: 30, triggerType: "ON_POSSESSION" },
   ];
-  const booking: DuesBooking = { bookingDate: "2026-02-01", cashAgreedPaise: L(60), accountAgreedPaise: L(40), planSnapshot: { installments } };
+  const booking: DuesBooking = {
+    bookingDate: "2026-02-01",
+    cashAgreedPaise: L(60),
+    accountAgreedPaise: L(40),
+    planSnapshot: { installments },
+  };
 
   it("attributes an ON_POSSESSION demand to the tower's possession stage so undo can find it", () => {
     const dues = evaluateDues({ booking, towerStages: stages, existingDemands: [], today: "2027-07-01" });
     const possession = dues.find((d) => d.seq === 4);
-    expect(possession).toMatchObject({ triggerStageId: "poss", triggerDate: "2027-06-30", triggerLabel: "On possession" });
+    expect(possession).toMatchObject({
+      triggerStageId: "poss",
+      triggerDate: "2027-06-30",
+      triggerLabel: "On possession",
+    });
     expect(demandStageId(installments[3] as PlanSnapshotInstallment, stages)).toBe("poss");
     expect(demandStageId(installments[1] as PlanSnapshotInstallment, stages)).toBe("plinth");
     expect(demandStageId(installments[0] as PlanSnapshotInstallment, stages)).toBe(null);
@@ -258,19 +305,44 @@ describe("SPEC §10 trigger evaluation edge cases", () => {
     expect(dues[0]?.triggerDate).toBe("2026-02-01");
   });
   it("stage installments are skipped when the tower has no such stage, ON_STAGE with null stage id never fires", () => {
-    const weird: PlanSnapshotInstallment[] = [{ seq: 1, name: "x", percent: 100, triggerType: "ON_STAGE", triggerStageId: null }];
-    expect(evaluateDues({ booking: { ...booking, planSnapshot: { installments: weird } }, towerStages: stages, existingDemands: [], today: "2030-01-01" })).toEqual([]);
+    const weird: PlanSnapshotInstallment[] = [
+      { seq: 1, name: "x", percent: 100, triggerType: "ON_STAGE", triggerStageId: null },
+    ];
+    expect(
+      evaluateDues({
+        booking: { ...booking, planSnapshot: { installments: weird } },
+        towerStages: stages,
+        existingDemands: [],
+        today: "2030-01-01",
+      }),
+    ).toEqual([]);
   });
   it("schedule preview forecasts the possession stage date through the possession stage id", () => {
     const pending = stages.map((s) => ({ ...s, status: "PENDING" as const, completedOn: null }));
-    const rows = schedulePreview({ booking, towerStages: pending, existingDemands: [], today: "2026-02-02", expectedStageDates: { poss: "2028-01-01", plinth: "2026-05-01" } });
-    expect(rows[3]).toMatchObject({ status: "NOT_YET_DUE", expectedTriggerDate: "2028-01-01", expectedDueDate: "2028-01-16" });
+    const rows = schedulePreview({
+      booking,
+      towerStages: pending,
+      existingDemands: [],
+      today: "2026-02-02",
+      expectedStageDates: { poss: "2028-01-01", plinth: "2026-05-01" },
+    });
+    expect(rows[3]).toMatchObject({
+      status: "NOT_YET_DUE",
+      expectedTriggerDate: "2028-01-01",
+      expectedDueDate: "2028-01-16",
+    });
     expect(rows[1]).toMatchObject({ expectedTriggerDate: "2026-05-01", expectedDueDate: "2026-05-16" });
     expect(rows[2]?.expectedTriggerDate).toBe(null);
     // A demand that is OPEN past its due date is OVERDUE; on its due date it is still RAISED.
-    const withDemand = [{ installmentSeq: 1, installmentName: "Booking", status: "OPEN" as const, dueDate: "2026-02-16" }];
-    expect(schedulePreview({ booking, towerStages: pending, existingDemands: withDemand, today: "2026-02-16" })[0]?.status).toBe("RAISED");
-    expect(schedulePreview({ booking, towerStages: pending, existingDemands: withDemand, today: "2026-02-17" })[0]?.status).toBe("OVERDUE");
+    const withDemand = [
+      { installmentSeq: 1, installmentName: "Booking", status: "OPEN" as const, dueDate: "2026-02-16" },
+    ];
+    expect(
+      schedulePreview({ booking, towerStages: pending, existingDemands: withDemand, today: "2026-02-16" })[0]?.status,
+    ).toBe("RAISED");
+    expect(
+      schedulePreview({ booking, towerStages: pending, existingDemands: withDemand, today: "2026-02-17" })[0]?.status,
+    ).toBe("OVERDUE");
   });
   it("catch-up on a tower past several stages raises them all once, and a second run raises nothing", () => {
     const done = stages.map((s) => ({ ...s, completedOn: s.completedOn ?? "2026-09-01" }));
@@ -281,7 +353,9 @@ describe("SPEC §10 trigger evaluation edge cases", () => {
     expect(evaluateDues({ booking, towerStages: done, existingDemands: existing, today: "2027-07-01" })).toEqual([]);
     // VOIDed demands (after a stage undo) are raised again once the stage completes again.
     const voided = existing.map((d) => (d.installmentSeq === 3 ? { ...d, status: "VOID" as const } : d));
-    expect(evaluateDues({ booking, towerStages: done, existingDemands: voided, today: "2027-07-01" }).map((d) => d.seq)).toEqual([3]);
+    expect(
+      evaluateDues({ booking, towerStages: done, existingDemands: voided, today: "2027-07-01" }).map((d) => d.seq),
+    ).toEqual([3]);
   });
 });
 
@@ -314,7 +388,14 @@ describe("SPEC §8 plan validation", () => {
     expect(validatePlan(clp).ok).toBe(true);
     const checked = validatePlan(clp, { knownStageIds: ["plinth", "slab1"] });
     expect(checked.ok).toBe(false);
-    expect(checked.errors).toEqual([{ code: "UNKNOWN_STAGE", message: "Installment 3: construction stage ghost does not exist", seq: 3, details: { stageId: "ghost" } }]);
+    expect(checked.errors).toEqual([
+      {
+        code: "UNKNOWN_STAGE",
+        message: "Installment 3: construction stage ghost does not exist",
+        seq: 3,
+        details: { stageId: "ghost" },
+      },
+    ]);
     expect(missingStagesForTower(clp, ["plinth"])).toEqual(["ghost"]);
     expect(missingStagesForTower(clp, ["plinth", "ghost"])).toEqual([]);
   });
@@ -322,7 +403,13 @@ describe("SPEC §8 plan validation", () => {
     const flexi: PlanInstallmentInput[] = [
       { seq: 1, name: "Booking", percent: 10, triggerType: "ON_BOOKING" },
       { seq: 2, name: "60 days", percent: 40, triggerType: "DAYS_AFTER_BOOKING", triggerDays: 60 },
-      ...["s10", "s11", "s12", "s13", "s14"].map((id, i) => ({ seq: 3 + i, name: `Stage ${id}`, percent: 10, triggerType: "ON_STAGE" as const, triggerStageId: id })),
+      ...["s10", "s11", "s12", "s13", "s14"].map((id, i) => ({
+        seq: 3 + i,
+        name: `Stage ${id}`,
+        percent: 10,
+        triggerType: "ON_STAGE" as const,
+        triggerStageId: id,
+      })),
     ];
     expect(validatePlan(flexi)).toMatchObject({ ok: true, totalBasisPoints: 10000 });
     const amounts = installmentAmounts(L(60), L(40), flexi);
@@ -331,32 +418,58 @@ describe("SPEC §8 plan validation", () => {
 });
 
 describe("SPEC §5 pricing", () => {
-  const flat: PricingFlat = { floor: 1, floorStart: 1, superBuiltupSqft: 1250, isCorner: false, facing: "EAST", flatTypeId: "ft" };
+  const flat: PricingFlat = {
+    floor: 1,
+    floorStart: 1,
+    superBuiltupSqft: 1250,
+    isCorner: false,
+    facing: "EAST",
+    flatTypeId: "ft",
+  };
   it("FLOOR_RISE is never negative: negative value, or floor below floorStart, yields zero", () => {
-    const rise: PlcRule = { plcTypeId: "fr", name: "Floor rise", calcMode: "FLOOR_RISE", value: 2500, appliesTo: "ALL" };
+    const rise: PlcRule = {
+      plcTypeId: "fr",
+      name: "Floor rise",
+      calcMode: "FLOOR_RISE",
+      value: 2500,
+      appliesTo: "ALL",
+    };
     expect(plcAmount(rise, { ...flat, floor: 1 }, 0)).toBe(0);
     expect(plcAmount(rise, { ...flat, floor: 5 }, 0)).toBe(2500 * 4 * 1250);
     expect(plcAmount(rise, { ...flat, floor: 0, floorStart: 1 }, 0)).toBe(0);
     expect(plcAmount({ ...rise, value: -2500 }, { ...flat, floor: 5 }, 0)).toBe(0);
     expect(plcAmount(rise, { ...flat, floor: 3, floorStart: 0 }, 0)).toBe(2500 * 3 * 1250);
     // Zero-amount PLC lines are not written into the breakup.
-    const result = priceFlat({ flat: { ...flat, floor: 1 }, rateCard: { rates: [{ flatTypeId: "ft", ratePerSqftPaise: 560_000, lumpSumPaise: null }], plcRules: [rise] } });
+    const result = priceFlat({
+      flat: { ...flat, floor: 1 },
+      rateCard: { rates: [{ flatTypeId: "ft", ratePerSqftPaise: 560_000, lumpSumPaise: null }], plcRules: [rise] },
+    });
     expect(result.breakup).toHaveLength(1);
     expect(result.totalPaise).toBe(560_000 * 1250);
   });
   it("PERCENT PLC uses the base price, half-up, with fractional areas", () => {
-    const vastu: PlcRule = { plcTypeId: "v", name: "Vastu", calcMode: "PERCENT", value: 1.5, appliesTo: "FACING_IN", facings: ["east"] };
+    const vastu: PlcRule = {
+      plcTypeId: "v",
+      name: "Vastu",
+      calcMode: "PERCENT",
+      value: 1.5,
+      appliesTo: "FACING_IN",
+      facings: ["east"],
+    };
     const result = priceFlat({
       flat: { ...flat, superBuiltupSqft: 1250.33 },
       rateCard: { rates: [{ flatTypeId: "ft", ratePerSqftPaise: 560_000, lumpSumPaise: null }], plcRules: [vastu] },
     });
-    const base = 560_000 * 125_033 / 100; // 700_184_800
+    const base = (560_000 * 125_033) / 100; // 700_184_800
     expect(result.breakup[0]?.amountPaise).toBe(base);
     expect(result.breakup[1]).toEqual({ label: "Vastu", amountPaise: Math.round((base * 150) / 10000) });
     expect(result.ratePerSqftPaise).toBe(560_000);
   });
   it("lump sum rate ignores area and reports an effective rate", () => {
-    const result = priceFlat({ flat, rateCard: { rates: [{ flatTypeId: "ft", ratePerSqftPaise: 999, lumpSumPaise: CRORE_PAISE }], plcRules: [] } });
+    const result = priceFlat({
+      flat,
+      rateCard: { rates: [{ flatTypeId: "ft", ratePerSqftPaise: 999, lumpSumPaise: CRORE_PAISE }], plcRules: [] },
+    });
     expect(result.totalPaise).toBe(CRORE_PAISE);
     expect(result.ratePerSqftPaise).toBe(800_000);
   });
@@ -364,19 +477,59 @@ describe("SPEC §5 pricing", () => {
 
 describe("SPEC §4 flat generation count for Tower C (15 floors, skip 13, refuge 7)", () => {
   it("physical floors are 1..15 minus 13; unit floors also drop 7; 4 per floor → 52 flats", () => {
-    const block = { code: "C", floors: 15, floorStart: 1, skipFloors: [13], refugeFloors: [7], podiumFloors: [], floorPlans: [{ fromFloor: 1, toFloor: 15, floorPlanTemplateId: "t" }], numberingPattern: "{block}-{floor}{pos2}" };
+    const block = {
+      code: "C",
+      floors: 15,
+      floorStart: 1,
+      skipFloors: [13],
+      refugeFloors: [7],
+      podiumFloors: [],
+      floorPlans: [{ fromFloor: 1, toFloor: 15, floorPlanTemplateId: "t" }],
+      numberingPattern: "{block}-{floor}{pos2}",
+    };
     expect(physicalFloors(block)).toHaveLength(14);
     expect(unitFloors(block)).toEqual([1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 14, 15]);
-    const ft = { id: "f", code: "F", name: "F", rooms: [{ roomTypeId: "r", roomTypeName: "Bedroom", label: "B", lengthFt: 1, widthFt: 1, sqft: 1 }], areas: [{ areaTypeId: "a", areaTypeCode: "SUPER_BUILT_UP", areaTypeName: "SBU", sqft: 1000 }], carpetSqft: 800, builtupSqft: 900, superBuiltupSqft: 1000, baseRatePerSqftPaise: 500_000, basePricePaise: null };
-    const template = { id: "t", flatsPerFloor: 4, positions: [1, 2, 3, 4].map((position) => ({ position, flatTypeId: "f" })) };
-    const flats = generateFlats(block, [template], [ft], () => ({ breakup: [], totalPaise: 1, ratePerSqftPaise: null }));
+    const ft = {
+      id: "f",
+      code: "F",
+      name: "F",
+      rooms: [{ roomTypeId: "r", roomTypeName: "Bedroom", label: "B", lengthFt: 1, widthFt: 1, sqft: 1 }],
+      areas: [{ areaTypeId: "a", areaTypeCode: "SUPER_BUILT_UP", areaTypeName: "SBU", sqft: 1000 }],
+      carpetSqft: 800,
+      builtupSqft: 900,
+      superBuiltupSqft: 1000,
+      baseRatePerSqftPaise: 500_000,
+      basePricePaise: null,
+    };
+    const template = {
+      id: "t",
+      flatsPerFloor: 4,
+      positions: [1, 2, 3, 4].map((position) => ({ position, flatTypeId: "f" })),
+    };
+    const flats = generateFlats(block, [template], [ft], () => ({
+      breakup: [],
+      totalPaise: 1,
+      ratePerSqftPaise: null,
+    }));
     expect(flats).toHaveLength(52);
     expect(flats.map((f) => f.flatNumber)).toContain("C-1504");
     expect(flats.map((f) => f.flatNumber)).not.toContain("C-1301");
     expect(flats.map((f) => f.flatNumber)).not.toContain("C-701");
     expect(flats.map((f) => f.flatNumber)).not.toContain("C-1601");
     // Ground-floor start: 0..8 is nine physical floors, labelled G then 1..8.
-    const ground = generateFlats({ ...block, floors: 8, floorStart: 0, skipFloors: [], refugeFloors: [], floorPlans: [{ fromFloor: 0, toFloor: 8, floorPlanTemplateId: "t" }] }, [template], [ft], () => ({ breakup: [], totalPaise: 1, ratePerSqftPaise: null }));
+    const ground = generateFlats(
+      {
+        ...block,
+        floors: 8,
+        floorStart: 0,
+        skipFloors: [],
+        refugeFloors: [],
+        floorPlans: [{ fromFloor: 0, toFloor: 8, floorPlanTemplateId: "t" }],
+      },
+      [template],
+      [ft],
+      () => ({ breakup: [], totalPaise: 1, ratePerSqftPaise: null }),
+    );
     expect(ground).toHaveLength(36);
     expect(ground[0]?.flatNumber).toBe("C-G01");
   });
@@ -418,7 +571,9 @@ describe("Verhoeff / Aadhaar", () => {
 describe("Money formatting", () => {
   it("amountInWords for ₹1,00,00,000 and neighbours", () => {
     expect(amountInWords(CRORE_PAISE)).toBe("Rupees One Crore Only");
-    expect(amountInWords(CRORE_PAISE - 1)).toBe("Rupees Ninety Nine Lakh Ninety Nine Thousand Nine Hundred Ninety Nine and Ninety Nine Paise Only");
+    expect(amountInWords(CRORE_PAISE - 1)).toBe(
+      "Rupees Ninety Nine Lakh Ninety Nine Thousand Nine Hundred Ninety Nine and Ninety Nine Paise Only",
+    );
     expect(amountInWords(CRORE_PAISE + 100)).toBe("Rupees One Crore One Only");
     expect(amountInWords(toPaise("12,50,000"))).toBe("Rupees Twelve Lakh Fifty Thousand Only");
     expect(amountInWords(toPaise("1,00,000"))).toBe("Rupees One Lakh Only");
@@ -446,7 +601,12 @@ describe("Financial year boundary in IST", () => {
   it("31 Mar belongs to the closing FY, 1 Apr opens the next, evaluated on the IST calendar date", () => {
     expect(financialYear("2026-03-31").label).toBe("2526");
     expect(financialYear("2026-04-01").label).toBe("2627");
-    expect(financialYear("2026-03-31")).toMatchObject({ start: "2025-04-01", end: "2026-03-31", startYear: 2025, endYear: 2026 });
+    expect(financialYear("2026-03-31")).toMatchObject({
+      start: "2025-04-01",
+      end: "2026-03-31",
+      startYear: 2025,
+      endYear: 2026,
+    });
     // 18:29:59Z on 31 Mar is 23:59:59 IST → still FY 25-26; one second later it is 1 Apr IST.
     expect(financialYearAt("2026-03-31T18:29:59Z").label).toBe("2526");
     expect(financialYearAt("2026-03-31T18:30:00Z").label).toBe("2627");
@@ -487,12 +647,32 @@ describe("Site visits", () => {
     expect(days.map((d) => d.date)).toEqual(["2026-10-28"]);
     expect(days[0]?.slots).toHaveLength(7);
     // Same instant written as +05:30 gives the same result.
-    expect(availability({ settings, from: "2026-10-26", to: "2026-10-28", nowIST: "2026-10-26T23:00:00+05:30", bookedCounts: new Map() })).toEqual(days);
+    expect(
+      availability({
+        settings,
+        from: "2026-10-26",
+        to: "2026-10-28",
+        nowIST: "2026-10-26T23:00:00+05:30",
+        bookedCounts: new Map(),
+      }),
+    ).toEqual(days);
     // 2 h lead at 09:30 on a Wednesday: 10:00 and 11:00 slots are gone, 12:00 stays.
-    const morning = availability({ settings: { ...settings, minLeadHours: 2 }, from: "2026-10-28", to: "2026-10-28", nowIST: "2026-10-28T09:30:00+05:30", bookedCounts: new Map() });
+    const morning = availability({
+      settings: { ...settings, minLeadHours: 2 },
+      from: "2026-10-28",
+      to: "2026-10-28",
+      nowIST: "2026-10-28T09:30:00+05:30",
+      bookedCounts: new Map(),
+    });
     expect(morning[0]?.slots.map((s) => s.start)).toEqual(["12:00", "13:00", "14:00", "15:00", "16:00"]);
     // Exactly on the lead boundary the slot is kept (start ≥ now + lead).
-    const exact = availability({ settings: { ...settings, minLeadHours: 2 }, from: "2026-10-28", to: "2026-10-28", nowIST: "2026-10-28T10:00:00+05:30", bookedCounts: new Map() });
+    const exact = availability({
+      settings: { ...settings, minLeadHours: 2 },
+      from: "2026-10-28",
+      to: "2026-10-28",
+      nowIST: "2026-10-28T10:00:00+05:30",
+      bookedCounts: new Map(),
+    });
     expect(exact[0]?.slots[0]?.start).toBe("12:00");
     // Blackout on a Monday removes the whole day; a Sunday is never offered.
     const week = availability({ settings, from: "2026-11-01", to: "2026-11-03", nowIST: now, bookedCounts: new Map() });
@@ -501,13 +681,25 @@ describe("Site visits", () => {
   it("the last seat shows 1 left and the next booking makes the slot disappear", () => {
     const now = "2026-10-26T17:30:00Z";
     const twoBooked = new Map([[slotKey("2026-10-28", "10:00"), 2]]);
-    expect(availability({ settings, from: "2026-10-28", to: "2026-10-28", nowIST: now, bookedCounts: twoBooked })[0]?.slots[0]).toEqual({ start: "10:00", end: "11:00", available: 1 });
+    expect(
+      availability({ settings, from: "2026-10-28", to: "2026-10-28", nowIST: now, bookedCounts: twoBooked })[0]
+        ?.slots[0],
+    ).toEqual({ start: "10:00", end: "11:00", available: 1 });
     const full = new Map([[slotKey("2026-10-28", "10:00"), 3]]);
-    expect(availability({ settings, from: "2026-10-28", to: "2026-10-28", nowIST: now, bookedCounts: full })[0]?.slots[0]?.start).toBe("11:00");
+    expect(
+      availability({ settings, from: "2026-10-28", to: "2026-10-28", nowIST: now, bookedCounts: full })[0]?.slots[0]
+        ?.start,
+    ).toBe("11:00");
     // Requests outside the window return nothing; from > to is empty, not an error.
-    expect(availability({ settings, from: "2026-12-01", to: "2026-12-31", nowIST: now, bookedCounts: new Map() })).toEqual([]);
-    expect(availability({ settings, from: "2026-10-30", to: "2026-10-28", nowIST: now, bookedCounts: new Map() })).toEqual([]);
-    expect(() => availability({ settings, from: "2026-13-01", to: "2026-10-28", nowIST: now, bookedCounts: new Map() })).toThrow();
+    expect(
+      availability({ settings, from: "2026-12-01", to: "2026-12-31", nowIST: now, bookedCounts: new Map() }),
+    ).toEqual([]);
+    expect(
+      availability({ settings, from: "2026-10-30", to: "2026-10-28", nowIST: now, bookedCounts: new Map() }),
+    ).toEqual([]);
+    expect(() =>
+      availability({ settings, from: "2026-13-01", to: "2026-10-28", nowIST: now, bookedCounts: new Map() }),
+    ).toThrow();
   });
   it("ICS has VTIMEZONE and VALARM, CRLF endings, and escapes ; , \\ and newlines", () => {
     const ics = icsForVisit({
@@ -527,7 +719,9 @@ describe("Site visits", () => {
     expect(ics).toContain("BEGIN:VTIMEZONE\r\nTZID:Asia/Kolkata\r\n");
     expect(ics).toContain("TZOFFSETFROM:+0530\r\nTZOFFSETTO:+0530\r\nTZNAME:IST");
     expect(ics).toContain("DTSTART;TZID=Asia/Kolkata:20261103T150000\r\nDTEND;TZID=Asia/Kolkata:20261103T160000");
-    expect(ics).toContain("BEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Reminder: Site visit\\; Ganesh Green Villas\\, Patna\r\nTRIGGER:-PT1H\r\nEND:VALARM");
+    expect(ics).toContain(
+      "BEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Reminder: Site visit\\; Ganesh Green Villas\\, Patna\r\nTRIGGER:-PT1H\r\nEND:VALARM",
+    );
     expect(ics).toContain("SUMMARY:Site visit\\; Ganesh Green Villas\\, Patna");
     expect(ics).toContain("LOCATION:Danapur\\; Patna");
     expect(ics).toContain("DESCRIPTION:Line 1\\nLine 2 with a backslash \\\\ and a comma\\, here");
@@ -551,9 +745,21 @@ describe("Ledger ordering and closure", () => {
       { kind: "PAYMENT", at: "2026-01-01T18:00:00Z", bucket: "CASH", amountPaise: 3, refNumber: "p-1800Z-prev-day" },
     ];
     // 2026-01-01T19:30Z == 2026-01-02T01:00+05:30 (same instant): DEMAND sorts before PAYMENT by kind priority.
-    expect(sortLedgerEvents(events).map((e) => e.refNumber)).toEqual(["p-1800Z-prev-day", "d-date", "d-1930Z", "p-0130Z", "p-2300Z"]);
+    expect(sortLedgerEvents(events).map((e) => e.refNumber)).toEqual([
+      "p-1800Z-prev-day",
+      "d-date",
+      "d-1930Z",
+      "p-0130Z",
+      "p-2300Z",
+    ]);
     const { rows } = deriveLedger(events);
-    expect(rows.map((r) => r.entryDate)).toEqual(["2026-01-01", "2026-01-02", "2026-01-02", "2026-01-02", "2026-01-02"]);
+    expect(rows.map((r) => r.entryDate)).toEqual([
+      "2026-01-01",
+      "2026-01-02",
+      "2026-01-02",
+      "2026-01-02",
+      "2026-01-02",
+    ]);
     expect(rows.at(-1)?.cashPaidCumPaise).toBe(6);
   });
   it("after CANCELLATION no further money event is accepted, and the refund shows as a negative amount", () => {
@@ -564,8 +770,12 @@ describe("Ledger ordering and closure", () => {
     ]);
     expect(rows[2]).toMatchObject({ event: "CANCELLATION", amountPaise: -L(5) });
     expect(summary.isClosed).toBe(true);
-    expect(() => deriveLedger([{ kind: "CANCELLATION", at: "2026-01-01", refundPaise: 0, deductionPaise: 0 }], summary)).toThrow(/closed/);
-    expect(() => deriveLedger([{ kind: "DEMAND", at: "2026-01-04", cashPaise: 1, accountPaise: 1 }], summary)).toThrow(/closed/);
+    expect(() =>
+      deriveLedger([{ kind: "CANCELLATION", at: "2026-01-01", refundPaise: 0, deductionPaise: 0 }], summary),
+    ).toThrow(/closed/);
+    expect(() => deriveLedger([{ kind: "DEMAND", at: "2026-01-04", cashPaise: 1, accountPaise: 1 }], summary)).toThrow(
+      /closed/,
+    );
   });
   it("ageing buckets by due date", () => {
     expect(ageingBucket("2026-05-01", "2026-04-30")).toBe("NOT_DUE");

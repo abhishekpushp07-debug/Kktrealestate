@@ -103,24 +103,50 @@ export const JOB_RUN_SWEEP_BATCH = 1_000;
  * JOB_RUN_SWEEP: marks job_runs rows that are still RUNNING after twice their job's time budget as ABANDONED (finished_at = now, error
  * explains why). Only rows still RUNNING are touched, so a run that finishes concurrently keeps its real outcome.
  */
-export async function sweepAbandonedJobRuns(db: DB, now: Date = new Date()): Promise<{ abandoned: number; jobs: Record<string, number> }> {
+export async function sweepAbandonedJobRuns(
+  db: DB,
+  now: Date = new Date(),
+): Promise<{ abandoned: number; jobs: Record<string, number> }> {
   const shortest = Math.min(DEFAULT_JOB_TIMEOUT_MS, ...Object.values(JOB_TIMEOUT_MS));
   const jobs: Record<string, number> = {};
   let abandoned = 0;
   let cursor: { at: Date; id: string } | null = null;
   for (;;) {
     // oldest first, keyset pages of (started_at, id): rows younger than twice the shortest budget can never be abandoned yet
-    const rows: { id: string; jobName: string; startedAt: Date }[] = await db.select({ id: jobRuns.id, jobName: jobRuns.jobName, startedAt: jobRuns.startedAt }).from(jobRuns)
-      .where(and(
-        eq(jobRuns.status, "RUNNING"), lt(jobRuns.startedAt, new Date(now.getTime() - 2 * shortest)),
-        cursor ? sql`(${jobRuns.startedAt}, ${jobRuns.id}) > (${cursor.at.toISOString()}::timestamptz, ${cursor.id}::uuid)` : undefined,
-      ))
-      .orderBy(asc(jobRuns.startedAt), asc(jobRuns.id)).limit(JOB_RUN_SWEEP_BATCH);
+    const rows: { id: string; jobName: string; startedAt: Date }[] = await db
+      .select({ id: jobRuns.id, jobName: jobRuns.jobName, startedAt: jobRuns.startedAt })
+      .from(jobRuns)
+      .where(
+        and(
+          eq(jobRuns.status, "RUNNING"),
+          lt(jobRuns.startedAt, new Date(now.getTime() - 2 * shortest)),
+          cursor
+            ? sql`(${jobRuns.startedAt}, ${jobRuns.id}) > (${cursor.at.toISOString()}::timestamptz, ${cursor.id}::uuid)`
+            : undefined,
+        ),
+      )
+      .orderBy(asc(jobRuns.startedAt), asc(jobRuns.id))
+      .limit(JOB_RUN_SWEEP_BATCH);
     const stale = rows.filter((r) => now.getTime() - r.startedAt.getTime() > 2 * jobTimeoutMs(r.jobName));
     if (stale.length > 0) {
-      const updated = await db.update(jobRuns).set({
-        status: "ABANDONED", finishedAt: now, error: "Abandoned: still RUNNING after twice the job's time budget (the worker running it stopped); a retry, if any, runs under its own run id",
-      }).where(and(inArray(jobRuns.id, stale.map((r) => r.id)), eq(jobRuns.status, "RUNNING"))).returning({ jobName: jobRuns.jobName });
+      const updated = await db
+        .update(jobRuns)
+        .set({
+          status: "ABANDONED",
+          finishedAt: now,
+          error:
+            "Abandoned: still RUNNING after twice the job's time budget (the worker running it stopped); a retry, if any, runs under its own run id",
+        })
+        .where(
+          and(
+            inArray(
+              jobRuns.id,
+              stale.map((r) => r.id),
+            ),
+            eq(jobRuns.status, "RUNNING"),
+          ),
+        )
+        .returning({ jobName: jobRuns.jobName });
       for (const u of updated) jobs[u.jobName] = (jobs[u.jobName] ?? 0) + 1;
       abandoned += updated.length;
     }
@@ -143,7 +169,12 @@ export function jobBackoffMs(env: Record<string, string | undefined> = process.e
 
 /** BullMQ options every enqueued or scheduled job gets: 3 attempts with exponential backoff, bounded history. */
 export function defaultJobOptions(): JobsOptions {
-  return { attempts: JOB_ATTEMPTS, backoff: { type: "exponential", delay: jobBackoffMs() }, removeOnComplete: { count: 500 }, removeOnFail: { count: 1000 } };
+  return {
+    attempts: JOB_ATTEMPTS,
+    backoff: { type: "exponential", delay: jobBackoffMs() },
+    removeOnComplete: { count: 500 },
+    removeOnFail: { count: 1000 },
+  };
 }
 
 const registry = new Map<string, JobHandler>();
@@ -189,7 +220,9 @@ let boundApp: FastifyInstance | null = null;
 /** Binds the app handed to job handlers when none is passed explicitly (the redis plugin binds the root app it decorates). */
 export function bindJobApp(app: FastifyInstance): void {
   boundApp = app;
-  app.addHook("onClose", async () => { if (boundApp === app) boundApp = null; });
+  app.addHook("onClose", async () => {
+    if (boundApp === app) boundApp = null;
+  });
 }
 
 /** The app bound by bindJobApp (null before any full app was built). */
@@ -237,12 +270,22 @@ function errorMessage(err: unknown): string {
  * Runs one attempt of a job: records a job_runs row (RUNNING → OK | FAILED) around the handler. A failure is recorded with
  * `{attempt, max_attempts, will_retry}` and RETHROWN (so BullMQ retries); on the final attempt the failure alert runs first.
  */
-export async function runJob(db: DB, name: string, data: Record<string, unknown> = {}, opts: RunJobOptions = {}): Promise<JobOutcome> {
+export async function runJob(
+  db: DB,
+  name: string,
+  data: Record<string, unknown> = {},
+  opts: RunJobOptions = {},
+): Promise<JobOutcome> {
   const attempt = Math.max(1, opts.attempt ?? 1);
   const maxAttempts = Math.max(attempt, opts.maxAttempts ?? 1);
   const runId = isUuid(opts.runId) ? opts.runId : randomUUID();
-  await db.insert(jobRuns).values({ id: runId, jobName: name, status: "RUNNING" })
-    .onConflictDoUpdate({ target: jobRuns.id, set: { status: "RUNNING", startedAt: new Date(), finishedAt: null, error: null, result: null } });
+  await db
+    .insert(jobRuns)
+    .values({ id: runId, jobName: name, status: "RUNNING" })
+    .onConflictDoUpdate({
+      target: jobRuns.id,
+      set: { status: "RUNNING", startedAt: new Date(), finishedAt: null, error: null, result: null },
+    });
   const log = logger.child({ job: name, runId, attempt });
   const app = opts.app === undefined ? boundApp : opts.app;
   const started = performance.now();
@@ -250,7 +293,10 @@ export async function runJob(db: DB, name: string, data: Record<string, unknown>
   try {
     const handler = jobHandler(name);
     const result = await handler({ db, log, data: publicJobData(data), app: app ?? null, runId, attempt, maxAttempts });
-    await db.update(jobRuns).set({ status: "OK", finishedAt: new Date(), result: { ...result, ...(attempt > 1 ? { attempt } : {}) } }).where(eq(jobRuns.id, runId));
+    await db
+      .update(jobRuns)
+      .set({ status: "OK", finishedAt: new Date(), result: { ...result, ...(attempt > 1 ? { attempt } : {}) } })
+      .where(eq(jobRuns.id, runId));
     recordJobRun(name, "OK", seconds());
     log.info({ result }, "job finished");
     return { runId, status: "OK", result };
@@ -258,12 +304,23 @@ export async function runJob(db: DB, name: string, data: Record<string, unknown>
     recordJobRun(name, "FAILED", seconds());
     const final = err instanceof UnregisteredJobError || attempt >= maxAttempts;
     const message = errorMessage(err);
-    await db.update(jobRuns).set({ status: "FAILED", finishedAt: new Date(), error: message, result: { attempt, max_attempts: maxAttempts, will_retry: !final } })
-      .where(eq(jobRuns.id, runId)).catch((e: unknown) => log.error({ err: e }, "could not record the job failure"));
+    await db
+      .update(jobRuns)
+      .set({
+        status: "FAILED",
+        finishedAt: new Date(),
+        error: message,
+        result: { attempt, max_attempts: maxAttempts, will_retry: !final },
+      })
+      .where(eq(jobRuns.id, runId))
+      .catch((e: unknown) => log.error({ err: e }, "could not record the job failure"));
     log.error({ err, final }, final ? "job failed (final attempt)" : "job attempt failed; BullMQ will retry");
     // a tenant job (payload `company_id`) alerts only that company's Super Admins: its error text may carry that tenant's data
     const companyId = isUuid(data["company_id"]) ? data["company_id"] : null;
-    if (final) await alertJobFailure(db, { jobName: name, runId, error: message, attempt, maxAttempts, companyId }).catch((e: unknown) => log.error({ err: e }, "job failure alert failed"));
+    if (final)
+      await alertJobFailure(db, { jobName: name, runId, error: message, attempt, maxAttempts, companyId }).catch(
+        (e: unknown) => log.error({ err: e }, "job failure alert failed"),
+      );
     throw err;
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useRef, useSyncExternalStore, type RefObject } from "react";
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -8,7 +8,9 @@ const FOCUSABLE =
 /** Traps Tab focus inside `ref` while `active`, restores focus to the opener on release. */
 export function useFocusTrap<T extends HTMLElement>(ref: RefObject<T | null>, active: boolean, onEscape?: () => void) {
   const escapeRef = useRef(onEscape);
-  escapeRef.current = onEscape;
+  useEffect(() => {
+    escapeRef.current = onEscape;
+  });
 
   useEffect(() => {
     if (!active) return;
@@ -16,7 +18,10 @@ export function useFocusTrap<T extends HTMLElement>(ref: RefObject<T | null>, ac
     if (!root) return;
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
-    const focusables = () => Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((el) => el.offsetParent !== null || el === document.activeElement);
+    const focusables = () =>
+      Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+        (el) => el.offsetParent !== null || el === document.activeElement,
+      );
     const initial = root.querySelector<HTMLElement>("[data-autofocus]") ?? focusables()[0] ?? root;
     const raf = requestAnimationFrame(() => initial.focus({ preventScroll: true }));
 
@@ -68,68 +73,62 @@ export function useLockBodyScroll(locked: boolean) {
   }, [locked]);
 }
 
+const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
+
+function subscribeReducedMotion(onChange: () => void): () => void {
+  const mq = window.matchMedia(REDUCED_MOTION);
+  mq.addEventListener("change", onChange);
+  return () => mq.removeEventListener("change", onChange);
+}
+
+/** True when the visitor asked for reduced motion; false while server rendering (hydration-safe). */
 export function usePrefersReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const update = () => setReduced(mq.matches);
-    update();
-    mq.addEventListener("change", update);
-    return () => mq.removeEventListener("change", update);
-  }, []);
-  return reduced;
-}
-
-/** Reads and writes a JSON value in localStorage, tolerating private mode / blocked storage. */
-export function useLocalStorage<T>(key: string, initial: T): [T, (value: T) => void] {
-  const [value, setValue] = useState<T>(initial);
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(key);
-      if (raw !== null) setValue(JSON.parse(raw) as T);
-    } catch {
-      // storage unavailable
-    }
-  }, [key]);
-  const update = useCallback(
-    (next: T) => {
-      setValue(next);
-      try {
-        window.localStorage.setItem(key, JSON.stringify(next));
-      } catch {
-        // storage unavailable
-      }
-    },
-    [key],
+  return useSyncExternalStore(
+    subscribeReducedMotion,
+    () => window.matchMedia(REDUCED_MOTION).matches,
+    () => false,
   );
-  return [value, update];
 }
 
-/** Captures UTM parameters from the current URL once on mount. */
+const noSubscription = () => () => undefined;
+
+/** False during server rendering and hydration, true once running in the browser (portals, window-only UI). */
+export function useIsClient(): boolean {
+  return useSyncExternalStore(
+    noSubscription,
+    () => true,
+    () => false,
+  );
+}
+
+const UTM_KEYS = ["source", "medium", "campaign", "term", "content"] as const;
+const NO_UTM: Record<string, string> = {};
+let utmCache: { search: string; value: Record<string, string> } | null = null;
+
+/** UTM parameters of the current URL, else those remembered for this browser session (cached per URL query). */
+function readUtm(): Record<string, string> {
+  const search = window.location.search;
+  if (utmCache?.search === search) return utmCache.value;
+  const params = new URLSearchParams(search);
+  let found: Record<string, string> = {};
+  for (const key of UTM_KEYS) {
+    const value = params.get(`utm_${key}`);
+    if (value) found[key] = value.slice(0, 200);
+  }
+  try {
+    if (Object.keys(found).length) window.sessionStorage.setItem("kkt:utm", JSON.stringify(found));
+    else {
+      const stored = window.sessionStorage.getItem("kkt:utm");
+      if (stored) found = JSON.parse(stored) as Record<string, string>;
+    }
+  } catch {
+    // storage unavailable: use what the URL carries
+  }
+  utmCache = { search, value: Object.keys(found).length ? found : NO_UTM };
+  return utmCache.value;
+}
+
+/** Captures UTM parameters from the current URL (or this session's landing URL); empty while server rendering. */
 export function useUtmParams(): Record<string, string> {
-  const [utm, setUtm] = useState<Record<string, string>>({});
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const found: Record<string, string> = {};
-    for (const key of ["source", "medium", "campaign", "term", "content"]) {
-      const value = params.get(`utm_${key}`);
-      if (value) found[key] = value.slice(0, 200);
-    }
-    if (Object.keys(found).length) {
-      setUtm(found);
-      try {
-        window.sessionStorage.setItem("kkt:utm", JSON.stringify(found));
-      } catch {
-        // ignore
-      }
-    } else {
-      try {
-        const stored = window.sessionStorage.getItem("kkt:utm");
-        if (stored) setUtm(JSON.parse(stored) as Record<string, string>);
-      } catch {
-        // ignore
-      }
-    }
-  }, []);
-  return utm;
+  return useSyncExternalStore(noSubscription, readUtm, () => NO_UTM);
 }

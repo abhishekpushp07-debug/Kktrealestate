@@ -10,7 +10,9 @@ function vendorChunk(id: string): string | undefined {
   if (!id.includes("node_modules")) return undefined;
   if (/[\\/]node_modules[\\/](react|react-dom|scheduler|react-router|react-router-dom)[\\/]/.test(id)) return "react";
   if (/[\\/]node_modules[\\/]@tanstack[\\/]/.test(id)) return "query";
-  if (/[\\/]node_modules[\\/](recharts|d3-[a-z-]+|victory-vendor|internmap|delaunator|robust-predicates)[\\/]/.test(id)) {
+  if (
+    /[\\/]node_modules[\\/](recharts|d3-[a-z-]+|victory-vendor|internmap|delaunator|robust-predicates)[\\/]/.test(id)
+  ) {
     return "charts";
   }
   return "vendor";

@@ -26,7 +26,19 @@ export interface WidgetProps {
 }
 
 /** Dashboard card: title, optional link, optional chart ↔ table toggle, Suspense for lazy charts. */
-export function Widget({ title, description, icon: Icon, to, toLabel = "View all", actions, table, loading = false, className, children, ...rest }: WidgetProps) {
+export function Widget({
+  title,
+  description,
+  icon: Icon,
+  to,
+  toLabel = "View all",
+  actions,
+  table,
+  loading = false,
+  className,
+  children,
+  ...rest
+}: WidgetProps) {
   const [showTable, setShowTable] = useState(false);
   return (
     <Card className={cn("flex min-w-0 flex-col", className)} data-testid={rest["data-testid"]}>
@@ -35,7 +47,13 @@ export function Widget({ title, description, icon: Icon, to, toLabel = "View all
           <>
             {actions}
             {table && (
-              <Button size="xs" variant={showTable ? "primary" : "ghost"} leftIcon={Table2} onClick={() => setShowTable((value) => !value)} aria-pressed={showTable}>
+              <Button
+                size="xs"
+                variant={showTable ? "primary" : "ghost"}
+                leftIcon={Table2}
+                onClick={() => setShowTable((value) => !value)}
+                aria-pressed={showTable}
+              >
                 Table
               </Button>
             )}
@@ -78,39 +96,75 @@ export interface MiniColumn<T> {
 }
 
 /** Compact table used by widgets (also the chart table-view). */
-export function MiniTable<T>({ rows, columns, rowKey, empty = "Nothing to show", footer, dense = false }: { rows: readonly T[]; columns: ReadonlyArray<MiniColumn<T>>; rowKey: (row: T, index: number) => string; empty?: string; footer?: ReactNode; dense?: boolean }) {
+export function MiniTable<T>({
+  rows,
+  columns,
+  rowKey,
+  empty = "Nothing to show",
+  footer,
+  dense = false,
+}: {
+  rows: readonly T[];
+  columns: ReadonlyArray<MiniColumn<T>>;
+  rowKey: (row: T, index: number) => string;
+  empty?: string;
+  footer?: ReactNode;
+  dense?: boolean;
+}) {
   if (rows.length === 0) return <EmptyState compact title={empty} className="py-6" />;
   return (
     <div className="min-w-0 overflow-x-auto">
-    <table className={cn("w-full min-w-[18rem] text-sm", dense && "text-xs")}>
-      <thead>
-        <tr className="border-b border-border text-left text-2xs uppercase tracking-wider text-ink-subtle">
-          {columns.map((column) => (
-            <th key={column.key} className={cn("px-2 py-1.5 font-semibold", column.align === "right" && "text-right")}>
-              {column.label}
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row, index) => (
-          <tr key={rowKey(row, index)} className="border-b border-border last:border-0">
+      <table className={cn("w-full min-w-[18rem] text-sm", dense && "text-xs")}>
+        <thead>
+          <tr className="border-b border-border text-left text-2xs uppercase tracking-wider text-ink-subtle">
             {columns.map((column) => (
-              <td key={column.key} className={cn("px-2 py-1.5", dense ? "py-1" : "py-1.5", column.align === "right" && "money text-right")}>
-                {column.cell(row)}
-              </td>
+              <th
+                key={column.key}
+                className={cn("px-2 py-1.5 font-semibold", column.align === "right" && "text-right")}
+              >
+                {column.label}
+              </th>
             ))}
           </tr>
-        ))}
-      </tbody>
-      {footer && <tfoot>{footer}</tfoot>}
-    </table>
+        </thead>
+        <tbody>
+          {rows.map((row, index) => (
+            <tr key={rowKey(row, index)} className="border-b border-border last:border-0">
+              {columns.map((column) => (
+                <td
+                  key={column.key}
+                  className={cn(
+                    "px-2 py-1.5",
+                    dense ? "py-1" : "py-1.5",
+                    column.align === "right" && "money text-right",
+                  )}
+                >
+                  {column.cell(row)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+        {footer && <tfoot>{footer}</tfoot>}
+      </table>
     </div>
   );
 }
 
 /** Label + percent bar (construction progress, tower availability). */
-export function ProgressRow({ label, sublabel, percent, trailing, tone = "navy" }: { label: ReactNode; sublabel?: ReactNode; percent: number; trailing?: ReactNode; tone?: "navy" | "gold" | "success" }) {
+export function ProgressRow({
+  label,
+  sublabel,
+  percent,
+  trailing,
+  tone = "navy",
+}: {
+  label: ReactNode;
+  sublabel?: ReactNode;
+  percent: number;
+  trailing?: ReactNode;
+  tone?: "navy" | "gold" | "success";
+}) {
   const pct = Math.max(0, Math.min(100, Number.isFinite(percent) ? percent : 0));
   return (
     <div className="space-y-1 py-1.5">
@@ -119,20 +173,52 @@ export function ProgressRow({ label, sublabel, percent, trailing, tone = "navy" 
         <span className="money shrink-0 text-xs text-ink-muted">{trailing ?? formatPercent(pct, 0)}</span>
       </div>
       {sublabel && <p className="truncate text-2xs text-ink-subtle">{sublabel}</p>}
-      <div className="h-1.5 overflow-hidden rounded-full bg-navy-50" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)} aria-label={typeof label === "string" ? label : "Progress"}>
-        <span className={cn("block h-full rounded-full", tone === "navy" && "bg-navy-950", tone === "gold" && "bg-gold", tone === "success" && "bg-success")} style={{ width: `${pct}%` }} />
+      <div
+        className="h-1.5 overflow-hidden rounded-full bg-navy-50"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(pct)}
+        aria-label={typeof label === "string" ? label : "Progress"}
+      >
+        <span
+          className={cn(
+            "block h-full rounded-full",
+            tone === "navy" && "bg-navy-950",
+            tone === "gold" && "bg-gold",
+            tone === "success" && "bg-success",
+          )}
+          style={{ width: `${pct}%` }}
+        />
       </div>
     </div>
   );
 }
 
 /** Horizontal stacked status bar with a legend (available / hold / booked / sold / blocked). */
-export function StatusStack({ counts, colors }: { counts: ReadonlyArray<{ key: string; label: string; value: number }>; colors: Readonly<Record<string, string>> }) {
+export function StatusStack({
+  counts,
+  colors,
+}: {
+  counts: ReadonlyArray<{ key: string; label: string; value: number }>;
+  colors: Readonly<Record<string, string>>;
+}) {
   const total = counts.reduce((sum, item) => sum + item.value, 0);
   return (
     <div className="space-y-1.5">
-      <div className="flex h-2.5 gap-0.5 overflow-hidden rounded-full bg-navy-50" role="img" aria-label={counts.map((item) => `${item.label} ${item.value}`).join(", ")}>
-        {counts.map((item) => (item.value > 0 ? <span key={item.key} style={{ width: `${(item.value / Math.max(1, total)) * 100}%`, backgroundColor: colors[item.key] }} /> : null))}
+      <div
+        className="flex h-2.5 gap-0.5 overflow-hidden rounded-full bg-navy-50"
+        role="img"
+        aria-label={counts.map((item) => `${item.label} ${item.value}`).join(", ")}
+      >
+        {counts.map((item) =>
+          item.value > 0 ? (
+            <span
+              key={item.key}
+              style={{ width: `${(item.value / Math.max(1, total)) * 100}%`, backgroundColor: colors[item.key] }}
+            />
+          ) : null,
+        )}
       </div>
       <dl className="flex flex-wrap gap-x-3 gap-y-0.5 text-2xs text-ink-muted">
         {counts.map((item) => (

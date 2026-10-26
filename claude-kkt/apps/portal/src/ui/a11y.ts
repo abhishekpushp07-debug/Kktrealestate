@@ -27,7 +27,11 @@ export const statusRegion = { role: "status", "aria-live": "polite", accessibili
  * Web-only ARIA attributes React Native's types do not declare (react-native-web forwards them to the DOM). Spread onto a TextInput
  * / Pressable; on native they are omitted.
  */
-export function webAria(attrs: { "aria-invalid"?: boolean; "aria-describedby"?: string; "aria-required"?: boolean }): Record<string, unknown> {
+export function webAria(attrs: {
+  "aria-invalid"?: boolean;
+  "aria-describedby"?: string;
+  "aria-required"?: boolean;
+}): Record<string, unknown> {
   if (Platform.OS !== "web") return {};
   const out: Record<string, unknown> = {};
   if (attrs["aria-invalid"]) out["aria-invalid"] = true;

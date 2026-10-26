@@ -4,7 +4,10 @@ import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Input, type InputProps } from "./input";
 
-export interface DateInputProps extends Omit<InputProps, "value" | "onChange" | "type" | "min" | "max" | "defaultValue"> {
+export interface DateInputProps extends Omit<
+  InputProps,
+  "value" | "onChange" | "type" | "min" | "max" | "defaultValue"
+> {
   /** Business date YYYY-MM-DD (null = empty). */
   value: string | null | undefined;
   onChange: (value: string | null) => void;
@@ -15,7 +18,16 @@ export interface DateInputProps extends Omit<InputProps, "value" | "onChange" | 
 }
 
 /** Native date picker bound to a YYYY-MM-DD string. */
-export function DateInput({ value, onChange, min, max, showDisplay = false, className, wrapperClassName, ...props }: DateInputProps) {
+export function DateInput({
+  value,
+  onChange,
+  min,
+  max,
+  showDisplay = false,
+  className,
+  wrapperClassName,
+  ...props
+}: DateInputProps) {
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
     onChange(event.target.value ? event.target.value : null);
   };

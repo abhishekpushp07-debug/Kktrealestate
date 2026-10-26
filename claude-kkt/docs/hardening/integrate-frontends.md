@@ -1,21 +1,23 @@
 All three front ends are now wired to every new or changed API capability, and the browser QA runs are clean. Every item in `docs/hardening/frontend-wiring.json` is either done or marked not applicable below. Typecheck passes for erp, web, portal and contracts; ERP and web builds and the portal web export pass. Nothing is committed.
 
 **One mistake to fix first.** While formatting my new files I ran `prettier --write` on a list that also picked up 7 untracked files belonging to the API agent. The change is formatting only: the API still typechecks and none of those files' content changed meaningfully. No other agent was reachable to tell. The API agent should re-read these before their next edit:
+
 - `apps/api/src/modules/money/services/ledgerRebuild.ts`
 - `apps/api/src/seed/firstBoot.ts`
 - `apps/api/test/integration/cross-track-money.test.ts`, `cross-track.test.ts`, `first-boot.test.ts`
 - `apps/api/test/unit/cache.test.ts`, `logger-trace.test.ts`
 
 ## Results
-| Check | Result |
-|---|---|
-| ERP unit tests | 158/158 (36 new) |
-| Web unit tests | 16/16 (3 new) |
-| Portal unit tests | 13/13 (5 new) |
-| ERP full browser walk | 551 page checks, 164/164 assertions, 500 axe scans, 499 clean. Two defects, both handled (below) |
+
+| Check                          | Result                                                                                                                                                  |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ERP unit tests                 | 158/158 (36 new)                                                                                                                                        |
+| Web unit tests                 | 16/16 (3 new)                                                                                                                                           |
+| Portal unit tests              | 13/13 (5 new)                                                                                                                                           |
+| ERP full browser walk          | 551 page checks, 164/164 assertions, 500 axe scans, 499 clean. Two defects, both handled (below)                                                        |
 | ERP re-runs on the final build | crm 18/18, money + hardening 79/79, then roles + hardening + smoke on a fresh seed: 287 checks, 56/56, 0 defects, 236 axe scans with 0 serious/critical |
-| Web full browser run | 145/145, 0 defects, 0 serious/critical |
-| Portal browser run | 0 defects, 46 axe scans, 0 violations |
+| Web full browser run           | 145/145, 0 defects, 0 serious/critical                                                                                                                  |
+| Portal browser run             | 0 defects, 46 axe scans, 0 violations                                                                                                                   |
 
 - **The two defects in the ERP full walk:**
   - A runner step still clicked the old "Verify / reject" KYC button; I updated the runner.
@@ -25,7 +27,9 @@ All three front ends are now wired to every new or changed API capability, and t
 - **Cleanup:** servers on 4600, 5673, 3600 and 8681 are stopped. I used kkt_h6 and Redis 22 only.
 
 ## What I wired
+
 **ERP**
+
 - **New admin pages** (in a new `features/system/` folder, with sidebar entries and routes):
   - **Jobs** (`/admin/jobs`): last run, last success, failures, next run, Run now with a live run watcher, and recent runs with their errors. A duplicate run (409 `JOB_ALREADY_RUNNING`) says "already queued or running" and follows the existing run.
   - **System health** (`/admin/system`): versions, database and Redis status, and a summary parsed from `GET /metrics`.
@@ -59,15 +63,18 @@ All three front ends are now wired to every new or changed API capability, and t
 **Portal:** errors show request and trace ids; a retired operation (410 `GONE`) asks for an app update; a 429 at sign-in shows a calm "try again in a moment"; any response marked `Deprecation` shows a dismissible "please update the app" notice. Other-charge bells already reach the Demands screen from the API, so nothing was needed there.
 
 **QA runners and docs:**
+
 - The ERP runner has a new `hardening` section; the smoke walk and the crm KYC and reschedule steps are updated.
 - The web runner now reschedules a visit.
 - The portal runner checks the update notice.
 - `docs/qa/erp.md`, `web.md` and `portal.md` each have an "Integration stage" section, and the screenshots are refreshed.
 
 ## Not applicable
+
 Deploy-only items (database grants, webhook payload, `x-sunset`), plus `Idempotent-Replayed`, which clients already treat like any other success.
 
 ## For the API agent and the integration stage
+
 - **Version policy:** the ERP now sends `If-Match` on `PATCH /construction/photos/:id`, and never calls `PATCH /payment-plan-assignments/:id`, so both can come off the exemption list. The photo row's `version` is still optional in the contract; it should always be returned first. Item 13 of `docs/TODO-integration.md` should be updated; I didn't edit it because it is outside my paths.
 - **Rescheduled visit links:** an old link returns 404 after a reschedule, not 410, because the token is rotated. The website treats either as "no longer works". Answering 410 for rotated tokens would match the documentation.
 - **Portal bells:** demand and other-charge bells come back with `booking_id: null`; resolving it would let the portal switch to the right booking.
@@ -75,6 +82,7 @@ Deploy-only items (database grants, webhook payload, `x-sunset`), plus `Idempote
 - **Already done by the API agent:** exposing the `X-Export-*` headers to the browser and the report-paging fix for exports. The ERP also works without them by falling back to the list's total.
 
 **Contract shapes the ERP now relies on:**
+
 - `POST /exports {path:"/api/v1/<list>", query}` → 202
 - `POST /exports/:id/link` and `POST /admin/backups/:id/link` → `{download_url, expires_at, file_name, …}`
 - `POST /admin/jobs/:name/run` → 202 `{run_id, …}`, or 409 with `details.run_id`

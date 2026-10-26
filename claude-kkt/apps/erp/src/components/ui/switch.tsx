@@ -33,7 +33,10 @@ export function Switch({ className, label, description, id, size = "md", ...prop
   return (
     <div className="flex items-start gap-2.5">
       {control}
-      <label htmlFor={inputId} className="cursor-pointer select-none text-sm text-ink peer-disabled:cursor-not-allowed peer-disabled:opacity-60">
+      <label
+        htmlFor={inputId}
+        className="cursor-pointer select-none text-sm text-ink peer-disabled:cursor-not-allowed peer-disabled:opacity-60"
+      >
         <span className="font-medium">{label}</span>
         {description && <span className="block text-xs text-ink-subtle">{description}</span>}
       </label>

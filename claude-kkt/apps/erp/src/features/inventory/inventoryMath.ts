@@ -75,8 +75,15 @@ export interface RangeValidation {
   ok: boolean;
 }
 
-function isComplete(range: RangeInput): range is { from_floor: number; to_floor: number; floor_plan_template_id: string | null } {
-  return range.from_floor !== null && range.to_floor !== null && Number.isInteger(range.from_floor) && Number.isInteger(range.to_floor);
+function isComplete(
+  range: RangeInput,
+): range is { from_floor: number; to_floor: number; floor_plan_template_id: string | null } {
+  return (
+    range.from_floor !== null &&
+    range.to_floor !== null &&
+    Number.isInteger(range.from_floor) &&
+    Number.isInteger(range.to_floor)
+  );
 }
 
 /** Coverage / overlap / bounds validation of floor-plan ranges against a floor spec. */
@@ -97,18 +104,26 @@ export function validateFloorRanges(ranges: readonly RangeInput[], spec: FloorSp
     if (range.from_floor < low || range.to_floor > high) outside.push(index);
   });
 
-  const complete = ranges.map((range, index) => ({ range, index })).filter(({ range, index }) => isComplete(range) && !invalid.includes(index));
+  const complete = ranges
+    .map((range, index) => ({ range, index }))
+    .filter(({ range, index }) => isComplete(range) && !invalid.includes(index));
   for (let i = 0; i < complete.length; i += 1) {
     for (let j = i + 1; j < complete.length; j += 1) {
       const a = complete[i];
       const b = complete[j];
       if (!a || !b || !isComplete(a.range) || !isComplete(b.range)) continue;
-      if (a.range.from_floor <= b.range.to_floor && b.range.from_floor <= a.range.to_floor) overlaps.push([a.index, b.index]);
+      if (a.range.from_floor <= b.range.to_floor && b.range.from_floor <= a.range.to_floor)
+        overlaps.push([a.index, b.index]);
     }
   }
 
   const uncovered = unitFloors(spec).filter((floor) => rangeCovering(ranges, floor) === null);
-  const ok = invalid.length === 0 && missingTemplate.length === 0 && outside.length === 0 && overlaps.length === 0 && uncovered.length === 0;
+  const ok =
+    invalid.length === 0 &&
+    missingTemplate.length === 0 &&
+    outside.length === 0 &&
+    overlaps.length === 0 &&
+    uncovered.length === 0;
   return { invalid, missingTemplate, outside, overlaps, uncovered, ok };
 }
 
@@ -135,7 +150,11 @@ export interface ExpectedFlats {
 }
 
 /** Expected flat count = Σ over unit floors of flats-per-floor of the covering template (refuge/podium/skip excluded). */
-export function expectedFlatCount(ranges: readonly RangeInput[], spec: FloorSpec, flatsPerTemplate: Readonly<Record<string, number>>): ExpectedFlats {
+export function expectedFlatCount(
+  ranges: readonly RangeInput[],
+  spec: FloorSpec,
+  flatsPerTemplate: Readonly<Record<string, number>>,
+): ExpectedFlats {
   const perFloor: ExpectedFlats["perFloor"] = [];
   const byTemplate: Record<string, number> = {};
   let total = 0;
@@ -189,12 +208,20 @@ export function ruleApplies(rule: PricingRule, flat: PricingFlat): boolean {
     case "CORNER":
       return flat.is_corner;
     case "FACING_IN":
-      return Boolean(flat.facing) && (rule.facings ?? []).some((facing) => facing.toUpperCase() === (flat.facing ?? "").toUpperCase());
+      return (
+        Boolean(flat.facing) &&
+        (rule.facings ?? []).some((facing) => facing.toUpperCase() === (flat.facing ?? "").toUpperCase())
+      );
   }
 }
 
 /** base = lump sum, else rate × super built-up; PLC lines per matching rule; floor rise = value × (floor − 1) × sq ft. */
-export function computeFlatPrice(flat: PricingFlat, rate: PricingRate | null, rules: readonly PricingRule[], fallback: PricingRate | null = null): PricePreview {
+export function computeFlatPrice(
+  flat: PricingFlat,
+  rate: PricingRate | null,
+  rules: readonly PricingRule[],
+  fallback: PricingRate | null = null,
+): PricePreview {
   const effective = rate ?? fallback;
   let base = 0;
   let baseLabel = "Base price";

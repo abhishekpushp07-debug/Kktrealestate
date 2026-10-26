@@ -1,6 +1,18 @@
 // A. Identity & platform
 import { sql } from "drizzle-orm";
-import { bigint, boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import {
+  bigint,
+  boolean,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  unique,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { appendOnly, citext, idColumn, mutable, softDelete, trgm } from "./_common.js";
 import { actorTypeEnum, jobRunStatusEnum, userTypeEnum } from "./enums.js";
 import type { Address, CompanySettings, JsonObject, Letterhead, Numbering } from "./json.js";
@@ -50,7 +62,10 @@ export const roles = pgTable(
       .references(() => companies.id),
     name: text("name").notNull(),
     description: text("description"),
-    permissions: text("permissions").array().notNull().default(sql`'{}'::text[]`),
+    permissions: text("permissions")
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
     isSystem: boolean("is_system").notNull().default(false),
     ...softDelete(),
     ...mutable(),
@@ -147,7 +162,10 @@ export const loginEvents = pgTable(
     userAgent: text("user_agent"),
     ...appendOnly(),
   },
-  (t) => [index("login_events_created_idx").on(t.createdAt.desc()), index("login_events_identifier_idx").on(t.identifier)],
+  (t) => [
+    index("login_events_created_idx").on(t.createdAt.desc()),
+    index("login_events_identifier_idx").on(t.identifier),
+  ],
 );
 
 /** Append-only: `audit_logs_immutable` raises on UPDATE/DELETE and `audit_logs_no_truncate` on TRUNCATE (src/sql/0001_triggers.sql). */
@@ -192,7 +210,10 @@ export const idempotencyKeys = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   },
-  (t) => [unique("idempotency_keys_scope_key_uq").on(t.scopeKey, t.key), index("idempotency_keys_expires_idx").on(t.expiresAt)],
+  (t) => [
+    unique("idempotency_keys_scope_key_uq").on(t.scopeKey, t.key),
+    index("idempotency_keys_expires_idx").on(t.expiresAt),
+  ],
 );
 
 /** Per-company, per-scope, per-financial-year counters; incremented atomically by `nextSequence`. */

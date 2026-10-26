@@ -14,7 +14,11 @@ import { T } from "@/ui/Text";
 import { colors, space } from "@/ui/theme";
 
 function excerpt(md: string): string {
-  return md.replace(/[#*_`>\[\]()]/g, "").replace(/\s+/g, " ").trim().slice(0, 160);
+  return md
+    .replace(/[#*_`>[\]()]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 160);
 }
 
 export function NoticesScreen(): React.JSX.Element {
@@ -28,7 +32,11 @@ export function NoticesScreen(): React.JSX.Element {
       {q.isError && q.data ? <StatusBar text="Showing saved notices — couldn't refresh." tone="warning" /> : null}
       <Screen onRefresh={() => queryClient.invalidateQueries({ queryKey: ["notices"] })}>
         {!q.data ? (
-          q.isError ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : <SkeletonRows rows={4} />
+          q.isError ? (
+            <ErrorState error={q.error} onRetry={() => void q.refetch()} />
+          ) : (
+            <SkeletonRows rows={4} />
+          )
         ) : rows.length === 0 ? (
           <EmptyState icon="notice" title="No notices yet" body="Announcements about your project will appear here." />
         ) : (

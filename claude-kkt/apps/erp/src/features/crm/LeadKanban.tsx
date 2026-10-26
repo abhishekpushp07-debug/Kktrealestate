@@ -1,9 +1,29 @@
 import { CalendarClock, GripVertical, MoreHorizontal, Phone, UserRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { LEAD_SOURCE_LABELS, LEAD_STAGES, LEAD_STAGE_LABELS, type LeadKanbanResponse, type LeadRow, type LeadStage } from "@kkt/contracts";
-import { Badge, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger, IconButton, Tooltip } from "@/components/ui";
+import {
+  LEAD_SOURCE_LABELS,
+  LEAD_STAGES,
+  LEAD_STAGE_LABELS,
+  type LeadKanbanResponse,
+  type LeadRow,
+  type LeadStage,
+} from "@kkt/contracts";
+import {
+  Badge,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+  IconButton,
+  Tooltip,
+} from "@/components/ui";
 import { formatPhone, formatRelative } from "@/lib/format";
-import { cn } from "@/lib/utils";
+import { cn, useNow } from "@/lib/utils";
 import { budgetLabel } from "./LeadDrawer";
 
 export interface LeadKanbanProps {
@@ -64,7 +84,16 @@ export function LeadKanban({ columns, canWrite, onOpen, onMove, loading = false 
     if (event.button !== 0) return;
     if ((event.target as HTMLElement).closest("a,button,[role=menuitem],[data-no-drag]")) return;
     event.currentTarget.setPointerCapture(event.pointerId);
-    setDrag({ lead, from, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, x: event.clientX, y: event.clientY, active: false });
+    setDrag({
+      lead,
+      from,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      x: event.clientX,
+      y: event.clientY,
+      active: false,
+    });
   };
 
   const onPointerMove = (event: ReactPointerEvent<HTMLElement>) => {
@@ -113,16 +142,29 @@ export function LeadKanban({ columns, canWrite, onOpen, onMove, loading = false 
               }}
               role="region"
               aria-label={`${LEAD_STAGE_LABELS[stage]} (${column.count})`}
-              className={cn("flex w-[17rem] shrink-0 flex-col rounded-lg border border-border border-t-4 bg-surface/70", STAGE_ACCENT[stage], isTarget && "ring-2 ring-gold bg-gold-light/40", readOnly && drag?.active && "opacity-60")}
+              className={cn(
+                "flex w-[17rem] shrink-0 flex-col rounded-lg border border-border border-t-4 bg-surface/70",
+                STAGE_ACCENT[stage],
+                isTarget && "ring-2 ring-gold bg-gold-light/40",
+                readOnly && drag?.active && "opacity-60",
+              )}
               style={{ scrollSnapAlign: "start" }}
               data-testid={`kanban-column-${stage}`}
             >
               <header className="flex items-center justify-between gap-2 px-3 py-2">
-                <h3 className="truncate text-xs font-bold uppercase tracking-wide text-navy-950">{LEAD_STAGE_LABELS[stage]}</h3>
-                <span className="money rounded-full bg-card px-2 text-2xs font-semibold text-ink-muted shadow-card">{column.count}</span>
+                <h3 className="truncate text-xs font-bold uppercase tracking-wide text-navy-950">
+                  {LEAD_STAGE_LABELS[stage]}
+                </h3>
+                <span className="money rounded-full bg-card px-2 text-2xs font-semibold text-ink-muted shadow-card">
+                  {column.count}
+                </span>
               </header>
               <div className="flex max-h-[calc(100dvh-22rem)] min-h-24 flex-col gap-2 overflow-y-auto px-2 pb-2 scrollbar-thin">
-                {column.leads.length === 0 && <p className="rounded-md border border-dashed border-border px-2 py-4 text-center text-2xs text-ink-subtle">{readOnly ? "No conversions yet" : "Drop leads here"}</p>}
+                {column.leads.length === 0 && (
+                  <p className="rounded-md border border-dashed border-border px-2 py-4 text-center text-2xs text-ink-subtle">
+                    {readOnly ? "No conversions yet" : "Drop leads here"}
+                  </p>
+                )}
                 {column.leads.map((lead) => (
                   <LeadCard
                     key={lead.id}
@@ -144,7 +186,11 @@ export function LeadKanban({ columns, canWrite, onOpen, onMove, loading = false 
         })}
       </div>
       {drag?.active && (
-        <div className="pointer-events-none fixed z-[70] w-60 -translate-x-1/2 -translate-y-1/2 rotate-1 rounded-md border border-gold bg-card p-2 text-sm shadow-pop" style={{ left: drag.x, top: drag.y }} aria-hidden="true">
+        <div
+          className="pointer-events-none fixed z-[70] w-60 -translate-x-1/2 -translate-y-1/2 rotate-1 rounded-md border border-gold bg-card p-2 text-sm shadow-pop"
+          style={{ left: drag.x, top: drag.y }}
+          aria-hidden="true"
+        >
           <p className="truncate font-semibold text-navy-950">{drag.lead.full_name}</p>
           <p className="money text-2xs text-ink-subtle">{formatPhone(drag.lead.phone)}</p>
         </div>
@@ -166,8 +212,24 @@ interface LeadCardProps {
   onMove: ((stage: LeadStage) => void) | undefined;
 }
 
-function LeadCard({ lead, stage, draggable, dragging, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onOpen, onMove }: LeadCardProps) {
-  const overdue = lead.next_follow_up_at !== null && Date.parse(lead.next_follow_up_at) < Date.now() && stage !== "CONVERTED" && stage !== "LOST";
+function LeadCard({
+  lead,
+  stage,
+  draggable,
+  dragging,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  onPointerCancel,
+  onOpen,
+  onMove,
+}: LeadCardProps) {
+  const now = useNow();
+  const overdue =
+    lead.next_follow_up_at !== null &&
+    Date.parse(lead.next_follow_up_at) < now &&
+    stage !== "CONVERTED" &&
+    stage !== "LOST";
   const budget = budgetLabel(lead);
   return (
     <article
@@ -176,12 +238,21 @@ function LeadCard({ lead, stage, draggable, dragging, onPointerDown, onPointerMo
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
-      className={cn("group rounded-md border border-border bg-card p-2.5 text-left shadow-card transition-shadow hover:shadow-pop focus-within:ring-2 focus-within:ring-gold", draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer", dragging && "opacity-40")}
+      className={cn(
+        "group rounded-md border border-border bg-card p-2.5 text-left shadow-card transition-shadow hover:shadow-pop focus-within:ring-2 focus-within:ring-gold",
+        draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer",
+        dragging && "opacity-40",
+      )}
       style={{ touchAction: "pan-y" }}
       data-testid={`lead-card-${lead.id}`}
     >
       <div className="flex items-start gap-1.5">
-        {draggable && <GripVertical className="mt-0.5 size-3.5 shrink-0 text-ink-subtle/60 group-hover:text-ink-subtle" aria-hidden="true" />}
+        {draggable && (
+          <GripVertical
+            className="mt-0.5 size-3.5 shrink-0 text-ink-subtle/60 group-hover:text-ink-subtle"
+            aria-hidden="true"
+          />
+        )}
         <div className="min-w-0 flex-1">
           {/* the name is the card's button (keyboard + click); the rest of the card opens on a pointer tap and drags between columns */}
           <button
@@ -233,8 +304,16 @@ function LeadCard({ lead, stage, draggable, dragging, onPointerDown, onPointerMo
           <UserRound className="size-3 shrink-0" aria-hidden="true" />
           <span className="truncate">{lead.assigned_user_name ?? "Unassigned"}</span>
         </span>
-        <Tooltip content={lead.next_follow_up_at ? `Follow-up ${formatRelative(lead.next_follow_up_at)}` : `Source: ${LEAD_SOURCE_LABELS[lead.source]}`}>
-          <span className={cn("money inline-flex shrink-0 items-center gap-1", overdue && "font-semibold text-danger-fg")}>
+        <Tooltip
+          content={
+            lead.next_follow_up_at
+              ? `Follow-up ${formatRelative(lead.next_follow_up_at)}`
+              : `Source: ${LEAD_SOURCE_LABELS[lead.source]}`
+          }
+        >
+          <span
+            className={cn("money inline-flex shrink-0 items-center gap-1", overdue && "font-semibold text-danger-fg")}
+          >
             <CalendarClock className="size-3" aria-hidden="true" />
             {lead.next_follow_up_at ? formatRelative(lead.next_follow_up_at) : LEAD_SOURCE_LABELS[lead.source]}
           </span>

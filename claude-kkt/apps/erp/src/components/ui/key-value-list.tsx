@@ -23,21 +23,52 @@ export interface KeyValueListProps {
 
 const COLUMNS = { 1: "sm:grid-cols-1", 2: "sm:grid-cols-2", 3: "sm:grid-cols-3" } as const;
 
-export function KeyValueList({ items, columns = 2, layout = "stacked", divided = true, className, emptyText = "—" }: KeyValueListProps) {
+export function KeyValueList({
+  items,
+  columns = 2,
+  layout = "stacked",
+  divided = true,
+  className,
+  emptyText = "—",
+}: KeyValueListProps) {
   return (
-    <dl className={cn("grid grid-cols-1", layout === "stacked" ? cn("gap-x-6 gap-y-3", COLUMNS[columns]) : "gap-0", className)}>
+    <dl
+      className={cn(
+        "grid grid-cols-1",
+        layout === "stacked" ? cn("gap-x-6 gap-y-3", COLUMNS[columns]) : "gap-0",
+        className,
+      )}
+    >
       {items.map((item, index) => (
         <div
           key={index}
           className={cn(
             "min-w-0",
             item.full && "sm:col-span-full",
-            layout === "inline" && cn("flex items-baseline justify-between gap-4 py-2", divided && index > 0 && "border-t border-border"),
+            layout === "inline" &&
+              cn("flex items-baseline justify-between gap-4 py-2", divided && index > 0 && "border-t border-border"),
           )}
         >
-          <dt className={cn("label-caps", layout === "inline" && "shrink-0 normal-case tracking-normal text-xs font-medium")}>{item.label}</dt>
-          <dd className={cn("mt-0.5 min-w-0 break-words text-sm text-ink", item.numeric && "money text-right", layout === "inline" && "mt-0 text-right font-medium")}>
-            {item.value === null || item.value === undefined || item.value === "" ? <span className="text-ink-subtle">{emptyText}</span> : item.value}
+          <dt
+            className={cn(
+              "label-caps",
+              layout === "inline" && "shrink-0 normal-case tracking-normal text-xs font-medium",
+            )}
+          >
+            {item.label}
+          </dt>
+          <dd
+            className={cn(
+              "mt-0.5 min-w-0 break-words text-sm text-ink",
+              item.numeric && "money text-right",
+              layout === "inline" && "mt-0 text-right font-medium",
+            )}
+          >
+            {item.value === null || item.value === undefined || item.value === "" ? (
+              <span className="text-ink-subtle">{emptyText}</span>
+            ) : (
+              item.value
+            )}
           </dd>
         </div>
       ))}

@@ -35,8 +35,7 @@ export const SIZES = {
 } as const;
 
 /** Simple luxury gradient placeholder used when a project has no image yet. */
-export const PLACEHOLDER_GRADIENT =
-  "linear-gradient(135deg, #0b1f3a 0%, #152849 45%, #2f477a 75%, #c9a227 140%)";
+export const PLACEHOLDER_GRADIENT = "linear-gradient(135deg, #0b1f3a 0%, #152849 45%, #2f477a 75%, #c9a227 140%)";
 
 export type VideoProvider = "youtube" | "vimeo" | "generic";
 
@@ -62,7 +61,11 @@ export function parseVideoUrl(raw: string): EmbedInfo | null {
     let id: string | null = null;
     if (host === "youtu.be") id = url.pathname.slice(1).split("/")[0] ?? null;
     else if (url.pathname.startsWith("/watch")) id = url.searchParams.get("v");
-    else if (url.pathname.startsWith("/embed/") || url.pathname.startsWith("/shorts/") || url.pathname.startsWith("/live/"))
+    else if (
+      url.pathname.startsWith("/embed/") ||
+      url.pathname.startsWith("/shorts/") ||
+      url.pathname.startsWith("/live/")
+    )
       id = url.pathname.split("/")[2] ?? null;
     if (!id || !/^[\w-]{6,20}$/.test(id)) return null;
     return {
@@ -75,7 +78,10 @@ export function parseVideoUrl(raw: string): EmbedInfo | null {
   }
 
   if (host === "vimeo.com" || host === "player.vimeo.com") {
-    const id = url.pathname.split("/").filter(Boolean).find((seg) => /^\d{5,}$/.test(seg));
+    const id = url.pathname
+      .split("/")
+      .filter(Boolean)
+      .find((seg) => /^\d{5,}$/.test(seg));
     if (!id) return null;
     return {
       provider: "vimeo",

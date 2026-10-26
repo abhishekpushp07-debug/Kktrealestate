@@ -15,12 +15,24 @@ describe("scope helpers", () => {
   it("ensureProjectAccess throws 404 (never 403) outside scope", () => {
     expect(() => ensureProjectAccess(all, "zzz")).not.toThrow();
     expect(() => ensureProjectAccess(scoped, "a")).not.toThrow();
-    try { ensureProjectAccess(scoped, "b"); throw new Error("expected throw"); } catch (e) { expect(e).toBeInstanceOf(ApiError); expect((e as ApiError).statusCode).toBe(404); }
+    try {
+      ensureProjectAccess(scoped, "b");
+      throw new Error("expected throw");
+    } catch (e) {
+      expect(e).toBeInstanceOf(ApiError);
+      expect((e as ApiError).statusCode).toBe(404);
+    }
     expect(() => ensureProjectAccess(scoped, null)).toThrow(ApiError);
   });
   it("assertPermission throws 403 FORBIDDEN", () => {
     const user = { permissions: new Set(["master.read"]) };
     expect(() => assertPermission(user, "master.read")).not.toThrow();
-    try { assertPermission(user, "master.write"); throw new Error("expected throw"); } catch (e) { expect((e as ApiError).statusCode).toBe(403); expect((e as ApiError).code).toBe("FORBIDDEN"); }
+    try {
+      assertPermission(user, "master.write");
+      throw new Error("expected throw");
+    } catch (e) {
+      expect((e as ApiError).statusCode).toBe(403);
+      expect((e as ApiError).code).toBe("FORBIDDEN");
+    }
   });
 });

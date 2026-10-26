@@ -17,22 +17,48 @@ describe("website form fields wire aria-invalid / aria-describedby to the error 
         <Input id="name" />
       </Field>,
     );
-    expect(attrs(html, "input")).toMatchObject({ id: "name", "aria-invalid": "true", "aria-describedby": "name-error", "aria-required": "true" });
-    expect(html).toContain('<p id="name-error" class="mt-1.5 text-sm text-danger" role="alert">Please enter your name.</p>');
+    expect(attrs(html, "input")).toMatchObject({
+      id: "name",
+      "aria-invalid": "true",
+      "aria-describedby": "name-error",
+      "aria-required": "true",
+    });
+    expect(html).toContain(
+      '<p id="name-error" class="mt-1.5 text-sm text-danger" role="alert">Please enter your name.</p>',
+    );
   });
 
   it("the hint describes the control when there is no error; textareas and selects are wired the same way", () => {
-    const t = renderToStaticMarkup(<Field label="Message" htmlFor="msg" hint="Optional"><Textarea id="msg" /></Field>);
+    const t = renderToStaticMarkup(
+      <Field label="Message" htmlFor="msg" hint="Optional">
+        <Textarea id="msg" />
+      </Field>,
+    );
     expect(attrs(t, "textarea")["aria-describedby"]).toBe("msg-hint");
     expect(attrs(t, "textarea")["aria-invalid"]).toBeUndefined();
-    const s = renderToStaticMarkup(<Field label="BHK" htmlFor="bhk" error="Pick one"><Select id="bhk"><option>2</option></Select></Field>);
+    const s = renderToStaticMarkup(
+      <Field label="BHK" htmlFor="bhk" error="Pick one">
+        <Select id="bhk">
+          <option>2</option>
+        </Select>
+      </Field>,
+    );
     expect(attrs(s, "select")).toMatchObject({ "aria-invalid": "true", "aria-describedby": "bhk-error" });
   });
 
   it("a control's own aria-describedby keeps the error in the description (merged, never replaced); other controls are untouched", () => {
-    const html = renderToStaticMarkup(<Field label="Phone" htmlFor="phone" error="Bad"><Input id="phone" aria-describedby="custom" /><Input id="other" /></Field>);
+    const html = renderToStaticMarkup(
+      <Field label="Phone" htmlFor="phone" error="Bad">
+        <Input id="phone" aria-describedby="custom" />
+        <Input id="other" />
+      </Field>,
+    );
     expect(attrs(html, "input")["aria-describedby"]).toBe("custom phone-error");
-    const same = renderToStaticMarkup(<Field label="Phone" htmlFor="p2" error="Bad"><Input id="p2" aria-describedby="p2-error" /></Field>);
+    const same = renderToStaticMarkup(
+      <Field label="Phone" htmlFor="p2" error="Bad">
+        <Input id="p2" aria-describedby="p2-error" />
+      </Field>,
+    );
     expect(attrs(same, "input")["aria-describedby"]).toBe("p2-error");
     expect(html).toMatch(/<input[^>]*id="other"(?![^>]*aria-invalid)[^>]*>/);
   });

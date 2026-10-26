@@ -39,7 +39,11 @@ export interface SweepResult {
 }
 
 /** Applies the retraction rule to the first `batch` notifications matching `stale`; returns how many it looked at. */
-async function retractBatch(db: Executor, stale: SQL, batch: number): Promise<{ seen: number; deleted: number; withdrawn: number }> {
+async function retractBatch(
+  db: Executor,
+  stale: SQL,
+  batch: number,
+): Promise<{ seen: number; deleted: number; withdrawn: number }> {
   const rows = await db.execute<{ seen: number; deleted: number; withdrawn: number }>(sql`
     with stale as (
       select n.id, n.is_read from notifications n
@@ -71,8 +75,14 @@ export async function sweepNotifications(db: Executor, batch = SWEEP_BATCH): Pro
   };
   for (const [entityType, target] of Object.entries(SWEEP_TARGETS)) {
     const live = target.live ? sql.raw(` and ${target.live}`) : sql``;
-    await run(entityType, sql`n.entity_type = ${entityType} and n.entity_id is not null and not exists (select 1 from ${sql.identifier(target.table)} t where t.id = n.entity_id${live})`);
+    await run(
+      entityType,
+      sql`n.entity_type = ${entityType} and n.entity_id is not null and not exists (select 1 from ${sql.identifier(target.table)} t where t.id = n.entity_id${live})`,
+    );
   }
-  await run("recipient:customer", sql`n.recipient_type = 'CUSTOMER' and not exists (select 1 from customers c where c.id = n.recipient_id and c.erased_at is null)`);
+  await run(
+    "recipient:customer",
+    sql`n.recipient_type = 'CUSTOMER' and not exists (select 1 from customers c where c.id = n.recipient_id and c.erased_at is null)`,
+  );
   return out;
 }

@@ -12,8 +12,12 @@ const NotFoundPage = lazy(() => import("@/pages/NotFoundPage"));
 
 // Master data
 const MastersLayout = lazy(() => import("@/features/masters/MastersLayout"));
-const MastersIndexRedirect = lazy(() => import("@/features/masters/MastersLayout").then((module) => ({ default: module.MastersIndexRedirect })));
-const MasterAliasRedirect = lazy(() => import("@/features/masters/MastersLayout").then((module) => ({ default: module.MasterAliasRedirect })));
+const MastersIndexRedirect = lazy(() =>
+  import("@/features/masters/MastersLayout").then((module) => ({ default: module.MastersIndexRedirect })),
+);
+const MasterAliasRedirect = lazy(() =>
+  import("@/features/masters/MastersLayout").then((module) => ({ default: module.MasterAliasRedirect })),
+);
 const MasterListPage = lazy(() => import("@/features/masters/MasterListPage"));
 
 // Inventory
@@ -326,7 +330,13 @@ export function AppRoutes() {
           }
           const Page = PAGES_BY_NAV_ID[item.id];
           if (!Page) return null;
-          return <Route key={item.id} path={item.exact ? item.to : `${item.to}/*`} element={<PermissionRoute permission={item.permission}>{<Page />}</PermissionRoute>} />;
+          return (
+            <Route
+              key={item.id}
+              path={item.exact ? item.to : `${item.to}/*`}
+              element={<PermissionRoute permission={item.permission}>{<Page />}</PermissionRoute>}
+            />
+          );
         })}
 
         {/* CMS routes outside the nav tree. */}

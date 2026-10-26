@@ -8,7 +8,12 @@ export async function LegalPageView({ slug, eyebrow }: { slug: string; eyebrow: 
   const page = await getPage(slug);
   return (
     <>
-      <PageHeader eyebrow={eyebrow} title={page.title} lead={page.updated_at ? `Last updated ${formatDate(page.updated_at)}` : undefined} compact />
+      <PageHeader
+        eyebrow={eyebrow}
+        title={page.title}
+        lead={page.updated_at ? `Last updated ${formatDate(page.updated_at)}` : undefined}
+        compact
+      />
       <div className="container-site py-12 sm:py-16">
         <Markdown source={page.body_md} className="prose-kkt mx-auto max-w-prose" />
       </div>

@@ -57,10 +57,28 @@ export interface SeedOptions {
 }
 
 /** Tables that survive a reseed: identity, audit trail, staff sessions and the job-run history (operational, not demo data). */
-export const RESEED_KEEP_TABLES = new Set(["companies", "roles", "users", "audit_logs", "refresh_tokens", "login_events", "password_history", "job_runs"]);
+export const RESEED_KEEP_TABLES = new Set([
+  "companies",
+  "roles",
+  "users",
+  "audit_logs",
+  "refresh_tokens",
+  "login_events",
+  "password_history",
+  "job_runs",
+]);
 
 /** Redis key prefixes that cache rows the reseed replaces. */
-const RESEED_REDIS_PREFIXES = ["idem:", "company:", "perm:user:", "perm:portal:", "pub:", "dash:", "visit:", "job:running:"];
+const RESEED_REDIS_PREFIXES = [
+  "idem:",
+  "company:",
+  "perm:user:",
+  "perm:portal:",
+  "pub:",
+  "dash:",
+  "visit:",
+  "job:running:",
+];
 
 async function hasProjects(app: FastifyInstance): Promise<boolean> {
   const [row] = await app.sql<{ n: number }[]>`select count(*)::int as n from projects`;
@@ -119,11 +137,17 @@ async function runDemoSeed(app: FastifyInstance, log: (msg: string) => void, sta
     await seedService(ctx);
     // the seeded ledgers end in the canonical posting order (LEDGER_REBUILD; a no-op when they already are), before validation
     const canonical = await rebuildAllLedgers(app.db, { companyId: boot.companyId });
-    log(`ledgers canonical: ${canonical.bookings_checked} checked, ${canonical.bookings_rebuilt} rebuilt (${canonical.order_changed_count} reordered)`);
+    log(
+      `ledgers canonical: ${canonical.bookings_checked} checked, ${canonical.bookings_rebuilt} rebuilt (${canonical.order_changed_count} reordered)`,
+    );
     const integrity = (await validateSeed(ctx)) as IntegrityReportResponse;
     await invalidate(app.redis, "pub:");
     await invalidate(app.redis, "dash:");
-    log(`seed complete in ${Math.round((Date.now() - started) / 1000)} s: ${Object.entries(ctx.counts).map(([k, v]) => `${k}=${v}`).join(", ")}`);
+    log(
+      `seed complete in ${Math.round((Date.now() - started) / 1000)} s: ${Object.entries(ctx.counts)
+        .map(([k, v]) => `${k}=${v}`)
+        .join(", ")}`,
+    );
     return { skipped: false, counts: ctx.counts, integrity, durationMs: Date.now() - started };
   } finally {
     config.WRITE_RATE_LIMIT_PER_MIN = writeLimit;
@@ -137,7 +161,10 @@ async function runDemoSeed(app: FastifyInstance, log: (msg: string) => void, sta
 /** Truncates every business table (keeping identity + audit) inside one transaction; the append-only guards stay active. */
 export async function truncateBusinessTables(app: FastifyInstance): Promise<string[]> {
   const rows = await app.sql<{ tablename: string }[]>`select tablename from pg_tables where schemaname = 'public'`;
-  const tables = rows.map((r) => r.tablename).filter((t) => !RESEED_KEEP_TABLES.has(t)).sort();
+  const tables = rows
+    .map((r) => r.tablename)
+    .filter((t) => !RESEED_KEEP_TABLES.has(t))
+    .sort();
   if (tables.length === 0) return [];
   // No trigger is bypassed (the app may run as a non-superuser role): TRUNCATE fires no row-level DELETE guard, and audit_logs — the only
   // table with a TRUNCATE guard — is kept.
@@ -155,7 +182,10 @@ export async function truncateBusinessTables(app: FastifyInstance): Promise<stri
  * Guarded reseed (POST /admin/reseed): restores EXACTLY the docs/SEED.md state. Needs a built app to drive the API; when the caller
  * has none (CLI, tests) one is built and closed here. Never allowed in production (the route enforces it; this function re-checks).
  */
-export async function reseed(db: DB, opts: { app?: FastifyInstance; log?: (msg: string) => void } = {}): Promise<{ counts: Record<string, number>; integrity?: IntegrityReportResponse; truncated: string[] }> {
+export async function reseed(
+  db: DB,
+  opts: { app?: FastifyInstance; log?: (msg: string) => void } = {},
+): Promise<{ counts: Record<string, number>; integrity?: IntegrityReportResponse; truncated: string[] }> {
   if (config.NODE_ENV === "production") throw new Error("reseed is disabled when NODE_ENV=production");
   const log = opts.log ?? ((msg: string) => logger.info({ seed: true }, msg));
   let app = opts.app;
@@ -173,7 +203,14 @@ export async function reseed(db: DB, opts: { app?: FastifyInstance; log?: (msg: 
     await bumpPermVersion(app.redis);
     const boot = await ensureBootstrap(db, { mode: "demo" });
     await app.db.transaction(async (tx) => {
-      await writeAudit(tx, { companyId: boot.companyId, actor: { type: "SYSTEM", id: null, name: "reseed" }, action: "admin.reseed", entityType: "company", entityId: boot.companyId, after: { truncated_tables: truncated.length, bootstrap_created: boot.created } });
+      await writeAudit(tx, {
+        companyId: boot.companyId,
+        actor: { type: "SYSTEM", id: null, name: "reseed" },
+        action: "admin.reseed",
+        entityType: "company",
+        entityId: boot.companyId,
+        after: { truncated_tables: truncated.length, bootstrap_created: boot.created },
+      });
     });
     const result = await seedDemo(app, { force: true, log });
     return { counts: result.counts, integrity: result.integrity, truncated };
@@ -191,14 +228,19 @@ async function main(): Promise<void> {
   await app.ready();
   try {
     const boot = await ensureBootstrap(app.db);
-    logger.info({ companyId: boot.companyId, created: boot.created, mode: boot.mode, admin: boot.adminEmail }, "bootstrap seed ensured");
+    logger.info(
+      { companyId: boot.companyId, created: boot.created, mode: boot.mode, admin: boot.adminEmail },
+      "bootstrap seed ensured",
+    );
     const force = process.argv.includes("--force");
     if (force) {
       await reseed(app.db, { app });
     } else {
       const result = await seedDemo(app);
-      if (result.refused) logger.warn("demo data not created: production (set SEED_DEMO=true to seed a demo deployment)");
-      else if (result.skipped) logger.warn("demo data already present (run with --force to drop business data and reseed)");
+      if (result.refused)
+        logger.warn("demo data not created: production (set SEED_DEMO=true to seed a demo deployment)");
+      else if (result.skipped)
+        logger.warn("demo data already present (run with --force to drop business data and reseed)");
     }
   } catch (err) {
     if (err instanceof BootstrapRefused) logger.fatal(err.message);

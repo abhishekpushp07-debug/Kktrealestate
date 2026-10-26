@@ -114,5 +114,8 @@ export function buildSchedulePreview(
       total_paise: cash + account,
     };
   });
-  return { rows, totals: { cash_paise: cashSoFar, account_paise: accountSoFar, total_paise: cashSoFar + accountSoFar } };
+  return {
+    rows,
+    totals: { cash_paise: cashSoFar, account_paise: accountSoFar, total_paise: cashSoFar + accountSoFar },
+  };
 }

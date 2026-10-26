@@ -14,7 +14,8 @@ export function isClosed(site: SiteSettings | null): site is SiteSettings {
   return site !== null && site.site_live === false;
 }
 
-export type SiteGate = { closed: false; site: SiteSettings | null } | { closed: true; site: SiteSettings; page: React.ReactElement };
+export type SiteGate =
+  { closed: false; site: SiteSettings | null } | { closed: true; site: SiteSettings; page: React.ReactElement };
 
 export async function siteGate(): Promise<SiteGate> {
   const site = await getSiteSettings();

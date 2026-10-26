@@ -30,6 +30,12 @@ export const SERIES_COLORS = { cash: "#24569a", account: "#c9a227", other: "#0f9
 export const ORDINAL_RAMP = ["#8ea9d1", "#5c80b5", "#3a5f98", "#1c4882", "#0b1f3a"] as const;
 
 /** Status palette (reserved meanings) for inventory stacks. */
-export const STATUS_COLORS = { available: "#10b981", hold: "#f59e0b", booked: "#163866", sold: "#c9a227", blocked: "#9ca3af" } as const;
+export const STATUS_COLORS = {
+  available: "#10b981",
+  hold: "#f59e0b",
+  booked: "#163866",
+  sold: "#c9a227",
+  blocked: "#9ca3af",
+} as const;
 
 export const CHART_INK = { grid: "#e5e9f0", axis: "#6b7280", text: "#0b1f3a" } as const;

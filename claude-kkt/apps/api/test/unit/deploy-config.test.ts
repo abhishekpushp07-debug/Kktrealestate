@@ -27,32 +27,40 @@ afterAll(() => {
 
 /** Compose variable interpolation: ${VAR}, ${VAR:-default}, ${VAR-default}, ${VAR:?error}, ${VAR?error}, $$. */
 function interpolate(text: string, vars: Record<string, string | undefined>): string {
-  return text.replace(/\$\$|\$\{([A-Za-z0-9_]+)(?:(:?)([-?])([^}]*))?\}/g, (whole, name: string | undefined, colon: string, op: string, arg: string) => {
-    if (whole === "$$") return "$";
-    const v = vars[name!];
-    const missing = v === undefined || (colon === ":" && v === "");
-    if (op === "?" && missing) throw new Error(`required variable ${name} is missing a value: ${arg}`);
-    if (op === "-" && missing) return arg;
-    return v ?? "";
-  });
+  return text.replace(
+    /\$\$|\$\{([A-Za-z0-9_]+)(?:(:?)([-?])([^}]*))?\}/g,
+    (whole, name: string | undefined, colon: string, op: string, arg: string) => {
+      if (whole === "$$") return "$";
+      const v = vars[name!];
+      const missing = v === undefined || (colon === ":" && v === "");
+      if (op === "?" && missing) throw new Error(`required variable ${name} is missing a value: ${arg}`);
+      if (op === "-" && missing) return arg;
+      return v ?? "";
+    },
+  );
 }
 
 type ComposeService = { environment?: Record<string, string | number | null> | string[] };
 
 function composeServices(file: string, vars: Record<string, string>): Record<string, ComposeService> {
-  const doc = YAML.parse(interpolate(readFileSync(join(ROOT, file), "utf8"), vars), { merge: true }) as { services: Record<string, ComposeService> };
+  const doc = YAML.parse(interpolate(readFileSync(join(ROOT, file), "utf8"), vars), { merge: true }) as {
+    services: Record<string, ComposeService>;
+  };
   return doc.services;
 }
 
 function envOf(svc: ComposeService): Record<string, string> {
   const raw = svc.environment ?? {};
-  const pairs = Array.isArray(raw) ? raw.map((e) => e.split(/=(.*)/s).slice(0, 2) as [string, string]) : Object.entries(raw).map(([k, v]) => [k, v === null ? "" : String(v)] as [string, string]);
+  const pairs = Array.isArray(raw)
+    ? raw.map((e) => e.split(/=(.*)/s).slice(0, 2) as [string, string])
+    : Object.entries(raw).map(([k, v]) => [k, v === null ? "" : String(v)] as [string, string]);
   return Object.fromEntries(pairs);
 }
 
 /** Secret files as mounted in the containers (/run/secrets/<name> in Compose, /run/secrets/kkt/<name> in Kubernetes). */
 function readSecret(path: string): string {
-  if (!path.startsWith("/run/secrets/")) throw Object.assign(new Error(`unexpected secret path ${path}`), { code: "ENOENT" });
+  if (!path.startsWith("/run/secrets/"))
+    throw Object.assign(new Error(`unexpected secret path ${path}`), { code: "ENOENT" });
   return readFileSync(join(secretsDir, basename(path)), "utf8");
 }
 
@@ -65,8 +73,12 @@ const host = (url: string) => `${new URL(url).hostname}:${new URL(url).port}`;
 
 describe("docker-compose.yml (quick start)", () => {
   const vars = {
-    JWT_SECRET: "j".repeat(96), FIELD_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64"), HASH_KEY: "h".repeat(64),
-    POSTGRES_PASSWORD: "pg0123456789abcdef", KKT_OWNER_DB_PASSWORD: "owner0123456789abcdef", KKT_APP_DB_PASSWORD: "app0123456789abcdef",
+    JWT_SECRET: "j".repeat(96),
+    FIELD_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64"),
+    HASH_KEY: "h".repeat(64),
+    POSTGRES_PASSWORD: "pg0123456789abcdef",
+    KKT_OWNER_DB_PASSWORD: "owner0123456789abcdef",
+    KKT_APP_DB_PASSWORD: "app0123456789abcdef",
   };
 
   it("api, worker and migrate boot; replicas never migrate, seed or run jobs; only migrate uses the owner role", () => {
@@ -93,7 +105,11 @@ describe("docker-compose.yml (quick start)", () => {
 });
 
 describe("docker-compose.prod.yml", () => {
-  const vars = { DOMAIN: "kkt.example.in", BOOTSTRAP_COMPANY_NAME: "Example Builders", BOOTSTRAP_ADMIN_EMAIL: "owner@kkt.example.in" };
+  const vars = {
+    DOMAIN: "kkt.example.in",
+    BOOTSTRAP_COMPANY_NAME: "Example Builders",
+    BOOTSTRAP_ADMIN_EMAIL: "owner@kkt.example.in",
+  };
 
   it("api, worker and migrate boot with the gen-secrets.sh files; API/worker via PgBouncer as kkt_app, migrate direct as kkt_owner", () => {
     const s = composeServices("docker-compose.prod.yml", vars);
@@ -120,7 +136,9 @@ describe("docker-compose.prod.yml", () => {
   });
 
   it("stops at render time when BOOTSTRAP_ADMIN_EMAIL is missing (the password file is always mounted, so migrate could never boot)", () => {
-    expect(() => composeServices("docker-compose.prod.yml", { ...vars, BOOTSTRAP_ADMIN_EMAIL: "" })).toThrow(/BOOTSTRAP_ADMIN_EMAIL/);
+    expect(() => composeServices("docker-compose.prod.yml", { ...vars, BOOTSTRAP_ADMIN_EMAIL: "" })).toThrow(
+      /BOOTSTRAP_ADMIN_EMAIL/,
+    );
   });
 
   it("generated secret files are readable by the non-root containers that bind-mount them; the directory is private", () => {
@@ -129,23 +147,33 @@ describe("docker-compose.prod.yml", () => {
   });
 
   it("every secret the stack mounts is produced by gen-secrets.sh", () => {
-    const doc = YAML.parse(interpolate(readFileSync(join(ROOT, "docker-compose.prod.yml"), "utf8"), vars), { merge: true }) as { secrets: Record<string, { file: string }> };
-    for (const [name, def] of Object.entries(doc.secrets)) expect(() => readFileSync(join(secretsDir, basename(def.file))), name).not.toThrow();
+    const doc = YAML.parse(interpolate(readFileSync(join(ROOT, "docker-compose.prod.yml"), "utf8"), vars), {
+      merge: true,
+    }) as { secrets: Record<string, { file: string }> };
+    for (const [name, def] of Object.entries(doc.secrets))
+      expect(() => readFileSync(join(secretsDir, basename(def.file))), name).not.toThrow();
   });
 });
 
 describe("infra/k8s (Secret created from the gen-secrets.sh files, as docs/DEPLOY.md describes)", () => {
   type Container = { name: string; env?: { name: string; value?: string; valueFrom?: unknown }[]; envFrom?: unknown[] };
-  type Workload = { kind: string; metadata: { name: string }; spec: { template?: { spec: { containers: Container[] } }; data?: never } };
+  type Workload = {
+    kind: string;
+    metadata: { name: string };
+    spec: { template?: { spec: { containers: Container[] } }; data?: never };
+  };
 
   function workloads(): { config: Record<string, string>; containers: Record<string, Container> } {
     const docs: Workload[] = [];
     for (const f of ["configmap.yaml", "api.yaml", "worker.yaml", "migrate-job.yaml"]) {
-      for (const d of YAML.parseAllDocuments(readFileSync(join(ROOT, "infra", "k8s", f), "utf8"))) docs.push(d.toJSON() as Workload);
+      for (const d of YAML.parseAllDocuments(readFileSync(join(ROOT, "infra", "k8s", f), "utf8")))
+        docs.push(d.toJSON() as Workload);
     }
     const cm = docs.find((d) => d.kind === "ConfigMap") as unknown as { data: Record<string, string> };
     const containers: Record<string, Container> = {};
-    for (const d of docs) if (d.kind === "Deployment" || d.kind === "Job") containers[d.metadata.name] = d.spec.template!.spec.containers[0]!;
+    for (const d of docs)
+      if (d.kind === "Deployment" || d.kind === "Job")
+        containers[d.metadata.name] = d.spec.template!.spec.containers[0]!;
     return { config: cm.data, containers };
   }
 

@@ -464,7 +464,7 @@
                                     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
                                     "type": "string"
                                   },
-                                  "status": { "enum": ["RUNNING", "OK", "FAILED"], "type": "string" }
+                                  "status": { "enum": ["RUNNING", "OK", "FAILED", "ABANDONED"], "type": "string" }
                                 },
                                 "required": [
                                   "id",
@@ -517,7 +517,7 @@
                                     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
                                     "type": "string"
                                   },
-                                  "status": { "enum": ["RUNNING", "OK", "FAILED"], "type": "string" }
+                                  "status": { "enum": ["RUNNING", "OK", "FAILED", "ABANDONED"], "type": "string" }
                                 },
                                 "required": [
                                   "id",
@@ -550,7 +550,9 @@
                               "EXPORT_CSV",
                               "EXPORT_CLEANUP",
                               "BACKUP_EXPORT",
-                              "PARTITION_MAINTENANCE"
+                              "PARTITION_MAINTENANCE",
+                              "JOB_RUN_SWEEP",
+                              "LEDGER_REBUILD"
                             ],
                             "type": "string"
                           },
@@ -621,7 +623,7 @@
                             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
                             "type": "string"
                           },
-                          "status": { "enum": ["RUNNING", "OK", "FAILED"], "type": "string" }
+                          "status": { "enum": ["RUNNING", "OK", "FAILED", "ABANDONED"], "type": "string" }
                         },
                         "required": ["id", "job_name", "started_at", "finished_at", "status", "result", "error"],
                         "type": "object"
@@ -666,7 +668,9 @@
                 "EXPORT_CSV",
                 "EXPORT_CLEANUP",
                 "BACKUP_EXPORT",
-                "PARTITION_MAINTENANCE"
+                "PARTITION_MAINTENANCE",
+                "JOB_RUN_SWEEP",
+                "LEDGER_REBUILD"
               ],
               "type": "string"
             }
@@ -711,7 +715,9 @@
                         "EXPORT_CSV",
                         "EXPORT_CLEANUP",
                         "BACKUP_EXPORT",
-                        "PARTITION_MAINTENANCE"
+                        "PARTITION_MAINTENANCE",
+                        "JOB_RUN_SWEEP",
+                        "LEDGER_REBUILD"
                       ],
                       "type": "string"
                     },
@@ -793,7 +799,9 @@
                 "EXPORT_CSV",
                 "EXPORT_CLEANUP",
                 "BACKUP_EXPORT",
-                "PARTITION_MAINTENANCE"
+                "PARTITION_MAINTENANCE",
+                "JOB_RUN_SWEEP",
+                "LEDGER_REBUILD"
               ],
               "type": "string"
             }
@@ -802,7 +810,7 @@
             "in": "query",
             "name": "status",
             "required": false,
-            "schema": { "enum": ["RUNNING", "OK", "FAILED"], "type": "string" }
+            "schema": { "enum": ["RUNNING", "OK", "FAILED", "ABANDONED"], "type": "string" }
           }
         ],
         "responses": {
@@ -844,7 +852,7 @@
                             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
                             "type": "string"
                           },
-                          "status": { "enum": ["RUNNING", "OK", "FAILED"], "type": "string" }
+                          "status": { "enum": ["RUNNING", "OK", "FAILED", "ABANDONED"], "type": "string" }
                         },
                         "required": ["id", "job_name", "started_at", "finished_at", "status", "result", "error"],
                         "type": "object"
@@ -918,7 +926,7 @@
                       "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
                       "type": "string"
                     },
-                    "status": { "enum": ["RUNNING", "OK", "FAILED"], "type": "string" }
+                    "status": { "enum": ["RUNNING", "OK", "FAILED", "ABANDONED"], "type": "string" }
                   },
                   "required": ["id", "job_name", "started_at", "finished_at", "status", "result", "error"],
                   "type": "object"
@@ -1336,7 +1344,7 @@
                                 "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
                                 "type": "string"
                               },
-                              "status": { "enum": ["RUNNING", "OK", "FAILED"], "type": "string" }
+                              "status": { "enum": ["RUNNING", "OK", "FAILED", "ABANDONED"], "type": "string" }
                             },
                             "required": ["id", "job_name", "started_at", "finished_at", "status", "result", "error"],
                             "type": "object"
@@ -4293,11 +4301,7 @@
                                   "type": "integer"
                                 },
                                 "thumb_url": { "type": ["string", "null"] },
-                                "version": {
-                                  "maximum": 9007199254740991,
-                                  "minimum": -9007199254740991,
-                                  "type": "integer"
-                                },
+                                "version": { "maximum": 9007199254740991, "minimum": 1, "type": "integer" },
                                 "visible_to_buyers": { "type": "boolean" }
                               },
                               "required": [
@@ -4310,7 +4314,8 @@
                                 "sort_order",
                                 "thumb_url",
                                 "medium_url",
-                                "created_at"
+                                "created_at",
+                                "version"
                               ],
                               "type": "object"
                             },
@@ -4556,11 +4561,7 @@
                                   "type": "integer"
                                 },
                                 "thumb_url": { "type": ["string", "null"] },
-                                "version": {
-                                  "maximum": 9007199254740991,
-                                  "minimum": -9007199254740991,
-                                  "type": "integer"
-                                },
+                                "version": { "maximum": 9007199254740991, "minimum": 1, "type": "integer" },
                                 "visible_to_buyers": { "type": "boolean" }
                               },
                               "required": [
@@ -4573,7 +4574,8 @@
                                 "sort_order",
                                 "thumb_url",
                                 "medium_url",
-                                "created_at"
+                                "created_at",
+                                "version"
                               ],
                               "type": "object"
                             },
@@ -4726,7 +4728,7 @@
                     "show_on_website": { "type": "boolean" },
                     "sort_order": { "maximum": 9007199254740991, "minimum": -9007199254740991, "type": "integer" },
                     "thumb_url": { "type": ["string", "null"] },
-                    "version": { "maximum": 9007199254740991, "minimum": -9007199254740991, "type": "integer" },
+                    "version": { "maximum": 9007199254740991, "minimum": 1, "type": "integer" },
                     "visible_to_buyers": { "type": "boolean" }
                   },
                   "required": [
@@ -4739,7 +4741,8 @@
                     "sort_order",
                     "thumb_url",
                     "medium_url",
-                    "created_at"
+                    "created_at",
+                    "version"
                   ],
                   "type": "object"
                 }
@@ -22849,6 +22852,7 @@
                   "caption": { "anyOf": [{ "maxLength": 200, "type": "string" }, { "type": "null" }] },
                   "show_on_website": { "type": "boolean" },
                   "sort_order": { "maximum": 1000, "minimum": 0, "type": "integer" },
+                  "version": { "maximum": 9007199254740991, "minimum": 1, "type": "integer" },
                   "visible_to_buyers": { "type": "boolean" }
                 },
                 "type": "object"
@@ -22889,7 +22893,7 @@
                     "show_on_website": { "type": "boolean" },
                     "sort_order": { "maximum": 9007199254740991, "minimum": -9007199254740991, "type": "integer" },
                     "thumb_url": { "type": ["string", "null"] },
-                    "version": { "maximum": 9007199254740991, "minimum": -9007199254740991, "type": "integer" },
+                    "version": { "maximum": 9007199254740991, "minimum": 1, "type": "integer" },
                     "visible_to_buyers": { "type": "boolean" }
                   },
                   "required": [
@@ -22902,7 +22906,8 @@
                     "sort_order",
                     "thumb_url",
                     "medium_url",
-                    "created_at"
+                    "created_at",
+                    "version"
                   ],
                   "type": "object"
                 }
@@ -22912,7 +22917,7 @@
           }
         },
         "security": [{ "bearerAuth": [] }],
-        "summary": "Update a stage photo's caption, flags or order (If-Match optional)",
+        "summary": "Update a stage photo's caption, flags or order (If-Match or body.version required)",
         "tags": ["construction"]
       }
     },
@@ -27323,7 +27328,8 @@
                       "type": "array"
                     },
                     "dry_run": { "type": "boolean" },
-                    "enabled": { "maximum": 9007199254740991, "minimum": 0, "type": "integer" }
+                    "enabled": { "maximum": 9007199254740991, "minimum": 0, "type": "integer" },
+                    "failed": { "maximum": 9007199254740991, "minimum": 0, "type": "integer" }
                   },
                   "required": ["dry_run", "enabled", "already_enabled", "credentials"],
                   "type": "object"
@@ -48001,7 +48007,8 @@
                 "BOOKING_CREATED",
                 "HOLD_EXPIRED",
                 "JOB_FAILED",
-                "EXPORT_READY"
+                "EXPORT_READY",
+                "SECURITY_ALERT"
               ],
               "type": "string"
             }
@@ -48083,7 +48090,8 @@
                               "BOOKING_CREATED",
                               "HOLD_EXPIRED",
                               "JOB_FAILED",
-                              "EXPORT_READY"
+                              "EXPORT_READY",
+                              "SECURITY_ALERT"
                             ],
                             "type": "string"
                           }
@@ -48210,7 +48218,8 @@
                         "BOOKING_CREATED",
                         "HOLD_EXPIRED",
                         "JOB_FAILED",
-                        "EXPORT_READY"
+                        "EXPORT_READY",
+                        "SECURITY_ALERT"
                       ],
                       "type": "string"
                     }
@@ -52940,7 +52949,8 @@
                 "BOOKING_CREATED",
                 "HOLD_EXPIRED",
                 "JOB_FAILED",
-                "EXPORT_READY"
+                "EXPORT_READY",
+                "SECURITY_ALERT"
               ],
               "type": "string"
             }
@@ -53026,7 +53036,8 @@
                               "BOOKING_CREATED",
                               "HOLD_EXPIRED",
                               "JOB_FAILED",
-                              "EXPORT_READY"
+                              "EXPORT_READY",
+                              "SECURITY_ALERT"
                             ],
                             "type": "string"
                           }

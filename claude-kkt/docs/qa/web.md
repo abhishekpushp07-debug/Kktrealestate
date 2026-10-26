@@ -54,6 +54,14 @@ axe 4.14 reports a few `color-contrast` nodes in the visit section of the projec
 
 `node docs/qa/contrast.mjs web` reads the `@theme` tokens from `app/globals.css` and checks every text/background pair the site uses: **39/39 pass** (table in `docs/qa/contrast-results.md`, enforced by `apps/web/test/contrast.test.ts`). Token changes: `ink-soft` #6e7b91 → #5b677a (3.96 → 5.30:1 on ivory-100), eyebrows and gold text from `gold-600` to `gold-700` #7f6318 (3.19 → 5.25:1), `success` #1f7a4d → #1d734a; the gold reference numbers on the enquiry / visit success cards use `gold-700` (light) or `gold-300` (dark). Review pass: the form fields (`components/ui/Field.tsx`) had a 1.36:1 border (navy-900/15), a 3.04:1 placeholder (ink-soft/70) and a 2.42:1 gold-500 focus border/ring with the outline removed — now navy-900/55 (3.79:1), ink-soft (5.59:1) and a gold-700 border + 2 px ring (5.68:1); the consent checkbox accent is gold-700; a control's own `aria-describedby` is merged with the field's error id instead of replacing it. Re-run after the change (`ONLY=static,enquiry,visit,security`): 36 audits, 117/117 checks, 36 axe scans with 0 serious/critical, visit submit 56 px (the check is now ≥ 48 px).
 
+## Verify stage 2026-10-26 (phase 5)
+
+The brochure gate now mounts per opening and the visit form derives its loading state from the request it answers (lint refactors).
+Stack: API bundle on `:4710` (fresh demo seed in `kkt_h7`, Redis db 23), website `next build` + `next start` on `:3710`
+(`NEXT_PUBLIC_API_URL=API_INTERNAL_URL=http://localhost:4710`); runner `ONLY=static,enquiry,brochure,visit,security`, `OUT_DIR` outside
+the repo. **Result: 40 page audits, 128/128 checks, 0 defects, 40 axe scans with 0 serious/critical.** The previous manage link of a
+rescheduled visit now answers **410** (the API keeps the hash of replaced tokens), and the page shows the expired-link view.
+
 ## Result (2026-10-25 run)
 
 **39 page audits (39 screenshots, all ≤ 300 KB), 88/88 page checks and 42/42 flow checks pass** after the fixes below: zero console errors, zero failed requests, no horizontal overflow at 390 px and no interactive target under 44 px on any audited page. Earlier runs of the same script found the defects listed further down; the fixes were verified by re-running the full suite.

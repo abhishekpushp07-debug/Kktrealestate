@@ -1,7 +1,19 @@
 import { and, eq } from "drizzle-orm";
 import type { FastifyRequest } from "fastify";
 import { todayIST } from "@kkt/domain";
-import { blocks, bookings, companies, flats, ledgerEntries, withAdvisoryLock, withTransactionRetry, type Address, type DB, type Executor, type Tx } from "@kkt/db";
+import {
+  blocks,
+  bookings,
+  companies,
+  flats,
+  ledgerEntries,
+  withAdvisoryLock,
+  withTransactionRetry,
+  type Address,
+  type DB,
+  type Executor,
+  type Tx,
+} from "@kkt/db";
 import { actorFromRequest, SYSTEM_ACTOR, type AuditActor } from "../../lib/audit.js";
 import { ApiError } from "../../lib/errors.js";
 import type { NumberingCompany } from "../../lib/numbering.js";
@@ -70,8 +82,18 @@ export function numberingOf(c: CompanyRecord): NumberingCompany {
 }
 
 /** Loads a booking of the company (404 when missing), optionally locked FOR UPDATE. */
-export async function loadBooking(tx: Executor, companyId: string, id: string, forUpdate = false): Promise<BookingRecord> {
-  const q = tx.select().from(bookings).where(and(eq(bookings.id, id), eq(bookings.companyId, companyId))).limit(1).$dynamic();
+export async function loadBooking(
+  tx: Executor,
+  companyId: string,
+  id: string,
+  forUpdate = false,
+): Promise<BookingRecord> {
+  const q = tx
+    .select()
+    .from(bookings)
+    .where(and(eq(bookings.id, id), eq(bookings.companyId, companyId)))
+    .limit(1)
+    .$dynamic();
   const rows = await (forUpdate ? q.for("update") : q);
   const row = rows[0];
   if (!row) throw ApiError.notFound("Booking");
@@ -87,7 +109,12 @@ export async function lockBooking(tx: Tx, bookingId: string, clock?: Clock): Pro
   await tx.select({ id: bookings.id }).from(bookings).where(eq(bookings.id, bookingId)).for("update");
   await withAdvisoryLock(tx, `booking:${bookingId}`);
   if (clock) {
-    const [last] = await tx.select({ at: ledgerEntries.at }).from(ledgerEntries).where(eq(ledgerEntries.bookingId, bookingId)).orderBy(desc(ledgerEntries.seq)).limit(1);
+    const [last] = await tx
+      .select({ at: ledgerEntries.at })
+      .from(ledgerEntries)
+      .where(eq(ledgerEntries.bookingId, bookingId))
+      .orderBy(desc(ledgerEntries.seq))
+      .limit(1);
     clock.observe(last?.at ?? null);
   }
 }
@@ -105,7 +132,11 @@ export async function lockBookingsInOrder(tx: Tx, bookingIds: readonly string[])
 
 /** Locks the flat row and then the block row of a booking (lock order above) before the booking itself is locked. */
 export async function lockFlatAndBlockOf(tx: Tx, companyId: string, bookingId: string): Promise<void> {
-  const [b] = await tx.select({ flatId: bookings.flatId, blockId: bookings.blockId }).from(bookings).where(and(eq(bookings.id, bookingId), eq(bookings.companyId, companyId))).limit(1);
+  const [b] = await tx
+    .select({ flatId: bookings.flatId, blockId: bookings.blockId })
+    .from(bookings)
+    .where(and(eq(bookings.id, bookingId), eq(bookings.companyId, companyId)))
+    .limit(1);
   if (!b) return; // the caller's own loader answers 404
   await tx.select({ id: flats.id }).from(flats).where(eq(flats.id, b.flatId)).for("update");
   await tx.select({ id: blocks.id }).from(blocks).where(eq(blocks.id, b.blockId)).for("update");
@@ -123,7 +154,9 @@ export function moneyTransaction<T>(db: DB, fn: (tx: Tx) => Promise<T>): Promise
 /** Renders a postal address on one line. */
 export function formatAddress(a: Address | null | undefined): string | null {
   if (!a) return null;
-  return [a.line1, a.line2, a.locality, a.city, a.state, a.pincode].filter((p) => p && String(p).trim() !== "").join(", ");
+  return [a.line1, a.line2, a.locality, a.city, a.state, a.pincode]
+    .filter((p) => p && String(p).trim() !== "")
+    .join(", ");
 }
 
 /** ISO string of a Date or null. */
@@ -161,19 +194,42 @@ export function snapshotInstallments(snapshot: PlanSnapshot): DomainInstallment[
 
 /** The tower's stage records as the dues engine reads them. */
 export async function loadTowerStages(db: Executor, blockId: string): Promise<TowerStage[]> {
-  const rows = await db.select().from(blockStages).where(eq(blockStages.blockId, blockId)).orderBy(asc(blockStages.sortOrder));
-  return rows.map((s) => ({ stageId: s.stageId, name: s.name, isPossession: s.isPossession, status: s.status, completedOn: s.completedOn }));
+  const rows = await db
+    .select()
+    .from(blockStages)
+    .where(eq(blockStages.blockId, blockId))
+    .orderBy(asc(blockStages.sortOrder));
+  return rows.map((s) => ({
+    stageId: s.stageId,
+    name: s.name,
+    isPossession: s.isPossession,
+    status: s.status,
+    completedOn: s.completedOn,
+  }));
 }
 
 /** Tower stages for many blocks in one query, keyed by block id. */
-export async function loadTowerStagesMany(db: Executor, blockIds: readonly string[]): Promise<Map<string, TowerStage[]>> {
+export async function loadTowerStagesMany(
+  db: Executor,
+  blockIds: readonly string[],
+): Promise<Map<string, TowerStage[]>> {
   const out = new Map<string, TowerStage[]>();
   const ids = [...new Set(blockIds)];
   if (ids.length === 0) return out;
-  const rows = await db.select().from(blockStages).where(inArray(blockStages.blockId, ids)).orderBy(asc(blockStages.blockId), asc(blockStages.sortOrder));
+  const rows = await db
+    .select()
+    .from(blockStages)
+    .where(inArray(blockStages.blockId, ids))
+    .orderBy(asc(blockStages.blockId), asc(blockStages.sortOrder));
   for (const s of rows) {
     const list = out.get(s.blockId) ?? [];
-    list.push({ stageId: s.stageId, name: s.name, isPossession: s.isPossession, status: s.status, completedOn: s.completedOn });
+    list.push({
+      stageId: s.stageId,
+      name: s.name,
+      isPossession: s.isPossession,
+      status: s.status,
+      completedOn: s.completedOn,
+    });
     out.set(s.blockId, list);
   }
   return out;

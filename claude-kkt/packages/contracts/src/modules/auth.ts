@@ -1,19 +1,16 @@
 import { z } from "zod";
 import { TokenAudienceSchema, UserTypeSchema } from "../enums.js";
-import {
-  EmailSchema,
-  IdSchema,
-  PasswordSchema,
-  TimestampSchema,
-  VersionSchema,
-} from "../common.js";
+import { EmailSchema, IdSchema, PasswordSchema, TimestampSchema, VersionSchema } from "../common.js";
 import { PermissionSchema } from "../permissions.js";
 
 /** Staff login body (email + password, optional TOTP code). */
 export const StaffLoginSchema = z.strictObject({
   email: EmailSchema,
   password: z.string().min(1).max(128),
-  mfa_code: z.string().regex(/^\d{6}$/).optional(),
+  mfa_code: z
+    .string()
+    .regex(/^\d{6}$/)
+    .optional(),
   device_name: z.string().trim().max(120).optional(),
 });
 export type StaffLogin = z.infer<typeof StaffLoginSchema>;
@@ -93,17 +90,27 @@ export const RefreshTokenSchema = z.strictObject({ refresh_token: z.string().min
 export type RefreshToken = z.infer<typeof RefreshTokenSchema>;
 
 /** Logout body (omit refresh_token to revoke only the current session). */
-export const LogoutSchema = z.strictObject({ refresh_token: z.string().min(16).optional(), all_devices: z.boolean().default(false) });
+export const LogoutSchema = z.strictObject({
+  refresh_token: z.string().min(16).optional(),
+  all_devices: z.boolean().default(false),
+});
 export type Logout = z.infer<typeof LogoutSchema>;
 
 /** Change own password. */
 export const ChangePasswordSchema = z
   .strictObject({ current_password: z.string().min(1).max(128), new_password: PasswordSchema })
-  .refine((v) => v.current_password !== v.new_password, { message: "New password must differ", path: ["new_password"] });
+  .refine((v) => v.current_password !== v.new_password, {
+    message: "New password must differ",
+    path: ["new_password"],
+  });
 export type ChangePassword = z.infer<typeof ChangePasswordSchema>;
 
 /** MFA setup response (secret shown once). */
-export const MfaSetupResponseSchema = z.object({ secret: z.string(), otpauth_url: z.string(), qr_svg: z.string().optional() });
+export const MfaSetupResponseSchema = z.object({
+  secret: z.string(),
+  otpauth_url: z.string(),
+  qr_svg: z.string().optional(),
+});
 export type MfaSetupResponse = z.infer<typeof MfaSetupResponseSchema>;
 
 /** Confirm MFA enrolment with a code from the authenticator. */
@@ -184,7 +191,14 @@ export const PASSWORD_POLICY: PasswordPolicy = {
 export const ACCOUNT_LOCKOUT_ATTEMPTS = 20;
 
 /** One public verification key of `GET /auth/jwks` (Ed25519, RFC 8037). */
-export const JwkSchema = z.object({ kty: z.string(), crv: z.string().optional(), x: z.string().optional(), kid: z.string(), use: z.string(), alg: z.string() });
+export const JwkSchema = z.object({
+  kty: z.string(),
+  crv: z.string().optional(),
+  x: z.string().optional(),
+  kid: z.string(),
+  use: z.string(),
+  alg: z.string(),
+});
 export type Jwk = z.infer<typeof JwkSchema>;
 
 /** `GET /auth/jwks`: every key that can still verify a live access token (the current one first, then JWT_PREVIOUS_SECRETS). */

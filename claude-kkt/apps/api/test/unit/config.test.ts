@@ -50,7 +50,9 @@ describe("TRUST_PROXY parsing", () => {
     const app = Fastify({ trustProxy: loadConfig({ NODE_ENV: "test" }).TRUST_PROXY });
     app.get("/ip", (req) => ({ ip: req.ip }));
     const ip = async (remoteAddress: string, xff?: string) =>
-      (await app.inject({ method: "GET", url: "/ip", remoteAddress, headers: xff ? { "x-forwarded-for": xff } : {} })).json<{ ip: string }>().ip;
+      (
+        await app.inject({ method: "GET", url: "/ip", remoteAddress, headers: xff ? { "x-forwarded-for": xff } : {} })
+      ).json<{ ip: string }>().ip;
     expect(await ip("127.0.0.1", "203.0.113.9")).toBe("203.0.113.9");
     expect(await ip("127.0.0.1", "198.51.100.1, 203.0.113.9")).toBe("203.0.113.9");
     expect(await ip("198.51.100.5", "203.0.113.9")).toBe("198.51.100.5");
@@ -58,7 +60,10 @@ describe("TRUST_PROXY parsing", () => {
 
     const lan = Fastify({ trustProxy: loadConfig({ NODE_ENV: "test", TRUST_PROXY: "uniquelocal" }).TRUST_PROXY });
     lan.get("/ip", (req) => ({ ip: req.ip }));
-    const lanIp = async (remoteAddress: string, xff: string) => (await lan.inject({ method: "GET", url: "/ip", remoteAddress, headers: { "x-forwarded-for": xff } })).json<{ ip: string }>().ip;
+    const lanIp = async (remoteAddress: string, xff: string) =>
+      (await lan.inject({ method: "GET", url: "/ip", remoteAddress, headers: { "x-forwarded-for": xff } })).json<{
+        ip: string;
+      }>().ip;
     expect(await lanIp("172.18.0.4", "203.0.113.9")).toBe("203.0.113.9");
     expect(await lanIp("127.0.0.1", "203.0.113.9")).toBe("127.0.0.1");
     await lan.close();
@@ -85,7 +90,12 @@ describe("environment-dependent defaults", () => {
     const c = loadConfig({ ...PROD_SECRETS });
     expect([c.SEED_ON_BOOT, c.SEED_DEMO, c.RUN_JOBS_IN_API, c.API_WORKERS]).toEqual([false, false, false, 0]);
     const explicit = loadConfig({ ...PROD_SECRETS, SEED_ON_BOOT: "true", RUN_JOBS_IN_API: "1", API_WORKERS: "2" });
-    expect([explicit.SEED_ON_BOOT, explicit.SEED_DEMO, explicit.RUN_JOBS_IN_API, explicit.API_WORKERS]).toEqual([true, false, true, 2]);
+    expect([explicit.SEED_ON_BOOT, explicit.SEED_DEMO, explicit.RUN_JOBS_IN_API, explicit.API_WORKERS]).toEqual([
+      true,
+      false,
+      true,
+      2,
+    ]);
   });
 
   it("API docs are public outside production and private in production unless DOCS_PUBLIC=true", () => {
@@ -101,7 +111,12 @@ describe("environment-dependent defaults", () => {
     expect(c.DEPLOY_ID).toBeUndefined();
     expect(c.GIT_SHA).toBeUndefined();
     expect(c.REDIS_COMMAND_TIMEOUT_MS).toBe(2_000);
-    const set = loadConfig({ NODE_ENV: "development", DEPLOY_ID: "2026-10-26.1", GIT_SHA: "abc123", REDIS_COMMAND_TIMEOUT_MS: "500" });
+    const set = loadConfig({
+      NODE_ENV: "development",
+      DEPLOY_ID: "2026-10-26.1",
+      GIT_SHA: "abc123",
+      REDIS_COMMAND_TIMEOUT_MS: "500",
+    });
     expect([set.DEPLOY_ID, set.GIT_SHA, set.REDIS_COMMAND_TIMEOUT_MS]).toEqual(["2026-10-26.1", "abc123", 500]);
     expect(failure({ NODE_ENV: "development", REDIS_COMMAND_TIMEOUT_MS: "10" })).toMatch(/REDIS_COMMAND_TIMEOUT_MS/);
   });
@@ -125,15 +140,24 @@ describe("storage and bootstrap validation", () => {
     expect(msg).toMatch(/S3_REGION is required when STORAGE_DRIVER=s3/);
     const ok = loadConfig({ ...PROD_SECRETS, STORAGE_DRIVER: "s3", S3_BUCKET: "kkt-docs", S3_REGION: "ap-south-1" });
     expect([ok.S3_BUCKET, ok.S3_REGION, ok.S3_ACCESS_KEY]).toEqual(["kkt-docs", "ap-south-1", undefined]);
-    expect(failure({ NODE_ENV: "test", STORAGE_DRIVER: "s3", S3_BUCKET: "b", S3_REGION: "r", S3_ACCESS_KEY: "AKIA" })).toMatch(/must be set together/);
+    expect(
+      failure({ NODE_ENV: "test", STORAGE_DRIVER: "s3", S3_BUCKET: "b", S3_REGION: "r", S3_ACCESS_KEY: "AKIA" }),
+    ).toMatch(/must be set together/);
     expect(loadConfig({ NODE_ENV: "test" }).S3_REGION).toBeUndefined();
   });
 
   it("bootstrap admin e-mail and password come together; the password is at least 12 characters", () => {
-    const c = loadConfig({ ...PROD_SECRETS, BOOTSTRAP_COMPANY_NAME: "Acme Builders", BOOTSTRAP_ADMIN_EMAIL: "owner@acme.in", BOOTSTRAP_ADMIN_PASSWORD: "Very$trong-pass1" });
+    const c = loadConfig({
+      ...PROD_SECRETS,
+      BOOTSTRAP_COMPANY_NAME: "Acme Builders",
+      BOOTSTRAP_ADMIN_EMAIL: "owner@acme.in",
+      BOOTSTRAP_ADMIN_PASSWORD: "Very$trong-pass1",
+    });
     expect([c.BOOTSTRAP_COMPANY_NAME, c.BOOTSTRAP_ADMIN_EMAIL]).toEqual(["Acme Builders", "owner@acme.in"]);
     expect(failure({ ...PROD_SECRETS, BOOTSTRAP_ADMIN_EMAIL: "owner@acme.in" })).toMatch(/must be set together/);
-    expect(failure({ ...PROD_SECRETS, BOOTSTRAP_ADMIN_EMAIL: "owner@acme.in", BOOTSTRAP_ADMIN_PASSWORD: "short" })).toMatch(/at least 12/);
+    expect(
+      failure({ ...PROD_SECRETS, BOOTSTRAP_ADMIN_EMAIL: "owner@acme.in", BOOTSTRAP_ADMIN_PASSWORD: "short" }),
+    ).toMatch(/at least 12/);
   });
 });
 
@@ -171,16 +195,29 @@ describe("<NAME>_FILE secrets", () => {
       return v;
     };
     const { JWT_SECRET: _j, DATABASE_URL: _d, REDIS_URL: _r, ...rest } = PROD_SECRETS;
-    const c = loadConfig({ ...rest, JWT_SECRET_FILE: "/run/secrets/jwt", DATABASE_URL_FILE: "/run/secrets/db", REDIS_URL_FILE: "/run/secrets/redis", METRICS_TOKEN_FILE: "/run/secrets/metrics" }, { readFile: read });
+    const c = loadConfig(
+      {
+        ...rest,
+        JWT_SECRET_FILE: "/run/secrets/jwt",
+        DATABASE_URL_FILE: "/run/secrets/db",
+        REDIS_URL_FILE: "/run/secrets/redis",
+        METRICS_TOKEN_FILE: "/run/secrets/metrics",
+      },
+      { readFile: read },
+    );
     expect(c.JWT_SECRET).toBe("j".repeat(40));
     expect(c.DATABASE_URL).toBe("postgres://app:pw@db/kkt");
     expect(c.REDIS_URL).toBe("redis://cache:6379/2");
     expect(c.METRICS_TOKEN).toBe("metrics-token-0123456789");
-    expect(failure({ ...PROD_SECRETS, HASH_KEY_FILE: "/run/secrets/nope" }, read)).toMatch(/HASH_KEY: set either HASH_KEY or HASH_KEY_FILE, not both/);
+    expect(failure({ ...PROD_SECRETS, HASH_KEY_FILE: "/run/secrets/nope" }, read)).toMatch(
+      /HASH_KEY: set either HASH_KEY or HASH_KEY_FILE, not both/,
+    );
     const { HASH_KEY: _h, ...noHash } = PROD_SECRETS;
     const missing = failure({ ...noHash, HASH_KEY_FILE: "/run/secrets/nope" }, read);
     expect(missing).toMatch(/HASH_KEY_FILE: cannot read \/run\/secrets\/nope \(ENOENT\)/);
-    expect(failure({ ...noHash, HASH_KEY_FILE: "/run/secrets/empty" }, (p) => (p === "/run/secrets/empty" ? "\n" : read(p)))).toMatch(/is empty/);
+    expect(
+      failure({ ...noHash, HASH_KEY_FILE: "/run/secrets/empty" }, (p) => (p === "/run/secrets/empty" ? "\n" : read(p))),
+    ).toMatch(/is empty/);
   });
 });
 
@@ -193,19 +230,37 @@ describe("key rotation inputs", () => {
     expect(() => parseFieldKeys("k2:short")).toThrow(/at least 32/);
     expect(() => parseFieldKeys(`bad kid:${"x".repeat(32)}`)).toThrow(/key id/);
     expect(() => parseFieldKeys(`k2:${"x".repeat(32)},k2:${"y".repeat(32)}`)).toThrow(/twice/);
-    expect(failure({ NODE_ENV: "test", FIELD_ENCRYPTION_KEYS: `k1:${"Z".repeat(40)}` })).toMatch(/key id k1 is FIELD_ENCRYPTION_KEY/);
+    expect(failure({ NODE_ENV: "test", FIELD_ENCRYPTION_KEYS: `k1:${"Z".repeat(40)}` })).toMatch(
+      /key id k1 is FIELD_ENCRYPTION_KEY/,
+    );
   });
 
   it("JWT_PREVIOUS_SECRETS is a verify-only list of strong secrets", () => {
-    expect(loadConfig({ NODE_ENV: "test", JWT_PREVIOUS_SECRETS: `${"a".repeat(32)}, ${"b".repeat(40)}` }).JWT_PREVIOUS_SECRETS).toEqual(["a".repeat(32), "b".repeat(40)]);
+    expect(
+      loadConfig({ NODE_ENV: "test", JWT_PREVIOUS_SECRETS: `${"a".repeat(32)}, ${"b".repeat(40)}` })
+        .JWT_PREVIOUS_SECRETS,
+    ).toEqual(["a".repeat(32), "b".repeat(40)]);
     expect(failure({ NODE_ENV: "test", JWT_PREVIOUS_SECRETS: "tooshort" })).toMatch(/JWT_PREVIOUS_SECRETS/);
   });
 
   it("validates the optional observability and internal-call settings", () => {
-    expect(failure({ NODE_ENV: "test", OTEL_EXPORTER_OTLP_ENDPOINT: "not a url" })).toMatch(/OTEL_EXPORTER_OTLP_ENDPOINT/);
-    expect(failure({ NODE_ENV: "test", INTERNAL_API_TOKEN: "short" })).toMatch(/INTERNAL_API_TOKEN must be at least 32/);
+    expect(failure({ NODE_ENV: "test", OTEL_EXPORTER_OTLP_ENDPOINT: "not a url" })).toMatch(
+      /OTEL_EXPORTER_OTLP_ENDPOINT/,
+    );
+    expect(failure({ NODE_ENV: "test", INTERNAL_API_TOKEN: "short" })).toMatch(
+      /INTERNAL_API_TOKEN must be at least 32/,
+    );
     expect(failure({ NODE_ENV: "test", DB_STATEMENT_TIMEOUT_MS: "-1" })).toMatch(/DB_STATEMENT_TIMEOUT_MS/);
-    const c = loadConfig({ NODE_ENV: "test", REDIS_SECURITY_URL: "redis://sec:6379/0", ERROR_WEBHOOK_URL: "https://hooks.example/x", METRICS_PORT: "9100" });
-    expect([c.REDIS_SECURITY_URL, c.ERROR_WEBHOOK_URL, c.METRICS_PORT]).toEqual(["redis://sec:6379/0", "https://hooks.example/x", 9100]);
+    const c = loadConfig({
+      NODE_ENV: "test",
+      REDIS_SECURITY_URL: "redis://sec:6379/0",
+      ERROR_WEBHOOK_URL: "https://hooks.example/x",
+      METRICS_PORT: "9100",
+    });
+    expect([c.REDIS_SECURITY_URL, c.ERROR_WEBHOOK_URL, c.METRICS_PORT]).toEqual([
+      "redis://sec:6379/0",
+      "https://hooks.example/x",
+      9100,
+    ]);
   });
 });

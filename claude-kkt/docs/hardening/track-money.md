@@ -5,11 +5,13 @@ All 12 items are done. Every test run passes, including the full integration sui
 ## Changes (all under /home/user/Kktrealestate/claude-kkt)
 
 **packages/domain**
+
 - `src/ledger.ts`: the canonical ledger order is now posting order. `sortLedgerEvents` sorts by posting instant, then event kind, then source id. A bare date counts as midnight IST. The business date is for display only. Adds `diffLedgerRows` / `LEDGER_ROW_COMPARED_FIELDS` for row-by-row comparison.
 - `src/holds.ts` (new): `isHoldExpired`, `effectiveFlatStatus`, `reserveUntil`.
 - `src/index.ts`.
 
 **packages/contracts** (targeted edits)
+
 - `errors.ts`: added `BOOKING_COMPLETED` (409).
 - `enums.ts`:
   - integrity finding type `PLAN_STAGE_MISSING`, with its label;
@@ -25,6 +27,7 @@ All 12 items are done. Every test run passes, including the full integration sui
 - `test/adversarial.test.ts`: points at `BookingFullRowSchema`.
 
 **apps/api/src/modules/money**
+
 - `common.ts`:
   - `Clock.observe` and `lockBooking(tx, id, clock?)`, so a booking's event instants always increase in posting order;
   - `lockBookingsInOrder`, `lockFlatAndBlockOf`;
@@ -45,16 +48,19 @@ All 12 items are done. Every test run passes, including the full integration sui
 - `routes/bookings.ts`: compact rows by default (CSV and `view=full` give full rows); draft upsert; `routes/payments.ts`; `routes/dues.ts`; `index.ts` exports.
 
 **Other modules**
+
 - `construction/service.ts`, `construction/routes.ts`: undo locks every affected booking in id order, withdraws other-charge bells, and status/undo/patch use the retry transaction.
 - `inventory/holds.ts` (new): job, reserve and release. `inventory/flats.ts`: reserve/release routes, and a lapsed hold no longer needs `settings.manage` to change. `inventory/blocks.ts`: plan fit checked on block create and stage-sequence change; the grid shows a lapsed hold as AVAILABLE. `inventory/index.ts`: `registerInventoryJobs`. `inventory/rateCards.ts`: lint fix.
 - `masters/kinds.ts`: plan edits are checked against the plan's active assignments.
 - `portal/bookings.ts`, `portal/common.ts`: lint fixes.
 
 **Tests and docs**
+
 - Tests: new `test/integration/money-hardening.test.ts` and `packages/domain/test/hardening.test.ts`. The money and construction fixtures now price flats at ₹1 Cr. The acceptance harness gets a `listAtCr` helper, used in scenarios 03 and 05–09.
 - Docs: `API-CONVENTIONS.md` (idempotency, lock order), `DATA-MODEL.md` (ledger order, deviation columns), `ARCHITECTURE.md` (list payload), `TODO-integration.md` (items #6 and #7 marked done).
 
 ## Tests and results
+
 - **Domain:** 130/130 pass (6 new). One reproduces the case of a payment dated before an earlier-posted demand: the rebuild gives the same rows as the live append.
 - **Contracts:** 183/183. **API unit:** 48/48.
 - **`money-hardening.test.ts`:** 18/18. It covers all 12 items, including:
@@ -65,6 +71,7 @@ All 12 items are done. Every test run passes, including the full integration sui
 - **Full suites:** integration 491/491 (34 files, kkt_h2, Redis 17); acceptance 55/55 (kkt_h2_acc, Redis 17).
 
 ## Decisions and deviations
+
 - **Notification type outside my brief:** I added `HOLD_EXPIRED` to `NOTIFICATION_TYPES`; my brief only covered the integrity and job enums. The staff bell response checks types against that enum, so a holder notification with an unknown type could break `GET /notifications`.
 - **Agreement value guard:**
   - It compares with the flat's current `price_paise`.
@@ -79,16 +86,20 @@ All 12 items are done. Every test run passes, including the full integration sui
 - **Undo response:** `withdrawn_notifications` now also counts other-charge bells.
 
 ## Not done (outside my paths)
+
 - The public availability grid (`web/publicContent.ts`) still shows a lapsed hold as not available. It should map each flat through `effectiveFlatStatus(flat)` from `@kkt/domain` before `toPublicAvailability`.
 - The portal notification screen map (`notifications/index.ts` `SCREEN_BY_ENTITY`) should send `booking_other_charge` to `"DEMANDS"`. Today it falls back to HOME, and `booking_id` comes back null for these bells.
 
 ## For other tracks and the integration stage
+
 **Platform / worker:**
+
 - The standalone worker must call `registerMoneyJobs(null)` (from `modules/money/index.ts`) and `registerInventoryJobs()` (from `modules/inventory/index.ts`).
 - At worker boot, enqueue `DUES_CATCHUP` (or `DAILY_DUES`) and `STARTUP_RECONCILIATION`.
 - Schedule `HOLD_EXPIRY` every 5 minutes (`*/5 * * * *`, Asia/Kolkata).
 
 **Frontend (ERP):**
+
 - **`POST /api/v1/bookings`:**
   - New optional `price_deviation_reason` (3–500 characters).
   - Without `agreement.edit` and a reason, a deviation is 422 `BUSINESS_RULE` with details `{rule:"PRICE_DEVIATION_NOT_ALLOWED", field, list_price_paise, agreement_value_paise, deviation_paise, needs:["agreement.edit permission"|"price_deviation_reason"]}`.

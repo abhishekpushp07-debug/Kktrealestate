@@ -14,7 +14,17 @@ export interface LightboxImage {
   subtitle?: string | null;
 }
 
-export function Lightbox({ images, index, onClose, onIndexChange }: { images: ReadonlyArray<LightboxImage>; index: number | null; onClose: () => void; onIndexChange: (i: number) => void }): React.JSX.Element | null {
+export function Lightbox({
+  images,
+  index,
+  onClose,
+  onIndexChange,
+}: {
+  images: ReadonlyArray<LightboxImage>;
+  index: number | null;
+  onClose: () => void;
+  onIndexChange: (i: number) => void;
+}): React.JSX.Element | null {
   const insets = useSafeAreaInsets();
   const zoom = useRef<ZoomableHandle>(null);
   const [chromeVisible, setChromeVisible] = useState(true);
@@ -43,7 +53,14 @@ export function Lightbox({ images, index, onClose, onIndexChange }: { images: Re
   return (
     <Modal visible transparent={false} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <GestureHandlerRootView style={styles.root}>
-        <ZoomableImage key={current.uri} ref={zoom} uri={current.uri} alt={current.caption ?? "Photo"} onSwipe={go} onSingleTap={() => setChromeVisible((v) => !v)} />
+        <ZoomableImage
+          key={current.uri}
+          ref={zoom}
+          uri={current.uri}
+          alt={current.caption ?? "Photo"}
+          onSwipe={go}
+          onSingleTap={() => setChromeVisible((v) => !v)}
+        />
         {chromeVisible ? (
           <>
             <View style={[styles.top, { paddingTop: Math.max(insets.top, 12) }]}>
@@ -51,13 +68,32 @@ export function Lightbox({ images, index, onClose, onIndexChange }: { images: Re
                 {index + 1} / {images.length}
               </T>
               <View style={styles.actions}>
-                <IconButton name="zoom-out" label="Zoom out" color={colors.onNavy} bg="rgba(255,255,255,0.12)" onPress={() => zoom.current?.zoomOut()} />
-                <IconButton name="zoom-in" label="Zoom in" color={colors.onNavy} bg="rgba(255,255,255,0.12)" onPress={() => zoom.current?.zoomIn()} />
+                <IconButton
+                  name="zoom-out"
+                  label="Zoom out"
+                  color={colors.onNavy}
+                  bg="rgba(255,255,255,0.12)"
+                  onPress={() => zoom.current?.zoomOut()}
+                />
+                <IconButton
+                  name="zoom-in"
+                  label="Zoom in"
+                  color={colors.onNavy}
+                  bg="rgba(255,255,255,0.12)"
+                  onPress={() => zoom.current?.zoomIn()}
+                />
                 <IconButton name="close" label="Close viewer" color={colors.navy} bg={colors.gold} onPress={onClose} />
               </View>
             </View>
             <View style={[styles.bottom, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-              <IconButton name="chevron-left" label="Previous photo" color={colors.onNavy} bg="rgba(255,255,255,0.12)" onPress={() => go(-1)} disabled={index === 0} />
+              <IconButton
+                name="chevron-left"
+                label="Previous photo"
+                color={colors.onNavy}
+                bg="rgba(255,255,255,0.12)"
+                onPress={() => go(-1)}
+                disabled={index === 0}
+              />
               <View style={{ flex: 1, alignItems: "center", gap: 2 }}>
                 {current.caption ? (
                   <T variant="bodyStrong" color={colors.onNavy} align="center" numberOfLines={2}>
@@ -70,7 +106,14 @@ export function Lightbox({ images, index, onClose, onIndexChange }: { images: Re
                   </T>
                 ) : null}
               </View>
-              <IconButton name="chevron-right" label="Next photo" color={colors.onNavy} bg="rgba(255,255,255,0.12)" onPress={() => go(1)} disabled={index === images.length - 1} />
+              <IconButton
+                name="chevron-right"
+                label="Next photo"
+                color={colors.onNavy}
+                bg="rgba(255,255,255,0.12)"
+                onPress={() => go(1)}
+                disabled={index === images.length - 1}
+              />
             </View>
           </>
         ) : null}
@@ -81,7 +124,28 @@ export function Lightbox({ images, index, onClose, onIndexChange }: { images: Re
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#050c18" },
-  top: { position: "absolute", top: 0, left: 0, right: 0, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: space.lg, paddingBottom: space.sm },
+  top: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: space.lg,
+    paddingBottom: space.sm,
+  },
   actions: { flexDirection: "row", gap: space.sm },
-  bottom: { position: "absolute", bottom: 0, left: 0, right: 0, flexDirection: "row", alignItems: "center", gap: space.md, paddingHorizontal: space.lg, paddingTop: space.md, backgroundColor: "rgba(5,12,24,0.55)" },
+  bottom: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.md,
+    paddingHorizontal: space.lg,
+    paddingTop: space.md,
+    backgroundColor: "rgba(5,12,24,0.55)",
+  },
 });

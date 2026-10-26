@@ -2,7 +2,8 @@ import type { FastifyInstance, InjectOptions } from "fastify";
 import postgres from "postgres";
 import { runMigrations } from "@kkt/db";
 
-export const TEST_DATABASE_URL = process.env["TEST_DATABASE_URL"] ?? "postgres://postgres:postgres@localhost:5432/kkt_api_test";
+export const TEST_DATABASE_URL =
+  process.env["TEST_DATABASE_URL"] ?? "postgres://postgres:postgres@localhost:5432/kkt_api_test";
 process.env["NODE_ENV"] = "test";
 process.env["DATABASE_URL"] = TEST_DATABASE_URL;
 process.env["REDIS_URL"] = process.env["TEST_REDIS_URL"] ?? process.env["REDIS_URL"] ?? "redis://localhost:6379/1";
@@ -87,7 +88,9 @@ export const CREDS = {
 } as const;
 
 /** Builds a fresh app on an empty, bootstrapped test database with a flushed Redis db. */
-export async function buildTestApp(opts: { extraRoutes?: (app: FastifyInstance) => Promise<void> | void } = {}): Promise<TestContext> {
+export async function buildTestApp(
+  opts: { extraRoutes?: (app: FastifyInstance) => Promise<void> | void } = {},
+): Promise<TestContext> {
   await ensureTestDatabase();
   const { buildApp } = await import("../../src/app.js");
   const { ensureBootstrap } = await import("../../src/seed/bootstrap.js");
@@ -97,16 +100,35 @@ export async function buildTestApp(opts: { extraRoutes?: (app: FastifyInstance) 
   await app.redis.flushdb();
   const boot = await ensureBootstrap(app.db);
 
-  async function request<T = unknown>(method: InjectOptions["method"], url: string, o: RequestOptions = {}): Promise<TestResponse<T>> {
+  async function request<T = unknown>(
+    method: InjectOptions["method"],
+    url: string,
+    o: RequestOptions = {},
+  ): Promise<TestResponse<T>> {
     const headers: Record<string, string> = { "x-forwarded-for": o.ip ?? freshIp(), ...(o.headers ?? {}) };
     if (o.token) headers["authorization"] = `Bearer ${o.token}`;
     if (o.body !== undefined) headers["content-type"] = "application/json";
-    const res = await app.inject({ method, url, headers, ...(o.body !== undefined ? { payload: JSON.stringify(o.body) } : {}) });
-    let body: unknown = null;
+    const res = await app.inject({
+      method,
+      url,
+      headers,
+      ...(o.body !== undefined ? { payload: JSON.stringify(o.body) } : {}),
+    });
+    let body: unknown;
     const ct = String(res.headers["content-type"] ?? "");
-    if (ct.includes("application/json") && res.body) { try { body = JSON.parse(res.body); } catch { body = res.body; } }
-    else body = res.body;
-    return { status: res.statusCode, body: body as T, text: res.body, headers: res.headers as Record<string, string | string[] | undefined> };
+    if (ct.includes("application/json") && res.body) {
+      try {
+        body = JSON.parse(res.body);
+      } catch {
+        body = res.body;
+      }
+    } else body = res.body;
+    return {
+      status: res.statusCode,
+      body: body as T,
+      text: res.body,
+      headers: res.headers as Record<string, string | string[] | undefined>,
+    };
   }
 
   async function login(email: string, password: string, extra: Record<string, unknown> = {}): Promise<LoginResult> {
@@ -121,9 +143,13 @@ export async function buildTestApp(opts: { extraRoutes?: (app: FastifyInstance) 
     request,
     login,
     loginAs: (role) => login(CREDS[role].email, CREDS[role].password),
-    close: async () => { await app.close(); },
+    close: async () => {
+      await app.close();
+    },
   };
 }
 
 /** Shorthand for an error body. */
-export interface ErrorBody { error: { code: string; message: string; details?: Record<string, unknown>; request_id?: string } }
+export interface ErrorBody {
+  error: { code: string; message: string; details?: Record<string, unknown>; request_id?: string };
+}

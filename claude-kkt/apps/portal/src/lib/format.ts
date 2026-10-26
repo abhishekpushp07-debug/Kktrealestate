@@ -78,9 +78,19 @@ export function formatDateTime(value: string | null | undefined, opts: { time?: 
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return value;
   try {
-    const date = new Intl.DateTimeFormat("en-IN", { timeZone: IST, day: "numeric", month: "short", year: "numeric" }).format(d);
+    const date = new Intl.DateTimeFormat("en-IN", {
+      timeZone: IST,
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }).format(d);
     if (opts.time === false) return date;
-    const time = new Intl.DateTimeFormat("en-IN", { timeZone: IST, hour: "numeric", minute: "2-digit", hour12: true }).format(d);
+    const time = new Intl.DateTimeFormat("en-IN", {
+      timeZone: IST,
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    }).format(d);
     return `${date}, ${time}`;
   } catch {
     return d.toISOString().slice(0, 10);

@@ -39,7 +39,19 @@ const TOOLBAR: ReadonlyArray<{ label: string; before: string; after: string; blo
 ];
 
 /** Textarea + live preview (write / preview / split) with a tiny formatting toolbar. */
-export function MarkdownEditor({ value, onChange, id, invalid, disabled, rows = 14, placeholder = "Write in Markdown…", maxLength = 100_000, split = true, className, ...rest }: MarkdownEditorProps) {
+export function MarkdownEditor({
+  value,
+  onChange,
+  id,
+  invalid,
+  disabled,
+  rows = 14,
+  placeholder = "Write in Markdown…",
+  maxLength = 100_000,
+  split = true,
+  className,
+  ...rest
+}: MarkdownEditorProps) {
   const generatedId = useId();
   const textareaId = id ?? generatedId;
   const [mode, setMode] = useState<EditorMode>(split ? "split" : "write");
@@ -72,11 +84,27 @@ export function MarkdownEditor({ value, onChange, id, invalid, disabled, rows = 
   const showPreview = mode !== "write";
 
   return (
-    <div className={cn("overflow-hidden rounded-md border bg-card", invalid ? "border-danger" : "border-border-strong", className)} data-testid={rest["data-testid"]}>
+    <div
+      className={cn(
+        "overflow-hidden rounded-md border bg-card",
+        invalid ? "border-danger" : "border-border-strong",
+        className,
+      )}
+      data-testid={rest["data-testid"]}
+    >
       <div className="flex flex-wrap items-center gap-1 border-b border-border bg-surface px-2 py-1">
         <div className="flex items-center gap-0.5" role="toolbar" aria-label="Formatting">
           {TOOLBAR.map((tool) => (
-            <Button key={tool.label} type="button" size="xs" variant="ghost" disabled={disabled} onClick={() => wrap(tool.before, tool.after, tool.block)} className={cn("min-w-7 px-1.5", tool.label === "B" && "font-bold", tool.label === "I" && "italic")} aria-label={tool.label}>
+            <Button
+              key={tool.label}
+              type="button"
+              size="xs"
+              variant="ghost"
+              disabled={disabled}
+              onClick={() => wrap(tool.before, tool.after, tool.block)}
+              className={cn("min-w-7 px-1.5", tool.label === "B" && "font-bold", tool.label === "I" && "italic")}
+              aria-label={tool.label}
+            >
               {tool.label}
             </Button>
           ))}
@@ -85,13 +113,35 @@ export function MarkdownEditor({ value, onChange, id, invalid, disabled, rows = 
           {words} words · {readingMinutes(value)} min read
         </span>
         <div className="flex items-center gap-0.5" role="group" aria-label="Editor mode">
-          <Button type="button" size="xs" variant={mode === "write" ? "primary" : "ghost"} leftIcon={PenLine} onClick={() => setMode("write")} aria-pressed={mode === "write"}>
+          <Button
+            type="button"
+            size="xs"
+            variant={mode === "write" ? "primary" : "ghost"}
+            leftIcon={PenLine}
+            onClick={() => setMode("write")}
+            aria-pressed={mode === "write"}
+          >
             Write
           </Button>
-          <Button type="button" size="xs" variant={mode === "preview" ? "primary" : "ghost"} leftIcon={Eye} onClick={() => setMode("preview")} aria-pressed={mode === "preview"}>
+          <Button
+            type="button"
+            size="xs"
+            variant={mode === "preview" ? "primary" : "ghost"}
+            leftIcon={Eye}
+            onClick={() => setMode("preview")}
+            aria-pressed={mode === "preview"}
+          >
             Preview
           </Button>
-          <Button type="button" size="xs" variant={mode === "split" ? "primary" : "ghost"} leftIcon={Columns2} onClick={() => setMode("split")} aria-pressed={mode === "split"} className="hidden lg:inline-flex">
+          <Button
+            type="button"
+            size="xs"
+            variant={mode === "split" ? "primary" : "ghost"}
+            leftIcon={Columns2}
+            onClick={() => setMode("split")}
+            aria-pressed={mode === "split"}
+            className="hidden lg:inline-flex"
+          >
             Split
           </Button>
         </div>
@@ -108,12 +158,18 @@ export function MarkdownEditor({ value, onChange, id, invalid, disabled, rows = 
             disabled={disabled}
             invalid={invalid}
             spellCheck
-            className={cn("rounded-none border-0 font-mono text-xs leading-5 focus-visible:ring-0", showPreview && "lg:border-r lg:border-border")}
+            className={cn(
+              "rounded-none border-0 font-mono text-xs leading-5 focus-visible:ring-0",
+              showPreview && "lg:border-r lg:border-border",
+            )}
             aria-label="Markdown source"
           />
         )}
         {showPreview && (
-          <div className={cn("max-h-[32rem] overflow-y-auto p-4 scrollbar-thin", showWrite && "hidden lg:block")} aria-live="polite">
+          <div
+            className={cn("max-h-[32rem] overflow-y-auto p-4 scrollbar-thin", showWrite && "hidden lg:block")}
+            aria-live="polite"
+          >
             <Markdown source={value} />
           </div>
         )}

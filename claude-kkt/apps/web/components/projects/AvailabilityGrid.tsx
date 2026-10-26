@@ -13,7 +13,8 @@ export function AvailabilityGrid({ grid }: { grid: AvailabilityGridData }) {
     <div>
       <div className="flex flex-wrap items-center justify-between gap-4">
         <p className="text-ink-muted">
-          <span className="font-semibold text-navy-900">{available}</span> {available === 1 ? "home" : "homes"} available right now
+          <span className="font-semibold text-navy-900">{available}</span> {available === 1 ? "home" : "homes"}{" "}
+          available right now
         </p>
         <ul className="flex flex-wrap gap-4 text-sm" aria-label="Legend">
           <li className="flex items-center gap-2">
@@ -43,7 +44,9 @@ export function AvailabilityGrid({ grid }: { grid: AvailabilityGridData }) {
                           <td key={cell.flat_number} className="p-0">
                             <span
                               className={`flex min-h-9 min-w-12 items-center justify-center rounded-md border px-1.5 font-mono text-[0.7rem] ${
-                                open ? "border-gold-600 bg-gold-500 text-navy-950 font-semibold" : "border-line bg-ivory-200 text-ink-soft"
+                                open
+                                  ? "border-gold-600 bg-gold-500 text-navy-950 font-semibold"
+                                  : "border-line bg-ivory-200 text-ink-soft"
                               }`}
                               title={`${cell.flat_number} · ${cell.configuration} · ${open ? "Available" : "Not available"}`}
                             >

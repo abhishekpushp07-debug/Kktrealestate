@@ -15,8 +15,22 @@ import { randInt, randomPercentBps, rng } from "./helpers.js";
 const installments: PlanSnapshotInstallment[] = [
   { seq: 1, name: "On Booking", percent: 10, triggerType: "ON_BOOKING", dueDays: 7 },
   { seq: 2, name: "30 days", percent: 15, triggerType: "DAYS_AFTER_BOOKING", triggerDays: 30, dueDays: 10 },
-  { seq: 3, name: "Plinth", percent: 25, triggerType: "ON_STAGE", triggerStageId: "plinth", triggerStageName: "Plinth" },
-  { seq: 4, name: "Slab 1", percent: 20, triggerType: "ON_STAGE", triggerStageId: "slab1", triggerStageName: "1st Slab" },
+  {
+    seq: 3,
+    name: "Plinth",
+    percent: 25,
+    triggerType: "ON_STAGE",
+    triggerStageId: "plinth",
+    triggerStageName: "Plinth",
+  },
+  {
+    seq: 4,
+    name: "Slab 1",
+    percent: 20,
+    triggerType: "ON_STAGE",
+    triggerStageId: "slab1",
+    triggerStageName: "1st Slab",
+  },
   { seq: 5, name: "Fixed", percent: 10, triggerType: "ON_DATE", triggerDate: "2026-12-01" },
   { seq: 6, name: "Possession", percent: 20, triggerType: "ON_POSSESSION", dueDays: 30 },
 ];
@@ -43,7 +57,9 @@ describe("triggerDate / triggerLabel", () => {
     expect(triggerDate(installments[3] as PlanSnapshotInstallment, "2026-02-01", stages)).toBe(null);
     expect(triggerDate(installments[4] as PlanSnapshotInstallment, "2026-02-01", stages)).toBe("2026-12-01");
     expect(triggerDate(installments[5] as PlanSnapshotInstallment, "2026-02-01", stages)).toBe(null);
-    const done = stages.map((s) => (s.isPossession ? { ...s, status: "COMPLETED" as const, completedOn: "2027-06-30" } : s));
+    const done = stages.map((s) =>
+      s.isPossession ? { ...s, status: "COMPLETED" as const, completedOn: "2027-06-30" } : s,
+    );
     expect(triggerDate(installments[5] as PlanSnapshotInstallment, "2026-02-01", done)).toBe("2027-06-30");
     expect(() => triggerDate(installments[0] as PlanSnapshotInstallment, "bad", stages)).toThrow();
   });
@@ -66,7 +82,11 @@ describe("installmentAmounts (telescoping)", () => {
     expect(amounts.map((a) => a.cumulativeBp)).toEqual([1000, 1500, 2500, 3000, 4000, 5000, 6000, 7500, 8500, 10000]);
   });
   it("sums exactly to the agreed amounts for awkward values", () => {
-    const plan = [{ seq: 1, percent: "33.33" }, { seq: 2, percent: "33.33" }, { seq: 3, percent: "33.34" }];
+    const plan = [
+      { seq: 1, percent: "33.33" },
+      { seq: 2, percent: "33.33" },
+      { seq: 3, percent: "33.34" },
+    ];
     const amounts = installmentAmounts(1_000_001, 999_999, plan);
     expect(amounts.reduce((s, a) => s + a.cashPaise, 0)).toBe(1_000_001);
     expect(amounts.reduce((s, a) => s + a.accountPaise, 0)).toBe(999_999);
@@ -77,7 +97,10 @@ describe("installmentAmounts (telescoping)", () => {
     for (let i = 0; i < 300; i += 1) {
       const count = randInt(next, 1, 12);
       const bps = randomPercentBps(next, count);
-      const plan = bps.map((bp, index) => ({ seq: index + 1, percent: `${Math.floor(bp / 100)}.${String(bp % 100).padStart(2, "0")}` }));
+      const plan = bps.map((bp, index) => ({
+        seq: index + 1,
+        percent: `${Math.floor(bp / 100)}.${String(bp % 100).padStart(2, "0")}`,
+      }));
       const total = randInt(next, 1, 2_000_000_000_00);
       const cash = randInt(next, 0, total);
       const account = total - cash;
@@ -110,7 +133,12 @@ describe("evaluateDues", () => {
       accountPaise: 400_000_00,
       totalPaise: 1_000_000_00,
     });
-    expect(dues[1]).toMatchObject({ triggerDate: "2026-03-03", dueDate: "2026-03-13", cashPaise: 900_000_00, accountPaise: 600_000_00 });
+    expect(dues[1]).toMatchObject({
+      triggerDate: "2026-03-03",
+      dueDate: "2026-03-13",
+      cashPaise: 900_000_00,
+      accountPaise: 600_000_00,
+    });
     expect(dues[2]).toMatchObject({
       triggerLabel: "On stage: Plinth",
       triggerStageId: "plinth",
@@ -120,10 +148,24 @@ describe("evaluateDues", () => {
     });
   });
   it("respects today for time triggers and the default due days", () => {
-    const dues = evaluateDues({ booking, towerStages: stages, existingDemands: [], today: "2026-03-02", defaultDueDays: 5 });
+    const dues = evaluateDues({
+      booking,
+      towerStages: stages,
+      existingDemands: [],
+      today: "2026-03-02",
+      defaultDueDays: 5,
+    });
     expect(dues.map((d) => d.seq)).toEqual([1]);
-    expect(evaluateDues({ booking, towerStages: stages, existingDemands: [], today: "2026-03-03" }).map((d) => d.seq)).toEqual([1, 2]);
-    const dec = evaluateDues({ booking, towerStages: stages, existingDemands: [], today: "2026-12-01", defaultDueDays: 5 });
+    expect(
+      evaluateDues({ booking, towerStages: stages, existingDemands: [], today: "2026-03-03" }).map((d) => d.seq),
+    ).toEqual([1, 2]);
+    const dec = evaluateDues({
+      booking,
+      towerStages: stages,
+      existingDemands: [],
+      today: "2026-12-01",
+      defaultDueDays: 5,
+    });
     expect(dec.map((d) => d.seq)).toEqual([1, 2, 3, 5]);
     expect(dec[3]?.dueDate).toBe("2026-12-06");
     expect(dec[3]?.triggerLabel).toBe("On 1 Dec 2026");
@@ -141,7 +183,10 @@ describe("evaluateDues", () => {
     const second = evaluateDues({
       booking,
       towerStages: stages,
-      existingDemands: [...existing, ...dues.map((d) => ({ installmentSeq: d.seq, installmentName: d.name, status: "OPEN" as const }))],
+      existingDemands: [
+        ...existing,
+        ...dues.map((d) => ({ installmentSeq: d.seq, installmentName: d.name, status: "OPEN" as const })),
+      ],
       today: "2026-04-01",
     });
     expect(second).toEqual([]);
@@ -150,7 +195,12 @@ describe("evaluateDues", () => {
     const all = stages.map((s) => ({ ...s, status: "COMPLETED" as const, completedOn: s.completedOn ?? "2027-01-20" }));
     const dues = evaluateDues({ booking, towerStages: all, existingDemands: [], today: "2027-02-01" });
     expect(dues.map((d) => d.seq)).toEqual([1, 2, 3, 4, 5, 6]);
-    expect(dues[5]).toMatchObject({ triggerLabel: "On possession", triggerDate: "2027-01-20", dueDate: "2027-02-19", cumulativePercent: "100.00" });
+    expect(dues[5]).toMatchObject({
+      triggerLabel: "On possession",
+      triggerDate: "2027-01-20",
+      dueDate: "2027-02-19",
+      cumulativePercent: "100.00",
+    });
     expect(dues.reduce((s, d) => s + d.cashPaise, 0)).toBe(booking.cashAgreedPaise);
     expect(dues.reduce((s, d) => s + d.accountPaise, 0)).toBe(booking.accountAgreedPaise);
   });
@@ -162,15 +212,34 @@ describe("schedulePreview", () => {
       booking,
       towerStages: stages,
       existingDemands: [
-        { installmentSeq: 1, installmentName: "On Booking", status: "PAID", dueDate: "2026-02-08", paidPaise: 1_000_000_00 },
-        { installmentSeq: 2, installmentName: "30 days", status: "PARTIALLY_PAID", dueDate: "2026-03-13", paidPaise: 500_000_00 },
+        {
+          installmentSeq: 1,
+          installmentName: "On Booking",
+          status: "PAID",
+          dueDate: "2026-02-08",
+          paidPaise: 1_000_000_00,
+        },
+        {
+          installmentSeq: 2,
+          installmentName: "30 days",
+          status: "PARTIALLY_PAID",
+          dueDate: "2026-03-13",
+          paidPaise: 500_000_00,
+        },
         { installmentSeq: 3, installmentName: "Plinth", status: "OPEN", dueDate: "2026-03-30" },
       ],
       today: "2026-04-01",
       expectedStageDates: { slab1: "2026-06-30" },
     });
     expect(rows).toHaveLength(6);
-    expect(rows.map((r) => r.status)).toEqual(["PAID", "PARTIALLY_PAID", "OVERDUE", "NOT_YET_DUE", "NOT_YET_DUE", "NOT_YET_DUE"]);
+    expect(rows.map((r) => r.status)).toEqual([
+      "PAID",
+      "PARTIALLY_PAID",
+      "OVERDUE",
+      "NOT_YET_DUE",
+      "NOT_YET_DUE",
+      "NOT_YET_DUE",
+    ]);
     expect(rows[0]?.paidPaise).toBe(1_000_000_00);
     expect(rows[1]?.paidPaise).toBe(500_000_00);
     expect(rows[2]?.expectedDueDate).toBe("2026-03-30");
@@ -187,7 +256,16 @@ describe("schedulePreview", () => {
     const rows = schedulePreview({
       booking,
       towerStages: stages,
-      existingDemands: [{ installmentSeq: 3, installmentName: "Plinth", status: "OPEN", dueDate: "2026-04-30", cashPaise: 1, accountPaise: 2 }],
+      existingDemands: [
+        {
+          installmentSeq: 3,
+          installmentName: "Plinth",
+          status: "OPEN",
+          dueDate: "2026-04-30",
+          cashPaise: 1,
+          accountPaise: 2,
+        },
+      ],
       today: "2026-04-01",
     });
     expect(rows[2]?.status).toBe("RAISED");

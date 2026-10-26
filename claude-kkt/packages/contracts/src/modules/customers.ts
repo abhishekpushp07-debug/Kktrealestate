@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { BookingStatusSchema, GenderSchema, KycStatusSchema, LeadSourceSchema, PortalAccessActionSchema } from "../enums.js";
+import {
+  BookingStatusSchema,
+  GenderSchema,
+  KycStatusSchema,
+  LeadSourceSchema,
+  PortalAccessActionSchema,
+} from "../enums.js";
 import {
   AadhaarSchema,
   AddressSchema,
@@ -216,7 +222,12 @@ export type CustomerListResponse = z.infer<typeof CustomerListResponseSchema>;
  * status needs settings.manage and a `reason`.
  */
 export const CustomerKycUpdateSchema = z
-  .strictObject({ ...VersionedSchema.shape, kyc_status: KycStatusSchema, kyc_remarks: NoteSchema.optional().nullable(), reason: ReasonSchema.optional() })
+  .strictObject({
+    ...VersionedSchema.shape,
+    kyc_status: KycStatusSchema,
+    kyc_remarks: NoteSchema.optional().nullable(),
+    reason: ReasonSchema.optional(),
+  })
   .refine((k) => k.kyc_status !== "REJECTED" || (k.kyc_remarks ?? "").length >= 3, {
     message: "Remarks are required when rejecting KYC",
     path: ["kyc_remarks"],
@@ -266,7 +277,10 @@ export const PortalAccessResponseSchema = z.object({
 export type PortalAccessResponse = z.infer<typeof PortalAccessResponseSchema>;
 
 /** Bulk-enable portal access for all customers with active bookings. */
-export const PortalBulkEnableSchema = z.strictObject({ project_id: IdSchema.optional(), dry_run: z.boolean().default(false) });
+export const PortalBulkEnableSchema = z.strictObject({
+  project_id: IdSchema.optional(),
+  dry_run: z.boolean().default(false),
+});
 export type PortalBulkEnable = z.infer<typeof PortalBulkEnableSchema>;
 
 /** `?format=csv` on the same call returns the credentials as a CSV attachment instead of JSON (still exactly once). */
@@ -300,7 +314,9 @@ export const CustomerEraseSchema = z.strictObject({ confirm: z.literal("ERASE"),
 export type CustomerErase = z.infer<typeof CustomerEraseSchema>;
 
 /** Co-applicant partial update: the row's `version` is required (here or as If-Match); a stale one → 409 VERSION_CONFLICT. */
-export const CoApplicantUpdateSchema = CoApplicantInputSchema.omit({ id: true }).partial().extend({ version: VersionSchema.optional() });
+export const CoApplicantUpdateSchema = CoApplicantInputSchema.omit({ id: true })
+  .partial()
+  .extend({ version: VersionSchema.optional() });
 export type CoApplicantUpdate = z.infer<typeof CoApplicantUpdateSchema>;
 
 export const CoApplicantListResponseSchema = z.object({ items: z.array(CoApplicantRowSchema) });

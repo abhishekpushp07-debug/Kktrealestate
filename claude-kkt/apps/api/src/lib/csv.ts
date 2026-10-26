@@ -13,28 +13,64 @@ export function parseCsv(text: string): string[][] {
     const ch = src[i]!;
     if (inQuotes) {
       if (ch === '"') {
-        if (src[i + 1] === '"') { field += '"'; i += 2; continue; }
-        inQuotes = false; i++; continue;
+        if (src[i + 1] === '"') {
+          field += '"';
+          i += 2;
+          continue;
+        }
+        inQuotes = false;
+        i++;
+        continue;
       }
-      field += ch; i++; continue;
+      field += ch;
+      i++;
+      continue;
     }
-    if (ch === '"') { inQuotes = true; i++; continue; }
-    if (ch === ",") { row.push(field); field = ""; i++; continue; }
-    if (ch === "\r") { i++; continue; }
-    if (ch === "\n") { row.push(field); rows.push(row); row = []; field = ""; i++; continue; }
-    field += ch; i++;
+    if (ch === '"') {
+      inQuotes = true;
+      i++;
+      continue;
+    }
+    if (ch === ",") {
+      row.push(field);
+      field = "";
+      i++;
+      continue;
+    }
+    if (ch === "\r") {
+      i++;
+      continue;
+    }
+    if (ch === "\n") {
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = "";
+      i++;
+      continue;
+    }
+    field += ch;
+    i++;
   }
-  if (field.length > 0 || row.length > 0) { row.push(field); rows.push(row); }
+  if (field.length > 0 || row.length > 0) {
+    row.push(field);
+    rows.push(row);
+  }
   return rows.filter((r) => !(r.length === 1 && r[0] === ""));
 }
 
 /** Parses CSV text with a header line into objects keyed by trimmed header names; `line` is the 1-based source line. */
-export function parseCsvObjects(text: string): { headers: string[]; rows: { line: number; values: Record<string, string> }[] } {
+export function parseCsvObjects(text: string): {
+  headers: string[];
+  rows: { line: number; values: Record<string, string> }[];
+} {
   const all = parseCsv(text);
   const headers = (all[0] ?? []).map((h) => h.trim());
   const rows = all.slice(1).map((r, idx) => {
     const values: Record<string, string> = {};
-    headers.forEach((h, c) => { if (h) values[h] = (r[c] ?? "").trim(); });
+    headers.forEach((h, c) => {
+      if (h) values[h] = (r[c] ?? "").trim();
+    });
     return { line: idx + 2, values };
   });
   return { headers, rows };
@@ -59,7 +95,8 @@ export function neutraliseFormula(value: string): string {
 export function csvField(value: unknown): string {
   if (value === null || value === undefined) return "";
   if (typeof value === "number" || typeof value === "bigint" || typeof value === "boolean") return String(value);
-  const raw = value instanceof Date ? value.toISOString() : typeof value === "object" ? JSON.stringify(value) : String(value);
+  const raw =
+    value instanceof Date ? value.toISOString() : typeof value === "object" ? JSON.stringify(value) : String(value);
   const s = neutraliseFormula(raw);
   return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
@@ -72,7 +109,12 @@ export interface CsvColumn<T> {
 }
 
 /** Streams rows as `text/csv` with RFC 4180 quoting and a `Content-Disposition: attachment` header. */
-export function sendCsv<T extends Record<string, unknown>>(reply: FastifyReply, filename: string, columns: readonly CsvColumn<T>[], rows: Iterable<T>): FastifyReply {
+export function sendCsv<T extends Record<string, unknown>>(
+  reply: FastifyReply,
+  filename: string,
+  columns: readonly CsvColumn<T>[],
+  rows: Iterable<T>,
+): FastifyReply {
   const safeName = filename.replace(/[^A-Za-z0-9._-]/g, "_");
   async function* lines(): AsyncGenerator<string> {
     yield `${columns.map((c) => csvField(c.header)).join(",")}\r\n`;

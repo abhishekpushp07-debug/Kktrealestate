@@ -76,10 +76,18 @@ export const BookingCreateSchema = BookingBase.superRefine((b, ctx) => {
     });
   }
   if (b.agreement_value_paise <= 0) {
-    ctx.addIssue({ code: "custom", message: "Agreement value must be greater than 0", path: ["agreement_value_paise"] });
+    ctx.addIssue({
+      code: "custom",
+      message: "Agreement value must be greater than 0",
+      path: ["agreement_value_paise"],
+    });
   }
   if (b.co_applicant_ids.includes(b.customer_id)) {
-    ctx.addIssue({ code: "custom", message: "Primary applicant cannot also be a co-applicant", path: ["co_applicant_ids"] });
+    ctx.addIssue({
+      code: "custom",
+      message: "Primary applicant cannot also be a co-applicant",
+      path: ["co_applicant_ids"],
+    });
   }
   if (new Set(b.co_applicant_ids).size !== b.co_applicant_ids.length) {
     ctx.addIssue({ code: "custom", message: "Duplicate co-applicants", path: ["co_applicant_ids"] });
@@ -88,7 +96,11 @@ export const BookingCreateSchema = BookingBase.superRefine((b, ctx) => {
     ctx.addIssue({ code: "custom", message: "Duplicate parking slots", path: ["parking_slot_ids"] });
   }
   if (b.plan_accepted_on < b.booking_date) {
-    ctx.addIssue({ code: "custom", message: "Plan acceptance date cannot be before the booking date", path: ["plan_accepted_on"] });
+    ctx.addIssue({
+      code: "custom",
+      message: "Plan acceptance date cannot be before the booking date",
+      path: ["plan_accepted_on"],
+    });
   }
   if (b.plan_acceptance_mode === "SIGNED_COPY" && b.plan_acceptance_document_id == null) {
     ctx.addIssue({ code: "custom", message: "Upload the signed copy", path: ["plan_acceptance_document_id"] });
@@ -151,7 +163,13 @@ export const BookingRowFlatSnapshotSchema = FlatSnapshotSchema.extend({
 export type BookingRowFlatSnapshot = z.infer<typeof BookingRowFlatSnapshotSchema>;
 
 /** List-row plan snapshot (GET /bookings compact view): the plan name; code, type, grace days and installments are on full rows and the detail. */
-export const BookingRowPlanSnapshotSchema = PlanSnapshotSchema.partial({ plan_id: true, code: true, plan_type: true, grace_days: true, installments: true });
+export const BookingRowPlanSnapshotSchema = PlanSnapshotSchema.partial({
+  plan_id: true,
+  code: true,
+  plan_type: true,
+  grace_days: true,
+  installments: true,
+});
 export type BookingRowPlanSnapshot = z.infer<typeof BookingRowPlanSnapshotSchema>;
 
 /** Per-bucket money summary (derived figures included). */
@@ -180,7 +198,14 @@ export const BookingSummarySchema = z.object({
   pending_cheques_paise: PaiseSchema,
   last_payment_at: TimestampSchema.nullable(),
   next_installment: z
-    .object({ seq: z.int(), name: z.string(), trigger_label: z.string(), expected_date: DateStringSchema.nullable(), cash_paise: PaiseSchema, account_paise: PaiseSchema })
+    .object({
+      seq: z.int(),
+      name: z.string(),
+      trigger_label: z.string(),
+      expected_date: DateStringSchema.nullable(),
+      cash_paise: PaiseSchema,
+      account_paise: PaiseSchema,
+    })
     .nullable(),
 });
 export type BookingSummary = z.infer<typeof BookingSummarySchema>;
@@ -321,7 +346,10 @@ export const AgreementRevisionCreateSchema = z
     message: "Cash agreed + Account agreed must equal the agreement value exactly",
     path: ["account_agreed_paise"],
   })
-  .refine((r) => r.agreement_value_paise > 0, { message: "Agreement value must be greater than 0", path: ["agreement_value_paise"] });
+  .refine((r) => r.agreement_value_paise > 0, {
+    message: "Agreement value must be greater than 0",
+    path: ["agreement_value_paise"],
+  });
 export type AgreementRevisionCreate = z.infer<typeof AgreementRevisionCreateSchema>;
 
 const AgreementValuesSchema = z.object({
@@ -519,7 +547,11 @@ export const OtherChargeAddSchema = z.strictObject({ ...VersionedSchema.shape, .
 export type OtherChargeAdd = z.infer<typeof OtherChargeAddSchema>;
 
 /** Raise a MANUAL other-charge demand now. */
-export const OtherChargeDemandNowSchema = z.strictObject({ ...VersionedSchema.shape, other_charge_id: IdSchema, due_date: DateStringSchema.optional() });
+export const OtherChargeDemandNowSchema = z.strictObject({
+  ...VersionedSchema.shape,
+  other_charge_id: IdSchema,
+  due_date: DateStringSchema.optional(),
+});
 export type OtherChargeDemandNow = z.infer<typeof OtherChargeDemandNowSchema>;
 
 /** Booking detail: row + tabs' first pages (full flat and plan snapshots, list price and any deviation from it). */
@@ -547,7 +579,10 @@ export const FlatNotAvailableDetailsSchema = z.object({
 export type FlatNotAvailableDetails = z.infer<typeof FlatNotAvailableDetailsSchema>;
 
 /** Raise the demand of one other-charge line (line id in the path). */
-export const OtherChargeDemandLineSchema = z.strictObject({ ...VersionedSchema.shape, due_date: DateStringSchema.optional() });
+export const OtherChargeDemandLineSchema = z.strictObject({
+  ...VersionedSchema.shape,
+  due_date: DateStringSchema.optional(),
+});
 export type OtherChargeDemandLine = z.infer<typeof OtherChargeDemandLineSchema>;
 
 /** Ledger query: JSON (default) or CSV export. */

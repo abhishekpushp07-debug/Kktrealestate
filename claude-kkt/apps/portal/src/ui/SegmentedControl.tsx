@@ -9,7 +9,17 @@ export interface Segment<K extends string> {
   count?: number;
 }
 
-export function SegmentedControl<K extends string>({ segments, value, onChange, scroll }: { segments: ReadonlyArray<Segment<K>>; value: K; onChange: (k: K) => void; scroll?: boolean }): React.JSX.Element {
+export function SegmentedControl<K extends string>({
+  segments,
+  value,
+  onChange,
+  scroll,
+}: {
+  segments: ReadonlyArray<Segment<K>>;
+  value: K;
+  onChange: (k: K) => void;
+  scroll?: boolean;
+}): React.JSX.Element {
   const items = segments.map((s) => {
     const active = s.key === value;
     return (
@@ -23,7 +33,12 @@ export function SegmentedControl<K extends string>({ segments, value, onChange, 
             onChange(s.key);
           }
         }}
-        style={({ pressed }) => [styles.seg, active ? styles.active : null, scroll ? null : { flex: 1 }, pressed ? { opacity: 0.85 } : null]}
+        style={({ pressed }) => [
+          styles.seg,
+          active ? styles.active : null,
+          scroll ? null : { flex: 1 },
+          pressed ? { opacity: 0.85 } : null,
+        ]}
       >
         <T variant="caption" color={active ? colors.navy : colors.inkMuted} style={{ fontSize: 13 }} numberOfLines={1}>
           {s.label}
@@ -34,7 +49,12 @@ export function SegmentedControl<K extends string>({ segments, value, onChange, 
   });
   if (scroll) {
     return (
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.track} accessibilityRole="tablist">
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.track}
+        accessibilityRole="tablist"
+      >
         {items}
       </ScrollView>
     );
@@ -48,6 +68,13 @@ export function SegmentedControl<K extends string>({ segments, value, onChange, 
 
 const styles = StyleSheet.create({
   track: { flexDirection: "row", backgroundColor: colors.navy100, borderRadius: radius.pill, padding: 2, gap: 2 },
-  seg: { minHeight: 48, paddingVertical: 8, paddingHorizontal: 14, borderRadius: radius.pill, alignItems: "center", justifyContent: "center" },
+  seg: {
+    minHeight: 48,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   active: { backgroundColor: colors.surface, boxShadow: "0 1px 4px rgba(11,31,58,0.12)" },
 });

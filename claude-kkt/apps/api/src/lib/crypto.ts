@@ -12,7 +12,10 @@ const hashKey = deriveKey(config.HASH_KEY, "kkt-hash-v1");
 // Field-encryption key ring (FIELD_ENCRYPTION_KEYS `kid:secret,…`, first = active; FIELD_ENCRYPTION_KEY is always kid `k1`)
 // ---------------------------------------------------------------------------
 
-interface FieldKeyRing { activeKid: string; keys: Map<string, Buffer> }
+interface FieldKeyRing {
+  activeKid: string;
+  keys: Map<string, Buffer>;
+}
 let ringSource: unknown = null;
 let ring: FieldKeyRing | null = null;
 
@@ -57,7 +60,8 @@ export function decryptField(token: string | null | undefined): string | null {
   if (!token) return null;
   const [kid, ivB, tagB, ctB] = token.split(".");
   const key = kid ? fieldKeyRing().keys.get(kid) : undefined;
-  if (!key || !ivB || !tagB || !ctB) throw new Error(kid && !key ? `Field encryption key ${kid} is not configured` : "Unknown field encryption format");
+  if (!key || !ivB || !tagB || !ctB)
+    throw new Error(kid && !key ? `Field encryption key ${kid} is not configured` : "Unknown field encryption format");
   const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(ivB, "base64url"));
   decipher.setAuthTag(Buffer.from(tagB, "base64url"));
   return Buffer.concat([decipher.update(Buffer.from(ctB, "base64url")), decipher.final()]).toString("utf8");
@@ -87,12 +91,18 @@ export function randomToken(bytes = 32): string {
 
 /** Strong temporary password for portal access: 12 chars, mixed classes, unambiguous alphabet. */
 export function temporaryPassword(): string {
-  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ", lower = "abcdefghjkmnpqrstuvwxyz", digits = "23456789", symbols = "@#$%&*";
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ",
+    lower = "abcdefghjkmnpqrstuvwxyz",
+    digits = "23456789",
+    symbols = "@#$%&*";
   const all = upper + lower + digits + symbols;
   const pick = (s: string) => s[randomBytes(1)[0]! % s.length]!;
   const chars = [pick(upper), pick(lower), pick(digits), pick(symbols)];
   while (chars.length < 12) chars.push(pick(all));
-  for (let i = chars.length - 1; i > 0; i--) { const j = randomBytes(1)[0]! % (i + 1); [chars[i], chars[j]] = [chars[j]!, chars[i]!]; }
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = randomBytes(1)[0]! % (i + 1);
+    [chars[i], chars[j]] = [chars[j]!, chars[i]!];
+  }
   return chars.join("");
 }
 
@@ -120,7 +130,8 @@ export function signPayload(payload: Record<string, string | number>, ttlSeconds
 export function verifyPayload<T extends Record<string, unknown>>(token: string): (T & { exp: number }) | null {
   const dot = token.lastIndexOf(".");
   if (dot <= 0) return null;
-  const body = token.slice(0, dot), sig = token.slice(dot + 1);
+  const body = token.slice(0, dot),
+    sig = token.slice(dot + 1);
   const a = Buffer.from(sig);
   const valid = signingKeys().some((key) => {
     const b = Buffer.from(createHmac("sha256", key).update(body).digest("base64url"));
@@ -131,11 +142,14 @@ export function verifyPayload<T extends Record<string, unknown>>(token: string):
     const data = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as T & { exp: number };
     if (typeof data.exp !== "number" || data.exp < Math.floor(Date.now() / 1000)) return null;
     return data;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 /** Constant-time string compare. */
 export function safeEqual(a: string, b: string): boolean {
-  const ba = Buffer.from(a), bb = Buffer.from(b);
+  const ba = Buffer.from(a),
+    bb = Buffer.from(b);
   return ba.length === bb.length && timingSafeEqual(ba, bb);
 }

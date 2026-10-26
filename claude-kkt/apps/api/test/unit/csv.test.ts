@@ -5,12 +5,19 @@ describe("RFC 4180 parser", () => {
   it("handles quotes, doubled quotes, embedded commas/newlines, CRLF and BOM", () => {
     const text = '﻿name,code,note\r\n"Aadhaar, front",AADHAAR,"He said ""hi""\nsecond line"\r\nPlain,PLAIN,\r\n';
     const rows = parseCsv(text);
-    expect(rows).toEqual([["name", "code", "note"], ["Aadhaar, front", "AADHAAR", 'He said "hi"\nsecond line'], ["Plain", "PLAIN", ""]]);
+    expect(rows).toEqual([
+      ["name", "code", "note"],
+      ["Aadhaar, front", "AADHAAR", 'He said "hi"\nsecond line'],
+      ["Plain", "PLAIN", ""],
+    ]);
   });
   it("maps header names to values with 1-based source lines and skips blank lines", () => {
     const { headers, rows } = parseCsvObjects("a,b\n1,2\n\n3,4\n");
     expect(headers).toEqual(["a", "b"]);
-    expect(rows).toEqual([{ line: 2, values: { a: "1", b: "2" } }, { line: 3, values: { a: "3", b: "4" } }]);
+    expect(rows).toEqual([
+      { line: 2, values: { a: "1", b: "2" } },
+      { line: 3, values: { a: "3", b: "4" } },
+    ]);
   });
   it("quotes fields that need it", () => {
     expect(csvField("plain")).toBe("plain");

@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { ProjectStatusSchema, ProjectTypeSchema, PublicAvailabilitySchema, StageStatusSchema, VisitStatusSchema } from "../enums.js";
+import {
+  ProjectStatusSchema,
+  ProjectTypeSchema,
+  PublicAvailabilitySchema,
+  StageStatusSchema,
+  VisitStatusSchema,
+} from "../enums.js";
 import {
   DateStringSchema,
   EmailSchema,
@@ -24,14 +30,25 @@ export const ConsentSchema = z.literal(true);
 // ---------------------------------------------------------------------------
 
 export const PublicSiteSettingsSchema = z.object({
-  brand: z.object({ name: z.string(), tagline: z.string().nullable(), logo_url: z.string().nullable(), favicon_url: z.string().nullable() }),
+  brand: z.object({
+    name: z.string(),
+    tagline: z.string().nullable(),
+    logo_url: z.string().nullable(),
+    favicon_url: z.string().nullable(),
+  }),
   contacts: z.object({ phone: z.string().nullable(), whatsapp: z.string().nullable(), email: z.string().nullable() }),
-  offices: z.array(z.object({ name: z.string(), address: z.string(), phone: z.string().nullable(), maps_link: z.string().nullable() })),
+  offices: z.array(
+    z.object({ name: z.string(), address: z.string(), phone: z.string().nullable(), maps_link: z.string().nullable() }),
+  ),
   social: z.record(z.string(), z.string()),
   trust_stats: z.array(z.object({ label: z.string(), value: z.string() })),
   value_props: z.array(z.object({ title: z.string(), body: z.string(), icon: z.string().nullable() })),
   disclaimer: z.string().nullable(),
-  seo_defaults: z.object({ title: z.string().nullable(), description: z.string().nullable(), og_image_url: z.string().nullable() }),
+  seo_defaults: z.object({
+    title: z.string().nullable(),
+    description: z.string().nullable(),
+    og_image_url: z.string().nullable(),
+  }),
   analytics: z.object({ ga_id: z.string().nullable() }),
   site_live: z.boolean(),
   coming_soon_message: z.string().nullable(),
@@ -91,7 +108,12 @@ export const PublicGalleryResponseSchema = z.object({
 });
 export type PublicGalleryResponse = z.infer<typeof PublicGalleryResponseSchema>;
 
-export const PublicPersonSchema = z.object({ name: z.string(), title: z.string(), bio: z.string().nullable(), photo_url: z.string().nullable() });
+export const PublicPersonSchema = z.object({
+  name: z.string(),
+  title: z.string(),
+  bio: z.string().nullable(),
+  photo_url: z.string().nullable(),
+});
 export type PublicPerson = z.infer<typeof PublicPersonSchema>;
 
 export const PublicPostCardSchema = z.object({
@@ -112,7 +134,11 @@ export const PublicPostDetailSchema = PublicPostCardSchema.extend({
   body_md: z.string(),
   updated_at: TimestampSchema,
   author_name: z.string().nullable(),
-  seo: z.object({ title: z.string().nullable(), description: z.string().nullable(), og_image_url: z.string().nullable() }),
+  seo: z.object({
+    title: z.string().nullable(),
+    description: z.string().nullable(),
+    og_image_url: z.string().nullable(),
+  }),
 });
 export type PublicPostDetail = z.infer<typeof PublicPostDetailSchema>;
 
@@ -125,7 +151,10 @@ export const PublicPageSchema = z.object({
 });
 export type PublicPage = z.infer<typeof PublicPageSchema>;
 
-export const PublicListQuerySchema = z.object({ page: IntQuerySchema.min(1).default(1), page_size: IntQuerySchema.min(1).max(50).default(12) });
+export const PublicListQuerySchema = z.object({
+  page: IntQuerySchema.min(1).default(1),
+  page_size: IntQuerySchema.min(1).max(50).default(12),
+});
 export type PublicListQuery = z.infer<typeof PublicListQuerySchema>;
 
 // ---------------------------------------------------------------------------
@@ -187,7 +216,14 @@ export const PublicAvailabilityGridSchema = z.object({
     z.object({
       name: z.string(),
       positions: z.int().min(0),
-      floors: z.array(z.object({ floor_label: z.string(), label: z.string().optional(), has_units: z.boolean(), cells: z.array(PublicAvailabilityCellSchema) })),
+      floors: z.array(
+        z.object({
+          floor_label: z.string(),
+          label: z.string().optional(),
+          has_units: z.boolean(),
+          cells: z.array(PublicAvailabilityCellSchema),
+        }),
+      ),
       available_count: z.int().min(0),
       total_count: z.int().min(0),
     }),
@@ -203,8 +239,24 @@ export const PublicConfigurationSchema = z.object({
   bhk: z.number(),
   facing: z.string().nullable(),
   description: z.string().nullable(),
-  rooms: z.array(z.object({ label: z.string(), room_type_name: z.string().nullable().optional(), length_ft: z.number(), width_ft: z.number(), sqft: z.number() })),
-  areas: z.array(z.object({ name: z.string(), code: z.string(), area_type_code: z.string().optional(), area_type_name: z.string().optional(), sqft: z.number() })),
+  rooms: z.array(
+    z.object({
+      label: z.string(),
+      room_type_name: z.string().nullable().optional(),
+      length_ft: z.number(),
+      width_ft: z.number(),
+      sqft: z.number(),
+    }),
+  ),
+  areas: z.array(
+    z.object({
+      name: z.string(),
+      code: z.string(),
+      area_type_code: z.string().optional(),
+      area_type_name: z.string().optional(),
+      sqft: z.number(),
+    }),
+  ),
   carpet_sqft: z.number().nullable().optional(),
   builtup_sqft: z.number().nullable().optional(),
   super_builtup_sqft: z.number().nullable().optional(),
@@ -253,7 +305,13 @@ export type PublicStageProgress = z.infer<typeof PublicStageProgressSchema>;
 /** Project detail page payload. */
 export const PublicProjectDetailSchema = PublicProjectCardSchema.extend({
   description: z.string().nullable(),
-  address: z.object({ line1: z.string(), locality: z.string().nullable(), city: z.string(), state: z.string(), pincode: z.string() }),
+  address: z.object({
+    line1: z.string(),
+    locality: z.string().nullable(),
+    city: z.string(),
+    state: z.string(),
+    pincode: z.string(),
+  }),
   latitude: z.number().nullable(),
   longitude: z.number().nullable(),
   landmarks: z.array(z.object({ name: z.string(), distance_km: z.number() })),
@@ -270,15 +328,29 @@ export const PublicProjectDetailSchema = PublicProjectCardSchema.extend({
   /** Present only when show_availability is on. */
   availability: PublicAvailabilityGridSchema.nullable(),
   /** Present only when show_progress is on. */
-  construction: z.object({ percent: z.number(), current_stage: z.string().nullable(), stages: z.array(PublicStageProgressSchema) }).nullable(),
+  construction: z
+    .object({ percent: z.number(), current_stage: z.string().nullable(), stages: z.array(PublicStageProgressSchema) })
+    .nullable(),
   video_urls: z.array(z.string()),
   tour_urls: z.array(z.string()),
   map_embed_url: z.string().nullable(),
   brochure_available: z.boolean(),
   faqs: z.array(z.object({ q: z.string(), a: z.string() })),
   visit_booking_enabled: z.boolean(),
-  blocks: z.array(z.object({ name: z.string(), type: z.string(), floors: z.int(), total_units: z.int(), available_units: z.int().nullable() })),
-  seo: z.object({ title: z.string().nullable(), description: z.string().nullable(), og_image_url: z.string().nullable() }),
+  blocks: z.array(
+    z.object({
+      name: z.string(),
+      type: z.string(),
+      floors: z.int(),
+      total_units: z.int(),
+      available_units: z.int().nullable(),
+    }),
+  ),
+  seo: z.object({
+    title: z.string().nullable(),
+    description: z.string().nullable(),
+    og_image_url: z.string().nullable(),
+  }),
   // --- apps/web aliases (same data, the shapes the Next.js site consumes) ---
   /** hero_urls as image objects. */
   hero_images: z.array(PublicImageSchema).optional(),
@@ -295,11 +367,21 @@ export const PublicProjectDetailSchema = PublicProjectCardSchema.extend({
       total_units: z.int().nullable(),
       block_count: z.int().nullable(),
       floors: z.string().nullable(),
-      address: z.object({ line1: z.string().nullable(), line2: z.string().nullable(), locality: z.string().nullable(), city: z.string().nullable(), state: z.string().nullable(), pincode: z.string().nullable() }),
+      address: z.object({
+        line1: z.string().nullable(),
+        line2: z.string().nullable(),
+        locality: z.string().nullable(),
+        city: z.string().nullable(),
+        state: z.string().nullable(),
+        pincode: z.string().nullable(),
+      }),
     })
     .optional(),
   /** Per-block progress; null unless show_progress. */
-  construction_progress: z.object({ blocks: z.array(PublicProgressBlockSchema) }).nullable().optional(),
+  construction_progress: z
+    .object({ blocks: z.array(PublicProgressBlockSchema) })
+    .nullable()
+    .optional(),
   /** Same as video_urls / tour_urls. */
   videos: z.array(z.string()).optional(),
   tours: z.array(z.string()).optional(),
@@ -359,7 +441,11 @@ export const PublicBrochureResponseSchema = z.object({
 export type PublicBrochureResponse = z.infer<typeof PublicBrochureResponseSchema>;
 
 /** Returning visitor: re-issue a link using the remembered token (still logs the activity). */
-export const PublicBrochureRepeatRequestSchema = z.strictObject({ project_slug: SlugSchema, visitor_token: z.string().min(16).max(200), website: HoneypotSchema });
+export const PublicBrochureRepeatRequestSchema = z.strictObject({
+  project_slug: SlugSchema,
+  visitor_token: z.string().min(16).max(200),
+  website: HoneypotSchema,
+});
 export type PublicBrochureRepeatRequest = z.infer<typeof PublicBrochureRepeatRequestSchema>;
 
 /** Either a first-time request (details + consent) or a returning device (visitor_token only). */
@@ -378,7 +464,11 @@ export const PublicVisitAvailabilityQuerySchema = z
   .refine((q) => !q.from || !q.to || q.from <= q.to, { message: "from must be ≤ to", path: ["to"] });
 export type PublicVisitAvailabilityQuery = z.infer<typeof PublicVisitAvailabilityQuerySchema>;
 
-export const PublicVisitSlotSchema = z.object({ start: TimeStringSchema, end: TimeStringSchema, available: z.int().min(1) });
+export const PublicVisitSlotSchema = z.object({
+  start: TimeStringSchema,
+  end: TimeStringSchema,
+  available: z.int().min(1),
+});
 export type PublicVisitSlot = z.infer<typeof PublicVisitSlotSchema>;
 
 export const PublicVisitAvailabilityResponseSchema = z.object({
@@ -502,7 +592,10 @@ export const PublicVisitRescheduleResponseSchema = PublicVisitManageResponseSche
 });
 export type PublicVisitRescheduleResponse = z.infer<typeof PublicVisitRescheduleResponseSchema>;
 
-export const PublicVisitCancelInputSchema = z.strictObject({ reason: z.string().trim().max(300).optional().nullable(), website: HoneypotSchema });
+export const PublicVisitCancelInputSchema = z.strictObject({
+  reason: z.string().trim().max(300).optional().nullable(),
+  website: HoneypotSchema,
+});
 export type PublicVisitCancelInput = z.infer<typeof PublicVisitCancelInputSchema>;
 
 export const PublicVisitCancelResponseSchema = z.object({ visit_number: z.string(), status: VisitStatusSchema });
@@ -515,7 +608,9 @@ export type PublicVisitCancelResponse = z.infer<typeof PublicVisitCancelResponse
 export const PublicHomeResponseSchema = z.object({
   banners: z.array(PublicBannerSchema),
   featured_projects: z.array(PublicProjectCardSchema),
-  sections: z.array(z.object({ key: z.string(), title: z.string().nullable(), body: z.record(z.string(), z.unknown()) })),
+  sections: z.array(
+    z.object({ key: z.string(), title: z.string().nullable(), body: z.record(z.string(), z.unknown()) }),
+  ),
   testimonials: z.array(PublicTestimonialSchema),
   latest_posts: z.array(PublicPostCardSchema),
   trust_stats: z.array(z.object({ label: z.string(), value: z.string() })),
@@ -527,13 +622,19 @@ export type PublicHomeResponse = z.infer<typeof PublicHomeResponseSchema>;
 export const PublicSiteResponseSchema = PublicSiteSettingsSchema.extend({
   banners: z.array(PublicBannerSchema),
   featured_projects: z.array(PublicProjectCardSchema),
-  home_sections: z.array(z.object({ key: z.string(), title: z.string().nullable(), body: z.record(z.string(), z.unknown()) })),
+  home_sections: z.array(
+    z.object({ key: z.string(), title: z.string().nullable(), body: z.record(z.string(), z.unknown()) }),
+  ),
   testimonials: z.array(PublicTestimonialSchema),
   latest_posts: z.array(PublicPostCardSchema),
 });
 export type PublicSiteResponse = z.infer<typeof PublicSiteResponseSchema>;
 
-export const PublicSitemapEntrySchema = z.object({ path: z.string(), updated_at: TimestampSchema, priority: z.number().min(0).max(1) });
+export const PublicSitemapEntrySchema = z.object({
+  path: z.string(),
+  updated_at: TimestampSchema,
+  priority: z.number().min(0).max(1),
+});
 export type PublicSitemapEntry = z.infer<typeof PublicSitemapEntrySchema>;
 export const PublicSitemapResponseSchema = z.object({ entries: z.array(PublicSitemapEntrySchema) });
 export type PublicSitemapResponse = z.infer<typeof PublicSitemapResponseSchema>;

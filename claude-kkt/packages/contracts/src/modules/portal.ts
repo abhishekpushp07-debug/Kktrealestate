@@ -63,7 +63,10 @@ export type PortalLoginResponse = z.infer<typeof PortalLoginResponseSchema>;
 /** Change password (forced at first login). */
 export const PortalChangePasswordSchema = z
   .strictObject({ current_password: z.string().min(1).max(128), new_password: PasswordSchema })
-  .refine((v) => v.current_password !== v.new_password, { message: "New password must differ", path: ["new_password"] });
+  .refine((v) => v.current_password !== v.new_password, {
+    message: "New password must differ",
+    path: ["new_password"],
+  });
 export type PortalChangePassword = z.infer<typeof PortalChangePasswordSchema>;
 
 export const PortalRefreshSchema = z.strictObject({ refresh_token: z.string().min(16) });
@@ -97,7 +100,12 @@ export const PortalBucketCardSchema = z.object({
 });
 export type PortalBucketCard = z.infer<typeof PortalBucketCardSchema>;
 
-export const PortalRelationshipManagerSchema = z.object({ name: z.string(), phone: z.string().nullable(), whatsapp: z.string().nullable(), email: z.string().nullable() });
+export const PortalRelationshipManagerSchema = z.object({
+  name: z.string(),
+  phone: z.string().nullable(),
+  whatsapp: z.string().nullable(),
+  email: z.string().nullable(),
+});
 export type PortalRelationshipManager = z.infer<typeof PortalRelationshipManagerSchema>;
 
 /** Portal home for one booking. */
@@ -116,11 +124,27 @@ export const PortalHomeResponseSchema = z.object({
     floor_label: z.string(),
     flat_type_name: z.string(),
   }),
-  construction: z.object({ percent: z.number(), current_stage: z.string().nullable(), next_stage: z.string().nullable() }),
-  money: z.object({ cash: PortalBucketCardSchema, account: PortalBucketCardSchema, total_due_paise: SignedPaiseSchema, other_charges_due_paise: SignedPaiseSchema }),
+  construction: z.object({
+    percent: z.number(),
+    current_stage: z.string().nullable(),
+    next_stage: z.string().nullable(),
+  }),
+  money: z.object({
+    cash: PortalBucketCardSchema,
+    account: PortalBucketCardSchema,
+    total_due_paise: SignedPaiseSchema,
+    other_charges_due_paise: SignedPaiseSchema,
+  }),
   plan: z.object({ name: z.string(), plan_type: PlanTypeSchema, accepted_on: DateStringSchema.nullable() }),
   next_installment: z
-    .object({ name: z.string(), trigger_label: z.string(), expected_date: DateStringSchema.nullable(), cash_paise: PaiseSchema, account_paise: PaiseSchema, total_paise: PaiseSchema })
+    .object({
+      name: z.string(),
+      trigger_label: z.string(),
+      expected_date: DateStringSchema.nullable(),
+      cash_paise: PaiseSchema,
+      account_paise: PaiseSchema,
+      total_paise: PaiseSchema,
+    })
     .nullable(),
   notices_unread: z.int().min(0),
   notifications_unread: z.int().min(0),
@@ -153,7 +177,15 @@ export const PortalMyFlatResponseSchema = z.object({
   flat_type_name: z.string(),
   bhk: z.number(),
   facing: z.string().nullable(),
-  rooms: z.array(z.object({ label: z.string(), room_type: z.string(), length_ft: z.number(), width_ft: z.number(), sqft: z.number() })),
+  rooms: z.array(
+    z.object({
+      label: z.string(),
+      room_type: z.string(),
+      length_ft: z.number(),
+      width_ft: z.number(),
+      sqft: z.number(),
+    }),
+  ),
   areas: z.array(z.object({ name: z.string(), code: z.string(), sqft: z.number() })),
   specifications: z.array(z.object({ category: z.string(), items: z.array(z.string()) })),
   parking: z.array(z.object({ number: z.string(), slot_type: z.string(), level: z.string().nullable() })),
@@ -164,7 +196,16 @@ export const PortalMyFlatResponseSchema = z.object({
     cash_agreed_paise: PaiseSchema,
     account_agreed_paise: PaiseSchema,
     revisions: z.array(
-      z.object({ revised_at: TimestampSchema, reason: z.string(), before_value_paise: PaiseSchema, after_value_paise: PaiseSchema, before_cash_paise: PaiseSchema, after_cash_paise: PaiseSchema, before_account_paise: PaiseSchema, after_account_paise: PaiseSchema }),
+      z.object({
+        revised_at: TimestampSchema,
+        reason: z.string(),
+        before_value_paise: PaiseSchema,
+        after_value_paise: PaiseSchema,
+        before_cash_paise: PaiseSchema,
+        after_cash_paise: PaiseSchema,
+        before_account_paise: PaiseSchema,
+        after_account_paise: PaiseSchema,
+      }),
     ),
   }),
 });
@@ -257,7 +298,12 @@ export type PortalPdfLinkResponse = z.infer<typeof PortalPdfLinkResponseSchema>;
 // Construction
 // ---------------------------------------------------------------------------
 
-export const PortalStagePhotoSchema = z.object({ thumb_url: z.string(), medium_url: z.string(), caption: z.string().nullable(), taken_on: DateStringSchema.nullable() });
+export const PortalStagePhotoSchema = z.object({
+  thumb_url: z.string(),
+  medium_url: z.string(),
+  caption: z.string().nullable(),
+  taken_on: DateStringSchema.nullable(),
+});
 export type PortalStagePhoto = z.infer<typeof PortalStagePhotoSchema>;
 
 export const PortalConstructionStageSchema = z.object({
@@ -322,7 +368,10 @@ export type PortalRequestMessageCreate = z.infer<typeof PortalRequestMessageCrea
 export const PortalRequestReopenSchema = z.strictObject({ reason: ReasonSchema });
 export type PortalRequestReopen = z.infer<typeof PortalRequestReopenSchema>;
 
-export const PortalRequestRateSchema = z.strictObject({ rating: z.int().min(1).max(5), comment: z.string().trim().max(1000).optional().nullable() });
+export const PortalRequestRateSchema = z.strictObject({
+  rating: z.int().min(1).max(5),
+  comment: z.string().trim().max(1000).optional().nullable(),
+});
 export type PortalRequestRate = z.infer<typeof PortalRequestRateSchema>;
 
 export const PortalRequestMessageSchema = z.object({
@@ -331,7 +380,15 @@ export const PortalRequestMessageSchema = z.object({
   author_name: z.string(),
   body: z.string(),
   /** `thumb_url` is the ≈480 px rendition for the thread; `url` is the signed full-size link the photo viewer opens (null only for files the customer may not open). */
-  attachments: z.array(z.object({ id: IdSchema, file_name: z.string(), mime: z.string(), thumb_url: z.string().nullable(), url: z.string().nullable() })),
+  attachments: z.array(
+    z.object({
+      id: IdSchema,
+      file_name: z.string(),
+      mime: z.string(),
+      thumb_url: z.string().nullable(),
+      url: z.string().nullable(),
+    }),
+  ),
   created_at: TimestampSchema,
 });
 export type PortalRequestMessage = z.infer<typeof PortalRequestMessageSchema>;
@@ -356,15 +413,24 @@ export const PortalRequestRowSchema = z.object({
   updated_at: TimestampSchema,
 });
 export type PortalRequestRow = z.infer<typeof PortalRequestRowSchema>;
-export const PortalRequestDetailResponseSchema = PortalRequestRowSchema.extend({ messages: z.array(PortalRequestMessageSchema) });
+export const PortalRequestDetailResponseSchema = PortalRequestRowSchema.extend({
+  messages: z.array(PortalRequestMessageSchema),
+});
 export type PortalRequestDetailResponse = z.infer<typeof PortalRequestDetailResponseSchema>;
-export const PortalRequestFilterSchema = ListQuerySchema.extend({ booking_id: IdSchema.optional(), status: ServiceStatusSchema.optional() });
+export const PortalRequestFilterSchema = ListQuerySchema.extend({
+  booking_id: IdSchema.optional(),
+  status: ServiceStatusSchema.optional(),
+});
 export type PortalRequestFilter = z.infer<typeof PortalRequestFilterSchema>;
 export const PortalRequestListResponseSchema = listEnvelope(PortalRequestRowSchema);
 export type PortalRequestListResponse = z.infer<typeof PortalRequestListResponseSchema>;
 
 /** A service category the customer may pick when raising a request (`GET /portal/requests/categories`). */
-export const PortalRequestCategorySchema = z.object({ id: IdSchema, name: z.string(), default_priority: ServicePrioritySchema });
+export const PortalRequestCategorySchema = z.object({
+  id: IdSchema,
+  name: z.string(),
+  default_priority: ServicePrioritySchema,
+});
 export type PortalRequestCategory = z.infer<typeof PortalRequestCategorySchema>;
 
 // ---------------------------------------------------------------------------
@@ -391,6 +457,8 @@ export const PortalNotificationRowSchema = z.object({
   body: z.string(),
   screen: z.enum(["HOME", "LEDGER", "DEMANDS", "SCHEDULE", "CONSTRUCTION", "REQUEST", "NOTICE", "DOCUMENTS"]),
   entity_id: IdSchema.nullable(),
+  /** The booking the bell belongs to (booking bells, and demand / other-charge / payment bells resolved to their booking), so the app
+   * can switch the selected booking before opening `screen`; null for company-wide bells (notices, requests without a booking). */
   booking_id: IdSchema.nullable(),
   is_read: z.boolean(),
   created_at: TimestampSchema,
@@ -401,7 +469,10 @@ export type PortalNotificationListResponse = z.infer<typeof PortalNotificationLi
 
 export const PortalMarkReadSchema = z
   .strictObject({ ids: z.array(IdSchema).max(200).optional(), all: z.boolean().default(false) })
-  .refine((m) => m.all || (m.ids !== undefined && m.ids.length > 0), { message: "Give ids or all=true", path: ["ids"] });
+  .refine((m) => m.all || (m.ids !== undefined && m.ids.length > 0), {
+    message: "Give ids or all=true",
+    path: ["ids"],
+  });
 export type PortalMarkRead = z.infer<typeof PortalMarkReadSchema>;
 
 /** `GET /portal/notifications/unread-count` (Appendix C: `{count}`; excludes withdrawn). */

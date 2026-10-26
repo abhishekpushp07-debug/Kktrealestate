@@ -61,10 +61,9 @@ export function SmartImage({
   }
 
   // Only origins baked into images.remotePatterns at build time may go through /_next/image.
-  let unoptimized = true;
+  let unoptimized: boolean;
   try {
-    const origin = new URL(resolved).origin;
-    unoptimized = !OPTIMIZER_ORIGINS.includes(origin);
+    unoptimized = !OPTIMIZER_ORIGINS.includes(new URL(resolved).origin);
   } catch {
     unoptimized = true;
   }

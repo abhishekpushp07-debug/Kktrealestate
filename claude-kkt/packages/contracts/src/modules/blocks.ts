@@ -69,7 +69,11 @@ function addBlockIssues(b: z.infer<typeof BlockBase>, ctx: z.RefinementCtx): voi
   }
   const outside = b.floor_plans.some((r) => r.from_floor < b.floor_start || r.to_floor > b.floors);
   if (outside) {
-    ctx.addIssue({ code: "custom", message: "Floor-plan ranges must lie within floor_start..floors", path: ["floor_plans"] });
+    ctx.addIssue({
+      code: "custom",
+      message: "Floor-plan ranges must lie within floor_start..floors",
+      path: ["floor_plans"],
+    });
   }
   const noUnits = new Set([...b.refuge_floors, ...b.podium_floors]);
   const unitFloors: number[] = [];
@@ -78,7 +82,11 @@ function addBlockIssues(b: z.infer<typeof BlockBase>, ctx: z.RefinementCtx): voi
   }
   const uncovered = unitFloors.filter((f) => !b.floor_plans.some((r) => f >= r.from_floor && f <= r.to_floor));
   if (uncovered.length > 0) {
-    ctx.addIssue({ code: "custom", message: `Floors without a floor plan: ${uncovered.join(", ")}`, path: ["floor_plans"] });
+    ctx.addIssue({
+      code: "custom",
+      message: `Floors without a floor plan: ${uncovered.join(", ")}`,
+      path: ["floor_plans"],
+    });
   }
 }
 
@@ -131,7 +139,10 @@ export const BlockListResponseSchema = listEnvelope(BlockRowSchema);
 export type BlockListResponse = z.infer<typeof BlockListResponseSchema>;
 
 /** Regenerate / generate flats for a block without flats (blocked once any flat is not AVAILABLE). */
-export const BlockGenerateFlatsSchema = z.strictObject({ ...VersionedSchema.shape, regenerate: z.boolean().default(false) });
+export const BlockGenerateFlatsSchema = z.strictObject({
+  ...VersionedSchema.shape,
+  regenerate: z.boolean().default(false),
+});
 export type BlockGenerateFlats = z.infer<typeof BlockGenerateFlatsSchema>;
 
 /** Append floors to an existing block. */
@@ -143,7 +154,10 @@ export const BlockAppendFloorsSchema = z
     skip_floors: z.array(z.int()).max(20).default([]),
     refuge_floors: z.array(z.int()).max(20).default([]),
   })
-  .refine((a) => rangesDisjoint(a.floor_plans), { message: "Floor-plan ranges must not overlap", path: ["floor_plans"] });
+  .refine((a) => rangesDisjoint(a.floor_plans), {
+    message: "Floor-plan ranges must not overlap",
+    path: ["floor_plans"],
+  });
 export type BlockAppendFloors = z.infer<typeof BlockAppendFloorsSchema>;
 
 /** Result of generation. */
@@ -156,7 +170,10 @@ export const BlockGenerateFlatsResponseSchema = z.object({
 export type BlockGenerateFlatsResponse = z.infer<typeof BlockGenerateFlatsResponseSchema>;
 
 /** Replace a block's stage sequence (ordered stage ids); allowed while no stage is completed. */
-export const BlockStageSequenceUpdateSchema = z.strictObject({ ...VersionedSchema.shape, stage_sequence: z.array(IdSchema).min(1).max(100) });
+export const BlockStageSequenceUpdateSchema = z.strictObject({
+  ...VersionedSchema.shape,
+  stage_sequence: z.array(IdSchema).min(1).max(100),
+});
 export type BlockStageSequenceUpdate = z.infer<typeof BlockStageSequenceUpdateSchema>;
 
 /** Grid query. */
@@ -222,7 +239,9 @@ export const BlockGridResponseSchema = z.object({
   floors: z.array(BlockGridFloorSchema),
   legend: z.object({
     by_status: StatusCountsSchema,
-    by_flat_type: z.array(z.object({ flat_type_id: IdSchema, code: z.string(), name: z.string(), count: z.int().min(0) })),
+    by_flat_type: z.array(
+      z.object({ flat_type_id: IdSchema, code: z.string(), name: z.string(), count: z.int().min(0) }),
+    ),
     price_bands: z.array(PriceBandSchema),
   }),
   unit_counts: UnitCountsSchema,
@@ -250,7 +269,14 @@ export type BlockPreviewCell = z.infer<typeof BlockPreviewCellSchema>;
 
 export const BlockPreviewResponseSchema = z.object({
   total_flats: z.int().min(0),
-  floors: z.array(z.object({ floor: z.int(), floor_label: z.string(), kind: FloorKindSchema, cells: z.array(BlockPreviewCellSchema) })),
+  floors: z.array(
+    z.object({
+      floor: z.int(),
+      floor_label: z.string(),
+      kind: FloorKindSchema,
+      cells: z.array(BlockPreviewCellSchema),
+    }),
+  ),
   total_value_paise: PaiseSchema,
 });
 export type BlockPreviewResponse = z.infer<typeof BlockPreviewResponseSchema>;

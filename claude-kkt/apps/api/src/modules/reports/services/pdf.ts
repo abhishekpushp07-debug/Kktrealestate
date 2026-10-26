@@ -127,8 +127,18 @@ export class BrandedPdf {
   }
 
   /** Body paragraph. */
-  paragraph(text: string, opts: { size?: number; italic?: boolean; color?: string; align?: "left" | "right" | "center" | "justify" } = {}): this {
-    this.ops.push({ op: "paragraph", text, size: opts.size ?? 9.5, italic: opts.italic === true, color: opts.color ?? PDF_THEME.ink, align: opts.align ?? "left" });
+  paragraph(
+    text: string,
+    opts: { size?: number; italic?: boolean; color?: string; align?: "left" | "right" | "center" | "justify" } = {},
+  ): this {
+    this.ops.push({
+      op: "paragraph",
+      text,
+      size: opts.size ?? 9.5,
+      italic: opts.italic === true,
+      color: opts.color ?? PDF_THEME.ink,
+      align: opts.align ?? "left",
+    });
     return this;
   }
 
@@ -139,7 +149,13 @@ export class BrandedPdf {
 
   /** Key/value blocks laid out two per row (label muted, value bold). */
   kv(blocks: readonly KvBlock[]): this {
-    this.ops.push({ op: "kv", blocks: blocks.map((b) => ({ title: b.title ?? null, rows: b.rows.map(([k, v]) => [k, valueText(v)] as [string, string]) })) });
+    this.ops.push({
+      op: "kv",
+      blocks: blocks.map((b) => ({
+        title: b.title ?? null,
+        rows: b.rows.map(([k, v]) => [k, valueText(v)] as [string, string]),
+      })),
+    });
     return this;
   }
 
@@ -147,14 +163,22 @@ export class BrandedPdf {
    * Table with a navy header, zebra rows, right-aligned Indian-formatted money and an optional bold totals row; breaks across pages
    * (header repeated). Cells are formatted here (money → "₹1,00,000", custom renderers) and only strings travel to the renderer.
    */
-  table<T extends Record<string, unknown>>(columns: readonly PdfColumn<T>[], rows: readonly T[], opts: { totals?: Record<string, unknown> | null; emptyText?: string; fontSize?: number } = {}): this {
+  table<T extends Record<string, unknown>>(
+    columns: readonly PdfColumn<T>[],
+    rows: readonly T[],
+    opts: { totals?: Record<string, unknown> | null; emptyText?: string; fontSize?: number } = {},
+  ): this {
     const cellText = (col: PdfColumn<T>, row: T): string => {
       if (col.render) return col.render(row);
       const v = row[col.key];
       if (col.money) return typeof v === "number" ? pdfMoney(v) : v == null ? "" : String(v);
       return valueText(v as string | number | null | undefined);
     };
-    const rendered: RenderColumn[] = columns.map((c) => ({ header: c.header, width: c.width ?? 1, align: c.align ?? (c.money ? "right" : "left") }));
+    const rendered: RenderColumn[] = columns.map((c) => ({
+      header: c.header,
+      width: c.width ?? 1,
+      align: c.align ?? (c.money ? "right" : "left"),
+    }));
     let totals: string[] | null = null;
     if (opts.totals) {
       const t = opts.totals;
@@ -190,8 +214,17 @@ export class BrandedPdf {
   }
 
   /** Signature block (right-aligned): "For <company>", space, name/title. */
-  signature(forName: string, signatoryName: string | null | undefined, signatoryTitle: string | null | undefined): this {
-    this.ops.push({ op: "signature", forName, name: signatoryName ?? "Authorised Signatory", title: signatoryTitle ?? null });
+  signature(
+    forName: string,
+    signatoryName: string | null | undefined,
+    signatoryTitle: string | null | undefined,
+  ): this {
+    this.ops.push({
+      op: "signature",
+      forName,
+      name: signatoryName ?? "Authorised Signatory",
+      title: signatoryTitle ?? null,
+    });
     return this;
   }
 
@@ -204,7 +237,9 @@ export class BrandedPdf {
     if (lh.tagline) sub.push(lh.tagline);
     const lines: string[] = [];
     if (lh.addressLine) lines.push(lh.addressLine);
-    const regs = [lh.gstin ? `GSTIN ${lh.gstin}` : null, lh.reraLine ?? null, lh.contactLine ?? null].filter((x): x is string => !!x);
+    const regs = [lh.gstin ? `GSTIN ${lh.gstin}` : null, lh.reraLine ?? null, lh.contactLine ?? null].filter(
+      (x): x is string => !!x,
+    );
     if (regs.length > 0) lines.push(regs.join("  ·  "));
     const logo = lh.logo && isPngOrJpeg(lh.logo) ? new Uint8Array(lh.logo) : null;
     return {
@@ -235,7 +270,8 @@ export class BrandedPdf {
 
 function valueText(v: string | number | null | undefined | unknown): string {
   if (v === null || v === undefined || v === "") return "—";
-  if (typeof v === "number") return Number.isInteger(v) ? `${v < 0 ? "-" : ""}${groupIndian(String(Math.abs(v)))}` : String(v);
+  if (typeof v === "number")
+    return Number.isInteger(v) ? `${v < 0 ? "-" : ""}${groupIndian(String(Math.abs(v)))}` : String(v);
   if (typeof v === "boolean") return v ? "Yes" : "No";
   return String(v);
 }
@@ -256,7 +292,12 @@ export interface ReportTableSpec<T extends Record<string, unknown>> {
   rows: readonly T[];
   totals?: Record<string, unknown> | null;
   /** Extra sections printed after the main table. */
-  sections?: readonly { heading: string; columns: readonly PdfColumn<Record<string, unknown>>[]; rows: readonly Record<string, unknown>[]; totals?: Record<string, unknown> | null }[];
+  sections?: readonly {
+    heading: string;
+    columns: readonly PdfColumn<Record<string, unknown>>[];
+    rows: readonly Record<string, unknown>[];
+    totals?: Record<string, unknown> | null;
+  }[];
   landscape?: boolean;
 }
 
@@ -272,8 +313,16 @@ export function pdfTruncationNote(shown: number, total: number): string {
 }
 
 /** Builds (without finishing) the generic report document: title bar, filter block, capped table with totals footer, optional extra sections. */
-export function buildReportPdf<T extends Record<string, unknown>>(letterhead: PdfLetterhead, spec: ReportTableSpec<T>): BrandedPdf {
-  const pdf = new BrandedPdf({ letterhead, title: spec.title, reference: spec.subtitle ?? null, landscape: spec.landscape ?? spec.columns.length > 7 });
+export function buildReportPdf<T extends Record<string, unknown>>(
+  letterhead: PdfLetterhead,
+  spec: ReportTableSpec<T>,
+): BrandedPdf {
+  const pdf = new BrandedPdf({
+    letterhead,
+    title: spec.title,
+    reference: spec.subtitle ?? null,
+    landscape: spec.landscape ?? spec.columns.length > 7,
+  });
   if (spec.filters && spec.filters.length > 0) {
     pdf.kv([{ title: "Filters", rows: spec.filters.map(([k, v]) => [k, v] as const) }]);
   }
@@ -287,16 +336,24 @@ export function buildReportPdf<T extends Record<string, unknown>>(letterhead: Pd
     if (sectionRows.length < s.rows.length) pdf.note(pdfTruncationNote(sectionRows.length, s.rows.length));
   }
   const totalsNote = spec.rows.length > PDF_MAX_ROWS ? " Totals cover every row, not only those printed." : "";
-  pdf.note(`${groupIndian(String(spec.rows.length))} row${spec.rows.length === 1 ? "" : "s"}.${totalsNote} Amounts in Indian Rupees; computer-generated report.`);
+  pdf.note(
+    `${groupIndian(String(spec.rows.length))} row${spec.rows.length === 1 ? "" : "s"}.${totalsNote} Amounts in Indian Rupees; computer-generated report.`,
+  );
   return pdf;
 }
 
 /** Generic report PDF as bytes (see buildReportPdf). */
-export async function reportPdf<T extends Record<string, unknown>>(letterhead: PdfLetterhead, spec: ReportTableSpec<T>): Promise<Buffer> {
+export async function reportPdf<T extends Record<string, unknown>>(
+  letterhead: PdfLetterhead,
+  spec: ReportTableSpec<T>,
+): Promise<Buffer> {
   return buildReportPdf(letterhead, spec).finish();
 }
 
 /** Generic report PDF as a readable stream (what the report routes send); resolves once the worker has produced the first bytes. */
-export function reportPdfStream<T extends Record<string, unknown>>(letterhead: PdfLetterhead, spec: ReportTableSpec<T>): Promise<Readable> {
+export function reportPdfStream<T extends Record<string, unknown>>(
+  letterhead: PdfLetterhead,
+  spec: ReportTableSpec<T>,
+): Promise<Readable> {
   return buildReportPdf(letterhead, spec).finishStream();
 }

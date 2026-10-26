@@ -33,7 +33,10 @@ export type NotificationListResponse = z.infer<typeof NotificationListResponseSc
 /** Mark some (or all) notifications read. */
 export const NotificationMarkReadSchema = z
   .strictObject({ ids: z.array(IdSchema).max(500).optional(), all: z.boolean().default(false) })
-  .refine((m) => m.all || (m.ids !== undefined && m.ids.length > 0), { message: "Give ids or all=true", path: ["ids"] });
+  .refine((m) => m.all || (m.ids !== undefined && m.ids.length > 0), {
+    message: "Give ids or all=true",
+    path: ["ids"],
+  });
 export type NotificationMarkRead = z.infer<typeof NotificationMarkReadSchema>;
 
 /** Unread count (excludes withdrawn). */

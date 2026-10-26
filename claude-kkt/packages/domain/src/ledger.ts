@@ -167,7 +167,9 @@ export function ledgerKindPriority(kind: LedgerEventKind): number {
 }
 
 /** Empty opening summary, optionally seeded with the agreed bucket values. */
-export function emptyLedgerSummary(agreed?: { cashAgreedPaise: number; accountAgreedPaise: number } | null): LedgerSummary {
+export function emptyLedgerSummary(
+  agreed?: { cashAgreedPaise: number; accountAgreedPaise: number } | null,
+): LedgerSummary {
   return {
     seq: 0,
     cashOrderRaisedPaise: 0,
@@ -220,7 +222,10 @@ function positive(amount: number, what: string): number {
 }
 
 /** Applies one event to a summary, returning the next summary and the row's display amount/bucket/label. */
-function applyEvent(prev: LedgerSummary, event: LedgerEvent): { next: LedgerSummary; amountPaise: number; bucket: Bucket | null; label: string } {
+function applyEvent(
+  prev: LedgerSummary,
+  event: LedgerEvent,
+): { next: LedgerSummary; amountPaise: number; bucket: Bucket | null; label: string } {
   if (prev.isClosed && event.kind !== "CANCELLATION") {
     throw new LedgerError(`Ledger is closed; cannot append ${event.kind}`);
   }
@@ -267,7 +272,12 @@ function applyEvent(prev: LedgerSummary, event: LedgerEvent): { next: LedgerSumm
         accountOrderRaisedPaise: prev.accountOrderRaisedPaise + accountAdj,
       });
       const newTotal = event.cashAgreedPaise + event.accountAgreedPaise;
-      return { next, amountPaise: prev.cashAgreedPaise === null ? newTotal : newTotal - prevTotal, bucket: null, label: event.label ?? "Agreement revised" };
+      return {
+        next,
+        amountPaise: prev.cashAgreedPaise === null ? newTotal : newTotal - prevTotal,
+        bucket: null,
+        label: event.label ?? "Agreement revised",
+      };
     }
     case "PLAN_CHANGE": {
       const cashAdj = event.cashRaisedAdjustmentPaise ?? 0;
@@ -303,7 +313,12 @@ function applyEvent(prev: LedgerSummary, event: LedgerEvent): { next: LedgerSumm
         throw new LedgerError("Ledger is already closed");
       }
       const next = withDerived({ ...prev, isClosed: true });
-      return { next, amountPaise: event.refundPaise === 0 ? 0 : -event.refundPaise, bucket: null, label: event.label ?? "Booking cancelled" };
+      return {
+        next,
+        amountPaise: event.refundPaise === 0 ? 0 : -event.refundPaise,
+        bucket: null,
+        label: event.label ?? "Booking cancelled",
+      };
     }
     default: {
       const never: never = event;
@@ -313,7 +328,13 @@ function applyEvent(prev: LedgerSummary, event: LedgerEvent): { next: LedgerSumm
 }
 
 /** Builds the ledger row for a summary that already includes the event. */
-function rowFrom(summary: LedgerSummary, event: LedgerEvent, amountPaise: number, bucket: Bucket | null, label: string): LedgerRow {
+function rowFrom(
+  summary: LedgerSummary,
+  event: LedgerEvent,
+  amountPaise: number,
+  bucket: Bucket | null,
+  label: string,
+): LedgerRow {
   return {
     seq: summary.seq,
     at: event.at,
@@ -337,7 +358,10 @@ function rowFrom(summary: LedgerSummary, event: LedgerEvent, amountPaise: number
 }
 
 /** O(1) incremental step: applies one event to the previous summary and returns the next row and summary. */
-export function appendLedgerRow(prevSummary: LedgerSummary, event: LedgerEvent): { row: LedgerRow; summary: LedgerSummary } {
+export function appendLedgerRow(
+  prevSummary: LedgerSummary,
+  event: LedgerEvent,
+): { row: LedgerRow; summary: LedgerSummary } {
   const applied = applyEvent(prevSummary, event);
   const summary: LedgerSummary = { ...applied.next, seq: prevSummary.seq + 1 };
   return { row: rowFrom(summary, event, applied.amountPaise, applied.bucket, applied.label), summary };
@@ -427,7 +451,11 @@ export interface LedgerRowDifference {
  * Compares a stored ledger with a rebuild row by row (both in seq order): event, source id, bucket, amount and every running balance.
  * A missing or extra row is reported once as field "row". Returns at most `limit` differences (default 20), first divergence first.
  */
-export function diffLedgerRows(stored: readonly ComparableLedgerRow[], recomputed: readonly ComparableLedgerRow[], limit = 20): LedgerRowDifference[] {
+export function diffLedgerRows(
+  stored: readonly ComparableLedgerRow[],
+  recomputed: readonly ComparableLedgerRow[],
+  limit = 20,
+): LedgerRowDifference[] {
   const out: LedgerRowDifference[] = [];
   const n = Math.max(stored.length, recomputed.length);
   for (let i = 0; i < n && out.length < limit; i += 1) {
@@ -460,7 +488,12 @@ export interface BucketCapInput {
 
 export type BucketCapResult =
   | { ok: true }
-  | { ok: false; code: "BUCKET_CAP_EXCEEDED"; message: string; details: { bucket: Bucket; agreedPaise: number; paidPaise: number; amountPaise: number; headroomPaise: number } };
+  | {
+      ok: false;
+      code: "BUCKET_CAP_EXCEEDED";
+      message: string;
+      details: { bucket: Bucket; agreedPaise: number; paidPaise: number; amountPaise: number; headroomPaise: number };
+    };
 
 /** Human label of a bucket. */
 export function bucketLabel(bucket: Bucket): string {
@@ -517,7 +550,11 @@ export interface DemandStatusResult {
 }
 
 /** Allocates paid money to demands FIFO per bucket (demands in raise order) and derives each demand's status. */
-export function demandStatuses(demands: readonly DemandForStatus[], cashPaidPaise: number, accountPaidPaise: number): DemandStatusResult[] {
+export function demandStatuses(
+  demands: readonly DemandForStatus[],
+  cashPaidPaise: number,
+  accountPaidPaise: number,
+): DemandStatusResult[] {
   assertPaise(cashPaidPaise, "cashPaidPaise");
   assertPaise(accountPaidPaise, "accountPaidPaise");
   let cashLeft = Math.max(0, cashPaidPaise);

@@ -28,14 +28,22 @@ async function downloadToCache(link: SignedFile): Promise<File> {
     return await File.downloadFileAsync(link.download_url, dest, { idempotent: true });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "";
-    throw new ApiError({ status: 0, code: "NETWORK", message: msg.includes("404") ? "This file is not available yet." : "Could not download the file. Please try again." });
+    throw new ApiError({
+      status: 0,
+      code: "NETWORK",
+      message: msg.includes("404")
+        ? "This file is not available yet."
+        : "Could not download the file. Please try again.",
+    });
   }
 }
 
 /** Opens the document for reading (in-app browser renders PDFs on iOS; Android falls back to the share sheet). */
 export async function viewSignedFile(link: SignedFile): Promise<void> {
   try {
-    const result = await WebBrowser.openBrowserAsync(link.download_url, { presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET });
+    const result = await WebBrowser.openBrowserAsync(link.download_url, {
+      presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
+    });
     if (result.type === "cancel" || result.type === "dismiss" || result.type === "opened") return;
   } catch {
     /* fall through to download + share */
@@ -48,7 +56,11 @@ export async function downloadAndShare(link: SignedFile): Promise<void> {
   const file = await downloadToCache(link);
   if (await Sharing.isAvailableAsync()) {
     const mime = link.mime ?? "application/pdf";
-    await Sharing.shareAsync(file.uri, { mimeType: mime, UTI: mime === "application/pdf" ? "com.adobe.pdf" : undefined, dialogTitle: link.file_name });
+    await Sharing.shareAsync(file.uri, {
+      mimeType: mime,
+      UTI: mime === "application/pdf" ? "com.adobe.pdf" : undefined,
+      dialogTitle: link.file_name,
+    });
     return;
   }
   throw new ApiError({ status: 0, code: "UNKNOWN", message: `Saved to ${file.uri}` });

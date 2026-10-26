@@ -2,7 +2,16 @@
  * Pricing engine (SPEC §5): base price from a rate card (rate × super built-up or lump sum) plus PLC rules,
  * with a line-item breakup. Also the flat-type fallback price and the bulk price-edit helper.
  */
-import { assertPaise, bpOfPaise, divRoundHalfUp, formatINR, mulPaiseBySqft, scaleDecimal, toBasisPoints, bigIntToSafeNumber } from "./money.js";
+import {
+  assertPaise,
+  bpOfPaise,
+  divRoundHalfUp,
+  formatINR,
+  mulPaiseBySqft,
+  scaleDecimal,
+  toBasisPoints,
+  bigIntToSafeNumber,
+} from "./money.js";
 
 /** Calculation mode of a PLC rule. */
 export type PlcCalcMode = "PER_SQFT" | "FIXED" | "PERCENT" | "FLOOR_RISE";
@@ -78,7 +87,9 @@ export function plcApplies(rule: PlcRule, flat: PricingFlat): boolean {
     case "CORNER":
       return flat.isCorner;
     case "FACING_IN":
-      return flat.facing !== null && (rule.facings ?? []).map((f) => f.toUpperCase()).includes(flat.facing.toUpperCase());
+      return (
+        flat.facing !== null && (rule.facings ?? []).map((f) => f.toUpperCase()).includes(flat.facing.toUpperCase())
+      );
     default: {
       const never: never = rule.appliesTo;
       throw new PricingError("INVALID_RULE", `Unknown appliesTo ${String(never)}`);
@@ -121,7 +132,11 @@ export function effectiveRatePerSqft(totalPaise: number, sqft: number): number |
 }
 
 /** Base price line from a rate or lump sum. */
-function baseLine(rate: { ratePerSqftPaise: number | null; lumpSumPaise: number | null }, sqft: number, what: string): { line: PriceLine; rate: number | null } {
+function baseLine(
+  rate: { ratePerSqftPaise: number | null; lumpSumPaise: number | null },
+  sqft: number,
+  what: string,
+): { line: PriceLine; rate: number | null } {
   if (rate.lumpSumPaise !== null && rate.lumpSumPaise !== undefined) {
     const amount = assertPaise(rate.lumpSumPaise, `${what} lump sum`);
     return { line: { label: "Base price (lump sum)", amountPaise: amount }, rate: effectiveRatePerSqft(amount, sqft) };
@@ -129,7 +144,10 @@ function baseLine(rate: { ratePerSqftPaise: number | null; lumpSumPaise: number 
   if (rate.ratePerSqftPaise !== null && rate.ratePerSqftPaise !== undefined) {
     const perSqft = assertPaise(rate.ratePerSqftPaise, `${what} rate`);
     return {
-      line: { label: `Base price (${sqftLabel(sqft)} × ${formatINR(perSqft)})`, amountPaise: mulPaiseBySqft(perSqft, sqft) },
+      line: {
+        label: `Base price (${sqftLabel(sqft)} × ${formatINR(perSqft)})`,
+        amountPaise: mulPaiseBySqft(perSqft, sqft),
+      },
       rate: perSqft,
     };
   }
@@ -175,7 +193,11 @@ export function priceFromFlatType(flatType: FlatTypePricing): PriceResult {
 }
 
 /** Prices with the active rate card when one is given and it covers the flat type, else from the flat type. */
-export function resolveFlatPrice(input: { flat: PricingFlat; flatType: FlatTypePricing; rateCard: RateCard | null }): PriceResult {
+export function resolveFlatPrice(input: {
+  flat: PricingFlat;
+  flatType: FlatTypePricing;
+  rateCard: RateCard | null;
+}): PriceResult {
   if (input.rateCard && input.rateCard.rates.some((r) => r.flatTypeId === input.flat.flatTypeId)) {
     return priceFlat({ flat: input.flat, rateCard: input.rateCard });
   }
@@ -226,7 +248,10 @@ export function bulkPriceEdit(input: BulkPriceEditInput): BulkPriceEditResult[] 
         base = { label: "Base price", amountPaise: assertPaise(input.value) };
         break;
       case "ADJUST_PERCENT":
-        base = { label: "Base price", amountPaise: flat.pricePaise + bpOfPaise(flat.pricePaise, toBasisPoints(input.value)) };
+        base = {
+          label: "Base price",
+          amountPaise: flat.pricePaise + bpOfPaise(flat.pricePaise, toBasisPoints(input.value)),
+        };
         break;
       case "ADJUST_AMOUNT":
         base = { label: "Base price", amountPaise: flat.pricePaise + assertPaise(input.value) };
@@ -240,12 +265,20 @@ export function bulkPriceEdit(input: BulkPriceEditInput): BulkPriceEditResult[] 
     const breakup: PriceLine[] = [base];
     if (step !== 0) {
       const floorsAbove = Math.max(0, flat.floor - floorStart);
-      const rise = Math.max(0, mulPaiseBySqft(assertPaise(step, "Floor rise step") * floorsAbove, flat.superBuiltupSqft));
+      const rise = Math.max(
+        0,
+        mulPaiseBySqft(assertPaise(step, "Floor rise step") * floorsAbove, flat.superBuiltupSqft),
+      );
       if (rise > 0) {
         breakup.push({ label: "Floor rise", amountPaise: rise });
       }
     }
     const pricePaise = breakup.reduce((sum, line) => sum + line.amountPaise, 0);
-    return { id: flat.id, pricePaise, ratePerSqftPaise: effectiveRatePerSqft(pricePaise, flat.superBuiltupSqft), breakup };
+    return {
+      id: flat.id,
+      pricePaise,
+      ratePerSqftPaise: effectiveRatePerSqft(pricePaise, flat.superBuiltupSqft),
+      breakup,
+    };
   });
 }

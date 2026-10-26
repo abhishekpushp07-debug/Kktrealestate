@@ -33,7 +33,12 @@ export function SiteNav({ brandName, logoUrl, phone, portalUrl }: SiteNavProps) 
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  useEffect(() => setOpen(false), [pathname]);
+  // Close the menu on navigation (adjusted while rendering rather than in an effect).
+  const [menuPath, setMenuPath] = useState(pathname);
+  if (menuPath !== pathname) {
+    setMenuPath(pathname);
+    setOpen(false);
+  }
 
   const tel = telHref(phone);
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
@@ -47,10 +52,12 @@ export function SiteNav({ brandName, logoUrl, phone, portalUrl }: SiteNavProps) 
       <nav className="container-wide flex h-18 items-center justify-between gap-4 text-ivory-100" aria-label="Primary">
         <Link href="/" className="tap flex min-w-0 items-center gap-3 rounded-md py-1" aria-label={`${brandName} home`}>
           {logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
             <img src={logoUrl} alt="" className="h-9 w-auto max-w-[9rem] object-contain" width={144} height={36} />
           ) : (
-            <span aria-hidden className="flex h-9 w-9 items-center justify-center rounded-full border border-gold-500/70 font-display text-lg text-gold-300">
+            <span
+              aria-hidden
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-gold-500/70 font-display text-lg text-gold-300"
+            >
               {brandName.charAt(0)}
             </span>
           )}

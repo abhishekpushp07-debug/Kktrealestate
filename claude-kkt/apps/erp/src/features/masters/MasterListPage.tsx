@@ -88,7 +88,12 @@ function GenericMasterList({ config }: GenericMasterListProps) {
         cell: ({ row }) => (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <IconButton icon={MoreHorizontal} label={`Actions for ${config.displayName(row.original)}`} size="sm" data-testid={`row-actions-${row.original.id}`} />
+              <IconButton
+                icon={MoreHorizontal}
+                label={`Actions for ${config.displayName(row.original)}`}
+                size="sm"
+                data-testid={`row-actions-${row.original.id}`}
+              />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               {canWrite && (
@@ -131,16 +136,31 @@ function GenericMasterList({ config }: GenericMasterListProps) {
         breadcrumbs={[{ label: "Home", to: "/" }, { label: "Master data", to: "/masters" }, { label: config.label }]}
         actions={
           <>
-            <Button variant="outline" leftIcon={Download} loading={exporting} onClick={() => void exportCsv()} data-testid="master-export-csv-btn">
+            <Button
+              variant="outline"
+              leftIcon={Download}
+              loading={exporting}
+              onClick={() => void exportCsv()}
+              data-testid="master-export-csv-btn"
+            >
               Export CSV
             </Button>
             {canWrite && (
-              <Button variant="outline" leftIcon={Upload} onClick={() => setImportOpen(true)} data-testid="master-import-csv-btn">
+              <Button
+                variant="outline"
+                leftIcon={Upload}
+                onClick={() => setImportOpen(true)}
+                data-testid="master-import-csv-btn"
+              >
                 Import CSV
               </Button>
             )}
             {canWrite && (
-              <Button leftIcon={Plus} onClick={() => setEditing({ open: true, row: null })} data-testid="master-new-btn">
+              <Button
+                leftIcon={Plus}
+                onClick={() => setEditing({ open: true, row: null })}
+                data-testid="master-new-btn"
+              >
                 New
               </Button>
             )}
@@ -152,7 +172,15 @@ function GenericMasterList({ config }: GenericMasterListProps) {
         search={list.search}
         onSearchChange={list.setSearch}
         searchPlaceholder={config.searchPlaceholder}
-        filters={<Switch size="sm" label="Show inactive" checked={list.includeInactive} onCheckedChange={list.setIncludeInactive} data-testid="master-include-inactive-switch" />}
+        filters={
+          <Switch
+            size="sm"
+            label="Show inactive"
+            checked={list.includeInactive}
+            onCheckedChange={list.setIncludeInactive}
+            data-testid="master-include-inactive-switch"
+          />
+        }
         hasActiveFilters={list.hasActiveFilters}
         onClearFilters={list.reset}
         summary={query.data ? `${formatNumber(total)} ${total === 1 ? "record" : "records"}` : undefined}
@@ -173,11 +201,21 @@ function GenericMasterList({ config }: GenericMasterListProps) {
         onColumnVisibilityChange={setVisibility}
         onRowClick={canWrite ? (row) => setEditing({ open: true, row }) : undefined}
         rowClassName={(row) => (row.is_active ? undefined : "[&>td]:text-ink-subtle")}
-        pagination={{ page: list.page, pageSize: list.pageSize, total, onPageChange: list.setPage, onPageSizeChange: list.setPageSize }}
+        pagination={{
+          page: list.page,
+          pageSize: list.pageSize,
+          total,
+          onPageChange: list.setPage,
+          onPageSizeChange: list.setPageSize,
+        }}
         emptyState={{
           icon: config.icon,
-          title: list.hasActiveFilters ? `No ${config.label.toLowerCase()} match` : `No ${config.label.toLowerCase()} yet`,
-          description: list.hasActiveFilters ? "Try a different search or include inactive records." : `${config.description}`,
+          title: list.hasActiveFilters
+            ? `No ${config.label.toLowerCase()} match`
+            : `No ${config.label.toLowerCase()} yet`,
+          description: list.hasActiveFilters
+            ? "Try a different search or include inactive records."
+            : `${config.description}`,
           action:
             canWrite && !list.hasActiveFilters ? (
               <>
@@ -193,15 +231,36 @@ function GenericMasterList({ config }: GenericMasterListProps) {
         data-testid={`master-table-${config.slug}`}
       />
 
-      <MasterFormSheet config={config} open={editing.open} onOpenChange={(open) => setEditing((state) => ({ ...state, open }))} row={editing.row} />
+      <MasterFormSheet
+        config={config}
+        open={editing.open}
+        onOpenChange={(open) => setEditing((state) => ({ ...state, open }))}
+        row={editing.row}
+      />
       <CsvImportDialog config={config} open={importOpen} onOpenChange={setImportOpen} />
-      <UsageDialog config={config} row={usageRow} open={usageRow !== null} onOpenChange={(open) => !open && setUsageRow(null)} />
-      <UsageDialog config={config} row={inUse?.row ?? null} preset={inUse?.usage ?? null} blocked open={inUse !== null} onOpenChange={(open) => !open && clearInUse()} />
+      <UsageDialog
+        config={config}
+        row={usageRow}
+        open={usageRow !== null}
+        onOpenChange={(open) => !open && setUsageRow(null)}
+      />
+      <UsageDialog
+        config={config}
+        row={inUse?.row ?? null}
+        preset={inUse?.usage ?? null}
+        blocked
+        open={inUse !== null}
+        onOpenChange={(open) => !open && clearInUse()}
+      />
       <ConfirmDialog
         open={confirmDeactivate !== null}
         onOpenChange={(open) => !open && setConfirmDeactivate(null)}
         title={`Deactivate ${config.singular.toLowerCase()}?`}
-        description={confirmDeactivate ? `${config.displayName(confirmDeactivate)} will disappear from dropdowns. Existing records that reference it keep working, and you can restore it later.` : undefined}
+        description={
+          confirmDeactivate
+            ? `${config.displayName(confirmDeactivate)} will disappear from dropdowns. Existing records that reference it keep working, and you can restore it later.`
+            : undefined
+        }
         confirmLabel="Deactivate"
         variant="destructive"
         onConfirm={async () => {

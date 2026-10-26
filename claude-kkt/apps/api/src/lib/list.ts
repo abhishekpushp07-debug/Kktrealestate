@@ -1,4 +1,20 @@
-import { and, asc, count, desc, eq, getTableColumns, getTableName, gt, ilike, isNotNull, isNull, lt, or, sql, type SQL } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  getTableColumns,
+  getTableName,
+  gt,
+  ilike,
+  isNotNull,
+  isNull,
+  lt,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 import type { AnyPgColumn, PgSelect, PgTable, SelectedFields } from "drizzle-orm/pg-core";
 import type { FastifyInstance } from "fastify";
 import type { ListQuery } from "@kkt/contracts";
@@ -81,7 +97,10 @@ export function searchCondition(columns: readonly (AnyPgColumn | SQL)[], term: s
   return parts.length === 1 ? parts[0] : or(...parts);
 }
 
-interface CursorPayload { v: string | number | boolean | null; id: string }
+interface CursorPayload {
+  v: string | number | boolean | null;
+  id: string;
+}
 
 function encodeCursor(p: CursorPayload): string {
   return Buffer.from(JSON.stringify([p.v, p.id])).toString("base64url");
@@ -115,7 +134,14 @@ function rawSortValue(v: unknown): CursorPayload["v"] {
  * (or, on ASC, any boundary before it) silently ends the listing — the async export would store a truncated file. Not-null columns of
  * the listed table keep the plain index-friendly condition; columns of joined tables count as nullable (LEFT JOINs).
  */
-export function keysetAfter(col: AnyPgColumn, idCol: AnyPgColumn, v: unknown, id: string, direction: "asc" | "desc", nullable: boolean): SQL {
+export function keysetAfter(
+  col: AnyPgColumn,
+  idCol: AnyPgColumn,
+  v: unknown,
+  id: string,
+  direction: "asc" | "desc",
+  nullable: boolean,
+): SQL {
   const cmp = direction === "asc" ? gt : lt;
   const tie = cmp(idCol, id);
   if (v === null || v === undefined) {
@@ -129,7 +155,11 @@ export function keysetAfter(col: AnyPgColumn, idCol: AnyPgColumn, v: unknown, id
 }
 
 /** Resolves the requested sort against the allow-list (400 on unknown fields). */
-export function resolveSort(sort: PaginateOptions["sort"]): { field: string; column: AnyPgColumn; direction: "asc" | "desc" } {
+export function resolveSort(sort: PaginateOptions["sort"]): {
+  field: string;
+  column: AnyPgColumn;
+  direction: "asc" | "desc";
+} {
   const parsed = parseSort(sort.requested ?? sort.default);
   const column = sort.allowed[parsed.field];
   if (!column) throw ApiError.badRequest(`Cannot sort by "${parsed.field}"`, { allowed: Object.keys(sort.allowed) });
@@ -165,7 +195,9 @@ async function tableEstimate(executor: Executor, table: PgTable): Promise<number
   const hit = tableEstimates.get(name);
   const now = Date.now();
   if (hit && now - hit.at < TABLE_ESTIMATE_TTL_MS) return hit.n;
-  const rows = (await executor.execute(sql`select reltuples::float8 as n from pg_class where oid = ${`"${name}"`}::regclass`)) as unknown as { n: number | string }[];
+  const rows = (await executor.execute(
+    sql`select reltuples::float8 as n from pg_class where oid = ${`"${name}"`}::regclass`,
+  )) as unknown as { n: number | string }[];
   const n = Number(rows[0]?.n ?? -1);
   tableEstimates.set(name, { n, at: now });
   return n;
@@ -181,7 +213,10 @@ export function resetTableEstimates(): void {
  * with ILIKE search, allow-listed sort and optional joins. One page query + one count query. Timestamp sorts page on a microsecond-exact
  * key; tables above `estimateAbove` rows report the planner's estimate as `total` unless `exact` is set.
  */
-export async function paginate<T = Record<string, unknown>>(executor: Executor, opts: PaginateOptions): Promise<ListResult<T>> {
+export async function paginate<T = Record<string, unknown>>(
+  executor: Executor,
+  opts: PaginateOptions,
+): Promise<ListResult<T>> {
   const sort = resolveSort(opts.sort);
   const idCol = opts.table.id;
   const dir = sort.direction === "asc" ? asc : desc;
@@ -203,9 +238,16 @@ export async function paginate<T = Record<string, unknown>>(executor: Executor, 
     : (opts.select as SelectedFields | undefined);
   const base: PgSelect = (selection ? executor.select(selection) : executor.select()).from(opts.table).$dynamic();
   let pageQuery: PgSelect = opts.join ? opts.join(base) : base;
-  pageQuery = pageQuery.where(where).orderBy(dir(sort.column), dir(idCol)).limit(pageSize + (cursorMode ? 1 : 0));
+  pageQuery = pageQuery
+    .where(where)
+    .orderBy(dir(sort.column), dir(idCol))
+    .limit(pageSize + (cursorMode ? 1 : 0));
   if (!cursorMode) pageQuery = pageQuery.offset((page - 1) * pageSize);
-  const countWhere = and(...[opts.where, searchCondition(opts.search?.columns ?? [], opts.search?.term)].filter((c): c is SQL => c !== undefined));
+  const countWhere = and(
+    ...[opts.where, searchCondition(opts.search?.columns ?? [], opts.search?.term)].filter(
+      (c): c is SQL => c !== undefined,
+    ),
+  );
   const countBase: PgSelect = executor.select({ total: count() }).from(opts.table).$dynamic();
   const countQuery = (opts.join ? opts.join(countBase) : countBase).where(countWhere);
   const [rows, total] = await Promise.all([pageQuery, countRows(executor, opts, countQuery, countWhere)]);
@@ -223,7 +265,12 @@ export async function paginate<T = Record<string, unknown>>(executor: Executor, 
 }
 
 /** Exact `count(*)` for small tables or `exact=true`; the planner's estimate of the filtered query above the threshold. */
-async function countRows(executor: Executor, opts: PaginateOptions, countQuery: PgSelect, where: SQL | undefined): Promise<number> {
+async function countRows(
+  executor: Executor,
+  opts: PaginateOptions,
+  countQuery: PgSelect,
+  where: SQL | undefined,
+): Promise<number> {
   const exact = async () => {
     const totals = (await countQuery) as { total?: number | string }[];
     return Number(totals[0]?.total ?? 0);
@@ -237,7 +284,12 @@ async function countRows(executor: Executor, opts: PaginateOptions, countQuery: 
 }
 
 /** Reads the sort value back from the last row: a flat select key, a nested table selection, or the full-row property. */
-function readSortValue(last: Record<string, unknown>, opts: PaginateOptions, column: AnyPgColumn, field: string): unknown {
+function readSortValue(
+  last: Record<string, unknown>,
+  opts: PaginateOptions,
+  column: AnyPgColumn,
+  field: string,
+): unknown {
   for (const [k, c] of Object.entries(opts.select ?? {})) {
     if (c === column) return last[k];
     if (c && typeof c === "object" && !("queryChunks" in (c as object))) {
@@ -252,7 +304,8 @@ function readSortValue(last: Record<string, unknown>, opts: PaginateOptions, col
 /** Reads the row id from a flat or nested selection. */
 function readId(last: Record<string, unknown>): unknown {
   if (last["id"] !== undefined) return last["id"];
-  for (const v of Object.values(last)) if (v && typeof v === "object" && "id" in (v as object)) return (v as { id: unknown }).id;
+  for (const v of Object.values(last))
+    if (v && typeof v === "object" && "id" in (v as object)) return (v as { id: unknown }).id;
   return undefined;
 }
 
@@ -263,7 +316,9 @@ function columnKey(table: PgTable, column: AnyPgColumn): string | undefined {
 }
 
 /** Maps the common ListQuery pagination fields onto paginate() options (search/sort are passed explicitly by the caller). */
-export function fromListQuery(q: ListQuery): Pick<PaginateOptions, "page" | "page_size" | "cursor" | "limit" | "exact"> {
+export function fromListQuery(
+  q: ListQuery,
+): Pick<PaginateOptions, "page" | "page_size" | "cursor" | "limit" | "exact"> {
   return { page: q.page, page_size: q.page_size, cursor: q.cursor, limit: q.limit, exact: q.exact };
 }
 
@@ -274,7 +329,10 @@ export const CSV_EXPORT_MAX_ROWS = 10_000;
 export const CSV_EXPORT_PAGE_ROWS = 5_000;
 
 /** Effective CSV export limits (default CSV_EXPORT_MAX_ROWS / CSV_EXPORT_PAGE_ROWS; integration tests lower them to exercise the cap). */
-export const csvExportLimits: { maxRows: number; pageRows: number } = { maxRows: CSV_EXPORT_MAX_ROWS, pageRows: CSV_EXPORT_PAGE_ROWS };
+export const csvExportLimits: { maxRows: number; pageRows: number } = {
+  maxRows: CSV_EXPORT_MAX_ROWS,
+  pageRows: CSV_EXPORT_PAGE_ROWS,
+};
 
 /** Request header that switches a `format=csv` list into keyset pages (`start` for the first page, then the returned cursor). */
 export const EXPORT_CURSOR_HEADER = "x-export-cursor";
@@ -303,7 +361,10 @@ export function csvExportFactsOf(query: object): CsvExportFacts | undefined {
  * `origin` is the request's own query object (`req.query`); pass it when `q` is a derived copy (e.g. `listPaging({ ...rest, format }, req.query)`),
  * otherwise the X-Export-* headers and the export job's keyset pages cannot find the request.
  */
-export function listPaging(q: ListQuery, origin: object = q): Pick<PaginateOptions, "page" | "page_size" | "cursor" | "limit" | "exact" | "csvExport"> {
+export function listPaging(
+  q: ListQuery,
+  origin: object = q,
+): Pick<PaginateOptions, "page" | "page_size" | "cursor" | "limit" | "exact" | "csvExport"> {
   if (q.format === "csv") {
     const keyset = csvExportCursors.get(origin);
     if (keyset) return { cursor: keyset.cursor, limit: csvExportLimits.pageRows, exact: true, csvExport: origin };

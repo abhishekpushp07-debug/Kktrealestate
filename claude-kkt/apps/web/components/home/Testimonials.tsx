@@ -12,7 +12,10 @@ export function Testimonials({ items }: { items: Testimonial[] }) {
       <div className="mt-12">
         <Carousel label="Testimonials" light itemClassName="w-[88%] sm:w-[60%] lg:w-[42%]">
           {items.map((t, i) => (
-            <figure key={`${t.name}-${i}`} className="flex h-full flex-col rounded-card border border-ivory-100/10 bg-ivory-100/5 p-7 backdrop-blur-sm sm:p-8">
+            <figure
+              key={`${t.name}-${i}`}
+              className="flex h-full flex-col rounded-card border border-ivory-100/10 bg-ivory-100/5 p-7 backdrop-blur-sm sm:p-8"
+            >
               <QuoteIcon size={28} className="text-gold-400" />
               {typeof t.rating === "number" && t.rating > 0 ? (
                 <p className="mt-4 flex gap-1 text-gold-400" role="img" aria-label={`${t.rating} out of 5 stars`}>
@@ -21,7 +24,9 @@ export function Testimonials({ items }: { items: Testimonial[] }) {
                   ))}
                 </p>
               ) : null}
-              <blockquote className="mt-4 flex-1 font-display text-xl leading-relaxed text-ivory-100/90 sm:text-2xl">“{t.quote}”</blockquote>
+              <blockquote className="mt-4 flex-1 font-display text-xl leading-relaxed text-ivory-100/90 sm:text-2xl">
+                “{t.quote}”
+              </blockquote>
               <figcaption className="mt-6 flex items-center gap-4">
                 <span className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full bg-navy-700">
                   <SmartImage src={t.photo_url ?? null} alt="" sizes="48px" />

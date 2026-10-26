@@ -73,13 +73,20 @@ export const projects = pgTable(
     landmarks: jsonb("landmarks").$type<Landmark[]>().notNull().default([]),
     approvals: jsonb("approvals").$type<Approval[]>().notNull().default([]),
     escrowBankAccountId: uuid("escrow_bank_account_id").references(() => bankAccounts.id),
-    stageSequence: uuid("stage_sequence").array().notNull().default(sql`'{}'::uuid[]`),
+    stageSequence: uuid("stage_sequence")
+      .array()
+      .notNull()
+      .default(sql`'{}'::uuid[]`),
     unitCounts: jsonb("unit_counts").$type<UnitCounts>().notNull().default(emptyUnitCounts),
     blockCount: integer("block_count").notNull().default(0),
     ...softDelete(),
     ...mutable(),
   },
-  (t) => [unique("projects_company_code_uq").on(t.companyId, t.code), index("projects_company_status_idx").on(t.companyId, t.status), trgm("projects_name_trgm_idx", t.name)],
+  (t) => [
+    unique("projects_company_code_uq").on(t.companyId, t.code),
+    index("projects_company_status_idx").on(t.companyId, t.status),
+    trgm("projects_name_trgm_idx", t.name),
+  ],
 );
 
 export const projectAmenities = pgTable(
@@ -138,10 +145,19 @@ export const projectWebsiteSettings = pgTable(
     showAvailability: boolean("show_availability").notNull().default(true),
     showProgress: boolean("show_progress").notNull().default(true),
     startingPriceOverridePaise: paise("starting_price_override_paise"),
-    heroDocumentIds: uuid("hero_document_ids").array().notNull().default(sql`'{}'::uuid[]`),
+    heroDocumentIds: uuid("hero_document_ids")
+      .array()
+      .notNull()
+      .default(sql`'{}'::uuid[]`),
     highlights: jsonb("highlights").$type<string[]>().notNull().default([]),
-    videoUrls: text("video_urls").array().notNull().default(sql`'{}'::text[]`),
-    tourUrls: text("tour_urls").array().notNull().default(sql`'{}'::text[]`),
+    videoUrls: text("video_urls")
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    tourUrls: text("tour_urls")
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
     mapEmbedUrl: text("map_embed_url"),
     brochureDocumentId: uuid("brochure_document_id"),
     faqs: jsonb("faqs").$type<Faq[]>().notNull().default([]),
@@ -161,14 +177,20 @@ export const projectVisitSettings = pgTable(
       .references(() => projects.id, { onDelete: "cascade" }),
     enabled: boolean("enabled").notNull().default(false),
     /** 0 = Sunday … 6 = Saturday. */
-    visitDays: integer("visit_days").array().notNull().default(sql`'{1,2,3,4,5,6}'::integer[]`),
+    visitDays: integer("visit_days")
+      .array()
+      .notNull()
+      .default(sql`'{1,2,3,4,5,6}'::integer[]`),
     startTime: time("start_time").notNull().default("10:00"),
     endTime: time("end_time").notNull().default("18:00"),
     slotMinutes: integer("slot_minutes").notNull().default(60),
     seatsPerSlot: integer("seats_per_slot").notNull().default(2),
     minLeadHours: integer("min_lead_hours").notNull().default(4),
     maxDaysAhead: integer("max_days_ahead").notNull().default(14),
-    blackoutDates: date("blackout_dates").array().notNull().default(sql`'{}'::date[]`),
+    blackoutDates: date("blackout_dates")
+      .array()
+      .notNull()
+      .default(sql`'{}'::date[]`),
     siteOfficeAddress: text("site_office_address"),
     mapsLink: text("maps_link"),
     instructions: text("instructions"),
@@ -193,12 +215,24 @@ export const blocks = pgTable(
     floors: integer("floors").notNull().default(1),
     floorStart: integer("floor_start").notNull().default(1),
     groundFloorLabel: text("ground_floor_label"),
-    skipFloors: integer("skip_floors").array().notNull().default(sql`'{}'::integer[]`),
-    refugeFloors: integer("refuge_floors").array().notNull().default(sql`'{}'::integer[]`),
-    podiumFloors: integer("podium_floors").array().notNull().default(sql`'{}'::integer[]`),
+    skipFloors: integer("skip_floors")
+      .array()
+      .notNull()
+      .default(sql`'{}'::integer[]`),
+    refugeFloors: integer("refuge_floors")
+      .array()
+      .notNull()
+      .default(sql`'{}'::integer[]`),
+    podiumFloors: integer("podium_floors")
+      .array()
+      .notNull()
+      .default(sql`'{}'::integer[]`),
     floorPlans: jsonb("floor_plans").$type<FloorPlanRange[]>().notNull().default([]),
     numberingPattern: text("numbering_pattern").notNull().default("{block}-{floor}{pos2}"),
-    stageSequence: uuid("stage_sequence").array().notNull().default(sql`'{}'::uuid[]`),
+    stageSequence: uuid("stage_sequence")
+      .array()
+      .notNull()
+      .default(sql`'{}'::uuid[]`),
     constructionPercent: percent("construction_percent").notNull().default(0),
     unitCounts: jsonb("unit_counts").$type<UnitCounts>().notNull().default(emptyUnitCounts),
     status: projectStatusEnum("status").notNull().default("PLANNING"),
@@ -236,7 +270,10 @@ export const blockStages = pgTable(
     completedAt: timestamp("completed_at", { withTimezone: true }),
     ...mutable(),
   },
-  (t) => [unique("block_stages_block_stage_uq").on(t.blockId, t.stageId), index("block_stages_block_sort_idx").on(t.blockId, t.sortOrder)],
+  (t) => [
+    unique("block_stages_block_stage_uq").on(t.blockId, t.stageId),
+    index("block_stages_block_sort_idx").on(t.blockId, t.sortOrder),
+  ],
 );
 
 export const stagePhotos = pgTable(
@@ -305,9 +342,14 @@ export const flats = pgTable(
     index("flats_block_floor_position_idx").on(t.blockId, t.floor, t.position),
     index("flats_company_status_type_idx").on(t.companyId, t.status, t.flatTypeId),
     // Expired-hold sweep: only HOLD rows, ordered by expiry.
-    index("flats_hold_until_idx").on(t.status, t.holdUntil).where(sql`${t.status} = 'HOLD'`),
+    index("flats_hold_until_idx")
+      .on(t.status, t.holdUntil)
+      .where(sql`${t.status} = 'HOLD'`),
     trgm("flats_flat_number_trgm_idx", t.flatNumber),
-    check("flats_price_nonneg_chk", sql`${t.pricePaise} >= 0 AND (${t.ratePerSqftPaise} IS NULL OR ${t.ratePerSqftPaise} >= 0)`),
+    check(
+      "flats_price_nonneg_chk",
+      sql`${t.pricePaise} >= 0 AND (${t.ratePerSqftPaise} IS NULL OR ${t.ratePerSqftPaise} >= 0)`,
+    ),
   ],
 );
 
@@ -350,7 +392,9 @@ export const rateCards = pgTable(
     ...mutable(),
   },
   (t) => [
-    uniqueIndex("rate_cards_one_active_uq").on(t.projectId).where(sql`${t.status} = 'ACTIVE'`),
+    uniqueIndex("rate_cards_one_active_uq")
+      .on(t.projectId)
+      .where(sql`${t.status} = 'ACTIVE'`),
     index("rate_cards_project_idx").on(t.projectId, t.effectiveFrom.desc()),
   ],
 );
@@ -387,7 +431,10 @@ export const rateCardPlcRules = pgTable(
     value: numeric("value", { precision: 14, scale: 4, mode: "number" }).notNull(),
     appliesTo: plcAppliesToEnum("applies_to").notNull().default("ALL"),
     floorsGte: integer("floors_gte"),
-    facings: text("facings").array().notNull().default(sql`'{}'::text[]`),
+    facings: text("facings")
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
     sortOrder: integer("sort_order").notNull().default(0),
     ...timestamps(),
   },

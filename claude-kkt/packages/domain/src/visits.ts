@@ -150,7 +150,10 @@ function icsLocal(date: string, time: string): string {
 
 /** Formats an instant as an iCalendar UTC timestamp "YYYYMMDDTHHmmssZ". */
 function icsUtc(instant: string | Date | number): string {
-  return new Date(toEpochMs(instant)).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+  return new Date(toEpochMs(instant))
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d{3}Z$/, "Z");
 }
 
 /** VTIMEZONE block for Asia/Kolkata (+05:30, no DST). */

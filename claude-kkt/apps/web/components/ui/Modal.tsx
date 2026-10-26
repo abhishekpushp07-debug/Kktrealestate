@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 
 import { CloseIcon } from "@/components/ui/icons";
-import { useFocusTrap, useLockBodyScroll } from "@/components/ui/hooks";
+import { useFocusTrap, useIsClient, useLockBodyScroll } from "@/components/ui/hooks";
 
 interface ModalProps {
   open: boolean;
@@ -20,8 +20,7 @@ const SIZES = { sm: "sm:max-w-md", md: "sm:max-w-lg", lg: "sm:max-w-3xl" };
 
 export function Modal({ open, onClose, title, description, children, variant = "sheet", size = "md" }: ModalProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const mounted = useIsClient();
   useFocusTrap(ref, open && mounted, onClose);
   useLockBodyScroll(open);
 
@@ -30,7 +29,13 @@ export function Modal({ open, onClose, title, description, children, variant = "
 
   return (
     <div className="fixed inset-0 z-[90] flex items-end justify-center sm:items-center sm:p-6" role="presentation">
-      <button type="button" aria-label="Close" className="absolute inset-0 bg-navy-950/70 backdrop-blur-sm animate-fade-in" onClick={onClose} tabIndex={-1} />
+      <button
+        type="button"
+        aria-label="Close"
+        className="absolute inset-0 bg-navy-950/70 backdrop-blur-sm animate-fade-in"
+        onClick={onClose}
+        tabIndex={-1}
+      />
       <div
         ref={ref}
         role="dialog"
@@ -48,7 +53,12 @@ export function Modal({ open, onClose, title, description, children, variant = "
             </h2>
             {description ? <p className="mt-1 text-sm text-ink-muted">{description}</p> : null}
           </div>
-          <button type="button" onClick={onClose} className="tap -mr-2 -mt-2 inline-flex shrink-0 items-center justify-center rounded-full text-navy-900 hover:bg-navy-900/5" aria-label="Close dialog">
+          <button
+            type="button"
+            onClick={onClose}
+            className="tap -mr-2 -mt-2 inline-flex shrink-0 items-center justify-center rounded-full text-navy-900 hover:bg-navy-900/5"
+            aria-label="Close dialog"
+          >
             <CloseIcon />
           </button>
         </div>

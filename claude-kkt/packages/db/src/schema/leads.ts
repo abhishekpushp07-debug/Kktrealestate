@@ -1,6 +1,19 @@
 // E. Leads & visits
 import { sql } from "drizzle-orm";
-import { boolean, check, date, index, integer, jsonb, pgTable, text, time, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  check,
+  date,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  text,
+  time,
+  timestamp,
+  unique,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { appendOnly, idColumn, mutable, paise, timestamps, trgm } from "./_common.js";
 import { customers } from "./customers.js";
 import { actorTypeEnum, leadSourceEnum, leadStageEnum, visitSourceEnum, visitStatusEnum } from "./enums.js";
@@ -129,6 +142,11 @@ export const siteVisits = pgTable(
     manageTokenHash: text("manage_token_hash"),
     /** The manage link stops working after this instant (visit end + grace); NULL only on rows created before migration 0002. */
     manageTokenExpiresAt: timestamp("manage_token_expires_at", { withTimezone: true }),
+    /** sha256 of manage tokens replaced by a reschedule (newest last, at most 20), so an old link answers 410 LINK_EXPIRED, not 404. */
+    supersededTokenHashes: text("superseded_token_hashes")
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
     source: visitSourceEnum("source").notNull().default("ERP"),
     rescheduledFrom: jsonb("rescheduled_from").$type<RescheduledFrom>(),
     cancelReason: text("cancel_reason"),
@@ -142,6 +160,7 @@ export const siteVisits = pgTable(
     index("site_visits_assignee_date_idx").on(t.assigneeUserId, t.visitDate),
     index("site_visits_lead_status_idx").on(t.leadId, t.status),
     index("site_visits_company_visit_date_idx").on(t.companyId, t.visitDate.desc(), t.id.desc()),
+    index("site_visits_superseded_token_hashes_idx").using("gin", t.supersededTokenHashes),
     check("site_visits_visitors_chk", sql`${t.visitors} BETWEEN 1 AND 6`),
   ],
 );

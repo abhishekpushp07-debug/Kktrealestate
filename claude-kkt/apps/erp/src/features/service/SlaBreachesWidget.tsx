@@ -15,7 +15,12 @@ export function SlaBreachesWidget({ enabled = true, className }: { enabled?: boo
   const shown = expanded ? rows : rows.slice(0, 3);
 
   return (
-    <section role="status" aria-label="SLA breaches" className={cn("mb-4 rounded-lg border border-danger/30 bg-danger-bg/60 p-3", className)} data-testid="sla-breaches-widget">
+    <section
+      role="status"
+      aria-label="SLA breaches"
+      className={cn("mb-4 rounded-lg border border-danger/30 bg-danger-bg/60 p-3", className)}
+      data-testid="sla-breaches-widget"
+    >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-sm font-bold text-danger-fg">
           <AlertTriangle className="size-4" aria-hidden="true" />
@@ -30,7 +35,10 @@ export function SlaBreachesWidget({ enabled = true, className }: { enabled?: boo
       <ul className="mt-2 divide-y divide-danger/15">
         {shown.map((ticket) => (
           <li key={ticket.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5 text-sm">
-            <Link to={`/service-requests/${ticket.id}`} className="money font-semibold text-navy-800 hover:underline focus-ring rounded-xs">
+            <Link
+              to={`/service-requests/${ticket.id}`}
+              className="money font-semibold text-navy-800 hover:underline focus-ring rounded-xs"
+            >
               {ticket.ticket_number}
             </Link>
             <span className="min-w-0 flex-1 truncate text-ink">{ticket.subject}</span>
@@ -41,7 +49,13 @@ export function SlaBreachesWidget({ enabled = true, className }: { enabled?: boo
         ))}
       </ul>
       {rows.length > 3 && (
-        <Button size="xs" variant="link" className="mt-1 text-danger-fg" onClick={() => setExpanded((value) => !value)} aria-expanded={expanded}>
+        <Button
+          size="xs"
+          variant="link"
+          className="mt-1 text-danger-fg"
+          onClick={() => setExpanded((value) => !value)}
+          aria-expanded={expanded}
+        >
           {expanded ? "Show fewer" : `Show all ${rows.length}`}
         </Button>
       )}

@@ -1,7 +1,13 @@
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { BOOKING_STATUS_LABELS, PAYMENT_BUCKET_LABELS, type BookingRow, type BucketSummary, type PaymentBucket } from "@kkt/contracts";
+import {
+  BOOKING_STATUS_LABELS,
+  PAYMENT_BUCKET_LABELS,
+  type BookingRow,
+  type BucketSummary,
+  type PaymentBucket,
+} from "@kkt/contracts";
 import { Badge, StatusChip } from "@/components/ui";
 import { formatDate, formatINR, formatINRShort, formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -34,7 +40,15 @@ export function DueAmount({ paise, short = false, advanceLabel = true, className
 }
 
 /** Plain money, right aligned with tabular figures. */
-export function Money({ paise, short = false, className }: { paise: number | null | undefined; short?: boolean; className?: string }) {
+export function Money({
+  paise,
+  short = false,
+  className,
+}: {
+  paise: number | null | undefined;
+  short?: boolean;
+  className?: string;
+}) {
   return <span className={cn("money", className)}>{short ? formatINRShort(paise) : formatINR(paise)}</span>;
 }
 
@@ -52,11 +66,17 @@ export interface BucketCardProps {
 
 /** Agreed / raised / paid / due for one bucket with a raised-vs-paid bar. */
 export function BucketCard({ bucket, title, summary, icon: Icon, className }: BucketCardProps) {
-  const label = title ?? (bucket === "TOTAL" ? "Total" : bucket === "OTHER" ? "Other charges" : `${PAYMENT_BUCKET_LABELS[bucket]} bucket`);
-  const raisedPct = summary.agreed_paise > 0 ? Math.min(100, (summary.order_raised_paise / summary.agreed_paise) * 100) : 0;
+  const label =
+    title ??
+    (bucket === "TOTAL" ? "Total" : bucket === "OTHER" ? "Other charges" : `${PAYMENT_BUCKET_LABELS[bucket]} bucket`);
+  const raisedPct =
+    summary.agreed_paise > 0 ? Math.min(100, (summary.order_raised_paise / summary.agreed_paise) * 100) : 0;
   const paidPct = summary.agreed_paise > 0 ? Math.min(100, (summary.paid_paise / summary.agreed_paise) * 100) : 0;
   return (
-    <div className={cn("flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-card p-4 shadow-card", className)} data-testid={`bucket-card-${bucket.toLowerCase()}`}>
+    <div
+      className={cn("flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-card p-4 shadow-card", className)}
+      data-testid={`bucket-card-${bucket.toLowerCase()}`}
+    >
       <div className="flex items-start justify-between gap-2">
         <span className="label-caps">{label}</span>
         {Icon && (
@@ -86,9 +106,21 @@ export function BucketCard({ bucket, title, summary, icon: Icon, className }: Bu
         </div>
       </dl>
       <div className="space-y-1">
-        <div className="relative h-2 overflow-hidden rounded-full bg-navy-50" role="img" aria-label={`Raised ${formatPercent(raisedPct, 0)}, paid ${formatPercent(paidPct, 0)} of agreed`}>
-          <span className="absolute inset-y-0 left-0 rounded-full bg-navy-200" style={{ width: `${raisedPct}%` }} aria-hidden="true" />
-          <span className="absolute inset-y-0 left-0 rounded-full bg-success" style={{ width: `${paidPct}%` }} aria-hidden="true" />
+        <div
+          className="relative h-2 overflow-hidden rounded-full bg-navy-50"
+          role="img"
+          aria-label={`Raised ${formatPercent(raisedPct, 0)}, paid ${formatPercent(paidPct, 0)} of agreed`}
+        >
+          <span
+            className="absolute inset-y-0 left-0 rounded-full bg-navy-200"
+            style={{ width: `${raisedPct}%` }}
+            aria-hidden="true"
+          />
+          <span
+            className="absolute inset-y-0 left-0 rounded-full bg-success"
+            style={{ width: `${paidPct}%` }}
+            aria-hidden="true"
+          />
         </div>
         <div className="flex flex-wrap items-center justify-between gap-x-2 text-2xs text-ink-subtle">
           <span>
@@ -99,7 +131,8 @@ export function BucketCard({ bucket, title, summary, icon: Icon, className }: Bu
           </span>
           {summary.pending_paise > 0 && (
             <span>
-              Cheques in hand <span className="money font-medium text-warning-fg">{formatINRShort(summary.pending_paise)}</span>
+              Cheques in hand{" "}
+              <span className="money font-medium text-warning-fg">{formatINRShort(summary.pending_paise)}</span>
             </span>
           )}
         </div>
@@ -112,16 +145,43 @@ export function BucketCard({ bucket, title, summary, icon: Icon, className }: Bu
 /* Booking references                                                   */
 /* ------------------------------------------------------------------ */
 
-export function BookingLink({ id, number, className, children }: { id: string; number: string; className?: string; children?: ReactNode }) {
+export function BookingLink({
+  id,
+  number,
+  className,
+  children,
+}: {
+  id: string;
+  number: string;
+  className?: string;
+  children?: ReactNode;
+}) {
   return (
-    <Link to={`/bookings/${id}`} className={cn("money font-semibold text-navy-800 hover:text-navy-950 hover:underline focus-ring rounded-xs", className)} onClick={(event) => event.stopPropagation()}>
+    <Link
+      to={`/bookings/${id}`}
+      className={cn(
+        "money font-semibold text-navy-800 hover:text-navy-950 hover:underline focus-ring rounded-xs",
+        className,
+      )}
+      onClick={(event) => event.stopPropagation()}
+    >
       {children ?? number}
     </Link>
   );
 }
 
 /** "Project · Tower · Flat" in one line. */
-export function UnitLabel({ project, block, flat, className }: { project: string; block: string; flat: string; className?: string }) {
+export function UnitLabel({
+  project,
+  block,
+  flat,
+  className,
+}: {
+  project: string;
+  block: string;
+  flat: string;
+  className?: string;
+}) {
   return (
     <span className={cn("inline-flex min-w-0 flex-wrap items-center gap-x-1 text-sm", className)}>
       <span className="truncate text-ink-muted">{project}</span>
@@ -177,11 +237,25 @@ export function BookingMobileCard({ booking }: { booking: BookingRow }) {
 }
 
 /** Small "label: value" pill list for review / summary rails. */
-export function SummaryLine({ label, value, strong = false, tone }: { label: ReactNode; value: ReactNode; strong?: boolean; tone?: "default" | "muted" }) {
+export function SummaryLine({
+  label,
+  value,
+  strong = false,
+  tone,
+}: {
+  label: ReactNode;
+  value: ReactNode;
+  strong?: boolean;
+  tone?: "default" | "muted";
+}) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-1 text-sm">
       <span className={cn("shrink-0", tone === "muted" ? "text-ink-subtle" : "text-ink-muted")}>{label}</span>
-      <span className={cn("money min-w-0 truncate text-right", strong ? "font-bold text-navy-950" : "font-medium text-ink")}>{value}</span>
+      <span
+        className={cn("money min-w-0 truncate text-right", strong ? "font-bold text-navy-950" : "font-medium text-ink")}
+      >
+        {value}
+      </span>
     </div>
   );
 }

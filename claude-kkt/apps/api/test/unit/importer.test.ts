@@ -15,15 +15,26 @@ describe("CSV coercion", () => {
     expect(coerceCsvValue(doc.applies_to, "CUSTOMER|BOOKING")).toEqual(["CUSTOMER", "BOOKING"]);
     expect(coerceCsvValue(doc.applies_to, '["CUSTOMER"]')).toEqual(["CUSTOMER"]);
     const ft = FlatTypeCreateSchema.shape;
-    expect(coerceCsvValue(ft.rooms, '[{"room_type_id":"x","label":"L","length_ft":10,"width_ft":12}]')).toEqual([{ room_type_id: "x", label: "L", length_ft: 10, width_ft: 12 }]);
+    expect(coerceCsvValue(ft.rooms, '[{"room_type_id":"x","label":"L","length_ft":10,"width_ft":12}]')).toEqual([
+      { room_type_id: "x", label: "L", length_ft: 10, width_ft: 12 },
+    ]);
     expect(coerceCsvValue(ft.bhk, "2.5")).toBe(2.5);
   });
   it("ignores unknown columns and parses into the create schema", () => {
     const input = csvRecordToInput(roomTypesKind, { name: "Study", code: "study", sort_order: "3", ignored: "x" });
     expect(input).toEqual({ name: "Study", code: "study", sort_order: 3 });
     expect(RoomTypeCreateSchema.parse(input).code).toBe("STUDY");
-    const doc = csvRecordToInput(documentTypesKind, { name: "PAN", code: "PAN", applies_to: "CUSTOMER", is_kyc: "true" });
+    const doc = csvRecordToInput(documentTypesKind, {
+      name: "PAN",
+      code: "PAN",
+      applies_to: "CUSTOMER",
+      is_kyc: "true",
+    });
     expect(DocumentTypeCreateSchema.safeParse(doc).success).toBe(true);
-    expect(csvRecordToInput(flatTypesKind, { name: "x", code: "X", bhk: "abc" })).toEqual({ name: "x", code: "X", bhk: "abc" });
+    expect(csvRecordToInput(flatTypesKind, { name: "x", code: "X", bhk: "abc" })).toEqual({
+      name: "x",
+      code: "X",
+      bhk: "abc",
+    });
   });
 });

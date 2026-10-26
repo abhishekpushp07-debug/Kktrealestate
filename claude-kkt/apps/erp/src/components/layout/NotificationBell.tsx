@@ -69,10 +69,14 @@ export function NotificationBell() {
 
   const list = useQuery({
     queryKey: notificationKeys.list,
-    queryFn: ({ signal }) => api.get<ListEnvelope<unknown> | unknown[]>("/notifications", { query: { page_size: 10 }, signal }),
+    queryFn: ({ signal }) =>
+      api.get<ListEnvelope<unknown> | unknown[]>("/notifications", { query: { page_size: 10 }, signal }),
     enabled: open,
     retry: false,
-    select: (data) => (Array.isArray(data) ? data : data.items).map(normaliseNotification).filter((row): row is NotificationRow => row !== null),
+    select: (data) =>
+      (Array.isArray(data) ? data : data.items)
+        .map(normaliseNotification)
+        .filter((row): row is NotificationRow => row !== null),
   });
 
   const count = unread.data ?? 0;
@@ -90,7 +94,10 @@ export function NotificationBell() {
         >
           <Bell aria-hidden="true" />
           {count > 0 && (
-            <span className="money pointer-events-none absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-gold px-1 text-[10px] font-bold text-navy-950 ring-2 ring-card" aria-hidden="true">
+            <span
+              className="money pointer-events-none absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-gold px-1 text-[10px] font-bold text-navy-950 ring-2 ring-card"
+              aria-hidden="true"
+            >
               {badge}
             </span>
           )}
@@ -112,8 +119,22 @@ export function NotificationBell() {
               ))}
             </div>
           )}
-          {list.isError && <EmptyState compact icon={BellOff} title="Notifications unavailable" description="Could not load notifications right now." />}
-          {list.data && list.data.length === 0 && <EmptyState compact icon={Bell} title="You're all caught up" description="New enquiries, cheques and demands will show here." />}
+          {list.isError && (
+            <EmptyState
+              compact
+              icon={BellOff}
+              title="Notifications unavailable"
+              description="Could not load notifications right now."
+            />
+          )}
+          {list.data && list.data.length === 0 && (
+            <EmptyState
+              compact
+              icon={Bell}
+              title="You're all caught up"
+              description="New enquiries, cheques and demands will show here."
+            />
+          )}
           {list.data && list.data.length > 0 && (
             <ul className="divide-y divide-border">
               {list.data.map((item) => (
@@ -126,12 +147,23 @@ export function NotificationBell() {
                       if (item.href) navigate(item.href);
                     }}
                   >
-                    <span className={cn("mt-1.5 size-2 shrink-0 rounded-full", item.read ? "bg-transparent" : "bg-gold")} aria-hidden="true" />
+                    <span
+                      className={cn("mt-1.5 size-2 shrink-0 rounded-full", item.read ? "bg-transparent" : "bg-gold")}
+                      aria-hidden="true"
+                    />
                     <span className="min-w-0 flex-1">
-                      <span className={cn("block truncate text-sm", item.read ? "text-ink" : "font-semibold text-navy-950")}>{item.title}</span>
+                      <span
+                        className={cn("block truncate text-sm", item.read ? "text-ink" : "font-semibold text-navy-950")}
+                      >
+                        {item.title}
+                      </span>
                       {item.body && <span className="block truncate text-xs text-ink-subtle">{item.body}</span>}
                     </span>
-                    {item.created_at && <time dateTime={item.created_at} className="money shrink-0 text-2xs text-ink-subtle">{formatRelative(item.created_at)}</time>}
+                    {item.created_at && (
+                      <time dateTime={item.created_at} className="money shrink-0 text-2xs text-ink-subtle">
+                        {formatRelative(item.created_at)}
+                      </time>
+                    )}
                   </button>
                 </li>
               ))}
@@ -139,7 +171,11 @@ export function NotificationBell() {
           )}
         </div>
         <div className="border-t border-border px-3 py-2 text-center">
-          <Link to="/notifications" onClick={() => setOpen(false)} className="text-xs font-medium text-navy-700 hover:text-navy-950 hover:underline focus-ring rounded-xs">
+          <Link
+            to="/notifications"
+            onClick={() => setOpen(false)}
+            className="text-xs font-medium text-navy-700 hover:text-navy-950 hover:underline focus-ring rounded-xs"
+          >
             View all notifications
           </Link>
         </div>

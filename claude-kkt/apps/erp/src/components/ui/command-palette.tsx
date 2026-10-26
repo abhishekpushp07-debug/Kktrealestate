@@ -1,7 +1,7 @@
 import { Command } from "cmdk";
 import { Clock, CornerDownLeft, Search, type LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { cn, readStorage, useDebouncedValue, writeStorage } from "@/lib/utils";
+import { cn, readStorage, useDebouncedValue, useOnChange, writeStorage } from "@/lib/utils";
 import { Kbd } from "./kbd";
 import { Spinner } from "./spinner";
 
@@ -64,6 +64,8 @@ export function useCommandPaletteHotkey(toggle: () => void): void {
   }, [toggle]);
 }
 
+const NO_SEARCH: { query: string; items: readonly CommandItem[] } = { query: "", items: [] };
+
 /** Ctrl/⌘+K palette (cmdk): recents, static groups and async search results. */
 export function CommandPalette({
   open,
@@ -76,35 +78,29 @@ export function CommandPalette({
   maxRecent = 8,
 }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<readonly CommandItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  // Results of the last finished search, tagged with the query they answer; `loading` is derived from the tag.
+  const [search, setSearch] = useState<{ query: string; items: readonly CommandItem[] }>(NO_SEARCH);
   const [recent, setRecent] = useState<CommandItem[]>(() => readStorage<CommandItem[]>(recentKey, []));
   const debounced = useDebouncedValue(query.trim(), 250);
+  const searching = Boolean(onSearch && open && debounced.length >= 2);
+  const results = searching ? search.items : NO_SEARCH.items;
+  const loading = searching && search.query !== debounced;
+
+  useOnChange(open, (isOpen) => {
+    if (isOpen) return;
+    setQuery("");
+    setSearch(NO_SEARCH);
+  });
 
   useEffect(() => {
-    if (!open) {
-      setQuery("");
-      setResults([]);
-    }
-  }, [open]);
-
-  useEffect(() => {
-    if (!onSearch || !open || debounced.length < 2) {
-      setResults([]);
-      setLoading(false);
-      return;
-    }
+    if (!onSearch || !open || debounced.length < 2) return;
     let cancelled = false;
-    setLoading(true);
     onSearch(debounced)
       .then((items) => {
-        if (!cancelled) setResults(items);
+        if (!cancelled) setSearch({ query: debounced, items });
       })
       .catch(() => {
-        if (!cancelled) setResults([]);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setSearch({ query: debounced, items: [] });
       });
     return () => {
       cancelled = true;
@@ -124,7 +120,10 @@ export function CommandPalette({
   );
 
   const filteredGroups = useMemo(
-    () => groups.map((group) => ({ ...group, items: group.items.filter((item) => matches(item, query)) })).filter((group) => group.items.length > 0),
+    () =>
+      groups
+        .map((group) => ({ ...group, items: group.items.filter((item) => matches(item, query)) }))
+        .filter((group) => group.items.length > 0),
     [groups, query],
   );
   const filteredRecent = useMemo(() => recent.filter((item) => matches(item, query)), [recent, query]);
@@ -148,13 +147,22 @@ export function CommandPalette({
         className="group flex cursor-pointer select-none items-center gap-2.5 rounded-sm px-2 py-2 text-sm text-ink data-[selected=true]:bg-navy-50 data-[selected=true]:text-navy-950"
       >
         <span className="flex size-6 shrink-0 items-center justify-center rounded-sm bg-surface text-ink-subtle group-data-[selected=true]:bg-card group-data-[selected=true]:text-navy-950">
-          {Icon ? <Icon className="size-3.5" aria-hidden="true" /> : prefix === "recent" ? <Clock className="size-3.5" aria-hidden="true" /> : <Search className="size-3.5" aria-hidden="true" />}
+          {Icon ? (
+            <Icon className="size-3.5" aria-hidden="true" />
+          ) : prefix === "recent" ? (
+            <Clock className="size-3.5" aria-hidden="true" />
+          ) : (
+            <Search className="size-3.5" aria-hidden="true" />
+          )}
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate font-medium">{item.label}</span>
           {item.description && <span className="block truncate text-xs text-ink-subtle">{item.description}</span>}
         </span>
-        <CornerDownLeft className="size-3.5 shrink-0 text-ink-subtle opacity-0 group-data-[selected=true]:opacity-100" aria-hidden="true" />
+        <CornerDownLeft
+          className="size-3.5 shrink-0 text-ink-subtle opacity-0 group-data-[selected=true]:opacity-100"
+          aria-hidden="true"
+        />
       </Command.Item>
     );
   };

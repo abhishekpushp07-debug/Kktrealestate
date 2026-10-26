@@ -68,24 +68,50 @@ export class StorageNotFoundError extends Error {
 class LocalStorage implements Storage {
   readonly driver = "local" as const;
   constructor(private readonly root: string) {}
-  private path(key: string): string { assertKey(key); return resolve(join(this.root, key)); }
-  async put(key: string, data: Buffer): Promise<void> { const p = this.path(key); await mkdir(dirname(p), { recursive: true }); await writeFile(p, data); }
+  private path(key: string): string {
+    assertKey(key);
+    return resolve(join(this.root, key));
+  }
+  async put(key: string, data: Buffer): Promise<void> {
+    const p = this.path(key);
+    await mkdir(dirname(p), { recursive: true });
+    await writeFile(p, data);
+  }
   async putStream(key: string, body: Readable): Promise<void> {
     const p = this.path(key);
     await mkdir(dirname(p), { recursive: true });
     await pipeline(body, createWriteStream(p));
   }
-  async get(key: string): Promise<Buffer> { return readFile(this.path(key)); }
-  async stream(key: string): Promise<Readable> { return createReadStream(this.path(key)); }
-  async exists(key: string): Promise<boolean> { try { await stat(this.path(key)); return true; } catch { return false; } }
-  async remove(key: string): Promise<void> { await rm(this.path(key), { force: true }); }
-  async signedUrl(key: string): Promise<string | null> { assertKey(key); return null; }
+  async get(key: string): Promise<Buffer> {
+    return readFile(this.path(key));
+  }
+  async stream(key: string): Promise<Readable> {
+    return createReadStream(this.path(key));
+  }
+  async exists(key: string): Promise<boolean> {
+    try {
+      await stat(this.path(key));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  async remove(key: string): Promise<void> {
+    await rm(this.path(key), { force: true });
+  }
+  async signedUrl(key: string): Promise<string | null> {
+    assertKey(key);
+    return null;
+  }
   async check(): Promise<void> {
     try {
       await mkdir(this.root, { recursive: true });
       await access(this.root, constants.W_OK | constants.R_OK);
     } catch (err) {
-      throw new Error(`Storage: local directory ${this.root} is not writable (${(err as NodeJS.ErrnoException).code ?? "error"}); set STORAGE_LOCAL_DIR or STORAGE_DRIVER=s3`, { cause: err });
+      throw new Error(
+        `Storage: local directory ${this.root} is not writable (${(err as NodeJS.ErrnoException).code ?? "error"}); set STORAGE_LOCAL_DIR or STORAGE_DRIVER=s3`,
+        { cause: err },
+      );
     }
   }
 }
@@ -119,20 +145,25 @@ export function s3ClientConfig(s: S3StorageSettings): S3ClientConfig {
   return {
     region: s.region,
     ...(s.endpoint ? { endpoint: s.endpoint, forcePathStyle: true } : {}),
-    ...(s.accessKeyId && s.secretAccessKey ? { credentials: { accessKeyId: s.accessKeyId, secretAccessKey: s.secretAccessKey } } : {}),
+    ...(s.accessKeyId && s.secretAccessKey
+      ? { credentials: { accessKeyId: s.accessKeyId, secretAccessKey: s.secretAccessKey } }
+      : {}),
     maxAttempts: 3,
   };
 }
 
 function isNotFound(err: unknown): boolean {
   const e = err as { name?: string; Code?: string; $metadata?: { httpStatusCode?: number } } | null;
-  return e?.name === "NotFound" || e?.name === "NoSuchKey" || e?.Code === "NoSuchKey" || e?.$metadata?.httpStatusCode === 404;
+  return (
+    e?.name === "NotFound" || e?.name === "NoSuchKey" || e?.Code === "NoSuchKey" || e?.$metadata?.httpStatusCode === 404
+  );
 }
 
 /** Turns the SDK's response body (a Node Readable with SDK mixins in Node, or a web stream/blob elsewhere) into a Readable. */
 function toReadable(body: unknown): Readable {
   if (body instanceof Readable) return body;
-  if (body && typeof (body as ReadableStream).getReader === "function") return Readable.fromWeb(body as import("node:stream/web").ReadableStream);
+  if (body && typeof (body as ReadableStream).getReader === "function")
+    return Readable.fromWeb(body as import("node:stream/web").ReadableStream);
   if (body instanceof Uint8Array || typeof body === "string") return Readable.from([body]);
   throw new Error("Storage: unexpected S3 response body");
 }
@@ -144,7 +175,10 @@ export class S3Storage implements Storage {
   private readonly presign: NonNullable<S3StorageDeps["presign"]>;
   private readonly partSize: number;
 
-  constructor(private readonly settings: S3StorageSettings, deps: S3StorageDeps = {}) {
+  constructor(
+    private readonly settings: S3StorageSettings,
+    deps: S3StorageDeps = {},
+  ) {
     this.client = deps.client ?? new S3Client(s3ClientConfig(settings));
     this.presign = deps.presign ?? ((client, command, opts) => getSignedUrl(client as S3Client, command, opts));
     this.partSize = Math.max(5 * 1024 * 1024, deps.partSize ?? 8 * 1024 * 1024);
@@ -178,13 +212,16 @@ export class S3Storage implements Storage {
 
   async get(key: string): Promise<Buffer> {
     const chunks: Buffer[] = [];
-    for await (const chunk of await this.stream(key)) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as Uint8Array));
+    for await (const chunk of await this.stream(key))
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as Uint8Array));
     return Buffer.concat(chunks);
   }
 
   async stream(key: string): Promise<Readable> {
     try {
-      const res = await this.client.send(new GetObjectCommand({ Bucket: this.settings.bucket, Key: this.objectKey(key) }));
+      const res = await this.client.send(
+        new GetObjectCommand({ Bucket: this.settings.bucket, Key: this.objectKey(key) }),
+      );
       return toReadable(res.Body);
     } catch (err) {
       if (isNotFound(err)) throw new StorageNotFoundError(key);
@@ -212,7 +249,9 @@ export class S3Storage implements Storage {
     const command = new GetObjectCommand({
       Bucket: this.settings.bucket,
       Key: this.objectKey(key),
-      ...(opts.filename ? { ResponseContentDisposition: `attachment; filename="${opts.filename.replace(/[^\w.\- ]+/g, "_")}"` } : {}),
+      ...(opts.filename
+        ? { ResponseContentDisposition: `attachment; filename="${opts.filename.replace(/[^\w.\- ]+/g, "_")}"` }
+        : {}),
       ...(opts.contentType ? { ResponseContentType: opts.contentType } : {}),
     });
     return this.presign(this.client, command, { expiresIn });
@@ -225,9 +264,12 @@ export class S3Storage implements Storage {
       const e = err as { name?: string; message?: string; $metadata?: { httpStatusCode?: number } };
       const status = e.$metadata?.httpStatusCode;
       const hint =
-        status === 404 || e.name === "NotFound" || e.name === "NoSuchBucket" ? "the bucket does not exist"
-          : status === 403 || e.name === "Forbidden" || e.name === "AccessDenied" ? "access denied (check S3_ACCESS_KEY/S3_SECRET_KEY or the IAM role's s3:ListBucket on the bucket)"
-            : status === 301 ? "the bucket is in another region (check S3_REGION)"
+        status === 404 || e.name === "NotFound" || e.name === "NoSuchBucket"
+          ? "the bucket does not exist"
+          : status === 403 || e.name === "Forbidden" || e.name === "AccessDenied"
+            ? "access denied (check S3_ACCESS_KEY/S3_SECRET_KEY or the IAM role's s3:ListBucket on the bucket)"
+            : status === 301
+              ? "the bucket is in another region (check S3_REGION)"
               : `${e.name ?? "error"}: ${e.message ?? "unknown"}`;
       throw new Error(
         `Storage: S3 bucket "${this.settings.bucket}" is not usable — ${hint} (region ${this.settings.region}${this.settings.endpoint ? `, endpoint ${this.settings.endpoint}` : ""}). Fix S3_* or set STORAGE_DRIVER=local.`,

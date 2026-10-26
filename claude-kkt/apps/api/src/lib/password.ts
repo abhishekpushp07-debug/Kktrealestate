@@ -10,7 +10,11 @@ export async function hashPassword(plain: string): Promise<string> {
 /** Verify a password against an argon2 hash; never throws on malformed hashes. */
 export async function verifyPassword(hash: string | null | undefined, plain: string): Promise<boolean> {
   if (!hash) return false;
-  try { return await argon2.verify(hash, plain); } catch { return false; }
+  try {
+    return await argon2.verify(hash, plain);
+  } catch {
+    return false;
+  }
 }
 
 /** Password policy: ≥10 chars with upper, lower and digit; returns a list of human-readable problems (empty = ok). */

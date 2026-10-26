@@ -87,6 +87,14 @@ On every page the script asserts: zero `console.error` / page errors, zero faile
 ### Tap targets at 390 px (after fixes)
 Since 2026-10-26 every `Button` size is ≥ 48 px, the tab bar items 60+ px, segments and rating stars 48 px, card/section actions 44 px pressables; the runner flags primary targets under 48 px. The 2026-10-25 state was: all primary actions ≥ 44 px: sign in / submit / send / save (46–54), payments segments (44), tab bar items (68), receipt/demand/document **View/Download** (46 on phones), bell (44), booking switcher chip (44), star rating (44), bank copy buttons (44), list rows (≥ 56). Remaining < 44 px elements, all secondary and all with hit-slop or a larger duplicate target: `Back`/header `sm` buttons (40 px box + 4–6 px hit-slop), lightbox icon buttons (40 + 6), card-header text links "Timeline / Schedule / Ledger" (18 px — the whole card is the tap target), "Show password" (16 px + 14 px hit-slop), "Go to ERP" (22 px + 12 px hit-slop), read-only rating stars in the list (14 px, not interactive), "Remove photo" badge (24 px). Text inputs measure 41 px for the `<input>` inside a 46 px field box.
 
+## Verify stage 2026-10-26 (phase 5)
+
+Lint refactors in the portal (skeleton/toast animated values held in state, Reanimated `get()`/`set()` in the zoomable image, the
+`?tab=` deep link and the profile reset adjusted while rendering). Stack: API bundle on `:4710` (fresh demo seed in `kkt_h7`, Redis db 23),
+`EXPO_PUBLIC_API_URL=http://localhost:4710 npx expo export --platform web` served by an SPA server on `:8710`, `OUT_DIR` outside the repo.
+**Result: 0 defects, 46 axe scans with 0 violations, 40 screenshots.** Bells for demands, other-charge lines and payments now carry
+their `booking_id`, so opening one switches to its booking.
+
 ## Defects found and fixed
 
 | # | Where | Defect | Fix |

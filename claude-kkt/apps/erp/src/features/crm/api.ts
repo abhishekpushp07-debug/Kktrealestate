@@ -1,5 +1,15 @@
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
-import type { Customer360Response, CustomerRow, EnquiryUnreadCount, LeadDetailResponse, LeadKanbanResponse, LeadRow, PortalAccessResponse, VisitCalendarResponse, VisitRow } from "@kkt/contracts";
+import type {
+  Customer360Response,
+  CustomerRow,
+  EnquiryUnreadCount,
+  LeadDetailResponse,
+  LeadKanbanResponse,
+  LeadRow,
+  PortalAccessResponse,
+  VisitCalendarResponse,
+  VisitRow,
+} from "@kkt/contracts";
 import { api, type ApiClientError, type ListEnvelope, type QueryParams } from "@/lib/api";
 import { useApiQuery } from "@/features/inventory/api";
 
@@ -27,23 +37,42 @@ export const crmKeys = {
 /* ------------------------------------------------------------------ */
 
 export function useCustomer360(id: string | null | undefined) {
-  return useApiQuery<Customer360Response>(crmKeys.customer360(id ?? ""), `${CUSTOMERS_PATH}/${id}/360`, { enabled: Boolean(id) });
+  return useApiQuery<Customer360Response>(crmKeys.customer360(id ?? ""), `${CUSTOMERS_PATH}/${id}/360`, {
+    enabled: Boolean(id),
+  });
 }
 
 export function usePortalAccess(id: string | null | undefined, enabled = true) {
-  return useApiQuery<PortalAccessResponse>(crmKeys.portal(id ?? ""), `${CUSTOMERS_PATH}/${id}/portal`, { enabled: enabled && Boolean(id), retry: false });
+  return useApiQuery<PortalAccessResponse>(crmKeys.portal(id ?? ""), `${CUSTOMERS_PATH}/${id}/portal`, {
+    enabled: enabled && Boolean(id),
+    retry: false,
+  });
 }
 
 /** Async option loader for customer comboboxes (name / code / phone). */
-export async function searchCustomers(query: string): Promise<Array<{ value: string; label: string; description: string; keywords: string[] }>> {
+export async function searchCustomers(
+  query: string,
+): Promise<Array<{ value: string; label: string; description: string; keywords: string[] }>> {
   const result = await api.list<CustomerRow>(CUSTOMERS_PATH, { page_size: 20, search: query, sort: "full_name" });
-  return result.items.map((customer) => ({ value: customer.id, label: customer.full_name, description: `${customer.customer_code} · ${customer.phone}`, keywords: [customer.phone, customer.customer_code] }));
+  return result.items.map((customer) => ({
+    value: customer.id,
+    label: customer.full_name,
+    description: `${customer.customer_code} · ${customer.phone}`,
+    keywords: [customer.phone, customer.customer_code],
+  }));
 }
 
 /** Async option loader for lead comboboxes. */
-export async function searchLeads(query: string): Promise<Array<{ value: string; label: string; description: string; keywords: string[] }>> {
+export async function searchLeads(
+  query: string,
+): Promise<Array<{ value: string; label: string; description: string; keywords: string[] }>> {
   const result = await api.list<LeadRow>(LEADS_PATH, { page_size: 20, search: query, sort: "-created_at" });
-  return result.items.map((lead) => ({ value: lead.id, label: lead.full_name, description: `${lead.lead_number} · ${lead.phone}${lead.project_name ? ` · ${lead.project_name}` : ""}`, keywords: [lead.phone, lead.lead_number] }));
+  return result.items.map((lead) => ({
+    value: lead.id,
+    label: lead.full_name,
+    description: `${lead.lead_number} · ${lead.phone}${lead.project_name ? ` · ${lead.project_name}` : ""}`,
+    keywords: [lead.phone, lead.lead_number],
+  }));
 }
 
 /* ------------------------------------------------------------------ */
@@ -81,8 +110,14 @@ export function useFollowUpsDue(enabled = true): UseQueryResult<LeadRow[], ApiCl
 export function useEnquiryUnreadCount(enabled = true): UseQueryResult<number, ApiClientError> {
   return useQuery<EnquiryUnreadCount | { count?: number }, ApiClientError, number, readonly unknown[]>({
     queryKey: crmKeys.enquiryUnread,
-    queryFn: ({ signal }) => api.get<EnquiryUnreadCount | { count?: number }>(`${ENQUIRIES_PATH}/unread-count`, { signal }),
-    select: (data) => ("unread" in data && typeof data.unread === "number" ? data.unread : "count" in data && typeof data.count === "number" ? data.count : 0),
+    queryFn: ({ signal }) =>
+      api.get<EnquiryUnreadCount | { count?: number }>(`${ENQUIRIES_PATH}/unread-count`, { signal }),
+    select: (data) =>
+      "unread" in data && typeof data.unread === "number"
+        ? data.unread
+        : "count" in data && typeof data.count === "number"
+          ? data.count
+          : 0,
     refetchInterval: 60_000,
     refetchIntervalInBackground: false,
     retry: false,
@@ -138,18 +173,45 @@ export function normaliseCalendar(raw: unknown): CalendarDay[] {
           if (!slot || typeof slot.start !== "string") return [];
           const visits = Array.isArray(slot.visits) ? (slot.visits as VisitRow[]) : [];
           const available = typeof slot.available === "number" ? slot.available : 0;
-          const booked = typeof slot.booked === "number" ? slot.booked : visits.filter((visit) => visit.status !== "CANCELLED").length;
-          return [{ start: slot.start, end: typeof slot.end === "string" ? slot.end : slot.start, seats: typeof slot.seats === "number" ? slot.seats : available + booked, booked, available, is_past: slot.is_past === true, visits }];
+          const booked =
+            typeof slot.booked === "number"
+              ? slot.booked
+              : visits.filter((visit) => visit.status !== "CANCELLED").length;
+          return [
+            {
+              start: slot.start,
+              end: typeof slot.end === "string" ? slot.end : slot.start,
+              seats: typeof slot.seats === "number" ? slot.seats : available + booked,
+              booked,
+              available,
+              is_past: slot.is_past === true,
+              visits,
+            },
+          ];
         }),
       },
     ];
   });
 }
 
-export function useVisitCalendar(projectId: string | null, from: string, to: string, assigneeUserId?: string | null): UseQueryResult<CalendarDay[], ApiClientError> {
+export function useVisitCalendar(
+  projectId: string | null,
+  from: string,
+  to: string,
+  assigneeUserId?: string | null,
+): UseQueryResult<CalendarDay[], ApiClientError> {
   return useQuery<unknown, ApiClientError, CalendarDay[], readonly unknown[]>({
     queryKey: [...crmKeys.calendar(projectId ?? "", from, to), assigneeUserId ?? ""],
-    queryFn: ({ signal }) => api.get<VisitCalendarResponse>(`${VISITS_PATH}/calendar`, { signal, query: { project_id: projectId ?? "", from, to, ...(assigneeUserId ? { assignee_user_id: assigneeUserId } : {}) } }),
+    queryFn: ({ signal }) =>
+      api.get<VisitCalendarResponse>(`${VISITS_PATH}/calendar`, {
+        signal,
+        query: {
+          project_id: projectId ?? "",
+          from,
+          to,
+          ...(assigneeUserId ? { assignee_user_id: assigneeUserId } : {}),
+        },
+      }),
     select: normaliseCalendar,
     enabled: Boolean(projectId),
   });

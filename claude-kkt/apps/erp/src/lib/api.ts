@@ -166,7 +166,10 @@ export function describeError(error: unknown): string {
 /** "Ref <request id> · trace <trace id>" for support (toasts and error panels); null when the error carries neither. */
 export function errorReference(error: unknown): string | null {
   if (!isApiClientError(error)) return null;
-  const parts = [error.requestId ? `Ref ${error.requestId}` : null, error.traceId ? `trace ${error.traceId}` : null].filter(Boolean);
+  const parts = [
+    error.requestId ? `Ref ${error.requestId}` : null,
+    error.traceId ? `trace ${error.traceId}` : null,
+  ].filter(Boolean);
   return parts.length ? parts.join(" · ") : null;
 }
 
@@ -389,7 +392,9 @@ export function refreshSession(): Promise<boolean> {
   // origin (a receipt print window, a second ERP tab) must never refresh concurrently: serialise through a Web Lock.
   const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
   // Promises flatten at runtime; `.then` keeps the declared type honest without a cast.
-  const granted: Promise<boolean> = locks ? locks.request(`${REFRESH_TOKEN_KEY}.rotate`, () => rotate()).then((value: unknown) => value === true) : rotate();
+  const granted: Promise<boolean> = locks
+    ? locks.request(`${REFRESH_TOKEN_KEY}.rotate`, () => rotate()).then((value: unknown) => value === true)
+    : rotate();
   const pending: Promise<boolean> = granted.finally(() => {
     refreshInFlight = null;
   });
@@ -444,7 +449,10 @@ async function execute(method: HttpMethod, path: string, options: RequestOptions
   }
   let response = await send(prepared, useAuth);
   if (response.status === 401 && useAuth) {
-    const peek = await response.clone().json().catch(() => undefined);
+    const peek = await response
+      .clone()
+      .json()
+      .catch(() => undefined);
     const code = isEnvelope(peek) ? peek.error.code : "UNAUTHENTICATED";
     if (code === "TOKEN_EXPIRED" || (code === "UNAUTHENTICATED" && tokens.getRefresh())) {
       const refreshed = await refreshSession();
@@ -501,7 +509,14 @@ export function csvExportFacts(headers: Headers, filename: string): CsvExportRes
 }
 
 /** Query keys the export job controls itself (sending them is a 400). */
-export const EXPORT_RESERVED_KEYS: ReadonlySet<string> = new Set(["page", "page_size", "cursor", "limit", "format", "exact"]);
+export const EXPORT_RESERVED_KEYS: ReadonlySet<string> = new Set([
+  "page",
+  "page_size",
+  "cursor",
+  "limit",
+  "format",
+  "exact",
+]);
 
 export type ExportQuery = Record<string, string | number | boolean | string[]>;
 
@@ -582,7 +597,10 @@ export const api = {
   download,
   /** GET a list endpoint with the standard envelope. */
   list<T>(path: string, params: ListParams = {}, options?: RequestOptions): Promise<ListEnvelope<T>> {
-    return request<ListEnvelope<T>>("GET", path, { ...options, query: { ...options?.query, ...buildListQuery(params) } });
+    return request<ListEnvelope<T>>("GET", path, {
+      ...options,
+      query: { ...options?.query, ...buildListQuery(params) },
+    });
   },
   /**
    * GET a list endpoint as CSV and hand it to the browser. Returns the X-Export-* facts: when `truncated` the file holds the first

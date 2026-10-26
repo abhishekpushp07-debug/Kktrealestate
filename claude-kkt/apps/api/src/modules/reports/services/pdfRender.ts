@@ -13,7 +13,16 @@ import { fileURLToPath } from "node:url";
 import PDFDocument from "pdfkit";
 
 /** Theme (SPEC §0: royal deep navy + gold). */
-export const PDF_THEME = { navy: "#0B1F3A", gold: "#C9A227", ink: "#1F2937", muted: "#6B7280", rule: "#D1D5DB", zebra: "#F6F3EA", white: "#FFFFFF", danger: "#B00020" } as const;
+export const PDF_THEME = {
+  navy: "#0B1F3A",
+  gold: "#C9A227",
+  ink: "#1F2937",
+  muted: "#6B7280",
+  rule: "#D1D5DB",
+  zebra: "#F6F3EA",
+  white: "#FFFFFF",
+  danger: "#B00020",
+} as const;
 
 /** Letterhead strings (+ logo bytes) as they reach the renderer. */
 export interface RenderLetterhead {
@@ -49,9 +58,23 @@ export type PdfOp =
   | { op: "spacer"; h: number }
   | { op: "ensureSpace"; needed: number }
   | { op: "heading"; text: string }
-  | { op: "paragraph"; text: string; size: number; italic: boolean; color: string; align: "left" | "right" | "center" | "justify" }
+  | {
+      op: "paragraph";
+      text: string;
+      size: number;
+      italic: boolean;
+      color: string;
+      align: "left" | "right" | "center" | "justify";
+    }
   | { op: "kv"; blocks: { title: string | null; rows: [string, string][] }[] }
-  | { op: "table"; columns: RenderColumn[]; rows: string[][]; totals: string[] | null; emptyText: string; fontSize: number }
+  | {
+      op: "table";
+      columns: RenderColumn[];
+      rows: string[][];
+      totals: string[] | null;
+      emptyText: string;
+      fontSize: number;
+    }
   | { op: "boxedText"; text: string }
   | { op: "amountBox"; label: string; amount: string }
   | { op: "signature"; forName: string; name: string; title: string | null };
@@ -69,7 +92,11 @@ export interface PdfFontFiles {
   italic: string;
 }
 
-const FONT_FILES = { regular: "DejaVuSans.ttf", bold: "DejaVuSans-Bold.ttf", italic: "DejaVuSans-Oblique.ttf" } as const;
+const FONT_FILES = {
+  regular: "DejaVuSans.ttf",
+  bold: "DejaVuSans-Bold.ttf",
+  italic: "DejaVuSans-Oblique.ttf",
+} as const;
 
 /**
  * Locates the DejaVu Sans TTFs: apps/api/assets/fonts (operator override) first, then the `dejavu-fonts-ttf` package. Throws when the
@@ -95,7 +122,9 @@ export function resolvePdfFonts(): PdfFontFiles {
     const pick = (f: string): string => (existsSync(join(dir, f)) ? join(dir, f) : regular);
     return { regular, bold: pick(FONT_FILES.bold), italic: pick(FONT_FILES.italic) };
   }
-  throw new Error(`PDF fonts not found: ${FONT_FILES.regular} is in none of ${dirs.join(", ")} (install dejavu-fonts-ttf)`);
+  throw new Error(
+    `PDF fonts not found: ${FONT_FILES.regular} is in none of ${dirs.join(", ")} (install dejavu-fonts-ttf)`,
+  );
 }
 
 let fontCache: { regular: Buffer; bold: Buffer; italic: Buffer } | null = null;
@@ -215,10 +244,16 @@ class Renderer {
       }
     }
     const textWidth = this.pageWidth - MARGIN - textLeft;
-    d.font(F_BOLD).fontSize(15).fillColor(PDF_THEME.navy).text(lh.name, textLeft, MARGIN, { width: textWidth, lineBreak: false });
+    d.font(F_BOLD)
+      .fontSize(15)
+      .fillColor(PDF_THEME.navy)
+      .text(lh.name, textLeft, MARGIN, { width: textWidth, lineBreak: false });
     let y = MARGIN + 18;
     if (lh.subLine) {
-      d.font(F_ITALIC).fontSize(8.5).fillColor(PDF_THEME.muted).text(lh.subLine, textLeft, y, { width: textWidth, lineBreak: false });
+      d.font(F_ITALIC)
+        .fontSize(8.5)
+        .fillColor(PDF_THEME.muted)
+        .text(lh.subLine, textLeft, y, { width: textWidth, lineBreak: false });
       y += 11;
     }
     d.font(F_REGULAR).fontSize(8).fillColor(PDF_THEME.ink);
@@ -228,13 +263,27 @@ class Renderer {
     }
     // gold rule
     const ruleY = MARGIN + 58;
-    d.moveTo(left, ruleY).lineTo(this.pageWidth - MARGIN, ruleY).lineWidth(1.6).strokeColor(PDF_THEME.gold).stroke();
+    d.moveTo(left, ruleY)
+      .lineTo(this.pageWidth - MARGIN, ruleY)
+      .lineWidth(1.6)
+      .strokeColor(PDF_THEME.gold)
+      .stroke();
     // title bar
     const barY = ruleY + 8;
     d.rect(left, barY, this.contentWidth, 22).fill(PDF_THEME.navy);
-    d.font(F_BOLD).fontSize(11).fillColor(PDF_THEME.white).text(this.opts.title.toUpperCase(), left + 8, barY + 6, { width: this.contentWidth * 0.6, lineBreak: false });
+    d.font(F_BOLD)
+      .fontSize(11)
+      .fillColor(PDF_THEME.white)
+      .text(this.opts.title.toUpperCase(), left + 8, barY + 6, { width: this.contentWidth * 0.6, lineBreak: false });
     if (this.opts.reference) {
-      d.font(F_REGULAR).fontSize(9).fillColor(PDF_THEME.white).text(this.opts.reference, left + this.contentWidth * 0.5 - 8, barY + 7, { width: this.contentWidth * 0.5, align: "right", lineBreak: false });
+      d.font(F_REGULAR)
+        .fontSize(9)
+        .fillColor(PDF_THEME.white)
+        .text(this.opts.reference, left + this.contentWidth * 0.5 - 8, barY + 7, {
+          width: this.contentWidth * 0.5,
+          align: "right",
+          lineBreak: false,
+        });
     }
     if (this.opts.watermark) this.drawWatermark(this.opts.watermark);
     d.fillColor(PDF_THEME.ink).font(F_REGULAR).fontSize(9);
@@ -264,14 +313,23 @@ class Renderer {
     const d = this.doc;
     d.font(F_BOLD).fontSize(10.5).fillColor(PDF_THEME.navy).text(text, MARGIN, d.y, { width: this.contentWidth });
     const y = d.y + 2;
-    d.moveTo(MARGIN, y).lineTo(MARGIN + 60, y).lineWidth(1).strokeColor(PDF_THEME.gold).stroke();
+    d.moveTo(MARGIN, y)
+      .lineTo(MARGIN + 60, y)
+      .lineWidth(1)
+      .strokeColor(PDF_THEME.gold)
+      .stroke();
     d.y = y + 7;
     d.fillColor(PDF_THEME.ink).font(F_REGULAR).fontSize(9);
   }
 
-  private paragraph(text: string, opts: { size: number; italic: boolean; color: string; align: "left" | "right" | "center" | "justify" }): void {
+  private paragraph(
+    text: string,
+    opts: { size: number; italic: boolean; color: string; align: "left" | "right" | "center" | "justify" },
+  ): void {
     const d = this.doc;
-    d.font(opts.italic ? F_ITALIC : F_REGULAR).fontSize(opts.size).fillColor(opts.color);
+    d.font(opts.italic ? F_ITALIC : F_REGULAR)
+      .fontSize(opts.size)
+      .fillColor(opts.color);
     const h = d.heightOfString(text, { width: this.contentWidth, align: opts.align });
     this.ensureSpace(Math.min(h, 200));
     d.text(text, MARGIN, d.y, { width: this.contentWidth, align: opts.align });
@@ -305,19 +363,34 @@ class Renderer {
     return h + 4;
   }
 
-  private drawKvBlock(block: { title: string | null; rows: [string, string][] }, x: number, top: number, width: number): void {
+  private drawKvBlock(
+    block: { title: string | null; rows: [string, string][] },
+    x: number,
+    top: number,
+    width: number,
+  ): void {
     const d = this.doc;
     let y = top;
     if (block.title) {
-      d.font(F_BOLD).fontSize(8).fillColor(PDF_THEME.gold).text(block.title.toUpperCase(), x, y, { width, lineBreak: false });
+      d.font(F_BOLD)
+        .fontSize(8)
+        .fillColor(PDF_THEME.gold)
+        .text(block.title.toUpperCase(), x, y, { width, lineBreak: false });
       y += 14;
-      d.moveTo(x, y - 2).lineTo(x + width, y - 2).lineWidth(0.5).strokeColor(PDF_THEME.rule).stroke();
+      d.moveTo(x, y - 2)
+        .lineTo(x + width, y - 2)
+        .lineWidth(0.5)
+        .strokeColor(PDF_THEME.rule)
+        .stroke();
       y += 2;
     }
     const labelWidth = width * 0.4 - 4;
     const valueWidth = width * 0.6;
     for (const [label, text] of block.rows) {
-      d.font(F_REGULAR).fontSize(8.5).fillColor(PDF_THEME.muted).text(label, x, y, { width: labelWidth, lineBreak: false });
+      d.font(F_REGULAR)
+        .fontSize(8.5)
+        .fillColor(PDF_THEME.muted)
+        .text(label, x, y, { width: labelWidth, lineBreak: false });
       d.font(F_BOLD).fontSize(9).fillColor(PDF_THEME.ink);
       const h = d.heightOfString(text, { width: valueWidth });
       d.text(text, x + width * 0.4, y, { width: valueWidth });
@@ -364,15 +437,26 @@ class Renderer {
       }
       const y = d.y;
       if (opt.zebra) d.rect(MARGIN, y, this.contentWidth, h).fill(PDF_THEME.zebra);
-      if (opt.top) d.moveTo(MARGIN, y).lineTo(MARGIN + this.contentWidth, y).lineWidth(1).strokeColor(PDF_THEME.gold).stroke();
-      d.font(opt.bold ? F_BOLD : F_REGULAR).fontSize(fontSize).fillColor(PDF_THEME.ink);
+      if (opt.top)
+        d.moveTo(MARGIN, y)
+          .lineTo(MARGIN + this.contentWidth, y)
+          .lineWidth(1)
+          .strokeColor(PDF_THEME.gold)
+          .stroke();
+      d.font(opt.bold ? F_BOLD : F_REGULAR)
+        .fontSize(fontSize)
+        .fillColor(PDF_THEME.ink);
       let x = MARGIN;
       texts.forEach((txt, i) => {
         const w = widths[i] ?? 0;
         d.text(txt, x + pad, y + 3, { width: w - 2 * pad, align: columns[i]?.align ?? "left" });
         x += w;
       });
-      d.moveTo(MARGIN, y + h).lineTo(MARGIN + this.contentWidth, y + h).lineWidth(0.3).strokeColor(PDF_THEME.rule).stroke();
+      d.moveTo(MARGIN, y + h)
+        .lineTo(MARGIN + this.contentWidth, y + h)
+        .lineWidth(0.3)
+        .strokeColor(PDF_THEME.rule)
+        .stroke();
       d.y = y + h;
       d.x = MARGIN;
     };
@@ -402,8 +486,18 @@ class Renderer {
     this.ensureSpace(44);
     const y = d.y;
     d.rect(MARGIN, y, this.contentWidth, 36).fill(PDF_THEME.zebra);
-    d.font(F_REGULAR).fontSize(9).fillColor(PDF_THEME.muted).text(label, MARGIN + 10, y + 12, { width: this.contentWidth / 2, lineBreak: false });
-    d.font(F_BOLD).fontSize(16).fillColor(PDF_THEME.navy).text(amount, MARGIN + this.contentWidth / 2 - 10, y + 9, { width: this.contentWidth / 2, align: "right", lineBreak: false });
+    d.font(F_REGULAR)
+      .fontSize(9)
+      .fillColor(PDF_THEME.muted)
+      .text(label, MARGIN + 10, y + 12, { width: this.contentWidth / 2, lineBreak: false });
+    d.font(F_BOLD)
+      .fontSize(16)
+      .fillColor(PDF_THEME.navy)
+      .text(amount, MARGIN + this.contentWidth / 2 - 10, y + 9, {
+        width: this.contentWidth / 2,
+        align: "right",
+        lineBreak: false,
+      });
     d.y = y + 44;
     d.x = MARGIN;
     d.fillColor(PDF_THEME.ink);
@@ -415,9 +509,18 @@ class Renderer {
     const w = 200;
     const x = MARGIN + this.contentWidth - w;
     const y = d.y + 10;
-    d.font(F_BOLD).fontSize(9).fillColor(PDF_THEME.ink).text(`For ${forName}`, x, y, { width: w, align: "right", lineBreak: false });
-    d.moveTo(x + 40, y + 40).lineTo(x + w, y + 40).lineWidth(0.6).strokeColor(PDF_THEME.rule).stroke();
-    d.font(F_REGULAR).fontSize(8.5).text(name, x, y + 43, { width: w, align: "right", lineBreak: false });
+    d.font(F_BOLD)
+      .fontSize(9)
+      .fillColor(PDF_THEME.ink)
+      .text(`For ${forName}`, x, y, { width: w, align: "right", lineBreak: false });
+    d.moveTo(x + 40, y + 40)
+      .lineTo(x + w, y + 40)
+      .lineWidth(0.6)
+      .strokeColor(PDF_THEME.rule)
+      .stroke();
+    d.font(F_REGULAR)
+      .fontSize(8.5)
+      .text(name, x, y + 43, { width: w, align: "right", lineBreak: false });
     if (title) d.fillColor(PDF_THEME.muted).text(title, x, y + 53, { width: w, align: "right", lineBreak: false });
     d.y = y + 66;
     d.x = MARGIN;
@@ -433,10 +536,18 @@ class Renderer {
       // the footer sits inside the bottom margin: lift the margin so the line wrapper never starts a new page while stamping it
       d.page.margins.bottom = 0;
       const y = this.pageHeight - MARGIN - 12;
-      d.moveTo(MARGIN, y - 4).lineTo(this.pageWidth - MARGIN, y - 4).lineWidth(0.6).strokeColor(PDF_THEME.gold).stroke();
+      d.moveTo(MARGIN, y - 4)
+        .lineTo(this.pageWidth - MARGIN, y - 4)
+        .lineWidth(0.6)
+        .strokeColor(PDF_THEME.gold)
+        .stroke();
       d.font(F_REGULAR).fontSize(7.5).fillColor(PDF_THEME.muted);
       d.text(this.opts.footer, MARGIN, y, { width: this.contentWidth * 0.7, lineBreak: false });
-      d.text(`Page ${i - range.start + 1} of ${range.count}`, MARGIN + this.contentWidth * 0.7, y, { width: this.contentWidth * 0.3, align: "right", lineBreak: false });
+      d.text(`Page ${i - range.start + 1} of ${range.count}`, MARGIN + this.contentWidth * 0.7, y, {
+        width: this.contentWidth * 0.3,
+        align: "right",
+        lineBreak: false,
+      });
     }
   }
 }

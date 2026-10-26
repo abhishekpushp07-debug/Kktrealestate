@@ -59,11 +59,17 @@ export const ServiceRequestUpdateSchema = z.strictObject({
 export type ServiceRequestUpdate = z.infer<typeof ServiceRequestUpdateSchema>;
 
 /** Change priority. */
-export const ServicePriorityChangeSchema = z.strictObject({ ...VersionedSchema.shape, priority: ServicePrioritySchema });
+export const ServicePriorityChangeSchema = z.strictObject({
+  ...VersionedSchema.shape,
+  priority: ServicePrioritySchema,
+});
 export type ServicePriorityChange = z.infer<typeof ServicePriorityChangeSchema>;
 
 /** Satisfaction rating 1–5 at close. */
-export const ServiceRatingSchema = z.strictObject({ rating: z.int().min(1).max(5), comment: NoteSchema.optional().nullable() });
+export const ServiceRatingSchema = z.strictObject({
+  rating: z.int().min(1).max(5),
+  comment: NoteSchema.optional().nullable(),
+});
 export type ServiceRating = z.infer<typeof ServiceRatingSchema>;
 
 /** Reopen within 7 days of Resolved. */
@@ -79,7 +85,9 @@ export const ServiceMessageRowSchema = z.object({
   author_name: z.string(),
   body: z.string(),
   is_internal: z.boolean(),
-  attachments: z.array(z.object({ id: IdSchema, file_name: z.string(), mime: z.string(), thumb_url: z.string().nullable() })),
+  attachments: z.array(
+    z.object({ id: IdSchema, file_name: z.string(), mime: z.string(), thumb_url: z.string().nullable() }),
+  ),
   created_at: TimestampSchema,
 });
 export type ServiceMessageRow = z.infer<typeof ServiceMessageRowSchema>;
@@ -121,7 +129,9 @@ export const ServiceRequestRowSchema = z.object({
 export type ServiceRequestRow = z.infer<typeof ServiceRequestRowSchema>;
 
 /** Ticket detail: row + thread (internal notes included for staff). */
-export const ServiceRequestDetailResponseSchema = ServiceRequestRowSchema.extend({ messages: z.array(ServiceMessageRowSchema) });
+export const ServiceRequestDetailResponseSchema = ServiceRequestRowSchema.extend({
+  messages: z.array(ServiceMessageRowSchema),
+});
 export type ServiceRequestDetailResponse = z.infer<typeof ServiceRequestDetailResponseSchema>;
 
 /** List filter for tickets. */
@@ -142,7 +152,9 @@ export type ServiceListResponse = z.infer<typeof ServiceListResponseSchema>;
 
 /** Kanban by status. */
 export const ServiceKanbanResponseSchema = z.object({
-  columns: z.array(z.object({ status: ServiceStatusSchema, count: z.int().min(0), tickets: z.array(ServiceRequestRowSchema) })),
+  columns: z.array(
+    z.object({ status: ServiceStatusSchema, count: z.int().min(0), tickets: z.array(ServiceRequestRowSchema) }),
+  ),
 });
 export type ServiceKanbanResponse = z.infer<typeof ServiceKanbanResponseSchema>;
 
@@ -157,18 +169,30 @@ export const ServiceBoardQuerySchema = z.object({
 export type ServiceBoardQuery = z.infer<typeof ServiceBoardQuerySchema>;
 
 /** Customer-facing ticket row (portal module maps it onto PortalRequestRow): staff ids are kept out, reopen/rate eligibility is computed. */
-export const CustomerTicketRowSchema = ServiceRequestRowSchema.omit({ assignee_user_id: true, assignee_name: true, sla_due_at: true, sla_breached_at: true, is_sla_breached: true }).extend({
+export const CustomerTicketRowSchema = ServiceRequestRowSchema.omit({
+  assignee_user_id: true,
+  assignee_name: true,
+  sla_due_at: true,
+  sla_breached_at: true,
+  is_sla_breached: true,
+}).extend({
   can_reopen: z.boolean(),
   can_rate: z.boolean(),
 });
 export type CustomerTicketRow = z.infer<typeof CustomerTicketRowSchema>;
 
 /** Customer-facing ticket detail: internal notes are never included. */
-export const CustomerTicketDetailSchema = CustomerTicketRowSchema.extend({ messages: z.array(ServiceMessageRowSchema) });
+export const CustomerTicketDetailSchema = CustomerTicketRowSchema.extend({
+  messages: z.array(ServiceMessageRowSchema),
+});
 export type CustomerTicketDetail = z.infer<typeof CustomerTicketDetailSchema>;
 
 /** Result of the hourly SLA breach check job. */
-export const SlaBreachCheckResultSchema = z.object({ checked_at: TimestampSchema, flagged: z.int().min(0), ticket_numbers: z.array(z.string()) });
+export const SlaBreachCheckResultSchema = z.object({
+  checked_at: TimestampSchema,
+  flagged: z.int().min(0),
+  ticket_numbers: z.array(z.string()),
+});
 export type SlaBreachCheckResult = z.infer<typeof SlaBreachCheckResultSchema>;
 
 /** Days after RESOLVED during which a customer may reopen. */

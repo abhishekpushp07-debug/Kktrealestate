@@ -70,7 +70,13 @@ export interface MasterKindDef {
   /** Counts references from other tables. */
   usage: (db: Executor, companyId: string, id: string) => Promise<UsageLine[]>;
   /** Post-write hook inside the transaction (child rows such as plan installments). */
-  afterWrite?: (tx: Executor, row: DbRow, input: Record<string, unknown>, ctx: WriteContext, mode: "create" | "update") => Promise<void>;
+  afterWrite?: (
+    tx: Executor,
+    row: DbRow,
+    input: Record<string, unknown>,
+    ctx: WriteContext,
+    mode: "create" | "update",
+  ) => Promise<void>;
   /** Kind-specific routes (reorder etc.). */
   extraRoutes?: (app: FastifyInstance, def: MasterKindDef) => void;
 }

@@ -30,7 +30,12 @@ export default async function VisitPage({ params, searchParams }: { params: Para
   }
   return (
     <>
-      <PageHeader eyebrow="Manage your visit" title="Your private site visit" lead="Add it to your calendar, find the site office, or cancel if your plans change." compact />
+      <PageHeader
+        eyebrow="Manage your visit"
+        title="Your private site visit"
+        lead="Add it to your calendar, find the site office, or cancel if your plans change."
+        compact
+      />
       <div className="container-site py-12 sm:py-16">
         <div className="mx-auto max-w-2xl">
           <ManageVisit visit={visit} token={token} justMoved={moved} />
@@ -51,7 +56,10 @@ function ExpiredVisitLink({ message }: { message: string }) {
       <PageHeader eyebrow="Manage your visit" title="This visit link has expired" lead={message} compact />
       <div className="container-site py-12 sm:py-16">
         <div className="mx-auto flex max-w-2xl flex-col items-center gap-4 text-center" role="status">
-          <p className="text-ink-muted">Links stop working once a visit is over, cancelled or rescheduled. Use the link in your latest confirmation, or book a new visit.</p>
+          <p className="text-ink-muted">
+            Links stop working once a visit is over, cancelled or rescheduled. Use the link in your latest confirmation,
+            or book a new visit.
+          </p>
           <Button href="/contact#visit">Book a site visit</Button>
           <Button href="/projects" variant="link">
             Explore our projects

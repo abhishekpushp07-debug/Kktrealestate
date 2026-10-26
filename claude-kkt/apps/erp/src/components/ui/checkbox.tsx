@@ -22,7 +22,11 @@ export function Checkbox({ className, label, description, id, checked, ...props 
       {...props}
     >
       <CheckboxPrimitive.Indicator className="text-white">
-        {checked === "indeterminate" ? <Minus className="size-3" strokeWidth={3} /> : <Check className="size-3" strokeWidth={3} />}
+        {checked === "indeterminate" ? (
+          <Minus className="size-3" strokeWidth={3} />
+        ) : (
+          <Check className="size-3" strokeWidth={3} />
+        )}
       </CheckboxPrimitive.Indicator>
     </CheckboxPrimitive.Root>
   );
@@ -30,7 +34,10 @@ export function Checkbox({ className, label, description, id, checked, ...props 
   return (
     <div className="flex items-start gap-2">
       <span className="flex h-5 items-center">{box}</span>
-      <label htmlFor={inputId} className="cursor-pointer select-none text-sm text-ink peer-disabled:cursor-not-allowed peer-disabled:opacity-60">
+      <label
+        htmlFor={inputId}
+        className="cursor-pointer select-none text-sm text-ink peer-disabled:cursor-not-allowed peer-disabled:opacity-60"
+      >
         <span className="font-medium">{label}</span>
         {description && <span className="block text-xs text-ink-subtle">{description}</span>}
       </label>

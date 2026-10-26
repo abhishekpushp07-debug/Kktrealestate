@@ -31,7 +31,16 @@ function Body({ bookingId }: { bookingId: string }): React.JSX.Element {
       <TabHeader title="My Flat" subtitle={d ? `${d.flat_number} · ${d.block_name} · ${d.project_name}` : undefined} />
       {q.isError && d ? <StatusBar text="Showing saved details — couldn't refresh." tone="warning" /> : null}
       <Screen onRefresh={() => refreshBooking(bookingId)}>
-        {d ? <FlatContent d={d} /> : q.isError ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : <><SkeletonCard lines={4} /><SkeletonCard lines={6} /></>}
+        {d ? (
+          <FlatContent d={d} />
+        ) : q.isError ? (
+          <ErrorState error={q.error} onRetry={() => void q.refetch()} />
+        ) : (
+          <>
+            <SkeletonCard lines={4} />
+            <SkeletonCard lines={6} />
+          </>
+        )}
       </Screen>
     </View>
   );
@@ -44,8 +53,22 @@ function FlatContent({ d }: { d: PortalMyFlatResponse }): React.JSX.Element {
   return (
     <>
       <Card padded={false}>
-        <Pressable accessibilityRole={d.floor_plan_url ? "button" : undefined} accessibilityLabel="Floor plan — tap to zoom" disabled={!d.floor_plan_url} onPress={() => setPlan(0)} style={styles.planWrap}>
-          {d.floor_plan_url ? <Image source={{ uri: d.floor_plan_url }} style={StyleSheet.absoluteFill} contentFit="contain" transition={300} accessibilityLabel="Floor plan" /> : (
+        <Pressable
+          accessibilityRole={d.floor_plan_url ? "button" : undefined}
+          accessibilityLabel="Floor plan — tap to zoom"
+          disabled={!d.floor_plan_url}
+          onPress={() => setPlan(0)}
+          style={styles.planWrap}
+        >
+          {d.floor_plan_url ? (
+            <Image
+              source={{ uri: d.floor_plan_url }}
+              style={StyleSheet.absoluteFill}
+              contentFit="contain"
+              transition={300}
+              accessibilityLabel="Floor plan"
+            />
+          ) : (
             <View style={styles.planEmpty}>
               <Icon name="image" size={28} color={colors.inkSubtle} />
               <T variant="small" color={colors.inkMuted}>
@@ -80,7 +103,11 @@ function FlatContent({ d }: { d: PortalMyFlatResponse }): React.JSX.Element {
       <Columns>
         <Col>
           <Card>
-            <CardHeader eyebrow="Rooms" title="Rooms & sizes" subtitle={`${d.rooms.length} rooms · ${formatSqft(totalRooms)}`} />
+            <CardHeader
+              eyebrow="Rooms"
+              title="Rooms & sizes"
+              subtitle={`${d.rooms.length} rooms · ${formatSqft(totalRooms)}`}
+            />
             {isPhone ? (
               d.rooms.map((r, i) => (
                 <View key={`${r.label}-${i}`}>
@@ -108,9 +135,31 @@ function FlatContent({ d }: { d: PortalMyFlatResponse }): React.JSX.Element {
                 keyOf={(r, i) => `${r.label}-${i}`}
                 columns={[
                   { key: "label", title: "Room", flex: 1.4, render: (r) => <T variant="bodyStrong">{r.label}</T> },
-                  { key: "type", title: "Type", render: (r) => <T variant="small" color={colors.inkMuted}>{r.room_type}</T> },
-                  { key: "size", title: "Size (ft)", align: "right", render: (r) => <T variant="small">{r.length_ft} × {r.width_ft}</T> },
-                  { key: "sqft", title: "Area", align: "right", render: (r) => <T variant="money">{formatSqft(r.sqft)}</T> },
+                  {
+                    key: "type",
+                    title: "Type",
+                    render: (r) => (
+                      <T variant="small" color={colors.inkMuted}>
+                        {r.room_type}
+                      </T>
+                    ),
+                  },
+                  {
+                    key: "size",
+                    title: "Size (ft)",
+                    align: "right",
+                    render: (r) => (
+                      <T variant="small">
+                        {r.length_ft} × {r.width_ft}
+                      </T>
+                    ),
+                  },
+                  {
+                    key: "sqft",
+                    title: "Area",
+                    align: "right",
+                    render: (r) => <T variant="money">{formatSqft(r.sqft)}</T>,
+                  },
                 ]}
               />
             )}
@@ -120,11 +169,33 @@ function FlatContent({ d }: { d: PortalMyFlatResponse }): React.JSX.Element {
             {d.areas.map((a, i) => (
               <KeyValue key={`${a.code}-${i}`} label={a.name} value={formatSqft(a.sqft)} right />
             ))}
-            {d.areas.length === 0 ? <T variant="small" color={colors.inkMuted}>Area details will appear once finalised.</T> : null}
+            {d.areas.length === 0 ? (
+              <T variant="small" color={colors.inkMuted}>
+                Area details will appear once finalised.
+              </T>
+            ) : null}
           </Card>
           <Card>
-            <CardHeader eyebrow="Parking" title={d.parking.length ? `${d.parking.length} slot${d.parking.length > 1 ? "s" : ""} allotted` : "Parking"} />
-            {d.parking.length ? d.parking.map((p, i) => <KeyValue key={`${p.number}-${i}`} label={p.number} value={`${p.slot_type}${p.level ? ` · ${p.level}` : ""}`} right />) : <T variant="small" color={colors.inkMuted}>No parking allotted to this booking.</T>}
+            <CardHeader
+              eyebrow="Parking"
+              title={
+                d.parking.length ? `${d.parking.length} slot${d.parking.length > 1 ? "s" : ""} allotted` : "Parking"
+              }
+            />
+            {d.parking.length ? (
+              d.parking.map((p, i) => (
+                <KeyValue
+                  key={`${p.number}-${i}`}
+                  label={p.number}
+                  value={`${p.slot_type}${p.level ? ` · ${p.level}` : ""}`}
+                  right
+                />
+              ))
+            ) : (
+              <T variant="small" color={colors.inkMuted}>
+                No parking allotted to this booking.
+              </T>
+            )}
           </Card>
         </Col>
         <Col>
@@ -151,7 +222,15 @@ function FlatContent({ d }: { d: PortalMyFlatResponse }): React.JSX.Element {
             </View>
           </Card>
           <Card>
-            <CardHeader eyebrow="Agreement" title="Revisions" subtitle={d.agreement.revisions.length ? `${d.agreement.revisions.length} audited change${d.agreement.revisions.length > 1 ? "s" : ""}` : "No changes since booking"} />
+            <CardHeader
+              eyebrow="Agreement"
+              title="Revisions"
+              subtitle={
+                d.agreement.revisions.length
+                  ? `${d.agreement.revisions.length} audited change${d.agreement.revisions.length > 1 ? "s" : ""}`
+                  : "No changes since booking"
+              }
+            />
             {d.agreement.revisions.map((r, i) => (
               <View key={`${r.revised_at}-${i}`} style={styles.revision}>
                 <T variant="caption" color={colors.inkSubtle}>
@@ -162,14 +241,17 @@ function FlatContent({ d }: { d: PortalMyFlatResponse }): React.JSX.Element {
                   Value {formatINR(r.before_value_paise)} → {formatINR(r.after_value_paise)}
                 </T>
                 <T variant="small" color={colors.inkMuted}>
-                  Cash {formatINR(r.before_cash_paise)} → {formatINR(r.after_cash_paise)} · Account {formatINR(r.before_account_paise)} → {formatINR(r.after_account_paise)}
+                  Cash {formatINR(r.before_cash_paise)} → {formatINR(r.after_cash_paise)} · Account{" "}
+                  {formatINR(r.before_account_paise)} → {formatINR(r.after_account_paise)}
                 </T>
               </View>
             ))}
           </Card>
           <Card>
             <CardHeader eyebrow="Finish" title="Specifications" />
-            {d.specifications.length === 0 ? <EmptyState icon="document" title="Specifications coming soon" style={{ paddingVertical: space.lg }} /> : null}
+            {d.specifications.length === 0 ? (
+              <EmptyState icon="document" title="Specifications coming soon" style={{ paddingVertical: space.lg }} />
+            ) : null}
             {d.specifications.map((s, i) => (
               <View key={`${s.category}-${i}`} style={{ gap: 4, marginBottom: space.md }}>
                 <T variant="label" color={colors.goldText}>
@@ -188,7 +270,14 @@ function FlatContent({ d }: { d: PortalMyFlatResponse }): React.JSX.Element {
           </Card>
         </Col>
       </Columns>
-      {d.floor_plan_url ? <Lightbox images={[{ uri: d.floor_plan_url, caption: `Floor plan · ${d.flat_number}` }]} index={plan} onClose={() => setPlan(null)} onIndexChange={setPlan} /> : null}
+      {d.floor_plan_url ? (
+        <Lightbox
+          images={[{ uri: d.floor_plan_url, caption: `Floor plan · ${d.flat_number}` }]}
+          index={plan}
+          onClose={() => setPlan(null)}
+          onIndexChange={setPlan}
+        />
+      ) : null}
     </>
   );
 }
@@ -196,10 +285,26 @@ function FlatContent({ d }: { d: PortalMyFlatResponse }): React.JSX.Element {
 const styles = StyleSheet.create({
   planWrap: { height: 240, backgroundColor: colors.surfaceMuted },
   planEmpty: { flex: 1, alignItems: "center", justifyContent: "center", gap: space.sm },
-  zoomHint: { position: "absolute", right: space.md, bottom: space.md, flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(11,31,58,0.7)", paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.pill },
+  zoomHint: {
+    position: "absolute",
+    right: space.md,
+    bottom: space.md,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(11,31,58,0.7)",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+  },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: space.xs, marginTop: space.sm },
   roomRow: { flexDirection: "row", alignItems: "center", gap: space.md, paddingVertical: 10 },
   priceRow: { flexDirection: "row", alignItems: "center", gap: space.md, paddingVertical: 6 },
-  revision: { gap: 2, paddingVertical: space.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
+  revision: {
+    gap: 2,
+    paddingVertical: space.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.line,
+  },
   specRow: { flexDirection: "row", alignItems: "flex-start", gap: 6, paddingLeft: 2 },
 });

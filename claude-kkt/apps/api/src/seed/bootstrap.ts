@@ -5,9 +5,21 @@ import { config } from "../config.js";
 import { hashPassword, passwordPolicyProblems } from "../lib/password.js";
 
 /** Staff logins created by the DEMO bootstrap (docs/SEED.md). Never created in production unless SEED_DEMO=true. */
-export const BOOTSTRAP_USERS: readonly { role: SystemRoleName; name: string; email: string; password: string; allProjects: boolean }[] = [
+export const BOOTSTRAP_USERS: readonly {
+  role: SystemRoleName;
+  name: string;
+  email: string;
+  password: string;
+  allProjects: boolean;
+}[] = [
   { role: "Super Admin", name: "Suresh Agarwal", email: "admin@sgb.in", password: "Admin@12345", allProjects: true },
-  { role: "Project Admin", name: "Rohit Kumar", email: "projects@sgb.in", password: "Project@12345", allProjects: false },
+  {
+    role: "Project Admin",
+    name: "Rohit Kumar",
+    email: "projects@sgb.in",
+    password: "Project@12345",
+    allProjects: false,
+  },
   { role: "Accounts", name: "Meena Sharma", email: "accounts@sgb.in", password: "Accounts@12345", allProjects: true },
   { role: "Sales", name: "Ankit Verma", email: "sales@sgb.in", password: "Sales@12345", allProjects: true },
   { role: "Marketing", name: "Nisha Singh", email: "marketing@sgb.in", password: "Marketing@12345", allProjects: true },
@@ -53,12 +65,39 @@ const DEMO_COMPANY = {
   gstin: "10AABCS1234A1Z5",
   phone: "6122200000",
   email: "info@sgb.in",
-  address: { line1: "SGB House, Boring Road", locality: "Sri Krishna Puri", city: "Patna", state: "Bihar", pincode: "800001" },
-  letterhead: { tagline: "Building homes, building trust", phone: "+91 612 2200000", email: "info@sgb.in", website: "https://www.sgb.in", signatory_name: "Suresh Agarwal", signatory_title: "Managing Director" },
+  address: {
+    line1: "SGB House, Boring Road",
+    locality: "Sri Krishna Puri",
+    city: "Patna",
+    state: "Bihar",
+    pincode: "800001",
+  },
+  letterhead: {
+    tagline: "Building homes, building trust",
+    phone: "+91 612 2200000",
+    email: "info@sgb.in",
+    website: "https://www.sgb.in",
+    signatory_name: "Suresh Agarwal",
+    signatory_title: "Managing Director",
+  },
 } as const;
 
-const DEFAULT_SETTINGS = { demand_due_days: 15, default_gst_percent: 5, round_robin_enabled: true, force_mfa_for_admins: false, sla_hours: { LOW: 72, MEDIUM: 48, HIGH: 24, URGENT: 8 }, booking_hold_hours: 48 };
-const DEFAULT_NUMBERING = { customer: { prefix: "CUST-" }, booking: { prefix: "BK-" }, demand: { prefix: "DM-" }, receipt: { prefix: "RCPT/" }, ticket: { prefix: "SR-" }, visit: { prefix: "SV-" } };
+const DEFAULT_SETTINGS = {
+  demand_due_days: 15,
+  default_gst_percent: 5,
+  round_robin_enabled: true,
+  force_mfa_for_admins: false,
+  sla_hours: { LOW: 72, MEDIUM: 48, HIGH: 24, URGENT: 8 },
+  booking_hold_hours: 48,
+};
+const DEFAULT_NUMBERING = {
+  customer: { prefix: "CUST-" },
+  booking: { prefix: "BK-" },
+  demand: { prefix: "DM-" },
+  receipt: { prefix: "RCPT/" },
+  ticket: { prefix: "SR-" },
+  visit: { prefix: "SV-" },
+};
 
 /** Validates the production first-boot settings; throws BootstrapRefused naming every problem (never the password itself). */
 function productionAdmin(): { companyName: string; email: string; password: string } {
@@ -74,7 +113,9 @@ function productionAdmin(): { companyName: string; email: string; password: stri
     if (weak.length > 0) problems.push(`BOOTSTRAP_ADMIN_PASSWORD must have ${weak.join(", ")}`);
   }
   if (problems.length > 0 || !companyName || !email || !password) {
-    throw new BootstrapRefused(`Refusing to start on a fresh production database: ${problems.join("; ")}. Set them for the first boot (the admin must change the password at first sign-in), or run with SEED_DEMO=true for a demo.`);
+    throw new BootstrapRefused(
+      `Refusing to start on a fresh production database: ${problems.join("; ")}. Set them for the first boot (the admin must change the password at first sign-in), or run with SEED_DEMO=true for a demo.`,
+    );
   }
   return { companyName, email, password };
 }
@@ -83,14 +124,24 @@ async function ensureRoles(tx: Executor, companyId: string): Promise<Record<Syst
   const roleIds = {} as Record<SystemRoleName, string>;
   for (const name of SYSTEM_ROLE_NAMES) {
     const def = SYSTEM_ROLES[name];
-    const [existing] = await tx.select({ id: roles.id }).from(roles).where(and(eq(roles.companyId, companyId), eq(roles.name, name))).limit(1);
+    const [existing] = await tx
+      .select({ id: roles.id })
+      .from(roles)
+      .where(and(eq(roles.companyId, companyId), eq(roles.name, name)))
+      .limit(1);
     if (existing) {
       roleIds[name] = existing.id;
       // Keep system-role permission bundles in sync with the contracts registry.
-      await tx.update(roles).set({ permissions: [...def.permissions], description: def.description, isSystem: true }).where(eq(roles.id, existing.id));
+      await tx
+        .update(roles)
+        .set({ permissions: [...def.permissions], description: def.description, isSystem: true })
+        .where(eq(roles.id, existing.id));
       continue;
     }
-    const [r] = await tx.insert(roles).values({ companyId, name, description: def.description, permissions: [...def.permissions], isSystem: true }).returning({ id: roles.id });
+    const [r] = await tx
+      .insert(roles)
+      .values({ companyId, name, description: def.description, permissions: [...def.permissions], isSystem: true })
+      .returning({ id: roles.id });
     roleIds[name] = r!.id;
   }
   return roleIds;
@@ -104,13 +155,16 @@ async function ensureRoles(tx: Executor, companyId: string): Promise<Record<Syst
  */
 export async function ensureBootstrap(db: DB, opts: { mode?: BootstrapMode } = {}): Promise<BootstrapResult> {
   const mode = opts.mode ?? bootstrapMode();
-  const prodAdmin = mode === "production" ? await (async () => {
-    // Validate first so a misconfigured replica fails fast; the hash is computed outside the lock.
-    const [any] = await db.select({ id: companies.id }).from(companies).limit(1);
-    if (any) return null;
-    const a = productionAdmin();
-    return { ...a, hash: await hashPassword(a.password) };
-  })() : null;
+  const prodAdmin =
+    mode === "production"
+      ? await (async () => {
+          // Validate first so a misconfigured replica fails fast; the hash is computed outside the lock.
+          const [any] = await db.select({ id: companies.id }).from(companies).limit(1);
+          if (any) return null;
+          const a = productionAdmin();
+          return { ...a, hash: await hashPassword(a.password) };
+        })()
+      : null;
   const demoHashes = mode === "demo" ? new Map<string, Promise<string>>() : null;
 
   return db.transaction(async (tx) => {
@@ -122,9 +176,22 @@ export async function ensureBootstrap(db: DB, opts: { mode?: BootstrapMode } = {
       created = true;
       if (mode === "production") {
         const a = prodAdmin ?? { ...productionAdmin(), hash: await hashPassword(productionAdmin().password) };
-        [company] = await tx.insert(companies).values({ name: a.companyName, fyStartMonth: 4, numbering: DEFAULT_NUMBERING, settings: DEFAULT_SETTINGS }).returning();
+        [company] = await tx
+          .insert(companies)
+          .values({ name: a.companyName, fyStartMonth: 4, numbering: DEFAULT_NUMBERING, settings: DEFAULT_SETTINGS })
+          .returning();
       } else {
-        [company] = await tx.insert(companies).values({ ...DEMO_COMPANY, address: { ...DEMO_COMPANY.address }, letterhead: { ...DEMO_COMPANY.letterhead }, fyStartMonth: 4, numbering: { ...DEFAULT_NUMBERING, receipt: { prefix: "SGB/" } }, settings: DEFAULT_SETTINGS }).returning();
+        [company] = await tx
+          .insert(companies)
+          .values({
+            ...DEMO_COMPANY,
+            address: { ...DEMO_COMPANY.address },
+            letterhead: { ...DEMO_COMPANY.letterhead },
+            fyStartMonth: 4,
+            numbering: { ...DEFAULT_NUMBERING, receipt: { prefix: "SGB/" } },
+            settings: DEFAULT_SETTINGS,
+          })
+          .returning();
       }
     }
     if (!company) throw new Error("bootstrap: company insert returned no row");
@@ -134,20 +201,42 @@ export async function ensureBootstrap(db: DB, opts: { mode?: BootstrapMode } = {
     if (mode === "production") {
       if (created) {
         const a = prodAdmin ?? { ...productionAdmin(), hash: await hashPassword(productionAdmin().password) };
-        await tx.insert(users).values({ companyId, name: "Administrator", email: a.email, passwordHash: a.hash, roleId: roleIds["Super Admin"], allProjects: true, mustChangePassword: true, passwordChangedAt: new Date() });
+        await tx.insert(users).values({
+          companyId,
+          name: "Administrator",
+          email: a.email,
+          passwordHash: a.hash,
+          roleId: roleIds["Super Admin"],
+          allProjects: true,
+          mustChangePassword: true,
+          passwordChangedAt: new Date(),
+        });
         adminEmail = a.email;
       }
       return { companyId, created, roleIds, mode, adminEmail };
     }
 
     for (const u of BOOTSTRAP_USERS) {
-      const [existing] = await tx.select({ id: users.id }).from(users).where(and(eq(users.companyId, companyId), eq(users.email, u.email))).limit(1);
+      const [existing] = await tx
+        .select({ id: users.id })
+        .from(users)
+        .where(and(eq(users.companyId, companyId), eq(users.email, u.email)))
+        .limit(1);
       if (existing) continue;
       let hash = demoHashes!.get(u.email);
-      if (!hash) { hash = hashPassword(u.password); demoHashes!.set(u.email, hash); }
+      if (!hash) {
+        hash = hashPassword(u.password);
+        demoHashes!.set(u.email, hash);
+      }
       await tx.insert(users).values({
-        companyId, name: u.name, email: u.email, passwordHash: await hash, roleId: roleIds[u.role],
-        allProjects: u.allProjects, mustChangePassword: false, passwordChangedAt: new Date(),
+        companyId,
+        name: u.name,
+        email: u.email,
+        passwordHash: await hash,
+        roleId: roleIds[u.role],
+        allProjects: u.allProjects,
+        mustChangePassword: false,
+        passwordChangedAt: new Date(),
       });
     }
     return { companyId, created, roleIds, mode, adminEmail };

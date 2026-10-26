@@ -16,7 +16,11 @@ const CALC_MODE_DESCRIPTIONS: Readonly<Record<PlcCalcMode, string>> = {
   FLOOR_RISE: "Rate × floors above the threshold × area",
 };
 
-const CALC_MODE_OPTIONS = PLC_CALC_MODES.map((value) => ({ value, label: PLC_CALC_MODE_LABELS[value], description: CALC_MODE_DESCRIPTIONS[value] }));
+const CALC_MODE_OPTIONS = PLC_CALC_MODES.map((value) => ({
+  value,
+  label: PLC_CALC_MODE_LABELS[value],
+  description: CALC_MODE_DESCRIPTIONS[value],
+}));
 
 /** PLC types: how the preferential location charge is computed on the rate card. */
 export function PlcTypeForm(_props: MasterFormProps) {
@@ -29,14 +33,33 @@ export function PlcTypeForm(_props: MasterFormProps) {
           name="name"
           label="Name"
           required
-          render={({ field }) => <Input {...field} value={field.value} onChange={(event) => field.onChange(event.target.value)} placeholder="Park Facing" maxLength={120} data-testid="field-name" />}
+          render={({ field }) => (
+            <Input
+              {...field}
+              value={field.value}
+              onChange={(event) => field.onChange(event.target.value)}
+              placeholder="Park Facing"
+              maxLength={120}
+              data-testid="field-name"
+            />
+          )}
         />
         <FormField
           control={control}
           name="code"
           label="Code"
           required
-          render={({ field }) => <Input {...field} value={field.value} onChange={(event) => field.onChange(event.target.value.toUpperCase())} placeholder="PARK_FACING" maxLength={30} className="font-mono uppercase" data-testid="field-code" />}
+          render={({ field }) => (
+            <Input
+              {...field}
+              value={field.value}
+              onChange={(event) => field.onChange(event.target.value.toUpperCase())}
+              placeholder="PARK_FACING"
+              maxLength={30}
+              className="font-mono uppercase"
+              data-testid="field-code"
+            />
+          )}
         />
       </FormRow>
       <FormField
@@ -44,7 +67,16 @@ export function PlcTypeForm(_props: MasterFormProps) {
         name="calc_mode"
         label="Calculation mode"
         required
-        render={({ field }) => <RadioGroup value={field.value} onValueChange={field.onChange} options={CALC_MODE_OPTIONS} cards aria-describedby={field["aria-describedby"]} data-testid="field-calc-mode" />}
+        render={({ field }) => (
+          <RadioGroup
+            value={field.value}
+            onValueChange={field.onChange}
+            options={CALC_MODE_OPTIONS}
+            cards
+            aria-describedby={field["aria-describedby"]}
+            data-testid="field-calc-mode"
+          />
+        )}
       />
     </div>
   );

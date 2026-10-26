@@ -20,42 +20,77 @@ beforeAll(async () => {
   hook = createServer((req, res) => {
     const chunks: Buffer[] = [];
     req.on("data", (c: Buffer) => chunks.push(c));
-    req.on("end", () => { posts.push(JSON.parse(Buffer.concat(chunks).toString())); res.end("ok"); });
+    req.on("end", () => {
+      posts.push(JSON.parse(Buffer.concat(chunks).toString()));
+      res.end("ok");
+    });
   });
   await new Promise<void>((r) => hook.listen(4919, "127.0.0.1", r));
   t = await buildTestApp({
     extraRoutes: (api) => {
       // stand-ins with the payment route's URL (the money module is not loaded in this file: KKT_MODULES=web)
       route(api, {
-        method: "POST", url: "/payments", public: true,
-        schema: { querystring: z.object({ replay: z.string().optional() }), response: { 201: z.object({ ok: z.boolean() }) } },
-        handler: async (req, reply) => { if (req.query.replay) reply.header("Idempotent-Replayed", "true"); return reply.code(201).send({ ok: true }); },
+        method: "POST",
+        url: "/payments",
+        public: true,
+        schema: {
+          querystring: z.object({ replay: z.string().optional() }),
+          response: { 201: z.object({ ok: z.boolean() }) },
+        },
+        handler: async (req, reply) => {
+          if (req.query.replay) reply.header("Idempotent-Replayed", "true");
+          return reply.code(201).send({ ok: true });
+        },
       });
       route(api, {
-        method: "GET", url: "/test/boom", public: true,
+        method: "GET",
+        url: "/test/boom",
+        public: true,
         schema: { response: { 200: z.object({ ok: z.boolean() }) } },
-        handler: async () => { throw new Error("insert failed: Key (phone)=(9876543210) already exists for ravi@example.com PAN ABCDE1234F"); },
+        handler: async () => {
+          throw new Error("insert failed: Key (phone)=(9876543210) already exists for ravi@example.com PAN ABCDE1234F");
+        },
       });
       route(api, {
-        method: "GET", url: "/test/busy", public: true,
+        method: "GET",
+        url: "/test/busy",
+        public: true,
         schema: { response: { 200: z.object({ ok: z.boolean() }) } },
-        handler: async () => { throw ApiError.unavailable("busy", 2); },
+        handler: async () => {
+          throw ApiError.unavailable("busy", 2);
+        },
       });
       route(api, {
-        method: "GET", url: "/test/old", public: true, deprecated: { sunset: "2027-06-30", since: "2026-11-01", replacement: "GET /api/v1/test/new" },
+        method: "GET",
+        url: "/test/old",
+        public: true,
+        deprecated: { sunset: "2027-06-30", since: "2026-11-01", replacement: "GET /api/v1/test/new" },
         schema: { response: { 200: z.object({ ok: z.boolean() }) }, summary: "Old thing" },
         handler: async () => ({ ok: true }),
       });
       route(api, {
-        method: "GET", url: "/test/old-staff", permission: "admin.tools", deprecated: { sunset: "2027-06-30" },
+        method: "GET",
+        url: "/test/old-staff",
+        permission: "admin.tools",
+        deprecated: { sunset: "2027-06-30" },
         schema: { response: { 200: z.object({ ok: z.boolean() }) } },
         handler: async () => ({ ok: true }),
       });
-      goneRoute(api, { method: "GET", url: "/test/retired", sunset: "2026-01-31", replacement: "GET /api/v1/test/new" });
+      goneRoute(api, {
+        method: "GET",
+        url: "/test/retired",
+        sunset: "2026-01-31",
+        replacement: "GET /api/v1/test/new",
+      });
       route(api, {
-        method: "GET", url: "/test/slow", public: true,
+        method: "GET",
+        url: "/test/slow",
+        public: true,
         schema: { response: { 200: z.object({ ok: z.boolean() }) } },
-        handler: async () => { await new Promise((r) => setTimeout(r, 600)); return { ok: true }; },
+        handler: async () => {
+          await new Promise((r) => setTimeout(r, 600));
+          return { ok: true };
+        },
       });
     },
   });
@@ -87,18 +122,24 @@ describe("metrics endpoint (prom-client, METRICS_TOKEN or admin.tools)", () => {
   });
 
   it("a wrong token falls through to staff authentication (401); staff need admin.tools (403 otherwise)", async () => {
-    const wrong = await t.request<ErrorBody>("GET", "/api/v1/metrics", { headers: { authorization: "Bearer metrics-token-integration-WRONG" } });
+    const wrong = await t.request<ErrorBody>("GET", "/api/v1/metrics", {
+      headers: { authorization: "Bearer metrics-token-integration-WRONG" },
+    });
     expect(wrong.status).toBe(401);
     expect((await t.request("GET", "/api/v1/metrics")).status).toBe(401);
     const admin = await t.loginAs("admin");
     expect((await t.request("GET", "/api/v1/metrics", { token: admin.access_token })).status).toBe(200);
     const sales = await t.loginAs("sales");
-    expect((await t.request<ErrorBody>("GET", "/api/v1/metrics", { token: sales.access_token })).body.error.code).toBe("FORBIDDEN");
+    expect((await t.request<ErrorBody>("GET", "/api/v1/metrics", { token: sales.access_token })).body.error.code).toBe(
+      "FORBIDDEN",
+    );
   });
 
   it("business counters: payments posted (replays excluded) and failed logins by audience", async () => {
-    const scrape = async () => (await t.request("GET", "/api/v1/metrics", { headers: { authorization: `Bearer ${TOKEN}` } })).text;
-    const value = (text: string, series: string) => Number(new RegExp(`^${series.replace(/[{}"=]/g, (c) => `\\${c}`)} (\\d+)`, "m").exec(text)?.[1] ?? 0);
+    const scrape = async () =>
+      (await t.request("GET", "/api/v1/metrics", { headers: { authorization: `Bearer ${TOKEN}` } })).text;
+    const value = (text: string, series: string) =>
+      Number(new RegExp(`^${series.replace(/[{}"=]/g, (c) => `\\${c}`)} (\\d+)`, "m").exec(text)?.[1] ?? 0);
     const before = await scrape();
     await t.request("POST", "/api/v1/payments", { body: {} });
     await t.request("POST", "/api/v1/payments", { body: {} });
@@ -106,7 +147,9 @@ describe("metrics endpoint (prom-client, METRICS_TOKEN or admin.tools)", () => {
     await t.request("POST", "/api/v1/auth/login", { body: { email: "admin@sgb.in", password: "definitely-wrong-1" } });
     const after = await scrape();
     expect(value(after, "payments_posted_total") - value(before, "payments_posted_total")).toBe(2);
-    expect(value(after, 'logins_failed_total{audience="erp"}') - value(before, 'logins_failed_total{audience="erp"}')).toBe(1);
+    expect(
+      value(after, 'logins_failed_total{audience="erp"}') - value(before, 'logins_failed_total{audience="erp"}'),
+    ).toBe(1);
   });
 });
 
@@ -118,7 +161,13 @@ describe("error reporter (ERROR_WEBHOOK_URL)", () => {
     await waitFor(() => posts.length >= 1);
     expect(posts).toHaveLength(1);
     const ev = posts[0]!.kkt;
-    expect(ev).toMatchObject({ kind: "http", id: r.body.error.request_id, where: "GET /api/v1/test/boom", status: 500, error_class: "Error" });
+    expect(ev).toMatchObject({
+      kind: "http",
+      id: r.body.error.request_id,
+      where: "GET /api/v1/test/boom",
+      status: 500,
+      error_class: "Error",
+    });
     const all = JSON.stringify(posts[0]);
     for (const leaked of ["9876543210", "ravi@example.com", "ABCDE1234F", "phone="]) expect(all).not.toContain(leaked);
     await t.request("GET", "/api/v1/test/boom");
@@ -137,7 +186,10 @@ describe("API versioning: deprecated and retired routes", () => {
     expect(r.headers["deprecation"]).toBe(`@${Date.UTC(2026, 10, 1) / 1000}`);
     expect(r.headers["sunset"]).toBe("Wed, 30 Jun 2027 00:00:00 GMT");
     expect(String(r.headers["link"])).toContain('rel="successor-version"');
-    const doc = await t.request<{ paths: Record<string, { get?: { deprecated?: boolean; description?: string } }> }>("GET", "/api/v1/openapi.json");
+    const doc = await t.request<{ paths: Record<string, { get?: { deprecated?: boolean; description?: string } }> }>(
+      "GET",
+      "/api/v1/openapi.json",
+    );
     expect(doc.body.paths["/api/v1/test/old"]?.get?.deprecated).toBe(true);
     expect(doc.body.paths["/api/v1/test/old"]?.get?.description).toContain("Sunset");
     expect(t.app.routeRegistry.find((e) => e.url === "/api/v1/test/old")?.sunset).toBe("2027-06-30");
@@ -157,13 +209,18 @@ describe("API versioning: deprecated and retired routes", () => {
     expect(ok.status).toBe(200);
     expect(ok.headers["sunset"]).toBe("Wed, 30 Jun 2027 00:00:00 GMT");
     // cross-origin browser clients may read them
-    const cors = await t.request("GET", "/api/v1/test/old", { headers: { origin: process.env["ERP_ORIGIN"] ?? "http://localhost:5173" } });
+    const cors = await t.request("GET", "/api/v1/test/old", {
+      headers: { origin: process.env["ERP_ORIGIN"] ?? "http://localhost:5173" },
+    });
     const exposed = String(cors.headers["access-control-expose-headers"] ?? "");
     for (const h of ["Deprecation", "Sunset", "Link", "X-Trace-Id"]) expect(exposed).toContain(h);
     // a non-deprecated route never carries the headers
     expect((await t.request("GET", "/api/v1/public/projects")).headers["sunset"]).toBeUndefined();
     // the OpenAPI operation carries the machine-readable sunset the compatibility gate uses for retirements
-    const doc = await t.request<{ paths: Record<string, { get?: Record<string, unknown> }> }>("GET", "/api/v1/openapi.json");
+    const doc = await t.request<{ paths: Record<string, { get?: Record<string, unknown> }> }>(
+      "GET",
+      "/api/v1/openapi.json",
+    );
     expect(doc.body.paths["/api/v1/test/old-staff"]?.get?.["x-sunset"]).toBe("2027-06-30");
   });
 
@@ -179,7 +236,9 @@ describe("API versioning: deprecated and retired routes", () => {
 describe("security headers", () => {
   it("API responses deny everything in CSP and framing; the docs UI gets a policy for its own assets", async () => {
     const api = await t.request("GET", "/api/v1/public/projects");
-    expect(api.headers["content-security-policy"]).toBe("default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
+    expect(api.headers["content-security-policy"]).toBe(
+      "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+    );
     expect(api.headers["x-content-type-options"]).toBe("nosniff");
     const err = await t.request("GET", "/api/v1/nope");
     expect(err.headers["content-security-policy"]).toContain("default-src 'none'");
@@ -207,21 +266,40 @@ describe("lifecycle: readiness while draining and graceful shutdown", () => {
   it("shutdown lets an in-flight request finish, refuses new connections, then closes the pools", async () => {
     await t.app.listen({ port: 0, host: "127.0.0.1" });
     const port = (t.app.server.address() as { port: number }).port;
-    const inflight = fetch(`http://127.0.0.1:${port}/api/v1/test/slow`).then(async (r) => ({ status: r.status, body: await r.json() as unknown }));
+    const inflight = fetch(`http://127.0.0.1:${port}/api/v1/test/slow`).then(async (r) => ({
+      status: r.status,
+      body: (await r.json()) as unknown,
+    }));
     await new Promise((r) => setTimeout(r, 100));
     const exits: number[] = [];
     const order: string[] = [];
-    const done = gracefulShutdown({
-      app: t.app,
-      jobs: { close: async () => { order.push("jobs"); } },
-      after: [() => { order.push("after"); }],
-      log: { info: () => undefined, error: () => undefined },
-      settings: { timeoutMs: 10_000, drainDelayMs: 0 },
-      exit: (c) => { exits.push(c); },
-      inflight: () => t.app.inflightRequests?.() ?? 0,
-    }, "SIGTERM");
+    const done = gracefulShutdown(
+      {
+        app: t.app,
+        jobs: {
+          close: async () => {
+            order.push("jobs");
+          },
+        },
+        after: [
+          () => {
+            order.push("after");
+          },
+        ],
+        log: { info: () => undefined, error: () => undefined },
+        settings: { timeoutMs: 10_000, drainDelayMs: 0 },
+        exit: (c) => {
+          exits.push(c);
+        },
+        inflight: () => t.app.inflightRequests?.() ?? 0,
+      },
+      "SIGTERM",
+    );
     await new Promise((r) => setTimeout(r, 50));
-    const refused = await fetch(`http://127.0.0.1:${port}/api/v1/health`).then(() => "connected", () => "refused");
+    const refused = await fetch(`http://127.0.0.1:${port}/api/v1/health`).then(
+      () => "connected",
+      () => "refused",
+    );
     expect(refused).toBe("refused");
     expect(await inflight).toEqual({ status: 200, body: { ok: true } });
     await done;

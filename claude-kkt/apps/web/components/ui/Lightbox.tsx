@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 import { SmartImage } from "@/components/ui/SmartImage";
 import { ArrowLeftIcon, ArrowRightIcon, CloseIcon } from "@/components/ui/icons";
-import { useFocusTrap, useLockBodyScroll } from "@/components/ui/hooks";
+import { useFocusTrap, useIsClient, useLockBodyScroll } from "@/components/ui/hooks";
 
 export interface LightboxImage {
   src: string;
@@ -24,8 +24,7 @@ export function Lightbox({ images, index, onClose, onIndexChange }: LightboxProp
   const open = index !== null && images.length > 0;
   const ref = useRef<HTMLDivElement>(null);
   const touchStart = useRef<number | null>(null);
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const mounted = useIsClient();
   useFocusTrap(ref, open && mounted, onClose);
   useLockBodyScroll(open);
 
@@ -51,7 +50,8 @@ export function Lightbox({ images, index, onClose, onIndexChange }: LightboxProp
   const current = images[index];
   if (!current) return null;
 
-  const nav = "tap inline-flex items-center justify-center rounded-full bg-ivory-100/10 text-ivory-100 backdrop-blur hover:bg-ivory-100/20";
+  const nav =
+    "tap inline-flex items-center justify-center rounded-full bg-ivory-100/10 text-ivory-100 backdrop-blur hover:bg-ivory-100/20";
 
   return (
     <div
@@ -80,19 +80,38 @@ export function Lightbox({ images, index, onClose, onIndexChange }: LightboxProp
         </button>
       </div>
       <div className="relative flex-1 min-h-0">
-        <SmartImage key={current.src} src={current.src} alt={current.alt} sizes="100vw" className="object-contain" quality={85} />
+        <SmartImage
+          key={current.src}
+          src={current.src}
+          alt={current.alt}
+          sizes="100vw"
+          className="object-contain"
+          quality={85}
+        />
         {images.length > 1 ? (
           <>
-            <button type="button" onClick={() => go(-1)} className={`${nav} absolute left-3 top-1/2 -translate-y-1/2 sm:left-6`} aria-label="Previous image">
+            <button
+              type="button"
+              onClick={() => go(-1)}
+              className={`${nav} absolute left-3 top-1/2 -translate-y-1/2 sm:left-6`}
+              aria-label="Previous image"
+            >
               <ArrowLeftIcon />
             </button>
-            <button type="button" onClick={() => go(1)} className={`${nav} absolute right-3 top-1/2 -translate-y-1/2 sm:right-6`} aria-label="Next image">
+            <button
+              type="button"
+              onClick={() => go(1)}
+              className={`${nav} absolute right-3 top-1/2 -translate-y-1/2 sm:right-6`}
+              aria-label="Next image"
+            >
               <ArrowRightIcon />
             </button>
           </>
         ) : null}
       </div>
-      <div className="min-h-14 px-4 py-4 text-center text-sm text-ivory-100/80 sm:px-6">{current.caption ?? current.alt}</div>
+      <div className="min-h-14 px-4 py-4 text-center text-sm text-ivory-100/80 sm:px-6">
+        {current.caption ?? current.alt}
+      </div>
     </div>
   );
 }

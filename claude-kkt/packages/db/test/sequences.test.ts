@@ -44,7 +44,9 @@ describe("sequences and advisory locks", () => {
     const [row] = await handle.db
       .select({ value: sequences.value })
       .from(sequences)
-      .where(sql`${sequences.companyId} = ${companyId} AND ${sequences.scope} = 'receipt' AND ${sequences.fy} = '2526'`);
+      .where(
+        sql`${sequences.companyId} = ${companyId} AND ${sequences.scope} = 'receipt' AND ${sequences.fy} = '2526'`,
+      );
     expect(row?.value).toBe(CONCURRENCY);
   });
 

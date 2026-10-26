@@ -53,7 +53,7 @@
     "ios": "expo start --ios",
     "build:web": "expo export --platform web",
     "generate:assets": "node ./scripts/generate-assets.mjs",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

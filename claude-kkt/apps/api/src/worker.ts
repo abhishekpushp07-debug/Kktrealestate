@@ -11,7 +11,14 @@ import type { Redis } from "ioredis";
 import { createDb, type DB, type DbHandle } from "@kkt/db";
 import { config } from "./config.js";
 import { isUuid, jobApp, registeredJobs, runJob, UnregisteredJobError, QUEUE_NAME } from "./jobs/index.js";
-import { bullConnection, createQueue, enqueueBootJobs, registerSchedules, type BootJobsResult, type ScheduleResult } from "./jobs/queue.js";
+import {
+  bullConnection,
+  createQueue,
+  enqueueBootJobs,
+  registerSchedules,
+  type BootJobsResult,
+  type ScheduleResult,
+} from "./jobs/queue.js";
 import { logger } from "./lib/logger.js";
 
 export { bullConnection, enqueueJob } from "./jobs/queue.js";
@@ -60,16 +67,30 @@ export function processJob(db: DB, app: FastifyInstance | null) {
 
 /** Starts the BullMQ consumer for the kkt-jobs queue, upserts the schedules and enqueues the boot jobs. */
 export async function startWorker(target?: DB | FastifyInstance | StartWorkerOptions): Promise<RunningWorker> {
-  const opts: StartWorkerOptions = !target ? {} : isApp(target) ? { app: target } : isOptions(target) ? target : { db: target };
+  const opts: StartWorkerOptions = !target
+    ? {}
+    : isApp(target)
+      ? { app: target }
+      : isOptions(target)
+        ? target
+        : { db: target };
   const app = opts.app ?? jobApp();
   const handle: DbHandle | null = opts.app || opts.db ? null : createDb(config.DATABASE_URL, { max: 4 });
   const db = opts.app?.db ?? opts.db ?? handle!.db;
   const connection = bullConnection(opts.redisUrl);
   const queue = createQueue(opts.redisUrl);
   const registered = new Set(registeredJobs());
-  const schedules = opts.schedules === false ? { scheduled: [], unregistered: [], disabled: [] } : await registerSchedules(queue, registered);
+  const schedules =
+    opts.schedules === false
+      ? { scheduled: [], unregistered: [], disabled: [] }
+      : await registerSchedules(queue, registered);
   const worker = new Worker(QUEUE_NAME, processJob(db, app), { connection, concurrency: opts.concurrency ?? 2 });
-  worker.on("failed", (job, err) => logger.error({ job: job?.name, jobId: job?.id, attemptsMade: job?.attemptsMade, err: err.message }, "job attempt failed"));
+  worker.on("failed", (job, err) =>
+    logger.error(
+      { job: job?.name, jobId: job?.id, attemptsMade: job?.attemptsMade, err: err.message },
+      "job attempt failed",
+    ),
+  );
   worker.on("error", (err) => logger.error({ err }, "worker error"));
   let boot: BootJobsResult | null = null;
   if (opts.boot !== false) {
@@ -77,7 +98,15 @@ export async function startWorker(target?: DB | FastifyInstance | StartWorkerOpt
     if (lockRedis) boot = await enqueueBootJobs(queue, { db, lockRedis, registered });
     else logger.warn("no Redis client for the boot lock; boot jobs not enqueued");
   }
-  logger.info({ queue: QUEUE_NAME, registered: [...registered], scheduled: schedules.scheduled, unregistered: schedules.unregistered }, "worker started");
+  logger.info(
+    {
+      queue: QUEUE_NAME,
+      registered: [...registered],
+      scheduled: schedules.scheduled,
+      unregistered: schedules.unregistered,
+    },
+    "worker started",
+  );
   return {
     queue,
     worker,
@@ -96,7 +125,12 @@ function isApp(x: unknown): x is FastifyInstance {
 }
 
 function isOptions(x: unknown): x is StartWorkerOptions {
-  return typeof x === "object" && x !== null && !("select" in x) && ("app" in x || "db" in x || "boot" in x || "schedules" in x || "concurrency" in x || "redisUrl" in x);
+  return (
+    typeof x === "object" &&
+    x !== null &&
+    !("select" in x) &&
+    ("app" in x || "db" in x || "boot" in x || "schedules" in x || "concurrency" in x || "redisUrl" in x)
+  );
 }
 
 /** Standalone entry point: build the full app (no listen), start the consumer, shut down on SIGTERM/SIGINT. */
@@ -128,5 +162,8 @@ async function main(): Promise<void> {
 
 const isMain = /worker\.(ts|js)$/.test(process.argv[1] ?? "");
 if (isMain) {
-  main().catch((err: unknown) => { logger.fatal({ err }, "worker failed to start"); process.exit(1); });
+  main().catch((err: unknown) => {
+    logger.fatal({ err }, "worker failed to start");
+    process.exit(1);
+  });
 }

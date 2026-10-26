@@ -1,17 +1,36 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import { Animated, Platform, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 
 const NATIVE_DRIVER = Platform.OS !== "web";
 import { colors, radius, space } from "./theme";
 
-export function Skeleton({ width = "100%", height = 16, round, style }: { width?: number | `${number}%`; height?: number; round?: boolean; style?: StyleProp<ViewStyle> }): React.JSX.Element {
-  const opacity = useRef(new Animated.Value(0.5)).current;
+export function Skeleton({
+  width = "100%",
+  height = 16,
+  round,
+  style,
+}: {
+  width?: number | `${number}%`;
+  height?: number;
+  round?: boolean;
+  style?: StyleProp<ViewStyle>;
+}): React.JSX.Element {
+  const [opacity] = useState(() => new Animated.Value(0.5));
   useEffect(() => {
-    const loop = Animated.loop(Animated.sequence([Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: NATIVE_DRIVER }), Animated.timing(opacity, { toValue: 0.5, duration: 700, useNativeDriver: NATIVE_DRIVER })]));
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: NATIVE_DRIVER }),
+        Animated.timing(opacity, { toValue: 0.5, duration: 700, useNativeDriver: NATIVE_DRIVER }),
+      ]),
+    );
     loop.start();
     return () => loop.stop();
   }, [opacity]);
-  return <Animated.View style={[styles.base, { width, height, borderRadius: round ? height / 2 : radius.sm, opacity }, style]} />;
+  return (
+    <Animated.View
+      style={[styles.base, { width, height, borderRadius: round ? height / 2 : radius.sm, opacity }, style]}
+    />
+  );
 }
 
 export function SkeletonCard({ lines = 3, height }: { lines?: number; height?: number }): React.JSX.Element {
@@ -44,5 +63,12 @@ export function SkeletonRows({ rows = 4 }: { rows?: number }): React.JSX.Element
 const styles = StyleSheet.create({
   base: { backgroundColor: colors.navy100 },
   card: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: space.lg },
-  row: { flexDirection: "row", gap: space.md, alignItems: "center", backgroundColor: colors.surface, borderRadius: radius.md, padding: space.md },
+  row: {
+    flexDirection: "row",
+    gap: space.md,
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    padding: space.md,
+  },
 });

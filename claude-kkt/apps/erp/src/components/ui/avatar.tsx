@@ -17,7 +17,9 @@ export function Avatar({ name, src, size = "md", className, tone = "gold" }: Ava
     <AvatarPrimitive.Root
       className={cn(
         "inline-flex shrink-0 select-none items-center justify-center overflow-hidden rounded-full font-display font-bold",
-        tone === "gold" ? "bg-gold-light text-gold-text ring-1 ring-gold-border" : "bg-navy-800 text-gold ring-1 ring-navy-700",
+        tone === "gold"
+          ? "bg-gold-light text-gold-text ring-1 ring-gold-border"
+          : "bg-navy-800 text-gold ring-1 ring-navy-700",
         SIZES[size],
         className,
       )}

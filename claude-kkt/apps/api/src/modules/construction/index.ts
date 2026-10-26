@@ -11,10 +11,34 @@ import type { FastifyInstance } from "fastify";
 import { registerConstructionRoutes } from "./routes.js";
 
 export {
-  blockStageTimeline, blockConstruction, projectConstruction, updateConstructionStatus, undoStage, patchStage, addPhoto, updatePhoto, deletePhoto,
-  constructionPercent, deriveProgress, recomputeBlockPercent, loadBlockScoped, loadStages, findStage, requireStage, toPhotoRows, parseBlockingReasons,
-  STAGE_ENTITY_TYPE, STAGE_STAFF_ROLES,
-  type ConstructionActor, type StatusUpdateInput, type StagePatchInput, type TimelineOptions, type BlockRecord, type BlockStageRecord, type StagePhotoRecord, type ScopedUser,
+  blockStageTimeline,
+  blockConstruction,
+  projectConstruction,
+  updateConstructionStatus,
+  undoStage,
+  patchStage,
+  addPhoto,
+  updatePhoto,
+  deletePhoto,
+  constructionPercent,
+  deriveProgress,
+  recomputeBlockPercent,
+  loadBlockScoped,
+  loadStages,
+  findStage,
+  requireStage,
+  toPhotoRows,
+  parseBlockingReasons,
+  STAGE_ENTITY_TYPE,
+  STAGE_STAFF_ROLES,
+  type ConstructionActor,
+  type StatusUpdateInput,
+  type StagePatchInput,
+  type TimelineOptions,
+  type BlockRecord,
+  type BlockStageRecord,
+  type StagePhotoRecord,
+  type ScopedUser,
 } from "./service.js";
 
 /** Fastify plugin: construction routes. */

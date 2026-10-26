@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ChangeEvent, type FocusEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type FocusEvent, type Ref } from "react";
 import { formatINRShort, groupIndian, paiseToRupeesInput, rupeesInputToPaise } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Input, type InputProps } from "./input";
@@ -115,6 +115,12 @@ export function PercentInput(props: PercentInputProps) {
 /* MoneyInput — user types rupees, value is integer paise               */
 /* ------------------------------------------------------------------ */
 
+/** Hands `node` to a caller's ref (callback or object), so MoneyInput can keep its own ref as well. */
+function assignRef<T>(ref: Ref<T> | undefined, node: T | null): void {
+  if (typeof ref === "function") ref(node);
+  else if (ref) ref.current = node;
+}
+
 export interface MoneyInputProps extends Omit<BaseProps, "prefix" | "suffix"> {
   /** Integer paise. */
   value: number | null | undefined;
@@ -132,7 +138,13 @@ function formatMoneyText(raw: string, allowNegative: boolean): string {
   text = text.replace(/-/g, "");
   const dot = text.indexOf(".");
   const intPart = (dot === -1 ? text : text.slice(0, dot)).replace(/^0+(?=\d)/, "");
-  const fracPart = dot === -1 ? null : text.slice(dot + 1).replace(/\./g, "").slice(0, 2);
+  const fracPart =
+    dot === -1
+      ? null
+      : text
+          .slice(dot + 1)
+          .replace(/\./g, "")
+          .slice(0, 2);
   const grouped = intPart ? groupIndian(intPart) : "";
   return (negative ? "-" : "") + grouped + (fracPart === null ? "" : `.${fracPart}`);
 }
@@ -151,6 +163,7 @@ export function MoneyInput({
   className,
   onBlur,
   onFocus,
+  ref: forwardedRef,
   ...props
 }: MoneyInputProps) {
   const [text, setText] = useState(() => paiseToRupeesInput(value));
@@ -202,16 +215,15 @@ export function MoneyInput({
     onBlur?.(event);
   };
 
-  const short = showShort && value !== null && value !== undefined && Math.abs(value) >= 1e7 ? formatINRShort(value) : undefined;
+  const short =
+    showShort && value !== null && value !== undefined && Math.abs(value) >= 1e7 ? formatINRShort(value) : undefined;
 
   return (
     <Input
       {...props}
       ref={(node) => {
         inputRef.current = node;
-        const forwarded = props.ref;
-        if (typeof forwarded === "function") forwarded(node);
-        else if (forwarded && typeof forwarded === "object") forwarded.current = node;
+        assignRef(forwardedRef, node);
       }}
       type="text"
       inputMode="decimal"

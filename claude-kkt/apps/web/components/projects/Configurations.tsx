@@ -20,7 +20,11 @@ export function Configurations({ items, showPrices }: { items: Configuration[]; 
 
   return (
     <div>
-      <div role="tablist" aria-label="Configurations" className="hide-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0">
+      <div
+        role="tablist"
+        aria-label="Configurations"
+        className="hide-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0"
+      >
         {items.map((c, i) => (
           <button
             key={c.code}
@@ -31,7 +35,9 @@ export function Configurations({ items, showPrices }: { items: Configuration[]; 
             aria-controls={`config-panel-${c.code}`}
             onClick={() => setActive(i)}
             className={`tap shrink-0 rounded-full border px-5 text-sm font-semibold transition ${
-              i === active ? "border-navy-900 bg-navy-900 text-ivory-100" : "border-navy-900/15 bg-white text-navy-900 hover:border-gold-500"
+              i === active
+                ? "border-navy-900 bg-navy-900 text-ivory-100"
+                : "border-navy-900/15 bg-white text-navy-900 hover:border-gold-500"
             }`}
           >
             {bhk(c)}
@@ -40,7 +46,12 @@ export function Configurations({ items, showPrices }: { items: Configuration[]; 
         ))}
       </div>
 
-      <div id={`config-panel-${current.code}`} role="tabpanel" aria-labelledby={`config-tab-${current.code}`} className="mt-6 grid gap-8 lg:grid-cols-[1.1fr_1fr]">
+      <div
+        id={`config-panel-${current.code}`}
+        role="tabpanel"
+        aria-labelledby={`config-tab-${current.code}`}
+        className="mt-6 grid gap-8 lg:grid-cols-[1.1fr_1fr]"
+      >
         <div>
           <div className="flex flex-wrap items-baseline justify-between gap-3">
             <h3 className="font-display text-display-sm text-navy-900">{current.name}</h3>
@@ -69,7 +80,9 @@ export function Configurations({ items, showPrices }: { items: Configuration[]; 
             ].map(([label, value]) => (
               <div key={String(label)} className="rounded-2xl border border-line bg-white p-4">
                 <dt className="text-xs uppercase tracking-wider text-ink-soft">{label}</dt>
-                <dd className="mt-1 font-semibold text-navy-900">{typeof value === "number" ? formatSqft(value) : "—"}</dd>
+                <dd className="mt-1 font-semibold text-navy-900">
+                  {typeof value === "number" ? formatSqft(value) : "—"}
+                </dd>
               </div>
             ))}
           </dl>
@@ -80,16 +93,26 @@ export function Configurations({ items, showPrices }: { items: Configuration[]; 
                 <caption className="sr-only">Room sizes for {current.name}</caption>
                 <thead className="bg-ivory-100 text-left text-xs uppercase tracking-wider text-ink-soft">
                   <tr>
-                    <th scope="col" className="px-4 py-3 font-medium">Room</th>
-                    <th scope="col" className="px-4 py-3 font-medium">Size (ft)</th>
-                    <th scope="col" className="px-4 py-3 text-right font-medium">Area</th>
+                    <th scope="col" className="px-4 py-3 font-medium">
+                      Room
+                    </th>
+                    <th scope="col" className="px-4 py-3 font-medium">
+                      Size (ft)
+                    </th>
+                    <th scope="col" className="px-4 py-3 text-right font-medium">
+                      Area
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {current.rooms.map((room, i) => (
                     <tr key={`${room.label}-${i}`} className="border-t border-line">
                       <td className="px-4 py-3 font-medium text-navy-900">{room.label}</td>
-                      <td className="px-4 py-3 text-ink-muted">{room.length_ft && room.width_ft ? `${formatNumber(room.length_ft, 1)} × ${formatNumber(room.width_ft, 1)}` : "—"}</td>
+                      <td className="px-4 py-3 text-ink-muted">
+                        {room.length_ft && room.width_ft
+                          ? `${formatNumber(room.length_ft, 1)} × ${formatNumber(room.width_ft, 1)}`
+                          : "—"}
+                      </td>
                       <td className="px-4 py-3 text-right text-ink-muted">{room.sqft ? formatSqft(room.sqft) : "—"}</td>
                     </tr>
                   ))}
@@ -111,9 +134,21 @@ export function Configurations({ items, showPrices }: { items: Configuration[]; 
 
         <div>
           {current.floor_plan_url ? (
-            <button type="button" onClick={() => setPlanOpen(true)} className="group relative block aspect-[4/3] w-full overflow-hidden rounded-card border border-line bg-white" aria-label={`Enlarge floor plan for ${current.name}`}>
-              <SmartImage src={current.floor_plan_url} alt={`Floor plan for ${current.name}`} sizes="(min-width: 1024px) 45vw, 100vw" className="object-contain p-4 transition duration-500 group-hover:scale-[1.02]" />
-              <span className="absolute bottom-3 right-3 rounded-full bg-navy-900/85 px-3 py-1 text-xs text-ivory-100">Tap to enlarge</span>
+            <button
+              type="button"
+              onClick={() => setPlanOpen(true)}
+              className="group relative block aspect-[4/3] w-full overflow-hidden rounded-card border border-line bg-white"
+              aria-label={`Enlarge floor plan for ${current.name}`}
+            >
+              <SmartImage
+                src={current.floor_plan_url}
+                alt={`Floor plan for ${current.name}`}
+                sizes="(min-width: 1024px) 45vw, 100vw"
+                className="object-contain p-4 transition duration-500 group-hover:scale-[1.02]"
+              />
+              <span className="absolute bottom-3 right-3 rounded-full bg-navy-900/85 px-3 py-1 text-xs text-ivory-100">
+                Tap to enlarge
+              </span>
             </button>
           ) : null}
           {current.specifications.length ? (
@@ -132,7 +167,12 @@ export function Configurations({ items, showPrices }: { items: Configuration[]; 
         </div>
       </div>
       {current.floor_plan_url ? (
-        <Lightbox images={[{ src: current.floor_plan_url, alt: `Floor plan for ${current.name}` }]} index={planOpen ? 0 : null} onClose={() => setPlanOpen(false)} onIndexChange={() => undefined} />
+        <Lightbox
+          images={[{ src: current.floor_plan_url, alt: `Floor plan for ${current.name}` }]}
+          index={planOpen ? 0 : null}
+          onClose={() => setPlanOpen(false)}
+          onIndexChange={() => undefined}
+        />
       ) : null}
     </div>
   );

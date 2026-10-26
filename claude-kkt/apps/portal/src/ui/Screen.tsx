@@ -3,7 +3,17 @@
 // bottom padding accounts for the tab bar (which is laid out outside the content, never over it).
 import { useRouter } from "expo-router";
 import { useEffect, useState, type ReactNode } from "react";
-import { Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View, type ScrollViewProps, type StyleProp, type ViewStyle } from "react-native";
+import {
+  Platform,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  View,
+  type ScrollViewProps,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { haptics } from "@/lib/haptics";
 import { IconButton } from "./Button";
@@ -21,7 +31,15 @@ export interface ScreenProps extends Omit<ScrollViewProps, "refreshControl"> {
   tone?: "ivory" | "navy";
 }
 
-export function Screen({ children, onRefresh, bottomInset = 0, padded = true, contentStyle, tone = "ivory", ...rest }: ScreenProps): React.JSX.Element {
+export function Screen({
+  children,
+  onRefresh,
+  bottomInset = 0,
+  padded = true,
+  contentStyle,
+  tone = "ivory",
+  ...rest
+}: ScreenProps): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const layout = useLayout();
   const [refreshing, setRefreshing] = useState(false);
@@ -47,7 +65,16 @@ export function Screen({ children, onRefresh, bottomInset = 0, padded = true, co
       keyboardShouldPersistTaps="handled"
       // web: the screen scroller is focusable so keyboard users can scroll screens that hold no controls (WCAG 2.1.1)
       focusable={Platform.OS === "web"}
-      refreshControl={onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.gold} colors={[colors.navy, colors.gold]} /> : undefined}
+      refreshControl={
+        onRefresh ? (
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void refresh()}
+            tintColor={colors.gold}
+            colors={[colors.navy, colors.gold]}
+          />
+        ) : undefined
+      }
       {...rest}
     >
       <View style={[styles.column, { maxWidth: layout.maxWidth }]}>{children}</View>
@@ -76,7 +103,16 @@ export function useDocumentTitle(title: string | null | undefined): void {
 }
 
 /** Screen header with safe-area top padding. */
-export function Header({ title, subtitle, back, onBack, right, tone = "ivory", large, children }: HeaderProps): React.JSX.Element {
+export function Header({
+  title,
+  subtitle,
+  back,
+  onBack,
+  right,
+  tone = "ivory",
+  large,
+  children,
+}: HeaderProps): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const layout = useLayout();
@@ -88,10 +124,28 @@ export function Header({ title, subtitle, back, onBack, right, tone = "ivory", l
     else router.replace("/");
   };
   return (
-    <View style={[styles.header, { paddingTop: Math.max(insets.top, Platform.OS === "web" ? 0 : 8) + (layout.isDesktop ? space.lg : space.sm), backgroundColor: onNavy ? colors.navy : colors.ivory, paddingHorizontal: layout.gutter }]}>
+    <View
+      style={[
+        styles.header,
+        {
+          paddingTop: Math.max(insets.top, Platform.OS === "web" ? 0 : 8) + (layout.isDesktop ? space.lg : space.sm),
+          backgroundColor: onNavy ? colors.navy : colors.ivory,
+          paddingHorizontal: layout.gutter,
+        },
+      ]}
+    >
       <View style={[styles.headerInner, { maxWidth: layout.maxWidth }]}>
         <View style={styles.headerRow}>
-          {back ? <IconButton name="chevron-left" label="Back" onPress={goBack} color={onNavy ? colors.onNavy : colors.navy} bg={onNavy ? "rgba(255,255,255,0.1)" : colors.surface} style={{ marginLeft: -4 }} /> : null}
+          {back ? (
+            <IconButton
+              name="chevron-left"
+              label="Back"
+              onPress={goBack}
+              color={onNavy ? colors.onNavy : colors.navy}
+              bg={onNavy ? "rgba(255,255,255,0.1)" : colors.surface}
+              style={{ marginLeft: -4 }}
+            />
+          ) : null}
           <View style={{ flex: 1, gap: 2 }}>
             <T variant={large ? "h1" : "h2"} color={onNavy ? colors.onNavy : colors.ink} numberOfLines={1}>
               {title}
@@ -110,7 +164,19 @@ export function Header({ title, subtitle, back, onBack, right, tone = "ivory", l
   );
 }
 
-export function Section({ title, action, onAction, children, style }: { title?: string; action?: string; onAction?: () => void; children: ReactNode; style?: StyleProp<ViewStyle> }): React.JSX.Element {
+export function Section({
+  title,
+  action,
+  onAction,
+  children,
+  style,
+}: {
+  title?: string;
+  action?: string;
+  onAction?: () => void;
+  children: ReactNode;
+  style?: StyleProp<ViewStyle>;
+}): React.JSX.Element {
   return (
     <View style={[styles.section, style]}>
       {title ? (

@@ -39,7 +39,10 @@ function resolver(doc: Json) {
     if (typeof ref !== "string") return node;
     if (seen.has(ref)) return null;
     seen.add(ref);
-    const parts = ref.replace(/^#\//, "").split("/").map((p) => p.replace(/~1/g, "/").replace(/~0/g, "~"));
+    const parts = ref
+      .replace(/^#\//, "")
+      .split("/")
+      .map((p) => p.replace(/~1/g, "/").replace(/~0/g, "~"));
     let base: unknown = ref.startsWith("#/components/") ? doc : root;
     for (const p of parts) base = isObj(base) ? base[p] : undefined;
     return resolve(base, root, seen);
@@ -49,7 +52,10 @@ function resolver(doc: Json) {
 /** Flattened view of a schema: property paths with type, requiredness and enum values. */
 interface Shape {
   /** path → info; "" is the root. */
-  nodes: Map<string, { types: Set<string>; required: boolean; enumValues: Set<string> | null; bounds: Record<string, number | null> }>;
+  nodes: Map<
+    string,
+    { types: Set<string>; required: boolean; enumValues: Set<string> | null; bounds: Record<string, number | null> }
+  >;
 }
 
 /** Validation bounds of a node (request tightening is breaking). */
@@ -58,9 +64,14 @@ const UPPER_BOUNDS = ["maxLength", "maximum", "exclusiveMaximum", "maxItems"] as
 const LOWER_BOUNDS = ["minLength", "minimum", "exclusiveMinimum", "minItems"] as const;
 
 const BOUND_APPLIES_TO: Record<keyof Bounds, readonly string[]> = {
-  maxLength: ["string"], minLength: ["string"],
-  maximum: ["number", "integer"], minimum: ["number", "integer"], exclusiveMaximum: ["number", "integer"], exclusiveMinimum: ["number", "integer"],
-  maxItems: ["array"], minItems: ["array"],
+  maxLength: ["string"],
+  minLength: ["string"],
+  maximum: ["number", "integer"],
+  minimum: ["number", "integer"],
+  exclusiveMaximum: ["number", "integer"],
+  exclusiveMinimum: ["number", "integer"],
+  maxItems: ["array"],
+  minItems: ["array"],
 };
 
 /**
@@ -103,7 +114,11 @@ function flatten(schema: unknown, resolve: ReturnType<typeof resolver>): Shape {
     const next = new Set(stack).add(s);
     const existing = shape.nodes.get(path);
     const types = typesOf(s);
-    const en = Array.isArray(s["enum"]) ? new Set((s["enum"] as unknown[]).map((v) => JSON.stringify(v))) : s["const"] !== undefined ? new Set([JSON.stringify(s["const"])]) : null;
+    const en = Array.isArray(s["enum"])
+      ? new Set((s["enum"] as unknown[]).map((v) => JSON.stringify(v)))
+      : s["const"] !== undefined
+        ? new Set([JSON.stringify(s["const"])])
+        : null;
     if (existing) {
       for (const t of types) existing.types.add(t);
       existing.required = existing.required && required;
@@ -121,7 +136,8 @@ function flatten(schema: unknown, resolve: ReturnType<typeof resolver>): Shape {
     const props = s["properties"];
     if (isObj(props)) {
       const req = new Set(Array.isArray(s["required"]) ? (s["required"] as string[]) : []);
-      for (const [name, child] of Object.entries(props)) visit(child, path ? `${path}.${name}` : name, req.has(name), depth + 1, next);
+      for (const [name, child] of Object.entries(props))
+        visit(child, path ? `${path}.${name}` : name, req.has(name), depth + 1, next);
     }
     if (s["items"] !== undefined) visit(s["items"], `${path}[]`, true, depth + 1, next);
     if (isObj(s["additionalProperties"])) visit(s["additionalProperties"], `${path}{}`, false, depth + 1, next);
@@ -142,7 +158,17 @@ function operations(doc: Json): Map<string, Operation> {
     if (!isObj(item)) continue;
     for (const m of METHODS) {
       const op = item[m];
-      if (isObj(op)) out.set(`${m.toUpperCase()} ${p}`, { key: `${m.toUpperCase()} ${p}`, op: { ...op, parameters: [...(Array.isArray(item["parameters"]) ? item["parameters"] : []), ...(Array.isArray(op["parameters"]) ? op["parameters"] : [])] } });
+      if (isObj(op))
+        out.set(`${m.toUpperCase()} ${p}`, {
+          key: `${m.toUpperCase()} ${p}`,
+          op: {
+            ...op,
+            parameters: [
+              ...(Array.isArray(item["parameters"]) ? item["parameters"] : []),
+              ...(Array.isArray(op["parameters"]) ? op["parameters"] : []),
+            ],
+          },
+        });
     }
   }
   return out;
@@ -169,14 +195,16 @@ function requestShape(op: Json, resolve: ReturnType<typeof resolver>): Shape {
   const body = isObj(op["requestBody"]) ? jsonSchemaOf(op["requestBody"]["content"]) : undefined;
   if (body !== undefined) {
     const bodyRequired = isObj(op["requestBody"]) && op["requestBody"]["required"] === true;
-    for (const [p, n] of flatten(body, resolve).nodes) shape.nodes.set(p ? `body.${p}` : "body", { ...n, required: p ? n.required : bodyRequired });
+    for (const [p, n] of flatten(body, resolve).nodes)
+      shape.nodes.set(p ? `body.${p}` : "body", { ...n, required: p ? n.required : bodyRequired });
   }
   for (const raw of (op["parameters"] as unknown[]) ?? []) {
     const prm = resolve(raw, raw);
     if (!prm || typeof prm["name"] !== "string") continue;
     const base = `${String(prm["in"])}:${String(prm["name"])}`;
     const flat = flatten(prm["schema"] ?? {}, resolve);
-    for (const [p, n] of flat.nodes) shape.nodes.set(p ? `${base}.${p}` : base, { ...n, required: p ? n.required : prm["required"] === true });
+    for (const [p, n] of flat.nodes)
+      shape.nodes.set(p ? `${base}.${p}` : base, { ...n, required: p ? n.required : prm["required"] === true });
   }
   return shape;
 }
@@ -204,8 +232,10 @@ function typeChanged(a: Set<string>, b: Set<string>): boolean {
 /** Request bounds that got stricter between base and current (old clients may send values the new schema rejects). */
 function tightenedBounds(b: Bounds, c: Bounds): string[] {
   const out: string[] = [];
-  for (const k of UPPER_BOUNDS) if (c[k] !== undefined && (b[k] === undefined || c[k]! < b[k]!)) out.push(`${k} ${b[k] ?? "none"} → ${c[k]}`);
-  for (const k of LOWER_BOUNDS) if (c[k] !== undefined && (b[k] === undefined || c[k]! > b[k]!)) out.push(`${k} ${b[k] ?? "none"} → ${c[k]}`);
+  for (const k of UPPER_BOUNDS)
+    if (c[k] !== undefined && (b[k] === undefined || c[k]! < b[k]!)) out.push(`${k} ${b[k] ?? "none"} → ${c[k]}`);
+  for (const k of LOWER_BOUNDS)
+    if (c[k] !== undefined && (b[k] === undefined || c[k]! > b[k]!)) out.push(`${k} ${b[k] ?? "none"} → ${c[k]}`);
   return out;
 }
 
@@ -227,8 +257,12 @@ export function diffOpenApi(base: Json, current: Json, opts: DiffOptions = {}): 
   for (const [key, { op }] of ob) {
     if (oc.has(key)) continue;
     const sunset = typeof op["x-sunset"] === "string" ? op["x-sunset"] : null;
-    if (op["deprecated"] === true && sunset !== null && sunset <= today) out.notices.push(`${key}: retired (deprecated, sunset ${sunset})`);
-    else out.breaking.push(`${key}: operation removed${op["deprecated"] === true && sunset ? ` before its sunset ${sunset}` : ""}`);
+    if (op["deprecated"] === true && sunset !== null && sunset <= today)
+      out.notices.push(`${key}: retired (deprecated, sunset ${sunset})`);
+    else
+      out.breaking.push(
+        `${key}: operation removed${op["deprecated"] === true && sunset ? ` before its sunset ${sunset}` : ""}`,
+      );
   }
   for (const [key] of oc) if (!ob.has(key)) out.additive.push(`${key}: operation added`);
 
@@ -254,19 +288,28 @@ export function diffOpenApi(base: Json, current: Json, opts: DiffOptions = {}): 
           if (!parentMissing(path, cs)) out.breaking.push(`${key}: response ${status} property "${label}" removed`);
           continue;
         }
-        if (bn.required && !cn.required && path !== "") out.breaking.push(`${key}: response ${status} property "${label}" is no longer required`);
+        if (bn.required && !cn.required && path !== "")
+          out.breaking.push(`${key}: response ${status} property "${label}" is no longer required`);
         if (typeChanged(bn.types, cn.types)) {
           const widenedToNull = [...bn.types].every((t) => cn.types.has(t));
-          (widenedToNull ? out.notices : out.breaking).push(`${key}: response ${status} property "${label}" type ${[...bn.types].join("|")} → ${[...cn.types].join("|")}`);
+          (widenedToNull ? out.notices : out.breaking).push(
+            `${key}: response ${status} property "${label}" type ${[...bn.types].join("|")} → ${[...cn.types].join("|")}`,
+          );
         }
         if (bn.enumValues && cn.enumValues) {
           const removed = [...bn.enumValues].filter((v) => !cn.enumValues!.has(v));
           const added = [...cn.enumValues].filter((v) => !bn.enumValues!.has(v));
-          if (removed.length) out.breaking.push(`${key}: response ${status} property "${label}" enum values removed: ${removed.join(", ")}`);
-          if (added.length) out.notices.push(`${key}: response ${status} property "${label}" enum values added: ${added.join(", ")}`);
+          if (removed.length)
+            out.breaking.push(
+              `${key}: response ${status} property "${label}" enum values removed: ${removed.join(", ")}`,
+            );
+          if (added.length)
+            out.notices.push(`${key}: response ${status} property "${label}" enum values added: ${added.join(", ")}`);
         }
       }
-      for (const [path] of cs.nodes) if (!bs.nodes.has(path) && !parentMissing(path, bs)) out.additive.push(`${key}: response ${status} property "${path || "(body)"}" added`);
+      for (const [path] of cs.nodes)
+        if (!bs.nodes.has(path) && !parentMissing(path, bs))
+          out.additive.push(`${key}: response ${status} property "${path || "(body)"}" added`);
     }
 
     // requests
@@ -284,7 +327,9 @@ export function diffOpenApi(base: Json, current: Json, opts: DiffOptions = {}): 
       if (cn.required && !bn.required) out.breaking.push(`${key}: request "${path}" became required`);
       if (typeChanged(bn.types, cn.types)) {
         const widened = [...bn.types].every((t) => cn.types.has(t));
-        (widened ? out.additive : out.breaking).push(`${key}: request "${path}" type ${[...bn.types].join("|")} → ${[...cn.types].join("|")}`);
+        (widened ? out.additive : out.breaking).push(
+          `${key}: request "${path}" type ${[...bn.types].join("|")} → ${[...cn.types].join("|")}`,
+        );
       }
       if (bn.enumValues && cn.enumValues) {
         const removed = [...bn.enumValues].filter((v) => !cn.enumValues!.has(v));
@@ -307,6 +352,7 @@ export function diffOpenApi(base: Json, current: Json, opts: DiffOptions = {}): 
 
 /** Human-readable report of a diff. */
 export function formatDiff(d: OpenApiDiff): string {
-  const section = (title: string, items: string[]) => (items.length ? `${title} (${items.length}):\n${items.map((i) => `  - ${i}`).join("\n")}` : `${title}: none`);
+  const section = (title: string, items: string[]) =>
+    items.length ? `${title} (${items.length}):\n${items.map((i) => `  - ${i}`).join("\n")}` : `${title}: none`;
   return [section("BREAKING", d.breaking), section("Additive", d.additive), section("Notices", d.notices)].join("\n");
 }

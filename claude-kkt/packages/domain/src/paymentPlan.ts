@@ -75,17 +75,29 @@ function validateTrigger(inst: PlanInstallmentInput): PlanValidationError | null
       return null;
     case "DAYS_AFTER_BOOKING":
       if (!Number.isInteger(inst.triggerDays) || (inst.triggerDays ?? 0) <= 0) {
-        return { code: "TRIGGER_DAYS_REQUIRED", message: `Installment ${inst.seq}: DAYS_AFTER_BOOKING needs trigger days > 0`, seq: inst.seq };
+        return {
+          code: "TRIGGER_DAYS_REQUIRED",
+          message: `Installment ${inst.seq}: DAYS_AFTER_BOOKING needs trigger days > 0`,
+          seq: inst.seq,
+        };
       }
       return null;
     case "ON_STAGE":
       if (!inst.triggerStageId || inst.triggerStageId.trim() === "") {
-        return { code: "TRIGGER_STAGE_REQUIRED", message: `Installment ${inst.seq}: ON_STAGE needs a construction stage`, seq: inst.seq };
+        return {
+          code: "TRIGGER_STAGE_REQUIRED",
+          message: `Installment ${inst.seq}: ON_STAGE needs a construction stage`,
+          seq: inst.seq,
+        };
       }
       return null;
     case "ON_DATE":
       if (!inst.triggerDate || !isValidDateString(inst.triggerDate)) {
-        return { code: "TRIGGER_DATE_REQUIRED", message: `Installment ${inst.seq}: ON_DATE needs a valid YYYY-MM-DD date`, seq: inst.seq };
+        return {
+          code: "TRIGGER_DATE_REQUIRED",
+          message: `Installment ${inst.seq}: ON_DATE needs a valid YYYY-MM-DD date`,
+          seq: inst.seq,
+        };
       }
       return null;
     default: {
@@ -104,10 +116,17 @@ export interface ValidatePlanOptions {
  * Validates a plan's installments and returns every problem found (empty errors means the plan is valid).
  * Names must be unique (case/space-insensitive) because the dues engine de-duplicates demands by sequence OR name.
  */
-export function validatePlan(installments: readonly PlanInstallmentInput[], options: ValidatePlanOptions = {}): PlanValidationResult {
+export function validatePlan(
+  installments: readonly PlanInstallmentInput[],
+  options: ValidatePlanOptions = {},
+): PlanValidationResult {
   const errors: PlanValidationError[] = [];
   if (installments.length === 0) {
-    return { ok: false, errors: [{ code: "EMPTY_PLAN", message: "A payment plan needs at least one installment" }], totalBasisPoints: 0 };
+    return {
+      ok: false,
+      errors: [{ code: "EMPTY_PLAN", message: "A payment plan needs at least one installment" }],
+      totalBasisPoints: 0,
+    };
   }
   const knownStages = options.knownStageIds ? new Set(options.knownStageIds) : null;
   const seqs = new Set<number>();
@@ -117,7 +136,11 @@ export function validatePlan(installments: readonly PlanInstallmentInput[], opti
   let onPossession = 0;
   for (const inst of installments) {
     if (!Number.isInteger(inst.seq) || inst.seq < 1) {
-      errors.push({ code: "INVALID_SEQ", message: `Sequence must be a positive integer, got ${String(inst.seq)}`, seq: inst.seq });
+      errors.push({
+        code: "INVALID_SEQ",
+        message: `Sequence must be a positive integer, got ${String(inst.seq)}`,
+        seq: inst.seq,
+      });
     } else if (seqs.has(inst.seq)) {
       errors.push({ code: "DUPLICATE_SEQ", message: `Sequence ${inst.seq} is used more than once`, seq: inst.seq });
     } else {
@@ -127,11 +150,20 @@ export function validatePlan(installments: readonly PlanInstallmentInput[], opti
     if (name === "") {
       errors.push({ code: "EMPTY_NAME", message: `Installment ${inst.seq} has no name`, seq: inst.seq });
     } else if (names.has(name)) {
-      errors.push({ code: "DUPLICATE_NAME", message: `Installment name "${inst.name.trim()}" is used more than once`, seq: inst.seq });
+      errors.push({
+        code: "DUPLICATE_NAME",
+        message: `Installment name "${inst.name.trim()}" is used more than once`,
+        seq: inst.seq,
+      });
     } else {
       names.add(name);
     }
-    if (knownStages && inst.triggerType === "ON_STAGE" && inst.triggerStageId && !knownStages.has(inst.triggerStageId)) {
+    if (
+      knownStages &&
+      inst.triggerType === "ON_STAGE" &&
+      inst.triggerStageId &&
+      !knownStages.has(inst.triggerStageId)
+    ) {
       errors.push({
         code: "UNKNOWN_STAGE",
         message: `Installment ${inst.seq}: construction stage ${inst.triggerStageId} does not exist`,
@@ -141,7 +173,11 @@ export function validatePlan(installments: readonly PlanInstallmentInput[], opti
     }
     const bp = percentToBasisPointsOrNull(inst.percent);
     if (bp === null || bp <= 0) {
-      errors.push({ code: "INVALID_PERCENT", message: `Installment ${inst.seq}: percent must be > 0 with at most 2 decimals`, seq: inst.seq });
+      errors.push({
+        code: "INVALID_PERCENT",
+        message: `Installment ${inst.seq}: percent must be > 0 with at most 2 decimals`,
+        seq: inst.seq,
+      });
     } else {
       total += bp;
     }
@@ -156,14 +192,26 @@ export function validatePlan(installments: readonly PlanInstallmentInput[], opti
       errors.push(triggerError);
     }
     if (inst.dueDays !== undefined && inst.dueDays !== null && (!Number.isInteger(inst.dueDays) || inst.dueDays < 0)) {
-      errors.push({ code: "INVALID_DUE_DAYS", message: `Installment ${inst.seq}: due days must be a non-negative integer`, seq: inst.seq });
+      errors.push({
+        code: "INVALID_DUE_DAYS",
+        message: `Installment ${inst.seq}: due days must be a non-negative integer`,
+        seq: inst.seq,
+      });
     }
   }
   if (onBooking > 1) {
-    errors.push({ code: "MULTIPLE_ON_BOOKING", message: "Only one installment may be ON_BOOKING", details: { count: onBooking } });
+    errors.push({
+      code: "MULTIPLE_ON_BOOKING",
+      message: "Only one installment may be ON_BOOKING",
+      details: { count: onBooking },
+    });
   }
   if (onPossession > 1) {
-    errors.push({ code: "MULTIPLE_ON_POSSESSION", message: "Only one installment may be ON_POSSESSION", details: { count: onPossession } });
+    errors.push({
+      code: "MULTIPLE_ON_POSSESSION",
+      message: "Only one installment may be ON_POSSESSION",
+      details: { count: onPossession },
+    });
   }
   if (total !== 10000) {
     errors.push({
@@ -181,7 +229,9 @@ export function sortBySeq<T extends { seq: number }>(items: readonly T[]): T[] {
 }
 
 /** Cumulative percent (basis points) reached after each installment, in sequence order. */
-export function cumulativeBasisPoints(installments: readonly { seq: number; percent: number | string }[]): { seq: number; bp: number; cumulativeBp: number }[] {
+export function cumulativeBasisPoints(
+  installments: readonly { seq: number; percent: number | string }[],
+): { seq: number; bp: number; cumulativeBp: number }[] {
   let running = 0;
   return sortBySeq(installments).map((inst) => {
     const bp = toBasisPoints(inst.percent);
@@ -198,7 +248,12 @@ export function missingStagesForTower(
   const have = new Set(towerStageIds);
   const missing: string[] = [];
   for (const inst of sortBySeq(installments)) {
-    if (inst.triggerType === "ON_STAGE" && inst.triggerStageId && !have.has(inst.triggerStageId) && !missing.includes(inst.triggerStageId)) {
+    if (
+      inst.triggerType === "ON_STAGE" &&
+      inst.triggerStageId &&
+      !have.has(inst.triggerStageId) &&
+      !missing.includes(inst.triggerStageId)
+    ) {
       missing.push(inst.triggerStageId);
     }
   }

@@ -15,7 +15,20 @@ import {
   type ServiceRequestRow,
   type ServiceStatus,
 } from "@kkt/contracts";
-import { bookingCoApplicants, bookings, companies, customers, documentTypes, documents, projects, serviceCategories, serviceRequestMessages, serviceRequests, users, type Executor } from "@kkt/db";
+import {
+  bookingCoApplicants,
+  bookings,
+  companies,
+  customers,
+  documentTypes,
+  documents,
+  projects,
+  serviceCategories,
+  serviceRequestMessages,
+  serviceRequests,
+  users,
+  type Executor,
+} from "@kkt/db";
 import { DEFAULT_SLA_HOURS, isSlaBreached, slaDueAt, todayIST, type SlaHours } from "@kkt/domain";
 import { writeAudit, type AuditActor } from "../../lib/audit.js";
 import { ApiError } from "../../lib/errors.js";
@@ -23,8 +36,8 @@ import { fromListQuery, paginate, type ListResult } from "../../lib/list.js";
 import { nextNumber } from "../../lib/numbering.js";
 import { ensureProjectAccess, type StaffContext } from "../../lib/scope.js";
 import { applyUpdate } from "../../lib/version.js";
-import { loadRows as loadDocumentRows } from "../documents/service.js";
-import { notify, notifyRole } from "../notifications/service.js";
+import { loadRows as loadDocumentRows } from "../documents/index.js";
+import { notify, notifyRole } from "../notifications/index.js";
 
 /** A service_requests row. */
 export type DbTicket = typeof serviceRequests.$inferSelect;
@@ -51,10 +64,16 @@ export const TICKET_ADMIN_ROLES = ["Super Admin"] as const;
 export const PAYMENT_CATEGORY_ROLES = ["Accounts"] as const;
 
 /** Request metadata carried into audit rows. */
-export interface WriteMeta { ip?: string | null; requestId?: string | null }
+export interface WriteMeta {
+  ip?: string | null;
+  requestId?: string | null;
+}
 
 /** Staff write context (the authenticated user + request metadata). */
-export interface TicketWriteContext { user: StaffContext; meta: WriteMeta }
+export interface TicketWriteContext {
+  user: StaffContext;
+  meta: WriteMeta;
+}
 
 /** One joined ticket row as selected by every ticket query. */
 export interface TicketJoined {
@@ -100,7 +119,12 @@ export function withTicketJoins(q: PgSelect): PgSelect {
 }
 
 /** Search columns for ticket lists (ticket number, subject, customer name/phone). */
-export const TICKET_SEARCH_COLUMNS = [serviceRequests.ticketNumber, serviceRequests.subject, customers.fullName, customers.phone] as const;
+export const TICKET_SEARCH_COLUMNS = [
+  serviceRequests.ticketNumber,
+  serviceRequests.subject,
+  customers.fullName,
+  customers.phone,
+] as const;
 
 /** Allow-listed sort fields for ticket lists. */
 export const TICKET_SORTABLE = {
@@ -115,7 +139,10 @@ export const TICKET_SORTABLE = {
 
 /** Condition: open ticket past its SLA (flagged by the job, or simply overdue right now). */
 export function slaBreachedCondition(now: Date): SQL {
-  return or(isNotNull(serviceRequests.slaBreachedAt), and(lt(serviceRequests.slaDueAt, now), notInArray(serviceRequests.status, [...TERMINAL_STATUSES])))!;
+  return or(
+    isNotNull(serviceRequests.slaBreachedAt),
+    and(lt(serviceRequests.slaDueAt, now), notInArray(serviceRequests.status, [...TERMINAL_STATUSES])),
+  )!;
 }
 
 /**
@@ -187,13 +214,30 @@ export function canRate(t: Pick<DbTicket, "status" | "rating">): boolean {
 
 /** Customer-facing wire row: no staff ids or SLA internals, plus reopen/rate eligibility. */
 export function toCustomerTicketRow(j: TicketJoined, now = new Date()): CustomerTicketRow {
-  const { assignee_user_id: _a, assignee_name: _b, sla_due_at: _c, sla_breached_at: _d, is_sla_breached: _e, ...rest } = toTicketRow(j, now);
+  const {
+    assignee_user_id: _a,
+    assignee_name: _b,
+    sla_due_at: _c,
+    sla_breached_at: _d,
+    is_sla_breached: _e,
+    ...rest
+  } = toTicketRow(j, now);
   return { ...rest, can_reopen: canReopen(j.sr, now), can_rate: canRate(j.sr) };
 }
 
 /** Loads one joined ticket of the company by id (optionally locked); null when missing. */
-export async function loadTicket(executor: Executor, companyId: string, id: string, opts: { forUpdate?: boolean; includeInternal?: boolean } = {}): Promise<TicketJoined | null> {
-  const q = withTicketJoins(executor.select(ticketSelect(opts.includeInternal ?? true)).from(serviceRequests).$dynamic())
+export async function loadTicket(
+  executor: Executor,
+  companyId: string,
+  id: string,
+  opts: { forUpdate?: boolean; includeInternal?: boolean } = {},
+): Promise<TicketJoined | null> {
+  const q = withTicketJoins(
+    executor
+      .select(ticketSelect(opts.includeInternal ?? true))
+      .from(serviceRequests)
+      .$dynamic(),
+  )
     .where(and(eq(serviceRequests.id, id), eq(serviceRequests.companyId, companyId)))
     .limit(1);
   const rows = await (opts.forUpdate ? q.for("update", { of: serviceRequests }) : q);
@@ -201,7 +245,12 @@ export async function loadTicket(executor: Executor, companyId: string, id: stri
 }
 
 /** Loads a ticket for staff: 404 when missing or outside the user's project scope. */
-export async function requireStaffTicket(executor: Executor, user: StaffContext, id: string, forUpdate = false): Promise<TicketJoined> {
+export async function requireStaffTicket(
+  executor: Executor,
+  user: StaffContext,
+  id: string,
+  forUpdate = false,
+): Promise<TicketJoined> {
   const t = await loadTicket(executor, user.companyId, id, { forUpdate, includeInternal: true });
   if (!t) throw ApiError.notFound("Service request");
   assertTicketScope(user, t);
@@ -209,7 +258,12 @@ export async function requireStaffTicket(executor: Executor, user: StaffContext,
 }
 
 /** Loads a ticket that belongs to the customer (internal-note-free counts); 404 otherwise. */
-export async function requireCustomerTicket(executor: Executor, ticketId: string, customerId: string, forUpdate = false): Promise<TicketJoined> {
+export async function requireCustomerTicket(
+  executor: Executor,
+  ticketId: string,
+  customerId: string,
+  forUpdate = false,
+): Promise<TicketJoined> {
   const q = withTicketJoins(executor.select(ticketSelect(false)).from(serviceRequests).$dynamic())
     .where(and(eq(serviceRequests.id, ticketId), eq(serviceRequests.customerId, customerId)))
     .limit(1);
@@ -220,11 +274,21 @@ export async function requireCustomerTicket(executor: Executor, ticketId: string
 }
 
 /** Thread of a ticket (internal notes only when `includeInternal`), attachments resolved in one documents query. */
-export async function loadMessages(executor: Executor, companyId: string, ticketId: string, includeInternal: boolean): Promise<ServiceMessageRow[]> {
+export async function loadMessages(
+  executor: Executor,
+  companyId: string,
+  ticketId: string,
+  includeInternal: boolean,
+): Promise<ServiceMessageRow[]> {
   const rows = await executor
     .select()
     .from(serviceRequestMessages)
-    .where(and(eq(serviceRequestMessages.ticketId, ticketId), includeInternal ? undefined : eq(serviceRequestMessages.isInternal, false)))
+    .where(
+      and(
+        eq(serviceRequestMessages.ticketId, ticketId),
+        includeInternal ? undefined : eq(serviceRequestMessages.isInternal, false),
+      ),
+    )
     .orderBy(asc(serviceRequestMessages.createdAt), asc(serviceRequestMessages.id));
   const ids = [...new Set(rows.flatMap((r) => r.attachmentIds))];
   const docs = await loadDocumentRows(executor, companyId, ids);
@@ -270,22 +334,39 @@ async function companyRow(tx: Executor, companyId: string): Promise<CompanyRow> 
 /** SLA hours per priority from company settings (defaults fill any gap). */
 export function slaHoursOf(company: Pick<CompanyRow, "settings">): SlaHours {
   const cfg = (company.settings as { sla_hours?: Partial<Record<ServicePriority, number>> } | null)?.sla_hours ?? {};
-  return { ...DEFAULT_SLA_HOURS, ...Object.fromEntries(Object.entries(cfg).filter(([, v]) => typeof v === "number" && Number.isFinite(v) && v > 0)) } as SlaHours;
+  return {
+    ...DEFAULT_SLA_HOURS,
+    ...Object.fromEntries(Object.entries(cfg).filter(([, v]) => typeof v === "number" && Number.isFinite(v) && v > 0)),
+  } as SlaHours;
 }
 
-async function resolveCategory(tx: Executor, companyId: string, categoryId: string): Promise<{ id: string; name: string; defaultPriority: ServicePriority }> {
+async function resolveCategory(
+  tx: Executor,
+  companyId: string,
+  categoryId: string,
+): Promise<{ id: string; name: string; defaultPriority: ServicePriority }> {
   const [cat] = await tx
-    .select({ id: serviceCategories.id, name: serviceCategories.name, defaultPriority: serviceCategories.defaultPriority, isActive: serviceCategories.isActive })
+    .select({
+      id: serviceCategories.id,
+      name: serviceCategories.name,
+      defaultPriority: serviceCategories.defaultPriority,
+      isActive: serviceCategories.isActive,
+    })
     .from(serviceCategories)
     .where(and(eq(serviceCategories.id, categoryId), eq(serviceCategories.companyId, companyId)))
     .limit(1);
   if (!cat) throw ApiError.badRequest("category_id does not exist", { field: "category_id" });
-  if (!cat.isActive) throw ApiError.rule("Service category is inactive", "CATEGORY_INACTIVE", { category_id: categoryId });
+  if (!cat.isActive)
+    throw ApiError.rule("Service category is inactive", "CATEGORY_INACTIVE", { category_id: categoryId });
   return cat;
 }
 
 async function resolveAssignee(tx: Executor, companyId: string, userId: string): Promise<{ id: string; name: string }> {
-  const [u] = await tx.select({ id: users.id, name: users.name, isActive: users.isActive }).from(users).where(and(eq(users.id, userId), eq(users.companyId, companyId))).limit(1);
+  const [u] = await tx
+    .select({ id: users.id, name: users.name, isActive: users.isActive })
+    .from(users)
+    .where(and(eq(users.id, userId), eq(users.companyId, companyId)))
+    .limit(1);
   if (!u) throw ApiError.badRequest("assignee_user_id does not exist", { field: "assignee_user_id" });
   if (!u.isActive) throw ApiError.rule("Assignee is inactive", "ASSIGNEE_INACTIVE", { assignee_user_id: userId });
   return u;
@@ -297,7 +378,12 @@ async function resolveAssignee(tx: Executor, companyId: string, userId: string):
  * file of the customer. Documents of the ticket's booking (`bookingId`) count only when already shared with the customer: unshared booking
  * paperwork (internal notes, drafts, co-applicant papers) never travels through a ticket thread.
  */
-export interface AttachmentOwner { ticketId?: string | null; customerId: string; bookingId?: string | null; author?: "STAFF" | "CUSTOMER" }
+export interface AttachmentOwner {
+  ticketId?: string | null;
+  customerId: string;
+  bookingId?: string | null;
+  author?: "STAFF" | "CUSTOMER";
+}
 
 /**
  * 400 unless every attachment id is a live document of the company that belongs to this ticket (entity SERVICE_REQUEST), its customer
@@ -305,34 +391,65 @@ export interface AttachmentOwner { ticketId?: string | null; customerId: string;
  * PAN/Aadhaar scan — would leak its name and thumbnail into the thread (the customer sees public messages), so it is rejected exactly as
  * if it did not exist.
  */
-export async function assertAttachments(tx: Executor, companyId: string, ids: readonly string[], owner: AttachmentOwner): Promise<void> {
+export async function assertAttachments(
+  tx: Executor,
+  companyId: string,
+  ids: readonly string[],
+  owner: AttachmentOwner,
+): Promise<void> {
   if (ids.length === 0) return;
   const customerDoc = and(eq(documents.entityType, "CUSTOMER"), eq(documents.entityId, owner.customerId))!;
   const belongs: SQL[] = [
     owner.author === "CUSTOMER"
-      ? and(customerDoc, or(eq(documents.sharedWithCustomer, true), and(eq(documents.uploadedByType, "CUSTOMER"), eq(documents.uploadedBy, owner.customerId))))!
+      ? and(
+          customerDoc,
+          or(
+            eq(documents.sharedWithCustomer, true),
+            and(eq(documents.uploadedByType, "CUSTOMER"), eq(documents.uploadedBy, owner.customerId)),
+          ),
+        )!
       : customerDoc,
   ];
-  if (owner.ticketId) belongs.push(and(eq(documents.entityType, "SERVICE_REQUEST"), eq(documents.entityId, owner.ticketId))!);
+  if (owner.ticketId)
+    belongs.push(and(eq(documents.entityType, "SERVICE_REQUEST"), eq(documents.entityId, owner.ticketId))!);
   // The ticket's booking contributes only what the buyer can already see in the portal (shared with the customer).
-  if (owner.bookingId) belongs.push(and(eq(documents.entityType, "BOOKING"), eq(documents.entityId, owner.bookingId), eq(documents.sharedWithCustomer, true))!);
+  if (owner.bookingId)
+    belongs.push(
+      and(
+        eq(documents.entityType, "BOOKING"),
+        eq(documents.entityId, owner.bookingId),
+        eq(documents.sharedWithCustomer, true),
+      )!,
+    );
   const rows = await tx
     .select({ id: documents.id })
     .from(documents)
     .leftJoin(documentTypes, eq(documentTypes.id, documents.documentTypeId))
-    .where(and(
-      eq(documents.companyId, companyId), inArray(documents.id, [...new Set(ids)]), eq(documents.isDeleted, false), eq(documents.isSensitive, false),
-      or(isNull(documents.documentTypeId), eq(documentTypes.isKyc, false)),
-      or(...belongs),
-    ));
+    .where(
+      and(
+        eq(documents.companyId, companyId),
+        inArray(documents.id, [...new Set(ids)]),
+        eq(documents.isDeleted, false),
+        eq(documents.isSensitive, false),
+        or(isNull(documents.documentTypeId), eq(documentTypes.isKyc, false)),
+        or(...belongs),
+      ),
+    );
   const found = new Set(rows.map((r) => r.id));
   const missing = ids.filter((id) => !found.has(id));
-  if (missing.length > 0) throw ApiError.badRequest("attachment_ids references a document that does not exist or does not belong to this request", { field: "attachment_ids", missing });
+  if (missing.length > 0)
+    throw ApiError.badRequest(
+      "attachment_ids references a document that does not exist or does not belong to this request",
+      { field: "attachment_ids", missing },
+    );
 }
 
 /** Condition: the customer is primary applicant or co-applicant of the booking row. */
 function bookingMemberCondition(customerId: string): SQL {
-  return or(eq(bookings.customerId, customerId), sql`exists (select 1 from ${bookingCoApplicants} bc where bc.booking_id = ${bookings.id} and bc.customer_id = ${customerId})`)!;
+  return or(
+    eq(bookings.customerId, customerId),
+    sql`exists (select 1 from ${bookingCoApplicants} bc where bc.booking_id = ${bookings.id} and bc.customer_id = ${customerId})`,
+  )!;
 }
 
 /** Project ids of the customer's ACTIVE/COMPLETED bookings (primary or co-applicant). */
@@ -371,7 +488,8 @@ async function notifyNewTicket(tx: Executor, t: DbTicket, customerName: string, 
     entityId: t.id,
     link: `/service-requests/${t.id}`,
   };
-  if (t.assigneeUserId) await notify(tx, { companyId: t.companyId, recipients: [{ type: "STAFF", id: t.assigneeUserId }], ...base });
+  if (t.assigneeUserId)
+    await notify(tx, { companyId: t.companyId, recipients: [{ type: "STAFF", id: t.assigneeUserId }], ...base });
   const roleNames: string[] = t.assigneeUserId ? [] : [...TICKET_ADMIN_ROLES];
   if (/payment/i.test(categoryName)) roleNames.push(...PAYMENT_CATEGORY_ROLES);
   if (roleNames.length > 0) await notifyRole(tx, t.companyId, roleNames, base);
@@ -385,13 +503,22 @@ async function createTicketCore(
   meta: WriteMeta,
   opts: { scopeUser?: StaffContext | undefined; bookingNotTheirs: () => ApiError },
 ): Promise<TicketJoined> {
-  const [customer] = await tx.select({ id: customers.id, name: customers.fullName, isActive: customers.isActive }).from(customers).where(and(eq(customers.id, input.customerId), eq(customers.companyId, companyId))).limit(1);
+  const [customer] = await tx
+    .select({ id: customers.id, name: customers.fullName, isActive: customers.isActive })
+    .from(customers)
+    .where(and(eq(customers.id, input.customerId), eq(customers.companyId, companyId)))
+    .limit(1);
   if (!customer) throw ApiError.badRequest("customer_id does not exist", { field: "customer_id" });
-  if (!customer.isActive) throw ApiError.rule("Customer is inactive", "CUSTOMER_INACTIVE", { customer_id: input.customerId });
+  if (!customer.isActive)
+    throw ApiError.rule("Customer is inactive", "CUSTOMER_INACTIVE", { customer_id: input.customerId });
 
   let bookingId: string | null = null;
   if (input.bookingId) {
-    const [b] = await tx.select({ id: bookings.id, projectId: bookings.projectId, member: bookingMemberCondition(input.customerId) }).from(bookings).where(and(eq(bookings.id, input.bookingId), eq(bookings.companyId, companyId))).limit(1);
+    const [b] = await tx
+      .select({ id: bookings.id, projectId: bookings.projectId, member: bookingMemberCondition(input.customerId) })
+      .from(bookings)
+      .where(and(eq(bookings.id, input.bookingId), eq(bookings.companyId, companyId)))
+      .limit(1);
     if (!b) throw opts.bookingNotTheirs();
     if (opts.scopeUser) ensureProjectAccess(opts.scopeUser, b.projectId, "Booking");
     if (!b.member) throw opts.bookingNotTheirs();
@@ -402,35 +529,78 @@ async function createTicketCore(
   const priority = input.priority ?? category.defaultPriority;
   const assignee = input.assigneeUserId ? await resolveAssignee(tx, companyId, input.assigneeUserId) : null;
   const attachmentIds = [...(input.attachmentIds ?? [])];
-  await assertAttachments(tx, companyId, attachmentIds, { customerId: customer.id, bookingId, author: actor.type === "CUSTOMER" ? "CUSTOMER" : "STAFF" });
+  await assertAttachments(tx, companyId, attachmentIds, {
+    customerId: customer.id,
+    bookingId,
+    author: actor.type === "CUSTOMER" ? "CUSTOMER" : "STAFF",
+  });
 
   const company = await companyRow(tx, companyId);
   const now = new Date();
-  const ticketNumber = await nextNumber(tx, { id: company.id, fyStartMonth: company.fyStartMonth, numbering: company.numbering }, "ticket", todayIST(now));
+  const ticketNumber = await nextNumber(
+    tx,
+    { id: company.id, fyStartMonth: company.fyStartMonth, numbering: company.numbering },
+    "ticket",
+    todayIST(now),
+  );
   const [created] = await tx
     .insert(serviceRequests)
     .values({
-      companyId, ticketNumber, customerId: customer.id, bookingId, categoryId: category.id, priority, subject: input.subject, description: input.description,
-      status: "NEW", assigneeUserId: assignee?.id ?? null, slaDueAt: new Date(slaDueAt(now, priority, slaHoursOf(company))), lastMessageAt: now,
-      createdBy: actor.type === "STAFF" ? actor.id : null, createdAt: now, updatedAt: now,
+      companyId,
+      ticketNumber,
+      customerId: customer.id,
+      bookingId,
+      categoryId: category.id,
+      priority,
+      subject: input.subject,
+      description: input.description,
+      status: "NEW",
+      assigneeUserId: assignee?.id ?? null,
+      slaDueAt: new Date(slaDueAt(now, priority, slaHoursOf(company))),
+      lastMessageAt: now,
+      createdBy: actor.type === "STAFF" ? actor.id : null,
+      createdAt: now,
+      updatedAt: now,
     })
     .returning();
   if (!created) throw new Error("insert returned no row");
   // The opening message carries the description and any attachments so the thread is complete on its own.
-  await tx.insert(serviceRequestMessages).values({ ticketId: created.id, authorType: actor.type, authorId: actor.id, authorName: actor.name ?? customer.name, body: input.description, isInternal: false, attachmentIds });
+  await tx.insert(serviceRequestMessages).values({
+    ticketId: created.id,
+    authorType: actor.type,
+    authorId: actor.id,
+    authorName: actor.name ?? customer.name,
+    body: input.description,
+    isInternal: false,
+    attachmentIds,
+  });
   await notifyNewTicket(tx, created, customer.name, category.name);
   const loaded = await loadTicket(tx, companyId, created.id, { includeInternal: true });
   if (!loaded) throw new Error("ticket vanished after insert");
-  await writeAudit(tx, { companyId, actor, action: "service_request.create", entityType: TICKET_ENTITY, entityId: created.id, after: toTicketRow(loaded, now), ip: meta.ip ?? null, requestId: meta.requestId ?? null });
+  await writeAudit(tx, {
+    companyId,
+    actor,
+    action: "service_request.create",
+    entityType: TICKET_ENTITY,
+    entityId: created.id,
+    after: toTicketRow(loaded, now),
+    ip: meta.ip ?? null,
+    requestId: meta.requestId ?? null,
+  });
   return loaded;
 }
 
 /** Staff creates a ticket on behalf of a customer (booking must belong to the customer and lie inside the user's scope). */
-export async function createTicket(tx: Executor, ctx: TicketWriteContext, input: CreateTicketInput): Promise<ServiceRequestDetailResponse> {
+export async function createTicket(
+  tx: Executor,
+  ctx: TicketWriteContext,
+  input: CreateTicketInput,
+): Promise<ServiceRequestDetailResponse> {
   const actor: AuditActor = { type: "STAFF", id: ctx.user.id, name: ctx.user.name };
   const t = await createTicketCore(tx, ctx.user.companyId, input, actor, ctx.meta, {
     scopeUser: ctx.user,
-    bookingNotTheirs: () => ApiError.badRequest("booking_id does not exist or does not belong to this customer", { field: "booking_id" }),
+    bookingNotTheirs: () =>
+      ApiError.badRequest("booking_id does not exist or does not belong to this customer", { field: "booking_id" }),
   });
   return ticketDetail(tx, t);
 }
@@ -438,13 +608,27 @@ export async function createTicket(tx: Executor, ctx: TicketWriteContext, input:
 /** Portal: the customer raises a ticket (booking must be theirs — primary or co-applicant — else 404). */
 export async function createTicketForCustomer(
   tx: Executor,
-  input: { customerId: string; bookingId: string | null; categoryId: string; priority?: ServicePriority | null; subject: string; description: string; attachmentIds?: readonly string[] },
+  input: {
+    customerId: string;
+    bookingId: string | null;
+    categoryId: string;
+    priority?: ServicePriority | null;
+    subject: string;
+    description: string;
+    attachmentIds?: readonly string[];
+  },
   meta: WriteMeta = {},
 ): Promise<CustomerTicketDetail> {
-  const [c] = await tx.select({ companyId: customers.companyId, name: customers.fullName }).from(customers).where(eq(customers.id, input.customerId)).limit(1);
+  const [c] = await tx
+    .select({ companyId: customers.companyId, name: customers.fullName })
+    .from(customers)
+    .where(eq(customers.id, input.customerId))
+    .limit(1);
   if (!c) throw ApiError.notFound("Customer");
   const actor: AuditActor = { type: "CUSTOMER", id: input.customerId, name: c.name };
-  const t = await createTicketCore(tx, c.companyId, { ...input, assigneeUserId: null }, actor, meta, { bookingNotTheirs: () => ApiError.notFound("Booking") });
+  const t = await createTicketCore(tx, c.companyId, { ...input, assigneeUserId: null }, actor, meta, {
+    bookingNotTheirs: () => ApiError.notFound("Booking"),
+  });
   return customerTicketDetail(tx, t);
 }
 
@@ -455,35 +639,68 @@ export async function createTicketForCustomer(
 /** 422 BUSINESS_RULE (rule INVALID_STATUS_TRANSITION) unless `from → to` is allowed. */
 export function assertTransition(from: ServiceStatus, to: ServiceStatus): void {
   if (!STATUS_TRANSITIONS[from].includes(to)) {
-    throw ApiError.rule(`Cannot move a ticket from ${from} to ${to}`, "INVALID_STATUS_TRANSITION", { from, to, allowed: STATUS_TRANSITIONS[from] });
+    throw ApiError.rule(`Cannot move a ticket from ${from} to ${to}`, "INVALID_STATUS_TRANSITION", {
+      from,
+      to,
+      allowed: STATUS_TRANSITIONS[from],
+    });
   }
 }
 
 /** Column changes implied by a transition (resolved_at / closed_at stamps, reopen counter). */
-export function statusPatch(current: Pick<DbTicket, "status" | "resolvedAt">, to: ServiceStatus, now: Date): Record<string, unknown> {
+export function statusPatch(
+  current: Pick<DbTicket, "status" | "resolvedAt">,
+  to: ServiceStatus,
+  now: Date,
+): Record<string, unknown> {
   const patch: Record<string, unknown> = { status: to };
   if (to === "RESOLVED") patch["resolvedAt"] = now;
-  if (to === "CLOSED") { patch["closedAt"] = now; if (!current.resolvedAt) patch["resolvedAt"] = now; }
-  if (current.status === "RESOLVED" && to === "IN_PROGRESS") { patch["reopenedCount"] = sql`${serviceRequests.reopenedCount} + 1`; patch["resolvedAt"] = null; patch["closedAt"] = null; }
+  if (to === "CLOSED") {
+    patch["closedAt"] = now;
+    if (!current.resolvedAt) patch["resolvedAt"] = now;
+  }
+  if (current.status === "RESOLVED" && to === "IN_PROGRESS") {
+    patch["reopenedCount"] = sql`${serviceRequests.reopenedCount} + 1`;
+    patch["resolvedAt"] = null;
+    patch["closedAt"] = null;
+  }
   return patch;
 }
 
 /** 409 TICKET_CLOSED: a closed ticket accepts no messages, edits or assignment (state conflict, like REOPEN_WINDOW_CLOSED / ALREADY_RATED). */
 function assertOpen(t: DbTicket): void {
-  if (t.status === "CLOSED") throw ApiError.conflict("TICKET_CLOSED", "This request is closed and can no longer be changed", { status: t.status, closed_at: iso(t.closedAt) });
+  if (t.status === "CLOSED")
+    throw ApiError.conflict("TICKET_CLOSED", "This request is closed and can no longer be changed", {
+      status: t.status,
+      closed_at: iso(t.closedAt),
+    });
 }
 
 async function notifyCustomerReply(tx: Executor, t: DbTicket, body: string): Promise<void> {
   await notify(tx, {
-    companyId: t.companyId, recipients: [{ type: "CUSTOMER", id: t.customerId }], type: "TICKET_STAFF_REPLY",
-    title: `Reply on your request ${t.ticketNumber}`, body: truncate(body), entityType: TICKET_ENTITY, entityId: t.id, link: `/requests/${t.id}`,
+    companyId: t.companyId,
+    recipients: [{ type: "CUSTOMER", id: t.customerId }],
+    type: "TICKET_STAFF_REPLY",
+    title: `Reply on your request ${t.ticketNumber}`,
+    body: truncate(body),
+    entityType: TICKET_ENTITY,
+    entityId: t.id,
+    link: `/requests/${t.id}`,
   });
 }
 
 /** Notifies the assignee (or Super Admin when unassigned) about customer activity on a ticket. */
 async function notifyStaffOfCustomer(tx: Executor, t: DbTicket, title: string, body: string): Promise<void> {
-  const base = { type: "TICKET_CUSTOMER_REPLY" as const, title, body: truncate(body), entityType: TICKET_ENTITY, entityId: t.id, link: `/service-requests/${t.id}` };
-  if (t.assigneeUserId) await notify(tx, { companyId: t.companyId, recipients: [{ type: "STAFF", id: t.assigneeUserId }], ...base });
+  const base = {
+    type: "TICKET_CUSTOMER_REPLY" as const,
+    title,
+    body: truncate(body),
+    entityType: TICKET_ENTITY,
+    entityId: t.id,
+    link: `/service-requests/${t.id}`,
+  };
+  if (t.assigneeUserId)
+    await notify(tx, { companyId: t.companyId, recipients: [{ type: "STAFF", id: t.assigneeUserId }], ...base });
   else await notifyRole(tx, t.companyId, TICKET_ADMIN_ROLES, base);
 }
 
@@ -497,7 +714,12 @@ export async function updateTicket(
   ctx: TicketWriteContext,
   id: string,
   expectedVersion: number,
-  patch: { priority?: ServicePriority | undefined; category_id?: string | undefined; subject?: string | undefined; description?: string | undefined },
+  patch: {
+    priority?: ServicePriority | undefined;
+    category_id?: string | undefined;
+    subject?: string | undefined;
+    description?: string | undefined;
+  },
 ): Promise<ServiceRequestDetailResponse> {
   const existing = await requireStaffTicket(tx, ctx.user, id, true);
   assertOpen(existing.sr);
@@ -505,7 +727,8 @@ export async function updateTicket(
   const changes: Record<string, unknown> = {};
   if (patch.subject !== undefined) changes["subject"] = patch.subject;
   if (patch.description !== undefined) changes["description"] = patch.description;
-  if (patch.category_id !== undefined && patch.category_id !== existing.sr.categoryId) changes["categoryId"] = (await resolveCategory(tx, ctx.user.companyId, patch.category_id)).id;
+  if (patch.category_id !== undefined && patch.category_id !== existing.sr.categoryId)
+    changes["categoryId"] = (await resolveCategory(tx, ctx.user.companyId, patch.category_id)).id;
   if (patch.priority !== undefined && patch.priority !== existing.sr.priority) {
     changes["priority"] = patch.priority;
     const company = await companyRow(tx, ctx.user.companyId);
@@ -513,47 +736,108 @@ export async function updateTicket(
   }
   await applyUpdate(tx, serviceRequests, id, expectedVersion, changes, TICKET_ENTITY);
   const updated = (await loadTicket(tx, ctx.user.companyId, id, { includeInternal: true }))!;
-  await writeAudit(tx, { companyId: ctx.user.companyId, actor: { type: "STAFF", id: ctx.user.id, name: ctx.user.name }, action: "service_request.update", entityType: TICKET_ENTITY, entityId: id, before, after: toTicketRow(updated), ip: ctx.meta.ip ?? null, requestId: ctx.meta.requestId ?? null });
+  await writeAudit(tx, {
+    companyId: ctx.user.companyId,
+    actor: { type: "STAFF", id: ctx.user.id, name: ctx.user.name },
+    action: "service_request.update",
+    entityType: TICKET_ENTITY,
+    entityId: id,
+    before,
+    after: toTicketRow(updated),
+    ip: ctx.meta.ip ?? null,
+    requestId: ctx.meta.requestId ?? null,
+  });
   return ticketDetail(tx, updated);
 }
 
 /** Assigns (or unassigns with null) a ticket; the new assignee is notified. */
-export async function assignTicket(tx: Executor, ctx: TicketWriteContext, id: string, expectedVersion: number, assigneeUserId: string | null): Promise<ServiceRequestDetailResponse> {
+export async function assignTicket(
+  tx: Executor,
+  ctx: TicketWriteContext,
+  id: string,
+  expectedVersion: number,
+  assigneeUserId: string | null,
+): Promise<ServiceRequestDetailResponse> {
   const existing = await requireStaffTicket(tx, ctx.user, id, true);
   assertOpen(existing.sr);
   const assignee = assigneeUserId ? await resolveAssignee(tx, ctx.user.companyId, assigneeUserId) : null;
-  const updated = await applyUpdate(tx, serviceRequests, id, expectedVersion, { assigneeUserId: assignee?.id ?? null }, TICKET_ENTITY);
+  const updated = await applyUpdate(
+    tx,
+    serviceRequests,
+    id,
+    expectedVersion,
+    { assigneeUserId: assignee?.id ?? null },
+    TICKET_ENTITY,
+  );
   if (assignee && assignee.id !== existing.sr.assigneeUserId) {
     await notify(tx, {
-      companyId: ctx.user.companyId, recipients: [{ type: "STAFF", id: assignee.id }], type: "TICKET_NEW",
-      title: `Ticket ${updated.ticketNumber} assigned to you`, body: `${updated.subject} · ${updated.priority}`, entityType: TICKET_ENTITY, entityId: id, link: `/service-requests/${id}`,
+      companyId: ctx.user.companyId,
+      recipients: [{ type: "STAFF", id: assignee.id }],
+      type: "TICKET_NEW",
+      title: `Ticket ${updated.ticketNumber} assigned to you`,
+      body: `${updated.subject} · ${updated.priority}`,
+      entityType: TICKET_ENTITY,
+      entityId: id,
+      link: `/service-requests/${id}`,
     });
   }
   await writeAudit(tx, {
-    companyId: ctx.user.companyId, actor: { type: "STAFF", id: ctx.user.id, name: ctx.user.name }, action: "service_request.assign", entityType: TICKET_ENTITY, entityId: id,
-    before: { assignee_user_id: existing.sr.assigneeUserId, assignee_name: existing.assigneeName }, after: { assignee_user_id: assignee?.id ?? null, assignee_name: assignee?.name ?? null },
-    ip: ctx.meta.ip ?? null, requestId: ctx.meta.requestId ?? null,
+    companyId: ctx.user.companyId,
+    actor: { type: "STAFF", id: ctx.user.id, name: ctx.user.name },
+    action: "service_request.assign",
+    entityType: TICKET_ENTITY,
+    entityId: id,
+    before: { assignee_user_id: existing.sr.assigneeUserId, assignee_name: existing.assigneeName },
+    after: { assignee_user_id: assignee?.id ?? null, assignee_name: assignee?.name ?? null },
+    ip: ctx.meta.ip ?? null,
+    requestId: ctx.meta.requestId ?? null,
   });
   return ticketDetail(tx, (await loadTicket(tx, ctx.user.companyId, id, { includeInternal: true }))!);
 }
 
 /** Explicit status change; RESOLVED stamps resolved_at, CLOSED stamps closed_at; an optional note becomes a public reply. */
-export async function changeStatus(tx: Executor, ctx: TicketWriteContext, id: string, expectedVersion: number, status: ServiceStatus, note?: string | null): Promise<ServiceRequestDetailResponse> {
+export async function changeStatus(
+  tx: Executor,
+  ctx: TicketWriteContext,
+  id: string,
+  expectedVersion: number,
+  status: ServiceStatus,
+  note?: string | null,
+): Promise<ServiceRequestDetailResponse> {
   const existing = await requireStaffTicket(tx, ctx.user, id, true);
   assertTransition(existing.sr.status, status);
   const now = new Date();
   const patch = statusPatch(existing.sr, status, now);
   const noteText = note?.trim();
   if (noteText) {
-    await tx.insert(serviceRequestMessages).values({ ticketId: id, authorType: "STAFF", authorId: ctx.user.id, authorName: ctx.user.name, body: noteText, isInternal: false, attachmentIds: [] });
+    await tx.insert(serviceRequestMessages).values({
+      ticketId: id,
+      authorType: "STAFF",
+      authorId: ctx.user.id,
+      authorName: ctx.user.name,
+      body: noteText,
+      isInternal: false,
+      attachmentIds: [],
+    });
     patch["lastMessageAt"] = now;
   }
   const updated = await applyUpdate(tx, serviceRequests, id, expectedVersion, patch, TICKET_ENTITY);
   if (noteText) await notifyCustomerReply(tx, updated, noteText);
   await writeAudit(tx, {
-    companyId: ctx.user.companyId, actor: { type: "STAFF", id: ctx.user.id, name: ctx.user.name }, action: "service_request.status", entityType: TICKET_ENTITY, entityId: id,
-    before: { status: existing.sr.status }, after: { status: updated.status, resolved_at: iso(updated.resolvedAt), closed_at: iso(updated.closedAt), note: noteText ?? null },
-    ip: ctx.meta.ip ?? null, requestId: ctx.meta.requestId ?? null,
+    companyId: ctx.user.companyId,
+    actor: { type: "STAFF", id: ctx.user.id, name: ctx.user.name },
+    action: "service_request.status",
+    entityType: TICKET_ENTITY,
+    entityId: id,
+    before: { status: existing.sr.status },
+    after: {
+      status: updated.status,
+      resolved_at: iso(updated.resolvedAt),
+      closed_at: iso(updated.closedAt),
+      note: noteText ?? null,
+    },
+    ip: ctx.meta.ip ?? null,
+    requestId: ctx.meta.requestId ?? null,
   });
   return ticketDetail(tx, (await loadTicket(tx, ctx.user.companyId, id, { includeInternal: true }))!);
 }
@@ -571,9 +855,25 @@ export async function addStaffMessage(
 ): Promise<ServiceRequestDetailResponse> {
   const existing = await requireStaffTicket(tx, ctx.user, id, true);
   assertOpen(existing.sr);
-  await assertAttachments(tx, ctx.user.companyId, input.attachment_ids, { ticketId: id, customerId: existing.sr.customerId, bookingId: existing.sr.bookingId, author: "STAFF" });
+  await assertAttachments(tx, ctx.user.companyId, input.attachment_ids, {
+    ticketId: id,
+    customerId: existing.sr.customerId,
+    bookingId: existing.sr.bookingId,
+    author: "STAFF",
+  });
   const now = new Date();
-  const [msg] = await tx.insert(serviceRequestMessages).values({ ticketId: id, authorType: "STAFF", authorId: ctx.user.id, authorName: ctx.user.name, body: input.body, isInternal: input.is_internal, attachmentIds: [...input.attachment_ids] }).returning({ id: serviceRequestMessages.id });
+  const [msg] = await tx
+    .insert(serviceRequestMessages)
+    .values({
+      ticketId: id,
+      authorType: "STAFF",
+      authorId: ctx.user.id,
+      authorName: ctx.user.name,
+      body: input.body,
+      isInternal: input.is_internal,
+      attachmentIds: [...input.attachment_ids],
+    })
+    .returning({ id: serviceRequestMessages.id });
   let patch: Record<string, unknown> = { lastMessageAt: now };
   if (input.status !== undefined && input.status !== existing.sr.status) {
     assertTransition(existing.sr.status, input.status);
@@ -581,12 +881,30 @@ export async function addStaffMessage(
   } else if (input.status === undefined && !input.is_internal && existing.sr.status === "NEW") {
     patch = { ...patch, ...statusPatch(existing.sr, "IN_PROGRESS", now) };
   }
-  const updated = await applyUpdate(tx, serviceRequests, id, expectedVersion ?? existing.sr.version, patch, TICKET_ENTITY);
+  const updated = await applyUpdate(
+    tx,
+    serviceRequests,
+    id,
+    expectedVersion ?? existing.sr.version,
+    patch,
+    TICKET_ENTITY,
+  );
   if (!input.is_internal) await notifyCustomerReply(tx, updated, input.body);
   await writeAudit(tx, {
-    companyId: ctx.user.companyId, actor: { type: "STAFF", id: ctx.user.id, name: ctx.user.name }, action: "service_request.message", entityType: TICKET_ENTITY, entityId: id,
-    before: { status: existing.sr.status }, after: { message_id: msg?.id ?? null, is_internal: input.is_internal, status: updated.status, attachment_count: input.attachment_ids.length },
-    ip: ctx.meta.ip ?? null, requestId: ctx.meta.requestId ?? null,
+    companyId: ctx.user.companyId,
+    actor: { type: "STAFF", id: ctx.user.id, name: ctx.user.name },
+    action: "service_request.message",
+    entityType: TICKET_ENTITY,
+    entityId: id,
+    before: { status: existing.sr.status },
+    after: {
+      message_id: msg?.id ?? null,
+      is_internal: input.is_internal,
+      status: updated.status,
+      attachment_count: input.attachment_ids.length,
+    },
+    ip: ctx.meta.ip ?? null,
+    requestId: ctx.meta.requestId ?? null,
   });
   return ticketDetail(tx, (await loadTicket(tx, ctx.user.companyId, id, { includeInternal: true }))!);
 }
@@ -607,7 +925,11 @@ export interface CustomerTicketFilter {
 }
 
 /** Tickets raised by the customer, newest first (no staff ids, no internal-note counts). */
-export async function listTicketsForCustomer(executor: Executor, customerId: string, q: CustomerTicketFilter = {}): Promise<ListResult<CustomerTicketRow>> {
+export async function listTicketsForCustomer(
+  executor: Executor,
+  customerId: string,
+  q: CustomerTicketFilter = {},
+): Promise<ListResult<CustomerTicketRow>> {
   const where: (SQL | undefined)[] = [eq(serviceRequests.customerId, customerId)];
   if (q.status) where.push(eq(serviceRequests.status, q.status));
   if (q.booking_id) where.push(eq(serviceRequests.bookingId, q.booking_id));
@@ -616,73 +938,179 @@ export async function listTicketsForCustomer(executor: Executor, customerId: str
     select: ticketSelect(false),
     join: withTicketJoins,
     where: and(...where.filter((w): w is SQL => w !== undefined)),
-    sort: { allowed: { created_at: serviceRequests.createdAt, updated_at: serviceRequests.updatedAt, last_message_at: serviceRequests.lastMessageAt, status: serviceRequests.status }, default: "-created_at", requested: q.sort },
-    ...fromListQuery({ page: q.page ?? 1, page_size: q.page_size ?? 25, cursor: q.cursor, limit: q.limit, include_inactive: false, exact: false }),
+    sort: {
+      allowed: {
+        created_at: serviceRequests.createdAt,
+        updated_at: serviceRequests.updatedAt,
+        last_message_at: serviceRequests.lastMessageAt,
+        status: serviceRequests.status,
+      },
+      default: "-created_at",
+      requested: q.sort,
+    },
+    ...fromListQuery({
+      page: q.page ?? 1,
+      page_size: q.page_size ?? 25,
+      cursor: q.cursor,
+      limit: q.limit,
+      include_inactive: false,
+      exact: false,
+    }),
   });
   const now = new Date();
   return { ...result, items: result.items.map((r) => toCustomerTicketRow(r, now)) };
 }
 
 /** One ticket of the customer with its thread (internal notes stripped); 404 when it is not theirs. */
-export async function ticketForCustomer(executor: Executor, ticketId: string, customerId: string): Promise<CustomerTicketDetail> {
+export async function ticketForCustomer(
+  executor: Executor,
+  ticketId: string,
+  customerId: string,
+): Promise<CustomerTicketDetail> {
   return customerTicketDetail(executor, await requireCustomerTicket(executor, ticketId, customerId));
 }
 
 /** Customer reply: AWAITING_CUSTOMER → IN_PROGRESS, notifies the assignee (or Super Admin). 404 when not theirs, 409 TICKET_CLOSED when closed. */
-export async function addCustomerMessage(tx: Executor, ticketId: string, customerId: string, body: string, attachmentIds: readonly string[] = [], meta: WriteMeta = {}): Promise<CustomerTicketDetail> {
+export async function addCustomerMessage(
+  tx: Executor,
+  ticketId: string,
+  customerId: string,
+  body: string,
+  attachmentIds: readonly string[] = [],
+  meta: WriteMeta = {},
+): Promise<CustomerTicketDetail> {
   const existing = await requireCustomerTicket(tx, ticketId, customerId, true);
   assertOpen(existing.sr);
-  await assertAttachments(tx, existing.sr.companyId, attachmentIds, { ticketId, customerId, bookingId: existing.sr.bookingId, author: "CUSTOMER" });
+  await assertAttachments(tx, existing.sr.companyId, attachmentIds, {
+    ticketId,
+    customerId,
+    bookingId: existing.sr.bookingId,
+    author: "CUSTOMER",
+  });
   const now = new Date();
-  const [msg] = await tx.insert(serviceRequestMessages).values({ ticketId, authorType: "CUSTOMER", authorId: customerId, authorName: existing.customerName, body, isInternal: false, attachmentIds: [...attachmentIds] }).returning({ id: serviceRequestMessages.id });
+  const [msg] = await tx
+    .insert(serviceRequestMessages)
+    .values({
+      ticketId,
+      authorType: "CUSTOMER",
+      authorId: customerId,
+      authorName: existing.customerName,
+      body,
+      isInternal: false,
+      attachmentIds: [...attachmentIds],
+    })
+    .returning({ id: serviceRequestMessages.id });
   const patch: Record<string, unknown> = { lastMessageAt: now };
   if (existing.sr.status === "AWAITING_CUSTOMER") Object.assign(patch, statusPatch(existing.sr, "IN_PROGRESS", now));
   const updated = await applyUpdate(tx, serviceRequests, ticketId, existing.sr.version, patch, TICKET_ENTITY);
   await notifyStaffOfCustomer(tx, updated, `Customer replied on ${updated.ticketNumber}`, body);
   await writeAudit(tx, {
-    companyId: existing.sr.companyId, actor: { type: "CUSTOMER", id: customerId, name: existing.customerName }, action: "service_request.message", entityType: TICKET_ENTITY, entityId: ticketId,
-    before: { status: existing.sr.status }, after: { message_id: msg?.id ?? null, is_internal: false, status: updated.status, attachment_count: attachmentIds.length }, ip: meta.ip ?? null, requestId: meta.requestId ?? null,
+    companyId: existing.sr.companyId,
+    actor: { type: "CUSTOMER", id: customerId, name: existing.customerName },
+    action: "service_request.message",
+    entityType: TICKET_ENTITY,
+    entityId: ticketId,
+    before: { status: existing.sr.status },
+    after: {
+      message_id: msg?.id ?? null,
+      is_internal: false,
+      status: updated.status,
+      attachment_count: attachmentIds.length,
+    },
+    ip: meta.ip ?? null,
+    requestId: meta.requestId ?? null,
   });
-  return customerTicketDetail(tx, (await requireCustomerTicket(tx, ticketId, customerId)));
+  return customerTicketDetail(tx, await requireCustomerTicket(tx, ticketId, customerId));
 }
 
 /** Customer reopens a RESOLVED ticket within 7 days of resolved_at → IN_PROGRESS, reopened_count + 1; otherwise 409 REOPEN_WINDOW_CLOSED. */
-export async function reopenByCustomer(tx: Executor, ticketId: string, customerId: string, reason?: string | null, meta: WriteMeta = {}): Promise<CustomerTicketDetail> {
+export async function reopenByCustomer(
+  tx: Executor,
+  ticketId: string,
+  customerId: string,
+  reason?: string | null,
+  meta: WriteMeta = {},
+): Promise<CustomerTicketDetail> {
   const existing = await requireCustomerTicket(tx, ticketId, customerId, true);
   const now = new Date();
   if (!canReopen(existing.sr, now)) {
-    throw ApiError.conflict("REOPEN_WINDOW_CLOSED", `This request can only be reopened within ${SERVICE_REOPEN_WINDOW_DAYS} days of being resolved`, {
-      status: existing.sr.status, resolved_at: iso(existing.sr.resolvedAt), window_days: SERVICE_REOPEN_WINDOW_DAYS,
-    });
+    throw ApiError.conflict(
+      "REOPEN_WINDOW_CLOSED",
+      `This request can only be reopened within ${SERVICE_REOPEN_WINDOW_DAYS} days of being resolved`,
+      {
+        status: existing.sr.status,
+        resolved_at: iso(existing.sr.resolvedAt),
+        window_days: SERVICE_REOPEN_WINDOW_DAYS,
+      },
+    );
   }
   const patch = statusPatch(existing.sr, "IN_PROGRESS", now);
   const reasonText = reason?.trim();
   if (reasonText) {
-    await tx.insert(serviceRequestMessages).values({ ticketId, authorType: "CUSTOMER", authorId: customerId, authorName: existing.customerName, body: `Reopened: ${reasonText}`, isInternal: false, attachmentIds: [] });
+    await tx.insert(serviceRequestMessages).values({
+      ticketId,
+      authorType: "CUSTOMER",
+      authorId: customerId,
+      authorName: existing.customerName,
+      body: `Reopened: ${reasonText}`,
+      isInternal: false,
+      attachmentIds: [],
+    });
     patch["lastMessageAt"] = now;
   }
   const updated = await applyUpdate(tx, serviceRequests, ticketId, existing.sr.version, patch, TICKET_ENTITY);
-  await notifyStaffOfCustomer(tx, updated, `Ticket ${updated.ticketNumber} reopened by customer`, reasonText ?? updated.subject);
+  await notifyStaffOfCustomer(
+    tx,
+    updated,
+    `Ticket ${updated.ticketNumber} reopened by customer`,
+    reasonText ?? updated.subject,
+  );
   await writeAudit(tx, {
-    companyId: existing.sr.companyId, actor: { type: "CUSTOMER", id: customerId, name: existing.customerName }, action: "service_request.reopen", entityType: TICKET_ENTITY, entityId: ticketId,
-    before: { status: existing.sr.status, reopened_count: existing.sr.reopenedCount }, after: { status: updated.status, reopened_count: updated.reopenedCount, reason: reasonText ?? null }, ip: meta.ip ?? null, requestId: meta.requestId ?? null,
+    companyId: existing.sr.companyId,
+    actor: { type: "CUSTOMER", id: customerId, name: existing.customerName },
+    action: "service_request.reopen",
+    entityType: TICKET_ENTITY,
+    entityId: ticketId,
+    before: { status: existing.sr.status, reopened_count: existing.sr.reopenedCount },
+    after: { status: updated.status, reopened_count: updated.reopenedCount, reason: reasonText ?? null },
+    ip: meta.ip ?? null,
+    requestId: meta.requestId ?? null,
   });
   return customerTicketDetail(tx, await requireCustomerTicket(tx, ticketId, customerId));
 }
 
 /** Customer rates a RESOLVED/CLOSED ticket once (1–5); rating a RESOLVED ticket closes it. 422 when not resolved, 409 ALREADY_RATED. */
-export async function rateByCustomer(tx: Executor, ticketId: string, customerId: string, rating: number, comment?: string | null, meta: WriteMeta = {}): Promise<CustomerTicketDetail> {
+export async function rateByCustomer(
+  tx: Executor,
+  ticketId: string,
+  customerId: string,
+  rating: number,
+  comment?: string | null,
+  meta: WriteMeta = {},
+): Promise<CustomerTicketDetail> {
   const existing = await requireCustomerTicket(tx, ticketId, customerId, true);
-  if (!TERMINAL_STATUSES.includes(existing.sr.status)) throw ApiError.rule("Only resolved or closed requests can be rated", "TICKET_NOT_RESOLVED", { status: existing.sr.status });
-  if (existing.sr.rating !== null) throw ApiError.conflict("ALREADY_RATED", "This request has already been rated", { rating: existing.sr.rating });
-  if (!Number.isInteger(rating) || rating < 1 || rating > 5) throw ApiError.badRequest("rating must be between 1 and 5", { field: "rating" });
+  if (!TERMINAL_STATUSES.includes(existing.sr.status))
+    throw ApiError.rule("Only resolved or closed requests can be rated", "TICKET_NOT_RESOLVED", {
+      status: existing.sr.status,
+    });
+  if (existing.sr.rating !== null)
+    throw ApiError.conflict("ALREADY_RATED", "This request has already been rated", { rating: existing.sr.rating });
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5)
+    throw ApiError.badRequest("rating must be between 1 and 5", { field: "rating" });
   const now = new Date();
   const patch: Record<string, unknown> = { rating, ratingComment: comment?.trim() || null };
   if (existing.sr.status === "RESOLVED") Object.assign(patch, statusPatch(existing.sr, "CLOSED", now));
   const updated = await applyUpdate(tx, serviceRequests, ticketId, existing.sr.version, patch, TICKET_ENTITY);
   await writeAudit(tx, {
-    companyId: existing.sr.companyId, actor: { type: "CUSTOMER", id: customerId, name: existing.customerName }, action: "service_request.rate", entityType: TICKET_ENTITY, entityId: ticketId,
-    before: { status: existing.sr.status, rating: null }, after: { status: updated.status, rating: updated.rating, rating_comment: updated.ratingComment }, ip: meta.ip ?? null, requestId: meta.requestId ?? null,
+    companyId: existing.sr.companyId,
+    actor: { type: "CUSTOMER", id: customerId, name: existing.customerName },
+    action: "service_request.rate",
+    entityType: TICKET_ENTITY,
+    entityId: ticketId,
+    before: { status: existing.sr.status, rating: null },
+    after: { status: updated.status, rating: updated.rating, rating_comment: updated.ratingComment },
+    ip: meta.ip ?? null,
+    requestId: meta.requestId ?? null,
   });
   return customerTicketDetail(tx, await requireCustomerTicket(tx, ticketId, customerId));
 }

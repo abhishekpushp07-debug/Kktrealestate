@@ -12,3 +12,7 @@ apps/api/loadtest/results/
 apps/portal/scripts/
 apps/portal/assets/
 apps/web/public/
+# orchestration scripts executed by the workflow runner (edited by the runner's authors, not part of the product)
+scripts/workflows/
+# owner specification: plain-text layout (==== banners, indented lists) that Markdown formatting would mangle
+docs/SPEC.md

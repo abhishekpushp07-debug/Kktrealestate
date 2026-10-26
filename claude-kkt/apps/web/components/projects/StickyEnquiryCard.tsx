@@ -16,7 +16,16 @@ interface StickyEnquiryCardProps {
 }
 
 /** Desktop sidebar card: sticks under the navbar while the visitor scrolls the project story. */
-export function StickyEnquiryCard({ projectSlug, projectName, startingPricePaise, showPrices, brochureAvailable, visitBookingEnabled, flatTypes, phone }: StickyEnquiryCardProps) {
+export function StickyEnquiryCard({
+  projectSlug,
+  projectName,
+  startingPricePaise,
+  showPrices,
+  brochureAvailable,
+  visitBookingEnabled,
+  flatTypes,
+  phone,
+}: StickyEnquiryCardProps) {
   const tel = telHref(phone);
   return (
     <aside className="lg:sticky lg:top-24" aria-label="Enquire about this project">
@@ -33,14 +42,21 @@ export function StickyEnquiryCard({ projectSlug, projectName, startingPricePaise
             <span className="font-display text-2xl text-navy-900">Price on request</span>
           </p>
         )}
-        <EnquiryForm projects={[{ slug: projectSlug, name: projectName }]} defaultProjectSlug={projectSlug} flatTypes={flatTypes} compact />
+        <EnquiryForm
+          projects={[{ slug: projectSlug, name: projectName }]}
+          defaultProjectSlug={projectSlug}
+          flatTypes={flatTypes}
+          compact
+        />
         <div className="mt-5 grid gap-2">
           {visitBookingEnabled ? (
             <Button href="#visit" variant="outline" className="w-full">
               <CalendarIcon size={18} /> Book a private site visit
             </Button>
           ) : null}
-          {brochureAvailable ? <BrochureButton projectSlug={projectSlug} projectName={projectName} variant="outline" className="w-full" /> : null}
+          {brochureAvailable ? (
+            <BrochureButton projectSlug={projectSlug} projectName={projectName} variant="outline" className="w-full" />
+          ) : null}
           {tel ? (
             <Button href={tel} variant="ghost" className="w-full">
               <PhoneIcon size={18} /> {phone}

@@ -16,7 +16,15 @@ export class ApiError extends Error {
   readonly traceId: string | undefined;
   readonly retryAfterSeconds: number | undefined;
 
-  constructor(init: { status: number; code: ClientErrorCode; message: string; details?: Record<string, unknown>; requestId?: string; traceId?: string; retryAfterSeconds?: number }) {
+  constructor(init: {
+    status: number;
+    code: ClientErrorCode;
+    message: string;
+    details?: Record<string, unknown>;
+    requestId?: string;
+    traceId?: string;
+    retryAfterSeconds?: number;
+  }) {
     super(init.message);
     this.name = "ApiError";
     this.status = init.status;
@@ -85,11 +93,24 @@ export interface ResponseIds {
 }
 
 /** ApiError from a failed response's status and parsed body (any code: unknown codes keep the server's message). */
-export function apiErrorFromBody(status: number, body: unknown, retryAfterSeconds?: number, ids: ResponseIds = {}): ApiError {
+export function apiErrorFromBody(
+  status: number,
+  body: unknown,
+  retryAfterSeconds?: number,
+  ids: ResponseIds = {},
+): ApiError {
   if (isApiError(body)) {
     const e = body.error;
     const traceId = nonEmpty((e as { trace_id?: unknown }).trace_id) ?? ids.traceId;
-    return new ApiError({ status, code: e.code, message: nonEmpty(e.message) ?? fallbackMessage(status), details: e.details, requestId: e.request_id ?? ids.requestId, ...(traceId ? { traceId } : {}), retryAfterSeconds });
+    return new ApiError({
+      status,
+      code: e.code,
+      message: nonEmpty(e.message) ?? fallbackMessage(status),
+      details: e.details,
+      requestId: e.request_id ?? ids.requestId,
+      ...(traceId ? { traceId } : {}),
+      retryAfterSeconds,
+    });
   }
   const top = record(body);
   const inner = record(top?.error);
@@ -98,5 +119,13 @@ export function apiErrorFromBody(status: number, body: unknown, retryAfterSecond
   const code = rawCode && /^[A-Za-z][A-Za-z0-9_]*$/.test(rawCode) ? rawCode.toUpperCase() : "UNKNOWN";
   const requestId = nonEmpty(inner?.request_id) ?? ids.requestId;
   const traceId = nonEmpty(inner?.trace_id) ?? ids.traceId;
-  return new ApiError({ status, code, message: message ?? fallbackMessage(status), details: record(inner?.details) ?? undefined, ...(requestId ? { requestId } : {}), ...(traceId ? { traceId } : {}), retryAfterSeconds });
+  return new ApiError({
+    status,
+    code,
+    message: message ?? fallbackMessage(status),
+    details: record(inner?.details) ?? undefined,
+    ...(requestId ? { requestId } : {}),
+    ...(traceId ? { traceId } : {}),
+    retryAfterSeconds,
+  });
 }

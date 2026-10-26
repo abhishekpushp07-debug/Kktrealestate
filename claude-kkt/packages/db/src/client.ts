@@ -52,7 +52,12 @@ export function dbTimeoutsFromEnv(env: Record<string, string | undefined> = proc
   return {
     statementTimeoutMs: envInt(env, "DB_STATEMENT_TIMEOUT_MS", DEFAULT_DB_TIMEOUTS.statementTimeoutMs, 0),
     lockTimeoutMs: envInt(env, "DB_LOCK_TIMEOUT_MS", DEFAULT_DB_TIMEOUTS.lockTimeoutMs, 0),
-    idleInTransactionTimeoutMs: envInt(env, "DB_IDLE_IN_TX_TIMEOUT_MS", DEFAULT_DB_TIMEOUTS.idleInTransactionTimeoutMs, 0),
+    idleInTransactionTimeoutMs: envInt(
+      env,
+      "DB_IDLE_IN_TX_TIMEOUT_MS",
+      DEFAULT_DB_TIMEOUTS.idleInTransactionTimeoutMs,
+      0,
+    ),
     connectTimeoutS: envInt(env, "DB_CONNECT_TIMEOUT_S", DEFAULT_DB_TIMEOUTS.connectTimeoutS, 1),
   };
 }
@@ -92,7 +97,8 @@ function withPreparedStatements<T extends Sql>(client: T): T {
   const unsafe = target.unsafe.bind(client) as UnsafeFn;
   // Drizzle passes `{ prepare: false }` explicitly for every unnamed query, so the flag is overridden rather than defaulted.
   target.unsafe = ((query: string, args?: unknown, options?: Record<string, unknown>) => {
-    if (args !== undefined && !Array.isArray(args)) return unsafe(query, { ...(args as Record<string, unknown>), prepare: true } as never);
+    if (args !== undefined && !Array.isArray(args))
+      return unsafe(query, { ...(args as Record<string, unknown>), prepare: true } as never);
     return unsafe(query, (args ?? []) as never, { ...(options ?? {}), prepare: true } as never);
   }) as unknown as UnsafeFn;
   if (typeof target.begin === "function") {
@@ -134,7 +140,10 @@ export interface DbCluster {
 }
 
 /** Opens a postgres.js pool on `url` and wraps it in Drizzle; `close()` ends the pool. */
-export function createDb(url: string = process.env["DATABASE_URL"] ?? DEFAULT_DATABASE_URL, options: CreateDbOptions = {}): DbHandle {
+export function createDb(
+  url: string = process.env["DATABASE_URL"] ?? DEFAULT_DATABASE_URL,
+  options: CreateDbOptions = {},
+): DbHandle {
   const env = dbTimeoutsFromEnv();
   const t: DbTimeouts = options.timeouts === false ? env : { ...env, ...(options.timeouts ?? {}) };
   const client = postgres(url, {
@@ -151,7 +160,9 @@ export function createDb(url: string = process.env["DATABASE_URL"] ?? DEFAULT_DA
           },
     // bigint columns arrive as JS numbers (all amounts fit in 2^53); drizzle's
     // `bigint({ mode: "number" })` also parses them, this keeps raw `sql` results consistent.
-    types: { bigint: { to: 20, from: [20], serialize: (v: number | bigint) => String(v), parse: (v: string) => Number(v) } },
+    types: {
+      bigint: { to: 20, from: [20], serialize: (v: number | bigint) => String(v), parse: (v: string) => Number(v) },
+    },
     onnotice: () => undefined,
   });
   if (options.prepare ?? prepareDefault()) withPreparedStatements(client);
@@ -245,7 +256,11 @@ export interface TransactionRetryOptions {
  * last retryable error is rethrown when the retries are exhausted. `fn` may run more than once, so it must not have side effects outside
  * the transaction (queue jobs, Redis writes, notifications) before it returns; do those after this resolves.
  */
-export async function withTransactionRetry<T>(db: DB, fn: (tx: Tx, attempt: number) => Promise<T>, options: TransactionRetryOptions = {}): Promise<T> {
+export async function withTransactionRetry<T>(
+  db: DB,
+  fn: (tx: Tx, attempt: number) => Promise<T>,
+  options: TransactionRetryOptions = {},
+): Promise<T> {
   const retries = Math.max(0, Math.floor(options.retries ?? 3));
   const base = options.baseDelayMs ?? 25;
   const cap = options.maxDelayMs ?? 1000;

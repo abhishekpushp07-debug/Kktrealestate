@@ -2,8 +2,29 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { CheckCircle2, Copy, ExternalLink, MoreHorizontal, Pencil, Plus, Tags, Zap } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { RATE_CARD_STATUSES, RATE_CARD_STATUS_LABELS, type RateCardApplyResponse, type RateCardRow } from "@kkt/contracts";
-import { Button, Combobox, ConfirmDialog, DataTable, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, IconButton, PageHeader, Select, Skeleton, StatusChip, Toolbar } from "@/components/ui";
+import {
+  RATE_CARD_STATUSES,
+  RATE_CARD_STATUS_LABELS,
+  type RateCardApplyResponse,
+  type RateCardRow,
+} from "@kkt/contracts";
+import {
+  Button,
+  Combobox,
+  ConfirmDialog,
+  DataTable,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  IconButton,
+  PageHeader,
+  Select,
+  Skeleton,
+  StatusChip,
+  Toolbar,
+} from "@/components/ui";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { formatDate, formatINR, formatNumber } from "@/lib/format";
@@ -40,11 +61,19 @@ export default function RateCardsOverviewPage() {
   const [apply, setApply] = useState<ApplyState | null>(null);
   const [newProject, setNewProject] = useState<string | null>(null);
 
-  const projectName = useMemo(() => new Map((projects.data ?? []).map((project) => [project.id, project.name])), [projects.data]);
+  const projectName = useMemo(
+    () => new Map((projects.data ?? []).map((project) => [project.id, project.name])),
+    [projects.data],
+  );
   const invalidate = [[RATE_CARDS_PATH], [FLATS_PATH], [BLOCKS_PATH], [PROJECTS_PATH]];
 
   const activate = useMutationWithToast<RateCardRow, RateCardRow>({
-    mutationFn: (card) => api.post<RateCardRow>(`${RATE_CARDS_PATH}/${card.id}/activate`, { version: card.version, apply_to_available_flats: true }, { version: card.version }),
+    mutationFn: (card) =>
+      api.post<RateCardRow>(
+        `${RATE_CARDS_PATH}/${card.id}/activate`,
+        { version: card.version, apply_to_available_flats: true },
+        { version: card.version },
+      ),
     successMessage: (saved) => `"${saved.name}" is now the active rate card`,
     invalidate,
     entityLabel: "This rate card",
@@ -52,7 +81,8 @@ export default function RateCardsOverviewPage() {
 
   const applyMutation = useMutationWithToast<RateCardApplyResponse, RateCardRow>({
     mutationFn: (card) => api.post<RateCardApplyResponse>(`${RATE_CARDS_PATH}/${card.id}/apply`, { dry_run: false }),
-    successMessage: (result) => `${formatNumber(result.repriced)} available ${result.repriced === 1 ? "flat" : "flats"} re-priced`,
+    successMessage: (result) =>
+      `${formatNumber(result.repriced)} available ${result.repriced === 1 ? "flat" : "flats"} re-priced`,
     invalidate,
     entityLabel: "This rate card",
   });
@@ -86,7 +116,8 @@ export default function RateCardsOverviewPage() {
           <span className="block min-w-0">
             <span className="block truncate font-medium">{row.original.name}</span>
             <span className="block truncate text-2xs text-ink-subtle">
-              {formatNumber(row.original.rates.length)} flat {row.original.rates.length === 1 ? "type" : "types"} · {formatNumber(row.original.plc_rules.length)} PLC {row.original.plc_rules.length === 1 ? "rule" : "rules"}
+              {formatNumber(row.original.rates.length)} flat {row.original.rates.length === 1 ? "type" : "types"} ·{" "}
+              {formatNumber(row.original.plc_rules.length)} PLC {row.original.plc_rules.length === 1 ? "rule" : "rules"}
             </span>
           </span>
         ),
@@ -95,26 +126,53 @@ export default function RateCardsOverviewPage() {
         accessorKey: "project_id",
         header: "Project",
         cell: ({ row }) => (
-          <Link to={`/projects/${row.original.project_id}?tab=rate-cards`} className="text-navy-800 hover:underline focus-ring rounded-xs" onClick={(event) => event.stopPropagation()}>
+          <Link
+            to={`/projects/${row.original.project_id}?tab=rate-cards`}
+            className="text-navy-800 hover:underline focus-ring rounded-xs"
+            onClick={(event) => event.stopPropagation()}
+          >
             {projectName.get(row.original.project_id) ?? "Project"}
           </Link>
         ),
       },
-      { accessorKey: "status", header: "Status", cell: ({ row }) => <StatusChip status={row.original.status} label={RATE_CARD_STATUS_LABELS[row.original.status]} size="sm" /> },
-      { accessorKey: "effective_from", header: "Effective", cell: ({ row }) => <span className="money">{formatDate(row.original.effective_from)}</span> },
+      {
+        accessorKey: "status",
+        header: "Status",
+        cell: ({ row }) => (
+          <StatusChip status={row.original.status} label={RATE_CARD_STATUS_LABELS[row.original.status]} size="sm" />
+        ),
+      },
+      {
+        accessorKey: "effective_from",
+        header: "Effective",
+        cell: ({ row }) => <span className="money">{formatDate(row.original.effective_from)}</span>,
+      },
       {
         id: "range",
         header: "Rate / sq ft",
         meta: { sortKey: false, align: "right" },
         cell: ({ row }) => {
-          const rates = row.original.rates.map((rate) => rate.rate_per_sqft_paise).filter((rate): rate is number => rate !== null);
+          const rates = row.original.rates
+            .map((rate) => rate.rate_per_sqft_paise)
+            .filter((rate): rate is number => rate !== null);
           if (rates.length === 0) return <span className="text-ink-subtle">lump sums</span>;
           const min = Math.min(...rates);
           const max = Math.max(...rates);
-          return <span className="money">{min === max ? formatINR(min) : `${formatINR(min)} – ${formatINR(max)}`}</span>;
+          return (
+            <span className="money">{min === max ? formatINR(min) : `${formatINR(min)} – ${formatINR(max)}`}</span>
+          );
         },
       },
-      { accessorKey: "activated_at", header: "Activated", meta: { hideOnMobile: true }, cell: ({ row }) => <span className="money text-ink-muted">{row.original.activated_at ? formatDate(row.original.activated_at) : "—"}</span> },
+      {
+        accessorKey: "activated_at",
+        header: "Activated",
+        meta: { hideOnMobile: true },
+        cell: ({ row }) => (
+          <span className="money text-ink-muted">
+            {row.original.activated_at ? formatDate(row.original.activated_at) : "—"}
+          </span>
+        ),
+      },
       {
         id: "actions",
         header: "",
@@ -125,12 +183,24 @@ export default function RateCardsOverviewPage() {
           return (
             <span className="flex items-center justify-end gap-1">
               {card.status === "DRAFT" && (
-                <Button size="xs" variant="gold" leftIcon={CheckCircle2} onClick={() => setActivateTarget(card)} data-testid={`rate-card-activate-${card.id}`}>
+                <Button
+                  size="xs"
+                  variant="gold"
+                  leftIcon={CheckCircle2}
+                  onClick={() => setActivateTarget(card)}
+                  data-testid={`rate-card-activate-${card.id}`}
+                >
                   Activate
                 </Button>
               )}
               {card.status === "ACTIVE" && (
-                <Button size="xs" variant="outline" leftIcon={Zap} onClick={() => void openApply(card)} data-testid={`rate-card-apply-${card.id}`}>
+                <Button
+                  size="xs"
+                  variant="outline"
+                  leftIcon={Zap}
+                  onClick={() => void openApply(card)}
+                  data-testid={`rate-card-apply-${card.id}`}
+                >
                   Apply
                 </Button>
               )}
@@ -140,11 +210,15 @@ export default function RateCardsOverviewPage() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   {card.status === "DRAFT" && (
-                    <DropdownMenuItem onSelect={() => setSheet({ open: true, projectId: card.project_id, row: card, clone: null })}>
+                    <DropdownMenuItem
+                      onSelect={() => setSheet({ open: true, projectId: card.project_id, row: card, clone: null })}
+                    >
                       <Pencil /> Edit draft
                     </DropdownMenuItem>
                   )}
-                  <DropdownMenuItem onSelect={() => setSheet({ open: true, projectId: card.project_id, row: null, clone: card })}>
+                  <DropdownMenuItem
+                    onSelect={() => setSheet({ open: true, projectId: card.project_id, row: null, clone: card })}
+                  >
                     <Copy /> Duplicate as draft
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
@@ -164,7 +238,11 @@ export default function RateCardsOverviewPage() {
   );
 
   const activeCount = (query.data?.items ?? []).filter((card) => card.status === "ACTIVE").length;
-  const activeFor = activateTarget ? (query.data?.items ?? []).find((card) => card.project_id === activateTarget.project_id && card.status === "ACTIVE") : null;
+  const activeFor = activateTarget
+    ? (query.data?.items ?? []).find(
+        (card) => card.project_id === activateTarget.project_id && card.status === "ACTIVE",
+      )
+    : null;
 
   return (
     <>
@@ -186,15 +264,43 @@ export default function RateCardsOverviewPage() {
         searchPlaceholder="Search rate cards…"
         filters={
           <>
-            <Combobox aria-label="Project" size="sm" className="w-full sm:w-48" value={list.filters.project_id ?? null} onValueChange={(value) => list.setFilter("project_id", value)} options={(projects.data ?? []).map((project) => ({ value: project.id, label: project.name, description: project.code ?? undefined }))} placeholder="All projects" allowClear data-testid="rate-cards-filter-project" />
-            <Select aria-label="Status" size="sm" className="w-full sm:w-36" value={list.filters.status ?? null} onValueChange={(value) => list.setFilter("status", value)} options={RATE_CARD_STATUSES.map((value) => ({ value, label: RATE_CARD_STATUS_LABELS[value] }))} placeholder="Any status" allowClear data-testid="rate-cards-filter-status" />
+            <Combobox
+              aria-label="Project"
+              size="sm"
+              className="w-full sm:w-48"
+              value={list.filters.project_id ?? null}
+              onValueChange={(value) => list.setFilter("project_id", value)}
+              options={(projects.data ?? []).map((project) => ({
+                value: project.id,
+                label: project.name,
+                description: project.code ?? undefined,
+              }))}
+              placeholder="All projects"
+              allowClear
+              data-testid="rate-cards-filter-project"
+            />
+            <Select
+              aria-label="Status"
+              size="sm"
+              className="w-full sm:w-36"
+              value={list.filters.status ?? null}
+              onValueChange={(value) => list.setFilter("status", value)}
+              options={RATE_CARD_STATUSES.map((value) => ({ value, label: RATE_CARD_STATUS_LABELS[value] }))}
+              placeholder="Any status"
+              allowClear
+              data-testid="rate-cards-filter-status"
+            />
           </>
         }
         hasActiveFilters={list.hasActiveFilters}
         onClearFilters={list.reset}
         exportSource={{ path: RATE_CARDS_PATH, params: list.params, filename: "rate-cards.csv" }}
         exportTotal={query.data?.total}
-        summary={query.data ? `${formatNumber(query.data.total)} cards · ${formatNumber(activeCount)} active on this page` : undefined}
+        summary={
+          query.data
+            ? `${formatNumber(query.data.total)} cards · ${formatNumber(activeCount)} active on this page`
+            : undefined
+        }
       />
       <DataTable
         columns={columns}
@@ -206,12 +312,36 @@ export default function RateCardsOverviewPage() {
         sort={list.sort}
         onSortChange={list.setSort}
         rowClassName={(row) => (row.status === "ACTIVE" ? "[&>td]:bg-gold-light/30" : undefined)}
-        pagination={{ page: list.page, pageSize: list.pageSize, total: query.data?.total ?? 0, onPageChange: list.setPage, onPageSizeChange: list.setPageSize }}
-        emptyState={{ icon: Tags, title: "No rate cards yet", description: "Create a draft per project with rates per flat type, then activate it to price the inventory.", action: canWrite ? <Button leftIcon={Plus} onClick={() => openNew(null)}>New rate card</Button> : undefined }}
+        pagination={{
+          page: list.page,
+          pageSize: list.pageSize,
+          total: query.data?.total ?? 0,
+          onPageChange: list.setPage,
+          onPageSizeChange: list.setPageSize,
+        }}
+        emptyState={{
+          icon: Tags,
+          title: "No rate cards yet",
+          description: "Create a draft per project with rates per flat type, then activate it to price the inventory.",
+          action: canWrite ? (
+            <Button leftIcon={Plus} onClick={() => openNew(null)}>
+              New rate card
+            </Button>
+          ) : undefined,
+        }}
         data-testid="rate-cards-table"
       />
 
-      {sheet.projectId && <RateCardFormSheet key={`${sheet.projectId}-${sheet.row?.id ?? "new"}`} projectId={sheet.projectId} open={sheet.open} onOpenChange={(open) => setSheet((state) => ({ ...state, open }))} rateCard={sheet.row} cloneFrom={sheet.clone} />}
+      {sheet.projectId && (
+        <RateCardFormSheet
+          key={`${sheet.projectId}-${sheet.row?.id ?? "new"}`}
+          projectId={sheet.projectId}
+          open={sheet.open}
+          onOpenChange={(open) => setSheet((state) => ({ ...state, open }))}
+          rateCard={sheet.row}
+          cloneFrom={sheet.clone}
+        />
+      )}
 
       <ConfirmDialog
         open={newProject !== null}
@@ -226,7 +356,22 @@ export default function RateCardsOverviewPage() {
           }
         }}
       >
-        {projects.isPending ? <Skeleton className="h-9" /> : <Combobox aria-label="Project" value={newProject || null} onValueChange={(value) => setNewProject(value ?? "")} options={(projects.data ?? []).map((project) => ({ value: project.id, label: project.name, description: project.code ?? undefined }))} placeholder="Pick a project" data-testid="rate-card-new-project" />}
+        {projects.isPending ? (
+          <Skeleton className="h-9" />
+        ) : (
+          <Combobox
+            aria-label="Project"
+            value={newProject || null}
+            onValueChange={(value) => setNewProject(value ?? "")}
+            options={(projects.data ?? []).map((project) => ({
+              value: project.id,
+              label: project.name,
+              description: project.code ?? undefined,
+            }))}
+            placeholder="Pick a project"
+            data-testid="rate-card-new-project"
+          />
+        )}
         {newProject === "" && <p className="mt-2 text-xs text-ink-subtle">Pick a project to continue.</p>}
       </ConfirmDialog>
 
@@ -234,7 +379,11 @@ export default function RateCardsOverviewPage() {
         open={activateTarget !== null}
         onOpenChange={(open) => !open && setActivateTarget(null)}
         title="Activate this rate card?"
-        description={activateTarget ? `"${activateTarget.name}" becomes the only Active card for ${projectName.get(activateTarget.project_id) ?? "its project"}${activeFor ? ` and supersedes "${activeFor.name}"` : ""}. Available flats are re-priced; Hold, Booked and Sold flats keep their price.` : undefined}
+        description={
+          activateTarget
+            ? `"${activateTarget.name}" becomes the only Active card for ${projectName.get(activateTarget.project_id) ?? "its project"}${activeFor ? ` and supersedes "${activeFor.name}"` : ""}. Available flats are re-priced; Hold, Booked and Sold flats keep their price.`
+            : undefined
+        }
         confirmLabel="Activate"
         onConfirm={async () => {
           if (activateTarget) await activate.mutateAsync(activateTarget);
@@ -245,7 +394,11 @@ export default function RateCardsOverviewPage() {
         open={apply !== null}
         onOpenChange={(open) => !open && setApply(null)}
         title="Apply rate card to the project?"
-        description={apply ? `Re-prices Available flats with "${apply.card.name}". Flats on Hold, Booked or Sold are never touched.` : undefined}
+        description={
+          apply
+            ? `Re-prices Available flats with "${apply.card.name}". Flats on Hold, Booked or Sold are never touched.`
+            : undefined
+        }
         confirmLabel={apply?.preview ? `Re-price ${formatNumber(apply.preview.repriced)} flats` : "Apply"}
         onConfirm={async () => {
           if (apply) await applyMutation.mutateAsync(apply.card);
@@ -268,9 +421,15 @@ export default function RateCardsOverviewPage() {
             </div>
           </dl>
         )}
-        {apply && !apply.loading && !apply.preview && <Notice tone="warning">Could not preview the count; applying will still only touch Available flats.</Notice>}
+        {apply && !apply.loading && !apply.preview && (
+          <Notice tone="warning">Could not preview the count; applying will still only touch Available flats.</Notice>
+        )}
       </ConfirmDialog>
-      {!canWrite && query.data && query.data.total > 0 && <p className="mt-3 text-xs text-ink-subtle">Viewing only — creating, activating and applying rate cards needs the “rate_card.write” permission.</p>}
+      {!canWrite && query.data && query.data.total > 0 && (
+        <p className="mt-3 text-xs text-ink-subtle">
+          Viewing only — creating, activating and applying rate cards needs the “rate_card.write” permission.
+        </p>
+      )}
     </>
   );
 }

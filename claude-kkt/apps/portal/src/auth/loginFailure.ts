@@ -16,19 +16,27 @@ const GENERIC = "Something went wrong. Please try again.";
 export function toLoginFailure(e: unknown): LoginFailure {
   if (e instanceof ApiError) {
     // a 401 without a usable code (proxy / non-envelope body) is still a failed sign-in
-    if (e.code === "INVALID_CREDENTIALS" || (e.status === 401 && (e.code === "UNKNOWN" || e.code === "UNAUTHENTICATED"))) {
+    if (
+      e.code === "INVALID_CREDENTIALS" ||
+      (e.status === 401 && (e.code === "UNKNOWN" || e.code === "UNAUTHENTICATED"))
+    ) {
       return { code: "INVALID_CREDENTIALS", message: INVALID_CREDENTIALS_COPY };
     }
     if (e.code === "LOCKED" || e.status === 423) {
       const lockedUntil = typeof e.details.locked_until === "string" ? e.details.locked_until : undefined;
-      return { code: "LOCKED", message: e.message || "Too many failed attempts. Your account is locked for a while.", lockedUntil };
+      return {
+        code: "LOCKED",
+        message: e.message || "Too many failed attempts. Your account is locked for a while.",
+        lockedUntil,
+      };
     }
     if (e.code === "RATE_LIMITED" || e.status === 429) {
       // also returned when parallel attempts exceed the lockout budget (security track): a fixed, calm message
       const wait = e.retryAfterSeconds ? `Try again in ${e.retryAfterSeconds} seconds.` : "Try again in a moment.";
       return { code: "RATE_LIMITED", message: `Too many attempts. ${wait}`, retryAfterSeconds: e.retryAfterSeconds };
     }
-    if (e.code === "VALIDATION_ERROR") return { code: "VALIDATION", message: "Enter a valid 10-digit mobile number and your password." };
+    if (e.code === "VALIDATION_ERROR")
+      return { code: "VALIDATION", message: "Enter a valid 10-digit mobile number and your password." };
     if (e.isNetwork) return { code: "NETWORK", message: e.message };
     return { code: "OTHER", message: e.message || GENERIC };
   }

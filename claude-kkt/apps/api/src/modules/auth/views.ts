@@ -12,7 +12,9 @@ export async function authUserView(db: Executor, userId: string): Promise<AuthUs
       roleName: roles.name,
       isSystem: roles.isSystem,
       permissions: roles.permissions,
-      projectIds: sql<string[]>`coalesce((select array_agg(${userProjectScopes.projectId}) from ${userProjectScopes} where ${userProjectScopes.userId} = ${users.id}), '{}'::uuid[])`,
+      projectIds: sql<
+        string[]
+      >`coalesce((select array_agg(${userProjectScopes.projectId}) from ${userProjectScopes} where ${userProjectScopes.userId} = ${users.id}), '{}'::uuid[])`,
     })
     .from(users)
     .innerJoin(roles, eq(roles.id, users.roleId))

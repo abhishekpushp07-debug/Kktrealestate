@@ -11,9 +11,21 @@ export function ProjectAdminDashboard({ data }: { data: ProjectAdminDashboardRes
   return (
     <div className="space-y-4" data-testid="project-admin-dashboard">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Projects in scope" value={formatNumber(data.projects.length)} hint={`${formatNumber(data.projects.reduce((sum, project) => sum + project.available, 0))} flats available`} icon={Building2} tone="navy" />
+        <StatCard
+          label="Projects in scope"
+          value={formatNumber(data.projects.length)}
+          hint={`${formatNumber(data.projects.reduce((sum, project) => sum + project.available, 0))} flats available`}
+          icon={Building2}
+          tone="navy"
+        />
         <StatCard label="Bookings this month" value={formatNumber(data.bookings_this_month)} icon={CalendarClock} />
-        <StatCard label="Demands raised this month" value={formatINRShort(data.demands_raised_this_month.amount_paise)} hint={`${formatNumber(data.demands_raised_this_month.count)} demands`} icon={ReceiptText} tone="gold" />
+        <StatCard
+          label="Demands raised this month"
+          value={formatINRShort(data.demands_raised_this_month.amount_paise)}
+          hint={`${formatNumber(data.demands_raised_this_month.count)} demands`}
+          icon={ReceiptText}
+          tone="gold"
+        />
         <StatCard label="Open tickets" value={formatNumber(data.open_tickets)} icon={LifeBuoy} />
       </div>
 
@@ -24,7 +36,17 @@ export function ProjectAdminDashboard({ data }: { data: ProjectAdminDashboardRes
           ) : (
             <div className="divide-y divide-border">
               {data.construction.map((tower) => (
-                <ProgressRow key={tower.block_id} label={<Link to={`/blocks/${tower.block_id}?tab=construction`} className="hover:underline">{tower.project_name} · {tower.block_name}</Link>} sublabel={`${tower.current_stage ?? "Not started"}${tower.next_stage ? ` → next: ${tower.next_stage}` : ""}`} percent={tower.percent} tone="gold" />
+                <ProgressRow
+                  key={tower.block_id}
+                  label={
+                    <Link to={`/blocks/${tower.block_id}?tab=construction`} className="hover:underline">
+                      {tower.project_name} · {tower.block_name}
+                    </Link>
+                  }
+                  sublabel={`${tower.current_stage ?? "Not started"}${tower.next_stage ? ` → next: ${tower.next_stage}` : ""}`}
+                  percent={tower.percent}
+                  tone="gold"
+                />
               ))}
             </div>
           )}
@@ -67,10 +89,34 @@ export function ProjectAdminDashboard({ data }: { data: ProjectAdminDashboardRes
           rowKey={(row, index) => `${row.block_id}-${row.stage_name}-${index}`}
           empty="No upcoming stages"
           columns={[
-            { key: "tower", label: "Tower", cell: (row) => <Link to={`/blocks/${row.block_id}?tab=construction`} className="font-medium hover:underline">{row.block_name}</Link> },
+            {
+              key: "tower",
+              label: "Tower",
+              cell: (row) => (
+                <Link to={`/blocks/${row.block_id}?tab=construction`} className="font-medium hover:underline">
+                  {row.block_name}
+                </Link>
+              ),
+            },
             { key: "stage", label: "Next stage", cell: (row) => row.stage_name },
-            { key: "bookings", label: "Active bookings", align: "right", cell: (row) => <Badge variant="navy" numeric>{formatNumber(row.active_bookings)}</Badge> },
-            { key: "amount", label: "Installments to raise", align: "right", cell: (row) => <span className="font-semibold text-navy-950">{formatINR(row.installment_total_paise)}</span> },
+            {
+              key: "bookings",
+              label: "Active bookings",
+              align: "right",
+              cell: (row) => (
+                <Badge variant="navy" numeric>
+                  {formatNumber(row.active_bookings)}
+                </Badge>
+              ),
+            },
+            {
+              key: "amount",
+              label: "Installments to raise",
+              align: "right",
+              cell: (row) => (
+                <span className="font-semibold text-navy-950">{formatINR(row.installment_total_paise)}</span>
+              ),
+            },
           ]}
         />
       </Widget>

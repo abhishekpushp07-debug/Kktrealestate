@@ -1,6 +1,7 @@
 ## Platform reliability track: report
 
 All 11 items are done and each has tests. Every suite I ran passes:
+
 - **API unit + integration:** 55 files, 619 tests (all serial, `kkt_h3`, Redis 18).
 - **Acceptance:** 13 files, 55 tests (`kkt_h3_acc`).
 - **Contracts:** 183 tests.
@@ -10,6 +11,7 @@ All 11 items are done and each has tests. Every suite I ran passes:
 All paths below are under `/home/user/Kktrealestate/claude-kkt`. Nothing is committed.
 
 ### What changed, by item
+
 1. **Standalone worker runs real handlers.**
    - `src/worker.ts` builds the full app without listening, then consumes the queue. It shuts down cleanly on SIGTERM.
    - `startWorker()` accepts the app, a DB handle, or an options object, so `server.ts`'s `startWorker(app.db)` call still works.
@@ -39,17 +41,18 @@ All paths below are under `/home/user/Kktrealestate/claude-kkt`. Nothing is comm
 6. **Redis.** `plugins/redis.ts` adds `app.redisSecurity` (its own client when `REDIS_SECURITY_URL` is set, otherwise the main client) and `app.jobQueue()`. BullMQ uses the main `REDIS_URL`. Rate limiting already failed open in `auth.ts` (security track); a test now confirms requests keep working with Redis down.
 7. **Database error mapping** (`lib/errors.ts`):
 
-| Database error | Response |
-|---|---|
-| 57014 (statement timeout) | 503 `SERVICE_UNAVAILABLE`, `Retry-After: 5` |
-| Connection or pool failure (class 08, 53300, 57P0x, connect timeout, refused or reset socket) | 503, `Retry-After: 5` |
-| 55P03 (lock timeout) | 409 `LOCK_TIMEOUT`, `Retry-After: 1` |
-| 40001 / 40P01 (serialization failure or deadlock) | 409 `CONFLICT_RETRY` |
+| Database error                                                                                | Response                                    |
+| --------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| 57014 (statement timeout)                                                                     | 503 `SERVICE_UNAVAILABLE`, `Retry-After: 5` |
+| Connection or pool failure (class 08, 53300, 57P0x, connect timeout, refused or reset socket) | 503, `Retry-After: 5`                       |
+| 55P03 (lock timeout)                                                                          | 409 `LOCK_TIMEOUT`, `Retry-After: 1`        |
+| 40001 / 40P01 (serialization failure or deadlock)                                             | 409 `CONFLICT_RETRY`                        |
 
-   All of these carry `details.retryable: true`.
-8. **CSV exports** (`lib/list.ts`, `modules/documents/exports.ts`).
-   - Every CSV list now sends `X-Export-Total` and `X-Export-Rows`, plus `X-Export-Truncated: true` when it was cut at 10,000 rows.
-   - The async export API pages through every row. The job calls the route in-process as the requesting user, using the `X-Export-Cursor` → `X-Export-Next-Cursor` handshake. Contract shapes are in the frontend section below.
+All of these carry `details.retryable: true`. 8. **CSV exports** (`lib/list.ts`, `modules/documents/exports.ts`).
+
+- Every CSV list now sends `X-Export-Total` and `X-Export-Rows`, plus `X-Export-Truncated: true` when it was cut at 10,000 rows.
+- The async export API pages through every row. The job calls the route in-process as the requesting user, using the `X-Export-Cursor` → `X-Export-Next-Cursor` handshake. Contract shapes are in the frontend section below.
+
 9. **Backup and restore.**
    - `POST /admin/backup` now returns 202 and enqueues `BACKUP_EXPORT`.
    - The job reads every table in one repeatable-read snapshot, through a cursor in batches of 5,000 with no row cap. It writes NDJSON per table into a ZIP (archiver) on disk, then to storage. `manifest.json` has row counts, schema version, sha256 per file and the FK load order. Format is `kkt-backup/2`.
@@ -68,6 +71,7 @@ All paths below are under `/home/user/Kktrealestate/claude-kkt`. Nothing is comm
     - `PARTITION_MAINTENANCE` is registered but only runs when `PARTITIONING_ENABLED=true`.
 
 ### Tests
+
 - **New files:**
   - `test/unit/jobs.test.ts`: registry, schedules, backoff, IST dues slot, deploy id, webhook against a real HTTP server.
   - `test/integration/platform.test.ts`: covers items 1–7 and 10 plus the sweep:
@@ -83,6 +87,7 @@ All paths below are under `/home/user/Kktrealestate/claude-kkt`. Nothing is comm
 - **Updated:** `admin.test.ts`, `admin-adversarial.test.ts`, `documents.test.ts` (PATCH requests now send a version).
 
 ### Decisions and deviations
+
 - **Edits outside my ownership:**
   - `enums.ts`: besides `JOB_NAMES` and its labels, I appended `JOB_FAILED` and `EXPORT_READY` to `NOTIFICATION_TYPES`. Without them the bell's response schema would reject these notifications. All targeted edits.
   - `errors.ts`: added `VERSION_REQUIRED` (400), `LOCK_TIMEOUT` (409), `CONFLICT_RETRY` (409), `EXPORT_NOT_READY` (409).
@@ -99,6 +104,7 @@ All paths below are under `/home/user/Kktrealestate/claude-kkt`. Nothing is comm
 - **One accidental run on another database:** one `platform.test.ts` run went out without my env exported. It truncated the default `kkt_api_test` database and flushed Redis db 1. Anyone using those defaults should reseed.
 
 ### What other tracks and the integration stage need to do
+
 - **Deploy track:**
   - Add `src/cli/restore.ts` to the `tsup` entries.
   - Pass `app` to `startWorker` in `server.ts`. Today it falls back to the bound app, which works.
@@ -108,21 +114,21 @@ All paths below are under `/home/user/Kktrealestate/claude-kkt`. Nothing is comm
   - `docs/RESTORE.md` (theirs) already matches the CLI.
 - **Frontend contracts (all in `contracts/modules/admin.ts`):**
 
-| Endpoint | Request | Response |
-|---|---|---|
-| `POST /exports` | `ExportCreateRequestSchema` `{path: "/api/v1/…", query: Record<string, string\|number\|boolean\|string[]>}` | 202 `ExportRowSchema` `{id, path, query, status, row_count, file_name, error, created_at, finished_at, expires_at}` |
-| `GET /exports` | `ExportFilterSchema` (`status`) | list envelope of export rows |
-| `GET /exports/:id` | — | export row |
-| `POST /exports/:id/link` | — | `{download_url, expires_at, file_name, row_count}` |
-| `POST /admin/backup` | `{include_sensitive}` | 202 `AdminBackupRowSchema` `{id, status, file_name, size_bytes, generated_at, finished_at, storage_expires_at, include_sensitive, table_count, row_count, generated_by, error, run_id}` |
-| `GET /admin/backups` | — | `{items: AdminBackupRow[]}` |
-| `POST /admin/backups/:id/link` | — | `{download_url, expires_at, file_name, size_bytes}` |
-| `GET /admin/jobs` | — | each job adds `schedule_enabled, last_success, failure_count_24h, failures_since_success, next_run_at` |
-| `POST /admin/jobs/:name/run` | — | 202 `AdminJobEnqueuedResponseSchema` |
+| Endpoint                       | Request                                                                                                     | Response                                                                                                                                                                                |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /exports`                | `ExportCreateRequestSchema` `{path: "/api/v1/…", query: Record<string, string\|number\|boolean\|string[]>}` | 202 `ExportRowSchema` `{id, path, query, status, row_count, file_name, error, created_at, finished_at, expires_at}`                                                                     |
+| `GET /exports`                 | `ExportFilterSchema` (`status`)                                                                             | list envelope of export rows                                                                                                                                                            |
+| `GET /exports/:id`             | —                                                                                                           | export row                                                                                                                                                                              |
+| `POST /exports/:id/link`       | —                                                                                                           | `{download_url, expires_at, file_name, row_count}`                                                                                                                                      |
+| `POST /admin/backup`           | `{include_sensitive}`                                                                                       | 202 `AdminBackupRowSchema` `{id, status, file_name, size_bytes, generated_at, finished_at, storage_expires_at, include_sensitive, table_count, row_count, generated_by, error, run_id}` |
+| `GET /admin/backups`           | —                                                                                                           | `{items: AdminBackupRow[]}`                                                                                                                                                             |
+| `POST /admin/backups/:id/link` | —                                                                                                           | `{download_url, expires_at, file_name, size_bytes}`                                                                                                                                     |
+| `GET /admin/jobs`              | —                                                                                                           | each job adds `schedule_enabled, last_success, failure_count_24h, failures_since_success, next_run_at`                                                                                  |
+| `POST /admin/jobs/:name/run`   | —                                                                                                           | 202 `AdminJobEnqueuedResponseSchema`                                                                                                                                                    |
 
-  - Export query keys `page`, `page_size`, `cursor`, `limit`, `format` and `exact` are reserved (400).
-  - Link endpoints return 409 `EXPORT_NOT_READY` before the export or backup is DONE.
-  - The new bell types are `JOB_FAILED` (link `/admin/jobs`) and `EXPORT_READY` (link `/exports` or `/admin/backups`).
+- Export query keys `page`, `page_size`, `cursor`, `limit`, `format` and `exact` are reserved (400).
+- Link endpoints return 409 `EXPORT_NOT_READY` before the export or backup is DONE.
+- The new bell types are `JOB_FAILED` (link `/admin/jobs`) and `EXPORT_READY` (link `/exports` or `/admin/backups`).
 - **ERP fixes:**
   - Send a version on the construction-photo toggle and the plan-assignment edit, then empty `VERSION_POLICY_EXEMPT`.
   - Fix `CoApplicantsCard`: it sends no version, so that PATCH already fails today.

@@ -120,7 +120,10 @@ export const PincodeSchema = z.string().regex(/^[1-9][0-9]{5}$/, "Invalid PIN co
 export type Pincode = z.infer<typeof PincodeSchema>;
 
 /** Bank account number: 9–18 digits. */
-export const BankAccountNumberSchema = z.preprocess(stripSpaces, z.string().regex(/^\d{9,18}$/, "Invalid account number"));
+export const BankAccountNumberSchema = z.preprocess(
+  stripSpaces,
+  z.string().regex(/^\d{9,18}$/, "Invalid account number"),
+);
 export type BankAccountNumber = z.infer<typeof BankAccountNumberSchema>;
 
 /** URL slug: lower-case letters, digits and single hyphens. */
@@ -259,7 +262,9 @@ export const MasterRowSchema = AuditedRowSchema.extend(ActiveRowSchema.shape);
 export type MasterRow = z.infer<typeof MasterRowSchema>;
 
 /** The shape of an Update schema: every field of the Create shape, optional and WITHOUT its create-time default. */
-export type UpdateShape<T extends z.ZodRawShape> = { [K in keyof T]: z.ZodOptional<T[K] extends z.ZodDefault<infer Inner extends z.ZodType> ? Inner : T[K]> };
+export type UpdateShape<T extends z.ZodRawShape> = {
+  [K in keyof T]: z.ZodOptional<T[K] extends z.ZodDefault<infer Inner extends z.ZodType> ? Inner : T[K]>;
+};
 
 /**
  * Makes the Update schema for a Create schema: all fields optional plus `version`.

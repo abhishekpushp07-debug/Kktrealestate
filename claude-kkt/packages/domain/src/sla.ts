@@ -14,7 +14,11 @@ export type SlaHours = Readonly<Record<Priority, number>>;
 export const DEFAULT_SLA_HOURS: SlaHours = { LOW: 72, MEDIUM: 48, HIGH: 24, URGENT: 8 };
 
 /** SLA deadline (RFC 3339 UTC) = created instant + the priority's hours. */
-export function slaDueAt(createdAtISO: string | Date, priority: Priority, slaHours: SlaHours = DEFAULT_SLA_HOURS): string {
+export function slaDueAt(
+  createdAtISO: string | Date,
+  priority: Priority,
+  slaHours: SlaHours = DEFAULT_SLA_HOURS,
+): string {
   const hours = slaHours[priority];
   if (!Number.isFinite(hours) || hours < 0) {
     throw new Error(`Invalid SLA hours for ${priority}: ${String(hours)}`);

@@ -35,17 +35,34 @@ export function effectiveConfig(c: Env, extra: { workers: number; role: string }
     database_replica: redactUrl(c.DATABASE_REPLICA_URL),
     database_pool_max: c.DATABASE_POOL_MAX,
     database_prepare: (process.env["DATABASE_PREPARE"] ?? "true").toLowerCase() !== "false",
-    db_timeouts_ms: { statement: c.DB_STATEMENT_TIMEOUT_MS, lock: c.DB_LOCK_TIMEOUT_MS, idle_in_tx: c.DB_IDLE_IN_TX_TIMEOUT_MS, connect: c.DB_CONNECT_TIMEOUT_S * 1000 },
+    db_timeouts_ms: {
+      statement: c.DB_STATEMENT_TIMEOUT_MS,
+      lock: c.DB_LOCK_TIMEOUT_MS,
+      idle_in_tx: c.DB_IDLE_IN_TX_TIMEOUT_MS,
+      connect: c.DB_CONNECT_TIMEOUT_S * 1000,
+    },
     redis: redactUrl(c.REDIS_URL),
     redis_security: redactUrl(c.REDIS_SECURITY_URL),
-    storage: c.STORAGE_DRIVER === "s3"
-      ? { driver: "s3", bucket: c.S3_BUCKET, region: c.S3_REGION, endpoint: redactUrl(c.S3_ENDPOINT), static_keys: Boolean(c.S3_ACCESS_KEY) }
-      : { driver: "local", dir: c.STORAGE_LOCAL_DIR },
+    storage:
+      c.STORAGE_DRIVER === "s3"
+        ? {
+            driver: "s3",
+            bucket: c.S3_BUCKET,
+            region: c.S3_REGION,
+            endpoint: redactUrl(c.S3_ENDPOINT),
+            static_keys: Boolean(c.S3_ACCESS_KEY),
+          }
+        : { driver: "local", dir: c.STORAGE_LOCAL_DIR },
     origins: { erp: c.ERP_ORIGIN, web: c.WEB_ORIGIN, portal: c.PORTAL_ORIGIN },
     trust_proxy: c.TRUST_PROXY,
     rate_limits_per_min: { public: c.PUBLIC_RATE_LIMIT_PER_MIN, writes: c.WRITE_RATE_LIMIT_PER_MIN },
     max_inflight: c.API_MAX_INFLIGHT,
-    tokens: { access_minutes: c.ACCESS_TOKEN_MINUTES, refresh_days: c.REFRESH_TOKEN_DAYS, previous_jwt_secrets: c.JWT_PREVIOUS_SECRETS.length, field_keys: c.FIELD_KEY_RING.length },
+    tokens: {
+      access_minutes: c.ACCESS_TOKEN_MINUTES,
+      refresh_days: c.REFRESH_TOKEN_DAYS,
+      previous_jwt_secrets: c.JWT_PREVIOUS_SECRETS.length,
+      field_keys: c.FIELD_KEY_RING.length,
+    },
     observability: {
       metrics_port: c.METRICS_PORT,
       metrics_token: c.METRICS_TOKEN ? "set" : "unset",

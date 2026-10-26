@@ -56,12 +56,24 @@ export function UsageDialog({ config, row, open, onOpenChange, preset = null, bl
           <Skeleton className="h-4 w-3/4" />
         </div>
       )}
-      {preset === null && query.isError && <ErrorState compact error={query.error} onRetry={() => void query.refetch()} />}
-      {usage && usage.usage_count === 0 && <EmptyState compact icon={Link2} title="Not referenced anywhere" description={`This ${config.singular.toLowerCase()} can be deactivated safely.`} />}
+      {preset === null && query.isError && (
+        <ErrorState compact error={query.error} onRetry={() => void query.refetch()} />
+      )}
+      {usage && usage.usage_count === 0 && (
+        <EmptyState
+          compact
+          icon={Link2}
+          title="Not referenced anywhere"
+          description={`This ${config.singular.toLowerCase()} can be deactivated safely.`}
+        />
+      )}
       {usage && usage.usage_count > 0 && (
         <div className="space-y-3">
           <p className="money font-display text-3xl font-extrabold text-navy-950">
-            {formatNumber(usage.usage_count)} <span className="text-base font-semibold text-ink-muted">reference{usage.usage_count === 1 ? "" : "s"}</span>
+            {formatNumber(usage.usage_count)}{" "}
+            <span className="text-base font-semibold text-ink-muted">
+              reference{usage.usage_count === 1 ? "" : "s"}
+            </span>
           </p>
           {usage.used_by.length > 0 && (
             <ul className="divide-y divide-border rounded-md border border-border">

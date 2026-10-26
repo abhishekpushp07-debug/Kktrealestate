@@ -41,7 +41,10 @@ const ident = (name: string) => sql.raw(`"${name.replace(/"/g, "")}"`);
 /** SQL condition: some encrypted value of the row was written under another key id. */
 function staleCondition(t: EncryptedTarget, kid: string) {
   const parts = t.columns.map((c) => sql`(${ident(c)} is not null and split_part(${ident(c)}, '.', 1) <> ${kid})`);
-  if (t.jsonb) parts.push(sql`(${ident(t.jsonb.column)} ->> ${t.jsonb.key} is not null and split_part(${ident(t.jsonb.column)} ->> ${t.jsonb.key}, '.', 1) <> ${kid})`);
+  if (t.jsonb)
+    parts.push(
+      sql`(${ident(t.jsonb.column)} ->> ${t.jsonb.key} is not null and split_part(${ident(t.jsonb.column)} ->> ${t.jsonb.key}, '.', 1) <> ${kid})`,
+    );
   return sql.join(parts, sql` or `);
 }
 
@@ -57,14 +60,19 @@ export async function countStaleCiphertexts(db: Executor): Promise<number> {
   const kid = activeFieldKeyId();
   let n = 0;
   for (const t of ENCRYPTED_TARGETS) {
-    const rows = await db.execute<{ n: number | string }>(sql`select count(*)::int as n from ${ident(t.table)} where ${staleCondition(t, kid)}`);
+    const rows = await db.execute<{ n: number | string }>(
+      sql`select count(*)::int as n from ${ident(t.table)} where ${staleCondition(t, kid)}`,
+    );
     n += Number(rows[0]?.n ?? 0);
   }
   return n;
 }
 
 /** Re-encrypts every stale ciphertext in batches of `batchSize` rows (one short transaction per batch). */
-export async function reencryptFields(db: Executor & { transaction: <T>(fn: (tx: Executor) => Promise<T>) => Promise<T> }, opts: { batchSize?: number } = {}): Promise<ReencryptResult> {
+export async function reencryptFields(
+  db: Executor & { transaction: <T>(fn: (tx: Executor) => Promise<T>) => Promise<T> },
+  opts: { batchSize?: number } = {},
+): Promise<ReencryptResult> {
   const kid = activeFieldKeyId();
   const batchSize = Math.min(Math.max(opts.batchSize ?? 200, 1), 5000);
   const updated: Record<string, number> = {};
@@ -88,12 +96,22 @@ export async function reencryptFields(db: Executor & { transaction: <T>(fn: (tx:
             if (t.jsonb) {
               const doc = row[t.jsonb.column] as Record<string, unknown> | null;
               const value = doc ? doc[t.jsonb.key] : null;
-              if (doc && typeof value === "string") sets.push(sql`${ident(t.jsonb.column)} = ${JSON.stringify({ ...doc, [t.jsonb.key]: reencryptField(value) })}::jsonb`);
+              if (doc && typeof value === "string")
+                sets.push(
+                  sql`${ident(t.jsonb.column)} = ${JSON.stringify({ ...doc, [t.jsonb.key]: reencryptField(value) })}::jsonb`,
+                );
             }
             // Compare-and-set: a value a user changed after the batch was read is left alone (never overwritten with the old secret).
-            const guards = t.columns.map((c) => sql`${ident(c)} is not distinct from ${(row[c] as string | null) ?? null}`);
-            if (t.jsonb) guards.push(sql`${ident(t.jsonb.column)} ->> ${t.jsonb.key} is not distinct from ${jsonKey(row[t.jsonb.column], t.jsonb.key)}`);
-            const done = await tx.execute(sql`update ${ident(t.table)} set ${sql.join(sets, sql`, `)} where id = ${row.id}::uuid and ${sql.join(guards, sql` and `)} returning id`);
+            const guards = t.columns.map(
+              (c) => sql`${ident(c)} is not distinct from ${(row[c] as string | null) ?? null}`,
+            );
+            if (t.jsonb)
+              guards.push(
+                sql`${ident(t.jsonb.column)} ->> ${t.jsonb.key} is not distinct from ${jsonKey(row[t.jsonb.column], t.jsonb.key)}`,
+              );
+            const done = await tx.execute(
+              sql`update ${ident(t.table)} set ${sql.join(sets, sql`, `)} where id = ${row.id}::uuid and ${sql.join(guards, sql` and `)} returning id`,
+            );
             if (done.length > 0) updated[t.table]! += 1;
           } catch {
             failed[t.table]! += 1; // key not configured or tampered: left as is and reported
@@ -108,5 +126,7 @@ export async function reencryptFields(db: Executor & { transaction: <T>(fn: (tx:
 
 /** Registers the REENCRYPT_FIELDS job (run on demand after adding a new active key; payload `{ batch_size? }`). */
 export function registerReencryptJob(): void {
-  registerJob("REENCRYPT_FIELDS", async ({ db, data }) => reencryptFields(db, { batchSize: typeof data["batch_size"] === "number" ? data["batch_size"] : undefined }));
+  registerJob("REENCRYPT_FIELDS", async ({ db, data }) =>
+    reencryptFields(db, { batchSize: typeof data["batch_size"] === "number" ? data["batch_size"] : undefined }),
+  );
 }

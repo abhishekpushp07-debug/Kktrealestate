@@ -50,7 +50,11 @@ export function signFileToken(secret: Buffer, id: string, exp: number): string {
 const FILE_TOKEN_RE = /^[A-Za-z0-9_-]{30}\.[A-Za-z0-9_-]{22}$/;
 
 /** File id of a valid, unexpired token; null when malformed, forged or expired (compared whole in constant time). */
-export function verifyFileToken(secret: Buffer, token: string, nowSeconds = Math.floor(Date.now() / 1000)): string | null {
+export function verifyFileToken(
+  secret: Buffer,
+  token: string,
+  nowSeconds = Math.floor(Date.now() / 1000),
+): string | null {
   if (!FILE_TOKEN_RE.test(token)) return null;
   const body = Buffer.from(token.slice(0, token.indexOf(".")), "base64url");
   if (body.length !== 22) return null;

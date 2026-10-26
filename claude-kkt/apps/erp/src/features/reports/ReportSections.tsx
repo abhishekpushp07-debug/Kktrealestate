@@ -2,7 +2,17 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { BarChart3, Table2 } from "lucide-react";
 import { Suspense, useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { Button, Card, CardContent, CardHeader, CardTitle, DataTable, Skeleton, StatCard, type DataTablePagination } from "@/components/ui";
+import {
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  DataTable,
+  Skeleton,
+  StatCard,
+  type DataTablePagination,
+} from "@/components/ui";
 import { formatINR, formatINRShort } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -36,7 +46,19 @@ export interface ReportTableProps<Row> {
 }
 
 /** DataTable with a sticky totals footer; sorting is off (reports come back fully computed). */
-export function ReportTable<Row>({ columns, rows, getRowId, loading = false, emptyTitle = "No rows for these filters", emptyDescription, pagination, density = "compact", maxHeight = "32rem", rowClassName, className }: ReportTableProps<Row>) {
+export function ReportTable<Row>({
+  columns,
+  rows,
+  getRowId,
+  loading = false,
+  emptyTitle = "No rows for these filters",
+  emptyDescription,
+  pagination,
+  density = "compact",
+  maxHeight = "32rem",
+  rowClassName,
+  className,
+}: ReportTableProps<Row>) {
   const defs = useMemo<ColumnDef<Row, unknown>[]>(
     () =>
       columns.map((column, index) => ({
@@ -44,11 +66,30 @@ export function ReportTable<Row>({ columns, rows, getRowId, loading = false, emp
         header: column.header,
         cell: ({ row }) => column.cell(row.original),
         footer: column.footer === undefined ? undefined : () => column.footer,
-        meta: { align: column.align, width: column.width, sortKey: false, hideOnMobile: column.hideOnMobile, locked: index === 0 },
+        meta: {
+          align: column.align,
+          width: column.width,
+          sortKey: false,
+          hideOnMobile: column.hideOnMobile,
+          locked: index === 0,
+        },
       })),
     [columns],
   );
-  return <DataTable columns={defs} data={rows} getRowId={getRowId} loading={loading} density={density} maxHeight={maxHeight} pagination={pagination} rowClassName={rowClassName} emptyState={{ title: emptyTitle, description: emptyDescription }} className={className} />;
+  return (
+    <DataTable
+      columns={defs}
+      data={rows}
+      getRowId={getRowId}
+      loading={loading}
+      density={density}
+      maxHeight={maxHeight}
+      pagination={pagination}
+      rowClassName={rowClassName}
+      emptyState={{ title: emptyTitle, description: emptyDescription }}
+      className={className}
+    />
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -67,7 +108,16 @@ export interface ReportSectionProps {
   "data-testid"?: string;
 }
 
-export function ReportSection({ title, description, chart, defaultView = "chart", actions, children, className, ...rest }: ReportSectionProps) {
+export function ReportSection({
+  title,
+  description,
+  chart,
+  defaultView = "chart",
+  actions,
+  children,
+  className,
+  ...rest
+}: ReportSectionProps) {
   const [view, setView] = useState<"chart" | "table">(chart ? defaultView : "table");
   return (
     <Card className={cn("min-w-0", className)} data-testid={rest["data-testid"]}>
@@ -77,10 +127,24 @@ export function ReportSection({ title, description, chart, defaultView = "chart"
             {actions}
             {chart && (
               <div className="flex items-center rounded-md bg-navy-50 p-0.5" role="group" aria-label="View">
-                <Button size="xs" variant={view === "chart" ? "primary" : "ghost"} leftIcon={BarChart3} onClick={() => setView("chart")} aria-pressed={view === "chart"} className="h-7">
+                <Button
+                  size="xs"
+                  variant={view === "chart" ? "primary" : "ghost"}
+                  leftIcon={BarChart3}
+                  onClick={() => setView("chart")}
+                  aria-pressed={view === "chart"}
+                  className="h-7"
+                >
                   Chart
                 </Button>
-                <Button size="xs" variant={view === "table" ? "primary" : "ghost"} leftIcon={Table2} onClick={() => setView("table")} aria-pressed={view === "table"} className="h-7">
+                <Button
+                  size="xs"
+                  variant={view === "table" ? "primary" : "ghost"}
+                  leftIcon={Table2}
+                  onClick={() => setView("table")}
+                  aria-pressed={view === "table"}
+                  className="h-7"
+                >
                   Table
                 </Button>
               </div>
@@ -91,7 +155,9 @@ export function ReportSection({ title, description, chart, defaultView = "chart"
         <CardTitle className="text-sm">{title}</CardTitle>
         {description && <p className="text-xs text-ink-subtle">{description}</p>}
       </CardHeader>
-      <CardContent className={cn("min-w-0", view === "table" ? "p-0" : "p-3 sm:p-4")}>{view === "chart" && chart ? <Suspense fallback={<Skeleton className="h-64" />}>{chart}</Suspense> : children}</CardContent>
+      <CardContent className={cn("min-w-0", view === "table" ? "p-0" : "p-3 sm:p-4")}>
+        {view === "chart" && chart ? <Suspense fallback={<Skeleton className="h-64" />}>{chart}</Suspense> : children}
+      </CardContent>
     </Card>
   );
 }
@@ -111,7 +177,15 @@ export function StatGrid({ items, loading = false }: { items: readonly StatItem[
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6" data-testid="report-stats">
       {items.map((item) => (
-        <StatCard key={item.label} label={item.label} value={item.value} hint={item.hint} tone={item.tone} loading={loading} className="p-3" />
+        <StatCard
+          key={item.label}
+          label={item.label}
+          value={item.value}
+          hint={item.hint}
+          tone={item.tone}
+          loading={loading}
+          className="p-3"
+        />
       ))}
     </div>
   );
@@ -121,9 +195,23 @@ export function StatGrid({ items, loading = false }: { items: readonly StatItem[
 /* Cells                                                                */
 /* ------------------------------------------------------------------ */
 
-export function Money({ paise, short = false, signed = false, className }: { paise: number | null | undefined; short?: boolean; signed?: boolean; className?: string }) {
+export function Money({
+  paise,
+  short = false,
+  signed = false,
+  className,
+}: {
+  paise: number | null | undefined;
+  short?: boolean;
+  signed?: boolean;
+  className?: string;
+}) {
   const negative = (paise ?? 0) < 0;
-  return <span className={cn("money", negative && "text-success-fg", className)}>{short ? formatINRShort(paise) : formatINR(paise, { signed })}</span>;
+  return (
+    <span className={cn("money", negative && "text-success-fg", className)}>
+      {short ? formatINRShort(paise) : formatINR(paise, { signed })}
+    </span>
+  );
 }
 
 /** Due figures: positive = due (red), negative = advance (green). */
@@ -140,7 +228,11 @@ export function Due({ paise }: { paise: number }) {
 export function BookingRef({ id, number }: { id: string | null; number: string }) {
   if (!id) return <span className="money">{number}</span>;
   return (
-    <Link to={`/bookings/${id}`} className="money font-semibold text-navy-800 hover:text-navy-950 hover:underline focus-ring rounded-xs" onClick={(event) => event.stopPropagation()}>
+    <Link
+      to={`/bookings/${id}`}
+      className="money font-semibold text-navy-800 hover:text-navy-950 hover:underline focus-ring rounded-xs"
+      onClick={(event) => event.stopPropagation()}
+    >
       {number}
     </Link>
   );

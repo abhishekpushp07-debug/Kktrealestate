@@ -1,5 +1,22 @@
 import type { ColumnDef } from "@tanstack/react-table";
-import { Building2, CalendarRange, DoorOpen, FileText, Hammer, Landmark, Layers, LayoutGrid, LayoutTemplate, ListChecks, ReceiptText, Ruler, Sparkles, Tags, Wallet, Wrench } from "lucide-react";
+import {
+  Building2,
+  CalendarRange,
+  DoorOpen,
+  FileText,
+  Hammer,
+  Landmark,
+  Layers,
+  LayoutGrid,
+  LayoutTemplate,
+  ListChecks,
+  ReceiptText,
+  Ruler,
+  Sparkles,
+  Tags,
+  Wallet,
+  Wrench,
+} from "lucide-react";
 import { createElement } from "react";
 import {
   AmenityCreateSchema,
@@ -138,7 +155,11 @@ function digitsOnly(value: string | undefined): string {
 }
 
 const BankAccountCreateFormSchema = z
-  .looseObject({ account_number: z.string(), account_number_confirm: z.string(), change_account_number: z.boolean().optional() })
+  .looseObject({
+    account_number: z.string(),
+    account_number_confirm: z.string(),
+    change_account_number: z.boolean().optional(),
+  })
   .superRefine((value, ctx) => {
     if (digitsOnly(value.account_number) !== digitsOnly(value.account_number_confirm)) {
       ctx.addIssue({ code: "custom", path: ["account_number_confirm"], message: "Account numbers do not match" });
@@ -148,7 +169,11 @@ const BankAccountCreateFormSchema = z
   .pipe(BankAccountCreateSchema);
 
 const BankAccountEditFormSchema = z
-  .looseObject({ change_account_number: z.boolean(), account_number: z.string().optional(), account_number_confirm: z.string().optional() })
+  .looseObject({
+    change_account_number: z.boolean(),
+    account_number: z.string().optional(),
+    account_number_confirm: z.string().optional(),
+  })
   .superRefine((value, ctx) => {
     if (!value.change_account_number) return;
     if (!digitsOnly(value.account_number)) {
@@ -157,7 +182,9 @@ const BankAccountEditFormSchema = z
       ctx.addIssue({ code: "custom", path: ["account_number_confirm"], message: "Account numbers do not match" });
     }
   })
-  .transform(({ change_account_number, account_number, account_number_confirm: _confirm, ...rest }): unknown => (change_account_number ? { ...rest, account_number } : rest))
+  .transform(({ change_account_number, account_number, account_number_confirm: _confirm, ...rest }): unknown =>
+    change_account_number ? { ...rest, account_number } : rest,
+  )
   .pipe(BankAccountCreateSchema.partial());
 
 /* ------------------------------------------------------------------ */
@@ -165,11 +192,20 @@ const BankAccountEditFormSchema = z
 /* ------------------------------------------------------------------ */
 
 function code(value: string) {
-  return createElement("code", { className: "rounded-xs bg-navy-50 px-1 py-0.5 font-mono text-xs text-navy-950" }, value);
+  return createElement(
+    "code",
+    { className: "rounded-xs bg-navy-50 px-1 py-0.5 font-mono text-xs text-navy-950" },
+    value,
+  );
 }
 
 function yesNo(value: boolean) {
-  return createElement(StatusChip, { status: value ? "ENABLED" : "DISABLED", label: value ? "Yes" : "No", size: "sm", dot: false });
+  return createElement(StatusChip, {
+    status: value ? "ENABLED" : "DISABLED",
+    label: value ? "Yes" : "No",
+    size: "sm",
+    dot: false,
+  });
 }
 
 function muted(value: string | null | undefined) {
@@ -195,11 +231,31 @@ const AREA_TYPE_COLUMNS: ColumnDef<AreaTypeRow, unknown>[] = [
 const FLAT_TYPE_COLUMNS: ColumnDef<FlatTypeRow, unknown>[] = [
   { accessorKey: "name", header: "Name", meta: { locked: true } },
   { accessorKey: "code", header: "Code", cell: ({ row }) => code(row.original.code) },
-  { accessorKey: "bhk", header: "BHK", meta: { align: "right", width: 80 }, cell: ({ row }) => formatNumber(row.original.bhk, Number.isInteger(row.original.bhk) ? 0 : 1) },
+  {
+    accessorKey: "bhk",
+    header: "BHK",
+    meta: { align: "right", width: 80 },
+    cell: ({ row }) => formatNumber(row.original.bhk, Number.isInteger(row.original.bhk) ? 0 : 1),
+  },
   { accessorKey: "facing", header: "Facing", cell: ({ row }) => muted(row.original.facing) },
-  { id: "rooms", header: "Rooms", meta: { align: "right", sortKey: false, width: 80 }, cell: ({ row }) => formatNumber(row.original.rooms.length) },
-  { accessorKey: "carpet_sqft", header: "Carpet", meta: { align: "right" }, cell: ({ row }) => formatSqft(row.original.carpet_sqft) },
-  { accessorKey: "super_builtup_sqft", header: "Super built-up", meta: { align: "right" }, cell: ({ row }) => formatSqft(row.original.super_builtup_sqft) },
+  {
+    id: "rooms",
+    header: "Rooms",
+    meta: { align: "right", sortKey: false, width: 80 },
+    cell: ({ row }) => formatNumber(row.original.rooms.length),
+  },
+  {
+    accessorKey: "carpet_sqft",
+    header: "Carpet",
+    meta: { align: "right" },
+    cell: ({ row }) => formatSqft(row.original.carpet_sqft),
+  },
+  {
+    accessorKey: "super_builtup_sqft",
+    header: "Super built-up",
+    meta: { align: "right" },
+    cell: ({ row }) => formatSqft(row.original.super_builtup_sqft),
+  },
   {
     id: "base_price",
     header: "Base price",
@@ -216,7 +272,12 @@ const FLAT_TYPE_COLUMNS: ColumnDef<FlatTypeRow, unknown>[] = [
 const BLOCK_TYPE_COLUMNS: ColumnDef<BlockTypeRow, unknown>[] = [
   { accessorKey: "name", header: "Name", meta: { locked: true } },
   { accessorKey: "code", header: "Code", cell: ({ row }) => code(row.original.code) },
-  { accessorKey: "has_floors", header: "Has floors", meta: { align: "center", width: 110 }, cell: ({ row }) => yesNo(row.original.has_floors) },
+  {
+    accessorKey: "has_floors",
+    header: "Has floors",
+    meta: { align: "center", width: 110 },
+    cell: ({ row }) => yesNo(row.original.has_floors),
+  },
 ];
 
 const FLOOR_PLAN_COLUMNS: ColumnDef<FloorPlanTemplateRow, unknown>[] = [
@@ -229,32 +290,57 @@ const FLOOR_PLAN_COLUMNS: ColumnDef<FloorPlanTemplateRow, unknown>[] = [
     meta: { sortKey: false },
     cell: ({ row }) => {
       const counts = new Map<string, number>();
-      for (const position of row.original.positions) counts.set(position.flat_type_code, (counts.get(position.flat_type_code) ?? 0) + 1);
+      for (const position of row.original.positions)
+        counts.set(position.flat_type_code, (counts.get(position.flat_type_code) ?? 0) + 1);
       return [...counts.entries()].map(([typeCode, count]) => `${typeCode}×${count}`).join(", ");
     },
   },
-  { id: "corners", header: "Corners", meta: { align: "right", sortKey: false, width: 90 }, cell: ({ row }) => formatNumber(row.original.positions.filter((position) => position.is_corner).length) },
+  {
+    id: "corners",
+    header: "Corners",
+    meta: { align: "right", sortKey: false, width: 90 },
+    cell: ({ row }) => formatNumber(row.original.positions.filter((position) => position.is_corner).length),
+  },
 ];
 
 const AMENITY_COLUMNS: ColumnDef<AmenityRow, unknown>[] = [
   { accessorKey: "name", header: "Name", meta: { locked: true } },
   { accessorKey: "category", header: "Category", cell: ({ row }) => muted(row.original.category) },
-  { accessorKey: "icon", header: "Icon", cell: ({ row }) => (row.original.icon ? code(row.original.icon) : muted(null)) },
+  {
+    accessorKey: "icon",
+    header: "Icon",
+    cell: ({ row }) => (row.original.icon ? code(row.original.icon) : muted(null)),
+  },
 ];
 
 const CONSTRUCTION_STAGE_COLUMNS: ColumnDef<ConstructionStageRow, unknown>[] = [
   { accessorKey: "sort_order", header: "#", meta: { align: "right", width: 60, locked: true } },
   { accessorKey: "name", header: "Stage" },
   { accessorKey: "code", header: "Code", cell: ({ row }) => code(row.original.code) },
-  { accessorKey: "is_possession", header: "Possession", meta: { align: "center", width: 110 }, cell: ({ row }) => (row.original.is_possession ? createElement(Badge, { variant: "gold" }, "Possession") : null) },
+  {
+    accessorKey: "is_possession",
+    header: "Possession",
+    meta: { align: "center", width: 110 },
+    cell: ({ row }) => (row.original.is_possession ? createElement(Badge, { variant: "gold" }, "Possession") : null),
+  },
 ];
 
 const PAYMENT_PLAN_COLUMNS: ColumnDef<PaymentPlanRow, unknown>[] = [
   { accessorKey: "name", header: "Plan", meta: { locked: true } },
   { accessorKey: "code", header: "Code", cell: ({ row }) => code(row.original.code) },
   { accessorKey: "plan_type", header: "Type", cell: ({ row }) => PLAN_TYPE_LABELS[row.original.plan_type] },
-  { id: "installments", header: "Installments", meta: { align: "right", sortKey: false, width: 110 }, cell: ({ row }) => formatNumber(row.original.installments.length) },
-  { accessorKey: "grace_days", header: "Grace", meta: { align: "right", width: 90 }, cell: ({ row }) => `${row.original.grace_days} d` },
+  {
+    id: "installments",
+    header: "Installments",
+    meta: { align: "right", sortKey: false, width: 110 },
+    cell: ({ row }) => formatNumber(row.original.installments.length),
+  },
+  {
+    accessorKey: "grace_days",
+    header: "Grace",
+    meta: { align: "right", width: 90 },
+    cell: ({ row }) => `${row.original.grace_days} d`,
+  },
   { accessorKey: "assignment_count", header: "Towers", meta: { align: "right", width: 90 } },
   { accessorKey: "booking_count", header: "Bookings", meta: { align: "right", width: 100 } },
 ];
@@ -262,25 +348,61 @@ const PAYMENT_PLAN_COLUMNS: ColumnDef<PaymentPlanRow, unknown>[] = [
 const CHARGE_TYPE_COLUMNS: ColumnDef<ChargeTypeRow, unknown>[] = [
   { accessorKey: "name", header: "Charge", meta: { locked: true } },
   { accessorKey: "code", header: "Code", cell: ({ row }) => code(row.original.code) },
-  { accessorKey: "default_amount_paise", header: "Default amount", meta: { align: "right" }, cell: ({ row }) => formatINR(row.original.default_amount_paise) },
-  { accessorKey: "is_taxable", header: "Taxable", meta: { align: "center", width: 90 }, cell: ({ row }) => yesNo(row.original.is_taxable) },
-  { accessorKey: "default_gst_percent", header: "GST", meta: { align: "right", width: 80 }, cell: ({ row }) => (row.original.is_taxable ? formatPercent(row.original.default_gst_percent) : muted(null)) },
+  {
+    accessorKey: "default_amount_paise",
+    header: "Default amount",
+    meta: { align: "right" },
+    cell: ({ row }) => formatINR(row.original.default_amount_paise),
+  },
+  {
+    accessorKey: "is_taxable",
+    header: "Taxable",
+    meta: { align: "center", width: 90 },
+    cell: ({ row }) => yesNo(row.original.is_taxable),
+  },
+  {
+    accessorKey: "default_gst_percent",
+    header: "GST",
+    meta: { align: "right", width: 80 },
+    cell: ({ row }) => (row.original.is_taxable ? formatPercent(row.original.default_gst_percent) : muted(null)),
+  },
   { accessorKey: "demand_at", header: "Demand at", cell: ({ row }) => CHARGE_DEMAND_AT_LABELS[row.original.demand_at] },
 ];
 
 const PAYMENT_MODE_COLUMNS: ColumnDef<PaymentModeRow, unknown>[] = [
   { accessorKey: "name", header: "Mode", meta: { locked: true } },
   { accessorKey: "code", header: "Code", cell: ({ row }) => code(row.original.code) },
-  { accessorKey: "requires_instrument", header: "Instrument ref.", meta: { align: "center" }, cell: ({ row }) => yesNo(row.original.requires_instrument) },
-  { accessorKey: "clears_immediately", header: "Clears at once", meta: { align: "center" }, cell: ({ row }) => yesNo(row.original.clears_immediately) },
-  { accessorKey: "is_cash", header: "Cash", meta: { align: "center", width: 80 }, cell: ({ row }) => yesNo(row.original.is_cash) },
+  {
+    accessorKey: "requires_instrument",
+    header: "Instrument ref.",
+    meta: { align: "center" },
+    cell: ({ row }) => yesNo(row.original.requires_instrument),
+  },
+  {
+    accessorKey: "clears_immediately",
+    header: "Clears at once",
+    meta: { align: "center" },
+    cell: ({ row }) => yesNo(row.original.clears_immediately),
+  },
+  {
+    accessorKey: "is_cash",
+    header: "Cash",
+    meta: { align: "center", width: 80 },
+    cell: ({ row }) => yesNo(row.original.is_cash),
+  },
   { accessorKey: "sort_order", header: "Order", meta: { align: "right", width: 80 } },
 ];
 
 const BANK_ACCOUNT_COLUMNS: ColumnDef<BankAccountRow, unknown>[] = [
   { accessorKey: "bank_name", header: "Bank", meta: { locked: true } },
   { accessorKey: "account_name", header: "Account name" },
-  { accessorKey: "account_number_masked", header: "Account no.", meta: { sortKey: false }, cell: ({ row }) => createElement("span", { className: "money font-mono text-xs" }, row.original.account_number_masked) },
+  {
+    accessorKey: "account_number_masked",
+    header: "Account no.",
+    meta: { sortKey: false },
+    cell: ({ row }) =>
+      createElement("span", { className: "money font-mono text-xs" }, row.original.account_number_masked),
+  },
   { accessorKey: "ifsc", header: "IFSC", cell: ({ row }) => code(row.original.ifsc) },
   { accessorKey: "branch", header: "Branch", cell: ({ row }) => muted(row.original.branch) },
   {
@@ -300,8 +422,18 @@ const BANK_ACCOUNT_COLUMNS: ColumnDef<BankAccountRow, unknown>[] = [
 const DOCUMENT_TYPE_COLUMNS: ColumnDef<DocumentTypeRow, unknown>[] = [
   { accessorKey: "name", header: "Document", meta: { locked: true } },
   { accessorKey: "code", header: "Code", cell: ({ row }) => code(row.original.code) },
-  { id: "applies_to", header: "Applies to", meta: { sortKey: false }, cell: ({ row }) => row.original.applies_to.map((entity) => DOCUMENT_APPLIES_TO_LABELS[entity]).join(", ") },
-  { accessorKey: "is_kyc", header: "KYC", meta: { align: "center", width: 80 }, cell: ({ row }) => yesNo(row.original.is_kyc) },
+  {
+    id: "applies_to",
+    header: "Applies to",
+    meta: { sortKey: false },
+    cell: ({ row }) => row.original.applies_to.map((entity) => DOCUMENT_APPLIES_TO_LABELS[entity]).join(", "),
+  },
+  {
+    accessorKey: "is_kyc",
+    header: "KYC",
+    meta: { align: "center", width: 80 },
+    cell: ({ row }) => yesNo(row.original.is_kyc),
+  },
 ];
 
 const PLC_TYPE_COLUMNS: ColumnDef<PlcTypeRow, unknown>[] = [
@@ -318,13 +450,31 @@ const SPEC_CATEGORY_COLUMNS: ColumnDef<SpecCategoryRow, unknown>[] = [
 const SPEC_ITEM_COLUMNS: ColumnDef<SpecItemRow, unknown>[] = [
   { accessorKey: "name", header: "Item", meta: { locked: true } },
   { accessorKey: "category_name", header: "Category", meta: { sortKey: false } },
-  { accessorKey: "description", header: "Description", cell: ({ row }) => createElement("span", { className: "block max-w-sm truncate text-ink-muted", title: row.original.description ?? undefined }, row.original.description || "—") },
+  {
+    accessorKey: "description",
+    header: "Description",
+    cell: ({ row }) =>
+      createElement(
+        "span",
+        { className: "block max-w-sm truncate text-ink-muted", title: row.original.description ?? undefined },
+        row.original.description || "—",
+      ),
+  },
   { accessorKey: "sort_order", header: "Order", meta: { align: "right", width: 90 } },
 ];
 
 const SERVICE_CATEGORY_COLUMNS: ColumnDef<ServiceCategoryRow, unknown>[] = [
   { accessorKey: "name", header: "Category", meta: { locked: true } },
-  { accessorKey: "default_priority", header: "Default priority", cell: ({ row }) => createElement(StatusChip, { status: row.original.default_priority, label: SERVICE_PRIORITY_LABELS[row.original.default_priority], size: "sm" }) },
+  {
+    accessorKey: "default_priority",
+    header: "Default priority",
+    cell: ({ row }) =>
+      createElement(StatusChip, {
+        status: row.original.default_priority,
+        label: SERVICE_PRIORITY_LABELS[row.original.default_priority],
+        size: "sm",
+      }),
+  },
   { accessorKey: "sort_order", header: "Order", meta: { align: "right", width: 90 } },
 ];
 
@@ -363,7 +513,8 @@ export const MASTER_CONFIGS: Readonly<Record<MasterKind, AnyMasterConfig>> = {
     slug: "area-types",
     label: MASTER_KIND_LABELS.AREA_TYPES,
     singular: "Area type",
-    description: "Carpet, Built-up, Super Built-up, Balcony, Terrace, Parking. The three structural codes drive the super ≥ built-up ≥ carpet rule.",
+    description:
+      "Carpet, Built-up, Super Built-up, Balcony, Terrace, Parking. The three structural codes drive the super ≥ built-up ≥ carpet rule.",
     icon: Ruler,
     group: "structure",
     columns: AREA_TYPE_COLUMNS,
@@ -376,7 +527,14 @@ export const MASTER_CONFIGS: Readonly<Record<MasterKind, AnyMasterConfig>> = {
     displayName: (row) => row.name,
     fields: [
       { name: "name", label: "Name", type: "text", required: true, placeholder: "Super Built-up" },
-      { name: "code", label: "Code", type: "code", required: true, placeholder: "SUPER_BUILT_UP", hint: "Use CARPET / BUILT_UP / SUPER_BUILT_UP for the structural areas" },
+      {
+        name: "code",
+        label: "Code",
+        type: "code",
+        required: true,
+        placeholder: "SUPER_BUILT_UP",
+        hint: "Use CARPET / BUILT_UP / SUPER_BUILT_UP for the structural areas",
+      },
       { name: "sort_order", label: "Sort order", type: "number", fallback: 0, min: 0, max: 10_000 },
     ],
   }),
@@ -385,13 +543,17 @@ export const MASTER_CONFIGS: Readonly<Record<MasterKind, AnyMasterConfig>> = {
     slug: "flat-types",
     label: MASTER_KIND_LABELS.FLAT_TYPES,
     singular: "Flat type",
-    description: "Configurations (3BHK-A…) with rooms, areas, optional base price and specification items. Flats snapshot these when a block is generated.",
+    description:
+      "Configurations (3BHK-A…) with rooms, areas, optional base price and specification items. Flats snapshot these when a block is generated.",
     icon: LayoutGrid,
     group: "structure",
     columns: FLAT_TYPE_COLUMNS,
     defaultSort: "name",
     searchPlaceholder: "Search flat types…",
-    csv: { columns: ["name", "code", "bhk", "facing", "description", "base_rate_per_sqft", "base_price"], example: "3BHK-A,3BHK_A,3,East,Corner unit,4500," },
+    csv: {
+      columns: ["name", "code", "bhk", "facing", "description", "base_rate_per_sqft", "base_price"],
+      example: "3BHK-A,3BHK_A,3,East,Corner unit,4500,",
+    },
     createSchema: FlatTypeFormSchema,
     defaults: () => ({
       name: "",
@@ -412,7 +574,13 @@ export const MASTER_CONFIGS: Readonly<Record<MasterKind, AnyMasterConfig>> = {
       bhk: row.bhk,
       facing: row.facing,
       description: row.description,
-      rooms: row.rooms.map((room) => ({ room_type_id: room.room_type_id, label: room.label, length_ft: room.length_ft, width_ft: room.width_ft, sqft: room.sqft })),
+      rooms: row.rooms.map((room) => ({
+        room_type_id: room.room_type_id,
+        label: room.label,
+        length_ft: room.length_ft,
+        width_ft: room.width_ft,
+        sqft: room.sqft,
+      })),
       areas: row.areas.map((area) => ({ area_type_id: area.area_type_id, sqft: area.sqft })),
       pricing_mode: pricingModeOf(row),
       base_rate_per_sqft_paise: row.base_rate_per_sqft_paise,
@@ -441,29 +609,56 @@ export const MASTER_CONFIGS: Readonly<Record<MasterKind, AnyMasterConfig>> = {
     displayName: (row) => row.name,
     fields: [
       { name: "name", label: "Name", type: "text", required: true, placeholder: "Tower" },
-      { name: "code", label: "Code", type: "code", required: true, placeholder: "TOWER", hint: `Standard codes: ${BLOCK_TYPE_CODES.join(", ")}` },
-      { name: "has_floors", label: "Has floors", type: "switch", description: "Off for villas and row houses: flats are numbered in one sequence" },
+      {
+        name: "code",
+        label: "Code",
+        type: "code",
+        required: true,
+        placeholder: "TOWER",
+        hint: `Standard codes: ${BLOCK_TYPE_CODES.join(", ")}`,
+      },
+      {
+        name: "has_floors",
+        label: "Has floors",
+        type: "switch",
+        description: "Off for villas and row houses: flats are numbered in one sequence",
+      },
     ],
   }),
-  FLOOR_PLAN_TEMPLATES: defineMaster<FloorPlanTemplateRow, FloorPlanTemplateValues, z.output<typeof FloorPlanTemplateFormSchema>>({
+  FLOOR_PLAN_TEMPLATES: defineMaster<
+    FloorPlanTemplateRow,
+    FloorPlanTemplateValues,
+    z.output<typeof FloorPlanTemplateFormSchema>
+  >({
     kind: "FLOOR_PLAN_TEMPLATES",
     slug: "floor-plan-templates",
     label: MASTER_KIND_LABELS.FLOOR_PLAN_TEMPLATES,
     singular: "Floor plan template",
-    description: "Flats per floor with the flat type, facing and corner flag of every position. Blocks apply templates to floor ranges.",
+    description:
+      "Flats per floor with the flat type, facing and corner flag of every position. Blocks apply templates to floor ranges.",
     icon: LayoutTemplate,
     group: "structure",
     columns: FLOOR_PLAN_COLUMNS,
     defaultSort: "name",
     searchPlaceholder: "Search templates…",
-    csv: { columns: ["name", "code", "position", "flat_type_code", "facing", "is_corner"], example: "Plan A,PLAN_A,1,3BHK_A,East,true" },
+    csv: {
+      columns: ["name", "code", "position", "flat_type_code", "facing", "is_corner"],
+      example: "Plan A,PLAN_A,1,3BHK_A,East,true",
+    },
     createSchema: FloorPlanTemplateFormSchema,
     defaults: () => ({ name: "", code: "", flats_per_floor: 4, positions: resizePositions([], 4) }),
     toValues: (row) => ({
       name: row.name,
       code: row.code,
       flats_per_floor: row.positions.length,
-      positions: [...row.positions].sort((a, b) => a.position - b.position).map((position) => ({ position: position.position, flat_type_id: position.flat_type_id, facing: position.facing, is_corner: position.is_corner })),
+      positions: [...row.positions]
+        .sort((a, b) => a.position - b.position)
+        .map((position) => ({
+          position: position.position,
+          flat_type_id: position.flat_type_id,
+          facing: position.facing,
+          is_corner: position.is_corner,
+        })),
     }),
     displayName: (row) => `${row.name} (${row.code})`,
     Form: FloorPlanTemplateForm,
@@ -488,15 +683,28 @@ export const MASTER_CONFIGS: Readonly<Record<MasterKind, AnyMasterConfig>> = {
     fields: [
       { name: "name", label: "Name", type: "text", required: true, placeholder: "Swimming Pool" },
       { name: "category", label: "Category", type: "text", nullable: true, placeholder: "Leisure", maxLength: 60 },
-      { name: "icon", label: "Icon", type: "text", nullable: true, placeholder: "waves", hint: "Lucide icon name used by the website", maxLength: 60 },
+      {
+        name: "icon",
+        label: "Icon",
+        type: "text",
+        nullable: true,
+        placeholder: "waves",
+        hint: "Lucide icon name used by the website",
+        maxLength: 60,
+      },
     ],
   }),
-  CONSTRUCTION_STAGES: defineMaster<ConstructionStageRow, ConstructionStageValues, z.output<typeof ConstructionStageCreateSchema>>({
+  CONSTRUCTION_STAGES: defineMaster<
+    ConstructionStageRow,
+    ConstructionStageValues,
+    z.output<typeof ConstructionStageCreateSchema>
+  >({
     kind: "CONSTRUCTION_STAGES",
     slug: "construction-stages",
     label: MASTER_KIND_LABELS.CONSTRUCTION_STAGES,
     singular: "Construction stage",
-    description: "The ordered list of physical stages every tower snapshots. Exactly one stage is the possession stage.",
+    description:
+      "The ordered list of physical stages every tower snapshots. Exactly one stage is the possession stage.",
     icon: Hammer,
     group: "structure",
     columns: CONSTRUCTION_STAGE_COLUMNS,
@@ -505,13 +713,31 @@ export const MASTER_CONFIGS: Readonly<Record<MasterKind, AnyMasterConfig>> = {
     csv: { columns: ["name", "code", "sort_order", "is_possession"], example: "Foundation,FOUNDATION,2,false" },
     createSchema: ConstructionStageCreateSchema,
     defaults: () => ({ name: "", code: "", sort_order: 0, is_possession: false }),
-    toValues: (row) => ({ name: row.name, code: row.code, sort_order: row.sort_order, is_possession: row.is_possession }),
+    toValues: (row) => ({
+      name: row.name,
+      code: row.code,
+      sort_order: row.sort_order,
+      is_possession: row.is_possession,
+    }),
     displayName: (row) => row.name,
     fields: [
       { name: "name", label: "Stage", type: "text", required: true, placeholder: "1st Slab" },
       { name: "code", label: "Code", type: "code", required: true, placeholder: "SLAB_1" },
-      { name: "sort_order", label: "Order", type: "number", fallback: 0, min: 0, max: 10_000, hint: "Position in the sequence; drag on the list to reorder" },
-      { name: "is_possession", label: "Possession stage", type: "switch", description: "Completing it triggers ON_POSSESSION installments and charges" },
+      {
+        name: "sort_order",
+        label: "Order",
+        type: "number",
+        fallback: 0,
+        min: 0,
+        max: 10_000,
+        hint: "Position in the sequence; drag on the list to reorder",
+      },
+      {
+        name: "is_possession",
+        label: "Possession stage",
+        type: "switch",
+        description: "Completing it triggers ON_POSSESSION installments and charges",
+      },
     ],
     Page: ConstructionStagesPage,
   }),
@@ -526,9 +752,32 @@ export const MASTER_CONFIGS: Readonly<Record<MasterKind, AnyMasterConfig>> = {
     columns: PAYMENT_PLAN_COLUMNS,
     defaultSort: "name",
     searchPlaceholder: "Search plans…",
-    csv: { columns: ["name", "code", "plan_type", "grace_days", "seq", "installment_name", "percent", "trigger_type", "trigger_days", "trigger_stage_code", "trigger_date", "due_days"], example: "Standard CLP,CLP_STD,CONSTRUCTION_LINKED,7,1,On booking,10,ON_BOOKING,,,,0" },
+    csv: {
+      columns: [
+        "name",
+        "code",
+        "plan_type",
+        "grace_days",
+        "seq",
+        "installment_name",
+        "percent",
+        "trigger_type",
+        "trigger_days",
+        "trigger_stage_code",
+        "trigger_date",
+        "due_days",
+      ],
+      example: "Standard CLP,CLP_STD,CONSTRUCTION_LINKED,7,1,On booking,10,ON_BOOKING,,,,0",
+    },
     createSchema: PaymentPlanCreateSchema,
-    defaults: () => ({ name: "", code: "", plan_type: null, description: null, grace_days: 0, installments: [{ ...emptyInstallment(1), name: "On booking", trigger_type: "ON_BOOKING", due_days: 0 }] }),
+    defaults: () => ({
+      name: "",
+      code: "",
+      plan_type: null,
+      description: null,
+      grace_days: 0,
+      installments: [{ ...emptyInstallment(1), name: "On booking", trigger_type: "ON_BOOKING", due_days: 0 }],
+    }),
     toValues: (row) => ({
       name: row.name,
       code: row.code,
@@ -558,16 +807,34 @@ export const MASTER_CONFIGS: Readonly<Record<MasterKind, AnyMasterConfig>> = {
     slug: "charge-types",
     label: MASTER_KIND_LABELS.CHARGE_TYPES,
     singular: "Charge type",
-    description: "Registry, maintenance deposit, parking, club membership… with default amount, GST and when the demand is raised.",
+    description:
+      "Registry, maintenance deposit, parking, club membership… with default amount, GST and when the demand is raised.",
     icon: ReceiptText,
     group: "money",
     columns: CHARGE_TYPE_COLUMNS,
     defaultSort: "name",
     searchPlaceholder: "Search charges…",
-    csv: { columns: ["name", "code", "default_amount", "is_taxable", "default_gst_percent", "demand_at"], example: "Maintenance Deposit,MAINT_DEP,50000,true,18,ON_POSSESSION" },
+    csv: {
+      columns: ["name", "code", "default_amount", "is_taxable", "default_gst_percent", "demand_at"],
+      example: "Maintenance Deposit,MAINT_DEP,50000,true,18,ON_POSSESSION",
+    },
     createSchema: ChargeTypeCreateSchema,
-    defaults: () => ({ name: "", code: "", default_amount_paise: 0, is_taxable: false, default_gst_percent: 0, demand_at: "MANUAL" }),
-    toValues: (row) => ({ name: row.name, code: row.code, default_amount_paise: row.default_amount_paise, is_taxable: row.is_taxable, default_gst_percent: row.default_gst_percent, demand_at: row.demand_at }),
+    defaults: () => ({
+      name: "",
+      code: "",
+      default_amount_paise: 0,
+      is_taxable: false,
+      default_gst_percent: 0,
+      demand_at: "MANUAL",
+    }),
+    toValues: (row) => ({
+      name: row.name,
+      code: row.code,
+      default_amount_paise: row.default_amount_paise,
+      is_taxable: row.is_taxable,
+      default_gst_percent: row.default_gst_percent,
+      demand_at: row.demand_at,
+    }),
     displayName: (row) => row.name,
     Form: ChargeTypeForm,
   }),
@@ -582,10 +849,27 @@ export const MASTER_CONFIGS: Readonly<Record<MasterKind, AnyMasterConfig>> = {
     columns: PAYMENT_MODE_COLUMNS,
     defaultSort: "sort_order",
     searchPlaceholder: "Search modes…",
-    csv: { columns: ["name", "code", "requires_instrument", "clears_immediately", "is_cash", "sort_order"], example: "Cheque,CHEQUE,true,false,false,2" },
+    csv: {
+      columns: ["name", "code", "requires_instrument", "clears_immediately", "is_cash", "sort_order"],
+      example: "Cheque,CHEQUE,true,false,false,2",
+    },
     createSchema: PaymentModeCreateSchema,
-    defaults: () => ({ name: "", code: null, requires_instrument: false, clears_immediately: true, is_cash: false, sort_order: 0 }),
-    toValues: (row) => ({ name: row.name, code: row.code, requires_instrument: row.requires_instrument, clears_immediately: row.clears_immediately, is_cash: row.is_cash, sort_order: row.sort_order }),
+    defaults: () => ({
+      name: "",
+      code: null,
+      requires_instrument: false,
+      clears_immediately: true,
+      is_cash: false,
+      sort_order: 0,
+    }),
+    toValues: (row) => ({
+      name: row.name,
+      code: row.code,
+      requires_instrument: row.requires_instrument,
+      clears_immediately: row.clears_immediately,
+      is_cash: row.is_cash,
+      sort_order: row.sort_order,
+    }),
     displayName: (row) => `${row.name} (${PAYMENT_MODE_CODE_LABELS[row.code]})`,
     Form: PaymentModeForm,
   }),
@@ -600,11 +884,34 @@ export const MASTER_CONFIGS: Readonly<Record<MasterKind, AnyMasterConfig>> = {
     columns: BANK_ACCOUNT_COLUMNS,
     defaultSort: "bank_name",
     searchPlaceholder: "Search bank or account name…",
-    csv: { columns: ["bank_name", "branch", "account_name", "account_number", "ifsc", "is_default", "is_escrow"], example: "HDFC Bank,MG Road,Shree Ganesh Builders,50100123456789,HDFC0001234,true,false" },
+    csv: {
+      columns: ["bank_name", "branch", "account_name", "account_number", "ifsc", "is_default", "is_escrow"],
+      example: "HDFC Bank,MG Road,Shree Ganesh Builders,50100123456789,HDFC0001234,true,false",
+    },
     createSchema: BankAccountCreateFormSchema,
     editSchema: BankAccountEditFormSchema,
-    defaults: () => ({ bank_name: "", branch: null, account_name: "", change_account_number: true, account_number: "", account_number_confirm: "", ifsc: "", is_default: false, is_escrow: false }),
-    toValues: (row) => ({ bank_name: row.bank_name, branch: row.branch, account_name: row.account_name, change_account_number: false, account_number: "", account_number_confirm: "", ifsc: row.ifsc, is_default: row.is_default, is_escrow: row.is_escrow }),
+    defaults: () => ({
+      bank_name: "",
+      branch: null,
+      account_name: "",
+      change_account_number: true,
+      account_number: "",
+      account_number_confirm: "",
+      ifsc: "",
+      is_default: false,
+      is_escrow: false,
+    }),
+    toValues: (row) => ({
+      bank_name: row.bank_name,
+      branch: row.branch,
+      account_name: row.account_name,
+      change_account_number: false,
+      account_number: "",
+      account_number_confirm: "",
+      ifsc: row.ifsc,
+      is_default: row.is_default,
+      is_escrow: row.is_escrow,
+    }),
     displayName: (row) => `${row.bank_name} ${row.account_number_masked}`,
     Form: BankAccountForm,
   }),
@@ -631,7 +938,8 @@ export const MASTER_CONFIGS: Readonly<Record<MasterKind, AnyMasterConfig>> = {
     slug: "plc-types",
     label: MASTER_KIND_LABELS.PLC_TYPES,
     singular: "PLC type",
-    description: "Preferential location charges — floor rise, corner, park facing, Vastu… each with a calculation mode used by rate cards.",
+    description:
+      "Preferential location charges — floor rise, corner, park facing, Vastu… each with a calculation mode used by rate cards.",
     icon: Tags,
     group: "money",
     columns: PLC_TYPE_COLUMNS,
@@ -676,14 +984,26 @@ export const MASTER_CONFIGS: Readonly<Record<MasterKind, AnyMasterConfig>> = {
     columns: SPEC_ITEM_COLUMNS,
     defaultSort: "sort_order",
     searchPlaceholder: "Search items…",
-    csv: { columns: ["category_name", "name", "description", "sort_order"], example: "Flooring,Vitrified tiles 600×600,Kajaria or equivalent,1" },
+    csv: {
+      columns: ["category_name", "name", "description", "sort_order"],
+      example: "Flooring,Vitrified tiles 600×600,Kajaria or equivalent,1",
+    },
     createSchema: SpecItemCreateSchema,
     defaults: () => ({ category_id: null, name: "", description: null, sort_order: 0 }),
-    toValues: (row) => ({ category_id: row.category_id, name: row.name, description: row.description, sort_order: row.sort_order }),
+    toValues: (row) => ({
+      category_id: row.category_id,
+      name: row.name,
+      description: row.description,
+      sort_order: row.sort_order,
+    }),
     displayName: (row) => `${row.category_name} · ${row.name}`,
     Form: SpecItemForm,
   }),
-  SERVICE_CATEGORIES: defineMaster<ServiceCategoryRow, ServiceCategoryValues, z.output<typeof ServiceCategoryCreateSchema>>({
+  SERVICE_CATEGORIES: defineMaster<
+    ServiceCategoryRow,
+    ServiceCategoryValues,
+    z.output<typeof ServiceCategoryCreateSchema>
+  >({
     kind: "SERVICE_CATEGORIES",
     slug: "service-categories",
     label: MASTER_KIND_LABELS.SERVICE_CATEGORIES,
@@ -701,7 +1021,13 @@ export const MASTER_CONFIGS: Readonly<Record<MasterKind, AnyMasterConfig>> = {
     displayName: (row) => row.name,
     fields: [
       { name: "name", label: "Category", type: "text", required: true, placeholder: "Plumbing" },
-      { name: "default_priority", label: "Default priority", type: "select", required: true, options: SERVICE_PRIORITIES.map((value) => ({ value, label: SERVICE_PRIORITY_LABELS[value] })) },
+      {
+        name: "default_priority",
+        label: "Default priority",
+        type: "select",
+        required: true,
+        options: SERVICE_PRIORITIES.map((value) => ({ value, label: SERVICE_PRIORITY_LABELS[value] })),
+      },
       { name: "sort_order", label: "Sort order", type: "number", fallback: 0, min: 0, max: 10_000 },
     ],
   }),

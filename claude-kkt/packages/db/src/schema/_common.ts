@@ -1,7 +1,17 @@
 // Shared column helpers used by every schema file. Keeps the conventions of
 // docs/DATA-MODEL.md ("Conventions") in one place so tables stay uniform.
 import { sql } from "drizzle-orm";
-import { bigint, boolean, customType, index, integer, numeric, timestamp, uuid, type ExtraConfigColumn } from "drizzle-orm/pg-core";
+import {
+  bigint,
+  boolean,
+  customType,
+  index,
+  integer,
+  numeric,
+  timestamp,
+  uuid,
+  type ExtraConfigColumn,
+} from "drizzle-orm/pg-core";
 
 /** Postgres `citext` (case-insensitive text), used for e-mail addresses. */
 export const citext = customType<{ data: string; driverData: string }>({

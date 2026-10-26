@@ -33,8 +33,21 @@ export function CopyField({ value, label = "Copy", secret = false, className }: 
 
   return (
     <div className={cn("flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2", className)}>
-      <code className={cn("min-w-0 flex-1 select-all break-all", secret ? "font-mono text-base font-semibold tracking-wide text-navy-950" : "font-mono text-xs text-ink")}>{value}</code>
-      <Button variant="outline" size="sm" leftIcon={copied ? Check : Copy} onClick={() => void copy()} data-testid="copy-field-btn">
+      <code
+        className={cn(
+          "min-w-0 flex-1 select-all break-all",
+          secret ? "font-mono text-base font-semibold tracking-wide text-navy-950" : "font-mono text-xs text-ink",
+        )}
+      >
+        {value}
+      </code>
+      <Button
+        variant="outline"
+        size="sm"
+        leftIcon={copied ? Check : Copy}
+        onClick={() => void copy()}
+        data-testid="copy-field-btn"
+      >
         {copied ? "Copied" : label}
       </Button>
     </div>

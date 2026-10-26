@@ -35,7 +35,9 @@ const flatTypes: FlatTypeDefinition[] = [
     code: "3BHK-A",
     name: "3BHK-A",
     facing: "EAST",
-    rooms: [{ roomTypeId: "r1", roomTypeName: "Bedroom", label: "Master Bedroom", lengthFt: 14, widthFt: 12, sqft: 168 }],
+    rooms: [
+      { roomTypeId: "r1", roomTypeName: "Bedroom", label: "Master Bedroom", lengthFt: 14, widthFt: 12, sqft: 168 },
+    ],
     areas: [
       { areaTypeId: "a1", areaTypeCode: "CARPET", areaTypeName: "Carpet", sqft: 1000 },
       { areaTypeId: "a3", areaTypeCode: "SUPER_BUILT_UP", areaTypeName: "Super Built-up", sqft: 1250 },
@@ -140,7 +142,9 @@ describe("planForFloor", () => {
         5,
       ),
     ).toThrow(/overlap|covered by 2/i);
-    expect(validateFloorPlanRanges({ ...towerC, floorPlans: [{ fromFloor: 1, toFloor: 10, floorPlanTemplateId: "planA" }] })).toEqual({
+    expect(
+      validateFloorPlanRanges({ ...towerC, floorPlans: [{ fromFloor: 1, toFloor: 10, floorPlanTemplateId: "planA" }] }),
+    ).toEqual({
       gaps: [11, 12, 14, 15],
       overlaps: [],
     });
@@ -165,10 +169,20 @@ describe("flatNumber", () => {
 describe("validateFlatType", () => {
   it("enforces rooms, areas and area order", () => {
     expect(validateFlatType(flatTypes[0] as FlatTypeDefinition)).toEqual([]);
-    const errors = validateFlatType({ rooms: [], areas: [], carpetSqft: 1000, builtupSqft: 900, superBuiltupSqft: 1200 });
+    const errors = validateFlatType({
+      rooms: [],
+      areas: [],
+      carpetSqft: 1000,
+      builtupSqft: 900,
+      superBuiltupSqft: 1200,
+    });
     expect(errors.map((e) => e.code)).toEqual(["NO_ROOMS", "NO_AREAS", "AREA_ORDER"]);
-    expect(validateFlatType({ ...flatTypes[0] as FlatTypeDefinition, superBuiltupSqft: 1000 }).map((e) => e.code)).toEqual(["AREA_ORDER"]);
-    expect(validateFlatType({ ...flatTypes[0] as FlatTypeDefinition, carpetSqft: -1 }).map((e) => e.code)).toContain("NEGATIVE_AREA");
+    expect(
+      validateFlatType({ ...(flatTypes[0] as FlatTypeDefinition), superBuiltupSqft: 1000 }).map((e) => e.code),
+    ).toEqual(["AREA_ORDER"]);
+    expect(validateFlatType({ ...(flatTypes[0] as FlatTypeDefinition), carpetSqft: -1 }).map((e) => e.code)).toContain(
+      "NEGATIVE_AREA",
+    );
   });
 });
 
@@ -217,13 +231,22 @@ describe("generateFlats", () => {
       floorPlans: [{ fromFloor: 0, toFloor: 0, floorPlanTemplateId: "planA" }],
       numberingPattern: "{block}{seq}",
     };
-    expect(generateFlats(villas, templates, flatTypes, pricing).map((f) => f.flatNumber)).toEqual(["V1", "V2", "V3", "V4"]);
+    expect(generateFlats(villas, templates, flatTypes, pricing).map((f) => f.flatNumber)).toEqual([
+      "V1",
+      "V2",
+      "V3",
+      "V4",
+    ]);
   });
   it("fails atomically on gaps, missing templates, missing flat types and duplicate numbers", () => {
-    expect(() => generateFlats({ ...towerC, floorPlans: towerC.floorPlans.slice(0, 1) }, templates, flatTypes, pricing)).toThrow(/floor 6/);
+    expect(() =>
+      generateFlats({ ...towerC, floorPlans: towerC.floorPlans.slice(0, 1) }, templates, flatTypes, pricing),
+    ).toThrow(/floor 6/);
     expect(() => generateFlats(towerC, templates.slice(0, 1), flatTypes, pricing)).toThrow(FlatGenerationError);
     expect(() => generateFlats(towerC, templates, flatTypes.slice(0, 1), pricing)).toThrow(/Flat type ft2/);
-    expect(() => generateFlats({ ...towerC, numberingPattern: "{block}-{floor}" }, templates, flatTypes, pricing)).toThrow(/duplicate/i);
+    expect(() =>
+      generateFlats({ ...towerC, numberingPattern: "{block}-{floor}" }, templates, flatTypes, pricing),
+    ).toThrow(/duplicate/i);
     const badTypes = flatTypes.map((f) => (f.id === "ft2" ? { ...f, rooms: [] } : f));
     expect(() => generateFlats(towerC, templates, badTypes, pricing)).toThrow(/invalid/);
   });

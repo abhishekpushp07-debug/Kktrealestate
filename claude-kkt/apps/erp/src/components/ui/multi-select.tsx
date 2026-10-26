@@ -51,7 +51,10 @@ export function MultiSelect({
   const fieldAria = useFieldAria(id, { invalid, "aria-describedby": aria["aria-describedby"] });
   const [open, setOpen] = useState(false);
   const selectedSet = useMemo(() => new Set(value), [value]);
-  const byKey = useMemo(() => new Map(options.map((option) => [option.value.toLowerCase(), option] as const)), [options]);
+  const byKey = useMemo(
+    () => new Map(options.map((option) => [option.value.toLowerCase(), option] as const)),
+    [options],
+  );
   const chips = options.filter((option) => selectedSet.has(option.value));
   const overflow = chips.length - maxChips;
 
@@ -152,7 +155,9 @@ export function MultiSelect({
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate">{option.label}</span>
-                      {option.description && <span className="block truncate text-xs text-ink-subtle">{option.description}</span>}
+                      {option.description && (
+                        <span className="block truncate text-xs text-ink-subtle">{option.description}</span>
+                      )}
                     </span>
                   </Command.Item>
                 );
@@ -161,10 +166,18 @@ export function MultiSelect({
             <div className="flex items-center justify-between border-t border-border px-2 py-1.5 text-xs">
               <span className="text-ink-subtle">{value.length} selected</span>
               <span className="flex gap-3">
-                <button type="button" className="font-medium text-navy-800 hover:underline focus-ring rounded-xs" onClick={selectAll}>
+                <button
+                  type="button"
+                  className="font-medium text-navy-800 hover:underline focus-ring rounded-xs"
+                  onClick={selectAll}
+                >
                   Select all
                 </button>
-                <button type="button" className="font-medium text-ink-subtle hover:underline focus-ring rounded-xs" onClick={clear}>
+                <button
+                  type="button"
+                  className="font-medium text-ink-subtle hover:underline focus-ring rounded-xs"
+                  onClick={clear}
+                >
                   Clear
                 </button>
               </span>

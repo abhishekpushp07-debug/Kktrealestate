@@ -1,6 +1,24 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { addDays } from "@kkt/domain";
-import { blockByCode, BOOT_TIMEOUT, bookingBody, bookingBySeq, bootAcceptance, createCustomer, demandsOf, flatsOf, getBooking, key, listAtCr, L, masterByCode, projectByCode, type Booking, type ErrorBody, type Harness } from "./harness.js";
+import {
+  blockByCode,
+  BOOT_TIMEOUT,
+  bookingBody,
+  bookingBySeq,
+  bootAcceptance,
+  createCustomer,
+  demandsOf,
+  flatsOf,
+  getBooking,
+  key,
+  listAtCr,
+  L,
+  masterByCode,
+  projectByCode,
+  type Booking,
+  type ErrorBody,
+  type Harness,
+} from "./harness.js";
 
 /**
  * SPEC §18 scenario 8 (L249): "Flexi booking: 10% demand immediately; the 40% installment is raised exactly once when 60 days pass
@@ -14,7 +32,11 @@ let admin: string;
 let sales: string;
 
 async function runDues(body: Record<string, unknown>): Promise<Run> {
-  const r = await h.request<Run & ErrorBody>("POST", "/api/v1/dues/run", { token: admin, body, headers: { "idempotency-key": key("dues") } });
+  const r = await h.request<Run & ErrorBody>("POST", "/api/v1/dues/run", {
+    token: admin,
+    body,
+    headers: { "idempotency-key": key("dues") },
+  });
   expect(r.status, r.text).toBe(200);
   return r.body;
 }
@@ -29,7 +51,9 @@ beforeAll(async () => {
   admin = (await h.loginAs("admin")).access_token;
   sales = (await h.loginAs("sales")).access_token;
 }, BOOT_TIMEOUT);
-afterAll(async () => { await h?.close(); });
+afterAll(async () => {
+  await h?.close();
+});
 
 describe("scenario 8 — Flexi 10:40:50 on a fresh booking", () => {
   let booking: Booking;
@@ -41,7 +65,11 @@ describe("scenario 8 — Flexi 10:40:50 on a fresh booking", () => {
     await listAtCr(h, admin, [flat.id]);
     const flexi = await masterByCode<{ id: string; code: string }>(h, admin, "payment-plans", "FLEXI_10_40_50");
     const customer = await createCustomer(h, sales, "Acceptance Buyer Eight", "9898000008");
-    const r = await h.request<Booking & ErrorBody>("POST", "/api/v1/bookings", { token: sales, headers: { "idempotency-key": key() }, body: bookingBody(h, flat.id, customer.id, { payment_plan_id: flexi.id }) });
+    const r = await h.request<Booking & ErrorBody>("POST", "/api/v1/bookings", {
+      token: sales,
+      headers: { "idempotency-key": key() },
+      body: bookingBody(h, flat.id, customer.id, { payment_plan_id: flexi.id }),
+    });
     expect(r.status, r.text).toBe(201);
     booking = r.body;
     expect(booking.plan_snapshot.name).toBe("Flexi 10:40:50"); // SPEC L122 seed example
@@ -49,7 +77,15 @@ describe("scenario 8 — Flexi 10:40:50 on a fresh booking", () => {
     expect(booking.summary.raised_percent).toBe(10);
     expect(booking.summary.cash).toMatchObject({ order_raised_paise: 6 * L, due_paise: 6 * L });
     expect(booking.summary.account).toMatchObject({ order_raised_paise: 4 * L, due_paise: 4 * L });
-    expect(booking.schedule.map((s) => s.status)).toEqual(["RAISED", "NOT_YET_DUE", "NOT_YET_DUE", "NOT_YET_DUE", "NOT_YET_DUE", "NOT_YET_DUE", "NOT_YET_DUE"]);
+    expect(booking.schedule.map((s) => s.status)).toEqual([
+      "RAISED",
+      "NOT_YET_DUE",
+      "NOT_YET_DUE",
+      "NOT_YET_DUE",
+      "NOT_YET_DUE",
+      "NOT_YET_DUE",
+      "NOT_YET_DUE",
+    ]);
     const demands = await demandsOf(h, admin, booking.id, false);
     expect(demands.map((d) => d.installment_seq)).toEqual([1]);
     // Tower C is past Excavation, but Flexi has no Excavation installment → nothing else is caught up (SPEC L191 catch-up applies only to the plan's own installments)
@@ -62,18 +98,30 @@ describe("scenario 8 — Flexi 10:40:50 on a fresh booking", () => {
     expect((await demandsOf(h, admin, booking.id, false)).map((d) => d.installment_seq)).toEqual([1]);
     // SPEC L152 admin "run dues now" / daily job on day 60: two simultaneous runs raise it exactly once (SPEC L151 unique constraint)
     const asOf = addDays(booking.booking_date, 60);
-    const [a, b] = await Promise.all([runDues({ booking_id: booking.id, as_of: asOf }), runDues({ booking_id: booking.id, as_of: asOf })]);
+    const [a, b] = await Promise.all([
+      runDues({ booking_id: booking.id, as_of: asOf }),
+      runDues({ booking_id: booking.id, as_of: asOf }),
+    ]);
     expect(a.demands_raised + b.demands_raised).toBe(1);
     // SPEC L138: a non-void demand already exists for the installment → skipped (idempotent) on later days
     expect((await runDues({ booking_id: booking.id, as_of: asOf })).demands_raised).toBe(0);
-    expect((await runDues({ booking_id: booking.id, as_of: addDays(booking.booking_date, 61) })).demands_raised).toBe(0);
-    expect((await runDues({ booking_id: booking.id, as_of: addDays(booking.booking_date, 120) })).demands_raised).toBe(0);
+    expect((await runDues({ booking_id: booking.id, as_of: addDays(booking.booking_date, 61) })).demands_raised).toBe(
+      0,
+    );
+    expect((await runDues({ booking_id: booking.id, as_of: addDays(booking.booking_date, 120) })).demands_raised).toBe(
+      0,
+    );
     const demands = await demandsOf(h, admin, booking.id, true);
     const live = demands.filter((d) => d.status !== "VOID");
     expect(live.map((d) => d.installment_seq)).toEqual([1, 2]);
     expect(demands.filter((d) => d.installment_seq === 2)).toHaveLength(1); // never twice, not even as VOID
     // SPEC L146: cash_demand = 40 % × 60 L, account_demand = 40 % × 40 L; due date = trigger date + due-days (SPEC L148)
-    expect(live[1]).toMatchObject({ cash_demand_paise: 24 * L, account_demand_paise: 16 * L, demand_date: asOf, installment_name: "60 days after booking" });
+    expect(live[1]).toMatchObject({
+      cash_demand_paise: 24 * L,
+      account_demand_paise: 16 * L,
+      demand_date: asOf,
+      installment_name: "60 days after booking",
+    });
     expect(live[1]?.due_date).toBe(addDays(asOf, 15)); // company setting demand_due_days = 15 (bootstrap)
     const after = await getBooking(h, admin, booking.id);
     expect(after.summary.raised_percent).toBe(50);
@@ -90,15 +138,24 @@ describe("scenario 8 — the seeded Flexi booking #7 (C-502, booked 20 days ago)
     expect(b7.booking_date).toBe(addDays(h.today, -20));
     expect((await runDues({ booking_id: b7.id })).demands_raised).toBe(0); // today = day 20
     expect((await runDues({ booking_id: b7.id, as_of: addDays(b7.booking_date, 59) })).demands_raised).toBe(0);
-    const [a, b] = await Promise.all([runDues({ booking_id: b7.id, as_of: addDays(b7.booking_date, 60) }), runDues({ booking_id: b7.id, as_of: addDays(b7.booking_date, 60) })]);
+    const [a, b] = await Promise.all([
+      runDues({ booking_id: b7.id, as_of: addDays(b7.booking_date, 60) }),
+      runDues({ booking_id: b7.id, as_of: addDays(b7.booking_date, 60) }),
+    ]);
     expect(a.demands_raised + b.demands_raised).toBe(1); // SPEC L249 "exactly once … never twice"
     expect((await runDues({ booking_id: b7.id, as_of: addDays(b7.booking_date, 90) })).demands_raised).toBe(0);
     const live = (await demandsOf(h, admin, b7.id, true)).filter((d) => d.status !== "VOID");
     expect(live.map((d) => d.installment_seq)).toEqual([1, 2]);
-    expect(live[1]).toMatchObject({ cash_demand_paise: share(b7.cash_agreed_paise, 10, 50), account_demand_paise: share(b7.account_agreed_paise, 10, 50) });
+    expect(live[1]).toMatchObject({
+      cash_demand_paise: share(b7.cash_agreed_paise, 10, 50),
+      account_demand_paise: share(b7.account_agreed_paise, 10, 50),
+    });
     expect((await getBooking(h, admin, b7.id)).summary.raised_percent).toBe(50);
     // a far-future as_of is refused rather than raising everything blindly
-    const far = await h.request<ErrorBody>("POST", "/api/v1/dues/run", { token: admin, body: { booking_id: b7.id, as_of: "2099-01-01" } });
+    const far = await h.request<ErrorBody>("POST", "/api/v1/dues/run", {
+      token: admin,
+      body: { booking_id: b7.id, as_of: "2099-01-01" },
+    });
     expect(far.status).toBe(400);
   });
 });

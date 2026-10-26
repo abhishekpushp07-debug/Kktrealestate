@@ -7,7 +7,21 @@ import { T } from "./Text";
 import { colors, radius, space, toneStyles, type Tone } from "./theme";
 import { alertRegion, useAnnounce } from "./a11y";
 
-export function EmptyState({ icon = "document", title, body, action, onAction, style }: { icon?: IconName; title: string; body?: string; action?: string; onAction?: () => void; style?: StyleProp<ViewStyle> }): React.JSX.Element {
+export function EmptyState({
+  icon = "document",
+  title,
+  body,
+  action,
+  onAction,
+  style,
+}: {
+  icon?: IconName;
+  title: string;
+  body?: string;
+  action?: string;
+  onAction?: () => void;
+  style?: StyleProp<ViewStyle>;
+}): React.JSX.Element {
   return (
     <View style={[styles.wrap, style]}>
       <View style={styles.iconRing}>
@@ -21,18 +35,34 @@ export function EmptyState({ icon = "document", title, body, action, onAction, s
           {body}
         </T>
       ) : null}
-      {action && onAction ? <Button title={action} variant="outline" size="sm" onPress={onAction} style={{ marginTop: space.sm }} /> : null}
+      {action && onAction ? (
+        <Button title={action} variant="outline" size="sm" onPress={onAction} style={{ marginTop: space.sm }} />
+      ) : null}
     </View>
   );
 }
 
-export function ErrorState({ error, onRetry, title, style }: { error: unknown; onRetry?: () => void; title?: string; style?: StyleProp<ViewStyle> }): React.JSX.Element {
+export function ErrorState({
+  error,
+  onRetry,
+  title,
+  style,
+}: {
+  error: unknown;
+  onRetry?: () => void;
+  title?: string;
+  style?: StyleProp<ViewStyle>;
+}): React.JSX.Element {
   const offline = error instanceof ApiError && error.isNetwork;
   const notFound = error instanceof ApiError && error.isNotFound;
   return (
     <View style={[styles.wrap, style]}>
       <View style={[styles.iconRing, { backgroundColor: offline ? colors.warningBg : colors.dangerBg }]}>
-        <Icon name={offline ? "refresh" : notFound ? "search" : "warning"} size={26} color={offline ? colors.warning : colors.danger} />
+        <Icon
+          name={offline ? "refresh" : notFound ? "search" : "warning"}
+          size={26}
+          color={offline ? colors.warning : colors.danger}
+        />
       </View>
       <T variant="h3" align="center">
         {title ?? (offline ? "You're offline" : notFound ? "Not found" : "Couldn't load this")}
@@ -45,19 +75,46 @@ export function ErrorState({ error, onRetry, title, style }: { error: unknown; o
           {errorReference(error)}
         </T>
       ) : null}
-      {onRetry ? <Button title="Try again" variant="outline" size="sm" icon="refresh" onPress={onRetry} style={{ marginTop: space.sm }} /> : null}
+      {onRetry ? (
+        <Button
+          title="Try again"
+          variant="outline"
+          size="sm"
+          icon="refresh"
+          onPress={onRetry}
+          style={{ marginTop: space.sm }}
+        />
+      ) : null}
     </View>
   );
 }
 
 /** Inline message strip (info / warning / danger / success). */
-export function Notice({ tone = "info", title, body, icon, style, children }: { tone?: Tone; title?: string; body?: string; icon?: IconName; style?: StyleProp<ViewStyle>; children?: React.ReactNode }): React.JSX.Element {
+export function Notice({
+  tone = "info",
+  title,
+  body,
+  icon,
+  style,
+  children,
+}: {
+  tone?: Tone;
+  title?: string;
+  body?: string;
+  icon?: IconName;
+  style?: StyleProp<ViewStyle>;
+  children?: React.ReactNode;
+}): React.JSX.Element {
   const t = toneStyles[tone];
   const urgent = tone === "danger" || tone === "warning";
   useAnnounce(tone === "danger" ? [title, body].filter(Boolean).join(". ") : null);
-  const defaultIcon: IconName = tone === "danger" ? "warning" : tone === "warning" ? "clock" : tone === "success" ? "check" : "info";
+  const defaultIcon: IconName =
+    tone === "danger" ? "warning" : tone === "warning" ? "clock" : tone === "success" ? "check" : "info";
   return (
-    <View style={[styles.notice, { backgroundColor: t.bg, borderColor: t.border }, style]} {...(urgent ? alertRegion : {})}>
+    <View
+      style={[styles.notice, { backgroundColor: t.bg, borderColor: t.border }, style]}
+      {...(urgent ? alertRegion : {})}
+    >
       <Icon name={icon ?? defaultIcon} size={18} color={t.fg} style={{ marginTop: 1 }} />
       <View style={{ flex: 1, gap: 2 }}>
         {title ? (
@@ -90,7 +147,15 @@ export function StatusBar({ text, tone = "info" }: { text: string; tone?: Tone }
 
 const styles = StyleSheet.create({
   wrap: { alignItems: "center", gap: space.sm, paddingVertical: space.xxxl, paddingHorizontal: space.lg },
-  iconRing: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.gold100, alignItems: "center", justifyContent: "center", marginBottom: space.xs },
+  iconRing: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.gold100,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: space.xs,
+  },
   notice: { flexDirection: "row", gap: space.md, padding: space.md, borderRadius: radius.md, borderWidth: 1 },
   statusBar: { paddingVertical: 6, paddingHorizontal: space.lg },
 });

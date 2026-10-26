@@ -3,13 +3,31 @@ import { useEffect, useMemo, useState } from "react";
 import { FormProvider, useForm, useFormContext } from "react-hook-form";
 import { RoleCreateSchema, RoleUpdateSchema, type RoleRow } from "@kkt/contracts";
 import { z } from "zod";
-import { applyServerErrors, Badge, Button, FormError, FormField, FormRow, Input, Select, Sheet, SheetBody, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, Textarea } from "@/components/ui";
+import {
+  applyServerErrors,
+  Badge,
+  Button,
+  FormError,
+  FormField,
+  FormRow,
+  Input,
+  Select,
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  Textarea,
+} from "@/components/ui";
 import { api, type ApiClientError } from "@/lib/api";
 import { useMutationWithToast } from "@/lib/queries";
 import { contractResolver } from "@/features/shared/contractResolver";
 import { useRoleOptions } from "@/features/shared/options";
 import { PermissionMatrix, usePermissionCatalog, type PermissionGroupLike } from "./PermissionMatrix";
 import { ROLES_PATH } from "./adminApi";
+import { useOnChange } from "@/lib/utils";
 
 export interface RoleValues {
   name: string;
@@ -48,7 +66,11 @@ export function RoleFormSheet({ open, onOpenChange, role, readOnly = false }: Ro
   const isSystem = role?.is_system === true;
   const schema = isSystem ? SystemRoleEditSchema : RoleCreateSchema;
   const resolver = useMemo(() => contractResolver<RoleValues, unknown>(schema), [schema]);
-  const form = useForm<RoleValues, unknown, unknown>({ resolver, defaultValues: role ? toValues(role) : defaults(), mode: "onTouched" });
+  const form = useForm<RoleValues, unknown, unknown>({
+    resolver,
+    defaultValues: role ? toValues(role) : defaults(),
+    mode: "onTouched",
+  });
   const [serverError, setServerError] = useState<unknown>(null);
   const [copyFrom, setCopyFrom] = useState<string | null>(null);
   const catalog = usePermissionCatalog(open);
@@ -56,12 +78,16 @@ export function RoleFormSheet({ open, onOpenChange, role, readOnly = false }: Ro
 
   const roleId = role?.id ?? null;
   const roleVersion = role?.version ?? null;
+  // Local state resets while rendering; react-hook-form's reset (an external store) stays in the effect below.
+  useOnChange(open ? `${roleId}:${roleVersion}` : null, (key) => {
+    if (key === null) return;
+    setServerError(null);
+    setCopyFrom(null);
+  });
   useEffect(() => {
     if (!open) return;
     form.reset(role ? toValues(role) : defaults());
-    setServerError(null);
-    setCopyFrom(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-seed the form only when it opens or the record changes
   }, [open, roleId, roleVersion]);
 
   const handleError = (error: ApiClientError) => {
@@ -78,7 +104,8 @@ export function RoleFormSheet({ open, onOpenChange, role, readOnly = false }: Ro
     onError: handleError,
   });
   const update = useMutationWithToast<RoleRow, { id: string; version: number; body: unknown }>({
-    mutationFn: ({ id, version, body }) => api.patch<RoleRow>(`${ROLES_PATH}/${id}`, withVersion(body, version), { version }),
+    mutationFn: ({ id, version, body }) =>
+      api.patch<RoleRow>(`${ROLES_PATH}/${id}`, withVersion(body, version), { version }),
     successMessage: (saved) => `Role ${saved.name} saved`,
     invalidate: [[ROLES_PATH]],
     entityLabel: "This role",
@@ -101,7 +128,7 @@ export function RoleFormSheet({ open, onOpenChange, role, readOnly = false }: Ro
   };
 
   const matrixLocked = readOnly || isSystem;
-  const title = readOnly ? role?.name ?? "Role" : mode === "create" ? "New role" : `Edit ${role?.name ?? "role"}`;
+  const title = readOnly ? (role?.name ?? "Role") : mode === "create" ? "New role" : `Edit ${role?.name ?? "role"}`;
 
   return (
     <Sheet open={open} onOpenChange={(next) => !busy && onOpenChange(next)}>
@@ -121,17 +148,32 @@ export function RoleFormSheet({ open, onOpenChange, role, readOnly = false }: Ro
             )}
           </div>
           <SheetDescription>
-            {isSystem ? "System roles are fixed by the product specification; only the description can be edited." : "A role is a named bundle of permission codes. Users get exactly the permissions of their role."}
+            {isSystem
+              ? "System roles are fixed by the product specification; only the description can be edited."
+              : "A role is a named bundle of permission codes. Users get exactly the permissions of their role."}
           </SheetDescription>
         </SheetHeader>
         <FormProvider {...form}>
           <form onSubmit={form.handleSubmit(submit)} className="flex min-h-0 flex-1 flex-col" noValidate>
             <SheetBody className="space-y-4">
               {serverError !== null && <FormError error={serverError} />}
-              <RoleFormFields matrixLocked={matrixLocked} readOnly={readOnly} groups={catalog.groups} roles={(roles.data ?? []).filter((candidate) => candidate.id !== role?.id)} rolesPending={roles.isPending} copyFrom={copyFrom} onCopyFrom={applyCopy} />
+              <RoleFormFields
+                matrixLocked={matrixLocked}
+                readOnly={readOnly}
+                groups={catalog.groups}
+                roles={(roles.data ?? []).filter((candidate) => candidate.id !== role?.id)}
+                rolesPending={roles.isPending}
+                copyFrom={copyFrom}
+                onCopyFrom={applyCopy}
+              />
             </SheetBody>
             <SheetFooter>
-              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy} data-testid="role-form-cancel-btn">
+              <Button
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                disabled={busy}
+                data-testid="role-form-cancel-btn"
+              >
                 {readOnly ? "Close" : "Cancel"}
               </Button>
               {!readOnly && (
@@ -157,47 +199,89 @@ interface RoleFormFieldsProps {
   onCopyFrom: (roleId: string | null) => void;
 }
 
-function RoleFormFields({ matrixLocked, readOnly, groups, roles, rolesPending, copyFrom, onCopyFrom }: RoleFormFieldsProps) {
+function RoleFormFields({
+  matrixLocked,
+  readOnly,
+  groups,
+  roles,
+  rolesPending,
+  copyFrom,
+  onCopyFrom,
+}: RoleFormFieldsProps) {
   const { control } = useFormContext<RoleValues>();
   return (
     <>
-              <FormRow columns={2}>
-                <FormField
-                  control={control}
-                  name="name"
-                  label="Name"
-                  required
-                  render={({ field }) => <Input {...field} value={field.value} onChange={(event) => field.onChange(event.target.value)} disabled={matrixLocked} maxLength={120} placeholder="Site Engineer" data-testid="field-name" />}
-                />
-                {!matrixLocked && (
-                  <div className="flex flex-col gap-1">
-                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-ink-muted">
-                      <Copy className="size-3.5" aria-hidden="true" /> Copy permissions from
-                    </span>
-                    <Select
-                      aria-label="Copy permissions from role"
-                      value={copyFrom}
-                      onValueChange={onCopyFrom}
-                      options={roles.map((candidate) => ({ value: candidate.id, label: candidate.name, description: `${candidate.permissions.length} permissions` }))}
-                      placeholder={rolesPending ? "Loading…" : "Start from an existing role"}
-                      allowClear
-                      data-testid="role-copy-from"
-                    />
-                  </div>
-                )}
-                <FormField
-                  control={control}
-                  name="description"
-                  label="Description"
-                  className="sm:col-span-2"
-                  render={({ field }) => <Textarea {...field} value={field.value ?? ""} onChange={(event) => field.onChange(event.target.value || null)} disabled={readOnly} rows={2} maxLength={2000} placeholder="What this role is for" data-testid="field-description" />}
-                />
-              </FormRow>
-              <FormField
-                control={control}
-                name="permissions"
-                render={({ field }) => <PermissionMatrix id={field.id} groups={groups} value={field.value} onChange={field.onChange} readOnly={matrixLocked} invalid={field.invalid} />}
-              />
+      <FormRow columns={2}>
+        <FormField
+          control={control}
+          name="name"
+          label="Name"
+          required
+          render={({ field }) => (
+            <Input
+              {...field}
+              value={field.value}
+              onChange={(event) => field.onChange(event.target.value)}
+              disabled={matrixLocked}
+              maxLength={120}
+              placeholder="Site Engineer"
+              data-testid="field-name"
+            />
+          )}
+        />
+        {!matrixLocked && (
+          <div className="flex flex-col gap-1">
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-ink-muted">
+              <Copy className="size-3.5" aria-hidden="true" /> Copy permissions from
+            </span>
+            <Select
+              aria-label="Copy permissions from role"
+              value={copyFrom}
+              onValueChange={onCopyFrom}
+              options={roles.map((candidate) => ({
+                value: candidate.id,
+                label: candidate.name,
+                description: `${candidate.permissions.length} permissions`,
+              }))}
+              placeholder={rolesPending ? "Loading…" : "Start from an existing role"}
+              allowClear
+              data-testid="role-copy-from"
+            />
+          </div>
+        )}
+        <FormField
+          control={control}
+          name="description"
+          label="Description"
+          className="sm:col-span-2"
+          render={({ field }) => (
+            <Textarea
+              {...field}
+              value={field.value ?? ""}
+              onChange={(event) => field.onChange(event.target.value || null)}
+              disabled={readOnly}
+              rows={2}
+              maxLength={2000}
+              placeholder="What this role is for"
+              data-testid="field-description"
+            />
+          )}
+        />
+      </FormRow>
+      <FormField
+        control={control}
+        name="permissions"
+        render={({ field }) => (
+          <PermissionMatrix
+            id={field.id}
+            groups={groups}
+            value={field.value}
+            onChange={field.onChange}
+            readOnly={matrixLocked}
+            invalid={field.invalid}
+          />
+        )}
+      />
     </>
   );
 }

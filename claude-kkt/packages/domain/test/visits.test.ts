@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { availability, icsEscape, icsFold, icsForVisit, isVisitPast, slotKey, slotKeyForInstant, slotTimes, type VisitSettings } from "../src/index.js";
+import {
+  availability,
+  icsEscape,
+  icsFold,
+  icsForVisit,
+  isVisitPast,
+  slotKey,
+  slotKeyForInstant,
+  slotTimes,
+  type VisitSettings,
+} from "../src/index.js";
 
 const settings: VisitSettings = {
   enabled: true,
@@ -63,9 +73,27 @@ describe("availability", () => {
   });
   it("omits days with no slots and returns nothing when disabled", () => {
     const allFull = new Map(slotTimes("10:00", "17:00", 60).map((t) => [slotKey("2026-10-26", t.start), 3] as const));
-    expect(availability({ settings, from: "2026-10-26", to: "2026-10-26", nowIST: now, bookedCounts: allFull })).toEqual([]);
-    expect(availability({ settings: { ...settings, enabled: false }, from: "2026-10-26", to: "2026-10-26", nowIST: now, bookedCounts: new Map() })).toEqual([]);
-    expect(availability({ settings: { ...settings, maxDaysAhead: 0 }, from: "2026-10-24", to: "2026-10-30", nowIST: now, bookedCounts: new Map() }).map((d) => d.date)).toEqual(["2026-10-24"]);
+    expect(
+      availability({ settings, from: "2026-10-26", to: "2026-10-26", nowIST: now, bookedCounts: allFull }),
+    ).toEqual([]);
+    expect(
+      availability({
+        settings: { ...settings, enabled: false },
+        from: "2026-10-26",
+        to: "2026-10-26",
+        nowIST: now,
+        bookedCounts: new Map(),
+      }),
+    ).toEqual([]);
+    expect(
+      availability({
+        settings: { ...settings, maxDaysAhead: 0 },
+        from: "2026-10-24",
+        to: "2026-10-30",
+        nowIST: now,
+        bookedCounts: new Map(),
+      }).map((d) => d.date),
+    ).toEqual(["2026-10-24"]);
   });
   it("evaluates 'now' in IST regardless of the offset given", () => {
     const utcNow = "2026-10-24T06:00:00Z"; // 11:30 IST
@@ -73,11 +101,23 @@ describe("availability", () => {
     const b = availability({ settings, from: "2026-10-24", to: "2026-10-24", nowIST: now, bookedCounts: new Map() });
     expect(a).toEqual(b);
     // late evening IST: today has no slots; the date rolls correctly for a UTC instant
-    const late = availability({ settings, from: "2026-10-24", to: "2026-10-26", nowIST: "2026-10-24T18:45:00Z", bookedCounts: new Map() });
+    const late = availability({
+      settings,
+      from: "2026-10-24",
+      to: "2026-10-26",
+      nowIST: "2026-10-24T18:45:00Z",
+      bookedCounts: new Map(),
+    });
     expect(late.map((d) => d.date)).toEqual(["2026-10-26"]);
   });
   it("30-minute slots", () => {
-    const days = availability({ settings: { ...settings, slotMinutes: 30 }, from: "2026-10-26", to: "2026-10-26", nowIST: now, bookedCounts: new Map() });
+    const days = availability({
+      settings: { ...settings, slotMinutes: 30 },
+      from: "2026-10-26",
+      to: "2026-10-26",
+      nowIST: now,
+      bookedCounts: new Map(),
+    });
     expect(days[0]?.slots).toHaveLength(14);
     expect(days[0]?.slots[1]).toEqual({ start: "10:30", end: "11:00", available: 3 });
   });
@@ -109,7 +149,12 @@ describe("icsForVisit", () => {
     expect(ics).toContain("UID:SV-2526/0001@kkt");
     expect(ics).toContain("DESCRIPTION:Visit number SV-2526/0001\\; 2 visitors\\, please carry ID");
     expect(ics).toContain("URL:https://www.example.com/visit/abc");
-    expect(ics.split("\r\n").filter((l) => l.length > 0).every((l) => new TextEncoder().encode(l).length <= 75)).toBe(true);
+    expect(
+      ics
+        .split("\r\n")
+        .filter((l) => l.length > 0)
+        .every((l) => new TextEncoder().encode(l).length <= 75),
+    ).toBe(true);
     expect(ics).not.toMatch(/[^\r]\n/);
   });
   it("escapes and folds", () => {
@@ -122,8 +167,28 @@ describe("icsForVisit", () => {
     expect(icsFold("short")).toBe("short");
   });
   it("rejects bad dates/times", () => {
-    expect(() => icsForVisit({ uid: "u", summary: "s", description: "", location: "", date: "2026-13-01", start: "10:00", end: "11:00" })).toThrow();
-    expect(() => icsForVisit({ uid: "u", summary: "s", description: "", location: "", date: "2026-10-01", start: "10:60", end: "11:00" })).toThrow();
+    expect(() =>
+      icsForVisit({
+        uid: "u",
+        summary: "s",
+        description: "",
+        location: "",
+        date: "2026-13-01",
+        start: "10:00",
+        end: "11:00",
+      }),
+    ).toThrow();
+    expect(() =>
+      icsForVisit({
+        uid: "u",
+        summary: "s",
+        description: "",
+        location: "",
+        date: "2026-10-01",
+        start: "10:60",
+        end: "11:00",
+      }),
+    ).toThrow();
   });
 });
 

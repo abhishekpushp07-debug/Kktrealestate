@@ -1,11 +1,25 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Check, ClipboardCopy, FileUp, Upload } from "lucide-react";
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
 import { toast } from "sonner";
 import type { MasterCsvImportResponse, MasterCsvImportRow } from "@kkt/contracts";
-import { Badge, Button, Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, FormError, StatusChip, Textarea, type StatusTone } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  FormError,
+  StatusChip,
+  Textarea,
+  type StatusTone,
+} from "@/components/ui";
 import { formatNumber } from "@/lib/format";
-import { cn } from "@/lib/utils";
+import { cn, useOnChange } from "@/lib/utils";
 import { importMasterCsv, masterPath } from "./api";
 import type { AnyMasterConfig } from "./types";
 
@@ -44,20 +58,26 @@ export function CsvImportDialog({ config, open, onOpenChange }: CsvImportDialogP
   const [error, setError] = useState<unknown>(null);
   const [headerCopied, setHeaderCopied] = useState(false);
 
-  useEffect(() => {
-    if (open) return;
+  useOnChange(open, (isOpen) => {
+    if (isOpen) return;
     setCsv("");
     setFileName(null);
     setPreview(null);
     setPreviewedCsv(null);
     setBusy(null);
     setError(null);
-  }, [open]);
+  });
 
   const header = config.csv.columns.join(",");
   const stale = preview !== null && previewedCsv !== csv;
   const canPreview = csv.trim().length > 0 && busy === null;
-  const canCommit = preview !== null && !preview.committed && !stale && preview.summary.error === 0 && preview.summary.create + preview.summary.update > 0 && busy === null;
+  const canCommit =
+    preview !== null &&
+    !preview.committed &&
+    !stale &&
+    preview.summary.error === 0 &&
+    preview.summary.create + preview.summary.update > 0 &&
+    busy === null;
 
   const run = async (commit: boolean) => {
     setBusy(commit ? "commit" : "preview");
@@ -110,13 +130,22 @@ export function CsvImportDialog({ config, open, onOpenChange }: CsvImportDialogP
       <DialogContent size="xl" data-testid={`csv-import-dialog-${config.slug}`}>
         <DialogHeader>
           <DialogTitle>Import {config.label.toLowerCase()} from CSV</DialogTitle>
-          <DialogDescription>Rows are matched on code (or name) — existing records are updated, new ones created. Nothing is written until you commit.</DialogDescription>
+          <DialogDescription>
+            Rows are matched on code (or name) — existing records are updated, new ones created. Nothing is written
+            until you commit.
+          </DialogDescription>
         </DialogHeader>
         <DialogBody className="space-y-4">
           <div className="rounded-md border border-border bg-surface/60 p-3 text-xs">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="label-caps">Expected columns</span>
-              <Button variant="ghost" size="xs" leftIcon={headerCopied ? Check : ClipboardCopy} onClick={() => void copyHeader()} data-testid="csv-copy-template-btn">
+              <Button
+                variant="ghost"
+                size="xs"
+                leftIcon={headerCopied ? Check : ClipboardCopy}
+                onClick={() => void copyHeader()}
+                data-testid="csv-copy-template-btn"
+              >
                 {headerCopied ? "Copied" : "Copy template"}
               </Button>
             </div>
@@ -129,8 +158,23 @@ export function CsvImportDialog({ config, open, onOpenChange }: CsvImportDialogP
               <label htmlFor="csv-import-text" className="text-xs font-semibold text-ink-muted">
                 CSV text {fileName && <span className="font-normal text-ink-subtle">· {fileName}</span>}
               </label>
-              <input ref={fileInput} type="file" accept=".csv,text/csv,text/plain" className="sr-only" tabIndex={-1} aria-label="CSV file" onChange={onFile} data-testid="csv-file-input" />
-              <Button variant="outline" size="sm" leftIcon={FileUp} onClick={() => fileInput.current?.click()} data-testid="csv-upload-btn">
+              <input
+                ref={fileInput}
+                type="file"
+                accept=".csv,text/csv,text/plain"
+                className="sr-only"
+                tabIndex={-1}
+                aria-label="CSV file"
+                onChange={onFile}
+                data-testid="csv-file-input"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                leftIcon={FileUp}
+                onClick={() => fileInput.current?.click()}
+                data-testid="csv-upload-btn"
+              >
                 Upload .csv
               </Button>
             </div>
@@ -148,7 +192,9 @@ export function CsvImportDialog({ config, open, onOpenChange }: CsvImportDialogP
               data-testid="csv-import-textarea"
             />
             <p className="money text-2xs text-ink-subtle">
-              {csv ? `${formatNumber(csv.split(/\r?\n/).filter((line) => line.trim()).length)} lines` : "Paste rows including the header line, or upload a file."}
+              {csv
+                ? `${formatNumber(csv.split(/\r?\n/).filter((line) => line.trim()).length)} lines`
+                : "Paste rows including the header line, or upload a file."}
             </p>
           </div>
 
@@ -157,7 +203,9 @@ export function CsvImportDialog({ config, open, onOpenChange }: CsvImportDialogP
           {preview && (
             <div className="space-y-2">
               <div className="flex flex-wrap items-center gap-2 text-xs">
-                <span className="label-caps">{preview.committed ? "Imported" : stale ? "Preview (out of date)" : "Preview"}</span>
+                <span className="label-caps">
+                  {preview.committed ? "Imported" : stale ? "Preview (out of date)" : "Preview"}
+                </span>
                 <Badge variant="success" numeric>
                   {preview.summary.create} create
                 </Badge>
@@ -184,12 +232,18 @@ export function CsvImportDialog({ config, open, onOpenChange }: CsvImportDialogP
                   </thead>
                   <tbody>
                     {preview.rows.map((row) => (
-                      <tr key={row.line} className={cn("border-t border-border", row.action === "ERROR" && "bg-danger-bg/40")} data-testid={`csv-row-${row.line}`}>
+                      <tr
+                        key={row.line}
+                        className={cn("border-t border-border", row.action === "ERROR" && "bg-danger-bg/40")}
+                        data-testid={`csv-row-${row.line}`}
+                      >
                         <td className="money px-2 py-1.5 text-right text-ink-subtle">{row.line}</td>
                         <td className="px-2 py-1.5">
                           <StatusChip status={row.action} tone={ACTION_TONES[row.action]} size="sm" />
                         </td>
-                        <td className="px-2 py-1.5 text-ink">{summariseData(row.data) || <span className="text-ink-subtle">—</span>}</td>
+                        <td className="px-2 py-1.5 text-ink">
+                          {summariseData(row.data) || <span className="text-ink-subtle">—</span>}
+                        </td>
                         <td className="px-2 py-1.5 text-danger-fg">
                           {row.errors.length > 0 ? (
                             <ul className="list-disc pl-4">
@@ -217,16 +271,37 @@ export function CsvImportDialog({ config, open, onOpenChange }: CsvImportDialogP
           )}
         </DialogBody>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy !== null} data-testid="csv-close-btn">
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={busy !== null}
+            data-testid="csv-close-btn"
+          >
             {preview?.committed ? "Done" : "Cancel"}
           </Button>
           {!preview?.committed && (
             <>
-              <Button variant={preview && !stale ? "outline" : "primary"} leftIcon={Upload} loading={busy === "preview"} disabled={!canPreview} onClick={() => void run(false)} data-testid="csv-preview-btn">
+              <Button
+                variant={preview && !stale ? "outline" : "primary"}
+                leftIcon={Upload}
+                loading={busy === "preview"}
+                disabled={!canPreview}
+                onClick={() => void run(false)}
+                data-testid="csv-preview-btn"
+              >
                 {preview ? "Re-run preview" : "Preview"}
               </Button>
-              <Button variant="gold" loading={busy === "commit"} disabled={!canCommit} onClick={() => void run(true)} data-testid="csv-commit-btn">
-                Commit {preview && !stale && preview.summary.error === 0 ? `${formatNumber(preview.summary.create + preview.summary.update)} rows` : ""}
+              <Button
+                variant="gold"
+                loading={busy === "commit"}
+                disabled={!canCommit}
+                onClick={() => void run(true)}
+                data-testid="csv-commit-btn"
+              >
+                Commit{" "}
+                {preview && !stale && preview.summary.error === 0
+                  ? `${formatNumber(preview.summary.create + preview.summary.update)} rows`
+                  : ""}
               </Button>
             </>
           )}

@@ -45,6 +45,7 @@ import { contractResolver } from "@/features/shared/contractResolver";
 import { useMasterRows } from "@/features/masters/api";
 import { useUserOptions } from "@/features/shared/options";
 import { PROJECTS_PATH } from "./api";
+import { useOnChange } from "@/lib/utils";
 
 export interface ProjectValues {
   name: string;
@@ -69,37 +70,46 @@ export interface ProjectValues {
 const nullable = (value: string): string | null => (value.trim() === "" ? null : value.trim());
 
 /** UI state → wire payload (empty strings become null, repeaters are cleaned). */
-const ProjectFormSchema = z
-  .looseObject({})
-  .transform((raw): unknown => {
-    const values = raw as unknown as ProjectValues;
-    return {
-      name: values.name,
-      code: values.code,
-      project_type: values.project_type,
-      status: values.status,
-      description: nullable(values.description),
-      address: {
-        line1: values.address.line1,
-        line2: nullable(values.address.line2),
-        locality: nullable(values.address.locality),
-        city: values.address.city,
-        state: values.address.state,
-        pincode: values.address.pincode,
-      },
-      rera_number: nullable(values.rera_number),
-      launch_date: values.launch_date,
-      possession_date: values.possession_date,
-      land_area_sqft: values.land_area_sqft,
-      latitude: values.latitude,
-      longitude: values.longitude,
-      escrow_bank_account_id: values.escrow_bank_account_id,
-      amenity_ids: values.amenity_ids,
-      landmarks: values.landmarks.filter((item) => item.name.trim() !== "").map((item) => ({ name: item.name.trim(), distance_km: item.distance_km ?? 0 })),
-      approvals: values.approvals.filter((item) => item.name.trim() !== "").map((item) => ({ name: item.name.trim(), number: nullable(item.number), issued_on: item.issued_on, status: item.status })),
-      team: values.team.filter((item) => item.user_id).map((item) => ({ user_id: item.user_id, role_label: nullable(item.role_label) })),
-    };
-  });
+const ProjectFormSchema = z.looseObject({}).transform((raw): unknown => {
+  const values = raw as unknown as ProjectValues;
+  return {
+    name: values.name,
+    code: values.code,
+    project_type: values.project_type,
+    status: values.status,
+    description: nullable(values.description),
+    address: {
+      line1: values.address.line1,
+      line2: nullable(values.address.line2),
+      locality: nullable(values.address.locality),
+      city: values.address.city,
+      state: values.address.state,
+      pincode: values.address.pincode,
+    },
+    rera_number: nullable(values.rera_number),
+    launch_date: values.launch_date,
+    possession_date: values.possession_date,
+    land_area_sqft: values.land_area_sqft,
+    latitude: values.latitude,
+    longitude: values.longitude,
+    escrow_bank_account_id: values.escrow_bank_account_id,
+    amenity_ids: values.amenity_ids,
+    landmarks: values.landmarks
+      .filter((item) => item.name.trim() !== "")
+      .map((item) => ({ name: item.name.trim(), distance_km: item.distance_km ?? 0 })),
+    approvals: values.approvals
+      .filter((item) => item.name.trim() !== "")
+      .map((item) => ({
+        name: item.name.trim(),
+        number: nullable(item.number),
+        issued_on: item.issued_on,
+        status: item.status,
+      })),
+    team: values.team
+      .filter((item) => item.user_id)
+      .map((item) => ({ user_id: item.user_id, role_label: nullable(item.role_label) })),
+  };
+});
 
 const CreateSchema = ProjectFormSchema.pipe(ProjectCreateSchema);
 const EditSchema = ProjectFormSchema.pipe(ProjectUpdateSchema.omit({ version: true }));
@@ -150,7 +160,12 @@ export function projectToValues(project: ProjectRow): ProjectValues {
     escrow_bank_account_id: project.escrow_bank_account_id,
     amenity_ids: [...project.amenity_ids],
     landmarks: project.landmarks.map((item) => ({ name: item.name, distance_km: item.distance_km })),
-    approvals: project.approvals.map((item) => ({ name: item.name, number: item.number ?? "", issued_on: item.issued_on, status: item.status })),
+    approvals: project.approvals.map((item) => ({
+      name: item.name,
+      number: item.number ?? "",
+      issued_on: item.issued_on,
+      status: item.status,
+    })),
     team: project.team.map((item) => ({ user_id: item.user_id, role_label: item.role_label ?? "" })),
   };
 }
@@ -167,16 +182,24 @@ export function ProjectFormSheet({ open, onOpenChange, project, onSaved }: Proje
   const mode = project ? "edit" : "create";
   const schema = mode === "edit" ? EditSchema : CreateSchema;
   const resolver = useMemo(() => contractResolver<ProjectValues, unknown>(schema), [schema]);
-  const form = useForm<ProjectValues, unknown, unknown>({ resolver, defaultValues: project ? projectToValues(project) : defaultProjectValues(), mode: "onTouched" });
+  const form = useForm<ProjectValues, unknown, unknown>({
+    resolver,
+    defaultValues: project ? projectToValues(project) : defaultProjectValues(),
+    mode: "onTouched",
+  });
   const [serverError, setServerError] = useState<unknown>(null);
 
   const projectId = project?.id ?? null;
   const projectVersion = project?.version ?? null;
+  // Local state resets while rendering; react-hook-form's reset (an external store) stays in the effect below.
+  useOnChange(open ? `${projectId}:${projectVersion}` : null, (key) => {
+    if (key === null) return;
+    setServerError(null);
+  });
   useEffect(() => {
     if (!open) return;
     form.reset(project ? projectToValues(project) : defaultProjectValues());
-    setServerError(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-seed the form only when it opens or the record changes
   }, [open, projectId, projectVersion]);
 
   const handleError = (error: ApiClientError) => {
@@ -197,7 +220,8 @@ export function ProjectFormSheet({ open, onOpenChange, project, onSaved }: Proje
   });
 
   const update = useMutationWithToast<ProjectRow, { id: string; version: number; body: unknown }>({
-    mutationFn: ({ id, version, body }) => api.patch<ProjectRow>(`${PROJECTS_PATH}/${id}`, { ...(body as Record<string, unknown>), version }, { version }),
+    mutationFn: ({ id, version, body }) =>
+      api.patch<ProjectRow>(`${PROJECTS_PATH}/${id}`, { ...(body as Record<string, unknown>), version }, { version }),
     successMessage: (saved) => `${saved.name} saved`,
     invalidate: [[PROJECTS_PATH]],
     entityLabel: "This project",
@@ -228,7 +252,11 @@ export function ProjectFormSheet({ open, onOpenChange, project, onSaved }: Proje
               </Badge>
             )}
           </div>
-          <SheetDescription>{project ? `${project.code} · updated ${formatDateTime(project.updated_at)}` : "Blocks, flats, rate cards and the website page hang off a project."}</SheetDescription>
+          <SheetDescription>
+            {project
+              ? `${project.code} · updated ${formatDateTime(project.updated_at)}`
+              : "Blocks, flats, rate cards and the website page hang off a project."}
+          </SheetDescription>
         </SheetHeader>
         <FormProvider {...form}>
           <form onSubmit={form.handleSubmit(submit)} className="flex min-h-0 flex-1 flex-col" noValidate>
@@ -237,7 +265,12 @@ export function ProjectFormSheet({ open, onOpenChange, project, onSaved }: Proje
               <ProjectFormFields open={open} />
             </SheetBody>
             <SheetFooter>
-              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy} data-testid="project-form-cancel-btn">
+              <Button
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                disabled={busy}
+                data-testid="project-form-cancel-btn"
+              >
                 Cancel
               </Button>
               <Button type="submit" loading={busy} data-testid="project-form-submit-btn">
@@ -260,57 +293,387 @@ function ProjectFormFields({ open }: { open: boolean }) {
   const approvals = useFieldArray({ control, name: "approvals" });
   const team = useFieldArray({ control, name: "team" });
 
-  const amenityOptions = useMemo(() => (amenities.data ?? []).map((row) => ({ value: row.id, label: row.name, description: row.category ?? undefined })), [amenities.data]);
-  const bankOptions = useMemo(() => (banks.data ?? []).map((row) => ({ value: row.id, label: `${row.bank_name} · ${row.account_number_masked}`, description: row.is_escrow ? "Escrow account" : row.account_name })), [banks.data]);
-  const userOptions = useMemo(() => (users.data ?? []).filter((user) => user.is_active).map((user) => ({ value: user.id, label: user.name, description: user.role_name, keywords: [user.email] })), [users.data]);
+  const amenityOptions = useMemo(
+    () =>
+      (amenities.data ?? []).map((row) => ({ value: row.id, label: row.name, description: row.category ?? undefined })),
+    [amenities.data],
+  );
+  const bankOptions = useMemo(
+    () =>
+      (banks.data ?? []).map((row) => ({
+        value: row.id,
+        label: `${row.bank_name} · ${row.account_number_masked}`,
+        description: row.is_escrow ? "Escrow account" : row.account_name,
+      })),
+    [banks.data],
+  );
+  const userOptions = useMemo(
+    () =>
+      (users.data ?? [])
+        .filter((user) => user.is_active)
+        .map((user) => ({ value: user.id, label: user.name, description: user.role_name, keywords: [user.email] })),
+    [users.data],
+  );
 
   return (
     <>
       <FormSection title="Identity">
         <FormRow columns={2}>
-          <FormField control={control} name="name" label="Project name" required render={({ field }) => <Input {...field} value={field.value} onChange={(event) => field.onChange(event.target.value)} maxLength={120} data-testid="field-project-name" />} />
-          <FormField control={control} name="code" label="Code" required hint="Upper-case, unique" render={({ field }) => <Input {...field} value={field.value} onChange={(event) => field.onChange(event.target.value.toUpperCase())} maxLength={30} className="font-mono uppercase" data-testid="field-project-code" />} />
-          <FormField control={control} name="project_type" label="Type" required render={({ field }) => <Select id={field.id} value={field.value} onValueChange={field.onChange} options={PROJECT_TYPES.map((value) => ({ value, label: PROJECT_TYPE_LABELS[value] }))} invalid={field.invalid} data-testid="field-project-type" />} />
-          <FormField control={control} name="status" label="Status" required render={({ field }) => <Select id={field.id} value={field.value} onValueChange={(value) => field.onChange(value ?? "PLANNING")} options={PROJECT_STATUSES.map((value) => ({ value, label: PROJECT_STATUS_LABELS[value] }))} data-testid="field-project-status" />} />
-          <FormField control={control} name="description" label="Description" className="sm:col-span-2" render={({ field }) => <Textarea {...field} value={field.value} onChange={(event) => field.onChange(event.target.value)} rows={3} maxLength={2000} placeholder="Shown on the website overview when published" />} />
+          <FormField
+            control={control}
+            name="name"
+            label="Project name"
+            required
+            render={({ field }) => (
+              <Input
+                {...field}
+                value={field.value}
+                onChange={(event) => field.onChange(event.target.value)}
+                maxLength={120}
+                data-testid="field-project-name"
+              />
+            )}
+          />
+          <FormField
+            control={control}
+            name="code"
+            label="Code"
+            required
+            hint="Upper-case, unique"
+            render={({ field }) => (
+              <Input
+                {...field}
+                value={field.value}
+                onChange={(event) => field.onChange(event.target.value.toUpperCase())}
+                maxLength={30}
+                className="font-mono uppercase"
+                data-testid="field-project-code"
+              />
+            )}
+          />
+          <FormField
+            control={control}
+            name="project_type"
+            label="Type"
+            required
+            render={({ field }) => (
+              <Select
+                id={field.id}
+                value={field.value}
+                onValueChange={field.onChange}
+                options={PROJECT_TYPES.map((value) => ({ value, label: PROJECT_TYPE_LABELS[value] }))}
+                invalid={field.invalid}
+                data-testid="field-project-type"
+              />
+            )}
+          />
+          <FormField
+            control={control}
+            name="status"
+            label="Status"
+            required
+            render={({ field }) => (
+              <Select
+                id={field.id}
+                value={field.value}
+                onValueChange={(value) => field.onChange(value ?? "PLANNING")}
+                options={PROJECT_STATUSES.map((value) => ({ value, label: PROJECT_STATUS_LABELS[value] }))}
+                data-testid="field-project-status"
+              />
+            )}
+          />
+          <FormField
+            control={control}
+            name="description"
+            label="Description"
+            className="sm:col-span-2"
+            render={({ field }) => (
+              <Textarea
+                {...field}
+                value={field.value}
+                onChange={(event) => field.onChange(event.target.value)}
+                rows={3}
+                maxLength={2000}
+                placeholder="Shown on the website overview when published"
+              />
+            )}
+          />
         </FormRow>
       </FormSection>
 
       <FormSection title="Location">
         <FormRow columns={2}>
-          <FormField control={control} name="address.line1" label="Address line 1" required className="sm:col-span-2" render={({ field }) => <Input {...field} value={field.value} onChange={(event) => field.onChange(event.target.value)} maxLength={200} />} />
-          <FormField control={control} name="address.line2" label="Address line 2" render={({ field }) => <Input {...field} value={field.value} onChange={(event) => field.onChange(event.target.value)} maxLength={200} />} />
-          <FormField control={control} name="address.locality" label="Locality" render={({ field }) => <Input {...field} value={field.value} onChange={(event) => field.onChange(event.target.value)} maxLength={120} />} />
-          <FormField control={control} name="address.city" label="City" required render={({ field }) => <Input {...field} value={field.value} onChange={(event) => field.onChange(event.target.value)} maxLength={80} />} />
-          <FormField control={control} name="address.state" label="State" required render={({ field }) => <Input {...field} value={field.value} onChange={(event) => field.onChange(event.target.value)} maxLength={80} />} />
-          <FormField control={control} name="address.pincode" label="PIN code" required render={({ field }) => <Input {...field} value={field.value} onChange={(event) => field.onChange(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" maxLength={6} className="money" />} />
-          <FormField control={control} name="latitude" label="Latitude" render={({ field }) => <NumberInput id={field.id} value={field.value} onChange={field.onChange} onBlur={field.onBlur} decimals={6} min={-90} max={90} allowNegative align="left" />} />
-          <FormField control={control} name="longitude" label="Longitude" render={({ field }) => <NumberInput id={field.id} value={field.value} onChange={field.onChange} onBlur={field.onBlur} decimals={6} min={-180} max={180} allowNegative align="left" />} />
+          <FormField
+            control={control}
+            name="address.line1"
+            label="Address line 1"
+            required
+            className="sm:col-span-2"
+            render={({ field }) => (
+              <Input
+                {...field}
+                value={field.value}
+                onChange={(event) => field.onChange(event.target.value)}
+                maxLength={200}
+              />
+            )}
+          />
+          <FormField
+            control={control}
+            name="address.line2"
+            label="Address line 2"
+            render={({ field }) => (
+              <Input
+                {...field}
+                value={field.value}
+                onChange={(event) => field.onChange(event.target.value)}
+                maxLength={200}
+              />
+            )}
+          />
+          <FormField
+            control={control}
+            name="address.locality"
+            label="Locality"
+            render={({ field }) => (
+              <Input
+                {...field}
+                value={field.value}
+                onChange={(event) => field.onChange(event.target.value)}
+                maxLength={120}
+              />
+            )}
+          />
+          <FormField
+            control={control}
+            name="address.city"
+            label="City"
+            required
+            render={({ field }) => (
+              <Input
+                {...field}
+                value={field.value}
+                onChange={(event) => field.onChange(event.target.value)}
+                maxLength={80}
+              />
+            )}
+          />
+          <FormField
+            control={control}
+            name="address.state"
+            label="State"
+            required
+            render={({ field }) => (
+              <Input
+                {...field}
+                value={field.value}
+                onChange={(event) => field.onChange(event.target.value)}
+                maxLength={80}
+              />
+            )}
+          />
+          <FormField
+            control={control}
+            name="address.pincode"
+            label="PIN code"
+            required
+            render={({ field }) => (
+              <Input
+                {...field}
+                value={field.value}
+                onChange={(event) => field.onChange(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                inputMode="numeric"
+                maxLength={6}
+                className="money"
+              />
+            )}
+          />
+          <FormField
+            control={control}
+            name="latitude"
+            label="Latitude"
+            render={({ field }) => (
+              <NumberInput
+                id={field.id}
+                value={field.value}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                decimals={6}
+                min={-90}
+                max={90}
+                allowNegative
+                align="left"
+              />
+            )}
+          />
+          <FormField
+            control={control}
+            name="longitude"
+            label="Longitude"
+            render={({ field }) => (
+              <NumberInput
+                id={field.id}
+                value={field.value}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                decimals={6}
+                min={-180}
+                max={180}
+                allowNegative
+                align="left"
+              />
+            )}
+          />
         </FormRow>
       </FormSection>
 
       <FormSection title="Statutory & timeline">
         <FormRow columns={2}>
-          <FormField control={control} name="rera_number" label="RERA number" render={({ field }) => <Input {...field} value={field.value} onChange={(event) => field.onChange(event.target.value)} maxLength={60} className="font-mono" />} />
-          <FormField control={control} name="land_area_sqft" label="Land area" render={({ field }) => <NumberInput id={field.id} value={field.value} onChange={field.onChange} onBlur={field.onBlur} decimals={2} min={0} suffix="sq ft" />} />
-          <FormField control={control} name="launch_date" label="Launch date" render={({ field }) => <DateInput id={field.id} value={field.value} onChange={field.onChange} onBlur={field.onBlur} />} />
-          <FormField control={control} name="possession_date" label="Possession date" render={({ field }) => <DateInput id={field.id} value={field.value} onChange={field.onChange} onBlur={field.onBlur} />} />
-          <FormField control={control} name="escrow_bank_account_id" label="Escrow bank account" className="sm:col-span-2" render={({ field }) => <Select id={field.id} value={field.value} onValueChange={field.onChange} options={bankOptions} placeholder={banks.isPending ? "Loading…" : "None"} allowClear />} />
+          <FormField
+            control={control}
+            name="rera_number"
+            label="RERA number"
+            render={({ field }) => (
+              <Input
+                {...field}
+                value={field.value}
+                onChange={(event) => field.onChange(event.target.value)}
+                maxLength={60}
+                className="font-mono"
+              />
+            )}
+          />
+          <FormField
+            control={control}
+            name="land_area_sqft"
+            label="Land area"
+            render={({ field }) => (
+              <NumberInput
+                id={field.id}
+                value={field.value}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                decimals={2}
+                min={0}
+                suffix="sq ft"
+              />
+            )}
+          />
+          <FormField
+            control={control}
+            name="launch_date"
+            label="Launch date"
+            render={({ field }) => (
+              <DateInput id={field.id} value={field.value} onChange={field.onChange} onBlur={field.onBlur} />
+            )}
+          />
+          <FormField
+            control={control}
+            name="possession_date"
+            label="Possession date"
+            render={({ field }) => (
+              <DateInput id={field.id} value={field.value} onChange={field.onChange} onBlur={field.onBlur} />
+            )}
+          />
+          <FormField
+            control={control}
+            name="escrow_bank_account_id"
+            label="Escrow bank account"
+            className="sm:col-span-2"
+            render={({ field }) => (
+              <Select
+                id={field.id}
+                value={field.value}
+                onValueChange={field.onChange}
+                options={bankOptions}
+                placeholder={banks.isPending ? "Loading…" : "None"}
+                allowClear
+              />
+            )}
+          />
         </FormRow>
       </FormSection>
 
       <FormSection title="Approvals" description="RERA, building plan, fire NOC and other statutory approvals.">
         <div className="space-y-2">
           {approvals.fields.map((item, index) => (
-            <div key={item.id} className="grid grid-cols-[1fr_auto] gap-2 rounded-md border border-border p-2 sm:grid-cols-[1.4fr_1fr_9rem_8rem_auto] sm:items-end sm:border-0 sm:p-0">
-              <FormField control={control} name={`approvals.${index}.name`} label={index === 0 ? "Approval" : undefined} render={({ field }) => <Input {...field} value={field.value} onChange={(event) => field.onChange(event.target.value)} placeholder="RERA registration" maxLength={120} aria-label="Approval name" />} />
-              <FormField control={control} name={`approvals.${index}.number`} label={index === 0 ? "Number" : undefined} className="col-span-2 sm:col-span-1" render={({ field }) => <Input {...field} value={field.value} onChange={(event) => field.onChange(event.target.value)} maxLength={80} className="font-mono" aria-label="Approval number" />} />
-              <FormField control={control} name={`approvals.${index}.issued_on`} label={index === 0 ? "Issued on" : undefined} className="col-span-2 sm:col-span-1" render={({ field }) => <DateInput id={field.id} value={field.value} onChange={field.onChange} aria-label="Issued on" />} />
-              <FormField control={control} name={`approvals.${index}.status`} label={index === 0 ? "Status" : undefined} render={({ field }) => <Select id={field.id} value={field.value} onValueChange={(value) => field.onChange(value ?? "RECEIVED")} options={APPROVAL_STATUSES.map((value) => ({ value, label: value === "NA" ? "Not applicable" : value.charAt(0) + value.slice(1).toLowerCase() }))} aria-label="Approval status" />} />
-              <IconButton icon={Trash2} label="Remove approval" size="sm" onClick={() => approvals.remove(index)} className="self-end" />
+            <div
+              key={item.id}
+              className="grid grid-cols-[1fr_auto] gap-2 rounded-md border border-border p-2 sm:grid-cols-[1.4fr_1fr_9rem_8rem_auto] sm:items-end sm:border-0 sm:p-0"
+            >
+              <FormField
+                control={control}
+                name={`approvals.${index}.name`}
+                label={index === 0 ? "Approval" : undefined}
+                render={({ field }) => (
+                  <Input
+                    {...field}
+                    value={field.value}
+                    onChange={(event) => field.onChange(event.target.value)}
+                    placeholder="RERA registration"
+                    maxLength={120}
+                    aria-label="Approval name"
+                  />
+                )}
+              />
+              <FormField
+                control={control}
+                name={`approvals.${index}.number`}
+                label={index === 0 ? "Number" : undefined}
+                className="col-span-2 sm:col-span-1"
+                render={({ field }) => (
+                  <Input
+                    {...field}
+                    value={field.value}
+                    onChange={(event) => field.onChange(event.target.value)}
+                    maxLength={80}
+                    className="font-mono"
+                    aria-label="Approval number"
+                  />
+                )}
+              />
+              <FormField
+                control={control}
+                name={`approvals.${index}.issued_on`}
+                label={index === 0 ? "Issued on" : undefined}
+                className="col-span-2 sm:col-span-1"
+                render={({ field }) => (
+                  <DateInput id={field.id} value={field.value} onChange={field.onChange} aria-label="Issued on" />
+                )}
+              />
+              <FormField
+                control={control}
+                name={`approvals.${index}.status`}
+                label={index === 0 ? "Status" : undefined}
+                render={({ field }) => (
+                  <Select
+                    id={field.id}
+                    value={field.value}
+                    onValueChange={(value) => field.onChange(value ?? "RECEIVED")}
+                    options={APPROVAL_STATUSES.map((value) => ({
+                      value,
+                      label: value === "NA" ? "Not applicable" : value.charAt(0) + value.slice(1).toLowerCase(),
+                    }))}
+                    aria-label="Approval status"
+                  />
+                )}
+              />
+              <IconButton
+                icon={Trash2}
+                label="Remove approval"
+                size="sm"
+                onClick={() => approvals.remove(index)}
+                className="self-end"
+              />
             </div>
           ))}
-          <Button variant="outline" size="sm" leftIcon={Plus} onClick={() => approvals.append({ name: "", number: "", issued_on: null, status: "RECEIVED" })} data-testid="add-approval-btn">
+          <Button
+            variant="outline"
+            size="sm"
+            leftIcon={Plus}
+            onClick={() => approvals.append({ name: "", number: "", issued_on: null, status: "RECEIVED" })}
+            data-testid="add-approval-btn"
+          >
             Add approval
           </Button>
         </div>
@@ -320,12 +683,49 @@ function ProjectFormFields({ open }: { open: boolean }) {
         <div className="space-y-2">
           {landmarks.fields.map((item, index) => (
             <div key={item.id} className="grid grid-cols-[1fr_7rem_auto] items-end gap-2">
-              <FormField control={control} name={`landmarks.${index}.name`} label={index === 0 ? "Landmark" : undefined} render={({ field }) => <Input {...field} value={field.value} onChange={(event) => field.onChange(event.target.value)} placeholder="Metro station" maxLength={120} aria-label="Landmark" />} />
-              <FormField control={control} name={`landmarks.${index}.distance_km`} label={index === 0 ? "Distance" : undefined} render={({ field }) => <NumberInput id={field.id} value={field.value} onChange={field.onChange} onBlur={field.onBlur} decimals={1} min={0} max={999} suffix="km" aria-label="Distance in km" />} />
+              <FormField
+                control={control}
+                name={`landmarks.${index}.name`}
+                label={index === 0 ? "Landmark" : undefined}
+                render={({ field }) => (
+                  <Input
+                    {...field}
+                    value={field.value}
+                    onChange={(event) => field.onChange(event.target.value)}
+                    placeholder="Metro station"
+                    maxLength={120}
+                    aria-label="Landmark"
+                  />
+                )}
+              />
+              <FormField
+                control={control}
+                name={`landmarks.${index}.distance_km`}
+                label={index === 0 ? "Distance" : undefined}
+                render={({ field }) => (
+                  <NumberInput
+                    id={field.id}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    decimals={1}
+                    min={0}
+                    max={999}
+                    suffix="km"
+                    aria-label="Distance in km"
+                  />
+                )}
+              />
               <IconButton icon={Trash2} label="Remove landmark" size="sm" onClick={() => landmarks.remove(index)} />
             </div>
           ))}
-          <Button variant="outline" size="sm" leftIcon={Plus} onClick={() => landmarks.append({ name: "", distance_km: null })} data-testid="add-landmark-btn">
+          <Button
+            variant="outline"
+            size="sm"
+            leftIcon={Plus}
+            onClick={() => landmarks.append({ name: "", distance_km: null })}
+            data-testid="add-landmark-btn"
+          >
             Add landmark
           </Button>
         </div>
@@ -335,19 +735,75 @@ function ProjectFormFields({ open }: { open: boolean }) {
         <div className="space-y-2">
           {team.fields.map((item, index) => (
             <div key={item.id} className="grid grid-cols-[1fr_auto] items-end gap-2 sm:grid-cols-[1.4fr_1fr_auto]">
-              <FormField control={control} name={`team.${index}.user_id`} label={index === 0 ? "User" : undefined} render={({ field }) => <Combobox id={field.id} value={field.value} onValueChange={(value) => field.onChange(value)} options={userOptions} placeholder={users.isPending ? "Loading…" : "Pick a user"} aria-label="Team member" />} />
-              <FormField control={control} name={`team.${index}.role_label`} label={index === 0 ? "Role" : undefined} className="col-span-2 sm:col-span-1" render={({ field }) => <Input {...field} value={field.value} onChange={(event) => field.onChange(event.target.value)} placeholder="Site engineer" maxLength={60} aria-label="Role label" />} />
-              <IconButton icon={Trash2} label="Remove team member" size="sm" onClick={() => team.remove(index)} className="self-end" />
+              <FormField
+                control={control}
+                name={`team.${index}.user_id`}
+                label={index === 0 ? "User" : undefined}
+                render={({ field }) => (
+                  <Combobox
+                    id={field.id}
+                    value={field.value}
+                    onValueChange={(value) => field.onChange(value)}
+                    options={userOptions}
+                    placeholder={users.isPending ? "Loading…" : "Pick a user"}
+                    aria-label="Team member"
+                  />
+                )}
+              />
+              <FormField
+                control={control}
+                name={`team.${index}.role_label`}
+                label={index === 0 ? "Role" : undefined}
+                className="col-span-2 sm:col-span-1"
+                render={({ field }) => (
+                  <Input
+                    {...field}
+                    value={field.value}
+                    onChange={(event) => field.onChange(event.target.value)}
+                    placeholder="Site engineer"
+                    maxLength={60}
+                    aria-label="Role label"
+                  />
+                )}
+              />
+              <IconButton
+                icon={Trash2}
+                label="Remove team member"
+                size="sm"
+                onClick={() => team.remove(index)}
+                className="self-end"
+              />
             </div>
           ))}
-          <Button variant="outline" size="sm" leftIcon={Plus} onClick={() => team.append({ user_id: null, role_label: "" })} data-testid="add-team-btn">
+          <Button
+            variant="outline"
+            size="sm"
+            leftIcon={Plus}
+            onClick={() => team.append({ user_id: null, role_label: "" })}
+            data-testid="add-team-btn"
+          >
             Add member
           </Button>
         </div>
       </FormSection>
 
       <FormSection title="Amenities">
-        <FormField control={control} name="amenity_ids" render={({ field }) => <MultiSelect id={field.id} value={field.value} onValueChange={field.onChange} options={amenityOptions} placeholder={amenities.isPending ? "Loading…" : "Pick amenities"} maxChips={6} aria-label="Amenities" data-testid="field-amenities" />} />
+        <FormField
+          control={control}
+          name="amenity_ids"
+          render={({ field }) => (
+            <MultiSelect
+              id={field.id}
+              value={field.value}
+              onValueChange={field.onChange}
+              options={amenityOptions}
+              placeholder={amenities.isPending ? "Loading…" : "Pick amenities"}
+              maxChips={6}
+              aria-label="Amenities"
+              data-testid="field-amenities"
+            />
+          )}
+        />
       </FormSection>
     </>
   );

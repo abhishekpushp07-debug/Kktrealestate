@@ -1,8 +1,22 @@
 import { ArrowRightLeft, MoreHorizontal } from "lucide-react";
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { SERVICE_STATUSES, SERVICE_STATUS_LABELS, type ServiceKanbanResponse, type ServiceRequestRow, type ServiceStatus } from "@kkt/contracts";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, IconButton } from "@/components/ui";
+import {
+  SERVICE_STATUSES,
+  SERVICE_STATUS_LABELS,
+  type ServiceKanbanResponse,
+  type ServiceRequestRow,
+  type ServiceStatus,
+} from "@kkt/contracts";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  IconButton,
+} from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { TicketCard } from "./components";
 
@@ -40,16 +54,27 @@ export function ServiceKanban({ columns, canWrite, onMove, loading = false }: Se
             <section
               key={status}
               aria-label={`${SERVICE_STATUS_LABELS[status]} (${column.count})`}
-              className={cn("flex w-[17rem] shrink-0 flex-col rounded-lg border border-border border-t-4 bg-surface/70", STATUS_ACCENT[status])}
+              className={cn(
+                "flex w-[17rem] shrink-0 flex-col rounded-lg border border-border border-t-4 bg-surface/70",
+                STATUS_ACCENT[status],
+              )}
               style={{ scrollSnapAlign: "start" }}
               data-testid={`service-column-${status}`}
             >
               <header className="flex items-center justify-between gap-2 px-3 py-2">
-                <h3 className="truncate text-xs font-bold uppercase tracking-wide text-navy-950">{SERVICE_STATUS_LABELS[status]}</h3>
-                <span className="money rounded-full bg-card px-2 text-2xs font-semibold text-ink-muted shadow-card">{column.count}</span>
+                <h3 className="truncate text-xs font-bold uppercase tracking-wide text-navy-950">
+                  {SERVICE_STATUS_LABELS[status]}
+                </h3>
+                <span className="money rounded-full bg-card px-2 text-2xs font-semibold text-ink-muted shadow-card">
+                  {column.count}
+                </span>
               </header>
               <div className="flex max-h-[calc(100dvh-22rem)] min-h-24 flex-col gap-2 overflow-y-auto px-2 pb-2 scrollbar-thin">
-                {column.tickets.length === 0 && <p className="rounded-md border border-dashed border-border px-2 py-4 text-center text-2xs text-ink-subtle">No tickets</p>}
+                {column.tickets.length === 0 && (
+                  <p className="rounded-md border border-dashed border-border px-2 py-4 text-center text-2xs text-ink-subtle">
+                    No tickets
+                  </p>
+                )}
                 {column.tickets.map((ticket) => (
                   <article
                     key={ticket.id}
@@ -67,7 +92,11 @@ export function ServiceKanban({ columns, canWrite, onMove, loading = false }: Se
                         canWrite ? (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <IconButton icon={MoreHorizontal} label={`Actions for ${ticket.ticket_number}`} size="xs" />
+                              <IconButton
+                                icon={MoreHorizontal}
+                                label={`Actions for ${ticket.ticket_number}`}
+                                size="xs"
+                              />
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuLabel>Move to</DropdownMenuLabel>

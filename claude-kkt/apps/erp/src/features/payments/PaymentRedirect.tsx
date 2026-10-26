@@ -11,7 +11,13 @@ export default function PaymentRedirect() {
   if (payment.isPending) return <PageSkeleton />;
   if (payment.isError) {
     if (isApiClientError(payment.error) && payment.error.status === 404) return <NotFoundPage />;
-    return <ErrorState error={payment.error} onRetry={() => void payment.refetch()} className="rounded-lg border border-border bg-card" />;
+    return (
+      <ErrorState
+        error={payment.error}
+        onRetry={() => void payment.refetch()}
+        className="rounded-lg border border-border bg-card"
+      />
+    );
   }
   return <Navigate to={`/bookings/${payment.data.booking_id}?tab=payments&highlight=${payment.data.id}`} replace />;
 }

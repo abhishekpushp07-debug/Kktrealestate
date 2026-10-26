@@ -62,7 +62,8 @@ export interface SelectFieldDef<Values extends FieldValues> extends FieldBase<Va
   allowClear?: boolean;
 }
 
-export type FieldDef<Values extends FieldValues> = TextFieldDef<Values> | NumberFieldDef<Values> | SwitchFieldDef<Values> | SelectFieldDef<Values>;
+export type FieldDef<Values extends FieldValues> =
+  TextFieldDef<Values> | NumberFieldDef<Values> | SwitchFieldDef<Values> | SelectFieldDef<Values>;
 
 /* ------------------------------------------------------------------ */
 /* Per-kind configuration                                               */
@@ -119,6 +120,8 @@ export interface MasterConfig<Row extends MasterRow, Values extends FieldValues,
 export type AnyMasterConfig = MasterConfig<MasterRow, FieldValues, unknown>;
 
 /** Erases the per-kind generics so configs can live in one registry (the only cast in the framework). */
-export function defineMaster<Row extends MasterRow, Values extends FieldValues, Output>(config: MasterConfig<Row, Values, Output>): AnyMasterConfig {
+export function defineMaster<Row extends MasterRow, Values extends FieldValues, Output>(
+  config: MasterConfig<Row, Values, Output>,
+): AnyMasterConfig {
   return config as unknown as AnyMasterConfig;
 }

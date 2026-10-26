@@ -22,8 +22,18 @@ function rowTint(status: ScheduleRow["status"]): string {
 function ProgressBar({ paid, total }: { paid: number; total: number }) {
   const pct = total > 0 ? Math.min(100, (paid / total) * 100) : 0;
   return (
-    <div className="h-1.5 w-full overflow-hidden rounded-full bg-navy-100" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)} aria-label="Paid">
-      <span className={cn("block h-full rounded-full", pct >= 100 ? "bg-success" : "bg-navy-950")} style={{ width: `${pct}%` }} />
+    <div
+      className="h-1.5 w-full overflow-hidden rounded-full bg-navy-100"
+      role="progressbar"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(pct)}
+      aria-label="Paid"
+    >
+      <span
+        className={cn("block h-full rounded-full", pct >= 100 ? "bg-success" : "bg-navy-950")}
+        style={{ width: `${pct}%` }}
+      />
     </div>
   );
 }
@@ -36,17 +46,22 @@ export function ScheduleTab({ bookingId, initial }: { bookingId: string; initial
   const totalAmount = rows.reduce((sum, row) => sum + row.total_paise, 0);
 
   if (schedule.isPending && !initial) return <Skeleton className="h-64" />;
-  if (schedule.isError && !initial) return <ErrorState compact error={schedule.error} onRetry={() => void schedule.refetch()} />;
-  if (rows.length === 0) return <EmptyState compact title="No installments" description="The plan snapshot has no installments." />;
+  if (schedule.isError && !initial)
+    return <ErrorState compact error={schedule.error} onRetry={() => void schedule.refetch()} />;
+  if (rows.length === 0)
+    return <EmptyState compact title="No installments" description="The plan snapshot has no installments." />;
 
   return (
     <div className="space-y-3" data-testid="schedule-tab">
       <div className="rounded-lg border border-border bg-card p-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
           <span className="text-ink-muted">
-            Paid <span className="money font-semibold text-success-fg">{formatINR(totalPaid)}</span> of <span className="money font-semibold text-navy-950">{formatINR(totalAmount)}</span>
+            Paid <span className="money font-semibold text-success-fg">{formatINR(totalPaid)}</span> of{" "}
+            <span className="money font-semibold text-navy-950">{formatINR(totalAmount)}</span>
           </span>
-          <span className="money text-xs text-ink-subtle">{formatPercent(totalAmount > 0 ? (totalPaid / totalAmount) * 100 : 0, 1)} of the schedule</span>
+          <span className="money text-xs text-ink-subtle">
+            {formatPercent(totalAmount > 0 ? (totalPaid / totalAmount) * 100 : 0, 1)} of the schedule
+          </span>
         </div>
         <div className="mt-2">
           <ProgressBar paid={totalPaid} total={totalAmount} />
@@ -73,19 +88,33 @@ export function ScheduleTab({ bookingId, initial }: { bookingId: string; initial
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.seq} className={cn("border-b border-border last:border-0", rowTint(row.status))} data-testid={`schedule-row-${row.seq}`}>
+              <tr
+                key={row.seq}
+                className={cn("border-b border-border last:border-0", rowTint(row.status))}
+                data-testid={`schedule-row-${row.seq}`}
+              >
                 <td className="money px-3 py-2 text-ink-subtle">{row.seq}</td>
                 <td className="px-3 py-2">
                   <span className="block font-medium">{row.name}</span>
-                  {row.demand_number && <span className="money block text-2xs text-ink-subtle">{row.demand_number}</span>}
+                  {row.demand_number && (
+                    <span className="money block text-2xs text-ink-subtle">{row.demand_number}</span>
+                  )}
                 </td>
                 <td className="px-3 py-2 text-ink-muted">{row.trigger_label}</td>
                 <td className="px-3 py-2">
                   <StatusChip status={row.status} label={SCHEDULE_STATUS_LABELS[row.status]} />
                 </td>
-                <td className="money px-3 py-2">{row.expected_date ? formatDate(row.expected_date) : <span className="text-ink-subtle">on stage</span>}</td>
+                <td className="money px-3 py-2">
+                  {row.expected_date ? (
+                    formatDate(row.expected_date)
+                  ) : (
+                    <span className="text-ink-subtle">on stage</span>
+                  )}
+                </td>
                 <td className="money px-3 py-2">{row.demand_date ? formatDate(row.demand_date) : "—"}</td>
-                <td className={cn("money px-3 py-2", row.status === "OVERDUE" && "font-semibold text-danger-fg")}>{row.due_date ? formatDate(row.due_date) : "—"}</td>
+                <td className={cn("money px-3 py-2", row.status === "OVERDUE" && "font-semibold text-danger-fg")}>
+                  {row.due_date ? formatDate(row.due_date) : "—"}
+                </td>
                 <td className="money px-3 py-2 text-right">
                   {formatPercent(row.percent)}
                   <span className="block text-2xs text-ink-subtle">cum. {formatPercent(row.cumulative_percent)}</span>
@@ -113,11 +142,13 @@ export function ScheduleTab({ bookingId, initial }: { bookingId: string; initial
               <StatusChip status={row.status} label={SCHEDULE_STATUS_LABELS[row.status]} size="sm" />
             </div>
             <p className="text-xs text-ink-muted">
-              {row.trigger_label} · {formatPercent(row.percent)} · {row.expected_date ? `expected ${formatDate(row.expected_date)}` : "on stage"}
+              {row.trigger_label} · {formatPercent(row.percent)} ·{" "}
+              {row.expected_date ? `expected ${formatDate(row.expected_date)}` : "on stage"}
               {row.due_date ? ` · due ${formatDate(row.due_date)}` : ""}
             </p>
             <p className="money mt-1 text-xs">
-              Cash {formatINRShort(row.cash_paise)} · Account {formatINRShort(row.account_paise)} · <span className="font-semibold text-navy-950">{formatINRShort(row.total_paise)}</span>
+              Cash {formatINRShort(row.cash_paise)} · Account {formatINRShort(row.account_paise)} ·{" "}
+              <span className="font-semibold text-navy-950">{formatINRShort(row.total_paise)}</span>
             </p>
             <div className="mt-2 flex items-center gap-2">
               <ProgressBar paid={row.paid_paise} total={row.total_paise} />

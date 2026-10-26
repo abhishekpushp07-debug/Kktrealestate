@@ -36,13 +36,18 @@ export const inventoryKeys = {
   website: (projectId: string) => [PROJECTS_PATH, "website", projectId] as const,
   brochureStats: (projectId: string) => [PROJECTS_PATH, "brochure-stats", projectId] as const,
   visitSettings: (projectId: string) => [PROJECTS_PATH, "visit-settings", projectId] as const,
-  documents: (entityType: DocumentEntityType, entityId: string) => [DOCUMENTS_PATH, "entity", entityType, entityId] as const,
+  documents: (entityType: DocumentEntityType, entityId: string) =>
+    [DOCUMENTS_PATH, "entity", entityType, entityId] as const,
 };
 
 type QueryOpts<T> = Omit<UseQueryOptions<T, ApiClientError, T, readonly unknown[]>, "queryKey" | "queryFn">;
 
 /** Thin typed wrapper around useQuery for one-off GETs. */
-export function useApiQuery<T>(queryKey: readonly unknown[], path: string, options: QueryOpts<T> & { query?: QueryParams } = {}): UseQueryResult<T, ApiClientError> {
+export function useApiQuery<T>(
+  queryKey: readonly unknown[],
+  path: string,
+  options: QueryOpts<T> & { query?: QueryParams } = {},
+): UseQueryResult<T, ApiClientError> {
   const { query, ...rest } = options;
   return useQuery<T, ApiClientError, T, readonly unknown[]>({
     queryKey,
@@ -59,17 +64,29 @@ export function useProject(id: string | null | undefined) {
   return useItem<ProjectRow>(PROJECTS_PATH, id);
 }
 
-export function useProjectBlocks(projectId: string | null | undefined, options: { enabled?: boolean } = {}): UseQueryResult<BlockRow[], ApiClientError> {
+export function useProjectBlocks(
+  projectId: string | null | undefined,
+  options: { enabled?: boolean } = {},
+): UseQueryResult<BlockRow[], ApiClientError> {
   return useQuery<ListEnvelope<BlockRow>, ApiClientError, BlockRow[], readonly unknown[]>({
     queryKey: inventoryKeys.projectBlocks(projectId ?? ""),
-    queryFn: ({ signal }) => api.list<BlockRow>(BLOCKS_PATH, { page_size: 200, sort: "sort_order", filters: { project_id: projectId ?? "" } }, { signal }),
+    queryFn: ({ signal }) =>
+      api.list<BlockRow>(
+        BLOCKS_PATH,
+        { page_size: 200, sort: "sort_order", filters: { project_id: projectId ?? "" } },
+        { signal },
+      ),
     select: (data) => data.items,
     enabled: Boolean(projectId) && options.enabled !== false,
   });
 }
 
 export function useWebsiteSettings(projectId: string | null | undefined) {
-  return useApiQuery<ProjectWebsiteSettingsRow>(inventoryKeys.website(projectId ?? ""), `${PROJECTS_PATH}/${projectId}/website`, { enabled: Boolean(projectId) });
+  return useApiQuery<ProjectWebsiteSettingsRow>(
+    inventoryKeys.website(projectId ?? ""),
+    `${PROJECTS_PATH}/${projectId}/website`,
+    { enabled: Boolean(projectId) },
+  );
 }
 
 export interface BrochureStats {
@@ -84,8 +101,17 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 /** Accepts `{download_count, sparkline}` as well as the website-row spelling of the same data. */
 export function normaliseBrochureStats(raw: unknown): BrochureStats {
   const record = asRecord(raw);
-  const count = typeof record?.download_count === "number" ? record.download_count : typeof record?.brochure_download_count === "number" ? record.brochure_download_count : 0;
-  const series = Array.isArray(record?.sparkline) ? record.sparkline : Array.isArray(record?.brochure_downloads_30d) ? record.brochure_downloads_30d : [];
+  const count =
+    typeof record?.download_count === "number"
+      ? record.download_count
+      : typeof record?.brochure_download_count === "number"
+        ? record.brochure_download_count
+        : 0;
+  const series = Array.isArray(record?.sparkline)
+    ? record.sparkline
+    : Array.isArray(record?.brochure_downloads_30d)
+      ? record.brochure_downloads_30d
+      : [];
   const sparkline = series.flatMap((point) => {
     const item = asRecord(point);
     if (!item || typeof item.date !== "string") return [];
@@ -105,7 +131,11 @@ export function useBrochureStats(projectId: string | null | undefined): UseQuery
 }
 
 export function useVisitSettings(projectId: string | null | undefined) {
-  return useApiQuery<VisitSettingsRow>(inventoryKeys.visitSettings(projectId ?? ""), `${PROJECTS_PATH}/${projectId}/visit-settings`, { enabled: Boolean(projectId) });
+  return useApiQuery<VisitSettingsRow>(
+    inventoryKeys.visitSettings(projectId ?? ""),
+    `${PROJECTS_PATH}/${projectId}/visit-settings`,
+    { enabled: Boolean(projectId) },
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -117,18 +147,28 @@ export function useBlock(id: string | null | undefined) {
 }
 
 export function useBlockGrid(blockId: string | null | undefined, colourBy: GridColourMode) {
-  return useApiQuery<BlockGridResponse>(inventoryKeys.blockGrid(blockId ?? "", colourBy), `${BLOCKS_PATH}/${blockId}/grid`, {
-    query: { colour_by: colourBy },
-    enabled: Boolean(blockId),
-  });
+  return useApiQuery<BlockGridResponse>(
+    inventoryKeys.blockGrid(blockId ?? "", colourBy),
+    `${BLOCKS_PATH}/${blockId}/grid`,
+    {
+      query: { colour_by: colourBy },
+      enabled: Boolean(blockId),
+    },
+  );
 }
 
 export function useBlockConstruction(blockId: string | null | undefined) {
-  return useApiQuery<BlockConstructionResponse>(inventoryKeys.blockConstruction(blockId ?? ""), `${BLOCKS_PATH}/${blockId}/construction`, { enabled: Boolean(blockId) });
+  return useApiQuery<BlockConstructionResponse>(
+    inventoryKeys.blockConstruction(blockId ?? ""),
+    `${BLOCKS_PATH}/${blockId}/construction`,
+    { enabled: Boolean(blockId) },
+  );
 }
 
 export function useFlatDetail(flatId: string | null | undefined) {
-  return useApiQuery<FlatDetailResponse>(inventoryKeys.flatDetail(flatId ?? ""), `${FLATS_PATH}/${flatId}`, { enabled: Boolean(flatId) });
+  return useApiQuery<FlatDetailResponse>(inventoryKeys.flatDetail(flatId ?? ""), `${FLATS_PATH}/${flatId}`, {
+    enabled: Boolean(flatId),
+  });
 }
 
 /* ------------------------------------------------------------------ */
@@ -138,7 +178,12 @@ export function useFlatDetail(flatId: string | null | undefined) {
 export function useRateCards(projectId: string | null | undefined): UseQueryResult<RateCardRow[], ApiClientError> {
   return useQuery<ListEnvelope<RateCardRow>, ApiClientError, RateCardRow[], readonly unknown[]>({
     queryKey: inventoryKeys.rateCards(projectId ?? ""),
-    queryFn: ({ signal }) => api.list<RateCardRow>(RATE_CARDS_PATH, { page_size: 200, sort: "-effective_from", filters: { project_id: projectId ?? "" } }, { signal }),
+    queryFn: ({ signal }) =>
+      api.list<RateCardRow>(
+        RATE_CARDS_PATH,
+        { page_size: 200, sort: "-effective_from", filters: { project_id: projectId ?? "" } },
+        { signal },
+      ),
     select: (data) => data.items,
     enabled: Boolean(projectId),
   });
@@ -148,10 +193,19 @@ export function useRateCards(projectId: string | null | undefined): UseQueryResu
 /* Documents                                                            */
 /* ------------------------------------------------------------------ */
 
-export function useEntityDocuments(entityType: DocumentEntityType, entityId: string | null | undefined, enabled = true): UseQueryResult<DocumentRow[], ApiClientError> {
+export function useEntityDocuments(
+  entityType: DocumentEntityType,
+  entityId: string | null | undefined,
+  enabled = true,
+): UseQueryResult<DocumentRow[], ApiClientError> {
   return useQuery<ListEnvelope<DocumentRow>, ApiClientError, DocumentRow[], readonly unknown[]>({
     queryKey: inventoryKeys.documents(entityType, entityId ?? ""),
-    queryFn: ({ signal }) => api.list<DocumentRow>(DOCUMENTS_PATH, { page_size: 200, sort: "-created_at", filters: { entity_type: entityType, entity_id: entityId ?? "" } }, { signal }),
+    queryFn: ({ signal }) =>
+      api.list<DocumentRow>(
+        DOCUMENTS_PATH,
+        { page_size: 200, sort: "-created_at", filters: { entity_type: entityType, entity_id: entityId ?? "" } },
+        { signal },
+      ),
     select: (data) => data.items,
     enabled: enabled && Boolean(entityId),
   });
@@ -194,7 +248,9 @@ interface LinkResponse {
 
 /** Short-lived signed link for a document (optionally a thumb/medium variant). */
 export async function fetchDocumentLink(documentId: string, variant?: "thumb" | "medium"): Promise<string> {
-  const response = await api.post<LinkResponse>(`${DOCUMENTS_PATH}/${documentId}/link`, undefined, { query: variant ? { variant } : undefined });
+  const response = await api.post<LinkResponse>(`${DOCUMENTS_PATH}/${documentId}/link`, undefined, {
+    query: variant ? { variant } : undefined,
+  });
   const url = response.url ?? response.download_url;
   if (!url) throw new Error("The server did not return a download link");
   return url;
@@ -212,6 +268,9 @@ export { useSalesUserOptions } from "@/features/shared/options";
 /* ------------------------------------------------------------------ */
 
 /** Body + If-Match for versioned POST actions. */
-export function versioned<T extends object>(body: T, version: number): { body: T & { version: number }; options: { version: number } } {
+export function versioned<T extends object>(
+  body: T,
+  version: number,
+): { body: T & { version: number }; options: { version: number } } {
   return { body: { ...body, version }, options: { version } };
 }

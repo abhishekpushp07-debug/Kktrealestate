@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { config } from "../../src/config.js";
-import { activeFieldKeyId, decryptField, encryptField, fieldKeyIdOf, reencryptField, signPayload, verifyPayload } from "../../src/lib/crypto.js";
+import {
+  activeFieldKeyId,
+  decryptField,
+  encryptField,
+  fieldKeyIdOf,
+  reencryptField,
+  signPayload,
+  verifyPayload,
+} from "../../src/lib/crypto.js";
 import { publicJwks, signAccessToken, signingKeys, verifyAccessToken } from "../../src/lib/jwt.js";
 
 const original = { ring: config.FIELD_KEY_RING, jwt: config.JWT_SECRET, prev: config.JWT_PREVIOUS_SECRETS };
@@ -39,7 +47,12 @@ describe("field encryption key ring", () => {
 describe("JWT signing key rotation", () => {
   const OLD = "old-jwt-secret-old-jwt-secret-old-jwt-secret-01";
   const NEW = "new-jwt-secret-new-jwt-secret-new-jwt-secret-02";
-  const claims = { sub: "00000000-0000-4000-8000-000000000001", aud: "erp" as const, cid: "00000000-0000-4000-8000-000000000002", sid: "00000000-0000-4000-8000-000000000003" };
+  const claims = {
+    sub: "00000000-0000-4000-8000-000000000001",
+    aud: "erp" as const,
+    cid: "00000000-0000-4000-8000-000000000002",
+    sid: "00000000-0000-4000-8000-000000000003",
+  };
 
   it("signs with the current secret (kid in the header) and accepts tokens of JWT_PREVIOUS_SECRETS", async () => {
     config.JWT_SECRET = OLD;
@@ -70,9 +83,16 @@ describe("JWT signing key rotation", () => {
     config.JWT_SECRET = NEW;
     config.JWT_PREVIOUS_SECRETS = [OLD];
     const legacyKey = signingKeys()[1]!.privateKey;
-    const legacy = await new SignJWT({ ...claims, typ: "access" }).setProtectedHeader({ alg: "EdDSA", kid: "k1" }).setIssuer("kkt").setAudience("erp").setSubject(claims.sub).setIssuedAt().setExpirationTime("15m").sign(legacyKey);
+    const legacy = await new SignJWT({ ...claims, typ: "access" })
+      .setProtectedHeader({ alg: "EdDSA", kid: "k1" })
+      .setIssuer("kkt")
+      .setAudience("erp")
+      .setSubject(claims.sub)
+      .setIssuedAt()
+      .setExpirationTime("15m")
+      .sign(legacyKey);
     expect((await verifyAccessToken(legacy, "erp")).ok).toBe(true);
-    expect((await verifyAccessToken(legacy, "portal"))).toEqual({ ok: false, reason: "WRONG_AUDIENCE" });
+    expect(await verifyAccessToken(legacy, "portal")).toEqual({ ok: false, reason: "WRONG_AUDIENCE" });
   });
 
   it("signed payloads (download, MFA, manage links) survive a rotation", () => {

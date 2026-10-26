@@ -30,7 +30,13 @@ import {
   listEnvelope,
 } from "../common.js";
 import { ChequeRowSchema } from "./payments.js";
-import { DemandRowSchema, LedgerRowSchema, ScheduleRowSchema, AgreementRevisionRowSchema, OtherChargeRowSchema } from "./bookings.js";
+import {
+  DemandRowSchema,
+  LedgerRowSchema,
+  ScheduleRowSchema,
+  AgreementRevisionRowSchema,
+  OtherChargeRowSchema,
+} from "./bookings.js";
 
 /** Export selector accepted by every report. */
 export const ReportExportQuerySchema = z.object({ export: ExportFormatSchema.optional() });
@@ -175,7 +181,12 @@ export type AdvancesReportRow = z.infer<typeof AdvancesReportRowSchema>;
 
 export const AdvancesReportResponseSchema = z.object({
   rows: z.array(AdvancesReportRowSchema),
-  totals: z.object({ cash_advance_paise: PaiseSchema, account_advance_paise: PaiseSchema, total_advance_paise: PaiseSchema, count: z.int().min(0) }),
+  totals: z.object({
+    cash_advance_paise: PaiseSchema,
+    account_advance_paise: PaiseSchema,
+    total_advance_paise: PaiseSchema,
+    count: z.int().min(0),
+  }),
 });
 export type AdvancesReportResponse = z.infer<typeof AdvancesReportResponseSchema>;
 
@@ -246,7 +257,12 @@ export type UpcomingDuesRow = z.infer<typeof UpcomingDuesRowSchema>;
 export const UpcomingDuesResponseSchema = z.object({
   rows: z.array(UpcomingDuesRowSchema),
   by_month: z.array(z.object({ month: z.string(), total_paise: PaiseSchema, count: z.int().min(0) })),
-  totals: z.object({ cash_paise: PaiseSchema, account_paise: PaiseSchema, total_paise: PaiseSchema, count: z.int().min(0) }),
+  totals: z.object({
+    cash_paise: PaiseSchema,
+    account_paise: PaiseSchema,
+    total_paise: PaiseSchema,
+    count: z.int().min(0),
+  }),
 });
 export type UpcomingDuesResponse = z.infer<typeof UpcomingDuesResponseSchema>;
 
@@ -281,7 +297,9 @@ export const InventoryReportResponseSchema = z.object({
   by_floor: z.array(InventoryCountRow.extend({ block_id: IdSchema, floor: z.int() })),
   by_block: z.array(InventoryCountRow.extend({ block_id: IdSchema })),
   totals: InventoryCountRow,
-  velocity: z.array(z.object({ month: z.string(), bookings: z.int().min(0), cancellations: z.int().min(0), value_paise: PaiseSchema })),
+  velocity: z.array(
+    z.object({ month: z.string(), bookings: z.int().min(0), cancellations: z.int().min(0), value_paise: PaiseSchema }),
+  ),
   realised_rate: z.array(
     z.object({
       flat_type_id: IdSchema,
@@ -298,7 +316,11 @@ export type InventoryReportResponse = z.infer<typeof InventoryReportResponseSche
 // Customer statement of account / schedule / allotment letter
 // ---------------------------------------------------------------------------
 
-export const BookingDocumentQuerySchema = z.object({ booking_id: IdSchema, export: ExportFormatSchema.optional(), format: ReportFormatSchema.optional() });
+export const BookingDocumentQuerySchema = z.object({
+  booking_id: IdSchema,
+  export: ExportFormatSchema.optional(),
+  format: ReportFormatSchema.optional(),
+});
 export type BookingDocumentQuery = z.infer<typeof BookingDocumentQuerySchema>;
 
 export const CustomerStatementResponseSchema = z.object({
@@ -386,7 +408,11 @@ export const ChequesReportResponseSchema = listEnvelope(ChequeRowSchema).extend(
 });
 export type ChequesReportResponse = z.infer<typeof ChequesReportResponseSchema>;
 
-export const CancellationsReportQuerySchema = DateRangeSchema.safeExtend({ project_id: IdSchema.optional(), export: ExportFormatSchema.optional(), format: ReportFormatSchema.optional() });
+export const CancellationsReportQuerySchema = DateRangeSchema.safeExtend({
+  project_id: IdSchema.optional(),
+  export: ExportFormatSchema.optional(),
+  format: ReportFormatSchema.optional(),
+});
 export type CancellationsReportQuery = z.infer<typeof CancellationsReportQuerySchema>;
 
 export const CancellationsReportRowSchema = z.object({
@@ -407,7 +433,12 @@ export type CancellationsReportRow = z.infer<typeof CancellationsReportRowSchema
 
 export const CancellationsReportResponseSchema = z.object({
   rows: z.array(CancellationsReportRowSchema),
-  totals: z.object({ count: z.int().min(0), paid_paise: PaiseSchema, deduction_paise: PaiseSchema, refund_paise: PaiseSchema }),
+  totals: z.object({
+    count: z.int().min(0),
+    paid_paise: PaiseSchema,
+    deduction_paise: PaiseSchema,
+    refund_paise: PaiseSchema,
+  }),
 });
 export type CancellationsReportResponse = z.infer<typeof CancellationsReportResponseSchema>;
 
@@ -426,7 +457,14 @@ export type SalesFunnelQuery = z.infer<typeof SalesFunnelQuerySchema>;
 
 export const SalesFunnelResponseSchema = z.object({
   by_stage: z.array(z.object({ stage: LeadStageSchema, count: z.int().min(0) })),
-  by_source: z.array(z.object({ source: LeadSourceSchema, leads: z.int().min(0), converted: z.int().min(0), conversion_percent: z.number() })),
+  by_source: z.array(
+    z.object({
+      source: LeadSourceSchema,
+      leads: z.int().min(0),
+      converted: z.int().min(0),
+      conversion_percent: z.number(),
+    }),
+  ),
   by_salesperson: z.array(
     z.object({
       user_id: IdSchema,
@@ -445,7 +483,12 @@ export const SalesFunnelResponseSchema = z.object({
     site_visits_by_status: z.array(z.object({ status: VisitStatusSchema, count: z.int().min(0) })),
   }),
   avg_response_hours: z.number().nullable(),
-  totals: z.object({ leads: z.int().min(0), converted: z.int().min(0), lost: z.int().min(0), bookings: z.int().min(0) }),
+  totals: z.object({
+    leads: z.int().min(0),
+    converted: z.int().min(0),
+    lost: z.int().min(0),
+    bookings: z.int().min(0),
+  }),
 });
 export type SalesFunnelResponse = z.infer<typeof SalesFunnelResponseSchema>;
 
@@ -468,7 +511,9 @@ export const BankwiseReceiptsResponseSchema = z.object({
       bank_account_label: z.string(),
       count: z.int().min(0),
       amount_paise: PaiseSchema,
-      by_mode: z.array(z.object({ mode_code: PaymentModeCodeSchema, amount_paise: PaiseSchema, count: z.int().min(0) })),
+      by_mode: z.array(
+        z.object({ mode_code: PaymentModeCodeSchema, amount_paise: PaiseSchema, count: z.int().min(0) }),
+      ),
     }),
   ),
   totals: z.object({ count: z.int().min(0), amount_paise: PaiseSchema }),
@@ -526,7 +571,6 @@ export type ReportPresetRow = z.infer<typeof ReportPresetRowSchema>;
 export const ReportPresetFilterSchema = z.object({ report_key: ReportKeySchema.optional() });
 export type ReportPresetFilter = z.infer<typeof ReportPresetFilterSchema>;
 
-
 // ---------------------------------------------------------------------------
 // Roznamcha range report, catalog, preset list
 // ---------------------------------------------------------------------------
@@ -564,7 +608,13 @@ export type ReportPresetListResponse = z.infer<typeof ReportPresetListResponseSc
 export const DashboardQuerySchema = z.object({ project_id: IdSchema.optional() });
 export type DashboardQuery = z.infer<typeof DashboardQuerySchema>;
 
-const MonthBucketRow = z.object({ month: z.string(), cash_paise: PaiseSchema, account_paise: PaiseSchema, other_paise: PaiseSchema, total_paise: PaiseSchema });
+const MonthBucketRow = z.object({
+  month: z.string(),
+  cash_paise: PaiseSchema,
+  account_paise: PaiseSchema,
+  other_paise: PaiseSchema,
+  total_paise: PaiseSchema,
+});
 
 const ProjectInventoryRow = z.object({
   project_id: IdSchema,
@@ -617,28 +667,56 @@ export const OwnerDashboardResponseSchema = z.object({
   top_overdue: z.array(TopOverdueRowSchema),
   pending_cheques: z.object({ count: z.int().min(0), amount_paise: PaiseSchema }),
   enquiries_this_week: z.int().min(0),
-  construction_progress: z.array(z.object({ block_id: IdSchema, block_name: z.string(), project_name: z.string(), percent: z.number(), current_stage: z.string().nullable() })),
+  construction_progress: z.array(
+    z.object({
+      block_id: IdSchema,
+      block_name: z.string(),
+      project_name: z.string(),
+      percent: z.number(),
+      current_stage: z.string().nullable(),
+    }),
+  ),
   dues_raised_this_month: z.object({ count: z.int().min(0), amount_paise: PaiseSchema }),
   upcoming_installments_30d: z.object({ count: z.int().min(0), amount_paise: PaiseSchema }),
-  totals: z.object({ total_due_paise: SignedPaiseSchema, total_advance_paise: PaiseSchema, collected_this_month_paise: PaiseSchema, active_bookings: z.int().min(0) }),
+  totals: z.object({
+    total_due_paise: SignedPaiseSchema,
+    total_advance_paise: PaiseSchema,
+    collected_this_month_paise: PaiseSchema,
+    active_bookings: z.int().min(0),
+  }),
 });
 export type OwnerDashboardResponse = z.infer<typeof OwnerDashboardResponseSchema>;
 
 /** Accounts dashboard. */
 export const AccountsDashboardResponseSchema = z.object({
   today: z.object({ count: z.int().min(0), amount_paise: PaiseSchema }),
-  this_month: z.object({ count: z.int().min(0), amount_paise: PaiseSchema, by_category: z.array(z.object({ category: MoneyCategorySchema, amount_paise: PaiseSchema })) }),
+  this_month: z.object({
+    count: z.int().min(0),
+    amount_paise: PaiseSchema,
+    by_category: z.array(z.object({ category: MoneyCategorySchema, amount_paise: PaiseSchema })),
+  }),
   cheques_to_clear: z.array(ChequeRowSchema),
   overdue_demands: z.array(DashboardDemandRow),
   bounced_recent: z.array(ChequeRowSchema),
-  demand_status_counts: z.array(z.object({ status: DemandStatusSchema, count: z.int().min(0), amount_paise: PaiseSchema })),
+  demand_status_counts: z.array(
+    z.object({ status: DemandStatusSchema, count: z.int().min(0), amount_paise: PaiseSchema }),
+  ),
 });
 export type AccountsDashboardResponse = z.infer<typeof AccountsDashboardResponseSchema>;
 
 /** Sales dashboard. */
 export const SalesDashboardResponseSchema = z.object({
   pipeline: z.array(z.object({ stage: LeadStageSchema, count: z.int().min(0) })),
-  follow_ups_due: z.array(z.object({ lead_id: IdSchema, lead_number: z.string(), full_name: z.string(), phone: z.string(), next_follow_up_at: TimestampSchema, project_name: z.string().nullable() })),
+  follow_ups_due: z.array(
+    z.object({
+      lead_id: IdSchema,
+      lead_number: z.string(),
+      full_name: z.string(),
+      phone: z.string(),
+      next_follow_up_at: TimestampSchema,
+      project_name: z.string().nullable(),
+    }),
+  ),
   new_enquiries: z.int().min(0),
   brochure_leads_this_week: z.int().min(0),
   todays_visits: z.array(DashboardVisitRow),
@@ -650,8 +728,25 @@ export type SalesDashboardResponse = z.infer<typeof SalesDashboardResponseSchema
 /** Project Admin dashboard (scoped). */
 export const ProjectAdminDashboardResponseSchema = z.object({
   projects: z.array(ProjectInventoryRow),
-  construction: z.array(z.object({ block_id: IdSchema, block_name: z.string(), project_name: z.string(), percent: z.number(), current_stage: z.string().nullable(), next_stage: z.string().nullable() })),
-  upcoming_stages: z.array(z.object({ block_id: IdSchema, block_name: z.string(), stage_name: z.string(), active_bookings: z.int().min(0), installment_total_paise: PaiseSchema })),
+  construction: z.array(
+    z.object({
+      block_id: IdSchema,
+      block_name: z.string(),
+      project_name: z.string(),
+      percent: z.number(),
+      current_stage: z.string().nullable(),
+      next_stage: z.string().nullable(),
+    }),
+  ),
+  upcoming_stages: z.array(
+    z.object({
+      block_id: IdSchema,
+      block_name: z.string(),
+      stage_name: z.string(),
+      active_bookings: z.int().min(0),
+      installment_total_paise: PaiseSchema,
+    }),
+  ),
   demands_raised_this_month: z.object({ count: z.int().min(0), amount_paise: PaiseSchema }),
   bookings_this_month: z.int().min(0),
   open_tickets: z.int().min(0),
@@ -695,5 +790,8 @@ export const SearchResultSchema = z.object({
 });
 export type SearchResult = z.infer<typeof SearchResultSchema>;
 
-export const SearchResponseSchema = z.object({ results: z.array(SearchResultSchema), recent: z.array(SearchResultSchema) });
+export const SearchResponseSchema = z.object({
+  results: z.array(SearchResultSchema),
+  recent: z.array(SearchResultSchema),
+});
 export type SearchResponse = z.infer<typeof SearchResponseSchema>;

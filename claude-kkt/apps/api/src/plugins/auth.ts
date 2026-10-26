@@ -26,17 +26,43 @@ declare module "fastify" {
 /** The only routes a user who must change their password may still call (staff and portal): change-password, logout, me. */
 const PASSWORD_CHANGE_EXEMPT = ["/auth/change-password", "/auth/logout", "/auth/me"];
 /** Routes an admin without MFA may still call while MFA is being forced (self-service + enrolment). */
-const MFA_EXEMPT = [...PASSWORD_CHANGE_EXEMPT, "/auth/sessions", "/auth/mfa/enroll", "/auth/mfa/verify", "/auth/mfa/disable"];
+const MFA_EXEMPT = [
+  ...PASSWORD_CHANGE_EXEMPT,
+  "/auth/sessions",
+  "/auth/mfa/enroll",
+  "/auth/mfa/verify",
+  "/auth/mfa/disable",
+];
 const ADMIN_ROLES = new Set(["Super Admin", "Project Admin"]);
 const WRITE_METHODS = new Set(["POST", "PATCH", "PUT", "DELETE"]);
 const USER_CACHE_TTL = 30;
 
 type StaffRow = {
-  id: string; company_id: string; name: string; email: string; role_id: string; is_active: boolean; must_change_password: boolean; mfa_enabled: boolean;
-  all_projects: boolean; role_name: string; is_system: boolean; permissions: string[]; role_active: boolean; project_ids: string[];
+  id: string;
+  company_id: string;
+  name: string;
+  email: string;
+  role_id: string;
+  is_active: boolean;
+  must_change_password: boolean;
+  mfa_enabled: boolean;
+  all_projects: boolean;
+  role_name: string;
+  is_system: boolean;
+  permissions: string[];
+  role_active: boolean;
+  project_ids: string[];
 };
 type PortalRow = {
-  id: string; customer_id: string; company_id: string; phone: string; is_enabled: boolean; locked_until: string | null; must_change_password: boolean; full_name: string; customer_active: boolean;
+  id: string;
+  customer_id: string;
+  company_id: string;
+  phone: string;
+  is_enabled: boolean;
+  locked_until: string | null;
+  must_change_password: boolean;
+  full_name: string;
+  customer_active: boolean;
 };
 
 /** Key of the revoked-session marker set when a refresh family is revoked (logout, reuse, admin). */
@@ -59,13 +85,22 @@ const REDIS_AUTH_BUDGET_MS = 250;
  * Runs a Redis command with a short budget; `{ok: false}` when Redis is down, slow or errors (the caller falls back to the database).
  * A client that is known to be disconnected (`client`, lib/cache redisUsable) is skipped without waiting at all.
  */
-async function redisTry<T>(what: string, fn: () => Promise<T>, client?: Redis): Promise<{ ok: true; value: T } | { ok: false }> {
+async function redisTry<T>(
+  what: string,
+  fn: () => Promise<T>,
+  client?: Redis,
+): Promise<{ ok: true; value: T } | { ok: false }> {
   if (client && !redisUsable(client)) return { ok: false };
   let timer: NodeJS.Timeout | undefined;
   try {
     const value = await Promise.race([
       fn(),
-      new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error(`redis ${what} exceeded ${REDIS_AUTH_BUDGET_MS} ms`)), REDIS_AUTH_BUDGET_MS); }),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`redis ${what} exceeded ${REDIS_AUTH_BUDGET_MS} ms`)),
+          REDIS_AUTH_BUDGET_MS,
+        );
+      }),
     ]);
     return { ok: true, value };
   } catch (err) {
@@ -84,7 +119,10 @@ export async function markSessionsRevoked(redis: Redis, sids: readonly string[])
   if (sids.length === 0) return;
   const ttl = (config.ACCESS_TOKEN_MINUTES + 2) * 60;
   if (await writeMarkers(redis, sids, ttl)) return;
-  logger.error({ sessions: sids.length }, "could not write revocation markers; enforced from the database and this process, retried in the background");
+  logger.error(
+    { sessions: sids.length },
+    "could not write revocation markers; enforced from the database and this process, retried in the background",
+  );
   const until = Date.now() + ttl * 1000;
   for (const sid of sids) pendingRevocations.set(sid, until);
   scheduleMarkerRetry(redis);
@@ -115,7 +153,10 @@ function scheduleMarkerRetry(redis: Redis): void {
       return;
     }
     const sids = [...pendingRevocations.keys()];
-    const ttl = Math.max(1, Math.ceil((Math.max(...sids.map((sid) => pendingRevocations.get(sid) ?? now)) - now) / 1000));
+    const ttl = Math.max(
+      1,
+      Math.ceil((Math.max(...sids.map((sid) => pendingRevocations.get(sid) ?? now)) - now) / 1000),
+    );
     void writeMarkers(redis, sids, ttl).then((ok) => {
       if (!ok) return;
       for (const sid of sids) pendingRevocations.delete(sid);
@@ -150,160 +191,217 @@ function endsWithAny(url: string, suffixes: readonly string[]): boolean {
 }
 
 /** Auth plugin: client IP, public rate limits, bearer verification per audience, staff RBAC + scope, portal identity, write rate limits. */
-export default fp(async (app) => {
-  app.decorateRequest("user", undefined);
-  app.decorateRequest("customer", undefined);
-  app.decorateRequest("authClaims", undefined);
+export default fp(
+  async (app) => {
+    app.decorateRequest("user", undefined);
+    app.decorateRequest("customer", undefined);
+    app.decorateRequest("authClaims", undefined);
 
-  /**
-   * Cached row + revocation marker from Redis. Revocation lives in the security Redis, the row cache in the shared one; when either
-   * cannot be read the database answers (user/role/permissions from the tables, revocation from refresh_tokens), so a Redis outage
-   * degrades to slower requests instead of 500s and never un-revokes a session.
-   */
-  async function cachedState<Row>(cacheKey: string, sid: string): Promise<{ row: Row | null; version: string | null; revoked: boolean | null }> {
-    const sec = securityRedis(app);
-    if (sec === app.redis) {
-      const r = await redisTry("auth mget", () => app.redis.mget(PERM_VERSION_KEY, cacheKey, revokedSessionKey(sid)), app.redis);
-      if (!r.ok) return { row: null, version: null, revoked: null };
-      const [version, raw, revoked] = r.value;
-      return { row: fromCache<Row>(raw ?? null, version ?? "0"), version: version ?? "0", revoked: Boolean(revoked) };
+    /**
+     * Cached row + revocation marker from Redis. Revocation lives in the security Redis, the row cache in the shared one; when either
+     * cannot be read the database answers (user/role/permissions from the tables, revocation from refresh_tokens), so a Redis outage
+     * degrades to slower requests instead of 500s and never un-revokes a session.
+     */
+    async function cachedState<Row>(
+      cacheKey: string,
+      sid: string,
+    ): Promise<{ row: Row | null; version: string | null; revoked: boolean | null }> {
+      const sec = securityRedis(app);
+      if (sec === app.redis) {
+        const r = await redisTry(
+          "auth mget",
+          () => app.redis.mget(PERM_VERSION_KEY, cacheKey, revokedSessionKey(sid)),
+          app.redis,
+        );
+        if (!r.ok) return { row: null, version: null, revoked: null };
+        const [version, raw, revoked] = r.value;
+        return { row: fromCache<Row>(raw ?? null, version ?? "0"), version: version ?? "0", revoked: Boolean(revoked) };
+      }
+      const [cache, marker] = await Promise.all([
+        redisTry("auth cache mget", () => app.redis.mget(PERM_VERSION_KEY, cacheKey), app.redis),
+        redisTry("revocation marker read", () => sec.get(revokedSessionKey(sid)), sec),
+      ]);
+      const version = cache.ok ? (cache.value[0] ?? "0") : null;
+      return {
+        row: cache.ok ? fromCache<Row>(cache.value[1] ?? null, version ?? "0") : null,
+        version,
+        revoked: marker.ok ? Boolean(marker.value) : null,
+      };
     }
-    const [cache, marker] = await Promise.all([
-      redisTry("auth cache mget", () => app.redis.mget(PERM_VERSION_KEY, cacheKey), app.redis),
-      redisTry("revocation marker read", () => sec.get(revokedSessionKey(sid)), sec),
-    ]);
-    const version = cache.ok ? (cache.value[0] ?? "0") : null;
-    return { row: cache.ok ? fromCache<Row>(cache.value[1] ?? null, version ?? "0") : null, version, revoked: marker.ok ? Boolean(marker.value) : null };
-  }
 
-  function fromCache<Row>(raw: string | null, version: string): Row | null {
-    if (!raw) return null;
-    try {
-      const cached = JSON.parse(raw) as { v: string; row: Row };
-      return cached.v === version ? cached.row : null;
-    } catch { return null; }
-  }
+    function fromCache<Row>(raw: string | null, version: string): Row | null {
+      if (!raw) return null;
+      try {
+        const cached = JSON.parse(raw) as { v: string; row: Row };
+        return cached.v === version ? cached.row : null;
+      } catch {
+        return null;
+      }
+    }
 
-  async function storeCache(key: string, version: string | null, row: unknown): Promise<void> {
-    if (version === null) return; // Redis was unreadable a moment ago: do not wait on it again
-    await redisTry("auth cache write", () => app.redis.set(key, JSON.stringify({ v: version, row }), "EX", USER_CACHE_TTL), app.redis);
-  }
+    async function storeCache(key: string, version: string | null, row: unknown): Promise<void> {
+      if (version === null) return; // Redis was unreadable a moment ago: do not wait on it again
+      await redisTry(
+        "auth cache write",
+        () => app.redis.set(key, JSON.stringify({ v: version, row }), "EX", USER_CACHE_TTL),
+        app.redis,
+      );
+    }
 
-  /** Session revocation from the database: a family is revoked once any of its refresh tokens carries revoked_at. */
-  const revokedSql = (sid: string) => sql`exists (select 1 from refresh_tokens rt where rt.family_id = ${sid}::uuid and rt.revoked_at is not null)`;
+    /** Session revocation from the database: a family is revoked once any of its refresh tokens carries revoked_at. */
+    const revokedSql = (sid: string) =>
+      sql`exists (select 1 from refresh_tokens rt where rt.family_id = ${sid}::uuid and rt.revoked_at is not null)`;
 
-  async function loadStaff(userId: string, sid: string): Promise<StaffRow> {
-    if (pendingRevoked(sid)) throw ApiError.unauthenticated("Session has been revoked", "SESSION_REVOKED");
-    const userKey = `perm:user:${userId}`;
-    const state = await cachedState<StaffRow>(userKey, sid);
-    if (state.revoked === true) throw ApiError.unauthenticated("Session has been revoked", "SESSION_REVOKED");
-    if (state.row && state.revoked === false) return state.row;
-    const rows = await app.db.execute<StaffRow & { session_revoked: boolean }>(sql`
+    async function loadStaff(userId: string, sid: string): Promise<StaffRow> {
+      if (pendingRevoked(sid)) throw ApiError.unauthenticated("Session has been revoked", "SESSION_REVOKED");
+      const userKey = `perm:user:${userId}`;
+      const state = await cachedState<StaffRow>(userKey, sid);
+      if (state.revoked === true) throw ApiError.unauthenticated("Session has been revoked", "SESSION_REVOKED");
+      if (state.row && state.revoked === false) return state.row;
+      const rows = await app.db.execute<StaffRow & { session_revoked: boolean }>(sql`
       select u.id, u.company_id, u.name, u.email, u.role_id, u.is_active, u.must_change_password, u.mfa_enabled, u.all_projects,
              r.name as role_name, r.is_system, r.permissions, r.is_active as role_active,
              coalesce((select array_agg(s.project_id) from user_project_scopes s where s.user_id = u.id), '{}'::uuid[]) as project_ids,
              ${revokedSql(sid)} as session_revoked
       from users u join roles r on r.id = u.role_id where u.id = ${userId}`);
-    const found = rows[0];
-    if (!found) throw ApiError.unauthenticated("User no longer exists", "INVALID_TOKEN");
-    if (found.session_revoked) throw ApiError.unauthenticated("Session has been revoked", "SESSION_REVOKED");
-    const { session_revoked: _r, ...row } = found;
-    if (!state.row) await storeCache(userKey, state.version, row);
-    return row;
-  }
+      const found = rows[0];
+      if (!found) throw ApiError.unauthenticated("User no longer exists", "INVALID_TOKEN");
+      if (found.session_revoked) throw ApiError.unauthenticated("Session has been revoked", "SESSION_REVOKED");
+      const { session_revoked: _r, ...row } = found;
+      if (!state.row) await storeCache(userKey, state.version, row);
+      return row;
+    }
 
-  async function loadPortal(portalUserId: string, sid: string): Promise<PortalRow> {
-    if (pendingRevoked(sid)) throw ApiError.unauthenticated("Session has been revoked", "SESSION_REVOKED");
-    const key = `perm:portal:${portalUserId}`;
-    const state = await cachedState<PortalRow>(key, sid);
-    if (state.revoked === true) throw ApiError.unauthenticated("Session has been revoked", "SESSION_REVOKED");
-    if (state.row && state.revoked === false) return state.row;
-    const rows = await app.db.execute<PortalRow & { session_revoked: boolean }>(sql`
+    async function loadPortal(portalUserId: string, sid: string): Promise<PortalRow> {
+      if (pendingRevoked(sid)) throw ApiError.unauthenticated("Session has been revoked", "SESSION_REVOKED");
+      const key = `perm:portal:${portalUserId}`;
+      const state = await cachedState<PortalRow>(key, sid);
+      if (state.revoked === true) throw ApiError.unauthenticated("Session has been revoked", "SESSION_REVOKED");
+      if (state.row && state.revoked === false) return state.row;
+      const rows = await app.db.execute<PortalRow & { session_revoked: boolean }>(sql`
       select pu.id, pu.customer_id, pu.company_id, pu.phone, pu.is_enabled, pu.locked_until, pu.must_change_password, c.full_name, c.is_active as customer_active,
              ${revokedSql(sid)} as session_revoked
       from portal_users pu join customers c on c.id = pu.customer_id where pu.id = ${portalUserId}`);
-    const found = rows[0];
-    if (!found) throw ApiError.unauthenticated("Account no longer exists", "INVALID_TOKEN");
-    if (found.session_revoked) throw ApiError.unauthenticated("Session has been revoked", "SESSION_REVOKED");
-    const { session_revoked: _r, ...row } = found;
-    if (!state.row) await storeCache(key, state.version, row);
-    return row;
-  }
-
-  /** Rate limits live in the security Redis; when it cannot be reached they fail open (logged) — the DB-backed lockout still applies. */
-  async function rateLimit(bucket: string, limit: number, windowSeconds: number): Promise<void> {
-    if (!redisUsable(securityRedis(app))) return; // disconnected: fail open at once (the DB-backed login lockout still applies)
-    let timer: NodeJS.Timeout | undefined;
-    try {
-      // Same budget as the other Redis reads on this path: a down Redis (client retrying with an offline queue) must not add seconds to
-      // every request before failing open.
-      await Promise.race([
-        enforceRateLimit(securityRedis(app), bucket, limit, windowSeconds),
-        new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error(`rate limit exceeded ${REDIS_AUTH_BUDGET_MS} ms`)), REDIS_AUTH_BUDGET_MS); }),
-      ]);
-    } catch (err) {
-      if (err instanceof ApiError) throw err;
-      logger.warn({ err: (err as Error).message, bucket }, "rate limit store unavailable; request allowed");
-    } finally {
-      if (timer) clearTimeout(timer);
+      const found = rows[0];
+      if (!found) throw ApiError.unauthenticated("Account no longer exists", "INVALID_TOKEN");
+      if (found.session_revoked) throw ApiError.unauthenticated("Session has been revoked", "SESSION_REVOKED");
+      const { session_revoked: _r, ...row } = found;
+      if (!state.row) await storeCache(key, state.version, row);
+      return row;
     }
-  }
 
-  app.addHook("onRequest", async (req) => {
-    req.clientIp = clientIp(req);
-    const url = req.routeOptions.url;
-    if (!url) return; // unknown route: let the 404 handler answer
-    const cfg = req.routeOptions.config;
-    // API docs (audit D): with DOCS_PUBLIC off (the production default) the OpenAPI document and Swagger UI need a staff token with
-    // admin.tools; they are authenticated below exactly like a staff route that declares that permission
-    const docsGuarded = !config.DOCS_PUBLIC && isDocsUrl(url);
-    if ((cfg.public || isPublicPrefix(url)) && !docsGuarded) {
-      const rl = cfg.rateLimit ?? { limit: config.PUBLIC_RATE_LIMIT_PER_MIN, windowSeconds: 60 };
-      await rateLimit(`pub:${cfg.rateLimit ? url : "all"}:${req.clientIp}`, rl.limit, rl.windowSeconds);
-      return;
+    /** Rate limits live in the security Redis; when it cannot be reached they fail open (logged) — the DB-backed lockout still applies. */
+    async function rateLimit(bucket: string, limit: number, windowSeconds: number): Promise<void> {
+      if (!redisUsable(securityRedis(app))) return; // disconnected: fail open at once (the DB-backed login lockout still applies)
+      let timer: NodeJS.Timeout | undefined;
+      try {
+        // Same budget as the other Redis reads on this path: a down Redis (client retrying with an offline queue) must not add seconds to
+        // every request before failing open.
+        await Promise.race([
+          enforceRateLimit(securityRedis(app), bucket, limit, windowSeconds),
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(
+              () => reject(new Error(`rate limit exceeded ${REDIS_AUTH_BUDGET_MS} ms`)),
+              REDIS_AUTH_BUDGET_MS,
+            );
+          }),
+        ]);
+      } catch (err) {
+        if (err instanceof ApiError) throw err;
+        logger.warn({ err: (err as Error).message, bucket }, "rate limit store unavailable; request allowed");
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
     }
-    const audience: TokenAudience = docsGuarded ? "erp" : (cfg.audience ?? "erp");
-    const permission = docsGuarded ? "admin.tools" : cfg.permission;
-    const token = bearer(req);
-    if (!token) throw ApiError.unauthenticated("Missing bearer token");
-    const result = await verifyAccessToken(token, audience);
-    if (!result.ok) {
-      if (result.reason === "WRONG_AUDIENCE") throw ApiError.unauthenticated("Token is not valid for this surface", "INVALID_AUDIENCE");
-      if (result.reason === "EXPIRED") throw ApiError.unauthenticated("Access token expired", "TOKEN_EXPIRED");
-      throw ApiError.unauthenticated("Invalid access token", "INVALID_TOKEN");
-    }
-    const claims = result.claims;
-    req.authClaims = claims;
-    req.subjectId = claims.sub;
 
-    if (audience === "erp") {
-      const row = await loadStaff(claims.sub, claims.sid);
-      if (!row.is_active || !row.role_active) throw ApiError.unauthenticated("User is inactive", "USER_INACTIVE");
-      const user: StaffContext = {
-        id: row.id, companyId: row.company_id, name: row.name, email: row.email, roleId: row.role_id, roleName: row.role_name, isSystemRole: row.is_system,
-        permissions: new Set(row.permissions), allProjects: row.all_projects, projectIds: row.project_ids ?? [], mustChangePassword: row.must_change_password,
-        mfaEnabled: row.mfa_enabled, sessionId: claims.sid,
+    app.addHook("onRequest", async (req) => {
+      req.clientIp = clientIp(req);
+      const url = req.routeOptions.url;
+      if (!url) return; // unknown route: let the 404 handler answer
+      const cfg = req.routeOptions.config;
+      // API docs (audit D): with DOCS_PUBLIC off (the production default) the OpenAPI document and Swagger UI need a staff token with
+      // admin.tools; they are authenticated below exactly like a staff route that declares that permission
+      const docsGuarded = !config.DOCS_PUBLIC && isDocsUrl(url);
+      if ((cfg.public || isPublicPrefix(url)) && !docsGuarded) {
+        const rl = cfg.rateLimit ?? { limit: config.PUBLIC_RATE_LIMIT_PER_MIN, windowSeconds: 60 };
+        await rateLimit(`pub:${cfg.rateLimit ? url : "all"}:${req.clientIp}`, rl.limit, rl.windowSeconds);
+        return;
+      }
+      const audience: TokenAudience = docsGuarded ? "erp" : (cfg.audience ?? "erp");
+      const permission = docsGuarded ? "admin.tools" : cfg.permission;
+      const token = bearer(req);
+      if (!token) throw ApiError.unauthenticated("Missing bearer token");
+      const result = await verifyAccessToken(token, audience);
+      if (!result.ok) {
+        if (result.reason === "WRONG_AUDIENCE")
+          throw ApiError.unauthenticated("Token is not valid for this surface", "INVALID_AUDIENCE");
+        if (result.reason === "EXPIRED") throw ApiError.unauthenticated("Access token expired", "TOKEN_EXPIRED");
+        throw ApiError.unauthenticated("Invalid access token", "INVALID_TOKEN");
+      }
+      const claims = result.claims;
+      req.authClaims = claims;
+      req.subjectId = claims.sub;
+
+      if (audience === "erp") {
+        const row = await loadStaff(claims.sub, claims.sid);
+        if (!row.is_active || !row.role_active) throw ApiError.unauthenticated("User is inactive", "USER_INACTIVE");
+        const user: StaffContext = {
+          id: row.id,
+          companyId: row.company_id,
+          name: row.name,
+          email: row.email,
+          roleId: row.role_id,
+          roleName: row.role_name,
+          isSystemRole: row.is_system,
+          permissions: new Set(row.permissions),
+          allProjects: row.all_projects,
+          projectIds: row.project_ids ?? [],
+          mustChangePassword: row.must_change_password,
+          mfaEnabled: row.mfa_enabled,
+          sessionId: claims.sid,
+        };
+        req.user = user;
+        if (user.mustChangePassword && !endsWithAny(url, PASSWORD_CHANGE_EXEMPT))
+          throw new ApiError(403, "PASSWORD_CHANGE_REQUIRED", "You must change your password before continuing");
+        if (!claims.mfa && ADMIN_ROLES.has(user.roleName) && !endsWithAny(url, MFA_EXEMPT)) {
+          const company = await loadCompany(app.db, app.redis, user.companyId);
+          if (company.settings.force_mfa_for_admins)
+            throw new ApiError(403, "MFA_REQUIRED", "Multi-factor authentication is required for administrators");
+        }
+        if (permission) {
+          const alternatives = permissionAlternatives(permission);
+          if (!alternatives.some((p) => user.permissions.has(p)))
+            throw ApiError.forbidden(`Missing permission ${alternatives.join(" or ")}`, {
+              permission: alternatives[0],
+              alternatives,
+            });
+        }
+        if (WRITE_METHODS.has(req.method)) await rateLimit(`w:${user.id}`, config.WRITE_RATE_LIMIT_PER_MIN, 60);
+        return;
+      }
+
+      const row = await loadPortal(claims.sub, claims.sid);
+      if (!row.is_enabled || !row.customer_active)
+        throw ApiError.unauthenticated("Portal access is disabled", "USER_INACTIVE");
+      if (row.locked_until && new Date(row.locked_until).getTime() > Date.now())
+        throw ApiError.locked("Account is temporarily locked", {
+          locked_until: new Date(row.locked_until).toISOString(),
+        });
+      const customer: PortalContext = {
+        portalUserId: row.id,
+        customerId: row.customer_id,
+        companyId: row.company_id,
+        phone: row.phone,
+        name: row.full_name,
+        mustChangePassword: row.must_change_password,
+        sessionId: claims.sid,
       };
-      req.user = user;
-      if (user.mustChangePassword && !endsWithAny(url, PASSWORD_CHANGE_EXEMPT)) throw new ApiError(403, "PASSWORD_CHANGE_REQUIRED", "You must change your password before continuing");
-      if (!claims.mfa && ADMIN_ROLES.has(user.roleName) && !endsWithAny(url, MFA_EXEMPT)) {
-        const company = await loadCompany(app.db, app.redis, user.companyId);
-        if (company.settings.force_mfa_for_admins) throw new ApiError(403, "MFA_REQUIRED", "Multi-factor authentication is required for administrators");
-      }
-      if (permission) {
-        const alternatives = permissionAlternatives(permission);
-        if (!alternatives.some((p) => user.permissions.has(p))) throw ApiError.forbidden(`Missing permission ${alternatives.join(" or ")}`, { permission: alternatives[0], alternatives });
-      }
-      if (WRITE_METHODS.has(req.method)) await rateLimit(`w:${user.id}`, config.WRITE_RATE_LIMIT_PER_MIN, 60);
-      return;
-    }
-
-    const row = await loadPortal(claims.sub, claims.sid);
-    if (!row.is_enabled || !row.customer_active) throw ApiError.unauthenticated("Portal access is disabled", "USER_INACTIVE");
-    if (row.locked_until && new Date(row.locked_until).getTime() > Date.now()) throw ApiError.locked("Account is temporarily locked", { locked_until: new Date(row.locked_until).toISOString() });
-    const customer: PortalContext = { portalUserId: row.id, customerId: row.customer_id, companyId: row.company_id, phone: row.phone, name: row.full_name, mustChangePassword: row.must_change_password, sessionId: claims.sid };
-    req.customer = customer;
-    if (customer.mustChangePassword && !endsWithAny(url, PASSWORD_CHANGE_EXEMPT)) throw new ApiError(403, "PASSWORD_CHANGE_REQUIRED", "You must change your password before continuing");
-    if (WRITE_METHODS.has(req.method)) await rateLimit(`w:${customer.portalUserId}`, config.WRITE_RATE_LIMIT_PER_MIN, 60);
-  });
-}, { name: "auth", dependencies: ["db", "redis"] });
+      req.customer = customer;
+      if (customer.mustChangePassword && !endsWithAny(url, PASSWORD_CHANGE_EXEMPT))
+        throw new ApiError(403, "PASSWORD_CHANGE_REQUIRED", "You must change your password before continuing");
+      if (WRITE_METHODS.has(req.method))
+        await rateLimit(`w:${customer.portalUserId}`, config.WRITE_RATE_LIMIT_PER_MIN, 60);
+    });
+  },
+  { name: "auth", dependencies: ["db", "redis"] },
+);

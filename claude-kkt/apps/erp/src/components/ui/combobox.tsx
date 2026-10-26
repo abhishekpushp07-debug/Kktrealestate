@@ -1,7 +1,7 @@
 import { Command } from "cmdk";
 import { Check, ChevronsUpDown, Plus, Search, X } from "lucide-react";
 import { Popover } from "radix-ui";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { cn, useDebouncedValue } from "@/lib/utils";
 import { Spinner } from "./spinner";
 import { useFieldAria } from "./field-context";
@@ -65,35 +65,46 @@ export function Combobox({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [remote, setRemote] = useState<readonly ComboboxOption[]>([]);
-  const [loading, setLoading] = useState(false);
+  // The query the remote results belong to; `loading` is derived from it instead of being toggled inside the effect.
+  const [settledQuery, setSettledQuery] = useState<string | null>(null);
+  // Options seen in earlier remote pages or picked, so the trigger keeps its label when the current page no longer has it.
+  const [known, setKnown] = useState<ReadonlyMap<string, ComboboxOption>>(() => new Map());
   const [creating, setCreating] = useState(false);
   const debouncedQuery = useDebouncedValue(query, 250);
-  const requestId = useRef(0);
-  const known = useRef(new Map<string, ComboboxOption>());
 
   const list = onSearch ? remote : options;
-  for (const option of list) known.current.set(option.value, option);
+  const loading = Boolean(onSearch && open && settledQuery !== debouncedQuery);
+  const remember = (seen: readonly ComboboxOption[]) =>
+    setKnown((previous) => {
+      const next = new Map(previous);
+      for (const option of seen) next.set(option.value, option);
+      return next;
+    });
 
   useEffect(() => {
     if (!onSearch || !open) return;
-    const id = (requestId.current += 1);
-    setLoading(true);
+    let current = true; // a newer query (or closing) supersedes this request
     onSearch(debouncedQuery)
       .then((result) => {
-        if (requestId.current === id) setRemote(result);
+        if (!current) return;
+        setRemote(result);
+        remember(result);
       })
       .catch(() => {
-        if (requestId.current === id) setRemote([]);
+        if (current) setRemote([]);
       })
       .finally(() => {
-        if (requestId.current === id) setLoading(false);
+        if (current) setSettledQuery(debouncedQuery);
       });
+    return () => {
+      current = false;
+    };
   }, [onSearch, debouncedQuery, open]);
 
   const selected = useMemo(() => {
     if (!value) return null;
-    return list.find((option) => option.value === value) ?? known.current.get(value) ?? null;
-  }, [list, value]);
+    return list.find((option) => option.value === value) ?? known.get(value) ?? null;
+  }, [list, value, known]);
   const displayLabel = selected?.label ?? selectedLabel;
 
   const byKey = useMemo(() => new Map(list.map((option) => [option.value.toLowerCase(), option] as const)), [list]);
@@ -104,6 +115,7 @@ export function Combobox({
   const pick = (key: string) => {
     const option = byKey.get(key.toLowerCase());
     if (!option || option.disabled) return;
+    remember([option]);
     onValueChange(option.value, option);
     setOpen(false);
     setQuery("");
@@ -180,7 +192,9 @@ export function Combobox({
               {loading && <Spinner size="xs" />}
             </div>
             <Command.List className="max-h-64 overflow-y-auto p-1 scrollbar-thin">
-              {!loading && <Command.Empty className="px-2 py-4 text-center text-xs text-ink-subtle">{emptyText}</Command.Empty>}
+              {!loading && (
+                <Command.Empty className="px-2 py-4 text-center text-xs text-ink-subtle">{emptyText}</Command.Empty>
+              )}
               {list.map((option) => (
                 <Command.Item
                   key={option.value}
@@ -192,7 +206,9 @@ export function Combobox({
                 >
                   <span className="min-w-0 flex-1">
                     <span className="block truncate">{option.label}</span>
-                    {option.description && <span className="block truncate text-xs text-ink-subtle">{option.description}</span>}
+                    {option.description && (
+                      <span className="block truncate text-xs text-ink-subtle">{option.description}</span>
+                    )}
                   </span>
                   {option.value === value && <Check className="size-4 shrink-0 text-navy-950" aria-hidden="true" />}
                 </Command.Item>

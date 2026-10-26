@@ -42,8 +42,11 @@ export async function generateMetadata(): Promise<Metadata> {
   const site = await getSiteSettings();
   const brand = brandName(site);
   const defaults = site?.seo_defaults ?? NO_SEO_DEFAULTS;
-  const title = defaults.title?.trim() || `${brand} · ${site?.brand?.tagline?.trim() || "Homes crafted for generations"}`;
-  const description = defaults.description?.trim() || `Discover residences by ${brand}: RERA-registered projects, transparent pricing and private site visits.`;
+  const title =
+    defaults.title?.trim() || `${brand} · ${site?.brand?.tagline?.trim() || "Homes crafted for generations"}`;
+  const description =
+    defaults.description?.trim() ||
+    `Discover residences by ${brand}: RERA-registered projects, transparent pricing and private site visits.`;
   const ogImage = resolveMediaUrl(defaults.og_image_url, publicApiUrl());
   const favicon = resolveMediaUrl(site?.brand?.favicon_url, publicApiUrl());
   const live = site?.site_live !== false;
@@ -63,9 +66,18 @@ export async function generateMetadata(): Promise<Metadata> {
       url: "/",
       ...(ogImage ? { images: [{ url: ogImage }] } : {}),
     },
-    twitter: { card: ogImage ? "summary_large_image" : "summary", title, description, ...(ogImage ? { images: [ogImage] } : {}) },
+    twitter: {
+      card: ogImage ? "summary_large_image" : "summary",
+      title,
+      description,
+      ...(ogImage ? { images: [ogImage] } : {}),
+    },
     robots: live
-      ? { index: true, follow: true, googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1 } }
+      ? {
+          index: true,
+          follow: true,
+          googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1 },
+        }
       : { index: false, follow: false },
     ...(favicon ? { icons: { icon: favicon } } : {}),
     formatDetection: { telephone: true, email: true, address: true },

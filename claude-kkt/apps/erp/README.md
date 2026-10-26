@@ -18,8 +18,8 @@ written; dependencies are hoisted at the repository root.
 
 ## Environment
 
-| Variable | Dev | Production |
-|---|---|---|
+| Variable       | Dev                                                        | Production                                                                                       |
+| -------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
 | `VITE_API_URL` | leave empty → same-origin `/api/v1` through the Vite proxy | public API origin, e.g. `https://api.example.com` (baked in at build time; see `Dockerfile` ARG) |
 
 Copy `.env.example` to `.env.local` if you need to point at a remote API during development.
@@ -82,18 +82,23 @@ const columns: ColumnDef<BookingRow>[] = [
            mobileCard={(row) => <BookingCard booking={row} />} />
 ```
 
-* Declare columns as `ColumnDef<Row>[]` with `accessorKey` and read `row.original` in `cell` — no
+- Declare columns as `ColumnDef<Row>[]` with `accessorKey` and read `row.original` in `cell` — no
   `createColumnHelper` casts. `meta.align: "right"` gives tabular figures for money.
-* Sorting and pagination are server-side; the table never sorts or slices client-side.
-* Rows above 100 are virtualised automatically; below 768 px every row renders as a card.
+- Sorting and pagination are server-side; the table never sorts or slices client-side.
+- Rows above 100 are virtualised automatically; below 768 px every row renders as a card.
 
 **Forms** — react-hook-form + zod. Use the request schemas from `@kkt/contracts` when the module
 exports them (`zodResolver(CreateBookingSchema)`); otherwise define a local zod schema next to the
 page. Wire fields with `FormField` (controlled) or `FieldWrapper` + `register` (native inputs):
 
 ```tsx
-<FormField control={form.control} name="agreement_value_paise" label="Agreement value" required
-           render={({ field }) => <MoneyInput {...field} value={field.value} onChange={field.onChange} />} />
+<FormField
+  control={form.control}
+  name="agreement_value_paise"
+  label="Agreement value"
+  required
+  render={({ field }) => <MoneyInput {...field} value={field.value} onChange={field.onChange} />}
+/>
 ```
 
 Money fields hold **integer paise**; `MoneyInput` lets the user type rupees (Indian grouping,

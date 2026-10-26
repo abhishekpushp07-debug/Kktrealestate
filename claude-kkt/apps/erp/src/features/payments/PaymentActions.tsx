@@ -1,5 +1,5 @@
 import { CheckCircle2, Printer, RotateCcw, Undo2, XCircle } from "lucide-react";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import type { ChequeRow, PaymentRow } from "@kkt/contracts";
 import { Button, ConfirmDialog, DateInput, FieldWrapper, Input, Textarea } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
@@ -8,9 +8,15 @@ import { useMutationWithToast } from "@/lib/queries";
 import { useBookingDetail } from "@/features/bookings/api";
 import { Notice } from "@/features/inventory/components";
 import { bouncePayment, clearPayment, PAYMENT_INVALIDATIONS, reversePayment } from "./api";
+import { useOnChange } from "@/lib/utils";
 
 /** The minimum a row needs for the action buttons (payments and cheques share them). */
-export type ActionablePayment = Pick<PaymentRow, "id" | "version" | "status" | "receipt_number" | "amount_paise" | "mode_code"> & Partial<Pick<PaymentRow, "customer_name" | "booking_id">> & Partial<Pick<ChequeRow, "instrument">>;
+export type ActionablePayment = Pick<
+  PaymentRow,
+  "id" | "version" | "status" | "receipt_number" | "amount_paise" | "mode_code"
+> &
+  Partial<Pick<PaymentRow, "customer_name" | "booking_id">> &
+  Partial<Pick<ChequeRow, "instrument">>;
 
 export type PaymentAction = "clear" | "bounce" | "reverse";
 
@@ -31,7 +37,8 @@ export function openReceiptPrint(paymentId: string): void {
 export function usePaymentActions(extraInvalidate: readonly (readonly unknown[])[] = []) {
   const invalidate = [...PAYMENT_INVALIDATIONS, ...extraInvalidate];
   const clear = useMutationWithToast<PaymentRow, { payment: ActionablePayment; cleared_on: string; remarks: string }>({
-    mutationFn: ({ payment, cleared_on, remarks }) => clearPayment(payment, { cleared_on, remarks: remarks.trim() || null }),
+    mutationFn: ({ payment, cleared_on, remarks }) =>
+      clearPayment(payment, { cleared_on, remarks: remarks.trim() || null }),
     successMessage: (row) => `${row.receipt_number} cleared`,
     invalidate,
     entityLabel: "This payment",
@@ -42,7 +49,10 @@ export function usePaymentActions(extraInvalidate: readonly (readonly unknown[])
     invalidate,
     entityLabel: "This payment",
   });
-  const reverse = useMutationWithToast<PaymentRow, { payment: ActionablePayment; reason: string; reversal_date: string }>({
+  const reverse = useMutationWithToast<
+    PaymentRow,
+    { payment: ActionablePayment; reason: string; reversal_date: string }
+  >({
     mutationFn: ({ payment, reason, reversal_date }) => reversePayment(payment, { reason, reversal_date }),
     successMessage: (row) => `${row.receipt_number} reversed — receipt cancelled`,
     // a reversal on a completed booking reopens it (flat SOLD → BOOKED)
@@ -66,7 +76,13 @@ export interface PaymentActionButtonsProps {
 }
 
 /** Clear / Bounce (pending), Reverse (cleared) and Print receipt, filtered by permission and status. */
-export function PaymentActionButtons({ payment, onAction, size = "xs", hidePrint = false, className }: PaymentActionButtonsProps) {
+export function PaymentActionButtons({
+  payment,
+  onAction,
+  size = "xs",
+  hidePrint = false,
+  className,
+}: PaymentActionButtonsProps) {
   const { can } = useAuth();
   const canClear = can("payment.clear");
   const canReverse = can("payment.reverse");
@@ -77,21 +93,46 @@ export function PaymentActionButtons({ payment, onAction, size = "xs", hidePrint
     <div className={className ?? "flex flex-wrap items-center justify-end gap-1"} data-no-row-click>
       {pending && canClear && (
         <>
-          <Button size={size} variant="outline" leftIcon={CheckCircle2} onClick={() => onAction({ action: "clear", payment })} data-testid={`payment-clear-${payment.id}`}>
+          <Button
+            size={size}
+            variant="outline"
+            leftIcon={CheckCircle2}
+            onClick={() => onAction({ action: "clear", payment })}
+            data-testid={`payment-clear-${payment.id}`}
+          >
             Clear
           </Button>
-          <Button size={size} variant="danger-outline" leftIcon={XCircle} onClick={() => onAction({ action: "bounce", payment })} data-testid={`payment-bounce-${payment.id}`}>
+          <Button
+            size={size}
+            variant="danger-outline"
+            leftIcon={XCircle}
+            onClick={() => onAction({ action: "bounce", payment })}
+            data-testid={`payment-bounce-${payment.id}`}
+          >
             Bounce
           </Button>
         </>
       )}
       {cleared && canReverse && (
-        <Button size={size} variant="ghost" leftIcon={Undo2} onClick={() => onAction({ action: "reverse", payment })} data-testid={`payment-reverse-${payment.id}`}>
+        <Button
+          size={size}
+          variant="ghost"
+          leftIcon={Undo2}
+          onClick={() => onAction({ action: "reverse", payment })}
+          data-testid={`payment-reverse-${payment.id}`}
+        >
           Reverse
         </Button>
       )}
       {!hidePrint && canPrint && (
-        <Button size={size} variant="ghost" leftIcon={Printer} onClick={() => openReceiptPrint(payment.id)} aria-label={`Print receipt ${payment.receipt_number}`} data-testid={`payment-print-${payment.id}`}>
+        <Button
+          size={size}
+          variant="ghost"
+          leftIcon={Printer}
+          onClick={() => openReceiptPrint(payment.id)}
+          aria-label={`Print receipt ${payment.receipt_number}`}
+          data-testid={`payment-print-${payment.id}`}
+        >
           Receipt
         </Button>
       )}
@@ -117,12 +158,11 @@ export function PaymentActionDialogs({ state, onClose, invalidate = [] }: Paymen
   const [remarks, setRemarks] = useState("");
   const today = todayIST();
 
-  useEffect(() => {
-    if (state) {
-      setDate(todayIST());
-      setRemarks("");
-    }
-  }, [state]);
+  useOnChange(state, (next) => {
+    if (!next) return;
+    setDate(todayIST());
+    setRemarks("");
+  });
 
   const close = useCallback(
     (open: boolean) => {
@@ -169,9 +209,21 @@ export function PaymentActionDialogs({ state, onClose, invalidate = [] }: Paymen
       >
         {summary}
         <FieldWrapper label="Cleared on" required>
-          {(control) => <DateInput id={control.id} value={date} onChange={(value) => setDate(value ?? today)} max={today} />}
+          {(control) => (
+            <DateInput id={control.id} value={date} onChange={(value) => setDate(value ?? today)} max={today} />
+          )}
         </FieldWrapper>
-        <FieldWrapper label="Remarks">{(control) => <Input id={control.id} value={remarks} onChange={(event) => setRemarks(event.target.value)} maxLength={1000} placeholder="Bank reference, clearing note…" />}</FieldWrapper>
+        <FieldWrapper label="Remarks">
+          {(control) => (
+            <Input
+              id={control.id}
+              value={remarks}
+              onChange={(event) => setRemarks(event.target.value)}
+              maxLength={1000}
+              placeholder="Bank reference, clearing note…"
+            />
+          )}
+        </FieldWrapper>
       </ConfirmDialog>
     );
   }
@@ -192,17 +244,37 @@ export function PaymentActionDialogs({ state, onClose, invalidate = [] }: Paymen
       >
         {summary}
         <FieldWrapper label="Bounced on" required>
-          {(control) => <DateInput id={control.id} value={date} onChange={(value) => setDate(value ?? today)} max={today} />}
+          {(control) => (
+            <DateInput id={control.id} value={date} onChange={(value) => setDate(value ?? today)} max={today} />
+          )}
         </FieldWrapper>
       </ConfirmDialog>
     );
   }
 
-  return <ReverseDialog payment={payment} summary={summary} date={date} setDate={setDate} today={today} close={close} reverse={actions.reverse.mutateAsync} />;
+  return (
+    <ReverseDialog
+      payment={payment}
+      summary={summary}
+      date={date}
+      setDate={setDate}
+      today={today}
+      close={close}
+      reverse={actions.reverse.mutateAsync}
+    />
+  );
 }
 
 /** Reverse confirmation; on a COMPLETED booking it warns that the booking reopens (settings.manage) or is blocked (409 BOOKING_COMPLETED). */
-function ReverseDialog({ payment, summary, date, setDate, today, close, reverse }: {
+function ReverseDialog({
+  payment,
+  summary,
+  date,
+  setDate,
+  today,
+  close,
+  reverse,
+}: {
   payment: ActionablePayment;
   summary: ReactNode;
   date: string;
@@ -237,7 +309,9 @@ function ReverseDialog({ payment, summary, date, setDate, today, close, reverse 
         </Notice>
       )}
       <FieldWrapper label="Reversal date" required>
-        {(control) => <DateInput id={control.id} value={date} onChange={(value) => setDate(value ?? today)} max={today} />}
+        {(control) => (
+          <DateInput id={control.id} value={date} onChange={(value) => setDate(value ?? today)} max={today} />
+        )}
       </FieldWrapper>
       <p className="flex items-start gap-1.5 text-xs text-ink-subtle">
         <RotateCcw className="mt-px size-3.5 shrink-0" aria-hidden="true" />
@@ -248,6 +322,26 @@ function ReverseDialog({ payment, summary, date, setDate, today, close, reverse 
 }
 
 /** Convenience: textarea for ad-hoc notes in dialogs that do not use ConfirmDialog's reason box. */
-export function NotesField({ value, onChange, label = "Notes" }: { value: string; onChange: (value: string) => void; label?: string }) {
-  return <FieldWrapper label={label}>{(control) => <Textarea id={control.id} value={value} onChange={(event) => onChange(event.target.value)} rows={2} maxLength={1000} />}</FieldWrapper>;
+export function NotesField({
+  value,
+  onChange,
+  label = "Notes",
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  label?: string;
+}) {
+  return (
+    <FieldWrapper label={label}>
+      {(control) => (
+        <Textarea
+          id={control.id}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          rows={2}
+          maxLength={1000}
+        />
+      )}
+    </FieldWrapper>
+  );
 }

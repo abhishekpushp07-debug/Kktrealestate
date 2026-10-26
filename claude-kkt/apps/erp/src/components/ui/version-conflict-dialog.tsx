@@ -16,7 +16,15 @@ export interface VersionConflictDialogProps {
 }
 
 /** Shown on 409 VERSION_CONFLICT: who changed the record and a reload action. */
-export function VersionConflictDialog({ open, entityLabel = "This record", changedBy, changedAt, currentVersion, onReload, onDismiss }: VersionConflictDialogProps) {
+export function VersionConflictDialog({
+  open,
+  entityLabel = "This record",
+  changedBy,
+  changedAt,
+  currentVersion,
+  onReload,
+  onDismiss,
+}: VersionConflictDialogProps) {
   const [reloading, setReloading] = useState(false);
   const reload = async () => {
     setReloading(true);
@@ -37,11 +45,15 @@ export function VersionConflictDialog({ open, entityLabel = "This record", chang
               <History className="size-5" aria-hidden="true" />
             </span>
             <div className="min-w-0 space-y-1">
-              <AlertDialog.Title className="font-display text-lg font-bold text-navy-950">{entityLabel} was changed by someone else</AlertDialog.Title>
+              <AlertDialog.Title className="font-display text-lg font-bold text-navy-950">
+                {entityLabel} was changed by someone else
+              </AlertDialog.Title>
               <AlertDialog.Description className="text-sm text-ink-muted">
-                {changedBy ? <strong className="font-semibold text-ink">{changedBy}</strong> : "Another user"} saved a newer version
+                {changedBy ? <strong className="font-semibold text-ink">{changedBy}</strong> : "Another user"} saved a
+                newer version
                 {changedAt ? ` on ${formatDateTime(changedAt, { zone: true })}` : ""}
-                {currentVersion ? ` (now v${currentVersion})` : ""}. Your edits were not saved. Reload to see the latest data, then re-apply your changes.
+                {currentVersion ? ` (now v${currentVersion})` : ""}. Your edits were not saved. Reload to see the latest
+                data, then re-apply your changes.
               </AlertDialog.Description>
             </div>
           </div>

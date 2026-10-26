@@ -9,7 +9,10 @@ export async function generateMetadata(): Promise<Metadata> {
   const page = await findPage("privacy");
   return pageMetadata({
     title: page?.seo?.title?.trim() || page?.title || "Privacy Policy",
-    description: page?.seo?.description?.trim() || markdownToText(page?.body_md) || "How we collect, use and protect your personal information.",
+    description:
+      page?.seo?.description?.trim() ||
+      markdownToText(page?.body_md) ||
+      "How we collect, use and protect your personal information.",
     path: "/privacy",
   });
 }

@@ -1,6 +1,18 @@
 // B. Masters
 import { sql } from "drizzle-orm";
-import { boolean, date, index, integer, jsonb, numeric, pgTable, text, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  date,
+  index,
+  integer,
+  jsonb,
+  numeric,
+  pgTable,
+  text,
+  unique,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { idColumn, mutable, paise, percent, softDelete, sqft, timestamps } from "./_common.js";
 import { chargeDemandAtEnum, planTypeEnum, plcCalcModeEnum, servicePriorityEnum, triggerTypeEnum } from "./enums.js";
 import { companies } from "./identity.js";
@@ -56,11 +68,18 @@ export const flatTypes = pgTable(
     superBuiltupSqft: sqft("super_builtup_sqft").notNull().default(0),
     baseRatePerSqftPaise: paise("base_rate_per_sqft_paise"),
     basePricePaise: paise("base_price_paise"),
-    specItemIds: uuid("spec_item_ids").array().notNull().default(sql`'{}'::uuid[]`),
+    specItemIds: uuid("spec_item_ids")
+      .array()
+      .notNull()
+      .default(sql`'{}'::uuid[]`),
     ...softDelete(),
     ...mutable(),
   },
-  (t) => [unique("flat_types_company_code_uq").on(t.companyId, t.code), index("flat_types_rooms_gin_idx").using("gin", t.rooms), index("flat_types_areas_gin_idx").using("gin", t.areas)],
+  (t) => [
+    unique("flat_types_company_code_uq").on(t.companyId, t.code),
+    index("flat_types_rooms_gin_idx").using("gin", t.rooms),
+    index("flat_types_areas_gin_idx").using("gin", t.areas),
+  ],
 );
 
 export const blockTypes = pgTable(
@@ -89,7 +108,10 @@ export const floorPlanTemplates = pgTable(
     ...softDelete(),
     ...mutable(),
   },
-  (t) => [unique("floor_plan_templates_company_code_uq").on(t.companyId, t.code), index("floor_plan_templates_positions_gin_idx").using("gin", t.positions)],
+  (t) => [
+    unique("floor_plan_templates_company_code_uq").on(t.companyId, t.code),
+    index("floor_plan_templates_positions_gin_idx").using("gin", t.positions),
+  ],
 );
 
 export const amenities = pgTable(
@@ -120,7 +142,9 @@ export const constructionStages = pgTable(
   },
   (t) => [
     unique("construction_stages_company_code_uq").on(t.companyId, t.code),
-    uniqueIndex("construction_stages_one_possession_uq").on(t.companyId).where(sql`${t.isPossession}`),
+    uniqueIndex("construction_stages_one_possession_uq")
+      .on(t.companyId)
+      .where(sql`${t.isPossession}`),
   ],
 );
 
@@ -212,7 +236,11 @@ export const bankAccounts = pgTable(
     ...softDelete(),
     ...mutable(),
   },
-  (t) => [uniqueIndex("bank_accounts_one_default_uq").on(t.companyId).where(sql`${t.isDefault}`)],
+  (t) => [
+    uniqueIndex("bank_accounts_one_default_uq")
+      .on(t.companyId)
+      .where(sql`${t.isDefault}`),
+  ],
 );
 
 export const documentTypes = pgTable(
@@ -223,7 +251,10 @@ export const documentTypes = pgTable(
     name: text("name").notNull(),
     code: text("code").notNull(),
     /** Entity kinds this type applies to: CUSTOMER, BOOKING, PROJECT, BLOCK, FLAT, PAYMENT. */
-    appliesTo: text("applies_to").array().notNull().default(sql`'{}'::text[]`),
+    appliesTo: text("applies_to")
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
     isKyc: boolean("is_kyc").notNull().default(false),
     ...softDelete(),
     ...mutable(),

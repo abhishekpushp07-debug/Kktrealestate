@@ -2,15 +2,15 @@
 
 ## Conventions (apply to EVERY table unless stated)
 
-* `id uuid PRIMARY KEY DEFAULT gen_random_uuid()`.
-* `company_id uuid NOT NULL REFERENCES companies(id)` on every business table (single tenant today, multi-tenant switch later with no migration). Every unique constraint on a business key is **scoped by company_id**.
-* `created_at timestamptz NOT NULL DEFAULT now()`, `updated_at timestamptz NOT NULL DEFAULT now()`, `created_by uuid NULL` (staff user id; NULL = system), `version integer NOT NULL DEFAULT 1` on every mutable row.
-* Soft delete for masters & structure: `is_active boolean NOT NULL DEFAULT true`, `deactivated_at timestamptz NULL`. Financial rows are never deleted — status VOID/REVERSED/CANCELLED with reason.
-* Money: `bigint` in **paise**, column suffix `_paise`. Percent: `numeric(5,2)`. Area: `numeric(10,2)` sq ft. Business dates: `date`. Event times: `timestamptz`.
-* Enums: Postgres enums (`pgEnum`) whose values come from `@kkt/contracts` (UPPER_SNAKE).
-* Snapshots and small lists that are always read/written whole: `jsonb` with a Zod schema in contracts.
-* Every list endpoint's filter+sort shape has a compound index listed under the table.
-* Drizzle schema lives in `packages/db/src/schema/*.ts` (one file per area below), exported from `packages/db/src/schema/index.ts`. Migrations are SQL generated with drizzle-kit and committed.
+- `id uuid PRIMARY KEY DEFAULT gen_random_uuid()`.
+- `company_id uuid NOT NULL REFERENCES companies(id)` on every business table (single tenant today, multi-tenant switch later with no migration). Every unique constraint on a business key is **scoped by company_id**.
+- `created_at timestamptz NOT NULL DEFAULT now()`, `updated_at timestamptz NOT NULL DEFAULT now()`, `created_by uuid NULL` (staff user id; NULL = system), `version integer NOT NULL DEFAULT 1` on every mutable row.
+- Soft delete for masters & structure: `is_active boolean NOT NULL DEFAULT true`, `deactivated_at timestamptz NULL`. Financial rows are never deleted — status VOID/REVERSED/CANCELLED with reason.
+- Money: `bigint` in **paise**, column suffix `_paise`. Percent: `numeric(5,2)`. Area: `numeric(10,2)` sq ft. Business dates: `date`. Event times: `timestamptz`.
+- Enums: Postgres enums (`pgEnum`) whose values come from `@kkt/contracts` (UPPER_SNAKE).
+- Snapshots and small lists that are always read/written whole: `jsonb` with a Zod schema in contracts.
+- Every list endpoint's filter+sort shape has a compound index listed under the table.
+- Drizzle schema lives in `packages/db/src/schema/*.ts` (one file per area below), exported from `packages/db/src/schema/index.ts`. Migrations are SQL generated with drizzle-kit and committed.
 
 ## A. Identity & platform
 
@@ -83,7 +83,7 @@
 **lead_stage_history** — lead_id CASCADE, from_stage, to_stage, by_user_id, reason, at.
 **lead_follow_ups** — lead_id CASCADE, note, done_at, next_at, by_user_id, created_at.
 **lead_activities** — lead_id CASCADE, type text, payload jsonb, actor_type, actor_id, at. INDEX(lead_id, at desc).
-**site_visits** — company_id, visit_number, project_id, lead_id → leads, customer_id, visit_date date, slot_start time, slot_end time, visitors int CHECK 1..6, name, phone, email, message, status enum(CONFIRMED, RESCHEDULED, COMPLETED, NO_SHOW, CANCELLED), assignee_user_id, manage_token_hash text, manage_token_expires_at timestamptz (backfilled to slot end + 1 day IST for existing links), source enum(WEBSITE, ERP), rescheduled_from jsonb {visit_date, slot_start}, cancel_reason, notes, outcome_marked_at, version. UNIQUE(company_id, visit_number). INDEX(project_id, visit_date, slot_start, status). INDEX(assignee_user_id, visit_date), `site_visits_company_visit_date_idx` (company_id, visit_date desc, id desc).
+**site_visits** — company_id, visit_number, project_id, lead_id → leads, customer_id, visit_date date, slot_start time, slot_end time, visitors int CHECK 1..6, name, phone, email, message, status enum(CONFIRMED, RESCHEDULED, COMPLETED, NO_SHOW, CANCELLED), assignee_user_id, manage_token_hash text, manage_token_expires_at timestamptz (backfilled to slot end + 1 day IST for existing links), superseded_token_hashes text[] NOT NULL DEFAULT '{}' (SHA-256 of the manage tokens a reschedule replaced, newest last, at most 20; GIN index `site_visits_superseded_token_hashes_idx`; migration 0004 — an old link answers 410 LINK_EXPIRED instead of 404), source enum(WEBSITE, ERP), rescheduled_from jsonb {visit_date, slot_start}, cancel_reason, notes, outcome_marked_at, version. UNIQUE(company_id, visit_number). INDEX(project_id, visit_date, slot_start, status). INDEX(assignee_user_id, visit_date), `site_visits_company_visit_date_idx` (company_id, visit_date desc, id desc).
 **brochure_downloads** — company_id, project_id, lead_id, token_hash text UNIQUE, expires_at, downloaded_at, ip, user_agent, created_at.
 **enquiries** — company_id, lead_id, project_id, name, phone, email, flat_type_id, message, source_page, utm jsonb, ip, reference_number, is_read boolean, created_at. INDEX(company_id, is_read, created_at desc), `enquiries_company_created_idx` (company_id, created_at desc, id desc).
 
@@ -133,13 +133,12 @@
 
 ## I. Search and list indexes (migration 0002)
 
-* `pg_trgm` is installed by the migration runner (`CREATE EXTENSION IF NOT EXISTS pg_trgm`) and by 0002 itself. Every column a list route
+- `pg_trgm` is installed by the migration runner (`CREATE EXTENSION IF NOT EXISTS pg_trgm`) and by 0002 itself. Every column a list route
   searches with `ILIKE '%term%'` on a large table has a trigram GIN index named `<table>_<column>_trgm_idx`: customers (full_name, phone,
   customer_code, email), leads (full_name, phone, lead_number, email), bookings.booking_number, flats.flat_number, projects.name,
   blocks.name, users (name, phone, `email::text` — the users list compares the citext column's text form so the expression index applies),
   payments.receipt_number, service_requests (subject, ticket_number). Small master/CMS tables are not indexed.
-* Every list route's default sort has a `(company_id, <sort col> DESC, id DESC)` index: bookings (booking_date), customers, leads,
+- Every list route's default sort has a `(company_id, <sort col> DESC, id DESC)` index: bookings (booking_date), customers, leads,
   enquiries, service_requests, audit_logs (created_at), payments (payment_date), demands (posted_at), site_visits (visit_date).
-* `flats_hold_until_idx` (status, hold_until) WHERE status = 'HOLD' serves the hold-expiry sweep.
-* Optimistic-concurrency `version` was added to `co_applicants` and `booking_drafts`, the remaining tables written through PATCH routes.
-
+- `flats_hold_until_idx` (status, hold_until) WHERE status = 'HOLD' serves the hold-expiry sweep.
+- Optimistic-concurrency `version` was added to `co_applicants` and `booking_drafts`, the remaining tables written through PATCH routes.

@@ -14,7 +14,11 @@ const workspaceRoot = path.resolve(projectRoot, "../..");
 const config = getDefaultConfig(projectRoot);
 config.watchFolders = Array.from(new Set([...(config.watchFolders ?? []), workspaceRoot]));
 config.resolver.nodeModulesPaths = Array.from(
-  new Set([...(config.resolver.nodeModulesPaths ?? []), path.join(projectRoot, "node_modules"), path.join(workspaceRoot, "node_modules")]),
+  new Set([
+    ...(config.resolver.nodeModulesPaths ?? []),
+    path.join(projectRoot, "node_modules"),
+    path.join(workspaceRoot, "node_modules"),
+  ]),
 );
 
 const previousResolve = config.resolver.resolveRequest;
@@ -29,7 +33,9 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
       }
     }
   }
-  return previousResolve ? previousResolve(context, moduleName, platform) : context.resolveRequest(context, moduleName, platform);
+  return previousResolve
+    ? previousResolve(context, moduleName, platform)
+    : context.resolveRequest(context, moduleName, platform);
 };
 
 module.exports = config;

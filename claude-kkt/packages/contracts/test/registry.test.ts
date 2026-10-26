@@ -31,9 +31,35 @@ import * as portal from "../src/modules/portal.js";
 import * as admin from "../src/modules/admin.js";
 
 const MODULES: Record<string, object> = {
-  enums, permissions, errors, common, auth, users, roles, masters, projects, blocks, flats, parking, rateCards, customers,
-  leads, paymentPlans, construction, bookings, payments, dues, documents, service, notifications, reports, cms, pub, visits,
-  portal, admin,
+  enums,
+  permissions,
+  errors,
+  common,
+  auth,
+  users,
+  roles,
+  masters,
+  projects,
+  blocks,
+  flats,
+  parking,
+  rateCards,
+  customers,
+  leads,
+  paymentPlans,
+  construction,
+  bookings,
+  payments,
+  dues,
+  documents,
+  service,
+  notifications,
+  reports,
+  cms,
+  pub,
+  visits,
+  portal,
+  admin,
 };
 
 describe("index exports", () => {
@@ -67,7 +93,9 @@ describe("permissions registry", () => {
     expect(sales).not.toContain("customer.kyc_view");
     expect(sales).toContain("booking.create");
     expect(sales).toContain("visit.write");
-    expect(roles["Accounts"]!.permissions).toEqual(expect.arrayContaining(["payment.post", "payment.clear", "payment.reverse", "receipt.print", "audit.view"]));
+    expect(roles["Accounts"]!.permissions).toEqual(
+      expect.arrayContaining(["payment.post", "payment.clear", "payment.reverse", "receipt.print", "audit.view"]),
+    );
     expect(roles["Marketing"]!.permissions).toEqual(expect.arrayContaining(["cms.read", "cms.write", "lead.read"]));
     expect(roles["Marketing"]!.permissions).not.toContain("cms.manage");
     expect(roles["Employee"]!.permissions.every((p) => /\.(read|view)$/.test(p))).toBe(true);
@@ -78,12 +106,46 @@ describe("permissions registry", () => {
   });
   it("includes every code the task requires", () => {
     const required = [
-      "users.manage", "roles.manage", "settings.manage", "audit.view", "master.read", "master.write", "project.read", "project.write",
-      "block.write", "flat.write", "flat.status", "construction.update", "construction.undo", "customer.read", "customer.write",
-      "customer.kyc_view", "customer.portal_manage", "lead.read", "lead.write", "visit.read", "visit.write", "booking.read",
-      "booking.create", "booking.cancel", "agreement.edit", "plan.manage", "payment.read", "payment.post", "payment.reverse",
-      "receipt.print", "report.view", "cms.read", "cms.write", "document.read", "document.write", "service.read", "service.write",
-      "service.assign", "notification.read", "admin.tools",
+      "users.manage",
+      "roles.manage",
+      "settings.manage",
+      "audit.view",
+      "master.read",
+      "master.write",
+      "project.read",
+      "project.write",
+      "block.write",
+      "flat.write",
+      "flat.status",
+      "construction.update",
+      "construction.undo",
+      "customer.read",
+      "customer.write",
+      "customer.kyc_view",
+      "customer.portal_manage",
+      "lead.read",
+      "lead.write",
+      "visit.read",
+      "visit.write",
+      "booking.read",
+      "booking.create",
+      "booking.cancel",
+      "agreement.edit",
+      "plan.manage",
+      "payment.read",
+      "payment.post",
+      "payment.reverse",
+      "receipt.print",
+      "report.view",
+      "cms.read",
+      "cms.write",
+      "document.read",
+      "document.write",
+      "service.read",
+      "service.write",
+      "service.assign",
+      "notification.read",
+      "admin.tools",
     ];
     for (const code of required) expect(permissions.ALL_PERMISSIONS).toContain(code);
   });
@@ -106,7 +168,14 @@ describe("error codes", () => {
     expect(new Set(errors.ERROR_CODES).size).toBe(errors.ERROR_CODES.length);
     expect(Object.keys(errors.ERROR_STATUS).sort()).toEqual([...errors.ERROR_CODES].sort());
     for (const code of errors.ERROR_CODES) expect(code).toMatch(/^[A-Z][A-Z0-9_]*$/);
-    for (const code of ["TICKET_CLOSED", "DUPLICATE_CUSTOMER", "REOPEN_WINDOW_CLOSED", "ALREADY_RATED", "CASH_INSUFFICIENT", "UNSUPPORTED_MEDIA_TYPE"] as const) {
+    for (const code of [
+      "TICKET_CLOSED",
+      "DUPLICATE_CUSTOMER",
+      "REOPEN_WINDOW_CLOSED",
+      "ALREADY_RATED",
+      "CASH_INSUFFICIENT",
+      "UNSUPPORTED_MEDIA_TYPE",
+    ] as const) {
       expect(errors.isKnownErrorCode(code), code).toBe(true);
     }
     expect(errors.statusForError("NOT_IMPLEMENTED")).toBe(501);
@@ -121,7 +190,9 @@ describe("enums", () => {
     expect(names.length).toBeGreaterThan(30);
     for (const labelName of names) {
       const base = labelName.slice(0, -"_LABELS".length);
-      const valuesName = Object.keys(enums).find((k) => k === `${base}S` || k === `${base}ES` || k === base.replace(/Y$/, "IES"));
+      const valuesName = Object.keys(enums).find(
+        (k) => k === `${base}S` || k === `${base}ES` || k === base.replace(/Y$/, "IES"),
+      );
       expect(valuesName, `values array for ${labelName}`).toBeDefined();
       const values = (enums as Record<string, unknown>)[valuesName as string] as readonly string[];
       const labels = (enums as Record<string, unknown>)[labelName] as Record<string, string>;

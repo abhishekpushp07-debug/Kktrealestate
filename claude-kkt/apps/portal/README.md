@@ -64,18 +64,19 @@ eas build:configure                       # creates eas.json (bundle ids are com
 EXPO_PUBLIC_API_URL=https://api.example.in eas build --platform all --profile production
 eas update --branch production            # OTA JS updates once expo-updates is added
 ```
+
 Set `EXPO_PUBLIC_API_URL` / `EXPO_PUBLIC_ERP_URL` as EAS environment variables for each profile. The web build is a
 static export (`web.output: "static"`), deployed by `apps/portal/Dockerfile` behind nginx with an SPA fallback.
 
 ## Notes / assumptions about the API
 
-* `GET /api/v1/portal/requests/categories` (not in Appendix C) is expected to return the active service-request
+- `GET /api/v1/portal/requests/categories` (not in Appendix C) is expected to return the active service-request
   categories (`{ id, name, default_priority }[]`, bare array or `{ items }`) so the "Raise a request" form can fill
   `category_id`. Priority is not part of `PortalRequestCreate` (strict object), so the form shows the category's
   default priority instead of sending one.
-* Request photos are uploaded one per call to `POST /requests/:id/attachments` as multipart field `file`; on create
+- Request photos are uploaded one per call to `POST /requests/:id/attachments` as multipart field `file`; on create
   the request is posted first (JSON, `attachment_ids: []`) and the photos follow with the text field `message_id` set to
   the opening message's id (so they show on the description bubble); on reply the uploads come first and their
   `document_id`s go into `attachment_ids`. Thread attachments carry `thumb_url` (grid) and `url` (full-size, for the viewer).
-* `GET /auth/sessions` and `GET /bookings` are read as bare arrays, with `{ items }` tolerated.
-* Lockout (423 `LOCKED`) reads `details.locked_until` when present; 429 reads the `Retry-After` header.
+- `GET /auth/sessions` and `GET /bookings` are read as bare arrays, with `{ items }` tolerated.
+- Lockout (423 `LOCKED`) reads `details.locked_until` when present; 429 reads the `Retry-After` header.

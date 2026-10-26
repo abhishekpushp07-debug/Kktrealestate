@@ -1,5 +1,13 @@
 import { z } from "zod";
-import { BoolQuerySchema, ListQuerySchema, MasterRowSchema, NameSchema, TextSchema, listEnvelope, updateOf } from "../common.js";
+import {
+  BoolQuerySchema,
+  ListQuerySchema,
+  MasterRowSchema,
+  NameSchema,
+  TextSchema,
+  listEnvelope,
+  updateOf,
+} from "../common.js";
 import { PermissionListSchema } from "../permissions.js";
 
 const RoleBase = z.strictObject({

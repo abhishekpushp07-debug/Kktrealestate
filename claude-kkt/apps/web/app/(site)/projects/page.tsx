@@ -35,10 +35,15 @@ export async function generateMetadata({ searchParams }: { searchParams: Promise
   const closed = await closedMetadata();
   if (closed) return closed;
   const filters = readFilters(await searchParams);
-  const parts = [filters.city, filters.status ? statusLabel(filters.status) : undefined, filters.bhk ? `${filters.bhk} BHK` : undefined].filter(Boolean);
+  const parts = [
+    filters.city,
+    filters.status ? statusLabel(filters.status) : undefined,
+    filters.bhk ? `${filters.bhk} BHK` : undefined,
+  ].filter(Boolean);
   return pageMetadata({
     title: parts.length ? `Projects · ${parts.join(" · ")}` : "Projects",
-    description: "Explore our RERA-registered residential and commercial projects: configurations, possession timelines and pricing on request.",
+    description:
+      "Explore our RERA-registered residential and commercial projects: configurations, possession timelines and pricing on request.",
     path: "/projects",
     noIndex: parts.length > 0 || Boolean(filters.q),
   });
@@ -49,14 +54,22 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
   if (gate.closed) return gate.page;
   const filters = readFilters(await searchParams);
   const hasFilters = Boolean(filters.city || filters.status || filters.bhk || filters.q);
-  const [all, filtered] = await Promise.all([listProjects(), hasFilters ? listProjects(filters) : Promise.resolve(null)]);
+  const [all, filtered] = await Promise.all([
+    listProjects(),
+    hasFilters ? listProjects(filters) : Promise.resolve(null),
+  ]);
   const projects = filtered ?? all;
   const cities = [...new Set(all.map((p) => p.city).filter(Boolean))].sort();
   const bhks = [...new Set(all.flatMap((p) => p.bhk_options ?? []))].sort((a, b) => a - b);
 
   return (
     <>
-      <PageHeader eyebrow="Our portfolio" title="Projects" lead="Residences and commercial addresses, each registered under RERA and built to the standard our families expect." compact />
+      <PageHeader
+        eyebrow="Our portfolio"
+        title="Projects"
+        lead="Residences and commercial addresses, each registered under RERA and built to the standard our families expect."
+        compact
+      />
       <div className="container-site -mt-8 relative z-10">
         <ProjectFilters filters={filters} cities={cities} bhks={bhks} />
       </div>
@@ -86,7 +99,12 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
           </div>
         )}
       </section>
-      <JsonLd data={breadcrumbJsonLd([{ name: "Home", path: "/" }, { name: "Projects", path: "/projects" }])} />
+      <JsonLd
+        data={breadcrumbJsonLd([
+          { name: "Home", path: "/" },
+          { name: "Projects", path: "/projects" },
+        ])}
+      />
     </>
   );
 }

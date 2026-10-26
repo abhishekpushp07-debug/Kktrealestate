@@ -4,7 +4,9 @@ import { z } from "zod";
 export type LabelMap<T extends string> = Readonly<Record<T, string>>;
 
 /** Builds a Zod enum from an as-const tuple of UPPER_SNAKE values. */
-export function enumSchema<const T extends readonly [string, ...string[]]>(values: T): z.ZodEnum<{ [K in T[number]]: K }> {
+export function enumSchema<const T extends readonly [string, ...string[]]>(
+  values: T,
+): z.ZodEnum<{ [K in T[number]]: K }> {
   return z.enum(values);
 }
 
@@ -35,7 +37,12 @@ export type TokenAudience = z.infer<typeof TokenAudienceSchema>;
 export const JOB_RUN_STATUSES = ["RUNNING", "OK", "FAILED", "ABANDONED"] as const;
 export const JobRunStatusSchema = enumSchema(JOB_RUN_STATUSES);
 export type JobRunStatus = z.infer<typeof JobRunStatusSchema>;
-export const JOB_RUN_STATUS_LABELS: LabelMap<JobRunStatus> = { RUNNING: "Running", OK: "OK", FAILED: "Failed", ABANDONED: "Abandoned" };
+export const JOB_RUN_STATUS_LABELS: LabelMap<JobRunStatus> = {
+  RUNNING: "Running",
+  OK: "OK",
+  FAILED: "Failed",
+  ABANDONED: "Abandoned",
+};
 
 export const GENDERS = ["MALE", "FEMALE", "OTHER"] as const;
 export const GenderSchema = enumSchema(GENDERS);
@@ -661,7 +668,8 @@ export const NOTIFICATION_TYPES = [
   "PAYMENT_RECEIVED",
   "BOOKING_CREATED",
   "HOLD_EXPIRED",
-  "JOB_FAILED", "EXPORT_READY",
+  "JOB_FAILED",
+  "EXPORT_READY",
   "SECURITY_ALERT",
 ] as const;
 export const NotificationTypeSchema = enumSchema(NOTIFICATION_TYPES);
@@ -686,7 +694,8 @@ export const NOTIFICATION_TYPE_LABELS: LabelMap<NotificationType> = {
   PAYMENT_RECEIVED: "Payment received",
   BOOKING_CREATED: "Booking created",
   HOLD_EXPIRED: "Flat hold lapsed",
-  JOB_FAILED: "Background job failed", EXPORT_READY: "Export ready",
+  JOB_FAILED: "Background job failed",
+  EXPORT_READY: "Export ready",
   SECURITY_ALERT: "Security alert",
 };
 
@@ -782,7 +791,12 @@ export type ExportFormat = z.infer<typeof ExportFormatSchema>;
 export const EXPORT_STATUSES = ["QUEUED", "RUNNING", "DONE", "FAILED"] as const;
 export const ExportStatusSchema = enumSchema(EXPORT_STATUSES);
 export type ExportStatus = z.infer<typeof ExportStatusSchema>;
-export const EXPORT_STATUS_LABELS: LabelMap<ExportStatus> = { QUEUED: "Queued", RUNNING: "Running", DONE: "Ready", FAILED: "Failed" };
+export const EXPORT_STATUS_LABELS: LabelMap<ExportStatus> = {
+  QUEUED: "Queued",
+  RUNNING: "Running",
+  DONE: "Ready",
+  FAILED: "Failed",
+};
 
 export const SEARCH_ENTITY_TYPES = ["PROJECT", "BLOCK", "FLAT", "CUSTOMER", "BOOKING", "LEAD", "PAYMENT"] as const;
 export const SearchEntityTypeSchema = enumSchema(SEARCH_ENTITY_TYPES);
@@ -809,8 +823,13 @@ export const JOB_NAMES = [
   "HOLD_EXPIRY",
   "DUES_CATCHUP",
   "REENCRYPT_FIELDS",
-  "IDEMPOTENCY_PURGE", "EXPORT_CSV", "EXPORT_CLEANUP", "BACKUP_EXPORT", "PARTITION_MAINTENANCE",
-  "JOB_RUN_SWEEP", "LEDGER_REBUILD",
+  "IDEMPOTENCY_PURGE",
+  "EXPORT_CSV",
+  "EXPORT_CLEANUP",
+  "BACKUP_EXPORT",
+  "PARTITION_MAINTENANCE",
+  "JOB_RUN_SWEEP",
+  "LEDGER_REBUILD",
 ] as const;
 export const JobNameSchema = enumSchema(JOB_NAMES);
 export type JobName = z.infer<typeof JobNameSchema>;
@@ -826,6 +845,11 @@ export const JOB_NAME_LABELS: LabelMap<JobName> = {
   HOLD_EXPIRY: "Release lapsed flat holds",
   DUES_CATCHUP: "Dues catch-up (boot / missed run)",
   REENCRYPT_FIELDS: "Re-encrypt PAN/Aadhaar/bank/MFA secrets to the active key",
-  IDEMPOTENCY_PURGE: "Purge expired idempotency keys (hourly)", EXPORT_CSV: "Asynchronous CSV export", EXPORT_CLEANUP: "Remove expired exports and backups (daily)", BACKUP_EXPORT: "Full backup export (ZIP)", PARTITION_MAINTENANCE: "Create next month's partitions (PARTITIONING_ENABLED only)",
-  JOB_RUN_SWEEP: "Mark abandoned job runs (every 15 minutes)", LEDGER_REBUILD: "Rebuild every booking ledger in canonical order (admin)",
+  IDEMPOTENCY_PURGE: "Purge expired idempotency keys (hourly)",
+  EXPORT_CSV: "Asynchronous CSV export",
+  EXPORT_CLEANUP: "Remove expired exports and backups (daily)",
+  BACKUP_EXPORT: "Full backup export (ZIP)",
+  PARTITION_MAINTENANCE: "Create next month's partitions (PARTITIONING_ENABLED only)",
+  JOB_RUN_SWEEP: "Mark abandoned job runs (every 15 minutes)",
+  LEDGER_REBUILD: "Rebuild every booking ledger in canonical order (admin)",
 };

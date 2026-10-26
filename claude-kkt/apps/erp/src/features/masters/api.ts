@@ -25,11 +25,15 @@ export interface MasterOptionsParams {
 }
 
 /** Up to 200 rows of a master kind for selects (active only unless asked otherwise). */
-export function useMasterRows<Row extends MasterRow>(slug: MasterSlug, params: MasterOptionsParams = {}): UseQueryResult<Row[], ApiClientError> {
+export function useMasterRows<Row extends MasterRow>(
+  slug: MasterSlug,
+  params: MasterOptionsParams = {},
+): UseQueryResult<Row[], ApiClientError> {
   const { includeInactive = false, sort = "name", enabled = true } = params;
   return useQuery<ListEnvelope<Row>, ApiClientError, Row[]>({
     queryKey: [...masterKeys.options(slug, includeInactive), sort],
-    queryFn: ({ signal }) => api.list<Row>(masterPath(slug), { page_size: 200, sort, include_inactive: includeInactive }, { signal }),
+    queryFn: ({ signal }) =>
+      api.list<Row>(masterPath(slug), { page_size: 200, sort, include_inactive: includeInactive }, { signal }),
     select: (data) => data.items,
     staleTime: 60_000,
     enabled,
@@ -52,9 +56,13 @@ export interface ActiveStateBody {
 }
 
 export function deactivateMaster(slug: MasterSlug, id: string, version: number): Promise<ActiveStateResponse> {
-  return api.post<ActiveStateResponse>(`${masterPath(slug)}/${id}/deactivate`, { version } satisfies ActiveStateBody, { version });
+  return api.post<ActiveStateResponse>(`${masterPath(slug)}/${id}/deactivate`, { version } satisfies ActiveStateBody, {
+    version,
+  });
 }
 
 export function activateMaster(slug: MasterSlug, id: string, version: number): Promise<ActiveStateResponse> {
-  return api.post<ActiveStateResponse>(`${masterPath(slug)}/${id}/activate`, { version } satisfies ActiveStateBody, { version });
+  return api.post<ActiveStateResponse>(`${masterPath(slug)}/${id}/activate`, { version } satisfies ActiveStateBody, {
+    version,
+  });
 }

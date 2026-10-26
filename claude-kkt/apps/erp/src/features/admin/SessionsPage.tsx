@@ -18,7 +18,17 @@ export interface DeviceInfo {
 export function describeDevice(userAgent: string | null): DeviceInfo {
   if (!userAgent) return { label: "Unknown device", icon: MonitorSmartphone };
   const ua = userAgent;
-  const browser = /Edg\//.test(ua) ? "Edge" : /OPR\//.test(ua) ? "Opera" : /Chrome\//.test(ua) ? "Chrome" : /Firefox\//.test(ua) ? "Firefox" : /Safari\//.test(ua) ? "Safari" : "Browser";
+  const browser = /Edg\//.test(ua)
+    ? "Edge"
+    : /OPR\//.test(ua)
+      ? "Opera"
+      : /Chrome\//.test(ua)
+        ? "Chrome"
+        : /Firefox\//.test(ua)
+          ? "Firefox"
+          : /Safari\//.test(ua)
+            ? "Safari"
+            : "Browser";
   if (/iPad/.test(ua)) return { label: `${browser} on iPad`, icon: Tablet };
   if (/iPhone/.test(ua)) return { label: `${browser} on iPhone`, icon: Smartphone };
   if (/Android/.test(ua)) return { label: `${browser} on Android`, icon: /Mobile/.test(ua) ? Smartphone : Tablet };
@@ -53,7 +63,11 @@ export default function SessionsPage() {
     invalidate: [[SESSIONS_PATH]],
   });
 
-  const sessions = [...(query.data ?? [])].sort((a, b) => Number(b.is_current) - Number(a.is_current) || Date.parse(b.last_used_at ?? b.created_at) - Date.parse(a.last_used_at ?? a.created_at));
+  const sessions = [...(query.data ?? [])].sort(
+    (a, b) =>
+      Number(b.is_current) - Number(a.is_current) ||
+      Date.parse(b.last_used_at ?? b.created_at) - Date.parse(a.last_used_at ?? a.created_at),
+  );
   const others = sessions.filter((session) => !session.is_current);
 
   return (
@@ -63,7 +77,13 @@ export default function SessionsPage() {
         description="Every device holding a refresh token for your account. Signing a device out revokes its whole token family."
         breadcrumbs={[{ label: "Home", to: "/" }, { label: "Account" }, { label: "Devices & sessions" }]}
         actions={
-          <Button variant="danger-outline" leftIcon={LogOut} disabled={others.length === 0} onClick={() => setRevokeAll(true)} data-testid="sessions-revoke-others-btn">
+          <Button
+            variant="danger-outline"
+            leftIcon={LogOut}
+            disabled={others.length === 0}
+            onClick={() => setRevokeAll(true)}
+            data-testid="sessions-revoke-others-btn"
+          >
             Sign out other devices
           </Button>
         }
@@ -83,15 +103,34 @@ export default function SessionsPage() {
           </ul>
         )}
         {query.isError && <ErrorState error={query.error} onRetry={() => void query.refetch()} compact />}
-        {query.data && sessions.length === 0 && <EmptyState compact icon={MonitorSmartphone} title="No active sessions" description="Sign in again to see this device listed." />}
+        {query.data && sessions.length === 0 && (
+          <EmptyState
+            compact
+            icon={MonitorSmartphone}
+            title="No active sessions"
+            description="Sign in again to see this device listed."
+          />
+        )}
         {sessions.length > 0 && (
           <ul className="divide-y divide-border" data-testid="sessions-list">
             {sessions.map((session) => {
               const device = describeDevice(session.user_agent);
               const Icon = device.icon;
               return (
-                <li key={session.id} className={cn("flex flex-wrap items-center gap-3 px-4 py-3", session.is_current && "bg-gold-light/40")} data-testid={`session-${session.id}`}>
-                  <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-md", session.is_current ? "bg-navy-950 text-gold" : "bg-navy-50 text-navy-700")}>
+                <li
+                  key={session.id}
+                  className={cn(
+                    "flex flex-wrap items-center gap-3 px-4 py-3",
+                    session.is_current && "bg-gold-light/40",
+                  )}
+                  data-testid={`session-${session.id}`}
+                >
+                  <span
+                    className={cn(
+                      "flex size-9 shrink-0 items-center justify-center rounded-md",
+                      session.is_current ? "bg-navy-950 text-gold" : "bg-navy-50 text-navy-700",
+                    )}
+                  >
                     <Icon className="size-4" aria-hidden="true" />
                   </span>
                   <div className="min-w-0 flex-1">
@@ -100,11 +139,19 @@ export default function SessionsPage() {
                       {session.is_current && <Badge variant="gold">This device</Badge>}
                     </div>
                     <p className="money truncate text-xs text-ink-subtle" title={session.user_agent ?? undefined}>
-                      {session.ip ?? "IP unknown"} · signed in {formatDateTime(session.created_at)} · last active {session.last_used_at ? formatRelative(session.last_used_at) : "—"} · expires {formatDateTime(session.expires_at)}
+                      {session.ip ?? "IP unknown"} · signed in {formatDateTime(session.created_at)} · last active{" "}
+                      {session.last_used_at ? formatRelative(session.last_used_at) : "—"} · expires{" "}
+                      {formatDateTime(session.expires_at)}
                     </p>
                   </div>
                   {!session.is_current && (
-                    <Button variant="outline" size="sm" leftIcon={LogOut} onClick={() => setRevoking(session)} data-testid={`session-revoke-${session.id}`}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      leftIcon={LogOut}
+                      onClick={() => setRevoking(session)}
+                      data-testid={`session-revoke-${session.id}`}
+                    >
                       Sign out
                     </Button>
                   )}
@@ -119,7 +166,11 @@ export default function SessionsPage() {
         open={revoking !== null}
         onOpenChange={(open) => !open && setRevoking(null)}
         title="Sign out this device?"
-        description={revoking ? `${describeDevice(revoking.user_agent).label} (${revoking.ip ?? "IP unknown"}) will need to sign in again.` : undefined}
+        description={
+          revoking
+            ? `${describeDevice(revoking.user_agent).label} (${revoking.ip ?? "IP unknown"}) will need to sign in again.`
+            : undefined
+        }
         confirmLabel="Sign out"
         variant="destructive"
         onConfirm={async () => {

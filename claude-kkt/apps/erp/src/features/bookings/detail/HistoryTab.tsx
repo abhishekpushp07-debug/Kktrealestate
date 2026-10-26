@@ -1,7 +1,15 @@
 import { Activity } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ACTOR_TYPE_LABELS, type AuditLogRow } from "@kkt/contracts";
-import { Button, EmptyState, ErrorState, Skeleton, Timeline, type TimelineItem, type TimelineTone } from "@/components/ui";
+import {
+  Button,
+  EmptyState,
+  ErrorState,
+  Skeleton,
+  Timeline,
+  type TimelineItem,
+  type TimelineTone,
+} from "@/components/ui";
 import { humanize } from "@/lib/utils";
 import { diffSnapshots, formatDiffValue } from "@/features/admin/auditDiff";
 import { useAuth } from "@/lib/auth";
@@ -17,7 +25,10 @@ function toneFor(action: string): TimelineTone {
 
 function DiffTable({ row }: { row: AuditLogRow }) {
   const [open, setOpen] = useState(false);
-  const rows = useMemo(() => diffSnapshots(row.before, row.after).filter((entry) => entry.status !== "same"), [row.before, row.after]);
+  const rows = useMemo(
+    () => diffSnapshots(row.before, row.after).filter((entry) => entry.status !== "same"),
+    [row.before, row.after],
+  );
   if (rows.length === 0) return null;
   return (
     <div className="text-xs">
@@ -59,11 +70,27 @@ export function HistoryTab({ bookingId }: { bookingId: string }) {
   const { can } = useAuth();
   const allowed = can("audit.view");
   const history = useBookingHistory(bookingId, { enabled: allowed });
-  if (!allowed) return <EmptyState compact icon={Activity} title="History is hidden for your role" description="The audit trail needs the audit-view permission." />;
+  if (!allowed)
+    return (
+      <EmptyState
+        compact
+        icon={Activity}
+        title="History is hidden for your role"
+        description="The audit trail needs the audit-view permission."
+      />
+    );
   if (history.isPending) return <Skeleton className="h-48" />;
   if (history.isError) return <ErrorState compact error={history.error} onRetry={() => void history.refetch()} />;
   const rows = [...(history.data ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at));
-  if (rows.length === 0) return <EmptyState compact icon={Activity} title="No history yet" description="Every create, revision, cancellation and completion is recorded here." />;
+  if (rows.length === 0)
+    return (
+      <EmptyState
+        compact
+        icon={Activity}
+        title="No history yet"
+        description="Every create, revision, cancellation and completion is recorded here."
+      />
+    );
   const items: TimelineItem[] = rows.map((row) => ({
     id: row.id,
     title: humanize(row.action.replace(/^[a-z_]+\./, "")),

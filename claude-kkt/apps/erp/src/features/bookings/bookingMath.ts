@@ -77,7 +77,13 @@ export function splitIsExact(total: number | null | undefined, split: Partial<Sp
   const cash = split.cash_paise ?? null;
   const account = split.account_paise ?? null;
   if (cash === null || account === null) return false;
-  return Number.isInteger(cash) && Number.isInteger(account) && cash >= 0 && account >= 0 && cash + account === Math.round(total);
+  return (
+    Number.isInteger(cash) &&
+    Number.isInteger(account) &&
+    cash >= 0 &&
+    account >= 0 &&
+    cash + account === Math.round(total)
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -102,7 +108,11 @@ export function otherChargesTotal(lines: readonly OtherChargeInput[]): ChargeTot
   return lines.reduce<ChargeTotals>(
     (sum, line) => {
       const totals = chargeLineTotals(line.amount_paise, line.gst_percent);
-      return { base_paise: sum.base_paise + totals.base_paise, gst_paise: sum.gst_paise + totals.gst_paise, total_paise: sum.total_paise + totals.total_paise };
+      return {
+        base_paise: sum.base_paise + totals.base_paise,
+        gst_paise: sum.gst_paise + totals.gst_paise,
+        total_paise: sum.total_paise + totals.total_paise,
+      };
     },
     { base_paise: 0, gst_paise: 0, total_paise: 0 },
   );
@@ -155,7 +165,12 @@ export const LEDGER_AMOUNT_CLASS: Readonly<Record<LedgerAmountTone, string>> = {
 
 /** Category chip for a ledger row: Cash / Account / Other charges / — */
 export function ledgerCategory(row: Pick<LedgerRow, "event" | "bucket">): "CASH" | "ACCOUNT" | "OTHER" | null {
-  if (row.event === "OTHER_CHARGE_DEMAND" || row.event === "OTHER_CHARGE_PAYMENT" || row.event === "OTHER_CHARGE_REVERSAL") return "OTHER";
+  if (
+    row.event === "OTHER_CHARGE_DEMAND" ||
+    row.event === "OTHER_CHARGE_PAYMENT" ||
+    row.event === "OTHER_CHARGE_REVERSAL"
+  )
+    return "OTHER";
   return row.bucket;
 }
 
@@ -265,8 +280,10 @@ export function validateStep(step: WizardStepId, state: WizardState, context: St
     }
     case "customer": {
       if (!state.customer_id) errors.customer_id = "Select or create the primary applicant";
-      if (state.customer_id && state.co_applicant_ids.includes(state.customer_id)) errors.co_applicant_ids = "Primary applicant cannot also be a co-applicant";
-      if (new Set(state.co_applicant_ids).size !== state.co_applicant_ids.length) errors.co_applicant_ids = "Duplicate co-applicants";
+      if (state.customer_id && state.co_applicant_ids.includes(state.customer_id))
+        errors.co_applicant_ids = "Primary applicant cannot also be a co-applicant";
+      if (new Set(state.co_applicant_ids).size !== state.co_applicant_ids.length)
+        errors.co_applicant_ids = "Duplicate co-applicants";
       if (state.co_applicant_ids.length > 10) errors.co_applicant_ids = "At most 10 co-applicants";
       break;
     }
@@ -276,8 +293,11 @@ export function validateStep(step: WizardStepId, state: WizardState, context: St
       else if (total <= 0) errors.agreement_value_paise = "Agreement value must be greater than 0";
       const deviation = priceDeviation(total, context.listPricePaise);
       if (deviation !== 0 && !errors.agreement_value_paise) {
-        if (context.canEditAgreement === false) errors.agreement_value_paise = "The agreement value must equal the flat's list price; changing it needs the “Edit agreement” permission";
-        else if (state.price_deviation_reason.trim().length < DEVIATION_REASON_MIN) errors.price_deviation_reason = "Give the reason for the price deviation (at least 3 characters)";
+        if (context.canEditAgreement === false)
+          errors.agreement_value_paise =
+            "The agreement value must equal the flat's list price; changing it needs the “Edit agreement” permission";
+        else if (state.price_deviation_reason.trim().length < DEVIATION_REASON_MIN)
+          errors.price_deviation_reason = "Give the reason for the price deviation (at least 3 characters)";
       }
       if (state.cash_agreed_paise === null) errors.cash_agreed_paise = "Enter the cash portion";
       if (state.account_agreed_paise === null) errors.account_agreed_paise = "Enter the account portion";
@@ -289,25 +309,31 @@ export function validateStep(step: WizardStepId, state: WizardState, context: St
       break;
     }
     case "plan": {
-      if (context.plansAvailable === false) errors.payment_plan_id = "No payment plan is assigned to this tower. Assign one in Master data first.";
+      if (context.plansAvailable === false)
+        errors.payment_plan_id = "No payment plan is assigned to this tower. Assign one in Master data first.";
       else if (!state.payment_plan_id) errors.payment_plan_id = "Choose a payment plan";
       if (!isDate(state.plan_accepted_on)) errors.plan_accepted_on = "Enter the acceptance date";
       else {
-        if (isDate(state.booking_date) && state.plan_accepted_on < state.booking_date) errors.plan_accepted_on = "Acceptance date cannot be before the booking date";
+        if (isDate(state.booking_date) && state.plan_accepted_on < state.booking_date)
+          errors.plan_accepted_on = "Acceptance date cannot be before the booking date";
         if (state.plan_accepted_on > context.today) errors.plan_accepted_on = "Acceptance date cannot be in the future";
       }
-      if (state.plan_acceptance_mode === "SIGNED_COPY" && !state.plan_acceptance_document_id) errors.plan_acceptance_document_id = "Upload the signed copy of the plan";
+      if (state.plan_acceptance_mode === "SIGNED_COPY" && !state.plan_acceptance_document_id)
+        errors.plan_acceptance_document_id = "Upload the signed copy of the plan";
       break;
     }
     case "charges": {
       state.other_charges.forEach((line, index) => {
-        if (!Number.isInteger(line.amount_paise) || line.amount_paise < 0) errors[`other_charges.${index}.amount_paise`] = "Enter a valid amount";
-        if (line.gst_percent < 0 || line.gst_percent > 100) errors[`other_charges.${index}.gst_percent`] = "GST must be between 0 and 100";
+        if (!Number.isInteger(line.amount_paise) || line.amount_paise < 0)
+          errors[`other_charges.${index}.amount_paise`] = "Enter a valid amount";
+        if (line.gst_percent < 0 || line.gst_percent > 100)
+          errors[`other_charges.${index}.gst_percent`] = "GST must be between 0 and 100";
       });
       const chargeIds = state.other_charges.map((line) => line.charge_type_id);
       if (new Set(chargeIds).size !== chargeIds.length) errors.other_charges = "A charge type can only be added once";
       if (state.other_charges.length > 30) errors.other_charges = "At most 30 charge lines";
-      if (new Set(state.parking_slot_ids).size !== state.parking_slot_ids.length) errors.parking_slot_ids = "Duplicate parking slots";
+      if (new Set(state.parking_slot_ids).size !== state.parking_slot_ids.length)
+        errors.parking_slot_ids = "Duplicate parking slots";
       if (state.parking_slot_ids.length > 10) errors.parking_slot_ids = "At most 10 parking slots";
       break;
     }
@@ -387,7 +413,10 @@ export function toDraftPayload(state: WizardState): Record<string, unknown> {
   put("sales_user_id", state.sales_user_id);
   put("broker_name", state.broker_name.trim() || null);
   put("remarks", state.remarks.trim() || null);
-  put("price_deviation_reason", state.price_deviation_reason.trim().length >= DEVIATION_REASON_MIN ? state.price_deviation_reason.trim() : null);
+  put(
+    "price_deviation_reason",
+    state.price_deviation_reason.trim().length >= DEVIATION_REASON_MIN ? state.price_deviation_reason.trim() : null,
+  );
   return payload;
 }
 
@@ -413,7 +442,12 @@ export function fromDraftPayload(payload: Record<string, unknown>, today: string
         const chargeTypeId = str(line.charge_type_id);
         const amount = int(line.amount_paise);
         const demandAt = line.demand_at;
-        if (!chargeTypeId || amount === null || (demandAt !== "ON_BOOKING" && demandAt !== "ON_POSSESSION" && demandAt !== "MANUAL")) return [];
+        if (
+          !chargeTypeId ||
+          amount === null ||
+          (demandAt !== "ON_BOOKING" && demandAt !== "ON_POSSESSION" && demandAt !== "MANUAL")
+        )
+          return [];
         const gst = typeof line.gst_percent === "number" && Number.isFinite(line.gst_percent) ? line.gst_percent : 0;
         return [{ charge_type_id: chargeTypeId, amount_paise: amount, gst_percent: gst, demand_at: demandAt }];
       })
@@ -448,7 +482,14 @@ export function fromDraftPayload(payload: Record<string, unknown>, today: string
 
 /** True when the wizard holds anything worth saving. */
 export function wizardHasContent(state: WizardState): boolean {
-  return Boolean(state.flat_id || state.customer_id || state.agreement_value_paise || state.other_charges.length || state.parking_slot_ids.length || state.remarks.trim());
+  return Boolean(
+    state.flat_id ||
+    state.customer_id ||
+    state.agreement_value_paise ||
+    state.other_charges.length ||
+    state.parking_slot_ids.length ||
+    state.remarks.trim(),
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -469,12 +510,21 @@ export function handoverBlockers(details: Record<string, unknown> | undefined): 
   if (Array.isArray(problems)) {
     for (const entry of problems) {
       if (typeof entry === "string") out.push(entry);
-      else if (typeof entry === "object" && entry !== null && typeof (entry as { message?: unknown }).message === "string") out.push((entry as { message: string }).message);
+      else if (
+        typeof entry === "object" &&
+        entry !== null &&
+        typeof (entry as { message?: unknown }).message === "string"
+      )
+        out.push((entry as { message: string }).message);
     }
   }
   const unraised = details?.unraised_installments;
   if (Array.isArray(unraised) && unraised.length > 0) {
-    const names = unraised.flatMap((entry) => (typeof entry === "object" && entry !== null ? [`${(entry as { seq?: unknown }).seq ?? "?"}. ${String((entry as { name?: unknown }).name ?? "")}`.trim()] : []));
+    const names = unraised.flatMap((entry) =>
+      typeof entry === "object" && entry !== null
+        ? [`${(entry as { seq?: unknown }).seq ?? "?"}. ${String((entry as { name?: unknown }).name ?? "")}`.trim()]
+        : [],
+    );
     out.push(`Installments not raised yet: ${names.join(", ")}`);
   }
   const cash = typeof details?.cash_short_paise === "number" ? details.cash_short_paise : 0;
@@ -494,10 +544,12 @@ export function newDraftId(): string {
 /** Text for 422 BUSINESS_RULE rule PRICE_DEVIATION_NOT_ALLOWED (details: list price, agreement value, what is needed). */
 export function priceDeviationProblem(details: Record<string, unknown> | undefined): string {
   const list = typeof details?.list_price_paise === "number" ? details.list_price_paise : null;
-  const needs = Array.isArray(details?.needs) ? details.needs.filter((item): item is string => typeof item === "string") : [];
+  const needs = Array.isArray(details?.needs)
+    ? details.needs.filter((item): item is string => typeof item === "string")
+    : [];
   const listText = list !== null ? ` The flat's list price is ${inr(list)}.` : "";
-  if (needs.some((item) => item.includes("permission"))) return `The agreement value must equal the list price; changing it needs the “Edit agreement” permission.${listText}`;
+  if (needs.some((item) => item.includes("permission")))
+    return `The agreement value must equal the list price; changing it needs the “Edit agreement” permission.${listText}`;
   if (needs.includes("price_deviation_reason")) return `Give a reason for the price deviation.${listText}`;
   return `The agreement value differs from the list price.${listText}`;
 }
-

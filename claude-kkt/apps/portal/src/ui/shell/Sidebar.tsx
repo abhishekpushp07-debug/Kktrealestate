@@ -52,7 +52,11 @@ export function Sidebar(): React.JSX.Element {
                   accessibilityRole="link"
                   accessibilityState={{ selected: active }}
                   onPress={() => router.navigate(link.href)}
-                  style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [styles.link, active ? styles.linkActive : null, pressed || hovered ? styles.linkHover : null]}
+                  style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [
+                    styles.link,
+                    active ? styles.linkActive : null,
+                    pressed || hovered ? styles.linkHover : null,
+                  ]}
                 >
                   <View style={[styles.indicator, active ? styles.indicatorActive : null]} />
                   <Icon name={link.icon} size={20} color={active ? colors.gold : colors.onNavyMuted} />
@@ -78,7 +82,11 @@ export function Sidebar(): React.JSX.Element {
             </T>
           </View>
         </Pressable>
-        <Pressable accessibilityRole="button" onPress={() => void logout()} style={({ pressed }) => [styles.signout, pressed ? styles.linkHover : null]}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => void logout()}
+          style={({ pressed }) => [styles.signout, pressed ? styles.linkHover : null]}
+        >
           <Icon name="logout" size={18} color={colors.onNavyMuted} />
           <T variant="small" color={colors.onNavyMuted}>
             Sign out
@@ -90,16 +98,59 @@ export function Sidebar(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  rail: { width: SIDEBAR_WIDTH, backgroundColor: colors.navy, height: "100%", borderRightWidth: 1, borderRightColor: "rgba(255,255,255,0.06)" },
-  brand: { flexDirection: "row", alignItems: "center", gap: space.md, paddingHorizontal: space.xl, marginBottom: space.xl },
-  mark: { width: 40, height: 40, borderRadius: radius.md, backgroundColor: "rgba(201,162,39,0.14)", borderWidth: 1, borderColor: "rgba(201,162,39,0.4)", alignItems: "center", justifyContent: "center" },
+  rail: {
+    width: SIDEBAR_WIDTH,
+    backgroundColor: colors.navy,
+    height: "100%",
+    borderRightWidth: 1,
+    borderRightColor: "rgba(255,255,255,0.06)",
+  },
+  brand: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.md,
+    paddingHorizontal: space.xl,
+    marginBottom: space.xl,
+  },
+  mark: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+    backgroundColor: "rgba(201,162,39,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(201,162,39,0.4)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   sectionTitle: { paddingHorizontal: space.xl, marginBottom: 6 },
-  link: { flexDirection: "row", alignItems: "center", gap: space.md, paddingVertical: 11, paddingLeft: space.lg, paddingRight: space.xl, marginHorizontal: space.sm, borderRadius: radius.md },
+  link: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.md,
+    paddingVertical: 11,
+    paddingLeft: space.lg,
+    paddingRight: space.xl,
+    marginHorizontal: space.sm,
+    borderRadius: radius.md,
+  },
   linkActive: { backgroundColor: "rgba(255,255,255,0.08)" },
   linkHover: { backgroundColor: "rgba(255,255,255,0.06)" },
   indicator: { width: 3, height: 20, borderRadius: 2, backgroundColor: "transparent", marginLeft: -space.sm },
   indicatorActive: { backgroundColor: colors.gold },
-  footer: { paddingHorizontal: space.lg, paddingTop: space.lg, gap: space.sm, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.08)" },
+  footer: {
+    paddingHorizontal: space.lg,
+    paddingTop: space.lg,
+    gap: space.sm,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.08)",
+  },
   user: { flexDirection: "row", alignItems: "center", gap: space.md, paddingVertical: 6 },
-  signout: { flexDirection: "row", alignItems: "center", gap: space.sm, paddingVertical: 8, paddingHorizontal: 4, borderRadius: radius.sm },
+  signout: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.sm,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    borderRadius: radius.sm,
+  },
 });

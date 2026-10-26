@@ -1,6 +1,20 @@
 // F (part). Plans ↔ towers, bookings
 import { sql } from "drizzle-orm";
-import { boolean, check, date, index, integer, jsonb, pgTable, primaryKey, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  check,
+  date,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  unique,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { appendOnly, idColumn, mutable, paise, percent, timestamps, trgm } from "./_common.js";
 import { customers } from "./customers.js";
 import { bookingStatusEnum, chargeDemandAtEnum, planAcceptanceModeEnum } from "./enums.js";
@@ -116,14 +130,19 @@ export const bookings = pgTable(
   },
   (t) => [
     unique("bookings_company_number_uq").on(t.companyId, t.bookingNumber),
-    uniqueIndex("bookings_one_active_per_flat_uq").on(t.flatId).where(sql`${t.status} = 'ACTIVE'`),
+    uniqueIndex("bookings_one_active_per_flat_uq")
+      .on(t.flatId)
+      .where(sql`${t.status} = 'ACTIVE'`),
     index("bookings_company_project_status_date_idx").on(t.companyId, t.projectId, t.status, t.bookingDate.desc()),
     index("bookings_block_status_idx").on(t.blockId, t.status),
     index("bookings_customer_idx").on(t.customerId),
     index("bookings_payment_plan_idx").on(t.paymentPlanId),
     index("bookings_company_booking_date_idx").on(t.companyId, t.bookingDate.desc(), t.id.desc()),
     trgm("bookings_booking_number_trgm_idx", t.bookingNumber),
-    check("bookings_agreement_split_chk", sql`${t.cashAgreedPaise} + ${t.accountAgreedPaise} = ${t.agreementValuePaise}`),
+    check(
+      "bookings_agreement_split_chk",
+      sql`${t.cashAgreedPaise} + ${t.accountAgreedPaise} = ${t.agreementValuePaise}`,
+    ),
     check("bookings_agreed_nonneg_chk", sql`${t.cashAgreedPaise} >= 0 AND ${t.accountAgreedPaise} >= 0`),
     check("bookings_list_price_nonneg_chk", sql`${t.listPricePaise} IS NULL OR ${t.listPricePaise} >= 0`),
   ],
@@ -172,7 +191,10 @@ export const bookingOtherCharges = pgTable(
   (t) => [
     index("booking_other_charges_booking_idx").on(t.bookingId),
     check("booking_other_charges_total_chk", sql`${t.totalPaise} = ${t.amountPaise} + ${t.gstPaise}`),
-    check("booking_other_charges_nonneg_chk", sql`${t.amountPaise} >= 0 AND ${t.gstPaise} >= 0 AND ${t.totalPaise} >= 0 AND ${t.paidPaise} >= 0`),
+    check(
+      "booking_other_charges_nonneg_chk",
+      sql`${t.amountPaise} >= 0 AND ${t.gstPaise} >= 0 AND ${t.totalPaise} >= 0 AND ${t.paidPaise} >= 0`,
+    ),
   ],
 );
 

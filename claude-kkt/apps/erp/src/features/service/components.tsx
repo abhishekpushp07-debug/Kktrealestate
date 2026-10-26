@@ -1,7 +1,12 @@
 import { AlertTriangle, Clock3, Paperclip, UserRound } from "lucide-react";
 import { type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { SERVICE_PRIORITY_LABELS, SERVICE_STATUS_LABELS, type ServicePriority, type ServiceRequestRow } from "@kkt/contracts";
+import {
+  SERVICE_PRIORITY_LABELS,
+  SERVICE_STATUS_LABELS,
+  type ServicePriority,
+  type ServiceRequestRow,
+} from "@kkt/contracts";
 import { Badge, StatusChip, Tooltip } from "@/components/ui";
 import { formatDateTime, formatRelative } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -12,7 +17,15 @@ import { slaLabel, slaState } from "./sla";
 /* ------------------------------------------------------------------ */
 
 export function PriorityChip({ priority, size = "sm" }: { priority: ServicePriority; size?: "sm" | "md" }) {
-  return <StatusChip status={priority} label={SERVICE_PRIORITY_LABELS[priority]} size={size} dot={priority === "URGENT" || priority === "HIGH"} data-testid={`priority-chip-${priority}`} />;
+  return (
+    <StatusChip
+      status={priority}
+      label={SERVICE_PRIORITY_LABELS[priority]}
+      size={size}
+      dot={priority === "URGENT" || priority === "HIGH"}
+      data-testid={`priority-chip-${priority}`}
+    />
+  );
 }
 
 export function TicketStatusChip({ status, size = "sm" }: { status: ServiceRequestRow["status"]; size?: "sm" | "md" }) {
@@ -20,7 +33,15 @@ export function TicketStatusChip({ status, size = "sm" }: { status: ServiceReque
 }
 
 /** "Due in 3 h" / "Breached 2 h ago" (red) / "SLA met". */
-export function SlaBadge({ ticket, now, className }: { ticket: Pick<ServiceRequestRow, "sla_due_at" | "is_sla_breached" | "status">; now?: Date; className?: string }) {
+export function SlaBadge({
+  ticket,
+  now,
+  className,
+}: {
+  ticket: Pick<ServiceRequestRow, "sla_due_at" | "is_sla_breached" | "status">;
+  now?: Date;
+  className?: string;
+}) {
   const state = slaState(ticket, now);
   const { text, tone } = slaLabel(state);
   const Icon = tone === "danger" ? AlertTriangle : Clock3;
@@ -55,7 +76,11 @@ export function TicketCard({ ticket, actions, compact = false, className }: Tick
     <div className={cn("flex min-w-0 flex-col gap-1.5", className)} data-testid={`ticket-card-${ticket.id}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <Link to={`/service-requests/${ticket.id}`} className="money text-xs font-semibold text-navy-700 hover:underline focus-ring rounded-xs" onClick={(event) => event.stopPropagation()}>
+          <Link
+            to={`/service-requests/${ticket.id}`}
+            className="money text-xs font-semibold text-navy-700 hover:underline focus-ring rounded-xs"
+            onClick={(event) => event.stopPropagation()}
+          >
             {ticket.ticket_number}
           </Link>
           <p className={cn("line-clamp-2 font-medium text-ink", compact ? "text-sm" : "text-sm")}>{ticket.subject}</p>

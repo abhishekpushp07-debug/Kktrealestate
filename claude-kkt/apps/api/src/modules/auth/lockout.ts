@@ -62,7 +62,12 @@ function toDate(v: unknown): Date | null {
 export async function loginLockState(db: Executor, t: LockTarget, now = new Date()): Promise<LockState> {
   const windowStart = new Date(now.getTime() - LOCK_WINDOW_MS);
   const reasons = `{${COUNTED_FAILURE_REASONS.join(",")}}`;
-  const rows = await db.execute<{ pair_n: number | string; pair_last: Date | string | null; acct_n: number | string; acct_last: Date | string | null }>(sql`
+  const rows = await db.execute<{
+    pair_n: number | string;
+    pair_last: Date | string | null;
+    acct_n: number | string;
+    acct_last: Date | string | null;
+  }>(sql`
     with since as (
       select greatest(${windowStart.toISOString()}::timestamptz, coalesce(${t.resetAt ? t.resetAt.toISOString() : null}::timestamptz, '-infinity'::timestamptz)) as acct_since
     ), pair_ok as (
@@ -82,17 +87,29 @@ export async function loginLockState(db: Executor, t: LockTarget, now = new Date
   const accountFailures = Number(r?.acct_n ?? 0);
   const pairLast = toDate(r?.pair_last);
   const acctLast = toDate(r?.acct_last);
-  const accountLockUntil = accountFailures >= ACCOUNT_LOCK_ATTEMPTS && acctLast ? new Date(acctLast.getTime() + LOCK_WINDOW_MS) : null;
-  const pairLockUntil = pairFailures >= PAIR_LOCK_ATTEMPTS && pairLast ? new Date(pairLast.getTime() + LOCK_WINDOW_MS) : null;
+  const accountLockUntil =
+    accountFailures >= ACCOUNT_LOCK_ATTEMPTS && acctLast ? new Date(acctLast.getTime() + LOCK_WINDOW_MS) : null;
+  const pairLockUntil =
+    pairFailures >= PAIR_LOCK_ATTEMPTS && pairLast ? new Date(pairLast.getTime() + LOCK_WINDOW_MS) : null;
   const live = (d: Date | null) => (d && d.getTime() > now.getTime() ? d : null);
-  const acct = live(accountLockUntil), pair = live(pairLockUntil);
+  const acct = live(accountLockUntil),
+    pair = live(pairLockUntil);
   const lockedUntil = acct && pair ? (acct > pair ? acct : pair) : (acct ?? pair);
-  return { pairFailures, accountFailures, lockedUntil, scope: acct ? "ACCOUNT" : pair ? "PAIR" : null, accountLockUntil: acct };
+  return {
+    pairFailures,
+    accountFailures,
+    lockedUntil,
+    scope: acct ? "ACCOUNT" : pair ? "PAIR" : null,
+    accountLockUntil: acct,
+  };
 }
 
 /** The one 423 every locked sign-in gets (pair or account, known or unknown identifier): same code, message and detail keys. */
 export function lockedError(until: Date): ApiError {
-  return ApiError.locked(`Too many failed sign-in attempts. Try again after ${PASSWORD_POLICY.lockout_minutes} minutes.`, { locked_until: until.toISOString() });
+  return ApiError.locked(
+    `Too many failed sign-in attempts. Try again after ${PASSWORD_POLICY.lockout_minutes} minutes.`,
+    { locked_until: until.toISOString() },
+  );
 }
 
 /**
@@ -112,10 +129,16 @@ function bump(map: Map<string, number>, key: string, by: number): void {
 }
 
 /** Reserves an attempt slot for a target (see above); returns the release function (idempotent). Throws 429 when the budget is used up. */
-export function reserveLoginAttempt(t: LockTarget, state: Pick<LockState, "pairFailures" | "accountFailures">): () => void {
+export function reserveLoginAttempt(
+  t: LockTarget,
+  state: Pick<LockState, "pairFailures" | "accountFailures">,
+): () => void {
   const acctKey = `${t.subjectType}:${t.identifier}`;
   const pairKey = `${acctKey}:${t.ip}`;
-  if ((inflightPair.get(pairKey) ?? 0) + state.pairFailures >= PAIR_LOCK_ATTEMPTS || (inflightAccount.get(acctKey) ?? 0) + state.accountFailures >= ACCOUNT_LOCK_ATTEMPTS) {
+  if (
+    (inflightPair.get(pairKey) ?? 0) + state.pairFailures >= PAIR_LOCK_ATTEMPTS ||
+    (inflightAccount.get(acctKey) ?? 0) + state.accountFailures >= ACCOUNT_LOCK_ATTEMPTS
+  ) {
     throw ApiError.rateLimited(1);
   }
   bump(inflightPair, pairKey, 1);

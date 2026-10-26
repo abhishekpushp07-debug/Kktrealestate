@@ -22,6 +22,8 @@ import { Skeleton } from "./skeleton";
 import type { ColumnChoice } from "./toolbar";
 
 declare module "@tanstack/react-table" {
+  // Module augmentation must repeat TanStack's type parameters verbatim, even though these fields do not use them.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- TData/TValue are required by declaration merging
   interface ColumnMeta<TData extends RowData, TValue> {
     /** Cell alignment; "right" also applies tabular figures (money). */
     align?: "left" | "right" | "center";
@@ -110,9 +112,17 @@ function resolveColumnLabel<T>(def: ColumnDef<T, unknown>): string {
 }
 
 /** Column chooser entries for the Toolbar. */
-export function getColumnChoices<T>(columns: readonly ColumnDef<T, unknown>[], visibility: VisibilityState = {}): ColumnChoice[] {
+export function getColumnChoices<T>(
+  columns: readonly ColumnDef<T, unknown>[],
+  visibility: VisibilityState = {},
+): ColumnChoice[] {
   return columns
-    .map((def) => ({ id: resolveColumnId(def), label: resolveColumnLabel(def), visible: visibility[resolveColumnId(def)] !== false, locked: def.meta?.locked }))
+    .map((def) => ({
+      id: resolveColumnId(def),
+      label: resolveColumnLabel(def),
+      visible: visibility[resolveColumnId(def)] !== false,
+      locked: def.meta?.locked,
+    }))
     .filter((choice) => choice.id !== "");
 }
 
@@ -166,7 +176,10 @@ export function DataTable<T>({
   const selected = selectedIds ?? internalSelection;
   const setSelected = onSelectionChange ?? setInternalSelection;
 
-  const rowSelection = useMemo<RowSelectionState>(() => Object.fromEntries(selected.map((id) => [id, true])), [selected]);
+  const rowSelection = useMemo<RowSelectionState>(
+    () => Object.fromEntries(selected.map((id) => [id, true])),
+    [selected],
+  );
 
   const handleSelectionChange = useCallback(
     (updater: Updater<RowSelectionState>) => {
@@ -183,6 +196,8 @@ export function DataTable<T>({
     [visibility, setVisibility],
   );
 
+  // TanStack Table returns non-memoisable functions; this app does not run the React Compiler and DataTable is not memoised.
+  // eslint-disable-next-line react-hooks/incompatible-library -- useReactTable has no compiler-compatible alternative
   const table = useReactTable<T>({
     data: data as T[],
     columns: columns as ColumnDef<T, unknown>[],
@@ -213,7 +228,10 @@ export function DataTable<T>({
   });
 
   const clearSelection = useCallback(() => setSelected([]), [setSelected]);
-  const selectedRows = useMemo(() => rows.filter((row) => rowSelection[row.id]).map((row) => row.original), [rows, rowSelection]);
+  const selectedRows = useMemo(
+    () => rows.filter((row) => rowSelection[row.id]).map((row) => row.original),
+    [rows, rowSelection],
+  );
 
   const handleRowClick = (row: Row<T>) => (event: MouseEvent<HTMLElement>) => {
     if (!onRowClick) return;
@@ -244,8 +262,16 @@ export function DataTable<T>({
         className="mb-2 flex flex-wrap items-center gap-2 rounded-md border border-navy-800 bg-navy-950 px-3 py-2 text-sm text-white shadow-card animate-slide-down"
       >
         <span className="money font-semibold">{selected.length.toLocaleString("en-IN")} selected</span>
-        <div className="flex flex-wrap items-center gap-2">{bulkActions?.({ ids: [...selected], rows: selectedRows, clear: clearSelection })}</div>
-        <Button variant="ghost" size="sm" className="ml-auto text-navy-100 hover:bg-navy-800 hover:text-white" leftIcon={X} onClick={clearSelection}>
+        <div className="flex flex-wrap items-center gap-2">
+          {bulkActions?.({ ids: [...selected], rows: selectedRows, clear: clearSelection })}
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="ml-auto text-navy-100 hover:bg-navy-800 hover:text-white"
+          leftIcon={X}
+          onClick={clearSelection}
+        >
           Clear
         </Button>
       </div>
@@ -268,8 +294,17 @@ export function DataTable<T>({
                 <Skeleton className="h-3 w-2/3" />
               </div>
             ))}
-          {showError && <ErrorState error={error} onRetry={onRetry} compact className="rounded-lg border border-border bg-card" />}
-          {showEmpty && <EmptyState compact className="rounded-lg border border-border bg-card" title="Nothing here yet" {...emptyState} />}
+          {showError && (
+            <ErrorState error={error} onRetry={onRetry} compact className="rounded-lg border border-border bg-card" />
+          )}
+          {showEmpty && (
+            <EmptyState
+              compact
+              className="rounded-lg border border-border bg-card"
+              title="Nothing here yet"
+              {...emptyState}
+            />
+          )}
           {!initialLoading &&
             !hasError &&
             rows.map((row) => {
@@ -306,7 +341,9 @@ export function DataTable<T>({
                       </span>
                     )}
                     {titleCell && (
-                      <div className="min-w-0 flex-1 text-sm font-semibold text-navy-950">{flexRender(titleCell.column.columnDef.cell, titleCell.getContext())}</div>
+                      <div className="min-w-0 flex-1 text-sm font-semibold text-navy-950">
+                        {flexRender(titleCell.column.columnDef.cell, titleCell.getContext())}
+                      </div>
                     )}
                   </div>
                   {restCells.length > 0 && (
@@ -314,7 +351,9 @@ export function DataTable<T>({
                       {restCells.map((cell) => (
                         <div key={cell.id} className="min-w-0">
                           <dt className="label-caps truncate">{resolveColumnLabel(cell.column.columnDef)}</dt>
-                          <dd className={cn("truncate text-sm", cell.column.columnDef.meta?.align === "right" && "money")}>
+                          <dd
+                            className={cn("truncate text-sm", cell.column.columnDef.meta?.align === "right" && "money")}
+                          >
                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                           </dd>
                         </div>
@@ -335,8 +374,13 @@ export function DataTable<T>({
 
   const virtualRows = virtualize ? virtualizer.getVirtualItems() : null;
   const paddingTop = virtualRows && virtualRows.length > 0 ? (virtualRows[0]?.start ?? 0) : 0;
-  const paddingBottom = virtualRows && virtualRows.length > 0 ? virtualizer.getTotalSize() - (virtualRows[virtualRows.length - 1]?.end ?? 0) : 0;
-  const renderedRows = virtualRows ? virtualRows.map((virtual) => rows[virtual.index]).filter((row): row is Row<T> => row !== undefined) : rows;
+  const paddingBottom =
+    virtualRows && virtualRows.length > 0
+      ? virtualizer.getTotalSize() - (virtualRows[virtualRows.length - 1]?.end ?? 0)
+      : 0;
+  const renderedRows = virtualRows
+    ? virtualRows.map((virtual) => rows[virtual.index]).filter((row): row is Row<T> => row !== undefined)
+    : rows;
   const hasFooter = leafColumns.some((column) => column.columnDef.footer !== undefined);
 
   return (
@@ -344,21 +388,39 @@ export function DataTable<T>({
       {bulkBar}
       <div className="relative overflow-hidden rounded-lg border border-border bg-card shadow-card">
         {loading && rows.length > 0 && (
-          <div className="absolute inset-x-0 top-0 z-30 h-0.5 overflow-hidden bg-navy-50" role="progressbar" aria-label="Refreshing">
-            <div className="h-full w-1/3 animate-shimmer bg-gradient-to-r from-transparent via-gold to-transparent" style={{ backgroundSize: "200% 100%" }} />
+          <div
+            className="absolute inset-x-0 top-0 z-30 h-0.5 overflow-hidden bg-navy-50"
+            role="progressbar"
+            aria-label="Refreshing"
+          >
+            <div
+              className="h-full w-1/3 animate-shimmer bg-gradient-to-r from-transparent via-gold to-transparent"
+              style={{ backgroundSize: "200% 100%" }}
+            />
           </div>
         )}
         {/* a scroll box with only text inside must itself be focusable so keyboard users can scroll it (WCAG 2.1.1) */}
-        <div ref={scrollRef} className="overflow-auto scrollbar-thin focus-ring-inset" style={{ maxHeight }} aria-busy={loading || undefined} {...(onRowClick || selectable ? {} : { tabIndex: 0, role: "region", "aria-label": "Table" })}>
+        <div
+          ref={scrollRef}
+          className="overflow-auto scrollbar-thin focus-ring-inset"
+          style={{ maxHeight }}
+          aria-busy={loading || undefined}
+          {...(onRowClick || selectable ? {} : { tabIndex: 0, role: "region", "aria-label": "Table" })}
+        >
           <table className="w-full min-w-max border-separate border-spacing-0 text-sm">
             <thead className="sticky top-0 z-20">
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
                   {selectable && (
-                    <th scope="col" className="sticky left-0 z-30 h-10 w-10 border-b border-border bg-surface px-3 text-left align-middle">
+                    <th
+                      scope="col"
+                      className="sticky left-0 z-30 h-10 w-10 border-b border-border bg-surface px-3 text-left align-middle"
+                    >
                       <Checkbox
                         aria-label="Select all rows on this page"
-                        checked={table.getIsAllRowsSelected() ? true : table.getIsSomeRowsSelected() ? "indeterminate" : false}
+                        checked={
+                          table.getIsAllRowsSelected() ? true : table.getIsSomeRowsSelected() ? "indeterminate" : false
+                        }
                         onCheckedChange={(checked) => table.toggleAllRowsSelected(checked === true)}
                       />
                     </th>
@@ -366,7 +428,10 @@ export function DataTable<T>({
                   {headerGroup.headers.map((header, index) => {
                     const meta = header.column.columnDef.meta;
                     const sortKey = meta?.sortKey === false ? null : (meta?.sortKey ?? header.column.id);
-                    const sortable = Boolean(onSortChange) && sortKey !== null && (meta?.sortKey !== undefined || header.column.accessorFn !== undefined);
+                    const sortable =
+                      Boolean(onSortChange) &&
+                      sortKey !== null &&
+                      (meta?.sortKey !== undefined || header.column.accessorFn !== undefined);
                     const active = sortKey !== null && (sort === sortKey || sort === `-${sortKey}`);
                     const direction = sortKey !== null && sort === `-${sortKey}` ? "desc" : active ? "asc" : null;
                     const pinned = pinFirstColumn && index === 0;
@@ -375,8 +440,14 @@ export function DataTable<T>({
                       <th
                         key={header.id}
                         scope="col"
-                        aria-sort={active ? (direction === "desc" ? "descending" : "ascending") : sortable ? "none" : undefined}
-                        style={pinned ? { left: pinOffset, width: meta?.width, minWidth: meta?.width } : { width: meta?.width, minWidth: meta?.width }}
+                        aria-sort={
+                          active ? (direction === "desc" ? "descending" : "ascending") : sortable ? "none" : undefined
+                        }
+                        style={
+                          pinned
+                            ? { left: pinOffset, width: meta?.width, minWidth: meta?.width }
+                            : { width: meta?.width, minWidth: meta?.width }
+                        }
                         className={cn(
                           "h-10 border-b border-border bg-surface px-3 text-left align-middle text-xs font-semibold uppercase tracking-wide text-ink-subtle whitespace-nowrap",
                           meta?.align === "right" && "text-right",
@@ -395,8 +466,16 @@ export function DataTable<T>({
                               meta?.align === "right" && "flex-row-reverse",
                             )}
                           >
-                            <span className="truncate">{flexRender(header.column.columnDef.header, header.getContext())}</span>
-                            <SortIcon className={cn("size-3.5 shrink-0", active ? "text-gold-text" : "text-ink-subtle/60 group-hover:text-ink-subtle")} aria-hidden="true" />
+                            <span className="truncate">
+                              {flexRender(header.column.columnDef.header, header.getContext())}
+                            </span>
+                            <SortIcon
+                              className={cn(
+                                "size-3.5 shrink-0",
+                                active ? "text-gold-text" : "text-ink-subtle/60 group-hover:text-ink-subtle",
+                              )}
+                              aria-hidden="true"
+                            />
                           </button>
                         ) : (
                           flexRender(header.column.columnDef.header, header.getContext())
@@ -417,7 +496,14 @@ export function DataTable<T>({
                       </td>
                     )}
                     {leafColumns.map((column, index) => (
-                      <td key={column.id} className={cn("h-10 border-b border-border px-3", pinFirstColumn && index === 0 && "sticky left-0 bg-card")} style={pinFirstColumn && index === 0 ? { left: pinOffset } : undefined}>
+                      <td
+                        key={column.id}
+                        className={cn(
+                          "h-10 border-b border-border px-3",
+                          pinFirstColumn && index === 0 && "sticky left-0 bg-card",
+                        )}
+                        style={pinFirstColumn && index === 0 ? { left: pinOffset } : undefined}
+                      >
                         <Skeleton className={cn("h-3.5", index === 0 ? "w-32" : "w-20")} />
                       </td>
                     ))}
@@ -462,8 +548,17 @@ export function DataTable<T>({
                       )}
                     >
                       {selectable && (
-                        <td className={cn("sticky left-0 z-10 w-10 border-b border-border px-3 align-middle", density === "normal" ? "h-10" : "h-8")}>
-                          <Checkbox checked={isSelected} onCheckedChange={() => row.toggleSelected()} aria-label="Select row" />
+                        <td
+                          className={cn(
+                            "sticky left-0 z-10 w-10 border-b border-border px-3 align-middle",
+                            density === "normal" ? "h-10" : "h-8",
+                          )}
+                        >
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => row.toggleSelected()}
+                            aria-label="Select row"
+                          />
                         </td>
                       )}
                       {row.getVisibleCells().map((cell, index) => {
@@ -472,7 +567,11 @@ export function DataTable<T>({
                         return (
                           <td
                             key={cell.id}
-                            style={pinned ? { left: pinOffset, width: meta?.width, minWidth: meta?.width } : { width: meta?.width, minWidth: meta?.width }}
+                            style={
+                              pinned
+                                ? { left: pinOffset, width: meta?.width, minWidth: meta?.width }
+                                : { width: meta?.width, minWidth: meta?.width }
+                            }
                             className={cn(
                               "border-b border-border px-3 align-middle whitespace-nowrap text-ink",
                               density === "normal" ? "h-10" : "h-8 text-xs",
@@ -513,7 +612,9 @@ export function DataTable<T>({
                             pinned && "sticky z-30 pinned-shadow",
                           )}
                         >
-                          {header.isPlaceholder ? null : flexRender(header.column.columnDef.footer, header.getContext())}
+                          {header.isPlaceholder
+                            ? null
+                            : flexRender(header.column.columnDef.footer, header.getContext())}
                         </td>
                       );
                     })}
@@ -523,7 +624,9 @@ export function DataTable<T>({
             )}
           </table>
         </div>
-        {footer && <div className="border-t border-border bg-surface/60 px-3 py-2 text-xs text-ink-muted">{footer}</div>}
+        {footer && (
+          <div className="border-t border-border bg-surface/60 px-3 py-2 text-xs text-ink-muted">{footer}</div>
+        )}
       </div>
       {paginationBar}
     </div>

@@ -39,7 +39,12 @@ export default async function BlogPage({ searchParams }: { searchParams: SearchP
 
   return (
     <>
-      <PageHeader eyebrow="Journal" title="News & perspectives" lead="Launch announcements, construction updates and considered writing on homes and the cities they shape." compact />
+      <PageHeader
+        eyebrow="Journal"
+        title="News & perspectives"
+        lead="Launch announcements, construction updates and considered writing on homes and the cities they shape."
+        compact
+      />
       <section className="container-site py-12 sm:py-16">
         {first ? (
           <>
@@ -57,7 +62,9 @@ export default async function BlogPage({ searchParams }: { searchParams: SearchP
             </ul>
           </>
         ) : (
-          <p className="rounded-card border border-dashed border-line p-12 text-center text-ink-muted">Our first stories are being written. Please check back soon.</p>
+          <p className="rounded-card border border-dashed border-line p-12 text-center text-ink-muted">
+            Our first stories are being written. Please check back soon.
+          </p>
         )}
         {totalPages > 1 ? (
           <nav className="mt-12 flex items-center justify-between gap-4" aria-label="Pagination">
@@ -81,7 +88,12 @@ export default async function BlogPage({ searchParams }: { searchParams: SearchP
           </nav>
         ) : null}
       </section>
-      <JsonLd data={breadcrumbJsonLd([{ name: "Home", path: "/" }, { name: "Journal", path: "/blog" }])} />
+      <JsonLd
+        data={breadcrumbJsonLd([
+          { name: "Home", path: "/" },
+          { name: "Journal", path: "/blog" },
+        ])}
+      />
     </>
   );
 }

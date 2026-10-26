@@ -3,7 +3,9 @@
 The foundation work is finished and every verification the task asked for passes. Most of it was already in the checkpoint, and I kept it after checking it. This session wrote the docs and `.env.example`, ran all the verifications, re-applied migration 0002 to a seeded database, and fixed one acceptance-test assertion that was already wrong. All paths below are under /home/user/Kktrealestate/claude-kkt. Nothing new is committed: this session's edits are still in the working tree.
 
 ## Changes (file list)
+
 **From the checkpoint, reviewed and kept:**
+
 - **Config:** `apps/api/src/config.ts`.
 - **Error-code renames:** `apps/api/src/modules/documents/service.ts` (UNSUPPORTED_MEDIA becomes UNSUPPORTED_MEDIA_TYPE) and `apps/api/src/modules/money/services/roznamcha.ts` (INSUFFICIENT_CASH becomes CASH_INSUFFICIENT).
 - **Client IP:** `apps/api/src/lib/rateLimit.ts`. `clientIp()` now just returns Fastify's proxy-aware `req.ip`.
@@ -19,6 +21,7 @@ The foundation work is finished and every verification the task asked for passes
 - **Tests:** `apps/api/test/unit/config.test.ts`, `apps/api/test/unit/error-registry.test.ts`, and updated expectations in the integration tests `documents.test.ts`, `money.test.ts` and `web-adversarial.test.ts`.
 
 **This session:**
+
 - `.env.example`: every new variable, plus a note about the `_FILE` form.
 - `docs/DEPLOY.md`: new environment tables (required in production, production defaults, `_FILE` secrets, first boot, network and storage, DB/Redis limits, key rotation, observability) and a note on the migration lock.
 - `docs/DATA-MODEL.md`: the new columns, constraints and indexes on each table, the `exports` table, invariants 7 and 8, and a new section "I. Search and list indexes".
@@ -27,6 +30,7 @@ The foundation work is finished and every verification the task asked for passes
 - `apps/api/test/acceptance/09-stage-jump-undo-integrity.test.ts`: this test was failing before my changes. The route returns `{count}` (as SPEC Appendix C says) but the test read `.unread`. I changed the test to read `count`.
 
 ## Tests and results
+
 - **Typecheck** passes for contracts, db, domain, api, erp, web and portal.
 - **Contracts tests:** 183/183 pass.
 - **packages/db tests** (against kkt_h0): 69/69 pass. `hardening.test.ts` covers:
@@ -46,23 +50,27 @@ The foundation work is finished and every verification the task asked for passes
   3. Re-ran `pnpm --filter @kkt/db migrate`.
 
   Every CHECK constraint validated on the seeded data. `list_price_paise` was backfilled on 10 of 10 bookings, each matching `flat_snapshot.price_paise`. `manage_token_expires_at` was backfilled on 10 of 10 visits. A second migrate run does nothing. Migrating an empty database is covered by `migrate.test.ts`.
+
 - **Schema drift:** `drizzle-kit generate` reports "No schema changes".
 
 ## ESLint counts (errors / warnings)
+
 I did not fix any lint findings, as the task says.
 
-| Package | Errors | Warnings | Main rules |
-|---|---|---|---|
-| contracts, domain, db | 0 | 0 | — |
-| api | 12 | 42 | all 42 warnings are `kkt/module-boundaries`; errors: no-unused-vars 7, no-useless-assignment 4, preserve-caught-error 1 |
-| erp | 68 | 9 | react-hooks/set-state-in-effect 51, incompatible-library 7, refs 5, purity 4, plus a few others |
-| web | 16 | 0 | set-state-in-effect 7, preserve-manual-memoization 2, `@next/next/no-img-element` 2, others |
-| portal | 25 | 0 | react-hooks/immutability 11, refs 10, others |
+| Package               | Errors | Warnings | Main rules                                                                                                              |
+| --------------------- | ------ | -------- | ----------------------------------------------------------------------------------------------------------------------- |
+| contracts, domain, db | 0      | 0        | —                                                                                                                       |
+| api                   | 12     | 42       | all 42 warnings are `kkt/module-boundaries`; errors: no-unused-vars 7, no-useless-assignment 4, preserve-caught-error 1 |
+| erp                   | 68     | 9        | react-hooks/set-state-in-effect 51, incompatible-library 7, refs 5, purity 4, plus a few others                         |
+| web                   | 16     | 0        | set-state-in-effect 7, preserve-manual-memoization 2, `@next/next/no-img-element` 2, others                             |
+| portal                | 25     | 0        | react-hooks/immutability 11, refs 10, others                                                                            |
 
 The two `@next/next/no-img-element` errors come from eslint-disable comments that name a Next.js lint rule; the Next ESLint plugin isn't loaded, so ESLint reports them as unknown rules. The verify stage should either remove those comments or add the plugin, which would need a package install.
 
 ## What the tracks can rely on
+
 **New environment variables** (validated in `apps/api/src/config.ts`):
+
 - **Production defaults:** `SEED_ON_BOOT`, `SEED_DEMO`, `RUN_JOBS_IN_API` default to false and `API_WORKERS` to `"auto"` (parsed as 0). Outside production they default to true, true, true and 1.
 - **First boot:** `BOOTSTRAP_COMPANY_NAME`, plus `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD`. The email and password must be set together; the password needs at least 12 characters.
 - **`TRUST_PROXY`** parses to `boolean | string[]` (default `["loopback"]`) and is passed to Fastify's `trustProxy`. An unknown entry stops the boot.
@@ -84,6 +92,7 @@ The two `@next/next/no-img-element` errors come from eslint-disable comments tha
 - **For tests:** `loadConfig(env, { readFile })` is exported.
 
 **`@kkt/db` exports:**
+
 - `withTransactionRetry<T>(db: DB, fn: (tx: Tx, attempt: number) => Promise<T>, opts?: { retries?=3; baseDelayMs?=25; maxDelayMs?=1000; isolationLevel?; onRetry?; sleep? }): Promise<T>`. It retries only on 40001/40P01, using full-jitter backoff, and finds the code through Drizzle's `cause` wrappers. Because `fn` can run more than once, do any side effects outside the database (queues, Redis, notifications) after it resolves.
 - `retryableTransactionError(err)`
 - `RETRYABLE_TRANSACTION_SQLSTATES`
@@ -95,6 +104,7 @@ The two `@next/next/no-img-element` errors come from eslint-disable comments tha
 - `MIGRATION_LOCK_KEY = "kkt:migrate"`
 
 **New columns:**
+
 - `bookings.list_price_paise bigint NULL` (backfilled), `bookings.price_deviation_reason text`, `bookings.price_deviation_by uuid`
 - `site_visits.manage_token_expires_at timestamptz` (backfilled to slot end + 1 day IST)
 - `customers.kyc_submitted_by uuid`, `customers.kyc_submitted_at timestamptz`
@@ -102,6 +112,7 @@ The two `@next/next/no-img-element` errors come from eslint-disable comments tha
 - a new table `exports`: id, company_id, user_id (cascades on user delete), path, query jsonb, status `export_status` (QUEUED/RUNNING/DONE/FAILED, default QUEUED), row_count, storage_key, error, created_at, finished_at, expires_at
 
 **Constraint names:**
+
 - `bookings_agreement_split_chk`, `bookings_agreed_nonneg_chk`, `bookings_list_price_nonneg_chk`
 - `demands_split_chk`, `demands_amounts_nonneg_chk`
 - `booking_other_charges_total_chk`, `booking_other_charges_nonneg_chk`
@@ -109,6 +120,7 @@ The two `@next/next/no-img-element` errors come from eslint-disable comments tha
 - `exports_row_count_nonneg_chk`
 
 **Unique indexes:**
+
 - `payments_company_idempotency_key_uq`
 - `customers_company_phone_live_uq` (WHERE erased_at IS NULL)
 - `customers_company_pan_hash_live_uq` (WHERE erased_at IS NULL AND pan_hash IS NOT NULL)
@@ -116,22 +128,26 @@ The two `@next/next/no-img-element` errors come from eslint-disable comments tha
 These match `assertNoDuplicate`. A race the application check misses now fails with a Postgres unique violation (23505).
 
 **Other indexes:**
+
 - `flats_hold_until_idx`
 - `(company_id, sort DESC, id DESC)` indexes for the default sort of bookings, customers, leads, enquiries, service_requests, audit_logs, payments, demands and site_visits
 - trigram indexes named `<table>_<col>_trgm_idx`
 
 **Error codes:**
+
 - `ApiErrorSchema.error.code` now accepts any UPPER_SNAKE string. `ErrorCode` is still the documented union, and `isKnownErrorCode()` is exported.
 - 19 codes were added: METHOD_NOT_ALLOWED, CONFLICT, NOT_IMPLEMENTED, SUPER_ADMIN_ONLY, PUBLISH_REQUIREMENTS, DUPLICATE_CUSTOMER, DUPLICATE_LEAD, DUPLICATE_PRESET, HAS_ACTIVE_BOOKING, JOB_ALREADY_RUNNING, ALREADY_DEMANDED, PARKING_NOT_AVAILABLE, PAYMENT_NOT_CLEARED, PAYMENT_NOT_PENDING, REGENERATE_BLOCKED, UNDO_NOT_LATEST, TICKET_CLOSED, REOPEN_WINDOW_CLOSED, ALREADY_RATED.
 - Tracks adding codes must append them to `ERROR_CODES` and `ERROR_STATUS`; the registry test fails otherwise.
 
 ## Decisions and deviations
+
 - **Migration layout:** the `pg_trgm` extension and the two backfills are hand-written lines inside the drizzle migration 0002, not a separate `src/sql/0002_*.sql` file. They only need to run once. `migrate.ts` also runs `CREATE EXTENSION IF NOT EXISTS pg_trgm` before the drizzle migrations, so it stays idempotent.
 - **Migration 0002 also replaces three existing indexes:** it drops `ledger_entries_booking_seq_idx` and rebuilds `audit_logs_company_created_idx` and `payments_company_date_idx` with `id DESC` added as a tie-breaker. Note: the index is dropped with no replacement; the task's later notes didn't cover it.
 - **No trigram indexes on small tables:** I skipped them on master and CMS tables, and also on site_visits and enquiries, whose searches are small.
 - **Migrations run without statement or lock timeouts** (`timeouts: false`). The advisory-lock wait has no limit, because another replica may be mid-migration.
 
 ## Not done; for the tracks and integration stage
+
 - **Bootstrap (Track task 6):** `server.ts` and `seed/*` don't use `SEED_DEMO` or `BOOTSTRAP_*` yet. Until that lands, production with `SEED_ON_BOOT=true` would still run the demo seed.
 - **Variables that are validated but not yet used by anything:** `REDIS_SECURITY_URL`, `METRICS_*`, `OTEL_*`, `ERROR_WEBHOOK_URL`, `INTERNAL_API_TOKEN`, `JWT_PREVIOUS_SECRETS` and `FIELD_KEY_RING`. The security and observability tracks need to wire them in.
 - **Columns no code reads or writes yet:** the API doesn't use any of the new columns, and the `exports` table has no routes or worker yet.

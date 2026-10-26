@@ -13,7 +13,7 @@ import { ClickToLoadEmbed } from "@/components/ui/ClickToLoadEmbed";
 import { Reveal } from "@/components/ui/Reveal";
 import { Section, SectionHeading } from "@/components/ui/Section";
 import { ArrowRightIcon } from "@/components/ui/icons";
-import { getSiteSettings, listPosts, listProjects } from "@/lib/api";
+import { listPosts, listProjects } from "@/lib/api";
 import { closedMetadata, siteGate } from "@/lib/gate";
 import { Markdown } from "@/lib/markdown";
 import { brandName, breadcrumbJsonLd } from "@/lib/seo";
@@ -57,14 +57,21 @@ export default async function HomePage() {
         <Section tone="ivory">
           <Reveal className="mx-auto max-w-prose text-center">
             <p className="eyebrow text-gold-700">{intro?.title ?? `About ${brand}`}</p>
-            <Markdown source={introText} className="prose-kkt mt-6 font-display text-2xl leading-relaxed text-navy-900 sm:text-3xl [&_p]:font-display" />
+            <Markdown
+              source={introText}
+              className="prose-kkt mt-6 font-display text-2xl leading-relaxed text-navy-900 sm:text-3xl [&_p]:font-display"
+            />
           </Reveal>
         </Section>
       ) : null}
 
       <Section tone={introText ? "white" : "ivory"} id="projects">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
-          <SectionHeading eyebrow="Featured residences" title={featuredSection?.title ?? "Addresses worth coming home to"} lead={sectionText(featuredSection?.body) ?? undefined} />
+          <SectionHeading
+            eyebrow="Featured residences"
+            title={featuredSection?.title ?? "Addresses worth coming home to"}
+            lead={sectionText(featuredSection?.body) ?? undefined}
+          />
           <Button href="/projects" variant="outline" className="shrink-0">
             All projects <ArrowRightIcon size={18} />
           </Button>
@@ -78,7 +85,9 @@ export default async function HomePage() {
             ))}
           </ul>
         ) : (
-          <p className="mt-12 rounded-card border border-dashed border-line p-10 text-center text-ink-muted">New residences are being prepared for launch. Please check back soon or speak to our team.</p>
+          <p className="mt-12 rounded-card border border-dashed border-line p-10 text-center text-ink-muted">
+            New residences are being prepared for launch. Please check back soon or speak to our team.
+          </p>
         )}
       </Section>
 
@@ -86,7 +95,12 @@ export default async function HomePage() {
 
       {site?.walkthrough_video_url ? (
         <Section tone="ivory">
-          <SectionHeading eyebrow="Walkthrough" title={videoSection?.title ?? "Step inside before you visit"} lead={sectionText(videoSection?.body) ?? "A cinematic tour of our craft. Loads only when you press play."} align="center" />
+          <SectionHeading
+            eyebrow="Walkthrough"
+            title={videoSection?.title ?? "Step inside before you visit"}
+            lead={sectionText(videoSection?.body) ?? "A cinematic tour of our craft. Loads only when you press play."}
+            align="center"
+          />
           <Reveal className="mx-auto mt-12 max-w-5xl">
             <ClickToLoadEmbed url={site.walkthrough_video_url} title={`${brand} walkthrough`} />
           </Reveal>
@@ -113,7 +127,11 @@ export default async function HomePage() {
         </Section>
       ) : null}
 
-      <EnquirySection projects={featured.map((p) => ({ slug: p.slug, name: p.name }))} contacts={site?.contacts ?? NO_CONTACTS} brandName={brand} />
+      <EnquirySection
+        projects={featured.map((p) => ({ slug: p.slug, name: p.name }))}
+        contacts={site?.contacts ?? NO_CONTACTS}
+        brandName={brand}
+      />
       <JsonLd data={breadcrumbJsonLd([{ name: "Home", path: "/" }])} />
     </>
   );

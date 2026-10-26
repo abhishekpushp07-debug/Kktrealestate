@@ -129,7 +129,8 @@ function parseBlocks(source: string): Block[] {
 // Inline
 // ---------------------------------------------------------------------------
 
-const INLINE_TOKEN = /(`[^`\n]+`)|(!\[[^\]]*\]\([^)\s]+(?:\s+"[^"]*")?\))|(\[[^\]]+\]\([^)\s]+(?:\s+"[^"]*")?\))|(\*\*[^*\n]+\*\*)|(__[^_\n]+__)|(\*[^*\n]+\*)|(_[^_\n]+_)|(\n)/;
+const INLINE_TOKEN =
+  /(`[^`\n]+`)|(!\[[^\]]*\]\([^)\s]+(?:\s+"[^"]*")?\))|(\[[^\]]+\]\([^)\s]+(?:\s+"[^"]*")?\))|(\*\*[^*\n]+\*\*)|(__[^_\n]+__)|(\*[^*\n]+\*)|(_[^_\n]+_)|(\n)/;
 
 function renderInline(text: string, keyPrefix: string): ReactNode[] {
   const nodes: ReactNode[] = [];
@@ -151,7 +152,8 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
     } else if (match[2]) {
       const m = /^!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)$/.exec(token);
       const href = m ? safeHref(m[2] ?? "") : null;
-      if (href) nodes.push(<img key={key} src={href} alt={m?.[1] ?? ""} title={m?.[3]} loading="lazy" decoding="async" />);
+      if (href)
+        nodes.push(<img key={key} src={href} alt={m?.[1] ?? ""} title={m?.[3]} loading="lazy" decoding="async" />);
       else nodes.push(m?.[1] ?? token);
     } else if (match[3]) {
       const m = /^\[([^\]]+)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)$/.exec(token);
@@ -160,7 +162,12 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
       if (href) {
         const external = /^https?:\/\//i.test(href);
         nodes.push(
-          <a key={key} href={href} title={m?.[3]} {...(external ? { rel: "noopener noreferrer", target: "_blank" } : {})}>
+          <a
+            key={key}
+            href={href}
+            title={m?.[3]}
+            {...(external ? { rel: "noopener noreferrer", target: "_blank" } : {})}
+          >
             {renderInline(label, `${key}-l`)}
           </a>,
         );
@@ -210,7 +217,9 @@ export function Markdown({ source, shiftHeadings = 1, className }: MarkdownProps
           case "paragraph":
             return <p key={key}>{renderInline(block.text, key)}</p>;
           case "list": {
-            const items = block.items.map((item, j) => <li key={`${key}-${j}`}>{renderInline(item, `${key}-${j}`)}</li>);
+            const items = block.items.map((item, j) => (
+              <li key={`${key}-${j}`}>{renderInline(item, `${key}-${j}`)}</li>
+            ));
             return block.ordered ? <ol key={key}>{items}</ol> : <ul key={key}>{items}</ul>;
           }
           case "quote":

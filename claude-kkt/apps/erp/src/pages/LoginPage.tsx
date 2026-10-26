@@ -24,21 +24,33 @@ const mfaSchema = z.object({
 type MfaForm = z.infer<typeof mfaSchema>;
 
 const HIGHLIGHTS = [
-  { title: "Everything is a selection", text: "Flat types, stages, plans and charges are defined once; blocks and bookings are built by picking." },
-  { title: "Two-bucket ledger", text: "Cash and Account tracked side by side, dues rising with construction, advances shown in green." },
-  { title: "Append-only money", text: "Payments are reversed, never deleted. Every change carries an actor, a reason and a request id." },
+  {
+    title: "Everything is a selection",
+    text: "Flat types, stages, plans and charges are defined once; blocks and bookings are built by picking.",
+  },
+  {
+    title: "Two-bucket ledger",
+    text: "Cash and Account tracked side by side, dues rising with construction, advances shown in green.",
+  },
+  {
+    title: "Append-only money",
+    text: "Payments are reversed, never deleted. Every change carries an actor, a reason and a request id.",
+  },
 ] as const;
 
 function loginErrorMessage(error: unknown): string {
   if (isApiClientError(error)) {
-    if (error.code === "INVALID_CREDENTIALS" || (error.status === 401 && error.code !== "MFA_REQUIRED")) return "Incorrect email or password.";
+    if (error.code === "INVALID_CREDENTIALS" || (error.status === 401 && error.code !== "MFA_REQUIRED"))
+      return "Incorrect email or password.";
     if (error.code === "LOCKED" || error.status === 423) {
       const until = error.details?.locked_until;
       const suffix = typeof until === "string" ? ` Try again after ${formatTime(until)}.` : " Try again in 15 minutes.";
       return `Too many failed attempts — this account is temporarily locked.${suffix}`;
     }
     if (error.code === "RATE_LIMITED" || error.status === 429) {
-      return error.retryAfterSeconds ? `Too many sign-in attempts. Try again in ${error.retryAfterSeconds} seconds.` : "Too many sign-in attempts. Try again in a moment.";
+      return error.retryAfterSeconds
+        ? `Too many sign-in attempts. Try again in ${error.retryAfterSeconds} seconds.`
+        : "Too many sign-in attempts. Try again in a moment.";
     }
   }
   return describeError(error);
@@ -55,7 +67,10 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<unknown>(null);
 
-  const credentials = useForm<Credentials>({ resolver: zodResolver(credentialsSchema), defaultValues: { email: "", password: "" } });
+  const credentials = useForm<Credentials>({
+    resolver: zodResolver(credentialsSchema),
+    defaultValues: { email: "", password: "" },
+  });
   const mfa = useForm<MfaForm>({ resolver: zodResolver(mfaSchema), defaultValues: { code: "" } });
 
   useEffect(() => {
@@ -99,7 +114,13 @@ export default function LoginPage() {
       finish(await completeMfa(mfaToken, values.code));
     } catch (cause) {
       if (isApiClientError(cause) && cause.status === 401 && cause.code !== "LOCKED") {
-        setError(new Error(cause.code === "TOKEN_EXPIRED" ? "The verification session expired. Sign in again." : "That code didn't match. Check your authenticator app and try again."));
+        setError(
+          new Error(
+            cause.code === "TOKEN_EXPIRED"
+              ? "The verification session expired. Sign in again."
+              : "That code didn't match. Check your authenticator app and try again.",
+          ),
+        );
         if (cause.code === "TOKEN_EXPIRED") {
           setStep("credentials");
           setMfaToken(null);
@@ -116,12 +137,18 @@ export default function LoginPage() {
       <aside className="navy-grain relative flex flex-col justify-between px-6 py-6 text-white lg:w-[46%] lg:px-12 lg:py-12 xl:w-1/2">
         <div className="flex items-center justify-between">
           <BrandMark withText onDark size="md" subtitle="Real-estate ERP" />
-          <span className="rounded-full border border-gold/40 bg-navy-900/60 px-2.5 py-1 text-2xs font-semibold uppercase tracking-wider text-gold">Staff</span>
+          <span className="rounded-full border border-gold/40 bg-navy-900/60 px-2.5 py-1 text-2xs font-semibold uppercase tracking-wider text-gold">
+            Staff
+          </span>
         </div>
         <div className="my-8 hidden lg:block">
           <p className="text-2xs font-semibold uppercase tracking-[0.2em] text-gold">Royal navy · Gold</p>
-          <h1 className="mt-3 max-w-md font-display text-4xl font-extrabold leading-[1.1] tracking-tight text-white">Run the whole business from one ledger.</h1>
-          <p className="mt-4 max-w-md text-md text-navy-100/85">Inventory, bookings, construction-linked dues, receipts and the website — one backend, every rupee in paise.</p>
+          <h1 className="mt-3 max-w-md font-display text-4xl font-extrabold leading-[1.1] tracking-tight text-white">
+            Run the whole business from one ledger.
+          </h1>
+          <p className="mt-4 max-w-md text-md text-navy-100/85">
+            Inventory, bookings, construction-linked dues, receipts and the website — one backend, every rupee in paise.
+          </p>
           <ul className="mt-8 space-y-4">
             {HIGHLIGHTS.map((item) => (
               <li key={item.title} className="flex gap-3">
@@ -134,14 +161,21 @@ export default function LoginPage() {
             ))}
           </ul>
         </div>
-        <p className="hidden text-2xs text-navy-200/70 lg:block">© {new Date().getFullYear()} KKT · Access is logged. Authorised staff only.</p>
+        <p className="hidden text-2xs text-navy-200/70 lg:block">
+          © {new Date().getFullYear()} KKT · Access is logged. Authorised staff only.
+        </p>
       </aside>
 
       {/* Form panel */}
       <main className="flex flex-1 items-center justify-center px-4 py-8 sm:px-8">
         <div className="w-full max-w-sm">
           {step === "credentials" ? (
-            <form onSubmit={(event) => void submitCredentials(event)} noValidate className="space-y-5" data-testid="login-form">
+            <form
+              onSubmit={(event) => void submitCredentials(event)}
+              noValidate
+              className="space-y-5"
+              data-testid="login-form"
+            >
               <div>
                 <h2 className="font-display text-2xl font-extrabold text-navy-950">Sign in</h2>
                 <p className="mt-1 text-sm text-ink-subtle">Use your staff email and password.</p>
@@ -182,15 +216,28 @@ export default function LoginPage() {
                       aria-pressed={showPassword}
                       className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm p-1 text-ink-subtle hover:text-navy-950 focus-ring"
                     >
-                      {showPassword ? <EyeOff className="size-4" aria-hidden="true" /> : <Eye className="size-4" aria-hidden="true" />}
+                      {showPassword ? (
+                        <EyeOff className="size-4" aria-hidden="true" />
+                      ) : (
+                        <Eye className="size-4" aria-hidden="true" />
+                      )}
                     </button>
                   </div>
                 )}
               </FieldWrapper>
-              <Button type="submit" variant="gold" size="lg" className="w-full" loading={credentials.formState.isSubmitting} data-testid="login-submit-btn">
+              <Button
+                type="submit"
+                variant="gold"
+                size="lg"
+                className="w-full"
+                loading={credentials.formState.isSubmitting}
+                data-testid="login-submit-btn"
+              >
                 Sign in
               </Button>
-              <p className="text-center text-xs text-ink-subtle">Forgot your password? Ask a Super Admin to reset it.</p>
+              <p className="text-center text-xs text-ink-subtle">
+                Forgot your password? Ask a Super Admin to reset it.
+              </p>
             </form>
           ) : (
             <form onSubmit={(event) => void submitMfa(event)} noValidate className="space-y-5" data-testid="mfa-form">
@@ -217,7 +264,14 @@ export default function LoginPage() {
                   />
                 )}
               </FieldWrapper>
-              <Button type="submit" variant="gold" size="lg" className="w-full" loading={mfa.formState.isSubmitting} data-testid="mfa-submit-btn">
+              <Button
+                type="submit"
+                variant="gold"
+                size="lg"
+                className="w-full"
+                loading={mfa.formState.isSubmitting}
+                data-testid="mfa-submit-btn"
+              >
                 Verify and sign in
               </Button>
               <Button

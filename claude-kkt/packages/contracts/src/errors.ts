@@ -70,7 +70,10 @@ export const ERROR_CODES = [
   "KYC_TRANSITION_INVALID",
   "LINK_EXPIRED",
   "BOOKING_COMPLETED",
-  "VERSION_REQUIRED", "LOCK_TIMEOUT", "CONFLICT_RETRY", "EXPORT_NOT_READY",
+  "VERSION_REQUIRED",
+  "LOCK_TIMEOUT",
+  "CONFLICT_RETRY",
+  "EXPORT_NOT_READY",
   "GONE",
   "IDEMPOTENT_SECRET_REPLAY",
 ] as const;
@@ -149,7 +152,10 @@ export const ERROR_STATUS: Readonly<Record<ErrorCode, number>> = {
   KYC_TRANSITION_INVALID: 409,
   LINK_EXPIRED: 410,
   BOOKING_COMPLETED: 409,
-  VERSION_REQUIRED: 400, LOCK_TIMEOUT: 409, CONFLICT_RETRY: 409, EXPORT_NOT_READY: 409,
+  VERSION_REQUIRED: 400,
+  LOCK_TIMEOUT: 409,
+  CONFLICT_RETRY: 409,
+  EXPORT_NOT_READY: 409,
   GONE: 410,
   IDEMPOTENT_SECRET_REPLAY: 409,
 };
@@ -209,7 +215,9 @@ export function isKnownErrorCode(code: string): code is ErrorCode {
  * code they do not know yet (they show the server's message and branch only on codes they know); {@link ErrorCode} stays the documented
  * union for exhaustive handling and autocompletion.
  */
-export const WireErrorCodeSchema = z.string().regex(/^[A-Z][A-Z0-9_]*$/, "error codes are UPPER_SNAKE") as unknown as z.ZodType<ErrorCode | (string & {})>;
+export const WireErrorCodeSchema = z
+  .string()
+  .regex(/^[A-Z][A-Z0-9_]*$/, "error codes are UPPER_SNAKE") as unknown as z.ZodType<ErrorCode | (string & {})>;
 
 /** The error envelope every failing response carries. */
 export const ApiErrorSchema = z.object({

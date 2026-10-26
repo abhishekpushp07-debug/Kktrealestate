@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { SAMPLE_BOOKING, buildSchedulePreview, percentSum, shareOfPaise, sumPercentBasisPoints, toBasisPoints } from "../paymentPlanMath";
+import {
+  SAMPLE_BOOKING,
+  buildSchedulePreview,
+  percentSum,
+  shareOfPaise,
+  sumPercentBasisPoints,
+  toBasisPoints,
+} from "../paymentPlanMath";
 
 describe("percent sum helper", () => {
   it("sums in basis points so 33.33 + 33.33 + 33.34 is exactly 100", () => {

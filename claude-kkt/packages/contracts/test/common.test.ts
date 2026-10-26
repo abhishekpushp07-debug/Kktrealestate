@@ -93,7 +93,13 @@ describe("ListQuerySchema", () => {
   it("applies defaults and coerces query strings", () => {
     const q = ListQuerySchema.parse({});
     expect(q).toMatchObject({ page: 1, page_size: 25, include_inactive: false });
-    const q2 = ListQuerySchema.parse({ page: "3", page_size: "50", include_inactive: "true", sort: "-created_at", format: "csv" });
+    const q2 = ListQuerySchema.parse({
+      page: "3",
+      page_size: "50",
+      include_inactive: "true",
+      sort: "-created_at",
+      format: "csv",
+    });
     expect(q2).toMatchObject({ page: 3, page_size: 50, include_inactive: true, sort: "-created_at", format: "csv" });
   });
   it("caps page_size at 200 and search at 100 chars", () => {
@@ -108,7 +114,9 @@ describe("ListQuerySchema", () => {
   });
   it("listEnvelope wraps items", () => {
     const env = listEnvelope(z.object({ id: z.string() }));
-    expect(env.safeParse({ items: [{ id: "a" }], total: 1, page: 1, page_size: 25, next_cursor: null }).success).toBe(true);
+    expect(env.safeParse({ items: [{ id: "a" }], total: 1, page: 1, page_size: 25, next_cursor: null }).success).toBe(
+      true,
+    );
     expect(env.safeParse({ items: [], total: 0, page: 0, page_size: 25, next_cursor: null }).success).toBe(false);
   });
 });
@@ -122,11 +130,20 @@ describe("updateOf", () => {
   });
 
   it("strips create-time defaults: a key the client did not send stays absent instead of being reset (partial PATCH semantics)", () => {
-    const Create = z.strictObject({ is_published: z.boolean().default(false), hero_document_ids: z.array(z.string()).max(3).default([]), name: z.string(), nick: z.string().optional().nullable() });
+    const Create = z.strictObject({
+      is_published: z.boolean().default(false),
+      hero_document_ids: z.array(z.string()).max(3).default([]),
+      name: z.string(),
+      nick: z.string().optional().nullable(),
+    });
     const U = updateOf(Create);
     expect(U.parse({ version: 1, name: "x" })).toEqual({ version: 1, name: "x" });
     expect(U.parse({ version: 1 })).toEqual({ version: 1 });
-    expect(U.parse({ version: 1, is_published: true, hero_document_ids: ["a"] })).toEqual({ version: 1, is_published: true, hero_document_ids: ["a"] });
+    expect(U.parse({ version: 1, is_published: true, hero_document_ids: ["a"] })).toEqual({
+      version: 1,
+      is_published: true,
+      hero_document_ids: ["a"],
+    });
     // the inner validation of a defaulted field still applies
     expect(U.safeParse({ version: 1, hero_document_ids: ["a", "b", "c", "d"] }).success).toBe(false);
     expect(U.safeParse({ version: 1, is_published: "yes" }).success).toBe(false);

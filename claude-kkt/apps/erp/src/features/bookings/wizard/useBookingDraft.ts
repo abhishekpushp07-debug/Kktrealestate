@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { BookingDraftRow } from "@kkt/contracts";
-import { readStorage, writeStorage } from "@/lib/utils";
+import { readStorage, useOnChange, writeStorage } from "@/lib/utils";
 import { bookingKeys, deleteDraft, saveDraft } from "../api";
 import { toDraftPayload, wizardHasContent, type WizardState } from "../bookingMath";
 
@@ -58,7 +58,15 @@ export interface UseBookingDraftResult {
  * Debounced autosave of the wizard: the contract-shaped payload goes to `PUT/POST /booking-drafts`
  * and the full UI state to localStorage as a fallback (so an API hiccup never loses the work).
  */
-export function useBookingDraft({ state, step, draftId, onDraftId, enabled, persisted = false, delayMs = 1500 }: UseBookingDraftOptions): UseBookingDraftResult {
+export function useBookingDraft({
+  state,
+  step,
+  draftId,
+  onDraftId,
+  enabled,
+  persisted = false,
+  delayMs = 1500,
+}: UseBookingDraftOptions): UseBookingDraftResult {
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<DraftStatus>("idle");
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
@@ -66,7 +74,10 @@ export function useBookingDraft({ state, step, draftId, onDraftId, enabled, pers
   const timer = useRef<number | null>(null);
   const inFlight = useRef<Promise<void> | null>(null);
   const latest = useRef({ state, step, draftId });
-  latest.current = { state, step, draftId };
+  // Read by timers and handlers only (never while rendering), so it is refreshed right after each commit.
+  useLayoutEffect(() => {
+    latest.current = { state, step, draftId };
+  });
   /** Whether the current draft id exists on the server (resumed, or saved at least once): discard only deletes those. */
   const persistedRef = useRef(persisted);
   useEffect(() => {
@@ -74,7 +85,12 @@ export function useBookingDraft({ state, step, draftId, onDraftId, enabled, pers
   }, [persisted]);
 
   const persistLocal = useCallback((current: WizardState, currentStep: number, id: string | null) => {
-    writeStorage<LocalDraft>(LOCAL_DRAFT_KEY, { id, step: currentStep, payload: { ...toDraftPayload(current), split_mode: current.split_mode }, updated_at: new Date().toISOString() });
+    writeStorage<LocalDraft>(LOCAL_DRAFT_KEY, {
+      id,
+      step: currentStep,
+      payload: { ...toDraftPayload(current), split_mode: current.split_mode },
+      updated_at: new Date().toISOString(),
+    });
   }, []);
 
   const save = useCallback(async (): Promise<void> => {
@@ -102,11 +118,18 @@ export function useBookingDraft({ state, step, draftId, onDraftId, enabled, pers
     }
   }, [onDraftId, persistLocal, queryClient]);
 
-  // Debounce on every state / step change.
+  // Every state / step change marks the draft dirty (while rendering) and restarts the debounce timer (effect).
+  const dirtyState = enabled && wizardHasContent(state) ? state : null;
+  const markDirty = () => setStatus((previous) => (previous === "saving" ? previous : "dirty"));
+  useOnChange(dirtyState, (changed) => {
+    if (changed) markDirty();
+  });
+  useOnChange(step, () => {
+    if (dirtyState) markDirty();
+  });
   useEffect(() => {
     if (!enabled) return;
     if (!wizardHasContent(state)) return;
-    setStatus((previous) => (previous === "saving" ? previous : "dirty"));
     if (timer.current !== null) window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => {
       timer.current = null;

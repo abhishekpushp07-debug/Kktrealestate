@@ -33,12 +33,18 @@ describe("form fields wire aria-invalid / aria-describedby to the error text", (
   });
 
   it("the hint is the description when there is no error; textareas and selects are wired the same way", () => {
-    const hint = renderToStaticMarkup(<FieldWrapper label="Note" hint="Shown to the customer" id="note">{(c) => <Textarea id={c.id} />}</FieldWrapper>);
+    const hint = renderToStaticMarkup(
+      <FieldWrapper label="Note" hint="Shown to the customer" id="note">
+        {(c) => <Textarea id={c.id} />}
+      </FieldWrapper>,
+    );
     expect(attrs(hint, "textarea")["aria-describedby"]).toBe("note-hint");
     expect(attrs(hint, "textarea")["aria-invalid"]).toBeUndefined();
     const select = renderToStaticMarkup(
       <FieldWrapper label="Mode" error="Pick a mode" id="mode">
-        {(c) => <Select id={c.id} value={null} onValueChange={() => undefined} options={[{ value: "CASH", label: "Cash" }]} />}
+        {(c) => (
+          <Select id={c.id} value={null} onValueChange={() => undefined} options={[{ value: "CASH", label: "Cash" }]} />
+        )}
       </FieldWrapper>,
     );
     const trigger = attrs(select, "button");
@@ -54,12 +60,20 @@ describe("form fields wire aria-invalid / aria-describedby to the error text", (
       </FieldWrapper>,
     );
     expect(attrs(html, "input")["aria-describedby"]).toBe("amt-words amt-error");
-    const same = renderToStaticMarkup(<FieldWrapper label="A" error="Bad" id="a">{(c) => <Input id={c.id} aria-describedby="a-error" />}</FieldWrapper>);
+    const same = renderToStaticMarkup(
+      <FieldWrapper label="A" error="Bad" id="a">
+        {(c) => <Input id={c.id} aria-describedby="a-error" />}
+      </FieldWrapper>,
+    );
     expect(attrs(same, "input")["aria-describedby"]).toBe("a-error");
   });
 
   it("controls with a different id are not touched (no duplicate wiring inside composite controls)", () => {
-    const html = renderToStaticMarkup(<FieldWrapper label="X" error="Bad" id="x">{() => <Input id="other" />}</FieldWrapper>);
+    const html = renderToStaticMarkup(
+      <FieldWrapper label="X" error="Bad" id="x">
+        {() => <Input id="other" />}
+      </FieldWrapper>,
+    );
     expect(attrs(html, "input")["aria-invalid"]).toBeUndefined();
     expect(attrs(html, "input")["aria-describedby"]).toBeUndefined();
   });
@@ -72,27 +86,28 @@ describe("ErrorState: 403 and 404 render the existing states with their own copy
 
   it("403 → no access, no retry", () => {
     const html = renderToStaticMarkup(<ErrorState error={forbidden} onRetry={() => undefined} />);
-    expect(html).toContain("data-error-kind=\"forbidden\"");
+    expect(html).toContain('data-error-kind="forbidden"');
     expect(html).toContain("have access");
     expect(html).not.toContain("Retry");
   });
 
   it("404 → not found (scoped users get 404 for other projects), no retry", () => {
     const html = renderToStaticMarkup(<ErrorState error={missing} onRetry={() => undefined} />);
-    expect(html).toContain("data-error-kind=\"not-found\"");
+    expect(html).toContain('data-error-kind="not-found"');
     expect(html).toContain("Not found");
     expect(html).not.toContain("Retry");
   });
 
   it("other errors keep the message and the Retry button", () => {
     const html = renderToStaticMarkup(<ErrorState error={failed} onRetry={() => undefined} />);
-    expect(html).toContain("data-error-kind=\"error\"");
+    expect(html).toContain('data-error-kind="error"');
     expect(html).toContain("Retry");
   });
 });
 
 describe("Activity report is gated on audit.view (the API guards GET /reports/activity with it)", () => {
-  const canWith = (held: string[]) => (p: PermissionRequirement) => (Array.isArray(p) ? p : [p]).some((x) => held.includes(x as string));
+  const canWith = (held: string[]) => (p: PermissionRequirement) =>
+    (Array.isArray(p) ? p : [p]).some((x) => held.includes(x as string));
 
   it("hidden without audit.view, shown with it; every other report stays visible to report.view", () => {
     const without = reportsFor(canWith(["report.view"])).map((r) => r.slug);
@@ -100,6 +115,8 @@ describe("Activity report is gated on audit.view (the API guards GET /reports/ac
     expect(without).not.toContain("activity");
     expect(withAudit).toContain("activity");
     expect(withAudit.length - without.length).toBe(1);
-    expect(reportsFor(canWith(["report.view", "audit.view"])).find((r) => r.slug === "activity")?.permission).toBe("audit.view");
+    expect(reportsFor(canWith(["report.view", "audit.view"])).find((r) => r.slug === "activity")?.permission).toBe(
+      "audit.view",
+    );
   });
 });

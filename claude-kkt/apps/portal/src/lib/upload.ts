@@ -21,7 +21,11 @@ export async function toBlob(file: LocalFile): Promise<Blob> {
   return file.mimeType && file.mimeType !== blob.type ? new Blob([blob], { type: file.mimeType }) : blob;
 }
 
-export async function buildMultipart(field: string, file: LocalFile, fields: Record<string, string> = {}): Promise<FormData> {
+export async function buildMultipart(
+  field: string,
+  file: LocalFile,
+  fields: Record<string, string> = {},
+): Promise<FormData> {
   const form = new FormData();
   for (const [k, v] of Object.entries(fields)) form.append(k, v);
   form.append(field, await toBlob(file), fileNameFor(file));

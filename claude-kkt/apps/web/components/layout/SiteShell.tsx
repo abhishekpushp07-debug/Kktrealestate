@@ -14,7 +14,12 @@ export function SiteShell({ site, children }: { site: SiteSettings | null; child
   const portal = site?.portal_url?.trim() || portalUrl();
   return (
     <>
-      <SiteNav brandName={brand} logoUrl={resolveMediaUrl(site?.brand?.logo_url, publicApiUrl())} phone={site?.contacts?.phone ?? null} portalUrl={portal} />
+      <SiteNav
+        brandName={brand}
+        logoUrl={resolveMediaUrl(site?.brand?.logo_url, publicApiUrl())}
+        phone={site?.contacts?.phone ?? null}
+        portalUrl={portal}
+      />
       <main id="main" className="pb-16 md:pb-0" tabIndex={-1}>
         {children}
       </main>

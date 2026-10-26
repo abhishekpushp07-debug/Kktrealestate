@@ -4,7 +4,13 @@ export default defineConfig({
   // pdfWorker: the PDF worker-thread entry (modules/reports/services/pdfPool.ts loads dist/modules/reports/services/pdfWorker.js, so a
   // worker thread only loads pdfkit + the renderer instead of the whole reports module graph and the app config).
   // cli/restore: the restore CLI ships in the image (`node dist/cli/restore.js --file … --database-url … --confirm`, docs/RESTORE.md).
-  entry: ["src/server.ts", "src/worker.ts", "src/modules/*/index.ts", "src/modules/reports/services/pdfWorker.ts", "src/cli/restore.ts"],
+  entry: [
+    "src/server.ts",
+    "src/worker.ts",
+    "src/modules/*/index.ts",
+    "src/modules/reports/services/pdfWorker.ts",
+    "src/cli/restore.ts",
+  ],
   outDir: "dist",
   splitting: true,
   format: ["esm"],

@@ -34,7 +34,12 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       if (this.props.fallback) return this.props.fallback(error, this.reset);
       return (
         <div className="flex min-h-[50vh] items-center justify-center p-4">
-          <ErrorState title="This page hit an unexpected error" error={error} onRetry={this.reset} className="max-w-lg rounded-lg border border-border bg-card" />
+          <ErrorState
+            title="This page hit an unexpected error"
+            error={error}
+            onRetry={this.reset}
+            className="max-w-lg rounded-lg border border-border bg-card"
+          />
         </div>
       );
     }

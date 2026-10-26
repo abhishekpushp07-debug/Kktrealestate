@@ -50,14 +50,21 @@ export const PaymentCreateSchema = z
   .superRefine((p, ctx) => {
     switch (p.against) {
       case "FLAT_VALUE":
-        if (p.bucket == null) ctx.addIssue({ code: "custom", message: "Pick Cash or Account for a flat-value payment", path: ["bucket"] });
+        if (p.bucket == null)
+          ctx.addIssue({ code: "custom", message: "Pick Cash or Account for a flat-value payment", path: ["bucket"] });
         if (p.other_charge_id != null) {
-          ctx.addIssue({ code: "custom", message: "other_charge_id is only for other-charge payments", path: ["other_charge_id"] });
+          ctx.addIssue({
+            code: "custom",
+            message: "other_charge_id is only for other-charge payments",
+            path: ["other_charge_id"],
+          });
         }
         break;
       case "OTHER_CHARGE":
-        if (p.other_charge_id == null) ctx.addIssue({ code: "custom", message: "Pick the charge line", path: ["other_charge_id"] });
-        if (p.bucket != null) ctx.addIssue({ code: "custom", message: "bucket does not apply to other-charge payments", path: ["bucket"] });
+        if (p.other_charge_id == null)
+          ctx.addIssue({ code: "custom", message: "Pick the charge line", path: ["other_charge_id"] });
+        if (p.bucket != null)
+          ctx.addIssue({ code: "custom", message: "bucket does not apply to other-charge payments", path: ["bucket"] });
         break;
     }
   });
@@ -87,7 +94,12 @@ export const PaymentRowSchema = z.object({
   mode_code: PaymentModeCodeSchema,
   mode_name: z.string(),
   instrument: z
-    .object({ number: z.string(), date: DateStringSchema.nullable(), bank_name: z.string().nullable(), branch: z.string().nullable() })
+    .object({
+      number: z.string(),
+      date: DateStringSchema.nullable(),
+      bank_name: z.string().nullable(),
+      branch: z.string().nullable(),
+    })
     .nullable(),
   bank_account_id: IdSchema.nullable(),
   bank_account_label: z.string().nullable(),
@@ -127,15 +139,27 @@ export const PaymentListResponseSchema = listEnvelope(PaymentRowSchema);
 export type PaymentListResponse = z.infer<typeof PaymentListResponseSchema>;
 
 /** Clear a pending cheque/DD (bucket cap re-checked). */
-export const PaymentClearSchema = z.strictObject({ ...VersionedSchema.shape, cleared_on: DateStringSchema.optional(), remarks: NoteSchema.optional().nullable() });
+export const PaymentClearSchema = z.strictObject({
+  ...VersionedSchema.shape,
+  cleared_on: DateStringSchema.optional(),
+  remarks: NoteSchema.optional().nullable(),
+});
 export type PaymentClear = z.infer<typeof PaymentClearSchema>;
 
 /** Bounce a pending cheque/DD with reason. */
-export const PaymentBounceSchema = z.strictObject({ ...VersionedSchema.shape, reason: ReasonSchema, bounced_on: DateStringSchema.optional() });
+export const PaymentBounceSchema = z.strictObject({
+  ...VersionedSchema.shape,
+  reason: ReasonSchema,
+  bounced_on: DateStringSchema.optional(),
+});
 export type PaymentBounce = z.infer<typeof PaymentBounceSchema>;
 
 /** Reverse a cleared payment with reason (receipt is cancelled, never deleted). */
-export const PaymentReverseSchema = z.strictObject({ ...VersionedSchema.shape, reason: ReasonSchema, reversal_date: DateStringSchema.optional() });
+export const PaymentReverseSchema = z.strictObject({
+  ...VersionedSchema.shape,
+  reason: ReasonSchema,
+  reversal_date: DateStringSchema.optional(),
+});
 export type PaymentReverse = z.infer<typeof PaymentReverseSchema>;
 
 /** Response of posting: the payment plus the ledger row it produced. */
@@ -172,7 +196,9 @@ export const ReceiptDataSchema = z.object({
   amount_paise: PaiseSchema,
   amount_words: z.string(),
   mode_name: z.string(),
-  instrument: z.object({ number: z.string(), date: DateStringSchema.nullable(), bank_name: z.string().nullable() }).nullable(),
+  instrument: z
+    .object({ number: z.string(), date: DateStringSchema.nullable(), bank_name: z.string().nullable() })
+    .nullable(),
   bank_account_label: z.string().nullable(),
   received_by_name: z.string().nullable(),
   remarks: z.string().nullable(),
@@ -209,7 +235,15 @@ export const DemandLetterDataSchema = z.object({
   total_words: z.string(),
   cash_due_paise: SignedPaiseSchema,
   account_due_paise: SignedPaiseSchema,
-  bank: z.object({ bank_name: z.string(), branch: z.string().nullable(), account_name: z.string(), account_number: z.string(), ifsc: z.string() }).nullable(),
+  bank: z
+    .object({
+      bank_name: z.string(),
+      branch: z.string().nullable(),
+      account_name: z.string(),
+      account_number: z.string(),
+      ifsc: z.string(),
+    })
+    .nullable(),
 });
 export type DemandLetterData = z.infer<typeof DemandLetterDataSchema>;
 
@@ -283,9 +317,18 @@ export const RoznamchaResponseSchema = z.object({
   cash_withdrawn_paise: PaiseSchema,
   closing_cash_paise: SignedPaiseSchema,
   receipts: z.array(RoznamchaReceiptRowSchema),
-  by_mode: z.array(z.object({ mode_code: PaymentModeCodeSchema, mode_name: z.string(), count: z.int().min(0), amount_paise: PaiseSchema })),
+  by_mode: z.array(
+    z.object({
+      mode_code: PaymentModeCodeSchema,
+      mode_name: z.string(),
+      count: z.int().min(0),
+      amount_paise: PaiseSchema,
+    }),
+  ),
   by_category: z.array(z.object({ category: MoneyCategorySchema, count: z.int().min(0), amount_paise: PaiseSchema })),
-  by_project: z.array(z.object({ project_id: IdSchema, project_name: z.string(), count: z.int().min(0), amount_paise: PaiseSchema })),
+  by_project: z.array(
+    z.object({ project_id: IdSchema, project_name: z.string(), count: z.int().min(0), amount_paise: PaiseSchema }),
+  ),
   contra_entries: z.array(ContraEntryRowSchema),
   totals: z.object({ receipts_count: z.int().min(0), receipts_paise: PaiseSchema, pending_cheques_paise: PaiseSchema }),
 });

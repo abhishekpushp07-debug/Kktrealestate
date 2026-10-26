@@ -6,10 +6,26 @@ import type { ValueProp } from "@/lib/types";
 const ICONS = [ShieldIcon, SparkleIcon, HomeIcon, CheckIcon];
 
 const DEFAULTS: ValueProp[] = [
-  { title: "RERA-registered, always", body: "Every project is registered and every approval is on record, so you buy with clarity.", icon: null },
-  { title: "Craft in every detail", body: "Considered layouts, premium specifications and finishes selected to last.", icon: null },
-  { title: "On time, as promised", body: "Construction-linked transparency with stage photos you can follow from your phone.", icon: null },
-  { title: "Relationship, not transaction", body: "A dedicated manager from the first visit to the day you receive your keys.", icon: null },
+  {
+    title: "RERA-registered, always",
+    body: "Every project is registered and every approval is on record, so you buy with clarity.",
+    icon: null,
+  },
+  {
+    title: "Craft in every detail",
+    body: "Considered layouts, premium specifications and finishes selected to last.",
+    icon: null,
+  },
+  {
+    title: "On time, as promised",
+    body: "Construction-linked transparency with stage photos you can follow from your phone.",
+    icon: null,
+  },
+  {
+    title: "Relationship, not transaction",
+    body: "A dedicated manager from the first visit to the day you receive your keys.",
+    icon: null,
+  },
 ];
 
 export function ValueProps({ items }: { items: ValueProp[] }) {

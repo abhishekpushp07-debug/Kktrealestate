@@ -6,14 +6,37 @@
 import { and, asc, desc, eq, or, sql, type SQL } from "drizzle-orm";
 import type { FastifyRequest } from "fastify";
 import { z } from "zod";
-import { ListQuerySchema, type PaymentBucket, type PortalBookingSwitcherItem, type PortalReceiptRow, type PortalRelationshipManager } from "@kkt/contracts";
-import { blocks, bookingCoApplicants, bookings, customers, flatTypes, flats, payments, projects, users, type Executor } from "@kkt/db";
+import {
+  ListQuerySchema,
+  type PaymentBucket,
+  type PortalBookingSwitcherItem,
+  type PortalReceiptRow,
+  type PortalRelationshipManager,
+} from "@kkt/contracts";
+import {
+  blocks,
+  bookingCoApplicants,
+  bookings,
+  customers,
+  flatTypes,
+  flats,
+  payments,
+  projects,
+  users,
+  type Executor,
+} from "@kkt/db";
 import { ApiError } from "../../lib/errors.js";
 import type { PortalContext, StaffContext } from "../../lib/scope.js";
 import type { BookingRecord } from "../money/index.js";
 
 /** Portal list query: paging only (search/sort allow-lists are per route; csv is not a portal feature). */
-export const PortalListQuerySchema = ListQuerySchema.pick({ page: true, page_size: true, cursor: true, limit: true, sort: true });
+export const PortalListQuerySchema = ListQuerySchema.pick({
+  page: true,
+  page_size: true,
+  cursor: true,
+  limit: true,
+  sort: true,
+});
 export type PortalListQuery = z.infer<typeof PortalListQuerySchema>;
 
 /** `:id` params. */
@@ -35,7 +58,10 @@ export interface OwnedBooking {
 
 /** Condition: the customer is the booking's primary applicant or one of its co-applicants. */
 export function memberCondition(customerId: string): SQL {
-  return or(eq(bookings.customerId, customerId), sql`exists (select 1 from ${bookingCoApplicants} bc where bc.booking_id = ${bookings.id} and bc.customer_id = ${customerId})`)!;
+  return or(
+    eq(bookings.customerId, customerId),
+    sql`exists (select 1 from ${bookingCoApplicants} bc where bc.booking_id = ${bookings.id} and bc.customer_id = ${customerId})`,
+  )!;
 }
 
 function ownedSelect(customerId: string) {
@@ -72,7 +98,11 @@ function ownedQuery(db: Executor, customer: Pick<PortalContext, "customerId" | "
 }
 
 /** Loads one booking the customer may see; 404 NOT_FOUND for anything else (another buyer's booking, a foreign company, an unknown id). */
-export async function loadOwnedBooking(db: Executor, customer: Pick<PortalContext, "customerId" | "companyId">, bookingId: string): Promise<OwnedBooking> {
+export async function loadOwnedBooking(
+  db: Executor,
+  customer: Pick<PortalContext, "customerId" | "companyId">,
+  bookingId: string,
+): Promise<OwnedBooking> {
   const rows = await ownedQuery(db, customer, eq(bookings.id, bookingId)).limit(1);
   const row = rows[0];
   if (!row) throw ApiError.notFound("Booking");
@@ -80,7 +110,10 @@ export async function loadOwnedBooking(db: Executor, customer: Pick<PortalContex
 }
 
 /** Every booking the customer may see: ACTIVE first, then COMPLETED, then CANCELLED; newest booking date first within a group. */
-export async function listOwnedBookings(db: Executor, customer: Pick<PortalContext, "customerId" | "companyId">): Promise<OwnedBooking[]> {
+export async function listOwnedBookings(
+  db: Executor,
+  customer: Pick<PortalContext, "customerId" | "companyId">,
+): Promise<OwnedBooking[]> {
   const rows = await ownedQuery(db, customer).orderBy(
     sql`case ${bookings.status} when 'ACTIVE' then 0 when 'COMPLETED' then 1 else 2 end`,
     desc(bookings.bookingDate),
@@ -91,7 +124,15 @@ export async function listOwnedBookings(db: Executor, customer: Pick<PortalConte
 
 /** Switcher item of an owned booking. */
 export function toSwitcherItem(o: OwnedBooking): PortalBookingSwitcherItem {
-  return { booking_id: o.booking.id, booking_number: o.booking.bookingNumber, project_name: o.projectName, block_name: o.blockName, flat_number: o.flatNumber, role: o.role, status: o.booking.status };
+  return {
+    booking_id: o.booking.id,
+    booking_number: o.booking.bookingNumber,
+    project_name: o.projectName,
+    block_name: o.blockName,
+    flat_number: o.flatNumber,
+    role: o.role,
+    status: o.booking.status,
+  };
 }
 
 /**
@@ -101,8 +142,19 @@ export function toSwitcherItem(o: OwnedBooking): PortalBookingSwitcherItem {
  */
 export function scopedReader(customer: PortalContext, projectId: string): StaffContext {
   return {
-    id: customer.customerId, companyId: customer.companyId, name: customer.name, email: "", roleId: "", roleName: "Customer", isSystemRole: false,
-    permissions: new Set<string>(), allProjects: false, projectIds: [projectId], mustChangePassword: false, mfaEnabled: false, sessionId: customer.sessionId,
+    id: customer.customerId,
+    companyId: customer.companyId,
+    name: customer.name,
+    email: "",
+    roleId: "",
+    roleName: "Customer",
+    isSystemRole: false,
+    permissions: new Set<string>(),
+    allProjects: false,
+    projectIds: [projectId],
+    mustChangePassword: false,
+    mfaEnabled: false,
+    sessionId: customer.sessionId,
   };
 }
 
@@ -134,13 +186,24 @@ export interface PaymentWithNames {
 /** Payment → customer-facing receipt row (no staff ids, no bank account ids). */
 export function toReceiptRow(r: PaymentWithNames): PortalReceiptRow {
   return {
-    payment_id: r.p.id, receipt_number: r.p.receiptNumber, payment_date: r.p.paymentDate, amount_paise: r.p.amountPaise, bucket: r.p.bucket,
-    against_label: againstLabel(r.p.bucket, r.chargeName), mode_name: r.modeName, instrument_number: r.p.instrument?.number ?? null, status: r.p.status, is_cancelled: r.p.receiptCancelled,
+    payment_id: r.p.id,
+    receipt_number: r.p.receiptNumber,
+    payment_date: r.p.paymentDate,
+    amount_paise: r.p.amountPaise,
+    bucket: r.p.bucket,
+    against_label: againstLabel(r.p.bucket, r.chargeName),
+    mode_name: r.modeName,
+    instrument_number: r.p.instrument?.number ?? null,
+    status: r.p.status,
+    is_cancelled: r.p.receiptCancelled,
   };
 }
 
 /** The customer's relationship manager as the portal shows it: name and contact details only, never the user id. */
-export async function relationshipManagerOf(db: Executor, customerId: string): Promise<PortalRelationshipManager | null> {
+export async function relationshipManagerOf(
+  db: Executor,
+  customerId: string,
+): Promise<PortalRelationshipManager | null> {
   const [row] = await db
     .select({ name: users.name, phone: users.phone, email: users.email, active: users.isActive })
     .from(customers)

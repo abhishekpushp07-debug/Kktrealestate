@@ -5,19 +5,49 @@
 import { readFileSync } from "node:fs";
 import { threadId } from "node:worker_threads";
 import { afterAll, afterEach, describe, expect, it } from "vitest";
-import { BrandedPdf, PDF_CURRENCY_PREFIX, findRupeeFont, pdfMoney, reportPdf, reportPdfStream } from "../../src/modules/reports/services/pdf.js";
+import {
+  BrandedPdf,
+  PDF_CURRENCY_PREFIX,
+  findRupeeFont,
+  pdfMoney,
+  reportPdf,
+  reportPdfStream,
+} from "../../src/modules/reports/services/pdf.js";
 import { closePdfPool, renderPdfWithInfo } from "../../src/modules/reports/services/pdfPool.js";
 import { pdfFonts, pdfText } from "../integration/pdfText.js";
 
 const L = 10_000_000; // ₹1,00,000 in paise
-const letterhead = { name: "Shree Ganesh Builders", legalName: "Shree Ganesh Builders Pvt Ltd", addressLine: "Bailey Road, Patna", gstin: "10AABCS1234A1Z5" };
+const letterhead = {
+  name: "Shree Ganesh Builders",
+  legalName: "Shree Ganesh Builders Pvt Ltd",
+  addressLine: "Bailey Road, Patna",
+  gstin: "10AABCS1234A1Z5",
+};
 
 function receipt(): BrandedPdf {
   const pdf = new BrandedPdf({ letterhead, title: "Payment Receipt", reference: "Receipt SGB/2526/0001" });
-  pdf.kv([{ title: "Received from", rows: [["Customer", "Anil Kumar"], ["Amount", pdfMoney(4 * L)]] }]);
+  pdf.kv([
+    {
+      title: "Received from",
+      rows: [
+        ["Customer", "Anil Kumar"],
+        ["Amount", pdfMoney(4 * L)],
+      ],
+    },
+  ]);
   pdf.amountBox("Amount received", 4 * L);
   pdf.amountInWords(4 * L);
-  pdf.table([{ key: "label", header: "Bucket", width: 2 }, { key: "amount", header: "Amount", money: true }], [{ label: "Cash", amount: 60 * L }, { label: "Account", amount: 40 * L }], { totals: { amount: 100 * L } });
+  pdf.table(
+    [
+      { key: "label", header: "Bucket", width: 2 },
+      { key: "amount", header: "Amount", money: true },
+    ],
+    [
+      { label: "Cash", amount: 60 * L },
+      { label: "Account", amount: 40 * L },
+    ],
+    { totals: { amount: 100 * L } },
+  );
   pdf.signature("Shree Ganesh Builders", null, null);
   return pdf;
 }
@@ -74,7 +104,14 @@ describe("PDF rendering runs in worker threads (piscina), never on the event loo
 
   it("report PDFs stream from the worker in several chunks while the event loop keeps ticking", async () => {
     const rows = Array.from({ length: 1500 }, (_, i) => ({ n: `Customer ${i + 1}`, amount: (i + 1) * L }));
-    const spec = { title: "Large report", columns: [{ key: "n", header: "Name", width: 3 }, { key: "amount", header: "Amount", money: true }], rows };
+    const spec = {
+      title: "Large report",
+      columns: [
+        { key: "n", header: "Name", width: 3 },
+        { key: "amount", header: "Amount", money: true },
+      ],
+      rows,
+    };
     // warm the pool so thread start-up is not measured
     await reportPdf(letterhead, { ...spec, rows: rows.slice(0, 2) });
     let last = performance.now();
@@ -118,12 +155,15 @@ describe("PDF rendering runs in worker threads (piscina), never on the event loo
     process.env.PDF_WORKER_THREADS = "1";
     process.env.PDF_WORKER_QUEUE = "1";
     const spec = { title: "Q", columns: [{ key: "n", header: "Name" }], rows: [{ n: "x" }] };
-    const results = await Promise.allSettled(Array.from({ length: 6 }, () => reportPdfStream(letterhead, spec).then(readAll)));
+    const results = await Promise.allSettled(
+      Array.from({ length: 6 }, () => reportPdfStream(letterhead, spec).then(readAll)),
+    );
     await closePdfPool();
     const rejected = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");
     expect(rejected.length).toBeGreaterThan(0);
     expect(rejected[0]!.reason).toMatchObject({ statusCode: 503 });
-    for (const r of results) if (r.status === "fulfilled") expect(r.value.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+    for (const r of results)
+      if (r.status === "fulfilled") expect(r.value.subarray(0, 5).toString("latin1")).toBe("%PDF-");
   });
 });
 
@@ -133,7 +173,10 @@ describe("PDF worker pool under concurrency and in the production bundle", () =>
     process.env.PDF_WORKER_THREADS = "2";
     const specs = Array.from({ length: 6 }, (_, k) => ({
       title: `Isolation report ${k}`,
-      columns: [{ key: "n", header: "Name", width: 3 }, { key: "amount", header: "Amount", money: true }],
+      columns: [
+        { key: "n", header: "Name", width: 3 },
+        { key: "amount", header: "Amount", money: true },
+      ],
       rows: Array.from({ length: 200 + k * 50 }, (_, i) => ({ n: `Row ${k}-${i}`, amount: (k + 1) * L })),
     }));
     const docs = await Promise.all(specs.map((spec) => reportPdfStream(letterhead, spec).then(readAll)));

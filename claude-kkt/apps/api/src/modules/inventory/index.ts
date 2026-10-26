@@ -9,13 +9,40 @@ import { registerRateCardRoutes } from "./rateCards.js";
 
 // Service functions other modules (booking engine, construction, web) may call.
 export {
-  refreshUnitCounts, refreshProjectCounts, ensureBlockStages, snapshotBlockStages, allStagesPending, loadProject, loadBlock, loadFlat,
-  loadActiveRateCard, loadRateCardDomain, priceWith, repriceFlats, applyPriceUpdates, writeAuditMany, MANUAL_STATUSES, ENGINE_STATUSES,
-  type DbProject, type DbBlock, type DbFlat, type LoadedRateCard,
+  refreshUnitCounts,
+  refreshProjectCounts,
+  ensureBlockStages,
+  snapshotBlockStages,
+  allStagesPending,
+  loadProject,
+  loadBlock,
+  loadFlat,
+  loadActiveRateCard,
+  loadRateCardDomain,
+  priceWith,
+  repriceFlats,
+  applyPriceUpdates,
+  writeAuditMany,
+  MANUAL_STATUSES,
+  ENGINE_STATUSES,
+  type DbProject,
+  type DbBlock,
+  type DbFlat,
+  type LoadedRateCard,
 } from "./service.js";
 export { toProjectRows, getProjectRow } from "./projects.js";
 export { toBlockRows, getBlockRow } from "./blocks.js";
-export { toFlatRows, getFlatRow, manualStatusChanges, statusAudit, defaultHoldUntil, assertHoldUntil, FLAT_SELECT, flatJoins, type FlatSelect } from "./flats.js";
+export {
+  toFlatRows,
+  getFlatRow,
+  manualStatusChanges,
+  statusAudit,
+  defaultHoldUntil,
+  assertHoldUntil,
+  FLAT_SELECT,
+  flatJoins,
+  type FlatSelect,
+} from "./flats.js";
 export { toParkingRows, loadParkingSlot, manualParkingStatus } from "./parking.js";
 export { toRateCardRows } from "./rateCards.js";
 export { releaseExpiredHolds, reserveFlat, releaseFlat } from "./holds.js";

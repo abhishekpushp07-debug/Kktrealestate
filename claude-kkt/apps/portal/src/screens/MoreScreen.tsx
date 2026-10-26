@@ -39,17 +39,48 @@ export function MoreScreen(): React.JSX.Element {
         </Card>
         <Section title="Services">
           <Card padded={false}>
-            <ListRow icon="document" title="Documents" subtitle="Statement, allotment letter, shared files" onPress={() => router.navigate("/more/documents")} />
-            <ListRow icon="request" title="Requests" subtitle="Raise and track service requests" onPress={() => router.navigate("/more/requests")} />
-            <ListRow icon="notice" title="Notices" subtitle="Announcements for your project" onPress={() => router.navigate("/more/notices")} />
-            <ListRow icon="bell" title="Notifications" right={<Badge count={unread} />} onPress={() => router.navigate("/more/notifications")} last />
+            <ListRow
+              icon="document"
+              title="Documents"
+              subtitle="Statement, allotment letter, shared files"
+              onPress={() => router.navigate("/more/documents")}
+            />
+            <ListRow
+              icon="request"
+              title="Requests"
+              subtitle="Raise and track service requests"
+              onPress={() => router.navigate("/more/requests")}
+            />
+            <ListRow
+              icon="notice"
+              title="Notices"
+              subtitle="Announcements for your project"
+              onPress={() => router.navigate("/more/notices")}
+            />
+            <ListRow
+              icon="bell"
+              title="Notifications"
+              right={<Badge count={unread} />}
+              onPress={() => router.navigate("/more/notifications")}
+              last
+            />
           </Card>
         </Section>
         <Section title="Account">
           <Card padded={false}>
-            <ListRow icon="bank" title="Bank details" subtitle="For Account-bucket transfers" onPress={() => router.navigate("/more/bank-details")} />
+            <ListRow
+              icon="bank"
+              title="Bank details"
+              subtitle="For Account-bucket transfers"
+              onPress={() => router.navigate("/more/bank-details")}
+            />
             <ListRow icon="lock" title="Change password" onPress={() => router.navigate("/more/password")} />
-            <ListRow icon="devices" title="Devices & sessions" subtitle="See where you're signed in" onPress={() => router.navigate("/more/sessions")} />
+            <ListRow
+              icon="devices"
+              title="Devices & sessions"
+              subtitle="See where you're signed in"
+              onPress={() => router.navigate("/more/sessions")}
+            />
             <ListRow icon="logout" title="Sign out" destructive chevron={false} onPress={() => setConfirm(true)} last />
           </Card>
         </Section>

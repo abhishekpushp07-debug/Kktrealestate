@@ -4,7 +4,16 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import type { FastifyInstance, FastifyPluginAsync, FastifyPluginCallback } from "fastify";
 
 /** Modules wired explicitly by app.ts (always on); every other `modules/<name>/index.(ts|js)` is auto-discovered. */
-export const CORE_MODULES = ["auth", "users", "roles", "masters", "notifications", "search", "audit", "system"] as const;
+export const CORE_MODULES = [
+  "auth",
+  "users",
+  "roles",
+  "masters",
+  "notifications",
+  "search",
+  "audit",
+  "system",
+] as const;
 
 type Plugin = FastifyPluginAsync | FastifyPluginCallback;
 
@@ -58,7 +67,12 @@ function exists(path: string): boolean {
 export function selectModules(discovered: string[], filter = process.env["KKT_MODULES"]): string[] {
   const nonCore = discovered.filter((n) => !(CORE_MODULES as readonly string[]).includes(n));
   if (filter === undefined || filter.trim() === "") return nonCore;
-  const wanted = new Set(filter.split(",").map((s) => s.trim()).filter(Boolean));
+  const wanted = new Set(
+    filter
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+  );
   return nonCore.filter((n) => wanted.has(n));
 }
 

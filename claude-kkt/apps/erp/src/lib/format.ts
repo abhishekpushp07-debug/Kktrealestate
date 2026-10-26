@@ -144,8 +144,26 @@ export function rupeesInputToPaise(input: string | null | undefined): number | n
 /* ------------------------------------------------------------------ */
 
 const ONES = [
-  "", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
-  "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen",
+  "",
+  "One",
+  "Two",
+  "Three",
+  "Four",
+  "Five",
+  "Six",
+  "Seven",
+  "Eight",
+  "Nine",
+  "Ten",
+  "Eleven",
+  "Twelve",
+  "Thirteen",
+  "Fourteen",
+  "Fifteen",
+  "Sixteen",
+  "Seventeen",
+  "Eighteen",
+  "Nineteen",
 ];
 const TENS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
 
@@ -232,10 +250,24 @@ const istParts = new Intl.DateTimeFormat("en-CA", {
 });
 
 /** Wall-clock fields of an instant in IST (independent of the browser's zone). */
-export function istWallClock(date: Date): { year: number; month: number; day: number; hour: number; minute: number; second: number } {
+export function istWallClock(date: Date): {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+} {
   const parts = istParts.formatToParts(date);
   const n = (type: Intl.DateTimeFormatPartTypes) => Number(pick(parts, type));
-  return { year: n("year"), month: n("month"), day: n("day"), hour: n("hour") % 24, minute: n("minute"), second: n("second") };
+  return {
+    year: n("year"),
+    month: n("month"),
+    day: n("day"),
+    hour: n("hour") % 24,
+    minute: n("minute"),
+    second: n("second"),
+  };
 }
 
 /**
@@ -341,7 +373,9 @@ export function istInputToInstant(value: string | null | undefined): string | nu
   const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(value ?? "");
   if (!m) return null;
   // IST is UTC+05:30 all year (no daylight saving)
-  const utc = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6] ?? 0)) - 330 * 60_000;
+  const utc =
+    Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6] ?? 0)) -
+    330 * 60_000;
   const date = new Date(utc);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }

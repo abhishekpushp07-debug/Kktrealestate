@@ -18,7 +18,14 @@ export function BellButton({ onNavy, count }: { onNavy?: boolean; count?: number
         haptics.tap();
         router.navigate("/more/notifications");
       }}
-      style={({ pressed }) => [styles.btn, { backgroundColor: onNavy ? "rgba(255,255,255,0.1)" : colors.surface, borderColor: onNavy ? "rgba(255,255,255,0.18)" : colors.line }, pressed ? { opacity: 0.8 } : null]}
+      style={({ pressed }) => [
+        styles.btn,
+        {
+          backgroundColor: onNavy ? "rgba(255,255,255,0.1)" : colors.surface,
+          borderColor: onNavy ? "rgba(255,255,255,0.18)" : colors.line,
+        },
+        pressed ? { opacity: 0.8 } : null,
+      ]}
     >
       <View>
         <Icon name="bell" size={20} color={onNavy ? colors.onNavy : colors.navy} />

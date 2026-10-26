@@ -63,7 +63,11 @@ export default function DashboardPage() {
     <>
       <PageHeader
         title={firstName ? `${greeting}, ${firstName}` : greeting}
-        description={dashboard.data ? `${DASHBOARD_ROLE_LABELS[dashboard.data.role]} dashboard${dashboard.dataUpdatedAt ? ` · updated ${formatRelative(new Date(dashboard.dataUpdatedAt))}` : ""}` : "Loading your dashboard…"}
+        description={
+          dashboard.data
+            ? `${DASHBOARD_ROLE_LABELS[dashboard.data.role]} dashboard${dashboard.dataUpdatedAt ? ` · updated ${formatRelative(new Date(dashboard.dataUpdatedAt))}` : ""}`
+            : "Loading your dashboard…"
+        }
         titleAddon={user?.role.name ? <Badge variant="gold">{user.role.name}</Badge> : undefined}
         actions={
           <>
@@ -90,14 +94,27 @@ export default function DashboardPage() {
                 data-testid="dashboard-project"
               />
             )}
-            <Button variant="outline" size="sm" leftIcon={RefreshCw} loading={dashboard.isFetching && !dashboard.isPending} onClick={() => void dashboard.refetch()} data-testid="dashboard-refresh">
+            <Button
+              variant="outline"
+              size="sm"
+              leftIcon={RefreshCw}
+              loading={dashboard.isFetching && !dashboard.isPending}
+              onClick={() => void dashboard.refetch()}
+              data-testid="dashboard-refresh"
+            >
               Refresh
             </Button>
           </>
         }
       />
       {dashboard.isPending && <DashboardSkeleton />}
-      {dashboard.isError && <ErrorState error={dashboard.error} onRetry={() => void dashboard.refetch()} className="rounded-lg border border-border bg-card" />}
+      {dashboard.isError && (
+        <ErrorState
+          error={dashboard.error}
+          onRetry={() => void dashboard.refetch()}
+          className="rounded-lg border border-border bg-card"
+        />
+      )}
       {dashboard.data && <RoleDashboard response={dashboard.data} />}
     </>
   );

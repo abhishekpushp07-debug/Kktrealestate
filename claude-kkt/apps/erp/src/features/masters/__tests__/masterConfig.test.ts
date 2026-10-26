@@ -32,7 +32,9 @@ describe("masterConfig registry", () => {
       expect(config.defaultSort, config.kind).toMatch(/^-?[a-z_]+$/);
       expect(config.csv.columns.length, config.kind).toBeGreaterThan(0);
       expect(config.csv.example.split(",").length, config.kind).toBe(config.csv.columns.length);
-      expect(Boolean(config.Form) || Boolean(config.fields?.length), `${config.kind} needs a Form or fields`).toBe(true);
+      expect(Boolean(config.Form) || Boolean(config.fields?.length), `${config.kind} needs a Form or fields`).toBe(
+        true,
+      );
       expect(typeof config.defaults(), config.kind).toBe("object");
       expect(config.singular.length, config.kind).toBeGreaterThan(0);
     }
@@ -72,10 +74,33 @@ describe("masterConfig registry", () => {
     }
 
     const banks = MASTER_CONFIGS.BANK_ACCOUNTS;
-    const mismatch = await banks.createSchema.safeParseAsync({ ...banks.defaults(), bank_name: "HDFC", account_name: "KKT", ifsc: "hdfc0001234", account_number: "501001234567", account_number_confirm: "501001234568" });
+    const mismatch = await banks.createSchema.safeParseAsync({
+      ...banks.defaults(),
+      bank_name: "HDFC",
+      account_name: "KKT",
+      ifsc: "hdfc0001234",
+      account_number: "501001234567",
+      account_number_confirm: "501001234568",
+    });
     expect(mismatch.success).toBe(false);
-    const ok = await banks.createSchema.safeParseAsync({ ...banks.defaults(), bank_name: "HDFC", account_name: "KKT", ifsc: "hdfc0001234", account_number: "5010 0123 4567", account_number_confirm: "501001234567" });
+    const ok = await banks.createSchema.safeParseAsync({
+      ...banks.defaults(),
+      bank_name: "HDFC",
+      account_name: "KKT",
+      ifsc: "hdfc0001234",
+      account_number: "5010 0123 4567",
+      account_number_confirm: "501001234567",
+    });
     expect(ok.success).toBe(true);
-    if (ok.success) expect(ok.data).toEqual({ bank_name: "HDFC", branch: null, account_name: "KKT", account_number: "501001234567", ifsc: "HDFC0001234", is_default: false, is_escrow: false });
+    if (ok.success)
+      expect(ok.data).toEqual({
+        bank_name: "HDFC",
+        branch: null,
+        account_name: "KKT",
+        account_number: "501001234567",
+        ifsc: "HDFC0001234",
+        is_default: false,
+        is_escrow: false,
+      });
   });
 });

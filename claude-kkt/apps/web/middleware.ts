@@ -9,7 +9,12 @@ import { publicApiUrl, siteUrl } from "@/lib/env";
  */
 export function middleware(request: NextRequest): NextResponse {
   const nonce = createNonce();
-  const csp = buildCsp({ nonce, apiOrigin: publicApiUrl(), dev: process.env.NODE_ENV === "development", https: siteUrl().startsWith("https://") });
+  const csp = buildCsp({
+    nonce,
+    apiOrigin: publicApiUrl(),
+    dev: process.env.NODE_ENV === "development",
+    https: siteUrl().startsWith("https://"),
+  });
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
   requestHeaders.set("content-security-policy", csp);

@@ -69,7 +69,10 @@ export const demandsRaised = new client.Counter({
     const n = (await p).demands;
     if (n === null) return;
     // (never call this.get() here: get() runs collect())
-    if (n > demandsSeen) { this.inc(n - demandsSeen); demandsSeen = n; }
+    if (n > demandsSeen) {
+      this.inc(n - demandsSeen);
+      demandsSeen = n;
+    }
   },
 });
 
@@ -116,7 +119,14 @@ export function recordRequest(route: string, method: string, status: number, sec
 /** What the dependency collector needs: a postgres.js-style tagged template and an ioredis-style client. */
 export interface DependencyProbes {
   query: (text: string) => Promise<Record<string, unknown>[]>;
-  redis: { ping(): Promise<string>; pipeline(): { llen(k: string): unknown; zcard(k: string): unknown; exec(): Promise<[Error | null, unknown][] | null> } };
+  redis: {
+    ping(): Promise<string>;
+    pipeline(): {
+      llen(k: string): unknown;
+      zcard(k: string): unknown;
+      exec(): Promise<[Error | null, unknown][] | null>;
+    };
+  };
   /** BullMQ queue name (default kkt-jobs) and key prefix (default bull). */
   queueName?: string;
   queuePrefix?: string;
@@ -146,30 +156,60 @@ let snapshot: { at: number; value: Promise<DependencySnapshot>; pending: boolean
 async function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   let t: NodeJS.Timeout | undefined;
   try {
-    return await Promise.race([p, new Promise<never>((_, rej) => { t = setTimeout(() => rej(new Error("probe timeout")), ms); })]);
+    return await Promise.race([
+      p,
+      new Promise<never>((_, rej) => {
+        t = setTimeout(() => rej(new Error("probe timeout")), ms);
+      }),
+    ]);
   } finally {
     if (t) clearTimeout(t);
   }
 }
 
 async function takeSnapshot(p: DependencyProbes): Promise<DependencySnapshot> {
-  const s: DependencySnapshot = { dbUp: 0, redisUp: 0, connections: {}, maxConnections: null, jobFailures24h: {}, jobLastSuccess: {}, integrityFindings: null, integrityLastRun: null, demands: null, queue: {} };
+  const s: DependencySnapshot = {
+    dbUp: 0,
+    redisUp: 0,
+    connections: {},
+    maxConnections: null,
+    jobFailures24h: {},
+    jobLastSuccess: {},
+    integrityFindings: null,
+    integrityLastRun: null,
+    demands: null,
+    queue: {},
+  };
   const db = async () => {
     const [conn, jobs, integ, demands] = await Promise.all([
-      p.query("select coalesce(state, 'unknown') as state, count(*)::int as n, current_setting('max_connections')::int as max from pg_stat_activity where datname = current_database() and backend_type = 'client backend' group by 1"),
-      p.query("select job_name, count(*) filter (where status in ('FAILED', 'ABANDONED') and started_at > now() - interval '24 hours')::int as failures, extract(epoch from max(finished_at) filter (where status = 'OK'))::float8 as last_ok from job_runs group by job_name"),
-      p.query("select coalesce(sum(jsonb_array_length(findings)), 0)::int as findings, extract(epoch from max(ran_at))::float8 as last_run from (select distinct on (company_id) findings, ran_at from integrity_runs order by company_id, ran_at desc) t"),
+      p.query(
+        "select coalesce(state, 'unknown') as state, count(*)::int as n, current_setting('max_connections')::int as max from pg_stat_activity where datname = current_database() and backend_type = 'client backend' group by 1",
+      ),
+      p.query(
+        "select job_name, count(*) filter (where status in ('FAILED', 'ABANDONED') and started_at > now() - interval '24 hours')::int as failures, extract(epoch from max(finished_at) filter (where status = 'OK'))::float8 as last_ok from job_runs group by job_name",
+      ),
+      p.query(
+        "select coalesce(sum(jsonb_array_length(findings)), 0)::int as findings, extract(epoch from max(ran_at))::float8 as last_run from (select distinct on (company_id) findings, ran_at from integrity_runs order by company_id, ran_at desc) t",
+      ),
       p.query("select count(*)::bigint as n from demands"),
     ]);
     s.dbUp = 1;
-    for (const r of conn) { s.connections[String(r["state"])] = Number(r["n"]); s.maxConnections = Number(r["max"]); }
-    if (s.maxConnections === null) s.maxConnections = Number((await p.query("select current_setting('max_connections')::int as max"))[0]?.["max"] ?? 0);
+    for (const r of conn) {
+      s.connections[String(r["state"])] = Number(r["n"]);
+      s.maxConnections = Number(r["max"]);
+    }
+    if (s.maxConnections === null)
+      s.maxConnections = Number(
+        (await p.query("select current_setting('max_connections')::int as max"))[0]?.["max"] ?? 0,
+      );
     for (const r of jobs) {
       s.jobFailures24h[String(r["job_name"])] = Number(r["failures"]);
-      if (r["last_ok"] !== null && r["last_ok"] !== undefined) s.jobLastSuccess[String(r["job_name"])] = Number(r["last_ok"]);
+      if (r["last_ok"] !== null && r["last_ok"] !== undefined)
+        s.jobLastSuccess[String(r["job_name"])] = Number(r["last_ok"]);
     }
     s.integrityFindings = Number(integ[0]?.["findings"] ?? 0);
-    s.integrityLastRun = integ[0]?.["last_run"] === null || integ[0]?.["last_run"] === undefined ? null : Number(integ[0]["last_run"]);
+    s.integrityLastRun =
+      integ[0]?.["last_run"] === null || integ[0]?.["last_run"] === undefined ? null : Number(integ[0]["last_run"]);
     s.demands = Number(demands[0]?.["n"] ?? 0);
   };
   const redis = async () => {
@@ -180,9 +220,15 @@ async function takeSnapshot(p: DependencyProbes): Promise<DependencySnapshot> {
     for (const st of LIST_STATES) pipe.llen(`${prefix}:${st}`);
     for (const st of ZSET_STATES) pipe.zcard(`${prefix}:${st}`);
     const res = (await pipe.exec()) ?? [];
-    [...LIST_STATES, ...ZSET_STATES].forEach((st, i) => { const r = res[i]; if (r && !r[0]) s.queue[st] = Number(r[1] ?? 0); });
+    [...LIST_STATES, ...ZSET_STATES].forEach((st, i) => {
+      const r = res[i];
+      if (r && !r[0]) s.queue[st] = Number(r[1] ?? 0);
+    });
   };
-  await Promise.all([withTimeout(db(), 3000).catch(() => undefined), withTimeout(redis(), 2000).catch(() => undefined)]);
+  await Promise.all([
+    withTimeout(db(), 3000).catch(() => undefined),
+    withTimeout(redis(), 2000).catch(() => undefined),
+  ]);
   return s;
 }
 
@@ -192,16 +238,32 @@ function current(): Promise<DependencySnapshot> | null {
   const min = (probes.minIntervalSeconds ?? 10) * 1000;
   // one snapshot serves every gauge of a scrape (they collect concurrently) and any scrape within minIntervalSeconds
   if (!snapshot || (!snapshot.pending && now - snapshot.at >= min)) {
-    const entry: { at: number; value: Promise<DependencySnapshot>; pending: boolean } = { at: now, value: Promise.resolve(null as unknown as DependencySnapshot), pending: true };
-    entry.value = takeSnapshot(probes).finally(() => { entry.pending = false; entry.at = Date.now(); });
+    const entry: { at: number; value: Promise<DependencySnapshot>; pending: boolean } = {
+      at: now,
+      value: Promise.resolve(null as unknown as DependencySnapshot),
+      pending: true,
+    };
+    entry.value = takeSnapshot(probes).finally(() => {
+      entry.pending = false;
+      entry.at = Date.now();
+    });
     snapshot = entry;
   }
   return snapshot.value;
 }
 
-function depGauge(name: string, help: string, labelNames: string[], fill: (g: client.Gauge<string>, s: DependencySnapshot) => void): client.Gauge<string> {
+function depGauge(
+  name: string,
+  help: string,
+  labelNames: string[],
+  fill: (g: client.Gauge<string>, s: DependencySnapshot) => void,
+): client.Gauge<string> {
   return new client.Gauge({
-    name, help, labelNames, aggregator: "max", registers: [registry],
+    name,
+    help,
+    labelNames,
+    aggregator: "max",
+    registers: [registry],
     async collect() {
       const p = current();
       if (!p) return;
@@ -213,18 +275,29 @@ function depGauge(name: string, help: string, labelNames: string[], fill: (g: cl
 
 depGauge("kkt_db_up", "1 when the metrics process can query Postgres.", [], (g, s) => g.set(s.dbUp));
 depGauge("kkt_redis_up", "1 when the metrics process can PING Redis.", [], (g, s) => g.set(s.redisUp));
-depGauge("kkt_db_connections", "Client connections to this database by state (pg_stat_activity; all API/worker pools, or PgBouncer server connections).", ["state"], (g, s) => {
-  for (const [state, n] of Object.entries(s.connections)) g.set({ state }, n);
+depGauge(
+  "kkt_db_connections",
+  "Client connections to this database by state (pg_stat_activity; all API/worker pools, or PgBouncer server connections).",
+  ["state"],
+  (g, s) => {
+    for (const [state, n] of Object.entries(s.connections)) g.set({ state }, n);
+  },
+);
+depGauge("kkt_db_max_connections", "Postgres max_connections.", [], (g, s) => {
+  if (s.maxConnections !== null) g.set(s.maxConnections);
 });
-depGauge("kkt_db_max_connections", "Postgres max_connections.", [], (g, s) => { if (s.maxConnections !== null) g.set(s.maxConnections); });
 depGauge("kkt_job_failures_24h", "FAILED job_runs in the last 24 h by job.", ["job_name"], (g, s) => {
   for (const [job, n] of Object.entries(s.jobFailures24h)) g.set({ job_name: job }, n);
 });
 depGauge("kkt_job_last_success_timestamp_seconds", "Unix time of the last OK run by job.", ["job_name"], (g, s) => {
   for (const [job, t] of Object.entries(s.jobLastSuccess)) g.set({ job_name: job }, t);
 });
-depGauge("kkt_integrity_findings", "Findings of the latest integrity run, summed over companies.", [], (g, s) => { if (s.integrityFindings !== null) g.set(s.integrityFindings); });
-depGauge("kkt_integrity_last_run_timestamp_seconds", "Unix time of the latest integrity run.", [], (g, s) => { if (s.integrityLastRun !== null) g.set(s.integrityLastRun); });
+depGauge("kkt_integrity_findings", "Findings of the latest integrity run, summed over companies.", [], (g, s) => {
+  if (s.integrityFindings !== null) g.set(s.integrityFindings);
+});
+depGauge("kkt_integrity_last_run_timestamp_seconds", "Unix time of the latest integrity run.", [], (g, s) => {
+  if (s.integrityLastRun !== null) g.set(s.integrityLastRun);
+});
 depGauge("kkt_jobs_queue_depth", "BullMQ jobs by state.", ["state"], (g, s) => {
   for (const [state, n] of Object.entries(s.queue)) g.set({ state }, n);
 });
@@ -279,25 +352,41 @@ export async function scrapeMetrics(timeoutMs = 6000): Promise<string> {
       if (m?.type !== RES || m.id !== id) return;
       cleanup();
       if (typeof m.body === "string") resolve(m.body);
-      else void localMetrics().then((t) => resolve(`# cluster aggregation failed (${m.error ?? "unknown"}); this worker only\n${t}`));
+      else
+        void localMetrics().then((t) =>
+          resolve(`# cluster aggregation failed (${m.error ?? "unknown"}); this worker only\n${t}`),
+        );
     };
-    const timer = setTimeout(() => { cleanup(); void localMetrics().then((t) => resolve(`# cluster aggregation timed out; this worker only\n${t}`)); }, timeoutMs);
-    const cleanup = () => { clearTimeout(timer); process.off("message", onMessage); };
+    const timer = setTimeout(() => {
+      cleanup();
+      void localMetrics().then((t) => resolve(`# cluster aggregation timed out; this worker only\n${t}`));
+    }, timeoutMs);
+    const cleanup = () => {
+      clearTimeout(timer);
+      process.off("message", onMessage);
+    };
     process.on("message", onMessage);
     process.send!({ type: REQ, id });
   });
 }
 
 /** In the cluster primary: aggregates every worker and answers workers' IPC scrape requests. Returns the aggregator. */
-export function setupPrimaryAggregation(): { aggregator: client.AggregatorRegistry<client.PrometheusContentType>; clusterMetrics: () => Promise<string> } {
+export function setupPrimaryAggregation(): {
+  aggregator: client.AggregatorRegistry<client.PrometheusContentType>;
+  clusterMetrics: () => Promise<string>;
+} {
   const aggregator = new client.AggregatorRegistry<client.PrometheusContentType>();
   const clusterMetrics = () => aggregator.clusterMetrics();
   cluster.on("message", (worker, msg: unknown) => {
     const m = msg as { type?: string; id?: string };
     if (m?.type !== REQ || typeof m.id !== "string") return;
     clusterMetrics()
-      .then((body) => { if (worker.isConnected()) worker.send({ type: RES, id: m.id, body }); })
-      .catch((err: unknown) => { if (worker.isConnected()) worker.send({ type: RES, id: m.id, error: (err as Error).message }); });
+      .then((body) => {
+        if (worker.isConnected()) worker.send({ type: RES, id: m.id, body });
+      })
+      .catch((err: unknown) => {
+        if (worker.isConnected()) worker.send({ type: RES, id: m.id, error: (err as Error).message });
+      });
   });
   return { aggregator, clusterMetrics };
 }

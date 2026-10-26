@@ -1,13 +1,33 @@
 import { Download, EyeOff, FileText, Image as ImageIcon, Paperclip, Share2, Upload } from "lucide-react";
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { ALLOWED_UPLOAD_MIME_TYPES, MAX_UPLOAD_BYTES, type DocumentAppliesTo, type DocumentEntityType, type DocumentRow, type DocumentTypeRow } from "@kkt/contracts";
-import { Badge, Button, Checkbox, EmptyState, ErrorState, FieldWrapper, Input, Select, SimpleDialog, Skeleton, Switch, Tooltip } from "@/components/ui";
+import {
+  ALLOWED_UPLOAD_MIME_TYPES,
+  MAX_UPLOAD_BYTES,
+  type DocumentAppliesTo,
+  type DocumentEntityType,
+  type DocumentRow,
+  type DocumentTypeRow,
+} from "@kkt/contracts";
+import {
+  Badge,
+  Button,
+  Checkbox,
+  EmptyState,
+  ErrorState,
+  FieldWrapper,
+  Input,
+  Select,
+  SimpleDialog,
+  Skeleton,
+  Switch,
+  Tooltip,
+} from "@/components/ui";
 import { describeError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { formatDateTime, formatNumber } from "@/lib/format";
 import { useMutationWithToast } from "@/lib/queries";
-import { cn } from "@/lib/utils";
+import { cn, useOnChange } from "@/lib/utils";
 import { useMasterRows } from "@/features/masters/api";
 import { fetchDocumentLink, inventoryKeys, uploadDocument, useEntityDocuments } from "./api";
 
@@ -39,7 +59,18 @@ export interface DocumentsPanelProps {
 const APPLIES: readonly DocumentAppliesTo[] = ["CUSTOMER", "BOOKING", "PROJECT", "BLOCK", "FLAT", "PAYMENT"];
 
 /** Documents of one entity: list with signed-link downloads and an upload dialog (type, sensitivity, share flag). */
-export function DocumentsPanel({ entityType, entityId, appliesTo, allowShare = true, onUploaded, bare = false, imagesOnly = false, rowAction, className, title = "Documents" }: DocumentsPanelProps) {
+export function DocumentsPanel({
+  entityType,
+  entityId,
+  appliesTo,
+  allowShare = true,
+  onUploaded,
+  bare = false,
+  imagesOnly = false,
+  rowAction,
+  className,
+  title = "Documents",
+}: DocumentsPanelProps) {
   const { can } = useAuth();
   const canUpload = can("document.write");
   const canReveal = can("customer.kyc_view");
@@ -47,7 +78,10 @@ export function DocumentsPanel({ entityType, entityId, appliesTo, allowShare = t
   const [uploadOpen, setUploadOpen] = useState(false);
   const [opening, setOpening] = useState<string | null>(null);
 
-  const rows = useMemo(() => (documents.data ?? []).filter((row) => !row.is_deleted && (!imagesOnly || row.mime.startsWith("image/"))), [documents.data, imagesOnly]);
+  const rows = useMemo(
+    () => (documents.data ?? []).filter((row) => !row.is_deleted && (!imagesOnly || row.mime.startsWith("image/"))),
+    [documents.data, imagesOnly],
+  );
 
   const open = async (row: DocumentRow) => {
     setOpening(row.id);
@@ -61,7 +95,8 @@ export function DocumentsPanel({ entityType, entityId, appliesTo, allowShare = t
     }
   };
 
-  const applies = appliesTo ?? (APPLIES.includes(entityType as DocumentAppliesTo) ? (entityType as DocumentAppliesTo) : undefined);
+  const applies =
+    appliesTo ?? (APPLIES.includes(entityType as DocumentAppliesTo) ? (entityType as DocumentAppliesTo) : undefined);
 
   const body = (
     <>
@@ -79,7 +114,13 @@ export function DocumentsPanel({ entityType, entityId, appliesTo, allowShare = t
           icon={Paperclip}
           title={imagesOnly ? "No images yet" : "No documents yet"}
           description={canUpload ? "Upload PDFs or images up to 15 MB." : "Nothing has been uploaded for this record."}
-          action={canUpload ? <Button size="sm" leftIcon={Upload} onClick={() => setUploadOpen(true)}>Upload</Button> : undefined}
+          action={
+            canUpload ? (
+              <Button size="sm" leftIcon={Upload} onClick={() => setUploadOpen(true)}>
+                Upload
+              </Button>
+            ) : undefined
+          }
         />
       )}
       {rows.length > 0 && (
@@ -90,7 +131,12 @@ export function DocumentsPanel({ entityType, entityId, appliesTo, allowShare = t
             return (
               <li key={row.id} className="flex items-center gap-3 py-2">
                 {row.thumb_url ? (
-                  <img src={row.thumb_url} alt="" className="size-10 shrink-0 rounded-sm border border-border object-cover" loading="lazy" />
+                  <img
+                    src={row.thumb_url}
+                    alt=""
+                    className="size-10 shrink-0 rounded-sm border border-border object-cover"
+                    loading="lazy"
+                  />
                 ) : (
                   <span className="flex size-10 shrink-0 items-center justify-center rounded-sm bg-navy-50 text-navy-700">
                     <Icon className="size-4" aria-hidden="true" />
@@ -121,7 +167,16 @@ export function DocumentsPanel({ entityType, entityId, appliesTo, allowShare = t
                     </Badge>
                   )}
                   {rowAction?.(row)}
-                  <Button variant="outline" size="sm" leftIcon={Download} loading={opening === row.id} disabled={locked} onClick={() => void open(row)} aria-label={`Download ${row.title || row.file_name}`} data-testid={`document-download-${row.id}`}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    leftIcon={Download}
+                    loading={opening === row.id}
+                    disabled={locked}
+                    onClick={() => void open(row)}
+                    aria-label={`Download ${row.title || row.file_name}`}
+                    data-testid={`document-download-${row.id}`}
+                  >
                     <span className="hidden sm:inline">Download</span>
                   </Button>
                 </div>
@@ -162,10 +217,19 @@ export function DocumentsPanel({ entityType, entityId, appliesTo, allowShare = t
     <section className={cn("rounded-lg border border-border bg-card shadow-card", className)}>
       <header className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
         <h3 className="font-display text-md font-bold text-navy-950">
-          {title} {documents.data && <span className="money ml-1 text-xs font-normal text-ink-subtle">{formatNumber(rows.length)}</span>}
+          {title}{" "}
+          {documents.data && (
+            <span className="money ml-1 text-xs font-normal text-ink-subtle">{formatNumber(rows.length)}</span>
+          )}
         </h3>
         {canUpload && (
-          <Button size="sm" variant="outline" leftIcon={Upload} onClick={() => setUploadOpen(true)} data-testid="documents-upload-btn">
+          <Button
+            size="sm"
+            variant="outline"
+            leftIcon={Upload}
+            onClick={() => setUploadOpen(true)}
+            data-testid="documents-upload-btn"
+          >
             Upload
           </Button>
         )}
@@ -191,7 +255,17 @@ export interface UploadDocumentDialogProps {
   title?: string;
 }
 
-export function UploadDocumentDialog({ open, onOpenChange, entityType, entityId, appliesTo, allowShare = true, imagesOnly = false, onUploaded, title = "Upload document" }: UploadDocumentDialogProps) {
+export function UploadDocumentDialog({
+  open,
+  onOpenChange,
+  entityType,
+  entityId,
+  appliesTo,
+  allowShare = true,
+  imagesOnly = false,
+  onUploaded,
+  title = "Upload document",
+}: UploadDocumentDialogProps) {
   const fileId = useId();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -206,29 +280,32 @@ export function UploadDocumentDialog({ open, onOpenChange, entityType, entityId,
     () =>
       (types.data ?? [])
         .filter((type) => !appliesTo || type.applies_to.includes(appliesTo))
-        .map((type) => ({ value: type.id, label: type.name, description: type.is_kyc ? "KYC — always sensitive, never shared" : undefined })),
+        .map((type) => ({
+          value: type.id,
+          label: type.name,
+          description: type.is_kyc ? "KYC — always sensitive, never shared" : undefined,
+        })),
     [types.data, appliesTo],
   );
   const selectedType = types.data?.find((type) => type.id === documentTypeId) ?? null;
   const forcedSensitive = selectedType?.is_kyc === true;
 
-  useEffect(() => {
-    if (!open) {
-      setFile(null);
-      setDocumentTypeId(null);
-      setDocTitle("");
-      setSensitive(false);
-      setShared(false);
-      setFileError(null);
-    }
-  }, [open]);
+  useOnChange(open, (isOpen) => {
+    if (isOpen) return;
+    setFile(null);
+    setDocumentTypeId(null);
+    setDocTitle("");
+    setSensitive(false);
+    setShared(false);
+    setFileError(null);
+  });
 
-  useEffect(() => {
-    if (forcedSensitive) {
-      setSensitive(true);
-      setShared(false);
-    }
-  }, [forcedSensitive]);
+  // KYC document types are always sensitive and never shared with the buyer.
+  useOnChange(forcedSensitive, (forced) => {
+    if (!forced) return;
+    setSensitive(true);
+    setShared(false);
+  });
 
   const upload = useMutationWithToast<DocumentRow, void>({
     mutationFn: () => {
@@ -287,7 +364,13 @@ export function UploadDocumentDialog({ open, onOpenChange, entityType, entityId,
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={upload.isPending}>
             Cancel
           </Button>
-          <Button leftIcon={Upload} loading={upload.isPending} disabled={!file} onClick={() => upload.mutate()} data-testid="upload-document-submit">
+          <Button
+            leftIcon={Upload}
+            loading={upload.isPending}
+            disabled={!file}
+            onClick={() => upload.mutate()}
+            data-testid="upload-document-submit"
+          >
             Upload
           </Button>
         </>
@@ -311,14 +394,50 @@ export function UploadDocumentDialog({ open, onOpenChange, entityType, entityId,
           )}
         </FieldWrapper>
         <FieldWrapper label="Document type" hint={types.isError ? "Could not load document types" : undefined}>
-          {(control) => <Select id={control.id} value={documentTypeId} onValueChange={setDocumentTypeId} options={typeOptions} placeholder={types.isPending ? "Loading…" : "Optional"} allowClear data-testid="upload-document-type" />}
+          {(control) => (
+            <Select
+              id={control.id}
+              value={documentTypeId}
+              onValueChange={setDocumentTypeId}
+              options={typeOptions}
+              placeholder={types.isPending ? "Loading…" : "Optional"}
+              allowClear
+              data-testid="upload-document-type"
+            />
+          )}
         </FieldWrapper>
         <FieldWrapper label="Title">
-          {(control) => <Input id={control.id} value={docTitle} onChange={(event) => setDocTitle(event.target.value)} maxLength={200} placeholder="Shown to staff (and the customer when shared)" />}
+          {(control) => (
+            <Input
+              id={control.id}
+              value={docTitle}
+              onChange={(event) => setDocTitle(event.target.value)}
+              maxLength={200}
+              placeholder="Shown to staff (and the customer when shared)"
+            />
+          )}
         </FieldWrapper>
         <div className="space-y-2">
-          <Checkbox checked={sensitive || forcedSensitive} disabled={forcedSensitive} onCheckedChange={(checked) => setSensitive(checked === true)} label="Sensitive" description={forcedSensitive ? "KYC documents are always sensitive: only users with KYC-view may download them." : "Download needs the KYC-view permission"} />
-          {allowShare && <Switch checked={shared && !forcedSensitive} disabled={forcedSensitive} onCheckedChange={setShared} label="Share with customer" description={forcedSensitive ? "KYC documents cannot be shared" : "Visible in the customer portal"} />}
+          <Checkbox
+            checked={sensitive || forcedSensitive}
+            disabled={forcedSensitive}
+            onCheckedChange={(checked) => setSensitive(checked === true)}
+            label="Sensitive"
+            description={
+              forcedSensitive
+                ? "KYC documents are always sensitive: only users with KYC-view may download them."
+                : "Download needs the KYC-view permission"
+            }
+          />
+          {allowShare && (
+            <Switch
+              checked={shared && !forcedSensitive}
+              disabled={forcedSensitive}
+              onCheckedChange={setShared}
+              label="Share with customer"
+              description={forcedSensitive ? "KYC documents cannot be shared" : "Visible in the customer portal"}
+            />
+          )}
         </div>
       </div>
     </SimpleDialog>

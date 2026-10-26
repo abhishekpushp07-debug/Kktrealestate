@@ -15,7 +15,15 @@ export const FieldAriaContext = createContext<FieldAria | null>(null);
  * aria-invalid / aria-describedby / aria-required unless it sets them itself. Controls with another id (or none) are untouched, so a
  * composite control's inner inputs never pick up the field's id.
  */
-export function useFieldAria(id: string | undefined, own: { invalid?: boolean | undefined; "aria-invalid"?: unknown; "aria-describedby"?: string | undefined; "aria-required"?: unknown }): {
+export function useFieldAria(
+  id: string | undefined,
+  own: {
+    invalid?: boolean | undefined;
+    "aria-invalid"?: unknown;
+    "aria-describedby"?: string | undefined;
+    "aria-required"?: unknown;
+  },
+): {
   "aria-invalid": boolean | undefined;
   "aria-describedby": string | undefined;
   "aria-required": boolean | undefined;
@@ -27,7 +35,11 @@ export function useFieldAria(id: string | undefined, own: { invalid?: boolean | 
     "aria-invalid": ownInvalid || (wired && field["aria-invalid"]) || undefined,
     // a control's own description is kept and the field's error/hint is added to it (never replaced: the error must stay announced)
     "aria-describedby": mergeIds(own["aria-describedby"], wired ? field["aria-describedby"] : undefined),
-    "aria-required": own["aria-required"] === true || own["aria-required"] === "true" || (wired && field["aria-required"]) || undefined,
+    "aria-required":
+      own["aria-required"] === true ||
+      own["aria-required"] === "true" ||
+      (wired && field["aria-required"]) ||
+      undefined,
   };
 }
 

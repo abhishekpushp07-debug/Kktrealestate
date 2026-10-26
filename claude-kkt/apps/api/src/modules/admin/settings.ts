@@ -4,7 +4,15 @@
  */
 import { and, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
-import { CompanyNumberingSchema, CompanySettingsPatchSchema, CompanySettingsResponseSchema, CompanySettingsValuesSchema, type AdminNumberingPreview, type CompanySettingsPatch, type CompanySettingsResponse } from "@kkt/contracts";
+import {
+  CompanyNumberingSchema,
+  CompanySettingsPatchSchema,
+  CompanySettingsResponseSchema,
+  CompanySettingsValuesSchema,
+  type AdminNumberingPreview,
+  type CompanySettingsPatch,
+  type CompanySettingsResponse,
+} from "@kkt/contracts";
 import { companies, documents, sequences, type CompanySettings, type Executor, type Numbering } from "@kkt/db";
 import { DEFAULT_NUMBER_PATTERN, financialYear, formatNumber, todayIST } from "@kkt/domain";
 import { config } from "../../config.js";
@@ -31,14 +39,26 @@ const SCOPES: readonly { scope: keyof Numbering; fallback: string }[] = [
  * Next number per scope for the financial year of `businessDate` (default: today in IST), e.g. CUST-2526/0001.
  * Reads the sequences table without consuming a number; other modules (ERP forms) may call it to show "next booking number".
  */
-export async function numberingPreview(db: Executor, company: Pick<CompanyRow, "id" | "fyStartMonth" | "numbering">, businessDate: string = todayIST()): Promise<AdminNumberingPreview[]> {
+export async function numberingPreview(
+  db: Executor,
+  company: Pick<CompanyRow, "id" | "fyStartMonth" | "numbering">,
+  businessDate: string = todayIST(),
+): Promise<AdminNumberingPreview[]> {
   const fy = financialYear(businessDate, company.fyStartMonth);
-  const rows = await db.select({ scope: sequences.scope, value: sequences.value }).from(sequences).where(and(eq(sequences.companyId, company.id), eq(sequences.fy, fy.label)));
+  const rows = await db
+    .select({ scope: sequences.scope, value: sequences.value })
+    .from(sequences)
+    .where(and(eq(sequences.companyId, company.id), eq(sequences.fy, fy.label)));
   const current = new Map(rows.map((r) => [r.scope, Number(r.value)]));
   return SCOPES.map(({ scope, fallback }) => {
     const cfg = company.numbering[scope] ?? { prefix: fallback };
     const last = current.get(scope) ?? 0;
-    return { scope, fy: fy.label, last_sequence: last, next_number: formatNumber(cfg.prefix || fallback, fy.label, last + 1, cfg.format ?? DEFAULT_NUMBER_PATTERN) };
+    return {
+      scope,
+      fy: fy.label,
+      last_sequence: last,
+      next_number: formatNumber(cfg.prefix || fallback, fy.label, last + 1, cfg.format ?? DEFAULT_NUMBER_PATTERN),
+    };
   });
 }
 
@@ -103,7 +123,10 @@ function invalid(prefix: string, issues: { path: PropertyKey[]; message: string 
  * Every numbering pattern is additionally rendered once with the engine: a pattern the engine cannot format must never be stored
  * (it would turn every create and GET /settings/company into a 500).
  */
-export function mergeJson(current: Pick<CompanyRow, "numbering" | "settings">, body: Pick<CompanySettingsPatch, "numbering" | "settings">): { numbering?: Numbering; settings?: CompanySettings } {
+export function mergeJson(
+  current: Pick<CompanyRow, "numbering" | "settings">,
+  body: Pick<CompanySettingsPatch, "numbering" | "settings">,
+): { numbering?: Numbering; settings?: CompanySettings } {
   const out: { numbering?: Numbering; settings?: CompanySettings } = {};
   if (body.numbering !== undefined) {
     const merged: Record<string, unknown> = { ...current.numbering };
@@ -115,7 +138,9 @@ export function mergeJson(current: Pick<CompanyRow, "numbering" | "settings">, b
       try {
         formatNumber(cfg.prefix || fallback, "2526", 1, cfg.format ?? DEFAULT_NUMBER_PATTERN);
       } catch (err) {
-        throw invalid("numbering", [{ path: [scope, "format"], message: err instanceof Error ? err.message : "Invalid number pattern" }]);
+        throw invalid("numbering", [
+          { path: [scope, "format"], message: err instanceof Error ? err.message : "Invalid number pattern" },
+        ]);
       }
     }
     out.numbering = parsed.data as Numbering;
@@ -138,7 +163,19 @@ export function mergeJson(current: Pick<CompanyRow, "numbering" | "settings">, b
 
 /** Fields of the audit snapshot (snake_case wire names of the changed columns). */
 function snapshot(c: CompanyRow, keys: string[]): Record<string, unknown> {
-  const wire: Record<string, unknown> = { name: c.name, legalName: c.legalName, gstin: c.gstin, phone: c.phone, email: c.email, address: c.address, logoDocumentId: c.logoDocumentId, letterhead: c.letterhead, fyStartMonth: c.fyStartMonth, numbering: c.numbering, settings: c.settings };
+  const wire: Record<string, unknown> = {
+    name: c.name,
+    legalName: c.legalName,
+    gstin: c.gstin,
+    phone: c.phone,
+    email: c.email,
+    address: c.address,
+    logoDocumentId: c.logoDocumentId,
+    letterhead: c.letterhead,
+    fyStartMonth: c.fyStartMonth,
+    numbering: c.numbering,
+    settings: c.settings,
+  };
   const out: Record<string, unknown> = {};
   for (const k of keys) out[k.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase()] = wire[k] ?? null;
   return out;
@@ -149,34 +186,77 @@ const UpdateBody = withOptionalVersion(CompanySettingsPatchSchema);
 /** GET/PATCH /settings/company. */
 export function registerSettingsRoutes(app: FastifyInstance): void {
   route(app, {
-    method: "GET", url: "/settings/company", permission: "settings.manage",
-    schema: { response: { 200: CompanySettingsResponseSchema }, summary: "Company profile, letterhead, numbering (with next-number preview) and settings", tags: ["settings"] },
+    method: "GET",
+    url: "/settings/company",
+    permission: "settings.manage",
+    schema: {
+      response: { 200: CompanySettingsResponseSchema },
+      summary: "Company profile, letterhead, numbering (with next-number preview) and settings",
+      tags: ["settings"],
+    },
     handler: async (req) => loadSettings(app.db, staff(req).companyId),
   });
 
   route(app, {
-    method: "PATCH", url: "/settings/company", permission: "settings.manage",
-    schema: { body: UpdateBody, response: { 200: CompanySettingsResponseSchema }, summary: "Update company settings (partial: numbering scopes and settings keys merge onto the stored values; version via body or If-Match; audited; company cache invalidated)", tags: ["settings"] },
+    method: "PATCH",
+    url: "/settings/company",
+    permission: "settings.manage",
+    schema: {
+      body: UpdateBody,
+      response: { 200: CompanySettingsResponseSchema },
+      summary:
+        "Update company settings (partial: numbering scopes and settings keys merge onto the stored values; version via body or If-Match; audited; company cache invalidated)",
+      tags: ["settings"],
+    },
     handler: async (req) => {
       const user = staff(req);
       const body = req.body as CompanySettingsPatch;
       const version = expectedVersion(req, body);
       const changes = changesOf(body);
-      if (Object.keys(changes).length === 0 && body.numbering === undefined && body.settings === undefined) throw ApiError.badRequest("Nothing to update");
+      if (Object.keys(changes).length === 0 && body.numbering === undefined && body.settings === undefined)
+        throw ApiError.badRequest("Nothing to update");
       const meta = adminMeta(req);
       const result = await app.db.transaction(async (tx) => {
-        const [before] = await tx.select().from(companies).where(eq(companies.id, user.companyId)).limit(1).for("update");
+        const [before] = await tx
+          .select()
+          .from(companies)
+          .where(eq(companies.id, user.companyId))
+          .limit(1)
+          .for("update");
         if (!before) throw ApiError.notFound("Company");
         const merged = mergeJson(before, body);
         if (merged.numbering) changes["numbering"] = merged.numbering;
         if (merged.settings) changes["settings"] = merged.settings;
         if (typeof changes["logoDocumentId"] === "string") {
-          const [doc] = await tx.select({ id: documents.id }).from(documents).where(and(eq(documents.id, changes["logoDocumentId"]), eq(documents.companyId, user.companyId), eq(documents.isDeleted, false))).limit(1);
-          if (!doc) throw ApiError.badRequest("logo_document_id does not refer to a live document of this company", { issues: [{ path: "logo_document_id", message: "Unknown document" }] });
+          const [doc] = await tx
+            .select({ id: documents.id })
+            .from(documents)
+            .where(
+              and(
+                eq(documents.id, changes["logoDocumentId"]),
+                eq(documents.companyId, user.companyId),
+                eq(documents.isDeleted, false),
+              ),
+            )
+            .limit(1);
+          if (!doc)
+            throw ApiError.badRequest("logo_document_id does not refer to a live document of this company", {
+              issues: [{ path: "logo_document_id", message: "Unknown document" }],
+            });
         }
         const after = await applyUpdate(tx, companies, user.companyId, version, changes, "company");
         const keys = Object.keys(changes);
-        await writeAudit(tx, { companyId: user.companyId, actor: meta.actor, ip: meta.ip, requestId: meta.requestId, action: "company.update", entityType: "company", entityId: user.companyId, before: snapshot(before, keys), after: snapshot(after, keys) });
+        await writeAudit(tx, {
+          companyId: user.companyId,
+          actor: meta.actor,
+          ip: meta.ip,
+          requestId: meta.requestId,
+          action: "company.update",
+          entityType: "company",
+          entityId: user.companyId,
+          before: snapshot(before, keys),
+          after: snapshot(after, keys),
+        });
         return toSettingsResponse(after, await numberingPreview(tx, after));
       });
       await invalidateCompany(app.redis, user.companyId);

@@ -1,11 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { decryptField, encryptField, keyedHash, randomToken, signPayload, temporaryPassword, verifyPayload } from "../../src/lib/crypto.js";
+import {
+  decryptField,
+  encryptField,
+  keyedHash,
+  randomToken,
+  signPayload,
+  temporaryPassword,
+  verifyPayload,
+} from "../../src/lib/crypto.js";
 import { signAccessToken, verifyAccessToken } from "../../src/lib/jwt.js";
 import { hashPassword, matchesHistory, passwordPolicyProblems, verifyPassword } from "../../src/lib/password.js";
 
 describe("field encryption", () => {
   it("round-trips and randomises IV", () => {
-    const a = encryptField("ABCDE1234F")!, b = encryptField("ABCDE1234F")!;
+    const a = encryptField("ABCDE1234F")!,
+      b = encryptField("ABCDE1234F")!;
     expect(a).not.toEqual(b);
     expect(decryptField(a)).toBe("ABCDE1234F");
     expect(encryptField("")).toBeNull();

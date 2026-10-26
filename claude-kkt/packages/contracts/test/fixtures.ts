@@ -6,7 +6,11 @@ export const U = (n: number): string => `${n.toString().padStart(8, "0")}-0000-4
 const STAGE = U(99);
 
 /** Builds one installment input with trigger details matching its trigger type. */
-export function inst(seq: number, percent: number, trigger: InstallmentInput["trigger_type"] = "ON_STAGE"): InstallmentInput {
+export function inst(
+  seq: number,
+  percent: number,
+  trigger: InstallmentInput["trigger_type"] = "ON_STAGE",
+): InstallmentInput {
   return {
     seq,
     name: `Installment ${seq}`,

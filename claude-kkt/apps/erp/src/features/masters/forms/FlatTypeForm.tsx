@@ -1,8 +1,27 @@
 import { Plus, Trash2 } from "lucide-react";
 import { useMemo } from "react";
 import { useFieldArray, useFormContext, useWatch } from "react-hook-form";
-import { AREA_TYPE_CODE_LABELS, STRUCTURAL_AREA_CODES, type AreaTypeRow, type RoomTypeRow, type SpecItemRow } from "@kkt/contracts";
-import { Button, FormField, FormRow, FormSection, IconButton, Input, MoneyInput, MultiSelect, NumberInput, RadioGroup, Select, Textarea } from "@/components/ui";
+import {
+  AREA_TYPE_CODE_LABELS,
+  STRUCTURAL_AREA_CODES,
+  type AreaTypeRow,
+  type RoomTypeRow,
+  type SpecItemRow,
+} from "@kkt/contracts";
+import {
+  Button,
+  FormField,
+  FormRow,
+  FormSection,
+  IconButton,
+  Input,
+  MoneyInput,
+  MultiSelect,
+  NumberInput,
+  RadioGroup,
+  Select,
+  Textarea,
+} from "@/components/ui";
 import { formatSqft } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useMasterRows } from "../api";
@@ -37,7 +56,16 @@ export interface FlatTypeValues {
   spec_item_ids: string[];
 }
 
-export const FACING_OPTIONS = ["North", "South", "East", "West", "North-East", "North-West", "South-East", "South-West"].map((value) => ({ value, label: value }));
+export const FACING_OPTIONS = [
+  "North",
+  "South",
+  "East",
+  "West",
+  "North-East",
+  "North-West",
+  "South-East",
+  "South-West",
+].map((value) => ({ value, label: value }));
 
 const PRICING_OPTIONS: ReadonlyArray<{ value: PricingMode; label: string; description: string }> = [
   { value: "NONE", label: "No base price", description: "Priced on the rate card only" },
@@ -60,7 +88,10 @@ export interface AreaCheck {
 }
 
 /** Live super ≥ built-up ≥ carpet check given area rows and the area-type code lookup. */
-export function checkStructuralAreas(areas: readonly AreaValues[], codeOf: (areaTypeId: string) => string | undefined): AreaCheck {
+export function checkStructuralAreas(
+  areas: readonly AreaValues[],
+  codeOf: (areaTypeId: string) => string | undefined,
+): AreaCheck {
   const byCode = new Map<string, number>();
   for (const area of areas) {
     if (!area.area_type_id || area.sqft === null) continue;
@@ -73,8 +104,10 @@ export function checkStructuralAreas(areas: readonly AreaValues[], codeOf: (area
   const superBuiltUp = byCode.get(superCode) ?? null;
   const problems: string[] = [];
   if (builtUp !== null && carpet !== null && builtUp < carpet) problems.push("Built-up must be ≥ carpet");
-  if (superBuiltUp !== null && builtUp !== null && superBuiltUp < builtUp) problems.push("Super built-up must be ≥ built-up");
-  if (superBuiltUp !== null && carpet !== null && builtUp === null && superBuiltUp < carpet) problems.push("Super built-up must be ≥ carpet");
+  if (superBuiltUp !== null && builtUp !== null && superBuiltUp < builtUp)
+    problems.push("Super built-up must be ≥ built-up");
+  if (superBuiltUp !== null && carpet !== null && builtUp === null && superBuiltUp < carpet)
+    problems.push("Super built-up must be ≥ carpet");
   return { carpet, builtUp, superBuiltUp, problems };
 }
 
@@ -94,20 +127,36 @@ export function FlatTypeForm(_props: MasterFormProps) {
   const watchedRooms = useWatch({ control, name: "rooms" });
   const watchedAreas = useWatch({ control, name: "areas" });
 
-  const roomTypeOptions = useMemo(() => (roomTypes.data ?? []).map((type) => ({ value: type.id, label: type.name })), [roomTypes.data]);
-  const areaTypeOptions = useMemo(() => (areaTypes.data ?? []).map((type) => ({ value: type.id, label: `${type.name} (${type.code})` })), [areaTypes.data]);
-  const areaCodeById = useMemo(() => new Map((areaTypes.data ?? []).map((type) => [type.id, type.code] as const)), [areaTypes.data]);
+  const roomTypeOptions = useMemo(
+    () => (roomTypes.data ?? []).map((type) => ({ value: type.id, label: type.name })),
+    [roomTypes.data],
+  );
+  const areaTypeOptions = useMemo(
+    () => (areaTypes.data ?? []).map((type) => ({ value: type.id, label: `${type.name} (${type.code})` })),
+    [areaTypes.data],
+  );
+  const areaCodeById = useMemo(
+    () => new Map((areaTypes.data ?? []).map((type) => [type.id, type.code] as const)),
+    [areaTypes.data],
+  );
   const specOptions = useMemo(
     () =>
       [...(specItems.data ?? [])]
         .sort((a, b) => a.category_name.localeCompare(b.category_name) || a.sort_order - b.sort_order)
-        .map((item) => ({ value: item.id, label: item.name, description: item.category_name, keywords: [item.category_name] })),
+        .map((item) => ({
+          value: item.id,
+          label: item.name,
+          description: item.category_name,
+          keywords: [item.category_name],
+        })),
     [specItems.data],
   );
 
   const totalRoomSqft = (watchedRooms ?? []).reduce((sum, room) => sum + (room.sqft ?? 0), 0);
   const areaCheck = checkStructuralAreas(watchedAreas ?? [], (id) => areaCodeById.get(id));
-  const usedAreaTypes = new Set((watchedAreas ?? []).map((area) => area.area_type_id).filter((id): id is string => Boolean(id)));
+  const usedAreaTypes = new Set(
+    (watchedAreas ?? []).map((area) => area.area_type_id).filter((id): id is string => Boolean(id)),
+  );
 
   /** Recomputes sq ft after a dimension change unless the user overrode it. */
   const updateDimension = (index: number, key: "length_ft" | "width_ft", value: number | null) => {
@@ -133,14 +182,33 @@ export function FlatTypeForm(_props: MasterFormProps) {
             name="name"
             label="Name"
             required
-            render={({ field }) => <Input {...field} value={field.value} onChange={(event) => field.onChange(event.target.value)} placeholder="3BHK-A" maxLength={120} data-testid="field-name" />}
+            render={({ field }) => (
+              <Input
+                {...field}
+                value={field.value}
+                onChange={(event) => field.onChange(event.target.value)}
+                placeholder="3BHK-A"
+                maxLength={120}
+                data-testid="field-name"
+              />
+            )}
           />
           <FormField
             control={control}
             name="code"
             label="Code"
             required
-            render={({ field }) => <Input {...field} value={field.value} onChange={(event) => field.onChange(event.target.value.toUpperCase())} placeholder="3BHK_A" maxLength={30} className="font-mono uppercase" data-testid="field-code" />}
+            render={({ field }) => (
+              <Input
+                {...field}
+                value={field.value}
+                onChange={(event) => field.onChange(event.target.value.toUpperCase())}
+                placeholder="3BHK_A"
+                maxLength={30}
+                className="font-mono uppercase"
+                data-testid="field-code"
+              />
+            )}
           />
           <FormField
             control={control}
@@ -148,20 +216,54 @@ export function FlatTypeForm(_props: MasterFormProps) {
             label="BHK"
             required
             hint="Steps of 0.5 (1.5 = 1 BHK + study)"
-            render={({ field }) => <NumberInput id={field.id} ref={field.ref} value={field.value} onChange={field.onChange} onBlur={field.onBlur} decimals={1} min={0} max={20} step={0.5} aria-invalid={field["aria-invalid"]} data-testid="field-bhk" />}
+            render={({ field }) => (
+              <NumberInput
+                id={field.id}
+                ref={field.ref}
+                value={field.value}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                decimals={1}
+                min={0}
+                max={20}
+                step={0.5}
+                aria-invalid={field["aria-invalid"]}
+                data-testid="field-bhk"
+              />
+            )}
           />
           <FormField
             control={control}
             name="facing"
             label="Facing"
-            render={({ field }) => <Select id={field.id} value={field.value} onValueChange={field.onChange} options={FACING_OPTIONS} placeholder="Any" allowClear data-testid="field-facing" />}
+            render={({ field }) => (
+              <Select
+                id={field.id}
+                value={field.value}
+                onValueChange={field.onChange}
+                options={FACING_OPTIONS}
+                placeholder="Any"
+                allowClear
+                data-testid="field-facing"
+              />
+            )}
           />
           <FormField
             control={control}
             name="description"
             label="Description"
             className="sm:col-span-2"
-            render={({ field }) => <Textarea {...field} value={field.value ?? ""} onChange={(event) => field.onChange(event.target.value || null)} placeholder="Shown on the website configuration card" maxLength={2000} rows={2} data-testid="field-description" />}
+            render={({ field }) => (
+              <Textarea
+                {...field}
+                value={field.value ?? ""}
+                onChange={(event) => field.onChange(event.target.value || null)}
+                placeholder="Shown on the website configuration card"
+                maxLength={2000}
+                rows={2}
+                data-testid="field-description"
+              />
+            )}
           />
         </FormRow>
       </FormSection>
@@ -176,41 +278,122 @@ export function FlatTypeForm(_props: MasterFormProps) {
             ))}
           </div>
           {rooms.fields.map((room, index) => (
-            <div key={room.id} className="grid grid-cols-2 gap-2 rounded-md border border-border bg-card p-2 sm:grid-cols-[1.2fr_1.2fr_4.5rem_4.5rem_5.5rem_2rem] sm:items-start sm:border-0 sm:bg-transparent sm:p-0">
+            <div
+              key={room.id}
+              className="grid grid-cols-2 gap-2 rounded-md border border-border bg-card p-2 sm:grid-cols-[1.2fr_1.2fr_4.5rem_4.5rem_5.5rem_2rem] sm:items-start sm:border-0 sm:bg-transparent sm:p-0"
+            >
               <FormField
                 control={control}
                 name={`rooms.${index}.room_type_id`}
                 className="col-span-2 sm:col-span-1"
-                render={({ field }) => <Select id={field.id} value={field.value} onValueChange={field.onChange} options={roomTypeOptions} placeholder={roomTypes.isPending ? "Loading…" : "Room type"} invalid={field.invalid} aria-label="Room type" data-testid={`room-${index}-type`} />}
+                render={({ field }) => (
+                  <Select
+                    id={field.id}
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    options={roomTypeOptions}
+                    placeholder={roomTypes.isPending ? "Loading…" : "Room type"}
+                    invalid={field.invalid}
+                    aria-label="Room type"
+                    data-testid={`room-${index}-type`}
+                  />
+                )}
               />
               <FormField
                 control={control}
                 name={`rooms.${index}.label`}
                 className="col-span-2 sm:col-span-1"
-                render={({ field }) => <Input {...field} value={field.value} onChange={(event) => field.onChange(event.target.value)} placeholder="Master Bedroom" maxLength={120} aria-label="Room label" data-testid={`room-${index}-label`} />}
+                render={({ field }) => (
+                  <Input
+                    {...field}
+                    value={field.value}
+                    onChange={(event) => field.onChange(event.target.value)}
+                    placeholder="Master Bedroom"
+                    maxLength={120}
+                    aria-label="Room label"
+                    data-testid={`room-${index}-label`}
+                  />
+                )}
               />
               <FormField
                 control={control}
                 name={`rooms.${index}.length_ft`}
-                render={({ field }) => <NumberInput id={field.id} value={field.value} onChange={(value) => updateDimension(index, "length_ft", value)} onBlur={field.onBlur} decimals={2} min={0} max={999} placeholder="L" aria-label="Length in feet" aria-invalid={field["aria-invalid"]} data-testid={`room-${index}-length`} />}
+                render={({ field }) => (
+                  <NumberInput
+                    id={field.id}
+                    value={field.value}
+                    onChange={(value) => updateDimension(index, "length_ft", value)}
+                    onBlur={field.onBlur}
+                    decimals={2}
+                    min={0}
+                    max={999}
+                    placeholder="L"
+                    aria-label="Length in feet"
+                    aria-invalid={field["aria-invalid"]}
+                    data-testid={`room-${index}-length`}
+                  />
+                )}
               />
               <FormField
                 control={control}
                 name={`rooms.${index}.width_ft`}
-                render={({ field }) => <NumberInput id={field.id} value={field.value} onChange={(value) => updateDimension(index, "width_ft", value)} onBlur={field.onBlur} decimals={2} min={0} max={999} placeholder="W" aria-label="Width in feet" aria-invalid={field["aria-invalid"]} data-testid={`room-${index}-width`} />}
+                render={({ field }) => (
+                  <NumberInput
+                    id={field.id}
+                    value={field.value}
+                    onChange={(value) => updateDimension(index, "width_ft", value)}
+                    onBlur={field.onBlur}
+                    decimals={2}
+                    min={0}
+                    max={999}
+                    placeholder="W"
+                    aria-label="Width in feet"
+                    aria-invalid={field["aria-invalid"]}
+                    data-testid={`room-${index}-width`}
+                  />
+                )}
               />
               <FormField
                 control={control}
                 name={`rooms.${index}.sqft`}
-                render={({ field }) => <NumberInput id={field.id} value={field.value} onChange={field.onChange} onBlur={field.onBlur} decimals={2} min={0} placeholder="sq ft" aria-label="Square feet" aria-invalid={field["aria-invalid"]} className="font-semibold" data-testid={`room-${index}-sqft`} />}
+                render={({ field }) => (
+                  <NumberInput
+                    id={field.id}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    decimals={2}
+                    min={0}
+                    placeholder="sq ft"
+                    aria-label="Square feet"
+                    aria-invalid={field["aria-invalid"]}
+                    className="font-semibold"
+                    data-testid={`room-${index}-sqft`}
+                  />
+                )}
               />
               <div className="flex justify-end sm:pt-0.5">
-                <IconButton icon={Trash2} label="Remove room" size="sm" variant="ghost" className="text-ink-subtle hover:text-danger-fg" disabled={rooms.fields.length <= 1} onClick={() => rooms.remove(index)} data-testid={`room-${index}-remove`} />
+                <IconButton
+                  icon={Trash2}
+                  label="Remove room"
+                  size="sm"
+                  variant="ghost"
+                  className="text-ink-subtle hover:text-danger-fg"
+                  disabled={rooms.fields.length <= 1}
+                  onClick={() => rooms.remove(index)}
+                  data-testid={`room-${index}-remove`}
+                />
               </div>
             </div>
           ))}
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <Button variant="outline" size="sm" leftIcon={Plus} onClick={() => rooms.append({ ...EMPTY_ROOM })} data-testid="add-room-btn">
+            <Button
+              variant="outline"
+              size="sm"
+              leftIcon={Plus}
+              onClick={() => rooms.append({ ...EMPTY_ROOM })}
+              data-testid="add-room-btn"
+            >
               Add room
             </Button>
             <span className="money text-xs text-ink-subtle">
@@ -237,7 +420,10 @@ export function FlatTypeForm(_props: MasterFormProps) {
                     id={field.id}
                     value={field.value}
                     onValueChange={field.onChange}
-                    options={areaTypeOptions.map((option) => ({ ...option, disabled: usedAreaTypes.has(option.value) && option.value !== field.value }))}
+                    options={areaTypeOptions.map((option) => ({
+                      ...option,
+                      disabled: usedAreaTypes.has(option.value) && option.value !== field.value,
+                    }))}
                     placeholder={areaTypes.isPending ? "Loading…" : "Area type"}
                     invalid={field.invalid}
                     aria-label="Area type"
@@ -248,18 +434,52 @@ export function FlatTypeForm(_props: MasterFormProps) {
               <FormField
                 control={control}
                 name={`areas.${index}.sqft`}
-                render={({ field }) => <NumberInput id={field.id} value={field.value} onChange={field.onChange} onBlur={field.onBlur} decimals={2} min={0} placeholder="sq ft" aria-label="Square feet" aria-invalid={field["aria-invalid"]} data-testid={`area-${index}-sqft`} />}
+                render={({ field }) => (
+                  <NumberInput
+                    id={field.id}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    decimals={2}
+                    min={0}
+                    placeholder="sq ft"
+                    aria-label="Square feet"
+                    aria-invalid={field["aria-invalid"]}
+                    data-testid={`area-${index}-sqft`}
+                  />
+                )}
               />
-              <IconButton icon={Trash2} label="Remove area" size="sm" variant="ghost" className="mt-0.5 text-ink-subtle hover:text-danger-fg" disabled={areas.fields.length <= 1} onClick={() => areas.remove(index)} data-testid={`area-${index}-remove`} />
+              <IconButton
+                icon={Trash2}
+                label="Remove area"
+                size="sm"
+                variant="ghost"
+                className="mt-0.5 text-ink-subtle hover:text-danger-fg"
+                disabled={areas.fields.length <= 1}
+                onClick={() => areas.remove(index)}
+                data-testid={`area-${index}-remove`}
+              />
             </div>
           ))}
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <Button variant="outline" size="sm" leftIcon={Plus} onClick={() => areas.append({ ...EMPTY_AREA })} disabled={areaTypeOptions.length > 0 && usedAreaTypes.size >= areaTypeOptions.length} data-testid="add-area-btn">
+            <Button
+              variant="outline"
+              size="sm"
+              leftIcon={Plus}
+              onClick={() => areas.append({ ...EMPTY_AREA })}
+              disabled={areaTypeOptions.length > 0 && usedAreaTypes.size >= areaTypeOptions.length}
+              data-testid="add-area-btn"
+            >
               Add area
             </Button>
             <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
               {STRUCTURAL_AREA_CODES.map((code) => {
-                const value = code === "CARPET" ? areaCheck.carpet : code === "BUILT_UP" ? areaCheck.builtUp : areaCheck.superBuiltUp;
+                const value =
+                  code === "CARPET"
+                    ? areaCheck.carpet
+                    : code === "BUILT_UP"
+                      ? areaCheck.builtUp
+                      : areaCheck.superBuiltUp;
                 return (
                   <span key={code} className={cn("money", value === null ? "text-ink-subtle" : "text-ink")}>
                     {AREA_TYPE_CODE_LABELS[code]}: <strong>{value === null ? "—" : formatSqft(value)}</strong>
@@ -269,7 +489,10 @@ export function FlatTypeForm(_props: MasterFormProps) {
             </div>
           </div>
           {areaCheck.problems.length > 0 && (
-            <ul role="alert" className="space-y-0.5 rounded-md border border-danger/30 bg-danger-bg px-3 py-2 text-xs font-medium text-danger-fg">
+            <ul
+              role="alert"
+              className="space-y-0.5 rounded-md border border-danger/30 bg-danger-bg px-3 py-2 text-xs font-medium text-danger-fg"
+            >
               {areaCheck.problems.map((problem) => (
                 <li key={problem}>{problem}</li>
               ))}
@@ -287,7 +510,16 @@ export function FlatTypeForm(_props: MasterFormProps) {
         <FormField
           control={control}
           name="pricing_mode"
-          render={({ field }) => <RadioGroup value={field.value} onValueChange={field.onChange} options={PRICING_OPTIONS} inline cards data-testid="field-pricing-mode" />}
+          render={({ field }) => (
+            <RadioGroup
+              value={field.value}
+              onValueChange={field.onChange}
+              options={PRICING_OPTIONS}
+              inline
+              cards
+              data-testid="field-pricing-mode"
+            />
+          )}
         />
         {pricingMode === "RATE" && (
           <FormField
@@ -295,7 +527,18 @@ export function FlatTypeForm(_props: MasterFormProps) {
             name="base_rate_per_sqft_paise"
             label="Base rate per sq ft"
             required
-            render={({ field }) => <MoneyInput id={field.id} value={field.value} onChange={field.onChange} onBlur={field.onBlur} showShort={false} aria-invalid={field["aria-invalid"]} className="sm:max-w-xs" data-testid="field-base-rate" />}
+            render={({ field }) => (
+              <MoneyInput
+                id={field.id}
+                value={field.value}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                showShort={false}
+                aria-invalid={field["aria-invalid"]}
+                className="sm:max-w-xs"
+                data-testid="field-base-rate"
+              />
+            )}
           />
         )}
         {pricingMode === "LUMP_SUM" && (
@@ -304,17 +547,40 @@ export function FlatTypeForm(_props: MasterFormProps) {
             name="base_price_paise"
             label="Lump-sum base price"
             required
-            render={({ field }) => <MoneyInput id={field.id} value={field.value} onChange={field.onChange} onBlur={field.onBlur} aria-invalid={field["aria-invalid"]} className="sm:max-w-xs" data-testid="field-base-price" />}
+            render={({ field }) => (
+              <MoneyInput
+                id={field.id}
+                value={field.value}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                aria-invalid={field["aria-invalid"]}
+                className="sm:max-w-xs"
+                data-testid="field-base-price"
+              />
+            )}
           />
         )}
       </FormSection>
 
-      <FormSection title="Specifications" description="Items shown under this configuration on the website and in the allotment letter.">
+      <FormSection
+        title="Specifications"
+        description="Items shown under this configuration on the website and in the allotment letter."
+      >
         <FormField
           control={control}
           name="spec_item_ids"
           render={({ field }) => (
-            <MultiSelect id={field.id} value={field.value} onValueChange={field.onChange} options={specOptions} placeholder={specItems.isPending ? "Loading…" : "Pick specification items"} searchPlaceholder="Search items or categories…" maxChips={6} aria-label="Specification items" data-testid="field-spec-items" />
+            <MultiSelect
+              id={field.id}
+              value={field.value}
+              onValueChange={field.onChange}
+              options={specOptions}
+              placeholder={specItems.isPending ? "Loading…" : "Pick specification items"}
+              searchPlaceholder="Search items or categories…"
+              maxChips={6}
+              aria-label="Specification items"
+              data-testid="field-spec-items"
+            />
           )}
         />
       </FormSection>

@@ -6,8 +6,15 @@ import { dashboardFor } from "../services/dashboards.js";
 
 export function registerDashboardRoutes(app: FastifyInstance): void {
   route(app, {
-    method: "GET", url: "/dashboard", permission: "dashboard.view",
-    schema: { querystring: DashboardQuerySchema, response: { 200: DashboardResponseSchema }, summary: "Role dashboard (Owner / Accounts / Sales / Project Admin / Employee widgets), project-scoped, cached 15 s" },
+    method: "GET",
+    url: "/dashboard",
+    permission: "dashboard.view",
+    schema: {
+      querystring: DashboardQuerySchema,
+      response: { 200: DashboardResponseSchema },
+      summary:
+        "Role dashboard (Owner / Accounts / Sales / Project Admin / Employee widgets), project-scoped, cached 15 s",
+    },
     handler: async (req) => dashboardFor(app.dbReplica, app.redis, req.user!, req.query),
   });
 }

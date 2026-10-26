@@ -1,7 +1,15 @@
 import { FileCheck2, IndianRupee } from "lucide-react";
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { PAYMENT_AGAINSTS, PAYMENT_AGAINST_LABELS, PAYMENT_MODE_CODES, PAYMENT_MODE_CODE_LABELS, PAYMENT_STATUSES, PAYMENT_STATUS_LABELS, type PaymentRow } from "@kkt/contracts";
+import {
+  PAYMENT_AGAINSTS,
+  PAYMENT_AGAINST_LABELS,
+  PAYMENT_MODE_CODES,
+  PAYMENT_MODE_CODE_LABELS,
+  PAYMENT_STATUSES,
+  PAYMENT_STATUS_LABELS,
+  type PaymentRow,
+} from "@kkt/contracts";
 import { Button, DateInput, PageHeader, Select, Toolbar } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 import { formatNumber } from "@/lib/format";
@@ -48,12 +56,60 @@ export default function PaymentsPage() {
         summary={query.data ? `${formatNumber(query.data.total)} receipts` : undefined}
         filters={
           <>
-            <Select aria-label="Project" size="sm" className="w-full sm:w-48" value={list.filters.project_id ?? null} onValueChange={(value) => list.setFilter("project_id", value)} options={(projects.data ?? []).map((project) => ({ value: project.id, label: project.name }))} placeholder="All projects" allowClear />
-            <Select aria-label="Status" size="sm" className="w-full sm:w-36" value={list.filters.status ?? null} onValueChange={(value) => list.setFilter("status", value)} options={PAYMENT_STATUSES.map((status) => ({ value: status, label: PAYMENT_STATUS_LABELS[status] }))} placeholder="Any status" allowClear />
-            <Select aria-label="Mode" size="sm" className="w-full sm:w-40" value={list.filters.mode_code ?? null} onValueChange={(value) => list.setFilter("mode_code", value)} options={PAYMENT_MODE_CODES.map((code) => ({ value: code, label: PAYMENT_MODE_CODE_LABELS[code] }))} placeholder="Any mode" allowClear />
-            <Select aria-label="Against" size="sm" className="w-full sm:w-36" value={list.filters.against ?? null} onValueChange={(value) => list.setFilter("against", value)} options={PAYMENT_AGAINSTS.map((value) => ({ value, label: PAYMENT_AGAINST_LABELS[value] }))} placeholder="Flat / charges" allowClear />
-            <DateInput aria-label="From date" className="h-12 text-xs sm:h-8" wrapperClassName="w-full sm:w-40" value={list.filters.from ?? null} onChange={(value) => list.setFilter("from", value)} />
-            <DateInput aria-label="To date" className="h-12 text-xs sm:h-8" wrapperClassName="w-full sm:w-40" value={list.filters.to ?? null} onChange={(value) => list.setFilter("to", value)} />
+            <Select
+              aria-label="Project"
+              size="sm"
+              className="w-full sm:w-48"
+              value={list.filters.project_id ?? null}
+              onValueChange={(value) => list.setFilter("project_id", value)}
+              options={(projects.data ?? []).map((project) => ({ value: project.id, label: project.name }))}
+              placeholder="All projects"
+              allowClear
+            />
+            <Select
+              aria-label="Status"
+              size="sm"
+              className="w-full sm:w-36"
+              value={list.filters.status ?? null}
+              onValueChange={(value) => list.setFilter("status", value)}
+              options={PAYMENT_STATUSES.map((status) => ({ value: status, label: PAYMENT_STATUS_LABELS[status] }))}
+              placeholder="Any status"
+              allowClear
+            />
+            <Select
+              aria-label="Mode"
+              size="sm"
+              className="w-full sm:w-40"
+              value={list.filters.mode_code ?? null}
+              onValueChange={(value) => list.setFilter("mode_code", value)}
+              options={PAYMENT_MODE_CODES.map((code) => ({ value: code, label: PAYMENT_MODE_CODE_LABELS[code] }))}
+              placeholder="Any mode"
+              allowClear
+            />
+            <Select
+              aria-label="Against"
+              size="sm"
+              className="w-full sm:w-36"
+              value={list.filters.against ?? null}
+              onValueChange={(value) => list.setFilter("against", value)}
+              options={PAYMENT_AGAINSTS.map((value) => ({ value, label: PAYMENT_AGAINST_LABELS[value] }))}
+              placeholder="Flat / charges"
+              allowClear
+            />
+            <DateInput
+              aria-label="From date"
+              className="h-12 text-xs sm:h-8"
+              wrapperClassName="w-full sm:w-40"
+              value={list.filters.from ?? null}
+              onChange={(value) => list.setFilter("from", value)}
+            />
+            <DateInput
+              aria-label="To date"
+              className="h-12 text-xs sm:h-8"
+              wrapperClassName="w-full sm:w-40"
+              value={list.filters.to ?? null}
+              onChange={(value) => list.setFilter("to", value)}
+            />
           </>
         }
         hasActiveFilters={list.hasActiveFilters}
@@ -68,9 +124,21 @@ export default function PaymentsPage() {
         onRetry={() => void query.refetch()}
         sort={list.sort}
         onSortChange={list.setSort}
-        pagination={{ page: list.page, pageSize: list.pageSize, total: query.data?.total ?? 0, onPageChange: list.setPage, onPageSizeChange: list.setPageSize }}
+        pagination={{
+          page: list.page,
+          pageSize: list.pageSize,
+          total: query.data?.total ?? 0,
+          onPageChange: list.setPage,
+          onPageSizeChange: list.setPageSize,
+        }}
         highlightId={params.get("highlight")}
-        emptyAction={can("payment.post") ? <Button size="sm" leftIcon={IndianRupee} onClick={() => setPostOpen(true)}>Post payment</Button> : undefined}
+        emptyAction={
+          can("payment.post") ? (
+            <Button size="sm" leftIcon={IndianRupee} onClick={() => setPostOpen(true)}>
+              Post payment
+            </Button>
+          ) : undefined
+        }
       />
       <PaymentDialog open={postOpen} onOpenChange={setPostOpen} />
     </>

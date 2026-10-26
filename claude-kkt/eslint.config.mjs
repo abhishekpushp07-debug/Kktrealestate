@@ -18,7 +18,8 @@ const moduleBoundaries = {
     docs: { description: "Cross-module imports in apps/api/src/modules must go through the other module's index.ts" },
     schema: [],
     messages: {
-      crossModule: "Module '{{from}}' imports '{{target}}' from module '{{to}}'; import it from '{{to}}/index.js' (or move it to lib/).",
+      crossModule:
+        "Module '{{from}}' imports '{{target}}' from module '{{to}}'; import it from '{{to}}/index.js' (or move it to lib/).",
     },
   },
   create(context) {
@@ -28,7 +29,8 @@ const moduleBoundaries = {
     const modulesRoot = match[1];
     const from = match[2];
     const check = (node, source) => {
-      if (!source || source.type !== "Literal" || typeof source.value !== "string" || !source.value.startsWith(".")) return;
+      if (!source || source.type !== "Literal" || typeof source.value !== "string" || !source.value.startsWith("."))
+        return;
       const resolved = path.resolve(path.dirname(filename), source.value);
       const rel = path.relative(modulesRoot, resolved);
       if (rel === "" || rel.startsWith("..") || path.isAbsolute(rel)) return; // outside modules/ (lib, plugins, …) or modules/ itself
@@ -70,7 +72,15 @@ export default tseslint.config(
     languageOptions: { ecmaVersion: 2023, sourceType: "module", globals: { ...globals.node } },
     linterOptions: { reportUnusedDisableDirectives: "warn" },
     rules: {
-      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_", destructuredArrayIgnorePattern: "^_" }],
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+          destructuredArrayIgnorePattern: "^_",
+        },
+      ],
     },
   },
   {
@@ -84,10 +94,16 @@ export default tseslint.config(
     rules: { "@typescript-eslint/no-require-imports": "off" },
   },
   {
+    // Workflow orchestration scripts run inside the workflow runner, which injects these globals.
+    files: ["scripts/workflows/**/*.js"],
+    languageOptions: {
+      globals: { agent: "readonly", parallel: "readonly", pipeline: "readonly", log: "readonly", args: "readonly" },
+    },
+  },
+  {
     files: ["apps/api/src/modules/**/*.ts"],
     plugins: { kkt },
-    // warn while the existing cross-module imports are moved behind index.ts; the verify stage flips this to "error"
-    rules: { "kkt/module-boundaries": "warn" },
+    rules: { "kkt/module-boundaries": "error" },
   },
   prettier,
 );

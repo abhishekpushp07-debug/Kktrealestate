@@ -2,17 +2,46 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { describe, expect, it } from "vitest";
 import { postErrorWebhook, webhookPayload } from "../../src/jobs/alerts.js";
-import { defaultJobOptions, hasJob, isUuid, JOB_ATTEMPTS, JOB_SCHEDULES, jobBackoffMs, jobHandler, partitioningEnabled, publicJobData, registerJob, registeredJobs, UnregisteredJobError } from "../../src/jobs/index.js";
+import {
+  defaultJobOptions,
+  hasJob,
+  isUuid,
+  JOB_ATTEMPTS,
+  JOB_SCHEDULES,
+  jobBackoffMs,
+  jobHandler,
+  partitioningEnabled,
+  publicJobData,
+  registerJob,
+  registeredJobs,
+  UnregisteredJobError,
+} from "../../src/jobs/index.js";
 import { bullConnection, deployId, lastDuesSlot, PROCESS_STARTED_AT } from "../../src/jobs/queue.js";
 import { config } from "../../src/config.js";
 
-const ctx = (log = { info: () => undefined }) => ({ db: {} as never, log: log as never, data: {}, app: null, runId: "r", attempt: 1, maxAttempts: 1 });
+const ctx = (log = { info: () => undefined }) => ({
+  db: {} as never,
+  log: log as never,
+  data: {},
+  app: null,
+  runId: "r",
+  attempt: 1,
+  maxAttempts: 1,
+});
 
 describe("job registry", () => {
   it("has the IST schedules incl. the new hourly/5-minute/daily housekeeping jobs; partition maintenance is switched by PARTITIONING_ENABLED", () => {
     expect(JOB_SCHEDULES.map((s) => `${s.name}@${s.cron}`)).toEqual([
-      "DAILY_DUES@30 0 * * *", "NIGHTLY_INTEGRITY@45 0 * * *", "OVERDUE_NOTIFICATIONS@15 1 * * *", "VISIT_OUTCOME_NUDGE@0 9 * * *", "SLA_BREACH_CHECK@5 * * * *",
-      "PORTAL_FILE_CLEANUP@20 * * * *", "IDEMPOTENCY_PURGE@35 * * * *", "HOLD_EXPIRY@*/5 * * * *", "EXPORT_CLEANUP@10 3 * * *", "PARTITION_MAINTENANCE@20 2 * * *",
+      "DAILY_DUES@30 0 * * *",
+      "NIGHTLY_INTEGRITY@45 0 * * *",
+      "OVERDUE_NOTIFICATIONS@15 1 * * *",
+      "VISIT_OUTCOME_NUDGE@0 9 * * *",
+      "SLA_BREACH_CHECK@5 * * * *",
+      "PORTAL_FILE_CLEANUP@20 * * * *",
+      "IDEMPOTENCY_PURGE@35 * * * *",
+      "HOLD_EXPIRY@*/5 * * * *",
+      "EXPORT_CLEANUP@10 3 * * *",
+      "PARTITION_MAINTENANCE@20 2 * * *",
       "JOB_RUN_SWEEP@*/15 * * * *",
     ]);
     expect(JOB_SCHEDULES.every((s) => s.tz === "Asia/Kolkata")).toBe(true);
@@ -47,7 +76,13 @@ describe("job registry", () => {
 describe("queue helpers", () => {
   it("BullMQ connects with the main REDIS_URL (db index, credentials, TLS)", () => {
     expect(bullConnection("redis://localhost:6379/18")).toMatchObject({ host: "localhost", port: 6379, db: 18 });
-    expect(bullConnection("rediss://u:p%40ss@cache:6380")).toMatchObject({ host: "cache", port: 6380, username: "u", password: "p@ss", tls: {} });
+    expect(bullConnection("rediss://u:p%40ss@cache:6380")).toMatchObject({
+      host: "cache",
+      port: 6380,
+      username: "u",
+      password: "p@ss",
+      tls: {},
+    });
   });
 
   it("the dues catch-up slot is the latest 00:30 IST at or before now", () => {
@@ -74,14 +109,30 @@ describe("failure alert webhook", () => {
     const received: unknown[] = [];
     const server = createServer((req, res) => {
       let body = "";
-      req.on("data", (c: Buffer) => { body += c.toString(); });
-      req.on("end", () => { received.push({ method: req.method, type: req.headers["content-type"], body: JSON.parse(body) as unknown }); res.writeHead(204).end(); });
+      req.on("data", (c: Buffer) => {
+        body += c.toString();
+      });
+      req.on("end", () => {
+        received.push({ method: req.method, type: req.headers["content-type"], body: JSON.parse(body) as unknown });
+        res.writeHead(204).end();
+      });
     });
     await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
     const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/hook`;
     try {
-      const payload = webhookPayload({ jobName: "DAILY_DUES", runId: "r1", error: "boom", attempt: 3, maxAttempts: 3 }, new Date("2026-10-26T00:00:00Z"));
-      expect(payload).toMatchObject({ event: "job.failed", job_name: "DAILY_DUES", run_id: "r1", error: "boom", attempts: 3, max_attempts: 3, occurred_at: "2026-10-26T00:00:00.000Z" });
+      const payload = webhookPayload(
+        { jobName: "DAILY_DUES", runId: "r1", error: "boom", attempt: 3, maxAttempts: 3 },
+        new Date("2026-10-26T00:00:00Z"),
+      );
+      expect(payload).toMatchObject({
+        event: "job.failed",
+        job_name: "DAILY_DUES",
+        run_id: "r1",
+        error: "boom",
+        attempts: 3,
+        max_attempts: 3,
+        occurred_at: "2026-10-26T00:00:00.000Z",
+      });
       expect(await postErrorWebhook(payload, url)).toBe(true);
       expect(received).toEqual([{ method: "POST", type: "application/json", body: payload }]);
       expect(await postErrorWebhook(payload, undefined)).toBe(false);

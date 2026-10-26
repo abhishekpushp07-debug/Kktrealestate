@@ -37,7 +37,12 @@ export function pageMetadata(meta: PageMeta): Metadata {
       ...(images ? { images } : {}),
       ...(meta.publishedTime ? { publishedTime: meta.publishedTime } : {}),
     },
-    twitter: { card: images ? "summary_large_image" : "summary", title: meta.title, description, ...(images ? { images } : {}) },
+    twitter: {
+      card: images ? "summary_large_image" : "summary",
+      title: meta.title,
+      description,
+      ...(images ? { images } : {}),
+    },
     ...(meta.noIndex ? { robots: { index: false, follow: false } } : {}),
   };
 }
@@ -54,7 +59,9 @@ function compact(obj: JsonLdObject): JsonLdObject {
 
 export function organizationJsonLd(site: SiteSettings | null, apiUrl: string): JsonLdObject {
   const base = siteUrl();
-  const sameAs = site ? Object.values(site.social ?? {}).filter((v): v is string => typeof v === "string" && v.length > 0) : [];
+  const sameAs = site
+    ? Object.values(site.social ?? {}).filter((v): v is string => typeof v === "string" && v.length > 0)
+    : [];
   const office = site?.offices?.[0];
   return compact({
     "@context": "https://schema.org",
@@ -93,7 +100,9 @@ export function websiteJsonLd(site: SiteSettings | null): JsonLdObject {
 export function projectJsonLd(project: ProjectDetail, apiUrl: string): JsonLdObject {
   const base = siteUrl();
   const address = project.key_facts?.address ?? NO_ADDRESS;
-  const images = (project.hero_images ?? []).map((img) => resolveMediaUrl(img.url, apiUrl)).filter((u): u is string => !!u);
+  const images = (project.hero_images ?? [])
+    .map((img) => resolveMediaUrl(img.url, apiUrl))
+    .filter((u): u is string => !!u);
   const listing: JsonLdObject = compact({
     "@context": "https://schema.org",
     "@type": "RealEstateListing",
@@ -145,7 +154,9 @@ export function articleJsonLd(post: PostDetail, site: SiteSettings | null, apiUr
     image: resolveMediaUrl(post.cover_url, apiUrl) ?? undefined,
     datePublished: post.published_at ?? undefined,
     dateModified: post.updated_at ?? post.published_at ?? undefined,
-    author: post.author_name ? { "@type": "Person", name: post.author_name } : { "@type": "Organization", name: brandName(site) },
+    author: post.author_name
+      ? { "@type": "Person", name: post.author_name }
+      : { "@type": "Organization", name: brandName(site) },
     publisher: { "@type": "Organization", name: brandName(site) },
     mainEntityOfPage: `${base}/blog/${post.slug}`,
   });

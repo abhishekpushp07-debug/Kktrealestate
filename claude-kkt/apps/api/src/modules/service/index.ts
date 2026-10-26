@@ -25,6 +25,7 @@ export {
   toTicketRow,
   toCustomerTicketRow,
   canReopen,
+  customerProjectIdsSubquery,
   canRate,
   assertTransition,
   slaHoursOf,
@@ -37,7 +38,16 @@ export {
   type TicketWriteContext,
   type WriteMeta,
 } from "./ticketService.js";
-export { noticesForCustomer, notifyNoticePublished, notifyDueNotices, liveNotices, isLive, toNoticeRow, NOTICE_ENTITY, type DbNotice } from "./notices.js";
+export {
+  noticesForCustomer,
+  notifyNoticePublished,
+  notifyDueNotices,
+  liveNotices,
+  isLive,
+  toNoticeRow,
+  NOTICE_ENTITY,
+  type DbNotice,
+} from "./notices.js";
 export { slaBreachCheck, registerServiceJobs, SLA_BREACH_JOB } from "./jobs.js";
 
 /** Service module: tickets (SLA, internal notes, reopen window, rating), notices for buyers and the hourly SLA breach job. */

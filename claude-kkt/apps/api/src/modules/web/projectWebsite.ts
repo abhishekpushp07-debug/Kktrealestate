@@ -6,8 +6,15 @@ import { and, eq, gte, isNotNull, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
-  BrochureStatsResponseSchema, IdSchema, ProjectWebsitePublishSchema, ProjectWebsiteSettingsRowSchema, ProjectWebsiteSettingsUpdateSchema, VisitSettingsRowSchema, VisitSettingsUpdateSchema,
-  type ProjectWebsiteSettingsRow, type VisitSettingsRow,
+  BrochureStatsResponseSchema,
+  IdSchema,
+  ProjectWebsitePublishSchema,
+  ProjectWebsiteSettingsRowSchema,
+  ProjectWebsiteSettingsUpdateSchema,
+  VisitSettingsRowSchema,
+  VisitSettingsUpdateSchema,
+  type ProjectWebsiteSettingsRow,
+  type VisitSettingsRow,
 } from "@kkt/contracts";
 import { brochureDownloads, projectVisitSettings, projectWebsiteSettings, projects, type Executor } from "@kkt/db";
 import { addDays, slugify, toISTDateString, todayIST } from "@kkt/domain";
@@ -19,7 +26,16 @@ import { camelRow } from "../../lib/rows.js";
 import { ensureProjectAccess, hasAnyPermission, type StaffContext } from "../../lib/scope.js";
 import { expectedVersion, withOptionalVersion } from "../../lib/version.js";
 import { seoWire } from "./cms.js";
-import { assertDocuments, bustPublicCache, documentUrls, isPublicDocument, loadDocuments, loadProjectById, updateByKey, type DocumentRecord } from "./shared.js";
+import {
+  assertDocuments,
+  bustPublicCache,
+  documentUrls,
+  isPublicDocument,
+  loadDocuments,
+  loadProjectById,
+  updateByKey,
+  type DocumentRecord,
+} from "./shared.js";
 import { ensureVisitSettings, visitSettingsWire } from "./visitService.js";
 
 export type DbProject = typeof projects.$inferSelect;
@@ -29,7 +45,8 @@ const idParams = z.object({ id: IdSchema });
 
 /** 403 unless the user may edit website/visit settings (project.write or cms.write — Marketing edits them too). */
 function assertWebsiteWrite(user: StaffContext): void {
-  if (!hasAnyPermission(user, ["project.write", "cms.write"])) throw ApiError.forbidden("Missing permission project.write", { permission: "project.write" });
+  if (!hasAnyPermission(user, ["project.write", "cms.write"]))
+    throw ApiError.forbidden("Missing permission project.write", { permission: "project.write" });
 }
 
 /** Loads a project in the user's scope (404 outside it or when missing). */
@@ -46,7 +63,11 @@ async function uniqueSlug(tx: Executor, project: DbProject): Promise<string> {
   const candidates = [base, `${base}-${slugify(project.code)}`];
   for (let i = 2; i < 50; i++) candidates.push(`${base}-${i}`);
   for (const slug of candidates) {
-    const [taken] = await tx.select({ projectId: projectWebsiteSettings.projectId }).from(projectWebsiteSettings).where(eq(projectWebsiteSettings.slug, slug)).limit(1);
+    const [taken] = await tx
+      .select({ projectId: projectWebsiteSettings.projectId })
+      .from(projectWebsiteSettings)
+      .where(eq(projectWebsiteSettings.slug, slug))
+      .limit(1);
     if (!taken) return slug;
   }
   return `${base}-${project.id.slice(0, 8)}`;
@@ -54,23 +75,41 @@ async function uniqueSlug(tx: Executor, project: DbProject): Promise<string> {
 
 /** Loads the website settings row of a project, creating the default (unpublished, slug from the name) when missing. */
 export async function ensureWebsiteSettings(tx: Executor, project: DbProject): Promise<DbWebsiteSettings> {
-  const [existing] = await tx.select().from(projectWebsiteSettings).where(eq(projectWebsiteSettings.projectId, project.id)).limit(1);
+  const [existing] = await tx
+    .select()
+    .from(projectWebsiteSettings)
+    .where(eq(projectWebsiteSettings.projectId, project.id))
+    .limit(1);
   if (existing) return existing;
   const slug = await uniqueSlug(tx, project);
   // Two projects with the same name created concurrently may both pick `slug`: the loser falls back to a slug derived from its id.
   for (const candidate of [slug, `${slug}-${project.id.slice(0, 8)}`]) {
-    const [created] = await tx.insert(projectWebsiteSettings).values({ projectId: project.id, slug: candidate }).onConflictDoNothing().returning();
+    const [created] = await tx
+      .insert(projectWebsiteSettings)
+      .values({ projectId: project.id, slug: candidate })
+      .onConflictDoNothing()
+      .returning();
     if (created) return created;
-    const [again] = await tx.select().from(projectWebsiteSettings).where(eq(projectWebsiteSettings.projectId, project.id)).limit(1);
+    const [again] = await tx
+      .select()
+      .from(projectWebsiteSettings)
+      .where(eq(projectWebsiteSettings.projectId, project.id))
+      .limit(1);
     if (again) return again;
   }
   throw new Error("project_website_settings insert produced no row");
 }
 
 /** What still blocks publishing: hero image, description, location (SPEC §15 "Cannot publish without hero image, description and location"). */
-export function publishBlockers(project: DbProject, w: Pick<DbWebsiteSettings, "heroDocumentIds">, docs: Map<string, DocumentRecord>): string[] {
+export function publishBlockers(
+  project: DbProject,
+  w: Pick<DbWebsiteSettings, "heroDocumentIds">,
+  docs: Map<string, DocumentRecord>,
+): string[] {
   const missing: string[] = [];
-  const heroes = w.heroDocumentIds.filter((id) => isPublicDocument(docs.get(id)) && docs.get(id)!.mime.startsWith("image/"));
+  const heroes = w.heroDocumentIds.filter(
+    (id) => isPublicDocument(docs.get(id)) && docs.get(id)!.mime.startsWith("image/"),
+  );
   if (heroes.length === 0) missing.push("hero_image");
   if (!project.description || project.description.trim().length === 0) missing.push("description");
   const hasAddress = Boolean(project.address?.line1 && project.address.city);
@@ -80,11 +119,24 @@ export function publishBlockers(project: DbProject, w: Pick<DbWebsiteSettings, "
 }
 
 /** Zero-filled daily download counts for the last 30 IST days (inclusive of today). */
-export async function brochureSparkline(db: Executor, projectId: string, days = 30): Promise<{ date: string; count: number }[]> {
+export async function brochureSparkline(
+  db: Executor,
+  projectId: string,
+  days = 30,
+): Promise<{ date: string; count: number }[]> {
   const today = todayIST();
   const start = addDays(today, -(days - 1));
   const since = new Date(`${start}T00:00:00+05:30`);
-  const rows = await db.select({ downloadedAt: brochureDownloads.downloadedAt }).from(brochureDownloads).where(and(eq(brochureDownloads.projectId, projectId), isNotNull(brochureDownloads.downloadedAt), gte(brochureDownloads.downloadedAt, since)));
+  const rows = await db
+    .select({ downloadedAt: brochureDownloads.downloadedAt })
+    .from(brochureDownloads)
+    .where(
+      and(
+        eq(brochureDownloads.projectId, projectId),
+        isNotNull(brochureDownloads.downloadedAt),
+        gte(brochureDownloads.downloadedAt, since),
+      ),
+    );
   const counts = new Map<string, number>();
   for (const r of rows) {
     const d = toISTDateString(r.downloadedAt!);
@@ -132,10 +184,19 @@ async function websiteRow(db: Executor, project: DbProject, w: DbWebsiteSettings
 }
 
 /** Applies a website-settings patch inside `tx` with the publish rule, slug uniqueness and document checks; returns the new row. */
-async function applyWebsitePatch(tx: Executor, user: StaffContext, project: DbProject, patch: Record<string, unknown>, version: number): Promise<DbWebsiteSettings> {
+async function applyWebsitePatch(
+  tx: Executor,
+  user: StaffContext,
+  project: DbProject,
+  patch: Record<string, unknown>,
+  version: number,
+): Promise<DbWebsiteSettings> {
   const existing = await ensureWebsiteSettings(tx, project);
   const heroIds = (patch["hero_document_ids"] as string[] | undefined) ?? existing.heroDocumentIds;
-  const brochureId = patch["brochure_document_id"] === undefined ? existing.brochureDocumentId : (patch["brochure_document_id"] as string | null);
+  const brochureId =
+    patch["brochure_document_id"] === undefined
+      ? existing.brochureDocumentId
+      : (patch["brochure_document_id"] as string | null);
   const seo = patch["seo"] as { og_image_document_id?: string | null } | null | undefined;
   await assertDocuments(tx, user.companyId, heroIds, "image", "hero_document_ids");
   await assertDocuments(tx, user.companyId, [brochureId], "pdf", "brochure_document_id");
@@ -144,11 +205,27 @@ async function applyWebsitePatch(tx: Executor, user: StaffContext, project: DbPr
   if (willPublish) {
     const docs = await loadDocuments(tx, heroIds);
     const missing = publishBlockers(project, { heroDocumentIds: heroIds }, docs);
-    if (missing.length > 0) throw new ApiError(422, "PUBLISH_REQUIREMENTS", `Cannot publish: add ${missing.map((m) => m.replace(/_/g, " ")).join(", ")} first`, { rule: "PUBLISH_REQUIREMENTS", missing });
+    if (missing.length > 0)
+      throw new ApiError(
+        422,
+        "PUBLISH_REQUIREMENTS",
+        `Cannot publish: add ${missing.map((m) => m.replace(/_/g, " ")).join(", ")} first`,
+        { rule: "PUBLISH_REQUIREMENTS", missing },
+      );
   }
   if (typeof patch["slug"] === "string" && patch["slug"] !== existing.slug) {
-    const [taken] = await tx.select({ projectId: projectWebsiteSettings.projectId }).from(projectWebsiteSettings).where(and(eq(projectWebsiteSettings.slug, patch["slug"]), sql`${projectWebsiteSettings.projectId} <> ${project.id}`)).limit(1);
-    if (taken) throw ApiError.conflict("DUPLICATE", "Another project already uses this slug", { field: "slug", value: patch["slug"] });
+    const [taken] = await tx
+      .select({ projectId: projectWebsiteSettings.projectId })
+      .from(projectWebsiteSettings)
+      .where(
+        and(eq(projectWebsiteSettings.slug, patch["slug"]), sql`${projectWebsiteSettings.projectId} <> ${project.id}`),
+      )
+      .limit(1);
+    if (taken)
+      throw ApiError.conflict("DUPLICATE", "Another project already uses this slug", {
+        field: "slug",
+        value: patch["slug"],
+      });
   }
   const changes = camelRow(patch);
   for (const k of Object.keys(changes)) if (changes[k] === undefined) delete changes[k];
@@ -156,18 +233,36 @@ async function applyWebsitePatch(tx: Executor, user: StaffContext, project: DbPr
   if (willPublish && !existing.isPublished) changes["publishedAt"] = new Date();
   if (!willPublish && existing.isPublished) changes["publishedAt"] = null;
   try {
-    return await updateByKey(tx, projectWebsiteSettings, projectWebsiteSettings.projectId, project.id, version, changes, "project_website_settings");
+    return await updateByKey(
+      tx,
+      projectWebsiteSettings,
+      projectWebsiteSettings.projectId,
+      project.id,
+      version,
+      changes,
+      "project_website_settings",
+    );
   } catch (e) {
     // Lost a race with another project taking the same slug between the pre-check and the UPDATE: 409, never a 500.
-    if (isUniqueViolation(e)) throw ApiError.conflict("DUPLICATE", "Another project already uses this slug", { field: "slug", value: patch["slug"] });
+    if (isUniqueViolation(e))
+      throw ApiError.conflict("DUPLICATE", "Another project already uses this slug", {
+        field: "slug",
+        value: patch["slug"],
+      });
     throw e;
   }
 }
 
 export function registerProjectWebsiteRoutes(app: FastifyInstance): void {
   route(app, {
-    method: "GET", url: "/projects/:id/website", permission: "project.read",
-    schema: { params: idParams, response: { 200: ProjectWebsiteSettingsRowSchema }, summary: "Project website toggles, hero images, brochure, FAQs, SEO" },
+    method: "GET",
+    url: "/projects/:id/website",
+    permission: "project.read",
+    schema: {
+      params: idParams,
+      response: { 200: ProjectWebsiteSettingsRowSchema },
+      summary: "Project website toggles, hero images, brochure, FAQs, SEO",
+    },
     handler: async (req) => {
       const user = req.user!;
       const project = await loadScopedProject(app.db, user, req.params.id);
@@ -177,8 +272,16 @@ export function registerProjectWebsiteRoutes(app: FastifyInstance): void {
   });
 
   route(app, {
-    method: "PATCH", url: "/projects/:id/website", permission: ["project.write", "cms.write"],
-    schema: { params: idParams, body: withOptionalVersion(ProjectWebsiteSettingsUpdateSchema), response: { 200: ProjectWebsiteSettingsRowSchema }, summary: "Update project website settings (project.write or cms.write); publishing needs hero image, description and location" },
+    method: "PATCH",
+    url: "/projects/:id/website",
+    permission: ["project.write", "cms.write"],
+    schema: {
+      params: idParams,
+      body: withOptionalVersion(ProjectWebsiteSettingsUpdateSchema),
+      response: { 200: ProjectWebsiteSettingsRowSchema },
+      summary:
+        "Update project website settings (project.write or cms.write); publishing needs hero image, description and location",
+    },
     handler: async (req) => {
       const user = req.user!;
       assertWebsiteWrite(user);
@@ -190,7 +293,16 @@ export function registerProjectWebsiteRoutes(app: FastifyInstance): void {
         const before = await websiteRow(tx, project, await ensureWebsiteSettings(tx, project));
         const updated = await applyWebsitePatch(tx, user, project, patch, version);
         const after = await websiteRow(tx, project, updated);
-        await writeAudit(tx, { companyId: user.companyId, actor: actorFromRequest(req), action: "project_website_settings.update", entityType: "project_website_settings", entityId: project.id, before, after, ...auditMeta(req) });
+        await writeAudit(tx, {
+          companyId: user.companyId,
+          actor: actorFromRequest(req),
+          action: "project_website_settings.update",
+          entityType: "project_website_settings",
+          entityId: project.id,
+          before,
+          after,
+          ...auditMeta(req),
+        });
         return after;
       });
       await bustPublicCache(app);
@@ -199,8 +311,15 @@ export function registerProjectWebsiteRoutes(app: FastifyInstance): void {
   });
 
   route(app, {
-    method: "POST", url: "/projects/:id/website/publish", permission: "project.read",
-    schema: { params: idParams, body: withOptionalVersion(ProjectWebsitePublishSchema), response: { 200: ProjectWebsiteSettingsRowSchema }, summary: "Publish / unpublish a project on the website" },
+    method: "POST",
+    url: "/projects/:id/website/publish",
+    permission: "project.read",
+    schema: {
+      params: idParams,
+      body: withOptionalVersion(ProjectWebsitePublishSchema),
+      response: { 200: ProjectWebsiteSettingsRowSchema },
+      summary: "Publish / unpublish a project on the website",
+    },
     handler: async (req) => {
       const user = req.user!;
       assertWebsiteWrite(user);
@@ -211,7 +330,16 @@ export function registerProjectWebsiteRoutes(app: FastifyInstance): void {
         const before = await websiteRow(tx, project, await ensureWebsiteSettings(tx, project));
         const updated = await applyWebsitePatch(tx, user, project, { is_published: body.is_published }, version);
         const after = await websiteRow(tx, project, updated);
-        await writeAudit(tx, { companyId: user.companyId, actor: actorFromRequest(req), action: body.is_published ? "project_website_settings.publish" : "project_website_settings.unpublish", entityType: "project_website_settings", entityId: project.id, before: { is_published: before.is_published }, after: { is_published: after.is_published }, ...auditMeta(req) });
+        await writeAudit(tx, {
+          companyId: user.companyId,
+          actor: actorFromRequest(req),
+          action: body.is_published ? "project_website_settings.publish" : "project_website_settings.unpublish",
+          entityType: "project_website_settings",
+          entityId: project.id,
+          before: { is_published: before.is_published },
+          after: { is_published: after.is_published },
+          ...auditMeta(req),
+        });
         return after;
       });
       await bustPublicCache(app);
@@ -220,12 +348,22 @@ export function registerProjectWebsiteRoutes(app: FastifyInstance): void {
   });
 
   route(app, {
-    method: "GET", url: "/projects/:id/brochure-stats", permission: "project.read",
-    schema: { params: idParams, response: { 200: BrochureStatsResponseSchema }, summary: "Brochure download counts with a 30-day daily sparkline" },
+    method: "GET",
+    url: "/projects/:id/brochure-stats",
+    permission: "project.read",
+    schema: {
+      params: idParams,
+      response: { 200: BrochureStatsResponseSchema },
+      summary: "Brochure download counts with a 30-day daily sparkline",
+    },
     handler: async (req) => {
       const user = req.user!;
       const project = await loadScopedProject(app.dbReplica, user, req.params.id);
-      const [w] = await app.dbReplica.select({ count: projectWebsiteSettings.brochureDownloadCount }).from(projectWebsiteSettings).where(eq(projectWebsiteSettings.projectId, project.id)).limit(1);
+      const [w] = await app.dbReplica
+        .select({ count: projectWebsiteSettings.brochureDownloadCount })
+        .from(projectWebsiteSettings)
+        .where(eq(projectWebsiteSettings.projectId, project.id))
+        .limit(1);
       const since = new Date(`${addDays(todayIST(), -29)}T00:00:00+05:30`);
       const [agg] = await app.dbReplica
         .select({
@@ -247,8 +385,14 @@ export function registerProjectWebsiteRoutes(app: FastifyInstance): void {
   });
 
   route(app, {
-    method: "GET", url: "/projects/:id/visit-settings", permission: "project.read",
-    schema: { params: idParams, response: { 200: VisitSettingsRowSchema }, summary: "Site-visit scheduler settings of a project" },
+    method: "GET",
+    url: "/projects/:id/visit-settings",
+    permission: "project.read",
+    schema: {
+      params: idParams,
+      response: { 200: VisitSettingsRowSchema },
+      summary: "Site-visit scheduler settings of a project",
+    },
     handler: async (req) => {
       const user = req.user!;
       const project = await loadScopedProject(app.db, user, req.params.id);
@@ -258,8 +402,15 @@ export function registerProjectWebsiteRoutes(app: FastifyInstance): void {
   });
 
   route(app, {
-    method: "PATCH", url: "/projects/:id/visit-settings", permission: ["project.write", "cms.write"],
-    schema: { params: idParams, body: withOptionalVersion(VisitSettingsUpdateSchema), response: { 200: VisitSettingsRowSchema }, summary: "Update site-visit settings (project.write or cms.write)" },
+    method: "PATCH",
+    url: "/projects/:id/visit-settings",
+    permission: ["project.write", "cms.write"],
+    schema: {
+      params: idParams,
+      body: withOptionalVersion(VisitSettingsUpdateSchema),
+      response: { 200: VisitSettingsRowSchema },
+      summary: "Update site-visit settings (project.write or cms.write)",
+    },
     handler: async (req) => {
       const user = req.user!;
       assertWebsiteWrite(user);
@@ -269,11 +420,38 @@ export function registerProjectWebsiteRoutes(app: FastifyInstance): void {
       const s = body.settings;
       const view = await app.db.transaction(async (tx) => {
         const existing = await ensureVisitSettings(tx, project.id);
-        const updated = await updateByKey(tx, projectVisitSettings, projectVisitSettings.projectId, project.id, version, {
-          enabled: s.enabled, visitDays: s.visit_days, startTime: s.start_time, endTime: s.end_time, slotMinutes: s.slot_minutes, seatsPerSlot: s.seats_per_slot, minLeadHours: s.min_lead_hours,
-          maxDaysAhead: s.max_days_ahead, blackoutDates: s.blackout_dates, siteOfficeAddress: s.site_office_address ?? null, mapsLink: s.maps_link ?? null, instructions: s.instructions ?? null,
-        }, "project_visit_settings");
-        await writeAudit(tx, { companyId: user.companyId, actor: actorFromRequest(req), action: "project_visit_settings.update", entityType: "project_visit_settings", entityId: project.id, before: visitSettingsWire(existing), after: visitSettingsWire(updated), ...auditMeta(req) });
+        const updated = await updateByKey(
+          tx,
+          projectVisitSettings,
+          projectVisitSettings.projectId,
+          project.id,
+          version,
+          {
+            enabled: s.enabled,
+            visitDays: s.visit_days,
+            startTime: s.start_time,
+            endTime: s.end_time,
+            slotMinutes: s.slot_minutes,
+            seatsPerSlot: s.seats_per_slot,
+            minLeadHours: s.min_lead_hours,
+            maxDaysAhead: s.max_days_ahead,
+            blackoutDates: s.blackout_dates,
+            siteOfficeAddress: s.site_office_address ?? null,
+            mapsLink: s.maps_link ?? null,
+            instructions: s.instructions ?? null,
+          },
+          "project_visit_settings",
+        );
+        await writeAudit(tx, {
+          companyId: user.companyId,
+          actor: actorFromRequest(req),
+          action: "project_visit_settings.update",
+          entityType: "project_visit_settings",
+          entityId: project.id,
+          before: visitSettingsWire(existing),
+          after: visitSettingsWire(updated),
+          ...auditMeta(req),
+        });
         return visitSettingsRow(updated);
       });
       await bustPublicCache(app);
@@ -283,5 +461,10 @@ export function registerProjectWebsiteRoutes(app: FastifyInstance): void {
 }
 
 function visitSettingsRow(row: typeof projectVisitSettings.$inferSelect): VisitSettingsRow {
-  return { project_id: row.projectId, settings: visitSettingsWire(row), updated_at: row.updatedAt.toISOString(), version: row.version };
+  return {
+    project_id: row.projectId,
+    settings: visitSettingsWire(row),
+    updated_at: row.updatedAt.toISOString(),
+    version: row.version,
+  };
 }

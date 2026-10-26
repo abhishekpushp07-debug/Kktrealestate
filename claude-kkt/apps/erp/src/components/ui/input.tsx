@@ -17,10 +17,24 @@ export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 
   wrapperClassName?: string;
 }
 
-export function Input({ className, invalid, leftIcon: LeftIcon, prefix, suffix, wrapperClassName, ref, ...props }: InputProps) {
+export function Input({
+  className,
+  invalid,
+  leftIcon: LeftIcon,
+  prefix,
+  suffix,
+  wrapperClassName,
+  ref,
+  ...props
+}: InputProps) {
   const hasLeft = Boolean(LeftIcon || prefix);
   const hasRight = Boolean(suffix);
-  const aria = useFieldAria(props.id, { invalid, "aria-invalid": props["aria-invalid"], "aria-describedby": props["aria-describedby"], "aria-required": props["aria-required"] });
+  const aria = useFieldAria(props.id, {
+    invalid,
+    "aria-invalid": props["aria-invalid"],
+    "aria-describedby": props["aria-describedby"],
+    "aria-required": props["aria-required"],
+  });
   const field = (
     <input
       ref={ref}
@@ -32,13 +46,22 @@ export function Input({ className, invalid, leftIcon: LeftIcon, prefix, suffix, 
   if (!hasLeft && !hasRight) return field;
   return (
     <div className={cn("relative w-full min-w-0", wrapperClassName)}>
-      {LeftIcon && <LeftIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-subtle" aria-hidden="true" />}
+      {LeftIcon && (
+        <LeftIcon
+          className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-subtle"
+          aria-hidden="true"
+        />
+      )}
       {!LeftIcon && prefix !== undefined && (
-        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink-subtle">{prefix}</span>
+        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink-subtle">
+          {prefix}
+        </span>
       )}
       {field}
       {suffix !== undefined && (
-        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-ink-subtle">{suffix}</span>
+        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-ink-subtle">
+          {suffix}
+        </span>
       )}
     </div>
   );
@@ -50,7 +73,12 @@ export interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElemen
 }
 
 export function Textarea({ className, invalid, rows = 3, ref, ...props }: TextareaProps) {
-  const aria = useFieldAria(props.id, { invalid, "aria-invalid": props["aria-invalid"], "aria-describedby": props["aria-describedby"], "aria-required": props["aria-required"] });
+  const aria = useFieldAria(props.id, {
+    invalid,
+    "aria-invalid": props["aria-invalid"],
+    "aria-describedby": props["aria-describedby"],
+    "aria-required": props["aria-required"],
+  });
   return (
     <textarea
       ref={ref}

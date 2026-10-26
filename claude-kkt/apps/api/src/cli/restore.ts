@@ -8,7 +8,8 @@
  */
 import { parseArgs } from "node:util";
 
-const USAGE = "usage: pnpm --filter @kkt/api restore -- --file <backup.zip> --database-url <postgres url of an empty database> --confirm [--allow-stripped]";
+const USAGE =
+  "usage: pnpm --filter @kkt/api restore -- --file <backup.zip> --database-url <postgres url of an empty database> --confirm [--allow-stripped]";
 
 async function main(): Promise<number> {
   const { values } = parseArgs({
@@ -34,16 +35,34 @@ async function main(): Promise<number> {
   process.env["DATABASE_URL"] ??= values["database-url"];
   const { restoreBackup } = await import("../modules/admin/restore.js");
   const result = await restoreBackup({
-    file: values.file, databaseUrl: values["database-url"], confirm: true, allowStripped: values["allow-stripped"],
+    file: values.file,
+    databaseUrl: values["database-url"],
+    confirm: true,
+    allowStripped: values["allow-stripped"],
     log: (msg) => console.log(msg),
   });
   const rows = result.tables.reduce((s, t) => s + t.restored, 0);
   const dirty = result.integrity.filter((i) => !i.ok);
-  console.log(JSON.stringify({ ok: dirty.length === 0, tables: result.tables.length, rows, integrity: result.integrity, duration_ms: result.duration_ms }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        ok: dirty.length === 0,
+        tables: result.tables.length,
+        rows,
+        integrity: result.integrity,
+        duration_ms: result.duration_ms,
+      },
+      null,
+      2,
+    ),
+  );
   return dirty.length === 0 ? 0 : 1;
 }
 
-main().then((code) => process.exit(code), (err: unknown) => {
-  console.error(`restore failed: ${err instanceof Error ? err.message : String(err)}`);
-  process.exit(1);
-});
+main().then(
+  (code) => process.exit(code),
+  (err: unknown) => {
+    console.error(`restore failed: ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(1);
+  },
+);

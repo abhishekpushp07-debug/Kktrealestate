@@ -19,7 +19,10 @@ function stable(value: unknown): string {
 }
 
 /** Key-by-key comparison of two audit snapshots; changed keys first, then the rest alphabetically. */
-export function diffSnapshots(before: Record<string, unknown> | null, after: Record<string, unknown> | null): DiffRow[] {
+export function diffSnapshots(
+  before: Record<string, unknown> | null,
+  after: Record<string, unknown> | null,
+): DiffRow[] {
   const keys = new Set<string>([...Object.keys(before ?? {}), ...Object.keys(after ?? {})]);
   const rows: DiffRow[] = [];
   for (const key of keys) {

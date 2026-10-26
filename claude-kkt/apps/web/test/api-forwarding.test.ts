@@ -1,10 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const incoming = new Map<string, string>();
-vi.mock("next/headers", () => ({ headers: async () => ({ get: (k: string) => incoming.get(k.toLowerCase()) ?? null }) }));
-vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NEXT_NOT_FOUND"); } }));
+vi.mock("next/headers", () => ({
+  headers: async () => ({ get: (k: string) => incoming.get(k.toLowerCase()) ?? null }),
+}));
+vi.mock("next/navigation", () => ({
+  notFound: () => {
+    throw new Error("NEXT_NOT_FOUND");
+  },
+}));
 
-const { getProject, findProject, getSiteSettings, sanitizeForwardedFor, visitorForwardHeaders } = await import("@/lib/api");
+const { getProject, findProject, getSiteSettings, sanitizeForwardedFor, visitorForwardHeaders } =
+  await import("@/lib/api");
 
 type Call = { url: string; init: RequestInit };
 let calls: Call[] = [];

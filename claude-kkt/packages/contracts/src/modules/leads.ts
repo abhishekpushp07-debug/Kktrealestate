@@ -271,13 +271,19 @@ export const EnquiryRowSchema = z.object({
 });
 export type EnquiryRow = z.infer<typeof EnquiryRowSchema>;
 
-export const EnquiryFilterSchema = ListQuerySchema.extend({ is_read: BoolQuerySchema.optional(), project_id: IdSchema.optional() });
+export const EnquiryFilterSchema = ListQuerySchema.extend({
+  is_read: BoolQuerySchema.optional(),
+  project_id: IdSchema.optional(),
+});
 export type EnquiryFilter = z.infer<typeof EnquiryFilterSchema>;
 export const EnquiryListResponseSchema = listEnvelope(EnquiryRowSchema);
 export type EnquiryListResponse = z.infer<typeof EnquiryListResponseSchema>;
 
 /** Mark enquiries read/unread. */
-export const EnquiryMarkReadSchema = z.strictObject({ ids: z.array(IdSchema).min(1).max(200), is_read: z.boolean().default(true) });
+export const EnquiryMarkReadSchema = z.strictObject({
+  ids: z.array(IdSchema).min(1).max(200),
+  is_read: z.boolean().default(true),
+});
 export type EnquiryMarkRead = z.infer<typeof EnquiryMarkReadSchema>;
 
 export const EnquiryUnreadCountSchema = z.object({ unread: z.int().min(0) });

@@ -8,9 +8,20 @@ import { isMetricsToken } from "../../src/plugins/telemetry.js";
 
 describe("error reporter", () => {
   it("sanitises personal data, credentials and identifiers out of messages", () => {
-    const raw = 'duplicate key value violates unique constraint "customers_company_phone_live_uq" Key (company_id, phone)=(5f0c, 9876543210) ravi.kumar@example.com PAN ABCDE1234F aadhaar 1234 5678 9012 +91 98765 43210 token=abc.def eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.c2lnbmF0dXJlLXNpZ25hdHVyZQ postgres://kkt_app:s3cret@db:5432/kkt id 3f2b8c1e-0c4a-4b7e-9a51-2a4f0e8b9c7d';
+    const raw =
+      'duplicate key value violates unique constraint "customers_company_phone_live_uq" Key (company_id, phone)=(5f0c, 9876543210) ravi.kumar@example.com PAN ABCDE1234F aadhaar 1234 5678 9012 +91 98765 43210 token=abc.def eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.c2lnbmF0dXJlLXNpZ25hdHVyZQ postgres://kkt_app:s3cret@db:5432/kkt id 3f2b8c1e-0c4a-4b7e-9a51-2a4f0e8b9c7d';
     const s = sanitizeMessage(raw, 1000);
-    for (const leaked of ["9876543210", "ravi.kumar@example.com", "ABCDE1234F", "1234 5678 9012", "s3cret", "eyJhbGci", "abc.def", "3f2b8c1e-0c4a"]) expect(s).not.toContain(leaked);
+    for (const leaked of [
+      "9876543210",
+      "ravi.kumar@example.com",
+      "ABCDE1234F",
+      "1234 5678 9012",
+      "s3cret",
+      "eyJhbGci",
+      "abc.def",
+      "3f2b8c1e-0c4a",
+    ])
+      expect(s).not.toContain(leaked);
     expect(s).toContain("customers_company_phone_live_uq");
     expect(s).toContain("<pan>");
     expect(s).toContain("<email>");
@@ -46,9 +57,19 @@ describe("error reporter", () => {
       dedupeSeconds: 60,
       now: () => now,
       version: "2.0.0",
-      fetchImpl: (async (url: string, init: { body: string }) => { posted.push({ url, body: JSON.parse(init.body) }); return new Response("ok"); }) as unknown as typeof fetch,
+      fetchImpl: (async (url: string, init: { body: string }) => {
+        posted.push({ url, body: JSON.parse(init.body) });
+        return new Response("ok");
+      }) as unknown as typeof fetch,
     });
-    const ev = (where: string) => ({ kind: "http" as const, id: "req-1", where, status: 500, errorClass: "TypeError", message: "boom" });
+    const ev = (where: string) => ({
+      kind: "http" as const,
+      id: "req-1",
+      where,
+      status: 500,
+      errorClass: "TypeError",
+      message: "boom",
+    });
     expect(reporter.report(ev("GET /api/v1/a"))).toBe(true);
     expect(reporter.report(ev("GET /api/v1/a"))).toBe(false); // duplicate inside the window
     expect(reporter.report(ev("GET /api/v1/b"))).toBe(true);
@@ -56,7 +77,14 @@ describe("error reporter", () => {
     await Promise.all(reporter.pending);
     expect(posted).toHaveLength(2);
     expect(posted[0]!.body.text).toContain("500 GET /api/v1/a — TypeError: boom (id req-1)");
-    expect(posted[0]!.body.kkt).toMatchObject({ kind: "http", id: "req-1", where: "GET /api/v1/a", status: 500, error_class: "TypeError", version: "2.0.0" });
+    expect(posted[0]!.body.kkt).toMatchObject({
+      kind: "http",
+      id: "req-1",
+      where: "GET /api/v1/a",
+      status: 500,
+      error_class: "TypeError",
+      version: "2.0.0",
+    });
     now += 61_000; // window passed, bucket refilled
     expect(reporter.report(ev("GET /api/v1/a"))).toBe(true);
     await Promise.all(reporter.pending);
@@ -65,22 +93,37 @@ describe("error reporter", () => {
   });
 
   it("never throws when the webhook is down", async () => {
-    const reporter = new ErrorReporter({ url: "https://hooks.example/x", fetchImpl: (async () => { throw new Error("ECONNREFUSED"); }) as unknown as typeof fetch });
-    expect(reporter.report({ kind: "job", id: "run-1", where: "DAILY_DUES", errorClass: "Error", message: "x" })).toBe(true);
+    const reporter = new ErrorReporter({
+      url: "https://hooks.example/x",
+      fetchImpl: (async () => {
+        throw new Error("ECONNREFUSED");
+      }) as unknown as typeof fetch,
+    });
+    expect(reporter.report({ kind: "job", id: "run-1", where: "DAILY_DUES", errorClass: "Error", message: "x" })).toBe(
+      true,
+    );
     await expect(Promise.all(reporter.pending)).resolves.toBeDefined();
   });
 });
 
 describe("deprecation headers (RFC 9745 / RFC 8594)", () => {
   it("emits Deprecation @epoch, Sunset HTTP-date and Link relations", () => {
-    const h = deprecationHeaders({ sunset: "2027-06-30", since: "2026-11-01", replacement: "GET /api/v1/bookings?view=compact" });
+    const h = deprecationHeaders({
+      sunset: "2027-06-30",
+      since: "2026-11-01",
+      replacement: "GET /api/v1/bookings?view=compact",
+    });
     expect(h["Deprecation"]).toBe(`@${Date.UTC(2026, 10, 1) / 1000}`);
     expect(h["Sunset"]).toBe("Wed, 30 Jun 2027 00:00:00 GMT");
-    expect(h["Link"]).toBe('</api/v1/docs>; rel="deprecation"; type="text/html", </api/v1/bookings?view=compact>; rel="successor-version"');
+    expect(h["Link"]).toBe(
+      '</api/v1/docs>; rel="deprecation"; type="text/html", </api/v1/bookings?view=compact>; rel="successor-version"',
+    );
   });
 
   it("defaults `since` to the 180-day window and rejects bad dates", () => {
-    expect(deprecationHeaders({ sunset: "2027-06-30" })["Deprecation"]).toBe(`@${(Date.UTC(2027, 5, 30) - 180 * 86_400_000) / 1000}`);
+    expect(deprecationHeaders({ sunset: "2027-06-30" })["Deprecation"]).toBe(
+      `@${(Date.UTC(2027, 5, 30) - 180 * 86_400_000) / 1000}`,
+    );
     expect(() => deprecationHeaders({ sunset: "someday" })).toThrow(/invalid date/);
     expect(() => deprecationHeaders({ sunset: "2027-01-01", since: "2027-02-01" })).toThrow(/after/);
   });
@@ -88,9 +131,24 @@ describe("deprecation headers (RFC 9745 / RFC 8594)", () => {
 
 describe("boot configuration log", () => {
   it("never contains a secret and strips credentials from URLs", () => {
-    const c = { ...config, DATABASE_URL: "postgres://kkt_app:pa55word@pgbouncer:6432/kkt?sslmode=require", REDIS_URL: "redis://:redispass@redis:6379/0", METRICS_TOKEN: "metrics-secret-0123456789", ERROR_WEBHOOK_URL: "https://hooks.slack.com/services/T000/B000/XXXX" };
+    const c = {
+      ...config,
+      DATABASE_URL: "postgres://kkt_app:pa55word@pgbouncer:6432/kkt?sslmode=require",
+      REDIS_URL: "redis://:redispass@redis:6379/0",
+      METRICS_TOKEN: "metrics-secret-0123456789",
+      ERROR_WEBHOOK_URL: "https://hooks.slack.com/services/T000/B000/XXXX",
+    };
     const text = JSON.stringify(effectiveConfig(c, { role: "single", workers: 1 }));
-    for (const secret of ["pa55word", "redispass", "metrics-secret", "XXXX", config.JWT_SECRET, config.HASH_KEY, config.FIELD_ENCRYPTION_KEY]) expect(text).not.toContain(secret);
+    for (const secret of [
+      "pa55word",
+      "redispass",
+      "metrics-secret",
+      "XXXX",
+      config.JWT_SECRET,
+      config.HASH_KEY,
+      config.FIELD_ENCRYPTION_KEY,
+    ])
+      expect(text).not.toContain(secret);
     expect(text).toContain('"database":"postgres://pgbouncer:6432/kkt"');
     expect(text).toContain('"metrics_token":"set"');
     expect(redactUrl("not a url")).toBe("<invalid>");
@@ -100,7 +158,14 @@ describe("boot configuration log", () => {
 describe("metrics listener (METRICS_PORT)", () => {
   it("serves the rendered text, requires the bearer when a token is set, 404s other paths", async () => {
     const log = { info: () => undefined, warn: () => undefined };
-    const server = await startMetricsServer({ port: 0, host: "127.0.0.1", render: async () => "up 1\n", contentType: "text/plain; version=0.0.4", token: "metrics-token-0123456789", log });
+    const server = await startMetricsServer({
+      port: 0,
+      host: "127.0.0.1",
+      render: async () => "up 1\n",
+      contentType: "text/plain; version=0.0.4",
+      token: "metrics-token-0123456789",
+      log,
+    });
     expect(server).not.toBeNull();
     const port = (server!.address() as { port: number }).port;
     try {
@@ -109,10 +174,18 @@ describe("metrics listener (METRICS_PORT)", () => {
       const ok = await fetch(`${base}/metrics`, { headers: { authorization: "Bearer metrics-token-0123456789" } });
       expect(ok.status).toBe(200);
       expect(await ok.text()).toBe("up 1\n");
-      expect((await fetch(`${base}/other`, { headers: { authorization: "Bearer metrics-token-0123456789" } })).status).toBe(404);
+      expect(
+        (await fetch(`${base}/other`, { headers: { authorization: "Bearer metrics-token-0123456789" } })).status,
+      ).toBe(404);
       // a taken port is logged, not fatal
       const warned: unknown[] = [];
-      const second = await startMetricsServer({ port, host: "127.0.0.1", render: async () => "", contentType: "text/plain", log: { info: () => undefined, warn: (o) => warned.push(o) } });
+      const second = await startMetricsServer({
+        port,
+        host: "127.0.0.1",
+        render: async () => "",
+        contentType: "text/plain",
+        log: { info: () => undefined, warn: (o) => warned.push(o) },
+      });
       expect(second).toBeNull();
       expect(warned).toHaveLength(1);
     } finally {

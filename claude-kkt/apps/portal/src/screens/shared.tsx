@@ -51,7 +51,13 @@ export function useFileActions() {
 }
 
 /** Renders children only when a booking is selected; otherwise loading / empty / error states. */
-export function BookingGate({ children, title }: { children: (bookingId: string) => ReactNode; title: string }): React.JSX.Element {
+export function BookingGate({
+  children,
+  title,
+}: {
+  children: (bookingId: string) => ReactNode;
+  title: string;
+}): React.JSX.Element {
   const booking = useBooking();
   const router = useRouter();
   if (booking.bookingId) return <>{children(booking.bookingId)}</>;
@@ -67,7 +73,13 @@ export function BookingGate({ children, title }: { children: (bookingId: string)
         ) : booking.isError ? (
           <ErrorState error={new Error("We couldn't load your bookings.")} onRetry={() => void booking.refetch()} />
         ) : (
-          <EmptyState icon="flat" title="No booking on your name yet" body="Once your booking is confirmed by our team, your flat, payments and documents will appear here." action="Contact us" onAction={() => router.navigate("/more/requests/new")} />
+          <EmptyState
+            icon="flat"
+            title="No booking on your name yet"
+            body="Once your booking is confirmed by our team, your flat, payments and documents will appear here."
+            action="Contact us"
+            onAction={() => router.navigate("/more/requests/new")}
+          />
         )}
       </Screen>
     </>
@@ -75,7 +87,19 @@ export function BookingGate({ children, title }: { children: (bookingId: string)
 }
 
 /** Header for tab roots: title, booking chip and bell. */
-export function TabHeader({ title, subtitle, tone = "ivory", children, back }: { title: string; subtitle?: string; tone?: "ivory" | "navy"; children?: ReactNode; back?: boolean }): React.JSX.Element {
+export function TabHeader({
+  title,
+  subtitle,
+  tone = "ivory",
+  children,
+  back,
+}: {
+  title: string;
+  subtitle?: string;
+  tone?: "ivory" | "navy";
+  children?: ReactNode;
+  back?: boolean;
+}): React.JSX.Element {
   return (
     <Header
       title={title}
@@ -100,15 +124,41 @@ export function FooterActions({ children }: { children: ReactNode }): React.JSX.
   return <View style={styles.footer}>{children}</View>;
 }
 
-export function PdfButtons({ keyBase, fetchLink, actions, compact }: { keyBase: string; fetchLink: PdfLinkFn; actions: ReturnType<typeof useFileActions>; compact?: boolean }): React.JSX.Element {
+export function PdfButtons({
+  keyBase,
+  fetchLink,
+  actions,
+  compact,
+}: {
+  keyBase: string;
+  fetchLink: PdfLinkFn;
+  actions: ReturnType<typeof useFileActions>;
+  compact?: boolean;
+}): React.JSX.Element {
   const busy = actions.busyKey?.startsWith(keyBase) ?? false;
   const { isPhone } = useLayout();
   // These are the primary actions of a receipt / demand / document row: full 46 px buttons on phones, compact on wider screens.
   const size = isPhone ? "md" : "sm";
   return (
     <View style={styles.pdfRow}>
-      <Button title="View" variant="outline" size={size} icon="external" loading={busy && actions.busyKey === `${keyBase}:view`} disabled={busy} onPress={() => actions.view(`${keyBase}:view`, fetchLink)} />
-      <Button title={compact ? "Save" : Platform.OS === "web" ? "Download" : "Share"} variant="ghost" size={size} icon={Platform.OS === "web" ? "download" : "share"} loading={busy && actions.busyKey === `${keyBase}:dl`} disabled={busy} onPress={() => actions.download(`${keyBase}:dl`, fetchLink)} />
+      <Button
+        title="View"
+        variant="outline"
+        size={size}
+        icon="external"
+        loading={busy && actions.busyKey === `${keyBase}:view`}
+        disabled={busy}
+        onPress={() => actions.view(`${keyBase}:view`, fetchLink)}
+      />
+      <Button
+        title={compact ? "Save" : Platform.OS === "web" ? "Download" : "Share"}
+        variant="ghost"
+        size={size}
+        icon={Platform.OS === "web" ? "download" : "share"}
+        loading={busy && actions.busyKey === `${keyBase}:dl`}
+        disabled={busy}
+        onPress={() => actions.download(`${keyBase}:dl`, fetchLink)}
+      />
     </View>
   );
 }

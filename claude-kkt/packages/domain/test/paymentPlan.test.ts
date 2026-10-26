@@ -32,7 +32,9 @@ describe("validatePlan", () => {
       { seq: 3, name: "c", percent: 99.7, triggerType: "DAYS_AFTER_BOOKING", triggerDays: 30 },
     ]);
     expect(floaty.ok).toBe(true);
-    expect(validatePlan([{ seq: 1, name: "a", percent: "33.333", triggerType: "ON_BOOKING" }]).errors.map((e) => e.code)).toContain("INVALID_PERCENT");
+    expect(
+      validatePlan([{ seq: 1, name: "a", percent: "33.333", triggerType: "ON_BOOKING" }]).errors.map((e) => e.code),
+    ).toContain("INVALID_PERCENT");
   });
   it("reports structural errors", () => {
     const result = validatePlan([
@@ -75,9 +77,11 @@ describe("missingStagesForTower", () => {
   it("lists stages the tower lacks, unique, in plan order", () => {
     expect(missingStagesForTower(clp, ["st-foundation", "st-plinth"])).toEqual([]);
     expect(missingStagesForTower(clp, ["st-foundation"])).toEqual(["st-plinth"]);
-    expect(missingStagesForTower([...clp, { seq: 7, name: "x", percent: 1, triggerType: "ON_STAGE", triggerStageId: "st-plinth" }], [])).toEqual([
-      "st-foundation",
-      "st-plinth",
-    ]);
+    expect(
+      missingStagesForTower(
+        [...clp, { seq: 7, name: "x", percent: 1, triggerType: "ON_STAGE", triggerStageId: "st-plinth" }],
+        [],
+      ),
+    ).toEqual(["st-foundation", "st-plinth"]);
   });
 });

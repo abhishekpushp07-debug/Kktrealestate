@@ -9,7 +9,10 @@ export async function generateMetadata(): Promise<Metadata> {
   const page = await findPage("disclaimer");
   return pageMetadata({
     title: page?.seo?.title?.trim() || page?.title || "Disclaimer",
-    description: page?.seo?.description?.trim() || markdownToText(page?.body_md) || "Important information about the content of this website and RERA.",
+    description:
+      page?.seo?.description?.trim() ||
+      markdownToText(page?.body_md) ||
+      "Important information about the content of this website and RERA.",
     path: "/disclaimer",
   });
 }

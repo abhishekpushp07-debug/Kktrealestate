@@ -7,7 +7,9 @@ describe("slaDueAt", () => {
     expect(slaDueAt("2026-10-24T06:00:00Z", "HIGH")).toBe("2026-10-25T06:00:00.000Z");
     expect(slaDueAt("2026-10-24T06:00:00Z", "MEDIUM")).toBe("2026-10-26T06:00:00.000Z");
     expect(slaDueAt("2026-10-24T06:00:00Z", "LOW")).toBe("2026-10-27T06:00:00.000Z");
-    expect(slaDueAt("2026-10-24T06:00:00Z", "LOW", { LOW: 1, MEDIUM: 1, HIGH: 1, URGENT: 0.5 })).toBe("2026-10-24T07:00:00.000Z");
+    expect(slaDueAt("2026-10-24T06:00:00Z", "LOW", { LOW: 1, MEDIUM: 1, HIGH: 1, URGENT: 0.5 })).toBe(
+      "2026-10-24T07:00:00.000Z",
+    );
     expect(() => slaDueAt("garbage", "LOW")).toThrow();
     expect(() => slaDueAt("2026-10-24T06:00:00Z", "LOW", { LOW: -1, MEDIUM: 1, HIGH: 1, URGENT: 1 })).toThrow();
   });

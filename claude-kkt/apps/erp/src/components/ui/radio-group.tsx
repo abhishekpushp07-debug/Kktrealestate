@@ -9,8 +9,10 @@ export interface RadioOption<V extends string = string> {
   disabled?: boolean;
 }
 
-export interface RadioGroupProps<V extends string = string>
-  extends Omit<ComponentProps<typeof RadioPrimitive.Root>, "value" | "onValueChange" | "defaultValue"> {
+export interface RadioGroupProps<V extends string = string> extends Omit<
+  ComponentProps<typeof RadioPrimitive.Root>,
+  "value" | "onValueChange" | "defaultValue"
+> {
   value?: V | null;
   defaultValue?: V;
   onValueChange?: (value: V) => void;
@@ -48,7 +50,8 @@ export function RadioGroup<V extends string = string>({
             htmlFor={id}
             className={cn(
               "flex cursor-pointer items-start gap-2 text-sm",
-              cards && "rounded-md border border-border bg-card px-3 py-2 transition-colors hover:border-navy-300 has-[[data-state=checked]]:border-navy-950 has-[[data-state=checked]]:bg-navy-50",
+              cards &&
+                "rounded-md border border-border bg-card px-3 py-2 transition-colors hover:border-navy-300 has-[[data-state=checked]]:border-navy-950 has-[[data-state=checked]]:bg-navy-50",
               option.disabled && "cursor-not-allowed opacity-60",
             )}
           >

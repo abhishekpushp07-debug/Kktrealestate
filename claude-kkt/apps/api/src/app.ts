@@ -38,7 +38,10 @@ import telemetryPlugin from "./plugins/telemetry.js";
 class UnavailableError extends Error {
   readonly statusCode = 503;
   readonly code = "SERVICE_UNAVAILABLE";
-  constructor() { super("Service under pressure, retry shortly"); this.name = "UnavailableError"; }
+  constructor() {
+    super("Service under pressure, retry shortly");
+    this.name = "UnavailableError";
+  }
 }
 
 /** Options for buildApp. */
@@ -56,35 +59,53 @@ export interface BuildAppOptions {
 
 /** A stand-in for a database/Redis client in an offline app: any call throws, property chains are allowed (registration-time wiring). */
 function offlineStub(what: string): unknown {
-  const fail = () => { throw new Error(`${what} is not available in an offline app (buildApp({ offline: true }))`); };
+  const fail = () => {
+    throw new Error(`${what} is not available in an offline app (buildApp({ offline: true }))`);
+  };
   const handler: ProxyHandler<() => void> = {
     // `then` (not a promise), `getter`/`setter` (Fastify's decorate() would treat the stub as an accessor pair)
-    get: (_t, prop) => (prop === "then" || prop === "getter" || prop === "setter" ? undefined : prop === Symbol.toPrimitive ? () => `[offline ${what}]` : new Proxy(fail, handler)),
+    get: (_t, prop) =>
+      prop === "then" || prop === "getter" || prop === "setter"
+        ? undefined
+        : prop === Symbol.toPrimitive
+          ? () => `[offline ${what}]`
+          : new Proxy(fail, handler),
     apply: fail,
   };
   return new Proxy(fail, handler);
 }
 
-const offlineDbPlugin = fp(async (app) => {
-  app.decorate("db", offlineStub("database") as FastifyInstance["db"]);
-  app.decorate("sql", offlineStub("database") as FastifyInstance["sql"]);
-  app.decorate("dbReplica", offlineStub("database") as FastifyInstance["dbReplica"]);
-}, { name: "db" });
-const offlineRedisPlugin = fp(async (app) => {
-  app.decorate("redis", offlineStub("redis") as FastifyInstance["redis"]);
-}, { name: "redis" });
+const offlineDbPlugin = fp(
+  async (app) => {
+    app.decorate("db", offlineStub("database") as FastifyInstance["db"]);
+    app.decorate("sql", offlineStub("database") as FastifyInstance["sql"]);
+    app.decorate("dbReplica", offlineStub("database") as FastifyInstance["dbReplica"]);
+  },
+  { name: "db" },
+);
+const offlineRedisPlugin = fp(
+  async (app) => {
+    app.decorate("redis", offlineStub("redis") as FastifyInstance["redis"]);
+  },
+  { name: "redis" },
+);
 
 /**
  * Content-Security-Policy of API responses: JSON, files and media never need to run anything, so everything is denied and the API cannot
  * be framed. The Swagger UI pages (/api/v1/docs) get a policy that allows exactly their own scripts and styles.
  */
 const API_CSP = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
-const DOCS_CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://validator.swagger.io; connect-src 'self'; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'";
+const DOCS_CSP =
+  "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://validator.swagger.io; connect-src 'self'; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'";
 
 /** Builds the fully configured Fastify application (plugins, modules under /api/v1, error envelope). Does not listen. */
 export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({
-    ...(opts.logger === false ? { logger: false } : opts.logger === true || opts.logger === undefined ? { loggerInstance: logger } : { loggerInstance: opts.logger }),
+    ...(opts.logger === false
+      ? { logger: false }
+      : opts.logger === true || opts.logger === undefined
+        ? { loggerInstance: logger }
+        : { loggerInstance: opts.logger }),
     // trace_id/span_id on every log line (request, module and job loggers) come from the logger's mixin (lib/logger.ts)
     genReqId: (req) => genReqId(req.headers),
     bodyLimit: 2 * 1024 * 1024,
@@ -118,7 +139,22 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
     allowedHeaders: ["Authorization", "Content-Type", "Idempotency-Key", "If-Match", "If-None-Match", "X-Request-Id"],
     // Deprecation/Sunset/Link (docs/VERSIONING.md) and X-Trace-Id must be readable by cross-origin browser clients too (dev servers)
     // X-Export-* (lib/list.ts): CSV row counts / truncation, so the ERP can offer POST /exports when a download was cut
-    exposedHeaders: ["X-Request-Id", "Idempotent-Replayed", "Retry-After", "ETag", "X-Response-Time", "X-Trace-Id", "Deprecation", "Sunset", "Link", "X-Export-Total", "X-Export-Rows", "X-Export-Truncated", "X-Export-Next-Cursor", "Content-Disposition"],
+    exposedHeaders: [
+      "X-Request-Id",
+      "Idempotent-Replayed",
+      "Retry-After",
+      "ETag",
+      "X-Response-Time",
+      "X-Trace-Id",
+      "Deprecation",
+      "Sunset",
+      "Link",
+      "X-Export-Total",
+      "X-Export-Rows",
+      "X-Export-Truncated",
+      "X-Export-Next-Cursor",
+      "Content-Disposition",
+    ],
     maxAge: 600,
   });
   await app.register(compress, { global: true, threshold: 1024, encodings: ["br", "gzip", "deflate"] });
@@ -137,15 +173,38 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
   await app.register(swagger, {
     openapi: {
       openapi: "3.1.0",
-      info: { title: "KKT API", version: config.APP_VERSION, description: "One backend, three front doors: ERP (staff), customer portal, marketing website." },
+      info: {
+        title: "KKT API",
+        version: config.APP_VERSION,
+        description: "One backend, three front doors: ERP (staff), customer portal, marketing website.",
+      },
       servers: [{ url: config.API_PUBLIC_URL }],
-      components: { securitySchemes: { bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT", description: "Staff access token (aud=erp)" }, portalBearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT", description: "Customer access token (aud=portal)" } } },
+      components: {
+        securitySchemes: {
+          bearerAuth: {
+            type: "http",
+            scheme: "bearer",
+            bearerFormat: "JWT",
+            description: "Staff access token (aud=erp)",
+          },
+          portalBearerAuth: {
+            type: "http",
+            scheme: "bearer",
+            bearerFormat: "JWT",
+            description: "Customer access token (aud=portal)",
+          },
+        },
+      },
     },
     transform: jsonSchemaTransform,
   });
   // staticCSP off: the docs pages get DOCS_CSP from the onSend hook above (swagger-ui's own policy forced upgrade-insecure-requests and
   // blocked its inline styles)
-  await app.register(swaggerUi, { routePrefix: "/api/v1/docs", staticCSP: false, uiConfig: { docExpansion: "list", persistAuthorization: true } });
+  await app.register(swaggerUi, {
+    routePrefix: "/api/v1/docs",
+    staticCSP: false,
+    uiConfig: { docExpansion: "list", persistAuthorization: true },
+  });
 
   if (opts.offline) {
     await app.register(offlineDbPlugin);
@@ -153,7 +212,10 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
   } else {
     await app.register(dbPlugin);
     await app.register(redisPlugin);
-    dbPoolMax.set(config.DATABASE_POOL_MAX + (config.DATABASE_REPLICA_URL ? Math.max(2, Math.floor(config.DATABASE_POOL_MAX / 2)) : 0));
+    dbPoolMax.set(
+      config.DATABASE_POOL_MAX +
+        (config.DATABASE_REPLICA_URL ? Math.max(2, Math.floor(config.DATABASE_POOL_MAX / 2)) : 0),
+    );
   }
   await app.register(requestContextPlugin);
   // telemetry before auth: RED metrics for every request, and a METRICS_TOKEN scrape is answered before staff authentication runs
@@ -164,16 +226,19 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
   await app.register(idempotencyPlugin);
 
   await systemModule(app);
-  await app.register(async (api) => {
-    await authModule(api);
-    await usersModule(api);
-    await rolesModule(api);
-    await mastersModule(api);
-    await notificationsModule(api);
-    await searchModule(api);
-    await auditModule(api);
-    if (opts.extraRoutes) await opts.extraRoutes(api);
-  }, { prefix: "/api/v1" });
+  await app.register(
+    async (api) => {
+      await authModule(api);
+      await usersModule(api);
+      await rolesModule(api);
+      await mastersModule(api);
+      await notificationsModule(api);
+      await searchModule(api);
+      await auditModule(api);
+      if (opts.extraRoutes) await opts.extraRoutes(api);
+    },
+    { prefix: "/api/v1" },
+  );
   // Business modules (inventory, crm, money, …) live in src/modules/<name>/index.ts and are auto-discovered;
   // KKT_MODULES=a,b restricts the set (used by per-module test runs).
   await registerDiscoveredModules(app, "/api/v1");

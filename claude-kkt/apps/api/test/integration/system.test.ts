@@ -2,12 +2,22 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildTestApp, type TestContext } from "./helpers.js";
 
 let t: TestContext;
-beforeAll(async () => { t = await buildTestApp(); });
-afterAll(async () => { await t?.close(); });
+beforeAll(async () => {
+  t = await buildTestApp();
+});
+afterAll(async () => {
+  await t?.close();
+});
 
 describe("system", () => {
   it("health reports dependency pings and version", async () => {
-    const r = await t.request<{ status: string; checks: Record<string, boolean>; db_ping_ms: number; version: string; uptime_seconds: number }>("GET", "/health");
+    const r = await t.request<{
+      status: string;
+      checks: Record<string, boolean>;
+      db_ping_ms: number;
+      version: string;
+      uptime_seconds: number;
+    }>("GET", "/health");
     expect(r.status).toBe(200);
     expect(r.body.status).toBe("ok");
     expect(r.body.checks).toEqual({ database: true, redis: true, storage: true });
@@ -22,7 +32,10 @@ describe("system", () => {
   });
 
   it("openapi document lists every registered route and docs are public", async () => {
-    const r = await t.request<{ openapi: string; paths: Record<string, Record<string, unknown>> }>("GET", "/api/v1/openapi.json");
+    const r = await t.request<{ openapi: string; paths: Record<string, Record<string, unknown>> }>(
+      "GET",
+      "/api/v1/openapi.json",
+    );
     expect(r.status).toBe(200);
     expect(r.body.openapi).toMatch(/^3\./);
     const paths = r.body.paths;
@@ -44,7 +57,7 @@ describe("system", () => {
     const m = await t.request("GET", "/metrics", { token: admin.access_token });
     expect(m.status).toBe(200);
     expect(String(m.headers["content-type"])).toContain("text/plain");
-    expect(m.text).toContain("http_requests_total{route=\"/api/v1/auth/me\",method=\"GET\",status=\"200\"}");
+    expect(m.text).toContain('http_requests_total{route="/api/v1/auth/me",method="GET",status="200"}');
     expect(m.text).toContain("http_request_duration_seconds_bucket");
     expect(m.text).toMatch(/le="0\.05"/);
     const sales = await t.loginAs("sales");
@@ -62,8 +75,16 @@ describe("system", () => {
 
   it("route registry endpoint needs admin.tools", async () => {
     const admin = await t.loginAs("admin");
-    const r = await t.request<{ items: { method: string; url: string; permission: string | null }[] }>("GET", "/api/v1/system/routes", { token: admin.access_token });
+    const r = await t.request<{ items: { method: string; url: string; permission: string | null }[] }>(
+      "GET",
+      "/api/v1/system/routes",
+      { token: admin.access_token },
+    );
     expect(r.status).toBe(200);
-    expect(r.body.items.some((i) => i.url === "/api/v1/masters/room-types" && i.method === "POST" && i.permission === "master.write")).toBe(true);
+    expect(
+      r.body.items.some(
+        (i) => i.url === "/api/v1/masters/room-types" && i.method === "POST" && i.permission === "master.write",
+      ),
+    ).toBe(true);
   });
 });

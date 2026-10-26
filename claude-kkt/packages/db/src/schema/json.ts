@@ -1,12 +1,6 @@
 // TypeScript shapes for jsonb columns. These mirror the Zod schemas in
 // @kkt/contracts (which validate on the wire); the database stores them whole.
-import type {
-  ChargeDemandAt,
-  PaymentBucket,
-  PlanType,
-  ServicePriority,
-  TriggerType,
-} from "@kkt/contracts";
+import type { ChargeDemandAt, PaymentBucket, PlanType, ServicePriority, TriggerType } from "@kkt/contracts";
 
 export interface Address {
   line1: string;

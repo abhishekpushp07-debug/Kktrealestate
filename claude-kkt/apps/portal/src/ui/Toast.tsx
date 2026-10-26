@@ -33,7 +33,10 @@ export function ToastProvider({ children }: { children: ReactNode }): React.JSX.
     if (tone === "success") haptics.success();
     if (tone === "error") haptics.error();
   }, []);
-  const api = useMemo<ToastApi>(() => ({ show, success: (t) => show(t, "success"), error: (t) => show(t, "error") }), [show]);
+  const api = useMemo<ToastApi>(
+    () => ({ show, success: (t) => show(t, "success"), error: (t) => show(t, "error") }),
+    [show],
+  );
   return (
     <ToastContext.Provider value={api}>
       {children}
@@ -44,21 +47,31 @@ export function ToastProvider({ children }: { children: ReactNode }): React.JSX.
 
 function ToastHost({ toast, onDone }: { toast: ToastMsg | null; onDone: () => void }): React.JSX.Element | null {
   const insets = useSafeAreaInsets();
-  const opacity = useRef(new Animated.Value(0)).current;
+  const [opacity] = useState(() => new Animated.Value(0));
   useEffect(() => {
     if (!toast) return;
     announce(toast.text);
     opacity.setValue(0);
     Animated.timing(opacity, { toValue: 1, duration: 180, useNativeDriver: NATIVE_DRIVER }).start();
-    const t = setTimeout(() => Animated.timing(opacity, { toValue: 0, duration: 220, useNativeDriver: NATIVE_DRIVER }).start(onDone), 3200);
+    const t = setTimeout(
+      () => Animated.timing(opacity, { toValue: 0, duration: 220, useNativeDriver: NATIVE_DRIVER }).start(onDone),
+      3200,
+    );
     return () => clearTimeout(t);
   }, [toast, opacity, onDone]);
   if (!toast) return null;
   const bg = toast.tone === "success" ? colors.success : toast.tone === "error" ? colors.danger : colors.navy;
   return (
     <View pointerEvents="none" style={[styles.host, { top: Math.max(insets.top, Platform.OS === "web" ? 16 : 8) + 8 }]}>
-      <Animated.View style={[styles.toast, shadow.raised, { backgroundColor: bg, opacity }]} {...(toast.tone === "error" ? alertRegion : statusRegion)}>
-        <Icon name={toast.tone === "success" ? "check" : toast.tone === "error" ? "warning" : "info"} size={18} color={colors.onNavy} />
+      <Animated.View
+        style={[styles.toast, shadow.raised, { backgroundColor: bg, opacity }]}
+        {...(toast.tone === "error" ? alertRegion : statusRegion)}
+      >
+        <Icon
+          name={toast.tone === "success" ? "check" : toast.tone === "error" ? "warning" : "info"}
+          size={18}
+          color={colors.onNavy}
+        />
         <T variant="small" color={colors.onNavy} style={{ flex: 1 }}>
           {toast.text}
         </T>
@@ -75,5 +88,14 @@ export function useToast(): ToastApi {
 
 const styles = StyleSheet.create({
   host: { position: "absolute", left: 0, right: 0, alignItems: "center", paddingHorizontal: space.lg, zIndex: 100 },
-  toast: { flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: space.lg, paddingVertical: 12, borderRadius: radius.pill, maxWidth: 480, width: "100%" },
+  toast: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.sm,
+    paddingHorizontal: space.lg,
+    paddingVertical: 12,
+    borderRadius: radius.pill,
+    maxWidth: 480,
+    width: "100%",
+  },
 });

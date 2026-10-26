@@ -30,7 +30,8 @@ const LABEL = process.env["LABEL"] ?? "";
 const FILTER = process.env["SCENARIOS"] ? new RegExp(process.env["SCENARIOS"], "i") : null;
 const EMAIL = process.env["LT_EMAIL"] ?? "admin@sgb.in";
 const PASSWORD = process.env["LT_PASSWORD"] ?? "Admin@12345";
-const OUT = process.env["OUT"] ?? join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "docs", "PERFORMANCE.md");
+const OUT =
+  process.env["OUT"] ?? join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "docs", "PERFORMANCE.md");
 /** Amount of each load-test payment (₹100). */
 const PAYMENT_PAISE = 100_00;
 
@@ -69,9 +70,18 @@ function percentile(sorted: number[], p: number): number {
 }
 
 async function run(s: Scenario, token: string): Promise<ScenarioResult> {
-  const headers: Record<string, string> = { authorization: `Bearer ${token}`, "content-type": "application/json", ...(s.headers ?? {}) };
+  const headers: Record<string, string> = {
+    authorization: `Bearer ${token}`,
+    "content-type": "application/json",
+    ...(s.headers ?? {}),
+  };
   const body = s.body !== undefined ? JSON.stringify(s.body) : undefined;
-  const base: RequestData = { method: s.method ?? "GET", path: `/api/v1${s.path}`, headers, ...(body !== undefined ? { body } : {}) };
+  const base: RequestData = {
+    method: s.method ?? "GET",
+    path: `/api/v1${s.path}`,
+    headers,
+    ...(body !== undefined ? { body } : {}),
+  };
   const latencies: number[] = [];
   const okLatencies: number[] = [];
   const status: Record<string, number> = {};
@@ -81,12 +91,19 @@ async function run(s: Scenario, token: string): Promise<ScenarioResult> {
     duration: DURATION,
     timeout: 30,
     title: s.name,
-    requests: [{
-      ...base,
-      ...(s.uniqueIdempotencyKey
-        ? { setupRequest: (req: RequestData): RequestData => ({ ...req, headers: { ...(req.headers ?? {}), "idempotency-key": randomUUID() } }) }
-        : {}),
-    }],
+    requests: [
+      {
+        ...base,
+        ...(s.uniqueIdempotencyKey
+          ? {
+              setupRequest: (req: RequestData): RequestData => ({
+                ...req,
+                headers: { ...(req.headers ?? {}), "idempotency-key": randomUUID() },
+              }),
+            }
+          : {}),
+      },
+    ],
   });
   instance.on("response", (_client, statusCode, _bytes, responseTime) => {
     latencies.push(responseTime);
@@ -97,7 +114,12 @@ async function run(s: Scenario, token: string): Promise<ScenarioResult> {
   const result = await instance;
   latencies.sort((a, b) => a - b);
   okLatencies.sort((a, b) => a - b);
-  const ok = { count: okLatencies.length, p50: percentile(okLatencies, 50), p95: percentile(okLatencies, 95), p99: percentile(okLatencies, 99) };
+  const ok = {
+    count: okLatencies.length,
+    p50: percentile(okLatencies, 50),
+    p95: percentile(okLatencies, 95),
+    p99: percentile(okLatencies, 99),
+  };
   return { scenario: s, result, p95: percentile(latencies, 95), samples: latencies.length, status, ok };
 }
 
@@ -107,26 +129,50 @@ function isOk(code: string, s: Scenario): boolean {
 }
 
 function fmtStatus(status: Record<string, number>, s: Scenario): string {
-  const bad = Object.entries(status).filter(([code]) => !isOk(code, s)).sort(([a], [b]) => a.localeCompare(b));
+  const bad = Object.entries(status)
+    .filter(([code]) => !isOk(code, s))
+    .sort(([a], [b]) => a.localeCompare(b));
   return bad.length === 0 ? "" : bad.map(([code, n]) => `${code}×${n}`).join(" ");
 }
 
 /** Failed responses: everything that is not a success status, plus socket errors and timeouts. */
 function failures(r: ScenarioResult): number {
-  const badStatuses = Object.entries(r.status).filter(([code]) => !isOk(code, r.scenario)).reduce((n, [, c]) => n + c, 0);
+  const badStatuses = Object.entries(r.status)
+    .filter(([code]) => !isOk(code, r.scenario))
+    .reduce((n, [, c]) => n + c, 0);
   return badStatuses + r.result.errors + r.result.timeouts;
 }
 
 function row(r: ScenarioResult): string {
   const { result, scenario } = r;
   const conns = scenario.connections ?? CONNECTIONS;
-  const shed = failures(r) > 0 && r.ok.count > 0 ? `admitted ${r.ok.count} = ${(r.ok.count / result.duration).toFixed(0)} rps @ p50 ${r.ok.p50.toFixed(0)} / p95 ${r.ok.p95.toFixed(0)} / p99 ${r.ok.p99.toFixed(0)} ms` : "";
-  const detail = [fmtStatus(r.status, scenario), result.errors ? `err×${result.errors}` : "", result.timeouts ? `timeout×${result.timeouts}` : "", shed].filter(Boolean).join("; ");
+  const shed =
+    failures(r) > 0 && r.ok.count > 0
+      ? `admitted ${r.ok.count} = ${(r.ok.count / result.duration).toFixed(0)} rps @ p50 ${r.ok.p50.toFixed(0)} / p95 ${r.ok.p95.toFixed(0)} / p99 ${r.ok.p99.toFixed(0)} ms`
+      : "";
+  const detail = [
+    fmtStatus(r.status, scenario),
+    result.errors ? `err×${result.errors}` : "",
+    result.timeouts ? `timeout×${result.timeouts}` : "",
+    shed,
+  ]
+    .filter(Boolean)
+    .join("; ");
   return `| ${scenario.name} | ${conns} | ${result.requests.total} | ${failures(r)}${detail ? ` (${detail})` : ""} | ${result.latency.p50} | ${r.p95.toFixed(1)} | ${result.latency.p97_5} | ${result.latency.p99} | ${result.requests.average.toFixed(0)} |`;
 }
 
-interface BookingRow { id: string; booking_number: string; status: string; summary: { cash: { agreed_paise: number; paid_paise: number; pending_paise: number } } }
-interface PaymentMode { id: string; name: string; clears_immediately: boolean; requires_instrument: boolean }
+interface BookingRow {
+  id: string;
+  booking_number: string;
+  status: string;
+  summary: { cash: { agreed_paise: number; paid_paise: number; pending_paise: number } };
+}
+interface PaymentMode {
+  id: string;
+  name: string;
+  clears_immediately: boolean;
+  requires_instrument: boolean;
+}
 
 /** Picks the ACTIVE booking with the most cash headroom so thousands of ₹100 payments never hit the bucket cap (a business rule, kept). */
 function pickPaymentTarget(items: BookingRow[]): { booking: BookingRow; headroomPaise: number } | null {
@@ -140,7 +186,12 @@ function pickPaymentTarget(items: BookingRow[]): { booking: BookingRow; headroom
 }
 
 function todayIst(): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 }
 
 /**
@@ -153,27 +204,42 @@ async function settle(token: string): Promise<void> {
   let streak = 0;
   while (streak < 3) {
     const t0 = performance.now();
-    const ok = await fetch(`${API}/auth/me`, { headers: { authorization: `Bearer ${token}` } }).then((r) => r.ok).catch(() => false);
+    const ok = await fetch(`${API}/auth/me`, { headers: { authorization: `Bearer ${token}` } })
+      .then((r) => r.ok)
+      .catch(() => false);
     streak = ok && performance.now() - t0 < SETTLE_MS ? streak + 1 : 0;
     if (streak < 3) {
-      if (Date.now() > deadline) { console.log("(server did not settle within 120 s; continuing)"); return; }
+      if (Date.now() > deadline) {
+        console.log("(server did not settle within 120 s; continuing)");
+        return;
+      }
       await new Promise((r) => setTimeout(r, 1000));
     }
   }
 }
 
 async function main(): Promise<void> {
-  const login = await json<{ access_token: string }>(`${API}/auth/login`, { method: "POST", body: JSON.stringify({ email: EMAIL, password: PASSWORD }) });
+  const login = await json<{ access_token: string }>(`${API}/auth/login`, {
+    method: "POST",
+    body: JSON.stringify({ email: EMAIL, password: PASSWORD }),
+  });
   const token = login.access_token;
   const auth = { authorization: `Bearer ${token}` };
-  const projects = await json<{ items: { id: string; slug?: string | null }[] }>(`${API}/projects?page_size=1`, { headers: auth });
+  const projects = await json<{ items: { id: string; slug?: string | null }[] }>(`${API}/projects?page_size=1`, {
+    headers: auth,
+  });
   const projectId = projects.items[0]?.id;
-  const blocks = projectId ? await json<{ items: { id: string }[] }>(`${API}/blocks?project_id=${projectId}&page_size=1`, { headers: auth }) : { items: [] };
+  const blocks = projectId
+    ? await json<{ items: { id: string }[] }>(`${API}/blocks?project_id=${projectId}&page_size=1`, { headers: auth })
+    : { items: [] };
   const blockId = blocks.items[0]?.id;
-  const bookings = await json<{ items: BookingRow[] }>(`${API}/bookings?status=ACTIVE&page_size=100`, { headers: auth });
+  const bookings = await json<{ items: BookingRow[] }>(`${API}/bookings?status=ACTIVE&page_size=100`, {
+    headers: auth,
+  });
   const bookingId = bookings.items[0]?.id;
   const publicProjects = await json<{ items?: { slug: string }[] } | { slug: string }[]>(`${API}/public/projects`);
-  const publicSlug = (Array.isArray(publicProjects) ? publicProjects[0]?.slug : publicProjects.items?.[0]?.slug) ?? null;
+  const publicSlug =
+    (Array.isArray(publicProjects) ? publicProjects[0]?.slug : publicProjects.items?.[0]?.slug) ?? null;
   const bookingsEtag = (await fetch(`${API}/bookings?page_size=25`, { headers: auth })).headers.get("etag");
 
   // write scenario target: an ACTIVE booking with headroom, and a payment mode that clears immediately without an instrument (UPI/Cash)
@@ -182,31 +248,60 @@ async function main(): Promise<void> {
   const mode = modes.items.find((m) => m.clears_immediately && !m.requires_instrument) ?? modes.items[0];
   if (target && mode) {
     const maxPayments = Math.floor(target.headroomPaise / PAYMENT_PAISE);
-    console.log(`write target: ${target.booking.booking_number} (cash headroom ₹${(target.headroomPaise / 100).toLocaleString("en-IN")} → room for ${maxPayments} payments of ₹100 via ${mode.name})`);
+    console.log(
+      `write target: ${target.booking.booking_number} (cash headroom ₹${(target.headroomPaise / 100).toLocaleString("en-IN")} → room for ${maxPayments} payments of ₹100 via ${mode.name})`,
+    );
   } else console.log("write scenario skipped: no ACTIVE booking with cash headroom or no payment mode");
 
   const scenarios: Scenario[] = [
     { name: "GET /auth/me", path: "/auth/me" },
     { name: "GET /projects", path: "/projects?page_size=25" },
-    ...(projectId ? [{ name: "GET /flats (list, filtered)", path: `/flats?project_id=${projectId}&page_size=50` }] : []),
+    ...(projectId
+      ? [{ name: "GET /flats (list, filtered)", path: `/flats?project_id=${projectId}&page_size=50` }]
+      : []),
     ...(blockId ? [{ name: "GET /blocks/:id/grid", path: `/blocks/${blockId}/grid` }] : []),
     { name: "GET /customers (search)", path: "/customers?search=kumar&page_size=25" },
     { name: "GET /bookings (list)", path: "/bookings?page_size=25" },
-    ...(bookingsEtag ? [{ name: "GET /bookings (list, If-None-Match → 304)", path: "/bookings?page_size=25", headers: { "if-none-match": bookingsEtag } }] : []),
-    ...(bookingId ? [{ name: "GET /bookings/:id", path: `/bookings/${bookingId}` }, { name: "GET /bookings/:id/ledger", path: `/bookings/${bookingId}/ledger` }] : []),
+    ...(bookingsEtag
+      ? [
+          {
+            name: "GET /bookings (list, If-None-Match → 304)",
+            path: "/bookings?page_size=25",
+            headers: { "if-none-match": bookingsEtag },
+          },
+        ]
+      : []),
+    ...(bookingId
+      ? [
+          { name: "GET /bookings/:id", path: `/bookings/${bookingId}` },
+          { name: "GET /bookings/:id/ledger", path: `/bookings/${bookingId}/ledger` },
+        ]
+      : []),
     { name: "GET /dashboard", path: "/dashboard" },
     { name: "GET /public/projects (no auth, cached)", path: "/public/projects" },
-    ...(publicSlug ? [{ name: "GET /public/projects/:slug (no auth, cached)", path: `/public/projects/${publicSlug}` }] : []),
+    ...(publicSlug
+      ? [{ name: "GET /public/projects/:slug (no auth, cached)", path: `/public/projects/${publicSlug}` }]
+      : []),
     { name: "GET /search?q=", path: "/search?q=A-1" },
     ...(target && mode
-      ? [{
-        name: `POST /payments (₹100, ${WRITE_CONNECTIONS} conns)`,
-        path: "/payments",
-        method: "POST" as const,
-        connections: WRITE_CONNECTIONS,
-        uniqueIdempotencyKey: true,
-        body: { booking_id: target.booking.id, against: "FLAT_VALUE", bucket: "CASH", amount_paise: PAYMENT_PAISE, payment_date: todayIst(), payment_mode_id: mode.id, remarks: "load test" },
-      }]
+      ? [
+          {
+            name: `POST /payments (₹100, ${WRITE_CONNECTIONS} conns)`,
+            path: "/payments",
+            method: "POST" as const,
+            connections: WRITE_CONNECTIONS,
+            uniqueIdempotencyKey: true,
+            body: {
+              booking_id: target.booking.id,
+              against: "FLAT_VALUE",
+              bucket: "CASH",
+              amount_paise: PAYMENT_PAISE,
+              payment_date: todayIst(),
+              payment_mode_id: mode.id,
+              remarks: "load test",
+            },
+          },
+        ]
       : []),
   ].filter((s) => !FILTER || FILTER.test(s.name));
 
@@ -216,7 +311,9 @@ async function main(): Promise<void> {
     process.stdout.write(`▶ ${s.name} … `);
     const r = await run(s, token);
     results.push(r);
-    console.log(`p50 ${r.result.latency.p50} ms · p95 ${r.p95.toFixed(1)} ms · p99 ${r.result.latency.p99} ms · ${r.result.requests.average.toFixed(0)} rps · failed ${failures(r)} ${fmtStatus(r.status, s)}`);
+    console.log(
+      `p50 ${r.result.latency.p50} ms · p95 ${r.p95.toFixed(1)} ms · p99 ${r.result.latency.p99} ms · ${r.result.requests.average.toFixed(0)} rps · failed ${failures(r)} ${fmtStatus(r.status, s)}`,
+    );
   }
   const table = [
     `### Run ${new Date().toISOString()} — ${CONNECTIONS} connections × ${DURATION}s per scenario${LABEL ? ` — ${LABEL}` : ""}`,
@@ -233,4 +330,7 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

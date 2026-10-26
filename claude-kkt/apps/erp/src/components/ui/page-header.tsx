@@ -21,13 +21,25 @@ export interface PageHeaderProps {
   children?: ReactNode;
 }
 
-export function PageHeader({ title, description, breadcrumbs, actions, backTo, titleAddon, className, children }: PageHeaderProps) {
+export function PageHeader({
+  title,
+  description,
+  breadcrumbs,
+  actions,
+  backTo,
+  titleAddon,
+  className,
+  children,
+}: PageHeaderProps) {
   return (
     <header className={cn("mb-4 flex flex-col gap-3", className)}>
       {(breadcrumbs?.length || backTo) && (
         <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1 text-xs text-ink-subtle">
           {backTo && (
-            <Link to={backTo} className="mr-1 inline-flex min-h-12 items-center gap-1 rounded-xs font-medium text-navy-700 hover:text-navy-950 focus-ring sm:hidden">
+            <Link
+              to={backTo}
+              className="mr-1 inline-flex min-h-12 items-center gap-1 rounded-xs font-medium text-navy-700 hover:text-navy-950 focus-ring sm:hidden"
+            >
               <ArrowLeft className="size-3.5" aria-hidden="true" /> Back
             </Link>
           )}
@@ -60,7 +72,11 @@ export function PageHeader({ title, description, breadcrumbs, actions, backTo, t
           </div>
           {description && <p className="mt-0.5 text-sm text-ink-subtle">{description}</p>}
         </div>
-        {actions && <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto [&>*]:flex-1 sm:[&>*]:flex-none">{actions}</div>}
+        {actions && (
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto [&>*]:flex-1 sm:[&>*]:flex-none">
+            {actions}
+          </div>
+        )}
       </div>
       {children}
     </header>

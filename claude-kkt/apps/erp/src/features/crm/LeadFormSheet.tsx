@@ -1,8 +1,36 @@
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
-import { LEAD_SOURCES, LEAD_SOURCE_LABELS, LeadCreateSchema, LeadUpdateSchema, type FlatTypeRow, type LeadRow } from "@kkt/contracts";
+import {
+  LEAD_SOURCES,
+  LEAD_SOURCE_LABELS,
+  LeadCreateSchema,
+  LeadUpdateSchema,
+  type FlatTypeRow,
+  type LeadRow,
+} from "@kkt/contracts";
 import { z } from "zod";
-import { applyServerErrors, Badge, Button, Checkbox, Combobox, FormError, FormField, FormRow, FormSection, Input, MoneyInput, Select, Sheet, SheetBody, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, Textarea } from "@/components/ui";
+import {
+  applyServerErrors,
+  Badge,
+  Button,
+  Checkbox,
+  Combobox,
+  FormError,
+  FormField,
+  FormRow,
+  FormSection,
+  Input,
+  MoneyInput,
+  Select,
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  Textarea,
+} from "@/components/ui";
 import { api, type ApiClientError } from "@/lib/api";
 import { formatDateTime, instantToIstInput, istInputToInstant } from "@/lib/format";
 import { useMutationWithToast } from "@/lib/queries";
@@ -13,6 +41,7 @@ import { contractResolver } from "@/features/shared/contractResolver";
 import { useProjectOptions } from "@/features/shared/options";
 import { LEADS_PATH, crmKeys } from "./api";
 import { normaliseIndianPhone } from "./verhoeff";
+import { useOnChange } from "@/lib/utils";
 
 export interface LeadValues {
   full_name: string;
@@ -68,7 +97,21 @@ const EditSchema = z
   .pipe(LeadUpdateSchema.omit({ version: true }));
 
 export function defaultLeadValues(seed: Partial<LeadValues> = {}): LeadValues {
-  return { full_name: "", phone: "", email: "", project_id: null, flat_type_id: null, budget_min_paise: null, budget_max_paise: null, source: "WALK_IN", assigned_user_id: null, message: "", next_follow_up_local: "", consent: false, ...seed };
+  return {
+    full_name: "",
+    phone: "",
+    email: "",
+    project_id: null,
+    flat_type_id: null,
+    budget_min_paise: null,
+    budget_max_paise: null,
+    source: "WALK_IN",
+    assigned_user_id: null,
+    message: "",
+    next_follow_up_local: "",
+    consent: false,
+    ...seed,
+  };
 }
 
 export function leadToValues(lead: LeadRow): LeadValues {
@@ -101,7 +144,11 @@ export function LeadFormSheet({ open, onOpenChange, lead, seed, onSaved }: LeadF
   const mode = lead ? "edit" : "create";
   const schema = mode === "edit" ? EditSchema : CreateSchema;
   const resolver = useMemo(() => contractResolver<LeadValues, unknown>(schema), [schema]);
-  const form = useForm<LeadValues, unknown, unknown>({ resolver, defaultValues: lead ? leadToValues(lead) : defaultLeadValues(seed), mode: "onTouched" });
+  const form = useForm<LeadValues, unknown, unknown>({
+    resolver,
+    defaultValues: lead ? leadToValues(lead) : defaultLeadValues(seed),
+    mode: "onTouched",
+  });
   const control = controlOf(form);
   const [serverError, setServerError] = useState<unknown>(null);
   const projects = useProjectOptions(open);
@@ -110,11 +157,15 @@ export function LeadFormSheet({ open, onOpenChange, lead, seed, onSaved }: LeadF
 
   const leadId = lead?.id ?? null;
   const leadVersion = lead?.version ?? null;
+  // Local state resets while rendering; react-hook-form's reset (an external store) stays in the effect below.
+  useOnChange(open ? `${leadId}:${leadVersion}` : null, (key) => {
+    if (key === null) return;
+    setServerError(null);
+  });
   useEffect(() => {
     if (!open) return;
     form.reset(lead ? leadToValues(lead) : defaultLeadValues(seed));
-    setServerError(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-seed the form only when it opens or the record changes
   }, [open, leadId, leadVersion]);
 
   const handleError = (error: ApiClientError) => {
@@ -133,7 +184,12 @@ export function LeadFormSheet({ open, onOpenChange, lead, seed, onSaved }: LeadF
     onError: handleError,
   });
   const update = useMutationWithToast<LeadRow, { row: LeadRow; body: unknown }>({
-    mutationFn: ({ row, body }) => api.patch<LeadRow>(`${LEADS_PATH}/${row.id}`, { ...(body as Record<string, unknown>), version: row.version }, { version: row.version }),
+    mutationFn: ({ row, body }) =>
+      api.patch<LeadRow>(
+        `${LEADS_PATH}/${row.id}`,
+        { ...(body as Record<string, unknown>), version: row.version },
+        { version: row.version },
+      ),
     successMessage: "Lead saved",
     invalidate: [[LEADS_PATH], crmKeys.leadDetail(lead?.id ?? "")],
     entityLabel: "This lead",
@@ -146,8 +202,22 @@ export function LeadFormSheet({ open, onOpenChange, lead, seed, onSaved }: LeadF
   });
   const busy = create.isPending || update.isPending;
 
-  const projectOptions = useMemo(() => (projects.data ?? []).map((project) => ({ value: project.id, label: project.name, description: project.code ?? undefined })), [projects.data]);
-  const userOptions = useMemo(() => (users.data ?? []).filter((user) => user.is_active).map((user) => ({ value: user.id, label: user.name, description: user.role_name, keywords: [user.email] })), [users.data]);
+  const projectOptions = useMemo(
+    () =>
+      (projects.data ?? []).map((project) => ({
+        value: project.id,
+        label: project.name,
+        description: project.code ?? undefined,
+      })),
+    [projects.data],
+  );
+  const userOptions = useMemo(
+    () =>
+      (users.data ?? [])
+        .filter((user) => user.is_active)
+        .map((user) => ({ value: user.id, label: user.name, description: user.role_name, keywords: [user.email] })),
+    [users.data],
+  );
 
   return (
     <Sheet open={open} onOpenChange={(next) => !busy && onOpenChange(next)}>
@@ -161,7 +231,11 @@ export function LeadFormSheet({ open, onOpenChange, lead, seed, onSaved }: LeadF
               </Badge>
             )}
           </div>
-          <SheetDescription>{lead ? `Updated ${formatDateTime(lead.updated_at)}` : "Website and brochure leads arrive automatically; use this for walk-ins, calls and referrals."}</SheetDescription>
+          <SheetDescription>
+            {lead
+              ? `Updated ${formatDateTime(lead.updated_at)}`
+              : "Website and brochure leads arrive automatically; use this for walk-ins, calls and referrals."}
+          </SheetDescription>
         </SheetHeader>
         <form
           noValidate
@@ -176,22 +250,190 @@ export function LeadFormSheet({ open, onOpenChange, lead, seed, onSaved }: LeadF
             {serverError !== null && <FormError error={serverError} />}
             <FormSection title="Contact">
               <FormRow columns={2}>
-                <FormField control={control} name="full_name" label="Name" required className="sm:col-span-2" render={({ field }) => <Input {...field} value={field.value} onChange={(event) => field.onChange(event.target.value)} maxLength={120} autoComplete="off" data-testid="lead-name" />} />
-                <FormField control={control} name="phone" label="Mobile" required hint="10-digit Indian mobile" render={({ field }) => <Input {...field} type="tel" value={field.value} onChange={(event) => field.onChange(event.target.value)} inputMode="tel" maxLength={16} className="money" autoComplete="off" data-testid="lead-phone" />} />
-                <FormField control={control} name="email" label="E-mail" render={({ field }) => <Input {...field} type="email" value={field.value} onChange={(event) => field.onChange(event.target.value)} maxLength={254} autoComplete="off" />} />
+                <FormField
+                  control={control}
+                  name="full_name"
+                  label="Name"
+                  required
+                  className="sm:col-span-2"
+                  render={({ field }) => (
+                    <Input
+                      {...field}
+                      value={field.value}
+                      onChange={(event) => field.onChange(event.target.value)}
+                      maxLength={120}
+                      autoComplete="off"
+                      data-testid="lead-name"
+                    />
+                  )}
+                />
+                <FormField
+                  control={control}
+                  name="phone"
+                  label="Mobile"
+                  required
+                  hint="10-digit Indian mobile"
+                  render={({ field }) => (
+                    <Input
+                      {...field}
+                      type="tel"
+                      value={field.value}
+                      onChange={(event) => field.onChange(event.target.value)}
+                      inputMode="tel"
+                      maxLength={16}
+                      className="money"
+                      autoComplete="off"
+                      data-testid="lead-phone"
+                    />
+                  )}
+                />
+                <FormField
+                  control={control}
+                  name="email"
+                  label="E-mail"
+                  render={({ field }) => (
+                    <Input
+                      {...field}
+                      type="email"
+                      value={field.value}
+                      onChange={(event) => field.onChange(event.target.value)}
+                      maxLength={254}
+                      autoComplete="off"
+                    />
+                  )}
+                />
               </FormRow>
             </FormSection>
             <FormSection title="Interest">
               <FormRow columns={2}>
-                <FormField control={control} name="project_id" label="Project" render={({ field }) => <Combobox id={field.id} value={field.value} onValueChange={(value) => field.onChange(value)} options={projectOptions} placeholder={projects.isPending ? "Loading…" : "Any project"} allowClear data-testid="lead-project" />} />
-                <FormField control={control} name="flat_type_id" label="Flat type" render={({ field }) => <Select id={field.id} value={field.value} onValueChange={field.onChange} options={(flatTypes.data ?? []).map((type) => ({ value: type.id, label: `${type.code} · ${type.name}` }))} placeholder={flatTypes.isPending ? "Loading…" : "Any"} allowClear />} />
-                <FormField control={control} name="budget_min_paise" label="Budget from" render={({ field }) => <MoneyInput id={field.id} value={field.value} onChange={field.onChange} onBlur={field.onBlur} />} />
-                <FormField control={control} name="budget_max_paise" label="Budget to" render={({ field }) => <MoneyInput id={field.id} value={field.value} onChange={field.onChange} onBlur={field.onBlur} />} />
-                <FormField control={control} name="source" label="Source" required hint={mode === "edit" ? "Fixed after creation" : undefined} render={({ field }) => <Select id={field.id} value={field.value} onValueChange={field.onChange} options={LEAD_SOURCES.map((value) => ({ value, label: LEAD_SOURCE_LABELS[value] }))} disabled={mode === "edit"} invalid={field.invalid} data-testid="lead-source" />} />
-                <FormField control={control} name="assigned_user_id" label="Assigned to" render={({ field }) => <Combobox id={field.id} value={field.value} onValueChange={(value) => field.onChange(value)} options={userOptions} placeholder={users.isPending ? "Loading…" : "Unassigned (round-robin)"} allowClear data-testid="lead-assignee" />} />
-                <FormField control={control} name="next_follow_up_local" label="Next follow-up" className="sm:col-span-2" render={({ field }) => <Input {...field} type="datetime-local" value={field.value} onChange={(event) => field.onChange(event.target.value)} className="money" />} />
-                <FormField control={control} name="message" label="Notes / message" className="sm:col-span-2" render={({ field }) => <Textarea {...field} value={field.value} onChange={(event) => field.onChange(event.target.value)} rows={3} maxLength={2000} />} />
-                <FormField control={control} name="consent" className="sm:col-span-2" render={({ field }) => <Checkbox id={field.id} checked={field.value} onCheckedChange={(checked) => field.onChange(checked === true)} label="Consent to be contacted" description="Required for marketing follow-ups" />} />
+                <FormField
+                  control={control}
+                  name="project_id"
+                  label="Project"
+                  render={({ field }) => (
+                    <Combobox
+                      id={field.id}
+                      value={field.value}
+                      onValueChange={(value) => field.onChange(value)}
+                      options={projectOptions}
+                      placeholder={projects.isPending ? "Loading…" : "Any project"}
+                      allowClear
+                      data-testid="lead-project"
+                    />
+                  )}
+                />
+                <FormField
+                  control={control}
+                  name="flat_type_id"
+                  label="Flat type"
+                  render={({ field }) => (
+                    <Select
+                      id={field.id}
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      options={(flatTypes.data ?? []).map((type) => ({
+                        value: type.id,
+                        label: `${type.code} · ${type.name}`,
+                      }))}
+                      placeholder={flatTypes.isPending ? "Loading…" : "Any"}
+                      allowClear
+                    />
+                  )}
+                />
+                <FormField
+                  control={control}
+                  name="budget_min_paise"
+                  label="Budget from"
+                  render={({ field }) => (
+                    <MoneyInput id={field.id} value={field.value} onChange={field.onChange} onBlur={field.onBlur} />
+                  )}
+                />
+                <FormField
+                  control={control}
+                  name="budget_max_paise"
+                  label="Budget to"
+                  render={({ field }) => (
+                    <MoneyInput id={field.id} value={field.value} onChange={field.onChange} onBlur={field.onBlur} />
+                  )}
+                />
+                <FormField
+                  control={control}
+                  name="source"
+                  label="Source"
+                  required
+                  hint={mode === "edit" ? "Fixed after creation" : undefined}
+                  render={({ field }) => (
+                    <Select
+                      id={field.id}
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      options={LEAD_SOURCES.map((value) => ({ value, label: LEAD_SOURCE_LABELS[value] }))}
+                      disabled={mode === "edit"}
+                      invalid={field.invalid}
+                      data-testid="lead-source"
+                    />
+                  )}
+                />
+                <FormField
+                  control={control}
+                  name="assigned_user_id"
+                  label="Assigned to"
+                  render={({ field }) => (
+                    <Combobox
+                      id={field.id}
+                      value={field.value}
+                      onValueChange={(value) => field.onChange(value)}
+                      options={userOptions}
+                      placeholder={users.isPending ? "Loading…" : "Unassigned (round-robin)"}
+                      allowClear
+                      data-testid="lead-assignee"
+                    />
+                  )}
+                />
+                <FormField
+                  control={control}
+                  name="next_follow_up_local"
+                  label="Next follow-up"
+                  className="sm:col-span-2"
+                  render={({ field }) => (
+                    <Input
+                      {...field}
+                      type="datetime-local"
+                      value={field.value}
+                      onChange={(event) => field.onChange(event.target.value)}
+                      className="money"
+                    />
+                  )}
+                />
+                <FormField
+                  control={control}
+                  name="message"
+                  label="Notes / message"
+                  className="sm:col-span-2"
+                  render={({ field }) => (
+                    <Textarea
+                      {...field}
+                      value={field.value}
+                      onChange={(event) => field.onChange(event.target.value)}
+                      rows={3}
+                      maxLength={2000}
+                    />
+                  )}
+                />
+                <FormField
+                  control={control}
+                  name="consent"
+                  className="sm:col-span-2"
+                  render={({ field }) => (
+                    <Checkbox
+                      id={field.id}
+                      checked={field.value}
+                      onCheckedChange={(checked) => field.onChange(checked === true)}
+                      label="Consent to be contacted"
+                      description="Required for marketing follow-ups"
+                    />
+                  )}
+                />
               </FormRow>
             </FormSection>
           </SheetBody>

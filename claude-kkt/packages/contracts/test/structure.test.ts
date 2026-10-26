@@ -36,23 +36,55 @@ describe("BlockCreateSchema", () => {
     expect(r.data?.numbering_pattern).toBe("{block}-{floor}{pos2}");
   });
   it("rejects overlapping ranges, uncovered floors and bad patterns", () => {
-    expect(BlockCreateSchema.safeParse({ ...block, floor_plans: [{ from_floor: 1, to_floor: 6, floor_plan_template_id: U(3) }, { from_floor: 6, to_floor: 15, floor_plan_template_id: U(4) }] }).success).toBe(false);
-    const r = BlockCreateSchema.safeParse({ ...block, floor_plans: [{ from_floor: 1, to_floor: 10, floor_plan_template_id: U(3) }] });
+    expect(
+      BlockCreateSchema.safeParse({
+        ...block,
+        floor_plans: [
+          { from_floor: 1, to_floor: 6, floor_plan_template_id: U(3) },
+          { from_floor: 6, to_floor: 15, floor_plan_template_id: U(4) },
+        ],
+      }).success,
+    ).toBe(false);
+    const r = BlockCreateSchema.safeParse({
+      ...block,
+      floor_plans: [{ from_floor: 1, to_floor: 10, floor_plan_template_id: U(3) }],
+    });
     expect(r.success).toBe(false);
     expect(r.error?.issues.some((i) => i.message.includes("11, 12, 14, 15"))).toBe(true);
     expect(BlockCreateSchema.safeParse({ ...block, numbering_pattern: "{tower}{seq}" }).success).toBe(false);
     expect(BlockCreateSchema.safeParse({ ...block, floor_start: 20 }).success).toBe(false);
   });
   it("does not require plans for refuge/podium floors", () => {
-    expect(BlockCreateSchema.safeParse({ ...block, podium_floors: [1, 2], floor_plans: [{ from_floor: 3, to_floor: 15, floor_plan_template_id: U(3) }] }).success).toBe(true);
+    expect(
+      BlockCreateSchema.safeParse({
+        ...block,
+        podium_floors: [1, 2],
+        floor_plans: [{ from_floor: 3, to_floor: 15, floor_plan_template_id: U(3) }],
+      }).success,
+    ).toBe(true);
   });
 });
 
 describe("FloorPlanTemplateCreateSchema", () => {
   it("requires positions 1..n", () => {
-    const ok = { name: "Plan A", code: "A", positions: [{ position: 1, flat_type_id: U(1) }, { position: 2, flat_type_id: U(1), is_corner: true }] };
+    const ok = {
+      name: "Plan A",
+      code: "A",
+      positions: [
+        { position: 1, flat_type_id: U(1) },
+        { position: 2, flat_type_id: U(1), is_corner: true },
+      ],
+    };
     expect(FloorPlanTemplateCreateSchema.safeParse(ok).success).toBe(true);
-    expect(FloorPlanTemplateCreateSchema.safeParse({ ...ok, positions: [{ position: 1, flat_type_id: U(1) }, { position: 3, flat_type_id: U(1) }] }).success).toBe(false);
+    expect(
+      FloorPlanTemplateCreateSchema.safeParse({
+        ...ok,
+        positions: [
+          { position: 1, flat_type_id: U(1) },
+          { position: 3, flat_type_id: U(1) },
+        ],
+      }).success,
+    ).toBe(false);
   });
 });
 
@@ -78,12 +110,26 @@ describe("PlcRuleSchema", () => {
 
 describe("CustomerCreateSchema", () => {
   it("normalises KYC inputs", () => {
-    const r = CustomerCreateSchema.safeParse({ full_name: "Rohit Sharma", phone: "+91 98765 43210", pan: "abcde1234f", aadhaar: "2345 6789 0123", email: "R@X.com" });
+    const r = CustomerCreateSchema.safeParse({
+      full_name: "Rohit Sharma",
+      phone: "+91 98765 43210",
+      pan: "abcde1234f",
+      aadhaar: "2345 6789 0123",
+      email: "R@X.com",
+    });
     expect(r.success).toBe(true);
-    expect(r.data).toMatchObject({ phone: "9876543210", pan: "ABCDE1234F", aadhaar: "234567890123", email: "r@x.com", same_as_current: true });
+    expect(r.data).toMatchObject({
+      phone: "9876543210",
+      pan: "ABCDE1234F",
+      aadhaar: "234567890123",
+      email: "r@x.com",
+      same_as_current: true,
+    });
   });
   it("needs a permanent address when not same as current", () => {
-    expect(CustomerCreateSchema.safeParse({ full_name: "A B", phone: "9876543210", same_as_current: false }).success).toBe(false);
+    expect(
+      CustomerCreateSchema.safeParse({ full_name: "A B", phone: "9876543210", same_as_current: false }).success,
+    ).toBe(false);
   });
 });
 
@@ -91,8 +137,12 @@ describe("ConstructionStatusUpdateSchema", () => {
   it("validates intermediate dates", () => {
     const ok = { version: 1, stage_id: U(1), completed_on: "2026-06-30", intermediate_dates: { [U(2)]: "2026-05-31" } };
     expect(ConstructionStatusUpdateSchema.safeParse(ok).success).toBe(true);
-    expect(ConstructionStatusUpdateSchema.safeParse({ ...ok, intermediate_dates: { [U(2)]: "2026-07-01" } }).success).toBe(false);
-    expect(ConstructionStatusUpdateSchema.safeParse({ ...ok, intermediate_dates: { nope: "2026-05-31" } }).success).toBe(false);
+    expect(
+      ConstructionStatusUpdateSchema.safeParse({ ...ok, intermediate_dates: { [U(2)]: "2026-07-01" } }).success,
+    ).toBe(false);
+    expect(
+      ConstructionStatusUpdateSchema.safeParse({ ...ok, intermediate_dates: { nope: "2026-05-31" } }).success,
+    ).toBe(false);
   });
 });
 

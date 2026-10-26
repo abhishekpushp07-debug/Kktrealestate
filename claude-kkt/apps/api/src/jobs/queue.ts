@@ -14,7 +14,9 @@ import { logger } from "../lib/logger.js";
 import { defaultJobOptions, JOB_SCHEDULES, QUEUE_NAME } from "./index.js";
 
 /** Connection options BullMQ needs, parsed from the main REDIS_URL (BullMQ never shares the security Redis). */
-export function bullConnection(url: string = config.REDIS_URL): ConnectionOptions & { host: string; port: number; db?: number } {
+export function bullConnection(
+  url: string = config.REDIS_URL,
+): ConnectionOptions & { host: string; port: number; db?: number } {
   const u = new URL(url);
   const db = u.pathname && u.pathname !== "/" ? Number(u.pathname.slice(1)) : undefined;
   return {
@@ -47,25 +49,51 @@ export interface EnqueuedJob {
  * `dedupeId` makes the add atomic against duplicates: while a job with the same id is pending or running (incl. its retries), the add
  * is a no-op that returns the existing job (`deduplicated: true`) — Redis decides, so parallel callers cannot both enqueue.
  */
-export async function enqueueJob(queue: Queue, name: JobName, data: Record<string, unknown> = {}, opts: { runId?: string; delayMs?: number; dedupeId?: string } = {}): Promise<EnqueuedJob> {
+export async function enqueueJob(
+  queue: Queue,
+  name: JobName,
+  data: Record<string, unknown> = {},
+  opts: { runId?: string; delayMs?: number; dedupeId?: string } = {},
+): Promise<EnqueuedJob> {
   const runId = opts.runId ?? randomUUID();
-  const job = await queue.add(name, { ...data, __run_id: runId }, {
-    ...defaultJobOptions(), jobId: runId, ...(opts.delayMs ? { delay: opts.delayMs } : {}), ...(opts.dedupeId ? { deduplication: { id: opts.dedupeId } } : {}),
-  });
+  const job = await queue.add(
+    name,
+    { ...data, __run_id: runId },
+    {
+      ...defaultJobOptions(),
+      jobId: runId,
+      ...(opts.delayMs ? { delay: opts.delayMs } : {}),
+      ...(opts.dedupeId ? { deduplication: { id: opts.dedupeId } } : {}),
+    },
+  );
   const jobId = job.id ?? runId;
-  return { runId: jobId === runId ? runId : jobId, jobId, name, queuedAt: new Date(job.timestamp || Date.now()).toISOString(), deduplicated: jobId !== runId };
+  return {
+    runId: jobId === runId ? runId : jobId,
+    jobId,
+    name,
+    queuedAt: new Date(job.timestamp || Date.now()).toISOString(),
+    deduplicated: jobId !== runId,
+  };
 }
 
 /** How long an HTTP request waits for the queue (Redis) before answering 503 instead of hanging on BullMQ's reconnect loop. */
 export const ENQUEUE_DEADLINE_MS = 5_000;
 
 /** enqueueJob with a deadline: rejects with an Error("job queue unreachable …") when Redis does not answer within `ms`. */
-export async function enqueueJobWithin(queue: Queue, name: JobName, data: Record<string, unknown> = {}, opts: { runId?: string; delayMs?: number; dedupeId?: string } = {}, ms = ENQUEUE_DEADLINE_MS): Promise<EnqueuedJob> {
+export async function enqueueJobWithin(
+  queue: Queue,
+  name: JobName,
+  data: Record<string, unknown> = {},
+  opts: { runId?: string; delayMs?: number; dedupeId?: string } = {},
+  ms = ENQUEUE_DEADLINE_MS,
+): Promise<EnqueuedJob> {
   let timer: NodeJS.Timeout | undefined;
   try {
     return await Promise.race([
       enqueueJob(queue, name, data, opts),
-      new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error(`job queue unreachable: ${name} not enqueued within ${ms} ms`)), ms); }),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`job queue unreachable: ${name} not enqueued within ${ms} ms`)), ms);
+      }),
     ]);
   } finally {
     if (timer) clearTimeout(timer);
@@ -88,7 +116,11 @@ export const schedulerId = (name: string) => `schedule:${name}`;
  * Upserts the repeatable schedules (idempotent by scheduler id). A job without a handler is skipped with a warning instead of failing the
  * boot (a module that is not deployed yet), and a disabled schedule is removed so it stops firing.
  */
-export async function registerSchedules(queue: Queue, registered: ReadonlySet<string>, log = logger): Promise<ScheduleResult> {
+export async function registerSchedules(
+  queue: Queue,
+  registered: ReadonlySet<string>,
+  log = logger,
+): Promise<ScheduleResult> {
   const out: ScheduleResult = { scheduled: [], unregistered: [], disabled: [] };
   for (const s of JOB_SCHEDULES) {
     if (s.enabled && !s.enabled()) {
@@ -101,7 +133,11 @@ export async function registerSchedules(queue: Queue, registered: ReadonlySet<st
       out.unregistered.push(s.name);
       continue;
     }
-    await queue.upsertJobScheduler(schedulerId(s.name), { pattern: s.cron, tz: s.tz }, { name: s.name, data: {}, opts: defaultJobOptions() });
+    await queue.upsertJobScheduler(
+      schedulerId(s.name),
+      { pattern: s.cron, tz: s.tz },
+      { name: s.name, data: {}, opts: defaultJobOptions() },
+    );
     out.scheduled.push(s.name);
   }
   return out;
@@ -130,8 +166,12 @@ export function lastDuesSlot(now: Date = new Date()): Date {
 
 /** Last successful DAILY_DUES / DUES_CATCHUP start time, or null. */
 export async function lastSuccessfulDuesRun(db: DB): Promise<Date | null> {
-  const [row] = await db.select({ startedAt: jobRuns.startedAt }).from(jobRuns)
-    .where(and(inArray(jobRuns.jobName, ["DAILY_DUES", "DUES_CATCHUP"]), eq(jobRuns.status, "OK"))).orderBy(desc(jobRuns.startedAt)).limit(1);
+  const [row] = await db
+    .select({ startedAt: jobRuns.startedAt })
+    .from(jobRuns)
+    .where(and(inArray(jobRuns.jobName, ["DAILY_DUES", "DUES_CATCHUP"]), eq(jobRuns.status, "OK")))
+    .orderBy(desc(jobRuns.startedAt))
+    .limit(1);
   return row?.startedAt ?? null;
 }
 
@@ -144,7 +184,7 @@ export const PROCESS_STARTED_AT = Math.round(Date.now() - process.uptime() * 100
  * `env` overrides the configuration (tests).
  */
 export function deployId(env?: Record<string, string | undefined>): string {
-  const id = env ? (env["DEPLOY_ID"] || env["GIT_SHA"]) : (config.DEPLOY_ID ?? config.GIT_SHA);
+  const id = env ? env["DEPLOY_ID"] || env["GIT_SHA"] : (config.DEPLOY_ID ?? config.GIT_SHA);
   return `${config.APP_VERSION}:${id || `started-${PROCESS_STARTED_AT}`}`;
 }
 
@@ -163,7 +203,10 @@ export interface BootJobsResult {
  * Boot jobs, once per deploy (Redis lock `boot:jobs:<deploy>`): STARTUP_RECONCILIATION, NOTIFICATION_SWEEP, and the dues catch-up when
  * the last successful DAILY_DUES/DUES_CATCHUP run started before the latest 00:30 IST slot (DUES_CATCHUP when registered, else DAILY_DUES).
  */
-export async function enqueueBootJobs(queue: Queue, deps: { db: DB; lockRedis: Redis; registered: ReadonlySet<string>; deploy?: string; now?: Date; log?: typeof logger }): Promise<BootJobsResult> {
+export async function enqueueBootJobs(
+  queue: Queue,
+  deps: { db: DB; lockRedis: Redis; registered: ReadonlySet<string>; deploy?: string; now?: Date; log?: typeof logger },
+): Promise<BootJobsResult> {
   const log = deps.log ?? logger;
   const out: BootJobsResult = { acquired: false, enqueued: [], skipped: [] };
   const lockKey = `boot:jobs:${deps.deploy ?? deployId()}`;
@@ -187,7 +230,11 @@ export async function enqueueBootJobs(queue: Queue, deps: { db: DB; lockRedis: R
       out.enqueued.push(await enqueueJob(queue, name, { __boot: true }));
     };
     await want("STARTUP_RECONCILIATION");
-    if (duesDone) out.skipped.push({ name: "DUES_CATCHUP", reason: `last successful dues run ${last!.toISOString()} is after ${slot.toISOString()}` });
+    if (duesDone)
+      out.skipped.push({
+        name: "DUES_CATCHUP",
+        reason: `last successful dues run ${last!.toISOString()} is after ${slot.toISOString()}`,
+      });
     else await want(deps.registered.has("DUES_CATCHUP") ? "DUES_CATCHUP" : "DAILY_DUES");
     await want("NOTIFICATION_SWEEP");
   } catch (err) {

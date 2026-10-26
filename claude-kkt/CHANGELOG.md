@@ -5,6 +5,44 @@ sunset date. Dates are IST.
 
 ## [Unreleased] — hardening round (phase 5)
 
+The round closed the gaps of the v2 80-factor audit (docs/AUDIT-80-FACTORS-V2.md) in five tracks, each adversarially reviewed, then
+an integration stage and a verify stage. Summary with links to every report: docs/hardening/STATUS-after-phase5.md.
+
+### Highlights by track
+
+- **Foundation:** production config validation (`_FILE` secrets, `TRUST_PROXY`, DB/Redis timeouts, key rings), migration lock and
+  `withTransactionRetry`, CHECK constraints and partial unique indexes behind the duplicate checks, trigram and sort indexes, a tolerant
+  error registry (migration 0002).
+- **Security & privacy:** escalation guards on users/roles (`details.reason`), search gated per entity, CSV formula neutralising,
+  proxy-aware client IP, IP-pair + account lockout counted in Postgres, production bootstrap without demo users, one erasure
+  implementation, KYC maker-checker, key rotation for JWT and field encryption (`REENCRYPT_FIELDS`).
+- **Money rules:** posting-order ledger, price-deviation guard (`list_price_paise`), flat reservation with `HOLD_EXPIRY`, handover
+  completeness, reversal on COMPLETED bookings (`BOOKING_COMPLETED` / reopen), compact bookings list (`view=full` for every field),
+  retrying money transactions, `LEDGER_REBUILD`.
+- **Platform reliability:** standalone worker with real handlers, retries + failure alerts, schedules and once-per-deploy boot jobs,
+  `NOTIFICATION_SWEEP`, durable Postgres-backed idempotency, staff PATCH version policy, async CSV exports, backup/restore CLI.
+- **Deployment & observability:** see the sections below.
+- **Frontend quality:** contrast fixes and axe in every QA runner, 48 px tap targets, IST everywhere in the ERP, PDFs with an embedded
+  ₹ font rendered in a worker pool, website CSP with nonces.
+- **Integration:** ERP/website/portal wired to every new capability (jobs, system health, backups, exports, KYC, price deviation,
+  reservations, visit self-reschedule); cross-track fixes (first boot, one-time secrets never replayed, docs gating, trace ids in logs,
+  job sweeps, Redis outage budget, snapshot-consistent integrity).
+
+### Verify stage
+
+- Code quality: the whole repository is Prettier-formatted (`pnpm format:check`; `docs/SPEC.md` and the workflow scripts are
+  excluded) and ESLint-clean with zero warnings in every package (`--max-warnings 0`). `kkt/module-boundaries` is now an error: every
+  cross-module import in `apps/api/src/modules` goes through the other module's `index.ts`. The React Compiler lint rules
+  (`react-hooks` v7) pass without blanket disables: state resets moved from effects to render-time adjustment (`useOnChange` in the
+  ERP), data loading tags results with the request they answer, `Date.now()` in render became a shared `useNow()` clock,
+  `react-hook-form` `watch()` became `useWatch`, Reanimated shared values use `get()`/`set()`, and hydration guards use
+  `useSyncExternalStore`. The remaining `eslint-disable` comments each give their reason.
+- API: `PATCH /construction/photos/:photoId` and `PATCH /payment-plan-assignments/:id` lost their version-policy exemption (400
+  `VERSION_REQUIRED` without `If-Match`/`body.version`); stage-photo rows always carry `version` (additive: `StagePhotoUpdate` accepts
+  `version`). Manage links replaced by a reschedule answer 410 `LINK_EXPIRED` instead of 404 (migration 0004,
+  `site_visits.superseded_token_hashes`). Portal bells for demands, other-charge lines and payments carry their `booking_id`.
+- OpenAPI snapshot regenerated for the additive changes of the round (no breaking change).
+
 ### Deployment
 
 - `docker-compose.prod.yml`: PgBouncer (transaction pooling, prepared statements kept with PgBouncer 1.24), one-shot `migrate` service

@@ -10,7 +10,7 @@
     "worker": "tsx src/worker.ts",
     "build": "tsup && tsup src/telemetry.ts --no-config --format esm --target node22 --platform node --out-dir dist --sourcemap",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings 0",
     "seed": "tsx src/seed/run.ts",
     "restore": "tsx src/cli/restore.ts",
     "test": "vitest run --dir test/unit",

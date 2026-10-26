@@ -73,7 +73,9 @@ export function GenericFields<Values extends FieldValues>({ fields }: GenericFie
                     name={field.name}
                     value={asText(field.value)}
                     onBlur={field.onBlur}
-                    onChange={(event) => field.onChange(def.nullable && event.target.value === "" ? null : event.target.value)}
+                    onChange={(event) =>
+                      field.onChange(def.nullable && event.target.value === "" ? null : event.target.value)
+                    }
                     placeholder={def.placeholder}
                     maxLength={def.maxLength ?? 2000}
                     aria-invalid={field["aria-invalid"]}
@@ -120,7 +122,14 @@ export function GenericFields<Values extends FieldValues>({ fields }: GenericFie
                 name={def.name}
                 className={className ?? "sm:col-span-2"}
                 render={({ field }) => (
-                  <Switch id={field.id} checked={field.value === true} onCheckedChange={field.onChange} label={def.label} description={def.description} data-testid={`field-${def.name.replaceAll(".", "-")}`} />
+                  <Switch
+                    id={field.id}
+                    checked={field.value === true}
+                    onCheckedChange={field.onChange}
+                    label={def.label}
+                    description={def.description}
+                    data-testid={`field-${def.name.replaceAll(".", "-")}`}
+                  />
                 )}
               />
             );

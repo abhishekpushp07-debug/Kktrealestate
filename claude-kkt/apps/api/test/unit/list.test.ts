@@ -10,7 +10,10 @@ describe("list helpers", () => {
   it("resolves allow-listed sorts and rejects unknown fields", () => {
     const allowed = { name: roomTypes.name, created_at: roomTypes.createdAt };
     expect(resolveSort({ allowed, default: "name" })).toMatchObject({ field: "name", direction: "asc" });
-    expect(resolveSort({ allowed, default: "name", requested: "-created_at" })).toMatchObject({ field: "created_at", direction: "desc" });
+    expect(resolveSort({ allowed, default: "name", requested: "-created_at" })).toMatchObject({
+      field: "created_at",
+      direction: "desc",
+    });
     expect(() => resolveSort({ allowed, default: "name", requested: "password_hash" })).toThrow(ApiError);
   });
 });

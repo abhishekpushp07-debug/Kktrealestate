@@ -190,7 +190,10 @@ function parseJson(text: string): unknown {
 async function toApiError(res: HttpResponse): Promise<ApiError> {
   const retryAfterHeader = res.headers.get("Retry-After");
   const retryAfterSeconds = retryAfterHeader && /^\d+$/.test(retryAfterHeader) ? Number(retryAfterHeader) : undefined;
-  const ids = { requestId: res.headers.get("X-Request-Id") ?? undefined, traceId: res.headers.get("X-Trace-Id") ?? undefined };
+  const ids = {
+    requestId: res.headers.get("X-Request-Id") ?? undefined,
+    traceId: res.headers.get("X-Trace-Id") ?? undefined,
+  };
   return apiErrorFromBody(res.status, parseJson(await res.text()), retryAfterSeconds, ids);
 }
 
@@ -202,9 +205,17 @@ async function doRefresh(): Promise<string> {
   if (!refreshToken) throw new ApiError({ status: 401, code: "UNAUTHENTICATED", message: "Please sign in again." });
   let res: HttpResponse;
   try {
-    res = await send(buildUrl("/auth/refresh"), { method: "POST", body: { refresh_token: refreshToken }, auth: false }, null);
+    res = await send(
+      buildUrl("/auth/refresh"),
+      { method: "POST", body: { refresh_token: refreshToken }, auth: false },
+      null,
+    );
   } catch {
-    throw new ApiError({ status: 0, code: "NETWORK", message: "Can't reach KKT right now. Check your internet connection." });
+    throw new ApiError({
+      status: 0,
+      code: "NETWORK",
+      message: "Can't reach KKT right now. Check your internet connection.",
+    });
   }
   if (!res.ok) {
     const err = await toApiError(res);
@@ -259,7 +270,11 @@ async function request<T>(path: string, o: RequestOptions = {}): Promise<T> {
     }
   } catch (e) {
     if (e instanceof ApiError) throw e;
-    throw new ApiError({ status: 0, code: "NETWORK", message: "Can't reach KKT right now. Check your internet connection." });
+    throw new ApiError({
+      status: 0,
+      code: "NETWORK",
+      message: "Can't reach KKT right now. Check your internet connection.",
+    });
   }
   if (!res.ok) {
     const err = await toApiError(res);
@@ -272,14 +287,20 @@ async function request<T>(path: string, o: RequestOptions = {}): Promise<T> {
 
 const get = <T>(path: string, query?: Query) => request<T>(path, { query });
 const post = <T>(path: string, body?: unknown, extra: Omit<RequestOptions, "method" | "body"> = {}) =>
-  request<T>(path, { method: "POST", body: body ?? {}, idempotencyKey: extra.idempotencyKey ?? newIdempotencyKey(), ...extra });
+  request<T>(path, {
+    method: "POST",
+    body: body ?? {},
+    idempotencyKey: extra.idempotencyKey ?? newIdempotencyKey(),
+    ...extra,
+  });
 const patch = <T>(path: string, body: unknown) => request<T>(path, { method: "PATCH", body });
 const del = <T>(path: string) => request<T>(path, { method: "DELETE" });
 
 /** Accepts either a bare array or a `{ items }` envelope (sessions/bookings shapes are arrays in Appendix C). */
 function itemsOf<T>(value: unknown): T[] {
   if (Array.isArray(value)) return value as T[];
-  if (value && typeof value === "object" && Array.isArray((value as { items?: unknown }).items)) return (value as { items: T[] }).items;
+  if (value && typeof value === "object" && Array.isArray((value as { items?: unknown }).items))
+    return (value as { items: T[] }).items;
   return [];
 }
 
@@ -301,9 +322,11 @@ export interface PortalRequestCategory {
 
 export const api = {
   auth: {
-    login: (body: PortalLogin) => request<PortalLoginResponse>("/auth/login", { method: "POST", body, auth: false, noRefresh: true }),
+    login: (body: PortalLogin) =>
+      request<PortalLoginResponse>("/auth/login", { method: "POST", body, auth: false, noRefresh: true }),
     refresh: () => refreshAccessToken(),
-    logout: (body: { refresh_token?: string; all_devices?: boolean }) => request<void>("/auth/logout", { method: "POST", body, noRefresh: true }),
+    logout: (body: { refresh_token?: string; all_devices?: boolean }) =>
+      request<void>("/auth/logout", { method: "POST", body, noRefresh: true }),
     me: () => get<PortalUser>("/auth/me"),
     changePassword: (body: PortalChangePassword) => post<void>("/auth/change-password", body),
     sessions: async () => itemsOf<PortalSessionRow>(await get<unknown>("/auth/sessions")),
@@ -314,37 +337,56 @@ export const api = {
     list: async () => itemsOf<PortalBookingSwitcherItem>(await get<unknown>("/bookings")),
     home: (id: string) => get<PortalHomeResponse>(`/bookings/${id}/home`),
     flat: (id: string) => get<PortalMyFlatResponse>(`/bookings/${id}/flat`),
-    ledger: (id: string, q: PageQuery = {}) => get<PortalLedgerResponse>(`/bookings/${id}/ledger`, { page: q.page, page_size: q.page_size ?? 200 }),
-    receipts: (id: string, q: PageQuery = {}) => get<PortalReceiptListResponse>(`/bookings/${id}/receipts`, { page: q.page, page_size: q.page_size ?? 200 }),
-    receiptPdf: (id: string, paymentId: string) => get<PortalPdfLinkResponse>(`/bookings/${id}/receipts/${paymentId}/pdf`),
-    demands: (id: string, q: PageQuery = {}) => get<PortalDemandListResponse>(`/bookings/${id}/demands`, { page: q.page, page_size: q.page_size ?? 200 }),
+    ledger: (id: string, q: PageQuery = {}) =>
+      get<PortalLedgerResponse>(`/bookings/${id}/ledger`, { page: q.page, page_size: q.page_size ?? 200 }),
+    receipts: (id: string, q: PageQuery = {}) =>
+      get<PortalReceiptListResponse>(`/bookings/${id}/receipts`, { page: q.page, page_size: q.page_size ?? 200 }),
+    receiptPdf: (id: string, paymentId: string) =>
+      get<PortalPdfLinkResponse>(`/bookings/${id}/receipts/${paymentId}/pdf`),
+    demands: (id: string, q: PageQuery = {}) =>
+      get<PortalDemandListResponse>(`/bookings/${id}/demands`, { page: q.page, page_size: q.page_size ?? 200 }),
     demandPdf: (id: string, demandId: string) => get<PortalPdfLinkResponse>(`/bookings/${id}/demands/${demandId}/pdf`),
     schedule: (id: string) => get<PortalScheduleResponse>(`/bookings/${id}/schedule`),
     statementPdf: (id: string) => get<PortalPdfLinkResponse>(`/bookings/${id}/statement.pdf`),
     allotmentLetterPdf: (id: string) => get<PortalPdfLinkResponse>(`/bookings/${id}/allotment-letter.pdf`),
     construction: (id: string) => get<PortalConstructionTimelineResponse>(`/bookings/${id}/construction`),
     documents: (id: string) => get<PortalDocumentListResponse>(`/bookings/${id}/documents`),
-    documentDownload: (id: string, docId: string) => get<PortalPdfLinkResponse>(`/bookings/${id}/documents/${docId}/download`),
+    documentDownload: (id: string, docId: string) =>
+      get<PortalPdfLinkResponse>(`/bookings/${id}/documents/${docId}/download`),
     bankDetails: (id: string) => get<PortalBankDetails>(`/bookings/${id}/bank-details`),
   },
   requests: {
     list: (q: { status?: ServiceStatus; booking_id?: string } & PageQuery = {}) =>
-      get<PortalRequestListResponse>("/requests", { status: q.status, booking_id: q.booking_id, page: q.page, page_size: q.page_size ?? 100 }),
+      get<PortalRequestListResponse>("/requests", {
+        status: q.status,
+        booking_id: q.booking_id,
+        page: q.page,
+        page_size: q.page_size ?? 100,
+      }),
     get: (id: string) => get<PortalRequestDetailResponse>(`/requests/${id}`),
-    create: (body: PortalRequestCreate, idempotencyKey?: string) => post<PortalRequestDetailResponse>("/requests", body, { idempotencyKey }),
-    addMessage: (id: string, body: PortalRequestMessageCreate) => post<PortalRequestDetailResponse>(`/requests/${id}/messages`, body),
-    reopen: (id: string, body: PortalRequestReopen) => post<PortalRequestDetailResponse>(`/requests/${id}/reopen`, body),
+    create: (body: PortalRequestCreate, idempotencyKey?: string) =>
+      post<PortalRequestDetailResponse>("/requests", body, { idempotencyKey }),
+    addMessage: (id: string, body: PortalRequestMessageCreate) =>
+      post<PortalRequestDetailResponse>(`/requests/${id}/messages`, body),
+    reopen: (id: string, body: PortalRequestReopen) =>
+      post<PortalRequestDetailResponse>(`/requests/${id}/reopen`, body),
     rate: (id: string, body: PortalRequestRate) => post<PortalRequestDetailResponse>(`/requests/${id}/rate`, body),
     /** One file per call; `messageId` (one of the customer's own messages, e.g. the opening message after create) appends it to that message. */
     uploadAttachment: async (id: string, file: LocalFile, opts: { messageId?: string } = {}) =>
-      request<PortalDocumentRow>(`/requests/${id}/attachments`, { method: "POST", form: await buildMultipart("file", file, opts.messageId ? { message_id: opts.messageId } : {}), idempotencyKey: newIdempotencyKey() }),
+      request<PortalDocumentRow>(`/requests/${id}/attachments`, {
+        method: "POST",
+        form: await buildMultipart("file", file, opts.messageId ? { message_id: opts.messageId } : {}),
+        idempotencyKey: newIdempotencyKey(),
+      }),
     categories: async () => itemsOf<PortalRequestCategory>(await get<unknown>("/requests/categories")),
   },
   notices: {
-    list: (q: PageQuery = {}) => get<PortalNoticeListResponse>("/notices", { page: q.page, page_size: q.page_size ?? 100 }),
+    list: (q: PageQuery = {}) =>
+      get<PortalNoticeListResponse>("/notices", { page: q.page, page_size: q.page_size ?? 100 }),
   },
   notifications: {
-    list: (q: PageQuery = {}) => get<PortalNotificationListResponse>("/notifications", { page: q.page, page_size: q.page_size ?? 100 }),
+    list: (q: PageQuery = {}) =>
+      get<PortalNotificationListResponse>("/notifications", { page: q.page, page_size: q.page_size ?? 100 }),
     unreadCount: () => get<{ count: number }>("/notifications/unread-count"),
     markRead: (body: PortalMarkRead) => post<void>("/notifications/mark-read", body),
   },

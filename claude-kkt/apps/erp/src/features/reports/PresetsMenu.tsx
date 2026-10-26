@@ -1,7 +1,19 @@
 import { Bookmark, BookmarkPlus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import type { ReportKey, ReportPresetRow } from "@kkt/contracts";
-import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, FieldWrapper, IconButton, Input, SimpleDialog } from "@/components/ui";
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  FieldWrapper,
+  IconButton,
+  Input,
+  SimpleDialog,
+} from "@/components/ui";
 import { useMutationWithToast } from "@/lib/queries";
 import { createPreset, deletePreset, reportKeys, usePresets } from "./api";
 
@@ -43,7 +55,10 @@ export function PresetsMenu({ reportKey, params, onApply }: PresetsMenuProps) {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" leftIcon={Bookmark} data-testid="report-presets-btn">
-            Presets{rows.length > 0 && <span className="money ml-1 rounded-full bg-navy-50 px-1.5 text-2xs text-ink-muted">{rows.length}</span>}
+            Presets
+            {rows.length > 0 && (
+              <span className="money ml-1 rounded-full bg-navy-50 px-1.5 text-2xs text-ink-muted">{rows.length}</span>
+            )}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-72">
@@ -51,14 +66,33 @@ export function PresetsMenu({ reportKey, params, onApply }: PresetsMenuProps) {
           <DropdownMenuSeparator />
           {presets.isPending && <p className="px-2 py-2 text-xs text-ink-subtle">Loading…</p>}
           {presets.isError && <p className="px-2 py-2 text-xs text-ink-subtle">Presets are unavailable right now.</p>}
-          {presets.data && rows.length === 0 && <p className="px-2 py-2 text-xs text-ink-subtle">No presets yet. Set the filters you want, then save them here.</p>}
+          {presets.data && rows.length === 0 && (
+            <p className="px-2 py-2 text-xs text-ink-subtle">
+              No presets yet. Set the filters you want, then save them here.
+            </p>
+          )}
           {rows.map((preset) => (
             <div key={preset.id} className="flex items-center gap-1 pr-1">
-              <DropdownMenuItem className="min-w-0 flex-1" onSelect={() => onApply(preset)} data-testid={`report-preset-apply-${preset.id}`}>
+              <DropdownMenuItem
+                className="min-w-0 flex-1"
+                onSelect={() => onApply(preset)}
+                data-testid={`report-preset-apply-${preset.id}`}
+              >
                 <Bookmark />
                 <span className="truncate">{preset.name}</span>
               </DropdownMenuItem>
-              <IconButton icon={Trash2} label={`Delete preset ${preset.name}`} size="xs" variant="ghost" className="text-ink-subtle hover:text-danger-fg" loading={remove.isPending && remove.variables?.id === preset.id} onClick={(event) => { event.preventDefault(); remove.mutate(preset); }} />
+              <IconButton
+                icon={Trash2}
+                label={`Delete preset ${preset.name}`}
+                size="xs"
+                variant="ghost"
+                className="text-ink-subtle hover:text-danger-fg"
+                loading={remove.isPending && remove.variables?.id === preset.id}
+                onClick={(event) => {
+                  event.preventDefault();
+                  remove.mutate(preset);
+                }}
+              />
             </div>
           ))}
           <DropdownMenuSeparator />
@@ -79,7 +113,12 @@ export function PresetsMenu({ reportKey, params, onApply }: PresetsMenuProps) {
             <Button variant="outline" onClick={() => setSaveOpen(false)} disabled={save.isPending}>
               Cancel
             </Button>
-            <Button onClick={() => save.mutate()} loading={save.isPending} disabled={name.trim().length === 0} data-testid="report-preset-save-confirm">
+            <Button
+              onClick={() => save.mutate()}
+              loading={save.isPending}
+              disabled={name.trim().length === 0}
+              data-testid="report-preset-save-confirm"
+            >
               Save preset
             </Button>
           </>

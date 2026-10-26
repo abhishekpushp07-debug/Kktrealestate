@@ -1,5 +1,12 @@
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
-import type { AuditLogRow, BookingRow, ServiceCategoryRow, ServiceKanbanResponse, ServiceRequestDetailResponse, ServiceRequestRow } from "@kkt/contracts";
+import type {
+  AuditLogRow,
+  BookingRow,
+  ServiceCategoryRow,
+  ServiceKanbanResponse,
+  ServiceRequestDetailResponse,
+  ServiceRequestRow,
+} from "@kkt/contracts";
 import { api, type ApiClientError, type ListEnvelope, type QueryParams } from "@/lib/api";
 import { useApiQuery } from "@/features/inventory/api";
 import { useMasterRows } from "@/features/masters/api";
@@ -36,20 +43,40 @@ function asArray<T>(raw: ListEnvelope<T> | T[] | undefined | null): T[] {
 /* ------------------------------------------------------------------ */
 
 /** `GET /service-requests/board` — tickets grouped by status (every column capped by `column_limit`). */
-export function useServiceBoard(filters: QueryParams, enabled = true): UseQueryResult<ServiceKanbanResponse, ApiClientError> {
-  return useApiQuery<ServiceKanbanResponse>(serviceKeys.board(filters), `${SERVICE_PATH}/board`, { query: filters, enabled, placeholderData: (previous) => previous });
+export function useServiceBoard(
+  filters: QueryParams,
+  enabled = true,
+): UseQueryResult<ServiceKanbanResponse, ApiClientError> {
+  return useApiQuery<ServiceKanbanResponse>(serviceKeys.board(filters), `${SERVICE_PATH}/board`, {
+    query: filters,
+    enabled,
+    placeholderData: (previous) => previous,
+  });
 }
 
 /** `GET /service-requests/:id` — ticket + thread (internal notes included for staff). */
-export function useServiceDetail(id: string | null | undefined): UseQueryResult<ServiceRequestDetailResponse, ApiClientError> {
-  return useApiQuery<ServiceRequestDetailResponse>(serviceKeys.detail(id ?? ""), `${SERVICE_PATH}/${id}`, { enabled: Boolean(id) });
+export function useServiceDetail(
+  id: string | null | undefined,
+): UseQueryResult<ServiceRequestDetailResponse, ApiClientError> {
+  return useApiQuery<ServiceRequestDetailResponse>(serviceKeys.detail(id ?? ""), `${SERVICE_PATH}/${id}`, {
+    enabled: Boolean(id),
+  });
 }
 
 /** `GET /service-requests/sla-breaches` — open tickets past their SLA (envelope or bare array). */
 export function useSlaBreaches(enabled = true): UseQueryResult<ServiceRequestRow[], ApiClientError> {
-  return useQuery<ListEnvelope<ServiceRequestRow> | ServiceRequestRow[], ApiClientError, ServiceRequestRow[], readonly unknown[]>({
+  return useQuery<
+    ListEnvelope<ServiceRequestRow> | ServiceRequestRow[],
+    ApiClientError,
+    ServiceRequestRow[],
+    readonly unknown[]
+  >({
     queryKey: serviceKeys.slaBreaches,
-    queryFn: ({ signal }) => api.get<ListEnvelope<ServiceRequestRow> | ServiceRequestRow[]>(`${SERVICE_PATH}/sla-breaches`, { signal, query: { page_size: 50 } }),
+    queryFn: ({ signal }) =>
+      api.get<ListEnvelope<ServiceRequestRow> | ServiceRequestRow[]>(`${SERVICE_PATH}/sla-breaches`, {
+        signal,
+        query: { page_size: 50 },
+      }),
     select: asArray,
     refetchInterval: 120_000,
     refetchIntervalInBackground: false,
@@ -59,10 +86,17 @@ export function useSlaBreaches(enabled = true): UseQueryResult<ServiceRequestRow
 }
 
 /** Audit trail of one ticket (`GET /audit-logs/entity/service_request/:id`); absent endpoints degrade to an empty list. */
-export function useTicketHistory(id: string | null | undefined, options: { enabled?: boolean } = {}): UseQueryResult<AuditLogRow[], ApiClientError> {
+export function useTicketHistory(
+  id: string | null | undefined,
+  options: { enabled?: boolean } = {},
+): UseQueryResult<AuditLogRow[], ApiClientError> {
   return useQuery<ListEnvelope<AuditLogRow> | AuditLogRow[], ApiClientError, AuditLogRow[], readonly unknown[]>({
     queryKey: serviceKeys.history(id ?? ""),
-    queryFn: ({ signal }) => api.get<ListEnvelope<AuditLogRow> | AuditLogRow[]>(`${AUDIT_PATH}/entity/service_request/${id}`, { signal, query: { page_size: 100 } }),
+    queryFn: ({ signal }) =>
+      api.get<ListEnvelope<AuditLogRow> | AuditLogRow[]>(`${AUDIT_PATH}/entity/service_request/${id}`, {
+        signal,
+        query: { page_size: 100 },
+      }),
     select: asArray,
     // Guarded by audit.view on the API; callers pass `enabled: can("audit.view")`.
     enabled: Boolean(id) && options.enabled !== false,
@@ -76,10 +110,17 @@ export function useServiceCategories(enabled = true): UseQueryResult<ServiceCate
 }
 
 /** Bookings of one customer for the ticket form (`GET /bookings?customer_id=`). */
-export function useCustomerBookings(customerId: string | null | undefined): UseQueryResult<BookingRow[], ApiClientError> {
+export function useCustomerBookings(
+  customerId: string | null | undefined,
+): UseQueryResult<BookingRow[], ApiClientError> {
   return useQuery<ListEnvelope<BookingRow>, ApiClientError, BookingRow[], readonly unknown[]>({
     queryKey: serviceKeys.customerBookings(customerId ?? ""),
-    queryFn: ({ signal }) => api.list<BookingRow>("/bookings", { page_size: 50, sort: "-booking_date", filters: { customer_id: customerId ?? "" } }, { signal }),
+    queryFn: ({ signal }) =>
+      api.list<BookingRow>(
+        "/bookings",
+        { page_size: 50, sort: "-booking_date", filters: { customer_id: customerId ?? "" } },
+        { signal },
+      ),
     select: (data) => data.items,
     enabled: Boolean(customerId),
   });

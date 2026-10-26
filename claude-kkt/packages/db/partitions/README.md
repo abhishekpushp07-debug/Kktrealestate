@@ -5,10 +5,10 @@ suggests ~50 M) monthly range partitions on `created_at` keep their indexes smal
 the planner skip months a query cannot touch. Nothing here runs with the normal migrations: a fresh install stays unpartitioned until an
 operator applies these scripts.
 
-| File | What it does |
-|---|---|
-| `001_functions.sql` | Idempotent helper functions: `kkt_partition_table(table)` converts one table, `kkt_create_month_partition(table, month)`, `kkt_create_next_partitions(months_ahead)` (what job PARTITION_MAINTENANCE calls), `kkt_partitioned_tables()`, `ledger_entries_booking_seq_unique_fn()` and `kkt_copy_statement_triggers()`. |
-| `002_partition_tables.sql` | Converts the four tables and creates the coming months. Safe to re-run (an already partitioned table is reported and left alone). |
+| File                       | What it does                                                                                                                                                                                                                                                                                                           |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `001_functions.sql`        | Idempotent helper functions: `kkt_partition_table(table)` converts one table, `kkt_create_month_partition(table, month)`, `kkt_create_next_partitions(months_ahead)` (what job PARTITION_MAINTENANCE calls), `kkt_partitioned_tables()`, `ledger_entries_booking_seq_unique_fn()` and `kkt_copy_statement_triggers()`. |
+| `002_partition_tables.sql` | Converts the four tables and creates the coming months. Safe to re-run (an already partitioned table is reported and left alone).                                                                                                                                                                                      |
 
 ## Applying
 

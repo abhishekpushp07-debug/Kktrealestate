@@ -76,9 +76,7 @@ function numberToDecimalString(value: number): string {
 
 /** Splits a decimal string such as "-1,25,000.505" into sign, integer and fraction digits. */
 function parseDecimal(input: string | number, what: string): DecimalParts {
-  const text = (typeof input === "number" ? numberToDecimalString(input) : input)
-    .replace(/[₹,\s_]/g, "")
-    .trim();
+  const text = (typeof input === "number" ? numberToDecimalString(input) : input).replace(/[₹,\s_]/g, "").trim();
   const match = /^([+-]?)(\d*)(?:\.(\d*))?$/.exec(text);
   if (!match || (match[2] === "" && (match[3] ?? "") === "")) {
     throw new MoneyError(`${what} "${String(input)}" is not a decimal number`);
@@ -226,8 +224,26 @@ export function formatINRShort(paise: number): string {
 }
 
 const ONES = [
-  "Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
-  "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen",
+  "Zero",
+  "One",
+  "Two",
+  "Three",
+  "Four",
+  "Five",
+  "Six",
+  "Seven",
+  "Eight",
+  "Nine",
+  "Ten",
+  "Eleven",
+  "Twelve",
+  "Thirteen",
+  "Fourteen",
+  "Fifteen",
+  "Sixteen",
+  "Seventeen",
+  "Eighteen",
+  "Nineteen",
 ] as const;
 const TENS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"] as const;
 

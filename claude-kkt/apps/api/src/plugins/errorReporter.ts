@@ -30,7 +30,10 @@ const PATTERNS: [RegExp, string][] = [
   [/\b[A-Za-z][A-Za-z0-9+.-]*:\/\/[^\s/@]+:[^\s/@]+@/g, "<url-with-credentials>://"],
   [/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g, "<jwt>"],
   [/\b(?:bearer|basic|digest)\s+[A-Za-z0-9._~+/=-]+/gi, "<secret>"],
-  [/(?<!<)\b(?:authorization|token|password|passwd|pwd|secret\w*|api[-_]?key|cookie|set-cookie|otp|pin)\b\s*[:=]?\s*\S+/gi, "<secret>"],
+  [
+    /(?<!<)\b(?:authorization|token|password|passwd|pwd|secret\w*|api[-_]?key|cookie|set-cookie|otp|pin)\b\s*[:=]?\s*\S+/gi,
+    "<secret>",
+  ],
   [/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, "<email>"],
   [/\b[A-Z]{5}[0-9]{4}[A-Z]\b/gi, "<pan>"],
   // Aadhaar (12 digits, optionally grouped 4-4-4 by spaces or hyphens)
@@ -45,7 +48,9 @@ const PATTERNS: [RegExp, string][] = [
 
 /** Strips personal data, credentials and identifiers from an error message and caps its length. */
 export function sanitizeMessage(raw: string, max = 300): string {
-  let s = String(raw ?? "").replace(/\s+/g, " ").trim();
+  let s = String(raw ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
   for (const [re, rep] of PATTERNS) s = s.replace(re, rep);
   return s.length > max ? `${s.slice(0, max - 1)}…` : s;
 }
@@ -99,8 +104,14 @@ export class ErrorReporter {
     const now = this.now();
     const key = `${event.kind}|${event.where}|${event.errorClass}`;
     const prev = this.seen.get(key);
-    if (prev && prev.until > now) { prev.suppressed += 1; return false; }
-    if (!this.takeToken()) { this.suppressedByLimit += 1; return false; }
+    if (prev && prev.until > now) {
+      prev.suppressed += 1;
+      return false;
+    }
+    if (!this.takeToken()) {
+      this.suppressedByLimit += 1;
+      return false;
+    }
     const repeats = prev?.suppressed ?? 0;
     this.seen.set(key, { until: now + this.dedupeMs, suppressed: 0 });
     if (this.seen.size > 500) for (const [k, v] of this.seen) if (v.until <= now) this.seen.delete(k);
@@ -114,17 +125,38 @@ export class ErrorReporter {
   private async post(e: ErrorEvent, repeats: number, limited: number): Promise<void> {
     const service = this.opts.service ?? "kkt-api";
     const head = e.kind === "http" ? `${e.status ?? 500} ${e.where}` : `job ${e.where} failed`;
-    const extra = [repeats ? `${repeats} similar suppressed` : "", limited ? `${limited} other errors dropped by the rate limit` : ""].filter(Boolean).join("; ");
+    const extra = [
+      repeats ? `${repeats} similar suppressed` : "",
+      limited ? `${limited} other errors dropped by the rate limit` : "",
+    ]
+      .filter(Boolean)
+      .join("; ");
     const text = `:rotating_light: [${service}${this.opts.version ? ` ${this.opts.version}` : ""}] ${head} — ${e.errorClass}: ${e.message} (id ${e.id}${e.traceId ? `, trace ${e.traceId}` : ""})${extra ? ` — ${extra}` : ""}`;
     const body = {
       text,
       kkt: {
-        service, version: this.opts.version, host: hostname(), kind: e.kind, id: e.id, where: e.where, status: e.status,
-        error_class: e.errorClass, message: e.message, trace_id: e.traceId, suppressed_repeats: repeats, dropped_by_rate_limit: limited, at: new Date(this.now()).toISOString(),
+        service,
+        version: this.opts.version,
+        host: hostname(),
+        kind: e.kind,
+        id: e.id,
+        where: e.where,
+        status: e.status,
+        error_class: e.errorClass,
+        message: e.message,
+        trace_id: e.traceId,
+        suppressed_repeats: repeats,
+        dropped_by_rate_limit: limited,
+        at: new Date(this.now()).toISOString(),
       },
     };
     try {
-      const res = await this.fetchImpl(this.opts.url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(3000) });
+      const res = await this.fetchImpl(this.opts.url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(3000),
+      });
       if (!res.ok) logger.warn({ status: res.status }, "error webhook answered non-2xx");
     } catch (err) {
       logger.warn({ err: (err as Error).message }, "error webhook post failed");
@@ -136,7 +168,14 @@ let shared: ErrorReporter | null | undefined;
 
 /** The process-wide reporter for ERROR_WEBHOOK_URL (null when unset). The job runner may call `reportJobFailure` with it. */
 export function errorReporter(): ErrorReporter | null {
-  if (shared === undefined) shared = config.ERROR_WEBHOOK_URL ? new ErrorReporter({ url: config.ERROR_WEBHOOK_URL, version: config.APP_VERSION, service: config.OTEL_SERVICE_NAME }) : null;
+  if (shared === undefined)
+    shared = config.ERROR_WEBHOOK_URL
+      ? new ErrorReporter({
+          url: config.ERROR_WEBHOOK_URL,
+          version: config.APP_VERSION,
+          service: config.OTEL_SERVICE_NAME,
+        })
+      : null;
   return shared;
 }
 
@@ -145,7 +184,13 @@ export function reportJobFailure(job: string, runId: string, err: unknown): void
   const r = errorReporter();
   if (!r) return;
   const e = err instanceof Error ? err : new Error(String(err));
-  r.report({ kind: "job", id: runId, where: job, errorClass: e.constructor?.name ?? "Error", message: sanitizeMessage(e.message) });
+  r.report({
+    kind: "job",
+    id: runId,
+    where: job,
+    errorClass: e.constructor?.name ?? "Error",
+    message: sanitizeMessage(e.message),
+  });
 }
 
 declare module "fastify" {
@@ -163,20 +208,28 @@ export function httpEvent(req: FastifyRequest, status: number, err: Error | unde
     id: req.id,
     where: `${req.method} ${req.routeOptions.url ?? "unmatched"}`,
     status,
-    errorClass: (e as { code?: string }).code && /^[A-Z0-9_]+$/.test(String((e as { code?: string }).code)) ? `${e.constructor?.name ?? "Error"}(${String((e as { code?: string }).code)})` : (e.constructor?.name ?? "Error"),
+    errorClass:
+      (e as { code?: string }).code && /^[A-Z0-9_]+$/.test(String((e as { code?: string }).code))
+        ? `${e.constructor?.name ?? "Error"}(${String((e as { code?: string }).code)})`
+        : (e.constructor?.name ?? "Error"),
     message: sanitizeMessage(e.message),
     traceId: currentTraceId(),
   };
 }
 
 /** Fastify plugin: posts 5xx answers (except 503) to ERROR_WEBHOOK_URL. No-op when the variable is unset. */
-export default fp(async (app, opts: { reporter?: ErrorReporter | null }) => {
-  const reporter = opts.reporter === undefined ? errorReporter() : opts.reporter;
-  if (!reporter) return;
-  app.addHook("onError", async (req, _reply, error) => { req.kktError = error; });
-  app.addHook("onResponse", async (req, reply) => {
-    const status = reply.statusCode;
-    if (status < 500 || status === 503) return;
-    reporter.report(httpEvent(req, status, req.kktError));
-  });
-}, { name: "error-reporter" });
+export default fp(
+  async (app, opts: { reporter?: ErrorReporter | null }) => {
+    const reporter = opts.reporter === undefined ? errorReporter() : opts.reporter;
+    if (!reporter) return;
+    app.addHook("onError", async (req, _reply, error) => {
+      req.kktError = error;
+    });
+    app.addHook("onResponse", async (req, reply) => {
+      const status = reply.statusCode;
+      if (status < 500 || status === 503) return;
+      reporter.report(httpEvent(req, status, req.kktError));
+    });
+  },
+  { name: "error-reporter" },
+);

@@ -140,11 +140,19 @@ export const FlatBulkPriceUpdateSchema = z
 export type FlatBulkPriceUpdate = z.infer<typeof FlatBulkPriceUpdateSchema>;
 
 /** Response of a bulk operation. */
-export const FlatBulkResponseSchema = z.object({ updated: z.int().min(0), skipped: z.int().min(0), skipped_ids: z.array(IdSchema) });
+export const FlatBulkResponseSchema = z.object({
+  updated: z.int().min(0),
+  skipped: z.int().min(0),
+  skipped_ids: z.array(IdSchema),
+});
 export type FlatBulkResponse = z.infer<typeof FlatBulkResponseSchema>;
 
 /** Change a flat's type (re-snapshots rooms/areas; only while AVAILABLE). */
-export const FlatTypeChangeSchema = z.strictObject({ ...VersionedSchema.shape, flat_type_id: IdSchema, reprice: z.boolean().default(true) });
+export const FlatTypeChangeSchema = z.strictObject({
+  ...VersionedSchema.shape,
+  flat_type_id: IdSchema,
+  reprice: z.boolean().default(true),
+});
 export type FlatTypeChange = z.infer<typeof FlatTypeChangeSchema>;
 
 /** Update flat notes / facing / corner flag. */
@@ -167,7 +175,11 @@ export const FlatHistoryRowSchema = z.object({
 export type FlatHistoryRow = z.infer<typeof FlatHistoryRowSchema>;
 
 /** Specification item as shown in the flat drawer. */
-export const FlatSpecItemSchema = z.object({ category: z.string(), name: z.string(), description: z.string().nullable() });
+export const FlatSpecItemSchema = z.object({
+  category: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+});
 export type FlatSpecItem = z.infer<typeof FlatSpecItemSchema>;
 
 /** Flat drawer: row + specifications + history. */

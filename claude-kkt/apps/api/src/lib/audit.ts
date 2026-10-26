@@ -23,7 +23,8 @@ export interface AuditEntry {
   requestId?: string | null;
 }
 
-const SENSITIVE_KEY = /(^|_)(password_hash|passwordhash|password|secret)$|_enc$|enc$|^mfa|^token|token$|refresh_token|access_token|otp/i;
+const SENSITIVE_KEY =
+  /(^|_)(password_hash|passwordhash|password|secret)$|_enc$|enc$|^mfa|^token|token$|refresh_token|access_token|otp/i;
 
 /** Returns true for keys whose values must never reach the audit log (hashes, encrypted fields, MFA material, tokens). */
 export function isSensitiveKey(key: string): boolean {

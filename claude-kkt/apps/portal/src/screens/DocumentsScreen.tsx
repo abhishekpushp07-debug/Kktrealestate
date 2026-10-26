@@ -16,7 +16,13 @@ export function DocumentsScreen(): React.JSX.Element {
   return <BookingGate title="Documents">{(id) => <Body bookingId={id} />}</BookingGate>;
 }
 
-const KIND_ICON: Record<PortalDocumentRow["kind"], IconName> = { STATEMENT: "rupee", ALLOTMENT_LETTER: "notice", SHARED: "document", PLAN_ACCEPTANCE: "check", ATTACHMENT: "document" };
+const KIND_ICON: Record<PortalDocumentRow["kind"], IconName> = {
+  STATEMENT: "rupee",
+  ALLOTMENT_LETTER: "notice",
+  SHARED: "document",
+  PLAN_ACCEPTANCE: "check",
+  ATTACHMENT: "document",
+};
 
 function Body({ bookingId }: { bookingId: string }): React.JSX.Element {
   const q = useDocuments(bookingId);
@@ -30,15 +36,38 @@ function Body({ bookingId }: { bookingId: string }): React.JSX.Element {
       <Screen onRefresh={() => refreshBooking(bookingId)}>
         <Section title="Generated for you">
           <Card padded={false}>
-            <DocRow icon="rupee" title="Account statement" subtitle="Every demand and payment with running balances" keyBase="statement" fetchLink={() => api.bookings.statementPdf(bookingId)} files={files} />
-            <DocRow icon="notice" title="Allotment letter" subtitle="Confirms your flat allotment" keyBase="allotment" fetchLink={() => api.bookings.allotmentLetterPdf(bookingId)} files={files} last />
+            <DocRow
+              icon="rupee"
+              title="Account statement"
+              subtitle="Every demand and payment with running balances"
+              keyBase="statement"
+              fetchLink={() => api.bookings.statementPdf(bookingId)}
+              files={files}
+            />
+            <DocRow
+              icon="notice"
+              title="Allotment letter"
+              subtitle="Confirms your flat allotment"
+              keyBase="allotment"
+              fetchLink={() => api.bookings.allotmentLetterPdf(bookingId)}
+              files={files}
+              last
+            />
           </Card>
         </Section>
         <Section title="Shared by our team">
           {!q.data ? (
-            q.isError ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : <SkeletonRows rows={3} />
+            q.isError ? (
+              <ErrorState error={q.error} onRetry={() => void q.refetch()} />
+            ) : (
+              <SkeletonRows rows={3} />
+            )
           ) : shared.length === 0 ? (
-            <EmptyState icon="document" title="Nothing shared yet" body="Agreements, plans and other files our team shares with you will appear here." />
+            <EmptyState
+              icon="document"
+              title="Nothing shared yet"
+              body="Agreements, plans and other files our team shares with you will appear here."
+            />
           ) : (
             <Card padded={false}>
               {shared.map((d, i) => (
@@ -62,12 +91,31 @@ function Body({ bookingId }: { bookingId: string }): React.JSX.Element {
   );
 }
 
-function DocRow({ icon, title, subtitle, keyBase, fetchLink, files, mime, last }: { icon: IconName; title: string; subtitle: string; keyBase: string; fetchLink: () => Promise<import("@kkt/contracts").PortalPdfLinkResponse>; files: ReturnType<typeof useFileActions>; mime?: string; last?: boolean }): React.JSX.Element {
+function DocRow({
+  icon,
+  title,
+  subtitle,
+  keyBase,
+  fetchLink,
+  files,
+  mime,
+  last,
+}: {
+  icon: IconName;
+  title: string;
+  subtitle: string;
+  keyBase: string;
+  fetchLink: () => Promise<import("@kkt/contracts").PortalPdfLinkResponse>;
+  files: ReturnType<typeof useFileActions>;
+  mime?: string;
+  last?: boolean;
+}): React.JSX.Element {
   const fetchTyped = async () => fetchLink();
   const actions = {
     ...files,
     view: (k: string, fn: () => Promise<import("@kkt/contracts").PortalPdfLinkResponse>) => files.view(k, fn, mime),
-    download: (k: string, fn: () => Promise<import("@kkt/contracts").PortalPdfLinkResponse>) => files.download(k, fn, mime),
+    download: (k: string, fn: () => Promise<import("@kkt/contracts").PortalPdfLinkResponse>) =>
+      files.download(k, fn, mime),
   };
   return (
     <View style={[styles.row, last ? null : styles.border]}>
@@ -90,5 +138,12 @@ function DocRow({ icon, title, subtitle, keyBase, fetchLink, files, mime, last }
 const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: space.md, padding: space.md, flexWrap: "wrap" },
   border: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line },
-  iconWrap: { width: 36, height: 36, borderRadius: radius.sm, backgroundColor: colors.navy50, alignItems: "center", justifyContent: "center" },
+  iconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.sm,
+    backgroundColor: colors.navy50,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });

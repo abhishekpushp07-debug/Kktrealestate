@@ -90,7 +90,11 @@ export type AreaSnapshot = z.infer<typeof AreaSnapshotSchema>;
 const FlatTypeBase = z.strictObject({
   name: NameSchema,
   code: CodeSchema,
-  bhk: z.number().min(0).max(20).refine((v) => Number.isInteger(v * 2), { message: "BHK in steps of 0.5" }),
+  bhk: z
+    .number()
+    .min(0)
+    .max(20)
+    .refine((v) => Number.isInteger(v * 2), { message: "BHK in steps of 0.5" }),
   facing: z.string().trim().max(40).optional().nullable(),
   description: TextSchema.optional().nullable(),
   rooms: z.array(FlatTypeRoomSchema).min(1, "At least one room"),
@@ -129,7 +133,10 @@ export const FlatTypeRowSchema = MasterRowSchema.extend({
 });
 export type FlatTypeRow = z.infer<typeof FlatTypeRowSchema>;
 
-export const FlatTypeFilterSchema = ListQuerySchema.extend({ bhk: z.coerce.number().optional(), facing: z.string().optional() });
+export const FlatTypeFilterSchema = ListQuerySchema.extend({
+  bhk: z.coerce.number().optional(),
+  facing: z.string().optional(),
+});
 export type FlatTypeFilter = z.infer<typeof FlatTypeFilterSchema>;
 
 // ---------------------------------------------------------------------------
@@ -144,7 +151,11 @@ export const BlockTypeCreateSchema = z.strictObject({
 export type BlockTypeCreate = z.infer<typeof BlockTypeCreateSchema>;
 export const BlockTypeUpdateSchema = updateOf(BlockTypeCreateSchema);
 export type BlockTypeUpdate = z.infer<typeof BlockTypeUpdateSchema>;
-export const BlockTypeRowSchema = MasterRowSchema.extend({ name: z.string(), code: z.string(), has_floors: z.boolean() });
+export const BlockTypeRowSchema = MasterRowSchema.extend({
+  name: z.string(),
+  code: z.string(),
+  has_floors: z.boolean(),
+});
 export type BlockTypeRow = z.infer<typeof BlockTypeRowSchema>;
 
 // ---------------------------------------------------------------------------
@@ -345,7 +356,11 @@ export const PlcTypeCreateSchema = z.strictObject({ name: NameSchema, code: Code
 export type PlcTypeCreate = z.infer<typeof PlcTypeCreateSchema>;
 export const PlcTypeUpdateSchema = updateOf(PlcTypeCreateSchema);
 export type PlcTypeUpdate = z.infer<typeof PlcTypeUpdateSchema>;
-export const PlcTypeRowSchema = MasterRowSchema.extend({ name: z.string(), code: z.string(), calc_mode: PlcCalcModeSchema });
+export const PlcTypeRowSchema = MasterRowSchema.extend({
+  name: z.string(),
+  code: z.string(),
+  calc_mode: PlcCalcModeSchema,
+});
 export type PlcTypeRow = z.infer<typeof PlcTypeRowSchema>;
 
 // ---------------------------------------------------------------------------
@@ -449,4 +464,6 @@ export const MasterCsvImportResponseSchema = z.object({
 export type MasterCsvImportResponse = z.infer<typeof MasterCsvImportResponseSchema>;
 
 /** Area type codes a flat type needs for the super ≥ built-up ≥ carpet check. */
-export const STRUCTURAL_AREA_CODES = ["CARPET", "BUILT_UP", "SUPER_BUILT_UP"] as const satisfies readonly z.infer<typeof AreaTypeCodeSchema>[];
+export const STRUCTURAL_AREA_CODES = ["CARPET", "BUILT_UP", "SUPER_BUILT_UP"] as const satisfies readonly z.infer<
+  typeof AreaTypeCodeSchema
+>[];

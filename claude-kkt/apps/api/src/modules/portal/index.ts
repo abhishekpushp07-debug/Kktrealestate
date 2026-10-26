@@ -20,16 +20,51 @@ import { ApiError } from "../../lib/errors.js";
 import { verifyAccessToken } from "../../lib/jwt.js";
 import { route } from "../../lib/routes.js";
 import { registerBookingRoutes } from "./bookings.js";
-import { PORTAL_FILE_TTL_SECONDS, openPortalFile, registerPortalJobs, verifyPortalFileToken, type PortalViewer } from "./files.js";
+import {
+  PORTAL_FILE_TTL_SECONDS,
+  openPortalFile,
+  registerPortalJobs,
+  verifyPortalFileToken,
+  type PortalViewer,
+} from "./files.js";
 import { registerNoticeRoutes } from "./notices.js";
 import { registerProfileRoutes } from "./profile.js";
 import { registerRequestRoutes } from "./requests.js";
 
-export { loadOwnedBooking, listOwnedBookings, toSwitcherItem, scopedReader, memberCondition, type OwnedBooking } from "./common.js";
-export { portalHome, portalFlat, portalLedger, portalReceipts, portalDemands, portalSchedule, portalConstruction, portalDocuments, portalBankDetails, unreadNotificationCount, unreadNoticeCount } from "./bookings.js";
 export {
-  storeTempFile, openPortalFile, cleanupExpiredTempFiles, verifyTempToken, verifyPortalFileToken, signPortalFile, portalDocumentUrl, PORTAL_FILE_TTL_SECONDS, PORTAL_FILE_CLEANUP_JOB,
-  type PortalFileToken, type PortalFileKind, type PortalViewer,
+  loadOwnedBooking,
+  listOwnedBookings,
+  toSwitcherItem,
+  scopedReader,
+  memberCondition,
+  type OwnedBooking,
+} from "./common.js";
+export {
+  portalHome,
+  portalFlat,
+  portalLedger,
+  portalReceipts,
+  portalDemands,
+  portalSchedule,
+  portalConstruction,
+  portalDocuments,
+  portalBankDetails,
+  unreadNotificationCount,
+  unreadNoticeCount,
+} from "./bookings.js";
+export {
+  storeTempFile,
+  openPortalFile,
+  cleanupExpiredTempFiles,
+  verifyTempToken,
+  verifyPortalFileToken,
+  signPortalFile,
+  portalDocumentUrl,
+  PORTAL_FILE_TTL_SECONDS,
+  PORTAL_FILE_CLEANUP_JOB,
+  type PortalFileToken,
+  type PortalFileKind,
+  type PortalViewer,
 } from "./files.js";
 export { portalProfile, updatePortalProfile } from "./profile.js";
 export { toPortalRequestRow, toPortalRequestDetail, requestCategories, assertPortalAttachments } from "./requests.js";
@@ -51,7 +86,11 @@ async function viewerOf(app: FastifyInstance, req: FastifyRequest): Promise<Port
   if (scheme?.toLowerCase() !== "bearer" || !token) return "FOREIGN";
   const result = await verifyAccessToken(token.trim(), "portal");
   if (!result.ok) return "FOREIGN";
-  const [pu] = await app.dbReplica.select({ customerId: portalUsers.customerId }).from(portalUsers).where(eq(portalUsers.id, result.claims.sub)).limit(1);
+  const [pu] = await app.dbReplica
+    .select({ customerId: portalUsers.customerId })
+    .from(portalUsers)
+    .where(eq(portalUsers.id, result.claims.sub))
+    .limit(1);
   return pu ? { customerId: pu.customerId } : "FOREIGN";
 }
 
@@ -63,11 +102,16 @@ export default async function portalModule(app: FastifyInstance): Promise<void> 
   registerProfileRoutes(app);
 
   route(app, {
-    method: "GET", url: "/portal/files/:token", public: true,
+    method: "GET",
+    url: "/portal/files/:token",
+    public: true,
     schema: {
-      params: z.object({ token: z.string().min(1).max(100) }), response: { 200: z.any() },
-      summary: "Stream a portal file through its signed, short-lived, customer-bound link (generated PDFs, shared documents, photos)",
-      description: "Malformed, forged or expired tokens are 404. The link is bound to the customer it was issued to: a request carrying any bearer token other than that customer's own portal token is 404 too. Without a bearer the signed link itself is the credential (PDF viewers and share sheets).",
+      params: z.object({ token: z.string().min(1).max(100) }),
+      response: { 200: z.any() },
+      summary:
+        "Stream a portal file through its signed, short-lived, customer-bound link (generated PDFs, shared documents, photos)",
+      description:
+        "Malformed, forged or expired tokens are 404. The link is bound to the customer it was issued to: a request carrying any bearer token other than that customer's own portal token is 404 too. Without a bearer the signed link itself is the credential (PDF viewers and share sheets).",
     },
     handler: async (req, reply) => {
       const token = verifyPortalFileToken(req.params.token);
@@ -78,7 +122,10 @@ export default async function portalModule(app: FastifyInstance): Promise<void> 
       if (!file) throw ApiError.notFound("File");
       const inline = file.mime.startsWith("image/") || file.mime === "application/pdf";
       reply.header("Content-Type", file.mime);
-      reply.header("Content-Disposition", `${inline ? "inline" : "attachment"}; filename="${asciiName(file.fileName)}"; filename*=UTF-8''${encodeURIComponent(file.fileName)}`);
+      reply.header(
+        "Content-Disposition",
+        `${inline ? "inline" : "attachment"}; filename="${asciiName(file.fileName)}"; filename*=UTF-8''${encodeURIComponent(file.fileName)}`,
+      );
       reply.header("Cache-Control", `private, max-age=${PORTAL_FILE_TTL_SECONDS}`);
       reply.header("X-Content-Type-Options", "nosniff");
       reply.header("Cross-Origin-Resource-Policy", "cross-origin"); // <img>/PDF viewers on the portal origin (see web/shared.ts crossOriginFile)

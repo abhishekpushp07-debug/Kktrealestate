@@ -20,7 +20,10 @@ function envMs(name: string, fallback: number, max: number): number {
 
 /** Reads SHUTDOWN_TIMEOUT_MS / SHUTDOWN_DRAIN_DELAY_MS. */
 export function shutdownSettingsFromEnv(): ShutdownSettings {
-  return { timeoutMs: envMs("SHUTDOWN_TIMEOUT_MS", 25_000, 600_000), drainDelayMs: envMs("SHUTDOWN_DRAIN_DELAY_MS", 0, 120_000) };
+  return {
+    timeoutMs: envMs("SHUTDOWN_TIMEOUT_MS", 25_000, 600_000),
+    drainDelayMs: envMs("SHUTDOWN_DRAIN_DELAY_MS", 0, 120_000),
+  };
 }
 
 /**
@@ -28,7 +31,8 @@ export function shutdownSettingsFromEnv(): ShutdownSettings {
  * the application bundle never imports (and re-runs) the preload module.
  */
 export async function shutdownTelemetry(): Promise<void> {
-  const fn = (globalThis as Record<symbol, unknown>)[Symbol.for("kkt.telemetry.shutdown")] as (() => Promise<void>) | undefined;
+  const fn = (globalThis as Record<symbol, unknown>)[Symbol.for("kkt.telemetry.shutdown")] as
+    (() => Promise<void>) | undefined;
   if (fn) await fn().catch(() => undefined);
 }
 
@@ -61,11 +65,23 @@ export async function gracefulShutdown(t: ShutdownTargets, signal: string): Prom
   const exit = t.exit ?? ((code: number) => process.exit(code));
   const started = Date.now();
   startDraining();
-  t.log.info({ signal, pid: process.pid, inflight: t.inflight?.() ?? null, drain_delay_ms: settings.drainDelayMs, timeout_ms: settings.timeoutMs }, "shutting down: draining");
+  t.log.info(
+    {
+      signal,
+      pid: process.pid,
+      inflight: t.inflight?.() ?? null,
+      drain_delay_ms: settings.drainDelayMs,
+      timeout_ms: settings.timeoutMs,
+    },
+    "shutting down: draining",
+  );
   let finished = false;
   const deadline = setTimeout(() => {
     if (finished) return;
-    t.log.error({ after_ms: Date.now() - started, inflight: t.inflight?.() ?? null }, "shutdown deadline reached; forcing exit");
+    t.log.error(
+      { after_ms: Date.now() - started, inflight: t.inflight?.() ?? null },
+      "shutdown deadline reached; forcing exit",
+    );
     exit(1);
   }, settings.timeoutMs);
   deadline.unref();

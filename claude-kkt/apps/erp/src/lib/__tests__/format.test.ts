@@ -67,7 +67,9 @@ describe("amountInWords", () => {
   it("spells amounts in the Indian system", () => {
     expect(amountInWords(12_50_000_00)).toBe("Rupees Twelve Lakh Fifty Thousand Only");
     expect(amountInWords(1_00_00_000_00)).toBe("Rupees One Crore Only");
-    expect(amountInWords(1_23_45_678_90)).toBe("Rupees One Crore Twenty Three Lakh Forty Five Thousand Six Hundred Seventy Eight and Ninety Paise Only");
+    expect(amountInWords(1_23_45_678_90)).toBe(
+      "Rupees One Crore Twenty Three Lakh Forty Five Thousand Six Hundred Seventy Eight and Ninety Paise Only",
+    );
     expect(amountInWords(150_00_00_000_00)).toBe("Rupees One Hundred Fifty Crore Only");
     expect(amountInWords(0)).toBe("Rupees Zero Only");
   });

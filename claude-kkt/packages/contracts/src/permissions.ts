@@ -217,7 +217,14 @@ export interface SystemRoleDefinition {
 const COMMON_STAFF: readonly Permission[] = ["dashboard.view", "notification.read", "master.read", "project.read"];
 
 /** Names of the system roles, in display order (SPEC §1). */
-export const SYSTEM_ROLE_NAMES = ["Super Admin", "Project Admin", "Accounts", "Sales", "Marketing", "Employee"] as const;
+export const SYSTEM_ROLE_NAMES = [
+  "Super Admin",
+  "Project Admin",
+  "Accounts",
+  "Sales",
+  "Marketing",
+  "Employee",
+] as const;
 
 /** A system role name literal. */
 export type SystemRoleName = (typeof SYSTEM_ROLE_NAMES)[number];
@@ -232,7 +239,8 @@ export const SYSTEM_ROLES: Readonly<Record<SystemRoleName, SystemRoleDefinition>
     permissions: [...ALL_PERMISSIONS],
   },
   "Project Admin": {
-    description: "Assigned projects only: blocks, flats, construction status, bookings view/create, customers, leads, reports.",
+    description:
+      "Assigned projects only: blocks, flats, construction status, bookings view/create, customers, leads, reports.",
     permissions: [
       ...COMMON_STAFF,
       "project.write",
@@ -277,7 +285,8 @@ export const SYSTEM_ROLES: Readonly<Record<SystemRoleName, SystemRoleDefinition>
     ],
   },
   Sales: {
-    description: "Customers, leads, enquiries inbox, availability grid, create bookings, site visits. Cannot post payments or see unmasked KYC.",
+    description:
+      "Customers, leads, enquiries inbox, availability grid, create bookings, site visits. Cannot post payments or see unmasked KYC.",
     permissions: [
       ...COMMON_STAFF,
       "customer.read",

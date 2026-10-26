@@ -13,11 +13,34 @@ export interface Column<Row> {
   render: (row: Row, index: number) => ReactNode;
 }
 
-export function Table<Row>({ columns, rows, keyOf, minWidth = 720, emptyText = "Nothing here yet." }: { columns: ReadonlyArray<Column<Row>>; rows: ReadonlyArray<Row>; keyOf: (row: Row, index: number) => string; minWidth?: number; emptyText?: string }): React.JSX.Element {
-  const cell = (c: Column<Row>) => ({ width: c.width, flex: c.width ? undefined : (c.flex ?? 1), alignItems: c.align === "right" ? "flex-end" : c.align === "center" ? "center" : "flex-start" } as const);
+export function Table<Row>({
+  columns,
+  rows,
+  keyOf,
+  minWidth = 720,
+  emptyText = "Nothing here yet.",
+}: {
+  columns: ReadonlyArray<Column<Row>>;
+  rows: ReadonlyArray<Row>;
+  keyOf: (row: Row, index: number) => string;
+  minWidth?: number;
+  emptyText?: string;
+}): React.JSX.Element {
+  const cell = (c: Column<Row>) =>
+    ({
+      width: c.width,
+      flex: c.width ? undefined : (c.flex ?? 1),
+      alignItems: c.align === "right" ? "flex-end" : c.align === "center" ? "center" : "flex-start",
+    }) as const;
   return (
     // focusable so keyboard users can scroll a wide table sideways (WCAG 2.1.1)
-    <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={{ minWidth: "100%" }} focusable accessibilityLabel="Table">
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator
+      contentContainerStyle={{ minWidth: "100%" }}
+      focusable
+      accessibilityLabel="Table"
+    >
       <View style={[styles.table, { minWidth }]}>
         <View style={[styles.row, styles.head]}>
           {columns.map((c) => (
@@ -51,8 +74,20 @@ export function Table<Row>({ columns, rows, keyOf, minWidth = 720, emptyText = "
 }
 
 const styles = StyleSheet.create({
-  table: { backgroundColor: colors.surface, borderRadius: radius.lg, overflow: "hidden", borderWidth: 1, borderColor: colors.line },
-  row: { flexDirection: "row", alignItems: "center", paddingHorizontal: space.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line },
+  table: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: colors.line,
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: space.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.line,
+  },
   head: { backgroundColor: colors.navy50 },
   zebra: { backgroundColor: "#FBFAF7" },
   cell: { paddingVertical: 12, paddingHorizontal: space.sm, minWidth: 0 },

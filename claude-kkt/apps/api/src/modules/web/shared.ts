@@ -52,7 +52,12 @@ export function fakeCode(prefix: string): string {
  * A believable document number for honeypot replies: the company's real pattern for the scope (`SV-2627/0417`), FY of `businessDate`,
  * random sequence. Bots that fill the honeypot must not be able to tell their submission was dropped (SPEC §15 "silently dropped").
  */
-export function fakeNumber(company: Pick<NumberingCompany, "fyStartMonth" | "numbering">, scope: NumberingScope | "enquiry", businessDate: string, fallbackPrefix: string): string {
+export function fakeNumber(
+  company: Pick<NumberingCompany, "fyStartMonth" | "numbering">,
+  scope: NumberingScope | "enquiry",
+  businessDate: string,
+  fallbackPrefix: string,
+): string {
   const fy = financialYear(businessDate, company.fyStartMonth);
   const cfg = scope === "enquiry" ? undefined : company.numbering[scope];
   const seq = 100 + (randomBytes(2).readUInt16BE(0) % 9000);
@@ -76,7 +81,9 @@ type CacheEnvelope<T> = { ok: true; value: T } | { ok: false };
 async function publicCacheVersion(app: FastifyInstance): Promise<string> {
   if (!redisUsable(app.redis)) return "0";
   try {
-    return (await withinBudget(app.redis.get(PUBLIC_CACHE_VERSION_KEY), CACHE_BUDGET_MS, "public cache version")) ?? "0";
+    return (
+      (await withinBudget(app.redis.get(PUBLIC_CACHE_VERSION_KEY), CACHE_BUDGET_MS, "public cache version")) ?? "0"
+    );
   } catch {
     return "0";
   }
@@ -88,10 +95,15 @@ async function publicCacheVersion(app: FastifyInstance): Promise<string> {
  */
 export function publicCacheKey(req: FastifyRequest): string {
   const pattern = req.routeOptions.url ?? req.url.split("?")[0] ?? req.url;
-  const params = Object.entries((req.params ?? {}) as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`);
+  const params = Object.entries((req.params ?? {}) as Record<string, unknown>)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`);
   const hasQuerySchema = Boolean((req.routeOptions.schema as { querystring?: unknown } | undefined)?.querystring);
   const query = hasQuerySchema
-    ? Object.entries((req.query ?? {}) as Record<string, unknown>).filter(([, v]) => v !== undefined && v !== null).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
+    ? Object.entries((req.query ?? {}) as Record<string, unknown>)
+        .filter(([, v]) => v !== undefined && v !== null)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
     : [];
   return `${pattern}|${params.join("&")}|${query.join("&")}`;
 }
@@ -100,7 +112,13 @@ export function publicCacheKey(req: FastifyRequest): string {
  * Read-through cache for public GETs keyed by generation + route + validated inputs (60 s). `fn` returns null for "not found", which is
  * cached too so an unpublished slug cannot be used to hammer the database.
  */
-export async function publicCached<T>(app: FastifyInstance, req: FastifyRequest, reply: FastifyReply, fn: () => Promise<T | null>, notFoundEntity = "Resource"): Promise<T> {
+export async function publicCached<T>(
+  app: FastifyInstance,
+  req: FastifyRequest,
+  reply: FastifyReply,
+  fn: () => Promise<T | null>,
+  notFoundEntity = "Resource",
+): Promise<T> {
   const key = `${PUBLIC_CACHE_PREFIX}${await publicCacheVersion(app)}:${publicCacheKey(req)}`;
   const env = await cached<CacheEnvelope<T>>(app.redis, key, PUBLIC_CACHE_SECONDS, async () => {
     const value = await fn();
@@ -129,12 +147,28 @@ export async function publicCompanyId(db: Executor): Promise<string | null> {
  * Versioned update for singleton tables keyed by something other than `id` (site_settings.company_id, project_*_settings.project_id):
  * `UPDATE … SET …, version = version + 1 WHERE key = $k AND version = $expected RETURNING *`; 409 VERSION_CONFLICT when stale, 404 when missing.
  */
-export async function updateByKey<T extends PgTable & { version: AnyPgColumn }>(tx: Executor, table: T, keyColumn: AnyPgColumn, keyValue: string, expected: number, changes: Record<string, unknown>, entityType: string): Promise<T["$inferSelect"]> {
+export async function updateByKey<T extends PgTable & { version: AnyPgColumn }>(
+  tx: Executor,
+  table: T,
+  keyColumn: AnyPgColumn,
+  keyValue: string,
+  expected: number,
+  changes: Record<string, unknown>,
+  entityType: string,
+): Promise<T["$inferSelect"]> {
   const set = { ...changes, version: sql`${table.version} + 1` } as unknown as PgUpdateSetSource<T>;
-  const rows = (await tx.update(table).set(set).where(and(eq(keyColumn, keyValue), eq(table.version, expected))).returning()) as T["$inferSelect"][];
+  const rows = (await tx
+    .update(table)
+    .set(set)
+    .where(and(eq(keyColumn, keyValue), eq(table.version, expected)))
+    .returning()) as T["$inferSelect"][];
   const row = rows[0];
   if (row) return row;
-  const [cur] = (await tx.select({ version: table.version }).from(table as PgTable).where(eq(keyColumn, keyValue)).limit(1)) as { version: number }[];
+  const [cur] = (await tx
+    .select({ version: table.version })
+    .from(table as PgTable)
+    .where(eq(keyColumn, keyValue))
+    .limit(1)) as { version: number }[];
   if (!cur) throw ApiError.notFound(entityType.replace(/_/g, " "));
   throw await versionConflict(tx, table as unknown as VersionedTable, keyValue, cur.version, entityType);
 }
@@ -143,18 +177,37 @@ export async function updateByKey<T extends PgTable & { version: AnyPgColumn }>(
 export type DocumentRecord = typeof documents.$inferSelect;
 
 /** Entity types whose non-sensitive images may be served through /public/media. */
-export const PUBLIC_DOCUMENT_ENTITY_TYPES = new Set<DocumentRecord["entityType"]>(["CMS", "PROJECT", "BLOCK", "FLAT", "STAGE", "COMPANY"]);
+export const PUBLIC_DOCUMENT_ENTITY_TYPES = new Set<DocumentRecord["entityType"]>([
+  "CMS",
+  "PROJECT",
+  "BLOCK",
+  "FLAT",
+  "STAGE",
+  "COMPANY",
+]);
 
 /** Loads live (non-deleted) documents by id in one query; missing ids are simply absent from the map. */
-export async function loadDocuments(db: Executor, ids: readonly (string | null | undefined)[]): Promise<Map<string, DocumentRecord>> {
+export async function loadDocuments(
+  db: Executor,
+  ids: readonly (string | null | undefined)[],
+): Promise<Map<string, DocumentRecord>> {
   const unique = [...new Set(ids.filter((x): x is string => typeof x === "string" && x.length > 0))];
   if (unique.length === 0) return new Map();
-  const rows = await db.select().from(documents).where(and(inArray(documents.id, unique), eq(documents.isDeleted, false)));
+  const rows = await db
+    .select()
+    .from(documents)
+    .where(and(inArray(documents.id, unique), eq(documents.isDeleted, false)));
   return new Map(rows.map((r) => [r.id, r]));
 }
 
 /** Public URLs for a document (variants fall back to the original when none were generated). */
-export function documentUrls(doc: DocumentRecord | undefined): { url: string | null; thumb_url: string | null; medium_url: string | null; width: number | null; height: number | null } {
+export function documentUrls(doc: DocumentRecord | undefined): {
+  url: string | null;
+  thumb_url: string | null;
+  medium_url: string | null;
+  width: number | null;
+  height: number | null;
+} {
   if (!doc) return { url: null, thumb_url: null, medium_url: null, width: null, height: null };
   const isImage = doc.mime.startsWith("image/");
   return {
@@ -172,15 +225,25 @@ export function isPublicDocument(doc: DocumentRecord | undefined): doc is Docume
 }
 
 /** 400 VALIDATION_ERROR unless every referenced document exists in the company, is live and (optionally) is an image / a PDF. */
-export async function assertDocuments(db: Executor, companyId: string, ids: readonly (string | null | undefined)[], kind: "image" | "pdf" | "any", field: string): Promise<Map<string, DocumentRecord>> {
+export async function assertDocuments(
+  db: Executor,
+  companyId: string,
+  ids: readonly (string | null | undefined)[],
+  kind: "image" | "pdf" | "any",
+  field: string,
+): Promise<Map<string, DocumentRecord>> {
   const docs = await loadDocuments(db, ids);
   for (const id of ids) {
     if (!id) continue;
     const d = docs.get(id);
-    if (!d || d.companyId !== companyId) throw ApiError.badRequest(`${field}: document ${id} not found`, { field, document_id: id });
-    if (d.isSensitive) throw ApiError.badRequest(`${field}: sensitive documents cannot be published`, { field, document_id: id });
-    if (kind === "image" && !d.mime.startsWith("image/")) throw ApiError.badRequest(`${field}: document ${id} is not an image`, { field, document_id: id });
-    if (kind === "pdf" && d.mime !== "application/pdf") throw ApiError.badRequest(`${field}: document ${id} is not a PDF`, { field, document_id: id });
+    if (!d || d.companyId !== companyId)
+      throw ApiError.badRequest(`${field}: document ${id} not found`, { field, document_id: id });
+    if (d.isSensitive)
+      throw ApiError.badRequest(`${field}: sensitive documents cannot be published`, { field, document_id: id });
+    if (kind === "image" && !d.mime.startsWith("image/"))
+      throw ApiError.badRequest(`${field}: document ${id} is not an image`, { field, document_id: id });
+    if (kind === "pdf" && d.mime !== "application/pdf")
+      throw ApiError.badRequest(`${field}: document ${id} is not a PDF`, { field, document_id: id });
   }
   return docs;
 }
@@ -194,9 +257,13 @@ export function isHoneypotTripped(body: { website?: string | null | undefined })
 export const RelaxedHoneypotSchema = z.string().max(500).optional().nullable();
 
 /** Rebuilds a strict public form schema with the honeypot relaxed (the contract schema itself refuses a filled honeypot). */
-export function relaxHoneypot<T extends z.ZodRawShape>(schema: z.ZodObject<T>): z.ZodObject<Omit<T, "website"> & { website: typeof RelaxedHoneypotSchema }> {
+export function relaxHoneypot<T extends z.ZodRawShape>(
+  schema: z.ZodObject<T>,
+): z.ZodObject<Omit<T, "website"> & { website: typeof RelaxedHoneypotSchema }> {
   const { website: _w, ...rest } = schema.shape;
-  return z.strictObject({ ...rest, website: RelaxedHoneypotSchema }) as unknown as z.ZodObject<Omit<T, "website"> & { website: typeof RelaxedHoneypotSchema }>;
+  return z.strictObject({ ...rest, website: RelaxedHoneypotSchema }) as unknown as z.ZodObject<
+    Omit<T, "website"> & { website: typeof RelaxedHoneypotSchema }
+  >;
 }
 
 /** Marks a public response as uncacheable (manage views, form replies). */
@@ -231,16 +298,32 @@ export function iso(v: Date | string | null | undefined): string | null {
 }
 
 /** Loads a project of the company; null when missing. */
-export async function loadProjectById(db: Executor, companyId: string, projectId: string): Promise<typeof projects.$inferSelect | null> {
-  const [p] = await db.select().from(projects).where(and(eq(projects.id, projectId), eq(projects.companyId, companyId))).limit(1);
+export async function loadProjectById(
+  db: Executor,
+  companyId: string,
+  projectId: string,
+): Promise<typeof projects.$inferSelect | null> {
+  const [p] = await db
+    .select()
+    .from(projects)
+    .where(and(eq(projects.id, projectId), eq(projects.companyId, companyId)))
+    .limit(1);
   return p ?? null;
 }
 
 /** 400 VALIDATION_ERROR unless every id is a project of the company. */
-export async function assertProjects(db: Executor, companyId: string, ids: readonly (string | null | undefined)[], field: string): Promise<void> {
+export async function assertProjects(
+  db: Executor,
+  companyId: string,
+  ids: readonly (string | null | undefined)[],
+  field: string,
+): Promise<void> {
   const unique = [...new Set(ids.filter((x): x is string => typeof x === "string"))];
   if (unique.length === 0) return;
-  const rows = await db.select({ id: projects.id }).from(projects).where(and(eq(projects.companyId, companyId), inArray(projects.id, unique)));
+  const rows = await db
+    .select({ id: projects.id })
+    .from(projects)
+    .where(and(eq(projects.companyId, companyId), inArray(projects.id, unique)));
   const found = new Set(rows.map((r) => r.id));
   const missing = unique.filter((id) => !found.has(id));
   if (missing.length > 0) throw ApiError.badRequest(`${field}: project ${missing[0]} not found`, { field, missing });

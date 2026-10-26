@@ -16,7 +16,11 @@ export default function Placeholder({ title, description }: PlaceholderProps) {
   const item = findNavItem(location.pathname);
   const group = item ? NAV_GROUPS.find((candidate) => candidate.items.includes(item)) : undefined;
   const heading = title ?? item?.label ?? "Page";
-  const breadcrumbs = [{ label: "Home", to: "/" }, ...(group && group.id !== "overview" ? [{ label: group.label }] : []), { label: heading }];
+  const breadcrumbs = [
+    { label: "Home", to: "/" },
+    ...(group && group.id !== "overview" ? [{ label: group.label }] : []),
+    { label: heading },
+  ];
 
   return (
     <>

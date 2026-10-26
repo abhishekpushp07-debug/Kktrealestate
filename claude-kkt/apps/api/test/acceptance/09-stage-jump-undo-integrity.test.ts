@@ -1,8 +1,31 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { addDays } from "@kkt/domain";
 import {
-  blockByCode, BOOT_TIMEOUT, bookingBody, bookingBySeq, bootAcceptance, construction, createCustomer, defaultBankAccount, demandsOf, flatsOf, getBooking, key, listAtCr, ledgerOf, masterByCode, paymentBody, paymentModes, projectByCode, stagesByName,
-  type Booking, type Demand, type ErrorBody, type Harness, type List, type PostPaymentResponse,
+  blockByCode,
+  BOOT_TIMEOUT,
+  bookingBody,
+  bookingBySeq,
+  bootAcceptance,
+  construction,
+  createCustomer,
+  defaultBankAccount,
+  demandsOf,
+  flatsOf,
+  getBooking,
+  key,
+  listAtCr,
+  ledgerOf,
+  masterByCode,
+  paymentBody,
+  paymentModes,
+  projectByCode,
+  stagesByName,
+  type Booking,
+  type Demand,
+  type ErrorBody,
+  type Harness,
+  type List,
+  type PostPaymentResponse,
 } from "./harness.js";
 
 /**
@@ -12,9 +35,27 @@ import {
  * Tower B (SEED.md: completed through Foundation) is jumped to 1st Slab (Plinth + 1st Slab).
  */
 
-type Integrity = { ok: boolean; findings: { type: string; booking_id: string; demand_number?: string | null }[]; counts?: Record<string, number>; bookings_checked?: number };
-type Status = { completed_stage_ids: string[]; demands_raised: number; demand_numbers: string[]; buyers_notified: number; construction_percent: number; version: number };
-type Undo = { stage_id: string; voided_demand_numbers: string[]; withdrawn_notifications: number; construction_percent: number; version: number };
+type Integrity = {
+  ok: boolean;
+  findings: { type: string; booking_id: string; demand_number?: string | null }[];
+  counts?: Record<string, number>;
+  bookings_checked?: number;
+};
+type Status = {
+  completed_stage_ids: string[];
+  demands_raised: number;
+  demand_numbers: string[];
+  buyers_notified: number;
+  construction_percent: number;
+  version: number;
+};
+type Undo = {
+  stage_id: string;
+  voided_demand_numbers: string[];
+  withdrawn_notifications: number;
+  construction_percent: number;
+  version: number;
+};
 type PortalNote = { id: string; type: string; entity_id: string | null; is_read: boolean };
 
 let h: Harness;
@@ -46,15 +87,27 @@ async function portalNotes(token: string): Promise<PortalNote[]> {
   return r.body.items;
 }
 
-async function status(body: Record<string, unknown>): Promise<{ status: number; body: Status & ErrorBody; text: string }> {
+async function status(
+  body: Record<string, unknown>,
+): Promise<{ status: number; body: Status & ErrorBody; text: string }> {
   const c = await construction(h, admin, towerB.id);
-  const r = await h.request<Status & ErrorBody>("POST", `/api/v1/blocks/${towerB.id}/construction/status`, { token: admin, body: { version: c.version, notify_buyers: true, ...body }, headers: { "idempotency-key": key("st") } });
+  const r = await h.request<Status & ErrorBody>("POST", `/api/v1/blocks/${towerB.id}/construction/status`, {
+    token: admin,
+    body: { version: c.version, notify_buyers: true, ...body },
+    headers: { "idempotency-key": key("st") },
+  });
   return { status: r.status, body: r.body, text: r.text };
 }
 
-async function undo(stageId: string, reason: string): Promise<{ status: number; body: Undo & ErrorBody; text: string }> {
+async function undo(
+  stageId: string,
+  reason: string,
+): Promise<{ status: number; body: Undo & ErrorBody; text: string }> {
   const c = await construction(h, admin, towerB.id);
-  const r = await h.request<Undo & ErrorBody>("POST", `/api/v1/blocks/${towerB.id}/construction/undo`, { token: admin, body: { version: c.version, stage_id: stageId, reason } });
+  const r = await h.request<Undo & ErrorBody>("POST", `/api/v1/blocks/${towerB.id}/construction/undo`, {
+    token: admin,
+    body: { version: c.version, stage_id: stageId, reason },
+  });
   return { status: r.status, body: r.body, text: r.text };
 }
 
@@ -72,15 +125,25 @@ beforeAll(async () => {
   const flexi = await masterByCode<{ id: string; code: string }>(h, admin, "payment-plans", "FLEXI_10_40_50");
   const cA = await createCustomer(h, sales, "Acceptance Buyer Nine A", "9898000091");
   const cB = await createCustomer(h, sales, "Acceptance Buyer Nine B", "9898000092");
-  const r1 = await h.request<Booking & ErrorBody>("POST", "/api/v1/bookings", { token: sales, headers: { "idempotency-key": key() }, body: bookingBody(h, flats.get("B-401")!.id, cA.id) });
+  const r1 = await h.request<Booking & ErrorBody>("POST", "/api/v1/bookings", {
+    token: sales,
+    headers: { "idempotency-key": key() },
+    body: bookingBody(h, flats.get("B-401")!.id, cA.id),
+  });
   if (r1.status !== 201) throw new Error(r1.text);
   bStd = r1.body;
-  const r2 = await h.request<Booking & ErrorBody>("POST", "/api/v1/bookings", { token: sales, headers: { "idempotency-key": key() }, body: bookingBody(h, flats.get("B-402")!.id, cB.id, { payment_plan_id: flexi.id }) });
+  const r2 = await h.request<Booking & ErrorBody>("POST", "/api/v1/bookings", {
+    token: sales,
+    headers: { "idempotency-key": key() },
+    body: bookingBody(h, flats.get("B-402")!.id, cB.id, { payment_plan_id: flexi.id }),
+  });
   if (r2.status !== 201) throw new Error(r2.text);
   bFlexi = r2.body;
   vikram = (await h.portalLogin("9876543214")).access_token;
 }, BOOT_TIMEOUT);
-afterAll(async () => { await h?.close(); });
+afterAll(async () => {
+  await h?.close();
+});
 
 describe("scenario 9 — integrity on clean data", () => {
   it("the integrity report shows zero findings on the seeded data plus the two fresh bookings", async () => {
@@ -108,7 +171,12 @@ describe("scenario 9 — jump two stages ahead", () => {
 
   it("marking 1st Slab completes Plinth too, raises Plinth (5 %) and 1st Slab (10 %) for every active Standard CLP booking, nothing for the Flexi booking, and rings the buyers' bells", async () => {
     const notesBefore = await portalNotes(vikram);
-    const r = await status({ stage_id: stages.get("1st Slab"), completed_on: h.today, intermediate_dates: { [stages.get("Plinth")!]: addDays(h.today, -1) }, notes: "Slab cast (acceptance)" });
+    const r = await status({
+      stage_id: stages.get("1st Slab"),
+      completed_on: h.today,
+      intermediate_dates: { [stages.get("Plinth")!]: addDays(h.today, -1) },
+      notes: "Slab cast (acceptance)",
+    });
     expect(r.status, r.text).toBe(200);
     // SPEC L128: picking a stage further ahead marks all intermediate stages Completed too (with the given dates)
     expect(r.body.completed_stage_ids).toEqual([stages.get("Plinth"), stages.get("1st Slab")]);
@@ -117,16 +185,41 @@ describe("scenario 9 — jump two stages ahead", () => {
     expect(r.body.demand_numbers).toHaveLength(4);
     const c = await construction(h, admin, towerB.id);
     const byName = new Map(c.stages.map((s) => [s.name, s]));
-    expect(byName.get("Plinth")).toMatchObject({ status: "COMPLETED", completed_on: addDays(h.today, -1), demands_raised: 2, can_undo: false });
-    expect(byName.get("1st Slab")).toMatchObject({ status: "COMPLETED", completed_on: h.today, demands_raised: 2, can_undo: true });
+    expect(byName.get("Plinth")).toMatchObject({
+      status: "COMPLETED",
+      completed_on: addDays(h.today, -1),
+      demands_raised: 2,
+      can_undo: false,
+    });
+    expect(byName.get("1st Slab")).toMatchObject({
+      status: "COMPLETED",
+      completed_on: h.today,
+      demands_raised: 2,
+      can_undo: true,
+    });
     expect(c.construction_percent).toBe(28.57); // 4 / 14 (SPEC L128 display only)
-    for (const [label, bk] of [["#5", b5], ["B-401", bStd]] as const) {
-      const ds = (await demandsOf(h, admin, bk.id, false));
+    for (const [label, bk] of [
+      ["#5", b5],
+      ["B-401", bStd],
+    ] as const) {
+      const ds = await demandsOf(h, admin, bk.id, false);
       const plinth = ds.find((d) => d.installment_seq === 4)!;
       const slab = ds.find((d) => d.installment_seq === 5)!;
       // SPEC L146: cash_demand = cash_agreed × percent / 100 (telescoped, SPEC L147); account likewise — "% × agreed per bucket"
-      expect(plinth, `${label} plinth`).toMatchObject({ cash_demand_paise: share(bk.cash_agreed_paise, 25, 30), account_demand_paise: share(bk.account_agreed_paise, 25, 30), trigger_stage_id: stages.get("Plinth"), demand_date: addDays(h.today, -1), status: "OPEN" });
-      expect(slab, `${label} slab`).toMatchObject({ cash_demand_paise: share(bk.cash_agreed_paise, 30, 40), account_demand_paise: share(bk.account_agreed_paise, 30, 40), trigger_stage_id: stages.get("1st Slab"), demand_date: h.today, status: "OPEN" });
+      expect(plinth, `${label} plinth`).toMatchObject({
+        cash_demand_paise: share(bk.cash_agreed_paise, 25, 30),
+        account_demand_paise: share(bk.account_agreed_paise, 25, 30),
+        trigger_stage_id: stages.get("Plinth"),
+        demand_date: addDays(h.today, -1),
+        status: "OPEN",
+      });
+      expect(slab, `${label} slab`).toMatchObject({
+        cash_demand_paise: share(bk.cash_agreed_paise, 30, 40),
+        account_demand_paise: share(bk.account_agreed_paise, 30, 40),
+        trigger_stage_id: stages.get("1st Slab"),
+        demand_date: h.today,
+        status: "OPEN",
+      });
       expect(ds.map((d) => d.installment_seq)).toEqual([1, 2, 3, 4, 5]);
       const after = await getBooking(h, admin, bk.id);
       expect(after.summary.raised_percent, label).toBe(40);
@@ -135,18 +228,28 @@ describe("scenario 9 — jump two stages ahead", () => {
     }
     expect((await demandsOf(h, admin, bFlexi.id, false)).map((d) => d.installment_seq)).toEqual([1]); // SPEC L250 "on plans that have them"
     expect((await getBooking(h, admin, bFlexi.id)).summary.raised_percent).toBe(10);
-    plinthDemands = [b5, bStd].map((bk) => bk.id).length ? await Promise.all([b5, bStd].map(async (bk) => (await demandsOf(h, admin, bk.id, false)).find((d) => d.installment_seq === 4)!)) : [];
-    slabDemands = await Promise.all([b5, bStd].map(async (bk) => (await demandsOf(h, admin, bk.id, false)).find((d) => d.installment_seq === 5)!));
+    plinthDemands = [b5, bStd].map((bk) => bk.id).length
+      ? await Promise.all(
+          [b5, bStd].map(async (bk) => (await demandsOf(h, admin, bk.id, false)).find((d) => d.installment_seq === 4)!),
+        )
+      : [];
+    slabDemands = await Promise.all(
+      [b5, bStd].map(async (bk) => (await demandsOf(h, admin, bk.id, false)).find((d) => d.installment_seq === 5)!),
+    );
     // SPEC L129 / L204: the buyer is notified of each installment demand raised (portal bell)
     const notesAfter = await portalNotes(vikram);
     const fresh = notesAfter.filter((n) => !notesBefore.some((o) => o.id === n.id));
     const raisedBells = fresh.filter((n) => n.type === "DEMAND_RAISED").map((n) => n.entity_id);
     expect(raisedBells).toEqual(expect.arrayContaining([plinthDemands[0]!.id, slabDemands[0]!.id]));
-    const unread = await h.request<{ count: number }>("GET", "/api/v1/portal/notifications/unread-count", { token: vikram });
+    const unread = await h.request<{ count: number }>("GET", "/api/v1/portal/notifications/unread-count", {
+      token: vikram,
+    });
     expect(unread.body.count).toBeGreaterThanOrEqual(2);
     // the ledger of each booking carries a DEMAND row per new demand (SPEC L149)
     const ledger = await ledgerOf(h, admin, bStd.id);
-    expect(ledger.filter((row) => row.event === "DEMAND").map((row) => row.ref_number)).toEqual(expect.arrayContaining([plinthDemands[1]!.demand_number, slabDemands[1]!.demand_number]));
+    expect(ledger.filter((row) => row.event === "DEMAND").map((row) => row.ref_number)).toEqual(
+      expect.arrayContaining([plinthDemands[1]!.demand_number, slabDemands[1]!.demand_number]),
+    );
   });
 
   it("only the latest completed stage can be undone; undoing 1st Slab (no payments) voids its demands, rebuilds ledgers and withdraws the bells", async () => {
@@ -154,11 +257,27 @@ describe("scenario 9 — jump two stages ahead", () => {
     // SPEC L130: "only the latest completed stage can be undone"
     expect(notLatest.status).toBe(409);
     expect(notLatest.body.error.code).toBe("UNDO_NOT_LATEST");
-    expect((await h.request("POST", `/api/v1/blocks/${towerB.id}/construction/undo`, { token: sales, body: { version: 1, stage_id: stages.get("1st Slab"), reason: "Sales cannot undo stages" } })).status).toBe(403); // SPEC L30 construction.undo
+    expect(
+      (
+        await h.request("POST", `/api/v1/blocks/${towerB.id}/construction/undo`, {
+          token: sales,
+          body: { version: 1, stage_id: stages.get("1st Slab"), reason: "Sales cannot undo stages" },
+        })
+      ).status,
+    ).toBe(403); // SPEC L30 construction.undo
     // mark one bell read so both retraction paths are exercised (SPEC L205: unread deleted, read ones marked withdrawn)
-    const slabBell = (await portalNotes(vikram)).find((n) => n.type === "DEMAND_RAISED" && n.entity_id === slabDemands[0]!.id)!;
+    const slabBell = (await portalNotes(vikram)).find(
+      (n) => n.type === "DEMAND_RAISED" && n.entity_id === slabDemands[0]!.id,
+    )!;
     expect(slabBell).toBeDefined();
-    expect((await h.request("POST", "/api/v1/portal/notifications/mark-read", { token: vikram, body: { ids: [slabBell.id] } })).status).toBe(200);
+    expect(
+      (
+        await h.request("POST", "/api/v1/portal/notifications/mark-read", {
+          token: vikram,
+          body: { ids: [slabBell.id] },
+        })
+      ).status,
+    ).toBe(200);
 
     const r = await undo(stages.get("1st Slab")!, "Slab certification still pending from the structural engineer");
     expect(r.status, r.text).toBe(200);
@@ -167,7 +286,12 @@ describe("scenario 9 — jump two stages ahead", () => {
     expect(r.body.withdrawn_notifications).toBeGreaterThanOrEqual(1); // the stage bells (staff); the demand bells are withdrawn by the money engine and checked on the portal below
     expect(r.body.construction_percent).toBe(21.43);
     const c = await construction(h, admin, towerB.id);
-    expect(c.stages.find((s) => s.name === "1st Slab")).toMatchObject({ status: "PENDING", completed_on: null, demands_raised: 0, can_undo: false });
+    expect(c.stages.find((s) => s.name === "1st Slab")).toMatchObject({
+      status: "PENDING",
+      completed_on: null,
+      demands_raised: 0,
+      can_undo: false,
+    });
     expect(c.stages.find((s) => s.name === "Plinth")?.can_undo).toBe(true);
     for (const [i, bk] of [b5, bStd].entries()) {
       const ds = await demandsOf(h, admin, bk.id, true);
@@ -175,7 +299,9 @@ describe("scenario 9 — jump two stages ahead", () => {
       expect(ds.filter((d) => d.status !== "VOID").map((d) => d.installment_seq)).toEqual([1, 2, 3, 4]);
       const after = await getBooking(h, admin, bk.id);
       expect(after.summary.raised_percent).toBe(30);
-      expect((await ledgerOf(h, admin, bk.id)).some((row) => row.ref_number === slabDemands[i]!.demand_number)).toBe(false); // ledger rebuilt without the voided demand
+      expect((await ledgerOf(h, admin, bk.id)).some((row) => row.ref_number === slabDemands[i]!.demand_number)).toBe(
+        false,
+      ); // ledger rebuilt without the voided demand
     }
     // SPEC L205 retraction: the buyer's bell no longer shows the slab demand (read → withdrawn, unread → deleted); counts exclude withdrawn
     const notes = await portalNotes(vikram);
@@ -193,7 +319,15 @@ describe("scenario 9 — jump two stages ahead", () => {
     const before = await getBooking(h, admin, b5.id);
     const slab = (await demandsOf(h, admin, b5.id, false)).find((d) => d.installment_seq === 5)!;
     // a receipt dated today (≥ the demand) that settles every open cash due, the slab installment included (FIFO per bucket)
-    const pay = await h.request<PostPaymentResponse & ErrorBody>("POST", "/api/v1/payments", { token: accounts, headers: { "idempotency-key": key() }, body: paymentBody(h, b5.id, modes, bank.id, { bucket: "CASH", amount: before.summary.cash.due_paise, mode: "UPI" }) });
+    const pay = await h.request<PostPaymentResponse & ErrorBody>("POST", "/api/v1/payments", {
+      token: accounts,
+      headers: { "idempotency-key": key() },
+      body: paymentBody(h, b5.id, modes, bank.id, {
+        bucket: "CASH",
+        amount: before.summary.cash.due_paise,
+        mode: "UPI",
+      }),
+    });
     expect(pay.status, pay.text).toBe(201);
     expect(pay.body.summary.cash_due_paise).toBe(0);
     expect((await demandsOf(h, admin, b5.id, false)).find((d) => d.id === slab.id)?.paid_paise).toBeGreaterThan(0);
@@ -201,11 +335,20 @@ describe("scenario 9 — jump two stages ahead", () => {
     // SPEC L130: "only if no demand raised by it has been paid by a payment dated on/after the demand"
     expect(blocked.status).toBe(409);
     expect(blocked.body.error.code).toBe("UNDO_BLOCKED");
-    const details = blocked.body.error.details as { reasons: string[]; blocking_payments: { receipt_number: string; demand_number: string; payment_date: string }[] };
+    const details = blocked.body.error.details as {
+      reasons: string[];
+      blocking_payments: { receipt_number: string; demand_number: string; payment_date: string }[];
+    };
     expect(details.reasons.join(" ")).toContain(slab.demand_number);
-    expect(details.blocking_payments.some((p) => p.receipt_number === pay.body.payment.receipt_number && p.demand_number === slab.demand_number)).toBe(true);
+    expect(
+      details.blocking_payments.some(
+        (p) => p.receipt_number === pay.body.payment.receipt_number && p.demand_number === slab.demand_number,
+      ),
+    ).toBe(true);
     // nothing changed
-    expect((await construction(h, admin, towerB.id)).stages.find((s) => s.name === "1st Slab")?.status).toBe("COMPLETED");
+    expect((await construction(h, admin, towerB.id)).stages.find((s) => s.name === "1st Slab")?.status).toBe(
+      "COMPLETED",
+    );
     expect((await demandsOf(h, admin, b5.id, false)).some((d) => d.installment_seq === 5)).toBe(true);
     expect((await demandsOf(h, admin, bStd.id, false)).some((d) => d.installment_seq === 5)).toBe(true);
     expect((await integrity(`?project_id=${sghId}`)).findings).toEqual([]);
@@ -235,14 +378,22 @@ describe("scenario 9 — integrity report flags and repairs manufactured anomali
     expect(company.ok).toBe(false);
     expect(company.findings.filter((f) => f.booking_id === bFlexi.id)).toHaveLength(2);
     // SPEC L153 REPAIR (admin-confirmed): void unsatisfied demands without payments, rebuild ledgers / summaries
-    expect((await h.request("POST", "/api/v1/dues/integrity/repair", { token: sales, body: { confirm: "REPAIR" } })).status).toBe(403);
-    expect((await h.request("POST", "/api/v1/dues/integrity/repair", { token: admin, body: { confirm: "no" } })).status).toBe(400);
-    const repaired = await h.request<{ demands_voided: number; summaries_fixed: number; report_after: Integrity } & ErrorBody>("POST", "/api/v1/dues/integrity/repair", { token: admin, body: { confirm: "REPAIR", booking_ids: [bFlexi.id] } });
+    expect(
+      (await h.request("POST", "/api/v1/dues/integrity/repair", { token: sales, body: { confirm: "REPAIR" } })).status,
+    ).toBe(403);
+    expect(
+      (await h.request("POST", "/api/v1/dues/integrity/repair", { token: admin, body: { confirm: "no" } })).status,
+    ).toBe(400);
+    const repaired = await h.request<
+      { demands_voided: number; summaries_fixed: number; report_after: Integrity } & ErrorBody
+    >("POST", "/api/v1/dues/integrity/repair", { token: admin, body: { confirm: "REPAIR", booking_ids: [bFlexi.id] } });
     expect(repaired.status, repaired.text).toBe(200);
     expect(repaired.body.demands_voided).toBe(1);
     expect(repaired.body.summaries_fixed).toBeGreaterThanOrEqual(1);
     expect(repaired.body.report_after.findings.filter((f) => f.booking_id === bFlexi.id)).toHaveLength(0);
-    expect((await demandsOf(h, admin, bFlexi.id, true)).find((d) => d.demand_number === "DM-FAKE/0001")?.status).toBe("VOID"); // voided, never deleted (SPEC L41)
+    expect((await demandsOf(h, admin, bFlexi.id, true)).find((d) => d.demand_number === "DM-FAKE/0001")?.status).toBe(
+      "VOID",
+    ); // voided, never deleted (SPEC L41)
     expect((await getBooking(h, admin, bFlexi.id)).summary.cash.paid_paise).toBe(0);
     const clean = await integrity();
     expect(clean.findings).toEqual([]);

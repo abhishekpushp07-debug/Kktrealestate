@@ -11,7 +11,17 @@ import { colors, radius, space } from "./theme";
 const MAX_FILES = 10;
 const MAX_BYTES = 15 * 1024 * 1024;
 
-export function AttachmentPicker({ files, onChange, onError, max = MAX_FILES }: { files: LocalFile[]; onChange: (files: LocalFile[]) => void; onError: (msg: string) => void; max?: number }): React.JSX.Element {
+export function AttachmentPicker({
+  files,
+  onChange,
+  onError,
+  max = MAX_FILES,
+}: {
+  files: LocalFile[];
+  onChange: (files: LocalFile[]) => void;
+  onError: (msg: string) => void;
+  max?: number;
+}): React.JSX.Element {
   const add = (assets: ImagePicker.ImagePickerAsset[]) => {
     const next = [...files];
     for (const a of assets) {
@@ -31,7 +41,12 @@ export function AttachmentPicker({ files, onChange, onError, max = MAX_FILES }: 
       const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!perm.granted) return onError("Allow photo access in Settings to attach pictures.");
     }
-    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], allowsMultipleSelection: true, selectionLimit: max - files.length, quality: 0.8 });
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsMultipleSelection: true,
+      selectionLimit: max - files.length,
+      quality: 0.8,
+    });
     if (!res.canceled) add(res.assets);
   };
 
@@ -46,8 +61,24 @@ export function AttachmentPicker({ files, onChange, onError, max = MAX_FILES }: 
   return (
     <View style={{ gap: space.sm }}>
       <View style={styles.buttons}>
-        {Platform.OS !== "web" ? <Button title="Camera" variant="outline" size="sm" icon="camera" onPress={() => void pickCamera()} disabled={files.length >= max} /> : null}
-        <Button title={Platform.OS === "web" ? "Add photos" : "Library"} variant="outline" size="sm" icon="image" onPress={() => void pickLibrary()} disabled={files.length >= max} />
+        {Platform.OS !== "web" ? (
+          <Button
+            title="Camera"
+            variant="outline"
+            size="sm"
+            icon="camera"
+            onPress={() => void pickCamera()}
+            disabled={files.length >= max}
+          />
+        ) : null}
+        <Button
+          title={Platform.OS === "web" ? "Add photos" : "Library"}
+          variant="outline"
+          size="sm"
+          icon="image"
+          onPress={() => void pickLibrary()}
+          disabled={files.length >= max}
+        />
         <T variant="caption" color={colors.inkSubtle}>
           {files.length}/{max} · JPG, PNG, WebP up to 15 MB
         </T>
@@ -57,7 +88,16 @@ export function AttachmentPicker({ files, onChange, onError, max = MAX_FILES }: 
           {files.map((f, i) => (
             <View key={`${f.uri}-${i}`} style={styles.thumbWrap}>
               <Image source={{ uri: f.uri }} style={styles.thumb} contentFit="cover" accessibilityLabel="" />
-              <IconButton name="close" label="Remove photo" size={24} iconSize={12} color={colors.onNavy} bg={colors.navy} style={styles.remove} onPress={() => onChange(files.filter((_, j) => j !== i))} />
+              <IconButton
+                name="close"
+                label="Remove photo"
+                size={24}
+                iconSize={12}
+                color={colors.onNavy}
+                bg={colors.navy}
+                style={styles.remove}
+                onPress={() => onChange(files.filter((_, j) => j !== i))}
+              />
             </View>
           ))}
         </ScrollView>
@@ -66,9 +106,22 @@ export function AttachmentPicker({ files, onChange, onError, max = MAX_FILES }: 
   );
 }
 
-export function AttachmentThumb({ uri, name, onPress }: { uri: string | null; name: string; onPress?: () => void }): React.JSX.Element {
+export function AttachmentThumb({
+  uri,
+  name,
+  onPress,
+}: {
+  uri: string | null;
+  name: string;
+  onPress?: () => void;
+}): React.JSX.Element {
   return (
-    <Pressable accessibilityRole={onPress ? "button" : undefined} onPress={onPress} disabled={!onPress} style={styles.attachment}>
+    <Pressable
+      accessibilityRole={onPress ? "button" : undefined}
+      onPress={onPress}
+      disabled={!onPress}
+      style={styles.attachment}
+    >
       {uri ? <Image source={{ uri }} style={styles.attachmentImg} contentFit="cover" accessibilityLabel="" /> : null}
       <T variant="caption" color={colors.navy} numberOfLines={1} style={{ maxWidth: 140 }}>
         {name}
@@ -82,6 +135,14 @@ const styles = StyleSheet.create({
   thumbWrap: { width: 84, height: 84 },
   thumb: { width: 84, height: 84, borderRadius: radius.md, backgroundColor: colors.navy100 },
   remove: { position: "absolute", top: -6, right: -6 },
-  attachment: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: colors.navy50, borderRadius: radius.sm, padding: 6, paddingRight: 10 },
+  attachment: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: colors.navy50,
+    borderRadius: radius.sm,
+    padding: 6,
+    paddingRight: 10,
+  },
   attachmentImg: { width: 32, height: 32, borderRadius: 6, backgroundColor: colors.navy100 },
 });

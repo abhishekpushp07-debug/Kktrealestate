@@ -17,10 +17,20 @@ import { useDocumentTitle } from "@/ui/Screen";
 
 function failureCopy(f: LoginFailure): { title: string; body: string; tone: "danger" | "warning" } {
   if (f.code === "LOCKED") {
-    return { title: "Account temporarily locked", body: f.lockedUntil ? `Too many failed attempts. Try again after ${formatDateTime(f.lockedUntil)}.` : f.message, tone: "warning" };
+    return {
+      title: "Account temporarily locked",
+      body: f.lockedUntil ? `Too many failed attempts. Try again after ${formatDateTime(f.lockedUntil)}.` : f.message,
+      tone: "warning",
+    };
   }
   if (f.code === "RATE_LIMITED") {
-    return { title: "Slow down a moment", body: f.retryAfterSeconds ? `Too many attempts from this device. Try again in ${f.retryAfterSeconds} seconds.` : f.message, tone: "warning" };
+    return {
+      title: "Slow down a moment",
+      body: f.retryAfterSeconds
+        ? `Too many attempts from this device. Try again in ${f.retryAfterSeconds} seconds.`
+        : f.message,
+      tone: "warning",
+    };
   }
   if (f.code === "NETWORK") return { title: "You're offline", body: f.message, tone: "warning" };
   return { title: f.code === "VALIDATION" ? "Check your details" : "Sign-in failed", body: f.message, tone: "danger" };
@@ -55,7 +65,9 @@ export function LoginScreen(): React.JSX.Element {
           Use the mobile number registered with your booking.
         </T>
       </View>
-      {failure ? <Notice tone={failureCopy(failure).tone} title={failureCopy(failure).title} body={failureCopy(failure).body} /> : null}
+      {failure ? (
+        <Notice tone={failureCopy(failure).tone} title={failureCopy(failure).title} body={failureCopy(failure).body} />
+      ) : null}
       <Field
         label="Mobile number"
         icon="phone"
@@ -92,7 +104,12 @@ export function LoginScreen(): React.JSX.Element {
         <T variant="small" color={colors.inkMuted}>
           Staff?
         </T>
-        <Pressable accessibilityRole="link" onPress={() => void openExternal(ERP_URL || "http://localhost:5173")} hitSlop={12} style={styles.erpLink}>
+        <Pressable
+          accessibilityRole="link"
+          onPress={() => void openExternal(ERP_URL || "http://localhost:5173")}
+          hitSlop={12}
+          style={styles.erpLink}
+        >
           <T variant="bodyStrong" color={colors.navy}>
             Go to ERP
           </T>
@@ -103,9 +120,24 @@ export function LoginScreen(): React.JSX.Element {
   );
 
   return (
-    <LinearGradient colors={[colors.navy, colors.navy800, "#071528"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.root}>
+    <LinearGradient
+      colors={[colors.navy, colors.navy800, "#071528"]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.root}
+    >
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={[styles.scroll, { paddingTop: insets.top + space.xxxl, paddingBottom: insets.bottom + space.xxl, paddingHorizontal: layout.gutter }]} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={[
+            styles.scroll,
+            {
+              paddingTop: insets.top + space.xxxl,
+              paddingBottom: insets.bottom + space.xxl,
+              paddingHorizontal: layout.gutter,
+            },
+          ]}
+          keyboardShouldPersistTaps="handled"
+        >
           <View style={[styles.inner, wide ? styles.innerWide : null]}>
             <View style={[styles.hero, wide ? styles.heroWide : null]}>
               <View style={styles.markRow}>
@@ -124,7 +156,11 @@ export function LoginScreen(): React.JSX.Element {
               </T>
               {wide ? (
                 <View style={styles.bullets}>
-                  {["Track every installment, cash and account", "Download receipts and demand letters", "Watch your tower rise, stage by stage"].map((b) => (
+                  {[
+                    "Track every installment, cash and account",
+                    "Download receipts and demand letters",
+                    "Watch your tower rise, stage by stage",
+                  ].map((b) => (
                     <View key={b} style={styles.bullet}>
                       <Icon name="check" size={14} color={colors.gold} />
                       <T variant="small" color={colors.onNavyMuted}>
@@ -151,11 +187,28 @@ const styles = StyleSheet.create({
   hero: { gap: space.md },
   heroWide: { flex: 1.1 },
   markRow: { flexDirection: "row", alignItems: "center", gap: space.md, marginBottom: space.sm },
-  mark: { width: 44, height: 44, borderRadius: radius.md, backgroundColor: "rgba(201,162,39,0.14)", borderWidth: 1, borderColor: "rgba(201,162,39,0.5)", alignItems: "center", justifyContent: "center" },
+  mark: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.md,
+    backgroundColor: "rgba(201,162,39,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(201,162,39,0.5)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   bullets: { gap: space.sm, marginTop: space.md },
   bullet: { flexDirection: "row", alignItems: "center", gap: space.sm },
   card: { backgroundColor: colors.ivory, borderRadius: radius.xl, padding: space.xxl, gap: space.lg, width: "100%" },
   cardWide: { flex: 1, maxWidth: 440 },
-  erpRow: { flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 6, paddingTop: space.sm, borderTopWidth: 1, borderTopColor: colors.line },
+  erpRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 6,
+    paddingTop: space.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.line,
+  },
   erpLink: { flexDirection: "row", alignItems: "center", gap: 4 },
 });

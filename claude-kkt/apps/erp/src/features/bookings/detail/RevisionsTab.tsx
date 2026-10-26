@@ -1,5 +1,11 @@
 import { ArrowRight, FileSignature, Route } from "lucide-react";
-import { TRIGGER_TYPE_LABELS, type AgreementRevisionRow, type BookingDetailResponse, type PlanRevisionRow, type PlanSnapshot } from "@kkt/contracts";
+import {
+  TRIGGER_TYPE_LABELS,
+  type AgreementRevisionRow,
+  type BookingDetailResponse,
+  type PlanRevisionRow,
+  type PlanSnapshot,
+} from "@kkt/contracts";
 import { Badge, EmptyState, Timeline, type TimelineItem } from "@/components/ui";
 import { formatINR, formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -11,7 +17,11 @@ function Delta({ before, after }: { before: number; after: number }) {
       <span className="text-ink-subtle line-through">{formatINR(before)}</span>
       <ArrowRight className="size-3 text-ink-subtle" aria-hidden="true" />
       <span className="font-semibold text-navy-950">{formatINR(after)}</span>
-      {diff !== 0 && <span className={cn("text-2xs font-semibold", diff > 0 ? "text-success-fg" : "text-danger-fg")}>({formatINR(diff, { signed: true })})</span>}
+      {diff !== 0 && (
+        <span className={cn("text-2xs font-semibold", diff > 0 ? "text-success-fg" : "text-danger-fg")}>
+          ({formatINR(diff, { signed: true })})
+        </span>
+      )}
     </span>
   );
 }
@@ -46,7 +56,8 @@ function PlanColumn({ snapshot, label }: { snapshot: PlanSnapshot; label: string
         {snapshot.installments.map((installment) => (
           <li key={installment.seq} className="flex justify-between gap-2">
             <span className="truncate">
-              {installment.seq}. {installment.name} <span className="text-ink-subtle">· {TRIGGER_TYPE_LABELS[installment.trigger_type]}</span>
+              {installment.seq}. {installment.name}{" "}
+              <span className="text-ink-subtle">· {TRIGGER_TYPE_LABELS[installment.trigger_type]}</span>
             </span>
             <span className="money shrink-0 font-medium">{formatPercent(installment.percent)}</span>
           </li>
@@ -99,7 +110,14 @@ export function RevisionsTab({ booking }: { booking: BookingDetailResponse }) {
   ].sort((a, b) => (b.at ?? "").localeCompare(a.at ?? ""));
 
   if (items.length === 0) {
-    return <EmptyState compact icon={FileSignature} title="No revisions" description="Agreement revisions and plan changes are recorded here with their before / after values." />;
+    return (
+      <EmptyState
+        compact
+        icon={FileSignature}
+        title="No revisions"
+        description="Agreement revisions and plan changes are recorded here with their before / after values."
+      />
+    );
   }
   return (
     <div className="rounded-lg border border-border bg-card p-4" data-testid="revisions-tab">

@@ -13,7 +13,7 @@
     "test": "turbo run test",
     "test:acceptance": "pnpm --filter @kkt/api test:acceptance",
     "typecheck": "turbo run typecheck",
-    "lint": "turbo run lint",
+    "lint": "turbo run lint && eslint --max-warnings 0 eslint.config.mjs scripts infra",
     "db:migrate": "pnpm --filter @kkt/db migrate",
     "db:seed": "pnpm --filter @kkt/api seed",
     "db:reset": "pnpm --filter @kkt/db reset && pnpm --filter @kkt/api seed",

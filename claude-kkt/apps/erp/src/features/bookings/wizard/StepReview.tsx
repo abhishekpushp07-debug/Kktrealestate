@@ -29,12 +29,24 @@ export function StepReview({ state, update, errors, showErrors }: StepProps) {
   const salesUsers = useSalesUserOptions();
   const plan = plans.data?.find((row) => row.plan_id === state.payment_plan_id) ?? null;
   const previewRequest = useMemo<SchedulePreviewRequest | null>(
-    () => (state.payment_plan_id && state.block_id && state.cash_agreed_paise !== null && state.account_agreed_paise !== null ? { plan_id: state.payment_plan_id, block_id: state.block_id, booking_date: state.booking_date, cash_agreed_paise: state.cash_agreed_paise, account_agreed_paise: state.account_agreed_paise } : null),
+    () =>
+      state.payment_plan_id && state.block_id && state.cash_agreed_paise !== null && state.account_agreed_paise !== null
+        ? {
+            plan_id: state.payment_plan_id,
+            block_id: state.block_id,
+            booking_date: state.booking_date,
+            cash_agreed_paise: state.cash_agreed_paise,
+            account_agreed_paise: state.account_agreed_paise,
+          }
+        : null,
     [state.payment_plan_id, state.block_id, state.booking_date, state.cash_agreed_paise, state.account_agreed_paise],
   );
   const preview = useSchedulePreview(previewRequest);
   const total = state.agreement_value_paise ?? 0;
-  const percents = splitPercents(total, { cash_paise: state.cash_agreed_paise ?? 0, account_paise: state.account_agreed_paise ?? 0 });
+  const percents = splitPercents(total, {
+    cash_paise: state.cash_agreed_paise ?? 0,
+    account_paise: state.account_agreed_paise ?? 0,
+  });
   const charges = otherChargesTotal(state.other_charges);
   const slots = (parking.data ?? []).filter((slot) => state.parking_slot_ids.includes(slot.id));
   const typeById = new Map((chargeTypes.data ?? []).map((type) => [type.id, type] as const));
@@ -56,7 +68,13 @@ export function StepReview({ state, update, errors, showErrors }: StepProps) {
 
       <div className="kkt-no-print flex items-center justify-between gap-2">
         <h3 className="font-display text-md font-bold text-navy-950">Review &amp; confirm</h3>
-        <Button size="sm" variant="outline" leftIcon={Printer} onClick={() => window.print()} data-testid="wizard-print-summary">
+        <Button
+          size="sm"
+          variant="outline"
+          leftIcon={Printer}
+          onClick={() => window.print()}
+          data-testid="wizard-print-summary"
+        >
           Print summary
         </Button>
       </div>
@@ -90,10 +108,21 @@ export function StepReview({ state, update, errors, showErrors }: StepProps) {
             <KeyValueList
               layout="inline"
               items={[
-                { label: "Primary", value: <span>{customer.data.full_name} <span className="money text-2xs text-ink-subtle">{customer.data.customer_code}</span></span> },
+                {
+                  label: "Primary",
+                  value: (
+                    <span>
+                      {customer.data.full_name}{" "}
+                      <span className="money text-2xs text-ink-subtle">{customer.data.customer_code}</span>
+                    </span>
+                  ),
+                },
                 { label: "Phone", value: <span className="money">{formatPhone(customer.data.phone)}</span> },
                 { label: "KYC", value: customer.data.kyc_status },
-                { label: "Co-applicants", value: state.co_applicant_ids.length ? `${state.co_applicant_ids.length} added` : "None" },
+                {
+                  label: "Co-applicants",
+                  value: state.co_applicant_ids.length ? `${state.co_applicant_ids.length} added` : "None",
+                },
               ]}
             />
           ) : (
@@ -105,9 +134,21 @@ export function StepReview({ state, update, errors, showErrors }: StepProps) {
           <KeyValueList
             layout="inline"
             items={[
-              { label: "Agreement value", value: <span className="font-bold text-navy-950">{formatINR(state.agreement_value_paise)}</span>, numeric: true },
-              { label: `Cash bucket (${formatPercent(percents.cash)})`, value: formatINR(state.cash_agreed_paise), numeric: true },
-              { label: `Account bucket (${formatPercent(percents.account)})`, value: formatINR(state.account_agreed_paise), numeric: true },
+              {
+                label: "Agreement value",
+                value: <span className="font-bold text-navy-950">{formatINR(state.agreement_value_paise)}</span>,
+                numeric: true,
+              },
+              {
+                label: `Cash bucket (${formatPercent(percents.cash)})`,
+                value: formatINR(state.cash_agreed_paise),
+                numeric: true,
+              },
+              {
+                label: `Account bucket (${formatPercent(percents.account)})`,
+                value: formatINR(state.account_agreed_paise),
+                numeric: true,
+              },
             ]}
           />
         </div>
@@ -120,7 +161,9 @@ export function StepReview({ state, update, errors, showErrors }: StepProps) {
               { label: "Installments", value: plan ? String(plan.installments.length) : "—", numeric: true },
               { label: "Accepted via", value: PLAN_ACCEPTANCE_MODE_LABELS[state.plan_acceptance_mode] },
               { label: "Accepted on", value: formatDate(state.plan_accepted_on) },
-              ...(state.plan_acceptance_mode === "SIGNED_COPY" ? [{ label: "Signed copy", value: state.plan_acceptance_document_id ? "Uploaded" : "Missing" }] : []),
+              ...(state.plan_acceptance_mode === "SIGNED_COPY"
+                ? [{ label: "Signed copy", value: state.plan_acceptance_document_id ? "Uploaded" : "Missing" }]
+                : []),
             ]}
           />
         </div>
@@ -168,7 +211,9 @@ export function StepReview({ state, update, errors, showErrors }: StepProps) {
         <div className="rounded-lg border border-border bg-card p-4">
           <h4 className="label-caps mb-2">Parking</h4>
           {slots.length === 0 ? (
-            <p className="text-xs text-ink-subtle">{state.parking_slot_ids.length ? `${state.parking_slot_ids.length} slot(s) selected` : "None."}</p>
+            <p className="text-xs text-ink-subtle">
+              {state.parking_slot_ids.length ? `${state.parking_slot_ids.length} slot(s) selected` : "None."}
+            </p>
           ) : (
             <ul className="flex flex-wrap gap-2 text-sm">
               {slots.map((slot) => (
@@ -185,19 +230,47 @@ export function StepReview({ state, update, errors, showErrors }: StepProps) {
         <h4 className="label-caps">Sales details</h4>
         <FormRow columns={2}>
           <FieldWrapper label="Sales person">
-            {(control) => <Select id={control.id} value={state.sales_user_id} onValueChange={(value) => update({ sales_user_id: value })} options={(salesUsers.data ?? []).map((user) => ({ value: user.id, label: user.name }))} placeholder="Assign later" allowClear />}
+            {(control) => (
+              <Select
+                id={control.id}
+                value={state.sales_user_id}
+                onValueChange={(value) => update({ sales_user_id: value })}
+                options={(salesUsers.data ?? []).map((user) => ({ value: user.id, label: user.name }))}
+                placeholder="Assign later"
+                allowClear
+              />
+            )}
           </FieldWrapper>
           <FieldWrapper label="Broker / channel partner" error={showErrors ? errors.broker_name : undefined}>
-            {(control) => <Input id={control.id} value={state.broker_name} onChange={(event) => update({ broker_name: event.target.value })} maxLength={120} placeholder="Optional" />}
+            {(control) => (
+              <Input
+                id={control.id}
+                value={state.broker_name}
+                onChange={(event) => update({ broker_name: event.target.value })}
+                maxLength={120}
+                placeholder="Optional"
+              />
+            )}
           </FieldWrapper>
         </FormRow>
         <FieldWrapper label="Remarks" error={showErrors ? errors.remarks : undefined}>
-          {(control) => <Textarea id={control.id} value={state.remarks} onChange={(event) => update({ remarks: event.target.value })} rows={3} maxLength={2000} placeholder="Special terms, negotiated items, notes for Accounts…" />}
+          {(control) => (
+            <Textarea
+              id={control.id}
+              value={state.remarks}
+              onChange={(event) => update({ remarks: event.target.value })}
+              rows={3}
+              maxLength={2000}
+              placeholder="Special terms, negotiated items, notes for Accounts…"
+            />
+          )}
         </FieldWrapper>
       </section>
 
       <Notice tone="info" className="kkt-no-print">
-        On confirm the flat is locked atomically (Available or your Hold → Booked), parking is allotted, the flat and plan are snapshotted, ON_BOOKING and already-triggered installments are demanded, and “on booking” charges are raised.
+        On confirm the flat is locked atomically (Available or your Hold → Booked), parking is allotted, the flat and
+        plan are snapshotted, ON_BOOKING and already-triggered installments are demanded, and “on booking” charges are
+        raised.
       </Notice>
     </div>
   );

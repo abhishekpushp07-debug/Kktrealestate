@@ -14,15 +14,27 @@ export interface VersionedBody {
 }
 
 export function deactivateUser(user: UserRow): Promise<ActiveStateResponse> {
-  return api.post<ActiveStateResponse>(`${USERS_PATH}/${user.id}/deactivate`, { version: user.version } satisfies VersionedBody, { version: user.version });
+  return api.post<ActiveStateResponse>(
+    `${USERS_PATH}/${user.id}/deactivate`,
+    { version: user.version } satisfies VersionedBody,
+    { version: user.version },
+  );
 }
 
 export function activateUser(user: UserRow): Promise<ActiveStateResponse> {
-  return api.post<ActiveStateResponse>(`${USERS_PATH}/${user.id}/activate`, { version: user.version } satisfies VersionedBody, { version: user.version });
+  return api.post<ActiveStateResponse>(
+    `${USERS_PATH}/${user.id}/activate`,
+    { version: user.version } satisfies VersionedBody,
+    { version: user.version },
+  );
 }
 
 export function unlockUser(user: UserRow): Promise<ActiveStateResponse> {
-  return api.post<ActiveStateResponse>(`${USERS_PATH}/${user.id}/unlock`, { version: user.version } satisfies VersionedBody, { version: user.version });
+  return api.post<ActiveStateResponse>(
+    `${USERS_PATH}/${user.id}/unlock`,
+    { version: user.version } satisfies VersionedBody,
+    { version: user.version },
+  );
 }
 
 export interface ResetPasswordResult {
@@ -46,17 +58,24 @@ export async function resetUserPassword(user: UserRow): Promise<string | null> {
 
 /** `GET /permissions` may answer `{groups}` or a bare array. */
 export function normalisePermissionCatalog(raw: unknown): PermissionGroupResponse[] | null {
-  const list = Array.isArray(raw) ? raw : typeof raw === "object" && raw !== null && Array.isArray((raw as { groups?: unknown }).groups) ? (raw as { groups: unknown[] }).groups : null;
+  const list = Array.isArray(raw)
+    ? raw
+    : typeof raw === "object" && raw !== null && Array.isArray((raw as { groups?: unknown }).groups)
+      ? (raw as { groups: unknown[] }).groups
+      : null;
   if (!list) return null;
   const groups: PermissionGroupResponse[] = [];
   for (const entry of list) {
     if (typeof entry !== "object" || entry === null) continue;
     const record = entry as Record<string, unknown>;
-    if (typeof record.key !== "string" || typeof record.label !== "string" || !Array.isArray(record.permissions)) continue;
+    if (typeof record.key !== "string" || typeof record.label !== "string" || !Array.isArray(record.permissions))
+      continue;
     const permissions = record.permissions.flatMap((item) => {
       if (typeof item !== "object" || item === null) return [];
       const permission = item as Record<string, unknown>;
-      return typeof permission.code === "string" && typeof permission.label === "string" ? [{ code: permission.code, label: permission.label }] : [];
+      return typeof permission.code === "string" && typeof permission.label === "string"
+        ? [{ code: permission.code, label: permission.label }]
+        : [];
     });
     groups.push({ key: record.key, label: record.label, permissions });
   }

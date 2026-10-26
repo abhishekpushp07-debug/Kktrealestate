@@ -36,13 +36,31 @@ export function BankAccountForm({ mode, row }: MasterFormProps) {
           name="bank_name"
           label="Bank"
           required
-          render={({ field }) => <Input {...field} value={field.value} onChange={(event) => field.onChange(event.target.value)} placeholder="HDFC Bank" maxLength={120} data-testid="field-bank-name" />}
+          render={({ field }) => (
+            <Input
+              {...field}
+              value={field.value}
+              onChange={(event) => field.onChange(event.target.value)}
+              placeholder="HDFC Bank"
+              maxLength={120}
+              data-testid="field-bank-name"
+            />
+          )}
         />
         <FormField
           control={control}
           name="branch"
           label="Branch"
-          render={({ field }) => <Input {...field} value={field.value ?? ""} onChange={(event) => field.onChange(event.target.value || null)} placeholder="MG Road" maxLength={120} data-testid="field-branch" />}
+          render={({ field }) => (
+            <Input
+              {...field}
+              value={field.value ?? ""}
+              onChange={(event) => field.onChange(event.target.value || null)}
+              placeholder="MG Road"
+              maxLength={120}
+              data-testid="field-branch"
+            />
+          )}
         />
         <FormField
           control={control}
@@ -50,14 +68,33 @@ export function BankAccountForm({ mode, row }: MasterFormProps) {
           label="Account name"
           required
           hint="As printed on receipts"
-          render={({ field }) => <Input {...field} value={field.value} onChange={(event) => field.onChange(event.target.value)} placeholder="Shree Ganesh Builders" maxLength={120} data-testid="field-account-name" />}
+          render={({ field }) => (
+            <Input
+              {...field}
+              value={field.value}
+              onChange={(event) => field.onChange(event.target.value)}
+              placeholder="Shree Ganesh Builders"
+              maxLength={120}
+              data-testid="field-account-name"
+            />
+          )}
         />
         <FormField
           control={control}
           name="ifsc"
           label="IFSC"
           required
-          render={({ field }) => <Input {...field} value={field.value} onChange={(event) => field.onChange(event.target.value.toUpperCase())} placeholder="HDFC0001234" maxLength={11} className="font-mono uppercase" data-testid="field-ifsc" />}
+          render={({ field }) => (
+            <Input
+              {...field}
+              value={field.value}
+              onChange={(event) => field.onChange(event.target.value.toUpperCase())}
+              placeholder="HDFC0001234"
+              maxLength={11}
+              className="font-mono uppercase"
+              data-testid="field-ifsc"
+            />
+          )}
         />
       </FormRow>
 
@@ -70,7 +107,12 @@ export function BankAccountForm({ mode, row }: MasterFormProps) {
               <span className="money font-mono font-semibold text-navy-950">{masked ?? "••••"}</span>
             </div>
             {!changing ? (
-              <Button variant="outline" size="sm" onClick={() => setValue("change_account_number", true, { shouldDirty: true })} data-testid="change-account-number-btn">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setValue("change_account_number", true, { shouldDirty: true })}
+                data-testid="change-account-number-btn"
+              >
                 Change number
               </Button>
             ) : (
@@ -136,12 +178,30 @@ export function BankAccountForm({ mode, row }: MasterFormProps) {
         <FormField
           control={control}
           name="is_default"
-          render={({ field }) => <Switch id={field.id} checked={field.value} onCheckedChange={field.onChange} label="Default account" description="Pre-selected on receipts and bank deposits" data-testid="field-is-default" />}
+          render={({ field }) => (
+            <Switch
+              id={field.id}
+              checked={field.value}
+              onCheckedChange={field.onChange}
+              label="Default account"
+              description="Pre-selected on receipts and bank deposits"
+              data-testid="field-is-default"
+            />
+          )}
         />
         <FormField
           control={control}
           name="is_escrow"
-          render={({ field }) => <Switch id={field.id} checked={field.value} onCheckedChange={field.onChange} label="RERA escrow account" description="Collections for registered projects land here" data-testid="field-is-escrow" />}
+          render={({ field }) => (
+            <Switch
+              id={field.id}
+              checked={field.value}
+              onCheckedChange={field.onChange}
+              label="RERA escrow account"
+              description="Collections for registered projects land here"
+              data-testid="field-is-escrow"
+            />
+          )}
         />
       </FormRow>
     </div>

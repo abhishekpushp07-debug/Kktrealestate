@@ -17,7 +17,9 @@ function friendlyMessage(issue: z.core.$ZodIssue): string {
  * empty, UI-only keys stripped by a `.transform().pipe()` wrapper); the schema decides what is
  * valid and `handleSubmit` receives the parsed `Output`, ready to send.
  */
-export function contractResolver<Values extends FieldValues, Output>(schema: z.ZodType<Output>): Resolver<Values, unknown, Output> {
+export function contractResolver<Values extends FieldValues, Output>(
+  schema: z.ZodType<Output>,
+): Resolver<Values, unknown, Output> {
   return async (values, _context, options) => {
     const result = await schema.safeParseAsync(values);
     if (result.success) {

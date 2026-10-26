@@ -31,7 +31,12 @@ export function BookingChip({ onNavy, block }: { onNavy?: boolean; block?: boole
           haptics.tap();
           setOpen(true);
         }}
-        style={({ pressed }) => [styles.chip, onNavy ? styles.chipNavy : styles.chipIvory, block ? styles.block : null, pressed ? { opacity: 0.8 } : null]}
+        style={({ pressed }) => [
+          styles.chip,
+          onNavy ? styles.chipNavy : styles.chipIvory,
+          block ? styles.block : null,
+          pressed ? { opacity: 0.8 } : null,
+        ]}
       >
         <Icon name="flat" size={14} color={onNavy ? colors.gold : colors.navy} />
         <View style={{ flexShrink: 1 }}>
@@ -39,14 +44,26 @@ export function BookingChip({ onNavy, block }: { onNavy?: boolean; block?: boole
             {compact ? current.flat_number : `${current.flat_number} · ${current.block_name}`}
           </T>
           {block ? (
-            <T variant="caption" color={onNavy ? colors.onNavySubtle : colors.inkSubtle} numberOfLines={1} style={{ fontWeight: "400" }}>
+            <T
+              variant="caption"
+              color={onNavy ? colors.onNavySubtle : colors.inkSubtle}
+              numberOfLines={1}
+              style={{ fontWeight: "400" }}
+            >
               {current.project_name}
             </T>
           ) : null}
         </View>
-        {multiple ? <Icon name="chevron-down" size={12} color={onNavy ? colors.onNavyMuted : colors.inkSubtle} /> : null}
+        {multiple ? (
+          <Icon name="chevron-down" size={12} color={onNavy ? colors.onNavyMuted : colors.inkSubtle} />
+        ) : null}
       </Pressable>
-      <Sheet visible={open} onClose={() => setOpen(false)} title="Your bookings" subtitle="Switch between the flats on your name">
+      <Sheet
+        visible={open}
+        onClose={() => setOpen(false)}
+        title="Your bookings"
+        subtitle="Switch between the flats on your name"
+      >
         {bookings.map((b) => (
           <OptionRow
             key={b.booking_id}
@@ -67,11 +84,27 @@ export function BookingChip({ onNavy, block }: { onNavy?: boolean; block?: boole
 export function BookingRoleChip(): React.JSX.Element | null {
   const { current } = useBooking();
   if (!current) return null;
-  return <Chip label={current.role === "PRIMARY" ? "Primary applicant" : "Co-applicant"} tone={current.role === "PRIMARY" ? "gold" : "navy"} small />;
+  return (
+    <Chip
+      label={current.role === "PRIMARY" ? "Primary applicant" : "Co-applicant"}
+      tone={current.role === "PRIMARY" ? "gold" : "navy"}
+      small
+    />
+  );
 }
 
 const styles = StyleSheet.create({
-  chip: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 7, minHeight: 44, borderRadius: radius.pill, borderWidth: 1, maxWidth: 240 },
+  chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    minHeight: 44,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    maxWidth: 240,
+  },
   chipIvory: { backgroundColor: colors.surface, borderColor: colors.line },
   chipNavy: { backgroundColor: "rgba(255,255,255,0.1)", borderColor: "rgba(255,255,255,0.18)" },
   block: { maxWidth: undefined, alignSelf: "stretch", paddingVertical: 10, gap: space.sm },

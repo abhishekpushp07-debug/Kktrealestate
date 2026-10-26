@@ -70,7 +70,10 @@ export const ParkingBulkGenerateSchema = z
   .refine((g) => g.to_number - g.from_number < 1000, { message: "At most 1000 slots per batch", path: ["to_number"] });
 export type ParkingBulkGenerate = z.infer<typeof ParkingBulkGenerateSchema>;
 
-export const ParkingBulkGenerateResponseSchema = z.object({ created: z.int().min(0), skipped_existing: z.array(z.string()) });
+export const ParkingBulkGenerateResponseSchema = z.object({
+  created: z.int().min(0),
+  skipped_existing: z.array(z.string()),
+});
 export type ParkingBulkGenerateResponse = z.infer<typeof ParkingBulkGenerateResponseSchema>;
 
 /** Manual status change (AVAILABLE/BLOCKED); ALLOTTED is set by the booking engine. */

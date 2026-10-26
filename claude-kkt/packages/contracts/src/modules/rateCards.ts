@@ -20,7 +20,7 @@ export const RateCardRateSchema = z
     rate_per_sqft_paise: PaiseSchema.optional().nullable(),
     lump_sum_paise: PaiseSchema.optional().nullable(),
   })
-  .refine((r) => (r.rate_per_sqft_paise ?? null) !== null !== ((r.lump_sum_paise ?? null) !== null), {
+  .refine((r) => ((r.rate_per_sqft_paise ?? null) !== null) !== ((r.lump_sum_paise ?? null) !== null), {
     message: "Give either rate_per_sqft_paise or lump_sum_paise",
     path: ["rate_per_sqft_paise"],
   });
@@ -105,18 +105,27 @@ export const RateCardRowSchema = AuditedRowSchema.extend({
 export type RateCardRow = z.infer<typeof RateCardRowSchema>;
 
 /** List filter for rate cards. */
-export const RateCardFilterSchema = ListQuerySchema.extend({ project_id: IdSchema.optional(), status: RateCardStatusSchema.optional() });
+export const RateCardFilterSchema = ListQuerySchema.extend({
+  project_id: IdSchema.optional(),
+  status: RateCardStatusSchema.optional(),
+});
 export type RateCardFilter = z.infer<typeof RateCardFilterSchema>;
 
 export const RateCardListResponseSchema = listEnvelope(RateCardRowSchema);
 export type RateCardListResponse = z.infer<typeof RateCardListResponseSchema>;
 
 /** Activate a Draft rate card (supersedes the current Active one). */
-export const RateCardActivateSchema = z.strictObject({ ...VersionedSchema.shape, apply_to_available_flats: z.boolean().default(true) });
+export const RateCardActivateSchema = z.strictObject({
+  ...VersionedSchema.shape,
+  apply_to_available_flats: z.boolean().default(true),
+});
 export type RateCardActivate = z.infer<typeof RateCardActivateSchema>;
 
 /** Apply the Active rate card: re-prices ONLY Available flats. */
-export const RateCardApplySchema = z.strictObject({ block_id: IdSchema.optional(), dry_run: z.boolean().default(false) });
+export const RateCardApplySchema = z.strictObject({
+  block_id: IdSchema.optional(),
+  dry_run: z.boolean().default(false),
+});
 export type RateCardApply = z.infer<typeof RateCardApplySchema>;
 
 export const RateCardApplyResponseSchema = z.object({

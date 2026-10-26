@@ -12,7 +12,16 @@ import {
 import { useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { api, describeError, errorReference, isApiClientError, type ApiClientError, type ListEnvelope, type ListParams, type QueryValue } from "@/lib/api";
+import {
+  api,
+  describeError,
+  errorReference,
+  isApiClientError,
+  type ApiClientError,
+  type ListEnvelope,
+  type ListParams,
+  type QueryValue,
+} from "@/lib/api";
 import { conflictDetailsFrom, conflictStore } from "@/lib/conflict-store";
 
 export { conflictStore, useVersionConflict } from "@/lib/conflict-store";
@@ -114,9 +123,18 @@ export function useListParams(options: UseListParamsOptions = {}): UseListParams
     [update, defaultPageSize],
   );
   const setSearch = useCallback((search: string) => update({ q: search }, true), [update]);
-  const setSort = useCallback((sort: string | null) => update({ sort: sort === defaultSort ? null : sort }, false), [update, defaultSort]);
-  const setFilter = useCallback((name: string, value: string | null | undefined) => update({ [name]: value }, true), [update]);
-  const setFilters = useCallback((filters: Record<string, string | null | undefined>) => update(filters, true), [update]);
+  const setSort = useCallback(
+    (sort: string | null) => update({ sort: sort === defaultSort ? null : sort }, false),
+    [update, defaultSort],
+  );
+  const setFilter = useCallback(
+    (name: string, value: string | null | undefined) => update({ [name]: value }, true),
+    [update],
+  );
+  const setFilters = useCallback(
+    (filters: Record<string, string | null | undefined>) => update(filters, true),
+    [update],
+  );
   const setIncludeInactive = useCallback((value: boolean) => update({ inactive: value ? "1" : null }, true), [update]);
   const reset = useCallback(() => {
     const patch: Record<string, null> = { page: null, page_size: null, q: null, sort: null, inactive: null };
@@ -161,7 +179,11 @@ export type ListQueryOptions<T> = Omit<
 >;
 
 /** Paginated list from a standard list endpoint; keeps the previous page while loading the next. */
-export function useList<T>(endpoint: string, params: ListParams, options: ListQueryOptions<T> = {}): UseQueryResult<ListEnvelope<T>, ApiClientError> {
+export function useList<T>(
+  endpoint: string,
+  params: ListParams,
+  options: ListQueryOptions<T> = {},
+): UseQueryResult<ListEnvelope<T>, ApiClientError> {
   return useQuery<ListEnvelope<T>, ApiClientError, ListEnvelope<T>, QueryKey>({
     queryKey: queryKeys.list(endpoint, params),
     queryFn: ({ signal }) => api.list<T>(endpoint, params, { signal }),
@@ -173,7 +195,11 @@ export function useList<T>(endpoint: string, params: ListParams, options: ListQu
 export type ItemQueryOptions<T> = Omit<UseQueryOptions<T, ApiClientError, T, QueryKey>, "queryKey" | "queryFn">;
 
 /** Single resource by id (`enabled` only when an id is present). */
-export function useItem<T>(endpoint: string, id: string | null | undefined, options: ItemQueryOptions<T> = {}): UseQueryResult<T, ApiClientError> {
+export function useItem<T>(
+  endpoint: string,
+  id: string | null | undefined,
+  options: ItemQueryOptions<T> = {},
+): UseQueryResult<T, ApiClientError> {
   return useQuery<T, ApiClientError, T, QueryKey>({
     queryKey: queryKeys.item(endpoint, id ?? ""),
     queryFn: ({ signal }) => api.get<T>(`${endpoint}/${id}`, { signal }),
@@ -186,8 +212,10 @@ export function useItem<T>(endpoint: string, id: string | null | undefined, opti
 /* Mutations                                                            */
 /* ------------------------------------------------------------------ */
 
-export interface MutationToastOptions<TData, TVariables, TContext>
-  extends Omit<UseMutationOptions<TData, ApiClientError, TVariables, TContext>, "onSuccess" | "onError"> {
+export interface MutationToastOptions<TData, TVariables, TContext> extends Omit<
+  UseMutationOptions<TData, ApiClientError, TVariables, TContext>,
+  "onSuccess" | "onError"
+> {
   successMessage?: string | ((data: TData, variables: TVariables) => string) | false;
   errorMessage?: string | ((error: ApiClientError, variables: TVariables) => string) | false;
   /** Query keys (prefixes) to invalidate after success. */
@@ -233,7 +261,10 @@ export function useMutationWithToast<TData = unknown, TVariables = void, TContex
         });
       } else if (errorMessage !== false) {
         const reference = errorReference(error);
-        toast.error(typeof errorMessage === "function" ? errorMessage(error, variables) : (errorMessage ?? describeError(error)), reference ? { description: reference } : undefined);
+        toast.error(
+          typeof errorMessage === "function" ? errorMessage(error, variables) : (errorMessage ?? describeError(error)),
+          reference ? { description: reference } : undefined,
+        );
       }
       onError?.(error, variables, context);
     },

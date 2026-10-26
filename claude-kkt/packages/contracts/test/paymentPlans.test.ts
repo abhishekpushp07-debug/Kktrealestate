@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { PaymentPlanCreateSchema, PaymentPlanUpdateSchema, InstallmentInputSchema, type InstallmentInput } from "../src/index.js";
+import {
+  PaymentPlanCreateSchema,
+  PaymentPlanUpdateSchema,
+  InstallmentInputSchema,
+  type InstallmentInput,
+} from "../src/index.js";
 
 const STAGE = "11111111-1111-4111-8111-111111111111";
 
@@ -23,7 +28,9 @@ function plan(installments: InstallmentInput[]) {
 
 describe("PaymentPlanCreateSchema", () => {
   it("accepts a plan whose percents sum to exactly 100.00", () => {
-    const r = PaymentPlanCreateSchema.safeParse(plan([inst(1, 10, "ON_BOOKING"), inst(2, 85, "DAYS_AFTER_BOOKING"), inst(3, 5, "ON_POSSESSION")]));
+    const r = PaymentPlanCreateSchema.safeParse(
+      plan([inst(1, 10, "ON_BOOKING"), inst(2, 85, "DAYS_AFTER_BOOKING"), inst(3, 5, "ON_POSSESSION")]),
+    );
     expect(r.success).toBe(true);
   });
   it("accepts two-decimal percents that sum to 100 without float drift", () => {
@@ -49,8 +56,12 @@ describe("PaymentPlanCreateSchema", () => {
     expect(r2.error?.issues.some((i) => i.message.includes("ON_POSSESSION"))).toBe(true);
   });
   it("requires trigger details per trigger type", () => {
-    expect(InstallmentInputSchema.safeParse({ ...inst(1, 10, "ON_STAGE"), trigger_stage_id: null }).success).toBe(false);
-    expect(InstallmentInputSchema.safeParse({ ...inst(1, 10, "DAYS_AFTER_BOOKING"), trigger_days: null }).success).toBe(false);
+    expect(InstallmentInputSchema.safeParse({ ...inst(1, 10, "ON_STAGE"), trigger_stage_id: null }).success).toBe(
+      false,
+    );
+    expect(InstallmentInputSchema.safeParse({ ...inst(1, 10, "DAYS_AFTER_BOOKING"), trigger_days: null }).success).toBe(
+      false,
+    );
     expect(InstallmentInputSchema.safeParse({ ...inst(1, 10, "ON_DATE"), trigger_date: null }).success).toBe(false);
     expect(InstallmentInputSchema.safeParse(inst(1, 10, "ON_BOOKING")).success).toBe(true);
   });
@@ -62,7 +73,9 @@ describe("PaymentPlanCreateSchema", () => {
 describe("PaymentPlanUpdateSchema", () => {
   it("validates installments only when present", () => {
     expect(PaymentPlanUpdateSchema.safeParse({ version: 2, name: "Renamed" }).success).toBe(true);
-    expect(PaymentPlanUpdateSchema.safeParse({ version: 2, installments: [inst(1, 90, "ON_BOOKING")] }).success).toBe(false);
+    expect(PaymentPlanUpdateSchema.safeParse({ version: 2, installments: [inst(1, 90, "ON_BOOKING")] }).success).toBe(
+      false,
+    );
     expect(PaymentPlanUpdateSchema.safeParse({ name: "no version" }).success).toBe(false);
   });
 });

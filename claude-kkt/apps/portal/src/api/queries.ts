@@ -37,7 +37,11 @@ export const queryClient = new QueryClient({
   },
 });
 
-export const persister = createAsyncStoragePersister({ storage: AsyncStorage, key: "kkt.portal.cache.v2", throttleTime: 1000 });
+export const persister = createAsyncStoragePersister({
+  storage: AsyncStorage,
+  key: "kkt.portal.cache.v2",
+  throttleTime: 1000,
+});
 
 export const persistOptions = {
   persister,
@@ -90,7 +94,8 @@ export const keys = {
   construction: (id: string) => ["booking", id, "construction"] as const,
   documents: (id: string) => ["booking", id, "documents"] as const,
   bank: (id: string) => ["booking", id, "bank"] as const,
-  requests: (f: { status?: ServiceStatus; booking_id?: string }) => ["requests", f.status ?? "ALL", f.booking_id ?? "ALL"] as const,
+  requests: (f: { status?: ServiceStatus; booking_id?: string }) =>
+    ["requests", f.status ?? "ALL", f.booking_id ?? "ALL"] as const,
   request: (id: string) => ["request", id] as const,
   requestCategories: ["request-categories"] as const,
   notices: ["notices"] as const,
@@ -108,26 +113,53 @@ const enabled = (id: string | null | undefined): id is string => typeof id === "
 
 // The switcher list is tiny and gates every booking screen: always re-read it once the session is authenticated (enabling a query
 // does not count as a mount, so refetchOnMount alone would keep a < 30 s old cached list).
-export const useBookings = (on = true) => useQuery({ queryKey: keys.bookings, queryFn: api.bookings.list, enabled: on, staleTime: 0 });
-export const useHome = (id: string | null) => useQuery({ queryKey: keys.home(id ?? ""), queryFn: () => api.bookings.home(id ?? ""), enabled: enabled(id) });
-export const useFlat = (id: string | null) => useQuery({ queryKey: keys.flat(id ?? ""), queryFn: () => api.bookings.flat(id ?? ""), enabled: enabled(id) });
-export const useLedger = (id: string | null) => useQuery({ queryKey: keys.ledger(id ?? ""), queryFn: () => api.bookings.ledger(id ?? ""), enabled: enabled(id) });
-export const useReceipts = (id: string | null) => useQuery({ queryKey: keys.receipts(id ?? ""), queryFn: () => api.bookings.receipts(id ?? ""), enabled: enabled(id) });
-export const useDemands = (id: string | null) => useQuery({ queryKey: keys.demands(id ?? ""), queryFn: () => api.bookings.demands(id ?? ""), enabled: enabled(id) });
-export const useSchedule = (id: string | null) => useQuery({ queryKey: keys.schedule(id ?? ""), queryFn: () => api.bookings.schedule(id ?? ""), enabled: enabled(id) });
-export const useConstruction = (id: string | null) => useQuery({ queryKey: keys.construction(id ?? ""), queryFn: () => api.bookings.construction(id ?? ""), enabled: enabled(id) });
-export const useDocuments = (id: string | null) => useQuery({ queryKey: keys.documents(id ?? ""), queryFn: () => api.bookings.documents(id ?? ""), enabled: enabled(id) });
-export const useBankDetails = (id: string | null) => useQuery({ queryKey: keys.bank(id ?? ""), queryFn: () => api.bookings.bankDetails(id ?? ""), enabled: enabled(id) });
+export const useBookings = (on = true) =>
+  useQuery({ queryKey: keys.bookings, queryFn: api.bookings.list, enabled: on, staleTime: 0 });
+export const useHome = (id: string | null) =>
+  useQuery({ queryKey: keys.home(id ?? ""), queryFn: () => api.bookings.home(id ?? ""), enabled: enabled(id) });
+export const useFlat = (id: string | null) =>
+  useQuery({ queryKey: keys.flat(id ?? ""), queryFn: () => api.bookings.flat(id ?? ""), enabled: enabled(id) });
+export const useLedger = (id: string | null) =>
+  useQuery({ queryKey: keys.ledger(id ?? ""), queryFn: () => api.bookings.ledger(id ?? ""), enabled: enabled(id) });
+export const useReceipts = (id: string | null) =>
+  useQuery({ queryKey: keys.receipts(id ?? ""), queryFn: () => api.bookings.receipts(id ?? ""), enabled: enabled(id) });
+export const useDemands = (id: string | null) =>
+  useQuery({ queryKey: keys.demands(id ?? ""), queryFn: () => api.bookings.demands(id ?? ""), enabled: enabled(id) });
+export const useSchedule = (id: string | null) =>
+  useQuery({ queryKey: keys.schedule(id ?? ""), queryFn: () => api.bookings.schedule(id ?? ""), enabled: enabled(id) });
+export const useConstruction = (id: string | null) =>
+  useQuery({
+    queryKey: keys.construction(id ?? ""),
+    queryFn: () => api.bookings.construction(id ?? ""),
+    enabled: enabled(id),
+  });
+export const useDocuments = (id: string | null) =>
+  useQuery({
+    queryKey: keys.documents(id ?? ""),
+    queryFn: () => api.bookings.documents(id ?? ""),
+    enabled: enabled(id),
+  });
+export const useBankDetails = (id: string | null) =>
+  useQuery({ queryKey: keys.bank(id ?? ""), queryFn: () => api.bookings.bankDetails(id ?? ""), enabled: enabled(id) });
 
 export const useRequests = (f: { status?: ServiceStatus; booking_id?: string } = {}) =>
   useQuery({ queryKey: keys.requests(f), queryFn: () => api.requests.list(f) });
-export const useRequest = (id: string | null) => useQuery({ queryKey: keys.request(id ?? ""), queryFn: () => api.requests.get(id ?? ""), enabled: enabled(id) });
-export const useRequestCategories = () => useQuery({ queryKey: keys.requestCategories, queryFn: api.requests.categories, staleTime: DAY });
+export const useRequest = (id: string | null) =>
+  useQuery({ queryKey: keys.request(id ?? ""), queryFn: () => api.requests.get(id ?? ""), enabled: enabled(id) });
+export const useRequestCategories = () =>
+  useQuery({ queryKey: keys.requestCategories, queryFn: api.requests.categories, staleTime: DAY });
 
 export const useNotices = () => useQuery({ queryKey: keys.notices, queryFn: () => api.notices.list() });
-export const useNotifications = () => useQuery({ queryKey: keys.notifications, queryFn: () => api.notifications.list() });
+export const useNotifications = () =>
+  useQuery({ queryKey: keys.notifications, queryFn: () => api.notifications.list() });
 export const useUnreadCount = (on = true) =>
-  useQuery({ queryKey: keys.unread, queryFn: api.notifications.unreadCount, enabled: on, refetchInterval: 60_000, staleTime: 15_000 });
+  useQuery({
+    queryKey: keys.unread,
+    queryFn: api.notifications.unreadCount,
+    enabled: on,
+    refetchInterval: 60_000,
+    staleTime: 15_000,
+  });
 export const useProfile = () => useQuery({ queryKey: keys.profile, queryFn: api.profile.get });
 export const useSessions = () => useQuery({ queryKey: keys.sessions, queryFn: api.auth.sessions, staleTime: 0 });
 

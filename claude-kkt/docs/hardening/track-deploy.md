@@ -5,6 +5,7 @@ All 7 deliverables are built and checked here: unit tests, integration and accep
 Paths below are under `/home/user/Kktrealestate/claude-kkt`. Nothing is committed.
 
 **Test results:**
+
 - **API unit tests:** 86/86 pass (15 files), all in `apps/api/test/unit/`.
   - `storage-s3.test.ts` (8): S3 driver against a fake client, no network.
   - `metrics.test.ts` (4): rewritten for prom-client.
@@ -21,6 +22,7 @@ Paths below are under `/home/user/Kktrealestate/claude-kkt`. Nothing is committe
 - **Not mine:** `documents.test.ts` currently has 5 failures, all `PATCH` requests now getting 400 `VERSION_REQUIRED` from the platform track's version policy.
 
 **Validation of the infrastructure files:**
+
 - **Compose:** `docker compose config` passes for both files and every profile.
 - **Kubernetes:** `kustomize build` piped into `kubeconform -strict` reports 27/27 valid. My checker `infra/scripts/validate-k8s.mjs` also passes, and catches the errors I planted to test it.
 - **Prometheus:** `promtool check rules` passes (21 rules), `promtool test rules` passes, and all 32 dashboard queries parse. `amtool check-config` passes.
@@ -30,6 +32,7 @@ Paths below are under `/home/user/Kktrealestate/claude-kkt`. Nothing is committe
 - The validators were downloaded into the scratchpad, and nginx was installed with apt only for this check.
 
 **Live checks:**
+
 - **Production bundle, 2 workers:**
   - Metrics on `METRICS_PORT` are aggregated across workers (`db_pool_max_connections 40`).
   - `/api/v1/metrics` works with the token; a wrong token gets 401.
@@ -42,6 +45,7 @@ Paths below are under `/home/user/Kktrealestate/claude-kkt`. Nothing is committe
 - **Roles:** `02-passwords.sh` works with a quoted password; when both are present, the secret file wins over the environment value.
 
 ## Changes
+
 - **API code:**
   - S3 driver in `lib/storage.ts`: streaming uploads, presigned GET links, MinIO/R2 support, `S3_PREFIX`, and a `HeadBucket` check at boot.
   - prom-client metrics in `lib/metrics.ts`. This file was not on my ownership list; I took it because it is the subject of the task.
@@ -63,6 +67,7 @@ Paths below are under `/home/user/Kktrealestate/claude-kkt`. Nothing is committe
 - **Docs:** `docs/DEPLOY.md` rewritten, keeping the foundation's environment tables. New `RESTORE.md`, `OBSERVABILITY.md`, `VERSIONING.md` and `CAPACITY.md`. `ARCHITECTURE.md` changed in §1, §2, §5 and §6. New `CHANGELOG.md`.
 
 ## Decisions
+
 - **Demands counter:** `demands_raised_total` is read from `count(*)` of `demands`. Most demands are raised by the worker, which has no metrics port, and demands are never deleted, so this always grows (also across restarts) without double counting.
 - **Business counters:** payments posted and failed logins are counted from route outcomes in my plugin, so no business module was edited.
 - **Database and Redis gauges:** computed only by worker 0 (or the single process), from one snapshot taken at most every 10 s, using the `max` aggregator.
@@ -74,12 +79,14 @@ Paths below are under `/home/user/Kktrealestate/claude-kkt`. Nothing is committe
 - **Telemetry bundling:** `telemetry.ts` is built by a second tsup command in the `build` script, because `tsup.config.ts` is not mine.
 
 ## Not finished
+
 - No image build or container run here. The CI `images` job builds all four images; the compose stack still needs a real `docker compose up` once a daemon is available.
 - Website HTML is still not cacheable at a CDN; `docs/CAPACITY.md` lists this as the first thing that breaks at scale.
 - No lag-aware fallback from read replicas to the primary.
 - The worker container has no health endpoint; its Kubernetes liveness probe only checks that the process exists.
 
 ## For the other tracks and the integration stage
+
 - **Platform track:**
   - In `jobs/index.ts`, after each run call `recordJobRun(name, "OK"|"FAILED", seconds)` from `lib/metrics.js`.
   - When a job fails for the last time, call `reportJobFailure(job, runId, err)` from `plugins/errorReporter.js`.

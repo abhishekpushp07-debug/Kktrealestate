@@ -7,7 +7,10 @@ const GROUP_ORDER: readonly MasterGroup[] = ["structure", "money", "documents"];
 
 /** Left sub-navigation (lg+) or scrollable pills (phones/tablets) listing the 16 master kinds. */
 export default function MastersLayout() {
-  const groups = GROUP_ORDER.map((group) => ({ group, items: MASTER_CONFIG_LIST.filter((config) => config.group === group) }));
+  const groups = GROUP_ORDER.map((group) => ({
+    group,
+    items: MASTER_CONFIG_LIST.filter((config) => config.group === group),
+  }));
 
   return (
     <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-start lg:gap-6">
@@ -21,7 +24,9 @@ export default function MastersLayout() {
                 className={({ isActive }) =>
                   cn(
                     "inline-flex h-12 items-center gap-1.5 whitespace-nowrap rounded-full border px-4 text-sm font-medium transition-colors focus-ring",
-                    isActive ? "border-navy-950 bg-navy-950 text-white" : "border-border bg-card text-ink-muted hover:border-navy-300 hover:text-navy-950",
+                    isActive
+                      ? "border-navy-950 bg-navy-950 text-white"
+                      : "border-border bg-card text-ink-muted hover:border-navy-300 hover:text-navy-950",
                   )
                 }
               >
@@ -34,7 +39,10 @@ export default function MastersLayout() {
       </nav>
 
       <aside className="hidden w-60 shrink-0 lg:block">
-        <nav aria-label="Master data kinds" className="sticky top-[calc(var(--spacing-topbar)+1.5rem)] space-y-4 rounded-lg border border-border bg-card p-2 shadow-card">
+        <nav
+          aria-label="Master data kinds"
+          className="sticky top-[calc(var(--spacing-topbar)+1.5rem)] space-y-4 rounded-lg border border-border bg-card p-2 shadow-card"
+        >
           {groups.map(({ group, items }) => (
             <div key={group}>
               <p className="label-caps px-2 pb-1 pt-1">{MASTER_GROUP_LABELS[group]}</p>
@@ -53,8 +61,19 @@ export default function MastersLayout() {
                     >
                       {({ isActive }) => (
                         <>
-                          {isActive && <span className="absolute inset-y-1.5 left-0 w-0.5 rounded-r-full bg-gold" aria-hidden="true" />}
-                          <config.icon className={cn("size-4 shrink-0", isActive ? "text-gold-text" : "text-ink-subtle group-hover:text-navy-950")} aria-hidden="true" />
+                          {isActive && (
+                            <span
+                              className="absolute inset-y-1.5 left-0 w-0.5 rounded-r-full bg-gold"
+                              aria-hidden="true"
+                            />
+                          )}
+                          <config.icon
+                            className={cn(
+                              "size-4 shrink-0",
+                              isActive ? "text-gold-text" : "text-ink-subtle group-hover:text-navy-950",
+                            )}
+                            aria-hidden="true"
+                          />
                           <span className="truncate">{config.label}</span>
                         </>
                       )}

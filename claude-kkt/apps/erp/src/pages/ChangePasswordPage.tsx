@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Check, Circle, KeyRound, TriangleAlert } from "lucide-react";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -27,11 +27,19 @@ const schema = z
       .string()
       .min(10, "At least 10 characters")
       .max(128)
-      .refine((value) => RULES.every((rule) => rule.test(value)), { message: "Use upper-case, lower-case and a digit" }),
+      .refine((value) => RULES.every((rule) => rule.test(value)), {
+        message: "Use upper-case, lower-case and a digit",
+      }),
     confirm_password: z.string().min(1, "Repeat the new password"),
   })
-  .refine((values) => values.new_password === values.confirm_password, { message: "Passwords do not match", path: ["confirm_password"] })
-  .refine((values) => values.new_password !== values.current_password, { message: "New password must differ from the current one", path: ["new_password"] });
+  .refine((values) => values.new_password === values.confirm_password, {
+    message: "Passwords do not match",
+    path: ["confirm_password"],
+  })
+  .refine((values) => values.new_password !== values.current_password, {
+    message: "New password must differ from the current one",
+    path: ["new_password"],
+  });
 
 type FormValues = z.infer<typeof schema>;
 
@@ -48,7 +56,7 @@ export default function ChangePasswordPage() {
     defaultValues: { current_password: "", new_password: "", confirm_password: "" },
     mode: "onTouched",
   });
-  const newPassword = form.watch("new_password");
+  const newPassword = useWatch({ control: form.control, name: "new_password" });
 
   const submit = form.handleSubmit(async (values) => {
     setError(null);
@@ -73,9 +81,15 @@ export default function ChangePasswordPage() {
           )}
         </div>
         {forced && (
-          <div role="status" className="flex items-start gap-2 rounded-md border border-status-hold-border bg-warning-bg px-3 py-2 text-sm text-warning-fg">
+          <div
+            role="status"
+            className="flex items-start gap-2 rounded-md border border-status-hold-border bg-warning-bg px-3 py-2 text-sm text-warning-fg"
+          >
             <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-            <span>You must set a new password before continuing. This is required on first login and after an administrator reset.</span>
+            <span>
+              You must set a new password before continuing. This is required on first login and after an administrator
+              reset.
+            </span>
           </div>
         )}
         <Card>
@@ -89,31 +103,76 @@ export default function ChangePasswordPage() {
                 <p className="text-sm text-ink-subtle">Your last 5 passwords cannot be reused.</p>
               </div>
             </div>
-            <form onSubmit={(event) => void submit(event)} noValidate className="space-y-4" data-testid="change-password-form">
+            <form
+              onSubmit={(event) => void submit(event)}
+              noValidate
+              className="space-y-4"
+              data-testid="change-password-form"
+            >
               <FormError error={error} />
               <FieldWrapper label="Current password" required error={form.formState.errors.current_password?.message}>
-                {(control) => <Input {...form.register("current_password")} {...control} type="password" autoComplete="current-password" autoFocus data-testid="current-password-input" />}
+                {(control) => (
+                  <Input
+                    {...form.register("current_password")}
+                    {...control}
+                    type="password"
+                    autoComplete="current-password"
+                    autoFocus
+                    data-testid="current-password-input"
+                  />
+                )}
               </FieldWrapper>
               <FieldWrapper label="New password" required error={form.formState.errors.new_password?.message}>
-                {(control) => <Input {...form.register("new_password")} {...control} type="password" autoComplete="new-password" data-testid="new-password-input" />}
+                {(control) => (
+                  <Input
+                    {...form.register("new_password")}
+                    {...control}
+                    type="password"
+                    autoComplete="new-password"
+                    data-testid="new-password-input"
+                  />
+                )}
               </FieldWrapper>
               <ul className="grid grid-cols-1 gap-1 text-xs sm:grid-cols-2" aria-label="Password requirements">
                 {RULES.map((rule) => {
                   const ok = rule.test(newPassword);
                   return (
-                    <li key={rule.id} className={cn("flex items-center gap-1.5", ok ? "text-success-fg" : "text-ink-subtle")}>
-                      {ok ? <Check className="size-3.5" aria-hidden="true" /> : <Circle className="size-3" aria-hidden="true" />}
+                    <li
+                      key={rule.id}
+                      className={cn("flex items-center gap-1.5", ok ? "text-success-fg" : "text-ink-subtle")}
+                    >
+                      {ok ? (
+                        <Check className="size-3.5" aria-hidden="true" />
+                      ) : (
+                        <Circle className="size-3" aria-hidden="true" />
+                      )}
                       {rule.label}
                     </li>
                   );
                 })}
               </ul>
-              <FieldWrapper label="Confirm new password" required error={form.formState.errors.confirm_password?.message}>
-                {(control) => <Input {...form.register("confirm_password")} {...control} type="password" autoComplete="new-password" data-testid="confirm-password-input" />}
+              <FieldWrapper
+                label="Confirm new password"
+                required
+                error={form.formState.errors.confirm_password?.message}
+              >
+                {(control) => (
+                  <Input
+                    {...form.register("confirm_password")}
+                    {...control}
+                    type="password"
+                    autoComplete="new-password"
+                    data-testid="confirm-password-input"
+                  />
+                )}
               </FieldWrapper>
               <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
                 {forced && (
-                  <Button type="button" variant="ghost" onClick={() => void logout().then(() => navigate("/login", { replace: true }))}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => void logout().then(() => navigate("/login", { replace: true }))}
+                  >
                     Sign out
                   </Button>
                 )}

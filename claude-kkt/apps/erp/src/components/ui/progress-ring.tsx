@@ -21,7 +21,15 @@ const STROKES = {
   danger: "stroke-danger",
 } as const;
 
-export function ProgressRing({ value, size = 64, strokeWidth = 6, label, tone = "navy", className, ...aria }: ProgressRingProps) {
+export function ProgressRing({
+  value,
+  size = 64,
+  strokeWidth = 6,
+  label,
+  tone = "navy",
+  className,
+  ...aria
+}: ProgressRingProps) {
   const pct = clamp(Number.isFinite(value) ? value : 0, 0, 100);
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -37,7 +45,14 @@ export function ProgressRing({ value, size = 64, strokeWidth = 6, label, tone = 
       style={{ width: size, height: size }}
     >
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90" aria-hidden="true">
-        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" strokeWidth={strokeWidth} className="stroke-navy-50" />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          strokeWidth={strokeWidth}
+          className="stroke-navy-50"
+        />
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -50,7 +65,10 @@ export function ProgressRing({ value, size = 64, strokeWidth = 6, label, tone = 
           className={cn("transition-[stroke-dashoffset] duration-500", STROKES[tone])}
         />
       </svg>
-      <span className="money absolute inset-0 flex items-center justify-center font-display text-xs font-bold text-navy-950" style={{ fontSize: Math.max(10, size / 4.5) }}>
+      <span
+        className="money absolute inset-0 flex items-center justify-center font-display text-xs font-bold text-navy-950"
+        style={{ fontSize: Math.max(10, size / 4.5) }}
+      >
         {label ?? `${Math.round(pct)}%`}
       </span>
     </div>

@@ -86,7 +86,7 @@ function isErrorBody(value: unknown): value is ApiErrorBody {
 }
 
 async function errorFromResponse(res: Response): Promise<ApiError> {
-  let body: unknown = null;
+  let body: unknown;
   try {
     body = await res.json();
   } catch {
@@ -105,8 +105,19 @@ async function errorFromResponse(res: Response): Promise<ApiError> {
     });
   }
   const code =
-    res.status === 429 ? "RATE_LIMITED" : res.status === 404 ? "NOT_FOUND" : res.status >= 500 ? "SERVER_ERROR" : "HTTP_ERROR";
-  return new ApiError({ status: res.status, code, message: res.statusText || `Request failed (${res.status})`, retryAfterSeconds });
+    res.status === 429
+      ? "RATE_LIMITED"
+      : res.status === 404
+        ? "NOT_FOUND"
+        : res.status >= 500
+          ? "SERVER_ERROR"
+          : "HTTP_ERROR";
+  return new ApiError({
+    status: res.status,
+    code,
+    message: res.statusText || `Request failed (${res.status})`,
+    retryAfterSeconds,
+  });
 }
 
 /** Human copy for the error codes the website can meaningfully explain. */
@@ -114,7 +125,9 @@ export function friendlyErrorMessage(error: unknown): string {
   if (isApiError(error)) {
     switch (error.code) {
       case "RATE_LIMITED": {
-        const wait = error.retryAfterSeconds ? ` Please try again in about ${error.retryAfterSeconds} seconds.` : " Please try again in a minute.";
+        const wait = error.retryAfterSeconds
+          ? ` Please try again in about ${error.retryAfterSeconds} seconds.`
+          : " Please try again in a minute.";
         return `You have sent a few requests in quick succession.${wait}`;
       }
       case "SLOT_FULL":
@@ -207,7 +220,9 @@ async function serverGet<T>(path: string, options: ServerGetOptions): Promise<Fe
     return { ok: true, data };
   } catch (cause) {
     if (process.env.NODE_ENV !== "test") {
-      console.warn(`[web] public API unreachable: GET ${url} — ${cause instanceof Error ? cause.message : String(cause)}`);
+      console.warn(
+        `[web] public API unreachable: GET ${url} — ${cause instanceof Error ? cause.message : String(cause)}`,
+      );
     }
     return {
       ok: false,
@@ -251,7 +266,10 @@ export async function listProjects(filters: ProjectListFilters = {}): Promise<Pr
 
 /** One project detail fetch per request (React cache): metadata and page body share it. */
 const projectDetail = cache((slug: string) =>
-  serverGet<ProjectDetail>(`/projects/${encodeURIComponent(slug)}`, { tags: ["projects", `project:${slug}`], ...DETAIL }),
+  serverGet<ProjectDetail>(`/projects/${encodeURIComponent(slug)}`, {
+    tags: ["projects", `project:${slug}`],
+    ...DETAIL,
+  }),
 );
 
 export async function getProject(slug: string): Promise<ProjectDetail> {
@@ -281,7 +299,9 @@ export async function listPosts(page = 1): Promise<ListEnvelope<PostCard>> {
   );
 }
 
-const postDetail = cache((slug: string) => serverGet<PostDetail>(`/posts/${encodeURIComponent(slug)}`, { tags: ["posts", `post:${slug}`], ...DETAIL }));
+const postDetail = cache((slug: string) =>
+  serverGet<PostDetail>(`/posts/${encodeURIComponent(slug)}`, { tags: ["posts", `post:${slug}`], ...DETAIL }),
+);
 
 export async function getPost(slug: string): Promise<PostDetail> {
   return unwrapDetail(await postDetail(slug));
@@ -291,7 +311,9 @@ export async function findPost(slug: string): Promise<PostDetail | null> {
   return unwrapOr(await postDetail(slug), null);
 }
 
-const pageDetail = cache((slug: string) => serverGet<PageDetail>(`/pages/${encodeURIComponent(slug)}`, { tags: ["pages", `page:${slug}`], ...DETAIL }));
+const pageDetail = cache((slug: string) =>
+  serverGet<PageDetail>(`/pages/${encodeURIComponent(slug)}`, { tags: ["pages", `page:${slug}`], ...DETAIL }),
+);
 
 export async function getPage(slug: string): Promise<PageDetail> {
   return unwrapDetail(await pageDetail(slug));
@@ -317,7 +339,9 @@ export async function getPeople(): Promise<Person[]> {
 }
 
 /** Manage view for a signed visit token. Never cached: cancelling changes it immediately. */
-const visitDetail = cache((token: string) => serverGet<SiteVisitManage>(`/site-visits/${encodeURIComponent(token)}`, { tags: [], revalidate: 0 }));
+const visitDetail = cache((token: string) =>
+  serverGet<SiteVisitManage>(`/site-visits/${encodeURIComponent(token)}`, { tags: [], revalidate: 0 }),
+);
 
 export async function getVisit(token: string): Promise<SiteVisitManage> {
   return unwrapDetail(await visitDetail(token));
@@ -350,7 +374,11 @@ async function browserRequest<TResponse>(apiUrl: string, path: string, init: Req
   try {
     res = await fetch(`${apiUrl}${API_PREFIX}${path}`, {
       ...init,
-      headers: { accept: "application/json", ...(init.body ? { "content-type": "application/json" } : {}), ...init.headers },
+      headers: {
+        accept: "application/json",
+        ...(init.body ? { "content-type": "application/json" } : {}),
+        ...init.headers,
+      },
       cache: "no-store",
     });
   } catch {
@@ -393,7 +421,11 @@ export function publicClient(apiUrl: string): PublicClient {
         method: "POST",
         body: JSON.stringify({}),
       }),
-    rescheduleSiteVisit: (token, body) => post<SiteVisitRescheduleRequest, SiteVisitRescheduleResult>(`/site-visits/${encodeURIComponent(token)}/reschedule`, body),
+    rescheduleSiteVisit: (token, body) =>
+      post<SiteVisitRescheduleRequest, SiteVisitRescheduleResult>(
+        `/site-visits/${encodeURIComponent(token)}/reschedule`,
+        body,
+      ),
     getVisitAvailability: (slug, from, to) =>
       browserRequest<VisitDay[]>(
         apiUrl,

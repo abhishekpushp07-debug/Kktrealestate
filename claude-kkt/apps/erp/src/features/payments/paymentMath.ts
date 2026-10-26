@@ -1,4 +1,10 @@
-import { PAYMENT_MODE_DEFAULTS, type BucketSummary, type PaymentBucket, type PaymentModeCode, type PaymentModeRow } from "@kkt/contracts";
+import {
+  PAYMENT_MODE_DEFAULTS,
+  type BucketSummary,
+  type PaymentBucket,
+  type PaymentModeCode,
+  type PaymentModeRow,
+} from "@kkt/contracts";
 import { formatINR } from "@/lib/format";
 
 /* ------------------------------------------------------------------ */
@@ -16,7 +22,9 @@ export interface ModeRules {
 }
 
 /** Behaviour of a payment mode: the master row wins, the contract defaults fill gaps. */
-export function modeRules(mode: Pick<PaymentModeRow, "code" | "requires_instrument" | "clears_immediately" | "is_cash"> | null | undefined): ModeRules {
+export function modeRules(
+  mode: Pick<PaymentModeRow, "code" | "requires_instrument" | "clears_immediately" | "is_cash"> | null | undefined,
+): ModeRules {
   const code: PaymentModeCode | null = mode?.code ?? null;
   const defaults = code ? PAYMENT_MODE_DEFAULTS[code] : null;
   const isCash = mode?.is_cash ?? defaults?.is_cash ?? false;
@@ -51,7 +59,8 @@ export function bucketMeter(bucket: PaymentBucket, summary: BucketSummary): Buck
     paid_paise: summary.paid_paise,
     pending_paise: summary.pending_paise,
     remaining_paise: remaining,
-    paid_percent: summary.agreed_paise > 0 ? Math.min(100, Math.round((summary.paid_paise / summary.agreed_paise) * 1000) / 10) : 0,
+    paid_percent:
+      summary.agreed_paise > 0 ? Math.min(100, Math.round((summary.paid_paise / summary.agreed_paise) * 1000) / 10) : 0,
   };
 }
 
@@ -63,8 +72,13 @@ export interface CapCheck {
 }
 
 /** SPEC §11 bucket cap: paid + amount must not exceed agreed. Mirrors the server's explanatory wording. */
-export function checkBucketCap(meter: BucketMeter, amountPaise: number | null | undefined, bucketLabel: string): CapCheck {
-  if (amountPaise === null || amountPaise === undefined || amountPaise <= 0) return { exceeded: false, excess_paise: 0, message: null };
+export function checkBucketCap(
+  meter: BucketMeter,
+  amountPaise: number | null | undefined,
+  bucketLabel: string,
+): CapCheck {
+  if (amountPaise === null || amountPaise === undefined || amountPaise <= 0)
+    return { exceeded: false, excess_paise: 0, message: null };
   const excess = meter.paid_paise + amountPaise - meter.agreed_paise;
   if (excess <= 0) return { exceeded: false, excess_paise: 0, message: null };
   return {
@@ -75,11 +89,20 @@ export function checkBucketCap(meter: BucketMeter, amountPaise: number | null | 
 }
 
 /** Other-charge payments cannot exceed the line total. */
-export function checkChargeCap(totalPaise: number, paidPaise: number, amountPaise: number | null | undefined): CapCheck {
-  if (amountPaise === null || amountPaise === undefined || amountPaise <= 0) return { exceeded: false, excess_paise: 0, message: null };
+export function checkChargeCap(
+  totalPaise: number,
+  paidPaise: number,
+  amountPaise: number | null | undefined,
+): CapCheck {
+  if (amountPaise === null || amountPaise === undefined || amountPaise <= 0)
+    return { exceeded: false, excess_paise: 0, message: null };
   const excess = paidPaise + amountPaise - totalPaise;
   if (excess <= 0) return { exceeded: false, excess_paise: 0, message: null };
-  return { exceeded: true, excess_paise: excess, message: `This charge totals ${formatINR(totalPaise)}; ${formatINR(paidPaise)} is already paid, so at most ${formatINR(Math.max(0, totalPaise - paidPaise))} can be accepted.` };
+  return {
+    exceeded: true,
+    excess_paise: excess,
+    message: `This charge totals ${formatINR(totalPaise)}; ${formatINR(paidPaise)} is already paid, so at most ${formatINR(Math.max(0, totalPaise - paidPaise))} can be accepted.`,
+  };
 }
 
 /* ------------------------------------------------------------------ */

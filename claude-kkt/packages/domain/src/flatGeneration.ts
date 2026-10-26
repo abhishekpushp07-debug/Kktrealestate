@@ -145,13 +145,18 @@ export function physicalFloors(block: Pick<BlockDefinition, "floors" | "floorSta
     }
   }
   if (out.length === 0) {
-    throw new FlatGenerationError("INVALID_FLOORS", "Every floor is in the skip list", { floors: block.floors, floorStart: block.floorStart });
+    throw new FlatGenerationError("INVALID_FLOORS", "Every floor is in the skip list", {
+      floors: block.floors,
+      floorStart: block.floorStart,
+    });
   }
   return out;
 }
 
 /** Floors that carry units: physical floors minus refuge and podium floors. */
-export function unitFloors(block: Pick<BlockDefinition, "floors" | "floorStart" | "skipFloors" | "refugeFloors" | "podiumFloors">): number[] {
+export function unitFloors(
+  block: Pick<BlockDefinition, "floors" | "floorStart" | "skipFloors" | "refugeFloors" | "podiumFloors">,
+): number[] {
   const noUnits = new Set([...block.refugeFloors, ...block.podiumFloors]);
   return physicalFloors(block).filter((floor) => !noUnits.has(floor));
 }
@@ -172,10 +177,14 @@ export function planForFloor(ranges: readonly FloorPlanRange[], floor: number): 
     throw new FlatGenerationError("FLOOR_PLAN_GAP", `No floor-plan range covers floor ${floor}`, { floor });
   }
   if (matches.length > 1) {
-    throw new FlatGenerationError("FLOOR_PLAN_OVERLAP", `Floor ${floor} is covered by ${matches.length} floor-plan ranges`, {
-      floor,
-      templateIds: matches.map((m) => m.floorPlanTemplateId),
-    });
+    throw new FlatGenerationError(
+      "FLOOR_PLAN_OVERLAP",
+      `Floor ${floor} is covered by ${matches.length} floor-plan ranges`,
+      {
+        floor,
+        templateIds: matches.map((m) => m.floorPlanTemplateId),
+      },
+    );
   }
   return first;
 }
@@ -207,7 +216,9 @@ const NUMBER_TOKEN = /\{(block|floor|pos|seq)(\d*)(?::(\d+))?\}/g;
 /** Renders a flat number from a pattern: "{block}-{floor}{pos2}" → "A-101"; "{block}{seq}" → "V1"; "{pos:3}" pads to 3. */
 export function flatNumber(pattern: string, ctx: FlatNumberContext): string {
   if (!/\{(floor|pos|seq)/.test(pattern)) {
-    throw new FlatGenerationError("INVALID_PATTERN", `Pattern "${pattern}" must contain {floor}, {pos} or {seq}`, { pattern });
+    throw new FlatGenerationError("INVALID_PATTERN", `Pattern "${pattern}" must contain {floor}, {pos} or {seq}`, {
+      pattern,
+    });
   }
   return pattern.replace(NUMBER_TOKEN, (_whole, name: string, inlineWidth: string, colonWidth?: string) => {
     const width = colonWidth ? Number(colonWidth) : inlineWidth ? Number(inlineWidth) : 0;
@@ -281,10 +292,14 @@ export function generateFlats(
     const range = planForFloor(block.floorPlans, floor);
     const template = templateById.get(range.floorPlanTemplateId);
     if (!template) {
-      throw new FlatGenerationError("TEMPLATE_NOT_FOUND", `Floor-plan template ${range.floorPlanTemplateId} not found`, {
-        templateId: range.floorPlanTemplateId,
-        floor,
-      });
+      throw new FlatGenerationError(
+        "TEMPLATE_NOT_FOUND",
+        `Floor-plan template ${range.floorPlanTemplateId} not found`,
+        {
+          templateId: range.floorPlanTemplateId,
+          floor,
+        },
+      );
     }
     const positions = [...template.positions].sort((a, b) => a.position - b.position);
     for (const position of positions) {
@@ -298,21 +313,41 @@ export function generateFlats(
       }
       const typeErrors = validateFlatType(flatType);
       if (typeErrors.length > 0) {
-        throw new FlatGenerationError("INVALID_FLAT_TYPE", `Flat type ${flatType.code} is invalid: ${typeErrors.map((e) => e.message).join("; ")}`, {
-          flatTypeId: flatType.id,
-          errors: typeErrors,
-        });
+        throw new FlatGenerationError(
+          "INVALID_FLAT_TYPE",
+          `Flat type ${flatType.code} is invalid: ${typeErrors.map((e) => e.message).join("; ")}`,
+          {
+            flatTypeId: flatType.id,
+            errors: typeErrors,
+          },
+        );
       }
       seq += 1;
       const label = floorLabel(floor, block.groundFloorLabel);
-      const number = flatNumber(block.numberingPattern, { blockCode: block.code, floorLabel: label, position: position.position, seq });
+      const number = flatNumber(block.numberingPattern, {
+        blockCode: block.code,
+        floorLabel: label,
+        position: position.position,
+        seq,
+      });
       if (seen.has(number)) {
-        throw new FlatGenerationError("DUPLICATE_FLAT_NUMBER", `Numbering pattern produces duplicate flat number ${number}`, { flatNumber: number });
+        throw new FlatGenerationError(
+          "DUPLICATE_FLAT_NUMBER",
+          `Numbering pattern produces duplicate flat number ${number}`,
+          { flatNumber: number },
+        );
       }
       seen.add(number);
       const facing = resolveFacing(position, flatType);
       const isCorner = position.isCorner === true;
-      const price = pricingFn({ flatType, floor, floorStart: block.floorStart, position: position.position, isCorner, facing });
+      const price = pricingFn({
+        flatType,
+        floor,
+        floorStart: block.floorStart,
+        position: position.position,
+        isCorner,
+        facing,
+      });
       drafts.push({
         flatNumber: number,
         floor,

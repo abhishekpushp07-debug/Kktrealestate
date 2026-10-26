@@ -14,7 +14,10 @@ export function TabBar({ state, navigateToTab, insets }: BottomTabBarProps): Rea
   const unread = useUnreadCount().data?.count ?? 0;
   const bottom = Math.max(insets.bottom, 8);
   return (
-    <View style={[styles.bar, { height: TAB_BAR_BASE_HEIGHT + bottom, paddingBottom: bottom }]} accessibilityRole="tablist">
+    <View
+      style={[styles.bar, { height: TAB_BAR_BASE_HEIGHT + bottom, paddingBottom: bottom }]}
+      accessibilityRole="tablist"
+    >
       {state.routes.map((route, index) => {
         const dest = TAB_DESTINATIONS.find((d) => d.route === route.name);
         if (!dest) return null;
@@ -33,7 +36,12 @@ export function TabBar({ state, navigateToTab, insets }: BottomTabBarProps): Rea
             >
               <View style={[styles.indicator, active ? styles.indicatorActive : null]} />
               <Icon name={dest.icon} size={22} color={active ? colors.gold : colors.onNavyMuted} />
-              <T variant="caption" color={active ? colors.onNavy : colors.onNavyMuted} style={{ fontSize: 10.5, lineHeight: 13 }} numberOfLines={1}>
+              <T
+                variant="caption"
+                color={active ? colors.onNavy : colors.onNavyMuted}
+                style={{ fontSize: 10.5, lineHeight: 13 }}
+                numberOfLines={1}
+              >
                 {dest.label}
               </T>
             </Pressable>
@@ -51,10 +59,23 @@ export function TabBar({ state, navigateToTab, insets }: BottomTabBarProps): Rea
 }
 
 const styles = StyleSheet.create({
-  bar: { flexDirection: "row", backgroundColor: colors.navy, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.08)" },
+  bar: {
+    flexDirection: "row",
+    backgroundColor: colors.navy,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.08)",
+  },
   itemWrap: { flex: 1 },
   item: { flex: 1, alignItems: "center", justifyContent: "center", gap: 4, paddingTop: space.sm },
-  indicator: { position: "absolute", top: 0, width: 28, height: 3, borderBottomLeftRadius: 3, borderBottomRightRadius: 3, backgroundColor: "transparent" },
+  indicator: {
+    position: "absolute",
+    top: 0,
+    width: 28,
+    height: 3,
+    borderBottomLeftRadius: 3,
+    borderBottomRightRadius: 3,
+    backgroundColor: "transparent",
+  },
   indicatorActive: { backgroundColor: colors.gold },
   badge: { position: "absolute", top: space.sm - 6, left: "50%", marginLeft: 4 },
 });

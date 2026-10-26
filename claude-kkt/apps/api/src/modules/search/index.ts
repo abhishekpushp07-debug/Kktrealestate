@@ -10,7 +10,14 @@ const BUDGET_MS = 150;
 
 const ALL_TYPES: readonly SearchEntityType[] = ["PROJECT", "BLOCK", "FLAT", "CUSTOMER", "BOOKING"];
 
-interface Row { ord: number; type: SearchEntityType; id: string; label: string; sublabel: string | null; href: string }
+interface Row {
+  ord: number;
+  type: SearchEntityType;
+  id: string;
+  label: string;
+  sublabel: string | null;
+  href: string;
+}
 
 /** `project_id = any($scope)` for scoped users, `true` for all-project users, `false` for a scoped user with no projects. */
 function scopeSql(user: StaffContext, column: string, params: unknown[]): string {
@@ -34,16 +41,32 @@ function customerScopeSql(user: StaffContext, params: unknown[]): string {
 }
 
 /** Entity types the caller may see: each one needs its own read permission (customers carry PII, bookings carry money). */
-export function permittedTypes(user: Pick<StaffContext, "permissions">, requested: readonly SearchEntityType[]): Set<SearchEntityType> {
-  const need: Partial<Record<SearchEntityType, string>> = { PROJECT: "project.read", BLOCK: "project.read", FLAT: "project.read", CUSTOMER: "customer.read", BOOKING: "booking.read" };
-  return new Set(requested.filter((t) => {
-    const p = need[t];
-    return p !== undefined && user.permissions.has(p);
-  }));
+export function permittedTypes(
+  user: Pick<StaffContext, "permissions">,
+  requested: readonly SearchEntityType[],
+): Set<SearchEntityType> {
+  const need: Partial<Record<SearchEntityType, string>> = {
+    PROJECT: "project.read",
+    BLOCK: "project.read",
+    FLAT: "project.read",
+    CUSTOMER: "customer.read",
+    BOOKING: "booking.read",
+  };
+  return new Set(
+    requested.filter((t) => {
+      const p = need[t];
+      return p !== undefined && user.permissions.has(p);
+    }),
+  );
 }
 
 /** One UNION ALL statement with a limited branch per entity type (the old five parallel queries took five pool connections per keystroke). */
-function buildSearch(user: StaffContext, term: string, types: Set<SearchEntityType>, per: number): { text: string; params: unknown[] } {
+function buildSearch(
+  user: StaffContext,
+  term: string,
+  types: Set<SearchEntityType>,
+  per: number,
+): { text: string; params: unknown[] } {
   const params: unknown[] = [user.companyId, `%${escapeLike(term)}%`, `${escapeLike(term)}%`];
   const [company, contains, prefix] = ["$1", "$2", "$3"];
   const branches: string[] = [];
@@ -73,7 +96,10 @@ function buildSearch(user: StaffContext, term: string, types: Set<SearchEntityTy
 /** Runs the search with a hard budget: on timeout the statement is cancelled server-side and an empty list is returned. */
 async function runWithBudget(sql: Sql, text: string, params: unknown[], log: (msg: string) => void): Promise<Row[]> {
   const query = sql.unsafe(text, params as never[], { prepare: true });
-  const timer = setTimeout(() => { log(`search exceeded ${BUDGET_MS} ms budget; cancelled`); void query.cancel(); }, BUDGET_MS);
+  const timer = setTimeout(() => {
+    log(`search exceeded ${BUDGET_MS} ms budget; cancelled`);
+    void query.cancel();
+  }, BUDGET_MS);
   try {
     return (await query) as unknown as Row[];
   } catch (e) {
@@ -91,8 +117,14 @@ async function runWithBudget(sql: Sql, text: string, params: unknown[], log: (ms
  */
 export async function searchModule(app: FastifyInstance): Promise<void> {
   route(app, {
-    method: "GET", url: "/search", permission: ["project.read", "customer.read", "booking.read"],
-    schema: { querystring: SearchQuerySchema, response: { 200: SearchResponseSchema }, summary: "Global search (Ctrl/Cmd+K)" },
+    method: "GET",
+    url: "/search",
+    permission: ["project.read", "customer.read", "booking.read"],
+    schema: {
+      querystring: SearchQuerySchema,
+      response: { 200: SearchResponseSchema },
+      summary: "Global search (Ctrl/Cmd+K)",
+    },
     handler: async (req) => {
       const user = req.user as StaffContext;
       const q = req.query;
@@ -102,7 +134,9 @@ export async function searchModule(app: FastifyInstance): Promise<void> {
       if (types.size === 0) return { results: [], recent: [] };
       const { text, params } = buildSearch(user, q.q, types, per);
       const rows = await runWithBudget(app.sql, text, params, (m) => req.log.warn(m));
-      const results: SearchResult[] = rows.slice(0, limit).map((r) => ({ type: r.type, id: r.id, label: r.label, sublabel: r.sublabel, href: r.href }));
+      const results: SearchResult[] = rows
+        .slice(0, limit)
+        .map((r) => ({ type: r.type, id: r.id, label: r.label, sublabel: r.sublabel, href: r.href }));
       return { results, recent: [] };
     },
   });

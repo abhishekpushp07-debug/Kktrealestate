@@ -6,6 +6,18 @@ Stack under test: API `apps/api` on `:4000` with the demo seed on its own databa
 
 Runner: [`docs/qa/erp/browser-qa.cjs`](erp/browser-qa.cjs) (`ERP_URL`, `API_URL`, `OUT_DIR`, `REPORT`, `WIPE=1`, `ONLY=login,roles,masters,inventory,crm,money,misc,hardening,smoke`). On every page it asserts: zero console errors / page errors, zero failed or ≥ 400 API requests (apart from the deliberate 4xx probes listed below), `document.documentElement.scrollWidth <= window.innerWidth`, and at 390 px that every **primary** target is ≥ 44 px tall (action buttons, tabs, sidebar / drawer / Back links; switches toggle through their 44 px label row and desktop-only breadcrumb crumbs count as secondary). It records every sub-44 px element, takes one palette-quantised viewport screenshot per listed page and width (`docs/qa/erp/<page>-<width>.png`, 40 files, 13–167 KB each, 2.1 MB in all), and verifies every flow through the API afterwards (status, ledger rows, audit rows, stage records, files).
 
+## Verify stage 2026-10-26 (phase 5: lint refactors)
+
+The verify stage moved about 50 ERP files off "set state in an effect" (dialog/sheet resets via `useOnChange`, derived loading flags,
+`useNow()`, `useWatch`); this walk checks that nothing regressed. Stack: API bundle on `:4710` (fresh demo seed in `kkt_h7`, Redis db 23,
+`ERP_ORIGIN=http://localhost:5710`), ERP built with `VITE_API_URL=http://localhost:4710` and served by `vite preview` on `:5710`; runner
+`ONLY=login,roles,masters,inventory,crm,money,misc,hardening,smoke` with `OUT_DIR` outside the repo (the committed screenshots are unchanged).
+
+**Result.** 575 page checks, 178/179 assertions, 524 axe scans (523 clean). The one failed assertion was the kanban drag gesture
+(NEW → CONTACTED) during the 27-minute full walk; the `crm` section re-run twice on its own passes 18/18 both times, so it is a flaky
+drag gesture under load, not a regression. The one axe finding is the known transient `target-size` hit on the cheques table header
+while the success toast covers it.
+
 ## Integration stage 2026-10-26 (phase 5 frontend wiring)
 
 Stack: API on `:4600` (demo seed in `kkt_h6`, Redis db 22, `ERP_ORIGIN=http://localhost:5673`), ERP built with `VITE_API_URL=http://localhost:4600` and served by `vite preview` on `:5673`; runner `ERP_URL=http://localhost:5673 API_URL=http://localhost:4600 node docs/qa/erp/browser-qa.cjs`. The runner has a new section **`hardening`** (`ONLY=hardening`), run after `money`/`misc`, and the smoke walk now includes `/admin/jobs`, `/admin/system`, `/admin/backups` and `/exports`.

@@ -15,7 +15,12 @@ const contentClass =
 export function DropdownMenuContent({ className, sideOffset = 6, ...props }: ComponentProps<typeof Primitive.Content>) {
   return (
     <Primitive.Portal>
-      <Primitive.Content sideOffset={sideOffset} collisionPadding={8} className={cn(contentClass, className)} {...props} />
+      <Primitive.Content
+        sideOffset={sideOffset}
+        collisionPadding={8}
+        className={cn(contentClass, className)}
+        {...props}
+      />
     </Primitive.Portal>
   );
 }
@@ -42,7 +47,8 @@ export function DropdownMenuItem({ className, destructive, inset, ...props }: Dr
       className={cn(
         itemClass,
         inset && "pl-8",
-        destructive && "text-danger-fg data-[highlighted]:bg-danger-bg data-[highlighted]:text-danger-fg [&_svg]:text-danger-fg",
+        destructive &&
+          "text-danger-fg data-[highlighted]:bg-danger-bg data-[highlighted]:text-danger-fg [&_svg]:text-danger-fg",
         className,
       )}
       {...props}
@@ -50,7 +56,12 @@ export function DropdownMenuItem({ className, destructive, inset, ...props }: Dr
   );
 }
 
-export function DropdownMenuCheckboxItem({ className, children, checked, ...props }: ComponentProps<typeof Primitive.CheckboxItem>) {
+export function DropdownMenuCheckboxItem({
+  className,
+  children,
+  checked,
+  ...props
+}: ComponentProps<typeof Primitive.CheckboxItem>) {
   return (
     <Primitive.CheckboxItem className={cn(itemClass, "pl-8", className)} checked={checked} {...props}>
       <span className="absolute left-2 flex size-4 items-center justify-center">
@@ -94,5 +105,7 @@ export function DropdownMenuSeparator({ className, ...props }: ComponentProps<ty
 }
 
 export function DropdownMenuShortcut({ className, ...props }: ComponentProps<"span">) {
-  return <span className={cn("ml-auto pl-4 font-mono text-[10px] tracking-wider text-ink-subtle", className)} {...props} />;
+  return (
+    <span className={cn("ml-auto pl-4 font-mono text-[10px] tracking-wider text-ink-subtle", className)} {...props} />
+  );
 }

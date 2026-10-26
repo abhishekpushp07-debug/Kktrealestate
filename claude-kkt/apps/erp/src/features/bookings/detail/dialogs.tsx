@@ -1,15 +1,50 @@
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { PAYMENT_BUCKET_LABELS, PLAN_ACCEPTANCE_MODES, PLAN_ACCEPTANCE_MODE_LABELS, type BookingDetailResponse, type BookingRow, type PlanAcceptanceMode, type SchedulePreviewRequest } from "@kkt/contracts";
-import { Badge, Button, DateInput, FieldWrapper, FormError, FormRow, MoneyInput, PercentInput, RadioGroup, Select, SimpleDialog, Skeleton, Tabs, TabsList, TabsTrigger, Textarea } from "@/components/ui";
+import {
+  PAYMENT_BUCKET_LABELS,
+  PLAN_ACCEPTANCE_MODES,
+  PLAN_ACCEPTANCE_MODE_LABELS,
+  type BookingDetailResponse,
+  type BookingRow,
+  type PlanAcceptanceMode,
+  type SchedulePreviewRequest,
+} from "@kkt/contracts";
+import {
+  Badge,
+  Button,
+  DateInput,
+  FieldWrapper,
+  FormError,
+  FormRow,
+  MoneyInput,
+  PercentInput,
+  RadioGroup,
+  Select,
+  SimpleDialog,
+  Skeleton,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  Textarea,
+} from "@/components/ui";
 import { api, type ApiClientError } from "@/lib/api";
 import { formatINR, formatPercent, todayIST } from "@/lib/format";
 import { useMutationWithToast } from "@/lib/queries";
-import { cn } from "@/lib/utils";
+import { cn, useOnChange } from "@/lib/utils";
 import { Notice } from "@/features/inventory/components";
 import { BOOKINGS_PATH, bookingInvalidations, useApplicablePlans, useSchedulePreview } from "../api";
-import { handoverBlockers, rebalanceSplitForTotal, splitFromAccount, splitFromAccountPercent, splitFromCash, splitFromCashPercent, splitIsExact, splitPercents, type SplitMode } from "../bookingMath";
+import {
+  handoverBlockers,
+  rebalanceSplitForTotal,
+  splitFromAccount,
+  splitFromAccountPercent,
+  splitFromCash,
+  splitFromCashPercent,
+  splitIsExact,
+  splitPercents,
+  type SplitMode,
+} from "../bookingMath";
 import { DueAmount } from "../components";
 import { SchedulePreviewTable } from "../wizard/SchedulePreviewTable";
 
@@ -21,9 +56,9 @@ interface DialogProps {
 
 function useReasonField(open: boolean) {
   const [reason, setReason] = useState("");
-  useEffect(() => {
-    if (!open) setReason("");
-  }, [open]);
+  useOnChange(open, (isOpen) => {
+    if (!isOpen) setReason("");
+  });
   return { reason, setReason, valid: reason.trim().length >= 3 };
 }
 
@@ -40,13 +75,16 @@ export function AgreementRevisionDialog({ open, onOpenChange, booking }: DialogP
   const [error, setError] = useState<unknown>(null);
   const { reason, setReason, valid: reasonValid } = useReasonField(open);
 
-  useEffect(() => {
-    if (!open) return;
-    setTotal(booking.agreement_value_paise);
-    setCash(booking.cash_agreed_paise);
-    setAccount(booking.account_agreed_paise);
-    setError(null);
-  }, [open, booking.agreement_value_paise, booking.cash_agreed_paise, booking.account_agreed_paise]);
+  useOnChange(
+    open ? `${booking.agreement_value_paise}:${booking.cash_agreed_paise}:${booking.account_agreed_paise}` : null,
+    (key) => {
+      if (key === null) return;
+      setTotal(booking.agreement_value_paise);
+      setCash(booking.cash_agreed_paise);
+      setAccount(booking.account_agreed_paise);
+      setError(null);
+    },
+  );
 
   const split = { cash_paise: cash ?? 0, account_paise: account ?? 0 };
   const exact = total !== null && total > 0 && splitIsExact(total, split);
@@ -55,8 +93,12 @@ export function AgreementRevisionDialog({ open, onOpenChange, booking }: DialogP
   const accountPaid = booking.summary.account.paid_paise;
   const cashBelowPaid = cash !== null && cash < cashPaid;
   const accountBelowPaid = account !== null && account < accountPaid;
-  const unchanged = total === booking.agreement_value_paise && cash === booking.cash_agreed_paise && account === booking.account_agreed_paise;
-  const canSubmit = exact && !cashBelowPaid && !accountBelowPaid && reasonValid && !unchanged && total !== null && total > 0;
+  const unchanged =
+    total === booking.agreement_value_paise &&
+    cash === booking.cash_agreed_paise &&
+    account === booking.account_agreed_paise;
+  const canSubmit =
+    exact && !cashBelowPaid && !accountBelowPaid && reasonValid && !unchanged && total !== null && total > 0;
 
   const applySplit = (next: { cash_paise: number; account_paise: number }) => {
     setCash(next.cash_paise);
@@ -67,15 +109,31 @@ export function AgreementRevisionDialog({ open, onOpenChange, booking }: DialogP
     if (next !== null && total) applySplit(rebalanceSplitForTotal(split, total, next));
   };
 
-  const effect = useMemo(() => {
+  const effect = (() => {
     if (!exact || cash === null || account === null) return null;
     const cashRaised = Math.round((booking.summary.raised_percent / 100) * cash);
     const accountRaised = Math.round((booking.summary.raised_percent / 100) * account);
-    return { cash_due: cashRaised - cashPaid, account_due: accountRaised - accountPaid, cash_raised: cashRaised, account_raised: accountRaised };
-  }, [exact, cash, account, booking.summary.raised_percent, cashPaid, accountPaid]);
+    return {
+      cash_due: cashRaised - cashPaid,
+      account_due: accountRaised - accountPaid,
+      cash_raised: cashRaised,
+      account_raised: accountRaised,
+    };
+  })();
 
   const revise = useMutationWithToast<BookingRow, void>({
-    mutationFn: () => api.post<BookingRow>(`${BOOKINGS_PATH}/${booking.id}/agreement-revisions`, { version: booking.version, agreement_value_paise: total ?? 0, cash_agreed_paise: cash ?? 0, account_agreed_paise: account ?? 0, reason: reason.trim() }, { version: booking.version }),
+    mutationFn: () =>
+      api.post<BookingRow>(
+        `${BOOKINGS_PATH}/${booking.id}/agreement-revisions`,
+        {
+          version: booking.version,
+          agreement_value_paise: total ?? 0,
+          cash_agreed_paise: cash ?? 0,
+          account_agreed_paise: account ?? 0,
+          reason: reason.trim(),
+        },
+        { version: booking.version },
+      ),
     successMessage: "Agreement revised — dues recomputed",
     errorMessage: false,
     invalidate: bookingInvalidations(booking.id),
@@ -98,7 +156,12 @@ export function AgreementRevisionDialog({ open, onOpenChange, booking }: DialogP
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={revise.isPending}>
             Cancel
           </Button>
-          <Button loading={revise.isPending} disabled={!canSubmit} onClick={() => revise.mutate()} data-testid="revision-save">
+          <Button
+            loading={revise.isPending}
+            disabled={!canSubmit}
+            onClick={() => revise.mutate()}
+            data-testid="revision-save"
+          >
             Save revision
           </Button>
         </>
@@ -106,8 +169,14 @@ export function AgreementRevisionDialog({ open, onOpenChange, booking }: DialogP
     >
       <div className="space-y-4">
         <FormRow columns={2}>
-          <FieldWrapper label="Agreement value" required hint={<span className="money">Currently {formatINR(booking.agreement_value_paise)}</span>}>
-            {(control) => <MoneyInput id={control.id} value={total} onChange={changeTotal} data-testid="revision-total" />}
+          <FieldWrapper
+            label="Agreement value"
+            required
+            hint={<span className="money">Currently {formatINR(booking.agreement_value_paise)}</span>}
+          >
+            {(control) => (
+              <MoneyInput id={control.id} value={total} onChange={changeTotal} data-testid="revision-total" />
+            )}
           </FieldWrapper>
           <div className="flex flex-col gap-1">
             <span className="text-xs font-semibold text-ink-muted">Enter the split as</span>
@@ -122,28 +191,84 @@ export function AgreementRevisionDialog({ open, onOpenChange, booking }: DialogP
         <FormRow columns={2}>
           {mode === "AMOUNT" ? (
             <>
-              <FieldWrapper label="Cash bucket" required error={cashBelowPaid ? `Cannot go below ${formatINR(cashPaid)} already received in cash` : undefined} hint={`Received ${formatINR(cashPaid)} · ${formatPercent(percents.cash)}`}>
-                {(control) => <MoneyInput id={control.id} value={cash} invalid={cashBelowPaid} onChange={(value) => (total ? applySplit(splitFromCash(total, value)) : setCash(value))} data-testid="revision-cash" />}
+              <FieldWrapper
+                label="Cash bucket"
+                required
+                error={cashBelowPaid ? `Cannot go below ${formatINR(cashPaid)} already received in cash` : undefined}
+                hint={`Received ${formatINR(cashPaid)} · ${formatPercent(percents.cash)}`}
+              >
+                {(control) => (
+                  <MoneyInput
+                    id={control.id}
+                    value={cash}
+                    invalid={cashBelowPaid}
+                    onChange={(value) => (total ? applySplit(splitFromCash(total, value)) : setCash(value))}
+                    data-testid="revision-cash"
+                  />
+                )}
               </FieldWrapper>
-              <FieldWrapper label="Account bucket" required error={accountBelowPaid ? `Cannot go below ${formatINR(accountPaid)} already received in account` : undefined} hint={`Received ${formatINR(accountPaid)} · ${formatPercent(percents.account)}`}>
-                {(control) => <MoneyInput id={control.id} value={account} invalid={accountBelowPaid} onChange={(value) => (total ? applySplit(splitFromAccount(total, value)) : setAccount(value))} data-testid="revision-account" />}
+              <FieldWrapper
+                label="Account bucket"
+                required
+                error={
+                  accountBelowPaid ? `Cannot go below ${formatINR(accountPaid)} already received in account` : undefined
+                }
+                hint={`Received ${formatINR(accountPaid)} · ${formatPercent(percents.account)}`}
+              >
+                {(control) => (
+                  <MoneyInput
+                    id={control.id}
+                    value={account}
+                    invalid={accountBelowPaid}
+                    onChange={(value) => (total ? applySplit(splitFromAccount(total, value)) : setAccount(value))}
+                    data-testid="revision-account"
+                  />
+                )}
               </FieldWrapper>
             </>
           ) : (
             <>
-              <FieldWrapper label="Cash %" required error={cashBelowPaid ? `Cannot go below ${formatINR(cashPaid)} already received` : undefined} hint={<span className="money">{formatINR(cash)}</span>}>
-                {(control) => <PercentInput id={control.id} value={percents.cash} disabled={!total} onChange={(value) => total && applySplit(splitFromCashPercent(total, value))} />}
+              <FieldWrapper
+                label="Cash %"
+                required
+                error={cashBelowPaid ? `Cannot go below ${formatINR(cashPaid)} already received` : undefined}
+                hint={<span className="money">{formatINR(cash)}</span>}
+              >
+                {(control) => (
+                  <PercentInput
+                    id={control.id}
+                    value={percents.cash}
+                    disabled={!total}
+                    onChange={(value) => total && applySplit(splitFromCashPercent(total, value))}
+                  />
+                )}
               </FieldWrapper>
-              <FieldWrapper label="Account %" required error={accountBelowPaid ? `Cannot go below ${formatINR(accountPaid)} already received` : undefined} hint={<span className="money">{formatINR(account)}</span>}>
-                {(control) => <PercentInput id={control.id} value={percents.account} disabled={!total} onChange={(value) => total && applySplit(splitFromAccountPercent(total, value))} />}
+              <FieldWrapper
+                label="Account %"
+                required
+                error={accountBelowPaid ? `Cannot go below ${formatINR(accountPaid)} already received` : undefined}
+                hint={<span className="money">{formatINR(account)}</span>}
+              >
+                {(control) => (
+                  <PercentInput
+                    id={control.id}
+                    value={percents.account}
+                    disabled={!total}
+                    onChange={(value) => total && applySplit(splitFromAccountPercent(total, value))}
+                  />
+                )}
               </FieldWrapper>
             </>
           )}
         </FormRow>
-        {!exact && total !== null && total > 0 && <Notice tone="danger">Cash + Account must equal the agreement value exactly.</Notice>}
+        {!exact && total !== null && total > 0 && (
+          <Notice tone="danger">Cash + Account must equal the agreement value exactly.</Notice>
+        )}
         {effect && (
           <div className="rounded-md border border-gold-border bg-gold-light p-3 text-xs" data-testid="revision-effect">
-            <p className="mb-1 font-semibold text-gold-text">Effect at {formatPercent(booking.summary.raised_percent)} raised</p>
+            <p className="mb-1 font-semibold text-gold-text">
+              Effect at {formatPercent(booking.summary.raised_percent)} raised
+            </p>
             <dl className="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-4">
               <dt className="text-ink-muted">Cash raised</dt>
               <dd className="money text-right font-medium">{formatINR(effect.cash_raised)}</dd>
@@ -161,7 +286,17 @@ export function AgreementRevisionDialog({ open, onOpenChange, booking }: DialogP
           </div>
         )}
         <FieldWrapper label="Reason" required hint="At least 3 characters — recorded in the revision and audit log">
-          {(control) => <Textarea id={control.id} value={reason} onChange={(event) => setReason(event.target.value)} rows={2} maxLength={500} placeholder="Negotiated discount, loan sanction changed the account portion…" data-testid="revision-reason" />}
+          {(control) => (
+            <Textarea
+              id={control.id}
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              rows={2}
+              maxLength={500}
+              placeholder="Negotiated discount, loan sanction changed the account portion…"
+              data-testid="revision-reason"
+            />
+          )}
         </FieldWrapper>
         <FormError error={error} />
       </div>
@@ -183,18 +318,41 @@ export function PlanChangeDialog({ open, onOpenChange, booking }: DialogProps) {
   const { reason, setReason, valid: reasonValid } = useReasonField(open);
   const paidInstallment = booking.schedule.some((row) => row.paid_paise > 0);
 
-  useEffect(() => {
-    if (!open) return;
+  useOnChange(open, (isOpen) => {
+    if (!isOpen) return;
     setPlanId(null);
     setError(null);
     setAcceptedOn(todayIST());
-  }, [open]);
+  });
 
-  const previewRequest = useMemo<SchedulePreviewRequest | null>(() => (planId ? { plan_id: planId, block_id: booking.block_id, booking_date: booking.booking_date, cash_agreed_paise: booking.cash_agreed_paise, account_agreed_paise: booking.account_agreed_paise } : null), [planId, booking]);
+  const previewRequest = useMemo<SchedulePreviewRequest | null>(
+    () =>
+      planId
+        ? {
+            plan_id: planId,
+            block_id: booking.block_id,
+            booking_date: booking.booking_date,
+            cash_agreed_paise: booking.cash_agreed_paise,
+            account_agreed_paise: booking.account_agreed_paise,
+          }
+        : null,
+    [planId, booking],
+  );
   const preview = useSchedulePreview(previewRequest);
 
   const change = useMutationWithToast<BookingRow, void>({
-    mutationFn: () => api.post<BookingRow>(`${BOOKINGS_PATH}/${booking.id}/plan-change`, { version: booking.version, payment_plan_id: planId ?? "", reason: reason.trim(), plan_acceptance_mode: acceptanceMode, plan_accepted_on: acceptedOn }, { version: booking.version }),
+    mutationFn: () =>
+      api.post<BookingRow>(
+        `${BOOKINGS_PATH}/${booking.id}/plan-change`,
+        {
+          version: booking.version,
+          payment_plan_id: planId ?? "",
+          reason: reason.trim(),
+          plan_acceptance_mode: acceptanceMode,
+          plan_accepted_on: acceptedOn,
+        },
+        { version: booking.version },
+      ),
     successMessage: "Payment plan changed — schedule recomputed",
     errorMessage: false,
     invalidate: bookingInvalidations(booking.id),
@@ -220,7 +378,12 @@ export function PlanChangeDialog({ open, onOpenChange, booking }: DialogProps) {
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={change.isPending}>
             Cancel
           </Button>
-          <Button loading={change.isPending} disabled={!canSubmit} onClick={() => change.mutate()} data-testid="plan-change-save">
+          <Button
+            loading={change.isPending}
+            disabled={!canSubmit}
+            onClick={() => change.mutate()}
+            data-testid="plan-change-save"
+          >
             Change plan
           </Button>
         </>
@@ -232,7 +395,10 @@ export function PlanChangeDialog({ open, onOpenChange, booking }: DialogProps) {
             <span className="inline-flex items-center gap-1.5 font-semibold">
               <AlertTriangle className="size-4" aria-hidden="true" /> Plan change blocked
             </span>
-            <p className="mt-0.5 text-xs">At least one installment demand has a payment applied. Reverse those payments first or keep the current plan.</p>
+            <p className="mt-0.5 text-xs">
+              At least one installment demand has a payment applied. Reverse those payments first or keep the current
+              plan.
+            </p>
           </Notice>
         )}
         <FieldWrapper label="New plan" required>
@@ -265,14 +431,43 @@ export function PlanChangeDialog({ open, onOpenChange, booking }: DialogProps) {
         {preview.data && <SchedulePreviewTable preview={preview.data} loading={preview.isFetching} />}
         <FormRow columns={2}>
           <FieldWrapper label="Accepted via" required>
-            {(control) => <Select<PlanAcceptanceMode> id={control.id} value={acceptanceMode} onValueChange={(value) => value && setAcceptanceMode(value)} options={PLAN_ACCEPTANCE_MODES.map((value) => ({ value, label: PLAN_ACCEPTANCE_MODE_LABELS[value] }))} />}
+            {(control) => (
+              <Select<PlanAcceptanceMode>
+                id={control.id}
+                value={acceptanceMode}
+                onValueChange={(value) => value && setAcceptanceMode(value)}
+                options={PLAN_ACCEPTANCE_MODES.map((value) => ({ value, label: PLAN_ACCEPTANCE_MODE_LABELS[value] }))}
+              />
+            )}
           </FieldWrapper>
-          <FieldWrapper label="Accepted on" required error={acceptedOn < booking.booking_date ? "Cannot be before the booking date" : undefined}>
-            {(control) => <DateInput id={control.id} value={acceptedOn} onChange={(value) => setAcceptedOn(value ?? todayIST())} min={booking.booking_date} max={todayIST()} />}
+          <FieldWrapper
+            label="Accepted on"
+            required
+            error={acceptedOn < booking.booking_date ? "Cannot be before the booking date" : undefined}
+          >
+            {(control) => (
+              <DateInput
+                id={control.id}
+                value={acceptedOn}
+                onChange={(value) => setAcceptedOn(value ?? todayIST())}
+                min={booking.booking_date}
+                max={todayIST()}
+              />
+            )}
           </FieldWrapper>
         </FormRow>
         <FieldWrapper label="Reason" required>
-          {(control) => <Textarea id={control.id} value={reason} onChange={(event) => setReason(event.target.value)} rows={2} maxLength={500} placeholder="Customer opted for the construction-linked plan…" data-testid="plan-change-reason" />}
+          {(control) => (
+            <Textarea
+              id={control.id}
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              rows={2}
+              maxLength={500}
+              placeholder="Customer opted for the construction-linked plan…"
+              data-testid="plan-change-reason"
+            />
+          )}
         </FieldWrapper>
         <FormError error={error} />
       </div>
@@ -294,24 +489,35 @@ export function CancelBookingDialog({ open, onOpenChange, booking }: DialogProps
   const paid = booking.summary.total_paid_paise + booking.summary.other_charges_paid_paise;
   const pendingCheques = booking.summary.pending_cheques_paise;
 
-  useEffect(() => {
-    if (!open) return;
+  useOnChange(open ? paid : null, (key) => {
+    if (key === null) return;
     setDeduction(0);
     setRefund(paid);
     setCancelDate(todayIST());
     setError(null);
-  }, [open, paid]);
-
-  useEffect(() => {
-    if (deduction === null) return;
-    setRefund(Math.max(0, paid - deduction));
-  }, [deduction, paid]);
+  });
+  // A new deduction proposes refund = paid − deduction; the refund stays editable afterwards.
+  const changeDeduction = (next: number | null) => {
+    setDeduction(next);
+    if (next !== null) setRefund(Math.max(0, paid - next));
+  };
 
   const refundTooHigh = refund !== null && refund > paid;
   const canSubmit = reasonValid && refund !== null && !refundTooHigh && (deduction ?? 0) >= 0 && pendingCheques === 0;
 
   const cancel = useMutationWithToast<BookingRow, void>({
-    mutationFn: () => api.post<BookingRow>(`${BOOKINGS_PATH}/${booking.id}/cancel`, { version: booking.version, reason: reason.trim(), deduction_paise: deduction ?? 0, refund_paise: refund ?? 0, cancel_date: cancelDate }, { version: booking.version }),
+    mutationFn: () =>
+      api.post<BookingRow>(
+        `${BOOKINGS_PATH}/${booking.id}/cancel`,
+        {
+          version: booking.version,
+          reason: reason.trim(),
+          deduction_paise: deduction ?? 0,
+          refund_paise: refund ?? 0,
+          cancel_date: cancelDate,
+        },
+        { version: booking.version },
+      ),
     successMessage: `Booking ${booking.booking_number} cancelled — flat ${booking.flat_number} is Available again`,
     errorMessage: false,
     invalidate: bookingInvalidations(booking.id),
@@ -334,7 +540,13 @@ export function CancelBookingDialog({ open, onOpenChange, booking }: DialogProps
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={cancel.isPending}>
             Keep booking
           </Button>
-          <Button variant="danger" loading={cancel.isPending} disabled={!canSubmit} onClick={() => cancel.mutate()} data-testid="cancel-confirm">
+          <Button
+            variant="danger"
+            loading={cancel.isPending}
+            disabled={!canSubmit}
+            onClick={() => cancel.mutate()}
+            data-testid="cancel-confirm"
+          >
             Cancel booking
           </Button>
         </>
@@ -343,7 +555,8 @@ export function CancelBookingDialog({ open, onOpenChange, booking }: DialogProps
       <div className="space-y-4">
         {pendingCheques > 0 && (
           <Notice tone="danger">
-            <span className="font-semibold">Pending cheques of {formatINR(pendingCheques)} block cancellation.</span> Clear or bounce them from the Payments tab first.
+            <span className="font-semibold">Pending cheques of {formatINR(pendingCheques)} block cancellation.</span>{" "}
+            Clear or bounce them from the Payments tab first.
           </Notice>
         )}
         <dl className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-md border border-border bg-surface px-3 py-2 text-xs">
@@ -356,17 +569,57 @@ export function CancelBookingDialog({ open, onOpenChange, booking }: DialogProps
         </dl>
         <FormRow columns={2}>
           <FieldWrapper label="Deduction" hint="Forfeited / cancellation charges">
-            {(control) => <MoneyInput id={control.id} value={deduction} onChange={setDeduction} maxPaise={paid} showShort={false} data-testid="cancel-deduction" />}
+            {(control) => (
+              <MoneyInput
+                id={control.id}
+                value={deduction}
+                onChange={changeDeduction}
+                maxPaise={paid}
+                showShort={false}
+                data-testid="cancel-deduction"
+              />
+            )}
           </FieldWrapper>
-          <FieldWrapper label="Refund" required error={refundTooHigh ? `Refund cannot exceed ${formatINR(paid)} received` : undefined} hint="Defaults to received − deduction">
-            {(control) => <MoneyInput id={control.id} value={refund} onChange={setRefund} invalid={refundTooHigh} showShort={false} data-testid="cancel-refund" />}
+          <FieldWrapper
+            label="Refund"
+            required
+            error={refundTooHigh ? `Refund cannot exceed ${formatINR(paid)} received` : undefined}
+            hint="Defaults to received − deduction"
+          >
+            {(control) => (
+              <MoneyInput
+                id={control.id}
+                value={refund}
+                onChange={setRefund}
+                invalid={refundTooHigh}
+                showShort={false}
+                data-testid="cancel-refund"
+              />
+            )}
           </FieldWrapper>
         </FormRow>
         <FieldWrapper label="Cancellation date" required>
-          {(control) => <DateInput id={control.id} value={cancelDate} onChange={(value) => setCancelDate(value ?? todayIST())} min={booking.booking_date} max={todayIST()} />}
+          {(control) => (
+            <DateInput
+              id={control.id}
+              value={cancelDate}
+              onChange={(value) => setCancelDate(value ?? todayIST())}
+              min={booking.booking_date}
+              max={todayIST()}
+            />
+          )}
         </FieldWrapper>
         <FieldWrapper label="Reason" required hint="Mandatory; audited and shown on the cancellations report">
-          {(control) => <Textarea id={control.id} value={reason} onChange={(event) => setReason(event.target.value)} rows={2} maxLength={500} data-testid="cancel-reason" />}
+          {(control) => (
+            <Textarea
+              id={control.id}
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              rows={2}
+              maxLength={500}
+              data-testid="cancel-reason"
+            />
+          )}
         </FieldWrapper>
         <FormError error={error} />
       </div>
@@ -386,22 +639,33 @@ export function CompleteBookingDialog({ open, onOpenChange, booking }: DialogPro
   const [problems, setProblems] = useState<string[]>([]);
   const [error, setError] = useState<unknown>(null);
 
-  useEffect(() => {
-    if (!open) return;
+  useOnChange(open, (isOpen) => {
+    if (!isOpen) return;
     setNotes("");
     setCompletedOn(todayIST());
     setProblems([]);
     setError(null);
-  }, [open]);
+  });
 
   const localBlockers = [
-    booking.summary.total_due_paise > 0 ? `Flat value due of ${formatINR(booking.summary.total_due_paise)} is outstanding` : null,
-    booking.summary.other_charges_due_paise > 0 ? `Other charges due of ${formatINR(booking.summary.other_charges_due_paise)} are outstanding` : null,
-    booking.summary.pending_cheques_paise > 0 ? `Cheques of ${formatINR(booking.summary.pending_cheques_paise)} are still pending` : null,
+    booking.summary.total_due_paise > 0
+      ? `Flat value due of ${formatINR(booking.summary.total_due_paise)} is outstanding`
+      : null,
+    booking.summary.other_charges_due_paise > 0
+      ? `Other charges due of ${formatINR(booking.summary.other_charges_due_paise)} are outstanding`
+      : null,
+    booking.summary.pending_cheques_paise > 0
+      ? `Cheques of ${formatINR(booking.summary.pending_cheques_paise)} are still pending`
+      : null,
   ].filter((item): item is string => item !== null);
 
   const complete = useMutationWithToast<BookingRow, void>({
-    mutationFn: () => api.post<BookingRow>(`${BOOKINGS_PATH}/${booking.id}/complete`, { version: booking.version, completion_notes: notes.trim() || null, completed_on: completedOn }, { version: booking.version }),
+    mutationFn: () =>
+      api.post<BookingRow>(
+        `${BOOKINGS_PATH}/${booking.id}/complete`,
+        { version: booking.version, completion_notes: notes.trim() || null, completed_on: completedOn },
+        { version: booking.version },
+      ),
     successMessage: `Booking ${booking.booking_number} completed — flat ${booking.flat_number} is Sold`,
     errorMessage: false,
     invalidate: bookingInvalidations(booking.id),
@@ -431,7 +695,14 @@ export function CompleteBookingDialog({ open, onOpenChange, booking }: DialogPro
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={complete.isPending}>
             Close
           </Button>
-          <Button variant="gold" leftIcon={CheckCircle2} loading={complete.isPending} disabled={localBlockers.length > 0} onClick={() => complete.mutate()} data-testid="complete-confirm">
+          <Button
+            variant="gold"
+            leftIcon={CheckCircle2}
+            loading={complete.isPending}
+            disabled={localBlockers.length > 0}
+            onClick={() => complete.mutate()}
+            data-testid="complete-confirm"
+          >
             Mark completed
           </Button>
         </>
@@ -447,16 +718,23 @@ export function CompleteBookingDialog({ open, onOpenChange, booking }: DialogPro
               ))}
             </ul>
             {(booking.summary.total_due_paise > 0 || booking.summary.other_charges_due_paise > 0) && (
-              <Button size="xs" variant="link" className="mt-1" onClick={() => {
-                onOpenChange(false);
-                navigate(`/bookings/${booking.id}?tab=overview&action=pay`);
-              }}>
+              <Button
+                size="xs"
+                variant="link"
+                className="mt-1"
+                onClick={() => {
+                  onOpenChange(false);
+                  navigate(`/bookings/${booking.id}?tab=overview&action=pay`);
+                }}
+              >
                 Post a payment
               </Button>
             )}
           </Notice>
         ) : (
-          <Notice tone="success">Dues are settled and no cheques are pending. The possession stage is verified by the server on confirm.</Notice>
+          <Notice tone="success">
+            Dues are settled and no cheques are pending. The possession stage is verified by the server on confirm.
+          </Notice>
         )}
         <dl className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-md border border-border bg-surface px-3 py-2 text-xs">
           <dt className="text-ink-subtle">{PAYMENT_BUCKET_LABELS.CASH} due</dt>
@@ -473,10 +751,28 @@ export function CompleteBookingDialog({ open, onOpenChange, booking }: DialogPro
           </dd>
         </dl>
         <FieldWrapper label="Completed on" required>
-          {(control) => <DateInput id={control.id} value={completedOn} onChange={(value) => setCompletedOn(value ?? todayIST())} min={booking.booking_date} max={todayIST()} />}
+          {(control) => (
+            <DateInput
+              id={control.id}
+              value={completedOn}
+              onChange={(value) => setCompletedOn(value ?? todayIST())}
+              min={booking.booking_date}
+              max={todayIST()}
+            />
+          )}
         </FieldWrapper>
         <FieldWrapper label="Handover notes">
-          {(control) => <Textarea id={control.id} value={notes} onChange={(event) => setNotes(event.target.value)} rows={3} maxLength={1000} placeholder="Keys handed over, snag list signed…" className={cn(complete.isPending && "opacity-60")} />}
+          {(control) => (
+            <Textarea
+              id={control.id}
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              rows={3}
+              maxLength={1000}
+              placeholder="Keys handed over, snag list signed…"
+              className={cn(complete.isPending && "opacity-60")}
+            />
+          )}
         </FieldWrapper>
         <FormError error={error} />
       </div>

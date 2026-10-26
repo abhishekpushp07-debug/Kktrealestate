@@ -37,7 +37,10 @@ export const PORTAL_PASSWORD = "Welcome@123";
 
 /** Thrown when the API answers with an unexpected status; carries the response for the report. */
 export class SeedError extends Error {
-  constructor(message: string, readonly details?: unknown) {
+  constructor(
+    message: string,
+    readonly details?: unknown,
+  ) {
     super(message);
     this.name = "SeedError";
   }
@@ -60,13 +63,60 @@ export interface CallOptions {
   multipart?: { fields: Record<string, string>; file: { name: string; data: Buffer; type?: string } };
 }
 
-export interface StaffUser { id: string; name: string; email: string; version: number; roleName: string }
-export interface SeedFlat { id: string; flat_number: string; floor: number; position: number; price_paise: number; status: string; version: number; flat_type_code: string }
-export interface SeedBlock { id: string; code: string; name: string; flats: Map<string, SeedFlat> }
-export interface SeedProject { id: string; code: string; slug: string; name: string; blocks: Record<string, SeedBlock>; parking: Map<string, string>; brochureDocId: string | null }
-export interface SeedCustomer { id: string; code: string; name: string; phone: string; email: string; version: number }
-export interface SeedBooking { id: string; number: string; flat: string; customerPhone: string; version: number }
-export interface SeedLead { id: string; number: string; phone: string; version: number; stage: string }
+export interface StaffUser {
+  id: string;
+  name: string;
+  email: string;
+  version: number;
+  roleName: string;
+}
+export interface SeedFlat {
+  id: string;
+  flat_number: string;
+  floor: number;
+  position: number;
+  price_paise: number;
+  status: string;
+  version: number;
+  flat_type_code: string;
+}
+export interface SeedBlock {
+  id: string;
+  code: string;
+  name: string;
+  flats: Map<string, SeedFlat>;
+}
+export interface SeedProject {
+  id: string;
+  code: string;
+  slug: string;
+  name: string;
+  blocks: Record<string, SeedBlock>;
+  parking: Map<string, string>;
+  brochureDocId: string | null;
+}
+export interface SeedCustomer {
+  id: string;
+  code: string;
+  name: string;
+  phone: string;
+  email: string;
+  version: number;
+}
+export interface SeedBooking {
+  id: string;
+  number: string;
+  flat: string;
+  customerPhone: string;
+  version: number;
+}
+export interface SeedLead {
+  id: string;
+  number: string;
+  phone: string;
+  version: number;
+  stage: string;
+}
 
 /** Everything the steps share. */
 export class SeedContext {
@@ -91,7 +141,11 @@ export class SeedContext {
   readonly counts: Record<string, number> = {};
   readonly log: (msg: string) => void;
 
-  constructor(readonly app: FastifyInstance, readonly companyId: string, log?: (msg: string) => void) {
+  constructor(
+    readonly app: FastifyInstance,
+    readonly companyId: string,
+    log?: (msg: string) => void,
+  ) {
     this.sql = app.sql;
     this.db = app.db;
     this.today = todayIST();
@@ -110,7 +164,12 @@ export class SeedContext {
   }
 
   /** The next `count` dates ≥ `fromDaysAhead` days ahead that fall on the given weekdays (0 = Sunday). */
-  nextVisitDays(fromDaysAhead: number, count: number, weekdays: readonly number[] = [1, 2, 3, 4, 5, 6], skip: readonly string[] = []): string[] {
+  nextVisitDays(
+    fromDaysAhead: number,
+    count: number,
+    weekdays: readonly number[] = [1, 2, 3, 4, 5, 6],
+    skip: readonly string[] = [],
+  ): string[] {
     const out: string[] = [];
     for (let i = fromDaysAhead; out.length < count && i < fromDaysAhead + 60; i++) {
       const d = this.future(i);
@@ -171,18 +230,29 @@ export class SeedContext {
   }
 
   /** One API call through app.inject; throws SeedError on an unexpected status. */
-  async call<T = Record<string, unknown>>(method: InjectOptions["method"], url: string, opts: CallOptions = {}): Promise<T> {
+  async call<T = Record<string, unknown>>(
+    method: InjectOptions["method"],
+    url: string,
+    opts: CallOptions = {},
+  ): Promise<T> {
     // The fake client IP is the socket address itself, so it holds whatever TRUST_PROXY says (no X-Forwarded-For needed).
     const ip = opts.ip ?? "10.77.0.1";
     const headers: Record<string, string> = { ...(opts.headers ?? {}) };
     if (opts.token) headers["authorization"] = `Bearer ${opts.token}`;
-    if (method === "POST" && opts.idempotent !== false && !headers["idempotency-key"]) headers["idempotency-key"] = this.idemKey();
+    if (method === "POST" && opts.idempotent !== false && !headers["idempotency-key"])
+      headers["idempotency-key"] = this.idemKey();
     if (opts.ifMatch !== undefined) headers["if-match"] = `"${opts.ifMatch}"`;
     let payload: string | Buffer | undefined;
     if (opts.multipart) {
       const fd = new FormData();
       for (const [k, v] of Object.entries(opts.multipart.fields)) fd.append(k, v);
-      fd.append("file", new Blob([new Uint8Array(opts.multipart.file.data)], { type: opts.multipart.file.type ?? "application/octet-stream" }), opts.multipart.file.name);
+      fd.append(
+        "file",
+        new Blob([new Uint8Array(opts.multipart.file.data)], {
+          type: opts.multipart.file.type ?? "application/octet-stream",
+        }),
+        opts.multipart.file.name,
+      );
       const encoded = new Response(fd);
       payload = Buffer.from(await encoded.arrayBuffer());
       headers["content-type"] = encoded.headers.get("content-type")!;
@@ -190,13 +260,29 @@ export class SeedContext {
       headers["content-type"] = "application/json";
       payload = JSON.stringify(opts.body);
     }
-    const res = await this.app.inject({ method, url, headers, remoteAddress: ip, ...(payload !== undefined ? { payload } : {}) });
-    const expected = opts.expect === undefined ? [200, 201, 204] : Array.isArray(opts.expect) ? opts.expect : [opts.expect as number];
+    const res = await this.app.inject({
+      method,
+      url,
+      headers,
+      remoteAddress: ip,
+      ...(payload !== undefined ? { payload } : {}),
+    });
+    const expected =
+      opts.expect === undefined ? [200, 201, 204] : Array.isArray(opts.expect) ? opts.expect : [opts.expect as number];
     const ct = String(res.headers["content-type"] ?? "");
     let body: unknown = res.body;
-    if (ct.includes("application/json") && res.body) { try { body = JSON.parse(res.body); } catch { body = res.body; } }
+    if (ct.includes("application/json") && res.body) {
+      try {
+        body = JSON.parse(res.body);
+      } catch {
+        body = res.body;
+      }
+    }
     if (!expected.includes(res.statusCode)) {
-      throw new SeedError(`${method} ${url} → ${res.statusCode}: ${res.body.slice(0, 600)}`, { status: res.statusCode, body });
+      throw new SeedError(`${method} ${url} → ${res.statusCode}: ${res.body.slice(0, 600)}`, {
+        status: res.statusCode,
+        body,
+      });
     }
     return body as T;
   }
@@ -207,12 +293,22 @@ export class SeedContext {
   }
 
   /** POST that must answer 201/200 (idempotent by default). */
-  post<T = Record<string, unknown>>(url: string, body: unknown, token: StaffKey = "admin", extra: Omit<CallOptions, "body" | "token"> = {}): Promise<T> {
+  post<T = Record<string, unknown>>(
+    url: string,
+    body: unknown,
+    token: StaffKey = "admin",
+    extra: Omit<CallOptions, "body" | "token"> = {},
+  ): Promise<T> {
     return this.call<T>("POST", url, { token: this.token(token), body, ...extra });
   }
 
   /** PATCH with the version in the body (or If-Match). */
-  patch<T = Record<string, unknown>>(url: string, body: unknown, token: StaffKey = "admin", extra: Omit<CallOptions, "body" | "token"> = {}): Promise<T> {
+  patch<T = Record<string, unknown>>(
+    url: string,
+    body: unknown,
+    token: StaffKey = "admin",
+    extra: Omit<CallOptions, "body" | "token"> = {},
+  ): Promise<T> {
     return this.call<T>("PATCH", url, { token: this.token(token), body, ...extra });
   }
 
@@ -220,11 +316,21 @@ export class SeedContext {
   async loginStaff(): Promise<void> {
     for (const key of Object.keys(STAFF) as StaffKey[]) {
       const creds = STAFF[key];
-      const r = await this.call<{ access_token: string; user: { id: string; name: string; email: string; role_name: string } }>("POST", "/api/v1/auth/login", { body: { email: creds.email, password: creds.password }, ip: this.freshIp(), idempotent: false });
+      const r = await this.call<{
+        access_token: string;
+        user: { id: string; name: string; email: string; role_name: string };
+      }>("POST", "/api/v1/auth/login", {
+        body: { email: creds.email, password: creds.password },
+        ip: this.freshIp(),
+        idempotent: false,
+      });
       this.tokens[key] = r.access_token;
     }
-    const list = await this.get<{ items: { id: string; name: string; email: string; version: number; role_name: string }[] }>("/api/v1/users?page_size=100");
-    for (const u of list.items) this.users.set(u.email, { id: u.id, name: u.name, email: u.email, version: u.version, roleName: u.role_name });
+    const list = await this.get<{
+      items: { id: string; name: string; email: string; version: number; role_name: string }[];
+    }>("/api/v1/users?page_size=100");
+    for (const u of list.items)
+      this.users.set(u.email, { id: u.id, name: u.name, email: u.email, version: u.version, roleName: u.role_name });
   }
 
   /** Current `version` of a resource (fresh GET). */
@@ -234,25 +340,45 @@ export class SeedContext {
   }
 
   /** Uploads a document through POST /documents (multipart) and returns its id. */
-  async uploadDocument(fields: { entity_type: string; entity_id: string; title?: string; document_type_id?: string; shared_with_customer?: boolean; is_sensitive?: boolean }, file: { name: string; data: Buffer; type?: string }, token: StaffKey = "admin"): Promise<string> {
+  async uploadDocument(
+    fields: {
+      entity_type: string;
+      entity_id: string;
+      title?: string;
+      document_type_id?: string;
+      shared_with_customer?: boolean;
+      is_sensitive?: boolean;
+    },
+    file: { name: string; data: Buffer; type?: string },
+    token: StaffKey = "admin",
+  ): Promise<string> {
     const f: Record<string, string> = { entity_type: fields.entity_type, entity_id: fields.entity_id };
     if (fields.title) f["title"] = fields.title;
     if (fields.document_type_id) f["document_type_id"] = fields.document_type_id;
     if (fields.shared_with_customer !== undefined) f["shared_with_customer"] = String(fields.shared_with_customer);
     if (fields.is_sensitive !== undefined) f["is_sensitive"] = String(fields.is_sensitive);
-    const r = await this.call<{ document: { id: string } }>("POST", "/api/v1/documents", { token: this.token(token), multipart: { fields: f, file } });
+    const r = await this.call<{ document: { id: string } }>("POST", "/api/v1/documents", {
+      token: this.token(token),
+      multipart: { fields: f, file },
+    });
     return r.document.id;
   }
 
   /** Uploads website media through POST /cms/media and returns the document id. */
   async uploadMedia(title: string, file: { name: string; data: Buffer; type?: string }): Promise<string> {
-    const r = await this.call<{ document: { id: string } }>("POST", "/api/v1/cms/media", { token: this.token("marketing"), multipart: { fields: { title }, file } });
+    const r = await this.call<{ document: { id: string } }>("POST", "/api/v1/cms/media", {
+      token: this.token("marketing"),
+      multipart: { fields: { title }, file },
+    });
     return r.document.id;
   }
 }
 
 function escapeXml(s: string): string {
-  return s.replace(/[<>&"']/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&apos;" })[c] ?? c);
+  return s.replace(
+    /[<>&"']/g,
+    (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&apos;" })[c] ?? c,
+  );
 }
 
 const imageCache = new Map<string, Promise<Buffer>>();
@@ -261,7 +387,12 @@ const imageCache = new Map<string, Promise<Buffer>>();
  * A 1600×1000 navy placeholder PNG with a gold caption (project / stage / subject) rendered by sharp — the demo has no external
  * image dependencies. Identical captions share one encode per run.
  */
-export function placeholderPng(caption: string, subtitle = "Shree Ganesh Builders · Patna", width = 1600, height = 1000): Promise<Buffer> {
+export function placeholderPng(
+  caption: string,
+  subtitle = "Shree Ganesh Builders · Patna",
+  width = 1600,
+  height = 1000,
+): Promise<Buffer> {
   const key = `${width}x${height}:${caption}|${subtitle}`;
   let p = imageCache.get(key);
   if (!p) {
@@ -288,7 +419,10 @@ export function placeholderPdf(title: string, lines: readonly string[]): Promise
     doc.on("error", reject);
     doc.rect(0, 0, doc.page.width, 110).fill(NAVY);
     doc.fillColor(GOLD).fontSize(22).text("Shree Ganesh Builders", 56, 36);
-    doc.fillColor("#F3EBD3").fontSize(10).text("SGB House, Boring Road, Patna 800001 · info@sgb.in · +91 612 2200000", 56, 66);
+    doc
+      .fillColor("#F3EBD3")
+      .fontSize(10)
+      .text("SGB House, Boring Road, Patna 800001 · info@sgb.in · +91 612 2200000", 56, 66);
     doc.moveDown(3);
     doc.fillColor(NAVY).fontSize(18).text(title, 56, 140);
     doc.moveDown();

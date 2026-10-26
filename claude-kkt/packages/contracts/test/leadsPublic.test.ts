@@ -11,7 +11,9 @@ describe("LeadStageChangeSchema", () => {
   it("requires a reason when moving to LOST", () => {
     expect(LeadStageChangeSchema.safeParse({ version: 1, stage: "LOST" }).success).toBe(false);
     expect(LeadStageChangeSchema.safeParse({ version: 1, stage: "LOST", lost_reason: "  " }).success).toBe(false);
-    expect(LeadStageChangeSchema.safeParse({ version: 1, stage: "LOST", lost_reason: "Budget mismatch" }).success).toBe(true);
+    expect(LeadStageChangeSchema.safeParse({ version: 1, stage: "LOST", lost_reason: "Budget mismatch" }).success).toBe(
+      true,
+    );
   });
   it("does not require a reason for other stages and forbids CONVERTED", () => {
     expect(LeadStageChangeSchema.safeParse({ version: 1, stage: "NEGOTIATION" }).success).toBe(true);
@@ -20,7 +22,12 @@ describe("LeadStageChangeSchema", () => {
 });
 
 describe("public forms honeypot", () => {
-  const enquiry = { name: "Asha Verma", phone: "+91 98765 43210", project_slug: "ganesh-heights", consent: true as const };
+  const enquiry = {
+    name: "Asha Verma",
+    phone: "+91 98765 43210",
+    project_slug: "ganesh-heights",
+    consent: true as const,
+  };
   it("accepts an empty or absent honeypot and normalises the phone", () => {
     const r = PublicEnquiryInputSchema.safeParse({ ...enquiry, website: "" });
     expect(r.success).toBe(true);
@@ -31,7 +38,12 @@ describe("public forms honeypot", () => {
     expect(PublicEnquiryInputSchema.safeParse({ ...enquiry, website: "http://spam.example" }).success).toBe(false);
     expect(PublicBrochureRequestSchema.safeParse({ ...enquiry, website: "x" }).success).toBe(false);
     expect(
-      PublicVisitBookingInputSchema.safeParse({ ...enquiry, visit_date: "2026-05-01", slot_start: "10:00", website: "bot" }).success,
+      PublicVisitBookingInputSchema.safeParse({
+        ...enquiry,
+        visit_date: "2026-05-01",
+        slot_start: "10:00",
+        website: "bot",
+      }).success,
     ).toBe(false);
   });
   it("requires consent and rejects unknown keys", () => {
@@ -49,6 +61,7 @@ describe("public forms honeypot", () => {
 describe("toPublicAvailability", () => {
   it("collapses everything but AVAILABLE to NOT_AVAILABLE", () => {
     expect(toPublicAvailability("AVAILABLE")).toBe("AVAILABLE");
-    for (const s of ["HOLD", "BLOCKED", "BOOKED", "SOLD"] as const) expect(toPublicAvailability(s)).toBe("NOT_AVAILABLE");
+    for (const s of ["HOLD", "BLOCKED", "BOOKED", "SOLD"] as const)
+      expect(toPublicAvailability(s)).toBe("NOT_AVAILABLE");
   });
 });

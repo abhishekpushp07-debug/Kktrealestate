@@ -14,7 +14,13 @@ interface CarouselProps {
 }
 
 /** CSS scroll-snap carousel. Works with swipe/scroll alone; buttons are progressive enhancement. */
-export function Carousel({ children, label, className = "", itemClassName = "w-[85%] sm:w-[60%] lg:w-[40%]", light = false }: CarouselProps) {
+export function Carousel({
+  children,
+  label,
+  className = "",
+  itemClassName = "w-[85%] sm:w-[60%] lg:w-[40%]",
+  light = false,
+}: CarouselProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [atStart, setAtStart] = useState(true);
   const [atEnd, setAtEnd] = useState(false);
@@ -46,7 +52,9 @@ export function Carousel({ children, label, className = "", itemClassName = "w-[
   };
 
   const btn = `tap inline-flex items-center justify-center rounded-full border transition disabled:opacity-30 ${
-    light ? "border-ivory-100/40 text-ivory-100 hover:bg-ivory-100/10" : "border-navy-900/20 text-navy-900 hover:bg-navy-900 hover:text-ivory-100"
+    light
+      ? "border-ivory-100/40 text-ivory-100 hover:bg-ivory-100/10"
+      : "border-navy-900/20 text-navy-900 hover:bg-navy-900 hover:text-ivory-100"
   }`;
 
   return (

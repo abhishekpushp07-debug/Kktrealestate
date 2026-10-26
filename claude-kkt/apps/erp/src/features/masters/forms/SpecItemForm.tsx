@@ -27,7 +27,17 @@ export function SpecItemForm(_props: MasterFormProps) {
           required
           hint={categories.isError ? "Could not load categories" : undefined}
           render={({ field }) => (
-            <Combobox id={field.id} value={field.value} onValueChange={(value) => field.onChange(value)} options={options} placeholder={categories.isPending ? "Loading…" : "Select a category"} emptyText="No categories yet" invalid={field.invalid} aria-describedby={field["aria-describedby"]} data-testid="field-category-id" />
+            <Combobox
+              id={field.id}
+              value={field.value}
+              onValueChange={(value) => field.onChange(value)}
+              options={options}
+              placeholder={categories.isPending ? "Loading…" : "Select a category"}
+              emptyText="No categories yet"
+              invalid={field.invalid}
+              aria-describedby={field["aria-describedby"]}
+              data-testid="field-category-id"
+            />
           )}
         />
         <FormField
@@ -35,20 +45,51 @@ export function SpecItemForm(_props: MasterFormProps) {
           name="name"
           label="Item"
           required
-          render={({ field }) => <Input {...field} value={field.value} onChange={(event) => field.onChange(event.target.value)} placeholder="Vitrified tiles 600×600" maxLength={120} data-testid="field-name" />}
+          render={({ field }) => (
+            <Input
+              {...field}
+              value={field.value}
+              onChange={(event) => field.onChange(event.target.value)}
+              placeholder="Vitrified tiles 600×600"
+              maxLength={120}
+              data-testid="field-name"
+            />
+          )}
         />
         <FormField
           control={control}
           name="sort_order"
           label="Sort order"
-          render={({ field }) => <NumberInput id={field.id} ref={field.ref} value={field.value} onChange={(value) => field.onChange(value ?? 0)} onBlur={field.onBlur} decimals={0} min={0} max={10_000} data-testid="field-sort-order" />}
+          render={({ field }) => (
+            <NumberInput
+              id={field.id}
+              ref={field.ref}
+              value={field.value}
+              onChange={(value) => field.onChange(value ?? 0)}
+              onBlur={field.onBlur}
+              decimals={0}
+              min={0}
+              max={10_000}
+              data-testid="field-sort-order"
+            />
+          )}
         />
         <FormField
           control={control}
           name="description"
           label="Description"
           className="sm:col-span-2"
-          render={({ field }) => <Textarea {...field} value={field.value ?? ""} onChange={(event) => field.onChange(event.target.value || null)} placeholder="Brand, grade, finish…" maxLength={2000} rows={3} data-testid="field-description" />}
+          render={({ field }) => (
+            <Textarea
+              {...field}
+              value={field.value ?? ""}
+              onChange={(event) => field.onChange(event.target.value || null)}
+              placeholder="Brand, grade, finish…"
+              maxLength={2000}
+              rows={3}
+              data-testid="field-description"
+            />
+          )}
         />
       </FormRow>
     </div>

@@ -1,6 +1,16 @@
 import Link from "next/link";
 
-import { FacebookIcon, InstagramIcon, LinkedInIcon, MailIcon, MapPinIcon, PhoneIcon, WhatsAppIcon, XIcon, YouTubeIcon } from "@/components/ui/icons";
+import {
+  FacebookIcon,
+  InstagramIcon,
+  LinkedInIcon,
+  MailIcon,
+  MapPinIcon,
+  PhoneIcon,
+  WhatsAppIcon,
+  XIcon,
+  YouTubeIcon,
+} from "@/components/ui/icons";
 import { telHref, whatsappHref } from "@/lib/format";
 import { NAV_LINKS } from "@/lib/nav";
 import { NO_CONTACTS, type SiteSettings } from "@/lib/types";
@@ -132,12 +142,20 @@ export function Footer({ site, brandName, erpUrl, portalUrl }: FooterProps) {
                     <span>{office.address}</span>
                   </p>
                   {office.phone ? (
-                    <a href={telHref(office.phone) ?? "#"} className="mt-1 inline-flex min-h-12 items-center text-ivory-100/80 hover:text-gold-300">
+                    <a
+                      href={telHref(office.phone) ?? "#"}
+                      className="mt-1 inline-flex min-h-12 items-center text-ivory-100/80 hover:text-gold-300"
+                    >
                       {office.phone}
                     </a>
                   ) : null}
                   {office.maps_link ? (
-                    <a href={office.maps_link} className="ml-3 inline-flex min-h-12 items-center text-gold-300 hover:underline" rel="noopener noreferrer" target="_blank">
+                    <a
+                      href={office.maps_link}
+                      className="ml-3 inline-flex min-h-12 items-center text-gold-300 hover:underline"
+                      rel="noopener noreferrer"
+                      target="_blank"
+                    >
                       Directions
                     </a>
                   ) : null}

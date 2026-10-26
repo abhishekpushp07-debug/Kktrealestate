@@ -1,5 +1,16 @@
 import type { ColumnDef } from "@tanstack/react-table";
-import { ArchiveRestore, KeyRound, Lock, LockOpen, MoreHorizontal, Pencil, Plus, Power, ShieldCheck, Users } from "lucide-react";
+import {
+  ArchiveRestore,
+  KeyRound,
+  Lock,
+  LockOpen,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Power,
+  ShieldCheck,
+  Users,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
@@ -47,14 +58,33 @@ export default function UsersPage() {
   const [confirm, setConfirm] = useState<{ kind: "reset" | "deactivate"; user: UserRow } | null>(null);
   const [tempPassword, setTempPassword] = useState<TempPasswordState | null>(null);
 
-  const projectName = useMemo(() => new Map((projects.data ?? []).map((project) => [project.id, project.name] as const)), [projects.data]);
+  const projectName = useMemo(
+    () => new Map((projects.data ?? []).map((project) => [project.id, project.name] as const)),
+    [projects.data],
+  );
 
-  const deactivate = useMutationWithToast<ActiveStateResponse, UserRow>({ mutationFn: deactivateUser, successMessage: (_data, user) => `${user.name} deactivated`, invalidate: [[USERS_PATH]], entityLabel: "This user" });
-  const activate = useMutationWithToast<ActiveStateResponse, UserRow>({ mutationFn: activateUser, successMessage: (_data, user) => `${user.name} restored`, invalidate: [[USERS_PATH]], entityLabel: "This user" });
-  const unlock = useMutationWithToast<ActiveStateResponse, UserRow>({ mutationFn: unlockUser, successMessage: (_data, user) => `${user.name} unlocked`, invalidate: [[USERS_PATH]], entityLabel: "This user" });
+  const deactivate = useMutationWithToast<ActiveStateResponse, UserRow>({
+    mutationFn: deactivateUser,
+    successMessage: (_data, user) => `${user.name} deactivated`,
+    invalidate: [[USERS_PATH]],
+    entityLabel: "This user",
+  });
+  const activate = useMutationWithToast<ActiveStateResponse, UserRow>({
+    mutationFn: activateUser,
+    successMessage: (_data, user) => `${user.name} restored`,
+    invalidate: [[USERS_PATH]],
+    entityLabel: "This user",
+  });
+  const unlock = useMutationWithToast<ActiveStateResponse, UserRow>({
+    mutationFn: unlockUser,
+    successMessage: (_data, user) => `${user.name} unlocked`,
+    invalidate: [[USERS_PATH]],
+    entityLabel: "This user",
+  });
   const reset = useMutationWithToast<string | null, UserRow>({
     mutationFn: resetUserPassword,
-    successMessage: (password, user) => (password ? `Temporary password issued for ${user.name}` : `Password reset for ${user.name}`),
+    successMessage: (password, user) =>
+      password ? `Temporary password issued for ${user.name}` : `Password reset for ${user.name}`,
     invalidate: [[USERS_PATH]],
     entityLabel: "This user",
     onSuccess: (password, user) => {
@@ -78,7 +108,11 @@ export default function UsersPage() {
           </span>
         ),
       },
-      { accessorKey: "role_name", header: "Role", cell: ({ row }) => <Badge variant="gold">{row.original.role_name}</Badge> },
+      {
+        accessorKey: "role_name",
+        header: "Role",
+        cell: ({ row }) => <Badge variant="gold">{row.original.role_name}</Badge>,
+      },
       {
         id: "scope",
         header: "Scope",
@@ -90,7 +124,8 @@ export default function UsersPage() {
             <Tooltip content={names.length ? names.join(", ") : "No projects"}>
               <span className="inline-flex">
                 <Badge variant="neutral" numeric>
-                  {formatNumber(row.original.project_ids.length)} project{row.original.project_ids.length === 1 ? "" : "s"}
+                  {formatNumber(row.original.project_ids.length)} project
+                  {row.original.project_ids.length === 1 ? "" : "s"}
                 </Badge>
               </span>
             </Tooltip>
@@ -101,7 +136,12 @@ export default function UsersPage() {
         accessorKey: "mfa_enabled",
         header: "MFA",
         meta: { align: "center", width: 90 },
-        cell: ({ row }) => (row.original.mfa_enabled ? <StatusChip status="ENABLED" label="On" size="sm" /> : <span className="text-xs text-ink-subtle">Off</span>),
+        cell: ({ row }) =>
+          row.original.mfa_enabled ? (
+            <StatusChip status="ENABLED" label="On" size="sm" />
+          ) : (
+            <span className="text-xs text-ink-subtle">Off</span>
+          ),
       },
       {
         accessorKey: "locked_until",
@@ -147,14 +187,22 @@ export default function UsersPage() {
           return (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <IconButton icon={MoreHorizontal} label={`Actions for ${user.name}`} size="sm" data-testid={`user-actions-${user.id}`} />
+                <IconButton
+                  icon={MoreHorizontal}
+                  label={`Actions for ${user.name}`}
+                  size="sm"
+                  data-testid={`user-actions-${user.id}`}
+                />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onSelect={() => setEditing({ open: true, user })}>
                   <Pencil /> Edit
                 </DropdownMenuItem>
                 {self ? (
-                  <DropdownMenuItem onSelect={() => navigate("/change-password")} data-testid="user-change-own-password">
+                  <DropdownMenuItem
+                    onSelect={() => navigate("/change-password")}
+                    data-testid="user-change-own-password"
+                  >
                     <KeyRound /> Change my password
                   </DropdownMenuItem>
                 ) : (
@@ -250,18 +298,39 @@ export default function UsersPage() {
         onSortChange={list.setSort}
         onRowClick={(user) => setEditing({ open: true, user })}
         rowClassName={(user) => (user.is_active ? undefined : "[&>td]:text-ink-subtle")}
-        pagination={{ page: list.page, pageSize: list.pageSize, total, onPageChange: list.setPage, onPageSizeChange: list.setPageSize }}
-        emptyState={{ icon: Users, title: list.hasActiveFilters ? "No users match" : "No users yet", description: list.hasActiveFilters ? "Try another search or clear the filters." : "Create the first staff account." }}
+        pagination={{
+          page: list.page,
+          pageSize: list.pageSize,
+          total,
+          onPageChange: list.setPage,
+          onPageSizeChange: list.setPageSize,
+        }}
+        emptyState={{
+          icon: Users,
+          title: list.hasActiveFilters ? "No users match" : "No users yet",
+          description: list.hasActiveFilters
+            ? "Try another search or clear the filters."
+            : "Create the first staff account.",
+        }}
         data-testid="users-table"
       />
 
-      <UserFormSheet open={editing.open} onOpenChange={(open) => setEditing((state) => ({ ...state, open }))} user={editing.user} onTemporaryPassword={(user, password) => setTempPassword({ user, password })} />
+      <UserFormSheet
+        open={editing.open}
+        onOpenChange={(open) => setEditing((state) => ({ ...state, open }))}
+        user={editing.user}
+        onTemporaryPassword={(user, password) => setTempPassword({ user, password })}
+      />
 
       <ConfirmDialog
         open={confirm?.kind === "reset"}
         onOpenChange={(open) => !open && setConfirm(null)}
         title="Reset password?"
-        description={confirm ? `${confirm.user.name} gets a new temporary password (shown once) and must change it at the next sign-in. Active sessions stay signed in until they expire.` : undefined}
+        description={
+          confirm
+            ? `${confirm.user.name} gets a new temporary password (shown once) and must change it at the next sign-in. Active sessions stay signed in until they expire.`
+            : undefined
+        }
         confirmLabel="Reset password"
         onConfirm={async () => {
           if (confirm) await reset.mutateAsync(confirm.user).catch(() => undefined);
@@ -271,7 +340,11 @@ export default function UsersPage() {
         open={confirm?.kind === "deactivate"}
         onOpenChange={(open) => !open && setConfirm(null)}
         title="Deactivate user?"
-        description={confirm ? `${confirm.user.name} can no longer sign in. Their history and audit trail stay intact; you can activate them again later.` : undefined}
+        description={
+          confirm
+            ? `${confirm.user.name} can no longer sign in. Their history and audit trail stay intact; you can activate them again later.`
+            : undefined
+        }
         confirmLabel="Deactivate"
         variant="destructive"
         onConfirm={async () => {
@@ -283,7 +356,11 @@ export default function UsersPage() {
         open={tempPassword !== null}
         onOpenChange={(open) => !open && setTempPassword(null)}
         title="Temporary password"
-        description={tempPassword ? `Share it with ${tempPassword.user.name} over a secure channel. It is shown only once.` : undefined}
+        description={
+          tempPassword
+            ? `Share it with ${tempPassword.user.name} over a secure channel. It is shown only once.`
+            : undefined
+        }
         size="sm"
         footer={
           <Button onClick={() => setTempPassword(null)} data-testid="temp-password-done-btn">

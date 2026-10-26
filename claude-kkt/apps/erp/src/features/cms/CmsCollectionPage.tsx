@@ -4,7 +4,33 @@ import { MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useForm, type Control, type DefaultValues, type FieldValues, type UseFormReturn } from "react-hook-form";
 import type { z } from "zod";
-import { applyServerErrors, Button, ConfirmDialog, DataTable, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, EmptyState, ErrorState, FormError, IconButton, PageHeader, Pagination, Sheet, SheetBody, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, Skeleton, Toolbar, type SheetSize } from "@/components/ui";
+import {
+  applyServerErrors,
+  Button,
+  ConfirmDialog,
+  DataTable,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  EmptyState,
+  ErrorState,
+  FormError,
+  IconButton,
+  PageHeader,
+  Pagination,
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  Skeleton,
+  Toolbar,
+  type SheetSize,
+} from "@/components/ui";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { formatNumber } from "@/lib/format";
@@ -12,6 +38,7 @@ import { useList, useListParams, useMutationWithToast, type UseListParamsResult 
 import { controlOf } from "@/features/inventory/components";
 import { contractResolver } from "@/features/shared/contractResolver";
 import { CMS_BREADCRUMBS } from "./CmsLayout";
+import { useOnChange } from "@/lib/utils";
 
 export interface CmsRowBase {
   id: string;
@@ -59,7 +86,9 @@ export interface CmsCollectionConfig<Row extends CmsRowBase, Values extends Fiel
 }
 
 /** Generic CRUD page for a CMS collection: list (table or grid), create/edit sheet, flag toggle and delete. */
-export function CmsCollectionPage<Row extends CmsRowBase, Values extends FieldValues>(config: CmsCollectionConfig<Row, Values>) {
+export function CmsCollectionPage<Row extends CmsRowBase, Values extends FieldValues>(
+  config: CmsCollectionConfig<Row, Values>,
+) {
   const { can } = useAuth();
   const canWrite = can("cms.write");
   const list = useListParams({ filterKeys: config.filterKeys ?? [], defaultSort: config.defaultSort ?? "sort_order" });
@@ -68,11 +97,20 @@ export function CmsCollectionPage<Row extends CmsRowBase, Values extends FieldVa
   const [deleting, setDeleting] = useState<Row | null>(null);
   const invalidate = [[config.path]];
   const flagKey = config.flagKey;
-  const [flagOn, flagOff] = config.flagLabels ?? (flagKey === "is_active" ? ["Active", "Inactive"] : ["Published", "Draft"]);
+  const [flagOn, flagOff] =
+    config.flagLabels ?? (flagKey === "is_active" ? ["Active", "Inactive"] : ["Published", "Draft"]);
 
   const toggle = useMutationWithToast<Row, Row>({
-    mutationFn: (row) => api.patch<Row>(`${config.path}/${row.id}`, { version: row.version, ...(flagKey ? { [flagKey]: !row[flagKey] } : {}) }, { version: row.version }),
-    successMessage: (saved) => (flagKey && saved[flagKey] ? `${config.singular} ${flagOn.toLowerCase()}` : `${config.singular} ${flagOff.toLowerCase()}`),
+    mutationFn: (row) =>
+      api.patch<Row>(
+        `${config.path}/${row.id}`,
+        { version: row.version, ...(flagKey ? { [flagKey]: !row[flagKey] } : {}) },
+        { version: row.version },
+      ),
+    successMessage: (saved) =>
+      flagKey && saved[flagKey]
+        ? `${config.singular} ${flagOn.toLowerCase()}`
+        : `${config.singular} ${flagOff.toLowerCase()}`,
     invalidate,
     entityLabel: `This ${config.singular.toLowerCase()}`,
   });
@@ -89,13 +127,22 @@ export function CmsCollectionPage<Row extends CmsRowBase, Values extends FieldVa
     canWrite ? (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <IconButton icon={MoreHorizontal} label={`Actions for ${config.singular.toLowerCase()}`} size="sm" data-no-row-click />
+          <IconButton
+            icon={MoreHorizontal}
+            label={`Actions for ${config.singular.toLowerCase()}`}
+            size="sm"
+            data-no-row-click
+          />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onSelect={() => setSheet({ open: true, row })}>
             <Pencil /> Edit
           </DropdownMenuItem>
-          {flagKey && <DropdownMenuItem onSelect={() => toggle.mutate(row)}>{row[flagKey] ? `Mark ${flagOff.toLowerCase()}` : `Mark ${flagOn.toLowerCase()}`}</DropdownMenuItem>}
+          {flagKey && (
+            <DropdownMenuItem onSelect={() => toggle.mutate(row)}>
+              {row[flagKey] ? `Mark ${flagOff.toLowerCase()}` : `Mark ${flagOn.toLowerCase()}`}
+            </DropdownMenuItem>
+          )}
           {config.rowActions?.(row)}
           <DropdownMenuSeparator />
           <DropdownMenuItem destructive onSelect={() => setDeleting(row)}>
@@ -104,7 +151,7 @@ export function CmsCollectionPage<Row extends CmsRowBase, Values extends FieldVa
         </DropdownMenuContent>
       </DropdownMenu>
     ) : (
-      config.rowActions?.(row) ?? null
+      (config.rowActions?.(row) ?? null)
     );
 
   const columns = useMemo<ColumnDef<Row, unknown>[]>(
@@ -117,7 +164,7 @@ export function CmsCollectionPage<Row extends CmsRowBase, Values extends FieldVa
         cell: ({ row }) => rowMenu(row.original),
       },
     ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- rowMenu only reads canWrite, config and stable setters/mutate; listing it would rebuild columns every render
     [config.columns, canWrite],
   );
 
@@ -148,22 +195,56 @@ export function CmsCollectionPage<Row extends CmsRowBase, Values extends FieldVa
         filters={config.filters?.(list)}
         hasActiveFilters={list.hasActiveFilters}
         onClearFilters={list.reset}
-        summary={query.data ? `${formatNumber(total)} ${total === 1 ? config.singular.toLowerCase() : config.title.toLowerCase()}` : undefined}
+        summary={
+          query.data
+            ? `${formatNumber(total)} ${total === 1 ? config.singular.toLowerCase() : config.title.toLowerCase()}`
+            : undefined
+        }
       />
 
       {config.grid ? (
         <div className="min-w-0">
           {query.isPending && <Skeleton className="h-72 rounded-lg" />}
-          {query.isError && <ErrorState error={query.error} onRetry={() => void query.refetch()} className="rounded-lg border border-border bg-card" />}
-          {query.data && rows.length === 0 && <EmptyState icon={config.icon} className="rounded-lg border border-border bg-card" title={`No ${config.title.toLowerCase()} yet`} description={config.emptyDescription} action={canWrite ? <Button leftIcon={Plus} onClick={() => setSheet({ open: true, row: null })}>New {config.singular.toLowerCase()}</Button> : undefined} />}
+          {query.isError && (
+            <ErrorState
+              error={query.error}
+              onRetry={() => void query.refetch()}
+              className="rounded-lg border border-border bg-card"
+            />
+          )}
+          {query.data && rows.length === 0 && (
+            <EmptyState
+              icon={config.icon}
+              className="rounded-lg border border-border bg-card"
+              title={`No ${config.title.toLowerCase()} yet`}
+              description={config.emptyDescription}
+              action={
+                canWrite ? (
+                  <Button leftIcon={Plus} onClick={() => setSheet({ open: true, row: null })}>
+                    New {config.singular.toLowerCase()}
+                  </Button>
+                ) : undefined
+              }
+            />
+          )}
           {rows.length > 0 && (
             <div className={query.isFetching ? "opacity-70 transition-opacity" : undefined}>
-              <div className="columns-2 gap-3 sm:columns-3 lg:columns-4 [&>*]:mb-3 [&>*]:break-inside-avoid" data-testid="cms-grid">
+              <div
+                className="columns-2 gap-3 sm:columns-3 lg:columns-4 [&>*]:mb-3 [&>*]:break-inside-avoid"
+                data-testid="cms-grid"
+              >
                 {rows.map((row) => (
                   <div key={row.id}>{config.grid?.(row, rowMenu(row))}</div>
                 ))}
               </div>
-              <Pagination page={list.page} pageSize={list.pageSize} total={total} onPageChange={list.setPage} onPageSizeChange={list.setPageSize} className="mt-3" />
+              <Pagination
+                page={list.page}
+                pageSize={list.pageSize}
+                total={total}
+                onPageChange={list.setPage}
+                onPageSizeChange={list.setPageSize}
+                className="mt-3"
+              />
             </div>
           )}
         </div>
@@ -178,14 +259,42 @@ export function CmsCollectionPage<Row extends CmsRowBase, Values extends FieldVa
           sort={list.sort}
           onSortChange={list.setSort}
           onRowClick={canWrite ? (row) => setSheet({ open: true, row }) : undefined}
-          pagination={{ page: list.page, pageSize: list.pageSize, total, onPageChange: list.setPage, onPageSizeChange: list.setPageSize }}
-          mobileCard={config.mobileCard ? (row) => <div className="rounded-lg border border-border bg-card p-3 shadow-card">{config.mobileCard?.(row, rowMenu(row))}</div> : undefined}
-          emptyState={{ icon: config.icon, title: `No ${config.title.toLowerCase()} yet`, description: config.emptyDescription, action: canWrite ? <Button leftIcon={Plus} onClick={() => setSheet({ open: true, row: null })}>New {config.singular.toLowerCase()}</Button> : undefined }}
+          pagination={{
+            page: list.page,
+            pageSize: list.pageSize,
+            total,
+            onPageChange: list.setPage,
+            onPageSizeChange: list.setPageSize,
+          }}
+          mobileCard={
+            config.mobileCard
+              ? (row) => (
+                  <div className="rounded-lg border border-border bg-card p-3 shadow-card">
+                    {config.mobileCard?.(row, rowMenu(row))}
+                  </div>
+                )
+              : undefined
+          }
+          emptyState={{
+            icon: config.icon,
+            title: `No ${config.title.toLowerCase()} yet`,
+            description: config.emptyDescription,
+            action: canWrite ? (
+              <Button leftIcon={Plus} onClick={() => setSheet({ open: true, row: null })}>
+                New {config.singular.toLowerCase()}
+              </Button>
+            ) : undefined,
+          }}
           data-testid="cms-table"
         />
       )}
 
-      <CmsFormSheet config={config} open={sheet.open} row={sheet.row} onOpenChange={(open) => setSheet((state) => ({ ...state, open }))} />
+      <CmsFormSheet
+        config={config}
+        open={sheet.open}
+        row={sheet.row}
+        onOpenChange={(open) => setSheet((state) => ({ ...state, open }))}
+      />
 
       <ConfirmDialog
         open={deleting !== null}
@@ -206,24 +315,46 @@ export function CmsCollectionPage<Row extends CmsRowBase, Values extends FieldVa
 /* Create / edit sheet                                                  */
 /* ------------------------------------------------------------------ */
 
-function CmsFormSheet<Row extends CmsRowBase, Values extends FieldValues>({ config, open, row, onOpenChange }: { config: CmsCollectionConfig<Row, Values>; open: boolean; row: Row | null; onOpenChange: (open: boolean) => void }) {
+function CmsFormSheet<Row extends CmsRowBase, Values extends FieldValues>({
+  config,
+  open,
+  row,
+  onOpenChange,
+}: {
+  config: CmsCollectionConfig<Row, Values>;
+  open: boolean;
+  row: Row | null;
+  onOpenChange: (open: boolean) => void;
+}) {
   const mode = row ? "edit" : "create";
   const schema = mode === "edit" ? (config.updateSchema ?? config.schema) : config.schema;
   const resolver = useMemo(() => contractResolver<Values, unknown>(schema), [schema]);
-  const form = useForm<Values, unknown, unknown>({ resolver, defaultValues: (row ? config.toValues(row) : config.defaultValues()) as DefaultValues<Values>, mode: "onTouched" });
+  const form = useForm<Values, unknown, unknown>({
+    resolver,
+    defaultValues: (row ? config.toValues(row) : config.defaultValues()) as DefaultValues<Values>,
+    mode: "onTouched",
+  });
   const control = controlOf(form);
   const [serverError, setServerError] = useState<unknown>(null);
 
+  // Local state resets while rendering; react-hook-form's reset (an external store) stays in the effect below.
+  useOnChange(open ? `${row?.id}:${row?.version}` : null, (key) => {
+    if (key !== null) setServerError(null);
+  });
   useEffect(() => {
-    if (open) {
-      form.reset(row ? config.toValues(row) : config.defaultValues());
-      setServerError(null);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (open) form.reset(row ? config.toValues(row) : config.defaultValues());
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-seed the form only when it opens or the record changes
   }, [open, row?.id, row?.version]);
 
   const save = useMutationWithToast<Row, unknown>({
-    mutationFn: (body) => (row ? api.patch<Row>(`${config.path}/${row.id}`, { ...(body as Record<string, unknown>), version: row.version }, { version: row.version }) : api.post<Row>(config.path, body)),
+    mutationFn: (body) =>
+      row
+        ? api.patch<Row>(
+            `${config.path}/${row.id}`,
+            { ...(body as Record<string, unknown>), version: row.version },
+            { version: row.version },
+          )
+        : api.post<Row>(config.path, body),
     successMessage: row ? `${config.singular} updated` : `${config.singular} created`,
     invalidate: [[config.path]],
     entityLabel: `This ${config.singular.toLowerCase()}`,
@@ -239,7 +370,9 @@ function CmsFormSheet<Row extends CmsRowBase, Values extends FieldValues>({ conf
     <Sheet open={open} onOpenChange={(next) => !save.isPending && onOpenChange(next)}>
       <SheetContent size={config.sheetSize ?? "lg"}>
         <SheetHeader>
-          <SheetTitle>{row ? `Edit ${config.singular.toLowerCase()}` : `New ${config.singular.toLowerCase()}`}</SheetTitle>
+          <SheetTitle>
+            {row ? `Edit ${config.singular.toLowerCase()}` : `New ${config.singular.toLowerCase()}`}
+          </SheetTitle>
           <SheetDescription>{config.description}</SheetDescription>
         </SheetHeader>
         <form

@@ -35,7 +35,10 @@ export const VisitSettingsSchema = z
     instructions: z.string().trim().max(1000).optional().nullable(),
   })
   .refine((s) => s.start_time < s.end_time, { message: "end_time must be after start_time", path: ["end_time"] })
-  .refine((s) => new Set(s.visit_days).size === s.visit_days.length, { message: "Duplicate visit days", path: ["visit_days"] });
+  .refine((s) => new Set(s.visit_days).size === s.visit_days.length, {
+    message: "Duplicate visit days",
+    path: ["visit_days"],
+  });
 export type VisitSettings = z.infer<typeof VisitSettingsSchema>;
 
 /** Update visit settings (full object + version). */
@@ -85,12 +88,21 @@ export type VisitRow = z.infer<typeof VisitRowSchema>;
 export const VisitTodayResponseSchema = z.object({
   date: DateStringSchema,
   items: z.array(VisitRowSchema),
-  counts: z.object({ total: z.int().min(0), pending: z.int().min(0), completed: z.int().min(0), no_show: z.int().min(0), cancelled: z.int().min(0) }),
+  counts: z.object({
+    total: z.int().min(0),
+    pending: z.int().min(0),
+    completed: z.int().min(0),
+    no_show: z.int().min(0),
+    cancelled: z.int().min(0),
+  }),
 });
 export type VisitTodayResponse = z.infer<typeof VisitTodayResponseSchema>;
 
 /** Body of POST /site-visits/:id/complete and /no-show (version optional: If-Match is accepted too). */
-export const VisitOutcomeBodySchema = z.strictObject({ version: VersionSchema.optional(), notes: NoteSchema.optional().nullable() });
+export const VisitOutcomeBodySchema = z.strictObject({
+  version: VersionSchema.optional(),
+  notes: NoteSchema.optional().nullable(),
+});
 export type VisitOutcomeBody = z.infer<typeof VisitOutcomeBodySchema>;
 
 /** List filter for visits. */
@@ -125,7 +137,10 @@ export const VisitCreateSchema = z
     assignee_user_id: IdSchema.optional().nullable(),
     notes: NoteSchema.optional().nullable(),
   })
-  .refine((v) => v.lead_id != null || v.customer_id != null, { message: "Link a lead or a customer", path: ["lead_id"] });
+  .refine((v) => v.lead_id != null || v.customer_id != null, {
+    message: "Link a lead or a customer",
+    path: ["lead_id"],
+  });
 export type VisitCreate = z.infer<typeof VisitCreateSchema>;
 
 /** Reschedule (capacity-checked; "moved" tag shown). */
@@ -142,7 +157,11 @@ export const VisitCancelSchema = z.strictObject({ ...VersionedSchema.shape, reas
 export type VisitCancel = z.infer<typeof VisitCancelSchema>;
 
 /** Mark outcome: COMPLETED (lead → Site Visit Done) or NO_SHOW. */
-export const VisitOutcomeUpdateSchema = z.strictObject({ ...VersionedSchema.shape, outcome: VisitOutcomeSchema, notes: NoteSchema.optional().nullable() });
+export const VisitOutcomeUpdateSchema = z.strictObject({
+  ...VersionedSchema.shape,
+  outcome: VisitOutcomeSchema,
+  notes: NoteSchema.optional().nullable(),
+});
 export type VisitOutcomeUpdate = z.infer<typeof VisitOutcomeUpdateSchema>;
 
 /** Confirm / assign / notes. */
@@ -176,15 +195,32 @@ export type VisitCalendarSlot = z.infer<typeof VisitCalendarSlotSchema>;
 
 export const VisitCalendarResponseSchema = z.object({
   project_id: IdSchema,
-  days: z.array(z.object({ date: DateStringSchema, is_visit_day: z.boolean(), is_blackout: z.boolean(), slots: z.array(VisitCalendarSlotSchema) })),
+  days: z.array(
+    z.object({
+      date: DateStringSchema,
+      is_visit_day: z.boolean(),
+      is_blackout: z.boolean(),
+      slots: z.array(VisitCalendarSlotSchema),
+    }),
+  ),
 });
 export type VisitCalendarResponse = z.infer<typeof VisitCalendarResponseSchema>;
 
 /** Internal availability query (for reschedule pickers; hides full slots). */
-export const VisitAvailabilityQuerySchema = z.object({ project_id: IdSchema, from: DateStringSchema, to: DateStringSchema, exclude_visit_id: IdSchema.optional() });
+export const VisitAvailabilityQuerySchema = z.object({
+  project_id: IdSchema,
+  from: DateStringSchema,
+  to: DateStringSchema,
+  exclude_visit_id: IdSchema.optional(),
+});
 export type VisitAvailabilityQuery = z.infer<typeof VisitAvailabilityQuerySchema>;
 
 export const VisitAvailabilityResponseSchema = z.object({
-  days: z.array(z.object({ date: DateStringSchema, slots: z.array(z.object({ start: TimeStringSchema, end: TimeStringSchema, available: z.int().min(1) })) })),
+  days: z.array(
+    z.object({
+      date: DateStringSchema,
+      slots: z.array(z.object({ start: TimeStringSchema, end: TimeStringSchema, available: z.int().min(1) })),
+    }),
+  ),
 });
 export type VisitAvailabilityResponse = z.infer<typeof VisitAvailabilityResponseSchema>;

@@ -26,7 +26,15 @@ const STATUS_LABELS: Record<SiteVisitManage["status"], string> = {
 };
 
 /** `justMoved`: the page was opened right after a self-reschedule (?moved=1 on the new link). */
-export function ManageVisit({ visit: initial, token, justMoved = false }: { visit: SiteVisitManage; token: string; justMoved?: boolean }) {
+export function ManageVisit({
+  visit: initial,
+  token,
+  justMoved = false,
+}: {
+  visit: SiteVisitManage;
+  token: string;
+  justMoved?: boolean;
+}) {
   const { apiUrl } = useSiteConfig();
   const router = useRouter();
   const [visit, setVisit] = useState(initial);
@@ -84,7 +92,11 @@ export function ManageVisit({ visit: initial, token, justMoved = false }: { visi
         </div>
         <span
           className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wider ${
-            upcoming ? "bg-success/10 text-success" : visit.status === "CANCELLED" ? "bg-danger/10 text-danger" : "bg-navy-50 text-navy-900"
+            upcoming
+              ? "bg-success/10 text-success"
+              : visit.status === "CANCELLED"
+                ? "bg-danger/10 text-danger"
+                : "bg-navy-50 text-navy-900"
           }`}
           aria-live="polite"
         >
@@ -134,7 +146,12 @@ export function ManageVisit({ visit: initial, token, justMoved = false }: { visi
             <dd className="whitespace-pre-line text-navy-900">
               {visit.site_office_address}
               {visit.maps_link ? (
-                <a href={visit.maps_link} className="mt-1 flex min-h-12 w-fit items-center gap-1 text-gold-700 underline-offset-4 hover:underline" rel="noopener noreferrer" target="_blank">
+                <a
+                  href={visit.maps_link}
+                  className="mt-1 flex min-h-12 w-fit items-center gap-1 text-gold-700 underline-offset-4 hover:underline"
+                  rel="noopener noreferrer"
+                  target="_blank"
+                >
                   Open in Maps <ExternalLinkIcon size={14} />
                 </a>
               ) : null}
@@ -142,7 +159,9 @@ export function ManageVisit({ visit: initial, token, justMoved = false }: { visi
           </div>
         ) : null}
       </dl>
-      {visit.instructions ? <p className="mt-6 rounded-xl bg-ivory-100 p-4 text-sm leading-6 text-ink-muted">{visit.instructions}</p> : null}
+      {visit.instructions ? (
+        <p className="mt-6 rounded-xl bg-ivory-100 p-4 text-sm leading-6 text-ink-muted">{visit.instructions}</p>
+      ) : null}
 
       {upcoming ? (
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -161,7 +180,9 @@ export function ManageVisit({ visit: initial, token, justMoved = false }: { visi
           ) : null}
         </div>
       ) : visit.status === "CANCELLED" ? (
-        <p className="mt-8 text-ink-muted">This visit has been cancelled. You are welcome to book another time whenever it suits you.</p>
+        <p className="mt-8 text-ink-muted">
+          This visit has been cancelled. You are welcome to book another time whenever it suits you.
+        </p>
       ) : null}
 
       {upcoming && visit.link_expires_at && !expired ? (
@@ -169,7 +190,6 @@ export function ManageVisit({ visit: initial, token, justMoved = false }: { visi
           This link works until {formatDateTime(visit.link_expires_at)}.
         </p>
       ) : null}
-
 
       {expired ? (
         <div className="mt-6 space-y-3" data-testid="visit-link-expired">
@@ -194,7 +214,12 @@ export function ManageVisit({ visit: initial, token, justMoved = false }: { visi
       ) : null}
 
       {confirming ? (
-        <div className="mt-6 rounded-2xl border border-danger/30 bg-danger/5 p-5" role="alertdialog" aria-labelledby="cancel-title" aria-describedby="cancel-desc">
+        <div
+          className="mt-6 rounded-2xl border border-danger/30 bg-danger/5 p-5"
+          role="alertdialog"
+          aria-labelledby="cancel-title"
+          aria-describedby="cancel-desc"
+        >
           <p id="cancel-title" className="font-semibold text-navy-900">
             Cancel visit {visit.visit_number}?
           </p>

@@ -33,7 +33,10 @@ export const ApprovalSchema = z.strictObject({
 export type Approval = z.infer<typeof ApprovalSchema>;
 
 /** A project team member. */
-export const ProjectTeamMemberSchema = z.strictObject({ user_id: IdSchema, role_label: z.string().trim().max(60).optional().nullable() });
+export const ProjectTeamMemberSchema = z.strictObject({
+  user_id: IdSchema,
+  role_label: z.string().trim().max(60).optional().nullable(),
+});
 export type ProjectTeamMember = z.infer<typeof ProjectTeamMemberSchema>;
 
 /** Unit counts by status plus total. */
@@ -115,7 +118,12 @@ export const ProjectRowSchema = MasterRowSchema.extend({
   longitude: z.number().nullable(),
   landmarks: z.array(z.object({ name: z.string(), distance_km: z.number() })),
   approvals: z.array(
-    z.object({ name: z.string(), number: z.string().nullable(), issued_on: DateStringSchema.nullable(), status: ApprovalStatusSchema }),
+    z.object({
+      name: z.string(),
+      number: z.string().nullable(),
+      issued_on: DateStringSchema.nullable(),
+      status: ApprovalStatusSchema,
+    }),
   ),
   escrow_bank_account_id: IdSchema.nullable(),
   stage_sequence: z.array(IdSchema),

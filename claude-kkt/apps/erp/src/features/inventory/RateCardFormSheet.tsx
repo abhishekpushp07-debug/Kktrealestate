@@ -13,7 +13,29 @@ import {
   type RateCardRow,
 } from "@kkt/contracts";
 import { z } from "zod";
-import { applyServerErrors, Badge, Button, DateInput, FormError, FormField, FormRow, FormSection, IconButton, Input, MoneyInput, NumberInput, PercentInput, Select, Sheet, SheetBody, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui";
+import {
+  applyServerErrors,
+  Badge,
+  Button,
+  DateInput,
+  FormError,
+  FormField,
+  FormRow,
+  FormSection,
+  IconButton,
+  Input,
+  MoneyInput,
+  NumberInput,
+  PercentInput,
+  Select,
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui";
 import { api, type ApiClientError } from "@/lib/api";
 import { todayIST } from "@/lib/format";
 import { useMutationWithToast } from "@/lib/queries";
@@ -22,6 +44,7 @@ import { useMasterRows } from "@/features/masters/api";
 import { FACING_OPTIONS } from "@/features/masters/forms/FlatTypeForm";
 import { inventoryKeys, RATE_CARDS_PATH } from "./api";
 import { controlOf } from "./components";
+import { useOnChange } from "@/lib/utils";
 
 interface RateValues {
   flat_type_id: string | null;
@@ -82,7 +105,12 @@ export function rateCardToValues(row: RateCardRow): RateCardValues {
   return {
     name: row.name,
     effective_from: row.effective_from,
-    rates: row.rates.map((rate) => ({ flat_type_id: rate.flat_type_id, mode: rate.lump_sum_paise !== null ? "LUMP" : "RATE", rate_per_sqft_paise: rate.rate_per_sqft_paise, lump_sum_paise: rate.lump_sum_paise })),
+    rates: row.rates.map((rate) => ({
+      flat_type_id: rate.flat_type_id,
+      mode: rate.lump_sum_paise !== null ? "LUMP" : "RATE",
+      rate_per_sqft_paise: rate.rate_per_sqft_paise,
+      lump_sum_paise: rate.lump_sum_paise,
+    })),
     plc_rules: [...row.plc_rules]
       .sort((a, b) => a.sort_order - b.sort_order)
       .map((rule) => ({
@@ -107,11 +135,28 @@ export interface RateCardFormSheetProps {
 }
 
 /** Draft rate card: effective date, rate (per sq ft or lump sum) per flat type, PLC rules repeater. */
-export function RateCardFormSheet({ projectId, open, onOpenChange, rateCard, cloneFrom = null }: RateCardFormSheetProps) {
+export function RateCardFormSheet({
+  projectId,
+  open,
+  onOpenChange,
+  rateCard,
+  cloneFrom = null,
+}: RateCardFormSheetProps) {
   const mode = rateCard ? "edit" : "create";
-  const schema = useMemo(() => (mode === "edit" ? buildFormSchema(projectId).pipe(EditSchema) : buildFormSchema(projectId).pipe(RateCardCreateSchema)), [mode, projectId]);
+  const schema = useMemo(
+    () =>
+      mode === "edit"
+        ? buildFormSchema(projectId).pipe(EditSchema)
+        : buildFormSchema(projectId).pipe(RateCardCreateSchema),
+    [mode, projectId],
+  );
   const resolver = useMemo(() => contractResolver<RateCardValues, unknown>(schema), [schema]);
-  const initial = () => (rateCard ? rateCardToValues(rateCard) : cloneFrom ? { ...rateCardToValues(cloneFrom), name: `${cloneFrom.name} (copy)`, effective_from: todayIST() } : defaultRateCardValues());
+  const initial = () =>
+    rateCard
+      ? rateCardToValues(rateCard)
+      : cloneFrom
+        ? { ...rateCardToValues(cloneFrom), name: `${cloneFrom.name} (copy)`, effective_from: todayIST() }
+        : defaultRateCardValues();
   const form = useForm<RateCardValues, unknown, unknown>({ resolver, defaultValues: initial(), mode: "onTouched" });
   const control = controlOf(form);
   const [serverError, setServerError] = useState<unknown>(null);
@@ -119,11 +164,15 @@ export function RateCardFormSheet({ projectId, open, onOpenChange, rateCard, clo
   const rowId = rateCard?.id ?? null;
   const rowVersion = rateCard?.version ?? null;
   const cloneId = cloneFrom?.id ?? null;
+  // Local state resets while rendering; react-hook-form's reset (an external store) stays in the effect below.
+  useOnChange(open ? `${rowId}:${rowVersion}:${cloneId}` : null, (key) => {
+    if (key === null) return;
+    setServerError(null);
+  });
   useEffect(() => {
     if (!open) return;
     form.reset(initial());
-    setServerError(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-seed the form only when it opens or the record changes
   }, [open, rowId, rowVersion, cloneId]);
 
   const handleError = (error: ApiClientError) => {
@@ -167,15 +216,47 @@ export function RateCardFormSheet({ projectId, open, onOpenChange, rateCard, clo
             <SheetTitle>{mode === "create" ? "New rate card" : "Edit draft rate card"}</SheetTitle>
             {rateCard && <Badge variant="neutral">Draft</Badge>}
           </div>
-          <SheetDescription>Rates per flat type plus PLC rules. Drafts can be edited until activated; activating supersedes the current Active card.</SheetDescription>
+          <SheetDescription>
+            Rates per flat type plus PLC rules. Drafts can be edited until activated; activating supersedes the current
+            Active card.
+          </SheetDescription>
         </SheetHeader>
         <FormProvider {...form}>
           <form noValidate onSubmit={form.handleSubmit(submit)} className="flex min-h-0 flex-1 flex-col">
             <SheetBody className="space-y-6">
               {serverError !== null && <FormError error={serverError} />}
               <FormRow columns={2}>
-                <FormField control={control} name="name" label="Name" required render={({ field }) => <Input {...field} value={field.value} onChange={(event) => field.onChange(event.target.value)} placeholder="Launch pricing 2026" maxLength={120} data-testid="rate-card-name" />} />
-                <FormField control={control} name="effective_from" label="Effective from" required render={({ field }) => <DateInput id={field.id} value={field.value} onChange={field.onChange} onBlur={field.onBlur} data-testid="rate-card-effective" />} />
+                <FormField
+                  control={control}
+                  name="name"
+                  label="Name"
+                  required
+                  render={({ field }) => (
+                    <Input
+                      {...field}
+                      value={field.value}
+                      onChange={(event) => field.onChange(event.target.value)}
+                      placeholder="Launch pricing 2026"
+                      maxLength={120}
+                      data-testid="rate-card-name"
+                    />
+                  )}
+                />
+                <FormField
+                  control={control}
+                  name="effective_from"
+                  label="Effective from"
+                  required
+                  render={({ field }) => (
+                    <DateInput
+                      id={field.id}
+                      value={field.value}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      data-testid="rate-card-effective"
+                    />
+                  )}
+                />
               </FormRow>
               <RatesRepeater open={open} />
               <PlcRulesRepeater open={open} />
@@ -201,30 +282,116 @@ function RatesRepeater({ open }: { open: boolean }) {
   const watched = useWatch({ control, name: "rates" }) ?? [];
   const flatTypes = useMasterRows<FlatTypeRow>("flat-types", { enabled: open });
   const used = new Set(watched.map((rate) => rate.flat_type_id).filter(Boolean));
-  const options = (flatTypes.data ?? []).map((type) => ({ value: type.id, label: `${type.code} · ${type.name}`, description: type.super_builtup_sqft ? `${type.super_builtup_sqft} sq ft super` : undefined }));
+  const options = (flatTypes.data ?? []).map((type) => ({
+    value: type.id,
+    label: `${type.code} · ${type.name}`,
+    description: type.super_builtup_sqft ? `${type.super_builtup_sqft} sq ft super` : undefined,
+  }));
   const error = formState.errors.rates?.root?.message ?? formState.errors.rates?.message;
 
   const addAll = () => {
     for (const type of flatTypes.data ?? []) {
-      if (!used.has(type.id)) rates.append({ flat_type_id: type.id, mode: type.base_price_paise !== null ? "LUMP" : "RATE", rate_per_sqft_paise: type.base_rate_per_sqft_paise, lump_sum_paise: type.base_price_paise });
+      if (!used.has(type.id))
+        rates.append({
+          flat_type_id: type.id,
+          mode: type.base_price_paise !== null ? "LUMP" : "RATE",
+          rate_per_sqft_paise: type.base_rate_per_sqft_paise,
+          lump_sum_paise: type.base_price_paise,
+        });
     }
   };
 
   return (
-    <FormSection title="Rates per flat type" description="Each flat type once: either a rate per sq ft (× super built-up) or a lump sum.">
+    <FormSection
+      title="Rates per flat type"
+      description="Each flat type once: either a rate per sq ft (× super built-up) or a lump sum."
+    >
       <div className="space-y-2">
         {rates.fields.map((item, index) => {
           const current = watched[index];
           return (
-            <div key={item.id} className="grid grid-cols-[1fr_auto] gap-2 rounded-md border border-border p-2 sm:grid-cols-[1.4fr_8rem_1fr_auto] sm:items-end sm:border-0 sm:p-0">
-              <FormField control={control} name={`rates.${index}.flat_type_id`} label={index === 0 ? "Flat type" : undefined} render={({ field }) => <Select id={field.id} value={field.value} onValueChange={field.onChange} options={options.map((option) => ({ ...option, disabled: used.has(option.value) && option.value !== field.value }))} placeholder={flatTypes.isPending ? "Loading…" : "Flat type"} invalid={field.invalid} aria-label="Flat type" />} />
-              <FormField control={control} name={`rates.${index}.mode`} label={index === 0 ? "Basis" : undefined} className="col-span-2 sm:col-span-1" render={({ field }) => <Select id={field.id} value={field.value} onValueChange={(value) => field.onChange(value ?? "RATE")} options={[{ value: "RATE", label: "Per sq ft" }, { value: "LUMP", label: "Lump sum" }]} aria-label="Pricing basis" />} />
+            <div
+              key={item.id}
+              className="grid grid-cols-[1fr_auto] gap-2 rounded-md border border-border p-2 sm:grid-cols-[1.4fr_8rem_1fr_auto] sm:items-end sm:border-0 sm:p-0"
+            >
+              <FormField
+                control={control}
+                name={`rates.${index}.flat_type_id`}
+                label={index === 0 ? "Flat type" : undefined}
+                render={({ field }) => (
+                  <Select
+                    id={field.id}
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    options={options.map((option) => ({
+                      ...option,
+                      disabled: used.has(option.value) && option.value !== field.value,
+                    }))}
+                    placeholder={flatTypes.isPending ? "Loading…" : "Flat type"}
+                    invalid={field.invalid}
+                    aria-label="Flat type"
+                  />
+                )}
+              />
+              <FormField
+                control={control}
+                name={`rates.${index}.mode`}
+                label={index === 0 ? "Basis" : undefined}
+                className="col-span-2 sm:col-span-1"
+                render={({ field }) => (
+                  <Select
+                    id={field.id}
+                    value={field.value}
+                    onValueChange={(value) => field.onChange(value ?? "RATE")}
+                    options={[
+                      { value: "RATE", label: "Per sq ft" },
+                      { value: "LUMP", label: "Lump sum" },
+                    ]}
+                    aria-label="Pricing basis"
+                  />
+                )}
+              />
               {current?.mode === "LUMP" ? (
-                <FormField control={control} name={`rates.${index}.lump_sum_paise`} label={index === 0 ? "Amount" : undefined} className="col-span-2 sm:col-span-1" render={({ field }) => <MoneyInput id={field.id} value={field.value} onChange={field.onChange} onBlur={field.onBlur} aria-label="Lump sum" />} />
+                <FormField
+                  control={control}
+                  name={`rates.${index}.lump_sum_paise`}
+                  label={index === 0 ? "Amount" : undefined}
+                  className="col-span-2 sm:col-span-1"
+                  render={({ field }) => (
+                    <MoneyInput
+                      id={field.id}
+                      value={field.value}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      aria-label="Lump sum"
+                    />
+                  )}
+                />
               ) : (
-                <FormField control={control} name={`rates.${index}.rate_per_sqft_paise`} label={index === 0 ? "Rate / sq ft" : undefined} className="col-span-2 sm:col-span-1" render={({ field }) => <MoneyInput id={field.id} value={field.value} onChange={field.onChange} onBlur={field.onBlur} showShort={false} aria-label="Rate per sq ft" />} />
+                <FormField
+                  control={control}
+                  name={`rates.${index}.rate_per_sqft_paise`}
+                  label={index === 0 ? "Rate / sq ft" : undefined}
+                  className="col-span-2 sm:col-span-1"
+                  render={({ field }) => (
+                    <MoneyInput
+                      id={field.id}
+                      value={field.value}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      showShort={false}
+                      aria-label="Rate per sq ft"
+                    />
+                  )}
+                />
               )}
-              <IconButton icon={Trash2} label="Remove rate" size="sm" className="self-end" onClick={() => rates.remove(index)} />
+              <IconButton
+                icon={Trash2}
+                label="Remove rate"
+                size="sm"
+                className="self-end"
+                onClick={() => rates.remove(index)}
+              />
             </div>
           );
         })}
@@ -234,7 +401,15 @@ function RatesRepeater({ open }: { open: boolean }) {
           </p>
         )}
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" leftIcon={Plus} onClick={() => rates.append({ flat_type_id: null, mode: "RATE", rate_per_sqft_paise: null, lump_sum_paise: null })} data-testid="rate-card-add-rate">
+          <Button
+            variant="outline"
+            size="sm"
+            leftIcon={Plus}
+            onClick={() =>
+              rates.append({ flat_type_id: null, mode: "RATE", rate_per_sqft_paise: null, lump_sum_paise: null })
+            }
+            data-testid="rate-card-add-rate"
+          >
             Add flat type
           </Button>
           {flatTypes.data && flatTypes.data.some((type) => !used.has(type.id)) && (
@@ -254,10 +429,17 @@ function PlcRulesRepeater({ open }: { open: boolean }) {
   const watched = useWatch({ control, name: "plc_rules" }) ?? [];
   const plcTypes = useMasterRows<PlcTypeRow>("plc-types", { enabled: open });
   const byId = new Map((plcTypes.data ?? []).map((type) => [type.id, type] as const));
-  const options = (plcTypes.data ?? []).map((type) => ({ value: type.id, label: type.name, description: PLC_CALC_MODE_LABELS[type.calc_mode] }));
+  const options = (plcTypes.data ?? []).map((type) => ({
+    value: type.id,
+    label: type.name,
+    description: PLC_CALC_MODE_LABELS[type.calc_mode],
+  }));
 
   return (
-    <FormSection title="PLC rules" description="Preferential location charges applied when a flat satisfies the condition.">
+    <FormSection
+      title="PLC rules"
+      description="Preferential location charges applied when a flat satisfies the condition."
+    >
       <div className="space-y-3">
         {rules.fields.map((item, index) => {
           const current = watched[index];
@@ -284,17 +466,90 @@ function PlcRulesRepeater({ open }: { open: boolean }) {
                     />
                   )}
                 />
-                <FormField control={control} name={`plc_rules.${index}.calc_mode`} label="Calculation" className="col-span-2 sm:col-span-1" render={({ field }) => <Select id={field.id} value={field.value} onValueChange={field.onChange} options={PLC_CALC_MODES.map((value) => ({ value, label: PLC_CALC_MODE_LABELS[value] }))} invalid={field.invalid} />} />
+                <FormField
+                  control={control}
+                  name={`plc_rules.${index}.calc_mode`}
+                  label="Calculation"
+                  className="col-span-2 sm:col-span-1"
+                  render={({ field }) => (
+                    <Select
+                      id={field.id}
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      options={PLC_CALC_MODES.map((value) => ({ value, label: PLC_CALC_MODE_LABELS[value] }))}
+                      invalid={field.invalid}
+                    />
+                  )}
+                />
                 {isPercent ? (
-                  <FormField control={control} name={`plc_rules.${index}.value_percent`} label="Percent of base" className="col-span-2 sm:col-span-1" render={({ field }) => <PercentInput id={field.id} value={field.value} onChange={field.onChange} onBlur={field.onBlur} />} />
+                  <FormField
+                    control={control}
+                    name={`plc_rules.${index}.value_percent`}
+                    label="Percent of base"
+                    className="col-span-2 sm:col-span-1"
+                    render={({ field }) => (
+                      <PercentInput id={field.id} value={field.value} onChange={field.onChange} onBlur={field.onBlur} />
+                    )}
+                  />
                 ) : (
-                  <FormField control={control} name={`plc_rules.${index}.value_paise`} label={current?.calc_mode === "FIXED" ? "Amount" : "Amount per sq ft"} className="col-span-2 sm:col-span-1" render={({ field }) => <MoneyInput id={field.id} value={field.value} onChange={field.onChange} onBlur={field.onBlur} showShort={false} />} />
+                  <FormField
+                    control={control}
+                    name={`plc_rules.${index}.value_paise`}
+                    label={current?.calc_mode === "FIXED" ? "Amount" : "Amount per sq ft"}
+                    className="col-span-2 sm:col-span-1"
+                    render={({ field }) => (
+                      <MoneyInput
+                        id={field.id}
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        showShort={false}
+                      />
+                    )}
+                  />
                 )}
-                <IconButton icon={Trash2} label="Remove rule" size="sm" className="self-end" onClick={() => rules.remove(index)} />
+                <IconButton
+                  icon={Trash2}
+                  label="Remove rule"
+                  size="sm"
+                  className="self-end"
+                  onClick={() => rules.remove(index)}
+                />
               </div>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr]">
-                <FormField control={control} name={`plc_rules.${index}.applies_to`} label="Applies to" render={({ field }) => <Select id={field.id} value={field.value} onValueChange={(value) => field.onChange(value ?? "ALL")} options={PLC_APPLIES_TOS.map((value) => ({ value, label: PLC_APPLIES_TO_LABELS[value] }))} />} />
-                {current?.applies_to === "FLOORS_GTE" && <FormField control={control} name={`plc_rules.${index}.floors_gte`} label="Floor ≥" required render={({ field }) => <NumberInput id={field.id} value={field.value} onChange={field.onChange} onBlur={field.onBlur} decimals={0} min={-5} max={200} allowNegative />} />}
+                <FormField
+                  control={control}
+                  name={`plc_rules.${index}.applies_to`}
+                  label="Applies to"
+                  render={({ field }) => (
+                    <Select
+                      id={field.id}
+                      value={field.value}
+                      onValueChange={(value) => field.onChange(value ?? "ALL")}
+                      options={PLC_APPLIES_TOS.map((value) => ({ value, label: PLC_APPLIES_TO_LABELS[value] }))}
+                    />
+                  )}
+                />
+                {current?.applies_to === "FLOORS_GTE" && (
+                  <FormField
+                    control={control}
+                    name={`plc_rules.${index}.floors_gte`}
+                    label="Floor ≥"
+                    required
+                    render={({ field }) => (
+                      <NumberInput
+                        id={field.id}
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        decimals={0}
+                        min={-5}
+                        max={200}
+                        allowNegative
+                      />
+                    )}
+                  />
+                )}
                 {current?.applies_to === "FACING_IN" && (
                   <FormField
                     control={control}
@@ -306,7 +561,19 @@ function PlcRulesRepeater({ open }: { open: boolean }) {
                         {FACING_OPTIONS.map((option) => {
                           const active = field.value.includes(option.value);
                           return (
-                            <button key={option.value} type="button" aria-pressed={active} onClick={() => field.onChange(active ? field.value.filter((value: string) => value !== option.value) : [...field.value, option.value])} className={`h-7 rounded-full border px-2.5 text-xs font-medium focus-ring ${active ? "border-navy-950 bg-navy-950 text-white" : "border-border-strong text-ink-muted hover:border-navy-300"}`}>
+                            <button
+                              key={option.value}
+                              type="button"
+                              aria-pressed={active}
+                              onClick={() =>
+                                field.onChange(
+                                  active
+                                    ? field.value.filter((value: string) => value !== option.value)
+                                    : [...field.value, option.value],
+                                )
+                              }
+                              className={`h-7 rounded-full border px-2.5 text-xs font-medium focus-ring ${active ? "border-navy-950 bg-navy-950 text-white" : "border-border-strong text-ink-muted hover:border-navy-300"}`}
+                            >
                               {option.label}
                             </button>
                           );
@@ -319,7 +586,23 @@ function PlcRulesRepeater({ open }: { open: boolean }) {
             </div>
           );
         })}
-        <Button variant="outline" size="sm" leftIcon={Plus} onClick={() => rules.append({ plc_type_id: null, calc_mode: null, value_paise: null, value_percent: null, applies_to: "ALL", floors_gte: null, facings: [] })} data-testid="rate-card-add-rule">
+        <Button
+          variant="outline"
+          size="sm"
+          leftIcon={Plus}
+          onClick={() =>
+            rules.append({
+              plc_type_id: null,
+              calc_mode: null,
+              value_paise: null,
+              value_percent: null,
+              applies_to: "ALL",
+              floors_gte: null,
+              facings: [],
+            })
+          }
+          data-testid="rate-card-add-rule"
+        >
           Add PLC rule
         </Button>
       </div>

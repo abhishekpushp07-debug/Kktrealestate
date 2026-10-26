@@ -10,7 +10,13 @@ export default function NotFound(): React.JSX.Element {
     <View style={{ flex: 1, backgroundColor: colors.ivory }}>
       <Header title="Page not found" back />
       <Screen>
-        <EmptyState icon="search" title="That page doesn't exist" body="The link may be old or mistyped." action="Go home" onAction={() => router.replace("/")} />
+        <EmptyState
+          icon="search"
+          title="That page doesn't exist"
+          body="The link may be old or mistyped."
+          action="Go home"
+          onAction={() => router.replace("/")}
+        />
       </Screen>
     </View>
   );

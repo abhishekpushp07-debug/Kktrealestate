@@ -11,7 +11,10 @@ export interface CardHeaderProps extends HTMLAttributes<HTMLDivElement> {
 
 export function CardHeader({ className, actions, children, ...props }: CardHeaderProps) {
   return (
-    <div className={cn("flex flex-wrap items-start justify-between gap-2 border-b border-border px-4 py-3", className)} {...props}>
+    <div
+      className={cn("flex flex-wrap items-start justify-between gap-2 border-b border-border px-4 py-3", className)}
+      {...props}
+    >
       <div className="min-w-0 flex-1">{children}</div>
       {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
     </div>

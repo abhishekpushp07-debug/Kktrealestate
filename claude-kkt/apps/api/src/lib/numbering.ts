@@ -11,13 +11,25 @@ export interface NumberingCompany {
   numbering: Numbering;
 }
 
-const FALLBACK_PREFIX: Record<NumberingScope, string> = { customer: "CUST-", booking: "BK-", demand: "DM-", receipt: "RCPT/", ticket: "SR-", visit: "SV-" };
+const FALLBACK_PREFIX: Record<NumberingScope, string> = {
+  customer: "CUST-",
+  booking: "BK-",
+  demand: "DM-",
+  receipt: "RCPT/",
+  ticket: "SR-",
+  visit: "SV-",
+};
 
 /**
  * Atomically allocates the next document number for a scope within the financial year of `businessDate`,
  * e.g. CUST-2526/0001, BK-2526/0001, SGB/2526/0001 (pattern per company numbering settings, default `{prefix}{fy}/{seq:4}`).
  */
-export async function nextNumber(tx: Executor, company: NumberingCompany, scope: NumberingScope, businessDate: string): Promise<string> {
+export async function nextNumber(
+  tx: Executor,
+  company: NumberingCompany,
+  scope: NumberingScope,
+  businessDate: string,
+): Promise<string> {
   const fy = financialYear(businessDate, company.fyStartMonth);
   const cfg = company.numbering[scope] ?? { prefix: FALLBACK_PREFIX[scope] };
   const seq = await nextSequence(tx, company.id, scope, fy.label);

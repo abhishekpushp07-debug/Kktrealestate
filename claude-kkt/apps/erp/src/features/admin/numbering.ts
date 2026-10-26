@@ -16,5 +16,7 @@ export function renderNumber(prefix: string, format: string | null | undefined, 
   return template
     .replace(/\{prefix\}/g, prefix)
     .replace(/\{fy\}/g, fy)
-    .replace(/\{seq(?::(\d+))?\}/g, (_match, width: string | undefined) => String(seq).padStart(width ? Number(width) : 0, "0"));
+    .replace(/\{seq(?::(\d+))?\}/g, (_match, width: string | undefined) =>
+      String(seq).padStart(width ? Number(width) : 0, "0"),
+    );
 }

@@ -2,9 +2,18 @@ import { and, eq, type SQL } from "drizzle-orm";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
-  DocumentDownloadLinkResponseSchema, DocumentFilterSchema, DocumentLinkQuerySchema, DocumentRowSchema, DocumentListResponseSchema,
-  DocumentUpdateSchema, DocumentUploadMetaSchema, DocumentUploadResponseSchema, IdSchema, coerceBoolean,
-  type DocumentRow, type DocumentUploadMeta,
+  DocumentDownloadLinkResponseSchema,
+  DocumentFilterSchema,
+  DocumentLinkQuerySchema,
+  DocumentRowSchema,
+  DocumentListResponseSchema,
+  DocumentUpdateSchema,
+  DocumentUploadMetaSchema,
+  DocumentUploadResponseSchema,
+  IdSchema,
+  coerceBoolean,
+  type DocumentRow,
+  type DocumentUploadMeta,
 } from "@kkt/contracts";
 import { documents } from "@kkt/db";
 import { actorFromRequest, auditMeta, writeAudit } from "../../lib/audit.js";
@@ -18,13 +27,40 @@ import { applyUpdate, expectedVersion, withOptionalVersion } from "../../lib/ver
 import { withdraw } from "../notifications/index.js";
 import { assertEntityWrite, documentScopeCondition, requireEntity } from "./entities.js";
 import {
-  DOCUMENT_SELECT, SIGNED_LINK_TTL_SECONDS, applyTypeRules, loadDocumentType, loadJoined, signedUrl, storage, storeBuffer, streamDocument,
-  toDocumentRow, variantKey, variantMeta, verifyLinkToken, withDocumentJoins, type DocumentJoined,
+  DOCUMENT_SELECT,
+  SIGNED_LINK_TTL_SECONDS,
+  applyTypeRules,
+  loadDocumentType,
+  loadJoined,
+  signedUrl,
+  storage,
+  storeBuffer,
+  streamDocument,
+  toDocumentRow,
+  variantKey,
+  variantMeta,
+  verifyLinkToken,
+  withDocumentJoins,
+  type DocumentJoined,
 } from "./service.js";
 
 const idParams = z.object({ id: IdSchema });
 const ENTITY = "document";
-const CSV_COLUMNS = ["id", "entity_type", "entity_id", "document_type_name", "title", "file_name", "mime", "size_bytes", "sha256", "is_sensitive", "shared_with_customer", "uploaded_by_name", "created_at"];
+const CSV_COLUMNS = [
+  "id",
+  "entity_type",
+  "entity_id",
+  "document_type_name",
+  "title",
+  "file_name",
+  "mime",
+  "size_bytes",
+  "sha256",
+  "is_sensitive",
+  "shared_with_customer",
+  "uploaded_by_name",
+  "created_at",
+];
 
 /** True when the caller may see sensitive (KYC) documents. */
 function canSeeSensitive(user: StaffContext): boolean {
@@ -44,15 +80,32 @@ function parseUploadMeta(fields: Record<string, unknown>): DocumentUploadMeta {
   }
   const parsed = DocumentUploadMetaSchema.safeParse(raw);
   if (!parsed.success) {
-    const issues = parsed.error.issues.map((i) => ({ path: i.path.map(String).join("."), message: i.message, code: i.code }));
-    throw ApiError.badRequest(issues.map((i) => (i.path ? `${i.path}: ${i.message}` : i.message)).slice(0, 5).join("; "), { issues });
+    const issues = parsed.error.issues.map((i) => ({
+      path: i.path.map(String).join("."),
+      message: i.message,
+      code: i.code,
+    }));
+    throw ApiError.badRequest(
+      issues
+        .map((i) => (i.path ? `${i.path}: ${i.message}` : i.message))
+        .slice(0, 5)
+        .join("; "),
+      { issues },
+    );
   }
   return parsed.data;
 }
 
 /** Loads a live document for a staff caller: 404 when missing, out of project scope, or sensitive and the caller lacks customer.kyc_view (when `hideSensitive`). */
-async function loadForStaff(app: FastifyInstance, user: StaffContext, id: string, opts: { hideSensitive: boolean; forUpdate?: boolean }): Promise<DocumentJoined> {
-  const j = await loadJoined(opts.forUpdate ? app.db : app.dbReplica, user.companyId, id, { forUpdate: opts.forUpdate });
+async function loadForStaff(
+  app: FastifyInstance,
+  user: StaffContext,
+  id: string,
+  opts: { hideSensitive: boolean; forUpdate?: boolean },
+): Promise<DocumentJoined> {
+  const j = await loadJoined(opts.forUpdate ? app.db : app.dbReplica, user.companyId, id, {
+    forUpdate: opts.forUpdate,
+  });
   if (!j) throw ApiError.notFound("Document");
   await requireEntity(app.dbReplica, user, j.doc.entityType, j.doc.entityId);
   if (opts.hideSensitive && j.doc.isSensitive && !canSeeSensitive(user)) throw ApiError.notFound("Document");
@@ -66,10 +119,15 @@ export function registerDocumentRoutes(app: FastifyInstance): void {
   installMultipartIdempotency(app, (url) => url.endsWith("/documents"));
 
   route(app, {
-    method: "POST", url: "/documents", permission: "document.write", idempotent: true,
+    method: "POST",
+    url: "/documents",
+    permission: "document.write",
+    idempotent: true,
     schema: {
-      response: { 201: DocumentUploadResponseSchema }, summary: "Upload a document (multipart)",
-      description: "multipart/form-data: `file` (PDF/JPEG/PNG/WebP ≤ 15 MB, validated by file signature) plus fields entity_type, entity_id, document_type_id?, title?, is_sensitive?, shared_with_customer?. KYC document types force is_sensitive and cannot be shared.",
+      response: { 201: DocumentUploadResponseSchema },
+      summary: "Upload a document (multipart)",
+      description:
+        "multipart/form-data: `file` (PDF/JPEG/PNG/WebP ≤ 15 MB, validated by file signature) plus fields entity_type, entity_id, document_type_id?, title?, is_sensitive?, shared_with_customer?. KYC document types force is_sensitive and cannot be shared.",
     },
     handler: async (req, reply) => {
       const user = req.user!;
@@ -79,13 +137,29 @@ export function registerDocumentRoutes(app: FastifyInstance): void {
       const view = await app.db.transaction(async (tx) => {
         await requireEntity(tx, user, meta.entity_type, meta.entity_id);
         const row = await storeBuffer(tx, {
-          companyId: user.companyId, entityType: meta.entity_type, entityId: meta.entity_id, buffer: upload.buffer, filename: upload.filename,
-          documentTypeId: meta.document_type_id ?? null, title: meta.title ?? null, isSensitive: meta.is_sensitive, sharedWithCustomer: meta.shared_with_customer,
-          uploadedBy: user.id, uploadedByType: "STAFF",
+          companyId: user.companyId,
+          entityType: meta.entity_type,
+          entityId: meta.entity_id,
+          buffer: upload.buffer,
+          filename: upload.filename,
+          documentTypeId: meta.document_type_id ?? null,
+          title: meta.title ?? null,
+          isSensitive: meta.is_sensitive,
+          sharedWithCustomer: meta.shared_with_customer,
+          uploadedBy: user.id,
+          uploadedByType: "STAFF",
         });
         const joined = await loadJoined(tx, user.companyId, row.id);
         const doc = toDocumentRow(joined!);
-        await writeAudit(tx, { companyId: user.companyId, actor: actorFromRequest(req), action: `${ENTITY}.upload`, entityType: ENTITY, entityId: row.id, after: auditSnapshot(doc), ...auditMeta(req) });
+        await writeAudit(tx, {
+          companyId: user.companyId,
+          actor: actorFromRequest(req),
+          action: `${ENTITY}.upload`,
+          entityType: ENTITY,
+          entityId: row.id,
+          after: auditSnapshot(doc),
+          ...auditMeta(req),
+        });
         return doc;
       });
       return reply.code(201).send({ document: view });
@@ -93,8 +167,14 @@ export function registerDocumentRoutes(app: FastifyInstance): void {
   });
 
   route(app, {
-    method: "GET", url: "/documents", permission: "document.read",
-    schema: { querystring: DocumentFilterSchema, response: { 200: DocumentListResponseSchema }, summary: "List documents of an entity" },
+    method: "GET",
+    url: "/documents",
+    permission: "document.read",
+    schema: {
+      querystring: DocumentFilterSchema,
+      response: { 200: DocumentListResponseSchema },
+      summary: "List documents of an entity",
+    },
     handler: async (req, reply) => {
       const user = req.user!;
       const q = req.query;
@@ -117,24 +197,48 @@ export function registerDocumentRoutes(app: FastifyInstance): void {
         join: withDocumentJoins,
         where: and(...where.filter((w): w is SQL => w !== undefined)),
         search: { columns: [documents.title, documents.fileName], term: q.search },
-        sort: { allowed: { created_at: documents.createdAt, title: documents.title, file_name: documents.fileName, size_bytes: documents.sizeBytes }, default: "-created_at", requested: q.sort },
+        sort: {
+          allowed: {
+            created_at: documents.createdAt,
+            title: documents.title,
+            file_name: documents.fileName,
+            size_bytes: documents.sizeBytes,
+          },
+          default: "-created_at",
+          requested: q.sort,
+        },
         ...listPaging(q),
       });
       const items = result.items.map(toDocumentRow);
-      if (q.format === "csv") return sendCsv(reply, "documents.csv", CSV_COLUMNS.map((k) => ({ key: k, header: k })), items as unknown as Record<string, unknown>[]);
+      if (q.format === "csv")
+        return sendCsv(
+          reply,
+          "documents.csv",
+          CSV_COLUMNS.map((k) => ({ key: k, header: k })),
+          items as unknown as Record<string, unknown>[],
+        );
       return { ...result, items };
     },
   });
 
   route(app, {
-    method: "GET", url: "/documents/:id", permission: "document.read",
+    method: "GET",
+    url: "/documents/:id",
+    permission: "document.read",
     schema: { params: idParams, response: { 200: DocumentRowSchema }, summary: "Document metadata" },
     handler: async (req) => toDocumentRow(await loadForStaff(app, req.user!, req.params.id, { hideSensitive: true })),
   });
 
   route(app, {
-    method: "PATCH", url: "/documents/:id", permission: "document.write",
-    schema: { params: idParams, body: withOptionalVersion(DocumentUpdateSchema), response: { 200: DocumentRowSchema }, summary: "Update title, type or sharing flags (KYC rules enforced); version required (body.version or If-Match)" },
+    method: "PATCH",
+    url: "/documents/:id",
+    permission: "document.write",
+    schema: {
+      params: idParams,
+      body: withOptionalVersion(DocumentUpdateSchema),
+      response: { 200: DocumentRowSchema },
+      summary: "Update title, type or sharing flags (KYC rules enforced); version required (body.version or If-Match)",
+    },
     handler: async (req) => {
       const user = req.user!;
       const body = req.body;
@@ -148,20 +252,46 @@ export function registerDocumentRoutes(app: FastifyInstance): void {
         const before = toDocumentRow(existing);
         const typeId = body.document_type_id === undefined ? doc.documentTypeId : body.document_type_id;
         const type = typeId ? await loadDocumentType(tx, user.companyId, typeId) : null;
-        const flags = applyTypeRules(type, doc.entityType, { isSensitive: body.is_sensitive ?? doc.isSensitive, sharedWithCustomer: body.shared_with_customer ?? doc.sharedWithCustomer });
-        const changes: Partial<typeof documents.$inferInsert> = { documentTypeId: type?.id ?? null, isSensitive: flags.isSensitive, sharedWithCustomer: flags.sharedWithCustomer, updatedAt: new Date() };
+        const flags = applyTypeRules(type, doc.entityType, {
+          isSensitive: body.is_sensitive ?? doc.isSensitive,
+          sharedWithCustomer: body.shared_with_customer ?? doc.sharedWithCustomer,
+        });
+        const changes: Partial<typeof documents.$inferInsert> = {
+          documentTypeId: type?.id ?? null,
+          isSensitive: flags.isSensitive,
+          sharedWithCustomer: flags.sharedWithCustomer,
+          updatedAt: new Date(),
+        };
         if (body.title !== undefined) changes.title = body.title;
         // Optimistic concurrency: `If-Match: "<version>"` or body.version is required (the version policy rejects a PATCH without one).
-        await applyUpdate(tx, documents, doc.id, expectedVersion(req as unknown as FastifyRequest, body), changes, ENTITY);
+        await applyUpdate(
+          tx,
+          documents,
+          doc.id,
+          expectedVersion(req as unknown as FastifyRequest, body),
+          changes,
+          ENTITY,
+        );
         const after = toDocumentRow((await loadJoined(tx, user.companyId, doc.id))!);
-        await writeAudit(tx, { companyId: user.companyId, actor: actorFromRequest(req), action: `${ENTITY}.update`, entityType: ENTITY, entityId: doc.id, before: auditSnapshot(before), after: auditSnapshot(after), ...auditMeta(req) });
+        await writeAudit(tx, {
+          companyId: user.companyId,
+          actor: actorFromRequest(req),
+          action: `${ENTITY}.update`,
+          entityType: ENTITY,
+          entityId: doc.id,
+          before: auditSnapshot(before),
+          after: auditSnapshot(after),
+          ...auditMeta(req),
+        });
         return after;
       });
     },
   });
 
   route(app, {
-    method: "DELETE", url: "/documents/:id", permission: "document.write",
+    method: "DELETE",
+    url: "/documents/:id",
+    permission: "document.write",
     schema: { params: idParams, response: { 204: z.null() }, summary: "Soft-delete a document" },
     handler: async (req, reply) => {
       const user = req.user!;
@@ -171,22 +301,42 @@ export function registerDocumentRoutes(app: FastifyInstance): void {
         assertEntityWrite(user, existing.doc.entityType);
         await requireEntity(tx, user, existing.doc.entityType, existing.doc.entityId);
         if (existing.doc.isSensitive && !canSeeSensitive(user)) throw ApiError.notFound("Document");
-        await tx.update(documents).set({ isDeleted: true, deletedAt: new Date(), updatedAt: new Date() }).where(eq(documents.id, existing.doc.id));
+        await tx
+          .update(documents)
+          .set({ isDeleted: true, deletedAt: new Date(), updatedAt: new Date() })
+          .where(eq(documents.id, existing.doc.id));
         await withdraw(tx, ENTITY, existing.doc.id);
         const before = toDocumentRow(existing);
-        await writeAudit(tx, { companyId: user.companyId, actor: actorFromRequest(req), action: `${ENTITY}.delete`, entityType: ENTITY, entityId: existing.doc.id, before: auditSnapshot(before), after: { ...auditSnapshot(before), is_deleted: true }, ...auditMeta(req) });
+        await writeAudit(tx, {
+          companyId: user.companyId,
+          actor: actorFromRequest(req),
+          action: `${ENTITY}.delete`,
+          entityType: ENTITY,
+          entityId: existing.doc.id,
+          before: auditSnapshot(before),
+          after: { ...auditSnapshot(before), is_deleted: true },
+          ...auditMeta(req),
+        });
       });
       return reply.code(204).send();
     },
   });
 
   route(app, {
-    method: "POST", url: "/documents/:id/link", permission: "document.read",
-    schema: { params: idParams, querystring: DocumentLinkQuerySchema, response: { 200: DocumentDownloadLinkResponseSchema }, summary: "Signed 15-minute download link (sensitive documents need customer.kyc_view)" },
+    method: "POST",
+    url: "/documents/:id/link",
+    permission: "document.read",
+    schema: {
+      params: idParams,
+      querystring: DocumentLinkQuerySchema,
+      response: { 200: DocumentDownloadLinkResponseSchema },
+      summary: "Signed 15-minute download link (sensitive documents need customer.kyc_view)",
+    },
     handler: async (req) => {
       const user = req.user!;
       const j = await loadForStaff(app, user, req.params.id, { hideSensitive: false });
-      if (j.doc.isSensitive && !canSeeSensitive(user)) throw ApiError.forbidden("Missing permission customer.kyc_view", { permission: "customer.kyc_view" });
+      if (j.doc.isSensitive && !canSeeSensitive(user))
+        throw ApiError.forbidden("Missing permission customer.kyc_view", { permission: "customer.kyc_view" });
       const variant = req.query.variant;
       if (!variantKey(j.doc, variant)) throw ApiError.notFound(`${variant} variant`);
       const link = signedUrl(j.doc.id, variant, SIGNED_LINK_TTL_SECONDS);
@@ -194,7 +344,15 @@ export function registerDocumentRoutes(app: FastifyInstance): void {
       if (j.doc.isSensitive) {
         // Every access to a KYC/sensitive file is audited, like a KYC reveal (SPEC §2).
         await app.db.transaction(async (tx) => {
-          await writeAudit(tx, { companyId: user.companyId, actor: actorFromRequest(req), action: `${ENTITY}.sensitive_link`, entityType: ENTITY, entityId: j.doc.id, after: { variant, expires_at: link.expires_at, entity_type: j.doc.entityType, entity_id: j.doc.entityId }, ...auditMeta(req) });
+          await writeAudit(tx, {
+            companyId: user.companyId,
+            actor: actorFromRequest(req),
+            action: `${ENTITY}.sensitive_link`,
+            entityType: ENTITY,
+            entityId: j.doc.id,
+            after: { variant, expires_at: link.expires_at, entity_type: j.doc.entityType, entity_id: j.doc.entityId },
+            ...auditMeta(req),
+          });
         });
       }
       return { download_url: link.url, expires_at: link.expires_at, file_name: meta.fileName, mime: meta.mime };
@@ -202,8 +360,14 @@ export function registerDocumentRoutes(app: FastifyInstance): void {
   });
 
   route(app, {
-    method: "GET", url: "/files/:token", public: true,
-    schema: { params: z.object({ token: z.string().min(1).max(100) }), response: { 200: z.any() }, summary: "Stream a file through a signed, short-lived link (any malformed, forged or expired token is 404)" },
+    method: "GET",
+    url: "/files/:token",
+    public: true,
+    schema: {
+      params: z.object({ token: z.string().min(1).max(100) }),
+      response: { 200: z.any() },
+      summary: "Stream a file through a signed, short-lived link (any malformed, forged or expired token is 404)",
+    },
     handler: async (req, reply) => {
       const link = verifyLinkToken(req.params.token);
       if (!link) throw ApiError.notFound("File");
@@ -211,7 +375,10 @@ export function registerDocumentRoutes(app: FastifyInstance): void {
       if (!file) throw ApiError.notFound("File");
       const inline = file.mime.startsWith("image/");
       reply.header("Content-Type", file.mime);
-      reply.header("Content-Disposition", `${inline ? "inline" : "attachment"}; filename="${asciiName(file.fileName)}"; filename*=UTF-8''${encodeURIComponent(file.fileName)}`);
+      reply.header(
+        "Content-Disposition",
+        `${inline ? "inline" : "attachment"}; filename="${asciiName(file.fileName)}"; filename*=UTF-8''${encodeURIComponent(file.fileName)}`,
+      );
       reply.header("Cache-Control", `private, max-age=${SIGNED_LINK_TTL_SECONDS}`);
       reply.header("X-Content-Type-Options", "nosniff");
       // Signed links are embedded as <img>/<iframe> by the ERP on another origin (the token is the credential).

@@ -1,8 +1,15 @@
 import { Columns3, Search, SlidersHorizontal, X } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
-import { cn, useDebouncedCallback } from "@/lib/utils";
+import { useState, type ReactNode } from "react";
+import { cn, useDebouncedCallback, useOnChange } from "@/lib/utils";
 import { Button, IconButton } from "./button";
-import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "./dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./dropdown-menu";
 import { ExportControl, type ExportSource } from "./export-control";
 import { Input } from "./input";
 
@@ -63,9 +70,8 @@ export function Toolbar({
   const [filtersOpen, setFiltersOpen] = useState(false);
   const emit = useDebouncedCallback((value: string) => onSearchChange?.(value), searchDelayMs);
 
-  useEffect(() => {
-    setDraft(search);
-  }, [search]);
+  // The URL's search wins whenever it changes from outside (back/forward, reset filters).
+  useOnChange(search, (next) => setDraft(next));
 
   const showSearch = Boolean(onSearchChange);
   const showFilters = Boolean(filters);
@@ -151,7 +157,9 @@ export function Toolbar({
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          {(onExportCsv || exportSource) && <ExportControl source={exportSource} total={exportTotal} onExportCsv={onExportCsv} exporting={exporting} />}
+          {(onExportCsv || exportSource) && (
+            <ExportControl source={exportSource} total={exportTotal} onExportCsv={onExportCsv} exporting={exporting} />
+          )}
           {actions}
         </div>
       </div>

@@ -83,13 +83,20 @@ export const AdminJobRunRowSchema = z.object({
   error: z.string().nullable(),
 });
 export type AdminJobRunRow = z.infer<typeof AdminJobRunRowSchema>;
-export const AdminJobRunFilterSchema = ListQuerySchema.extend({ job_name: JobNameSchema.optional(), status: JobRunStatusSchema.optional() });
+export const AdminJobRunFilterSchema = ListQuerySchema.extend({
+  job_name: JobNameSchema.optional(),
+  status: JobRunStatusSchema.optional(),
+});
 export type AdminJobRunFilter = z.infer<typeof AdminJobRunFilterSchema>;
 export const AdminJobRunListResponseSchema = listEnvelope(AdminJobRunRowSchema);
 export type AdminJobRunListResponse = z.infer<typeof AdminJobRunListResponseSchema>;
 
 /** Right to erasure (admin side). */
-export const AdminErasureRequestSchema = z.strictObject({ customer_id: IdSchema, confirm: z.literal("ERASE"), reason: ReasonSchema });
+export const AdminErasureRequestSchema = z.strictObject({
+  customer_id: IdSchema,
+  confirm: z.literal("ERASE"),
+  reason: ReasonSchema,
+});
 export type AdminErasureRequest = z.infer<typeof AdminErasureRequestSchema>;
 
 // ---------------------------------------------------------------------------
@@ -131,7 +138,11 @@ export type AuditLogListResponse = z.infer<typeof AuditLogListResponseSchema>;
 
 /** Characters allowed in a document-number prefix (SPEC §2: CUST-, BK-, SGB/ …): letters, digits, slash, dash, underscore, dot. */
 export const NUMBER_PREFIX_RE = /^[A-Za-z0-9/_.-]*$/;
-export const NumberPrefixSchema = z.string().trim().max(10).regex(NUMBER_PREFIX_RE, "Prefix may only contain letters, digits, / - _ .");
+export const NumberPrefixSchema = z
+  .string()
+  .trim()
+  .max(10)
+  .regex(NUMBER_PREFIX_RE, "Prefix may only contain letters, digits, / - _ .");
 export type NumberPrefix = z.infer<typeof NumberPrefixSchema>;
 
 const NUMBER_FORMAT_TOKEN_RE = /\{(prefix|fy|seq(?::\d{1,2})?)\}/g;
@@ -144,8 +155,14 @@ export const NumberFormatSchema = z
   .trim()
   .min(1)
   .max(40)
-  .refine((f) => (f.match(/\{seq(?::\d{1,2})?\}/g) ?? []).length === 1, "Pattern needs exactly one {seq} or {seq:N} token")
-  .refine((f) => NUMBER_PREFIX_RE.test(f.replace(NUMBER_FORMAT_TOKEN_RE, "")), "Pattern may only contain {prefix}, {fy}, {seq:N} and letters, digits, / - _ .");
+  .refine(
+    (f) => (f.match(/\{seq(?::\d{1,2})?\}/g) ?? []).length === 1,
+    "Pattern needs exactly one {seq} or {seq:N} token",
+  )
+  .refine(
+    (f) => NUMBER_PREFIX_RE.test(f.replace(NUMBER_FORMAT_TOKEN_RE, "")),
+    "Pattern may only contain {prefix}, {fy}, {seq:N} and letters, digits, / - _ .",
+  );
 export type NumberFormat = z.infer<typeof NumberFormatSchema>;
 
 const NumberingScopeSchema = z.strictObject({ prefix: NumberPrefixSchema, format: NumberFormatSchema.optional() });
@@ -269,7 +286,9 @@ export const AdminNumberingPreviewSchema = z.object({
 export type AdminNumberingPreview = z.infer<typeof AdminNumberingPreviewSchema>;
 
 /** GET/PATCH /settings/company response: the company row plus the numbering preview. */
-export const CompanySettingsResponseSchema = CompanySettingsRowSchema.extend({ numbering_preview: z.array(AdminNumberingPreviewSchema) });
+export const CompanySettingsResponseSchema = CompanySettingsRowSchema.extend({
+  numbering_preview: z.array(AdminNumberingPreviewSchema),
+});
 export type CompanySettingsResponse = z.infer<typeof CompanySettingsResponseSchema>;
 
 /** POST /admin/backup body. */
@@ -317,7 +336,10 @@ export const AdminBackupQueuedResponseSchema = AdminBackupRowSchema;
 export type AdminBackupQueuedResponse = z.infer<typeof AdminBackupQueuedResponseSchema>;
 
 /** POST /admin/backups/:id/link → signed 15-minute download link of a DONE backup (409 EXPORT_NOT_READY before). */
-export const AdminBackupLinkResponseSchema = SignedLinkSchema.extend({ file_name: z.string(), size_bytes: z.int().min(0).nullable() });
+export const AdminBackupLinkResponseSchema = SignedLinkSchema.extend({
+  file_name: z.string(),
+  size_bytes: z.int().min(0).nullable(),
+});
 export type AdminBackupLinkResponse = z.infer<typeof AdminBackupLinkResponseSchema>;
 
 // ---------------------------------------------------------------------------
@@ -325,12 +347,30 @@ export type AdminBackupLinkResponse = z.infer<typeof AdminBackupLinkResponseSche
 // ---------------------------------------------------------------------------
 
 /** Query values of the list route being exported (the export job controls paging/format keys). */
-export const ExportQueryValueSchema = z.union([z.string().max(500), z.number(), z.boolean(), z.array(z.string().max(500)).max(50)]);
+export const ExportQueryValueSchema = z.union([
+  z.string().max(500),
+  z.number(),
+  z.boolean(),
+  z.array(z.string().max(500)).max(50),
+]);
 
 /** POST /exports body: any GET list route under /api/v1 the caller may read, with its filters. */
 export const ExportCreateRequestSchema = z.strictObject({
-  path: z.string().trim().min(8).max(300).regex(/^\/api\/v1\/[A-Za-z0-9/_.:-]+$/, "path must be an /api/v1/… list route without a query string"),
-  query: z.record(z.string().regex(/^[a-z][a-z0-9_]*$/).max(64), ExportQueryValueSchema).default({}),
+  path: z
+    .string()
+    .trim()
+    .min(8)
+    .max(300)
+    .regex(/^\/api\/v1\/[A-Za-z0-9/_.:-]+$/, "path must be an /api/v1/… list route without a query string"),
+  query: z
+    .record(
+      z
+        .string()
+        .regex(/^[a-z][a-z0-9_]*$/)
+        .max(64),
+      ExportQueryValueSchema,
+    )
+    .default({}),
 });
 export type ExportCreateRequest = z.infer<typeof ExportCreateRequestSchema>;
 
@@ -418,7 +458,10 @@ export const AdminJobEnqueuedResponseSchema = z.object({
 export type AdminJobEnqueuedResponse = z.infer<typeof AdminJobEnqueuedResponseSchema>;
 
 /** POST /admin/customers/:id/erase body. */
-export const AdminCustomerEraseRequestSchema = z.strictObject({ confirm: z.literal("ERASE"), reason: ReasonSchema.optional() });
+export const AdminCustomerEraseRequestSchema = z.strictObject({
+  confirm: z.literal("ERASE"),
+  reason: ReasonSchema.optional(),
+});
 export type AdminCustomerEraseRequest = z.infer<typeof AdminCustomerEraseRequestSchema>;
 
 export const AdminCustomerEraseResponseSchema = z.object({
@@ -437,7 +480,12 @@ export const AdminCustomerEraseResponseSchema = z.object({
     portal_disabled: z.boolean(),
     sessions_revoked: z.int().min(0),
   }),
-  financial_rows_kept: z.object({ bookings: z.int().min(0), payments: z.int().min(0), demands: z.int().min(0).default(0), ledger_entries: z.int().min(0).default(0) }),
+  financial_rows_kept: z.object({
+    bookings: z.int().min(0),
+    payments: z.int().min(0),
+    demands: z.int().min(0).default(0),
+    ledger_entries: z.int().min(0).default(0),
+  }),
 });
 export type AdminCustomerEraseResponse = z.infer<typeof AdminCustomerEraseResponseSchema>;
 

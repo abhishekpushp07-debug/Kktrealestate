@@ -33,13 +33,16 @@ export const InstallmentInputSchema = z
   .superRefine((i, ctx) => {
     switch (i.trigger_type) {
       case "DAYS_AFTER_BOOKING":
-        if (i.trigger_days == null) ctx.addIssue({ code: "custom", message: "trigger_days required", path: ["trigger_days"] });
+        if (i.trigger_days == null)
+          ctx.addIssue({ code: "custom", message: "trigger_days required", path: ["trigger_days"] });
         break;
       case "ON_STAGE":
-        if (i.trigger_stage_id == null) ctx.addIssue({ code: "custom", message: "trigger_stage_id required", path: ["trigger_stage_id"] });
+        if (i.trigger_stage_id == null)
+          ctx.addIssue({ code: "custom", message: "trigger_stage_id required", path: ["trigger_stage_id"] });
         break;
       case "ON_DATE":
-        if (i.trigger_date == null) ctx.addIssue({ code: "custom", message: "trigger_date required", path: ["trigger_date"] });
+        if (i.trigger_date == null)
+          ctx.addIssue({ code: "custom", message: "trigger_date required", path: ["trigger_date"] });
         break;
       case "ON_BOOKING":
       case "ON_POSSESSION":
@@ -54,10 +57,18 @@ export function sumPercentBasisPoints(installments: readonly { percent: number }
 }
 
 /** Adds plan-level issues: percents sum to 100.00, unique seq, ≤1 ON_BOOKING, ≤1 ON_POSSESSION. */
-export function addInstallmentListIssues(installments: readonly InstallmentInput[], ctx: z.RefinementCtx, path: readonly PropertyKey[]): void {
+export function addInstallmentListIssues(
+  installments: readonly InstallmentInput[],
+  ctx: z.RefinementCtx,
+  path: readonly PropertyKey[],
+): void {
   if (sumPercentBasisPoints(installments) !== 10_000) {
     const total = (sumPercentBasisPoints(installments) / 100).toFixed(2);
-    ctx.addIssue({ code: "custom", message: `Installment percents must sum to exactly 100.00 (got ${total})`, path: [...path] });
+    ctx.addIssue({
+      code: "custom",
+      message: `Installment percents must sum to exactly 100.00 (got ${total})`,
+      path: [...path],
+    });
   }
   if (new Set(installments.map((i) => i.seq)).size !== installments.length) {
     ctx.addIssue({ code: "custom", message: "Installment sequences must be unique", path: [...path] });
@@ -80,7 +91,9 @@ const PaymentPlanBase = z.strictObject({
 });
 
 /** Create a payment plan with installments (sum 100.00, unique seq, ≤1 ON_BOOKING, ≤1 ON_POSSESSION). */
-export const PaymentPlanCreateSchema = PaymentPlanBase.superRefine((p, ctx) => addInstallmentListIssues(p.installments, ctx, ["installments"]));
+export const PaymentPlanCreateSchema = PaymentPlanBase.superRefine((p, ctx) =>
+  addInstallmentListIssues(p.installments, ctx, ["installments"]),
+);
 export type PaymentPlanCreate = z.infer<typeof PaymentPlanCreateSchema>;
 
 /** Update a payment plan (partial + version); installments, when given, are validated as a whole. */
@@ -122,7 +135,10 @@ export const PaymentPlanRowSchema = MasterRowSchema.extend({
 });
 export type PaymentPlanRow = z.infer<typeof PaymentPlanRowSchema>;
 
-export const PaymentPlanFilterSchema = ListQuerySchema.extend({ plan_type: PlanTypeSchema.optional(), project_id: IdSchema.optional() });
+export const PaymentPlanFilterSchema = ListQuerySchema.extend({
+  plan_type: PlanTypeSchema.optional(),
+  project_id: IdSchema.optional(),
+});
 export type PaymentPlanFilter = z.infer<typeof PaymentPlanFilterSchema>;
 export const PaymentPlanListResponseSchema = listEnvelope(PaymentPlanRowSchema);
 export type PaymentPlanListResponse = z.infer<typeof PaymentPlanListResponseSchema>;
@@ -207,7 +223,11 @@ export const PlanAssignmentListResponseSchema = listEnvelope(PlanAssignmentRowSc
 export type PlanAssignmentListResponse = z.infer<typeof PlanAssignmentListResponseSchema>;
 
 /** Plans applicable to a tower on a date (default first). */
-export const ApplicablePlansQuerySchema = z.object({ project_id: IdSchema, block_id: IdSchema, on_date: DateStringSchema.optional() });
+export const ApplicablePlansQuerySchema = z.object({
+  project_id: IdSchema,
+  block_id: IdSchema,
+  on_date: DateStringSchema.optional(),
+});
 export type ApplicablePlansQuery = z.infer<typeof ApplicablePlansQuerySchema>;
 
 export const ApplicablePlanRowSchema = z.object({

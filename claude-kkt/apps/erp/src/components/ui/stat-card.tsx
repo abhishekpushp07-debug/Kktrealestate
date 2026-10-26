@@ -28,8 +28,24 @@ export interface StatCardProps {
   "data-testid"?: string;
 }
 
-export function StatCard({ label, value, hint, delta, icon: Icon, sparkline, loading = false, tone = "default", className, onClick, ...rest }: StatCardProps) {
-  const good = delta ? (delta.direction === "flat" ? null : (delta.direction === "up") === (delta.positiveIsGood ?? true)) : null;
+export function StatCard({
+  label,
+  value,
+  hint,
+  delta,
+  icon: Icon,
+  sparkline,
+  loading = false,
+  tone = "default",
+  className,
+  onClick,
+  ...rest
+}: StatCardProps) {
+  const good = delta
+    ? delta.direction === "flat"
+      ? null
+      : (delta.direction === "up") === (delta.positiveIsGood ?? true)
+    : null;
   const DeltaIcon = delta?.direction === "up" ? ArrowUpRight : delta?.direction === "down" ? ArrowDownRight : Minus;
   const Wrapper = onClick ? "button" : "div";
   return (
@@ -49,7 +65,12 @@ export function StatCard({ label, value, hint, delta, icon: Icon, sparkline, loa
       <div className="flex items-start justify-between gap-2">
         <span className={cn("label-caps", tone === "navy" && "text-navy-200")}>{label}</span>
         {Icon && (
-          <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-md", tone === "navy" ? "bg-navy-800 text-gold" : "bg-navy-50 text-navy-700")}>
+          <span
+            className={cn(
+              "flex size-8 shrink-0 items-center justify-center rounded-md",
+              tone === "navy" ? "bg-navy-800 text-gold" : "bg-navy-50 text-navy-700",
+            )}
+          >
             <Icon className="size-4" aria-hidden="true" />
           </span>
         )}
@@ -57,7 +78,14 @@ export function StatCard({ label, value, hint, delta, icon: Icon, sparkline, loa
       {loading ? (
         <Skeleton className={cn("h-7 w-32", tone === "navy" && "opacity-20")} />
       ) : (
-        <div className={cn("money font-display text-2xl font-extrabold leading-8 tracking-tight", tone === "navy" ? "text-white" : "text-navy-950")}>{value}</div>
+        <div
+          className={cn(
+            "money font-display text-2xl font-extrabold leading-8 tracking-tight",
+            tone === "navy" ? "text-white" : "text-navy-950",
+          )}
+        >
+          {value}
+        </div>
       )}
       {(delta || hint) && (
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
@@ -80,10 +108,14 @@ export function StatCard({ label, value, hint, delta, icon: Icon, sparkline, loa
               {delta.label && <span className="sr-only"> {delta.label}</span>}
             </span>
           )}
-          {(hint ?? delta?.label) && <span className={cn(tone === "navy" ? "text-navy-200" : "text-ink-subtle")}>{hint ?? delta?.label}</span>}
+          {(hint ?? delta?.label) && (
+            <span className={cn(tone === "navy" ? "text-navy-200" : "text-ink-subtle")}>{hint ?? delta?.label}</span>
+          )}
         </div>
       )}
-      {sparkline && <div className="pointer-events-none absolute bottom-2 right-3 h-10 w-24 opacity-90">{sparkline}</div>}
+      {sparkline && (
+        <div className="pointer-events-none absolute bottom-2 right-3 h-10 w-24 opacity-90">{sparkline}</div>
+      )}
     </Wrapper>
   );
 }

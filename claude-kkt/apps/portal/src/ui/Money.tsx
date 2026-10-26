@@ -4,7 +4,19 @@ import { formatINR } from "@/lib/format";
 import { T, type TextVariant } from "./Text";
 import { colors, space } from "./theme";
 
-export function Money({ paise, variant = "money", color, signed, style }: { paise: number; variant?: TextVariant; color?: string; signed?: boolean; style?: StyleProp<TextStyle> }): React.JSX.Element {
+export function Money({
+  paise,
+  variant = "money",
+  color,
+  signed,
+  style,
+}: {
+  paise: number;
+  variant?: TextVariant;
+  color?: string;
+  signed?: boolean;
+  style?: StyleProp<TextStyle>;
+}): React.JSX.Element {
   return (
     <T variant={variant} color={color ?? colors.ink} style={style} selectable>
       {formatINR(paise, { signed })}
@@ -15,7 +27,17 @@ export function Money({ paise, variant = "money", color, signed, style }: { pais
 /**
  * Due figure the customer way: positive = due (red), negative = advance (green, "(advance)"), zero = settled.
  */
-export function DueMoney({ paise, variant = "money", onNavy, showZeroLabel = true }: { paise: number; variant?: TextVariant; onNavy?: boolean; showZeroLabel?: boolean }): React.JSX.Element {
+export function DueMoney({
+  paise,
+  variant = "money",
+  onNavy,
+  showZeroLabel = true,
+}: {
+  paise: number;
+  variant?: TextVariant;
+  onNavy?: boolean;
+  showZeroLabel?: boolean;
+}): React.JSX.Element {
   if (paise < 0) {
     return (
       <View style={styles.inline}>
@@ -42,4 +64,6 @@ export function DueMoney({ paise, variant = "money", onNavy, showZeroLabel = tru
   );
 }
 
-const styles = StyleSheet.create({ inline: { flexDirection: "row", alignItems: "baseline", gap: space.xs, flexWrap: "wrap" } });
+const styles = StyleSheet.create({
+  inline: { flexDirection: "row", alignItems: "baseline", gap: space.xs, flexWrap: "wrap" },
+});

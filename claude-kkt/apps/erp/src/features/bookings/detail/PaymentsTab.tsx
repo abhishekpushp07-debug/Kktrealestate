@@ -34,7 +34,13 @@ export function PaymentsTab({ booking, highlightId, onPostPayment }: PaymentsTab
         invalidate={bookingInvalidations(booking.id)}
         highlightId={highlightId}
         emptyTitle="No payments yet"
-        emptyAction={canPost ? <Button size="sm" leftIcon={IndianRupee} onClick={onPostPayment}>Post the first payment</Button> : undefined}
+        emptyAction={
+          canPost ? (
+            <Button size="sm" leftIcon={IndianRupee} onClick={onPostPayment}>
+              Post the first payment
+            </Button>
+          ) : undefined
+        }
       />
     </div>
   );

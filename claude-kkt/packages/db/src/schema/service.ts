@@ -66,7 +66,10 @@ export const serviceRequestMessages = pgTable(
     authorName: text("author_name"),
     body: text("body").notNull(),
     isInternal: boolean("is_internal").notNull().default(false),
-    attachmentIds: uuid("attachment_ids").array().notNull().default(sql`'{}'::uuid[]`),
+    attachmentIds: uuid("attachment_ids")
+      .array()
+      .notNull()
+      .default(sql`'{}'::uuid[]`),
     ...appendOnly(),
   },
   (t) => [index("service_request_messages_ticket_idx").on(t.ticketId, t.createdAt)],

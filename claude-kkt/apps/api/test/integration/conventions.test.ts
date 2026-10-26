@@ -7,18 +7,29 @@ let token: string;
 const URL = "/api/v1/masters/spec-categories";
 const TOTAL = 60;
 
-interface Page { items: { id: string; name: string; sort_order: number }[]; total: number; page: number; page_size: number; next_cursor: string | null }
+interface Page {
+  items: { id: string; name: string; sort_order: number }[];
+  total: number;
+  page: number;
+  page_size: number;
+  next_cursor: string | null;
+}
 
 beforeAll(async () => {
   t = await buildTestApp();
   token = (await t.loginAs("admin")).access_token;
   // 60 rows that all tie on sort_order so keyset paging must break ties on id
   for (let i = 1; i <= TOTAL; i++) {
-    const r = await t.request("POST", URL, { token, body: { name: `Category ${String(i).padStart(2, "0")}`, sort_order: 0 } });
+    const r = await t.request("POST", URL, {
+      token,
+      body: { name: `Category ${String(i).padStart(2, "0")}`, sort_order: 0 },
+    });
     if (r.status !== 201) throw new Error(`fixture: ${r.text}`);
   }
 });
-afterAll(async () => { await t?.close(); });
+afterAll(async () => {
+  await t?.close();
+});
 
 async function walk(query: string, limit: number): Promise<{ ids: string[]; pages: number; totals: Set<number> }> {
   const ids: string[] = [];
@@ -55,14 +66,23 @@ describe("list envelope and headers", () => {
     expect(r.headers["x-request-id"]).toMatch(/^[A-Za-z0-9._-]{8,64}$/);
     expect(r.headers["etag"]).toBeTruthy();
     expect(r.headers["cache-control"]).toBe("no-store");
-    const notModified = await t.request("GET", `${URL}?page_size=10`, { token, headers: { "if-none-match": String(r.headers["etag"]) } });
+    const notModified = await t.request("GET", `${URL}?page_size=10`, {
+      token,
+      headers: { "if-none-match": String(r.headers["etag"]) },
+    });
     expect(notModified.status).toBe(304);
     expect(notModified.text).toBe("");
-    const changed = await t.request("GET", `${URL}?page_size=11`, { token, headers: { "if-none-match": String(r.headers["etag"]) } });
+    const changed = await t.request("GET", `${URL}?page_size=11`, {
+      token,
+      headers: { "if-none-match": String(r.headers["etag"]) },
+    });
     expect(changed.status).toBe(200);
     expect(changed.headers["etag"]).not.toBe(r.headers["etag"]);
     // an inbound X-Request-Id of sane shape is echoed; garbage is replaced
-    const echoed = await t.request("GET", `${URL}?page_size=1`, { token, headers: { "x-request-id": "client-req-0001" } });
+    const echoed = await t.request("GET", `${URL}?page_size=1`, {
+      token,
+      headers: { "x-request-id": "client-req-0001" },
+    });
     expect(echoed.headers["x-request-id"]).toBe("client-req-0001");
     const garbage = await t.request("GET", `${URL}?page_size=1`, { token, headers: { "x-request-id": "<script>" } });
     expect(garbage.headers["x-request-id"]).not.toBe("<script>");
@@ -108,13 +128,23 @@ describe("pagination on a 60-row fixture", () => {
     expect(desc.ids).toEqual([...desc.ids].sort().reverse());
     const byName = await walk("sort=-name", 25);
     expect(byName.pages).toBe(3);
-    const names = (await t.request<Page>("GET", `${URL}?page_size=200&sort=-name`, { token })).body.items.map((i) => i.id);
+    const names = (await t.request<Page>("GET", `${URL}?page_size=200&sort=-name`, { token })).body.items.map(
+      (i) => i.id,
+    );
     expect(byName.ids).toEqual(names);
     // a cursor from one sort cannot be replayed under another sort order silently: it still yields a valid page and no duplicates overall
     const first = await t.request<Page>("GET", `${URL}?sort=name&limit=5`, { token });
-    const skewed = await t.request<ErrorBody | Page>("GET", `${URL}?sort=-name&limit=5&cursor=${encodeURIComponent(first.body.next_cursor!)}`, { token });
+    const skewed = await t.request<ErrorBody | Page>(
+      "GET",
+      `${URL}?sort=-name&limit=5&cursor=${encodeURIComponent(first.body.next_cursor!)}`,
+      { token },
+    );
     expect([200, 400]).toContain(skewed.status);
-    const bad = await t.request<ErrorBody>("GET", `${URL}?limit=5&cursor=${encodeURIComponent(Buffer.from('["x"]').toString("base64url"))}`, { token });
+    const bad = await t.request<ErrorBody>(
+      "GET",
+      `${URL}?limit=5&cursor=${encodeURIComponent(Buffer.from('["x"]').toString("base64url"))}`,
+      { token },
+    );
     expect(bad.status).toBe(400);
   });
 
@@ -156,11 +186,19 @@ describe("If-Match", () => {
   it("state-change POSTs accept the expected version through If-Match and refuse a stale one", async () => {
     const list = await t.request<Page>("GET", `${URL}?page_size=1&sort=-name`, { token });
     const row = list.body.items[0]!;
-    const stale = await t.request<ErrorBody>("POST", `${URL}/${row.id}/deactivate`, { token, body: {}, headers: { "if-match": '"99"' } });
+    const stale = await t.request<ErrorBody>("POST", `${URL}/${row.id}/deactivate`, {
+      token,
+      body: {},
+      headers: { "if-match": '"99"' },
+    });
     expect(stale.status).toBe(409);
     expect(stale.body.error.code).toBe("VERSION_CONFLICT");
     expect(stale.body.error.details?.["current"]).toBe(1);
-    const ok = await t.request<{ version: number }>("POST", `${URL}/${row.id}/deactivate`, { token, body: {}, headers: { "if-match": '"1"' } });
+    const ok = await t.request<{ version: number }>("POST", `${URL}/${row.id}/deactivate`, {
+      token,
+      body: {},
+      headers: { "if-match": '"1"' },
+    });
     expect(ok.status).toBe(200);
     expect(ok.body.version).toBe(2);
     expect((await t.request("POST", `${URL}/${row.id}/activate`, { token, body: { version: 2 } })).status).toBe(200);

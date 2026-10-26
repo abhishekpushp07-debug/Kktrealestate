@@ -31,7 +31,13 @@ async function start(): Promise<void> {
   } catch {
     // older runtimes without module.register: CommonJS instrumentation still works
   }
-  const [{ NodeSDK }, { OTLPTraceExporter }, { HttpInstrumentation }, { IORedisInstrumentation }, { resourceFromAttributes }] = await Promise.all([
+  const [
+    { NodeSDK },
+    { OTLPTraceExporter },
+    { HttpInstrumentation },
+    { IORedisInstrumentation },
+    { resourceFromAttributes },
+  ] = await Promise.all([
     import("@opentelemetry/sdk-node"),
     import("@opentelemetry/exporter-trace-otlp-http"),
     import("@opentelemetry/instrumentation-http"),
@@ -41,7 +47,11 @@ async function start(): Promise<void> {
   const serviceName = process.env["OTEL_SERVICE_NAME"] ?? "kkt-api";
   const sdk = new NodeSDK({
     serviceName,
-    resource: resourceFromAttributes({ "service.name": serviceName, "service.version": process.env["APP_VERSION"] ?? "2.0.0", "deployment.environment": process.env["NODE_ENV"] ?? "development" }),
+    resource: resourceFromAttributes({
+      "service.name": serviceName,
+      "service.version": process.env["APP_VERSION"] ?? "2.0.0",
+      "deployment.environment": process.env["NODE_ENV"] ?? "development",
+    }),
     // The exporter reads OTEL_EXPORTER_OTLP_ENDPOINT (+ /v1/traces) and OTEL_EXPORTER_OTLP_HEADERS itself.
     traceExporter: new OTLPTraceExporter(),
     instrumentations: [
@@ -61,10 +71,14 @@ async function start(): Promise<void> {
   });
   sdk.start();
   (globalThis as Record<symbol, unknown>)[TELEMETRY_SHUTDOWN] = () => sdk.shutdown();
-  process.stderr.write(`${JSON.stringify({ level: 30, time: Date.now(), msg: "opentelemetry tracing enabled", endpoint: endpoint.replace(/\/\/[^@/]*@/, "//<credentials>@"), service: serviceName })}\n`);
+  process.stderr.write(
+    `${JSON.stringify({ level: 30, time: Date.now(), msg: "opentelemetry tracing enabled", endpoint: endpoint.replace(/\/\/[^@/]*@/, "//<credentials>@"), service: serviceName })}\n`,
+  );
 }
 
 await start().catch((err: unknown) => {
   // Tracing must never stop the API from booting.
-  process.stderr.write(`${JSON.stringify({ level: 40, time: Date.now(), msg: "opentelemetry failed to start; continuing without tracing", err: (err as Error).message })}\n`);
+  process.stderr.write(
+    `${JSON.stringify({ level: 40, time: Date.now(), msg: "opentelemetry failed to start; continuing without tracing", err: (err as Error).message })}\n`,
+  );
 });

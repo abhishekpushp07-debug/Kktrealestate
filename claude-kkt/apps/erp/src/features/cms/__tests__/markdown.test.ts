@@ -35,21 +35,29 @@ describe("renderMarkdownToHtml", () => {
   });
 
   it("renders headings, paragraphs, emphasis and code", () => {
-    expect(renderMarkdownToHtml("# Title\n\nSome **bold** and *italic* with `code`.")).toBe("<h1>Title</h1><p>Some <strong>bold</strong> and <em>italic</em> with <code>code</code>.</p>");
+    expect(renderMarkdownToHtml("# Title\n\nSome **bold** and *italic* with `code`.")).toBe(
+      "<h1>Title</h1><p>Some <strong>bold</strong> and <em>italic</em> with <code>code</code>.</p>",
+    );
     expect(renderMarkdownToHtml("### Three")).toBe("<h3>Three</h3>");
     expect(renderMarkdownToHtml("snake_case_word stays")).toBe("<p>snake_case_word stays</p>");
   });
 
   it("renders unordered and ordered lists with safe links", () => {
-    const html = renderMarkdownToHtml("- [Projects](https://kkt.example/projects)\n- Plain item\n\n1. first\n2. second");
-    expect(html).toBe('<ul><li><a href="https://kkt.example/projects" target="_blank" rel="noopener noreferrer">Projects</a></li><li>Plain item</li></ul><ol><li>first</li><li>second</li></ol>');
+    const html = renderMarkdownToHtml(
+      "- [Projects](https://kkt.example/projects)\n- Plain item\n\n1. first\n2. second",
+    );
+    expect(html).toBe(
+      '<ul><li><a href="https://kkt.example/projects" target="_blank" rel="noopener noreferrer">Projects</a></li><li>Plain item</li></ul><ol><li>first</li><li>second</li></ol>',
+    );
     expect(renderMarkdownToHtml("3. third\n4. fourth")).toBe('<ol start="3"><li>third</li><li>fourth</li></ol>');
   });
 
   it("drops javascript: links (keeps the text) and unsafe images", () => {
     expect(renderMarkdownToHtml("[click](javascript:alert(1))")).toBe("<p>click</p>");
     expect(renderMarkdownToHtml("![logo](data:image/svg+xml;base64,AAAA)")).toBe("<p>logo</p>");
-    expect(renderMarkdownToHtml("![logo](/media/1.webp)")).toBe('<p><img src="/media/1.webp" alt="logo" loading="lazy"></p>');
+    expect(renderMarkdownToHtml("![logo](/media/1.webp)")).toBe(
+      '<p><img src="/media/1.webp" alt="logo" loading="lazy"></p>',
+    );
   });
 
   it("escapes attribute values inside links and titles", () => {
@@ -60,8 +68,12 @@ describe("renderMarkdownToHtml", () => {
   });
 
   it("renders fenced code blocks verbatim (escaped), quotes, rules and hard breaks", () => {
-    expect(renderMarkdownToHtml("```html\n<b>raw</b>\n```")).toBe('<pre><code class="language-html">&lt;b&gt;raw&lt;/b&gt;</code></pre>');
-    expect(renderMarkdownToHtml("> quoted **text**\n> more")).toBe("<blockquote><p>quoted <strong>text</strong> more</p></blockquote>");
+    expect(renderMarkdownToHtml("```html\n<b>raw</b>\n```")).toBe(
+      '<pre><code class="language-html">&lt;b&gt;raw&lt;/b&gt;</code></pre>',
+    );
+    expect(renderMarkdownToHtml("> quoted **text**\n> more")).toBe(
+      "<blockquote><p>quoted <strong>text</strong> more</p></blockquote>",
+    );
     expect(renderMarkdownToHtml("a\n\n---\n\nb")).toBe("<p>a</p><hr><p>b</p>");
     expect(renderMarkdownToHtml("line one  \nline two")).toBe("<p>line one<br>line two</p>");
   });
@@ -84,7 +96,9 @@ describe("parser helpers", () => {
   });
 
   it("produces a plain-text excerpt", () => {
-    expect(markdownExcerpt("# Hello\n\nSome **bold** text with [a link](https://x.example).")).toBe("Hello Some bold text with a link.");
+    expect(markdownExcerpt("# Hello\n\nSome **bold** text with [a link](https://x.example).")).toBe(
+      "Hello Some bold text with a link.",
+    );
     expect(markdownExcerpt("word ".repeat(100), 20).endsWith("…")).toBe(true);
   });
 });

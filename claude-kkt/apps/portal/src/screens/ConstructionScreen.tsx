@@ -27,10 +27,22 @@ function Body({ bookingId }: { bookingId: string }): React.JSX.Element {
   const d = q.data;
   return (
     <View style={{ flex: 1, backgroundColor: colors.ivory }}>
-      <TabHeader title="Construction" subtitle={d ? `${d.block_name} · ${Math.round(d.percent)}% complete` : undefined} />
+      <TabHeader
+        title="Construction"
+        subtitle={d ? `${d.block_name} · ${Math.round(d.percent)}% complete` : undefined}
+      />
       {q.isError && d ? <StatusBar text="Showing saved progress — couldn't refresh." tone="warning" /> : null}
       <Screen onRefresh={() => refreshBooking(bookingId)}>
-        {d ? <Timeline d={d} /> : q.isError ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : <><SkeletonCard lines={2} /><SkeletonCard lines={5} /></>}
+        {d ? (
+          <Timeline d={d} />
+        ) : q.isError ? (
+          <ErrorState error={q.error} onRetry={() => void q.refetch()} />
+        ) : (
+          <>
+            <SkeletonCard lines={2} />
+            <SkeletonCard lines={5} />
+          </>
+        )}
       </Screen>
     </View>
   );
@@ -42,7 +54,11 @@ function Timeline({ d }: { d: PortalConstructionTimelineResponse }): React.JSX.E
   const images = useMemo<LightboxImage[]>(() => {
     if (!viewer) return [];
     const stage = d.stages[viewer.stage];
-    return (stage?.photos ?? []).map((p) => ({ uri: p.medium_url, caption: p.caption ?? stage?.name ?? null, subtitle: p.taken_on ? formatDate(p.taken_on) : null }));
+    return (stage?.photos ?? []).map((p) => ({
+      uri: p.medium_url,
+      caption: p.caption ?? stage?.name ?? null,
+      subtitle: p.taken_on ? formatDate(p.taken_on) : null,
+    }));
   }, [viewer, d.stages]);
   return (
     <>
@@ -63,18 +79,42 @@ function Timeline({ d }: { d: PortalConstructionTimelineResponse }): React.JSX.E
           </View>
         </View>
       </Card>
-      {d.stages.length === 0 ? <EmptyState icon="construction" title="No stages yet" body="Construction stages for your tower will appear here as work begins." /> : null}
+      {d.stages.length === 0 ? (
+        <EmptyState
+          icon="construction"
+          title="No stages yet"
+          body="Construction stages for your tower will appear here as work begins."
+        />
+      ) : null}
       <View style={styles.timeline}>
         {d.stages.map((s, i) => (
-          <StageRow key={`${s.name}-${i}`} stage={s} isLast={i === d.stages.length - 1} onOpenPhoto={(index) => setViewer({ stage: i, index })} />
+          <StageRow
+            key={`${s.name}-${i}`}
+            stage={s}
+            isLast={i === d.stages.length - 1}
+            onOpenPhoto={(index) => setViewer({ stage: i, index })}
+          />
         ))}
       </View>
-      <Lightbox images={images} index={viewer?.index ?? null} onClose={() => setViewer(null)} onIndexChange={(index) => setViewer((v) => (v ? { ...v, index } : v))} />
+      <Lightbox
+        images={images}
+        index={viewer?.index ?? null}
+        onClose={() => setViewer(null)}
+        onIndexChange={(index) => setViewer((v) => (v ? { ...v, index } : v))}
+      />
     </>
   );
 }
 
-function StageRow({ stage, isLast, onOpenPhoto }: { stage: PortalConstructionStage; isLast: boolean; onOpenPhoto: (index: number) => void }): React.JSX.Element {
+function StageRow({
+  stage,
+  isLast,
+  onOpenPhoto,
+}: {
+  stage: PortalConstructionStage;
+  isLast: boolean;
+  onOpenPhoto: (index: number) => void;
+}): React.JSX.Element {
   const active = stage.status === "IN_PROGRESS";
   const done = stage.status === "COMPLETED";
   const { isPhone } = useLayout();
@@ -82,7 +122,9 @@ function StageRow({ stage, isLast, onOpenPhoto }: { stage: PortalConstructionSta
   return (
     <View style={styles.stageRow}>
       <View style={styles.rail}>
-        <View style={[styles.dot, done ? styles.dotDone : active ? styles.dotActive : null]}>{done ? <Icon name="check" size={12} color={colors.onNavy} /> : null}</View>
+        <View style={[styles.dot, done ? styles.dotDone : active ? styles.dotActive : null]}>
+          {done ? <Icon name="check" size={12} color={colors.onNavy} /> : null}
+        </View>
         {!isLast ? <View style={[styles.line, done ? styles.lineDone : null]} /> : null}
       </View>
       <Card style={[styles.stageCard, active ? styles.stageActive : null]}>
@@ -96,7 +138,11 @@ function StageRow({ stage, isLast, onOpenPhoto }: { stage: PortalConstructionSta
           </View>
           <View style={{ alignItems: "flex-end", gap: 4 }}>
             <StageStatusChip status={stage.status} small />
-            {stage.is_possession ? <T variant="caption" color={colors.goldText}>Possession stage</T> : null}
+            {stage.is_possession ? (
+              <T variant="caption" color={colors.goldText}>
+                Possession stage
+              </T>
+            ) : null}
           </View>
         </View>
         {stage.notes ? (
@@ -107,8 +153,20 @@ function StageRow({ stage, isLast, onOpenPhoto }: { stage: PortalConstructionSta
         {stage.photos.length ? (
           <View style={styles.photoGrid}>
             {stage.photos.map((p, i) => (
-              <Pressable key={`${p.thumb_url}-${i}`} accessibilityRole="button" accessibilityLabel={p.caption ?? `Photo ${i + 1} of ${stage.name}`} onPress={() => onOpenPhoto(i)} style={({ pressed }) => [{ width: thumbWidth, aspectRatio: 1 }, pressed ? { opacity: 0.8 } : null]}>
-                <Image source={{ uri: p.thumb_url }} style={styles.photo} contentFit="cover" transition={200} accessibilityLabel="" />
+              <Pressable
+                key={`${p.thumb_url}-${i}`}
+                accessibilityRole="button"
+                accessibilityLabel={p.caption ?? `Photo ${i + 1} of ${stage.name}`}
+                onPress={() => onOpenPhoto(i)}
+                style={({ pressed }) => [{ width: thumbWidth, aspectRatio: 1 }, pressed ? { opacity: 0.8 } : null]}
+              >
+                <Image
+                  source={{ uri: p.thumb_url }}
+                  style={styles.photo}
+                  contentFit="cover"
+                  transition={200}
+                  accessibilityLabel=""
+                />
               </Pressable>
             ))}
           </View>
@@ -123,7 +181,17 @@ const styles = StyleSheet.create({
   timeline: { gap: 0 },
   stageRow: { flexDirection: "row", gap: space.md },
   rail: { width: 24, alignItems: "center" },
-  dot: { width: 22, height: 22, borderRadius: 11, backgroundColor: colors.surface, borderWidth: 2, borderColor: colors.navy200, alignItems: "center", justifyContent: "center", marginTop: 18 },
+  dot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.surface,
+    borderWidth: 2,
+    borderColor: colors.navy200,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 18,
+  },
   dotDone: { backgroundColor: colors.success, borderColor: colors.success },
   dotActive: { borderColor: colors.gold, backgroundColor: colors.gold100 },
   line: { flex: 1, width: 2, backgroundColor: colors.navy100, marginTop: 4, marginBottom: -space.lg },

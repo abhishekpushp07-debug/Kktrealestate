@@ -1,6 +1,7 @@
 The security & privacy track is finished: all 15 items are fixed, each with tests. The full integration suite was not re-run end to end after my last fixes; the four files that failed in the full run were each re-run and pass.
 
 ## Test results (databases kkt_h1 / kkt_h1_acc, Redis index 16)
+
 - **Full integration run:** 479 of 483 passed. Three failures were mine and are fixed:
   - `admin.test.ts` reseed: the demo seed submitted KYC without a document, which the new rules refuse.
   - `rbac.test.ts`: self-deactivation is now 403 `SELF_CHANGE` instead of 422.
@@ -14,6 +15,7 @@ The security & privacy track is finished: all 15 items are fixed, each with test
 - **ESLint** on my files: no new errors. I fixed two existing unused-variable errors (`PASSWORD_POLICY` in `auth/portal.ts`, `GGV_SLUG` in `seed/leads.ts`).
 
 ## What changed, item by item
+
 1. **Privilege escalation:** blocked with 403 FORBIDDEN and `details.reason`:
    - `SELF_CHANGE`: nobody changes their own role, scope, forced-change flag or active state. Name, e-mail and phone can still be edited, and fields an edit form re-sends unchanged don't count.
    - `PERMISSION_ESCALATION` (with `details.missing`): nobody grants a role, or creates or edits a custom role, carrying permissions they don't hold.
@@ -63,6 +65,7 @@ The security & privacy track is finished: all 15 items are fixed, each with test
 15. **Bulk portal enable:** returns `credentials[{customer_id, customer_code, full_name, phone, temporary_password}]` once, with `temp_password` kept as an alias. `?format=csv` on the same call returns a no-store CSV. The batch audit row holds counts only.
 
 ## Decisions you should know about
+
 - **Locks for unknown identifiers:** they get pair locks too. Without that, a 423 would reveal that an account exists. I adjusted one portal rate-limit test that reused a single unknown phone.
 - **Seed lock:** `seedDemo` uses a session-scoped advisory lock, not the transaction-scoped one the task specified. A transaction held open for the whole multi-minute seed would be killed by `DB_IDLE_IN_TX_TIMEOUT_MS`.
 - **Seed refusal:** in production without `SEED_DEMO`, `seedDemo` returns `{skipped, refused: "production"}` instead of throwing, because `server.ts` (not my file) calls it at boot.
@@ -70,6 +73,7 @@ The security & privacy track is finished: all 15 items are fixed, each with test
 - **Booking documents in tickets:** I kept booking documents that are already shared with the customer. The portal's own attachment rule allows them, and they count as "same customer".
 
 ## For the other tracks and integration
+
 - **Platform:**
   - Decorate `app.redisSecurity` in `plugins/redis.ts`; my code picks it up automatically.
   - The standalone worker must load the auth module so `REENCRYPT_FIELDS` is registered.
@@ -89,9 +93,11 @@ The security & privacy track is finished: all 15 items are fixed, each with test
 - **Seed:** the demo seed now creates 10 more documents (PAN placeholders); counts are compared relatively, so nothing else needs changing.
 
 ## Files
+
 All paths are under `/home/user/Kktrealestate/claude-kkt`.
 
 **API source:**
+
 - `apps/api/src/lib/`: `csv.ts`, `rateLimit.ts`, `crypto.ts`, `jwt.ts`, `scope.ts`
 - `apps/api/src/plugins/auth.ts`
 - `apps/api/src/modules/auth/`: `lockout.ts` (new), `reencrypt.ts` (new), `service.ts`, `staff.ts`, `portal.ts`, `index.ts`
@@ -103,16 +109,19 @@ All paths are under `/home/user/Kktrealestate/claude-kkt`.
 - `apps/api/src/seed/`: `bootstrap.ts`, `run.ts`, `context.ts`, `customers.ts`, `leads.ts`
 
 **Contracts (additive):**
+
 - `packages/contracts/src/modules/`: `auth.ts`, `customers.ts`, `public.ts`
 - `packages/contracts/src/errors.ts`: three codes appended
 - `packages/contracts/src/enums.ts`: `REENCRYPT_FIELDS` plus its label
 
 **Tests:**
+
 - New: `apps/api/test/integration/security-hardening.test.ts` (20 tests), `apps/api/test/integration/bootstrap.test.ts` (9), `apps/api/test/unit/key-rotation.test.ts` (4)
 - Extended: `apps/api/test/unit/csv.test.ts`; `apps/api/test/integration/visits.test.ts` (5 new tests)
 - Updated to the new rules: `apps/api/test/integration/`: `auth`, `security`, `rbac`, `crm`, `crm-adversarial`, `service`, `service-adversarial`, `portal-adversarial`, `web-adversarial`, `admin` (`.test.ts` each)
 
 **Docs:**
+
 - `docs/SECURITY.md`, including the key-rotation runbook
 - `docs/API-CONVENTIONS.md`: Appendix A (auth) and Appendix B (public)
 - `docs/SEED.md`

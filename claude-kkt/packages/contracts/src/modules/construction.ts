@@ -6,6 +6,7 @@ import {
   NoteSchema,
   ReasonSchema,
   TimestampSchema,
+  VersionSchema,
   VersionedSchema,
   listEnvelope,
 } from "../common.js";
@@ -22,8 +23,8 @@ export const StagePhotoRowSchema = z.object({
   thumb_url: z.string().nullable(),
   medium_url: z.string().nullable(),
   created_at: TimestampSchema,
-  /** Optimistic-concurrency version of the photo row (If-Match on PATCH). */
-  version: z.int().optional(),
+  /** Optimistic-concurrency version of the photo row (send it as If-Match or body.version on PATCH). */
+  version: VersionSchema,
 });
 export type StagePhotoRow = z.infer<typeof StagePhotoRowSchema>;
 
@@ -43,6 +44,8 @@ export const StagePhotoUpdateSchema = z.strictObject({
   visible_to_buyers: z.boolean().optional(),
   show_on_website: z.boolean().optional(),
   sort_order: z.int().min(0).max(1000).optional(),
+  /** The version read (alternatively the If-Match header); one of the two is required (staff PATCH version policy). */
+  version: VersionSchema.optional(),
 });
 export type StagePhotoUpdate = z.infer<typeof StagePhotoUpdateSchema>;
 
@@ -132,7 +135,11 @@ export const ConstructionStatusUpdateResponseSchema = z.object({
 export type ConstructionStatusUpdateResponse = z.infer<typeof ConstructionStatusUpdateResponseSchema>;
 
 /** Undo the latest completed stage (blocked if a demand it raised was paid on/after its date). */
-export const ConstructionUndoSchema = z.strictObject({ ...VersionedSchema.shape, stage_id: IdSchema, reason: ReasonSchema });
+export const ConstructionUndoSchema = z.strictObject({
+  ...VersionedSchema.shape,
+  stage_id: IdSchema,
+  reason: ReasonSchema,
+});
 export type ConstructionUndo = z.infer<typeof ConstructionUndoSchema>;
 
 export const ConstructionUndoResponseSchema = z.object({
@@ -150,7 +157,9 @@ export type ConstructionUndoResponse = z.infer<typeof ConstructionUndoResponseSc
 /** Details carried by UNDO_BLOCKED (`reasons` are the human sentences of the undo rule; `blocking_payments` the parsed receipts). */
 export const UndoBlockedDetailsSchema = z.object({
   reasons: z.array(z.string()),
-  blocking_payments: z.array(z.object({ receipt_number: z.string(), payment_date: DateStringSchema, demand_number: z.string() })),
+  blocking_payments: z.array(
+    z.object({ receipt_number: z.string(), payment_date: DateStringSchema, demand_number: z.string() }),
+  ),
 });
 
 /** Details carried by UNDO_NOT_LATEST. */

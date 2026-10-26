@@ -1,7 +1,15 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { StyleSheet, View } from "react-native";
-import { LEDGER_EVENT_LABELS, SCHEDULE_STATUS_LABELS, TRIGGER_TYPE_LABELS, type PortalDemandRow, type PortalLedgerRow, type PortalReceiptRow, type PortalScheduleRow } from "@kkt/contracts";
+import {
+  LEDGER_EVENT_LABELS,
+  SCHEDULE_STATUS_LABELS,
+  TRIGGER_TYPE_LABELS,
+  type PortalDemandRow,
+  type PortalLedgerRow,
+  type PortalReceiptRow,
+  type PortalScheduleRow,
+} from "@kkt/contracts";
 import { api } from "@/api/client";
 import { refreshBooking, useDemands, useLedger, useReceipts, useSchedule } from "@/api/queries";
 import { daysUntil, formatDate, formatINR } from "@/lib/format";
@@ -38,9 +46,12 @@ function Body({ bookingId }: { bookingId: string }): React.JSX.Element {
   const params = useLocalSearchParams<{ tab?: string }>();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>(isTab(params.tab) ? params.tab : "receipts");
-  useEffect(() => {
+  // A deep link (?tab=demands from a bell) switches the tab; adjusted while rendering instead of in an effect.
+  const [linkedTab, setLinkedTab] = useState(params.tab);
+  if (linkedTab !== params.tab) {
+    setLinkedTab(params.tab);
     if (isTab(params.tab)) setTab(params.tab);
-  }, [params.tab]);
+  }
   const change = (t: Tab) => {
     setTab(t);
     router.setParams({ tab: t });
@@ -54,7 +65,12 @@ function Body({ bookingId }: { bookingId: string }): React.JSX.Element {
       </TabHeader>
       <Screen onRefresh={() => refreshBooking(bookingId)}>
         {pendingCheques.length > 0 && tab !== "schedule" ? (
-          <Notice tone="warning" icon="clock" title={`${pendingCheques.length} cheque${pendingCheques.length > 1 ? "s" : ""} pending clearance · ${formatINR(pendingCheques.reduce((s, c) => s + c.amount_paise, 0))}`} body="Pending cheques appear as “cheques in hand” and count towards paid only once they clear." />
+          <Notice
+            tone="warning"
+            icon="clock"
+            title={`${pendingCheques.length} cheque${pendingCheques.length > 1 ? "s" : ""} pending clearance · ${formatINR(pendingCheques.reduce((s, c) => s + c.amount_paise, 0))}`}
+            body="Pending cheques appear as “cheques in hand” and count towards paid only once they clear."
+          />
         ) : null}
         {tab === "receipts" ? <Receipts bookingId={bookingId} /> : null}
         {tab === "ledger" ? <Ledger bookingId={bookingId} /> : null}
@@ -73,8 +89,16 @@ function Receipts({ bookingId }: { bookingId: string }): React.JSX.Element {
   const q = useReceipts(bookingId);
   const files = useFileActions();
   const rows = q.data?.items ?? [];
-  if (!q.data) return q.isError ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : <SkeletonRows rows={5} />;
-  if (rows.length === 0) return <EmptyState icon="rupee" title="No receipts yet" body="Receipts appear here as soon as a payment is recorded against your booking." />;
+  if (!q.data)
+    return q.isError ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : <SkeletonRows rows={5} />;
+  if (rows.length === 0)
+    return (
+      <EmptyState
+        icon="rupee"
+        title="No receipts yet"
+        body="Receipts appear here as soon as a payment is recorded against your booking."
+      />
+    );
   return (
     <>
       {q.isError ? <StatusBar text="Showing saved receipts — couldn't refresh." tone="warning" /> : null}
@@ -87,7 +111,15 @@ function Receipts({ bookingId }: { bookingId: string }): React.JSX.Element {
   );
 }
 
-function ReceiptCard({ r, bookingId, files }: { r: PortalReceiptRow; bookingId: string; files: ReturnType<typeof useFileActions> }): React.JSX.Element {
+function ReceiptCard({
+  r,
+  bookingId,
+  files,
+}: {
+  r: PortalReceiptRow;
+  bookingId: string;
+  files: ReturnType<typeof useFileActions>;
+}): React.JSX.Element {
   return (
     <Card style={r.is_cancelled ? { opacity: 0.7 } : null}>
       <View style={styles.rowHead}>
@@ -102,7 +134,12 @@ function ReceiptCard({ r, bookingId, files }: { r: PortalReceiptRow; bookingId: 
           </T>
         </View>
         <View style={{ alignItems: "flex-end", gap: 6 }}>
-          <Money paise={r.amount_paise} variant="h3" color={r.is_cancelled ? colors.inkSubtle : colors.navy} style={r.is_cancelled ? { textDecorationLine: "line-through" } : null} />
+          <Money
+            paise={r.amount_paise}
+            variant="h3"
+            color={r.is_cancelled ? colors.inkSubtle : colors.navy}
+            style={r.is_cancelled ? { textDecorationLine: "line-through" } : null}
+          />
           <View style={styles.chips}>
             <BucketChip bucket={r.bucket} />
             <PaymentStatusChip status={r.status} cancelled={r.is_cancelled} small />
@@ -118,7 +155,11 @@ function ReceiptCard({ r, bookingId, files }: { r: PortalReceiptRow; bookingId: 
         ) : (
           <View style={{ flex: 1 }} />
         )}
-        <PdfButtons keyBase={`receipt:${r.payment_id}`} fetchLink={() => api.bookings.receiptPdf(bookingId, r.payment_id)} actions={files} />
+        <PdfButtons
+          keyBase={`receipt:${r.payment_id}`}
+          fetchLink={() => api.bookings.receiptPdf(bookingId, r.payment_id)}
+          actions={files}
+        />
       </View>
     </Card>
   );
@@ -132,8 +173,16 @@ function Ledger({ bookingId }: { bookingId: string }): React.JSX.Element {
   const q = useLedger(bookingId);
   const { isPhone } = useLayout();
   const rows = q.data?.items ?? [];
-  if (!q.data) return q.isError ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : <SkeletonRows rows={6} />;
-  if (rows.length === 0) return <EmptyState icon="document" title="Ledger is empty" body="Demands and payments will be listed here in order, with running totals." />;
+  if (!q.data)
+    return q.isError ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : <SkeletonRows rows={6} />;
+  if (rows.length === 0)
+    return (
+      <EmptyState
+        icon="document"
+        title="Ledger is empty"
+        body="Demands and payments will be listed here in order, with running totals."
+      />
+    );
   const last = rows[rows.length - 1];
   return (
     <>
@@ -145,7 +194,10 @@ function Ledger({ bookingId }: { bookingId: string }): React.JSX.Element {
             <Summary label="Account paid" value={<Money paise={last.account_paid_paise} />} />
             <Summary label="Cash due" value={<DueMoney paise={last.cash_due_paise} showZeroLabel={false} />} />
             <Summary label="Account due" value={<DueMoney paise={last.account_due_paise} showZeroLabel={false} />} />
-            <Summary label="Total due" value={<DueMoney paise={last.total_due_paise} variant="h3" showZeroLabel={false} />} />
+            <Summary
+              label="Total due"
+              value={<DueMoney paise={last.total_due_paise} variant="h3" showZeroLabel={false} />}
+            />
           </View>
         </Card>
       ) : null}
@@ -162,22 +214,69 @@ function Ledger({ bookingId }: { bookingId: string }): React.JSX.Element {
           keyOf={(r) => String(r.seq)}
           columns={[
             { key: "date", title: "Date", width: 96, render: (r) => <T variant="small">{formatDate(r.entry_date)}</T> },
-            { key: "event", title: "Event", flex: 2, render: (r) => (
-              <View style={{ gap: 2 }}>
-                <T variant="bodyStrong" numberOfLines={2}>{r.label}</T>
-                <View style={styles.chipsLeft}>
-                  <Chip label={LEDGER_EVENT_LABELS[r.event]} tone="neutral" small />
-                  <BucketChip bucket={r.bucket} />
+            {
+              key: "event",
+              title: "Event",
+              flex: 2,
+              render: (r) => (
+                <View style={{ gap: 2 }}>
+                  <T variant="bodyStrong" numberOfLines={2}>
+                    {r.label}
+                  </T>
+                  <View style={styles.chipsLeft}>
+                    <Chip label={LEDGER_EVENT_LABELS[r.event]} tone="neutral" small />
+                    <BucketChip bucket={r.bucket} />
+                  </View>
                 </View>
-              </View>
-            ) },
-            { key: "amount", title: "Amount", align: "right", width: 118, render: (r) => <Money paise={r.amount_paise} color={r.amount_paise < 0 ? colors.danger : isPaymentEvent(r.event) ? colors.success : colors.ink} /> },
+              ),
+            },
+            {
+              key: "amount",
+              title: "Amount",
+              align: "right",
+              width: 118,
+              render: (r) => (
+                <Money
+                  paise={r.amount_paise}
+                  color={r.amount_paise < 0 ? colors.danger : isPaymentEvent(r.event) ? colors.success : colors.ink}
+                />
+              ),
+            },
             { key: "cashPaid", title: "Cash paid", align: "right", render: (r) => <Money paise={r.cash_paid_paise} /> },
-            { key: "accPaid", title: "Account paid", align: "right", render: (r) => <Money paise={r.account_paid_paise} /> },
-            { key: "cashDue", title: "Cash due", align: "right", render: (r) => <DueMoney paise={r.cash_due_paise} showZeroLabel={false} /> },
-            { key: "accDue", title: "Account due", align: "right", render: (r) => <DueMoney paise={r.account_due_paise} showZeroLabel={false} /> },
-            { key: "totalDue", title: "Total due", align: "right", render: (r) => <DueMoney paise={r.total_due_paise} showZeroLabel={false} /> },
-            { key: "ref", title: "Ref", width: 108, render: (r) => <T variant="caption" color={colors.inkSubtle} numberOfLines={2}>{r.ref_number ?? "—"}</T> },
+            {
+              key: "accPaid",
+              title: "Account paid",
+              align: "right",
+              render: (r) => <Money paise={r.account_paid_paise} />,
+            },
+            {
+              key: "cashDue",
+              title: "Cash due",
+              align: "right",
+              render: (r) => <DueMoney paise={r.cash_due_paise} showZeroLabel={false} />,
+            },
+            {
+              key: "accDue",
+              title: "Account due",
+              align: "right",
+              render: (r) => <DueMoney paise={r.account_due_paise} showZeroLabel={false} />,
+            },
+            {
+              key: "totalDue",
+              title: "Total due",
+              align: "right",
+              render: (r) => <DueMoney paise={r.total_due_paise} showZeroLabel={false} />,
+            },
+            {
+              key: "ref",
+              title: "Ref",
+              width: 108,
+              render: (r) => (
+                <T variant="caption" color={colors.inkSubtle} numberOfLines={2}>
+                  {r.ref_number ?? "—"}
+                </T>
+              ),
+            },
           ]}
         />
       )}
@@ -211,17 +310,28 @@ function LedgerCard({ r }: { r: PortalLedgerRow }): React.JSX.Element {
           </T>
           <T variant="bodyStrong">{r.label}</T>
           <View style={styles.chipsLeft}>
-            <Chip label={LEDGER_EVENT_LABELS[r.event]} tone={isPayment ? "success" : isReversal ? "danger" : "neutral"} small />
+            <Chip
+              label={LEDGER_EVENT_LABELS[r.event]}
+              tone={isPayment ? "success" : isReversal ? "danger" : "neutral"}
+              small
+            />
             <BucketChip bucket={r.bucket} />
           </View>
         </View>
-        <Money paise={r.amount_paise} variant="h3" color={isReversal || r.amount_paise < 0 ? colors.danger : isPayment ? colors.success : colors.navy} />
+        <Money
+          paise={r.amount_paise}
+          variant="h3"
+          color={isReversal || r.amount_paise < 0 ? colors.danger : isPayment ? colors.success : colors.navy}
+        />
       </View>
       <View style={styles.ledgerGrid}>
         <Mini label="Cash paid" value={<Money paise={r.cash_paid_paise} variant="small" />} />
         <Mini label="Account paid" value={<Money paise={r.account_paid_paise} variant="small" />} />
         <Mini label="Cash due" value={<DueMoney paise={r.cash_due_paise} variant="small" showZeroLabel={false} />} />
-        <Mini label="Account due" value={<DueMoney paise={r.account_due_paise} variant="small" showZeroLabel={false} />} />
+        <Mini
+          label="Account due"
+          value={<DueMoney paise={r.account_due_paise} variant="small" showZeroLabel={false} />}
+        />
       </View>
       <View style={styles.totalDue}>
         <T variant="small" color={colors.inkMuted}>
@@ -252,8 +362,16 @@ function Demands({ bookingId }: { bookingId: string }): React.JSX.Element {
   const q = useDemands(bookingId);
   const files = useFileActions();
   const rows = q.data?.items ?? [];
-  if (!q.data) return q.isError ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : <SkeletonRows rows={4} />;
-  if (rows.length === 0) return <EmptyState icon="notice" title="No demands raised yet" body="Installment demands are raised as your payment plan triggers — on booking, on construction stages or on dates." />;
+  if (!q.data)
+    return q.isError ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : <SkeletonRows rows={4} />;
+  if (rows.length === 0)
+    return (
+      <EmptyState
+        icon="notice"
+        title="No demands raised yet"
+        body="Installment demands are raised as your payment plan triggers — on booking, on construction stages or on dates."
+      />
+    );
   return (
     <>
       {q.isError ? <StatusBar text="Showing saved demands — couldn't refresh." tone="warning" /> : null}
@@ -266,7 +384,15 @@ function Demands({ bookingId }: { bookingId: string }): React.JSX.Element {
   );
 }
 
-function DemandCard({ d, bookingId, files }: { d: PortalDemandRow; bookingId: string; files: ReturnType<typeof useFileActions> }): React.JSX.Element {
+function DemandCard({
+  d,
+  bookingId,
+  files,
+}: {
+  d: PortalDemandRow;
+  bookingId: string;
+  files: ReturnType<typeof useFileActions>;
+}): React.JSX.Element {
   const balance = d.total_demand_paise - d.paid_paise;
   const days = daysUntil(d.due_date);
   const open = d.status === "OPEN" || d.status === "PARTIALLY_PAID";
@@ -295,7 +421,13 @@ function DemandCard({ d, bookingId, files }: { d: PortalDemandRow; bookingId: st
       <View style={styles.rowFoot}>
         <View style={{ flex: 1, gap: 2 }}>
           <T variant="caption" color={d.is_overdue && open ? colors.danger : colors.inkMuted}>
-            {open ? (days < 0 ? `Due ${formatDate(d.due_date)} · ${-days} day${-days === 1 ? "" : "s"} overdue` : days === 0 ? "Due today" : `Due ${formatDate(d.due_date)} · in ${days} day${days === 1 ? "" : "s"}`) : `Due date ${formatDate(d.due_date)}`}
+            {open
+              ? days < 0
+                ? `Due ${formatDate(d.due_date)} · ${-days} day${-days === 1 ? "" : "s"} overdue`
+                : days === 0
+                  ? "Due today"
+                  : `Due ${formatDate(d.due_date)} · in ${days} day${days === 1 ? "" : "s"}`
+              : `Due date ${formatDate(d.due_date)}`}
           </T>
           {open && balance > 0 ? (
             <T variant="small">
@@ -304,7 +436,12 @@ function DemandCard({ d, bookingId, files }: { d: PortalDemandRow; bookingId: st
             </T>
           ) : null}
         </View>
-        <PdfButtons keyBase={`demand:${d.demand_id}`} fetchLink={() => api.bookings.demandPdf(bookingId, d.demand_id)} actions={files} compact />
+        <PdfButtons
+          keyBase={`demand:${d.demand_id}`}
+          fetchLink={() => api.bookings.demandPdf(bookingId, d.demand_id)}
+          actions={files}
+          compact
+        />
       </View>
     </Card>
   );
@@ -317,7 +454,8 @@ function DemandCard({ d, bookingId, files }: { d: PortalDemandRow; bookingId: st
 function Schedule({ bookingId }: { bookingId: string }): React.JSX.Element {
   const q = useSchedule(bookingId);
   const d = q.data;
-  if (!d) return q.isError ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : <SkeletonRows rows={6} />;
+  if (!d)
+    return q.isError ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : <SkeletonRows rows={6} />;
   const paid = d.rows.filter((r) => r.status === "PAID").length;
   return (
     <>
@@ -361,7 +499,13 @@ function Schedule({ bookingId }: { bookingId: string }): React.JSX.Element {
           ))}
         </Card>
       ) : null}
-      {d.rows.length === 0 ? <EmptyState icon="calendar" title="No installments" body="Your payment plan has no installments configured yet." /> : null}
+      {d.rows.length === 0 ? (
+        <EmptyState
+          icon="calendar"
+          title="No installments"
+          body="Your payment plan has no installments configured yet."
+        />
+      ) : null}
       <View>
         {d.rows.map((r, i) => (
           <ScheduleRow key={r.seq} r={r} isLast={i === d.rows.length - 1} />
@@ -378,10 +522,29 @@ function ScheduleRow({ r, isLast }: { r: PortalScheduleRow; isLast: boolean }): 
   return (
     <View style={styles.stageRow}>
       <View style={styles.rail}>
-        <View style={[styles.dot, done ? styles.dotDone : active ? (r.status === "OVERDUE" ? styles.dotOverdue : styles.dotActive) : null]}>{done ? <Icon name="check" size={12} color={colors.onNavy} /> : <T variant="caption" color={active ? colors.navy : colors.inkSubtle} style={{ fontSize: 10, lineHeight: 12 }}>{r.seq}</T>}</View>
+        <View
+          style={[
+            styles.dot,
+            done ? styles.dotDone : active ? (r.status === "OVERDUE" ? styles.dotOverdue : styles.dotActive) : null,
+          ]}
+        >
+          {done ? (
+            <Icon name="check" size={12} color={colors.onNavy} />
+          ) : (
+            <T
+              variant="caption"
+              color={active ? colors.navy : colors.inkSubtle}
+              style={{ fontSize: 10, lineHeight: 12 }}
+            >
+              {r.seq}
+            </T>
+          )}
+        </View>
         {!isLast ? <View style={[styles.line, done ? styles.lineDone : null]} /> : null}
       </View>
-      <Card style={[styles.stageCard, active ? styles.stageActive : null, r.status === "OVERDUE" ? styles.overdue : null]}>
+      <Card
+        style={[styles.stageCard, active ? styles.stageActive : null, r.status === "OVERDUE" ? styles.overdue : null]}
+      >
         <View style={styles.rowHead}>
           <View style={{ flex: 1, gap: 2 }}>
             <T variant="bodyStrong">{r.name}</T>
@@ -401,7 +564,9 @@ function ScheduleRow({ r, isLast }: { r: PortalScheduleRow; isLast: boolean }): 
         <View style={[styles.chips, { marginTop: space.sm }]}>
           <Chip label={`Cash ${formatINR(r.cash_paise)}`} tone="gold" small />
           <Chip label={`Account ${formatINR(r.account_paise)}`} tone="navy" small />
-          {r.paid_paise > 0 && !done ? <Chip label={`Paid ${formatINR(r.paid_paise)} · balance ${formatINR(balance)}`} tone="warning" small /> : null}
+          {r.paid_paise > 0 && !done ? (
+            <Chip label={`Paid ${formatINR(r.paid_paise)} · balance ${formatINR(balance)}`} tone="warning" small />
+          ) : null}
           {done ? <Chip label={SCHEDULE_STATUS_LABELS[r.status]} tone="success" small icon="check" /> : null}
         </View>
       </Card>
@@ -416,13 +581,38 @@ const styles = StyleSheet.create({
   chipsLeft: { flexDirection: "row", flexWrap: "wrap", gap: 4 },
   summaryRow: { flexDirection: "row", flexWrap: "wrap", gap: space.md },
   summaryCell: { minWidth: 120, flexGrow: 1, gap: 2 },
-  ledgerGrid: { flexDirection: "row", flexWrap: "wrap", marginTop: space.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line, paddingTop: space.sm },
+  ledgerGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: space.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.line,
+    paddingTop: space.sm,
+  },
   mini: { width: "50%", paddingVertical: 4, gap: 2 },
-  totalDue: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: space.xs, paddingTop: space.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
+  totalDue: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: space.xs,
+    paddingTop: space.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.line,
+  },
   overdue: { borderWidth: 1, borderColor: "#F2C4BE" },
   stageRow: { flexDirection: "row", gap: space.md },
   rail: { width: 24, alignItems: "center" },
-  dot: { width: 22, height: 22, borderRadius: 11, backgroundColor: colors.surface, borderWidth: 2, borderColor: colors.navy200, alignItems: "center", justifyContent: "center", marginTop: 18 },
+  dot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.surface,
+    borderWidth: 2,
+    borderColor: colors.navy200,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 18,
+  },
   dotDone: { backgroundColor: colors.success, borderColor: colors.success },
   dotActive: { borderColor: colors.gold, backgroundColor: colors.gold100 },
   dotOverdue: { borderColor: colors.danger, backgroundColor: colors.dangerBg },

@@ -6,12 +6,12 @@ export type TokenAudience = "erp" | "portal";
 
 /** Claims we put in every access token. */
 export interface AccessClaimsInput {
-  sub: string;           // user id (staff) or portal user id (customer)
+  sub: string; // user id (staff) or portal user id (customer)
   aud: TokenAudience;
-  cid: string;           // company id
-  sid: string;           // refresh-token family id (session)
-  mfa?: boolean;         // MFA satisfied for this session
-  pwd?: boolean;         // must change password
+  cid: string; // company id
+  sid: string; // refresh-token family id (session)
+  mfa?: boolean; // MFA satisfied for this session
+  pwd?: boolean; // must change password
 }
 export type AccessClaims = AccessClaimsInput & JWTPayload & { typ: "access" };
 
@@ -35,7 +35,10 @@ function deriveKeyPair(secret: string): { privateKey: KeyObject; publicKey: KeyO
 
 /** Key id: first 16 base64url characters of the SHA-256 of the public key (SPKI DER). Reveals nothing about the secret. */
 function keyId(publicKey: KeyObject): string {
-  return createHash("sha256").update(publicKey.export({ format: "der", type: "spki" })).digest("base64url").slice(0, 16);
+  return createHash("sha256")
+    .update(publicKey.export({ format: "der", type: "spki" }))
+    .digest("base64url")
+    .slice(0, 16);
 }
 
 let ringSource: string | null = null;
@@ -60,7 +63,10 @@ export function signingKeys(): SigningKey[] {
 const ISSUER = "kkt";
 
 /** Sign a 15-minute (configurable) access token for the given audience with the current key (its kid in the header). */
-export async function signAccessToken(claims: AccessClaimsInput, minutes = config.ACCESS_TOKEN_MINUTES): Promise<string> {
+export async function signAccessToken(
+  claims: AccessClaimsInput,
+  minutes = config.ACCESS_TOKEN_MINUTES,
+): Promise<string> {
   const key = signingKeys()[0]!;
   return new SignJWT({ ...claims, typ: "access" })
     .setProtectedHeader({ alg: "EdDSA", kid: key.kid })
@@ -72,13 +78,18 @@ export async function signAccessToken(claims: AccessClaimsInput, minutes = confi
     .sign(key.privateKey);
 }
 
-export type VerifyResult = { ok: true; claims: AccessClaims } | { ok: false; reason: "EXPIRED" | "INVALID" | "WRONG_AUDIENCE" };
+export type VerifyResult =
+  { ok: true; claims: AccessClaims } | { ok: false; reason: "EXPIRED" | "INVALID" | "WRONG_AUDIENCE" };
 
 /** Candidate keys for a token: the one its kid names, else (tokens minted before kids were fingerprints, e.g. `k1`) every key. */
 function candidates(token: string): SigningKey[] {
   const keys = signingKeys();
   let kid: string | undefined;
-  try { kid = decodeProtectedHeader(token).kid; } catch { return []; }
+  try {
+    kid = decodeProtectedHeader(token).kid;
+  } catch {
+    return [];
+  }
   const named = keys.filter((k) => k.kid === kid);
   return named.length > 0 ? named : keys;
 }
@@ -88,9 +99,19 @@ export async function verifyAccessToken(token: string, audience: TokenAudience):
   let lastCode: string | undefined;
   for (const key of candidates(token)) {
     try {
-      const { payload } = await jwtVerify(token, key.publicKey, { issuer: ISSUER, clockTolerance: 30, algorithms: ["EdDSA"] });
+      const { payload } = await jwtVerify(token, key.publicKey, {
+        issuer: ISSUER,
+        clockTolerance: 30,
+        algorithms: ["EdDSA"],
+      });
       if (payload.aud !== audience) return { ok: false, reason: "WRONG_AUDIENCE" };
-      if (payload.typ !== "access" || typeof payload.sub !== "string" || typeof payload.cid !== "string" || typeof payload.sid !== "string") return { ok: false, reason: "INVALID" };
+      if (
+        payload.typ !== "access" ||
+        typeof payload.sub !== "string" ||
+        typeof payload.cid !== "string" ||
+        typeof payload.sid !== "string"
+      )
+        return { ok: false, reason: "INVALID" };
       return { ok: true, claims: payload as unknown as AccessClaims };
     } catch (e) {
       lastCode = (e as { code?: string }).code;
@@ -103,6 +124,8 @@ export async function verifyAccessToken(token: string, audience: TokenAudience):
 
 /** Public JWK set for external verifiers (e.g. an edge proxy): every key that can still verify a live token, current first. */
 export async function publicJwks(): Promise<{ keys: Record<string, unknown>[] }> {
-  const keys = await Promise.all(signingKeys().map(async (k) => ({ ...(await exportJWK(k.publicKey)), kid: k.kid, use: "sig", alg: "EdDSA" })));
+  const keys = await Promise.all(
+    signingKeys().map(async (k) => ({ ...(await exportJWK(k.publicKey)), kid: k.kid, use: "sig", alg: "EdDSA" })),
+  );
   return { keys };
 }

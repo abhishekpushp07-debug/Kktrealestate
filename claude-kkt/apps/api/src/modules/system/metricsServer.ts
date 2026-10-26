@@ -26,12 +26,16 @@ export function startMetricsServer(o: MetricsServerOptions): Promise<Server | nu
       return;
     }
     if (o.token && !isMetricsToken(req.headers.authorization, o.token)) {
-      res.writeHead(401, { "content-type": "text/plain", "www-authenticate": 'Bearer realm="metrics"' }).end("unauthorized\n");
+      res
+        .writeHead(401, { "content-type": "text/plain", "www-authenticate": 'Bearer realm="metrics"' })
+        .end("unauthorized\n");
       return;
     }
     o.render()
       .then((body) => res.writeHead(200, { "content-type": o.contentType, "cache-control": "no-store" }).end(body))
-      .catch((err: unknown) => res.writeHead(500, { "content-type": "text/plain" }).end(`metrics unavailable: ${(err as Error).message}\n`));
+      .catch((err: unknown) =>
+        res.writeHead(500, { "content-type": "text/plain" }).end(`metrics unavailable: ${(err as Error).message}\n`),
+      );
   });
   server.keepAliveTimeout = 65_000;
   return new Promise((resolve) => {

@@ -25,24 +25,36 @@ declare module "fastify" {
  * (lib/cache.ts redisUsable) and spend at most a short budget on a slow one.
  */
 export function createRedis(url = config.REDIS_URL): Redis {
-  return new Redis(url, { maxRetriesPerRequest: 3, enableReadyCheck: true, lazyConnect: true, commandTimeout: config.REDIS_COMMAND_TIMEOUT_MS, retryStrategy: (times) => Math.min(times * 200, 5000) });
+  return new Redis(url, {
+    maxRetriesPerRequest: 3,
+    enableReadyCheck: true,
+    lazyConnect: true,
+    commandTimeout: config.REDIS_COMMAND_TIMEOUT_MS,
+    retryStrategy: (times) => Math.min(times * 200, 5000),
+  });
 }
 
 /** Fastify plugin exposing `app.redis`, `app.redisSecurity` and `app.jobQueue()`; closes them on shutdown. */
-export default fp(async (app) => {
-  const redis = createRedis();
-  await redis.connect();
-  const security = config.REDIS_SECURITY_URL && config.REDIS_SECURITY_URL !== config.REDIS_URL ? createRedis(config.REDIS_SECURITY_URL) : null;
-  if (security) await security.connect();
-  let queue: Queue | null = null;
-  app.decorate("redis", redis);
-  app.decorate("redisSecurity", security ?? redis);
-  app.decorate("jobQueue", () => (queue ??= createQueue()));
-  // job handlers run with this (root) app when a caller hands the worker only a DB handle (server.ts's in-process worker)
-  bindJobApp(app);
-  app.addHook("onClose", async () => {
-    if (queue) await queue.close().catch(() => undefined);
-    if (security) await security.quit().catch(() => undefined);
-    await redis.quit().catch(() => undefined);
-  });
-}, { name: "redis" });
+export default fp(
+  async (app) => {
+    const redis = createRedis();
+    await redis.connect();
+    const security =
+      config.REDIS_SECURITY_URL && config.REDIS_SECURITY_URL !== config.REDIS_URL
+        ? createRedis(config.REDIS_SECURITY_URL)
+        : null;
+    if (security) await security.connect();
+    let queue: Queue | null = null;
+    app.decorate("redis", redis);
+    app.decorate("redisSecurity", security ?? redis);
+    app.decorate("jobQueue", () => (queue ??= createQueue()));
+    // job handlers run with this (root) app when a caller hands the worker only a DB handle (server.ts's in-process worker)
+    bindJobApp(app);
+    app.addHook("onClose", async () => {
+      if (queue) await queue.close().catch(() => undefined);
+      if (security) await security.quit().catch(() => undefined);
+      await redis.quit().catch(() => undefined);
+    });
+  },
+  { name: "redis" },
+);

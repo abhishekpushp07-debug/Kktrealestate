@@ -3,7 +3,22 @@ import { CalendarCheck2, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, 
 import { useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { VISIT_SOURCE_LABELS, VISIT_STATUSES, VISIT_STATUS_LABELS, type VisitRow } from "@kkt/contracts";
-import { Badge, Button, Combobox, DataTable, DateInput, ErrorState, PageHeader, Select, Skeleton, StatusChip, Tabs, TabsList, TabsTrigger, Toolbar } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  Combobox,
+  DataTable,
+  DateInput,
+  ErrorState,
+  PageHeader,
+  Select,
+  Skeleton,
+  StatusChip,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  Toolbar,
+} from "@/components/ui";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { formatDate, formatNumber, formatPhone, todayIST } from "@/lib/format";
@@ -48,10 +63,14 @@ export default function SiteVisitsPage() {
     );
   };
 
-  const range = useMemo(() => (view === "week" ? { from: startOfWeek(date), to: addDays(startOfWeek(date), 6) } : { from: date, to: date }), [view, date]);
+  const range = useMemo(
+    () => (view === "week" ? { from: startOfWeek(date), to: addDays(startOfWeek(date), 6) } : { from: date, to: date }),
+    [view, date],
+  );
   const calendar = useVisitCalendar(view === "list" ? null : projectId, range.from, range.to, assignee);
 
-  const step = (direction: -1 | 1) => setParam({ date: addDays(view === "week" ? startOfWeek(date) : date, direction * (view === "week" ? 7 : 1)) });
+  const step = (direction: -1 | 1) =>
+    setParam({ date: addDays(view === "week" ? startOfWeek(date) : date, direction * (view === "week" ? 7 : 1)) });
 
   return (
     <>
@@ -73,20 +92,64 @@ export default function SiteVisitsPage() {
       <Toolbar
         filters={
           <>
-            <Combobox aria-label="Project" size="sm" className="w-full sm:w-48" value={projectId} onValueChange={(value) => setParam({ project: value })} options={(projects.data ?? []).map((project) => ({ value: project.id, label: project.name, description: project.code ?? undefined }))} placeholder={projects.isPending ? "Loading…" : "Project"} data-testid="visits-project" />
-            <Combobox aria-label="Assignee" size="sm" className="w-full sm:w-44" value={assignee} onValueChange={(value) => setParam({ assignee: value })} options={(users.data ?? []).map((user) => ({ value: user.id, label: user.name, keywords: [user.email] }))} placeholder="Anyone" allowClear />
+            <Combobox
+              aria-label="Project"
+              size="sm"
+              className="w-full sm:w-48"
+              value={projectId}
+              onValueChange={(value) => setParam({ project: value })}
+              options={(projects.data ?? []).map((project) => ({
+                value: project.id,
+                label: project.name,
+                description: project.code ?? undefined,
+              }))}
+              placeholder={projects.isPending ? "Loading…" : "Project"}
+              data-testid="visits-project"
+            />
+            <Combobox
+              aria-label="Assignee"
+              size="sm"
+              className="w-full sm:w-44"
+              value={assignee}
+              onValueChange={(value) => setParam({ assignee: value })}
+              options={(users.data ?? []).map((user) => ({ value: user.id, label: user.name, keywords: [user.email] }))}
+              placeholder="Anyone"
+              allowClear
+            />
             {view !== "list" && (
               <div className="flex items-center gap-1">
-                <Button variant="outline" size="sm" aria-label={view === "week" ? "Previous week" : "Previous day"} onClick={() => step(-1)} className="px-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  aria-label={view === "week" ? "Previous week" : "Previous day"}
+                  onClick={() => step(-1)}
+                  className="px-2"
+                >
                   <ChevronLeft aria-hidden="true" />
                 </Button>
                 <div className="w-40">
-                  <DateInput aria-label="Date" value={date} onChange={(value) => setParam({ date: value })} className="h-12 text-xs sm:h-8" />
+                  <DateInput
+                    aria-label="Date"
+                    value={date}
+                    onChange={(value) => setParam({ date: value })}
+                    className="h-12 text-xs sm:h-8"
+                  />
                 </div>
-                <Button variant="outline" size="sm" aria-label={view === "week" ? "Next week" : "Next day"} onClick={() => step(1)} className="px-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  aria-label={view === "week" ? "Next week" : "Next day"}
+                  onClick={() => step(1)}
+                  className="px-2"
+                >
                   <ChevronRight aria-hidden="true" />
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => setParam({ date: null })} disabled={date === todayIST()}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setParam({ date: null })}
+                  disabled={date === todayIST()}
+                >
                   Today
                 </Button>
               </div>
@@ -96,13 +159,25 @@ export default function SiteVisitsPage() {
         actions={
           <Tabs value={view} onValueChange={(value) => setParam({ view: value === "day" ? null : value })}>
             <TabsList variant="pills" aria-label="View">
-              <TabsTrigger value="day" icon={<CalendarCheck2 className="size-3.5" aria-hidden="true" />} data-testid="visits-view-day">
+              <TabsTrigger
+                value="day"
+                icon={<CalendarCheck2 className="size-3.5" aria-hidden="true" />}
+                data-testid="visits-view-day"
+              >
                 Day
               </TabsTrigger>
-              <TabsTrigger value="week" icon={<CalendarDays className="size-3.5" aria-hidden="true" />} data-testid="visits-view-week">
+              <TabsTrigger
+                value="week"
+                icon={<CalendarDays className="size-3.5" aria-hidden="true" />}
+                data-testid="visits-view-week"
+              >
                 Week
               </TabsTrigger>
-              <TabsTrigger value="list" icon={<List className="size-3.5" aria-hidden="true" />} data-testid="visits-view-list">
+              <TabsTrigger
+                value="list"
+                icon={<List className="size-3.5" aria-hidden="true" />}
+                data-testid="visits-view-list"
+              >
                 List
               </TabsTrigger>
             </TabsList>
@@ -113,11 +188,19 @@ export default function SiteVisitsPage() {
       {view === "list" ? (
         <VisitsTable onOpen={(visit) => setParam({ visit: visit.id })} projectId={projectId} />
       ) : !projectId ? (
-        <ErrorState title="No project selected" description="Pick a project to see its visit calendar." className="rounded-lg border border-border bg-card" />
+        <ErrorState
+          title="No project selected"
+          description="Pick a project to see its visit calendar."
+          className="rounded-lg border border-border bg-card"
+        />
       ) : calendar.isPending ? (
         <Skeleton className="h-96 rounded-lg" />
       ) : calendar.isError ? (
-        <ErrorState error={calendar.error} onRetry={() => void calendar.refetch()} className="rounded-lg border border-border bg-card" />
+        <ErrorState
+          error={calendar.error}
+          onRetry={() => void calendar.refetch()}
+          className="rounded-lg border border-border bg-card"
+        />
       ) : (
         <div className={cn(calendar.isFetching && "opacity-70 transition-opacity")}>
           <VisitCalendar days={calendar.data} mode={view} onOpen={(visit) => setParam({ visit: visit.id })} />
@@ -131,7 +214,16 @@ export default function SiteVisitsPage() {
         projectId={params.get("project") ?? projectId}
         leadId={params.get("lead_id")}
         customerId={params.get("customer_id")}
-        onSaved={(visit) => setParam({ new: null, lead_id: null, customer_id: null, visit: visit.id, date: visit.visit_date, project: visit.project_id })}
+        onSaved={(visit) =>
+          setParam({
+            new: null,
+            lead_id: null,
+            customer_id: null,
+            visit: visit.id,
+            date: visit.visit_date,
+            project: visit.project_id,
+          })
+        }
       />
     </>
   );
@@ -144,7 +236,8 @@ export default function SiteVisitsPage() {
 function TodayStrip({ onOpen, canWrite }: { onOpen: (visit: VisitRow) => void; canWrite: boolean }) {
   const today = useVisitsToday();
   const outcome = useMutationWithToast<VisitRow, { visit: VisitRow; kind: "complete" | "no-show" }>({
-    mutationFn: ({ visit, kind }) => api.post<VisitRow>(`${VISITS_PATH}/${visit.id}/${kind}`, { version: visit.version }, { version: visit.version }),
+    mutationFn: ({ visit, kind }) =>
+      api.post<VisitRow>(`${VISITS_PATH}/${visit.id}/${kind}`, { version: visit.version }, { version: visit.version }),
     successMessage: (_saved, { kind }) => (kind === "complete" ? "Marked completed" : "Marked no-show"),
     invalidate: [[VISITS_PATH], crmKeys.today],
     entityLabel: "This visit",
@@ -153,7 +246,11 @@ function TodayStrip({ onOpen, canWrite }: { onOpen: (visit: VisitRow) => void; c
   if (today.isError || (today.data && rows.length === 0)) return null;
   const pending = rows.filter(visitIsOpen).length;
   return (
-    <section aria-label="Today's visits" className="mb-3 rounded-lg border border-border bg-card p-3 shadow-card" data-testid="visits-today">
+    <section
+      aria-label="Today's visits"
+      className="mb-3 rounded-lg border border-border bg-card p-3 shadow-card"
+      data-testid="visits-today"
+    >
       <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-navy-950">
         <CalendarCheck2 className="size-4 text-gold-text" aria-hidden="true" /> Today's visits
         {today.data && (
@@ -169,7 +266,10 @@ function TodayStrip({ onOpen, canWrite }: { onOpen: (visit: VisitRow) => void; c
           {rows
             .sort((a, b) => a.slot_start.localeCompare(b.slot_start))
             .map((visit) => (
-              <li key={visit.id} className="flex w-60 shrink-0 flex-col rounded-md border border-border bg-surface/60 p-2">
+              <li
+                key={visit.id}
+                className="flex w-60 shrink-0 flex-col rounded-md border border-border bg-surface/60 p-2"
+              >
                 <button type="button" onClick={() => onOpen(visit)} className="text-left focus-ring rounded-xs">
                   <span className="money text-xs font-semibold text-navy-950">{formatSlotTime(visit.slot_start)}</span>
                   <span className="block truncate text-sm font-medium">{visit.name}</span>
@@ -181,10 +281,32 @@ function TodayStrip({ onOpen, canWrite }: { onOpen: (visit: VisitRow) => void; c
                   <StatusChip status={visit.status} label={VISIT_STATUS_LABELS[visit.status]} size="sm" />
                   {canWrite && visitIsOpen(visit) && (
                     <span className="ml-auto flex gap-1">
-                      <Button size="xs" variant="outline" leftIcon={CheckCircle2} loading={outcome.isPending && outcome.variables?.visit.id === visit.id && outcome.variables.kind === "complete"} onClick={() => outcome.mutate({ visit, kind: "complete" })} data-testid={`today-complete-${visit.id}`}>
+                      <Button
+                        size="xs"
+                        variant="outline"
+                        leftIcon={CheckCircle2}
+                        loading={
+                          outcome.isPending &&
+                          outcome.variables?.visit.id === visit.id &&
+                          outcome.variables.kind === "complete"
+                        }
+                        onClick={() => outcome.mutate({ visit, kind: "complete" })}
+                        data-testid={`today-complete-${visit.id}`}
+                      >
                         Done
                       </Button>
-                      <Button size="xs" variant="ghost" leftIcon={UserX} loading={outcome.isPending && outcome.variables?.visit.id === visit.id && outcome.variables.kind === "no-show"} onClick={() => outcome.mutate({ visit, kind: "no-show" })} data-testid={`today-no-show-${visit.id}`}>
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        leftIcon={UserX}
+                        loading={
+                          outcome.isPending &&
+                          outcome.variables?.visit.id === visit.id &&
+                          outcome.variables.kind === "no-show"
+                        }
+                        onClick={() => outcome.mutate({ visit, kind: "no-show" })}
+                        data-testid={`today-no-show-${visit.id}`}
+                      >
                         No-show
                       </Button>
                     </span>
@@ -208,7 +330,7 @@ function VisitsTable({ onOpen, projectId }: { onOpen: (visit: VisitRow) => void;
   // Seed the project filter from the calendar's project the first time the list opens.
   useEffect(() => {
     if (projectId && !list.filters.project_id && !list.hasActiveFilters) list.setFilter("project_id", projectId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time seed on mount; later project changes must not override the user's filter
   }, []);
   const query = useList<VisitRow>(VISITS_PATH, list.params);
   const columns = useMemo<ColumnDef<VisitRow, unknown>[]>(
@@ -249,8 +371,17 @@ function VisitsTable({ onOpen, projectId }: { onOpen: (visit: VisitRow) => void;
           </span>
         ),
       },
-      { accessorKey: "assignee_name", header: "Assignee", cell: ({ row }) => row.original.assignee_name ?? <span className="text-ink-subtle">—</span> },
-      { accessorKey: "source", header: "Source", meta: { hideOnMobile: true, width: 90 }, cell: ({ row }) => VISIT_SOURCE_LABELS[row.original.source] },
+      {
+        accessorKey: "assignee_name",
+        header: "Assignee",
+        cell: ({ row }) => row.original.assignee_name ?? <span className="text-ink-subtle">—</span>,
+      },
+      {
+        accessorKey: "source",
+        header: "Source",
+        meta: { hideOnMobile: true, width: 90 },
+        cell: ({ row }) => VISIT_SOURCE_LABELS[row.original.source],
+      },
     ],
     [],
   );
@@ -263,15 +394,54 @@ function VisitsTable({ onOpen, projectId }: { onOpen: (visit: VisitRow) => void;
         searchPlaceholder="Search visitor, phone or number…"
         filters={
           <>
-            <Select aria-label="Status" size="sm" className="w-full sm:w-36" value={list.filters.status ?? null} onValueChange={(value) => list.setFilter("status", value)} options={VISIT_STATUSES.map((value) => ({ value, label: VISIT_STATUS_LABELS[value] }))} placeholder="Any status" allowClear />
-            <Combobox aria-label="Assignee" size="sm" className="w-full sm:w-40" value={list.filters.assignee_user_id ?? null} onValueChange={(value) => list.setFilter("assignee_user_id", value)} options={(users.data ?? []).map((user) => ({ value: user.id, label: user.name }))} placeholder="Anyone" allowClear />
+            <Select
+              aria-label="Status"
+              size="sm"
+              className="w-full sm:w-36"
+              value={list.filters.status ?? null}
+              onValueChange={(value) => list.setFilter("status", value)}
+              options={VISIT_STATUSES.map((value) => ({ value, label: VISIT_STATUS_LABELS[value] }))}
+              placeholder="Any status"
+              allowClear
+            />
+            <Combobox
+              aria-label="Assignee"
+              size="sm"
+              className="w-full sm:w-40"
+              value={list.filters.assignee_user_id ?? null}
+              onValueChange={(value) => list.setFilter("assignee_user_id", value)}
+              options={(users.data ?? []).map((user) => ({ value: user.id, label: user.name }))}
+              placeholder="Anyone"
+              allowClear
+            />
             <div className="w-full sm:w-40">
-              <DateInput aria-label="From" value={list.filters.from ?? null} onChange={(value) => list.setFilter("from", value)} className="h-12 text-xs sm:h-8" max={list.filters.to} />
+              <DateInput
+                aria-label="From"
+                value={list.filters.from ?? null}
+                onChange={(value) => list.setFilter("from", value)}
+                className="h-12 text-xs sm:h-8"
+                max={list.filters.to}
+              />
             </div>
             <div className="w-full sm:w-40">
-              <DateInput aria-label="To" value={list.filters.to ?? null} onChange={(value) => list.setFilter("to", value)} className="h-12 text-xs sm:h-8" min={list.filters.from} />
+              <DateInput
+                aria-label="To"
+                value={list.filters.to ?? null}
+                onChange={(value) => list.setFilter("to", value)}
+                className="h-12 text-xs sm:h-8"
+                min={list.filters.from}
+              />
             </div>
-            <Select aria-label="Needs outcome" size="sm" className="w-full sm:w-40" value={list.filters.needs_outcome ?? null} onValueChange={(value) => list.setFilter("needs_outcome", value)} options={[{ value: "true", label: "Needs outcome" }]} placeholder="All visits" allowClear />
+            <Select
+              aria-label="Needs outcome"
+              size="sm"
+              className="w-full sm:w-40"
+              value={list.filters.needs_outcome ?? null}
+              onValueChange={(value) => list.setFilter("needs_outcome", value)}
+              options={[{ value: "true", label: "Needs outcome" }]}
+              placeholder="All visits"
+              allowClear
+            />
           </>
         }
         hasActiveFilters={list.hasActiveFilters}
@@ -290,8 +460,20 @@ function VisitsTable({ onOpen, projectId }: { onOpen: (visit: VisitRow) => void;
         sort={list.sort}
         onSortChange={list.setSort}
         onRowClick={onOpen}
-        pagination={{ page: list.page, pageSize: list.pageSize, total, onPageChange: list.setPage, onPageSizeChange: list.setPageSize }}
-        emptyState={{ icon: CalendarCheck2, title: list.hasActiveFilters ? "No visits match" : "No site visits yet", description: list.hasActiveFilters ? "Try other filters." : "Website bookings and staff-created visits appear here." }}
+        pagination={{
+          page: list.page,
+          pageSize: list.pageSize,
+          total,
+          onPageChange: list.setPage,
+          onPageSizeChange: list.setPageSize,
+        }}
+        emptyState={{
+          icon: CalendarCheck2,
+          title: list.hasActiveFilters ? "No visits match" : "No site visits yet",
+          description: list.hasActiveFilters
+            ? "Try other filters."
+            : "Website bookings and staff-created visits appear here.",
+        }}
         data-testid="visits-table"
       />
     </>

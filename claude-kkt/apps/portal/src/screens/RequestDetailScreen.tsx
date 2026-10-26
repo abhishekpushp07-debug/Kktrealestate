@@ -28,11 +28,24 @@ export function RequestDetailScreen(): React.JSX.Element {
   const d = q.data;
   return (
     <View style={{ flex: 1, backgroundColor: colors.ivory }}>
-      <Header title={d ? d.ticket_number : "Request"} subtitle={d ? `${d.category_name} · ${d.flat_number}` : undefined} back />
+      <Header
+        title={d ? d.ticket_number : "Request"}
+        subtitle={d ? `${d.category_name} · ${d.flat_number}` : undefined}
+        back
+      />
       {q.isError && d ? <StatusBar text="Showing saved conversation — couldn't refresh." tone="warning" /> : null}
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
         <Screen onRefresh={() => queryClient.invalidateQueries({ queryKey: ["request", requestId] })}>
-          {d ? <Detail d={d} /> : q.isError ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : <><SkeletonCard lines={3} /><SkeletonRows rows={3} /></>}
+          {d ? (
+            <Detail d={d} />
+          ) : q.isError ? (
+            <ErrorState error={q.error} onRetry={() => void q.refetch()} />
+          ) : (
+            <>
+              <SkeletonCard lines={3} />
+              <SkeletonRows rows={3} />
+            </>
+          )}
         </Screen>
       </KeyboardAvoidingView>
     </View>
@@ -103,8 +116,17 @@ function Detail({ d }: { d: PortalRequestDetailResponse }): React.JSX.Element {
         </T>
       </Card>
 
-      {d.status === "AWAITING_CUSTOMER" ? <Notice tone="warning" icon="chat" title="Our team is waiting for your reply" body="Add the details requested below so we can continue." /> : null}
-      {d.status === "RESOLVED" && d.can_reopen ? <Notice tone="success" title="Marked resolved" body="Not fixed? You can reopen this request within 7 days." /> : null}
+      {d.status === "AWAITING_CUSTOMER" ? (
+        <Notice
+          tone="warning"
+          icon="chat"
+          title="Our team is waiting for your reply"
+          body="Add the details requested below so we can continue."
+        />
+      ) : null}
+      {d.status === "RESOLVED" && d.can_reopen ? (
+        <Notice tone="success" title="Marked resolved" body="Not fixed? You can reopen this request within 7 days." />
+      ) : null}
 
       <View style={{ gap: space.sm }}>
         {d.messages.map((m) => (
@@ -120,7 +142,14 @@ function Detail({ d }: { d: PortalRequestDetailResponse }): React.JSX.Element {
       {!closed || d.status === "RESOLVED" ? (
         <Card style={{ gap: space.md }}>
           <T variant="h3">{d.status === "RESOLVED" ? "Add a note" : "Reply"}</T>
-          <Field accessibilityLabel="Your message" value={body} onChangeText={setBody} placeholder="Write your message…" multiline maxLength={5000} />
+          <Field
+            accessibilityLabel="Your message"
+            value={body}
+            onChangeText={setBody}
+            placeholder="Write your message…"
+            multiline
+            maxLength={5000}
+          />
           <AttachmentPicker files={files} onChange={setFiles} onError={(m) => toast.error(m)} max={10} />
           <Button title="Send" icon="chat" variant="primary" loading={reply.isPending} onPress={() => void send()} />
         </Card>
@@ -142,26 +171,61 @@ function Detail({ d }: { d: PortalRequestDetailResponse }): React.JSX.Element {
           <StarRating value={rating} onChange={d.can_rate ? setRating : undefined} />
           {d.can_rate ? (
             <>
-              <Field accessibilityLabel="Rating comment (optional)" value={comment} onChangeText={setComment} placeholder="Anything we should know? (optional)" multiline maxLength={1000} />
-              <Button title={d.rating ? "Update rating" : "Submit rating"} variant="gold" loading={rate.isPending} onPress={() => void doRate()} />
+              <Field
+                accessibilityLabel="Rating comment (optional)"
+                value={comment}
+                onChangeText={setComment}
+                placeholder="Anything we should know? (optional)"
+                multiline
+                maxLength={1000}
+              />
+              <Button
+                title={d.rating ? "Update rating" : "Submit rating"}
+                variant="gold"
+                loading={rate.isPending}
+                onPress={() => void doRate()}
+              />
             </>
           ) : null}
         </Card>
       ) : null}
 
-      <Sheet visible={reopenOpen} onClose={() => setReopenOpen(false)} title="Reopen request" subtitle="Tell us what's still pending">
-        <Field accessibilityLabel="Reason for reopening" value={reason} onChangeText={setReason} placeholder="e.g. The leak has started again after the repair." multiline maxLength={500} />
+      <Sheet
+        visible={reopenOpen}
+        onClose={() => setReopenOpen(false)}
+        title="Reopen request"
+        subtitle="Tell us what's still pending"
+      >
+        <Field
+          accessibilityLabel="Reason for reopening"
+          value={reason}
+          onChangeText={setReason}
+          placeholder="e.g. The leak has started again after the repair."
+          multiline
+          maxLength={500}
+        />
         <View style={styles.sheetActions}>
           <Button title="Cancel" variant="outline" onPress={() => setReopenOpen(false)} />
           <Button title="Reopen" variant="primary" loading={reopen.isPending} onPress={() => void doReopen()} />
         </View>
       </Sheet>
-      <Lightbox images={lightbox ? [{ uri: lightbox.uri, caption: lightbox.caption }] : []} index={lightbox ? 0 : null} onClose={() => setLightbox(null)} onIndexChange={() => undefined} />
+      <Lightbox
+        images={lightbox ? [{ uri: lightbox.uri, caption: lightbox.caption }] : []}
+        index={lightbox ? 0 : null}
+        onClose={() => setLightbox(null)}
+        onIndexChange={() => undefined}
+      />
     </>
   );
 }
 
-function Bubble({ m, onOpenImage }: { m: PortalRequestMessage; onOpenImage: (uri: string, caption: string) => void }): React.JSX.Element {
+function Bubble({
+  m,
+  onOpenImage,
+}: {
+  m: PortalRequestMessage;
+  onOpenImage: (uri: string, caption: string) => void;
+}): React.JSX.Element {
   const mine = m.author === "YOU";
   const system = m.author === "SYSTEM";
   if (system) {
@@ -191,7 +255,16 @@ function Bubble({ m, onOpenImage }: { m: PortalRequestMessage; onOpenImage: (uri
         {m.attachments.length ? (
           <View style={styles.attachments}>
             {m.attachments.map((a) => (
-              <AttachmentThumb key={a.id} uri={a.thumb_url} name={a.file_name} onPress={a.mime.startsWith("image/") && (a.url ?? a.thumb_url) ? () => onOpenImage(a.url ?? a.thumb_url ?? "", a.file_name) : undefined} />
+              <AttachmentThumb
+                key={a.id}
+                uri={a.thumb_url}
+                name={a.file_name}
+                onPress={
+                  a.mime.startsWith("image/") && (a.url ?? a.thumb_url)
+                    ? () => onOpenImage(a.url ?? a.thumb_url ?? "", a.file_name)
+                    : undefined
+                }
+              />
             ))}
           </View>
         ) : null}

@@ -12,8 +12,20 @@ import { PortalListQuerySchema, customerOf } from "./common.js";
 /** Registers /portal/notices. */
 export function registerNoticeRoutes(app: FastifyInstance): void {
   route(app, {
-    method: "GET", url: "/portal/notices", audience: "portal",
-    schema: { querystring: PortalListQuerySchema, response: { 200: PortalNoticeListResponseSchema }, summary: "Live notices: company-wide plus the projects of the customer's bookings" },
-    handler: async (req) => noticesForCustomer(app.dbReplica, customerOf(req).customerId, { page: req.query.page, page_size: req.query.page_size, cursor: req.query.cursor, limit: req.query.limit }),
+    method: "GET",
+    url: "/portal/notices",
+    audience: "portal",
+    schema: {
+      querystring: PortalListQuerySchema,
+      response: { 200: PortalNoticeListResponseSchema },
+      summary: "Live notices: company-wide plus the projects of the customer's bookings",
+    },
+    handler: async (req) =>
+      noticesForCustomer(app.dbReplica, customerOf(req).customerId, {
+        page: req.query.page,
+        page_size: req.query.page_size,
+        cursor: req.query.cursor,
+        limit: req.query.limit,
+      }),
   });
 }

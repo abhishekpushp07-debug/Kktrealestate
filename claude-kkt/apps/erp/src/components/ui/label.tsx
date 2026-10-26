@@ -8,7 +8,10 @@ export interface LabelProps extends ComponentProps<typeof LabelPrimitive.Root> {
 
 export function Label({ className, required, children, ...props }: LabelProps) {
   return (
-    <LabelPrimitive.Root className={cn("inline-flex items-center gap-1 text-xs font-semibold text-ink-muted", className)} {...props}>
+    <LabelPrimitive.Root
+      className={cn("inline-flex items-center gap-1 text-xs font-semibold text-ink-muted", className)}
+      {...props}
+    >
       {children}
       {required && (
         <span className="text-danger" aria-hidden="true">

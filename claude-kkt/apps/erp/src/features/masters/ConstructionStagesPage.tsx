@@ -1,6 +1,19 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { ArchiveRestore, ArrowDown, ArrowUp, GripVertical, Hammer, Link2, MoreHorizontal, Pencil, Plus, Power, RotateCcw, Save } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  ArchiveRestore,
+  ArrowDown,
+  ArrowUp,
+  GripVertical,
+  Hammer,
+  Link2,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Power,
+  RotateCcw,
+  Save,
+} from "lucide-react";
+import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type { ConstructionStageRow, MasterRow } from "@kkt/contracts";
 import {
   Badge,
@@ -23,7 +36,7 @@ import {
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useMutationWithToast } from "@/lib/queries";
-import { cn } from "@/lib/utils";
+import { cn, useOnChange } from "@/lib/utils";
 import { CsvImportDialog } from "./CsvImportDialog";
 import { MasterFormSheet } from "./MasterFormSheet";
 import { UsageDialog } from "./UsageDialog";
@@ -54,13 +67,13 @@ export function ConstructionStagesPage({ config }: MasterPageProps) {
   const inactive = useMemo(() => (query.data ?? []).filter((stage) => !stage.is_active), [query.data]);
   const [draft, setDraft] = useState<ConstructionStageRow[] | null>(null);
   const stages = draft ?? serverActive;
-  const dirty = draft !== null && (draft.length !== serverActive.length || draft.some((stage, index) => stage.id !== serverActive[index]?.id));
+  const dirty =
+    draft !== null &&
+    (draft.length !== serverActive.length || draft.some((stage, index) => stage.id !== serverActive[index]?.id));
 
   // Drop a stale draft when the server list changes (someone saved or a stage was added).
   const serverIds = serverActive.map((stage) => stage.id).join("|");
-  useEffect(() => {
-    setDraft(null);
-  }, [serverIds]);
+  useOnChange(serverIds, () => setDraft(null));
 
   const [editing, setEditing] = useState<{ open: boolean; row: MasterRow | null }>({ open: false, row: null });
   const [importOpen, setImportOpen] = useState(false);
@@ -77,12 +90,20 @@ export function ConstructionStagesPage({ config }: MasterPageProps) {
 
   const setPossession = useMutationWithToast<ConstructionStageRow, ConstructionStageRow>({
     mutationFn: async (stage) => {
-      const updated = await api.patch<ConstructionStageRow>(`${path}/${stage.id}`, { is_possession: true, version: stage.version }, { version: stage.version });
+      const updated = await api.patch<ConstructionStageRow>(
+        `${path}/${stage.id}`,
+        { is_possession: true, version: stage.version },
+        { version: stage.version },
+      );
       // Exactly one possession stage: clear any other flag the server left in place.
       const fresh = await api.list<ConstructionStageRow>(path, { page_size: 200, sort: "sort_order" });
       const others = fresh.items.filter((item) => item.is_possession && item.id !== stage.id);
       for (const other of others) {
-        await api.patch<ConstructionStageRow>(`${path}/${other.id}`, { is_possession: false, version: other.version }, { version: other.version });
+        await api.patch<ConstructionStageRow>(
+          `${path}/${other.id}`,
+          { is_possession: false, version: other.version },
+          { version: other.version },
+        );
       }
       return updated;
     },
@@ -122,7 +143,8 @@ export function ConstructionStagesPage({ config }: MasterPageProps) {
   };
 
   const onHandlePointerUp = (event: ReactPointerEvent<HTMLButtonElement>) => {
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    if (event.currentTarget.hasPointerCapture(event.pointerId))
+      event.currentTarget.releasePointerCapture(event.pointerId);
     setDragging(null);
   };
 
@@ -143,7 +165,11 @@ export function ConstructionStagesPage({ config }: MasterPageProps) {
               <Button variant="outline" onClick={() => setImportOpen(true)} data-testid="master-import-csv-btn">
                 Import CSV
               </Button>
-              <Button leftIcon={Plus} onClick={() => setEditing({ open: true, row: null })} data-testid="master-new-btn">
+              <Button
+                leftIcon={Plus}
+                onClick={() => setEditing({ open: true, row: null })}
+                data-testid="master-new-btn"
+              >
                 New stage
               </Button>
             </>
@@ -153,19 +179,48 @@ export function ConstructionStagesPage({ config }: MasterPageProps) {
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-3 text-xs text-ink-subtle">
-          <Switch size="sm" label="Show inactive" checked={showInactive} onCheckedChange={setShowInactive} data-testid="stages-include-inactive-switch" />
+          <Switch
+            size="sm"
+            label="Show inactive"
+            checked={showInactive}
+            onCheckedChange={setShowInactive}
+            data-testid="stages-include-inactive-switch"
+          />
           {query.data && (
-            <span className={cn("inline-flex items-center gap-1 font-medium", possessionCount === 1 ? "text-success-fg" : "text-danger-fg")} role="status">
-              {possessionCount === 1 ? "Possession stage set" : possessionCount === 0 ? "No possession stage flagged" : `${possessionCount} stages flagged as possession — keep exactly one`}
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 font-medium",
+                possessionCount === 1 ? "text-success-fg" : "text-danger-fg",
+              )}
+              role="status"
+            >
+              {possessionCount === 1
+                ? "Possession stage set"
+                : possessionCount === 0
+                  ? "No possession stage flagged"
+                  : `${possessionCount} stages flagged as possession — keep exactly one`}
             </span>
           )}
         </div>
         {dirty && canWrite && (
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" leftIcon={RotateCcw} onClick={() => setDraft(null)} disabled={reorder.isPending}>
+            <Button
+              variant="ghost"
+              size="sm"
+              leftIcon={RotateCcw}
+              onClick={() => setDraft(null)}
+              disabled={reorder.isPending}
+            >
               Discard
             </Button>
-            <Button size="sm" variant="gold" leftIcon={Save} loading={reorder.isPending} onClick={() => reorder.mutate(stages.map((stage) => stage.id))} data-testid="stages-save-order-btn">
+            <Button
+              size="sm"
+              variant="gold"
+              leftIcon={Save}
+              loading={reorder.isPending}
+              onClick={() => reorder.mutate(stages.map((stage) => stage.id))}
+              data-testid="stages-save-order-btn"
+            >
               Save order
             </Button>
           </div>
@@ -191,7 +246,13 @@ export function ConstructionStagesPage({ config }: MasterPageProps) {
             icon={Hammer}
             title="No construction stages yet"
             description="Add the physical stages in order (Excavation → … → Possession) and flag the one that triggers possession."
-            action={canWrite ? <Button leftIcon={Plus} onClick={() => setEditing({ open: true, row: null })}>New stage</Button> : undefined}
+            action={
+              canWrite ? (
+                <Button leftIcon={Plus} onClick={() => setEditing({ open: true, row: null })}>
+                  New stage
+                </Button>
+              ) : undefined
+            }
           />
         )}
         {query.data && (stages.length > 0 || inactive.length > 0) && (
@@ -203,7 +264,11 @@ export function ConstructionStagesPage({ config }: MasterPageProps) {
                   if (node) itemRefs.current.set(stage.id, node);
                   else itemRefs.current.delete(stage.id);
                 }}
-                className={cn("flex min-h-10 items-center gap-2 px-2 py-1.5 sm:gap-3 sm:px-3", dragging === stage.id && "bg-gold-light/60", !stage.is_active && "opacity-60")}
+                className={cn(
+                  "flex min-h-10 items-center gap-2 px-2 py-1.5 sm:gap-3 sm:px-3",
+                  dragging === stage.id && "bg-gold-light/60",
+                  !stage.is_active && "opacity-60",
+                )}
                 data-testid={`stage-row-${stage.id}`}
               >
                 <button
@@ -214,22 +279,37 @@ export function ConstructionStagesPage({ config }: MasterPageProps) {
                   onPointerMove={onHandlePointerMove}
                   onPointerUp={onHandlePointerUp}
                   onPointerCancel={onHandlePointerUp}
-                  className={cn("hidden size-7 shrink-0 touch-none items-center justify-center rounded-sm text-ink-subtle focus-ring sm:flex", canWrite ? "cursor-grab hover:bg-navy-50 hover:text-navy-950 active:cursor-grabbing" : "cursor-default opacity-40")}
+                  className={cn(
+                    "hidden size-7 shrink-0 touch-none items-center justify-center rounded-sm text-ink-subtle focus-ring sm:flex",
+                    canWrite
+                      ? "cursor-grab hover:bg-navy-50 hover:text-navy-950 active:cursor-grabbing"
+                      : "cursor-default opacity-40",
+                  )}
                 >
                   <GripVertical className="size-4" aria-hidden="true" />
                 </button>
-                <span className="money flex size-7 shrink-0 items-center justify-center rounded-full bg-navy-950 text-xs font-bold text-white">{index + 1}</span>
+                <span className="money flex size-7 shrink-0 items-center justify-center rounded-full bg-navy-950 text-xs font-bold text-white">
+                  {index + 1}
+                </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex min-w-0 items-center gap-2">
                     <span className="truncate text-sm font-semibold text-navy-950">{stage.name}</span>
-                    <code className="hidden rounded-xs bg-navy-50 px-1 py-0.5 font-mono text-2xs text-navy-950 sm:inline">{stage.code}</code>
+                    <code className="hidden rounded-xs bg-navy-50 px-1 py-0.5 font-mono text-2xs text-navy-950 sm:inline">
+                      {stage.code}
+                    </code>
                     {stage.is_possession && <Badge variant="gold">Possession</Badge>}
                   </div>
                   <span className="money block text-2xs text-ink-subtle sm:hidden">
                     {stage.code} · order {stage.sort_order}
                   </span>
                 </div>
-                <label className={cn("hidden items-center gap-1.5 text-xs text-ink-muted sm:inline-flex", canWrite ? "cursor-pointer" : "cursor-default")} title="Possession stage">
+                <label
+                  className={cn(
+                    "hidden items-center gap-1.5 text-xs text-ink-muted sm:inline-flex",
+                    canWrite ? "cursor-pointer" : "cursor-default",
+                  )}
+                  title="Possession stage"
+                >
                   <input
                     type="radio"
                     name="possession-stage"
@@ -243,13 +323,32 @@ export function ConstructionStagesPage({ config }: MasterPageProps) {
                 </label>
                 {canWrite && (
                   <div className="hidden items-center sm:flex">
-                    <IconButton icon={ArrowUp} label="Move up" size="xs" disabled={index === 0} onClick={() => move(index, index - 1)} data-testid={`stage-up-${stage.id}`} />
-                    <IconButton icon={ArrowDown} label="Move down" size="xs" disabled={index === stages.length - 1} onClick={() => move(index, index + 1)} data-testid={`stage-down-${stage.id}`} />
+                    <IconButton
+                      icon={ArrowUp}
+                      label="Move up"
+                      size="xs"
+                      disabled={index === 0}
+                      onClick={() => move(index, index - 1)}
+                      data-testid={`stage-up-${stage.id}`}
+                    />
+                    <IconButton
+                      icon={ArrowDown}
+                      label="Move down"
+                      size="xs"
+                      disabled={index === stages.length - 1}
+                      onClick={() => move(index, index + 1)}
+                      data-testid={`stage-down-${stage.id}`}
+                    />
                   </div>
                 )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <IconButton icon={MoreHorizontal} label={`Actions for ${stage.name}`} size="sm" data-testid={`row-actions-${stage.id}`} />
+                    <IconButton
+                      icon={MoreHorizontal}
+                      label={`Actions for ${stage.name}`}
+                      size="sm"
+                      data-testid={`row-actions-${stage.id}`}
+                    />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     {canWrite && (
@@ -257,10 +356,18 @@ export function ConstructionStagesPage({ config }: MasterPageProps) {
                         <DropdownMenuItem onSelect={() => setEditing({ open: true, row: stage })}>
                           <Pencil /> Edit
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="sm:hidden" disabled={index === 0} onSelect={() => move(index, index - 1)}>
+                        <DropdownMenuItem
+                          className="sm:hidden"
+                          disabled={index === 0}
+                          onSelect={() => move(index, index - 1)}
+                        >
                           <ArrowUp /> Move up
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="sm:hidden" disabled={index === stages.length - 1} onSelect={() => move(index, index + 1)}>
+                        <DropdownMenuItem
+                          className="sm:hidden"
+                          disabled={index === stages.length - 1}
+                          onSelect={() => move(index, index + 1)}
+                        >
                           <ArrowDown /> Move down
                         </DropdownMenuItem>
                         {!stage.is_possession && (
@@ -286,19 +393,32 @@ export function ConstructionStagesPage({ config }: MasterPageProps) {
               </li>
             ))}
             {inactive.map((stage) => (
-              <li key={stage.id} className="flex min-h-10 items-center gap-2 bg-surface/60 px-2 py-1.5 sm:gap-3 sm:px-3" data-testid={`stage-row-${stage.id}`}>
+              <li
+                key={stage.id}
+                className="flex min-h-10 items-center gap-2 bg-surface/60 px-2 py-1.5 sm:gap-3 sm:px-3"
+                data-testid={`stage-row-${stage.id}`}
+              >
                 <span className="hidden size-7 sm:block" aria-hidden="true" />
-                <span className="money flex size-7 shrink-0 items-center justify-center rounded-full bg-border text-xs font-bold text-ink-muted">–</span>
+                <span className="money flex size-7 shrink-0 items-center justify-center rounded-full bg-border text-xs font-bold text-ink-muted">
+                  –
+                </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex min-w-0 items-center gap-2">
                     <span className="truncate text-sm font-medium text-ink-muted">{stage.name}</span>
-                    <code className="hidden rounded-xs bg-navy-50 px-1 py-0.5 font-mono text-2xs text-ink-muted sm:inline">{stage.code}</code>
+                    <code className="hidden rounded-xs bg-navy-50 px-1 py-0.5 font-mono text-2xs text-ink-muted sm:inline">
+                      {stage.code}
+                    </code>
                     <StatusChip status="INACTIVE" size="sm" />
                   </div>
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <IconButton icon={MoreHorizontal} label={`Actions for ${stage.name}`} size="sm" data-testid={`row-actions-${stage.id}`} />
+                    <IconButton
+                      icon={MoreHorizontal}
+                      label={`Actions for ${stage.name}`}
+                      size="sm"
+                      data-testid={`row-actions-${stage.id}`}
+                    />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem onSelect={() => setUsageRow(stage)}>
@@ -316,7 +436,10 @@ export function ConstructionStagesPage({ config }: MasterPageProps) {
           </ol>
         )}
       </Card>
-      <p className="mt-2 text-xs text-ink-subtle">Drag the handle or use the arrows to reorder, then save. Towers snapshot this sequence when they are created; existing towers keep theirs.</p>
+      <p className="mt-2 text-xs text-ink-subtle">
+        Drag the handle or use the arrows to reorder, then save. Towers snapshot this sequence when they are created;
+        existing towers keep theirs.
+      </p>
 
       <MasterFormSheet
         config={{ ...config, defaults: () => ({ ...config.defaults(), sort_order: nextSortOrder }) }}
@@ -326,13 +449,29 @@ export function ConstructionStagesPage({ config }: MasterPageProps) {
         onSaved={() => void queryClient.invalidateQueries({ queryKey: [path] })}
       />
       <CsvImportDialog config={config} open={importOpen} onOpenChange={setImportOpen} />
-      <UsageDialog config={config} row={usageRow} open={usageRow !== null} onOpenChange={(open) => !open && setUsageRow(null)} />
-      <UsageDialog config={config} row={inUse?.row ?? null} preset={inUse?.usage ?? null} blocked open={inUse !== null} onOpenChange={(open) => !open && clearInUse()} />
+      <UsageDialog
+        config={config}
+        row={usageRow}
+        open={usageRow !== null}
+        onOpenChange={(open) => !open && setUsageRow(null)}
+      />
+      <UsageDialog
+        config={config}
+        row={inUse?.row ?? null}
+        preset={inUse?.usage ?? null}
+        blocked
+        open={inUse !== null}
+        onOpenChange={(open) => !open && clearInUse()}
+      />
       <ConfirmDialog
         open={confirmDeactivate !== null}
         onOpenChange={(open) => !open && setConfirmDeactivate(null)}
         title="Deactivate stage?"
-        description={confirmDeactivate ? `${confirmDeactivate.name} will be removed from the sequence new towers snapshot. Towers already built keep it.` : undefined}
+        description={
+          confirmDeactivate
+            ? `${confirmDeactivate.name} will be removed from the sequence new towers snapshot. Towers already built keep it.`
+            : undefined
+        }
         confirmLabel="Deactivate"
         variant="destructive"
         onConfirm={async () => {

@@ -48,22 +48,39 @@ export function FileViewerHost(): React.JSX.Element | null {
               {file.file_name}
             </Text>
             <View style={styles.actions}>
-              <Pressable accessibilityRole="button" onPress={() => window.open(file.download_url, "_blank", "noopener,noreferrer")} style={styles.action}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => window.open(file.download_url, "_blank", "noopener,noreferrer")}
+                style={styles.action}
+              >
                 <Text style={styles.actionText}>Open in new tab</Text>
               </Pressable>
               <Pressable accessibilityRole="button" onPress={() => void downloadAndShare(file)} style={styles.action}>
                 <Text style={styles.actionText}>Download</Text>
               </Pressable>
-              <Pressable accessibilityRole="button" accessibilityLabel="Close viewer" onPress={() => setFile(null)} style={[styles.action, styles.close]}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Close viewer"
+                onPress={() => setFile(null)}
+                style={[styles.action, styles.close]}
+              >
                 <Text style={styles.closeText}>✕</Text>
               </Pressable>
             </View>
           </View>
           <View style={styles.body}>
             {isImage ? (
-              <img src={file.download_url} alt={file.file_name} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", margin: "auto" }} />
+              <img
+                src={file.download_url}
+                alt={file.file_name}
+                style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", margin: "auto" }}
+              />
             ) : (
-              <iframe title={file.file_name} src={file.download_url} style={{ border: 0, width: "100%", height: "100%", background: "#fff" }} />
+              <iframe
+                title={file.file_name}
+                src={file.download_url}
+                style={{ border: 0, width: "100%", height: "100%", background: "#fff" }}
+              />
             )}
           </View>
         </View>
@@ -73,12 +90,39 @@ export function FileViewerHost(): React.JSX.Element | null {
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: colors.overlay, padding: space.lg, alignItems: "center", justifyContent: "center" },
-  sheet: { width: "100%", maxWidth: 1100, height: "100%", maxHeight: 900, backgroundColor: colors.ivory, borderRadius: radius.lg, overflow: "hidden" },
-  bar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: space.md, paddingHorizontal: space.lg, paddingVertical: space.md, backgroundColor: colors.navy },
+  backdrop: {
+    flex: 1,
+    backgroundColor: colors.overlay,
+    padding: space.lg,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sheet: {
+    width: "100%",
+    maxWidth: 1100,
+    height: "100%",
+    maxHeight: 900,
+    backgroundColor: colors.ivory,
+    borderRadius: radius.lg,
+    overflow: "hidden",
+  },
+  bar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: space.md,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.md,
+    backgroundColor: colors.navy,
+  },
   title: { flex: 1, color: colors.onNavy, fontFamily: fonts.body, fontSize: 15, fontWeight: "600" },
   actions: { flexDirection: "row", gap: space.sm, alignItems: "center" },
-  action: { paddingHorizontal: space.md, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: "rgba(255,255,255,0.12)" },
+  action: {
+    paddingHorizontal: space.md,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    backgroundColor: "rgba(255,255,255,0.12)",
+  },
   actionText: { color: colors.onNavy, fontFamily: fonts.body, fontSize: 13, fontWeight: "600" },
   close: { backgroundColor: colors.gold },
   closeText: { color: colors.navy, fontWeight: "700", fontSize: 14 },

@@ -1,7 +1,19 @@
 import { useEffect, useId, useMemo, useState } from "react";
 import { FormProvider, useForm, type FieldValues } from "react-hook-form";
 import type { MasterRow } from "@kkt/contracts";
-import { applyServerErrors, Badge, Button, FormError, Sheet, SheetBody, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui";
+import {
+  applyServerErrors,
+  Badge,
+  Button,
+  FormError,
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui";
 import { api, type ApiClientError } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { useMutationWithToast } from "@/lib/queries";
@@ -10,6 +22,7 @@ import { businessRuleIssues, type BusinessRuleIssue } from "@/features/shared/er
 import { GenericFields } from "./GenericFields";
 import { masterPath } from "./api";
 import type { AnyMasterConfig } from "./types";
+import { useOnChange } from "@/lib/utils";
 
 export interface MasterFormSheetProps {
   config: AnyMasterConfig;
@@ -47,13 +60,17 @@ export function MasterFormSheet({ config, open, onOpenChange, row, onSaved }: Ma
 
   const rowId = row?.id ?? null;
   const rowVersion = row?.version ?? null;
+  // Local state resets while rendering; react-hook-form's reset (an external store) stays in the effect below.
+  useOnChange(open ? `${config.kind}:${rowId}:${rowVersion}` : null, (key) => {
+    if (key === null) return;
+    setIssues([]);
+    setServerError(null);
+  });
   useEffect(() => {
     if (!open) return;
     form.reset(row ? config.toValues(row) : config.defaults());
-    setIssues([]);
-    setServerError(null);
     // Reset whenever the drawer opens for a (different) record or a newer version of it.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the record identity, not on every render's objects
   }, [open, rowId, rowVersion, config.kind]);
 
   const handleError = (error: ApiClientError) => {
@@ -83,7 +100,8 @@ export function MasterFormSheet({ config, open, onOpenChange, row, onSaved }: Ma
   });
 
   const update = useMutationWithToast<MasterRow, UpdateVariables>({
-    mutationFn: ({ id, version, body }) => api.patch<MasterRow>(`${path}/${id}`, withVersion(body, version), { version }),
+    mutationFn: ({ id, version, body }) =>
+      api.patch<MasterRow>(`${path}/${id}`, withVersion(body, version), { version }),
     successMessage: `${config.singular} saved`,
     invalidate: [[path]],
     entityLabel: config.singular,
@@ -120,14 +138,19 @@ export function MasterFormSheet({ config, open, onOpenChange, row, onSaved }: Ma
               </Badge>
             )}
           </div>
-          <SheetDescription>{row ? `${config.displayName(row)} · updated ${formatDateTime(row.updated_at)}` : config.description}</SheetDescription>
+          <SheetDescription>
+            {row ? `${config.displayName(row)} · updated ${formatDateTime(row.updated_at)}` : config.description}
+          </SheetDescription>
         </SheetHeader>
         <FormProvider {...form}>
           <form id={formId} onSubmit={form.handleSubmit(submit)} className="flex min-h-0 flex-1 flex-col" noValidate>
             <SheetBody className="space-y-4">
               {serverError !== null && <FormError error={serverError} />}
               {issues.length > 0 && (
-                <div role="alert" className="rounded-md border border-danger/30 bg-danger-bg px-3 py-2 text-sm text-danger-fg">
+                <div
+                  role="alert"
+                  className="rounded-md border border-danger/30 bg-danger-bg px-3 py-2 text-sm text-danger-fg"
+                >
                   <p className="font-semibold">The server rejected this {config.singular.toLowerCase()}:</p>
                   <ul className="mt-1 list-disc space-y-0.5 pl-5">
                     {issues.map((issue, index) => (
@@ -142,7 +165,12 @@ export function MasterFormSheet({ config, open, onOpenChange, row, onSaved }: Ma
               {KindForm ? <KindForm mode={mode} row={row} /> : <GenericFields fields={config.fields ?? []} />}
             </SheetBody>
             <SheetFooter>
-              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy} data-testid="master-form-cancel-btn">
+              <Button
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                disabled={busy}
+                data-testid="master-form-cancel-btn"
+              >
                 Cancel
               </Button>
               <Button type="submit" loading={busy} data-testid="master-form-submit-btn">

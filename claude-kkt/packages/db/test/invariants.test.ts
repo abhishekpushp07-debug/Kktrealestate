@@ -1,6 +1,16 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createDb, type DbHandle } from "../src/client.js";
-import { bankAccounts, blockTypes, companies, constructionStages, demands, paymentPlanAssignments, projectWebsiteSettings, projects, rateCards } from "../src/schema/index.js";
+import {
+  bankAccounts,
+  blockTypes,
+  companies,
+  constructionStages,
+  demands,
+  paymentPlanAssignments,
+  projectWebsiteSettings,
+  projects,
+  rateCards,
+} from "../src/schema/index.js";
 import { TEST_DATABASE_URL } from "./env.js";
 import { createBooking, createFixture, type Fixture } from "./fixtures.js";
 import { rejectsWithPg } from "./util.js";
@@ -45,7 +55,9 @@ describe("database-enforced invariants", () => {
       dueDate: "2025-06-16",
     };
     const insert = (demandNumber: string, status: "OPEN" | "PAID" | "VOID", installmentSeq = 1) =>
-      handle.db.insert(demands).values({ ...base, demandNumber, status, installmentSeq, voidReason: status === "VOID" ? "undo" : null });
+      handle.db
+        .insert(demands)
+        .values({ ...base, demandNumber, status, installmentSeq, voidReason: status === "VOID" ? "undo" : null });
 
     await insert("DM-2526/0001", "OPEN");
     await rejectsWithPg(insert("DM-2526/0002", "OPEN"), UNIQUE_VIOLATION);
@@ -79,13 +91,19 @@ describe("database-enforced invariants", () => {
     await rejectsWithPg(handle.db.insert(bankAccounts).values({ ...acct, isDefault: true }), UNIQUE_VIOLATION);
     await expect(handle.db.insert(bankAccounts).values({ ...acct, isDefault: false })).resolves.toBeDefined();
 
-    await handle.db.insert(constructionStages).values({ companyId: fx.companyId, name: "Possession", code: "POSSESSION", isPossession: true });
+    await handle.db
+      .insert(constructionStages)
+      .values({ companyId: fx.companyId, name: "Possession", code: "POSSESSION", isPossession: true });
     await rejectsWithPg(
-      handle.db.insert(constructionStages).values({ companyId: fx.companyId, name: "Handover", code: "HANDOVER", isPossession: true }),
+      handle.db
+        .insert(constructionStages)
+        .values({ companyId: fx.companyId, name: "Handover", code: "HANDOVER", isPossession: true }),
       UNIQUE_VIOLATION,
     );
     await expect(
-      handle.db.insert(constructionStages).values({ companyId: fx.companyId, name: "Finishing", code: "FINISHING", isPossession: false }),
+      handle.db
+        .insert(constructionStages)
+        .values({ companyId: fx.companyId, name: "Finishing", code: "FINISHING", isPossession: false }),
     ).resolves.toBeDefined();
   });
 
@@ -93,35 +111,75 @@ describe("database-enforced invariants", () => {
     const row = { companyId: fx.companyId, planId: fx.planId, projectId: fx.projectId, blockId: null };
     await handle.db.insert(paymentPlanAssignments).values(row);
     await rejectsWithPg(handle.db.insert(paymentPlanAssignments).values(row), UNIQUE_VIOLATION);
-    await expect(handle.db.insert(paymentPlanAssignments).values({ ...row, blockId: fx.blockId })).resolves.toBeDefined();
+    await expect(
+      handle.db.insert(paymentPlanAssignments).values({ ...row, blockId: fx.blockId }),
+    ).resolves.toBeDefined();
   });
 
   it("scopes business-key uniqueness by company: the same code is fine in another company, a duplicate in the same company is not", async () => {
-    const [other] = await handle.db.insert(companies).values({ name: "Other Builders" }).returning({ id: companies.id });
+    const [other] = await handle.db
+      .insert(companies)
+      .values({ name: "Other Builders" })
+      .returning({ id: companies.id });
     if (!other) throw new Error("company insert failed");
-    await expect(handle.db.insert(blockTypes).values({ companyId: other.id, name: "Tower", code: "TOWER" })).resolves.toBeDefined();
-    await expect(handle.db.insert(blockTypes).values({ companyId: fx.companyId, name: "Tower", code: "TOWER" })).resolves.toBeDefined();
-    await rejectsWithPg(handle.db.insert(blockTypes).values({ companyId: fx.companyId, name: "Tower 2", code: "TOWER" }), UNIQUE_VIOLATION);
-    await expect(handle.db.insert(projects).values({ companyId: other.id, name: "Twin", code: "PRJ-TWIN" })).resolves.toBeDefined();
-    await expect(handle.db.insert(projects).values({ companyId: fx.companyId, name: "Twin", code: "PRJ-TWIN" })).resolves.toBeDefined();
-    await rejectsWithPg(handle.db.insert(projects).values({ companyId: fx.companyId, name: "Twin 2", code: "PRJ-TWIN" }), UNIQUE_VIOLATION);
+    await expect(
+      handle.db.insert(blockTypes).values({ companyId: other.id, name: "Tower", code: "TOWER" }),
+    ).resolves.toBeDefined();
+    await expect(
+      handle.db.insert(blockTypes).values({ companyId: fx.companyId, name: "Tower", code: "TOWER" }),
+    ).resolves.toBeDefined();
+    await rejectsWithPg(
+      handle.db.insert(blockTypes).values({ companyId: fx.companyId, name: "Tower 2", code: "TOWER" }),
+      UNIQUE_VIOLATION,
+    );
+    await expect(
+      handle.db.insert(projects).values({ companyId: other.id, name: "Twin", code: "PRJ-TWIN" }),
+    ).resolves.toBeDefined();
+    await expect(
+      handle.db.insert(projects).values({ companyId: fx.companyId, name: "Twin", code: "PRJ-TWIN" }),
+    ).resolves.toBeDefined();
+    await rejectsWithPg(
+      handle.db.insert(projects).values({ companyId: fx.companyId, name: "Twin 2", code: "PRJ-TWIN" }),
+      UNIQUE_VIOLATION,
+    );
     // a second possession stage is fine in another company (the partial unique is per company)
     await expect(
-      handle.db.insert(constructionStages).values({ companyId: other.id, name: "Possession", code: "POSSESSION", isPossession: true }),
+      handle.db
+        .insert(constructionStages)
+        .values({ companyId: other.id, name: "Possession", code: "POSSESSION", isPossession: true }),
     ).resolves.toBeDefined();
   });
 
   it("website slugs are globally unique (they are URLs) while NULL slugs are allowed on many projects", async () => {
-    const [p1] = await handle.db.insert(projects).values({ companyId: fx.companyId, name: "Slug 1", code: "SLUG-1" }).returning({ id: projects.id });
-    const [p2] = await handle.db.insert(projects).values({ companyId: fx.companyId, name: "Slug 2", code: "SLUG-2" }).returning({ id: projects.id });
-    const [p3] = await handle.db.insert(projects).values({ companyId: fx.companyId, name: "Slug 3", code: "SLUG-3" }).returning({ id: projects.id });
+    const [p1] = await handle.db
+      .insert(projects)
+      .values({ companyId: fx.companyId, name: "Slug 1", code: "SLUG-1" })
+      .returning({ id: projects.id });
+    const [p2] = await handle.db
+      .insert(projects)
+      .values({ companyId: fx.companyId, name: "Slug 2", code: "SLUG-2" })
+      .returning({ id: projects.id });
+    const [p3] = await handle.db
+      .insert(projects)
+      .values({ companyId: fx.companyId, name: "Slug 3", code: "SLUG-3" })
+      .returning({ id: projects.id });
     if (!p1 || !p2 || !p3) throw new Error("project insert failed");
     await handle.db.insert(projectWebsiteSettings).values({ projectId: p1.id, slug: "ganesh-heights" });
-    await rejectsWithPg(handle.db.insert(projectWebsiteSettings).values({ projectId: p2.id, slug: "ganesh-heights" }), UNIQUE_VIOLATION);
-    await expect(handle.db.insert(projectWebsiteSettings).values({ projectId: p2.id, slug: null })).resolves.toBeDefined();
-    await expect(handle.db.insert(projectWebsiteSettings).values({ projectId: p3.id, slug: null })).resolves.toBeDefined();
+    await rejectsWithPg(
+      handle.db.insert(projectWebsiteSettings).values({ projectId: p2.id, slug: "ganesh-heights" }),
+      UNIQUE_VIOLATION,
+    );
+    await expect(
+      handle.db.insert(projectWebsiteSettings).values({ projectId: p2.id, slug: null }),
+    ).resolves.toBeDefined();
+    await expect(
+      handle.db.insert(projectWebsiteSettings).values({ projectId: p3.id, slug: null }),
+    ).resolves.toBeDefined();
     // one settings row per project
-    await rejectsWithPg(handle.db.insert(projectWebsiteSettings).values({ projectId: p1.id, slug: "other" }), UNIQUE_VIOLATION);
+    await rejectsWithPg(
+      handle.db.insert(projectWebsiteSettings).values({ projectId: p1.id, slug: "other" }),
+      UNIQUE_VIOLATION,
+    );
   });
 
   it("enforces slot_minutes IN (30, 60) and rating 1..5 (NULL rating allowed)", async () => {
@@ -129,13 +187,20 @@ describe("database-enforced invariants", () => {
       handle.sql`INSERT INTO project_visit_settings (project_id, slot_minutes) VALUES (${fx.projectId}, 45)`,
       /project_visit_settings_slot_minutes_chk/,
     );
-    await expect(handle.sql`INSERT INTO project_visit_settings (project_id, slot_minutes) VALUES (${fx.projectId}, 30)`).resolves.toBeDefined();
-    const [category] = await handle.sql<{ id: string }[]>`INSERT INTO service_categories (company_id, name) VALUES (${fx.companyId}, 'Defect/Snag') RETURNING id`;
+    await expect(
+      handle.sql`INSERT INTO project_visit_settings (project_id, slot_minutes) VALUES (${fx.projectId}, 30)`,
+    ).resolves.toBeDefined();
+    const [category] = await handle.sql<
+      { id: string }[]
+    >`INSERT INTO service_categories (company_id, name) VALUES (${fx.companyId}, 'Defect/Snag') RETURNING id`;
     const ticket = (n: number, rating: number | null) =>
       handle.sql`INSERT INTO service_requests (company_id, ticket_number, customer_id, category_id, subject, rating)
                  VALUES (${fx.companyId}, ${"SR-" + String(n)}, ${fx.customerId}, ${category!.id}, 'Leak', ${rating})`;
     // category_id is NOT NULL (docs/TODO-integration.md item 11)
-    await rejectsWithPg(handle.sql`INSERT INTO service_requests (company_id, ticket_number, customer_id, subject) VALUES (${fx.companyId}, 'SR-0', ${fx.customerId}, 'No category')`, /category_id/);
+    await rejectsWithPg(
+      handle.sql`INSERT INTO service_requests (company_id, ticket_number, customer_id, subject) VALUES (${fx.companyId}, 'SR-0', ${fx.customerId}, 'No category')`,
+      /category_id/,
+    );
     await rejectsWithPg(ticket(1, 0), /service_requests_rating_chk/);
     await rejectsWithPg(ticket(2, 6), /service_requests_rating_chk/);
     await expect(ticket(3, 5)).resolves.toBeDefined();

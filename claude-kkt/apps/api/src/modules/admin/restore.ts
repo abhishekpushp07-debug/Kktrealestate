@@ -35,7 +35,10 @@ export interface RestoreOptions {
 
 /** Outcome of restoreBackup(). */
 export interface RestoreResult {
-  manifest: Pick<BackupManifest, "format" | "generated_at" | "app_version" | "company" | "include_sensitive" | "schema" | "table_count" | "row_count">;
+  manifest: Pick<
+    BackupManifest,
+    "format" | "generated_at" | "app_version" | "company" | "include_sensitive" | "schema" | "table_count" | "row_count"
+  >;
   tables: { name: string; expected: number; restored: number }[];
   load_order: string[];
   integrity: { company_id: string; ok: boolean; findings: number }[];
@@ -88,8 +91,12 @@ export async function readZipText(file: string, name: string): Promise<string> {
 }
 
 /** Columns of every public table in the target: name → { columns, required secret-less columns }. */
-async function targetColumns(pg: Sql): Promise<Map<string, Map<string, { notNull: boolean; hasDefault: boolean; type: string }>>> {
-  const rows = await pg<{ table_name: string; column_name: string; is_nullable: string; column_default: string | null; data_type: string }[]>`
+async function targetColumns(
+  pg: Sql,
+): Promise<Map<string, Map<string, { notNull: boolean; hasDefault: boolean; type: string }>>> {
+  const rows = await pg<
+    { table_name: string; column_name: string; is_nullable: string; column_default: string | null; data_type: string }[]
+  >`
     select table_name, column_name, is_nullable, column_default, data_type from information_schema.columns where table_schema = 'public'`;
   const out = new Map<string, Map<string, { notNull: boolean; hasDefault: boolean; type: string }>>();
   for (const r of rows) {
@@ -104,7 +111,9 @@ const ident = (s: string) => `"${s.replace(/"/g, '""')}"`;
 
 /** Public tables of the target that hold at least one row. */
 async function nonEmptyTables(pg: Sql): Promise<string[]> {
-  const tables = await pg<{ name: string }[]>`select tablename as name from pg_tables where schemaname = 'public' order by tablename`;
+  const tables = await pg<
+    { name: string }[]
+  >`select tablename as name from pg_tables where schemaname = 'public' order by tablename`;
   const out: string[] = [];
   for (const { name } of tables) {
     const [r] = await pg.unsafe<{ any: boolean }[]>(`select exists(select 1 from ${ident(name)}) as any`);
@@ -114,7 +123,9 @@ async function nonEmptyTables(pg: Sql): Promise<string[]> {
 }
 
 function notEmpty(tables: readonly string[]): Error {
-  return new Error(`the target database is not empty (${tables.slice(0, 5).join(", ")}${tables.length > 5 ? ", …" : ""}); restore into a new database`);
+  return new Error(
+    `the target database is not empty (${tables.slice(0, 5).join(", ")}${tables.length > 5 ? ", …" : ""}); restore into a new database`,
+  );
 }
 
 /** Restores a backup archive into an empty database. Throws (writing nothing) on any failed check. */
@@ -127,14 +138,16 @@ export async function restoreBackup(opts: RestoreOptions): Promise<RestoreResult
     const manifestEntry = entries.get("manifest.json");
     if (!manifestEntry) throw new Error("manifest.json is missing: not a KKT backup");
     const manifest = JSON.parse(await entryText(zip, manifestEntry)) as BackupManifest;
-    if (manifest.format !== BACKUP_FORMAT) throw new Error(`unsupported backup format ${manifest.format} (this build restores ${BACKUP_FORMAT})`);
+    if (manifest.format !== BACKUP_FORMAT)
+      throw new Error(`unsupported backup format ${manifest.format} (this build restores ${BACKUP_FORMAT})`);
 
     // 1. integrity of the archive
     log(`verifying ${manifest.tables.length + Object.keys(manifest.files ?? {}).length} checksums`);
     for (const t of manifest.tables) {
       const e = entries.get(t.file);
       if (!e) throw new Error(`${t.file} listed in manifest.json is missing from the archive`);
-      if ((await entrySha256(zip, e)) !== t.sha256) throw new Error(`checksum mismatch for ${t.file}: the archive is corrupt or was modified`);
+      if ((await entrySha256(zip, e)) !== t.sha256)
+        throw new Error(`checksum mismatch for ${t.file}: the archive is corrupt or was modified`);
     }
     for (const [name, sum] of Object.entries(manifest.files ?? {})) {
       const e = entries.get(name);
@@ -142,7 +155,9 @@ export async function restoreBackup(opts: RestoreOptions): Promise<RestoreResult
     }
     const stripped = manifest.tables.filter((t) => t.stripped_columns.length > 0);
     if (!manifest.include_sensitive && stripped.length > 0 && !opts.allowStripped) {
-      throw new Error("this backup was made without include_sensitive (no password hashes, MFA secrets or encrypted KYC); pass --allow-stripped to restore it anyway (users must then reset their passwords)");
+      throw new Error(
+        "this backup was made without include_sensitive (no password hashes, MFA secrets or encrypted KYC); pass --allow-stripped to restore it anyway (users must then reset their passwords)",
+      );
     }
 
     // 2. target: must be empty BEFORE anything touches it (never migrate someone else's database), then migrate; the schema must not be
@@ -155,8 +170,14 @@ export async function restoreBackup(opts: RestoreOptions): Promise<RestoreResult
       log("migrating the target database");
       await runMigrations(opts.databaseUrl);
       const version = await schemaVersion(pg);
-      if (manifest.schema.migrations_applied !== null && version.migrations_applied !== null && version.migrations_applied < manifest.schema.migrations_applied) {
-        throw new Error(`the target schema (${version.migrations_applied} migrations) is older than the backup's (${manifest.schema.migrations_applied}); restore with the same or a newer application version`);
+      if (
+        manifest.schema.migrations_applied !== null &&
+        version.migrations_applied !== null &&
+        version.migrations_applied < manifest.schema.migrations_applied
+      ) {
+        throw new Error(
+          `the target schema (${version.migrations_applied} migrations) is older than the backup's (${manifest.schema.migrations_applied}); restore with the same or a newer application version`,
+        );
       }
       const columns = await targetColumns(pg);
       // the migrations themselves must not have written rows either
@@ -176,11 +197,23 @@ export async function restoreBackup(opts: RestoreOptions): Promise<RestoreResult
           const cols = t.columns.filter((c) => target.has(c));
           const unknown = t.columns.filter((c) => !target.has(c));
           if (unknown.length > 0) throw new Error(`${name}: the target has no column ${unknown.join(", ")}`);
-          const fills = opts.allowStripped ? t.stripped_columns.filter((c) => { const col = target.get(c); return col && col.notNull && !col.hasDefault; }) : [];
-          for (const c of fills) if (!["text", "character varying"].includes(target.get(c)!.type)) throw new Error(`${name}.${c} is a required stripped column of type ${target.get(c)!.type}; it cannot be filled`);
+          const fills = opts.allowStripped
+            ? t.stripped_columns.filter((c) => {
+                const col = target.get(c);
+                return col && col.notNull && !col.hasDefault;
+              })
+            : [];
+          for (const c of fills)
+            if (!["text", "character varying"].includes(target.get(c)!.type))
+              throw new Error(
+                `${name}.${c} is a required stripped column of type ${target.get(c)!.type}; it cannot be filled`,
+              );
           const insertCols = [...cols, ...fills].map(ident).join(", ");
           // unique per row (token hashes carry unique indexes), never a valid hash or ciphertext
-          const selectCols = [...cols.map(ident), ...fills.map(() => `'${STRIPPED_MARKER}:' || gen_random_uuid()::text`)].join(", ");
+          const selectCols = [
+            ...cols.map(ident),
+            ...fills.map(() => `'${STRIPPED_MARKER}:' || gen_random_uuid()::text`),
+          ].join(", ");
           const statement = `insert into ${ident(name)} (${insertCols}) select ${selectCols} from json_populate_recordset(null::${ident(name)}, $1::json)`;
           const lines = createInterface({ input: await entryStream(zip, entries.get(t.file)!), crlfDelay: Infinity });
           let batch: string[] = [];
@@ -199,7 +232,8 @@ export async function restoreBackup(opts: RestoreOptions): Promise<RestoreResult
           await flush();
           const [count] = await tx.unsafe<{ n: number }[]>(`select count(*)::int as n from ${ident(name)}`);
           const n = Number(count?.n ?? 0);
-          if (n !== t.rows || restored !== t.rows) throw new Error(`${name}: expected ${t.rows} rows, loaded ${restored}, table has ${n}`);
+          if (n !== t.rows || restored !== t.rows)
+            throw new Error(`${name}: expected ${t.rows} rows, loaded ${restored}, table has ${n}`);
           tables.push({ name, expected: t.rows, restored: n });
           log(`${name}: ${n} rows`);
         }

@@ -2,17 +2,37 @@ import { ArrowLeft, ArrowRight, Check, History, Timer, Trash2, X } from "lucide-
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { BookingCreateSchema, FLAT_STATUS_LABELS, type BookingCreate, type BookingDraftRow, type BookingRow, type FlatStatus } from "@kkt/contracts";
+import {
+  BookingCreateSchema,
+  FLAT_STATUS_LABELS,
+  type BookingCreate,
+  type BookingDraftRow,
+  type BookingRow,
+  type FlatStatus,
+} from "@kkt/contracts";
 import { Button, ConfirmDialog, PageHeader, Stepper, type Step } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { formatDateTime, formatRelative, todayIST } from "@/lib/format";
 import { useMutationWithToast } from "@/lib/queries";
-import { BREAKPOINTS, cn, useMediaQuery } from "@/lib/utils";
+import { BREAKPOINTS, cn, useMediaQuery, useOnChange } from "@/lib/utils";
 import { useFlatDetail } from "@/features/inventory/api";
 import { Notice } from "@/features/inventory/components";
 import { BOOKINGS_PATH, bookingKeys, useApplicablePlans, useMyDrafts } from "../api";
-import { emptyWizardState, firstIncompleteStep, newDraftId, priceDeviationProblem, fromDraftPayload, toBookingCreatePayload, validateStep, WIZARD_STEPS, wizardHasContent, type StepErrors, type WizardState, type WizardStepId } from "../bookingMath";
+import {
+  emptyWizardState,
+  firstIncompleteStep,
+  newDraftId,
+  priceDeviationProblem,
+  fromDraftPayload,
+  toBookingCreatePayload,
+  validateStep,
+  WIZARD_STEPS,
+  wizardHasContent,
+  type StepErrors,
+  type WizardState,
+  type WizardStepId,
+} from "../bookingMath";
 import { StepAgreement } from "./StepAgreement";
 import { StepCharges } from "./StepCharges";
 import { StepCustomer } from "./StepCustomer";
@@ -21,7 +41,12 @@ import { StepPlan } from "./StepPlan";
 import { StepReview } from "./StepReview";
 import { SummaryRail } from "./SummaryRail";
 import { clearLocalDraft, readLocalDraft, useBookingDraft, type LocalDraft } from "./useBookingDraft";
-import { formatCountdown, RESERVE_MINUTES, useFlatReservation, type UseFlatReservationResult } from "./useFlatReservation";
+import {
+  formatCountdown,
+  RESERVE_MINUTES,
+  useFlatReservation,
+  type UseFlatReservationResult,
+} from "./useFlatReservation";
 import type { StepProps } from "./types";
 
 const STEP_META: Readonly<Record<WizardStepId, { label: string; description: string }>> = {
@@ -43,12 +68,28 @@ interface ResumeCandidate {
 }
 
 function candidateFromServer(row: BookingDraftRow): ResumeCandidate {
-  const parts = [row.project_name, row.flat_number ? `Flat ${row.flat_number}` : null, row.customer_name].filter(Boolean);
-  return { source: "server", id: row.id, step: row.step, payload: row.payload, updated_at: row.updated_at, label: parts.length ? parts.join(" · ") : "Unnamed draft" };
+  const parts = [row.project_name, row.flat_number ? `Flat ${row.flat_number}` : null, row.customer_name].filter(
+    Boolean,
+  );
+  return {
+    source: "server",
+    id: row.id,
+    step: row.step,
+    payload: row.payload,
+    updated_at: row.updated_at,
+    label: parts.length ? parts.join(" · ") : "Unnamed draft",
+  };
 }
 
 function candidateFromLocal(draft: LocalDraft): ResumeCandidate {
-  return { source: "local", id: draft.id, step: draft.step, payload: draft.payload, updated_at: draft.updated_at, label: "Draft saved on this device" };
+  return {
+    source: "local",
+    id: draft.id,
+    step: draft.step,
+    payload: draft.payload,
+    updated_at: draft.updated_at,
+    label: "Draft saved on this device",
+  };
 }
 
 /** Countdown of the wizard's hold on the picked flat, with extend / reserve-again. */
@@ -61,21 +102,39 @@ function ReservationBanner({ reservation }: { reservation: UseFlatReservationRes
         ? "border-danger/30 bg-danger-bg text-danger-fg"
         : "border-status-hold-border bg-warning-bg text-warning-fg";
   return (
-    <div role="status" aria-live="polite" className={cn("mb-4 flex flex-wrap items-center gap-2 rounded-md border px-3 py-2 text-sm", tone)} data-testid="wizard-reservation">
+    <div
+      role="status"
+      aria-live="polite"
+      className={cn("mb-4 flex flex-wrap items-center gap-2 rounded-md border px-3 py-2 text-sm", tone)}
+      data-testid="wizard-reservation"
+    >
       <Timer className="size-4 shrink-0" aria-hidden="true" />
       <span className="min-w-0 flex-1">
         {reservation.status === "reserving" && "Reserving this flat for you…"}
         {reservation.status === "held" && (
           <>
-            Flat held for you · <span className="money font-semibold" data-testid="wizard-reservation-countdown">{formatCountdown(reservation.secondsLeft)}</span> left
-            {reservation.holdUntil ? <span className="text-xs"> (until {formatDateTime(reservation.holdUntil)})</span> : null}. Nobody else can book it meanwhile.
+            Flat held for you ·{" "}
+            <span className="money font-semibold" data-testid="wizard-reservation-countdown">
+              {formatCountdown(reservation.secondsLeft)}
+            </span>{" "}
+            left
+            {reservation.holdUntil ? (
+              <span className="text-xs"> (until {formatDateTime(reservation.holdUntil)})</span>
+            ) : null}
+            . Nobody else can book it meanwhile.
           </>
         )}
-        {reservation.status === "expired" && "Your hold on this flat lapsed. Someone else may book it now — reserve it again to keep it."}
+        {reservation.status === "expired" &&
+          "Your hold on this flat lapsed. Someone else may book it now — reserve it again to keep it."}
         {reservation.status === "error" && `The flat could not be reserved: ${reservation.error ?? "unknown error"}`}
       </span>
       {reservation.status !== "reserving" && (
-        <Button size="xs" variant="outline" onClick={() => void reservation.extend()} data-testid="wizard-reservation-extend">
+        <Button
+          size="xs"
+          variant="outline"
+          onClick={() => void reservation.extend()}
+          data-testid="wizard-reservation-extend"
+        >
           {reservation.status === "held" ? `Extend to ${RESERVE_MINUTES} min` : "Reserve again"}
         </Button>
       )}
@@ -117,10 +176,14 @@ export default function BookingWizard() {
 
   // Prefilled flat → derive project / tower.
   const prefillFlat = useFlatDetail(params.get("flat_id"));
-  useEffect(() => {
-    if (!prefillFlat.data) return;
-    setState((previous) => (previous.flat_id === prefillFlat.data.id && (!previous.project_id || !previous.block_id) ? { ...previous, project_id: prefillFlat.data.project_id, block_id: prefillFlat.data.block_id } : previous));
-  }, [prefillFlat.data]);
+  useOnChange(prefillFlat.data, (flat) => {
+    if (!flat) return;
+    setState((previous) =>
+      previous.flat_id === flat.id && (!previous.project_id || !previous.block_id)
+        ? { ...previous, project_id: flat.project_id, block_id: flat.block_id }
+        : previous,
+    );
+  });
 
   // Resume candidates.
   const drafts = useMyDrafts(!resumed);
@@ -134,35 +197,49 @@ export default function BookingWizard() {
     return local && local.id !== draftId ? candidateFromLocal(local) : null;
   }, [drafts.data, drafts.isPending, drafts.isError, resumed, dismissedResume, draftId]);
 
-  // Explicit ?draft=<id> deep link.
-  useEffect(() => {
-    const wanted = params.get("draft");
-    if (!wanted || !drafts.data) return;
-    const row = drafts.data.find((draft) => draft.id === wanted);
-    if (row) resume(candidateFromServer(row));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drafts.data]);
-
-  const resume = (candidate: ResumeCandidate) => {
+  /** Restores the wizard's own state from a draft (safe while rendering: only this component's setters). */
+  const restore = (candidate: ResumeCandidate) => {
     const restored = fromDraftPayload(candidate.payload, today);
     setState(restored);
     setDraftId(candidate.id ?? newDraftId());
     setDraftPersisted(candidate.source === "server");
     setStepIndex(Math.min(Math.max(candidate.step - 1, 0), WIZARD_STEPS.length - 1));
     setResumed(true);
-    setParams(
-      (previous) => {
-        const next = new URLSearchParams(previous);
-        if (candidate.id) next.set("draft", candidate.id);
-        else next.delete("draft");
-        next.delete("customer_id");
-        next.delete("project_id");
-        next.delete("flat_id");
-        return next;
-      },
-      { replace: true },
-    );
   };
+  /** Points the URL at the resumed draft and drops the prefill parameters. */
+  const syncResumeUrl = useCallback(
+    (id: string | null) =>
+      setParams(
+        (previous) => {
+          const next = new URLSearchParams(previous);
+          if (id) next.set("draft", id);
+          else next.delete("draft");
+          next.delete("customer_id");
+          next.delete("project_id");
+          next.delete("flat_id");
+          return next;
+        },
+        { replace: true },
+      ),
+    [setParams],
+  );
+  const resume = (candidate: ResumeCandidate) => {
+    restore(candidate);
+    syncResumeUrl(candidate.id ?? null);
+  };
+
+  // Explicit ?draft=<id> deep link: restored while rendering once the drafts list arrives; the URL follows in an effect.
+  const [deepLinkedDraft, setDeepLinkedDraft] = useState<string | null>(null);
+  useOnChange(drafts.data, (rows) => {
+    const wanted = params.get("draft");
+    const row = wanted ? rows?.find((draft) => draft.id === wanted) : undefined;
+    if (!row) return;
+    restore(candidateFromServer(row));
+    setDeepLinkedDraft(row.id);
+  });
+  useEffect(() => {
+    if (deepLinkedDraft) syncResumeUrl(deepLinkedDraft);
+  }, [deepLinkedDraft, syncResumeUrl]);
 
   // Validation context.
   const flat = useFlatDetail(state.flat_id);
@@ -170,14 +247,39 @@ export default function BookingWizard() {
   const flatStatus: FlatStatus | null = flat.data?.status ?? null;
   const listPricePaise = flat.data?.price_paise ?? null;
   const canEditAgreement = can("agreement.edit");
-  const context = useMemo(() => ({ today, flatStatus, plansAvailable: plans.data ? plans.data.length > 0 : null, listPricePaise, canEditAgreement }), [today, flatStatus, plans.data, listPricePaise, canEditAgreement]);
-  const stepErrors = useMemo<StepErrors[]>(() => WIZARD_STEPS.map((step) => validateStep(step, state, context)), [state, context]);
+  const context = useMemo(
+    () => ({
+      today,
+      flatStatus,
+      plansAvailable: plans.data ? plans.data.length > 0 : null,
+      listPricePaise,
+      canEditAgreement,
+    }),
+    [today, flatStatus, plans.data, listPricePaise, canEditAgreement],
+  );
+  const stepErrors = useMemo<StepErrors[]>(
+    () => WIZARD_STEPS.map((step) => validateStep(step, state, context)),
+    [state, context],
+  );
   const currentStep = WIZARD_STEPS[stepIndex] ?? "flat";
   const currentErrors = stepErrors[stepIndex] ?? {};
-  const completed = useMemo(() => WIZARD_STEPS.map((_, index) => index).filter((index) => index < stepIndex && Object.keys(stepErrors[index] ?? {}).length === 0), [stepIndex, stepErrors]);
+  const completed = useMemo(
+    () =>
+      WIZARD_STEPS.map((_, index) => index).filter(
+        (index) => index < stepIndex && Object.keys(stepErrors[index] ?? {}).length === 0,
+      ),
+    [stepIndex, stepErrors],
+  );
 
   // Autosave.
-  const draft = useBookingDraft({ state, step: stepIndex + 1, draftId, onDraftId: setDraftId, enabled: !submitted, persisted: draftPersisted });
+  const draft = useBookingDraft({
+    state,
+    step: stepIndex + 1,
+    draftId,
+    onDraftId: setDraftId,
+    enabled: !submitted,
+    persisted: draftPersisted,
+  });
 
   // Unsaved-changes guard.
   const dirty = wizardHasContent(state) && !submitted;
@@ -191,7 +293,16 @@ export default function BookingWizard() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [dirty]);
 
-  const steps = useMemo<Step[]>(() => WIZARD_STEPS.map((step, index) => ({ id: step, label: STEP_META[step].label, description: isCompact ? undefined : STEP_META[step].description, error: attempted.has(index) && Object.keys(stepErrors[index] ?? {}).length > 0 })), [attempted, stepErrors, isCompact]);
+  const steps = useMemo<Step[]>(
+    () =>
+      WIZARD_STEPS.map((step, index) => ({
+        id: step,
+        label: STEP_META[step].label,
+        description: isCompact ? undefined : STEP_META[step].description,
+        error: attempted.has(index) && Object.keys(stepErrors[index] ?? {}).length > 0,
+      })),
+    [attempted, stepErrors, isCompact],
+  );
 
   function goTo(index: number) {
     setLastActivityAt(Date.now());
@@ -210,8 +321,16 @@ export default function BookingWizard() {
     enabled: !submitted,
     lastActivityAt,
     onUnavailable: (info) => {
-      toast.error(`That flat is no longer available${info.current_status ? ` — it is ${FLAT_STATUS_LABELS[info.current_status as FlatStatus] ?? info.current_status.toLowerCase()}${info.hold_until ? ` until ${formatDateTime(info.hold_until)}` : ""}` : ""}. Pick another flat.`);
-      update({ flat_id: null, agreement_value_paise: null, cash_agreed_paise: null, account_agreed_paise: null, price_deviation_reason: "" });
+      toast.error(
+        `That flat is no longer available${info.current_status ? ` — it is ${FLAT_STATUS_LABELS[info.current_status as FlatStatus] ?? info.current_status.toLowerCase()}${info.hold_until ? ` until ${formatDateTime(info.hold_until)}` : ""}` : ""}. Pick another flat.`,
+      );
+      update({
+        flat_id: null,
+        agreement_value_paise: null,
+        cash_agreed_paise: null,
+        account_agreed_paise: null,
+        price_deviation_reason: "",
+      });
       goTo(0);
     },
   });
@@ -231,7 +350,8 @@ export default function BookingWizard() {
 
   const create = useMutationWithToast<BookingRow, BookingCreate>({
     mutationFn: (body) => api.post<BookingRow>(BOOKINGS_PATH, body),
-    successMessage: (booking) => `Booking ${booking.booking_number} confirmed — flat ${booking.flat_number} is now Booked`,
+    successMessage: (booking) =>
+      `Booking ${booking.booking_number} confirmed — flat ${booking.flat_number} is now Booked`,
     errorMessage: false,
     invalidate: [[BOOKINGS_PATH], ["/flats"], ["/blocks"], ["/projects"], ["/customers"], bookingKeys.drafts],
     onSuccess: async (booking) => {
@@ -244,9 +364,18 @@ export default function BookingWizard() {
     onError: (error) => {
       if (error.status === 409 && error.code === "FLAT_NOT_AVAILABLE") {
         reservation.forget();
-        const status = typeof error.details?.current_status === "string" ? (error.details.current_status as FlatStatus) : null;
-        toast.error(`That flat is no longer available${status ? ` — it is now ${FLAT_STATUS_LABELS[status] ?? status}` : ""}. Pick another flat.`);
-        update({ flat_id: null, agreement_value_paise: null, cash_agreed_paise: null, account_agreed_paise: null, price_deviation_reason: "" });
+        const status =
+          typeof error.details?.current_status === "string" ? (error.details.current_status as FlatStatus) : null;
+        toast.error(
+          `That flat is no longer available${status ? ` — it is now ${FLAT_STATUS_LABELS[status] ?? status}` : ""}. Pick another flat.`,
+        );
+        update({
+          flat_id: null,
+          agreement_value_paise: null,
+          cash_agreed_paise: null,
+          account_agreed_paise: null,
+          price_deviation_reason: "",
+        });
         goTo(0);
         return;
       }
@@ -265,7 +394,9 @@ export default function BookingWizard() {
         return;
       }
       if (error.code === "VALIDATION_ERROR" && error.validationIssues.length > 0) {
-        setServerIssues(error.validationIssues.map((issue) => (issue.path ? `${issue.path}: ${issue.message}` : issue.message)));
+        setServerIssues(
+          error.validationIssues.map((issue) => (issue.path ? `${issue.path}: ${issue.message}` : issue.message)),
+        );
         return;
       }
       if (error.isVersionConflict) return;
@@ -304,7 +435,11 @@ export default function BookingWizard() {
     update,
     errors: currentErrors,
     showErrors: attempted.has(stepIndex),
-    can: { editAgreement: canEditAgreement, writeCustomer: can("customer.write"), uploadDocument: can("document.write") },
+    can: {
+      editAgreement: canEditAgreement,
+      writeCustomer: can("customer.write"),
+      uploadDocument: can("document.write"),
+    },
   };
 
   const stepElement = (() => {
@@ -331,17 +466,31 @@ export default function BookingWizard() {
       <PageHeader
         title="New booking"
         description="Six steps: flat, customer, agreement, plan, charges, review. Your progress is saved automatically."
-        breadcrumbs={[{ label: "Home", to: "/" }, { label: "Sales" }, { label: "Bookings", to: "/bookings" }, { label: "New booking" }]}
+        breadcrumbs={[
+          { label: "Home", to: "/" },
+          { label: "Sales" },
+          { label: "Bookings", to: "/bookings" },
+          { label: "New booking" },
+        ]}
         backTo="/bookings"
         actions={
-          <Button variant="ghost" leftIcon={X} onClick={() => (dirty ? setCancelOpen(true) : navigate("/bookings"))} data-testid="wizard-cancel">
+          <Button
+            variant="ghost"
+            leftIcon={X}
+            onClick={() => (dirty ? setCancelOpen(true) : navigate("/bookings"))}
+            data-testid="wizard-cancel"
+          >
             Cancel
           </Button>
         }
       />
 
       {resumeCandidate && (
-        <div role="status" className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-gold-border bg-gold-light px-4 py-3 text-sm" data-testid="resume-banner">
+        <div
+          role="status"
+          className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-gold-border bg-gold-light px-4 py-3 text-sm"
+          data-testid="resume-banner"
+        >
           <History className="size-4 shrink-0 text-gold-text" aria-hidden="true" />
           <div className="min-w-0 flex-1">
             <p className="font-semibold text-navy-950">Resume booking?</p>
@@ -378,9 +527,24 @@ export default function BookingWizard() {
         </div>
       )}
 
-      <div className={cn("grid gap-4", isCompact ? "grid-cols-1" : "grid-cols-[13rem_minmax(0,1fr)_18rem] xl:grid-cols-[14rem_minmax(0,1fr)_20rem]")}>
-        <Stepper steps={steps} current={stepIndex} completed={completed} onStepClick={goTo} orientation={isCompact ? "horizontal" : "vertical"} className={cn(!isCompact && "sticky top-20 h-fit rounded-lg border border-border bg-card p-4 shadow-card")} />
-        <section className="min-w-0 rounded-lg border border-border bg-card p-4 shadow-card sm:p-6" aria-labelledby="wizard-step-title">
+      <div
+        className={cn(
+          "grid gap-4",
+          isCompact ? "grid-cols-1" : "grid-cols-[13rem_minmax(0,1fr)_18rem] xl:grid-cols-[14rem_minmax(0,1fr)_20rem]",
+        )}
+      >
+        <Stepper
+          steps={steps}
+          current={stepIndex}
+          completed={completed}
+          onStepClick={goTo}
+          orientation={isCompact ? "horizontal" : "vertical"}
+          className={cn(!isCompact && "sticky top-20 h-fit rounded-lg border border-border bg-card p-4 shadow-card")}
+        />
+        <section
+          className="min-w-0 rounded-lg border border-border bg-card p-4 shadow-card sm:p-6"
+          aria-labelledby="wizard-step-title"
+        >
           <header className="mb-4">
             <p className="label-caps">
               Step {stepIndex + 1} of {WIZARD_STEPS.length}
@@ -406,16 +570,33 @@ export default function BookingWizard() {
         <SummaryRail state={state} draftStatus={draft.status} lastSavedAt={draft.lastSavedAt} />
       </div>
 
-      <div className="sticky bottom-0 z-40 -mx-4 mt-4 border-t border-border bg-card/95 px-4 py-2.5 shadow-pop backdrop-blur md:-mx-6 md:px-6" data-testid="wizard-footer">
+      <div
+        className="sticky bottom-0 z-40 -mx-4 mt-4 border-t border-border bg-card/95 px-4 py-2.5 shadow-pop backdrop-blur md:-mx-6 md:px-6"
+        data-testid="wizard-footer"
+      >
         <div className="mx-auto flex max-w-screen-2xl items-center justify-between gap-2">
-          <Button variant="outline" leftIcon={ArrowLeft} disabled={stepIndex === 0 || create.isPending} onClick={() => goTo(stepIndex - 1)} data-testid="wizard-back">
+          <Button
+            variant="outline"
+            leftIcon={ArrowLeft}
+            disabled={stepIndex === 0 || create.isPending}
+            onClick={() => goTo(stepIndex - 1)}
+            data-testid="wizard-back"
+          >
             Back
           </Button>
           <span className="hidden text-xs text-ink-subtle sm:inline">
-            {Object.keys(currentErrors).length > 0 && attempted.has(stepIndex) ? `${Object.keys(currentErrors).length} thing${Object.keys(currentErrors).length === 1 ? "" : "s"} to fix on this step` : "All good on this step"}
+            {Object.keys(currentErrors).length > 0 && attempted.has(stepIndex)
+              ? `${Object.keys(currentErrors).length} thing${Object.keys(currentErrors).length === 1 ? "" : "s"} to fix on this step`
+              : "All good on this step"}
           </span>
           {isLast ? (
-            <Button leftIcon={Check} variant="gold" loading={create.isPending} onClick={confirm} data-testid="wizard-confirm">
+            <Button
+              leftIcon={Check}
+              variant="gold"
+              loading={create.isPending}
+              onClick={confirm}
+              data-testid="wizard-confirm"
+            >
               Confirm booking
             </Button>
           ) : (
@@ -435,7 +616,13 @@ export default function BookingWizard() {
         cancelLabel="Stay"
         onConfirm={() => cancel(false)}
       >
-        <Button variant="danger-outline" size="sm" leftIcon={Trash2} onClick={() => void cancel(true)} data-testid="wizard-discard-leave">
+        <Button
+          variant="danger-outline"
+          size="sm"
+          leftIcon={Trash2}
+          onClick={() => void cancel(true)}
+          data-testid="wizard-discard-leave"
+        >
           Discard draft and leave
         </Button>
       </ConfirmDialog>

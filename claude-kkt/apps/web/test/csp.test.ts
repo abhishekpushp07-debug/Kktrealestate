@@ -3,7 +3,13 @@ import { describe, expect, it } from "vitest";
 import { buildCsp, createNonce } from "@/lib/csp";
 
 function directives(csp: string): Map<string, string> {
-  return new Map(csp.split(";").map((d) => d.trim()).filter(Boolean).map((d) => [d.split(" ")[0]!, d.slice(d.indexOf(" ") + 1)]));
+  return new Map(
+    csp
+      .split(";")
+      .map((d) => d.trim())
+      .filter(Boolean)
+      .map((d) => [d.split(" ")[0]!, d.slice(d.indexOf(" ") + 1)]),
+  );
 }
 
 describe("website Content-Security-Policy", () => {

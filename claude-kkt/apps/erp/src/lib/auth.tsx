@@ -186,7 +186,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return null;
       }
       // Network or server failure: keep whatever we had, but stop blocking the UI.
-      if (mounted.current) setStatus((prev) => (prev === "loading" ? (tokens.hasSession() ? "authenticated" : "anonymous") : prev));
+      if (mounted.current)
+        setStatus((prev) => (prev === "loading" ? (tokens.hasSession() ? "authenticated" : "anonymous") : prev));
       throw error;
     }
   }, [clearSession]);
@@ -194,6 +195,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Restore the session on load.
   useEffect(() => {
     if (!tokens.hasSession()) return;
+    // refreshMe sets state only after awaiting GET /auth/me (an external system); the compiler does not model the await.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- state is set asynchronously, after the network response
     refreshMe().catch(() => undefined);
   }, [refreshMe]);
 
@@ -266,8 +269,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     [permissionSet],
   );
-  const canAny = useCallback((codes: readonly Permission[]) => codes.some((code) => permissionSet.has(code)), [permissionSet]);
-  const canAll = useCallback((codes: readonly Permission[]) => codes.every((code) => permissionSet.has(code)), [permissionSet]);
+  const canAny = useCallback(
+    (codes: readonly Permission[]) => codes.some((code) => permissionSet.has(code)),
+    [permissionSet],
+  );
+  const canAll = useCallback(
+    (codes: readonly Permission[]) => codes.every((code) => permissionSet.has(code)),
+    [permissionSet],
+  );
 
   const scope = useMemo<ProjectScope>(() => {
     const ids = user?.project_ids ?? [];

@@ -89,7 +89,11 @@ describe("cash / account split auto-balance", () => {
 
 describe("other charge totals", () => {
   it("adds GST half-up and sums lines", () => {
-    expect(chargeLineTotals(1_00_000_00, 18)).toEqual({ base_paise: 1_00_000_00, gst_paise: 18_000_00, total_paise: 1_18_000_00 });
+    expect(chargeLineTotals(1_00_000_00, 18)).toEqual({
+      base_paise: 1_00_000_00,
+      gst_paise: 18_000_00,
+      total_paise: 1_18_000_00,
+    });
     expect(chargeLineTotals(333, 18)).toEqual({ base_paise: 333, gst_paise: 60, total_paise: 393 });
     const sum = otherChargesTotal([
       { charge_type_id: "a", amount_paise: 1_00_000_00, gst_percent: 18, demand_at: "ON_BOOKING" },
@@ -170,26 +174,48 @@ describe("wizard step validators", () => {
   });
 
   it("rejects a primary applicant who is also a co-applicant and duplicates", () => {
-    expect(validateStep("customer", { ...complete(), co_applicant_ids: ["c1"] }, context).co_applicant_ids).toMatch(/Primary/);
-    expect(validateStep("customer", { ...complete(), co_applicant_ids: ["c2", "c2"] }, context).co_applicant_ids).toMatch(/Duplicate/);
+    expect(validateStep("customer", { ...complete(), co_applicant_ids: ["c1"] }, context).co_applicant_ids).toMatch(
+      /Primary/,
+    );
+    expect(
+      validateStep("customer", { ...complete(), co_applicant_ids: ["c2", "c2"] }, context).co_applicant_ids,
+    ).toMatch(/Duplicate/);
     expect(validateStep("customer", { ...complete(), customer_id: null }, context).customer_id).toBeDefined();
   });
 
   it("insists the split equals the agreement value exactly", () => {
     const off = { ...complete(), account_agreed_paise: 40_00_000_01 };
     expect(validateStep("agreement", off, context).account_agreed_paise).toMatch(/exactly/);
-    expect(validateStep("agreement", { ...complete(), agreement_value_paise: 0 }, context).agreement_value_paise).toMatch(/greater than 0/);
-    expect(validateStep("agreement", { ...complete(), cash_agreed_paise: null }, context).cash_agreed_paise).toBeDefined();
+    expect(
+      validateStep("agreement", { ...complete(), agreement_value_paise: 0 }, context).agreement_value_paise,
+    ).toMatch(/greater than 0/);
+    expect(
+      validateStep("agreement", { ...complete(), cash_agreed_paise: null }, context).cash_agreed_paise,
+    ).toBeDefined();
     expect(firstIncompleteStep(off, context)).toBe(2);
   });
 
   it("checks the plan, acceptance date ordering and the signed copy upload", () => {
     expect(validateStep("plan", { ...complete(), payment_plan_id: null }, context).payment_plan_id).toBeDefined();
-    expect(validateStep("plan", complete(), { ...context, plansAvailable: false }).payment_plan_id).toMatch(/No payment plan/);
-    expect(validateStep("plan", { ...complete(), plan_accepted_on: "2026-10-19" }, context).plan_accepted_on).toMatch(/before the booking date/);
-    expect(validateStep("plan", { ...complete(), plan_accepted_on: "2026-12-01" }, context).plan_accepted_on).toMatch(/future/);
-    expect(validateStep("plan", { ...complete(), plan_acceptance_mode: "SIGNED_COPY" }, context).plan_acceptance_document_id).toMatch(/Upload/);
-    expect(validateStep("plan", { ...complete(), plan_acceptance_mode: "SIGNED_COPY", plan_acceptance_document_id: "d1" }, context)).toEqual({});
+    expect(validateStep("plan", complete(), { ...context, plansAvailable: false }).payment_plan_id).toMatch(
+      /No payment plan/,
+    );
+    expect(validateStep("plan", { ...complete(), plan_accepted_on: "2026-10-19" }, context).plan_accepted_on).toMatch(
+      /before the booking date/,
+    );
+    expect(validateStep("plan", { ...complete(), plan_accepted_on: "2026-12-01" }, context).plan_accepted_on).toMatch(
+      /future/,
+    );
+    expect(
+      validateStep("plan", { ...complete(), plan_acceptance_mode: "SIGNED_COPY" }, context).plan_acceptance_document_id,
+    ).toMatch(/Upload/);
+    expect(
+      validateStep(
+        "plan",
+        { ...complete(), plan_acceptance_mode: "SIGNED_COPY", plan_acceptance_document_id: "d1" },
+        context,
+      ),
+    ).toEqual({});
   });
 
   it("validates charge lines and parking picks", () => {
@@ -219,9 +245,23 @@ describe("draft payload round trip", () => {
   const today = "2026-10-25";
 
   it("keeps only contract keys on the server payload", () => {
-    const state = { ...emptyWizardState(today), project_id: "p", block_id: "b", flat_id: "f", split_mode: "PERCENT" as const, remarks: "  " };
+    const state = {
+      ...emptyWizardState(today),
+      project_id: "p",
+      block_id: "b",
+      flat_id: "f",
+      split_mode: "PERCENT" as const,
+      remarks: "  ",
+    };
     const payload = toDraftPayload(state);
-    expect(payload).toEqual({ project_id: "p", block_id: "b", flat_id: "f", booking_date: today, plan_acceptance_mode: "IN_PERSON", plan_accepted_on: today });
+    expect(payload).toEqual({
+      project_id: "p",
+      block_id: "b",
+      flat_id: "f",
+      booking_date: today,
+      plan_acceptance_mode: "IN_PERSON",
+      plan_accepted_on: today,
+    });
     expect("split_mode" in payload).toBe(false);
   });
 
@@ -235,7 +275,10 @@ describe("draft payload round trip", () => {
         cash_agreed_paise: "60",
         split_mode: "PERCENT",
         plan_acceptance_mode: "PORTAL",
-        other_charges: [{ charge_type_id: "ct", amount_paise: 100, gst_percent: 18, demand_at: "ON_BOOKING" }, { charge_type_id: "bad", demand_at: "NOPE" }],
+        other_charges: [
+          { charge_type_id: "ct", amount_paise: 100, gst_percent: 18, demand_at: "ON_BOOKING" },
+          { charge_type_id: "bad", demand_at: "NOPE" },
+        ],
         broker_name: "Shah & Co",
       },
       today,

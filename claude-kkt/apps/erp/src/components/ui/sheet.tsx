@@ -24,7 +24,14 @@ export interface SheetContentProps extends ComponentProps<typeof DialogPrimitive
 }
 
 /** Right-side drawer: full height, flex column (header / scrollable body / sticky footer). */
-export function SheetContent({ className, children, size = "md", side = "right", hideClose = false, ...props }: SheetContentProps) {
+export function SheetContent({
+  className,
+  children,
+  size = "md",
+  side = "right",
+  hideClose = false,
+  ...props
+}: SheetContentProps) {
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-navy-950/55 data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out" />
@@ -54,7 +61,12 @@ export function SheetContent({ className, children, size = "md", side = "right",
 }
 
 export function SheetHeader({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("flex shrink-0 flex-col gap-0.5 border-b border-border px-5 py-3.5 pr-12", className)} {...props} />;
+  return (
+    <div
+      className={cn("flex shrink-0 flex-col gap-0.5 border-b border-border px-5 py-3.5 pr-12", className)}
+      {...props}
+    />
+  );
 }
 
 export function SheetTitle({ className, ...props }: ComponentProps<typeof DialogPrimitive.Title>) {
@@ -99,7 +111,11 @@ export function Drawer({ open, onOpenChange, title, description, children, foote
       <SheetContent size={size}>
         <SheetHeader>
           <SheetTitle>{title}</SheetTitle>
-          {description ? <SheetDescription>{description}</SheetDescription> : <SheetDescription className="sr-only">{title}</SheetDescription>}
+          {description ? (
+            <SheetDescription>{description}</SheetDescription>
+          ) : (
+            <SheetDescription className="sr-only">{title}</SheetDescription>
+          )}
         </SheetHeader>
         <SheetBody>{children}</SheetBody>
         {footer && <SheetFooter>{footer}</SheetFooter>}

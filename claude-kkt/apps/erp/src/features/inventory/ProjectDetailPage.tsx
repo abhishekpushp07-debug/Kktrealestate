@@ -2,7 +2,19 @@ import { Globe, Pencil, Plus } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { PROJECT_STATUS_LABELS, PROJECT_TYPE_LABELS } from "@kkt/contracts";
-import { Badge, Button, ErrorState, PageSkeleton, ProgressRing, StatusChip, Tabs, TabsContent, TabsList, TabsTrigger, PageHeader } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  ErrorState,
+  PageSkeleton,
+  ProgressRing,
+  StatusChip,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+  PageHeader,
+} from "@/components/ui";
 import { isApiClientError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { formatNumber } from "@/lib/format";
@@ -34,7 +46,13 @@ export default function ProjectDetailPage() {
   if (project.isPending) return <PageSkeleton />;
   if (project.isError) {
     if (isApiClientError(project.error) && project.error.status === 404) return <NotFoundPage />;
-    return <ErrorState error={project.error} onRetry={() => void project.refetch()} className="rounded-lg border border-border bg-card" />;
+    return (
+      <ErrorState
+        error={project.error}
+        onRetry={() => void project.refetch()}
+        className="rounded-lg border border-border bg-card"
+      />
+    );
   }
   const row = project.data;
   const canEdit = can("project.write");
@@ -68,7 +86,12 @@ export default function ProjectDetailPage() {
         actions={
           <>
             {canEdit && (
-              <Button variant="outline" leftIcon={Pencil} onClick={() => setEditOpen(true)} data-testid="project-edit-btn">
+              <Button
+                variant="outline"
+                leftIcon={Pencil}
+                onClick={() => setEditOpen(true)}
+                data-testid="project-edit-btn"
+              >
                 Edit
               </Button>
             )}
@@ -84,12 +107,21 @@ export default function ProjectDetailPage() {
       >
         <div className="grid gap-3 rounded-lg border border-border bg-card p-4 shadow-card sm:grid-cols-[auto_1fr] sm:items-center">
           <div className="flex items-center gap-3">
-            <ProgressRing value={row.construction_percent} size={56} strokeWidth={5} tone="gold" aria-label="Construction progress" />
+            <ProgressRing
+              value={row.construction_percent}
+              size={56}
+              strokeWidth={5}
+              tone="gold"
+              aria-label="Construction progress"
+            />
             <div className="leading-tight">
               <p className="label-caps">Construction</p>
-              <p className="money text-sm font-semibold text-navy-950">{Math.round(row.construction_percent)}% complete</p>
+              <p className="money text-sm font-semibold text-navy-950">
+                {Math.round(row.construction_percent)}% complete
+              </p>
               <p className="text-xs text-ink-subtle">
-                {formatNumber(row.block_count)} {row.block_count === 1 ? "block" : "blocks"} · {formatNumber(row.unit_counts.total)} units
+                {formatNumber(row.block_count)} {row.block_count === 1 ? "block" : "blocks"} ·{" "}
+                {formatNumber(row.unit_counts.total)} units
               </p>
             </div>
           </div>

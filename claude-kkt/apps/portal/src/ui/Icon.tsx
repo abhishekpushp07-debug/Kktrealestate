@@ -4,12 +4,50 @@ import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-na
 import { colors } from "./theme";
 
 export type IconName =
-  | "home" | "flat" | "rupee" | "construction" | "more"
-  | "bell" | "chevron-right" | "chevron-left" | "chevron-down" | "chevron-up"
-  | "close" | "check" | "plus" | "minus" | "download" | "share" | "external"
-  | "document" | "notice" | "request" | "user" | "lock" | "logout" | "bank" | "devices"
-  | "camera" | "image" | "star" | "info" | "warning" | "copy" | "search" | "refresh"
-  | "calendar" | "phone" | "chat" | "mail" | "zoom-in" | "zoom-out" | "filter" | "clock" | "diamond" | "dot" | "edit";
+  | "home"
+  | "flat"
+  | "rupee"
+  | "construction"
+  | "more"
+  | "bell"
+  | "chevron-right"
+  | "chevron-left"
+  | "chevron-down"
+  | "chevron-up"
+  | "close"
+  | "check"
+  | "plus"
+  | "minus"
+  | "download"
+  | "share"
+  | "external"
+  | "document"
+  | "notice"
+  | "request"
+  | "user"
+  | "lock"
+  | "logout"
+  | "bank"
+  | "devices"
+  | "camera"
+  | "image"
+  | "star"
+  | "info"
+  | "warning"
+  | "copy"
+  | "search"
+  | "refresh"
+  | "calendar"
+  | "phone"
+  | "chat"
+  | "mail"
+  | "zoom-in"
+  | "zoom-out"
+  | "filter"
+  | "clock"
+  | "diamond"
+  | "dot"
+  | "edit";
 
 export interface IconProps {
   name: IconName;
@@ -28,19 +66,74 @@ export function Icon({ name, size = 22, color = colors.ink, style }: IconProps):
   const center = (extra: ViewStyle): ViewStyle => ({ position: "absolute", left: "50%", top: "50%", ...extra });
 
   const bar = (len: number, thick: number, rotate = "0deg", dx = 0, dy = 0): React.JSX.Element => (
-    <View key={`${len}-${rotate}-${dx}-${dy}`} style={center({ width: len, height: thick, backgroundColor: c, borderRadius: thick / 2, marginLeft: -len / 2 + dx, marginTop: -thick / 2 + dy, transform: [{ rotate }] })} />
+    <View
+      key={`${len}-${rotate}-${dx}-${dy}`}
+      style={center({
+        width: len,
+        height: thick,
+        backgroundColor: c,
+        borderRadius: thick / 2,
+        marginLeft: -len / 2 + dx,
+        marginTop: -thick / 2 + dy,
+        transform: [{ rotate }],
+      })}
+    />
   );
   const chevron = (rotate: string, len = s * 0.42, dx = 0, dy = 0): React.JSX.Element => (
-    <View style={center({ width: len, height: len, borderTopWidth: w, borderRightWidth: w, borderColor: c, marginLeft: -len / 2 + dx, marginTop: -len / 2 + dy, transform: [{ rotate }] })} />
+    <View
+      style={center({
+        width: len,
+        height: len,
+        borderTopWidth: w,
+        borderRightWidth: w,
+        borderColor: c,
+        marginLeft: -len / 2 + dx,
+        marginTop: -len / 2 + dy,
+        transform: [{ rotate }],
+      })}
+    />
   );
   const ring = (d: number, dx = 0, dy = 0, extra: ViewStyle = {}): React.JSX.Element => (
-    <View style={center({ width: d, height: d, borderRadius: d / 2, borderWidth: w, borderColor: c, marginLeft: -d / 2 + dx, marginTop: -d / 2 + dy, ...extra })} />
+    <View
+      style={center({
+        width: d,
+        height: d,
+        borderRadius: d / 2,
+        borderWidth: w,
+        borderColor: c,
+        marginLeft: -d / 2 + dx,
+        marginTop: -d / 2 + dy,
+        ...extra,
+      })}
+    />
   );
   const rect = (wd: number, ht: number, dx = 0, dy = 0, extra: ViewStyle = {}): React.JSX.Element => (
-    <View style={center({ width: wd, height: ht, borderWidth: w, borderColor: c, borderRadius: Math.max(2, s * 0.12), marginLeft: -wd / 2 + dx, marginTop: -ht / 2 + dy, ...extra })} />
+    <View
+      style={center({
+        width: wd,
+        height: ht,
+        borderWidth: w,
+        borderColor: c,
+        borderRadius: Math.max(2, s * 0.12),
+        marginLeft: -wd / 2 + dx,
+        marginTop: -ht / 2 + dy,
+        ...extra,
+      })}
+    />
   );
   const glyph = (ch: string, scale = 0.85, dy = 0): React.JSX.Element => (
-    <Text style={{ color: c, fontSize: s * scale, lineHeight: s, fontWeight: "700", textAlign: "center", marginTop: dy, includeFontPadding: false }} allowFontScaling={false}>
+    <Text
+      style={{
+        color: c,
+        fontSize: s * scale,
+        lineHeight: s,
+        fontWeight: "700",
+        textAlign: "center",
+        marginTop: dy,
+        includeFontPadding: false,
+      }}
+      allowFontScaling={false}
+    >
       {ch}
     </Text>
   );
@@ -50,9 +143,43 @@ export function Icon({ name, size = 22, color = colors.ink, style }: IconProps):
     case "home":
       inner = (
         <>
-          <View style={center({ width: s * 0.5, height: s * 0.5, borderTopWidth: w, borderLeftWidth: w, borderColor: c, marginLeft: -s * 0.25, marginTop: -s * 0.25 - s * 0.14, transform: [{ rotate: "45deg" }] })} />
-          <View style={center({ width: s * 0.56, height: s * 0.38, borderLeftWidth: w, borderRightWidth: w, borderBottomWidth: w, borderColor: c, borderBottomLeftRadius: 2, borderBottomRightRadius: 2, marginLeft: -s * 0.28, marginTop: -s * 0.02 })} />
-          <View style={center({ width: s * 0.14, height: s * 0.2, backgroundColor: c, marginLeft: -s * 0.07, marginTop: s * 0.16, borderTopLeftRadius: 2, borderTopRightRadius: 2 })} />
+          <View
+            style={center({
+              width: s * 0.5,
+              height: s * 0.5,
+              borderTopWidth: w,
+              borderLeftWidth: w,
+              borderColor: c,
+              marginLeft: -s * 0.25,
+              marginTop: -s * 0.25 - s * 0.14,
+              transform: [{ rotate: "45deg" }],
+            })}
+          />
+          <View
+            style={center({
+              width: s * 0.56,
+              height: s * 0.38,
+              borderLeftWidth: w,
+              borderRightWidth: w,
+              borderBottomWidth: w,
+              borderColor: c,
+              borderBottomLeftRadius: 2,
+              borderBottomRightRadius: 2,
+              marginLeft: -s * 0.28,
+              marginTop: -s * 0.02,
+            })}
+          />
+          <View
+            style={center({
+              width: s * 0.14,
+              height: s * 0.2,
+              backgroundColor: c,
+              marginLeft: -s * 0.07,
+              marginTop: s * 0.16,
+              borderTopLeftRadius: 2,
+              borderTopRightRadius: 2,
+            })}
+          />
         </>
       );
       break;
@@ -62,7 +189,17 @@ export function Icon({ name, size = 22, color = colors.ink, style }: IconProps):
       inner = (
         <View style={{ width: q * 2 + g, height: q * 2 + g, flexDirection: "row", flexWrap: "wrap", gap: g }}>
           {[0, 1, 2, 3].map((i) => (
-            <View key={i} style={{ width: q, height: q, borderWidth: w, borderColor: c, borderRadius: 3, backgroundColor: i === 3 ? c : "transparent" }} />
+            <View
+              key={i}
+              style={{
+                width: q,
+                height: q,
+                borderWidth: w,
+                borderColor: c,
+                borderRadius: 3,
+                backgroundColor: i === 3 ? c : "transparent",
+              }}
+            />
           ))}
         </View>
       );
@@ -95,7 +232,19 @@ export function Icon({ name, size = 22, color = colors.ink, style }: IconProps):
     case "bell":
       inner = (
         <>
-          <View style={center({ width: s * 0.54, height: s * 0.5, borderWidth: w, borderColor: c, borderTopLeftRadius: s * 0.27, borderTopRightRadius: s * 0.27, borderBottomWidth: 0, marginLeft: -s * 0.27, marginTop: -s * 0.3 })} />
+          <View
+            style={center({
+              width: s * 0.54,
+              height: s * 0.5,
+              borderWidth: w,
+              borderColor: c,
+              borderTopLeftRadius: s * 0.27,
+              borderTopRightRadius: s * 0.27,
+              borderBottomWidth: 0,
+              marginLeft: -s * 0.27,
+              marginTop: -s * 0.3,
+            })}
+          />
           {bar(s * 0.7, w, "0deg", 0, s * 0.2)}
           {bar(s * 0.2, w * 1.4, "0deg", 0, s * 0.34)}
           {bar(w * 1.2, s * 0.1, "0deg", 0, -s * 0.36)}
@@ -124,7 +273,18 @@ export function Icon({ name, size = 22, color = colors.ink, style }: IconProps):
       break;
     case "check":
       inner = (
-        <View style={center({ width: s * 0.3, height: s * 0.55, borderBottomWidth: w, borderRightWidth: w, borderColor: c, marginLeft: -s * 0.13, marginTop: -s * 0.34, transform: [{ rotate: "45deg" }] })} />
+        <View
+          style={center({
+            width: s * 0.3,
+            height: s * 0.55,
+            borderBottomWidth: w,
+            borderRightWidth: w,
+            borderColor: c,
+            marginLeft: -s * 0.13,
+            marginTop: -s * 0.34,
+            transform: [{ rotate: "45deg" }],
+          })}
+        />
       );
       break;
     case "plus":
@@ -152,14 +312,38 @@ export function Icon({ name, size = 22, color = colors.ink, style }: IconProps):
         <>
           {bar(s * 0.5, w, "90deg", 0, -s * 0.08)}
           {chevron("-45deg", s * 0.3, 0, -s * 0.16)}
-          <View style={center({ width: s * 0.64, height: s * 0.44, borderWidth: w, borderTopWidth: 0, borderColor: c, borderBottomLeftRadius: 3, borderBottomRightRadius: 3, marginLeft: -s * 0.32, marginTop: -s * 0.02 })} />
+          <View
+            style={center({
+              width: s * 0.64,
+              height: s * 0.44,
+              borderWidth: w,
+              borderTopWidth: 0,
+              borderColor: c,
+              borderBottomLeftRadius: 3,
+              borderBottomRightRadius: 3,
+              marginLeft: -s * 0.32,
+              marginTop: -s * 0.02,
+            })}
+          />
         </>
       );
       break;
     case "external":
       inner = (
         <>
-          <View style={center({ width: s * 0.6, height: s * 0.6, borderWidth: w, borderTopWidth: 0, borderRightWidth: 0, borderColor: c, borderRadius: 3, marginLeft: -s * 0.36, marginTop: -s * 0.24 })} />
+          <View
+            style={center({
+              width: s * 0.6,
+              height: s * 0.6,
+              borderWidth: w,
+              borderTopWidth: 0,
+              borderRightWidth: 0,
+              borderColor: c,
+              borderRadius: 3,
+              marginLeft: -s * 0.36,
+              marginTop: -s * 0.24,
+            })}
+          />
           {bar(s * 0.5, w, "-45deg", s * 0.1, -s * 0.1)}
           {chevron("0deg", s * 0.28, s * 0.2, -s * 0.2)}
         </>
@@ -190,7 +374,19 @@ export function Icon({ name, size = 22, color = colors.ink, style }: IconProps):
       inner = (
         <>
           {rect(s * 0.72, s * 0.56, 0, -s * 0.06, { borderRadius: s * 0.18 })}
-          <View style={center({ width: s * 0.18, height: s * 0.18, borderBottomWidth: w, borderLeftWidth: w, borderColor: c, marginLeft: -s * 0.26, marginTop: s * 0.1, transform: [{ rotate: "-20deg" }], backgroundColor: "transparent" })} />
+          <View
+            style={center({
+              width: s * 0.18,
+              height: s * 0.18,
+              borderBottomWidth: w,
+              borderLeftWidth: w,
+              borderColor: c,
+              marginLeft: -s * 0.26,
+              marginTop: s * 0.1,
+              transform: [{ rotate: "-20deg" }],
+              backgroundColor: "transparent",
+            })}
+          />
         </>
       );
       break;
@@ -198,14 +394,38 @@ export function Icon({ name, size = 22, color = colors.ink, style }: IconProps):
       inner = (
         <>
           {ring(s * 0.34, 0, -s * 0.18)}
-          <View style={center({ width: s * 0.66, height: s * 0.34, borderWidth: w, borderBottomWidth: 0, borderColor: c, borderTopLeftRadius: s * 0.33, borderTopRightRadius: s * 0.33, marginLeft: -s * 0.33, marginTop: s * 0.08 })} />
+          <View
+            style={center({
+              width: s * 0.66,
+              height: s * 0.34,
+              borderWidth: w,
+              borderBottomWidth: 0,
+              borderColor: c,
+              borderTopLeftRadius: s * 0.33,
+              borderTopRightRadius: s * 0.33,
+              marginLeft: -s * 0.33,
+              marginTop: s * 0.08,
+            })}
+          />
         </>
       );
       break;
     case "lock":
       inner = (
         <>
-          <View style={center({ width: s * 0.4, height: s * 0.36, borderWidth: w, borderBottomWidth: 0, borderColor: c, borderTopLeftRadius: s * 0.2, borderTopRightRadius: s * 0.2, marginLeft: -s * 0.2, marginTop: -s * 0.4 })} />
+          <View
+            style={center({
+              width: s * 0.4,
+              height: s * 0.36,
+              borderWidth: w,
+              borderBottomWidth: 0,
+              borderColor: c,
+              borderTopLeftRadius: s * 0.2,
+              borderTopRightRadius: s * 0.2,
+              marginLeft: -s * 0.2,
+              marginTop: -s * 0.4,
+            })}
+          />
           {rect(s * 0.62, s * 0.44, 0, s * 0.12, { backgroundColor: c })}
         </>
       );
@@ -213,7 +433,18 @@ export function Icon({ name, size = 22, color = colors.ink, style }: IconProps):
     case "logout":
       inner = (
         <>
-          <View style={center({ width: s * 0.5, height: s * 0.66, borderWidth: w, borderRightWidth: 0, borderColor: c, borderRadius: 3, marginLeft: -s * 0.36, marginTop: -s * 0.33 })} />
+          <View
+            style={center({
+              width: s * 0.5,
+              height: s * 0.66,
+              borderWidth: w,
+              borderRightWidth: 0,
+              borderColor: c,
+              borderRadius: 3,
+              marginLeft: -s * 0.36,
+              marginTop: -s * 0.33,
+            })}
+          />
           {bar(s * 0.5, w, "0deg", s * 0.12)}
           {chevron("45deg", s * 0.26, s * 0.22)}
         </>
@@ -222,7 +453,18 @@ export function Icon({ name, size = 22, color = colors.ink, style }: IconProps):
     case "bank":
       inner = (
         <>
-          <View style={center({ width: s * 0.5, height: s * 0.5, borderTopWidth: w, borderLeftWidth: w, borderColor: c, marginLeft: -s * 0.25, marginTop: -s * 0.25 - s * 0.14, transform: [{ rotate: "45deg" }] })} />
+          <View
+            style={center({
+              width: s * 0.5,
+              height: s * 0.5,
+              borderTopWidth: w,
+              borderLeftWidth: w,
+              borderColor: c,
+              marginLeft: -s * 0.25,
+              marginTop: -s * 0.25 - s * 0.14,
+              transform: [{ rotate: "45deg" }],
+            })}
+          />
           {bar(s * 0.3, w, "90deg", -s * 0.22, s * 0.1)}
           {bar(s * 0.3, w, "90deg", 0, s * 0.1)}
           {bar(s * 0.3, w, "90deg", s * 0.22, s * 0.1)}
@@ -251,8 +493,28 @@ export function Icon({ name, size = 22, color = colors.ink, style }: IconProps):
       inner = (
         <>
           {rect(s * 0.7, s * 0.6)}
-          <View style={center({ width: s * 0.1, height: s * 0.1, borderRadius: s * 0.05, backgroundColor: c, marginLeft: -s * 0.2, marginTop: -s * 0.2 })} />
-          <View style={center({ width: s * 0.28, height: s * 0.28, borderTopWidth: w, borderLeftWidth: w, borderColor: c, marginLeft: -s * 0.05, marginTop: -s * 0.06, transform: [{ rotate: "45deg" }] })} />
+          <View
+            style={center({
+              width: s * 0.1,
+              height: s * 0.1,
+              borderRadius: s * 0.05,
+              backgroundColor: c,
+              marginLeft: -s * 0.2,
+              marginTop: -s * 0.2,
+            })}
+          />
+          <View
+            style={center({
+              width: s * 0.28,
+              height: s * 0.28,
+              borderTopWidth: w,
+              borderLeftWidth: w,
+              borderColor: c,
+              marginLeft: -s * 0.05,
+              marginTop: -s * 0.06,
+              transform: [{ rotate: "45deg" }],
+            })}
+          />
         </>
       );
       break;
@@ -325,9 +587,38 @@ export function Icon({ name, size = 22, color = colors.ink, style }: IconProps):
     case "phone":
       inner = (
         <>
-          <View style={center({ width: s * 0.26, height: s * 0.72, borderWidth: w, borderColor: c, borderRadius: s * 0.13, marginLeft: -s * 0.13, marginTop: -s * 0.36, transform: [{ rotate: "-40deg" }] })} />
-          <View style={center({ width: s * 0.2, height: s * 0.2, borderRadius: s * 0.1, backgroundColor: c, marginLeft: -s * 0.1 - s * 0.16, marginTop: -s * 0.1 - s * 0.2 })} />
-          <View style={center({ width: s * 0.2, height: s * 0.2, borderRadius: s * 0.1, backgroundColor: c, marginLeft: -s * 0.1 + s * 0.16, marginTop: -s * 0.1 + s * 0.2 })} />
+          <View
+            style={center({
+              width: s * 0.26,
+              height: s * 0.72,
+              borderWidth: w,
+              borderColor: c,
+              borderRadius: s * 0.13,
+              marginLeft: -s * 0.13,
+              marginTop: -s * 0.36,
+              transform: [{ rotate: "-40deg" }],
+            })}
+          />
+          <View
+            style={center({
+              width: s * 0.2,
+              height: s * 0.2,
+              borderRadius: s * 0.1,
+              backgroundColor: c,
+              marginLeft: -s * 0.1 - s * 0.16,
+              marginTop: -s * 0.1 - s * 0.2,
+            })}
+          />
+          <View
+            style={center({
+              width: s * 0.2,
+              height: s * 0.2,
+              borderRadius: s * 0.1,
+              backgroundColor: c,
+              marginLeft: -s * 0.1 + s * 0.16,
+              marginTop: -s * 0.1 + s * 0.2,
+            })}
+          />
         </>
       );
       break;
@@ -335,7 +626,18 @@ export function Icon({ name, size = 22, color = colors.ink, style }: IconProps):
       inner = (
         <>
           {rect(s * 0.74, s * 0.52, 0, 0, { borderRadius: 3 })}
-          <View style={center({ width: s * 0.34, height: s * 0.34, borderBottomWidth: w, borderRightWidth: w, borderColor: c, marginLeft: -s * 0.17, marginTop: -s * 0.3, transform: [{ rotate: "45deg" }] })} />
+          <View
+            style={center({
+              width: s * 0.34,
+              height: s * 0.34,
+              borderBottomWidth: w,
+              borderRightWidth: w,
+              borderColor: c,
+              marginLeft: -s * 0.17,
+              marginTop: -s * 0.3,
+              transform: [{ rotate: "45deg" }],
+            })}
+          />
         </>
       );
       break;
@@ -358,7 +660,17 @@ export function Icon({ name, size = 22, color = colors.ink, style }: IconProps):
       );
       break;
     case "diamond":
-      inner = <View style={{ width: s * 0.5, height: s * 0.5, backgroundColor: c, transform: [{ rotate: "45deg" }], borderRadius: 2 }} />;
+      inner = (
+        <View
+          style={{
+            width: s * 0.5,
+            height: s * 0.5,
+            backgroundColor: c,
+            transform: [{ rotate: "45deg" }],
+            borderRadius: 2,
+          }}
+        />
+      );
       break;
     case "dot":
       inner = <View style={{ width: s * 0.4, height: s * 0.4, borderRadius: s * 0.2, backgroundColor: c }} />;
@@ -377,7 +689,12 @@ export function Icon({ name, size = 22, color = colors.ink, style }: IconProps):
   }
 
   return (
-    <View style={[box, style]} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+    <View
+      style={[box, style]}
+      pointerEvents="none"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
       <View style={[abs, { alignItems: "center", justifyContent: "center" }]}>{inner}</View>
     </View>
   );

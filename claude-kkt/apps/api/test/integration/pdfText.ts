@@ -63,7 +63,8 @@ function parseCmap(cmap: string): Map<number, string> {
     }
   }
   for (const block of cmap.matchAll(/beginbfchar([\s\S]*?)endbfchar/g)) {
-    for (const r of block[1]!.matchAll(/<([0-9a-fA-F]+)>\s*<([0-9a-fA-F\s]+)>/g)) map.set(parseInt(r[1]!, 16), hexToStr(r[2]!.replace(/\s+/g, "")));
+    for (const r of block[1]!.matchAll(/<([0-9a-fA-F]+)>\s*<([0-9a-fA-F\s]+)>/g))
+      map.set(parseInt(r[1]!, 16), hexToStr(r[2]!.replace(/\s+/g, "")));
   }
   return map;
 }
@@ -105,11 +106,17 @@ export function pdfText(buf: Buffer): string {
   }
   const out: string[] = [];
   for (const o of objs.values()) {
-    if (!o.stream || /\/Type\s*\/(XObject|Font|FontDescriptor)|\/Subtype\s*\/(Image|Type0|CIDFontType2)|\/Length1/.test(o.dict)) continue;
+    if (
+      !o.stream ||
+      /\/Type\s*\/(XObject|Font|FontDescriptor)|\/Subtype\s*\/(Image|Type0|CIDFontType2)|\/Length1/.test(o.dict)
+    )
+      continue;
     const content = o.stream.toString("latin1");
     if (!/\bTJ\b|\bTj\b/.test(content)) continue;
     let current: Map<number, string> | null = null;
-    for (const tok of content.matchAll(/\/([A-Za-z0-9_.+-]+)\s+[\d.]+\s+Tf|\[((?:<[0-9A-Fa-f]*>\s*-?[\d.]*\s*)+)\]\s*TJ/g)) {
+    for (const tok of content.matchAll(
+      /\/([A-Za-z0-9_.+-]+)\s+[\d.]+\s+Tf|\[((?:<[0-9A-Fa-f]*>\s*-?[\d.]*\s*)+)\]\s*TJ/g,
+    )) {
       if (tok[1] !== undefined) {
         current = fontByName.get(tok[1]) ?? null;
         continue;

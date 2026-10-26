@@ -1,14 +1,32 @@
 import type { HTMLAttributes } from "react";
 import { cn, humanize } from "@/lib/utils";
 
-export type StatusTone = "available" | "hold" | "booked" | "sold" | "blocked" | "success" | "warning" | "danger" | "info" | "neutral" | "navy" | "gold";
+export type StatusTone =
+  | "available"
+  | "hold"
+  | "booked"
+  | "sold"
+  | "blocked"
+  | "success"
+  | "warning"
+  | "danger"
+  | "info"
+  | "neutral"
+  | "navy"
+  | "gold";
 
 const TONE_CLASS: Readonly<Record<StatusTone, { chip: string; dot: string }>> = {
-  available: { chip: "border-status-available-border bg-status-available-bg text-status-available-fg", dot: "bg-status-available" },
+  available: {
+    chip: "border-status-available-border bg-status-available-bg text-status-available-fg",
+    dot: "bg-status-available",
+  },
   hold: { chip: "border-status-hold-border bg-status-hold-bg text-status-hold-fg", dot: "bg-status-hold" },
   booked: { chip: "border-status-booked-border bg-status-booked-bg text-status-booked-fg", dot: "bg-gold" },
   sold: { chip: "border-status-sold-border bg-status-sold-bg text-status-sold-fg", dot: "bg-status-sold" },
-  blocked: { chip: "border-status-blocked-border bg-status-blocked-bg text-status-blocked-fg", dot: "bg-status-blocked" },
+  blocked: {
+    chip: "border-status-blocked-border bg-status-blocked-bg text-status-blocked-fg",
+    dot: "bg-status-blocked",
+  },
   success: { chip: "border-status-available-border bg-success-bg text-success-fg", dot: "bg-success" },
   warning: { chip: "border-status-hold-border bg-warning-bg text-warning-fg", dot: "bg-warning" },
   danger: { chip: "border-danger/30 bg-danger-bg text-danger-fg", dot: "bg-danger" },

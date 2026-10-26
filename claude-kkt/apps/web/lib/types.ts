@@ -40,7 +40,13 @@ import type {
   Utm,
 } from "@kkt/contracts";
 
-export type { ProjectStatus, ProjectType, StageStatus, VisitStatus, PublicAvailability as AvailabilityCellStatus } from "@kkt/contracts";
+export type {
+  ProjectStatus,
+  ProjectType,
+  StageStatus,
+  VisitStatus,
+  PublicAvailability as AvailabilityCellStatus,
+} from "@kkt/contracts";
 export type { PublicImage };
 
 // ---------------------------------------------------------------------------
@@ -136,7 +142,14 @@ export type Person = PublicPerson;
 
 export const NO_CONTACTS: SiteContacts = { phone: null, whatsapp: null, email: null };
 export const NO_SEO_DEFAULTS: SeoDefaults = { title: null, description: null, og_image_url: null };
-export const NO_ADDRESS: KeyFacts["address"] = { line1: null, line2: null, locality: null, city: null, state: null, pincode: null };
+export const NO_ADDRESS: KeyFacts["address"] = {
+  line1: null,
+  line2: null,
+  locality: null,
+  city: null,
+  state: null,
+  pincode: null,
+};
 
 // ---------------------------------------------------------------------------
 // Error envelope + list filters

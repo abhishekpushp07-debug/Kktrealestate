@@ -1,7 +1,18 @@
 import { CheckCircle2, Clock3, MapPin, MinusCircle, Pencil, Save, Users } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { ConstructionStageRow, ProjectRow } from "@kkt/contracts";
-import { Avatar, Badge, Button, Card, CardContent, CardHeader, CardTitle, EmptyState, KeyValueList, StatusChip } from "@/components/ui";
+import {
+  Avatar,
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  EmptyState,
+  KeyValueList,
+  StatusChip,
+} from "@/components/ui";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { formatDate, formatNumber, formatSqft } from "@/lib/format";
@@ -10,6 +21,7 @@ import { useMasterRows } from "@/features/masters/api";
 import type { AmenityRow } from "@kkt/contracts";
 import { PROJECTS_PATH } from "../api";
 import { Notice, SortableIdList } from "../components";
+import { useOnChange } from "@/lib/utils";
 
 export interface OverviewTabProps {
   project: ProjectRow;
@@ -27,7 +39,10 @@ export function OverviewTab({ project, onEdit }: OverviewTabProps) {
   }, [amenities.data, project.amenity_ids]);
 
   const facts = [
-    { label: "Type", value: project.project_type.charAt(0) + project.project_type.slice(1).toLowerCase().replace("_", " ") },
+    {
+      label: "Type",
+      value: project.project_type.charAt(0) + project.project_type.slice(1).toLowerCase().replace("_", " "),
+    },
     { label: "Status", value: <StatusChip status={project.status} size="sm" /> },
     { label: "RERA number", value: project.rera_number },
     { label: "Launch", value: project.launch_date ? formatDate(project.launch_date) : null },
@@ -37,15 +52,28 @@ export function OverviewTab({ project, onEdit }: OverviewTabProps) {
     { label: "Units", value: formatNumber(project.unit_counts.total), numeric: true },
     {
       label: "Address",
-      value: [project.address.line1, project.address.line2, project.address.locality, `${project.address.city}, ${project.address.state} ${project.address.pincode}`].filter(Boolean).join(", "),
+      value: [
+        project.address.line1,
+        project.address.line2,
+        project.address.locality,
+        `${project.address.city}, ${project.address.state} ${project.address.pincode}`,
+      ]
+        .filter(Boolean)
+        .join(", "),
       full: true,
     },
     {
       label: "Coordinates",
       value:
         project.latitude !== null && project.longitude !== null ? (
-          <a className="inline-flex items-center gap-1 text-navy-700 hover:underline" href={`https://www.google.com/maps?q=${project.latitude},${project.longitude}`} target="_blank" rel="noreferrer noopener">
-            <MapPin className="size-3.5" aria-hidden="true" /> {project.latitude.toFixed(5)}, {project.longitude.toFixed(5)}
+          <a
+            className="inline-flex items-center gap-1 text-navy-700 hover:underline"
+            href={`https://www.google.com/maps?q=${project.latitude},${project.longitude}`}
+            target="_blank"
+            rel="noreferrer noopener"
+          >
+            <MapPin className="size-3.5" aria-hidden="true" /> {project.latitude.toFixed(5)},{" "}
+            {project.longitude.toFixed(5)}
           </a>
         ) : null,
     },
@@ -55,7 +83,15 @@ export function OverviewTab({ project, onEdit }: OverviewTabProps) {
   return (
     <div className="grid gap-4 lg:grid-cols-3">
       <Card className="lg:col-span-2">
-        <CardHeader actions={onEdit ? <Button variant="ghost" size="sm" leftIcon={Pencil} onClick={onEdit}>Edit</Button> : undefined}>
+        <CardHeader
+          actions={
+            onEdit ? (
+              <Button variant="ghost" size="sm" leftIcon={Pencil} onClick={onEdit}>
+                Edit
+              </Button>
+            ) : undefined
+          }
+        >
           <CardTitle>Facts</CardTitle>
         </CardHeader>
         <CardContent>
@@ -71,14 +107,27 @@ export function OverviewTab({ project, onEdit }: OverviewTabProps) {
         </CardHeader>
         <CardContent className="p-0">
           {project.approvals.length === 0 ? (
-            <EmptyState compact title="No approvals recorded" description="Add RERA, building plan and NOCs from Edit." />
+            <EmptyState
+              compact
+              title="No approvals recorded"
+              description="Add RERA, building plan and NOCs from Edit."
+            />
           ) : (
             <ul className="divide-y divide-border">
               {project.approvals.map((approval, index) => {
                 const Icon = APPROVAL_ICON[approval.status];
                 return (
                   <li key={`${approval.name}-${index}`} className="flex items-center gap-3 px-4 py-2.5">
-                    <Icon className={approval.status === "RECEIVED" ? "size-4 text-success" : approval.status === "APPLIED" ? "size-4 text-warning" : "size-4 text-ink-subtle"} aria-hidden="true" />
+                    <Icon
+                      className={
+                        approval.status === "RECEIVED"
+                          ? "size-4 text-success"
+                          : approval.status === "APPLIED"
+                            ? "size-4 text-warning"
+                            : "size-4 text-ink-subtle"
+                      }
+                      aria-hidden="true"
+                    />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-ink">{approval.name}</p>
                       <p className="truncate text-2xs text-ink-subtle">
@@ -86,7 +135,11 @@ export function OverviewTab({ project, onEdit }: OverviewTabProps) {
                         {approval.issued_on ? `Issued ${formatDate(approval.issued_on)}` : "No date"}
                       </p>
                     </div>
-                    <Badge variant={APPROVAL_TONE[approval.status]}>{approval.status === "NA" ? "N/A" : approval.status.charAt(0) + approval.status.slice(1).toLowerCase()}</Badge>
+                    <Badge variant={APPROVAL_TONE[approval.status]}>
+                      {approval.status === "NA"
+                        ? "N/A"
+                        : approval.status.charAt(0) + approval.status.slice(1).toLowerCase()}
+                    </Badge>
                   </li>
                 );
               })}
@@ -101,11 +154,18 @@ export function OverviewTab({ project, onEdit }: OverviewTabProps) {
         </CardHeader>
         <CardContent className="p-0">
           {project.landmarks.length === 0 ? (
-            <EmptyState compact title="No landmarks" description="Nearby places with distances show on the website map." />
+            <EmptyState
+              compact
+              title="No landmarks"
+              description="Nearby places with distances show on the website map."
+            />
           ) : (
             <ul className="divide-y divide-border">
               {project.landmarks.map((landmark, index) => (
-                <li key={`${landmark.name}-${index}`} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
+                <li
+                  key={`${landmark.name}-${index}`}
+                  className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm"
+                >
                   <span className="truncate">{landmark.name}</span>
                   <span className="money shrink-0 text-ink-muted">{landmark.distance_km} km</span>
                 </li>
@@ -121,7 +181,12 @@ export function OverviewTab({ project, onEdit }: OverviewTabProps) {
         </CardHeader>
         <CardContent className="p-0">
           {project.team.length === 0 ? (
-            <EmptyState compact icon={Users} title="No team members" description="Assign the staff responsible from Edit." />
+            <EmptyState
+              compact
+              icon={Users}
+              title="No team members"
+              description="Assign the staff responsible from Edit."
+            />
           ) : (
             <ul className="divide-y divide-border">
               {project.team.map((member) => (
@@ -141,7 +206,10 @@ export function OverviewTab({ project, onEdit }: OverviewTabProps) {
       <Card className="lg:col-span-3">
         <CardHeader>
           <CardTitle>
-            Amenities <span className="money ml-1 text-xs font-normal text-ink-subtle">{formatNumber(project.amenity_ids.length)}</span>
+            Amenities{" "}
+            <span className="money ml-1 text-xs font-normal text-ink-subtle">
+              {formatNumber(project.amenity_ids.length)}
+            </span>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -154,7 +222,9 @@ export function OverviewTab({ project, onEdit }: OverviewTabProps) {
                   {amenity.name}
                 </Badge>
               ))}
-              {amenities.data && amenityNames.length < project.amenity_ids.length && <Badge variant="neutral">+{project.amenity_ids.length - amenityNames.length} unknown</Badge>}
+              {amenities.data && amenityNames.length < project.amenity_ids.length && (
+                <Badge variant="neutral">+{project.amenity_ids.length - amenityNames.length} unknown</Badge>
+              )}
             </div>
           )}
         </CardContent>
@@ -167,13 +237,15 @@ export function OverviewTab({ project, onEdit }: OverviewTabProps) {
 function StageSequenceCard({ project }: { project: ProjectRow }) {
   const { can } = useAuth();
   const canEdit = can("project.write");
-  const stages = useMasterRows<ConstructionStageRow>("construction-stages", { sort: "sort_order", includeInactive: true });
+  const stages = useMasterRows<ConstructionStageRow>("construction-stages", {
+    sort: "sort_order",
+    includeInactive: true,
+  });
   const [draft, setDraft] = useState<string[] | null>(null);
   const value = draft ?? project.stage_sequence;
 
-  useEffect(() => {
-    setDraft(null);
-  }, [project.version]);
+  // A newer project version discards the unsaved reorder.
+  useOnChange(project.version, () => setDraft(null));
 
   const options = useMemo(
     () =>
@@ -196,7 +268,12 @@ function StageSequenceCard({ project }: { project: ProjectRow }) {
   );
 
   const save = useMutationWithToast<ProjectRow, string[]>({
-    mutationFn: (sequence) => api.patch<ProjectRow>(`${PROJECTS_PATH}/${project.id}`, { stage_sequence: sequence, version: project.version }, { version: project.version }),
+    mutationFn: (sequence) =>
+      api.patch<ProjectRow>(
+        `${PROJECTS_PATH}/${project.id}`,
+        { stage_sequence: sequence, version: project.version },
+        { version: project.version },
+      ),
     successMessage: "Stage sequence saved",
     invalidate: [[PROJECTS_PATH]],
     entityLabel: "This project",
@@ -214,7 +291,14 @@ function StageSequenceCard({ project }: { project: ProjectRow }) {
               <Button variant="ghost" size="sm" onClick={() => setDraft(null)} disabled={save.isPending}>
                 Reset
               </Button>
-              <Button variant="gold" size="sm" leftIcon={Save} loading={save.isPending} onClick={() => save.mutate(value)} data-testid="project-save-stages-btn">
+              <Button
+                variant="gold"
+                size="sm"
+                leftIcon={Save}
+                loading={save.isPending}
+                onClick={() => save.mutate(value)}
+                data-testid="project-save-stages-btn"
+              >
                 Save
               </Button>
             </>
@@ -225,8 +309,18 @@ function StageSequenceCard({ project }: { project: ProjectRow }) {
         <p className="text-xs text-ink-subtle">New blocks snapshot this order. Existing blocks keep theirs.</p>
       </CardHeader>
       <CardContent className="space-y-3">
-        {value.length === 0 && !canEdit && <Notice tone="warning">No sequence set — blocks will use the master order.</Notice>}
-        <SortableIdList value={value} onChange={setDraft} options={options} disabled={!canEdit || save.isPending} onResetToDefault={canEdit ? () => setDraft(masterDefault) : undefined} emptyText="Using the master order. Pick stages below or load the default." data-testid="project-stage-sequence" />
+        {value.length === 0 && !canEdit && (
+          <Notice tone="warning">No sequence set — blocks will use the master order.</Notice>
+        )}
+        <SortableIdList
+          value={value}
+          onChange={setDraft}
+          options={options}
+          disabled={!canEdit || save.isPending}
+          onResetToDefault={canEdit ? () => setDraft(masterDefault) : undefined}
+          emptyText="Using the master order. Pick stages below or load the default."
+          data-testid="project-stage-sequence"
+        />
       </CardContent>
     </Card>
   );

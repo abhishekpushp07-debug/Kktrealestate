@@ -13,7 +13,10 @@ export type SlaState =
 export const SLA_URGENT_MS = 2 * 60 * 60 * 1000;
 
 /** Derives the SLA display state of a ticket at `now`. */
-export function slaState(ticket: Pick<ServiceRequestRow, "sla_due_at" | "is_sla_breached" | "status">, now: Date = new Date()): SlaState {
+export function slaState(
+  ticket: Pick<ServiceRequestRow, "sla_due_at" | "is_sla_breached" | "status">,
+  now: Date = new Date(),
+): SlaState {
   if (SLA_STOPPED_STATUSES.includes(ticket.status)) return { kind: "stopped", breached: ticket.is_sla_breached };
   if (!ticket.sla_due_at) return { kind: "none" };
   const due = Date.parse(ticket.sla_due_at);
@@ -50,7 +53,9 @@ export function slaLabel(state: SlaState): { text: string; tone: "danger" | "war
 }
 
 /** Forward transitions offered as buttons for each status (reopen is listed last). */
-export const STATUS_TRANSITIONS: Readonly<Record<ServiceStatus, readonly { to: ServiceStatus; label: string; variant: "primary" | "gold" | "outline" }[]>> = {
+export const STATUS_TRANSITIONS: Readonly<
+  Record<ServiceStatus, readonly { to: ServiceStatus; label: string; variant: "primary" | "gold" | "outline" }[]>
+> = {
   NEW: [{ to: "IN_PROGRESS", label: "Start work", variant: "primary" }],
   IN_PROGRESS: [
     { to: "AWAITING_CUSTOMER", label: "Await customer", variant: "gold" },

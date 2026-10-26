@@ -3,7 +3,22 @@ import { createInventoryBasics, post, projectBody, towerCBody, type InventoryBas
 import { createCustomer, type Flat } from "./money.js";
 
 /** The 14 seed stages (docs/SEED.md) in master order. */
-export const STAGE_NAMES = ["Excavation", "Foundation", "Plinth", "1st Slab", "2nd Slab", "3rd Slab", "4th Slab", "Top Slab", "Brickwork", "Plastering", "Flooring", "Finishing", "External Development", "Possession"] as const;
+export const STAGE_NAMES = [
+  "Excavation",
+  "Foundation",
+  "Plinth",
+  "1st Slab",
+  "2nd Slab",
+  "3rd Slab",
+  "4th Slab",
+  "Top Slab",
+  "Brickwork",
+  "Plastering",
+  "Flooring",
+  "Finishing",
+  "External Development",
+  "Possession",
+] as const;
 export type StageName = (typeof STAGE_NAMES)[number];
 
 /** Everything the construction tests build on: two projects with one 14-stage tower each, a Standard CLP plan, a UPI mode, a bank account and customers. */
@@ -39,7 +54,11 @@ export function standardClpInstallments(s: ConstructionWorld["stages"]) {
 }
 
 async function loadFlats(t: TestContext, token: string, blockId: string): Promise<Map<string, Flat>> {
-  const r = await t.request<{ items: Flat[] }>("GET", `/api/v1/flats?block_id=${blockId}&page_size=200&sort=flat_number`, { token });
+  const r = await t.request<{ items: Flat[] }>(
+    "GET",
+    `/api/v1/flats?block_id=${blockId}&page_size=200&sort=flat_number`,
+    { token },
+  );
   if (r.status !== 200) throw new Error(`flats: ${r.text}`);
   return new Map(r.body.items.map((f) => [f.flat_number, f]));
 }
@@ -49,44 +68,129 @@ export async function createConstructionWorld(t: TestContext, admin: string): Pr
   // basics made Excavation(10) Foundation(20) Plinth(30) Top Slab(40) Possession(140); add the other nine BEFORE any project so every tower snapshots all 14
   const [excavation, foundation, plinth, topSlab] = basics.stageIds as [string, string, string, string, string];
   const extra: Partial<Record<StageName, string>> = {};
-  for (const [name, sort] of [["1st Slab", 32], ["2nd Slab", 34], ["3rd Slab", 36], ["4th Slab", 38], ["Brickwork", 50], ["Plastering", 60], ["Flooring", 70], ["Finishing", 80], ["External Development", 90]] as const) {
-    extra[name] = (await post<{ id: string }>(t, admin, "/api/v1/masters/construction-stages", { name, code: name.toUpperCase().replace(/ /g, "_"), sort_order: sort })).id;
+  for (const [name, sort] of [
+    ["1st Slab", 32],
+    ["2nd Slab", 34],
+    ["3rd Slab", 36],
+    ["4th Slab", 38],
+    ["Brickwork", 50],
+    ["Plastering", 60],
+    ["Flooring", 70],
+    ["Finishing", 80],
+    ["External Development", 90],
+  ] as const) {
+    extra[name] = (
+      await post<{ id: string }>(t, admin, "/api/v1/masters/construction-stages", {
+        name,
+        code: name.toUpperCase().replace(/ /g, "_"),
+        sort_order: sort,
+      })
+    ).id;
   }
   const stages: ConstructionWorld["stages"] = {
-    Excavation: excavation, Foundation: foundation, Plinth: plinth, "1st Slab": extra["1st Slab"]!, "2nd Slab": extra["2nd Slab"]!, "3rd Slab": extra["3rd Slab"]!, "4th Slab": extra["4th Slab"]!,
-    "Top Slab": topSlab, Brickwork: extra.Brickwork!, Plastering: extra.Plastering!, Flooring: extra.Flooring!, Finishing: extra.Finishing!, "External Development": extra["External Development"]!, Possession: basics.possessionStageId,
+    Excavation: excavation,
+    Foundation: foundation,
+    Plinth: plinth,
+    "1st Slab": extra["1st Slab"]!,
+    "2nd Slab": extra["2nd Slab"]!,
+    "3rd Slab": extra["3rd Slab"]!,
+    "4th Slab": extra["4th Slab"]!,
+    "Top Slab": topSlab,
+    Brickwork: extra.Brickwork!,
+    Plastering: extra.Plastering!,
+    Flooring: extra.Flooring!,
+    Finishing: extra.Finishing!,
+    "External Development": extra["External Development"]!,
+    Possession: basics.possessionStageId,
   };
   const stageOrder = STAGE_NAMES.map((n) => stages[n]);
 
   const sgh = await post<{ id: string }>(t, admin, "/api/v1/projects", projectBody("Shree Ganesh Heights", "SGH"));
   const ggv = await post<{ id: string }>(t, admin, "/api/v1/projects", projectBody("Ganesh Green Villas", "GGV"));
-  const towerA = await post<{ id: string }>(t, admin, "/api/v1/blocks", towerCBody(sgh.id, basics, { name: "Tower A", code: "A", floors: 3, skip_floors: [], refuge_floors: [], floor_plans: [{ from_floor: 1, to_floor: 3, floor_plan_template_id: basics.templates.FP4 }] }));
-  const towerG = await post<{ id: string }>(t, admin, "/api/v1/blocks", towerCBody(ggv.id, basics, { name: "Tower G", code: "G", floors: 2, skip_floors: [], refuge_floors: [], floor_plans: [{ from_floor: 1, to_floor: 2, floor_plan_template_id: basics.templates.FP4 }] }));
+  const towerA = await post<{ id: string }>(
+    t,
+    admin,
+    "/api/v1/blocks",
+    towerCBody(sgh.id, basics, {
+      name: "Tower A",
+      code: "A",
+      floors: 3,
+      skip_floors: [],
+      refuge_floors: [],
+      floor_plans: [{ from_floor: 1, to_floor: 3, floor_plan_template_id: basics.templates.FP4 }],
+    }),
+  );
+  const towerG = await post<{ id: string }>(
+    t,
+    admin,
+    "/api/v1/blocks",
+    towerCBody(ggv.id, basics, {
+      name: "Tower G",
+      code: "G",
+      floors: 2,
+      skip_floors: [],
+      refuge_floors: [],
+      floor_plans: [{ from_floor: 1, to_floor: 2, floor_plan_template_id: basics.templates.FP4 }],
+    }),
+  );
 
   // ₹1 Cr list price on every flat: the tests book at ₹1 Cr and the agreement value guard rejects an unexplained deviation
-  await t.app.sql`update flats set price_paise = ${1_000_000_000}, rate_card_id = null, price_breakup = ${JSON.stringify([{ label: "Base price", amount_paise: 1_000_000_000 }])}::jsonb where project_id in (${sgh.id}, ${ggv.id})`;
-  const upi = await post<{ id: string }>(t, admin, "/api/v1/masters/payment-modes", { name: "UPI", code: "UPI", sort_order: 1 });
-  const bank = await post<{ id: string }>(t, admin, "/api/v1/masters/bank-accounts", { bank_name: "HDFC Bank", branch: "Boring Road", account_name: "Shree Ganesh Builders", account_number: "50100123456789", ifsc: "HDFC0000123", is_default: true });
-  const plan = await post<{ id: string }>(t, admin, "/api/v1/masters/payment-plans", { name: "Standard CLP", code: "STD_CLP", plan_type: "CONSTRUCTION_LINKED", installments: standardClpInstallments(stages) });
+  await t.app
+    .sql`update flats set price_paise = ${1_000_000_000}, rate_card_id = null, price_breakup = ${JSON.stringify([{ label: "Base price", amount_paise: 1_000_000_000 }])}::jsonb where project_id in (${sgh.id}, ${ggv.id})`;
+  const upi = await post<{ id: string }>(t, admin, "/api/v1/masters/payment-modes", {
+    name: "UPI",
+    code: "UPI",
+    sort_order: 1,
+  });
+  const bank = await post<{ id: string }>(t, admin, "/api/v1/masters/bank-accounts", {
+    bank_name: "HDFC Bank",
+    branch: "Boring Road",
+    account_name: "Shree Ganesh Builders",
+    account_number: "50100123456789",
+    ifsc: "HDFC0000123",
+    is_default: true,
+  });
+  const plan = await post<{ id: string }>(t, admin, "/api/v1/masters/payment-plans", {
+    name: "Standard CLP",
+    code: "STD_CLP",
+    plan_type: "CONSTRUCTION_LINKED",
+    installments: standardClpInstallments(stages),
+  });
   await post(t, admin, "/api/v1/payment-plan-assignments", { plan_id: plan.id, project_id: sgh.id, is_default: true });
   await post(t, admin, "/api/v1/payment-plan-assignments", { plan_id: plan.id, project_id: ggv.id, is_default: true });
 
   const customers: string[] = [];
-  for (const name of ["Rajesh Kumar Sinha", "Priya Verma", "Amit Kumar", "Sunita Devi"]) customers.push(await createCustomer(t, name));
+  for (const name of ["Rajesh Kumar Sinha", "Priya Verma", "Amit Kumar", "Sunita Devi"])
+    customers.push(await createCustomer(t, name));
 
   return {
-    basics, stages, stageOrder,
+    basics,
+    stages,
+    stageOrder,
     sgh: { id: sgh.id, towerId: towerA.id, flats: await loadFlats(t, admin, towerA.id) },
     ggv: { id: ggv.id, towerId: towerG.id, flats: await loadFlats(t, admin, towerG.id) },
-    upiModeId: upi.id, bankAccountId: bank.id, planId: plan.id, customers,
+    upiModeId: upi.id,
+    bankAccountId: bank.id,
+    planId: plan.id,
+    customers,
   };
 }
 
 /** Inserts a (fake, already-stored) image document row directly; `withVariants` gives it thumb/medium renditions like a real upload. */
-export async function insertImageDocument(t: TestContext, entityType: "STAGE" | "BLOCK" | "PROJECT" | "CUSTOMER", entityId: string, opts: { withVariants?: boolean; mime?: string; sensitive?: boolean } = {}): Promise<string> {
+export async function insertImageDocument(
+  t: TestContext,
+  entityType: "STAGE" | "BLOCK" | "PROJECT" | "CUSTOMER",
+  entityId: string,
+  opts: { withVariants?: boolean; mime?: string; sensitive?: boolean } = {},
+): Promise<string> {
   const n = Math.floor(Math.random() * 1e9);
-  const variants = opts.withVariants === false ? null : JSON.stringify({ thumb_key: `t/${n}_thumb.webp`, medium_key: `t/${n}_medium.webp`, width: 1600, height: 1200 });
-  const [row] = await t.app.sql<{ id: string }[]>`insert into documents (company_id, entity_type, entity_id, file_name, mime, size_bytes, sha256, storage_key, variants, uploaded_by_type, is_sensitive)
+  const variants =
+    opts.withVariants === false
+      ? null
+      : JSON.stringify({ thumb_key: `t/${n}_thumb.webp`, medium_key: `t/${n}_medium.webp`, width: 1600, height: 1200 });
+  const [row] = await t.app.sql<
+    { id: string }[]
+  >`insert into documents (company_id, entity_type, entity_id, file_name, mime, size_bytes, sha256, storage_key, variants, uploaded_by_type, is_sensitive)
     values (${t.companyId}, ${entityType}, ${entityId}, ${`photo-${n}.jpg`}, ${opts.mime ?? "image/jpeg"}, 12345, ${`sha-${n}`}, ${`t/${n}.jpg`}, ${variants}::jsonb, 'SYSTEM', ${opts.sensitive ?? false}) returning id`;
   return row!.id;
 }

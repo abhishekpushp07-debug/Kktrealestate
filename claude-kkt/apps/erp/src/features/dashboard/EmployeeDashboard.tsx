@@ -8,12 +8,23 @@ import { MiniTable, StatusStack, Widget } from "./widgets";
 
 /** Employee: read-only inventory snapshot plus company notices. */
 export function EmployeeDashboard({ data }: { data: EmployeeDashboardResponse }) {
-  const totals = data.projects.reduce((sum, project) => ({ available: sum.available + project.available, total: sum.total + project.total, sold: sum.sold + project.sold }), { available: 0, total: 0, sold: 0 });
+  const totals = data.projects.reduce(
+    (sum, project) => ({
+      available: sum.available + project.available,
+      total: sum.total + project.total,
+      sold: sum.sold + project.sold,
+    }),
+    { available: 0, total: 0, sold: 0 },
+  );
   return (
     <div className="space-y-4" data-testid="employee-dashboard">
       <div className="grid gap-3 sm:grid-cols-3">
         <StatCard label="Projects" value={formatNumber(data.projects.length)} icon={Building2} tone="navy" />
-        <StatCard label="Flats available" value={formatNumber(totals.available)} hint={`of ${formatNumber(totals.total)} units`} />
+        <StatCard
+          label="Flats available"
+          value={formatNumber(totals.available)}
+          hint={`of ${formatNumber(totals.total)} units`}
+        />
         <StatCard label="Sold" value={formatNumber(totals.sold)} tone="gold" />
       </div>
       <div className="grid gap-4 xl:grid-cols-3">
@@ -51,8 +62,20 @@ export function EmployeeDashboard({ data }: { data: EmployeeDashboardResponse })
             rowKey={(row) => row.id}
             empty="No notices"
             columns={[
-              { key: "title", label: "Notice", cell: (row) => <Link to="/website/notices" className="font-medium hover:underline">{row.title}</Link> },
-              { key: "at", label: "Published", cell: (row) => <span className="money text-xs text-ink-muted">{formatDateTime(row.publish_at)}</span> },
+              {
+                key: "title",
+                label: "Notice",
+                cell: (row) => (
+                  <Link to="/website/notices" className="font-medium hover:underline">
+                    {row.title}
+                  </Link>
+                ),
+              },
+              {
+                key: "at",
+                label: "Published",
+                cell: (row) => <span className="money text-xs text-ink-muted">{formatDateTime(row.publish_at)}</span>,
+              },
             ]}
           />
         </Widget>

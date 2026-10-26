@@ -19,7 +19,13 @@ export function ProtectedRoute({ children, allowForcedPasswordChange = false }: 
     return <Navigate to="/login" replace state={{ from: `${location.pathname}${location.search}` }} />;
   }
   if (mustChangePassword && !allowForcedPasswordChange) {
-    return <Navigate to="/change-password" replace state={{ forced: true, from: `${location.pathname}${location.search}` }} />;
+    return (
+      <Navigate
+        to="/change-password"
+        replace
+        state={{ forced: true, from: `${location.pathname}${location.search}` }}
+      />
+    );
   }
   return children ? <>{children}</> : <Outlet />;
 }
@@ -30,6 +36,7 @@ export function PublicOnlyRoute({ children }: { children: ReactNode }) {
   const location = useLocation();
   const state = location.state as { from?: string } | null;
   if (status === "loading") return <FullPageLoader />;
-  if (status === "authenticated") return <Navigate to={state?.from && state.from !== "/login" ? state.from : "/"} replace />;
+  if (status === "authenticated")
+    return <Navigate to={state?.from && state.from !== "/login" ? state.from : "/"} replace />;
   return <>{children}</>;
 }
