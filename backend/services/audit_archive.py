@@ -14,12 +14,14 @@ async def retention_months() -> int:
 
 
 async def ensure_indexes():
-    for coll in (db.audit_logs, db.audit_logs_archive):
-        await coll.create_index("id", unique=True)
-        await coll.create_index([("company_id", 1), ("created_at", -1)])
-        await coll.create_index([("entity_type", 1), ("entity_id", 1), ("created_at", -1)])
-        await coll.create_index([("actor_id", 1), ("created_at", -1)])
-        await coll.create_index("action")
+    """Hot indexes already exist (db.ensure_indexes); the archive mirrors them by name so lookups cost the same on both collections."""
+    coll = db.audit_logs_archive
+    await coll.create_index("id", unique=True)
+    await coll.create_index([("entity_type", 1), ("entity_id", 1), ("created_at", -1)], name="audit_entity_created")
+    await coll.create_index([("company_id", 1), ("created_at", -1)])
+    await coll.create_index([("created_at", -1)])
+    await coll.create_index("actor_id")
+    await coll.create_index("action")
 
 
 async def archive_old_rows(months: int | None = None, batch: int = 1000) -> dict:
