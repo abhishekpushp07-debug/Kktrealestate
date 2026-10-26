@@ -25,7 +25,7 @@ export function ConstructionStatusPanel({ blockId, onChanged }) {
   const load = useCallback(() => api.get(`/blocks/${blockId}/construction`).then((r) => setData(r.data)).catch((e) => toast.error(errMsg(e))), [blockId]);
   const savePlanned = async (s, v) => {
     if ((v || "") === (s.planned_date || "")) return;
-    try { await api.patch(`/blocks/${blockId}/construction/stages/${s.stage_id}/planned-date`, { planned_date: v || null }); toast.success(v ? `Planned ${fmtDate(v)}` : "Planned date cleared"); load(); } catch (e) { toast.error(errMsg(e)); }
+    try { await api.patch(`/blocks/${blockId}/construction/stages/${s.stage_id}/planned-date`, { planned_date: v || null, version: data?.block?.version ?? 0 }); toast.success(v ? `Planned ${fmtDate(v)}` : "Planned date cleared"); load(); } catch (e) { toast.error(errMsg(e)); }
   };
   useEffect(() => { load(); }, [load]);
   if (!data) return <div className="card p-5 text-sm text-txt-muted">Loading…</div>;

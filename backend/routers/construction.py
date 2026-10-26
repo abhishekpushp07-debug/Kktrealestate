@@ -112,6 +112,7 @@ class StageSetIn(StrictModel):
 
 class PlannedDateIn(StrictModel):
     planned_date: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+    version: int | None = None  # optional optimistic-concurrency check on the tower
 
 
 @router.patch("/blocks/{block_id}/construction/stages/{stage_id}/planned-date")
@@ -125,6 +126,8 @@ async def set_planned_date(block_id: str, stage_id: str, body: PlannedDateIn, re
         raise ApiError(404, "Stage not in this tower's sequence", "STAGE_NOT_FOUND")
     if st.get("status") == "Completed":
         raise ApiError(409, "Stage already completed — planned date is fixed by the completion date", "STAGE_COMPLETED")
+    if body.version is not None and body.version != block.get("version"):
+        raise ApiError(409, "Record changed by someone else", "VERSION_CONFLICT")
     before = st.get("planned_date")
     await db.blocks.update_one({"id": block_id, "construction_stages.stage_id": stage_id}, {"$set": {"construction_stages.$.planned_date": body.planned_date, "updated_at": now_iso()}})
     await write_audit(user, "construction.planned_date", "block", block_id, {"stage_id": stage_id, "planned_date": before}, {"stage_id": stage_id, "planned_date": body.planned_date}, client_ip(request), user["company_id"])
