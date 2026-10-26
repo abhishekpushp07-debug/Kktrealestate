@@ -254,13 +254,13 @@ class TestServiceRequests:
         tok = r.json()["access_token"]
         srs = requests.get(f"{BASE}/api/portal/service-requests", headers=_hdr(tok)).json()
         items = srs.get("items") or srs
-        sr1 = [s for s in items if s.get("ticket_number") == "SR-2627-0001"]
-        if not sr1:
-            pytest.skip("SR-2627-0001 not found for Priya")
-        sid = sr1[0]["id"]
+        assert items, "story persona Priya must have a service request"
+        sid = items[0]["id"]
+        # staff posts an internal note on her ticket; the portal view must never show it
+        r = requests.post(f"{BASE}/api/service-requests/{sid}/reply", headers=_hdr(_erp_login("admin@kkt.in"), idem=True), json={"message": "INTERNAL NOTE: vendor quote pending", "internal": True})
+        assert r.status_code in (200, 201), r.text
         d = requests.get(f"{BASE}/api/portal/service-requests/{sid}", headers=_hdr(tok)).json()
-        body = str(d)
-        assert "INTERNAL NOTE" not in body.upper(), "Internal note leaked to portal"
+        assert "INTERNAL NOTE" not in str(d).upper(), "Internal note leaked to portal"
 
 
 class TestProfileBank:

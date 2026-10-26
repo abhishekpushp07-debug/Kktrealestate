@@ -31,7 +31,20 @@ TEST_PORT = int(os.environ.get("KKT_TEST_PORT", "8021"))
 _server_proc = None
 
 
+def _raise_mongod_fd_limit():
+    """Local-box guard: mongod ships with a 1024 soft nofile limit; three WiredTiger DBs (~320 files each) + the suite's
+    connections cross it and mongod fasserts (TooManyFilesOpen → 'connection closed' flakes). Best effort, root only."""
+    try:
+        for pid in subprocess.run(["pgrep", "-x", "mongod"], capture_output=True, text=True).stdout.split():
+            cur = [ln for ln in open(f"/proc/{pid}/limits") if ln.startswith("Max open files")]
+            if cur and int(cur[0].split()[3]) < 8192:
+                subprocess.run(["prlimit", "--pid", pid, "--nofile=65536:1048576"], check=False)
+    except Exception as e:  # noqa: BLE001
+        print("mongod fd limit guard skipped:", e)
+
+
 def _snapshot_preview_into_test_db():
+    _raise_mongod_fd_limit()
     from pymongo import MongoClient
     cli = MongoClient(os.environ["MONGO_URL"])
     src, dst = cli[PREVIEW_DB], cli[TEST_DB]
