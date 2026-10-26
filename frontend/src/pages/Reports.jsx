@@ -1,3 +1,4 @@
+import { ShieldAlert } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -112,11 +113,12 @@ export default function Reports() {
             {GROUPS.map((g) => { const rs = (list?.items || []).filter((r) => g.keys.includes(r.key) && can(`reports.${REPORT_CODE[r.key] || r.key.replace(/-/g, "_")}.view`)); return (
               <div key={g.name} className="mb-3 last:mb-0">
                 <p className="flex items-center gap-2 px-3 pb-1.5 pt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-txt-muted"><g.icon className="h-3.5 w-3.5" />{g.name}</p>
-                {rs.length === 0 ? <p className="px-3 pb-1 text-xs text-txt-muted">Coming soon</p> : rs.map((r) => <button key={r.key} onClick={() => nav(`/reports/${r.key}`)} className={cn("block w-full rounded-lg px-3 py-2 text-left text-sm transition-colors", r.key === key ? "bg-ink-950 font-semibold text-warm-50" : "text-ink-950 hover:bg-warm-100")} data-testid={`report-${r.key}`}>{r.name}</button>)}
+                {rs.length === 0 ? <p className="px-3 pb-1 text-xs text-txt-muted">No access</p> : rs.map((r) => <button key={r.key} onClick={() => nav(`/reports/${r.key}`)} className={cn("block w-full rounded-lg px-3 py-2 text-left text-sm transition-colors", r.key === key ? "bg-ink-950 font-semibold text-warm-50" : "text-ink-950 hover:bg-warm-100")} data-testid={`report-${r.key}`}>{r.name}</button>)}
               </div>); })}
           </Card>
         </aside>
         <section className="min-w-0 space-y-6">
+          {!can(`reports.${REPORT_CODE[key] || key.replace(/-/g, "_")}.view`) ? <EmptyState icon={ShieldAlert} title="Access restricted" description={`Your role lacks the ${`reports.${REPORT_CODE[key] || key.replace(/-/g, "_")}.view`} permission.`} testId="forbidden-report" /> : <>
           <div><h2 className="font-display text-2xl text-ink-950" data-testid="report-title">{meta?.name || key}</h2><p className="mt-1 text-sm text-txt-secondary">{DESC[key] || meta?.description}</p></div>
           <Card className="space-y-4 print:hidden" testId="report-filters">
             <div className="flex flex-wrap items-center gap-3">
@@ -164,6 +166,7 @@ export default function Reports() {
                 {data.totals && <tfoot className="sticky bottom-0 bg-ink-950 font-semibold text-warm-50" data-testid="report-totals"><tr className="h-12">{data.columns.map((c, i) => <td key={c.key} className={cn("px-4", c.type === "str" ? "" : "text-right tabular-nums")}>{i === 0 ? "Total" : data.totals[c.key] != null ? cell(c, data.totals[c.key]) : ""}</td>)}</tr></tfoot>}
               </table></div>)}
           </Card>
+          </>}
         </section>
       </div>
     </div>

@@ -50,7 +50,7 @@ function Row({ p, can, onAct, nav }) {
       <div className="flex gap-1">
         <JourneyButton entityType="payment" entityId={p.id} className="btn btn-ghost btn-sm !px-2" label="" /><HistoryButton entityType="payment" entityId={p.id} label={p.receipt_number} />
         {can("finance.receipt.print") && <button onClick={() => window.open(`${BASE_PATH}/print/receipt/${p.id}`, "_blank")} className="btn btn-ghost btn-sm !px-2" aria-label="Print" data-testid={`print-${p.id}`}><Printer className="h-4 w-4" /></button>}
-        {p.status === "Pending" && can("finance.payment.create") && <><button onClick={() => onAct({ p, kind: "clear" })} className="btn btn-secondary btn-sm" data-testid={`clear-${p.id}`}>Clear</button><button onClick={() => onAct({ p, kind: "bounce" })} className="btn btn-ghost btn-sm text-brick" data-testid={`bounce-${p.id}`}>Bounce</button></>}
+        {p.status === "Pending" && can("finance.cheque.clear") && <><button onClick={() => onAct({ p, kind: "clear" })} className="btn btn-secondary btn-sm" data-testid={`clear-${p.id}`}>Clear</button><button onClick={() => onAct({ p, kind: "bounce" })} className="btn btn-ghost btn-sm text-brick" data-testid={`bounce-${p.id}`}>Bounce</button></>}
         {p.status === "Cleared" && can("finance.payment.reverse") && <button onClick={() => onAct({ p, kind: "reverse" })} className="btn btn-ghost btn-sm text-brick" data-testid={`reverse-${p.id}`}>Reverse</button>}
       </div>
     </li>
