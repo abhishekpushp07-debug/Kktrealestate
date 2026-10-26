@@ -241,7 +241,7 @@ JAMA_TYPES = ("PAYMENT", "OTHER_CHARGE_PAYMENT", "REVERSAL", "REFUND")
 
 def two_sided(rows: list[dict], events: list) -> None:
     """Owner's ledger law: Udhar (dues raised) | Jama (money received; reversals/refunds negative) | Mode | running Balance = Σ Udhar − Σ Jama."""
-    bal = cum_flat = cum_cash = cum_acct = 0
+    bal = cum_flat = cum_cash = cum_acct = cum_other = oc_jama = 0
     for r, (_, _p, kind, src) in zip(rows, events):
         amt = r["amount_paise"]
         udhar = amt if kind in UDHAR_TYPES else 0
@@ -253,6 +253,10 @@ def two_sided(rows: list[dict], events: list) -> None:
             u_cash = r["cash_order_raised_paise"] - cum_cash
             u_acct = r["account_order_raised_paise"] - cum_acct
             udhar = u_cash + u_acct
+            if kind == "CANCELLATION":
+                udhar += oc_jama - cum_other  # undemanded/unpaid other charges are written off with the booking
+        if kind == "OTHER_CHARGE_PAYMENT" or (kind in ("REVERSAL", "REFUND") and r.get("category") in (None, "Other")):
+            oc_jama += jama
         if kind == "PAYMENT" and src.get("status") == "Reversed":
             r["tag"] = "REVERSED"
         elif kind == "REVERSAL":
@@ -272,4 +276,6 @@ def two_sided(rows: list[dict], events: list) -> None:
             cum_flat += udhar
             cum_cash += u_cash
             cum_acct += u_acct
+        else:
+            cum_other += udhar
         r.update(udhar_paise=udhar, jama_paise=jama, mode=mode, instrument=inst, balance_paise=bal, udhar_cash_paise=u_cash, udhar_account_paise=u_acct)

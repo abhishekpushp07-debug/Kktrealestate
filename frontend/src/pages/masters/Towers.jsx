@@ -48,7 +48,7 @@ function TowerForm({ tower, projects, onClose, onSaved }) {
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
   useEffect(() => { api.get("/master/block-types?page_size=50").then((r) => setTypes(r.data.items)); api.get("/master/flat-types?page_size=100").then((r) => setFlatTypes(r.data.items)); }, []);
   useEffect(() => { if (f.project_id) api.get(`/stage-plans?project_id=${f.project_id}`).then((r) => setStagePlans(r.data.items.filter((p) => p.is_active))); }, [f.project_id]);
-  useEffect(() => { setPositions((p) => Array.from({ length: Number(f.flats_per_floor) || 0 }, (_, i) => p[i] || { position: i + 1, flat_type_id: flatTypes[0]?.id || "" })); }, [f.flats_per_floor, flatTypes]);
+  useEffect(() => { setPositions((p) => Array.from({ length: Number(f.flats_per_floor) || 0 }, (_, i) => (p[i]?.flat_type_id ? p[i] : { position: i + 1, flat_type_id: flatTypes[0]?.id || "" }))); }, [f.flats_per_floor, flatTypes]);
   const missing = [["project_id", "Project"], ["name", "Name"], ["code", "Code"], ["block_type_id", "Block type"]].filter(([k]) => !String(f[k]).trim());
   const save = async () => {
     setErr(null);
