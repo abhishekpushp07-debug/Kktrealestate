@@ -4,54 +4,37 @@ bringing up nodes...
 ........................................................................ [ 14%]
 ........................................................................ [ 28%]
 ........................................................................ [ 42%]
-........................F...................F........................... [ 56%]
-.............s.......................................................... [ 70%]
+....................................s................................... [ 56%]
+........................................................................ [ 70%]
 ........................................................................ [ 84%]
-.........................................s.............................. [ 99%]
+.........................................s.........................F.... [ 99%]
 .....                                                                    [100%]
 =================================== FAILURES ===================================
-_______________________ test_matrix_file_matches_runtime _______________________
-[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+___ TestErpConstructionPhotos.test_upload_valid_and_invalid_and_patch_delete ___
+[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
 
-tmp_path = PosixPath('/tmp/pytest-of-root/pytest-155/popen-gw1/test_matrix_file_matches_runti0')
+self = <tests.test_phase_5.TestErpConstructionPhotos object at 0xfc8bfbd0f350>
+admin_tok = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDdhOGUiLCJjaWQiOiI2MWUzNWMx...oiYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDUyOTAyLCJleHAiOjE3OTMwNTM4MDJ9.Q7hTtE_By1P3Dpq9-NV3bIKmwn5yjaXA3k38jc-mhiw'
 
-    def test_matrix_file_matches_runtime(tmp_path):
-        """Write the derived matrix next to the code so reviewers can diff it; fail if a tracked copy exists and differs."""
-        import json
-        target = os.path.join(os.path.dirname(__file__), "..", "security", "permission_matrix.json")
-        doc = {f"{m} {p}": sorted(v["perms"]) if v["perms"] else (["<portal>"] if v["portal"] else (["<authenticated>"] if v["authed"] else ["<public>"])) for (m, p), v in sorted(MATRIX.items())}
-        os.makedirs(os.path.dirname(target), exist_ok=True)
-        if os.path.exists(target):
->           assert json.load(open(target)) == doc, "security/permission_matrix.json is stale — regenerate by deleting it and re-running this test"
-E           AssertionError: security/permission_matrix.json is stale — regenerate by deleting it and re-running this test
-E           assert {'DELETE /api...cated>'], ...} == {'DELETE /api...cated>'], ...}
-E             
-E             Omitting 456 identical items, use -vv to show
-E             Right contains 1 more item:
-E             {'PATCH /api/blocks/{block_id}/construction/stages/{stage_id}/planned-date': ['construction.stage.update',
-E                                                                                           'construction.update.complete']}
-E             Use -v to get more diff
+    def test_upload_valid_and_invalid_and_patch_delete(self, admin_tok):
+        blocks = requests.get(f"{BASE}/api/blocks", headers=_hdr(admin_tok)).json()
+        bitems = blocks.get("items") or blocks
+        # pick a block with completed milestones (any block)
+        block_id = bitems[0]["id"]
+        # valid upload — endpoint uses `files` (plural)
+        jpg = _small_jpeg_bytes()
+        files = {"files": ("photo.jpg", io.BytesIO(jpg), "image/jpeg")}
+        r = requests.post(
+            f"{BASE}/api/blocks/{block_id}/milestones/1/photos",
+            files=files,
+            headers={"Authorization": f"Bearer {admin_tok}", "Idempotency-Key": str(uuid.uuid4())},
+        )
+>       assert r.status_code in (200, 201), f"{r.status_code} {r.text[:300]}"
+E       AssertionError: 500 {"detail":"Internal server error","code":"INTERNAL_ERROR","request_id":"e23855420506436c","error":{"code":"INTERNAL_ERROR","message":"Internal server error","details":[],"request_id":"e23855420506436c"}}
+E       assert 500 in (200, 201)
+E        +  where 500 = <Response [500]>.status_code
 
-tests/test_permission_matrix.py:84: AssertionError
-________________________ test_collections_csv_no_paise _________________________
-[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
-
-admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDd...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDUyNDUyLCJleHAiOjE3OTMwNTMzNTJ9.Kf_sbLjND_xk8Kv7kd_wtS0Z2aVpEtJ6LswldA1CZYY'}
-
-    def test_collections_csv_no_paise(admin_headers):
-        r = requests.get(f"{BASE_URL}/api/reports/collections?format=csv", headers=admin_headers, timeout=20)
-        assert r.status_code == 200, r.text[:300]
-        text = r.text
-        header = text.splitlines()[0] if text else ""
-        assert "paise" not in header.lower(), f"'paise' in header: {header}"
-        # columns ending in _inr expected
-        cols = [c.strip().lower() for c in header.split(",")]
-        inr_cols = [c for c in cols if c.endswith("_inr")]
->       assert inr_cols, f"no _inr columns found in header: {header}"
-E       AssertionError: no _inr columns found in header: # Collections Report · 01 Oct 2025 – 27 Oct 2026 · status Cleared · grouped by day
-E       assert []
-
-tests/test_phase_c_refocus.py:119: AssertionError
+tests/test_phase_5.py:441: AssertionError
 =============================== warnings summary ===============================
 ../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
 ../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
@@ -82,6 +65,5 @@ tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
 =========================== short test summary info ============================
-FAILED tests/test_permission_matrix.py::test_matrix_file_matches_runtime - As...
-FAILED tests/test_phase_c_refocus.py::test_collections_csv_no_paise - Asserti...
-2 failed, 505 passed, 2 skipped, 9 warnings in 168.35s (0:02:48)
+FAILED tests/test_phase_5.py::TestErpConstructionPhotos::test_upload_valid_and_invalid_and_patch_delete
+1 failed, 506 passed, 2 skipped, 9 warnings in 194.80s (0:03:14)

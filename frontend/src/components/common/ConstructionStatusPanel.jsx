@@ -23,6 +23,10 @@ export function ConstructionStatusPanel({ blockId, onChanged }) {
   const [undoOpen, setUndoOpen] = useState(false);
   const [reason, setReason] = useState("");
   const load = useCallback(() => api.get(`/blocks/${blockId}/construction`).then((r) => setData(r.data)).catch((e) => toast.error(errMsg(e))), [blockId]);
+  const savePlanned = async (s, v) => {
+    if ((v || "") === (s.planned_date || "")) return;
+    try { await api.patch(`/blocks/${blockId}/construction/stages/${s.stage_id}/planned-date`, { planned_date: v || null }); toast.success(v ? `Planned ${fmtDate(v)}` : "Planned date cleared"); load(); } catch (e) { toast.error(errMsg(e)); }
+  };
   useEffect(() => { load(); }, [load]);
   if (!data) return <div className="card p-5 text-sm text-txt-muted">Loading…</div>;
   const canEdit = can("construction.stage.update") || can("construction.update.complete");
@@ -50,8 +54,8 @@ export function ConstructionStatusPanel({ blockId, onChanged }) {
           {data.stages.map((s) => <li key={s.stage_id} className={`flex flex-wrap items-center gap-3 rounded-lg border px-3 py-2 ${s.status === "Completed" ? "border-emerald-200 bg-sage-50/50" : s.status === "In Progress" ? "border-gold-border bg-gold-light" : "bg-white"}`} data-testid={`cs-stage-${s.seq}`}>
             <span className={`grid h-7 w-7 place-items-center rounded-full text-xs font-bold ${s.status === "Completed" ? "bg-emerald-600 text-white" : "bg-warm-50 text-txt-secondary"}`}>{s.status === "Completed" ? <Check className="h-4 w-4" /> : s.seq}</span>
             <div className="min-w-0 flex-1"><p className="text-sm font-semibold text-ink-950">{s.name}{s.is_possession && <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-[#6B4E00]">Possession</span>}</p><p className="text-xs text-txt-secondary">{s.status}{s.completed_on ? ` · ${fmtDate(s.completed_on)}` : ""}{s.completed_by_name ? ` · ${s.completed_by_name}` : ""}</p></div>
-            {s.status !== "Completed" && <label className="flex items-center gap-1 text-xs text-txt-secondary" title="Planned completion date (drives the Receivables Forecast month)">Planned<input type="date" className="h-7 rounded border px-1 text-xs" value={s.planned_date || ""} data-testid={`cs-stage-${s.seq}-planned`}
-              onChange={async (e) => { try { await api.patch(`/blocks/${blockId}/construction/stages/${s.stage_id}/planned-date`, { planned_date: e.target.value || null }); toast.success(e.target.value ? `Planned ${fmtDate(e.target.value)}` : "Planned date cleared"); load(); } catch (err) { toast.error(err.response?.data?.detail?.message || err.response?.data?.detail || "Could not save planned date"); } }} /></label>}
+            {s.status !== "Completed" && <label className="flex items-center gap-1 text-xs text-txt-secondary" title="Planned completion date (drives the Receivables Forecast month)">Planned<input type="date" className="h-7 rounded border px-1 text-xs" defaultValue={s.planned_date || ""} data-testid={`cs-stage-${s.seq}-planned`}
+              onBlur={(e) => savePlanned(s, e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") savePlanned(s, e.currentTarget.value); }} /></label>}
             {s.demands?.count > 0 && <span className="text-xs text-txt-secondary" data-testid={`cs-stage-${s.seq}-demands`}>{s.demands.count} demand(s) · {inr(s.demands.total)} · paid {inr(s.demands.paid)}</span>}
           </li>)}
         </ol>

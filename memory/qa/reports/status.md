@@ -1,4 +1,4 @@
-# Phase I reports — tie-out status · DB `test_database` · 2026-10-27T03:37:02+05:30
+# Phase I reports — tie-out status · DB `test_database` · 2026-10-27T03:44:41+05:30
 
 ## collections-v2 — DONE
 - **PASS** net Jama (receipt basis, all time) == Σ cleared receipts · report=`32365678500` raw=`32365678500`

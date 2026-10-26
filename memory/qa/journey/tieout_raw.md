@@ -32,8 +32,13 @@
 | sales-leads total == leads | `125` | `125` | **PASS** |  |
 | Σ cleared cash receipts == booking.summary.cash_paid (all active) | `0` | `0` | **PASS** | count of bookings that differ |
 | Σ Udhar − Σ Jama == outstanding − advance (every booking) | `0` | `0` | **PASS** | two-sided ledger law |
-| report [collections-v2] net Jama == Σ Jama rows (receipts + reversals) | `` | `` | **PASS** | tools/tieout_reports.py |
-| report [collections-v2] net Jama == Σ cleared receipts | `` | `` | **PASS** | tools/tieout_reports.py |
+| report [collections-v2] net Jama (receipt basis, all time) == Σ cleared receipts | `` | `` | **PASS** | tools/tieout_reports.py |
+| report [collections-v2] net Jama == Σ ledger Jama rows (receipts + reversals) | `` | `` | **PASS** | tools/tieout_reports.py |
+| report [collections-v2] FY total (receipt basis) == raw payments by receipt date | `` | `` | **PASS** | tools/tieout_reports.py |
+| report [collections-v2] basis label present (receipt) | `` | `` | **PASS** | tools/tieout_reports.py |
+| report [collections-v2] FY total (clearance basis) == raw payments by clearance date | `` | `` | **PASS** | tools/tieout_reports.py |
+| report [collections-v2] basis label present (clearance) | `` | `` | **PASS** | tools/tieout_reports.py |
+| report [collections-v2] receipt basis == legacy collections (payment_date, Cleared) | `` | `` | **PASS** | tools/tieout_reports.py |
 | report [collections-v2] Σ by project == total (total_paise) | `` | `` | **PASS** | tools/tieout_reports.py |
 | report [collections-v2] Σ by block == total (total_paise) | `` | `` | **PASS** | tools/tieout_reports.py |
 | report [collections-v2] Σ by bucket == total (total_paise) | `` | `` | **PASS** | tools/tieout_reports.py |
@@ -41,15 +46,19 @@
 | report [collections-v2] Σ by bank == total (total_paise) | `` | `` | **PASS** | tools/tieout_reports.py |
 | report [collections-v2] Σ by rm == total (total_paise) | `` | `` | **PASS** | tools/tieout_reports.py |
 | report [collections-v2] Σ by day == total (total_paise) | `` | `` | **PASS** | tools/tieout_reports.py |
-| report [outstanding-v2] balance == Σ definitions.outstanding(summary) | `` | `` | **PASS** | tools/tieout_reports.py |
-| report [outstanding-v2] Σ Udhar − Σ Jama == balance − advance | `` | `` | **PASS** | tools/tieout_reports.py |
+| report [outstanding-v2] outstanding == Σ definitions.outstanding(summary) | `` | `` | **PASS** | tools/tieout_reports.py |
 | report [outstanding-v2] advance held == Σ definitions.advance | `` | `` | **PASS** | tools/tieout_reports.py |
-| report [outstanding-v2] balance == Home outstanding tile | `` | `` | **PASS** | tools/tieout_reports.py |
-| report [outstanding-v2] bands Σ == total balance | `` | `` | **PASS** | tools/tieout_reports.py |
+| report [outstanding-v2] net == outstanding − advance == Σ Udhar − Σ Jama | `` | `` | **PASS** | tools/tieout_reports.py |
+| report [outstanding-v2] per booking: report net == ledger net == summary net; report outstanding == summary outstanding | `` | `` | **PASS** | tools/tieout_reports.py |
+| report [outstanding-v2] outstanding == Home outstanding tile | `` | `` | **PASS** | tools/tieout_reports.py |
+| report [outstanding-v2] bands Σ == outstanding | `` | `` | **PASS** | tools/tieout_reports.py |
 | report [outstanding-v2] report bands == Σ definitions.ageing_bands | `` | `` | **PASS** | tools/tieout_reports.py |
-| report [outstanding-v2] Σ by customer == total (balance_paise) | `` | `` | **PASS** | tools/tieout_reports.py |
-| report [outstanding-v2] Σ by project == total (balance_paise) | `` | `` | **PASS** | tools/tieout_reports.py |
-| report [outstanding-v2] Σ by block == total (balance_paise) | `` | `` | **PASS** | tools/tieout_reports.py |
+| report [outstanding-v2] Σ by customer == total (outstanding_paise) | `` | `` | **PASS** | tools/tieout_reports.py |
+| report [outstanding-v2] Σ by customer == total (net_balance_paise) | `` | `` | **PASS** | tools/tieout_reports.py |
+| report [outstanding-v2] Σ by project == total (outstanding_paise) | `` | `` | **PASS** | tools/tieout_reports.py |
+| report [outstanding-v2] Σ by project == total (net_balance_paise) | `` | `` | **PASS** | tools/tieout_reports.py |
+| report [outstanding-v2] Σ by block == total (outstanding_paise) | `` | `` | **PASS** | tools/tieout_reports.py |
+| report [outstanding-v2] Σ by block == total (net_balance_paise) | `` | `` | **PASS** | tools/tieout_reports.py |
 | report [demand-vs-collection] demanded == Σ non-void demands | `` | `` | **PASS** | tools/tieout_reports.py |
 | report [demand-vs-collection] collected == Σ demand.paid | `` | `` | **PASS** | tools/tieout_reports.py |
 | report [cash-vs-account] cash raised == Σ summary.cash_order_raised | `` | `` | **PASS** | tools/tieout_reports.py |
@@ -64,6 +73,10 @@
 | report [receivables-forecast] Σ by project == total (expected_paise) | `` | `` | **PASS** | tools/tieout_reports.py |
 | report [receivables-forecast] Σ by block == total (expected_paise) | `` | `` | **PASS** | tools/tieout_reports.py |
 | report [receivables-forecast] Σ by booking == total (expected_paise) | `` | `` | **PASS** | tools/tieout_reports.py |
+| report [receivables-forecast] Σ by stage == total (expected_paise) | `` | `` | **PASS** | tools/tieout_reports.py |
+| report [receivables-forecast] Σ by month == total (expected_paise) | `` | `` | **PASS** | tools/tieout_reports.py |
+| report [receivables-forecast] default grouping is tower → stage when no planned dates | `` | `` | **PASS** | tools/tieout_reports.py |
+| report [receivables-forecast] stage grouping: one row per tower·stage, Σ == total | `` | `` | **PASS** | tools/tieout_reports.py |
 | report [cancellations] rows == Cancelled bookings | `` | `` | **PASS** | tools/tieout_reports.py |
 | report [cancellations] refund paid == Σ paid refunds | `` | `` | **PASS** | tools/tieout_reports.py |
 | report [cancellations] ledger REFUND rows == Σ paid refunds | `` | `` | **PASS** | tools/tieout_reports.py |
@@ -90,11 +103,15 @@
 | report [sales-team] sold value == Σ live agreement values | `` | `` | **PASS** | tools/tieout_reports.py |
 | report [sales-team] collections == Σ cleared receipts of live bookings | `` | `` | **PASS** | tools/tieout_reports.py |
 | report [sales-team] overdue == outstanding report overdue | `` | `` | **PASS** | tools/tieout_reports.py |
-| report [construction-vs-plan] stages done == Σ Completed stage records | `` | `` | **PASS** | tools/tieout_reports.py |
-| report [construction-vs-plan] stage demands == Σ ON_STAGE demands | `` | `` | **PASS** | tools/tieout_reports.py |
+| report [construction-vs-plan] stage rows == Σ stages of active towers | `` | `` | **PASS** | tools/tieout_reports.py |
+| report [construction-vs-plan] stage demands == Σ ON_STAGE/ON_POSSESSION demands | `` | `` | **PASS** | tools/tieout_reports.py |
+| report [construction-vs-plan] subtotals == Σ their stage rows (demanded) | `` | `` | **PASS** | tools/tieout_reports.py |
+| report [construction-vs-plan] no tower name with leading/trailing space | `` | `` | **PASS** | tools/tieout_reports.py |
+| report [construction-vs-plan] GET /payments/demands honours block_id | `` | `` | **PASS** | tools/tieout_reports.py |
 | report [service-sla] tickets == service_requests | `` | `` | **PASS** | tools/tieout_reports.py |
 | report [activity] audit actions == audit_logs | `` | `` | **PASS** | tools/tieout_reports.py |
 | report [data-quality] open demands on cancelled bookings == 0 (integrity) | `` | `` | **PASS** | tools/tieout_reports.py |
+| report [data-quality] towers without stage plan excludes inactive towers | `` | `` | **PASS** | tools/tieout_reports.py |
 | report [data-quality] payment plans not summing 100 == 0 | `` | `` | **PASS** | tools/tieout_reports.py |
 | report [data-quality] integrity report ok | `` | `` | **PASS** | tools/tieout_reports.py |
-| Phase I report tie-outs all PASS | `True` | `True` | **PASS** | 65 report ties |
+| Phase I report tie-outs all PASS | `True` | `True` | **PASS** | 82 report ties |
