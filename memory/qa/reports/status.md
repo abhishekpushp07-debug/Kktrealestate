@@ -1,4 +1,4 @@
-# Phase I reports — tie-out status · DB `test_database` · 2026-10-27T03:59:47+05:30
+# Phase I reports — tie-out status · DB `test_database` · 2026-10-27T04:45:43+05:30
 
 ## collections-v2 — DONE
 - **PASS** net Jama (receipt basis, all time) == Σ cleared receipts · report=`32365678500` raw=`32365678500`
@@ -110,7 +110,7 @@
 - **PASS** tickets == service_requests · report=`14` raw=`14`
 
 ## activity — DONE
-- **PASS** audit actions == audit_logs · report=`3882` raw=`3882`
+- **PASS** audit actions == audit_logs · report=`4002` raw=`4002`
 
 ## data-quality — DONE
 - **PASS** open demands on cancelled bookings == 0 (integrity) · report=`0` raw=`0`

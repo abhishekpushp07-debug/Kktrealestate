@@ -40,7 +40,7 @@ async def archive_old_rows(months: int | None = None, batch: int = 1000) -> dict
         confirmed = await db.audit_logs_archive.count_documents({"id": {"$in": ids}})
         if confirmed != len(ids):
             break
-        res = await db.audit_logs.delete_many({"id": {"$in": ids}})
+        res = await db.audit_logs.raw("archive to cold storage").delete_many({"id": {"$in": ids}})
         moved += res.deleted_count
     await db.settings.update_one({"key": "audit_archive_last_run"}, {"$set": {"value": {"at": now_iso(), "cutoff": cutoff, "moved": moved, "months": months}}}, upsert=True)
     return {"cutoff": cutoff, "moved": moved, "months": months, "hot": await db.audit_logs.count_documents({}), "archived": await db.audit_logs_archive.count_documents({})}

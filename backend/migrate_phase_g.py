@@ -34,7 +34,7 @@ async def migrate_phase_g(dry_run: bool = False, actor: dict | None = None) -> d
             await db.refunds.insert_one({"id": new_id(), "company_id": b["company_id"], "refund_number": f"RF-LEGACY-{b['booking_number'].split('-')[-1]}", "booking_id": b["id"], "booking_number": b["booking_number"], "customer_id": b["customer_id"], "customer_name": b["customer_name"],
                                          "project_id": b["project_id"], "project_code": b.get("project_code"), "block_id": b["block_id"], "flat_id": b["flat_id"], "amount_paise": c["refund_paise"], "split": {"Cash": min(s.get("cash_paid_paise", 0), c["refund_paise"]), "Account": max(0, c["refund_paise"] - min(s.get("cash_paid_paise", 0), c["refund_paise"])), "Other": 0},
                                          "deduction_paise": c.get("deduction_paise", 0), "received_paise": s.get("paid_paise", 0), "status": "Pending", "legacy": True, "due_by": None, "created_at": ts, "created_by": who["id"], "paid_at": None, "paid_date": None, "mode": None, "version": 1})
-    await db.audit_logs.update_many({"propagated_complete": {"$exists": False}}, {"$set": {"propagated_complete": True, "propagated": {"legacy": ts}}})
+    await db.audit_logs.raw("phase G migration").update_many({"propagated_complete": {"$exists": False}}, {"$set": {"propagated_complete": True, "propagated": {"legacy": ts}}})
     from services.ledger import rebuild
     for bid in rep["by_booking"]:
         await rebuild(bid)

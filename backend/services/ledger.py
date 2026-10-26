@@ -181,7 +181,7 @@ async def rebuild(booking_id: str) -> list[dict]:
             status = "Cancelled"  # definition: a cancelled booking carries no live demands
         if (d.get("status") != status) or d.get("paid_paise") != paid:
             await db.demands.update_one({"id": d["id"]}, {"$set": {"status": status, "paid_paise": paid}})
-    await db.ledger_entries.delete_many({"booking_id": booking_id})
+    await db.ledger_entries.raw("ledger projection rebuild").delete_many({"booking_id": booking_id})
     if rows:
         await db.ledger_entries.insert_many([dict(r) for r in rows])
     await db.bookings.update_one({"id": booking_id}, {"$set": {"summary": summary, "other_charges": list(lines.values()), "ledger_rebuilt_at": now_iso()}})
