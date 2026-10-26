@@ -174,7 +174,9 @@ class PaymentPlanIn(StrictModel):
 
 
 async def _usage_stage(doc_id):
-    return await db.payment_plans.count_documents({"is_active": True, "installments.trigger_stage_id": doc_id}), "payment plan(s)"
+    plans = await db.payment_plans.count_documents({"is_active": True, "installments.trigger_stage_id": doc_id})
+    stage_plans = await db.construction_stage_plans.count_documents({"is_active": True, "stage_ids": doc_id})
+    return plans + stage_plans, "payment plan(s) / stage plan(s)"
 
 
 async def _usage_plan(doc_id):
