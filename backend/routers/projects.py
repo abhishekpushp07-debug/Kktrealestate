@@ -90,9 +90,18 @@ class ProjectCreate(StrictModel):
         return v
 
 
+class CancellationPolicy(StrictModel):
+    deduction_type: Literal["percent", "fixed"] = "percent"
+    deduction_base: Literal["received", "agreement"] = "received"
+    deduction_value: float = Field(ge=0)
+    gst_on_deduction: bool = False
+    refund_sla_days: int = Field(default=45, ge=0, le=365)
+
+
 class ProjectUpdate(StrictModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
     default_cash_percent: float | None = Field(default=None, ge=0, le=100)
+    cancellation_policy: CancellationPolicy | None = None
     description: str | None = None
     project_type: Literal["Residential", "Commercial", "Mixed"] | None = None
     address: Address | None = None

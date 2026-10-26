@@ -277,7 +277,12 @@ class SwapIn(StrictModel):
     version: int | None = None
 
 
-async def _policy(company_id: str) -> dict:
+async def _policy(company_id: str, project_id: str | None = None) -> dict:
+    """Project policy wins, else company, else money_ops.DEFAULT_POLICY."""
+    if project_id:
+        p = await db.projects.find_one({"id": project_id}, {"_id": 0, "cancellation_policy": 1})
+        if (p or {}).get("cancellation_policy"):
+            return p["cancellation_policy"]
     c = await db.companies.find_one({"id": company_id}, {"_id": 0, "cancellation_policy": 1})
     return (c or {}).get("cancellation_policy") or {}
 
@@ -286,7 +291,7 @@ async def _policy(company_id: str) -> dict:
 async def cancellation_preview_ep(booking_id: str, deduction: float | None = None, user: dict = Depends(require("sales.booking.cancel"))):
     from services.money_ops import cancellation_preview
     b = await _load(booking_id, user)
-    return present_money(cancellation_preview(b, await _policy(user["company_id"]), to_paise(deduction) if deduction is not None else None))
+    return present_money(cancellation_preview(b, await _policy(user["company_id"], b.get("project_id")), to_paise(deduction) if deduction is not None else None))
 
 
 @router.get("/{booking_id}/refunds")
@@ -305,7 +310,7 @@ async def cancel_booking(booking_id: str, body: CancelIn, request: Request, user
         raise ApiError(409, f"Booking is already {b['status']}", "BOOKING_NOT_ACTIVE")
     if await db.payments.count_documents({"booking_id": booking_id, "status": "Pending"}):
         raise ApiError(409, "Clear or bounce pending cheques before cancelling", "PENDING_PAYMENTS")
-    policy = await _policy(user["company_id"])
+    policy = await _policy(user["company_id"], b.get("project_id"))
     pv = cancellation_preview(b, policy, to_paise(body.deduction) if body.deduction else None)
     ts = now_iso()
     canc = {"at": ts, "by": user["id"], "by_name": user["name"], "reason": body.reason, **{k: pv[k] for k in ("received_paise", "deduction_paise", "charges_due_paise", "refund_paise", "forfeiture_paise")}, "lines": pv["lines"], "policy": pv["policy"]}
