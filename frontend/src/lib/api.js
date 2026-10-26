@@ -57,6 +57,11 @@ api.interceptors.response.use(
     if (rid) { lastError.request_id = rid; lastError.at = Date.now(); }
     if (response?.status === 409 && response.data?.code === "VERSION_CONFLICT" && conflictHandler.fn) conflictHandler.fn(response.data);
     if (response?.status === 403 && response.data?.code === "PERMISSION_DENIED" && onDenied.fn) onDenied.fn(response.data);
+    if (response?.status === 503 && response.headers?.["retry-after"] && (config.method || "get").toLowerCase() === "get" && !config._retried503) {
+      config._retried503 = true;  // Phase K.11: idempotent GET retried once after Retry-After (capped at 5 s)
+      await new Promise((res) => setTimeout(res, Math.min(5, Number(response.headers["retry-after"]) || 2) * 1000));
+      return api(config);
+    }
     if (response?.status === 401 && !config._retry && !config.url.includes("/auth/login") && !config.url.includes("/auth/refresh")) {
       config._retry = true;
       try {
