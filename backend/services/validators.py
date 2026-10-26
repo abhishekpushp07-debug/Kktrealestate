@@ -35,6 +35,9 @@ async def apply_validators() -> dict:
     existing = set(await db.list_collection_names())
     for name, schema in SCHEMAS.items():
         validator = {"$jsonSchema": {"bsonType": "object", **schema}}
+        from services.invariants import VALIDATORS as _INV  # Phase K: keep money $expr invariants when re-applying schemas
+        if name in _INV and "$expr" in _INV[name]:
+            validator = {"$and": [validator, {"$expr": _INV[name]["$expr"]}]}
         try:
             if name not in existing:
                 await db.create_collection(name, validator=validator, validationLevel="moderate", validationAction="error")

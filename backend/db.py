@@ -17,7 +17,8 @@ POOL = {"maxPoolSize": int(os.environ.get("MONGO_MAX_POOL", "50")), "minPoolSize
         "maxIdleTimeMS": 120000, "heartbeatFrequencyMS": 10000}
 client = AsyncIOMotorClient(os.environ["MONGO_URL"], **POOL, retryWrites=True, retryReads=True, compressors="zlib",
                             event_listeners=[__import__("dbtiming").DbTimingListener(), __import__("dbtiming").PoolListener()])
-db = client.get_database(os.environ["DB_NAME"], write_concern=__import__("pymongo").WriteConcern(w="majority", j=True) if os.environ.get("MONGO_WRITE_MAJORITY", "1") == "1" else None)
+_db_raw = client.get_database(os.environ["DB_NAME"], write_concern=__import__("pymongo").WriteConcern(w="majority", j=True) if os.environ.get("MONGO_WRITE_MAJORITY", "1") == "1" else None)
+db = __import__("services.immutable", fromlist=["GuardedDatabase"]).GuardedDatabase(_db_raw)  # Phase K: audit_logs / ledger_entries append-only guard
 # reads: primary (default) for transactional truth; `db_ro` below for derived read models
 # derived read models may be served from secondaries when a replica set exists (standalone ignores the preference)
 db_ro = client.get_database(os.environ["DB_NAME"], read_preference=__import__("pymongo").ReadPreference.SECONDARY_PREFERRED)
@@ -55,6 +56,8 @@ async def ensure_indexes():
     await db.companies.create_index("id", unique=True)
     await db.idempotency_keys.create_index([("user_id", ASCENDING), ("key", ASCENDING)], unique=True)
     await db.idempotency_keys.create_index("created_at", expireAfterSeconds=86400)
+    await db.idempotency_claims.create_index([("owner", ASCENDING), ("key", ASCENDING)], unique=True)
+    await db.idempotency_claims.create_index("created_at", expireAfterSeconds=86400)
     await db.rate_limits.create_index([("bucket", ASCENDING), ("slot", ASCENDING)], unique=True)
     await db.rate_limits.create_index("expires_at", expireAfterSeconds=0)
     await db.login_events.create_index([("created_at", DESCENDING)])
