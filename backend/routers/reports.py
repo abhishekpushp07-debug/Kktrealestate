@@ -20,6 +20,8 @@ from utils import (
     write_audit,
 )
 
+from services.budgets import REPORT_MS  # Phase K.8
+
 router = APIRouter(prefix="/reports", tags=["reports"])
 REPORTS = [
     # Finance
@@ -158,13 +160,13 @@ async def collections(request: Request, from_date: str | None = None, to_date: s
         if category != "Other charges":
             q["payment_category"] = category
     key = {"day": "$payment_date", "week": {"$dateToString": {"format": "%G-W%V", "date": {"$dateFromString": {"dateString": "$payment_date"}}}}, "month": {"$substr": ["$payment_date", 0, 7]}}[group_by if group_by in ("day", "week", "month") else "day"]
-    rows = await db.payments.aggregate([{"$match": q}, {"$group": {"_id": key, "count": {"$sum": 1}, "total_paise": {"$sum": "$amount_paise"},
+    rows = await db.payments.aggregate(maxTimeMS=REPORT_MS, pipeline=[{"$match": q}, {"$group": {"_id": key, "count": {"$sum": 1}, "total_paise": {"$sum": "$amount_paise"},
         "cash_paise": {"$sum": {"$cond": [{"$eq": ["$payment_category", "Cash"]}, "$amount_paise", 0]}}, "account_paise": {"$sum": {"$cond": [{"$eq": ["$payment_category", "Account"]}, "$amount_paise", 0]}},
         "other_paise": {"$sum": {"$cond": [{"$ne": ["$against", "FLAT_VALUE"]}, "$amount_paise", 0]}}}}, {"$sort": {"_id": 1}}]).to_list(None)
     for r in rows:
         r["period"] = r.pop("_id")
-    by_mode = await db.payments.aggregate([{"$match": q}, {"$group": {"_id": "$payment_mode_name", "total_paise": {"$sum": "$amount_paise"}, "count": {"$sum": 1}}}, {"$sort": {"total_paise": -1}}]).to_list(None)
-    gst = await db.payments.aggregate([{"$match": {**q, "against": {"$ne": "FLAT_VALUE"}}}, {"$lookup": {"from": "bookings", "localField": "booking_id", "foreignField": "id", "as": "b"}}, {"$unwind": "$b"}, {"$unwind": "$b.other_charges"},
+    by_mode = await db.payments.aggregate(maxTimeMS=REPORT_MS, pipeline=[{"$match": q}, {"$group": {"_id": "$payment_mode_name", "total_paise": {"$sum": "$amount_paise"}, "count": {"$sum": 1}}}, {"$sort": {"total_paise": -1}}]).to_list(None)
+    gst = await db.payments.aggregate(maxTimeMS=REPORT_MS, pipeline=[{"$match": {**q, "against": {"$ne": "FLAT_VALUE"}}}, {"$lookup": {"from": "bookings", "localField": "booking_id", "foreignField": "id", "as": "b"}}, {"$unwind": "$b"}, {"$unwind": "$b.other_charges"},
         {"$match": {"$expr": {"$eq": ["$b.other_charges.line_id", "$other_charge_line_id"]}}}, {"$group": {"_id": None, "gst_paise": {"$sum": {"$cond": [{"$gt": ["$b.other_charges.total_paise", 0]}, {"$toLong": {"$multiply": ["$amount_paise", {"$divide": ["$b.other_charges.gst_paise", "$b.other_charges.total_paise"]}]}}, 0]}}}}]).to_list(1)
     totals = {k: sum(r[k] for r in rows) for k in ("count", "total_paise", "cash_paise", "account_paise", "other_paise")}
     totals["gst_collected_paise"] = gst[0]["gst_paise"] if gst else 0
@@ -228,7 +230,7 @@ async def advances(request: Request, project_id: str | None = None, format: str 
 async def demand_vs_collection(request: Request, project_id: str | None = None, block_id: str | None = None, format: str | None = None, user: dict = Depends(require("reports.demand_vs_collection.view"))):
     _strict_params(request, {'block_id', 'project_id'})
     q = {**_scope(user, project_id, block_id), "voided": False}
-    rows = await db.demands.aggregate([{"$match": q}, {"$group": {"_id": {"block_id": "$block_id", "seq": "$milestone_seq", "name": "$milestone_name", "pct": "$cumulative_percent"}, "cash_demand_paise": {"$sum": "$cash_demand_paise"}, "account_demand_paise": {"$sum": "$account_demand_paise"}, "demand_paise": {"$sum": "$total_demand_paise"}, "collected_paise": {"$sum": "$paid_paise"}, "count": {"$sum": 1}}}, {"$sort": {"_id.block_id": 1, "_id.seq": 1}}]).to_list(None)
+    rows = await db.demands.aggregate(maxTimeMS=REPORT_MS, pipeline=[{"$match": q}, {"$group": {"_id": {"block_id": "$block_id", "seq": "$milestone_seq", "name": "$milestone_name", "pct": "$cumulative_percent"}, "cash_demand_paise": {"$sum": "$cash_demand_paise"}, "account_demand_paise": {"$sum": "$account_demand_paise"}, "demand_paise": {"$sum": "$total_demand_paise"}, "collected_paise": {"$sum": "$paid_paise"}, "count": {"$sum": 1}}}, {"$sort": {"_id.block_id": 1, "_id.seq": 1}}]).to_list(None)
     blocks = {b["id"]: f"{b.get('project_code', '')} {b['name']}" for b in await db.blocks.find({"company_id": user["company_id"]}, {"_id": 0, "id": 1, "name": 1, "project_code": 1}).to_list(None)}
     out = [{"block": blocks.get(r["_id"]["block_id"], "?"), "milestone": f"{r['_id']['seq']}. {r['_id']['name']}", "percent": r["_id"]["pct"], "count": r["count"], "cash_demand_paise": r["cash_demand_paise"], "account_demand_paise": r["account_demand_paise"], "demand_paise": r["demand_paise"], "collected_paise": r["collected_paise"],
             "pct_collected": round(100 * r["collected_paise"] / r["demand_paise"], 1) if r["demand_paise"] else 0} for r in rows]
@@ -244,7 +246,7 @@ async def inventory(request: Request, project_id: str | None = None, group_by: s
     _strict_params(request, {'group_by', 'project_id'})
     q = {**_scope(user, project_id), "is_active": True}
     key = {"project": "$project_id", "block": "$block_id", "flat_type": "$flat_type_code", "floor": {"$concat": ["$block_id", "|", {"$toString": "$floor"}]}}.get(group_by, "$block_id")
-    rows = await db.flats.aggregate([{"$match": q}, {"$group": {"_id": key, "total": {"$sum": 1}, **{s.lower(): {"$sum": {"$cond": [{"$eq": ["$status", s]}, 1, 0]}} for s in ("Available", "Hold", "Booked", "Sold", "Blocked")},
+    rows = await db.flats.aggregate(maxTimeMS=REPORT_MS, pipeline=[{"$match": q}, {"$group": {"_id": key, "total": {"$sum": 1}, **{s.lower(): {"$sum": {"$cond": [{"$eq": ["$status", s]}, 1, 0]}} for s in ("Available", "Hold", "Booked", "Sold", "Blocked")},
         "available_value": {"$sum": {"$cond": [{"$eq": ["$status", "Available"]}, {"$divide": [{"$ifNull": ["$price_paise", 0]}, 100]}, 0]}}, "sold_value": {"$sum": {"$cond": [{"$in": ["$status", ["Booked", "Sold"]]}, {"$divide": [{"$ifNull": ["$price_paise", 0]}, 100]}, 0]}}, "sqft": {"$sum": {"$ifNull": ["$super_builtup_sqft", 0]}}}}, {"$sort": {"_id": 1}}]).to_list(None)
     names = {b["id"]: f"{b.get('project_code', '')} {b['name']}" for b in await db.blocks.find({"company_id": user["company_id"]}, {"_id": 0, "id": 1, "name": 1, "project_code": 1}).to_list(None)}
     names.update({p["id"]: p["name"] for p in await db.projects.find({"company_id": user["company_id"]}, {"_id": 0, "id": 1, "name": 1}).to_list(None)})
@@ -255,9 +257,9 @@ async def inventory(request: Request, project_id: str | None = None, group_by: s
         return names.get(k, k)
     out = [{"group": label(r["_id"]), "total": r["total"], "available": r["available"], "hold": r["hold"], "booked": r["booked"], "sold": r["sold"], "blocked": r["blocked"], "available_value_paise": int(r["available_value"] * 100), "sold_value_paise": int(r["sold_value"] * 100)} for r in rows]
     since = (clock.today().replace(day=1) - timedelta(days=365)).isoformat()
-    vel = await db.bookings.aggregate([{"$match": {**_scope(user, project_id), "booking_date": {"$gte": since}}}, {"$group": {"_id": {"$substr": ["$booking_date", 0, 7]}, "bookings": {"$sum": 1}, "value_paise": {"$sum": "$agreement_value_paise"}, "sqft": {"$sum": {"$ifNull": ["$flat_snapshot.super_builtup_sqft", 0]}}}}, {"$sort": {"_id": 1}}]).to_list(None)
-    rate = await db.bookings.aggregate([{"$match": {**_scope(user, project_id), "status": {"$in": ["Active", "Completed"]}}}, {"$group": {"_id": "$project_code", "value_paise": {"$sum": "$agreement_value_paise"}, "sqft": {"$sum": {"$ifNull": ["$flat_snapshot.super_builtup_sqft", 0]}}, "n": {"$sum": 1}}}]).to_list(None)
-    rc = await db.rate_cards.aggregate([{"$match": {"company_id": user["company_id"], "is_active": True}}, {"$group": {"_id": "$project_id", "base": {"$avg": "$rate_per_sqft"}}}]).to_list(None)
+    vel = await db.bookings.aggregate(maxTimeMS=REPORT_MS, pipeline=[{"$match": {**_scope(user, project_id), "booking_date": {"$gte": since}}}, {"$group": {"_id": {"$substr": ["$booking_date", 0, 7]}, "bookings": {"$sum": 1}, "value_paise": {"$sum": "$agreement_value_paise"}, "sqft": {"$sum": {"$ifNull": ["$flat_snapshot.super_builtup_sqft", 0]}}}}, {"$sort": {"_id": 1}}]).to_list(None)
+    rate = await db.bookings.aggregate(maxTimeMS=REPORT_MS, pipeline=[{"$match": {**_scope(user, project_id), "status": {"$in": ["Active", "Completed"]}}}, {"$group": {"_id": "$project_code", "value_paise": {"$sum": "$agreement_value_paise"}, "sqft": {"$sum": {"$ifNull": ["$flat_snapshot.super_builtup_sqft", 0]}}, "n": {"$sum": 1}}}]).to_list(None)
+    rc = await db.rate_cards.aggregate(maxTimeMS=REPORT_MS, pipeline=[{"$match": {"company_id": user["company_id"], "is_active": True}}, {"$group": {"_id": "$project_id", "base": {"$avg": "$rate_per_sqft"}}}]).to_list(None)
     pcode = {p["id"]: p["code"] for p in await db.projects.find({"company_id": user["company_id"]}, {"_id": 0, "id": 1, "code": 1}).to_list(None)}
     rcm = {pcode.get(r["_id"]): r["base"] for r in rc}
     realised = [{"project": r["_id"], "bookings": r["n"], "realised_rate": round(r["value_paise"] / 100 / r["sqft"], 0) if r["sqft"] else None, "rate_card": rcm.get(r["_id"])} for r in rate]
@@ -334,7 +336,7 @@ async def sales_leads(request: Request, from_date: str | None = None, to_date: s
             overdue += 1
     for e in src.values():
         e["conversion_pct"] = round(100 * e["converted"] / e["leads"], 1) if e["leads"] else 0
-    per_user = await db.bookings.aggregate([{"$match": {"company_id": user["company_id"], **project_scope_filter(user), "booking_date": {"$gte": f, "$lte": t}}}, {"$group": {"_id": "$sales_user_id", "bookings": {"$sum": 1}, "value_paise": {"$sum": "$agreement_value_paise"}}}]).to_list(None)
+    per_user = await db.bookings.aggregate(maxTimeMS=REPORT_MS, pipeline=[{"$match": {"company_id": user["company_id"], **project_scope_filter(user), "booking_date": {"$gte": f, "$lte": t}}}, {"$group": {"_id": "$sales_user_id", "bookings": {"$sum": 1}, "value_paise": {"$sum": "$agreement_value_paise"}}}]).to_list(None)
     unames = {u["id"]: u["name"] for u in await db.users.find({"company_id": user["company_id"]}, {"_id": 0, "id": 1, "name": 1}).to_list(None)}
     enq = {}
     for l in leads:
@@ -353,8 +355,8 @@ async def roznamcha_range(request: Request, from_date: str | None = None, to_dat
     _strict_params(request, {'to_date', 'from_date'})
     f, t = _dates(from_date, to_date)
     base = {"company_id": user["company_id"], **project_scope_filter(user)}
-    pays = await db.payments.aggregate([{"$match": {**base, "payment_date": {"$gte": f, "$lte": t}, "status": "Cleared"}}, {"$group": {"_id": "$payment_date", "cash_paise": {"$sum": {"$cond": [{"$eq": ["$payment_mode_code", "CASH"]}, "$amount_paise", 0]}}, "bank_paise": {"$sum": {"$cond": [{"$ne": ["$payment_mode_code", "CASH"]}, "$amount_paise", 0]}}, "count": {"$sum": 1}}}, {"$sort": {"_id": 1}}]).to_list(None)
-    contra = await db.contra_entries.aggregate([{"$match": {"company_id": user["company_id"], "date": {"$gte": f, "$lte": t}}}, {"$group": {"_id": "$date", "deposit_paise": {"$sum": {"$cond": [{"$eq": ["$kind", "DEPOSIT"]}, "$amount_paise", 0]}}, "withdrawal_paise": {"$sum": {"$cond": [{"$eq": ["$kind", "WITHDRAWAL"]}, "$amount_paise", 0]}}}}]).to_list(None)
+    pays = await db.payments.aggregate(maxTimeMS=REPORT_MS, pipeline=[{"$match": {**base, "payment_date": {"$gte": f, "$lte": t}, "status": "Cleared"}}, {"$group": {"_id": "$payment_date", "cash_paise": {"$sum": {"$cond": [{"$eq": ["$payment_mode_code", "CASH"]}, "$amount_paise", 0]}}, "bank_paise": {"$sum": {"$cond": [{"$ne": ["$payment_mode_code", "CASH"]}, "$amount_paise", 0]}}, "count": {"$sum": 1}}}, {"$sort": {"_id": 1}}]).to_list(None)
+    contra = await db.contra_entries.aggregate(maxTimeMS=REPORT_MS, pipeline=[{"$match": {"company_id": user["company_id"], "date": {"$gte": f, "$lte": t}}}, {"$group": {"_id": "$date", "deposit_paise": {"$sum": {"$cond": [{"$eq": ["$kind", "DEPOSIT"]}, "$amount_paise", 0]}}, "withdrawal_paise": {"$sum": {"$cond": [{"$eq": ["$kind", "WITHDRAWAL"]}, "$amount_paise", 0]}}}}]).to_list(None)
     cm = {c["_id"]: c for c in contra}
     rows = [{"date": p["_id"], "count": p["count"], "cash_paise": p["cash_paise"], "bank_paise": p["bank_paise"], "total_paise": p["cash_paise"] + p["bank_paise"], "deposit_paise": cm.get(p["_id"], {}).get("deposit_paise", 0), "withdrawal_paise": cm.get(p["_id"], {}).get("withdrawal_paise", 0)} for p in pays]
     for d, c in cm.items():
@@ -370,7 +372,7 @@ async def roznamcha_range(request: Request, from_date: str | None = None, to_dat
 async def bank_receipts(request: Request, from_date: str | None = None, to_date: str | None = None, format: str | None = None, user: dict = Depends(require("reports.bank_wise.view"))):
     _strict_params(request, {'to_date', 'from_date'})
     f, t = _dates(from_date, to_date)
-    rows = await db.payments.aggregate([{"$match": {"company_id": user["company_id"], **project_scope_filter(user), "payment_date": {"$gte": f, "$lte": t}, "status": {"$in": ["Cleared", "Pending"]}, "payment_mode_code": {"$ne": "CASH"}}},
+    rows = await db.payments.aggregate(maxTimeMS=REPORT_MS, pipeline=[{"$match": {"company_id": user["company_id"], **project_scope_filter(user), "payment_date": {"$gte": f, "$lte": t}, "status": {"$in": ["Cleared", "Pending"]}, "payment_mode_code": {"$ne": "CASH"}}},
         {"$group": {"_id": {"bank": {"$ifNull": ["$bank_account_name", "Unassigned"]}, "mode": "$payment_mode_name"}, "count": {"$sum": 1}, "cleared_paise": {"$sum": {"$cond": [{"$eq": ["$status", "Cleared"]}, "$amount_paise", 0]}}, "pending_paise": {"$sum": {"$cond": [{"$eq": ["$status", "Pending"]}, "$amount_paise", 0]}}}}, {"$sort": {"_id.bank": 1}}]).to_list(None)
     out = [{"bank": r["_id"]["bank"], "mode": r["_id"]["mode"], "count": r["count"], "cleared_paise": r["cleared_paise"], "pending_paise": r["pending_paise"], "total_paise": r["cleared_paise"] + r["pending_paise"]} for r in rows]
     totals = {k: sum(r[k] for r in out) for k in ("count", "cleared_paise", "pending_paise", "total_paise")}
@@ -384,8 +386,8 @@ async def activity(request: Request, from_date: str | None = None, to_date: str 
     _strict_params(request, {'to_date', 'from_date'})
     f, t = _dates(from_date, to_date)
     rng = {"$gte": f, "$lte": t + "T23:59:59"}
-    acts = await db.audit_logs.aggregate([{"$match": {"company_id": user["company_id"], "created_at": rng}}, {"$group": {"_id": "$action", "count": {"$sum": 1}}}, {"$sort": {"count": -1}}]).to_list(None)
-    logins = await db.login_events.aggregate([{"$match": {"created_at": rng}}, {"$group": {"_id": {"email": "$email", "ok": "$success"}, "count": {"$sum": 1}, "last": {"$max": "$created_at"}}}]).to_list(None)
+    acts = await db.audit_logs.aggregate(maxTimeMS=REPORT_MS, pipeline=[{"$match": {"company_id": user["company_id"], "created_at": rng}}, {"$group": {"_id": "$action", "count": {"$sum": 1}}}, {"$sort": {"count": -1}}]).to_list(None)
+    logins = await db.login_events.aggregate(maxTimeMS=REPORT_MS, pipeline=[{"$match": {"created_at": rng}}, {"$group": {"_id": {"email": "$email", "ok": "$success"}, "count": {"$sum": 1}, "last": {"$max": "$created_at"}}}]).to_list(None)
     per = {}
     for l in logins:
         e = per.setdefault(l["_id"]["email"], {"email": l["_id"]["email"], "success": 0, "failed": 0, "last_login": None})
@@ -625,8 +627,8 @@ async def construction_progress(request: Request, project_id: str | None = None,
         q["project_id"] = project_id
     blocks = await db.blocks.find(q, {"_id": 0, "id": 1, "name": 1, "project_id": 1, "construction_stages": 1}).to_list(None)
     projects = {p["id"]: p["name"] for p in await db.projects.find({"company_id": user["company_id"]}, {"_id": 0, "id": 1, "name": 1}).to_list(None)}
-    photos = {(p["_id"]["b"], p["_id"]["s"]): p["n"] for p in await db.construction_photos.aggregate([{"$group": {"_id": {"b": "$block_id", "s": "$milestone_seq"}, "n": {"$sum": 1}}}]).to_list(None)}
-    demands = {(d["_id"]["b"], d["_id"]["s"]): (d["n"], d["amt"]) for d in await db.demands.aggregate([{"$match": {"voided": {"$ne": True}, "trigger_stage_id": {"$ne": None}}}, {"$group": {"_id": {"b": "$block_id", "s": "$trigger_stage_id"}, "n": {"$sum": 1}, "amt": {"$sum": "$total_demand_paise"}}}]).to_list(None)}
+    photos = {(p["_id"]["b"], p["_id"]["s"]): p["n"] for p in await db.construction_photos.aggregate(maxTimeMS=REPORT_MS, pipeline=[{"$group": {"_id": {"b": "$block_id", "s": "$milestone_seq"}, "n": {"$sum": 1}}}]).to_list(None)}
+    demands = {(d["_id"]["b"], d["_id"]["s"]): (d["n"], d["amt"]) for d in await db.demands.aggregate(maxTimeMS=REPORT_MS, pipeline=[{"$match": {"voided": {"$ne": True}, "trigger_stage_id": {"$ne": None}}}, {"$group": {"_id": {"b": "$block_id", "s": "$trigger_stage_id"}, "n": {"$sum": 1}, "amt": {"$sum": "$total_demand_paise"}}}]).to_list(None)}
     rows, towers = [], []
     for b in blocks:
         stages = b.get("construction_stages") or []

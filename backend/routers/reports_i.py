@@ -12,6 +12,8 @@ from services import pdf as _pdf
 from utils import ApiError
 from routers.reports import REPORTS, _company, _dates, _scope, _strict_params, respond
 
+from services.budgets import REPORT_MS  # Phase K.8
+
 router = APIRouter(prefix="/reports", tags=["reports"])
 LIVE = ["Active", "Completed"]
 
@@ -97,7 +99,7 @@ async def collections_v2(request: Request, from_date: str | None = None, to_date
             b = bids[r["booking_id"]]
             e.update({"customer_name": b["customer_name"], "booking_number": b["booking_number"], "tag": "Reversal: " + (r["reversal"] or {}).get("reason", "") if r["_rev"] else (r.get("payment_mode_name") or ""), "date": r["_date"], "_link": f"/payments?q={r['receipt_number']}"})
     out = sorted(g.values(), key=lambda e: (e["group"] if group_by in ("day", "week", "month") else -e["total_paise"]))
-    pend = await db.payments.aggregate([{"$match": {**_scope(user, project_id, block_id), "status": "Pending"}}, {"$group": {"_id": None, "n": {"$sum": 1}, "amt": {"$sum": "$amount_paise"}}}]).to_list(1)
+    pend = await db.payments.aggregate(maxTimeMS=REPORT_MS, pipeline=[{"$match": {**_scope(user, project_id, block_id), "status": "Pending"}}, {"$group": {"_id": None, "n": {"$sum": 1}, "amt": {"$sum": "$amount_paise"}}}]).to_list(1)
     totals = {k: sum(e[k] for e in out) for k in ("count", "cash_paise", "account_paise", "other_paise", "reversal_paise", "total_paise")}
     totals["pending_instruments"] = pend[0]["n"] if pend else 0
     totals["pending_paise"] = pend[0]["amt"] if pend else 0
@@ -433,7 +435,7 @@ async def construction_vs_plan(request: Request, project_id: str | None = None, 
         tower = " ".join(x for x in [b.get("project_code"), (b.get("name") or "").strip()] if x)
         st = sorted(b.get("construction_stages") or [], key=lambda s: s["seq"])
         nxt = next((s for s in st if s.get("status") != "Completed"), None)
-        agg = {a["_id"]: a for a in await db.demands.aggregate([{"$match": {"block_id": b["id"], "voided": {"$ne": True}, "trigger_type": {"$in": ["ON_STAGE", "ON_POSSESSION"]}}}, {"$group": {"_id": "$trigger_stage_id", "d": {"$sum": "$total_demand_paise"}, "c": {"$sum": "$paid_paise"}, "bk": {"$addToSet": "$booking_id"}}}]).to_list(None)}
+        agg = {a["_id"]: a for a in await db.demands.aggregate(maxTimeMS=REPORT_MS, pipeline=[{"$match": {"block_id": b["id"], "voided": {"$ne": True}, "trigger_type": {"$in": ["ON_STAGE", "ON_POSSESSION"]}}}, {"$group": {"_id": "$trigger_stage_id", "d": {"$sum": "$total_demand_paise"}, "c": {"$sum": "$paid_paise"}, "bk": {"$addToSet": "$booking_id"}}}]).to_list(None)}
         # expected Udhar per pending stage from live bookings' plan snapshots
         expected, affected = {}, {}
         async for bk in db.bookings.find({"block_id": b["id"], "status": {"$in": LIVE}}, {"_id": 0, "agreement_value_paise": 1, "payment_plan_snapshot": 1}):
