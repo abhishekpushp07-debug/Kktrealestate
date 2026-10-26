@@ -92,7 +92,7 @@ async def _book(d1: Date, d2: Date, user: dict) -> dict:
         pr["count"] += 1
         pr["amount_paise"] += r["amount_paise"]
     contra = await db.contra_entries.find({"company_id": cid, "date": {"$gte": d1.isoformat(), "$lte": d2.isoformat()}}, {"_id": 0}).sort("date", 1).to_list(500)
-    cash_received = sum(r["amount_paise"] for r in cleared if r["payment_mode_code"] == "CASH")
+    cash_received = sum(r["amount_paise"] for r in receipts if r["payment_mode_code"] == "CASH" and r["status"] in ("Cleared", "Reversed"))  # a cash receipt reversed later is still cash that came in; the reversal is a separate outflow below
     deposits = sum(c["amount_paise"] for c in contra if c["kind"] == "DEPOSIT")
     withdrawals = sum(c["amount_paise"] for c in contra if c["kind"] == "WITHDRAWAL")
     refunds_cash = await _cash_refunds(cid, {"paid_date": {"$gte": d1.isoformat(), "$lte": d2.isoformat()}})

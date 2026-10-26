@@ -20,18 +20,19 @@ Rule: commit after every router file / green test group. No `git checkout --`/`r
 - [x] notifications: registry-driven subscriber registered as surface `notifications`
 - [x] master factory: kind-specific granular codes (12 master features)
 - [x] all routers: `date.today()` → services.clock.today()
-- [ ] customers/crm rename fan-out (verify via effects tests)
-- [ ] cms/catalogues granular guards (verify via rbac + guard scan tests)
-- [ ] granular guard rewrite audit: 0 legacy 2-part codes left in routers
+- [x] customers/crm rename fan-out (verify via effects tests)
+- [x] cms/catalogues granular guards (verify via rbac + guard scan tests)
+- [x] granular guard rewrite audit: 0 legacy 2-part codes left in routers
 
 ## Verification gates
-- [ ] full suite green on kkt_test (0 skips except env-dependent, each justified)
-- [ ] tieout 29/29
-- [ ] integrity 0, outbox 0
-- [ ] story reseed → headline numbers identical to /app/memory/qa/story/headline_numbers.json
+- [x] full suite green (481 passed, 2→1 justified skip) on kkt_test (0 skips except env-dependent, each justified)
+- [x] tieout 29/29
+- [x] integrity 0, outbox 0
+- [x] story reseed → headline (rehearsed on kkt_test: 10 passed) numbers identical to /app/memory/qa/story/headline_numbers.json
 - [ ] effects probe spot-checks
-- [ ] Phase R granular: registry 120–160+ codes (now 200 incl. 12 master features), migration equivalence test, Collections Clerk proof, History buttons, audit retention/archive
-- [ ] preview untouched until reseed; frontend build; screenshots; PRD/credentials updated
+- [x] Phase R granular: registry 120–160+ codes (now 200 incl. 12 master features), migration equivalence test, Collections Clerk proof, History buttons, audit retention/archive
+- [x] preview untouched until reseed; frontend build; screenshots; PRD/credentials updated
 
 ## Could not reproduce exactly
-- (fill in at report time)
+- Lost router wiring was reconstructed from contracts, not restored byte-for-byte: project-level cancellation_policy model, walk-in lead auto-convert, roznamcha opening/reversals, audit router, admin reseed (base-only = full reseed then business-collection wipe + counter reset), notification subscriber (registry-driven). Behaviour is verified by the same tests/tie-outs; implementation details may differ from the lost versions.
+- effects probe spot-checks: see tools/effects_probe.py run in final report.

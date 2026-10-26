@@ -1,6 +1,7 @@
 """Shared test session: ONE login per account per session (avoids the 10/60s login rate limit) — transparently applied to every test
 that calls `requests.post(.../auth/login)` or `requests.post(.../portal/auth/login)` by caching the first successful response."""
 import os
+import subprocess
 import time
 import sys
 
