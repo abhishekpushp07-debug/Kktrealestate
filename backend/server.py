@@ -203,6 +203,7 @@ async def lifespan(app: FastAPI):
         except Exception:
             logger.exception("[startup] ensure_indexes failed (continuing)")
         _spawn(__import__("services.invariants", fromlist=["ensure_invariants"]).ensure_invariants())  # Phase K: unique partial indexes + validators (idempotent, background)
+        _spawn(__import__("services.loadshed", fromlist=["lag_probe"]).lag_probe())  # Phase K.7: event-loop lag probe
         try:
             await asyncio.wait_for(detect_transaction_support(), timeout=2)
         except Exception:
@@ -260,9 +261,21 @@ async def validation_exc_handler(request: Request, exc: RequestValidationError):
 
 @app.exception_handler(Exception)
 async def unhandled_exc_handler(request: Request, exc: Exception):
-    logger.exception("Unhandled error")
     rid = getattr(request.state, "request_id", None)
+    from pymongo.errors import AutoReconnect, ExecutionTimeout, NetworkTimeout, OperationFailure, ServerSelectionTimeoutError, WriteConcernError
+    if isinstance(exc, ExecutionTimeout):  # Phase K.8/K.11: retryable DB envelopes
+        return _retryable(rid, 503, "QUERY_TIMEOUT", "Query exceeded its time budget; narrow the filters or retry", "5")
+    if isinstance(exc, (AutoReconnect, NetworkTimeout, ServerSelectionTimeoutError, WriteConcernError)):
+        logger.warning("transient db error: %s", exc)
+        return _retryable(rid, 503, "DB_TIMEOUT", "Database temporarily unavailable; retry shortly", "2")
+    if isinstance(exc, OperationFailure) and (exc.code in (112, 251, 246) or exc.has_error_label("TransientTransactionError")):
+        return _retryable(rid, 409, "CONFLICT_RETRY", "Write conflict; retry the request", "1")
+    logger.exception("Unhandled error")
     return JSONResponse(status_code=500, content={"detail": "Internal server error", "code": "INTERNAL_ERROR", "request_id": rid, "error": {"code": "INTERNAL_ERROR", "message": "Internal server error", "details": [], "request_id": rid}})
+
+
+def _retryable(rid, status, code, msg, retry_after):
+    return JSONResponse(status_code=status, headers={"Retry-After": retry_after}, content={"detail": msg, "code": code, "request_id": rid, "error": {"code": code, "message": msg, "details": [], "request_id": rid}})
 
 
 api_router = APIRouter(prefix="/api")
@@ -388,3 +401,4 @@ app.add_middleware(ETagMiddleware)
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.add_middleware(IdempotencyMiddleware)
 app.add_middleware(ObservabilityMiddleware)
+app.add_middleware(__import__("services.loadshed", fromlist=["LoadShedMiddleware"]).LoadShedMiddleware)  # Phase K.7: outermost — sheds before any work
