@@ -390,3 +390,71 @@ describe("authentication with a Redis that is really down", () => {
     }
   }, 30_000);
 });
+
+describe("authentication with a Redis that is connected but never answers (budget path, not the disconnected fast path)", () => {
+  it("sign-in fails open past the rate-limit budget, /auth/me falls back to the database and revocation still holds", async () => {
+    const net = await import("node:net");
+    const { createRedis } = await import("../../src/plugins/redis.js");
+    const seen: string[] = [];
+    const sockets = new Set<import("node:net").Socket>();
+    // answers the ready check (INFO) so the client is "ready", then swallows every other command
+    const server = net.createServer((sock) => {
+      sockets.add(sock);
+      sock.on("data", (buf) => {
+        const text = buf.toString("latin1");
+        for (const m of text.matchAll(/\*\d+\r\n\$\d+\r\n([A-Za-z]+)\r\n/g)) {
+          const cmd = m[1]!.toLowerCase();
+          seen.push(cmd);
+          // connection setup (CLIENT SETINFO, INFO) is answered in order; nothing after it ever is
+          if (cmd === "client") sock.write("+OK\r\n");
+          if (cmd === "info") {
+            const body = "# Server\r\nredis_version:7.0.0\r\nloading:0\r\n";
+            sock.write(`$${Buffer.byteLength(body)}\r\n${body}\r\n`);
+          }
+        }
+      });
+      sock.on("error", () => undefined);
+    });
+    await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+    const port = (server.address() as { port: number }).port;
+    const hung = createRedis(`redis://127.0.0.1:${port}`);
+    hung.on("error", () => undefined);
+    await hung.connect();
+    expect(hung.status).toBe("ready");
+    const host = t.app as unknown as { redisSecurity: unknown; redis: unknown };
+    const [cache, security] = [host.redis, host.redisSecurity];
+    host.redis = hung;
+    host.redisSecurity = hung;
+    let token: string | undefined;
+    try {
+      let started = Date.now();
+      const login = await t.request<{ access_token: string }>("POST", "/api/v1/auth/login", { body: CREDS.accounts });
+      expect(login.status, login.text).toBe(200);
+      token = login.body.access_token;
+      expect(Date.now() - started).toBeLessThan(2_000);
+      expect(seen).toContain("evalsha"); // the rate limit really asked Redis and failed open on the budget
+
+      started = Date.now();
+      const me = await t.request("GET", "/api/v1/auth/me", { token: login.body.access_token });
+      expect(me.status, me.text).toBe(200);
+      expect(Date.now() - started).toBeLessThan(2_000);
+
+      expect(
+        (await t.request("POST", "/api/v1/auth/logout", { token: login.body.access_token, body: {} })).status,
+      ).toBe(204);
+      started = Date.now();
+      const after = await t.request<ErrorBody>("GET", "/api/v1/auth/me", { token: login.body.access_token });
+      expect(after.status).toBe(401);
+      expect(after.body.error.code).toBe("SESSION_REVOKED");
+      expect(Date.now() - started).toBeLessThan(2_000);
+    } finally {
+      host.redis = cache;
+      host.redisSecurity = security;
+      hung.disconnect();
+      for (const s of sockets) s.destroy();
+      await new Promise((r) => server.close(r));
+    }
+    // with the real Redis back, the revoked token stays revoked (the database revocation, not a Redis marker)
+    expect((await t.request("GET", "/api/v1/auth/me", { token: token ?? null })).status).toBe(401);
+  }, 30_000);
+});

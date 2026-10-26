@@ -61,6 +61,18 @@ describe("lib/cache cached(): Redis is optional and time-boxed", () => {
     expect(await cached(broken, "k", 30, loader)).toEqual({ from: "db" });
   });
 
+  it("withinBudget: a reply already waiting when the timer fires (busy event loop) still wins", async () => {
+    // the reply is delivered in the first check phase; the event loop is blocked past the budget before it gets there, so the budget
+    // timer is overdue in the same iteration: the deferred rejection lets the waiting reply through
+    const reply = new Promise<number>((r) => setImmediate(() => r(7)));
+    const result = withinBudget(reply, 20, "busy");
+    const until = performance.now() + 60;
+    while (performance.now() < until) {
+      /* block the event loop beyond the budget */
+    }
+    await expect(result).resolves.toBe(7);
+  });
+
   it("withinBudget rejects after the budget and resolves otherwise", async () => {
     await expect(withinBudget(new Promise(() => undefined), 20, "slow")).rejects.toThrow("slow exceeded 20 ms");
     await expect(withinBudget(Promise.resolve(7), 20)).resolves.toBe(7);

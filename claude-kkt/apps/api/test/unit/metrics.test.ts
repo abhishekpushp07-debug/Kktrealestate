@@ -143,9 +143,7 @@ describe("per-request metric bookkeeping (hot path)", () => {
     expect(text).toContain(
       'http_request_duration_seconds_bucket{le="0.3",route="/api/v1/projects",method="GET",status="200"} 1',
     );
-    expect(text).toContain(
-      'http_request_duration_seconds_count{route="/api/v1/projects",method="GET",status="200"} 2',
-    );
+    expect(text).toContain('http_request_duration_seconds_count{route="/api/v1/projects",method="GET",status="200"} 2');
   });
 
   it("http_requests_in_flight is read at scrape time and released once per closed response", async () => {

@@ -89,9 +89,158 @@ production migrate job with `SEED_ON_BOOT=true SEED_DEMO=true` (10 bookings, 36 
   (two timers per Redis call); the security-client lookups and the Redis rate-limit `MULTI` (≈ 13 % of CPU on the cached public path
   in a `--cpu-prof` sample); the version-policy, docs-gate, deprecation and trace-id hooks. Payments additionally write the
   Postgres-backed idempotency claim row and take the money track's ordered locks (≈ 70 payments/s on one booking instead of ≈ 105).
-  Bisecting it is the first item for the next performance pass (docs/STATUS.md). Every list and detail endpoint still meets p95 < 300 ms at 200
+  Bisected and fixed in "Regression fix" below (most of the gap was the box; the pipeline part is fixed). Every list and detail endpoint still meets p95 < 300 ms at 200
   connections except `/flats`, `/bookings`, `/bookings/:id` and `/bookings/:id/ledger` (302–337 ms); at 1,000 zero-think-time
   connections only `/dashboard`, `/public/projects` and `/search` do (`/public/projects/:slug` p95 329 ms, `/auth/me` 371 ms).
+
+## Regression fix (2026-10-26)
+
+**Method.** Database `kkt_perf` (migrated + demo seed), Redis db 25, production bundle of every stage built in its own git worktree
+(`pnpm install --offline --frozen-lockfile`, `pnpm --filter @kkt/api build`; the older bundles read the newer schema without problems),
+`NODE_ENV=production`, `LOG_LEVEL=warn`, raised write/public rate limits as in the runs above, `SEED_ON_BOOT=false`,
+`RUN_MIGRATIONS_ON_BOOT=false`. Three measurements:
+
+- **Throughput, one process** (`API_WORKERS=1`): autocannon, 100 connections × 15 s, each endpoint twice with a 3 s pause before each
+  run, best run kept. The pause matters: with no gap, `@fastify/under-pressure` (event-loop utilisation > 0.98) can stay latched and
+  answer every request 503 (see the open items), which shows up as a five-figure "throughput".
+- **CPU per request, one process**: a fixed request rate (800 rps `/auth/me`, 1,500 rps `/public/projects`, 400 rps `/projects`),
+  15 s after a 5 s warm-up. Ticks in `/proc/<pid>/stat` of the API, `redis-server` and the Postgres backends, divided by the requests
+  served. This number does not depend on the box's speed of the moment, so it is the one to compare stages with: the shared 4-vCPU box
+  moved by ±10 % in throughput between back-to-back runs of the same bundle.
+- **The full load test** (`apps/api/loadtest/run.ts`, `API_WORKERS=auto`, 200 and 1,000 connections × 30 s) on a fresh copy of the
+  seeded database for every run.
+
+**First finding: most of the reported 30–55 % was the box, not the code.** The baseline commit `1a7d012`, re-measured today on the same
+box, does `/auth/me` at 1,586–1,792 rps in one process (the tuning-day table above says 2,571) and 2,982–3,123 rps with 4 workers at
+200 connections (tuning day: 5,319); `/public/projects` 11,350–12,967 rps (tuning day: 21,585). The "Hardening round re-run" compared
+runs made on different days; measured side by side the hardening bundle was 6–13 % slower on `/auth/me`, 5–22 % slower on the Redis-only
+public routes, unchanged on database-bound lists, and 20–30 % slower on `/bookings/:id` and its ledger (module work, see below).
+
+### Bisect (one process, `kkt_perf`)
+
+| Stage                                   | `/auth/me` rps | `/public/projects` rps | `/projects` rps | `/bookings` rps | `/auth/me` CPU µs/req | `/public/projects` CPU µs/req | `/projects` CPU µs/req |
+| --------------------------------------- | -------------- | ---------------------- | --------------- | --------------- | --------------------- | ----------------------------- | ---------------------- |
+| `1a7d012` baseline                      | 1,586          | 5,948                  | 725             | 218             | 1,011                 | 260                           | 2,085                  |
+| `c788f31` foundation                    | 1,735          | 5,384                  | 756             | 210             | 1,028                 | 253                           | 1,936                  |
+| `e744975` tracks                        | 1,555          | 4,560                  | 666             | 455             | 1,053                 | 250                           | 2,034                  |
+| `36010c0` integration                   | 1,646          | 4,640                  | 708             | 492             | 1,040                 | 276                           | 2,101                  |
+| `1f4d32b` verify (the regressed bundle) | 1,525          | 4,776                  | 704             | 487             | 1,077                 | 293                           | 2,079                  |
+| this fix                                | see below      | see below              | see below       | see below       | 1,029                 | 223                           | 2,099                  |
+
+Throughput columns: one run per stage (best of two), so ±10 % is noise. CPU columns: mean of 2 rounds (4 for the baseline, `1f4d32b` and
+the fix), API process only (Redis ≈ 31–38 µs and Postgres ≈ 140–180 µs per `/auth/me` in every stage; the fix's Lua script costs Redis
+≈ 5 µs more per public request than MULTI/EXEC). `/bookings` is faster from `e744975` on because the list sends compact rows. The cost
+came in with `e744975` (auth Redis budgets, telemetry plugin, key-ring JWT verification: `/auth/me` +40–60 µs) and `36010c0`/`1f4d32b`
+(per-command Redis timeout, `cached()` budget: `/public/projects` +30 µs). The foundation stage (`c788f31`, trust proxy, DB timeouts as
+startup parameters, transaction retry) costs nothing measurable.
+
+### Root causes (file:line in `1f4d32b`) and fixes
+
+1. **Rate limit = five Redis commands per public request**: `lib/rateLimit.ts:20` ran `MULTI / INCR / EXPIRE / GET / EXEC` for every
+   public request, and since `36010c0` each of those commands also arms and clears an ioredis command timer. In a `--cpu-prof` sample of
+   the cached public route it was ≈ 40 µs of 242 µs per request. **Fix:** one `EVALSHA` of a three-line Lua script (same keys, same
+   two-window weighting, same expiry refresh, atomic like MULTI), loaded with `EVAL` on `NOSCRIPT`. Unit test:
+   `test/unit/rate-limit.test.ts`; behaviour (429 + Retry-After, fail-open on errors) unchanged.
+2. **Every Redis call on the hot path paid for an async wrapper, a `Promise.race`, an extra promise and a timer**:
+   `plugins/auth.ts:88-110` (`redisTry`: auth cache + revocation `MGET`), `plugins/auth.ts:294-312` (rate limit) and
+   `lib/cache.ts:24-36` (`withinBudget`, used by `cached()`, `loadCompany` and the public cache version) — 2–3 per request.
+   **Fix:** `withinBudget` is one promise and one timer, and the auth plugin uses it instead of its own copies.
+3. **The Redis budgets measured the event loop, not Redis**: timers run before I/O in an event-loop iteration, so under load the 250 ms
+   auth budget fired while the `MGET` reply was already in the socket, and the request fell back to the (much more expensive) database
+   query — 3,056 times in the `1f4d32b` 1,000-connection run (`"redis auth mget exceeded 250 ms"`), adding load exactly when the process
+   was saturated. **Fix:** the rejection is deferred by one `setImmediate` (after the poll phase), so a reply that is already there wins;
+   a dead or slow Redis still costs at most the budget plus one loop iteration (`test/unit/cache.test.ts`). Final 1,000-connection run:
+   0 fallbacks. The Redis-outage tests (`security-hardening`, `security-review`, `platform`, `cross-track`) pass unchanged.
+4. **Per-request telemetry bookkeeping**: `plugins/telemetry.ts:50-51` updated a prom-client gauge twice per request (label hashing) and
+   allocated a closure for it, and looked up the active span twice (`:53`, `:58`); `lib/metrics.ts:111` built and validated a label
+   object for the counter and again for the histogram on every request. **Fix:** the in-flight gauge reads a plain counter in its
+   `collect()` at scrape time (one shared `close` listener per request), one span lookup whose result is reused (nothing else runs
+   without an SDK), and the counter/histogram children are cached per route/method/status. The metric names, labels and values are the
+   same (`test/unit/metrics.test.ts`).
+5. **JWT key ring rebuilt per request**: `lib/jwt.ts:52-53` built `[JWT_SECRET, ...JWT_PREVIOUS_SECRETS]` and joined it on every
+   verification, and `:89` base64/JSON-decoded the token header that `jwtVerify` decodes again. **Fix:** an allocation-free comparison
+   with the secrets the ring was built from, and with a single key (no rotation in progress) the `kid` lookup is skipped — that key is the
+   only candidate either way. Rotation (`test/unit/key-rotation.test.ts`) is unchanged.
+6. Minor: `plugins/loadShed.ts:28` allocated a release closure per request; it is now one function per plugin instance.
+
+**Checked and not a cost** (so left alone): Redis and Postgres round trips per request are identical in the baseline and `1f4d32b`
+(`INFO commandstats` and `pg_stat_database.xact_commit` over 2,000 requests: `/auth/me` 1 `MGET` + 1 `GET` + 1 query; `/public/projects`
+the rate-limit transaction + 2 `GET`; `/projects` ≈ 5 queries; `/bookings` ≈ 3 queries); the idempotency plugin returns before any I/O
+on GET; the database client sends `statement_timeout` / `lock_timeout` / `idle_in_transaction_session_timeout` as startup parameters (per
+connection, no `SET` per query or transaction) and still uses prepared statements; with `OTEL_EXPORTER_OTLP_ENDPOINT` unset no SDK and no
+AsyncLocalStorage context manager is registered and `lib/routes.ts` returns the handler unwrapped; the pino trace mixin runs per log
+line only (none per request at `warn`; it must return a fresh object because pino merges into it); Zod is not jitless; trust proxy
+(`proxy-addr`) only walks `X-Forwarded-For` when the header is present; the error reporter registers no hooks without
+`ERROR_WEBHOOK_URL`; async vs callback hooks differ by ≤ 0.2 µs per hook in a micro-benchmark (not converted); removing the ioredis
+`commandTimeout` changed nothing measurable (kept: it bounds un-budgeted writes during an outage).
+
+**Tried and rejected:** ioredis `enableAutoPipelining` gave +12 % on `/auth/me` and +5 % on `/public/projects` but cost `/projects` 7 %
+(688 → 634 rps, three interleaved rounds): commands wait for `setImmediate` and only one batch per client is in flight, which lengthens
+the critical path of requests that then wait for the database pool.
+
+### Before / after
+
+One process, three interleaved rounds (baseline → `1f4d32b` → fix, repeated), mean of the best-of-two per round, 100 connections × 15 s
+(this campaign ran before item 3 above, which matters only under saturation):
+
+| Endpoint           | `1a7d012` | `1f4d32b`      | fix                |
+| ------------------ | --------- | -------------- | ------------------ |
+| `/auth/me`         | 1,596     | 1,524 (−4.5 %) | 1,533 (−4.0 %)     |
+| `/public/projects` | 5,310     | 4,649 (−12 %)  | **5,549 (+4.5 %)** |
+| `/projects`        | 720       | 669 (−7 %)     | 687 (−4.6 %)       |
+| `/bookings`        | 208       | 454            | 442                |
+
+CPU per request (the stable measure, 4 interleaved rounds): `/auth/me` 1,011 → 1,077 → **1,029 µs** (+1.8 % vs the baseline),
+`/public/projects` 260 → 293 → **223 µs** (−14 %), `/projects` 2,085 → 2,079 → **2,099 µs** (+0.7 %).
+
+Four workers, 200 connections × 20 s, two interleaved rounds (`/auth/me`, `/projects`, `/bookings`, `/bookings/:id`, `/public/projects`):
+baseline 3,102 / 1,575 / 406 / 1,147 / 12,341 rps; `1f4d32b` 2,698 / 1,610 / 915 / 781 / 9,597; fix (before item 3) 2,943 / 1,641 /
+834 / 902 / 13,585.
+
+Full load test, same day, fresh database copy per run (req/s; the fix's two tables are the last runs in this file; the baseline and
+`1f4d32b` tables are not appended — they would only repeat these columns):
+
+| Scenario                     | 200: `1a7d012` (2 runs) | 200: `1f4d32b` | 200: fix | 1,000: `1a7d012` (2 runs) | 1,000: `1f4d32b` | 1,000: fix |
+| ---------------------------- | ----------------------- | -------------- | -------- | ------------------------- | ---------------- | ---------- |
+| `GET /auth/me`               | 3,123 / 2,982           | 2,932          | 3,265    | 3,695 / 3,808             | 3,600            | 3,819      |
+| `GET /projects`              | 1,601 / 1,591           | 1,758          | 1,752    | 1,768 / 1,791             | 1,655            | 1,926      |
+| `GET /flats`                 | 821 / 867               | 911            | 896      | 998 / 1,014               | 969              | 1,044      |
+| `GET /blocks/:id/grid`       | 1,479 / 1,413           | 1,604          | 1,466    | 1,379 / 1,383             | 1,284            | 1,739      |
+| `GET /customers?search=`     | 1,624 / 1,622           | 1,473          | 1,370    | 2,016 / 1,769             | 1,747            | 1,724      |
+| `GET /bookings`              | 400 / 409               | 1,026          | 854      | 494 / 445                 | 946              | 1,056      |
+| `GET /bookings/:id`          | 1,109 / 1,187           | 861            | 879      | 1,355 / 1,287             | 1,029            | 1,011      |
+| `GET /bookings/:id/ledger`   | 1,180 / 1,250           | 965            | 931      | 1,417 / 1,270             | 1,236            | 1,139      |
+| `GET /dashboard`             | 5,325 / 6,117           | 5,255          | 5,495    | 4,768 / 5,058             | 4,423            | 4,436      |
+| `GET /public/projects`       | 11,350 / 12,967         | 10,836         | 13,493   | 12,137 / 11,470           | 10,619           | 10,509     |
+| `GET /public/projects/:slug` | 5,121 / 5,324           | 5,037          | 5,221    | 4,980 / 5,018             | 4,765            | 4,003      |
+| `GET /search?q=`             | 4,239 / 3,853           | 4,129          | 3,894    | 5,583 / 5,484             | 5,451            | 5,098      |
+| `POST /payments`             | 75 / 75                 | 70             | 71       | 73 / 73                   | 61               | 51         |
+
+At 1,000 zero-think-time connections the box (4 API workers, Postgres, Redis and autocannon on 4 vCPUs) swings by 10–20 % between runs
+of the same bundle (an earlier run of the fix, before item 3, did 13,584 rps on `/public/projects` there); read that half for errors
+and tail latency, not for single-digit differences. The fix run had no non-2xx at 200 connections except 22 on `POST /payments`
+(11 client timeouts in the run that hit the stuck request, see the open items) and 2 on `/search` at 1,000; the baseline had 440 and 866
+non-2xx (client timeouts) on the two bookings-list scenarios at 1,000 connections in its two runs, the fix none. `POST /payments` is
+lock-bound on one booking and runs last, after the 1,000-connection storm: 51–65 rps over the fix's runs against 61–73 for the others.
+
+**Not the pipeline (left for module work):** `/bookings/:id` and `/bookings/:id/ledger` are 20–30 % slower than the baseline with the same
+number of queries (4): the money track's detail payload (price deviation, plan revisions, schedule forecast) costs more Drizzle query
+building and a larger Zod response serialisation (≈ 150 vs 112 µs per request); `/customers?search=` and `POST /payments` (ordered
+locks, Postgres idempotency claim) are 5–15 % slower for the same kind of reason. These are features, not overhead, and were not traded
+away here.
+
+**Open items found on the way:**
+
+- `@fastify/under-pressure` with `maxEventLoopUtilization: 0.98` (`app.ts`, unchanged since the baseline) can latch under sustained
+  saturation: the 503s are cheap, so utilisation stays above the threshold and every request is refused until the load drops. Seen in one
+  process at 100 connections and with 4 workers at 400 connections; the benchmarks pause between runs to avoid it.
+- `/search` cancels its statement after 150 ms with `query.cancel()` (`modules/search/index.ts`, unchanged since the baseline). Postgres
+  cancels whatever the backend runs when the cancel arrives, and postgres.js pipelines other requests' queries on the same connection, so a
+  late cancel can hit a neighbour: one `GET /search` 1,000-connection run logged a `companies` query failing inside postgres.js
+  (`DataRow … reading 'length'`), and one run (14,829 cancellations at 200 connections) left a request without an answer for 300 s, which
+  aborted that run's 1,000-connection half (re-run separately, clean). A targeted search storm (3 × 20 s at 400 connections) did not
+  reproduce a hang on the fix or on the baseline. Running the search on a reserved connection, or with `SET LOCAL statement_timeout`
+  inside a transaction instead of an out-of-band cancel, would remove the race.
 
 ### Run 2026-10-25T20:00:05.847Z — 200 connections × 30s per scenario — before tuning
 
@@ -263,3 +412,41 @@ production migrate job with `SEED_ON_BOOT=true SEED_DEMO=true` (10 bookings, 36 
 | GET /public/projects/:slug (no auth, cached) | 1000  | 117804   | 0                                                                                    | 232    | 328.7  | 356      | 421    | 3928  |
 | GET /search?q=                               | 1000  | 150305   | 50 (err×25; timeout×25; admitted 150305 = 4987 rps @ p50 150 / p95 264 / p99 360 ms) | 149    | 264.3  | 303      | 359    | 5010  |
 | POST /payments (₹100, 50 conns)              | 50    | 1849     | 0                                                                                    | 646    | 1471.6 | 1571     | 1659   | 62    |
+
+### Run 2026-10-26T13:31:16.462Z — 200 connections × 30s per scenario — regression fix: Lua rate limit, Redis budgets that measure Redis (not event-loop lag), cached metric series, one trace lookup, JWT ring fast path; NODE_ENV=production, API_WORKERS=auto
+
+| Scenario                                     | Conns | Requests | non-2xx                                                                           | p50 ms | p95 ms | p97.5 ms | p99 ms | req/s |
+| -------------------------------------------- | ----- | -------- | --------------------------------------------------------------------------------- | ------ | ------ | -------- | ------ | ----- |
+| GET /auth/me                                 | 200   | 97922    | 0                                                                                 | 55     | 107.0  | 122      | 143    | 3265  |
+| GET /projects                                | 200   | 52544    | 0                                                                                 | 109    | 169.2  | 186      | 207    | 1752  |
+| GET /flats (list, filtered)                  | 200   | 26872    | 0                                                                                 | 215    | 314.6  | 336      | 370    | 896   |
+| GET /blocks/:id/grid                         | 200   | 43980    | 0                                                                                 | 130    | 195.1  | 211      | 236    | 1466  |
+| GET /customers (search)                      | 200   | 41102    | 0                                                                                 | 138    | 221.3  | 247      | 278    | 1370  |
+| GET /bookings (list)                         | 200   | 25629    | 0                                                                                 | 224    | 327.2  | 351      | 394    | 854   |
+| GET /bookings (list, If-None-Match → 304)    | 200   | 27902    | 0                                                                                 | 210    | 292.0  | 311      | 341    | 930   |
+| GET /bookings/:id                            | 200   | 26370    | 0                                                                                 | 220    | 312.7  | 340      | 375    | 879   |
+| GET /bookings/:id/ledger                     | 200   | 27919    | 0                                                                                 | 205    | 305.2  | 329      | 364    | 931   |
+| GET /dashboard                               | 200   | 164833   | 0                                                                                 | 33     | 57.8   | 65       | 74     | 5495  |
+| GET /public/projects (no auth, cached)       | 200   | 404773   | 0                                                                                 | 13     | 25.7   | 29       | 34     | 13493 |
+| GET /public/projects/:slug (no auth, cached) | 200   | 156608   | 0                                                                                 | 34     | 66.8   | 78       | 93     | 5221  |
+| GET /search?q=                               | 200   | 116804   | 0                                                                                 | 28     | 212.2  | 228      | 243    | 3894  |
+| POST /payments (₹100, 50 conns)              | 50    | 2122     | 22 (err×11; timeout×11; admitted 2122 = 71 rps @ p50 498 / p95 869 / p99 1050 ms) | 498    | 868.8  | 961      | 1049   | 71    |
+
+### Run 2026-10-26T14:02:12.515Z — 1000 connections × 30s per scenario — regression fix: Lua rate limit, Redis budgets that measure Redis (not event-loop lag), cached metric series, one trace lookup, JWT ring fast path; NODE_ENV=production, API_WORKERS=auto
+
+| Scenario                                     | Conns | Requests | non-2xx                                                                           | p50 ms | p95 ms | p97.5 ms | p99 ms | req/s |
+| -------------------------------------------- | ----- | -------- | --------------------------------------------------------------------------------- | ------ | ------ | -------- | ------ | ----- |
+| GET /auth/me                                 | 1000  | 114553   | 0                                                                                 | 240    | 390.2  | 429      | 515    | 3819  |
+| GET /projects                                | 1000  | 57781    | 0                                                                                 | 448    | 733.4  | 836      | 1960   | 1926  |
+| GET /flats (list, filtered)                  | 1000  | 31307    | 0                                                                                 | 744    | 1271.5 | 1498     | 9642   | 1044  |
+| GET /blocks/:id/grid                         | 1000  | 52170    | 0                                                                                 | 505    | 759.5  | 833      | 3106   | 1739  |
+| GET /customers (search)                      | 1000  | 51720    | 0                                                                                 | 487    | 751.1  | 861      | 2946   | 1724  |
+| GET /bookings (list)                         | 1000  | 31668    | 0                                                                                 | 708    | 1217.1 | 1438     | 10709  | 1056  |
+| GET /bookings (list, If-None-Match → 304)    | 1000  | 30830    | 0                                                                                 | 760    | 1445.7 | 1695     | 9029   | 1028  |
+| GET /bookings/:id                            | 1000  | 30335    | 0                                                                                 | 827    | 1309.8 | 1543     | 7061   | 1011  |
+| GET /bookings/:id/ledger                     | 1000  | 34162    | 0                                                                                 | 774    | 1165.1 | 1298     | 3798   | 1139  |
+| GET /dashboard                               | 1000  | 133069   | 0                                                                                 | 175    | 279.6  | 330      | 2843   | 4436  |
+| GET /public/projects (no auth, cached)       | 1000  | 315259   | 0                                                                                 | 84     | 190.3  | 221      | 274    | 10509 |
+| GET /public/projects/:slug (no auth, cached) | 1000  | 120077   | 0                                                                                 | 209    | 363.6  | 405      | 562    | 4003  |
+| GET /search?q=                               | 1000  | 152933   | 2 (err×1; timeout×1; admitted 152933 = 5054 rps @ p50 143 / p95 267 / p99 387 ms) | 143    | 267.3  | 307      | 387    | 5098  |
+| POST /payments (₹100, 50 conns)              | 50    | 1538     | 0                                                                                 | 929    | 1791.0 | 2134     | 2437   | 51    |

@@ -23,16 +23,32 @@ export function redisUsable(redis: Pick<Redis, "status"> | null | undefined): bo
 /**
  * Resolves with `p` or rejects once `ms` has passed (the command itself is not cancelled; its late result is ignored). Hot path (every
  * cached read and every Redis call on the authentication path): one promise and one timer, no `Promise.race` and no async wrapper.
+ *
+ * The budget measures Redis, not the event loop: timers run before I/O in an event-loop iteration, so under heavy load the timer can
+ * fire while the reply is already waiting in the socket. The rejection is therefore deferred by one `setImmediate` (after this
+ * iteration's poll phase); a reply that was already there wins, and a busy process does not fall back to the (far more expensive)
+ * database for answers Redis gave in time. A dead or slow Redis still costs at most the budget plus one loop iteration.
  */
 export function withinBudget<T>(p: Promise<T>, ms: number, what = "redis"): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`${what} exceeded ${ms} ms`)), ms);
+    let settled = false;
+    const timer = setTimeout(() => {
+      setImmediate(() => {
+        if (settled) return;
+        settled = true;
+        reject(new Error(`${what} exceeded ${ms} ms`));
+      });
+    }, ms);
     p.then(
       (value) => {
+        if (settled) return;
+        settled = true;
         clearTimeout(timer);
         resolve(value);
       },
       (err: unknown) => {
+        if (settled) return;
+        settled = true;
         clearTimeout(timer);
         reject(err as Error);
       },

@@ -95,6 +95,46 @@ describe("JWT signing key rotation", () => {
     expect(await verifyAccessToken(legacy, "portal")).toEqual({ ok: false, reason: "WRONG_AUDIENCE" });
   });
 
+  it("with a single key (no header pre-check) tampered, malformed, foreign-key and non-EdDSA tokens are still refused", async () => {
+    const { SignJWT } = await import("jose");
+    config.JWT_SECRET = NEW;
+    config.JWT_PREVIOUS_SECRETS = [];
+    expect(signingKeys()).toHaveLength(1);
+    const good = await signAccessToken(claims);
+    expect((await verifyAccessToken(good, "erp")).ok).toBe(true);
+    const [h, p, sig] = good.split(".") as [string, string, string];
+    const forged = Buffer.from(JSON.stringify({ ...claims, aud: "erp", typ: "access", sub: "evil" })).toString(
+      "base64url",
+    );
+    expect(await verifyAccessToken(`${h}.${forged}.${sig}`, "erp")).toEqual({ ok: false, reason: "INVALID" });
+    expect(await verifyAccessToken("not-a-token", "erp")).toEqual({ ok: false, reason: "INVALID" });
+    expect(await verifyAccessToken(`${h}.${p}.`, "erp")).toEqual({ ok: false, reason: "INVALID" });
+    // signed by a key that is not configured (the old secret after the rotation window closed)
+    config.JWT_SECRET = OLD;
+    const foreign = await signAccessToken(claims);
+    config.JWT_SECRET = NEW;
+    expect(await verifyAccessToken(foreign, "erp")).toEqual({ ok: false, reason: "INVALID" });
+    // HS256 with the secret as the HMAC key (algorithm confusion) is refused
+    const hs = await new SignJWT({ ...claims, typ: "access" })
+      .setProtectedHeader({ alg: "HS256", kid: signingKeys()[0]!.kid })
+      .setIssuer("kkt")
+      .setAudience("erp")
+      .setIssuedAt()
+      .setExpirationTime("15m")
+      .sign(new TextEncoder().encode(NEW));
+    expect(await verifyAccessToken(hs, "erp")).toEqual({ ok: false, reason: "INVALID" });
+  });
+
+  it("the cached ring notices an in-place change of JWT_PREVIOUS_SECRETS", async () => {
+    config.JWT_SECRET = NEW;
+    config.JWT_PREVIOUS_SECRETS = [OLD];
+    expect(signingKeys()).toHaveLength(2);
+    config.JWT_PREVIOUS_SECRETS.pop();
+    expect(signingKeys()).toHaveLength(1);
+    (config.JWT_PREVIOUS_SECRETS as string[]).push(OLD);
+    expect(signingKeys()).toHaveLength(2);
+  });
+
   it("signed payloads (download, MFA, manage links) survive a rotation", () => {
     config.JWT_SECRET = OLD;
     config.JWT_PREVIOUS_SECRETS = [];
