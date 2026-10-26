@@ -20,7 +20,7 @@ export default function Catalogues() {
   const [q, setQ] = useState("");
   const [draft, setDraft] = useState("");
   const [edit, setEdit] = useState(null);
-  const write = can("catalogue.write");
+  const write = can("masters.catalogue.create");
   const load = (t) => api.get(`/catalogues/${t}?include_inactive=true`).then((r) => setItems(r.data.items)).catch((e) => toast.error(errMsg(e)));
   useMemo(() => { setItems(null); load(type); }, [type]); // eslint-disable-line react-hooks/exhaustive-deps
   const act = async (fn, msg) => { try { await fn(); await invalidateCatalogues(); await load(type); msg && toast.success(msg); } catch (e) { toast.error(errMsg(e)); } };

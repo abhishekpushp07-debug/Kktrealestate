@@ -23,7 +23,7 @@ export function ConstructionStatusPanel({ blockId, onChanged }) {
   const load = useCallback(() => api.get(`/blocks/${blockId}/construction`).then((r) => setData(r.data)).catch((e) => toast.error(errMsg(e))), [blockId]);
   useEffect(() => { load(); }, [load]);
   if (!data) return <div className="card p-5 text-sm text-txt-muted">Loading…</div>;
-  const canEdit = can("construction.update") || can("milestone.update");
+  const canEdit = can("construction.stage.update") || can("construction.stage.update");
   const pending = data.stages.filter((s) => s.status !== "Completed");
   const openConfirm = () => { const t = data.stages.find((s) => s.stage_id === target); if (!t) return; const today = new Date().toISOString().slice(0, 10); setConfirm({ target: t, rows: data.stages.filter((s) => s.status !== "Completed" && s.seq <= t.seq).map((s) => ({ ...s, date: today })) }); };
   const apply = async () => {
@@ -40,7 +40,7 @@ export function ConstructionStatusPanel({ blockId, onChanged }) {
           {canEdit && <div className="ml-auto flex items-center gap-2">
             <select className="h-10 rounded-md border px-3 text-sm" value={target} onChange={(e) => setTarget(e.target.value)} data-testid="cs-stage-select"><option value="">Mark stage completed…</option>{pending.map((s) => <option key={s.stage_id} value={s.stage_id}>{s.seq}. {s.name}</option>)}</select>
             <Button className="bg-ink-950 hover:bg-ink-800" disabled={!target} onClick={openConfirm} data-testid="cs-mark-btn"><Check className="mr-1 h-4 w-4" />Update</Button>
-            {(can("construction.undo") || can("milestone.undo")) && data.current_stage && <Button variant="outline" onClick={() => setUndoOpen(true)} data-testid="cs-undo-btn"><Undo2 className="mr-1 h-4 w-4" />Undo last</Button>}
+            {(can("construction.stage.undo") || can("construction.stage.undo")) && data.current_stage && <Button variant="outline" onClick={() => setUndoOpen(true)} data-testid="cs-undo-btn"><Undo2 className="mr-1 h-4 w-4" />Undo last</Button>}
           </div>}
         </div>
         <p className="mt-2 text-xs text-txt-secondary">{data.active_bookings} active booking(s) in this tower — completing a stage raises the linked plan installments automatically.</p>

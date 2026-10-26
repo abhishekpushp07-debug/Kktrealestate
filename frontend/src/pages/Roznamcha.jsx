@@ -43,7 +43,7 @@ export default function Roznamcha({ embedded }) {
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="input !w-40" data-testid="rozn-date" />
         </div>
         <div className="flex items-center gap-2">
-          {can("settings.manage") && <button className="btn btn-secondary" onClick={() => setOpening({ date, amount: "", remarks: "" })} data-testid="rozn-set-opening">Set opening cash</button>}
+          {can("finance.roznamcha.opening_balance") && <button className="btn btn-secondary" onClick={() => setOpening({ date, amount: "", remarks: "" })} data-testid="rozn-set-opening">Set opening cash</button>}
           <button className="btn btn-secondary" onClick={() => window.print()} data-testid="rozn-print"><Printer className="h-4 w-4" strokeWidth={1.75} />Print day book</button>
         </div>
       </div>
@@ -68,7 +68,7 @@ export default function Roznamcha({ embedded }) {
           <Group title="By bucket · project" rows={{ ...d.by_category, ...Object.fromEntries(Object.entries(d.by_project).map(([k, v]) => [`▸ ${k}`, v])) }} testId="rozn-by-bucket" />
           <Card className="print:hidden" testId="rozn-contra">
             <h3 className="font-display text-lg">Contra entry</h3>
-            {can("payment.post") ? <div className="mt-4 space-y-4">
+            {can("finance.roznamcha.view") ? <div className="mt-4 space-y-4">
               <Segmented options={[{ value: "DEPOSIT", label: "Deposit to bank" }, { value: "WITHDRAWAL", label: "Withdraw cash" }]} value={contra.kind} onChange={(v) => setContra({ ...contra, kind: v })} testId="contra-kind" />
               <Field label="Amount (₹)" required><input type="number" className="input font-display text-lg" value={contra.amount} onChange={(e) => setContra({ ...contra, amount: e.target.value })} data-testid="contra-amount" /></Field>
               <Field label="Bank account" required><Select options={banks} value={contra.bank_account_id} onChange={(v) => setContra({ ...contra, bank_account_id: v })} allowAdd={false} testId="contra-bank" /></Field>

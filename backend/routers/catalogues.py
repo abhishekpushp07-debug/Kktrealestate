@@ -167,14 +167,14 @@ def etag_response(request: Request, payload: dict, max_age: int = 300) -> Respon
 
 
 @router.get("")
-async def get_bundle(request: Request, user: dict = Depends(get_current_user)):
+async def get_bundle(request: Request, user: dict = Depends(require("masters.catalogue.view"))):
     from services import ttlcache
     data = await ttlcache.cached(f"bundle:{ttlcache.scope_key(user)}:{await current_version()}", 15, lambda: bundle(user["company_id"], user))
     return etag_response(request, data)
 
 
 @router.get("/{ctype}")
-async def get_type(ctype: str, include_inactive: bool = False, parent_id: str | None = None, user: dict = Depends(get_current_user)):
+async def get_type(ctype: str, include_inactive: bool = False, parent_id: str | None = None, user: dict = Depends(require("masters.catalogue.view"))):
     q = {"company_id": user["company_id"], "type": ctype, **({} if include_inactive else {"is_active": True}), **({"parent_id": parent_id} if parent_id else {})}
     items = await db.catalogue_items.find(q, {"_id": 0}).sort([("sort_order", 1), ("label", 1)]).to_list(2000)
     return {"type": ctype, "items": items, "total": len(items), "version": await current_version()}
@@ -245,7 +245,7 @@ async def reorder(ctype: str, body: ReorderIn, request: Request, user: dict = De
 
 
 @router.get("/{ctype}/export.csv")
-async def export_csv(ctype: str, user: dict = Depends(get_current_user)):
+async def export_csv(ctype: str, user: dict = Depends(require("masters.catalogue.view"))):
     items = await db.catalogue_items.find({"company_id": user["company_id"], "type": ctype}, {"_id": 0}).sort("sort_order", 1).to_list(5000)
     buf = io.StringIO()
     w = csv.DictWriter(buf, fieldnames=["code", "label", "parent_code", "sort_order", "is_active"], extrasaction="ignore")

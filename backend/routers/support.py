@@ -204,7 +204,7 @@ async def delete_notice(notice_id: str, request: Request, user: dict = Depends(r
 
 # ---------- Construction photos ----------
 @router.get("/blocks/{block_id}/photos")
-async def list_photos(block_id: str, user: dict = Depends(require("construction.stage.view"))):
+async def list_photos(block_id: str, user: dict = Depends(require("construction.photo.view"))):
     return {"items": await db.construction_photos.find({"block_id": block_id, "is_active": True}, {"_id": 0}).sort([("milestone_seq", 1), ("order", 1)]).to_list(500)}
 
 

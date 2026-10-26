@@ -49,9 +49,9 @@ function Row({ p, can, onAct, nav }) {
       <StatusPill status={p.status} />
       <div className="flex gap-1">
         <JourneyButton entityType="payment" entityId={p.id} className="btn btn-ghost btn-sm !px-2" label="" /><HistoryButton entityType="payment" entityId={p.id} label={p.receipt_number} />
-        {can("receipt.print") && <button onClick={() => window.open(`${BASE_PATH}/print/receipt/${p.id}`, "_blank")} className="btn btn-ghost btn-sm !px-2" aria-label="Print" data-testid={`print-${p.id}`}><Printer className="h-4 w-4" /></button>}
-        {p.status === "Pending" && can("payment.post") && <><button onClick={() => onAct({ p, kind: "clear" })} className="btn btn-secondary btn-sm" data-testid={`clear-${p.id}`}>Clear</button><button onClick={() => onAct({ p, kind: "bounce" })} className="btn btn-ghost btn-sm text-brick" data-testid={`bounce-${p.id}`}>Bounce</button></>}
-        {p.status === "Cleared" && can("payment.reverse") && <button onClick={() => onAct({ p, kind: "reverse" })} className="btn btn-ghost btn-sm text-brick" data-testid={`reverse-${p.id}`}>Reverse</button>}
+        {can("finance.receipt.print") && <button onClick={() => window.open(`${BASE_PATH}/print/receipt/${p.id}`, "_blank")} className="btn btn-ghost btn-sm !px-2" aria-label="Print" data-testid={`print-${p.id}`}><Printer className="h-4 w-4" /></button>}
+        {p.status === "Pending" && can("finance.payment.create") && <><button onClick={() => onAct({ p, kind: "clear" })} className="btn btn-secondary btn-sm" data-testid={`clear-${p.id}`}>Clear</button><button onClick={() => onAct({ p, kind: "bounce" })} className="btn btn-ghost btn-sm text-brick" data-testid={`bounce-${p.id}`}>Bounce</button></>}
+        {p.status === "Cleared" && can("finance.payment.reverse") && <button onClick={() => onAct({ p, kind: "reverse" })} className="btn btn-ghost btn-sm text-brick" data-testid={`reverse-${p.id}`}>Reverse</button>}
       </div>
     </li>
   );
@@ -77,7 +77,7 @@ export default function Payments() {
     <div className="space-y-8" data-testid="payments-page">
       <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div><p className="label">Collections</p><h1 className="mt-1 font-display text-4xl text-ink-950">Payments</h1></div>
-        {can("payment.post") && <button onClick={() => setPost(true)} className="btn btn-gold" data-testid="post-payment-btn"><Plus className="h-4 w-4" strokeWidth={1.75} />Post payment</button>}
+        {can("finance.payment.create") && <button onClick={() => setPost(true)} className="btn btn-gold" data-testid="post-payment-btn"><Plus className="h-4 w-4" strokeWidth={1.75} />Post payment</button>}
       </header>
       <section className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4" data-testid="payment-tiles">
         {!home.data ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />) : <>

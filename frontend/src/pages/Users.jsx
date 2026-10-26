@@ -76,7 +76,7 @@ export default function Users() {
     <div className="space-y-8" data-testid="users-page">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div><p className="label">Settings</p><h1 className="mt-1 font-display text-4xl text-ink-950">Users & Roles</h1><p className="mt-2 text-sm text-txt-secondary">Who can sign in, what they can do, and which projects they see.</p></div>
-        <div className="flex gap-2"><Link to="/admin/access-control" className="btn btn-secondary" data-testid="access-control-link">Access control</Link><Link to="/roles" className="btn btn-secondary" data-testid="roles-link">Roles & permissions</Link>{can("users.manage") && <button onClick={() => setEditing(null)} className="btn btn-primary" data-testid="new-user-btn"><Plus className="h-4 w-4" />Invite user</button>}</div>
+        <div className="flex gap-2"><Link to="/admin/access-control" className="btn btn-secondary" data-testid="access-control-link">Access control</Link><Link to="/roles" className="btn btn-secondary" data-testid="roles-link">Roles & permissions</Link>{can("admin.user.view") && <button onClick={() => setEditing(null)} className="btn btn-primary" data-testid="new-user-btn"><Plus className="h-4 w-4" />Invite user</button>}</div>
       </header>
       <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
         <StatTile label="Active users" value={String(all.filter((u) => u.is_active).length)} hint={`${all.length} total`} icon={UserCheck} testId="users-tile-active" />

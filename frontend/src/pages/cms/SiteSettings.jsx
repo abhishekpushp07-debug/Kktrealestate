@@ -28,7 +28,7 @@ export default function SiteSettingsPage() {
       const r = await api.patch("/cms/site", { data, version: s.version }); setS(r.data); toast.success("Site settings saved");
     } catch (e) { toast.error(e instanceof SyntaxError ? "Invalid JSON in a list field" : errMsg(e)); } finally { setBusy(false); }
   };
-  const ro = !can("cms.write");
+  const ro = !can("website.cms.edit");
   return (
     <div data-testid="site-settings-page">
       <PageHeader title="Website · Site Settings" subtitle="Brand, contact, trust stats, SEO, tracking and go-live switch." actions={<div className="flex items-center gap-3"><a href="/" target="_blank" rel="noreferrer" className="text-sm font-semibold text-gold-hover hover:underline" data-testid="view-site-link">View website ↗</a>{!ro && <Button onClick={save} disabled={busy} className="bg-ink-950 hover:bg-ink-800" data-testid="site-save-btn">{busy ? "Saving…" : "Save"}</Button>}</div>} />

@@ -43,7 +43,7 @@ export default function BookingWizard() {
   const [newCust, setNewCust] = useState(false);
   const [agr, setAgr] = useState({ total: "", cash: "", account: "", mode: "amount", cashPct: "" });
   const [discount, setDiscount] = useState("");
-  const canEditAgr = can("agreement.edit") || can("settings.manage");
+  const canEditAgr = can("sales.agreement.revise") || can("sales.agreement.revise");
   const [charges, setCharges] = useState([]);
   const [slots, setSlots] = useState([]);
   const [bookingDate, setBookingDate] = useState(new Date().toISOString().slice(0, 10));
@@ -114,7 +114,7 @@ export default function BookingWizard() {
         </div>}
         {step === 1 && <Suspense fallback={<p className="text-sm text-txt-muted">Loading grid…</p>}><UnitGrid grid={grid} flat={flat} setFlat={setFlat} flatQ={flatQ} setFlatQ={setFlatQ} /></Suspense>}
         {step === 2 && <div>
-          <div className="flex flex-col gap-2 sm:flex-row"><input value={custSearch} onChange={(e) => setCustSearch(e.target.value)} placeholder="Search by phone, name or code…" className="input sm:max-w-md" data-testid="wiz-customer-search" />{can("customer.write") && <button type="button" className="btn btn-secondary" onClick={() => setNewCust(true)} data-testid="wiz-new-customer"><Plus className="h-4 w-4" />New customer</button>}</div>
+          <div className="flex flex-col gap-2 sm:flex-row"><input value={custSearch} onChange={(e) => setCustSearch(e.target.value)} placeholder="Search by phone, name or code…" className="input sm:max-w-md" data-testid="wiz-customer-search" />{can("sales.customer.edit") && <button type="button" className="btn btn-secondary" onClick={() => setNewCust(true)} data-testid="wiz-new-customer"><Plus className="h-4 w-4" />New customer</button>}</div>
           <div className="mt-4 grid gap-3 md:grid-cols-2">{custResults.map((c) => <button key={c.id} onClick={() => setCustomer(c)} className={cn("card card-hover flex items-center gap-3 !p-4 text-left", customer?.id === c.id && "!border-ink-950 ring-1 ring-ink-950")} data-testid={`wiz-customer-${c.customer_code}`}><Avatar name={c.full_name} size={36} /><div className="min-w-0"><p className="truncate text-sm font-semibold text-ink-950">{c.salutation} {c.full_name}</p><p className="truncate text-xs text-txt-secondary">{c.customer_code} · {c.phone} · KYC {c.kyc_status}</p></div></button>)}</div>
           {customer && <p className="mt-4 text-sm text-txt-secondary">Selected: <b className="text-ink-950">{customer.full_name}</b> ({customer.customer_code})</p>}
           {customer && <div className="mt-3 max-w-md"><Field label="Lead this booking converts" hint="Keeps the sales funnel truthful. Walk-in creates a Converted lead with source Walk-in."><select className="input" value={leadId} onChange={(e) => setLeadId(e.target.value)} data-testid="wiz-lead"><option value="">No lead / walk-in</option>{leads.map((l) => <option key={l.id} value={l.id}>{l.lead_number} · {l.status} · {l.source || ""}</option>)}</select></Field></div>}

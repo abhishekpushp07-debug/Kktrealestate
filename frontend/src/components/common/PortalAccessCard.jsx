@@ -14,8 +14,8 @@ export function PortalAccessCard({ customerId }) {
   const [portalUrl, setPortalUrl] = useState(portalHref(null));
   useEffect(() => { api.get("/public/site").then((r) => setPortalUrl(portalHref(r.data.portal_url))).catch(() => {}); }, []);
   const load = () => api.get(`/customers/${customerId}/portal`).then((r) => setSt(r.data)).catch(() => setSt({ enabled: false }));
-  useEffect(() => { if (can("customer.portal_manage")) load(); }, [customerId]); // eslint-disable-line
-  if (!can("customer.portal_manage") || !st) return null;
+  useEffect(() => { if (can("service.portal.manage")) load(); }, [customerId]); // eslint-disable-line
+  if (!can("service.portal.manage") || !st) return null;
   const run = async (fn, ok) => { setBusy(true); try { const r = await fn(); if (r?.data?.temporary_password) setTemp(r.data); toast.success(ok); load(); } catch (e) { toast.error(errMsg(e)); } finally { setBusy(false); } };
   const copy = () => { navigator.clipboard?.writeText(`Login: ${temp.login_phone}\nTemporary password: ${temp.temporary_password}`); toast.success("Copied"); };
   return (

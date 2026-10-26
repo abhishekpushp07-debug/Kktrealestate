@@ -58,9 +58,9 @@ export function DocumentsPanel({ entityType, entityId, canWrite = true, initial 
             <button onClick={() => open(d)} className="font-medium text-ink-950 hover:underline" data-testid={`doc-open-${d.id}`}>{d.file_name}</button>
             {d.document_type_name && <span className="rounded-full bg-warm-50 px-2 py-0.5 text-[11px] text-txt-secondary">{d.document_type_name}</span>}
             {d.is_sensitive && <span className="flex items-center gap-1 rounded-full bg-amber2-50 px-2 py-0.5 text-[11px] text-amber2"><Lock className="h-3 w-3" />KYC</span>}
-            {canWrite && can("customer.write") && !d.is_sensitive && <button onClick={() => share(d)} className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${d.shared_with_customer ? "bg-sage-50 text-sage" : "bg-warm-50 text-txt-secondary"}`} data-testid={`doc-share-${d.id}`}>{d.shared_with_customer ? "Shared with customer" : "Share to portal"}</button>}
+            {canWrite && can("sales.customer.edit") && !d.is_sensitive && <button onClick={() => share(d)} className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${d.shared_with_customer ? "bg-sage-50 text-sage" : "bg-warm-50 text-txt-secondary"}`} data-testid={`doc-share-${d.id}`}>{d.shared_with_customer ? "Shared with customer" : "Share to portal"}</button>}
             <span className="ml-auto text-xs text-txt-secondary">{(d.size / 1024).toFixed(0)} KB · {d.uploaded_by_name} · {fmtDateTime(d.uploaded_at)}</span>
-            {canWrite && can("customer.write") && <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="Delete document" onClick={() => remove(d)} data-testid={`doc-delete-${d.id}`}><Trash2 className="h-3.5 w-3.5 text-txt-secondary" /></Button>}
+            {canWrite && can("sales.customer.edit") && <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="Delete document" onClick={() => remove(d)} data-testid={`doc-delete-${d.id}`}><Trash2 className="h-3.5 w-3.5 text-txt-secondary" /></Button>}
           </li>)}
         </ul>
       )}

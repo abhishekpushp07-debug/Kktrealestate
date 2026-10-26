@@ -61,7 +61,7 @@ export function VisitActions({ v, onDone, compact }) {
   const [note, setNote] = useState("");
   const [slot, setSlot] = useState(null);
   const [busy, setBusy] = useState(false);
-  if (!can("visit.write")) return null;
+  if (!can("sales.site_visit.create")) return null;
   const act = async (action, body = {}) => { setBusy(true); try { await api.post(`/site-visits/${v.id}/${action}`, body); toast.success(`Marked ${action}`); setMode(null); setNote(""); onDone(); } catch (e) { toast.error(errMsg(e)); } finally { setBusy(false); } };
   const open = !["Completed", "No-show", "Cancelled"].includes(v.status);
   return <div className="flex flex-wrap items-center gap-1" onClick={(e) => e.stopPropagation()}>
@@ -111,7 +111,7 @@ export default function SiteVisits() {
     { key: "actions", label: "", render: (v) => <VisitActions v={v} onDone={list.reload} /> },
   ];
   return <div data-testid="site-visits-page">
-    <PageHeader title="Site Visits" subtitle="Website bookings and walk-ins, by slot and project." actions={<div className="flex gap-2"><div className="flex rounded-md border text-xs font-semibold">{[["calendar", CalendarDays], ["list", List]].map(([m, I]) => <button key={m} onClick={() => setSp({ view: m })} className={cn("flex items-center gap-1 px-3 py-2 capitalize", view === m ? "bg-ink-950 text-white" : "text-txt-secondary")} data-testid={`visits-view-${m}`}><I className="h-3.5 w-3.5" />{m}</button>)}</div>{can("visit.read") && <button type="button" className="btn btn-secondary" onClick={() => api.get(exportUrl, { responseType: "blob" }).then((r) => { const u = URL.createObjectURL(r.data); const a = document.createElement("a"); a.href = u; a.download = "site-visits.csv"; a.click(); URL.revokeObjectURL(u); })} data-testid="visits-export"><Download className="mr-1.5 h-4 w-4" />CSV</button>}{can("visit.write") && <button type="button" className="btn btn-primary" onClick={() => setCreate(true)} className="bg-ink-950 hover:bg-ink-800" data-testid="visits-new"><Plus className="mr-1.5 h-4 w-4" />New visit</button>}</div>} />
+    <PageHeader title="Site Visits" subtitle="Website bookings and walk-ins, by slot and project." actions={<div className="flex gap-2"><div className="flex rounded-md border text-xs font-semibold">{[["calendar", CalendarDays], ["list", List]].map(([m, I]) => <button key={m} onClick={() => setSp({ view: m })} className={cn("flex items-center gap-1 px-3 py-2 capitalize", view === m ? "bg-ink-950 text-white" : "text-txt-secondary")} data-testid={`visits-view-${m}`}><I className="h-3.5 w-3.5" />{m}</button>)}</div>{can("sales.site_visit.view") && <button type="button" className="btn btn-secondary" onClick={() => api.get(exportUrl, { responseType: "blob" }).then((r) => { const u = URL.createObjectURL(r.data); const a = document.createElement("a"); a.href = u; a.download = "site-visits.csv"; a.click(); URL.revokeObjectURL(u); })} data-testid="visits-export"><Download className="mr-1.5 h-4 w-4" />CSV</button>}{can("sales.site_visit.create") && <button type="button" className="btn btn-primary" onClick={() => setCreate(true)} className="bg-ink-950 hover:bg-ink-800" data-testid="visits-new"><Plus className="mr-1.5 h-4 w-4" />New visit</button>}</div>} />
     <div className="mb-4 flex flex-wrap gap-2" data-testid="visit-filters">
       <Select value={f.project_id || "all"} onValueChange={(v) => setF({ ...f, project_id: v === "all" ? "" : v })}><SelectTrigger className="w-48" data-testid="visit-filter-project"><SelectValue placeholder="All projects" /></SelectTrigger><SelectContent><SelectItem value="all">All projects</SelectItem>{(projects?.items || []).map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select>
       {view === "list" && <><Select value={f.status || "all"} onValueChange={(v) => setF({ ...f, status: v === "all" ? "" : v })}><SelectTrigger className="w-40" data-testid="visit-filter-status"><SelectValue placeholder="All statuses" /></SelectTrigger><SelectContent><SelectItem value="all">All statuses</SelectItem>{STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select>
@@ -127,7 +127,7 @@ export function LeadVisits({ leadId, lead }) {
   const [create, setCreate] = useState(false);
   const { can } = useAuth();
   const items = data?.items || [];
-  return <div data-testid="lead-visits"><div className="mb-2 flex items-center justify-between"><p className="text-xs font-semibold uppercase tracking-wide text-txt-secondary">Site visits</p>{can("visit.write") && <button onClick={() => setCreate(true)} className="text-xs font-semibold text-ink-950 underline" data-testid="lead-book-visit">Book a visit</button>}</div>
+  return <div data-testid="lead-visits"><div className="mb-2 flex items-center justify-between"><p className="text-xs font-semibold uppercase tracking-wide text-txt-secondary">Site visits</p>{can("sales.site_visit.create") && <button onClick={() => setCreate(true)} className="text-xs font-semibold text-ink-950 underline" data-testid="lead-book-visit">Book a visit</button>}</div>
     {items.length === 0 ? <p className="text-xs text-txt-secondary">No visits yet</p> : items.map((v) => <div key={v.id} className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-md bg-warm-50 p-2 text-xs"><span><b className="tabular-nums">{fmtDate(v.date)} {v.slot_start}</b> · {v.project_name} <span className="font-mono text-txt-muted">{v.visit_number}</span></span><span className="flex items-center gap-2"><Pill tone={VISIT_TONE[v.status]}>{v.status}</Pill><VisitActions v={v} onDone={reload} compact /></span></div>)}
     {create && <NewVisit open onClose={() => setCreate(false)} onSaved={reload} lead={lead} />}
   </div>;
@@ -135,8 +135,8 @@ export function LeadVisits({ leadId, lead }) {
 
 export function TodayVisitsWidget() {
   const { can } = useAuth();
-  const { data, reload } = useFetch(can("visit.read") ? "/site-visits/today" : null);
-  if (!can("visit.read") || !data) return null;
+  const { data, reload } = useFetch(can("sales.site_visit.view") ? "/site-visits/today" : null);
+  if (!can("sales.site_visit.view") || !data) return null;
   return <div className="card mt-6 p-5" data-testid="today-visits-widget"><div className="mb-3 flex items-center justify-between"><h2 className="text-base font-bold text-ink-950 md:text-lg">Today's site visits</h2><span className="text-xs text-txt-secondary">{data.items.length} scheduled</span></div>
     {data.items.length === 0 ? <p className="text-sm text-txt-secondary">No visits today.</p> : <div className="divide-y">{data.items.map((v) => <div key={v.id} className="flex flex-wrap items-center gap-3 py-2 text-sm" data-testid={`today-visit-${v.visit_number}`}><span className="w-14 font-bold tabular-nums text-ink-950">{v.slot_start}</span><span className="min-w-0 flex-1"><b>{v.name}</b> · {v.project_name}<span className="block text-xs text-txt-secondary">{v.assigned_to_name || "Unassigned"} · {v.visitors_count} pax</span></span><Pill tone={VISIT_TONE[v.status]}>{v.status}</Pill><VisitActions v={v} onDone={reload} compact /></div>)}</div>}
   </div>;

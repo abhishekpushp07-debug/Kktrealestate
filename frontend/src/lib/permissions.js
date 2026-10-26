@@ -1,14 +1,15 @@
-// Shared permission manifest (mirrors backend permissions.py PERMISSION_META). Hierarchical module.feature.action ↔ legacy code.
-export const HIER = {
-  "admin.user.edit": "users.manage", "admin.role.edit": "roles.manage", "admin.settings.edit": "settings.manage", "admin.audit.view": "audit.view",
-  "masters.master.view": "master.read", "masters.master.edit": "master.write", "masters.catalogue.create": "catalogue.write",
-  "inventory.project.view": "project.read", "inventory.project.edit": "project.write", "inventory.block.edit": "block.write", "inventory.flat.edit": "flat.write", "inventory.flat.approve": "flat.status",
-  "inventory.construction.edit": "construction.update", "inventory.construction.delete": "construction.undo",
-  "crm.customer.view": "customer.read", "crm.customer.edit": "customer.write", "crm.customer.custom": "customer.kyc_view", "crm.lead.view": "lead.read", "crm.lead.edit": "lead.write", "crm.visit.view": "visit.read", "crm.visit.edit": "visit.write",
-  "sales.booking.view": "booking.read", "sales.booking.create": "booking.create", "sales.booking.delete": "booking.cancel", "sales.agreement.edit": "agreement.edit",
-  "finance.payment.view": "payment.read", "finance.payment.create": "payment.post", "finance.payment.delete": "payment.reverse", "finance.receipt.export": "receipt.print",
-  "reports.report.view": "report.view", "website.cms.view": "cms.read", "website.cms.edit": "cms.write",
-  "service.portal.edit": "customer.portal_manage", "service.ticket.view": "service.read", "service.ticket.edit": "service.write", "service.ticket.approve": "service.assign",
+// Shared permission manifest — hierarchical module.feature.action codes (mirrors backend permissions.py).
+// Legacy coarse codes are no longer accepted by the backend; this map lets any stray legacy call resolve to its closest specific code.
+export const LEGACY = {
+  "project.read": "masters.project.view", "project.write": "masters.project.edit", "block.write": "masters.tower.edit", "flat.write": "masters.flat.edit", "flat.status": "sales.hold.create",
+  "customer.read": "sales.customer.view", "customer.write": "sales.customer.edit", "customer.kyc_view": "sales.kyc.reveal", "customer.portal_manage": "service.portal.manage",
+  "lead.read": "sales.lead.view", "lead.write": "sales.lead.create", "visit.read": "sales.site_visit.view", "visit.write": "sales.site_visit.create",
+  "booking.read": "sales.booking.view", "booking.create": "sales.booking.create", "booking.cancel": "sales.booking.cancel", "agreement.edit": "sales.agreement.revise",
+  "payment.read": "finance.payment.view", "payment.post": "finance.payment.create", "payment.reverse": "finance.payment.reverse", "receipt.print": "finance.receipt.print",
+  "report.view": "reports.collections.view", "cms.read": "website.cms.view", "cms.write": "website.cms.edit",
+  "service.read": "service.ticket.view", "service.write": "service.ticket.edit", "service.assign": "service.ticket.assign",
+  "settings.manage": "admin.settings.edit", "users.manage": "admin.user.view", "roles.manage": "admin.role.edit", "audit.view": "admin.audit.view",
+  "master.read": "masters.catalogue.view", "master.write": "masters.payment_plan.edit", "catalogue.write": "masters.catalogue.create",
+  "milestone.update": "construction.stage.update", "milestone.undo": "construction.stage.undo", "construction.update": "construction.stage.update", "construction.undo": "construction.stage.undo",
 };
-export const UI_ONLY = ["reports.collection.export"];
-export const canonical = (code) => HIER[code] || code;
+export const canonical = (code) => LEGACY[code] || code;

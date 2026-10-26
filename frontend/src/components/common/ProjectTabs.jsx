@@ -69,14 +69,14 @@ export function RateCardsTab({ projectId, onApplied }) {
   const items = data?.items || [];
   return (
     <div data-testid="rate-cards-tab">
-      <div className="mb-3 flex items-center justify-between"><p className="text-sm text-txt-secondary">Rate cards define base rates per flat type plus PLC rules. Only one is Active; applying re-prices Available flats only.</p>{can("flat.write") && <Button size="sm" onClick={() => setOpen(true)} className="bg-ink-950 hover:bg-ink-800" data-testid="new-rate-card-btn"><Plus className="mr-1 h-4 w-4" />New rate card</Button>}</div>
+      <div className="mb-3 flex items-center justify-between"><p className="text-sm text-txt-secondary">Rate cards define base rates per flat type plus PLC rules. Only one is Active; applying re-prices Available flats only.</p>{can("masters.rate_card.edit") && <Button size="sm" onClick={() => setOpen(true)} className="bg-ink-950 hover:bg-ink-800" data-testid="new-rate-card-btn"><Plus className="mr-1 h-4 w-4" />New rate card</Button>}</div>
       {!loading && items.length === 0 ? <EmptyState title="No rate cards" description="Create a rate card to price inventory with PLCs." /> : (
         <div className="grid gap-3 md:grid-cols-2">
           {items.map((rc) => (
             <div key={rc.id} className="card p-4" data-testid={`rate-card-${rc.id}`}>
               <div className="flex items-start justify-between"><div><p className="font-bold text-ink-950">{rc.name}</p><p className="text-xs text-txt-secondary">Effective {fmtDate(rc.effective_from)} · {rc.rates.length} rates · {rc.plc_rules.length} PLC rules</p></div><Pill tone={rc.status === "Active" ? "green" : rc.status === "Draft" ? "amber" : "slate"}>{rc.status}</Pill></div>
               {rc.applied_at && <p className="mt-2 text-xs text-txt-secondary">Applied {fmtDateTime(rc.applied_at)} · {num(rc.applied_count)} flats</p>}
-              {can("flat.write") && <div className="mt-3 flex gap-2">
+              {can("masters.rate_card.edit") && <div className="mt-3 flex gap-2">
                 {rc.status === "Draft" && <Button size="sm" variant="outline" onClick={() => act(rc, "activate")} data-testid={`rc-activate-${rc.id}`}><CheckCircle2 className="mr-1 h-3.5 w-3.5" />Activate</Button>}
                 {rc.status === "Active" && <Button size="sm" onClick={() => act(rc, "apply")} className="bg-gold text-ink-950 hover:bg-gold-hover" data-testid={`rc-apply-${rc.id}`}><Play className="mr-1 h-3.5 w-3.5" />Apply to Available flats</Button>}
               </div>}
@@ -106,7 +106,7 @@ export function ParkingTab({ projectId }) {
         <div className="flex gap-2 text-xs">{["Available", "Allotted", "Blocked"].map((s) => <span key={s} className="rounded-full border bg-white px-2 py-0.5"><b className="text-ink-950">{counts[s] || 0}</b> {s}</span>)}</div>
         <div className="ml-auto flex gap-2">
           <Select value={filter} onValueChange={(v) => { setFilter(v); setPage(1); }}><SelectTrigger className="h-9 w-36" data-testid="parking-type-filter"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All types</SelectItem>{["Covered", "Open", "Stilt", "Basement"].map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent></Select>
-          {can("block.write") && <Button size="sm" onClick={() => setOpen(!open)} className="bg-ink-950 hover:bg-ink-800" data-testid="parking-generate-btn"><Plus className="mr-1 h-4 w-4" />Bulk generate</Button>}
+          {can("masters.tower.create") && <Button size="sm" onClick={() => setOpen(!open)} className="bg-ink-950 hover:bg-ink-800" data-testid="parking-generate-btn"><Plus className="mr-1 h-4 w-4" />Bulk generate</Button>}
         </div>
       </div>
       {open && <div className="card mb-4 grid grid-cols-2 gap-3 p-4 md:grid-cols-6" data-testid="parking-generate-form">

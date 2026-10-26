@@ -14,18 +14,18 @@ import { prefetchRoute } from "@/lib/prefetch";
 import { useDensity } from "@/hooks/useDensity";
 
 const NAV = [
-  { to: "/dashboard", label: "Home", icon: Home, perm: "project.read" },
-  { to: "/projects", label: "Projects", icon: Building2, perm: "project.read", match: ["/projects", "/blocks", "/flats"] },
-  { to: "/customers", label: "Customers", icon: UserRound, perm: "customer.read", match: ["/customers"] },
-  { to: "/leads", label: "Leads & Visits", icon: Funnel, perm: "lead.read", match: ["/leads", "/site-visits"] },
-  { to: "/bookings", label: "Bookings", icon: FileSignature, perm: "booking.read", match: ["/bookings"] },
-  { to: "/payments", label: "Payments", icon: Receipt, perm: "payment.read", match: ["/payments", "/roznamcha"] },
-  { to: "/service-requests", label: "Service", icon: LifeBuoy, perm: "service.read", match: ["/service-requests"] },
-  { to: "/reports", label: "Reports", icon: BarChart3, perm: "report.view", match: ["/reports"] },
-  { to: "/website/settings", label: "Website", icon: Globe, perm: "cms.read", match: ["/website"], surface: "public_website" },
-  { to: "/settings", label: "Settings", icon: Settings, perm: "settings.manage", match: ["/settings", "/users", "/roles", "/audit", "/admin", "/master"] },
+  { to: "/dashboard", label: "Home", icon: Home, perm: "masters.project.view" },
+  { to: "/projects", label: "Projects", icon: Building2, perm: "masters.project.view", match: ["/projects", "/blocks", "/flats"] },
+  { to: "/customers", label: "Customers", icon: UserRound, perm: "sales.customer.view", match: ["/customers"] },
+  { to: "/leads", label: "Leads & Visits", icon: Funnel, perm: "sales.lead.view", match: ["/leads", "/site-visits"] },
+  { to: "/bookings", label: "Bookings", icon: FileSignature, perm: "sales.booking.view", match: ["/bookings"] },
+  { to: "/payments", label: "Payments", icon: Receipt, perm: "finance.payment.view", match: ["/payments", "/roznamcha"] },
+  { to: "/service-requests", label: "Service", icon: LifeBuoy, perm: "service.ticket.view", match: ["/service-requests"] },
+  { to: "/reports", label: "Reports", icon: BarChart3, perm: "reports.collections.view", match: ["/reports"] },
+  { to: "/website/settings", label: "Website", icon: Globe, perm: "website.cms.view", match: ["/website"], surface: "public_website" },
+  { to: "/settings", label: "Settings", icon: Settings, perm: "admin.settings.view", match: ["/settings", "/users", "/roles", "/audit", "/admin", "/master"] },
 ];
-const QUICK = [["Booking", "/bookings/new", "booking.create"], ["Customer", "/customers?new=1", "customer.write"], ["Payment", "/payments?new=1", "payment.create"], ["Lead", "/leads?new=1", "lead.write"], ["Visit", "/site-visits?new=1", "visit.write"]];
+const QUICK = [["Booking", "/bookings/new", "sales.booking.create"], ["Customer", "/customers?new=1", "sales.customer.create"], ["Payment", "/payments?new=1", "payment.create"], ["Lead", "/leads?new=1", "sales.lead.create"], ["Visit", "/site-visits?new=1", "sales.site_visit.create"]];
 const CRUMB = { dashboard: "Home", projects: "Projects", customers: "Customers", leads: "Leads", "site-visits": "Site Visits", bookings: "Bookings", payments: "Payments", roznamcha: "Roznamcha", reports: "Reports", "service-requests": "Service", website: "Website", settings: "Settings", users: "Users", roles: "Roles", audit: "Audit log", master: "Catalogues", blocks: "Tower", flats: "Inventory", new: "New", setup: "Setup", catalogues: "Catalogues", "flat-types": "Flat types", "floor-plan-templates": "Floor plans", "plc-types": "PLC types", "spec-categories": "Spec categories", "spec-items": "Spec items", "room-types": "Room types", "area-types": "Area types", "block-types": "Block types", amenities: "Amenities", "construction-stages": "Construction stages", "payment-plans": "Payment plans", "charge-types": "Charge types", "payment-modes": "Payment modes", "bank-accounts": "Bank accounts", "document-types": "Document types", "service-sla": "Service SLA", "construction-progress": "Construction progress", collections: "Collections", outstanding: "Outstanding", inventory: "Inventory", cheques: "Cheques", advances: "Advances", activity: "Activity", "sales-leads": "Sales & Leads", "upcoming-dues": "Upcoming dues", "demand-vs-collection": "Demand vs collection", cancellations: "Cancellations", "roznamcha-range": "Roznamcha range", "bank-receipts": "Bank receipts" };
 
 function Sidebar({ collapsed, setCollapsed, mobile, onClose }) {

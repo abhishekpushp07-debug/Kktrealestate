@@ -46,8 +46,8 @@ export default function ProjectDetail() {
       <PageHeader crumbs={[{ label: "Projects", to: "/projects" }, { label: p.code }]} title={p.name} subtitle={`${p.project_type} · ${p.address?.city || ""} ${p.rera_number ? `· RERA ${p.rera_number}` : ""}`}
         actions={<>
           <Pill tone={p.status === "Ready" ? "green" : p.status === "Under Construction" ? "amber" : "slate"} className="px-3 py-1 text-xs">{p.status}</Pill>
-          {can("project.write") && <button type="button" className="btn btn-secondary" onClick={() => setEditOpen(true)} data-testid="edit-project-btn"><Pencil className="mr-1.5 h-4 w-4" />Edit</button>}
-          {can("block.write") && <button type="button" className="btn btn-primary" onClick={() => setBlockOpen(true)} className="bg-ink-950 hover:bg-ink-800" data-testid="new-block-btn"><Plus className="mr-1.5 h-4 w-4" />Add block</button>}
+          {can("masters.project.edit") && <button type="button" className="btn btn-secondary" onClick={() => setEditOpen(true)} data-testid="edit-project-btn"><Pencil className="mr-1.5 h-4 w-4" />Edit</button>}
+          {can("masters.tower.create") && <button type="button" className="btn btn-primary" onClick={() => setBlockOpen(true)} className="bg-ink-950 hover:bg-ink-800" data-testid="new-block-btn"><Plus className="mr-1.5 h-4 w-4" />Add block</button>}
         </>} />
       <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard label="Total units" value={inv.total} testId="project-stat-total" />
@@ -63,7 +63,7 @@ export default function ProjectDetail() {
         <TabsContent value="pricing" className="mt-4"><RateCardsTab projectId={p.id} onApplied={reload} /></TabsContent>
         <TabsContent value="parking" className="mt-4"><ParkingTab projectId={p.id} /></TabsContent>
         <TabsContent value="history" className="mt-4"><div className="card p-5"><HistoryTimeline entityType="project" entityId={p.id} /></div></TabsContent>
-        <TabsContent value="documents" className="mt-4"><div className="card p-5"><DocumentsPanel entityType="project" entityId={p.id} canWrite={can("project.write")} /></div></TabsContent>
+        <TabsContent value="documents" className="mt-4"><div className="card p-5"><DocumentsPanel entityType="project" entityId={p.id} canWrite={can("masters.project.edit")} /></div></TabsContent>
         <TabsContent value="overview" className="mt-4 grid gap-4 lg:grid-cols-3">
           <div className="card p-5 lg:col-span-2">
             <h3 className="mb-4 text-base font-bold text-ink-950">Project details</h3>
@@ -84,7 +84,7 @@ export default function ProjectDetail() {
           </div>
         </TabsContent>
         <TabsContent value="blocks" className="mt-4">
-          {p.blocks.length === 0 ? <EmptyState icon={Layers} title="No blocks yet" description="Add a block to generate flats from your flat types." actionLabel={can("block.write") ? "Add block" : undefined} onAction={() => setBlockOpen(true)} testId="blocks-empty" /> : (
+          {p.blocks.length === 0 ? <EmptyState icon={Layers} title="No blocks yet" description="Add a block to generate flats from your flat types." actionLabel={can("masters.tower.create") ? "Add block" : undefined} onAction={() => setBlockOpen(true)} testId="blocks-empty" /> : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {p.blocks.map((b) => (
                 <Link to={`/blocks/${b.id}`} key={b.id} className="card p-5 transition-colors hover:border-gold/60" data-testid={`block-card-${b.code}`}>

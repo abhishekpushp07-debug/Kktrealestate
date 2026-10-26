@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from pydantic import Field
 
 from db import db
-from deps import ensure_project_access, require
+from deps import ensure_project_access, require, require_any
 from services import ttlcache
 from services.filesig import sniff
 from storage import APP_NAME, put_object
@@ -199,7 +199,7 @@ async def delete_item(coll: str, item_id: str, request: Request, user: dict = De
 
 
 @router.get("/projects/{project_id}/website")
-async def project_website(project_id: str, user: dict = Depends(require("website.cms.view"))):
+async def project_website(project_id: str, user: dict = Depends(require_any("website.cms.view", "masters.project.view"))):
     p = await get_or_404(db.projects, project_id, "Project", {"company_id": user["company_id"]})
     ensure_project_access(user, project_id)
     return {"id": p["id"], "version": p["version"], "website": p.get("website") or {"is_published": False, "slug": slugify(p["name"])}}

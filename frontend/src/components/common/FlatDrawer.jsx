@@ -87,7 +87,7 @@ export function FlatDrawer({ flatId, onClose, onChanged }) {
             {flat.specifications?.length > 0 && <><p className="label-xs mb-2 mt-4">Specifications</p><div className="grid grid-cols-2 gap-1 text-xs" data-testid="flat-specs">{flat.specifications.map((s) => <div key={s.id} className="rounded border bg-white px-2 py-1"><span className="text-txt-muted">{s.category}: </span><b className="text-ink-950">{s.name}</b>{s.brand ? <span className="text-txt-secondary"> · {s.brand}</span> : null}</div>)}</div></>}
             <details className="mt-4"><summary className="label-xs cursor-pointer">History</summary><div className="mt-2"><HistoryTimeline entityType="flat" entityId={flat.id} /></div></details>
           </div>
-          {can("flat.status") && (
+          {can("sales.hold.create") && (
             <div className="mt-6 rounded-lg border p-4" data-testid="flat-status-section">
               <p className="label-xs mb-2">Change status</p>
               {manual ? <>
@@ -99,7 +99,7 @@ export function FlatDrawer({ flatId, onClose, onChanged }) {
               </> : <p className="text-sm text-txt-secondary">Status is controlled by the booking.</p>}
             </div>
           )}
-          {can("flat.write") && (
+          {can("masters.flat.edit") && (
             <div className="mt-4 rounded-lg border p-4 space-y-3" data-testid="flat-edit-section">
               <p className="label-xs">Edit flat</p>
               <Field label="Flat type" hint={flat.status !== "Available" ? "Only editable while Available" : "Changing re-snapshots rooms & areas"}><Combobox options={ftOptions} value={edit.flat_type_id} onChange={(v) => setEdit({ ...edit, flat_type_id: v })} disabled={flat.status !== "Available"} testId="flat-edit-type" /></Field>

@@ -230,7 +230,7 @@ async def get_payment(payment_id: str, user: dict = Depends(require("finance.pay
 async def receipt(payment_id: str, user: dict = Depends(require("finance.receipt.print"))):
     p = await get_or_404(db.payments, payment_id, "Payment", {"company_id": user["company_id"]})
     ensure_project_access(user, p["project_id"])
-    b = await db.bookings.find_one({"id": p["booking_id"]}, {"_id": 0, "booking_number": 1, "flat_snapshot": 1, "project_name": 1, "block_name": 1, "agreement_value_paise": 1, "cash_agreed_paise": 1, "account_agreed_paise": 1})
+    b = await db.bookings.find_one({"id": p["booking_id"]}, {"_id": 0, "booking_number": 1, "status": 1, "flat_snapshot": 1, "project_name": 1, "block_name": 1, "agreement_value_paise": 1, "cash_agreed_paise": 1, "account_agreed_paise": 1})
     customer = await db.customers.find_one({"id": p["customer_id"]}, {"_id": 0, "full_name": 1, "salutation": 1, "address_current": 1, "phone": 1, "customer_code": 1})
     company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0, "bank_account": 0})
     row = await db.ledger_entries.find_one({"booking_id": p["booking_id"], "ref": p["receipt_number"], "type": {"$in": ["PAYMENT", "OTHER_CHARGE_PAYMENT"]}}, {"_id": 0})

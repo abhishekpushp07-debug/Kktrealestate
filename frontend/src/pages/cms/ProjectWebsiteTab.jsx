@@ -58,7 +58,7 @@ export function ProjectWebsiteTab({ projectId, slugDefault }) {
       setD({ ...r.data.website, version: r.data.version, faqsText: JSON.stringify(r.data.website.faqs || [], null, 2) }); toast.success("Website settings saved");
     } catch (e) { toast.error(e.response?.data?.detail || "Save failed"); } finally { setBusy(false); }
   };
-  const ro = !can("project.write");
+  const ro = !can("website.cms.edit");
   return (
     <div className="card p-5" data-testid="project-website-tab">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div><h3 className="text-base font-bold text-ink-950">Public website</h3><p className="text-sm text-txt-secondary">Controls what visitors see on <code>/projects/{d.slug || slugDefault}</code>.</p></div>

@@ -56,7 +56,7 @@ export default function Customers() {
       <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div><p className="label">CRM</p><h1 className="mt-1 font-display text-4xl text-ink-950">Customers <span className="text-txt-muted">· {counts?.total ?? total}</span></h1></div>
         <div className="flex flex-wrap gap-2">
-          {can("customer.write") && <Link to="/customers/new" className="btn btn-primary" data-testid="new-customer-btn"><Plus className="h-4 w-4" strokeWidth={1.75} />New customer</Link>}
+          {can("sales.customer.create") && <Link to="/customers/new" className="btn btn-primary" data-testid="new-customer-btn"><Plus className="h-4 w-4" strokeWidth={1.75} />New customer</Link>}
         </div>
       </header>
       <section className="space-y-4" data-testid="customer-filters">
@@ -77,7 +77,7 @@ export default function Customers() {
           <Chip active={f.has_overdue} onClick={() => setF({ ...f, has_overdue: !f.has_overdue })} testId="chip-overdue">Has overdue</Chip>
         </div>
       </section>
-      {!loading && items.length === 0 ? <EmptyState icon={UserRound} title="No customers match" description="Try clearing a filter or search by phone." action={can("customer.write") && <Link to="/customers/new" className="btn btn-primary">Add a customer</Link>} testId="customers-empty" /> : view === "cards" ? (
+      {!loading && items.length === 0 ? <EmptyState icon={UserRound} title="No customers match" description="Try clearing a filter or search by phone." action={can("sales.customer.create") && <Link to="/customers/new" className="btn btn-primary">Add a customer</Link>} testId="customers-empty" /> : view === "cards" ? (
         <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3" data-testid="customers-grid">
           {items.map((c) => <CustomerCard key={c.id} c={c} people={people} />)}
           {loading && Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-56 rounded-2xl" />)}

@@ -39,7 +39,7 @@ export default function MasterPage() {
   const list = useList(`/master/${cfg.kind}`, { include_inactive: showInactive || undefined, include_usage: true, page_size: 100 });
   const [editing, setEditing] = useState(undefined);
   const [confirm, setConfirm] = useState(null);
-  const write = can("master.write");
+  const write = can("masters.payment_plan.edit");
   const items = (list.items || list.rows || []).filter((r) => !q || JSON.stringify(r).toLowerCase().includes(q.toLowerCase()));
 
   const toggle = async (row) => {

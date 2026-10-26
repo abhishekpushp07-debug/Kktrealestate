@@ -24,8 +24,8 @@ export function ConstructionPhotos({ blockId, milestones }) {
   const patch = async (p, body) => { try { await api.patch(`/photos/${p.id}`, { ...body, version: p.version ?? 0 }); load(); } catch (e) { toast.error(errMsg(e)); } };
   const del = async (p) => { if (!window.confirm("Delete photo?")) return; try { await api.delete(`/photos/${p.id}`); load(); } catch (e) { toast.error(errMsg(e)); } };
   const saveNote = async () => { try { await api.patch(`/blocks/${blockId}/milestones/${seq}/note`, { progress_note: note, version: 0 }); toast.success("Progress note saved"); } catch (e) { toast.error(errMsg(e)); } };
-  if (!can("project.read")) return null;
-  const canEdit = can("milestone.update");
+  if (!can("construction.photo.view")) return null;
+  const canEdit = can("construction.photo.upload");
   return (
     <div className="card p-5" data-testid="construction-photos-panel">
       <div className="mb-3 flex flex-wrap items-center gap-2"><Camera className="h-4 w-4 text-gold" /><h3 className="text-base font-bold text-ink-950">Construction photos</h3><span className="text-xs text-txt-secondary">{photos.length} photos · customers see those marked visible</span>

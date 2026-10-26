@@ -16,12 +16,12 @@ REGISTRY = {
         "bank_account": ("Bank accounts", ["view", "create", "edit", "delete"]), "catalogue": ("Catalogues", ["view", "create", "edit"]),
         "flat_type": ("Flat / room / area types", ["view", "create", "edit", "delete"]), "block_type": ("Block types", ["view", "create", "edit", "delete"]), "specification": ("Specifications", ["view", "create", "edit", "delete"]), "amenity": ("Amenities", ["view", "create", "edit", "delete"]), "payment_mode": ("Payment modes", ["view", "create", "edit", "delete"]), "document_type": ("Document types", ["view", "create", "edit", "delete"])}),
     "sales": ("Sales & CRM", {
-        "lead": ("Leads", ["view", "create", "edit", "delete", "assign", "export"]), "site_visit": ("Site visits", ["view", "create", "edit", "cancel", "complete", "export"]), "customer": ("Customers", ["view", "create", "edit", "delete", "export"]),
+        "lead": ("Leads", ["view", "create", "edit", "delete", "assign", "export"]), "site_visit": ("Site visits", ["view", "create", "edit", "cancel", "complete", "export"]), "customer": ("Customers", ["view", "create", "edit", "export"]),
         "kyc": ("KYC", ["view_masked", "reveal", "edit"]), "booking": ("Bookings", ["view", "create", "edit", "cancel", "transfer", "export"]), "agreement": ("Agreement", ["view", "revise"]), "hold": ("Holds / blocks", ["create", "release"])}),
     "finance": ("Finance", {
         "payment": ("Payments", ["view", "create", "reverse", "export"]), "cheque": ("Cheques", ["clear", "bounce"]), "demand": ("Demands", ["view", "create", "void", "export"]), "refund": ("Refunds", ["view", "create", "approve", "pay"]),
         "roznamcha": ("Roznamcha", ["view", "opening_balance", "deposit"]), "receipt": ("Receipts", ["print", "download"]), "ledger": ("Ledger", ["view", "export"])}),
-    "construction": ("Construction", {"stage": ("Stages", ["view", "update", "undo"]), "photo": ("Photos", ["upload", "delete"]), "notice": ("Notices", ["view", "create", "edit", "delete"])}),
+    "construction": ("Construction", {"stage": ("Stages", ["view", "update", "undo"]), "photo": ("Photos", ["view", "upload", "delete"]), "notice": ("Notices", ["view", "create", "edit", "delete"])}),
     "service": ("Service", {"ticket": ("Tickets", ["view", "create", "edit", "assign", "close", "reopen", "delete", "export"]), "category_sla": ("Categories & SLA", ["edit"]), "portal": ("Customer portal", ["view", "manage"])}),
     "website": ("Website", {"cms": ("Website CMS", ["view", "edit"])}),
     "reports": ("Reports", {k: (lbl, ["view", "export"]) for k, lbl in [("collections", "Collections"), ("outstanding", "Outstanding & ageing"), ("demand_vs_collection", "Demand vs collection"),

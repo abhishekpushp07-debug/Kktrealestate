@@ -137,7 +137,7 @@ export default function Leads() {
     <div className="space-y-8" data-testid="leads-page">
       <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div><p className="label">Sales funnel</p><h1 className="mt-1 font-display text-4xl text-ink-950">Leads & Visits</h1></div>
-        <div className="flex flex-wrap gap-2"><Select options={(projects?.items || []).map((p) => ({ value: p.id, label: p.name, sub: p.code }))} value={projectId} onChange={setProjectId} placeholder="All projects" allowAdd={false} className="w-52" testId="leads-filter-project" />{can("visit.write") && <button onClick={() => setNewVisit(true)} className="btn btn-secondary" data-testid="visits-new"><CalendarDays className="h-4 w-4" strokeWidth={1.75} />Book visit</button>}{can("lead.write") && <button onClick={() => setOpen(true)} className="btn btn-primary" data-testid="new-lead-btn"><Plus className="h-4 w-4" strokeWidth={1.75} />New lead</button>}</div>
+        <div className="flex flex-wrap gap-2"><Select options={(projects?.items || []).map((p) => ({ value: p.id, label: p.name, sub: p.code }))} value={projectId} onChange={setProjectId} placeholder="All projects" allowAdd={false} className="w-52" testId="leads-filter-project" />{can("sales.site_visit.create") && <button onClick={() => setNewVisit(true)} className="btn btn-secondary" data-testid="visits-new"><CalendarDays className="h-4 w-4" strokeWidth={1.75} />Book visit</button>}{can("sales.lead.create") && <button onClick={() => setOpen(true)} className="btn btn-primary" data-testid="new-lead-btn"><Plus className="h-4 w-4" strokeWidth={1.75} />New lead</button>}</div>
       </header>
       <section className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4" data-testid="lead-tiles">
         {!board ? [1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-28 rounded-2xl" />) : <>
@@ -166,7 +166,7 @@ export default function Leads() {
         <div className="flex items-center justify-between"><h3 className="font-display text-lg">Brochure downloads · last 30 days</h3><span className="pill bg-warm-100 text-txt-secondary">{brochure.data?.last_30 ?? 0} downloads</span></div>
         {brochure.data ? <div className="mt-6 flex h-40 items-end gap-1" data-testid="brochure-series">{brochure.data.series.map((d) => { const mx = Math.max(1, ...brochure.data.series.map((x) => x.count)); return <div key={d.date} title={`${fmtDate(d.date)} · ${d.count}`} className="flex-1 rounded-t bg-ink-950" style={{ height: `${Math.max(3, (d.count / mx) * 100)}%`, opacity: d.count ? 1 : 0.15 }} />; })}</div> : <Skeleton className="mt-6 h-40" />}
         <p className="mt-3 text-xs text-txt-secondary">{brochure.data?.brochure_leads_week ?? 0} brochure leads this week{brochure.data?.total ? ` · ${brochure.data.total} all-time for this project` : ""}</p>
-        {can("lead.read") && <button onClick={() => nav("/leads?tab=list")} className="btn btn-secondary btn-sm mt-4"><Download className="h-3.5 w-3.5" />See brochure leads</button>}
+        {can("sales.lead.export") && <button onClick={() => nav("/leads?tab=list")} className="btn btn-secondary btn-sm mt-4"><Download className="h-3.5 w-3.5" />See brochure leads</button>}
       </Card>}
       {open && <LeadForm open={open} onOpenChange={setOpen} onSaved={refresh} />}
       {sel && <LeadDrawer lead={sel} onClose={() => setSel(null)} onChanged={refresh} />}

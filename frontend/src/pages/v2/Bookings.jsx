@@ -39,7 +39,7 @@ export default function Bookings() {
     <div className="space-y-8" data-testid="bookings-page">
       <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div><p className="label">Sales</p><h1 className="mt-1 font-display text-4xl text-ink-950">Bookings <span className="text-txt-muted">· {list.total ?? ""}</span></h1></div>
-        {can("booking.create") && <Link to="/bookings/new" className="btn btn-primary" data-testid="new-booking-btn"><Plus className="h-4 w-4" strokeWidth={1.75} />New booking</Link>}
+        {can("sales.booking.create") && <Link to="/bookings/new" className="btn btn-primary" data-testid="new-booking-btn"><Plus className="h-4 w-4" strokeWidth={1.75} />New booking</Link>}
       </header>
       <section className="flex flex-col gap-3 md:flex-row md:items-center" data-testid="booking-filters">
         <label className="relative flex-1"><Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-txt-muted" strokeWidth={1.75} /><input value={list.search} onChange={(e) => list.setSearch(e.target.value)} placeholder="Booking no., customer, flat…" className="input !pl-10" data-testid="booking-search" /></label>

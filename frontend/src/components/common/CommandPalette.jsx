@@ -8,13 +8,13 @@ import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, C
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const PAGES = [
-  ["Home", "/dashboard", LayoutDashboard, "project.read"], ["Projects", "/projects", Building2, "project.read"], ["Customers", "/customers", Users, "customer.read"], ["Bookings", "/bookings", Grid3X3, "booking.read"],
-  ["Payments", "/payments", IndianRupee, "payment.read"], ["Leads & Visits", "/leads", PhoneCall, "lead.read"], ["Service", "/service-requests", LifeBuoy, "service.read"], ["Reports", "/reports", BarChart3, "report.view"],
-  ["Catalogues", "/settings/catalogues", Database, "master.read"], ["Users", "/users", Users, "users.manage"], ["Roles", "/roles", ShieldCheck, "roles.manage"], ["Audit Log", "/audit", History, "audit.view"], ["Settings", "/settings", Settings, "settings.manage"],
+  ["Home", "/dashboard", LayoutDashboard, "masters.project.view"], ["Projects", "/projects", Building2, "masters.project.view"], ["Customers", "/customers", Users, "sales.customer.view"], ["Bookings", "/bookings", Grid3X3, "sales.booking.view"],
+  ["Payments", "/payments", IndianRupee, "finance.payment.view"], ["Leads & Visits", "/leads", PhoneCall, "sales.lead.view"], ["Service", "/service-requests", LifeBuoy, "service.ticket.view"], ["Reports", "/reports", BarChart3, "reports.collections.view"],
+  ["Catalogues", "/settings/catalogues", Database, "masters.catalogue.view"], ["Users", "/users", Users, "admin.user.view"], ["Roles", "/roles", ShieldCheck, "admin.role.edit"], ["Audit Log", "/audit", History, "admin.audit.view"], ["Settings", "/settings", Settings, "admin.settings.edit"],
 ];
 const ACTIONS = [
-  ["New booking", "/bookings/new", Plus, "booking.create"], ["Post payment", "/payments?post=1", IndianRupee, "payment.post"], ["New customer", "/customers/new", UserPlus, "customer.write"],
-  ["New lead", "/leads?new=1", PhoneCall, "lead.write"], ["Log a call", "/customers?log=1", PhoneCall, "customer.write"], ["Mark construction stage", "/projects", Hammer, "block.write"], ["Roznamcha (today)", "/payments?tab=roznamcha", Receipt, "payment.read"],
+  ["New booking", "/bookings/new", Plus, "sales.booking.create"], ["Post payment", "/payments?post=1", IndianRupee, "finance.payment.create"], ["New customer", "/customers/new", UserPlus, "sales.customer.create"],
+  ["New lead", "/leads?new=1", PhoneCall, "sales.lead.create"], ["Log a call", "/customers?log=1", PhoneCall, "sales.customer.create"], ["Mark construction stage", "/projects", Hammer, "masters.tower.edit"], ["Roznamcha (today)", "/payments?tab=roznamcha", Receipt, "finance.payment.view"],
 ];
 export const GO = { p: ["/projects", "Projects"], c: ["/customers", "Customers"], b: ["/bookings", "Bookings"], h: ["/dashboard", "Home"], y: ["/payments", "Payments"], l: ["/leads", "Leads"], s: ["/service-requests", "Service"], r: ["/reports", "Reports"] };
 const ICON = { projects: Building2, blocks: Layers, flats: Home, users: Users, flat_types: Database };

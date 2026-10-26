@@ -164,6 +164,7 @@
   "project.read": [
    "admin.audit.view",
    "admin.definitions.view",
+   "construction.photo.view",
    "construction.stage.view",
    "masters.flat.view",
    "masters.payment_plan.view",
@@ -810,7 +811,8 @@
   },
   "cms:GET /projects/{project_id}/website": {
    "codes": [
-    "website.cms.view"
+    "website.cms.view",
+    "masters.project.view"
    ],
    "fn": "project_website",
    "legacy": [
@@ -2267,7 +2269,7 @@
   },
   "support:GET /blocks/{block_id}/photos": {
    "codes": [
-    "construction.stage.view"
+    "construction.photo.view"
    ],
    "fn": "list_photos",
    "legacy": [

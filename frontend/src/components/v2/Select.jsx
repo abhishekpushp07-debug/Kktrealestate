@@ -32,7 +32,7 @@ export function Select({ options: optionsProp, type, parentId, value, onChange, 
   useEffect(() => { if (!open) return; const h = (e) => { if (!box.current?.contains(e.target)) setOpen(false); }; document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h); }, [open]);
   useEffect(() => { if (open) { setQ(""); setHi(0); setTimeout(() => inp.current?.focus(), 10); } }, [open]);
   const pick = (o) => { if (rk) remember(rk, o.value); if (multiple) { const cur = value || []; onChange(cur.includes(o.value) ? cur.filter((v) => v !== o.value) : [...cur, o.value]); } else { onChange(o.value, o); setOpen(false); } };
-  const canAdd = allowAdd && type && can("catalogue.write") && q.trim() && !options.some((o) => o.label.toLowerCase() === q.trim().toLowerCase());
+  const canAdd = allowAdd && type && can("masters.catalogue.create") && q.trim() && !options.some((o) => o.label.toLowerCase() === q.trim().toLowerCase());
   const add = async () => {
     setAdding(true);
     try { const r = await api.post(`/catalogues/${type}/items`, { label: q.trim(), parent_id: parentId || null }); await invalidateCatalogues(); toast.success(`Added "${r.data.label}"`); pick({ value: r.data.id, label: r.data.label }); }

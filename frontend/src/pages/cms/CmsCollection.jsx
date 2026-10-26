@@ -94,12 +94,12 @@ export default function CmsCollection() {
   if (!cfg) return <p>Unknown section</p>;
   const del = async (r) => { if (!window.confirm("Delete this item?")) return; try { await api.delete(`/cms/${coll}/${r.id}`); toast.success("Deleted"); list.reload(); } catch (e) { toast.error(errMsg(e)); } };
   const columns = [...cfg.cols, { key: "is_active", label: "Active", render: (r) => <Pill tone={r.is_active !== false ? "emerald" : "slate"}>{r.is_active !== false ? "Yes" : "No"}</Pill> },
-    { key: "actions", label: "", render: (r) => can("cms.write") && <Button size="icon" variant="ghost" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); del(r); }} data-testid={`cms-delete-${r.id}`}><Trash2 className="h-3.5 w-3.5 text-txt-secondary" /></Button> }];
+    { key: "actions", label: "", render: (r) => can("website.cms.edit") && <Button size="icon" variant="ghost" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); del(r); }} data-testid={`cms-delete-${r.id}`}><Trash2 className="h-3.5 w-3.5 text-txt-secondary" /></Button> }];
   return (
     <div data-testid={`cms-${coll}-page`}>
-      <PageHeader title={`Website · ${cfg.label}`} subtitle="Content shown on the public website." actions={can("cms.write") && <Button onClick={() => setEdit({})} className="bg-ink-950 hover:bg-ink-800" data-testid="cms-new-btn"><Plus className="mr-1 h-4 w-4" />New</Button>} />
+      <PageHeader title={`Website · ${cfg.label}`} subtitle="Content shown on the public website." actions={can("website.cms.edit") && <Button onClick={() => setEdit({})} className="bg-ink-950 hover:bg-ink-800" data-testid="cms-new-btn"><Plus className="mr-1 h-4 w-4" />New</Button>} />
       <CmsNav active={coll} />
-      <DataTable {...list} columns={columns} testId="cms-table" searchPlaceholder="Search…" onRowClick={(r) => can("cms.write") && setEdit(r)} />
+      <DataTable {...list} columns={columns} testId="cms-table" searchPlaceholder="Search…" onRowClick={(r) => can("website.cms.edit") && setEdit(r)} />
       {edit && <CmsForm coll={coll} item={edit.id ? edit : null} onClose={() => setEdit(null)} onSaved={() => list.reload()} />}
     </div>
   );

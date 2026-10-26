@@ -11,7 +11,7 @@ export function PaymentPlanMatrix({ projectId, blocks }) {
   const [asg, setAsg] = useState([]);
   const load = useCallback(() => Promise.all([api.get("/master/payment-plans?page_size=100"), api.get(`/payment-plan-assignments?project_id=${projectId}`)]).then(([p, a]) => { setPlans(p.data.items); setAsg(a.data.items); }).catch((e) => toast.error(errMsg(e))), [projectId]);
   useEffect(() => { load(); }, [load]);
-  const canEdit = can("master.write");
+  const canEdit = can("masters.payment_plan.edit");
   const find = (planId, blockId) => asg.find((a) => a.payment_plan_id === planId && (a.block_id || null) === blockId);
   const toggle = async (plan, blockId) => {
     const a = find(plan.id, blockId);
@@ -46,10 +46,10 @@ export function StageSequenceEditor({ entityType, entityId, sequence, onSaved })
     <div className="card p-5" data-testid="stage-sequence-editor">
       <p className="mb-3 text-sm text-txt-secondary">{seq.length ? `${seq.length} stages in sequence` : "Using the master's default order"} — pick the stages that apply, then order them.</p>
       <div className="grid gap-4 md:grid-cols-2">
-        <div><p className="label-xs mb-2">Available stages</p><div className="flex flex-wrap gap-2">{stages.map((s) => <button key={s.id} type="button" onClick={() => can("project.write") && toggle(s.id)} className={`rounded-full border px-3 py-1 text-xs font-semibold ${ids.includes(s.id) ? "border-ink-950 bg-ink-950 text-white" : "bg-white text-txt-secondary"}`} data-testid={`seq-stage-${s.code}`}>{s.name}</button>)}</div></div>
-        <div><p className="label-xs mb-2">Order</p><ol className="space-y-1">{seq.map((x, i) => <li key={x.stage_id} className="flex items-center gap-2 rounded border bg-white px-2 py-1 text-sm"><span className="w-5 font-bold text-ink-950">{i + 1}</span><span className="flex-1">{name(x.stage_id)}</span>{can("project.write") && <><button type="button" onClick={() => move(i, -1)} className="px-1 text-txt-muted">↑</button><button type="button" onClick={() => move(i, 1)} className="px-1 text-txt-muted">↓</button></>}</li>)}</ol></div>
+        <div><p className="label-xs mb-2">Available stages</p><div className="flex flex-wrap gap-2">{stages.map((s) => <button key={s.id} type="button" onClick={() => can("masters.construction_stage.edit") && toggle(s.id)} className={`rounded-full border px-3 py-1 text-xs font-semibold ${ids.includes(s.id) ? "border-ink-950 bg-ink-950 text-white" : "bg-white text-txt-secondary"}`} data-testid={`seq-stage-${s.code}`}>{s.name}</button>)}</div></div>
+        <div><p className="label-xs mb-2">Order</p><ol className="space-y-1">{seq.map((x, i) => <li key={x.stage_id} className="flex items-center gap-2 rounded border bg-white px-2 py-1 text-sm"><span className="w-5 font-bold text-ink-950">{i + 1}</span><span className="flex-1">{name(x.stage_id)}</span>{can("masters.construction_stage.edit") && <><button type="button" onClick={() => move(i, -1)} className="px-1 text-txt-muted">↑</button><button type="button" onClick={() => move(i, 1)} className="px-1 text-txt-muted">↓</button></>}</li>)}</ol></div>
       </div>
-      {can("project.write") && <Button className="mt-4 bg-ink-950 hover:bg-ink-800" onClick={save} data-testid="seq-save">Save sequence</Button>}
+      {can("masters.construction_stage.edit") && <Button className="mt-4 bg-ink-950 hover:bg-ink-800" onClick={save} data-testid="seq-save">Save sequence</Button>}
     </div>
   );
 }
