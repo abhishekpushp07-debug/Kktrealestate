@@ -23,7 +23,7 @@ export default function AuditLog() {
   const set = (k, v) => { const n = new URLSearchParams(sp); if (v && v !== "all") n.set(k, v); else n.delete(k); setSp(n, { replace: true }); };
   const { data: modules } = useFetch("/audit-logs/modules");
   const { data: users } = useFetch("/users?limit=100");
-  const filters = { module: get("module") || undefined, actor_id: get("user") || undefined, action: get("action") || undefined, date_from: get("from") || undefined, date_to: get("to") || undefined, record: get("record") || undefined, field: get("field") || undefined };
+  const filters = { module: get("module") || undefined, actor_id: get("user") || undefined, action: get("action") || undefined, date_from: get("from") || undefined, include_archive: get("archive") === "1" || undefined, date_to: get("to") || undefined, record: get("record") || undefined, field: get("field") || undefined };
   const list = useList("/audit-logs", filters, { sort: "-created_at" });
   const [open, setOpen] = useState(null);
   const [journey, setJourney] = useState(null);
@@ -50,6 +50,7 @@ export default function AuditLog() {
           <input className="input !h-9 !w-44" placeholder="Action (e.g. flat.update)" value={get("action")} onChange={(e) => set("action", e.target.value)} data-testid="audit-action-filter" />
           <input className="input !h-9 !w-44" placeholder="Record id / number" value={get("record")} onChange={(e) => set("record", e.target.value)} data-testid="audit-record-filter" />
           <input className="input !h-9 !w-32" placeholder="Field" value={get("field")} onChange={(e) => set("field", e.target.value)} data-testid="audit-field-filter" />
+          <label className="flex h-9 items-center gap-2 rounded-md border border-warm-200 px-3 text-xs font-medium text-txt-secondary" data-testid="audit-archive-toggle"><input type="checkbox" checked={get("archive") === "1"} onChange={(e) => set("archive", e.target.checked ? "1" : "")} data-testid="audit-archive-checkbox" />Include archive</label>
           <DateInput value={get("from")} onChange={(e) => set("from", e.target.value)} className="h-9 w-40" data-testid="audit-date-from" />
           <DateInput value={get("to")} onChange={(e) => set("to", e.target.value)} className="h-9 w-40" data-testid="audit-date-to" />
         </>} />

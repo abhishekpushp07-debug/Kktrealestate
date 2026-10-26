@@ -30,7 +30,7 @@ export function ChangeRows({ changes, filter }) {
 }
 
 export function HistoryTimeline({ entityType, entityId }) {
-  const { data, loading } = useFetch(entityId ? `/audit-logs/entity/${entityType}/${entityId}` : null);
+  const { data, loading } = useFetch(entityId ? `/audit-logs/entity/${entityType}/${entityId}?include_archive=true` : null);
   const [field, setField] = useState("");
   const fields = useMemo(() => Array.from(new Set((data?.items || []).flatMap((a) => (a.changed_fields || []).map((c) => c.field)))).sort(), [data]);
   if (loading) return <Skeleton className="h-40" />;
