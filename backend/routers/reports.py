@@ -2,6 +2,7 @@
 from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Request, Response
+from fastapi.responses import JSONResponse
 from pymongo import ReturnDocument
 
 from services import clock, definitions
@@ -92,7 +93,7 @@ def _default_kpis(payload: dict, columns: list[tuple], totals: dict | None, rows
     return k or [{"label": "Rows", "value": len(rows), "kind": "num"}]
 
 
-def respond(request: Request, fmt: str | None, payload: dict, title: str, company: dict, columns: list[tuple], rows: list[dict], totals: dict | None = None, filename="report", landscape=False):
+async def respond(request: Request, fmt: str | None, payload: dict, title: str, company: dict, columns: list[tuple], rows: list[dict], totals: dict | None = None, filename="report", landscape=False):
     if fmt in ("csv", "pdf") and getattr(request.state, "perm_code", "").startswith("reports."):
         exp = request.state.perm_code.rsplit(".", 1)[0] + ".export"
         if exp not in request.state.perms:
@@ -111,6 +112,17 @@ def respond(request: Request, fmt: str | None, payload: dict, title: str, compan
                 return "" if v is None else round(v / 100, 2)
             from utils import csv_safe
             return "" if v is None else csv_safe(v)
+        from routers import exports as _ex
+        total_rows = len(rows)
+        if total_rows > _ex.EXPORT_SYNC_MAX and request.query_params.get("async", "1") != "0":  # Phase J3: large → export job + Exports page
+            user = {"id": getattr(request.state, "user_id", None) or request.headers.get("x-user-id"), "company_id": company.get("id")}
+            _rows = [[val(c, r.get(c[0])) for c in columns] for r in rows]
+            _totals = [("TOTAL" if i == 0 else val(c, totals.get(c[0])) if c[0] in totals else "") for i, c in enumerate(columns)] if totals else None
+            async def produce():
+                return _rows
+            job = await _ex.start_export(user, filename, title, header_line, [head(c) for c in columns], produce, _totals)
+            return JSONResponse(status_code=202, content={"export": job, "message": f"{total_rows:,} rows exceed the {_ex.EXPORT_SYNC_MAX:,}-row sync limit; your export is being prepared — see Reports → Exports"},
+                                headers={"X-Export-Total": str(total_rows), "X-Export-Rows": "0", "X-Export-Truncated": "false", "X-Export-Async": job["id"]})
         buf = io.StringIO()
         buf.write(f"# {header_line}\n")
         w = _csv.writer(buf)
@@ -119,7 +131,7 @@ def respond(request: Request, fmt: str | None, payload: dict, title: str, compan
             w.writerow([val(c, r.get(c[0])) for c in columns])
         if totals:
             w.writerow([("TOTAL" if i == 0 else val(c, totals.get(c[0])) if c[0] in totals else "") for i, c in enumerate(columns)])
-        return Response(content=buf.getvalue(), media_type="text/csv", headers={"Content-Disposition": f'attachment; filename="{filename}.csv"'})
+        return Response(content=buf.getvalue(), media_type="text/csv", headers={"Content-Disposition": f'attachment; filename="{filename}.csv"', "X-Export-Total": str(total_rows), "X-Export-Rows": str(total_rows), "X-Export-Truncated": "false"})
     if fmt == "pdf":
         d = _pdf.BrandedDoc(title, company, landscape_mode=landscape, subtitle=payload.get("subtitle"))
         d.h1(title)
@@ -172,7 +184,7 @@ async def collections(request: Request, from_date: str | None = None, to_date: s
     totals = {k: sum(r[k] for r in rows) for k in ("count", "total_paise", "cash_paise", "account_paise", "other_paise")}
     totals["gst_collected_paise"] = gst[0]["gst_paise"] if gst else 0
     cols = [("period", "Period", "str", 1.2), ("count", "Receipts", "num", 0.7), ("cash_paise", "Cash", "money"), ("account_paise", "Account", "money"), ("other_paise", "Other charges", "money"), ("total_paise", "Total", "money")]
-    return respond(request, format, {"from_date": f, "to_date": t, "group_by": group_by, "by_mode": [{"mode": m["_id"], **m} for m in by_mode], "filters_text": f"{_pdf.fmt_date(f)} – {_pdf.fmt_date(t)} · status {q['status']} · grouped by {group_by}"},
+    return await respond(request, format, {"from_date": f, "to_date": t, "group_by": group_by, "by_mode": [{"mode": m["_id"], **m} for m in by_mode], "filters_text": f"{_pdf.fmt_date(f)} – {_pdf.fmt_date(t)} · status {q['status']} · grouped by {group_by}"},
                    "Collections Report", await _company(user), cols, rows, totals, "collections")
 
 
@@ -207,7 +219,7 @@ async def outstanding(request: Request, project_id: str | None = None, block_id:
     cols = [("booking_number", "Booking" if group_by == "customer" else group_by.title(), "str", 1.1), ("customer_name", "Customer", "str", 1.4), ("unit", "Unit", "str", 1), ("raised_paise", "Raised", "money"), ("paid_paise", "Paid", "money"),
             ("cash_due_paise", "Cash due", "money"), ("account_due_paise", "Account due", "money"), ("other_due_paise", "Charges due", "money"), ("due_paise", "Total due", "money"), ("overdue_paise", "Overdue", "money")]
     top = sorted([r for r in rows if r["overdue_paise"] > 0], key=lambda r: -r["overdue_paise"])[:10] if group_by == "customer" else []
-    return respond(request, format, {"ageing": [{"bucket": k, "amount_paise": v} for k, v in ageing.items()], "top_overdue": top, "filters_text": f"As of {_pdf.fmt_date(today.isoformat())}"}, "Outstanding & Ageing", await _company(user), cols, rows, totals, "outstanding", landscape=True)
+    return await respond(request, format, {"ageing": [{"bucket": k, "amount_paise": v} for k, v in ageing.items()], "top_overdue": top, "filters_text": f"As of {_pdf.fmt_date(today.isoformat())}"}, "Outstanding & Ageing", await _company(user), cols, rows, totals, "outstanding", landscape=True)
 
 
 # ---------- 3. Advances ----------
@@ -222,7 +234,7 @@ async def advances(request: Request, project_id: str | None = None, format: str 
         rows[-1]["total_advance_paise"] = rows[-1]["cash_advance_paise"] + rows[-1]["account_advance_paise"]
     cols = [("booking_number", "Booking", "str"), ("customer_name", "Customer", "str", 1.5), ("unit", "Unit", "str"), ("cash_advance_paise", "Cash advance", "money"), ("account_advance_paise", "Account advance", "money"), ("total_advance_paise", "Total advance", "money"), ("since", "Since", "date")]
     totals = {k: sum(r[k] for r in rows) for k in ("cash_advance_paise", "account_advance_paise", "total_advance_paise")}
-    return respond(request, format, {}, "Advance Report", await _company(user), cols, rows, totals, "advances")
+    return await respond(request, format, {}, "Advance Report", await _company(user), cols, rows, totals, "advances")
 
 
 # ---------- 4. Demand vs collection ----------
@@ -238,7 +250,7 @@ async def demand_vs_collection(request: Request, project_id: str | None = None, 
     totals = {k: sum(r[k] for r in out) for k in ("count", "cash_demand_paise", "account_demand_paise", "demand_paise", "collected_paise")}
     totals["pct_collected"] = round(100 * totals["collected_paise"] / totals["demand_paise"], 1) if totals["demand_paise"] else 0
     cols = [("block", "Block", "str", 1.3), ("milestone", "Milestone", "str", 1.3), ("percent", "Cum %", "pct", 0.6), ("count", "Demands", "num", 0.7), ("cash_demand_paise", "Cash demanded", "money"), ("account_demand_paise", "Account demanded", "money"), ("demand_paise", "Total demanded", "money"), ("collected_paise", "Collected", "money"), ("pct_collected", "% collected", "pct", 0.8)]
-    return respond(request, format, {}, "Demand vs Collection", await _company(user), cols, out, totals, "demand-vs-collection", landscape=True)
+    return await respond(request, format, {}, "Demand vs Collection", await _company(user), cols, out, totals, "demand-vs-collection", landscape=True)
 
 
 # ---------- 5. Inventory ----------
@@ -266,7 +278,7 @@ async def inventory(request: Request, project_id: str | None = None, group_by: s
     realised = [{"project": r["_id"], "bookings": r["n"], "realised_rate": round(r["value_paise"] / 100 / r["sqft"], 0) if r["sqft"] else None, "rate_card": rcm.get(r["_id"])} for r in rate]
     totals = {k: sum(r[k] for r in out) for k in ("total", "available", "hold", "booked", "sold", "blocked", "available_value_paise", "sold_value_paise")}
     cols = [("group", group_by.replace("_", " ").title(), "str", 1.8), ("total", "Total", "num", 0.6), ("available", "Available", "num", 0.7), ("hold", "Hold", "num", 0.5), ("booked", "Booked", "num", 0.6), ("sold", "Sold", "num", 0.5), ("blocked", "Blocked", "num", 0.6), ("available_value_paise", "Available value", "money"), ("sold_value_paise", "Sold value", "money")]
-    return respond(request, format, {"velocity": [{"month": v["_id"], "bookings": v["bookings"], "value_paise": v["value_paise"]} for v in vel], "realised_rates": realised}, "Inventory Report", await _company(user), cols, out, totals, "inventory")
+    return await respond(request, format, {"velocity": [{"month": v["_id"], "bookings": v["bookings"], "value_paise": v["value_paise"]} for v in vel], "realised_rates": realised}, "Inventory Report", await _company(user), cols, out, totals, "inventory")
 
 
 # ---------- 8. Cheques ----------
@@ -282,7 +294,7 @@ async def cheques(request: Request, project_id: str | None = None, status: str |
         e = by_status.setdefault(r["status"], {"count": 0, "amount_paise": 0})
         e["count"] += 1
         e["amount_paise"] += r["amount_paise"]
-    out = respond(request, format, {"status": status or "All"}, f"Cheques — {status or 'All'}", await _company(user), cols, rows, {"amount_paise": sum(r["amount_paise"] for r in rows)}, "cheques")
+    out = await respond(request, format, {"status": status or "All"}, f"Cheques — {status or 'All'}", await _company(user), cols, rows, {"amount_paise": sum(r["amount_paise"] for r in rows)}, "cheques")
     if isinstance(out, dict):
         out["by_status"] = by_status
     return out
@@ -309,7 +321,7 @@ async def cancellations(request: Request, from_date: str | None = None, to_date:
                      "refund_paid_paise": rf.get("amount_paise", 0) if rf.get("status") == "Paid" else 0, "refund_status": rf.get("status") or ("None" if not c.get("refund_paise") else "Pending")})
     cols = [("booking_number", "Booking", "str"), ("customer_name", "Customer", "str", 1.4), ("unit", "Unit", "str"), ("cancelled_at", "Cancelled", "date"), ("reason", "Reason", "str", 1.6), ("paid_paise", "Paid", "money"), ("forfeiture_paise", "Forfeited", "money"), ("refund_paise", "Refund", "money"), ("refund_paid_paise", "Refund paid", "money"), ("refund_status", "Refund status", "str")]
     totals = {k: sum(r[k] or 0 for r in rows) for k in ("paid_paise", "forfeiture_paise", "refund_paise", "refund_paid_paise")}
-    return respond(request, format, {"from_date": f, "to_date": t}, "Cancellations & Refunds", await _company(user), cols, rows, totals, "cancellations", landscape=True)
+    return await respond(request, format, {"from_date": f, "to_date": t}, "Cancellations & Refunds", await _company(user), cols, rows, totals, "cancellations", landscape=True)
 
 
 # ---------- 10. Sales & leads ----------
@@ -345,7 +357,7 @@ async def sales_leads(request: Request, from_date: str | None = None, to_date: s
             enq[l.get("project_name") or "General"] = enq.get(l.get("project_name") or "General", 0) + 1
     rows = list(src.values())
     cols = [("source", "Source", "str", 1.5), ("leads", "Leads", "num"), ("converted", "Converted", "num"), ("conversion_pct", "Conversion", "pct")]
-    return respond(request, format, {"from_date": f, "to_date": t, "funnel": funnel, "avg_response_hours": round(sum(resp) / len(resp), 1) if resp else None, "follow_ups_overdue": overdue,
+    return await respond(request, format, {"from_date": f, "to_date": t, "funnel": funnel, "avg_response_hours": round(sum(resp) / len(resp), 1) if resp else None, "follow_ups_overdue": overdue,
                                      "bookings_per_user": [{"user": unames.get(r["_id"], "Unassigned"), "bookings": r["bookings"], "value_paise": r["value_paise"]} for r in per_user], "enquiries_per_project": [{"project": k, "count": v} for k, v in enq.items()]},
                    "Sales & Leads", await _company(user), cols, rows, {"leads": len(leads), "converted": sum(r["converted"] for r in rows)}, "sales-leads")
 
@@ -366,7 +378,7 @@ async def roznamcha_range(request: Request, from_date: str | None = None, to_dat
     rows.sort(key=lambda r: r["date"])
     totals = {k: sum(r[k] for r in rows) for k in ("count", "cash_paise", "bank_paise", "total_paise", "deposit_paise", "withdrawal_paise")}
     cols = [("date", "Date", "date"), ("count", "Receipts", "num", 0.7), ("cash_paise", "Cash", "money"), ("bank_paise", "Bank/Digital", "money"), ("total_paise", "Total", "money"), ("deposit_paise", "Deposited", "money"), ("withdrawal_paise", "Withdrawn", "money")]
-    return respond(request, format, {"from_date": f, "to_date": t}, "Roznamcha — Period Summary", await _company(user), cols, rows, totals, "roznamcha-range")
+    return await respond(request, format, {"from_date": f, "to_date": t}, "Roznamcha — Period Summary", await _company(user), cols, rows, totals, "roznamcha-range")
 
 
 @router.get("/bank-receipts")
@@ -378,7 +390,7 @@ async def bank_receipts(request: Request, from_date: str | None = None, to_date:
     out = [{"bank": r["_id"]["bank"], "mode": r["_id"]["mode"], "count": r["count"], "cleared_paise": r["cleared_paise"], "pending_paise": r["pending_paise"], "total_paise": r["cleared_paise"] + r["pending_paise"]} for r in rows]
     totals = {k: sum(r[k] for r in out) for k in ("count", "cleared_paise", "pending_paise", "total_paise")}
     cols = [("bank", "Bank account", "str", 1.6), ("mode", "Mode", "str"), ("count", "Receipts", "num", 0.7), ("cleared_paise", "Cleared", "money"), ("pending_paise", "Pending", "money"), ("total_paise", "Total", "money")]
-    return respond(request, format, {"from_date": f, "to_date": t}, "Bank-wise Receipts", await _company(user), cols, out, totals, "bank-receipts")
+    return await respond(request, format, {"from_date": f, "to_date": t}, "Bank-wise Receipts", await _company(user), cols, out, totals, "bank-receipts")
 
 
 # ---------- 12. Activity ----------
@@ -400,7 +412,7 @@ async def activity(request: Request, from_date: str | None = None, to_date: str 
     rows = sorted(per.values(), key=lambda r: -r["failed"])
     failed_recent = await db.login_events.find({"success": False, "created_at": rng}, {"_id": 0, "email": 1, "ip": 1, "reason": 1, "created_at": 1}).sort("created_at", -1).limit(50).to_list(50)
     cols = [("email", "User", "str", 1.6), ("success", "Logins", "num"), ("failed", "Failed", "num"), ("last_login", "Last login", "date")]
-    return respond(request, format, {"from_date": f, "to_date": t, "actions": [{"action": a["_id"], "count": a["count"]} for a in acts], "failed_recent": failed_recent}, "Activity Report", await _company(user), cols, rows, {"success": sum(r["success"] for r in rows), "failed": sum(r["failed"] for r in rows)}, "activity")
+    return await respond(request, format, {"from_date": f, "to_date": t, "actions": [{"action": a["_id"], "count": a["count"]} for a in acts], "failed_recent": failed_recent}, "Activity Report", await _company(user), cols, rows, {"success": sum(r["success"] for r in rows), "failed": sum(r["failed"] for r in rows)}, "activity")
 
 
 # ---------- 6/7. Statement & allotment letter (per booking) ----------
@@ -617,7 +629,7 @@ async def service_sla(request: Request, from_date: str | None = None, to_date: s
               "sla_met_pct": round(100 * sum(r["sla_met"] for r in by.values()) / judged) if judged else None,
               "avg_resolution_h": round(sum(all_res) / len(all_res), 1) if all_res else None, "avg_rating": round(sum(all_rt) / len(all_rt), 1) if all_rt else None}
     cols = [("category", "Category", "str", 1.6), ("total", "Tickets", "num"), ("open", "Open", "num"), ("resolved", "Resolved", "num"), ("sla_met_pct", "SLA met %", "pct"), ("avg_resolution_h", "Avg resolution (h)", "num"), ("avg_rating", "Avg rating", "num")]
-    return respond(request, format, {"from_date": f, "to_date": t, "status_counts": [{"status": k, "count": v} for k, v in status_counts.items()]}, "Service SLA Report", await _company(user), cols, rows, totals, "service-sla")
+    return await respond(request, format, {"from_date": f, "to_date": t, "status_counts": [{"status": k, "count": v} for k, v in status_counts.items()]}, "Service SLA Report", await _company(user), cols, rows, totals, "service-sla")
 
 
 @router.get("/construction-progress")
@@ -643,4 +655,4 @@ async def construction_progress(request: Request, project_id: str | None = None,
                          "photos": photos.get((b["id"], s["seq"]), 0), "demands": dn, "demand_paise": damt})
     totals = {"photos": sum(r["photos"] for r in rows), "demands": sum(r["demands"] for r in rows), "demand_paise": sum(r["demand_paise"] for r in rows)}
     cols = [("project", "Project", "str", 1.4), ("tower", "Tower", "str"), ("seq", "#", "num", 0.4), ("stage", "Stage", "str", 1.4), ("status", "Status", "str"), ("planned_on", "Planned", "date"), ("completed_on", "Completed", "date"), ("variance_days", "Var. days", "num"), ("photos", "Photos", "num"), ("demands", "Demands", "num"), ("demand_paise", "Demanded", "money")]
-    return respond(request, format, {"towers": towers}, "Construction Progress Report", await _company(user), cols, rows, totals, "construction-progress", landscape=True)
+    return await respond(request, format, {"towers": towers}, "Construction Progress Report", await _company(user), cols, rows, totals, "construction-progress", landscape=True)

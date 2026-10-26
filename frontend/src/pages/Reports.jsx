@@ -1,7 +1,7 @@
 import { ShieldAlert } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { Download, FileText, Printer, Save, Trash2, Pencil, BarChart3, Receipt, CalendarClock, Building2, Users, Wrench, Activity, Check, X } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, PieChart, Pie, Cell, CartesianGrid } from "recharts";
 import api, { errMsg } from "@/lib/api";
@@ -95,7 +95,9 @@ export default function Reports() {
     : key === "service-sla" ? { type: "bar", rows: data.rows.map((r) => ({ name: r.category, Open: r.open, Resolved: r.resolved })), keys: ["Open", "Resolved"], stacked: true }
     : key === "construction-progress" ? { type: "bar", rows: (data.towers || []).map((x) => ({ name: x.tower, Progress: x.pct })), keys: ["Progress"] }
     : key === "demand-vs-collection" ? { type: "bar", rows: data.rows.slice(0, 20).map((r) => ({ name: r.milestone.split(". ")[1] || r.milestone, Demanded: r.demand_paise / 100, Collected: r.collected_paise / 100 })), keys: ["Demanded", "Collected"] } : null);
-  const download = () => api.get(`/reports/${key}`, { params: { ...params, format: "csv" }, responseType: "blob" }).then((r) => { const a = document.createElement("a"); a.href = URL.createObjectURL(r.data); a.download = `${key}.csv`; a.click(); }).catch((e) => toast.error(errMsg(e)));
+  const download = () => api.get(`/reports/${key}`, { params: { ...params, format: "csv" }, responseType: "blob" }).then(async (r) => {
+    if (r.status === 202) { const j = JSON.parse(await r.data.text()); toast.success(j.message, { action: { label: "Exports", onClick: () => nav("/reports/exports") } }); return; }
+    const a = document.createElement("a"); a.href = URL.createObjectURL(r.data); a.download = `${key}.csv`; a.click(); }).catch((e) => toast.error(errMsg(e)));
   const savePreset = async () => { try { const r = await api.post("/reports/presets", { report_key: key, name: presetName.trim(), filters: f }); setPresetName(""); setActivePreset(r.data.id); reloadPresets(); toast.success("Preset saved"); } catch (e) { toast.error(errMsg(e)); } };
   const items = presets?.items || [];
   return (
@@ -104,6 +106,7 @@ export default function Reports() {
         <div><p className="label">Insight</p><h1 className="mt-1 font-display text-4xl text-ink-950">Reports</h1></div>
         <div className="flex gap-2 print:hidden">
           {can(`${permFor(key)}.export`) && <button className="btn btn-secondary" onClick={download} data-testid="rf-export-csv"><Download className="h-4 w-4" />CSV</button>}
+          <Link to="/reports/exports" className="btn btn-ghost" data-testid="rf-exports-link">Exports</Link>
           {can(`${permFor(key)}.export`) && <button className="btn btn-secondary" onClick={() => openPdf(`/reports/${key}?${qs}&format=pdf`)} data-testid="rf-export-pdf"><FileText className="h-4 w-4" />PDF</button>}
           <button className="btn btn-primary" onClick={() => window.print()} data-testid="rf-print"><Printer className="h-4 w-4" />Print</button>
         </div>

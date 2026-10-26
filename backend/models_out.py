@@ -70,6 +70,7 @@ class ProjectsOutPage(_Out):
     page: Any = None
     page_size: Any = None
     next_cursor: Any = None
+    total_estimated: bool | None = None
     has_more: Any = None
 
 
@@ -130,6 +131,7 @@ class BlocksOutPage(_Out):
     page: Any = None
     page_size: Any = None
     next_cursor: Any = None
+    total_estimated: bool | None = None
     has_more: Any = None
 
 
@@ -190,6 +192,7 @@ class FlatsOutPage(_Out):
     page: Any = None
     page_size: Any = None
     next_cursor: Any = None
+    total_estimated: bool | None = None
     has_more: Any = None
 
 
@@ -282,6 +285,7 @@ class CustomersOutPage(_Out):
     page: Any = None
     page_size: Any = None
     next_cursor: Any = None
+    total_estimated: bool | None = None
     has_more: Any = None
 
 
@@ -362,6 +366,7 @@ class BookingsOutPage(_Out):
     page: Any = None
     page_size: Any = None
     next_cursor: Any = None
+    total_estimated: bool | None = None
     has_more: Any = None
 
 
@@ -427,6 +432,7 @@ class PaymentsOutPage(_Out):
     page: Any = None
     page_size: Any = None
     next_cursor: Any = None
+    total_estimated: bool | None = None
     has_more: Any = None
 
 
@@ -469,6 +475,7 @@ class UsersOutPage(_Out):
     page: Any = None
     page_size: Any = None
     next_cursor: Any = None
+    total_estimated: bool | None = None
     has_more: Any = None
 
 
@@ -492,6 +499,7 @@ class CataloguesOutPage(_Out):
     page: Any = None
     page_size: Any = None
     next_cursor: Any = None
+    total_estimated: bool | None = None
     has_more: Any = None
 
 
@@ -546,6 +554,7 @@ class LeadsOutPage(_Out):
     page: Any = None
     page_size: Any = None
     next_cursor: Any = None
+    total_estimated: bool | None = None
     has_more: Any = None
 
 
@@ -593,6 +602,7 @@ class VisitsOutPage(_Out):
     page: Any = None
     page_size: Any = None
     next_cursor: Any = None
+    total_estimated: bool | None = None
     has_more: Any = None
 
 
@@ -648,5 +658,6 @@ class ServiceOutPage(_Out):
     page: Any = None
     page_size: Any = None
     next_cursor: Any = None
+    total_estimated: bool | None = None
     has_more: Any = None
 

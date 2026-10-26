@@ -1267,6 +1267,17 @@
      },
      "total": {
       "title": "Total"
+     },
+     "total_estimated": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Total Estimated"
      }
     },
     "required": [
@@ -1870,6 +1881,17 @@
      },
      "total": {
       "title": "Total"
+     },
+     "total_estimated": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Total Estimated"
      }
     },
     "required": [
@@ -4043,6 +4065,17 @@
      },
      "total": {
       "title": "Total"
+     },
+     "total_estimated": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Total Estimated"
      }
     },
     "required": [
@@ -4956,6 +4989,17 @@
      },
      "total": {
       "title": "Total"
+     },
+     "total_estimated": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Total Estimated"
      }
     },
     "required": [
@@ -5996,6 +6040,17 @@
      },
      "total": {
       "title": "Total"
+     },
+     "total_estimated": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Total Estimated"
      }
     },
     "required": [
@@ -6870,6 +6925,17 @@
      },
      "total": {
       "title": "Total"
+     },
+     "total_estimated": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Total Estimated"
      }
     },
     "required": [
@@ -8386,6 +8452,17 @@
      },
      "total": {
       "title": "Total"
+     },
+     "total_estimated": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Total Estimated"
      }
     },
     "required": [
@@ -10238,6 +10315,17 @@
      },
      "total": {
       "title": "Total"
+     },
+     "total_estimated": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Total Estimated"
      }
     },
     "required": [
@@ -10610,6 +10698,17 @@
      },
      "total": {
       "title": "Total"
+     },
+     "total_estimated": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Total Estimated"
      }
     },
     "required": [
@@ -12574,6 +12673,18 @@
        "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
        "title": "Include"
       }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
+      }
      }
     ],
     "responses": {
@@ -13036,6 +13147,18 @@
        "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
        "title": "Include"
       }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
+      }
      }
     ],
     "responses": {
@@ -13275,6 +13398,18 @@
        ],
        "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
        "title": "Include"
+      }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
       }
      }
     ],
@@ -13974,6 +14109,18 @@
        ],
        "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
        "title": "Include"
+      }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
       }
      }
     ],
@@ -15367,6 +15514,18 @@
        ],
        "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
        "title": "Include"
+      }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
       }
      }
     ],
@@ -17227,6 +17386,18 @@
        "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
        "title": "Include"
       }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
+      }
      }
     ],
     "responses": {
@@ -17862,6 +18033,18 @@
        ],
        "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
        "title": "Include"
+      }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
       }
      }
     ],
@@ -19101,6 +19284,133 @@
     ]
    }
   },
+  "/api/exports": {
+   "get": {
+    "operationId": "list_exports_api_exports_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Exports",
+    "tags": [
+     "exports"
+    ]
+   }
+  },
+  "/api/exports/{export_id}": {
+   "get": {
+    "operationId": "get_export_api_exports__export_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "export_id",
+      "required": true,
+      "schema": {
+       "title": "Export Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Get Export",
+    "tags": [
+     "exports"
+    ]
+   }
+  },
+  "/api/exports/{export_id}/download": {
+   "get": {
+    "operationId": "download_api_exports__export_id__download_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "export_id",
+      "required": true,
+      "schema": {
+       "title": "Export Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "exp",
+      "required": true,
+      "schema": {
+       "title": "Exp",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "sig",
+      "required": true,
+      "schema": {
+       "title": "Sig",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Download",
+    "tags": [
+     "exports"
+    ]
+   }
+  },
   "/api/flats": {
    "get": {
     "operationId": "list_flats_api_flats_get",
@@ -19355,6 +19665,18 @@
        ],
        "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
        "title": "Include"
+      }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
       }
      }
     ],
@@ -20124,6 +20446,18 @@
        "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
        "title": "Include"
       }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
+      }
      }
     ],
     "responses": {
@@ -20780,6 +21114,18 @@
        "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
        "title": "Include"
       }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
+      }
      }
     ],
     "responses": {
@@ -21279,6 +21625,18 @@
        ],
        "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
        "title": "Include"
+      }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
       }
      }
     ],
@@ -21780,6 +22138,18 @@
        "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
        "title": "Include"
       }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
+      }
      }
     ],
     "responses": {
@@ -22279,6 +22649,18 @@
        ],
        "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
        "title": "Include"
+      }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
       }
      }
     ],
@@ -22780,6 +23162,18 @@
        "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
        "title": "Include"
       }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
+      }
      }
     ],
     "responses": {
@@ -23279,6 +23673,18 @@
        ],
        "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
        "title": "Include"
+      }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
       }
      }
     ],
@@ -23825,6 +24231,18 @@
        "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
        "title": "Include"
       }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
+      }
      }
     ],
     "responses": {
@@ -24324,6 +24742,18 @@
        ],
        "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
        "title": "Include"
+      }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
       }
      }
     ],
@@ -24825,6 +25255,18 @@
        "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
        "title": "Include"
       }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
+      }
      }
     ],
     "responses": {
@@ -25324,6 +25766,18 @@
        ],
        "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
        "title": "Include"
+      }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
       }
      }
     ],
@@ -25825,6 +26279,18 @@
        "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
        "title": "Include"
       }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
+      }
      }
     ],
     "responses": {
@@ -26324,6 +26790,18 @@
        ],
        "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
        "title": "Include"
+      }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
       }
      }
     ],
@@ -26825,6 +27303,18 @@
        "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
        "title": "Include"
       }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
+      }
      }
     ],
     "responses": {
@@ -27325,6 +27815,18 @@
        "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
        "title": "Include"
       }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
+      }
      }
     ],
     "responses": {
@@ -27824,6 +28326,18 @@
        ],
        "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
        "title": "Include"
+      }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
       }
      }
     ],
@@ -28700,6 +29214,18 @@
        "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
        "title": "Include"
       }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
+      }
      }
     ],
     "responses": {
@@ -29515,6 +30041,18 @@
        "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
        "title": "Include"
       }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
+      }
      }
     ],
     "responses": {
@@ -29838,6 +30376,18 @@
        ],
        "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
        "title": "Include"
+      }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
       }
      }
     ],
@@ -30193,6 +30743,18 @@
        ],
        "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
        "title": "Include"
+      }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
       }
      }
     ],
@@ -32383,6 +32945,18 @@
        "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
        "title": "Include"
       }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
+      }
      }
     ],
     "responses": {
@@ -32844,6 +33418,18 @@
        ],
        "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
        "title": "Include"
+      }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
       }
      }
     ],
@@ -34539,6 +35125,18 @@
        ],
        "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
        "title": "Include"
+      }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
       }
      }
     ],
@@ -37445,6 +38043,18 @@
        "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
        "title": "Include"
       }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
+      }
      }
     ],
     "responses": {
@@ -38241,6 +38851,18 @@
        "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
        "title": "Include"
       }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
+      }
      }
     ],
     "responses": {
@@ -38965,6 +39587,18 @@
        ],
        "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
        "title": "Include"
+      }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
       }
      }
     ],
@@ -40051,6 +40685,18 @@
        ],
        "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
        "title": "Include"
+      }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
       }
      }
     ],

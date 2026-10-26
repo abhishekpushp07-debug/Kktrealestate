@@ -111,7 +111,7 @@ async def collections_v2(request: Request, from_date: str | None = None, to_date
                "filters_text": f"{_pdf.fmt_date(f)} – {_pdf.fmt_date(t)} · grouped by {label.lower()}", "group_options": ["day", "week", "month", "project", "block", "bucket", "mode", "bank", "rm", "receipt"],
                "kpis": [{"label": "Net Jama", "value_paise": totals["total_paise"], "kind": "money", "hint": f"{totals['count']} rows · {basis_text.lower()}"}, {"label": "Cash (Jama)", "value_paise": totals["cash_paise"], "kind": "money"}, {"label": "Account (Jama)", "value_paise": totals["account_paise"], "kind": "money"},
                         {"label": "Pending instruments", "value_paise": totals["pending_paise"], "kind": "money", "hint": f"{totals['pending_instruments']} not yet cleared (excluded)", "tone": "brick" if totals["pending_paise"] else None}]}
-    return etag_respond(request, respond(request, format, payload, "Collections (Jama)", await _company(user), cols, out, totals, "collections-v2", landscape=True))
+    return etag_respond(request, await respond(request, format, payload, "Collections (Jama)", await _company(user), cols, out, totals, "collections-v2", landscape=True))
 
 
 # ---------- 2b. Outstanding & ageing (Udhar − Jama) with advance + bands from definitions ----------
@@ -153,7 +153,7 @@ async def outstanding_v2(request: Request, project_id: str | None = None, block_
                "ageing": [{"bucket": k, "amount_paise": v} for k, v in ageing.items()], "filters_text": f"As of {_pdf.fmt_date(today.isoformat())} · grouped by {group_by}",
                "kpis": [{"label": "Outstanding", "value_paise": totals["outstanding_paise"], "kind": "money", "hint": f"{totals['bookings']} live bookings", "tone": "brick" if totals["outstanding_paise"] else "sage"}, {"label": "Advance held", "value_paise": totals["advance_paise"], "kind": "money", "tone": "sage"},
                         {"label": "Net balance", "value_paise": totals["net_balance_paise"], "kind": "money", "hint": "Σ Udhar − Σ Jama"}, {"label": "Overdue", "value_paise": totals["overdue_paise"], "kind": "money", "tone": "brick" if totals["overdue_paise"] else None}]}
-    return etag_respond(request, respond(request, format, payload, "Outstanding & Ageing", await _company(user), cols, rows, totals, "outstanding-v2", landscape=True))
+    return etag_respond(request, await respond(request, format, payload, "Outstanding & Ageing", await _company(user), cols, rows, totals, "outstanding-v2", landscape=True))
 
 
 # ---------- 4. Cash vs Account split ----------
@@ -194,7 +194,7 @@ async def cash_vs_account(request: Request, project_id: str | None = None, block
             ("account_agreed_paise", "Account agreed", "money"), ("account_raised_paise", "Account raised", "money"), ("account_received_paise", "Account received", "money"), ("account_balance_paise", "Account balance", "money"),
             ("cash_share_agreed_pct", "Cash % agreed", "pct", 0.7), ("cash_share_raised_pct", "Cash % raised", "pct", 0.7), ("variance", "Variance", "str", 0.8)]
     payload = {"purpose": "Agreed vs raised vs received vs balance per bucket; flags bookings where the cash share raised drifts from the agreed share.", "as_of": clock.today().isoformat(), "group_by": group_by, "group_options": ["booking", "project", "block"]}
-    return etag_respond(request, respond(request, format, payload, "Cash vs Account Split", await _company(user), cols, rows, totals, "cash-vs-account", landscape=True))
+    return etag_respond(request, await respond(request, format, payload, "Cash vs Account Split", await _company(user), cols, rows, totals, "cash-vs-account", landscape=True))
 
 
 # ---------- 6. Receivables forecast ----------
@@ -277,7 +277,7 @@ async def receivables_forecast(request: Request, project_id: str | None = None, 
                "group_by": group_by, "group_options": ["stage", "month", "project", "block", "booking"], "per_booking": per_booking, "filters_text": f"As of {_pdf.fmt_date(today.isoformat())} · Σ forecast + Σ raised == Σ agreement" + ("" if any_dated else " · no planned dates set — grouped tower → stage"),
                "kpis": [{"label": "Still to raise", "value_paise": totals["expected_paise"], "kind": "money", "hint": "Σ forecast"}, {"label": "Expected Cash", "value_paise": totals["cash_paise"], "kind": "money"}, {"label": "Expected Account", "value_paise": totals["account_paise"], "kind": "money"},
                         {"label": "Agreement total", "value_paise": totals["agreement_paise"], "kind": "money", "hint": f"raised {_pdf.inr(totals['raised_paise'])} · forecast + raised = agreement", "tone": "sage"}]}
-    return etag_respond(request, respond(request, format, payload, "Receivables Forecast", await _company(user), cols, rows, totals, "receivables-forecast", landscape=True))
+    return etag_respond(request, await respond(request, format, payload, "Receivables Forecast", await _company(user), cols, rows, totals, "receivables-forecast", landscape=True))
 
 
 # ---------- 9. Other charges ----------
@@ -300,7 +300,7 @@ async def other_charges(request: Request, project_id: str | None = None, block_i
     cols = [("group", {"charge": "Charge type", "project": "Project", "booking": "Booking"}.get(group_by, "Group"), "str", 1.4)] + ([("customer_name", "Customer", "str", 1.2)] if group_by == "booking" else []) + \
         [("lines", "Lines", "num", 0.6), ("agreed_paise", "Agreed", "money"), ("demanded_paise", "Demanded (Udhar)", "money"), ("collected_paise", "Collected (Jama)", "money"), ("balance_paise", "Balance", "money"), ("pct_collected", "% collected", "pct", 0.7)]
     payload = {"purpose": "Maintenance, registration, parking, bounce and other charges: demanded vs collected per charge type (Other-charges ledger).", "as_of": clock.today().isoformat(), "group_by": group_by, "group_options": ["charge", "project", "booking"]}
-    return etag_respond(request, respond(request, format, payload, "Other Charges", await _company(user), cols, rows, totals, "other-charges"))
+    return etag_respond(request, await respond(request, format, payload, "Other Charges", await _company(user), cols, rows, totals, "other-charges"))
 
 
 # ---------- 10. Roznamcha (daybook) summary ----------
@@ -353,7 +353,7 @@ async def roznamcha_summary(request: Request, from_date: str | None = None, to_d
             ("deposit_paise", "Deposited", "money"), ("withdrawal_paise", "Withdrawn", "money"), ("cash_refund_paise", "Cash refunds", "money"), ("closing_paise", "Closing cash", "money")]
     payload = {"purpose": "Daybook: opening cash, receipts by mode, bank deposits / withdrawals, cash refunds, closing — rolls up monthly.", "from_date": f, "to_date": t, "group_by": group_by, "group_options": ["day", "month"], "opening_from": open_date,
                "filters_text": f"{_pdf.fmt_date(f)} – {_pdf.fmt_date(t)} · opening carried from {_pdf.fmt_date(open_date)}"}
-    return etag_respond(request, respond(request, format, payload, "Roznamcha Summary", await _company(user), cols, rows, totals, "roznamcha-summary", landscape=True))
+    return etag_respond(request, await respond(request, format, payload, "Roznamcha Summary", await _company(user), cols, rows, totals, "roznamcha-summary", landscape=True))
 
 
 # ---------- 13. Site visit conversion ----------
@@ -384,7 +384,7 @@ async def site_visits(request: Request, from_date: str | None = None, to_date: s
     totals["show_pct"] = round(100 * totals["completed"] / totals["scheduled"], 1) if totals["scheduled"] else 0
     cols = [("group", {"rm": "Relationship manager", "project": "Project", "month": "Month"}.get(group_by, "Group"), "str", 1.4), ("scheduled", "Visits", "num"), ("completed", "Completed", "num"), ("no_show", "No-show", "num"), ("cancelled", "Cancelled", "num"), ("show_pct", "Show-up %", "pct", 0.7), ("converted", "→ Booking", "num"), ("conversion_pct", "Visit → booking %", "pct", 0.8)]
     payload = {"purpose": "Site visits scheduled / completed / no-show / cancelled and how many completed visits became bookings.", "from_date": f, "to_date": t, "group_by": group_by, "group_options": ["rm", "project", "month"], "filters_text": f"{_pdf.fmt_date(f)} – {_pdf.fmt_date(t)}"}
-    return etag_respond(request, respond(request, format, payload, "Site Visit Conversion", await _company(user), cols, rows, totals, "site-visits"))
+    return etag_respond(request, await respond(request, format, payload, "Site Visit Conversion", await _company(user), cols, rows, totals, "site-visits"))
 
 
 # ---------- 14. Sales team performance ----------
@@ -419,7 +419,7 @@ async def sales_team(request: Request, from_date: str | None = None, to_date: st
     totals = {k: sum(r[k] for r in rows) for k in ("leads", "visits", "bookings", "sold_paise", "collected_paise", "overdue_paise")}
     cols = [("group", "Relationship manager", "str", 1.5), ("leads", "Leads", "num"), ("visits", "Visits done", "num"), ("bookings", "Bookings", "num"), ("sold_paise", "Sold value", "money"), ("collected_paise", "Collections (Jama)", "money"), ("overdue_paise", "Overdue of their customers", "money")]
     payload = {"purpose": "Per RM: leads taken, visits completed, bookings & sold value in the period, collections received, and overdue across all their live bookings.", "from_date": f, "to_date": t, "filters_text": f"{_pdf.fmt_date(f)} – {_pdf.fmt_date(t)}"}
-    return etag_respond(request, respond(request, format, payload, "Sales Team Performance", await _company(user), cols, rows, totals, "sales-team"))
+    return etag_respond(request, await respond(request, format, payload, "Sales Team Performance", await _company(user), cols, rows, totals, "sales-team"))
 
 
 # ---------- 15. Construction vs plan ----------
@@ -466,7 +466,7 @@ async def construction_vs_plan(request: Request, project_id: str | None = None, 
     payload = {"purpose": "Per tower, per stage: status and dates, stage-linked demands raised vs collected, and the Udhar each pending stage will raise from live bookings' plan snapshots (tower subtotals).", "as_of": clock.today().isoformat(),
                "kpis": [{"label": "Towers", "value": towers, "kind": "num"}, {"label": "Stage demands (Udhar)", "value_paise": totals["demanded_paise"], "kind": "money", "hint": f"collected {_pdf.inr(totals['collected_paise'])}"}, {"label": "Stage balance", "value_paise": totals["balance_paise"], "kind": "money", "tone": "brick" if totals["balance_paise"] else "sage"},
                         {"label": "Next-stage expected Udhar", "value_paise": nxt_exp, "kind": "money", "hint": "across towers' next pending stage"}]}
-    return etag_respond(request, respond(request, format, payload, "Construction vs Plan", await _company(user), cols, rows, totals, "construction-vs-plan", landscape=True))
+    return etag_respond(request, await respond(request, format, payload, "Construction vs Plan", await _company(user), cols, rows, totals, "construction-vs-plan", landscape=True))
 
 
 # ---------- 18. Data quality ----------
@@ -491,4 +491,4 @@ async def data_quality(request: Request, format: str | None = None, user: dict =
     totals = {"count": sum(r["count"] for r in rows), "status": f"{sum(1 for r in rows if r['count'])} checks need review"}
     cols = [("group", "Check", "str", 2), ("count", "Records", "num"), ("status", "Status", "str"), ("which", "Which", "str", 2)]
     payload = {"purpose": "Hygiene counts that should trend to zero; each drills to the list. Consistency of the ledger itself is the integrity report.", "as_of": clock.today().isoformat(), "integrity": integ}
-    return etag_respond(request, respond(request, format, payload, "Data Quality", await _company(user), cols, rows, totals, "data-quality"))
+    return etag_respond(request, await respond(request, format, payload, "Data Quality", await _company(user), cols, rows, totals, "data-quality"))

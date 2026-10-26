@@ -96,10 +96,11 @@ class ListParams:
         with_total: bool | None = Query(None, description="Compute total (expensive). Default: yes in page mode (legacy UI), no in cursor mode"),
         fields: str | None = Query(None, max_length=400, description="Comma-separated projection to widen/narrow list items"),
         include: str | None = Query(None, max_length=200, description="Comma-separated related docs to embed (see PRD 'API packeting')"),
+        exact: bool = Query(False, description="Phase J3: force an exact count above 10,000 rows (default: estimated)"),
     ):
         self.page, self.page_size, self.search, self.sort = page, page_size, search, sort
         self.include_inactive, self.cursor, self.limit, self.format = include_inactive, cursor, limit, format
-        self.with_total, self.fields, self.include = with_total, fields, include
+        self.with_total, self.fields, self.include, self.exact = with_total, fields, include, exact
 
     def sort_spec(self, allowed: list[str], default: str = "name"):
         field = self.sort.lstrip("-")
@@ -129,7 +130,27 @@ def _dec_cursor(cur: str):
         return None, None, cur
 
 
-async def paginate(coll, query: dict, params: ListParams, sort, projection: dict | None = None) -> dict:
+ESTIMATE_ABOVE = 10_000
+
+
+async def smart_count(coll, query: dict, exact: bool = False, budget_ms: int | None = None) -> tuple[int, bool]:
+    """Phase J3: exact counts up to ESTIMATE_ABOVE; beyond that an estimate (bounded count + sampled extrapolation) unless exact=True. Returns (total, estimated)."""
+    kw = {"maxTimeMS": budget_ms} if budget_ms else {}
+    if exact:
+        return await coll.count_documents(query, **kw), False
+    n = await coll.count_documents(query, limit=ESTIMATE_ABOVE + 1, **kw)
+    if n <= ESTIMATE_ABOVE:
+        return n, False
+    if not query:
+        return await coll.estimated_document_count(), True
+    sample = await coll.aggregate([{"$sample": {"size": 2000}}, {"$match": query}, {"$count": "n"}], **kw).to_list(1)
+    est_total = await coll.estimated_document_count()
+    frac = (sample[0]["n"] / 2000) if sample else 0
+    return max(ESTIMATE_ABOVE + 1, int(est_total * frac)), True
+
+
+async def paginate(coll, query: dict, params: ListParams, sort, projection: dict | None = None, budget_ms: int | None = None) -> dict:
+    """budget_ms: Phase K.8/J3 query budget (maxTimeMS) for the page + count; ExecutionTimeout → 503 QUERY_TIMEOUT via the global handler."""
     proj = {"_id": 0}
     if projection:
         proj.update(projection)
@@ -151,33 +172,39 @@ async def paginate(coll, query: dict, params: ListParams, sort, projection: dict
         ks_sort = [("id", id_dir)] if key == "id" else [(key, direction), ("id", id_dir)]
         if proj.get("id") and key not in proj:
             proj = {**proj, key: 1}
-        total = await coll.count_documents(query) if params.with_total else None
-        items = await coll.find(q, proj).sort(ks_sort).limit(limit + 1).to_list(limit + 1)
+        total, est = (await smart_count(coll, query, params.exact, budget_ms)) if params.with_total else (None, False)
+        cur = coll.find(q, proj).sort(ks_sort).limit(limit + 1)
+        if budget_ms:
+            cur = cur.max_time_ms(budget_ms)
+        items = await cur.to_list(limit + 1)
         has_more = len(items) > limit
         items = items[:limit]
         nxt = _enc_cursor(items[-1], key) if has_more and items else None
-        return {"items": items, "total": total, "page": None, "page_size": limit, "next_cursor": nxt}
+        return {"items": items, "total": total, "total_estimated": est, "page": None, "page_size": limit, "next_cursor": nxt}
     if params.format == "csv":
         items = await coll.find(query, proj).sort(sort).limit(10000).to_list(10000)
         return {"items": items, "total": len(items), "page": 1, "page_size": len(items), "next_cursor": None, "_csv": True}
     if params.page == 1 and not params.search:
         from services import ttlcache
         ck = f"list:{coll.name}:{hashlib.md5(repr((query, sort, proj, params.page_size, params.with_total)).encode()).hexdigest()}"
-        return await ttlcache.cached(ck, 5, lambda: _page(coll, query, params, sort, proj))
-    return await _page(coll, query, params, sort, proj)
+        return await ttlcache.cached(ck, 5, lambda: _page(coll, query, params, sort, proj, budget_ms))
+    return await _page(coll, query, params, sort, proj, budget_ms)
 
 
-async def _page(coll, query: dict, params: ListParams, sort, proj: dict) -> dict:
+async def _page(coll, query: dict, params: ListParams, sort, proj: dict, budget_ms: int | None = None) -> dict:
     cursor = coll.find(query, proj).sort(sort).skip((params.page - 1) * params.page_size).limit(params.page_size + 1)
+    if budget_ms:
+        cursor = cursor.max_time_ms(budget_ms)
+    est = False
     if params.with_total is not False:
-        total, items = await asyncio.gather(coll.count_documents(query), cursor.to_list(params.page_size + 1))  # count and page in parallel
+        (total, est), items = await asyncio.gather(smart_count(coll, query, params.exact, budget_ms), cursor.to_list(params.page_size + 1))  # count and page in parallel
     else:
         total, items = None, await cursor.to_list(params.page_size + 1)
     if total is not None:
         items = items[: params.page_size]
     has_more = (params.page * params.page_size < total) if total is not None else len(items) > params.page_size
     items = items[:params.page_size]
-    return {"items": items, "total": total, "page": params.page, "page_size": params.page_size, "next_cursor": _enc_cursor(items[-1], sort[0][0] if sort else "id") if has_more and items else None}
+    return {"items": items, "total": total, "total_estimated": est, "page": params.page, "page_size": params.page_size, "next_cursor": _enc_cursor(items[-1], sort[0][0] if sort else "id") if has_more and items else None}
 
 
 def strip_private(doc: dict | None) -> dict | None:

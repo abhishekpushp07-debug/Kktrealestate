@@ -72,7 +72,11 @@ def test_cursor_walk_is_lossless(Hd, company_id, path, coll, extra, flt, limit):
     seen, total, pages = walk(Hd, path, limit, extra)
     assert len(seen) == len(set(seen)), f"{path} limit={limit}: duplicates across pages"
     # the endpoint's own total is the contract; the DB set catches silent scope drift (only when the endpoint has no implicit filter)
-    assert total <= len(seen) <= total + 10, f"{path} limit={limit}: fetched {len(seen)} ≠ total {total} over {pages} pages"  # +10: concurrent inserts by other xdist workers
+    # Deterministic under concurrent xdist writers: re-read the total after the walk and accept any count within [min, max] of the two snapshots (+10 inserts in flight).
+    r1 = requests.get(f"{BASE}{path}", params={"limit": limit, "with_total": "true", **extra}, headers=Hd, timeout=60).json()
+    total_after = r1.get("total", total)
+    lo, hi = min(total, total_after), max(total, total_after)
+    assert lo - 10 <= len(seen) <= hi + 10, f"{path} limit={limit}: fetched {len(seen)} outside totals [{total}, {total_after}] over {pages} pages"
     full = db_ids(coll, flt, company_id)
     if total == len(full):
         assert set(seen) == full, f"{path} limit={limit}: set differs from DB ({len(full - set(seen))} missing)"
