@@ -18,6 +18,9 @@ const BlockDetail = lazy(() => import("@/pages/BlockDetail"));
 const Flats = lazy(() => import("@/pages/Flats"));
 const MasterPage = lazy(() => import("@/pages/master/MasterPage"));
 const MastersHub = lazy(() => import("@/pages/masters/MastersHub"));
+const TowersMaster = lazy(() => import("@/pages/masters/Towers"));
+const FlatsMaster = lazy(() => import("@/pages/masters/Flats"));
+const ProjectsMaster = lazy(() => import("@/pages/masters/ProjectsMaster"));
 const StagePlans = lazy(() => import("@/pages/masters/StagePlans"));
 const PaymentPlans = lazy(() => import("@/pages/masters/PaymentPlans"));
 const ConstructionUpdate = lazy(() => import("@/pages/ConstructionUpdate"));
@@ -90,6 +93,9 @@ export default function ErpApp() {
           <Route path="/masters" element={<Guard perm="masters.*"><MastersHub /></Guard>}>
             <Route path="m/:kind" element={<MasterPage />} />
             <Route path="stage-plans" element={<Guard perm="masters.stage_plan.view"><StagePlans /></Guard>} />
+            <Route path="towers" element={<Guard perm="masters.tower.view"><TowersMaster /></Guard>} />
+            <Route path="flats" element={<Guard perm="masters.flat.view"><FlatsMaster /></Guard>} />
+            <Route path="projects" element={<Guard perm="masters.project.view"><ProjectsMaster /></Guard>} />
             <Route path="payment-plans" element={<Guard perm="masters.payment_plan.view"><PaymentPlans /></Guard>} />
             <Route path="rate-cards" element={<Navigate to="/projects" replace />} />
           </Route>

@@ -393,10 +393,14 @@ async def build_statement_pdf(booking_id: str, user: dict) -> tuple[bytes, str]:
     d.table(["#", "Milestone", "Cum %", "Cash demand", "Account demand", "Total", "Due date", "Paid", "Balance", "Status"],
             [[x["milestone_seq"], x["milestone_name"], f"{x['cumulative_percent']}%", _pdf.inr(x["cash_demand_paise"]), _pdf.inr(x["account_demand_paise"]), _pdf.inr(x["total_demand_paise"]), _pdf.fmt_date(x["due_date"]), _pdf.inr(x.get("paid_paise", 0)), _pdf.inr(x["total_demand_paise"] - x.get("paid_paise", 0)), x["status"]] for x in demands],
             widths=[0.4, 1.6, 0.6, 1, 1, 1, 0.9, 1, 1, 0.8], align_right=[3, 4, 5, 7, 8])
-    d.h2("Ledger")
-    d.table(["#", "Date", "Particulars", "Ref", "Amount", "Cash paid (cum)", "Account paid (cum)", "Cash due", "Account due", "Total due", "Charges due"],
-            [[e["seq"], _pdf.fmt_date(e["date"]), f"{e['type'].replace('_', ' ').title()} — {e.get('note') or ''}", e.get("ref") or "", _pdf.inr(e["amount_paise"]), _pdf.inr(e["cash_paid_cum_paise"]), _pdf.inr(e["account_paid_cum_paise"]), _pdf.inr(e["cash_due_paise"]), _pdf.inr(e["account_due_paise"]), _pdf.inr(e["total_due_paise"]), _pdf.inr(e.get("other_charges_due_paise", 0))] for e in ledger],
-            widths=[0.35, 0.8, 2, 1, 1, 1, 1, 0.9, 0.9, 1, 0.9], align_right=[4, 5, 6, 7, 8, 9, 10])
+    d.h2("Ledger (Udhar / Jama)")
+    rows = [[_pdf.fmt_date(e["date"]), f"{e['type'].replace('_', ' ').title()} — {e.get('note') or ''}" + (f" [{e['tag']}]" if e.get("tag") else "") + (f" · {e['ref']}" if e.get("ref") else ""),
+             _pdf.inr(e.get("udhar_paise", 0)) if e.get("udhar_paise") else "", _pdf.inr(e.get("jama_paise", 0)) if e.get("jama_paise") else "",
+             " ".join(x for x in [(e.get("mode") if e.get("mode") != "Due" else None), e.get("instrument")] if x), _pdf.inr(e.get("balance_paise", 0))] for e in ledger]
+    tu, tj = sum(e.get("udhar_paise", 0) for e in ledger), sum(e.get("jama_paise", 0) for e in ledger)
+    rows.append(["", "Totals", _pdf.inr(tu), _pdf.inr(tj), "", _pdf.inr(tu - tj)])
+    d.table(["Date", "Particulars", "Udhar", "Jama", "Mode / Instrument", "Balance"], rows, widths=[0.9, 3.2, 1.1, 1.1, 1.4, 1.1], align_right=[2, 3, 5])
+    d.totals([("Total Udhar", _pdf.inr(tu)), ("Total Jama", _pdf.inr(tj)), ("Balance (Udhar − Jama)", _pdf.inr(tu - tj)), ("Advance held", _pdf.inr(s.get("advance_paise", 0)))])
     if b.get("other_charges"):
         d.h2("Other charges")
         d.table(["Charge", "Amount", "GST", "Total", "Demanded", "Paid", "Due"], [[c["name"], _pdf.inr(c["amount_paise"]), _pdf.inr(c.get("gst_paise", 0)), _pdf.inr(c["total_paise"]), _pdf.inr(c.get("demanded_paise", 0)), _pdf.inr(c.get("paid_paise", 0)), _pdf.inr(c.get("demanded_paise", 0) - c.get("paid_paise", 0))] for c in b["other_charges"]], align_right=[1, 2, 3, 4, 5, 6])

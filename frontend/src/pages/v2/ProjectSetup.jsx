@@ -178,7 +178,7 @@ export default function ProjectSetup() {
   const load = async (projectId) => {
     const [pr, st] = await Promise.all([api.get(`/projects/${projectId}`), api.get(`/projects/${projectId}/setup`)]);
     setP({ ...pr.data, codeTouched: true }); setSetup(st.data);
-    setTowers(st.data.towers.map((t) => ({ ...t, skip_floors: (t.skip_floors || []).join(","), refuge_floors: (t.refuge_floors || []).join(","), podium_floors: (t.podium_floors || []).join(",") })));
+    setTowers(st.data.towers.map((t) => ({ ...t, _orig_name: t.name, _orig_block_type_id: t.block_type_id, skip_floors: (t.skip_floors || []).join(","), refuge_floors: (t.refuge_floors || []).join(","), podium_floors: (t.podium_floors || []).join(",") })));
     setSeq(st.data.stages.project_sequence.map((s, k) => ({ stage_id: s.stage_id, seq: k + 1 })));
     setAssign(st.data.plans.assignments.map((a) => ({ payment_plan_id: a.payment_plan_id, block_id: a.block_id || null, is_default: !!a.is_default })));
   };
@@ -195,7 +195,7 @@ export default function ProjectSetup() {
       } else if (step === 1 || step === 2) {
         for (const t of towers) {
           if (!t.block_type_id) throw new Error(`${t.name}: choose a block type`);
-          if (t.id) { if (step === 1) await api.patch(`/blocks/${t.id}`, { name: t.name, block_type_id: t.block_type_id, version: t.version }); }
+          if (t.id) { if (step === 1 && (t.name !== t._orig_name || t.block_type_id !== t._orig_block_type_id)) await api.patch(`/blocks/${t.id}`, { name: t.name, block_type_id: t.block_type_id }); }
           else await api.post("/blocks", { project_id: pid, block_type_id: t.block_type_id, name: t.name, code: t.code, floors: Number(t.floors), floor_start: Number(t.floor_start), skip_floors: chips(t.skip_floors), refuge_floors: chips(t.refuge_floors), podium_floors: chips(t.podium_floors), numbering_pattern: t.numbering_pattern, flats_per_floor: t.flats_per_floor || null, floor_plans: step === 2 && t.floor_plans?.length ? t.floor_plans.map((r) => ({ from_floor: r.from_floor, to_floor: r.to_floor, floor_plan_template_id: r.floor_plan_template_id || null, positions: r.floor_plan_template_id ? null : (r.positions || []).filter((x) => x.flat_type_id).map((x) => ({ position: x.position, flat_type_id: x.flat_type_id, facing: x.facing || null })) })) : null, rate_per_sqft: t.rate_per_sqft ?? null, floor_rise_per_sqft: t.floor_rise_per_sqft ?? null });
         }
         if (step === 2 || towers.some((t) => t.id)) await load(pid);

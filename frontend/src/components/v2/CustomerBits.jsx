@@ -122,6 +122,7 @@ export function ThreeLedgers({ customerId, bookingId, testId = "ledgers" }) {
               <td className="whitespace-nowrap px-4 py-2 text-xs text-txt-secondary">{r.mode && r.mode !== "Due" ? r.mode : ""}{r.instrument ? ` · ${r.instrument}` : ""}</td>
               <td className={cn("whitespace-nowrap px-6 py-2 text-right font-display text-base font-semibold tabular-nums", (r.balance_paise || 0) > 0 ? "text-brick" : "text-sage")} data-testid={`ledger-balance-${r.seq}`}>{r.balance_paise != null && <Num s={inr(r.balance_paise / 100)} />}</td>
             </tr>); })}</tbody>
+          <tfoot><tr className="border-t-2 border-warm-200 bg-warm-50 font-semibold text-ink-950" data-testid="ledger-footer-totals"><td className="px-6 py-2" colSpan={2}>Totals · Balance = Udhar − Jama · Advance held {inr((sum?.advance_paise || 0) / 100)}</td><td className="px-4 py-2 text-right tabular-nums" data-testid="ledger-footer-udhar">{inr(rows.reduce((s, r) => s + (r.udhar_paise || 0), 0) / 100)}</td><td className="px-4 py-2 text-right tabular-nums text-sage" data-testid="ledger-footer-jama">{inr(rows.reduce((s, r) => s + (r.jama_paise || 0), 0) / 100)}</td><td /><td className="px-6 py-2 text-right tabular-nums" data-testid="ledger-footer-balance">{inr(rows.reduce((s, r) => s + (r.udhar_paise || 0) - (r.jama_paise || 0), 0) / 100)}</td></tr></tfoot>
         </table></div>
       )}
     </Card>
