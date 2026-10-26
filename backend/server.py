@@ -202,6 +202,7 @@ async def lifespan(app: FastAPI):
             _spawn(ensure_indexes())
         except Exception:
             logger.exception("[startup] ensure_indexes failed (continuing)")
+        _spawn(__import__("services.invariants", fromlist=["ensure_invariants"]).ensure_invariants())  # Phase K: unique partial indexes + validators (idempotent, background)
         try:
             await asyncio.wait_for(detect_transaction_support(), timeout=2)
         except Exception:
@@ -279,7 +280,17 @@ async def _dues_loop():
                 logger.info("Dues engine raised %s demands", res["demands_raised"])
             from services.integrity import integrity_report
             from routers.notifications import notify_roles
-            ir = await integrity_report()
+            from services import job_runs as _jr
+            _run = await _jr.start("NIGHTLY_INTEGRITY")
+            try:
+                ir = await integrity_report()
+                await _jr.finish(_run, {"ok": ir["ok"], "counts": ir["counts"]})
+            except Exception as e:  # noqa: BLE001
+                await _jr.item_failed(_run, "integrity_report", e)
+                await _jr.finish(_run)
+                raise
+            await _jr.sweep()
+            await _jr.notify_stale_if_needed()
             logger.info("[phase7] nightly integrity: ok=%s counts=%s", ir["ok"], ir["counts"])
             if ir["findings"]:
                 for cid in {f["booking_id"] for f in ir["findings"]} and {c["id"] for c in await db.companies.find({}, {"_id": 0, "id": 1}).to_list(None)}:

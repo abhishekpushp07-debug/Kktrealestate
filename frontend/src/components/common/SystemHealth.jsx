@@ -47,6 +47,13 @@ export function SystemHealthCard() {
             <div data-testid="ops-jobs"><p className="label flex items-center gap-1"><Timer className="h-3.5 w-3.5" />Background jobs</p>
               <ul className="mt-2 space-y-1 text-sm">{jobs.map(([n, j]) => <li key={n} className="flex justify-between gap-2"><span>{n}</span><span className="text-txt-muted tabular-nums">{j.ok ? "ok" : "failed"} · {ms(j.duration_ms)} · {new Date(j.last_run).toLocaleTimeString()}</span></li>)}
                 {!jobs.length && <li className="text-txt-muted">No job has run in this process yet.</li>}</ul>
+              {d.job_runs && (
+                <div className="mt-3" data-testid="ops-job-runs"><p className="label">Job runs (durable)</p>
+                  <ul className="mt-1 space-y-1 text-sm">{Object.entries(d.job_runs.jobs).map(([n, j]) => (
+                    <li key={n} className="flex justify-between gap-2" data-testid={`ops-job-run-${n}`}><span>{n}{d.job_runs.stale.includes(n) && <span className="ml-2 rounded-full bg-brick/10 px-2 py-0.5 text-xs font-semibold text-brick" data-testid={`ops-job-stale-${n}`}>stale &gt; {d.job_runs.stale_after_h} h</span>}</span>
+                      <span className="text-txt-muted tabular-nums">{j.last_status || "never"} · last OK {j.last_ok_at ? new Date(j.last_ok_at).toLocaleString() : "—"}{j.failed_items ? ` · ${j.failed_items} item errors` : ""}</span></li>))}
+                  </ul></div>
+              )}
               <p className="mt-3 text-xs text-txt-muted">Read models: oldest project summary {d.read_models.oldest_project_summary_age_s == null ? "—" : `${Math.round(d.read_models.oldest_project_summary_age_s / 60)} min`} old · last full refresh {d.read_models.last_full_refresh ? new Date(d.read_models.last_full_refresh).toLocaleString() : "—"}</p>
             </div>
             <div data-testid="ops-slow"><p className="label flex items-center gap-1"><Database className="h-3.5 w-3.5" />Slow requests (&gt; 500 ms) · errors {Object.entries(d.requests.errors_by_code).map(([c, n]) => `${c}×${n}`).join(" ") || "none"}</p>

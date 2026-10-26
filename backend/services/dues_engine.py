@@ -128,8 +128,15 @@ async def raise_due_installments(booking: dict, today: date | None = None, poste
 
 
 async def run_dues_for_all(today: date | None = None, actor: dict | None = None) -> dict:
-    n, bookings = 0, 0
-    async for b in db.bookings.find({"status": "Active", "payment_plan_snapshot": {"$ne": None}}, {"_id": 0}):
-        bookings += 1
-        n += len(await raise_due_installments(b, today, actor=actor))
-    return {"bookings_checked": bookings, "demands_raised": n, "as_of": (today or clock.today()).isoformat(), "ran_at": clock.now(None).isoformat()}
+    """DAILY_DUES: per-booking isolation — a poisoned booking is recorded as an item error and the run continues (job_runs)."""
+    from services import job_runs
+    counts = {"bookings_checked": 0, "demands_raised": 0}
+
+    async def one(b):
+        counts["bookings_checked"] += 1
+        n = len(await raise_due_installments(b, today, actor=actor))
+        counts["demands_raised"] += n
+        return n
+    run = await job_runs.run_isolated("DAILY_DUES", db.bookings.find({"status": "Active", "payment_plan_snapshot": {"$ne": None}}, {"_id": 0}), one, item_id=lambda b: b.get("booking_number") or b.get("id"),
+                                      result_fn=lambda acc: {**counts, "as_of": (today or clock.today()).isoformat()})
+    return {**counts, "as_of": (today or clock.today()).isoformat(), "ran_at": clock.now(None).isoformat(), "job_run": {"id": run["id"], "status": run["status"], "failed_items": run["failed_items"], "errors": run["errors"]}}

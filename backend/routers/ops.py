@@ -39,6 +39,7 @@ async def ops(window: int = 900, user: dict = Depends(require("admin.system_heal
         "process": {"pid": os.getpid(), "rss_mb": rss_mb, "db_name": os.environ.get("DB_NAME")},
         "requests": {k: snap[k] for k in ("window_s", "requests", "rps", "p50_ms", "p95_ms", "by_group", "slow", "errors_by_code")},
         "jobs": snap["jobs"],
+        "job_runs": await __import__("services.job_runs", fromlist=["health"]).health(),
         "read_models": {"last_full_refresh": (rm or {}).get("value"), "oldest_project_summary_age_s": staleness_s},
         "cache": __import__("services.ttlcache", fromlist=["HITS"]).HITS, "db_pool": {"config": POOL, "live": POOL_STATS, "server": {"connections": (srv.get("connections") or {}), "opcounters": (srv.get("opcounters") or {}),
                                                                    "version": srv.get("version")} if srv else None},
