@@ -5,6 +5,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import Field, field_validator
 
+from services import clock
 from db import db
 from models_out import CustomersOut, CustomersOutPage
 from deps import project_scope_filter, require
@@ -207,7 +208,7 @@ async def list_customers(params: ListParams = Depends(), has_overdue: bool = Fal
         q["source"] = source
     if assigned_sales_user_id:
         q["assigned_sales_user_id"] = assigned_sales_user_id
-    today = date.today().isoformat()
+    today = clock.today().isoformat()
     if has_overdue:
         q["id"] = {"$in": await db.demands.distinct("customer_id", {"voided": {"$ne": True}, "status": {"$in": ["Open", "Partially Paid"]}, "due_date": {"$lt": today}})}
     res = await paginate(db.customers, q, params, params.sort_spec(["full_name", "customer_code", "created_at", "kyc_status", "phone", "engagement_score", "lifecycle_stage"], "-created_at"))
@@ -273,7 +274,7 @@ async def get_customer(customer_id: str, request: Request, reveal: bool = Query(
     out = present(doc, do_reveal)
     out["bookings"] = await db.bookings.find({"$or": [{"customer_id": customer_id}, {"co_applicant_customer_ids": customer_id}]}, {"_id": 0, "id": 1, "booking_number": 1, "status": 1, "flat_snapshot": 1, "project_id": 1, "agreement_value_paise": 1, "summary": 1, "booking_date": 1, "payment_plan_snapshot": 1, "block_id": 1, "cash_agreed_paise": 1, "account_agreed_paise": 1}).to_list(50)
     from services.dues_engine import schedule
-    today = date.today().isoformat()
+    today = clock.today().isoformat()
     for bk in out["bookings"]:
         snap = bk.pop("payment_plan_snapshot", None)
         bk["plan_name"] = (snap or {}).get("name")

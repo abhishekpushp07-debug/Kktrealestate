@@ -3,6 +3,7 @@ from datetime import UTC, date, datetime, timedelta
 
 from fastapi import APIRouter, Depends
 
+from services import clock
 from db import db
 from deps import project_scope_filter, require
 from services.money import present_money
@@ -22,7 +23,7 @@ async def widgets(user: dict = Depends(require("masters.project.view"))):
     cid = user["company_id"]
     scope = project_scope_filter(user)
     base = {"company_id": cid, **scope}
-    today = date.today()
+    today = clock.today()
     out = {"role": role}
     if "payment.read" in perms and role != "Sales":
         since = (today.replace(day=1) - timedelta(days=335)).replace(day=1).isoformat()
@@ -31,14 +32,8 @@ async def widgets(user: dict = Depends(require("masters.project.view"))):
         for r in rows:
             trend.setdefault(r["_id"]["m"], {"month": r["_id"]["m"], "Cash_paise": 0, "Account_paise": 0, "Other_paise": 0})[f"{r['_id']['c']}_paise"] += r["s"]
         out["collections_trend"] = sorted(trend.values(), key=lambda x: x["month"])
-        ageing = {"Not due": 0, "0-30": 0, "31-60": 0, "61-90": 0, "90+": 0}
-        async for d in db.demands.find({**base, "voided": False, "status": {"$in": ["Open", "Partially Paid"]}}, {"_id": 0, "due_date": 1, "total_demand_paise": 1, "paid_paise": 1}):
-            rem = d["total_demand_paise"] - d.get("paid_paise", 0)
-            try:
-                days = (today - date.fromisoformat(d["due_date"])).days
-            except (TypeError, ValueError):
-                days = -1
-            ageing["Not due" if days < 0 else "0-30" if days <= 30 else "31-60" if days <= 60 else "61-90" if days <= 90 else "90+"] += rem
+        from services.definitions import ageing_for_bookings
+        ageing, _ = await ageing_for_bookings(base, today)
         out["ageing"] = [{"bucket": k, "amount_paise": v} for k, v in ageing.items()]
         pend = await db.payments.find({**base, "status": "Pending"}, {"_id": 0, "id": 1, "receipt_number": 1, "customer_name": 1, "amount_paise": 1, "instrument": 1, "booking_id": 1}).sort("instrument.date", 1).to_list(20)
         out["pending_cheques"] = {"items": pend, "amount_paise": sum(p["amount_paise"] for p in pend), "count": len(pend)}

@@ -90,10 +90,14 @@ async def issue_refresh_token(user: dict, request: Request) -> str:
 
 
 async def _public_user(user: dict) -> dict:
+    from services import rbac
+    from deps import _current_roles_version
     u = strip_private(user)
-    role = await db.roles.find_one({"id": u["role_id"]}, {"_id": 0, "name": 1, "permissions": 1})
-    u["role_name"] = role["name"] if role else None
-    u["permissions"] = sorted(role["permissions"]) if role else []
+    eff = await rbac.resolve(user, await _current_roles_version(), now_iso())
+    u["role_name"] = eff["role_names"][0] if eff["role_names"] else None
+    u["role_names"] = eff["role_names"]
+    u["permissions"] = sorted(eff["permissions"])
+    u["is_super_admin"] = eff["is_super"]
     u["mfa_enabled"] = bool(user.get("mfa_enabled"))
     return u
 
@@ -229,6 +233,8 @@ async def logout(body: LogoutIn, user: dict = Depends(get_current_user)):
 async def me(user: dict = Depends(get_current_user)):
     u = strip_private(user)
     u["permissions"] = sorted(user["permissions"])
+    u["is_super_admin"] = user.get("is_super_admin", False)
+    u["role_names"] = user.get("role_names", [])
     u["mfa_enabled"] = bool(user.get("mfa_enabled"))
     u["mfa_setup_required"] = await _mfa_policy_requires(user) and not user.get("mfa_enabled")
     return u

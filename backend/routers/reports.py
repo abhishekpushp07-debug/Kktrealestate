@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta
 from fastapi import APIRouter, Depends, Request, Response
 from pymongo import ReturnDocument
 
+from services import clock
 from db import db
 from deps import ensure_project_access, project_scope_filter, require
 from services.money import amount_in_words, present_money
@@ -38,7 +39,7 @@ def _strict_params(request: Request, allowed: set[str]):
 
 
 def _dates(from_date, to_date):
-    today = date.today()
+    today = clock.today()
     f = from_date or (today.replace(day=1) - timedelta(days=365)).isoformat()
     t = to_date or today.isoformat()
     return f, t
@@ -118,12 +119,7 @@ async def collections(request: Request, from_date: str | None = None, to_date: s
 
 
 # ---------- 2. Outstanding & ageing ----------
-def _age_bucket(due_date: str, today: date) -> str:
-    try:
-        d = (today - date.fromisoformat(due_date)).days
-    except (TypeError, ValueError):
-        return "Not due"
-    return "Not due" if d < 0 else "0-30" if d <= 30 else "31-60" if d <= 60 else "61-90" if d <= 90 else "90+"
+from services.definitions import ageing_for_bookings  # noqa: E402
 
 
 @router.get("/outstanding")
@@ -131,15 +127,8 @@ async def outstanding(request: Request, project_id: str | None = None, block_id:
     _strict_params(request, {'block_id', 'group_by', 'project_id'})
     q = {**_scope(user, project_id, block_id), "status": {"$in": ["Active", "Completed"]}}
     bks = await db.bookings.find(q, {"_id": 0, "id": 1, "booking_number": 1, "customer_name": 1, "project_code": 1, "block_code": 1, "flat_snapshot.flat_number": 1, "summary": 1, "project_id": 1, "block_id": 1}).to_list(None)
-    today = date.today()
-    dem = await db.demands.find({"booking_id": {"$in": [b["id"] for b in bks]}, "voided": False, "status": {"$ne": "Paid"}}, {"_id": 0, "booking_id": 1, "due_date": 1, "total_demand_paise": 1, "paid_paise": 1}).to_list(None)
-    ageing = {"Not due": 0, "0-30": 0, "31-60": 0, "61-90": 0, "90+": 0}
-    per_bk = {}
-    for d in dem:
-        rem = max(d["total_demand_paise"] - d.get("paid_paise", 0), 0)
-        bk = _age_bucket(d["due_date"], today)
-        ageing[bk] += rem
-        per_bk.setdefault(d["booking_id"], {k: 0 for k in ageing})[bk] += rem
+    today = clock.today()
+    ageing, per_bk = await ageing_for_bookings(q, today)
     rows = []
     for b in bks:
         s = b.get("summary") or {}
@@ -210,7 +199,7 @@ async def inventory(request: Request, project_id: str | None = None, group_by: s
             return f"{names.get(b, b)} · Floor {f}"
         return names.get(k, k)
     out = [{"group": label(r["_id"]), "total": r["total"], "available": r["available"], "hold": r["hold"], "booked": r["booked"], "sold": r["sold"], "blocked": r["blocked"], "available_value_paise": int(r["available_value"] * 100), "sold_value_paise": int(r["sold_value"] * 100)} for r in rows]
-    since = (date.today().replace(day=1) - timedelta(days=365)).isoformat()
+    since = (clock.today().replace(day=1) - timedelta(days=365)).isoformat()
     vel = await db.bookings.aggregate([{"$match": {**_scope(user, project_id), "booking_date": {"$gte": since}}}, {"$group": {"_id": {"$substr": ["$booking_date", 0, 7]}, "bookings": {"$sum": 1}, "value_paise": {"$sum": "$agreement_value_paise"}, "sqft": {"$sum": {"$ifNull": ["$flat_snapshot.super_builtup_sqft", 0]}}}}, {"$sort": {"_id": 1}}]).to_list(None)
     rate = await db.bookings.aggregate([{"$match": {**_scope(user, project_id), "status": {"$in": ["Active", "Completed"]}}}, {"$group": {"_id": "$project_code", "value_paise": {"$sum": "$agreement_value_paise"}, "sqft": {"$sum": {"$ifNull": ["$flat_snapshot.super_builtup_sqft", 0]}}, "n": {"$sum": 1}}}]).to_list(None)
     rc = await db.rate_cards.aggregate([{"$match": {"company_id": user["company_id"], "is_active": True}}, {"$group": {"_id": "$project_id", "base": {"$avg": "$rate_per_sqft"}}}]).to_list(None)

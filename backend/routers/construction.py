@@ -4,6 +4,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, Request
 from pydantic import Field
 
+from services import clock
 from db import db
 from deps import ensure_project_access, require
 from services.dues_engine import raise_due_installments, run_dues_for_all, schedule, trigger_label
@@ -151,8 +152,8 @@ async def set_current_stage(block_id: str, body: StageSetIn, request: Request, u
             st = next((s for s in stages if s["stage_id"] == m["stage_id"]), {})
             if st.get("visible_to_customers", True):
                 await notify_booking_parties(b, "stage.completed", f"Construction update: {m['name']} completed", f"{res.get('name', '')} · {m['name']} completed on {m['completed_on']} · {round(done * 100 / len(stages))}% done", "block", block_id, {"stage_id": m["stage_id"]})
-    await write_audit(user, "construction.stage_complete", "block", block_id, after={"stage": target["name"], "marked": [m["name"] for m in marked], "demands_raised": len(created)}, ip=client_ip(request))
-    return present_money({"block": {k: res.get(k) for k in ("id", "construction_percent", "version")}, "marked": marked, "demands_raised": len(created), "demands": created})
+    audit_id = await write_audit(user, "construction.stage_complete", "block", block_id, after={"stage": target["name"], "marked": [m["name"] for m in marked], "demands_raised": len(created), "demands_total_paise": sum(d.get("total_demand_paise", 0) for d in created)}, ip=client_ip(request))
+    return present_money({"block": {k: res.get(k) for k in ("id", "construction_percent", "version")}, "marked": marked, "demands_raised": len(created), "demands": created, "demands_total_paise": sum(d.get("total_demand_paise", 0) for d in created), "audit_id": audit_id, "stage_name": target["name"]})
 
 
 class UndoIn(StrictModel):
@@ -194,8 +195,8 @@ async def undo_stage(block_id: str, body: UndoIn, request: Request, user: dict =
         cum = round(sum(d.get("percent") or 0 for d in rem), 2) if all(d.get("percent") is not None for d in rem) else max((d.get("cumulative_percent") or 0 for d in rem), default=0)
         await db.bookings.update_one({"id": b["id"]}, {"$set": {"raised_percent": cum, "construction_percent": cum}})
         await rebuild(b["id"])
-    await write_audit(user, "construction.undo", "block", block_id, before={"stage": last["name"]}, after={"reason": body.reason, "demands_voided": voided.modified_count, "notifications": retracted}, ip=client_ip(request))
-    return present_money({"block": {k: res.get(k) for k in ("id", "construction_percent", "version")}, "demands_voided": voided.modified_count, "notifications_retracted": retracted})
+    audit_id = await write_audit(user, "construction.undo", "block", block_id, before={"stage": last["name"]}, after={"reason": body.reason, "demands_voided": voided.modified_count, "notifications": retracted}, ip=client_ip(request))
+    return present_money({"block": {k: res.get(k) for k in ("id", "construction_percent", "version")}, "demands_voided": voided.modified_count, "notifications_retracted": retracted, "audit_id": audit_id, "stage_name": last["name"]})
 
 
 # ---------- payment plan assignments ----------
@@ -255,7 +256,7 @@ async def unassign_plan(assignment_id: str, request: Request, user: dict = Depen
 
 
 async def applicable_plans(project_id: str, block_id: str) -> list[dict]:
-    today = date.today().isoformat()
+    today = clock.today().isoformat()
     asg = await db.payment_plan_assignments.find({"project_id": project_id, "is_active": True, "$or": [{"block_id": block_id}, {"block_id": None}], "$and": [{"$or": [{"effective_from": None}, {"effective_from": {"$lte": today}}]}, {"$or": [{"effective_to": None}, {"effective_to": {"$gte": today}}]}]}, {"_id": 0}).to_list(None)
     plans = {p["id"]: p for p in await db.payment_plans.find({"id": {"$in": [a["payment_plan_id"] for a in asg]}, "is_active": True}, {"_id": 0}).to_list(None)}
     seen, out = set(), []
@@ -319,7 +320,7 @@ async def change_booking_plan(booking_id: str, body: PlanChangeIn, request: Requ
 @router.get("/reports/upcoming-dues")
 async def upcoming_dues(days: int = 90, project_id: str | None = None, format: str | None = None, user: dict = Depends(require("reports.receivables_forecast.view"))):
     from datetime import timedelta
-    horizon = (date.today() + timedelta(days=days)).isoformat()
+    horizon = (clock.today() + timedelta(days=days)).isoformat()
     q = {"company_id": user["company_id"], "status": "Active", "payment_plan_snapshot": {"$ne": None}}
     if project_id:
         q["project_id"] = project_id

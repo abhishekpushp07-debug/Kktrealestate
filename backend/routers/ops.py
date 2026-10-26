@@ -1,3 +1,4 @@
+from services import clock
 """Phase D5: /api/admin/ops — in-process observability snapshot (Super Admin)."""
 import os
 import time
@@ -22,7 +23,7 @@ async def ops(window: int = 900, user: dict = Depends(require("admin.system_heal
     if oldest:
         from datetime import datetime, timezone
         try:
-            staleness_s = round((datetime.now(timezone.utc) - datetime.fromisoformat(oldest[0]["computed_at"])).total_seconds())
+            staleness_s = round((clock.now() - datetime.fromisoformat(oldest[0]["computed_at"])).total_seconds())
         except Exception:  # noqa: BLE001
             staleness_s = None
     try:

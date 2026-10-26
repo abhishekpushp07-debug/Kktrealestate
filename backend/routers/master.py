@@ -372,7 +372,12 @@ def _prepare_bank_in(data: dict) -> dict:
     return data
 
 
+MASTER_FEATURE = {"floor-plan-templates": "floor_plan", "plc-types": "plc", "construction-stages": "construction_stage", "payment-plans": "payment_plan", "charge-types": "charge_type", "bank-accounts": "bank_account"}
+
+
 def _register(kind: str, coll_name: str, InModel, search_fields: list[str], usage_fn, label: str):
+    feat = MASTER_FEATURE.get(kind, "catalogue")  # other kinds are catalogue-style masters
+    P_VIEW, P_CREATE, P_EDIT, P_DELETE = (f"masters.{feat}.{a}" for a in ("view", "create", "edit", "delete"))
     UpdateModel = _partial(InModel)
     coll = db[coll_name]
     is_bank = coll_name == "bank_accounts"
@@ -394,7 +399,7 @@ def _register(kind: str, coll_name: str, InModel, search_fields: list[str], usag
         if await coll.find_one(q):
             raise ApiError(409, f"{label} with the same name or code already exists", "DUPLICATE")
 
-    async def list_items(request: Request, response: Response, params: ListParams = Depends(), include_usage: bool = False, user: dict = Depends(require("master.read"))):
+    async def list_items(request: Request, response: Response, params: ListParams = Depends(), include_usage: bool = False, user: dict = Depends(require(P_VIEW))):
         q = {"company_id": user["company_id"], **search_filter(params.search, search_fields)}
         if not params.include_inactive:
             q["is_active"] = True
@@ -419,7 +424,7 @@ def _register(kind: str, coll_name: str, InModel, search_fields: list[str], usag
         response.headers["Cache-Control"] = "private, max-age=60"
         return res
 
-    async def create_item(body: InModel, request: Request, user: dict = Depends(require("master.write"))):
+    async def create_item(body: InModel, request: Request, user: dict = Depends(require(P_CREATE))):
         data = body.model_dump()
         if has_code:
             data["code"] = data["code"].upper()
@@ -437,10 +442,10 @@ def _register(kind: str, coll_name: str, InModel, search_fields: list[str], usag
         await write_audit(user, f"{coll_name}.create", coll_name, doc["id"], after=out, ip=client_ip(request))
         return out
 
-    async def get_item(item_id: str, user: dict = Depends(require("master.read"))):
+    async def get_item(item_id: str, user: dict = Depends(require(P_VIEW))):
         return present(await get_or_404(coll, item_id, label, {"company_id": user["company_id"]}))
 
-    async def update_item(item_id: str, body: UpdateModel, request: Request, user: dict = Depends(require("master.write"))):
+    async def update_item(item_id: str, body: UpdateModel, request: Request, user: dict = Depends(require(P_EDIT))):
         before = await get_or_404(coll, item_id, label, {"company_id": user["company_id"]})
         changes = body.model_dump(exclude_unset=True)
         if not changes:
@@ -473,7 +478,7 @@ def _register(kind: str, coll_name: str, InModel, search_fields: list[str], usag
         if count:
             raise ApiError(409, f"Cannot deactivate: this {label.lower()} is used by {count} active {what}", "IN_USE")
 
-    async def deactivate_item(item_id: str, request: Request, user: dict = Depends(require("master.write"))):
+    async def deactivate_item(item_id: str, request: Request, user: dict = Depends(require(P_DELETE))):
         before = await get_or_404(coll, item_id, label, {"company_id": user["company_id"]})
         await _deactivate_check(item_id)
         await coll.update_one({"id": item_id}, {"$set": {"is_active": False, "deleted_at": now_iso(), "updated_at": now_iso()}, "$inc": {"version": 1}})
@@ -481,7 +486,7 @@ def _register(kind: str, coll_name: str, InModel, search_fields: list[str], usag
         await write_audit(user, f"{coll_name}.deactivate", coll_name, item_id, before=present(before), after=present(after), ip=client_ip(request))
         return present(after)
 
-    async def activate_item(item_id: str, request: Request, user: dict = Depends(require("master.write"))):
+    async def activate_item(item_id: str, request: Request, user: dict = Depends(require(P_EDIT))):
         before = await get_or_404(coll, item_id, label, {"company_id": user["company_id"]})
         await coll.update_one({"id": item_id}, {"$set": {"is_active": True, "deleted_at": None, "updated_at": now_iso()}, "$inc": {"version": 1}})
         after = await coll.find_one({"id": item_id}, {"_id": 0})
@@ -500,7 +505,7 @@ def _register(kind: str, coll_name: str, InModel, search_fields: list[str], usag
 
 @router.api_route("/milestone-templates", methods=["GET", "POST"], include_in_schema=False)
 @router.api_route("/milestone-templates/{rest:path}", methods=["GET", "POST", "PATCH", "DELETE"], include_in_schema=False)
-async def legacy_milestone_templates(rest: str = "", user: dict = Depends(require("master.read"))):
+async def legacy_milestone_templates(rest: str = "", user: dict = Depends(require("masters.construction_stage.view"))):
     raise ApiError(410, LEGACY_GONE["milestone-templates"], "LEGACY_GONE")
 
 

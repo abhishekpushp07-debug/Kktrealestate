@@ -10,6 +10,7 @@ from datetime import UTC, date, datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, Query, Request, Response
 from pydantic import Field, field_validator
 
+from services import clock
 from db import db
 from models_out import VisitsOut, VisitsOutPage
 from deps import JWT_SECRET, enforce_rate_limit, project_scope_filter, require, require_any
@@ -162,12 +163,12 @@ async def brochure_download(token: str):
 
 @router.get("/brochure-stats")
 async def brochure_stats(project_id: str | None = None, user: dict = Depends(require("sales.lead.view"))):
-    since = (date.today() - timedelta(days=29)).isoformat()
+    since = (clock.today() - timedelta(days=29)).isoformat()
     q = {"at": {"$gte": since}, **({"project_id": project_id} if project_id else {})}
     rows = await db.brochure_downloads.aggregate([{"$match": q}, {"$group": {"_id": {"$substr": ["$at", 0, 10]}, "n": {"$sum": 1}}}]).to_list(None)
     by = {r["_id"]: r["n"] for r in rows}
-    days = [(date.today() - timedelta(days=i)).isoformat() for i in range(29, -1, -1)]
-    week = (date.today() - timedelta(days=6)).isoformat()
+    days = [(clock.today() - timedelta(days=i)).isoformat() for i in range(29, -1, -1)]
+    week = (clock.today() - timedelta(days=6)).isoformat()
     lq = {"company_id": user["company_id"], "source": "Brochure", "created_at": {"$gte": week}, **project_scope_filter(user)}
     total = await db.projects.find_one({"id": project_id}, {"_id": 0, "website.brochure_download_count": 1}) if project_id else None
     return {"series": [{"date": d, "count": by.get(d, 0)} for d in days], "last_30": sum(by.values()), "total": ((total or {}).get("website") or {}).get("brochure_download_count", 0), "brochure_leads_week": await db.leads.count_documents(lq)}
@@ -377,6 +378,7 @@ async def visit_public_cancel(token: str, body: CancelIn):
         raise ApiError(409, f"Visit is already {v['status']}", "INVALID_STATE")
     await _set_status(v, "Cancelled", None, body.reason or "Cancelled by visitor", "site_visit_cancelled", "Site visit cancelled by visitor")
     await notify_user(p["company_id"], v.get("assigned_to"), "Site visit cancelled", f"{v['name']} · {p['name']} · {fmt_date(v['date'])} {v['slot_start']}", "visit.cancelled", "site_visit", v["id"], "/site-visits")
+    await write_audit({"id": f"visitor:{v['id']}", "name": v.get("name") or "Visitor", "company_id": p["company_id"]}, "visit.cancel", "site_visit", v["id"], before={"visit_number": v.get("visit_number"), "status": v["status"]}, after={"visit_number": v.get("visit_number"), "status": "Cancelled", "reason": body.reason}, company_id=p["company_id"])
     return _public_visit({**v, "status": "Cancelled"}, p)
 
 
@@ -509,9 +511,11 @@ class NoteIn(StrictModel):
 
 @router.patch("/{visit_id}")
 async def visit_notes(visit_id: str, body: NoteIn, user: dict = Depends(require("sales.site_visit.edit"))):
-    await get_or_404(db.site_visits, visit_id, "Visit", {"company_id": user["company_id"]})
+    before = await get_or_404(db.site_visits, visit_id, "Visit", {"company_id": user["company_id"]})
     await db.site_visits.update_one({"id": visit_id}, {"$set": {"notes": body.notes, "updated_at": now_iso()}})
-    return await db.site_visits.find_one({"id": visit_id}, {"_id": 0})
+    after = await db.site_visits.find_one({"id": visit_id}, {"_id": 0})
+    await write_audit(user, "visit.update", "site_visit", visit_id, before={"visit_number": before.get("visit_number"), "notes": before.get("notes")}, after={"visit_number": before.get("visit_number"), "notes": body.notes})
+    return after
 
 
 # ---------- daily nudge ----------

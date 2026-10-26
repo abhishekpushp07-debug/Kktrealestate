@@ -29,7 +29,8 @@ class UserCreate(StrictModel):
     email: EmailStr
     phone: str | None = None
     password: str
-    role_id: str
+    role_id: str | None = None
+    role_ids: list[str] | None = None
     project_scope: list[str] = ["*"]
     must_change_password: bool = False
 
@@ -68,10 +69,11 @@ async def _validate_role_and_scope(role_id: str | None, scope: list[str] | None)
 
 
 async def _enrich(items: list[dict]) -> list[dict]:
-    role_ids = {u["role_id"] for u in items}
+    role_ids = {r for u in items for r in ([u.get("role_id")] + list(u.get("role_ids") or [])) if r}
     roles = {r["id"]: r["name"] for r in await db.roles.find({"id": {"$in": list(role_ids)}}, {"_id": 0, "id": 1, "name": 1}).to_list(None)}
     for u in items:
-        u["role_name"] = roles.get(u["role_id"])
+        u["role_name"] = roles.get(u.get("role_id"))
+        u["role_names"] = [roles[r] for r in (u.get("role_ids") or [u.get("role_id")]) if r in roles]
     return items
 
 
@@ -90,9 +92,15 @@ async def create_user(body: UserCreate, request: Request, user: dict = Depends(r
     email = body.email.lower()
     if await db.users.find_one({"email": email}):
         raise ApiError(409, "A user with this email already exists", "DUPLICATE_EMAIL")
-    await _validate_role_and_scope(body.role_id, body.project_scope)
+    role_ids = body.role_ids or ([body.role_id] if body.role_id else [])
+    if not role_ids:  # R1: new users default to Employee (= no access) until granted
+        emp = await db.roles.find_one({"name": "Employee", "is_system": True}, {"_id": 0, "id": 1})
+        role_ids = [emp["id"]] if emp else []
+    for rid in role_ids:
+        await _validate_role_and_scope(rid, None)
+    await _validate_role_and_scope(None, body.project_scope)
     doc = {**base_doc(user, user["company_id"]), "name": body.name, "email": email, "phone": body.phone,
-           "role_id": body.role_id, "project_scope": body.project_scope, "password_hash": hash_password(body.password),
+           "role_id": role_ids[0] if role_ids else None, "role_ids": role_ids, "project_scope": body.project_scope, "password_hash": hash_password(body.password),
            "must_change_password": body.must_change_password, "mfa_enabled": False, "password_history": [],
            "failed_attempts": 0, "locked_until": None}
     await db.users.insert_one(doc)
@@ -121,8 +129,13 @@ async def update_user(user_id: str, body: UserUpdate, request: Request, user: di
         await _guard_last_super_admin(before, None)
     if "role_id" in changes and changes["role_id"] != before["role_id"]:
         await _guard_last_super_admin(before, changes["role_id"])
+        changes["role_ids"] = [changes["role_id"]] + [r for r in (before.get("role_ids") or []) if r != before["role_id"]]
     changes.pop("updated_at", None)
     after = await apply_update(db.users, before, changes, expected_version(request, body.version), "User")
+    if "role_id" in changes:
+        from services import rbac
+        await rbac.bump_version()
+        rbac.invalidate(user_id)
     if changes.get("is_active") is False:
         await db.refresh_tokens.update_many({"user_id": user_id, "revoked": False}, {"$set": {"revoked": True, "reason": "deactivated"}})
     await write_audit(user, "user.update", "user", user_id, before=before, after=after, ip=client_ip(request))
