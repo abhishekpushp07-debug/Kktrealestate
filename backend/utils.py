@@ -233,6 +233,13 @@ async def next_number(scope: str, key: str) -> int:
     return doc["seq"]
 
 
+def csv_safe(v):
+    """Phase K.16: neutralise spreadsheet formulas — cells starting with = + - @ (or tab/CR) get a leading apostrophe."""
+    if isinstance(v, str) and v[:1] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + v
+    return v
+
+
 def to_csv(items: list[dict], fields: list[str] | None = None) -> str:
     import csv
     import io
@@ -244,5 +251,5 @@ def to_csv(items: list[dict], fields: list[str] | None = None) -> str:
     w = csv.DictWriter(buf, fieldnames=fields, extrasaction="ignore")
     w.writeheader()
     for it in items:
-        w.writerow({k: (json.dumps(v) if isinstance(v, (dict, list)) else v) for k, v in it.items() if k in fields})
+        w.writerow({k: csv_safe(json.dumps(v) if isinstance(v, (dict, list)) else v) for k, v in it.items() if k in fields})
     return buf.getvalue()

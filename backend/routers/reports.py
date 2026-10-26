@@ -109,7 +109,8 @@ def respond(request: Request, fmt: str | None, payload: dict, title: str, compan
         def val(c, v):
             if c[2] == "money":
                 return "" if v is None else round(v / 100, 2)
-            return "" if v is None else v
+            from utils import csv_safe
+            return "" if v is None else csv_safe(v)
         buf = io.StringIO()
         buf.write(f"# {header_line}\n")
         w = _csv.writer(buf)
