@@ -97,7 +97,11 @@ async def ensure_indexes():
     await db.demands.create_index([("booking_id", ASCENDING), ("installment_seq", ASCENDING)], unique=True, partialFilterExpression={"voided": False, "installment_seq": {"$type": "int"}})
     await db.payment_plan_assignments.create_index([("project_id", ASCENDING), ("block_id", ASCENDING), ("is_active", ASCENDING)])
     await db.construction_stages.create_index("name", unique=True)
-    await db.payment_plans.create_index("name", unique=True)
+    try:
+        await db.payment_plans.drop_index("name_1")  # Phase M: names are unique per project+tower, not globally
+    except Exception:
+        pass
+    await db.payment_plans.create_index([("company_id", ASCENDING), ("project_id", ASCENDING), ("block_id", ASCENDING), ("name", ASCENDING)], unique=True, name="plan_name_scope", partialFilterExpression={"is_active": True})
     await db.ledger_entries.create_index([("booking_id", ASCENDING), ("seq", ASCENDING)])
     await db.notifications.create_index([("user_id", ASCENDING), ("read", ASCENDING), ("created_at", DESCENDING)])
     await db.notifications.create_index([("audit_id", ASCENDING), ("user_id", ASCENDING)])
