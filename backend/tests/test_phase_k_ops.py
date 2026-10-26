@@ -9,16 +9,19 @@ import requests
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from tests.conftest import BASE  # noqa: E402
 
-_LOOP = asyncio.new_event_loop()
 
 
 def test_backup_manifest_and_restore_drill_records_job_run():
     from tools.backup import run_backup
-    from tools.restore_drill import drill_job
     out = tempfile.mkdtemp()
     m = run_backup(out)
     assert m["sha256"] and m["bytes"] > 1000 and os.path.exists(os.path.join(out, m["archive"]))
-    run = _LOOP.run_until_complete(drill_job(os.path.join(out, m["archive"]), scratch="kkt_restore_drill_test"))
+    import json
+    import subprocess
+    proc = subprocess.run([sys.executable, "-c", f"import asyncio, json, sys\nsys.path.insert(0, '.')\nfrom tools.restore_drill import drill_job\nprint(json.dumps(asyncio.run(drill_job({os.path.join(out, m['archive'])!r}, scratch='kkt_restore_drill_test')), default=str))"],
+                          cwd=os.path.join(os.path.dirname(__file__), ".."), capture_output=True, text=True, timeout=240, env={**os.environ})
+    assert proc.returncode == 0, proc.stderr[-2000:]
+    run = json.loads(proc.stdout.strip().splitlines()[-1])
     assert run["status"] == "OK", run
     assert run["result"]["verify"]["ledger_totals_match"] is True
     assert run["result"]["verify"]["mismatches"] == []
