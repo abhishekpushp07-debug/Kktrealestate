@@ -251,20 +251,55 @@ async def revise_agreement(booking_id: str, body: RevisionIn, request: Request, 
     return _present(await db.bookings.find_one({"id": booking_id}, {"_id": 0}))
 
 
+class TransferIn(StrictModel):
+    new_flat_id: str
+    reason: str = Field(min_length=3, max_length=500)
+    price_handling: Literal["revise_agreement", "keep_agreement"] = "revise_agreement"
+    old_flat_status: Literal["Available", "Blocked", "Hold"] = "Available"
+    cash_percent: float | None = Field(default=None, ge=0, le=100)
+    version: int | None = None
+
+
+class SwapIn(StrictModel):
+    other_booking_id: str
+    reason: str = Field(min_length=3, max_length=500)
+    version: int | None = None
+
+
+async def _policy(company_id: str) -> dict:
+    c = await db.companies.find_one({"id": company_id}, {"_id": 0, "cancellation_policy": 1})
+    return (c or {}).get("cancellation_policy") or {}
+
+
+@router.get("/{booking_id}/cancellation-preview")
+async def cancellation_preview_ep(booking_id: str, deduction: float | None = None, user: dict = Depends(require("sales.booking.cancel"))):
+    from services.money_ops import cancellation_preview
+    b = await _load(booking_id, user)
+    return present_money(cancellation_preview(b, await _policy(user["company_id"]), to_paise(deduction) if deduction is not None else None))
+
+
+@router.get("/{booking_id}/refunds")
+async def booking_refunds(booking_id: str, user: dict = Depends(require("finance.refund.view"))):
+    await _load(booking_id, user)
+    items = await db.refunds.find({"booking_id": booking_id, "parent_refund_id": None}, {"_id": 0}).sort("created_at", -1).to_list(None)
+    return present_money({"items": items, "total": len(items)})
+
+
 @router.post("/{booking_id}/cancel")
 async def cancel_booking(booking_id: str, body: CancelIn, request: Request, user: dict = Depends(require("sales.booking.cancel"))):
+    """Cancellation maths comes from money_ops (deduction % of agreement/received, capped at received; only demanded penalty charges deducted)."""
+    from services.money_ops import cancellation_preview, create_refund
     b = await _load(booking_id, user)
     if b["status"] != "Active":
         raise ApiError(409, f"Booking is already {b['status']}", "BOOKING_NOT_ACTIVE")
-    paid = (b.get("summary") or {}).get("paid_paise", 0) + (b.get("summary") or {}).get("other_charges_paid_paise", 0)
-    refund, ded = to_paise(body.refund), to_paise(body.deduction)
-    if refund > paid:
-        raise ApiError(409, "Refund cannot exceed amount received", "REFUND_EXCEEDS_PAID")
     if await db.payments.count_documents({"booking_id": booking_id, "status": "Pending"}):
         raise ApiError(409, "Clear or bounce pending cheques before cancelling", "PENDING_PAYMENTS")
+    policy = await _policy(user["company_id"])
+    pv = cancellation_preview(b, policy, to_paise(body.deduction) if body.deduction else None)
     ts = now_iso()
-    canc = {"at": ts, "by": user["id"], "by_name": user["name"], "reason": body.reason, "refund_paise": refund, "deduction_paise": ded}
+    canc = {"at": ts, "by": user["id"], "by_name": user["name"], "reason": body.reason, **{k: pv[k] for k in ("received_paise", "deduction_paise", "charges_due_paise", "refund_paise", "forfeiture_paise")}, "lines": pv["lines"], "policy": pv["policy"]}
     ver = expected_version(request, body.version)
+    pre_summary = dict(b.get("summary") or {})
     async with unit_of_work() as uow:
         after = await guarded_update(db.bookings, {"id": booking_id, "status": "Active", **({"version": ver} if ver is not None else {})}, {"$set": {"status": "Cancelled", "cancellation": canc, "updated_at": ts}, "$inc": {"version": 1}}, uow)
         if not after:
@@ -273,11 +308,98 @@ async def cancel_booking(booking_id: str, body: CancelIn, request: Request, user
         flat = await db.flats.find_one_and_update({"id": b["flat_id"]}, {"$set": {"status": "Available", "booking_id": None, "status_changed_at": ts, "status_changed_by": user["id"]}, "$inc": {"version": 1}}, projection={"_id": 0}, **uow.kw())
         await apply_status_delta(b["block_id"], b["project_id"], flat["status"] if flat else "Booked", "Available", uow.session)
         await db.parking_slots.update_many({"booking_id": booking_id}, {"$set": {"status": "Available", "booking_id": None, "customer_id": None}}, **uow.kw())
-        await db.demands.update_many({"booking_id": booking_id, "status": {"$ne": "Paid"}}, {"$set": {"status": "Cancelled"}}, **uow.kw())
+        await db.demands.update_many({"booking_id": booking_id, "status": {"$ne": "Paid"}}, {"$set": {"status": "Cancelled", "cancelled_at": ts}}, **uow.kw())
+    if b.get("lead_id"):
+        await db.leads.update_one({"id": b["lead_id"]}, {"$set": {"status": "Lost", "lost_reason": "Booking cancelled", "updated_at": ts}})
     await rebuild(booking_id)
-    await write_audit(user, "booking.cancel", "booking", booking_id, before={"status": "Active"}, after={"status": "Cancelled", **canc, "booking_number": b["booking_number"]}, ip=client_ip(request))
-    await write_audit(user, "flat.status", "flat", b["flat_id"], before={"status": "Booked"}, after={"status": "Available", "reason": "Booking cancelled"}, ip=client_ip(request))
-    return _present(await db.bookings.find_one({"id": booking_id}, {"_id": 0}))
+    rf = await create_refund({**b, "status": "Cancelled"}, pv["deduction_paise"], user, policy, preview=pv, pre_summary=pre_summary)
+    await write_audit(user, "booking.cancel", "booking", booking_id, before={"status": "Active", "booking_number": b["booking_number"]}, after={"status": "Cancelled", **{k: canc[k] for k in ("reason", "received_paise", "deduction_paise", "refund_paise", "forfeiture_paise")}, "booking_number": b["booking_number"]}, ip=client_ip(request))
+    await write_audit(user, "flat.status", "flat", b["flat_id"], before={"status": "Booked", "flat_number": b.get("flat_number")}, after={"status": "Available", "reason": "Booking cancelled", "flat_number": b.get("flat_number")}, ip=client_ip(request))
+    out = _present(await db.bookings.find_one({"id": booking_id}, {"_id": 0}))
+    out["refund"] = present_money(rf) if rf else None
+    return out
+
+
+async def _move_flat(b: dict, new_flat: dict, user: dict, ts: str, old_status: str, uow) -> None:
+    await db.flats.update_one({"id": b["flat_id"]}, {"$set": {"status": old_status, "booking_id": None, "status_changed_at": ts, "status_changed_by": user["id"]}, "$inc": {"version": 1}}, **uow.kw())
+    await apply_status_delta(b["block_id"], b["project_id"], "Booked", old_status, uow.session)
+    await db.flats.update_one({"id": new_flat["id"]}, {"$set": {"status": "Booked", "booking_id": b["id"], "status_changed_at": ts, "status_changed_by": user["id"]}, "$inc": {"version": 1}}, **uow.kw())
+    await apply_status_delta(new_flat["block_id"], new_flat["project_id"], new_flat["status"], "Booked", uow.session)
+
+
+@router.post("/{booking_id}/transfer")
+async def transfer_booking(booking_id: str, body: TransferIn, request: Request, user: dict = Depends(require("sales.booking.transfer"))):
+    """Move an active booking to another available flat; money follows the customer (payments/demands re-bound), agreement optionally revised to the new price with a cash-%."""
+    from services.money_ops import rebind_demands_to_block, reproportion_open_demands
+    b = await _load(booking_id, user)
+    if b["status"] != "Active":
+        raise ApiError(409, f"Booking is {b['status']}", "BOOKING_NOT_ACTIVE")
+    if await db.payments.count_documents({"booking_id": booking_id, "status": "Pending"}):
+        raise ApiError(409, "Clear or bounce pending cheques before transferring", "PENDING_PAYMENTS")
+    nf = await get_or_404(db.flats, body.new_flat_id, "Flat")
+    ensure_project_access(user, nf["project_id"])
+    if nf["id"] == b["flat_id"]:
+        raise ApiError(400, "Already on this flat", "SAME_FLAT")
+    if nf["status"] != "Available":
+        raise ApiError(409, f"Target flat is {nf['status']}", "FLAT_NOT_AVAILABLE")
+    nb = await db.blocks.find_one({"id": nf["block_id"]}, {"_id": 0})
+    np_ = await db.projects.find_one({"id": nf["project_id"]}, {"_id": 0, "code": 1, "name": 1})
+    ts = now_iso()
+    old = {"agreement_value_paise": b["agreement_value_paise"], "cash_agreed_paise": b["cash_agreed_paise"], "account_agreed_paise": b["account_agreed_paise"]}
+    sets = {"flat_id": nf["id"], "flat_number": nf.get("flat_number"), "block_id": nf["block_id"], "block_code": nb.get("code"), "block_name": nb.get("name"), "project_id": nf["project_id"], "project_code": np_.get("code"), "project_name": np_.get("name"),
+            "construction_percent": nb.get("construction_percent", 0), "updated_at": ts}
+    if body.price_handling == "revise_agreement" and nf.get("price_paise"):
+        pct = body.cash_percent if body.cash_percent is not None else (b["cash_agreed_paise"] * 100 / b["agreement_value_paise"] if b["agreement_value_paise"] else 0)
+        cash = pct_of(nf["price_paise"], pct)
+        sets.update({"agreement_value_paise": nf["price_paise"], "cash_agreed_paise": cash, "account_agreed_paise": nf["price_paise"] - cash})
+    tr = {"id": new_id(), "at": ts, "by": user["id"], "by_name": user["name"], "reason": body.reason, "from_flat_id": b["flat_id"], "from_flat": b.get("flat_number"), "from_block_id": b["block_id"], "to_flat_id": nf["id"], "to_flat": nf.get("flat_number"), "to_block_id": nf["block_id"],
+          "price_handling": body.price_handling, "cash_percent": body.cash_percent, "before": old, "after": {k: sets.get(k, old[k]) for k in old}}
+    ver = expected_version(request, body.version)
+    async with unit_of_work() as uow:
+        after = await guarded_update(db.bookings, {"id": booking_id, "status": "Active", **({"version": ver} if ver is not None else {})}, {"$set": sets, "$push": {"transfers": tr}, "$inc": {"version": 1}}, uow)
+        if not after:
+            raise ApiError(409, "Booking changed; reload and retry", "VERSION_CONFLICT")
+        await _move_flat(b, nf, user, ts, body.old_flat_status, uow)
+    rebind = await rebind_demands_to_block({**b, **sets, "id": booking_id}, nb, user)
+    if tr["after"] != old:
+        await reproportion_open_demands({**b, **sets, "id": booking_id}, user, f"transfer: {body.reason}", old_agreement_value_paise=old["agreement_value_paise"])
+    await rebuild(booking_id)
+    await write_audit(user, "booking.transfer", "booking", booking_id, before={"flat_number": b.get("flat_number"), "block_code": b.get("block_code"), **old, "booking_number": b["booking_number"]}, after={"flat_number": nf.get("flat_number"), "block_code": nb.get("code"), **tr["after"], "booking_number": b["booking_number"], "reason": body.reason}, ip=client_ip(request))
+    await write_audit(user, "flat.status", "flat", b["flat_id"], before={"status": "Booked", "flat_number": b.get("flat_number")}, after={"status": body.old_flat_status, "reason": f"Transferred to {nf.get('flat_number')}", "flat_number": b.get("flat_number")}, ip=client_ip(request))
+    await write_audit(user, "flat.status", "flat", nf["id"], before={"status": "Available", "flat_number": nf.get("flat_number")}, after={"status": "Booked", "reason": f"Transfer of {b['booking_number']}", "flat_number": nf.get("flat_number")}, ip=client_ip(request))
+    out = _present(await db.bookings.find_one({"id": booking_id}, {"_id": 0}))
+    out["transfer"], out["rebind"] = tr, rebind
+    return out
+
+
+@router.post("/{booking_id}/swap")
+async def swap_bookings(booking_id: str, body: SwapIn, request: Request, user: dict = Depends(require("sales.booking.transfer"))):
+    """Two active bookings exchange flats; each keeps its own agreement values and money."""
+    from services.money_ops import rebind_demands_to_block
+    b1 = await _load(booking_id, user)
+    b2 = await _load(body.other_booking_id, user)
+    if b1["id"] == b2["id"] or b1["status"] != "Active" or b2["status"] != "Active":
+        raise ApiError(409, "Both bookings must be active and different", "BOOKING_NOT_ACTIVE")
+    ts = now_iso()
+    f1 = await db.flats.find_one({"id": b1["flat_id"]}, {"_id": 0})
+    f2 = await db.flats.find_one({"id": b2["flat_id"]}, {"_id": 0})
+    blocks = {bl["id"]: bl for bl in await db.blocks.find({"id": {"$in": [f1["block_id"], f2["block_id"]]}}, {"_id": 0}).to_list(None)}
+    ver = expected_version(request, body.version)
+
+    def sets_for(f, bl):
+        return {"flat_id": f["id"], "flat_number": f.get("flat_number"), "block_id": f["block_id"], "block_code": bl.get("code"), "block_name": bl.get("name"), "construction_percent": bl.get("construction_percent", 0), "updated_at": ts}
+    async with unit_of_work() as uow:
+        for bk, f, other in ((b1, f2, b2), (b2, f1, b1)):
+            tr = {"id": new_id(), "at": ts, "by": user["id"], "by_name": user["name"], "reason": f"swap with {other['booking_number']}: {body.reason}", "from_flat_id": bk["flat_id"], "from_flat": bk.get("flat_number"), "to_flat_id": f["id"], "to_flat": f.get("flat_number"), "swap_with": other["booking_number"]}
+            q = {"id": bk["id"], "status": "Active", **({"version": ver} if ver is not None and bk is b1 else {})}
+            if not await guarded_update(db.bookings, q, {"$set": sets_for(f, blocks[f["block_id"]]), "$push": {"transfers": tr}, "$inc": {"version": 1}}, uow):
+                raise ApiError(409, "Booking changed; reload and retry", "VERSION_CONFLICT")
+            await db.flats.update_one({"id": f["id"]}, {"$set": {"booking_id": bk["id"], "status_changed_at": ts, "status_changed_by": user["id"]}, "$inc": {"version": 1}}, **uow.kw())
+    for bk, f in ((b1, f2), (b2, f1)):
+        await rebind_demands_to_block({**bk, **sets_for(f, blocks[f["block_id"]])}, blocks[f["block_id"]], user)
+        await rebuild(bk["id"])
+        await write_audit(user, "booking.transfer", "booking", bk["id"], before={"flat_number": bk.get("flat_number"), "booking_number": bk["booking_number"]}, after={"flat_number": f.get("flat_number"), "booking_number": bk["booking_number"], "reason": f"swap: {body.reason}"}, ip=client_ip(request))
+    return present_money({"swapped": [await db.bookings.find_one({"id": b1["id"]}, {"_id": 0}), await db.bookings.find_one({"id": b2["id"]}, {"_id": 0})]})
 
 
 @router.post("/{booking_id}/complete")
