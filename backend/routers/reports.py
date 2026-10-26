@@ -22,13 +22,35 @@ from utils import (
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 REPORTS = [
-    {"key": "collections", "name": "Collections", "group": "Finance"}, {"key": "outstanding", "name": "Outstanding & Ageing", "group": "Finance"},
-    {"key": "advances", "name": "Advances", "group": "Finance"}, {"key": "demand-vs-collection", "name": "Demand vs Collection (by installment/stage)", "group": "Finance"}, {"key": "upcoming-dues", "name": "Upcoming Dues Forecast", "group": "Finance"},
-    {"key": "cheques", "name": "Cheques", "group": "Finance"}, {"key": "cancellations", "name": "Cancellations & Refunds", "group": "Finance"},
-    {"key": "roznamcha-range", "name": "Roznamcha Range", "group": "Finance"}, {"key": "bank-receipts", "name": "Bank-wise Receipts", "group": "Finance"},
-    {"key": "inventory", "name": "Inventory", "group": "Sales"}, {"key": "sales-leads", "name": "Sales & Leads", "group": "Sales"},
-    {"key": "activity", "name": "Activity", "group": "Admin"},
-    {"key": "service-sla", "name": "Service SLA", "group": "Operations"}, {"key": "construction-progress", "name": "Construction progress", "group": "Operations"},
+    # Finance
+    {"key": "collections-v2", "name": "Collections (Jama)", "group": "Finance", "purpose": "What came in: by period, project, tower, ledger, mode, bank, RM or receipt — reversals negative."},
+    {"key": "outstanding-v2", "name": "Outstanding & Ageing", "group": "Finance", "purpose": "Udhar − Jama per booking / customer / project / tower with ageing bands and advance held."},
+    {"key": "demand-vs-collection", "name": "Demand vs Collection", "group": "Finance", "purpose": "Demanded (Udhar) vs collected (Jama) per stage / installment per tower."},
+    {"key": "cash-vs-account", "name": "Cash vs Account Split", "group": "Finance", "purpose": "Agreed vs raised vs received vs balance per bucket, with variance flags."},
+    {"key": "cheques", "name": "Cheque / Instrument Register", "group": "Finance", "purpose": "Every cheque / DD with status, bank, dates and bounce follow-up."},
+    {"key": "receivables-forecast", "name": "Receivables Forecast", "group": "Finance", "purpose": "Udhar still to be raised per booking, by month / project / tower."},
+    {"key": "cancellations", "name": "Cancellations & Refunds", "group": "Finance", "purpose": "Cancelled bookings, deductions, refund payable / paid / pending."},
+    {"key": "bank-receipts", "name": "Bank-wise Receipts & Deposits", "group": "Finance", "purpose": "Receipts per bank account, cleared vs pending clearance."},
+    {"key": "other-charges", "name": "Other Charges", "group": "Finance", "purpose": "Maintenance / registration / parking / bounce: demanded vs collected per charge type."},
+    {"key": "roznamcha-summary", "name": "Roznamcha (Daybook) Summary", "group": "Finance", "purpose": "Daily opening, receipts by mode, deposits, cash refunds, closing — with monthly roll-up."},
+    {"key": "collections", "name": "Collections (legacy by period)", "group": "Finance", "purpose": "Receipts by day / week / month across ledgers.", "hidden": True},
+    {"key": "outstanding", "name": "Outstanding (legacy)", "group": "Finance", "purpose": "Dues by customer / block / project.", "hidden": True},
+    {"key": "advances", "name": "Advances", "group": "Finance", "purpose": "Customers who have paid ahead of their demands."},
+    {"key": "roznamcha-range", "name": "Roznamcha Range (legacy)", "group": "Finance", "purpose": "Day-book totals across a date range.", "hidden": True},
+    {"key": "upcoming-dues", "name": "Upcoming Dues (legacy)", "group": "Finance", "purpose": "Demands that will trigger soon.", "hidden": True},
+    # Sales
+    {"key": "inventory", "name": "Project Sales & Inventory", "group": "Sales", "purpose": "Available / hold / booked / sold units and value, average rate, velocity."},
+    {"key": "sales-leads", "name": "Lead Funnel & Source Performance", "group": "Sales", "purpose": "Leads by stage and source, conversion %, response time, overdue follow-ups."},
+    {"key": "site-visits", "name": "Site Visit Conversion", "group": "Sales", "purpose": "Visits scheduled / completed / no-show and visit → booking conversion per RM / project."},
+    {"key": "sales-team", "name": "Sales Team Performance", "group": "Sales", "purpose": "Per RM: leads, visits, bookings, sold value, collections, overdue of their customers."},
+    # Construction
+    {"key": "construction-vs-plan", "name": "Construction vs Plan", "group": "Construction", "purpose": "Stage-plan progress per tower, stage demands vs collected, next stage expected Udhar."},
+    {"key": "construction-progress", "name": "Construction progress (towers)", "group": "Construction", "purpose": "Per-tower stage status, photos and demands per stage."},
+    # Operations
+    {"key": "service-sla", "name": "Service SLA", "group": "Operations", "purpose": "Tickets by category / status, SLA met vs breached, ageing, ratings."},
+    # Admin
+    {"key": "activity", "name": "Audit Trail", "group": "Admin", "purpose": "Who did what, when; logins and failed attempts."},
+    {"key": "data-quality", "name": "Data Quality", "group": "Admin", "purpose": "Hygiene counts that should be zero; each drills to the list."},
 ]
 
 

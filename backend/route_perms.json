@@ -193,16 +193,31 @@
   "report.view": [
    "reports.bank_wise.view",
    "reports.cancellations_refunds.view",
+   "reports.cash_vs_account.export",
+   "reports.cash_vs_account.view",
    "reports.cheque_register.view",
+   "reports.collections.export",
    "reports.collections.view",
+   "reports.construction_vs_plan.export",
    "reports.construction_vs_plan.view",
+   "reports.data_quality.export",
+   "reports.data_quality.view",
    "reports.demand_vs_collection.view",
    "reports.inventory.view",
    "reports.lead_funnel.view",
+   "reports.other_charges.export",
+   "reports.other_charges.view",
+   "reports.outstanding.export",
    "reports.outstanding.view",
+   "reports.receivables_forecast.export",
    "reports.receivables_forecast.view",
+   "reports.roznamcha.export",
    "reports.roznamcha.view",
-   "reports.service_sla.view"
+   "reports.sales_team.export",
+   "reports.sales_team.view",
+   "reports.service_sla.view",
+   "reports.site_visit_conversion.export",
+   "reports.site_visit_conversion.view"
   ],
   "roles.manage": [
    "admin.access_control.manage",
@@ -2236,6 +2251,126 @@
     "reports.collections.export"
    ],
    "fn": "create_preset",
+   "legacy": [
+    "report.view"
+   ]
+  },
+  "reports_i:GET /cash-vs-account": {
+   "codes": [
+    "reports.cash_vs_account.view"
+   ],
+   "export_codes": [
+    "reports.cash_vs_account.export"
+   ],
+   "fn": "cash_vs_account",
+   "legacy": [
+    "report.view"
+   ]
+  },
+  "reports_i:GET /collections-v2": {
+   "codes": [
+    "reports.collections.view"
+   ],
+   "export_codes": [
+    "reports.collections.export"
+   ],
+   "fn": "collections_v2",
+   "legacy": [
+    "report.view"
+   ]
+  },
+  "reports_i:GET /construction-vs-plan": {
+   "codes": [
+    "reports.construction_vs_plan.view"
+   ],
+   "export_codes": [
+    "reports.construction_vs_plan.export"
+   ],
+   "fn": "construction_vs_plan",
+   "legacy": [
+    "report.view"
+   ]
+  },
+  "reports_i:GET /data-quality": {
+   "codes": [
+    "reports.data_quality.view"
+   ],
+   "export_codes": [
+    "reports.data_quality.export"
+   ],
+   "fn": "data_quality",
+   "legacy": [
+    "report.view"
+   ]
+  },
+  "reports_i:GET /other-charges": {
+   "codes": [
+    "reports.other_charges.view"
+   ],
+   "export_codes": [
+    "reports.other_charges.export"
+   ],
+   "fn": "other_charges",
+   "legacy": [
+    "report.view"
+   ]
+  },
+  "reports_i:GET /outstanding-v2": {
+   "codes": [
+    "reports.outstanding.view"
+   ],
+   "export_codes": [
+    "reports.outstanding.export"
+   ],
+   "fn": "outstanding_v2",
+   "legacy": [
+    "report.view"
+   ]
+  },
+  "reports_i:GET /receivables-forecast": {
+   "codes": [
+    "reports.receivables_forecast.view"
+   ],
+   "export_codes": [
+    "reports.receivables_forecast.export"
+   ],
+   "fn": "receivables_forecast",
+   "legacy": [
+    "report.view"
+   ]
+  },
+  "reports_i:GET /roznamcha-summary": {
+   "codes": [
+    "reports.roznamcha.view"
+   ],
+   "export_codes": [
+    "reports.roznamcha.export"
+   ],
+   "fn": "roznamcha_summary",
+   "legacy": [
+    "report.view"
+   ]
+  },
+  "reports_i:GET /sales-team": {
+   "codes": [
+    "reports.sales_team.view"
+   ],
+   "export_codes": [
+    "reports.sales_team.export"
+   ],
+   "fn": "sales_team",
+   "legacy": [
+    "report.view"
+   ]
+  },
+  "reports_i:GET /site-visits": {
+   "codes": [
+    "reports.site_visit_conversion.view"
+   ],
+   "export_codes": [
+    "reports.site_visit_conversion.export"
+   ],
+   "fn": "site_visits",
    "legacy": [
     "report.view"
    ]

@@ -26,7 +26,8 @@ REGISTRY = {
     "website": ("Website", {"cms": ("Website CMS", ["view", "edit"])}),
     "reports": ("Reports", {k: (lbl, ["view", "export"]) for k, lbl in [("collections", "Collections"), ("outstanding", "Outstanding & ageing"), ("demand_vs_collection", "Demand vs collection"),
                             ("cheque_register", "Cheque register"), ("receivables_forecast", "Receivables forecast"), ("inventory", "Inventory"), ("construction_vs_plan", "Construction vs plan"),
-                            ("cancellations_refunds", "Cancellations & refunds"), ("lead_funnel", "Lead funnel"), ("bank_wise", "Bank-wise receipts"), ("roznamcha", "Roznamcha"), ("service_sla", "Service SLA"), ("audit", "Activity / audit")]}),
+                            ("cancellations_refunds", "Cancellations & refunds"), ("lead_funnel", "Lead funnel"), ("bank_wise", "Bank-wise receipts"), ("roznamcha", "Roznamcha"), ("service_sla", "Service SLA"), ("audit", "Activity / audit"),
+                            ("cash_vs_account", "Cash vs account split"), ("other_charges", "Other charges"), ("site_visit_conversion", "Site visit conversion"), ("sales_team", "Sales team performance"), ("data_quality", "Data quality")]}),
     "admin": ("Administration", {
         "user": ("Users", ["view", "create", "edit", "deactivate"]), "role": ("Roles", ["view", "create", "edit", "delete"]), "access_control": ("Access control", ["manage"]), "audit": ("Audit history", ["view", "export", "archive"]),
         "settings": ("Company settings", ["view", "edit"]), "definitions": ("Definitions", ["view"]), "system_health": ("System health", ["view"]), "data": ("Data operations", ["reseed", "recompute", "backup", "erase"]), "documentation": ("Documentation", ["view"])}),

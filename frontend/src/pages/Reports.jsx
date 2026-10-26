@@ -12,28 +12,15 @@ import { Card, StatTile, Skeleton, EmptyState } from "@/components/v2";
 import { Segmented } from "@/components/v2/CustomerBits";
 import { DateInput } from "@/components/common/DateInput";
 import { cn } from "@/lib/utils";
+import { FILTERS, permFor, GROUP_LABEL, GROUP_ORDER } from "@/lib/reportsMeta";
+const GROUP_ICON = { Finance: Receipt, Sales: Users, Construction: Building2, Operations: Wrench, Admin: Activity };
 
 const COLORS = ["#0A0C10", "#C9A227", "#5B7F6A", "#B8573E", "#8E95A3", "#2A313C"];
-const FILTERS = {
-  collections: ["from_date", "to_date", "project_id", "mode", "category", "status", "group_by"], outstanding: ["project_id", "group_by_out"], advances: ["project_id"], "demand-vs-collection": ["project_id"], "upcoming-dues": ["project_id"],
-  inventory: ["project_id", "group_by_inv"], cheques: ["project_id", "cheque_status"], cancellations: ["from_date", "to_date", "project_id"], "sales-leads": ["from_date", "to_date"], "roznamcha-range": ["from_date", "to_date"], "bank-receipts": ["from_date", "to_date"], activity: ["from_date", "to_date"],
-  "service-sla": ["from_date", "to_date", "project_id"], "construction-progress": ["project_id"],
-};
-const MAP = { group_by_out: "group_by", group_by_inv: "group_by", cheque_status: "status" };
-// report key → registry feature (reports.<feature>.view / .export)
-const REPORT_CODE = { "roznamcha-range": "roznamcha", "bank-receipts": "bank_wise", cheques: "cheque_register", advances: "outstanding", "upcoming-dues": "receivables_forecast", cancellations: "cancellations_refunds", "sales-leads": "lead_funnel", "service-sla": "service_sla", "construction-progress": "construction_vs_plan", activity: "audit", "demand-vs-collection": "demand_vs_collection" };
-const GROUPS = [
-  { name: "Collections", icon: Receipt, keys: ["collections", "roznamcha-range", "bank-receipts", "cheques"] },
-  { name: "Dues & Ageing", icon: CalendarClock, keys: ["outstanding", "advances", "demand-vs-collection", "upcoming-dues", "cancellations"] },
-  { name: "Inventory", icon: Building2, keys: ["inventory"] },
-  { name: "Sales & Leads", icon: Users, keys: ["sales-leads"] },
-  { name: "Operations", icon: Wrench, keys: ["service-sla", "construction-progress"] },
-  { name: "Activity", icon: Activity, keys: ["activity"] },
-];
 const DESC = {
   collections: "Receipts by period, split across Cash, Account and Other-charges ledgers.", outstanding: "Dues by customer, block or project with ageing buckets.", advances: "Customers who have paid ahead of their demands.", "demand-vs-collection": "Demanded vs collected per milestone/installment.", "upcoming-dues": "Forecast of demands that will trigger soon.", inventory: "Available / hold / booked / sold inventory with velocity and realised rates.", cheques: "Cheques in hand, bounced or cleared.", cancellations: "Cancelled bookings and refunds.", "sales-leads": "Lead funnel, enquiries and response times.", "roznamcha-range": "Day-book totals across a date range.", "bank-receipts": "Receipts grouped by bank account.", activity: "Who did what, when.",
   "service-sla": "Tickets by category and status, SLA met %, average resolution time and customer ratings.", "construction-progress": "Per-tower stage status, planned vs actual dates, site photos and demands raised per stage.",
 };
+const MAP = { group_by_out: "group_by", group_by_inv: "group_by", cheque_status: "status", group: "group_by" };
 const iso = (d) => d.toISOString().slice(0, 10);
 const PRESET_DATES = {
   Today: () => { const t = iso(new Date()); return { from_date: t, to_date: t }; },
@@ -57,6 +44,17 @@ const Sel = ({ value, onChange, children, testId }) => <select className="input 
 function kpis(key, d) {
   if (!d) return [];
   const t = d.totals || {};
+  const m = (v) => inrShort((v || 0) / 100);
+  if (key === "collections-v2") return [["Net Jama", m(t.total_paise), `${t.count || 0} ledger rows`], ["Cash", m(t.cash_paise)], ["Account", m(t.account_paise)], ["Pending instruments", m(t.pending_paise), `${t.pending_instruments || 0} not yet cleared`, t.pending_paise ? "brick" : undefined]];
+  if (key === "outstanding-v2") return [["Udhar raised", m(t.udhar_paise)], ["Jama received", m(t.jama_paise)], ["Balance (Udhar − Jama)", m(t.balance_paise), `${t.bookings || 0} live bookings`, t.balance_paise > 0 ? "brick" : "sage"], ["Overdue", m(t.overdue_paise), `advance held ${m(t.advance_paise)}`, t.overdue_paise > 0 ? "brick" : undefined]];
+  if (key === "cash-vs-account") return [["Cash agreed", m(t.cash_agreed_paise), `raised ${m(t.cash_raised_paise)}`], ["Cash balance", m(t.cash_balance_paise), undefined, t.cash_balance_paise ? "brick" : "sage"], ["Account agreed", m(t.account_agreed_paise), `raised ${m(t.account_raised_paise)}`], ["Variance", String(t.variance || "—"), `${t.bookings || 0} bookings`]];
+  if (key === "receivables-forecast") return [["Still to raise", m(t.expected_paise), "Σ forecast"], ["Expected Cash", m(t.cash_paise)], ["Expected Account", m(t.account_paise)], ["Agreement total", m(t.agreement_paise), `raised ${m(t.raised_paise)} · forecast + raised = agreement`, "sage"]];
+  if (key === "other-charges") return [["Demanded (Udhar)", m(t.demanded_paise), `${t.lines || 0} lines`], ["Collected (Jama)", m(t.collected_paise)], ["Balance", m(t.balance_paise), undefined, t.balance_paise ? "brick" : "sage"], ["% collected", t.pct_collected != null ? `${t.pct_collected}%` : "—"]];
+  if (key === "roznamcha-summary") return [["Opening cash", m(t.opening_paise)], ["Cash received", m(t.cash_in_paise), `${t.receipts || 0} receipts`], ["Deposited", m(t.deposit_paise), `withdrawn ${m(t.withdrawal_paise)}`], ["Closing cash", m(t.closing_paise), undefined, "sage"]];
+  if (key === "site-visits") return [["Visits", String(t.scheduled ?? 0)], ["Completed", String(t.completed ?? 0), `${t.show_pct ?? 0}% show-up`], ["No-show / cancelled", String((t.no_show || 0) + (t.cancelled || 0)), undefined, (t.no_show || 0) ? "brick" : undefined], ["Visit → booking", `${t.conversion_pct ?? 0}%`, `${t.converted || 0} bookings`, "sage"]];
+  if (key === "sales-team") return [["Leads", String(t.leads ?? 0)], ["Bookings", String(t.bookings ?? 0), m(t.sold_paise)], ["Collections", m(t.collected_paise)], ["Overdue", m(t.overdue_paise), "across their customers", t.overdue_paise ? "brick" : undefined]];
+  if (key === "construction-vs-plan") return [["Towers", String(d.rows?.length || 0)], ["Stages done", `${t.completed ?? 0} / ${t.stages ?? 0}`], ["Stage demands", m(t.stage_demanded_paise), `collected ${m(t.stage_collected_paise)}`], ["Next-stage Udhar", m(t.next_expected_paise), "expected on completion"]];
+  if (key === "data-quality") return [["Records to review", String(t.count ?? 0), t.status, t.count ? "brick" : "sage"], ["Checks", String(d.rows?.length || 0)], ["Integrity", d.integrity ? (d.integrity.ok ? "OK" : "Findings") : "—", d.integrity?.ran_at ? fmtDate(d.integrity.ran_at) : undefined, d.integrity && !d.integrity.ok ? "brick" : "sage"]];
   if (key === "collections") return [["Collected", inrShort((t.total_paise || 0) / 100), `${d.rows.length} periods`], ["Cash", inrShort((t.cash_paise || 0) / 100)], ["Account", inrShort((t.account_paise || 0) / 100)], ["Other charges", inrShort((t.other_paise || 0) / 100), t.gst_collected_paise != null ? `GST ${inrShort(t.gst_collected_paise / 100)}` : undefined]];
   if (key === "outstanding") return [["Raised", inrShort((t.raised_paise || 0) / 100)], ["Paid", inrShort((t.paid_paise || 0) / 100)], ["Due", inrShort((t.due_paise || 0) / 100), "all ledgers", t.due_paise > 0 ? "brick" : "sage"], ["Overdue", inrShort((t.overdue_paise || 0) / 100), `${d.top_overdue?.length || 0} customers`, t.overdue_paise > 0 ? "brick" : undefined]];
   if (key === "inventory") return [["Units", String(t.total ?? 0)], ["Available", String(t.available ?? 0), inrShort((t.available_value_paise || 0) / 100)], ["Booked", String((t.booked || 0) + (t.hold || 0)), `${t.hold || 0} on hold`], ["Sold", String(t.sold ?? 0), inrShort((t.sold_value_paise || 0) / 100), "sage"]];
@@ -70,11 +68,12 @@ function kpis(key, d) {
 
 export default function Reports() {
   const { can } = useAuth();
-  const { key = "collections" } = useParams();
+  const { key = "collections-v2" } = useParams();
   const nav = useNavigate();
   const { data: list } = useFetch("/reports");
   const { data: projects } = useFetch("/projects?page_size=50");
-  const [f, setF] = useState({ group_by: "month", group_by_out: "customer", group_by_inv: "block", cheque_status: "All", ...PRESET_DATES.FY() });
+  const [f, setF] = useState({ group_by: "month", group_by_out: "customer", group_by_inv: "block", cheque_status: "All", group: "", ...PRESET_DATES.FY() });
+  useEffect(() => { setF((p) => ({ ...p, group: "" })); }, [key]);
   const [range, setRange] = useState("FY");
   const [presetName, setPresetName] = useState("");
   const [renaming, setRenaming] = useState(null);
@@ -102,24 +101,24 @@ export default function Reports() {
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div><p className="label">Insight</p><h1 className="mt-1 font-display text-4xl text-ink-950">Reports</h1></div>
         <div className="flex gap-2 print:hidden">
-          {can("reports.collection.export") && <button className="btn btn-secondary" onClick={download} data-testid="rf-export-csv"><Download className="h-4 w-4" />CSV</button>}
-          {can("reports.collection.export") && <button className="btn btn-secondary" onClick={() => openPdf(`/reports/${key}?${qs}&format=pdf`)} data-testid="rf-export-pdf"><FileText className="h-4 w-4" />PDF</button>}
+          {can(`${permFor(key)}.export`) && <button className="btn btn-secondary" onClick={download} data-testid="rf-export-csv"><Download className="h-4 w-4" />CSV</button>}
+          {can(`${permFor(key)}.export`) && <button className="btn btn-secondary" onClick={() => openPdf(`/reports/${key}?${qs}&format=pdf`)} data-testid="rf-export-pdf"><FileText className="h-4 w-4" />PDF</button>}
           <button className="btn btn-primary" onClick={() => window.print()} data-testid="rf-print"><Printer className="h-4 w-4" />Print</button>
         </div>
       </header>
       <div className="grid min-w-0 gap-6 xl:grid-cols-[260px_1fr]">
         <aside className="min-w-0 print:hidden">
           <Card className="!p-3" testId="report-list">
-            {GROUPS.map((g) => { const rs = (list?.items || []).filter((r) => g.keys.includes(r.key) && can(`reports.${REPORT_CODE[r.key] || r.key.replace(/-/g, "_")}.view`)); return (
-              <div key={g.name} className="mb-3 last:mb-0">
-                <p className="flex items-center gap-2 px-3 pb-1.5 pt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-txt-muted"><g.icon className="h-3.5 w-3.5" />{g.name}</p>
-                {rs.length === 0 ? <p className="px-3 pb-1 text-xs text-txt-muted">No access</p> : rs.map((r) => <button key={r.key} onClick={() => nav(`/reports/${r.key}`)} className={cn("block w-full rounded-lg px-3 py-2 text-left text-sm transition-colors", r.key === key ? "bg-ink-950 font-semibold text-warm-50" : "text-ink-950 hover:bg-warm-100")} data-testid={`report-${r.key}`}>{r.name}</button>)}
+            {GROUP_ORDER.map((gname) => { const rs = (list?.items || []).filter((r) => r.group === gname && !r.hidden && can(`${permFor(r.key)}.view`)); if (!rs.length) return null; const Icon = GROUP_ICON[gname] || BarChart3; return (
+              <div key={gname} className="mb-3 last:mb-0">
+                <p className="flex items-center gap-2 px-3 pb-1.5 pt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-txt-muted"><Icon className="h-3.5 w-3.5" />{gname}</p>
+                {rs.map((r) => <button key={r.key} onClick={() => nav(`/reports/${r.key}`)} title={r.purpose} className={cn("block w-full rounded-lg px-3 py-2 text-left text-sm transition-colors", r.key === key ? "bg-ink-950 font-semibold text-warm-50" : "text-ink-950 hover:bg-warm-100")} data-testid={`report-${r.key}`}>{r.name}</button>)}
               </div>); })}
           </Card>
         </aside>
         <section className="min-w-0 space-y-6">
-          {!can(`reports.${REPORT_CODE[key] || key.replace(/-/g, "_")}.view`) ? <EmptyState icon={ShieldAlert} title="Access restricted" description={`Your role lacks the ${`reports.${REPORT_CODE[key] || key.replace(/-/g, "_")}.view`} permission.`} testId="forbidden-report" /> : <>
-          <div><h2 className="font-display text-2xl text-ink-950" data-testid="report-title">{meta?.name || key}</h2><p className="mt-1 text-sm text-txt-secondary">{DESC[key] || meta?.description}</p></div>
+          {!can(`${permFor(key)}.view`) ? <EmptyState icon={ShieldAlert} title="Access restricted" description={`Your role lacks the ${permFor(key)}.view permission.`} testId="forbidden-report" /> : <>
+          <div><h2 className="font-display text-2xl text-ink-950" data-testid="report-title">{meta?.name || key}</h2><p className="mt-1 text-sm text-txt-secondary" data-testid="report-purpose">{meta?.purpose || DESC[key]}</p>{data?.as_of && <p className="mt-1 text-xs text-txt-muted" data-testid="report-asof">As of {fmtDate(data.as_of)}{data.filters_text ? ` · ${data.filters_text}` : ""}</p>}</div>
           <Card className="space-y-4 print:hidden" testId="report-filters">
             <div className="flex flex-wrap items-center gap-3">
               {has("from_date") && <Segmented options={Object.keys(PRESET_DATES).map((k) => ({ value: k, label: k }))} value={range} onChange={(v) => { setRange(v); setActivePreset(null); setF((p) => ({ ...p, ...PRESET_DATES[v]() })); }} testId="rf-range" />}
@@ -129,6 +128,7 @@ export default function Reports() {
               {has("mode") && <Sel value={f.mode || ""} onChange={set("mode")} testId="rf-mode"><option value="">All modes</option>{["CASH", "UPI", "NEFT_RTGS", "CHEQUE", "DD", "LOAN_DISBURSEMENT"].map((m) => <option key={m}>{m}</option>)}</Sel>}
               {has("category") && <Sel value={f.category || ""} onChange={set("category")} testId="rf-category"><option value="">All ledgers</option>{["Cash", "Account", "Other charges"].map((m) => <option key={m}>{m}</option>)}</Sel>}
               {has("status") && <Sel value={f.status || ""} onChange={set("status")} testId="rf-status"><option value="">Cleared</option>{["Pending", "Bounced", "Reversed"].map((m) => <option key={m}>{m}</option>)}</Sel>}
+              {has("group") && data?.group_options && <Sel value={f.group || data.group_by} onChange={set("group")} testId="rf-group">{data.group_options.map((m) => <option key={m} value={m}>{GROUP_LABEL[m] || m}</option>)}</Sel>}
               {has("group_by") && <Sel value={f.group_by} onChange={set("group_by")} testId="rf-groupby">{["day", "week", "month"].map((m) => <option key={m} value={m}>By {m}</option>)}</Sel>}
               {has("group_by_out") && <Sel value={f.group_by_out} onChange={set("group_by_out")} testId="rf-groupby-out">{["customer", "block", "project"].map((m) => <option key={m} value={m}>By {m}</option>)}</Sel>}
               {has("group_by_inv") && <Sel value={f.group_by_inv} onChange={set("group_by_inv")} testId="rf-groupby-inv">{["project", "block", "flat_type", "floor"].map((m) => <option key={m} value={m}>By {m.replace("_", " ")}</option>)}</Sel>}
@@ -162,7 +162,7 @@ export default function Reports() {
             {loading && !data ? <div className="space-y-2 p-6">{[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-10" />)}</div> : !data?.rows?.length ? <div className="p-6"><EmptyState icon={BarChart3} title="No data for these filters" description="Widen the date range or clear a filter." testId="report-empty" /></div> : (
               <div className="max-h-[60vh] overflow-auto"><table className="w-full text-sm">
                 <thead className="sticky top-0 z-10 bg-warm-100 text-[11px] font-semibold uppercase tracking-wider text-txt-secondary"><tr>{data.columns.map((c) => <th key={c.key} className={cn("px-4 py-3", c.type === "str" ? "text-left" : "text-right")}>{c.label}</th>)}</tr></thead>
-                <tbody>{data.rows.map((r, i) => <tr key={i} className={cn("h-11 border-t border-warm-100", i % 2 === 1 && "bg-warm-50/60")}>{data.columns.map((c) => <td key={c.key} className={cn("px-4", c.type === "str" ? "text-ink-950" : "text-right tabular-nums")}>{cell(c, r[c.key])}</td>)}</tr>)}</tbody>
+                <tbody>{data.rows.map((r, i) => <tr key={i} className={cn("h-11 border-t border-warm-100", i % 2 === 1 && "bg-warm-50/60")}>{data.columns.map((c, ci) => <td key={c.key} className={cn("px-4", c.type === "str" ? "text-ink-950" : "text-right tabular-nums")}>{ci === 0 && r._link ? <button className="font-semibold text-ink-950 underline-offset-2 hover:underline" onClick={() => nav(r._link)} data-testid={`report-drill-${i}`}>{cell(c, r[c.key])}</button> : cell(c, r[c.key])}</td>)}</tr>)}</tbody>
                 {data.totals && <tfoot className="sticky bottom-0 bg-ink-950 font-semibold text-warm-50" data-testid="report-totals"><tr className="h-12">{data.columns.map((c, i) => <td key={c.key} className={cn("px-4", c.type === "str" ? "" : "text-right tabular-nums")}>{i === 0 ? "Total" : data.totals[c.key] != null ? cell(c, data.totals[c.key]) : ""}</td>)}</tr></tfoot>}
               </table></div>)}
           </Card>
