@@ -7,7 +7,7 @@ from pydantic import Field
 from db import db
 from deps import project_scope_filter, require
 from services.money import present_money, to_paise
-from utils import ApiError, StrictModel, base_doc, client_ip, get_or_404, write_audit
+from utils import ApiError, StrictModel, base_doc, client_ip, get_or_404, new_id, now_iso, write_audit
 
 router = APIRouter(prefix="/roznamcha", tags=["roznamcha"])
 
@@ -20,12 +20,47 @@ class ContraIn(StrictModel):
     remarks: str | None = Field(default=None, max_length=300)
 
 
+class OpeningIn(StrictModel):
+    date: Date
+    amount: float = Field(ge=0)
+    remarks: str | None = Field(default=None, max_length=300)
+
+
+async def _cash_refunds(company_id: str, q: dict) -> int:
+    r = await db.refunds.aggregate([{"$match": {"company_id": company_id, "status": "Paid", "mode": "CASH", "parent_refund_id": None, **q}}, {"$group": {"_id": None, "s": {"$sum": {"$ifNull": ["$amount_total_paise", "$amount_paise"]}}}}]).to_list(1)
+    return r[0]["s"] if r else 0
+
+
 async def _cash_in_hand_before(company_id: str, day: Date, scope: dict) -> int:
+    """Opening cash = latest opening-balance entry on/before the day + cash receipts − deposits + withdrawals − cash refunds since that entry."""
     before = day.isoformat()
-    rec = await db.payments.aggregate([{"$match": {"company_id": company_id, "payment_mode_code": "CASH", "status": "Cleared", "payment_date": {"$lt": before}, **scope}}, {"$group": {"_id": None, "s": {"$sum": "$amount_paise"}}}]).to_list(1)
-    contra = await db.contra_entries.aggregate([{"$match": {"company_id": company_id, "date": {"$lt": before}}}, {"$group": {"_id": "$kind", "s": {"$sum": "$amount_paise"}}}]).to_list(None)
+    ob = await db.cash_openings.find_one({"company_id": company_id, "date": {"$lte": before}}, {"_id": 0}, sort=[("date", -1)])
+    lo = {"$gte": ob["date"]} if ob else {}
+    rec = await db.payments.aggregate([{"$match": {"company_id": company_id, "payment_mode_code": "CASH", "status": {"$in": ["Cleared", "Reversed"]}, "payment_date": {**lo, "$lt": before}, **scope}}, {"$group": {"_id": None, "s": {"$sum": "$amount_paise"}}}]).to_list(1)
+    rev = await db.payments.aggregate([{"$match": {"company_id": company_id, "payment_mode_code": "CASH", "status": "Reversed", "reversal.at": {**({"$gte": ob["date"]} if ob else {}), "$lt": before}, **scope}}, {"$group": {"_id": None, "s": {"$sum": "$amount_paise"}}}]).to_list(1)
+    contra = await db.contra_entries.aggregate([{"$match": {"company_id": company_id, "date": {**lo, "$lt": before}}}, {"$group": {"_id": "$kind", "s": {"$sum": "$amount_paise"}}}]).to_list(None)
     cmap = {c["_id"]: c["s"] for c in contra}
-    return (rec[0]["s"] if rec else 0) - cmap.get("DEPOSIT", 0) + cmap.get("WITHDRAWAL", 0)
+    return (ob["amount_paise"] if ob else 0) + (rec[0]["s"] if rec else 0) - (rev[0]["s"] if rev else 0) - cmap.get("DEPOSIT", 0) + cmap.get("WITHDRAWAL", 0) - await _cash_refunds(company_id, {"paid_date": {**lo, "$lt": before}})
+
+
+async def cash_in_hand_on(company_id: str, day: Date, scope: dict) -> int:
+    """Closing cash of `day` (used by the cash payout guard)."""
+    return await _cash_in_hand_before(company_id, day + timedelta(days=1), scope)
+
+
+@router.get("/opening")
+async def get_opening(user: dict = Depends(require("finance.roznamcha.view"))):
+    items = await db.cash_openings.find({"company_id": user["company_id"]}, {"_id": 0}).sort("date", -1).to_list(50)
+    return present_money({"items": items, "total": len(items)})
+
+
+@router.post("/opening", status_code=201)
+async def set_opening(body: OpeningIn, request: Request, user: dict = Depends(require("finance.roznamcha.opening_balance"))):
+    doc = {"id": new_id(), "company_id": user["company_id"], "date": body.date.isoformat(), "amount_paise": to_paise(body.amount), "remarks": body.remarks, "created_at": now_iso(), "created_by": user["id"], "created_by_name": user["name"]}
+    prev = await db.cash_openings.find_one({"company_id": user["company_id"], "date": doc["date"]}, {"_id": 0})
+    await db.cash_openings.update_one({"company_id": user["company_id"], "date": doc["date"]}, {"$set": doc}, upsert=True)
+    await write_audit(user, "roznamcha.opening", "roznamcha", doc["id"], before=prev, after=doc, ip=client_ip(request))
+    return present_money(doc)
 
 
 @router.get("")
@@ -60,13 +95,18 @@ async def _book(d1: Date, d2: Date, user: dict) -> dict:
     cash_received = sum(r["amount_paise"] for r in cleared if r["payment_mode_code"] == "CASH")
     deposits = sum(c["amount_paise"] for c in contra if c["kind"] == "DEPOSIT")
     withdrawals = sum(c["amount_paise"] for c in contra if c["kind"] == "WITHDRAWAL")
-    closing = opening + cash_received - deposits + withdrawals
+    refunds_cash = await _cash_refunds(cid, {"paid_date": {"$gte": d1.isoformat(), "$lte": d2.isoformat()}})
+    refunds_all = await db.refunds.aggregate([{"$match": {"company_id": cid, "status": "Paid", "parent_refund_id": None, "paid_date": {"$gte": d1.isoformat(), "$lte": d2.isoformat()}}}, {"$group": {"_id": None, "s": {"$sum": {"$ifNull": ["$amount_total_paise", "$amount_paise"]}}}}]).to_list(1)
+    reversals = await db.payments.find({"company_id": cid, "status": "Reversed", "reversal.at": {"$gte": d1.isoformat(), "$lte": d2.isoformat() + "T23:59:59.999999+00:00"}, **scope}, {"_id": 0}).sort("reversal.at", 1).to_list(500)
+    cash_reversed = sum(r["amount_paise"] for r in reversals if r["payment_mode_code"] == "CASH")
+    closing = opening + cash_received - deposits + withdrawals - refunds_cash - cash_reversed
     return present_money({
+        "refunds_paise": refunds_all[0]["s"] if refunds_all else 0, "cash_refunds_paise": refunds_cash,
         "date_from": d1.isoformat(), "date_to": d2.isoformat(),
         "opening_cash_paise": opening, "cash_received_paise": cash_received, "bank_deposits_paise": deposits, "cash_withdrawals_paise": withdrawals, "closing_cash_paise": closing,
         "total_receipts_paise": sum(r["amount_paise"] for r in cleared), "pending_paise": sum(r["amount_paise"] for r in receipts if r["status"] == "Pending"),
         "by_mode": by_mode, "by_category": {k: {"amount_paise": v} for k, v in by_cat.items()}, "by_project": by_project,
-        "receipts": receipts, "contra": contra,
+        "receipts": receipts, "contra": contra, "reversals": reversals, "cash_reversed_paise": cash_reversed,
     })
 
 

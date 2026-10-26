@@ -234,7 +234,7 @@ async def receipt(payment_id: str, user: dict = Depends(require("finance.receipt
     customer = await db.customers.find_one({"id": p["customer_id"]}, {"_id": 0, "full_name": 1, "salutation": 1, "address_current": 1, "phone": 1, "customer_code": 1})
     company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0, "bank_account": 0})
     row = await db.ledger_entries.find_one({"booking_id": p["booking_id"], "ref": p["receipt_number"], "type": {"$in": ["PAYMENT", "OTHER_CHARGE_PAYMENT"]}}, {"_id": 0})
-    return present_money({"payment": p, "booking": b, "customer": customer, "company": company, "amount_in_words": amount_in_words(p["amount_paise"]), "after": row,
+    return present_money({"payment": p, "booking": b, "customer": customer, "company": company, "amount_in_words": amount_in_words(p["amount_paise"]), "after": row, "watermark": {"Reversed": "REVERSED", "Bounced": "BOUNCED"}.get(p["status"]),
                           "cancelled": p["status"] == "Reversed", "subject_to_realisation": p["status"] == "Pending" or p.get("payment_mode_code") in ("CHEQUE", "DD")})
 
 
@@ -263,9 +263,11 @@ async def bounce_payment(payment_id: str, body: ReasonIn, request: Request, user
         raise ApiError(409, f"Payment is {p['status']}; only pending instruments can bounce", "NOT_PENDING")
     ts = now_iso()
     await db.payments.update_one({"id": payment_id}, {"$set": {"status": "Bounced", "bounced_at": ts, "bounce_reason": body.reason, "updated_at": ts}, "$inc": {"version": 1}})
+    from services.money_ops import raise_bounce_charge
+    charge = await raise_bounce_charge(p, user)
     await rebuild(p["booking_id"])
-    await write_audit(user, "payment.bounce", "payment", payment_id, before={"status": "Pending"}, after={"status": "Bounced", "reason": body.reason, "receipt_number": p.get("receipt_number"), "customer_name": p.get("customer_name")}, ip=client_ip(request))
-    return present_money(await db.payments.find_one({"id": payment_id}, {"_id": 0}))
+    await write_audit(user, "payment.bounce", "payment", payment_id, before={"status": "Pending"}, after={"status": "Bounced", "reason": body.reason, "receipt_number": p.get("receipt_number"), "customer_name": p.get("customer_name"), "bounce_charge_paise": (charge or {}).get("total_paise")}, ip=client_ip(request))
+    return present_money({**(await db.payments.find_one({"id": payment_id}, {"_id": 0})), "bounce_charge": charge})
 
 
 @router.post("/{payment_id}/reverse")
