@@ -24,24 +24,24 @@ def _post(h, path, body):
 
 
 # ---- payments: bucket cap, cheque pending → clear → reverse (replaces test_phase_2 payment/cheque tests) ----
-def test_cash_bucket_cap_rejected_on_anchor(admin_headers, anchor_booking):
-    b = requests.get(f"{API}/bookings/{anchor_booking['id']}", headers=admin_headers).json()
+def test_cash_bucket_cap_rejected_on_anchor(admin_headers, work_booking):
+    b = requests.get(f"{API}/bookings/{work_booking['id']}", headers=admin_headers).json()
     room = b["cash_agreed_paise"] - b["summary"]["cash_paid_paise"]
     r = _post(admin_headers, "/payments", {"booking_id": b["id"], "payment_category": "Cash", "amount": room / 100 + 1000, "payment_date": date.today().isoformat(), "payment_mode_id": _modes(admin_headers)["CASH"]["id"]})
     assert r.status_code == 409 and "Revise agreement" in r.json()["detail"], r.text
 
 
-def test_cheque_pending_clear_then_reverse(admin_headers, anchor_booking):
+def test_cheque_pending_clear_then_reverse(admin_headers, work_booking):
     h = admin_headers
     bank = requests.get(f"{API}/master/bank-accounts", headers=h).json()["items"][0]
-    r = _post(h, "/payments", {"booking_id": anchor_booking["id"], "payment_category": "Account", "amount": 1000, "payment_date": date.today().isoformat(), "payment_mode_id": _modes(h)["CHEQUE"]["id"], "bank_account_id": bank["id"],
+    r = _post(h, "/payments", {"booking_id": work_booking["id"], "payment_category": "Account", "amount": 1000, "payment_date": date.today().isoformat(), "payment_mode_id": _modes(h)["CHEQUE"]["id"], "bank_account_id": bank["id"],
                                "instrument": {"number": "777001", "date": date.today().isoformat(), "bank_name": "SBI"}})
     assert r.status_code == 201, r.text
     p = r.json()
     assert p["status"] == "Pending"
     c = _post(h, f"/payments/{p['id']}/clear", {"cleared_date": date.today().isoformat()})
     assert c.status_code == 200 and c.json()["status"] == "Cleared", c.text
-    led = requests.get(f"{API}/bookings/{anchor_booking['id']}/ledger", headers=h).json()["rows"]
+    led = requests.get(f"{API}/bookings/{work_booking['id']}/ledger", headers=h).json()["rows"]
     assert any(x["ref"] == p["receipt_number"] for x in led)
     rv = _post(h, f"/payments/{p['id']}/reverse", {"reason": "story rewrite"})
     assert rv.status_code == 200 and rv.json()["status"] == "Reversed", rv.text

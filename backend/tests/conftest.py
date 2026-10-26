@@ -324,3 +324,11 @@ def _story_mode() -> bool:
         return False
 
 
+
+
+@pytest.fixture(scope="session")
+def work_booking(admin_headers, anchor_booking):
+    """An Active story booking that is NOT a headline anchor — tests may post/reverse money against it without disturbing anchor assertions."""
+    r = requests.get(f"{BASE}/api/bookings", params={"status": "Active", "page_size": 50}, headers=admin_headers).json()
+    items = r["items"] if isinstance(r, dict) else r
+    return next(b for b in sorted(items, key=lambda x: x["booking_number"], reverse=True) if b["booking_number"] not in (anchor_booking["booking_number"], "BK-2526-0009", "BK-2526-0013"))
