@@ -20,16 +20,16 @@ async def global_search(q: str = Query(min_length=1, max_length=60), limit: int 
     perms = user["permissions"]
     tasks, keys = [], []
     digits = re.sub(r"\D", "", q)
-    if scope in ("all", "customers") and "customer.read" in perms:
+    if scope in ("all", "customers") and "sales.customer.view" in perms:
         keys.append("customers")
         ors = [{"customer_code": {"$regex": "^" + re.escape(q.upper())}}, {"full_name": rx}]
         if digits:
             ors.append({"phone": {"$regex": "^(\\+91)?" + digits}})
         tasks.append(db.customers.find({"company_id": cid, "is_active": True, "$or": ors}, {"_id": 0, "id": 1, "full_name": 1, "customer_code": 1, "phone": 1, "kyc_status": 1, "lifecycle_stage": 1}).limit(limit).to_list(limit))
-    if scope in ("all", "bookings") and "booking.read" in perms:
+    if scope in ("all", "bookings") and "sales.booking.view" in perms:
         keys.append("bookings")
         tasks.append(db.bookings.find({"company_id": cid, **project_scope_filter(user), "$or": [{"booking_number": {"$regex": "^" + re.escape(q.upper())}}, {"customer_name": rx}, {"flat_snapshot.flat_number": rx}]}, {"_id": 0, "id": 1, "booking_number": 1, "customer_name": 1, "status": 1, "project_name": 1, "block_name": 1, "flat_snapshot.flat_number": 1}).limit(limit).to_list(limit))
-    if scope in ("all", "projects", "flats") and "project.read" in perms:
+    if scope in ("all", "projects", "flats") and "masters.project.view" in perms:
         if scope != "flats":
             keys += ["projects", "blocks"]
             tasks.append(db.projects.find({"company_id": cid, "is_active": True, **project_scope_filter(user, "id"), "$or": [{"code": rx}, {"name": any_rx}, {"address.city": rx}]}, {"_id": 0, "id": 1, "name": 1, "code": 1, "status": 1, "address.city": 1}).limit(limit).to_list(limit))

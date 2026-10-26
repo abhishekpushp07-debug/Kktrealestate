@@ -154,6 +154,13 @@ class MfaDisableIn(StrictModel):
     code: str | None = None
 
 
+@router.get("/login-options")
+async def login_options(request: Request):
+    from services.owner_bootstrap import demo_login_allowed
+    c = await db.companies.find_one({}, {"_id": 0, "name": 1})
+    return {"demo_accounts": demo_login_allowed(request), "company": (c or {}).get("name")}
+
+
 @router.post("/login")
 async def login(body: LoginIn, request: Request):
     ip = client_ip(request)
@@ -163,6 +170,10 @@ async def login(body: LoginIn, request: Request):
     if not user or not user.get("is_active"):
         await _login_event(email, False, request, "invalid_credentials")
         raise ApiError(401, "Invalid email or password", "INVALID_CREDENTIALS")
+    from services.owner_bootstrap import demo_login_allowed
+    if user.get("is_demo") and not demo_login_allowed(request):
+        await _login_event(email, False, request, "demo_disabled", user["id"])
+        raise ApiError(401, "Demo accounts are not available on this host", "DEMO_LOGIN_DISABLED")
     locked_until = user.get("locked_until")
     if locked_until and datetime.fromisoformat(locked_until) > datetime.now(UTC):
         await _login_event(email, False, request, "locked", user["id"])

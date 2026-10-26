@@ -172,8 +172,7 @@
   "project.write": [
    "masters.construction_stage.edit",
    "masters.project.create",
-   "masters.project.edit",
-   "website.cms.edit"
+   "masters.project.edit"
   ],
   "receipt.print": [
    "finance.receipt.download",

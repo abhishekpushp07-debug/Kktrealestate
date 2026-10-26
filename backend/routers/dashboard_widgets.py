@@ -25,7 +25,7 @@ async def widgets(user: dict = Depends(require("masters.project.view"))):
     base = {"company_id": cid, **scope}
     today = clock.today()
     out = {"role": role}
-    if "payment.read" in perms and role != "Sales":
+    if "finance.payment.view" in perms and role != "Sales":
         since = (today.replace(day=1) - timedelta(days=335)).replace(day=1).isoformat()
         rows = await db.payments.aggregate([{"$match": {**base, "status": "Cleared", "payment_date": {"$gte": since}}}, {"$group": {"_id": {"m": {"$substr": ["$payment_date", 0, 7]}, "c": {"$cond": [{"$ne": ["$against", "FLAT_VALUE"]}, "Other", "$payment_category"]}}, "s": {"$sum": "$amount_paise"}}}]).to_list(None)
         trend = {}
@@ -52,7 +52,7 @@ async def widgets(user: dict = Depends(require("masters.project.view"))):
         td = await db.payments.aggregate([{"$match": {**base, "status": "Cleared", "payment_date": today.isoformat()}}, {"$group": {"_id": None, "s": {"$sum": "$amount_paise"}, "n": {"$sum": 1}}}]).to_list(1)
         out["collections_today"] = {"amount_paise": td[0]["s"] if td else 0, "count": td[0]["n"] if td else 0}
         out["collections_month"] = {"amount_paise": tm[0]["s"] if tm else 0, "count": tm[0]["n"] if tm else 0}
-    if "booking.read" in perms:
+    if "sales.booking.view" in perms:
         since = (today.replace(day=1) - timedelta(days=335)).replace(day=1).isoformat()
         vel = await db.bookings.aggregate([{"$match": {**base, "booking_date": {"$gte": since}}}, {"$group": {"_id": {"$substr": ["$booking_date", 0, 7]}, "n": {"$sum": 1}, "v": {"$sum": "$agreement_value_paise"}}}, {"$sort": {"_id": 1}}]).to_list(None)
         out["sales_velocity"] = [{"month": v["_id"], "bookings": v["n"], "value_paise": v["v"]} for v in vel]
@@ -65,7 +65,7 @@ async def widgets(user: dict = Depends(require("masters.project.view"))):
     out["inventory_by_project"] = [{"project": p["code"], "name": p["name"], **(p.get("unit_counts") or {})} for p in projects]
     blocks = await db.blocks.find({**base, "is_active": True}, {"_id": 0, "id": 1, "name": 1, "code": 1, "project_code": 1, "construction_percent": 1, "milestones": 1, "unit_counts": 1}).sort("code", 1).to_list(None)
     out["construction"] = [{"id": b["id"], "block": f"{b.get('project_code', '')} {b['name']}", "percent": b.get("construction_percent", 0), "next_milestone": next((m["name"] for m in b.get("milestones") or [] if m["status"] == "Pending"), None), "available": (b.get("unit_counts") or {}).get("available", 0), "total": (b.get("unit_counts") or {}).get("total", 0)} for b in blocks]
-    if "payment.read" in perms or "booking.read" in perms:
+    if "finance.payment.view" in perms or "sales.booking.view" in perms:
         m0 = today.replace(day=1).isoformat()
         dm = await db.demands.aggregate([{"$match": {**base, "voided": {"$ne": True}, "demand_date": {"$gte": m0}}}, {"$group": {"_id": None, "n": {"$sum": 1}, "v": {"$sum": "$total_demand_paise"}, "p": {"$sum": "$paid_paise"}}}]).to_list(1)
         out["dues_raised_month"] = {"count": dm[0]["n"] if dm else 0, "total_paise": dm[0]["v"] if dm else 0, "paid_paise": dm[0]["p"] if dm else 0}
@@ -78,7 +78,7 @@ async def widgets(user: dict = Depends(require("masters.project.view"))):
                 if r["status"] == "Not yet due" and r["expected_date"] and r["expected_date"] <= horizon:
                     up.append({"booking_number": bk["booking_number"], "booking_id": bk["id"], "customer_name": bk.get("customer_name"), "installment": r["name"], "expected_date": r["expected_date"], "total_paise": r["total_expected_paise"]})
         out["upcoming_installments"] = sorted(up, key=lambda x: x["expected_date"])[:20]
-    if "lead.read" in perms:
+    if "sales.lead.view" in perms:
         lq = {"company_id": cid, **scope}
         if role == "Sales":
             lq["assigned_to"] = user["id"]
@@ -91,7 +91,7 @@ async def widgets(user: dict = Depends(require("masters.project.view"))):
         out["new_enquiries"] = await db.leads.find({"company_id": cid, "source": "Website", "is_read": False}, {"_id": 0, "id": 1, "lead_number": 1, "name": 1, "phone": 1, "project_name": 1, "created_at": 1}).sort("created_at", -1).to_list(10)
         end = datetime.now(UTC).replace(hour=23, minute=59, second=59).isoformat()
         out["follow_ups_due"] = await db.leads.find({**lq, "next_follow_up_at": {"$lte": end}, "status": {"$nin": ["Converted", "Lost"]}}, {"_id": 0, "id": 1, "lead_number": 1, "name": 1, "phone": 1, "status": 1, "next_follow_up_at": 1}).sort("next_follow_up_at", 1).to_list(15)
-    if "milestone.update" in perms or role == "Project Admin":
+    if "construction.stage.update" in perms or role == "Project Admin":
         out["demands_raised_month"] = await db.demands.count_documents({**base, "voided": False, "demand_date": {"$gte": today.replace(day=1).isoformat()}})
     res = present_money(out)
     ttlcache.put(ck, res, 10)

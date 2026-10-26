@@ -50,16 +50,16 @@ async def _dashboard(user: dict):
         c["total"] = sum(c[s] for s in STATUSES)
         b["inventory"] = c
     recent = []
-    if "audit.view" in user["permissions"]:
+    if "admin.audit.view" in user["permissions"]:
         recent = await db.audit_logs.find({"company_id": user["company_id"]}, {"_id": 0, "before": 0, "after": 0}).sort("created_at", -1).limit(10).to_list(10)
     users_count = await db.users.count_documents({"company_id": user["company_id"], "is_active": True}) if "admin.user.view" in user["permissions"] else None
     out = {"inventory": inventory, "projects": projects, "blocks": blocks, "recent_audit": recent, "active_users": users_count}
-    if "payment.read" in user["permissions"]:
+    if "finance.payment.view" in user["permissions"]:
         out["collections"] = await collections_widget(user)
         from routers.dashboard_widgets import widgets as _widgets
         w = await _widgets(user)
         out["collections"].update({k: w[k] for k in ("dues_raised_month", "upcoming_installments") if k in w})
-    if "lead.read" in user["permissions"]:
+    if "sales.lead.view" in user["permissions"]:
         out["follow_ups_due"] = await followups_widget(user)
     return out
 
