@@ -9,33 +9,62 @@ import { ApiError } from "./errors.js";
 /** A table with `id` and `version` columns (every mutable business table). */
 export type VersionedTable = PgTable & { id: AnyPgColumn; version: AnyPgColumn };
 
-/** The version a request carries: `body.version` (a number) or the `If-Match: "<n>"` / `W/"<n>"` header; null when neither is present. */
+/** The strong ETag of a versioned resource (contract C6): `"v<version>"`. */
+export function versionEtag(version: number): string {
+  return `"v${version}"`;
+}
+
+/**
+ * The version an If-Match header names: `"v<n>"` (the ETag single-resource GETs and writes send), `W/"v<n>"`, and the legacy forms
+ * `"<n>"`, `W/"<n>"` and a bare `<n>`. Null for anything else (`*`, a body-hash tag, a list of tags).
+ */
+export function parseIfMatch(raw: string | undefined): number | null {
+  if (!raw) return null;
+  const m = /^\s*(?:W\/)?"?v?(\d{1,9})"?\s*$/.exec(raw);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return Number.isInteger(n) && n >= 1 ? n : null;
+}
+
+/** Where a request's `expected_version` body field is kept after the version policy lifted it out of the body (see installVersionPolicy). */
+const EXPECTED_VERSION = Symbol("kkt.expectedVersion");
+type WithExpected = { [EXPECTED_VERSION]?: number };
+
+/**
+ * The version a request carries: `body.version` (a number), the `expected_version` body field (contract C6; lifted out of the body
+ * before validation, so strict body schemas need not declare it), or the If-Match header ({@link parseIfMatch}); null when none is present.
+ */
 export function requestVersion(req: Pick<FastifyRequest, "headers">, body?: unknown): number | null {
   if (body && typeof body === "object" && typeof (body as { version?: unknown }).version === "number")
     return (body as { version: number }).version;
+  const lifted = (req as WithExpected)[EXPECTED_VERSION];
+  if (typeof lifted === "number") return lifted;
   const header = req.headers["if-match"];
-  const raw = Array.isArray(header) ? header[0] : header;
-  if (raw) {
-    const n = Number(raw.replace(/^W\//, "").replace(/"/g, "").trim());
-    if (Number.isInteger(n) && n >= 1) return n;
-  }
-  return null;
+  return parseIfMatch(Array.isArray(header) ? header[0] : header);
 }
 
-/** 400 VERSION_REQUIRED (a precondition-required error carried as 400 so every client handles it like a validation failure). */
+/**
+ * 428 VERSION_REQUIRED (contract C6, RFC 6585 "Precondition Required"): a write of a versioned resource without If-Match, `version` or
+ * `expected_version`. `details.issues` keeps the validation shape so clients can show it on the form.
+ */
 export function versionRequired(): ApiError {
-  return new ApiError(400, "VERSION_REQUIRED", "version is required (body.version or If-Match header)", {
-    issues: [
-      {
-        path: "version",
-        message: "Required: send the version you read (body.version or If-Match)",
-        code: "version_required",
-      },
-    ],
-  });
+  return new ApiError(
+    428,
+    "VERSION_REQUIRED",
+    'The version you read is required: send If-Match: "v<version>" (or body.version / body.expected_version)',
+    {
+      issues: [
+        {
+          path: "version",
+          message: "Required: send the version you read (If-Match, body.version or body.expected_version)",
+          code: "version_required",
+        },
+      ],
+    },
+  );
 }
 
-/** Reads the expected version from the body (`version`) or the `If-Match: "<n>"` header; 400 VERSION_REQUIRED when neither is present. */
+/** Reads the expected version from the body (`version` / `expected_version`) or If-Match; 428 VERSION_REQUIRED when none is present. */
 export function expectedVersion(req: FastifyRequest, body?: { version?: number } | null): number {
   const v = requestVersion(req, body);
   if (v === null) throw versionRequired();
@@ -56,27 +85,49 @@ export function optionalExpectedVersion(
 }
 
 /**
- * Staff PATCH routes accepted without a version. Empty: the last two transitional exemptions (the construction photo flag toggle and
- * the plan-assignment edit) were removed once the ERP sent If-Match there (docs/TODO-integration.md item 13). Keep it empty.
+ * Staff PATCH/DELETE routes accepted without a version: the session routes (a refresh-token family has no version). Every other staff
+ * PATCH and every DELETE of a versioned resource requires one (contract C6).
  */
-export const VERSION_POLICY_EXEMPT: readonly string[] = [];
+export const VERSION_POLICY_EXEMPT: readonly string[] = [
+  "/api/v1/auth/sessions/:id",
+  "/api/v1/auth/sessions",
+  "/api/v1/portal/auth/sessions/:id",
+  "/api/v1/portal/auth/sessions",
+];
 
-/** True when a route must carry a version: every staff (erp-audience) PATCH except the transitional exemptions. Portal self-service edits are exempt. */
+/**
+ * True when a route must carry a version before its handler runs: every staff (erp-audience) PATCH and DELETE except
+ * {@link VERSION_POLICY_EXEMPT}. Portal self-service edits and public routes are exempt (portal PATCH /profile honours If-Match).
+ * State-change POSTs (deactivate/restore, cancel, clear/bounce/reverse, …) require it in their handlers via expectedVersion().
+ */
 export function requiresVersion(
   method: string,
   url: string | undefined,
   cfg: { audience?: string; public?: boolean } | undefined,
 ): boolean {
-  if (method !== "PATCH" || !url) return false;
+  if ((method !== "PATCH" && method !== "DELETE") || !url) return false;
   if (cfg?.public || cfg?.audience === "portal") return false;
   return !VERSION_POLICY_EXEMPT.includes(url);
 }
 
 /**
- * Version policy (audit F4): a staff PATCH without `version` (body) or If-Match is 400 VERSION_REQUIRED before the handler runs, so no
- * route can fall back to last-writer-wins. Runs as a preHandler (after authentication and permission checks, after body validation).
+ * Version policy (audit F4, contract C6):
+ * - preValidation: a numeric (or numeric-string) `expected_version` field is lifted out of a JSON body before schema validation, so
+ *   every write accepts it without each strict body schema declaring it;
+ * - preHandler: a staff PATCH or DELETE without If-Match / `version` / `expected_version` is 428 VERSION_REQUIRED before the handler
+ *   runs, so no route can fall back to last-writer-wins (after authentication and permission checks, after body validation).
  */
 export function installVersionPolicy(app: FastifyInstance): void {
+  app.addHook("preValidation", async (req) => {
+    const body = req.body as Record<string, unknown> | null | undefined;
+    if (!body || typeof body !== "object" || Array.isArray(body) || !("expected_version" in body)) return;
+    const raw = body["expected_version"];
+    const n = typeof raw === "number" ? raw : typeof raw === "string" && /^\d{1,9}$/.test(raw) ? Number(raw) : NaN;
+    if (!Number.isInteger(n) || n < 1)
+      throw ApiError.invalid("expected_version", "expected_version must be a positive integer", "invalid_type");
+    (req as WithExpected)[EXPECTED_VERSION] = n;
+    delete body["expected_version"];
+  });
   app.addHook("preHandler", async (req) => {
     if (
       !requiresVersion(
@@ -122,6 +173,7 @@ export async function versionConflict(
     .limit(1);
   const details: VersionConflictDetails = {
     current,
+    current_version: current,
     changed_by: last?.actorName ?? null,
     changed_at: last?.createdAt ? new Date(last.createdAt).toISOString() : null,
   };

@@ -139,6 +139,25 @@ export interface DbCluster {
   close(): Promise<void>;
 }
 
+/** A bigint value read from Postgres that a JS number cannot hold exactly (|v| > 2^53 − 1). */
+export class BigIntPrecisionError extends RangeError {
+  readonly value: string;
+  constructor(value: string) {
+    super(
+      `bigint ${value} is outside the safe integer range (±${Number.MAX_SAFE_INTEGER}) and cannot be read as a number without losing precision`,
+    );
+    this.name = "BigIntPrecisionError";
+    this.value = value;
+  }
+}
+
+/** Parses a Postgres int8 text value to a number, refusing values that would lose precision. */
+export function parseBigint(value: string): number {
+  const n = Number(value);
+  if (!Number.isSafeInteger(n)) throw new BigIntPrecisionError(value);
+  return n;
+}
+
 /** Opens a postgres.js pool on `url` and wraps it in Drizzle; `close()` ends the pool. */
 export function createDb(
   url: string = process.env["DATABASE_URL"] ?? DEFAULT_DATABASE_URL,
@@ -158,10 +177,11 @@ export function createDb(
             lock_timeout: t.lockTimeoutMs,
             idle_in_transaction_session_timeout: t.idleInTransactionTimeoutMs,
           },
-    // bigint columns arrive as JS numbers (all amounts fit in 2^53); drizzle's
-    // `bigint({ mode: "number" })` also parses them, this keeps raw `sql` results consistent.
+    // bigint columns arrive as JS numbers (money in paise fits in 2^53 by a wide margin); drizzle's `bigint({ mode: "number" })`
+    // reads the same parsed value and raw `sql` results stay consistent. A value outside the safe-integer range is never rounded
+    // silently: the query fails with BigIntPrecisionError.
     types: {
-      bigint: { to: 20, from: [20], serialize: (v: number | bigint) => String(v), parse: (v: string) => Number(v) },
+      bigint: { to: 20, from: [20], serialize: (v: number | bigint) => String(v), parse: parseBigint },
     },
     onnotice: () => undefined,
   });
@@ -206,10 +226,16 @@ export async function withSessionAdvisoryLock<T>(handle: DbHandle, key: string, 
   if (max < 2) throw new Error("withSessionAdvisoryLock needs a pool of at least 2 connections (one holds the lock)");
   const conn = await handle.sql.reserve();
   try {
-    // The lock wait is unbounded on purpose (another replica may be mid-migration); a connection-level lock_timeout must not abort it.
+    // The wait is unbounded on purpose (another replica may be mid-migration), but it polls pg_try_advisory_lock instead of blocking
+    // in pg_advisory_lock: a session blocked inside a statement holds a snapshot, and CREATE INDEX CONCURRENTLY run by the holder waits
+    // for every older snapshot to go away — a blocked waiter would stall the holder's online migration for good.
     await conn.unsafe("SET lock_timeout = 0");
     await conn.unsafe("SET statement_timeout = 0");
-    await conn`SELECT pg_advisory_lock(hashtext(${key}))`;
+    for (let attempt = 0; ; attempt += 1) {
+      const [row] = await conn<{ locked: boolean }[]>`SELECT pg_try_advisory_lock(hashtext(${key})) AS locked`;
+      if (row?.locked) break;
+      await new Promise((resolve) => setTimeout(resolve, Math.min(1000, 50 * 2 ** Math.min(attempt, 5))));
+    }
     try {
       return await fn();
     } finally {

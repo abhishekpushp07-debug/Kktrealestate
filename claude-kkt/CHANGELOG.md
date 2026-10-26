@@ -3,6 +3,56 @@
 All notable changes to KKT v2. The API follows docs/VERSIONING.md: additive within `/api/v1`, deprecations announced here with their
 sunset date. Dates are IST.
 
+## [Unreleased] — phase 7 foundation (v3 audit fixes)
+
+Report: docs/hardening/phase7-foundation.md.
+
+### Breaking (deliberate, recorded per docs/VERSIONING.md "Deliberate breaks")
+
+- **Versions are required on every write of a versioned resource (contract C6).** Besides staff PATCH (already required), every
+  state-change POST that used to fall back to last-writer-wins (deactivate/activate of masters, projects, blocks, customers, users and
+  roles; site-visit cancel/complete/no-show/outcome; staff replies on service requests) and every DELETE of a versioned resource
+  (booking drafts, plan assignments, co-applicants, CMS rows, stage photos, notices, report presets, documents) now answers
+  **428 `VERSION_REQUIRED`** without `If-Match`, `version` or `expected_version`. The full route list is in the foundation report.
+- `VERSION_REQUIRED` moved from **400 to 428** (Precondition Required); `details.issues[0].path` stays `"version"`.
+- `page` of offset lists is capped at **1000** (400 VALIDATION_ERROR naming cursor mode beyond it).
+- A PERCENT PLC value with more than 2 decimals, or a fractional FIXED / per-sq-ft / floor-rise value, is **400** at input (it used to
+  be stored and then fail every price with 500).
+- `BucketCapDetailsSchema` (contracts) now matches the wire: `{bucket: CASH|ACCOUNT, agreed_paise, paid_paise, amount_paise,
+headroom_paise}` (the API never sent the old `received_paise` / `attempted_paise`).
+- VALIDATION_ERROR details have one shape: `details.issues[{path, message, code}]`; the handler-raised `{field}` details are gone.
+
+### Added
+
+- `ETag: "v<version>"` on single versioned resources; `If-Match: "v<n>"` (and `W/"v<n>"`, legacy `"<n>"`) and body
+  `expected_version` are accepted by every versioned write; `VERSION_CONFLICT` details carry `current_version`.
+- Rows now carry `version`: demands, other-charge lines (`line_version` on `POST …/other-charges/:lineId/demand`), booking drafts,
+  report presets. Ledger events `DEMAND_VOIDED`, `LEDGER_RESTATED` (used by the money track).
+- Error codes `CONSTRAINT_VIOLATION` (422), `INVALID_AMOUNT` (422), `COMPANY_REQUIRED` (400); database CHECK / FK / NOT NULL /
+  unique / class-22 errors map to 422 / 409 IN_USE / 409 DUPLICATE / 400 instead of 500; domain MoneyError → 422 INVALID_AMOUNT.
+- `BUSINESS_RULES` / `RuleId` registry in `@kkt/contracts` (`details.rule` of 422 BUSINESS_RULE).
+- Tenant resolution `apps/api/src/lib/tenant.ts` (contract C4): principal → `x-kkt-company` slug → Host in `companies.hosts` → the only
+  company → 400 COMPANY_REQUIRED.
+
+### Database (migration 0005, online)
+
+- Migration runner: checksummed hand-written SQL (`drizzle.kkt_schema_files`) — unchanged trigger files no longer re-lock every table
+  on every deploy; online files (`src/sql/online/*.sql`) run statement by statement outside a transaction with recovery of INVALID
+  indexes; waiting replicas poll the migration lock. Rules for new migrations: docs/DATA-MODEL.md §J.
+- 65 foreign-key indexes, trigram indexes on demand numbers / installment names / cheque numbers, all built CONCURRENTLY.
+- `version` on demands, other-charge lines, rate-card rates and PLC rules, plan installments, enquiries, lead follow-ups (bumped by a
+  trigger on every UPDATE).
+- Ledger epochs (`bookings.ledger_epoch`, `ledger_entries.epoch`, UNIQUE (booking_id, epoch, seq)), `ledger_rebuilds`.
+- `bookings.cancellation_refund_paise` / `cancellation_deduction_paise` (backfilled); `companies.slug` (backfilled, unique) and
+  `companies.hosts`; `users.totp_last_step`; `refresh_tokens.family_started_at` (backfilled); `audit_seals` (append-only hash chain);
+  `service_requests.sla_paused_at` / `sla_paused_seconds`; `site_visits.ics_sequence`; `idempotency_keys.committed_at` /
+  `lease_expires_at`; `job_runs.heartbeat_at` / `checkpoint`; `storage_pending_objects`, `storage_deletions`.
+- New companies default to `force_mfa_for_admins = true` (existing rows unchanged).
+- The application role `kkt_app` loses UPDATE/DELETE/TRUNCATE on ledger_entries, audit_logs, audit_seals, ledger_rebuilds and
+  DELETE/TRUNCATE on payments and demands. **Upgrade note:** run `infra/postgres/init/01-roles.sql` again (idempotent) or let the
+  migration apply `0002_privileges.sql`.
+- bigint values beyond ±(2^53 − 1) are refused with `BigIntPrecisionError` instead of being rounded silently.
+
 ## [Unreleased] — hardening round (phase 5)
 
 The round closed the gaps of the v2 80-factor audit (docs/AUDIT-80-FACTORS-V2.md) in five tracks, each adversarially reviewed, then

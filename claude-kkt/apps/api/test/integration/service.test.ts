@@ -2,7 +2,15 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { financialYear, todayIST } from "@kkt/domain";
 import { createPortalCustomer, createProject } from "./fixtures.js";
 import { createActiveBooking } from "./fixtures/crm.js";
-import { CREDS, buildTestApp, type ErrorBody, type LoginResult, type TestContext } from "./helpers.js";
+import {
+  CREDS,
+  buildTestApp,
+  ifMatch,
+  versionOf,
+  type ErrorBody,
+  type LoginResult,
+  type TestContext,
+} from "./helpers.js";
 
 process.env["KKT_MODULES"] ??= "service";
 
@@ -299,7 +307,9 @@ describe("ticket creation", () => {
       },
     });
     expect(wrongBooking.status).toBe(400);
-    expect(wrongBooking.body.error.details?.["field"]).toBe("booking_id");
+    expect((wrongBooking.body.error.details?.["issues"] as { path: string }[] | undefined)?.[0]?.path).toBe(
+      "booking_id",
+    );
     const inactive = await t.request<ErrorBody>("POST", "/api/v1/service-requests", {
       token: admin.access_token,
       body: { customer_id: customerA, category_id: inactiveCat, subject: "Old category", description: "x" },
@@ -338,7 +348,7 @@ describe("ticket creation", () => {
       },
     });
     expect(badDoc.status).toBe(400);
-    expect(badDoc.body.error.details?.["field"]).toBe("attachment_ids");
+    expect((badDoc.body.error.details?.["issues"] as { path: string }[] | undefined)?.[0]?.path).toBe("attachment_ids");
     const unknownKey = await t.request<ErrorBody>("POST", "/api/v1/service-requests", {
       token: admin.access_token,
       body: { customer_id: customerA, category_id: snagCat, subject: "Extra", description: "x", foo: 1 },
@@ -486,7 +496,7 @@ describe("patch and assign", () => {
       token: admin.access_token,
       body: { priority: "LOW" },
     });
-    expect(noVersion.status).toBe(400);
+    expect(noVersion.status).toBe(428);
     expect(await auditCount("service_request.update", tk.id)).toBe(2);
   });
 
@@ -532,6 +542,7 @@ describe("messages", () => {
     const tk = await createTicket({ subject: "Thread" });
     const note = await t.request<Ticket>("POST", `/api/v1/service-requests/${tk.id}/messages`, {
       token: admin.access_token,
+      headers: ifMatch(await versionOf(t, `/api/v1/service-requests/${tk.id}`, admin.access_token)),
       body: { body: "Customer is a VIP, handle gently", is_internal: true },
     });
     expect(note.status, note.text).toBe(201);
@@ -541,6 +552,7 @@ describe("messages", () => {
     expect(await notifCount("CUSTOMER", customerA, "TICKET_STAFF_REPLY", tk.id)).toBe(0);
     const reply = await t.request<Ticket>("POST", `/api/v1/service-requests/${tk.id}/messages`, {
       token: admin.access_token,
+      headers: ifMatch(await versionOf(t, `/api/v1/service-requests/${tk.id}`, admin.access_token)),
       body: { body: "We have scheduled a site inspection.", attachment_ids: [docId] },
     });
     expect(reply.status, reply.text).toBe(201);
@@ -574,6 +586,7 @@ describe("messages", () => {
     const tk = await createTicket({ subject: "Need info" });
     const askFromNew = await t.request<ErrorBody>("POST", `/api/v1/service-requests/${tk.id}/messages`, {
       token: admin.access_token,
+      headers: ifMatch(await versionOf(t, `/api/v1/service-requests/${tk.id}`, admin.access_token)),
       body: { body: "Please share a photo of the leak.", status: "AWAITING_CUSTOMER" },
     });
     expect(askFromNew.status).toBe(422); // NEW → AWAITING_CUSTOMER is not a valid transition
@@ -586,6 +599,7 @@ describe("messages", () => {
     expect(started.status).toBe(200);
     const ask = await t.request<Ticket>("POST", `/api/v1/service-requests/${tk.id}/messages`, {
       token: admin.access_token,
+      headers: ifMatch(await versionOf(t, `/api/v1/service-requests/${tk.id}`, admin.access_token)),
       body: { body: "Please share a photo of the leak.", status: "AWAITING_CUSTOMER" },
     });
     expect(ask.status, ask.text).toBe(201);
@@ -593,6 +607,7 @@ describe("messages", () => {
     expect(await notifCount("CUSTOMER", customerA, "TICKET_STAFF_REPLY", tk.id)).toBe(1);
     const internalKeeps = await t.request<Ticket>("POST", `/api/v1/service-requests/${tk.id}/messages`, {
       token: admin.access_token,
+      headers: ifMatch(await versionOf(t, `/api/v1/service-requests/${tk.id}`, admin.access_token)),
       body: { body: "Chasing the site engineer", is_internal: true },
     });
     expect(internalKeeps.body.status).toBe("AWAITING_CUSTOMER"); // internal notes never move the status
@@ -607,6 +622,7 @@ describe("customer replies and status machine", () => {
     expect(inProgress.status).toBe(200);
     const awaiting = await t.request<Ticket>("POST", `/api/v1/service-requests/${tk.id}/messages`, {
       token: admin.access_token,
+      headers: ifMatch(await versionOf(t, `/api/v1/service-requests/${tk.id}`, admin.access_token)),
       body: { body: "Which floor is affected?", status: "AWAITING_CUSTOMER" },
     });
     expect(awaiting.status, awaiting.text).toBe(201);
@@ -631,6 +647,7 @@ describe("customer replies and status machine", () => {
     ).rejects.toMatchObject({ statusCode: 409, code: "TICKET_CLOSED" });
     const staffLate = await t.request<ErrorBody>("POST", `/api/v1/service-requests/${tk.id}/messages`, {
       token: admin.access_token,
+      headers: ifMatch(await versionOf(t, `/api/v1/service-requests/${tk.id}`, admin.access_token)),
       body: { body: "too late" },
     });
     expect(staffLate.status).toBe(409);
@@ -1010,7 +1027,10 @@ describe("notices", () => {
     });
     expect(await notifCount("CUSTOMER", customerB, "NOTICE_PUBLISHED", n.id)).toBe(1);
     expect((await t.request("DELETE", `/api/v1/notices/${n.id}`, { token: employee.access_token })).status).toBe(403);
-    const del = await t.request<Notice>("DELETE", `/api/v1/notices/${n.id}`, { token: admin.access_token });
+    const del = await t.request<Notice>("DELETE", `/api/v1/notices/${n.id}`, {
+      token: admin.access_token,
+      headers: { "if-match": `"v${n.version}"` },
+    });
     expect(del.status, del.text).toBe(200);
     expect(del.body.is_published).toBe(false);
     expect(del.body.version).toBe(n.version + 1);

@@ -159,7 +159,7 @@ export function registerParkingRoutes(app: FastifyInstance): void {
       const user = req.user!;
       const q = req.query;
       if (q.project_id && q.project_id !== req.params.id)
-        throw ApiError.badRequest("project_id must match the path", { field: "project_id" });
+        throw ApiError.invalid("project_id", "project_id must match the path");
       const project = await loadProject(app.dbReplica, user, req.params.id);
       const where: (SQL | undefined)[] = [
         eq(parkingSlots.companyId, user.companyId),
@@ -212,8 +212,7 @@ export function registerParkingRoutes(app: FastifyInstance): void {
     handler: async (req, reply) => {
       const user = req.user!;
       const body = req.body;
-      if (body.project_id !== req.params.id)
-        throw ApiError.badRequest("project_id must match the path", { field: "project_id" });
+      if (body.project_id !== req.params.id) throw ApiError.invalid("project_id", "project_id must match the path");
       const row = await app.db.transaction(async (tx) => {
         const project = await loadProject(tx, user, req.params.id, true);
         if (!project.isActive) throw ApiError.rule("Project is inactive", "PROJECT_INACTIVE");
@@ -264,8 +263,7 @@ export function registerParkingRoutes(app: FastifyInstance): void {
     handler: async (req, reply) => {
       const user = req.user!;
       const body = req.body;
-      if (body.project_id !== req.params.id)
-        throw ApiError.badRequest("project_id must match the path", { field: "project_id" });
+      if (body.project_id !== req.params.id) throw ApiError.invalid("project_id", "project_id must match the path");
       const result = await app.db.transaction(async (tx) => {
         const project = await loadProject(tx, user, req.params.id, true);
         if (!project.isActive) throw ApiError.rule("Project is inactive", "PROJECT_INACTIVE");
@@ -454,7 +452,7 @@ export function registerParkingRoutes(app: FastifyInstance): void {
           .orderBy(asc(parkingSlots.number))
           .for("update");
         if (rows.length !== new Set(body.slot_ids).size)
-          throw ApiError.badRequest("Every slot_id must belong to this project", { field: "slot_ids" });
+          throw ApiError.invalid("slot_ids", "Every slot_id must belong to this project");
         const audits: AuditEntry[] = [];
         const skipped: string[] = [];
         const toUpdate: string[] = [];

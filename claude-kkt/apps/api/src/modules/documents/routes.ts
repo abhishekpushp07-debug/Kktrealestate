@@ -301,10 +301,14 @@ export function registerDocumentRoutes(app: FastifyInstance): void {
         assertEntityWrite(user, existing.doc.entityType);
         await requireEntity(tx, user, existing.doc.entityType, existing.doc.entityId);
         if (existing.doc.isSensitive && !canSeeSensitive(user)) throw ApiError.notFound("Document");
-        await tx
-          .update(documents)
-          .set({ isDeleted: true, deletedAt: new Date(), updatedAt: new Date() })
-          .where(eq(documents.id, existing.doc.id));
+        await applyUpdate(
+          tx,
+          documents,
+          existing.doc.id,
+          expectedVersion(req as unknown as FastifyRequest, null),
+          { isDeleted: true, deletedAt: new Date(), updatedAt: new Date() },
+          ENTITY,
+        );
         await withdraw(tx, ENTITY, existing.doc.id);
         const before = toDocumentRow(existing);
         await writeAudit(tx, {

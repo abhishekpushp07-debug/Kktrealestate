@@ -87,6 +87,7 @@ export const customers = pgTable(
     trgm("customers_phone_trgm_idx", t.phone),
     trgm("customers_customer_code_trgm_idx", t.customerCode),
     trgm("customers_email_trgm_idx", t.email),
+    index("customers_relationship_manager_id_idx").on(t.relationshipManagerId),
   ],
 );
 
@@ -111,7 +112,10 @@ export const coApplicants = pgTable(
     ...timestamps(),
     version: integer("version").notNull().default(1),
   },
-  (t) => [index("co_applicants_customer_idx").on(t.customerId, t.sortOrder)],
+  (t) => [
+    index("co_applicants_customer_idx").on(t.customerId, t.sortOrder),
+    index("co_applicants_company_id_idx").on(t.companyId),
+  ],
 );
 
 export const portalUsers = pgTable(

@@ -76,6 +76,10 @@ export const ERROR_CODES = [
   "EXPORT_NOT_READY",
   "GONE",
   "IDEMPOTENT_SECRET_REPLAY",
+  // phase 7 foundation: database constraint mapping, domain money errors, tenant resolution (contract C4)
+  "CONSTRAINT_VIOLATION",
+  "INVALID_AMOUNT",
+  "COMPANY_REQUIRED",
 ] as const;
 
 /** An error code literal. */
@@ -152,12 +156,16 @@ export const ERROR_STATUS: Readonly<Record<ErrorCode, number>> = {
   KYC_TRANSITION_INVALID: 409,
   LINK_EXPIRED: 410,
   BOOKING_COMPLETED: 409,
-  VERSION_REQUIRED: 400,
+  // 428 Precondition Required (contract C6): a write of a versioned resource without If-Match / version / expected_version
+  VERSION_REQUIRED: 428,
   LOCK_TIMEOUT: 409,
   CONFLICT_RETRY: 409,
   EXPORT_NOT_READY: 409,
   GONE: 410,
   IDEMPOTENT_SECRET_REPLAY: 409,
+  CONSTRAINT_VIOLATION: 422,
+  INVALID_AMOUNT: 422,
+  COMPANY_REQUIRED: 400,
 };
 
 /** Returns the HTTP status for an error code. */
@@ -165,34 +173,63 @@ export function statusForError(code: ErrorCode): number {
   return ERROR_STATUS[code];
 }
 
-/** Shape of `details` for VERSION_CONFLICT. */
+/**
+ * Shape of `details` for VERSION_CONFLICT. `current_version` (contract C6) and the older `current` carry the same number: the version
+ * the record is at now (re-read it, or send this version to overwrite deliberately).
+ */
 export const VersionConflictDetailsSchema = z.object({
   current: z.int().min(1),
+  current_version: z.int().min(1).optional(),
   changed_by: z.string().nullable(),
   changed_at: z.string().nullable().optional(),
 });
 export type VersionConflictDetails = z.infer<typeof VersionConflictDetailsSchema>;
 
-/** Shape of `details` for IN_USE. */
-export const InUseDetailsSchema = z.object({ usage_count: z.int().min(0), used_by: z.array(z.string()).optional() });
+/**
+ * Shape of `details` for IN_USE. Masters' deactivation guard sends `usage_count` and `used_by` (kinds of usage); a row whose delete or
+ * re-key a foreign key refused (database 23503) also names the `constraint` and the referencing table (`referenced_by`).
+ */
+export const InUseDetailsSchema = z.object({
+  usage_count: z.int().min(0),
+  used_by: z.array(z.string()).optional(),
+  constraint: z.string().nullable().optional(),
+  referenced_by: z.string().nullable().optional(),
+});
 export type InUseDetails = z.infer<typeof InUseDetailsSchema>;
 
 /** Shape of `details` for PLAN_STAGES_MISSING. */
 export const PlanStagesMissingDetailsSchema = z.object({ missing_stages: z.array(z.string()) });
 export type PlanStagesMissingDetails = z.infer<typeof PlanStagesMissingDetailsSchema>;
 
-/** Shape of `details` for BUCKET_CAP_EXCEEDED. */
+/**
+ * Shape of `details` for BUCKET_CAP_EXCEEDED, exactly what the API sends (apps/api/src/modules/money/services/payments.ts, at posting
+ * and at cheque clearing): the bucket's agreed amount, what it has already received (CLEARED), the amount refused and the headroom
+ * left (agreed − paid, never negative). Other-charge lines refuse with CHARGE_CAP_EXCEEDED instead.
+ */
 export const BucketCapDetailsSchema = z.object({
-  bucket: z.enum(["CASH", "ACCOUNT", "OTHER_CHARGE"]),
+  bucket: z.enum(["CASH", "ACCOUNT"]),
   agreed_paise: z.int(),
-  received_paise: z.int(),
-  attempted_paise: z.int(),
+  paid_paise: z.int(),
+  amount_paise: z.int(),
   headroom_paise: z.int(),
 });
 export type BucketCapDetails = z.infer<typeof BucketCapDetailsSchema>;
 
-/** Shape of `details` for BUSINESS_RULE. */
+/** Shape of `details` for BUSINESS_RULE: `rule` is one of BUSINESS_RULES (rules.ts); clients treat an unknown id like a generic 422. */
 export const BusinessRuleDetailsSchema = z.object({ rule: z.string() }).catchall(z.unknown());
+
+/**
+ * Shape of `details` for CONSTRAINT_VIOLATION (422): the database refused a value. `kind` says which rule: a CHECK constraint, a
+ * reference to a row that does not exist (`references` = its table), or a missing required column.
+ */
+export const ConstraintViolationDetailsSchema = z.object({
+  kind: z.enum(["check", "foreign_key", "not_null"]),
+  constraint: z.string().nullable(),
+  table: z.string().nullable(),
+  references: z.string().nullable().optional(),
+  column: z.string().nullable().optional(),
+});
+export type ConstraintViolationDetails = z.infer<typeof ConstraintViolationDetailsSchema>;
 export type BusinessRuleDetails = z.infer<typeof BusinessRuleDetailsSchema>;
 
 /** Shape of `details` for VALIDATION_ERROR. */

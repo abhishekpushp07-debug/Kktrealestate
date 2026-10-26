@@ -911,9 +911,15 @@ describe("saved presets (per user)", () => {
     expect(filtered.items).toHaveLength(0);
     const others = await json<{ items: { id: string }[] }>("/api/v1/reports/presets", admin);
     expect(others.items).toHaveLength(0);
-    const notMine = await t.request<ErrorBody>("DELETE", `/api/v1/reports/presets/${create.body.id}`, { token: admin });
+    const notMine = await t.request<ErrorBody>("DELETE", `/api/v1/reports/presets/${create.body.id}`, {
+      token: admin,
+      headers: { "if-match": '"v1"' },
+    });
     expect(notMine.status).toBe(404);
-    const del = await t.request("DELETE", `/api/v1/reports/presets/${create.body.id}`, { token: accounts });
+    const del = await t.request("DELETE", `/api/v1/reports/presets/${create.body.id}`, {
+      token: accounts,
+      headers: { "if-match": '"v1"' },
+    });
     expect(del.status).toBe(204);
     const after = await json<{ items: unknown[] }>("/api/v1/reports/presets", accounts);
     expect(after.items).toHaveLength(0);

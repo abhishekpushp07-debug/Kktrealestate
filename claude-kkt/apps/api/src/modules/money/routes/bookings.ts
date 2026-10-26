@@ -44,7 +44,7 @@ import { ApiError } from "../../../lib/errors.js";
 import { listPaging, paginate } from "../../../lib/list.js";
 import { route } from "../../../lib/routes.js";
 import { ensureProjectAccess, scopeFilter } from "../../../lib/scope.js";
-import { expectedVersion, withOptionalVersion } from "../../../lib/version.js";
+import { assertVersion, expectedVersion, withOptionalVersion } from "../../../lib/version.js";
 import { actorOf } from "../common.js";
 import {
   addOtherCharge,
@@ -187,6 +187,7 @@ async function draftRows(
       project_name: pm.get(String(pl["project_id"])) ?? null,
       customer_name: cm.get(String(pl["customer_id"])) ?? null,
       updated_at: r.updatedAt.toISOString(),
+      version: r.version,
     };
   });
 }
@@ -243,11 +244,18 @@ export function registerBookingRoutes(app: FastifyInstance): void {
     permission: "booking.create",
     schema: { params: idParams, response: { 204: z.null() }, summary: "Discard a wizard draft" },
     handler: async (req, reply) => {
-      const deleted = await app.db
-        .delete(bookingDrafts)
-        .where(and(eq(bookingDrafts.id, req.params.id), eq(bookingDrafts.userId, req.user!.id)))
-        .returning({ id: bookingDrafts.id });
-      if (deleted.length === 0) throw ApiError.notFound("Draft");
+      const expected = expectedVersion(req, null);
+      await app.db.transaction(async (tx) => {
+        const [draft] = await tx
+          .select({ id: bookingDrafts.id, version: bookingDrafts.version })
+          .from(bookingDrafts)
+          .where(and(eq(bookingDrafts.id, req.params.id), eq(bookingDrafts.userId, req.user!.id)))
+          .for("update")
+          .limit(1);
+        if (!draft) throw ApiError.notFound("Draft");
+        await assertVersion(tx, bookingDrafts, draft.id, draft.version, expected, "booking_draft");
+        await tx.delete(bookingDrafts).where(eq(bookingDrafts.id, draft.id));
+      });
       return reply.code(204).send();
     },
   });
@@ -519,12 +527,13 @@ export function registerBookingRoutes(app: FastifyInstance): void {
     idempotent: true,
     schema: {
       params: idParams,
-      body: AgreementRevisionCreateSchema,
+      body: withOptionalVersion(AgreementRevisionCreateSchema),
       response: { 201: BookingDetailResponseSchema },
       summary: "Revise cash/account agreed values (≥ paid per bucket; telescoping recompute; AGREEMENT_CHANGE row)",
     },
     handler: async (req, reply) => {
-      await reviseAgreement(app.db, req.user!, req.params.id, req.body, actorOf(req));
+      const version = expectedVersion(req, req.body);
+      await reviseAgreement(app.db, req.user!, req.params.id, { ...req.body, version }, actorOf(req));
       return reply
         .code(201)
         .send(await bookingDetail(app.db, await loadBookingSelect(app.db, req.user!, req.params.id)));

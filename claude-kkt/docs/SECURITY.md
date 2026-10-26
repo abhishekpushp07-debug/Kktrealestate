@@ -27,6 +27,11 @@
 - CSV exports (every list, reports, audit, login events, portal credentials) neutralise spreadsheet formulas: a text cell starting with `=`, `+`, `-`, `@`, TAB or CR gets a leading `'` (plain numbers such as `-1250.50` stay numeric).
 - Documents: magic-byte validation (`file-type`), 15 MB cap, uuid storage keys, no original path stored, signed 15-minute download URLs (HMAC), KYC-flagged documents gated by `customer.kyc_view` and never shareable with customers.
 - Audit log: append-only (DB trigger), stores actor, action, entity, before/after (sensitive fields stripped), IP, request id. Portal actions carry `actor_type = CUSTOMER`.
+- Database privileges of the application role (migration 0005; `infra/postgres/init/01-roles.sql` and `packages/db/src/sql/0002_privileges.sql`,
+  applied by every migration when `kkt_app` exists): no UPDATE, DELETE or TRUNCATE on `ledger_entries`, `audit_logs`, `audit_seals`,
+  `ledger_rebuilds`; no DELETE or TRUNCATE on `payments` and `demands`; no TRUNCATE, REFERENCES or TRIGGER anywhere. A compromised API
+  process therefore cannot rewrite or remove the books, only append to them; the append-only triggers are a second line. `audit_seals`
+  (hash chain over `audit_logs`) is append-only like the log.
 - Right to erasure has ONE implementation (`modules/admin/erase.ts`, Super Admin only; `POST /customers/:id/erase` delegates to it): it anonymises the customer, their co-applicants (never deleted), the portal login (sessions revoked), documents (soft-deleted, bytes removed), leads, site visits, enquiries, testimonials and portal login-event identifiers when no booking is ACTIVE (409 `HAS_ACTIVE_BOOKING`); bookings, payments, demands and ledger rows keep the customer code; one `customer.erased` audit row records counts and the reason, never the PII.
 - Backups: Super Admin export (JSON per table, zipped) via 15-minute signed link; sensitive fields encrypted at rest remain encrypted in the export.
 

@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ALL_PERMISSIONS, SYSTEM_ROLES } from "@kkt/contracts";
 import { createProject } from "./fixtures.js";
 import { createActiveBooking, validAadhaar } from "./fixtures/crm.js";
-import { buildTestApp, CREDS, type ErrorBody, type TestContext } from "./helpers.js";
+import { buildTestApp, CREDS, type ErrorBody, ifMatch, type TestContext, versionOf } from "./helpers.js";
 
 /**
  * Adversarial review of the security track: attacks the hardening of security-hardening.test.ts from the angles its tests left open —
@@ -96,6 +96,7 @@ describe("account management cannot widen the caller's reach", () => {
       const off = await t.request<ErrorBody>("POST", `/api/v1/users/${target.id}/deactivate`, {
         token: scopedAdmin,
         body: {},
+        headers: ifMatch(await versionOf(t, `/api/v1/users/${target.id}`, scopedAdmin)),
       });
       expect(off.status).toBe(403);
       const rename = await t.request<ErrorBody>("PATCH", `/api/v1/users/${target.id}`, {

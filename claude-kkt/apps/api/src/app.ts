@@ -1,6 +1,5 @@
 import compress from "@fastify/compress";
 import cors from "@fastify/cors";
-import etag from "@fastify/etag";
 import helmet from "@fastify/helmet";
 import multipart from "@fastify/multipart";
 import sensible from "@fastify/sensible";
@@ -26,6 +25,7 @@ import { lifecycle } from "./modules/system/lifecycle.js";
 import { usersModule } from "./modules/users/index.js";
 import authPlugin from "./plugins/auth.js";
 import dbPlugin from "./plugins/db.js";
+import etagPlugin from "./plugins/etag.js";
 import errorReporterPlugin from "./plugins/errorReporter.js";
 import idempotencyPlugin from "./plugins/idempotency.js";
 import loadShedPlugin from "./plugins/loadShed.js";
@@ -150,7 +150,8 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
     maxAge: 600,
   });
   await app.register(compress, { global: true, threshold: 1024, encodings: ["br", "gzip", "deflate"] });
-  await app.register(etag);
+  // ETag "v<version>" on single versioned resources (If-Match round trip, contract C6); body-hash ETag + 304 for everything else
+  await app.register(etagPlugin);
   await app.register(multipart, { limits: { fileSize: 15 * 1024 * 1024, files: 5 } });
   await app.register(sensible, { sharedSchemaId: undefined });
   await app.register(swagger, {

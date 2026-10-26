@@ -14,7 +14,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { appendOnly, idColumn, mutable, paise, percent, timestamps, trgm } from "./_common.js";
+import { appendOnly, idColumn, mutable, paise, percent, trgm, versioned } from "./_common.js";
 import { bookingOtherCharges, bookings } from "./bookings.js";
 import { customers } from "./customers.js";
 import {
@@ -72,7 +72,7 @@ export const demands = pgTable(
     voidedAt: timestamp("voided_at", { withTimezone: true }),
     voidReason: text("void_reason"),
     postedAt: timestamp("posted_at", { withTimezone: true }).notNull().defaultNow(),
-    ...timestamps(),
+    ...versioned(),
   },
   (t) => [
     unique("demands_company_number_uq").on(t.companyId, t.demandNumber),
@@ -83,11 +83,17 @@ export const demands = pgTable(
     index("demands_block_stage_idx").on(t.blockId, t.triggerStageId),
     index("demands_booking_posted_idx").on(t.bookingId, t.postedAt),
     index("demands_company_posted_idx").on(t.companyId, t.postedAt.desc(), t.id.desc()),
+    // migration 0005 (built CONCURRENTLY by src/sql/online/0005_indexes.sql): the demands list search
+    trgm("demands_demand_number_trgm_idx", t.demandNumber),
+    trgm("demands_installment_name_trgm_idx", t.installmentName),
     check("demands_split_chk", sql`${t.cashDemandPaise} + ${t.accountDemandPaise} = ${t.totalDemandPaise}`),
     check(
       "demands_amounts_nonneg_chk",
       sql`${t.cashDemandPaise} >= 0 AND ${t.accountDemandPaise} >= 0 AND ${t.paidPaise} >= 0`,
     ),
+    index("demands_customer_id_idx").on(t.customerId),
+    index("demands_project_id_idx").on(t.projectId),
+    index("demands_trigger_stage_id_idx").on(t.triggerStageId),
   ],
 );
 
@@ -149,6 +155,14 @@ export const payments = pgTable(
       .on(t.companyId, t.idempotencyKey)
       .where(sql`${t.idempotencyKey} IS NOT NULL`),
     trgm("payments_receipt_number_trgm_idx", t.receiptNumber),
+    // migration 0005 (online): the cheque / instrument number searched by GET /payments (`instrument ->> 'number'`)
+    index("payments_instrument_number_trgm_idx").using("gin", sql`(${t.instrument} ->> 'number') gin_trgm_ops`),
+    index("payments_bank_account_id_idx").on(t.bankAccountId),
+    index("payments_block_id_idx").on(t.blockId),
+    index("payments_customer_id_idx").on(t.customerId),
+    index("payments_other_charge_id_idx").on(t.otherChargeId),
+    index("payments_payment_mode_id_idx").on(t.paymentModeId),
+    index("payments_received_by_idx").on(t.receivedBy),
   ],
 );
 
@@ -160,6 +174,11 @@ export const ledgerEntries = pgTable(
     bookingId: uuid("booking_id")
       .notNull()
       .references(() => bookings.id),
+    /**
+     * Rebuild epoch (migration 0005, contract C7): a rebuild never deletes rows, it writes the restated ledger as epoch n+1;
+     * `bookings.ledger_epoch` names the current one. `seq` restarts at 1 in every epoch.
+     */
+    epoch: integer("epoch").notNull().default(1),
     seq: integer("seq").notNull(),
     at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
     entryDate: date("entry_date").notNull(),
@@ -181,8 +200,40 @@ export const ledgerEntries = pgTable(
     note: text("note"),
     ...appendOnly(),
   },
-  // The UNIQUE (booking_id, seq) index serves every ledger read; a second plain index on the same columns was dropped in 0002.
-  (t) => [unique("ledger_entries_booking_seq_uq").on(t.bookingId, t.seq)],
+  // UNIQUE (booking_id, epoch, seq) serves every ledger read (a booking's current epoch in seq order). Migration 0005 replaced
+  // UNIQUE (booking_id, seq): the index is built CONCURRENTLY and attached as the constraint by src/sql/online/0005_indexes.sql.
+  (t) => [
+    unique("ledger_entries_booking_epoch_seq_uq").on(t.bookingId, t.epoch, t.seq),
+    index("ledger_entries_company_id_idx").on(t.companyId),
+  ],
+);
+
+/**
+ * One row per ledger rebuild (contract C7): the booking's ledger moved from `from_epoch` to `to_epoch` for `reason` (agreement revision,
+ * plan change, stage undo, repair, admin recompute …). `summary` holds the money totals of the restated epoch. Append-only.
+ */
+export const ledgerRebuilds = pgTable(
+  "ledger_rebuilds",
+  {
+    id: idColumn(),
+    companyId: companyId(),
+    bookingId: uuid("booking_id")
+      .notNull()
+      .references(() => bookings.id),
+    fromEpoch: integer("from_epoch").notNull(),
+    toEpoch: integer("to_epoch").notNull(),
+    reason: text("reason").notNull(),
+    /** Staff user who caused the rebuild; NULL = system (jobs, repair runs). */
+    actorId: uuid("actor_id").references(() => users.id),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+    summary: jsonb("summary").$type<Record<string, unknown>>().notNull().default({}),
+  },
+  (t) => [
+    index("ledger_rebuilds_booking_at_idx").on(t.bookingId, t.at.desc()),
+    index("ledger_rebuilds_company_id_idx").on(t.companyId),
+    index("ledger_rebuilds_actor_id_idx").on(t.actorId),
+    check("ledger_rebuilds_epochs_chk", sql`${t.toEpoch} > ${t.fromEpoch} AND ${t.fromEpoch} >= 1`),
+  ],
 );
 
 export const contraEntries = pgTable(
@@ -201,5 +252,7 @@ export const contraEntries = pgTable(
   (t) => [
     index("contra_entries_company_date_idx").on(t.companyId, t.entryDate),
     check("contra_entries_amount_positive_chk", sql`${t.amountPaise} > 0`),
+    index("contra_entries_bank_account_id_idx").on(t.bankAccountId),
+    index("contra_entries_by_user_id_idx").on(t.byUserId),
   ],
 );

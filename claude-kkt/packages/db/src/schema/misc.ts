@@ -21,7 +21,10 @@ export const reportPresets = pgTable(
     params: jsonb("params").$type<JsonObject>().notNull().default({}),
     ...mutable(),
   },
-  (t) => [index("report_presets_user_report_idx").on(t.userId, t.reportKey)],
+  (t) => [
+    index("report_presets_user_report_idx").on(t.userId, t.reportKey),
+    index("report_presets_company_id_idx").on(t.companyId),
+  ],
 );
 
 export const integrityRuns = pgTable(
@@ -71,5 +74,6 @@ export const exports = pgTable(
     index("exports_user_created_idx").on(t.userId, t.createdAt.desc()),
     index("exports_status_expires_idx").on(t.status, t.expiresAt),
     check("exports_row_count_nonneg_chk", sql`${t.rowCount} IS NULL OR ${t.rowCount} >= 0`),
+    index("exports_company_id_idx").on(t.companyId),
   ],
 );

@@ -594,7 +594,9 @@ describe("request thread attachment smuggling", () => {
       const res = await attempt(ids);
       expect(res.status, label).toBe(400);
       expect(res.body.error.code, label).toBe("VALIDATION_ERROR");
-      expect(res.body.error.details?.["field"], label).toBe("attachment_ids");
+      expect((res.body.error.details?.["issues"] as { path: string }[] | undefined)?.[0]?.path, label).toBe(
+        "attachment_ids",
+      );
     }
     // nothing leaked into the thread
     const d = await ok<Request>(`/api/v1/portal/requests/${reqA1}`, tokenA);

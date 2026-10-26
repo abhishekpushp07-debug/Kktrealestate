@@ -116,7 +116,7 @@ describe("CMS site settings", () => {
       token: marketing,
       body: { disclaimer: "x" },
     });
-    expect(noVersion.status).toBe(400);
+    expect(noVersion.status).toBe(428);
     const stale = await t.request<ErrorBody>("PATCH", "/api/v1/cms/site", {
       token: marketing,
       body: { version: 9, disclaimer: "x" },
@@ -234,7 +234,13 @@ describe("CMS content", () => {
     const site = await pub<Site>("/api/v1/public/site");
     expect(site.status, site.text).toBe(200);
     expect(site.body.banners.map((b) => b.title)).toContain("Diwali Dhamaka");
-    const del = await t.request("DELETE", `/api/v1/cms/banners/${r1.body.id}`, { token: marketing });
+    const bannerVersion = (
+      await t.request<{ version: number }>("GET", `/api/v1/cms/banners/${r1.body.id}`, { token: admin })
+    ).body.version;
+    const del = await t.request("DELETE", `/api/v1/cms/banners/${r1.body.id}`, {
+      token: marketing,
+      headers: { "if-match": `"v${bannerVersion}"` },
+    });
     expect(del.status).toBe(204);
     expect((await t.request("GET", `/api/v1/cms/banners/${r1.body.id}`, { token: admin })).status).toBe(404);
     const audits = await t.app.sql<

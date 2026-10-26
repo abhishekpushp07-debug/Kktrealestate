@@ -23,6 +23,8 @@ const EVENT_VARIANT: Readonly<
   OTHER_CHARGE_PAYMENT: "success",
   OTHER_CHARGE_REVERSAL: "danger",
   CANCELLATION: "danger",
+  DEMAND_VOIDED: "neutral",
+  LEDGER_RESTATED: "info",
 };
 
 function CategoryChip({ row }: { row: LedgerRow }) {

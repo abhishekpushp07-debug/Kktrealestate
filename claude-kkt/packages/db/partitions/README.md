@@ -40,8 +40,9 @@ What a conversion does (no row is copied):
    (`<table>_yYYYYmMM`, UTC calendar months) are created.
 
 Uniqueness that does not include `created_at` cannot be a unique index on a partitioned table. The only such rule is the ledger's
-`UNIQUE (booking_id, seq)`; after the conversion it is a plain index plus the trigger `ledger_entries_booking_seq_unique`, which takes a
-transaction-scoped advisory lock on `(booking, seq)` and raises the same `23505 ledger_entries_booking_seq_uq` error on a duplicate
+`UNIQUE (booking_id, epoch, seq)` (migration 0005; ledger epochs); after the conversion it is a plain index plus the trigger
+`ledger_entries_booking_seq_unique`, which takes a transaction-scoped advisory lock on `(booking, epoch, seq)` and raises the same
+`23505 ledger_entries_booking_epoch_seq_uq` error on a duplicate
 (race-free under READ COMMITTED, the isolation level the API uses; the money module also serialises ledger appends per booking).
 
 ## Keeping months ahead

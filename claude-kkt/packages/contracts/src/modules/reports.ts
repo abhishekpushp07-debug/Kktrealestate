@@ -28,6 +28,7 @@ import {
   SignedPaiseSchema,
   TimestampSchema,
   listEnvelope,
+  VersionSchema,
 } from "../common.js";
 import { ChequeRowSchema } from "./payments.js";
 import {
@@ -565,6 +566,8 @@ export const ReportPresetRowSchema = z.object({
   name: z.string(),
   params: z.record(z.string(), z.unknown()),
   created_at: TimestampSchema,
+  /** Optimistic-concurrency version: DELETE /reports/presets/:id requires it (If-Match "v<n>"). */
+  version: VersionSchema,
 });
 export type ReportPresetRow = z.infer<typeof ReportPresetRowSchema>;
 

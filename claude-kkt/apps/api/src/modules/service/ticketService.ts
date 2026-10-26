@@ -355,7 +355,7 @@ async function resolveCategory(
     .from(serviceCategories)
     .where(and(eq(serviceCategories.id, categoryId), eq(serviceCategories.companyId, companyId)))
     .limit(1);
-  if (!cat) throw ApiError.badRequest("category_id does not exist", { field: "category_id" });
+  if (!cat) throw ApiError.invalid("category_id", "category_id does not exist");
   if (!cat.isActive)
     throw ApiError.rule("Service category is inactive", "CATEGORY_INACTIVE", { category_id: categoryId });
   return cat;
@@ -367,7 +367,7 @@ async function resolveAssignee(tx: Executor, companyId: string, userId: string):
     .from(users)
     .where(and(eq(users.id, userId), eq(users.companyId, companyId)))
     .limit(1);
-  if (!u) throw ApiError.badRequest("assignee_user_id does not exist", { field: "assignee_user_id" });
+  if (!u) throw ApiError.invalid("assignee_user_id", "assignee_user_id does not exist");
   if (!u.isActive) throw ApiError.rule("Assignee is inactive", "ASSIGNEE_INACTIVE", { assignee_user_id: userId });
   return u;
 }
@@ -438,9 +438,11 @@ export async function assertAttachments(
   const found = new Set(rows.map((r) => r.id));
   const missing = ids.filter((id) => !found.has(id));
   if (missing.length > 0)
-    throw ApiError.badRequest(
+    throw ApiError.invalid(
+      "attachment_ids",
       "attachment_ids references a document that does not exist or does not belong to this request",
-      { field: "attachment_ids", missing },
+      "invalid",
+      { missing },
     );
 }
 
@@ -508,7 +510,7 @@ async function createTicketCore(
     .from(customers)
     .where(and(eq(customers.id, input.customerId), eq(customers.companyId, companyId)))
     .limit(1);
-  if (!customer) throw ApiError.badRequest("customer_id does not exist", { field: "customer_id" });
+  if (!customer) throw ApiError.invalid("customer_id", "customer_id does not exist");
   if (!customer.isActive)
     throw ApiError.rule("Customer is inactive", "CUSTOMER_INACTIVE", { customer_id: input.customerId });
 
@@ -600,7 +602,7 @@ export async function createTicket(
   const t = await createTicketCore(tx, ctx.user.companyId, input, actor, ctx.meta, {
     scopeUser: ctx.user,
     bookingNotTheirs: () =>
-      ApiError.badRequest("booking_id does not exist or does not belong to this customer", { field: "booking_id" }),
+      ApiError.invalid("booking_id", "booking_id does not exist or does not belong to this customer"),
   });
   return ticketDetail(tx, t);
 }
@@ -1096,7 +1098,7 @@ export async function rateByCustomer(
   if (existing.sr.rating !== null)
     throw ApiError.conflict("ALREADY_RATED", "This request has already been rated", { rating: existing.sr.rating });
   if (!Number.isInteger(rating) || rating < 1 || rating > 5)
-    throw ApiError.badRequest("rating must be between 1 and 5", { field: "rating" });
+    throw ApiError.invalid("rating", "rating must be between 1 and 5");
   const now = new Date();
   const patch: Record<string, unknown> = { rating, ratingComment: comment?.trim() || null };
   if (existing.sr.status === "RESOLVED") Object.assign(patch, statusPatch(existing.sr, "CLOSED", now));

@@ -237,13 +237,15 @@ export async function assertDocuments(
     if (!id) continue;
     const d = docs.get(id);
     if (!d || d.companyId !== companyId)
-      throw ApiError.badRequest(`${field}: document ${id} not found`, { field, document_id: id });
+      throw ApiError.invalid(field, `${field}: document ${id} not found`, "invalid", { document_id: id });
     if (d.isSensitive)
-      throw ApiError.badRequest(`${field}: sensitive documents cannot be published`, { field, document_id: id });
+      throw ApiError.invalid(field, `${field}: sensitive documents cannot be published`, "invalid", {
+        document_id: id,
+      });
     if (kind === "image" && !d.mime.startsWith("image/"))
-      throw ApiError.badRequest(`${field}: document ${id} is not an image`, { field, document_id: id });
+      throw ApiError.invalid(field, `${field}: document ${id} is not an image`, "invalid", { document_id: id });
     if (kind === "pdf" && d.mime !== "application/pdf")
-      throw ApiError.badRequest(`${field}: document ${id} is not a PDF`, { field, document_id: id });
+      throw ApiError.invalid(field, `${field}: document ${id} is not a PDF`, "invalid", { document_id: id });
   }
   return docs;
 }
@@ -326,5 +328,6 @@ export async function assertProjects(
     .where(and(eq(projects.companyId, companyId), inArray(projects.id, unique)));
   const found = new Set(rows.map((r) => r.id));
   const missing = unique.filter((id) => !found.has(id));
-  if (missing.length > 0) throw ApiError.badRequest(`${field}: project ${missing[0]} not found`, { field, missing });
+  if (missing.length > 0)
+    throw ApiError.invalid(field, `${field}: project ${missing[0]} not found`, "invalid", { missing });
 }

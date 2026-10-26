@@ -238,7 +238,7 @@ export interface StatusChangeInput {
 export function assertHoldUntil(holdUntil: Date | null): void {
   if (holdUntil === null) return;
   if (Number.isNaN(holdUntil.getTime()) || holdUntil.getTime() <= Date.now())
-    throw ApiError.badRequest("hold_until must be in the future", { field: "hold_until" });
+    throw ApiError.invalid("hold_until", "hold_until must be in the future");
 }
 
 /**
@@ -475,7 +475,7 @@ export function registerFlatRoutes(app: FastifyInstance): void {
       };
       const version = expectedVersion(req, body);
       if (body.price_breakup && body.price_breakup.reduce((s, l) => s + l.amount_paise, 0) !== body.price_paise)
-        throw ApiError.badRequest("Breakup lines must add up to price_paise", { field: "price_breakup" });
+        throw ApiError.invalid("price_breakup", "Breakup lines must add up to price_paise");
       return app.db.transaction(async (tx) => {
         const flat = await loadFlat(tx, user, req.params.id, true);
         if (ENGINE_STATUSES.has(flat.status))
@@ -612,7 +612,7 @@ export function registerFlatRoutes(app: FastifyInstance): void {
           .from(flatTypes)
           .where(and(eq(flatTypes.id, body.flat_type_id), eq(flatTypes.companyId, user.companyId)))
           .limit(1);
-        if (!ft) throw ApiError.badRequest("flat_type_id does not exist", { field: "flat_type_id" });
+        if (!ft) throw ApiError.invalid("flat_type_id", "flat_type_id does not exist");
         if (!ft.isActive) throw ApiError.rule(`Flat type ${ft.name} is inactive`, "FLAT_TYPE_INACTIVE");
         const domain = flatTypeToDomain(ft);
         const changes: Record<string, unknown> = {

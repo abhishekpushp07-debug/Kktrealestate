@@ -202,7 +202,10 @@ kubectl apply -k infra/k8s
   default privileges for everything the owner creates later. No `TRUNCATE`, no DDL (no `CREATE` on the schema, not an owner), cannot
   `ALTER TABLE … DISABLE TRIGGER` or `SET session_replication_role`, so the append-only triggers on `audit_logs`, `payments` and
   `demands` hold against the application itself. It has `pg_read_all_stats` (connection states for `/metrics`) and the safety timeouts
-  as role defaults. `apps/api/test/integration/db-roles.test.ts` proves all of this against the real migrations.
+  as role defaults. Since migration 0005 it also has **no UPDATE/DELETE/TRUNCATE on `ledger_entries`, `audit_logs`, `audit_seals`,
+  `ledger_rebuilds`** and **no DELETE/TRUNCATE on `payments`, `demands`** (`packages/db/src/sql/0002_privileges.sql`, applied by every
+  migration that changes the schema when `kkt_app` exists, and by `01-roles.sql`). Reseed (never in production) truncates as the
+  owner. `apps/api/test/integration/db-roles.test.ts` proves all of this against the real migrations.
 
 `infra/postgres/init/02-passwords.sh` sets both passwords from the secret files (production) or `KKT_OWNER_DB_PASSWORD` /
 `KKT_APP_DB_PASSWORD` (quick start); re-run it to rotate. Jobs that would need DDL at runtime (e.g. creating next month's partitions)
@@ -270,8 +273,13 @@ whitespace is trimmed; setting both `<NAME>` and `<NAME>_FILE` is an error, as i
 | `REDIS_COMMAND_TIMEOUT_MS` | `2000`                        | Upper bound of one command on the API's Redis clients (ioredis `commandTimeout`, 100–60000). Reads with a database fallback (caches, session state, idempotency fast path, rate limits) skip a disconnected Redis at once and give a slow one at most 150–250 ms, so a Redis outage costs requests no noticeable latency. |
 | `REDIS_SECURITY_URL`       | — (falls back to `REDIS_URL`) | Separate Redis configured `maxmemory-policy noeviction` for token revocation markers, locks and rate limits, so cache eviction can never drop them.                                                                                                                                                                       |
 
-Migrations take the session-level advisory lock `pg_advisory_lock(hashtext('kkt:migrate'))`, so several replicas booting at once
-apply them one after the other (the later ones find nothing to do).
+Migrations take the session-level advisory lock `hashtext('kkt:migrate')`, so several replicas booting at once apply them one after
+the other (the later ones find nothing to do); waiting replicas poll `pg_try_advisory_lock` rather than block inside a statement, so
+they never hold a snapshot an online `CREATE INDEX CONCURRENTLY` would wait for. Hand-written SQL files are re-applied only when their
+sha256 changes (or a new drizzle migration was applied), online files (`packages/db/src/sql/online`) run statement by statement outside
+a transaction; set `KKT_MIGRATE_REAPPLY_SQL=true` on the migrate job to force every file once (e.g. after restoring a schema by hand).
+Rules for writing migrations: docs/DATA-MODEL.md §J. An online index build waits for transactions older than itself: deploy the
+migrate job when no long report or backup transaction is running, or expect it to wait for them.
 
 ### Key rotation
 

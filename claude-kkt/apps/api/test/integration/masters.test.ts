@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createBasics, type Basics } from "./fixtures.js";
-import { buildTestApp, type ErrorBody, type TestContext } from "./helpers.js";
+import { buildTestApp, ifMatch, versionOf, type ErrorBody, type TestContext } from "./helpers.js";
 
 let t: TestContext;
 let token: string;
@@ -233,7 +233,8 @@ describe.each(cases)("masters/$path", (c) => {
     expect(viaHeader.status, viaHeader.text).toBe(200);
     expect(viaHeader.body.version).toBe(3);
     const noVersion = await t.request<ErrorBody>("PATCH", `${url}/${created.body.id}`, { token, body: c.patch });
-    expect(noVersion.status).toBe(400);
+    expect(noVersion.status).toBe(428);
+    expect(noVersion.body.error.code).toBe("VERSION_REQUIRED");
     const usage = await t.request<{ usage_count: number; used_by: unknown[] }>(
       "GET",
       `${url}/${created.body.id}/usage`,
@@ -254,7 +255,7 @@ describe.each(cases)("masters/$path", (c) => {
     expect(shown.body.items.map((i) => i.id)).toContain(created.body.id);
     const restored = await t.request<{ is_active: boolean }>("POST", `${url}/${created.body.id}/activate`, {
       token,
-      body: {},
+      body: { version: deact.body.version },
     });
     expect(restored.status).toBe(200);
     expect(restored.body.is_active).toBe(true);
@@ -436,17 +437,18 @@ describe("kind-specific rules", () => {
       { token },
     );
     expect(usage.body.used_by).toEqual([{ entity_type: "floor_plan_templates", count: 1 }]);
-    const stage = await t.request<ErrorBody>(
-      "POST",
-      `/api/v1/masters/construction-stages/${basics.stageIds[2]}/deactivate`,
-      { token, body: {} },
-    );
+    const stageUrl = `/api/v1/masters/construction-stages/${basics.stageIds[2]}`;
+    const stage = await t.request<{ version: number }>("POST", `${stageUrl}/deactivate`, {
+      token,
+      body: {},
+      headers: ifMatch(await versionOf(t, stageUrl, token)),
+    });
     expect(stage.status).toBe(200); // not referenced yet
     expect(
       (
-        await t.request("POST", `/api/v1/masters/construction-stages/${basics.stageIds[2]}/activate`, {
+        await t.request("POST", `${stageUrl}/activate`, {
           token,
-          body: {},
+          body: { version: stage.body.version },
         })
       ).status,
     ).toBe(200);

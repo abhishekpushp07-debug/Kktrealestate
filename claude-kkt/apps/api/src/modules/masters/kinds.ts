@@ -410,7 +410,7 @@ export const specItemsKind = kind({
         .from(specCategories)
         .where(and(eq(specCategories.id, input["category_id"]), eq(specCategories.companyId, ctx.companyId)))
         .limit(1);
-      if (!cat) throw ApiError.badRequest("category_id does not exist", { field: "category_id" });
+      if (!cat) throw ApiError.invalid("category_id", "category_id does not exist");
       if (!cat.isActive) throw ApiError.rule("Specification category is inactive", "CATEGORY_INACTIVE");
     }
     return camelRow(input);
@@ -500,7 +500,7 @@ export const flatTypesKind = kind({
       const byId = new Map(found.map((f) => [f.id, f]));
       values["rooms"] = rooms.map((r) => {
         const rt = byId.get(r.room_type_id);
-        if (!rt) throw ApiError.badRequest(`Unknown room type ${r.room_type_id}`, { field: "rooms" });
+        if (!rt) throw ApiError.invalid("rooms", `Unknown room type ${r.room_type_id}`);
         if (!rt.isActive) throw ApiError.rule(`Room type ${rt.name} is inactive`, "ROOM_TYPE_INACTIVE");
         const sqft = r.sqft ?? Math.round(r.length_ft * r.width_ft * 100) / 100;
         return {
@@ -515,7 +515,7 @@ export const flatTypesKind = kind({
     }
     if ("areas" in values || !existing) {
       const ids = [...new Set(areas.map((a) => a.area_type_id))];
-      if (ids.length !== areas.length) throw ApiError.badRequest("Each area type once", { field: "areas" });
+      if (ids.length !== areas.length) throw ApiError.invalid("areas", "Each area type once");
       const found = ids.length
         ? await tx
             .select({ id: areaTypes.id, name: areaTypes.name, code: areaTypes.code, isActive: areaTypes.isActive })
@@ -525,7 +525,7 @@ export const flatTypesKind = kind({
       const byId = new Map(found.map((f) => [f.id, f]));
       const snap = areas.map((a) => {
         const at = byId.get(a.area_type_id);
-        if (!at) throw ApiError.badRequest(`Unknown area type ${a.area_type_id}`, { field: "areas" });
+        if (!at) throw ApiError.invalid("areas", `Unknown area type ${a.area_type_id}`);
         if (!at.isActive) throw ApiError.rule(`Area type ${at.name} is inactive`, "AREA_TYPE_INACTIVE");
         return { area_type_id: a.area_type_id, area_type_code: at.code, area_type_name: at.name, sqft: a.sqft };
       });
@@ -560,8 +560,7 @@ export const flatTypesKind = kind({
         .select({ id: specItems.id })
         .from(specItems)
         .where(and(eq(specItems.companyId, ctx.companyId), inArray(specItems.id, ids)));
-      if (found.length !== ids.length)
-        throw ApiError.badRequest("Unknown specification item id", { field: "spec_item_ids" });
+      if (found.length !== ids.length) throw ApiError.invalid("spec_item_ids", "Unknown specification item id");
       values["specItemIds"] = ids;
     }
     return values;
@@ -610,7 +609,7 @@ export const floorPlanTemplatesKind = kind({
     if (positions) {
       const sorted = [...positions].map((p) => p.position).sort((a, b) => a - b);
       if (!sorted.every((p, i) => p === i + 1))
-        throw ApiError.badRequest("Positions must be 1..n without gaps or duplicates", { field: "positions" });
+        throw ApiError.invalid("positions", "Positions must be 1..n without gaps or duplicates");
       const ids = [...new Set(positions.map((p) => p.flat_type_id))];
       const found = await tx
         .select({ id: flatTypes.id, isActive: flatTypes.isActive, name: flatTypes.name })
@@ -619,7 +618,7 @@ export const floorPlanTemplatesKind = kind({
       const byId = new Map(found.map((f) => [f.id, f]));
       for (const p of positions) {
         const ft = byId.get(p.flat_type_id);
-        if (!ft) throw ApiError.badRequest(`Unknown flat type ${p.flat_type_id}`, { field: "positions" });
+        if (!ft) throw ApiError.invalid("positions", `Unknown flat type ${p.flat_type_id}`);
         if (!ft.isActive) throw ApiError.rule(`Flat type ${ft.name} is inactive`, "FLAT_TYPE_INACTIVE");
       }
       values["positions"] = positions.map((p) => ({
@@ -724,13 +723,13 @@ export const constructionStagesKind = kind({
       handler: async (req) => {
         const user = req.user!;
         const ids = req.body.stage_ids;
-        if (new Set(ids).size !== ids.length) throw ApiError.badRequest("Duplicate stage ids", { field: "stage_ids" });
+        if (new Set(ids).size !== ids.length) throw ApiError.invalid("stage_ids", "Duplicate stage ids");
         return app.db.transaction(async (tx) => {
           const found = await tx
             .select({ id: constructionStages.id })
             .from(constructionStages)
             .where(and(eq(constructionStages.companyId, user.companyId), inArray(constructionStages.id, ids)));
-          if (found.length !== ids.length) throw ApiError.badRequest("Unknown stage id", { field: "stage_ids" });
+          if (found.length !== ids.length) throw ApiError.invalid("stage_ids", "Unknown stage id");
           for (const [i, id] of ids.entries())
             await tx
               .update(constructionStages)

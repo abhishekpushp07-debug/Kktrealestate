@@ -156,12 +156,12 @@ async function assertRatesAndRules(
 ): Promise<void> {
   if (rates) {
     const ids = [...new Set(rates.map((r) => r.flat_type_id))];
-    if (ids.length !== rates.length) throw ApiError.badRequest("Each flat type once", { field: "rates" });
+    if (ids.length !== rates.length) throw ApiError.invalid("rates", "Each flat type once");
     const found = await tx
       .select({ id: flatTypes.id, isActive: flatTypes.isActive, name: flatTypes.name })
       .from(flatTypes)
       .where(and(eq(flatTypes.companyId, companyId), inArray(flatTypes.id, ids)));
-    if (found.length !== ids.length) throw ApiError.badRequest("Unknown flat type id in rates", { field: "rates" });
+    if (found.length !== ids.length) throw ApiError.invalid("rates", "Unknown flat type id in rates");
     const inactive = found.find((f) => !f.isActive);
     if (inactive)
       throw ApiError.rule(`Flat type ${inactive.name} is inactive`, "FLAT_TYPE_INACTIVE", {
@@ -174,8 +174,7 @@ async function assertRatesAndRules(
       .select({ id: plcTypes.id, isActive: plcTypes.isActive, name: plcTypes.name })
       .from(plcTypes)
       .where(and(eq(plcTypes.companyId, companyId), inArray(plcTypes.id, ids)));
-    if (found.length !== ids.length)
-      throw ApiError.badRequest("Unknown PLC type id in plc_rules", { field: "plc_rules" });
+    if (found.length !== ids.length) throw ApiError.invalid("plc_rules", "Unknown PLC type id in plc_rules");
     const inactive = found.find((f) => !f.isActive);
     if (inactive)
       throw ApiError.rule(`PLC type ${inactive.name} is inactive`, "PLC_TYPE_INACTIVE", { plc_type_id: inactive.id });
@@ -381,7 +380,7 @@ export function registerRateCardRoutes(app: FastifyInstance): void {
       if (body.rate_card_id) {
         const rc = await loadRateCard(db, user, body.rate_card_id);
         if (rc.projectId !== project.id)
-          throw ApiError.badRequest("rate_card_id belongs to another project", { field: "rate_card_id" });
+          throw ApiError.invalid("rate_card_id", "rate_card_id belongs to another project");
         card = await loadRateCardDomain(db, rc.id);
         cardName = rc.name;
       } else {
@@ -400,8 +399,7 @@ export function registerRateCardRoutes(app: FastifyInstance): void {
       let superBuiltupSqft: number | null = null;
       if (body.flat_id) {
         const flat = await loadFlat(db, user, body.flat_id);
-        if (flat.projectId !== project.id)
-          throw ApiError.badRequest("flat_id belongs to another project", { field: "flat_id" });
+        if (flat.projectId !== project.id) throw ApiError.invalid("flat_id", "flat_id belongs to another project");
         const [block] = await db
           .select({ floorStart: blocks.floorStart })
           .from(blocks)
@@ -426,7 +424,7 @@ export function registerRateCardRoutes(app: FastifyInstance): void {
         .from(flatTypes)
         .where(and(eq(flatTypes.id, flatTypeId), eq(flatTypes.companyId, user.companyId)))
         .limit(1);
-      if (!ft) throw ApiError.badRequest("flat_type_id does not exist", { field: "flat_type_id" });
+      if (!ft) throw ApiError.invalid("flat_type_id", "flat_type_id does not exist");
       const domain = flatTypeToDomain(ft);
       const sqft = superBuiltupSqft ?? domain.superBuiltupSqft;
       const resolvedFacing = facing ?? domain.facing ?? null;
@@ -471,7 +469,7 @@ export function registerRateCardRoutes(app: FastifyInstance): void {
       if (req.query.rate_card_id) {
         const rc = await loadRateCard(db, user, req.query.rate_card_id);
         if (rc.projectId !== flat.projectId)
-          throw ApiError.badRequest("rate_card_id belongs to another project", { field: "rate_card_id" });
+          throw ApiError.invalid("rate_card_id", "rate_card_id belongs to another project");
         card = await loadRateCardDomain(db, rc.id);
       } else card = await loadActiveRateCard(db, flat.projectId);
       const [[block], [ft]] = await Promise.all([
@@ -684,7 +682,7 @@ export function registerRateCardRoutes(app: FastifyInstance): void {
         if (body.block_id) {
           const block = await loadBlock(tx, user, body.block_id);
           if (block.projectId !== card.projectId)
-            throw ApiError.badRequest("block_id belongs to another project", { field: "block_id" });
+            throw ApiError.invalid("block_id", "block_id belongs to another project");
         }
         const loaded = await loadRateCardDomain(tx, card.id);
         if (!loaded) throw ApiError.notFound("Rate card");

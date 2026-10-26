@@ -31,7 +31,7 @@ import { ApiError } from "../../lib/errors.js";
 import { escapeLike, listPaging, paginate } from "../../lib/list.js";
 import { route } from "../../lib/routes.js";
 import { ensureProjectAccess, type StaffContext } from "../../lib/scope.js";
-import { applyUpdate, expectedVersion } from "../../lib/version.js";
+import { applyUpdate, expectedVersion, withOptionalVersion } from "../../lib/version.js";
 import { canonicalPhone, createCustomer, loadCustomerSelect, metaOf, validationError } from "./customerService.js";
 import {
   LEAD_SELECT,
@@ -424,16 +424,16 @@ export function leadRoutes(app: FastifyInstance): void {
     permission: "lead.write",
     schema: {
       params: idParams,
-      body: LeadStageChangeBodySchema,
+      body: withOptionalVersion(LeadStageChangeBodySchema),
       response: { 200: LeadRowSchema },
       summary: "Move a lead along the pipeline (LOST needs a reason; CONVERTED only via /convert)",
     },
     handler: async (req) => {
+      const version = expectedVersion(req, req.body);
       const user = req.user!;
       return app.db.transaction(async (tx) => {
         const sel = await loadLeadFor(tx, user, req.params.id, true);
-        if (sel.l.version !== req.body.version)
-          await applyUpdate(tx, leads, req.params.id, req.body.version, {}, "lead"); // raises 409 VERSION_CONFLICT
+        if (sel.l.version !== version) await applyUpdate(tx, leads, req.params.id, version, {}, "lead"); // raises 409 VERSION_CONFLICT
         await setLeadStage(tx, sel.l, req.body.stage, {
           reason: req.body.lost_reason ?? req.body.reason ?? null,
           note: req.body.note ?? null,
@@ -514,11 +514,12 @@ export function leadRoutes(app: FastifyInstance): void {
     permission: "lead.write",
     schema: {
       params: idParams,
-      body: LeadAssignSchema,
+      body: withOptionalVersion(LeadAssignSchema),
       response: { 200: LeadRowSchema },
       summary: "Assign (or unassign) a lead",
     },
     handler: async (req) => {
+      const version = expectedVersion(req, req.body);
       const user = req.user!;
       return app.db.transaction(async (tx) => {
         const sel = await loadLeadFor(tx, user, req.params.id, true);
@@ -527,7 +528,7 @@ export function leadRoutes(app: FastifyInstance): void {
           tx,
           leads,
           req.params.id,
-          req.body.version,
+          version,
           { assignedUserId: req.body.assigned_user_id, lastActivityAt: new Date() },
           "lead",
         );
@@ -579,11 +580,12 @@ export function leadRoutes(app: FastifyInstance): void {
     idempotent: true,
     schema: {
       params: idParams,
-      body: LeadConvertSchema,
+      body: withOptionalVersion(LeadConvertSchema),
       response: { 200: LeadConvertResponseSchema },
       summary: "Convert a lead: link or create the customer, stage CONVERTED, optional booking draft",
     },
     handler: async (req) => {
+      const version = expectedVersion(req, req.body);
       const user = req.user!;
       const b = req.body;
       return app.db.transaction(async (tx) => {
@@ -596,7 +598,7 @@ export function leadRoutes(app: FastifyInstance): void {
           }
           throw ApiError.rule("Lead is already converted", "LEAD_CLOSED", { customer_id: sel.l.customerId });
         }
-        if (sel.l.version !== b.version) await applyUpdate(tx, leads, req.params.id, b.version, {}, "lead");
+        if (sel.l.version !== version) await applyUpdate(tx, leads, req.params.id, version, {}, "lead");
         let customerId: string;
         let customerCode: string;
         if (b.customer_id) {

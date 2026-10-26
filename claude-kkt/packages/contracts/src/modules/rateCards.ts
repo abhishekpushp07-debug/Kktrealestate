@@ -4,6 +4,7 @@ import {
   AuditedRowSchema,
   DateStringSchema,
   IdSchema,
+  hasMaxDecimals,
   ListQuerySchema,
   MoneyBreakupLineSchema,
   NameSchema,
@@ -41,8 +42,16 @@ export const PlcRuleSchema = z
     if (r.calc_mode === "PERCENT" && r.value > 100) {
       ctx.addIssue({ code: "custom", message: "Percent PLC cannot exceed 100", path: ["value"] });
     }
-    if (r.calc_mode !== "PERCENT" && !Number.isInteger(r.value)) {
-      ctx.addIssue({ code: "custom", message: "Paise values must be integers", path: ["value"] });
+    // the pricing engine works in basis points (packages/domain toBasisPoints): a third decimal would fail every price later
+    if (r.calc_mode === "PERCENT" && !hasMaxDecimals(r.value, 2)) {
+      ctx.addIssue({ code: "custom", message: "A percent PLC has at most 2 decimal places", path: ["value"] });
+    }
+    if (r.calc_mode !== "PERCENT" && !Number.isSafeInteger(r.value)) {
+      ctx.addIssue({
+        code: "custom",
+        message: "FIXED, per-sq-ft and floor-rise PLC values are whole paise (integers)",
+        path: ["value"],
+      });
     }
     if (r.applies_to === "FLOORS_GTE" && (r.floors_gte === undefined || r.floors_gte === null)) {
       ctx.addIssue({ code: "custom", message: "floors_gte is required for FLOORS_GTE", path: ["floors_gte"] });

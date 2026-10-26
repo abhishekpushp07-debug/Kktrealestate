@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createProject } from "./fixtures.js";
-import { buildTestApp, CREDS, type ErrorBody, type TestContext } from "./helpers.js";
+import { buildTestApp, CREDS, type ErrorBody, ifMatch, type TestContext, versionOf } from "./helpers.js";
 
 let t: TestContext;
 beforeAll(async () => {
@@ -223,6 +223,7 @@ describe("users admin", () => {
     const self = await t.request<ErrorBody>("POST", `/api/v1/users/${admin.user.id}/deactivate`, {
       token: admin.access_token,
       body: {},
+      headers: ifMatch(await versionOf(t, `/api/v1/users/${admin.user.id}`, admin.access_token)),
     });
     expect(self.status).toBe(403); // nobody changes their own active state
     expect(self.body.error.details?.["reason"]).toBe("SELF_CHANGE");
@@ -269,6 +270,7 @@ describe("users admin", () => {
     const deact = await t.request<ErrorBody>("POST", `/api/v1/roles/${sales.id}/deactivate`, {
       token: admin.access_token,
       body: {},
+      headers: ifMatch(await versionOf(t, `/api/v1/roles/${sales.id}`, admin.access_token)),
     });
     expect(deact.status).toBe(409);
     expect(deact.body.error.code).toBe("SYSTEM_ROLE");

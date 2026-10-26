@@ -23,7 +23,7 @@ import { sendCsv } from "../../lib/csv.js";
 import { listPaging, paginate } from "../../lib/list.js";
 import { route } from "../../lib/routes.js";
 import { ensureProjectAccess } from "../../lib/scope.js";
-import { expectedVersion, optionalExpectedVersion, withOptionalVersion } from "../../lib/version.js";
+import { expectedVersion, withOptionalVersion } from "../../lib/version.js";
 import {
   TICKET_SEARCH_COLUMNS,
   TICKET_SORTABLE,
@@ -292,8 +292,8 @@ export function ticketRoutes(app: FastifyInstance): void {
     },
     handler: async (req, reply) => {
       const detail = await app.db.transaction(async (tx) => {
-        const current = await requireStaffTicket(tx, req.user!, req.params.id);
-        const version = optionalExpectedVersion(req, null, current.sr.version);
+        await requireStaffTicket(tx, req.user!, req.params.id); // out of scope → 404 before the version check
+        const version = expectedVersion(req, null);
         return addStaffMessage(tx, ctxOf(req), req.params.id, version, req.body);
       });
       return reply.code(201).send(detail);

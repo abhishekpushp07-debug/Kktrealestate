@@ -14,6 +14,7 @@ import { reportPresets } from "@kkt/db";
 import { actorFromRequest, auditMeta, writeAudit } from "../../../lib/audit.js";
 import { ApiError } from "../../../lib/errors.js";
 import { route } from "../../../lib/routes.js";
+import { assertVersion, expectedVersion } from "../../../lib/version.js";
 import { REPORT_CATALOG } from "./reports.js";
 
 type PresetRecord = typeof reportPresets.$inferSelect;
@@ -35,6 +36,7 @@ function toRow(p: PresetRecord): ReportPresetRow {
     name: p.name,
     params: p.params,
     created_at: p.createdAt.toISOString(),
+    version: p.version,
   };
 }
 
@@ -145,6 +147,14 @@ export function registerPresetRoutes(app: FastifyInstance): void {
           )
           .limit(1);
         if (!existing) throw ApiError.notFound("Preset");
+        await assertVersion(
+          tx,
+          reportPresets,
+          existing.id,
+          existing.version,
+          expectedVersion(req, null),
+          "report_preset",
+        );
         await tx.delete(reportPresets).where(eq(reportPresets.id, existing.id));
         await writeAudit(tx, {
           companyId: user.companyId,

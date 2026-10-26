@@ -25,6 +25,7 @@ import {
   SignedPaiseSchema,
   TextSchema,
   TimestampSchema,
+  VersionSchema,
   VersionedSchema,
   listEnvelope,
 } from "../common.js";
@@ -129,6 +130,8 @@ export const BookingDraftRowSchema = z.object({
   project_name: z.string().nullable(),
   customer_name: z.string().nullable(),
   updated_at: TimestampSchema,
+  /** Optimistic-concurrency version: DELETE /booking-drafts/:id requires it (If-Match "v<n>"). */
+  version: VersionSchema,
 });
 export type BookingDraftRow = z.infer<typeof BookingDraftRowSchema>;
 
@@ -504,6 +507,8 @@ export const DemandRowSchema = z.object({
   void_reason: z.string().nullable(),
   posted_at: TimestampSchema,
   created_at: TimestampSchema,
+  /** Optimistic-concurrency version (migration 0005): bumped by every change, including a payment applied to the demand. */
+  version: VersionSchema,
 });
 export type DemandRow = z.infer<typeof DemandRowSchema>;
 
@@ -539,6 +544,8 @@ export const OtherChargeRowSchema = z.object({
   paid_paise: PaiseSchema,
   due_paise: SignedPaiseSchema,
   sort_order: z.int(),
+  /** Optimistic-concurrency version (migration 0005); POST …/other-charges/:lineId/demand checks it when `line_version` is sent. */
+  version: VersionSchema,
 });
 export type OtherChargeRow = z.infer<typeof OtherChargeRowSchema>;
 
@@ -582,6 +589,8 @@ export type FlatNotAvailableDetails = z.infer<typeof FlatNotAvailableDetailsSche
 export const OtherChargeDemandLineSchema = z.strictObject({
   ...VersionedSchema.shape,
   due_date: DateStringSchema.optional(),
+  /** The line's own version as read (OtherChargeRow.version): a line changed since (e.g. a payment) answers 409 VERSION_CONFLICT. */
+  line_version: VersionSchema.optional(),
 });
 export type OtherChargeDemandLine = z.infer<typeof OtherChargeDemandLineSchema>;
 

@@ -26,7 +26,7 @@ import { listPaging, paginate } from "../../lib/list.js";
 import { hashPassword } from "../../lib/password.js";
 import { translatePgError } from "../../lib/pgErrors.js";
 import { route } from "../../lib/routes.js";
-import { applyUpdate, expectedVersion, optionalExpectedVersion, withOptionalVersion } from "../../lib/version.js";
+import { applyUpdate, expectedVersion, withOptionalVersion } from "../../lib/version.js";
 import {
   assertCanGrant,
   ensureProjectAccess,
@@ -101,7 +101,7 @@ async function assertRole(tx: Executor, caller: StaffContext, roleId: string): P
     .from(roles)
     .where(and(eq(roles.id, roleId), eq(roles.companyId, caller.companyId)))
     .limit(1);
-  if (!r) throw ApiError.badRequest("role_id does not exist", { field: "role_id" });
+  if (!r) throw ApiError.invalid("role_id", "role_id does not exist");
   if (!r.isActive) throw ApiError.rule("Role is inactive", "ROLE_INACTIVE");
   assertCanGrant(caller, r.permissions, `the role ${r.name}`);
   // Super Admin is more than its permission list (erasure, backups, restore, every other Super Admin): even a caller holding every
@@ -172,8 +172,7 @@ async function assertProjects(tx: Executor, caller: StaffContext, ids: string[])
     .select({ id: projects.id })
     .from(projects)
     .where(and(eq(projects.companyId, caller.companyId), inArray(projects.id, ids)));
-  if (found.length !== new Set(ids).size)
-    throw ApiError.badRequest("One or more project_ids do not exist", { field: "project_ids" });
+  if (found.length !== new Set(ids).size) throw ApiError.invalid("project_ids", "One or more project_ids do not exist");
 }
 
 async function replaceScopes(tx: Executor, userId: string, allProjects: boolean, projectIds: string[]): Promise<void> {
@@ -352,7 +351,7 @@ export async function usersModule(app: FastifyInstance): Promise<void> {
         if (body.all_projects !== undefined || body.project_ids !== undefined) {
           const ids = body.project_ids ?? before.project_ids;
           if (!allProjects && ids.length === 0)
-            throw ApiError.badRequest("Pick at least one project for a scoped user", { field: "project_ids" });
+            throw ApiError.invalid("project_ids", "Pick at least one project for a scoped user");
           await replaceScopes(tx, req.params.id, allProjects, ids);
         }
         const after = await getUserRow(tx, ctx.companyId, req.params.id);
@@ -388,7 +387,7 @@ export async function usersModule(app: FastifyInstance): Promise<void> {
         const result = await app.db.transaction(async (tx) => {
           const before = await getUserRow(tx, ctx.companyId, req.params.id);
           await assertTargetManageable(tx, ctx, req.params.id);
-          const version = optionalExpectedVersion(req, req.body, before.version);
+          const version = expectedVersion(req, req.body);
           const updated = await applyUpdate(
             tx,
             users,
@@ -424,11 +423,12 @@ export async function usersModule(app: FastifyInstance): Promise<void> {
     permission: "users.manage",
     schema: {
       params: z.object({ id: IdSchema }),
-      body: UserResetPasswordSchema,
+      body: withOptionalVersion(UserResetPasswordSchema),
       response: { 200: UserResetPasswordResponseSchema },
       summary: "Reset a user's password (temporary password shown once)",
     },
     handler: async (req, reply) => {
+      const version = expectedVersion(req, req.body);
       const ctx = req.user!;
       reply.header("Cache-Control", "no-store"); // carries a one-time password
       const plain = req.body.new_password ?? temporaryPassword();
@@ -446,7 +446,7 @@ export async function usersModule(app: FastifyInstance): Promise<void> {
           tx,
           users,
           req.params.id,
-          req.body.version,
+          version,
           {
             passwordHash: hash,
             mustChangePassword: req.body.must_change_password,
@@ -481,24 +481,18 @@ export async function usersModule(app: FastifyInstance): Promise<void> {
     permission: "users.manage",
     schema: {
       params: z.object({ id: IdSchema }),
-      body: UserUnlockSchema,
+      body: withOptionalVersion(UserUnlockSchema),
       response: { 200: UserRowSchema },
       summary: "Clear a lockout",
     },
     handler: async (req) => {
+      const version = expectedVersion(req, req.body);
       const ctx = req.user!;
       return app.db.transaction(async (tx) => {
         await getUserRow(tx, ctx.companyId, req.params.id);
         await assertTargetManageable(tx, ctx, req.params.id, { selfAllowed: true });
         // locked_until = now (not null) also marks the reset point of the per-IP lockout counters (auth/lockout.ts).
-        await applyUpdate(
-          tx,
-          users,
-          req.params.id,
-          req.body.version,
-          { failedAttempts: 0, lockedUntil: new Date() },
-          "user",
-        );
+        await applyUpdate(tx, users, req.params.id, version, { failedAttempts: 0, lockedUntil: new Date() }, "user");
         await writeAudit(tx, {
           companyId: ctx.companyId,
           ...meta(req),
@@ -517,20 +511,21 @@ export async function usersModule(app: FastifyInstance): Promise<void> {
     permission: "users.manage",
     schema: {
       params: z.object({ id: IdSchema }),
-      body: UserProjectScopeSchema,
+      body: withOptionalVersion(UserProjectScopeSchema),
       response: { 200: UserRowSchema },
       summary: "Set a user's project scope",
     },
     handler: async (req) => {
+      const version = expectedVersion(req, req.body);
       const ctx = req.user!;
       if (!req.body.all_projects && req.body.project_ids.length === 0)
-        throw ApiError.badRequest("Pick at least one project for a scoped user", { field: "project_ids" });
+        throw ApiError.invalid("project_ids", "Pick at least one project for a scoped user");
       const row = await app.db.transaction(async (tx) => {
         const before = await getUserRow(tx, ctx.companyId, req.params.id);
         await assertProjects(tx, ctx, req.body.project_ids); // foreign projects stay undiscoverable: 404 before any 403
         await assertTargetManageable(tx, ctx, req.params.id);
         assertScopeGrant(ctx, req.body.all_projects);
-        await applyUpdate(tx, users, req.params.id, req.body.version, { allProjects: req.body.all_projects }, "user");
+        await applyUpdate(tx, users, req.params.id, version, { allProjects: req.body.all_projects }, "user");
         await replaceScopes(tx, req.params.id, req.body.all_projects, req.body.project_ids);
         const after = await getUserRow(tx, ctx.companyId, req.params.id);
         await writeAudit(tx, {

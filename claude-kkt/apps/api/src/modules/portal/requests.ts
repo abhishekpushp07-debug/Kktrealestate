@@ -139,9 +139,11 @@ export async function assertPortalAttachments(
   const found = new Set(rows.map((r) => r.id));
   const missing = ids.filter((id) => !found.has(id));
   if (missing.length > 0)
-    throw ApiError.badRequest(
+    throw ApiError.invalid(
+      "attachment_ids",
       "attachment_ids references a document that does not exist or does not belong to this request",
-      { field: "attachment_ids", missing },
+      "invalid",
+      { missing },
     );
 }
 
@@ -177,7 +179,7 @@ export async function addRequestAttachment(
   let messageId: string | null = null;
   if (rawMessageId !== undefined && rawMessageId !== "") {
     const parsed = MessageIdField.safeParse(rawMessageId);
-    if (!parsed.success) throw ApiError.badRequest("message_id must be a UUID", { field: "message_id" });
+    if (!parsed.success) throw ApiError.invalid("message_id", "message_id must be a UUID");
     messageId = parsed.data;
   }
   return app.db.transaction(async (tx) => {
@@ -215,7 +217,7 @@ export async function addRequestAttachment(
       uploadedByType: "CUSTOMER",
     });
     if (message && message.attachmentIds.length >= 10)
-      throw ApiError.badRequest("A message may carry at most 10 attachments", { field: "message_id" });
+      throw ApiError.invalid("message_id", "A message may carry at most 10 attachments");
     if (message)
       await tx
         .update(serviceRequestMessages)

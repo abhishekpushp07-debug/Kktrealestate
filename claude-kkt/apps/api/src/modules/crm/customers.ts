@@ -55,7 +55,7 @@ import {
   type StaffContext,
 } from "../../lib/scope.js";
 import { eraseCustomer } from "../admin/index.js";
-import { applyUpdate, assertVersion, expectedVersion, optionalExpectedVersion } from "../../lib/version.js";
+import { applyUpdate, assertVersion, expectedVersion, withOptionalVersion } from "../../lib/version.js";
 import { revokeAllFamilies } from "../auth/index.js";
 import { bumpPermVersion } from "../../lib/cache.js";
 import {
@@ -295,8 +295,7 @@ async function kycTransition(
         permission: "settings.manage",
       });
     if (!reason)
-      throw ApiError.badRequest("Give a reason for changing a verified KYC status", {
-        field: "reason",
+      throw ApiError.invalid("reason", "Give a reason for changing a verified KYC status", "invalid", {
         issues: [{ path: "reason", message: "Required when changing a VERIFIED status" }],
       });
   }
@@ -557,12 +556,13 @@ export function customerRoutes(app: FastifyInstance): void {
     permission: "customer.write",
     schema: {
       params: idParams,
-      body: CustomerKycUpdateSchema,
+      body: withOptionalVersion(CustomerKycUpdateSchema),
       response: { 200: CustomerRowSchema },
       summary:
         "KYC workflow (maker-checker): SUBMITTED needs PAN + Aadhaar + a KYC document; VERIFIED/REJECTED only from SUBMITTED by a customer.kyc_view holder who is not the submitter; changing VERIFIED needs settings.manage + reason",
     },
     handler: async (req) => {
+      const version = expectedVersion(req, req.body);
       const user = req.user!;
       const body = req.body;
       return app.db.transaction(async (tx) => {
@@ -573,7 +573,7 @@ export function customerRoutes(app: FastifyInstance): void {
         const to = body.kyc_status;
         if (to === "PENDING")
           throw ApiError.rule("KYC can be set to SUBMITTED, VERIFIED or REJECTED", "KYC_STATUS_INVALID");
-        await assertVersion(tx, customers, c.id, c.version, body.version, "customer"); // a stale form is a conflict before any workflow rule
+        await assertVersion(tx, customers, c.id, c.version, version, "customer"); // a stale form is a conflict before any workflow rule
         const decision = await kycTransition(tx, user, c, to, body.reason);
         const changes: Record<string, unknown> = { kycStatus: to, kycRemarks: body.kyc_remarks ?? null };
         if (to === "SUBMITTED")
@@ -585,7 +585,7 @@ export function customerRoutes(app: FastifyInstance): void {
           });
         // DB time on purpose: the same clock as updated_at, so "edited since the rejection" compares like with like.
         else Object.assign(changes, { kycVerifiedBy: user.id, kycVerifiedAt: sql`now()` });
-        await applyUpdate(tx, customers, req.params.id, body.version, changes, "customer");
+        await applyUpdate(tx, customers, req.params.id, version, changes, "customer");
         const after = await getCustomerRow(tx, user.companyId, req.params.id);
         await writeAudit(tx, {
           companyId: user.companyId,
@@ -734,6 +734,14 @@ export function customerRoutes(app: FastifyInstance): void {
           .where(and(eq(coApplicants.id, req.params.caId), eq(coApplicants.customerId, req.params.id)))
           .limit(1);
         if (!existing) throw ApiError.notFound("Co-applicant");
+        await assertVersion(
+          tx,
+          coApplicants,
+          existing.id,
+          existing.version,
+          expectedVersion(req, null),
+          "co_applicant",
+        );
         await tx.delete(coApplicants).where(eq(coApplicants.id, existing.id));
         await writeAudit(tx, {
           companyId: user.companyId,
@@ -787,7 +795,7 @@ export function customerRoutes(app: FastifyInstance): void {
                 used_by: [{ entity_type: "bookings", count: n }],
               });
           }
-          const version = optionalExpectedVersion(req, req.body, sel.c.version);
+          const version = expectedVersion(req, req.body);
           const updated = await applyUpdate(
             tx,
             customers,

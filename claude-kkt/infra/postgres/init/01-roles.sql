@@ -47,6 +47,27 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO kkt_app;
 GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO kkt_app;
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO kkt_app;
 REVOKE TRUNCATE, REFERENCES, TRIGGER ON ALL TABLES IN SCHEMA public FROM kkt_app;
+-- The books stay append-only for the application itself (migration 0005; packages/db/src/sql/0002_privileges.sql applies the same
+-- revokes after every schema change, so tables created later are covered too):
+--   ledger_entries, audit_logs, audit_seals, ledger_rebuilds — no UPDATE / DELETE (rows are only appended);
+--   payments, demands — no DELETE (reversed / voided with a reason, never deleted).
+-- On a fresh database the tables do not exist yet when this file runs; to_regclass() skips them and the migration applies the revokes.
+DO $$
+DECLARE
+  t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['ledger_entries', 'audit_logs', 'audit_seals', 'ledger_rebuilds'] LOOP
+    IF to_regclass(format('public.%I', t)) IS NOT NULL THEN
+      EXECUTE format('REVOKE UPDATE, DELETE, TRUNCATE ON public.%I FROM kkt_app', t);
+    END IF;
+  END LOOP;
+  FOREACH t IN ARRAY ARRAY['payments', 'demands'] LOOP
+    IF to_regclass(format('public.%I', t)) IS NOT NULL THEN
+      EXECUTE format('REVOKE DELETE, TRUNCATE ON public.%I FROM kkt_app', t);
+    END IF;
+  END LOOP;
+END
+$$;
 
 -- Behind PgBouncer (transaction pooling) the client's per-connection startup parameters are ignored, so the API's safety limits
 -- (DB_STATEMENT_TIMEOUT_MS / DB_LOCK_TIMEOUT_MS / DB_IDLE_IN_TX_TIMEOUT_MS defaults) are also role defaults.

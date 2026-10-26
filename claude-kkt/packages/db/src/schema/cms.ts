@@ -89,7 +89,11 @@ export const cmsTestimonials = pgTable(
     sortOrder: integer("sort_order").notNull().default(0),
     ...mutable(),
   },
-  (t) => [index("cms_testimonials_company_published_idx").on(t.companyId, t.isPublished, t.sortOrder)],
+  (t) => [
+    index("cms_testimonials_company_published_idx").on(t.companyId, t.isPublished, t.sortOrder),
+    index("cms_testimonials_customer_id_idx").on(t.customerId),
+    index("cms_testimonials_project_id_idx").on(t.projectId),
+  ],
 );
 
 export const cmsGallery = pgTable(
@@ -105,7 +109,10 @@ export const cmsGallery = pgTable(
     isPublished: boolean("is_published").notNull().default(false),
     ...mutable(),
   },
-  (t) => [index("cms_gallery_company_project_published_idx").on(t.companyId, t.projectId, t.isPublished, t.sortOrder)],
+  (t) => [
+    index("cms_gallery_company_project_published_idx").on(t.companyId, t.projectId, t.isPublished, t.sortOrder),
+    index("cms_gallery_project_id_idx").on(t.projectId),
+  ],
 );
 
 export const cmsPosts = pgTable(
@@ -131,6 +138,7 @@ export const cmsPosts = pgTable(
   (t) => [
     unique("cms_posts_company_slug_uq").on(t.companyId, t.slug),
     index("cms_posts_company_status_published_idx").on(t.companyId, t.status, t.publishedAt.desc()),
+    index("cms_posts_author_user_id_idx").on(t.authorUserId),
   ],
 );
 

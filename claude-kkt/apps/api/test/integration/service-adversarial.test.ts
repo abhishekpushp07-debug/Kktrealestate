@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { financialYear, todayIST } from "@kkt/domain";
 import { createPortalCustomer, createProject } from "./fixtures.js";
 import { createActiveBooking } from "./fixtures/crm.js";
-import { buildTestApp, type ErrorBody, type LoginResult, type TestContext } from "./helpers.js";
+import { buildTestApp, ifMatch, versionOf, type ErrorBody, type LoginResult, type TestContext } from "./helpers.js";
 
 process.env["KKT_MODULES"] ??= "service";
 
@@ -76,10 +76,15 @@ async function createTicket(overrides: Record<string, unknown> = {}): Promise<Ti
 }
 
 async function message(id: string, body: Record<string, unknown>, headers: Record<string, string> = {}) {
+  // staff replies require the ticket's version (contract C6); tests that do not care send the current one
+  const withVersion =
+    "if-match" in headers
+      ? headers
+      : { ...headers, ...ifMatch(await versionOf(t, `/api/v1/service-requests/${id}`, admin.access_token)) };
   return t.request<Ticket>("POST", `/api/v1/service-requests/${id}/messages`, {
     token: admin.access_token,
     body,
-    headers,
+    headers: withVersion,
   });
 }
 
@@ -225,7 +230,7 @@ describe("attachment ownership", () => {
       expect(r.status, r.text).toBe(400);
       const err = r.body as unknown as ErrorBody;
       expect(err.error.code).toBe("VALIDATION_ERROR");
-      expect(err.error.details?.["field"]).toBe("attachment_ids");
+      expect((err.error.details?.["issues"] as { path: string }[] | undefined)?.[0]?.path).toBe("attachment_ids");
       expect(err.error.details?.["missing"]).toEqual([bad]);
     }
     expect(await messageCount(tk.id)).toBe(before);

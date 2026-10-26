@@ -255,7 +255,7 @@ export async function createContra(
       .from(bankAccounts)
       .where(and(eq(bankAccounts.id, body.bank_account_id), eq(bankAccounts.companyId, user.companyId)))
       .limit(1);
-    if (!acct) throw ApiError.badRequest("bank_account_id does not exist", { field: "bank_account_id" });
+    if (!acct) throw ApiError.invalid("bank_account_id", "bank_account_id does not exist");
     if (!acct.isActive) throw ApiError.rule("Bank account is inactive", "BANK_ACCOUNT_INACTIVE");
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`contra:${user.companyId}`}))`);
     if (body.type === "DEPOSIT") {

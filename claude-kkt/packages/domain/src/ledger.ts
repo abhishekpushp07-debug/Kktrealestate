@@ -436,7 +436,8 @@ export const LEDGER_ROW_COMPARED_FIELDS = [
   "otherChargesDuePaise",
 ] as const;
 export type LedgerRowComparedField = (typeof LEDGER_ROW_COMPARED_FIELDS)[number];
-export type ComparableLedgerRow = Pick<LedgerRow, LedgerRowComparedField>;
+/** A row as compared by {@link diffLedgerRows}; `event` is any stored event name (the database also knows DEMAND_VOIDED / LEDGER_RESTATED). */
+export type ComparableLedgerRow = Omit<Pick<LedgerRow, LedgerRowComparedField>, "event"> & { event: string };
 
 /** One row-level difference between a stored ledger and its rebuild. */
 export interface LedgerRowDifference {

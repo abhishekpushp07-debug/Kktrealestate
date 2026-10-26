@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { BucketCapDetailsSchema } from "@kkt/contracts";
 import { addDays, financialYear, todayIST } from "@kkt/domain";
 import { nightlyIntegrity, overdueNotifications, voidDemandsForStage } from "../../src/modules/money/index.js";
 import { completeStage, createMoneyWorld, resetStage, type MoneyWorld } from "./fixtures/money.js";
@@ -375,7 +376,7 @@ describe("payment plans ↔ towers (SPEC §8)", () => {
       token: admin,
       body: { is_default: true },
     });
-    expect(versionless.status, versionless.text).toBe(400);
+    expect(versionless.status, versionless.text).toBe(428);
     expect(versionless.body.error.code).toBe("VERSION_REQUIRED");
     expect(stale.body.error.code).toBe("VERSION_CONFLICT");
     const made = await t.request<{ is_default: boolean; version: number }>(
@@ -629,7 +630,7 @@ describe("booking engine (SPEC §12)", () => {
       token: sales,
       body: { remarks: "x" },
     });
-    expect(noVersion.status).toBe(400);
+    expect(noVersion.status).toBe(428);
     const selfCo = await t.request<ErrorBody>("PATCH", `/api/v1/bookings/${b1.id}`, {
       token: sales,
       body: { version: b.version, co_applicant_ids: [w.customers[0]!] },
@@ -682,8 +683,19 @@ describe("booking engine (SPEC §12)", () => {
     expect(
       (await t.request<{ items: unknown[] }>("GET", "/api/v1/booking-drafts", { token: admin })).body.items,
     ).toHaveLength(0); // per user
-    expect((await t.request("DELETE", `/api/v1/booking-drafts/${draft.body.id}`, { token: admin })).status).toBe(404);
-    expect((await t.request("DELETE", `/api/v1/booking-drafts/${draft.body.id}`, { token: sales })).status).toBe(204);
+    const draftVersion = (
+      await t.request<{ items: { id: string; version: number }[] }>("GET", "/api/v1/booking-drafts", { token: sales })
+    ).body.items[0]!.version;
+    const draftIfMatch = { "if-match": `"v${draftVersion}"` };
+    expect(
+      (await t.request("DELETE", `/api/v1/booking-drafts/${draft.body.id}`, { token: admin, headers: draftIfMatch }))
+        .status,
+    ).toBe(404);
+    expect((await t.request("DELETE", `/api/v1/booking-drafts/${draft.body.id}`, { token: sales })).status).toBe(428);
+    expect(
+      (await t.request("DELETE", `/api/v1/booking-drafts/${draft.body.id}`, { token: sales, headers: draftIfMatch }))
+        .status,
+    ).toBe(204);
   });
 
   it("handover is blocked while the possession stage is pending (409 HANDOVER_BLOCKED)", async () => {
@@ -733,7 +745,9 @@ describe("payments, bucket cap, instruments, reversal (SPEC §11)", () => {
       payBody(b1.id, "CASH", 5 * L, w.modes.CHEQUE, { bank_account_id: w.bankAccountId }),
     );
     expect(noInstrument.status).toBe(400);
-    expect(noInstrument.body.error.details?.["field"]).toBe("instrument.number");
+    expect((noInstrument.body.error.details?.["issues"] as { path: string }[] | undefined)?.[0]?.path).toBe(
+      "instrument.number",
+    );
     const noChequeDate = await payFail(
       payBody(b1.id, "CASH", 5 * L, w.modes.CHEQUE, {
         bank_account_id: w.bankAccountId,
@@ -743,7 +757,9 @@ describe("payments, bucket cap, instruments, reversal (SPEC §11)", () => {
     expect(noChequeDate.status).toBe(400);
     const noBank = await payFail(payBody(b1.id, "ACCOUNT", 4 * L, w.modes.NEFT, { instrument: { number: "NEFT123" } }));
     expect(noBank.status).toBe(400);
-    expect(noBank.body.error.details?.["field"]).toBe("bank_account_id");
+    expect((noBank.body.error.details?.["issues"] as { path: string }[] | undefined)?.[0]?.path).toBe(
+      "bank_account_id",
+    );
     const noBucket = await payFail({
       booking_id: b1.id,
       against: "FLAT_VALUE",
@@ -887,7 +903,7 @@ describe("payments, bucket cap, instruments, reversal (SPEC §11)", () => {
       token: accounts,
       body: { reason: "Wrong entry" },
     });
-    expect(noVersion.status).toBe(400);
+    expect(noVersion.status).toBe(428);
     b = await getBooking(b1.id);
     expect(b.summary.cash).toMatchObject({ paid_paise: 5 * L, pending_paise: 0, due_paise: L });
     expect(b.summary.pending_cheques_paise).toBe(0);
@@ -1000,6 +1016,14 @@ describe("payments, bucket cap, instruments, reversal (SPEC §11)", () => {
     expect(over.body.error.message).toBe(
       "Account agreed ₹40,00,000; already received ₹4,00,000; cannot accept ₹37,00,000 – revise the agreement first",
     );
+    // the contract's details schema is exactly what the API sends (audit v3 A5: it used to declare received/attempted_paise)
+    expect(BucketCapDetailsSchema.strict().parse(over.body.error.details)).toEqual({
+      bucket: "ACCOUNT",
+      agreed_paise: 40 * L,
+      paid_paise: 4 * L,
+      amount_paise: 37 * L,
+      headroom_paise: 36 * L,
+    });
     let b = await getBooking(b1.id);
     const salesRevise = await t.request<ErrorBody>("POST", `/api/v1/bookings/${b1.id}/agreement-revisions`, {
       token: sales,

@@ -32,7 +32,7 @@ import { registerJob } from "../../jobs/index.js";
 import { listPaging, paginate } from "../../lib/list.js";
 import { route } from "../../lib/routes.js";
 import { ensureProjectAccess, scopeFilter, type StaffContext } from "../../lib/scope.js";
-import { assertVersion, expectedVersion, optionalExpectedVersion } from "../../lib/version.js";
+import { assertVersion, expectedVersion } from "../../lib/version.js";
 import { loadScopedProject } from "./projectWebsite.js";
 import { availabilityCachePath } from "./publicVisits.js";
 import { bustPublicCache, clock } from "./shared.js";
@@ -464,7 +464,7 @@ export function registerVisitRoutes(app: FastifyInstance): void {
           siteVisits,
           existing.v.id,
           existing.v.version,
-          optionalExpectedVersion(req, body, existing.v.version),
+          expectedVersion(req, body),
           "site_visit",
         );
         return cancelVisit(tx, existing.v, body.reason, { actor: actorFromRequest(req), ...auditMeta(req) });
@@ -498,7 +498,7 @@ export function registerVisitRoutes(app: FastifyInstance): void {
             siteVisits,
             existing.v.id,
             existing.v.version,
-            optionalExpectedVersion(req, body, existing.v.version),
+            expectedVersion(req, body),
             "site_visit",
           );
           return markOutcome(tx, existing.v, outcome, body.notes, { actor: actorFromRequest(req), ...auditMeta(req) });
@@ -528,7 +528,7 @@ export function registerVisitRoutes(app: FastifyInstance): void {
           siteVisits,
           existing.v.id,
           existing.v.version,
-          optionalExpectedVersion(req, body, existing.v.version),
+          expectedVersion(req, body),
           "site_visit",
         );
         return markOutcome(tx, existing.v, body.outcome, body.notes, {

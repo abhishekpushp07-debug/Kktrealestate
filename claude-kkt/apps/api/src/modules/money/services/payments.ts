@@ -338,21 +338,19 @@ async function postPaymentTx(
     throw ApiError.rule("Payment date cannot be before the booking date", "PAYMENT_DATE_BEFORE_BOOKING", {
       booking_date: b.bookingDate,
     });
-  if (!mode) throw ApiError.badRequest("payment_mode_id does not exist", { field: "payment_mode_id" });
+  if (!mode) throw ApiError.invalid("payment_mode_id", "payment_mode_id does not exist");
   if (!mode.isActive) throw ApiError.rule(`Payment mode ${mode.name} is inactive`, "PAYMENT_MODE_INACTIVE");
   if (mode.requiresInstrument) {
     if (!body.instrument?.number)
-      throw ApiError.badRequest(`${mode.name} needs an instrument reference number`, { field: "instrument.number" });
+      throw ApiError.invalid("instrument.number", `${mode.name} needs an instrument reference number`);
     if (!mode.clearsImmediately && !body.instrument.date)
-      throw ApiError.badRequest(`${mode.name} needs the instrument date`, { field: "instrument.date" });
+      throw ApiError.invalid("instrument.date", `${mode.name} needs the instrument date`);
   }
   let bankAccountId: string | null = null;
   if (!mode.isCash) {
     if (!body.bank_account_id)
-      throw ApiError.badRequest("Pick the company bank account credited for non-cash payments", {
-        field: "bank_account_id",
-      });
-    if (!acct) throw ApiError.badRequest("bank_account_id does not exist", { field: "bank_account_id" });
+      throw ApiError.invalid("bank_account_id", "Pick the company bank account credited for non-cash payments");
+    if (!acct) throw ApiError.invalid("bank_account_id", "bank_account_id does not exist");
     if (!acct.isActive) throw ApiError.rule("Bank account is inactive", "BANK_ACCOUNT_INACTIVE");
     bankAccountId = acct.id;
   }
@@ -360,8 +358,7 @@ async function postPaymentTx(
   if (flatValue) {
     assertBucketCapWith(b, body.bucket!, body.amount_paise, paid);
   } else {
-    if (!chargeLine)
-      throw ApiError.badRequest("other_charge_id does not belong to this booking", { field: "other_charge_id" });
+    if (!chargeLine) throw ApiError.invalid("other_charge_id", "other_charge_id does not belong to this booking");
     assertChargeCapWith(chargeLine, body.amount_paise, paid);
     line = chargeLine;
   }

@@ -32,7 +32,7 @@ import { ApiError } from "../../lib/errors.js";
 import { listPaging, paginate, type ListResult } from "../../lib/list.js";
 import { route } from "../../lib/routes.js";
 import { ensureProjectAccess, scopeFilter, type StaffContext } from "../../lib/scope.js";
-import { applyUpdate, expectedVersion, optionalExpectedVersion, withOptionalVersion } from "../../lib/version.js";
+import { applyUpdate, expectedVersion, withOptionalVersion } from "../../lib/version.js";
 import { notify, withdraw } from "../notifications/index.js";
 import { customerProjectIdsSubquery } from "./ticketService.js";
 
@@ -235,7 +235,7 @@ export async function noticesForCustomer(
 
 function assertWindow(publishAt: Date | null, expiresAt: Date | null): void {
   if (publishAt && expiresAt && publishAt.getTime() > expiresAt.getTime())
-    throw ApiError.badRequest("expires_at must be after publish_at", { field: "expires_at" });
+    throw ApiError.invalid("expires_at", "expires_at must be after publish_at");
 }
 
 async function assertProject(tx: Executor, user: StaffContext, projectId: string | null | undefined): Promise<void> {
@@ -245,7 +245,7 @@ async function assertProject(tx: Executor, user: StaffContext, projectId: string
     .from(projects)
     .where(and(eq(projects.id, projectId), eq(projects.companyId, user.companyId)))
     .limit(1);
-  if (!p) throw ApiError.badRequest("project_id does not exist", { field: "project_id" });
+  if (!p) throw ApiError.invalid("project_id", "project_id does not exist");
   ensureProjectAccess(user, projectId);
 }
 
@@ -444,7 +444,7 @@ export function noticeRoutes(app: FastifyInstance): void {
       const m = meta(req);
       return app.db.transaction(async (tx) => {
         const existing = await requireNotice(tx, user, req.params.id, true);
-        const version = optionalExpectedVersion(req, null, existing.n.version);
+        const version = expectedVersion(req, null);
         const updated = await applyUpdate(tx, notices, req.params.id, version, { isPublished: false }, NOTICE_ENTITY);
         const retracted = await withdraw(tx, NOTICE_ENTITY, updated.id);
         const view = toNoticeRow((await loadNotice(tx, user.companyId, updated.id))!);

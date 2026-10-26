@@ -62,7 +62,7 @@ import { listPaging, paginate } from "../../lib/list.js";
 import { translatePgError } from "../../lib/pgErrors.js";
 import { route } from "../../lib/routes.js";
 import { scopeFilter, type StaffContext } from "../../lib/scope.js";
-import { applyUpdate, expectedVersion, optionalExpectedVersion, withOptionalVersion } from "../../lib/version.js";
+import { applyUpdate, expectedVersion, withOptionalVersion } from "../../lib/version.js";
 import { assertAssignmentsFitBlock } from "../money/index.js";
 import { assertHoldUntil, defaultHoldUntil, manualStatusChanges, statusAudit } from "./flats.js";
 import { assertFilterScope } from "./projects.js";
@@ -189,15 +189,16 @@ function assertStructure(def: ReturnType<typeof blockToDefinition>): void {
     translateDomainError(e);
   }
   if (problems.gaps.length > 0)
-    throw ApiError.badRequest(`Floors without a floor plan: ${problems.gaps.join(", ")}`, {
-      field: "floor_plans",
+    throw ApiError.invalid("floor_plans", `Floors without a floor plan: ${problems.gaps.join(", ")}`, "invalid", {
       gaps: problems.gaps,
     });
   if (problems.overlaps.length > 0)
-    throw ApiError.badRequest(`Floors covered by more than one floor plan: ${problems.overlaps.join(", ")}`, {
-      field: "floor_plans",
-      overlaps: problems.overlaps,
-    });
+    throw ApiError.invalid(
+      "floor_plans",
+      `Floors covered by more than one floor plan: ${problems.overlaps.join(", ")}`,
+      "invalid",
+      { overlaps: problems.overlaps },
+    );
 }
 
 async function assertBlockType(tx: Executor, companyId: string, id: string): Promise<void> {
@@ -206,7 +207,7 @@ async function assertBlockType(tx: Executor, companyId: string, id: string): Pro
     .from(blockTypes)
     .where(and(eq(blockTypes.companyId, companyId), eq(blockTypes.id, id)))
     .limit(1);
-  if (!bt) throw ApiError.badRequest("block_type_id does not exist", { field: "block_type_id" });
+  if (!bt) throw ApiError.invalid("block_type_id", "block_type_id does not exist");
   if (!bt.isActive) throw ApiError.rule(`Block type ${bt.name} is inactive`, "BLOCK_TYPE_INACTIVE");
 }
 
@@ -566,14 +567,11 @@ export function registerBlockRoutes(app: FastifyInstance): void {
               : existing.floorPlans,
             numberingPattern: body.numbering_pattern ?? existing.numberingPattern,
           };
-          if (merged.floorStart > merged.floors)
-            throw ApiError.badRequest("floor_start must be ≤ floors", { field: "floor_start" });
+          if (merged.floorStart > merged.floors) throw ApiError.invalid("floor_start", "floor_start must be ≤ floors");
           if (!rangesDisjoint(merged.floorPlans))
-            throw ApiError.badRequest("Floor-plan ranges must not overlap", { field: "floor_plans" });
+            throw ApiError.invalid("floor_plans", "Floor-plan ranges must not overlap");
           if (merged.floorPlans.some((r) => r.from_floor < merged.floorStart || r.to_floor > merged.floors))
-            throw ApiError.badRequest("Floor-plan ranges must lie within floor_start..floors", {
-              field: "floor_plans",
-            });
+            throw ApiError.invalid("floor_plans", "Floor-plan ranges must lie within floor_start..floors");
           assertStructure(blockToDefinition(merged));
           if (body.floor_plans)
             await loadTemplates(
@@ -749,22 +747,25 @@ export function registerBlockRoutes(app: FastifyInstance): void {
       };
       const version = expectedVersion(req, body);
       if (!rangesDisjoint(body.floor_plans))
-        throw ApiError.badRequest("Floor-plan ranges must not overlap", { field: "floor_plans" });
+        throw ApiError.invalid("floor_plans", "Floor-plan ranges must not overlap");
       return app.db.transaction(async (tx) => {
         const block = await loadBlock(tx, user, req.params.id, true);
         const oldTop = block.floors;
         const newTop = oldTop + body.new_floors;
         const outside = body.floor_plans.some((r) => r.from_floor <= oldTop || r.to_floor > newTop);
         if (outside)
-          throw ApiError.badRequest(`New floor-plan ranges must lie within floors ${oldTop + 1}..${newTop}`, {
-            field: "floor_plans",
-          });
+          throw ApiError.invalid(
+            "floor_plans",
+            `New floor-plan ranges must lie within floors ${oldTop + 1}..${newTop}`,
+          );
         const extraNoUnit = [...body.skip_floors, ...body.refuge_floors].filter((f) => f <= oldTop || f > newTop);
         if (extraNoUnit.length > 0)
-          throw ApiError.badRequest(`Skip/refuge floors must lie within floors ${oldTop + 1}..${newTop}`, {
-            field: "skip_floors",
-            floors: extraNoUnit,
-          });
+          throw ApiError.invalid(
+            "skip_floors",
+            `Skip/refuge floors must lie within floors ${oldTop + 1}..${newTop}`,
+            "invalid",
+            { floors: extraNoUnit },
+          );
         const merged = {
           ...block,
           floors: newTop,
@@ -780,7 +781,7 @@ export function registerBlockRoutes(app: FastifyInstance): void {
           ],
         };
         if (!rangesDisjoint(merged.floorPlans))
-          throw ApiError.badRequest("Floor-plan ranges must not overlap", { field: "floor_plans" });
+          throw ApiError.invalid("floor_plans", "Floor-plan ranges must not overlap");
         const def = blockToDefinition(merged);
         assertStructure(def);
         // Generate with the full definition so sequence-based numbering continues, then keep only the new floors (all of them when the block has no flats yet).
@@ -971,7 +972,7 @@ export function registerBlockRoutes(app: FastifyInstance): void {
         await lockBlockRow(tx, block.id);
         const rows = [...locked].sort((a, b) => a.floor - b.floor || a.position - b.position);
         if (rows.length !== new Set(body.flat_ids).size)
-          throw ApiError.badRequest("Every flat_id must belong to this block", { field: "flat_ids" });
+          throw ApiError.invalid("flat_ids", "Every flat_id must belong to this block");
         const skipped: string[] = [];
         const eligible: { flat: DbFlat; changes: Record<string, unknown> }[] = [];
         for (const flat of rows) {
@@ -1028,8 +1029,7 @@ export function registerBlockRoutes(app: FastifyInstance): void {
     handler: async (req) => {
       const user = req.user!;
       const body = req.body;
-      if (body.block_id !== req.params.id)
-        throw ApiError.badRequest("block_id must match the path", { field: "block_id" });
+      if (body.block_id !== req.params.id) throw ApiError.invalid("block_id", "block_id must match the path");
       return withTransactionRetry(app.db, async (tx) => {
         const block = await loadBlock(tx, user, req.params.id);
         const where: (SQL | undefined)[] = [eq(flats.blockId, block.id)];
@@ -1144,7 +1144,7 @@ export function registerBlockRoutes(app: FastifyInstance): void {
                 { usage_count: nonAvailable, used_by: [{ entity_type: "flats", count: nonAvailable }] },
               );
           }
-          const version = optionalExpectedVersion(req, req.body, existing.version);
+          const version = expectedVersion(req, req.body);
           const updated = await applyUpdate(
             tx,
             blocks,

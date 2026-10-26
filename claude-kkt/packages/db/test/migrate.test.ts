@@ -7,7 +7,7 @@ import { listSqlFiles, MIGRATIONS_FOLDER, runMigrations, SQL_FOLDER } from "../s
 import { resetDatabase, resetRefusalReason } from "../src/reset.js";
 import { TEST_DATABASE_URL } from "./env.js";
 
-const EXPECTED_TABLE_COUNT = 78;
+const EXPECTED_TABLE_COUNT = 82;
 /** Tables created by 0000_initial (0002 adds `exports`). */
 const INITIAL_TABLE_COUNT = 77;
 /** Committed drizzle migrations in journal order. */
@@ -17,6 +17,7 @@ const EXPECTED_MIGRATIONS = [
   "0002_foundation_hardening",
   "0003_job_run_abandoned",
   "0004_site_visit_superseded_tokens",
+  "0005_online_foundation",
 ] as const;
 
 /** Replaces the database name in a postgres URL. */
@@ -125,7 +126,7 @@ describe("migrations", () => {
     }
     expect(initial).toContain('UNIQUE NULLS NOT DISTINCT("plan_id","project_id","block_id")');
     const files = await listSqlFiles(SQL_FOLDER);
-    expect(files.map((f) => f.split("/").pop())).toEqual(["0001_triggers.sql"]);
+    expect(files.map((f) => f.split("/").pop())).toEqual(["0001_triggers.sql", "0002_privileges.sql"]);
   });
 
   it("creates the partial unique indexes with the required WHERE clauses", async () => {

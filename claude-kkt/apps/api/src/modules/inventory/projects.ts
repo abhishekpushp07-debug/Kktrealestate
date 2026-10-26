@@ -33,7 +33,7 @@ import { listPaging, paginate } from "../../lib/list.js";
 import { translatePgError } from "../../lib/pgErrors.js";
 import { route } from "../../lib/routes.js";
 import { ensureProjectAccess, scopeFilter, type StaffContext } from "../../lib/scope.js";
-import { applyUpdate, expectedVersion, optionalExpectedVersion, withOptionalVersion } from "../../lib/version.js";
+import { applyUpdate, expectedVersion, withOptionalVersion } from "../../lib/version.js";
 import {
   allStagesPending,
   assertStageSequence,
@@ -147,20 +147,20 @@ async function assertAmenities(tx: Executor, companyId: string, ids: readonly st
     .select({ id: amenities.id, isActive: amenities.isActive, name: amenities.name })
     .from(amenities)
     .where(and(eq(amenities.companyId, companyId), inArray(amenities.id, unique)));
-  if (found.length !== unique.length) throw ApiError.badRequest("Unknown amenity id", { field: "amenity_ids" });
+  if (found.length !== unique.length) throw ApiError.invalid("amenity_ids", "Unknown amenity id");
   const inactive = found.find((a) => !a.isActive);
   if (inactive) throw ApiError.rule(`Amenity ${inactive.name} is inactive`, "AMENITY_INACTIVE");
 }
 
 async function assertTeam(tx: Executor, companyId: string, members: readonly { user_id: string }[]): Promise<void> {
   const unique = [...new Set(members.map((m) => m.user_id))];
-  if (unique.length !== members.length) throw ApiError.badRequest("Each team member once", { field: "team" });
+  if (unique.length !== members.length) throw ApiError.invalid("team", "Each team member once");
   if (unique.length === 0) return;
   const found = await tx
     .select({ id: users.id })
     .from(users)
     .where(and(eq(users.companyId, companyId), inArray(users.id, unique)));
-  if (found.length !== unique.length) throw ApiError.badRequest("Unknown user id in team", { field: "team" });
+  if (found.length !== unique.length) throw ApiError.invalid("team", "Unknown user id in team");
 }
 
 async function assertBankAccount(tx: Executor, companyId: string, id: string): Promise<void> {
@@ -169,7 +169,7 @@ async function assertBankAccount(tx: Executor, companyId: string, id: string): P
     .from(bankAccounts)
     .where(and(eq(bankAccounts.companyId, companyId), eq(bankAccounts.id, id)))
     .limit(1);
-  if (!b) throw ApiError.badRequest("escrow_bank_account_id does not exist", { field: "escrow_bank_account_id" });
+  if (!b) throw ApiError.invalid("escrow_bank_account_id", "escrow_bank_account_id does not exist");
 }
 
 async function replaceAmenities(tx: Executor, projectId: string, ids: readonly string[]): Promise<void> {
@@ -372,7 +372,7 @@ export function registerProjectRoutes(app: FastifyInstance): void {
           const launch = body.launch_date === undefined ? existing.launchDate : body.launch_date;
           const possession = body.possession_date === undefined ? existing.possessionDate : body.possession_date;
           if (launch && possession && launch > possession)
-            throw ApiError.badRequest("Possession date must be after launch date", { field: "possession_date" });
+            throw ApiError.invalid("possession_date", "Possession date must be after launch date");
         }
         const { version: _v, amenity_ids, team, ...rest } = body;
         let updated: DbProject;
@@ -470,7 +470,7 @@ export function registerProjectRoutes(app: FastifyInstance): void {
                 used_by: [{ entity_type: "blocks", count: n }],
               });
           }
-          const version = optionalExpectedVersion(req, req.body, existing.version);
+          const version = expectedVersion(req, req.body);
           const updated = await applyUpdate(
             tx,
             projects,

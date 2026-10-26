@@ -1,5 +1,8 @@
 import type { FastifyError, FastifyReply, FastifyRequest } from "fastify";
 import { hasZodFastifySchemaValidationErrors, isResponseSerializationError } from "fastify-type-provider-zod";
+import type { RuleId } from "@kkt/contracts";
+import { MoneyError } from "@kkt/domain";
+import { mapIntegrityError, withUsageCount } from "./pgErrors.js";
 
 /** Application error with a stable machine-readable code (see docs/API-CONVENTIONS.md). */
 export class ApiError extends Error {
@@ -24,6 +27,17 @@ export class ApiError extends Error {
   static badRequest(message: string, details?: Record<string, unknown>) {
     return new ApiError(400, "VALIDATION_ERROR", message, details);
   }
+  /**
+   * 400 VALIDATION_ERROR for one request field, in the same `details.issues` shape as schema validation failures, so every client maps
+   * it onto the form field (`path` is the field's dotted path, e.g. `customer_id` or `installments.2.percent`). `extra` adds
+   * further details next to `issues` (e.g. the conflicting ids).
+   */
+  static invalid(field: string, message: string, code = "invalid", extra?: Record<string, unknown>) {
+    return new ApiError(400, "VALIDATION_ERROR", message, {
+      issues: [{ path: field, message, code }],
+      ...(extra ?? {}),
+    });
+  }
   static unauthenticated(message = "Not authenticated", code = "UNAUTHENTICATED") {
     return new ApiError(401, code, message);
   }
@@ -36,7 +50,8 @@ export class ApiError extends Error {
   static conflict(code: string, message: string, details?: Record<string, unknown>) {
     return new ApiError(409, code, message, details);
   }
-  static rule(message: string, rule: string, details?: Record<string, unknown>) {
+  /** 422 BUSINESS_RULE naming a registered rule (`@kkt/contracts` BUSINESS_RULES; the rule-registry test keeps them in sync). */
+  static rule(message: string, rule: RuleId, details?: Record<string, unknown>) {
     return new ApiError(422, "BUSINESS_RULE", message, { rule, ...(details ?? {}) });
   }
   static locked(message: string, details?: Record<string, unknown>) {
@@ -194,12 +209,20 @@ export function mapDatabaseError(err: unknown): ApiError | null {
   return null;
 }
 
+/** A domain money failure (packages/domain MoneyError: a non-integer paise amount, a percent with more than 2 decimals …) as 422. */
+export function mapMoneyError(err: unknown): ApiError | null {
+  if (!(err instanceof MoneyError)) return null;
+  return new ApiError(422, "INVALID_AMOUNT", err.message, {
+    issues: [{ path: "", message: err.message, code: "money" }],
+  });
+}
+
 /** Fastify error handler: every failure becomes `{ error: { code, message, details, request_id } }`. */
 export function errorHandler(
   error: FastifyError | ApiError | Error,
   request: FastifyRequest,
   reply: FastifyReply,
-): void {
+): void | Promise<void> {
   const requestId = request.id;
   if (error instanceof ApiError) {
     if (error.headers) reply.headers(error.headers);
@@ -237,6 +260,21 @@ export function errorHandler(
   if (mapped) {
     request.log.warn({ err: error, code: mapped.code }, "database error mapped to a retryable response");
     errorHandler(mapped, request, reply);
+    return;
+  }
+  const integrity = mapIntegrityError(error);
+  if (integrity) {
+    request.log.info({ err: error, code: integrity.code }, "database constraint/data error mapped to a client error");
+    const db = (request.server as { db?: Parameters<typeof withUsageCount>[0] }).db;
+    if (integrity.code === "IN_USE" && db)
+      return withUsageCount(db, error, integrity).then((withCount) => errorHandler(withCount, request, reply));
+    errorHandler(integrity, request, reply);
+    return;
+  }
+  const money = mapMoneyError(error);
+  if (money) {
+    request.log.info({ err: error }, "money error mapped to 422");
+    errorHandler(money, request, reply);
     return;
   }
   const fe = error as FastifyError;

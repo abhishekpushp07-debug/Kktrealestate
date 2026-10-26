@@ -35,12 +35,22 @@ export const appendOnly = () => ({ createdAt: createdAt() });
 /** Rows that change but carry no optimistic-concurrency version (child/engine rows). */
 export const timestamps = () => ({ createdAt: createdAt(), updatedAt: updatedAt() });
 
+/** `version integer NOT NULL DEFAULT 1` (optimistic concurrency, docs/API-CONVENTIONS.md "Versions"). */
+export const versionColumn = () => integer("version").notNull().default(1);
+
+/**
+ * Child/engine rows that change and carry a version but no created_by (migration 0005: demands, other-charge lines, rate-card rates and
+ * PLC rules, plan installments, enquiries, lead follow-ups). Every UPDATE bumps `version` (trigger `bump_version`, src/sql/0001_triggers.sql)
+ * unless the statement sets it itself (applyUpdate's `version = version + 1 WHERE version = expected`).
+ */
+export const versioned = () => ({ createdAt: createdAt(), updatedAt: updatedAt(), version: versionColumn() });
+
 /** Every mutable business row: created_at, updated_at, created_by (NULL = system), version. */
 export const mutable = () => ({
   createdAt: createdAt(),
   updatedAt: updatedAt(),
   createdBy: uuid("created_by"),
-  version: integer("version").notNull().default(1),
+  version: versionColumn(),
 });
 
 /** Soft delete for masters & structure: `is_active`, `deactivated_at`. */

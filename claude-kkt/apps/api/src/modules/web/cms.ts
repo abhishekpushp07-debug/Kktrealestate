@@ -65,7 +65,13 @@ import { listPaging, paginate } from "../../lib/list.js";
 import { translatePgError } from "../../lib/pgErrors.js";
 import { route } from "../../lib/routes.js";
 import { camelRow, snakeRow } from "../../lib/rows.js";
-import { applyUpdate, expectedVersion, withOptionalVersion } from "../../lib/version.js";
+import {
+  applyUpdate,
+  assertVersion,
+  expectedVersion,
+  withOptionalVersion,
+  type VersionedTable,
+} from "../../lib/version.js";
 import {
   DOCUMENT_SELECT,
   loadJoined,
@@ -473,6 +479,14 @@ function registerCmsKind(app: FastifyInstance, def: CmsKindDef): void {
       const user = req.user!;
       await app.db.transaction(async (tx) => {
         const existing = await loadRow(tx, def, user.companyId, req.params.id, true);
+        await assertVersion(
+          tx,
+          def.table as unknown as VersionedTable,
+          req.params.id,
+          Number(existing["version"]),
+          expectedVersion(req, null),
+          def.entity,
+        );
         const before = await viewOne(tx, existing, user.companyId);
         await tx.delete(def.table).where(eq(def.table.id, req.params.id));
         await writeAudit(tx, {
@@ -519,7 +533,7 @@ async function assertCustomer(db: Executor, companyId: string, id: string | null
     .from(customers)
     .where(and(eq(customers.id, id), eq(customers.companyId, companyId)))
     .limit(1);
-  if (!c) throw ApiError.badRequest(`customer_id: customer ${id} not found`, { field: "customer_id" });
+  if (!c) throw ApiError.invalid("customer_id", `customer_id: customer ${id} not found`);
 }
 
 /** Website routes a CMS page slug may not shadow (the sitemap and the Next.js router already own them). */

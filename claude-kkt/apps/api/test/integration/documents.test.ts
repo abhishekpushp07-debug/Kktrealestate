@@ -501,7 +501,14 @@ describe("sensitivity and permissions", () => {
         })
       ).status,
     ).toBe(404);
-    expect((await t.request("DELETE", `/api/v1/documents/${sensitiveId}`, { token: sales })).status).toBe(404);
+    expect(
+      (
+        await t.request("DELETE", `/api/v1/documents/${sensitiveId}`, {
+          token: sales,
+          headers: { "if-match": `"v${await docVersion(sensitiveId)}"` },
+        })
+      ).status,
+    ).toBe(404);
     const ok = await t.request<LinkBody>("POST", `/api/v1/documents/${plainId}/link`, { token: sales });
     expect(ok.status, ok.text).toBe(200);
     expect((await fetchFile(ok.body.download_url)).statusCode).toBe(200);
@@ -626,8 +633,18 @@ describe("soft delete", () => {
     );
     const link = await t.request<LinkBody>("POST", `/api/v1/documents/${doc.id}/link`, { token: admin });
     expect((await fetchFile(link.body.download_url)).statusCode).toBe(200);
-    expect((await t.request("DELETE", `/api/v1/documents/${doc.id}`, { token: employee })).status).toBe(403);
-    const del = await t.request("DELETE", `/api/v1/documents/${doc.id}`, { token: admin });
+    expect(
+      (
+        await t.request("DELETE", `/api/v1/documents/${doc.id}`, {
+          token: employee,
+          headers: { "if-match": `"v${await docVersion(doc.id)}"` },
+        })
+      ).status,
+    ).toBe(403);
+    const del = await t.request("DELETE", `/api/v1/documents/${doc.id}`, {
+      token: admin,
+      headers: { "if-match": `"v${await docVersion(doc.id)}"` },
+    });
     expect(del.status, del.text).toBe(204);
     expect((await t.request("GET", `/api/v1/documents/${doc.id}`, { token: admin })).status).toBe(404);
     expect((await t.request("POST", `/api/v1/documents/${doc.id}/link`, { token: admin })).status).toBe(404);
@@ -639,7 +656,14 @@ describe("soft delete", () => {
         })
       ).status,
     ).toBe(404);
-    expect((await t.request("DELETE", `/api/v1/documents/${doc.id}`, { token: admin })).status).toBe(404);
+    expect(
+      (
+        await t.request("DELETE", `/api/v1/documents/${doc.id}`, {
+          token: admin,
+          headers: { "if-match": `"v${await docVersion(doc.id)}"` },
+        })
+      ).status,
+    ).toBe(404);
     expect((await fetchFile(link.body.download_url)).statusCode).toBe(404);
     const list = await t.request<ListBody>(
       "GET",
@@ -1136,7 +1160,14 @@ describe("adversarial: streaming, tenancy and lists", () => {
         })
       ).status,
     ).toBe(404);
-    expect((await t.request("DELETE", `/api/v1/documents/${foreign.id}`, { token: admin })).status).toBe(404);
+    expect(
+      (
+        await t.request("DELETE", `/api/v1/documents/${foreign.id}`, {
+          token: admin,
+          headers: { "if-match": `"v${await docVersion(foreign.id)}"` },
+        })
+      ).status,
+    ).toBe(404);
     expect(
       (
         await t.request("GET", `/api/v1/documents?entity_type=CUSTOMER&entity_id=${otherCustomer!.id}`, {

@@ -13,7 +13,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { idColumn, mutable, paise, percent, softDelete, sqft, timestamps } from "./_common.js";
+import { idColumn, mutable, paise, percent, softDelete, sqft, versioned } from "./_common.js";
 import { chargeDemandAtEnum, planTypeEnum, plcCalcModeEnum, servicePriorityEnum, triggerTypeEnum } from "./enums.js";
 import { companies } from "./identity.js";
 import type { FlatTypeArea, FlatTypeRoom, FloorPlanPosition } from "./json.js";
@@ -180,9 +180,12 @@ export const paymentPlanInstallments = pgTable(
     triggerDate: date("trigger_date"),
     dueDays: integer("due_days"),
     notes: text("notes"),
-    ...timestamps(),
+    ...versioned(),
   },
-  (t) => [unique("payment_plan_installments_plan_seq_uq").on(t.planId, t.seq)],
+  (t) => [
+    unique("payment_plan_installments_plan_seq_uq").on(t.planId, t.seq),
+    index("payment_plan_installments_trigger_stage_id_idx").on(t.triggerStageId),
+  ],
 );
 
 export const chargeTypes = pgTable(
@@ -240,6 +243,7 @@ export const bankAccounts = pgTable(
     uniqueIndex("bank_accounts_one_default_uq")
       .on(t.companyId)
       .where(sql`${t.isDefault}`),
+    index("bank_accounts_company_id_idx").on(t.companyId),
   ],
 );
 
@@ -303,7 +307,10 @@ export const specItems = pgTable(
     ...softDelete(),
     ...mutable(),
   },
-  (t) => [index("spec_items_category_idx").on(t.categoryId, t.sortOrder)],
+  (t) => [
+    index("spec_items_category_idx").on(t.categoryId, t.sortOrder),
+    index("spec_items_company_id_idx").on(t.companyId),
+  ],
 );
 
 export const serviceCategories = pgTable(

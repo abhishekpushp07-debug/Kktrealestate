@@ -190,7 +190,8 @@ export function registerConstructionRoutes(app: FastifyInstance): void {
       summary: "Remove a stage photo (the document itself is kept)",
     },
     handler: async (req, reply) => {
-      await app.db.transaction((tx) => deletePhoto(tx, req.user!, actorOf(req), req.params.photoId));
+      const expected = expectedVersion(req, null);
+      await app.db.transaction((tx) => deletePhoto(tx, req.user!, actorOf(req), req.params.photoId, expected));
       return reply.code(204).send();
     },
   });

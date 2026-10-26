@@ -47,6 +47,8 @@ const EXPECTED_COLUMNS: Record<string, string[]> = {
     "created_at",
     "updated_at",
     "version",
+    "slug",
+    "hosts",
   ],
   roles: ["id", "company_id", "name", "description", "permissions", "is_system", "version"],
   users: [
@@ -69,6 +71,7 @@ const EXPECTED_COLUMNS: Record<string, string[]> = {
     "password_changed_at",
     "avatar_document_id",
     "version",
+    "totp_last_step",
   ],
   user_project_scopes: ["user_id", "project_id"],
   password_history: ["user_type", "subject_id", "password_hash", "created_at"],
@@ -86,6 +89,7 @@ const EXPECTED_COLUMNS: Record<string, string[]> = {
     "ip",
     "created_at",
     "last_used_at",
+    "family_started_at",
   ],
   login_events: ["company_id", "subject_type", "identifier", "success", "reason", "ip", "user_agent", "created_at"],
   audit_logs: [
@@ -112,9 +116,12 @@ const EXPECTED_COLUMNS: Record<string, string[]> = {
     "response_body",
     "created_at",
     "expires_at",
+    "committed_at",
+    "lease_expires_at",
   ],
   sequences: ["company_id", "scope", "fy", "value"],
-  job_runs: ["job_name", "started_at", "finished_at", "status", "result", "error"],
+  job_runs: ["job_name", "started_at", "finished_at", "status", "result", "error", "heartbeat_at", "checkpoint"],
+  audit_seals: ["id", "company_id", "first_audit_id", "last_audit_id", "row_count", "prev_hash", "hash", "sealed_at"],
   // B. Masters
   room_types: ["company_id", "name", "code", "sort_order", "is_active", "deactivated_at", "version"],
   area_types: ["company_id", "name", "code", "sort_order", "is_active", "deactivated_at", "version"],
@@ -152,6 +159,7 @@ const EXPECTED_COLUMNS: Record<string, string[]> = {
     "trigger_date",
     "due_days",
     "notes",
+    "version",
   ],
   charge_types: [
     "company_id",
@@ -350,7 +358,7 @@ const EXPECTED_COLUMNS: Record<string, string[]> = {
     "superseded_at",
     "version",
   ],
-  rate_card_rates: ["rate_card_id", "flat_type_id", "rate_per_sqft_paise", "lump_sum_paise"],
+  rate_card_rates: ["rate_card_id", "flat_type_id", "rate_per_sqft_paise", "lump_sum_paise", "version"],
   rate_card_plc_rules: [
     "rate_card_id",
     "plc_type_id",
@@ -360,6 +368,7 @@ const EXPECTED_COLUMNS: Record<string, string[]> = {
     "floors_gte",
     "facings",
     "sort_order",
+    "version",
   ],
   // D. Customers & portal identity
   customers: [
@@ -458,7 +467,7 @@ const EXPECTED_COLUMNS: Record<string, string[]> = {
     "version",
   ],
   lead_stage_history: ["lead_id", "from_stage", "to_stage", "by_user_id", "reason", "at"],
-  lead_follow_ups: ["lead_id", "note", "done_at", "next_at", "by_user_id", "created_at"],
+  lead_follow_ups: ["lead_id", "note", "done_at", "next_at", "by_user_id", "created_at", "version"],
   lead_activities: ["lead_id", "type", "payload", "actor_type", "actor_id", "at"],
   site_visits: [
     "company_id",
@@ -485,6 +494,7 @@ const EXPECTED_COLUMNS: Record<string, string[]> = {
     "notes",
     "outcome_marked_at",
     "version",
+    "ics_sequence",
   ],
   brochure_downloads: [
     "company_id",
@@ -512,6 +522,7 @@ const EXPECTED_COLUMNS: Record<string, string[]> = {
     "reference_number",
     "is_read",
     "created_at",
+    "version",
   ],
   // F. Plans ↔ towers, bookings, money
   payment_plan_assignments: [
@@ -565,6 +576,9 @@ const EXPECTED_COLUMNS: Record<string, string[]> = {
     "completed_by",
     "completion_notes",
     "version",
+    "cancellation_refund_paise",
+    "cancellation_deduction_paise",
+    "ledger_epoch",
   ],
   booking_co_applicants: ["booking_id", "customer_id"],
   booking_other_charges: [
@@ -583,6 +597,7 @@ const EXPECTED_COLUMNS: Record<string, string[]> = {
     "due_date",
     "paid_paise",
     "sort_order",
+    "version",
   ],
   agreement_revisions: [
     "company_id",
@@ -628,6 +643,7 @@ const EXPECTED_COLUMNS: Record<string, string[]> = {
     "void_reason",
     "posted_at",
     "created_at",
+    "version",
   ],
   payments: [
     "company_id",
@@ -682,7 +698,9 @@ const EXPECTED_COLUMNS: Record<string, string[]> = {
     "ref_number",
     "ref_id",
     "note",
+    "epoch",
   ],
+  ledger_rebuilds: ["id", "company_id", "booking_id", "from_epoch", "to_epoch", "reason", "actor_id", "at", "summary"],
   contra_entries: [
     "company_id",
     "entry_date",
@@ -714,6 +732,18 @@ const EXPECTED_COLUMNS: Record<string, string[]> = {
     "deleted_at",
     "created_at",
   ],
+  storage_pending_objects: ["key", "company_id", "purpose", "created_at"],
+  storage_deletions: [
+    "id",
+    "key",
+    "company_id",
+    "reason",
+    "attempts",
+    "last_error",
+    "next_attempt_at",
+    "created_at",
+    "done_at",
+  ],
   service_requests: [
     "company_id",
     "ticket_number",
@@ -734,6 +764,8 @@ const EXPECTED_COLUMNS: Record<string, string[]> = {
     "rating_comment",
     "last_message_at",
     "version",
+    "sla_paused_at",
+    "sla_paused_seconds",
   ],
   service_request_messages: [
     "ticket_id",
@@ -947,7 +979,11 @@ const EXPECTED_INDEXES: ExpectedIndex[] = [
   { table: "payments", columns: ["company_id", "idempotency_key"], unique: true, where: "idempotency_key IS NOT NULL" },
   { table: "payments", columns: ["project_id", "payment_date"] },
   { table: "payments", columns: ["company_id", "status", "payment_date"] },
-  { table: "ledger_entries", columns: ["booking_id", "seq"], unique: true },
+  { table: "ledger_entries", columns: ["booking_id", "epoch", "seq"], unique: true },
+  { table: "ledger_rebuilds", columns: ["booking_id", "at"] },
+  { table: "companies", columns: ["slug"], unique: true },
+  { table: "audit_seals", columns: ["company_id", "sealed_at"] },
+  { table: "storage_deletions", columns: ["done_at", "next_attempt_at"] },
   { table: "contra_entries", columns: ["company_id", "entry_date"] },
   { table: "documents", columns: ["entity_type", "entity_id", "is_deleted"] },
   { table: "service_requests", columns: ["company_id", "ticket_number"], unique: true },
@@ -987,16 +1023,17 @@ const NO_COMPANY_ID = new Set([
   "service_request_messages",
 ]);
 
-/** Tables with updated_at but, per DATA-MODEL.md, no optimistic-concurrency version (engine/child rows). */
-const UPDATABLE_WITHOUT_VERSION = new Set([
-  "payment_plan_installments",
-  "rate_card_rates",
-  "rate_card_plc_rules",
-  "enquiries",
-  "lead_follow_ups",
-  "booking_other_charges",
-  "demands",
-]);
+/**
+ * Tables with updated_at but no optimistic-concurrency version. Empty since migration 0005 versioned the last seven (demands, other
+ * charges, rate-card rates / PLC rules, plan installments, enquiries, lead follow-ups): every mutable row has a version (SPEC §2).
+ */
+const UPDATABLE_WITHOUT_VERSION = new Set<string>([]);
+
+/** Tables whose company_id may be NULL: login events of unknown identifiers, seals over every company, storage keys of system objects. */
+const NULLABLE_COMPANY_ID = new Set(["login_events", "audit_seals", "storage_pending_objects", "storage_deletions"]);
+
+/** Tables whose id is not a uuid: audit_seals is a bigserial chain (seal n follows seal n − 1). */
+const NON_UUID_ID = new Set(["audit_seals"]);
 
 interface ColumnRow {
   table_name: string;
@@ -1068,9 +1105,9 @@ describe("DATA-MODEL.md conformance", () => {
     await handle.close();
   });
 
-  it("has exactly the 78 tables of DATA-MODEL.md and nothing else", () => {
+  it("has exactly the 82 tables of DATA-MODEL.md and nothing else", () => {
     const expected = Object.keys(EXPECTED_COLUMNS).sort();
-    expect(expected).toHaveLength(78);
+    expect(expected).toHaveLength(82);
     expect([...byTable.keys()].sort()).toEqual(expected);
   });
 
@@ -1211,7 +1248,8 @@ describe("DATA-MODEL.md conformance", () => {
       const col = cols.get("company_id");
       if (!col) problems.push(`${table}: missing company_id`);
       else if (col.udt_name !== "uuid") problems.push(`${table}: company_id is ${col.udt_name}`);
-      else if (col.is_nullable === "YES" && table !== "login_events") problems.push(`${table}: company_id nullable`);
+      else if (col.is_nullable === "YES" && !NULLABLE_COMPANY_ID.has(table))
+        problems.push(`${table}: company_id nullable`);
       if (!withFk.has(table)) problems.push(`${table}: company_id has no FK to companies`);
     }
     expect(problems).toEqual([]);
@@ -1224,7 +1262,7 @@ describe("DATA-MODEL.md conformance", () => {
     expect([...byTable.keys()].filter((t) => !withPk.has(t))).toEqual([]);
     for (const [table, cols] of byTable) {
       const id = cols.get("id");
-      if (!id) continue;
+      if (!id || NON_UUID_ID.has(table)) continue;
       expect(id.udt_name, `${table}.id`).toBe("uuid");
       expect(id.column_default, `${table}.id default`).toBe("gen_random_uuid()");
     }

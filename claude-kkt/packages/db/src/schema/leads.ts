@@ -14,7 +14,7 @@ import {
   unique,
   uuid,
 } from "drizzle-orm/pg-core";
-import { appendOnly, idColumn, mutable, paise, timestamps, trgm } from "./_common.js";
+import { appendOnly, idColumn, mutable, paise, trgm, versioned } from "./_common.js";
 import { customers } from "./customers.js";
 import { actorTypeEnum, leadSourceEnum, leadStageEnum, visitSourceEnum, visitStatusEnum } from "./enums.js";
 import { companies, users } from "./identity.js";
@@ -67,6 +67,9 @@ export const leads = pgTable(
     trgm("leads_phone_trgm_idx", t.phone),
     trgm("leads_lead_number_trgm_idx", t.leadNumber),
     trgm("leads_email_trgm_idx", t.email),
+    index("leads_customer_id_idx").on(t.customerId),
+    index("leads_flat_type_id_idx").on(t.flatTypeId),
+    index("leads_project_id_idx").on(t.projectId),
   ],
 );
 
@@ -97,7 +100,7 @@ export const leadFollowUps = pgTable(
     doneAt: timestamp("done_at", { withTimezone: true }),
     nextAt: timestamp("next_at", { withTimezone: true }),
     byUserId: uuid("by_user_id"),
-    ...timestamps(),
+    ...versioned(),
   },
   (t) => [index("lead_follow_ups_lead_idx").on(t.leadId, t.createdAt.desc())],
 );
@@ -152,6 +155,8 @@ export const siteVisits = pgTable(
     cancelReason: text("cancel_reason"),
     notes: text("notes"),
     outcomeMarkedAt: timestamp("outcome_marked_at", { withTimezone: true }),
+    /** iCalendar SEQUENCE of the visit's .ics (migration 0005): bumped on every reschedule/cancel so calendar clients apply updates. */
+    icsSequence: integer("ics_sequence").notNull().default(0),
     ...mutable(),
   },
   (t) => [
@@ -162,6 +167,7 @@ export const siteVisits = pgTable(
     index("site_visits_company_visit_date_idx").on(t.companyId, t.visitDate.desc(), t.id.desc()),
     index("site_visits_superseded_token_hashes_idx").using("gin", t.supersededTokenHashes),
     check("site_visits_visitors_chk", sql`${t.visitors} BETWEEN 1 AND 6`),
+    index("site_visits_customer_id_idx").on(t.customerId),
   ],
 );
 
@@ -181,7 +187,11 @@ export const brochureDownloads = pgTable(
     userAgent: text("user_agent"),
     ...appendOnly(),
   },
-  (t) => [index("brochure_downloads_project_created_idx").on(t.projectId, t.createdAt.desc())],
+  (t) => [
+    index("brochure_downloads_project_created_idx").on(t.projectId, t.createdAt.desc()),
+    index("brochure_downloads_company_id_idx").on(t.companyId),
+    index("brochure_downloads_lead_id_idx").on(t.leadId),
+  ],
 );
 
 export const enquiries = pgTable(
@@ -201,10 +211,13 @@ export const enquiries = pgTable(
     ip: text("ip"),
     referenceNumber: text("reference_number").notNull(),
     isRead: boolean("is_read").notNull().default(false),
-    ...timestamps(),
+    ...versioned(),
   },
   (t) => [
     index("enquiries_company_read_created_idx").on(t.companyId, t.isRead, t.createdAt.desc()),
     index("enquiries_company_created_idx").on(t.companyId, t.createdAt.desc(), t.id.desc()),
+    index("enquiries_flat_type_id_idx").on(t.flatTypeId),
+    index("enquiries_lead_id_idx").on(t.leadId),
+    index("enquiries_project_id_idx").on(t.projectId),
   ],
 );

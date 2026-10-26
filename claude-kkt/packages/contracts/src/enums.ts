@@ -545,6 +545,9 @@ export const LEDGER_EVENTS = [
   "OTHER_CHARGE_PAYMENT",
   "OTHER_CHARGE_REVERSAL",
   "CANCELLATION",
+  // migration 0005 (contract C7): a voided demand leaves a compensating row; a rebuild opens a new epoch with a restatement row
+  "DEMAND_VOIDED",
+  "LEDGER_RESTATED",
 ] as const;
 export const LedgerEventSchema = enumSchema(LEDGER_EVENTS);
 export type LedgerEvent = z.infer<typeof LedgerEventSchema>;
@@ -558,6 +561,8 @@ export const LEDGER_EVENT_LABELS: LabelMap<LedgerEvent> = {
   OTHER_CHARGE_PAYMENT: "Other charge payment",
   OTHER_CHARGE_REVERSAL: "Other charge reversal",
   CANCELLATION: "Cancellation",
+  DEMAND_VOIDED: "Demand voided",
+  LEDGER_RESTATED: "Ledger restated",
 };
 
 export const CONTRA_TYPES = ["DEPOSIT", "WITHDRAWAL"] as const;

@@ -13,6 +13,8 @@ export {
   DEFAULT_DB_TIMEOUTS,
   nextSequence,
   DEFAULT_DATABASE_URL,
+  BigIntPrecisionError,
+  parseBigint,
 } from "./client.js";
 export type {
   DB,
@@ -28,9 +30,15 @@ export {
   runMigrations,
   migrateHandle,
   listSqlFiles,
+  listOnlineSqlFiles,
+  applyOnlineSql,
+  splitSqlStatements,
+  parseConcurrentIndex,
   MIGRATIONS_FOLDER,
   SQL_FOLDER,
   MIGRATION_LOCK_KEY,
+  SCHEMA_FILES_TABLE,
 } from "./migrate.js";
+export type { MigrateOptions, MigrateReport, OnlineStatementResult, ConcurrentIndexStatement } from "./migrate.js";
 export { resetDatabase, resetRefusalReason } from "./reset.js";
 export type { ResetGuards } from "./reset.js";

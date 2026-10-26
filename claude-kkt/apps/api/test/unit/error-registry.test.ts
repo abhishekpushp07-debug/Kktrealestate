@@ -6,7 +6,14 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ApiErrorSchema, ERROR_CODES, ERROR_STATUS, isKnownErrorCode } from "@kkt/contracts";
+import {
+  ApiErrorSchema,
+  BUSINESS_RULES,
+  ERROR_CODES,
+  ERROR_STATUS,
+  isKnownErrorCode,
+  isKnownRuleId,
+} from "@kkt/contracts";
 import { describe, expect, it } from "vitest";
 
 const SRC = fileURLToPath(new URL("../../src", import.meta.url));
@@ -121,5 +128,83 @@ describe("error code registry", () => {
     expect(ApiErrorSchema.safeParse({ error: { code: "not-a-code", message: "x" } }).success).toBe(false);
     expect(ApiErrorSchema.safeParse({ error: { code: "", message: "x" } }).success).toBe(false);
     expect(isKnownErrorCode("SOME_FUTURE_RULE")).toBe(false);
+  });
+});
+
+/** The argument list of every call `name(…)` in `text` (balanced parentheses, strings and template literals skipped). */
+function callArgs(text: string, name: string): { args: string; index: number }[] {
+  const out: { args: string; index: number }[] = [];
+  for (let at = text.indexOf(name); at !== -1; at = text.indexOf(name, at + name.length)) {
+    let i = at + name.length;
+    let depth = 1;
+    let quote: string | null = null;
+    for (; i < text.length && depth > 0; i += 1) {
+      const c = text[i]!;
+      if (quote) {
+        if (c === "\\") i += 1;
+        else if (c === quote) quote = null;
+      } else if (c === '"' || c === "'" || c === "`") quote = c;
+      else if (c === "(") depth += 1;
+      else if (c === ")") depth -= 1;
+    }
+    out.push({ args: text.slice(at + name.length, i - 1), index: at });
+  }
+  return out;
+}
+
+describe("business-rule registry (BUSINESS_RULES, RuleId)", () => {
+  const sites = tsFiles(SRC).flatMap((file) => {
+    const text = readFileSync(file, "utf8");
+    return callArgs(text, "ApiError.rule(").map((c) => ({
+      ...c,
+      where: `${relative(SRC, file)}:${lineOf(text, c.index)}`,
+    }));
+  });
+
+  it("the scan sees the rule sites", () => {
+    expect(sites.length).toBeGreaterThan(80);
+  });
+
+  it("every literal rule id raised by the API is registered (dynamic ids are domain error codes, typed as RuleId)", () => {
+    const literal = sites
+      .map((s) => ({
+        ...s,
+        id: /^\s*(?:`(?:[^`\\]|\\.)*`|"(?:[^"\\]|\\.)*"|[^,])*,\s*"([A-Z][A-Z0-9_]*)"/s.exec(s.args)?.[1],
+      }))
+      .filter((s) => s.id !== undefined);
+    expect(literal.length).toBeGreaterThan(80);
+    expect(literal.filter((s) => !isKnownRuleId(s.id!)).map((s) => `${s.id} (${s.where})`)).toEqual([]);
+    const dynamic = sites.filter((s) => !literal.includes(s as never) && !/,\s*"[A-Z]/.test(s.args));
+    expect(dynamic.map((s) => s.where).every((w) => w.startsWith(join("modules", "inventory", "service.ts")))).toBe(
+      true,
+    );
+    expect(BUSINESS_RULES.length).toBeGreaterThan(70);
+  });
+});
+
+describe("validation error details have one shape: details.issues[{path, message, code}]", () => {
+  it("no VALIDATION_ERROR site sends the old {field} details (ApiError.invalid builds issues)", () => {
+    const offenders = tsFiles(SRC).flatMap((file) => {
+      const text = readFileSync(file, "utf8");
+      return [...callArgs(text, "ApiError.badRequest("), ...callArgs(text, 'new ApiError(400, "VALIDATION_ERROR",')]
+        .filter((c) => /[{,]\s*field\s*[:,}]/.test(c.args))
+        .map((c) => `${relative(SRC, file)}:${lineOf(text, c.index)}`);
+    });
+    expect(offenders).toEqual([]);
+  });
+
+  it("ApiError.invalid and versionRequired produce the issues shape the contracts parse", async () => {
+    const { ApiError } = await import("../../src/lib/errors.js");
+    const { versionRequired } = await import("../../src/lib/version.js");
+    const { ValidationErrorDetailsSchema } = await import("@kkt/contracts");
+    const e = ApiError.invalid("customer_id", "Customer does not exist", "invalid", { customer_id: "x" });
+    expect(e.statusCode).toBe(400);
+    expect(ValidationErrorDetailsSchema.parse(e.details)).toEqual({
+      issues: [{ path: "customer_id", message: "Customer does not exist", code: "invalid" }],
+    });
+    expect(e.details?.["customer_id"]).toBe("x");
+    const v = versionRequired();
+    expect(v.statusCode).toBe(428);
+    expect(ValidationErrorDetailsSchema.parse(v.details).issues[0]?.path).toBe("version");
   });
 });

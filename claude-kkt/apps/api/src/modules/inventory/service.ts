@@ -238,15 +238,14 @@ export async function masterStageOrder(db: Executor, companyId: string): Promise
 
 /** 400 unless every id is a construction stage of the company and no id repeats. */
 export async function assertStageSequence(db: Executor, companyId: string, ids: readonly string[]): Promise<void> {
-  if (new Set(ids).size !== ids.length)
-    throw ApiError.badRequest("stage_sequence repeats a stage", { field: "stage_sequence" });
+  if (new Set(ids).size !== ids.length) throw ApiError.invalid("stage_sequence", "stage_sequence repeats a stage");
   if (ids.length === 0) return;
   const found = await db
     .select({ id: constructionStages.id })
     .from(constructionStages)
     .where(and(eq(constructionStages.companyId, companyId), inArray(constructionStages.id, [...ids])));
   if (found.length !== ids.length)
-    throw ApiError.badRequest("stage_sequence references an unknown construction stage", { field: "stage_sequence" });
+    throw ApiError.invalid("stage_sequence", "stage_sequence references an unknown construction stage");
 }
 
 /**
@@ -452,8 +451,7 @@ export async function loadTemplates(
     .select()
     .from(floorPlanTemplates)
     .where(and(eq(floorPlanTemplates.companyId, companyId), inArray(floorPlanTemplates.id, unique)));
-  if (rows.length !== unique.length)
-    throw ApiError.badRequest("Unknown floor-plan template id", { field: "floor_plans" });
+  if (rows.length !== unique.length) throw ApiError.invalid("floor_plans", "Unknown floor-plan template id");
   for (const t of rows)
     if (!t.isActive)
       throw ApiError.rule(`Floor-plan template ${t.name} is inactive`, "TEMPLATE_INACTIVE", { template_id: t.id });

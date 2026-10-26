@@ -23,6 +23,15 @@ async function ticket(ctx: SeedContext, id: string): Promise<Ticket> {
   return ctx.get<Ticket>(`/api/v1/service-requests/${id}`);
 }
 
+/** Staff reply / internal note on a ticket, sent with the ticket's current version (If-Match; contract C6). */
+async function staffMessage(ctx: SeedContext, id: string, body: Record<string, unknown>): Promise<Ticket> {
+  const current = await ticket(ctx, id);
+  return ctx.post<Ticket>(`/api/v1/service-requests/${id}/messages`, body, "admin", {
+    idempotent: false,
+    ifMatch: current.version,
+  });
+}
+
 export async function seedService(ctx: SeedContext): Promise<void> {
   ctx.log("service requests: NEW, IN_PROGRESS (internal note), AWAITING_CUSTOMER, RESOLVED, CLOSED (rated 5); notices");
   const cat = (name: string) => ctx.serviceCategories[name]!;
@@ -59,23 +68,13 @@ export async function seedService(ctx: SeedContext): Promise<void> {
       "admin",
     );
     t = await staffStatus(ctx, t, "IN_PROGRESS", "Picked up by sales desk");
-    await ctx.post(
-      `/api/v1/service-requests/${t.id}/messages`,
-      {
-        body: "Bounced cheque 118822 was replaced by UPI on time – no need to mention it in the letter. Loan file is urgent for the customer.",
-        is_internal: true,
-      },
-      "admin",
-      { idempotent: false },
-    );
-    await ctx.post(
-      `/api/v1/service-requests/${t.id}/messages`,
-      {
-        body: "Hello Mr Kumar, the allotment letter and schedule are being prepared on letterhead; you will have them in the portal by tomorrow evening.",
-      },
-      "admin",
-      { idempotent: false },
-    );
+    await staffMessage(ctx, t.id, {
+      body: "Bounced cheque 118822 was replaced by UPI on time – no need to mention it in the letter. Loan file is urgent for the customer.",
+      is_internal: true,
+    });
+    await staffMessage(ctx, t.id, {
+      body: "Hello Mr Kumar, the allotment letter and schedule are being prepared on letterhead; you will have them in the portal by tomorrow evening.",
+    });
   }
 
   // 3 · AWAITING_CUSTOMER construction query – Vikram Singh (portal) → staff asked for details
@@ -93,15 +92,10 @@ export async function seedService(ctx: SeedContext): Promise<void> {
     });
     let t = await ticket(ctx, created.id);
     t = await staffStatus(ctx, t, "IN_PROGRESS");
-    await ctx.post(
-      `/api/v1/service-requests/${t.id}/messages`,
-      {
-        body: "Plinth work starts next week; could you confirm whether you want the stage-wise schedule by email or WhatsApp?",
-        status: "AWAITING_CUSTOMER",
-      },
-      "admin",
-      { idempotent: false },
-    );
+    await staffMessage(ctx, t.id, {
+      body: "Plinth work starts next week; could you confirm whether you want the stage-wise schedule by email or WhatsApp?",
+      status: "AWAITING_CUSTOMER",
+    });
   }
 
   // 4 · RESOLVED defect/snag – Anjali Sharma (portal); the customer can still rate it from the portal
@@ -119,12 +113,9 @@ export async function seedService(ctx: SeedContext): Promise<void> {
     });
     let t = await ticket(ctx, created.id);
     t = await staffStatus(ctx, t, "IN_PROGRESS", "Site engineer assigned");
-    await ctx.post(
-      `/api/v1/service-requests/${t.id}/messages`,
-      { body: "Our team re-sealed the window frame and applied waterproofing; please check after the next rain." },
-      "admin",
-      { idempotent: false },
-    );
+    await staffMessage(ctx, t.id, {
+      body: "Our team re-sealed the window frame and applied waterproofing; please check after the next rain.",
+    });
     t = await ticket(ctx, t.id);
     await staffStatus(ctx, t, "RESOLVED", "Window frame sealed and waterproofed");
   }
@@ -144,12 +135,9 @@ export async function seedService(ctx: SeedContext): Promise<void> {
       "admin",
     );
     t = await staffStatus(ctx, t, "IN_PROGRESS", "Walkthrough scheduled");
-    await ctx.post(
-      `/api/v1/service-requests/${t.id}/messages`,
-      { body: "Walkthrough completed and keys handed over along with the registry documents. Welcome home!" },
-      "admin",
-      { idempotent: false },
-    );
+    await staffMessage(ctx, t.id, {
+      body: "Walkthrough completed and keys handed over along with the registry documents. Welcome home!",
+    });
     t = await ticket(ctx, t.id);
     t = await staffStatus(ctx, t, "RESOLVED", "Keys handed over");
     const token = await portalLogin(ctx, "9876543210");

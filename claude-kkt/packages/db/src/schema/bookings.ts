@@ -15,7 +15,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { appendOnly, idColumn, mutable, paise, percent, timestamps, trgm } from "./_common.js";
+import { appendOnly, idColumn, mutable, paise, percent, timestamps, trgm, versioned } from "./_common.js";
 import { customers } from "./customers.js";
 import { bookingStatusEnum, chargeDemandAtEnum, planAcceptanceModeEnum } from "./enums.js";
 import { companies, users } from "./identity.js";
@@ -53,6 +53,8 @@ export const paymentPlanAssignments = pgTable(
     unique("payment_plan_assignments_plan_project_block_uq").on(t.planId, t.projectId, t.blockId).nullsNotDistinct(),
     index("payment_plan_assignments_project_block_active_idx").on(t.projectId, t.blockId, t.isActive),
     index("payment_plan_assignments_plan_idx").on(t.planId),
+    index("payment_plan_assignments_block_id_idx").on(t.blockId),
+    index("payment_plan_assignments_company_id_idx").on(t.companyId),
   ],
 );
 
@@ -69,7 +71,10 @@ export const bookingDrafts = pgTable(
     ...timestamps(),
     version: integer("version").notNull().default(1),
   },
-  (t) => [index("booking_drafts_user_updated_idx").on(t.userId, t.updatedAt.desc())],
+  (t) => [
+    index("booking_drafts_user_updated_idx").on(t.userId, t.updatedAt.desc()),
+    index("booking_drafts_company_id_idx").on(t.companyId),
+  ],
 );
 
 export const bookings = pgTable(
@@ -123,6 +128,11 @@ export const bookings = pgTable(
     pendingChequesPaise: paise("pending_cheques_paise").notNull().default(0),
     lastPaymentAt: timestamp("last_payment_at", { withTimezone: true }),
     cancellation: jsonb("cancellation").$type<Cancellation>(),
+    /** Refund and deduction of a cancellation as money columns (migration 0005; `cancellation` jsonb keeps the history text). */
+    cancellationRefundPaise: paise("cancellation_refund_paise"),
+    cancellationDeductionPaise: paise("cancellation_deduction_paise"),
+    /** Current ledger epoch (contract C7): ledger_entries of this booking with `epoch` = this value are the live statement. */
+    ledgerEpoch: integer("ledger_epoch").notNull().default(1),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     completedBy: uuid("completed_by"),
     completionNotes: text("completion_notes"),
@@ -145,6 +155,16 @@ export const bookings = pgTable(
     ),
     check("bookings_agreed_nonneg_chk", sql`${t.cashAgreedPaise} >= 0 AND ${t.accountAgreedPaise} >= 0`),
     check("bookings_list_price_nonneg_chk", sql`${t.listPricePaise} IS NULL OR ${t.listPricePaise} >= 0`),
+    // added NOT VALID by migration 0005 and validated by src/sql/online/0005_indexes.sql (no long lock on bookings)
+    check(
+      "bookings_cancellation_amounts_nonneg_chk",
+      sql`(${t.cancellationRefundPaise} IS NULL OR ${t.cancellationRefundPaise} >= 0) AND (${t.cancellationDeductionPaise} IS NULL OR ${t.cancellationDeductionPaise} >= 0)`,
+    ),
+    check("bookings_ledger_epoch_chk", sql`${t.ledgerEpoch} >= 1`),
+    index("bookings_flat_id_idx").on(t.flatId),
+    index("bookings_lead_id_idx").on(t.leadId),
+    index("bookings_project_id_idx").on(t.projectId),
+    index("bookings_sales_user_id_idx").on(t.salesUserId),
   ],
 );
 
@@ -186,7 +206,7 @@ export const bookingOtherCharges = pgTable(
     dueDate: date("due_date"),
     paidPaise: paise("paid_paise").notNull().default(0),
     sortOrder: integer("sort_order").notNull().default(0),
-    ...timestamps(),
+    ...versioned(),
   },
   (t) => [
     index("booking_other_charges_booking_idx").on(t.bookingId),
@@ -195,6 +215,8 @@ export const bookingOtherCharges = pgTable(
       "booking_other_charges_nonneg_chk",
       sql`${t.amountPaise} >= 0 AND ${t.gstPaise} >= 0 AND ${t.totalPaise} >= 0 AND ${t.paidPaise} >= 0`,
     ),
+    index("booking_other_charges_charge_type_id_idx").on(t.chargeTypeId),
+    index("booking_other_charges_company_id_idx").on(t.companyId),
   ],
 );
 
@@ -214,7 +236,10 @@ export const agreementRevisions = pgTable(
     after: jsonb("after").$type<AgreementValues>().notNull(),
     ...appendOnly(),
   },
-  (t) => [index("agreement_revisions_booking_idx").on(t.bookingId, t.revisedAt.desc())],
+  (t) => [
+    index("agreement_revisions_booking_idx").on(t.bookingId, t.revisedAt.desc()),
+    index("agreement_revisions_company_id_idx").on(t.companyId),
+  ],
 );
 
 export const bookingPlanRevisions = pgTable(
@@ -232,5 +257,8 @@ export const bookingPlanRevisions = pgTable(
     afterPlanSnapshot: jsonb("after_plan_snapshot").$type<PlanSnapshot>().notNull(),
     ...appendOnly(),
   },
-  (t) => [index("booking_plan_revisions_booking_idx").on(t.bookingId, t.at.desc())],
+  (t) => [
+    index("booking_plan_revisions_booking_idx").on(t.bookingId, t.at.desc()),
+    index("booking_plan_revisions_company_id_idx").on(t.companyId),
+  ],
 );

@@ -13,7 +13,7 @@ import {
   towerCBody,
   type InventoryBasics,
 } from "./fixtures/inventory.js";
-import { buildTestApp, type ErrorBody, type TestContext } from "./helpers.js";
+import { buildTestApp, type ErrorBody, ifMatch, type TestContext, versionOf } from "./helpers.js";
 
 type UnitCounts = { available: number; hold: number; blocked: number; booked: number; sold: number; total: number };
 type ProjectRow = {
@@ -637,7 +637,13 @@ describe("status guards, re-snapshot and hold windows", () => {
     expect(regen.status).toBe(409);
     expect(regen.body.error.code).toBe("REGENERATE_BLOCKED");
     expect(
-      (await t.request<ErrorBody>("POST", `/api/v1/blocks/${c.id}/deactivate`, { token: admin, body: {} })).status,
+      (
+        await t.request<ErrorBody>("POST", `/api/v1/blocks/${c.id}/deactivate`, {
+          token: admin,
+          body: {},
+          headers: ifMatch(await versionOf(t, `/api/v1/blocks/${c.id}`, admin)),
+        })
+      ).status,
     ).toBe(409);
     await expectCountsTrue(c.id);
     expect((await block(c.id)).unit_counts.booked).toBe(1);
@@ -791,6 +797,7 @@ describe("unit_counts stay true after every operation", () => {
     const deact = await t.request<{ is_active: boolean }>("POST", `/api/v1/blocks/${x.id}/deactivate`, {
       token: admin,
       body: {},
+      headers: ifMatch(await versionOf(t, `/api/v1/blocks/${x.id}`, admin)),
     });
     expect(deact.status, deact.text).toBe(200);
     const withoutX = await project(sgh.id);
@@ -809,6 +816,7 @@ describe("unit_counts stay true after every operation", () => {
     const react = await t.request<{ is_active: boolean }>("POST", `/api/v1/blocks/${x.id}/activate`, {
       token: admin,
       body: {},
+      headers: ifMatch(await versionOf(t, `/api/v1/blocks/${x.id}`, admin)),
     });
     expect(react.status, react.text).toBe(200);
     expect((await project(sgh.id)).unit_counts.total).toBe(withX.unit_counts.total);

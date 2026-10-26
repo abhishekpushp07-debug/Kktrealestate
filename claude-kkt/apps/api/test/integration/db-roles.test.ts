@@ -124,6 +124,31 @@ describe("database roles (kkt_owner migrates, kkt_app is DML only)", () => {
     );
   });
 
+  it("the books are append-only for kkt_app by privilege (migration 0005): no UPDATE/DELETE on ledger_entries, audit_logs, audit_seals, ledger_rebuilds; no DELETE on payments/demands", async () => {
+    for (const statement of [
+      "update ledger_entries set note = note",
+      "delete from ledger_entries",
+      "update audit_logs set action = action",
+      "delete from audit_seals",
+      "update ledger_rebuilds set reason = reason",
+      "delete from payments",
+      "delete from demands",
+      "truncate payments",
+    ])
+      expect(await denied(asApp.unsafe(statement)), statement).toBe("42501");
+    // still allowed: appending, and updating payment/demand status rows
+    expect(
+      await denied(
+        asApp.begin(async (tx) => {
+          await tx.unsafe("update payments set remarks = remarks");
+          await tx.unsafe("update demands set status = status");
+          await tx.unsafe("select 1 from ledger_entries limit 1");
+          throw new Error("rollback");
+        }),
+      ),
+    ).toBe("rollback");
+  });
+
   it("kkt_app carries the safety timeouts as role defaults (PgBouncer ignores startup parameters)", async () => {
     const plain = postgres(url("kkt_app", APP_PW), { max: 1, onnotice: () => undefined });
     try {

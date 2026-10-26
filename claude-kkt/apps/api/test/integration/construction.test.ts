@@ -425,7 +425,7 @@ describe("stage photos (flags visible_to_buyers / show_on_website)", () => {
       token: admin,
       body: { caption: "x" },
     });
-    expect(versionless.status, versionless.text).toBe(400);
+    expect(versionless.status, versionless.text).toBe(428);
     expect(versionless.body.error.code).toBe("VERSION_REQUIRED");
     const patched = await t.request<Photo>("PATCH", `/api/v1/construction/photos/${hiddenPhoto.id}`, {
       token: paSgh,
@@ -479,18 +479,38 @@ describe("stage photos (flags visible_to_buyers / show_on_website)", () => {
       { token: admin, body: { document_id: extraDoc, visible_to_buyers: false } },
     );
     expect(extra.status).toBe(201);
-    expect((await t.request("DELETE", `/api/v1/construction/photos/${extra.body.id}`, { token: sales })).status).toBe(
-      403,
-    );
-    expect((await t.request("DELETE", `/api/v1/construction/photos/${extra.body.id}`, { token: paGgv })).status).toBe(
-      404,
-    );
-    expect((await t.request("DELETE", `/api/v1/construction/photos/${extra.body.id}`, { token: admin })).status).toBe(
-      204,
-    );
-    expect((await t.request("DELETE", `/api/v1/construction/photos/${extra.body.id}`, { token: admin })).status).toBe(
-      404,
-    );
+    expect(
+      (
+        await t.request("DELETE", `/api/v1/construction/photos/${extra.body.id}`, {
+          token: sales,
+          headers: { "if-match": `"v${extra.body.version}"` },
+        })
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await t.request("DELETE", `/api/v1/construction/photos/${extra.body.id}`, {
+          token: paGgv,
+          headers: { "if-match": `"v${extra.body.version}"` },
+        })
+      ).status,
+    ).toBe(404);
+    expect(
+      (
+        await t.request("DELETE", `/api/v1/construction/photos/${extra.body.id}`, {
+          token: admin,
+          headers: { "if-match": `"v${extra.body.version}"` },
+        })
+      ).status,
+    ).toBe(204);
+    expect(
+      (
+        await t.request("DELETE", `/api/v1/construction/photos/${extra.body.id}`, {
+          token: admin,
+          headers: { "if-match": `"v${extra.body.version}"` },
+        })
+      ).status,
+    ).toBe(404);
     const [doc] = await t.app.sql<{ is_deleted: boolean }[]>`select is_deleted from documents where id = ${extraDoc}`;
     expect(doc!.is_deleted).toBe(false);
     expect((await stageOf("Excavation")).photos).toHaveLength(0);
@@ -526,7 +546,7 @@ describe("marking stages (jump-ahead, dues, bells)", () => {
       token: admin,
       body: { stage_id: w.stages.Excavation, completed_on: d0() },
     });
-    expect(noVersion.status).toBe(400);
+    expect(noVersion.status).toBe(428);
     const stale = await status({ stage_id: w.stages.Excavation, completed_on: d0() }, { version: 99 });
     expect(stale.status).toBe(409);
     expect(stale.body.error.code).toBe("VERSION_CONFLICT");

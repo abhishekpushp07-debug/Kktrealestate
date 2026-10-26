@@ -77,6 +77,8 @@ const DATA_MODEL_ENUMS: ReadonlyArray<readonly [string, readonly string[], reado
       "OTHER_CHARGE_PAYMENT",
       "OTHER_CHARGE_REVERSAL",
       "CANCELLATION",
+      "DEMAND_VOIDED",
+      "LEDGER_RESTATED",
     ],
   ],
   ["contra_entries.type", contracts.CONTRA_TYPES, ["DEPOSIT", "WITHDRAWAL"]],

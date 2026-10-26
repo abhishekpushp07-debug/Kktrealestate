@@ -124,7 +124,7 @@ export async function reserveFlat(
   try {
     until = reserveUntil(minutes, now);
   } catch {
-    throw ApiError.badRequest("minutes must be 1–30", { field: "minutes" });
+    throw ApiError.invalid("minutes", "minutes must be 1–30");
   }
   // an own longer hold (e.g. the 48 h manual hold) is never shortened by a wizard reservation
   if (own && flat.holdUntil && flat.holdUntil.getTime() > until.getTime()) until = flat.holdUntil;

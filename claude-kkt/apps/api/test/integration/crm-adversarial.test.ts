@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createProject } from "./fixtures.js";
 import { validAadhaar } from "./fixtures/crm.js";
-import { buildTestApp, type ErrorBody, type LoginResult, type TestContext } from "./helpers.js";
+import { buildTestApp, type ErrorBody, ifMatch, type LoginResult, type TestContext, versionOf } from "./helpers.js";
 
 process.env["KKT_MODULES"] ??= "crm";
 
@@ -115,6 +115,7 @@ async function setUserActive(id: string, active: boolean): Promise<void> {
   const r = await t.request("POST", `/api/v1/users/${id}/${active ? "activate" : "deactivate"}`, {
     token: admin.access_token,
     body: {},
+    headers: ifMatch(await versionOf(t, `/api/v1/users/${id}`, admin.access_token)),
   });
   expect(r.status, r.text).toBe(200);
 }
@@ -420,6 +421,7 @@ describe("reveal auditing and secrets hygiene", () => {
     const deact = await t.request<{ is_active: boolean }>("POST", `/api/v1/customers/${cid}/deactivate`, {
       token: admin.access_token,
       body: {},
+      headers: ifMatch(await versionOf(t, `/api/v1/customers/${cid}`, admin.access_token)),
     });
     expect(deact.status, deact.text).toBe(200);
     const refused = await t.request<ErrorBody>("POST", "/api/v1/portal/auth/login", {
@@ -443,6 +445,7 @@ describe("reveal auditing and secrets hygiene", () => {
     const restored = await t.request<{ is_active: boolean }>("POST", `/api/v1/customers/${cid}/activate`, {
       token: admin.access_token,
       body: {},
+      headers: ifMatch(await versionOf(t, `/api/v1/customers/${cid}`, admin.access_token)),
     });
     expect(restored.body.is_active).toBe(true);
     expect(
@@ -677,8 +680,13 @@ describe("right to erasure", () => {
       ).body.error.details?.["rule"],
     ).toBe("CUSTOMER_ERASED");
     expect(
-      (await t.request<ErrorBody>("POST", `/api/v1/customers/${cid}/activate`, { token: admin.access_token, body: {} }))
-        .body.error.details?.["rule"],
+      (
+        await t.request<ErrorBody>("POST", `/api/v1/customers/${cid}/activate`, {
+          token: admin.access_token,
+          body: {},
+          headers: ifMatch(await versionOf(t, `/api/v1/customers/${cid}`, admin.access_token)),
+        })
+      ).body.error.details?.["rule"],
     ).toBe("CUSTOMER_ERASED");
     expect(
       (

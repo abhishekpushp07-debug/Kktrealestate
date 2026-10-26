@@ -144,7 +144,7 @@ describe("admin · company settings", () => {
       token: admin,
       body: { name: "Nope" },
     });
-    expect(noVersion.status).toBe(400);
+    expect(noVersion.status).toBe(428);
 
     const unknown = await t.request<ErrorBody>("PATCH", "/api/v1/settings/company", {
       token: admin,

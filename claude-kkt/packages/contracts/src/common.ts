@@ -186,6 +186,18 @@ export const IntQuerySchema = z.coerce.number().int();
 export const MAX_PAGE_SIZE = 200;
 /** Default page size. */
 export const DEFAULT_PAGE_SIZE = 25;
+/**
+ * Highest `page` an offset list accepts: deep OFFSET scans every skipped row, so beyond it the client must page with `cursor`/`limit`
+ * (keyset, constant cost per page). A larger page answers 400 VALIDATION_ERROR naming cursor mode.
+ */
+export const MAX_PAGE = 1000;
+
+/** `page` query parameter of offset lists: 1 … {@link MAX_PAGE}, default 1. */
+export const PageQuerySchema = IntQuerySchema.min(1)
+  .max(MAX_PAGE, {
+    message: `page must be at most ${MAX_PAGE}; page deeper with cursor mode (cursor + limit, next_cursor)`,
+  })
+  .default(1);
 
 /** Sort expression: `field` or `-field`. */
 export const SortSchema = z.string().regex(/^-?[a-z][a-z0-9_.]{0,49}$/, "Sort must be field or -field");
@@ -193,7 +205,7 @@ export type Sort = z.infer<typeof SortSchema>;
 
 /** Common list query (offset or cursor pagination, search, sort, csv). */
 export const ListQuerySchema = z.object({
-  page: IntQuerySchema.min(1).default(1),
+  page: PageQuerySchema,
   page_size: IntQuerySchema.min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
   cursor: z.string().max(512).optional(),
   limit: IntQuerySchema.min(1).max(MAX_PAGE_SIZE).optional(),

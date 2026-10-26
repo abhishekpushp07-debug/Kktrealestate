@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { buildTestApp, type ErrorBody, type TestContext } from "./helpers.js";
+import { buildTestApp, ifMatch, versionOf, type ErrorBody, type TestContext } from "./helpers.js";
 
 /** docs/API-CONVENTIONS.md rule by rule: envelope, headers, offset + keyset pagination on a 60-row fixture, ETag/304, CSV export. */
 let t: TestContext;
@@ -152,7 +152,15 @@ describe("pagination on a 60-row fixture", () => {
     const first = await t.request<{ id: string; version: number }>("GET", `${URL}?page_size=1&sort=name`, { token });
     const victim = first.body as unknown as Page;
     const row = victim.items[0]!;
-    expect((await t.request("POST", `${URL}/${row.id}/deactivate`, { token, body: {} })).status).toBe(200);
+    expect(
+      (
+        await t.request("POST", `${URL}/${row.id}/deactivate`, {
+          token,
+          body: {},
+          headers: ifMatch(await versionOf(t, `${URL}/${row.id}`, token)),
+        })
+      ).status,
+    ).toBe(200);
     const active = await walk("sort=name", 25);
     expect(active.ids).toHaveLength(TOTAL - 1);
     expect(active.ids).not.toContain(row.id);
@@ -163,7 +171,15 @@ describe("pagination on a 60-row fixture", () => {
     const last = await t.request<Page>("GET", `${URL}?limit=200`, { token });
     expect(last.body.items).toHaveLength(TOTAL - 1);
     expect(last.body.next_cursor).toBeNull();
-    expect((await t.request("POST", `${URL}/${row.id}/activate`, { token, body: {} })).status).toBe(200);
+    expect(
+      (
+        await t.request("POST", `${URL}/${row.id}/activate`, {
+          token,
+          body: {},
+          headers: ifMatch(await versionOf(t, `${URL}/${row.id}`, token)),
+        })
+      ).status,
+    ).toBe(200);
   });
 });
 

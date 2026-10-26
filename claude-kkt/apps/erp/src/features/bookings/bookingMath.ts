@@ -153,6 +153,8 @@ export function ledgerAmountTone(row: Pick<LedgerRow, "event" | "amount_paise">)
     case "OTHER_CHARGE_DEMAND":
     case "AGREEMENT_CHANGE":
     case "PLAN_CHANGE":
+    case "DEMAND_VOIDED":
+    case "LEDGER_RESTATED":
       return "neutral";
   }
 }

@@ -17,7 +17,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { appendOnly, idColumn, mutable, paise, percent, softDelete, sqft, timestamps, trgm } from "./_common.js";
+import { appendOnly, idColumn, mutable, paise, percent, softDelete, sqft, trgm, versioned } from "./_common.js";
 import { documents } from "./documents.js";
 import {
   flatStatusEnum,
@@ -86,6 +86,7 @@ export const projects = pgTable(
     unique("projects_company_code_uq").on(t.companyId, t.code),
     index("projects_company_status_idx").on(t.companyId, t.status),
     trgm("projects_name_trgm_idx", t.name),
+    index("projects_escrow_bank_account_id_idx").on(t.escrowBankAccountId),
   ],
 );
 
@@ -100,7 +101,10 @@ export const projectAmenities = pgTable(
       .references(() => amenities.id),
     ...appendOnly(),
   },
-  (t) => [primaryKey({ name: "project_amenities_pk", columns: [t.projectId, t.amenityId] })],
+  (t) => [
+    primaryKey({ name: "project_amenities_pk", columns: [t.projectId, t.amenityId] }),
+    index("project_amenities_amenity_id_idx").on(t.amenityId),
+  ],
 );
 
 export const projectTeam = pgTable(
@@ -115,7 +119,10 @@ export const projectTeam = pgTable(
     roleLabel: text("role_label"),
     ...appendOnly(),
   },
-  (t) => [primaryKey({ name: "project_team_pk", columns: [t.projectId, t.userId] })],
+  (t) => [
+    primaryKey({ name: "project_team_pk", columns: [t.projectId, t.userId] }),
+    index("project_team_user_id_idx").on(t.userId),
+  ],
 );
 
 /** Identity table (DATA-MODEL §A) kept here because it references `projects`. */
@@ -130,7 +137,10 @@ export const userProjectScopes = pgTable(
       .references(() => projects.id, { onDelete: "cascade" }),
     ...appendOnly(),
   },
-  (t) => [primaryKey({ name: "user_project_scopes_pk", columns: [t.userId, t.projectId] })],
+  (t) => [
+    primaryKey({ name: "user_project_scopes_pk", columns: [t.userId, t.projectId] }),
+    index("user_project_scopes_project_id_idx").on(t.projectId),
+  ],
 );
 
 export const projectWebsiteSettings = pgTable(
@@ -245,6 +255,7 @@ export const blocks = pgTable(
     index("blocks_company_project_idx").on(t.companyId, t.projectId),
     index("blocks_floor_plans_gin_idx").using("gin", t.floorPlans),
     trgm("blocks_name_trgm_idx", t.name),
+    index("blocks_block_type_id_idx").on(t.blockTypeId),
   ],
 );
 
@@ -273,6 +284,8 @@ export const blockStages = pgTable(
   (t) => [
     unique("block_stages_block_stage_uq").on(t.blockId, t.stageId),
     index("block_stages_block_sort_idx").on(t.blockId, t.sortOrder),
+    index("block_stages_company_id_idx").on(t.companyId),
+    index("block_stages_stage_id_idx").on(t.stageId),
   ],
 );
 
@@ -293,7 +306,11 @@ export const stagePhotos = pgTable(
     sortOrder: integer("sort_order").notNull().default(0),
     ...mutable(),
   },
-  (t) => [index("stage_photos_block_stage_idx").on(t.blockStageId, t.sortOrder)],
+  (t) => [
+    index("stage_photos_block_stage_idx").on(t.blockStageId, t.sortOrder),
+    index("stage_photos_company_id_idx").on(t.companyId),
+    index("stage_photos_document_id_idx").on(t.documentId),
+  ],
 );
 
 export const flats = pgTable(
@@ -350,6 +367,7 @@ export const flats = pgTable(
       "flats_price_nonneg_chk",
       sql`${t.pricePaise} >= 0 AND (${t.ratePerSqftPaise} IS NULL OR ${t.ratePerSqftPaise} >= 0)`,
     ),
+    index("flats_flat_type_id_idx").on(t.flatTypeId),
   ],
 );
 
@@ -373,6 +391,7 @@ export const parkingSlots = pgTable(
     unique("parking_slots_project_number_uq").on(t.projectId, t.number),
     index("parking_slots_project_status_idx").on(t.projectId, t.status),
     check("parking_slots_price_nonneg_chk", sql`${t.pricePaise} >= 0`),
+    index("parking_slots_company_id_idx").on(t.companyId),
   ],
 );
 
@@ -396,6 +415,7 @@ export const rateCards = pgTable(
       .on(t.projectId)
       .where(sql`${t.status} = 'ACTIVE'`),
     index("rate_cards_project_idx").on(t.projectId, t.effectiveFrom.desc()),
+    index("rate_cards_company_id_idx").on(t.companyId),
   ],
 );
 
@@ -411,9 +431,12 @@ export const rateCardRates = pgTable(
       .references(() => flatTypes.id),
     ratePerSqftPaise: paise("rate_per_sqft_paise"),
     lumpSumPaise: paise("lump_sum_paise"),
-    ...timestamps(),
+    ...versioned(),
   },
-  (t) => [unique("rate_card_rates_card_type_uq").on(t.rateCardId, t.flatTypeId)],
+  (t) => [
+    unique("rate_card_rates_card_type_uq").on(t.rateCardId, t.flatTypeId),
+    index("rate_card_rates_flat_type_id_idx").on(t.flatTypeId),
+  ],
 );
 
 export const rateCardPlcRules = pgTable(
@@ -436,7 +459,10 @@ export const rateCardPlcRules = pgTable(
       .notNull()
       .default(sql`'{}'::text[]`),
     sortOrder: integer("sort_order").notNull().default(0),
-    ...timestamps(),
+    ...versioned(),
   },
-  (t) => [index("rate_card_plc_rules_card_idx").on(t.rateCardId, t.sortOrder)],
+  (t) => [
+    index("rate_card_plc_rules_card_idx").on(t.rateCardId, t.sortOrder),
+    index("rate_card_plc_rules_plc_type_id_idx").on(t.plcTypeId),
+  ],
 );

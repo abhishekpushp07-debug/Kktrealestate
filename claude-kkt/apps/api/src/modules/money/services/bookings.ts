@@ -49,7 +49,7 @@ import { ApiError } from "../../../lib/errors.js";
 import { nextNumber } from "../../../lib/numbering.js";
 import { isUniqueViolation } from "../../../lib/pgErrors.js";
 import { ensureProjectAccess, type StaffContext } from "../../../lib/scope.js";
-import { applyUpdate } from "../../../lib/version.js";
+import { applyUpdate, assertVersion } from "../../../lib/version.js";
 import { notify, notifyRole } from "../../notifications/index.js";
 import {
   ACCOUNTS_ROLES,
@@ -119,7 +119,7 @@ async function loadCustomers(
   const byId = new Map(rows.map((c) => [c.id, c]));
   for (const id of unique) {
     const c = byId.get(id);
-    if (!c) throw ApiError.badRequest("Customer does not exist", { field: "customer_id", customer_id: id });
+    if (!c) throw ApiError.invalid("customer_id", "Customer does not exist", "invalid", { customer_id: id });
     if (!c.isActive)
       throw ApiError.rule(`Customer ${c.fullName} is inactive`, "CUSTOMER_INACTIVE", { customer_id: id });
   }
@@ -142,7 +142,7 @@ async function buildChargeLines(
   return inputs.map((i, idx) => {
     const t = byId.get(i.charge_type_id);
     if (!t)
-      throw ApiError.badRequest("Unknown charge type", { field: "other_charges", charge_type_id: i.charge_type_id });
+      throw ApiError.invalid("other_charges", "Unknown charge type", "invalid", { charge_type_id: i.charge_type_id });
     if (!t.isActive) throw ApiError.rule(`Charge type ${t.name} is inactive`, "CHARGE_TYPE_INACTIVE");
     const gstPercent = t.isTaxable ? i.gst_percent : 0;
     const gstPaise = gstPercent > 0 ? pctOfPaise(i.amount_paise, gstPercent) : 0;
@@ -255,7 +255,7 @@ export async function createBooking(
           .from(users)
           .where(and(eq(users.id, body.sales_user_id), eq(users.companyId, user.companyId)))
           .limit(1);
-        if (!su) throw ApiError.badRequest("sales_user_id does not exist", { field: "sales_user_id" });
+        if (!su) throw ApiError.invalid("sales_user_id", "sales_user_id does not exist");
       }
 
       // parking: AVAILABLE slots of the same project, locked (ascending id) before any number is allocated
@@ -271,8 +271,7 @@ export async function createBooking(
         for (const id of body.parking_slot_ids) {
           const s = byId.get(id);
           if (!s || s.projectId !== flat.projectId)
-            throw ApiError.badRequest("Parking slot does not belong to the project", {
-              field: "parking_slot_ids",
+            throw ApiError.invalid("parking_slot_ids", "Parking slot does not belong to the project", "invalid", {
               slot_id: id,
             });
           if (s.status !== "AVAILABLE")
@@ -739,7 +738,20 @@ export async function cancelBooking(
       .update(demands)
       .set({ status: "CANCELLED" })
       .where(and(eq(demands.bookingId, b.id), inArray(demands.status, ["OPEN", "PARTIALLY_PAID"])));
-    await applyUpdate(tx, bookings, b.id, body.version, { status: "CANCELLED", cancellation }, "booking");
+    await applyUpdate(
+      tx,
+      bookings,
+      b.id,
+      body.version,
+      {
+        status: "CANCELLED",
+        cancellation,
+        // money columns (migration 0005); the jsonb keeps the full record
+        cancellationRefundPaise: body.refund_paise,
+        cancellationDeductionPaise: body.deduction_paise,
+      },
+      "booking",
+    );
     await appendEvent(tx, b.id, events.cancellation(cancellation));
     await tx
       .update(flats)
@@ -983,7 +995,7 @@ export async function demandOtherChargeLine(
   user: StaffContext,
   bookingId: string,
   lineId: string,
-  body: { version: number; due_date?: string | undefined },
+  body: { version: number; due_date?: string | undefined; line_version?: number | undefined },
   actor: MoneyActor,
 ): Promise<void> {
   await moneyTransaction(db, async (tx) => {
@@ -992,8 +1004,11 @@ export async function demandOtherChargeLine(
       .select()
       .from(bookingOtherCharges)
       .where(and(eq(bookingOtherCharges.id, lineId), eq(bookingOtherCharges.bookingId, b.id)))
+      .for("update")
       .limit(1);
     if (!line) throw ApiError.notFound("Other charge line");
+    if (body.line_version !== undefined)
+      await assertVersion(tx, bookingOtherCharges, line.id, line.version, body.line_version, "booking");
     if (line.demandedAt)
       throw ApiError.conflict("ALREADY_DEMANDED", `${line.name} was already demanded as ${line.demandNumber}`, {
         demand_number: line.demandNumber,
@@ -1019,7 +1034,7 @@ export async function updateBooking(
     if (body.sales_user_id !== undefined) changes["salesUserId"] = body.sales_user_id;
     if (body.co_applicant_ids) {
       if (body.co_applicant_ids.includes(b.customerId))
-        throw ApiError.badRequest("Primary applicant cannot also be a co-applicant", { field: "co_applicant_ids" });
+        throw ApiError.invalid("co_applicant_ids", "Primary applicant cannot also be a co-applicant");
       await loadCustomers(tx, b.companyId, body.co_applicant_ids);
       await tx.delete(bookingCoApplicants).where(eq(bookingCoApplicants.bookingId, b.id));
       if (body.co_applicant_ids.length > 0)

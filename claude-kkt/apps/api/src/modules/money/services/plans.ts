@@ -42,7 +42,7 @@ export async function loadPlan(
     .from(paymentPlans)
     .where(and(eq(paymentPlans.id, planId), eq(paymentPlans.companyId, companyId)))
     .limit(1);
-  if (!plan) throw ApiError.badRequest("plan_id does not exist", { field: "plan_id" });
+  if (!plan) throw ApiError.invalid("plan_id", "plan_id does not exist");
   if (!plan.isActive && !opts.allowInactive) throw ApiError.rule("Payment plan is inactive", "PLAN_INACTIVE");
   const loaded = await loadPlansInstallments(db, [plan.id]);
   return { plan, installments: loaded.get(plan.id) ?? [] };
@@ -164,8 +164,7 @@ export async function assertPlanFitsScope(
   blockId: string | null,
 ): Promise<void> {
   const scopes = await stageIdsOfScope(db, projectId, blockId);
-  if (blockId && scopes.length === 0)
-    throw ApiError.badRequest("block_id does not belong to the project", { field: "block_id" });
+  if (blockId && scopes.length === 0) throw ApiError.invalid("block_id", "block_id does not belong to the project");
   const installments = loaded.installments.map((i) => ({
     seq: i.seq,
     triggerType: i.triggerType as TriggerType,

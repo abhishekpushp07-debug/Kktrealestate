@@ -23,7 +23,7 @@ import { ApiError } from "../../lib/errors.js";
 import { listPaging, paginate } from "../../lib/list.js";
 import { translatePgError } from "../../lib/pgErrors.js";
 import { route } from "../../lib/routes.js";
-import { applyUpdate, expectedVersion, optionalExpectedVersion, withOptionalVersion } from "../../lib/version.js";
+import { applyUpdate, expectedVersion, withOptionalVersion } from "../../lib/version.js";
 import { assertCanGrant, escalationForbidden, isSuperAdmin } from "../../lib/scope.js";
 
 type DbRole = typeof roles.$inferSelect;
@@ -70,13 +70,15 @@ const REQUIRED_PERMISSION = "dashboard.view";
 
 function assertKnownPermissions(codes: readonly string[]): void {
   const unknown = codes.filter((c) => !(ALL_PERMISSIONS as readonly string[]).includes(c));
-  if (unknown.length > 0) throw ApiError.badRequest("Unknown permission codes", { field: "permissions", unknown });
-  if (codes.length === 0) throw ApiError.badRequest("Pick at least one permission", { field: "permissions" });
+  if (unknown.length > 0) throw ApiError.invalid("permissions", "Unknown permission codes", "invalid", { unknown });
+  if (codes.length === 0) throw ApiError.invalid("permissions", "Pick at least one permission");
   if (!codes.includes(REQUIRED_PERMISSION))
-    throw ApiError.badRequest(`Every role must include ${REQUIRED_PERMISSION} (it gates sign-in and self-service)`, {
-      field: "permissions",
-      required: REQUIRED_PERMISSION,
-    });
+    throw ApiError.invalid(
+      "permissions",
+      `Every role must include ${REQUIRED_PERMISSION} (it gates sign-in and self-service)`,
+      "invalid",
+      { required: REQUIRED_PERMISSION },
+    );
 }
 
 function meta(req: FastifyRequest) {
@@ -271,7 +273,7 @@ export async function rolesModule(app: FastifyInstance): Promise<void> {
             tx,
             roles,
             req.params.id,
-            optionalExpectedVersion(req, req.body, before.version),
+            expectedVersion(req, req.body),
             action === "deactivate"
               ? { isActive: false, deactivatedAt: new Date() }
               : { isActive: true, deactivatedAt: null },

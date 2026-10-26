@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createProject } from "./fixtures.js";
 import { createActiveBooking } from "./fixtures/crm.js";
-import { buildTestApp, CREDS, type ErrorBody, type TestContext } from "./helpers.js";
+import { buildTestApp, CREDS, type ErrorBody, ifMatch, type TestContext, versionOf } from "./helpers.js";
 
 /**
  * Security & privacy hardening (audit group D and the security items of A, B and G): privilege escalation through user/role management,
@@ -97,7 +97,11 @@ describe("privilege escalation through user and role management", () => {
     });
     expect(scope.status).toBe(403);
     expect(reason(scope)).toBe("SELF_CHANGE");
-    const off = await t.request<ErrorBody>("POST", `/api/v1/users/${uaId}/deactivate`, { token: ua, body: {} });
+    const off = await t.request<ErrorBody>("POST", `/api/v1/users/${uaId}/deactivate`, {
+      token: ua,
+      body: {},
+      headers: ifMatch(await versionOf(t, `/api/v1/users/${uaId}`, ua)),
+    });
     expect(off.status).toBe(403);
     expect(reason(off)).toBe("SELF_CHANGE");
     const rename = await t.request<{ name: string; role_name: string }>("PATCH", `/api/v1/users/${uaId}`, {

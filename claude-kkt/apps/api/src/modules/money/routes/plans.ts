@@ -22,7 +22,7 @@ import { listPaging, paginate } from "../../../lib/list.js";
 import { translatePgError } from "../../../lib/pgErrors.js";
 import { route } from "../../../lib/routes.js";
 import { ensureProjectAccess, scopeFilter, type StaffContext } from "../../../lib/scope.js";
-import { applyUpdate, expectedVersion, optionalExpectedVersion, withOptionalVersion } from "../../../lib/version.js";
+import { applyUpdate, expectedVersion, withOptionalVersion } from "../../../lib/version.js";
 import { actorOf, loadCompanyRow } from "../common.js";
 import {
   applicablePlanRows,
@@ -97,7 +97,7 @@ async function assertBlockInProject(
     .from(blocks)
     .where(and(eq(blocks.id, blockId), eq(blocks.projectId, projectId), eq(blocks.companyId, companyId)))
     .limit(1);
-  if (!b) throw ApiError.badRequest("block_id does not belong to the project", { field: "block_id" });
+  if (!b) throw ApiError.invalid("block_id", "block_id does not belong to the project");
 }
 
 export function registerPlanRoutes(app: FastifyInstance): void {
@@ -279,7 +279,7 @@ export function registerPlanRoutes(app: FastifyInstance): void {
       const user = req.user!;
       await app.db.transaction(async (tx) => {
         const existing = await loadAssignment(tx, user, req.params.id, true);
-        const version = optionalExpectedVersion(req, null, existing.a.version);
+        const version = expectedVersion(req, null);
         await applyUpdate(
           tx,
           paymentPlanAssignments,

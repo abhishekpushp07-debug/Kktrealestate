@@ -127,6 +127,7 @@ export function toOtherChargeRow(c: OtherChargeRecord): OtherChargeRow {
     paid_paise: c.paidPaise,
     due_paise: c.demandedAt ? c.totalPaise - c.paidPaise : 0,
     sort_order: c.sortOrder,
+    version: c.version,
   };
 }
 
@@ -877,5 +878,6 @@ export function toDemandRow(s: DemandSelect, today = todayDate()): DemandRow {
     void_reason: d.voidReason,
     posted_at: d.postedAt.toISOString(),
     created_at: d.createdAt.toISOString(),
+    version: d.version,
   };
 }

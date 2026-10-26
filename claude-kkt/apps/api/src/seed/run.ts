@@ -62,6 +62,8 @@ export const RESEED_KEEP_TABLES = new Set([
   "roles",
   "users",
   "audit_logs",
+  // the hash chain over audit_logs (append-only like the log itself; TRUNCATE is refused by its trigger)
+  "audit_seals",
   "refresh_tokens",
   "login_events",
   "password_history",
@@ -166,8 +168,8 @@ export async function truncateBusinessTables(app: FastifyInstance): Promise<stri
     .filter((t) => !RESEED_KEEP_TABLES.has(t))
     .sort();
   if (tables.length === 0) return [];
-  // No trigger is bypassed (the app may run as a non-superuser role): TRUNCATE fires no row-level DELETE guard, and audit_logs — the only
-  // table with a TRUNCATE guard — is kept.
+  // No trigger is bypassed: TRUNCATE fires no row-level DELETE guard, and audit_logs / audit_seals — the tables with a TRUNCATE guard —
+  // are kept. TRUNCATE needs the owner role (kkt_app has no TRUNCATE privilege), like every reseed outside production.
   await app.sql.begin(async (tx) => {
     await tx.unsafe(`truncate table ${tables.map((t) => `"${t}"`).join(", ")} restart identity cascade`);
     // portal sessions belong to the customers that were just removed; staff sessions stay valid

@@ -478,7 +478,7 @@ describe("idempotency and version edge cases", () => {
         body: { name: "x" },
         headers: { "if-match": tag },
       });
-      expect(r.status, tag).toBe(400);
+      expect(r.status, tag).toBe(428);
       expect(r.body.error.code, tag).toBe("VERSION_REQUIRED");
     }
   });

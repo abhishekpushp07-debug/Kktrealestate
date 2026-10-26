@@ -68,7 +68,7 @@ beforeAll(async () => {
         schema: { body: z.object({ v: z.number() }), response: { 201: z.object({ n: z.number() }) } },
         handler: async (_req, reply) => {
           flakyCalls += 1;
-          if (flakyCalls === 1) throw ApiError.rule("first attempt fails", "TEST");
+          if (flakyCalls === 1) throw ApiError.rule("first attempt fails", "NO_CHANGE");
           return reply.code(201).send({ n: flakyCalls });
         },
       });
@@ -522,7 +522,7 @@ describe("database error mapping", () => {
 
 // ---------------------------------------------------------------------------
 describe("version policy", () => {
-  it("a staff PATCH without body.version or If-Match is 400 VERSION_REQUIRED before the handler runs; with either it proceeds", async () => {
+  it("a staff PATCH without body.version or If-Match is 428 VERSION_REQUIRED before the handler runs; with either it proceeds", async () => {
     const created = await t.request<{ id: string; version: number }>("POST", "/api/v1/masters/room-types", {
       token: admin,
       body: { name: "Versioned Room", code: "VROOM" },
@@ -532,7 +532,7 @@ describe("version policy", () => {
       token: admin,
       body: { name: "Renamed" },
     });
-    expect(none.status).toBe(400);
+    expect(none.status).toBe(428);
     expect(none.body.error.code).toBe("VERSION_REQUIRED");
     expect(none.body.error.details?.["issues"]).toEqual([expect.objectContaining({ path: "version" })]);
     // even for a record that does not exist the version is checked first (no information about existence)
@@ -566,16 +566,37 @@ describe("version policy", () => {
     ).toBe(401);
   });
 
-  it("every staff PATCH route is covered by the policy (no exemptions left); portal self-service is exempt", async () => {
+  it("every staff PATCH and DELETE route is covered by the policy (only the session routes are exempt); portal self-service is exempt", async () => {
     const { requiresVersion, VERSION_POLICY_EXEMPT } = await import("../../src/lib/version.js");
-    expect(VERSION_POLICY_EXEMPT).toEqual([]);
+    expect([...VERSION_POLICY_EXEMPT].sort()).toEqual(
+      [
+        "/api/v1/auth/sessions",
+        "/api/v1/auth/sessions/:id",
+        "/api/v1/portal/auth/sessions",
+        "/api/v1/portal/auth/sessions/:id",
+      ].sort(),
+    );
+    const deletes = t.app.routeRegistry.filter((r) => r.method === "DELETE");
+    expect(deletes.length).toBeGreaterThan(8);
+    const uncoveredDeletes = deletes
+      .filter((r) => !requiresVersion("DELETE", r.url, { audience: r.audience ?? undefined, public: r.public }))
+      .map((r) => r.url)
+      .sort();
+    expect(uncoveredDeletes).toEqual(
+      [
+        "/api/v1/auth/sessions",
+        "/api/v1/auth/sessions/:id",
+        "/api/v1/portal/auth/sessions",
+        "/api/v1/portal/auth/sessions/:id",
+      ].sort(),
+    );
     const patches = t.app.routeRegistry.filter((r) => r.method === "PATCH");
     expect(patches.length).toBeGreaterThan(20);
     const uncovered = patches
       .filter((r) => !requiresVersion("PATCH", r.url, { audience: r.audience ?? undefined, public: r.public }))
       .map((r) => r.url)
       .sort();
-    expect(uncovered).toEqual([...VERSION_POLICY_EXEMPT, "/api/v1/portal/profile"].sort());
+    expect(uncovered).toEqual(["/api/v1/portal/profile"]);
   });
 });
 
@@ -669,7 +690,10 @@ describe("notification sweep", () => {
     const [u] = await t.app.sql<{ id: string }[]>`select id from users where email = 'admin@sgb.in'`;
     await t.app
       .sql`insert into notifications (company_id, recipient_type, recipient_id, type, title, entity_type, entity_id) values (${t.companyId}, 'STAFF', ${u!.id}, 'DEMAND_RAISED', 'doc', 'document', ${d!.id})`;
-    const del = await t.request("DELETE", `/api/v1/documents/${d!.id}`, { token: admin });
+    const del = await t.request("DELETE", `/api/v1/documents/${d!.id}`, {
+      token: admin,
+      headers: { "if-match": '"v1"' },
+    });
     expect(del.status, del.text).toBe(204);
     expect((await t.app.sql`select 1 from notifications where entity_id = ${d!.id}`).length).toBe(0);
   });

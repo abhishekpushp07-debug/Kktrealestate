@@ -280,7 +280,10 @@ describe("plan ↔ tower fit: the bookings' own plan snapshots", () => {
       { token: admin },
     );
     for (const a of assignments.body.items) {
-      const del = await t.request("DELETE", `/api/v1/payment-plan-assignments/${a.id}`, { token: admin });
+      const del = await t.request("DELETE", `/api/v1/payment-plan-assignments/${a.id}`, {
+        token: admin,
+        headers: { "if-match": `"v${a.version}"` },
+      });
       expect(del.status, del.text).toBe(204);
     }
     const block = await t.request<{ version: number; stage_sequence: string[] }>("GET", `/api/v1/blocks/${tower.id}`, {

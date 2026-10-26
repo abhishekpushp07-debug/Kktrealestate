@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { financialYear, todayIST } from "@kkt/domain";
 import { createProject } from "./fixtures.js";
 import { createActiveBooking, invalidAadhaar, validAadhaar } from "./fixtures/crm.js";
-import { buildTestApp, type ErrorBody, type LoginResult, type TestContext } from "./helpers.js";
+import { buildTestApp, type ErrorBody, ifMatch, type LoginResult, type TestContext, versionOf } from "./helpers.js";
 
 process.env["KKT_MODULES"] ??= "crm";
 
@@ -753,7 +753,7 @@ describe("customers: KYC encryption, masking, audited reveal, duplicates, versio
       token: salesA.access_token,
       body: { occupation: "Engineer" },
     });
-    expect(noVersion.status).toBe(400);
+    expect(noVersion.status).toBe(428);
     const viaHeader = await t.request<Customer>("PATCH", `/api/v1/customers/${customerId}`, {
       token: salesA.access_token,
       body: { notes: "Prefers evening calls" },
@@ -870,7 +870,7 @@ describe("customers: KYC encryption, masking, audited reveal, duplicates, versio
       `/api/v1/customers/${customerId}/co-applicants/${add.body.id}`,
       { token: salesA.access_token, body: { relation: "Spouse" } },
     );
-    expect(noVersion.status).toBe(400);
+    expect(noVersion.status).toBe(428);
     const upd = await t.request<{ relation: string; version: number }>(
       "PATCH",
       `/api/v1/customers/${customerId}/co-applicants/${add.body.id}`,
@@ -895,6 +895,7 @@ describe("customers: KYC encryption, masking, audited reveal, duplicates, versio
     expect(viaHeader.body.version).toBe(3);
     const del = await t.request("DELETE", `/api/v1/customers/${customerId}/co-applicants/${add.body.id}`, {
       token: salesA.access_token,
+      headers: { "if-match": '"v3"' },
     });
     expect(del.status).toBe(204);
     expect(
@@ -908,6 +909,7 @@ describe("customers: KYC encryption, masking, audited reveal, duplicates, versio
       (
         await t.request("DELETE", `/api/v1/customers/${customerId}/co-applicants/${add.body.id}`, {
           token: salesA.access_token,
+          headers: { "if-match": '"v3"' },
         })
       ).status,
     ).toBe(404);
@@ -1139,6 +1141,7 @@ describe("portal access card, bulk enable, deactivate, 360", () => {
     const inUse = await t.request<ErrorBody>("POST", `/api/v1/customers/${c2}/deactivate`, {
       token: admin.access_token,
       body: {},
+      headers: ifMatch(await versionOf(t, `/api/v1/customers/${c2}`, admin.access_token)),
     });
     expect(inUse.status).toBe(409);
     expect(inUse.body.error.code).toBe("IN_USE");
@@ -1172,6 +1175,7 @@ describe("portal access card, bulk enable, deactivate, 360", () => {
     const restored = await t.request<{ is_active: boolean }>("POST", `/api/v1/customers/${customerId}/activate`, {
       token: admin.access_token,
       body: {},
+      headers: ifMatch(await versionOf(t, `/api/v1/customers/${customerId}`, admin.access_token)),
     });
     expect(restored.body.is_active).toBe(true);
   });

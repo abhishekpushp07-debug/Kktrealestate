@@ -592,7 +592,7 @@ export interface StatusUpdateInput {
 }
 
 function assertNotFuture(date: string, today: string, field: string): void {
-  if (date > today) throw ApiError.badRequest(`${field} cannot be in the future`, { field, today });
+  if (date > today) throw ApiError.invalid(field, `${field} cannot be in the future`, "invalid", { today });
 }
 
 /**
@@ -622,21 +622,27 @@ export async function updateConstructionStatus(
   for (const [ref, date] of Object.entries(input.intermediateDates)) {
     const s = findStage(toComplete, ref);
     if (!s)
-      throw ApiError.badRequest("intermediate_dates names a stage that is not being completed", {
-        field: "intermediate_dates",
-        stage_id: ref,
-      });
+      throw ApiError.invalid(
+        "intermediate_dates",
+        "intermediate_dates names a stage that is not being completed",
+        "invalid",
+        { stage_id: ref },
+      );
     assertNotFuture(date, today, `intermediate_dates.${ref}`);
     if (date > input.completedOn)
-      throw ApiError.badRequest("Intermediate stage dates cannot be after the reached stage's date", {
-        field: "intermediate_dates",
-        stage_id: ref,
-      });
+      throw ApiError.invalid(
+        "intermediate_dates",
+        "Intermediate stage dates cannot be after the reached stage's date",
+        "invalid",
+        { stage_id: ref },
+      );
     if (s.id === target.id && date !== input.completedOn)
-      throw ApiError.badRequest("intermediate_dates gives the reached stage a date different from completed_on", {
-        field: "intermediate_dates",
-        stage_id: ref,
-      });
+      throw ApiError.invalid(
+        "intermediate_dates",
+        "intermediate_dates gives the reached stage a date different from completed_on",
+        "invalid",
+        { stage_id: ref },
+      );
     dates.set(s.id, date);
   }
   // stages are built in order: completion dates must be non-decreasing along the sequence; an undated stage takes the date of the next dated one
@@ -646,12 +652,12 @@ export async function updateConstructionStatus(
     const s = toComplete[i]!;
     const date = s.id === target.id ? input.completedOn : (dates.get(s.id) ?? nextDate);
     if (date > nextDate)
-      throw ApiError.badRequest(`${s.name} cannot be completed after the stage that follows it`, {
-        field: "intermediate_dates",
-        stage_id: s.stageId,
-        date,
-        next_stage_date: nextDate,
-      });
+      throw ApiError.invalid(
+        "intermediate_dates",
+        `${s.name} cannot be completed after the stage that follows it`,
+        "invalid",
+        { stage_id: s.stageId, date, next_stage_date: nextDate },
+      );
     resolvedDates.set(s.id, date);
     nextDate = date;
   }
@@ -659,9 +665,9 @@ export async function updateConstructionStatus(
   if (input.markInProgressRef) {
     inProgress = requireStage(stages, input.markInProgressRef);
     if (inProgress.sortOrder <= target.sortOrder || inProgress.status === "COMPLETED")
-      throw ApiError.badRequest(
+      throw ApiError.invalid(
+        "mark_in_progress_stage_id",
         "mark_in_progress_stage_id must be a stage after the reached one that is not completed",
-        { field: "mark_in_progress_stage_id" },
       );
   }
 
@@ -1089,20 +1095,21 @@ async function assertPhotoDocument(
     .from(documents)
     .where(and(eq(documents.id, documentId), eq(documents.companyId, block.companyId), eq(documents.isDeleted, false)))
     .limit(1);
-  if (!doc) throw ApiError.badRequest("document_id does not exist", { field: "document_id" });
+  if (!doc) throw ApiError.invalid("document_id", "document_id does not exist");
   if (!doc.mime.startsWith("image/"))
-    throw ApiError.badRequest("Stage photos must be images", { field: "document_id", mime: doc.mime });
-  if (doc.isSensitive)
-    throw ApiError.badRequest("Sensitive documents cannot be stage photos", { field: "document_id" });
+    throw ApiError.invalid("document_id", "Stage photos must be images", "invalid", { mime: doc.mime });
+  if (doc.isSensitive) throw ApiError.invalid("document_id", "Sensitive documents cannot be stage photos");
   const attachedHere =
     (doc.entityType === "STAGE" && stageRowIds.includes(doc.entityId)) ||
     (doc.entityType === "BLOCK" && doc.entityId === block.id) ||
     (doc.entityType === "PROJECT" && doc.entityId === block.projectId);
   if (!PHOTO_ENTITY_TYPES.has(doc.entityType) || !attachedHere)
-    throw ApiError.badRequest("Document must be attached to this stage, its block or its project", {
-      field: "document_id",
-      entity_type: doc.entityType,
-    });
+    throw ApiError.invalid(
+      "document_id",
+      "Document must be attached to this stage, its block or its project",
+      "invalid",
+      { entity_type: doc.entityType },
+    );
 }
 
 /** POST /blocks/:id/construction/:stageId/photos. */
@@ -1204,8 +1211,10 @@ export async function deletePhoto(
   user: StaffContext,
   actor: ConstructionActor,
   photoId: string,
+  expectedVersion: number,
 ): Promise<void> {
   const { photo, stage, block } = await loadPhotoScoped(tx, user, photoId, true);
+  await assertVersion(tx, stagePhotos, photo.id, photo.version, expectedVersion, "stage_photo");
   await tx.delete(stagePhotos).where(eq(stagePhotos.id, photo.id));
   await writeAudit(tx, {
     companyId: block.companyId,

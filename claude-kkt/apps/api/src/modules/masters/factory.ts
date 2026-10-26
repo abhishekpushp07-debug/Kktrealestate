@@ -17,7 +17,7 @@ import { listPaging, paginate } from "../../lib/list.js";
 import { ensureProjectAccess } from "../../lib/scope.js";
 import { translatePgError } from "../../lib/pgErrors.js";
 import { route } from "../../lib/routes.js";
-import { applyUpdate, expectedVersion, optionalExpectedVersion, withOptionalVersion } from "../../lib/version.js";
+import { applyUpdate, expectedVersion, withOptionalVersion } from "../../lib/version.js";
 import type { DbRow, MasterKindDef, WriteContext } from "./types.js";
 
 const idParams = z.object({ id: IdSchema });
@@ -307,7 +307,7 @@ export function registerMasterKind(app: FastifyInstance, def: MasterKindDef): vo
                 usage,
               );
           }
-          const version = optionalExpectedVersion(req, req.body, Number(existing["version"]));
+          const version = expectedVersion(req, req.body);
           const updated = (await applyUpdate(
             tx,
             def.table,

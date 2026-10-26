@@ -10,6 +10,7 @@ import {
   DateStringSchema,
   EmailSchema,
   IntQuerySchema,
+  PageQuerySchema,
   PaiseSchema,
   PhoneSchema,
   SlugSchema,
@@ -152,7 +153,7 @@ export const PublicPageSchema = z.object({
 export type PublicPage = z.infer<typeof PublicPageSchema>;
 
 export const PublicListQuerySchema = z.object({
-  page: IntQuerySchema.min(1).default(1),
+  page: PageQuerySchema,
   page_size: IntQuerySchema.min(1).max(50).default(12),
 });
 export type PublicListQuery = z.infer<typeof PublicListQuerySchema>;

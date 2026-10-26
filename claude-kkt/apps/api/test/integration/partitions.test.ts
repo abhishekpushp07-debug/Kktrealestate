@@ -115,7 +115,7 @@ describe("monthly partitioning scripts", () => {
     );
     const summary = await applyScripts();
     expect(summary.filter((s) => s.includes("partitioned ("))).toHaveLength(4);
-    expect(summary.find((s) => s.startsWith("ledger_entries"))).toContain("ledger_entries_booking_seq_uq");
+    expect(summary.find((s) => s.startsWith("ledger_entries"))).toContain("ledger_entries_booking_epoch_seq_uq");
     const partitioned = await pg<{ t: string }[]>`select kkt_partitioned_tables() as t`;
     expect(partitioned.map((r) => r.t)).toEqual(TABLES);
     for (const t of TABLES) {
@@ -165,7 +165,16 @@ describe("monthly partitioning scripts", () => {
     >`select c.relname as p from pg_inherits i join pg_class c on c.oid = i.inhrelid where i.inhparent = 'audit_logs'::regclass and c.relname ~ '_y[0-9]{4}m[0-9]{2}$' limit 1`;
     await expect(pg.unsafe(`truncate ${m!.p}`)).rejects.toThrow(/immutable/);
 
-    await expect(ledger(2)).rejects.toMatchObject({ code: "23505", constraint_name: "ledger_entries_booking_seq_uq" });
+    await expect(ledger(2)).rejects.toMatchObject({
+      code: "23505",
+      constraint_name: "ledger_entries_booking_epoch_seq_uq",
+    });
+    // ledger epochs (migration 0005): the same seq in a new epoch is a new row, not a duplicate
+    await pg.unsafe(
+      `insert into ledger_entries (company_id, booking_id, epoch, seq, entry_date, event, amount_paise, cash_paid_cum_paise, account_paid_cum_paise, cash_order_raised_paise, account_order_raised_paise, cash_due_paise, account_due_paise, total_due_paise)
+      values ($1, $2, 2, 2, current_date, 'LEDGER_RESTATED', 0, 0, 0, 0, 0, 0, 0, 0)`,
+      [companyId, bookingId],
+    );
     await ledger(4);
     // two connections racing for the same (booking, seq): exactly one wins
     const a = postgres(url, { max: 1, onnotice: () => undefined });
@@ -193,7 +202,7 @@ describe("monthly partitioning scripts", () => {
         (await pg<{ n: number }[]>`select count(*)::int as n from ledger_entries where booking_id = ${bookingId}`)[0]!
           .n,
       ),
-    ).toBe(5);
+    ).toBe(6);
   });
 
   it("PARTITION_MAINTENANCE is registered but only creates partitions with PARTITIONING_ENABLED=true; the app's notification sweep works on the partitioned table", async () => {

@@ -34,6 +34,10 @@ export const serviceRequests = pgTable(
     assigneeUserId: uuid("assignee_user_id").references(() => users.id),
     slaDueAt: timestamp("sla_due_at", { withTimezone: true }),
     slaBreachedAt: timestamp("sla_breached_at", { withTimezone: true }),
+    /** Set while the SLA clock is paused (AWAITING_CUSTOMER); NULL while it runs (migration 0005). */
+    slaPausedAt: timestamp("sla_paused_at", { withTimezone: true }),
+    /** Seconds the SLA clock has been paused in total; the effective deadline is sla_due_at + this. */
+    slaPausedSeconds: integer("sla_paused_seconds").notNull().default(0),
     resolvedAt: timestamp("resolved_at", { withTimezone: true }),
     closedAt: timestamp("closed_at", { withTimezone: true }),
     reopenedCount: integer("reopened_count").notNull().default(0),
@@ -51,6 +55,8 @@ export const serviceRequests = pgTable(
     trgm("service_requests_subject_trgm_idx", t.subject),
     trgm("service_requests_ticket_number_trgm_idx", t.ticketNumber),
     check("service_requests_rating_chk", sql`${t.rating} IS NULL OR ${t.rating} BETWEEN 1 AND 5`),
+    index("service_requests_booking_id_idx").on(t.bookingId),
+    index("service_requests_category_id_idx").on(t.categoryId),
   ],
 );
 
@@ -96,6 +102,7 @@ export const notifications = pgTable(
   (t) => [
     index("notifications_recipient_idx").on(t.recipientType, t.recipientId, t.isRead, t.createdAt.desc()),
     index("notifications_entity_idx").on(t.entityType, t.entityId),
+    index("notifications_company_id_idx").on(t.companyId),
   ],
 );
 
@@ -112,5 +119,8 @@ export const notices = pgTable(
     isPublished: boolean("is_published").notNull().default(false),
     ...mutable(),
   },
-  (t) => [index("notices_company_project_published_idx").on(t.companyId, t.projectId, t.isPublished, t.publishAt)],
+  (t) => [
+    index("notices_company_project_published_idx").on(t.companyId, t.projectId, t.isPublished, t.publishAt),
+    index("notices_project_id_idx").on(t.projectId),
+  ],
 );

@@ -8,7 +8,7 @@ import {
   towerCBody,
   type InventoryBasics,
 } from "./fixtures/inventory.js";
-import { CREDS, buildTestApp, type ErrorBody, type TestContext } from "./helpers.js";
+import { buildTestApp, CREDS, type ErrorBody, ifMatch, type TestContext, versionOf } from "./helpers.js";
 
 type UnitCounts = { available: number; hold: number; blocked: number; booked: number; sold: number; total: number };
 type ProjectRow = {
@@ -264,7 +264,7 @@ describe("projects (SPEC §4)", () => {
       token: admin,
       body: { description: "x" },
     });
-    expect(noVersion.status).toBe(400);
+    expect(noVersion.status).toBe(428);
     const forbidden = await t.request<ErrorBody>("PATCH", `/api/v1/projects/${sgh.id}`, {
       token: sales,
       body: { version: 4, description: "x" },
@@ -605,6 +605,7 @@ describe("flat status transitions (SPEC §4)", () => {
     const deact = await t.request<ErrorBody>("POST", `/api/v1/blocks/${towerC.id}/deactivate`, {
       token: admin,
       body: {},
+      headers: ifMatch(await versionOf(t, `/api/v1/blocks/${towerC.id}`, admin)),
     });
     expect(deact.status).toBe(409);
     expect(deact.body.error.code).toBe("IN_USE");
@@ -651,6 +652,7 @@ describe("flat status transitions (SPEC §4)", () => {
     const deact = await t.request<{ is_active: boolean }>("POST", `/api/v1/blocks/${d.body.id}/deactivate`, {
       token: admin,
       body: {},
+      headers: ifMatch(await versionOf(t, `/api/v1/blocks/${d.body.id}`, admin)),
     });
     expect(deact.status, deact.text).toBe(200);
     const proj = await getProject(sgh.id);
@@ -737,7 +739,7 @@ describe("flat status transitions (SPEC §4)", () => {
       token: admin,
       body: { name: "x" },
     });
-    expect(noVersion.status).toBe(400);
+    expect(noVersion.status).toBe(428);
     const forbidden = await t.request<ErrorBody>("PATCH", `/api/v1/blocks/${towerC.id}`, {
       token: sales,
       body: { version: block.version + 2, name: "x" },
@@ -1249,6 +1251,7 @@ describe("scope, permissions, idempotency", () => {
     const inUse = await t.request<ErrorBody>("POST", `/api/v1/projects/${sgh.id}/deactivate`, {
       token: admin,
       body: {},
+      headers: ifMatch(await versionOf(t, `/api/v1/projects/${sgh.id}`, admin)),
     });
     expect(inUse.status).toBe(409);
     expect(inUse.body.error.code).toBe("IN_USE");
@@ -1269,6 +1272,7 @@ describe("scope, permissions, idempotency", () => {
     const restored = await t.request<{ is_active: boolean }>("POST", `/api/v1/projects/${ggv.id}/activate`, {
       token: admin,
       body: {},
+      headers: ifMatch(await versionOf(t, `/api/v1/projects/${ggv.id}`, admin)),
     });
     expect(restored.status).toBe(200);
     expect(restored.body.is_active).toBe(true);

@@ -638,7 +638,7 @@ describe("ERP site visits", () => {
     expect((await leadOf("9876600101")).stage).toBe("SITE_VISIT_DONE");
     const again = await t.request<ErrorBody>("POST", `/api/v1/site-visits/${erpVisit.id}/no-show`, {
       token: sales,
-      body: {},
+      body: { version: done.body.version },
     });
     expect(again.status).toBe(422);
     expect(again.body.error.details?.["rule"]).toBe("OUTCOME_MARKED");

@@ -27,6 +27,17 @@ BEGIN
 END;
 $$;
 
+-- The application role keeps no UPDATE/DELETE/TRUNCATE on the append-only books (src/sql/0002_privileges.sql); a new partition gets the
+-- schema's default privileges, so the same revoke is applied to every partition of audit_logs / ledger_entries as it is created.
+CREATE OR REPLACE FUNCTION kkt_restrict_partition(parent text, child text) RETURNS void
+LANGUAGE plpgsql AS $$
+BEGIN
+  IF parent IN ('audit_logs', 'ledger_entries') AND EXISTS (SELECT FROM pg_roles WHERE rolname = 'kkt_app') THEN
+    EXECUTE format('REVOKE UPDATE, DELETE, TRUNCATE ON public.%I FROM kkt_app', child);
+  END IF;
+END;
+$$;
+
 -- Creates the [month, month + 1) UTC partition of `parent` unless it exists or the month is already covered by another partition
 -- (the <table>_legacy partition covers everything before the month after partitioning); returns its name, or NULL when nothing was
 -- created. Rows already sitting in the DEFAULT partition for that month make this fail loudly (move them first).
@@ -49,6 +60,7 @@ BEGIN
     RETURN NULL;
   END;
   PERFORM kkt_copy_statement_triggers(parent, name);
+  PERFORM kkt_restrict_partition(parent, name);
   RETURN name;
 END;
 $$;
@@ -96,18 +108,23 @@ BEGIN
 END
 $$;
 
--- ledger_entries keeps its "one seq per booking" invariant after partitioning: a UNIQUE index on a partitioned table must contain the
--- partition key, so (booking_id, seq) uniqueness is enforced by this trigger instead. The transaction-scoped advisory lock on
--- (booking, seq) serialises concurrent inserts of the same pair, and the EXISTS check (a new snapshot under READ COMMITTED, the
--- isolation level the API uses) then sees the committed winner. The money module already serialises ledger appends per booking.
+-- ledger_entries keeps its "one seq per booking and epoch" invariant after partitioning: a UNIQUE index on a partitioned table must
+-- contain the partition key, so (booking_id, epoch, seq) uniqueness is enforced by this trigger instead. The transaction-scoped advisory
+-- lock on (booking, epoch, seq) serialises concurrent inserts of the same triple, and the EXISTS check (a new snapshot under READ
+-- COMMITTED, the isolation level the API uses) then sees the committed winner. The money module already serialises ledger appends per
+-- booking. (src/sql/online/0005_indexes.sql installs the same function on a database partitioned before migration 0005.)
 CREATE OR REPLACE FUNCTION ledger_entries_booking_seq_unique_fn() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
-  PERFORM pg_advisory_xact_lock(hashtext('ledger_entries:' || NEW.booking_id::text), NEW.seq);
-  IF EXISTS (SELECT 1 FROM public.ledger_entries WHERE booking_id = NEW.booking_id AND seq = NEW.seq AND id <> NEW.id) THEN
-    RAISE EXCEPTION 'duplicate key value violates unique constraint "ledger_entries_booking_seq_uq"'
-      USING ERRCODE = 'unique_violation', DETAIL = format('Key (booking_id, seq)=(%s, %s) already exists.', NEW.booking_id, NEW.seq),
-            CONSTRAINT = 'ledger_entries_booking_seq_uq';
+  PERFORM pg_advisory_xact_lock(hashtext('ledger_entries:' || NEW.booking_id::text || ':' || NEW.epoch::text), NEW.seq);
+  IF EXISTS (
+    SELECT 1 FROM public.ledger_entries
+    WHERE booking_id = NEW.booking_id AND epoch = NEW.epoch AND seq = NEW.seq AND id <> NEW.id
+  ) THEN
+    RAISE EXCEPTION 'duplicate key value violates unique constraint "ledger_entries_booking_epoch_seq_uq"'
+      USING ERRCODE = 'unique_violation',
+            DETAIL = format('Key (booking_id, epoch, seq)=(%s, %s, %s) already exists.', NEW.booking_id, NEW.epoch, NEW.seq),
+            CONSTRAINT = 'ledger_entries_booking_epoch_seq_uq';
   END IF;
   RETURN NEW;
 END;
@@ -117,7 +134,7 @@ $$;
 --   1. the table is renamed <table>_legacy and becomes the partition for everything before next month (MINVALUE .. next month, UTC);
 --   2. a new partitioned parent takes the original name with the same columns, defaults, NOT NULL/CHECK constraints, foreign keys,
 --      indexes and triggers; the primary key becomes (id, created_at) and UNIQUE constraints without created_at become plain indexes
---      (ledger_entries keeps (booking_id, seq) unique through ledger_entries_booking_seq_unique_fn);
+--      (ledger_entries keeps (booking_id, epoch, seq) unique through ledger_entries_booking_seq_unique_fn);
 --   3. a DEFAULT partition and the next months' partitions are created.
 -- Takes an ACCESS EXCLUSIVE lock on the table for the duration (validation scans of the legacy rows). Returns a summary line.
 CREATE OR REPLACE FUNCTION kkt_partition_table(parent text) RETURNS text
@@ -207,13 +224,14 @@ BEGIN
   END LOOP;
   IF parent = 'ledger_entries' THEN
     EXECUTE 'DROP TRIGGER IF EXISTS ledger_entries_booking_seq_unique ON public.ledger_entries';
-    EXECUTE 'CREATE TRIGGER ledger_entries_booking_seq_unique BEFORE INSERT OR UPDATE OF booking_id, seq ON public.ledger_entries FOR EACH ROW EXECUTE FUNCTION ledger_entries_booking_seq_unique_fn()';
+    EXECUTE 'CREATE TRIGGER ledger_entries_booking_seq_unique BEFORE INSERT OR UPDATE OF booking_id, epoch, seq ON public.ledger_entries FOR EACH ROW EXECUTE FUNCTION ledger_entries_booking_seq_unique_fn()';
   END IF;
 
   -- 3. safety-net default partition + the coming months
   IF to_regclass(format('public.%I', parent || '_default')) IS NULL THEN
     EXECUTE format('CREATE TABLE public.%I PARTITION OF public.%I DEFAULT', parent || '_default', parent);
     PERFORM kkt_copy_statement_triggers(parent, parent || '_default');
+    PERFORM kkt_restrict_partition(parent, parent || '_default');
   END IF;
   PERFORM kkt_create_month_partition(parent, (next_month AT TIME ZONE 'UTC')::date);
   PERFORM kkt_create_month_partition(parent, ((next_month + interval '1 month') AT TIME ZONE 'UTC')::date);

@@ -153,3 +153,17 @@ export async function buildTestApp(
 export interface ErrorBody {
   error: { code: string; message: string; details?: Record<string, unknown>; request_id?: string };
 }
+
+/**
+ * The current version of a single resource (GET `url` → body.version), for the state-change POSTs and DELETEs that require one
+ * (contract C6: 428 VERSION_REQUIRED without it).
+ */
+export async function versionOf(t: TestContext, url: string, token: string): Promise<number> {
+  const r = await t.request<{ version?: number }>("GET", url, { token });
+  if (r.status !== 200 || typeof r.body.version !== "number")
+    throw new Error(`versionOf ${url} → ${r.status} ${r.text.slice(0, 200)}`);
+  return r.body.version;
+}
+
+/** `If-Match: "v<version>"` header for `version`. */
+export const ifMatch = (version: number): Record<string, string> => ({ "if-match": `"v${version}"` });

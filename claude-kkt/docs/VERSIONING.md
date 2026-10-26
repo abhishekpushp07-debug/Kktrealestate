@@ -95,6 +95,17 @@ Only for a redesign that cannot be expressed additively (e.g. a different money 
 (`app.register(…, { prefix: "/api/v2" })`), shares the services and the database, gets its own `docs/openapi/v2.json` snapshot and
 compatibility test, and v1 follows rule 3 as a whole surface.
 
+## Deliberate breaks
+
+A break of rule 2 is shipped only when keeping the old behaviour is itself the defect, and then it is recorded in `CHANGELOG.md` under
+"Breaking", the snapshot is regenerated with `--force` in the same change, and the clients that ship with the API (ERP, website) are
+updated in the same release; the portal is checked against it.
+
+- **Phase 7 (contract C6):** versions became mandatory on every versioned write (state-change POSTs and DELETEs answered
+  last-writer-wins without one), and VERSION_REQUIRED moved from 400 to 428. Also tightened in the same release: `page` ≤ 1000 on
+  offset lists, PLC value precision, the corrected `BucketCapDetailsSchema`, and one `details.issues` shape for VALIDATION_ERROR. The
+  portal app is unaffected (portal routes do not require versions; `PATCH /portal/profile` still accepts a missing If-Match).
+
 ## Database changes follow the same rule
 
 Migrations are additive within a release (new tables/columns/indexes; columns become NOT NULL only after a backfill release), so the
