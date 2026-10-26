@@ -14,6 +14,13 @@ router = APIRouter(prefix="/projects", tags=["project-setup"])
 SECTIONS = ("towers", "stages", "plans", "pricing")
 
 
+async def _active_assignments(project_id: str) -> list[dict]:
+    """Assignments whose plan is still active (a deactivated plan must not be re-submitted by the setup form)."""
+    asg = await db.payment_plan_assignments.find({"project_id": project_id, "is_active": True}, {"_id": 0}).to_list(200)
+    live = {p["id"] for p in await db.payment_plans.find({"id": {"$in": [a["payment_plan_id"] for a in asg]}, "is_active": True}, {"_id": 0, "id": 1}).to_list(None)}
+    return [a for a in asg if a["payment_plan_id"] in live]
+
+
 async def _tower_view(b: dict, assignments: list[dict], flats_by_block: dict) -> dict:
     stages = await ensure_block_stages(b)
     done = [s for s in stages if s.get("status") == "Completed"]
@@ -35,7 +42,7 @@ async def get_setup(project_id: str, user: dict = Depends(require("masters.proje
     p = await get_or_404(db.projects, project_id, "Project", {"company_id": user["company_id"]})
     blocks, assignments, rate_card, parking, counts = await asyncio.gather(
         db.blocks.find({"project_id": project_id, "is_active": True}, {"_id": 0}).sort("name", 1).to_list(200),
-        db.payment_plan_assignments.find({"project_id": project_id, "is_active": True}, {"_id": 0}).to_list(200),
+        _active_assignments(project_id),
         db.rate_cards.find_one({"project_id": project_id, "status": "Active"}, {"_id": 0, "id": 1, "name": 1, "effective_from": 1, "rates": 1, "applied_count": 1}),
         db.parking_slots.aggregate([{"$match": {"project_id": project_id}}, {"$group": {"_id": "$status", "n": {"$sum": 1}}}]).to_list(None),
         db.flats.aggregate([{"$match": {"project_id": project_id, "is_active": True}}, {"$group": {"_id": {"b": "$block_id", "s": "$status"}, "n": {"$sum": 1}}}]).to_list(None))
