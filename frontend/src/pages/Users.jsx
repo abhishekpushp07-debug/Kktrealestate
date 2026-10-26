@@ -58,7 +58,7 @@ function UserSheet({ item, roles, projects, onClose, onSaved, onReset }) {
 }
 
 export default function Users() {
-  const { can } = useAuth();
+  const { can, user: me } = useAuth();
   const [showInactive, setShowInactive] = useState(false);
   const [q, setQ] = useState("");
   const list = useList("/users", { include_inactive: showInactive || undefined, page_size: 100 });
@@ -104,7 +104,7 @@ export default function Users() {
       <Dialog open={!!resetFor} onOpenChange={(o) => !o && setResetFor(null)}>
         <DialogContent className="v2" data-testid="reset-password-dialog"><DialogHeader><DialogTitle className="font-display text-xl">Reset password · {resetFor?.name}</DialogTitle></DialogHeader>
           <Field label="New temporary password" hint="Min 8 chars, 1 letter, 1 number"><input className="input !h-10" type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} data-testid="reset-password-input" /></Field>
-          <DialogFooter><button onClick={doReset} className="btn btn-primary" data-testid="reset-password-submit">Reset password</button></DialogFooter>
+          <DialogFooter>{resetFor?.id === me?.id ? <p className="mr-auto self-center text-xs text-txt-muted" data-testid="reset-self-reason">You cannot reset your own password here — use Change password.</p> : null}<button onClick={doReset} disabled={resetFor?.id === me?.id} className="btn btn-primary" data-testid="reset-password-submit">Reset password</button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

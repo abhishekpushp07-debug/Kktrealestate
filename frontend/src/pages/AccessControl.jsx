@@ -76,7 +76,9 @@ function UserAccess({ userId, tree, roles, projects, onSaved }) {
     <div className="space-y-5" data-testid="user-access-panel">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div><p className="label">Access for</p><h2 className="font-display text-2xl text-ink-950" data-testid="access-user-name">{acc.user.name}</h2><p className="text-xs text-txt-secondary">{acc.user.email} · {isSuper ? "Super Admin — unrestrictable" : `${effective.size} effective permissions`}</p></div>
-        <div className="flex gap-2"><HistoryButton entityType="user" entityId={userId} label={acc.user.name} /><Button onClick={save} disabled={busy || userId === me?.id && !isSuper && false} data-testid="access-save-button"><Save className="mr-1.5 h-4 w-4" />Save</Button></div>
+        <div className="flex gap-2"><HistoryButton entityType="user" entityId={userId} label={acc.user.name} />
+          {userId === me?.id ? <span className="self-center text-xs text-txt-muted" data-testid="access-self-edit-reason" title="Rule R1: nobody changes their own roles, grants or scope">You cannot change your own access — ask another administrator</span> : null}
+          <Button onClick={save} disabled={busy || userId === me?.id} data-testid="access-save-button"><Save className="mr-1.5 h-4 w-4" />Save</Button></div>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         <div className="card p-4"><p className="label-xs mb-2">Roles (multi)</p><div className="flex flex-wrap gap-2">{(roles || []).map((r) => <button key={r.id} type="button" onClick={() => setRoleIds((c) => (c.includes(r.id) ? c.filter((x) => x !== r.id) : [...c, r.id]))} className={cn("pill border", roleIds.includes(r.id) ? "border-ink-950 bg-ink-950 text-white" : "border-warm-200 bg-white text-txt-secondary")} data-testid={`access-role-${r.name.replace(/\s+/g, "-").toLowerCase()}`}>{r.name}</button>)}</div></div>
