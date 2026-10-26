@@ -4,95 +4,10 @@ bringing up nodes...
 ........................................................................ [ 14%]
 ........................................................................ [ 29%]
 ........................................................................ [ 43%]
-........................................................................ [ 58%]
-..............................................s......................... [ 73%]
-......................................................F.....F........... [ 87%]
-........................s.............................F.....             [100%]
-=================================== FAILURES ===================================
-_____ TestPaymentPlanAssignments.test_assign_stage_plan_to_villa_block_409 _____
-[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
-
-self = <tests.test_phase_7.TestPaymentPlanAssignments object at 0xf9f302b53cd0>
-H = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDd...xNzkzMDQ3NTA5LCJleHAiOjE3OTMwNDg0MDl9.LwRXdvO1dZxTXKizKbuX-QKRJI8FjuVBHO1zToJKnSQ', 'Content-Type': 'application/json'}
-
-    def test_assign_stage_plan_to_villa_block_409(self, H):
-        """Assigning Standard CLP (has ON_STAGE installments) to Villa Block V (no matching stages) → 409."""
-        proj, blk = self._find_project_block(H, "GGV", "Block V")
-        # find Standard CLP plan id
-        rp = requests.get(f"{API}/master/payment-plans?limit=100", headers=H, timeout=10)
-        plans = rp.json().get("items") or rp.json()
-        clp = next((p for p in plans if p.get("name") == "Standard CLP"), None)
-        if not clp:
-            pytest.skip("Standard CLP plan not found")
-        payload = {"payment_plan_id": clp["id"], "project_id": proj["id"], "block_id": blk["id"], "is_default": False}
-        r = requests.post(f"{API}/payment-plan-assignments", headers=H, json=payload, timeout=15)
-        if r.status_code == 201:
-            # delete and report
-            aid = r.json().get("id")
-            if aid:
-                requests.delete(f"{API}/payment-plan-assignments/{aid}", headers=H, timeout=10)
->           pytest.fail(f"Expected 409 for stage-less tower assignment but got 201: {r.text}")
-E           Failed: Expected 409 for stage-less tower assignment but got 201: {"id":"45200a64-68cb-48a3-abc8-9ea8342097b2","company_id":"61e35c1c-91c6-43c9-a732-2f790d5b57aa","payment_plan_id":"703a94b0-7381-4bca-a42e-bbd97f7d6b4f","project_id":"200c7ddc-e071-47aa-95ae-92a43738dcda","block_id":"db2a87c2-8bd2-48ee-9f3f-fe432e325c9a","is_default":false,"effective_from":null,"effective_to":null,"is_active":true,"plan_name":"Standard CLP","plan_code":"STANDARD_CLP","project_name":"Ganesh Green Villas","block_name":"Villa Block V","created_at":"2026-10-26T20:46:48.272097+00:00","created_by":"b63b8b19-94ac-4c8e-845b-faf8019d7a8e"}
-
-tests/test_phase_7.py:186: Failed
-___________________________ test_integrity_report_ok ___________________________
-[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
-
-H = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDd...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDQ3NTA5LCJleHAiOjE3OTMwNDg0MDl9.LwRXdvO1dZxTXKizKbuX-QKRJI8FjuVBHO1zToJKnSQ'}
-
-    def test_integrity_report_ok(H):
-        r = requests.get(f"{BASE}/api/admin/integrity-report?fresh=1", headers=H, timeout=15)
-        assert r.status_code == 200
->       assert r.json().get("ok") is True
-E       AssertionError: assert False is True
-E        +  where False = <built-in method get of dict object at 0xf9f300ed6a40>('ok')
-E        +    where <built-in method get of dict object at 0xf9f300ed6a40> = {'ok': False, 'as_of': '2026-10-27', 'ran_at': '2026-10-26T20:46:49.015390+00:00', 'bookings_checked': 79, ...}.get
-E        +      where {'ok': False, 'as_of': '2026-10-27', 'ran_at': '2026-10-26T20:46:49.015390+00:00', 'bookings_checked': 79, ...} = json()
-E        +        where json = <Response [200]>.json
-
-tests/test_phase_b4_backend_sanity.py:34: AssertionError
-___________________ test_startup_idempotent_on_pre_phase7_db ___________________
-[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
-
-    def test_startup_idempotent_on_pre_phase7_db():
-        loop = asyncio.new_event_loop()
-        cl = loop.run_until_complete(_prepare())
-        try:
-            log1 = _run_startup()
->           assert "integrity: ok=True" in log1, log1[-2000:]
-E           AssertionError: tion_stages index: name_1 dup key: { name: "Foundation" }', 'keyPattern': {'name': 1}, 'keyValue': {'name': 'Foundation'}}
-E             [startup] seed_phase7 ok in 0.00s
-E             [startup] backfill_demand_installments ok in 0.00s
-E             [startup] migrate_phase_g ok in 0.00s
-E             Phase 7 migration done: {'started_at': '2026-10-26T20:47:41.498184+00:00', 'bookings_checked': 88, 'plans_created': ['Standard CLP', 'Villa CLP'], 'stages_created': 16, 'finished_at': '2026-10-26T20:47:43.472158+00:00', 'ok': True, 'changed': 0}
-E             [startup] migrate_phase7 ok in 1.98s
-E             Phase 7 seed complete
-E             [startup] seed_phase7 ok in 0.41s
-E             [startup] backfill_demand_installments ok in 0.04s
-E             [startup] migrate_phase_g ok in 0.00s
-E             [notify] sweep: {'normalized': 1562, 'deleted': 99}
-E             [startup] sweep_notifications ok in 5.08s
-E             [phase7] integrity: ok=False bookings=79 counts={'missing_demand': 6, 'ledger_due_mismatch': 1}
-E             [startup] integrity_report ok in 0.18s
-E             [startup] counters ok in 0.02s
-E             [notify] sweep: {'normalized': 1386, 'deleted': 59}
-E             [startup] sweep_notifications ok in 3.60s
-E             [startup] reconcile ok in 0.81s
-E             [phase7] integrity: ok=False bookings=79 counts={'missing_demand': 6, 'ledger_due_mismatch': 1}
-E             [startup] integrity_report ok in 0.20s
-E             [startup] counters ok in 0.00s
-E             [phase11] customer profiles migrated: 91
-E             [startup] reconcile ok in 0.84s
-E             [phase11] read models: {'blocks': 11, 'projects': 2, 'customers': 91, 'ms': 1104}
-E             [phase11] catalogue items seeded: 351
-E             [startup] startup_phase11 ok in 1.28s
-E             [startup] schema_validators ok in 0.01s
-E             [startup] price_paise_backfill ok in 0.00s
-E             [startup] background tasks complete in 7.6s: {'seed_if_empty': 0.0, 'seed_phase15': 0.0, 'seed_phase3': 0.0, 'system_roles': 0.22, 'seed_marketing_user': 0.0, 'owner_bootstrap': 0.0, 'migrate_phase7': 1.98, 'seed_phase7': 0.41, 'backfill_demand_installments': 0.04, 'migrate_phase_g': 0.0, 'sweep_notifications': 3.6, 'integrity_report': 0.2, 'counters': 0.0, 'reconcile': 0.84, 'startup_phase11': 1.28, 'schema_validators': 0.01, 'price_paise_backfill': 0.0}
-E             
-E           assert 'integrity: ok=True' in "[startup] indexes ensured in 2.90s\nUoW mode: ordered-writes+compensation\nKKT backend serving after 2.90s (uow=order...'counters': 0.0, 'reconcile': 0.84, 'startup_phase11': 1.28, 'schema_validators': 0.01, 'price_paise_backfill': 0.0}\n"
-
-tests/test_startup_migrations.py:90: AssertionError
+....................s................................................... [ 58%]
+........................................................................ [ 73%]
+........................................................................ [ 87%]
+........................s...................................             [100%]
 =============================== warnings summary ===============================
 ../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
 ../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
@@ -122,8 +37,4 @@ tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources
     warnings.warn(
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-=========================== short test summary info ============================
-FAILED tests/test_phase_7.py::TestPaymentPlanAssignments::test_assign_stage_plan_to_villa_block_409
-FAILED tests/test_phase_b4_backend_sanity.py::test_integrity_report_ok - Asse...
-FAILED tests/test_startup_migrations.py::test_startup_idempotent_on_pre_phase7_db
-3 failed, 487 passed, 2 skipped, 9 warnings in 177.25s (0:02:57)
+490 passed, 2 skipped, 9 warnings in 186.94s (0:03:06)

@@ -196,9 +196,14 @@ export default function ProjectSetup() {
         for (const t of towers) {
           if (!t.block_type_id) throw new Error(`${t.name}: choose a block type`);
           if (t.id) { if (step === 1 && (t.name !== t._orig_name || t.block_type_id !== t._orig_block_type_id)) await api.patch(`/blocks/${t.id}`, { name: t.name, block_type_id: t.block_type_id }); }
-          else await api.post("/blocks", { project_id: pid, block_type_id: t.block_type_id, name: t.name, code: t.code, floors: Number(t.floors), floor_start: Number(t.floor_start), skip_floors: chips(t.skip_floors), refuge_floors: chips(t.refuge_floors), podium_floors: chips(t.podium_floors), numbering_pattern: t.numbering_pattern, flats_per_floor: t.flats_per_floor || null, floor_plans: step === 2 && t.floor_plans?.length ? t.floor_plans.map((r) => ({ from_floor: r.from_floor, to_floor: r.to_floor, floor_plan_template_id: r.floor_plan_template_id || null, positions: r.floor_plan_template_id ? null : (r.positions || []).filter((x) => x.flat_type_id).map((x) => ({ position: x.position, flat_type_id: x.flat_type_id, facing: x.facing || null })) })) : null, rate_per_sqft: t.rate_per_sqft ?? null, floor_rise_per_sqft: t.floor_rise_per_sqft ?? null });
+          else if (step === 1) { if (!t.name || !t.code || !t.floors) throw new Error("Each new tower needs a name, code and floors"); }
+          else {
+            const fps = (t.floor_plans?.length ? t.floor_plans : [{ from_floor: t.floor_start, to_floor: t.floor_start + t.floors - 1, positions: [] }]).map((r) => ({ from_floor: r.from_floor, to_floor: r.to_floor, floor_plan_template_id: r.floor_plan_template_id || null, positions: r.floor_plan_template_id ? null : (r.positions || []).filter((x) => x.flat_type_id).map((x) => ({ position: x.position, flat_type_id: x.flat_type_id, facing: x.facing || null })) }));
+            if (fps.some((r) => !r.floor_plan_template_id && !r.positions.length)) throw new Error(`${t.name}: pick a flat type for each position (or a floor-plan template)`);
+            await api.post("/blocks", { project_id: pid, block_type_id: t.block_type_id, name: t.name, code: t.code, floors: Number(t.floors), floor_start: Number(t.floor_start), skip_floors: chips(t.skip_floors), refuge_floors: chips(t.refuge_floors), podium_floors: chips(t.podium_floors), numbering_pattern: t.numbering_pattern, flats_per_floor: t.flats_per_floor || null, floor_plans: fps, rate_per_sqft: t.rate_per_sqft ?? null, floor_rise_per_sqft: t.floor_rise_per_sqft ?? null });
+          }
         }
-        if (step === 2 || towers.some((t) => t.id)) await load(pid);
+        if (step === 2) await load(pid);
       } else if (step === 3) { await api.put(`/projects/${pid}/setup/stages`, { project_sequence: seq }); await load(pid); }
       else if (step === 4) { await api.put(`/projects/${pid}/setup/plans`, { assignments: assign }); await load(pid); }
       else if (step === 5) { await api.put(`/projects/${pid}/setup/pricing`, { block_rates: towers.filter((t) => t.id).map((t) => ({ block_id: t.id, rate_per_sqft: t.rate_per_sqft ?? null, floor_rise_per_sqft: t.floor_rise_per_sqft ?? null, default_cash_percent: t.default_cash_percent ?? null })) }); await load(pid); }
