@@ -123,6 +123,12 @@ async def update_user(user_id: str, body: UserUpdate, request: Request, user: di
     if not changes:
         raise ApiError(400, "No changes supplied", "NO_CHANGES")
     await _validate_role_and_scope(changes.get("role_id"), changes.get("project_scope"))
+    from services import access_guard
+    if any(k in changes for k in ("role_id", "project_scope")):
+        access_guard.no_self_change(user, user_id, "role or project scope")
+    await access_guard.guard_target(user, before, [changes["role_id"]] if changes.get("role_id") else None, changes.get("project_scope"))
+    if changes.get("role_id") and changes["role_id"] != before["role_id"]:
+        await access_guard.guard_grants(user, [], [changes["role_id"]])
     if changes.get("is_active") is False:
         if user_id == user["id"]:
             raise ApiError(409, "You cannot deactivate your own account", "SELF_DEACTIVATE")
@@ -154,6 +160,9 @@ async def _guard_last_super_admin(target: dict, new_role_id: str | None):
 @router.post("/{user_id}/reset-password")
 async def reset_password(user_id: str, body: ResetPasswordIn, request: Request, user: dict = Depends(require("admin.user.edit"))):
     await get_or_404(db.users, user_id, "User", {"company_id": user["company_id"]})
+    from services import access_guard
+    access_guard.no_self_change(user, user_id, "password via the admin route (use Change password)")
+    await access_guard.guard_target(user, await db.users.find_one({"id": user_id}, {"_id": 0}))
     await set_password(user_id, body.new_password, clear_must_change=False)
     await db.users.update_one({"id": user_id}, {"$set": {"must_change_password": True}})
     await write_audit(user, "user.reset_password", "user", user_id, ip=client_ip(request))
