@@ -122,7 +122,7 @@ async def create_booking(body: BookingIn, request: Request, user: dict = Depends
     ensure_project_access(user, flat["project_id"])
     if flat["status"] not in ("Available", "Hold"):
         raise ApiError(409, f"Flat {flat['flat_number']} is {flat['status']}", "FLAT_NOT_AVAILABLE")
-    if flat["status"] == "Hold" and flat.get("status_changed_by") not in (user["id"], None) and "settings.manage" not in user["permissions"]:
+    if flat["status"] == "Hold" and flat.get("status_changed_by") not in (user["id"], None) and "sales.hold.release" not in user["permissions"]:
         raise ApiError(409, f"Flat {flat['flat_number']} is on Hold by another user", "FLAT_HELD_BY_OTHER")
     customer = await get_or_404(db.customers, body.customer_id, "Customer", {"company_id": user["company_id"], "is_active": True})
     if body.co_applicant_customer_ids and await db.customers.count_documents({"id": {"$in": body.co_applicant_customer_ids}}) != len(set(body.co_applicant_customer_ids)):
@@ -189,7 +189,16 @@ async def create_booking(body: BookingIn, request: Request, user: dict = Depends
         await raise_due_installments(doc, posted_at=posted_at, actor=user)  # ON_BOOKING + catch-up on already-completed stages
     await rebuild(doc["id"])
     if body.lead_id:
-        await db.leads.update_one({"id": body.lead_id}, {"$set": {"booking_id": doc["id"]}})
+        await db.leads.update_one({"id": body.lead_id}, {"$set": {"booking_id": doc["id"], "status": "Converted", "converted_customer_id": customer["id"], "updated_at": now_iso()}, "$push": {"stage_history": {"status": "Converted", "at": now_iso(), "by": user["id"], "note": f"Booking {doc['booking_number']}"}}})
+        await write_audit(user, "lead.convert", "lead", body.lead_id, before={"status": None}, after={"status": "Converted", "customer_id": customer["id"], "booking_id": doc["id"]}, ip=client_ip(request))
+    else:  # walk-in: every booking has a lead so the funnel stays complete
+        lead = {**base_doc(user, user["company_id"]), "lead_number": await generate_number("lead", company), "name": customer["full_name"], "phone": customer.get("phone"), "email": customer.get("email"), "source": "Walk-in", "project_id": flat["project_id"], "project_name": project.get("name"),
+                "status": "Converted", "stage_history": [{"status": "New", "at": posted_at, "by": user["id"], "note": "Walk-in"}, {"status": "Converted", "at": posted_at, "by": user["id"], "note": f"Booking {doc['booking_number']}"}], "follow_ups": [], "next_follow_up_at": None,
+                "lost_reason": None, "converted_customer_id": customer["id"], "assigned_to": user["id"], "booking_id": doc["id"], "created_at": posted_at}
+        await db.leads.insert_one(lead)
+        await db.bookings.update_one({"id": doc["id"]}, {"$set": {"lead_id": lead["id"]}})
+        await write_audit(user, "lead.create", "lead", lead["id"], after={"lead_number": lead["lead_number"], "name": lead["name"], "source": "Walk-in", "status": "Converted"}, ip=client_ip(request))
+        await write_audit(user, "lead.convert", "lead", lead["id"], before={"status": "New"}, after={"status": "Converted", "customer_id": customer["id"], "booking_id": doc["id"]}, ip=client_ip(request))
     after = await db.bookings.find_one({"id": doc["id"]}, {"_id": 0})
     await write_audit(user, "booking.create", "booking", doc["id"], after={k: after[k] for k in ("id", "booking_number", "customer_name", "flat_snapshot", "agreement_value_paise", "cash_agreed_paise", "account_agreed_paise")}, ip=client_ip(request))
     await write_audit(user, "flat.status", "flat", flat["id"], before={"status": flat["status"]}, after={"status": "Booked", "booking_number": doc["booking_number"]}, ip=client_ip(request))
@@ -246,6 +255,8 @@ async def revise_agreement(booking_id: str, body: RevisionIn, request: Request, 
     after = await db.bookings.find_one_and_update(q, {"$set": {"cash_agreed_paise": new_c, "account_agreed_paise": new_a, "agreement_value_paise": new_c + new_a, "updated_at": now_iso()}, "$push": {"agreement_revisions": rev}, "$inc": {"version": 1}}, projection={"_id": 0}, return_document=True)
     if not after:
         raise ApiError(409, "Booking was modified by someone else. Reload and retry.", "VERSION_CONFLICT")
+    from services.money_ops import reproportion_open_demands
+    await reproportion_open_demands(after, user, body.reason, old_agreement_value_paise=b["agreement_value_paise"])
     await rebuild(booking_id)
     await write_audit(user, "booking.agreement_revision", "booking", booking_id, before=rev["before"], after={**rev["after"], "reason": body.reason, "booking_number": b["booking_number"]}, ip=client_ip(request))
     return _present(await db.bookings.find_one({"id": booking_id}, {"_id": 0}))

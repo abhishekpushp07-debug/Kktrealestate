@@ -36,10 +36,10 @@ async def global_search(q: str = Query(min_length=1, max_length=60), limit: int 
             tasks.append(db.blocks.find({"company_id": cid, "is_active": True, **project_scope_filter(user), "$or": [{"code": rx}, {"name": any_rx}]}, {"_id": 0, "id": 1, "name": 1, "code": 1, "project_id": 1, "status": 1}).limit(limit).to_list(limit))
         keys.append("flats")
         tasks.append(db.flats.find({"company_id": cid, "is_active": True, **project_scope_filter(user), "flat_number": rx}, {"_id": 0, "id": 1, "flat_number": 1, "block_id": 1, "project_id": 1, "status": 1, "price_paise": 1, "flat_type_code": 1}).limit(limit).to_list(limit))
-    if scope == "all" and "users.manage" in perms:
+    if scope == "all" and "admin.user.view" in perms:
         keys.append("users")
         tasks.append(db.users.find({"company_id": cid, "is_active": True, "$or": [{"name": any_rx}, {"email": rx}]}, {"_id": 0, "id": 1, "name": 1, "email": 1, "role_id": 1}).limit(limit).to_list(limit))
-    if scope == "all" and "master.read" in perms:
+    if scope == "all" and "masters.flat_type.view" in perms:
         keys.append("flat_types")
         tasks.append(db.flat_types.find({"company_id": cid, "is_active": True, "$or": [{"name": any_rx}, {"code": rx}]}, {"_id": 0, "id": 1, "name": 1, "code": 1, "bhk": 1}).limit(limit).to_list(limit))
     results = await asyncio.gather(*tasks) if tasks else []

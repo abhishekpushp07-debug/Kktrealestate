@@ -92,7 +92,7 @@ async def get_company(user: dict = Depends(get_current_user)):
     if not company:
         raise ApiError(404, "Company not found", "NOT_FOUND")
     out = present(company)
-    if "settings.manage" not in user["permissions"]:
+    if "admin.settings.view" not in user["permissions"]:
         out = {k: out[k] for k in ("id", "name", "brand", "legal_name", "logo_url", "financial_year_start_month", "accent") if k in out}
     return out
 

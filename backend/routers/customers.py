@@ -303,6 +303,9 @@ async def update_customer(customer_id: str, body: CustomerUpdate, request: Reque
     if not changes:
         raise ApiError(400, "No changes supplied", "NO_CHANGES")
     after = await apply_update(db.customers, before, changes, expected_version(request, body.version), "Customer")
+    if {"full_name", "phone"} & set(changes):
+        from services.money_ops import fan_out_customer
+        await fan_out_customer(after, user)
     await write_audit(user, "customer.update", "customer", customer_id, before=present(before), after=present(after), ip=client_ip(request))
     return present(after)
 

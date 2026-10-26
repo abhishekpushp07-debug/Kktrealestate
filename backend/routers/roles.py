@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import field_validator
 
 from db import db
-from deps import get_current_user, require
+from deps import get_current_user, require, require_any
 from permissions import PERMISSION_GROUPS, PERMISSION_SET
 from utils import (
     ApiError,
@@ -60,9 +60,7 @@ async def list_permissions(user: dict = Depends(get_current_user)):
 
 
 @router.get("/roles")
-async def list_roles(params: ListParams = Depends(), user: dict = Depends(get_current_user)):
-    if not ({"roles.manage", "users.manage"} & user["permissions"]):
-        raise ApiError(403, "Missing permission: roles.manage", "FORBIDDEN")
+async def list_roles(params: ListParams = Depends(), user: dict = Depends(require_any("admin.role.view", "admin.user.view"))):
     q = {"company_id": user["company_id"], **search_filter(params.search, ["name", "description"])}
     if not params.include_inactive:
         q["is_active"] = True

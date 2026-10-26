@@ -11,8 +11,8 @@ from utils import ApiError, base_doc, client_ip, get_or_404, now_iso, write_audi
 router = APIRouter(prefix="/documents", tags=["documents"])
 MAX_SIZE = 15 * 1024 * 1024
 ALLOWED = {"application/pdf": "pdf", "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
-ENTITY_PERMS = {"customer": "customer.write", "booking": "booking.create", "project": "project.write", "block": "block.write", "flat": "flat.write", "payment": "payment.post", "floor_plan_template": "master.write"}
-READ_PERMS = {"customer": "customer.read", "booking": "booking.read", "project": "project.read", "block": "project.read", "flat": "project.read", "payment": "payment.read", "floor_plan_template": "master.read"}
+ENTITY_PERMS = {"customer": "sales.customer.edit", "booking": "sales.booking.edit", "project": "masters.project.edit", "block": "masters.tower.edit", "flat": "masters.flat.edit", "payment": "finance.payment.create", "floor_plan_template": "masters.floor_plan.edit"}
+READ_PERMS = {"customer": "sales.customer.view", "booking": "sales.booking.view", "project": "masters.project.view", "block": "masters.project.view", "flat": "masters.project.view", "payment": "finance.payment.view", "floor_plan_template": "masters.floor_plan.view"}
 
 
 PARENT = {"customer": db.customers, "booking": db.bookings, "project": db.projects, "block": db.blocks, "flat": db.flats, "payment": db.payments, "floor_plan_template": db.floor_plan_templates}

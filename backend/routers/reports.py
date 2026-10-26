@@ -4,7 +4,7 @@ from datetime import date, datetime, timedelta
 from fastapi import APIRouter, Depends, Request, Response
 from pymongo import ReturnDocument
 
-from services import clock
+from services import clock, definitions
 from db import db
 from deps import ensure_project_access, project_scope_filter, require
 from services.money import amount_in_words, present_money
@@ -135,7 +135,7 @@ async def outstanding(request: Request, project_id: str | None = None, block_id:
         a = per_bk.get(b["id"], {})
         rows.append({"booking_number": b["booking_number"], "customer_name": b["customer_name"], "unit": f"{b['project_code']} {b.get('block_code', '')}-{(b.get('flat_snapshot') or {}).get('flat_number', '')}", "project_id": b["project_id"], "block_id": b["block_id"],
                      "raised_paise": s.get("total_order_raised_paise", 0), "paid_paise": s.get("paid_paise", 0), "cash_due_paise": s.get("cash_due_paise", 0), "account_due_paise": s.get("account_due_paise", 0),
-                     "other_due_paise": s.get("other_charges_due_paise", 0), "due_paise": s.get("due_paise", 0) + s.get("other_charges_due_paise", 0), "overdue_paise": sum(v for k, v in a.items() if k != "Not due"), **{f"age_{k}": v for k, v in a.items()}})
+                     "other_due_paise": s.get("other_charges_due_paise", 0), "due_paise": definitions.outstanding(s)["total_paise"], "overdue_paise": sum(v for k, v in a.items() if k != "Not due"), **{f"age_{k}": v for k, v in a.items()}})
     if group_by in ("project", "block"):
         g = {}
         for r in rows:
@@ -213,13 +213,21 @@ async def inventory(request: Request, project_id: str | None = None, group_by: s
 
 # ---------- 8. Cheques ----------
 @router.get("/cheques")
-async def cheques(request: Request, project_id: str | None = None, status: str = "Pending", format: str | None = None, user: dict = Depends(require("reports.cheque_register.view"))):
+async def cheques(request: Request, project_id: str | None = None, status: str | None = None, format: str | None = None, user: dict = Depends(require("reports.cheque_register.view"))):
     _strict_params(request, {'status', 'project_id'})
-    q = {**_scope(user, project_id), "payment_mode_code": {"$in": ["CHEQUE", "DD"]}, "status": status}
+    q = {**_scope(user, project_id), "payment_mode_code": {"$in": ["CHEQUE", "DD"]}, **({"status": status} if status else {})}
     rows = [{"receipt_number": p["receipt_number"], "customer_name": p["customer_name"], "booking_number": p["booking_number"], "instrument_number": (p.get("instrument") or {}).get("number"), "instrument_date": (p.get("instrument") or {}).get("date"), "bank": (p.get("instrument") or {}).get("bank_name"), "amount_paise": p["amount_paise"], "status": p["status"], "bounced_at": p.get("bounced_at")}
             for p in await db.payments.find(q, {"_id": 0}).sort("instrument.date", 1).to_list(2000)]
     cols = [("receipt_number", "Receipt", "str", 1.1), ("customer_name", "Customer", "str", 1.4), ("booking_number", "Booking", "str"), ("instrument_number", "Cheque/DD no.", "str"), ("instrument_date", "Instrument date", "date"), ("bank", "Bank", "str"), ("amount_paise", "Amount", "money"), ("status", "Status", "str", 0.7)]
-    return respond(request, format, {"status": status}, f"Cheques — {status}", await _company(user), cols, rows, {"amount_paise": sum(r["amount_paise"] for r in rows)}, "cheques")
+    by_status = {}
+    for r in rows:
+        e = by_status.setdefault(r["status"], {"count": 0, "amount_paise": 0})
+        e["count"] += 1
+        e["amount_paise"] += r["amount_paise"]
+    out = respond(request, format, {"status": status or "All"}, f"Cheques — {status or 'All'}", await _company(user), cols, rows, {"amount_paise": sum(r["amount_paise"] for r in rows)}, "cheques")
+    if isinstance(out, dict):
+        out["by_status"] = by_status
+    return out
 
 
 # ---------- 9. Cancellations ----------
@@ -229,11 +237,16 @@ async def cancellations(request: Request, from_date: str | None = None, to_date:
     f, t = _dates(from_date, to_date)
     q = {**_scope(user, project_id), "status": "Cancelled", "cancellation.at": {"$gte": f, "$lte": t + "T23:59:59"}}
     rows = []
-    for b in await db.bookings.find(q, {"_id": 0}).to_list(500):
+    bks = await db.bookings.find(q, {"_id": 0}).to_list(500)
+    refunds = {r["booking_id"]: r for r in await db.refunds.find({"booking_id": {"$in": [b["id"] for b in bks]}}, {"_id": 0}).to_list(None)}
+    for b in bks:
         c = b.get("cancellation") or {}
-        rows.append({"booking_number": b["booking_number"], "customer_name": b["customer_name"], "unit": f"{b['project_code']} {b['flat_snapshot']['flat_number']}", "cancelled_at": c.get("at"), "reason": c.get("reason"), "paid_paise": (b.get("summary") or {}).get("paid_paise", 0), "forfeiture_paise": c.get("deduction_paise", 0), "refund_paise": c.get("refund_paise", 0), "refund_status": c.get("refund_status") or ("Refunded" if c.get("refunded_at") else "Pending")})
-    cols = [("booking_number", "Booking", "str"), ("customer_name", "Customer", "str", 1.4), ("unit", "Unit", "str"), ("cancelled_at", "Cancelled", "date"), ("reason", "Reason", "str", 1.6), ("paid_paise", "Paid", "money"), ("forfeiture_paise", "Forfeited", "money"), ("refund_paise", "Refund", "money"), ("refund_status", "Refund status", "str")]
-    totals = {k: sum(r[k] or 0 for r in rows) for k in ("paid_paise", "forfeiture_paise", "refund_paise")}
+        rf = refunds.get(b["id"]) or {}
+        received = c.get("received_paise", (b.get("summary") or {}).get("paid_paise", 0))
+        rows.append({"booking_number": b["booking_number"], "customer_name": b["customer_name"], "unit": f"{b['project_code']} {b['flat_snapshot']['flat_number']}", "cancelled_at": c.get("at"), "reason": c.get("reason"), "paid_paise": received, "forfeiture_paise": c.get("deduction_paise", 0), "refund_paise": c.get("refund_paise", 0),
+                     "refund_paid_paise": rf.get("amount_paise", 0) if rf.get("status") == "Paid" else 0, "refund_status": rf.get("status") or ("None" if not c.get("refund_paise") else "Pending")})
+    cols = [("booking_number", "Booking", "str"), ("customer_name", "Customer", "str", 1.4), ("unit", "Unit", "str"), ("cancelled_at", "Cancelled", "date"), ("reason", "Reason", "str", 1.6), ("paid_paise", "Paid", "money"), ("forfeiture_paise", "Forfeited", "money"), ("refund_paise", "Refund", "money"), ("refund_paid_paise", "Refund paid", "money"), ("refund_status", "Refund status", "str")]
+    totals = {k: sum(r[k] or 0 for r in rows) for k in ("paid_paise", "forfeiture_paise", "refund_paise", "refund_paid_paise")}
     return respond(request, format, {"from_date": f, "to_date": t}, "Cancellations & Refunds", await _company(user), cols, rows, totals, "cancellations", landscape=True)
 
 

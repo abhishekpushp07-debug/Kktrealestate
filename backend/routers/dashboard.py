@@ -52,7 +52,7 @@ async def _dashboard(user: dict):
     recent = []
     if "audit.view" in user["permissions"]:
         recent = await db.audit_logs.find({"company_id": user["company_id"]}, {"_id": 0, "before": 0, "after": 0}).sort("created_at", -1).limit(10).to_list(10)
-    users_count = await db.users.count_documents({"company_id": user["company_id"], "is_active": True}) if "users.manage" in user["permissions"] else None
+    users_count = await db.users.count_documents({"company_id": user["company_id"], "is_active": True}) if "admin.user.view" in user["permissions"] else None
     out = {"inventory": inventory, "projects": projects, "blocks": blocks, "recent_audit": recent, "active_users": users_count}
     if "payment.read" in user["permissions"]:
         out["collections"] = await collections_widget(user)
@@ -93,7 +93,7 @@ async def followups_widget(user: dict) -> dict:
     from datetime import datetime
     end = datetime.now(UTC).replace(hour=23, minute=59, second=59).isoformat()
     q = {"company_id": user["company_id"], "next_follow_up_at": {"$lte": end}, "status": {"$nin": ["Converted", "Lost"]}}
-    if "users.manage" not in user["permissions"]:
+    if "admin.user.view" not in user["permissions"]:
         q["assigned_to"] = user["id"]
     items = await db.leads.find(q, {"_id": 0, "id": 1, "lead_number": 1, "name": 1, "phone": 1, "status": 1, "next_follow_up_at": 1}).sort("next_follow_up_at", 1).to_list(20)
     return {"items": items, "count": len(items)}

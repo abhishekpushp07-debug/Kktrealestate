@@ -111,8 +111,10 @@ async def _mfa_policy_requires(user: dict) -> bool:
     s = await db.settings.find_one({"key": "mfa_required_for_admin_roles"}, {"_id": 0, "value": 1})
     if not (s and s.get("value")):
         return False
-    role = await db.roles.find_one({"id": user["role_id"]}, {"_id": 0, "permissions": 1})
-    return bool(role and ({"users.manage", "roles.manage", "settings.manage"} & set(role["permissions"])))
+    from permissions import expand
+    roles = await db.roles.find({"id": {"$in": list(dict.fromkeys([*(user.get("role_ids") or []), *([user["role_id"]] if user.get("role_id") else [])]))}}, {"_id": 0, "permissions": 1}).to_list(None)
+    perms = {c for r in roles for c in expand(r.get("permissions") or [])}
+    return bool({"admin.user.edit", "admin.role.edit", "admin.settings.edit", "admin.access_control.manage"} & perms)
 
 
 class LoginIn(StrictModel):

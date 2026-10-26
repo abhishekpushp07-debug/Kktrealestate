@@ -255,7 +255,7 @@ DOCS_DIR = "/app/docs"
 
 
 def _super_admin(user: dict):
-    if user.get("role_name") not in ("Super Admin",) and "settings.manage" not in (user.get("permissions") or []):
+    if user.get("role_name") not in ("Super Admin",) and "admin.settings.edit" not in (user.get("permissions") or []):
         raise ApiError(403, "Super Admin only", "FORBIDDEN")
 
 

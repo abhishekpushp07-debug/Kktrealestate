@@ -337,7 +337,7 @@ async def root_health():
 
 
 @api_router.get("/metrics", tags=["system"])
-async def metrics(user: dict = Depends(require("settings.manage"))):
+async def metrics(user: dict = Depends(require("admin.system_health.view"))):
     return metrics_snapshot()
 
 
