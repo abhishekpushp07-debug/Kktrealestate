@@ -51,7 +51,7 @@ def portal_token():
 
 @pytest.fixture(scope="session")
 def anchor_booking_id(admin_headers):
-    r = requests.get(f"{API}/bookings", headers=admin_headers, params={"q": ANCHOR_BK}, timeout=30)
+    r = requests.get(f"{API}/bookings", headers=admin_headers, params={"search": ANCHOR_BK, "page_size": 5}, timeout=30)
     assert r.status_code == 200
     data = r.json()
     items = data.get("items") or data if isinstance(data, dict) else data

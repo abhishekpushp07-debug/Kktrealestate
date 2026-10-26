@@ -53,6 +53,7 @@ async def reseed(body: ReseedIn, request: Request, user: dict = Depends(require(
         if c not in keep and not c.startswith("system."):
             await db[c].delete_many({})
     await db.settings.update_one({"key": "story"}, {"$set": {"value": None}}, upsert=True)
+    await db.settings.update_one({"key": "story_mode"}, {"$set": {"value": True}}, upsert=True)
     await seed()
     await seed_phase15()
     await seed_phase2()

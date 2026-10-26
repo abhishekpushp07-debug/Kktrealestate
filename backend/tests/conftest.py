@@ -333,7 +333,7 @@ def _story_mode() -> bool:
     try:
         from pymongo import MongoClient
         db = MongoClient(os.environ["MONGO_URL"])[os.environ["DB_NAME"]]
-        return bool(db.settings.find_one({"key": "story_mode", "value": True}))
+        return bool(db.settings.find_one({"key": "story_mode", "value": True}) or db.settings.find_one({"key": "story", "value.as_of": {"$exists": True}}))
     except Exception:
         return False
 
