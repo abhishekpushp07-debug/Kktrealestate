@@ -3,7 +3,7 @@ import { Readable } from "node:stream";
 import { and, desc, eq, inArray, or, sql, type SQL } from "drizzle-orm";
 import type { PgSelect } from "drizzle-orm/pg-core";
 import { fileTypeFromBuffer } from "file-type";
-import sharp from "sharp";
+import sharp, { type Metadata as SharpMetadata } from "sharp";
 import {
   ALLOWED_UPLOAD_MIME_TYPES,
   MAX_UPLOAD_BYTES,
@@ -223,7 +223,7 @@ export async function storeBuffer(tx: Executor, input: StoreBufferInput): Promis
 
 /** Reads the declared image dimensions from the header (no pixel decoding); 413 when they exceed MAX_IMAGE_PIXELS, 415 when unreadable. */
 async function imageDimensions(buffer: Buffer): Promise<{ width: number; height: number }> {
-  let meta: sharp.Metadata;
+  let meta: SharpMetadata;
   try {
     meta = await sharp(buffer, { limitInputPixels: false }).metadata();
   } catch {

@@ -47,6 +47,12 @@
       "@tailwindcss/oxide",
       "unrs-resolver",
       "sharp"
-    ]
+    ],
+    "overrides": {
+      "@fastify/static": ">=10.1.2",
+      "postcss": ">=8.5.23",
+      "@expo/cli>zod": "^4.6.7",
+      "next>sharp": "^0.35.5"
+    }
   }
 }

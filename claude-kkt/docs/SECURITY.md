@@ -61,3 +61,14 @@
    `HASH_KEY` cannot be rotated without recomputing every keyed hash (duplicate detection); it is not covered by this runbook.
 
 - Request ids on every log line and error body; failed logins recorded in `login_events`; `/metrics` exposes Prometheus counters/histograms (auth required).
+
+## Dependency advisories
+
+`pnpm audit --prod` is run on every dependency change. As of 2026-10-26 the only open advisory is
+`node-forge <=1.4.0` (high, no patched release) reached through `apps/portal > expo > @expo/cli`.
+`@expo/cli` is build-time tooling for `expo export`/`expo start`; it is not part of the exported
+portal bundle or any server image, so the advisory has no runtime exposure. It is re-checked on each
+Expo SDK upgrade. Fixed in this round: `sharp` raised to 0.35.5 in the API and pinned for Next.js
+(`next>sharp`), `@fastify/static` and `postcss` forced to patched versions through `pnpm.overrides`,
+and four unused API dependencies removed (`@fastify/rate-limit`, `@fastify/static`,
+`@fastify/under-pressure`, `ics`).
