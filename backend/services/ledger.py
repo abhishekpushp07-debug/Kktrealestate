@@ -241,17 +241,26 @@ JAMA_TYPES = ("PAYMENT", "OTHER_CHARGE_PAYMENT", "REVERSAL", "REFUND")
 
 def two_sided(rows: list[dict], events: list) -> None:
     """Owner's ledger law: Udhar (dues raised) | Jama (money received; reversals/refunds negative) | Mode | running Balance = Σ Udhar − Σ Jama."""
-    bal = 0
+    bal = cum_flat = cum_cash = cum_acct = 0
     for r, (_, _p, kind, src) in zip(rows, events):
         amt = r["amount_paise"]
         udhar = amt if kind in UDHAR_TYPES else 0
         jama = amt if kind in JAMA_TYPES else 0
+        u_cash = src.get("cash_demand_paise", 0) if kind == "DEMAND" else 0
+        u_acct = src.get("account_demand_paise", 0) if kind == "DEMAND" else 0
+        if kind in ("TRANSFER", "AGREEMENT_CHANGE", "CANCELLATION", "REFUND"):
+            # re-basing rows: Udhar adjusts so that Σ flat-value Udhar == order raised (definitions) at this point
+            u_cash = r["cash_order_raised_paise"] - cum_cash
+            u_acct = r["account_order_raised_paise"] - cum_acct
+            udhar = u_cash + u_acct
         if kind == "PAYMENT" and src.get("status") == "Reversed":
             r["tag"] = "REVERSED"
         elif kind == "REVERSAL":
             r["tag"] = "REVERSED"
         elif kind == "REFUND":
             r["tag"] = "REFUND"
+        elif kind == "CANCELLATION":
+            r["tag"] = "CANCELLED"
         elif kind == "PAYMENT" and src.get("status") == "Bounced":
             r["tag"] = "BOUNCED"
         else:
@@ -259,8 +268,8 @@ def two_sided(rows: list[dict], events: list) -> None:
         mode = src.get("payment_mode_name") or src.get("payment_mode") or src.get("mode") or ("Due" if udhar else None)
         inst = (src.get("instrument") or {}).get("number") if isinstance(src.get("instrument"), dict) else (src.get("instrument_number") or src.get("cheque_number") or src.get("reference") or src.get("utr"))
         bal += udhar - jama
-        r.update(udhar_paise=udhar, jama_paise=jama, mode=mode, instrument=inst, balance_paise=bal,
-                 udhar_cash_paise=src.get("cash_demand_paise", 0) if kind == "DEMAND" else (udhar if kind == "AGREEMENT_CHANGE" and src.get("after", {}).get("cash_agreed_paise") != src.get("before", {}).get("cash_agreed_paise") and udhar else 0),
-                 udhar_account_paise=src.get("account_demand_paise", 0) if kind == "DEMAND" else 0)
-        if kind == "OTHER_CHARGE_DEMAND":
-            r["udhar_cash_paise"] = 0
+        if kind != "OTHER_CHARGE_DEMAND":
+            cum_flat += udhar
+            cum_cash += u_cash
+            cum_acct += u_acct
+        r.update(udhar_paise=udhar, jama_paise=jama, mode=mode, instrument=inst, balance_paise=bal, udhar_cash_paise=u_cash, udhar_account_paise=u_acct)

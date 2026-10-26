@@ -1,387 +1,256 @@
 {
  "LEGACY_EXPANSION": {
-  "admin.access_control.manage": [
-   "admin.access_control.manage"
-  ],
-  "admin.audit.archive": [
-   "admin.audit.archive"
-  ],
-  "admin.audit.export": [
-   "admin.audit.export"
-  ],
-  "admin.audit.view": [
-   "admin.audit.view"
-  ],
-  "admin.data.backup": [
-   "admin.data.backup"
-  ],
-  "admin.data.erase": [
-   "admin.data.erase"
-  ],
-  "admin.data.recompute": [
-   "admin.data.recompute"
-  ],
-  "admin.data.reseed": [
-   "admin.data.reseed"
-  ],
-  "admin.definitions.view": [
-   "admin.definitions.view"
-  ],
-  "admin.documentation.view": [
-   "admin.documentation.view"
-  ],
-  "admin.role.create": [
-   "admin.role.create"
-  ],
-  "admin.role.delete": [
-   "admin.role.delete"
-  ],
-  "admin.role.edit": [
-   "admin.role.edit"
-  ],
-  "admin.role.view": [
-   "admin.role.view"
-  ],
-  "admin.settings.edit": [
-   "admin.settings.edit"
-  ],
-  "admin.settings.view": [
-   "admin.settings.view"
-  ],
-  "admin.system_health.view": [
-   "admin.system_health.view"
-  ],
-  "admin.user.create": [
-   "admin.user.create"
-  ],
-  "admin.user.deactivate": [
-   "admin.user.deactivate",
-   "admin.user.edit"
-  ],
-  "admin.user.edit": [
-   "admin.user.deactivate",
-   "admin.user.edit"
-  ],
-  "admin.user.view": [
-   "admin.role.view",
-   "admin.user.view"
-  ],
-  "construction.notice.create": [
-   "construction.notice.create"
-  ],
-  "construction.notice.delete": [
-   "construction.notice.delete"
-  ],
-  "construction.notice.edit": [
-   "construction.notice.edit"
-  ],
-  "construction.notice.view": [
-   "construction.notice.view"
-  ],
-  "construction.photo.delete": [
-   "construction.photo.delete"
-  ],
-  "construction.photo.upload": [
-   "construction.photo.upload"
-  ],
-  "construction.photo.view": [
-   "construction.stage.view"
-  ],
-  "construction.stage.undo": [
-   "construction.stage.undo"
-  ],
-  "construction.stage.update": [
-   "construction.stage.update"
-  ],
-  "construction.stage.view": [
-   "construction.stage.view"
-  ],
-  "construction.update.complete": [
-   "construction.stage.update"
-  ],
-  "construction.update.undo": [
-   "construction.stage.undo"
-  ],
-  "construction.update.view": [
-   "construction.update.view"
-  ],
-  "finance.cheque.bounce": [
-   "finance.cheque.bounce"
-  ],
-  "finance.cheque.clear": [
-   "finance.cheque.clear"
-  ],
-  "finance.demand.create": [
-   "finance.demand.create"
-  ],
-  "finance.demand.export": [
-   "finance.demand.export"
-  ],
-  "finance.demand.view": [
-   "finance.demand.view"
-  ],
-  "finance.ledger.export": [
-   "finance.ledger.export"
-  ],
-  "finance.ledger.view": [
-   "finance.ledger.view"
-  ],
-  "finance.payment.create": [
-   "finance.payment.create"
-  ],
-  "finance.payment.reverse": [
-   "finance.payment.reverse"
-  ],
-  "finance.payment.view": [
-   "finance.payment.view"
-  ],
-  "finance.receipt.download": [
-   "finance.receipt.download"
-  ],
-  "finance.receipt.print": [
-   "finance.receipt.print"
-  ],
-  "finance.refund.pay": [
-   "finance.refund.pay"
-  ],
-  "finance.refund.view": [
-   "finance.refund.view"
-  ],
-  "finance.roznamcha.deposit": [
-   "finance.roznamcha.deposit"
-  ],
-  "finance.roznamcha.opening_balance": [
-   "finance.roznamcha.opening_balance"
-  ],
-  "finance.roznamcha.view": [
-   "finance.roznamcha.view"
-  ],
-  "masters.catalogue.create": [
-   "masters.catalogue.create"
-  ],
-  "masters.catalogue.edit": [
-   "masters.catalogue.edit"
-  ],
-  "masters.catalogue.view": [
-   "masters.catalogue.view"
-  ],
-  "masters.construction_stage.edit": [
-   "masters.construction_stage.edit"
-  ],
-  "masters.construction_stage.view": [
-   "masters.construction_stage.view"
-  ],
-  "masters.flat.create": [
-   "masters.flat.create"
-  ],
-  "masters.flat.edit": [
-   "masters.flat.edit"
-  ],
-  "masters.flat.view": [
-   "masters.flat.view"
-  ],
-  "masters.payment_plan.assign": [
-   "masters.payment_plan.assign"
-  ],
-  "masters.payment_plan.create": [
-   "masters.payment_plan.create"
-  ],
-  "masters.payment_plan.view": [
-   "masters.payment_plan.view"
-  ],
-  "masters.project.create": [
-   "masters.project.create"
-  ],
-  "masters.project.edit": [
-   "masters.project.edit"
-  ],
-  "masters.project.view": [
-   "masters.project.view",
-   "website.cms.view"
-  ],
-  "masters.rate_card.apply": [
-   "masters.rate_card.apply"
-  ],
-  "masters.rate_card.create": [
-   "masters.rate_card.create"
-  ],
-  "masters.rate_card.edit": [
-   "masters.rate_card.edit"
-  ],
-  "masters.rate_card.view": [
-   "masters.rate_card.view"
-  ],
-  "masters.stage_plan.create": [
-   "masters.stage_plan.create"
-  ],
-  "masters.stage_plan.delete": [
-   "masters.stage_plan.delete"
-  ],
-  "masters.stage_plan.edit": [
-   "masters.stage_plan.edit"
-  ],
-  "masters.stage_plan.view": [
-   "masters.stage_plan.view"
-  ],
-  "masters.tower.create": [
-   "masters.tower.create"
-  ],
-  "masters.tower.edit": [
-   "masters.tower.edit"
-  ],
-  "reports.audit.view": [
-   "reports.audit.view"
-  ],
-  "reports.bank_wise.view": [
-   "reports.bank_wise.view"
-  ],
-  "reports.cancellations_refunds.view": [
-   "reports.cancellations_refunds.view"
-  ],
-  "reports.cheque_register.view": [
-   "reports.cheque_register.view"
-  ],
-  "reports.collections.view": [
-   "reports.collections.view"
-  ],
-  "reports.construction_vs_plan.view": [
-   "reports.construction_vs_plan.view"
-  ],
-  "reports.demand_vs_collection.view": [
-   "reports.demand_vs_collection.view"
-  ],
-  "reports.inventory.view": [
-   "reports.inventory.view"
-  ],
-  "reports.lead_funnel.view": [
-   "reports.lead_funnel.view"
-  ],
-  "reports.outstanding.view": [
-   "reports.outstanding.view"
-  ],
-  "reports.receivables_forecast.view": [
-   "reports.receivables_forecast.view"
-  ],
-  "reports.roznamcha.view": [
-   "reports.roznamcha.view"
-  ],
-  "reports.service_sla.view": [
-   "reports.service_sla.view"
-  ],
-  "sales.agreement.revise": [
-   "sales.agreement.revise"
-  ],
-  "sales.agreement.view": [
-   "sales.agreement.view"
-  ],
-  "sales.booking.cancel": [
-   "sales.booking.cancel"
-  ],
-  "sales.booking.create": [
-   "sales.booking.create"
-  ],
-  "sales.booking.edit": [
-   "sales.booking.edit"
-  ],
-  "sales.booking.export": [
-   "sales.booking.export"
-  ],
-  "sales.booking.transfer": [
+  "agreement.edit": [
+   "masters.payment_plan.assign",
+   "sales.agreement.revise",
    "sales.booking.transfer"
   ],
-  "sales.booking.view": [
+  "audit.view": [
+   "admin.audit.export",
+   "admin.audit.view",
+   "reports.audit.view"
+  ],
+  "block.write": [
+   "masters.flat.create",
+   "masters.flat.edit",
+   "masters.tower.create",
+   "masters.tower.edit"
+  ],
+  "booking.cancel": [
+   "sales.booking.cancel"
+  ],
+  "booking.create": [
+   "finance.demand.create",
+   "sales.booking.create",
+   "sales.booking.edit"
+  ],
+  "booking.read": [
+   "finance.demand.export",
+   "finance.ledger.export",
+   "finance.ledger.view",
+   "finance.refund.view",
+   "sales.agreement.view",
+   "sales.booking.cancel",
+   "sales.booking.export",
    "sales.booking.view"
   ],
-  "sales.customer.create": [
-   "sales.customer.create",
-   "sales.lead.edit"
+  "catalogue.write": [
+   "masters.catalogue.create",
+   "masters.catalogue.edit"
   ],
-  "sales.customer.edit": [
-   "sales.customer.edit"
+  "cms.read": [
+   "construction.notice.view",
+   "website.cms.view"
   ],
-  "sales.customer.view": [
-   "sales.customer.view"
-  ],
-  "sales.hold.create": [
-   "sales.hold.create",
-   "sales.hold.release"
-  ],
-  "sales.hold.release": [
-   "sales.hold.create",
-   "sales.hold.release"
-  ],
-  "sales.kyc.edit": [
-   "sales.kyc.edit"
-  ],
-  "sales.lead.create": [
-   "sales.lead.create"
-  ],
-  "sales.lead.edit": [
-   "sales.customer.create",
-   "sales.lead.edit"
-  ],
-  "sales.lead.view": [
-   "sales.lead.view"
-  ],
-  "sales.site_visit.cancel": [
-   "sales.site_visit.cancel",
-   "sales.site_visit.complete",
-   "sales.site_visit.edit"
-  ],
-  "sales.site_visit.complete": [
-   "sales.site_visit.cancel",
-   "sales.site_visit.complete",
-   "sales.site_visit.edit"
-  ],
-  "sales.site_visit.create": [
-   "sales.site_visit.create"
-  ],
-  "sales.site_visit.edit": [
-   "sales.site_visit.cancel",
-   "sales.site_visit.complete",
-   "sales.site_visit.edit"
-  ],
-  "sales.site_visit.export": [
-   "sales.site_visit.export"
-  ],
-  "sales.site_visit.view": [
-   "sales.site_visit.view"
-  ],
-  "service.portal.manage": [
-   "service.portal.manage"
-  ],
-  "service.portal.view": [
-   "service.portal.view"
-  ],
-  "service.ticket.assign": [
-   "service.ticket.assign"
-  ],
-  "service.ticket.close": [
-   "service.ticket.close",
-   "service.ticket.edit",
-   "service.ticket.reopen"
-  ],
-  "service.ticket.create": [
-   "service.ticket.create"
-  ],
-  "service.ticket.edit": [
-   "service.ticket.close",
-   "service.ticket.edit",
-   "service.ticket.reopen"
-  ],
-  "service.ticket.reopen": [
-   "service.ticket.close",
-   "service.ticket.edit",
-   "service.ticket.reopen"
-  ],
-  "service.ticket.view": [
-   "service.ticket.view"
-  ],
-  "website.cms.edit": [
+  "cms.write": [
+   "construction.notice.create",
+   "construction.notice.delete",
+   "construction.notice.edit",
    "website.cms.edit"
   ],
-  "website.cms.view": [
-   "website.cms.view"
+  "construction.undo": [
+   "construction.stage.undo",
+   "construction.update.undo"
+  ],
+  "construction.update": [
+   "construction.stage.update",
+   "construction.update.complete",
+   "construction.update.view"
+  ],
+  "customer.kyc_view": [
+   "sales.kyc.edit",
+   "sales.kyc.reveal",
+   "sales.kyc.view_masked"
+  ],
+  "customer.portal_manage": [
+   "service.portal.manage",
+   "service.portal.view"
+  ],
+  "customer.read": [
+   "sales.customer.view"
+  ],
+  "customer.write": [
+   "sales.customer.create",
+   "sales.customer.edit"
+  ],
+  "flat.status": [
+   "sales.hold.create",
+   "sales.hold.release"
+  ],
+  "flat.write": [
+   "masters.flat.edit",
+   "masters.rate_card.apply",
+   "masters.rate_card.create",
+   "masters.rate_card.edit"
+  ],
+  "lead.read": [
+   "sales.lead.view"
+  ],
+  "lead.write": [
+   "sales.customer.create",
+   "sales.lead.create",
+   "sales.lead.edit"
+  ],
+  "master.read": [
+   "masters.amenity.view",
+   "masters.bank_account.view",
+   "masters.block_type.view",
+   "masters.charge_type.view",
+   "masters.construction_stage.view",
+   "masters.document_type.view",
+   "masters.flat_type.view",
+   "masters.floor_plan.view",
+   "masters.payment_mode.view",
+   "masters.payment_plan.view",
+   "masters.plc.view",
+   "masters.specification.view",
+   "masters.stage_plan.view"
+  ],
+  "master.write": [
+   "masters.amenity.create",
+   "masters.amenity.delete",
+   "masters.amenity.edit",
+   "masters.bank_account.create",
+   "masters.bank_account.delete",
+   "masters.bank_account.edit",
+   "masters.block_type.create",
+   "masters.block_type.delete",
+   "masters.block_type.edit",
+   "masters.charge_type.create",
+   "masters.charge_type.delete",
+   "masters.charge_type.edit",
+   "masters.construction_stage.create",
+   "masters.construction_stage.delete",
+   "masters.construction_stage.edit",
+   "masters.document_type.create",
+   "masters.document_type.delete",
+   "masters.document_type.edit",
+   "masters.flat_type.create",
+   "masters.flat_type.delete",
+   "masters.flat_type.edit",
+   "masters.floor_plan.create",
+   "masters.floor_plan.delete",
+   "masters.floor_plan.edit",
+   "masters.payment_mode.create",
+   "masters.payment_mode.delete",
+   "masters.payment_mode.edit",
+   "masters.payment_plan.assign",
+   "masters.payment_plan.create",
+   "masters.payment_plan.delete",
+   "masters.payment_plan.edit",
+   "masters.plc.create",
+   "masters.plc.delete",
+   "masters.plc.edit",
+   "masters.specification.create",
+   "masters.specification.delete",
+   "masters.specification.edit",
+   "masters.stage_plan.create",
+   "masters.stage_plan.delete",
+   "masters.stage_plan.edit"
+  ],
+  "milestone.update": [
+   "construction.photo.delete",
+   "construction.photo.upload",
+   "construction.stage.update",
+   "construction.update.complete"
+  ],
+  "payment.post": [
+   "finance.cheque.bounce",
+   "finance.cheque.clear",
+   "finance.payment.create",
+   "finance.roznamcha.deposit"
+  ],
+  "payment.read": [
+   "finance.demand.view",
+   "finance.payment.view",
+   "finance.refund.view",
+   "finance.roznamcha.view"
+  ],
+  "payment.reverse": [
+   "finance.payment.reverse",
+   "finance.refund.pay"
+  ],
+  "project.read": [
+   "admin.audit.view",
+   "admin.definitions.view",
+   "construction.photo.view",
+   "construction.stage.view",
+   "construction.update.view",
+   "masters.flat.view",
+   "masters.payment_plan.view",
+   "masters.project.view",
+   "masters.rate_card.view"
+  ],
+  "project.write": [
+   "masters.construction_stage.edit",
+   "masters.project.create",
+   "masters.project.edit"
+  ],
+  "receipt.print": [
+   "finance.receipt.download",
+   "finance.receipt.print"
+  ],
+  "report.view": [
+   "reports.bank_wise.view",
+   "reports.cancellations_refunds.view",
+   "reports.cheque_register.view",
+   "reports.collections.view",
+   "reports.construction_vs_plan.view",
+   "reports.demand_vs_collection.view",
+   "reports.inventory.view",
+   "reports.lead_funnel.view",
+   "reports.outstanding.view",
+   "reports.receivables_forecast.view",
+   "reports.roznamcha.view",
+   "reports.service_sla.view"
+  ],
+  "roles.manage": [
+   "admin.access_control.manage",
+   "admin.role.create",
+   "admin.role.delete",
+   "admin.role.edit",
+   "admin.role.view"
+  ],
+  "service.assign": [
+   "service.ticket.assign"
+  ],
+  "service.read": [
+   "service.ticket.view"
+  ],
+  "service.write": [
+   "service.ticket.close",
+   "service.ticket.create",
+   "service.ticket.edit",
+   "service.ticket.reopen"
+  ],
+  "settings.manage": [
+   "admin.audit.archive",
+   "admin.data.backup",
+   "admin.data.erase",
+   "admin.data.recompute",
+   "admin.data.reseed",
+   "admin.documentation.view",
+   "admin.settings.edit",
+   "admin.settings.view",
+   "admin.system_health.view",
+   "finance.roznamcha.opening_balance"
+  ],
+  "users.manage": [
+   "admin.access_control.manage",
+   "admin.user.create",
+   "admin.user.deactivate",
+   "admin.user.edit",
+   "admin.user.view"
+  ],
+  "visit.read": [
+   "sales.site_visit.export",
+   "sales.site_visit.view"
+  ],
+  "visit.write": [
+   "sales.site_visit.cancel",
+   "sales.site_visit.complete",
+   "sales.site_visit.create",
+   "sales.site_visit.edit"
   ]
  },
  "ROUTE_PERMS": {
@@ -391,7 +260,7 @@
    ],
    "fn": "registry",
    "legacy": [
-    "admin.access_control.manage"
+    "roles.manage"
    ]
   },
   "access:GET /roles/{role_id}/users": {
@@ -400,7 +269,7 @@
    ],
    "fn": "role_users",
    "legacy": [
-    "admin.role.view"
+    "roles.manage"
    ]
   },
   "access:GET /tree": {
@@ -416,7 +285,7 @@
    ],
    "fn": "get_access",
    "legacy": [
-    "admin.access_control.manage"
+    "users.manage"
    ]
   },
   "access:POST /roles/{role_id}/clone": {
@@ -425,7 +294,7 @@
    ],
    "fn": "clone_role",
    "legacy": [
-    "admin.role.create"
+    "roles.manage"
    ]
   },
   "access:PUT /users/{user_id}": {
@@ -434,7 +303,7 @@
    ],
    "fn": "put_access",
    "legacy": [
-    "admin.access_control.manage"
+    "users.manage"
    ]
   },
   "admin:GET /audit/archive/status": {
@@ -443,7 +312,7 @@
    ],
    "fn": "audit_archive_status",
    "legacy": [
-    "admin.audit.view"
+    "audit.view"
    ]
   },
   "admin:GET /backups": {
@@ -452,7 +321,7 @@
    ],
    "fn": "list_backups",
    "legacy": [
-    "admin.data.backup"
+    "settings.manage"
    ]
   },
   "admin:GET /backups/{backup_id}/download": {
@@ -468,7 +337,7 @@
    ],
    "fn": "docs_md",
    "legacy": [
-    "admin.documentation.view"
+    "settings.manage"
    ]
   },
   "admin:GET /docs/technical.pdf": {
@@ -477,7 +346,7 @@
    ],
    "fn": "docs_pdf",
    "legacy": [
-    "admin.documentation.view"
+    "settings.manage"
    ]
   },
   "admin:GET /reseed/status": {
@@ -486,16 +355,16 @@
    ],
    "fn": "reseed_status",
    "legacy": [
-    "admin.data.reseed"
+    "settings.manage"
    ]
   },
   "admin:GET /story-marker": {
    "codes": [
     "admin.data.reseed"
    ],
-   "fn": "story_marker",
+   "fn": "story_marker_get",
    "legacy": [
-    "admin.data.reseed"
+    "settings.manage"
    ]
   },
   "admin:POST /audit/archive": {
@@ -504,7 +373,7 @@
    ],
    "fn": "run_audit_archive",
    "legacy": [
-    "admin.audit.archive"
+    "settings.manage"
    ]
   },
   "admin:POST /backup": {
@@ -513,7 +382,7 @@
    ],
    "fn": "create_backup",
    "legacy": [
-    "admin.data.backup"
+    "settings.manage"
    ]
   },
   "admin:POST /customers/{customer_id}/erase": {
@@ -522,7 +391,7 @@
    ],
    "fn": "erase_customer",
    "legacy": [
-    "admin.data.erase"
+    "settings.manage"
    ]
   },
   "admin:POST /docs/regenerate": {
@@ -531,7 +400,7 @@
    ],
    "fn": "docs_regenerate",
    "legacy": [
-    "admin.documentation.view"
+    "settings.manage"
    ]
   },
   "admin:POST /recompute-counters": {
@@ -540,7 +409,7 @@
    ],
    "fn": "recompute_counters",
    "legacy": [
-    "admin.data.recompute"
+    "settings.manage"
    ]
   },
   "admin:POST /reconcile-ledgers": {
@@ -549,7 +418,7 @@
    ],
    "fn": "reconcile",
    "legacy": [
-    "admin.data.recompute"
+    "settings.manage"
    ]
   },
   "admin:POST /reseed": {
@@ -558,16 +427,16 @@
    ],
    "fn": "reseed",
    "legacy": [
-    "admin.data.reseed"
+    "settings.manage"
    ]
   },
   "admin:POST /story-marker": {
    "codes": [
     "admin.data.reseed"
    ],
-   "fn": "set_story_marker",
+   "fn": "story_marker",
    "legacy": [
-    "admin.data.reseed"
+    "settings.manage"
    ]
   },
   "audit:GET ": {
@@ -576,7 +445,7 @@
    ],
    "fn": "list_audit_logs",
    "legacy": [
-    "admin.audit.view"
+    "audit.view"
    ]
   },
   "audit:GET /entity-types": {
@@ -585,7 +454,7 @@
    ],
    "fn": "entity_types",
    "legacy": [
-    "admin.audit.view"
+    "audit.view"
    ]
   },
   "audit:GET /entity/{entity_type}/{entity_id}": {
@@ -593,7 +462,9 @@
     "admin.audit.view"
    ],
    "fn": "entity_history",
-   "legacy": []
+   "legacy": [
+    "project.read"
+   ]
   },
   "audit:GET /export.csv": {
    "codes": [
@@ -601,7 +472,7 @@
    ],
    "fn": "export_csv",
    "legacy": [
-    "admin.audit.export"
+    "audit.view"
    ]
   },
   "audit:GET /login-events": {
@@ -610,7 +481,7 @@
    ],
    "fn": "login_events",
    "legacy": [
-    "admin.audit.view"
+    "audit.view"
    ]
   },
   "audit:GET /modules": {
@@ -619,7 +490,7 @@
    ],
    "fn": "modules",
    "legacy": [
-    "admin.audit.view"
+    "audit.view"
    ]
   },
   "blocks:GET ": {
@@ -628,7 +499,7 @@
    ],
    "fn": "list_blocks",
    "legacy": [
-    "masters.project.view"
+    "project.read"
    ]
   },
   "blocks:GET /{block_id}": {
@@ -637,7 +508,7 @@
    ],
    "fn": "get_block",
    "legacy": [
-    "masters.project.view"
+    "project.read"
    ]
   },
   "blocks:GET /{block_id}/grid": {
@@ -646,7 +517,7 @@
    ],
    "fn": "block_grid",
    "legacy": [
-    "masters.project.view"
+    "project.read"
    ]
   },
   "blocks:PATCH /{block_id}": {
@@ -655,7 +526,7 @@
    ],
    "fn": "update_block",
    "legacy": [
-    "masters.tower.edit"
+    "block.write"
    ]
   },
   "blocks:POST ": {
@@ -664,7 +535,7 @@
    ],
    "fn": "create_block",
    "legacy": [
-    "masters.tower.create"
+    "block.write"
    ]
   },
   "blocks:POST /{block_id}/bulk-price": {
@@ -673,7 +544,7 @@
    ],
    "fn": "bulk_price",
    "legacy": [
-    "masters.flat.edit"
+    "flat.write"
    ]
   },
   "blocks:POST /{block_id}/bulk-status": {
@@ -683,8 +554,7 @@
    ],
    "fn": "bulk_status",
    "legacy": [
-    "sales.hold.create",
-    "sales.hold.release"
+    "flat.status"
    ]
   },
   "blocks:POST /{block_id}/floors": {
@@ -693,7 +563,7 @@
    ],
    "fn": "add_floors",
    "legacy": [
-    "masters.tower.edit"
+    "block.write"
    ]
   },
   "blocks:POST /{block_id}/generate-flats": {
@@ -702,7 +572,7 @@
    ],
    "fn": "regenerate_flats",
    "legacy": [
-    "masters.flat.create"
+    "block.write"
    ]
   },
   "bookings:GET ": {
@@ -711,7 +581,7 @@
    ],
    "fn": "list_bookings",
    "legacy": [
-    "sales.booking.view"
+    "booking.read"
    ]
   },
   "bookings:GET /{booking_id}": {
@@ -720,7 +590,7 @@
    ],
    "fn": "get_booking",
    "legacy": [
-    "sales.booking.view"
+    "booking.read"
    ]
   },
   "bookings:GET /{booking_id}/cancellation-preview": {
@@ -729,7 +599,7 @@
    ],
    "fn": "cancellation_preview_ep",
    "legacy": [
-    "sales.booking.cancel"
+    "booking.read"
    ]
   },
   "bookings:GET /{booking_id}/demands/{demand_id}/letter": {
@@ -738,7 +608,7 @@
    ],
    "fn": "demand_letter",
    "legacy": [
-    "finance.demand.export"
+    "booking.read"
    ]
   },
   "bookings:GET /{booking_id}/ledger": {
@@ -747,7 +617,7 @@
    ],
    "fn": "ledger",
    "legacy": [
-    "finance.ledger.view"
+    "booking.read"
    ]
   },
   "bookings:GET /{booking_id}/refunds": {
@@ -756,7 +626,7 @@
    ],
    "fn": "booking_refunds",
    "legacy": [
-    "finance.refund.view"
+    "booking.read"
    ]
   },
   "bookings:POST ": {
@@ -765,7 +635,7 @@
    ],
    "fn": "create_booking",
    "legacy": [
-    "sales.booking.create"
+    "booking.create"
    ]
   },
   "bookings:POST /{booking_id}/agreement-revisions": {
@@ -774,7 +644,7 @@
    ],
    "fn": "revise_agreement",
    "legacy": [
-    "sales.agreement.revise"
+    "agreement.edit"
    ]
   },
   "bookings:POST /{booking_id}/cancel": {
@@ -783,7 +653,7 @@
    ],
    "fn": "cancel_booking",
    "legacy": [
-    "sales.booking.cancel"
+    "booking.cancel"
    ]
   },
   "bookings:POST /{booking_id}/complete": {
@@ -792,7 +662,7 @@
    ],
    "fn": "complete_booking",
    "legacy": [
-    "sales.booking.edit"
+    "booking.create"
    ]
   },
   "bookings:POST /{booking_id}/other-charges/demand": {
@@ -801,7 +671,7 @@
    ],
    "fn": "demand_other_charge",
    "legacy": [
-    "finance.demand.create"
+    "booking.create"
    ]
   },
   "bookings:POST /{booking_id}/recompute": {
@@ -810,7 +680,7 @@
    ],
    "fn": "recompute",
    "legacy": [
-    "admin.data.recompute"
+    "settings.manage"
    ]
   },
   "bookings:POST /{booking_id}/swap": {
@@ -819,7 +689,7 @@
    ],
    "fn": "swap_bookings",
    "legacy": [
-    "sales.booking.transfer"
+    "agreement.edit"
    ]
   },
   "bookings:POST /{booking_id}/transfer": {
@@ -828,7 +698,7 @@
    ],
    "fn": "transfer_booking",
    "legacy": [
-    "sales.booking.transfer"
+    "agreement.edit"
    ]
   },
   "bootstrap:GET /blocks/{block_id}/summary": {
@@ -837,7 +707,7 @@
    ],
    "fn": "block_summary",
    "legacy": [
-    "masters.project.view"
+    "project.read"
    ]
   },
   "bootstrap:GET /bootstrap": {
@@ -853,7 +723,7 @@
    ],
    "fn": "customer_summary",
    "legacy": [
-    "sales.customer.view"
+    "customer.read"
    ]
   },
   "bootstrap:GET /dashboard/snapshot": {
@@ -862,7 +732,7 @@
    ],
    "fn": "dashboard_snapshot",
    "legacy": [
-    "masters.project.view"
+    "project.read"
    ]
   },
   "bootstrap:GET /projects/{project_id}/summary": {
@@ -871,7 +741,7 @@
    ],
    "fn": "project_summary",
    "legacy": [
-    "masters.project.view"
+    "project.read"
    ]
   },
   "bootstrap:POST /admin/recompute-read-models": {
@@ -880,7 +750,7 @@
    ],
    "fn": "recompute",
    "legacy": [
-    "admin.data.recompute"
+    "settings.manage"
    ]
   },
   "catalogues:GET ": {
@@ -888,27 +758,21 @@
     "masters.catalogue.view"
    ],
    "fn": "get_bundle",
-   "legacy": [
-    "masters.catalogue.view"
-   ]
+   "legacy": []
   },
   "catalogues:GET /{ctype}": {
    "codes": [
     "masters.catalogue.view"
    ],
    "fn": "get_type",
-   "legacy": [
-    "masters.catalogue.view"
-   ]
+   "legacy": []
   },
   "catalogues:GET /{ctype}/export.csv": {
    "codes": [
     "masters.catalogue.view"
    ],
    "fn": "export_csv",
-   "legacy": [
-    "masters.catalogue.view"
-   ]
+   "legacy": []
   },
   "catalogues:PATCH /{ctype}/items/{item_id}": {
    "codes": [
@@ -916,7 +780,7 @@
    ],
    "fn": "patch_item",
    "legacy": [
-    "masters.catalogue.edit"
+    "catalogue.write"
    ]
   },
   "catalogues:POST /{ctype}/import": {
@@ -925,7 +789,7 @@
    ],
    "fn": "import_csv",
    "legacy": [
-    "masters.catalogue.create"
+    "catalogue.write"
    ]
   },
   "catalogues:POST /{ctype}/items": {
@@ -934,7 +798,7 @@
    ],
    "fn": "add_item",
    "legacy": [
-    "masters.catalogue.create"
+    "catalogue.write"
    ]
   },
   "catalogues:POST /{ctype}/reorder": {
@@ -943,7 +807,7 @@
    ],
    "fn": "reorder",
    "legacy": [
-    "masters.catalogue.edit"
+    "catalogue.write"
    ]
   },
   "cms:DELETE /{coll}/{item_id}": {
@@ -952,17 +816,17 @@
    ],
    "fn": "delete_item",
    "legacy": [
-    "website.cms.edit"
+    "cms.write"
    ]
   },
   "cms:GET /projects/{project_id}/website": {
    "codes": [
-    "website.cms.view"
+    "website.cms.view",
+    "masters.project.view"
    ],
    "fn": "project_website",
    "legacy": [
-    "website.cms.view",
-    "masters.project.view"
+    "project.read"
    ]
   },
   "cms:GET /site": {
@@ -971,7 +835,7 @@
    ],
    "fn": "site",
    "legacy": [
-    "website.cms.view"
+    "cms.read"
    ]
   },
   "cms:GET /{coll}": {
@@ -980,7 +844,7 @@
    ],
    "fn": "list_items",
    "legacy": [
-    "website.cms.view"
+    "cms.read"
    ]
   },
   "cms:PATCH /projects/{project_id}/website": {
@@ -989,7 +853,7 @@
    ],
    "fn": "update_project_website",
    "legacy": [
-    "website.cms.edit"
+    "cms.write"
    ]
   },
   "cms:PATCH /site": {
@@ -998,7 +862,7 @@
    ],
    "fn": "update_site",
    "legacy": [
-    "website.cms.edit"
+    "cms.write"
    ]
   },
   "cms:PATCH /{coll}/{item_id}": {
@@ -1007,7 +871,7 @@
    ],
    "fn": "update_item",
    "legacy": [
-    "website.cms.edit"
+    "cms.write"
    ]
   },
   "cms:POST /media": {
@@ -1016,7 +880,7 @@
    ],
    "fn": "upload_media",
    "legacy": [
-    "website.cms.edit"
+    "cms.write"
    ]
   },
   "cms:POST /{coll}": {
@@ -1025,7 +889,7 @@
    ],
    "fn": "create_item",
    "legacy": [
-    "website.cms.edit"
+    "cms.write"
    ]
   },
   "construction:DELETE /payment-plan-assignments/{assignment_id}": {
@@ -1034,7 +898,7 @@
    ],
    "fn": "unassign_plan",
    "legacy": [
-    "masters.payment_plan.assign"
+    "master.write"
    ]
   },
   "construction:GET /admin/integrity-report": {
@@ -1043,7 +907,7 @@
    ],
    "fn": "integrity_report_route",
    "legacy": [
-    "admin.system_health.view"
+    "settings.manage"
    ]
   },
   "construction:GET /admin/migration-report": {
@@ -1052,7 +916,7 @@
    ],
    "fn": "migration_report",
    "legacy": [
-    "admin.system_health.view"
+    "settings.manage"
    ]
   },
   "construction:GET /blocks/{block_id}/construction": {
@@ -1061,7 +925,7 @@
    ],
    "fn": "block_construction",
    "legacy": [
-    "construction.stage.view"
+    "project.read"
    ]
   },
   "construction:GET /bookings/{booking_id}/schedule": {
@@ -1070,7 +934,7 @@
    ],
    "fn": "booking_schedule",
    "legacy": [
-    "sales.agreement.view"
+    "booking.read"
    ]
   },
   "construction:GET /payment-plan-assignments": {
@@ -1079,7 +943,7 @@
    ],
    "fn": "list_assignments",
    "legacy": [
-    "masters.payment_plan.view"
+    "project.read"
    ]
   },
   "construction:GET /projects/{project_id}/blocks/{block_id}/payment-plans": {
@@ -1088,7 +952,7 @@
    ],
    "fn": "block_payment_plans",
    "legacy": [
-    "masters.payment_plan.view"
+    "project.read"
    ]
   },
   "construction:GET /reports/upcoming-dues": {
@@ -1097,7 +961,7 @@
    ],
    "fn": "upcoming_dues",
    "legacy": [
-    "reports.receivables_forecast.view"
+    "report.view"
    ]
   },
   "construction:PATCH /blocks/{block_id}/stage-sequence": {
@@ -1106,7 +970,7 @@
    ],
    "fn": "set_block_sequence",
    "legacy": [
-    "masters.construction_stage.edit"
+    "project.write"
    ]
   },
   "construction:PATCH /projects/{project_id}/stage-sequence": {
@@ -1115,7 +979,7 @@
    ],
    "fn": "set_project_sequence",
    "legacy": [
-    "masters.construction_stage.edit"
+    "project.write"
    ]
   },
   "construction:POST /admin/integrity-repair": {
@@ -1124,7 +988,7 @@
    ],
    "fn": "integrity_repair_route",
    "legacy": [
-    "admin.data.recompute"
+    "settings.manage"
    ]
   },
   "construction:POST /admin/run-dues": {
@@ -1133,7 +997,7 @@
    ],
    "fn": "run_dues",
    "legacy": [
-    "admin.data.recompute"
+    "settings.manage"
    ]
   },
   "construction:POST /blocks/{block_id}/construction/stage": {
@@ -1142,8 +1006,7 @@
    ],
    "fn": "set_current_stage",
    "legacy": [
-    "construction.stage.update",
-    "construction.update.complete"
+    "construction.update"
    ]
   },
   "construction:POST /blocks/{block_id}/construction/undo": {
@@ -1152,8 +1015,7 @@
    ],
    "fn": "undo_stage",
    "legacy": [
-    "construction.stage.undo",
-    "construction.update.undo"
+    "construction.undo"
    ]
   },
   "construction:POST /bookings/{booking_id}/payment-plan": {
@@ -1162,7 +1024,7 @@
    ],
    "fn": "change_booking_plan",
    "legacy": [
-    "masters.payment_plan.assign"
+    "agreement.edit"
    ]
   },
   "construction:POST /payment-plan-assignments": {
@@ -1171,7 +1033,7 @@
    ],
    "fn": "assign_plan",
    "legacy": [
-    "masters.payment_plan.assign"
+    "master.write"
    ]
   },
   "crm:GET /bookings/{booking_id}/ledgers": {
@@ -1180,7 +1042,7 @@
    ],
    "fn": "booking_three_ledgers",
    "legacy": [
-    "finance.ledger.view"
+    "booking.read"
    ]
   },
   "crm:GET /communications": {
@@ -1189,7 +1051,7 @@
    ],
    "fn": "list_communications",
    "legacy": [
-    "sales.customer.view"
+    "customer.read"
    ]
   },
   "crm:GET /customers/{customer_id}/ledgers": {
@@ -1198,7 +1060,7 @@
    ],
    "fn": "customer_three_ledgers",
    "legacy": [
-    "finance.ledger.view"
+    "booking.read"
    ]
   },
   "crm:GET /customers/{customer_id}/timeline": {
@@ -1207,7 +1069,7 @@
    ],
    "fn": "customer_timeline",
    "legacy": [
-    "sales.customer.view"
+    "customer.read"
    ]
   },
   "crm:PATCH /customers/{customer_id}/profile": {
@@ -1216,7 +1078,7 @@
    ],
    "fn": "update_profile",
    "legacy": [
-    "sales.customer.edit"
+    "customer.write"
    ]
   },
   "crm:POST /communications": {
@@ -1225,7 +1087,7 @@
    ],
    "fn": "log_communication",
    "legacy": [
-    "sales.customer.edit"
+    "customer.write"
    ]
   },
   "customers:GET ": {
@@ -1234,7 +1096,7 @@
    ],
    "fn": "list_customers",
    "legacy": [
-    "sales.customer.view"
+    "customer.read"
    ]
   },
   "customers:GET /rm-options": {
@@ -1243,7 +1105,7 @@
    ],
    "fn": "rm_options",
    "legacy": [
-    "sales.customer.view"
+    "customer.read"
    ]
   },
   "customers:GET /{customer_id}": {
@@ -1252,7 +1114,7 @@
    ],
    "fn": "get_customer",
    "legacy": [
-    "sales.customer.view"
+    "customer.read"
    ]
   },
   "customers:GET /{customer_id}/panels": {
@@ -1261,7 +1123,7 @@
    ],
    "fn": "customer_panels",
    "legacy": [
-    "sales.customer.view"
+    "customer.read"
    ]
   },
   "customers:GET /{customer_id}/payments": {
@@ -1270,7 +1132,7 @@
    ],
    "fn": "customer_payments",
    "legacy": [
-    "finance.payment.view"
+    "payment.read"
    ]
   },
   "customers:PATCH /{customer_id}": {
@@ -1279,7 +1141,7 @@
    ],
    "fn": "update_customer",
    "legacy": [
-    "sales.customer.edit"
+    "customer.write"
    ]
   },
   "customers:POST ": {
@@ -1288,7 +1150,7 @@
    ],
    "fn": "create_customer",
    "legacy": [
-    "sales.customer.create"
+    "customer.write"
    ]
   },
   "customers:POST /{customer_id}/kyc-status": {
@@ -1297,7 +1159,7 @@
    ],
    "fn": "set_kyc_status",
    "legacy": [
-    "sales.kyc.edit"
+    "customer.kyc_view"
    ]
   },
   "dashboard:GET ": {
@@ -1306,7 +1168,7 @@
    ],
    "fn": "dashboard",
    "legacy": [
-    "masters.project.view"
+    "project.read"
    ]
   },
   "dashboard_widgets:GET /widgets": {
@@ -1315,7 +1177,7 @@
    ],
    "fn": "widgets",
    "legacy": [
-    "masters.project.view"
+    "project.read"
    ]
   },
   "documents:DELETE /{doc_id}": {
@@ -1352,7 +1214,7 @@
    ],
    "fn": "list_flats",
    "legacy": [
-    "masters.project.view"
+    "project.read"
    ]
   },
   "flats:GET /{flat_id}": {
@@ -1361,7 +1223,7 @@
    ],
    "fn": "get_flat",
    "legacy": [
-    "masters.project.view"
+    "project.read"
    ]
   },
   "flats:PATCH /{flat_id}": {
@@ -1370,7 +1232,7 @@
    ],
    "fn": "update_flat",
    "legacy": [
-    "masters.flat.edit"
+    "flat.write"
    ]
   },
   "flats:PATCH /{flat_id}/status": {
@@ -1380,8 +1242,7 @@
    ],
    "fn": "change_status",
    "legacy": [
-    "sales.hold.create",
-    "sales.hold.release"
+    "flat.status"
    ]
   },
   "home:GET /dashboard/home": {
@@ -1390,7 +1251,7 @@
    ],
    "fn": "home",
    "legacy": [
-    "masters.project.view"
+    "project.read"
    ]
   },
   "imports:GET /template/{kind}": {
@@ -1399,7 +1260,7 @@
    ],
    "fn": "template",
    "legacy": [
-    "masters.project.view"
+    "project.read"
    ]
   },
   "imports:POST /{kind}/confirm": {
@@ -1408,7 +1269,7 @@
    ],
    "fn": "confirm",
    "legacy": [
-    "masters.flat.create"
+    "block.write"
    ]
   },
   "imports:POST /{kind}/preview": {
@@ -1417,7 +1278,7 @@
    ],
    "fn": "preview",
    "legacy": [
-    "masters.flat.create"
+    "block.write"
    ]
   },
   "leads:GET ": {
@@ -1426,7 +1287,7 @@
    ],
    "fn": "list_leads",
    "legacy": [
-    "sales.lead.view"
+    "lead.read"
    ]
   },
   "leads:GET /board": {
@@ -1435,7 +1296,7 @@
    ],
    "fn": "board",
    "legacy": [
-    "sales.lead.view"
+    "lead.read"
    ]
   },
   "leads:GET /stages": {
@@ -1444,7 +1305,7 @@
    ],
    "fn": "stages",
    "legacy": [
-    "sales.lead.view"
+    "lead.read"
    ]
   },
   "leads:GET /{lead_id}": {
@@ -1453,7 +1314,7 @@
    ],
    "fn": "get_lead",
    "legacy": [
-    "sales.lead.view"
+    "lead.read"
    ]
   },
   "leads:PATCH /{lead_id}": {
@@ -1462,7 +1323,7 @@
    ],
    "fn": "update_lead",
    "legacy": [
-    "sales.lead.edit"
+    "lead.write"
    ]
   },
   "leads:POST ": {
@@ -1471,7 +1332,7 @@
    ],
    "fn": "create_lead",
    "legacy": [
-    "sales.lead.create"
+    "lead.write"
    ]
   },
   "leads:POST /{lead_id}/convert": {
@@ -1481,8 +1342,7 @@
    ],
    "fn": "convert",
    "legacy": [
-    "sales.lead.edit",
-    "sales.customer.create"
+    "lead.write"
    ]
   },
   "leads:POST /{lead_id}/follow-ups": {
@@ -1491,7 +1351,7 @@
    ],
    "fn": "add_follow_up",
    "legacy": [
-    "sales.lead.edit"
+    "lead.write"
    ]
   },
   "leads:POST /{lead_id}/stage": {
@@ -1500,7 +1360,71 @@
    ],
    "fn": "move_stage",
    "legacy": [
-    "sales.lead.edit"
+    "lead.write"
+   ]
+  },
+  "master:FACTORY master.read": {
+   "codes": [
+    "masters.amenity.view",
+    "masters.bank_account.view",
+    "masters.block_type.view",
+    "masters.charge_type.view",
+    "masters.construction_stage.view",
+    "masters.document_type.view",
+    "masters.flat_type.view",
+    "masters.floor_plan.view",
+    "masters.payment_mode.view",
+    "masters.payment_plan.view",
+    "masters.plc.view",
+    "masters.specification.view"
+   ],
+   "fn": "_register",
+   "legacy": [
+    "master.read"
+   ]
+  },
+  "master:FACTORY master.write": {
+   "codes": [
+    "masters.amenity.create",
+    "masters.amenity.delete",
+    "masters.amenity.edit",
+    "masters.bank_account.create",
+    "masters.bank_account.delete",
+    "masters.bank_account.edit",
+    "masters.block_type.create",
+    "masters.block_type.delete",
+    "masters.block_type.edit",
+    "masters.charge_type.create",
+    "masters.charge_type.delete",
+    "masters.charge_type.edit",
+    "masters.construction_stage.create",
+    "masters.construction_stage.delete",
+    "masters.construction_stage.edit",
+    "masters.document_type.create",
+    "masters.document_type.delete",
+    "masters.document_type.edit",
+    "masters.flat_type.create",
+    "masters.flat_type.delete",
+    "masters.flat_type.edit",
+    "masters.floor_plan.create",
+    "masters.floor_plan.delete",
+    "masters.floor_plan.edit",
+    "masters.payment_mode.create",
+    "masters.payment_mode.delete",
+    "masters.payment_mode.edit",
+    "masters.payment_plan.create",
+    "masters.payment_plan.delete",
+    "masters.payment_plan.edit",
+    "masters.plc.create",
+    "masters.plc.delete",
+    "masters.plc.edit",
+    "masters.specification.create",
+    "masters.specification.delete",
+    "masters.specification.edit"
+   ],
+   "fn": "_register",
+   "legacy": [
+    "master.write"
    ]
   },
   "masters_plus:DELETE /stage-plans/{plan_id}": {
@@ -1617,7 +1541,7 @@
    ],
    "fn": "list_milestones",
    "legacy": [
-    "construction.stage.view"
+    "project.read"
    ]
   },
   "milestones:POST /{block_id}/milestones/{seq}/complete": {
@@ -1626,7 +1550,7 @@
    ],
    "fn": "complete_milestone",
    "legacy": [
-    "construction.stage.update"
+    "construction.update"
    ]
   },
   "milestones:POST /{block_id}/milestones/{seq}/undo": {
@@ -1635,7 +1559,7 @@
    ],
    "fn": "undo_milestone",
    "legacy": [
-    "construction.stage.undo"
+    "construction.undo"
    ]
   },
   "notifications:GET ": {
@@ -1644,7 +1568,7 @@
    ],
    "fn": "list_notifications",
    "legacy": [
-    "masters.project.view"
+    "project.read"
    ]
   },
   "notifications:GET /unread-count": {
@@ -1653,7 +1577,7 @@
    ],
    "fn": "unread_count",
    "legacy": [
-    "masters.project.view"
+    "project.read"
    ]
   },
   "notifications:POST /read-all": {
@@ -1662,7 +1586,7 @@
    ],
    "fn": "mark_all_read",
    "legacy": [
-    "masters.project.view"
+    "project.read"
    ]
   },
   "notifications:POST /{notification_id}/read": {
@@ -1671,7 +1595,7 @@
    ],
    "fn": "mark_read",
    "legacy": [
-    "masters.project.view"
+    "project.read"
    ]
   },
   "ops:GET /ops": {
@@ -1680,7 +1604,7 @@
    ],
    "fn": "ops",
    "legacy": [
-    "admin.system_health.view"
+    "settings.manage"
    ]
   },
   "parking:GET ": {
@@ -1689,7 +1613,7 @@
    ],
    "fn": "list_slots",
    "legacy": [
-    "masters.flat.view"
+    "project.read"
    ]
   },
   "parking:PATCH /{slot_id}": {
@@ -1698,7 +1622,7 @@
    ],
    "fn": "update_slot",
    "legacy": [
-    "masters.flat.edit"
+    "block.write"
    ]
   },
   "parking:POST ": {
@@ -1707,7 +1631,7 @@
    ],
    "fn": "create_slot",
    "legacy": [
-    "masters.flat.create"
+    "block.write"
    ]
   },
   "parking:POST /bulk-generate": {
@@ -1716,7 +1640,7 @@
    ],
    "fn": "bulk_generate",
    "legacy": [
-    "masters.flat.create"
+    "block.write"
    ]
   },
   "payments:GET ": {
@@ -1725,7 +1649,7 @@
    ],
    "fn": "list_payments",
    "legacy": [
-    "finance.payment.view"
+    "payment.read"
    ]
   },
   "payments:GET /cheques-in-hand": {
@@ -1734,7 +1658,7 @@
    ],
    "fn": "cheques_in_hand",
    "legacy": [
-    "finance.payment.view"
+    "payment.read"
    ]
   },
   "payments:GET /demands": {
@@ -1743,7 +1667,7 @@
    ],
    "fn": "list_open_demands",
    "legacy": [
-    "finance.demand.view"
+    "payment.read"
    ]
   },
   "payments:GET /summary": {
@@ -1752,7 +1676,7 @@
    ],
    "fn": "payments_summary",
    "legacy": [
-    "finance.payment.view"
+    "payment.read"
    ]
   },
   "payments:GET /{payment_id}": {
@@ -1761,7 +1685,7 @@
    ],
    "fn": "get_payment",
    "legacy": [
-    "finance.payment.view"
+    "payment.read"
    ]
   },
   "payments:GET /{payment_id}/receipt": {
@@ -1770,7 +1694,7 @@
    ],
    "fn": "receipt",
    "legacy": [
-    "finance.receipt.print"
+    "receipt.print"
    ]
   },
   "payments:POST ": {
@@ -1779,7 +1703,7 @@
    ],
    "fn": "post_payment",
    "legacy": [
-    "finance.payment.create"
+    "payment.post"
    ]
   },
   "payments:POST /{payment_id}/bounce": {
@@ -1788,7 +1712,7 @@
    ],
    "fn": "bounce_payment",
    "legacy": [
-    "finance.cheque.bounce"
+    "payment.post"
    ]
   },
   "payments:POST /{payment_id}/clear": {
@@ -1797,7 +1721,7 @@
    ],
    "fn": "clear_payment",
    "legacy": [
-    "finance.cheque.clear"
+    "payment.post"
    ]
   },
   "payments:POST /{payment_id}/reverse": {
@@ -1806,7 +1730,7 @@
    ],
    "fn": "reverse_payment",
    "legacy": [
-    "finance.payment.reverse"
+    "payment.reverse"
    ]
   },
   "pdfs:GET /bookings/{booking_id}/allotment.pdf": {
@@ -1815,7 +1739,7 @@
    ],
    "fn": "allotment_pdf",
    "legacy": [
-    "sales.booking.export"
+    "booking.read"
    ]
   },
   "pdfs:GET /bookings/{booking_id}/demands/{demand_id}/letter.pdf": {
@@ -1824,7 +1748,7 @@
    ],
    "fn": "demand_letter_pdf",
    "legacy": [
-    "finance.demand.export"
+    "booking.read"
    ]
   },
   "pdfs:GET /bookings/{booking_id}/statement.pdf": {
@@ -1833,7 +1757,7 @@
    ],
    "fn": "statement_pdf",
    "legacy": [
-    "finance.ledger.export"
+    "booking.read"
    ]
   },
   "pdfs:GET /payments/{payment_id}/receipt.pdf": {
@@ -1842,7 +1766,7 @@
    ],
    "fn": "receipt_pdf",
    "legacy": [
-    "finance.receipt.download"
+    "receipt.print"
    ]
   },
   "portal:GET /{customer_id}/portal": {
@@ -1851,7 +1775,7 @@
    ],
    "fn": "portal_status",
    "legacy": [
-    "service.portal.view"
+    "customer.portal_manage"
    ]
   },
   "portal:POST /portal/bulk-enable": {
@@ -1860,7 +1784,7 @@
    ],
    "fn": "portal_bulk_enable",
    "legacy": [
-    "service.portal.manage"
+    "customer.portal_manage"
    ]
   },
   "portal:POST /{customer_id}/portal/enable": {
@@ -1869,7 +1793,7 @@
    ],
    "fn": "portal_enable",
    "legacy": [
-    "service.portal.manage"
+    "customer.portal_manage"
    ]
   },
   "portal:POST /{customer_id}/portal/revoke-sessions": {
@@ -1878,7 +1802,7 @@
    ],
    "fn": "portal_revoke",
    "legacy": [
-    "service.portal.manage"
+    "customer.portal_manage"
    ]
   },
   "portal:POST /{customer_id}/portal/toggle": {
@@ -1887,7 +1811,7 @@
    ],
    "fn": "portal_toggle",
    "legacy": [
-    "service.portal.manage"
+    "customer.portal_manage"
    ]
   },
   "project_setup:GET /{project_id}/setup": {
@@ -1896,7 +1820,7 @@
    ],
    "fn": "get_setup",
    "legacy": [
-    "masters.project.view"
+    "project.read"
    ]
   },
   "project_setup:PUT /{project_id}/setup/{section}": {
@@ -1905,7 +1829,7 @@
    ],
    "fn": "save_section",
    "legacy": [
-    "masters.project.edit"
+    "project.write"
    ]
   },
   "projects:GET ": {
@@ -1914,7 +1838,7 @@
    ],
    "fn": "list_projects",
    "legacy": [
-    "masters.project.view"
+    "project.read"
    ]
   },
   "projects:GET /suggest-code": {
@@ -1923,7 +1847,7 @@
    ],
    "fn": "suggest_code",
    "legacy": [
-    "masters.project.create"
+    "project.write"
    ]
   },
   "projects:GET /{project_id}": {
@@ -1932,7 +1856,7 @@
    ],
    "fn": "get_project",
    "legacy": [
-    "masters.project.view"
+    "project.read"
    ]
   },
   "projects:PATCH /{project_id}": {
@@ -1941,7 +1865,7 @@
    ],
    "fn": "update_project",
    "legacy": [
-    "masters.project.edit"
+    "project.write"
    ]
   },
   "projects:POST ": {
@@ -1950,7 +1874,7 @@
    ],
    "fn": "create_project",
    "legacy": [
-    "masters.project.create"
+    "project.write"
    ]
   },
   "propagation:GET /admin/propagation": {
@@ -1959,7 +1883,7 @@
    ],
    "fn": "propagation_health",
    "legacy": [
-    "admin.system_health.view"
+    "settings.manage"
    ]
   },
   "propagation:GET /customers/{customer_id}/events": {
@@ -1968,7 +1892,7 @@
    ],
    "fn": "customer_timeline",
    "legacy": [
-    "sales.customer.view"
+    "customer.read"
    ]
   },
   "propagation:GET /definitions": {
@@ -1977,7 +1901,7 @@
    ],
    "fn": "definitions",
    "legacy": [
-    "admin.definitions.view"
+    "project.read"
    ]
   },
   "propagation:GET /journey/entity/{entity_type}/{entity_id}": {
@@ -1986,7 +1910,7 @@
    ],
    "fn": "journey_entity",
    "legacy": [
-    "admin.audit.view"
+    "project.read"
    ]
   },
   "propagation:GET /journey/{audit_id}": {
@@ -1995,7 +1919,7 @@
    ],
    "fn": "journey",
    "legacy": [
-    "admin.audit.view"
+    "project.read"
    ]
   },
   "propagation:GET /refunds": {
@@ -2004,7 +1928,7 @@
    ],
    "fn": "list_refunds",
    "legacy": [
-    "finance.refund.view"
+    "payment.read"
    ]
   },
   "propagation:POST /refunds/{refund_id}/pay": {
@@ -2013,7 +1937,7 @@
    ],
    "fn": "pay_refund_ep",
    "legacy": [
-    "finance.refund.pay"
+    "payment.reverse"
    ]
   },
   "rate_cards:GET ": {
@@ -2022,7 +1946,7 @@
    ],
    "fn": "list_rate_cards",
    "legacy": [
-    "masters.rate_card.view"
+    "project.read"
    ]
   },
   "rate_cards:GET /{rc_id}": {
@@ -2031,7 +1955,7 @@
    ],
    "fn": "get_rate_card",
    "legacy": [
-    "masters.rate_card.view"
+    "project.read"
    ]
   },
   "rate_cards:PATCH /{rc_id}": {
@@ -2040,7 +1964,7 @@
    ],
    "fn": "update_rate_card",
    "legacy": [
-    "masters.rate_card.edit"
+    "flat.write"
    ]
   },
   "rate_cards:POST ": {
@@ -2049,7 +1973,7 @@
    ],
    "fn": "create_rate_card",
    "legacy": [
-    "masters.rate_card.create"
+    "flat.write"
    ]
   },
   "rate_cards:POST /{rc_id}/activate": {
@@ -2058,7 +1982,7 @@
    ],
    "fn": "activate_rate_card",
    "legacy": [
-    "masters.rate_card.edit"
+    "flat.write"
    ]
   },
   "rate_cards:POST /{rc_id}/apply": {
@@ -2067,43 +1991,55 @@
    ],
    "fn": "apply_rate_card",
    "legacy": [
-    "masters.rate_card.apply"
+    "flat.write"
    ]
   },
   "reports:DELETE /presets/{preset_id}": {
    "codes": [
     "reports.collections.view"
    ],
+   "export_codes": [
+    "reports.collections.export"
+   ],
    "fn": "delete_preset",
    "legacy": [
-    "reports.collections.view"
+    "report.view"
    ]
   },
   "reports:GET ": {
    "codes": [
     "reports.collections.view"
    ],
+   "export_codes": [
+    "reports.collections.export"
+   ],
    "fn": "list_reports",
    "legacy": [
-    "reports.collections.view"
+    "report.view"
    ]
   },
   "reports:GET /activity": {
    "codes": [
     "reports.audit.view"
    ],
+   "export_codes": [
+    "reports.audit.export"
+   ],
    "fn": "activity",
    "legacy": [
-    "reports.audit.view"
+    "audit.view"
    ]
   },
   "reports:GET /advances": {
    "codes": [
     "reports.outstanding.view"
    ],
+   "export_codes": [
+    "reports.outstanding.export"
+   ],
    "fn": "advances",
    "legacy": [
-    "reports.outstanding.view"
+    "report.view"
    ]
   },
   "reports:GET /allotment/{booking_id}": {
@@ -2112,124 +2048,163 @@
    ],
    "fn": "allotment",
    "legacy": [
-    "sales.booking.export"
+    "booking.read"
    ]
   },
   "reports:GET /bank-receipts": {
    "codes": [
     "reports.bank_wise.view"
    ],
+   "export_codes": [
+    "reports.bank_wise.export"
+   ],
    "fn": "bank_receipts",
    "legacy": [
-    "reports.bank_wise.view"
+    "report.view"
    ]
   },
   "reports:GET /cancellations": {
    "codes": [
     "reports.cancellations_refunds.view"
    ],
+   "export_codes": [
+    "reports.cancellations_refunds.export"
+   ],
    "fn": "cancellations",
    "legacy": [
-    "reports.cancellations_refunds.view"
+    "report.view"
    ]
   },
   "reports:GET /cheques": {
    "codes": [
     "reports.cheque_register.view"
    ],
+   "export_codes": [
+    "reports.cheque_register.export"
+   ],
    "fn": "cheques",
    "legacy": [
-    "reports.cheque_register.view"
+    "report.view"
    ]
   },
   "reports:GET /collections": {
    "codes": [
     "reports.collections.view"
    ],
+   "export_codes": [
+    "reports.collections.export"
+   ],
    "fn": "collections",
    "legacy": [
-    "reports.collections.view"
+    "report.view"
    ]
   },
   "reports:GET /construction-progress": {
    "codes": [
     "reports.construction_vs_plan.view"
    ],
+   "export_codes": [
+    "reports.construction_vs_plan.export"
+   ],
    "fn": "construction_progress",
    "legacy": [
-    "reports.construction_vs_plan.view"
+    "report.view"
    ]
   },
   "reports:GET /demand-vs-collection": {
    "codes": [
     "reports.demand_vs_collection.view"
    ],
+   "export_codes": [
+    "reports.demand_vs_collection.export"
+   ],
    "fn": "demand_vs_collection",
    "legacy": [
-    "reports.demand_vs_collection.view"
+    "report.view"
    ]
   },
   "reports:GET /demand-vs-collection-installment": {
    "codes": [
     "reports.demand_vs_collection.view"
    ],
+   "export_codes": [
+    "reports.demand_vs_collection.export"
+   ],
    "fn": "demand_vs_collection",
    "legacy": [
-    "reports.demand_vs_collection.view"
+    "report.view"
    ]
   },
   "reports:GET /inventory": {
    "codes": [
     "reports.inventory.view"
    ],
+   "export_codes": [
+    "reports.inventory.export"
+   ],
    "fn": "inventory",
    "legacy": [
-    "reports.inventory.view"
+    "report.view"
    ]
   },
   "reports:GET /outstanding": {
    "codes": [
     "reports.outstanding.view"
    ],
+   "export_codes": [
+    "reports.outstanding.export"
+   ],
    "fn": "outstanding",
    "legacy": [
-    "reports.outstanding.view"
+    "report.view"
    ]
   },
   "reports:GET /presets": {
    "codes": [
     "reports.collections.view"
    ],
+   "export_codes": [
+    "reports.collections.export"
+   ],
    "fn": "list_presets",
    "legacy": [
-    "reports.collections.view"
+    "report.view"
    ]
   },
   "reports:GET /roznamcha-range": {
    "codes": [
     "reports.roznamcha.view"
    ],
+   "export_codes": [
+    "reports.roznamcha.export"
+   ],
    "fn": "roznamcha_range",
    "legacy": [
-    "reports.roznamcha.view"
+    "report.view"
    ]
   },
   "reports:GET /sales-leads": {
    "codes": [
     "reports.lead_funnel.view"
    ],
+   "export_codes": [
+    "reports.lead_funnel.export"
+   ],
    "fn": "sales_leads",
    "legacy": [
-    "reports.lead_funnel.view"
+    "report.view"
    ]
   },
   "reports:GET /service-sla": {
    "codes": [
     "reports.service_sla.view"
    ],
+   "export_codes": [
+    "reports.service_sla.export"
+   ],
    "fn": "service_sla",
    "legacy": [
-    "reports.service_sla.view"
+    "report.view"
    ]
   },
   "reports:GET /statement/{booking_id}": {
@@ -2238,25 +2213,31 @@
    ],
    "fn": "statement",
    "legacy": [
-    "finance.ledger.export"
+    "booking.read"
    ]
   },
   "reports:PATCH /presets/{preset_id}": {
    "codes": [
     "reports.collections.view"
    ],
+   "export_codes": [
+    "reports.collections.export"
+   ],
    "fn": "rename_preset",
    "legacy": [
-    "reports.collections.view"
+    "report.view"
    ]
   },
   "reports:POST /presets": {
    "codes": [
     "reports.collections.view"
    ],
+   "export_codes": [
+    "reports.collections.export"
+   ],
    "fn": "create_preset",
    "legacy": [
-    "reports.collections.view"
+    "report.view"
    ]
   },
   "roles:DELETE /roles/{role_id}": {
@@ -2265,7 +2246,7 @@
    ],
    "fn": "delete_role",
    "legacy": [
-    "admin.role.delete"
+    "roles.manage"
    ]
   },
   "roles:GET /permissions": {
@@ -2280,10 +2261,7 @@
     "admin.role.view"
    ],
    "fn": "list_roles",
-   "legacy": [
-    "admin.role.view",
-    "admin.user.view"
-   ]
+   "legacy": []
   },
   "roles:GET /roles/{role_id}": {
    "codes": [
@@ -2291,7 +2269,7 @@
    ],
    "fn": "get_role",
    "legacy": [
-    "admin.role.view"
+    "roles.manage"
    ]
   },
   "roles:PATCH /roles/{role_id}": {
@@ -2300,7 +2278,7 @@
    ],
    "fn": "update_role",
    "legacy": [
-    "admin.role.edit"
+    "roles.manage"
    ]
   },
   "roles:POST /roles": {
@@ -2309,7 +2287,7 @@
    ],
    "fn": "create_role",
    "legacy": [
-    "admin.role.create"
+    "roles.manage"
    ]
   },
   "roznamcha:GET ": {
@@ -2318,7 +2296,7 @@
    ],
    "fn": "day_book",
    "legacy": [
-    "finance.roznamcha.view"
+    "payment.read"
    ]
   },
   "roznamcha:GET /opening": {
@@ -2327,7 +2305,7 @@
    ],
    "fn": "get_opening",
    "legacy": [
-    "finance.roznamcha.view"
+    "payment.read"
    ]
   },
   "roznamcha:GET /range": {
@@ -2336,7 +2314,7 @@
    ],
    "fn": "day_book_range",
    "legacy": [
-    "finance.roznamcha.view"
+    "payment.read"
    ]
   },
   "roznamcha:POST /contra": {
@@ -2345,7 +2323,7 @@
    ],
    "fn": "contra",
    "legacy": [
-    "finance.roznamcha.deposit"
+    "payment.post"
    ]
   },
   "roznamcha:POST /opening": {
@@ -2354,7 +2332,7 @@
    ],
    "fn": "set_opening",
    "legacy": [
-    "finance.roznamcha.opening_balance"
+    "settings.manage"
    ]
   },
   "search:GET /search": {
@@ -2377,7 +2355,7 @@
    ],
    "fn": "numbering_preview",
    "legacy": [
-    "admin.settings.view"
+    "settings.manage"
    ]
   },
   "settings:PATCH /company": {
@@ -2386,7 +2364,7 @@
    ],
    "fn": "update_company",
    "legacy": [
-    "admin.settings.edit"
+    "settings.manage"
    ]
   },
   "support:DELETE /notices/{notice_id}": {
@@ -2395,7 +2373,7 @@
    ],
    "fn": "delete_notice",
    "legacy": [
-    "construction.notice.delete"
+    "cms.write"
    ]
   },
   "support:DELETE /photos/{photo_id}": {
@@ -2404,16 +2382,16 @@
    ],
    "fn": "delete_photo",
    "legacy": [
-    "construction.photo.delete"
+    "milestone.update"
    ]
   },
   "support:GET /blocks/{block_id}/photos": {
    "codes": [
-    "construction.stage.view"
+    "construction.photo.view"
    ],
    "fn": "list_photos",
    "legacy": [
-    "construction.photo.view"
+    "project.read"
    ]
   },
   "support:GET /notices": {
@@ -2422,7 +2400,7 @@
    ],
    "fn": "list_notices",
    "legacy": [
-    "construction.notice.view"
+    "cms.read"
    ]
   },
   "support:GET /service-requests": {
@@ -2431,7 +2409,7 @@
    ],
    "fn": "list_sr",
    "legacy": [
-    "service.ticket.view"
+    "service.read"
    ]
   },
   "support:GET /service-requests/categories": {
@@ -2440,7 +2418,7 @@
    ],
    "fn": "sr_categories",
    "legacy": [
-    "service.ticket.view"
+    "service.read"
    ]
   },
   "support:GET /service-requests/{sr_id}": {
@@ -2449,7 +2427,7 @@
    ],
    "fn": "get_sr",
    "legacy": [
-    "service.ticket.view"
+    "service.read"
    ]
   },
   "support:GET /service-requests/{sr_id}/attachments/{idx}": {
@@ -2458,7 +2436,7 @@
    ],
    "fn": "sr_attachment",
    "legacy": [
-    "service.ticket.view"
+    "service.read"
    ]
   },
   "support:PATCH /blocks/{block_id}/milestones/{seq}/note": {
@@ -2467,7 +2445,7 @@
    ],
    "fn": "milestone_note",
    "legacy": [
-    "construction.stage.update"
+    "milestone.update"
    ]
   },
   "support:PATCH /documents/{doc_id}/share": {
@@ -2476,7 +2454,7 @@
    ],
    "fn": "share_document",
    "legacy": [
-    "sales.customer.edit"
+    "customer.write"
    ]
   },
   "support:PATCH /notices/{notice_id}": {
@@ -2485,7 +2463,7 @@
    ],
    "fn": "update_notice",
    "legacy": [
-    "construction.notice.edit"
+    "cms.write"
    ]
   },
   "support:PATCH /photos/{photo_id}": {
@@ -2494,7 +2472,7 @@
    ],
    "fn": "patch_photo",
    "legacy": [
-    "construction.photo.upload"
+    "milestone.update"
    ]
   },
   "support:POST /blocks/{block_id}/milestones/{seq}/photos": {
@@ -2503,7 +2481,7 @@
    ],
    "fn": "upload_photos",
    "legacy": [
-    "construction.photo.upload"
+    "milestone.update"
    ]
   },
   "support:POST /notices": {
@@ -2512,7 +2490,7 @@
    ],
    "fn": "create_notice",
    "legacy": [
-    "construction.notice.create"
+    "cms.write"
    ]
   },
   "support:POST /service-requests": {
@@ -2521,7 +2499,7 @@
    ],
    "fn": "create_sr",
    "legacy": [
-    "service.ticket.create"
+    "service.write"
    ]
   },
   "support:POST /service-requests/{sr_id}/assign": {
@@ -2530,7 +2508,7 @@
    ],
    "fn": "assign_sr",
    "legacy": [
-    "service.ticket.assign"
+    "service.assign"
    ]
   },
   "support:POST /service-requests/{sr_id}/reply": {
@@ -2539,7 +2517,7 @@
    ],
    "fn": "reply_sr",
    "legacy": [
-    "service.ticket.edit"
+    "service.write"
    ]
   },
   "support:POST /service-requests/{sr_id}/status": {
@@ -2550,9 +2528,7 @@
    ],
    "fn": "status_sr",
    "legacy": [
-    "service.ticket.close",
-    "service.ticket.reopen",
-    "service.ticket.edit"
+    "service.write"
    ]
   },
   "users:GET ": {
@@ -2561,7 +2537,7 @@
    ],
    "fn": "list_users",
    "legacy": [
-    "admin.user.view"
+    "users.manage"
    ]
   },
   "users:GET /{user_id}": {
@@ -2570,7 +2546,7 @@
    ],
    "fn": "get_user",
    "legacy": [
-    "admin.user.view"
+    "users.manage"
    ]
   },
   "users:PATCH /{user_id}": {
@@ -2580,8 +2556,7 @@
    ],
    "fn": "update_user",
    "legacy": [
-    "admin.user.edit",
-    "admin.user.deactivate"
+    "users.manage"
    ]
   },
   "users:POST ": {
@@ -2590,7 +2565,7 @@
    ],
    "fn": "create_user",
    "legacy": [
-    "admin.user.create"
+    "users.manage"
    ]
   },
   "users:POST /{user_id}/reset-password": {
@@ -2599,7 +2574,7 @@
    ],
    "fn": "reset_password",
    "legacy": [
-    "admin.user.edit"
+    "users.manage"
    ]
   },
   "visits:GET ": {
@@ -2608,7 +2583,7 @@
    ],
    "fn": "list_visits",
    "legacy": [
-    "sales.site_visit.view"
+    "visit.read"
    ]
   },
   "visits:GET /availability": {
@@ -2617,7 +2592,7 @@
    ],
    "fn": "erp_availability",
    "legacy": [
-    "sales.site_visit.view"
+    "visit.read"
    ]
   },
   "visits:GET /brochure-stats": {
@@ -2626,7 +2601,7 @@
    ],
    "fn": "brochure_stats",
    "legacy": [
-    "sales.lead.view"
+    "lead.read"
    ]
   },
   "visits:GET /calendar": {
@@ -2635,7 +2610,7 @@
    ],
    "fn": "calendar",
    "legacy": [
-    "sales.site_visit.view"
+    "visit.read"
    ]
   },
   "visits:GET /export": {
@@ -2644,7 +2619,7 @@
    ],
    "fn": "export_visits",
    "legacy": [
-    "sales.site_visit.export"
+    "visit.read"
    ]
   },
   "visits:GET /today": {
@@ -2653,7 +2628,7 @@
    ],
    "fn": "today_visits",
    "legacy": [
-    "sales.site_visit.view"
+    "visit.read"
    ]
   },
   "visits:PATCH /{visit_id}": {
@@ -2662,7 +2637,7 @@
    ],
    "fn": "visit_notes",
    "legacy": [
-    "sales.site_visit.edit"
+    "visit.write"
    ]
   },
   "visits:POST ": {
@@ -2671,7 +2646,7 @@
    ],
    "fn": "erp_create",
    "legacy": [
-    "sales.site_visit.create"
+    "visit.write"
    ]
   },
   "visits:POST /{visit_id}/reschedule": {
@@ -2680,7 +2655,7 @@
    ],
    "fn": "reschedule",
    "legacy": [
-    "sales.site_visit.edit"
+    "visit.write"
    ]
   },
   "visits:POST /{visit_id}/{action}": {
@@ -2691,9 +2666,7 @@
    ],
    "fn": "visit_action",
    "legacy": [
-    "sales.site_visit.cancel",
-    "sales.site_visit.complete",
-    "sales.site_visit.edit"
+    "visit.write"
    ]
   }
  }

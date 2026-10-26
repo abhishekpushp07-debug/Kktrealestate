@@ -32,6 +32,8 @@ def _route_perms():
                 for c in fn.__closure__:
                     if isinstance(c.cell_contents, str):
                         perms.add(c.cell_contents)
+                    elif isinstance(c.cell_contents, (list, tuple, set, frozenset)) and all(isinstance(x, str) for x in c.cell_contents):
+                        perms.update(c.cell_contents)
                 authed = True
             elif name in ("portal_user", "portal_booking", "portal_account"):
                 portal = True

@@ -6,91 +6,94 @@
   "<authenticated>"
  ],
  "DELETE /api/cms/{coll}/{item_id}": [
-  "<authenticated>"
+  "website.cms.edit"
  ],
  "DELETE /api/documents/{doc_id}": [
   "<authenticated>"
  ],
  "DELETE /api/master/milestone-templates/{rest:path}": [
-  "<authenticated>"
+  "masters.construction_stage.view"
  ],
  "DELETE /api/notices/{notice_id}": [
-  "<authenticated>"
+  "construction.notice.delete"
  ],
  "DELETE /api/payment-plan-assignments/{assignment_id}": [
-  "<authenticated>"
+  "masters.payment_plan.assign"
  ],
  "DELETE /api/photos/{photo_id}": [
-  "<authenticated>"
+  "construction.photo.delete"
  ],
  "DELETE /api/reports/presets/{preset_id}": [
-  "<authenticated>"
+  "reports.collections.view"
  ],
  "DELETE /api/roles/{role_id}": [
-  "<authenticated>"
+  "admin.role.delete"
+ ],
+ "DELETE /api/stage-plans/{plan_id}": [
+  "masters.stage_plan.delete"
  ],
  "GET /api/admin/access/registry": [
-  "<authenticated>"
+  "admin.access_control.manage"
  ],
  "GET /api/admin/access/roles/{role_id}/users": [
-  "<authenticated>"
+  "admin.role.view"
  ],
  "GET /api/admin/access/tree": [
   "<authenticated>"
  ],
  "GET /api/admin/access/users/{user_id}": [
-  "<authenticated>"
+  "admin.access_control.manage"
  ],
  "GET /api/admin/audit/archive/status": [
-  "<authenticated>"
+  "admin.audit.view"
  ],
  "GET /api/admin/backups": [
-  "<authenticated>"
+  "admin.data.backup"
  ],
  "GET /api/admin/backups/{backup_id}/download": [
   "<public>"
  ],
  "GET /api/admin/docs/technical.md": [
-  "<authenticated>"
+  "admin.documentation.view"
  ],
  "GET /api/admin/docs/technical.pdf": [
-  "<authenticated>"
+  "admin.documentation.view"
  ],
  "GET /api/admin/integrity-report": [
-  "<authenticated>"
+  "admin.system_health.view"
  ],
  "GET /api/admin/migration-report": [
-  "<authenticated>"
+  "admin.system_health.view"
  ],
  "GET /api/admin/ops": [
-  "<authenticated>"
+  "admin.system_health.view"
  ],
  "GET /api/admin/propagation": [
-  "<authenticated>"
+  "admin.system_health.view"
  ],
  "GET /api/admin/reseed/status": [
-  "<authenticated>"
+  "admin.data.reseed"
  ],
  "GET /api/admin/story-marker": [
-  "<authenticated>"
+  "admin.data.reseed"
  ],
  "GET /api/audit-logs": [
-  "<authenticated>"
+  "admin.audit.view"
  ],
  "GET /api/audit-logs/entity-types": [
-  "<authenticated>"
+  "admin.audit.view"
  ],
  "GET /api/audit-logs/entity/{entity_type}/{entity_id}": [
   "<authenticated>"
  ],
  "GET /api/audit-logs/export.csv": [
-  "<authenticated>"
+  "admin.audit.export"
  ],
  "GET /api/audit-logs/login-events": [
-  "<authenticated>"
+  "admin.audit.view"
  ],
  "GET /api/audit-logs/modules": [
-  "<authenticated>"
+  "admin.audit.view"
  ],
  "GET /api/auth/login-options": [
   "<public>"
@@ -102,127 +105,131 @@
   "<authenticated>"
  ],
  "GET /api/blocks": [
-  "<authenticated>"
+  "masters.project.view"
  ],
  "GET /api/blocks/{block_id}": [
-  "<authenticated>"
+  "masters.project.view"
  ],
  "GET /api/blocks/{block_id}/construction": [
-  "<authenticated>"
+  "construction.stage.view"
  ],
  "GET /api/blocks/{block_id}/grid": [
-  "<authenticated>"
+  "masters.project.view"
  ],
  "GET /api/blocks/{block_id}/milestones": [
-  "<authenticated>"
+  "construction.stage.view"
  ],
  "GET /api/blocks/{block_id}/photos": [
-  "<authenticated>"
+  "construction.photo.view"
+ ],
+ "GET /api/blocks/{block_id}/stages/{stage_id}/preview": [
+  "construction.update.view"
  ],
  "GET /api/blocks/{block_id}/summary": [
-  "<authenticated>"
+  "masters.project.view"
  ],
  "GET /api/bookings": [
-  "<authenticated>"
+  "sales.booking.view"
  ],
  "GET /api/bookings/{booking_id}": [
-  "<authenticated>"
+  "sales.booking.view"
  ],
  "GET /api/bookings/{booking_id}/allotment.pdf": [
-  "<authenticated>"
+  "sales.booking.export"
  ],
  "GET /api/bookings/{booking_id}/cancellation-preview": [
-  "<authenticated>"
+  "sales.booking.cancel"
  ],
  "GET /api/bookings/{booking_id}/demands/{demand_id}/letter": [
-  "<authenticated>"
+  "finance.demand.export"
  ],
  "GET /api/bookings/{booking_id}/demands/{demand_id}/letter.pdf": [
-  "<authenticated>"
+  "finance.demand.export"
  ],
  "GET /api/bookings/{booking_id}/ledger": [
-  "<authenticated>"
+  "finance.ledger.view"
  ],
  "GET /api/bookings/{booking_id}/ledgers": [
-  "<authenticated>"
+  "finance.ledger.view"
  ],
  "GET /api/bookings/{booking_id}/refunds": [
-  "<authenticated>"
+  "finance.refund.view"
  ],
  "GET /api/bookings/{booking_id}/schedule": [
-  "<authenticated>"
+  "sales.agreement.view"
  ],
  "GET /api/bookings/{booking_id}/statement.pdf": [
-  "<authenticated>"
+  "finance.ledger.export"
  ],
  "GET /api/bootstrap": [
   "<authenticated>"
  ],
  "GET /api/catalogues": [
-  "<authenticated>"
+  "masters.catalogue.view"
  ],
  "GET /api/catalogues/{ctype}": [
-  "<authenticated>"
+  "masters.catalogue.view"
  ],
  "GET /api/catalogues/{ctype}/export.csv": [
-  "<authenticated>"
+  "masters.catalogue.view"
  ],
  "GET /api/cms/projects/{project_id}/website": [
-  "<authenticated>"
+  "masters.project.view",
+  "website.cms.view"
  ],
  "GET /api/cms/site": [
-  "<authenticated>"
+  "website.cms.view"
  ],
  "GET /api/cms/{coll}": [
-  "<authenticated>"
+  "website.cms.view"
  ],
  "GET /api/communications": [
-  "<authenticated>"
+  "sales.customer.view"
  ],
  "GET /api/customers": [
-  "<authenticated>"
+  "sales.customer.view"
  ],
  "GET /api/customers/rm-options": [
-  "<authenticated>"
+  "sales.customer.view"
  ],
  "GET /api/customers/{customer_id}": [
-  "<authenticated>"
+  "sales.customer.view"
  ],
  "GET /api/customers/{customer_id}/events": [
-  "<authenticated>"
+  "sales.customer.view"
  ],
  "GET /api/customers/{customer_id}/ledgers": [
-  "<authenticated>"
+  "finance.ledger.view"
  ],
  "GET /api/customers/{customer_id}/panels": [
-  "<authenticated>"
+  "sales.customer.view"
  ],
  "GET /api/customers/{customer_id}/payments": [
-  "<authenticated>"
+  "finance.payment.view"
  ],
  "GET /api/customers/{customer_id}/portal": [
-  "<authenticated>"
+  "service.portal.view"
  ],
  "GET /api/customers/{customer_id}/summary": [
-  "<authenticated>"
+  "sales.customer.view"
  ],
  "GET /api/customers/{customer_id}/timeline": [
-  "<authenticated>"
+  "sales.customer.view"
  ],
  "GET /api/dashboard": [
-  "<authenticated>"
+  "masters.project.view"
  ],
  "GET /api/dashboard/home": [
-  "<authenticated>"
+  "masters.project.view"
  ],
  "GET /api/dashboard/snapshot": [
-  "<authenticated>"
+  "masters.project.view"
  ],
  "GET /api/dashboard/widgets": [
-  "<authenticated>"
+  "masters.project.view"
  ],
  "GET /api/definitions": [
-  "<authenticated>"
+  "admin.definitions.view"
  ],
  "GET /api/documents": [
   "<authenticated>"
@@ -231,169 +238,178 @@
   "<authenticated>"
  ],
  "GET /api/flats": [
-  "<authenticated>"
+  "masters.project.view"
  ],
  "GET /api/flats/{flat_id}": [
-  "<authenticated>"
+  "masters.project.view"
  ],
  "GET /api/health": [
   "<public>"
  ],
  "GET /api/imports/template/{kind}": [
-  "<authenticated>"
+  "masters.project.view"
  ],
  "GET /api/journey/entity/{entity_type}/{entity_id}": [
-  "<authenticated>"
+  "admin.audit.view"
  ],
  "GET /api/journey/{audit_id}": [
-  "<authenticated>"
+  "admin.audit.view"
  ],
  "GET /api/leads": [
-  "<authenticated>"
+  "sales.lead.view"
  ],
  "GET /api/leads/board": [
-  "<authenticated>"
+  "sales.lead.view"
  ],
  "GET /api/leads/stages": [
-  "<authenticated>"
+  "sales.lead.view"
  ],
  "GET /api/leads/{lead_id}": [
-  "<authenticated>"
+  "sales.lead.view"
  ],
  "GET /api/master/amenities": [
-  "<authenticated>"
+  "masters.amenity.view"
  ],
  "GET /api/master/amenities/{item_id}": [
-  "<authenticated>"
+  "masters.amenity.view"
  ],
  "GET /api/master/area-types": [
-  "<authenticated>"
+  "masters.flat_type.view"
  ],
  "GET /api/master/area-types/{item_id}": [
-  "<authenticated>"
+  "masters.flat_type.view"
  ],
  "GET /api/master/bank-accounts": [
-  "<authenticated>"
+  "masters.bank_account.view"
  ],
  "GET /api/master/bank-accounts/{item_id}": [
-  "<authenticated>"
+  "masters.bank_account.view"
  ],
  "GET /api/master/block-types": [
-  "<authenticated>"
+  "masters.block_type.view"
  ],
  "GET /api/master/block-types/{item_id}": [
-  "<authenticated>"
+  "masters.block_type.view"
  ],
  "GET /api/master/charge-types": [
-  "<authenticated>"
+  "masters.charge_type.view"
  ],
  "GET /api/master/charge-types/{item_id}": [
-  "<authenticated>"
+  "masters.charge_type.view"
  ],
  "GET /api/master/construction-stages": [
-  "<authenticated>"
+  "masters.construction_stage.view"
  ],
  "GET /api/master/construction-stages/{item_id}": [
-  "<authenticated>"
+  "masters.construction_stage.view"
+ ],
+ "GET /api/master/construction-stages/{stage_id}/where-used": [
+  "masters.construction_stage.view"
  ],
  "GET /api/master/document-types": [
-  "<authenticated>"
+  "masters.document_type.view"
  ],
  "GET /api/master/document-types/{item_id}": [
-  "<authenticated>"
+  "masters.document_type.view"
  ],
  "GET /api/master/flat-types": [
-  "<authenticated>"
+  "masters.flat_type.view"
  ],
  "GET /api/master/flat-types/{item_id}": [
-  "<authenticated>"
+  "masters.flat_type.view"
  ],
  "GET /api/master/floor-plan-templates": [
-  "<authenticated>"
+  "masters.floor_plan.view"
  ],
  "GET /api/master/floor-plan-templates/{item_id}": [
-  "<authenticated>"
+  "masters.floor_plan.view"
  ],
  "GET /api/master/milestone-templates": [
-  "<authenticated>"
+  "masters.construction_stage.view"
  ],
  "GET /api/master/milestone-templates/{rest:path}": [
-  "<authenticated>"
+  "masters.construction_stage.view"
  ],
  "GET /api/master/payment-modes": [
-  "<authenticated>"
+  "masters.payment_mode.view"
  ],
  "GET /api/master/payment-modes/{item_id}": [
-  "<authenticated>"
+  "masters.payment_mode.view"
  ],
  "GET /api/master/payment-plans": [
-  "<authenticated>"
+  "masters.payment_plan.view"
  ],
  "GET /api/master/payment-plans/{item_id}": [
-  "<authenticated>"
+  "masters.payment_plan.view"
  ],
  "GET /api/master/plc-types": [
-  "<authenticated>"
+  "masters.plc.view"
  ],
  "GET /api/master/plc-types/{item_id}": [
-  "<authenticated>"
+  "masters.plc.view"
  ],
  "GET /api/master/room-types": [
-  "<authenticated>"
+  "masters.flat_type.view"
  ],
  "GET /api/master/room-types/{item_id}": [
-  "<authenticated>"
+  "masters.flat_type.view"
  ],
  "GET /api/master/spec-categories": [
-  "<authenticated>"
+  "masters.specification.view"
  ],
  "GET /api/master/spec-categories/{item_id}": [
-  "<authenticated>"
+  "masters.specification.view"
  ],
  "GET /api/master/spec-items": [
-  "<authenticated>"
+  "masters.specification.view"
  ],
  "GET /api/master/spec-items/{item_id}": [
-  "<authenticated>"
+  "masters.specification.view"
  ],
  "GET /api/metrics": [
-  "<authenticated>"
+  "admin.system_health.view"
  ],
  "GET /api/notices": [
-  "<authenticated>"
+  "construction.notice.view"
  ],
  "GET /api/notifications": [
-  "<authenticated>"
+  "masters.project.view"
  ],
  "GET /api/notifications/unread-count": [
-  "<authenticated>"
+  "masters.project.view"
  ],
  "GET /api/parking": [
-  "<authenticated>"
+  "masters.flat.view"
  ],
  "GET /api/payment-plan-assignments": [
-  "<authenticated>"
+  "masters.payment_plan.view"
+ ],
+ "GET /api/payment-plans/structured": [
+  "masters.payment_plan.view"
+ ],
+ "GET /api/payment-plans/{plan_id}/where-used": [
+  "masters.payment_plan.view"
  ],
  "GET /api/payments": [
-  "<authenticated>"
+  "finance.payment.view"
  ],
  "GET /api/payments/cheques-in-hand": [
-  "<authenticated>"
+  "finance.payment.view"
  ],
  "GET /api/payments/demands": [
-  "<authenticated>"
+  "finance.demand.view"
  ],
  "GET /api/payments/summary": [
-  "<authenticated>"
+  "finance.payment.view"
  ],
  "GET /api/payments/{payment_id}": [
-  "<authenticated>"
+  "finance.payment.view"
  ],
  "GET /api/payments/{payment_id}/receipt": [
-  "<authenticated>"
+  "finance.receipt.print"
  ],
  "GET /api/payments/{payment_id}/receipt.pdf": [
-  "<authenticated>"
+  "finance.receipt.download"
  ],
  "GET /api/permissions": [
   "<authenticated>"
@@ -471,28 +487,28 @@
   "<portal>"
  ],
  "GET /api/projects": [
-  "<authenticated>"
+  "masters.project.view"
  ],
  "GET /api/projects/suggest-code": [
-  "<authenticated>"
+  "masters.project.create"
  ],
  "GET /api/projects/{project_id}": [
-  "<authenticated>"
+  "masters.project.view"
  ],
  "GET /api/projects/{project_id}/blocks/{block_id}/payment-plans": [
-  "<authenticated>"
+  "masters.payment_plan.view"
  ],
  "GET /api/projects/{project_id}/rate-cards": [
-  "<authenticated>"
+  "masters.rate_card.view"
  ],
  "GET /api/projects/{project_id}/rate-cards/{rc_id}": [
-  "<authenticated>"
+  "masters.rate_card.view"
  ],
  "GET /api/projects/{project_id}/setup": [
-  "<authenticated>"
+  "masters.project.view"
  ],
  "GET /api/projects/{project_id}/summary": [
-  "<authenticated>"
+  "masters.project.view"
  ],
  "GET /api/public/brochure/{doc_id}": [
   "<public>"
@@ -558,283 +574,298 @@
   "<public>"
  ],
  "GET /api/refunds": [
-  "<authenticated>"
+  "finance.refund.view"
  ],
  "GET /api/reports": [
-  "<authenticated>"
+  "reports.collections.view"
  ],
  "GET /api/reports/activity": [
-  "<authenticated>"
+  "reports.audit.view"
  ],
  "GET /api/reports/advances": [
-  "<authenticated>"
+  "reports.outstanding.view"
  ],
  "GET /api/reports/allotment/{booking_id}": [
-  "<authenticated>"
+  "sales.booking.export"
  ],
  "GET /api/reports/bank-receipts": [
-  "<authenticated>"
+  "reports.bank_wise.view"
  ],
  "GET /api/reports/cancellations": [
-  "<authenticated>"
+  "reports.cancellations_refunds.view"
  ],
  "GET /api/reports/cheques": [
-  "<authenticated>"
+  "reports.cheque_register.view"
  ],
  "GET /api/reports/collections": [
-  "<authenticated>"
+  "reports.collections.view"
  ],
  "GET /api/reports/construction-progress": [
-  "<authenticated>"
+  "reports.construction_vs_plan.view"
  ],
  "GET /api/reports/demand-vs-collection": [
-  "<authenticated>"
+  "reports.demand_vs_collection.view"
  ],
  "GET /api/reports/demand-vs-collection-installment": [
-  "<authenticated>"
+  "reports.demand_vs_collection.view"
  ],
  "GET /api/reports/inventory": [
-  "<authenticated>"
+  "reports.inventory.view"
  ],
  "GET /api/reports/outstanding": [
-  "<authenticated>"
+  "reports.outstanding.view"
  ],
  "GET /api/reports/presets": [
-  "<authenticated>"
+  "reports.collections.view"
  ],
  "GET /api/reports/roznamcha-range": [
-  "<authenticated>"
+  "reports.roznamcha.view"
  ],
  "GET /api/reports/sales-leads": [
-  "<authenticated>"
+  "reports.lead_funnel.view"
  ],
  "GET /api/reports/service-sla": [
-  "<authenticated>"
+  "reports.service_sla.view"
  ],
  "GET /api/reports/statement/{booking_id}": [
-  "<authenticated>"
+  "finance.ledger.export"
  ],
  "GET /api/reports/upcoming-dues": [
-  "<authenticated>"
+  "reports.receivables_forecast.view"
  ],
  "GET /api/roles": [
-  "<authenticated>"
+  "admin.role.view",
+  "admin.user.view"
  ],
  "GET /api/roles/{role_id}": [
-  "<authenticated>"
+  "admin.role.view"
  ],
  "GET /api/roznamcha": [
-  "<authenticated>"
+  "finance.roznamcha.view"
  ],
  "GET /api/roznamcha/opening": [
-  "<authenticated>"
+  "finance.roznamcha.view"
  ],
  "GET /api/roznamcha/range": [
-  "<authenticated>"
+  "finance.roznamcha.view"
  ],
  "GET /api/search": [
   "<authenticated>"
  ],
  "GET /api/service-requests": [
-  "<authenticated>"
+  "service.ticket.view"
  ],
  "GET /api/service-requests/categories": [
-  "<authenticated>"
+  "service.ticket.view"
  ],
  "GET /api/service-requests/{sr_id}": [
-  "<authenticated>"
+  "service.ticket.view"
  ],
  "GET /api/service-requests/{sr_id}/attachments/{idx}": [
-  "<authenticated>"
+  "service.ticket.view"
  ],
  "GET /api/settings/company": [
   "<authenticated>"
  ],
  "GET /api/settings/numbering/preview": [
-  "<authenticated>"
+  "admin.settings.view"
  ],
  "GET /api/site-visits": [
-  "<authenticated>"
+  "sales.site_visit.view"
  ],
  "GET /api/site-visits/availability": [
-  "<authenticated>"
+  "sales.site_visit.view"
  ],
  "GET /api/site-visits/brochure-stats": [
-  "<authenticated>"
+  "sales.lead.view"
  ],
  "GET /api/site-visits/calendar": [
-  "<authenticated>"
+  "sales.site_visit.view"
  ],
  "GET /api/site-visits/export": [
-  "<authenticated>"
+  "sales.site_visit.export"
  ],
  "GET /api/site-visits/today": [
-  "<authenticated>"
+  "sales.site_visit.view"
+ ],
+ "GET /api/stage-plans": [
+  "masters.stage_plan.view"
+ ],
+ "GET /api/stage-plans/{plan_id}": [
+  "masters.stage_plan.view"
+ ],
+ "GET /api/stage-plans/{plan_id}/where-used": [
+  "masters.stage_plan.view"
  ],
  "GET /api/users": [
-  "<authenticated>"
+  "admin.user.view"
  ],
  "GET /api/users/{user_id}": [
-  "<authenticated>"
+  "admin.user.view"
  ],
  "PATCH /api/blocks/{block_id}": [
-  "<authenticated>"
+  "masters.tower.edit"
  ],
  "PATCH /api/blocks/{block_id}/milestones/{seq}/note": [
-  "<authenticated>"
+  "construction.stage.update"
  ],
  "PATCH /api/blocks/{block_id}/stage-sequence": [
-  "<authenticated>"
+  "masters.construction_stage.edit"
  ],
  "PATCH /api/catalogues/{ctype}/items/{item_id}": [
-  "<authenticated>"
+  "masters.catalogue.edit"
  ],
  "PATCH /api/cms/projects/{project_id}/website": [
-  "<authenticated>"
+  "website.cms.edit"
  ],
  "PATCH /api/cms/site": [
-  "<authenticated>"
+  "website.cms.edit"
  ],
  "PATCH /api/cms/{coll}/{item_id}": [
-  "<authenticated>"
+  "website.cms.edit"
  ],
  "PATCH /api/customers/{customer_id}": [
-  "<authenticated>"
+  "sales.customer.edit"
  ],
  "PATCH /api/customers/{customer_id}/profile": [
-  "<authenticated>"
+  "sales.customer.edit"
  ],
  "PATCH /api/documents/{doc_id}/share": [
-  "<authenticated>"
+  "sales.customer.edit"
  ],
  "PATCH /api/flats/{flat_id}": [
-  "<authenticated>"
+  "masters.flat.edit"
  ],
  "PATCH /api/flats/{flat_id}/status": [
-  "<authenticated>"
+  "sales.hold.create",
+  "sales.hold.release"
  ],
  "PATCH /api/leads/{lead_id}": [
-  "<authenticated>"
+  "sales.lead.edit"
  ],
  "PATCH /api/master/amenities/{item_id}": [
-  "<authenticated>"
+  "masters.amenity.edit"
  ],
  "PATCH /api/master/area-types/{item_id}": [
-  "<authenticated>"
+  "masters.flat_type.edit"
  ],
  "PATCH /api/master/bank-accounts/{item_id}": [
-  "<authenticated>"
+  "masters.bank_account.edit"
  ],
  "PATCH /api/master/block-types/{item_id}": [
-  "<authenticated>"
+  "masters.block_type.edit"
  ],
  "PATCH /api/master/charge-types/{item_id}": [
-  "<authenticated>"
+  "masters.charge_type.edit"
  ],
  "PATCH /api/master/construction-stages/{item_id}": [
-  "<authenticated>"
+  "masters.construction_stage.edit"
  ],
  "PATCH /api/master/document-types/{item_id}": [
-  "<authenticated>"
+  "masters.document_type.edit"
  ],
  "PATCH /api/master/flat-types/{item_id}": [
-  "<authenticated>"
+  "masters.flat_type.edit"
  ],
  "PATCH /api/master/floor-plan-templates/{item_id}": [
-  "<authenticated>"
+  "masters.floor_plan.edit"
  ],
  "PATCH /api/master/milestone-templates/{rest:path}": [
-  "<authenticated>"
+  "masters.construction_stage.view"
  ],
  "PATCH /api/master/payment-modes/{item_id}": [
-  "<authenticated>"
+  "masters.payment_mode.edit"
  ],
  "PATCH /api/master/payment-plans/{item_id}": [
-  "<authenticated>"
+  "masters.payment_plan.edit"
  ],
  "PATCH /api/master/plc-types/{item_id}": [
-  "<authenticated>"
+  "masters.plc.edit"
  ],
  "PATCH /api/master/room-types/{item_id}": [
-  "<authenticated>"
+  "masters.flat_type.edit"
  ],
  "PATCH /api/master/spec-categories/{item_id}": [
-  "<authenticated>"
+  "masters.specification.edit"
  ],
  "PATCH /api/master/spec-items/{item_id}": [
-  "<authenticated>"
+  "masters.specification.edit"
  ],
  "PATCH /api/notices/{notice_id}": [
-  "<authenticated>"
+  "construction.notice.edit"
  ],
  "PATCH /api/parking/{slot_id}": [
-  "<authenticated>"
+  "masters.flat.edit"
  ],
  "PATCH /api/photos/{photo_id}": [
-  "<authenticated>"
+  "construction.photo.upload"
  ],
  "PATCH /api/portal/me": [
   "<portal>"
  ],
  "PATCH /api/projects/{project_id}": [
-  "<authenticated>"
+  "masters.project.edit"
  ],
  "PATCH /api/projects/{project_id}/rate-cards/{rc_id}": [
-  "<authenticated>"
+  "masters.rate_card.edit"
  ],
  "PATCH /api/projects/{project_id}/stage-sequence": [
-  "<authenticated>"
+  "masters.construction_stage.edit"
  ],
  "PATCH /api/reports/presets/{preset_id}": [
-  "<authenticated>"
+  "reports.collections.view"
  ],
  "PATCH /api/roles/{role_id}": [
-  "<authenticated>"
+  "admin.role.edit"
  ],
  "PATCH /api/settings/company": [
-  "<authenticated>"
+  "admin.settings.edit"
  ],
  "PATCH /api/site-visits/{visit_id}": [
-  "<authenticated>"
+  "sales.site_visit.edit"
+ ],
+ "PATCH /api/stage-plans/{plan_id}": [
+  "masters.stage_plan.edit"
  ],
  "PATCH /api/users/{user_id}": [
-  "<authenticated>"
+  "admin.user.deactivate",
+  "admin.user.edit"
  ],
  "POST /api/admin/access/roles/{role_id}/clone": [
-  "<authenticated>"
+  "admin.role.create"
  ],
  "POST /api/admin/audit/archive": [
-  "<authenticated>"
+  "admin.audit.archive"
  ],
  "POST /api/admin/backup": [
-  "<authenticated>"
+  "admin.data.backup"
  ],
  "POST /api/admin/customers/{customer_id}/erase": [
-  "<authenticated>"
+  "admin.data.erase"
  ],
  "POST /api/admin/docs/regenerate": [
-  "<authenticated>"
+  "admin.documentation.view"
  ],
  "POST /api/admin/integrity-repair": [
-  "<authenticated>"
+  "admin.data.recompute"
  ],
  "POST /api/admin/recompute-counters": [
-  "<authenticated>"
+  "admin.data.recompute"
  ],
  "POST /api/admin/recompute-read-models": [
-  "<authenticated>"
+  "admin.data.recompute"
  ],
  "POST /api/admin/reconcile-ledgers": [
-  "<authenticated>"
+  "admin.data.recompute"
  ],
  "POST /api/admin/reseed": [
-  "<authenticated>"
+  "admin.data.reseed"
  ],
  "POST /api/admin/run-dues": [
-  "<authenticated>"
+  "admin.data.recompute"
  ],
  "POST /api/admin/story-marker": [
-  "<authenticated>"
+  "admin.data.reseed"
  ],
  "POST /api/auth/change-password": [
   "<authenticated>"
@@ -861,334 +892,341 @@
   "<public>"
  ],
  "POST /api/blocks": [
-  "<authenticated>"
+  "masters.tower.create"
  ],
  "POST /api/blocks/{block_id}/bulk-price": [
-  "<authenticated>"
+  "masters.flat.edit"
  ],
  "POST /api/blocks/{block_id}/bulk-status": [
-  "<authenticated>"
+  "sales.hold.create",
+  "sales.hold.release"
  ],
  "POST /api/blocks/{block_id}/construction/stage": [
-  "<authenticated>"
+  "construction.stage.update",
+  "construction.update.complete"
  ],
  "POST /api/blocks/{block_id}/construction/undo": [
-  "<authenticated>"
+  "construction.stage.undo",
+  "construction.update.undo"
  ],
  "POST /api/blocks/{block_id}/floors": [
-  "<authenticated>"
+  "masters.tower.edit"
  ],
  "POST /api/blocks/{block_id}/generate-flats": [
-  "<authenticated>"
+  "masters.flat.create"
  ],
  "POST /api/blocks/{block_id}/milestones/{seq}/complete": [
-  "<authenticated>"
+  "construction.stage.update"
  ],
  "POST /api/blocks/{block_id}/milestones/{seq}/photos": [
-  "<authenticated>"
+  "construction.photo.upload"
  ],
  "POST /api/blocks/{block_id}/milestones/{seq}/undo": [
-  "<authenticated>"
+  "construction.stage.undo"
  ],
  "POST /api/bookings": [
-  "<authenticated>"
+  "sales.booking.create"
  ],
  "POST /api/bookings/{booking_id}/agreement-revisions": [
-  "<authenticated>"
+  "sales.agreement.revise"
  ],
  "POST /api/bookings/{booking_id}/cancel": [
-  "<authenticated>"
+  "sales.booking.cancel"
  ],
  "POST /api/bookings/{booking_id}/complete": [
-  "<authenticated>"
+  "sales.booking.edit"
  ],
  "POST /api/bookings/{booking_id}/other-charges/demand": [
-  "<authenticated>"
+  "finance.demand.create"
  ],
  "POST /api/bookings/{booking_id}/payment-plan": [
-  "<authenticated>"
+  "masters.payment_plan.assign"
  ],
  "POST /api/bookings/{booking_id}/recompute": [
-  "<authenticated>"
+  "admin.data.recompute"
  ],
  "POST /api/bookings/{booking_id}/swap": [
-  "<authenticated>"
+  "sales.booking.transfer"
  ],
  "POST /api/bookings/{booking_id}/transfer": [
-  "<authenticated>"
+  "sales.booking.transfer"
  ],
  "POST /api/catalogues/{ctype}/import": [
-  "<authenticated>"
+  "masters.catalogue.create"
  ],
  "POST /api/catalogues/{ctype}/items": [
-  "<authenticated>"
+  "masters.catalogue.create"
  ],
  "POST /api/catalogues/{ctype}/reorder": [
-  "<authenticated>"
+  "masters.catalogue.edit"
  ],
  "POST /api/cms/media": [
-  "<authenticated>"
+  "website.cms.edit"
  ],
  "POST /api/cms/{coll}": [
-  "<authenticated>"
+  "website.cms.edit"
  ],
  "POST /api/communications": [
-  "<authenticated>"
+  "sales.customer.edit"
  ],
  "POST /api/customers": [
-  "<authenticated>"
+  "sales.customer.create"
  ],
  "POST /api/customers/portal/bulk-enable": [
-  "<authenticated>"
+  "service.portal.manage"
  ],
  "POST /api/customers/{customer_id}/kyc-status": [
-  "<authenticated>"
+  "sales.kyc.edit"
  ],
  "POST /api/customers/{customer_id}/portal/enable": [
-  "<authenticated>"
+  "service.portal.manage"
  ],
  "POST /api/customers/{customer_id}/portal/revoke-sessions": [
-  "<authenticated>"
+  "service.portal.manage"
  ],
  "POST /api/customers/{customer_id}/portal/toggle": [
-  "<authenticated>"
+  "service.portal.manage"
  ],
  "POST /api/documents": [
   "<authenticated>"
  ],
  "POST /api/imports/{kind}/confirm": [
-  "<authenticated>"
+  "masters.flat.create"
  ],
  "POST /api/imports/{kind}/preview": [
-  "<authenticated>"
+  "masters.flat.create"
  ],
  "POST /api/leads": [
-  "<authenticated>"
+  "sales.lead.create"
  ],
  "POST /api/leads/{lead_id}/convert": [
-  "<authenticated>"
+  "sales.customer.create",
+  "sales.lead.edit"
  ],
  "POST /api/leads/{lead_id}/follow-ups": [
-  "<authenticated>"
+  "sales.lead.edit"
  ],
  "POST /api/leads/{lead_id}/stage": [
-  "<authenticated>"
+  "sales.lead.edit"
  ],
  "POST /api/master/amenities": [
-  "<authenticated>"
+  "masters.amenity.create"
  ],
  "POST /api/master/amenities/{item_id}/activate": [
-  "<authenticated>"
+  "masters.amenity.edit"
  ],
  "POST /api/master/amenities/{item_id}/deactivate": [
-  "<authenticated>"
+  "masters.amenity.delete"
  ],
  "POST /api/master/amenities/{item_id}/restore": [
-  "<authenticated>"
+  "masters.amenity.edit"
  ],
  "POST /api/master/area-types": [
-  "<authenticated>"
+  "masters.flat_type.create"
  ],
  "POST /api/master/area-types/{item_id}/activate": [
-  "<authenticated>"
+  "masters.flat_type.edit"
  ],
  "POST /api/master/area-types/{item_id}/deactivate": [
-  "<authenticated>"
+  "masters.flat_type.delete"
  ],
  "POST /api/master/area-types/{item_id}/restore": [
-  "<authenticated>"
+  "masters.flat_type.edit"
  ],
  "POST /api/master/bank-accounts": [
-  "<authenticated>"
+  "masters.bank_account.create"
  ],
  "POST /api/master/bank-accounts/{item_id}/activate": [
-  "<authenticated>"
+  "masters.bank_account.edit"
  ],
  "POST /api/master/bank-accounts/{item_id}/deactivate": [
-  "<authenticated>"
+  "masters.bank_account.delete"
  ],
  "POST /api/master/bank-accounts/{item_id}/restore": [
-  "<authenticated>"
+  "masters.bank_account.edit"
  ],
  "POST /api/master/block-types": [
-  "<authenticated>"
+  "masters.block_type.create"
  ],
  "POST /api/master/block-types/{item_id}/activate": [
-  "<authenticated>"
+  "masters.block_type.edit"
  ],
  "POST /api/master/block-types/{item_id}/deactivate": [
-  "<authenticated>"
+  "masters.block_type.delete"
  ],
  "POST /api/master/block-types/{item_id}/restore": [
-  "<authenticated>"
+  "masters.block_type.edit"
  ],
  "POST /api/master/charge-types": [
-  "<authenticated>"
+  "masters.charge_type.create"
  ],
  "POST /api/master/charge-types/{item_id}/activate": [
-  "<authenticated>"
+  "masters.charge_type.edit"
  ],
  "POST /api/master/charge-types/{item_id}/deactivate": [
-  "<authenticated>"
+  "masters.charge_type.delete"
  ],
  "POST /api/master/charge-types/{item_id}/restore": [
-  "<authenticated>"
+  "masters.charge_type.edit"
  ],
  "POST /api/master/construction-stages": [
-  "<authenticated>"
+  "masters.construction_stage.create"
  ],
  "POST /api/master/construction-stages/{item_id}/activate": [
-  "<authenticated>"
+  "masters.construction_stage.edit"
  ],
  "POST /api/master/construction-stages/{item_id}/deactivate": [
-  "<authenticated>"
+  "masters.construction_stage.delete"
  ],
  "POST /api/master/construction-stages/{item_id}/restore": [
-  "<authenticated>"
+  "masters.construction_stage.edit"
  ],
  "POST /api/master/document-types": [
-  "<authenticated>"
+  "masters.document_type.create"
  ],
  "POST /api/master/document-types/{item_id}/activate": [
-  "<authenticated>"
+  "masters.document_type.edit"
  ],
  "POST /api/master/document-types/{item_id}/deactivate": [
-  "<authenticated>"
+  "masters.document_type.delete"
  ],
  "POST /api/master/document-types/{item_id}/restore": [
-  "<authenticated>"
+  "masters.document_type.edit"
  ],
  "POST /api/master/flat-types": [
-  "<authenticated>"
+  "masters.flat_type.create"
  ],
  "POST /api/master/flat-types/{item_id}/activate": [
-  "<authenticated>"
+  "masters.flat_type.edit"
  ],
  "POST /api/master/flat-types/{item_id}/deactivate": [
-  "<authenticated>"
+  "masters.flat_type.delete"
  ],
  "POST /api/master/flat-types/{item_id}/restore": [
-  "<authenticated>"
+  "masters.flat_type.edit"
  ],
  "POST /api/master/floor-plan-templates": [
-  "<authenticated>"
+  "masters.floor_plan.create"
  ],
  "POST /api/master/floor-plan-templates/{item_id}/activate": [
-  "<authenticated>"
+  "masters.floor_plan.edit"
  ],
  "POST /api/master/floor-plan-templates/{item_id}/deactivate": [
-  "<authenticated>"
+  "masters.floor_plan.delete"
  ],
  "POST /api/master/floor-plan-templates/{item_id}/restore": [
-  "<authenticated>"
+  "masters.floor_plan.edit"
  ],
  "POST /api/master/milestone-templates": [
-  "<authenticated>"
+  "masters.construction_stage.view"
  ],
  "POST /api/master/milestone-templates/{rest:path}": [
-  "<authenticated>"
+  "masters.construction_stage.view"
  ],
  "POST /api/master/payment-modes": [
-  "<authenticated>"
+  "masters.payment_mode.create"
  ],
  "POST /api/master/payment-modes/{item_id}/activate": [
-  "<authenticated>"
+  "masters.payment_mode.edit"
  ],
  "POST /api/master/payment-modes/{item_id}/deactivate": [
-  "<authenticated>"
+  "masters.payment_mode.delete"
  ],
  "POST /api/master/payment-modes/{item_id}/restore": [
-  "<authenticated>"
+  "masters.payment_mode.edit"
  ],
  "POST /api/master/payment-plans": [
-  "<authenticated>"
+  "masters.payment_plan.create"
  ],
  "POST /api/master/payment-plans/{item_id}/activate": [
-  "<authenticated>"
+  "masters.payment_plan.edit"
  ],
  "POST /api/master/payment-plans/{item_id}/deactivate": [
-  "<authenticated>"
+  "masters.payment_plan.delete"
  ],
  "POST /api/master/payment-plans/{item_id}/restore": [
-  "<authenticated>"
+  "masters.payment_plan.edit"
  ],
  "POST /api/master/plc-types": [
-  "<authenticated>"
+  "masters.plc.create"
  ],
  "POST /api/master/plc-types/{item_id}/activate": [
-  "<authenticated>"
+  "masters.plc.edit"
  ],
  "POST /api/master/plc-types/{item_id}/deactivate": [
-  "<authenticated>"
+  "masters.plc.delete"
  ],
  "POST /api/master/plc-types/{item_id}/restore": [
-  "<authenticated>"
+  "masters.plc.edit"
  ],
  "POST /api/master/room-types": [
-  "<authenticated>"
+  "masters.flat_type.create"
  ],
  "POST /api/master/room-types/{item_id}/activate": [
-  "<authenticated>"
+  "masters.flat_type.edit"
  ],
  "POST /api/master/room-types/{item_id}/deactivate": [
-  "<authenticated>"
+  "masters.flat_type.delete"
  ],
  "POST /api/master/room-types/{item_id}/restore": [
-  "<authenticated>"
+  "masters.flat_type.edit"
  ],
  "POST /api/master/spec-categories": [
-  "<authenticated>"
+  "masters.specification.create"
  ],
  "POST /api/master/spec-categories/{item_id}/activate": [
-  "<authenticated>"
+  "masters.specification.edit"
  ],
  "POST /api/master/spec-categories/{item_id}/deactivate": [
-  "<authenticated>"
+  "masters.specification.delete"
  ],
  "POST /api/master/spec-categories/{item_id}/restore": [
-  "<authenticated>"
+  "masters.specification.edit"
  ],
  "POST /api/master/spec-items": [
-  "<authenticated>"
+  "masters.specification.create"
  ],
  "POST /api/master/spec-items/{item_id}/activate": [
-  "<authenticated>"
+  "masters.specification.edit"
  ],
  "POST /api/master/spec-items/{item_id}/deactivate": [
-  "<authenticated>"
+  "masters.specification.delete"
  ],
  "POST /api/master/spec-items/{item_id}/restore": [
-  "<authenticated>"
+  "masters.specification.edit"
  ],
  "POST /api/notices": [
-  "<authenticated>"
+  "construction.notice.create"
  ],
  "POST /api/notifications/read-all": [
-  "<authenticated>"
+  "masters.project.view"
  ],
  "POST /api/notifications/{notification_id}/read": [
-  "<authenticated>"
+  "masters.project.view"
  ],
  "POST /api/parking": [
-  "<authenticated>"
+  "masters.flat.create"
  ],
  "POST /api/parking/bulk-generate": [
-  "<authenticated>"
+  "masters.flat.create"
  ],
  "POST /api/payment-plan-assignments": [
-  "<authenticated>"
+  "masters.payment_plan.assign"
+ ],
+ "POST /api/payment-plans/structured": [
+  "masters.payment_plan.create"
  ],
  "POST /api/payments": [
-  "<authenticated>"
+  "finance.payment.create"
  ],
  "POST /api/payments/{payment_id}/bounce": [
-  "<authenticated>"
+  "finance.cheque.bounce"
  ],
  "POST /api/payments/{payment_id}/clear": [
-  "<authenticated>"
+  "finance.cheque.clear"
  ],
  "POST /api/payments/{payment_id}/reverse": [
-  "<authenticated>"
+  "finance.payment.reverse"
  ],
  "POST /api/portal/auth/change-password": [
   "<portal>"
@@ -1230,16 +1268,16 @@
   "<portal>"
  ],
  "POST /api/projects": [
-  "<authenticated>"
+  "masters.project.create"
  ],
  "POST /api/projects/{project_id}/rate-cards": [
-  "<authenticated>"
+  "masters.rate_card.create"
  ],
  "POST /api/projects/{project_id}/rate-cards/{rc_id}/activate": [
-  "<authenticated>"
+  "masters.rate_card.edit"
  ],
  "POST /api/projects/{project_id}/rate-cards/{rc_id}/apply": [
-  "<authenticated>"
+  "masters.rate_card.apply"
  ],
  "POST /api/public/brochure-requests": [
   "<public>"
@@ -1254,51 +1292,61 @@
   "<public>"
  ],
  "POST /api/refunds/{refund_id}/pay": [
-  "<authenticated>"
+  "finance.refund.pay"
  ],
  "POST /api/reports/presets": [
-  "<authenticated>"
+  "reports.collections.view"
  ],
  "POST /api/roles": [
-  "<authenticated>"
+  "admin.role.create"
  ],
  "POST /api/roznamcha/contra": [
-  "<authenticated>"
+  "finance.roznamcha.deposit"
  ],
  "POST /api/roznamcha/opening": [
-  "<authenticated>"
+  "finance.roznamcha.opening_balance"
  ],
  "POST /api/service-requests": [
-  "<authenticated>"
+  "service.ticket.create"
  ],
  "POST /api/service-requests/{sr_id}/assign": [
-  "<authenticated>"
+  "service.ticket.assign"
  ],
  "POST /api/service-requests/{sr_id}/reply": [
-  "<authenticated>"
+  "service.ticket.edit"
  ],
  "POST /api/service-requests/{sr_id}/status": [
-  "<authenticated>"
+  "service.ticket.close",
+  "service.ticket.edit",
+  "service.ticket.reopen"
  ],
  "POST /api/site-visits": [
-  "<authenticated>"
+  "sales.site_visit.create"
  ],
  "POST /api/site-visits/{visit_id}/reschedule": [
-  "<authenticated>"
+  "sales.site_visit.edit"
  ],
  "POST /api/site-visits/{visit_id}/{action}": [
-  "<authenticated>"
+  "sales.site_visit.cancel",
+  "sales.site_visit.complete",
+  "sales.site_visit.edit"
+ ],
+ "POST /api/stage-plans": [
+  "masters.stage_plan.create"
+ ],
+ "POST /api/stage-plans/{plan_id}/copy": [
+  "masters.stage_plan.create"
  ],
  "POST /api/users": [
-  "<authenticated>"
+  "admin.user.create"
  ],
  "POST /api/users/{user_id}/reset-password": [
-  "<authenticated>"
+  "admin.user.edit"
  ],
  "PUT /api/admin/access/users/{user_id}": [
-  "<authenticated>"
+  "admin.access_control.manage"
  ],
  "PUT /api/projects/{project_id}/setup/{section}": [
-  "<authenticated>"
+  "masters.project.edit"
  ]
 }

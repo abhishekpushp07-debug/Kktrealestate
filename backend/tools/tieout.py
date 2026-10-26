@@ -3,7 +3,8 @@ Usage: python tools/tieout.py [--base URL]  → prints PASS/FAIL table and write
 import argparse
 import os
 import sys
-from datetime import date
+from datetime import date, datetime, timezone, timedelta
+IST = timezone(timedelta(hours=5, minutes=30))
 
 import requests
 from dotenv import load_dotenv
@@ -66,7 +67,7 @@ def main(base):
     from services.definitions import ageing_bands, overdue_of
     overdue_raw, bands_raw = 0, {}
     for b in db.bookings.find({"company_id": cid, "status": {"$in": ["Active", "Completed"]}}, {"id": 1, "summary": 1, "other_charges": 1}):
-        bb = ageing_bands(b.get("summary") or {}, list(db.demands.find({"booking_id": b["id"], "voided": {"$ne": True}})), b.get("other_charges") or [], date.today())
+        bb = ageing_bands(b.get("summary") or {}, list(db.demands.find({"booking_id": b["id"], "voided": {"$ne": True}})), b.get("other_charges") or [], datetime.now(IST).date())
         overdue_raw += overdue_of(bb)
         for k, v in bb.items():
             bands_raw[k] = bands_raw.get(k, 0) + v

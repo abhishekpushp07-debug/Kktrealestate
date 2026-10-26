@@ -10,11 +10,11 @@
 | home units/available tiles == flats | `(138, 57)` | `(138, 57)` | **PASS** |  |
 | legacy dashboard inventory == flats | `{'Available': 57, 'Hold': 2, 'Booked': 77, 'Sold': 1, 'Blocked': 1}` | `{'Available': 57, 'Blocked': 1, 'Booked': 77, 'Hold': 2, 'Sold': 1}` | **PASS** |  |
 | outstanding total == Σ booking summary dues | `2034464900` | `2034464900` | **PASS** |  |
-| home overdue tile == Σ bookings overdue (definitions.ageing_bands) | `1589246100` | `1589096100` | **FAIL** |  |
-| report overdue == Σ bookings overdue | `1589246100` | `1589096100` | **FAIL** |  |
+| home overdue tile == Σ bookings overdue (definitions.ageing_bands) | `1589246100` | `1589246100` | **PASS** |  |
+| report overdue == Σ bookings overdue | `1589246100` | `1589246100` | **PASS** |  |
 | dashboard overdue == report overdue | `1589246100` | `1589246100` | **PASS** |  |
 | ageing bands sum == report total outstanding | `2034464900` | `2034464900` | **PASS** |  |
-| report bands == Σ booking bands | `{'Not due': 445218800, '0-30': 75480000, '31-60': 613172400, '61-90': ` | `{'Not due': 445368800, '0-30': 75330000, '31-60': 613172400, '61-90': ` | **FAIL** |  |
+| report bands == Σ booking bands | `{'Not due': 445218800, '0-30': 75480000, '31-60': 613172400, '61-90': ` | `{'Not due': 445218800, '0-30': 75480000, '31-60': 613172400, '61-90': ` | **PASS** |  |
 | home outstanding tile == Σ booking dues | `2034464900` | `2034464900` | **PASS** |  |
 | home outstanding tile == outstanding report due | `2034464900` | `2034464900` | **PASS** |  |
 | ONE NUMBER: Home outstanding == Outstanding report total | `2034464900` | `2034464900` | **PASS** |  |
@@ -31,3 +31,4 @@
 | cancellations rows == Cancelled bookings | `4` | `4` | **PASS** |  |
 | sales-leads total == leads | `122` | `122` | **PASS** |  |
 | Σ cleared cash receipts == booking.summary.cash_paid (all active) | `0` | `0` | **PASS** | count of bookings that differ |
+| Σ Udhar − Σ Jama == outstanding − advance (every booking) | `0` | `0` | **PASS** | two-sided ledger law |

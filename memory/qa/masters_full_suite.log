@@ -1,0 +1,515 @@
+bringing up nodes...
+bringing up nodes...
+
+..................................................F..................... [ 14%]
+......................................F........FFF.......F.....F........ [ 29%]
+.........EEE...................F..F.........F...............F.....F..... [ 44%]
+..................................F...............F..................... [ 58%]
+...................................................................F.... [ 73%]
+....F...............FF..........................F....................... [ 88%]
+......................s...................................               [100%]
+==================================== ERRORS ====================================
+__________ ERROR at setup of test_receipt_pdf_text_and_deterministic ___________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDd...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDQxOTYwLCJleHAiOjE3OTMwNDI4NjB9.nPeDK_yGw11wtjy0A5MgiSFBJ7lXLC6Blo7AkQvlUaA'}
+
+    @pytest.fixture(scope="session")
+    def anchor_booking_id(admin_headers):
+        r = requests.get(f"{API}/bookings", headers=admin_headers, params={"q": ANCHOR_BK}, timeout=30)
+        assert r.status_code == 200
+        data = r.json()
+        items = data.get("items") or data if isinstance(data, dict) else data
+        if isinstance(data, dict) and "items" in data:
+            items = data["items"]
+        for b in items:
+            if b.get("booking_number") == ANCHOR_BK:
+                return b["id"]
+>       pytest.fail(f"Booking {ANCHOR_BK} not found")
+E       Failed: Booking BK-2526-0001 not found
+
+tests/test_phase_b_hardening_review.py:63: Failed
+______________ ERROR at setup of test_allotment_pdf_has_signature ______________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDd...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDQxOTYwLCJleHAiOjE3OTMwNDI4NjB9.nPeDK_yGw11wtjy0A5MgiSFBJ7lXLC6Blo7AkQvlUaA'}
+
+    @pytest.fixture(scope="session")
+    def anchor_booking_id(admin_headers):
+        r = requests.get(f"{API}/bookings", headers=admin_headers, params={"q": ANCHOR_BK}, timeout=30)
+        assert r.status_code == 200
+        data = r.json()
+        items = data.get("items") or data if isinstance(data, dict) else data
+        if isinstance(data, dict) and "items" in data:
+            items = data["items"]
+        for b in items:
+            if b.get("booking_number") == ANCHOR_BK:
+                return b["id"]
+>       pytest.fail(f"Booking {ANCHOR_BK} not found")
+E       Failed: Booking BK-2526-0001 not found
+
+tests/test_phase_b_hardening_review.py:63: Failed
+____________ ERROR at setup of test_demand_letter_pdf_has_signature ____________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDd...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDQxOTYwLCJleHAiOjE3OTMwNDI4NjB9.nPeDK_yGw11wtjy0A5MgiSFBJ7lXLC6Blo7AkQvlUaA'}
+
+    @pytest.fixture(scope="session")
+    def anchor_booking_id(admin_headers):
+        r = requests.get(f"{API}/bookings", headers=admin_headers, params={"q": ANCHOR_BK}, timeout=30)
+        assert r.status_code == 200
+        data = r.json()
+        items = data.get("items") or data if isinstance(data, dict) else data
+        if isinstance(data, dict) and "items" in data:
+            items = data["items"]
+        for b in items:
+            if b.get("booking_number") == ANCHOR_BK:
+                return b["id"]
+>       pytest.fail(f"Booking {ANCHOR_BK} not found")
+E       Failed: Booking BK-2526-0001 not found
+
+tests/test_phase_b_hardening_review.py:63: Failed
+=================================== FAILURES ===================================
+___________________________ test_project_admin_scope ___________________________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+projadmin = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmMjBjNWY0ZS04MmZlLTRkOTgtYjE4NS0yMzdkYjZkMGNlNWIiLCJjaWQiOiI2MWUzNWMx...oiYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDQxOTYxLCJleHAiOjE3OTMwNDI4NjF9.d1lg7zJ2AwdCzdZr0KwHX4pHGtky7g_DwdAHrOM0FRs'
+admin = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDdhOGUiLCJjaWQiOiI2MWUzNWMx...oiYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDQxOTYwLCJleHAiOjE3OTMwNDI4NjB9.nPeDK_yGw11wtjy0A5MgiSFBJ7lXLC6Blo7AkQvlUaA'
+sgh_id = 'c170483e-f746-40df-9f1f-e6d798328039'
+
+    def test_project_admin_scope(projadmin, admin, sgh_id):
+        r = requests.get(f"{API}/cms/projects/{sgh_id}/website", headers=H(projadmin), timeout=15)
+>       assert r.status_code == 200
+E       assert 403 == 200
+E        +  where 403 = <Response [403]>.status_code
+
+tests/test_phase_3.py:331: AssertionError
+______________________________ test_reports_rbac _______________________________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+client = <httpx.Client object at 0xf99da32a8e50>
+accounts = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMDNiMzdjMi0yMmMwLTRiY2MtOThjMS1iOTI0OTM5YTN...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDQxOTY0LCJleHAiOjE3OTMwNDI4NjR9.gF0DYqdf4fc3g-uOb1pUbaXyGFETwAXWfkqMSR-Q58A'}
+employee = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzMWZiZTUxNS0zODkxLTRjODEtOWJiOS00NzZkMDBiZDR...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDQxOTY0LCJleHAiOjE3OTMwNDI4NjR9.pkXbTKLivzDAcukCh0TUDMoY2fSrDKOkTZmXK1Xwjs4'}
+
+    def test_reports_rbac(client, accounts, employee):
+>       assert client.get("/api/reports/collections", headers=accounts).status_code == 200
+E       AssertionError: assert 403 == 200
+E        +  where 403 = <Response [403 Forbidden]>.status_code
+E        +    where <Response [403 Forbidden]> = get('/api/reports/collections', headers={'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMDNiMzdjMi0yMmMwLTRiY2MtOThjMS1iOTI0OTM5YTN...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDQxOTY0LCJleHAiOjE3OTMwNDI4NjR9.gF0DYqdf4fc3g-uOb1pUbaXyGFETwAXWfkqMSR-Q58A'})
+E        +      where get = <httpx.Client object at 0xf99da32a8e50>.get
+
+tests/test_phase_4_full.py:82: AssertionError
+___________________________ test_dashboard_accounts ____________________________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+client = <httpx.Client object at 0xf99da32a8e50>
+accounts = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMDNiMzdjMi0yMmMwLTRiY2MtOThjMS1iOTI0OTM5YTN...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDQxOTY0LCJleHAiOjE3OTMwNDI4NjR9.gF0DYqdf4fc3g-uOb1pUbaXyGFETwAXWfkqMSR-Q58A'}
+
+    def test_dashboard_accounts(client, accounts):
+        d = client.get("/api/dashboard/widgets", headers=accounts).json()
+>       assert d["role"] == "Accounts"
+               ^^^^^^^^^
+E       KeyError: 'role'
+
+tests/test_phase_4_full.py:183: KeyError
+_____________________________ test_dashboard_sales _____________________________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+client = <httpx.Client object at 0xf99da32a8e50>
+sales = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI4NGIzOTI4My1jMTc5LTQ4YzItOGI0YS1jZWUxMGJhZjY...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDQxOTY1LCJleHAiOjE3OTMwNDI4NjV9.B_Y3aEw-hCi74sNRWeH0SoTdd9ZfzAsW5FJ87odJyKo'}
+
+    def test_dashboard_sales(client, sales):
+        d = client.get("/api/dashboard/widgets", headers=sales).json()
+>       assert d["role"] == "Sales"
+               ^^^^^^^^^
+E       KeyError: 'role'
+
+tests/test_phase_4_full.py:191: KeyError
+_________________________ test_dashboard_project_admin _________________________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+client = <httpx.Client object at 0xf99da32a8e50>
+padmin = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmMjBjNWY0ZS04MmZlLTRkOTgtYjE4NS0yMzdkYjZkMGN...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDQxOTY1LCJleHAiOjE3OTMwNDI4NjV9.69YxsRCUfMa4pO1L873fz_LofF7OejcC3P5CwTZMhxg'}
+
+    def test_dashboard_project_admin(client, padmin):
+        d = client.get("/api/dashboard/widgets", headers=padmin).json()
+>       assert d["role"] == "Project Admin"
+               ^^^^^^^^^
+E       KeyError: 'role'
+
+tests/test_phase_4_full.py:199: KeyError
+______________________ test_notifications_website_enquiry ______________________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+client = <httpx.Client object at 0xf99da32a8e50>
+sales = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI4NGIzOTI4My1jMTc5LTQ4YzItOGI0YS1jZWUxMGJhZjY...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDQxOTY1LCJleHAiOjE3OTMwNDI4NjV9.B_Y3aEw-hCi74sNRWeH0SoTdd9ZfzAsW5FJ87odJyKo'}
+marketing = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhNjEzNjJjNS04MDQ5LTQ3MDAtYWJjOS1mYWMzNWQ2MTE...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDQxOTY1LCJleHAiOjE3OTMwNDI4NjV9.ILtYO7LheSx6pOPQlwmc8r0pDD8_SsDC0tKN8pgmoF8'}
+accounts = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMDNiMzdjMi0yMmMwLTRiY2MtOThjMS1iOTI0OTM5YTN...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDQxOTY0LCJleHAiOjE3OTMwNDI4NjR9.gF0DYqdf4fc3g-uOb1pUbaXyGFETwAXWfkqMSR-Q58A'}
+
+    def test_notifications_website_enquiry(client, sales, marketing, accounts):
+        def unread(h):
+            r = client.get("/api/notifications", headers=h).json()
+            return r.get("unread", r.get("unread_count", 0)), r.get("items", r if isinstance(r, list) else [])
+    
+        sales_before, _ = unread(sales)
+        mktg_before, _ = unread(marketing)
+        acct_before, _ = unread(accounts)
+    
+        body = {"name": "Notif QA", "phone": "9811122233", "consent": True, "website": "", "project_slug": "shree-ganesh-heights"}
+        r = client.post("/api/public/enquiries", json=body)
+        if r.status_code == 429:  # public enquiry guard is 5/60 s per IP and test_phase_3 bursts it on another worker; wait for a fresh window
+            import time as _t
+            _t.sleep(int(r.json().get("retry_after") or 60) + 1)
+            r = client.post("/api/public/enquiries", json=body)
+        assert r.status_code == 200, r.text
+    
+        import time; time.sleep(1.0)
+    
+        sales_after, s_items = unread(sales)
+        mktg_after, m_items = unread(marketing)
+        acct_after, a_items = unread(accounts)
+    
+>       assert sales_after > sales_before, f"sales unread not increased ({sales_before}->{sales_after})"
+E       AssertionError: sales unread not increased (0->0)
+E       assert 0 > 0
+
+tests/test_phase_4_full.py:228: AssertionError
+__________________________ test_marketing_permissions __________________________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+client = <httpx.Client object at 0xf99da32a8e50>
+marketing = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhNjEzNjJjNS04MDQ5LTQ3MDAtYWJjOS1mYWMzNWQ2MTE...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDQxOTY1LCJleHAiOjE3OTMwNDI4NjV9.ILtYO7LheSx6pOPQlwmc8r0pDD8_SsDC0tKN8pgmoF8'}
+
+    def test_marketing_permissions(client, marketing):
+>       assert client.get("/api/cms/site", headers=marketing).status_code == 200
+E       AssertionError: assert 403 == 200
+E        +  where 403 = <Response [403 Forbidden]>.status_code
+E        +    where <Response [403 Forbidden]> = get('/api/cms/site', headers={'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhNjEzNjJjNS04MDQ5LTQ3MDAtYWJjOS1mYWMzNWQ2MTE...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDQxOTY1LCJleHAiOjE3OTMwNDI4NjV9.ILtYO7LheSx6pOPQlwmc8r0pDD8_SsDC0tKN8pgmoF8'})
+E        +      where get = <httpx.Client object at 0xf99da32a8e50>.get
+
+tests/test_phase_4_full.py:347: AssertionError
+_______________________ test_document_project_scope_404 ________________________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+    def test_document_project_scope_404():
+        h = H()
+        projects = [p for p in requests.get(f"{BASE}/projects", headers=h, timeout=15).json()["items"] if p.get("website", {}).get("slug")]
+        assert len(projects) >= 2
+        a, b = projects[0], projects[1]
+        bk = next(x for x in requests.get(f"{BASE}/bookings?project_id={b['id']}&page_size=5", headers=h, timeout=15).json()["items"])
+        roles = requests.get(f"{BASE}/roles", headers=h, timeout=15).json()["items"]
+        sales = next(r for r in roles if r["name"] == "Sales")
+        email = f"scoped-{uuid.uuid4().hex[:6]}@kkt.in"
+        r = requests.post(f"{BASE}/users", headers=h, json={"name": "Scoped A", "email": email, "password": "Scoped@12345", "role_id": sales["id"], "project_scope": [a["id"]]}, timeout=15)
+        assert r.status_code == 201, r.text
+        sh = H(email, "Scoped@12345")
+        r = requests.get(f"{BASE}/documents?entity_type=booking&entity_id={bk['id']}", headers=sh, timeout=15)
+>       assert r.status_code == 404, r.text
+E       AssertionError: {"detail":"Missing permission: sales.booking.view","code":"FORBIDDEN","request_id":"1c167e0d5b7544e4","error":{"code":"FORBIDDEN","message":"Missing permission: sales.booking.view","details":[],"request_id":"1c167e0d5b7544e4"}}
+E       assert 403 == 404
+E        +  where 403 = <Response [403]>.status_code
+
+tests/test_phase_11a.py:96: AssertionError
+__________________ test_catalogue_bundle_etag_and_inline_add ___________________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+    def test_catalogue_bundle_etag_and_inline_add():
+        h = H()
+        r = requests.get(f"{BASE}/catalogues", headers=h, timeout=15)
+        assert r.status_code == 200 and r.headers.get("ETag")
+        local = requests.get(os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:8001").rstrip("/") + "/api/catalogues", headers=h, timeout=15)  # the preview ingress rewrites Cache-Control
+        assert "max-age=300" in local.headers["Cache-Control"]
+        types = r.json()["types"]
+        for t in ("salutation", "state", "city", "locality", "bank", "lead_source", "communication_type", "projects", "blocks", "flat_types", "payment_plans", "users"):
+            assert types.get(t), t
+        assert len(types["state"]) >= 36 and len(types["bank"]) >= 30
+        r2 = requests.get(f"{BASE}/catalogues", headers={**h, "If-None-Match": r.headers["ETag"]}, timeout=15)
+        assert r2.status_code == 304
+        label = f"Astronaut {uuid.uuid4().hex[:4]}"
+        r = requests.post(f"{BASE}/catalogues/occupation/items", headers=H("sales@kkt.in"), json={"label": label}, timeout=15)
+>       assert r.status_code == 201, r.text
+E       AssertionError: {"detail":"Missing permission: masters.catalogue.create","code":"PERMISSION_DENIED","request_id":"881afc22aa874f92","missing":"masters.catalogue.create","any_of":["masters.catalogue.create"],"error":{"code":"PERMISSION_DENIED","message":"Missing permission: masters.catalogue.create","details":[{"missing":"masters.catalogue.create","any_of":["masters.catalogue.create"]}],"request_id":"881afc22aa874f92"}}
+E       assert 403 == 201
+E        +  where 403 = <Response [403]>.status_code
+
+tests/test_phase_11a.py:169: AssertionError
+_________________________ test_regression_anchor_story _________________________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+base_url = 'http://127.0.0.1:8021'
+admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDd...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDQxOTYwLCJleHAiOjE3OTMwNDI4NjB9.nPeDK_yGw11wtjy0A5MgiSFBJ7lXLC6Blo7AkQvlUaA'}
+anchor_booking = {'lead_id': 'b34f46f2-99ec-4de2-88c1-58f29d788d92', 'account_agreed': 1921500.0, 'account_agreed_paise': 192150000, 'agreement_value': 4803750.0, ...}
+
+    def test_regression_anchor_story(base_url, admin_headers, anchor_booking):
+        """Story anchor BK-2526-0014 (bounce persona): ledger balances to the paisa; row count/due are documented in test_credentials.md."""
+        b = requests.get(f"{base_url}/api/bookings/{anchor_booking['id']}", headers=admin_headers).json()
+        led = requests.get(f"{base_url}/api/bookings/{anchor_booking['id']}/ledger", headers=admin_headers).json()
+        rows = led["rows"]
+        assert rows and rows[-1]["cash_due"] + rows[-1]["account_due"] == b["summary"]["cash_due"] + b["summary"]["account_due"], (rows[-1], b["summary"])
+>       assert b["summary"]["outstanding"] == b["summary"]["due"] and b["summary"]["due"] >= 0 and b["booking_number"] == "BK-2526-0014"
+E       AssertionError: assert (0.0 == 0.0 and 0.0 >= 0 and 'BK-2526-0001' == 'BK-2526-0014'
+E         
+E         - BK-2526-0014
+E         ?            -
+E         + BK-2526-0001
+E         ?           +)
+
+tests/test_hardening.py:68: AssertionError
+_______________ test_kyc_masked_for_sales_revealed_for_accounts ________________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDd...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDQxOTYwLCJleHAiOjE3OTMwNDI4NjB9.nPeDK_yGw11wtjy0A5MgiSFBJ7lXLC6Blo7AkQvlUaA'}
+
+    def test_kyc_masked_for_sales_revealed_for_accounts(admin_headers):
+        cust = requests.get(f"{API}/customers?page_size=1&search=CUST-2526-0002", headers=admin_headers).json()["items"][0]
+        r = requests.patch(f"{API}/customers/{cust['id']}", headers=admin_headers, json={"pan": "ABCPV1234K", "version": cust["version"]})
+        assert r.status_code == 200, r.text
+        s = requests.get(f"{API}/customers/{cust['id']}", headers=H("sales@kkt.in")).json()
+>       assert s.get("pan") in (None, "") and s["pan_masked"].startswith("XXXXX") and s["pan_masked"].endswith("234K")
+                                              ^^^^^^^^^^^^^^^
+E       KeyError: 'pan_masked'
+
+tests/test_story_behaviours.py:65: KeyError
+_______________________ test_matrix_file_matches_runtime _______________________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-112/popen-gw1/test_matrix_file_matches_runti0')
+
+    def test_matrix_file_matches_runtime(tmp_path):
+        """Write the derived matrix next to the code so reviewers can diff it; fail if a tracked copy exists and differs."""
+        import json
+        target = os.path.join(os.path.dirname(__file__), "..", "security", "permission_matrix.json")
+        doc = {f"{m} {p}": sorted(v["perms"]) if v["perms"] else (["<portal>"] if v["portal"] else (["<authenticated>"] if v["authed"] else ["<public>"])) for (m, p), v in sorted(MATRIX.items())}
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        if os.path.exists(target):
+>           assert json.load(open(target)) == doc, "security/permission_matrix.json is stale — regenerate by deleting it and re-running this test"
+E           AssertionError: security/permission_matrix.json is stale — regenerate by deleting it and re-running this test
+E           assert {'DELETE /api...cated>'], ...} == {'DELETE /api...cated>'], ...}
+E             
+E             Omitting 434 identical items, use -vv to show
+E             Right contains 12 more items:
+E             {'DELETE /api/stage-plans/{plan_id}': ['<authenticated>'],
+E              'GET /api/blocks/{block_id}/stages/{stage_id}/preview': ['<authenticated>'],
+E              'GET /api/master/construction-stages/{stage_id}/where-used': ['<authenticated>'],
+E              'GET /api/payment-plans/structured': ['<authenticated>'],...
+E             
+E             ...Full output truncated (9 lines hidden), use '-vv' to show
+
+tests/test_permission_matrix.py:82: AssertionError
+_________________ test_stages_forward_only_and_undo_roundtrip __________________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDd...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDQxOTYwLCJleHAiOjE3OTMwNDI4NjB9.nPeDK_yGw11wtjy0A5MgiSFBJ7lXLC6Blo7AkQvlUaA'}
+
+    def test_stages_forward_only_and_undo_roundtrip(admin_headers):
+        h = admin_headers
+        blk = next(b for b in requests.get(f"{API_B}/blocks?page_size=20", headers=h).json()["items"] if b["code"] == "C")  # Tower C: mid-construction in the story
+        ms = requests.get(f"{API_B}/blocks/{blk['id']}/milestones", headers=h).json()
+        nxt = ms["next_seq"]
+        assert nxt is not None
+        # stages are sequential: completing seq+1 catches up seq too (both marked, both audited), undo walks back one at a time
+        done = requests.post(f"{API_B}/blocks/{blk['id']}/milestones/{nxt + 1}/complete", headers=h, json={"completed_on": date.today().isoformat()})
+        assert done.status_code == 200 and done.json().get("audit_id") and len(done.json()["marked"]) == 2, done.text
+        after = requests.get(f"{API_B}/blocks/{blk['id']}/milestones", headers=h).json()
+        assert after["next_seq"] in (None, nxt + 2) and after["construction_percent"] > ms["construction_percent"]
+        assert requests.post(f"{API_B}/blocks/{blk['id']}/milestones/{nxt}/complete", headers=h, json={"completed_on": date.today().isoformat()}).status_code == 409  # already completed
+        for _ in range(2):
+            undo = requests.post(f"{API_B}/blocks/{blk['id']}/construction/undo", headers=h, json={"reason": "story rewrite roundtrip"})
+>           assert undo.status_code == 200 and undo.json().get("audit_id"), undo.text
+E           AssertionError: {"detail":"A demand raised by this stage already has a payment; undo is blocked","code":"UNDO_BLOCKED_BY_PAYMENTS","request_id":"df8e49d246c643d0","error":{"code":"UNDO_BLOCKED_BY_PAYMENTS","message":"A demand raised by this stage already has a payment; undo is blocked","details":[],"request_id":"df8e49d246c643d0"}}
+E           assert (409 == 200)
+E            +  where 409 = <Response [409]>.status_code
+
+tests/test_phase_d_perf.py:148: AssertionError
+____________________ test_multi_role_union_and_direct_deny _____________________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+admin = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDd...wiaWF0IjoxNzkzMDQxOTYwLCJleHAiOjE3OTMwNDI4NjB9.nPeDK_yGw11wtjy0A5MgiSFBJ7lXLC6Blo7AkQvlUaA', 'X-Rate-Limit-Bypass': ''}
+sales_user = ({'id': '8bb71683-d6d0-4d95-a1e6-df0890bb4034', 'company_id': '61e35c1c-91c6-43c9-a732-2f790d5b57aa', 'created_at': '2...11458ee', ...}, 'role_ids': ['80e27882-7721-4260-8d0f-4315111458ee'], 'role_names': ['Sales'], 'is_super': False, ...})
+
+    def test_multi_role_union_and_direct_deny(admin, sales_user):
+        u, acc = sales_user
+        r = requests.put(f"{BASE}/admin/access/users/{u['id']}", json={"role_ids": [_role("Sales"), _role("Accounts")], "direct": [{"code": "finance.payment.create", "effect": "deny", "reason": "test"}]}, headers=admin, timeout=20)
+        assert r.status_code == 200, r.text
+        eff = set(r.json()["effective"])
+>       assert "finance.payment.reverse" in eff and "sales.customer.edit" in eff  # union of both roles
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: assert ('finance.payment.reverse' in {'audit.view', 'booking.create', 'booking.read', 'catalogue.write', 'customer.kyc_view', 'customer.portal_manage', ...})
+
+tests/test_rbac.py:66: AssertionError
+___________________ test_sgh_booking_60_40_and_cash_payment ____________________
+[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
+
+admin_token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDdhOGUiLCJjaWQiOiI2MWUzNWMx...oiYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDQxOTYwLCJleHAiOjE3OTMwNDI4NjB9.nPeDK_yGw11wtjy0A5MgiSFBJ7lXLC6Blo7AkQvlUaA'
+accounts_token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMDNiMzdjMi0yMmMwLTRiY2MtOThjMS1iOTI0OTM5YTNiMDYiLCJjaWQiOiI2MWUzNWMx...oiYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDQyMDE5LCJleHAiOjE3OTMwNDI5MTl9.6MfpiL5CQbcSRU2ApV7dTBHgMofRa9V-h_u7MLXNk_8'
+
+    def test_sgh_booking_60_40_and_cash_payment(admin_token, accounts_token):
+        H = _h(admin_token)
+    
+        # Find SGH project and an Available flat
+        projects = requests.get(f"{API}/projects?page_size=50", headers=H, timeout=30).json()
+        sgh = next((p for p in projects["items"] if p.get("code") == "SGH"), None)
+        assert sgh, "SGH project missing"
+    
+        flats = requests.get(f"{API}/flats?project_id={sgh['id']}&status=Available&page_size=20", headers=H, timeout=30).json()
+        assert flats.get("items"), "need an Available SGH flat"
+        flat = flats["items"][0]
+    
+        customers = requests.get(f"{API}/customers?page_size=5", headers=H, timeout=30).json()
+        cust = customers["items"][0]
+    
+        # Compose a booking payload. Agreed value from flat rate.
+        agreed = flat.get("final_price") or flat.get("agreed_value") or 10000000
+        cash = int(agreed * 0.6)
+        acct = int(agreed - cash)
+        body = {
+            "flat_id": flat["id"],
+            "customer_id": cust["id"],
+            "booking_date": "2026-01-15",
+            "agreement_value": agreed,
+            "cash_agreed": cash,
+            "account_agreed": acct,
+        }
+        import uuid
+        r = requests.post(f"{API}/bookings", headers={**H, "Idempotency-Key": str(uuid.uuid4())}, json=body, timeout=30)
+        if r.status_code not in (200, 201):
+            pytest.skip(f"Booking create not accepted in this shape: {r.status_code} {r.text[:200]}")
+        bk = r.json()
+        bk_id = bk.get("id") or bk.get("booking", {}).get("id")
+        assert bk_id
+    
+        # GET booking → cash_agreed_paise > 0
+        g = requests.get(f"{API}/bookings/{bk_id}", headers=H, timeout=30).json()
+        cap = g.get("cash_agreed_paise") or g.get("cash_agreed", 0) * 100
+        assert cap and cap > 0, "cash_agreed_paise must be > 0 for SGH"
+    
+        # Post ₹10,000 cash via accounts user
+        HA = _h(accounts_token)
+        # Get Cash payment mode
+        modes = requests.get(f"{API}/catalogues", headers=H, timeout=30).json()["types"].get("payment_modes", [])
+        cash_mode = next((m for m in modes if m.get("code") == "CASH" or (m.get("label") or m.get("name")) == "Cash"), None)
+        assert cash_mode, "Cash payment mode missing"
+        pay = {
+            "booking_id": bk_id,
+            "against": "FLAT_VALUE",
+            "payment_category": "Cash",
+            "amount": 10000,
+            "payment_date": "2026-01-15",
+            "payment_mode_id": cash_mode["id"],
+        }
+        r2 = requests.post(f"{API}/payments", headers={**HA, "Idempotency-Key": str(uuid.uuid4())}, json=pay, timeout=30)
+>       assert r2.status_code in (200, 201), r2.text
+E       AssertionError: {"detail":"Missing permission: finance.payment.create","code":"PERMISSION_DENIED","request_id":"4623b2f7334445dd","missing":"finance.payment.create","any_of":["finance.payment.create"],"error":{"code":"PERMISSION_DENIED","message":"Missing permission: finance.payment.create","details":[{"missing":"finance.payment.create","any_of":["finance.payment.create"]}],"request_id":"4623b2f7334445dd"}}
+E       assert 403 in (200, 201)
+E        +  where 403 = <Response [403]>.status_code
+
+tests/test_e8_undo_api.py:156: AssertionError
+___________________ TestRBAC.test_projectadmin_scoped_to_SGH ___________________
+[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
+
+self = <tests.test_kkt_erp.TestRBAC object at 0xfcd004412a50>
+
+    def test_projectadmin_scoped_to_SGH(self):
+        h = _h("projectadmin@kkt.in")
+        r = requests.get(f"{API}/projects", headers=h)
+>       assert r.status_code == 200
+E       assert 403 == 200
+E        +  where 403 = <Response [403]>.status_code
+
+tests/test_kkt_erp.py:144: AssertionError
+_____________________ test_documents_upload_download_rbac ______________________
+[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
+
+    def test_documents_upload_download_rbac():
+        cust = httpx.get(f"{BASE}/customers?page_size=1", headers=H("admin@kkt.in")).json()["items"][0]
+        files = {"file": ("t.png", io.BytesIO(b"\x89PNG\r\n\x1a\n" + b"0" * 50), "image/png")}
+        r = httpx.post(
+            f"{BASE}/documents",
+            data={"entity_type": "customer", "entity_id": cust["id"], "is_sensitive": "true"},
+            files=files,
+            headers=H("sales@kkt.in"),
+            timeout=60,
+        )
+>       assert r.status_code == 201, r.text
+E       AssertionError: {"detail":"Missing permission: sales.customer.edit","code":"FORBIDDEN","request_id":"9b1cf3d23c6c41ac","error":{"code":"FORBIDDEN","message":"Missing permission: sales.customer.edit","details":[],"request_id":"9b1cf3d23c6c41ac"}}
+E       assert 403 == 201
+E        +  where 403 = <Response [403 Forbidden]>.status_code
+
+tests/test_phase_2.py:84: AssertionError
+____________________ test_leads_board_and_crud_and_convert _____________________
+[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
+
+    def test_leads_board_and_crud_and_convert():
+        r = httpx.get(f"{BASE}/leads/board", headers=H("sales@kkt.in"))
+>       assert r.status_code == 200
+E       assert 403 == 200
+E        +  where 403 = <Response [403 Forbidden]>.status_code
+
+tests/test_phase_2.py:107: AssertionError
+__________ TestErpServiceRequests.test_filters_and_detail_and_actions __________
+[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
+
+self = <tests.test_phase_5.TestErpServiceRequests object at 0xfccfc395f190>
+sales_tok = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI4NGIzOTI4My1jMTc5LTQ4YzItOGI0YS1jZWUxMGJhZjY0MjEiLCJjaWQiOiI2MWUzNWMx...oiYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDQyMDUwLCJleHAiOjE3OTMwNDI5NTB9.YNZ1OHI2clibzi0bAI_gZHEGCeNpek9tn7DjyzVKkBY'
+admin_tok = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDdhOGUiLCJjaWQiOiI2MWUzNWMx...oiYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDQyMDUwLCJleHAiOjE3OTMwNDI5NTB9.qIvIBdBcTPnmSY_95nm0RQZiDherviklCC095MIeFAw'
+
+    def test_filters_and_detail_and_actions(self, sales_tok, admin_tok):
+        r = requests.get(f"{BASE}/api/service-requests?status=New", headers=_hdr(sales_tok))
+>       assert r.status_code == 200
+E       assert 403 == 200
+E        +  where 403 = <Response [403]>.status_code
+
+tests/test_phase_5.py:341: AssertionError
+=============================== warnings summary ===============================
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+  /root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+tests/test_kkt_erp.py::TestBlock::test_create_block_and_generation
+tests/test_kkt_erp.py::TestFlatType::test_create_flat_type_auto_area
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+  /root/.venv/lib/python3.11/site-packages/_pytest/fixtures.py:1313: PytestRemovedIn10Warning: Class-scoped fixture defined as instance method is deprecated.
+  Instance attributes set in this fixture will NOT be visible to test methods,
+  as each test gets a new instance while the fixture runs only once per class.
+  Use @classmethod decorator and set attributes on cls instead.
+  See https://docs.pytest.org/en/stable/deprecations.html#class-scoped-fixture-as-instance-method
+    fixturefunc = resolve_fixture_function(fixturedef, request)
+
+tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources
+  /root/.venv/lib/python3.11/site-packages/_pytest/python.py:171: PytestReturnNotNoneWarning: Test functions should return None, but tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources returned <class 'str'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_phase_3.py::test_project_admin_scope - assert 403 == 200
+FAILED tests/test_phase_4_full.py::test_reports_rbac - AssertionError: assert...
+FAILED tests/test_phase_4_full.py::test_dashboard_accounts - KeyError: 'role'
+FAILED tests/test_phase_4_full.py::test_dashboard_sales - KeyError: 'role'
+FAILED tests/test_phase_4_full.py::test_dashboard_project_admin - KeyError: '...
+FAILED tests/test_phase_4_full.py::test_notifications_website_enquiry - Asser...
+FAILED tests/test_phase_4_full.py::test_marketing_permissions - AssertionErro...
+FAILED tests/test_phase_11a.py::test_document_project_scope_404 - AssertionEr...
+FAILED tests/test_phase_11a.py::test_catalogue_bundle_etag_and_inline_add - A...
+FAILED tests/test_hardening.py::test_regression_anchor_story - AssertionError...
+FAILED tests/test_story_behaviours.py::test_kyc_masked_for_sales_revealed_for_accounts
+FAILED tests/test_permission_matrix.py::test_matrix_file_matches_runtime - As...
+FAILED tests/test_phase_d_perf.py::test_stages_forward_only_and_undo_roundtrip
+FAILED tests/test_rbac.py::test_multi_role_union_and_direct_deny - AssertionE...
+FAILED tests/test_e8_undo_api.py::test_sgh_booking_60_40_and_cash_payment - A...
+FAILED tests/test_kkt_erp.py::TestRBAC::test_projectadmin_scoped_to_SGH - ass...
+FAILED tests/test_phase_2.py::test_documents_upload_download_rbac - Assertion...
+FAILED tests/test_phase_2.py::test_leads_board_and_crud_and_convert - assert ...
+FAILED tests/test_phase_5.py::TestErpServiceRequests::test_filters_and_detail_and_actions
+ERROR tests/test_phase_b_hardening_review.py::test_receipt_pdf_text_and_deterministic
+ERROR tests/test_phase_b_hardening_review.py::test_allotment_pdf_has_signature
+ERROR tests/test_phase_b_hardening_review.py::test_demand_letter_pdf_has_signature
+19 failed, 467 passed, 1 skipped, 9 warnings, 3 errors in 204.10s (0:03:24)
