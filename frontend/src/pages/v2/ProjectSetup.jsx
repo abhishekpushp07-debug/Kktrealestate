@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Check, Plus, Trash2 } from "lucide-react";
 import api, { errMsg } from "@/lib/api";
@@ -113,7 +113,7 @@ function Stages({ seq, setSeq, cats, setup }) {
   const move = (i, d) => { const n = [...seq]; const [x] = n.splice(i, 1); n.splice(i + d, 0, x); setSeq(n.map((s, k) => ({ ...s, seq: k + 1 }))); };
   return (
     <div className="grid gap-6 xl:grid-cols-2">
-      <Card testId="stages-chosen"><h3 className="font-display text-lg">Project sequence</h3><p className="mb-4 text-xs text-txt-secondary">Applies to every tower by default; a tower can override later from its Construction tab.</p>
+      <Card testId="stages-chosen"><h3 className="font-display text-lg">Project sequence (setup summary)</h3><p className="mb-4 text-xs text-txt-secondary">Default order for new towers. Per-tower stage plans are managed in <Link to="/masters/stage-plans" className="font-semibold text-ink-950 underline" data-testid="setup-link-stage-plans">Masters → Construction Stage Plans</Link>.</p>
         <ol className="space-y-2">{seq.map((s, i) => <li key={s.stage_id} className="flex items-center gap-3 rounded-xl border border-warm-200 px-3 py-2"><span className="grid h-7 w-7 place-items-center rounded-full bg-ink-950 font-display text-xs text-gold-400">{i + 1}</span><span className="flex-1 text-sm font-semibold">{all.find((a) => a.value === s.stage_id)?.label}</span>{planRefs[s.stage_id] && <span className="pill bg-gold-light text-[#8a6d12]">{planRefs[s.stage_id]} plan{planRefs[s.stage_id] > 1 ? "s" : ""}</span>}<button type="button" disabled={i === 0} onClick={() => move(i, -1)} className="text-txt-muted hover:text-ink-950 disabled:opacity-30">↑</button><button type="button" disabled={i === seq.length - 1} onClick={() => move(i, 1)} className="text-txt-muted hover:text-ink-950 disabled:opacity-30">↓</button><button type="button" onClick={() => setSeq(seq.filter((x) => x.stage_id !== s.stage_id).map((x, k) => ({ ...x, seq: k + 1 })))} className="text-txt-muted hover:text-brick" aria-label="Remove"><Trash2 className="h-4 w-4" /></button></li>)}</ol>
         {seq.length === 0 && <p className="text-sm text-txt-muted">Pick stages from the catalogue →</p>}
       </Card>

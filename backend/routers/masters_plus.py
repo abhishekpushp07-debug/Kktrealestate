@@ -76,6 +76,8 @@ async def stage_usage(stage_id: str, user: dict = Depends(require("masters.const
 # ---------------- Stage plans ----------------
 @router.get("/stage-plans")
 async def list_stage_plans(project_id: str | None = None, block_id: str | None = None, user: dict = Depends(require("masters.stage_plan.view"))):
+    from tools.migrate_phase_m import ensure_booking_stage
+    await ensure_booking_stage(user["company_id"])
     q = {"company_id": user["company_id"], **({"project_id": project_id} if project_id else {}), **({"block_id": block_id} if block_id else {})}
     items = await db.construction_stage_plans.find(q, {"_id": 0}).sort("name", 1).to_list(500)
     stages = await _stages(user["company_id"])
