@@ -4,7 +4,7 @@ from db import db
 from deps import require
 from services.counters import recompute_all
 from services.ledger import rebuild
-from utils import ApiError, StrictModel, client_ip, write_audit
+from utils import ApiError, StrictModel, client_ip, now_iso, write_audit
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -21,6 +21,16 @@ async def reconcile(user: dict = Depends(require("admin.data.recompute"))):
 
 class ReseedIn(StrictModel):
     confirm: str
+    story: bool = False
+    as_of: str | None = None
+
+
+class MarkerIn(StrictModel):
+    as_of: str
+    bookings: int = 0
+
+
+RESEED_JOB: dict = {"status": "idle"}
 
 
 BUSINESS_COLLECTIONS = ["construction_stages", "payment_plans", "payment_plan_assignments", "portal_accounts", "portal_refresh_tokens", "service_requests", "service_categories", "notices", "construction_photos", "notifications", "projects", "blocks", "flats", "rate_cards", "parking_slots", "customers", "leads", "bookings", "payments", "demands", "ledger_entries", "contra_entries", "documents",
@@ -42,6 +52,7 @@ async def reseed(body: ReseedIn, request: Request, user: dict = Depends(require(
     for c in await db.list_collection_names():
         if c not in keep and not c.startswith("system."):
             await db[c].delete_many({})
+    await db.settings.update_one({"key": "story"}, {"$set": {"value": None}}, upsert=True)
     await seed()
     await seed_phase15()
     await seed_phase2()
@@ -72,8 +83,64 @@ async def reseed(body: ReseedIn, request: Request, user: dict = Depends(require(
     await backfill_price_paise()
     await db.settings.update_one({"key": "roles_version"}, {"$inc": {"value": 1}}, upsert=True)
     await recompute_all()
+    if body.story:  # story mode: keep the base setup (company, users, roles, masters, projects/towers/flats, plans, stages); every business record is then driven through the API by tools/story_seed.py
+        await _wipe_business_records()
+        from services.owner_bootstrap import ensure_owner
+        await ensure_owner()
+        await db.settings.update_one({"key": "roles_version"}, {"$inc": {"value": 1}}, upsert=True)
+        await recompute_all()
+        await write_audit(user, "admin.reseed", "system", "seed", after={"mode": "story", "as_of": body.as_of}, ip=client_ip(request))
+        import asyncio
+        asyncio.get_event_loop().create_task(_run_story(body.as_of))
+        return {"ok": True, "reseeded": BUSINESS_COLLECTIONS, "story": True, "status": "running"}
     await write_audit(user, "admin.reseed", "system", "seed", after={"collections": BUSINESS_COLLECTIONS}, ip=client_ip(request))
     return {"ok": True, "reseeded": BUSINESS_COLLECTIONS}
+
+
+STORY_WIPE = ["customers", "leads", "site_visits", "bookings", "payments", "demands", "ledger_entries", "contra_entries", "documents", "communications", "service_requests", "portal_accounts", "portal_refresh_tokens",
+              "notifications", "refunds", "cash_openings", "idempotency_keys", "cms_testimonials", "project_summaries", "block_summaries", "customer_summaries", "dashboard_snapshots", "cache", "report_cache", "notices"]
+
+
+async def _wipe_business_records():
+    for c in STORY_WIPE:
+        await db[c].delete_many({})
+    await db.counters.delete_many({"scope": {"$nin": ["project_code"]}})
+    await db.flats.update_many({}, {"$set": {"status": "Available", "booking_id": None}})
+    await db.parking_slots.update_many({}, {"$set": {"status": "Available", "booking_id": None, "customer_id": None}})
+    await db.blocks.update_many({}, {"$set": {"construction_percent": 0}, "$unset": {"construction_stages": "", "milestones": ""}})  # stages rebuilt lazily from the sequence by ensure_block_stages
+
+
+async def _run_story(as_of: str | None):
+    import asyncio
+    import os
+    import subprocess
+    import sys
+    RESEED_JOB.update({"status": "running", "as_of": as_of, "log": "/tmp/story_reseed.log"})
+    env = {**os.environ, "STORY_BASE_URL": "http://127.0.0.1:8001"}
+    proc = await asyncio.create_subprocess_exec(sys.executable, "tools/story_seed.py", *(["--as-of", as_of] if as_of else []), cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))), env=env, stdout=open("/tmp/story_reseed.log", "w"), stderr=subprocess.STDOUT)
+    rc = await proc.wait()
+    RESEED_JOB.update({"status": "done" if rc == 0 else "failed", "rc": rc})
+
+
+@router.get("/reseed/status")
+async def reseed_status(user: dict = Depends(require("admin.data.reseed"))):
+    return RESEED_JOB
+
+
+@router.get("/story-marker")
+async def story_marker(user: dict = Depends(require("admin.data.reseed"))):
+    doc = await db.settings.find_one({"key": "story"}, {"_id": 0})
+    return (doc or {}).get("value") or {}
+
+
+@router.post("/story-marker")
+async def set_story_marker(body: MarkerIn, user: dict = Depends(require("admin.data.reseed"))):
+    from services.owner_bootstrap import ensure_owner
+    val = {"as_of": body.as_of, "bookings": body.bookings, "at": now_iso()}
+    await db.settings.update_one({"key": "story"}, {"$set": {"value": val}}, upsert=True)
+    await ensure_owner()
+    await recompute_all()
+    return val
 
 
 # ---------- Backup & export ----------
