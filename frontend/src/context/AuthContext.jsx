@@ -65,7 +65,7 @@ export function AuthProvider({ children }) {
 
   const value = useMemo(() => ({
     user, company, surfaces, loading, login, loginMfa, logout, setCompany, refreshMe,
-    can: (perm) => !!user?.is_super_admin || !!user?.permissions?.includes(canonical(perm)),
+    can: (perm) => !!user?.is_super_admin || (perm.endsWith(".*") ? !!user?.permissions?.some((c) => c.startsWith(perm.slice(0, -1))) : !!user?.permissions?.includes(canonical(perm))),
     canAny: (...perms) => !!user?.is_super_admin || perms.some((p) => user?.permissions?.includes(canonical(p))),
   }), [user, company, surfaces, loading, login, loginMfa, logout, refreshMe]);
 

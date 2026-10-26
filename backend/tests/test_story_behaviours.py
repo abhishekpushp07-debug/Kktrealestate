@@ -48,26 +48,6 @@ def test_cheque_pending_clear_then_reverse(admin_headers, work_booking):
     assert requests.get(f"{API}/payments/{p['id']}/receipt", headers=h).json()["watermark"] == "REVERSED"
 
 
-# ---- construction: forward-only + undo (replaces test_milestones_forward_only_and_undo_block, TestTowerBConstruction) ----
-def test_stages_forward_only_and_undo_roundtrip(admin_headers):
-    h = admin_headers
-    blk = next(b for b in requests.get(f"{API}/blocks?page_size=20", headers=h).json()["items"] if b["code"] == "C")  # Tower C: mid-construction in the story
-    ms = requests.get(f"{API}/blocks/{blk['id']}/milestones", headers=h).json()
-    nxt = ms["next_seq"]
-    assert nxt is not None
-    # stages are sequential: completing seq+1 catches up seq too (both marked, both audited), undo walks back one at a time
-    done = requests.post(f"{API}/blocks/{blk['id']}/milestones/{nxt + 1}/complete", headers=h, json={"completed_on": date.today().isoformat()})
-    assert done.status_code == 200 and done.json().get("audit_id") and len(done.json()["marked"]) == 2, done.text
-    after = requests.get(f"{API}/blocks/{blk['id']}/milestones", headers=h).json()
-    assert after["next_seq"] in (None, nxt + 2) and after["construction_percent"] > ms["construction_percent"]
-    assert requests.post(f"{API}/blocks/{blk['id']}/milestones/{nxt}/complete", headers=h, json={"completed_on": date.today().isoformat()}).status_code == 409  # already completed
-    for _ in range(2):
-        undo = requests.post(f"{API}/blocks/{blk['id']}/construction/undo", headers=h, json={"reason": "story rewrite roundtrip"})
-        assert undo.status_code == 200 and undo.json().get("audit_id"), undo.text
-    back = requests.get(f"{API}/blocks/{blk['id']}/milestones", headers=h).json()
-    assert back["next_seq"] == nxt and back["construction_percent"] == ms["construction_percent"]
-
-
 def test_block_percent_matches_completed_stage_weights(admin_headers):
     for blk in requests.get(f"{API}/blocks?page_size=20", headers=admin_headers).json()["items"]:
         ms = requests.get(f"{API}/blocks/{blk['id']}/milestones", headers=admin_headers).json()

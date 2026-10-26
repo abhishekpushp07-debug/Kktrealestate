@@ -121,3 +121,31 @@ def test_cors_evil_origin():
     acao = headers.get("Access-Control-Allow-Origin") or headers.get("access-control-allow-origin")
     print(f"CORS ACAO header for evil origin: {acao!r}")
     # Report-only; do not fail (ingress may inject)
+
+
+from datetime import date
+from tests.conftest import BASE as _B
+API_B = f"{_B}/api"
+
+
+# Construction complete→undo roundtrip lives here ON PURPOSE: xdist runs with --dist loadscope, so co-locating it with
+# test_integrity_report_fresh serialises the two — otherwise the integrity snapshot can land between complete and undo.
+def test_stages_forward_only_and_undo_roundtrip(admin_headers):
+    h = admin_headers
+    blk = next(b for b in requests.get(f"{API_B}/blocks?page_size=20", headers=h).json()["items"] if b["code"] == "C")  # Tower C: mid-construction in the story
+    ms = requests.get(f"{API_B}/blocks/{blk['id']}/milestones", headers=h).json()
+    nxt = ms["next_seq"]
+    assert nxt is not None
+    # stages are sequential: completing seq+1 catches up seq too (both marked, both audited), undo walks back one at a time
+    done = requests.post(f"{API_B}/blocks/{blk['id']}/milestones/{nxt + 1}/complete", headers=h, json={"completed_on": date.today().isoformat()})
+    assert done.status_code == 200 and done.json().get("audit_id") and len(done.json()["marked"]) == 2, done.text
+    after = requests.get(f"{API_B}/blocks/{blk['id']}/milestones", headers=h).json()
+    assert after["next_seq"] in (None, nxt + 2) and after["construction_percent"] > ms["construction_percent"]
+    assert requests.post(f"{API_B}/blocks/{blk['id']}/milestones/{nxt}/complete", headers=h, json={"completed_on": date.today().isoformat()}).status_code == 409  # already completed
+    for _ in range(2):
+        undo = requests.post(f"{API_B}/blocks/{blk['id']}/construction/undo", headers=h, json={"reason": "story rewrite roundtrip"})
+        assert undo.status_code == 200 and undo.json().get("audit_id"), undo.text
+    back = requests.get(f"{API_B}/blocks/{blk['id']}/milestones", headers=h).json()
+    assert back["next_seq"] == nxt and back["construction_percent"] == ms["construction_percent"]
+
+

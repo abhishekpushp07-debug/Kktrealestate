@@ -8,7 +8,7 @@ Each test below depended on the legacy demo seed (fixed demo personas, pre-switc
 | `test_phase_2.py::test_concurrency_and_sum_mismatch` | Needed free `V1` demo flats; version-conflict + idempotency now in `test_hardening.py::test_version_conflict_409` / `test_idempotency_replay_customer_create`. |
 | `test_phase_2.py::test_payment_requires_idempotency_and_bucket_cap_and_revision` | Rewritten: `test_story_behaviours.py::test_cash_bucket_cap_rejected_on_anchor` + `test_hardening.py::test_payment_without_idempotency_key_rejected` + `effects::test_agreement_revision_reproportions_open_demands`. |
 | `test_phase_2.py::test_cheque_pending_clear_bounce_reverse` | Rewritten: `test_story_behaviours.py::test_cheque_pending_clear_then_reverse` + `effects::test_cheque_bounce_raises_charge_and_notifies`. |
-| `test_phase_2.py::test_milestones_forward_only_and_undo_block` | Rewritten: `test_story_behaviours.py::test_stages_forward_only_and_undo_roundtrip`. |
+| `test_phase_2.py::test_milestones_forward_only_and_undo_block` | Rewritten: `test_phase_d_perf.py::test_stages_forward_only_and_undo_roundtrip` (co-located with the integrity test for loadscope ordering). |
 | `test_phase_2.py::test_kyc_masking_and_reveal` | Rewritten on story customer: `test_story_behaviours.py::test_kyc_masked_for_sales_revealed_for_accounts`. |
 | `test_phase_2.py::test_roznamcha` | Hard-coded demo day totals; rewritten as a data-relative identity: `test_story_behaviours.py::test_roznamcha_identity_on_story_cash_day`. |
 | `test_phase_3.py::test_cms_collection_counts[testimonials-6]` | Testimonials were demo content; the story dataset ships none. Other CMS collections still asserted. |
