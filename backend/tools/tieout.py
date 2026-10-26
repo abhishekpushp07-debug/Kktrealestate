@@ -127,6 +127,17 @@ def main(base):
             bad2 += 1
     tie("Σ Udhar − Σ Jama == outstanding − advance (every booking)", 0, bad2, "two-sided ledger law")
 
+    # Phase I: every report has its own tie-out set (tools/tieout_reports.py) — folded in so this stays the one scoreboard
+    from tools.tieout_reports import main as reports_main
+    import io, contextlib
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        reports_ok = reports_main(base)
+    rep_lines = [l for l in buf.getvalue().splitlines() if l.startswith(("PASS", "FAIL"))]
+    for l in rep_lines:
+        rows.append((f"report {l[5:].split(' report=')[0].strip()}", "", "", l[:4], "tools/tieout_reports.py"))
+    tie("Phase I report tie-outs all PASS", True, reports_ok, f"{len(rep_lines)} report ties")
+
     os.makedirs("/app/memory/qa/journey", exist_ok=True)
     with open("/app/memory/qa/journey/tieout_raw.md", "w") as f:
         f.write(f"# Report tie-outs · DB `{os.environ['DB_NAME']}` · {date.today()}\n\n| Tie-out | Report value | Raw value | Result | Note |\n|---|---|---|---|---|\n")
