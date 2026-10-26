@@ -38,8 +38,18 @@ async def list_audit_logs(
 ):
     q = _query(user, params, entity_type, entity_id, actor_id, action, date_from, date_to, module, field, record)
     sort = [("created_at", -1)] if params.sort in ("name", "-created_at") else [("created_at", 1)]
-    coll = db.audit_logs_archive if include_archive else db.audit_logs
-    return await paginate(coll, q, params, sort, {"before": 0, "after": 0, "propagated": 0, "surfaces": 0})
+    proj = {"before": 0, "after": 0, "propagated": 0, "surfaces": 0}
+    if not include_archive:
+        return await paginate(db.audit_logs, q, params, sort, proj)
+    # hot + archive together: archived rows are older than every hot row, so hot pages come first and the archive continues the same ordering
+    hot = await paginate(db.audit_logs, q, params, sort, proj)
+    arch_total = await db.audit_logs_archive.count_documents(q)
+    out = {**hot, "total": hot["total"] + arch_total, "archive_total": arch_total}
+    if len(hot["items"]) < params.page_size:
+        need = params.page_size - len(hot["items"])
+        skip = max(0, (params.page - 1) * params.page_size - hot["total"])
+        out["items"] = hot["items"] + [{**r, "archived": True} for r in await db.audit_logs_archive.find(q, {"_id": 0, **proj}).sort(sort).skip(skip).limit(need).to_list(need)]
+    return out
 
 
 @router.get("/export.csv")
@@ -49,8 +59,9 @@ async def export_csv(params: ListParams = Depends(), entity_type: str | None = N
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow(["created_at", "user", "action", "module", "entity_type", "record_id", "record", "changes", "ip", "request_id"])
-    coll = db.audit_logs_archive if include_archive else db.audit_logs
-    async for r in coll.find(q, {"_id": 0}).sort("created_at", -1).limit(10000):
+    rows = db.audit_logs.find(q, {"_id": 0}).sort("created_at", -1).limit(10000)
+    rows = [r async for r in rows] + ([r async for r in db.audit_logs_archive.find(q, {"_id": 0}).sort("created_at", -1).limit(10000)] if include_archive else [])
+    for r in rows:
         ch = "; ".join(f"{c['label']}: {c.get('old')} → {c.get('new')}" for c in (r.get("changed_fields") or []))
         w.writerow([r.get("created_at"), r.get("user_name") or r.get("actor_name"), r.get("action"), r.get("module_name"), r.get("entity_type"), r.get("entity_id"), r.get("record_label"), ch, r.get("ip"), r.get("request_id")])
     return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=audit-logs.csv"})
