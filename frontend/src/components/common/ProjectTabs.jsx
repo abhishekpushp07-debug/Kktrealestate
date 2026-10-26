@@ -1,3 +1,4 @@
+import { HistoryButton } from "@/components/common/HistoryTimeline";
 import { useState } from "react";
 import { Plus, Play, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
@@ -77,6 +78,7 @@ export function RateCardsTab({ projectId, onApplied }) {
               <div className="flex items-start justify-between"><div><p className="font-bold text-ink-950">{rc.name}</p><p className="text-xs text-txt-secondary">Effective {fmtDate(rc.effective_from)} · {rc.rates.length} rates · {rc.plc_rules.length} PLC rules</p></div><Pill tone={rc.status === "Active" ? "green" : rc.status === "Draft" ? "amber" : "slate"}>{rc.status}</Pill></div>
               {rc.applied_at && <p className="mt-2 text-xs text-txt-secondary">Applied {fmtDateTime(rc.applied_at)} · {num(rc.applied_count)} flats</p>}
               {can("masters.rate_card.edit") && <div className="mt-3 flex gap-2">
+                <HistoryButton entityType="rate_card" entityId={rc.id} label={rc.name} />
                 {rc.status === "Draft" && <Button size="sm" variant="outline" onClick={() => act(rc, "activate")} data-testid={`rc-activate-${rc.id}`}><CheckCircle2 className="mr-1 h-3.5 w-3.5" />Activate</Button>}
                 {rc.status === "Active" && <Button size="sm" onClick={() => act(rc, "apply")} className="bg-gold text-ink-950 hover:bg-gold-hover" data-testid={`rc-apply-${rc.id}`}><Play className="mr-1 h-3.5 w-3.5" />Apply to Available flats</Button>}
               </div>}

@@ -1,3 +1,4 @@
+import { HistoryButton } from "@/components/common/HistoryTimeline";
 import { useAuth } from "@/context/AuthContext";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -59,7 +60,7 @@ function RoleEditor({ role, groups, onSaved }) {
           </tr>); })}</tbody>
       </table></div>
       <div className="flex items-center justify-between gap-3 border-t border-warm-100 bg-warm-50/60 px-6 py-4">
-        {!role.is_system && !isNew && can("admin.role.edit") ? <button className="btn btn-ghost text-brick" onClick={del} data-testid="role-delete-btn"><Trash2 className="h-4 w-4" />Deactivate role</button> : <span className="text-xs text-txt-muted">{role.is_system ? "System role · name is fixed" : ""}</span>}
+        {!isNew && <HistoryButton entityType="role" entityId={role.id} label={role.name} />}{!role.is_system && !isNew && can("admin.role.edit") ? <button className="btn btn-ghost text-brick" onClick={del} data-testid="role-delete-btn"><Trash2 className="h-4 w-4" />Deactivate role</button> : <span className="text-xs text-txt-muted">{role.is_system ? "System role · name is fixed" : ""}</span>}
         <div className="flex items-center gap-3">{dirty ? <span className="text-xs text-txt-secondary" data-testid="role-diff-summary">+{added.length} / −{removed.length}</span> : null}<button className="btn btn-primary" disabled={busy || (!dirty && !isNew)} onClick={() => (isNew && !added.length ? save() : setPreview(true))} data-testid="role-save-btn">{isNew ? "Create role" : "Review & save"}</button></div>
       </div>
       <Dialog open={preview} onOpenChange={setPreview}>

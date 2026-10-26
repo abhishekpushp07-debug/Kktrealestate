@@ -1,3 +1,4 @@
+import { HistoryButton } from "@/components/common/HistoryTimeline";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Plus, Pencil, Ban, RotateCcw, LayoutGrid, List, ChevronRight, Link2, Search } from "lucide-react";
@@ -49,7 +50,7 @@ export default function MasterPage() {
   const FormComp = cfg.custom === "flatType" ? FlatTypeForm : cfg.custom === "paymentPlan" ? PaymentPlanForm : cfg.custom === "floorPlan" ? FloorPlanForm : GenericMasterForm;
   const nameOf = (r) => r.name || r.bank_name || r.title;
   const Actions = ({ r }) => write && <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-    <button className="btn btn-ghost btn-sm !px-2" onClick={() => setEditing(r)} aria-label="Edit" data-testid={`master-edit-${r.id}`}><Pencil className="h-3.5 w-3.5" /></button>
+    <HistoryButton entityType={cfg.kind.replace(/-/g, "_")} entityId={r.id} label={r.name} /><button className="btn btn-ghost btn-sm !px-2" onClick={() => setEditing(r)} aria-label="Edit" data-testid={`master-edit-${r.id}`}><Pencil className="h-3.5 w-3.5" /></button>
     <button className={cn("btn btn-sm", r.is_active ? "btn-ghost text-brick" : "btn-secondary text-sage")} onClick={() => askToggle(r)} data-testid={`master-toggle-${r.id}`}>{r.is_active ? <><Ban className="h-3.5 w-3.5" />Deactivate</> : <><RotateCcw className="h-3.5 w-3.5" />Restore</>}</button>
   </div>;
 

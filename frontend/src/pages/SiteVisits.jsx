@@ -1,3 +1,4 @@
+import { HistoryButton } from "@/components/common/HistoryTimeline";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { CalendarDays, ChevronLeft, ChevronRight, Download, List, Plus } from "lucide-react";
@@ -65,6 +66,7 @@ export function VisitActions({ v, onDone, compact }) {
   const act = async (action, body = {}) => { setBusy(true); try { await api.post(`/site-visits/${v.id}/${action}`, body); toast.success(`Marked ${action}`); setMode(null); setNote(""); onDone(); } catch (e) { toast.error(errMsg(e)); } finally { setBusy(false); } };
   const open = !["Completed", "No-show", "Cancelled"].includes(v.status);
   return <div className="flex flex-wrap items-center gap-1" onClick={(e) => e.stopPropagation()}>
+    <HistoryButton entityType="site_visit" entityId={v.id} />
     {open && <><button type="button" className="btn btn-secondary !h-8 !px-3 text-xs h-8 text-sage" disabled={busy} onClick={() => act("complete")} data-testid={`visit-complete-${v.visit_number}`}>Complete</button><button type="button" className="btn btn-secondary !h-8 !px-3 text-xs h-8 text-brick" disabled={busy} onClick={() => act("no-show")} data-testid={`visit-noshow-${v.visit_number}`}>No-show</button>
       {!compact && <><button type="button" className="btn btn-secondary !h-8 !px-3 text-xs h-8" onClick={() => setMode("reschedule")} data-testid={`visit-reschedule-${v.visit_number}`}>Reschedule</button><button type="button" className="btn btn-ghost !h-8 !px-3 text-xs h-8 text-txt-secondary" onClick={() => setMode("cancel")} data-testid={`visit-cancel-${v.visit_number}`}>Cancel</button></>}</>}
     {!open && v.status === "Cancelled" && !compact && <button type="button" className="btn btn-secondary !h-8 !px-3 text-xs h-8" disabled={busy} onClick={() => act("confirm")} data-testid={`visit-confirm-${v.visit_number}`}>Re-confirm</button>}

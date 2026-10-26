@@ -24,6 +24,7 @@ async def ensure_indexes():
 
 async def archive_old_rows(months: int | None = None, batch: int = 1000) -> dict:
     """Idempotent: copy rows with created_at < cutoff into the archive (upsert by id), then remove them from the hot collection only after the copy is confirmed."""
+    await ensure_indexes()
     months = months or await retention_months()
     cutoff = (clock.today() - timedelta(days=30 * months)).isoformat()
     moved = 0
