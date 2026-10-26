@@ -80,6 +80,8 @@ class ProjectCreate(StrictModel):
     escrow_bank_account_id: str | None = None
     land_area_sqft: float | None = Field(default=None, ge=0)
     phases: list[Phase] = []
+    cancellation_policy: "CancellationPolicy | None" = None
+    bounce_policy: "BouncePolicy | None" = None
 
     @field_validator("code")
     @classmethod
@@ -98,10 +100,20 @@ class CancellationPolicy(StrictModel):
     refund_sla_days: int = Field(default=45, ge=0, le=365)
 
 
+class BouncePolicy(StrictModel):
+    enabled: bool = True
+    charge_type_id: str | None = None
+    amount: float = Field(default=500.0, ge=0)
+
+
+ProjectCreate.model_rebuild()
+
+
 class ProjectUpdate(StrictModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
     default_cash_percent: float | None = Field(default=None, ge=0, le=100)
     cancellation_policy: CancellationPolicy | None = None
+    bounce_policy: BouncePolicy | None = None
     description: str | None = None
     project_type: Literal["Residential", "Commercial", "Mixed"] | None = None
     address: Address | None = None

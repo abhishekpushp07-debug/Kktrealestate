@@ -5,104 +5,36 @@ bringing up nodes...
 ........................................................................ [ 29%]
 ........................................................................ [ 43%]
 ........................................................................ [ 58%]
-................FFFF..........................s......................... [ 73%]
-.............F.......................................................... [ 87%]
+..............................................s......................... [ 73%]
+......................................................F................. [ 87%]
 ........................s...................................             [100%]
 =================================== FAILURES ===================================
-___________________ test_payment_plan_validation_and_create ____________________
-[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
+_____ TestPaymentPlanAssignments.test_assign_stage_plan_to_villa_block_409 _____
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
 
-ctx = {'admin': {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mY...5b57aa', 'created_at': '2026-10-26T20:32:38.870988+00:00', 'updated_at': '2026-10-26T20:32:38.870988+00:00', ...}, ...}
+self = <tests.test_phase_7.TestPaymentPlanAssignments object at 0xfc765c95a2d0>
+H = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDd...xNzkzMDQ3MTUyLCJleHAiOjE3OTMwNDgwNTJ9.o-6EP0hzy7f5q2fB1HvesJwp9IiINF-DzJYYitzvbn0', 'Content-Type': 'application/json'}
 
-    def test_payment_plan_validation_and_create(ctx):
-        h, sp = ctx["admin"], ctx["sp"]
-        ids = sp["stage_ids"]
-        base = {"name": "Flexi 10x10", "project_id": ctx["project"]["id"], "block_id": ctx["tower"]["id"], "stage_plan_id": sp["id"]}
-        rows95 = [{"stage_id": s, "percent": p} for s, p in zip(ids, [10, 20, 20, 20, 15, 10, 0][: len(ids)])]
-        r = requests.post(f"{BASE}/payment-plans/structured", headers=h, json={**base, "rows": rows95}, timeout=30)
-        assert r.status_code == 422 and "100.00%" in r.text, r.text
-        r = requests.post(f"{BASE}/payment-plans/structured", headers=h, json={**base, "rows": rows95 + [{"stage_id": ids[1], "percent": 5}]}, timeout=30)
-        assert r.status_code == 422 and "twice" in r.text
-        rows95[-1]["percent"] += 5
-        rows100 = rows95
-        assert round(sum(x["percent"] for x in rows100), 2) == 100
-        r = requests.post(f"{BASE}/payment-plans/structured", headers=h, json={**base, "rows": rows100}, timeout=30)
->       assert r.status_code == 201, r.text
-E       AssertionError: {"detail":"Internal server error","code":"INTERNAL_ERROR","request_id":"fc80e67d4eaa4be4","error":{"code":"INTERNAL_ERROR","message":"Internal server error","details":[],"request_id":"fc80e67d4eaa4be4"}}
-E       assert 500 == 201
-E        +  where 500 = <Response [500]>.status_code
+    def test_assign_stage_plan_to_villa_block_409(self, H):
+        """Assigning Standard CLP (has ON_STAGE installments) to Villa Block V (no matching stages) → 409."""
+        proj, blk = self._find_project_block(H, "GGV", "Block V")
+        # find Standard CLP plan id
+        rp = requests.get(f"{API}/master/payment-plans?limit=100", headers=H, timeout=10)
+        plans = rp.json().get("items") or rp.json()
+        clp = next((p for p in plans if p.get("name") == "Standard CLP"), None)
+        if not clp:
+            pytest.skip("Standard CLP plan not found")
+        payload = {"payment_plan_id": clp["id"], "project_id": proj["id"], "block_id": blk["id"], "is_default": False}
+        r = requests.post(f"{API}/payment-plan-assignments", headers=H, json=payload, timeout=15)
+        if r.status_code == 201:
+            # delete and report
+            aid = r.json().get("id")
+            if aid:
+                requests.delete(f"{API}/payment-plan-assignments/{aid}", headers=H, timeout=10)
+>           pytest.fail(f"Expected 409 for stage-less tower assignment but got 201: {r.text}")
+E           Failed: Expected 409 for stage-less tower assignment but got 201: {"id":"9cdd9d3b-1fbb-42f9-ade3-93890a1a50ff","company_id":"61e35c1c-91c6-43c9-a732-2f790d5b57aa","payment_plan_id":"703a94b0-7381-4bca-a42e-bbd97f7d6b4f","project_id":"200c7ddc-e071-47aa-95ae-92a43738dcda","block_id":"db2a87c2-8bd2-48ee-9f3f-fe432e325c9a","is_default":false,"effective_from":null,"effective_to":null,"is_active":true,"plan_name":"Standard CLP","plan_code":"STANDARD_CLP","project_name":"Ganesh Green Villas","block_name":"Villa Block V","created_at":"2026-10-26T20:40:53.703660+00:00","created_by":"b63b8b19-94ac-4c8e-845b-faf8019d7a8e"}
 
-tests/test_phase_m_masters.py:87: AssertionError
-__________________ test_stage_removal_blocked_when_referenced __________________
-[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
-
-ctx = {'admin': {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mY...5b57aa', 'created_at': '2026-10-26T20:32:38.870988+00:00', 'updated_at': '2026-10-26T20:32:38.870988+00:00', ...}, ...}
-
-    def test_stage_removal_blocked_when_referenced(ctx):
-        h, sp = ctx["admin"], ctx["sp"]
-        r = requests.patch(f"{BASE}/stage-plans/{sp['id']}", headers=h, json={"name": "zed", "project_id": sp["project_id"], "block_id": sp["block_id"], "stage_ids": sp["stage_ids"][:-1]}, timeout=30)
->       assert r.status_code == 409 and r.json()["code"] == "STAGE_IN_USE", r.text
-E       AssertionError: {"id":"0af5ce53-38ee-4bc4-8e9f-eed2bd8d56b3","company_id":"61e35c1c-91c6-43c9-a732-2f790d5b57aa","created_at":"2026-10-26T20:32:38.902602+00:00","updated_at":"2026-10-26T20:32:38.987953+00:00","created_by":"b63b8b19-94ac-4c8e-845b-faf8019d7a8e","is_active":true,"deleted_at":null,"version":2,"name":"zed","project_id":"200c7ddc-e071-47aa-95ae-92a43738dcda","project_name":"Ganesh Green Villas","block_id":"5365211d-0f00-47dc-b168-8927a77db3d0","block_name":"PM-PB2","stage_ids":["067b9dd6-0349-4e6e-9a29-2c571ce42cfe","75120428-0989-4e76-a8a6-a2833ffdeef7","44835f94-6af8-46ae-baef-86806070122a","d3f14041-6fde-4a03-9b12-e39ad345543f","dbef0af0-0f47-46cf-a723-60728680775d","9e4f79ca-f213-4c98-91af-26f94537ec7d"]}
-E       assert (200 == 409)
-E        +  where 200 = <Response [200]>.status_code
-
-tests/test_phase_m_masters.py:107: AssertionError
-______________________ test_owner_flow_udhar_jama_balance ______________________
-[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
-
-ctx = {'admin': {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mY...5b57aa', 'created_at': '2026-10-26T20:32:38.870988+00:00', 'updated_at': '2026-10-26T20:32:38.870988+00:00', ...}, ...}
-
-    def test_owner_flow_udhar_jama_balance(ctx):
-        h = ctx["admin"]
->       b = _book(ctx)
-            ^^^^^^^^^^
-
-tests/test_phase_m_masters.py:128: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-
-ctx = {'admin': {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mY...5b57aa', 'created_at': '2026-10-26T20:32:38.870988+00:00', 'updated_at': '2026-10-26T20:32:38.870988+00:00', ...}, ...}
-
-    def _book(ctx):
-        h = ctx["admin"]
-        flats = _get(h, "/flats", block_id=ctx["tower"]["id"], status="Available", page_size=5)["items"]
-        assert flats, "tower has no flats"
-        cust = requests.post(f"{BASE}/customers", headers=h, json={"full_name": f"PM Buyer {uuid.uuid4().hex[:4]}", "phone": f"9{uuid.uuid4().int % 10**9:09d}"}, timeout=30)
-        assert cust.status_code == 201, cust.text
->       body = {"customer_id": cust.json()["id"], "flat_id": flats[0]["id"], "payment_plan_id": ctx["plan"]["id"], "agreement_value": 5_000_000, "cash_agreed": 2_500_000, "account_agreed": 2_500_000, "booking_date": "2026-10-20"}
-                                                                                                ^^^^^^^^^^^
-E       KeyError: 'plan'
-
-tests/test_phase_m_masters.py:120: KeyError
-____________________ test_ledger_csv_has_two_sided_columns _____________________
-[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
-
-ctx = {'admin': {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mY...5b57aa', 'created_at': '2026-10-26T20:32:38.870988+00:00', 'updated_at': '2026-10-26T20:32:38.870988+00:00', ...}, ...}
-
-    def test_ledger_csv_has_two_sided_columns(ctx):
->       r = requests.get(f"{BASE}/bookings/{ctx['booking']['id']}/ledger", headers=ctx["admin"], params={"format": "csv"}, timeout=30)
-                                            ^^^^^^^^^^^^^^
-E       KeyError: 'booking'
-
-tests/test_phase_m_masters.py:168: KeyError
-________________ TestProjectSetupSave.test_put_plans_idempotent ________________
-[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
-
-self = <tests.test_phase_11b.TestProjectSetupSave object at 0xff408fa01cd0>
-auth_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDd...xNzkzMDQ2Njc0LCJleHAiOjE3OTMwNDc1NzR9.yf69gX4aO4dyJ9Pxq67GDkh41PQVuSDISOe00B34vgs', 'Content-Type': 'application/json'}
-project_id = 'c170483e-f746-40df-9f1f-e6d798328039'
-
-    def test_put_plans_idempotent(self, auth_headers, project_id):
-        r = requests.get(f"{API}/projects/{project_id}/setup", headers=auth_headers, timeout=20)
-        assignments = [{"payment_plan_id": a["payment_plan_id"], "block_id": a.get("block_id"), "is_default": bool(a.get("is_default"))}
-                       for a in r.json()["plans"]["assignments"]]
-        body = {"assignments": assignments}
-        r2 = requests.put(f"{API}/projects/{project_id}/setup/plans", headers=auth_headers, json=body, timeout=30)
->       assert r2.status_code == 200, f"plans PUT: {r2.status_code} {r2.text[:400]}"
-E       AssertionError: plans PUT: 409 {"detail":"Plan 'Standard CLP' needs stages missing from Tower Z (test)'s sequence: 3rd Slab, Top Slab, Brickwork, Plastering, Finishing","code":"PLAN_STAGES_MISSING","request_id":"09cdfac7701f4850","error":{"code":"PLAN_STAGES_MISSING","message":"Plan 'Standard CLP' needs stages missing from Tower Z (test)'s sequence: 3rd Slab, Top Slab, Brickwork, Plastering, Finishing","details":[],"request_id"
-E       assert 409 == 200
-E        +  where 409 = <Response [409]>.status_code
-
-tests/test_phase_11b.py:79: AssertionError
+tests/test_phase_7.py:186: Failed
 =============================== warnings summary ===============================
 ../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
 ../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
@@ -133,9 +65,5 @@ tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
 =========================== short test summary info ============================
-FAILED tests/test_phase_m_masters.py::test_payment_plan_validation_and_create
-FAILED tests/test_phase_m_masters.py::test_stage_removal_blocked_when_referenced
-FAILED tests/test_phase_m_masters.py::test_owner_flow_udhar_jama_balance - Ke...
-FAILED tests/test_phase_m_masters.py::test_ledger_csv_has_two_sided_columns
-FAILED tests/test_phase_11b.py::TestProjectSetupSave::test_put_plans_idempotent
-5 failed, 485 passed, 2 skipped, 9 warnings in 172.76s (0:02:52)
+FAILED tests/test_phase_7.py::TestPaymentPlanAssignments::test_assign_stage_plan_to_villa_block_409
+1 failed, 489 passed, 2 skipped, 9 warnings in 179.90s (0:02:59)
