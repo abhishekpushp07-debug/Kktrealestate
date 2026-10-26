@@ -191,24 +191,60 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
 
 
 class IdempotencyMiddleware(BaseHTTPMiddleware):
-    """Replays stored responses for POST requests carrying Idempotency-Key (per user, 24h TTL)."""
+    """Phase K durable idempotency: claim (owner, key) with route + body hash BEFORE the handler runs.
+    in-progress duplicate: wait <=10 s then 409 IDEMPOTENCY_IN_PROGRESS; same key different body: 422 IDEMPOTENCY_MISMATCH; different route: 422 IDEMPOTENCY_KEY_REUSED;
+    replay: stored response + Idempotent-Replayed: true; one-time secrets stored redacted so replay is 409 IDEMPOTENT_SECRET_REPLAY; claims abandoned after 60 s; TTL 24 h."""
+    SECRET_KEYS = ("temp_password", "temporary_password", "api_key", "reset_token", "otp", "recovery_codes")
+
+    @staticmethod
+    def _err(status, code, msg, headers=None):
+        return JSONResponse(status_code=status, headers=headers or {}, content={"detail": msg, "code": code, "error": {"code": code, "message": msg}})
 
     async def dispatch(self, request, call_next):
         key = request.headers.get("idempotency-key")
         if request.method != "POST" or not key or not request.url.path.startswith("/api"):
             return await call_next(request)
+        import hashlib
+        from datetime import timedelta
         auth = request.headers.get("authorization", "")
         try:
             sub = jwt.decode(auth[7:], options={"verify_signature": False}).get("sub") if auth.lower().startswith("bearer ") else None
         except Exception:
             sub = None
         owner = sub or request.headers.get("x-forwarded-for", request.client.host if request.client else "anon")
-        existing = await db.idempotency_keys.find_one({"user_id": owner, "key": key}, {"_id": 0})
-        if existing:
-            if existing["path"] != request.url.path:
-                return JSONResponse(status_code=422, content={"detail": "Idempotency-Key already used for a different endpoint", "code": "IDEMPOTENCY_KEY_REUSED", "error": {"code": "IDEMPOTENCY_KEY_REUSED", "message": "Idempotency-Key already used for a different endpoint", "details": []}})
-            return Response(content=existing["body"], status_code=existing["status"], media_type="application/json", headers={"Idempotent-Replayed": "true"})
-        response = await call_next(request)
+        raw = await request.body()
+        body_hash = hashlib.sha256(raw).hexdigest()
+        now = datetime.now(UTC)
+        try:
+            await db.idempotency_claims.insert_one({"owner": owner, "key": key, "path": request.url.path, "body_hash": body_hash, "state": "in_progress", "created_at": now, "updated_at": now})
+        except Exception:
+            deadline = time.time() + 10
+            while True:
+                existing = await db.idempotency_claims.find_one({"owner": owner, "key": key}, {"_id": 0})
+                if not existing:
+                    return self._err(409, "IDEMPOTENCY_IN_PROGRESS", "Request with this Idempotency-Key is still being processed; retry shortly", {"Retry-After": "2"})
+                if existing["path"] != request.url.path:
+                    return self._err(422, "IDEMPOTENCY_KEY_REUSED", "Idempotency-Key already used for a different endpoint")
+                if existing["body_hash"] != body_hash:
+                    return self._err(422, "IDEMPOTENCY_MISMATCH", "Idempotency-Key was used with a different request body")
+                if existing["state"] == "done":
+                    if existing.get("secret_redacted"):
+                        return self._err(409, "IDEMPOTENT_SECRET_REPLAY", "This response carried a one-time secret and cannot be replayed; issue a new request")
+                    return Response(content=existing["body"], status_code=existing["status"], media_type="application/json", headers={"Idempotent-Replayed": "true"})
+                upd = existing["updated_at"]
+                upd = upd if upd.tzinfo else upd.replace(tzinfo=UTC)
+                if now - upd > timedelta(seconds=60):
+                    r = await db.idempotency_claims.update_one({"owner": owner, "key": key, "state": "in_progress", "updated_at": existing["updated_at"]}, {"$set": {"updated_at": now}})
+                    if r.modified_count:
+                        break
+                if time.time() >= deadline:
+                    return self._err(409, "IDEMPOTENCY_IN_PROGRESS", "Request with this Idempotency-Key is still being processed; retry shortly", {"Retry-After": "2"})
+                await asyncio.sleep(0.25)
+        try:
+            response = await call_next(request)
+        except Exception:
+            await db.idempotency_claims.delete_one({"owner": owner, "key": key, "state": "in_progress"})
+            raise
         body = b"".join([chunk async for chunk in response.body_iterator])
         stored = body
         if response.headers.get("content-encoding") == "gzip":
@@ -218,12 +254,11 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             except (EOFError, OSError):
                 stored = None
         if response.status_code < 500 and stored is not None:
-            from datetime import datetime
-            try:
-                await db.idempotency_keys.insert_one({"user_id": owner, "key": key, "path": request.url.path, "status": response.status_code,
-                                                      "body": stored.decode("utf-8", "replace"), "created_at": datetime.now(UTC)})
-            except Exception:
-                pass
+            text = stored.decode("utf-8", "replace")
+            redacted = response.status_code < 300 and any(f'"{k}"' in text for k in self.SECRET_KEYS)
+            await db.idempotency_claims.update_one({"owner": owner, "key": key}, {"$set": {"state": "done", "status": response.status_code, "body": "" if redacted else text, "secret_redacted": redacted, "updated_at": datetime.now(UTC)}})
+        else:
+            await db.idempotency_claims.delete_one({"owner": owner, "key": key})
         return Response(content=body, status_code=response.status_code, media_type=response.media_type, headers=dict(response.headers))
 
 
