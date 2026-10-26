@@ -1,66 +1,51 @@
-# Probe `lead_stage` · BK-2526-0012 · 2026-10-26
+# Probe `lead_stage` · BK-2627-0022 · 2026-10-26
 
-Action result: `{"id": "dc3da097-9a4e-48f5-bfb1-97bcee48e9d4", "company_id": "36cd450b-9910-4a57-aebb-68f2be8b6c6f", "created_at": "2026-10-10T05:00:00+00:00", "updated_at": "2026-10-26T14:08:25.562381+00:00", "created_by": "a8b2f2ca-8e1c-4722-a626-dccd7581941d", "is_active": true, "deleted_at": null, "version": 2, "name": "Ashok Prasad", "phone": "+919876501171", "email": null, "project_id": "7315d90c-523b-4934-`
+Action result: `{"id": "2fdc35e5-6dea-4de3-aa0c-a9cdb729c780", "company_id": "61e35c1c-91c6-43c9-a732-2f790d5b57aa", "created_at": "2026-10-10T05:00:00+00:00", "updated_at": "2026-10-26T18:22:48.231594+00:00", "created_by": "b63b8b19-94ac-4c8e-845b-faf8019d7a8e", "is_active": true, "deleted_at": null, "version": 4, "name": "Ashok Prasad", "phone": "+919876501178", "email": null, "project_id": "c170483e-f746-40df-`
 
 ## Surfaces changed within 2.5 s (12)
 - **project.summary(read-model)**
-  - .advance: 757403.75 → 747403.75
-  - .advance_paise: 75740375 → 74740375
-  - .collections_mtd: 13894710.0 → 13884710.0
-  - .collections_mtd_paise: 1389471000 → 1388471000
-  - .collections_total: 189072952.51 → 189062952.51
-  - .collections_total_paise: 18907295251 → 18906295251
-  - .computed_at: "2026-10-26T14:08:16.168739+00:00" → "2026-10-26T14:08:25.626508+00:00"
-  - .paid: 188099077.51 → 188089077.51
-- **block.summary(read-model)**
-  - .advance: 10000.0 → 0.0
-  - .advance_paise: 1000000 → 0
-  - .collections_mtd: 3444687.5 → 3434687.5
-  - .collections_mtd_paise: 344468750 → 343468750
-  - .collections_total: 45355875.0 → 45345875.0
-  - .collections_total_paise: 4535587500 → 4534587500
-  - .computed_at: "2026-10-26T14:08:16.159842+00:00" → "2026-10-26T14:08:25.616387+00:00"
-  - .paid: 44867625.0 → 44857625.0
+  - .computed_at: "2026-10-26T18:22:40.242393+00:00" → "2026-10-26T18:22:50.250144+00:00"
 - **dashboard.home**
-  - .computed_at: "2026-10-26T14:08:16.180841+00:00" → "2026-10-26T14:08:25.642600+00:00"
-  - .greeting_date: "2026-10-26T14:08:25.228094+00:00" → "2026-10-26T14:08:28.212999+00:00"
+  - .computed_at: "2026-10-26T18:22:40.254662+00:00" → "2026-10-26T18:22:50.254915+00:00"
+  - .greeting_date: "2026-10-26T18:22:40.888680+00:00" → "2026-10-26T18:22:50.855404+00:00"
   - .projects[]: 2 items, content changed
   - .recent[]: 12 items, content changed
-  - .totals.advance: 757403.75 → 747403.75
-  - .totals.advance_paise: 75740375 → 74740375
-  - .totals.collections_mtd: 13894710.0 → 13884710.0
-  - .totals.collections_mtd_paise: 1389471000 → 1388471000
 - **report.collections(today)**
-  - .error.request_id: "c11f6216924545ef" → "9b1e271594674b8d"
-  - .request_id: "c11f6216924545ef" → "9b1e271594674b8d"
+  - .error.request_id: "23d1b9f8360c4a7f" → "7b2395f419ff46ff"
+  - .request_id: "23d1b9f8360c4a7f" → "7b2395f419ff46ff"
+- **report.inventory**
+  - .realised_rates[]: 2 items, content changed
 - **report.sales_leads**
   - .funnel[]: 7 items, content changed
   - .rows[]: 6 items, content changed
 - **report.roznamcha_range**
-  - .error.request_id: "b334268f953c42c1" → "a225f921eb904026"
-  - .request_id: "b334268f953c42c1" → "a225f921eb904026"
+  - .error.request_id: "ee07df4ec40948d4" → "e151dc2524204d06"
+  - .request_id: "ee07df4ec40948d4" → "e151dc2524204d06"
 - **report.bank_receipts**
   - .rows[]: 5 items, content changed
 - **report.activity**
-  - .actions[]: 57 items, content changed
-  - .rows[]: 457 items, content changed
+  - .actions[]: 59 items, content changed
+  - .rows[]: 458 items, content changed
 - **audit.recent**
   - .items[]: 3 items, content changed
-  - .next_cursor: "WyJjcmVhdGVkX2F0IiwgIjIwMjYtMTAtMjZUMTQ6MDg6MjMuNTQ5Mjk2KzA → "WyJjcmVhdGVkX2F0IiwgIjIwMjYtMTAtMjZUMTQ6MDg6MjMuNjQ5MTQxKzA
-  - .total: 3630 → 3631
+  - .next_cursor: "WyJjcmVhdGVkX2F0IiwgIjIwMjYtMTAtMjZUMTg6MjI6MzguMTgyNTgyKzA → "WyJjcmVhdGVkX2F0IiwgIjIwMjYtMTAtMjZUMTg6MjI6MzguMjMyODM2KzA
+  - .total: 3758 → 3759
 - **search(customer name)**
-  - .took_ms: 2.7 → 2.4
+  - .took_ms: 3.0 → 2.7
 - **leads.board**
   - .columns[]: 7 items, content changed
 - **pdf.statement(len)**
-  - .error.request_id: "94da3491d9b34885" → "ed3a61b03fbf4f0e"
-  - .request_id: "94da3491d9b34885" → "ed3a61b03fbf4f0e"
+  - .error.request_id: "bded9641ea7c48f9" → "03a99fe27cf04db2"
+  - .request_id: "bded9641ea7c48f9" → "03a99fe27cf04db2"
 
-## Changed only after caches expired (stale 2.5–9 s) (0)
+## Changed only after caches expired (stale 2.5–9 s) (2)
+- dashboard.legacy
+- dashboard.widgets
 
-## Unchanged (35)
+## Unchanged (33)
 - audit.booking
 - block.detail+grid
+- block.summary(read-model)
 - booking.detail+summary
 - booking.ledger(account)
 - booking.ledger(cash)
@@ -74,8 +59,6 @@ Action result: `{"id": "dc3da097-9a4e-48f5-bfb1-97bcee48e9d4", "company_id": "36
 - customer.ledgers
 - customer.panels(comms/docs)
 - customer.timeline
-- dashboard.legacy
-- dashboard.widgets
 - flat.detail
 - inventory.flats(block)
 - leads.list
@@ -88,7 +71,6 @@ Action result: `{"id": "dc3da097-9a4e-48f5-bfb1-97bcee48e9d4", "company_id": "36
 - report.cheques
 - report.construction_progress
 - report.demand_vs_collection
-- report.inventory
 - report.outstanding
 - report.service_sla
 - report.statement
@@ -96,7 +78,7 @@ Action result: `{"id": "dc3da097-9a4e-48f5-bfb1-97bcee48e9d4", "company_id": "36
 - service.list
 
 ## Restore
-`[200, {"id": "dc3da097-9a4e-48f5-bfb1-97bcee48e9d4", "company_id": "36cd450b-9910-4a57-aebb-68f2be8b6c6f", "created_at": "2026-10-10T05:00:00+00:00", "updated_at": "2026-10-26T14:08:34.756494+00:00", "created_by": "a8b2f2ca-8e1c-4722-a626-dccd7581941d", "is_active": true, "deleted_at": null, "versio`
+`[200, {"id": "2fdc35e5-6dea-4de3-aa0c-a9cdb729c780", "company_id": "61e35c1c-91c6-43c9-a732-2f790d5b57aa", "created_at": "2026-10-10T05:00:00+00:00", "updated_at": "2026-10-26T18:22:57.573633+00:00", "created_by": "b63b8b19-94ac-4c8e-845b-faf8019d7a8e", "is_active": true, "deleted_at": null, "versio`
 
 ## Expected (registry) vs actual
 - _propagated_complete: True

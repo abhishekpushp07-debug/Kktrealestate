@@ -1,77 +1,73 @@
-# Probe `flat_hold` · BK-2526-0002 · 2026-10-26
+# Probe `flat_hold` · BK-2627-0022 · 2026-10-26
 
-Action result: `{"id": "efa19393-ba5b-4869-8240-6b166d34b94f", "company_id": "502247ec-ff5e-4038-b2b6-f6d48c9aec8e", "created_at": "2026-10-26T00:58:57.490079+00:00", "updated_at": "2026-10-26T10:26:01.106620+00:00", "created_by": "system", "is_active": true, "deleted_at": null, "version": 33, "project_id": "48b9fd93-bf6b-4c6b-85cf-60c71ff1eca5", "block_id": "2186f929-6c1d-461b-b567-651c38768ad1", "flat_type_id":`
+Action result: `{"id": "dcaf425d-da49-42d5-aee5-7e2b3951dcd1", "company_id": "61e35c1c-91c6-43c9-a732-2f790d5b57aa", "created_at": "2026-10-26T18:15:33.994397+00:00", "updated_at": "2026-10-26T18:22:59.192820+00:00", "created_by": "system", "is_active": true, "deleted_at": null, "version": 4, "project_id": "c170483e-f746-40df-9f1f-e6d798328039", "block_id": "d5ce049b-f5b8-4e03-9642-6e08c92beaf9", "flat_type_id": `
 
-## Surfaces changed within 2.5 s (17)
+## Surfaces changed within 2.5 s (15)
 - **project.workspace**
-  - .blocks[]: 4 items, content changed
-  - .inventory.Available: 147 → 146
-  - .inventory.Hold: 4 → 5
-  - .unit_counts.available: 147 → 146
-  - .unit_counts.hold: 4 → 5
+  - .blocks[]: 3 items, content changed
+  - .inventory.Available: 51 → 50
+  - .inventory.Hold: 2 → 3
+  - .unit_counts.available: 51 → 50
+  - .unit_counts.hold: 2 → 3
 - **project.summary(read-model)**
-  - .blocks[]: 25 items, content changed
-  - .computed_at: "2026-10-26T10:25:52.141575+00:00" → "2026-10-26T10:26:01.469474+00:00"
-  - .units.available: 147 → 146
-  - .units.by_status.Available: 147 → 146
-  - .units.by_status.Hold: 4 → 5
+  - .blocks[]: 3 items, content changed
+  - .computed_at: "2026-10-26T18:22:50.250144+00:00" → "2026-10-26T18:22:59.600179+00:00"
+  - .units.available: 51 → 50
+  - .units.by_status.Available: 51 → 50
+  - .units.by_status.Hold: 2 → 3
 - **block.summary(read-model)**
-  - .computed_at: "2026-10-26T10:25:42.102909+00:00" → "2026-10-26T10:26:01.462812+00:00"
-  - .units.available: 27 → 26
-  - .units.by_status.Available: 27 → 26
-  - .units.by_status.Hold: 1 → 2
+  - .computed_at: "2026-10-26T18:22:40.226884+00:00" → "2026-10-26T18:22:59.585636+00:00"
+  - .units.available: 12 → 11
+  - .units.by_status.Available: 12 → 11
+  - .units.by_status.Hold: null → 1
 - **block.detail+grid**
-  - .counts.Available: 27 → 26
-  - .counts.Hold: 1 → 2
+  - .counts.Available: 12 → 11
+  - .counts.Hold: 0 → 1
   - .floors[]: 8 items, content changed
 - **inventory.flats(block)**
   - .items[]: 32 items, content changed
 - **dashboard.home**
-  - .computed_at: "2026-10-26T10:25:52.147186+00:00" → "2026-10-26T10:26:01.475700+00:00"
-  - .greeting_date: "2026-10-26T10:26:00.845813+00:00" → "2026-10-26T10:26:03.799380+00:00"
-  - .projects[]: 3 items, content changed
-  - .totals.available: 161 → 160
+  - .computed_at: "2026-10-26T18:22:50.254915+00:00" → "2026-10-26T18:22:59.604722+00:00"
+  - .greeting_date: "2026-10-26T18:22:58.956413+00:00" → "2026-10-26T18:23:01.860104+00:00"
+  - .projects[]: 2 items, content changed
+  - .totals.available: 57 → 56
 - **dashboard.legacy**
-  - .blocks[]: 6 items, content changed
-  - .follow_ups_due.items[]: 3 items, content changed
-  - .inventory.Available: 161 → 160
-  - .inventory.Hold: 6 → 7
-  - .projects[]: 3 items, content changed
+  - .blocks[]: 5 items, content changed
+  - .inventory.Available: 57 → 56
+  - .inventory.Hold: 2 → 3
+  - .projects[]: 2 items, content changed
   - .recent_audit[]: 10 items, content changed
 - **report.collections(today)**
-  - .error.request_id: "934767aa9f034bda" → "6e12ac9d17ec4025"
-  - .request_id: "934767aa9f034bda" → "6e12ac9d17ec4025"
-- **report.demand_vs_collection**
-  - .rows[]: 41 items, content changed
+  - .error.request_id: "0fcbadac67584429" → "a2f6aa0d13c44c05"
+  - .request_id: "0fcbadac67584429" → "a2f6aa0d13c44c05"
 - **report.inventory**
-  - .realised_rates[]: 2 items, content changed
-  - .rows[]: 6 items, content changed
-  - .totals.available: 161 → 160
-  - .totals.available_value: 924752000.0 → 919824000.0
-  - .totals.available_value_paise: 92475200000 → 91982400000
-  - .totals.hold: 6 → 7
-- **report.sales_leads**
-  - .bookings_per_user[]: 3 items, content changed
+  - .rows[]: 5 items, content changed
+  - .totals.available: 57 → 56
+  - .totals.available_value: 360018175.0 → 353565675.0
+  - .totals.available_value_paise: 36001817500 → 35356567500
+  - .totals.hold: 2 → 3
 - **report.roznamcha_range**
-  - .error.request_id: "8a6bcbf17caa4678" → "8976c3431f9a4aa3"
-  - .request_id: "8a6bcbf17caa4678" → "8976c3431f9a4aa3"
+  - .error.request_id: "89e62cfd542644e8" → "9734becc457a43c9"
+  - .request_id: "89e62cfd542644e8" → "9734becc457a43c9"
 - **report.bank_receipts**
-  - .rows[]: 6 items, content changed
+  - .rows[]: 5 items, content changed
 - **report.activity**
-  - .actions[]: 103 items, content changed
-  - .rows[]: 354 items, content changed
+  - .actions[]: 59 items, content changed
+  - .rows[]: 458 items, content changed
 - **audit.recent**
   - .items[]: 3 items, content changed
-  - .next_cursor: "f12b772f-f91d-44ed-b415-200689c6d6b1" → "b5d70cc3-22e6-4eb3-9373-fd62d99c1b8a"
-  - .total: 4893 → 4894
+  - .next_cursor: "WyJjcmVhdGVkX2F0IiwgIjIwMjYtMTAtMjZUMTg6MjI6NDguMjMyODIyKzA → "WyJjcmVhdGVkX2F0IiwgIjIwMjYtMTAtMjZUMTg6MjI6NTcuNTc0OTYzKzA
+  - .total: 3760 → 3761
 - **search(customer name)**
-  - .took_ms: 2.5 → 2.7
+  - .took_ms: 2.8 → 2.6
 - **pdf.statement(len)**
-  - .error.request_id: "dc53e2199d624f77" → "d99b40c3557e41c9"
-  - .request_id: "dc53e2199d624f77" → "d99b40c3557e41c9"
+  - .error.request_id: "e649e010dc404241" → "49447fb614a7489c"
+  - .request_id: "e649e010dc404241" → "49447fb614a7489c"
 
-## Changed only after caches expired (stale 2.5–9 s) (1)
+## Changed only after caches expired (stale 2.5–9 s) (3)
 - dashboard.widgets
+- report.demand_vs_collection
+- report.sales_leads
 
 ## Unchanged (29)
 - audit.booking
@@ -105,7 +101,7 @@ Action result: `{"id": "efa19393-ba5b-4869-8240-6b166d34b94f", "company_id": "50
 - service.list
 
 ## Restore
-`[200, {"id": "efa19393-ba5b-4869-8240-6b166d34b94f", "company_id": "502247ec-ff5e-4038-b2b6-f6d48c9aec8e", "created_at": "2026-10-26T00:58:57.490079+00:00", "updated_at": "2026-10-26T10:26:10.477601+00:00", "created_by": "system", "is_active": true, "deleted_at": null, "version": 34, "project_id": "`
+`[200, {"id": "dcaf425d-da49-42d5-aee5-7e2b3951dcd1", "company_id": "61e35c1c-91c6-43c9-a732-2f790d5b57aa", "created_at": "2026-10-26T18:15:33.994397+00:00", "updated_at": "2026-10-26T18:23:08.560554+00:00", "created_by": "system", "is_active": true, "deleted_at": null, "version": 5, "project_id": "c`
 
 ## Expected (registry) vs actual
 - _propagated_complete: True

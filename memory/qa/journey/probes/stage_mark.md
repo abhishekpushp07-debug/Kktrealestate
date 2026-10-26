@@ -1,180 +1,84 @@
-# Probe `stage_mark` · BK-2526-0012 · 2026-10-26
+# Probe `stage_mark` · BK-2627-0022 · 2026-10-26
 
-Action result: `{"block": {"id": "5ed89402-f7e8-4cad-b930-a98094cdffa4", "construction_percent": 44, "version": 5}, "marked": [{"stage_id": "c431f83e-2a43-49f7-8407-c71d488a7bcc", "name": "3rd Slab", "completed_on": "2026-10-26"}], "demands_raised": 29, "demands": [{"id": "aa1c1bc9-1418-4b3d-93bd-0ce9c8f0a17d", "company_id": "36cd450b-9910-4a57-aebb-68f2be8b6c6f", "booking_id": "70d63942-de17-40f2-8532-b2ccbb9a8d`
+Action result: `{"block": {"id": "d5ce049b-f5b8-4e03-9642-6e08c92beaf9", "construction_percent": 82, "version": 12}, "marked": [{"stage_id": "9f60aa4e-a8ec-4070-9438-bf23f6d242de", "name": "Flooring", "completed_on": "2026-10-26"}], "demands_raised": 0, "demands": [], "demands_total_paise": 0, "demands_total": 0.0, "audit_id": "33b99aa5-ea77-42b9-80ee-a974699128f5", "stage_name": "Flooring"}`
 
-## Surfaces changed within 2.5 s (27)
+## Surfaces changed within 2.5 s (16)
 - **booking.detail+summary**
-  - .block_milestones[]: 9 items, content changed
-  - .construction_percent: 30.0 → 40.0
-  - .demands[]: len 4 → 5
-  - .ledger_rebuilt_at: "2026-09-02T05:00:00+00:00" → "2026-10-26T14:07:46.013846+00:00"
-  - .raised_percent: 30.0 → 40.0
-  - .summary.account_due: 0.0 → 184800.0
-  - .summary.account_due_paise: 0 → 18480000
-  - .summary.account_order_raised: 554400.0 → 739200.0
-- **booking.ledger(cash)**
-  - .booking.construction_percent: 30.0 → 40.0
-  - .booking.summary.account_due: 0.0 → 184800.0
-  - .booking.summary.account_due_paise: 0 → 18480000
-  - .booking.summary.account_order_raised: 554400.0 → 739200.0
-  - .booking.summary.account_order_raised_paise: 55440000 → 73920000
-  - .booking.summary.cash_due: 0.0 → 277200.0
-  - .booking.summary.cash_due_paise: 0 → 27720000
-  - .booking.summary.cash_order_raised: 831600.0 → 1108800.0
-- **booking.ledger(account)**
-  - .booking.construction_percent: 30.0 → 40.0
-  - .booking.summary.account_due: 0.0 → 184800.0
-  - .booking.summary.account_due_paise: 0 → 18480000
-  - .booking.summary.account_order_raised: 554400.0 → 739200.0
-  - .booking.summary.account_order_raised_paise: 55440000 → 73920000
-  - .booking.summary.cash_due: 0.0 → 277200.0
-  - .booking.summary.cash_due_paise: 0 → 27720000
-  - .booking.summary.cash_order_raised: 831600.0 → 1108800.0
-- **booking.ledger(other)**
-  - .booking.construction_percent: 30.0 → 40.0
-  - .booking.summary.account_due: 0.0 → 184800.0
-  - .booking.summary.account_due_paise: 0 → 18480000
-  - .booking.summary.account_order_raised: 554400.0 → 739200.0
-  - .booking.summary.account_order_raised_paise: 55440000 → 73920000
-  - .booking.summary.cash_due: 0.0 → 277200.0
-  - .booking.summary.cash_due_paise: 0 → 27720000
-  - .booking.summary.cash_order_raised: 831600.0 → 1108800.0
-- **booking.ledger(combined)**
-  - .booking.construction_percent: 30.0 → 40.0
-  - .booking.summary.account_due: 0.0 → 184800.0
-  - .booking.summary.account_due_paise: 0 → 18480000
-  - .booking.summary.account_order_raised: 554400.0 → 739200.0
-  - .booking.summary.account_order_raised_paise: 55440000 → 73920000
-  - .booking.summary.cash_due: 0.0 → 277200.0
-  - .booking.summary.cash_due_paise: 0 → 27720000
-  - .booking.summary.cash_order_raised: 831600.0 → 1108800.0
-- **booking.schedule/demands**
-  - .total: 499 → 528
-- **customer.360**
-  - .bookings[]: 1 items, content changed
-- **customer.ledgers**
-  - .bookings[]: 1 items, content changed
-  - .ledgers[]: 1 items, content changed
-  - .totals.account.due: 0.0 → 184800.0
-  - .totals.account.due_paise: 0 → 18480000
-  - .totals.account.raised: 554400.0 → 739200.0
-  - .totals.account.raised_paise: 55440000 → 73920000
-  - .totals.cash.due: 0.0 → 277200.0
-  - .totals.cash.due_paise: 0 → 27720000
+  - .block_milestones[]: 11 items, content changed
 - **project.workspace**
   - .blocks[]: 3 items, content changed
 - **project.summary(read-model)**
   - .blocks[]: 3 items, content changed
-  - .computed_at: "2026-10-26T14:06:32.723588+00:00" → "2026-10-26T14:07:50.007212+00:00"
-  - .outstanding.account: 7999511.25 → 14844211.25
-  - .outstanding.account_paise: 799951125 → 1484421125
-  - .outstanding.cash: 10644127.5 → 20911177.5
-  - .outstanding.cash_paise: 1064412750 → 2091117750
-  - .outstanding.total: 19146138.75 → 36257888.75
-  - .outstanding.total_paise: 1914613875 → 3625788875
+  - .computed_at: "2026-10-26T18:22:59.600179+00:00" → "2026-10-26T18:23:10.621570+00:00"
+  - .progress_pct: 53.7 → 56.7
+  - .units.available: 50 → 51
+  - .units.by_status.Available: 50 → 51
+  - .units.by_status.Hold: 3 → 2
 - **block.summary(read-model)**
-  - .collections_mtd: 1143750.0 → 3434687.5
-  - .collections_mtd_paise: 114375000 → 343468750
-  - .computed_at: "2025-12-05T05:00:00+00:00" → "2026-10-26T14:07:49.997881+00:00"
-  - .outstanding.account: 2591050.0 → 9435750.0
-  - .outstanding.account_paise: 259105000 → 943575000
-  - .outstanding.cash: 3886575.0 → 14153625.0
-  - .outstanding.cash_paise: 388657500 → 1415362500
-  - .outstanding.total: 6477625.0 → 23589375.0
+  - .computed_at: "2026-10-26T18:22:59.585636+00:00" → "2026-10-26T18:23:10.607228+00:00"
+  - .progress.completed: 8 → 9
+  - .progress.current_stage: "Finishing" → "Flooring"
+  - .progress.percent: 73 → 82
+  - .progress.upcoming_stage: "Flooring" → "External Works"
+  - .units.available: 11 → 12
+  - .units.by_status.Available: 11 → 12
+  - .units.by_status.Hold: 1 → null
 - **block.detail+grid**
-  - .block.construction_percent: 33 → 44
+  - .block.construction_percent: 73 → 82
 - **dashboard.home**
-  - .ageing_counts.not_due: 6 → 35
-  - .ageing_paise.not_due: 320266500 → 2031441500
-  - .computed_at: "2026-10-26T14:07:42.983909+00:00" → "2026-10-26T14:07:50.094318+00:00"
-  - .greeting_date: "2026-10-26T14:07:42.992970+00:00" → "2026-10-26T14:07:51.567804+00:00"
+  - .computed_at: "2026-10-26T18:22:59.604722+00:00" → "2026-10-26T18:23:10.626123+00:00"
+  - .greeting_date: "2026-10-26T18:23:09.979239+00:00" → "2026-10-26T18:23:12.929812+00:00"
   - .projects[]: 2 items, content changed
-  - .recent[]: 12 items, content changed
-  - .today.demands_raised: 1 → 30
-  - .totals.outstanding: 19501138.75 → 36612888.75
+  - .totals.available: 56 → 57
 - **dashboard.legacy**
-  - .blocks[]: 4 items, content changed
-  - .collections.dues_raised_month.count: 20 → 49
-  - .collections.dues_raised_month.total: 10814287.5 → 27926037.5
-  - .collections.dues_raised_month.total_paise: 1081428750 → 2792603750
-  - .collections.outstanding_due: 19501138.75 → 36612888.75
-  - .collections.outstanding_due_paise: 1950113875 → 3661288875
+  - .blocks[]: 5 items, content changed
   - .recent_audit[]: 10 items, content changed
-- **dashboard.widgets**
-  - .ageing[]: 5 items, content changed
-  - .construction[]: 4 items, content changed
-  - .dues_raised_month.count: 20 → 49
-  - .dues_raised_month.total: 10814287.5 → 27926037.5
-  - .dues_raised_month.total_paise: 1081428750 → 2792603750
 - **report.collections(today)**
-  - .error.request_id: "a0f7c2b876db4e50" → "785d13ced2024068"
-  - .request_id: "a0f7c2b876db4e50" → "785d13ced2024068"
-- **report.outstanding**
-  - .ageing[]: 5 items, content changed
-  - .rows[]: 77 items, content changed
-  - .top_overdue[]: 10 items, content changed
-  - .totals.account_due: 7999511.25 → 14844211.25
-  - .totals.account_due_paise: 799951125 → 1484421125
-  - .totals.cash_due: 10644127.5 → 20911177.5
-  - .totals.cash_due_paise: 1064412750 → 2091117750
-  - .totals.due: 19501138.75 → 36612888.75
+  - .error.request_id: "b73ce7bf0bf9453f" → "70e424ebba7a4d5f"
+  - .request_id: "b73ce7bf0bf9453f" → "70e424ebba7a4d5f"
 - **report.demand_vs_collection**
-  - .rows[]: len 27 → 28
-  - .totals.account_demand: 204061990.63 → 210906690.63
-  - .totals.account_demand_paise: 20406199063 → 21090669063
-  - .totals.cash_demand: 132298946.88 → 142565996.88
-  - .totals.cash_demand_paise: 13229894688 → 14256599688
-  - .totals.count: 499 → 528
-  - .totals.demand: 336360937.51 → 353472687.51
-  - .totals.demand_paise: 33636093751 → 35347268751
+  - .rows[]: 28 items, content changed
 - **report.roznamcha_range**
-  - .error.request_id: "2112b2885ed64142" → "addfa68c6ceb442d"
-  - .request_id: "2112b2885ed64142" → "addfa68c6ceb442d"
+  - .error.request_id: "b59bac346a764ea6" → "d31989edba144cca"
+  - .request_id: "b59bac346a764ea6" → "d31989edba144cca"
+- **report.bank_receipts**
+  - .rows[]: 5 items, content changed
 - **report.activity**
-  - .actions[]: 56 items, content changed
-  - .rows[]: 457 items, content changed
-- **report.statement**
-  - .booking.construction_percent: 30.0 → 40.0
-  - .booking.ledger_rebuilt_at: "2026-09-02T05:00:00+00:00" → "2026-10-26T14:07:46.013846+00:00"
-  - .booking.raised_percent: 30.0 → 40.0
-  - .booking.summary.account_due: 0.0 → 184800.0
-  - .booking.summary.account_due_paise: 0 → 18480000
-  - .booking.summary.account_order_raised: 554400.0 → 739200.0
-  - .booking.summary.account_order_raised_paise: 55440000 → 73920000
-  - .booking.summary.cash_due: 0.0 → 277200.0
+  - .actions[]: 59 items, content changed
+  - .rows[]: 458 items, content changed
 - **report.construction_progress**
-  - .rows[]: 37 items, content changed
-  - .totals.demand: 278071187.51 → 295182937.51
-  - .totals.demand_paise: 27807118751 → 29518293751
-  - .totals.demands: 420 → 449
-  - .towers[]: 4 items, content changed
-- **audit.booking**
-  - .items[]: 5 items, content changed
-  - .next_cursor: "WyJjcmVhdGVkX2F0IiwgIjIwMjYtMDYtMjVUMDU6MDA6MDArMDA6MDAiLCA → "WyJjcmVhdGVkX2F0IiwgIjIwMjYtMDYtMjVUMDU6MDA6MDArMDA6MDAiLCA
-  - .total: 13 → 14
+  - .rows[]: 46 items, content changed
+  - .towers[]: 5 items, content changed
 - **audit.recent**
   - .items[]: 3 items, content changed
-  - .next_cursor: "WyJjcmVhdGVkX2F0IiwgIjIwMjYtMTAtMjZUMTQ6MDY6MDQuOTA4NTM1KzA → "WyJjcmVhdGVkX2F0IiwgIjIwMjYtMTAtMjZUMTQ6MDc6NDguNzg2NzIzKzA
-  - .total: 3595 → 3625
-- **search(customer name)**
-  - .took_ms: 3.1 → 2.9
+  - .next_cursor: "WyJjcmVhdGVkX2F0IiwgIjIwMjYtMTAtMjZUMTg6MjI6NTkuMTk5ODgwKzA → "WyJjcmVhdGVkX2F0IiwgIjIwMjYtMTAtMjZUMTg6MjM6MDguNTY3Nzk4KzA
+  - .total: 3762 → 3763
 - **construction.milestones(block)**
-  - .block.version: 4 → 5
-  - .construction_percent: 33 → 44
-  - .milestones[]: 9 items, content changed
-  - .next_seq: 4 → 5
-  - .stages[]: 9 items, content changed
+  - .block.version: 11 → 12
+  - .construction_percent: 73 → 82
+  - .milestones[]: 11 items, content changed
+  - .next_seq: 9 → 10
+  - .stages[]: 11 items, content changed
 - **pdf.statement(len)**
-  - .error.request_id: "1b82ad48ea9b487e" → "b097483b15ac4bcd"
-  - .request_id: "1b82ad48ea9b487e" → "b097483b15ac4bcd"
+  - .error.request_id: "a34c1457f0c444fa" → "c0d769b9c38546b4"
+  - .request_id: "a34c1457f0c444fa" → "c0d769b9c38546b4"
 
-## Changed only after caches expired (stale 2.5–9 s) (2)
-- report.bank_receipts
-- report.inventory
+## Changed only after caches expired (stale 2.5–9 s) (3)
+- dashboard.widgets
+- report.sales_leads
+- search(customer name)
 
-## Unchanged (18)
+## Unchanged (28)
+- audit.booking
+- booking.ledger(account)
+- booking.ledger(cash)
+- booking.ledger(combined)
+- booking.ledger(other)
+- booking.schedule/demands
 - bootstrap.counts
 - cheques.in_hand
+- customer.360
+- customer.ledgers
 - customer.panels(comms/docs)
 - customer.timeline
 - flat.detail
@@ -187,13 +91,15 @@ Action result: `{"block": {"id": "5ed89402-f7e8-4cad-b930-a98094cdffa4", "constr
 - report.advances
 - report.cancellations
 - report.cheques
-- report.sales_leads
+- report.inventory
+- report.outstanding
 - report.service_sla
+- report.statement
 - roznamcha(today)
 - service.list
 
 ## Restore
-`[200, {"block": {"id": "5ed89402-f7e8-4cad-b930-a98094cdffa4", "construction_percent": 33, "version": 6}, "demands_voided": 29, "notifications_retracted": {"deleted": 225, "withdrawn": 0}}]`
+`[200, {"block": {"id": "d5ce049b-f5b8-4e03-9642-6e08c92beaf9", "construction_percent": 73, "version": 13}, "demands_voided": 0, "notifications_retracted": {"deleted": 20, "withdrawn": 0}, "audit_id": "d12109fa-0f28-4197-a66a-a887693e9411", "stage_name": "Flooring"}]`
 
 ## Expected (registry) vs actual
 - _propagated_complete: True

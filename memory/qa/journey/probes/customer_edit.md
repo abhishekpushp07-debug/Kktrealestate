@@ -1,45 +1,43 @@
-# Probe `customer_edit` · BK-2526-0002 · 2026-10-26
+# Probe `customer_edit` · BK-2627-0022 · 2026-10-26
 
-Action result: `{"id": "1c2a0b53-c933-4082-9371-ae5225f5b0f5", "company_id": "502247ec-ff5e-4038-b2b6-f6d48c9aec8e", "created_at": "2026-10-26T00:58:58.084053+00:00", "updated_at": "2026-10-26T10:26:44.147782+00:00", "created_by": "system", "is_active": true, "deleted_at": null, "version": 2, "customer_code": "CUST-2526-0002", "salutation": "Mrs", "full_name": "Priya Verma", "father_or_spouse_name": "Sanjay Verma`
+Action result: `{"id": "924ae5b8-9b04-421d-a75d-20ef63efe8e3", "company_id": "61e35c1c-91c6-43c9-a732-2f790d5b57aa", "created_at": "2026-10-09T05:00:00+00:00", "updated_at": "2026-10-26T18:23:42.369836+00:00", "created_by": "b63b8b19-94ac-4c8e-845b-faf8019d7a8e", "is_active": true, "deleted_at": null, "version": 5, "salutation": null, "full_name": "Deepak Thakur", "father_or_spouse_name": null, "dob": null, "gend`
 
 ## Surfaces changed within 2.5 s (10)
 - **customer.360**
-  - .occupation: "Service" → "F-probe occupation"
-  - .updated_at: "2026-10-26T00:58:58.084053+00:00" → "2026-10-26T10:26:44.147782+00:00"
-  - .version: 1 → 2
+  - .occupation: "Business" → "F-probe occupation"
+  - .updated_at: "2026-10-26T18:22:04.238124+00:00" → "2026-10-26T18:23:42.369836+00:00"
+  - .version: 4 → 5
 - **dashboard.home**
-  - .computed_at: "2026-10-26T10:26:25.306422+00:00" → "2026-10-26T10:26:46.164289+00:00"
-  - .greeting_date: "2026-10-26T10:26:33.981780+00:00" → "2026-10-26T10:26:46.786254+00:00"
-  - .projects[]: 3 items, content changed
+  - .computed_at: "2026-10-26T18:23:25.465027+00:00" → "2026-10-26T18:23:44.389665+00:00"
+  - .greeting_date: "2026-10-26T18:23:32.246322+00:00" → "2026-10-26T18:23:44.999436+00:00"
+  - .projects[]: 2 items, content changed
   - .recent[]: 12 items, content changed
+- **dashboard.legacy**
+  - .recent_audit[]: 10 items, content changed
 - **report.collections(today)**
-  - .error.request_id: "88debcbb133f4c07" → "2eef69f584c94364"
-  - .request_id: "88debcbb133f4c07" → "2eef69f584c94364"
-- **report.sales_leads**
-  - .bookings_per_user[]: 3 items, content changed
+  - .error.request_id: "62fdb4001b5e4925" → "07de21640ce545f7"
+  - .request_id: "62fdb4001b5e4925" → "07de21640ce545f7"
 - **report.roznamcha_range**
-  - .error.request_id: "8cd5b6ceba5849a5" → "a9cf2b8283d6493a"
-  - .request_id: "8cd5b6ceba5849a5" → "a9cf2b8283d6493a"
+  - .error.request_id: "4a20f6900b2d42bb" → "a0ffc3a33ffc4a84"
+  - .request_id: "4a20f6900b2d42bb" → "a0ffc3a33ffc4a84"
 - **report.bank_receipts**
-  - .rows[]: 6 items, content changed
+  - .rows[]: 5 items, content changed
 - **report.activity**
-  - .actions[]: 103 items, content changed
-  - .rows[]: 354 items, content changed
+  - .actions[]: 59 items, content changed
+  - .rows[]: 458 items, content changed
 - **audit.recent**
   - .items[]: 3 items, content changed
-  - .next_cursor: "470c380b-e243-4259-a672-c874df71d8c8" → "e38b3be1-50a7-4524-9b52-5ef086a768bf"
-  - .total: 4900 → 4901
+  - .next_cursor: "WyJjcmVhdGVkX2F0IiwgIjIwMjYtMTAtMjZUMTg6MjM6MjEuNTQ4Njk1KzA → "WyJjcmVhdGVkX2F0IiwgIjIwMjYtMTAtMjZUMTg6MjM6MzAuODU3ODMzKzA
+  - .total: 3766 → 3767
 - **search(customer name)**
-  - .took_ms: 2.9 → 2.6
+  - .took_ms: 2.4 → 2.7
 - **pdf.statement(len)**
-  - .error.request_id: "5d3339103cb149a2" → "65b74ca4d0ab4929"
-  - .request_id: "5d3339103cb149a2" → "65b74ca4d0ab4929"
+  - .error.request_id: "f1c06902663e46cd" → "8150b9bc59d94b79"
+  - .request_id: "f1c06902663e46cd" → "8150b9bc59d94b79"
 
-## Changed only after caches expired (stale 2.5–9 s) (2)
-- dashboard.legacy
-- report.demand_vs_collection
+## Changed only after caches expired (stale 2.5–9 s) (0)
 
-## Unchanged (35)
+## Unchanged (37)
 - audit.booking
 - block.detail+grid
 - block.summary(read-model)
@@ -69,15 +67,17 @@ Action result: `{"id": "1c2a0b53-c933-4082-9371-ae5225f5b0f5", "company_id": "50
 - report.cancellations
 - report.cheques
 - report.construction_progress
+- report.demand_vs_collection
 - report.inventory
 - report.outstanding
+- report.sales_leads
 - report.service_sla
 - report.statement
 - roznamcha(today)
 - service.list
 
 ## Restore
-`[200, {"id": "1c2a0b53-c933-4082-9371-ae5225f5b0f5", "company_id": "502247ec-ff5e-4038-b2b6-f6d48c9aec8e", "created_at": "2026-10-26T00:58:58.084053+00:00", "updated_at": "2026-10-26T10:26:53.455459+00:00", "created_by": "system", "is_active": true, "deleted_at": null, "version": 3, "customer_code":`
+`[200, {"id": "924ae5b8-9b04-421d-a75d-20ef63efe8e3", "company_id": "61e35c1c-91c6-43c9-a732-2f790d5b57aa", "created_at": "2026-10-09T05:00:00+00:00", "updated_at": "2026-10-26T18:23:51.625189+00:00", "created_by": "b63b8b19-94ac-4c8e-845b-faf8019d7a8e", "is_active": true, "deleted_at": null, "versio`
 
 ## Expected (registry) vs actual
 - _propagated_complete: True

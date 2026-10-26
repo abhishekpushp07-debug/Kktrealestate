@@ -1,38 +1,40 @@
-# Probe `demand_manual` · BK-2526-0002 · 2026-10-26
+# Probe `demand_manual` · BK-2627-0022 · 2026-10-26
 
-Action result: `{"status": 422, "detail": "line_id: Field required; charge_type_id: Extra inputs are not permitted", "code": "VALIDATION_ERROR", "errors": [{"field": "line_id", "message": "Field required"}, {"field": "charge_type_id", "message": "Extra inputs are not permitted"}], "request_id": "0ee05ffbbb244d7e", "error": {"code": "VALIDATION_ERROR", "message": "line_id: Field required; charge_type_id: Extra inp`
+Action result: `{"skipped": "no un-demanded manual other-charge line on this booking (and there is no demand void API to restore one)"}`
 
-## Surfaces changed within 2.5 s (8)
-- **dashboard.legacy**
-  - .recent_audit[]: 10 items, content changed
+## Surfaces changed within 2.5 s (10)
+- **project.summary(read-model)**
+  - .computed_at: "2026-10-26T18:23:21.926471+00:00" → "2026-10-26T18:23:32.883640+00:00"
+- **block.summary(read-model)**
+  - .computed_at: "2026-10-26T18:23:21.911930+00:00" → "2026-10-26T18:23:32.869506+00:00"
 - **report.collections(today)**
-  - .error.request_id: "9fdeb4b18b374812" → "16d30cf7f31b4f4c"
-  - .request_id: "9fdeb4b18b374812" → "16d30cf7f31b4f4c"
+  - .error.request_id: "59fff18ef4a7428e" → "0afdcfeec5144453"
+  - .request_id: "59fff18ef4a7428e" → "0afdcfeec5144453"
 - **report.inventory**
   - .realised_rates[]: 2 items, content changed
+- **report.sales_leads**
+  - .bookings_per_user[]: 2 items, content changed
 - **report.roznamcha_range**
-  - .error.request_id: "103225f3859c4c92" → "eb74d7d3f36544d0"
-  - .request_id: "103225f3859c4c92" → "eb74d7d3f36544d0"
+  - .error.request_id: "01784555eb184a97" → "7e94201d8acd464f"
+  - .request_id: "01784555eb184a97" → "7e94201d8acd464f"
 - **report.bank_receipts**
-  - .rows[]: 6 items, content changed
+  - .rows[]: 5 items, content changed
 - **report.activity**
-  - .actions[]: 103 items, content changed
-  - .rows[]: 354 items, content changed
+  - .actions[]: 59 items, content changed
+  - .rows[]: 458 items, content changed
 - **search(customer name)**
-  - .took_ms: 2.7 → 2.6
+  - .took_ms: 2.6 → 2.7
 - **pdf.statement(len)**
-  - .error.request_id: "37fdb6be248d4e9f" → "fdb2278255874f34"
-  - .request_id: "37fdb6be248d4e9f" → "fdb2278255874f34"
+  - .error.request_id: "b03c147c29e74c7d" → "3b9426d2cd684af8"
+  - .request_id: "b03c147c29e74c7d" → "3b9426d2cd684af8"
 
-## Changed only after caches expired (stale 2.5–9 s) (2)
+## Changed only after caches expired (stale 2.5–9 s) (1)
 - report.demand_vs_collection
-- report.sales_leads
 
-## Unchanged (37)
+## Unchanged (36)
 - audit.booking
 - audit.recent
 - block.detail+grid
-- block.summary(read-model)
 - booking.detail+summary
 - booking.ledger(account)
 - booking.ledger(cash)
@@ -47,6 +49,7 @@ Action result: `{"status": 422, "detail": "line_id: Field required; charge_type_
 - customer.panels(comms/docs)
 - customer.timeline
 - dashboard.home
+- dashboard.legacy
 - dashboard.widgets
 - flat.detail
 - inventory.flats(block)
@@ -55,7 +58,6 @@ Action result: `{"status": 422, "detail": "line_id: Field required; charge_type_
 - notifications(staff)
 - payments.list+totals
 - payments.summary
-- project.summary(read-model)
 - project.workspace
 - report.advances
 - report.cancellations
@@ -73,17 +75,17 @@ Action result: `{"status": 422, "detail": "line_id: Field required; charge_type_
 ## Expected (registry) vs actual
 - _propagated_complete: True
 - audit: MISSING
-- blocks: MISSING
+- blocks: changed
 - bookings: MISSING
 - bootstrap: MISSING
 - customer360: MISSING
-- dashboard: changed
+- dashboard: MISSING
 - demands: MISSING
 - home: MISSING
 - ledgers: MISSING
 - notifications: MISSING
 - payments: MISSING
-- projects: MISSING
+- projects: changed
 - reports: changed
 - roznamcha: changed
 - widgets: MISSING

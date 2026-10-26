@@ -1,180 +1,187 @@
-# Probe `payment_cash` · BK-2526-0012 · 2026-10-26
+# Probe `payment_cash` · BK-2627-0022 · 2026-10-26
 
-Action result: `{"id": "e5548e71-42e8-449d-a452-ea628315f055", "company_id": "36cd450b-9910-4a57-aebb-68f2be8b6c6f", "created_at": "2026-10-26T14:08:14.084251+00:00", "updated_at": "2026-10-26T14:08:14.084251+00:00", "created_by": "a8b2f2ca-8e1c-4722-a626-dccd7581941d", "is_active": true, "deleted_at": null, "version": 1, "receipt_number": "KKT/2627/00576", "booking_id": "00882ab2-9a49-4b8f-8c3c-5dcf06e60a6f", "b`
+Action result: `{"id": "d98e9eb4-aa9c-4b5b-972a-5045de97bd1e", "company_id": "61e35c1c-91c6-43c9-a732-2f790d5b57aa", "created_at": "2026-10-26T18:22:14.590532+00:00", "updated_at": "2026-10-26T18:22:14.590532+00:00", "created_by": "b63b8b19-94ac-4c8e-845b-faf8019d7a8e", "is_active": true, "deleted_at": null, "version": 1, "receipt_number": "KKT/2627/00579", "booking_id": "02d58183-0695-4b00-827f-9b6acdac2821", "b`
 
-## Surfaces changed within 2.5 s (28)
+## Surfaces changed within 2.5 s (30)
 - **booking.detail+summary**
-  - .ledger_rebuilt_at: "2026-10-26T14:07:58.316006+00:00" → "2026-10-26T14:08:14.095355+00:00"
-  - .payments[]: len 8 → 9
-  - .summary.advance: 0.0 → 10000.0
-  - .summary.advance_paise: 0 → 1000000
-  - .summary.cash_due: 0.0 → -10000.0
-  - .summary.cash_due_paise: 0 → -1000000
-  - .summary.cash_paid: 831600.0 → 841600.0
-  - .summary.cash_paid_paise: 83160000 → 84160000
+  - .demands[]: 9 items, content changed
+  - .ledger_rebuilt_at: "2026-10-26T18:21:32.530878+00:00" → "2026-10-26T18:22:14.603770+00:00"
+  - .payments[]: len 11 → 12
+  - .summary.cash_due: 1990125.0 → 1980125.0
+  - .summary.cash_due_paise: 199012500 → 198012500
+  - .summary.cash_paid: 1393088.0 → 1403088.0
+  - .summary.cash_paid_paise: 139308800 → 140308800
+  - .summary.due: 3582725.0 → 3572725.0
 - **booking.ledger(cash)**
-  - .booking.summary.advance: 0.0 → 10000.0
-  - .booking.summary.advance_paise: 0 → 1000000
-  - .booking.summary.cash_due: 0.0 → -10000.0
-  - .booking.summary.cash_due_paise: 0 → -1000000
-  - .booking.summary.cash_paid: 831600.0 → 841600.0
-  - .booking.summary.cash_paid_paise: 83160000 → 84160000
-  - .booking.summary.last_payment_at: "2026-08-29" → "2026-10-26"
-  - .booking.summary.paid: 1386000.0 → 1396000.0
+  - .booking.summary.cash_due: 1990125.0 → 1980125.0
+  - .booking.summary.cash_due_paise: 199012500 → 198012500
+  - .booking.summary.cash_paid: 1393088.0 → 1403088.0
+  - .booking.summary.cash_paid_paise: 139308800 → 140308800
+  - .booking.summary.due: 3582725.0 → 3572725.0
+  - .booking.summary.due_paise: 358272500 → 357272500
+  - .booking.summary.outstanding: 3582725.0 → 3572725.0
+  - .booking.summary.outstanding_paise: 358272500 → 357272500
 - **booking.ledger(account)**
-  - .booking.summary.advance: 0.0 → 10000.0
-  - .booking.summary.advance_paise: 0 → 1000000
-  - .booking.summary.cash_due: 0.0 → -10000.0
-  - .booking.summary.cash_due_paise: 0 → -1000000
-  - .booking.summary.cash_paid: 831600.0 → 841600.0
-  - .booking.summary.cash_paid_paise: 83160000 → 84160000
-  - .booking.summary.last_payment_at: "2026-08-29" → "2026-10-26"
-  - .booking.summary.paid: 1386000.0 → 1396000.0
+  - .booking.summary.cash_due: 1990125.0 → 1980125.0
+  - .booking.summary.cash_due_paise: 199012500 → 198012500
+  - .booking.summary.cash_paid: 1393088.0 → 1403088.0
+  - .booking.summary.cash_paid_paise: 139308800 → 140308800
+  - .booking.summary.due: 3582725.0 → 3572725.0
+  - .booking.summary.due_paise: 358272500 → 357272500
+  - .booking.summary.outstanding: 3582725.0 → 3572725.0
+  - .booking.summary.outstanding_paise: 358272500 → 357272500
 - **booking.ledger(other)**
-  - .booking.summary.advance: 0.0 → 10000.0
-  - .booking.summary.advance_paise: 0 → 1000000
-  - .booking.summary.cash_due: 0.0 → -10000.0
-  - .booking.summary.cash_due_paise: 0 → -1000000
-  - .booking.summary.cash_paid: 831600.0 → 841600.0
-  - .booking.summary.cash_paid_paise: 83160000 → 84160000
-  - .booking.summary.last_payment_at: "2026-08-29" → "2026-10-26"
-  - .booking.summary.paid: 1386000.0 → 1396000.0
+  - .booking.summary.cash_due: 1990125.0 → 1980125.0
+  - .booking.summary.cash_due_paise: 199012500 → 198012500
+  - .booking.summary.cash_paid: 1393088.0 → 1403088.0
+  - .booking.summary.cash_paid_paise: 139308800 → 140308800
+  - .booking.summary.due: 3582725.0 → 3572725.0
+  - .booking.summary.due_paise: 358272500 → 357272500
+  - .booking.summary.outstanding: 3582725.0 → 3572725.0
+  - .booking.summary.outstanding_paise: 358272500 → 357272500
 - **booking.ledger(combined)**
-  - .booking.summary.advance: 0.0 → 10000.0
-  - .booking.summary.advance_paise: 0 → 1000000
-  - .booking.summary.cash_due: 0.0 → -10000.0
-  - .booking.summary.cash_due_paise: 0 → -1000000
-  - .booking.summary.cash_paid: 831600.0 → 841600.0
-  - .booking.summary.cash_paid_paise: 83160000 → 84160000
-  - .booking.summary.last_payment_at: "2026-08-29" → "2026-10-26"
-  - .booking.summary.paid: 1386000.0 → 1396000.0
+  - .booking.summary.cash_due: 1990125.0 → 1980125.0
+  - .booking.summary.cash_due_paise: 199012500 → 198012500
+  - .booking.summary.cash_paid: 1393088.0 → 1403088.0
+  - .booking.summary.cash_paid_paise: 139308800 → 140308800
+  - .booking.summary.due: 3582725.0 → 3572725.0
+  - .booking.summary.due_paise: 358272500 → 357272500
+  - .booking.summary.outstanding: 3582725.0 → 3572725.0
+  - .booking.summary.outstanding_paise: 358272500 → 357272500
 - **customer.360**
   - .bookings[]: 1 items, content changed
 - **customer.ledgers**
   - .bookings[]: 1 items, content changed
   - .ledgers[]: 1 items, content changed
-  - .totals.cash.advance: 0.0 → 10000.0
-  - .totals.cash.advance_paise: 0 → 1000000
-  - .totals.cash.paid: 831600.0 → 841600.0
-  - .totals.cash.paid_paise: 83160000 → 84160000
-  - .totals.combined.advance: 0.0 → 10000.0
-  - .totals.combined.advance_paise: 0 → 1000000
+  - .totals.cash.due: 1990125.0 → 1980125.0
+  - .totals.cash.due_paise: 199012500 → 198012500
+  - .totals.cash.paid: 1393088.0 → 1403088.0
+  - .totals.cash.paid_paise: 139308800 → 140308800
+  - .totals.combined.due: 3583225.0 → 3573225.0
+  - .totals.combined.due_paise: 358322500 → 357322500
 - **customer.timeline**
-  - .items[]: len 8 → 9
-  - .total: 8 → 9
+  - .items[]: len 11 → 12
+  - .total: 11 → 12
 - **project.summary(read-model)**
-  - .advance: 747403.75 → 757403.75
-  - .advance_paise: 74740375 → 75740375
-  - .collections_mtd: 13884710.0 → 13894710.0
-  - .collections_mtd_paise: 1388471000 → 1389471000
-  - .collections_total: 189062952.51 → 189072952.51
-  - .collections_total_paise: 18906295251 → 18907295251
-  - .computed_at: "2026-10-26T14:08:00.623325+00:00" → "2026-10-26T14:08:16.168739+00:00"
-  - .paid: 188089077.51 → 188099077.51
+  - .collections_mtd: 12644601.0 → 12654601.0
+  - .collections_mtd_paise: 1264460100 → 1265460100
+  - .collections_total: 196151435.0 → 196161435.0
+  - .collections_total_paise: 19615143500 → 19616143500
+  - .computed_at: "2026-10-26T18:21:45.536840+00:00" → "2026-10-26T18:22:16.666856+00:00"
+  - .outstanding.cash: 10979564.0 → 10969564.0
+  - .outstanding.cash_paise: 1097956400 → 1096956400
+  - .outstanding.total: 20253999.0 → 20243999.0
 - **block.summary(read-model)**
-  - .advance: 0.0 → 10000.0
-  - .advance_paise: 0 → 1000000
-  - .collections_mtd: 3434687.5 → 3444687.5
-  - .collections_mtd_paise: 343468750 → 344468750
-  - .collections_total: 45345875.0 → 45355875.0
-  - .collections_total_paise: 4534587500 → 4535587500
-  - .computed_at: "2026-10-26T14:08:00.614106+00:00" → "2026-10-26T14:08:16.159842+00:00"
-  - .paid: 44857625.0 → 44867625.0
+  - .collections_mtd: 5225901.0 → 5235901.0
+  - .collections_mtd_paise: 522590100 → 523590100
+  - .collections_total: 90572457.0 → 90582457.0
+  - .collections_total_paise: 9057245700 → 9058245700
+  - .computed_at: "2026-10-26T18:21:45.522026+00:00" → "2026-10-26T18:22:16.652805+00:00"
+  - .outstanding.cash: 6534937.0 → 6524937.0
+  - .outstanding.cash_paise: 653493700 → 652493700
+  - .outstanding.total: 11722562.0 → 11712562.0
 - **dashboard.home**
+  - .ageing_paise.not_due: 471753800 → 470753800
   - .collections_12m[]: 12 items, content changed
-  - .computed_at: "2026-10-26T14:08:00.629724+00:00" → "2026-10-26T14:08:16.180841+00:00"
-  - .greeting_date: "2026-10-26T14:08:13.735793+00:00" → "2026-10-26T14:08:16.886574+00:00"
+  - .computed_at: "2026-10-26T18:22:06.256487+00:00" → "2026-10-26T18:22:16.679911+00:00"
+  - .greeting_date: "2026-10-26T18:22:14.219371+00:00" → "2026-10-26T18:22:17.300303+00:00"
   - .projects[]: 2 items, content changed
   - .recent[]: 12 items, content changed
   - .spark.collections[]: 8 items, content changed
-  - .totals.advance: 747403.75 → 757403.75
-  - .totals.advance_paise: 74740375 → 75740375
+  - .totals.collections_mtd: 12644601.0 → 12654601.0
 - **dashboard.legacy**
-  - .collections.month.Cash: 8086695.0 → 8096695.0
-  - .collections.month.Cash_paise: 808669500 → 809669500
-  - .collections.month.count: 60 → 61
-  - .collections.month.total: 13884710.0 → 13894710.0
-  - .collections.month.total_paise: 1388471000 → 1389471000
-  - .collections.today.Cash: 454410.0 → 464410.0
-  - .collections.today.Cash_paise: 45441000 → 46441000
-  - .collections.today.count: 2 → 3
+  - .collections.dues_raised_month.paid: 6050025.0 → 6060025.0
+  - .collections.dues_raised_month.paid_paise: 605002500 → 606002500
+  - .collections.month.Cash: 8072551.0 → 8082551.0
+  - .collections.month.Cash_paise: 807255100 → 808255100
+  - .collections.month.count: 52 → 53
+  - .collections.month.total: 12644601.0 → 12654601.0
+  - .collections.month.total_paise: 1264460100 → 1265460100
+  - .collections.outstanding_due: 20608999.0 → 20598999.0
 - **dashboard.widgets**
-  - .collections_month.amount: 13884710.0 → 13894710.0
-  - .collections_month.amount_paise: 1388471000 → 1389471000
-  - .collections_month.count: 60 → 61
-  - .collections_today.amount: 757350.0 → 767350.0
-  - .collections_today.amount_paise: 75735000 → 76735000
-  - .collections_today.count: 2 → 3
+  - .ageing[]: 5 items, content changed
+  - .collections_month.amount: 12644601.0 → 12654601.0
+  - .collections_month.amount_paise: 1264460100 → 1265460100
+  - .collections_month.count: 52 → 53
+  - .collections_today.amount: 1194076.0 → 1204076.0
+  - .collections_today.amount_paise: 119407600 → 120407600
+  - .collections_today.count: 3 → 4
   - .collections_trend[]: 13 items, content changed
 - **payments.list+totals**
-  - .total: 955 → 956
+  - .total: 972 → 973
 - **payments.summary**
-  - .Cleared.amount: 316712952.51 → 316722952.51
-  - .Cleared.amount_paise: 31671295251 → 31672295251
-  - .Cleared.count: 948 → 949
+  - .Cleared.amount: 323151435.0 → 323161435.0
+  - .Cleared.amount_paise: 32315143500 → 32316143500
+  - .Cleared.count: 960 → 961
 - **roznamcha(today)**
-  - .by_category.Cash.amount: 454410.0 → 464410.0
-  - .by_category.Cash.amount_paise: 45441000 → 46441000
-  - .by_mode.Cash.amount: 454410.0 → 464410.0
-  - .by_mode.Cash.amount_paise: 45441000 → 46441000
+  - .by_category.Cash.amount: 796051.0 → 806051.0
+  - .by_category.Cash.amount_paise: 79605100 → 80605100
+  - .by_mode.Cash.amount: 199013.0 → 209013.0
+  - .by_mode.Cash.amount_paise: 19901300 → 20901300
   - .by_mode.Cash.count: 1 → 2
-  - .by_project.SGH.amount: 757350.0 → 767350.0
-  - .by_project.SGH.amount_paise: 75735000 → 76735000
-  - .by_project.SGH.count: 2 → 3
+  - .by_project.SGH.amount: 1194076.0 → 1204076.0
+  - .by_project.SGH.amount_paise: 119407600 → 120407600
+  - .by_project.SGH.count: 3 → 4
 - **report.collections(today)**
-  - .error.request_id: "b2289adf97ae477f" → "6b35f11a26604648"
-  - .request_id: "b2289adf97ae477f" → "6b35f11a26604648"
+  - .error.request_id: "25bd4c97a7584dc8" → "a2eedf2d698c47cb"
+  - .request_id: "25bd4c97a7584dc8" → "a2eedf2d698c47cb"
 - **report.outstanding**
-  - .rows[]: 77 items, content changed
-  - .totals.paid: 315532577.51 → 315542577.51
-  - .totals.paid_paise: 31553257751 → 31554257751
-- **report.advances**
-  - .rows[]: len 5 → 6
-  - .totals.cash_advance: 411748.75 → 421748.75
-  - .totals.cash_advance_paise: 41174875 → 42174875
-  - .totals.total_advance: 747403.75 → 757403.75
-  - .totals.total_advance_paise: 74740375 → 75740375
+  - .ageing[]: 5 items, content changed
+  - .rows[]: 78 items, content changed
+  - .totals.cash_due: 10328713.0 → 10318713.0
+  - .totals.cash_due_paise: 1032871300 → 1031871300
+  - .totals.due: 20608999.0 → 20598999.0
+  - .totals.due_paise: 2060899900 → 2059899900
+  - .totals.paid: 321784310.0 → 321794310.0
+  - .totals.paid_paise: 32178431000 → 32179431000
+- **report.demand_vs_collection**
+  - .rows[]: 28 items, content changed
+  - .totals.collected: 321546282.0 → 321556282.0
+  - .totals.collected_paise: 32154628200 → 32155628200
 - **report.inventory**
   - .realised_rates[]: 2 items, content changed
+- **report.sales_leads**
+  - .bookings_per_user[]: 2 items, content changed
 - **report.roznamcha_range**
-  - .error.request_id: "44e17ac627814822" → "81a15b55550c4532"
-  - .request_id: "44e17ac627814822" → "81a15b55550c4532"
+  - .error.request_id: "18b1032ec42e47d2" → "a05538b6892a4303"
+  - .request_id: "18b1032ec42e47d2" → "a05538b6892a4303"
 - **report.bank_receipts**
   - .rows[]: 5 items, content changed
 - **report.activity**
-  - .actions[]: 57 items, content changed
-  - .rows[]: 457 items, content changed
+  - .actions[]: 59 items, content changed
+  - .rows[]: 458 items, content changed
 - **report.statement**
-  - .booking.ledger_rebuilt_at: "2026-10-26T14:07:58.316006+00:00" → "2026-10-26T14:08:14.095355+00:00"
-  - .booking.summary.advance: 0.0 → 10000.0
-  - .booking.summary.advance_paise: 0 → 1000000
-  - .booking.summary.cash_due: 0.0 → -10000.0
-  - .booking.summary.cash_due_paise: 0 → -1000000
-  - .booking.summary.cash_paid: 831600.0 → 841600.0
-  - .booking.summary.cash_paid_paise: 83160000 → 84160000
-  - .booking.summary.last_payment_at: "2026-08-29" → "2026-10-26"
+  - .booking.ledger_rebuilt_at: "2026-10-26T18:21:32.530878+00:00" → "2026-10-26T18:22:14.603770+00:00"
+  - .booking.summary.cash_due: 1990125.0 → 1980125.0
+  - .booking.summary.cash_due_paise: 199012500 → 198012500
+  - .booking.summary.cash_paid: 1393088.0 → 1403088.0
+  - .booking.summary.cash_paid_paise: 139308800 → 140308800
+  - .booking.summary.due: 3582725.0 → 3572725.0
+  - .booking.summary.due_paise: 358272500 → 357272500
+  - .booking.summary.outstanding: 3582725.0 → 3572725.0
 - **audit.booking**
   - .items[]: 5 items, content changed
-  - .next_cursor: "WyJjcmVhdGVkX2F0IiwgIjIwMjYtMDYtMjVUMDU6MDA6MDArMDA6MDAiLCA → "WyJjcmVhdGVkX2F0IiwgIjIwMjYtMDgtMTNUMDU6MDA6MDArMDA6MDAiLCA
-  - .total: 14 → 15
+  - .next_cursor: "WyJjcmVhdGVkX2F0IiwgIjIwMjYtMTAtMjZUMTg6MjA6MzYuNjE2MTk1KzA → "WyJjcmVhdGVkX2F0IiwgIjIwMjYtMTAtMjZUMTg6MjA6MzguNDM3NjY5KzA
+  - .total: 24 → 25
 - **audit.recent**
   - .items[]: 3 items, content changed
-  - .next_cursor: "WyJjcmVhdGVkX2F0IiwgIjIwMjYtMTAtMjZUMTQ6MDc6NDguODc2OTYzKzA → "WyJjcmVhdGVkX2F0IiwgIjIwMjYtMTAtMjZUMTQ6MDg6MTQuMDk2MjYxKzA
-  - .total: 3626 → 3628
+  - .next_cursor: "WyJjcmVhdGVkX2F0IiwgIjIwMjYtMTAtMjZUMTg6MjE6NTUuMDMyNDI2KzA → "WyJjcmVhdGVkX2F0IiwgIjIwMjYtMTAtMjZUMTg6MjI6MTQuNjA1Nzk3KzA
+  - .total: 3745 → 3747
 - **search(customer name)**
-  - .took_ms: 33.6 → 2.8
+  - .took_ms: 2.5 → 2.8
+- **construction.milestones(block)**
+  - .stages[]: 11 items, content changed
 - **pdf.statement(len)**
-  - .error.request_id: "2ca335d1ac9c4cb8" → "e3fc59499469420f"
-  - .request_id: "2ca335d1ac9c4cb8" → "e3fc59499469420f"
+  - .error.request_id: "51687f426472444b" → "43a5a1c5b53d4dd0"
+  - .request_id: "51687f426472444b" → "43a5a1c5b53d4dd0"
 
 ## Changed only after caches expired (stale 2.5–9 s) (0)
 
-## Unchanged (19)
+## Unchanged (17)
 - block.detail+grid
 - booking.schedule/demands
 - bootstrap.counts
 - cheques.in_hand
-- construction.milestones(block)
 - customer.panels(comms/docs)
 - flat.detail
 - inventory.flats(block)
@@ -182,16 +189,15 @@ Action result: `{"id": "e5548e71-42e8-449d-a452-ea628315f055", "company_id": "36
 - leads.list
 - notifications(staff)
 - project.workspace
+- report.advances
 - report.cancellations
 - report.cheques
 - report.construction_progress
-- report.demand_vs_collection
-- report.sales_leads
 - report.service_sla
 - service.list
 
 ## Restore
-`[200, {"id": "e5548e71-42e8-449d-a452-ea628315f055", "company_id": "36cd450b-9910-4a57-aebb-68f2be8b6c6f", "created_at": "2026-10-26T14:08:14.084251+00:00", "updated_at": "2026-10-26T14:08:23.536476+00:00", "created_by": "a8b2f2ca-8e1c-4722-a626-dccd7581941d", "is_active": true, "deleted_at": null, `
+`[200, {"id": "d98e9eb4-aa9c-4b5b-972a-5045de97bd1e", "company_id": "61e35c1c-91c6-43c9-a732-2f790d5b57aa", "created_at": "2026-10-26T18:22:14.590532+00:00", "updated_at": "2026-10-26T18:22:24.033594+00:00", "created_by": "b63b8b19-94ac-4c8e-845b-faf8019d7a8e", "is_active": true, "deleted_at": null, `
 
 ## Expected (registry) vs actual
 - _propagated_complete: True

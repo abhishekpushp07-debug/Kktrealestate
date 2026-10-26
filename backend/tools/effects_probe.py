@@ -66,7 +66,7 @@ def surfaces(api, ctx):
         "payments.summary": lambda: api.get("/payments/summary"),
         "roznamcha(today)": lambda: api.get("/roznamcha", date=today),
         "cheques.in_hand": lambda: api.get("/payments/cheques-in-hand"),
-        "report.collections(today)": lambda: api.get("/reports/collections", date_from=today, date_to=today),
+        "report.collections(today)": lambda: api.get("/reports/collections", from_date=today, to_date=today),
         "report.outstanding": lambda: api.get("/reports/outstanding"),
         "report.advances": lambda: api.get("/reports/advances"),
         "report.demand_vs_collection": lambda: api.get("/reports/demand-vs-collection"),
@@ -74,7 +74,7 @@ def surfaces(api, ctx):
         "report.cheques": lambda: api.get("/reports/cheques"),
         "report.cancellations": lambda: api.get("/reports/cancellations"),
         "report.sales_leads": lambda: api.get("/reports/sales-leads"),
-        "report.roznamcha_range": lambda: api.get("/reports/roznamcha-range", date_from=today, date_to=today),
+        "report.roznamcha_range": lambda: api.get("/reports/roznamcha-range", from_date=today, to_date=today),
         "report.bank_receipts": lambda: api.get("/reports/bank-receipts"),
         "report.activity": lambda: api.get("/reports/activity"),
         "report.statement": lambda: api.get(f"/reports/statement/{b}"),
@@ -88,7 +88,7 @@ def surfaces(api, ctx):
         "leads.list": lambda: api.get("/leads", page_size=5),
         "service.list": lambda: api.get("/service-requests", page_size=5),
         "construction.milestones(block)": lambda: api.get(f"/blocks/{bl}/milestones"),
-        "pdf.statement(len)": lambda: api.get(f"/pdfs/bookings/{b}/statement.pdf"),
+        "pdf.statement(len)": lambda: api.get(f"/bookings/{b}/statement.pdf"),
     }
     out = {}
     for k, f in S.items():
