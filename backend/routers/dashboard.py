@@ -3,6 +3,7 @@ from datetime import UTC
 from fastapi import APIRouter, Depends
 
 from db import db
+from services import clock
 from deps import project_scope_filter, require
 from routers.projects import STATUSES, status_counts
 
@@ -68,7 +69,7 @@ async def collections_widget(user: dict) -> dict:
     from datetime import datetime
 
     from services.money import present_money
-    today = datetime.now(UTC).date()
+    today = clock.today()
     month_start = today.replace(day=1).isoformat()
     base = {"company_id": user["company_id"], "status": "Cleared", **project_scope_filter(user)}
 

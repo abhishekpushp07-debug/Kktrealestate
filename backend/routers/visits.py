@@ -200,7 +200,7 @@ def _slots_for(cfg: dict, d: date, now_ist: datetime) -> list[tuple[str, str]]:
 
 async def availability(p: dict, d_from: date, d_to: date) -> list[dict]:
     cfg = visit_settings(p)
-    now_ist = datetime.now(IST)
+    now_ist = clock.now(IST)
     booked = await db.site_visits.aggregate([{"$match": {"project_id": p["id"], "date": {"$gte": d_from.isoformat(), "$lte": d_to.isoformat()}, "status": {"$nin": ["Cancelled"]}}}, {"$group": {"_id": {"d": "$date", "s": "$slot_start"}, "n": {"$sum": 1}}}]).to_list(None)
     cnt = {(b["_id"]["d"], b["_id"]["s"]): b["n"] for b in booked}
     days = []
@@ -216,7 +216,7 @@ async def availability(p: dict, d_from: date, d_to: date) -> list[dict]:
 async def public_availability(project_slug: str, from_: str | None = Query(default=None, alias="from"), to: str | None = None, from_compat: str | None = Query(default=None, alias="from_")):
     p = await _project_by_slug(project_slug)
     from_ = from_ or from_compat
-    d_from = date.fromisoformat(from_) if from_ else datetime.now(IST).date()
+    d_from = date.fromisoformat(from_) if from_ else clock.now(IST).date()
     d_to = min(date.fromisoformat(to) if to else d_from + timedelta(days=13), d_from + timedelta(days=45))
     ck = f"avail:{p['id']}:{d_from}:{d_to}"
     hit = ttlcache.get(ck)
@@ -249,7 +249,7 @@ class VisitPublicIn(StrictModel):
 async def _reserve(p: dict, d: str, slot_start: str, exclude_id: str | None = None) -> str:
     """Atomic capacity check: insert a reservation marker then recount; roll back if over capacity."""
     cfg = visit_settings(p)
-    now_ist = datetime.now(IST)
+    now_ist = clock.now(IST)
     slots = dict(_slots_for(cfg, date.fromisoformat(d), now_ist))
     if slot_start not in slots:
         raise ApiError(409, "That slot is not available", "SLOT_UNAVAILABLE")
@@ -315,7 +315,7 @@ async def public_book(body: VisitPublicIn, request: Request):
 def visit_link_minutes(visit_date: str) -> int:
     """Signed manage/ICS links expire 7 days after the visit date."""
     end = datetime.combine(date.fromisoformat(visit_date) + timedelta(days=7), datetime.min.time(), tzinfo=IST)
-    return max(1, int((end - datetime.now(IST)).total_seconds() // 60))
+    return max(1, int((end - clock.now(IST)).total_seconds() // 60))
 
 
 async def _visit_from_token(token: str) -> tuple[dict, dict]:
@@ -364,7 +364,7 @@ async def _set_status(v: dict, status: str, by: str | None, note: str | None, ac
                 await db.leads.update_one({"id": v["lead_id"]}, {"$set": {"status": "Site Visit Done", "updated_at": now_iso()}, "$push": {"stage_history": {"status": "Site Visit Done", "at": now_iso(), "by": by, "note": v["visit_number"]}}})
         if status == "Cancelled":
             lead = await db.leads.find_one({"id": v["lead_id"]}, {"_id": 0, "status": 1, "stage_history": 1})
-            still_open = await db.site_visits.count_documents({"lead_id": v["lead_id"], "id": {"$ne": v["id"]}, "status": {"$in": ["Confirmed", "Rescheduled"]}, "date": {"$gte": datetime.now(IST).date().isoformat()}})
+            still_open = await db.site_visits.count_documents({"lead_id": v["lead_id"], "id": {"$ne": v["id"]}, "status": {"$in": ["Confirmed", "Rescheduled"]}, "date": {"$gte": clock.now(IST).date().isoformat()}})
             if lead and lead["status"] == "Site Visit Scheduled" and not still_open:
                 prev = next((h["status"] for h in reversed(lead.get("stage_history") or []) if h["status"] != "Site Visit Scheduled"), "New")
                 await db.leads.update_one({"id": v["lead_id"]}, {"$set": {"status": prev, "updated_at": now_iso()}, "$push": {"stage_history": {"status": prev, "at": now_iso(), "by": by, "note": f"Reverted — {v['visit_number']} cancelled"}}})
@@ -411,7 +411,7 @@ async def export_visits(project_id: str | None = None, status: str | None = None
 
 @router.get("/today")
 async def today_visits(user: dict = Depends(require("sales.site_visit.view"))):
-    today = datetime.now(IST).date().isoformat()
+    today = clock.now(IST).date().isoformat()
     q = {"company_id": user["company_id"], "date": today, "status": {"$nin": ["Cancelled"]}, **project_scope_filter(user)}
     if user.get("role_name") == "Sales":
         q["assigned_to"] = user["id"]
@@ -522,7 +522,7 @@ async def visit_notes(visit_id: str, body: NoteIn, user: dict = Depends(require(
 async def nudge_loop():
     while True:
         try:
-            today = datetime.now(IST).date().isoformat()
+            today = clock.now(IST).date().isoformat()
             async for v in db.site_visits.find({"date": {"$lt": today}, "status": {"$in": ["Confirmed", "Rescheduled"]}, "nudged_on": {"$ne": today}}, {"_id": 0}):
                 await notify_user(v["company_id"], v.get("assigned_to"), "Mark outcome", f"{v['visit_number']} · {v['name']} · {v['project_name']} · {fmt_date(v['date'])} — mark Completed or No-show", "visit.nudge", "site_visit", v["id"], "/site-visits")
                 await db.site_visits.update_one({"id": v["id"]}, {"$set": {"nudged_on": today}})
@@ -557,7 +557,7 @@ async def seed_phase9():
         await db.projects.update_one({"id": p["id"]}, {"$set": upd})
     projects = await db.projects.find({"company_id": cid, "website.is_published": True}, {"_id": 0}).to_list(10)
     leads = await db.leads.find({"company_id": cid, "status": {"$nin": ["Lost", "Converted"]}}, {"_id": 0}).to_list(30)
-    today = datetime.now(IST).date()
+    today = clock.now(IST).date()
     sgh = next((p for p in projects if (p.get("code") or "").upper() == "SGH"), projects[0])
     ggv = next((p for p in projects if (p.get("code") or "").upper() == "GGV"), projects[-1])
     plan = []

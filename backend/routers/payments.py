@@ -7,6 +7,7 @@ from pydantic import Field, model_validator
 
 from crypto import decrypt_field, mask
 from db import db
+from services import clock
 from models_out import PaymentsOut, PaymentsOutPage
 from deps import require_idempotency_key, ensure_project_access, project_scope_filter, require
 from services.ledger import CLEAR_IMMEDIATELY, bucket_paid, line_paid, rebuild
@@ -55,7 +56,7 @@ class PaymentIn(StrictModel):
             raise ValueError("payment_category (Cash/Account) is required for flat value payments")
         if self.against == "OTHER_CHARGE" and not self.other_charge_line_id:
             raise ValueError("other_charge_line_id is required for other-charge payments")
-        if self.payment_date > datetime.now(UTC).date():
+        if self.payment_date > clock.today():
             raise ValueError("payment_date cannot be in the future")
         return self
 

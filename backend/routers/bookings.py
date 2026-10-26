@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Request, Response
 from pydantic import Field, model_validator
 
 from db import db
+from services import clock
 from models_out import BookingsOut, BookingsOutPage
 from deps import ensure_project_access, project_scope_filter, require
 from services.counters import apply_status_delta
@@ -59,7 +60,7 @@ class BookingIn(StrictModel):
     def _sum(self):
         if to_paise(self.cash_agreed) + to_paise(self.account_agreed) != to_paise(self.agreement_value):
             raise ValueError("cash_agreed + account_agreed must equal agreement_value exactly")
-        if self.booking_date > datetime.now(UTC).date():
+        if self.booking_date > clock.today():
             raise ValueError("booking_date cannot be in the future")
         return self
 
