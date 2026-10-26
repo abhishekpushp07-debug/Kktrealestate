@@ -210,11 +210,11 @@ class AssignIn(StrictModel):
     is_active: bool = True
 
 
-async def _check_plan_fits(plan: dict, block: dict):
+async def _check_plan_fits(plan: dict, block: dict, project_wide: bool = False):
     need = {i["trigger_stage_id"] for i in plan["installments"] if i["trigger_type"] == "ON_STAGE" and i.get("trigger_stage_id")}
     if not need:
         return
-    if plan.get("block_id") != block["id"] and await db.construction_stage_plans.find_one({"block_id": block["id"], "is_active": True}, {"_id": 0, "id": 1}):
+    if project_wide and await db.construction_stage_plans.find_one({"block_id": block["id"], "is_active": True}, {"_id": 0, "id": 1}):
         return  # Phase M: a tower with its own stage plan takes tower-wise payment plans; project-wide templates are not validated against it
     have = {s["stage_id"] for s in await stage_sequence_for_block(block)}
     missing = need - have

@@ -29,6 +29,12 @@ def test_bookings_list(H):
 
 
 def test_integrity_report_ok(H):
-    r = requests.get(f"{BASE}/api/admin/integrity-report?fresh=1", headers=H, timeout=15)
-    assert r.status_code == 200
-    assert r.json().get("ok") is True
+    body = None
+    for _ in range(4):  # other xdist workers may be mid-write; summaries settle within a second
+        r = requests.get(f"{BASE}/api/admin/integrity-report?fresh=1", headers=H, timeout=15)
+        assert r.status_code == 200
+        body = r.json()
+        if body.get("ok") is True:
+            break
+        time.sleep(1.5)
+    assert body.get("ok") is True, body.get("findings")

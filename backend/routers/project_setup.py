@@ -135,7 +135,7 @@ async def save_section(project_id: str, section: str, body: dict, request: Reque
             if a.block_id and a.block_id not in blocks:
                 raise ApiError(404, "Tower does not belong to this project", "TOWER_NOT_IN_PROJECT")
             for b in ([blocks[a.block_id]] if a.block_id else blocks.values()):
-                await _check_plan_fits(plans[a.payment_plan_id], b)
+                await _check_plan_fits(plans[a.payment_plan_id], b, project_wide=not a.block_id)
         if sum(1 for a in data.assignments if a.is_default and not a.block_id) > 1 or any(sum(1 for a in data.assignments if a.is_default and a.block_id == bid) > 1 for bid in blocks):
             raise ApiError(422, "Only one default plan per scope", "VALIDATION_ERROR")
         in_use = {a["payment_plan_id"] for a in await db.bookings.find({"project_id": project_id, "status": "Active"}, {"_id": 0, "payment_plan_id": 1}).to_list(None)}
