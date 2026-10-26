@@ -152,7 +152,7 @@ _real_post = requests.post
 _real_session_post = requests.Session.post
 
 
-NO_CACHE_FILES = ("test_phase_1_5.py", "test_phase_5.py", "test_phase_11a.py", "test_owner_bootstrap.py")  # MFA / refresh-rotation / session-revocation / host-gating tests need real logins
+NO_CACHE_FILES = ("test_phase_1_5.py", "test_phase_5.py", "test_phase_11a.py", "test_owner_bootstrap.py", "test_story_behaviours.py")  # MFA / refresh-rotation / session-revocation / host-gating tests need real logins
 
 
 def _cache_key(url, kwargs):

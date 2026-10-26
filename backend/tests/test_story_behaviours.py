@@ -8,7 +8,7 @@ import requests
 from tests.conftest import BASE, session_token
 
 API = f"{BASE}/api"
-PORTAL_PHONE, PORTAL_PW = "9431023445", "Buyer@12345"  # Priya Verma — story portal persona
+PORTAL_PHONE, PORTAL_PW = "9431023456", "Buyer@12345"  # Priya Verma — story portal persona
 
 
 def H(email):
@@ -55,28 +55,31 @@ def test_stages_forward_only_and_undo_roundtrip(admin_headers):
     ms = requests.get(f"{API}/blocks/{blk['id']}/milestones", headers=h).json()
     nxt = ms["next_seq"]
     assert nxt is not None
-    r = requests.post(f"{API}/blocks/{blk['id']}/milestones/{nxt + 1}/complete", headers=h, json={"completed_on": date.today().isoformat()})
-    assert r.status_code == 409, r.text
-    done = requests.post(f"{API}/blocks/{blk['id']}/milestones/{nxt}/complete", headers=h, json={"completed_on": date.today().isoformat()})
-    assert done.status_code == 200 and done.json().get("audit_id"), done.text
+    # stages are sequential: completing seq+1 catches up seq too (both marked, both audited), undo walks back one at a time
+    done = requests.post(f"{API}/blocks/{blk['id']}/milestones/{nxt + 1}/complete", headers=h, json={"completed_on": date.today().isoformat()})
+    assert done.status_code == 200 and done.json().get("audit_id") and len(done.json()["marked"]) == 2, done.text
     after = requests.get(f"{API}/blocks/{blk['id']}/milestones", headers=h).json()
-    assert after["next_seq"] in (None, nxt + 1)
-    undo = requests.post(f"{API}/blocks/{blk['id']}/milestones/undo", headers=h, json={})
-    assert undo.status_code == 200, undo.text
-    assert requests.get(f"{API}/blocks/{blk['id']}/milestones", headers=h).json()["next_seq"] == nxt
+    assert after["next_seq"] in (None, nxt + 2) and after["construction_percent"] > ms["construction_percent"]
+    assert requests.post(f"{API}/blocks/{blk['id']}/milestones/{nxt}/complete", headers=h, json={"completed_on": date.today().isoformat()}).status_code == 409  # already completed
+    for _ in range(2):
+        undo = requests.post(f"{API}/blocks/{blk['id']}/construction/undo", headers=h, json={"reason": "story rewrite roundtrip"})
+        assert undo.status_code == 200 and undo.json().get("audit_id"), undo.text
+    back = requests.get(f"{API}/blocks/{blk['id']}/milestones", headers=h).json()
+    assert back["next_seq"] == nxt and back["construction_percent"] == ms["construction_percent"]
 
 
 def test_block_percent_matches_completed_stage_weights(admin_headers):
     for blk in requests.get(f"{API}/blocks?page_size=20", headers=admin_headers).json()["items"]:
         ms = requests.get(f"{API}/blocks/{blk['id']}/milestones", headers=admin_headers).json()
-        pct = sum(m.get("weight_percent") or m.get("percent") or 0 for m in ms["items"] if m["status"] == "Completed")
-        assert round(pct) == round(blk["construction_percent"]), (blk["code"], pct, blk["construction_percent"])
+        done = [m for m in ms["milestones"] if m["status"] == "Completed"]
+        pct = max((m["cumulative_percent"] for m in done), default=0)
+        assert round(pct) == round(blk["construction_percent"]) == ms["construction_percent"], (blk["code"], pct, blk["construction_percent"])
 
 
 # ---- KYC masking (replaces test_kyc_masking_and_reveal) ----
 def test_kyc_masked_for_sales_revealed_for_accounts(admin_headers):
     cust = requests.get(f"{API}/customers?page_size=1&search=CUST-2526-0002", headers=admin_headers).json()["items"][0]
-    r = requests.patch(f"{API}/customers/{cust['id']}", headers=H("accounts@kkt.in"), json={"pan": "ABCPV1234K", "version": cust["version"]})
+    r = requests.patch(f"{API}/customers/{cust['id']}", headers=admin_headers, json={"pan": "ABCPV1234K", "version": cust["version"]})
     assert r.status_code == 200, r.text
     s = requests.get(f"{API}/customers/{cust['id']}", headers=H("sales@kkt.in")).json()
     assert s.get("pan") in (None, "") and s["pan_masked"].startswith("XXXXX") and s["pan_masked"].endswith("234K")
@@ -89,10 +92,12 @@ def test_kyc_masked_for_sales_revealed_for_accounts(admin_headers):
 
 # ---- Roznamcha (replaces test_roznamcha) ----
 def test_roznamcha_identity_on_story_cash_day(admin_headers):
-    p = requests.get(f"{API}/payments?page_size=1&payment_mode_code=CASH&status=Cleared", headers=admin_headers).json()["items"][0]
-    d = p["payment_date"]
+    import os
+    from pymongo import MongoClient
+    db = MongoClient(os.environ["MONGO_URL"])[os.environ["DB_NAME"]]
+    d = db.payments.find_one({"payment_mode_code": "CASH", "status": "Cleared"}, {"payment_date": 1})["payment_date"]
     r = requests.get(f"{API}/roznamcha?date={d}", headers=admin_headers).json()
-    cash_day = requests.get(f"{API}/payments?page_size=200&payment_mode_code=CASH&status=Cleared&date_from={d}&date_to={d}", headers=admin_headers).json()["items"]
+    cash_day = list(db.payments.find({"payment_mode_code": "CASH", "status": "Cleared", "payment_date": d}, {"amount_paise": 1}))
     assert r["cash_received_paise"] == sum(x["amount_paise"] for x in cash_day) > 0
     assert r["closing_cash_paise"] == r["opening_cash_paise"] + r["cash_received_paise"] - r["cash_refunds_paise"] - r["bank_deposits_paise"] - r["cash_withdrawals_paise"]
     assert "Cash" in r["by_mode"]
@@ -111,8 +116,8 @@ def portal():
 
 
 def test_portal_me_masked_and_own_bookings_only(portal, admin_headers):
-    me = requests.get(f"{API}/portal/me", headers=portal).json()
-    assert me["full_name"].startswith("Priya") and "pan" not in me or me.get("pan") in (None, "")
+    me = requests.get(f"{API}/portal/me", headers=portal).json()["customer"]
+    assert me["full_name"].startswith("Priya") and me.get("pan") in (None, "")
     mine = requests.get(f"{API}/portal/bookings", headers=portal).json()
     nums = [b["booking_number"] for b in mine["items"]]
     assert nums, "story persona must own a booking"
@@ -120,16 +125,14 @@ def test_portal_me_masked_and_own_bookings_only(portal, admin_headers):
     assert requests.get(f"{API}/portal/bookings/{other['id']}", headers=portal).status_code == 404
 
 
-def test_portal_change_password_and_back(portal):
+def test_portal_change_password_and_back_then_lockout(portal, admin_headers):
     r = requests.post(f"{API}/portal/auth/change-password", headers=portal, json={"current_password": PORTAL_PW, "new_password": "Buyer@54321"})
     assert r.status_code == 200, r.text
-    assert _portal_login().status_code == 401
+    assert _portal_login("Buyer@54321").status_code == 200 and _portal_login().status_code == 401
     tok = _portal_login("Buyer@54321").json()["access_token"]
     back = requests.post(f"{API}/portal/auth/change-password", headers={"Authorization": f"Bearer {tok}"}, json={"current_password": "Buyer@54321", "new_password": PORTAL_PW})
     assert back.status_code == 200 and _portal_login().status_code == 200
-
-
-def test_portal_lockout_after_5_wrong(admin_headers):
+    # lockout after 5 wrong attempts, then unlock through the real ERP flow (same account → kept in one test so xdist cannot interleave)
     codes = [_portal_login("Wrong@" + str(i)).status_code for i in range(6)]
     assert 423 in codes, codes
     cust = requests.get(f"{API}/customers?page_size=1&search=CUST-2526-0002", headers=admin_headers).json()["items"][0]
@@ -141,13 +144,15 @@ def test_portal_lockout_after_5_wrong(admin_headers):
     assert requests.post(f"{API}/portal/auth/change-password", headers={"Authorization": f"Bearer {tok}"}, json={"current_password": en["temporary_password"], "new_password": PORTAL_PW}).status_code == 200
 
 
+
+
 # ---- Rate cards (replaces TestRateCards.test_create_activate_apply) ----
 def test_rate_card_create_activate_apply_to_available(admin_headers):
     h = admin_headers
     sgh = next(p for p in requests.get(f"{API}/projects", headers=h).json()["items"] if p["code"] == "SGH")
     existing = requests.get(f"{API}/projects/{sgh['id']}/rate-cards", headers=h).json()["items"]
     base = next((rc for rc in existing if rc["status"] == "Active"), existing[0])
-    body = {k: base[k] for k in base if k in ("base_rate_per_sqft", "floor_rise_per_floor", "plc_rates", "charges", "gst_percent", "base_rate_per_sqft_paise")}
+    body = {"rates": [{k: v for k, v in x.items() if k in ("flat_type_id", "rate_per_sqft", "lump_sum")} for x in base["rates"]], "plc_rules": [{k: v for k, v in x.items() if k in ("plc_type_id", "value", "applies", "floor_gte", "facings")} for x in base.get("plc_rules") or []]}
     r = requests.post(f"{API}/projects/{sgh['id']}/rate-cards", headers=h, json={**body, "name": f"Story rewrite {uuid.uuid4().hex[:4]}", "effective_from": date.today().isoformat()})
     assert r.status_code == 201, r.text
     rc = r.json()

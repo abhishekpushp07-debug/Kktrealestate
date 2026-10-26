@@ -14,10 +14,10 @@ Each test below depended on the legacy demo seed (fixed demo personas, pre-switc
 | `test_phase_3.py::test_cms_collection_counts[testimonials-6]` | Testimonials were demo content; the story dataset ships none. Other CMS collections still asserted. |
 | `test_phase_7.py::TestBK0001Integrity` | Demo ledger row counts; ledger integrity now `test_ledger_example.py` (owner example) + `test_story_headline.py::test_story_anchor_bk_2526_0013`. |
 | `test_phase_7.py::TestTowerBConstruction` | Demo "2 of 11" fixture; rewritten data-relative: `test_story_behaviours.py::test_block_percent_matches_completed_stage_weights`. |
-| `test_phase_5.py::TestPortalAuth::test_lockout_after_5_wrong` | Rewritten on the story portal persona: `test_story_behaviours.py::test_portal_lockout_after_5_wrong`. |
+| `test_phase_5.py::TestPortalAuth::test_lockout_after_5_wrong` | Rewritten on the story portal persona: `test_story_behaviours.py::test_portal_change_password_and_back_then_lockout`. |
 | `test_phase_5.py::TestPortalData::test_me_masked / test_bookings_list / test_other_customers_booking_404` | Rewritten: `test_story_behaviours.py::test_portal_me_masked_and_own_bookings_only`. |
 | `test_phase_5.py::TestServiceRequests::test_rate_sunita_sr3` | Demo persona "Sunita" + SR-3 fixture; SR create/reply/rate flow kept in `TestServiceRequests::test_categories_and_create_and_reply`. |
-| `test_phase_5.py::TestChangePassword` | Demo persona "Santosh"; rewritten: `test_story_behaviours.py::test_portal_change_password_and_back`. |
+| `test_phase_5.py::TestChangePassword` | Demo persona "Santosh"; rewritten: `test_story_behaviours.py::test_portal_change_password_and_back_then_lockout`. |
 | `test_phase_5.py::TestErpPortalMgmt::test_get_portal_status_and_revoke_and_bulk` | Demo portal account list; revoke + enable + temp-password flow covered by `test_new_customer_enable_and_temp_password_flow` and the lockout rewrite. |
 | `test_phase_5.py::TestErpDocShare::test_toggle_share_and_sensitive_block` | Expected a demo-seeded shared allotment document; sensitive-document RBAC is `test_phase_2.py::test_documents_upload_download_rbac`. |
 | `test_phase_1_5.py::TestRateCards::test_create_activate_apply` | Assumed demo flat A-101 on Hold; rewritten data-relative: `test_story_behaviours.py::test_rate_card_create_activate_apply_to_available`. |
