@@ -327,7 +327,7 @@ jobs:
 
   images:
     name: Container images (build; push on main)
-    needs: [typecheck, unit]
+    needs: [lint, format, typecheck, unit, db, api-integration, acceptance, openapi, build, infra]
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:

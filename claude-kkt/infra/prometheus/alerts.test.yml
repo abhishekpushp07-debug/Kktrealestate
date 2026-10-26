@@ -87,12 +87,12 @@ tests:
         exp_alerts: []
 
   # a daily job that stopped succeeding (labels as scraped: job is the target, job_name the job)
-  - interval: 1h
+  - interval: 1m
     input_series:
       - series: 'kkt_job_last_success_timestamp_seconds{job="kkt-api", job_name="DAILY_DUES", instance="api-1"}'
-        values: "0x30"
+        values: "0x1700"
       - series: 'kkt_job_last_success_timestamp_seconds{job="kkt-api", job_name="NIGHTLY_INTEGRITY", instance="api-1"}'
-        values: "100000x30"
+        values: "100000x1700"
     alert_rule_test:
       - eval_time: 28h
         alertname: KktDailyJobStale

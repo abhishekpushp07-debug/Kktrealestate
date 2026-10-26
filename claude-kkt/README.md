@@ -38,15 +38,15 @@ Run each `pnpm` command in its own terminal. Other demo logins (Accounts, Sales,
 
 ## Quality gates
 
-Every push runs these in CI (`.github/workflows/ci.yml`); all pass at the end of the phase-5 hardening round:
+Every push runs these in CI (`.github/workflows/ci.yml`). Container images are built and pushed only after every gate below and the infrastructure checks pass:
 
 | Gate              | Command                                             | State                                                                                                        |
 | ----------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | Formatting        | `pnpm format:check`                                 | Prettier, whole repo (`docs/SPEC.md` and generated files excluded)                                           |
 | Lint              | `pnpm lint`                                         | ESLint 0 errors / 0 warnings (`--max-warnings 0`), React Compiler rules, `kkt/module-boundaries` as an error |
 | Types             | `pnpm typecheck`                                    | 7/7 packages                                                                                                 |
-| Unit tests        | `pnpm test`, `pnpm --filter @kkt/db test`           | domain 130 · contracts 183 · db 71 · api 114 · erp 162 · web 17 · portal 13                                  |
-| API integration   | `pnpm --filter @kkt/api test:integration`           | 588 tests / 46 files against PostgreSQL 16 + Redis 7                                                         |
+| Unit tests        | `pnpm test`, `pnpm --filter @kkt/db test`           | domain 130 · contracts 183 · db 71 · api 133 · erp 162 · web 17 · portal 13                                  |
+| API integration   | `pnpm --filter @kkt/api test:integration`           | 600 tests / 48 files against PostgreSQL 16 + Redis 7                                                         |
 | Acceptance        | `pnpm test:acceptance`                              | the 13 owner scenarios, 55 tests                                                                             |
 | API compatibility | `pnpm --filter @kkt/api openapi:check`              | no breaking change against `docs/openapi/v1.json`                                                            |
 | Builds            | `pnpm build`, `pnpm --filter @kkt/portal build:web` | API bundle, ERP, website; portal web export                                                                  |
