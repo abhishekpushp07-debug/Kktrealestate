@@ -61,6 +61,8 @@ function kpis(key, d) {
   if (key === "sales-leads") return [["Leads", String((d.funnel || []).reduce((a, s) => a + s.count, 0))], ["Avg response", d.avg_response_hours != null ? `${d.avg_response_hours} h` : "—"], ["Follow-ups overdue", String(d.follow_ups_overdue ?? 0), undefined, d.follow_ups_overdue ? "brick" : undefined], ["Web enquiries", String((d.enquiries_per_project || []).reduce((a, e) => a + e.count, 0))]];
   if (key === "service-sla") return [["Tickets", String(t.total ?? 0), `${t.open ?? 0} open`], ["SLA met", t.sla_met_pct != null ? `${t.sla_met_pct}%` : "—", "resolved within SLA", t.sla_met_pct != null && t.sla_met_pct < 80 ? "brick" : "sage"], ["Avg resolution", t.avg_resolution_h != null ? `${t.avg_resolution_h} h` : "—"], ["Avg rating", t.avg_rating != null ? `${t.avg_rating} ★` : "—", "closed tickets"]];
   if (key === "construction-progress") { const tw = d.towers || []; return [["Towers", String(tw.length), `${tw.filter((x) => x.pct === 100).length} possession ready`], ["Avg progress", tw.length ? `${Math.round(tw.reduce((a, x) => a + x.pct, 0) / tw.length)}%` : "—", "stages completed"], ["Site photos", String(t.photos ?? 0)], ["Stage demands", String(t.demands ?? 0), inrShort((t.demand_paise || 0) / 100)]]; }
+  if (key === "activity") return [["Audit rows", String((d.actions || []).reduce((a, x) => a + x.count, 0)), `${(d.actions || []).length} action types`], ["Logins", String(t.success ?? 0)], ["Failed logins", String(t.failed ?? 0), undefined, t.failed ? "brick" : undefined], ["Users seen", String(d.rows?.length || 0)]];
+  if (key === "cheques") return [["Instruments", String(d.rows?.length || 0), inrShort((t.amount_paise || 0) / 100)], ...Object.entries(d.by_status || {}).slice(0, 3).map(([k, v]) => [k, String(v.count), inrShort(v.amount_paise / 100), k === "Bounced" ? "brick" : k === "Cleared" ? "sage" : undefined])];
   const money = Object.entries(t).filter(([k]) => k.endsWith("_paise")).slice(0, 4);
   if (money.length) return money.map(([k, v]) => [k.replace(/_paise$/, "").replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase()), inrShort((v || 0) / 100)]);
   return [["Rows", String(d.rows?.length || 0)]];
@@ -79,7 +81,7 @@ export default function Reports() {
   const [renaming, setRenaming] = useState(null);
   const [activePreset, setActivePreset] = useState(null);
   const { data: presets, reload: reloadPresets } = useFetch(`/reports/presets?report_key=${key}`, [key]);
-  const params = useMemo(() => Object.fromEntries(Object.entries(f).filter(([k, v]) => v && FILTERS[key]?.includes(k)).map(([k, v]) => [MAP[k] || k, v])), [f, key]);
+  const params = useMemo(() => Object.fromEntries(Object.entries(f).filter(([k, v]) => v && v !== "All" && FILTERS[key]?.includes(k)).map(([k, v]) => [MAP[k] || k, v])), [f, key]);
   const qs = new URLSearchParams(params).toString();
   const { data, loading } = useFetch(`/reports/${key}${qs ? `?${qs}` : ""}`, [key, qs]);
   const meta = (list?.items || []).find((r) => r.key === key);

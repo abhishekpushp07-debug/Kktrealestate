@@ -594,14 +594,26 @@
  "GET /api/reports/cancellations": [
   "reports.cancellations_refunds.view"
  ],
+ "GET /api/reports/cash-vs-account": [
+  "reports.cash_vs_account.view"
+ ],
  "GET /api/reports/cheques": [
   "reports.cheque_register.view"
  ],
  "GET /api/reports/collections": [
   "reports.collections.view"
  ],
+ "GET /api/reports/collections-v2": [
+  "reports.collections.view"
+ ],
  "GET /api/reports/construction-progress": [
   "reports.construction_vs_plan.view"
+ ],
+ "GET /api/reports/construction-vs-plan": [
+  "reports.construction_vs_plan.view"
+ ],
+ "GET /api/reports/data-quality": [
+  "reports.data_quality.view"
  ],
  "GET /api/reports/demand-vs-collection": [
   "reports.demand_vs_collection.view"
@@ -612,20 +624,38 @@
  "GET /api/reports/inventory": [
   "reports.inventory.view"
  ],
+ "GET /api/reports/other-charges": [
+  "reports.other_charges.view"
+ ],
  "GET /api/reports/outstanding": [
+  "reports.outstanding.view"
+ ],
+ "GET /api/reports/outstanding-v2": [
   "reports.outstanding.view"
  ],
  "GET /api/reports/presets": [
   "reports.collections.view"
  ],
+ "GET /api/reports/receivables-forecast": [
+  "reports.receivables_forecast.view"
+ ],
  "GET /api/reports/roznamcha-range": [
+  "reports.roznamcha.view"
+ ],
+ "GET /api/reports/roznamcha-summary": [
   "reports.roznamcha.view"
  ],
  "GET /api/reports/sales-leads": [
   "reports.lead_funnel.view"
  ],
+ "GET /api/reports/sales-team": [
+  "reports.sales_team.view"
+ ],
  "GET /api/reports/service-sla": [
   "reports.service_sla.view"
+ ],
+ "GET /api/reports/site-visits": [
+  "reports.site_visit_conversion.view"
  ],
  "GET /api/reports/statement/{booking_id}": [
   "finance.ledger.export"

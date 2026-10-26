@@ -1,0 +1,135 @@
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [ 14%]
+........................................................................ [ 28%]
+........................................................................ [ 42%]
+.......F.........................s...................................... [ 56%]
+........................................................................ [ 71%]
+........................................................................ [ 85%]
+.F....................................s.............................F... [ 99%]
+..                                                                       [100%]
+=================================== FAILURES ===================================
+_______________________ test_matrix_file_matches_runtime _______________________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-148/popen-gw1/test_matrix_file_matches_runti0')
+
+    def test_matrix_file_matches_runtime(tmp_path):
+        """Write the derived matrix next to the code so reviewers can diff it; fail if a tracked copy exists and differs."""
+        import json
+        target = os.path.join(os.path.dirname(__file__), "..", "security", "permission_matrix.json")
+        doc = {f"{m} {p}": sorted(v["perms"]) if v["perms"] else (["<portal>"] if v["portal"] else (["<authenticated>"] if v["authed"] else ["<public>"])) for (m, p), v in sorted(MATRIX.items())}
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        if os.path.exists(target):
+>           assert json.load(open(target)) == doc, "security/permission_matrix.json is stale — regenerate by deleting it and re-running this test"
+E           AssertionError: security/permission_matrix.json is stale — regenerate by deleting it and re-running this test
+E           assert {'DELETE /api...cated>'], ...} == {'DELETE /api...cated>'], ...}
+E             
+E             Omitting 446 identical items, use -vv to show
+E             Right contains 10 more items:
+E             {'GET /api/reports/cash-vs-account': ['reports.cash_vs_account.view'],
+E              'GET /api/reports/collections-v2': ['reports.collections.view'],
+E              'GET /api/reports/construction-vs-plan': ['reports.construction_vs_plan.view'],
+E              'GET /api/reports/data-quality': ['reports.data_quality.view'],...
+E             
+E             ...Full output truncated (7 lines hidden), use '-vv' to show
+
+tests/test_permission_matrix.py:84: AssertionError
+___________________________ test_integrity_report_ok ___________________________
+[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
+
+H = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDd...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDQ5NjUwLCJleHAiOjE3OTMwNTA1NTB9.mTZ3RZIQMRmIcCX8wppgLDxQsdDAqyKmlfbUdtlznaM'}
+
+    def test_integrity_report_ok(H):
+        body = None
+        for _ in range(4):  # other xdist workers may be mid-write; summaries settle within a second
+            r = requests.get(f"{BASE}/api/admin/integrity-report?fresh=1", headers=H, timeout=15)
+            assert r.status_code == 200
+            body = r.json()
+            if body.get("ok") is True:
+                break
+            time.sleep(1.5)
+>       assert body.get("ok") is True, body.get("findings")
+E       AssertionError: [{'kind': 'ledger_due_mismatch', 'detail': 'last ledger outstanding 331837500 ≠ summary due 265500000', 'booking_id': '02d58183-0695-4b00-827f-9b6acdac2821', 'booking_number': 'BK-2627-0022', ...}]
+E       assert False is True
+E        +  where False = <built-in method get of dict object at 0xfa3209cdce40>('ok')
+E        +    where <built-in method get of dict object at 0xfa3209cdce40> = {'ok': False, 'as_of': '2026-10-27', 'ran_at': '2026-10-26T21:22:32.744242+00:00', 'bookings_checked': 80, ...}.get
+
+tests/test_phase_b4_backend_sanity.py:40: AssertionError
+___________________ test_startup_idempotent_on_pre_phase7_db ___________________
+[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
+
+    def test_startup_idempotent_on_pre_phase7_db():
+        loop = asyncio.new_event_loop()
+        cl = loop.run_until_complete(_prepare())
+        try:
+            log1 = _run_startup()
+>           assert "integrity: ok=True" in log1, log1[-2000:]
+E           AssertionError: on_stages index: name_1 dup key: { name: "Excavation" }', 'keyPattern': {'name': 1}, 'keyValue': {'name': 'Excavation'}}
+E             [startup] seed_phase7 ok in 0.00s
+E             [startup] backfill_demand_installments ok in 0.00s
+E             [startup] migrate_phase_g ok in 0.00s
+E             Phase 7 migration done: {'started_at': '2026-10-26T21:23:28.924053+00:00', 'bookings_checked': 89, 'plans_created': ['Standard CLP', 'Villa CLP'], 'stages_created': 16, 'finished_at': '2026-10-26T21:23:31.064759+00:00', 'ok': True, 'changed': 0}
+E             [startup] migrate_phase7 ok in 2.14s
+E             Phase 7 seed complete
+E             [startup] seed_phase7 ok in 0.43s
+E             [startup] backfill_demand_installments ok in 0.05s
+E             [startup] migrate_phase_g ok in 0.00s
+E             [notify] sweep: {'normalized': 1565, 'deleted': 100}
+E             [startup] sweep_notifications ok in 5.19s
+E             [phase7] integrity: ok=False bookings=80 counts={'missing_demand': 6, 'ledger_due_mismatch': 1}
+E             [startup] integrity_report ok in 0.18s
+E             [startup] counters ok in 0.02s
+E             [startup] reconcile ok in 0.77s
+E             [notify] sweep: {'normalized': 1386, 'deleted': 59}
+E             [startup] sweep_notifications ok in 3.58s
+E             [phase11] customer profiles migrated: 92
+E             [phase7] integrity: ok=False bookings=80 counts={'missing_demand': 6, 'ledger_due_mismatch': 1}
+E             [startup] integrity_report ok in 0.20s
+E             [startup] counters ok in 0.00s
+E             [startup] reconcile ok in 0.87s
+E             [phase11] read models: {'blocks': 12, 'projects': 2, 'customers': 92, 'ms': 1112}
+E             [phase11] catalogue items seeded: 351
+E             [startup] startup_phase11 ok in 1.29s
+E             [startup] schema_validators ok in 0.01s
+E             [startup] price_paise_backfill ok in 0.00s
+E             [startup] background tasks complete in 7.7s: {'seed_if_empty': 0.0, 'seed_phase15': 0.0, 'seed_phase3': 0.0, 'system_roles': 0.23, 'seed_marketing_user': 0.0, 'owner_bootstrap': 0.0, 'migrate_phase7': 2.14, 'seed_phase7': 0.43, 'backfill_demand_installments': 0.05, 'migrate_phase_g': 0.0, 'sweep_notifications': 3.58, 'integrity_report': 0.2, 'counters': 0.0, 'reconcile': 0.87, 'startup_phase11': 1.29, 'schema_validators': 0.01, 'price_paise_backfill': 0.0}
+E             
+E           assert 'integrity: ok=True' in "[startup] indexes ensured in 2.93s\nUoW mode: ordered-writes+compensation\nKKT backend serving after 2.94s (uow=order...'counters': 0.0, 'reconcile': 0.87, 'startup_phase11': 1.29, 'schema_validators': 0.01, 'price_paise_backfill': 0.0}\n"
+
+tests/test_startup_migrations.py:90: AssertionError
+=============================== warnings summary ===============================
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+  /root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+tests/test_kkt_erp.py::TestBlock::test_create_block_and_generation
+tests/test_kkt_erp.py::TestFlatType::test_create_flat_type_auto_area
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+  /root/.venv/lib/python3.11/site-packages/_pytest/fixtures.py:1313: PytestRemovedIn10Warning: Class-scoped fixture defined as instance method is deprecated.
+  Instance attributes set in this fixture will NOT be visible to test methods,
+  as each test gets a new instance while the fixture runs only once per class.
+  Use @classmethod decorator and set attributes on cls instead.
+  See https://docs.pytest.org/en/stable/deprecations.html#class-scoped-fixture-as-instance-method
+    fixturefunc = resolve_fixture_function(fixturedef, request)
+
+tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources
+  /root/.venv/lib/python3.11/site-packages/_pytest/python.py:171: PytestReturnNotNoneWarning: Test functions should return None, but tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources returned <class 'str'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_permission_matrix.py::test_matrix_file_matches_runtime - As...
+FAILED tests/test_phase_b4_backend_sanity.py::test_integrity_report_ok - Asse...
+FAILED tests/test_startup_migrations.py::test_startup_idempotent_on_pre_phase7_db
+3 failed, 501 passed, 2 skipped, 9 warnings in 194.56s (0:03:14)

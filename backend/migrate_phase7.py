@@ -42,8 +42,8 @@ async def migrate_phase7() -> dict:
     for i, name in enumerate(STAGES):
         if name not in stage_by_name:
             doc = {"id": new_id(), "company_id": cid, "name": name, "code": _code(name), "description": None, "seq_hint": (i + 1) * 10, "is_possession": name == "Possession/Handover", "applies_to_block_types": [], "is_active": True, "version": 1, "created_at": now_iso(), "updated_at": now_iso(), "created_by": "system"}
-            await db.construction_stages.insert_one(doc)
-            stage_by_name[name] = doc
+            await db.construction_stages.update_one({"name": name}, {"$setOnInsert": doc}, upsert=True)  # idempotent under concurrent boot
+            stage_by_name[name] = await db.construction_stages.find_one({"name": name}, {"_id": 0})
             report["stages_created"] += 1
     # 2. templates → stage sequences + CLP plans
     templates = await db.milestone_templates.find({}, {"_id": 0}).to_list(None)
@@ -59,8 +59,8 @@ async def migrate_phase7() -> dict:
                 continue
             if sname not in stage_by_name:
                 doc = {"id": new_id(), "company_id": cid, "name": sname, "code": _code(sname), "description": "Created from milestone template", "seq_hint": 500 + m["seq"], "is_possession": False, "applies_to_block_types": [], "is_active": True, "version": 1, "created_at": now_iso(), "updated_at": now_iso(), "created_by": "system"}
-                await db.construction_stages.insert_one(doc)
-                stage_by_name[sname] = doc
+                await db.construction_stages.update_one({"name": sname}, {"$setOnInsert": doc}, upsert=True)
+                stage_by_name[sname] = await db.construction_stages.find_one({"name": sname}, {"_id": 0})
                 report["stages_created"] += 1
             st = stage_by_name[sname]
             seq_entries.append({"stage_id": st["id"], "seq": len(seq_entries) + 1})
