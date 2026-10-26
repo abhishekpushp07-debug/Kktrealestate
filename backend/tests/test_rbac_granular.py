@@ -23,7 +23,7 @@ def test_legacy_expansion_is_behaviourally_equivalent():
 def test_system_roles_cover_their_legacy_routes():
     from permissions import SYSTEM_ROLES, ROUTE_PERMS, _LEGACY_ROLES
     for name, spec in _LEGACY_ROLES.items():
-        if name == "Super Admin":
+        if spec["permissions"] is None:  # Super Admin / Admin: everything
             continue
         have = set(SYSTEM_ROLES[name]["permissions"])
         for k, v in ROUTE_PERMS.items():
@@ -72,8 +72,10 @@ def test_clerk_reports_collections_only(clerk):
     assert out.status_code == 403 and out.json()["missing"] == "reports.outstanding.view"
     exp = requests.get(f"{API}/reports/collections?format=csv", headers=h, timeout=30)
     assert exp.status_code == 403 and exp.json()["missing"] == "reports.collections.export"
-    for path in ("/bookings?page_size=1", "/leads?page_size=1", "/projects", "/users?page_size=1", "/audit-logs?page_size=1", "/settings/company"):
+    for path in ("/bookings?page_size=1", "/leads?page_size=1", "/projects", "/users?page_size=1", "/audit-logs?page_size=1", "/roznamcha"):
         assert requests.get(f"{API}{path}", headers=h, timeout=20).status_code == 403, path
+    brand = requests.get(f"{API}/settings/company", headers=h, timeout=20).json()  # branding is for every signed-in user, finance/numbering settings are masked
+    assert "name" in brand and "receipt_prefix" not in brand and "bank_account" not in brand
 
 
 def test_direct_grant_and_deny_on_clerk(clerk, admin_headers):
