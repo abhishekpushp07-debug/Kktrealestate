@@ -372,11 +372,12 @@ def _prepare_bank_in(data: dict) -> dict:
     return data
 
 
-MASTER_FEATURE = {"floor-plan-templates": "floor_plan", "plc-types": "plc", "construction-stages": "construction_stage", "payment-plans": "payment_plan", "charge-types": "charge_type", "bank-accounts": "bank_account"}
+MASTER_FEATURE = {"floor-plan-templates": "floor_plan", "plc-types": "plc", "construction-stages": "construction_stage", "payment-plans": "payment_plan", "charge-types": "charge_type", "bank-accounts": "bank_account",
+                  "spec-categories": "specification", "spec-items": "specification", "room-types": "flat_type", "area-types": "flat_type", "flat-types": "flat_type", "block-types": "block_type", "amenities": "amenity", "payment-modes": "payment_mode", "document-types": "document_type"}
 
 
 def _register(kind: str, coll_name: str, InModel, search_fields: list[str], usage_fn, label: str):
-    feat = MASTER_FEATURE.get(kind, "catalogue")  # other kinds are catalogue-style masters
+    feat = MASTER_FEATURE[kind]
     P_VIEW, P_CREATE, P_EDIT, P_DELETE = (f"masters.{feat}.{a}" for a in ("view", "create", "edit", "delete"))
     UpdateModel = _partial(InModel)
     coll = db[coll_name]

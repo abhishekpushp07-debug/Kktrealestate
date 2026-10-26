@@ -134,10 +134,11 @@ async def story_marker(user: dict = Depends(require("admin.data.reseed"))):
 
 
 @router.post("/story-marker")
-async def set_story_marker(body: MarkerIn, user: dict = Depends(require("admin.data.reseed"))):
+async def set_story_marker(body: MarkerIn, request: Request, user: dict = Depends(require("admin.data.reseed"))):
     from services.owner_bootstrap import ensure_owner
     val = {"as_of": body.as_of, "bookings": body.bookings, "at": now_iso()}
     await db.settings.update_one({"key": "story"}, {"$set": {"value": val}}, upsert=True)
+    await write_audit(user, "admin.story_marker", "system", "story", after=val, ip=client_ip(request))
     await ensure_owner()
     await recompute_all()
     return val

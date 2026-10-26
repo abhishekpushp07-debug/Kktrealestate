@@ -63,24 +63,24 @@ def test_multi_role_union_and_direct_deny(admin, sales_user):
     r = requests.put(f"{BASE}/admin/access/users/{u['id']}", json={"role_ids": [_role("Sales"), _role("Accounts")], "direct": [{"code": "finance.payment.create", "effect": "deny", "reason": "test"}]}, headers=admin, timeout=20)
     assert r.status_code == 200, r.text
     eff = set(r.json()["effective"])
-    assert "payment.reverse" in eff and "customer.write" in eff  # union of both roles
-    assert "payment.post" not in eff  # direct deny wins over role grant
-    assert {"role", "deny"} <= {s["type"] for s in r.json()["sources"]["payment.post"]}
+    assert "finance.payment.reverse" in eff and "sales.customer.edit" in eff  # union of both roles
+    assert "finance.payment.create" not in eff  # direct deny wins over role grant
+    assert {"role", "deny"} <= {s["type"] for s in r.json()["sources"]["finance.payment.create"]}
     h = _login(PROBE)
     me = requests.get(f"{BASE}/auth/me", headers=h, timeout=20).json()
-    assert me["role_names"] == ["Sales", "Accounts"] and "payment.post" not in me["permissions"]
+    assert me["role_names"] == ["Sales", "Accounts"] and "finance.payment.create" not in me["permissions"]
     p = requests.post(f"{BASE}/payments", json={}, headers=h, timeout=20)
     assert p.status_code == 403 and p.json()["code"] == "PERMISSION_DENIED" and p.json()["missing"] == "finance.payment.create"
     # direct allow on top of role
-    r = requests.put(f"{BASE}/admin/access/users/{u['id']}", json={"role_ids": [_role("Sales")], "direct": [{"code": "audit.view", "effect": "allow"}]}, headers=admin, timeout=20)
-    assert "audit.view" in r.json()["effective"]
+    r = requests.put(f"{BASE}/admin/access/users/{u['id']}", json={"role_ids": [_role("Sales")], "direct": [{"code": "admin.audit.view", "effect": "allow"}]}, headers=admin, timeout=20)
+    assert "admin.audit.view" in r.json()["effective"]
     assert requests.get(f"{BASE}/audit-logs?limit=1", headers=_login(PROBE), timeout=20).status_code == 200  # no re-login needed
 
 
 def test_super_admin_unrestrictable_and_last_super_admin(admin):
     me = requests.get(f"{BASE}/auth/me", headers=admin, timeout=20).json()
     sa = _role("Super Admin")
-    r = requests.put(f"{BASE}/admin/access/users/{me['id']}", json={"role_ids": [sa], "direct": [{"code": "payment.post", "effect": "deny"}]}, headers=admin, timeout=20)
+    r = requests.put(f"{BASE}/admin/access/users/{me['id']}", json={"role_ids": [sa], "direct": [{"code": "finance.payment.create", "effect": "deny"}]}, headers=admin, timeout=20)
     assert r.status_code == 409 and r.json()["code"] == "SUPER_ADMIN_UNRESTRICTABLE"
     others = db.users.count_documents({"is_active": True, "id": {"$ne": me["id"]}, "$or": [{"role_id": sa}, {"role_ids": sa}]})
     if others == 0:
@@ -93,7 +93,7 @@ def test_super_admin_unrestrictable_and_last_super_admin(admin):
             assert r.status_code == 409 and r.json()["code"] == "LAST_SUPER_ADMIN", r.text
         finally:
             db.users.update_many({"_rbac_tmp": True}, {"$set": {"is_active": True}, "$unset": {"_rbac_tmp": ""}})
-    r = requests.patch(f"{BASE}/roles/{sa}", json={"permissions": ["project.read"]}, headers=admin, timeout=20)
+    r = requests.patch(f"{BASE}/roles/{sa}", json={"permissions": ["masters.project.view"]}, headers=admin, timeout=20)
     assert r.status_code == 409
 
 

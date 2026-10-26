@@ -23,32 +23,46 @@ RULES = {
 }
 
 
-async def notify_roles(company_id: str, roles: list[str], title: str, body: str, kind: str, entity_type: str, entity_id: str, link: str | None = None):
+async def notify_roles(company_id: str, roles: list[str], title: str, body: str, kind: str, entity_type: str, entity_id: str, link: str | None = None, exclude: set | None = None):
     role_ids = [r["id"] for r in await db.roles.find({"company_id": company_id, "name": {"$in": roles}}, {"_id": 0, "id": 1}).to_list(None)]
-    users = await db.users.find({"company_id": company_id, "role_id": {"$in": role_ids}, "is_active": True}, {"_id": 0, "id": 1}).to_list(None)
+    users = [u for u in await db.users.find({"company_id": company_id, "$or": [{"role_id": {"$in": role_ids}}, {"role_ids": {"$in": role_ids}}], "is_active": True}, {"_id": 0, "id": 1}).to_list(None) if u["id"] not in (exclude or set())]
     if not users:
         return
     now = now_iso()
     await db.notifications.insert_many([{**base_doc(None, company_id), "user_id": u["id"], "title": title, "body": body, "kind": kind, "entity_type": entity_type, "entity_id": entity_id, "link": link, "read": False, "created_at": now} for u in users])
 
 
-@bus.subscribe("entity.changed")
+@bus.subscribe("entity.changed", "notifications")
 async def notification_subscriber(evt: dict):
-    rule = RULES.get(evt.get("action"))
-    if not rule or not evt.get("company_id"):
-        return
-    roles, build = rule
+    """Registry-driven (event_registry.EVENTS): roles → ERP users, parties → assignee / RM / customer (portal). RULES is the legacy fallback."""
+    spec = evt.get("spec") or {}
     after = evt.get("after") or {}
-    res = build(after)
+    cid = evt.get("company_id")
+    if not cid:
+        return
+    title_fn = spec.get("title")
+    res = title_fn(after) if title_fn else None
+    if res is None and evt.get("action") in RULES:
+        res = RULES[evt["action"]][1](after)
     if not res:
         return
-    if evt["action"].startswith("service.") and after.get("assigned_to"):
-        now = now_iso()
-        link = f"/service-requests/{evt['entity_id']}"
-        await db.notifications.insert_one({**base_doc(None, evt["company_id"]), "user_id": after["assigned_to"], "title": res[0], "body": res[1], "kind": evt["action"], "entity_type": "service_request", "entity_id": evt["entity_id"], "link": link, "read": False, "created_at": now})
-        roles = [r for r in roles if r != "Sales"]
-    link = {"lead": "/leads?source=Website", "payment": "/payments", "booking": f"/bookings/{evt['entity_id']}", "block": f"/blocks/{evt['entity_id']}", "demand": "/bookings", "service_request": f"/service-requests/{evt['entity_id']}"}.get(evt["entity_type"])
-    await notify_roles(evt["company_id"], roles, res[0], res[1], evt["action"], evt["entity_type"], evt["entity_id"], link)
+    link = {"lead": "/leads", "payment": "/payments", "booking": f"/bookings/{evt['entity_id']}", "block": f"/blocks/{evt['entity_id']}", "demand": "/bookings", "service_request": f"/service-requests/{evt['entity_id']}", "site_visit": "/site-visits"}.get(evt["entity_type"])
+    parties = spec.get("parties") or []
+    seen = set()
+    if "assignee" in parties and after.get("assigned_to"):
+        seen.add(after["assigned_to"])
+        await db.notifications.insert_one({**base_doc(None, cid), "user_id": after["assigned_to"], "title": res[0], "body": res[1], "kind": evt["action"], "entity_type": evt["entity_type"], "entity_id": evt["entity_id"], "link": link, "read": False, "created_at": now_iso()})
+    if "rm" in parties and after.get("rm_user_id") and after["rm_user_id"] not in seen:
+        seen.add(after["rm_user_id"])
+        await db.notifications.insert_one({**base_doc(None, cid), "user_id": after["rm_user_id"], "title": res[0], "body": res[1], "kind": evt["action"], "entity_type": evt["entity_type"], "entity_id": evt["entity_id"], "link": link, "read": False, "created_at": now_iso()})
+    if "customer" in parties and evt["entity_type"] == "booking":
+        b = await db.bookings.find_one({"id": evt["entity_id"]}, {"_id": 0, "id": 1, "company_id": 1, "customer_id": 1, "co_applicant_customer_ids": 1})
+        if b:
+            from services.portal_notify import notify_booking_parties
+            await notify_booking_parties(b, evt["action"], res[0], res[1], evt["entity_type"], evt["entity_id"])
+    roles = spec.get("roles") or (RULES.get(evt["action"], ([], None))[0])
+    if roles:
+        await notify_roles(cid, roles, res[0], res[1], evt["action"], evt["entity_type"], evt["entity_id"], link, exclude=seen)
 
 
 async def overdue_demand_job():
