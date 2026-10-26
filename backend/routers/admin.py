@@ -116,7 +116,7 @@ async def _run_story(as_of: str | None):
     import subprocess
     import sys
     RESEED_JOB.update({"status": "running", "as_of": as_of, "log": "/tmp/story_reseed.log"})
-    env = {**os.environ, "STORY_BASE_URL": "http://127.0.0.1:8001"}
+    env = {**os.environ, "STORY_BASE_URL": os.environ.get("KKT_SELF_BASE", "http://127.0.0.1:8001")}  # private test backends set KKT_SELF_BASE so the seeder never targets the preview
     proc = await asyncio.create_subprocess_exec(sys.executable, "tools/story_seed.py", *(["--as-of", as_of] if as_of else []), cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))), env=env, stdout=open("/tmp/story_reseed.log", "w"), stderr=subprocess.STDOUT)
     rc = await proc.wait()
     RESEED_JOB.update({"status": "done" if rc == 0 else "failed", "rc": rc})

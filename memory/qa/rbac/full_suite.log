@@ -7,7 +7,7 @@ bringing up nodes...
 ........................................................................ [ 59%]
 ........................................................................ [ 74%]
 ........................................................................ [ 89%]
-........s......s...................................                      [100%]
+...............s...................................                      [100%]
 =============================== warnings summary ===============================
 ../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
 ../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
@@ -38,6 +38,5 @@ tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
 =========================== short test summary info ============================
-SKIPPED [1] tests/test_phase_5.py:259: SR-2627-0001 not found for Priya
 SKIPPED [1] tests/test_cors_deny.py:12: platform ingress adds its own CORS headers; app-level deny is asserted against the local backend
-481 passed, 2 skipped, 9 warnings in 176.09s (0:02:56)
+482 passed, 1 skipped, 9 warnings in 164.09s (0:02:44)

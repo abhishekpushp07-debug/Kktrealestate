@@ -6,9 +6,9 @@
 | cheques-in-hand count == Pending payments | `6` | `6` | **PASS** |  |
 | cheques-in-hand amount == Σ Pending | `128110000` | `128110000` | **PASS** |  |
 | cheque register rows == instrument payments | `129` | `129` | **PASS** | raw by status {'Bounced': 2, 'Cleared': 121, 'Pending': 6} |
-| inventory report by_status == flats | `{'Available': 51, 'Hold': 2, 'Booked': 77, 'Sold': 1, 'Blocked': 1}` | `{'Available': 51, 'Blocked': 1, 'Booked': 77, 'Hold': 2, 'Sold': 1}` | **PASS** |  |
-| home units/available tiles == flats | `(132, 51)` | `(132, 51)` | **PASS** |  |
-| legacy dashboard inventory == flats | `{'Available': 51, 'Hold': 2, 'Booked': 77, 'Sold': 1, 'Blocked': 1}` | `{'Available': 51, 'Blocked': 1, 'Booked': 77, 'Hold': 2, 'Sold': 1}` | **PASS** |  |
+| inventory report by_status == flats | `{'Available': 57, 'Hold': 2, 'Booked': 77, 'Sold': 1, 'Blocked': 1}` | `{'Available': 57, 'Blocked': 1, 'Booked': 77, 'Hold': 2, 'Sold': 1}` | **PASS** |  |
+| home units/available tiles == flats | `(138, 57)` | `(138, 57)` | **PASS** |  |
+| legacy dashboard inventory == flats | `{'Available': 57, 'Hold': 2, 'Booked': 77, 'Sold': 1, 'Blocked': 1}` | `{'Available': 57, 'Blocked': 1, 'Booked': 77, 'Hold': 2, 'Sold': 1}` | **PASS** |  |
 | outstanding total == Σ booking summary dues | `2060849900` | `2060849900` | **PASS** |  |
 | home overdue tile == Σ bookings overdue (definitions.ageing_bands) | `1589096100` | `1589096100` | **PASS** |  |
 | report overdue == Σ bookings overdue | `1589096100` | `1589096100` | **PASS** |  |
