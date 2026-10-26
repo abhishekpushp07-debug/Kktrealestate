@@ -632,8 +632,8 @@ describe("fixed defects", () => {
     expect(contracts.ActivityReportRowSchema.shape.actor_type.safeParse("SYSTEM").success).toBe(true);
     expect(contracts.ActivityReportRowSchema.shape.actor_type.safeParse("robot").success).toBe(false);
     expect(contracts.ApprovalStatusSchema.options).toEqual(["APPLIED", "RECEIVED", "NA"]);
-    expect(contracts.BookingRowSchema.shape.parking_slots.element.shape.slot_type.safeParse("COVERED").success).toBe(true);
-    expect(contracts.BookingRowSchema.shape.parking_slots.element.shape.slot_type.safeParse("Garage").success).toBe(false);
+    expect(contracts.BookingFullRowSchema.shape.parking_slots.element.shape.slot_type.safeParse("COVERED").success).toBe(true);
+    expect(contracts.BookingFullRowSchema.shape.parking_slots.element.shape.slot_type.safeParse("Garage").success).toBe(false);
   });
   it("admin recompute needs a scope", () => {
     expect(contracts.AdminRecomputeRequestSchema.safeParse({}).success).toBe(false);

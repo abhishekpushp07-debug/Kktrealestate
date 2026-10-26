@@ -15,7 +15,7 @@ import {
   type ServiceRequestRow,
   type ServiceStatus,
 } from "@kkt/contracts";
-import { bookingCoApplicants, bookings, companies, customers, documents, projects, serviceCategories, serviceRequestMessages, serviceRequests, users, type Executor } from "@kkt/db";
+import { bookingCoApplicants, bookings, companies, customers, documentTypes, documents, projects, serviceCategories, serviceRequestMessages, serviceRequests, users, type Executor } from "@kkt/db";
 import { DEFAULT_SLA_HOURS, isSlaBreached, slaDueAt, todayIST, type SlaHours } from "@kkt/domain";
 import { writeAudit, type AuditActor } from "../../lib/audit.js";
 import { ApiError } from "../../lib/errors.js";
@@ -291,23 +291,40 @@ async function resolveAssignee(tx: Executor, companyId: string, userId: string):
   return u;
 }
 
-/** What a thread attachment may belong to: the ticket itself, its customer or its booking. */
-export interface AttachmentOwner { ticketId?: string | null; customerId: string; bookingId: string | null }
+/**
+ * What a thread attachment may belong to: the ticket itself or its customer. `author` decides how much of the customer's record may be
+ * carried: a customer (portal) may only attach their own uploads or files already shared with them; staff may attach any non-sensitive
+ * file of the customer. Documents of the ticket's booking (`bookingId`) count only when already shared with the customer: unshared booking
+ * paperwork (internal notes, drafts, co-applicant papers) never travels through a ticket thread.
+ */
+export interface AttachmentOwner { ticketId?: string | null; customerId: string; bookingId?: string | null; author?: "STAFF" | "CUSTOMER" }
 
 /**
- * 400 unless every attachment id is a live, non-sensitive document of the company that belongs to this ticket (entity SERVICE_REQUEST),
- * its customer (entity CUSTOMER) or its booking (entity BOOKING). Anything else — another customer's file, a KYC document — would leak
- * its name and thumbnail into the thread (the customer sees public messages), so it is rejected as if it did not exist.
+ * 400 unless every attachment id is a live document of the company that belongs to this ticket (entity SERVICE_REQUEST), its customer
+ * (entity CUSTOMER) or — when shared with the customer — its booking, is not sensitive and is not of a KYC document type. Anything else — another customer's file, a booking document, a
+ * PAN/Aadhaar scan — would leak its name and thumbnail into the thread (the customer sees public messages), so it is rejected exactly as
+ * if it did not exist.
  */
 export async function assertAttachments(tx: Executor, companyId: string, ids: readonly string[], owner: AttachmentOwner): Promise<void> {
   if (ids.length === 0) return;
-  const belongs: SQL[] = [and(eq(documents.entityType, "CUSTOMER"), eq(documents.entityId, owner.customerId))!];
+  const customerDoc = and(eq(documents.entityType, "CUSTOMER"), eq(documents.entityId, owner.customerId))!;
+  const belongs: SQL[] = [
+    owner.author === "CUSTOMER"
+      ? and(customerDoc, or(eq(documents.sharedWithCustomer, true), and(eq(documents.uploadedByType, "CUSTOMER"), eq(documents.uploadedBy, owner.customerId))))!
+      : customerDoc,
+  ];
   if (owner.ticketId) belongs.push(and(eq(documents.entityType, "SERVICE_REQUEST"), eq(documents.entityId, owner.ticketId))!);
-  if (owner.bookingId) belongs.push(and(eq(documents.entityType, "BOOKING"), eq(documents.entityId, owner.bookingId))!);
+  // The ticket's booking contributes only what the buyer can already see in the portal (shared with the customer).
+  if (owner.bookingId) belongs.push(and(eq(documents.entityType, "BOOKING"), eq(documents.entityId, owner.bookingId), eq(documents.sharedWithCustomer, true))!);
   const rows = await tx
     .select({ id: documents.id })
     .from(documents)
-    .where(and(eq(documents.companyId, companyId), inArray(documents.id, [...ids]), eq(documents.isDeleted, false), eq(documents.isSensitive, false), or(...belongs)));
+    .leftJoin(documentTypes, eq(documentTypes.id, documents.documentTypeId))
+    .where(and(
+      eq(documents.companyId, companyId), inArray(documents.id, [...new Set(ids)]), eq(documents.isDeleted, false), eq(documents.isSensitive, false),
+      or(isNull(documents.documentTypeId), eq(documentTypes.isKyc, false)),
+      or(...belongs),
+    ));
   const found = new Set(rows.map((r) => r.id));
   const missing = ids.filter((id) => !found.has(id));
   if (missing.length > 0) throw ApiError.badRequest("attachment_ids references a document that does not exist or does not belong to this request", { field: "attachment_ids", missing });
@@ -385,7 +402,7 @@ async function createTicketCore(
   const priority = input.priority ?? category.defaultPriority;
   const assignee = input.assigneeUserId ? await resolveAssignee(tx, companyId, input.assigneeUserId) : null;
   const attachmentIds = [...(input.attachmentIds ?? [])];
-  await assertAttachments(tx, companyId, attachmentIds, { customerId: customer.id, bookingId });
+  await assertAttachments(tx, companyId, attachmentIds, { customerId: customer.id, bookingId, author: actor.type === "CUSTOMER" ? "CUSTOMER" : "STAFF" });
 
   const company = await companyRow(tx, companyId);
   const now = new Date();
@@ -554,7 +571,7 @@ export async function addStaffMessage(
 ): Promise<ServiceRequestDetailResponse> {
   const existing = await requireStaffTicket(tx, ctx.user, id, true);
   assertOpen(existing.sr);
-  await assertAttachments(tx, ctx.user.companyId, input.attachment_ids, { ticketId: id, customerId: existing.sr.customerId, bookingId: existing.sr.bookingId });
+  await assertAttachments(tx, ctx.user.companyId, input.attachment_ids, { ticketId: id, customerId: existing.sr.customerId, bookingId: existing.sr.bookingId, author: "STAFF" });
   const now = new Date();
   const [msg] = await tx.insert(serviceRequestMessages).values({ ticketId: id, authorType: "STAFF", authorId: ctx.user.id, authorName: ctx.user.name, body: input.body, isInternal: input.is_internal, attachmentIds: [...input.attachment_ids] }).returning({ id: serviceRequestMessages.id });
   let patch: Record<string, unknown> = { lastMessageAt: now };
@@ -615,7 +632,7 @@ export async function ticketForCustomer(executor: Executor, ticketId: string, cu
 export async function addCustomerMessage(tx: Executor, ticketId: string, customerId: string, body: string, attachmentIds: readonly string[] = [], meta: WriteMeta = {}): Promise<CustomerTicketDetail> {
   const existing = await requireCustomerTicket(tx, ticketId, customerId, true);
   assertOpen(existing.sr);
-  await assertAttachments(tx, existing.sr.companyId, attachmentIds, { ticketId, customerId, bookingId: existing.sr.bookingId });
+  await assertAttachments(tx, existing.sr.companyId, attachmentIds, { ticketId, customerId, bookingId: existing.sr.bookingId, author: "CUSTOMER" });
   const now = new Date();
   const [msg] = await tx.insert(serviceRequestMessages).values({ ticketId, authorType: "CUSTOMER", authorId: customerId, authorName: existing.customerName, body, isInternal: false, attachmentIds: [...attachmentIds] }).returning({ id: serviceRequestMessages.id });
   const patch: Record<string, unknown> = { lastMessageAt: now };

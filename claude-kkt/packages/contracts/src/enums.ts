@@ -577,6 +577,7 @@ export const INTEGRITY_FINDING_TYPES = [
   "DUPLICATE_DEMAND",
   "UNMAPPED_DEMAND",
   "SUMMARY_MISMATCH",
+  "PLAN_STAGE_MISSING",
 ] as const;
 export const IntegrityFindingTypeSchema = enumSchema(INTEGRITY_FINDING_TYPES);
 export type IntegrityFindingType = z.infer<typeof IntegrityFindingTypeSchema>;
@@ -586,6 +587,7 @@ export const INTEGRITY_FINDING_TYPE_LABELS: LabelMap<IntegrityFindingType> = {
   DUPLICATE_DEMAND: "Duplicate installment demand",
   UNMAPPED_DEMAND: "Demand not mapped to an installment",
   SUMMARY_MISMATCH: "Stored summary differs from recomputation",
+  PLAN_STAGE_MISSING: "Plan installment on a stage the tower does not have",
 };
 
 // ---------------------------------------------------------------------------
@@ -657,6 +659,8 @@ export const NOTIFICATION_TYPES = [
   "NOTICE_PUBLISHED",
   "PAYMENT_RECEIVED",
   "BOOKING_CREATED",
+  "HOLD_EXPIRED",
+  "JOB_FAILED", "EXPORT_READY",
 ] as const;
 export const NotificationTypeSchema = enumSchema(NOTIFICATION_TYPES);
 export type NotificationType = z.infer<typeof NotificationTypeSchema>;
@@ -679,6 +683,8 @@ export const NOTIFICATION_TYPE_LABELS: LabelMap<NotificationType> = {
   NOTICE_PUBLISHED: "Notice published",
   PAYMENT_RECEIVED: "Payment received",
   BOOKING_CREATED: "Booking created",
+  HOLD_EXPIRED: "Flat hold lapsed",
+  JOB_FAILED: "Background job failed", EXPORT_READY: "Export ready",
 };
 
 export const POST_STATUSES = ["DRAFT", "PUBLISHED"] as const;
@@ -797,6 +803,10 @@ export const JOB_NAMES = [
   "STARTUP_RECONCILIATION",
   "SLA_BREACH_CHECK",
   "PORTAL_FILE_CLEANUP",
+  "HOLD_EXPIRY",
+  "DUES_CATCHUP",
+  "REENCRYPT_FIELDS",
+  "IDEMPOTENCY_PURGE", "EXPORT_CSV", "EXPORT_CLEANUP", "BACKUP_EXPORT", "PARTITION_MAINTENANCE",
 ] as const;
 export const JobNameSchema = enumSchema(JOB_NAMES);
 export type JobName = z.infer<typeof JobNameSchema>;
@@ -809,4 +819,8 @@ export const JOB_NAME_LABELS: LabelMap<JobName> = {
   VISIT_OUTCOME_NUDGE: "Site visit outcome nudge",
   NOTIFICATION_SWEEP: "Notification sweep",
   STARTUP_RECONCILIATION: "Startup reconciliation",
+  HOLD_EXPIRY: "Release lapsed flat holds",
+  DUES_CATCHUP: "Dues catch-up (boot / missed run)",
+  REENCRYPT_FIELDS: "Re-encrypt PAN/Aadhaar/bank/MFA secrets to the active key",
+  IDEMPOTENCY_PURGE: "Purge expired idempotency keys (hourly)", EXPORT_CSV: "Asynchronous CSV export", EXPORT_CLEANUP: "Remove expired exports and backups (daily)", BACKUP_EXPORT: "Full backup export (ZIP)", PARTITION_MAINTENANCE: "Create next month's partitions (PARTITIONING_ENABLED only)",
 };

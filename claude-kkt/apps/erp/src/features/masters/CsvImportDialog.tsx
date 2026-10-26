@@ -129,7 +129,7 @@ export function CsvImportDialog({ config, open, onOpenChange }: CsvImportDialogP
               <label htmlFor="csv-import-text" className="text-xs font-semibold text-ink-muted">
                 CSV text {fileName && <span className="font-normal text-ink-subtle">· {fileName}</span>}
               </label>
-              <input ref={fileInput} type="file" accept=".csv,text/csv,text/plain" className="sr-only" onChange={onFile} data-testid="csv-file-input" />
+              <input ref={fileInput} type="file" accept=".csv,text/csv,text/plain" className="sr-only" tabIndex={-1} aria-label="CSV file" onChange={onFile} data-testid="csv-file-input" />
               <Button variant="outline" size="sm" leftIcon={FileUp} onClick={() => fileInput.current?.click()} data-testid="csv-upload-btn">
                 Upload .csv
               </Button>

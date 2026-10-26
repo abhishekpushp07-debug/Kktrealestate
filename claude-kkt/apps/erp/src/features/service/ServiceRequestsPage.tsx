@@ -181,7 +181,7 @@ export default function ServiceRequestsPage() {
           onRowClick={(row) => navigate(`/service-requests/${row.id}`)}
           pagination={{ page: list.page, pageSize: list.pageSize, total: query.data?.total ?? 0, onPageChange: list.setPage, onPageSizeChange: list.setPageSize }}
           mobileCard={(row) => (
-            <div role="button" tabIndex={0} onClick={() => navigate(`/service-requests/${row.id}`)} onKeyDown={(event) => { if (event.key === "Enter") navigate(`/service-requests/${row.id}`); }} className="rounded-lg border border-border bg-card p-3 shadow-card focus-ring">
+            <div onClick={() => navigate(`/service-requests/${row.id}`)} className="cursor-pointer rounded-lg border border-border bg-card p-3 shadow-card focus-within:ring-2 focus-within:ring-gold">
               <TicketCard ticket={row} />
             </div>
           )}

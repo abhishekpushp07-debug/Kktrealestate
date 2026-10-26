@@ -1,0 +1,27 @@
+# Prometheus for the Compose production stack (docker-compose.prod.yml --profile monitoring). Kubernetes: the api Service carries
+# prometheus.io annotations / use a ServiceMonitor on port "metrics" (infra/k8s/api.yaml) with the same alert rules.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 30s
+  external_labels: { system: kkt }
+
+rule_files: [alerts.yml]
+
+alerting:
+  alertmanagers:
+    - static_configs: [{ targets: ["alertmanager:9093"] }]
+
+scrape_configs:
+  # every API container serves the aggregate of its node:cluster workers on METRICS_PORT (9464); one target per replica
+  - job_name: kkt-api
+    authorization: { type: Bearer, credentials_file: /run/secrets/metrics_token }
+    dns_sd_configs: [{ names: [api], type: A, port: 9464, refresh_interval: 30s }]
+  - job_name: postgres
+    static_configs: [{ targets: ["postgres-exporter:9187"] }]
+  - job_name: redis
+    static_configs: [{ targets: ["redis-exporter:9121"] }]
+  # host disk/CPU/memory and the backup status file (/backups/status.prom via the textfile collector)
+  - job_name: node
+    static_configs: [{ targets: ["node-exporter:9100"] }]
+  - job_name: prometheus
+    static_configs: [{ targets: ["localhost:9090"] }]

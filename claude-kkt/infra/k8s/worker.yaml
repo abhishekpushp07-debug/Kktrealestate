@@ -1,0 +1,63 @@
+# Job worker: BullMQ consumer (daily dues, integrity, notifications, exports, backups). One replica; Recreate so two versions never
+# consume the queue at once during a rollout. It has no HTTP port; the liveness probe checks the node process is alive (a heartbeat
+# endpoint in worker.ts would also catch a hung event loop).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: kkt
+  labels: { app.kubernetes.io/name: worker, app.kubernetes.io/part-of: kkt, app.kubernetes.io/component: worker }
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels: { app.kubernetes.io/name: worker }
+  strategy: { type: Recreate }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: worker, app.kubernetes.io/part-of: kkt, app.kubernetes.io/component: worker }
+    spec:
+      automountServiceAccountToken: false
+      # active jobs finish before exit (BullMQ worker.close())
+      terminationGracePeriodSeconds: 130
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: worker
+          image: kkt-api:latest
+          imagePullPolicy: IfNotPresent
+          args: ["node", "--import", "./dist/telemetry.js", "dist/worker.js"]
+          envFrom:
+            - configMapRef: { name: kkt-config }
+          env:
+            - { name: OTEL_SERVICE_NAME, value: kkt-worker }
+            - { name: DATABASE_URL_FILE, value: /run/secrets/kkt/database_url }
+            - { name: REDIS_URL_FILE, value: /run/secrets/kkt/redis_url }
+            - { name: JWT_SECRET_FILE, value: /run/secrets/kkt/jwt_secret }
+            - { name: FIELD_ENCRYPTION_KEY_FILE, value: /run/secrets/kkt/field_encryption_key }
+            - { name: HASH_KEY_FILE, value: /run/secrets/kkt/hash_key }
+            # 5xx / failed-job webhook: opt in once the Secret's error_webhook_url holds a real URL (gen-secrets.sh writes the placeholder
+            # "unused", which is not a URL and would stop the pod at boot with "ERROR_WEBHOOK_URL: Invalid URL")
+            # - { name: ERROR_WEBHOOK_URL_FILE, value: /run/secrets/kkt/error_webhook_url }
+          resources:
+            requests: { cpu: 500m, memory: 512Mi }
+            limits: { cpu: "2", memory: 2Gi }
+          livenessProbe:
+            exec: { command: ["sh", "-c", "pgrep -f dist/worker.js > /dev/null"] }
+            periodSeconds: 30
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: secrets, mountPath: /run/secrets/kkt, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: secrets
+          secret: { secretName: kkt-secrets, defaultMode: 0440 }
+        - name: tmp
+          emptyDir: { sizeLimit: 4Gi }

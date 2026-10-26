@@ -7,11 +7,16 @@
  *    resources are always fetched fresh (see DETAIL). Network failures degrade to empty fallbacks so a
  *    build or a request never dies because the backend is briefly away; a 404 on a detail resource
  *    becomes `notFound()`.
+ *  - Uncached server fetches forward the visitor's address (`x-forwarded-for` of the incoming request) so the API's per-IP
+ *    limits apply per visitor, not to the web server as a whole (the API honours it only from proxies in its TRUST_PROXY list —
+ *    see apps/web/README.md). Cached list fetches are shared by every visitor and are sent without it.
+ *  - Detail fetches are memoised per request with React `cache()`: generateMetadata and the page body share one API call.
  *  - The browser client (`publicClient(apiUrl)`) performs the form POSTs and the live availability
  *    GET, surfacing the API error envelope `{ error: { code, message } }` as `ApiError`
  *    (including 429 RATE_LIMITED with Retry-After and 409 SLOT_FULL).
  */
 import { notFound } from "next/navigation";
+import { cache } from "react";
 
 import { internalApiUrl } from "@/lib/env";
 import type {
@@ -148,12 +153,42 @@ function buildQuery(params: Record<string, string | undefined> | undefined): str
   return qs ? `?${qs}` : "";
 }
 
+/** Valid `x-forwarded-for` chain: comma-separated IPv4/IPv6 tokens only (anything else is dropped, never forwarded). */
+export function sanitizeForwardedFor(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const hops = value
+    .split(",")
+    .map((h) => h.trim())
+    .filter((h) => /^[0-9a-fA-F:.]{2,45}$/.test(h) && (h.includes(".") || h.includes(":")));
+  if (hops.length === 0) return null;
+  return hops.slice(-10).join(", ");
+}
+
+/**
+ * Forwarding headers for an uncached server fetch: the visitor chain the web server received (`x-forwarded-for`, set by the
+ * reverse proxy / Next.js server) or, failing that, `x-real-ip`. Outside a request (build, sitemap generation) there is none.
+ */
+export async function visitorForwardHeaders(): Promise<Record<string, string>> {
+  if (typeof window !== "undefined") return {};
+  try {
+    // dynamic import: this module is shared with client components, where next/headers must not be imported
+    const { headers } = await import("next/headers");
+    const h = await headers();
+    const chain = sanitizeForwardedFor(h.get("x-forwarded-for")) ?? sanitizeForwardedFor(h.get("x-real-ip"));
+    return chain ? { "x-forwarded-for": chain } : {};
+  } catch {
+    return {};
+  }
+}
+
 async function serverGet<T>(path: string, options: ServerGetOptions): Promise<FetchResult<T>> {
   const url = `${internalApiUrl()}${API_PREFIX}${path}${buildQuery(options.params)}`;
   const revalidate = options.revalidate ?? REVALIDATE_SECONDS;
+  // Only uncached requests carry the visitor's address: a header on a cached fetch would split the Data Cache per visitor.
+  const forward = revalidate === 0 ? await visitorForwardHeaders() : {};
   try {
     const res = await fetch(url, {
-      headers: { accept: "application/json" },
+      headers: { accept: "application/json", ...forward },
       ...(revalidate === 0 ? { cache: "no-store" as const } : { next: { revalidate, tags: options.tags } }),
     });
     if (!res.ok) {
@@ -206,18 +241,18 @@ export async function listProjects(filters: ProjectListFilters = {}): Promise<Pr
   return Array.isArray(result.data) ? result.data : result.data.items;
 }
 
+/** One project detail fetch per request (React cache): metadata and page body share it. */
+const projectDetail = cache((slug: string) =>
+  serverGet<ProjectDetail>(`/projects/${encodeURIComponent(slug)}`, { tags: ["projects", `project:${slug}`], ...DETAIL }),
+);
+
 export async function getProject(slug: string): Promise<ProjectDetail> {
-  return unwrapDetail(
-    await serverGet<ProjectDetail>(`/projects/${encodeURIComponent(slug)}`, { tags: ["projects", `project:${slug}`], ...DETAIL }),
-  );
+  return unwrapDetail(await projectDetail(slug));
 }
 
 /** Same as getProject but never throws — used for metadata and the sitemap. */
 export async function findProject(slug: string): Promise<ProjectDetail | null> {
-  return unwrapOr(
-    await serverGet<ProjectDetail>(`/projects/${encodeURIComponent(slug)}`, { tags: ["projects", `project:${slug}`], ...DETAIL }),
-    null,
-  );
+  return unwrapOr(await projectDetail(slug), null);
 }
 
 export async function getVisitAvailability(slug: string, from: string, to: string): Promise<VisitDay[]> {
@@ -238,20 +273,24 @@ export async function listPosts(page = 1): Promise<ListEnvelope<PostCard>> {
   );
 }
 
+const postDetail = cache((slug: string) => serverGet<PostDetail>(`/posts/${encodeURIComponent(slug)}`, { tags: ["posts", `post:${slug}`], ...DETAIL }));
+
 export async function getPost(slug: string): Promise<PostDetail> {
-  return unwrapDetail(await serverGet<PostDetail>(`/posts/${encodeURIComponent(slug)}`, { tags: ["posts", `post:${slug}`], ...DETAIL }));
+  return unwrapDetail(await postDetail(slug));
 }
 
 export async function findPost(slug: string): Promise<PostDetail | null> {
-  return unwrapOr(await serverGet<PostDetail>(`/posts/${encodeURIComponent(slug)}`, { tags: ["posts", `post:${slug}`], ...DETAIL }), null);
+  return unwrapOr(await postDetail(slug), null);
 }
 
+const pageDetail = cache((slug: string) => serverGet<PageDetail>(`/pages/${encodeURIComponent(slug)}`, { tags: ["pages", `page:${slug}`], ...DETAIL }));
+
 export async function getPage(slug: string): Promise<PageDetail> {
-  return unwrapDetail(await serverGet<PageDetail>(`/pages/${encodeURIComponent(slug)}`, { tags: ["pages", `page:${slug}`], ...DETAIL }));
+  return unwrapDetail(await pageDetail(slug));
 }
 
 export async function findPage(slug: string): Promise<PageDetail | null> {
-  return unwrapOr(await serverGet<PageDetail>(`/pages/${encodeURIComponent(slug)}`, { tags: ["pages", `page:${slug}`], ...DETAIL }), null);
+  return unwrapOr(await pageDetail(slug), null);
 }
 
 export async function getGallery(projectSlug?: string): Promise<GalleryResponse> {
@@ -270,10 +309,10 @@ export async function getPeople(): Promise<Person[]> {
 }
 
 /** Manage view for a signed visit token. Never cached: cancelling changes it immediately. */
+const visitDetail = cache((token: string) => serverGet<SiteVisitManage>(`/site-visits/${encodeURIComponent(token)}`, { tags: [], revalidate: 0 }));
+
 export async function getVisit(token: string): Promise<SiteVisitManage> {
-  return unwrapDetail(
-    await serverGet<SiteVisitManage>(`/site-visits/${encodeURIComponent(token)}`, { tags: [], revalidate: 0 }),
-  );
+  return unwrapDetail(await visitDetail(token));
 }
 
 // ---------------------------------------------------------------------------

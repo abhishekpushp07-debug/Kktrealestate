@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import type { FastifyRequest } from "fastify";
 import { todayIST } from "@kkt/domain";
-import { bookings, companies, withAdvisoryLock, type Address, type Executor, type Tx } from "@kkt/db";
+import { blocks, bookings, companies, flats, ledgerEntries, withAdvisoryLock, withTransactionRetry, type Address, type DB, type Executor, type Tx } from "@kkt/db";
 import { actorFromRequest, SYSTEM_ACTOR, type AuditActor } from "../../lib/audit.js";
 import { ApiError } from "../../lib/errors.js";
 import type { NumberingCompany } from "../../lib/numbering.js";
@@ -41,6 +41,15 @@ export class Clock {
     this.last = Math.max(this.last + 1, now);
     return new Date(this.last);
   }
+  /**
+   * Never hand out an instant at or before `at` (the booking's last ledger instant). Posting order is the canonical ledger order, so a
+   * booking's events must have strictly increasing instants even when another process's clock ran ahead or a shared clock of a
+   * tower-wide run got ahead of real time.
+   */
+  observe(at: Date | null | undefined): this {
+    if (at) this.last = Math.max(this.last, at.getTime());
+    return this;
+  }
 }
 
 /** Today's business date (IST). */
@@ -74,9 +83,41 @@ export async function loadBooking(tx: Executor, companyId: string, id: string, f
  * Lock order is always booking row (FOR UPDATE) → advisory lock, so a dues run and a payment on the same booking can never deadlock
  * (the payment path locks the row first; a job that only took the advisory lock would then block on the row while holding the advisory lock).
  */
-export async function lockBooking(tx: Tx, bookingId: string): Promise<void> {
+export async function lockBooking(tx: Tx, bookingId: string, clock?: Clock): Promise<void> {
   await tx.select({ id: bookings.id }).from(bookings).where(eq(bookings.id, bookingId)).for("update");
   await withAdvisoryLock(tx, `booking:${bookingId}`);
+  if (clock) {
+    const [last] = await tx.select({ at: ledgerEntries.at }).from(ledgerEntries).where(eq(ledgerEntries.bookingId, bookingId)).orderBy(desc(ledgerEntries.seq)).limit(1);
+    clock.observe(last?.at ?? null);
+  }
+}
+
+/**
+ * LOCK ORDER for every unit of work that touches money (deadlock-free by construction):
+ *   payment row → flat row → block row → booking rows (ascending id, row + advisory) → parking / charge / demand rows of those bookings
+ *   → document-number sequence rows LAST (booking, demand, receipt numbers are allocated after every row lock is held).
+ * Tower-wide work (stage completion / undo) takes the block row first and then every booking of the tower in id order, so a dues run
+ * or a payment (one booking → its sequence row) can never wait on it in the opposite order.
+ */
+export async function lockBookingsInOrder(tx: Tx, bookingIds: readonly string[]): Promise<void> {
+  for (const id of [...new Set(bookingIds)].sort()) await lockBooking(tx, id);
+}
+
+/** Locks the flat row and then the block row of a booking (lock order above) before the booking itself is locked. */
+export async function lockFlatAndBlockOf(tx: Tx, companyId: string, bookingId: string): Promise<void> {
+  const [b] = await tx.select({ flatId: bookings.flatId, blockId: bookings.blockId }).from(bookings).where(and(eq(bookings.id, bookingId), eq(bookings.companyId, companyId))).limit(1);
+  if (!b) return; // the caller's own loader answers 404
+  await tx.select({ id: flats.id }).from(flats).where(eq(flats.id, b.flatId)).for("update");
+  await tx.select({ id: blocks.id }).from(blocks).where(eq(blocks.id, b.blockId)).for("update");
+}
+
+/**
+ * Every money / construction transaction runs through this: the whole unit of work is retried (jittered backoff) when Postgres aborts
+ * it with 40001 (serialization failure) or 40P01 (deadlock victim), so a lock-order race never surfaces as a 500. `fn` may run more
+ * than once — it must create its Clock and read its rows inside.
+ */
+export function moneyTransaction<T>(db: DB, fn: (tx: Tx) => Promise<T>): Promise<T> {
+  return withTransactionRetry(db, (tx) => fn(tx), { retries: 4 });
 }
 
 /** Renders a postal address on one line. */
@@ -99,7 +140,7 @@ export function num(v: unknown): number {
 // Shared loaders / mappers used by the dues, booking, payment and integrity services
 // ---------------------------------------------------------------------------
 
-import { asc, inArray } from "drizzle-orm";
+import { asc, desc, inArray } from "drizzle-orm";
 import type { PlanSnapshotInstallment as DomainInstallment, TowerStage } from "@kkt/domain";
 import { blockStages, type PlanSnapshot } from "@kkt/db";
 

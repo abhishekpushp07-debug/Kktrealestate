@@ -76,7 +76,7 @@ export function ReportSection({ title, description, chart, defaultView = "chart"
           <>
             {actions}
             {chart && (
-              <div className="flex items-center rounded-md bg-navy-50 p-0.5" role="tablist" aria-label="View">
+              <div className="flex items-center rounded-md bg-navy-50 p-0.5" role="group" aria-label="View">
                 <Button size="xs" variant={view === "chart" ? "primary" : "ghost"} leftIcon={BarChart3} onClick={() => setView("chart")} aria-pressed={view === "chart"} className="h-7">
                   Chart
                 </Button>

@@ -53,7 +53,7 @@
     "generate:assets": "node ./scripts/generate-assets.mjs",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "echo no-unit-tests && exit 0"
+    "test": "vitest run"
   },
   "private": true
 }

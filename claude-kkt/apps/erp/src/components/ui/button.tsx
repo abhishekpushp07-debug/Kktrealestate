@@ -19,9 +19,9 @@ export const buttonVariants = cva(
       },
       size: {
         xs: "h-9 px-2 text-xs sm:h-7 [&_svg]:size-3.5",
-        sm: "h-11 px-2.5 text-xs sm:h-8 [&_svg]:size-4",
-        md: "h-11 px-3.5 text-sm sm:h-9 [&_svg]:size-4",
-        lg: "h-11 px-5 text-base [&_svg]:size-5",
+        sm: "h-12 px-2.5 text-xs sm:h-8 [&_svg]:size-4",
+        md: "h-12 px-3.5 text-sm sm:h-9 [&_svg]:size-4",
+        lg: "h-12 px-5 text-base [&_svg]:size-5",
       },
     },
     defaultVariants: { variant: "primary", size: "md" },
@@ -88,7 +88,7 @@ export interface IconButtonProps extends Omit<ButtonProps, "leftIcon" | "rightIc
   label: string;
 }
 
-const ICON_SIZES = { xs: "size-9 sm:size-7", sm: "size-11 sm:size-8", md: "size-11 sm:size-9", lg: "size-11" } as const;
+const ICON_SIZES = { xs: "size-9 sm:size-7", sm: "size-12 sm:size-8", md: "size-12 sm:size-9", lg: "size-12" } as const;
 
 export function IconButton({ icon: Icon, label, className, size = "md", variant = "ghost", loading, ref, ...props }: IconButtonProps) {
   return (

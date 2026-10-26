@@ -41,6 +41,8 @@ export function registerPaymentRoutes(app: FastifyInstance): void {
       const user = req.user!;
       const key = req.headers["idempotency-key"];
       const result = await postPayment(app.db, user, req.body, actorOf(req), Array.isArray(key) ? (key[0] ?? null) : (key ?? null));
+      // the key was found on an existing payment (the plugin's replay record was lost): same receipt, nothing created
+      if (result.replayed) reply.header("Idempotent-Replayed", "true");
       const payment = toPaymentRow(await loadPaymentSelect(app.db, user, result.paymentId));
       const b = await loadBooking(app.db, user.companyId, req.body.booking_id);
       return reply.code(201).send({

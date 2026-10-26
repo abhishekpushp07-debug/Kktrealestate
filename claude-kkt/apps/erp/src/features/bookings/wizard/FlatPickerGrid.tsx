@@ -88,23 +88,29 @@ export function FlatPickerGrid({ grid, value, onPick, loading = false }: FlatPic
 
       <div className={cn("relative overflow-x-auto rounded-lg border border-border bg-card shadow-card scrollbar-thin", loading && "opacity-60")}>
         <div className="min-w-max p-2" role="grid" aria-label={`${grid.block_name} flats — pick one`} aria-rowcount={floors.length + 1} style={{ display: "grid", gridTemplateColumns: `3.5rem repeat(${positions}, minmax(4.75rem, 1fr))`, gap: 4 }}>
-          <div className="sticky left-0 z-10 bg-card" role="columnheader" aria-label="Floor" />
-          {Array.from({ length: positions }, (_, index) => (
-            <div key={index} role="columnheader" className="money px-1 text-center text-2xs font-semibold uppercase tracking-wide text-ink-subtle">
-              P{index + 1}
+          {/* rows are display:contents wrappers: the CSS grid lays out the cells, the ARIA grid gets proper rows */}
+          <div role="row" className="contents">
+            <div className="sticky left-0 z-10 bg-card" role="columnheader">
+              <span className="sr-only">Floor</span>
             </div>
-          ))}
+            {Array.from({ length: positions }, (_, index) => (
+              <div key={index} role="columnheader" className="money px-1 text-center text-2xs font-semibold uppercase tracking-wide text-ink-subtle">
+                P{index + 1}
+              </div>
+            ))}
+          </div>
           {floors.map((floor) => {
             const byPosition = new Map(floor.cells.map((cell) => [cell.position, cell] as const));
-            return [
-              <div key={`label-${floor.floor}`} role="rowheader" className="money sticky left-0 z-10 flex h-11 items-center justify-center rounded-sm border border-border bg-card text-xs font-bold text-navy-950">
+            return (
+              <div key={`row-${floor.floor}`} role="row" className="contents">
+              <div role="rowheader" className="money sticky left-0 z-10 flex h-12 items-center justify-center rounded-sm border border-border bg-card text-xs font-bold text-navy-950">
                 {floor.floor_label}
-              </div>,
-              floor.kind !== "UNITS" || floor.cells.length === 0 ? (
+              </div>
+              {floor.kind !== "UNITS" || floor.cells.length === 0 ? (
                 <div
                   key={`band-${floor.floor}`}
                   role="gridcell"
-                  className="flex h-11 items-center justify-center rounded-sm border border-dashed border-border-strong text-2xs font-semibold uppercase tracking-wider text-ink-subtle"
+                  className="flex h-12 items-center justify-center rounded-sm border border-dashed border-border-strong text-2xs font-semibold uppercase tracking-wider text-ink-subtle"
                   style={{ gridColumn: `span ${positions}`, backgroundImage: "repeating-linear-gradient(135deg, var(--color-border) 0 2px, transparent 2px 10px)" }}
                 >
                   {floor.kind === "REFUGE" ? "Refuge floor" : floor.kind === "PODIUM" ? "Podium" : "No units"}
@@ -112,7 +118,7 @@ export function FlatPickerGrid({ grid, value, onPick, loading = false }: FlatPic
               ) : (
                 Array.from({ length: positions }, (_, index) => {
                   const cell = byPosition.get(index + 1);
-                  if (!cell) return <div key={`empty-${floor.floor}-${index}`} role="gridcell" aria-hidden="true" className="h-11 rounded-sm border border-dashed border-border/60" />;
+                  if (!cell) return <div key={`empty-${floor.floor}-${index}`} role="gridcell" aria-hidden="true" className="h-12 rounded-sm border border-dashed border-border/60" />;
                   const selectable = isPickable(cell);
                   const selected = cell.flat_id === value;
                   return (
@@ -144,12 +150,11 @@ export function FlatPickerGrid({ grid, value, onPick, loading = false }: FlatPic
                         }}
                         aria-selected={selected}
                         aria-disabled={!selectable || undefined}
-                        aria-label={`${cell.flat_number}, ${FLAT_STATUS_LABELS[cell.status]}, ${formatINR(cell.price_paise)}${selectable ? "" : ", not bookable"}`}
                         onClick={() => selectable && onPick(cell)}
                         data-status={cell.status}
                         data-testid={`pick-cell-${cell.flat_number}`}
                         className={cn(
-                          "relative flex h-11 min-w-0 flex-col items-center justify-center rounded-sm border px-1 leading-tight transition-shadow focus-ring",
+                          "relative flex h-12 min-w-0 flex-col items-center justify-center rounded-sm border px-1 leading-tight transition-shadow focus-ring",
                           STATUS_CELL_CLASS[cell.status],
                           selectable ? "cursor-pointer hover:shadow-pop" : "cursor-not-allowed opacity-45 saturate-50",
                           selected && "ring-2 ring-gold ring-offset-2 ring-offset-card",
@@ -157,14 +162,19 @@ export function FlatPickerGrid({ grid, value, onPick, loading = false }: FlatPic
                         )}
                       >
                         <span className="money truncate text-xs font-bold">{cell.flat_number}</span>
-                        <span className="money truncate text-[10px] opacity-90">{cell.status === "AVAILABLE" ? formatINRShort(cell.price_paise) : FLAT_STATUS_LABELS[cell.status]}</span>
+                        <span className="money truncate text-[10px]">{cell.status === "AVAILABLE" ? formatINRShort(cell.price_paise) : FLAT_STATUS_LABELS[cell.status]}</span>
+                        <span className="sr-only">
+                          , {FLAT_STATUS_LABELS[cell.status]}, {formatINR(cell.price_paise)}
+                          {selectable ? "" : ", not bookable"}
+                        </span>
                         {cell.is_corner && <span className="absolute right-0.5 top-0.5 size-1.5 rounded-full bg-current opacity-60" aria-hidden="true" />}
                       </button>
                     </Tooltip>
                   );
                 })
-              ),
-            ];
+              )}
+              </div>
+            );
           })}
         </div>
       </div>

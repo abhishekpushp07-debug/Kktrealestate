@@ -34,16 +34,20 @@ export function SegmentedControl<K extends string>({ segments, value, onChange, 
   });
   if (scroll) {
     return (
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.track}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.track} accessibilityRole="tablist">
         {items}
       </ScrollView>
     );
   }
-  return <View style={styles.track}>{items}</View>;
+  return (
+    <View style={styles.track} accessibilityRole="tablist">
+      {items}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
   track: { flexDirection: "row", backgroundColor: colors.navy100, borderRadius: radius.pill, padding: 2, gap: 2 },
-  seg: { minHeight: 44, paddingVertical: 8, paddingHorizontal: 14, borderRadius: radius.pill, alignItems: "center", justifyContent: "center" },
+  seg: { minHeight: 48, paddingVertical: 8, paddingHorizontal: 14, borderRadius: radius.pill, alignItems: "center", justifyContent: "center" },
   active: { backgroundColor: colors.surface, boxShadow: "0 1px 4px rgba(11,31,58,0.12)" },
 });

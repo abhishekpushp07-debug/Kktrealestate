@@ -254,7 +254,7 @@ function SiteSettingsForm({ row }: { row: SiteSettingsRow }) {
               <CardDescription>Up to 12, shown on the home page in this order. Only published projects appear publicly.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <FormField control={control} name="featured_project_ids" render={({ field }) => <MultiSelect id={field.id} value={field.value} onValueChange={(values) => field.onChange(values.slice(0, 12))} options={projectOptions} placeholder={projects.isPending ? "Loading projects…" : "Pick projects"} maxChips={6} disabled={disabled} data-testid="site-featured-projects" />} />
+              <FormField control={control} name="featured_project_ids" render={({ field }) => <MultiSelect id={field.id} value={field.value} onValueChange={(values) => field.onChange(values.slice(0, 12))} options={projectOptions} placeholder={projects.isPending ? "Loading projects…" : "Pick projects"} maxChips={6} disabled={disabled} aria-label="Featured projects" data-testid="site-featured-projects" />} />
               <SocialFields control={control} disabled={disabled} />
             </CardContent>
           </Card>

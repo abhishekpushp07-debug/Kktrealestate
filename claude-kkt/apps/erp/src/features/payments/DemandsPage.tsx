@@ -157,8 +157,8 @@ export default function DemandsPage() {
                 <Select aria-label="Project" size="sm" className="w-full sm:w-48" value={list.filters.project_id ?? null} onValueChange={(value) => list.setFilters({ project_id: value, block_id: null })} options={(projects.data ?? []).map((project) => ({ value: project.id, label: project.name }))} placeholder="All projects" allowClear />
                 <Select aria-label="Status" size="sm" className="w-full sm:w-40" value={list.filters.status ?? null} onValueChange={(value) => list.setFilter("status", value)} options={DEMAND_STATUSES.map((status) => ({ value: status, label: DEMAND_STATUS_LABELS[status] }))} placeholder="Any status" allowClear />
                 <Select aria-label="Overdue" size="sm" className="w-full sm:w-36" value={list.filters.overdue_only ?? null} onValueChange={(value) => list.setFilter("overdue_only", value)} options={[{ value: "true", label: "Overdue only" }]} placeholder="All ages" allowClear />
-                <DateInput aria-label="Due from" className="h-11 text-xs sm:h-8" wrapperClassName="w-full sm:w-40" value={list.filters.from ?? null} onChange={(value) => list.setFilter("from", value)} />
-                <DateInput aria-label="Due to" className="h-11 text-xs sm:h-8" wrapperClassName="w-full sm:w-40" value={list.filters.to ?? null} onChange={(value) => list.setFilter("to", value)} />
+                <DateInput aria-label="Due from" className="h-12 text-xs sm:h-8" wrapperClassName="w-full sm:w-40" value={list.filters.from ?? null} onChange={(value) => list.setFilter("from", value)} />
+                <DateInput aria-label="Due to" className="h-12 text-xs sm:h-8" wrapperClassName="w-full sm:w-40" value={list.filters.to ?? null} onChange={(value) => list.setFilter("to", value)} />
               </>
             }
             hasActiveFilters={list.hasActiveFilters}

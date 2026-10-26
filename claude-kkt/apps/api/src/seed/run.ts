@@ -17,12 +17,12 @@
 import { pathToFileURL } from "node:url";
 import type { FastifyInstance } from "fastify";
 import type { IntegrityReportResponse } from "@kkt/contracts";
-import { runMigrations, type DB } from "@kkt/db";
+import { runMigrations, withSessionAdvisoryLock, type DB, type DbHandle } from "@kkt/db";
 import { config } from "../config.js";
 import { writeAudit } from "../lib/audit.js";
 import { bumpPermVersion, invalidate } from "../lib/cache.js";
 import { logger } from "../lib/logger.js";
-import { ensureBootstrap } from "./bootstrap.js";
+import { BootstrapRefused, ensureBootstrap } from "./bootstrap.js";
 import { seedBookings } from "./bookings.js";
 import { seedCms } from "./cms.js";
 import { seedConstruction } from "./construction.js";
@@ -41,6 +41,8 @@ export { SEED_FALLBACKS } from "./fallbacks.js";
 /** Result of a seed run. */
 export interface SeedResult {
   skipped: boolean;
+  /** Set when the demo seed was refused (production without SEED_DEMO=true). */
+  refused?: "production";
   counts: Record<string, number>;
   integrity?: IntegrityReportResponse;
   durationMs: number;
@@ -64,15 +66,36 @@ async function hasProjects(app: FastifyInstance): Promise<boolean> {
   return (row?.n ?? 0) > 0;
 }
 
-/** Seeds the demo company through the API. Idempotent: returns `{skipped: true}` when projects already exist (unless force). */
+/** Session-level advisory lock key held for a whole demo seed run (several replicas booting together seed once). */
+export const SEED_LOCK_KEY = "kkt:seed-demo";
+
+/**
+ * Seeds the demo company through the API. Idempotent: returns `{skipped: true}` when projects already exist (unless force).
+ * Refused (`{skipped: true, refused: "production"}`, logged) when NODE_ENV=production unless SEED_DEMO=true: demo logins with published
+ * passwords must never appear in a real deployment by accident. Concurrent callers (replicas) are serialised by an advisory lock and the
+ * project check is repeated under it, so the demo data is created exactly once. The lock is session-scoped on a dedicated connection
+ * rather than transaction-scoped: the run drives the API for minutes, and a transaction held open that long would be killed by
+ * DB_IDLE_IN_TX_TIMEOUT_MS.
+ */
 export async function seedDemo(app: FastifyInstance, opts: SeedOptions = {}): Promise<SeedResult> {
   const started = Date.now();
   const log = opts.log ?? ((msg: string) => logger.info({ seed: true }, msg));
-  if (!opts.force && (await hasProjects(app))) {
-    log("seed skipped: the demo company already has projects");
-    return { skipped: true, counts: {}, durationMs: Date.now() - started };
+  if (config.NODE_ENV === "production" && !config.SEED_DEMO) {
+    logger.warn({ seed: true }, "demo seed refused: NODE_ENV=production and SEED_DEMO is not true");
+    return { skipped: true, refused: "production", counts: {}, durationMs: Date.now() - started };
   }
-  const boot = await ensureBootstrap(app.db);
+  const handle = { sql: app.sql, db: app.db } as unknown as DbHandle;
+  return withSessionAdvisoryLock(handle, SEED_LOCK_KEY, async () => {
+    if (!opts.force && (await hasProjects(app))) {
+      log("seed skipped: the demo company already has projects");
+      return { skipped: true, counts: {}, durationMs: Date.now() - started };
+    }
+    return runDemoSeed(app, log, started);
+  });
+}
+
+async function runDemoSeed(app: FastifyInstance, log: (msg: string) => void, started: number): Promise<SeedResult> {
+  const boot = await ensureBootstrap(app.db, { mode: "demo" });
   const ctx = new SeedContext(app, boot.companyId, log);
   // The seed posts several hundred writes in a minute from one admin login; the per-user write throttle is an operational guard,
   // not a business rule, so it is lifted for the duration of the run and restored afterwards.
@@ -107,13 +130,14 @@ export async function seedDemo(app: FastifyInstance, opts: SeedOptions = {}): Pr
   }
 }
 
-/** Truncates every business table (keeping identity + audit), inside one transaction with the append-only guards bypassed. */
+/** Truncates every business table (keeping identity + audit) inside one transaction; the append-only guards stay active. */
 export async function truncateBusinessTables(app: FastifyInstance): Promise<string[]> {
   const rows = await app.sql<{ tablename: string }[]>`select tablename from pg_tables where schemaname = 'public'`;
   const tables = rows.map((r) => r.tablename).filter((t) => !RESEED_KEEP_TABLES.has(t)).sort();
   if (tables.length === 0) return [];
+  // No trigger is bypassed (the app may run as a non-superuser role): TRUNCATE fires no row-level DELETE guard, and audit_logs — the only
+  // table with a TRUNCATE guard — is kept.
   await app.sql.begin(async (tx) => {
-    await tx.unsafe("set local session_replication_role = replica");
     await tx.unsafe(`truncate table ${tables.map((t) => `"${t}"`).join(", ")} restart identity cascade`);
     // portal sessions belong to the customers that were just removed; staff sessions stay valid
     await tx.unsafe("delete from refresh_tokens where subject_type = 'CUSTOMER'");
@@ -143,7 +167,7 @@ export async function reseed(db: DB, opts: { app?: FastifyInstance; log?: (msg: 
     const truncated = await truncateBusinessTables(app);
     for (const prefix of RESEED_REDIS_PREFIXES) await invalidate(app.redis, prefix);
     await bumpPermVersion(app.redis);
-    const boot = await ensureBootstrap(db);
+    const boot = await ensureBootstrap(db, { mode: "demo" });
     await app.db.transaction(async (tx) => {
       await writeAudit(tx, { companyId: boot.companyId, actor: { type: "SYSTEM", id: null, name: "reseed" }, action: "admin.reseed", entityType: "company", entityId: boot.companyId, after: { truncated_tables: truncated.length, bootstrap_created: boot.created } });
     });
@@ -163,14 +187,18 @@ async function main(): Promise<void> {
   await app.ready();
   try {
     const boot = await ensureBootstrap(app.db);
-    logger.info({ companyId: boot.companyId, created: boot.created }, "bootstrap seed ensured");
+    logger.info({ companyId: boot.companyId, created: boot.created, mode: boot.mode, admin: boot.adminEmail }, "bootstrap seed ensured");
     const force = process.argv.includes("--force");
     if (force) {
       await reseed(app.db, { app });
     } else {
       const result = await seedDemo(app);
-      if (result.skipped) logger.warn("demo data already present (run with --force to drop business data and reseed)");
+      if (result.refused) logger.warn("demo data not created: production (set SEED_DEMO=true to seed a demo deployment)");
+      else if (result.skipped) logger.warn("demo data already present (run with --force to drop business data and reseed)");
     }
+  } catch (err) {
+    if (err instanceof BootstrapRefused) logger.fatal(err.message);
+    throw err;
   } finally {
     await app.close();
   }

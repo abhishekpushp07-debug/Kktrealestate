@@ -1,8 +1,8 @@
-import { inflateSync } from "node:zlib";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { addDays, todayIST } from "@kkt/domain";
 import { completeStage, createMoneyWorld, type MoneyWorld } from "./fixtures/money.js";
 import { buildTestApp, type ErrorBody, type TestContext } from "./helpers.js";
+import { pdfText } from "./pdfText.js";
 
 /**
  * Reports module (SPEC §14 reports / dashboards / branded PDFs, §11 receipt & demand-letter rules, §18 scenario 13):
@@ -88,23 +88,6 @@ async function fetchPdf(url: string, token = admin): Promise<Buffer> {
   return buf;
 }
 
-/** Text of a pdfkit PDF: inflates every content stream and decodes the WinAnsi hex strings of the TJ operators. */
-function pdfText(buf: Buffer): string {
-  const latin = buf.toString("latin1");
-  const out: string[] = [];
-  const re = /stream\r?\n([\s\S]*?)\r?\nendstream/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(latin)) !== null) {
-    const raw = Buffer.from(m[1]!, "latin1");
-    let content: string;
-    try { content = inflateSync(raw).toString("latin1"); } catch { content = raw.toString("latin1"); }
-    for (const tj of content.matchAll(/\[((?:<[0-9A-Fa-f]*>\s*-?[\d.]*\s*)+)\]\s*TJ/g)) {
-      const hex = [...tj[1]!.matchAll(/<([0-9A-Fa-f]*)>/g)].map((h) => h[1]!).join("");
-      out.push(Buffer.from(hex, "hex").toString("latin1"));
-    }
-  }
-  return out.join("\n");
-}
 
 async function json<T = Record<string, unknown>>(url: string, token = admin): Promise<T> {
   const r = await t.request<T>("GET", url, { token });
@@ -414,7 +397,8 @@ describe("branded PDFs: receipt, demand letter, allotment letter, statement (SPE
     expect(text).toContain("GSTIN 10AABCS1234A1Z5");
     expect(text).toContain("PAYMENT RECEIPT");
     expect(text).toContain("Page 1 of 1");
-    expect(text).toMatch(/Rs\. 4,00,000|₹4,00,000/);
+    expect(text).toContain("₹4,00,000");
+    expect(text).not.toContain("Rs.");
     expect(text).not.toContain("CANCELLED");
     expect(text).not.toContain("subject to realisation");
 
@@ -441,8 +425,8 @@ describe("branded PDFs: receipt, demand letter, allotment letter, statement (SPE
     expect(text).toContain(w.bankAccountNumber);
     expect(text).toContain("HDFC0000123");
     expect(text).toContain("Rupees Five Lakh Only");
-    expect(text).toMatch(/Rs\. 3,00,000|₹3,00,000/);
-    expect(text).toMatch(/Rs\. 2,00,000|₹2,00,000/);
+    expect(text).toContain("₹3,00,000");
+    expect(text).toContain("₹2,00,000");
     const wrongBooking = await t.request<ErrorBody>("GET", `/api/v1/bookings/${b2.id}/demands/${b1Excavation.id}/letter.pdf`, { token: accounts });
     expect(wrongBooking.status).toBe(404);
   });

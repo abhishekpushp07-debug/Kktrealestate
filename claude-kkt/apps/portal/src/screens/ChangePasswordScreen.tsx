@@ -44,7 +44,7 @@ export function ChangePasswordScreen({ forced }: { forced: boolean }): React.JSX
       toast.success("Password updated");
       if (!forced) router.back();
     } catch (e) {
-      if (e instanceof ApiError && (e.code === "INVALID_CREDENTIALS" || e.status === 401)) setError("Your current password is incorrect.");
+      if (e instanceof ApiError && e.code === "INVALID_CREDENTIALS") setError("Your current password is incorrect.");
       else if (e instanceof ApiError && e.code === "PASSWORD_POLICY") setError(e.message);
       else if (e instanceof ApiError && e.code === "VALIDATION_ERROR") setError("Choose a stronger password (10+ characters with upper, lower case and a digit).");
       else setError(e instanceof Error ? e.message : "Could not change the password.");

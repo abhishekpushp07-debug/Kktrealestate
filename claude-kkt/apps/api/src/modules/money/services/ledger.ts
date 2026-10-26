@@ -5,8 +5,8 @@
  */
 import { and, asc, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import {
-  appendLedgerRow, bpOfPaise, deriveLedger, emptyLedgerSummary, ledgerEntryDate, toBasisPoints,
-  type LedgerEvent, type LedgerRow, type LedgerSummary,
+  appendLedgerRow, bpOfPaise, deriveLedger, diffLedgerRows, emptyLedgerSummary, ledgerEntryDate, toBasisPoints,
+  type LedgerEvent, type LedgerRow, type LedgerRowDifference, type LedgerSummary,
 } from "@kkt/domain";
 import { agreementRevisions, bookingOtherCharges, bookingPlanRevisions, bookings, demands, ledgerEntries, payments, type AgreementValues, type Executor, type Tx } from "@kkt/db";
 import { ApiError } from "../../../lib/errors.js";
@@ -32,7 +32,10 @@ export interface AppendResult {
 export interface RebuildResult {
   rows: LedgerRow[];
   summary: LedgerSummary;
+  /** Aggregate figures (booking summary columns, row count, final dues) that differ. */
   mismatches: SummaryMismatch[];
+  /** Row-by-row differences between the stored ledger and the rebuild (event, source id, amounts, every running balance). */
+  rowMismatches: LedgerRowDifference[];
   stored: Record<string, number>;
   recomputed: Record<string, number>;
 }
@@ -211,8 +214,9 @@ function summaryFigures(s: { cashOrderRaisedPaise: number; accountOrderRaisedPai
 }
 
 /**
- * Derives the whole ledger again from the source tables and compares it with the stored booking summary and ledger rows.
- * With `write` (admin recompute / repair) the stored rows and summary are replaced by the recomputation (under the booking lock).
+ * Derives the whole ledger again from the source tables — in the canonical posting order the live path appends in (domain
+ * sortLedgerEvents) — and compares it with the stored booking summary AND, row by row, with the stored ledger (integrity finding e).
+ * With `write` (admin recompute / repair / revisions / undo) the stored rows and summary are replaced by the recomputation (under the booking lock).
  */
 export async function rebuild(tx: Executor, bookingId: string, opts: { write?: boolean } = {}): Promise<RebuildResult> {
   if (opts.write) await lockBooking(tx as Tx, bookingId);
@@ -236,12 +240,13 @@ export async function rebuild(tx: Executor, bookingId: string, opts: { write?: b
     const r = recomputed[field] ?? 0;
     if (s !== r) mismatches.push({ field, stored: s, recomputed: r });
   }
+  const rowMismatches = diffLedgerRows(storedRows, derived.rows);
   if (opts.write) {
     await tx.delete(ledgerEntries).where(eq(ledgerEntries.bookingId, bookingId));
     if (derived.rows.length > 0) await tx.insert(ledgerEntries).values(derived.rows.map((r) => rowValues(booking.companyId, bookingId, r)));
     await writeSummary(tx, bookingId, derived.summary);
   }
-  return { rows: derived.rows, summary: derived.summary, mismatches, stored, recomputed };
+  return { rows: derived.rows, summary: derived.summary, mismatches, rowMismatches, stored, recomputed };
 }
 
 /** Stored ledger rows of a booking in seq order. */

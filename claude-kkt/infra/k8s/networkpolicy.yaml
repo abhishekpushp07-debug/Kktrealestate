@@ -1,0 +1,83 @@
+# Default deny for every pod in the namespace, then only the paths the system needs.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: kkt
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+---
+# the ingress controller reaches the API and the three front ends
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-controller
+  namespace: kkt
+spec:
+  podSelector:
+    matchExpressions:
+      - { key: app.kubernetes.io/name, operator: In, values: [api, web, erp, portal] }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: ingress-nginx } }
+---
+# the website's server-side rendering calls the API in-cluster
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-web-to-api
+  namespace: kkt
+spec:
+  podSelector: { matchLabels: { app.kubernetes.io/name: api } }
+  policyTypes: [Ingress]
+  ingress:
+    - from: [{ podSelector: { matchLabels: { app.kubernetes.io/name: web } } }]
+      ports: [{ port: 4000, protocol: TCP }]
+---
+# Prometheus (namespace "monitoring") scrapes the API's metrics port only
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-metrics-scrape
+  namespace: kkt
+spec:
+  podSelector: { matchLabels: { app.kubernetes.io/name: api } }
+  policyTypes: [Ingress]
+  ingress:
+    - from: [{ namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: monitoring } } }]
+      ports: [{ port: 9464, protocol: TCP }]
+---
+# only the API, the worker and the migrate Job may open database connections through PgBouncer
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-db-clients-to-pgbouncer
+  namespace: kkt
+spec:
+  podSelector: { matchLabels: { app.kubernetes.io/name: pgbouncer } }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - { key: app.kubernetes.io/name, operator: In, values: [api, worker, migrate] }
+      ports: [{ port: 6432, protocol: TCP }]
+---
+# front ends never talk to anything but DNS (static nginx) or the API (web): no egress to the database, Redis or the internet
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: frontends-egress
+  namespace: kkt
+spec:
+  podSelector:
+    matchExpressions:
+      - { key: app.kubernetes.io/name, operator: In, values: [web, erp, portal] }
+  policyTypes: [Egress]
+  egress:
+    - to: [{ namespaceSelector: {}, podSelector: { matchLabels: { k8s-app: kube-dns } } }]
+      ports: [{ port: 53, protocol: UDP }, { port: 53, protocol: TCP }]
+    - to: [{ podSelector: { matchLabels: { app.kubernetes.io/name: api } } }]
+      ports: [{ port: 4000, protocol: TCP }]

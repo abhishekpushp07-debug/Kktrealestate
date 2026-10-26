@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { addDays } from "@kkt/domain";
-import { blockByCode, BOOT_TIMEOUT, bookingBody, bookingBySeq, bootAcceptance, createCustomer, demandsOf, flatsOf, getBooking, key, L, masterByCode, projectByCode, type Booking, type ErrorBody, type Harness } from "./harness.js";
+import { blockByCode, BOOT_TIMEOUT, bookingBody, bookingBySeq, bootAcceptance, createCustomer, demandsOf, flatsOf, getBooking, key, listAtCr, L, masterByCode, projectByCode, type Booking, type ErrorBody, type Harness } from "./harness.js";
 
 /**
  * SPEC §18 scenario 8 (L249): "Flexi booking: 10% demand immediately; the 40% installment is raised exactly once when 60 days pass
@@ -38,6 +38,7 @@ describe("scenario 8 — Flexi 10:40:50 on a fresh booking", () => {
     const sgh = await projectByCode(h, admin, "SGH");
     const towerC = await blockByCode(h, admin, sgh.id, "C");
     const flat = (await flatsOf(h, admin, towerC.id)).get("C-1103")!;
+    await listAtCr(h, admin, [flat.id]);
     const flexi = await masterByCode<{ id: string; code: string }>(h, admin, "payment-plans", "FLEXI_10_40_50");
     const customer = await createCustomer(h, sales, "Acceptance Buyer Eight", "9898000008");
     const r = await h.request<Booking & ErrorBody>("POST", "/api/v1/bookings", { token: sales, headers: { "idempotency-key": key() }, body: bookingBody(h, flat.id, customer.id, { payment_plan_id: flexi.id }) });

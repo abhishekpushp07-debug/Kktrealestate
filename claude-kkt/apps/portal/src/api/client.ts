@@ -6,8 +6,6 @@
 import { fetch as expoFetch } from "expo/fetch";
 import { Platform } from "react-native";
 import {
-  isApiError,
-  type ErrorCode,
   type PortalBankDetails,
   type PortalBookingSwitcherItem,
   type PortalChangePassword,
@@ -41,6 +39,7 @@ import {
   type TokenPair,
 } from "@kkt/contracts";
 import { secureStorage } from "@/lib/storage";
+import { ApiError, apiErrorFromBody } from "./errors";
 import { buildMultipart, type LocalFile } from "@/lib/upload";
 
 // ---------------------------------------------------------------------------
@@ -57,47 +56,7 @@ const REFRESH_KEY = "kkt.portal.refresh";
 // Errors
 // ---------------------------------------------------------------------------
 
-/** Documented codes, the two client-side ones, and any code a newer server may send (shown with the server's message). */
-export type ClientErrorCode = ErrorCode | "NETWORK" | "UNKNOWN" | (string & {});
-
-export class ApiError extends Error {
-  readonly status: number;
-  readonly code: ClientErrorCode;
-  readonly details: Record<string, unknown>;
-  readonly requestId: string | undefined;
-  readonly retryAfterSeconds: number | undefined;
-
-  constructor(init: { status: number; code: ClientErrorCode; message: string; details?: Record<string, unknown>; requestId?: string; retryAfterSeconds?: number }) {
-    super(init.message);
-    this.name = "ApiError";
-    this.status = init.status;
-    this.code = init.code;
-    this.details = init.details ?? {};
-    this.requestId = init.requestId;
-    this.retryAfterSeconds = init.retryAfterSeconds;
-  }
-
-  get isNetwork(): boolean {
-    return this.code === "NETWORK";
-  }
-  get isAuth(): boolean {
-    return this.status === 401;
-  }
-  get isNotFound(): boolean {
-    return this.status === 404;
-  }
-}
-
-export function isApiErrorInstance(e: unknown): e is ApiError {
-  return e instanceof ApiError;
-}
-
-/** A human message for any thrown value. */
-export function errorMessage(e: unknown, fallback = "Something went wrong. Please try again."): string {
-  if (e instanceof ApiError) return e.message || fallback;
-  if (e instanceof Error && e.message) return e.message;
-  return fallback;
-}
+export { ApiError, errorMessage, isApiErrorInstance, type ClientErrorCode } from "./errors";
 
 // ---------------------------------------------------------------------------
 // Tokens
@@ -227,29 +186,10 @@ function parseJson(text: string): unknown {
   }
 }
 
-function fallbackMessage(status: number): string {
-  if (status === 404) return "We couldn't find that.";
-  if (status === 413) return "That file is too large (max 15 MB).";
-  if (status === 429) return "Too many attempts. Please wait a moment and try again.";
-  if (status >= 500) return "Our server had a hiccup. Please try again in a moment.";
-  return "Something went wrong. Please try again.";
-}
-
 async function toApiError(res: HttpResponse): Promise<ApiError> {
-  const data = parseJson(await res.text());
   const retryAfterHeader = res.headers.get("Retry-After");
   const retryAfterSeconds = retryAfterHeader && /^\d+$/.test(retryAfterHeader) ? Number(retryAfterHeader) : undefined;
-  if (isApiError(data)) {
-    return new ApiError({
-      status: res.status,
-      code: data.error.code,
-      message: data.error.message || fallbackMessage(res.status),
-      details: data.error.details,
-      requestId: data.error.request_id,
-      retryAfterSeconds,
-    });
-  }
-  return new ApiError({ status: res.status, code: "UNKNOWN", message: fallbackMessage(res.status), retryAfterSeconds });
+  return apiErrorFromBody(res.status, parseJson(await res.text()), retryAfterSeconds);
 }
 
 // Single-flight refresh: concurrent 401s share one refresh call.

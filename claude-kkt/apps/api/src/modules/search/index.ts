@@ -20,6 +20,28 @@ function scopeSql(user: StaffContext, column: string, params: unknown[]): string
   return `${column} = any($${params.length}::uuid[])`;
 }
 
+/**
+ * A project-scoped user only finds customers linked to a project in scope: primary applicant or co-applicant on a booking there, or the
+ * customer of a lead for one of those projects. All-project users see every customer.
+ */
+function customerScopeSql(user: StaffContext, params: unknown[]): string {
+  if (user.allProjects) return "true";
+  if (user.projectIds.length === 0) return "false";
+  params.push(user.projectIds);
+  const p = `$${params.length}::uuid[]`;
+  return `(exists (select 1 from bookings sb where sb.project_id = any(${p}) and (sb.customer_id = c.id or exists (select 1 from booking_co_applicants sbc where sbc.booking_id = sb.id and sbc.customer_id = c.id)))
+    or exists (select 1 from leads sl where sl.customer_id = c.id and sl.project_id = any(${p})))`;
+}
+
+/** Entity types the caller may see: each one needs its own read permission (customers carry PII, bookings carry money). */
+export function permittedTypes(user: Pick<StaffContext, "permissions">, requested: readonly SearchEntityType[]): Set<SearchEntityType> {
+  const need: Partial<Record<SearchEntityType, string>> = { PROJECT: "project.read", BLOCK: "project.read", FLAT: "project.read", CUSTOMER: "customer.read", BOOKING: "booking.read" };
+  return new Set(requested.filter((t) => {
+    const p = need[t];
+    return p !== undefined && user.permissions.has(p);
+  }));
+}
+
 /** One UNION ALL statement with a limited branch per entity type (the old five parallel queries took five pool connections per keystroke). */
 function buildSearch(user: StaffContext, term: string, types: Set<SearchEntityType>, per: number): { text: string; params: unknown[] } {
   const params: unknown[] = [user.companyId, `%${escapeLike(term)}%`, `${escapeLike(term)}%`];
@@ -39,7 +61,7 @@ function buildSearch(user: StaffContext, term: string, types: Set<SearchEntityTy
   }
   if (types.has("CUSTOMER")) {
     branches.push(`(select 4, 'CUSTOMER', c.id, c.full_name, c.customer_code || ' · ' || c.phone, '/customers/' || c.id
-      from customers c where c.company_id = ${company} and c.is_active and (c.full_name ilike ${contains} or c.phone ilike ${prefix} or c.customer_code ilike ${prefix}) limit ${per})`);
+      from customers c where c.company_id = ${company} and c.is_active and ${customerScopeSql(user, params)} and (c.full_name ilike ${contains} or c.phone ilike ${prefix} or c.customer_code ilike ${prefix}) limit ${per})`);
   }
   if (types.has("BOOKING")) {
     branches.push(`(select 5, 'BOOKING', bk.id, bk.booking_number, cu.full_name || ' · ' || coalesce(bk.flat_snapshot->>'flat_number', '') || ' · ' || bk.status, '/bookings/' || bk.id
@@ -62,17 +84,21 @@ async function runWithBudget(sql: Sql, text: string, params: unknown[], log: (ms
   }
 }
 
-/** Command-palette search across projects, blocks, flats, customers and bookings (ILIKE: prefix on codes/numbers/phones, contains on names; scope-aware; 20 results max). */
+/**
+ * Command-palette search across projects, blocks, flats, customers and bookings (ILIKE: prefix on codes/numbers/phones, contains on names;
+ * scope-aware; 20 results max). Each entity type is gated by its own read permission: PROJECT/BLOCK/FLAT → project.read,
+ * CUSTOMER → customer.read, BOOKING → booking.read; types the caller may not read are silently left out.
+ */
 export async function searchModule(app: FastifyInstance): Promise<void> {
   route(app, {
-    method: "GET", url: "/search", permission: "project.read",
+    method: "GET", url: "/search", permission: ["project.read", "customer.read", "booking.read"],
     schema: { querystring: SearchQuerySchema, response: { 200: SearchResponseSchema }, summary: "Global search (Ctrl/Cmd+K)" },
     handler: async (req) => {
       const user = req.user as StaffContext;
       const q = req.query;
       const limit = Math.min(20, q.limit);
       const per = Math.max(3, Math.ceil(limit / 2));
-      const types = new Set<SearchEntityType>(q.types ?? ALL_TYPES);
+      const types = permittedTypes(user, q.types ?? ALL_TYPES);
       if (types.size === 0) return { results: [], recent: [] };
       const { text, params } = buildSearch(user, q.q, types, per);
       const rows = await runWithBudget(app.sql, text, params, (m) => req.log.warn(m));

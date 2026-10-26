@@ -419,7 +419,7 @@ export async function portalBankDetails(db: Executor, customer: PortalContext, b
   let [bank] = project?.escrow ? await db.select().from(bankAccounts).where(and(active, eq(bankAccounts.id, project.escrow))).limit(1) : [];
   if (!bank) [bank] = await db.select().from(bankAccounts).where(and(active, eq(bankAccounts.isDefault, true))).limit(1);
   if (!bank) throw ApiError.notFound("Bank details");
-  let number: string | null = null;
+  let number: string | null;
   try { number = decryptField(bank.accountNumberEnc); } catch { number = null; }
   if (!number) throw ApiError.notFound("Bank details");
   return {

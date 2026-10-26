@@ -4,6 +4,7 @@ import { Button } from "./Button";
 import { Icon, type IconName } from "./Icon";
 import { T } from "./Text";
 import { colors, radius, space, toneStyles, type Tone } from "./theme";
+import { alertRegion, useAnnounce } from "./a11y";
 
 export function EmptyState({ icon = "document", title, body, action, onAction, style }: { icon?: IconName; title: string; body?: string; action?: string; onAction?: () => void; style?: StyleProp<ViewStyle> }): React.JSX.Element {
   return (
@@ -46,9 +47,11 @@ export function ErrorState({ error, onRetry, title, style }: { error: unknown; o
 /** Inline message strip (info / warning / danger / success). */
 export function Notice({ tone = "info", title, body, icon, style, children }: { tone?: Tone; title?: string; body?: string; icon?: IconName; style?: StyleProp<ViewStyle>; children?: React.ReactNode }): React.JSX.Element {
   const t = toneStyles[tone];
+  const urgent = tone === "danger" || tone === "warning";
+  useAnnounce(tone === "danger" ? [title, body].filter(Boolean).join(". ") : null);
   const defaultIcon: IconName = tone === "danger" ? "warning" : tone === "warning" ? "clock" : tone === "success" ? "check" : "info";
   return (
-    <View style={[styles.notice, { backgroundColor: t.bg, borderColor: t.border }, style]}>
+    <View style={[styles.notice, { backgroundColor: t.bg, borderColor: t.border }, style]} {...(urgent ? alertRegion : {})}>
       <Icon name={icon ?? defaultIcon} size={18} color={t.fg} style={{ marginTop: 1 }} />
       <View style={{ flex: 1, gap: 2 }}>
         {title ? (

@@ -16,7 +16,7 @@ export function Checkbox({ className, label, description, id, checked, ...props 
       id={inputId}
       checked={checked}
       className={cn(
-        "peer flex size-4 shrink-0 items-center justify-center rounded-xs border border-border-strong bg-card transition-colors focus-ring data-[state=checked]:border-navy-950 data-[state=checked]:bg-navy-950 data-[state=indeterminate]:border-navy-950 data-[state=indeterminate]:bg-navy-950 disabled:cursor-not-allowed disabled:opacity-50",
+        "peer flex size-4 shrink-0 items-center justify-center rounded-xs border border-border-input bg-card transition-colors focus-ring data-[state=checked]:border-navy-950 data-[state=checked]:bg-navy-950 data-[state=indeterminate]:border-navy-950 data-[state=indeterminate]:bg-navy-950 disabled:cursor-not-allowed disabled:opacity-50",
         className,
       )}
       {...props}

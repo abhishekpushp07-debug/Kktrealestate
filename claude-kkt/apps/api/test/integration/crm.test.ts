@@ -397,9 +397,17 @@ describe("customers: KYC encryption, masking, audited reveal, duplicates, versio
     expect(viaHeader.body.version).toBe(3);
     const rejectedNoRemarks = await t.request<ErrorBody>("POST", `/api/v1/customers/${customerId}/kyc`, { token: admin.access_token, body: { version: 3, kyc_status: "REJECTED" } });
     expect(rejectedNoRemarks.status).toBe(400);
-    const submitted = await t.request<Customer & { kyc_verified_by: string | null }>("POST", `/api/v1/customers/${customerId}/kyc`, { token: salesA.access_token, body: { version: 3, kyc_status: "SUBMITTED" } });
+    // SUBMITTED needs PAN + Aadhaar (present) and a KYC document on file
+    const incomplete = await t.request<ErrorBody>("POST", `/api/v1/customers/${customerId}/kyc`, { token: salesA.access_token, body: { version: 3, kyc_status: "SUBMITTED" } });
+    expect(incomplete.status).toBe(422);
+    expect(incomplete.body.error.code).toBe("KYC_INCOMPLETE");
+    expect(incomplete.body.error.details?.["missing"]).toEqual(["kyc_document"]);
+    await t.app.sql`insert into documents (company_id, entity_type, entity_id, file_name, mime, size_bytes, sha256, storage_key, uploaded_by_type, uploaded_by, is_sensitive)
+      values (${t.companyId}, 'CUSTOMER', ${customerId}, 'pan.jpg', 'image/jpeg', 100, 'sha-kyc', 'k/pan.jpg', 'STAFF', ${salesA.user.id}, true)`;
+    const submitted = await t.request<Customer & { kyc_verified_by: string | null; kyc_submitted_by: string | null }>("POST", `/api/v1/customers/${customerId}/kyc`, { token: salesA.access_token, body: { version: 3, kyc_status: "SUBMITTED" } });
     expect(submitted.status, submitted.text).toBe(200);
     expect(submitted.body.kyc_status).toBe("SUBMITTED");
+    expect(submitted.body.kyc_submitted_by).toBe(salesA.user.id);
     expect(submitted.body.kyc_verified_by).toBeNull();
     const verified = await t.request<Customer & { kyc_verified_by: string | null; kyc_verified_by_name: string | null; kyc_verified_at: string | null }>("POST", `/api/v1/customers/${customerId}/kyc`, { token: admin.access_token, body: { version: 4, kyc_status: "VERIFIED", kyc_remarks: "Documents checked" } });
     expect(verified.status, verified.text).toBe(200);
@@ -438,14 +446,24 @@ describe("customers: KYC encryption, masking, audited reveal, duplicates, versio
     expect(customer.body.co_applicants).toHaveLength(1);
     const revealed = await t.request<{ co_applicants_revealed: { pan: string | null }[] }>("GET", `/api/v1/customers/${customerId}?reveal=true`, { token: admin.access_token });
     expect(revealed.body.co_applicants_revealed[0]!.pan).toBe("SUNIT5678A");
-    const upd = await t.request<{ relation: string }>("PATCH", `/api/v1/customers/${customerId}/co-applicants/${add.body.id}`, { token: salesA.access_token, body: { relation: "Spouse" } });
+    // version is required (body or If-Match); a stale one is a 409 VERSION_CONFLICT
+    const noVersion = await t.request<ErrorBody>("PATCH", `/api/v1/customers/${customerId}/co-applicants/${add.body.id}`, { token: salesA.access_token, body: { relation: "Spouse" } });
+    expect(noVersion.status).toBe(400);
+    const upd = await t.request<{ relation: string; version: number }>("PATCH", `/api/v1/customers/${customerId}/co-applicants/${add.body.id}`, { token: salesA.access_token, body: { relation: "Spouse", version: 1 } });
     expect(upd.status, upd.text).toBe(200);
     expect(upd.body.relation).toBe("Spouse");
+    expect(upd.body.version).toBe(2);
+    const stale = await t.request<ErrorBody>("PATCH", `/api/v1/customers/${customerId}/co-applicants/${add.body.id}`, { token: salesA.access_token, body: { relation: "Sister" }, headers: { "if-match": '"1"' } });
+    expect(stale.status).toBe(409);
+    expect(stale.body.error.code).toBe("VERSION_CONFLICT");
+    const viaHeader = await t.request<{ relation: string; version: number }>("PATCH", `/api/v1/customers/${customerId}/co-applicants/${add.body.id}`, { token: salesA.access_token, body: { relation: "Wife" }, headers: { "if-match": '"2"' } });
+    expect(viaHeader.status, viaHeader.text).toBe(200);
+    expect(viaHeader.body.version).toBe(3);
     const del = await t.request("DELETE", `/api/v1/customers/${customerId}/co-applicants/${add.body.id}`, { token: salesA.access_token });
     expect(del.status).toBe(204);
     expect((await t.request<{ items: unknown[] }>("GET", `/api/v1/customers/${customerId}/co-applicants`, { token: salesA.access_token })).body.items).toEqual([]);
     expect((await t.request("DELETE", `/api/v1/customers/${customerId}/co-applicants/${add.body.id}`, { token: salesA.access_token })).status).toBe(404);
-    expect(await countRows("audit_logs", `action like 'customer.co_applicant_%' and entity_id = '${customerId}'`)).toBe(3);
+    expect(await countRows("audit_logs", `action like 'customer.co_applicant_%' and entity_id = '${customerId}'`)).toBe(4); // add, update ×2, remove
   });
 });
 

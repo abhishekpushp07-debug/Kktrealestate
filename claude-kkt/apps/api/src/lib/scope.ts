@@ -54,3 +54,29 @@ export function assertPermission(user: Pick<StaffContext, "permissions">, code: 
 export function hasAnyPermission(user: Pick<StaffContext, "permissions">, codes: readonly Permission[]): boolean {
   return codes.some((c) => user.permissions.has(c));
 }
+
+/** Name of the all-powerful system role (SPEC §1). */
+export const SUPER_ADMIN_ROLE_NAME = "Super Admin";
+
+/** True when the caller holds the Super Admin SYSTEM role (a custom role named "Super Admin" does not count). */
+export function isSuperAdmin(user: Pick<StaffContext, "roleName" | "isSystemRole">): boolean {
+  return user.roleName === SUPER_ADMIN_ROLE_NAME && user.isSystemRole;
+}
+
+/** Reasons carried in `details.reason` of the 403s that stop privilege escalation through user and role management. */
+export type EscalationReason = "SELF_CHANGE" | "PERMISSION_ESCALATION" | "SCOPE_ESCALATION" | "SUPER_ADMIN_TARGET" | "TARGET_OUTRANKS_CALLER" | "SYSTEM_ROLE_SUPER_ADMIN_ONLY";
+
+/** 403 FORBIDDEN with `details.reason` (and any extra details). */
+export function escalationForbidden(reason: EscalationReason, message: string, details: Record<string, unknown> = {}): ApiError {
+  return ApiError.forbidden(message, { reason, ...details });
+}
+
+/**
+ * "Nobody may grant what they do not hold": throws 403 PERMISSION_ESCALATION (details.missing) when `permissions` contains a code the
+ * caller does not hold. Super Admin holds everything and is never refused.
+ */
+export function assertCanGrant(user: Pick<StaffContext, "roleName" | "isSystemRole" | "permissions">, permissions: readonly string[], what = "this role"): void {
+  if (isSuperAdmin(user)) return;
+  const missing = [...new Set(permissions)].filter((p) => !user.permissions.has(p)).sort();
+  if (missing.length > 0) throw escalationForbidden("PERMISSION_ESCALATION", `You cannot grant ${what}: it carries permissions you do not hold yourself`, { missing });
+}

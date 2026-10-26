@@ -81,7 +81,7 @@ export default function SiteVisitsPage() {
                   <ChevronLeft aria-hidden="true" />
                 </Button>
                 <div className="w-40">
-                  <DateInput aria-label="Date" value={date} onChange={(value) => setParam({ date: value })} className="h-11 text-xs sm:h-8" />
+                  <DateInput aria-label="Date" value={date} onChange={(value) => setParam({ date: value })} className="h-12 text-xs sm:h-8" />
                 </div>
                 <Button variant="outline" size="sm" aria-label={view === "week" ? "Next week" : "Next day"} onClick={() => step(1)} className="px-2">
                   <ChevronRight aria-hidden="true" />
@@ -267,10 +267,10 @@ function VisitsTable({ onOpen, projectId }: { onOpen: (visit: VisitRow) => void;
             <Select aria-label="Status" size="sm" className="w-full sm:w-36" value={list.filters.status ?? null} onValueChange={(value) => list.setFilter("status", value)} options={VISIT_STATUSES.map((value) => ({ value, label: VISIT_STATUS_LABELS[value] }))} placeholder="Any status" allowClear />
             <Combobox aria-label="Assignee" size="sm" className="w-full sm:w-40" value={list.filters.assignee_user_id ?? null} onValueChange={(value) => list.setFilter("assignee_user_id", value)} options={(users.data ?? []).map((user) => ({ value: user.id, label: user.name }))} placeholder="Anyone" allowClear />
             <div className="w-full sm:w-40">
-              <DateInput aria-label="From" value={list.filters.from ?? null} onChange={(value) => list.setFilter("from", value)} className="h-11 text-xs sm:h-8" max={list.filters.to} />
+              <DateInput aria-label="From" value={list.filters.from ?? null} onChange={(value) => list.setFilter("from", value)} className="h-12 text-xs sm:h-8" max={list.filters.to} />
             </div>
             <div className="w-full sm:w-40">
-              <DateInput aria-label="To" value={list.filters.to ?? null} onChange={(value) => list.setFilter("to", value)} className="h-11 text-xs sm:h-8" min={list.filters.from} />
+              <DateInput aria-label="To" value={list.filters.to ?? null} onChange={(value) => list.setFilter("to", value)} className="h-12 text-xs sm:h-8" min={list.filters.from} />
             </div>
             <Select aria-label="Needs outcome" size="sm" className="w-full sm:w-40" value={list.filters.needs_outcome ?? null} onValueChange={(value) => list.setFilter("needs_outcome", value)} options={[{ value: "true", label: "Needs outcome" }]} placeholder="All visits" allowClear />
           </>

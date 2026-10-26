@@ -123,7 +123,7 @@ export function EnquiryForm({ projects, flatTypes, defaultProjectSlug = "", tone
         <h3 className="mt-5 font-display text-display-sm">Thank you, {values.name.split(" ")[0]}.</h3>
         <p className={`mt-3 ${dark ? "text-ivory-100/75" : "text-ink-muted"}`}>Your enquiry has been received. Our relationship manager will call you shortly.</p>
         <p className="mt-5 text-sm uppercase tracking-widest opacity-70">Reference number</p>
-        <p className="mt-1 font-display text-3xl text-gold-500">{status.reference}</p>
+        <p className={`mt-1 font-display text-3xl ${dark ? "text-gold-300" : "text-gold-700"}`}>{status.reference}</p>
         {wa ? (
           <Button href={wa} variant={dark ? "outline-light" : "outline"} className="mt-8" external rel="noopener noreferrer" target="_blank">
             <WhatsAppIcon size={18} /> Continue on WhatsApp

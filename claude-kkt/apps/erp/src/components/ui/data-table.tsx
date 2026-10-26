@@ -287,7 +287,7 @@ export function DataTable<T>({
               return (
                 <div
                   key={row.id}
-                  role={onRowClick ? "button" : undefined}
+                  // focusable like a desktop row (Enter opens it) but not role=button: cards hold checkboxes and action menus
                   tabIndex={onRowClick ? 0 : undefined}
                   onClick={handleRowClick(row)}
                   onKeyDown={handleRowKey(row)}
@@ -348,7 +348,8 @@ export function DataTable<T>({
             <div className="h-full w-1/3 animate-shimmer bg-gradient-to-r from-transparent via-gold to-transparent" style={{ backgroundSize: "200% 100%" }} />
           </div>
         )}
-        <div ref={scrollRef} className="overflow-auto scrollbar-thin" style={{ maxHeight }} aria-busy={loading || undefined}>
+        {/* a scroll box with only text inside must itself be focusable so keyboard users can scroll it (WCAG 2.1.1) */}
+        <div ref={scrollRef} className="overflow-auto scrollbar-thin focus-ring-inset" style={{ maxHeight }} aria-busy={loading || undefined} {...(onRowClick || selectable ? {} : { tabIndex: 0, role: "region", "aria-label": "Table" })}>
           <table className="w-full min-w-max border-separate border-spacing-0 text-sm">
             <thead className="sticky top-0 z-20">
               {table.getHeaderGroups().map((headerGroup) => (
@@ -389,7 +390,7 @@ export function DataTable<T>({
                             type="button"
                             onClick={() => onSortChange?.(nextSort(sort, sortKey))}
                             className={cn(
-                              "group -mx-1 inline-flex max-w-full items-center gap-1 rounded-xs px-1 py-0.5 hover:text-navy-950 focus-ring",
+                              "group -mx-1 inline-flex min-h-6 max-w-full items-center gap-1 rounded-xs px-1 py-0.5 hover:text-navy-950 focus-ring",
                               active && "text-navy-950",
                               meta?.align === "right" && "flex-row-reverse",
                             )}

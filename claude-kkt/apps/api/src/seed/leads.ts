@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import { sha256 } from "../lib/crypto.js";
 import { SeedError, type SeedContext } from "./context.js";
 import { customerBody, KAVITA, setKyc } from "./customers.js";
-import { GGV_SLUG, SGH_SLUG } from "./projects.js";
+import { SGH_SLUG } from "./projects.js";
 
 interface LeadRow { id: string; lead_number: string; phone: string; version: number; stage: string }
 

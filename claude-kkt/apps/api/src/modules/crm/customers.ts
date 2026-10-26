@@ -32,14 +32,16 @@ import { keyedHash } from "../../lib/crypto.js";
 import { ApiError } from "../../lib/errors.js";
 import { listPaging, paginate } from "../../lib/list.js";
 import { route } from "../../lib/routes.js";
-import { assertPermission, ensureProjectAccess, scopeFilter } from "../../lib/scope.js";
-import { applyUpdate, expectedVersion, optionalExpectedVersion } from "../../lib/version.js";
+import { assertPermission, ensureProjectAccess, isSuperAdmin, scopeFilter, type StaffContext } from "../../lib/scope.js";
+import { eraseCustomer } from "../admin/erase.js";
+import { applyUpdate, assertVersion, expectedVersion, optionalExpectedVersion } from "../../lib/version.js";
 import { revokeAllFamilies } from "../auth/service.js";
 import { bumpPermVersion } from "../../lib/cache.js";
 import {
   CUSTOMER_SELECT, activeBookingCount, canonicalPhone, coApplicantColumns, coApplicantRow, coApplicantsFor, createCustomer, customerRow, getCustomerRow, joinRm, listCoApplicants, loadCustomerSelect,
   metaOf, portalAccessView, revealedRow, toCustomerRows, updateCustomer, type CustomerSelect, type CustomerWriteContext,
 } from "./customerService.js";
+import { securityRedis } from "../../plugins/auth.js";
 
 const idParams = z.object({ id: IdSchema });
 const coParams = z.object({ id: IdSchema, caId: IdSchema });
@@ -113,6 +115,58 @@ async function customer360(db: Executor, companyId: string, id: string, user: Fa
     tickets_open: ticketRows.filter((t) => t.status !== "CLOSED" && t.status !== "RESOLVED").length,
     portal: portal.is_enabled || portal.enabled_at ? portal : null,
   };
+}
+
+/** Allowed KYC moves (target → sources); anything else is 409 KYC_TRANSITION_INVALID. VERIFIED → * is the settings.manage override. */
+const KYC_FROM: Record<"SUBMITTED" | "VERIFIED" | "REJECTED", readonly string[]> = { SUBMITTED: ["PENDING", "REJECTED", "VERIFIED"], VERIFIED: ["SUBMITTED"], REJECTED: ["SUBMITTED", "VERIFIED"] };
+
+/** What is missing for a KYC submission: PAN, Aadhaar and at least one live KYC document (sensitive, or of a KYC document type). */
+async function kycMissing(tx: Executor, c: typeof customers.$inferSelect): Promise<string[]> {
+  const missing: string[] = [];
+  if (!c.panEnc) missing.push("pan");
+  if (!c.aadhaarEnc) missing.push("aadhaar");
+  const [doc] = await tx
+    .select({ id: documents.id })
+    .from(documents)
+    .leftJoin(documentTypes, eq(documentTypes.id, documents.documentTypeId))
+    .where(and(eq(documents.companyId, c.companyId), eq(documents.entityType, "CUSTOMER"), eq(documents.entityId, c.id), eq(documents.isDeleted, false), or(eq(documents.isSensitive, true), eq(documentTypes.isKyc, true))))
+    .limit(1);
+  if (!doc) missing.push("kyc_document");
+  return missing;
+}
+
+/**
+ * Checks one KYC move against the maker-checker workflow and returns whether it re-opens a VERIFIED file. Errors: 409 KYC_TRANSITION_INVALID
+ * (move not allowed, or a rejected file resubmitted without any edit since the rejection), 422 KYC_INCOMPLETE (details.missing),
+ * 403 FORBIDDEN with details.reason KYC_VERIFIED_LOCKED (VERIFIED changed without settings.manage) or KYC_MAKER_CHECKER (the submitter
+ * verifying their own submission), 400 when the reason for changing a VERIFIED status is missing.
+ */
+async function kycTransition(tx: Executor, user: StaffContext, c: typeof customers.$inferSelect, to: "SUBMITTED" | "VERIFIED" | "REJECTED", reason: string | undefined): Promise<{ reopened: boolean }> {
+  const from = c.kycStatus;
+  // Only someone allowed to see the unmasked identifiers can vouch for (or reject) them (checked before the workflow: 403 first).
+  if (to === "VERIFIED" || to === "REJECTED") assertPermission(user, "customer.kyc_view");
+  if (!KYC_FROM[to].includes(from)) {
+    throw ApiError.conflict("KYC_TRANSITION_INVALID", `KYC cannot move from ${from} to ${to}`, { from, to, allowed_from: KYC_FROM[to] });
+  }
+  const reopened = from === "VERIFIED";
+  if (reopened) {
+    if (!user.permissions.has("settings.manage")) throw ApiError.forbidden("Only an administrator (settings.manage) can change a VERIFIED KYC status", { reason: "KYC_VERIFIED_LOCKED", permission: "settings.manage" });
+    if (!reason) throw ApiError.badRequest("Give a reason for changing a verified KYC status", { field: "reason", issues: [{ path: "reason", message: "Required when changing a VERIFIED status" }] });
+  }
+  if (to === "VERIFIED" || to === "REJECTED") {
+    // …and never the person who submitted them (maker-checker).
+    if (!reopened && c.kycSubmittedBy === user.id) throw ApiError.forbidden("KYC must be verified by someone other than the person who submitted it", { reason: "KYC_MAKER_CHECKER", submitted_by: c.kycSubmittedBy });
+    return { reopened };
+  }
+  // → SUBMITTED
+  if (from === "REJECTED" && c.kycVerifiedAt && c.updatedAt.getTime() <= c.kycVerifiedAt.getTime()) {
+    const [doc] = await tx.select({ id: documents.id }).from(documents)
+      .where(and(eq(documents.entityType, "CUSTOMER"), eq(documents.entityId, c.id), eq(documents.isDeleted, false), gt(documents.createdAt, c.kycVerifiedAt))).limit(1);
+    if (!doc) throw ApiError.conflict("KYC_TRANSITION_INVALID", "Correct the customer's details or upload a new KYC document before resubmitting a rejected KYC", { from, to, reason: "UNCHANGED_SINCE_REJECTION" });
+  }
+  const missing = await kycMissing(tx, c);
+  if (missing.length > 0) throw new ApiError(422, "KYC_INCOMPLETE", `KYC cannot be submitted yet: missing ${missing.join(", ")}`, { missing });
+  return { reopened };
 }
 
 /** /customers routes: list, create, get (masked / audited reveal), update, KYC, co-applicants, 360, deactivate/activate, erase, duplicate check. */
@@ -215,20 +269,29 @@ export function customerRoutes(app: FastifyInstance): void {
 
   route(app, {
     method: "POST", url: "/customers/:id/kyc", permission: "customer.write",
-    schema: { params: idParams, body: CustomerKycUpdateSchema, response: { 200: CustomerRowSchema }, summary: "Set KYC status (verifier recorded; VERIFIED/REJECTED need customer.kyc_view)" },
+    schema: { params: idParams, body: CustomerKycUpdateSchema, response: { 200: CustomerRowSchema }, summary: "KYC workflow (maker-checker): SUBMITTED needs PAN + Aadhaar + a KYC document; VERIFIED/REJECTED only from SUBMITTED by a customer.kyc_view holder who is not the submitter; changing VERIFIED needs settings.manage + reason" },
     handler: async (req) => {
       const user = req.user!;
-      const status = req.body.kyc_status;
-      const verified = status === "VERIFIED" || status === "REJECTED";
-      // Only someone allowed to see the unmasked identifiers can vouch for (or reject) them.
-      if (verified) assertPermission(user, "customer.kyc_view");
+      const body = req.body;
       return app.db.transaction(async (tx) => {
         const sel = await loadCustomerSelect(tx, user.companyId, req.params.id, true);
-        if (sel.c.erasedAt) throw ApiError.rule("This customer record was erased and can no longer be edited", "CUSTOMER_ERASED");
-        if (status === "PENDING") throw ApiError.rule("KYC can be set to SUBMITTED, VERIFIED or REJECTED", "KYC_STATUS_INVALID");
-        await applyUpdate(tx, customers, req.params.id, req.body.version, { kycStatus: status, kycRemarks: req.body.kyc_remarks ?? null, kycVerifiedBy: verified ? user.id : null, kycVerifiedAt: verified ? new Date() : null }, "customer");
+        const c = sel.c;
+        if (c.erasedAt) throw ApiError.rule("This customer record was erased and can no longer be edited", "CUSTOMER_ERASED");
+        const to = body.kyc_status;
+        if (to === "PENDING") throw ApiError.rule("KYC can be set to SUBMITTED, VERIFIED or REJECTED", "KYC_STATUS_INVALID");
+        await assertVersion(tx, customers, c.id, c.version, body.version, "customer"); // a stale form is a conflict before any workflow rule
+        const decision = await kycTransition(tx, user, c, to, body.reason);
+        const changes: Record<string, unknown> = { kycStatus: to, kycRemarks: body.kyc_remarks ?? null };
+        if (to === "SUBMITTED") Object.assign(changes, { kycSubmittedBy: user.id, kycSubmittedAt: sql`now()`, kycVerifiedBy: null, kycVerifiedAt: null });
+        // DB time on purpose: the same clock as updated_at, so "edited since the rejection" compares like with like.
+        else Object.assign(changes, { kycVerifiedBy: user.id, kycVerifiedAt: sql`now()` });
+        await applyUpdate(tx, customers, req.params.id, body.version, changes, "customer");
         const after = await getCustomerRow(tx, user.companyId, req.params.id);
-        await writeAudit(tx, { companyId: user.companyId, ...metaOf(req), action: "customer.kyc", entityType: "customer", entityId: req.params.id, before: { kyc_status: sel.c.kycStatus }, after: { kyc_status: status, kyc_remarks: req.body.kyc_remarks ?? null, kyc_verified_by: verified ? user.id : null } });
+        await writeAudit(tx, {
+          companyId: user.companyId, ...metaOf(req), action: decision.reopened ? "customer.kyc_reopened" : "customer.kyc", entityType: "customer", entityId: req.params.id,
+          before: { kyc_status: c.kycStatus, kyc_submitted_by: c.kycSubmittedBy, kyc_verified_by: c.kycVerifiedBy },
+          after: { kyc_status: to, kyc_remarks: body.kyc_remarks ?? null, ...(to === "SUBMITTED" ? { kyc_submitted_by: user.id } : { kyc_verified_by: user.id }), ...(body.reason ? { reason: body.reason } : {}) },
+        });
         return after;
       });
     },
@@ -250,7 +313,8 @@ export function customerRoutes(app: FastifyInstance): void {
     handler: async (req, reply) => {
       const user = req.user!;
       const row = await app.db.transaction(async (tx) => {
-        await loadCustomerSelect(tx, user.companyId, req.params.id, true);
+        const sel = await loadCustomerSelect(tx, user.companyId, req.params.id, true);
+        if (sel.c.erasedAt) throw ApiError.rule("This customer record was erased and can no longer be edited", "CUSTOMER_ERASED");
         const [agg] = await tx.select({ n: sql<number>`coalesce(max(${coApplicants.sortOrder}), -1)::int` }).from(coApplicants).where(eq(coApplicants.customerId, req.params.id));
         const [created] = await tx.insert(coApplicants).values({ companyId: user.companyId, customerId: req.params.id, fullName: req.body.full_name, relation: req.body.relation, ...coApplicantColumns(req.body), sortOrder: Number(agg?.n ?? -1) + 1 }).returning();
         if (!created) throw new Error("co-applicant insert returned no row");
@@ -264,15 +328,18 @@ export function customerRoutes(app: FastifyInstance): void {
 
   route(app, {
     method: "PATCH", url: "/customers/:id/co-applicants/:caId", permission: "customer.write",
-    schema: { params: coParams, body: CoApplicantUpdateSchema, response: { 200: CoApplicantRowSchema }, summary: "Update a co-applicant" },
+    schema: { params: coParams, body: CoApplicantUpdateSchema, response: { 200: CoApplicantRowSchema }, summary: "Update a co-applicant (version required: body.version or If-Match; stale → 409 VERSION_CONFLICT)" },
     handler: async (req) => {
       const user = req.user!;
+      const { version: _v, ...patch } = req.body;
+      const version = expectedVersion(req, req.body);
       return app.db.transaction(async (tx) => {
-        await loadCustomerSelect(tx, user.companyId, req.params.id, true);
+        const sel = await loadCustomerSelect(tx, user.companyId, req.params.id, true);
+        if (sel.c.erasedAt) throw ApiError.rule("This customer record was erased and can no longer be edited", "CUSTOMER_ERASED");
         const [existing] = await tx.select().from(coApplicants).where(and(eq(coApplicants.id, req.params.caId), eq(coApplicants.customerId, req.params.id))).limit(1);
         if (!existing) throw ApiError.notFound("Co-applicant");
-        const [updated] = await tx.update(coApplicants).set(coApplicantColumns(req.body)).where(eq(coApplicants.id, existing.id)).returning();
-        const view = coApplicantRow(updated!);
+        const updated = await applyUpdate(tx, coApplicants, existing.id, version, coApplicantColumns(patch), "co_applicant");
+        const view = coApplicantRow(updated);
         await writeAudit(tx, { companyId: user.companyId, ...metaOf(req), action: "customer.co_applicant_update", entityType: "customer", entityId: req.params.id, before: coApplicantRow(existing) as unknown as Record<string, unknown>, after: view as unknown as Record<string, unknown> });
         return view;
       });
@@ -285,7 +352,8 @@ export function customerRoutes(app: FastifyInstance): void {
     handler: async (req, reply) => {
       const user = req.user!;
       await app.db.transaction(async (tx) => {
-        await loadCustomerSelect(tx, user.companyId, req.params.id, true);
+        const sel = await loadCustomerSelect(tx, user.companyId, req.params.id, true);
+        if (sel.c.erasedAt) throw ApiError.rule("This customer record was erased and can no longer be edited", "CUSTOMER_ERASED");
         const [existing] = await tx.select().from(coApplicants).where(and(eq(coApplicants.id, req.params.caId), eq(coApplicants.customerId, req.params.id))).limit(1);
         if (!existing) throw ApiError.notFound("Co-applicant");
         await tx.delete(coApplicants).where(eq(coApplicants.id, existing.id));
@@ -322,7 +390,7 @@ export function customerRoutes(app: FastifyInstance): void {
             // Portal login is switched off with the customer (re-enable it explicitly after restoring); live sessions die now.
             const [pu] = await tx.select({ id: portalUsers.id, isEnabled: portalUsers.isEnabled }).from(portalUsers).where(eq(portalUsers.customerId, req.params.id)).limit(1).for("update");
             if (pu) {
-              await revokeAllFamilies(tx, app.redis, "CUSTOMER", pu.id, "CUSTOMER_DEACTIVATED");
+              await revokeAllFamilies(tx, securityRedis(app), "CUSTOMER", pu.id, "CUSTOMER_DEACTIVATED");
               if (pu.isEnabled) await tx.update(portalUsers).set({ isEnabled: false, disabledAt: new Date(), version: sql`${portalUsers.version} + 1` }).where(eq(portalUsers.id, pu.id));
             }
           }
@@ -335,39 +403,16 @@ export function customerRoutes(app: FastifyInstance): void {
     });
   }
 
+  // One erasure implementation (admin/erase.ts): same guarantees (co-applicants anonymised, documents removed, leads/visits/enquiries/
+  // testimonials scrubbed, portal disabled, financial rows kept) and the same `customer.erased` audit row as POST /admin/customers/:id/erase.
   route(app, {
     method: "POST", url: "/customers/:id/erase", permission: "admin.tools",
-    schema: { params: idParams, body: CustomerEraseSchema, response: { 200: CustomerRowSchema }, summary: "Right to erasure: anonymise PII (no active booking); financial records stay" },
+    schema: { params: idParams, body: CustomerEraseSchema, response: { 200: CustomerRowSchema }, summary: "Right to erasure (Super Admin): anonymise PII when no booking is ACTIVE (409 HAS_ACTIVE_BOOKING); financial records stay. Same implementation as POST /admin/customers/:id/erase" },
     handler: async (req) => {
       const user = req.user!;
-      const result = await app.db.transaction(async (tx) => {
-        const sel = await loadCustomerSelect(tx, user.companyId, req.params.id, true);
-        if (sel.c.erasedAt) throw ApiError.rule("Customer is already erased", "ALREADY_ERASED");
-        const n = await activeBookingCount(tx, req.params.id);
-        if (n > 0) throw ApiError.conflict("IN_USE", `This customer has ${n} active booking(s); erasure is only possible without active bookings`, { usage_count: n, used_by: [{ entity_type: "bookings", count: n }] });
-        const before = await getCustomerRow(tx, user.companyId, req.params.id);
-        const anon = `Erased customer ${sel.c.customerCode}`;
-        const anonPhone = `0000${sel.c.customerCode.replace(/\D/g, "").slice(-6).padStart(6, "0")}`;
-        await tx.update(customers).set({
-          salutation: null, fullName: anon, fatherOrSpouseName: null, dob: null, gender: null, phone: anonPhone, altPhone: null, email: null,
-          addressCurrent: null, addressPermanent: null, occupation: null, companyName: null, incomeBand: null, panEnc: null, panHash: null, panLast4: null, aadhaarEnc: null, aadhaarHash: null, aadhaarLast4: null,
-          bank: null, nominee: null, notes: null, tags: [], isActive: false, deactivatedAt: new Date(), erasedAt: new Date(), version: sql`${customers.version} + 1`,
-        }).where(eq(customers.id, req.params.id));
-        await tx.delete(coApplicants).where(eq(coApplicants.customerId, req.params.id));
-        const [pu] = await tx.select({ id: portalUsers.id }).from(portalUsers).where(eq(portalUsers.customerId, req.params.id)).limit(1).for("update");
-        if (pu) {
-          // The portal login row would otherwise keep the real phone number (and block its re-use by a future customer).
-          await revokeAllFamilies(tx, app.redis, "CUSTOMER", pu.id, "CUSTOMER_ERASED");
-          await tx.update(portalUsers).set({ isEnabled: false, disabledAt: new Date(), phone: anonPhone, version: sql`${portalUsers.version} + 1` }).where(eq(portalUsers.id, pu.id));
-        }
-        // Leads that were converted into this customer carry the same PII (name, phone, email, free-text message).
-        await tx.update(leads).set({ fullName: anon, phone: anonPhone, email: null, message: null }).where(and(eq(leads.companyId, user.companyId), eq(leads.customerId, req.params.id)));
-        const after = await getCustomerRow(tx, user.companyId, req.params.id);
-        await writeAudit(tx, { companyId: user.companyId, ...metaOf(req), action: "customer.erase", entityType: "customer", entityId: req.params.id, before: { customer_code: before.customer_code, kyc_status: before.kyc_status }, after: { reason: req.body.reason, erased_at: after.erased_at } });
-        return after;
-      });
-      await bumpPermVersion(app.redis);
-      return result;
+      if (!isSuperAdmin(user)) throw new ApiError(403, "SUPER_ADMIN_ONLY", "Only the Super Admin role may perform this action");
+      await eraseCustomer(app, { companyId: user.companyId, customerId: req.params.id, reason: req.body.reason, meta: metaOf(req) });
+      return getCustomerRow(app.db, user.companyId, req.params.id);
     },
   });
 

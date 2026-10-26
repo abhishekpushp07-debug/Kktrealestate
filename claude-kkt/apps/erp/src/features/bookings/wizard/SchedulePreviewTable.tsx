@@ -16,7 +16,7 @@ export function SchedulePreviewTable({ preview, loading = false, compact = false
   const satisfied = preview.rows.filter((row) => row.already_satisfied).length;
   return (
     <div className={cn("space-y-2", loading && "opacity-60")} data-testid="schedule-preview">
-      <div className={cn("hidden overflow-x-auto rounded-lg border border-border bg-card md:block", compact && "md:hidden")}>
+      <div className={cn("hidden overflow-x-auto rounded-lg border border-border bg-card focus-ring md:block", compact && "md:hidden")} tabIndex={0} role="region" aria-label="Payment schedule preview">
         <table className="w-full min-w-[40rem] text-sm">
           <thead>
             <tr className="border-b border-border bg-surface text-left text-2xs uppercase tracking-wider text-ink-subtle">

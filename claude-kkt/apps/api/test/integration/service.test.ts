@@ -99,7 +99,7 @@ beforeAll(async () => {
   // SLA hours per priority come from company settings: URGENT shortened to 2 h for the breach tests.
   await t.app.sql`update companies set settings = settings || '{"sla_hours": {"LOW": 72, "MEDIUM": 48, "HIGH": 24, "URGENT": 2}}'::jsonb where id = ${t.companyId}`;
   const [doc] = await t.app.sql<{ id: string }[]>`insert into documents (company_id, entity_type, entity_id, file_name, mime, size_bytes, sha256, storage_key, uploaded_by_type, uploaded_by)
-    values (${t.companyId}, 'CUSTOMER', ${customerA}, 'wall.jpg', 'image/jpeg', 1234, 'abc', 'k/wall.jpg', 'STAFF', ${admin.user.id}) returning id`;
+    values (${t.companyId}, 'CUSTOMER', ${customerA}, 'wall.jpg', 'image/jpeg', 1234, 'abc', 'k/wall.jpg', 'CUSTOMER', ${customerA}) returning id`; // the buyer's own photo: usable by staff and buyer alike
   docId = doc!.id;
   // Project Admin scoped to project A only.
   const [pm] = await t.app.sql<{ id: string; version: number }[]>`select id, version from users where email = ${CREDS.projects.email}`;

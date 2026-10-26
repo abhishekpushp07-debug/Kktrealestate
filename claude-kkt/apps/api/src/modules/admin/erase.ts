@@ -2,12 +2,13 @@
  * Right to erasure (SPEC §2): anonymises a customer's PII once they have no ACTIVE booking (as primary or co-applicant), keeping every
  * financial row (bookings, demands, payments, ledger) intact and never touching audit history. Co-applicants are anonymised, the portal
  * login is disabled with its sessions revoked, customer documents are soft-deleted and removed from storage, and every other copy of the
- * PII goes too: leads (linked or sharing the phone), site visits, website enquiries with the phone, and testimonials (unpublished).
+ * PII goes too: leads (linked or sharing the phone), site visits, website enquiries with the phone, portal login events (identifier) and
+ * testimonials (unpublished). This is the ONLY erasure implementation: POST /customers/:id/erase (crm) delegates here.
  */
 import { and, eq, exists, inArray, or, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { AdminCustomerEraseRequestSchema, AdminCustomerEraseResponseSchema, IdSchema, type AdminCustomerEraseResponse } from "@kkt/contracts";
-import { bookingCoApplicants, bookings, cmsTestimonials, coApplicants, customers, demands, documents, enquiries, leads, ledgerEntries, payments, portalUsers, siteVisits, type Executor } from "@kkt/db";
+import { bookingCoApplicants, bookings, cmsTestimonials, coApplicants, customers, demands, documents, enquiries, leads, ledgerEntries, loginEvents, payments, portalUsers, siteVisits, type Executor } from "@kkt/db";
 import { z } from "zod";
 import { writeAudit } from "../../lib/audit.js";
 import { bumpPermVersion } from "../../lib/cache.js";
@@ -18,6 +19,7 @@ import { route } from "../../lib/routes.js";
 import { createStorage, type Storage } from "../../lib/storage.js";
 import { revokeAllFamilies } from "../auth/service.js";
 import { adminMeta, requireSuperAdmin, staff, type AdminMeta } from "./common.js";
+import { securityRedis } from "../../plugins/auth.js";
 
 let storageInstance: Storage | null = null;
 function storage(): Storage {
@@ -87,7 +89,7 @@ export async function eraseCustomer(app: FastifyInstance, input: EraseInput): Pr
     let sessionsRevoked = 0;
     const [pu] = await tx.select({ id: portalUsers.id }).from(portalUsers).where(eq(portalUsers.customerId, customerId)).limit(1).for("update");
     if (pu) {
-      sessionsRevoked = await revokeAllFamilies(tx, app.redis, "CUSTOMER", pu.id, "CUSTOMER_ERASED");
+      sessionsRevoked = await revokeAllFamilies(tx, securityRedis(app), "CUSTOMER", pu.id, "CUSTOMER_ERASED");
       await tx.update(portalUsers).set({ isEnabled: false, disabledAt: now, phone, passwordHash: await hashPassword(randomToken(24)), mustChangePassword: true, failedAttempts: 0, lockedUntil: null, version: sql`${portalUsers.version} + 1` }).where(eq(portalUsers.id, pu.id));
       portalDisabled = true;
     }
@@ -105,6 +107,9 @@ export async function eraseCustomer(app: FastifyInstance, input: EraseInput): Pr
       .where(and(eq(siteVisits.companyId, companyId), or(eq(siteVisits.customerId, customerId), inArray(siteVisits.phone, phones)))).returning({ id: siteVisits.id });
     const enquiryRows = await tx.update(enquiries).set({ name, phone, email: null, message: null, ip: null })
       .where(and(eq(enquiries.companyId, companyId), inArray(enquiries.phone, phones))).returning({ id: enquiries.id });
+    // Portal sign-in history is keyed by phone: keep the events (security history), drop the number.
+    const loginRows = await tx.update(loginEvents).set({ identifier: phone })
+      .where(and(eq(loginEvents.subjectType, "CUSTOMER"), inArray(loginEvents.identifier, phones))).returning({ id: loginEvents.id });
     const testimonialRows = await tx.update(cmsTestimonials).set({ name, quote: "Testimonial withdrawn (customer erased)", photoDocumentId: null, isPublished: false, updatedAt: now })
       .where(and(eq(cmsTestimonials.companyId, companyId), eq(cmsTestimonials.customerId, customerId))).returning({ id: cmsTestimonials.id });
 
@@ -120,7 +125,7 @@ export async function eraseCustomer(app: FastifyInstance, input: EraseInput): Pr
       before: { customer_code: c.customerCode, kyc_status: c.kycStatus, is_active: c.isActive, had_portal_access: Boolean(pu), documents: docs.length, co_applicants: cas.length },
       after: {
         reason: input.reason, erased_at: now.toISOString(), full_name: name, documents_removed: docs.length, co_applicants_anonymised: cas.length, leads_anonymised: leadRows.length,
-        site_visits_anonymised: visitRows.length, enquiries_anonymised: enquiryRows.length, testimonials_withdrawn: testimonialRows.length, portal_disabled: portalDisabled, sessions_revoked: sessionsRevoked,
+        site_visits_anonymised: visitRows.length, enquiries_anonymised: enquiryRows.length, login_events_anonymised: loginRows.length, testimonials_withdrawn: testimonialRows.length, portal_disabled: portalDisabled, sessions_revoked: sessionsRevoked,
         financial_rows_kept: { bookings: Number(kept?.bookings ?? 0), payments: Number(kept?.payments ?? 0), demands: Number(kept?.demands ?? 0), ledger_entries: Number(kept?.ledger ?? 0) },
       },
     });

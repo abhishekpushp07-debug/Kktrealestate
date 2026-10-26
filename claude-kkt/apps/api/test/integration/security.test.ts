@@ -83,27 +83,33 @@ describe("tokens", () => {
 });
 
 describe("lockout", () => {
-  it("resets the failure counter on a successful login", async () => {
+  it("resets the (account, IP) failure counter on a successful login", async () => {
+    const ip = "10.241.0.1";
     const wrong = { email: CREDS.marketing.email, password: "Wrong-Pass-1A" };
-    for (let i = 0; i < 3; i++) expect((await t.request("POST", "/api/v1/auth/login", { body: wrong })).status).toBe(401);
-    const third = await t.request<ErrorBody>("POST", "/api/v1/auth/login", { body: wrong });
-    expect(third.status).toBe(401);
-    expect(third.body.error.details?.["attempts_left"]).toBe(1);
-    expect((await t.request("POST", "/api/v1/auth/login", { body: CREDS.marketing })).status).toBe(200);
+    for (let i = 0; i < 3; i++) expect((await t.request("POST", "/api/v1/auth/login", { ip, body: wrong })).status).toBe(401);
+    const fourth = await t.request<ErrorBody>("POST", "/api/v1/auth/login", { ip, body: wrong });
+    expect(fourth.status).toBe(401);
+    expect(fourth.body.error.details).toBeUndefined(); // no attempts_left: it would reveal that the account exists
+    expect((await t.request("POST", "/api/v1/auth/login", { ip, body: CREDS.marketing })).status).toBe(200);
     const [row] = await t.app.sql<{ failed_attempts: number }[]>`select failed_attempts from users where email = ${CREDS.marketing.email}`;
     expect(row!.failed_attempts).toBe(0);
     // four more failures do not lock (counter restarted), the fifth does
-    for (let i = 0; i < 4; i++) expect((await t.request("POST", "/api/v1/auth/login", { body: wrong })).status).toBe(401);
-    expect((await t.request("POST", "/api/v1/auth/login", { body: wrong })).status).toBe(423);
-    await t.app.sql`update users set failed_attempts = 0, locked_until = null where email = ${CREDS.marketing.email}`;
+    for (let i = 0; i < 4; i++) expect((await t.request("POST", "/api/v1/auth/login", { ip, body: wrong })).status).toBe(401);
+    expect((await t.request("POST", "/api/v1/auth/login", { ip, body: wrong })).status).toBe(423);
+    await t.app.sql`update users set failed_attempts = 0, locked_until = now() where email = ${CREDS.marketing.email}`;
   });
 
-  it("unknown e-mail and wrong password are indistinguishable on the wire", async () => {
-    const unknown = await t.request<ErrorBody>("POST", "/api/v1/auth/login", { body: { email: "nobody-here@sgb.in", password: "Wrong-Pass-1A" } });
-    const wrong = await t.request<ErrorBody>("POST", "/api/v1/auth/login", { body: { email: CREDS.sales.email, password: "Wrong-Pass-1A" } });
-    expect(unknown.status).toBe(wrong.status);
-    expect(unknown.body.error.code).toBe(wrong.body.error.code);
-    expect(unknown.body.error.message).toBe(wrong.body.error.message);
+  it("unknown e-mail and wrong password are indistinguishable on the wire, including the lockout", async () => {
+    const strip = (b: ErrorBody) => ({ code: b.error.code, message: b.error.message, details: b.error.details ? Object.keys(b.error.details).sort() : null });
+    const unknownIp = "10.242.0.1", knownIp = "10.242.0.2";
+    for (let i = 1; i <= 6; i++) {
+      const unknown = await t.request<ErrorBody>("POST", "/api/v1/auth/login", { ip: unknownIp, body: { email: "nobody-here@sgb.in", password: "Wrong-Pass-1A" } });
+      const wrong = await t.request<ErrorBody>("POST", "/api/v1/auth/login", { ip: knownIp, body: { email: CREDS.sales.email, password: "Wrong-Pass-1A" } });
+      expect(unknown.status).toBe(wrong.status);
+      expect(unknown.status).toBe(i < 5 ? 401 : 423);
+      expect(strip(unknown.body)).toEqual(strip(wrong.body));
+    }
+    await t.app.sql`update login_events set created_at = created_at - interval '1 hour' where identifier in ('nobody-here@sgb.in', ${CREDS.sales.email})`;
   });
 });
 
@@ -118,11 +124,18 @@ describe("deactivation", () => {
     const next = await t.request<ErrorBody>("GET", "/api/v1/auth/me", { token: victim.access_token });
     expect(next.status).toBe(401);
     expect(["SESSION_REVOKED", "USER_INACTIVE"]).toContain(next.body.error.code);
-    // Redis lost (no revocation marker, no cached permissions): the database row still says inactive
+    // Redis lost (no revocation marker, no cached permissions): the database still refuses — the families were revoked with the
+    // deactivation (refresh_tokens.revoked_at → SESSION_REVOKED) and the row says inactive
     await t.app.redis.flushdb();
     const again = await t.request<ErrorBody>("GET", "/api/v1/auth/me", { token: victim.access_token });
     expect(again.status).toBe(401);
-    expect(again.body.error.code).toBe("USER_INACTIVE");
+    expect(["SESSION_REVOKED", "USER_INACTIVE"]).toContain(again.body.error.code);
+    // even a session the deactivation did not revoke is refused by the inactive row
+    await t.app.sql`update refresh_tokens set revoked_at = null where subject_id = ${created.id}`;
+    await t.app.redis.flushdb();
+    const inactive = await t.request<ErrorBody>("GET", "/api/v1/auth/me", { token: victim.access_token });
+    expect(inactive.body.error.code).toBe("USER_INACTIVE");
+    await t.app.sql`update refresh_tokens set revoked_at = now() where subject_id = ${created.id}`;
     expect((await t.request<ErrorBody>("POST", "/api/v1/auth/refresh", { body: { refresh_token: victim.refresh_token } })).status).toBe(401);
   });
 });

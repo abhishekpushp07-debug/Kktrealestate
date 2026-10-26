@@ -24,10 +24,10 @@ export async function enforceRateLimit(redis: Redis, bucket: string, limit: numb
 }
 
 /**
- * Client IP for rate limits, lockouts and audit rows: Fastify's proxy-aware `req.ip`. X-Forwarded-For is honoured only for hops that
- * TRUST_PROXY trusts (default `loopback`), and the client is the right-most untrusted hop, so a caller cannot choose its own IP by
- * prepending addresses to the header. `_headers` is kept for call-site compatibility.
+ * Client IP for rate limits, lockouts, the public idempotency scope, audit rows and login events: Fastify's proxy-aware `req.ip`.
+ * X-Forwarded-For is honoured only for hops that TRUST_PROXY trusts (default `loopback`), and the client is the right-most untrusted
+ * hop, so a caller cannot choose its own IP by sending or prepending X-Forwarded-For. Nothing else in the API reads that header.
  */
-export function clientIp(_headers: Record<string, string | string[] | undefined>, fallback: string | undefined): string {
-  return (fallback ?? "unknown").slice(0, 64);
+export function clientIp(req: { ip?: string | undefined }): string {
+  return (req.ip || "unknown").slice(0, 64);
 }

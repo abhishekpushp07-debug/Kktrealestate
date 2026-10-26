@@ -1,0 +1,23 @@
+# kubectl apply -k infra/k8s   (after creating the kkt-secrets Secret: see secret.example.yaml)
+# Set the image tags your CI pushed, e.g.  kustomize edit set image kkt-api=ghcr.io/acme/kkt-api:2.1.0
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: kkt
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - postgres-external.yaml
+  - pgbouncer.yaml
+  - migrate-job.yaml
+  - api.yaml
+  - worker.yaml
+  - web.yaml
+  - erp.yaml
+  - portal.yaml
+  - ingress.yaml
+  - networkpolicy.yaml
+images:
+  - { name: kkt-api, newName: ghcr.io/OWNER/kkt-api, newTag: latest }
+  - { name: kkt-web, newName: ghcr.io/OWNER/kkt-web, newTag: latest }
+  - { name: kkt-erp, newName: ghcr.io/OWNER/kkt-erp, newTag: latest }
+  - { name: kkt-portal, newName: ghcr.io/OWNER/kkt-portal, newTag: latest }

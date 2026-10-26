@@ -47,7 +47,7 @@ export function ProgressTimeline({ progress }: { progress: ConstructionProgress 
             return (
               <li key={`${stage.name}-${i}`} className="relative grid grid-cols-[2rem_1fr] gap-4 pb-8 last:pb-0">
                 {i < block.stages.length - 1 ? <span aria-hidden className={`absolute left-[0.95rem] top-8 bottom-0 w-px ${done ? "bg-gold-500" : "bg-line"}`} /> : null}
-                <span className={`relative z-10 flex h-8 w-8 items-center justify-center rounded-full border-2 ${done ? "border-gold-500 bg-gold-500 text-navy-950" : now ? "border-gold-500 bg-white text-gold-600" : "border-line bg-white text-ink-soft"}`} aria-hidden>
+                <span className={`relative z-10 flex h-8 w-8 items-center justify-center rounded-full border-2 ${done ? "border-gold-500 bg-gold-500 text-navy-950" : now ? "border-gold-500 bg-white text-gold-700" : "border-line bg-white text-ink-soft"}`} aria-hidden>
                   {done ? <CheckIcon size={16} /> : <span className={`h-2.5 w-2.5 rounded-full ${now ? "bg-gold-500 animate-pulse" : "bg-line"}`} />}
                 </span>
                 <div className="min-w-0">

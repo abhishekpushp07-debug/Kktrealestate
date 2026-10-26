@@ -40,10 +40,27 @@ export function parseCsvObjects(text: string): { headers: string[]; rows: { line
   return { headers, rows };
 }
 
-/** Quotes one CSV field per RFC 4180 (quotes when it contains a comma, quote, CR or LF). */
+/** Characters that make a spreadsheet (Excel, LibreOffice, Google Sheets) treat a cell as a formula or a DDE command. */
+const FORMULA_TRIGGER = /^[=+\-@\t\r]/;
+/** A plain number ("-1250", "+91", "-0.5", "1e3" excluded): safe to keep as a number even though it starts with - or +. */
+const PLAIN_NUMBER = /^[+-]?\d+(?:\.\d+)?$/;
+
+/**
+ * Neutralises spreadsheet formula injection (OWASP "CSV injection"): a text cell starting with = + - @ TAB or CR gets a leading single
+ * quote so the spreadsheet shows it as text instead of evaluating it (`=HYPERLINK(...)` from a website enquiry name, `@SUM(...)`, DDE).
+ * JavaScript numbers and plain numeric strings ("-1250.50") are left alone so amounts stay numeric.
+ */
+export function neutraliseFormula(value: string): string {
+  if (!FORMULA_TRIGGER.test(value) || PLAIN_NUMBER.test(value)) return value;
+  return `'${value}`;
+}
+
+/** Quotes one CSV field per RFC 4180 (quotes when it contains a comma, quote, CR or LF); text cells are formula-neutralised first. */
 export function csvField(value: unknown): string {
   if (value === null || value === undefined) return "";
-  const s = value instanceof Date ? value.toISOString() : typeof value === "object" ? JSON.stringify(value) : String(value);
+  if (typeof value === "number" || typeof value === "bigint" || typeof value === "boolean") return String(value);
+  const raw = value instanceof Date ? value.toISOString() : typeof value === "object" ? JSON.stringify(value) : String(value);
+  const s = neutraliseFormula(raw);
   return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 

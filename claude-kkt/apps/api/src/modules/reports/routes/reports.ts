@@ -12,7 +12,7 @@ import { formatDateLabel } from "@kkt/domain";
 import { route } from "../../../lib/routes.js";
 import { ensureProjectAccess } from "../../../lib/scope.js";
 import { roznamcha } from "../../money/services/roznamcha.js";
-import { assertOptionalRange, letterheadFor, rangeFilters, sendPdf, sendRowsCsv, wantedFormat, type ExportQuery } from "../common.js";
+import { assertOptionalRange, letterheadFor, rangeFilters, sendPdf, sendRowsCsv, wantedFormat } from "../common.js";
 import { allotmentLetterData, allotmentLetterPdf, customerStatement, customerStatementPdf } from "../services/documents.js";
 import { advancesReport, bankwiseReceipts, cancellationsReport, chequesReport, collectionsReport, demandVsCollection, outstandingReport, upcomingDues } from "../services/moneyReports.js";
 import { pdfDate, reportPdfStream, type PdfColumn, type ReportTableSpec } from "../services/pdf.js";
@@ -61,7 +61,7 @@ async function exportTable(reply: FastifyReply, fmt: "csv" | "pdf" | "json", fil
   if (fmt === "csv") return sendRowsCsv(reply, `${filename}.csv`, keys, rows);
   if (fmt === "pdf") {
     const [letterhead, spec] = await Promise.all([letterheadFor(db, companyId), Promise.resolve(pdf())]);
-    return sendPdf(reply, `${filename}.pdf`, reportPdfStream(letterhead, spec));
+    return sendPdf(reply, `${filename}.pdf`, await reportPdfStream(letterhead, spec));
   }
   return undefined;
 }

@@ -7,6 +7,7 @@ import {
 } from "@kkt/contracts";
 import { actorFromRequest } from "../../lib/audit.js";
 import { route } from "../../lib/routes.js";
+import { moneyTransaction } from "../money/index.js";
 import { expectedVersion, optionalExpectedVersion, withOptionalVersion } from "../../lib/version.js";
 import { addPhoto, blockConstruction, deletePhoto, loadBlockScoped, patchStage, projectConstruction, undoStage, updateConstructionStatus, updatePhoto, type ConstructionActor } from "./service.js";
 
@@ -41,7 +42,7 @@ export function registerConstructionRoutes(app: FastifyInstance): void {
     schema: { params: blockParams, body: StatusBodySchema, response: { 200: ConstructionStatusUpdateResponseSchema }, summary: "Mark the stage reached (intermediate stages are completed too), raise dues for every active booking and notify" },
     handler: async (req) => {
       const body = req.body;
-      return app.db.transaction((tx) => updateConstructionStatus(tx, req.user!, actorOf(req), req.params.id, {
+      return moneyTransaction(app.db, (tx) => updateConstructionStatus(tx, req.user!, actorOf(req), req.params.id, {
         stageRef: body.stage_id, completedOn: body.completed_on, intermediateDates: body.intermediate_dates, notes: body.notes, notifyBuyers: body.notify_buyers,
         markInProgressRef: body.mark_in_progress_stage_id, expectedVersion: expectedVersion(req, body),
       }));
@@ -53,7 +54,7 @@ export function registerConstructionRoutes(app: FastifyInstance): void {
     schema: { params: blockParams, body: UndoBodySchema, response: { 200: ConstructionUndoResponseSchema }, summary: "Undo the latest completed stage (UNDO RULE): void its demands, clear completion data, withdraw notifications" },
     handler: async (req) => {
       const body = req.body;
-      return app.db.transaction((tx) => undoStage(tx, req.user!, actorOf(req), req.params.id, { stageRef: body.stage_id, reason: body.reason, expectedVersion: expectedVersion(req, body) }));
+      return moneyTransaction(app.db, (tx) => undoStage(tx, req.user!, actorOf(req), req.params.id, { stageRef: body.stage_id, reason: body.reason, expectedVersion: expectedVersion(req, body) }));
     },
   });
 
@@ -62,7 +63,7 @@ export function registerConstructionRoutes(app: FastifyInstance): void {
     schema: { params: stageParams, body: StagePatchBodySchema, response: { 200: BlockConstructionResponseSchema }, summary: "Non-financial stage edits: notes, started_on, PENDING ↔ IN_PROGRESS (never COMPLETED)" },
     handler: async (req) => {
       const body = req.body;
-      return app.db.transaction((tx) => patchStage(tx, req.user!, actorOf(req), req.params.id, req.params.stageId, { notes: body.notes, startedOn: body.started_on, status: body.status, expectedVersion: expectedVersion(req, body) }));
+      return moneyTransaction(app.db, (tx) => patchStage(tx, req.user!, actorOf(req), req.params.id, req.params.stageId, { notes: body.notes, startedOn: body.started_on, status: body.status, expectedVersion: expectedVersion(req, body) }));
     },
   });
 

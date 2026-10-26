@@ -99,6 +99,7 @@ export interface CustomerSelect {
   c: DbCustomer;
   rmName: string | null;
   kycVerifierName: string | null;
+  kycSubmitterName?: string | null;
   activeBookings: number | string;
   portalEnabled: boolean | null;
 }
@@ -112,10 +113,11 @@ export const activeBookingCountSql = sql<number>`(
   where b.status = 'ACTIVE' and (b.customer_id = "customers"."id" or exists (
     select 1 from ${bookingCoApplicants} bc where bc.booking_id = b.id and bc.customer_id = "customers"."id")))`;
 const kycVerifierNameSql = sql<string | null>`(select u.name from ${users} u where u.id = "customers"."kyc_verified_by")`;
+const kycSubmitterNameSql = sql<string | null>`(select u.name from ${users} u where u.id = "customers"."kyc_submitted_by")`;
 const portalEnabledSql = sql<boolean | null>`(select pu.is_enabled from ${portalUsers} pu where pu.customer_id = "customers"."id")`;
 
 /** Drizzle selection for customer rows (join `users` as relationship manager with `joinRm`). */
-export const CUSTOMER_SELECT = { c: customers, rmName: rm.name, kycVerifierName: kycVerifierNameSql, activeBookings: activeBookingCountSql, portalEnabled: portalEnabledSql };
+export const CUSTOMER_SELECT = { c: customers, rmName: rm.name, kycVerifierName: kycVerifierNameSql, kycSubmitterName: kycSubmitterNameSql, activeBookings: activeBookingCountSql, portalEnabled: portalEnabledSql };
 
 /** Left-joins the relationship manager (used by the dynamic list query). */
 export function joinRm(q: PgSelect): PgSelect {
@@ -124,7 +126,7 @@ export function joinRm(q: PgSelect): PgSelect {
 
 /** Co-applicant wire row (masked). */
 export function coApplicantRow(r: DbCoApplicant): CoApplicantRow {
-  return { id: r.id, customer_id: r.customerId, full_name: r.fullName, relation: r.relation ?? "", phone: r.phone, email: r.email, pan_masked: maskedPan(r.panEnc), aadhaar_masked: maskedAadhaar(r.aadhaarEnc), sort_order: r.sortOrder };
+  return { id: r.id, customer_id: r.customerId, full_name: r.fullName, relation: r.relation ?? "", phone: r.phone, email: r.email, pan_masked: maskedPan(r.panEnc), aadhaar_masked: maskedAadhaar(r.aadhaarEnc), sort_order: r.sortOrder, version: r.version };
 }
 
 /** Loads co-applicants for many customers in one query (no N+1). */
@@ -163,6 +165,7 @@ export function customerRow(r: CustomerSelect, cas: DbCoApplicant[]): CustomerRo
     nominee: c.nominee ? { name: c.nominee.name, relation: c.nominee.relation, phone: c.nominee.phone ?? null, dob: c.nominee.dob ?? null } : null,
     co_applicants: cas.map(coApplicantRow),
     kyc_status: c.kycStatus, kyc_verified_by: c.kycVerifiedBy, kyc_verified_by_name: r.kycVerifierName ?? null, kyc_verified_at: c.kycVerifiedAt ? c.kycVerifiedAt.toISOString() : null, kyc_remarks: c.kycRemarks,
+    kyc_submitted_by: c.kycSubmittedBy ?? null, kyc_submitted_by_name: r.kycSubmitterName ?? null, kyc_submitted_at: c.kycSubmittedAt ? c.kycSubmittedAt.toISOString() : null,
     notes: c.notes, tags: c.tags ?? [], active_booking_count: Number(r.activeBookings ?? 0), portal_enabled: r.portalEnabled === true, erased_at: c.erasedAt ? c.erasedAt.toISOString() : null,
   };
 }
@@ -226,6 +229,36 @@ export async function assertNoDuplicate(tx: Executor, companyId: string, phone: 
   throw ApiError.conflict("DUPLICATE_CUSTOMER", matchedOn === "PHONE" ? `A customer with phone ${phone} already exists (${hit.code})` : `A customer with this PAN already exists (${hit.code})`, {
     existing: { id: hit.id, customer_code: hit.code, full_name: hit.name, matched_on: matchedOn },
   });
+}
+
+/** Partial unique indexes (migration 0002) mirroring assertNoDuplicate: one live customer per (company, phone) and per (company, PAN hash). */
+export const CUSTOMER_UNIQUE_CONSTRAINTS = ["customers_company_phone_live_uq", "customers_company_pan_hash_live_uq"] as const;
+
+function pgConstraint(err: unknown): string | null {
+  let e: unknown = err;
+  for (let i = 0; i < 5 && e && typeof e === "object"; i++) {
+    const x = e as { code?: string; constraint_name?: string; constraint?: string; cause?: unknown };
+    if (x.code === "23505") return x.constraint_name ?? x.constraint ?? "";
+    e = x.cause;
+  }
+  return null;
+}
+
+/**
+ * Runs a customer insert/update in a savepoint and turns a unique violation of the live phone/PAN indexes — a writer that slipped past
+ * the advisory lock + assertNoDuplicate (another code path, a direct insert) — into the same 409 DUPLICATE_CUSTOMER with details.existing.
+ */
+export async function withCustomerUniqueGuard<T>(tx: Executor, companyId: string, phone: string | null, panHash: string | null, excludeId: string | null, write: (sp: Executor) => Promise<T>): Promise<T> {
+  try {
+    return await (tx as Executor & { transaction: <R>(fn: (sp: Executor) => Promise<R>) => Promise<R> }).transaction(write);
+  } catch (err) {
+    const constraint = pgConstraint(err);
+    if (constraint === null || !(CUSTOMER_UNIQUE_CONSTRAINTS as readonly string[]).includes(constraint)) throw err;
+    // The savepoint rolled back; the conflicting row is committed, so the regular check now finds and names it.
+    const onPhone = constraint === "customers_company_phone_live_uq";
+    await assertNoDuplicate(tx, companyId, onPhone ? phone : null, onPhone ? null : panHash, excludeId);
+    throw ApiError.conflict("DUPLICATE_CUSTOMER", onPhone ? `A customer with phone ${phone} already exists` : "A customer with this PAN already exists", { existing: null, constraint });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -295,7 +328,7 @@ export async function replaceCoApplicants(tx: Executor, companyId: string, custo
     const cols = { ...coApplicantColumns(input), sortOrder: i };
     if (input.id && existingIds.has(input.id)) {
       keep.add(input.id);
-      await tx.update(coApplicants).set(cols).where(eq(coApplicants.id, input.id));
+      await tx.update(coApplicants).set({ ...cols, version: sql`${coApplicants.version} + 1` }).where(eq(coApplicants.id, input.id));
     } else {
       const [row] = await tx.insert(coApplicants).values({ companyId, customerId, fullName: input.full_name, relation: input.relation, ...cols }).returning({ id: coApplicants.id });
       if (row) keep.add(row.id);
@@ -323,7 +356,8 @@ export async function createCustomer(tx: Executor, ctx: CustomerWriteContext, bo
   await assertNoDuplicate(tx, ctx.user.companyId, cols["phone"] as string, (cols["panHash"] as string | null) ?? null, null);
   const company = await loadCompany(tx, ctx.redis, ctx.user.companyId);
   const code = await nextNumber(tx, company, "customer", todayIST());
-  const [created] = await tx.insert(customers).values({ ...(cols as object), companyId: ctx.user.companyId, customerCode: code, fullName: body.full_name, phone: cols["phone"] as string, createdBy: ctx.user.id } as typeof customers.$inferInsert).returning();
+  const [created] = await withCustomerUniqueGuard(tx, ctx.user.companyId, cols["phone"] as string, (cols["panHash"] as string | null) ?? null, null, (sp) =>
+    sp.insert(customers).values({ ...(cols as object), companyId: ctx.user.companyId, customerCode: code, fullName: body.full_name, phone: cols["phone"] as string, createdBy: ctx.user.id } as typeof customers.$inferInsert).returning());
   if (!created) throw new Error("customer insert returned no row");
   if (body.co_applicants.length > 0) await replaceCoApplicants(tx, ctx.user.companyId, created.id, body.co_applicants);
   const view = await getCustomerRow(tx, ctx.user.companyId, created.id);
@@ -342,9 +376,15 @@ export async function updateCustomer(tx: Executor, ctx: CustomerWriteContext, id
   if (patch.relationship_manager_id !== undefined) await assertRm(tx, ctx.user.companyId, patch.relationship_manager_id);
   const phone = (cols["phone"] as string | undefined) ?? null;
   const panHash = patch.pan !== undefined ? ((cols["panHash"] as string | null) ?? null) : null;
+  // A submitted or verified KYC vouches for specific identifiers: changing PAN or Aadhaar sends the file back to PENDING, so the new values
+  // go through submission and an independent verification again (maker-checker) instead of inheriting the old VERIFIED badge.
+  const identifiersChanged = (patch.pan !== undefined && ((cols["panHash"] as string | null) ?? null) !== sel.c.panHash)
+    || (patch.aadhaar !== undefined && ((cols["aadhaarHash"] as string | null) ?? null) !== sel.c.aadhaarHash);
+  const kycReset = identifiersChanged && (sel.c.kycStatus === "SUBMITTED" || sel.c.kycStatus === "VERIFIED");
+  if (kycReset) Object.assign(cols, { kycStatus: "PENDING", kycSubmittedBy: null, kycSubmittedAt: null, kycVerifiedBy: null, kycVerifiedAt: null });
   await lockCustomerKeys(tx, ctx.user.companyId, phone, panHash);
   await assertNoDuplicate(tx, ctx.user.companyId, phone, panHash, id);
-  await applyUpdate(tx, customers, id, version, cols, "customer");
+  await withCustomerUniqueGuard(tx, ctx.user.companyId, phone, panHash, id, (sp) => applyUpdate(sp, customers, id, version, cols, "customer"));
   if (phone && phone !== sel.c.phone) {
     // The portal login is the customer's phone: keep it in step (another portal login on that phone → 409 DUPLICATE).
     try {
@@ -354,6 +394,9 @@ export async function updateCustomer(tx: Executor, ctx: CustomerWriteContext, id
   if (co_applicants !== undefined) await replaceCoApplicants(tx, ctx.user.companyId, id, co_applicants);
   const after = await getCustomerRow(tx, ctx.user.companyId, id);
   await writeAudit(tx, { companyId: ctx.user.companyId, ...ctx.meta, action: "customer.update", entityType: "customer", entityId: id, before: before as unknown as Record<string, unknown>, after: after as unknown as Record<string, unknown> });
+  if (kycReset) {
+    await writeAudit(tx, { companyId: ctx.user.companyId, ...ctx.meta, action: "customer.kyc_reset", entityType: "customer", entityId: id, before: { kyc_status: sel.c.kycStatus, kyc_verified_by: sel.c.kycVerifiedBy }, after: { kyc_status: "PENDING", reason: "IDENTIFIERS_CHANGED" } });
+  }
   return after;
 }
 

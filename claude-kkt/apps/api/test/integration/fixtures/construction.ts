@@ -63,6 +63,8 @@ export async function createConstructionWorld(t: TestContext, admin: string): Pr
   const towerA = await post<{ id: string }>(t, admin, "/api/v1/blocks", towerCBody(sgh.id, basics, { name: "Tower A", code: "A", floors: 3, skip_floors: [], refuge_floors: [], floor_plans: [{ from_floor: 1, to_floor: 3, floor_plan_template_id: basics.templates.FP4 }] }));
   const towerG = await post<{ id: string }>(t, admin, "/api/v1/blocks", towerCBody(ggv.id, basics, { name: "Tower G", code: "G", floors: 2, skip_floors: [], refuge_floors: [], floor_plans: [{ from_floor: 1, to_floor: 2, floor_plan_template_id: basics.templates.FP4 }] }));
 
+  // ₹1 Cr list price on every flat: the tests book at ₹1 Cr and the agreement value guard rejects an unexplained deviation
+  await t.app.sql`update flats set price_paise = ${1_000_000_000}, rate_card_id = null, price_breakup = ${JSON.stringify([{ label: "Base price", amount_paise: 1_000_000_000 }])}::jsonb where project_id in (${sgh.id}, ${ggv.id})`;
   const upi = await post<{ id: string }>(t, admin, "/api/v1/masters/payment-modes", { name: "UPI", code: "UPI", sort_order: 1 });
   const bank = await post<{ id: string }>(t, admin, "/api/v1/masters/bank-accounts", { bank_name: "HDFC Bank", branch: "Boring Road", account_name: "Shree Ganesh Builders", account_number: "50100123456789", ifsc: "HDFC0000123", is_default: true });
   const plan = await post<{ id: string }>(t, admin, "/api/v1/masters/payment-plans", { name: "Standard CLP", code: "STD_CLP", plan_type: "CONSTRUCTION_LINKED", installments: standardClpInstallments(stages) });

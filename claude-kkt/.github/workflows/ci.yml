@@ -1,14 +1,137 @@
 name: CI
+
 on:
-  push: { branches: [main] }
+  push:
+    branches: [main]
   pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "22"
+  TURBO_TELEMETRY_DISABLED: "1"
+  # insecure CI-only secrets (dev/test defaults are used by the test suites themselves)
+  JWT_SECRET: ci-only-secret-ci-only-secret-ci-only-secret
+  FIELD_ENCRYPTION_KEY: Y2ktb25seS1rZXktY2ktb25seS1rZXktY2ktb25seS0wMQ==
+  HASH_KEY: ci-only-hash-key
+
 jobs:
-  verify:
+  install:
+    name: Install (pnpm store cache)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      # pnpm version from package.json "packageManager"
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+
+  lint:
+    name: Lint (eslint)
+    needs: install
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      # pnpm version from package.json "packageManager"
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+
+  format:
+    name: Format (prettier --check)
+    needs: install
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      # pnpm version from package.json "packageManager"
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+
+  typecheck:
+    name: Typecheck
+    needs: install
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      # pnpm version from package.json "packageManager"
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+
+  unit:
+    name: Unit tests (every package)
+    needs: install
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      # pnpm version from package.json "packageManager"
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: contracts, domain
+        run: pnpm --filter @kkt/contracts --filter @kkt/domain test
+      - name: ERP
+        run: pnpm --filter @kkt/erp test
+      - name: web, portal
+        run: pnpm --filter @kkt/web --filter @kkt/portal test
+      - name: API unit (incl. OpenAPI compatibility, S3 driver, metrics, error registry)
+        run: pnpm --filter @kkt/api test
+
+  db:
+    name: Database (migrations, constraints, triggers)
+    needs: install
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     services:
       postgres:
         image: postgres:16-alpine
         env: { POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres, POSTGRES_DB: kkt_test }
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/kkt_test
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/kkt_test
+    steps:
+      - uses: actions/checkout@v4
+      # pnpm version from package.json "packageManager"
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @kkt/db migrate && pnpm --filter @kkt/db test
+
+  api-integration:
+    name: API integration (shard ${{ matrix.shard }}/3)
+    needs: install
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix: { shard: [1, 2, 3] }
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres, POSTGRES_DB: postgres }
         ports: ["5432:5432"]
         options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 20
       redis:
@@ -16,22 +139,217 @@ jobs:
         ports: ["6379:6379"]
         options: --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 20
     env:
-      DATABASE_URL: postgres://postgres:postgres@localhost:5432/kkt_test
-      REDIS_URL: redis://localhost:6379/0
-      JWT_SECRET: ci-only-secret-ci-only-secret-ci-only-secret
-      FIELD_ENCRYPTION_KEY: Y2ktb25seS1rZXktY2ktb25seS1rZXktY2ktb25seS0wMQ==
-      HASH_KEY: ci-only-hash-key
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/kkt_api_test
+      TEST_REDIS_URL: redis://localhost:6379/1
     steps:
       - uses: actions/checkout@v4
+      # pnpm version from package.json "packageManager"
       - uses: pnpm/action-setup@v4
-        with: { version: 10 }
       - uses: actions/setup-node@v4
-        with: { node-version: 22, cache: pnpm }
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: pnpm }
       - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck
-      - run: pnpm --filter @kkt/contracts --filter @kkt/domain test
-      - run: pnpm --filter @kkt/db migrate && pnpm --filter @kkt/db test
-      - run: pnpm --filter @kkt/api test && pnpm --filter @kkt/api test:integration
-      - run: pnpm --filter @kkt/api build && pnpm --filter @kkt/erp build && pnpm --filter @kkt/web build
-      - name: Acceptance scenarios
-        run: pnpm --filter @kkt/api test:acceptance
+      - name: Integration files of this shard (one database per job, files run serially)
+        run: pnpm --filter @kkt/api exec vitest run --dir test/integration --no-file-parallelism --shard=${{ matrix.shard }}/3
+
+  acceptance:
+    name: Acceptance scenarios
+    needs: install
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres, POSTGRES_DB: postgres }
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      ACCEPTANCE_DATABASE_URL: postgres://postgres:postgres@localhost:5432/kkt_acceptance
+      ACCEPTANCE_REDIS_URL: redis://localhost:6379/12
+    steps:
+      - uses: actions/checkout@v4
+      # pnpm version from package.json "packageManager"
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @kkt/api test:acceptance
+
+  openapi:
+    name: OpenAPI compatibility (docs/openapi/v1.json)
+    needs: install
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      # pnpm version from package.json "packageManager"
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      # prints every breaking / additive difference and fails on breaking ones (docs/VERSIONING.md)
+      - run: pnpm --filter @kkt/api openapi:check
+      - name: The committed snapshot is current (additive changes need `pnpm --filter @kkt/api openapi`)
+        run: |
+          pnpm --filter @kkt/api openapi
+          git diff --exit-code --stat docs/openapi/v1.json || { echo "::error::docs/openapi/v1.json is out of date: run pnpm --filter @kkt/api openapi and commit it"; exit 1; }
+
+  build:
+    name: Builds + API start smoke
+    needs: install
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres, POSTGRES_DB: kkt_smoke }
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      # pnpm version from package.json "packageManager"
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: API bundle
+        run: pnpm --filter @kkt/api build
+      - name: API start smoke (production mode, 2 workers, migrate job first)
+        working-directory: apps/api
+        env:
+          NODE_ENV: production
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/kkt_smoke
+          REDIS_URL: redis://localhost:6379/3
+          API_PORT: "4000"
+          METRICS_PORT: "9464"
+          METRICS_TOKEN: ci-metrics-token-0123456789
+          API_WORKERS: "2"
+          STORAGE_LOCAL_DIR: /tmp/kkt-storage
+          BOOTSTRAP_COMPANY_NAME: CI Builders
+          BOOTSTRAP_ADMIN_EMAIL: owner@ci.test
+          BOOTSTRAP_ADMIN_PASSWORD: Ci-owner-password-2026!
+        run: |
+          SEED_ON_BOOT=true node dist/server.js migrate
+          node --import ./dist/telemetry.js dist/server.js > /tmp/api.log 2>&1 &
+          echo $! > /tmp/api.pid
+          for _ in $(seq 1 60); do curl -sf http://localhost:4000/api/v1/health > /dev/null && break; sleep 1; done
+          curl -sf http://localhost:4000/api/v1/health | tee /dev/stderr | grep -q '"status":"ok"'
+          curl -sf http://localhost:4000/api/v1/ready | grep -q '"ready":true'
+          curl -sf -H "Authorization: Bearer $METRICS_TOKEN" http://localhost:9464/metrics | grep -q '^http_requests_total{route="/api/v1/health"'
+          curl -sf -H "Authorization: Bearer $METRICS_TOKEN" http://localhost:4000/api/v1/metrics | grep -q '^db_pool_max_connections 40'
+          kill -TERM "$(cat /tmp/api.pid)"
+          for _ in $(seq 1 30); do kill -0 "$(cat /tmp/api.pid)" 2> /dev/null || break; sleep 1; done
+          if kill -0 "$(cat /tmp/api.pid)" 2> /dev/null; then echo "::error::the API did not stop on SIGTERM"; exit 1; fi
+          grep -q '"msg":"shutdown complete"' /tmp/api.log
+      - name: Show the API log on failure
+        if: failure()
+        run: cat /tmp/api.log || true
+      - name: ERP
+        run: pnpm --filter @kkt/erp build
+      - name: Website
+        run: pnpm --filter @kkt/web build
+      - name: Portal web export
+        run: pnpm --filter @kkt/portal build:web
+      - uses: actions/upload-artifact@v4
+        with:
+          name: builds
+          retention-days: 7
+          path: |
+            apps/api/dist
+            apps/erp/dist
+            apps/portal/dist
+
+  infra:
+    name: Infra (compose, k8s, Prometheus, Caddy, nginx, scripts)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}" }
+      - name: docker compose config (quick start + production, every profile)
+        env:
+          JWT_SECRET: x
+          FIELD_ENCRYPTION_KEY: x
+          HASH_KEY: x
+          POSTGRES_PASSWORD: x
+          KKT_OWNER_DB_PASSWORD: x
+          KKT_APP_DB_PASSWORD: x
+          DOMAIN: kkt.example.in
+          BOOTSTRAP_ADMIN_EMAIL: owner@kkt.example.in
+        run: |
+          docker compose -f docker-compose.yml config -q
+          docker compose -f docker-compose.prod.yml --profile monitoring --profile minio --profile security-redis config -q
+      - name: Kubernetes manifests (kubeconform schemas + semantic checks)
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz | tar xz kubeconform
+          curl -sSL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.4.3/kustomize_v5.4.3_linux_amd64.tar.gz" | tar xz kustomize
+          ./kustomize build infra/k8s > /tmp/k8s.yaml
+          ./kubeconform -strict -summary -kubernetes-version 1.30.0 /tmp/k8s.yaml infra/k8s/secret.example.yaml
+          npm install --no-save --no-package-lock yaml@2 > /dev/null
+          node infra/scripts/validate-k8s.mjs infra/k8s
+      - name: Prometheus rules, rule unit tests, dashboard queries, Alertmanager config
+        run: |
+          curl -sSL https://github.com/prometheus/prometheus/releases/download/v2.55.1/prometheus-2.55.1.linux-amd64.tar.gz | tar xz --strip-components=1 prometheus-2.55.1.linux-amd64/promtool
+          ./promtool check rules infra/prometheus/alerts.yml
+          ./promtool test rules infra/prometheus/alerts.test.yml
+          node infra/scripts/dashboard-rules.mjs infra/grafana/kkt-api.json > /tmp/dashboard-rules.yml
+          ./promtool check rules /tmp/dashboard-rules.yml
+          sed 's#/run/secrets/metrics_token#/tmp/metrics_token#' infra/prometheus/prometheus.yml > infra/prometheus/ci-prometheus.yml && echo token > /tmp/metrics_token
+          ./promtool check config infra/prometheus/ci-prometheus.yml
+          docker run --rm -v "$PWD/infra/prometheus:/cfg:ro" --entrypoint amtool prom/alertmanager:v0.27.0 check-config /cfg/alertmanager.yml
+      - name: Caddyfile
+        run: docker run --rm -e DOMAIN=kkt.example.in -v "$PWD/infra/caddy:/etc/caddy:ro" caddy:2.8-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+      - name: nginx configs of the ERP and portal images (rendered like the image does, then nginx -t)
+        run: |
+          for app in erp portal; do
+            mkdir -p /tmp/nginx-$app
+            # shellcheck disable=SC2016 # the literal ${CSP_CONNECT_SRC} is the variable list for envsubst
+            CSP_CONNECT_SRC="'self'" envsubst '${CSP_CONNECT_SRC}' < apps/$app/nginx.conf > /tmp/nginx-$app/default.conf
+            docker run --rm -v /tmp/nginx-$app:/etc/nginx/conf.d:ro nginxinc/nginx-unprivileged:1.27-alpine nginx -t
+          done
+      - name: Shell scripts
+        run: shellcheck -s sh -S warning infra/backup/backup.sh infra/postgres/init/02-passwords.sh infra/scripts/gen-secrets.sh
+      - name: Generated secrets are complete for docker-compose.prod.yml
+        run: |
+          sh infra/scripts/gen-secrets.sh /tmp/secrets > /dev/null
+          for s in $(docker compose -f docker-compose.prod.yml config --format json 2>/dev/null | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>console.log(Object.values(JSON.parse(d).secrets).map(s=>s.file.split("/").pop()).join(" ")))'); do
+            test -s "/tmp/secrets/$s" || { echo "::error::gen-secrets.sh does not create $s"; exit 1; }
+          done
+        env: { DOMAIN: kkt.example.in, BOOTSTRAP_ADMIN_EMAIL: owner@kkt.example.in }
+
+  images:
+    name: Container images (build; push on main)
+    needs: [typecheck, unit]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [api, erp, web, portal]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with: { registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}" }
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/${{ matrix.app }}/Dockerfile
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/kkt-${{ matrix.app }}:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/kkt-${{ matrix.app }}:latest
+          cache-from: type=gha,scope=${{ matrix.app }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.app }}

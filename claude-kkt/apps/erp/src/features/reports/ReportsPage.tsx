@@ -2,9 +2,10 @@ import { ChevronRight, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Badge, Input, PageHeader } from "@/components/ui";
+import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { useReportCatalog } from "./api";
-import { REPORT_GROUP_ICON, REPORT_GROUP_LABELS, REPORT_GROUP_ORDER, REPORTS, SPECIAL_REPORTS, type ReportGroup } from "./reports";
+import { REPORT_GROUP_ICON, REPORT_GROUP_LABELS, REPORT_GROUP_ORDER, REPORTS, reportsFor, SPECIAL_REPORTS, type ReportGroup } from "./reports";
 
 interface CatalogCard {
   key: string;
@@ -19,16 +20,17 @@ interface CatalogCard {
 /** `/reports` — catalogue cards grouped Money / Sales / Inventory / Operations. */
 export default function ReportsPage() {
   const catalog = useReportCatalog();
+  const { can } = useAuth();
   const [query, setQuery] = useState("");
 
   const serverKeys = useMemo(() => new Set<string>((catalog.data?.reports ?? []).map((entry) => entry.key)), [catalog.data]);
   const cards = useMemo<CatalogCard[]>(() => {
-    const generic = REPORTS.map<CatalogCard>((report) => ({ key: report.key, slug: report.slug, label: report.label, description: report.description, group: report.group, icon: report.icon, formats: report.formats }));
+    const generic = reportsFor(can).map<CatalogCard>((report) => ({ key: report.key, slug: report.slug, label: report.label, description: report.description, group: report.group, icon: report.icon, formats: report.formats }));
     const special = SPECIAL_REPORTS.map<CatalogCard>((report) => ({ key: report.key, slug: report.slug, label: report.label, description: report.description, group: report.group, icon: report.icon, formats: ["pdf"] }));
     const all = [...generic, ...special];
     const needle = query.trim().toLowerCase();
     return needle ? all.filter((card) => `${card.label} ${card.description}`.toLowerCase().includes(needle)) : all;
-  }, [query]);
+  }, [query, can]);
 
   return (
     <>

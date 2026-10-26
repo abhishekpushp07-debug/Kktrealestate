@@ -15,7 +15,7 @@ export function Testimonials({ items }: { items: Testimonial[] }) {
             <figure key={`${t.name}-${i}`} className="flex h-full flex-col rounded-card border border-ivory-100/10 bg-ivory-100/5 p-7 backdrop-blur-sm sm:p-8">
               <QuoteIcon size={28} className="text-gold-400" />
               {typeof t.rating === "number" && t.rating > 0 ? (
-                <p className="mt-4 flex gap-1 text-gold-400" aria-label={`${t.rating} out of 5 stars`}>
+                <p className="mt-4 flex gap-1 text-gold-400" role="img" aria-label={`${t.rating} out of 5 stars`}>
                   {Array.from({ length: 5 }, (_, s) => (
                     <StarIcon key={s} size={14} className={s < (t.rating ?? 0) ? "" : "opacity-25"} />
                   ))}

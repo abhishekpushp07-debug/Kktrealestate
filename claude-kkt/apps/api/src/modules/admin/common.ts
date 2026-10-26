@@ -1,4 +1,5 @@
 import type { FastifyRequest } from "fastify";
+import { z } from "zod";
 import { actorFromRequest, auditMeta, type AuditActor } from "../../lib/audit.js";
 import { ApiError } from "../../lib/errors.js";
 import type { StaffContext } from "../../lib/scope.js";
@@ -37,3 +38,6 @@ export function iso(d: Date | string | null | undefined): string | null {
   if (d === null || d === undefined) return null;
   return d instanceof Date ? d.toISOString() : new Date(d).toISOString();
 }
+
+/** `:id` path parameter (uuid). */
+export const idParams = z.object({ id: z.uuid() });

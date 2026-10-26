@@ -1,6 +1,7 @@
 import type { UseQueryResult } from "@tanstack/react-query";
 import type { CmsPostRow, DocumentRow, DocumentVariant, SiteSettingsRow } from "@kkt/contracts";
 import { api, apiBaseUrl, isApiClientError, type ApiClientError } from "@/lib/api";
+import { instantToIstInput, istInputToInstant } from "@/lib/format";
 import { uploadDocument, useApiQuery } from "@/features/inventory/api";
 
 /* ------------------------------------------------------------------ */
@@ -103,19 +104,13 @@ export function slugify(text: string): string {
     .slice(0, 120);
 }
 
-/** `datetime-local` value ↔ RFC 3339. */
+/** `datetime-local` value (IST wall clock) ↔ RFC 3339, independent of the browser's zone. */
 export function isoToLocalInput(iso: string | null | undefined): string {
-  if (!iso) return "";
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return instantToIstInput(iso);
 }
 
 export function localInputToIso(value: string): string | null {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  return istInputToInstant(value);
 }
 
 /** Trim → null when empty. */

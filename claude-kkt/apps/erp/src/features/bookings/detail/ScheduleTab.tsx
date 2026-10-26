@@ -22,7 +22,7 @@ function rowTint(status: ScheduleRow["status"]): string {
 function ProgressBar({ paid, total }: { paid: number; total: number }) {
   const pct = total > 0 ? Math.min(100, (paid / total) * 100) : 0;
   return (
-    <div className="h-1.5 w-full overflow-hidden rounded-full bg-navy-100" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)}>
+    <div className="h-1.5 w-full overflow-hidden rounded-full bg-navy-100" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)} aria-label="Paid">
       <span className={cn("block h-full rounded-full", pct >= 100 ? "bg-success" : "bg-navy-950")} style={{ width: `${pct}%` }} />
     </div>
   );

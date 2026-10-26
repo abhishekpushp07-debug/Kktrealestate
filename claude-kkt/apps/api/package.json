@@ -5,17 +5,21 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch --clear-screen=false src/server.ts",
-    "start": "node dist/server.js",
+    "start": "node --import ./dist/telemetry.js dist/server.js",
+    "migrate": "node dist/server.js migrate",
     "worker": "tsx src/worker.ts",
-    "build": "tsup",
+    "build": "tsup && tsup src/telemetry.ts --no-config --format esm --target node22 --platform node --out-dir dist --sourcemap",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "seed": "tsx src/seed/run.ts",
+    "restore": "tsx src/cli/restore.ts",
     "test": "vitest run --dir test/unit",
     "test:integration": "vitest run --dir test/integration --no-file-parallelism",
     "test:acceptance": "vitest run --dir test/acceptance --no-file-parallelism",
     "test:all": "vitest run --no-file-parallelism",
-    "loadtest": "tsx loadtest/run.ts"
+    "loadtest": "tsx loadtest/run.ts",
+    "openapi": "tsx src/modules/system/openapiCli.ts",
+    "openapi:check": "tsx src/modules/system/openapiCli.ts --check"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1156.0",

@@ -141,7 +141,8 @@ describe("users admin", () => {
     expect(stale.body.error.details?.["current"]).toBe(deact.body.version);
     expect(stale.body.error.details?.["changed_by"]).toBe("Suresh Agarwal");
     const self = await t.request<ErrorBody>("POST", `/api/v1/users/${admin.user.id}/deactivate`, { token: admin.access_token, body: {} });
-    expect(self.status).toBe(422);
+    expect(self.status).toBe(403); // nobody changes their own active state
+    expect(self.body.error.details?.["reason"]).toBe("SELF_CHANGE");
     await t.app.sql`update users set locked_until = now() + interval '10 minutes', failed_attempts = 5 where id = ${created.body.id}`;
     const listLocked = await t.request<{ items: { id: string }[] }>("GET", "/api/v1/users?is_locked=true&include_inactive=true", { token: admin.access_token });
     expect(listLocked.body.items.map((u) => u.id)).toContain(created.body.id);

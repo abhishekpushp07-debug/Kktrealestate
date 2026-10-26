@@ -37,20 +37,21 @@ describe("staff login", () => {
     expect(r.body.error.code).toBe("VALIDATION_ERROR");
   });
 
-  it("locks the account after 5 failures (423) and unlocks when the window passes", async () => {
+  it("locks the account after 5 failures from one IP (423) and unlocks when the window passes", async () => {
+    const ip = "10.240.0.1";
     for (let i = 1; i <= 4; i++) {
-      const r = await t.request<ErrorBody>("POST", "/api/v1/auth/login", { body: { email: CREDS.employee.email, password: "wrong-pass-1A" } });
+      const r = await t.request<ErrorBody>("POST", "/api/v1/auth/login", { ip, body: { email: CREDS.employee.email, password: "wrong-pass-1A" } });
       expect(r.status).toBe(401);
     }
-    const fifth = await t.request<ErrorBody>("POST", "/api/v1/auth/login", { body: { email: CREDS.employee.email, password: "wrong-pass-1A" } });
+    const fifth = await t.request<ErrorBody>("POST", "/api/v1/auth/login", { ip, body: { email: CREDS.employee.email, password: "wrong-pass-1A" } });
     expect(fifth.status).toBe(423);
     expect(fifth.body.error.code).toBe("LOCKED");
     expect(typeof fifth.body.error.details?.["locked_until"]).toBe("string");
-    const correctButLocked = await t.request<ErrorBody>("POST", "/api/v1/auth/login", { body: CREDS.employee });
+    const correctButLocked = await t.request<ErrorBody>("POST", "/api/v1/auth/login", { ip, body: CREDS.employee });
     expect(correctButLocked.status).toBe(423);
-    // time travel: the lockout window has passed
-    await t.app.sql`update users set locked_until = now() - interval '1 minute' where email = ${CREDS.employee.email}`;
-    const ok = await t.request<{ access_token: string }>("POST", "/api/v1/auth/login", { body: CREDS.employee });
+    // time travel: the lockout window has passed (the failures are older than 15 minutes)
+    await t.app.sql`update login_events set created_at = created_at - interval '16 minutes' where identifier = ${CREDS.employee.email}`;
+    const ok = await t.request<{ access_token: string }>("POST", "/api/v1/auth/login", { ip, body: CREDS.employee });
     expect(ok.status).toBe(200);
     const [row] = await t.app.sql<{ failed_attempts: number; locked_until: string | null }[]>`select failed_attempts, locked_until from users where email = ${CREDS.employee.email}`;
     expect(row!.failed_attempts).toBe(0);
@@ -200,12 +201,17 @@ describe("MFA", () => {
     expect(bad.status).toBe(422);
     const verify = await t.request("POST", "/api/v1/auth/mfa/verify", { token: login.access_token, body: { code: authenticator.generate(enroll.body.secret) } });
     expect(verify.status).toBe(200);
-    const step1 = await t.request<{ mfa_required: boolean; mfa_token: string }>("POST", "/api/v1/auth/login", { body: CREDS.accounts });
+    const ip = "10.243.0.1";
+    const step1 = await t.request<{ mfa_required: boolean; mfa_token: string }>("POST", "/api/v1/auth/login", { ip, body: CREDS.accounts });
     expect(step1.status).toBe(200);
     expect(step1.body.mfa_required).toBe(true);
-    const wrong = await t.request<ErrorBody>("POST", "/api/v1/auth/login/mfa", { body: { mfa_token: step1.body.mfa_token, code: "123456" } });
+    const wrong = await t.request<ErrorBody>("POST", "/api/v1/auth/login/mfa", { ip, body: { mfa_token: step1.body.mfa_token, code: "123456" } });
     expect(wrong.status).toBe(401);
-    const step2 = await t.request<{ access_token: string; user: { mfa_enabled: boolean } }>("POST", "/api/v1/auth/login/mfa", { body: { mfa_token: step1.body.mfa_token, code: authenticator.generate(enroll.body.secret) } });
+    // the MFA token is bound to the client IP of the password step
+    const elsewhere = await t.request<ErrorBody>("POST", "/api/v1/auth/login/mfa", { ip: "10.243.0.2", body: { mfa_token: step1.body.mfa_token, code: authenticator.generate(enroll.body.secret) } });
+    expect(elsewhere.status).toBe(401);
+    expect(elsewhere.body.error.code).toBe("INVALID_TOKEN");
+    const step2 = await t.request<{ access_token: string; user: { mfa_enabled: boolean } }>("POST", "/api/v1/auth/login/mfa", { ip, body: { mfa_token: step1.body.mfa_token, code: authenticator.generate(enroll.body.secret) } });
     expect(step2.status).toBe(200);
     expect(step2.body.user.mfa_enabled).toBe(true);
     const inline = await t.request<{ access_token: string }>("POST", "/api/v1/auth/login", { body: { ...CREDS.accounts, mfa_code: authenticator.generate(enroll.body.secret) } });
@@ -277,8 +283,9 @@ describe("portal auth", () => {
 
   it("locks a customer after 5 failures", async () => {
     await createPortalCustomer(t, { phone: "9876543211", name: "Priya Verma" });
-    for (let i = 0; i < 4; i++) await t.request("POST", "/api/v1/portal/auth/login", { body: { phone: "9876543211", password: "wrong-pass-1A" } });
-    const locked = await t.request<ErrorBody>("POST", "/api/v1/portal/auth/login", { body: { phone: "9876543211", password: "wrong-pass-1A" } });
+    const ip = "10.240.0.2";
+    for (let i = 0; i < 4; i++) await t.request("POST", "/api/v1/portal/auth/login", { ip, body: { phone: "9876543211", password: "wrong-pass-1A" } });
+    const locked = await t.request<ErrorBody>("POST", "/api/v1/portal/auth/login", { ip, body: { phone: "9876543211", password: "wrong-pass-1A" } });
     expect(locked.status).toBe(423);
     expect(locked.body.error.code).toBe("LOCKED");
   });

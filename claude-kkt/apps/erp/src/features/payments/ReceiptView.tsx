@@ -15,7 +15,7 @@ export function ReceiptView({ receipt, className }: ReceiptViewProps) {
     <article className={cn("relative text-ink", className)} data-testid="receipt-view" data-status={receipt.status}>
       {receipt.is_cancelled && (
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <span className="rotate-[-24deg] rounded-lg border-8 border-danger/60 px-10 py-4 font-display text-6xl font-extrabold uppercase tracking-[0.3em] text-danger/60">Cancelled</span>
+          <span className="rotate-[-24deg] rounded-lg border-8 border-danger/60 px-10 py-4 font-display text-6xl font-extrabold uppercase tracking-[0.3em] text-danger/80">Cancelled</span>
         </div>
       )}
       <Letterhead

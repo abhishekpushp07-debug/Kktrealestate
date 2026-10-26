@@ -142,13 +142,17 @@ describe("thread ordering", () => {
 });
 
 describe("attachment ownership", () => {
-  it("rejects attachments that do not belong to the ticket, its customer or its booking, and sensitive (KYC) documents; nothing is written", async () => {
+  it("rejects attachments that do not belong to the ticket or its customer (booking paperwork included), and sensitive (KYC) documents; nothing is written", async () => {
     const tk = await createTicket({ subject: "Attachments" });
     const other = await createTicket({ customer_id: customerB, booking_id: bookingB, subject: "Other customer" });
     const docTicket = await insertDoc("SERVICE_REQUEST", tk.id, "photo-on-ticket.jpg");
     const docOtherTicket = await insertDoc("SERVICE_REQUEST", other.id, "photo-on-other.jpg");
     const before = await messageCount(tk.id);
-    for (const bad of [docB, docAKyc, docOtherTicket]) {
+    // a non-sensitive document whose TYPE is a KYC type is refused too
+    const [kycType] = await t.app.sql<{ id: string }[]>`insert into document_types (company_id, name, code, is_kyc) values (${t.companyId}, 'PAN card', 'PAN_CARD_SVC', true) returning id`;
+    const docATyped = await insertDoc("CUSTOMER", customerA, "pan-a.jpg");
+    await t.app.sql`update documents set document_type_id = ${kycType!.id} where id = ${docATyped}`;
+    for (const bad of [docB, docAKyc, docATyped, docOtherTicket, docBookingA]) {
       const r = await message(tk.id, { body: "see attached", attachment_ids: [docA, bad] });
       expect(r.status, r.text).toBe(400);
       const err = r.body as unknown as ErrorBody;
@@ -157,29 +161,44 @@ describe("attachment ownership", () => {
       expect(err.error.details?.["missing"]).toEqual([bad]);
     }
     expect(await messageCount(tk.id)).toBe(before);
-    const ok = await message(tk.id, { body: "all mine", attachment_ids: [docA, docBookingA, docTicket] });
+    const ok = await message(tk.id, { body: "all mine", attachment_ids: [docA, docTicket] });
     expect(ok.status, ok.text).toBe(201);
-    expect(ok.body.messages.at(-1)!.attachments.map((a) => a.id)).toEqual([docA, docBookingA, docTicket]);
-    // creation: the booking document and the customer document are fine, another customer's document is not
+    expect(ok.body.messages.at(-1)!.attachments.map((a) => a.id)).toEqual([docA, docTicket]);
+    // creation: the customer document is fine; another customer's document or the booking's paperwork is not
     const badCreate = await t.request<ErrorBody>("POST", "/api/v1/service-requests", { token: admin.access_token, body: { customer_id: customerA, booking_id: bookingA, category_id: snagCat, subject: "Foreign attachment", description: "x", attachment_ids: [docB] } });
     expect(badCreate.status).toBe(400);
     expect(badCreate.body.error.details?.["missing"]).toEqual([docB]);
     const kycCreate = await t.request<ErrorBody>("POST", "/api/v1/service-requests", { token: admin.access_token, body: { customer_id: customerA, booking_id: bookingA, category_id: snagCat, subject: "KYC attachment", description: "x", attachment_ids: [docAKyc] } });
     expect(kycCreate.status).toBe(400);
-    const okCreate = await createTicket({ subject: "Own attachments", attachment_ids: [docA, docBookingA] });
-    expect(okCreate.messages[0]!.attachments.map((a) => a.id)).toEqual([docA, docBookingA]);
+    const bookingCreate = await t.request<ErrorBody>("POST", "/api/v1/service-requests", { token: admin.access_token, body: { customer_id: customerA, booking_id: bookingA, category_id: snagCat, subject: "Booking paperwork", description: "x", attachment_ids: [docBookingA] } });
+    expect(bookingCreate.status).toBe(400);
+    const okCreate = await createTicket({ subject: "Own attachments", attachment_ids: [docA] });
+    expect(okCreate.messages[0]!.attachments.map((a) => a.id)).toEqual([docA]);
+    // a booking document the buyer can already see (shared with the customer) may travel; it never may once unshared
+    const sharedBooking = await insertDoc("BOOKING", bookingA, "allotment-shared.pdf");
+    await t.app.sql`update documents set shared_with_customer = true where id = ${sharedBooking}`;
+    expect((await message(tk.id, { body: "allotment", attachment_ids: [sharedBooking] })).status).toBe(201);
   });
 
-  it("applies the same rule to the customer (portal) path", async () => {
+  it("applies a stricter rule to the customer (portal) path: only their own uploads or files shared with them", async () => {
     const { addCustomerMessage, createTicketForCustomer } = await svc();
     const tk = await createTicket({ subject: "Customer attachments" });
     await expect(t.app.db.transaction((tx) => addCustomerMessage(tx, tk.id, customerA, "not mine", [docB]))).rejects.toMatchObject({ statusCode: 400 });
     await expect(t.app.db.transaction((tx) => addCustomerMessage(tx, tk.id, customerA, "kyc", [docAKyc]))).rejects.toMatchObject({ statusCode: 400 });
-    const ok = await t.app.db.transaction((tx) => addCustomerMessage(tx, tk.id, customerA, "mine", [docA]));
-    expect(ok.messages.at(-1)!.attachments[0]!.id).toBe(docA);
-    await expect(t.app.db.transaction((tx) => createTicketForCustomer(tx, { customerId: customerB, bookingId: bookingB, categoryId: snagCat, subject: "Foreign doc", description: "x", attachmentIds: [docA] }))).rejects.toMatchObject({ statusCode: 400 });
-    const created = await t.app.db.transaction((tx) => createTicketForCustomer(tx, { customerId: customerB, bookingId: bookingB, categoryId: snagCat, subject: "Own doc", description: "x", attachmentIds: [docB] }));
-    expect(created.messages[0]!.attachments[0]!.id).toBe(docB);
+    await expect(t.app.db.transaction((tx) => addCustomerMessage(tx, tk.id, customerA, "booking", [docBookingA]))).rejects.toMatchObject({ statusCode: 400 });
+    // a staff-only file on the customer's own record was never shown to them: it cannot be pulled into the thread either
+    await expect(t.app.db.transaction((tx) => addCustomerMessage(tx, tk.id, customerA, "staff file", [docA]))).rejects.toMatchObject({ statusCode: 400 });
+    const shared = await insertDoc("CUSTOMER", customerA, "shared-a.jpg");
+    await t.app.sql`update documents set shared_with_customer = true where id = ${shared}`;
+    const own = await insertDoc("CUSTOMER", customerA, "own-a.jpg");
+    await t.app.sql`update documents set uploaded_by_type = 'CUSTOMER', uploaded_by = ${customerA} where id = ${own}`;
+    const ok = await t.app.db.transaction((tx) => addCustomerMessage(tx, tk.id, customerA, "mine", [shared, own]));
+    expect(ok.messages.at(-1)!.attachments.map((a) => a.id)).toEqual([shared, own]);
+    await expect(t.app.db.transaction((tx) => createTicketForCustomer(tx, { customerId: customerB, bookingId: bookingB, categoryId: snagCat, subject: "Foreign doc", description: "x", attachmentIds: [shared] }))).rejects.toMatchObject({ statusCode: 400 });
+    const ownB = await insertDoc("CUSTOMER", customerB, "own-b.jpg");
+    await t.app.sql`update documents set uploaded_by_type = 'CUSTOMER', uploaded_by = ${customerB} where id = ${ownB}`;
+    const created = await t.app.db.transaction((tx) => createTicketForCustomer(tx, { customerId: customerB, bookingId: bookingB, categoryId: snagCat, subject: "Own doc", description: "x", attachmentIds: [ownB] }));
+    expect(created.messages[0]!.attachments[0]!.id).toBe(ownB);
   });
 });
 

@@ -4,6 +4,34 @@
 
 **Result of the final run: 40 screenshots, 0 defects, 0 console errors, 0 failed requests, no horizontal overflow at 390 px, 90/90 related API integration tests green** (`auth`, `portal`, `portal-adversarial`, `service`, `seed`). `pnpm --filter @kkt/contracts|@kkt/api|@kkt/portal typecheck` green; `expo export --platform web` green.
 
+## Re-run 2026-10-26 (phase 5 frontend-quality track)
+
+Stack: API on `:4500` (fresh demo seed in `kkt_h5`, Redis db 20), `EXPO_PUBLIC_API_URL=http://localhost:4500 npx expo export --platform web` served by the SPA server on `:8581`. Runner env: `PORTAL_URL`, `API_URL`, `PORTAL_DB` (database used to restore the seed password at the end), `OUT_DIR`, `AXE=0` to skip the scans. Primary targets (tab bar and main action buttons) are now checked at **48 px** on phones and reported as defects below that.
+
+**Result: 40 screenshots, 0 defects, 0 console errors, 0 failed requests, no overflow, no primary target under 48 px; axe-core: 45 scans (23 at 1440 px, 22 at 390 px), 0 violations.** New assertions: the login inputs carry their labels as accessible names; a failed sign-in is announced through a `role="alert"` live region; on "Raise a request" an empty submit leaves the Subject input `aria-invalid="true"` with `aria-describedby` pointing at its `role="alert"` error.
+
+### Accessibility (axe)
+
+`docs/qa/axe.cjs` (axe-core 4.14.0, WCAG 2.0/2.1/2.2 A + AA, reduced motion emulated while scanning). The first scans of the unchanged portal found on every screen a missing document `<title>`, plus `label-content-name-mismatch` (booking chip, "More" tab with its unread badge), `nested-interactive` (pressable home cards containing "Timeline"/"Schedule" buttons), `target-size` (18 px card-header links), `image-alt` (expo-image `<img>` without `alt`), `aria-progressbar-name` (construction ring), `aria-required-parent` (segmented-control tabs outside a `tablist`), `aria-required-attr` / `aria-input-field-name` (rating stars as an unnamed `slider`), `autocomplete-valid` (`autocomplete="password"`), `color-contrast` (gold700 labels 3.46:1) and `scrollable-region-focusable` (tables and text-only screens). Fixes:
+
+| Rule | Fix |
+|---|---|
+| document-title | `<title>` in `+html.tsx`; `useDocumentTitle()` sets "Screen · KKT Customer Portal" from every `Header` and the six header-less tab screens |
+| label-content-name-mismatch | booking chip named by its visible text (button only when there is more than one booking); the "More" tab's unread badge sits outside the tab (`aria-hidden`), the tab is named "More, N unread" |
+| nested-interactive | inside a pressable `Card`, `CardHeader` renders its action as text (the card is the button) |
+| target-size | card-header and section actions are 44 px tall pressables; `Button` `sm` is 48 px; segmented control 48 px; rating stars 48 px |
+| image-alt | `accessibilityLabel` on every expo-image (empty for decorative thumbnails inside labelled buttons, "Floor plan", the photo caption in the lightbox) |
+| aria-progressbar-name | `ProgressRing` has an accessible name ("Construction progress") and an integer `aria-valuenow` |
+| aria-required-parent | `SegmentedControl` containers are `role="tablist"` |
+| aria-required-attr / aria-input-field-name | editable rating = `radiogroup` of five `radio` stars (`aria-checked`); read-only rating = one image "4 out of 5 stars" |
+| autocomplete-valid | `current-password` on the login password |
+| color-contrast | `goldText` token (#7F6312) for gold text and the gold chip |
+| scrollable-region-focusable | the screen scroller and wide tables are focusable on web |
+
+Form accessibility (`src/ui/Field.tsx`): every `TextInput` gets its label as `accessibilityLabel` (`aria-label` on web), `aria-invalid` + `aria-describedby` (→ error, else hint) on web and `accessibilityHint` on native; the error text is an assertive live region (`role="alert"` on web, `accessibilityLiveRegion` on Android, `AccessibilityInfo.announceForAccessibility` on iOS). Danger/warning `Notice`s and error toasts are alerts too; other toasts are polite status regions. Label-less fields (request reply, rating comment, reopen reason) carry explicit labels.
+
+Contrast: `node docs/qa/contrast.mjs portal` → **53/53** token pairs pass (enforced by `apps/portal/test/contrast.test.ts`) (see `docs/qa/contrast-results.md`; `inkSubtle` #8B95A5 → #636A76, `warning` → #995B00, `success` → #1B7546, new `goldText` and `dangerOnNavy`). Review pass: field borders were exempted as "informational" at 1.54:1 (`lineStrong`), the sign-in fields on navy had a 2.24:1 border (white/25) and a focused field on white turned plain gold (2.42:1) — new `fieldBorder` #857F72 (3.98:1 on white, 3.47:1 on surfaceMuted), `fieldBorderOnNavy` white/50 (4.51:1 against the field fill), focused border `goldText` on light surfaces, `dangerOnNavy` for invalid fields on navy. Sign-in: only `INVALID_CREDENTIALS` (or a code-less 401) shows the generic "don't match" copy; any other code — e.g. 401 `USER_INACTIVE` "Portal access is disabled" after a correct password — shows the server's message (`src/auth/loginFailure.ts`, `test/loginFailure.test.ts`); change-password maps only `INVALID_CREDENTIALS` to "current password is incorrect". Re-run after the change: 45 axe scans, 0 serious/critical, 40 screenshots, 0 defects.
+
 ## Customers walked
 
 | Customer | Phone | Why |
@@ -49,7 +77,7 @@ On every page the script asserts: zero `console.error` / page errors, zero faile
 * The API sweep (all Appendix C endpoints × 3 customers, validated against the `Portal*` Zod schemas) also confirmed: `home`/`statement.pdf` of another customer's booking → 404; signed file links are bound to the customer.
 
 ### Tap targets at 390 px (after fixes)
-All primary actions are ≥ 44 px: sign in / submit / send / save (46–54), payments segments (44), tab bar items (68), receipt/demand/document **View/Download** (46 on phones), bell (44), booking switcher chip (44), star rating (44), bank copy buttons (44), list rows (≥ 56). Remaining < 44 px elements, all secondary and all with hit-slop or a larger duplicate target: `Back`/header `sm` buttons (40 px box + 4–6 px hit-slop), lightbox icon buttons (40 + 6), card-header text links "Timeline / Schedule / Ledger" (18 px — the whole card is the tap target), "Show password" (16 px + 14 px hit-slop), "Go to ERP" (22 px + 12 px hit-slop), read-only rating stars in the list (14 px, not interactive), "Remove photo" badge (24 px). Text inputs measure 41 px for the `<input>` inside a 46 px field box.
+Since 2026-10-26 every `Button` size is ≥ 48 px, the tab bar items 60+ px, segments and rating stars 48 px, card/section actions 44 px pressables; the runner flags primary targets under 48 px. The 2026-10-25 state was: all primary actions ≥ 44 px: sign in / submit / send / save (46–54), payments segments (44), tab bar items (68), receipt/demand/document **View/Download** (46 on phones), bell (44), booking switcher chip (44), star rating (44), bank copy buttons (44), list rows (≥ 56). Remaining < 44 px elements, all secondary and all with hit-slop or a larger duplicate target: `Back`/header `sm` buttons (40 px box + 4–6 px hit-slop), lightbox icon buttons (40 + 6), card-header text links "Timeline / Schedule / Ledger" (18 px — the whole card is the tap target), "Show password" (16 px + 14 px hit-slop), "Go to ERP" (22 px + 12 px hit-slop), read-only rating stars in the list (14 px, not interactive), "Remove photo" badge (24 px). Text inputs measure 41 px for the `<input>` inside a 46 px field box.
 
 ## Defects found and fixed
 
@@ -84,5 +112,6 @@ su postgres -c "psql -c 'CREATE DATABASE kkt_qa_portal'"
 cd apps/api && DATABASE_URL=postgres://postgres:postgres@localhost:5432/kkt_qa_portal REDIS_URL=redis://localhost:6379/15 API_PORT=4200 API_PUBLIC_URL=http://localhost:4200 \
   RUN_MIGRATIONS_ON_BOOT=true SEED_ON_BOOT=true PORTAL_ORIGIN=http://localhost:8081 npx tsx src/server.ts
 cd apps/portal && EXPO_PUBLIC_API_URL=http://localhost:4200 npx expo export --platform web   # then serve dist/ with an SPA fallback on :8081
-node docs/qa/portal/browser-qa.cjs   # Playwright walk, rewrites docs/qa/portal/*.png and writes report.json to a temp dir
+PORTAL_URL=http://localhost:8081 API_URL=http://localhost:4200 PORTAL_DB=kkt_qa_portal node docs/qa/portal/browser-qa.cjs   # Playwright walk + axe scans, rewrites docs/qa/portal/*.png and writes report.json to a temp dir
+node docs/qa/contrast.mjs portal       # design-token contrast
 ```

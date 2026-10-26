@@ -43,10 +43,11 @@ export function GalleryGrid({ items, projects }: GalleryGridProps) {
             const ratio = img.width && img.height ? img.width / img.height : [4 / 5, 1, 4 / 3, 3 / 4][i % 4] ?? 1;
             return (
               <li key={`${img.url}-${i}`} className="mb-4 break-inside-avoid">
-                <button type="button" onClick={() => setIndex(i)} className="group relative block w-full overflow-hidden rounded-card bg-navy-900 shadow-card" style={{ aspectRatio: String(ratio) }} aria-label={`Open ${img.caption || img.alt || `image ${i + 1}`}`}>
+                <button type="button" onClick={() => setIndex(i)} className="group relative block w-full overflow-hidden rounded-card bg-navy-900 shadow-card" style={{ aspectRatio: String(ratio) }} aria-label={img.caption || img.project_name ? undefined : `Open ${img.alt || `image ${i + 1}`}`}>
                   <SmartImage src={img.url} alt="" sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw" className="transition duration-700 ease-luxe group-hover:scale-105" />
                   {img.caption || img.project_name ? (
                     <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-navy-950/80 to-transparent p-4 text-left text-sm text-ivory-100">
+                      <span className="sr-only">Open image: </span>
                       {img.caption ?? img.project_name}
                       {img.caption && img.project_name ? <span className="block text-xs text-ivory-100/70">{img.project_name}</span> : null}
                     </span>

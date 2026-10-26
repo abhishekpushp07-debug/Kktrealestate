@@ -15,11 +15,9 @@ import { writeAudit, type AuditActor } from "../../lib/audit.js";
 import { ApiError } from "../../lib/errors.js";
 import { ensureProjectAccess, type StaffContext } from "../../lib/scope.js";
 import { applyUpdate, assertVersion } from "../../lib/version.js";
-import { signedUrl } from "../documents/service.js";
-import { lockBooking } from "../money/common.js";
-import { raiseDuesForBlock, voidDemandsForStage } from "../money/services/dues.js";
-import { rebuild } from "../money/services/ledger.js";
-import { notify, withdraw } from "../notifications/service.js";
+import { signedUrl } from "../documents/index.js";
+import { OTHER_CHARGE_ENTITY_TYPE, lockBookingsInOrder, raiseDuesForBlock, rebuild, voidDemandsForStage } from "../money/index.js";
+import { notify, withdraw } from "../notifications/index.js";
 
 export type BlockRecord = typeof blocks.$inferSelect;
 export type BlockStageRecord = typeof blockStages.$inferSelect;
@@ -439,7 +437,7 @@ type PossessionChargeLine = { line: typeof bookingOtherCharges.$inferSelect; boo
  */
 async function possessionChargeLines(tx: Tx, blockId: string): Promise<PossessionChargeLine[]> {
   const active = await tx.select({ id: bookings.id }).from(bookings).where(and(eq(bookings.blockId, blockId), eq(bookings.status, "ACTIVE"))).orderBy(asc(bookings.id));
-  for (const b of active) await lockBooking(tx, b.id);
+  await lockBookingsInOrder(tx, active.map((b) => b.id));
   if (active.length === 0) return [];
   return tx.select({ line: bookingOtherCharges, booking: { id: bookings.id, bookingNumber: bookings.bookingNumber, companyId: bookings.companyId } }).from(bookingOtherCharges)
     .innerJoin(bookings, eq(bookings.id, bookingOtherCharges.bookingId))
@@ -464,6 +462,10 @@ export async function undoStage(tx: Tx, user: StaffContext, actor: ConstructionA
   if (!latestCompleted || latestCompleted.id !== stage.id) {
     throw ApiError.conflict("UNDO_NOT_LATEST", `Only the latest completed stage (${latestCompleted?.name ?? "none"}) can be undone`, { latest_stage_id: latestCompleted?.stageId ?? null, latest_stage_name: latestCompleted?.name ?? null });
   }
+  // lock order (money/common.ts): block row (held) → every booking the undo may touch, ascending id, before any of them is read
+  const touched = await tx.select({ id: bookings.id }).from(bookings)
+    .where(and(eq(bookings.blockId, block.id), or(eq(bookings.status, "ACTIVE"), exists(tx.select({ one: sql`1` }).from(demands).where(and(eq(demands.bookingId, bookings.id), ne(demands.status, "VOID")))))));
+  await lockBookingsInOrder(tx, touched.map((b) => b.id));
   const chargeLines = stage.isPossession ? await possessionChargeLines(tx, block.id) : [];
   const chargeReasons = chargeLines.filter((c) => c.line.paidPaise > 0).map((c) => `Other charge ${c.line.name} (${c.line.demandNumber}) of ${c.booking.bookingNumber} has been paid ${formatINR(c.line.paidPaise)} since it was demanded on possession`);
   const result = await voidDemandsForStage(tx, block.id, stage.stageId, `Stage ${stage.name} undone: ${input.reason}`, actor);
@@ -472,9 +474,13 @@ export async function undoStage(tx: Tx, user: StaffContext, actor: ConstructionA
     throw ApiError.conflict("UNDO_BLOCKED", `Cannot undo ${stage.name}: a demand it raised has been paid on/after its date`, { reasons, blocking_payments: parseBlockingReasons(reasons) });
   }
   const undemanded: string[] = [];
+  let chargeBells = 0;
   for (const { line, booking } of chargeLines) {
     await tx.update(bookingOtherCharges).set({ demandedAt: null, demandNumber: null, dueDate: null }).where(eq(bookingOtherCharges.id, line.id));
     undemanded.push(line.demandNumber ?? line.id);
+    // the charge's own demand bell (keyed by the line since TODO-integration #6) is withdrawn with it
+    const bell = await withdraw(tx, OTHER_CHARGE_ENTITY_TYPE, line.id);
+    chargeBells += bell.deleted + bell.withdrawn;
     await writeAudit(tx, {
       companyId: booking.companyId, actor, action: "other_charge.undemand", entityType: "booking_other_charge", entityId: line.id,
       before: { demand_number: line.demandNumber, demanded_at: line.demandedAt?.toISOString() ?? null, due_date: line.dueDate },
@@ -493,7 +499,7 @@ export async function undoStage(tx: Tx, user: StaffContext, actor: ConstructionA
     ip: actor.ip ?? null, requestId: actor.requestId ?? null,
   });
   return {
-    block_id: block.id, stage_id: stage.stageId, voided_demand_numbers: result.voided.map((d) => d.demandNumber), undemanded_charge_numbers: undemanded, withdrawn_notifications: withdrawn.deleted + withdrawn.withdrawn,
+    block_id: block.id, stage_id: stage.stageId, voided_demand_numbers: result.voided.map((d) => d.demandNumber), undemanded_charge_numbers: undemanded, withdrawn_notifications: withdrawn.deleted + withdrawn.withdrawn + chargeBells,
     construction_percent: Number(updatedBlock.constructionPercent), version: updatedBlock.version,
   };
 }

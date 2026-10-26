@@ -20,6 +20,9 @@ export interface MoneyWorld {
 
 export interface Flat { id: string; flat_number: string; status: string; version: number; price_paise: number }
 
+/** List price of every flat of the money world (₹1 Cr, the SPEC §11 worked example). */
+export const LIST_PRICE_PAISE = 1_000_000_000;
+
 /** Villa CLP cumulative 10/15/25/30/40/50/60/75/85/100 (SPEC §11 worked example). */
 export function villaClpInstallments(s: MoneyWorld["stages"]) {
   return [
@@ -77,6 +80,9 @@ export async function createMoneyWorld(t: TestContext, admin: string): Promise<M
   const towerA = await post<{ id: string }>(t, admin, "/api/v1/blocks", towerCBody(sgh.id, basics, { name: "Tower A", code: "A", floors: 3, skip_floors: [], refuge_floors: [], floor_plans: [{ from_floor: 1, to_floor: 3, floor_plan_template_id: basics.templates.FP4 }] }));
   const towerU = await post<{ id: string }>(t, admin, "/api/v1/blocks", towerCBody(sgh.id, basics, { name: "Tower U", code: "U", floors: 2, skip_floors: [], refuge_floors: [], floor_plans: [{ from_floor: 1, to_floor: 2, floor_plan_template_id: basics.templates.FP4 }] }));
   const towerG = await post<{ id: string }>(t, admin, "/api/v1/blocks", towerCBody(ggv.id, basics, { name: "Tower G", code: "G", floors: 2, skip_floors: [], refuge_floors: [], floor_plans: [{ from_floor: 1, to_floor: 2, floor_plan_template_id: basics.templates.FP4 }] }));
+  // Every money-world flat is listed at exactly ₹1 Cr so the tests' ₹1 Cr agreements are at list price (the agreement value guard of
+  // POST /bookings rejects a deviation without agreement.edit + price_deviation_reason).
+  await t.app.sql`update flats set price_paise = ${LIST_PRICE_PAISE}, rate_card_id = null, price_breakup = ${JSON.stringify([{ label: "Base price", amount_paise: LIST_PRICE_PAISE }])}::jsonb where project_id in (${sgh.id}, ${ggv.id})`;
   // created after the towers: no stage sequence contains it
   const alien = await post<{ id: string }>(t, admin, "/api/v1/masters/construction-stages", { name: "Landscaping", code: "LANDSCAPING", sort_order: 80 });
 

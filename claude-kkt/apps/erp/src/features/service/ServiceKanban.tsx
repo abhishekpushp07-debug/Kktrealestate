@@ -53,18 +53,10 @@ export function ServiceKanban({ columns, canWrite, onMove, loading = false }: Se
                 {column.tickets.map((ticket) => (
                   <article
                     key={ticket.id}
-                    role="button"
-                    tabIndex={0}
+                    // pointer users can tap anywhere on the card; keyboard users reach the ticket through its number link (no nested controls in a role=button)
                     onClick={(event) => {
                       if ((event.target as HTMLElement).closest("a,button,[role=menuitem]")) return;
                       navigate(`/service-requests/${ticket.id}`);
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.target !== event.currentTarget) return;
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        navigate(`/service-requests/${ticket.id}`);
-                      }
                     }}
                     className="cursor-pointer rounded-md border border-border bg-card p-2.5 shadow-card transition-colors hover:border-navy-300 focus-ring"
                   >

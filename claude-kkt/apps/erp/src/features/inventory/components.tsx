@@ -106,15 +106,18 @@ export function UnitCountsBar({ counts, legend = true, size = "md", className }:
         <dl className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-2xs text-ink-subtle">
           {STATUS_ORDER.map((status) => (
             <div key={status} className="flex items-center gap-1">
-              <span className={cn("size-1.5 rounded-full", DOT_CLASS[status])} aria-hidden="true" />
               <dt className="sr-only">{FLAT_STATUS_LABELS[status]}</dt>
-              <dd className="money">
+              <dd className="money inline-flex items-center gap-1">
+                <span className={cn("size-1.5 rounded-full", DOT_CLASS[status])} aria-hidden="true" />
                 <span className="font-semibold text-ink">{formatNumber(statusCount(counts, status))}</span> {FLAT_STATUS_LABELS[status].toLowerCase()}
               </dd>
             </div>
           ))}
           <div className="ml-auto money">
-            <span className="font-semibold text-ink">{formatNumber(total)}</span> total
+            <dt className="sr-only">Total</dt>
+            <dd>
+              <span className="font-semibold text-ink">{formatNumber(total)}</span> total
+            </dd>
           </div>
         </dl>
       )}

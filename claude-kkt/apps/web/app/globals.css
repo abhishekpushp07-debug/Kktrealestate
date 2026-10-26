@@ -25,7 +25,7 @@
   --color-gold-400: #d4b23a;
   --color-gold-500: #c9a227;
   --color-gold-600: #a8861f;
-  --color-gold-700: #86691a;
+  --color-gold-700: #7f6318; /* text gold: ≥ 4.5:1 on every ivory and white (docs/qa/contrast.mjs) */
   --color-gold-800: #5f4a13;
   --color-gold-900: #3d300c;
 
@@ -39,9 +39,9 @@
   /* Semantic */
   --color-ink: #0b1f3a;
   --color-ink-muted: #4a5a74;
-  --color-ink-soft: #6e7b91;
+  --color-ink-soft: #5b677a; /* ≥ 4.5:1 on ivory-50…200 and white */
   --color-line: #e3dccb;
-  --color-success: #1f7a4d;
+  --color-success: #1d734a;
   --color-danger: #b42318;
 
   /* Typography */
@@ -131,6 +131,11 @@
     html {
       scroll-padding-bottom: 0;
     }
+  }
+  /* Pages with the sticky "On this page" bar under the navbar (project detail): keep focused / scrolled-to content below both
+     (WCAG 2.4.11 focus not obscured; in-page anchors land under the bar otherwise). */
+  html:has(nav[data-section-nav]) {
+    scroll-padding-top: 8.5rem;
   }
   body {
     @apply bg-ivory-100 text-ink font-sans antialiased;

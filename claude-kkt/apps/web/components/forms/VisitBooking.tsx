@@ -128,38 +128,41 @@ export function VisitBooking({ projects, defaultProjectSlug, fixedProject = fals
           <div className="min-w-0">
             <h3 className="font-display text-display-sm">Your visit is confirmed</h3>
             <p className={`mt-1 ${dark ? "text-ivory-100/75" : "text-ink-muted"}`}>
-              Visit number <span className="font-semibold text-gold-500">{r.visit_number}</span>
+              Visit number <span className={`font-semibold ${dark ? "text-gold-300" : "text-gold-700"}`}>{r.visit_number}</span>
               {` · ${r.project_name || projectName}`}
             </p>
           </div>
         </div>
         <dl className="mt-6 grid gap-4 sm:grid-cols-2">
-          <div className="flex gap-3">
-            <CalendarIcon className="mt-0.5 shrink-0 text-gold-500" />
-            <div>
-              <dt className="text-xs uppercase tracking-widest opacity-70">Date</dt>
-              <dd className="font-semibold">{formatDate(r.visit_date, "long")}</dd>
-            </div>
+          {/* dl > div > (dt, dd) only: the icons sit inside the dt, the maps link inside the dd */}
+          <div className="relative pl-9">
+            <dt className="text-xs uppercase tracking-widest opacity-70">
+              <CalendarIcon className="absolute left-0 top-0.5 text-gold-500" aria-hidden />
+              Date
+            </dt>
+            <dd className="font-semibold">{formatDate(r.visit_date, "long")}</dd>
           </div>
-          <div className="flex gap-3">
-            <ClockIcon className="mt-0.5 shrink-0 text-gold-500" />
-            <div>
-              <dt className="text-xs uppercase tracking-widest opacity-70">Time (IST)</dt>
-              <dd className="font-semibold">{formatTimeRange(r.slot_start, r.slot_end)}</dd>
-            </div>
+          <div className="relative pl-9">
+            <dt className="text-xs uppercase tracking-widest opacity-70">
+              <ClockIcon className="absolute left-0 top-0.5 text-gold-500" aria-hidden />
+              Time (IST)
+            </dt>
+            <dd className="font-semibold">{formatTimeRange(r.slot_start, r.slot_end)}</dd>
           </div>
           {r.site_office_address ? (
-            <div className="flex gap-3 sm:col-span-2">
-              <MapPinIcon className="mt-0.5 shrink-0 text-gold-500" />
-              <div>
-                <dt className="text-xs uppercase tracking-widest opacity-70">Site office</dt>
-                <dd className="whitespace-pre-line">{r.site_office_address}</dd>
+            <div className="relative pl-9 sm:col-span-2">
+              <dt className="text-xs uppercase tracking-widest opacity-70">
+                <MapPinIcon className="absolute left-0 top-0.5 text-gold-500" aria-hidden />
+                Site office
+              </dt>
+              <dd className="whitespace-pre-line">
+                {r.site_office_address}
                 {r.maps_link ? (
-                  <a href={r.maps_link} className="mt-1 inline-flex min-h-12 items-center gap-1 text-gold-600 underline-offset-4 hover:underline" rel="noopener noreferrer" target="_blank">
+                  <a href={r.maps_link} className={`mt-1 flex min-h-12 w-fit items-center gap-1 underline-offset-4 hover:underline ${dark ? "text-gold-300" : "text-gold-700"}`} rel="noopener noreferrer" target="_blank">
                     Open in Maps <ExternalLinkIcon size={14} />
                   </a>
                 ) : null}
-              </div>
+              </dd>
             </div>
           ) : null}
         </dl>

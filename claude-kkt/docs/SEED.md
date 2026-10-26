@@ -54,7 +54,9 @@ Every seeded customer has portal access enabled with password `Welcome@123` (alr
 * Website: published, slug `ganesh-green-villas`, prices hidden ("Price on request"), availability shown, progress hidden.
 
 ## Customers (12, valid-format KYC; PAN/Aadhaar encrypted; Verhoeff-valid Aadhaar numbers generated)
-Rajesh Kumar Sinha 9876543210, Priya Verma 9876543211, Amit Kumar 9876543212, Sunita Devi 9876543213, Vikram Singh 9876543214, Neha Gupta 9876543215, Manoj Prasad 9876543216, Anjali Sharma 9876543217, Rakesh Yadav 9876543218, Pooja Mishra 9876543219, Sanjay Jha 9876543220, Kavita Roy 9876543221. Relationship manager = sales@sgb.in. KYC: 8 VERIFIED, 2 SUBMITTED, 2 PENDING.
+Rajesh Kumar Sinha 9876543210, Priya Verma 9876543211, Amit Kumar 9876543212, Sunita Devi 9876543213, Vikram Singh 9876543214, Neha Gupta 9876543215, Manoj Prasad 9876543216, Anjali Sharma 9876543217, Rakesh Yadav 9876543218, Pooja Mishra 9876543219, Sanjay Jha 9876543220, Kavita Roy 9876543221. Relationship manager = sales@sgb.in. KYC: 8 VERIFIED, 2 SUBMITTED, 2 PENDING. Every SUBMITTED/VERIFIED customer has a PAN-card placeholder PDF on file (document type PAN, sensitive), filed and submitted by sales@sgb.in and verified by admin@sgb.in (maker-checker).
+
+The demo logins, passwords and this dataset are created only outside production, or in production with `SEED_DEMO=true`; a production first boot creates just the company, the six system roles and one Super Admin from `BOOTSTRAP_*` (docs/SECURITY.md).
 
 ## Bookings (10) — all dated within FY 2025-26; demands follow exactly from tower stages + plan
 | # | Booking | Flat | Customer | Plan | Scenario |

@@ -18,7 +18,7 @@ import { Avatar } from "@/ui/ListRow";
 import { DueMoney, Money } from "@/ui/Money";
 import { ProgressRing } from "@/ui/ProgressRing";
 import { useLayout } from "@/ui/Responsive";
-import { Col, Columns, Screen } from "@/ui/Screen";
+import { useDocumentTitle, Col, Columns, Screen } from "@/ui/Screen";
 import { Skeleton, SkeletonCard } from "@/ui/Skeleton";
 import { ErrorState, Notice, StatusBar } from "@/ui/States";
 import { T } from "@/ui/Text";
@@ -28,6 +28,7 @@ import { colors, radius, shadow, space } from "@/ui/theme";
 import { BookingGate, useFileActions } from "./shared";
 
 export function HomeScreen(): React.JSX.Element {
+  useDocumentTitle("Home");
   return <BookingGate title="Home">{(bookingId) => <HomeBody bookingId={bookingId} />}</BookingGate>;
 }
 
@@ -95,7 +96,7 @@ function HomeContent({ data, bookingId }: { data: PortalHomeResponse; bookingId:
       {/* Hero card */}
       <Card padded={false} onPress={() => router.navigate("/flat")} style={styles.flatCard}>
         <View style={styles.flatImageWrap}>
-          {b.project_image_url ? <Image source={{ uri: b.project_image_url }} style={StyleSheet.absoluteFill} contentFit="cover" transition={300} /> : null}
+          {b.project_image_url ? <Image source={{ uri: b.project_image_url }} style={StyleSheet.absoluteFill} contentFit="cover" transition={300} accessibilityLabel="" /> : null}
           {/* Project hero images carry their own text; a firm navy wash keeps the flat number and labels at AA contrast on any photo. */}
           <LinearGradient colors={["rgba(11,31,58,0.45)", "rgba(11,31,58,0.78)", "rgba(11,31,58,0.97)"]} locations={[0, 0.5, 1]} style={StyleSheet.absoluteFill} />
           <View style={styles.flatText}>

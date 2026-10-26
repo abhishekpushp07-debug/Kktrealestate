@@ -13,3 +13,4 @@ export * from "./dues.js";
 export * from "./ledger.js";
 export * from "./visits.js";
 export * from "./sla.js";
+export * from "./holds.js";

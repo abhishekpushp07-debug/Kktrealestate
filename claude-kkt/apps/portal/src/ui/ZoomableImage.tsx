@@ -16,7 +16,7 @@ export interface ZoomableHandle {
 const MIN = 1;
 const MAX = 5;
 
-export const ZoomableImage = forwardRef<ZoomableHandle, { uri: string; onSwipe?: (dir: -1 | 1) => void; onSingleTap?: () => void }>(function ZoomableImage({ uri, onSwipe, onSingleTap }, ref) {
+export const ZoomableImage = forwardRef<ZoomableHandle, { uri: string; alt?: string; onSwipe?: (dir: -1 | 1) => void; onSingleTap?: () => void }>(function ZoomableImage({ uri, alt, onSwipe, onSingleTap }, ref) {
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
   const tx = useSharedValue(0);
@@ -109,7 +109,7 @@ export const ZoomableImage = forwardRef<ZoomableHandle, { uri: string; onSwipe?:
   return (
     <GestureDetector gesture={gesture}>
       <Animated.View style={[styles.fill, style]}>
-        <Image source={{ uri }} style={styles.fill} contentFit="contain" transition={200} accessibilityIgnoresInvertColors />
+        <Image source={{ uri }} style={styles.fill} contentFit="contain" transition={200} accessibilityIgnoresInvertColors accessibilityLabel={alt ?? "Photo"} />
       </Animated.View>
     </GestureDetector>
   );

@@ -61,6 +61,8 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
   transpilePackages: ["@kkt/contracts"],
+  // Lint runs as its own step (`pnpm lint` with the repo's flat config, see eslint.config.mjs) so the build does not fail on style rules.
+  eslint: { ignoreDuringBuilds: true },
   env: { NEXT_PUBLIC_IMAGE_ORIGINS: imageOrigins },
   images: {
     remotePatterns,

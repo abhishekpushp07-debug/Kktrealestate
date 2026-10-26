@@ -3,9 +3,10 @@ import type { PgSelect } from "drizzle-orm/pg-core";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
-  FlatDetailResponseSchema, FlatFilterSchema, FlatListResponseSchema, FlatPriceUpdateSchema, FlatRowSchema, FlatStatusChangeSchema, FlatStatusSchema, FlatTypeChangeSchema, FlatUpdateSchema, IdSchema, VersionSchema,
+  FlatDetailResponseSchema, FlatFilterSchema, FlatListResponseSchema, FlatPriceUpdateSchema, FlatReleaseSchema, FlatReserveSchema, FlatRowSchema, FlatStatusChangeSchema, FlatStatusSchema, FlatTypeChangeSchema, FlatUpdateSchema, IdSchema, VersionSchema,
   type FlatRow, type FlatStatus,
 } from "@kkt/contracts";
+import { isHoldExpired } from "@kkt/domain";
 import { auditLogs, blocks, bookings, customers, flatTypes, flats, parkingSlots, specCategories, specItems, users, type Executor } from "@kkt/db";
 import { writeAudit, type AuditEntry } from "../../lib/audit.js";
 import { loadCompany } from "../../lib/company.js";
@@ -15,6 +16,7 @@ import { listPaging, paginate } from "../../lib/list.js";
 import { route } from "../../lib/routes.js";
 import { scopeFilter, type StaffContext } from "../../lib/scope.js";
 import { applyUpdate, expectedVersion, withOptionalVersion } from "../../lib/version.js";
+import { releaseFlat, reserveFlat } from "./holds.js";
 import { assertFilterScope } from "./projects.js";
 import {
   ENGINE_STATUSES, areasToDb, areasToDomain, breakupToDb, flatTypeToDomain, loadActiveRateCard, loadFlat, meta, priceWith, refreshUnitCounts, roomsToDb, roomsToDomain, type DbFlat,
@@ -100,7 +102,8 @@ export function assertHoldUntil(holdUntil: Date | null): void {
 export function manualStatusChanges(user: StaffContext, flat: DbFlat, input: StatusChangeInput): Record<string, unknown> {
   if (ENGINE_STATUSES.has(input.status)) throw ApiError.rule(`Status ${input.status} is set only by the booking engine`, "ENGINE_STATUS", { status: input.status });
   if (ENGINE_STATUSES.has(flat.status)) throw ApiError.rule(`Flat ${flat.flatNumber} is ${flat.status}; its status is set only by the booking engine`, "ENGINE_STATUS", { status: flat.status });
-  if (flat.status === "HOLD" && flat.holdByUserId && flat.holdByUserId !== user.id && !user.permissions.has("settings.manage")) {
+  // a lapsed hold (hold_until passed) no longer belongs to anybody: any flat.status holder may change it
+  if (flat.status === "HOLD" && flat.holdByUserId && flat.holdByUserId !== user.id && !user.permissions.has("settings.manage") && !isHoldExpired(flat)) {
     throw ApiError.forbidden("This flat is on hold by another user; releasing it needs settings.manage", { permission: "settings.manage", hold_by_user_id: flat.holdByUserId });
   }
   if (flat.status === input.status && input.status !== "HOLD") throw ApiError.rule(`Flat ${flat.flatNumber} is already ${input.status}`, "NO_CHANGE");
@@ -228,6 +231,30 @@ export function registerFlatRoutes(app: FastifyInstance): void {
         await writeAudit(tx, statusAudit(req, flat, updated, body.reason));
         await refreshUnitCounts(tx, flat.blockId);
         return getFlatRow(tx, user, flat.id);
+      });
+    },
+  });
+
+  route(app, {
+    method: "POST", url: "/flats/:id/reserve", permission: "booking.create",
+    schema: { params: idParams, body: FlatReserveSchema, response: { 200: FlatRowSchema }, summary: "Booking wizard: hold an Available flat for 1–30 minutes (repeat to extend; 409 when someone else holds it)" },
+    handler: async (req) => {
+      const user = req.user!;
+      return app.db.transaction(async (tx) => {
+        await reserveFlat(tx, user, req.params.id, req.body.minutes, meta(req));
+        return getFlatRow(tx, user, req.params.id);
+      });
+    },
+  });
+
+  route(app, {
+    method: "POST", url: "/flats/:id/release", permission: "booking.create",
+    schema: { params: idParams, body: FlatReleaseSchema, response: { 200: FlatRowSchema }, summary: "Release a hold: the holder, or settings.manage (a lapsed hold by anyone)" },
+    handler: async (req) => {
+      const user = req.user!;
+      return app.db.transaction(async (tx) => {
+        await releaseFlat(tx, user, req.params.id, req.body.reason, meta(req));
+        return getFlatRow(tx, user, req.params.id);
       });
     },
   });

@@ -19,6 +19,12 @@ type DocRow = {
 type LinkBody = { download_url: string; expires_at: string; file_name: string; mime: string };
 type ListBody = { items: DocRow[]; total: number; page: number; page_size: number; next_cursor: string | null };
 
+/** Current version of a document (PATCH requires it); 1 for ids that do not exist in this company. */
+async function docVersion(id: string): Promise<number> {
+  const [row] = await t.app.sql<{ version: number }[]>`select version from documents where id = ${id}`;
+  return row?.version ?? 1;
+}
+
 let t: TestContext;
 let admin: string;
 let sales: string;
@@ -236,19 +242,19 @@ describe("KYC and document-type rules", () => {
     expect(doc.document_type_name).toBe("PAN Card");
     expect(doc.is_sensitive).toBe(true);
     expect(doc.shared_with_customer).toBe(false);
-    const share = await t.request<ErrorBody>("PATCH", `/api/v1/documents/${doc.id}`, { token: admin, body: { shared_with_customer: true } });
+    const share = await t.request<ErrorBody>("PATCH", `/api/v1/documents/${doc.id}`, { token: admin, body: { shared_with_customer: true, version: await docVersion(doc.id) } });
     expect(share.status).toBe(422);
     expect(share.body.error.details?.["rule"]).toBe("KYC_NOT_SHAREABLE");
-    const unsens = await t.request<DocRow>("PATCH", `/api/v1/documents/${doc.id}`, { token: admin, body: { is_sensitive: false, title: "PAN of Rajesh" } });
+    const unsens = await t.request<DocRow>("PATCH", `/api/v1/documents/${doc.id}`, { token: admin, body: { is_sensitive: false, title: "PAN of Rajesh", version: await docVersion(doc.id) } });
     expect(unsens.status, unsens.text).toBe(200);
     expect(unsens.body.is_sensitive).toBe(true);
     expect(unsens.body.title).toBe("PAN of Rajesh");
     // Switching a shared document onto a KYC type is refused too.
     const plain = await uploadOk(admin, { entity_type: "CUSTOMER", entity_id: customerId, shared_with_customer: "true" }, { name: "welcome.pdf", data: pdf });
-    const retype = await t.request<ErrorBody>("PATCH", `/api/v1/documents/${plain.id}`, { token: admin, body: { document_type_id: panTypeId } });
+    const retype = await t.request<ErrorBody>("PATCH", `/api/v1/documents/${plain.id}`, { token: admin, body: { document_type_id: panTypeId, version: await docVersion(plain.id) } });
     expect(retype.status).toBe(422);
     expect(retype.body.error.details?.["rule"]).toBe("KYC_NOT_SHAREABLE");
-    const retypeUnshared = await t.request<DocRow>("PATCH", `/api/v1/documents/${plain.id}`, { token: admin, body: { document_type_id: panTypeId, shared_with_customer: false } });
+    const retypeUnshared = await t.request<DocRow>("PATCH", `/api/v1/documents/${plain.id}`, { token: admin, body: { document_type_id: panTypeId, shared_with_customer: false, version: await docVersion(plain.id) } });
     expect(retypeUnshared.status, retypeUnshared.text).toBe(200);
     expect(retypeUnshared.body.is_sensitive).toBe(true);
     expect(retypeUnshared.body.is_kyc).toBe(true);
@@ -261,9 +267,9 @@ describe("KYC and document-type rules", () => {
     expect(r.body.error.details?.["rule"]).toBe("DOCUMENT_TYPE_NOT_APPLICABLE");
     const ok = await uploadOk(admin, { entity_type: "PROJECT", entity_id: projectId, document_type_id: floorPlanTypeId, title: "Typical floor" }, { name: "floor.png", data: png });
     expect(ok.document_type_name).toBe("Floor Plan");
-    const retype = await t.request<ErrorBody>("PATCH", `/api/v1/documents/${ok.id}`, { token: admin, body: { document_type_id: agreementTypeId } });
+    const retype = await t.request<ErrorBody>("PATCH", `/api/v1/documents/${ok.id}`, { token: admin, body: { document_type_id: agreementTypeId, version: await docVersion(ok.id) } });
     expect(retype.status).toBe(422);
-    const clear = await t.request<DocRow>("PATCH", `/api/v1/documents/${ok.id}`, { token: admin, body: { document_type_id: null } });
+    const clear = await t.request<DocRow>("PATCH", `/api/v1/documents/${ok.id}`, { token: admin, body: { document_type_id: null, version: await docVersion(ok.id) } });
     expect(clear.status, clear.text).toBe(200);
     expect(clear.body.document_type_id).toBeNull();
     expect(clear.body.is_kyc).toBe(false);
@@ -291,7 +297,7 @@ describe("sensitivity and permissions", () => {
     expect(denied.status).toBe(403);
     expect(denied.body.error.code).toBe("FORBIDDEN");
     expect(denied.body.error.details?.["permission"]).toBe("customer.kyc_view");
-    expect((await t.request("PATCH", `/api/v1/documents/${sensitiveId}`, { token: sales, body: { title: "x" } })).status).toBe(404);
+    expect((await t.request("PATCH", `/api/v1/documents/${sensitiveId}`, { token: sales, body: { title: "x", version: await docVersion(sensitiveId) } })).status).toBe(404);
     expect((await t.request("DELETE", `/api/v1/documents/${sensitiveId}`, { token: sales })).status).toBe(404);
     const ok = await t.request<LinkBody>("POST", `/api/v1/documents/${plainId}/link`, { token: sales });
     expect(ok.status, ok.text).toBe(200);
@@ -372,7 +378,7 @@ describe("soft delete", () => {
     expect(del.status, del.text).toBe(204);
     expect((await t.request("GET", `/api/v1/documents/${doc.id}`, { token: admin })).status).toBe(404);
     expect((await t.request("POST", `/api/v1/documents/${doc.id}/link`, { token: admin })).status).toBe(404);
-    expect((await t.request("PATCH", `/api/v1/documents/${doc.id}`, { token: admin, body: { title: "x" } })).status).toBe(404);
+    expect((await t.request("PATCH", `/api/v1/documents/${doc.id}`, { token: admin, body: { title: "x", version: await docVersion(doc.id) } })).status).toBe(404);
     expect((await t.request("DELETE", `/api/v1/documents/${doc.id}`, { token: admin })).status).toBe(404);
     expect((await fetchFile(link.body.download_url)).statusCode).toBe(404);
     const list = await t.request<ListBody>("GET", `/api/v1/documents?entity_type=CUSTOMER&entity_id=${customerId}&page_size=200`, { token: admin });
@@ -558,8 +564,8 @@ describe("adversarial: uploads", () => {
     const unknown = await upload(admin, { entity_type: "CUSTOMER", entity_id: customerId, storage_key: "x" }, { name: "a.pdf", data: pdf });
     expect(unknown.status).toBe(400);
     const doc = await uploadOk(admin, { entity_type: "CUSTOMER", entity_id: customerId }, { name: "p.pdf", data: pdf });
-    expect((await t.request("PATCH", `/api/v1/documents/${doc.id}`, { token: admin, body: { storage_key: "x" } })).status).toBe(400);
-    expect((await t.request("PATCH", `/api/v1/documents/${doc.id}`, { token: admin, body: { title: "" } })).status).toBe(400);
+    expect((await t.request("PATCH", `/api/v1/documents/${doc.id}`, { token: admin, body: { storage_key: "x", version: await docVersion(doc.id) } })).status).toBe(400);
+    expect((await t.request("PATCH", `/api/v1/documents/${doc.id}`, { token: admin, body: { title: "", version: await docVersion(doc.id) } })).status).toBe(400);
   });
 
   it("same Idempotency-Key with a different file or different fields is 422 IDEMPOTENCY_MISMATCH", async () => {
@@ -636,7 +642,7 @@ describe("adversarial: streaming, tenancy and lists", () => {
     const foreign = await t.app.db.transaction((tx) => svc.storeBuffer(tx, { companyId: other!.id, entityType: "CUSTOMER", entityId: otherCustomer!.id, buffer: pdf, filename: "foreign.pdf", title: "Foreign", uploadedBy: null, uploadedByType: "SYSTEM" }));
     expect((await t.request("GET", `/api/v1/documents/${foreign.id}`, { token: admin })).status).toBe(404);
     expect((await t.request("POST", `/api/v1/documents/${foreign.id}/link`, { token: admin })).status).toBe(404);
-    expect((await t.request("PATCH", `/api/v1/documents/${foreign.id}`, { token: admin, body: { title: "Stolen" } })).status).toBe(404);
+    expect((await t.request("PATCH", `/api/v1/documents/${foreign.id}`, { token: admin, body: { title: "Stolen", version: await docVersion(foreign.id) } })).status).toBe(404);
     expect((await t.request("DELETE", `/api/v1/documents/${foreign.id}`, { token: admin })).status).toBe(404);
     expect((await t.request("GET", `/api/v1/documents?entity_type=CUSTOMER&entity_id=${otherCustomer!.id}`, { token: admin })).status).toBe(404);
     const byId = await t.request<ListBody>("GET", `/api/v1/documents?entity_id=${otherCustomer!.id}`, { token: admin });

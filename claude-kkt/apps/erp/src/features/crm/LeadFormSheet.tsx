@@ -4,7 +4,7 @@ import { LEAD_SOURCES, LEAD_SOURCE_LABELS, LeadCreateSchema, LeadUpdateSchema, t
 import { z } from "zod";
 import { applyServerErrors, Badge, Button, Checkbox, Combobox, FormError, FormField, FormRow, FormSection, Input, MoneyInput, Select, Sheet, SheetBody, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, Textarea } from "@/components/ui";
 import { api, type ApiClientError } from "@/lib/api";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, instantToIstInput, istInputToInstant } from "@/lib/format";
 import { useMutationWithToast } from "@/lib/queries";
 import { useSalesUserOptions } from "@/features/inventory/api";
 import { controlOf } from "@/features/inventory/components";
@@ -25,25 +25,19 @@ export interface LeadValues {
   source: string | null;
   assigned_user_id: string | null;
   message: string;
-  /** datetime-local value (local time) */
+  /** datetime-local value (IST wall clock) */
   next_follow_up_local: string;
   consent: boolean;
 }
 
-/** datetime-local ("2026-10-25T15:30") → RFC 3339 instant, or null. */
+/** datetime-local ("2026-10-25T15:30", IST wall clock) → RFC 3339 instant, or null. */
 export function localToIso(value: string): string | null {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  return istInputToInstant(value);
 }
 
-/** RFC 3339 instant → datetime-local value in the browser's zone. */
+/** RFC 3339 instant → datetime-local value on the IST wall clock (whatever the browser's zone). */
 export function isoToLocal(value: string | null | undefined): string {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return instantToIstInput(value);
 }
 
 const base = (values: LeadValues) => ({

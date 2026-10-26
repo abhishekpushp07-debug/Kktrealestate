@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { addDays } from "@kkt/domain";
 import {
-  blockByCode, BOOT_TIMEOUT, bookingBody, bookingBySeq, bootAcceptance, construction, createCustomer, defaultBankAccount, demandsOf, flatsOf, getBooking, key, ledgerOf, masterByCode, paymentBody, paymentModes, projectByCode, stagesByName,
+  blockByCode, BOOT_TIMEOUT, bookingBody, bookingBySeq, bootAcceptance, construction, createCustomer, defaultBankAccount, demandsOf, flatsOf, getBooking, key, listAtCr, ledgerOf, masterByCode, paymentBody, paymentModes, projectByCode, stagesByName,
   type Booking, type Demand, type ErrorBody, type Harness, type List, type PostPaymentResponse,
 } from "./harness.js";
 
@@ -68,6 +68,7 @@ beforeAll(async () => {
   stages = await stagesByName(h, admin);
   b5 = await bookingBySeq(h, admin, 5);
   const flats = await flatsOf(h, admin, towerB.id);
+  await listAtCr(h, admin, [flats.get("B-401")!.id, flats.get("B-402")!.id]);
   const flexi = await masterByCode<{ id: string; code: string }>(h, admin, "payment-plans", "FLEXI_10_40_50");
   const cA = await createCustomer(h, sales, "Acceptance Buyer Nine A", "9898000091");
   const cB = await createCustomer(h, sales, "Acceptance Buyer Nine B", "9898000092");

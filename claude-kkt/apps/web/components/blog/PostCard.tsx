@@ -12,7 +12,7 @@ export function PostCard({ post, featured = false }: { post: PostCardData; featu
         <SmartImage src={post.cover_url ?? null} alt="" sizes={featured ? SIZES.half : SIZES.third} className="transition duration-700 ease-luxe group-hover:scale-105" />
       </div>
       <div className={`flex flex-1 flex-col p-6 ${featured ? "lg:p-10" : ""}`}>
-        <p className="text-xs uppercase tracking-[0.2em] text-gold-600">
+        <p className="text-xs uppercase tracking-[0.2em] text-gold-700">
           {post.published_at ? formatDate(post.published_at) : "News"}
           {post.reading_minutes ? ` · ${post.reading_minutes} min read` : ""}
         </p>

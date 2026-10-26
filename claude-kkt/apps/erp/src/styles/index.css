@@ -31,9 +31,11 @@
   --color-card: #ffffff;
   --color-border: #e2e8f0;
   --color-border-strong: #cbd5e1;
+  /* boundary of form controls (inputs, selects, checkboxes, radios, switch track): >= 3:1 on card/surface/ivory (WCAG 1.4.11) */
+  --color-border-input: #7c8aa0;
   --color-ink: #0f172a;
   --color-ink-muted: #475569;
-  --color-ink-subtle: #64748b;
+  --color-ink-subtle: #5d6a7f; /* ≥ 4.5:1 on card, surface and ivory (docs/qa/contrast.mjs) */
 
   /* Status chips (badge / background / foreground) */
   --color-status-available: #10b981;
@@ -61,10 +63,10 @@
   --color-success: #10b981;
   --color-success-bg: #ecfdf5;
   --color-success-fg: #047857;
-  --color-danger: #ef4444;
+  --color-danger: #dc2626; /* white text on danger buttons ≥ 4.5:1 */
   --color-danger-bg: #fef2f2;
   --color-danger-fg: #b91c1c;
-  --color-danger-hover: #dc2626;
+  --color-danger-hover: #b91c1c;
   --color-warning: #f59e0b;
   --color-warning-bg: #fffbeb;
   --color-warning-fg: #b45309;
@@ -205,9 +207,11 @@
   }
 
   /* Gold focus ring everywhere; controls that draw their own ring add `outline-none`. */
+  /* gold ring with a navy inner ring: ≥ 3:1 against both light surfaces (navy) and navy surfaces (gold) — WCAG 1.4.11 */
   :focus-visible {
     outline: 2px solid var(--color-gold);
     outline-offset: 2px;
+    box-shadow: 0 0 0 2px var(--color-navy-950);
     border-radius: var(--radius-xs);
   }
 
@@ -254,14 +258,14 @@
 @utility focus-ring {
   outline: none;
   &:focus-visible {
-    box-shadow: 0 0 0 2px var(--color-card), 0 0 0 4px var(--color-gold);
+    box-shadow: 0 0 0 2px var(--color-navy-950), 0 0 0 4px var(--color-gold);
   }
 }
 
 @utility focus-ring-inset {
   outline: none;
   &:focus-visible {
-    box-shadow: inset 0 0 0 2px var(--color-gold);
+    box-shadow: inset 0 0 0 2px var(--color-navy-950), inset 0 0 0 4px var(--color-gold);
   }
 }
 

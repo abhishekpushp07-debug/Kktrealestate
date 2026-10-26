@@ -182,10 +182,29 @@ export async function loadVisitSelect(db: Executor, companyId: string, id: strin
   return row;
 }
 
-/** Loads a visit by its (unhashed) manage token; null when unknown. */
-export async function loadVisitByToken(db: Executor, token: string): Promise<VisitSelect | null> {
-  const rows = (await joinVisit(db.select(VISIT_SELECT).from(siteVisits).$dynamic()).where(eq(siteVisits.manageTokenHash, sha256(token))).limit(1)) as unknown as VisitSelect[];
-  return rows[0] ?? null;
+/** How long a manage link outlives its visit. */
+export const MANAGE_LINK_GRACE_MS = 24 * 3_600_000;
+
+/** Expiry of a manage link: the end of the visit slot (IST) + 24 hours. */
+export function manageTokenExpiry(date: string, slotEnd: string): Date {
+  return new Date(istDateTimeMs(date, slotEnd) + MANAGE_LINK_GRACE_MS);
+}
+
+/** True when the manage link no longer works (expired, cancelled visit, or never given an expiry). */
+export function isManageLinkExpired(v: Pick<DbVisit, "manageTokenExpiresAt">, now = new Date()): boolean {
+  return !v.manageTokenExpiresAt || v.manageTokenExpiresAt.getTime() <= now.getTime();
+}
+
+/**
+ * Loads a visit by its (unhashed) manage token; null when unknown. Expired links (visit end + 24 h, cancelled, or replaced by a reschedule)
+ * are returned only with `includeExpired` so the public routes can answer 410 LINK_EXPIRED instead of 404.
+ */
+export async function loadVisitByToken(db: Executor, token: string, opts: { includeExpired?: boolean; forUpdate?: boolean } = {}): Promise<VisitSelect | null> {
+  const q = joinVisit(db.select(VISIT_SELECT).from(siteVisits).$dynamic()).where(eq(siteVisits.manageTokenHash, sha256(token))).limit(1);
+  const rows = (await (opts.forUpdate ? q.for("update", { of: siteVisits }) : q)) as unknown as VisitSelect[];
+  const row = rows[0] ?? null;
+  if (!row || opts.includeExpired) return row;
+  return isManageLinkExpired(row.v) ? null : row;
 }
 
 // ---------------------------------------------------------------------------
@@ -324,7 +343,7 @@ export async function bookVisit(tx: Tx, input: BookVisitInput): Promise<BookedVi
     .values({
       companyId: input.companyId, visitNumber, projectId: input.project.id, leadId: lead?.id ?? null, customerId: input.customerId ?? null, visitDate: input.date, slotStart: slot.start, slotEnd: slot.end,
       visitors: input.visitors, name: input.name, phone: input.phone, email: input.email ?? null, message: input.message ?? null, status: "CONFIRMED", assigneeUserId: assignee,
-      manageTokenHash: sha256(token), source: input.source, notes: input.notes ?? null, createdBy: input.createdBy ?? null,
+      manageTokenHash: sha256(token), manageTokenExpiresAt: manageTokenExpiry(input.date, slot.end), source: input.source, notes: input.notes ?? null, createdBy: input.createdBy ?? null,
     })
     .returning();
   if (!visit) throw new Error("site_visits insert returned no row");
@@ -360,7 +379,8 @@ export interface ChangeMeta { actor: AuditActor; ip?: string | null; requestId?:
 export async function cancelVisit(tx: Executor, visit: DbVisit, reason: string | null, meta: ChangeMeta): Promise<DbVisit> {
   if (visit.status === "CANCELLED") throw ApiError.rule("This visit is already cancelled", "VISIT_CANCELLED");
   if (visit.status === "COMPLETED" || visit.status === "NO_SHOW") throw ApiError.rule("A visit with an outcome cannot be cancelled", "VISIT_CLOSED");
-  const [updated] = await tx.update(siteVisits).set({ status: "CANCELLED", cancelReason: reason, version: sql`${siteVisits.version} + 1` }).where(eq(siteVisits.id, visit.id)).returning();
+  // The manage link dies with the visit (it could otherwise be used to see the visitor's details).
+  const [updated] = await tx.update(siteVisits).set({ status: "CANCELLED", cancelReason: reason, manageTokenExpiresAt: new Date(), version: sql`${siteVisits.version} + 1` }).where(eq(siteVisits.id, visit.id)).returning();
   if (!updated) throw ApiError.notFound("Site visit");
   if (visit.leadId) {
     await recordLeadActivity(tx, visit.leadId, "VISIT_CANCELLED", { visit_number: visit.visitNumber, visit_date: visit.visitDate, slot_start: clock(visit.slotStart), reason }, meta.actor);
@@ -371,16 +391,24 @@ export async function cancelVisit(tx: Executor, visit: DbVisit, reason: string |
   return updated;
 }
 
-/** Moves a visit to another slot (capacity-checked, excluding itself), status RESCHEDULED, keeps the original slot in rescheduled_from. */
-export async function rescheduleVisit(tx: Tx, visit: DbVisit, settings: DbVisitSettings, date: string, start: string, notes: string | null | undefined, meta: ChangeMeta, mode: "public" | "erp" = "erp"): Promise<DbVisit> {
+/**
+ * Moves a visit to another slot (capacity-checked, excluding itself), status RESCHEDULED, keeps the original slot in rescheduled_from.
+ * The manage link is ROTATED: the old token stops working and the new one (returned as `newManageToken`, valid until the new slot's end
+ * + 24 h) is what the visitor gets back (public reschedule) or what staff share (ERP reschedule response `manage_url`).
+ */
+export async function rescheduleVisit(tx: Tx, visit: DbVisit, settings: DbVisitSettings, date: string, start: string, notes: string | null | undefined, meta: ChangeMeta, mode: "public" | "erp" = "erp"): Promise<DbVisit & { newManageToken: string }> {
   if (visit.status === "CANCELLED" || visit.status === "COMPLETED" || visit.status === "NO_SHOW") throw ApiError.rule("Only upcoming visits can be rescheduled", "VISIT_CLOSED");
   const slot = matchSlot(settings, date, start, { mode });
   if (date === visit.visitDate && slot.start === clock(visit.slotStart)) throw ApiError.rule("The visit is already in this slot", "SAME_SLOT");
   await reserveSeat(tx, visit.projectId, settings, date, slot.start, visit.id);
   const original = visit.rescheduledFrom ?? { visit_date: visit.visitDate, slot_start: clock(visit.slotStart) };
+  const token = randomToken(24);
   const [updated] = await tx
     .update(siteVisits)
-    .set({ visitDate: date, slotStart: slot.start, slotEnd: slot.end, status: "RESCHEDULED", rescheduledFrom: original, notes: notes === undefined ? visit.notes : notes, version: sql`${siteVisits.version} + 1` })
+    .set({
+      visitDate: date, slotStart: slot.start, slotEnd: slot.end, status: "RESCHEDULED", rescheduledFrom: original, notes: notes === undefined ? visit.notes : notes,
+      manageTokenHash: sha256(token), manageTokenExpiresAt: manageTokenExpiry(date, slot.end), version: sql`${siteVisits.version} + 1`,
+    })
     .where(eq(siteVisits.id, visit.id))
     .returning();
   if (!updated) throw ApiError.notFound("Site visit");
@@ -388,8 +416,8 @@ export async function rescheduleVisit(tx: Tx, visit: DbVisit, settings: DbVisitS
   if (updated.assigneeUserId && updated.assigneeUserId !== (meta.actor.type === "STAFF" ? meta.actor.id : null)) {
     await notify(tx, { companyId: visit.companyId, recipients: [{ type: "STAFF", id: updated.assigneeUserId }], type: "VISIT_BOOKED", title: `Site visit moved: ${visit.name} · ${date} ${slot.start}`, body: visit.visitNumber, entityType: "site_visit", entityId: visit.id, link: `/site-visits?id=${visit.id}` });
   }
-  await writeAudit(tx, { companyId: visit.companyId, actor: meta.actor, action: "site_visit.reschedule", entityType: "site_visit", entityId: visit.id, before: auditView(visit), after: auditView(updated), ip: meta.ip ?? null, requestId: meta.requestId ?? null });
-  return updated;
+  await writeAudit(tx, { companyId: visit.companyId, actor: meta.actor, action: "site_visit.reschedule", entityType: "site_visit", entityId: visit.id, before: auditView(visit), after: { ...auditView(updated), manage_link_rotated: true }, ip: meta.ip ?? null, requestId: meta.requestId ?? null });
+  return Object.assign(updated, { newManageToken: token });
 }
 
 /** Marks the outcome: COMPLETED (lead → SITE_VISIT_DONE) or NO_SHOW; appends the matching activity. */

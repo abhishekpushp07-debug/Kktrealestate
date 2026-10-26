@@ -12,7 +12,7 @@ import { actorOf, todayDate } from "../common.js";
 import { raiseDuesForAll } from "../services/dues.js";
 import { repair, runReport } from "../services/integrity.js";
 
-const ZERO: IntegrityCounts = { UNSATISFIED_DEMAND: 0, MISSING_DEMAND: 0, DUPLICATE_DEMAND: 0, UNMAPPED_DEMAND: 0, SUMMARY_MISMATCH: 0 };
+const ZERO: IntegrityCounts = { UNSATISFIED_DEMAND: 0, MISSING_DEMAND: 0, DUPLICATE_DEMAND: 0, UNMAPPED_DEMAND: 0, SUMMARY_MISMATCH: 0, PLAN_STAGE_MISSING: 0 };
 
 export function registerDuesRoutes(app: FastifyInstance): void {
   route(app, {

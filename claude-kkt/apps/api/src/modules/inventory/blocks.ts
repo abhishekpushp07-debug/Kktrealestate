@@ -7,8 +7,8 @@ import {
   FlatBulkStatusChangeSchema, IdSchema, VersionedSchema, rangesDisjoint,
   type BlockCreate, type BlockGridCell, type BlockGridResponse, type BlockRow, type BlockUpdate, type FlatStatus, type PriceBand,
 } from "@kkt/contracts";
-import { blockStages, blockTypes, blocks, bookings, customers, flatTypes, flats, floorPlanTemplates, projects, type Executor, type FloorPlanRange } from "@kkt/db";
-import { bulkPriceEdit, floorLabel, formatINRShort, physicalFloors, unitFloors, validateFloorPlanRanges, type FlatDraft } from "@kkt/domain";
+import { blockStages, blockTypes, blocks, bookings, customers, flatTypes, flats, floorPlanTemplates, projects, withTransactionRetry, type Executor, type FloorPlanRange, type Tx } from "@kkt/db";
+import { bulkPriceEdit, floorLabel, formatINRShort, isHoldExpired, physicalFloors, unitFloors, validateFloorPlanRanges, type FlatDraft } from "@kkt/domain";
 import { writeAudit, type AuditEntry } from "../../lib/audit.js";
 import { sendCsv } from "../../lib/csv.js";
 import { ApiError } from "../../lib/errors.js";
@@ -17,6 +17,7 @@ import { translatePgError } from "../../lib/pgErrors.js";
 import { route } from "../../lib/routes.js";
 import { scopeFilter, type StaffContext } from "../../lib/scope.js";
 import { applyUpdate, expectedVersion, optionalExpectedVersion, withOptionalVersion } from "../../lib/version.js";
+import { assertAssignmentsFitBlock } from "../money/index.js";
 import { assertHoldUntil, defaultHoldUntil, manualStatusChanges, statusAudit } from "./flats.js";
 import { assertFilterScope } from "./projects.js";
 import {
@@ -113,6 +114,11 @@ async function generateInto(tx: Executor, req: Parameters<typeof meta>[0], block
 const BLOCK_CSV = ["name", "code", "project_name", "block_type_name", "floors", "floor_start", "numbering_pattern", "status", "construction_percent", "current_stage_name", "is_active", "version"];
 
 /** Block routes. */
+/** Locks a block row (FOR UPDATE) — taken AFTER the flat rows by every unit of work that touches both (lock order, money/common.ts). */
+async function lockBlockRow(tx: Tx, blockId: string): Promise<void> {
+  await tx.select({ id: blocks.id }).from(blocks).where(eq(blocks.id, blockId)).for("update");
+}
+
 export function registerBlockRoutes(app: FastifyInstance): void {
   route(app, {
     method: "GET", url: "/blocks", permission: "project.read",
@@ -162,6 +168,8 @@ export function registerBlockRoutes(app: FastifyInstance): void {
         } catch (e) { translatePgError(e, "A block with this code in the project"); }
         if (!created) throw new Error("insert returned no row");
         await ensureBlockStages(tx, created.id);
+        // a project-wide plan assignment now covers this tower too: its ON_STAGE installments must exist in the tower's stages
+        await assertAssignmentsFitBlock(tx, user.companyId, created.id, `Creating ${created.name}`);
         if (body.generate_flats) await generateInto(tx, req, created, "block.generate_flats");
         else await refreshUnitCounts(tx, created.id);
         const [view] = await toBlockRows(tx, [created]);
@@ -210,7 +218,7 @@ export function registerBlockRoutes(app: FastifyInstance): void {
       const user = req.user!;
       const body = req.body as BlockUpdate & { version?: number };
       const version = expectedVersion(req, body);
-      return app.db.transaction(async (tx) => {
+      return withTransactionRetry(app.db, async (tx) => { // block → flats (structural regeneration): retried if it ever loses a deadlock to a booking
         const existing = await loadBlock(tx, user, req.params.id, true);
         const [before] = await toBlockRows(tx, [existing]);
         if (body.block_type_id) await assertBlockType(tx, user.companyId, body.block_type_id);
@@ -249,7 +257,10 @@ export function registerBlockRoutes(app: FastifyInstance): void {
         }
         let updated: DbBlock;
         try { updated = await applyUpdate(tx, blocks, existing.id, version, changes, "block"); } catch (e) { translatePgError(e, "A block with this code in the project"); }
-        if (body.stage_sequence) await snapshotBlockStages(tx, updated);
+        if (body.stage_sequence) {
+          await snapshotBlockStages(tx, updated);
+          await assertAssignmentsFitBlock(tx, user.companyId, existing.id, `Changing ${existing.name}'s stage sequence`);
+        }
         if (touched.length > 0 && flatCount > 0) {
           // Flats must always mirror the block definition: a structural change on a block whose flats are all Available regenerates them atomically.
           await tx.delete(flats).where(eq(flats.blockId, existing.id));
@@ -276,6 +287,8 @@ export function registerBlockRoutes(app: FastifyInstance): void {
         if (!(await allStagesPending(tx, [existing.id]))) throw ApiError.rule("Stage sequence can only change while every stage is pending", "STAGES_STARTED");
         const updated = await applyUpdate(tx, blocks, existing.id, version, { stageSequence: body.stage_sequence }, "block");
         await snapshotBlockStages(tx, updated);
+        // every active plan assignment covering the tower must still find its ON_STAGE stages (else the change rolls back)
+        await assertAssignmentsFitBlock(tx, user.companyId, existing.id, `Changing ${existing.name}'s stage sequence`);
         await writeAudit(tx, { companyId: user.companyId, ...meta(req), action: "block.stage_sequence", entityType: "block", entityId: existing.id, before: { stage_sequence: existing.stageSequence }, after: { stage_sequence: updated.stageSequence } });
         return (await toBlockRows(tx, [updated]))[0]!;
       });
@@ -289,7 +302,7 @@ export function registerBlockRoutes(app: FastifyInstance): void {
       const user = req.user!;
       const body = req.body as { version?: number; regenerate: boolean };
       const version = expectedVersion(req, body);
-      return app.db.transaction(async (tx) => {
+      return withTransactionRetry(app.db, async (tx) => { // block → flats: retried on 40001 / 40P01
         const block = await loadBlock(tx, user, req.params.id, true);
         const { total, nonAvailable } = await nonAvailableCount(tx, block.id);
         if (nonAvailable > 0) throw ApiError.conflict("REGENERATE_BLOCKED", `${nonAvailable} flat(s) of ${block.name} are not Available; flats cannot be regenerated`, { non_available: nonAvailable, total });
@@ -364,15 +377,19 @@ export function registerBlockRoutes(app: FastifyInstance): void {
       const byFloor = new Map<number, BlockGridCell[]>();
       const byStatus: Record<FlatStatus, number> = { AVAILABLE: 0, HOLD: 0, BLOCKED: 0, BOOKED: 0, SOLD: 0 };
       const byType = new Map<string, { flat_type_id: string; code: string; name: string; count: number }>();
+      const now = new Date();
       for (const { f, typeName, customerName } of cells) {
         const band = f.pricePaise > 0 ? bandOf(f.pricePaise) : 0;
         if (f.pricePaise > 0 && bands[band]) bands[band].count += 1;
-        byStatus[f.status] += 1;
+        // a lapsed hold is AVAILABLE to everybody (the HOLD_EXPIRY job writes the release later)
+        const lapsed = isHoldExpired(f, now);
+        const status: FlatStatus = lapsed ? "AVAILABLE" : f.status;
+        byStatus[status] += 1;
         const t = byType.get(f.flatTypeId) ?? { flat_type_id: f.flatTypeId, code: f.flatTypeCode, name: typeName, count: 0 };
         t.count += 1; byType.set(f.flatTypeId, t);
         byFloor.set(f.floor, [...(byFloor.get(f.floor) ?? []), {
-          flat_id: f.id, flat_number: f.flatNumber, position: f.position, status: f.status, flat_type_id: f.flatTypeId, flat_type_code: f.flatTypeCode, facing: f.facing, is_corner: f.isCorner,
-          super_builtup_sqft: Number(f.superBuiltupSqft), price_paise: f.pricePaise, price_band: band, booking_id: f.bookingId, customer_name: customerName, hold_until: f.holdUntil ? f.holdUntil.toISOString() : null,
+          flat_id: f.id, flat_number: f.flatNumber, position: f.position, status, flat_type_id: f.flatTypeId, flat_type_code: f.flatTypeCode, facing: f.facing, is_corner: f.isCorner,
+          super_builtup_sqft: Number(f.superBuiltupSqft), price_paise: f.pricePaise, price_band: band, booking_id: f.bookingId, customer_name: customerName, hold_until: f.holdUntil && !lapsed ? f.holdUntil.toISOString() : null,
         }]);
       }
       const def = blockToDefinition(block);
@@ -399,9 +416,14 @@ export function registerBlockRoutes(app: FastifyInstance): void {
       const body = req.body;
       const holdUntil = body.status === "HOLD" ? (body.hold_until ? new Date(body.hold_until) : await defaultHoldUntil(app, user.companyId)) : null;
       assertHoldUntil(holdUntil);
-      return app.db.transaction(async (tx) => {
-        const block = await loadBlock(tx, user, req.params.id, true);
-        const rows = await tx.select().from(flats).where(and(eq(flats.blockId, block.id), inArray(flats.id, body.flat_ids))).orderBy(asc(flats.floor), asc(flats.position)).for("update");
+      // retried on 40001 / 40P01 (one unit of work, no side effects outside the database)
+      return withTransactionRetry(app.db, async (tx) => {
+        const block = await loadBlock(tx, user, req.params.id);
+        // LOCK ORDER (money/common.ts): flat rows (ascending id) → block row, exactly like booking creation, reserve / release and
+        // HOLD_EXPIRY — taking the block first would deadlock against a booking that holds its flat and waits for the block
+        const locked = await tx.select().from(flats).where(and(eq(flats.blockId, block.id), inArray(flats.id, body.flat_ids))).orderBy(asc(flats.id)).for("update");
+        await lockBlockRow(tx, block.id);
+        const rows = [...locked].sort((a, b) => a.floor - b.floor || a.position - b.position);
         if (rows.length !== new Set(body.flat_ids).size) throw ApiError.badRequest("Every flat_id must belong to this block", { field: "flat_ids" });
         const skipped: string[] = [];
         const eligible: { flat: DbFlat; changes: Record<string, unknown> }[] = [];
@@ -432,13 +454,15 @@ export function registerBlockRoutes(app: FastifyInstance): void {
       const user = req.user!;
       const body = req.body;
       if (body.block_id !== req.params.id) throw ApiError.badRequest("block_id must match the path", { field: "block_id" });
-      return app.db.transaction(async (tx) => {
-        const block = await loadBlock(tx, user, req.params.id, true);
+      return withTransactionRetry(app.db, async (tx) => {
+        const block = await loadBlock(tx, user, req.params.id);
         const where: (SQL | undefined)[] = [eq(flats.blockId, block.id)];
         if (body.floors && body.floors.length > 0) where.push(inArray(flats.floor, body.floors));
         if (body.flat_ids && body.flat_ids.length > 0) where.push(inArray(flats.id, body.flat_ids));
         if (body.flat_type_id) where.push(eq(flats.flatTypeId, body.flat_type_id));
-        const rows = await tx.select({ id: flats.id, floor: flats.floor, superBuiltupSqft: flats.superBuiltupSqft, pricePaise: flats.pricePaise, status: flats.status, flatNumber: flats.flatNumber, breakup: flats.priceBreakup }).from(flats).where(and(...where.filter((w): w is SQL => w !== undefined))).for("update");
+        const rows = await tx.select({ id: flats.id, floor: flats.floor, superBuiltupSqft: flats.superBuiltupSqft, pricePaise: flats.pricePaise, status: flats.status, flatNumber: flats.flatNumber, breakup: flats.priceBreakup }).from(flats).where(and(...where.filter((w): w is SQL => w !== undefined))).orderBy(asc(flats.id)).for("update");
+        // lock order: flat rows (ascending id, above) → block row (see bulk-status)
+        await lockBlockRow(tx, block.id);
         const eligible = rows.filter((r) => (body.only_available ? r.status === "AVAILABLE" : !["BOOKED", "SOLD"].includes(r.status)));
         const eligibleIds = new Set(eligible.map((r) => r.id));
         const skipped = rows.filter((r) => !eligibleIds.has(r.id)).map((r) => r.id);

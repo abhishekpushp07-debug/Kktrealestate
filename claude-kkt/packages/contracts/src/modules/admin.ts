@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ActorTypeSchema, JobNameSchema, JobRunStatusSchema } from "../enums.js";
+import { ActorTypeSchema, ExportStatusSchema, JobNameSchema, JobRunStatusSchema } from "../enums.js";
 import {
   AddressSchema,
   DateStringSchema,
@@ -276,17 +276,26 @@ export type CompanySettingsResponse = z.infer<typeof CompanySettingsResponseSche
 export const AdminBackupRequestSchema = z.strictObject({ include_sensitive: z.boolean().default(false) });
 export type AdminBackupRequest = z.infer<typeof AdminBackupRequestSchema>;
 
-/** One stored backup (kept 24 h). */
+/**
+ * One backup (POST /admin/backup enqueues job BACKUP_EXPORT; the archive is kept 24 h, then EXPORT_CLEANUP removes it). `status` follows the export lifecycle
+ * QUEUED → RUNNING → DONE | FAILED; file facts are null until DONE.
+ */
 export const AdminBackupRowSchema = z.object({
   id: IdSchema,
-  file_name: z.string(),
-  size_bytes: z.int().min(0),
+  status: ExportStatusSchema,
+  file_name: z.string().nullable(),
+  size_bytes: z.int().min(0).nullable(),
+  /** When the backup was requested. */
   generated_at: TimestampSchema,
-  storage_expires_at: TimestampSchema,
+  finished_at: TimestampSchema.nullable(),
+  storage_expires_at: TimestampSchema.nullable(),
   include_sensitive: z.boolean(),
-  table_count: z.int().min(0),
-  row_count: z.int().min(0),
+  table_count: z.int().min(0).nullable(),
+  row_count: z.int().min(0).nullable(),
   generated_by: z.string().nullable(),
+  error: z.string().nullable(),
+  /** job_runs id of the backup job's first attempt. */
+  run_id: IdSchema.nullable(),
 });
 export type AdminBackupRow = z.infer<typeof AdminBackupRowSchema>;
 
@@ -303,6 +312,52 @@ export type AdminBackupCreatedResponse = z.infer<typeof AdminBackupCreatedRespon
 export const AdminBackupListResponseSchema = z.object({ items: z.array(AdminBackupRowSchema) });
 export type AdminBackupListResponse = z.infer<typeof AdminBackupListResponseSchema>;
 
+/** POST /admin/backup → 202: the backup row (QUEUED) and the run id of job BACKUP_EXPORT. */
+export const AdminBackupQueuedResponseSchema = AdminBackupRowSchema;
+export type AdminBackupQueuedResponse = z.infer<typeof AdminBackupQueuedResponseSchema>;
+
+/** POST /admin/backups/:id/link → signed 15-minute download link of a DONE backup (409 EXPORT_NOT_READY before). */
+export const AdminBackupLinkResponseSchema = SignedLinkSchema.extend({ file_name: z.string(), size_bytes: z.int().min(0).nullable() });
+export type AdminBackupLinkResponse = z.infer<typeof AdminBackupLinkResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// Asynchronous CSV exports (POST /exports; job EXPORT_CSV; files kept 7 days)
+// ---------------------------------------------------------------------------
+
+/** Query values of the list route being exported (the export job controls paging/format keys). */
+export const ExportQueryValueSchema = z.union([z.string().max(500), z.number(), z.boolean(), z.array(z.string().max(500)).max(50)]);
+
+/** POST /exports body: any GET list route under /api/v1 the caller may read, with its filters. */
+export const ExportCreateRequestSchema = z.strictObject({
+  path: z.string().trim().min(8).max(300).regex(/^\/api\/v1\/[A-Za-z0-9/_.:-]+$/, "path must be an /api/v1/… list route without a query string"),
+  query: z.record(z.string().regex(/^[a-z][a-z0-9_]*$/).max(64), ExportQueryValueSchema).default({}),
+});
+export type ExportCreateRequest = z.infer<typeof ExportCreateRequestSchema>;
+
+/** One export as listed. */
+export const ExportRowSchema = z.object({
+  id: IdSchema,
+  path: z.string(),
+  query: z.record(z.string(), z.unknown()),
+  status: ExportStatusSchema,
+  row_count: z.int().min(0).nullable(),
+  file_name: z.string(),
+  error: z.string().nullable(),
+  created_at: TimestampSchema,
+  finished_at: TimestampSchema.nullable(),
+  expires_at: TimestampSchema.nullable(),
+});
+export type ExportRow = z.infer<typeof ExportRowSchema>;
+
+export const ExportFilterSchema = ListQuerySchema.extend({ status: ExportStatusSchema.optional() });
+export type ExportFilter = z.infer<typeof ExportFilterSchema>;
+export const ExportListResponseSchema = listEnvelope(ExportRowSchema);
+export type ExportListResponse = z.infer<typeof ExportListResponseSchema>;
+
+/** POST /exports/:id/link → signed 15-minute download link of a DONE export (409 EXPORT_NOT_READY before). */
+export const ExportLinkResponseSchema = SignedLinkSchema.extend({ file_name: z.string(), row_count: z.int().min(0) });
+export type ExportLinkResponse = z.infer<typeof ExportLinkResponseSchema>;
+
 /** POST /admin/reconcile body (dry run of recompute; defaults to every booking in scope). */
 export const AdminReconcileRequestSchema = z.strictObject({
   booking_id: IdSchema.optional(),
@@ -318,13 +373,22 @@ export const AdminReconcileResponseSchema = z.object({
 });
 export type AdminReconcileResponse = z.infer<typeof AdminReconcileResponseSchema>;
 
-/** One job as known to the registry (schedule + handler presence + last run). */
+/** One job as known to the registry (schedule + handler presence + last run, last success, failures, next run). */
 export const AdminJobInfoSchema = z.object({
   name: JobNameSchema,
   registered: z.boolean(),
   cron: z.string().nullable(),
   tz: z.string().nullable(),
+  /** False for a schedule switched off by configuration (PARTITION_MAINTENANCE without PARTITIONING_ENABLED). */
+  schedule_enabled: z.boolean(),
   last_run: AdminJobRunRowSchema.nullable(),
+  last_success: AdminJobRunRowSchema.nullable(),
+  /** Failed attempts in the last 24 h. */
+  failure_count_24h: z.int().min(0),
+  /** Failed attempts since the last success (all of them when it never succeeded). */
+  failures_since_success: z.int().min(0),
+  /** Next fire time of the repeatable schedule (null when unscheduled or no worker registered it yet). */
+  next_run_at: TimestampSchema.nullable(),
 });
 export type AdminJobInfo = z.infer<typeof AdminJobInfoSchema>;
 
@@ -342,6 +406,16 @@ export type AdminJobNameParams = z.infer<typeof AdminJobNameParamsSchema>;
 /** POST /admin/jobs/:name/run body (optional payload handed to the handler). */
 export const AdminJobRunNowRequestSchema = z.strictObject({ data: z.record(z.string(), z.unknown()).optional() });
 export type AdminJobRunNowRequest = z.infer<typeof AdminJobRunNowRequestSchema>;
+
+/** POST /admin/jobs/:name/run → 202: the job is queued; poll GET /admin/jobs/runs/:run_id (404 until a worker starts it). */
+export const AdminJobEnqueuedResponseSchema = z.object({
+  run_id: IdSchema,
+  job_id: z.string(),
+  job_name: JobNameSchema,
+  status: z.literal("QUEUED"),
+  queued_at: TimestampSchema,
+});
+export type AdminJobEnqueuedResponse = z.infer<typeof AdminJobEnqueuedResponseSchema>;
 
 /** POST /admin/customers/:id/erase body. */
 export const AdminCustomerEraseRequestSchema = z.strictObject({ confirm: z.literal("ERASE"), reason: ReasonSchema.optional() });

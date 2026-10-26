@@ -1,14 +1,15 @@
 /**
- * Scheduled jobs of the money module (registered through the core job registry): DAILY_DUES (00:30 IST), NIGHTLY_INTEGRITY (00:45) and
- * OVERDUE_NOTIFICATIONS (01:15). Each works per company so the single-tenant setup needs no special casing.
+ * Scheduled jobs of the money module (registered through the core job registry): DAILY_DUES (00:30 IST), NIGHTLY_INTEGRITY (00:45),
+ * OVERDUE_NOTIFICATIONS (01:15) and DUES_CATCHUP (enqueue at worker/API boot — SPEC §10 "at startup": a server down across 00:30 IST
+ * must not leave time-triggered dues unraised until the next night). Each works per company so the single-tenant setup needs no special casing.
  */
 import { and, eq, inArray, lt, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
-import { bookings, companies, demands, notifications, type DB } from "@kkt/db";
+import { bookings, companies, demands, notifications, withAdvisoryLock, type DB, type Tx } from "@kkt/db";
 import { formatINR } from "@kkt/domain";
 import { registerJob } from "../../jobs/index.js";
-import { notify, notifyRole } from "../notifications/service.js";
-import { ACCOUNTS_ROLES, todayDate } from "./common.js";
+import { notify, notifyRole } from "../notifications/index.js";
+import { ACCOUNTS_ROLES, moneyTransaction, todayDate } from "./common.js";
 import { bookingRecipients, raiseDuesForAll } from "./services/dues.js";
 import { nightlyIntegrity } from "./services/integrity.js";
 
@@ -38,21 +39,44 @@ export async function nightlyIntegrityJob(db: DB): Promise<Record<string, unknow
   return out;
 }
 
-/** Marks a (demand, day) as notified; Redis NX when available, otherwise the notifications table (one DEMAND_OVERDUE per demand per day). */
-async function claimOverdue(app: FastifyInstance | null, db: DB, demandId: string, today: string): Promise<boolean> {
-  if (app) {
-    try {
-      const ok = await app.redis.set(`overdue:${demandId}:${today}`, "1", "EX", 2 * 24 * 3600, "NX");
-      if (ok) return true;
-      return false;
-    } catch { /* fall back to the database */ }
+/**
+ * Dues catch-up (SPEC §10 "at startup"): the same idempotent engine run as DAILY_DUES for every company, without the integrity
+ * report — safe to enqueue at every boot and after any missed 00:30 run (demands are unique per installment, so nothing is raised twice).
+ */
+export async function duesCatchup(db: DB): Promise<Record<string, unknown>> {
+  const today = todayDate();
+  const out: Record<string, unknown> = { as_of: today };
+  for (const companyId of await companyIds(db)) {
+    const s = await raiseDuesForAll(db, today, { companyId });
+    out[companyId] = { bookings_checked: s.bookingsChecked, demands_raised: s.demandsRaised, demand_numbers: s.demandNumbers };
   }
-  const [row] = await db.select({ id: notifications.id }).from(notifications)
-    .where(and(eq(notifications.entityType, "demand"), eq(notifications.entityId, demandId), eq(notifications.type, "DEMAND_OVERDUE"), sql`${notifications.createdAt} >= (${today}::date)::timestamptz`)).limit(1);
-  return !row;
+  return out;
 }
 
-/** Overdue demand notifications: once per demand per day to the buyer and Accounts. */
+const overdueKey = (demandId: string, today: string) => `overdue:${demandId}:${today}`;
+
+/** Fast-path skip: the Redis marker written AFTER a successful notification commit (best effort; the database decides). */
+async function alreadyMarked(app: FastifyInstance | null, demandId: string, today: string): Promise<boolean> {
+  if (!app) return false;
+  try {
+    return (await app.redis.exists(overdueKey(demandId, today))) === 1;
+  } catch {
+    return false;
+  }
+}
+
+/** The durable once-per-day guard, inside the notification transaction (serialised per demand and day by an advisory lock). */
+async function notifiedToday(tx: Tx, demandId: string, today: string): Promise<boolean> {
+  await withAdvisoryLock(tx, overdueKey(demandId, today));
+  const [row] = await tx.select({ id: notifications.id }).from(notifications)
+    .where(and(eq(notifications.entityType, "demand"), eq(notifications.entityId, demandId), eq(notifications.type, "DEMAND_OVERDUE"), sql`${notifications.createdAt} >= ((${today}::date)::timestamp at time zone 'Asia/Kolkata')`)).limit(1);
+  return !!row;
+}
+
+/**
+ * Overdue demand notifications: once per demand per day to the buyer and Accounts. The day's claim is made only AFTER the notification
+ * transaction commits (audit A7): a database failure leaves no marker, so the next run retries the notice instead of dropping it.
+ */
 export async function overdueNotifications(db: DB, app: FastifyInstance | null): Promise<Record<string, unknown>> {
   const today = todayDate();
   const rows = await db.select({ d: demands, b: bookings }).from(demands).innerJoin(bookings, eq(bookings.id, demands.bookingId))
@@ -60,22 +84,30 @@ export async function overdueNotifications(db: DB, app: FastifyInstance | null):
   let sent = 0;
   let skipped = 0;
   for (const { d, b } of rows) {
-    if (!(await claimOverdue(app, db, d.id, today))) { skipped += 1; continue; }
-    await db.transaction(async (tx) => {
+    if (await alreadyMarked(app, d.id, today)) { skipped += 1; continue; }
+    const notified = await moneyTransaction(db, async (tx) => {
+      if (await notifiedToday(tx, d.id, today)) return false;
       const outstanding = d.totalDemandPaise - d.paidPaise;
       const title = `Demand ${d.demandNumber} overdue (${d.installmentName})`;
       const body = `${formatINR(outstanding)} outstanding; due date was ${d.dueDate}`;
       await notify(tx, { companyId: d.companyId, recipients: await bookingRecipients(tx, b), type: "DEMAND_OVERDUE", title, body, entityType: "demand", entityId: d.id, link: `/bookings/${b.id}/demands` });
       await notifyRole(tx, d.companyId, ACCOUNTS_ROLES, { type: "DEMAND_OVERDUE", title: `${title} – ${b.bookingNumber}`, body, entityType: "demand", entityId: d.id, link: `/bookings/${b.id}/demands` });
+      return true;
     });
-    sent += 1;
+    // committed (or found already done): only now is the day claimed in Redis
+    if (app) await app.redis.set(overdueKey(d.id, today), "1", "EX", 2 * 24 * 3600).catch(() => undefined);
+    if (notified) sent += 1; else skipped += 1;
   }
   return { as_of: today, overdue_demands: rows.length, notified: sent, already_notified_today: skipped };
 }
 
-/** Registers the three job handlers; `app` supplies Redis for the once-per-day guard. */
+/**
+ * Registers the job handlers; `app` supplies Redis for the once-per-day fast path (null in a standalone worker: the database guard alone
+ * keeps overdue notices to once per demand per day). The worker / boot sequence should enqueue DUES_CATCHUP (and STARTUP_RECONCILIATION) at start.
+ */
 export function registerMoneyJobs(app: FastifyInstance | null): void {
   registerJob("DAILY_DUES", async ({ db }) => dailyDues(db));
+  registerJob("DUES_CATCHUP", async ({ db }) => duesCatchup(db));
   registerJob("NIGHTLY_INTEGRITY", async ({ db }) => nightlyIntegrityJob(db));
   registerJob("OVERDUE_NOTIFICATIONS", async ({ db }) => overdueNotifications(db, app));
 }

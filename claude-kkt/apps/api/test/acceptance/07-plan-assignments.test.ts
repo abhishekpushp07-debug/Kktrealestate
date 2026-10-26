@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { addDays } from "@kkt/domain";
-import { blockByCode, BOOT_TIMEOUT, bookingBody, bootAcceptance, customerByPhone, flatsOf, key, masterByCode, projectByCode, type Block, type ErrorBody, type Harness, type List } from "./harness.js";
+import { blockByCode, BOOT_TIMEOUT, bookingBody, bootAcceptance, customerByPhone, flatsOf, key, listAtCr, masterByCode, projectByCode, type Block, type ErrorBody, type Harness, type List } from "./harness.js";
 
 /**
  * SPEC §18 scenario 7 (L248): "Plan dropdown shows only plans assigned to the chosen tower; a plan referencing a stage missing from a
@@ -84,6 +84,7 @@ describe("scenario 7 — the plan dropdown", () => {
     expect((await applicable(blockP.id, admin)).plans.map((p) => p.plan_id)).not.toContain(created.body.id);
     // Tower A booking on the Tower-B-only plan is refused (SPEC L121 "exactly the applicable plans")
     const flatA = [...(await flatsOf(h, admin, towerA.id)).values()].find((f) => f.status === "AVAILABLE")!;
+    await listAtCr(h, admin, [flatA.id]);
     const customer = await customerByPhone(h, admin, "9876543221");
     const notApplicable = await h.request<ErrorBody>("POST", "/api/v1/bookings", { token: sales, headers: { "idempotency-key": key() }, body: bookingBody(h, flatA.id, customer.id, { payment_plan_id: created.body.id }) });
     expect(notApplicable.status).toBe(409);

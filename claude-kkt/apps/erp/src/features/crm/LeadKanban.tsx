@@ -171,27 +171,28 @@ function LeadCard({ lead, stage, draggable, dragging, onPointerDown, onPointerMo
   const budget = budgetLabel(lead);
   return (
     <article
-      role="button"
-      tabIndex={0}
       aria-label={`${lead.full_name}, ${LEAD_STAGE_LABELS[stage]}`}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onOpen();
-        }
-      }}
-      className={cn("group rounded-md border border-border bg-card p-2.5 text-left shadow-card transition-shadow hover:shadow-pop focus-ring", draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer", dragging && "opacity-40")}
+      className={cn("group rounded-md border border-border bg-card p-2.5 text-left shadow-card transition-shadow hover:shadow-pop focus-within:ring-2 focus-within:ring-gold", draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer", dragging && "opacity-40")}
       style={{ touchAction: "pan-y" }}
       data-testid={`lead-card-${lead.id}`}
     >
       <div className="flex items-start gap-1.5">
         {draggable && <GripVertical className="mt-0.5 size-3.5 shrink-0 text-ink-subtle/60 group-hover:text-ink-subtle" aria-hidden="true" />}
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-navy-950">{lead.full_name}</p>
+          {/* the name is the card's button (keyboard + click); the rest of the card opens on a pointer tap and drags between columns */}
+          <button
+            type="button"
+            className="block max-w-full truncate rounded-xs text-left text-sm font-semibold text-navy-950 outline-none focus-visible:underline"
+            onClick={onOpen}
+            data-no-drag
+            data-testid={`lead-card-open-${lead.id}`}
+          >
+            {lead.full_name}
+          </button>
           <p className="money truncate text-2xs text-ink-subtle">
             <Phone className="mr-0.5 inline size-3" aria-hidden="true" />
             {formatPhone(lead.phone)} · {lead.lead_number}

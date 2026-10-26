@@ -269,8 +269,9 @@ describe(".ics", () => {
   it("a past visit cannot be cancelled from its manage link (422 VISIT_PAST) and shows can_cancel=false", async () => {
     const { sha256 } = await import("../../src/lib/crypto.js");
     const token = "past-visit-manage-token-000000000001";
-    await t.app.sql`insert into site_visits (company_id, visit_number, project_id, visit_date, slot_start, slot_end, visitors, name, phone, status, source, manage_token_hash)
-      values (${t.companyId}, 'SV-TEST/0777', ${wp.projectId}, ${D(-2)}, '10:00', '11:00', 1, 'Yesterday Visitor', '9876612301', 'CONFIRMED', 'WEBSITE', ${sha256(token)})`;
+    // a visit that ended recently: its link still works for 24 h after the slot (expiry set explicitly here)
+    await t.app.sql`insert into site_visits (company_id, visit_number, project_id, visit_date, slot_start, slot_end, visitors, name, phone, status, source, manage_token_hash, manage_token_expires_at)
+      values (${t.companyId}, 'SV-TEST/0777', ${wp.projectId}, ${D(-2)}, '10:00', '11:00', 1, 'Yesterday Visitor', '9876612301', 'CONFIRMED', 'WEBSITE', ${sha256(token)}, now() + interval '1 hour')`;
     const manage = await t.request<{ can_cancel: boolean; project_slug: string }>("GET", `/api/v1/public/site-visits/${token}`);
     expect(manage.status, manage.text).toBe(200);
     expect(manage.body.can_cancel).toBe(false);
@@ -278,6 +279,9 @@ describe(".ics", () => {
     const cancel = await t.request<ErrorBody>("POST", `/api/v1/public/site-visits/${token}/cancel`, { body: { reason: "late", website: "" } });
     expect(cancel.status).toBe(422);
     expect(cancel.body.error.details?.["rule"]).toBe("VISIT_PAST");
+    // once the 24 h grace has passed the link is dead
+    await t.app.sql`update site_visits set manage_token_expires_at = now() - interval '1 minute' where visit_number = 'SV-TEST/0777'`;
+    expect((await t.request<ErrorBody>("GET", `/api/v1/public/site-visits/${token}`)).body.error.code).toBe("LINK_EXPIRED");
   });
 });
 

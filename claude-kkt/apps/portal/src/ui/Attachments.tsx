@@ -56,7 +56,7 @@ export function AttachmentPicker({ files, onChange, onError, max = MAX_FILES }: 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
           {files.map((f, i) => (
             <View key={`${f.uri}-${i}`} style={styles.thumbWrap}>
-              <Image source={{ uri: f.uri }} style={styles.thumb} contentFit="cover" />
+              <Image source={{ uri: f.uri }} style={styles.thumb} contentFit="cover" accessibilityLabel="" />
               <IconButton name="close" label="Remove photo" size={24} iconSize={12} color={colors.onNavy} bg={colors.navy} style={styles.remove} onPress={() => onChange(files.filter((_, j) => j !== i))} />
             </View>
           ))}
@@ -69,7 +69,7 @@ export function AttachmentPicker({ files, onChange, onError, max = MAX_FILES }: 
 export function AttachmentThumb({ uri, name, onPress }: { uri: string | null; name: string; onPress?: () => void }): React.JSX.Element {
   return (
     <Pressable accessibilityRole={onPress ? "button" : undefined} onPress={onPress} disabled={!onPress} style={styles.attachment}>
-      {uri ? <Image source={{ uri }} style={styles.attachmentImg} contentFit="cover" /> : null}
+      {uri ? <Image source={{ uri }} style={styles.attachmentImg} contentFit="cover" accessibilityLabel="" /> : null}
       <T variant="caption" color={colors.navy} numberOfLines={1} style={{ maxWidth: 140 }}>
         {name}
       </T>

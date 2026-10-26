@@ -1,6 +1,7 @@
 /** Routes: /booking-drafts, /bookings and its sub-resources (SPEC §12, §11 ledger, §10 schedule). */
 import { and, desc, eq, gte, inArray, lte, sql, type SQL } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import {
   AgreementRevisionCreateSchema, BookingCancelSchema, BookingCompleteSchema, BookingCreateSchema, BookingDetailResponseSchema, BookingDraftListResponseSchema, BookingDraftRowSchema,
@@ -19,7 +20,7 @@ import { addOtherCharge, cancelBooking, changePlan, completeBooking, createBooki
 import { nonVoidDemands } from "../services/dues.js";
 import { demandLetterData } from "../services/payments.js";
 import {
-  BOOKING_SELECT, DEMAND_SELECT, PAYMENT_SELECT, bookingDetail, bookingJoins, demandJoins, loadBookingRelated, loadBookingSelect, paymentJoins, scheduleRows, toBookingRows, toDemandRow, toLedgerRow,
+  BOOKING_SELECT, DEMAND_SELECT, PAYMENT_SELECT, bookingDetail, bookingJoins, demandJoins, loadBookingRelated, loadBookingSelect, paymentJoins, scheduleRows, toBookingRows, toCompactBookingRows, toDemandRow, toLedgerRow,
   toPaymentRow, toSummary, type BookingSelect, type DemandSelect, type PaymentSelect,
 } from "../services/views.js";
 import type { LedgerEntryRecord } from "../services/ledger.js";
@@ -82,14 +83,18 @@ export function registerBookingRoutes(app: FastifyInstance): void {
     handler: async (req) => {
       const user = req.user!;
       const body = req.body;
-      const row = await app.db.transaction(async (tx) => {
-        if (body.id) {
-          const [updated] = await tx.update(bookingDrafts).set({ payload: body.payload as Record<string, unknown>, step: body.step, updatedAt: new Date() }).where(and(eq(bookingDrafts.id, body.id), eq(bookingDrafts.userId, user.id))).returning();
-          if (updated) return updated;
-        }
-        const [created] = await tx.insert(bookingDrafts).values({ companyId: user.companyId, userId: user.id, payload: body.payload as Record<string, unknown>, step: body.step }).returning();
-        return created!;
-      });
+      const payload = body.payload as Record<string, unknown>;
+      // Upsert by the client-generated id: a retried autosave updates the same row instead of creating a duplicate. The update
+      // only applies to the caller's own draft (another user's id → 404, nothing changes).
+      const id = body.id ?? randomUUID();
+      const [row] = await app.db.insert(bookingDrafts).values({ id, companyId: user.companyId, userId: user.id, payload, step: body.step })
+        .onConflictDoUpdate({
+          target: bookingDrafts.id,
+          set: { payload, step: body.step, updatedAt: new Date(), version: sql`${bookingDrafts.version} + 1` },
+          setWhere: and(eq(bookingDrafts.userId, user.id), eq(bookingDrafts.companyId, user.companyId)),
+        })
+        .returning();
+      if (!row) throw ApiError.notFound("Draft");
       return (await draftRows(app.db, [row]))[0]!;
     },
   });
@@ -129,8 +134,12 @@ export function registerBookingRoutes(app: FastifyInstance): void {
         sort: { allowed: { booking_date: bookings.bookingDate, booking_number: bookings.bookingNumber, created_at: bookings.createdAt, status: bookings.status, customer_name: customers.fullName, agreement_value_paise: bookings.agreementValuePaise }, default: "-booking_date", requested: q.sort },
         ...listPaging(q),
       });
-      const items = await toBookingRows(app.dbReplica, result.items);
-      if (q.format === "csv") return sendCsv<BookingRow>(reply, "bookings.csv", BOOKING_CSV.map((k) => ({ key: k, header: k, value: (r: BookingRow) => bookingCsvValue(r, k) })), items);
+      if (q.format === "csv") {
+        const full = await toBookingRows(app.dbReplica, result.items);
+        return sendCsv<BookingRow>(reply, "bookings.csv", BOOKING_CSV.map((k) => ({ key: k, header: k, value: (r: BookingRow) => bookingCsvValue(r, k) })), full);
+      }
+      // compact rows by default (≈ 1 KB each: no snapshots, schedule or related lists); view=full for every field
+      const items = q.view === "full" ? await toBookingRows(app.dbReplica, result.items) : await toCompactBookingRows(app.dbReplica, result.items);
       return { ...result, items };
     },
   });

@@ -2,8 +2,8 @@
 // padding) and a header with back button / title / actions. Tab screens pass `tabbed` so the
 // bottom padding accounts for the tab bar (which is laid out outside the content, never over it).
 import { useRouter } from "expo-router";
-import { useState, type ReactNode } from "react";
-import { Platform, RefreshControl, ScrollView, StyleSheet, View, type ScrollViewProps, type StyleProp, type ViewStyle } from "react-native";
+import { useEffect, useState, type ReactNode } from "react";
+import { Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View, type ScrollViewProps, type StyleProp, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { haptics } from "@/lib/haptics";
 import { IconButton } from "./Button";
@@ -45,6 +45,8 @@ export function Screen({ children, onRefresh, bottomInset = 0, padded = true, co
         contentStyle,
       ]}
       keyboardShouldPersistTaps="handled"
+      // web: the screen scroller is focusable so keyboard users can scroll screens that hold no controls (WCAG 2.1.1)
+      focusable={Platform.OS === "web"}
       refreshControl={onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.gold} colors={[colors.navy, colors.gold]} /> : undefined}
       {...rest}
     >
@@ -65,12 +67,21 @@ export interface HeaderProps {
   children?: ReactNode;
 }
 
+/** Web: the browser tab / screen-reader page title follows the screen ("Payments · KKT Customer Portal"). */
+export function useDocumentTitle(title: string | null | undefined): void {
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined") return;
+    document.title = title ? `${title} · KKT Customer Portal` : "KKT Customer Portal";
+  }, [title]);
+}
+
 /** Screen header with safe-area top padding. */
 export function Header({ title, subtitle, back, onBack, right, tone = "ivory", large, children }: HeaderProps): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const layout = useLayout();
   const onNavy = tone === "navy";
+  useDocumentTitle(title);
   const goBack = () => {
     if (onBack) return onBack();
     if (router.canGoBack()) router.back();
@@ -108,9 +119,11 @@ export function Section({ title, action, onAction, children, style }: { title?: 
             {title}
           </T>
           {action && onAction ? (
-            <T variant="caption" color={colors.navy} onPress={onAction} accessibilityRole="button">
-              {action}
-            </T>
+            <Pressable accessibilityRole="button" onPress={onAction} style={styles.sectionAction}>
+              <T variant="caption" color={colors.navy}>
+                {action}
+              </T>
+            </Pressable>
           ) : null}
         </View>
       ) : null}
@@ -131,6 +144,7 @@ export function Col({ children, flex = 1 }: { children: ReactNode; flex?: number
 }
 
 const styles = StyleSheet.create({
+  sectionAction: { minHeight: 44, justifyContent: "center", paddingHorizontal: 4, marginVertical: -12 },
   scroll: { flex: 1 },
   content: { paddingTop: space.lg, alignItems: "center" },
   column: { width: "100%", gap: space.lg },

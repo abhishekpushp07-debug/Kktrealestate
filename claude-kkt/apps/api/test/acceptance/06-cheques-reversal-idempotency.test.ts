@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
-  blockByCode, BOOT_TIMEOUT, bookingBody, bootAcceptance, createCustomer, defaultBankAccount, flatsOf, getBooking, key, L, ledgerOf, paymentBody, paymentModes, projectByCode,
+  blockByCode, BOOT_TIMEOUT, bookingBody, bootAcceptance, createCustomer, defaultBankAccount, flatsOf, getBooking, key, listAtCr, L, ledgerOf, paymentBody, paymentModes, projectByCode,
   type Booking, type ErrorBody, type Harness, type List, type Payment, type PostPaymentResponse,
 } from "./harness.js";
 
@@ -33,6 +33,7 @@ beforeAll(async () => {
   const sgh = await projectByCode(h, admin, "SGH");
   const towerC = await blockByCode(h, admin, sgh.id, "C");
   const flat = (await flatsOf(h, admin, towerC.id)).get("C-1102")!;
+  await listAtCr(h, admin, [flat.id]);
   const customer = await createCustomer(h, sales, "Acceptance Buyer Six", "9898000006");
   const r = await h.request<Booking & ErrorBody>("POST", "/api/v1/bookings", { token: sales, body: bookingBody(h, flat.id, customer.id), headers: { "idempotency-key": key() } });
   if (r.status !== 201) throw new Error(r.text);

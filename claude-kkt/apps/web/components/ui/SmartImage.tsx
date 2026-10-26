@@ -53,8 +53,7 @@ export function SmartImage({
   if (!resolved) {
     return (
       <div
-        role="img"
-        aria-label={alt || undefined}
+        {...(alt ? { role: "img", "aria-label": alt } : { "aria-hidden": true })}
         className={`${fill ? "absolute inset-0" : ""} ${wrapperClassName}`.trim()}
         style={{ backgroundImage: PLACEHOLDER_GRADIENT }}
       />

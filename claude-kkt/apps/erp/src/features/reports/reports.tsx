@@ -41,6 +41,7 @@ import {
 import { Badge, StatusChip, type DataTablePagination } from "@/components/ui";
 import type { QueryParams } from "@/lib/api";
 import { formatDate, formatDateTime, formatINRShort, formatNumber, formatPercent } from "@/lib/format";
+import type { PermissionRequirement } from "@/lib/permissions";
 import { humanize } from "@/lib/utils";
 import { BookingRef, Due, Money, Pct, ReportSection, ReportTable, StatGrid, TwoLine, type ReportColumn } from "./ReportSections";
 import type { FilterDef } from "./reportQuery";
@@ -72,6 +73,8 @@ export interface ReportDefinition {
   paginated?: boolean;
   /** Export formats offered (every report supports CSV + PDF per the contract). */
   formats: readonly ("csv" | "pdf")[];
+  /** Extra permission the API requires beyond report.view (the catalogue hides the card and the page shows Forbidden without it). */
+  permission?: PermissionRequirement;
   render: (data: unknown, context: RenderContext) => ReactNode;
 }
 
@@ -696,6 +699,8 @@ const activity = defineReport<ActivityReportResponse>({
   group: "operations",
   icon: Activity,
   path: "/reports/activity",
+  // GET /reports/activity is guarded by audit.view, not report.view (docs/TODO-integration.md item 10)
+  permission: "audit.view",
   paginated: true,
   filters: [{ kind: "dateRange", required: false }, { kind: "enum", key: "kind", label: "Kind", options: [{ value: "AUDIT", label: "Audit actions" }, { value: "LOGIN", label: "Logins" }, { value: "FAILED_LOGIN", label: "Failed logins" }], defaultValue: "AUDIT" }, { kind: "user", key: "user_id", label: "User" }, { kind: "text", key: "entity_type", label: "Entity type", placeholder: "booking, payment…" }],
   render: (data, context) => (
@@ -721,6 +726,11 @@ const activity = defineReport<ActivityReportResponse>({
 });
 
 export const REPORTS: readonly ReportDefinition[] = [collections, outstanding, advances, demandVsCollection, upcomingDues, cheques, cancellations, bankwise, roznamcha, salesFunnel, inventory, activity];
+
+/** Generic reports this user may open (report.view is checked by the route; some reports need more, e.g. Activity → audit.view). */
+export function reportsFor(can: (permission: PermissionRequirement) => boolean): ReportDefinition[] {
+  return REPORTS.filter((report) => !report.permission || can(report.permission));
+}
 
 export function findReport(slug: string | undefined): ReportDefinition | undefined {
   return REPORTS.find((report) => report.slug === slug);

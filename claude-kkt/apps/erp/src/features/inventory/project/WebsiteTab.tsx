@@ -292,14 +292,14 @@ function HeroImagesCard({ project, canWrite }: { project: ProjectRow; canWrite: 
                   <span className="absolute left-1 top-1 flex size-5 items-center justify-center rounded-full bg-navy-950 text-[10px] font-bold text-white">{index === 0 ? <Star className="size-3 text-gold" aria-hidden="true" /> : index + 1}</span>
                   {canWrite && (
                     <div className="mt-1 flex items-center justify-between">
-                      <button type="button" className="text-2xs text-ink-subtle hover:text-navy-950 disabled:opacity-40" disabled={index === 0} onClick={() => move(id, -1)}>
-                        ◄
+                      <button type="button" aria-label="Move earlier" className="inline-flex size-8 items-center justify-center rounded-sm text-xs text-ink-subtle hover:bg-navy-50 hover:text-navy-950 focus-ring disabled:opacity-40" disabled={index === 0} onClick={() => move(id, -1)}>
+                        <span aria-hidden="true">◄</span>
                       </button>
-                      <button type="button" className="text-2xs text-danger-fg hover:underline" onClick={() => toggle(id)}>
+                      <button type="button" className="inline-flex min-h-8 items-center px-1 text-2xs text-danger-fg hover:underline focus-ring" onClick={() => toggle(id)}>
                         Remove
                       </button>
-                      <button type="button" className="text-2xs text-ink-subtle hover:text-navy-950 disabled:opacity-40" disabled={index === selected.length - 1} onClick={() => move(id, 1)}>
-                        ►
+                      <button type="button" aria-label="Move later" className="inline-flex size-8 items-center justify-center rounded-sm text-xs text-ink-subtle hover:bg-navy-50 hover:text-navy-950 focus-ring disabled:opacity-40" disabled={index === selected.length - 1} onClick={() => move(id, 1)}>
+                        <span aria-hidden="true">►</span>
                       </button>
                     </div>
                   )}

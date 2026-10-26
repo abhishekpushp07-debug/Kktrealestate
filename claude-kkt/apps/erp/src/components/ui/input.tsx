@@ -1,9 +1,10 @@
 import type { LucideIcon } from "lucide-react";
 import type { InputHTMLAttributes, ReactNode, Ref, TextareaHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
+import { useFieldAria } from "./field-context";
 
 export const inputClassName =
-  "h-11 sm:h-9 w-full min-w-0 rounded-md border border-border-strong bg-card px-3 text-sm text-ink shadow-none transition-colors placeholder:text-ink-subtle hover:border-navy-300 focus-ring focus-visible:border-gold disabled:cursor-not-allowed disabled:bg-surface disabled:text-ink-subtle aria-invalid:border-danger aria-invalid:focus-visible:border-danger read-only:bg-surface";
+  "h-12 sm:h-9 w-full min-w-0 rounded-md border border-border-input bg-card px-3 text-sm text-ink shadow-none transition-colors placeholder:text-ink-subtle hover:border-navy-400 focus-ring focus-visible:border-gold disabled:cursor-not-allowed disabled:bg-surface disabled:text-ink-subtle aria-invalid:border-danger aria-invalid:focus-visible:border-danger read-only:bg-surface";
 
 export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "size" | "prefix"> {
   ref?: Ref<HTMLInputElement>;
@@ -19,12 +20,13 @@ export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 
 export function Input({ className, invalid, leftIcon: LeftIcon, prefix, suffix, wrapperClassName, ref, ...props }: InputProps) {
   const hasLeft = Boolean(LeftIcon || prefix);
   const hasRight = Boolean(suffix);
+  const aria = useFieldAria(props.id, { invalid, "aria-invalid": props["aria-invalid"], "aria-describedby": props["aria-describedby"], "aria-required": props["aria-required"] });
   const field = (
     <input
       ref={ref}
       className={cn(inputClassName, hasLeft && "pl-9", hasRight && "pr-10", className)}
-      aria-invalid={invalid || props["aria-invalid"] || undefined}
       {...props}
+      {...aria}
     />
   );
   if (!hasLeft && !hasRight) return field;
@@ -48,13 +50,14 @@ export interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElemen
 }
 
 export function Textarea({ className, invalid, rows = 3, ref, ...props }: TextareaProps) {
+  const aria = useFieldAria(props.id, { invalid, "aria-invalid": props["aria-invalid"], "aria-describedby": props["aria-describedby"], "aria-required": props["aria-required"] });
   return (
     <textarea
       ref={ref}
       rows={rows}
       className={cn(inputClassName, "h-auto min-h-[4.5rem] resize-y py-2 leading-5", className)}
-      aria-invalid={invalid || props["aria-invalid"] || undefined}
       {...props}
+      {...aria}
     />
   );
 }

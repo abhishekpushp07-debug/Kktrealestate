@@ -4,7 +4,7 @@
  */
 import { and, asc, eq, inArray, isNull, lte, gte, or, sql, type SQL } from "drizzle-orm";
 import type { ApplicablePlanRow, InstallmentRow, SchedulePreviewResponse, TriggerType } from "@kkt/contracts";
-import { blockStages, blocks, constructionStages, paymentPlanAssignments, paymentPlanInstallments, paymentPlans, projects, type Executor, type PlanSnapshot } from "@kkt/db";
+import { blockStages, blocks, bookings, constructionStages, paymentPlanAssignments, paymentPlanInstallments, paymentPlans, projects, type Executor, type PlanSnapshot } from "@kkt/db";
 import { missingStagesForTower, schedulePreview, triggerLabel } from "@kkt/domain";
 import { ApiError } from "../../../lib/errors.js";
 import { loadTowerStages, snapshotInstallments, todayDate } from "../common.js";
@@ -105,6 +105,113 @@ export async function assertPlanFitsScope(db: Executor, loaded: LoadedPlan, proj
     const names = [...new Set(missing.map((m) => m.name))].join(", ");
     throw ApiError.conflict("PLAN_STAGES_MISSING", `Plan "${loaded.plan.name}" references stages missing from the tower's stage sequence: ${names}`, { missing_stages: missing });
   }
+}
+
+/** One missing stage of an assignment that no longer fits (details.missing_stages of 409 PLAN_STAGES_MISSING). */
+export interface MissingAssignmentStage {
+  id: string;
+  name: string;
+  block_id: string;
+  block_name: string;
+  plan_id: string;
+  plan_name: string;
+  assignment_id: string;
+}
+
+/**
+ * An ACTIVE booking of the tower whose plan SNAPSHOT has an installment the tower could no longer raise (details.stranded_bookings of
+ * 409 PLAN_STAGES_MISSING): an ON_STAGE installment on a stage the tower lacks, or an ON_POSSESSION one without a possession stage.
+ */
+export interface StrandedBookingInstallment {
+  booking_id: string;
+  booking_number: string;
+  installment_seq: number;
+  installment_name: string;
+  stage_id: string | null;
+  stage_name: string | null;
+}
+
+function throwMissing(missing: readonly MissingAssignmentStage[], what: string, stranded: readonly StrandedBookingInstallment[] = []): void {
+  if (missing.length === 0 && stranded.length === 0) return;
+  const lines = [
+    ...new Set(missing.map((m) => `"${m.plan_name}" needs ${m.name} on ${m.block_name}`)),
+    ...new Set(stranded.map((s) => `booking ${s.booking_number} installment ${s.installment_seq} "${s.installment_name}" needs ${s.stage_name ?? (s.stage_id ? s.stage_id : "a possession stage")}`)),
+  ].join("; ");
+  throw ApiError.conflict("PLAN_STAGES_MISSING", `${what} would leave payment plans referencing stages the tower does not have: ${lines}`, { missing_stages: missing, stranded_bookings: stranded });
+}
+
+/**
+ * ACTIVE bookings of a block whose plan snapshot (taken at booking, never re-read from the plan) has an installment the block's CURRENT
+ * stage records cannot trigger. Such an installment is never raised and blocks handover forever, so a stage-sequence change that
+ * strands one is refused (audit E3: plan ↔ tower fit at every change point — the bookings' own snapshots included).
+ */
+async function strandedBookingInstallments(db: Executor, blockId: string): Promise<StrandedBookingInstallment[]> {
+  const rows = await db.select({ id: bookings.id, bookingNumber: bookings.bookingNumber, planSnapshot: bookings.planSnapshot }).from(bookings).where(and(eq(bookings.blockId, blockId), eq(bookings.status, "ACTIVE")));
+  if (rows.length === 0) return [];
+  const stages = await loadTowerStages(db, blockId);
+  const stageIds = new Set(stages.map((s) => s.stageId));
+  const hasPossession = stages.some((s) => s.isPossession);
+  const out: StrandedBookingInstallment[] = [];
+  for (const b of rows) {
+    for (const i of b.planSnapshot.installments) {
+      const missingStage = i.trigger_type === "ON_STAGE" && !!i.trigger_stage_id && !stageIds.has(i.trigger_stage_id);
+      const missingPossession = i.trigger_type === "ON_POSSESSION" && !hasPossession;
+      if (missingStage || missingPossession) {
+        out.push({ booking_id: b.id, booking_number: b.bookingNumber, installment_seq: i.seq, installment_name: i.name, stage_id: missingStage ? (i.trigger_stage_id ?? null) : null, stage_name: missingStage ? (i.trigger_stage_name ?? null) : null });
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Plan ↔ tower fit at every change point (SPEC §8, audit E3): re-validates every ACTIVE assignment covering `blockId` (block-specific
+ * and project-wide) against the block's CURRENT stage records — call it after a block's stage sequence was replaced or a block was
+ * created under a project-wide assignment, inside the same transaction, so a misfit rolls the change back with 409 PLAN_STAGES_MISSING.
+ */
+export async function assertAssignmentsFitBlock(db: Executor, companyId: string, blockId: string, what = "This change"): Promise<void> {
+  const [block] = await db.select({ id: blocks.id, projectId: blocks.projectId }).from(blocks).where(and(eq(blocks.id, blockId), eq(blocks.companyId, companyId))).limit(1);
+  if (!block) return;
+  // the tower's ACTIVE bookings carry their own plan snapshots: none may be left with an installment the new stages cannot raise
+  const stranded = await strandedBookingInstallments(db, blockId);
+  const assignments = await db.select({ a: paymentPlanAssignments, plan: paymentPlans }).from(paymentPlanAssignments).innerJoin(paymentPlans, eq(paymentPlans.id, paymentPlanAssignments.planId))
+    .where(and(eq(paymentPlanAssignments.companyId, companyId), eq(paymentPlanAssignments.projectId, block.projectId), or(eq(paymentPlanAssignments.blockId, blockId), isNull(paymentPlanAssignments.blockId)), eq(paymentPlanAssignments.isActive, true)));
+  if (assignments.length === 0) {
+    throwMissing([], what, stranded);
+    return;
+  }
+  const scopes = await stageIdsOfScope(db, block.projectId, blockId);
+  const installments = await loadPlansInstallments(db, assignments.map((x) => x.a.planId));
+  const missing: MissingAssignmentStage[] = [];
+  for (const { a, plan } of assignments) {
+    const inst = installments.get(plan.id) ?? [];
+    for (const scope of scopes) {
+      for (const id of missingStagesForTower(inst.map((i) => ({ seq: i.seq, triggerType: i.triggerType as TriggerType, triggerStageId: i.triggerStageId })), scope.stageIds)) {
+        missing.push({ id, name: inst.find((i) => i.triggerStageId === id)?.stageName ?? id, block_id: scope.blockId, block_name: scope.blockName, plan_id: plan.id, plan_name: plan.name, assignment_id: a.id });
+      }
+    }
+  }
+  throwMissing(missing, what, stranded);
+}
+
+/**
+ * Re-validates every ACTIVE assignment of a plan (each tower it covers) against the plan's CURRENT installments — call it after the
+ * plan's installments were replaced (masters edit), inside the same transaction → 409 PLAN_STAGES_MISSING when an assigned tower lacks a stage.
+ */
+export async function assertPlanFitsActiveAssignments(db: Executor, companyId: string, planId: string, what = "This plan edit"): Promise<void> {
+  const assignments = await db.select().from(paymentPlanAssignments).where(and(eq(paymentPlanAssignments.companyId, companyId), eq(paymentPlanAssignments.planId, planId), eq(paymentPlanAssignments.isActive, true)));
+  if (assignments.length === 0) return;
+  const loaded = await loadPlan(db, companyId, planId, { allowInactive: true });
+  const inst = loaded.installments.map((i) => ({ seq: i.seq, triggerType: i.triggerType as TriggerType, triggerStageId: i.triggerStageId }));
+  const missing: MissingAssignmentStage[] = [];
+  for (const a of assignments) {
+    for (const scope of await stageIdsOfScope(db, a.projectId, a.blockId)) {
+      for (const id of missingStagesForTower(inst, scope.stageIds)) {
+        missing.push({ id, name: loaded.installments.find((i) => i.triggerStageId === id)?.stageName ?? id, block_id: scope.blockId, block_name: scope.blockName, plan_id: loaded.plan.id, plan_name: loaded.plan.name, assignment_id: a.id });
+      }
+    }
+  }
+  throwMissing(missing, what);
 }
 
 /** Active assignments covering a block on a date (block-specific and project-wide), block default first, then project default. */

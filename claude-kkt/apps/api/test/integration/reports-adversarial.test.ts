@@ -1,4 +1,3 @@
-import { inflateSync } from "node:zlib";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { addDays, todayIST } from "@kkt/domain";
 import { parseCsv } from "../../src/lib/csv.js";
@@ -7,6 +6,7 @@ import { dashboardCacheKey, PDF_MAX_ROWS, REPORT_CATALOG, reportPdf } from "../.
 import { post, towerCBody } from "./fixtures/inventory.js";
 import { completeStage, createMoneyWorld, type MoneyWorld } from "./fixtures/money.js";
 import { buildTestApp, type ErrorBody, type TestContext } from "./helpers.js";
+import { pdfText } from "./pdfText.js";
 
 /**
  * Adversarial review of the reports module: other-charge receipts and reversals vs flat-value collections, ageing on REMAINING demand
@@ -61,23 +61,6 @@ async function json<T = Record<string, unknown>>(url: string, token = admin): Pr
   return r.body;
 }
 
-/** Text of a pdfkit PDF: inflates every content stream and decodes the WinAnsi hex strings of the TJ operators. */
-function pdfText(buf: Buffer): string {
-  const latin = buf.toString("latin1");
-  const out: string[] = [];
-  const re = /stream\r?\n([\s\S]*?)\r?\nendstream/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(latin)) !== null) {
-    const raw = Buffer.from(m[1]!, "latin1");
-    let content: string;
-    try { content = inflateSync(raw).toString("latin1"); } catch { content = raw.toString("latin1"); }
-    for (const tj of content.matchAll(/\[((?:<[0-9A-Fa-f]*>\s*-?[\d.]*\s*)+)\]\s*TJ/g)) {
-      const hex = [...tj[1]!.matchAll(/<([0-9A-Fa-f]*)>/g)].map((h) => h[1]!).join("");
-      out.push(Buffer.from(hex, "hex").toString("latin1"));
-    }
-  }
-  return out.join("\n");
-}
 
 beforeAll(async () => {
   t = await buildTestApp();

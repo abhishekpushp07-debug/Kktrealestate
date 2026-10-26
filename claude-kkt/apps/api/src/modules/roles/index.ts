@@ -24,6 +24,7 @@ import { listPaging, paginate } from "../../lib/list.js";
 import { translatePgError } from "../../lib/pgErrors.js";
 import { route } from "../../lib/routes.js";
 import { applyUpdate, expectedVersion, optionalExpectedVersion, withOptionalVersion } from "../../lib/version.js";
+import { assertCanGrant, escalationForbidden, isSuperAdmin } from "../../lib/scope.js";
 
 type DbRole = typeof roles.$inferSelect;
 interface RoleSelect { role: DbRole; userCount: number }
@@ -95,6 +96,7 @@ export async function rolesModule(app: FastifyInstance): Promise<void> {
     handler: async (req, reply) => {
       const ctx = req.user!;
       assertKnownPermissions(req.body.permissions);
+      assertCanGrant(ctx, req.body.permissions, "a role with these permissions");
       const row = await app.db.transaction(async (tx) => {
         let created: DbRole | undefined;
         try {
@@ -125,8 +127,11 @@ export async function rolesModule(app: FastifyInstance): Promise<void> {
       const version = expectedVersion(req, body);
       const row = await app.db.transaction(async (tx) => {
         const before = await getRoleRow(tx, ctx.companyId, req.params.id);
+        if (before.is_system && !isSuperAdmin(ctx)) throw escalationForbidden("SYSTEM_ROLE_SUPER_ADMIN_ONLY", "Only a Super Admin can edit a system role");
         if (before.is_system && (body.name !== undefined || body.permissions !== undefined)) throw ApiError.conflict("SYSTEM_ROLE", "System roles cannot be renamed or have their permissions changed");
         if (body.permissions) assertKnownPermissions(body.permissions);
+        // The role as it will stand after the edit may only carry permissions the editor holds.
+        if (!before.is_system) assertCanGrant(ctx, body.permissions ?? before.permissions, "this role");
         const changes: Record<string, unknown> = {};
         if (body.name !== undefined) changes["name"] = body.name;
         if (body.description !== undefined) changes["description"] = body.description;
@@ -149,6 +154,7 @@ export async function rolesModule(app: FastifyInstance): Promise<void> {
         const ctx = req.user!;
         const result = await app.db.transaction(async (tx) => {
           const before = await getRoleRow(tx, ctx.companyId, req.params.id);
+          if (action === "activate") assertCanGrant(ctx, before.permissions, "this role");
           if (action === "deactivate") {
             if (before.is_system) throw ApiError.conflict("SYSTEM_ROLE", "System roles cannot be deactivated");
             const [c] = await tx.select({ n: count() }).from(users).where(eq(users.roleId, req.params.id));

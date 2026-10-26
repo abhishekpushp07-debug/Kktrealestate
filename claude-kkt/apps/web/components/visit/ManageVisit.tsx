@@ -47,7 +47,7 @@ export function ManageVisit({ visit: initial, token }: { visit: SiteVisitManage;
     <div className="rounded-card border border-line bg-white p-6 shadow-card sm:p-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="eyebrow text-gold-600">Site visit</p>
+          <p className="eyebrow text-gold-700">Site visit</p>
           <h2 className="mt-2 font-display text-display-sm text-navy-900">{visit.visit_number}</h2>
           <p className="mt-1 text-ink-muted">{visit.project_name}</p>
         </div>
@@ -62,19 +62,20 @@ export function ManageVisit({ visit: initial, token }: { visit: SiteVisitManage;
       </div>
 
       <dl className="mt-8 grid gap-5 sm:grid-cols-2">
-        <div className="flex gap-3">
-          <CalendarIcon className="mt-0.5 shrink-0 text-gold-600" />
-          <div>
-            <dt className="text-xs uppercase tracking-widest text-ink-soft">Date</dt>
-            <dd className="font-semibold text-navy-900">{formatDate(visit.visit_date, "long")}</dd>
-          </div>
+        {/* dl > div > (dt, dd) only: the icons sit inside the dt, the maps link inside the dd */}
+        <div className="relative pl-9">
+          <dt className="text-xs uppercase tracking-widest text-ink-soft">
+            <CalendarIcon className="absolute left-0 top-0.5 text-gold-600" aria-hidden />
+            Date
+          </dt>
+          <dd className="font-semibold text-navy-900">{formatDate(visit.visit_date, "long")}</dd>
         </div>
-        <div className="flex gap-3">
-          <ClockIcon className="mt-0.5 shrink-0 text-gold-600" />
-          <div>
-            <dt className="text-xs uppercase tracking-widest text-ink-soft">Time (IST)</dt>
-            <dd className="font-semibold text-navy-900">{formatTimeRange(visit.slot_start, visit.slot_end)}</dd>
-          </div>
+        <div className="relative pl-9">
+          <dt className="text-xs uppercase tracking-widest text-ink-soft">
+            <ClockIcon className="absolute left-0 top-0.5 text-gold-600" aria-hidden />
+            Time (IST)
+          </dt>
+          <dd className="font-semibold text-navy-900">{formatTimeRange(visit.slot_start, visit.slot_end)}</dd>
         </div>
         {visit.visitors ? (
           <div>
@@ -89,17 +90,19 @@ export function ManageVisit({ visit: initial, token }: { visit: SiteVisitManage;
           </div>
         ) : null}
         {visit.site_office_address ? (
-          <div className="flex gap-3 sm:col-span-2">
-            <MapPinIcon className="mt-0.5 shrink-0 text-gold-600" />
-            <div>
-              <dt className="text-xs uppercase tracking-widest text-ink-soft">Site office</dt>
-              <dd className="whitespace-pre-line text-navy-900">{visit.site_office_address}</dd>
+          <div className="relative pl-9 sm:col-span-2">
+            <dt className="text-xs uppercase tracking-widest text-ink-soft">
+              <MapPinIcon className="absolute left-0 top-0.5 text-gold-600" aria-hidden />
+              Site office
+            </dt>
+            <dd className="whitespace-pre-line text-navy-900">
+              {visit.site_office_address}
               {visit.maps_link ? (
-                <a href={visit.maps_link} className="mt-1 inline-flex min-h-12 items-center gap-1 text-gold-700 underline-offset-4 hover:underline" rel="noopener noreferrer" target="_blank">
+                <a href={visit.maps_link} className="mt-1 flex min-h-12 w-fit items-center gap-1 text-gold-700 underline-offset-4 hover:underline" rel="noopener noreferrer" target="_blank">
                   Open in Maps <ExternalLinkIcon size={14} />
                 </a>
               ) : null}
-            </div>
+            </dd>
           </div>
         ) : null}
       </dl>

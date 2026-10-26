@@ -9,7 +9,7 @@ import { formatINR } from "@kkt/domain";
 import { writeAudit } from "../../../lib/audit.js";
 import { ApiError } from "../../../lib/errors.js";
 import { scopeFilter, type StaffContext } from "../../../lib/scope.js";
-import type { MoneyActor } from "../common.js";
+import { moneyTransaction, type MoneyActor } from "../common.js";
 import { bankLabel } from "./views.js";
 
 /** Cash in hand before `date` (exclusive): cleared cash receipts − deposits + withdrawals dated earlier. */
@@ -102,7 +102,7 @@ export async function roznamcha(db: Executor, user: StaffContext, from: string, 
 
 /** Records a contra entry; a deposit may not exceed the cash in hand at the end of that day (409 CASH_INSUFFICIENT). */
 export async function createContra(db: DB, user: StaffContext, body: ContraEntryCreate, actor: MoneyActor): Promise<string> {
-  return db.transaction(async (tx) => {
+  return moneyTransaction(db, async (tx) => {
     const [acct] = await tx.select({ id: bankAccounts.id, isActive: bankAccounts.isActive }).from(bankAccounts).where(and(eq(bankAccounts.id, body.bank_account_id), eq(bankAccounts.companyId, user.companyId))).limit(1);
     if (!acct) throw ApiError.badRequest("bank_account_id does not exist", { field: "bank_account_id" });
     if (!acct.isActive) throw ApiError.rule("Bank account is inactive", "BANK_ACCOUNT_INACTIVE");

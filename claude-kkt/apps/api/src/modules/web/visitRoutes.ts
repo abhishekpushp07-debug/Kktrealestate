@@ -24,7 +24,7 @@ import { availabilityCachePath } from "./publicVisits.js";
 import { bustPublicCache, clock } from "./shared.js";
 import {
   VISIT_SELECT, bookVisit, cancelVisit, domainSettings, ensureVisitSettings, isPast, joinVisit, loadVisitSelect, markOutcome, needsOutcomeCondition, nudgeVisitOutcomes,
-  projectAvailability, rescheduleVisit, visitRow, type VisitSelect,
+  manageUrl, projectAvailability, rescheduleVisit, visitRow, type VisitSelect,
 } from "./visitService.js";
 
 const idParams = z.object({ id: IdSchema });
@@ -204,7 +204,7 @@ export function registerVisitRoutes(app: FastifyInstance): void {
 
   route(app, {
     method: "POST", url: "/site-visits/:id/reschedule", permission: "visit.write",
-    schema: { params: idParams, body: VisitRescheduleSchema.partial({ version: true }), response: { 200: VisitRowSchema }, summary: "Move a visit to another slot (capacity-checked; status RESCHEDULED, rescheduled_from kept)" },
+    schema: { params: idParams, body: VisitRescheduleSchema.partial({ version: true }), response: { 200: VisitRowSchema }, summary: "Move a visit to another slot (capacity-checked; status RESCHEDULED, rescheduled_from kept); the visitor's manage link is rotated and the new one returned once in manage_url" },
     handler: async (req) => {
       const user = req.user!;
       const body = req.body;
@@ -216,7 +216,8 @@ export function registerVisitRoutes(app: FastifyInstance): void {
         return rescheduleVisit(tx, existing.v, settings, body.visit_date, body.slot_start, body.notes, { actor: actorFromRequest(req), ...auditMeta(req) });
       });
       await bustAvailability(app, result.projectId);
-      return visitRow(await loadVisitSelect(app.db, user.companyId, result.id));
+      // The reschedule rotated the visitor's manage link: hand the new one to staff (once) so they can share it.
+      return { ...visitRow(await loadVisitSelect(app.db, user.companyId, result.id)), manage_url: manageUrl(result.newManageToken) };
     },
   });
 

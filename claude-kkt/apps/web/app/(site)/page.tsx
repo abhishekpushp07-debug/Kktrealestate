@@ -56,7 +56,7 @@ export default async function HomePage() {
       {introText ? (
         <Section tone="ivory">
           <Reveal className="mx-auto max-w-prose text-center">
-            <p className="eyebrow text-gold-600">{intro?.title ?? `About ${brand}`}</p>
+            <p className="eyebrow text-gold-700">{intro?.title ?? `About ${brand}`}</p>
             <Markdown source={introText} className="prose-kkt mt-6 font-display text-2xl leading-relaxed text-navy-900 sm:text-3xl [&_p]:font-display" />
           </Reveal>
         </Section>

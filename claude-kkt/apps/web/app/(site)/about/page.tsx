@@ -127,7 +127,7 @@ export default async function AboutPage() {
       <Section tone="ivory">
         <div className="flex flex-col items-start justify-between gap-6 rounded-card border border-line bg-white p-8 sm:flex-row sm:items-center sm:p-10">
           <div>
-            <p className="eyebrow text-gold-600">Next step</p>
+            <p className="eyebrow text-gold-700">Next step</p>
             <h2 className="mt-2 font-display text-display-sm text-navy-900">See the craft for yourself.</h2>
           </div>
           <Button href="/projects">

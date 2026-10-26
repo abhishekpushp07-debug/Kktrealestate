@@ -8,7 +8,7 @@ import type {
   AccountsDashboardResponse, ChequeRow, DashboardQuery, DashboardResponse, DashboardRole, DemandStatus, EmployeeDashboardResponse, LeadStage, MoneyCategory, OwnerDashboardResponse,
   ProjectAdminDashboardResponse, SalesDashboardResponse, VisitStatus,
 } from "@kkt/contracts";
-import { blockStages, blocks, bookings, demands, enquiries, leads, notices, payments, projects, serviceRequests, type Executor } from "@kkt/db";
+import { blockStages, blocks, bookings, demands, enquiries, leads, notices, payments, projects, type Executor } from "@kkt/db";
 import { addDays, compareDates, diffDays, installmentAmounts } from "@kkt/domain";
 import { cached } from "../../../lib/cache.js";
 import { ensureProjectAccess, scopeFilter, type StaffContext } from "../../../lib/scope.js";

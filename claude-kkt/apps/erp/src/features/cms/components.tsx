@@ -107,7 +107,7 @@ export interface DateTimeInputProps {
   "data-testid"?: string;
 }
 
-/** Native datetime-local picker; stores an ISO instant and shows the IST rendering underneath. */
+/** Native datetime-local picker on the IST wall clock (whatever the browser zone); stores an ISO instant and shows the IST rendering underneath. */
 export function DateTimeInput({ value, onChange, id, invalid, disabled, min, ...rest }: DateTimeInputProps) {
   return (
     <div className="min-w-0">

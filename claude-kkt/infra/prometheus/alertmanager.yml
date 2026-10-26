@@ -1,0 +1,25 @@
+# Alert routing (docker-compose.prod.yml --profile monitoring). Critical alerts page immediately; warnings are grouped.
+# The Slack-compatible webhook URL is the same secret the API's error reporter uses (infra/secrets/error_webhook_url).
+route:
+  receiver: ops
+  group_by: [alertname, route, job]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers: [severity="critical"]
+      receiver: ops
+      group_wait: 10s
+      repeat_interval: 1h
+receivers:
+  - name: ops
+    slack_configs:
+      - api_url_file: /run/secrets/error_webhook_url
+        send_resolved: true
+        title: "{{ .Status | toUpper }} {{ .CommonLabels.alertname }} ({{ .CommonLabels.severity }})"
+        text: '{{ range .Alerts }}{{ .Annotations.summary }} — {{ .Annotations.description }}{{ "\n" }}{{ end }}'
+inhibit_rules:
+  # when the API is down, do not also page for its latency/5xx
+  - source_matchers: [alertname="KktApiDown"]
+    target_matchers: [component="api"]
+    equal: [job]

@@ -9,6 +9,7 @@ import { financialYear, todayIST } from "@kkt/domain";
 import { createPortalCustomer, createProject } from "./fixtures.js";
 import { createActiveBooking } from "./fixtures/crm.js";
 import { buildTestApp, freshIp, type ErrorBody, type TestContext } from "./helpers.js";
+import { startTestWorker, waitFor, waitForExport, waitForRun, type TestWorker } from "./worker.js";
 
 type Settings = {
   id: string; name: string; version: number; fy_start_month: number;
@@ -16,7 +17,8 @@ type Settings = {
   settings: { demand_due_days: number; default_gst_percent: number; round_robin_enabled: boolean; force_mfa_for_admins: boolean; sla_hours: Record<string, number>; booking_hold_hours: number };
   numbering_preview: { scope: string; fy: string; last_sequence: number; next_number: string }[];
 };
-type Backup = { id: string; download_url: string; expires_at: string; file_name: string; size_bytes: number; table_count: number; row_count: number; include_sensitive: boolean };
+type Backup = { id: string; status: string; run_id: string | null; file_name: string | null; size_bytes: number | null; table_count: number | null; row_count: number | null; include_sensitive: boolean; finished_at: string | null; storage_expires_at: string | null; error: string | null };
+type BackupLink = { download_url: string; expires_at: string; file_name: string; size_bytes: number | null };
 type JobRun = { id: string; job_name: string; status: string; result: Record<string, unknown> | null; error: string | null };
 type Mismatch = { booking_id: string; booking_number: string; field: string; stored: number; recomputed: number };
 
@@ -25,6 +27,7 @@ let admin: string;
 let accounts: string;
 let sales: string;
 let ops: string; // custom role holding admin.tools + settings.manage but NOT the Super Admin role
+let worker: TestWorker;
 const fy = financialYear(todayIST(), 4).label;
 
 beforeAll(async () => {
@@ -37,8 +40,9 @@ beforeAll(async () => {
   const user = await t.request<{ id: string }>("POST", "/api/v1/users", { token: admin, body: { name: "Ops Person", email: "ops@sgb.in", role_id: role.body.id, all_projects: true, password: "OpsTools@2025", must_change_password: false } });
   expect(user.status, user.text).toBe(201);
   ops = (await t.login("ops@sgb.in", "OpsTools@2025")).access_token;
+  worker = await startTestWorker(t.app);
 });
-afterAll(async () => { await t?.close(); });
+afterAll(async () => { await worker?.close(); await t?.close(); });
 
 async function auditRows(action: string): Promise<{ before: Record<string, unknown> | null; after: Record<string, unknown> | null; entity_id: string | null }[]> {
   return t.app.sql<{ before: Record<string, unknown> | null; after: Record<string, unknown> | null; entity_id: string | null }[]>`select before, after, entity_id from audit_logs where action = ${action} order by created_at`;
@@ -115,12 +119,19 @@ describe("admin · company settings", () => {
 
 describe("admin · backup", () => {
   let first: Backup;
-  let zipBytes: Buffer;
+  let firstLink: BackupLink;
+  let zipFile: string;
 
   async function download(url: string): Promise<{ status: number; headers: Record<string, unknown>; bytes: Buffer }> {
     const path = url.replace(/^https?:\/\/[^/]+/, "");
     const res = await t.app.inject({ method: "GET", url: path, headers: { "x-forwarded-for": freshIp() } });
     return { status: res.statusCode, headers: res.headers as Record<string, unknown>, bytes: res.rawPayload };
+  }
+
+  async function finished(id: string): Promise<Backup> {
+    await waitForExport(t.app, id, 120_000);
+    const list = await t.request<{ items: Backup[] }>("GET", "/api/v1/admin/backups", { token: admin });
+    return list.body.items.find((i) => i.id === id)!;
   }
 
   it("Accounts (no admin.tools) → 403 FORBIDDEN; admin.tools without the Super Admin role → 403 SUPER_ADMIN_ONLY", async () => {
@@ -135,99 +146,113 @@ describe("admin · backup", () => {
     expect(l.body.error.code).toBe("SUPER_ADMIN_ONLY");
   });
 
-  it("Super Admin gets a ZIP with manifest, RESTORE.md and one JSON per table; sensitive columns stripped; `unzip -t` passes", async () => {
+  it("Super Admin queues BACKUP_EXPORT (202); the worker streams a ZIP with manifest, RESTORE.md and one NDJSON per table; sensitive columns stripped; `unzip -t` passes", async () => {
     await t.app.sql`insert into customers (company_id, customer_code, full_name, phone, pan_enc, pan_hash, pan_last4) values (${t.companyId}, 'CUST-BK01', 'Backup Subject', '9876500001', 'k1.iv.tag.ct', 'hash', '234F')`;
-    const { backupTables } = await import("../../src/modules/admin/index.js");
+    const { backupTables, readZipEntries, readZipText } = await import("../../src/modules/admin/index.js");
     const tables = backupTables();
     expect(tables.length).toBeGreaterThanOrEqual(77);
 
     const r = await t.request<Backup>("POST", "/api/v1/admin/backup", { token: admin, body: {}, headers: { "idempotency-key": "bk-1" } });
-    expect(r.status, r.text).toBe(201);
-    first = r.body;
-    expect(first.table_count).toBe(tables.length);
-    expect(first.include_sensitive).toBe(false);
-    expect(first.file_name).toMatch(/^kkt-backup-\d{8}-\d{6}Z-[0-9a-f]{8}\.zip$/);
-    expect(first.download_url).toContain("/api/v1/admin/backups/download/");
-    expect(new Date(first.expires_at).getTime() - Date.now()).toBeLessThanOrEqual(15 * 60 * 1000 + 2000);
-    expect(new Date(first.expires_at).getTime() - Date.now()).toBeGreaterThan(14 * 60 * 1000);
-
+    expect(r.status, r.text).toBe(202);
+    expect(r.body).toMatchObject({ status: "QUEUED", include_sensitive: false, file_name: null, generated_by: expect.any(String) });
+    expect(r.body.run_id).toMatch(/^[0-9a-f-]{36}$/);
     const replay = await t.request<Backup>("POST", "/api/v1/admin/backup", { token: admin, body: {}, headers: { "idempotency-key": "bk-1" } });
-    expect(replay.status).toBe(201);
+    expect(replay.status).toBe(202);
     expect(replay.headers["idempotent-replayed"]).toBe("true");
-    expect(replay.body.id).toBe(first.id);
+    expect(replay.body.id).toBe(r.body.id);
 
-    const dl = await download(first.download_url);
+    first = await finished(r.body.id);
+    expect(first.status, first.error ?? "").toBe("DONE");
+    expect(first.table_count).toBe(tables.length);
+    expect(first.file_name).toMatch(/^kkt-backup-\d{8}-\d{6}Z-[0-9a-f]{8}\.zip$/);
+    expect(new Date(first.storage_expires_at!).getTime() - Date.now()).toBeGreaterThan(23 * 3600 * 1000);
+    const run = await waitForRun(t.app, r.body.run_id!);
+    expect(run).toMatchObject({ job_name: "BACKUP_EXPORT", status: "OK" });
+
+    const link = await t.request<BackupLink>("POST", `/api/v1/admin/backups/${first.id}/link`, { token: admin });
+    expect(link.status, link.text).toBe(200);
+    firstLink = link.body;
+    expect(firstLink.download_url).toContain("/api/v1/admin/backups/download/");
+    expect(new Date(firstLink.expires_at).getTime() - Date.now()).toBeLessThanOrEqual(15 * 60 * 1000 + 2000);
+    expect((await t.request<ErrorBody>("POST", `/api/v1/admin/backups/${first.id}/link`, { token: ops })).status).toBe(403);
+
+    const dl = await download(firstLink.download_url);
     expect(dl.status).toBe(200);
     expect(String(dl.headers["content-type"])).toContain("application/zip");
-    expect(String(dl.headers["content-disposition"])).toContain(first.file_name);
-    zipBytes = dl.bytes;
-    expect(zipBytes.length).toBe(first.size_bytes);
-    expect(zipBytes.subarray(0, 4).toString("hex")).toBe("504b0304");
+    expect(String(dl.headers["content-disposition"])).toContain(first.file_name!);
+    expect(dl.bytes.length).toBe(first.size_bytes);
+    expect(dl.bytes.subarray(0, 4).toString("hex")).toBe("504b0304");
 
-    const dir = mkdtempSync(join(tmpdir(), "kkt-backup-"));
-    const file = join(dir, first.file_name);
-    writeFileSync(file, zipBytes);
-    let unzipAvailable = true;
-    let listing = "";
-    try { listing = execFileSync("unzip", ["-t", file], { encoding: "utf8" }); } catch (err) { if ((err as NodeJS.ErrnoException).code === "ENOENT") unzipAvailable = false; else throw err; }
-    if (unzipAvailable) expect(listing).toContain("No errors detected");
+    zipFile = join(mkdtempSync(join(tmpdir(), "kkt-backup-")), first.file_name!);
+    writeFileSync(zipFile, dl.bytes);
+    try { expect(execFileSync("unzip", ["-t", zipFile], { encoding: "utf8" })).toContain("No errors detected"); } catch (err) { if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err; }
 
-    const { readCentralDirectory, readZipEntry } = await import("../../src/modules/admin/index.js");
-    const entries = readCentralDirectory(zipBytes);
-    expect(entries).toHaveLength(tables.length + 2);
-    const names = entries.map((e) => e.name);
-    expect(names).toContain("manifest.json");
-    expect(names).toContain("RESTORE.md");
-    for (const tbl of tables) expect(names).toContain(`tables/${tbl.name}.json`);
-    const byName = (n: string) => entries.find((e) => e.name === n)!;
-    const manifest = JSON.parse(readZipEntry(zipBytes, byName("manifest.json")).toString("utf8")) as { format: string; include_sensitive: boolean; table_count: number; row_count: number; tables: { name: string; rows: number; stripped_columns: string[] }[] };
-    expect(manifest.format).toBe("kkt-backup/1");
+    const names = (await readZipEntries(zipFile)).map((e) => e.name);
+    expect(names).toHaveLength(tables.length + 2);
+    expect(names).toEqual(expect.arrayContaining(["manifest.json", "RESTORE.md"]));
+    for (const tbl of tables) expect(names).toContain(`tables/${tbl.name}.ndjson`);
+    const manifest = JSON.parse(await readZipText(zipFile, "manifest.json")) as { format: string; include_sensitive: boolean; table_count: number; row_count: number; tables: { name: string; rows: number; stripped_columns: string[] }[] };
+    expect(manifest.format).toBe("kkt-backup/2");
     expect(manifest.include_sensitive).toBe(false);
     expect(manifest.table_count).toBe(tables.length);
     expect(manifest.row_count).toBe(first.row_count);
     expect(manifest.tables.find((x) => x.name === "users")!.stripped_columns).toEqual(expect.arrayContaining(["password_hash", "mfa_secret_enc", "mfa_pending_secret_enc"]));
     expect(manifest.tables.find((x) => x.name === "refresh_tokens")!.stripped_columns).toContain("token_hash");
     expect(manifest.tables.find((x) => x.name === "customers")!.stripped_columns).toEqual(expect.arrayContaining(["pan_enc", "aadhaar_enc"]));
-    const users = JSON.parse(readZipEntry(zipBytes, byName("tables/users.json")).toString("utf8")) as Record<string, unknown>[];
+    const ndjson = async (table: string) => (await readZipText(zipFile, `tables/${table}.ndjson`)).split("\n").filter(Boolean).map((l) => JSON.parse(l) as Record<string, unknown>);
+    const users = await ndjson("users");
     expect(users.length).toBeGreaterThanOrEqual(6);
     for (const u of users) { expect(u).not.toHaveProperty("password_hash"); expect(u).toHaveProperty("email"); expect(u).toHaveProperty("role_id"); }
-    const customers = JSON.parse(readZipEntry(zipBytes, byName("tables/customers.json")).toString("utf8")) as Record<string, unknown>[];
-    const subject = customers.find((c) => c["customer_code"] === "CUST-BK01")!;
+    const subject = (await ndjson("customers")).find((c) => c["customer_code"] === "CUST-BK01")!;
     expect(subject).toBeDefined();
     expect(subject).not.toHaveProperty("pan_enc");
     expect(subject["pan_last4"]).toBe("234F");
-    expect(readZipEntry(zipBytes, byName("RESTORE.md")).toString("utf8")).toContain("Restoring a KKT backup");
-    // every entry inflates and matches its CRC
-    for (const e of entries) expect(readZipEntry(zipBytes, e).length).toBe(e.uncompressedSize);
+    const restoreMd = await readZipText(zipFile, "RESTORE.md");
+    expect(restoreMd).toContain("Restoring a KKT backup");
+    expect(restoreMd).toContain("pnpm --filter @kkt/api restore");
+    expect(restoreMd).not.toContain("session_replication_role");
 
     const audits = await auditRows("backup.export");
     expect(audits).toHaveLength(1);
     expect(audits[0]!.after).toMatchObject({ backup_id: first.id, include_sensitive: false });
+    const [bell] = await t.app.sql<{ n: number }[]>`select count(*)::int as n from notifications where type = 'EXPORT_READY' and entity_id = ${first.id}`;
+    expect(bell!.n).toBe(1);
   });
 
-  it("include_sensitive keeps the encrypted/hashed columns; the list shows both archives newest first", async () => {
+  it("a backup that is not finished has no link (409 EXPORT_NOT_READY); another company's backup is 404", async () => {
+    const [queued] = await t.app.sql<{ id: string }[]>`insert into exports (company_id, user_id, path, query, status) select ${t.companyId}, id, 'admin:backup', '{"kind":"backup","include_sensitive":false}'::jsonb, 'RUNNING' from users where email = 'admin@sgb.in' returning id`;
+    const r = await t.request<ErrorBody>("POST", `/api/v1/admin/backups/${queued!.id}/link`, { token: admin });
+    expect(r.status).toBe(409);
+    expect(r.body.error.code).toBe("EXPORT_NOT_READY");
+    await t.app.sql`delete from exports where id = ${queued!.id}`;
+    expect((await t.request("POST", "/api/v1/admin/backups/11111111-1111-4111-8111-111111111111/link", { token: admin })).status).toBe(404);
+  });
+
+  it("include_sensitive keeps the encrypted/hashed columns; the list shows both backups newest first with their status", async () => {
     const r = await t.request<Backup>("POST", "/api/v1/admin/backup", { token: admin, body: { include_sensitive: true } });
-    expect(r.status, r.text).toBe(201);
-    expect(r.body.include_sensitive).toBe(true);
-    const dl = await download(r.body.download_url);
+    expect(r.status, r.text).toBe(202);
+    const done = await finished(r.body.id);
+    expect(done).toMatchObject({ status: "DONE", include_sensitive: true });
+    const link = await t.request<BackupLink>("POST", `/api/v1/admin/backups/${done.id}/link`, { token: admin });
+    const dl = await download(link.body.download_url);
     expect(dl.status).toBe(200);
-    const { readCentralDirectory, readZipEntry } = await import("../../src/modules/admin/index.js");
-    const entries = readCentralDirectory(dl.bytes);
-    const users = JSON.parse(readZipEntry(dl.bytes, entries.find((e) => e.name === "tables/users.json")!).toString("utf8")) as Record<string, unknown>[];
-    expect(users.every((u) => typeof u["password_hash"] === "string" && (u["password_hash"] as string).startsWith("$argon2"))).toBe(true);
-    const customers = JSON.parse(readZipEntry(dl.bytes, entries.find((e) => e.name === "tables/customers.json")!).toString("utf8")) as Record<string, unknown>[];
-    expect(customers.find((c) => c["customer_code"] === "CUST-BK01")!["pan_enc"]).toBe("k1.iv.tag.ct");
-    const manifest = JSON.parse(readZipEntry(dl.bytes, entries.find((e) => e.name === "manifest.json")!).toString("utf8")) as { tables: { name: string; stripped_columns: string[] }[] };
+    const file = join(mkdtempSync(join(tmpdir(), "kkt-backup-")), "sens.zip");
+    writeFileSync(file, dl.bytes);
+    const { readZipText } = await import("../../src/modules/admin/index.js");
+    const ndjson = async (table: string) => (await readZipText(file, `tables/${table}.ndjson`)).split("\n").filter(Boolean).map((l) => JSON.parse(l) as Record<string, unknown>);
+    expect((await ndjson("users")).every((u) => typeof u["password_hash"] === "string" && (u["password_hash"] as string).startsWith("$argon2"))).toBe(true);
+    expect((await ndjson("customers")).find((c) => c["customer_code"] === "CUST-BK01")!["pan_enc"]).toBe("k1.iv.tag.ct");
+    const manifest = JSON.parse(await readZipText(file, "manifest.json")) as { tables: { name: string; stripped_columns: string[] }[] };
     expect(manifest.tables.every((x) => x.stripped_columns.length === 0)).toBe(true);
 
     const list = await t.request<{ items: Backup[] }>("GET", "/api/v1/admin/backups", { token: admin });
     expect(list.status).toBe(200);
     expect(list.body.items.map((i) => i.id)).toEqual([r.body.id, first.id]);
-    expect(list.body.items[1]).toMatchObject({ file_name: first.file_name, size_bytes: first.size_bytes, include_sensitive: false });
+    expect(list.body.items[1]).toMatchObject({ status: "DONE", file_name: first.file_name, size_bytes: first.size_bytes, include_sensitive: false });
   });
 
   it("download links are signed: a forged, expired, unknown or storage-expired token is 404; the fresh link still works", async () => {
-    const forged = `${first.download_url.slice(0, -2)}xx`;
+    const forged = `${firstLink.download_url.slice(0, -2)}xx`;
     expect((await download(forged)).status).toBe(404);
     const { signBackupToken } = await import("../../src/modules/admin/index.js");
     const now = Math.floor(Date.now() / 1000);
@@ -236,13 +261,14 @@ describe("admin · backup", () => {
     // a valid signature for a backup that does not exist
     expect((await download(`/api/v1/admin/backups/download/${signBackupToken("11111111-1111-4111-8111-111111111111", now + 60)}`)).status).toBe(404);
     // tampered body with the original signature
-    const [body, sig] = first.download_url.split("/").at(-1)!.split(".");
+    const [body, sig] = firstLink.download_url.split("/").at(-1)!.split(".");
     const tampered = `${body!.slice(0, 5)}${body![5] === "A" ? "B" : "A"}${body!.slice(6)}.${sig}`;
     expect((await download(`/api/v1/admin/backups/download/${tampered}`)).status).toBe(404);
-    expect((await download(first.download_url)).status).toBe(200);
-    // storage TTL (24 h): once the stored entry has expired the archive is gone even with a fresh signature
-    await t.app.redis.del(`backup:meta:${first.id}`);
-    expect((await download(first.download_url)).status).toBe(404);
+    expect((await download(firstLink.download_url)).status).toBe(200);
+    // storage TTL (24 h): once the backup has expired the archive is gone even with a fresh signature
+    await t.app.sql`update exports set expires_at = now() - interval '1 second' where id = ${first.id}`;
+    expect((await download(firstLink.download_url)).status).toBe(404);
+    expect((await t.request("POST", `/api/v1/admin/backups/${first.id}/link`, { token: admin })).status).toBe(404);
   });
 });
 
@@ -428,28 +454,34 @@ describe("admin · recompute / reconcile", () => {
 });
 
 describe("admin · jobs", () => {
-  it("lists every job with schedule/handler state and links to run-dues-now; run-now records a job_runs row", async () => {
-    const list = await t.request<{ jobs: { name: string; registered: boolean; cron: string | null; last_run: JobRun | null }[]; recent_runs: JobRun[]; links: Record<string, string> }>("GET", "/api/v1/admin/jobs", { token: admin });
+  type JobInfo = { name: string; registered: boolean; cron: string | null; schedule_enabled: boolean; last_run: JobRun | null; last_success: JobRun | null; failure_count_24h: number; failures_since_success: number; next_run_at: string | null };
+  it("lists every job with handler/schedule state, last run, last success, failure counts and next run; run-now enqueues (202) and the worker records job_runs", async () => {
+    const list = await t.request<{ jobs: JobInfo[]; recent_runs: JobRun[]; links: Record<string, string> }>("GET", "/api/v1/admin/jobs", { token: admin });
     expect(list.status, list.text).toBe(200);
     expect(list.body.jobs.map((j) => j.name).sort()).toEqual([...JOB_NAMES].sort());
     const recon = list.body.jobs.find((j) => j.name === "STARTUP_RECONCILIATION")!;
-    expect(recon.registered).toBe(true);
-    expect(recon.last_run).toBeNull();
+    expect(recon).toMatchObject({ registered: true, last_run: null, last_success: null, failure_count_24h: 0, failures_since_success: 0 });
     expect(list.body.jobs.find((j) => j.name === "DAILY_DUES")!.cron).toBe("30 0 * * *");
+    expect(list.body.jobs.find((j) => j.name === "PARTITION_MAINTENANCE")).toMatchObject({ registered: true, schedule_enabled: false, next_run_at: null });
+    for (const name of ["NOTIFICATION_SWEEP", "IDEMPOTENCY_PURGE", "EXPORT_CSV", "EXPORT_CLEANUP", "BACKUP_EXPORT"]) expect(list.body.jobs.find((j) => j.name === name)!.registered, name).toBe(true);
     expect(list.body.links["run_dues_now"]).toBe("/api/v1/dues/run");
     expect((await t.request("GET", "/api/v1/admin/jobs", { token: sales })).status).toBe(403);
 
-    const run = await t.request<JobRun>("POST", "/api/v1/admin/jobs/STARTUP_RECONCILIATION/run", { token: admin, body: {} });
-    expect(run.status, run.text).toBe(200);
-    expect(run.body).toMatchObject({ job_name: "STARTUP_RECONCILIATION", status: "OK", error: null });
-    expect(run.body.result).toMatchObject({ bookings_checked: expect.any(Number) });
-    const [row] = await t.app.sql<{ status: string; finished_at: string | null }[]>`select status, finished_at from job_runs where id = ${run.body.id}`;
-    expect(row).toMatchObject({ status: "OK" });
-    expect(row!.finished_at).not.toBeNull();
+    const run = await t.request<{ run_id: string; job_id: string; job_name: string; status: string; queued_at: string }>("POST", "/api/v1/admin/jobs/STARTUP_RECONCILIATION/run", { token: admin, body: {} });
+    expect(run.status, run.text).toBe(202);
+    expect(run.body).toMatchObject({ job_name: "STARTUP_RECONCILIATION", status: "QUEUED" });
+    const done = await waitForRun(t.app, run.body.run_id);
+    expect(done).toMatchObject({ status: "OK", error: null });
+    expect(done.result).toMatchObject({ bookings_checked: expect.any(Number) });
+    const one = await t.request<JobRun>("GET", `/api/v1/admin/jobs/runs/${run.body.run_id}`, { token: admin });
+    expect(one.status).toBe(200);
+    expect(one.body).toMatchObject({ id: run.body.run_id, status: "OK" });
+    expect((await t.request("GET", "/api/v1/admin/jobs/runs/11111111-1111-4111-8111-111111111111", { token: admin })).status).toBe(404);
 
-    const after = await t.request<{ jobs: { name: string; last_run: JobRun | null }[]; recent_runs: JobRun[] }>("GET", "/api/v1/admin/jobs", { token: admin });
-    expect(after.body.jobs.find((j) => j.name === "STARTUP_RECONCILIATION")!.last_run?.id).toBe(run.body.id);
-    expect(after.body.recent_runs[0]!.id).toBe(run.body.id);
+    const after = await t.request<{ jobs: JobInfo[]; recent_runs: JobRun[] }>("GET", "/api/v1/admin/jobs", { token: admin });
+    const reconAfter = after.body.jobs.find((j) => j.name === "STARTUP_RECONCILIATION")!;
+    expect(reconAfter.last_run?.id).toBe(run.body.run_id);
+    expect(reconAfter.last_success?.id).toBe(run.body.run_id);
 
     const runs = await t.request<{ items: JobRun[]; total: number }>("GET", "/api/v1/admin/jobs/runs?job_name=STARTUP_RECONCILIATION&status=OK", { token: admin });
     expect(runs.status, runs.text).toBe(200);
@@ -459,9 +491,9 @@ describe("admin · jobs", () => {
     expect(String(csv.headers["content-type"])).toContain("text/csv");
     expect(csv.text.split("\r\n")[0]).toBe("started_at,job_name,status,finished_at,error");
 
-    const audits = await auditRows("job.run");
+    const audits = await auditRows("job.enqueue");
     expect(audits).toHaveLength(1);
-    expect(audits[0]!.after).toMatchObject({ job_name: "STARTUP_RECONCILIATION", status: "OK" });
+    expect(audits[0]!.after).toMatchObject({ job_name: "STARTUP_RECONCILIATION" });
   });
 
   it("refuses unknown names (400) and jobs without a handler in this process (422 JOB_NOT_REGISTERED)", async () => {
@@ -473,6 +505,7 @@ describe("admin · jobs", () => {
       expect(r.status).toBe(422);
       expect(r.body.error.details?.["rule"]).toBe("JOB_NOT_REGISTERED");
     }
+    await waitFor("idle queue", async () => (await t.app.jobQueue().getActiveCount()) === 0);
   });
 });
 
@@ -486,7 +519,7 @@ describe("admin · reseed guard and system facts", () => {
     expect(o.status).toBe(403);
     expect(o.body.error.code).toBe("SUPER_ADMIN_ONLY");
     const r = await t.request<ErrorBody & { counts?: Record<string, number>; integrity?: { ok: boolean } }>("POST", "/api/v1/admin/reseed", { token: admin, body: { confirm: "RESEED" } });
-    expect([200, 501]).toContain(r.status);
+    expect([200, 501], r.text).toContain(r.status);
     if (r.status === 501) {
       expect(r.body.error.code).toBe("NOT_IMPLEMENTED");
       expect(r.body.error.message).toContain("reseed(db)");

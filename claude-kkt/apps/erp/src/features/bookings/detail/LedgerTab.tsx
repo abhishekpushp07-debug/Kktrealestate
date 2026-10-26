@@ -34,14 +34,14 @@ function RefLink({ row }: { row: LedgerRow }) {
   const isPayment = row.event === "PAYMENT" || row.event === "REVERSAL" || row.event === "OTHER_CHARGE_PAYMENT" || row.event === "OTHER_CHARGE_REVERSAL";
   if (isPayment && row.ref_id) {
     return (
-      <Link to={`/print/receipt/${row.ref_id}`} target="_blank" rel="noopener" className="money text-navy-800 hover:underline focus-ring rounded-xs" onClick={(event) => event.stopPropagation()}>
+      <Link to={`/print/receipt/${row.ref_id}`} target="_blank" rel="noopener" className="money text-navy-800 underline underline-offset-2 hover:text-navy-950 focus-ring rounded-xs" onClick={(event) => event.stopPropagation()}>
         {row.ref_number}
       </Link>
     );
   }
   if ((row.event === "DEMAND" || row.event === "OTHER_CHARGE_DEMAND") && row.ref_id) {
     return (
-      <Link to={`/print/demand/${row.booking_id}/${row.ref_id}`} target="_blank" rel="noopener" className="money text-navy-800 hover:underline focus-ring rounded-xs" onClick={(event) => event.stopPropagation()}>
+      <Link to={`/print/demand/${row.booking_id}/${row.ref_id}`} target="_blank" rel="noopener" className="money text-navy-800 underline underline-offset-2 hover:text-navy-950 focus-ring rounded-xs" onClick={(event) => event.stopPropagation()}>
         {row.ref_number}
       </Link>
     );

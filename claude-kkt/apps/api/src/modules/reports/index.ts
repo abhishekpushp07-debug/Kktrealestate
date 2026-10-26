@@ -9,6 +9,7 @@
  */
 import type { FastifyInstance } from "fastify";
 import { registerDashboardRoutes } from "./routes/dashboard.js";
+import { closePdfPool } from "./services/pdfPool.js";
 import { registerDocumentRoutes } from "./routes/documents.js";
 import { registerPresetRoutes } from "./routes/presets.js";
 import { registerReportRoutes } from "./routes/reports.js";
@@ -19,10 +20,17 @@ export { collectionsReport, outstandingReport, advancesReport, demandVsCollectio
 export { inventoryReport, projectInventory, salesFunnel, activityReport } from "./services/salesReports.js";
 export { dashboardFor, dashboardRoleFor, dashboardCacheKey, DASHBOARD_TTL_SECONDS } from "./services/dashboards.js";
 export { letterheadFor, wantedFormat, sendPdf } from "./common.js";
+export { closePdfPool, renderPdfBuffer, renderPdfStream } from "./services/pdfPool.js";
+/** Worker-thread entry (the PDF pool loads it from this module entry when the build has no separate pdfWorker entry). */
+export { default as pdfWorkerTask } from "./services/pdfWorker.js";
 export { REPORT_CATALOG, reportPath } from "./routes/reports.js";
 
 /** Fastify plugin: report, document, preset and dashboard routes. */
 export default async function reportsModule(app: FastifyInstance): Promise<void> {
+  // PDF worker threads stop with the app (they are created on the first PDF)
+  app.addHook("onClose", async () => {
+    await closePdfPool();
+  });
   registerReportRoutes(app);
   registerDocumentRoutes(app);
   registerPresetRoutes(app);

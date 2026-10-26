@@ -14,6 +14,8 @@ export const colors = {
   navy50: "#F1F4F8",
   gold: "#C9A227",
   gold700: "#A98518",
+  /** Gold for text and chip labels (≥ 4.5:1 on white, ivory, surfaceMuted and gold100; docs/qa/contrast.mjs). */
+  goldText: "#7F6312",
   gold200: "#EBD88F",
   gold100: "#F5ECCF",
   gold50: "#FBF6E7",
@@ -22,14 +24,21 @@ export const colors = {
   surfaceMuted: "#F2EFE8",
   ink: "#14213A",
   inkMuted: "#5B6778",
-  inkSubtle: "#8B95A5",
+  /** Captions and placeholders: ≥ 4.5:1 on surface, ivory and surfaceMuted (was #8B95A5, 3.03:1). */
+  inkSubtle: "#636A76",
   line: "#E5E1D8",
   lineStrong: "#D5D0C4",
-  success: "#1E7D4B",
+  /** Boundary of form fields (text inputs, select fields): ≥ 3:1 on surface, ivory and surfaceMuted (WCAG 1.4.11). */
+  fieldBorder: "#857F72",
+  /** Field boundary on navy surfaces (sign-in card): ≥ 3:1 on navy. */
+  fieldBorderOnNavy: "rgba(255,255,255,0.5)",
+  success: "#1B7546",
   successBg: "#E6F4EC",
   danger: "#B42318",
+  /** Error text on navy surfaces (sign-in card on navy, chat bubbles). */
+  dangerOnNavy: "#FFB8AD",
   dangerBg: "#FBEAE8",
-  warning: "#B76E00",
+  warning: "#995B00",
   warningBg: "#FFF4E0",
   info: "#1C4E80",
   infoBg: "#E8F0F9",
@@ -92,7 +101,7 @@ export type Tone = "neutral" | "navy" | "gold" | "success" | "danger" | "warning
 export const toneStyles: Record<Tone, { bg: string; fg: string; border: string }> = {
   neutral: { bg: colors.surfaceMuted, fg: colors.inkMuted, border: colors.line },
   navy: { bg: colors.navy100, fg: colors.navy, border: colors.navy200 },
-  gold: { bg: colors.gold100, fg: colors.gold700, border: colors.gold200 },
+  gold: { bg: colors.gold100, fg: colors.goldText, border: colors.gold200 },
   success: { bg: colors.successBg, fg: colors.success, border: "#BFE3CD" },
   danger: { bg: colors.dangerBg, fg: colors.danger, border: "#F2C4BE" },
   warning: { bg: colors.warningBg, fg: colors.warning, border: "#F5DDA8" },

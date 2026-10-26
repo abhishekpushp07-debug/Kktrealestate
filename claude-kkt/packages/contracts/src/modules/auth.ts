@@ -179,3 +179,14 @@ export const PASSWORD_POLICY: PasswordPolicy = {
   lockout_attempts: 5,
   lockout_minutes: 15,
 };
+
+/** Failures across all client IPs (15 minutes) that lock the account itself; 5 from one IP lock only that IP (lockout_attempts). */
+export const ACCOUNT_LOCKOUT_ATTEMPTS = 20;
+
+/** One public verification key of `GET /auth/jwks` (Ed25519, RFC 8037). */
+export const JwkSchema = z.object({ kty: z.string(), crv: z.string().optional(), x: z.string().optional(), kid: z.string(), use: z.string(), alg: z.string() });
+export type Jwk = z.infer<typeof JwkSchema>;
+
+/** `GET /auth/jwks`: every key that can still verify a live access token (the current one first, then JWT_PREVIOUS_SECRETS). */
+export const JwksResponseSchema = z.object({ keys: z.array(JwkSchema) });
+export type JwksResponse = z.infer<typeof JwksResponseSchema>;

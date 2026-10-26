@@ -1,6 +1,6 @@
 /** Step 4 — the 12 customers (11 here, Kavita Roy by lead conversion in leads.ts), KYC statuses and, later, portal access for all. */
 import { verhoeffCheckDigit } from "@kkt/domain";
-import { PORTAL_PASSWORD, SeedError, type SeedContext } from "./context.js";
+import { PORTAL_PASSWORD, placeholderPdf, SeedError, type SeedContext } from "./context.js";
 
 /** Verhoeff-valid 12-digit Aadhaar from an 11-digit base (first digit 2–9). */
 export function aadhaarFrom(base11: string): string {
@@ -46,6 +46,13 @@ export function customerBody(c: CustomerSpec, ctx: SeedContext): Record<string, 
 export async function setKyc(ctx: SeedContext, phone: string, target: CustomerSpec["kyc"]): Promise<void> {
   const c = ctx.customer(phone);
   if (target === "PENDING") return;
+  // KYC is evidence-based (maker-checker): Sales files the PAN scan and submits, the Super Admin verifies.
+  const spec = [...CUSTOMERS, KAVITA].find((x) => x.phone === phone);
+  await ctx.uploadDocument(
+    { entity_type: "CUSTOMER", entity_id: c.id, title: `PAN card – ${c.name}`, document_type_id: ctx.ids["docType:PAN"], is_sensitive: true },
+    { name: `pan-${phone.slice(-4)}.pdf`, data: await placeholderPdf(`PAN card – ${c.name}`, [`Permanent Account Number ${spec ? `XXXXX${spec.pan.slice(5)}` : ""}`, "Self-attested copy (demo placeholder)."]), type: "application/pdf" },
+    "sales",
+  );
   const submitted = await ctx.post<{ version: number }>(`/api/v1/customers/${c.id}/kyc`, { version: c.version, kyc_status: "SUBMITTED" }, "sales", { idempotent: false });
   c.version = submitted.version;
   if (target === "VERIFIED") {

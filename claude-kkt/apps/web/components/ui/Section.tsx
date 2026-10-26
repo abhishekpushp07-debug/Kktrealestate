@@ -37,7 +37,7 @@ export function SectionHeading({ eyebrow, title, lead, align = "left", light = f
   const Tag = as;
   return (
     <div className={`max-w-3xl ${align === "center" ? "mx-auto text-center" : ""} ${className}`.trim()}>
-      {eyebrow ? <p className={`eyebrow mb-4 ${light ? "text-gold-300" : "text-gold-600"}`}>{eyebrow}</p> : null}
+      {eyebrow ? <p className={`eyebrow mb-4 ${light ? "text-gold-300" : "text-gold-700"}`}>{eyebrow}</p> : null}
       <Tag className={`font-display text-display-md ${light ? "text-ivory-100" : "text-navy-900"}`}>{title}</Tag>
       {lead ? <p className={`mt-5 text-lg leading-8 ${light ? "text-ivory-100/75" : "text-ink-muted"}`}>{lead}</p> : null}
     </div>
@@ -45,7 +45,7 @@ export function SectionHeading({ eyebrow, title, lead, align = "left", light = f
 }
 
 export function Eyebrow({ children, light = false, className = "" }: { children: ReactNode; light?: boolean; className?: string }) {
-  return <p className={`eyebrow ${light ? "text-gold-300" : "text-gold-600"} ${className}`.trim()}>{children}</p>;
+  return <p className={`eyebrow ${light ? "text-gold-300" : "text-gold-700"} ${className}`.trim()}>{children}</p>;
 }
 
 export function Badge({ children, tone = "gold", className = "" }: { children: ReactNode; tone?: "gold" | "navy" | "ivory" | "success"; className?: string }) {

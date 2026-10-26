@@ -1,5 +1,5 @@
 import { Tabs as Primitive } from "radix-ui";
-import type { ComponentProps, ReactNode } from "react";
+import { useCallback, useEffect, useRef, type ComponentProps, type ReactNode, type Ref } from "react";
 import { cn } from "@/lib/utils";
 
 export const Tabs = Primitive.Root;
@@ -28,11 +28,27 @@ export interface TabsTriggerProps extends ComponentProps<typeof Primitive.Trigge
   icon?: ReactNode;
 }
 
-export function TabsTrigger({ className, children, count, icon, ...props }: TabsTriggerProps) {
+export function TabsTrigger({ className, children, count, icon, ref, ...props }: TabsTriggerProps) {
+  const own = useRef<HTMLButtonElement | null>(null);
+  const setRef = useCallback(
+    (node: HTMLButtonElement | null) => {
+      own.current = node;
+      if (typeof ref === "function") ref(node);
+      else if (ref) (ref as { current: HTMLButtonElement | null }).current = node;
+    },
+    [ref],
+  );
+  // Tabs used as a view switcher (cards/table, kanban/list) have no TabsContent: drop the dangling aria-controls Radix adds.
+  useEffect(() => {
+    const node = own.current;
+    const controls = node?.getAttribute("aria-controls");
+    if (node && controls && !document.getElementById(controls)) node.removeAttribute("aria-controls");
+  });
   return (
     <Primitive.Trigger
+      ref={setRef as Ref<HTMLButtonElement>}
       className={cn(
-        "group inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 text-sm font-medium text-ink-muted lg:h-9 transition-colors hover:text-navy-950 focus-ring disabled:pointer-events-none disabled:opacity-50",
+        "group inline-flex h-12 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 text-sm font-medium text-ink-muted lg:h-9 transition-colors hover:text-navy-950 focus-ring disabled:pointer-events-none disabled:opacity-50",
         // underline variant
         "[[data-variant=underline]_&]:-mb-px [[data-variant=underline]_&]:border-b-2 [[data-variant=underline]_&]:border-transparent [[data-variant=underline]_&]:rounded-none [[data-variant=underline]_&]:data-[state=active]:border-gold [[data-variant=underline]_&]:data-[state=active]:text-navy-950",
         // pills variant

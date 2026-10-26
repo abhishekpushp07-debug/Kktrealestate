@@ -7,11 +7,14 @@ import { PASSWORD_POLICY } from "@kkt/contracts";
 import { loginEvents, passwordHistory, portalUsers, refreshTokens, users, type Executor } from "@kkt/db";
 import { config } from "../../config.js";
 import { writeAudit, type AuditActor } from "../../lib/audit.js";
+import { SUPER_ADMIN_ROLE_NAME } from "../../lib/scope.js";
+import { notifyRole } from "../notifications/service.js";
+import { loginLockState, lockedError, PAIR_LOCK_ATTEMPTS, reserveLoginAttempt, type LockTarget } from "./lockout.js";
 import { randomToken, sha256 } from "../../lib/crypto.js";
 import { ApiError } from "../../lib/errors.js";
 import { signAccessToken, type TokenAudience } from "../../lib/jwt.js";
 import { hashPassword, matchesHistory, passwordPolicyProblems } from "../../lib/password.js";
-import { markSessionRevoked, revokedSessionKey } from "../../plugins/auth.js";
+import { markSessionRevoked, markSessionsRevoked, securityRedis } from "../../plugins/auth.js";
 
 /** The subject a session belongs to. */
 export interface SessionSubject {
@@ -30,9 +33,6 @@ export interface IssuedTokens {
   audience: TokenAudience;
   family_id: string;
 }
-
-/** Lockout window in milliseconds (PASSWORD_POLICY.lockout_minutes). */
-export const LOCKOUT_MS = PASSWORD_POLICY.lockout_minutes * 60_000;
 
 function requestMeta(req: FastifyRequest): { ip: string; userAgent: string | null } {
   const ua = req.headers["user-agent"];
@@ -79,11 +79,7 @@ export async function revokeAllFamilies(tx: Executor, redis: Redis, subjectType:
     .where(and(eq(refreshTokens.subjectType, subjectType), eq(refreshTokens.subjectId, subjectId), isNull(refreshTokens.revokedAt), keepFamilyId ? ne(refreshTokens.familyId, keepFamilyId) : undefined))
     .returning({ familyId: refreshTokens.familyId });
   const families = [...new Set(rows.map((r) => r.familyId))];
-  if (families.length > 0) {
-    const pipe = redis.multi();
-    for (const f of families) pipe.set(revokedSessionKey(f), "1", "EX", (config.ACCESS_TOKEN_MINUTES + 2) * 60);
-    await pipe.exec();
-  }
+  await markSessionsRevoked(redis, families);
   return families.length;
 }
 
@@ -134,7 +130,7 @@ export async function rotateRefresh(
   if (!row || row.subjectType !== expectedType) throw ApiError.unauthenticated("Invalid refresh token", "INVALID_TOKEN");
   const reuse = async (): Promise<never> => {
     await app.db.transaction(async (tx) => {
-      await revokeFamily(tx, app.redis, row.familyId, "REUSE_DETECTED");
+      await revokeFamily(tx, securityRedis(app), row.familyId, "REUSE_DETECTED");
       await writeAudit(tx, {
         companyId: row.companyId,
         actor: { type: row.subjectType, id: row.subjectId, name: null },
@@ -174,36 +170,71 @@ export async function recordLoginEvent(tx: Executor, e: { companyId: string | nu
   await tx.insert(loginEvents).values({ companyId: e.companyId, subjectType: e.subjectType, identifier: e.identifier, success: e.success, reason: e.reason, ip: meta.ip, userAgent: meta.userAgent });
 }
 
-/** Lockout state of an account row. */
+/** Lockout state of an account row (the account-wide lock; per-IP pair locks live in login_events, see lockout.ts). */
 export function isLocked(row: { lockedUntil: Date | null }): boolean {
   return !!row.lockedUntil && row.lockedUntil.getTime() > Date.now();
 }
 
-/** Throws 423 LOCKED with `details.locked_until` when the account is inside its lockout window. */
-export function assertNotLocked(row: { lockedUntil: Date | null }): void {
-  if (isLocked(row)) throw ApiError.locked(`Account locked until ${row.lockedUntil!.toISOString()} after too many failed attempts`, { locked_until: row.lockedUntil!.toISOString() });
+/** An account a sign-in attempt resolved to (null for an unknown identifier). */
+export interface LoginAccount {
+  type: UserType;
+  id: string;
+  companyId: string;
+  lockedUntil: Date | null;
+  /** For notifications/audit: e-mail or customer name. */
+  label: string;
+  /** ERP link of the account (Super Admin notification). */
+  link: string;
 }
 
-/** Computes the next failed_attempts/locked_until after a failed login (5 failures → 15 min lock). */
-export function nextFailureState(row: { failedAttempts: number; lockedUntil: Date | null }): { failedAttempts: number; lockedUntil: Date | null; justLocked: boolean } {
-  const resetWindow = row.lockedUntil !== null && row.lockedUntil.getTime() <= Date.now();
-  const failed = (resetWindow ? 0 : row.failedAttempts) + 1;
-  if (failed >= PASSWORD_POLICY.lockout_attempts) return { failedAttempts: failed, lockedUntil: new Date(Date.now() + LOCKOUT_MS), justLocked: true };
-  return { failedAttempts: failed, lockedUntil: resetWindow ? null : row.lockedUntil, justLocked: false };
+/**
+ * Refuses a sign-in attempt up front when the account (account-wide lock) or the (identifier, IP) pair is locked: 423 with the same body
+ * for known and unknown identifiers. The blocked attempt is recorded as reason LOCKED (not counted as a guess). An allowed attempt reserves
+ * an in-flight slot (lockout.ts reserveLoginAttempt; 429 when parallel attempts would exceed the lock budget): the caller must call the
+ * returned release function once the attempt has been decided (try/finally).
+ */
+export async function assertLoginAllowed(db: Executor, req: FastifyRequest, target: LockTarget, account: LoginAccount | null): Promise<() => void> {
+  let until: Date | null = account && isLocked(account) ? account.lockedUntil : null;
+  const state = until ? null : await loginLockState(db, target);
+  if (state) until = state.lockedUntil;
+  if (until || !state) {
+    await recordLoginEvent(db, { companyId: account?.companyId ?? null, subjectType: target.subjectType, identifier: target.identifier, success: false, reason: "LOCKED", req });
+    throw lockedError(until!);
+  }
+  return reserveLoginAttempt(target, state);
 }
 
-/** Applies a failed attempt to a staff user row and returns the new state. */
-export async function applyStaffFailure(tx: Executor, row: typeof users.$inferSelect): Promise<ReturnType<typeof nextFailureState>> {
-  const next = nextFailureState(row);
-  await tx.update(users).set({ failedAttempts: next.failedAttempts, lockedUntil: next.lockedUntil }).where(eq(users.id, row.id));
-  return next;
-}
-
-/** Applies a failed attempt to a portal user row and returns the new state. */
-export async function applyPortalFailure(tx: Executor, row: typeof portalUsers.$inferSelect): Promise<ReturnType<typeof nextFailureState>> {
-  const next = nextFailureState(row);
-  await tx.update(portalUsers).set({ failedAttempts: next.failedAttempts, lockedUntil: next.lockedUntil }).where(eq(portalUsers.id, row.id));
-  return next;
+/**
+ * Records a failed guess and answers it: 401 INVALID_CREDENTIALS with an identical body whether or not the account exists (no
+ * attempts_left), or 423 LOCKED once this failure completed a pair lock (5 from this IP) or an account lock (20 across IPs). An account
+ * lock is written to `locked_until`, audited and notified to the Super Admins; a pair lock is audited with the IP.
+ */
+export async function failLogin(app: FastifyInstance, req: FastifyRequest, target: LockTarget, account: LoginAccount | null, reason: "BAD_PASSWORD" | "BAD_MFA", message: string): Promise<never> {
+  const state = await app.db.transaction(async (tx) => {
+    await recordLoginEvent(tx, { companyId: account?.companyId ?? null, subjectType: target.subjectType, identifier: target.identifier, success: false, reason: account ? reason : "UNKNOWN_USER", req });
+    if (account?.type === "STAFF") await tx.update(users).set({ failedAttempts: sql`${users.failedAttempts} + 1` }).where(eq(users.id, account.id));
+    else if (account) await tx.update(portalUsers).set({ failedAttempts: sql`${portalUsers.failedAttempts} + 1` }).where(eq(portalUsers.id, account.id));
+    const st = await loginLockState(tx, target);
+    if (!account) return st;
+    const prefix = account.type === "STAFF" ? "auth" : "portal_auth";
+    const entityType = account.type === "STAFF" ? "user" : "portal_user";
+    const actor: AuditActor = { type: "SYSTEM", id: null, name: "lockout" };
+    if (st.accountLockUntil && !isLocked(account)) {
+      if (account.type === "STAFF") await tx.update(users).set({ lockedUntil: st.accountLockUntil }).where(eq(users.id, account.id));
+      else await tx.update(portalUsers).set({ lockedUntil: st.accountLockUntil }).where(eq(portalUsers.id, account.id));
+      await writeAudit(tx, { companyId: account.companyId, actor, action: `${prefix}.locked`, entityType, entityId: account.id, after: { scope: "ACCOUNT", locked_until: st.accountLockUntil.toISOString(), failures: st.accountFailures }, ip: req.clientIp, requestId: req.id });
+      await notifyRole(tx, account.companyId, [SUPER_ADMIN_ROLE_NAME], {
+        type: "INTEGRITY_FINDINGS", title: `Security: ${account.type === "STAFF" ? "staff" : "customer"} account ${account.label} locked after ${st.accountFailures} failed sign-ins`,
+        body: `Failed sign-ins came from several IP addresses within ${PASSWORD_POLICY.lockout_minutes} minutes; the account is locked until ${st.accountLockUntil.toISOString()}.`,
+        entityType, entityId: account.id, link: account.link,
+      });
+    } else if (st.scope === "PAIR" && st.pairFailures === PAIR_LOCK_ATTEMPTS) {
+      await writeAudit(tx, { companyId: account.companyId, actor, action: `${prefix}.locked`, entityType, entityId: account.id, after: { scope: "PAIR", ip: target.ip, locked_until: st.lockedUntil?.toISOString() ?? null, failures: st.pairFailures }, ip: req.clientIp, requestId: req.id });
+    }
+    return st;
+  });
+  if (state.lockedUntil) throw lockedError(state.lockedUntil);
+  throw new ApiError(401, "INVALID_CREDENTIALS", message);
 }
 
 /** Validates a new password against the policy and the last 5 hashes; returns the new hash. 422 PASSWORD_POLICY on violation. */

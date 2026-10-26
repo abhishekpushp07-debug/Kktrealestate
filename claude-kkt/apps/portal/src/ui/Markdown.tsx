@@ -142,7 +142,7 @@ export function Markdown({ source }: { source: string }): React.JSX.Element {
               <View key={k} style={styles.list}>
                 {b.items.map((it, j) => (
                   <View key={`${k}-${j}`} style={styles.li}>
-                    <T variant="body" color={colors.gold700} style={styles.bullet}>
+                    <T variant="body" color={colors.goldText} style={styles.bullet}>
                       {b.kind === "ul" ? "•" : `${j + 1}.`}
                     </T>
                     <T variant="body" style={{ flex: 1 }}>

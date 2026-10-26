@@ -465,6 +465,10 @@ export const PublicVisitManageResponseSchema = z.object({
   maps_link: z.string().nullable(),
   instructions: z.string().nullable(),
   can_cancel: z.boolean(),
+  /** True while the visitor may move the visit themselves (POST /public/site-visits/:token/reschedule). */
+  can_reschedule: z.boolean().optional(),
+  /** When this manage link stops working (visit end + 24 h; immediately once cancelled; a reschedule issues a new link). */
+  link_expires_at: z.string().nullable().optional(),
   ics_url: UrlSchema,
   // apps/web aliases (`SiteVisitManage`)
   date: DateStringSchema.optional(),
@@ -473,6 +477,30 @@ export const PublicVisitManageResponseSchema = z.object({
   address: z.string().nullable().optional(),
 });
 export type PublicVisitManageResponse = z.infer<typeof PublicVisitManageResponseSchema>;
+
+/**
+ * `POST /public/site-visits/:token/reschedule`: the visitor moves their own visit (capacity re-checked; 409 SLOT_FULL, 422 SLOT_INVALID).
+ * `date`/`start` (Appendix B spellings) or `visit_date`/`slot_start`; same honeypot and 5/min/IP limit as the booking form.
+ */
+export const PublicVisitRescheduleInputSchema = z
+  .strictObject({
+    date: DateStringSchema.optional(),
+    start: TimeStringSchema.optional(),
+    visit_date: DateStringSchema.optional(),
+    slot_start: TimeStringSchema.optional(),
+    website: HoneypotSchema,
+  })
+  .refine((b) => Boolean(b.date ?? b.visit_date), { message: "date is required", path: ["date"] })
+  .refine((b) => Boolean(b.start ?? b.slot_start), { message: "start is required", path: ["start"] });
+export type PublicVisitRescheduleInput = z.infer<typeof PublicVisitRescheduleInputSchema>;
+
+/** Reschedule result: the manage view of the moved visit plus its NEW manage link (the old link stops working) and .ics. */
+export const PublicVisitRescheduleResponseSchema = PublicVisitManageResponseSchema.extend({
+  manage_url: UrlSchema,
+  /** The new manage token (the website navigates to /visit/<token>). */
+  manage_token: z.string(),
+});
+export type PublicVisitRescheduleResponse = z.infer<typeof PublicVisitRescheduleResponseSchema>;
 
 export const PublicVisitCancelInputSchema = z.strictObject({ reason: z.string().trim().max(300).optional().nullable(), website: HoneypotSchema });
 export type PublicVisitCancelInput = z.infer<typeof PublicVisitCancelInputSchema>;

@@ -81,6 +81,22 @@ export const FlatStatusChangeSchema = z.strictObject({
 });
 export type FlatStatusChange = z.infer<typeof FlatStatusChangeSchema>;
 
+/**
+ * Booking wizard reservation (POST /flats/:id/reserve, permission booking.create): puts an AVAILABLE flat (or one whose HOLD has lapsed)
+ * on HOLD by the caller until now + minutes (1–30). Repeating it as the same holder extends the hold (idempotent); a live hold by
+ * someone else, or a BLOCKED / BOOKED / SOLD flat, answers 409 FLAT_NOT_AVAILABLE. Response: FlatRow.
+ */
+export const FlatReserveSchema = z.strictObject({
+  minutes: z.int().min(1).max(30).default(15),
+});
+export type FlatReserve = z.infer<typeof FlatReserveSchema>;
+
+/** Release a HOLD (POST /flats/:id/release): the holder, or a user with settings.manage. Response: FlatRow. */
+export const FlatReleaseSchema = z.strictObject({
+  reason: NoteSchema.optional().nullable(),
+});
+export type FlatRelease = z.infer<typeof FlatReleaseSchema>;
+
 /** Bulk status change for multi-selected flats. */
 export const FlatBulkStatusChangeSchema = z.strictObject({
   flat_ids: IdListSchema,

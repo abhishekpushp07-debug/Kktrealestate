@@ -6,7 +6,45 @@ Stack under test: API `apps/api` on `:4100` with the demo seed in its own databa
 
 Runner: [`docs/qa/web/browser-qa.cjs`](web/browser-qa.cjs) (`WEB_URL`, `API_URL`, `OUT_DIR`, `ONLY=static,enquiry,brochure,visit,toggles`), PNGs over 300 KB are palette-quantised by [`docs/qa/web/shrink.py`](web/shrink.py). On every page it asserts: zero console errors / page errors, zero failed or ≥ 400 requests (apart from the deliberate 404 / 429 tests), `scrollWidth <= innerWidth`, every visible link/button/field ≥ 44 px tall at 390 px (stretched-link cards count their whole card), and records the time to `networkidle` plus one viewport screenshot per page and width.
 
-## Result
+## Re-run 2026-10-26 (phase 5 frontend-quality track)
+
+Stack: API on `:4500` (fresh demo seed in `kkt_h5`, Redis db 20, `TRUST_PROXY` default `loopback`), website `next build` + `next start` on `:3500` with `NEXT_PUBLIC_API_URL=API_INTERNAL_URL=http://localhost:4500`, `NEXT_PUBLIC_SITE_URL=http://localhost:3500`. Runner env: `WEB_URL`, `API_URL`, `SITE_URL`, `REDIS_DB`, `OUT_DIR`, `REPORT` (JSON report, default a temp file), `ONLY=static,enquiry,brochure,visit,security,toggles`, `AXE=0` to skip the scans. Primary targets are now checked at **48 px** (SPEC §15).
+
+**Result: 40 page audits, 140/140 checks pass (52/52 flow checks in the full run, 88/88 page checks in the static re-run), 0 defects; axe-core: 40 scans (19 at 1440 px, 21 at 390 px) with 0 violations.** The first full run right after the database was recreated failed three home/projects/gallery page checks because the Next.js Data Cache still held the previous database's list responses (≤ 60 s); the static walk re-run after that window — 30 audits, 88/88 checks, 30 axe scans — is clean.
+
+New checks in the runner:
+
+| Check | Result |
+|---|---|
+| `security` flow: `Content-Security-Policy` on HTML responses is `script-src 'self' 'nonce-…' 'strict-dynamic'` (no `unsafe-inline`), `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'`, `frame-src https:`; every executable `<script>` (88 on the project page) carries the request nonce; the nonce changes per request; `X-Frame-Options: DENY`, nosniff, Referrer-Policy, Permissions-Policy present | pass |
+| Click-to-load embed under the CSP: no iframe before the click, the player iframe after it, no CSP violation in the console | pass |
+| Visitor IP forwarding: a render requested with `x-forwarded-for: 203.0.113.x` creates the API rate-limit key `rl:pub:all:203.0.113.x:…` (the API limits the visitor, not the web server) | pass |
+| Enquiry form, empty submit: the name field is `aria-invalid="true"` and `aria-describedby` points at its `role="alert"` error | pass |
+| Manage link after cancelling a visit: the API now answers 410 `LINK_EXPIRED` (security track); the page renders the branded "This visit link has expired" view instead of the error boundary | pass (`visit-link-expired-390`) |
+
+### Accessibility (axe)
+
+`docs/qa/axe.cjs` runs `@axe-core/playwright` (axe-core 4.14.0, WCAG 2.0/2.1/2.2 A + AA tags) once per page and width, with `prefers-reduced-motion: reduce` emulated during the scan (smooth scrolling and scroll-reveal fades otherwise make axe measure elements mid-scroll). Serious and critical violations are defects.
+
+First scan of the unchanged site (30 scans): **22 pages with serious violations** — `label-content-name-mismatch` (gallery tiles named "Open …" while showing the caption; 72 nodes), `role-img-alt` (image placeholders `role="img"` without a name; 44), `color-contrast` (availability "not available" cells `ink-soft/70`; 27), `aria-prohibited-attr` (star ratings `aria-label` on a `<p>`; 24), `scrollable-region-focusable` (testimonial carousel; 4); the visit confirmation and manage pages also had invalid `<dl>` content (`definition-list`, `dlitem`). All fixed:
+
+| Rule | Fix |
+|---|---|
+| label-content-name-mismatch | gallery tiles drop the `aria-label` when a caption is visible; an `sr-only` "Open image:" prefix keeps the action in the name |
+| role-img-alt | `SmartImage` placeholders are `role="img"` only with alt text, else `aria-hidden` |
+| color-contrast | availability cells `text-ink-soft` (5.3:1 on ivory-200 after the token change) |
+| aria-prohibited-attr | star ratings are `role="img"` with the "N out of 5 stars" label |
+| scrollable-region-focusable | the carousel track is focusable (`tabIndex=0`, gold focus ring) |
+| definition-list / dlitem | visit confirmation + manage page: icons moved into the `<dt>`, the maps link into the `<dd>` |
+| (focus not obscured) | pages with the sticky "On this page" bar use `scroll-padding-top: 8.5rem`, so scrolled-to / focused content is not hidden under it |
+
+axe 4.14 reports a few `color-contrast` nodes in the visit section of the project page at 390 px with the page background (ivory) instead of the navy section behind the text; the runner re-checks such nodes against their nearest opaque ancestor and lists them as "re-verified false positives" (9 nodes, actual contrast ≥ 10:1) instead of defects.
+
+### Contrast (design tokens)
+
+`node docs/qa/contrast.mjs web` reads the `@theme` tokens from `app/globals.css` and checks every text/background pair the site uses: **39/39 pass** (table in `docs/qa/contrast-results.md`, enforced by `apps/web/test/contrast.test.ts`). Token changes: `ink-soft` #6e7b91 → #5b677a (3.96 → 5.30:1 on ivory-100), eyebrows and gold text from `gold-600` to `gold-700` #7f6318 (3.19 → 5.25:1), `success` #1f7a4d → #1d734a; the gold reference numbers on the enquiry / visit success cards use `gold-700` (light) or `gold-300` (dark). Review pass: the form fields (`components/ui/Field.tsx`) had a 1.36:1 border (navy-900/15), a 3.04:1 placeholder (ink-soft/70) and a 2.42:1 gold-500 focus border/ring with the outline removed — now navy-900/55 (3.79:1), ink-soft (5.59:1) and a gold-700 border + 2 px ring (5.68:1); the consent checkbox accent is gold-700; a control's own `aria-describedby` is merged with the field's error id instead of replacing it. Re-run after the change (`ONLY=static,enquiry,visit,security`): 36 audits, 117/117 checks, 36 axe scans with 0 serious/critical, visit submit 56 px (the check is now ≥ 48 px).
+
+## Result (2026-10-25 run)
 
 **39 page audits (39 screenshots, all ≤ 300 KB), 88/88 page checks and 42/42 flow checks pass** after the fixes below: zero console errors, zero failed requests, no horizontal overflow at 390 px and no interactive target under 44 px on any audited page. Earlier runs of the same script found the defects listed further down; the fixes were verified by re-running the full suite.
 
@@ -64,6 +102,6 @@ Verification: `pnpm --filter @kkt/contracts typecheck`, `--filter @kkt/api typec
 * **Seed placeholders, not website defects**: the brand logo is a tiny generated square; the walkthrough and project videos use placeholder YouTube ids (`sgb-walkthrough`, `sgh-walkthrough`) and the 360° tour / map embeds point at placeholder Matterport / Google Maps URLs, so clicking "Play video" / "Load map" in the demo loads an empty player. Real CMS values fix this with no code change.
 * Phone numbers are rendered exactly as stored (`6122200000`); a display formatter (`+91 612 220 0000`) would read better in the navbar, footer and contact cards. Cosmetic, not changed.
 * `next start` warns that the project uses `output: "standalone"`; in production run `node .next/standalone/server.js` (see `apps/web/Dockerfile`). Behaviour under test is identical.
-* Site settings and lists are cached for 60 s in the Next.js Data Cache (plus 60 s in the API); `site_live` and publish/unpublish of *lists* therefore show within about a minute, while detail pages switch instantly. Next revalidates list entries stale-while-revalidate, so the **first** request after a toggle that lands more than 60 s later still gets the previous list once (the sitemap fetched while the site was off cached empty project/post lists, and the following `/projects` and `/blog` requests showed them once). Acceptable under "cached ~60 s"; a `revalidateTag` call from the CMS routes would make it instant. `generateMetadata` and the page body each call the (uncached) detail endpoint, i.e. two small requests per project/post/page render; acceptable, but a per-request memo (`React.cache`) would halve it.
+* Site settings and lists are cached for 60 s in the Next.js Data Cache (plus 60 s in the API); `site_live` and publish/unpublish of *lists* therefore show within about a minute, while detail pages switch instantly. Next revalidates list entries stale-while-revalidate, so the **first** request after a toggle that lands more than 60 s later still gets the previous list once (the sitemap fetched while the site was off cached empty project/post lists, and the following `/projects` and `/blog` requests showed them once). Acceptable under "cached ~60 s"; a `revalidateTag` call from the CMS routes would make it instant. `generateMetadata` and the page body share one detail request per render since 2026-10-26 (React `cache()` in `lib/api.ts`).
 * The enquiry rate-limit test leaves five `QA Visitor n` leads and the visit test one cancelled `SV-…` visit in `kkt_qa_web`; run `POST /api/v1/admin/reseed` or drop the database before reusing it.
-* Not covered by this walk: the ERP side of site visits (reschedule / outcomes), honeypot drop (covered by the API integration suite), and WCAG contrast measurement (visual check only; the navy/gold/ivory tokens were not changed).
+* Not covered by this walk: the ERP side of site visits (reschedule / outcomes) and the honeypot drop (covered by the API integration suite). WCAG contrast is now measured (`docs/qa/contrast.mjs` + axe, see the 2026-10-26 re-run above).

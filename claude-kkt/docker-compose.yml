@@ -1,75 +1,161 @@
-# Local / single-VM deployment: one backend, three front doors behind Caddy.
-# Production: run the same images behind a load balancer; see docs/DEPLOY.md.
+# Single-VM quick start: one backend, three front doors behind Caddy (docs/DEPLOY.md "Quick start").
+# For production use docker-compose.prod.yml (PgBouncer, secrets as files, S3 storage, WAL archiving and nightly backups).
+#
+#   export DOMAIN=kkt.in JWT_SECRET=$(openssl rand -hex 48) FIELD_ENCRYPTION_KEY=$(openssl rand -base64 32) HASH_KEY=$(openssl rand -hex 32) \
+#          POSTGRES_PASSWORD=$(openssl rand -hex 24) KKT_OWNER_DB_PASSWORD=$(openssl rand -hex 24) KKT_APP_DB_PASSWORD=$(openssl rand -hex 24) \
+#          BOOTSTRAP_COMPANY_NAME="My Builders" BOOTSTRAP_ADMIN_EMAIL=owner@example.in BOOTSTRAP_ADMIN_PASSWORD='First-Login-2026x'
+#   docker compose up -d --build
+#
+# Boot order (no first-boot race): postgres → migrate (one-shot: migrations + first-boot seed as kkt_owner, then exits) → api replicas
+# and the worker (kkt_app, DML only; they never migrate or seed). Passwords must be URL-safe (hex), they go into connection strings.
+x-api-env: &api-env
+  NODE_ENV: production
+  REDIS_URL: redis://redis:6379/0
+  JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
+  FIELD_ENCRYPTION_KEY: ${FIELD_ENCRYPTION_KEY:?set FIELD_ENCRYPTION_KEY}
+  HASH_KEY: ${HASH_KEY:?set HASH_KEY}
+  API_PUBLIC_URL: https://erp.${DOMAIN:-kkt.local}
+  ERP_ORIGIN: https://erp.${DOMAIN:-kkt.local}
+  WEB_ORIGIN: https://www.${DOMAIN:-kkt.local}
+  PORTAL_ORIGIN: https://my.${DOMAIN:-kkt.local}
+  STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
+  STORAGE_LOCAL_DIR: /data/storage
+  S3_BUCKET: ${S3_BUCKET:-}
+  S3_REGION: ${S3_REGION:-}
+  S3_ENDPOINT: ${S3_ENDPOINT:-}
+  S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
+  S3_SECRET_KEY: ${S3_SECRET_KEY:-}
+  # Caddy reaches the API over the Compose network (a private range): trust its X-Forwarded-For, nobody else's.
+  TRUST_PROXY: uniquelocal
+  RUN_MIGRATIONS_ON_BOOT: "false"
+  SEED_ON_BOOT: "false"
+  RUN_JOBS_IN_API: "false"
+  METRICS_TOKEN: ${METRICS_TOKEN:-}
+  ERROR_WEBHOOK_URL: ${ERROR_WEBHOOK_URL:-}
+  OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+
 services:
   postgres:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
       POSTGRES_DB: kkt
+      # read by infra/postgres/init/02-passwords.sh on the first start
+      KKT_OWNER_DB_PASSWORD: ${KKT_OWNER_DB_PASSWORD:?set KKT_OWNER_DB_PASSWORD}
+      KKT_APP_DB_PASSWORD: ${KKT_APP_DB_PASSWORD:?set KKT_APP_DB_PASSWORD}
     command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./infra/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
-    healthcheck: { test: ["CMD-SHELL", "pg_isready -U postgres"], interval: 5s, timeout: 3s, retries: 20 }
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U postgres -d kkt"], interval: 5s, timeout: 3s, retries: 20 }
+    restart: unless-stopped
+
   redis:
     image: redis:7-alpine
-    command: ["redis-server", "--maxmemory", "512mb", "--maxmemory-policy", "allkeys-lru", "--save", ""]
+    # durable (append-only file) and never evicting: it holds revocation markers, rate limits, locks and the job queue
+    command:
+      [
+        "redis-server",
+        "--appendonly",
+        "yes",
+        "--appendfsync",
+        "everysec",
+        "--maxmemory",
+        "512mb",
+        "--maxmemory-policy",
+        "noeviction",
+      ]
+    volumes: ["redisdata:/data"]
     healthcheck: { test: ["CMD", "redis-cli", "ping"], interval: 5s, timeout: 3s, retries: 20 }
+    restart: unless-stopped
+
+  migrate:
+    build: { context: ., dockerfile: apps/api/Dockerfile }
+    image: kkt-api:local
+    command: ["node", "dist/server.js", "migrate"]
+    environment:
+      <<: *api-env
+      DATABASE_URL: postgres://kkt_owner:${KKT_OWNER_DB_PASSWORD}@postgres:5432/kkt
+      # first-boot seed: company + one Super Admin from BOOTSTRAP_* (a no-op once a company exists); the demo dataset only with SEED_DEMO=true
+      SEED_ON_BOOT: "true"
+      SEED_DEMO: ${SEED_DEMO:-false}
+      BOOTSTRAP_COMPANY_NAME: ${BOOTSTRAP_COMPANY_NAME:-}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+    volumes: ["storage:/data/storage"]
+    depends_on: { postgres: { condition: service_healthy }, redis: { condition: service_healthy } }
+    restart: "no"
+
   api:
-    build: { context: ., dockerfile: apps/api/Dockerfile }
+    image: kkt-api:local
     environment:
-      NODE_ENV: production
-      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/kkt
-      REDIS_URL: redis://redis:6379/0
-      API_PORT: 4000
-      API_PUBLIC_URL: https://erp.${DOMAIN:-kkt.local}
-      JWT_SECRET: ${JWT_SECRET}
-      FIELD_ENCRYPTION_KEY: ${FIELD_ENCRYPTION_KEY}
-      HASH_KEY: ${HASH_KEY}
-      ERP_ORIGIN: https://erp.${DOMAIN:-kkt.local}
-      WEB_ORIGIN: https://www.${DOMAIN:-kkt.local}
-      PORTAL_ORIGIN: https://my.${DOMAIN:-kkt.local}
-      STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
-      STORAGE_LOCAL_DIR: /data/storage
-      SEED_ON_BOOT: ${SEED_ON_BOOT:-true}
-      RUN_MIGRATIONS_ON_BOOT: "true"
-    volumes: [ "storage:/data/storage" ]
-    depends_on: { postgres: { condition: service_healthy }, redis: { condition: service_healthy } }
+      <<: *api-env
+      DATABASE_URL: postgres://kkt_app:${KKT_APP_DB_PASSWORD}@postgres:5432/kkt
+      API_WORKERS: ${API_WORKERS:-auto}
+      DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-10}
+    volumes: ["storage:/data/storage"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    # replicas are safe: they never migrate or seed, and every piece of shared state lives in Postgres/Redis
     deploy: { replicas: 2 }
-    healthcheck: { test: ["CMD", "wget", "-qO-", "http://localhost:4000/api/v1/health"], interval: 10s, timeout: 3s, retries: 10 }
+    stop_grace_period: 40s
+    restart: unless-stopped
+
   worker:
-    build: { context: ., dockerfile: apps/api/Dockerfile }
-    command: ["node", "dist/worker.js"]
+    image: kkt-api:local
+    command: ["node", "--import", "./dist/telemetry.js", "dist/worker.js"]
     environment:
-      NODE_ENV: production
-      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/kkt
-      REDIS_URL: redis://redis:6379/0
-      JWT_SECRET: ${JWT_SECRET}
-      FIELD_ENCRYPTION_KEY: ${FIELD_ENCRYPTION_KEY}
-      HASH_KEY: ${HASH_KEY}
-      STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
-      STORAGE_LOCAL_DIR: /data/storage
-    volumes: [ "storage:/data/storage" ]
-    depends_on: { postgres: { condition: service_healthy }, redis: { condition: service_healthy } }
+      <<: *api-env
+      DATABASE_URL: postgres://kkt_app:${KKT_APP_DB_PASSWORD}@postgres:5432/kkt
+    volumes: ["storage:/data/storage"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    # the worker has no HTTP listener; the image's API health check does not apply
+    healthcheck: { disable: true }
+    stop_grace_period: 120s
+    restart: unless-stopped
+
   erp:
-    build: { context: ., dockerfile: apps/erp/Dockerfile, args: { VITE_API_URL: https://erp.${DOMAIN:-kkt.local} } }
+    build: { context: ., dockerfile: apps/erp/Dockerfile, args: { VITE_API_URL: "" } }
+    restart: unless-stopped
+
   web:
-    build: { context: ., dockerfile: apps/web/Dockerfile }
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: https://erp.${DOMAIN:-kkt.local}
+        NEXT_PUBLIC_PORTAL_URL: https://my.${DOMAIN:-kkt.local}
+        NEXT_PUBLIC_ERP_URL: https://erp.${DOMAIN:-kkt.local}
+        NEXT_PUBLIC_SITE_URL: https://www.${DOMAIN:-kkt.local}
     environment:
-      NEXT_PUBLIC_API_URL: https://erp.${DOMAIN:-kkt.local}
       API_INTERNAL_URL: http://api:4000
-      NEXT_PUBLIC_PORTAL_URL: https://my.${DOMAIN:-kkt.local}
-      NEXT_PUBLIC_ERP_URL: https://erp.${DOMAIN:-kkt.local}
-    depends_on: [ api ]
+    depends_on: [api]
+    restart: unless-stopped
+
   portal:
-    build: { context: ., dockerfile: apps/portal/Dockerfile, args: { EXPO_PUBLIC_API_URL: https://erp.${DOMAIN:-kkt.local} } }
+    build:
+      {
+        context: .,
+        dockerfile: apps/portal/Dockerfile,
+        args: { EXPO_PUBLIC_API_URL: "https://my.${DOMAIN:-kkt.local}" },
+      }
+    restart: unless-stopped
+
   caddy:
     image: caddy:2-alpine
-    ports: [ "80:80", "443:443" ]
-    environment: { DOMAIN: ${DOMAIN:-kkt.local} }
+    ports: ["80:80", "443:443", "443:443/udp"]
+    environment: { DOMAIN: "${DOMAIN:-kkt.local}" }
     volumes:
       - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
-    depends_on: [ api, erp, web, portal ]
-volumes: { pgdata: {}, storage: {}, caddy_data: {} }
+    depends_on: [api, erp, web, portal]
+    restart: unless-stopped
+
+volumes: { pgdata: {}, redisdata: {}, storage: {}, caddy_data: {} }

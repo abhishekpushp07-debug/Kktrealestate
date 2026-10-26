@@ -1,10 +1,9 @@
 /**
- * Adversarial review of the admin module: tenant isolation and memory bounds of the backup, ZIP validity (CRC-32, sizes, UTF-8 names,
- * streamed entries), erasure keeping financial rows + audit history and reaching every PII copy, settings validation (SLA, GST, prefixes,
+ * Adversarial review of the admin module: tenant isolation, cursor streaming and checksums of the backup archive, erasure keeping financial rows + audit history and reaching every PII copy, settings validation (SLA, GST, prefixes,
  * number patterns, partial patches) with the company cache visible through GET /auth/me, and the production reseed guard.
  */
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -20,8 +19,8 @@ type Settings = {
   numbering_preview: { scope: string; fy: string; last_sequence: number; next_number: string }[];
 };
 type Manifest = {
-  format: string; include_sensitive: boolean; max_rows_per_table: number; truncated_tables: string[]; row_count: number;
-  tables: { name: string; file: string; rows: number; total_rows: number; truncated: boolean; scope: string; note: string | null; columns: string[]; stripped_columns: string[] }[];
+  format: string; include_sensitive: boolean; row_count: number;
+  tables: { name: string; file: string; rows: number; sha256: string; scope: string; columns: string[]; stripped_columns: string[] }[];
 };
 
 let t: TestContext;
@@ -120,30 +119,28 @@ describe("backup · tenant isolation, memory bounds and ZIP validity", () => {
     for (let i = 0; i < 5; i++) await t.app.sql`insert into customers (company_id, customer_code, full_name, phone) values (${t.companyId}, ${`CUST-BULK${i}`}, ${`Bulk ${i}`}, ${`98765001${20 + i}`})`;
   });
 
-  function entriesOf(zip: Buffer) {
-    return import("../../src/modules/admin/index.js").then(({ readCentralDirectory, readZipEntry }) => {
-      const entries = readCentralDirectory(zip);
-      const read = (name: string) => { const e = entries.find((x) => x.name === name); if (!e) throw new Error(`missing ${name}`); return readZipEntry(zip, e); };
-      const json = <T,>(name: string) => JSON.parse(read(name).toString("utf8")) as T;
-      return { entries, read, json };
-    });
+  /** Builds a backup archive into a temp file and reads it back with yauzl. */
+  async function build(includeSensitive: boolean, batchSize?: number) {
+    const { writeBackupArchive, readZipText, readZipEntries } = await import("../../src/modules/admin/index.js");
+    const file = join(mkdtempSync(join(tmpdir(), "kkt-bk-")), "b.zip");
+    const manifest = await writeBackupArchive(t.app.db, file, { companyId: t.companyId, companyName: "SGB", includeSensitive, ...(batchSize ? { batchSize } : {}) });
+    const text = (name: string) => readZipText(file, name);
+    const rows = async <T,>(table: string) => (await text(`tables/${table}.ndjson`)).split("\n").filter(Boolean).map((l) => JSON.parse(l) as T);
+    return { manifest, file, text, rows, entries: await readZipEntries(file) };
   }
 
   it("exports only the caller's tenant: companies, users, customers, leads and child tables of another company never appear; PII hashes are stripped", async () => {
-    const { buildBackup } = await import("../../src/modules/admin/index.js");
-    const built = await buildBackup(t.app.db, { companyId: t.companyId, companyName: "SGB", includeSensitive: false });
-    const { json } = await entriesOf(built.zip);
-    const companies = json<{ id: string }[]>("tables/companies.json");
-    expect(companies.map((c) => c.id)).toEqual([t.companyId]);
-    const customers = json<Record<string, unknown>[]>("tables/customers.json");
+    const built = await build(false);
+    expect((await built.rows<{ id: string }>("companies")).map((c) => c.id)).toEqual([t.companyId]);
+    const customers = await built.rows<Record<string, unknown>>("customers");
     expect(customers.every((c) => c["company_id"] === t.companyId)).toBe(true);
     expect(customers.some((c) => c["customer_code"] === "CUST-OTHER")).toBe(false);
     expect(customers.find((c) => c["customer_code"] === "CUST-HASH")).toBeDefined();
     for (const c of customers) { expect(c).not.toHaveProperty("pan_hash"); expect(c).not.toHaveProperty("aadhaar_hash"); }
-    const leads = json<{ id: string; company_id: string }[]>("tables/leads.json");
+    const leads = await built.rows<{ id: string; company_id: string }>("leads");
     expect(leads.every((l) => l.company_id === t.companyId)).toBe(true);
     const myLeadIds = new Set(leads.map((l) => l.id));
-    const acts = json<{ lead_id: string }[]>("tables/lead_activities.json");
+    const acts = await built.rows<{ lead_id: string }>("lead_activities");
     expect(acts.length).toBeGreaterThan(0);
     expect(acts.every((a) => myLeadIds.has(a.lead_id))).toBe(true);
     expect(acts.some((a) => a.lead_id === otherLeadId)).toBe(false);
@@ -153,81 +150,38 @@ describe("backup · tenant isolation, memory bounds and ZIP validity", () => {
     expect(manifest.tables.find((x) => x.name === "companies")!.scope).toBe("company");
     expect(manifest.tables.find((x) => x.name === "job_runs")!.scope).toBe("global");
     // the sensitive export keeps the hashes but is still tenant-scoped
-    const sens = await buildBackup(t.app.db, { companyId: t.companyId, companyName: "SGB", includeSensitive: true });
-    const s = await entriesOf(sens.zip);
-    expect(s.json<{ id: string }[]>("tables/companies.json").map((c) => c.id)).toEqual([t.companyId]);
-    expect(s.json<Record<string, unknown>[]>("tables/customers.json").find((c) => c["customer_code"] === "CUST-HASH")!["pan_hash"]).toBe("myhash");
+    const sens = await build(true);
+    expect((await sens.rows<{ id: string }>("companies")).map((c) => c.id)).toEqual([t.companyId]);
+    expect((await sens.rows<Record<string, unknown>>("customers")).find((c) => c["customer_code"] === "CUST-HASH")!["pan_hash"]).toBe("myhash");
   });
 
-  it("streams tables in batches and caps each table at max_rows_per_table, saying so in the manifest", async () => {
-    const { buildBackup, BACKUP_MAX_ROWS_PER_TABLE } = await import("../../src/modules/admin/index.js");
-    expect(BACKUP_MAX_ROWS_PER_TABLE).toBe(200_000);
+  it("streams every table through a cursor in batches with no row cap; the manifest carries counts, sha256 per file, schema version and the FK load order", async () => {
+    const { BACKUP_FORMAT } = await import("../../src/modules/admin/index.js");
     const [n] = await t.app.sql<{ n: number }[]>`select count(*)::int as n from customers where company_id = ${t.companyId}`;
     expect(n!.n).toBeGreaterThanOrEqual(6);
-    const built = await buildBackup(t.app.db, { companyId: t.companyId, companyName: "SGB", includeSensitive: false, maxRowsPerTable: 3, batchSize: 2 });
-    const { json, entries } = await entriesOf(built.zip);
-    const manifest = json<Manifest>("manifest.json");
-    expect(manifest.max_rows_per_table).toBe(3);
-    const cust = manifest.tables.find((x) => x.name === "customers")!;
-    expect(cust).toMatchObject({ rows: 3, total_rows: n!.n, truncated: true });
-    expect(cust.note).toMatch(/3 of \d+ rows/);
-    expect(manifest.truncated_tables).toContain("customers");
-    expect(json<unknown[]>("tables/customers.json")).toHaveLength(3);
-    const users = manifest.tables.find((x) => x.name === "users")!;
-    expect(users.truncated).toBe(true); // 6 seeded users > 3
-    const roles = manifest.tables.find((x) => x.name === "sequences")!;
-    expect(roles.truncated).toBe(false);
+    const built = await build(false, 2);
+    const manifest = built.manifest as unknown as Manifest & { batch_size: number; load_order: string[]; schema: { migrations_applied: number | null }; files: Record<string, string> };
+    expect(manifest.format).toBe(BACKUP_FORMAT);
+    expect(manifest.batch_size).toBe(2);
+    expect(manifest).not.toHaveProperty("max_rows_per_table");
+    expect(manifest.schema.migrations_applied).toBeGreaterThanOrEqual(3);
+    expect(manifest.tables.find((x) => x.name === "customers")).toMatchObject({ rows: n!.n });
+    expect(await built.rows("customers")).toHaveLength(n!.n);
     expect(manifest.row_count).toBe(manifest.tables.reduce((s, x) => s + x.rows, 0));
-    // batched streaming still yields valid JSON and matching CRCs for every entry
-    for (const e of entries) expect((await entriesOf(built.zip)).read(e.name).length).toBe(e.uncompressedSize);
-    const bigger = await buildBackup(t.app.db, { companyId: t.companyId, companyName: "SGB", includeSensitive: false, batchSize: 2 });
-    const m2 = (await entriesOf(bigger.zip)).json<Manifest>("manifest.json");
-    expect(m2.tables.find((x) => x.name === "customers")).toMatchObject({ rows: n!.n, total_rows: n!.n, truncated: false, note: null });
-    expect(m2.truncated_tables).toEqual([]);
-  });
-
-  it("ZipWriter: streamed entries, UTF-8 names (flag bit 11), empty entries and stored-vs-deflated choice all read back; `unzip -t` agrees; junk input fails cleanly", async () => {
-    const { ZipWriter, readCentralDirectory, readZipEntry, crc32 } = await import("../../src/modules/admin/index.js");
-    const w = new ZipWriter(new Date("2026-03-31T18:29:59Z"));
-    const name = "tables/ünïcødé-टेबल.json";
-    const s = w.stream(name);
-    const parts = ["[\n", JSON.stringify({ a: "é".repeat(1000) }), ",\n", JSON.stringify({ b: 2 }), "\n]\n"];
-    for (const p of parts) await s.write(p);
-    await s.end();
-    w.file("empty.txt", "");
-    w.file("random.bin", Buffer.from(Array.from({ length: 512 }, (_, i) => (i * 7919) & 0xff)));
-    const dup = () => w.file(name, "x");
-    expect(dup).toThrow(/Duplicate/);
-    expect(() => w.file("../escape.txt", "x")).toThrow(/Invalid/);
-    expect(() => w.file("/abs.txt", "x")).toThrow(/Invalid/);
-    const zip = w.build();
-    const entries = readCentralDirectory(zip);
-    expect(entries.map((e) => e.name)).toEqual([name, "empty.txt", "random.bin"]);
-    const u = entries[0]!;
-    const expected = Buffer.from(parts.join(""), "utf8");
-    expect(u.uncompressedSize).toBe(expected.length);
-    expect(u.crc).toBe(crc32(expected));
-    expect(u.method).toBe(8);
-    expect(readZipEntry(zip, u).equals(expected)).toBe(true);
-    expect(zip.readUInt16LE(u.localHeaderOffset + 6) & 0x0800).toBe(0x0800);
-    expect(zip.readUInt16LE(u.localHeaderOffset + 26)).toBe(Buffer.byteLength(name, "utf8"));
-    expect(entries[1]).toMatchObject({ uncompressedSize: 0, compressedSize: 0, crc: 0, method: 0 });
-    expect(readZipEntry(zip, entries[1]!).length).toBe(0);
-    expect(readZipEntry(zip, entries[2]!)).toHaveLength(512);
-    expect(crc32(Buffer.from("123456789"))).toBe(0xcbf43926); // the CRC-32 check value
-    const dir = mkdtempSync(join(tmpdir(), "kkt-zip-"));
-    const file = join(dir, "t.zip");
-    writeFileSync(file, zip);
+    // parents before children
+    const at = (name: string) => manifest.load_order.indexOf(name);
+    expect(at("companies")).toBeLessThan(at("users"));
+    expect(at("customers")).toBeLessThan(at("bookings"));
+    expect(at("bookings")).toBeLessThan(at("payments"));
+    // every file's sha256 matches its bytes; the manifest itself and RESTORE.md are present
+    const { createHash } = await import("node:crypto");
+    for (const tb of manifest.tables as unknown as { file: string; sha256: string }[]) expect(createHash("sha256").update(await built.text(tb.file)).digest("hex"), tb.file).toBe(tb.sha256);
+    expect(createHash("sha256").update(await built.text("RESTORE.md")).digest("hex")).toBe(manifest.files["RESTORE.md"]);
+    expect(built.entries.map((e) => e.name)).toEqual(expect.arrayContaining(["manifest.json", "RESTORE.md", "tables/customers.ndjson"]));
     try {
-      const listing = execFileSync("unzip", ["-t", file], { encoding: "utf8" });
+      const listing = execFileSync("unzip", ["-t", built.file], { encoding: "utf8" });
       expect(listing).toContain("No errors detected");
     } catch (err) { if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err; }
-    expect(() => readCentralDirectory(Buffer.alloc(0))).toThrow(/ZIP/);
-    expect(() => readCentralDirectory(Buffer.from("not a zip at all, honestly"))).toThrow(/ZIP/);
-    const corrupt = Buffer.from(zip);
-    const flip = u.localHeaderOffset + 30 + Buffer.byteLength(name, "utf8") + 3;
-    corrupt[flip] = (corrupt[flip] ?? 0) ^ 0xff;
-    expect(() => readZipEntry(corrupt, u)).toThrow(/CRC|ZIP|unexpected|invalid/i);
   });
 });
 

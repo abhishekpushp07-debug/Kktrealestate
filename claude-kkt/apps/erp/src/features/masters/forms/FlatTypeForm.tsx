@@ -314,7 +314,7 @@ export function FlatTypeForm(_props: MasterFormProps) {
           control={control}
           name="spec_item_ids"
           render={({ field }) => (
-            <MultiSelect id={field.id} value={field.value} onValueChange={field.onChange} options={specOptions} placeholder={specItems.isPending ? "Loading…" : "Pick specification items"} searchPlaceholder="Search items or categories…" maxChips={6} data-testid="field-spec-items" />
+            <MultiSelect id={field.id} value={field.value} onValueChange={field.onChange} options={specOptions} placeholder={specItems.isPending ? "Loading…" : "Pick specification items"} searchPlaceholder="Search items or categories…" maxChips={6} aria-label="Specification items" data-testid="field-spec-items" />
           )}
         />
       </FormSection>

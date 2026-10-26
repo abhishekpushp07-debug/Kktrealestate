@@ -57,7 +57,7 @@ export function Avatar({ name, size = 44, onNavy }: { name: string; size?: numbe
   const ini = ((parts[0]?.[0] ?? "") + (parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? "") : "")).toUpperCase() || "?";
   return (
     <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: onNavy ? "rgba(255,255,255,0.14)" : colors.gold100, borderWidth: 1, borderColor: onNavy ? "rgba(255,255,255,0.2)" : colors.gold200, alignItems: "center", justifyContent: "center" }}>
-      <T variant="title" color={onNavy ? colors.gold200 : colors.gold700} style={{ fontSize: size * 0.36, lineHeight: size * 0.44 }}>
+      <T variant="title" color={onNavy ? colors.gold200 : colors.goldText} style={{ fontSize: size * 0.36, lineHeight: size * 0.44 }}>
         {ini}
       </T>
     </View>
@@ -66,13 +66,22 @@ export function Avatar({ name, size = 44, onNavy }: { name: string; size?: numbe
 
 export function StarRating({ value, onChange, size = 30 }: { value: number; onChange?: (v: number) => void; size?: number }): React.JSX.Element {
   return (
-    <View style={{ flexDirection: "row", gap: 4 }} accessibilityRole="adjustable" accessibilityValue={{ min: 1, max: 5, now: value }}>
-      {[1, 2, 3, 4, 5].map((n) => (
-        <Pressable key={n} disabled={!onChange} accessibilityRole="button" accessibilityLabel={`${n} star${n > 1 ? "s" : ""}`} onPress={() => onChange?.(n)} hitSlop={4} style={onChange ? { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" } : null}>
-          <Icon name="star" size={size} color={n <= value ? colors.gold : colors.navy200} />
-        </Pressable>
-      ))}
-    </View>
+    // read-only: one image "4 out of 5 stars"; editable: a radio group of five 48 px stars
+    onChange ? (
+      <View style={{ flexDirection: "row", gap: 4 }} accessibilityRole="radiogroup" accessibilityLabel="Rating">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <Pressable key={n} accessibilityRole="radio" aria-checked={n === value} accessibilityLabel={`${n} star${n > 1 ? "s" : ""}`} onPress={() => onChange(n)} style={{ minWidth: 48, minHeight: 48, alignItems: "center", justifyContent: "center" }}>
+            <Icon name="star" size={size} color={n <= value ? colors.gold : colors.navy200} />
+          </Pressable>
+        ))}
+      </View>
+    ) : (
+      <View style={{ flexDirection: "row", gap: 4 }} accessibilityRole="image" accessibilityLabel={`${value} out of 5 stars`}>
+        {[1, 2, 3, 4, 5].map((n) => (
+          <Icon key={n} name="star" size={size} color={n <= value ? colors.gold : colors.navy200} />
+        ))}
+      </View>
+    )
   );
 }
 

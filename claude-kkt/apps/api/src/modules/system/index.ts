@@ -4,11 +4,12 @@ import { z } from "zod";
 import { HealthResponseSchema } from "@kkt/contracts";
 import { config } from "../../config.js";
 import { ApiError } from "../../lib/errors.js";
-import { renderPrometheus } from "../../lib/metrics.js";
+import { METRICS_CONTENT_TYPE, scrapeMetrics } from "../../lib/metrics.js";
 import { route } from "../../lib/routes.js";
+import { lifecycle } from "./lifecycle.js";
 
 const HealthSchema = HealthResponseSchema.extend({ db_ping_ms: z.number().nullable(), redis_ping_ms: z.number().nullable() });
-const RegistrySchema = z.object({ items: z.array(z.object({ method: z.string(), url: z.string(), permission: z.string().nullable(), audience: z.enum(["erp", "portal"]).nullable(), public: z.boolean() })) });
+const RegistrySchema = z.object({ items: z.array(z.object({ method: z.string(), url: z.string(), permission: z.string().nullable(), audience: z.enum(["erp", "portal"]).nullable(), public: z.boolean(), sunset: z.string().optional() })) });
 
 /** System module: /health, /ready, /metrics, /api/v1/system/routes and the OpenAPI document. */
 export async function systemModule(app: FastifyInstance): Promise<void> {
@@ -37,6 +38,8 @@ export async function systemModule(app: FastifyInstance): Promise<void> {
       method: "GET", url, public: true,
       schema: { response: { 200: z.object({ ready: z.literal(true) }) }, summary: "Readiness (503 when a dependency is down)", tags: ["system"] },
       handler: async () => {
+        // a draining process (SIGTERM received) leaves the load balancer before it stops listening
+        if (lifecycle.draining) throw ApiError.unavailable("Not ready: shutting down", 5);
         const p = await probe();
         if (p.db === null || p.redis === null) {
           throw ApiError.unavailable(`Not ready: ${[p.db === null ? "database" : null, p.redis === null ? "redis" : null].filter(Boolean).join(", ")} unreachable`, 5);
@@ -46,13 +49,15 @@ export async function systemModule(app: FastifyInstance): Promise<void> {
     });
   }
 
+  // Staff with admin.tools, or a scraper presenting `Authorization: Bearer <METRICS_TOKEN>` (answered by plugins/telemetry.ts before
+  // authentication). Under node:cluster the text is the aggregate of every worker (lib/metrics.ts scrapeMetrics).
   for (const url of ["/metrics", "/api/v1/metrics"]) {
     route(app, {
       method: "GET", url, permission: "admin.tools",
-      schema: { response: { 200: z.string() }, summary: "Prometheus metrics", tags: ["system"] },
+      schema: { response: { 200: z.string() }, summary: "Prometheus metrics (admin.tools, or the METRICS_TOKEN bearer)", tags: ["system"] },
       handler: async (_req, reply) => {
-        reply.header("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
-        return reply.send(renderPrometheus({ nodejs_heap_used_bytes: process.memoryUsage().heapUsed }));
+        reply.header("Content-Type", METRICS_CONTENT_TYPE);
+        return reply.send(await scrapeMetrics());
       },
     });
   }

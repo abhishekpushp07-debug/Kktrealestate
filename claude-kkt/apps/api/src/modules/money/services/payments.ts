@@ -4,17 +4,19 @@
  */
 import { and, eq, sql } from "drizzle-orm";
 import type { DemandLetterData, PaymentBounce, PaymentClear, PaymentCreate, PaymentReverse, ReceiptData } from "@kkt/contracts";
-import { bankAccounts, blocks, bookingOtherCharges, bookings, companies, customers, demands, flats, paymentModes, payments, projects, users, type DB, type Executor, type Tx } from "@kkt/db";
+import { bankAccounts, blocks, bookingOtherCharges, bookings, companies, customers, demands, flats, ledgerEntries, paymentModes, payments, projects, users, type DB, type Executor, type Tx } from "@kkt/db";
 import { amountInWords, bucketCapCheck, formatINR, type Bucket } from "@kkt/domain";
 import { writeAudit } from "../../../lib/audit.js";
 import { decryptField } from "../../../lib/crypto.js";
 import { ApiError } from "../../../lib/errors.js";
 import { nextNumber } from "../../../lib/numbering.js";
+import { isUniqueViolation } from "../../../lib/pgErrors.js";
 import { ensureProjectAccess, type StaffContext } from "../../../lib/scope.js";
 import { applyUpdate } from "../../../lib/version.js";
-import { notify, notifyRole } from "../../notifications/service.js";
-import { ACCOUNTS_ROLES, Clock, formatAddress, loadBooking, loadCompanyRow, lockBooking, numberingOf, todayDate, type BookingRecord, type MoneyActor } from "../common.js";
+import { notify, notifyRole } from "../../notifications/index.js";
+import { ACCOUNTS_ROLES, Clock, formatAddress, loadBooking, loadCompanyRow, lockBooking, lockFlatAndBlockOf, moneyTransaction, numberingOf, todayDate, type BookingRecord, type MoneyActor } from "../common.js";
 import { bookingRecipients, recomputeDemandStatuses } from "./dues.js";
+import { reopenCompletedBooking } from "./bookings.js";
 import { appendEvent, events } from "./ledger.js";
 import { bankLabel } from "./views.js";
 
@@ -64,17 +66,75 @@ async function applyCleared(tx: Tx, b: BookingRecord, p: PaymentRecord, at: Date
   return seq;
 }
 
-/** Posting result (payment id + the ledger seq it produced). */
-export interface PostResult { paymentId: string; ledgerSeq: number | null }
+/** Posting result (payment id + the ledger seq it produced; `replayed` when an earlier posting with the same Idempotency-Key was returned). */
+export interface PostResult { paymentId: string; ledgerSeq: number | null; replayed: boolean }
 
-/** POSTING ALGORITHM (one transaction; Idempotency-Key enforced by the route). */
+/**
+ * JSON-stable view of the money-relevant fields of a posting (booking, against, bucket / charge line, amount, date, mode, bank account,
+ * instrument) — what a same-key retry must repeat. Remarks are left out: clearing may legitimately edit them later.
+ */
+function postingFingerprint(x: { bookingId: string; against: string; bucket: string | null; otherChargeId: string | null; amountPaise: number; paymentDate: string; paymentModeId: string; bankAccountId: string | null; instrument: { number?: string | null; date?: string | null; bank_name?: string | null; branch?: string | null } | null; remarks?: string | null }): string {
+  const i = x.instrument;
+  return JSON.stringify([x.bookingId, x.against, x.bucket, x.otherChargeId, x.amountPaise, x.paymentDate, x.paymentModeId, x.bankAccountId,
+    i?.number ? [i.number, i.date ?? null, i.bank_name ?? null, i.branch ?? null] : null]);
+}
+
+function bodyFingerprint(body: PaymentCreate): string {
+  return postingFingerprint({
+    bookingId: body.booking_id, against: body.against, bucket: body.against === "FLAT_VALUE" ? (body.bucket ?? null) : null, otherChargeId: body.against === "OTHER_CHARGE" ? (body.other_charge_id ?? null) : null,
+    amountPaise: body.amount_paise, paymentDate: body.payment_date, paymentModeId: body.payment_mode_id, bankAccountId: body.bank_account_id ?? null,
+    instrument: body.instrument ?? null, remarks: body.remarks ?? null,
+  });
+}
+
+/**
+ * Crash-safe idempotency (SPEC §2 "payment posting REQUIRES an Idempotency-Key; replaying returns the original and creates nothing"):
+ * the key is stored on the payments row itself (unique per company), so even when the plugin's replay record was never written
+ * (crash / Redis or DB hiccup between COMMIT and onSend) a retry finds the original payment. Same key + different posting → 422
+ * IDEMPOTENCY_MISMATCH. Returns null when the key is new.
+ */
+async function existingPosting(db: Executor, companyId: string, key: string, body: PaymentCreate): Promise<PostResult | null> {
+  const [p] = await db.select().from(payments).where(and(eq(payments.companyId, companyId), eq(payments.idempotencyKey, key))).limit(1);
+  if (!p) return null;
+  const stored = postingFingerprint({ bookingId: p.bookingId, against: p.against, bucket: p.bucket, otherChargeId: p.otherChargeId, amountPaise: p.amountPaise, paymentDate: p.paymentDate, paymentModeId: p.paymentModeId, bankAccountId: p.bankAccountId, instrument: p.instrument, remarks: p.remarks });
+  // the original was posted with a bank account only for non-cash modes; a cash replay that repeats an ignored bank_account_id still matches
+  const fresh = bodyFingerprint(body);
+  const freshNoBank = bodyFingerprint({ ...body, bank_account_id: null });
+  if (stored !== fresh && stored !== freshNoBank) throw new ApiError(422, "IDEMPOTENCY_MISMATCH", "Idempotency-Key was already used with a different payment", { receipt_number: p.receiptNumber });
+  const [row] = await db.select({ seq: ledgerEntries.seq }).from(ledgerEntries).where(and(eq(ledgerEntries.bookingId, p.bookingId), eq(ledgerEntries.refId, p.id), sql`${ledgerEntries.event} in ('PAYMENT', 'OTHER_CHARGE_PAYMENT')`)).limit(1);
+  return { paymentId: p.id, ledgerSeq: row?.seq ?? null, replayed: true };
+}
+
+/** POSTING ALGORITHM (one transaction, retried on 40001/40P01; Idempotency-Key enforced by the route and stored on the row). */
 export async function postPayment(db: DB, user: StaffContext, body: PaymentCreate, actor: MoneyActor, idempotencyKey: string | null): Promise<PostResult> {
   const today = todayDate();
-  return db.transaction(async (tx) => {
+  if (idempotencyKey) {
+    const prior = await existingPosting(db, user.companyId, idempotencyKey, body);
+    if (prior) return prior;
+  }
+  try {
+    return await moneyTransaction(db, (tx) => postPaymentTx(tx, user, body, actor, idempotencyKey, today));
+  } catch (err) {
+    // a concurrent duplicate with the same key committed first: answer with the original posting
+    if (idempotencyKey && isUniqueViolation(err)) {
+      const prior = await existingPosting(db, user.companyId, idempotencyKey, body);
+      if (prior) return prior;
+    }
+    throw err;
+  }
+}
+
+async function postPaymentTx(tx: Tx, user: StaffContext, body: PaymentCreate, actor: MoneyActor, idempotencyKey: string | null, today: string): Promise<PostResult> {
     const b = await loadBooking(tx, user.companyId, body.booking_id, true);
     ensureProjectAccess(user, b.projectId, "Booking");
     if (b.status !== "ACTIVE") throw ApiError.conflict("BOOKING_NOT_ACTIVE", `Booking ${b.bookingNumber} is ${b.status.toLowerCase()}; payments are no longer accepted`, { status: b.status });
-    await lockBooking(tx, b.id);
+    const clock = new Clock();
+    await lockBooking(tx, b.id, clock);
+    if (idempotencyKey) {
+      // serialised behind the booking lock: an identical retry that raced us sees the committed original here
+      const prior = await existingPosting(tx, user.companyId, idempotencyKey, body);
+      if (prior) return prior;
+    }
     if (body.payment_date > today) throw ApiError.rule("Payment date cannot be in the future", "PAYMENT_DATE_FUTURE", { today });
     if (body.payment_date < b.bookingDate) throw ApiError.rule("Payment date cannot be before the booking date", "PAYMENT_DATE_BEFORE_BOOKING", { booking_date: b.bookingDate });
     const [mode] = await tx.select().from(paymentModes).where(and(eq(paymentModes.id, body.payment_mode_id), eq(paymentModes.companyId, user.companyId))).limit(1);
@@ -101,10 +161,9 @@ export async function postPayment(db: DB, user: StaffContext, body: PaymentCreat
       await assertChargeCap(tx, l, body.amount_paise);
       line = l;
     }
-    // validation passed → the receipt number is allocated (numbers are never burnt by rejected postings)
+    // validation passed and every row lock is held → the receipt number (sequence row, LAST lock) is allocated
     const company = await loadCompanyRow(tx, user.companyId);
     const receiptNumber = await nextNumber(tx, numberingOf(company), "receipt", body.payment_date);
-    const clock = new Clock();
     const postedAt = clock.next();
     const cleared = mode.clearsImmediately;
     const [p] = await tx.insert(payments).values({
@@ -122,24 +181,25 @@ export async function postPayment(db: DB, user: StaffContext, body: PaymentCreat
     }
     await writeAudit(tx, { companyId: b.companyId, actor, action: "payment.post", entityType: "payment", entityId: p.id, after: { receipt_number: receiptNumber, booking_id: b.id, against: p.against, bucket: p.bucket, amount_paise: p.amountPaise, payment_date: p.paymentDate, mode_code: p.modeCode, status: p.status, instrument: p.instrument }, ip: actor.ip ?? null, requestId: actor.requestId ?? null });
     await notify(tx, { companyId: b.companyId, recipients: await bookingRecipients(tx, b), type: "PAYMENT_RECEIVED", title: `Payment of ${formatINR(p.amountPaise)} received (receipt ${receiptNumber})`, body: cleared ? `${mode.name} – ${p.bucket ?? line?.name ?? ""}`.trim() : `${mode.name} – subject to realisation`, entityType: "payment", entityId: p.id, link: `/bookings/${b.id}/payments` });
-    return { paymentId: p.id, ledgerSeq };
-  });
+    return { paymentId: p.id, ledgerSeq, replayed: false };
 }
 
 /** Loads a payment of the company inside the user's scope, locked, with its booking. */
-async function loadPaymentForUpdate(tx: Tx, user: StaffContext, id: string): Promise<{ p: PaymentRecord; b: BookingRecord }> {
+async function loadPaymentForUpdate(tx: Tx, user: StaffContext, id: string, opts: { clock?: Clock; lockFlatAndBlock?: boolean } = {}): Promise<{ p: PaymentRecord; b: BookingRecord }> {
   const [p] = await tx.select().from(payments).where(and(eq(payments.id, id), eq(payments.companyId, user.companyId))).limit(1).for("update");
   if (!p) throw ApiError.notFound("Payment");
   ensureProjectAccess(user, p.projectId, "Payment");
+  if (opts.lockFlatAndBlock) await lockFlatAndBlockOf(tx, user.companyId, p.bookingId);
   const b = await loadBooking(tx, user.companyId, p.bookingId, true);
-  await lockBooking(tx, b.id);
+  await lockBooking(tx, b.id, opts.clock);
   return { p, b };
 }
 
 /** PENDING → CLEARED (bucket cap re-checked at clearing). */
 export async function clearPayment(db: DB, user: StaffContext, id: string, body: PaymentClear, actor: MoneyActor): Promise<void> {
-  await db.transaction(async (tx) => {
-    const { p, b } = await loadPaymentForUpdate(tx, user, id);
+  await moneyTransaction(db, async (tx) => {
+    const clock = new Clock();
+    const { p, b } = await loadPaymentForUpdate(tx, user, id, { clock });
     if (p.status !== "PENDING") throw ApiError.conflict("PAYMENT_NOT_PENDING", `Receipt ${p.receiptNumber} is ${p.status.toLowerCase()}, not pending`, { status: p.status });
     if (b.status !== "ACTIVE") throw ApiError.conflict("BOOKING_NOT_ACTIVE", `Booking ${b.bookingNumber} is ${b.status.toLowerCase()}`, { status: b.status });
     if (p.against === "FLAT_VALUE") await assertBucketCap(tx, b, p.bucket!, p.amountPaise);
@@ -147,7 +207,7 @@ export async function clearPayment(db: DB, user: StaffContext, id: string, body:
       const [line] = await tx.select().from(bookingOtherCharges).where(eq(bookingOtherCharges.id, p.otherChargeId!)).limit(1);
       if (line) await assertChargeCap(tx, line, p.amountPaise);
     }
-    const clearedAt = new Clock().next();
+    const clearedAt = clock.next();
     const updated = await applyUpdate(tx, payments, p.id, body.version, { status: "CLEARED", clearedAt, clearedBy: user.id, remarks: body.remarks ?? p.remarks }, "payment");
     await tx.update(bookings).set({ pendingChequesPaise: sql`greatest(0, ${bookings.pendingChequesPaise} - ${p.amountPaise})` }).where(eq(bookings.id, b.id));
     await applyCleared(tx, b, updated, clearedAt);
@@ -158,7 +218,7 @@ export async function clearPayment(db: DB, user: StaffContext, id: string, body:
 
 /** PENDING → BOUNCED (never counts; Accounts notified). */
 export async function bouncePayment(db: DB, user: StaffContext, id: string, body: PaymentBounce, actor: MoneyActor): Promise<void> {
-  await db.transaction(async (tx) => {
+  await moneyTransaction(db, async (tx) => {
     const { p, b } = await loadPaymentForUpdate(tx, user, id);
     if (p.status !== "PENDING") throw ApiError.conflict("PAYMENT_NOT_PENDING", `Receipt ${p.receiptNumber} is ${p.status.toLowerCase()}, not pending`, { status: p.status });
     await applyUpdate(tx, payments, p.id, body.version, { status: "BOUNCED", bouncedAt: new Date(), bouncedBy: user.id, bounceReason: body.reason, receiptCancelled: true }, "payment");
@@ -170,13 +230,24 @@ export async function bouncePayment(db: DB, user: StaffContext, id: string, body
 }
 
 /** CLEARED → REVERSED: negative REVERSAL row, summary decremented, receipt cancelled (never deleted). */
-export async function reversePayment(db: DB, user: StaffContext, id: string, body: PaymentReverse, actor: MoneyActor): Promise<void> {
-  await db.transaction(async (tx) => {
-    const { p, b } = await loadPaymentForUpdate(tx, user, id);
+export async function reversePayment(db: DB, user: StaffContext, id: string, body: PaymentReverse, actor: MoneyActor): Promise<{ reopened: boolean }> {
+  return moneyTransaction(db, async (tx) => {
+    const clock = new Clock();
+    // payment → flat → block → booking: reopening a completed booking flips the flat and refreshes the tower's unit counts
+    const { p, b } = await loadPaymentForUpdate(tx, user, id, { clock, lockFlatAndBlock: true });
     if (p.status !== "CLEARED") throw ApiError.conflict("PAYMENT_NOT_CLEARED", `Receipt ${p.receiptNumber} is ${p.status.toLowerCase()}; only cleared payments can be reversed`, { status: p.status });
     // a cancelled booking's ledger is closed (SPEC §12): nothing more can be appended to it
     if (b.status === "CANCELLED") throw ApiError.conflict("BOOKING_NOT_ACTIVE", `Booking ${b.bookingNumber} is cancelled; its ledger is closed`, { status: b.status });
-    const reversedAt = new Clock().next();
+    // a handed-over booking (SOLD flat) is only reversed by an administrator, and that reopens it (TODO-integration #7)
+    let reopened = false;
+    if (b.status === "COMPLETED") {
+      if (!user.permissions.has("settings.manage")) {
+        throw ApiError.conflict("BOOKING_COMPLETED", `Booking ${b.bookingNumber} has been handed over; reversing ${p.receiptNumber} needs settings.manage and reopens the booking`, { status: b.status, permission: "settings.manage" });
+      }
+      await reopenCompletedBooking(tx, b, user, `Reversal of ${p.receiptNumber}: ${body.reason}`, actor);
+      reopened = true;
+    }
+    const reversedAt = clock.next();
     const updated = await applyUpdate(tx, payments, p.id, body.version, { status: "REVERSED", reversedAt, reversedBy: user.id, reversalReason: body.reason, receiptCancelled: true }, "payment");
     if (p.against === "FLAT_VALUE") {
       await appendEvent(tx, b.id, events.reversal(updated, reversedAt));
@@ -186,7 +257,8 @@ export async function reversePayment(db: DB, user: StaffContext, id: string, bod
     }
     await recomputeDemandStatuses(tx, b.id);
     await writeAudit(tx, { companyId: b.companyId, actor, action: "payment.reverse", entityType: "payment", entityId: p.id, before: { status: "CLEARED" }, after: { status: "REVERSED", reason: body.reason, receipt_cancelled: true }, ip: actor.ip ?? null, requestId: actor.requestId ?? null });
-    await notifyRole(tx, b.companyId, ACCOUNTS_ROLES, { type: "PAYMENT_RECEIVED", title: `Receipt ${p.receiptNumber} reversed on ${b.bookingNumber}`, body: `${formatINR(p.amountPaise)} – ${body.reason}`, entityType: "payment", entityId: p.id, link: `/bookings/${b.id}/payments` });
+    await notifyRole(tx, b.companyId, ACCOUNTS_ROLES, { type: "PAYMENT_RECEIVED", title: `Receipt ${p.receiptNumber} reversed on ${b.bookingNumber}${reopened ? " (booking reopened)" : ""}`, body: `${formatINR(p.amountPaise)} – ${body.reason}`, entityType: "payment", entityId: p.id, link: `/bookings/${b.id}/payments` });
+    return { reopened };
   });
 }
 

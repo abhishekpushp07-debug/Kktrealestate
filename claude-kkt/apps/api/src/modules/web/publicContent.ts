@@ -60,6 +60,12 @@ async function publishedSlugs(db: Executor, companyId: string): Promise<Map<stri
 // Project cards
 // ---------------------------------------------------------------------------
 
+/**
+ * A flat's status as the public site shows it: a HOLD whose hold_until has passed has lapsed and is AVAILABLE again (domain
+ * isHoldExpired; the HOLD_EXPIRY job writes the release a few minutes later).
+ */
+const effectiveStatusSql = sql<FlatLite["status"]>`(case when ${flats.status} = 'HOLD' and ${flats.holdUntil} is not null and ${flats.holdUntil} <= now() then 'AVAILABLE' else ${flats.status}::text end)`;
+
 interface FlatAgg { projectId: string; flatTypeId: string; minAvailablePrice: number | null; available: number; total: number }
 
 async function flatAggregates(db: Executor, projectIds: string[]): Promise<FlatAgg[]> {
@@ -67,8 +73,8 @@ async function flatAggregates(db: Executor, projectIds: string[]): Promise<FlatA
   const rows = await db
     .select({
       projectId: flats.projectId, flatTypeId: flats.flatTypeId,
-      minAvailablePrice: sql<number | string | null>`min(${flats.pricePaise}) filter (where ${flats.status} = 'AVAILABLE')`,
-      available: sql<number>`count(*) filter (where ${flats.status} = 'AVAILABLE')::int`,
+      minAvailablePrice: sql<number | string | null>`min(${flats.pricePaise}) filter (where ${effectiveStatusSql} = 'AVAILABLE')`,
+      available: sql<number>`count(*) filter (where ${effectiveStatusSql} = 'AVAILABLE')::int`,
       total: sql<number>`count(*)::int`,
     })
     .from(flats)
@@ -299,7 +305,7 @@ export async function buildProjectDetail(db: Executor, companyId: string, slug: 
   const [amenityRows, blockRows, flatRows, heroDocs, visitSettings, gallery] = await Promise.all([
     db.select({ name: amenities.name, category: amenities.category, icon: amenities.icon }).from(projectAmenities).innerJoin(amenities, eq(amenities.id, projectAmenities.amenityId)).where(eq(projectAmenities.projectId, p.id)).orderBy(asc(amenities.name)),
     db.select({ id: blocks.id, name: blocks.name, floors: blocks.floors, typeName: blockTypes.name, percent: blocks.constructionPercent, status: blocks.status }).from(blocks).leftJoin(blockTypes, eq(blockTypes.id, blocks.blockTypeId)).where(and(eq(blocks.projectId, p.id), eq(blocks.isActive, true))).orderBy(asc(blocks.sortOrder), asc(blocks.name)),
-    db.select({ id: flats.id, blockId: flats.blockId, flatNumber: flats.flatNumber, floor: flats.floor, floorLabel: flats.floorLabel, position: flats.position, flatTypeId: flats.flatTypeId, flatTypeCode: flats.flatTypeCode, facing: flats.facing, status: flats.status, pricePaise: flats.pricePaise }).from(flats).innerJoin(blocks, eq(blocks.id, flats.blockId)).where(and(eq(flats.projectId, p.id), eq(blocks.isActive, true))),
+    db.select({ id: flats.id, blockId: flats.blockId, flatNumber: flats.flatNumber, floor: flats.floor, floorLabel: flats.floorLabel, position: flats.position, flatTypeId: flats.flatTypeId, flatTypeCode: flats.flatTypeCode, facing: flats.facing, status: effectiveStatusSql, pricePaise: flats.pricePaise }).from(flats).innerJoin(blocks, eq(blocks.id, flats.blockId)).where(and(eq(flats.projectId, p.id), eq(blocks.isActive, true))),
     loadDocuments(db, [...w.heroDocumentIds, w.brochureDocumentId, w.seo.og_image_document_id]),
     loadVisitSettings(db, p.id),
     galleryFor(db, companyId, p.id, slugs),

@@ -145,7 +145,7 @@ export default async function ProjectPage({ params }: { params: Params }) {
       </div>
 
       {/* In-page navigation */}
-      <nav aria-label="On this page" className="sticky top-18 z-30 border-b border-line bg-ivory-100/90 backdrop-blur">
+      <nav aria-label="On this page" data-section-nav className="sticky top-18 z-30 border-b border-line bg-ivory-100/90 backdrop-blur">
         <ul className="container-site hide-scrollbar flex gap-1 overflow-x-auto">
           {sections.map((s) => (
             <li key={s.id} className="shrink-0">
@@ -161,7 +161,7 @@ export default async function ProjectPage({ params }: { params: Params }) {
         <div className="min-w-0 space-y-12">
           {/* Overview & highlights */}
           <section id="overview" className={SECTION} aria-labelledby="overview-title">
-            <p className="eyebrow text-gold-600">Overview</p>
+            <p className="eyebrow text-gold-700">Overview</p>
             <h2 id="overview-title" className={`${H2} mt-3`}>
               About {project.name}
             </h2>
@@ -227,7 +227,7 @@ export default async function ProjectPage({ params }: { params: Params }) {
 
           {project.configurations.length ? (
             <section id="configurations" className={SECTION} aria-labelledby="configurations-title">
-              <p className="eyebrow text-gold-600">Configurations & floor plans</p>
+              <p className="eyebrow text-gold-700">Configurations & floor plans</p>
               <h2 id="configurations-title" className={`${H2} mt-3 mb-6`}>
                 Choose the home that fits your life
               </h2>
@@ -237,7 +237,7 @@ export default async function ProjectPage({ params }: { params: Params }) {
 
           {project.amenities.length ? (
             <section id="amenities" className={SECTION} aria-labelledby="amenities-title">
-              <p className="eyebrow text-gold-600">Amenities</p>
+              <p className="eyebrow text-gold-700">Amenities</p>
               <h2 id="amenities-title" className={`${H2} mt-3`}>
                 Everyday luxuries, thoughtfully placed
               </h2>
@@ -260,7 +260,7 @@ export default async function ProjectPage({ params }: { params: Params }) {
 
           {project.availability?.blocks.length ? (
             <section id="availability" className={SECTION} aria-labelledby="availability-title">
-              <p className="eyebrow text-gold-600">Availability</p>
+              <p className="eyebrow text-gold-700">Availability</p>
               <h2 id="availability-title" className={`${H2} mt-3 mb-6`}>
                 Live inventory
               </h2>
@@ -270,7 +270,7 @@ export default async function ProjectPage({ params }: { params: Params }) {
 
           {project.construction_progress?.blocks.length ? (
             <section id="progress" className={SECTION} aria-labelledby="progress-title">
-              <p className="eyebrow text-gold-600">Construction progress</p>
+              <p className="eyebrow text-gold-700">Construction progress</p>
               <h2 id="progress-title" className={`${H2} mt-3 mb-6`}>
                 Watch your home take shape
               </h2>
@@ -280,7 +280,7 @@ export default async function ProjectPage({ params }: { params: Params }) {
 
           {project.video_urls.length + project.tour_urls.length > 0 ? (
             <section id="media" className={SECTION} aria-labelledby="media-title">
-              <p className="eyebrow text-gold-600">Walkthrough & virtual tour</p>
+              <p className="eyebrow text-gold-700">Walkthrough & virtual tour</p>
               <h2 id="media-title" className={`${H2} mt-3`}>
                 Step inside from wherever you are
               </h2>
@@ -302,7 +302,7 @@ export default async function ProjectPage({ params }: { params: Params }) {
 
           {project.map_embed_url || project.landmarks.length ? (
             <section id="location" className={SECTION} aria-labelledby="location-title">
-              <p className="eyebrow text-gold-600">Location</p>
+              <p className="eyebrow text-gold-700">Location</p>
               <h2 id="location-title" className={`${H2} mt-3`}>
                 Well connected, beautifully placed
               </h2>
@@ -347,7 +347,7 @@ export default async function ProjectPage({ params }: { params: Params }) {
 
           {project.faqs.length ? (
             <section id="faqs" className={SECTION} aria-labelledby="faqs-title">
-              <p className="eyebrow text-gold-600">Questions</p>
+              <p className="eyebrow text-gold-700">Questions</p>
               <h2 id="faqs-title" className={`${H2} mt-3 mb-6`}>
                 Frequently asked
               </h2>

@@ -4,6 +4,7 @@ import { Popover } from "radix-ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cn, useDebouncedValue } from "@/lib/utils";
 import { Spinner } from "./spinner";
+import { useFieldAria } from "./field-context";
 
 export interface ComboboxOption {
   value: string;
@@ -60,6 +61,7 @@ export function Combobox({
   id,
   ...aria
 }: ComboboxProps) {
+  const fieldAria = useFieldAria(id, { invalid, "aria-describedby": aria["aria-describedby"] });
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [remote, setRemote] = useState<readonly ComboboxOption[]>([]);
@@ -134,14 +136,14 @@ export function Combobox({
             id={id}
             role="combobox"
             aria-expanded={open}
-            aria-invalid={invalid || undefined}
             disabled={disabled}
             className={cn(
-              "flex w-full min-w-0 items-center justify-between gap-2 rounded-md border border-border-strong bg-card px-3 text-left text-sm transition-colors hover:border-navy-300 focus-ring focus-visible:border-gold disabled:cursor-not-allowed disabled:bg-surface disabled:text-ink-subtle aria-invalid:border-danger",
-              size === "md" ? "h-11 sm:h-9" : "h-11 text-xs sm:h-8",
+              "flex w-full min-w-0 items-center justify-between gap-2 rounded-md border border-border-input bg-card px-3 text-left text-sm transition-colors hover:border-navy-400 focus-ring focus-visible:border-gold disabled:cursor-not-allowed disabled:bg-surface disabled:text-ink-subtle aria-invalid:border-danger",
+              size === "md" ? "h-12 sm:h-9" : "h-12 text-xs sm:h-8",
               allowClear && value && "pr-14",
             )}
             {...aria}
+            {...fieldAria}
           >
             <span className={cn("truncate", !displayLabel && "text-ink-subtle")}>{displayLabel ?? placeholder}</span>
             <ChevronsUpDown className="size-4 shrink-0 text-ink-subtle" aria-hidden="true" />
@@ -151,7 +153,7 @@ export function Combobox({
           <button
             type="button"
             aria-label="Clear selection"
-            className="absolute right-8 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-ink-subtle hover:bg-navy-50 hover:text-navy-950 focus-ring"
+            className="absolute right-7 top-1/2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-full text-ink-subtle hover:bg-navy-50 hover:text-navy-950 focus-ring"
             onClick={() => onValueChange(null, null)}
           >
             <X className="size-3.5" aria-hidden="true" />

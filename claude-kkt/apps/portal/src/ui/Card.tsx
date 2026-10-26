@@ -1,3 +1,4 @@
+import { createContext, useContext } from "react";
 import { Pressable, StyleSheet, View, type StyleProp, type ViewProps, type ViewStyle } from "react-native";
 import { Icon } from "./Icon";
 import { T } from "./Text";
@@ -10,6 +11,9 @@ export interface CardProps extends ViewProps {
   style?: StyleProp<ViewStyle>;
 }
 
+/** True inside a pressable Card: nested controls would be "interactive inside interactive", so headers render their action as text. */
+const PressableCardContext = createContext(false);
+
 const toneBg = { surface: colors.surface, navy: colors.navy, gold: colors.gold50, muted: colors.surfaceMuted } as const;
 
 /** Elevated ivory surface; `tone="navy"` for the hero card. */
@@ -18,7 +22,7 @@ export function Card({ padded = true, tone = "surface", onPress, style, children
   if (onPress) {
     return (
       <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [base, pressed ? styles.pressed : null]} {...rest}>
-        {children}
+        <PressableCardContext.Provider value={true}>{children}</PressableCardContext.Provider>
       </Pressable>
     );
   }
@@ -30,11 +34,12 @@ export function Card({ padded = true, tone = "surface", onPress, style, children
 }
 
 export function CardHeader({ title, subtitle, action, onAction, eyebrow }: { title: string; subtitle?: string; eyebrow?: string; action?: string; onAction?: () => void }): React.JSX.Element {
+  const insidePressable = useContext(PressableCardContext);
   return (
     <View style={styles.header}>
       <View style={{ flex: 1 }}>
         {eyebrow ? (
-          <T variant="label" color={colors.gold700}>
+          <T variant="label" color={colors.goldText}>
             {eyebrow}
           </T>
         ) : null}
@@ -45,8 +50,16 @@ export function CardHeader({ title, subtitle, action, onAction, eyebrow }: { tit
           </T>
         ) : null}
       </View>
-      {action && onAction ? (
-        <Pressable accessibilityRole="button" onPress={onAction} hitSlop={8} style={styles.actionRow}>
+      {action && onAction && insidePressable ? (
+        // the whole card is the button: show the affordance without a nested control
+        <View style={styles.actionRow}>
+          <T variant="caption" color={colors.navy}>
+            {action}
+          </T>
+          <Icon name="chevron-right" size={14} color={colors.navy} />
+        </View>
+      ) : action && onAction ? (
+        <Pressable accessibilityRole="button" onPress={onAction} style={styles.actionRow}>
           <T variant="caption" color={colors.navy}>
             {action}
           </T>
@@ -81,7 +94,7 @@ const styles = StyleSheet.create({
   goldBorder: { borderWidth: 1, borderColor: colors.gold200 },
   pressed: { opacity: 0.92 },
   header: { flexDirection: "row", alignItems: "flex-start", gap: space.md, marginBottom: space.md },
-  actionRow: { flexDirection: "row", alignItems: "center", gap: 2, paddingTop: 2 },
+  actionRow: { flexDirection: "row", alignItems: "center", gap: 2, minHeight: 44, paddingHorizontal: 4, marginTop: -10, marginRight: -4 },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.line, alignSelf: "stretch" },
   kv: { flexDirection: "row", alignItems: "flex-start", gap: space.md, paddingVertical: 8 },
 });

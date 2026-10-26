@@ -22,8 +22,9 @@ export function BookingChip({ onNavy, block }: { onNavy?: boolean; block?: boole
   return (
     <>
       <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={multiple ? "Switch booking" : "Current booking"}
+        // the visible flat · tower text is the accessible name; a single booking is plain text, not a button
+        accessibilityRole={multiple ? "button" : "text"}
+        accessibilityHint={multiple ? "Opens the list of your bookings" : undefined}
         disabled={!multiple}
         hitSlop={6}
         onPress={() => {

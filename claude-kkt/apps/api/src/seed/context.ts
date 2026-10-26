@@ -172,7 +172,9 @@ export class SeedContext {
 
   /** One API call through app.inject; throws SeedError on an unexpected status. */
   async call<T = Record<string, unknown>>(method: InjectOptions["method"], url: string, opts: CallOptions = {}): Promise<T> {
-    const headers: Record<string, string> = { "x-forwarded-for": opts.ip ?? "10.77.0.1", ...(opts.headers ?? {}) };
+    // The fake client IP is the socket address itself, so it holds whatever TRUST_PROXY says (no X-Forwarded-For needed).
+    const ip = opts.ip ?? "10.77.0.1";
+    const headers: Record<string, string> = { ...(opts.headers ?? {}) };
     if (opts.token) headers["authorization"] = `Bearer ${opts.token}`;
     if (method === "POST" && opts.idempotent !== false && !headers["idempotency-key"]) headers["idempotency-key"] = this.idemKey();
     if (opts.ifMatch !== undefined) headers["if-match"] = `"${opts.ifMatch}"`;
@@ -188,7 +190,7 @@ export class SeedContext {
       headers["content-type"] = "application/json";
       payload = JSON.stringify(opts.body);
     }
-    const res = await this.app.inject({ method, url, headers, ...(payload !== undefined ? { payload } : {}) });
+    const res = await this.app.inject({ method, url, headers, remoteAddress: ip, ...(payload !== undefined ? { payload } : {}) });
     const expected = opts.expect === undefined ? [200, 201, 204] : Array.isArray(opts.expect) ? opts.expect : [opts.expect as number];
     const ct = String(res.headers["content-type"] ?? "");
     let body: unknown = res.body;

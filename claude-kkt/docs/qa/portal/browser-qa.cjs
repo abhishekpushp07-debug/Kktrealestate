@@ -1,5 +1,6 @@
-// Browser QA for apps/portal — see docs/qa/portal.md. Run from the repo root with the API on :4200 and the web export served on :8081:
-//   node docs/qa/portal/browser-qa.cjs
+// Browser QA for apps/portal — see docs/qa/portal.md. Run from the repo root with the API and the web export served (SPA fallback):
+//   PORTAL_URL=http://localhost:8081 API_URL=http://localhost:4200 PORTAL_DB=kkt_qa_portal node docs/qa/portal/browser-qa.cjs
+// AXE=0 skips the axe-core scans.
 const { chromium } = require("playwright");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -8,9 +9,12 @@ const ROOT = path.resolve(__dirname, "..", "..", "..");
 const sharp = require(path.join(ROOT, "node_modules", "sharp"));
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "kkt-portal-qa-"));
 
-const PORTAL = "http://localhost:8081";
-const API = "http://localhost:4200/api/v1";
-const OUT = __dirname;
+const PORTAL = process.env.PORTAL_URL || "http://localhost:8081";
+const API = `${process.env.API_URL || "http://localhost:4200"}/api/v1`;
+const PORTAL_DB = process.env.PORTAL_DB || "kkt_qa_portal";
+const { createAxe } = require("../axe.cjs");
+const axe = createAxe("portal");
+const OUT = process.env.OUT_DIR || __dirname;
 const MAX_SHOTS = 40;
 fs.mkdirSync(OUT, { recursive: true });
 for (const f of fs.readdirSync(OUT)) if (f.endsWith(".png")) fs.unlinkSync(path.join(OUT, f));
@@ -100,13 +104,21 @@ async function check(page, name, opts = {}) {
       if (cs.visibility === "hidden" || cs.display === "none") continue;
       targets.push({ text: (el.getAttribute("aria-label") || el.textContent || "").trim().slice(0, 40), h: Math.round(r.height), w: Math.round(r.width), tag: el.tagName.toLowerCase(), role: el.getAttribute("role") });
     }
-    const tabbar = document.querySelector('[role="tablist"]');
-    const tb = tabbar ? tabbar.getBoundingClientRect() : null;
+    // the app tab bar is the bottom-most tablist (segmented controls are tablists too)
+    const tablists = [...document.querySelectorAll('[role="tablist"]')].map((t) => t.getBoundingClientRect()).filter((r) => r.height > 0);
+    const tb = tablists.length ? tablists.reduce((a, b) => (b.bottom > a.bottom ? b : a)) : null;
     return { sw, iw, targets, tabbar: tb ? { top: tb.top, bottom: tb.bottom, h: tb.height } : null, ih: window.innerHeight };
   });
   const overflow = metrics.sw > metrics.iw;
-  const small = metrics.targets.filter((t) => t.h < 44);
-  const entry = { name, width, errors: d.errors, failed: d.failed, warnings: d.warnings.length, overflow: overflow ? `${metrics.sw}>${metrics.iw}` : null, small, tabbar: metrics.tabbar, ih: metrics.ih };
+  const small = metrics.targets.filter((t) => t.h < 47.5);
+  // Primary targets (SPEC: ≥ 48 px on phones): the tab bar and the main action buttons of a screen.
+  const PRIMARY = /^(Sign in|Sign out|Save|Submit|Send|Raise|Confirm|Change password|Update password|Continue|Reopen|Rate|Try again|New|Pay|Download statement)/i;
+  const smallPrimary = width < 500 ? small.filter((t) => t.role === "tab" || (t.role === "button" && PRIMARY.test(t.text))) : [];
+  const axeViolations = await axe.scan(page, name, width);
+  const axeBlocking = axe.blocking(axeViolations);
+  const entry = { name, width, axe: axeViolations ? axeViolations.map((v) => `${v.impact}:${v.id}(${v.nodes})`) : null, errors: d.errors, failed: d.failed, warnings: d.warnings.length, overflow: overflow ? `${metrics.sw}>${metrics.iw}` : null, small, smallPrimary, tabbar: metrics.tabbar, ih: metrics.ih };
+  if (axeBlocking.length) report.defects.push({ page: `${name}-${width}`, kind: "axe", detail: axeBlocking.map((v) => `${v.impact} ${v.id} ×${v.nodes}: ${v.targets.slice(0, 3).join(" | ")} — ${v.summary.slice(0, 160)}`).join(" || ").slice(0, 900) });
+  if (smallPrimary.length) report.defects.push({ page: `${name}-${width}`, kind: "target", detail: smallPrimary.map((t) => `${t.text} ${t.h}px`).join(", ") });
   report.pages.push(entry);
   if (d.errors.length) report.defects.push({ page: `${name}-${width}`, kind: "console", detail: d.errors.join(" | ").slice(0, 600) });
   if (d.failed.length) report.defects.push({ page: `${name}-${width}`, kind: "request", detail: d.failed.join(" | ").slice(0, 600) });
@@ -120,7 +132,7 @@ async function check(page, name, opts = {}) {
     report.shots += 1;
     entry.shot = `${name}-${width}.png (${Math.round(png.length / 1024)} KB)`;
   }
-  log(`[${width}] ${name}: errors=${d.errors.length} failed=${d.failed.length} overflow=${entry.overflow ?? "no"} small=${small.length}${entry.shot ? " shot=" + entry.shot : ""}`);
+  log(`[${width}] ${name}: errors=${d.errors.length} failed=${d.failed.length} overflow=${entry.overflow ?? "no"} small=${small.length} smallPrimary=${smallPrimary.length} axe=${axeBlocking.length ? axeBlocking.map((v) => v.id).join(",") : "ok"}${entry.shot ? " shot=" + entry.shot : ""}`);
   if (d.errors.length) log("   console:", d.errors.slice(0, 3));
   if (d.failed.length) log("   failed:", d.failed.slice(0, 3));
   return entry;
@@ -186,6 +198,9 @@ const PHOTO = path.join(TMP, "snag.jpg");
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     await sleep(1200);
     expect((await bodyText(page)).includes("Sign-in failed"), "wrong password shows 'Sign-in failed'", page);
+    // accessibility: inputs are labelled, the failure is announced through a live region
+    expect((await page.getByLabel("Mobile number", { exact: true }).count()) === 1 && (await page.getByLabel("Password", { exact: true }).count()) === 1, "login inputs carry their labels as accessible names", page);
+    expect((await page.locator('[role="alert"]', { hasText: "Sign-in failed" }).count()) === 1, "sign-in failure is a role=alert live region", page);
     page.mon.allow.length = 0; drain(page);
     await login(page, "9876543210");
     expect(page.url().endsWith("/") || page.url().endsWith("8081"), "login lands on home", page);
@@ -282,6 +297,16 @@ const PHOTO = path.join(TMP, "snag.jpg");
     await check(page, "requests");
     await page.getByRole("button", { name: "New" }).click();
     await settle(page);
+    // submit empty: field errors are announced (role=alert) and wired to the inputs (aria-invalid + aria-describedby)
+    await page.getByRole("button", { name: "Submit request" }).click();
+    await sleep(400);
+    {
+      const subject = page.getByLabel("Subject", { exact: true });
+      const describedBy = await subject.getAttribute("aria-describedby");
+      const errText = describedBy ? await page.locator(`[id="${describedBy}"]`).innerText().catch(() => "") : "";
+      expect((await subject.getAttribute("aria-invalid")) === "true" && /short subject/.test(errText) && (await page.locator(`[id="${describedBy}"][role="alert"]`).count()) === 1, `empty submit: Subject is aria-invalid and described by its role=alert error ("${errText}")`, page);
+      await check(page, "request-new-errors", { noShot: true });
+    }
     await page.getByRole("button", { name: /Category/ }).first().click().catch(() => page.locator("text=What is this about?").click());
     await sleep(500);
     await page.getByRole("button", { name: /Defect|Snag/ }).first().click();
@@ -341,7 +366,7 @@ const PHOTO = path.join(TMP, "snag.jpg");
     await staffSetStatus(ids.newRequest, "RESOLVED");
     await page.reload({ waitUntil: "load" });
     await settle(page, 1000);
-    await page.getByRole("button", { name: "4 stars" }).click();
+    await page.getByRole("radio", { name: "4 stars" }).click();
     await page.getByPlaceholder(/Anything we should know/).fill("Quick turnaround, thank you.");
     await page.getByRole("button", { name: "Submit rating" }).click();
     await sleep(2000);
@@ -520,10 +545,10 @@ const PHOTO = path.join(TMP, "snag.jpg");
     await check(page, "login");
     await login(page, "9876543210");
     let txt = await bodyText(page);
-    expect((await page.locator('[role="tablist"]').count()) === 1 && !txt.includes("SERVICES"), "phone: tab bar present, no sidebar", page);
+    expect((await page.getByRole("tab", { name: "My Flat" }).count()) === 1 && !txt.includes("SERVICES"), "phone: tab bar present, no sidebar", page);
     const tabCheck = async (name) => {
       const m = await page.evaluate(() => {
-        const tb = document.querySelector('[role="tablist"]').getBoundingClientRect();
+        const tb = [...document.querySelectorAll('[role="tablist"]')].map((t) => t.getBoundingClientRect()).reduce((a, b) => (b.bottom > a.bottom ? b : a));
         const scroller = [...document.querySelectorAll("div")].find((d) => { const cs = getComputedStyle(d); return (cs.overflowY === "auto" || cs.overflowY === "scroll") && d.scrollHeight > d.clientHeight; });
         if (!scroller) return { tbTop: tb.top, tbBottom: tb.bottom, ih: window.innerHeight };
         scroller.scrollTop = scroller.scrollHeight;
@@ -609,11 +634,14 @@ const PHOTO = path.join(TMP, "snag.jpg");
     const sqlFile = path.join(TMP, "restore.sql");
     fs.writeFileSync(sqlFile, "update portal_users set password_hash = (select pu2.password_hash from portal_users pu2 join customers c2 on c2.id = pu2.customer_id where c2.phone = '9876543211'), failed_attempts = 0, locked_until = null where customer_id = (select id from customers where phone = '9876543210');\n");
     fs.chmodSync(sqlFile, 0o644); fs.chmodSync(TMP, 0o755);
-    execSync(`cat ${sqlFile} | su postgres -c "psql -d kkt_qa_portal"`);
+    execSync(`cat ${sqlFile} | su postgres -c "psql -d ${PORTAL_DB}"`);
     delete passwords["9876543210"]; fs.writeFileSync(PW_FILE, JSON.stringify(passwords));
-    report.notes.push("Seed password Welcome@123 restored for 9876543210 on kkt_qa_portal after the run (hash copied in the DB; the history rule is append-only).");
+    report.notes.push(`Seed password Welcome@123 restored for 9876543210 on ${PORTAL_DB} after the run (hash copied in the DB; the history rule is append-only).`);
   } catch (e) { report.notes.push("Could not restore the seed password: " + e.message); }
+  report.axe = axe.summary();
+  log("\n==== ACCESSIBILITY (axe)\n" + axe.markdown());
   fs.writeFileSync(path.join(TMP, "report.json"), JSON.stringify(report, null, 2));
+  log("report:", path.join(TMP, "report.json"));
   log("\nSHOTS:", report.shots, "DEFECTS:", report.defects.length);
   for (const d of report.defects) log(" -", d.page, d.kind, d.detail.slice(0, 300));
 })().catch((e) => { console.error("FATAL", e); fs.writeFileSync(path.join(TMP, "report.json"), JSON.stringify(report, null, 2)); process.exit(1); });

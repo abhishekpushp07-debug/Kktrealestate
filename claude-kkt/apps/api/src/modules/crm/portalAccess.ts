@@ -1,9 +1,10 @@
 import { and, eq, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
-import { IdSchema, PortalAccessRequestSchema, PortalAccessResponseSchema, PortalBulkEnableResponseSchema, PortalBulkEnableSchema, type PortalAccessAction, type PortalAccessResponse } from "@kkt/contracts";
+import { IdSchema, PortalAccessRequestSchema, PortalAccessResponseSchema, PortalBulkEnableQuerySchema, PortalBulkEnableResponseSchema, PortalBulkEnableSchema, type PortalAccessAction, type PortalAccessResponse, type PortalBulkCredential } from "@kkt/contracts";
 import { bookingCoApplicants, bookings, customers, passwordHistory, portalUsers, type Executor } from "@kkt/db";
 import { writeAudit } from "../../lib/audit.js";
+import { sendCsv } from "../../lib/csv.js";
 import { bumpPermVersion } from "../../lib/cache.js";
 import { temporaryPassword } from "../../lib/crypto.js";
 import { ApiError } from "../../lib/errors.js";
@@ -13,6 +14,7 @@ import { route } from "../../lib/routes.js";
 import { ensureProjectAccess, scopeFilter } from "../../lib/scope.js";
 import { revokeAllFamilies } from "../auth/service.js";
 import { loadCustomerSelect, metaOf, portalAccessView, type DbCustomer, type DbPortalUser, type WriteMeta } from "./customerService.js";
+import { securityRedis } from "../../plugins/auth.js";
 
 const idParams = z.object({ id: IdSchema });
 
@@ -32,7 +34,7 @@ async function enablePortal(tx: Executor, app: FastifyInstance, customer: DbCust
     await tx.insert(passwordHistory).values({ userType: "CUSTOMER", subjectId: existing.id, passwordHash: existing.passwordHash });
     [pu] = await tx
       .update(portalUsers)
-      .set({ phone: customer.phone, passwordHash: hash, mustChangePassword: true, isEnabled: true, failedAttempts: 0, lockedUntil: null, enabledBy, enabledAt: new Date(), disabledAt: null, version: sql`${portalUsers.version} + 1` })
+      .set({ phone: customer.phone, passwordHash: hash, mustChangePassword: true, isEnabled: true, failedAttempts: 0, lockedUntil: new Date(), enabledBy, enabledAt: new Date(), disabledAt: null, version: sql`${portalUsers.version} + 1` })
       .where(eq(portalUsers.id, existing.id))
       .returning();
   } else {
@@ -41,7 +43,7 @@ async function enablePortal(tx: Executor, app: FastifyInstance, customer: DbCust
     } catch (e) { translatePgError(e, `A portal login with phone ${customer.phone}`); }
   }
   if (!pu) throw new Error("portal user write returned no row");
-  await revokeAllFamilies(tx, app.redis, "CUSTOMER", pu.id, "PORTAL_ENABLED");
+  await revokeAllFamilies(tx, securityRedis(app), "CUSTOMER", pu.id, "PORTAL_ENABLED");
   await writeAudit(tx, { companyId: customer.companyId, ...meta, action: existing ? "customer.portal_reenable" : "customer.portal_enable", entityType: "customer", entityId: customer.id, after: { portal_user_id: pu.id, phone: pu.phone, must_change_password: true } });
   return pu;
 }
@@ -64,19 +66,19 @@ async function portalAction(app: FastifyInstance, req: FastifyRequest, customerI
     if (action === "RESET_PASSWORD") {
       if (!pu.isEnabled) throw ApiError.rule("Portal access is disabled; enable it to issue a new password", "PORTAL_NOT_ENABLED");
       await tx.insert(passwordHistory).values({ userType: "CUSTOMER", subjectId: pu.id, passwordHash: pu.passwordHash });
-      await tx.update(portalUsers).set({ passwordHash: hash!, mustChangePassword: true, failedAttempts: 0, lockedUntil: null, version: sql`${portalUsers.version} + 1` }).where(eq(portalUsers.id, pu.id));
-      const revoked = await revokeAllFamilies(tx, app.redis, "CUSTOMER", pu.id, "PASSWORD_RESET");
+      await tx.update(portalUsers).set({ passwordHash: hash!, mustChangePassword: true, failedAttempts: 0, lockedUntil: new Date(), version: sql`${portalUsers.version} + 1` }).where(eq(portalUsers.id, pu.id));
+      const revoked = await revokeAllFamilies(tx, securityRedis(app), "CUSTOMER", pu.id, "PASSWORD_RESET");
       await writeAudit(tx, { companyId: user.companyId, ...meta, action: "customer.portal_reset_password", entityType: "customer", entityId: customer.id, after: { portal_user_id: pu.id, must_change_password: true, sessions_revoked: revoked } });
       return portalAccessView(tx, user.companyId, customer, plain);
     }
     if (action === "DISABLE") {
       if (!pu.isEnabled) throw ApiError.rule("Portal access is already disabled", "PORTAL_ALREADY_DISABLED");
       await tx.update(portalUsers).set({ isEnabled: false, disabledAt: new Date(), version: sql`${portalUsers.version} + 1` }).where(eq(portalUsers.id, pu.id));
-      const revoked = await revokeAllFamilies(tx, app.redis, "CUSTOMER", pu.id, "PORTAL_DISABLED");
+      const revoked = await revokeAllFamilies(tx, securityRedis(app), "CUSTOMER", pu.id, "PORTAL_DISABLED");
       await writeAudit(tx, { companyId: user.companyId, ...meta, action: "customer.portal_disable", entityType: "customer", entityId: customer.id, before: { is_enabled: true }, after: { is_enabled: false, sessions_revoked: revoked } });
       return portalAccessView(tx, user.companyId, customer);
     }
-    const revoked = await revokeAllFamilies(tx, app.redis, "CUSTOMER", pu.id, "ADMIN_REVOKED");
+    const revoked = await revokeAllFamilies(tx, securityRedis(app), "CUSTOMER", pu.id, "ADMIN_REVOKED");
     await writeAudit(tx, { companyId: user.companyId, ...meta, action: "customer.portal_revoke_sessions", entityType: "customer", entityId: customer.id, after: { portal_user_id: pu.id, sessions_revoked: revoked } });
     return portalAccessView(tx, user.companyId, customer);
   });
@@ -103,20 +105,20 @@ export function portalAccessRoutes(app: FastifyInstance): void {
     route(app, {
       method: "POST", url: `/customers/:id/portal/${path}`, permission: "customer.portal_manage",
       schema: { params: idParams, body: z.object({}).strict().optional(), response: { 200: PortalAccessResponseSchema }, summary: `Portal access: ${action.toLowerCase().replace(/_/g, " ")}` },
-      handler: async (req) => portalAction(app, req, req.params.id, action),
+      handler: async (req, reply) => { reply.header("Cache-Control", "no-store"); return portalAction(app, req, req.params.id, action); },
     });
   }
 
   route(app, {
     method: "POST", url: "/customers/:id/portal", permission: "customer.portal_manage",
     schema: { params: idParams, body: PortalAccessRequestSchema, response: { 200: PortalAccessResponseSchema }, summary: "Portal access action {action: ENABLE|RESET_PASSWORD|DISABLE|REVOKE_SESSIONS}" },
-    handler: async (req) => portalAction(app, req, req.params.id, req.body.action),
+    handler: async (req, reply) => { reply.header("Cache-Control", "no-store"); return portalAction(app, req, req.params.id, req.body.action); },
   });
 
   route(app, {
     method: "POST", url: "/customers/portal/bulk-enable", permission: "customer.portal_manage",
-    schema: { body: PortalBulkEnableSchema, response: { 200: PortalBulkEnableResponseSchema }, summary: "Enable portal access for every customer with an ACTIVE booking; the temporary passwords are returned once in `credentials`" },
-    handler: async (req) => {
+    schema: { body: PortalBulkEnableSchema, querystring: PortalBulkEnableQuerySchema, response: { 200: PortalBulkEnableResponseSchema }, summary: "Enable portal access for every customer with an ACTIVE booking; the one-time credentials [{customer_id, customer_code, full_name, phone, temporary_password}] are returned once (JSON, or CSV with ?format=csv), never stored or audited" },
+    handler: async (req, reply) => {
       const user = req.user!;
       if (req.body.project_id) ensureProjectAccess(user, req.body.project_id);
       const scope = scopeFilter(user, bookings.projectId);
@@ -133,8 +135,9 @@ export function portalAccessRoutes(app: FastifyInstance): void {
       const todo = candidates.filter((r) => r.enabled !== true);
       const alreadyEnabled = candidates.length - todo.length;
       if (req.body.dry_run) return { dry_run: true, enabled: todo.length, already_enabled: alreadyEnabled, credentials: [] };
-      const credentials: { customer_id: string; customer_code: string; phone: string; temp_password: string }[] = [];
+      const credentials: PortalBulkCredential[] = [];
       const meta = metaOf(req);
+      let failed = 0;
       for (const r of todo) {
         // One short transaction per customer; argon2 runs outside the row lock.
         const plain = temporaryPassword();
@@ -144,18 +147,28 @@ export function portalAccessRoutes(app: FastifyInstance): void {
             const [fresh] = await tx.select().from(customers).where(eq(customers.id, r.c.id)).limit(1).for("update");
             if (!fresh) return;
             const pu = await enablePortal(tx, app, fresh, user.id, hash, meta);
-            credentials.push({ customer_id: fresh.id, customer_code: fresh.customerCode, phone: pu.phone, temp_password: plain });
+            credentials.push({ customer_id: fresh.id, customer_code: fresh.customerCode, full_name: fresh.fullName, phone: pu.phone, temporary_password: plain, temp_password: plain });
           });
         } catch (e) {
           // Raced (enabled meanwhile) or phone already used by another portal login: skip this customer, never fail the batch.
           if (e instanceof ApiError && (e.code === "BUSINESS_RULE" || e.code === "DUPLICATE")) continue;
-          throw e;
+          // Anything else (a database hiccup): never throw away the passwords already issued in this batch — they exist only in this
+          // response. Count the failure and stop; the next run enables the rest.
+          req.log.error({ err: e, customer_id: r.c.id }, "portal bulk enable stopped early");
+          failed = todo.length - credentials.length;
+          break;
         }
       }
-      // The audit row carries counts and ids only; the temporary passwords exist in this one response and nowhere else.
-      await app.db.transaction((tx) => writeAudit(tx, { companyId: user.companyId, ...meta, action: "customer.portal_bulk_enable", entityType: "company", entityId: user.companyId, after: { enabled: credentials.length, already_enabled: alreadyEnabled, project_id: req.body.project_id ?? null, customer_ids: credentials.map((c) => c.customer_id) } }));
-      await bumpPermVersion(app.redis);
-      return { dry_run: false, enabled: credentials.length, already_enabled: alreadyEnabled, credentials };
+      // The batch audit row carries counts only (each customer also has its own customer.portal_enable row without any password); the
+      // temporary passwords exist in this one response and nowhere else (the route is deliberately not idempotent: no stored replay).
+      await app.db.transaction((tx) => writeAudit(tx, { companyId: user.companyId, ...meta, action: "customer.portal_bulk_enable", entityType: "company", entityId: user.companyId, after: { enabled: credentials.length, already_enabled: alreadyEnabled, failed, project_id: req.body.project_id ?? null, format: req.query.format ?? "json" } }));
+      await bumpPermVersion(app.redis).catch((err: unknown) => req.log.warn({ err }, "permission cache bump failed after portal bulk enable"));
+      reply.header("Cache-Control", "no-store"); // one-time passwords: never cached by a browser or proxy
+      if (req.query.format === "csv") {
+        reply.header("Pragma", "no-cache");
+        return sendCsv(reply, "portal-credentials.csv", ["customer_code", "full_name", "phone", "temporary_password", "customer_id"].map((k) => ({ key: k, header: k })), credentials as unknown as Record<string, unknown>[]);
+      }
+      return { dry_run: false, enabled: credentials.length, already_enabled: alreadyEnabled, ...(failed > 0 ? { failed } : {}), credentials };
     },
   });
 }

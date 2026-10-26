@@ -1,6 +1,6 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import type { AnyPgColumn, PgTable, PgUpdateSetSource } from "drizzle-orm/pg-core";
-import type { FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { VersionSchema, type VersionConflictDetails } from "@kkt/contracts";
 import { auditLogs, type Executor } from "@kkt/db";
@@ -9,28 +9,61 @@ import { ApiError } from "./errors.js";
 /** A table with `id` and `version` columns (every mutable business table). */
 export type VersionedTable = PgTable & { id: AnyPgColumn; version: AnyPgColumn };
 
-/** Reads the expected version from the body (`version`) or the `If-Match: "<n>"` header; 400 when neither is present. */
-export function expectedVersion(req: FastifyRequest, body?: { version?: number } | null): number {
-  if (body && typeof body.version === "number") return body.version;
+/** The version a request carries: `body.version` (a number) or the `If-Match: "<n>"` / `W/"<n>"` header; null when neither is present. */
+export function requestVersion(req: Pick<FastifyRequest, "headers">, body?: unknown): number | null {
+  if (body && typeof body === "object" && typeof (body as { version?: unknown }).version === "number") return (body as { version: number }).version;
   const header = req.headers["if-match"];
   const raw = Array.isArray(header) ? header[0] : header;
   if (raw) {
     const n = Number(raw.replace(/^W\//, "").replace(/"/g, "").trim());
     if (Number.isInteger(n) && n >= 1) return n;
   }
-  throw ApiError.badRequest("version is required (body.version or If-Match header)");
+  return null;
 }
 
-/** Like expectedVersion() but falls back to `current` when neither body.version nor If-Match is present (deactivate/restore style actions). */
+/** 400 VERSION_REQUIRED (a precondition-required error carried as 400 so every client handles it like a validation failure). */
+export function versionRequired(): ApiError {
+  return new ApiError(400, "VERSION_REQUIRED", "version is required (body.version or If-Match header)", { issues: [{ path: "version", message: "Required: send the version you read (body.version or If-Match)", code: "version_required" }] });
+}
+
+/** Reads the expected version from the body (`version`) or the `If-Match: "<n>"` header; 400 VERSION_REQUIRED when neither is present. */
+export function expectedVersion(req: FastifyRequest, body?: { version?: number } | null): number {
+  const v = requestVersion(req, body);
+  if (v === null) throw versionRequired();
+  return v;
+}
+
+/**
+ * Like expectedVersion() but falls back to `current` when neither body.version nor If-Match is present. Only for state-change POST
+ * actions (deactivate/restore, clear/bounce, …): the API keeps accepting them without a version, but the ERP always sends one
+ * (docs/API-CONVENTIONS.md "Versions"). PATCH routes never use this: the version policy rejects a version-less PATCH first.
+ */
 export function optionalExpectedVersion(req: FastifyRequest, body: { version?: number } | null | undefined, current: number): number {
-  if (body && typeof body.version === "number") return body.version;
-  const header = req.headers["if-match"];
-  const raw = Array.isArray(header) ? header[0] : header;
-  if (raw) {
-    const n = Number(raw.replace(/^W\//, "").replace(/"/g, "").trim());
-    if (Number.isInteger(n) && n >= 1) return n;
-  }
-  return current;
+  return requestVersion(req, body) ?? current;
+}
+
+/**
+ * Staff PATCH routes still accepted without a version while their ERP screens are rewired (docs/TODO-integration.md): the photo flag
+ * toggle and the plan-assignment edit. The integration stage empties this list once the ERP sends `version` / If-Match there.
+ */
+export const VERSION_POLICY_EXEMPT: readonly string[] = ["/api/v1/construction/photos/:photoId", "/api/v1/payment-plan-assignments/:id"];
+
+/** True when a route must carry a version: every staff (erp-audience) PATCH except the transitional exemptions. Portal self-service edits are exempt. */
+export function requiresVersion(method: string, url: string | undefined, cfg: { audience?: string; public?: boolean } | undefined): boolean {
+  if (method !== "PATCH" || !url) return false;
+  if (cfg?.public || cfg?.audience === "portal") return false;
+  return !VERSION_POLICY_EXEMPT.includes(url);
+}
+
+/**
+ * Version policy (audit F4): a staff PATCH without `version` (body) or If-Match is 400 VERSION_REQUIRED before the handler runs, so no
+ * route can fall back to last-writer-wins. Runs as a preHandler (after authentication and permission checks, after body validation).
+ */
+export function installVersionPolicy(app: FastifyInstance): void {
+  app.addHook("preHandler", async (req) => {
+    if (!requiresVersion(req.method, req.routeOptions.url, req.routeOptions.config as { audience?: string; public?: boolean })) return;
+    if (requestVersion(req, req.body) === null) throw versionRequired();
+  });
 }
 
 /** Throws 409 VERSION_CONFLICT when `current` differs from `expected`. */

@@ -58,7 +58,7 @@ export default function EnquiriesInbox() {
         meta: { locked: true },
         cell: ({ row }) => (
           <span className="flex min-w-0 items-center gap-2">
-            <span className={cn("size-2 shrink-0 rounded-full", row.original.is_read ? "bg-transparent" : "bg-gold")} aria-label={row.original.is_read ? undefined : "Unread"} />
+            <span className={cn("size-2 shrink-0 rounded-full", row.original.is_read ? "bg-transparent" : "bg-gold")} {...(row.original.is_read ? { "aria-hidden": true } : { role: "img", "aria-label": "Unread" })} />
             <span className="min-w-0 leading-tight">
               <span className={cn("block truncate", row.original.is_read ? "font-medium text-ink" : "font-semibold text-navy-950")}>{row.original.name}</span>
               <span className="money block truncate text-2xs font-normal text-ink-subtle">

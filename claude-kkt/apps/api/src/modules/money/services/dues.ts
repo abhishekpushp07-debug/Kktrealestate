@@ -9,8 +9,8 @@ import { bookingOtherCharges, bookings, demands, payments, type DB, type Executo
 import { addDays, demandStageId, demandStatuses, evaluateDues, formatINR, type TowerStage } from "@kkt/domain";
 import { writeAudit } from "../../../lib/audit.js";
 import { nextNumber } from "../../../lib/numbering.js";
-import { notify, notifyRole, withdraw } from "../../notifications/service.js";
-import { ACCOUNTS_ROLES, Clock, loadCompanyRow, loadTowerStagesMany, lockBooking, numberingOf, snapshotInstallments, loadTowerStages, todayDate, type BookingRecord, type CompanyRecord, type MoneyActor, SYSTEM_MONEY_ACTOR } from "../common.js";
+import { notify, notifyRole, withdraw } from "../../notifications/index.js";
+import { ACCOUNTS_ROLES, Clock, loadCompanyRow, loadTowerStagesMany, lockBooking, lockBookingsInOrder, moneyTransaction, numberingOf, snapshotInstallments, loadTowerStages, todayDate, type BookingRecord, type CompanyRecord, type MoneyActor, SYSTEM_MONEY_ACTOR } from "../common.js";
 import { appendEvent, events, rebuild } from "./ledger.js";
 
 export type DemandRecord = typeof demands.$inferSelect;
@@ -53,9 +53,9 @@ export async function bookingRecipients(db: Executor, booking: Pick<BookingRecor
  */
 export async function raiseDues(tx: Tx, booking: BookingRecord, opts: RaiseOptions = {}): Promise<RaiseResult> {
   if (booking.status !== "ACTIVE") return { raised: [], notifications: 0 };
-  await lockBooking(tx, booking.id);
-  const today = opts.today ?? todayDate();
   const clock = opts.clock ?? new Clock();
+  await lockBooking(tx, booking.id, clock);
+  const today = opts.today ?? todayDate();
   const actor = opts.actor ?? SYSTEM_MONEY_ACTOR;
   const company = opts.company ?? (await loadCompanyRow(tx, booking.companyId));
   const towerStages = opts.towerStages ?? (await loadTowerStages(tx, booking.blockId));
@@ -100,13 +100,16 @@ export async function raiseDues(tx: Tx, booking: BookingRecord, opts: RaiseOptio
   return { raised, notifications };
 }
 
+/** Notification / audit entity type of an other-charge line (its demand bell is keyed by the line id). */
+export const OTHER_CHARGE_ENTITY_TYPE = "booking_other_charge";
+
 /** Raises the demand of one other-charge line (ON_BOOKING at creation, ON_POSSESSION by the engine, MANUAL by staff). */
 export async function raiseOtherChargeDemand(tx: Tx, booking: BookingRecord, line: OtherChargeRecord, opts: RaiseOptions & { dueDate?: string } = {}): Promise<OtherChargeRecord> {
   if (line.demandedAt) return line;
-  await lockBooking(tx, booking.id);
+  const clock = opts.clock ?? new Clock();
+  await lockBooking(tx, booking.id, clock);
   const today = opts.today ?? todayDate();
   const company = opts.company ?? (await loadCompanyRow(tx, booking.companyId));
-  const clock = opts.clock ?? new Clock();
   const demandNumber = await nextNumber(tx, numberingOf(company), "demand", today);
   const demandedAt = clock.next();
   const dueDate = opts.dueDate ?? addDays(today, company.settings.demand_due_days);
@@ -115,13 +118,21 @@ export async function raiseOtherChargeDemand(tx: Tx, booking: BookingRecord, lin
   await appendEvent(tx, booking.id, events.otherChargeDemand(updated, demandedAt));
   const actor = opts.actor ?? SYSTEM_MONEY_ACTOR;
   await writeAudit(tx, { companyId: booking.companyId, actor, action: "other_charge.demand", entityType: "booking_other_charge", entityId: line.id, after: { demand_number: demandNumber, total_paise: line.totalPaise, due_date: dueDate }, ip: actor.ip ?? null, requestId: actor.requestId ?? null });
-  await notify(tx, { companyId: booking.companyId, recipients: await bookingRecipients(tx, booking), type: "DEMAND_RAISED", title: `${line.name} demanded (${demandNumber})`, body: `${formatINR(line.totalPaise)} due ${dueDate}`, entityType: "booking", entityId: booking.id, link: `/bookings/${booking.id}` });
+  // keyed by the charge line (TODO-integration #6) so a possession undo withdraws exactly this bell
+  await notify(tx, { companyId: booking.companyId, recipients: await bookingRecipients(tx, booking), type: "DEMAND_RAISED", title: `${line.name} demanded (${demandNumber})`, body: `${formatINR(line.totalPaise)} due ${dueDate}`, entityType: OTHER_CHARGE_ENTITY_TYPE, entityId: line.id, link: `/bookings/${booking.id}` });
   return updated;
 }
 
-/** Raises dues for every ACTIVE booking of a block (stage completion, admin run). Called inside the caller's transaction. */
+/**
+ * Raises dues for every ACTIVE booking of a block (stage completion, admin run). Called inside the caller's transaction, which already
+ * holds the block row. Every booking is locked first (ascending id) and only then are demand numbers allocated, so the demand
+ * sequence row is always the LAST lock taken (see lockBookingsInOrder) and a concurrent dues run / booking cannot deadlock with it.
+ */
 export async function raiseDuesForBlock(tx: Tx, blockId: string, opts: RaiseOptions = {}): Promise<{ bookingsChecked: number; raised: DemandRecord[]; notifications: number }> {
-  const rows = await tx.select().from(bookings).where(and(eq(bookings.blockId, blockId), eq(bookings.status, "ACTIVE"))).orderBy(asc(bookings.bookingDate), asc(bookings.id));
+  const active = await tx.select({ id: bookings.id }).from(bookings).where(and(eq(bookings.blockId, blockId), eq(bookings.status, "ACTIVE"))).orderBy(asc(bookings.id));
+  await lockBookingsInOrder(tx, active.map((b) => b.id));
+  // re-read under the locks (a booking may have been cancelled / completed while we waited)
+  const rows = active.length ? await tx.select().from(bookings).where(and(inArray(bookings.id, active.map((b) => b.id)), eq(bookings.status, "ACTIVE"))).orderBy(asc(bookings.bookingDate), asc(bookings.id)) : [];
   const towerStages = opts.towerStages ?? (await loadTowerStages(tx, blockId));
   const company = opts.company ?? (rows[0] ? await loadCompanyRow(tx, rows[0].companyId) : undefined);
   const clock = opts.clock ?? new Clock();
@@ -172,7 +183,7 @@ export async function raiseDuesForAll(db: DB, today: string = todayDate(), scope
     let company = companies.get(companyId);
     if (!company) { company = await loadCompanyRow(db, companyId); companies.set(companyId, company); }
     const towerStages = stagesByBlock.get(blockId) ?? [];
-    const result = await db.transaction(async (tx) => {
+    const result = await moneyTransaction(db, async (tx) => {
       const [b] = await tx.select().from(bookings).where(eq(bookings.id, id)).limit(1);
       if (!b || b.status !== "ACTIVE") return null;
       return raiseDues(tx, b, { today, actor, company, towerStages });

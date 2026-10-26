@@ -55,6 +55,37 @@ function validationIssues(validation: readonly { instancePath?: string; message?
   });
 }
 
+/** SQLSTATE codes / driver error codes the error handler maps instead of answering 500. */
+const PG_STATEMENT_TIMEOUT = "57014";
+const PG_LOCK_TIMEOUT = "55P03";
+const PG_RETRYABLE = new Set(["40001", "40P01"]);
+/** Connection-level failures: Postgres refusing or dropping connections, the pool's connect timeout, sockets dying. */
+const PG_UNAVAILABLE = new Set(["53300", "53400", "57P01", "57P02", "57P03", "58000", "58030"]);
+const DRIVER_UNAVAILABLE = new Set(["CONNECT_TIMEOUT", "CONNECTION_CLOSED", "CONNECTION_ENDED", "CONNECTION_DESTROYED", "ECONNREFUSED", "ECONNRESET", "ETIMEDOUT", "EPIPE", "ENOTFOUND", "EAI_AGAIN"]);
+
+/** The SQLSTATE (5 chars) or driver/socket error code of a database failure, following Drizzle's `cause` wrappers. */
+export function databaseErrorCode(err: unknown, depth = 0): string | null {
+  if (!err || typeof err !== "object" || depth > 5) return null;
+  const code = (err as { code?: unknown }).code;
+  if (typeof code === "string" && (/^[0-9A-Z]{5}$/.test(code) || DRIVER_UNAVAILABLE.has(code))) return code;
+  return databaseErrorCode((err as { cause?: unknown }).cause, depth + 1);
+}
+
+/**
+ * Maps database failures that are not bugs onto retryable envelopes (audit C7): statement timeout and connection/pool trouble → 503
+ * SERVICE_UNAVAILABLE with Retry-After 5; lock timeout → 409 LOCK_TIMEOUT; a serialization failure or deadlock that escaped
+ * withTransactionRetry → 409 CONFLICT_RETRY. `details.retryable` is true for all of them. Null for anything else.
+ */
+export function mapDatabaseError(err: unknown): ApiError | null {
+  const code = databaseErrorCode(err);
+  if (!code) return null;
+  if (code === PG_STATEMENT_TIMEOUT) return new ApiError(503, "SERVICE_UNAVAILABLE", "The database took too long to answer; retry shortly", { retry_after: 5, retryable: true, reason: "statement_timeout" }, { "Retry-After": "5" });
+  if (code === PG_LOCK_TIMEOUT) return new ApiError(409, "LOCK_TIMEOUT", "The record is being changed by another request; retry in a moment", { retryable: true, retry_after: 1 }, { "Retry-After": "1" });
+  if (PG_RETRYABLE.has(code)) return new ApiError(409, "CONFLICT_RETRY", "A concurrent change conflicted with this one; retry the request", { retryable: true, sqlstate: code }, { "Retry-After": "1" });
+  if (PG_UNAVAILABLE.has(code) || code.startsWith("08") || DRIVER_UNAVAILABLE.has(code)) return new ApiError(503, "SERVICE_UNAVAILABLE", "The database is unavailable; retry shortly", { retry_after: 5, retryable: true, reason: "database_unavailable" }, { "Retry-After": "5" });
+  return null;
+}
+
 /** Fastify error handler: every failure becomes `{ error: { code, message, details, request_id } }`. */
 export function errorHandler(error: FastifyError | ApiError | Error, request: FastifyRequest, reply: FastifyReply): void {
   const requestId = request.id;
@@ -71,6 +102,12 @@ export function errorHandler(error: FastifyError | ApiError | Error, request: Fa
   if (isResponseSerializationError(error)) {
     request.log.error({ err: error, issues: error.cause?.issues }, "response serialization failed");
     reply.status(500).send({ error: { code: "INTERNAL_ERROR", message: "Response did not match its schema", request_id: requestId } });
+    return;
+  }
+  const mapped = mapDatabaseError(error);
+  if (mapped) {
+    request.log.warn({ err: error, code: mapped.code }, "database error mapped to a retryable response");
+    errorHandler(mapped, request, reply);
     return;
   }
   const fe = error as FastifyError;

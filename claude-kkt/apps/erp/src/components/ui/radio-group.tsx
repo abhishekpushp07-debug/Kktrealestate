@@ -56,7 +56,7 @@ export function RadioGroup<V extends string = string>({
               id={id}
               value={option.value}
               disabled={option.disabled}
-              className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border border-border-strong bg-card focus-ring data-[state=checked]:border-navy-950"
+              className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border border-border-input bg-card focus-ring data-[state=checked]:border-navy-950"
             >
               <RadioPrimitive.Indicator className="size-2 rounded-full bg-navy-950" />
             </RadioPrimitive.Item>

@@ -20,26 +20,30 @@ export function TabBar({ state, navigateToTab, insets }: BottomTabBarProps): Rea
         if (!dest) return null;
         const active = state.index === index;
         return (
-          <Pressable
-            key={route.key}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: active }}
-            accessibilityLabel={dest.label}
-            onPress={() => {
-              haptics.select();
-              navigateToTab(route.key);
-            }}
-            style={({ pressed }) => [styles.item, pressed ? { opacity: 0.75 } : null]}
-          >
-            <View style={[styles.indicator, active ? styles.indicatorActive : null]} />
-            <View>
+          <View key={route.key} style={styles.itemWrap}>
+            <Pressable
+              accessibilityRole="tab"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={dest.key === "more" && unread > 0 ? `${dest.label}, ${unread} unread` : dest.label}
+              onPress={() => {
+                haptics.select();
+                navigateToTab(route.key);
+              }}
+              style={({ pressed }) => [styles.item, pressed ? { opacity: 0.75 } : null]}
+            >
+              <View style={[styles.indicator, active ? styles.indicatorActive : null]} />
               <Icon name={dest.icon} size={22} color={active ? colors.gold : colors.onNavyMuted} />
-              {dest.key === "more" && unread > 0 ? <Badge count={unread} style={styles.badge} /> : null}
-            </View>
-            <T variant="caption" color={active ? colors.onNavy : colors.onNavyMuted} style={{ fontSize: 10.5, lineHeight: 13 }} numberOfLines={1}>
-              {dest.label}
-            </T>
-          </Pressable>
+              <T variant="caption" color={active ? colors.onNavy : colors.onNavyMuted} style={{ fontSize: 10.5, lineHeight: 13 }} numberOfLines={1}>
+                {dest.label}
+              </T>
+            </Pressable>
+            {/* the unread count sits outside the tab so the tab's visible text stays its label (the count is in its accessible name) */}
+            {dest.key === "more" && unread > 0 ? (
+              <View aria-hidden pointerEvents="none" style={styles.badge}>
+                <Badge count={unread} />
+              </View>
+            ) : null}
+          </View>
         );
       })}
     </View>
@@ -48,8 +52,9 @@ export function TabBar({ state, navigateToTab, insets }: BottomTabBarProps): Rea
 
 const styles = StyleSheet.create({
   bar: { flexDirection: "row", backgroundColor: colors.navy, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.08)" },
+  itemWrap: { flex: 1 },
   item: { flex: 1, alignItems: "center", justifyContent: "center", gap: 4, paddingTop: space.sm },
   indicator: { position: "absolute", top: 0, width: 28, height: 3, borderBottomLeftRadius: 3, borderBottomRightRadius: 3, backgroundColor: "transparent" },
   indicatorActive: { backgroundColor: colors.gold },
-  badge: { position: "absolute", top: -6, right: -10 },
+  badge: { position: "absolute", top: space.sm - 6, left: "50%", marginLeft: 4 },
 });

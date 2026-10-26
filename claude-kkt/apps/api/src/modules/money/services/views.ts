@@ -5,7 +5,7 @@
 import { and, asc, eq, getTableColumns, sql } from "drizzle-orm";
 import type { PgSelect, PgTable } from "drizzle-orm/pg-core";
 import type {
-  AgreementRevisionRow, BookingDetailResponse, BookingRow, BookingSummary, DemandRow, LedgerRow, OtherChargeRow, PaymentRow, PlanRevisionRow, ScheduleRow,
+  AgreementRevisionRow, BookingDetailResponse, BookingFullRow, BookingRow, BookingSummary, DemandRow, LedgerRow, OtherChargeRow, PaymentRow, PlanRevisionRow, ScheduleRow,
 } from "@kkt/contracts";
 import {
   agreementRevisions, bankAccounts, blocks, blockStages, bookingCoApplicants, bookingOtherCharges, bookingPlanRevisions, bookings, customers, demands, flats, parkingSlots, paymentModes, payments, projects, users,
@@ -226,21 +226,26 @@ export async function loadBookingRelated(db: Executor, rows: readonly BookingRec
   };
 }
 
-/** Booking selection + related → wire row. */
-export function toBookingRow(s: BookingSelect, rel: BookingRelated, today = todayDate()): BookingRow {
+/** The stored flat snapshot in wire shape (full: rooms, areas and price breakup included). */
+function fullFlatSnapshot(b: BookingRecord): BookingDetailResponse["flat_snapshot"] {
+  const snap = b.flatSnapshot as unknown as BookingDetailResponse["flat_snapshot"];
+  return { ...snap, floor_label: snap.floor_label ?? String(snap.floor), flat_type_name: snap.flat_type_name ?? snap.flat_type_code, facing: snap.facing ?? null, carpet_sqft: snap.carpet_sqft ?? null, builtup_sqft: snap.builtup_sqft ?? null };
+}
+
+/** Booking selection + related → full wire row (every field; detail, `view=full`, CSV). */
+export function toBookingRow(s: BookingSelect, rel: BookingRelated, today = todayDate()): BookingFullRow {
   const b = s.booking;
   const schedule = scheduleRows(b, rel.stages.get(b.blockId) ?? [], rel.demands.get(b.id) ?? [], today);
   const charges = rel.charges.get(b.id) ?? [];
   const pend = rel.pending.get(b.id) ?? { cash: 0, account: 0 };
-  const snap = b.flatSnapshot as unknown as BookingRow["flat_snapshot"];
   return {
     id: b.id, company_id: b.companyId, created_at: b.createdAt.toISOString(), updated_at: b.updatedAt.toISOString(), created_by: b.createdBy, version: b.version,
     booking_number: b.bookingNumber, project_id: b.projectId, project_name: s.projectName, block_id: b.blockId, block_name: s.blockName, flat_id: b.flatId, flat_number: s.flatNumber,
     customer_id: b.customerId, customer_code: s.customerCode, customer_name: s.customerName, customer_phone: s.customerPhone,
     co_applicants: (rel.coApplicants.get(b.id) ?? []).map((c) => ({ customer_id: c.customer_id, full_name: c.full_name, phone: c.phone })),
     booking_date: b.bookingDate, status: b.status, agreement_value_paise: b.agreementValuePaise, cash_agreed_paise: b.cashAgreedPaise, account_agreed_paise: b.accountAgreedPaise,
-    flat_snapshot: { ...snap, floor_label: snap.floor_label ?? String(snap.floor), flat_type_name: snap.flat_type_name ?? snap.flat_type_code, facing: snap.facing ?? null, carpet_sqft: snap.carpet_sqft ?? null, builtup_sqft: snap.builtup_sqft ?? null },
-    rate_per_sqft_paise: b.ratePerSqftPaise, payment_plan_id: b.paymentPlanId, plan_snapshot: b.planSnapshot as BookingRow["plan_snapshot"],
+    flat_snapshot: fullFlatSnapshot(b),
+    rate_per_sqft_paise: b.ratePerSqftPaise, payment_plan_id: b.paymentPlanId, plan_snapshot: b.planSnapshot as BookingFullRow["plan_snapshot"],
     plan_accepted_on: b.planAcceptedOn, plan_acceptance_mode: b.planAcceptanceMode, plan_acceptance_document_id: b.planAcceptanceDocumentId,
     sales_user_id: b.salesUserId, sales_user_name: s.salesUserName, lead_id: b.leadId, broker_name: b.brokerName, remarks: b.remarks,
     parking_slots: (rel.parking.get(b.id) ?? []).map((p) => ({ id: p.id, number: p.number, slot_type: p.slot_type })),
@@ -251,11 +256,66 @@ export function toBookingRow(s: BookingSelect, rel: BookingRelated, today = toda
   };
 }
 
-/** Booking rows for a page of selections (batch related loads). */
-export async function toBookingRows(db: Executor, selections: readonly BookingSelect[]): Promise<BookingRow[]> {
+/**
+ * Compact list row (GET /bookings default view, audit C: ≈ 1 KB instead of ≈ 5 KB per row): what list screens, pickers and the payment
+ * dialog read — ids, numbers, names, status, agreement value, plan name and the bucket summary (agreed / raised / paid / due / pending per bucket). Needs only co-applicants and pending
+ * cheques (no schedule, stages, demands or charges are loaded for a page).
+ */
+export function toCompactBookingRow(s: BookingSelect, rel: Pick<BookingRelated, "coApplicants" | "pending">): BookingRow {
+  const b = s.booking;
+  const pend = rel.pending.get(b.id) ?? { cash: 0, account: 0 };
+  const cash = bucket(b.cashAgreedPaise, b.cashOrderRaisedPaise, b.cashPaidPaise, pend.cash);
+  const account = bucket(b.accountAgreedPaise, b.accountOrderRaisedPaise, b.accountPaidPaise, pend.account);
+  const plan = b.planSnapshot as BookingFullRow["plan_snapshot"];
+  return {
+    id: b.id, version: b.version, booking_number: b.bookingNumber, status: b.status, booking_date: b.bookingDate,
+    project_id: b.projectId, project_name: s.projectName, block_name: s.blockName, flat_id: b.flatId, flat_number: s.flatNumber,
+    customer_id: b.customerId, customer_code: s.customerCode, customer_name: s.customerName, customer_phone: s.customerPhone,
+    co_applicants: (rel.coApplicants.get(b.id) ?? []).map((c) => ({ customer_id: c.customer_id, full_name: c.full_name, phone: c.phone })),
+    agreement_value_paise: b.agreementValuePaise,
+    plan_snapshot: { name: plan.name },
+    summary: {
+      raised_percent: Number(b.raisedPercent), cash, account,
+      total_paid_paise: cash.paid_paise + account.paid_paise, total_due_paise: cash.due_paise + account.due_paise,
+      other_charges_due_paise: b.otherChargesDemandedPaise - b.otherChargesPaidPaise, pending_cheques_paise: b.pendingChequesPaise,
+    },
+  };
+}
+
+/** Co-applicants and pending cheques of a page of bookings in one round trip (all a compact row needs). */
+export async function loadCompactRelated(db: Executor, rows: readonly BookingRecord[]): Promise<Pick<BookingRelated, "coApplicants" | "pending">> {
+  const ids = [...new Set(rows.map((b) => b.id))];
+  if (ids.length === 0) return { coApplicants: new Map(), pending: new Map() };
+  const result = (await db.execute(sql`
+    select
+      (select coalesce(json_agg(json_build_object('bookingId', ca.booking_id, 'customerId', c.id, 'fullName', c.full_name, 'phone', c.phone)), '[]'::json)
+         from ${bookingCoApplicants} ca join ${customers} c on c.id = ca.customer_id where ca.booking_id = any(${uuidArray(ids)})) as co,
+      (select coalesce(json_agg(json_build_object('bookingId', x.booking_id, 'bucket', x.bucket, 'n', x.n)), '[]'::json)
+         from (select booking_id, bucket, coalesce(sum(amount_paise), 0)::bigint as n from ${payments}
+               where booking_id = any(${uuidArray(ids)}) and status = 'PENDING' and against = 'FLAT_VALUE' group by booking_id, bucket) x) as pend
+  `)) as unknown as Pick<RelatedJson, "co" | "pend">[];
+  const j = result[0] ?? { co: [], pend: [] };
+  const pending = new Map<string, { cash: number; account: number }>();
+  for (const p of j.pend) {
+    const cur = pending.get(p.bookingId) ?? { cash: 0, account: 0 };
+    if (p.bucket === "CASH") cur.cash += Number(p.n);
+    if (p.bucket === "ACCOUNT") cur.account += Number(p.n);
+    pending.set(p.bookingId, cur);
+  }
+  return { coApplicants: groupBy(j.co.map((c) => ({ bookingId: c.bookingId, customer_id: c.customerId, full_name: c.fullName, phone: c.phone })), (c) => c.bookingId), pending };
+}
+
+/** Full booking rows for a page of selections (batch related loads). */
+export async function toBookingRows(db: Executor, selections: readonly BookingSelect[]): Promise<BookingFullRow[]> {
   const rel = await loadBookingRelated(db, selections.map((s) => s.booking));
   const today = todayDate();
   return selections.map((s) => toBookingRow(s, rel, today));
+}
+
+/** Compact booking rows for a list page (see toCompactBookingRow). */
+export async function toCompactBookingRows(db: Executor, selections: readonly BookingSelect[]): Promise<BookingRow[]> {
+  const rel = await loadCompactRelated(db, selections.map((s) => s.booking));
+  return selections.map((s) => toCompactBookingRow(s, rel));
 }
 
 export function toAgreementRevisionRow(r: typeof agreementRevisions.$inferSelect): AgreementRevisionRow {
@@ -277,6 +337,9 @@ export async function bookingDetail(db: Executor, s: BookingSelect): Promise<Boo
   ]);
   return {
     ...row,
+    list_price_paise: s.booking.listPricePaise ?? null,
+    price_deviation_reason: s.booking.priceDeviationReason ?? null,
+    price_deviation_by: s.booking.priceDeviationBy ?? null,
     other_charges: (rel.charges.get(s.booking.id) ?? []).map(toOtherChargeRow),
     schedule: scheduleRows(s.booking, rel.stages.get(s.booking.blockId) ?? [], rel.demands.get(s.booking.id) ?? [], today),
     agreement_revisions: revs.map(toAgreementRevisionRow),

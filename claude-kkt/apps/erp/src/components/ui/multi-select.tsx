@@ -3,6 +3,7 @@ import { Check, ChevronsUpDown, Search, X } from "lucide-react";
 import { Popover } from "radix-ui";
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
+import { useFieldAria } from "./field-context";
 
 export interface MultiSelectOption {
   value: string;
@@ -47,6 +48,7 @@ export function MultiSelect({
   id,
   ...aria
 }: MultiSelectProps) {
+  const fieldAria = useFieldAria(id, { invalid, "aria-describedby": aria["aria-describedby"] });
   const [open, setOpen] = useState(false);
   const selectedSet = useMemo(() => new Set(value), [value]);
   const byKey = useMemo(() => new Map(options.map((option) => [option.value.toLowerCase(), option] as const)), [options]);
@@ -72,14 +74,14 @@ export function MultiSelect({
           id={id}
           role="combobox"
           aria-expanded={open}
-          aria-invalid={invalid || undefined}
           disabled={disabled}
           className={cn(
-            "flex w-full min-w-0 items-center justify-between gap-2 rounded-md border border-border-strong bg-card px-2 text-left text-sm transition-colors hover:border-navy-300 focus-ring focus-visible:border-gold disabled:cursor-not-allowed disabled:bg-surface aria-invalid:border-danger",
-            size === "md" ? "min-h-9 py-1" : "min-h-8 py-0.5 text-xs",
+            "flex w-full min-w-0 items-center justify-between gap-2 rounded-md border border-border-input bg-card px-2 text-left text-sm transition-colors hover:border-navy-400 focus-ring focus-visible:border-gold disabled:cursor-not-allowed disabled:bg-surface aria-invalid:border-danger",
+            size === "md" ? "min-h-12 py-1 sm:min-h-9" : "min-h-12 py-0.5 text-xs sm:min-h-8",
             className,
           )}
           {...aria}
+          {...fieldAria}
         >
           <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
             {chips.length === 0 && <span className="px-1 text-ink-subtle">{placeholder}</span>}
@@ -143,7 +145,7 @@ export function MultiSelect({
                       aria-hidden="true"
                       className={cn(
                         "flex size-4 shrink-0 items-center justify-center rounded-xs border",
-                        checked ? "border-navy-950 bg-navy-950 text-white" : "border-border-strong bg-card",
+                        checked ? "border-navy-950 bg-navy-950 text-white" : "border-border-input bg-card",
                       )}
                     >
                       {checked && <Check className="size-3" strokeWidth={3} />}

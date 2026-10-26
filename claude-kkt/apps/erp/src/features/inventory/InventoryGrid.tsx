@@ -209,33 +209,39 @@ export function InventoryGrid({ grid, colourBy, onColourByChange, onCellClick, c
 
       <div className={cn("kkt-print-scroll relative overflow-x-auto rounded-lg border border-border bg-card shadow-card scrollbar-thin", loading && "opacity-60")}>
         <div className="min-w-max p-2" role="grid" aria-label={`${grid.block_name} inventory grid`} aria-rowcount={floors.length + 1} style={{ display: "grid", gridTemplateColumns: `3.5rem repeat(${positions}, minmax(4.75rem, 1fr))`, gap: 4 }}>
-          <div className="sticky left-0 z-10 bg-card" role="columnheader" aria-label="Floor" />
-          {Array.from({ length: positions }, (_, index) => (
-            <div key={index} role="columnheader" className="money px-1 text-center text-2xs font-semibold uppercase tracking-wide text-ink-subtle">
-              P{index + 1}
+          {/* rows are display:contents wrappers: the CSS grid lays out the cells, the ARIA grid gets proper rows */}
+          <div role="row" className="contents">
+            <div className="sticky left-0 z-10 bg-card" role="columnheader">
+              <span className="sr-only">Floor</span>
             </div>
-          ))}
+            {Array.from({ length: positions }, (_, index) => (
+              <div key={index} role="columnheader" className="money px-1 text-center text-2xs font-semibold uppercase tracking-wide text-ink-subtle">
+                P{index + 1}
+              </div>
+            ))}
+          </div>
           {floors.map((floor) => {
             const byPosition = new Map(floor.cells.map((cell) => [cell.position, cell] as const));
             const floorSelected = floor.cells.length > 0 && floor.cells.every((cell) => selected.includes(cell.flat_id));
-            return [
-              <button
-                key={`label-${floor.floor}`}
-                type="button"
-                role="rowheader"
-                disabled={!canBulk || floor.cells.length === 0}
-                aria-pressed={canBulk ? floorSelected : undefined}
-                onClick={() => selectFloor(floor.cells)}
-                title={floor.cells.length > 0 && canBulk ? `Select floor ${floor.floor_label}` : undefined}
-                className={cn("money sticky left-0 z-10 flex h-11 items-center justify-center rounded-sm border bg-card text-xs font-bold text-navy-950 focus-ring disabled:cursor-default", floorSelected ? "border-gold bg-gold-light" : "border-border", canBulk && floor.cells.length > 0 && "hover:border-navy-300")}
-              >
-                {floor.floor_label}
-              </button>,
-              floor.kind !== "UNITS" || floor.cells.length === 0 ? (
+            return (
+              <div key={`row-${floor.floor}`} role="row" className="contents">
+              <div role="rowheader" className="sticky left-0 z-10 h-12">
+                <button
+                  type="button"
+                  disabled={!canBulk || floor.cells.length === 0}
+                  aria-pressed={canBulk ? floorSelected : undefined}
+                  onClick={() => selectFloor(floor.cells)}
+                  title={floor.cells.length > 0 && canBulk ? `Select floor ${floor.floor_label}` : undefined}
+                  className={cn("money flex h-full w-full items-center justify-center rounded-sm border bg-card text-xs font-bold text-navy-950 focus-ring disabled:cursor-default", floorSelected ? "border-gold bg-gold-light" : "border-border", canBulk && floor.cells.length > 0 && "hover:border-navy-300")}
+                >
+                  {floor.floor_label}
+                </button>
+              </div>
+              {floor.kind !== "UNITS" || floor.cells.length === 0 ? (
                 <div
                   key={`band-${floor.floor}`}
                   role="gridcell"
-                  className="flex h-11 items-center justify-center rounded-sm border border-dashed border-border-strong text-2xs font-semibold uppercase tracking-wider text-ink-subtle"
+                  className="flex h-12 items-center justify-center rounded-sm border border-dashed border-border-strong text-2xs font-semibold uppercase tracking-wider text-ink-subtle"
                   style={{ gridColumn: `span ${positions}`, backgroundImage: "repeating-linear-gradient(135deg, var(--color-border) 0 2px, transparent 2px 10px)" }}
                 >
                   {floor.kind === "REFUGE" ? "Refuge floor" : floor.kind === "PODIUM" ? "Podium" : "No units"}
@@ -243,7 +249,7 @@ export function InventoryGrid({ grid, colourBy, onColourByChange, onCellClick, c
               ) : (
                 Array.from({ length: positions }, (_, index) => {
                   const cell = byPosition.get(index + 1);
-                  if (!cell) return <div key={`empty-${floor.floor}-${index}`} role="gridcell" aria-hidden="true" className="h-11 rounded-sm border border-dashed border-border/60" />;
+                  if (!cell) return <div key={`empty-${floor.floor}-${index}`} role="gridcell" aria-hidden="true" className="h-12 rounded-sm border border-dashed border-border/60" />;
                   const isSelected = selected.includes(cell.flat_id);
                   return (
                     <Tooltip
@@ -268,21 +274,22 @@ export function InventoryGrid({ grid, colourBy, onColourByChange, onCellClick, c
                         type="button"
                         role="gridcell"
                         aria-selected={isSelected}
-                        aria-label={`${cell.flat_number}, ${FLAT_STATUS_LABELS[cell.status]}, ${formatINR(cell.price_paise)}`}
                         onClick={handleCell(cell)}
                         data-status={cell.status}
                         data-testid={`grid-cell-${cell.flat_number}`}
-                        className={cn("relative flex h-11 min-w-0 flex-col items-center justify-center rounded-sm border px-1 leading-tight transition-shadow focus-ring hover:shadow-pop", cellClass(cell), isSelected && "ring-2 ring-gold ring-offset-1 ring-offset-card")}
+                        className={cn("relative flex h-12 min-w-0 flex-col items-center justify-center rounded-sm border px-1 leading-tight transition-shadow focus-ring hover:shadow-pop", cellClass(cell), isSelected && "ring-2 ring-gold ring-offset-1 ring-offset-card")}
                       >
                         <span className="money truncate text-xs font-bold">{cell.flat_number}</span>
-                        <span className="money truncate text-[10px] opacity-90">{colourBy === "PRICE_BAND" ? formatINRShort(cell.price_paise) : colourBy === "FLAT_TYPE" ? cell.flat_type_code : cell.status === "AVAILABLE" ? formatINRShort(cell.price_paise) : FLAT_STATUS_LABELS[cell.status]}</span>
+                        <span className="money truncate text-[10px]">{colourBy === "PRICE_BAND" ? formatINRShort(cell.price_paise) : colourBy === "FLAT_TYPE" ? cell.flat_type_code : cell.status === "AVAILABLE" ? formatINRShort(cell.price_paise) : FLAT_STATUS_LABELS[cell.status]}</span>
+                        <span className="sr-only">, {FLAT_STATUS_LABELS[cell.status]}, {formatINR(cell.price_paise)}</span>
                         {cell.is_corner && <span className="absolute right-0.5 top-0.5 size-1.5 rounded-full bg-current opacity-60" aria-hidden="true" />}
                       </button>
                     </Tooltip>
                   );
                 })
-              ),
-            ];
+              )}
+              </div>
+            );
           })}
         </div>
       </div>
@@ -316,8 +323,10 @@ export function GridLegend({ grid, colourBy }: { grid: BlockGridResponse; colour
     <dl className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs" aria-label="Legend">
       {items.map((item) => (
         <div key={item.key} className="flex items-center gap-1.5">
-          <span className={cn("size-3 rounded-xs border", item.className)} aria-hidden="true" />
-          <dt className="text-ink-muted">{item.label}</dt>
+          <dt className="flex items-center gap-1.5 text-ink-muted">
+            <span className={cn("size-3 rounded-xs border", item.className)} aria-hidden="true" />
+            {item.label}
+          </dt>
           <dd className="money font-semibold text-navy-950">{formatNumber(item.count)}</dd>
         </div>
       ))}

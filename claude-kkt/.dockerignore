@@ -1,0 +1,20 @@
+# Build context for every Dockerfile (they all build from the repository root).
+**/node_modules
+**/dist
+**/.next
+**/.expo
+**/.turbo
+**/coverage
+**/*.log
+.git
+.github
+docs
+storage
+infra/secrets
+apps/api/storage
+apps/api/test
+apps/api/loadtest
+apps/web/.next
+.env
+.env.*
+!.env.example

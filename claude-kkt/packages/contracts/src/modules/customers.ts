@@ -48,6 +48,8 @@ export const CoApplicantRowSchema = z.object({
   pan_masked: z.string().nullable(),
   aadhaar_masked: z.string().nullable(),
   sort_order: z.int(),
+  /** Optimistic-concurrency version: PATCH /customers/:id/co-applicants/:caId requires it (body.version or If-Match). */
+  version: VersionSchema,
 });
 export type CoApplicantRow = z.infer<typeof CoApplicantRowSchema>;
 
@@ -163,6 +165,10 @@ export const CustomerRowSchema = MasterRowSchema.extend({
   kyc_verified_by_name: z.string().nullable(),
   kyc_verified_at: TimestampSchema.nullable(),
   kyc_remarks: z.string().nullable(),
+  /** Maker of the KYC check (set when the status moves to SUBMITTED); the verifier must be someone else. */
+  kyc_submitted_by: IdSchema.nullable().optional(),
+  kyc_submitted_by_name: z.string().nullable().optional(),
+  kyc_submitted_at: TimestampSchema.nullable().optional(),
   notes: z.string().nullable(),
   tags: z.array(z.string()),
   active_booking_count: z.int().min(0),
@@ -203,9 +209,14 @@ export type CustomerFilter = z.infer<typeof CustomerFilterSchema>;
 export const CustomerListResponseSchema = listEnvelope(CustomerRowSchema);
 export type CustomerListResponse = z.infer<typeof CustomerListResponseSchema>;
 
-/** Update KYC status (verifier recorded by the server). */
+/**
+ * KYC workflow (maker-checker): PENDING/REJECTED → SUBMITTED needs PAN, Aadhaar and at least one KYC document (422 KYC_INCOMPLETE; a
+ * rejected file must have been edited since the rejection); SUBMITTED → VERIFIED/REJECTED needs customer.kyc_view and a verifier who is
+ * not the submitter (403 FORBIDDEN details.reason KYC_MAKER_CHECKER); any other move is 409 KYC_TRANSITION_INVALID. Changing a VERIFIED
+ * status needs settings.manage and a `reason`.
+ */
 export const CustomerKycUpdateSchema = z
-  .strictObject({ ...VersionedSchema.shape, kyc_status: KycStatusSchema, kyc_remarks: NoteSchema.optional().nullable() })
+  .strictObject({ ...VersionedSchema.shape, kyc_status: KycStatusSchema, kyc_remarks: NoteSchema.optional().nullable(), reason: ReasonSchema.optional() })
   .refine((k) => k.kyc_status !== "REJECTED" || (k.kyc_remarks ?? "").length >= 3, {
     message: "Remarks are required when rejecting KYC",
     path: ["kyc_remarks"],
@@ -258,11 +269,29 @@ export type PortalAccessResponse = z.infer<typeof PortalAccessResponseSchema>;
 export const PortalBulkEnableSchema = z.strictObject({ project_id: IdSchema.optional(), dry_run: z.boolean().default(false) });
 export type PortalBulkEnable = z.infer<typeof PortalBulkEnableSchema>;
 
+/** `?format=csv` on the same call returns the credentials as a CSV attachment instead of JSON (still exactly once). */
+export const PortalBulkEnableQuerySchema = z.object({ format: z.enum(["json", "csv"]).optional() });
+export type PortalBulkEnableQuery = z.infer<typeof PortalBulkEnableQuerySchema>;
+
+/** One login created by a bulk enable. The temporary password exists only in this response: it is never stored, logged or audited. */
+export const PortalBulkCredentialSchema = z.object({
+  customer_id: IdSchema,
+  customer_code: z.string(),
+  full_name: z.string(),
+  phone: z.string(),
+  temporary_password: z.string(),
+  /** @deprecated same value as temporary_password (kept for older clients). */
+  temp_password: z.string(),
+});
+export type PortalBulkCredential = z.infer<typeof PortalBulkCredentialSchema>;
+
 export const PortalBulkEnableResponseSchema = z.object({
   dry_run: z.boolean(),
   enabled: z.int().min(0),
   already_enabled: z.int().min(0),
-  credentials: z.array(z.object({ customer_id: IdSchema, customer_code: z.string(), phone: z.string(), temp_password: z.string() })),
+  /** Customers not enabled because the batch stopped on an unexpected error (absent when 0); re-run the bulk enable for them. */
+  failed: z.int().min(0).optional(),
+  credentials: z.array(PortalBulkCredentialSchema),
 });
 export type PortalBulkEnableResponse = z.infer<typeof PortalBulkEnableResponseSchema>;
 
@@ -270,8 +299,8 @@ export type PortalBulkEnableResponse = z.infer<typeof PortalBulkEnableResponseSc
 export const CustomerEraseSchema = z.strictObject({ confirm: z.literal("ERASE"), reason: ReasonSchema });
 export type CustomerErase = z.infer<typeof CustomerEraseSchema>;
 
-/** Co-applicant partial update (child row, no version). */
-export const CoApplicantUpdateSchema = CoApplicantInputSchema.omit({ id: true }).partial();
+/** Co-applicant partial update: the row's `version` is required (here or as If-Match); a stale one → 409 VERSION_CONFLICT. */
+export const CoApplicantUpdateSchema = CoApplicantInputSchema.omit({ id: true }).partial().extend({ version: VersionSchema.optional() });
 export type CoApplicantUpdate = z.infer<typeof CoApplicantUpdateSchema>;
 
 export const CoApplicantListResponseSchema = z.object({ items: z.array(CoApplicantRowSchema) });

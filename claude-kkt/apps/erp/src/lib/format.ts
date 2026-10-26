@@ -218,9 +218,52 @@ function toDate(value: string | Date | null | undefined): Date | null {
   return isValid(date) ? date : null;
 }
 
-/** "2026-10-24" → "24 Oct 2026". */
-export function formatDate(value: string | Date | null | undefined, pattern = "dd MMM yyyy"): string {
+const BUSINESS_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+const istParts = new Intl.DateTimeFormat("en-CA", {
+  timeZone: IST_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hourCycle: "h23",
+});
+
+/** Wall-clock fields of an instant in IST (independent of the browser's zone). */
+export function istWallClock(date: Date): { year: number; month: number; day: number; hour: number; minute: number; second: number } {
+  const parts = istParts.formatToParts(date);
+  const n = (type: Intl.DateTimeFormatPartTypes) => Number(pick(parts, type));
+  return { year: n("year"), month: n("month"), day: n("day"), hour: n("hour") % 24, minute: n("minute"), second: n("second") };
+}
+
+/**
+ * A browser-local Date whose local fields equal the value's IST wall clock, for date-fns patterns (which format in the local zone).
+ * Business dates (YYYY-MM-DD) keep their calendar day as-is; instants are converted to IST first.
+ */
+function istLocalDate(value: string | Date | null | undefined): Date | null {
+  if (typeof value === "string") {
+    const m = BUSINESS_DATE.exec(value);
+    if (m) {
+      const local = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12);
+      return isValid(local) ? local : null;
+    }
+  }
   const date = toDate(value);
+  if (!date) return null;
+  const w = istWallClock(date);
+  return new Date(w.year, w.month - 1, w.day, w.hour, w.minute, w.second);
+}
+
+/**
+ * "2026-10-24" → "24 Oct 2026". Instants (RFC 3339 / Date) are shown on their IST calendar day whatever the browser's zone, so a
+ * payment posted at 00:30 IST never shows as the previous day on a laptop set to UTC.
+ * Use it for the calendar day; times of day go through formatDateTime / formatTime (Intl with timeZone, exact in every browser zone —
+ * a time-of-day pattern here could land in the browser's own daylight-saving gap).
+ */
+export function formatDate(value: string | Date | null | undefined, pattern = "dd MMM yyyy"): string {
+  const date = istLocalDate(value);
   return date ? dfFormat(date, pattern) : "—";
 }
 
@@ -273,9 +316,34 @@ export function todayIST(): string {
   return `${pick(parts, "year")}-${pick(parts, "month")}-${pick(parts, "day")}`;
 }
 
-/** Date → YYYY-MM-DD (local calendar). */
+/** Date → YYYY-MM-DD on its IST calendar day. */
 export function toDateString(date: Date): string {
-  return dfFormat(date, "yyyy-MM-dd");
+  const w = istWallClock(date);
+  return `${w.year}-${String(w.month).padStart(2, "0")}-${String(w.day).padStart(2, "0")}`;
+}
+
+/** Current hour (0–23) in IST. */
+export function istHour(now: Date = new Date()): number {
+  return istWallClock(now).hour;
+}
+
+/** RFC 3339 instant → `datetime-local` input value ("2026-10-25T15:30") on the IST wall clock. */
+export function instantToIstInput(value: string | Date | null | undefined): string {
+  const date = toDate(value);
+  if (!date) return "";
+  const w = istWallClock(date);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${w.year}-${pad(w.month)}-${pad(w.day)}T${pad(w.hour)}:${pad(w.minute)}`;
+}
+
+/** `datetime-local` input value read as IST wall-clock time → RFC 3339 instant (UTC), or null. */
+export function istInputToInstant(value: string | null | undefined): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(value ?? "");
+  if (!m) return null;
+  // IST is UTC+05:30 all year (no daylight saving)
+  const utc = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6] ?? 0)) - 330 * 60_000;
+  const date = new Date(utc);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
 /** Short relative time: "just now", "5 min ago", "3 h ago", "2 d ago", else "24 Oct 2026". */

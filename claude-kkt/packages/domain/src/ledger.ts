@@ -343,26 +343,37 @@ export function appendLedgerRow(prevSummary: LedgerSummary, event: LedgerEvent):
   return { row: rowFrom(summary, event, applied.amountPaise, applied.bucket, applied.label), summary };
 }
 
-/** Epoch milliseconds of an event's `at` when it is an instant; 0 for a bare business date (sorts first within its day). */
-function instantMs(at: string): number {
-  return isValidDateString(at) ? 0 : toEpochMs(at);
+/**
+ * Posting instant of an event in epoch milliseconds. A bare business date (YYYY-MM-DD, used by tests and fixtures that have no
+ * instants) counts as midnight IST of that date, so it sorts before every instant of the same IST day.
+ */
+export function ledgerEventInstantMs(at: string): number {
+  return isValidDateString(at) ? toEpochMs(`${at}T00:00:00+05:30`) : toEpochMs(at);
 }
 
 /**
- * Sorts events by business date, then instant (so "+05:30" and "Z" stamps of the same moment compare equal),
- * then kind priority; stable; does not mutate the input.
+ * CANONICAL LEDGER ORDER — posting order, exactly as the live path appends rows (SPEC §11): by the posting instant `at`
+ * (so "+05:30" and "Z" stamps of the same moment compare equal), then kind priority, then the source record id (`refId`),
+ * then input position (stable). The business date (`entryDate`, e.g. a payment's payment_date) is a display attribute only:
+ * a payment posted today but dated before an earlier-posted demand still follows that demand, so seq and every running balance
+ * survive any rebuild (agreement revision, plan change, stage undo, integrity repair). Does not mutate the input.
  */
 export function sortLedgerEvents<T extends LedgerEvent>(events: readonly T[]): T[] {
-  const keyed = events.map((event, index) => ({ event, index, date: ledgerEntryDate(event), ms: instantMs(event.at) }));
+  const keyed = events.map((event, index) => ({ event, index, ms: ledgerEventInstantMs(event.at) }));
   keyed.sort((a, b) => {
-    if (a.date !== b.date) {
-      return a.date < b.date ? -1 : 1;
-    }
     if (a.ms !== b.ms) {
       return a.ms - b.ms;
     }
     const byKind = ledgerKindPriority(a.event.kind) - ledgerKindPriority(b.event.kind);
-    return byKind !== 0 ? byKind : a.index - b.index;
+    if (byKind !== 0) {
+      return byKind;
+    }
+    const ra = a.event.refId ?? "";
+    const rb = b.event.refId ?? "";
+    if (ra !== rb) {
+      return ra < rb ? -1 : 1;
+    }
+    return a.index - b.index;
   });
   return keyed.map((k) => k.event);
 }
@@ -372,7 +383,7 @@ export interface DerivedLedger {
   summary: LedgerSummary;
 }
 
-/** Rebuilds the whole ledger from events (sorted by at, then kind priority) with running balances and a final summary. */
+/** Rebuilds the whole ledger from events in canonical posting order (sortLedgerEvents) with running balances and a final summary. */
 export function deriveLedger(events: readonly LedgerEvent[], opening?: LedgerSummary | null): DerivedLedger {
   let summary = opening ?? emptyLedgerSummary();
   const rows: LedgerRow[] = [];
@@ -382,6 +393,62 @@ export function deriveLedger(events: readonly LedgerEvent[], opening?: LedgerSum
     summary = next.summary;
   }
   return { rows, summary };
+}
+
+/** The fields of a ledger row that must match between the stored ledger and a rebuild (integrity finding (e)). */
+export const LEDGER_ROW_COMPARED_FIELDS = [
+  "seq",
+  "event",
+  "refId",
+  "bucket",
+  "amountPaise",
+  "cashPaidCumPaise",
+  "accountPaidCumPaise",
+  "cashOrderRaisedPaise",
+  "accountOrderRaisedPaise",
+  "cashDuePaise",
+  "accountDuePaise",
+  "totalDuePaise",
+  "otherChargesDuePaise",
+] as const;
+export type LedgerRowComparedField = (typeof LEDGER_ROW_COMPARED_FIELDS)[number];
+export type ComparableLedgerRow = Pick<LedgerRow, LedgerRowComparedField>;
+
+/** One row-level difference between a stored ledger and its rebuild. */
+export interface LedgerRowDifference {
+  /** 1-based position in the ledger (the seq the row has, or should have). */
+  position: number;
+  field: LedgerRowComparedField | "row";
+  stored: string | number | null;
+  recomputed: string | number | null;
+}
+
+/**
+ * Compares a stored ledger with a rebuild row by row (both in seq order): event, source id, bucket, amount and every running balance.
+ * A missing or extra row is reported once as field "row". Returns at most `limit` differences (default 20), first divergence first.
+ */
+export function diffLedgerRows(stored: readonly ComparableLedgerRow[], recomputed: readonly ComparableLedgerRow[], limit = 20): LedgerRowDifference[] {
+  const out: LedgerRowDifference[] = [];
+  const n = Math.max(stored.length, recomputed.length);
+  for (let i = 0; i < n && out.length < limit; i += 1) {
+    const s = stored[i];
+    const r = recomputed[i];
+    if (!s || !r) {
+      out.push({ position: i + 1, field: "row", stored: s ? s.event : null, recomputed: r ? r.event : null });
+      continue;
+    }
+    for (const field of LEDGER_ROW_COMPARED_FIELDS) {
+      const a = s[field] ?? null;
+      const b = r[field] ?? null;
+      if (a !== b) {
+        out.push({ position: i + 1, field, stored: a, recomputed: b });
+        if (out.length >= limit) {
+          break;
+        }
+      }
+    }
+  }
+  return out;
 }
 
 export interface BucketCapInput {

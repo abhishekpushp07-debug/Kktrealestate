@@ -7,6 +7,7 @@ import { haptics } from "@/lib/haptics";
 import { Icon } from "./Icon";
 import { T } from "./Text";
 import { colors, radius, shadow, space } from "./theme";
+import { alertRegion, announce, statusRegion } from "./a11y";
 
 type ToastTone = "success" | "error" | "info";
 interface ToastMsg {
@@ -46,6 +47,7 @@ function ToastHost({ toast, onDone }: { toast: ToastMsg | null; onDone: () => vo
   const opacity = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (!toast) return;
+    announce(toast.text);
     opacity.setValue(0);
     Animated.timing(opacity, { toValue: 1, duration: 180, useNativeDriver: NATIVE_DRIVER }).start();
     const t = setTimeout(() => Animated.timing(opacity, { toValue: 0, duration: 220, useNativeDriver: NATIVE_DRIVER }).start(onDone), 3200);
@@ -55,7 +57,7 @@ function ToastHost({ toast, onDone }: { toast: ToastMsg | null; onDone: () => vo
   const bg = toast.tone === "success" ? colors.success : toast.tone === "error" ? colors.danger : colors.navy;
   return (
     <View pointerEvents="none" style={[styles.host, { top: Math.max(insets.top, Platform.OS === "web" ? 16 : 8) + 8 }]}>
-      <Animated.View style={[styles.toast, shadow.raised, { backgroundColor: bg, opacity }]}>
+      <Animated.View style={[styles.toast, shadow.raised, { backgroundColor: bg, opacity }]} {...(toast.tone === "error" ? alertRegion : statusRegion)}>
         <Icon name={toast.tone === "success" ? "check" : toast.tone === "error" ? "warning" : "info"} size={18} color={colors.onNavy} />
         <T variant="small" color={colors.onNavy} style={{ flex: 1 }}>
           {toast.text}

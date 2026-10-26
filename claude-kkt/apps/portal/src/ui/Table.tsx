@@ -16,7 +16,8 @@ export interface Column<Row> {
 export function Table<Row>({ columns, rows, keyOf, minWidth = 720, emptyText = "Nothing here yet." }: { columns: ReadonlyArray<Column<Row>>; rows: ReadonlyArray<Row>; keyOf: (row: Row, index: number) => string; minWidth?: number; emptyText?: string }): React.JSX.Element {
   const cell = (c: Column<Row>) => ({ width: c.width, flex: c.width ? undefined : (c.flex ?? 1), alignItems: c.align === "right" ? "flex-end" : c.align === "center" ? "center" : "flex-start" } as const);
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={{ minWidth: "100%" }}>
+    // focusable so keyboard users can scroll a wide table sideways (WCAG 2.1.1)
+    <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={{ minWidth: "100%" }} focusable accessibilityLabel="Table">
       <View style={[styles.table, { minWidth }]}>
         <View style={[styles.row, styles.head]}>
           {columns.map((c) => (

@@ -11,7 +11,7 @@ import { Icon } from "@/ui/Icon";
 import { DueMoney, Money } from "@/ui/Money";
 import { ProgressBar } from "@/ui/ProgressRing";
 import { useLayout } from "@/ui/Responsive";
-import { Screen } from "@/ui/Screen";
+import { useDocumentTitle, Screen } from "@/ui/Screen";
 import { SegmentedControl } from "@/ui/SegmentedControl";
 import { SkeletonRows } from "@/ui/Skeleton";
 import { EmptyState, ErrorState, Notice, StatusBar } from "@/ui/States";
@@ -30,6 +30,7 @@ const TABS: ReadonlyArray<{ key: Tab; label: string }> = [
 const isTab = (v: unknown): v is Tab => v === "receipts" || v === "ledger" || v === "demands" || v === "schedule";
 
 export function PaymentsScreen(): React.JSX.Element {
+  useDocumentTitle("Payments");
   return <BookingGate title="Payments">{(id) => <Body bookingId={id} />}</BookingGate>;
 }
 

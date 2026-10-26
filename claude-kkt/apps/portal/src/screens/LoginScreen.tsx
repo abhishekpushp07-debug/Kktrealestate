@@ -13,6 +13,7 @@ import { useLayout } from "@/ui/Responsive";
 import { Notice } from "@/ui/States";
 import { T } from "@/ui/Text";
 import { colors, radius, shadow, space } from "@/ui/theme";
+import { useDocumentTitle } from "@/ui/Screen";
 
 function failureCopy(f: LoginFailure): { title: string; body: string; tone: "danger" | "warning" } {
   if (f.code === "LOCKED") {
@@ -22,10 +23,11 @@ function failureCopy(f: LoginFailure): { title: string; body: string; tone: "dan
     return { title: "Slow down a moment", body: f.retryAfterSeconds ? `Too many attempts from this device. Try again in ${f.retryAfterSeconds} seconds.` : f.message, tone: "warning" };
   }
   if (f.code === "NETWORK") return { title: "You're offline", body: f.message, tone: "warning" };
-  return { title: f.code === "INVALID_CREDENTIALS" ? "Sign-in failed" : "Check your details", body: f.message, tone: "danger" };
+  return { title: f.code === "VALIDATION" ? "Check your details" : "Sign-in failed", body: f.message, tone: "danger" };
 }
 
 export function LoginScreen(): React.JSX.Element {
+  useDocumentTitle("Sign in");
   const { login } = useAuth();
   const insets = useSafeAreaInsets();
   const layout = useLayout();
@@ -78,7 +80,7 @@ export function LoginScreen(): React.JSX.Element {
         secureTextEntry
         secureToggle
         textContentType="password"
-        autoComplete="password"
+        autoComplete="current-password"
         returnKeyType="go"
         onSubmitEditing={() => void submit()}
       />

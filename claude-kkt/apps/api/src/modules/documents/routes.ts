@@ -14,7 +14,8 @@ import { listPaging, paginate } from "../../lib/list.js";
 import { installMultipartIdempotency, uploadOf } from "../../lib/multipart.js";
 import { route } from "../../lib/routes.js";
 import type { StaffContext } from "../../lib/scope.js";
-import { applyUpdate, optionalExpectedVersion, withOptionalVersion } from "../../lib/version.js";
+import { applyUpdate, expectedVersion, withOptionalVersion } from "../../lib/version.js";
+import { withdraw } from "../notifications/index.js";
 import { assertEntityWrite, documentScopeCondition, requireEntity } from "./entities.js";
 import {
   DOCUMENT_SELECT, SIGNED_LINK_TTL_SECONDS, applyTypeRules, loadDocumentType, loadJoined, signedUrl, storage, storeBuffer, streamDocument,
@@ -133,7 +134,7 @@ export function registerDocumentRoutes(app: FastifyInstance): void {
 
   route(app, {
     method: "PATCH", url: "/documents/:id", permission: "document.write",
-    schema: { params: idParams, body: withOptionalVersion(DocumentUpdateSchema), response: { 200: DocumentRowSchema }, summary: "Update title, type or sharing flags (KYC rules enforced); If-Match / version honoured" },
+    schema: { params: idParams, body: withOptionalVersion(DocumentUpdateSchema), response: { 200: DocumentRowSchema }, summary: "Update title, type or sharing flags (KYC rules enforced); version required (body.version or If-Match)" },
     handler: async (req) => {
       const user = req.user!;
       const body = req.body;
@@ -150,8 +151,8 @@ export function registerDocumentRoutes(app: FastifyInstance): void {
         const flags = applyTypeRules(type, doc.entityType, { isSensitive: body.is_sensitive ?? doc.isSensitive, sharedWithCustomer: body.shared_with_customer ?? doc.sharedWithCustomer });
         const changes: Partial<typeof documents.$inferInsert> = { documentTypeId: type?.id ?? null, isSensitive: flags.isSensitive, sharedWithCustomer: flags.sharedWithCustomer, updatedAt: new Date() };
         if (body.title !== undefined) changes.title = body.title;
-        // Optimistic concurrency: `If-Match: "<version>"` (or body.version) is honoured; without either the current version is assumed.
-        await applyUpdate(tx, documents, doc.id, optionalExpectedVersion(req as unknown as FastifyRequest, body, doc.version), changes, ENTITY);
+        // Optimistic concurrency: `If-Match: "<version>"` or body.version is required (the version policy rejects a PATCH without one).
+        await applyUpdate(tx, documents, doc.id, expectedVersion(req as unknown as FastifyRequest, body), changes, ENTITY);
         const after = toDocumentRow((await loadJoined(tx, user.companyId, doc.id))!);
         await writeAudit(tx, { companyId: user.companyId, actor: actorFromRequest(req), action: `${ENTITY}.update`, entityType: ENTITY, entityId: doc.id, before: auditSnapshot(before), after: auditSnapshot(after), ...auditMeta(req) });
         return after;
@@ -171,6 +172,7 @@ export function registerDocumentRoutes(app: FastifyInstance): void {
         await requireEntity(tx, user, existing.doc.entityType, existing.doc.entityId);
         if (existing.doc.isSensitive && !canSeeSensitive(user)) throw ApiError.notFound("Document");
         await tx.update(documents).set({ isDeleted: true, deletedAt: new Date(), updatedAt: new Date() }).where(eq(documents.id, existing.doc.id));
+        await withdraw(tx, ENTITY, existing.doc.id);
         const before = toDocumentRow(existing);
         await writeAudit(tx, { companyId: user.companyId, actor: actorFromRequest(req), action: `${ENTITY}.delete`, entityType: ENTITY, entityId: existing.doc.id, before: auditSnapshot(before), after: { ...auditSnapshot(before), is_deleted: true }, ...auditMeta(req) });
       });

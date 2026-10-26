@@ -6,7 +6,11 @@ const path = require("path");
 const WEB = process.env.WEB_URL || "http://localhost:3000";
 const API = process.env.API_URL || "http://localhost:4100";
 const OUT = process.env.OUT_DIR || __dirname;
-const REPORT = path.join(path.dirname(__filename), "report.json");
+const SITE = process.env.SITE_URL || WEB; // NEXT_PUBLIC_SITE_URL of the build under test (sitemap / robots URLs)
+const REDIS_DB = process.env.REDIS_DB || null; // Redis db of the API under test (visitor-IP forwarding check)
+const REPORT = process.env.REPORT || path.join(require("os").tmpdir(), `kkt-web-qa-${Date.now()}.json`);
+const { createAxe } = require("../axe.cjs");
+const axe = createAxe("web");
 const ONLY = process.env.ONLY ? process.env.ONLY.split(",") : null; // e.g. ONLY=static,enquiry,brochure,visit,toggles
 const VIEWPORTS = { 1440: { width: 1440, height: 900 }, 390: { width: 390, height: 844 } };
 fs.mkdirSync(OUT, { recursive: true });
@@ -55,7 +59,7 @@ async function metrics(page) {
       const after = getComputedStyle(el, "::after");
       let hitH = r.height;
       if (after.position === "absolute" && after.content !== "none" && el.offsetParent) hitH = Math.max(hitH, el.offsetParent.getBoundingClientRect().height);
-      if (hitH < 44) small.push({ tag: el.tagName.toLowerCase(), text: (el.innerText || el.getAttribute("aria-label") || el.value || el.name || "").trim().replace(/\s+/g, " ").slice(0, 40), h: Math.round(r.height), w: Math.round(r.width) });
+      if (hitH < 47.5) small.push({ tag: el.tagName.toLowerCase(), text: (el.innerText || el.getAttribute("aria-label") || el.value || el.name || "").trim().replace(/\s+/g, " ").slice(0, 40), h: Math.round(r.height), w: Math.round(r.width) });
     }
     return { scrollWidth: sw, innerWidth: iw, small };
   });
@@ -84,12 +88,15 @@ async function audit(h, name, width, opts = {}) {
   const failed = net.failed.filter((f) => !allow.some((a) => (a instanceof RegExp ? a.test(f) : f.includes(a))));
   const consoleErrors = [...net.consoleErrors, ...net.pageErrors].filter((c) => !allow.some((a) => (a instanceof RegExp ? a.test(c) : c.includes(a))));
   const shot = opts.noShot ? null : await shoot(page, name, width);
-  const entry = { page: name, width, url: page.url(), consoleErrors, failed, overflow: width === 390 ? m.scrollWidth > m.innerWidth : m.scrollWidth > m.innerWidth, scrollWidth: m.scrollWidth, innerWidth: m.innerWidth, small: m.small, settleMs: opts.settleMs ?? null, shot };
+  const axeViolations = await axe.scan(page, name, width);
+  const axeBlocking = axe.blocking(axeViolations);
+  const entry = { page: name, width, url: page.url(), axe: axeViolations ? axeViolations.map((v) => `${v.impact}:${v.id}(${v.nodes})`) : null, consoleErrors, failed, overflow: width === 390 ? m.scrollWidth > m.innerWidth : m.scrollWidth > m.innerWidth, scrollWidth: m.scrollWidth, innerWidth: m.innerWidth, small: m.small, settleMs: opts.settleMs ?? null, shot };
   report.pages.push(entry);
   const problems = [];
   if (consoleErrors.length) problems.push(`console: ${consoleErrors.join(" | ")}`);
   if (failed.length) problems.push(`requests: ${failed.join(" | ")}`);
   if (entry.overflow) problems.push(`overflow ${m.scrollWidth}>${m.innerWidth}`);
+  if (axeBlocking.length) problems.push(`axe: ${axeBlocking.map((v) => `${v.impact} ${v.id} ×${v.nodes} ${v.targets.slice(0, 3).join(" | ")}`).join(" ;; ")}`);
   if (width === 390 && m.small.length) problems.push(`small targets: ${m.small.map((s) => `${s.tag}"${s.text}"${s.h}px`).join(", ")}`);
   log(problems.length ? "WARN" : "OK  ", `${name}@${width}`, entry.settleMs !== null ? `${entry.settleMs}ms` : "", shot ? `${shot.file} ${shot.kb}KB` : "", problems.join(" ;; "));
   if (problems.length) report.defects.push(`${name}@${width}: ${problems.join(" ;; ")}`);
@@ -230,9 +237,9 @@ async function staticWalk(browser) {
   }
   // sitemap + robots via request
   const sm = await (await fetch(`${WEB}/sitemap.xml`)).text();
-  want(sm.includes("<loc>http://localhost:3000/projects/shree-ganesh-heights</loc>") && sm.includes("/projects/ganesh-green-villas") && sm.includes(`/blog/${postSlug}`) && !sm.includes("ggv-block-q-handover"), "sitemap.xml lists published content only");
+  want(sm.includes(`<loc>${SITE}/projects/shree-ganesh-heights</loc>`) && sm.includes("/projects/ganesh-green-villas") && sm.includes(`/blog/${postSlug}`) && !sm.includes("ggv-block-q-handover"), "sitemap.xml lists published content only");
   const rb = await (await fetch(`${WEB}/robots.txt`)).text();
-  want(/Allow: \//.test(rb) && rb.includes("Sitemap: http://localhost:3000/sitemap.xml") && rb.includes("Disallow: /visit/"), "robots.txt allows crawl, hides /visit/");
+  want(/Allow: \//.test(rb) && rb.includes(`Sitemap: ${SITE}/sitemap.xml`) && rb.includes("Disallow: /visit/"), "robots.txt allows crawl, hides /visit/");
 }
 
 // ---------------------------------------------------------------------------
@@ -242,6 +249,18 @@ async function enquiryFlow(browser) {
   const h = await newPage(browser, 1440);
   const { page } = h;
   const refs = [];
+  // accessibility: an empty submit marks the fields invalid and points them at their role=alert errors
+  {
+    await page.goto(`${WEB}/contact`, { waitUntil: "domcontentloaded" });
+    const form = page.locator("#enquire form");
+    await form.locator('input[name="name"]').waitFor({ timeout: 10000 });
+    await form.locator('button[type="submit"]').click();
+    await sleep(300);
+    const nameInput = form.locator('input[name="name"]');
+    const describedBy = await nameInput.getAttribute("aria-describedby");
+    const errText = describedBy ? await page.locator(`[id="${describedBy}"]`).innerText().catch(() => "") : "";
+    want((await nameInput.getAttribute("aria-invalid")) === "true" && errText.length > 0 && (await page.locator(`[id="${describedBy}"][role="alert"]`).count()) === 1, "enquiry: empty submit → name aria-invalid, described by its role=alert error", errText);
+  }
   const t0 = Date.now();
   for (let i = 1; i <= 6; i++) {
     const t = Date.now();
@@ -368,7 +387,7 @@ async function visitFlow(browser) {
   await form.locator('input[name="consent"]').check();
   const submit = form.locator('button[type="submit"]');
   const sh = await submit.evaluate((e) => e.getBoundingClientRect().height);
-  want(sh >= 44, "visit submit button ≥ 44px on phone", `${sh}px`);
+  want(sh >= 48, "visit submit button ≥ 48px on phone (SPEC §15)", `${sh}px`);
   await submit.click();
   const ok = await page.getByText("Your visit is confirmed").waitFor({ timeout: 15000 }).then(() => true).catch(() => false);
   const box = page.locator("#visit [role=status]");
@@ -404,10 +423,11 @@ async function visitFlow(browser) {
     const avail2 = await (await fetch(`${API}/api/v1/public/projects/shree-ganesh-heights/visit-availability`)).json();
     const slotAfter = avail2.flatMap((d) => d.slots.map((s) => ({ ...s, date: d.date }))).find((s) => s.start === to24h(slotStart) && dateMatches(dateLabel, s.date));
     want(slotAfter && slotAfter.available === leftBefore, "cancel frees the seat", `after=${slotAfter?.available}`);
-    // reload manage page: still cancelled, no cancel button
+    // reload manage page: cancelling expires the link (API 410 LINK_EXPIRED) → the branded "link has expired" page, no cancel button
     await page.reload({ waitUntil: "domcontentloaded" });
     await settle(page);
-    want((await page.getByText("Cancelled").count()) > 0 && (await page.getByRole("button", { name: "Cancel this visit" }).count()) === 0, "manage page persists Cancelled state");
+    want((await page.getByRole("heading", { name: /link has expired/i }).count()) > 0 && (await page.getByRole("button", { name: "Cancel this visit" }).count()) === 0, "manage link after cancel shows the expired-link page (410), not an error");
+    await audit(h, "visit-link-expired", 390, { allow: [/410 GET/, /status of 410/] });
   }
   // SLOT_FULL: book the remaining seats via API then try the UI once more
   h.reset();
@@ -487,6 +507,47 @@ async function toggleFlows(browser) {
   await h.ctx.close();
 }
 
+// ---------------------------------------------------------------------------
+// Security headers (strict nonce CSP), click-to-load embeds under the CSP, visitor IP forwarding to the API
+// ---------------------------------------------------------------------------
+async function securityFlow(browser) {
+  const res = await fetch(`${WEB}/projects/shree-ganesh-heights`);
+  const csp = res.headers.get("content-security-policy") ?? "";
+  const html = await res.text();
+  const nonce = /'nonce-([A-Za-z0-9+/=]+)'/.exec(csp)?.[1];
+  want(Boolean(nonce) && /script-src [^;]*'strict-dynamic'/.test(csp) && !/script-src [^;]*'unsafe-inline'/.test(csp), "CSP: script-src is nonce + strict-dynamic (no unsafe-inline)", csp.slice(0, 160));
+  want(/frame-ancestors 'none'/.test(csp) && /object-src 'none'/.test(csp) && /base-uri 'self'/.test(csp) && /frame-src https:/.test(csp), "CSP: frame-ancestors/object-src/base-uri locked, https frames allowed for click-to-load embeds");
+  const scripts = [...html.matchAll(/<script\b([^>]*)>/g)].map((m) => m[1]).filter((a) => !/application\/ld\+json/.test(a));
+  want(scripts.length > 0 && scripts.every((a) => a.includes(`nonce="${nonce}"`)), "every executable <script> carries the request nonce", `${scripts.filter((a) => !a.includes(`nonce="${nonce}"`)).length}/${scripts.length} without`);
+  want(res.headers.get("x-frame-options") === "DENY" && res.headers.get("x-content-type-options") === "nosniff" && Boolean(res.headers.get("referrer-policy")) && Boolean(res.headers.get("permissions-policy")), "X-Frame-Options / nosniff / Referrer-Policy / Permissions-Policy present");
+  const res2 = await fetch(`${WEB}/projects/shree-ganesh-heights`);
+  want(/'nonce-([^']+)'/.exec(res2.headers.get("content-security-policy") ?? "")?.[1] !== nonce, "nonce changes per request");
+
+  // embeds load only after the click and the CSP lets the iframe in (no violation reported)
+  const h = await newPage(browser, 1440);
+  const cspViolations = [];
+  h.page.on("console", (m) => { if (/Content Security Policy/i.test(m.text())) cspViolations.push(m.text().slice(0, 200)); });
+  await h.page.goto(`${WEB}/projects/shree-ganesh-heights`, { waitUntil: "domcontentloaded" });
+  await settle(h.page);
+  want((await h.page.locator("#media iframe").count()) === 0, "no third-party iframe before the click");
+  const play = h.page.locator("#media button").first();
+  await play.click();
+  await sleep(800);
+  want((await h.page.locator("#media iframe").count()) === 1, "click-to-load injects the player iframe");
+  want(cspViolations.length === 0, "no CSP violation on a project page incl. the embed", cspViolations.join(" | "));
+  h.reset();
+  await h.ctx.close();
+
+  // the web server forwards the visitor's address: the API rate-limits that address, not the web server's
+  if (REDIS_DB !== null) {
+    const { execSync } = require("node:child_process");
+    const ip = `203.0.113.${10 + Math.floor(Math.random() * 200)}`;
+    const r = await fetch(`${WEB}/projects/shree-ganesh-heights`, { headers: { "x-forwarded-for": ip } });
+    const keys = execSync(`redis-cli -n ${REDIS_DB} --scan --pattern 'rl:pub:*${ip}*'`).toString().trim();
+    want(r.status === 200 && keys.length > 0, "detail render is rate-limited under the visitor's IP (x-forwarded-for forwarded to the API)", `${ip}: ${keys.split("\n")[0] ?? "no key"}`);
+  }
+}
+
 (async () => {
   const browser = await chromium.launch();
   const run = (k) => !ONLY || ONLY.includes(k);
@@ -495,13 +556,17 @@ async function toggleFlows(browser) {
     if (run("enquiry")) await enquiryFlow(browser);
     if (run("brochure")) await brochureFlow(browser);
     if (run("visit")) await visitFlow(browser);
+    if (run("security")) await securityFlow(browser);
     if (run("toggles")) await toggleFlows(browser);
   } catch (e) {
     log("CRASH", e);
     report.defects.push(`CRASH: ${e?.stack ?? e}`);
   } finally {
     await browser.close();
+    report.axe = axe.summary();
+    log("\n==== ACCESSIBILITY (axe)\n" + axe.markdown());
     fs.writeFileSync(REPORT, JSON.stringify(report, null, 2));
+    log(`report: ${REPORT}`);
     log(`done: ${report.pages.length} page audits, ${report.flows.filter((f) => f.ok).length}/${report.flows.length} checks passed, ${report.shots} screenshots, ${report.defects.length} defects`);
   }
 })();

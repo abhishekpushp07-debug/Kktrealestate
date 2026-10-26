@@ -84,7 +84,7 @@ export function MarkdownEditor({ value, onChange, id, invalid, disabled, rows = 
         <span className="money ml-auto hidden text-2xs text-ink-subtle sm:inline">
           {words} words · {readingMinutes(value)} min read
         </span>
-        <div className="flex items-center gap-0.5" role="tablist" aria-label="Editor mode">
+        <div className="flex items-center gap-0.5" role="group" aria-label="Editor mode">
           <Button type="button" size="xs" variant={mode === "write" ? "primary" : "ghost"} leftIcon={PenLine} onClick={() => setMode("write")} aria-pressed={mode === "write"}>
             Write
           </Button>

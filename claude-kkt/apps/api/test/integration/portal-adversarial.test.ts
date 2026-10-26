@@ -435,8 +435,9 @@ describe("budget, limits and strictness", () => {
 
   it("portal login is rate limited per IP (10/min → 429 with Retry-After) without locking anybody out", async () => {
     const ip = freshIp();
+    // a different (unknown) phone per attempt: 5 failures for one phone from one IP would lock that pair (423) before the rate limit
     for (let i = 0; i < 10; i += 1) {
-      const r = await t.request<ErrorBody>("POST", "/api/v1/portal/auth/login", { ip, body: { phone: "9000000001", password: "Wrong@12345" } });
+      const r = await t.request<ErrorBody>("POST", "/api/v1/portal/auth/login", { ip, body: { phone: `90000000${String(i + 10)}`, password: "Wrong@12345" } });
       expect(r.status, `attempt ${i + 1}`).toBe(401);
     }
     const blocked = await t.request<ErrorBody>("POST", "/api/v1/portal/auth/login", { ip, body: { phone: "9000000001", password: "Wrong@12345" } });

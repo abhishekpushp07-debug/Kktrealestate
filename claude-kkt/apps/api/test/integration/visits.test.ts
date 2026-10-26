@@ -241,8 +241,12 @@ describe("public booking", () => {
     const [row] = await t.app.sql<{ status: string; cancel_reason: string }[]>`select status, cancel_reason from site_visits where visit_number = ${single.body.visit_number}`;
     expect(row!.status).toBe("CANCELLED");
     expect(row!.cancel_reason).toBe("Change of plans");
-    // cancelling again is a no-op 200
-    expect((await t.request<Manage>("POST", `/api/v1/public/site-visits/${token}/cancel`, { body: {} })).body.status).toBe("CANCELLED");
+    // the link died with the visit: cancelling again, the manage view and the .ics answer 410 LINK_EXPIRED
+    const again = await t.request<ErrorBody>("POST", `/api/v1/public/site-visits/${token}/cancel`, { body: {} });
+    expect(again.status).toBe(410);
+    expect(again.body.error.code).toBe("LINK_EXPIRED");
+    expect((await t.request("GET", `/api/v1/public/site-visits/${token}`)).status).toBe(410);
+    expect((await t.request("GET", `/api/v1/public/site-visits/${token}.ics`)).status).toBe(410);
     // the lead with two upcoming visits keeps SITE_VISIT_SCHEDULED after one cancellation
     const tokenA = twoA.body.manage_url.split("/visit/")[1]!;
     expect((await t.request<Manage>("POST", `/api/v1/public/site-visits/${tokenA}/cancel`, { body: {} })).body.status).toBe("CANCELLED");
@@ -388,5 +392,94 @@ describe("ERP site visits", () => {
     expect(list.body.items.every((v) => v.is_past)).toBe(true);
     const { registeredJobs } = await import("../../src/jobs/index.js");
     expect(registeredJobs()).toContain("VISIT_OUTCOME_NUDGE");
+  });
+});
+
+describe("manage links: expiry, rotation and visitor self-reschedule", () => {
+  type Rescheduled = Manage & { manage_url: string; manage_token: string; link_expires_at: string; can_reschedule: boolean; slot_start: string; visit_date: string };
+  const tokenOf = (url: string) => url.split("/visit/")[1]!;
+
+  it("a booked link expires at the visit's end + 24 h (IST)", async () => {
+    const r = await book("9876600501", D(11), "10:00");
+    expect(r.status, r.text).toBe(201);
+    const [row] = await t.app.sql<{ expires: string }[]>`select manage_token_expires_at::text as expires from site_visits where visit_number = ${r.body.visit_number}`;
+    // slot 10:00–11:00 IST on D(11) ends at 05:30 UTC; + 24 h
+    const end = new Date(`${D(11)}T11:00:00+05:30`).getTime() + 24 * 3_600_000;
+    expect(new Date(row!.expires).getTime()).toBe(end);
+    const manage = await t.request<Manage & { link_expires_at: string; can_reschedule: boolean }>("GET", `/api/v1/public/site-visits/${tokenOf(r.body.manage_url)}`);
+    expect(manage.status).toBe(200);
+    expect(new Date(manage.body.link_expires_at).getTime()).toBe(end);
+    expect(manage.body.can_reschedule).toBe(true);
+  });
+
+  it("the visitor reschedules from the link: capacity-checked, new link + .ics returned, the old link stops working", async () => {
+    const r = await book("9876600502", D(11), "11:00");
+    expect(r.status, r.text).toBe(201);
+    const oldToken = tokenOf(r.body.manage_url);
+    // fill D(12) 10:00 so it is full (2 seats)
+    expect((await book("9876600503", D(12), "10:00")).status).toBe(201);
+    expect((await book("9876600504", D(12), "10:00")).status).toBe(201);
+    const full = await t.request<ErrorBody>("POST", `/api/v1/public/site-visits/${oldToken}/reschedule`, { body: { date: D(12), start: "10:00", website: "" } });
+    expect(full.status).toBe(409);
+    expect(full.body.error.code).toBe("SLOT_FULL");
+    const invalid = await t.request<ErrorBody>("POST", `/api/v1/public/site-visits/${oldToken}/reschedule`, { body: { date: D(5), start: "10:00" } }); // blackout
+    expect(invalid.status).toBe(422);
+    expect(invalid.body.error.details?.["rule"]).toBe("SLOT_INVALID");
+    const moved = await t.request<Rescheduled>("POST", `/api/v1/public/site-visits/${oldToken}/reschedule`, { body: { date: D(12), start: "11:00", website: "" } });
+    expect(moved.status, moved.text).toBe(200);
+    expect(moved.body.status).toBe("RESCHEDULED");
+    expect(moved.body.visit_date).toBe(D(12));
+    expect(moved.body.slot_start).toBe("11:00");
+    expect(moved.body.manage_token).not.toBe(oldToken);
+    expect(moved.body.manage_url).toContain(`/visit/${moved.body.manage_token}`);
+    expect(moved.body.ics_url).toContain(moved.body.manage_token);
+    expect(new Date(moved.body.link_expires_at).getTime()).toBe(new Date(`${D(12)}T12:00:00+05:30`).getTime() + 24 * 3_600_000);
+    // the old link is dead; the new one works and serves the moved .ics
+    const old = await t.request<ErrorBody>("GET", `/api/v1/public/site-visits/${oldToken}`);
+    expect(old.status).toBe(404); // rotated away: the old hash no longer exists anywhere
+    const fresh = await t.request<Manage>("GET", `/api/v1/public/site-visits/${moved.body.manage_token}`);
+    expect(fresh.status).toBe(200);
+    const ics = await t.request("GET", `/api/v1/public/site-visits/${moved.body.manage_token}.ics`);
+    expect(ics.status).toBe(200);
+    expect(ics.text).toContain(`DTSTART;TZID=Asia/Kolkata:${D(12).replace(/-/g, "")}T110000`);
+    // seats moved with it, and the audit names the rotation
+    const days = await availability(D(11), D(12));
+    expect(days.find((d) => d.date === D(12))!.slots.find((s) => s.start === "11:00")!.available).toBe(1);
+    const [audit] = await t.app.sql<{ after: { manage_link_rotated: boolean } }[]>`select after from audit_logs where action = 'site_visit.reschedule' order by created_at desc limit 1`;
+    expect(audit!.after.manage_link_rotated).toBe(true);
+  });
+
+  it("honeypot: a filled website field gets a believable answer and changes nothing", async () => {
+    const r = await book("9876600505", D(13), "10:00");
+    const token = tokenOf(r.body.manage_url);
+    const bot = await t.request<Rescheduled>("POST", `/api/v1/public/site-visits/${token}/reschedule`, { body: { date: D(13), start: "12:00", website: "http://spam.example" } });
+    expect(bot.status).toBe(200);
+    expect(bot.body.manage_token).not.toBe(token);
+    const [row] = await t.app.sql<{ slot_start: string; status: string }[]>`select slot_start::text, status from site_visits where visit_number = ${r.body.visit_number}`;
+    expect(row).toEqual({ slot_start: "10:00:00", status: "CONFIRMED" });
+    expect((await t.request("GET", `/api/v1/public/site-visits/${token}`)).status).toBe(200); // the real link still works
+    expect((await t.request("GET", `/api/v1/public/site-visits/${bot.body.manage_token}`)).status).toBe(404); // the fake one never did
+  });
+
+  it("an ERP reschedule also rotates the link and hands the new one to staff once", async () => {
+    const r = await book("9876600506", D(13), "11:00");
+    const token = tokenOf(r.body.manage_url);
+    const [v] = await t.app.sql<{ id: string; version: number }[]>`select id, version from site_visits where visit_number = ${r.body.visit_number}`;
+    const moved = await t.request<VisitRow & { manage_url: string | null }>("POST", `/api/v1/site-visits/${v!.id}/reschedule`, { token: sales, body: { version: v!.version, visit_date: D(13), slot_start: "12:00" } });
+    expect(moved.status, moved.text).toBe(200);
+    expect(moved.body.manage_url).toMatch(/\/visit\//);
+    expect((await t.request("GET", `/api/v1/public/site-visits/${token}`)).status).toBe(404);
+    expect((await t.request("GET", `/api/v1/public/site-visits/${tokenOf(moved.body.manage_url!)}`)).status).toBe(200);
+    // a plain read never re-exposes it
+    expect((await t.request<{ manage_url: string | null }>("GET", `/api/v1/site-visits/${v!.id}`, { token: sales })).body.manage_url ?? null).toBeNull();
+  });
+
+  it("a cancelled visit's link expires immediately and cannot be rescheduled", async () => {
+    const r = await book("9876600507", D(13), "10:00");
+    const token = tokenOf(r.body.manage_url);
+    expect((await t.request("POST", `/api/v1/public/site-visits/${token}/cancel`, { body: {} })).status).toBe(200);
+    const res = await t.request<ErrorBody>("POST", `/api/v1/public/site-visits/${token}/reschedule`, { body: { date: D(13), start: "12:00" } });
+    expect(res.status).toBe(410);
+    expect(res.body.error.code).toBe("LINK_EXPIRED");
   });
 });

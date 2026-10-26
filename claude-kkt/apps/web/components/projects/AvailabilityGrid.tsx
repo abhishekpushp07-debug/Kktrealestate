@@ -43,7 +43,7 @@ export function AvailabilityGrid({ grid }: { grid: AvailabilityGridData }) {
                           <td key={cell.flat_number} className="p-0">
                             <span
                               className={`flex min-h-9 min-w-12 items-center justify-center rounded-md border px-1.5 font-mono text-[0.7rem] ${
-                                open ? "border-gold-600 bg-gold-500 text-navy-950 font-semibold" : "border-line bg-ivory-200 text-ink-soft/70"
+                                open ? "border-gold-600 bg-gold-500 text-navy-950 font-semibold" : "border-line bg-ivory-200 text-ink-soft"
                               }`}
                               title={`${cell.flat_number} · ${cell.configuration} · ${open ? "Available" : "Not available"}`}
                             >

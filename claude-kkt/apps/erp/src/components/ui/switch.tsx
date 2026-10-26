@@ -15,7 +15,7 @@ export function Switch({ className, label, description, id, size = "md", ...prop
     <SwitchPrimitive.Root
       id={inputId}
       className={cn(
-        "peer relative inline-flex shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent bg-border-strong transition-colors focus-ring data-[state=checked]:bg-navy-950 disabled:cursor-not-allowed disabled:opacity-50",
+        "peer relative inline-flex shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent bg-border-input transition-colors focus-ring data-[state=checked]:bg-navy-950 disabled:cursor-not-allowed disabled:opacity-50",
         size === "md" ? "h-5 w-9" : "h-4 w-7",
         className,
       )}

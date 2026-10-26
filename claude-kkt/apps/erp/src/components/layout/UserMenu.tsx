@@ -34,9 +34,9 @@ export function UserMenu() {
         <button
           type="button"
           className="flex h-9 items-center gap-2 rounded-md px-1.5 text-left hover:bg-navy-50 focus-ring sm:pr-2"
-          aria-label="Account menu"
           data-testid="user-menu-trigger"
         >
+          <span className="sr-only">Account menu</span>
           <Avatar name={user?.name} src={user?.avatar_url} size="sm" />
           <span className="hidden min-w-0 leading-tight md:block">
             <span className="block max-w-36 truncate text-sm font-semibold text-navy-950">{user?.name ?? "—"}</span>

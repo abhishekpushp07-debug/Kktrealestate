@@ -30,6 +30,7 @@ import { decryptField, encryptField } from "../../lib/crypto.js";
 import { ApiError } from "../../lib/errors.js";
 import { route } from "../../lib/routes.js";
 import { camelRow, snakeRow } from "../../lib/rows.js";
+import { assertPlanFitsActiveAssignments } from "../money/index.js";
 import { countWhere } from "./factory.js";
 import type { DbRow, MasterKindDef, MasterTable, UsageLine } from "./types.js";
 
@@ -370,7 +371,7 @@ export const paymentPlansKind = kind({
     }
     return camelRow(rest);
   },
-  afterWrite: async (tx, row, input) => {
+  afterWrite: async (tx, row, input, ctx, mode) => {
     const installments = input["installments"] as InstallmentInput[] | undefined;
     if (!installments) return;
     const planId = String(row["id"]);
@@ -378,6 +379,9 @@ export const paymentPlansKind = kind({
     await tx.insert(paymentPlanInstallments).values(installments.map((i) => ({
       planId, seq: i.seq, name: i.name, percent: i.percent, triggerType: i.trigger_type, triggerDays: i.trigger_days ?? null, triggerStageId: i.trigger_stage_id ?? null, triggerDate: i.trigger_date ?? null, dueDays: i.due_days ?? null, notes: i.notes ?? null,
     })));
+    // SPEC §8 at every change point (audit E3): the edited installments must still fit every tower the plan is actively assigned to;
+    // a stage the tower lacks → 409 PLAN_STAGES_MISSING and the whole edit rolls back (bookings keep their own plan snapshots)
+    if (mode === "update") await assertPlanFitsActiveAssignments(tx, ctx.companyId, planId, `Editing plan "${String(row["name"] ?? "")}"`);
   },
   toRows: async (db, rows) => {
     const ids = rows.map((r) => String(r["id"]));

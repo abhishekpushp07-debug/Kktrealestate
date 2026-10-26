@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { blockByCode, BOOT_TIMEOUT, bookingBody, bootAcceptance, customerByPhone, flatsOf, getFlat, key, projectByCode, type Booking, type ErrorBody, type Harness, type List } from "./harness.js";
+import { blockByCode, BOOT_TIMEOUT, bookingBody, bootAcceptance, customerByPhone, flatsOf, getFlat, key, listAtCr, projectByCode, type Booking, type ErrorBody, type Harness, type List } from "./harness.js";
 
 /**
  * SPEC §18 scenario 3 (L244): "Two simultaneous bookings for the same flat → exactly one succeeds."
@@ -23,6 +23,7 @@ describe("scenario 3 — two simultaneous bookings of one flat", () => {
     const towerC = await blockByCode(h, admin, sgh.id, "C");
     const flat = (await flatsOf(h, admin, towerC.id)).get("C-1001")!;
     expect(flat.status).toBe("AVAILABLE");
+    await listAtCr(h, admin, [flat.id]);
     const kavita = await customerByPhone(h, admin, "9876543221");
     const sanjay = await customerByPhone(h, admin, "9876543220");
     const [r1, r2] = await Promise.all([
@@ -57,6 +58,7 @@ describe("scenario 3 — two simultaneous bookings of one flat", () => {
     const towerC = await blockByCode(h, admin, sgh.id, "C");
     const flat = (await flatsOf(h, admin, towerC.id)).get("C-1002")!;
     expect(flat.status).toBe("AVAILABLE");
+    await listAtCr(h, admin, [flat.id]);
     const customers = await h.request<List<{ id: string }>>("GET", "/api/v1/customers?page_size=20", { token: admin });
     const ids = customers.body.items.slice(0, 5).map((c) => c.id);
     const results = await Promise.all(ids.map((customerId, i) => h.request<Booking & ErrorBody>("POST", "/api/v1/bookings", { token: i % 2 ? admin : sales, body: bookingBody(h, flat.id, customerId), headers: { "idempotency-key": key() } })));

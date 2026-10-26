@@ -8,6 +8,8 @@ const path = require("node:path");
 const os = require("node:os");
 const ROOT = path.resolve(__dirname, "..", "..", "..");
 const sharp = require(path.join(ROOT, "node_modules", "sharp"));
+const { createAxe } = require("../axe.cjs");
+const axe = createAxe("erp");
 
 const BASE = process.env.ERP_URL || "http://localhost:5173";
 const API = process.env.API_URL || "http://localhost:4000";
@@ -87,7 +89,7 @@ async function login(page, role) {
   reset(page);
 }
 
-/** Horizontal overflow + interactive targets under 44 px (phone). Elements inside tables and dense rows are excluded (secondary targets). */
+/** Horizontal overflow + interactive targets under 48 px (phone; SPEC asks 48 px). Elements inside tables and dense rows are excluded (secondary targets). */
 async function layout(page) {
   return page.evaluate(() => {
     const docW = document.documentElement.scrollWidth, winW = window.innerWidth;
@@ -110,10 +112,10 @@ async function layout(page) {
       if (s.visibility === "hidden" || s.display === "none" || s.opacity === "0") continue;
       if (el.closest("table, [data-dense], [role=grid]")) continue;
       targets += 1;
-      if (r.height < 43.5) {
+      if (r.height < 47.5) {
         const id = el.getAttribute("data-testid") || "";
         const label = (id || el.getAttribute("aria-label") || el.textContent || "").trim().replace(/\s+/g, " ").slice(0, 40);
-        // Primary = buttons/links that carry an action, every tab, and nav links (sidebar, drawer, Back). Switches are toggled through their 44 px label row and breadcrumb crumbs are desktop-only, so they count as secondary.
+        // Primary = buttons/links that carry an action, every tab, and nav links (sidebar, drawer, Back). Switches are toggled through their 48 px label row and breadcrumb crumbs are desktop-only, so they count as secondary.
         const labelled = el.id && document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
         const isSwitch = el.getAttribute("role") === "switch" && Boolean(labelled);
         const crumb = el.tagName === "A" && Boolean(el.closest("ol")) && Boolean(el.closest('nav[aria-label="Breadcrumb"]'));
@@ -153,13 +155,16 @@ async function check(page, name, opts = {}) {
     if (shotCount >= MAX_SHOTS) summary.notes.push(`screenshot budget exhausted at ${name}-${page.width}`);
     else shot = await screenshot(page, typeof opts.shot === "string" ? opts.shot : name);
   }
-  const rec = { name, role: page.role, width: page.width, url: page.url().replace(BASE, ""), errors, failed, allowed: page.col.failed.filter((f) => f.allowed), overflow: lay.overflow ? `${lay.docW}>${lay.winW}` : null, wide: lay.wide, targets: lay.targets, smallPrimary: lay.small.filter((s) => s.primary), smallAll: lay.small.length, small: lay.small, shot, note: opts.note || null };
+  const axeViolations = await axe.scan(page, name, page.width, { exclude: opts.axeExclude });
+  const axeBlocking = axe.blocking(axeViolations);
+  const rec = { name, role: page.role, width: page.width, url: page.url().replace(BASE, ""), axe: axeViolations ? axeViolations.map((v) => `${v.impact}:${v.id}(${v.nodes})`) : null, errors, failed, allowed: page.col.failed.filter((f) => f.allowed), overflow: lay.overflow ? `${lay.docW}>${lay.winW}` : null, wide: lay.wide, targets: lay.targets, smallPrimary: lay.small.filter((s) => s.primary), smallAll: lay.small.length, small: lay.small, shot, note: opts.note || null };
   fs.appendFileSync(RESULTS, JSON.stringify(rec) + "\n");
   summary.checks += 1;
   const flags = [];
   if (errors.length) { flags.push(`console=${errors.length}`); summary.defects.push({ page: `${name}-${page.width}`, kind: "console", detail: errors.join(" | ").slice(0, 500) }); }
   if (failed.length) { flags.push(`failed=${failed.length}`); summary.defects.push({ page: `${name}-${page.width}`, kind: "request", detail: failed.map((f) => `${f.status} ${f.method} ${f.url}${f.error ? " " + f.error : ""}`).join(" | ").slice(0, 500) }); }
   if (lay.overflow && page.width === 390) { flags.push(`OVERFLOW ${lay.docW}>${lay.winW}`); summary.defects.push({ page: `${name}-${page.width}`, kind: "overflow", detail: `${lay.docW}>${lay.winW} ${lay.wide.join("; ")}` }); }
+  if (axeBlocking.length) { flags.push(`axe=${axeBlocking.map((v) => v.id).join(",")}`); summary.defects.push({ page: `${name}-${page.width}`, kind: "axe", detail: axeBlocking.map((v) => `${v.impact} ${v.id} ×${v.nodes}: ${v.targets.slice(0, 3).join(" | ")} — ${v.summary.slice(0, 160)}`).join(" || ").slice(0, 900) }); }
   if (page.width === 390 && rec.smallPrimary.length) { flags.push(`smallPrimary=${rec.smallPrimary.length}`); summary.defects.push({ page: `${name}-${page.width}`, kind: "target", detail: rec.smallPrimary.map((s) => `${s.label} ${s.h}px`).join(", ") }); }
   log(`[${page.width}] ${name} ${rec.url} ${flags.length ? "!! " + flags.join(" ") : "ok"}${shot ? ` shot=${shot.file} (${shot.kb} KB)` : ""}${opts.note ? " · " + opts.note : ""}`);
   for (const e of errors) log("    console:", e.slice(0, 220));
@@ -258,23 +263,28 @@ async function fillMarkdown(page, testId, text) {
 
 /* ------------------------------------------------------------------ API helpers (admin token for setup/verification) */
 
+// Access tokens live ~15 min and a full walk takes longer: tokens are refreshed after 10 minutes and on any 401.
 const tokens = {};
-async function apiLogin(role = "admin") {
-  if (tokens[role]) return tokens[role];
+async function apiLogin(role = "admin", fresh = false) {
+  const cached = tokens[role];
+  if (!fresh && cached && Date.now() - cached.at < 10 * 60_000) return cached.token;
   const res = await fetch(`${API}/api/v1/auth/login`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(CREDS[role]) });
   const body = await res.json();
-  tokens[role] = body.access_token;
+  tokens[role] = { token: body.access_token, at: Date.now() };
   return body.access_token;
 }
-async function apiGet(p, role = "admin") {
-  const res = await fetch(`${API}/api/v1${p}`, { headers: { authorization: `Bearer ${await apiLogin(role)}` } });
+async function apiFetch(p, init, role) {
+  let res = await fetch(`${API}/api/v1${p}`, { ...init, headers: { ...init.headers, authorization: `Bearer ${await apiLogin(role)}` } });
+  if (res.status === 401) res = await fetch(`${API}/api/v1${p}`, { ...init, headers: { ...init.headers, authorization: `Bearer ${await apiLogin(role, true)}` } });
   return { status: res.status, body: await res.json().catch(() => null) };
 }
+async function apiGet(p, role = "admin") {
+  return apiFetch(p, { headers: {} }, role);
+}
 async function apiSend(method, p, body, role = "admin", version) {
-  const headers = { authorization: `Bearer ${await apiLogin(role)}`, "content-type": "application/json", "idempotency-key": crypto.randomUUID() };
+  const headers = { "content-type": "application/json", "idempotency-key": crypto.randomUUID() };
   if (version !== undefined) headers["if-match"] = `"${version}"`;
-  const res = await fetch(`${API}/api/v1${p}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
-  return { status: res.status, body: await res.json().catch(() => null) };
+  return apiFetch(p, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) }, role);
 }
 const PHONE = () => `9${String(Math.floor(Math.random() * 1e9)).padStart(9, "0")}`;
 function aadhaar() {
@@ -404,6 +414,12 @@ async function sectionRoles(browser, ids) {
             await goto(page, "/projects");
             const names = await page.locator("main").innerText();
             expect(!names.includes("Ganesh Green") && names.includes("Shree Ganesh Heights"), "scoped project list shows SGH only", page);
+            // Activity report needs audit.view (the API guards GET /reports/activity with it); Project Admin holds report.view only
+            await goto(page, "/reports");
+            expect((await page.getByTestId("report-card-activity").count()) === 0 && (await page.getByTestId("report-card-collections").count()) === 1, "project admin: reports catalogue hides the Activity report (no audit.view)", page);
+            await goto(page, "/reports/activity");
+            expect((await page.getByText(/don.t have access/i).count()) > 0, "project admin: /reports/activity shows the forbidden page without calling the API", page);
+            await check(page, "reports-activity-forbidden");
           }
           if (role === "sales") {
             await goto(page, `/customers/${ids.rajesh.id}`);
@@ -1848,6 +1864,9 @@ async function sectionSmoke(browser, ids) {
   const mins = ((Date.now() - t0) / 60000).toFixed(1);
   log(`\n==== SUMMARY (${mins} min): ${summary.checks} page checks, ${summary.asserts.pass}/${summary.asserts.pass + summary.asserts.fail} assertions passed, ${summary.shots} screenshots, ${summary.defects.length} defects`);
   for (const d of summary.defects) log(`  - [${d.kind}] ${d.page}: ${d.detail}`);
+  log("\n==== ACCESSIBILITY (axe)\n" + axe.markdown());
+  summary.axe = axe.summary();
+  fs.writeFileSync(path.join(TMP, "axe.json"), JSON.stringify(axe.pages, null, 2));
   fs.writeFileSync(path.join(TMP, "summary.json"), JSON.stringify(summary, null, 2));
   log(`summary.json: ${path.join(TMP, "summary.json")}`);
 })().catch((e) => { console.error("FATAL", e); process.exit(1); });

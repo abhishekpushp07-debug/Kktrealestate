@@ -33,7 +33,7 @@ function SectionTable<T>({ title, rows, columns, total, empty }: { title: string
         {rows.length === 0 ? (
           <p className="px-4 py-6 text-center text-xs text-ink-subtle">{empty}</p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Scrollable table">
             <table className="w-full min-w-[20rem] text-sm">
               <thead>
                 <tr className="border-b border-border bg-surface text-left text-2xs uppercase tracking-wider text-ink-subtle">

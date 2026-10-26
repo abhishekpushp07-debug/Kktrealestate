@@ -7,17 +7,13 @@ import { Platform } from "react-native";
 import { api, ApiError, session } from "@/api/client";
 import { clearPersistedCache, queryClient, keys } from "@/api/queries";
 import { kvStorage } from "@/lib/storage";
+import { toLoginFailure, type LoginFailure } from "./loginFailure";
 
 const USER_KEY = "kkt.portal.user";
 
 export type AuthStatus = "booting" | "anonymous" | "authenticated";
 
-export interface LoginFailure {
-  code: "INVALID_CREDENTIALS" | "LOCKED" | "RATE_LIMITED" | "VALIDATION" | "NETWORK" | "OTHER";
-  message: string;
-  lockedUntil?: string;
-  retryAfterSeconds?: number;
-}
+export type { LoginFailure } from "./loginFailure";
 
 interface AuthContextValue {
   status: AuthStatus;
@@ -44,23 +40,6 @@ function deviceName(): string {
     return `${browser} on web`;
   }
   return Platform.OS === "ios" ? "iPhone app" : "Android app";
-}
-
-function toFailure(e: unknown): LoginFailure {
-  if (e instanceof ApiError) {
-    if (e.code === "INVALID_CREDENTIALS" || e.status === 401) return { code: "INVALID_CREDENTIALS", message: "That phone number and password don't match." };
-    if (e.code === "LOCKED" || e.status === 423) {
-      const lockedUntil = typeof e.details.locked_until === "string" ? e.details.locked_until : undefined;
-      return { code: "LOCKED", message: e.message || "Too many failed attempts. Your account is locked for a while.", lockedUntil };
-    }
-    if (e.code === "RATE_LIMITED" || e.status === 429) {
-      return { code: "RATE_LIMITED", message: e.message || "Too many attempts. Please wait a minute and try again.", retryAfterSeconds: e.retryAfterSeconds };
-    }
-    if (e.code === "VALIDATION_ERROR") return { code: "VALIDATION", message: "Enter a valid 10-digit mobile number and your password." };
-    if (e.isNetwork) return { code: "NETWORK", message: e.message };
-    return { code: "OTHER", message: e.message };
-  }
-  return { code: "OTHER", message: "Something went wrong. Please try again." };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }): React.JSX.Element {
@@ -148,7 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
         setStatus("authenticated");
         return { ok: true };
       } catch (e) {
-        return { ok: false, failure: toFailure(e) };
+        return { ok: false, failure: toLoginFailure(e) };
       }
     },
     [persistUser],

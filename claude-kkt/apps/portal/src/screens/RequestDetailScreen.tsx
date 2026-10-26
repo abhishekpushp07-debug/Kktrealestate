@@ -120,7 +120,7 @@ function Detail({ d }: { d: PortalRequestDetailResponse }): React.JSX.Element {
       {!closed || d.status === "RESOLVED" ? (
         <Card style={{ gap: space.md }}>
           <T variant="h3">{d.status === "RESOLVED" ? "Add a note" : "Reply"}</T>
-          <Field value={body} onChangeText={setBody} placeholder="Write your message…" multiline maxLength={5000} />
+          <Field accessibilityLabel="Your message" value={body} onChangeText={setBody} placeholder="Write your message…" multiline maxLength={5000} />
           <AttachmentPicker files={files} onChange={setFiles} onError={(m) => toast.error(m)} max={10} />
           <Button title="Send" icon="chat" variant="primary" loading={reply.isPending} onPress={() => void send()} />
         </Card>
@@ -142,7 +142,7 @@ function Detail({ d }: { d: PortalRequestDetailResponse }): React.JSX.Element {
           <StarRating value={rating} onChange={d.can_rate ? setRating : undefined} />
           {d.can_rate ? (
             <>
-              <Field value={comment} onChangeText={setComment} placeholder="Anything we should know? (optional)" multiline maxLength={1000} />
+              <Field accessibilityLabel="Rating comment (optional)" value={comment} onChangeText={setComment} placeholder="Anything we should know? (optional)" multiline maxLength={1000} />
               <Button title={d.rating ? "Update rating" : "Submit rating"} variant="gold" loading={rate.isPending} onPress={() => void doRate()} />
             </>
           ) : null}
@@ -150,7 +150,7 @@ function Detail({ d }: { d: PortalRequestDetailResponse }): React.JSX.Element {
       ) : null}
 
       <Sheet visible={reopenOpen} onClose={() => setReopenOpen(false)} title="Reopen request" subtitle="Tell us what's still pending">
-        <Field value={reason} onChangeText={setReason} placeholder="e.g. The leak has started again after the repair." multiline maxLength={500} />
+        <Field accessibilityLabel="Reason for reopening" value={reason} onChangeText={setReason} placeholder="e.g. The leak has started again after the repair." multiline maxLength={500} />
         <View style={styles.sheetActions}>
           <Button title="Cancel" variant="outline" onPress={() => setReopenOpen(false)} />
           <Button title="Reopen" variant="primary" loading={reopen.isPending} onPress={() => void doReopen()} />
@@ -178,7 +178,7 @@ function Bubble({ m, onOpenImage }: { m: PortalRequestMessage; onOpenImage: (uri
     <View style={[styles.bubbleRow, mine ? styles.bubbleRowMine : null]}>
       <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleStaff]}>
         <View style={styles.bubbleHead}>
-          <T variant="caption" color={mine ? colors.onNavyMuted : colors.gold700}>
+          <T variant="caption" color={mine ? colors.onNavyMuted : colors.goldText}>
             {mine ? "You" : m.author_name}
           </T>
           <T variant="caption" color={mine ? colors.onNavySubtle : colors.inkSubtle}>

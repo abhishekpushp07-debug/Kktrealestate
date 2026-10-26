@@ -43,7 +43,7 @@ export function Lightbox({ images, index, onClose, onIndexChange }: { images: Re
   return (
     <Modal visible transparent={false} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <GestureHandlerRootView style={styles.root}>
-        <ZoomableImage key={current.uri} ref={zoom} uri={current.uri} onSwipe={go} onSingleTap={() => setChromeVisible((v) => !v)} />
+        <ZoomableImage key={current.uri} ref={zoom} uri={current.uri} alt={current.caption ?? "Photo"} onSwipe={go} onSingleTap={() => setChromeVisible((v) => !v)} />
         {chromeVisible ? (
           <>
             <View style={[styles.top, { paddingTop: Math.max(insets.top, 12) }]}>

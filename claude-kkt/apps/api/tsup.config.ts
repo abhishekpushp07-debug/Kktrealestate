@@ -1,7 +1,9 @@
 import { cp } from "node:fs/promises";
 import { defineConfig } from "tsup";
 export default defineConfig({
-  entry: ["src/server.ts", "src/worker.ts", "src/modules/*/index.ts"],
+  // pdfWorker: the PDF worker-thread entry (modules/reports/services/pdfPool.ts loads dist/modules/reports/services/pdfWorker.js, so a
+  // worker thread only loads pdfkit + the renderer instead of the whole reports module graph and the app config).
+  entry: ["src/server.ts", "src/worker.ts", "src/modules/*/index.ts", "src/modules/reports/services/pdfWorker.ts"],
   outDir: "dist",
   splitting: true,
   format: ["esm"],

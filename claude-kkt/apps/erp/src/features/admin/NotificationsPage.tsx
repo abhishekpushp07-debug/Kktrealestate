@@ -99,7 +99,7 @@ export default function NotificationsPage() {
                   className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-navy-50/70 focus-ring-inset"
                   data-testid={`notification-${item.id}`}
                 >
-                  <span className={cn("mt-2 size-2 shrink-0 rounded-full", item.is_read ? "bg-border" : "bg-gold")} aria-label={item.is_read ? "Read" : "Unread"} />
+                  <span className={cn("mt-2 size-2 shrink-0 rounded-full", item.is_read ? "bg-border" : "bg-gold")} role="img" aria-label={item.is_read ? "Read" : "Unread"} />
                   <span className="min-w-0 flex-1">
                     <span className="flex flex-wrap items-center gap-2">
                       <span className={cn("truncate text-sm", item.is_read ? "text-ink" : "font-semibold text-navy-950")}>{item.title}</span>

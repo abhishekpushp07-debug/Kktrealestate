@@ -119,10 +119,10 @@ function ChangesTab() {
             <Combobox aria-label="Actor" size="sm" className="w-full sm:w-48" value={list.filters.actor_id ?? null} onValueChange={(value) => list.setFilter("actor_id", value)} options={userOptions} placeholder="Any actor" allowClear data-testid="audit-filter-actor" />
             <Select aria-label="Actor type" size="sm" className="w-full sm:w-32" value={list.filters.actor_type ?? null} onValueChange={(value) => list.setFilter("actor_type", value)} options={ACTOR_TYPES.map((value) => ({ value, label: ACTOR_TYPE_LABELS[value] }))} placeholder="Actor type" allowClear data-testid="audit-filter-actor-type" />
             <div className="w-full sm:w-40">
-              <DateInput aria-label="From" value={list.filters.from ?? null} onChange={(value) => list.setFilter("from", value)} className="h-11 text-xs sm:h-8" max={list.filters.to} data-testid="audit-filter-from" />
+              <DateInput aria-label="From" value={list.filters.from ?? null} onChange={(value) => list.setFilter("from", value)} className="h-12 text-xs sm:h-8" max={list.filters.to} data-testid="audit-filter-from" />
             </div>
             <div className="w-full sm:w-40">
-              <DateInput aria-label="To" value={list.filters.to ?? null} onChange={(value) => list.setFilter("to", value)} className="h-11 text-xs sm:h-8" min={list.filters.from} data-testid="audit-filter-to" />
+              <DateInput aria-label="To" value={list.filters.to ?? null} onChange={(value) => list.setFilter("to", value)} className="h-12 text-xs sm:h-8" min={list.filters.from} data-testid="audit-filter-to" />
             </div>
           </>
         }
@@ -279,10 +279,10 @@ function LoginEventsTab() {
               data-testid="login-filter-success"
             />
             <div className="w-full sm:w-40">
-              <DateInput aria-label="From" value={list.filters.from ?? null} onChange={(value) => list.setFilter("from", value)} className="h-11 text-xs sm:h-8" data-testid="login-filter-from" />
+              <DateInput aria-label="From" value={list.filters.from ?? null} onChange={(value) => list.setFilter("from", value)} className="h-12 text-xs sm:h-8" data-testid="login-filter-from" />
             </div>
             <div className="w-full sm:w-40">
-              <DateInput aria-label="To" value={list.filters.to ?? null} onChange={(value) => list.setFilter("to", value)} className="h-11 text-xs sm:h-8" data-testid="login-filter-to" />
+              <DateInput aria-label="To" value={list.filters.to ?? null} onChange={(value) => list.setFilter("to", value)} className="h-12 text-xs sm:h-8" data-testid="login-filter-to" />
             </div>
           </>
         }

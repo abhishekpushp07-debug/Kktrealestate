@@ -134,11 +134,11 @@ function TicketView({ ticket }: { ticket: ServiceRequestDetailResponse }) {
               <div className="flex items-start gap-2">
                 <Contact className="mt-0.5 size-4 shrink-0 text-gold-text" aria-hidden="true" />
                 <div className="min-w-0">
-                  <Link to={`/customers/${ticket.customer_id}`} className="font-semibold text-navy-800 hover:underline focus-ring rounded-xs" data-testid="ticket-customer-link">
+                  <Link to={`/customers/${ticket.customer_id}`} className="inline-flex min-h-6 items-center font-semibold text-navy-800 hover:underline focus-ring rounded-xs" data-testid="ticket-customer-link">
                     {ticket.customer_name}
                   </Link>
                   <p className="money text-xs text-ink-muted">
-                    <a href={`tel:${ticket.customer_phone}`} className="hover:underline">
+                    <a href={`tel:${ticket.customer_phone}`} className="inline-flex min-h-6 items-center hover:underline">
                       {formatPhone(ticket.customer_phone)}
                     </a>
                   </p>

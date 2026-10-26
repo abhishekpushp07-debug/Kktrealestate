@@ -11,6 +11,7 @@ import {
 } from "react-hook-form";
 import { describeError, isApiClientError } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { FieldAriaContext } from "./field-context";
 import { Label } from "./label";
 
 /* ------------------------------------------------------------------ */
@@ -60,7 +61,7 @@ export function FieldWrapper({ label, hint, error, required, id, className, hori
         </Label>
       )}
       <div className="min-w-0">
-        {typeof children === "function" ? children(control) : children}
+        <FieldAriaContext.Provider value={control}>{typeof children === "function" ? children(control) : children}</FieldAriaContext.Provider>
         {error ? (
           <p id={errorId} role="alert" className="mt-1 flex items-start gap-1 text-xs font-medium text-danger-fg">
             <CircleAlert className="mt-px size-3.5 shrink-0" aria-hidden="true" />

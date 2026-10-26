@@ -24,7 +24,7 @@ export default function CmsLayout() {
                 data-testid={`cms-tab-${item.id}`}
                 className={({ isActive }) =>
                   cn(
-                    "inline-flex h-11 items-center gap-1.5 whitespace-nowrap rounded-full border px-4 text-sm font-medium transition-colors focus-ring",
+                    "inline-flex h-12 items-center gap-1.5 whitespace-nowrap rounded-full border px-4 text-sm font-medium transition-colors focus-ring",
                     isActive ? "border-navy-950 bg-navy-950 text-white" : "border-border bg-card text-ink-muted hover:border-navy-300 hover:text-navy-950",
                   )
                 }

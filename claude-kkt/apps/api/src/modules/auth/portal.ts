@@ -1,7 +1,7 @@
 import { count, eq, or, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { IdSchema, LogoutSchema, OkResponseSchema, PASSWORD_POLICY, PortalChangePasswordSchema, PortalLoginResponseSchema, PortalLoginSchema, PortalRefreshSchema, PortalSessionRowSchema, PortalUserSchema, type PortalUser } from "@kkt/contracts";
+import { IdSchema, LogoutSchema, OkResponseSchema, PortalChangePasswordSchema, PortalLoginResponseSchema, PortalLoginSchema, PortalRefreshSchema, PortalSessionRowSchema, PortalUserSchema, type PortalUser } from "@kkt/contracts";
 import { bookingCoApplicants, bookings, customers, portalUsers, type Executor } from "@kkt/db";
 import { normalizeIndianPhone } from "@kkt/domain";
 import { writeAudit } from "../../lib/audit.js";
@@ -9,7 +9,12 @@ import { bumpPermVersion } from "../../lib/cache.js";
 import { ApiError } from "../../lib/errors.js";
 import { hashPassword, verifyPassword } from "../../lib/password.js";
 import { route } from "../../lib/routes.js";
-import { applyPortalFailure, assertNotLocked, createSession, familyOfSession, listSessions, newPasswordHash, recordLoginEvent, revokeAllFamilies, revokeFamily, rotateRefresh } from "./service.js";
+import { assertLoginAllowed, createSession, failLogin, familyOfSession, listSessions, newPasswordHash, recordLoginEvent, revokeAllFamilies, revokeFamily, rotateRefresh } from "./service.js";
+import { resetPointOf } from "./lockout.js";
+import { securityRedis } from "../../plugins/auth.js";
+
+/** The one message of a failed customer sign-in (unknown phone and wrong password alike). */
+const INVALID_PORTAL_LOGIN = "Invalid phone number or password";
 
 let dummy: Promise<string> | null = null;
 /** A throw-away argon2 hash used to equalise the timing of unknown-phone and wrong-password failures. */
@@ -51,34 +56,31 @@ export async function portalAuthRoutes(app: FastifyInstance): Promise<void> {
     handler: async (req) => {
       const phone = normalizeIndianPhone(req.body.phone) ?? req.body.phone;
       const [pu] = await app.db.select().from(portalUsers).where(eq(portalUsers.phone, phone)).limit(1);
-      if (!pu) {
-        await verifyPassword(await dummyHash(), req.body.password); // same argon2 cost as a wrong password: no enumeration oracle
-        await recordLoginEvent(app.db, { companyId: null, subjectType: "CUSTOMER", identifier: phone, success: false, reason: "UNKNOWN_USER", req });
-        throw new ApiError(401, "INVALID_CREDENTIALS", "Invalid phone number or password");
-      }
-      assertNotLocked(pu);
-      if (!(await verifyPassword(pu.passwordHash, req.body.password))) {
-        const next = await app.db.transaction(async (tx) => {
-          const n = await applyPortalFailure(tx, pu);
-          await recordLoginEvent(tx, { companyId: pu.companyId, subjectType: "CUSTOMER", identifier: phone, success: false, reason: n.justLocked ? "LOCKED" : "BAD_PASSWORD", req });
-          if (n.justLocked) await writeAudit(tx, { companyId: pu.companyId, actor: { type: "SYSTEM", id: null, name: "lockout" }, action: "portal_auth.locked", entityType: "portal_user", entityId: pu.id, after: { locked_until: n.lockedUntil }, ip: req.clientIp, requestId: req.id });
-          return n;
+      const target = { subjectType: "CUSTOMER" as const, identifier: phone, ip: req.clientIp, resetAt: resetPointOf(pu) };
+      const account = pu ? { type: "CUSTOMER" as const, id: pu.id, companyId: pu.companyId, lockedUntil: pu.lockedUntil, label: pu.phone, link: `/customers/${pu.customerId}` } : null;
+      // Same lock checks, same argon2 cost and same answers whether or not the phone has a portal login (no enumeration oracle).
+      const release = await assertLoginAllowed(app.db, req, target, account);
+      try {
+        if (!pu || !account) {
+          await verifyPassword(await dummyHash(), req.body.password);
+          return await failLogin(app, req, target, null, "BAD_PASSWORD", INVALID_PORTAL_LOGIN);
+        }
+        if (!(await verifyPassword(pu.passwordHash, req.body.password))) return await failLogin(app, req, target, account, "BAD_PASSWORD", INVALID_PORTAL_LOGIN);
+        if (!pu.isEnabled) {
+          await recordLoginEvent(app.db, { companyId: pu.companyId, subjectType: "CUSTOMER", identifier: phone, success: false, reason: "DISABLED", req });
+          throw ApiError.unauthenticated("Portal access is disabled", "USER_INACTIVE");
+        }
+        return await app.db.transaction(async (tx) => {
+          const tokens = await createSession(tx, { type: "CUSTOMER", id: pu.id, companyId: pu.companyId, aud: "portal" }, req, { mfa: false, mustChangePassword: pu.mustChangePassword });
+          await tx.update(portalUsers).set({ failedAttempts: 0, lockedUntil: null, lastLoginAt: new Date() }).where(eq(portalUsers.id, pu.id));
+          await recordLoginEvent(tx, { companyId: pu.companyId, subjectType: "CUSTOMER", identifier: phone, success: true, reason: null, req });
+          const user = await portalUserView(tx, pu.id);
+          await writeAudit(tx, { companyId: pu.companyId, actor: { type: "CUSTOMER", id: pu.customerId, name: user.full_name }, action: "portal_auth.login", entityType: "portal_user", entityId: pu.id, after: { session_id: tokens.family_id }, ip: req.clientIp, requestId: req.id });
+          return { access_token: tokens.access_token, refresh_token: tokens.refresh_token, token_type: tokens.token_type, expires_in: tokens.expires_in, audience: tokens.audience, user };
         });
-        if (next.justLocked) throw ApiError.locked(`Account locked for ${PASSWORD_POLICY.lockout_minutes} minutes after ${PASSWORD_POLICY.lockout_attempts} failed attempts`, { locked_until: next.lockedUntil!.toISOString() });
-        throw new ApiError(401, "INVALID_CREDENTIALS", "Invalid phone number or password");
+      } finally {
+        release();
       }
-      if (!pu.isEnabled) {
-        await recordLoginEvent(app.db, { companyId: pu.companyId, subjectType: "CUSTOMER", identifier: phone, success: false, reason: "DISABLED", req });
-        throw ApiError.unauthenticated("Portal access is disabled", "USER_INACTIVE");
-      }
-      return app.db.transaction(async (tx) => {
-        const tokens = await createSession(tx, { type: "CUSTOMER", id: pu.id, companyId: pu.companyId, aud: "portal" }, req, { mfa: false, mustChangePassword: pu.mustChangePassword });
-        await tx.update(portalUsers).set({ failedAttempts: 0, lockedUntil: null, lastLoginAt: new Date() }).where(eq(portalUsers.id, pu.id));
-        await recordLoginEvent(tx, { companyId: pu.companyId, subjectType: "CUSTOMER", identifier: phone, success: true, reason: null, req });
-        const user = await portalUserView(tx, pu.id);
-        await writeAudit(tx, { companyId: pu.companyId, actor: { type: "CUSTOMER", id: pu.customerId, name: user.full_name }, action: "portal_auth.login", entityType: "portal_user", entityId: pu.id, after: { session_id: tokens.family_id }, ip: req.clientIp, requestId: req.id });
-        return { access_token: tokens.access_token, refresh_token: tokens.refresh_token, token_type: tokens.token_type, expires_in: tokens.expires_in, audience: tokens.audience, user };
-      });
     },
   });
 
@@ -102,7 +104,7 @@ export async function portalAuthRoutes(app: FastifyInstance): Promise<void> {
       const c = req.customer!;
       const all = req.body?.all_devices === true;
       await app.db.transaction(async (tx) => {
-        const n = all ? await revokeAllFamilies(tx, app.redis, "CUSTOMER", c.portalUserId, "LOGOUT_ALL") : await revokeFamily(tx, app.redis, c.sessionId, "LOGOUT");
+        const n = all ? await revokeAllFamilies(tx, securityRedis(app), "CUSTOMER", c.portalUserId, "LOGOUT_ALL") : await revokeFamily(tx, securityRedis(app), c.sessionId, "LOGOUT");
         await writeAudit(tx, { companyId: c.companyId, actor: { type: "CUSTOMER", id: c.customerId, name: c.name }, action: all ? "portal_auth.logout_all" : "portal_auth.logout", entityType: "portal_user", entityId: c.portalUserId, after: { sessions_revoked: n }, ip: req.clientIp, requestId: req.id });
       });
       return reply.code(204).send();
@@ -126,7 +128,7 @@ export async function portalAuthRoutes(app: FastifyInstance): Promise<void> {
         if (!(await verifyPassword(pu.passwordHash, req.body.current_password))) throw new ApiError(401, "INVALID_CREDENTIALS", "Current password is incorrect");
         const hash = await newPasswordHash(tx, "CUSTOMER", pu.id, pu.passwordHash, req.body.new_password);
         await tx.update(portalUsers).set({ passwordHash: hash, mustChangePassword: false }).where(eq(portalUsers.id, pu.id));
-        await revokeAllFamilies(tx, app.redis, "CUSTOMER", pu.id, "PASSWORD_CHANGED", c.sessionId);
+        await revokeAllFamilies(tx, securityRedis(app), "CUSTOMER", pu.id, "PASSWORD_CHANGED", c.sessionId);
         await writeAudit(tx, { companyId: c.companyId, actor: { type: "CUSTOMER", id: c.customerId, name: c.name }, action: "portal_auth.password_changed", entityType: "portal_user", entityId: pu.id, ip: req.clientIp, requestId: req.id });
       });
       await bumpPermVersion(app.redis);
@@ -147,7 +149,7 @@ export async function portalAuthRoutes(app: FastifyInstance): Promise<void> {
       const c = req.customer!;
       await app.db.transaction(async (tx) => {
         const family = await familyOfSession(tx, "CUSTOMER", c.portalUserId, req.params.id);
-        await revokeFamily(tx, app.redis, family, "REVOKED_BY_USER");
+        await revokeFamily(tx, securityRedis(app), family, "REVOKED_BY_USER");
         await writeAudit(tx, { companyId: c.companyId, actor: { type: "CUSTOMER", id: c.customerId, name: c.name }, action: "portal_auth.session_revoked", entityType: "portal_user", entityId: c.portalUserId, after: { family_id: family }, ip: req.clientIp, requestId: req.id });
       });
       return reply.code(204).send();
@@ -160,7 +162,7 @@ export async function portalAuthRoutes(app: FastifyInstance): Promise<void> {
     handler: async (req) => {
       const c = req.customer!;
       return app.db.transaction(async (tx) => {
-        const revoked = await revokeAllFamilies(tx, app.redis, "CUSTOMER", c.portalUserId, "REVOKED_OTHERS", c.sessionId);
+        const revoked = await revokeAllFamilies(tx, securityRedis(app), "CUSTOMER", c.portalUserId, "REVOKED_OTHERS", c.sessionId);
         await writeAudit(tx, { companyId: c.companyId, actor: { type: "CUSTOMER", id: c.customerId, name: c.name }, action: "portal_auth.sessions_revoked_others", entityType: "portal_user", entityId: c.portalUserId, after: { revoked }, ip: req.clientIp, requestId: req.id });
         return { revoked };
       });

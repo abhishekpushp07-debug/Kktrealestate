@@ -1,0 +1,131 @@
+# promtool test rules infra/prometheus/alerts.test.yml   (CI: .github/workflows/ci.yml "infra" job)
+rule_files: [alerts.yml]
+evaluation_interval: 30s
+tests:
+  - interval: 30s
+    input_series:
+      # 3% of requests fail with 500 (503 load shedding does not count)
+      - series: 'http_requests_total{job="kkt-api", route="/api/v1/bookings", method="GET", status="200"}'
+        values: "0+97x40"
+      - series: 'http_requests_total{job="kkt-api", route="/api/v1/bookings", method="GET", status="500"}'
+        values: "0+3x40"
+      - series: 'http_requests_total{job="kkt-api", route="/api/v1/bookings", method="GET", status="503"}'
+        values: "0+50x40"
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: KktApi5xxRateHigh
+        exp_alerts:
+          - exp_labels: { severity: warning, component: api }
+            exp_annotations:
+              summary: "More than 1% of API requests fail with 5xx"
+              description: "5xx ratio 2% over 5 minutes. The error webhook carries request ids; search the logs by request_id / trace_id."
+      - eval_time: 15m
+        alertname: KktApi5xxRateCritical
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'kkt_integrity_findings{job="kkt-api", instance="api-1"}'
+        values: "0 0 2 2 2 2 2 2 2 2"
+      # as scraped: the target label job="kkt-api" next to the metric's own job_name
+      - series: 'kkt_job_failures_24h{job="kkt-api", job_name="DAILY_DUES", instance="api-1"}'
+        values: "1x10"
+      - series: 'kkt_db_up{job="kkt-api", instance="api-1"}'
+        values: "1 1 0 0 0 0"
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: KktIntegrityFindings
+        exp_alerts:
+          - exp_labels: { severity: critical, component: money }
+            exp_annotations:
+              summary: "The integrity report has 2 finding(s)"
+              description: "Ledger/summary/demand mismatches. ERP → Admin → Integrity lists them; repair is audited. Money is never auto-corrected."
+      - eval_time: 9m
+        alertname: KktJobFailed
+        exp_alerts:
+          - exp_labels: { severity: warning, component: jobs, job_name: DAILY_DUES }
+            exp_annotations:
+              summary: "Job DAILY_DUES failed in the last 24 h"
+              description: "1 FAILED run(s) in job_runs. ERP → Admin → Jobs shows the error; re-run after fixing (failed runs are retried with backoff first)."
+      - eval_time: 5m
+        alertname: KktDbDown
+        exp_alerts:
+          - exp_labels: { severity: critical, component: database }
+            exp_annotations:
+              summary: "The API cannot query Postgres"
+              description: "Readiness fails, so the load balancer stops sending traffic. Check postgres and pgbouncer containers."
+
+  - interval: 1m
+    input_series:
+      # slow route: every request takes ~0.6 s; a fast route stays under 50 ms
+      - series: 'http_request_duration_seconds_bucket{job="kkt-api", route="/api/v1/bookings", method="GET", status="200", le="0.3"}'
+        values: "0+0x20"
+      - series: 'http_request_duration_seconds_bucket{job="kkt-api", route="/api/v1/bookings", method="GET", status="200", le="1"}'
+        values: "0+60x20"
+      - series: 'http_request_duration_seconds_bucket{job="kkt-api", route="/api/v1/bookings", method="GET", status="200", le="+Inf"}'
+        values: "0+60x20"
+      - series: 'http_requests_total{job="kkt-api", route="/api/v1/bookings", method="GET", status="200"}'
+        values: "0+60x20"
+      - series: 'http_request_duration_seconds_bucket{job="kkt-api", route="/api/v1/projects", method="GET", status="200", le="0.05"}'
+        values: "0+60x20"
+      - series: 'http_request_duration_seconds_bucket{job="kkt-api", route="/api/v1/projects", method="GET", status="200", le="+Inf"}'
+        values: "0+60x20"
+      - series: 'http_requests_total{job="kkt-api", route="/api/v1/projects", method="GET", status="200"}'
+        values: "0+60x20"
+      - series: 'kkt_backup_last_success_timestamp_seconds{job="node"}'
+        values: "0x20"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: KktApiLatencyP95High
+        exp_alerts:
+          - exp_labels: { severity: warning, component: api, route: /api/v1/bookings }
+            exp_annotations:
+              summary: "p95 latency of /api/v1/bookings is above 300 ms"
+              description: "p95 965ms for 10 minutes (target: list pages < 300 ms). Check the route's trace and pg_stat_statements."
+      - eval_time: 20m
+        alertname: KktBackupStale
+        exp_alerts: []
+
+  # a daily job that stopped succeeding (labels as scraped: job is the target, job_name the job)
+  - interval: 1h
+    input_series:
+      - series: 'kkt_job_last_success_timestamp_seconds{job="kkt-api", job_name="DAILY_DUES", instance="api-1"}'
+        values: "0x30"
+      - series: 'kkt_job_last_success_timestamp_seconds{job="kkt-api", job_name="NIGHTLY_INTEGRITY", instance="api-1"}'
+        values: "100000x30"
+    alert_rule_test:
+      - eval_time: 28h
+        alertname: KktDailyJobStale
+        exp_alerts:
+          - exp_labels: { severity: critical, component: jobs, job_name: DAILY_DUES }
+            exp_annotations:
+              summary: "DAILY_DUES has not succeeded for more than 26 hours"
+              description: "Time-triggered dues or the integrity report did not run. Is the worker container running? Check `docker compose logs worker`."
+
+  # two API replicas report the same database-wide connection counts: 90 + 60 of 200 is 75% (no alert), 120 + 60 is 90% (alert);
+  # summing across replicas would have doubled both
+  - interval: 1m
+    input_series:
+      - series: 'kkt_db_connections{job="kkt-api", instance="api-1", state="active"}'
+        values: "90x10 120x10"
+      - series: 'kkt_db_connections{job="kkt-api", instance="api-2", state="active"}'
+        values: "90x10 120x10"
+      - series: 'kkt_db_connections{job="kkt-api", instance="api-1", state="idle"}'
+        values: "60x20"
+      - series: 'kkt_db_connections{job="kkt-api", instance="api-2", state="idle"}'
+        values: "60x20"
+      - series: 'kkt_db_max_connections{job="kkt-api", instance="api-1"}'
+        values: "200x20"
+      - series: 'kkt_db_max_connections{job="kkt-api", instance="api-2"}'
+        values: "200x20"
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: KktDbPoolSaturation
+        exp_alerts: []
+      - eval_time: 19m
+        alertname: KktDbPoolSaturation
+        exp_alerts:
+          - exp_labels: { severity: warning, component: database }
+            exp_annotations:
+              summary: "Postgres connections above 80% of max_connections"
+              description: "90% in use. Lower DATABASE_POOL_MAX × workers × replicas, or route through PgBouncer (docs/CAPACITY.md)."

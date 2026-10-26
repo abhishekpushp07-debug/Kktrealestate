@@ -29,8 +29,9 @@ const palette: Record<ButtonVariant, { bg: string; fg: string; border: string; p
 };
 
 const sizes: Record<ButtonSize, { h: number; px: number; font: number; icon: number }> = {
-  sm: { h: 40, px: 14, font: 13, icon: 16 },
-  md: { h: 46, px: 18, font: 15, icon: 18 },
+  // every size is ≥ 48 px tall (SPEC §15/§16 tap targets); sm only narrows padding and type
+  sm: { h: 48, px: 14, font: 13, icon: 16 },
+  md: { h: 48, px: 18, font: 15, icon: 18 },
   lg: { h: 54, px: 22, font: 16, icon: 20 },
 };
 
@@ -73,7 +74,7 @@ export function Button({ title, variant = "primary", size = "md", icon, iconRigh
 }
 
 /** Round icon-only button (header actions, close buttons). */
-export function IconButton({ name, onPress, color = colors.navy, bg = "transparent", size = 40, iconSize = 22, label, style, disabled }: { name: IconName; onPress?: () => void; color?: string; bg?: string; size?: number; iconSize?: number; label: string; style?: StyleProp<ViewStyle>; disabled?: boolean }): React.JSX.Element {
+export function IconButton({ name, onPress, color = colors.navy, bg = "transparent", size = 44, iconSize = 22, label, style, disabled }: { name: IconName; onPress?: () => void; color?: string; bg?: string; size?: number; iconSize?: number; label: string; style?: StyleProp<ViewStyle>; disabled?: boolean }): React.JSX.Element {
   return (
     <Pressable
       accessibilityRole="button"

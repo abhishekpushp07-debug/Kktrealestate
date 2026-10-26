@@ -56,7 +56,7 @@ export function ConstructionTab({ project, blocks }: ConstructionTabProps) {
           <>
             <p className="text-xs text-ink-subtle">
               Showing <span className="font-semibold text-ink">{current.name}</span> ·{" "}
-              <Link to={`/blocks/${current.id}?tab=construction`} className="text-navy-700 hover:underline">
+              <Link to={`/blocks/${current.id}?tab=construction`} className="text-navy-700 underline underline-offset-2 hover:text-navy-950">
                 Open block
               </Link>
             </p>

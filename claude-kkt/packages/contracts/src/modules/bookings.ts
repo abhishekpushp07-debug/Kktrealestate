@@ -59,6 +59,11 @@ const BookingBase = z.strictObject({
   sales_user_id: IdSchema.optional().nullable(),
   broker_name: z.string().trim().max(120).optional().nullable(),
   remarks: TextSchema.optional().nullable(),
+  /**
+   * Required when agreement_value_paise differs from the flat's current list price (flats.price_paise); the caller then also needs
+   * agreement.edit. Without both the API answers 422 BUSINESS_RULE (details.rule PRICE_DEVIATION_NOT_ALLOWED).
+   */
+  price_deviation_reason: ReasonSchema.optional().nullable(),
 });
 
 /** Create a booking (atomic flat lock; Idempotency-Key accepted). */
@@ -91,7 +96,11 @@ export const BookingCreateSchema = BookingBase.superRefine((b, ctx) => {
 });
 export type BookingCreate = z.infer<typeof BookingCreateSchema>;
 
-/** Wizard draft autosave: a partial, unvalidated payload plus the current step. */
+/**
+ * Wizard draft autosave: a partial, unvalidated payload plus the current step. The client generates the draft id (uuid) once when the
+ * wizard starts and sends it on every save: the server upserts by (id, user), so retries never create duplicates. (Omitting id still
+ * creates a new draft, for older clients.)
+ */
 export const BookingDraftUpsertSchema = z.strictObject({
   id: IdSchema.optional(),
   step: z.int().min(1).max(6),
@@ -129,6 +138,21 @@ export const FlatSnapshotSchema = z.object({
   areas: z.array(AreaSnapshotSchema),
 });
 export type FlatSnapshot = z.infer<typeof FlatSnapshotSchema>;
+
+/**
+ * List-row flat snapshot (GET /bookings): the rooms / areas / price breakup arrays are only sent on the booking detail, so a
+ * 25-row page stays small. Every other snapshot field is present on both.
+ */
+export const BookingRowFlatSnapshotSchema = FlatSnapshotSchema.extend({
+  price_breakup: z.array(MoneyBreakupLineSchema).optional(),
+  rooms: z.array(RoomSnapshotSchema).optional(),
+  areas: z.array(AreaSnapshotSchema).optional(),
+});
+export type BookingRowFlatSnapshot = z.infer<typeof BookingRowFlatSnapshotSchema>;
+
+/** List-row plan snapshot (GET /bookings compact view): the plan name; code, type, grace days and installments are on full rows and the detail. */
+export const BookingRowPlanSnapshotSchema = PlanSnapshotSchema.partial({ plan_id: true, code: true, plan_type: true, grace_days: true, installments: true });
+export type BookingRowPlanSnapshot = z.infer<typeof BookingRowPlanSnapshotSchema>;
 
 /** Per-bucket money summary (derived figures included). */
 export const BucketSummarySchema = z.object({
@@ -172,8 +196,8 @@ export const CancellationInfoSchema = z.object({
 });
 export type CancellationInfo = z.infer<typeof CancellationInfoSchema>;
 
-/** Booking row with summary. */
-export const BookingRowSchema = AuditedRowSchema.extend({
+/** Booking row with summary — every field (GET /bookings?view=full, CSV, and the base of the detail). */
+export const BookingFullRowSchema = AuditedRowSchema.extend({
   booking_number: z.string(),
   project_id: IdSchema,
   project_name: z.string(),
@@ -211,6 +235,58 @@ export const BookingRowSchema = AuditedRowSchema.extend({
   completion_notes: z.string().nullable(),
   revision_count: z.int().min(0),
 });
+export type BookingFullRow = z.infer<typeof BookingFullRowSchema>;
+
+/**
+ * Summary of a compact list row: the per-bucket figures, totals paid / due, pending cheques, other-charges due and raised %; the
+ * remaining figures (and next_installment, which needs the schedule) are on the full row / detail only.
+ */
+export const BookingRowSummarySchema = BookingSummarySchema.partial({
+  total_order_raised_paise: true,
+  other_charges_total_paise: true,
+  other_charges_demanded_paise: true,
+  other_charges_paid_paise: true,
+  last_payment_at: true,
+  next_installment: true,
+});
+export type BookingRowSummary = z.infer<typeof BookingRowSummarySchema>;
+
+/**
+ * A booking as GET /bookings lists it. The default (compact) view sends only what list screens, pickers and the payment dialog read
+ * (≈ 1 KB per row, audit C): id / project / flat / customer ids, numbers, names, status, agreement value, plan name and the bucket summary
+ * (whose agreed figures carry the cash / account split). Fields marked optional here
+ * are present on `view=full` rows, CSV exports and always on the booking detail.
+ */
+export const BookingRowSchema = BookingFullRowSchema.extend({
+  company_id: IdSchema.optional(),
+  created_at: TimestampSchema.optional(),
+  updated_at: TimestampSchema.optional(),
+  created_by: IdSchema.nullable().optional(),
+  project_id: IdSchema.optional(),
+  block_id: IdSchema.optional(),
+  /** duplicates of summary.cash.agreed_paise / summary.account.agreed_paise */
+  cash_agreed_paise: PaiseSchema.optional(),
+  account_agreed_paise: PaiseSchema.optional(),
+  payment_plan_id: IdSchema.optional(),
+  flat_snapshot: BookingRowFlatSnapshotSchema.optional(),
+  rate_per_sqft_paise: PaiseSchema.nullable().optional(),
+  plan_snapshot: BookingRowPlanSnapshotSchema,
+  plan_accepted_on: DateStringSchema.nullable().optional(),
+  plan_acceptance_mode: PlanAcceptanceModeSchema.nullable().optional(),
+  plan_acceptance_document_id: IdSchema.nullable().optional(),
+  sales_user_id: IdSchema.nullable().optional(),
+  sales_user_name: z.string().nullable().optional(),
+  lead_id: IdSchema.nullable().optional(),
+  broker_name: z.string().nullable().optional(),
+  remarks: z.string().nullable().optional(),
+  parking_slots: z.array(z.object({ id: IdSchema, number: z.string(), slot_type: ParkingTypeSchema })).optional(),
+  summary: BookingRowSummarySchema,
+  cancellation: CancellationInfoSchema.nullable().optional(),
+  completed_at: TimestampSchema.nullable().optional(),
+  completed_by_name: z.string().nullable().optional(),
+  completion_notes: z.string().nullable().optional(),
+  revision_count: z.int().min(0).optional(),
+});
 export type BookingRow = z.infer<typeof BookingRowSchema>;
 
 /** List filter for bookings. */
@@ -225,6 +301,8 @@ export const BookingFilterSchema = ListQuerySchema.extend({
   to: DateStringSchema.optional(),
   has_due: BoolQuerySchema.optional(),
   has_advance: BoolQuerySchema.optional(),
+  /** compact (default): the light list row; full: every field (heavier — rooms, areas, breakup, installments, next installment). */
+  view: z.enum(["compact", "full"]).optional(),
 });
 export type BookingFilter = z.infer<typeof BookingFilterSchema>;
 export const BookingListResponseSchema = listEnvelope(BookingRowSchema);
@@ -444,8 +522,15 @@ export type OtherChargeAdd = z.infer<typeof OtherChargeAddSchema>;
 export const OtherChargeDemandNowSchema = z.strictObject({ ...VersionedSchema.shape, other_charge_id: IdSchema, due_date: DateStringSchema.optional() });
 export type OtherChargeDemandNow = z.infer<typeof OtherChargeDemandNowSchema>;
 
-/** Booking detail: row + tabs' first pages. */
-export const BookingDetailResponseSchema = BookingRowSchema.extend({
+/** Booking detail: row + tabs' first pages (full flat and plan snapshots, list price and any deviation from it). */
+export const BookingDetailResponseSchema = BookingFullRowSchema.extend({
+  flat_snapshot: FlatSnapshotSchema,
+  plan_snapshot: PlanSnapshotSchema,
+  /** The flat's list price when it was booked (null on bookings made before it was recorded). */
+  list_price_paise: PaiseSchema.nullable().optional(),
+  /** Why the agreement value differs from the list price (a deviation can only be made by an agreement.edit holder; null at list price). */
+  price_deviation_reason: z.string().nullable().optional(),
+  price_deviation_by: IdSchema.nullable().optional(),
   other_charges: z.array(OtherChargeRowSchema),
   schedule: z.array(ScheduleRowSchema),
   agreement_revisions: z.array(AgreementRevisionRowSchema),

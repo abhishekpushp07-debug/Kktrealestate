@@ -259,6 +259,8 @@ describe("reveal auditing and secrets hygiene", () => {
     expect(denied.body.error.details?.["permission"]).toBe("customer.kyc_view");
     const rejectedDenied = await t.request<ErrorBody>("POST", `/api/v1/customers/${cid}/kyc`, { token: salesA.access_token, body: { version: cust.body.version, kyc_status: "REJECTED", kyc_remarks: "blurry scan" } });
     expect(rejectedDenied.status).toBe(403);
+    await t.app.sql`insert into documents (company_id, entity_type, entity_id, file_name, mime, size_bytes, sha256, storage_key, uploaded_by_type, uploaded_by, is_sensitive)
+      values (${t.companyId}, 'CUSTOMER', ${cid}, 'aadhaar.jpg', 'image/jpeg', 100, 'sha-kyc-adv', 'k/aadhaar-adv.jpg', 'STAFF', ${salesA.user.id}, true)`;
     const submitted = await t.request<Customer>("POST", `/api/v1/customers/${cid}/kyc`, { token: salesA.access_token, body: { version: cust.body.version, kyc_status: "SUBMITTED" } });
     expect(submitted.status, submitted.text).toBe(200);
     const verified = await t.request<Customer & { kyc_verified_by: string }>("POST", `/api/v1/customers/${cid}/kyc`, { token: admin.access_token, body: { version: submitted.body.version, kyc_status: "VERIFIED" } });
@@ -360,7 +362,7 @@ describe("right to erasure", () => {
     expect(fresh.status, fresh.text).toBe(201);
     expect((await t.request<PortalCard>("POST", `/api/v1/customers/${fresh.body.id}/portal/enable`, { token: admin.access_token, body: {} })).status).toBe(200);
     // the erase audit row holds the reason, not the PII
-    const text = await auditTextFor("customer.erase");
+    const text = await auditTextFor("customer.erased"); // the single erasure implementation (admin/erase.ts) writes customer.erased
     expect(text).toContain("DPDP");
     expect(text).not.toContain(p);
     expect(text).not.toContain("erase@example.com");

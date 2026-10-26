@@ -1,0 +1,149 @@
+name: Nightly (load-test smoke + browser QA)
+
+on:
+  schedule:
+    # 03:00 IST
+    - cron: "30 21 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "22"
+  PLAYWRIGHT_VERSION: "1.63.0"
+  DATABASE_URL: postgres://postgres:postgres@localhost:5432/kkt_nightly
+  REDIS_URL: redis://localhost:6379/0
+  JWT_SECRET: nightly-only-secret-nightly-only-secret-0123
+  FIELD_ENCRYPTION_KEY: bmlnaHRseS1vbmx5LWtleS1uaWdodGx5LW9ubHkta2V5MDE=
+  HASH_KEY: nightly-only-hash-key
+
+jobs:
+  loadtest-smoke:
+    name: Load-test smoke (production bundle, 2 workers)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres, POSTGRES_DB: kkt_nightly }
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      # pnpm version from package.json "packageManager"
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @kkt/api build
+      - name: Migrate + demo seed, start the API
+        working-directory: apps/api
+        run: |
+          NODE_ENV=development SEED_ON_BOOT=true SEED_DEMO=true node dist/server.js migrate
+          NODE_ENV=production SEED_ON_BOOT=false RUN_MIGRATIONS_ON_BOOT=false API_WORKERS=2 LOG_LEVEL=warn \
+            PUBLIC_RATE_LIMIT_PER_MIN=1000000 WRITE_RATE_LIMIT_PER_MIN=1000000 STORAGE_LOCAL_DIR=/tmp/kkt-storage \
+            node dist/server.js > /tmp/api.log 2>&1 &
+          for _ in $(seq 1 60); do curl -sf http://localhost:4000/api/v1/ready > /dev/null && break; sleep 1; done
+      - name: Load test (smoke profile; results as an artifact)
+        env:
+          {
+            BASE: "http://localhost:4000",
+            CONNECTIONS: "50",
+            WRITE_CONNECTIONS: "10",
+            DURATION: "10",
+            LABEL: "nightly smoke",
+            OUT: /tmp/loadtest.md,
+          }
+        run: |
+          echo "# Nightly load-test smoke" > /tmp/loadtest.md
+          pnpm --filter @kkt/api loadtest
+          cat /tmp/loadtest.md >> "$GITHUB_STEP_SUMMARY"
+          # every scenario must have completed requests and no more than 1% failures
+          node -e '
+            const rows = require("fs").readFileSync("/tmp/loadtest.md","utf8").split("\n").filter(l => /^\| (GET|POST) /.test(l));
+            if (rows.length < 10) { console.error("too few scenarios", rows.length); process.exit(1); }
+            const bad = rows.filter(r => { const c = r.split("|").map(s => s.trim()); const req = Number(c[3]); const non2xx = parseInt(c[4], 10) || 0; return req === 0 || non2xx / req > 0.01; });
+            if (bad.length) { console.error("failing scenarios:\n" + bad.join("\n")); process.exit(1); }
+            console.log(rows.length + " scenarios ok");'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: loadtest, path: /tmp/loadtest.md, retention-days: 30 }
+
+  browser-qa:
+    name: Browser QA (ERP, website, portal; 1440 + 390 px, axe)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres, POSTGRES_DB: kkt_nightly }
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      # pnpm version from package.json "packageManager"
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: Playwright + Chromium
+        run: |
+          npm install -g "playwright@${PLAYWRIGHT_VERSION}"
+          npx -y "playwright@${PLAYWRIGHT_VERSION}" install --with-deps chromium
+      - name: Build everything
+        run: |
+          pnpm --filter @kkt/api build
+          VITE_API_URL=http://localhost:4000 pnpm --filter @kkt/erp build
+          NEXT_PUBLIC_API_URL=http://localhost:4000 API_INTERNAL_URL=http://localhost:4000 pnpm --filter @kkt/web build
+          EXPO_PUBLIC_API_URL=http://localhost:4000 pnpm --filter @kkt/portal build:web
+      - name: Start API (demo data), ERP, website, portal
+        run: |
+          cd apps/api
+          NODE_ENV=development SEED_ON_BOOT=true SEED_DEMO=true node dist/server.js migrate
+          NODE_ENV=development RUN_MIGRATIONS_ON_BOOT=false SEED_ON_BOOT=false RUN_JOBS_IN_API=false LOG_LEVEL=warn \
+            PUBLIC_RATE_LIMIT_PER_MIN=1000000 WRITE_RATE_LIMIT_PER_MIN=1000000 STORAGE_LOCAL_DIR=/tmp/kkt-storage \
+            node dist/server.js > /tmp/api.log 2>&1 &
+          cd ../erp && npx vite preview --port 5173 --strictPort > /tmp/erp.log 2>&1 &
+          cd ../web && PORT=3000 API_INTERNAL_URL=http://localhost:4000 npx next start --port 3000 > /tmp/web.log 2>&1 &
+          cd ../portal && npx -y serve@14 -s dist -l 8081 > /tmp/portal.log 2>&1 &
+          for url in http://localhost:4000/api/v1/ready http://localhost:5173 http://localhost:3000 http://localhost:8081; do
+            for _ in $(seq 1 90); do curl -sf "$url" > /dev/null && break; sleep 1; done
+          done
+      - name: ERP QA
+        env:
+          {
+            NODE_PATH: /usr/local/lib/node_modules,
+            ERP_URL: "http://localhost:5173",
+            API_URL: "http://localhost:4000",
+            OUT_DIR: /tmp/qa/erp,
+          }
+        run: mkdir -p "$OUT_DIR" && node docs/qa/erp/browser-qa.cjs
+      - name: Website QA
+        if: always()
+        env:
+          {
+            NODE_PATH: /usr/local/lib/node_modules,
+            WEB_URL: "http://localhost:3000",
+            API_URL: "http://localhost:4000",
+            OUT_DIR: /tmp/qa/web,
+          }
+        run: mkdir -p "$OUT_DIR" && node docs/qa/web/browser-qa.cjs
+      - name: Portal QA
+        if: always()
+        env: { NODE_PATH: /usr/local/lib/node_modules, API_URL: "http://localhost:4000", OUT_DIR: /tmp/qa/portal }
+        run: mkdir -p "$OUT_DIR" && node docs/qa/portal/browser-qa.cjs
+      - name: Server logs
+        if: failure()
+        run: tail -n 200 /tmp/api.log /tmp/erp.log /tmp/web.log /tmp/portal.log || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: browser-qa, path: /tmp/qa, retention-days: 14 }

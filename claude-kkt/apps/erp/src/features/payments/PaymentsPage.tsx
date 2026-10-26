@@ -63,8 +63,8 @@ export default function PaymentsPage() {
             <Select aria-label="Status" size="sm" className="w-full sm:w-36" value={list.filters.status ?? null} onValueChange={(value) => list.setFilter("status", value)} options={PAYMENT_STATUSES.map((status) => ({ value: status, label: PAYMENT_STATUS_LABELS[status] }))} placeholder="Any status" allowClear />
             <Select aria-label="Mode" size="sm" className="w-full sm:w-40" value={list.filters.mode_code ?? null} onValueChange={(value) => list.setFilter("mode_code", value)} options={PAYMENT_MODE_CODES.map((code) => ({ value: code, label: PAYMENT_MODE_CODE_LABELS[code] }))} placeholder="Any mode" allowClear />
             <Select aria-label="Against" size="sm" className="w-full sm:w-36" value={list.filters.against ?? null} onValueChange={(value) => list.setFilter("against", value)} options={PAYMENT_AGAINSTS.map((value) => ({ value, label: PAYMENT_AGAINST_LABELS[value] }))} placeholder="Flat / charges" allowClear />
-            <DateInput aria-label="From date" className="h-11 text-xs sm:h-8" wrapperClassName="w-full sm:w-40" value={list.filters.from ?? null} onChange={(value) => list.setFilter("from", value)} />
-            <DateInput aria-label="To date" className="h-11 text-xs sm:h-8" wrapperClassName="w-full sm:w-40" value={list.filters.to ?? null} onChange={(value) => list.setFilter("to", value)} />
+            <DateInput aria-label="From date" className="h-12 text-xs sm:h-8" wrapperClassName="w-full sm:w-40" value={list.filters.from ?? null} onChange={(value) => list.setFilter("from", value)} />
+            <DateInput aria-label="To date" className="h-12 text-xs sm:h-8" wrapperClassName="w-full sm:w-40" value={list.filters.to ?? null} onChange={(value) => list.setFilter("to", value)} />
           </>
         }
         hasActiveFilters={list.hasActiveFilters}

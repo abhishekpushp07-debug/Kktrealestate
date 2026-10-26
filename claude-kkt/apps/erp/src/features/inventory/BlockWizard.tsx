@@ -649,7 +649,7 @@ function PricingStep({ state, spec, templateById, flatTypeById, activeCard, rate
           ) : (
             <Notice tone="warning">No active rate card for this project. Flats will use flat-type base prices; you can apply a rate card later.</Notice>
           )}
-          <div className="overflow-x-auto rounded-md border border-border">
+          <div className="overflow-x-auto rounded-md border border-border" tabIndex={0} role="region" aria-label="Scrollable table">
             <table className="w-full min-w-[32rem] text-sm">
               <thead className="bg-surface text-left text-2xs uppercase tracking-wide text-ink-subtle">
                 <tr>

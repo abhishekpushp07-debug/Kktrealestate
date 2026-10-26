@@ -309,7 +309,19 @@ export function paymentBody(h: Harness, bookingId: string, modes: Record<string,
   return body;
 }
 
-/** Booking body (SPEC §12 wizard payload): ₹1 Cr / 60 L cash / 40 L account unless overridden. */
+/**
+ * Lists the given flats at exactly ₹1 Cr (POST /flats/:id/price as a flat.write holder) so the scenarios' ₹1 Cr agreements are at list
+ * price: POST /bookings rejects a deviation from the flat's list price without agreement.edit + price_deviation_reason (audit E9).
+ */
+export async function listAtCr(h: Harness, token: string, flatIds: readonly string[]): Promise<void> {
+  for (const id of flatIds) {
+    const f = await getFlat(h, token, id);
+    if (f.price_paise === CR) continue;
+    must(await h.request("POST", `/api/v1/flats/${id}/price`, { token, body: { version: f.version, price_paise: CR, reason: "Acceptance scenario list price" } }), 200, "POST /flats/:id/price");
+  }
+}
+
+/** Booking body (SPEC §12 wizard payload): ₹1 Cr / 60 L cash / 40 L account unless overridden (list the flat at ₹1 Cr first: listAtCr). */
 export function bookingBody(h: Harness, flatId: string, customerId: string, extra: Record<string, unknown> = {}): Record<string, unknown> {
   return { flat_id: flatId, customer_id: customerId, booking_date: h.today, agreement_value_paise: CR, cash_agreed_paise: 60 * L, account_agreed_paise: 40 * L, plan_acceptance_mode: "IN_PERSON", plan_accepted_on: h.today, ...extra };
 }

@@ -6,7 +6,44 @@ Stack under test: API `apps/api` on `:4000` with the demo seed on its own databa
 
 Runner: [`docs/qa/erp/browser-qa.cjs`](erp/browser-qa.cjs) (`ERP_URL`, `API_URL`, `OUT_DIR`, `REPORT`, `WIPE=1`, `ONLY=login,roles,masters,inventory,crm,money,misc,smoke`). On every page it asserts: zero console errors / page errors, zero failed or ≥ 400 API requests (apart from the deliberate 4xx probes listed below), `document.documentElement.scrollWidth <= window.innerWidth`, and at 390 px that every **primary** target is ≥ 44 px tall (action buttons, tabs, sidebar / drawer / Back links; switches toggle through their 44 px label row and desktop-only breadcrumb crumbs count as secondary). It records every sub-44 px element, takes one palette-quantised viewport screenshot per listed page and width (`docs/qa/erp/<page>-<width>.png`, 40 files, 13–167 KB each, 2.1 MB in all), and verifies every flow through the API afterwards (status, ledger rows, audit rows, stage records, files).
 
-## Result
+## Re-run 2026-10-26 (phase 5 frontend-quality track)
+
+Stack: API on `:4500` with a fresh demo seed in `kkt_h5` (Redis db 20, `ERP_ORIGIN=http://localhost:5573`), ERP built with `VITE_API_URL=http://localhost:4500` and served by `vite preview` on `:5573`; runner `ERP_URL=http://localhost:5573 API_URL=http://localhost:4500 node docs/qa/erp/browser-qa.cjs` (`AXE=0` skips the scans). Primary targets are now checked at **48 px** at 390 px (SPEC §15), and the runner's API helper renews its access token (a full walk with axe takes ~24 min, longer than a token lives).
+
+**Result: 545 page audits (382 at 1440 px, 163 at 390 px), 150/150 flow assertions pass, 40 screenshots, 0 console errors, 0 failed requests, no overflow, no primary target under 48 px; axe-core: 494 scans (331 at 1440 px, 163 at 390 px), 493 with no violation.** The one remaining finding is transient: `target-size` on the cheques table's "Amount" sort header right after clearing a cheque, when the success toast briefly overlaps the header (11 × 24 px uncovered); a re-scan of the same page afterwards is clean.
+
+New assertions: as Project Admin (report.view without audit.view) the reports catalogue has no Activity card and `/reports/activity` renders the Forbidden page without calling the API (TODO-integration item 10).
+
+### Accessibility (axe)
+
+`docs/qa/axe.cjs` (axe-core 4.14.0, WCAG 2.0/2.1/2.2 A + AA, reduced motion emulated while scanning); serious and critical violations are defects. The first run against the unchanged ERP (480 scans) had **711 serious/critical findings on 432 scans**:
+
+| Rule | Pages | Nodes | Cause → fix |
+|---|---|---|---|
+| label-content-name-mismatch | 412 | 843 | the account-menu trigger was labelled "Account menu" while showing the user's name and role → `sr-only` "Account menu" text instead of `aria-label`; inventory / flat-picker cells were labelled "A-801, Available, ₹85,88,000" while showing "₹85.9 L" → visible text first, details in an `sr-only` suffix; lead cards (below) |
+| aria-required-parent / aria-required-children / aria-allowed-attr | 13 / 41 / 11 | 535 / 47 / 78 | the inventory grid and the wizard's flat picker put `columnheader`/`rowheader`/`gridcell` directly in `role="grid"` (and `aria-pressed` on a `rowheader`) → `display: contents` `role="row"` wrappers, the floor-select button inside its `rowheader`; report Chart/Table and editor-mode toggles were `role="tablist"` of plain buttons → `role="group"` of `aria-pressed` toggles |
+| nested-interactive | 54 | 374 | phone list cards (`DataTable` mobile cards), lead and ticket kanban cards and ticket list cards were `role="button"` around checkboxes, menus and links → no role; the name / number link is the keyboard target (lead name is now a button) |
+| color-contrast | 22 | 323 | navy KPI cards drew the delta chip in green/red on navy-800 (2.13:1) → light green/red/navy-100 on the navy card; inventory cell prices at `opacity-90`; CANCELLED receipt watermark → `text-danger/80`; token changes below |
+| target-size | 25 | 67 | website-tab image reorder arrows (10 × 16 px) → 32 px buttons with names; combobox clear (18 px) → 24 px; inline customer / phone links → 24 px rows; sortable headers `min-h-6` |
+| definition-list | 48 | 65 | the block status legend put a swatch `span` and a total `div` straight in the `<dl>` → swatch inside the `dd`, total as `dt`/`dd` |
+| aria-progressbar-name | 9 | 59 | dashboard progress rows and schedule bars → `aria-label` |
+| aria-valid-attr-value | 45 | 45 | view switchers built on Radix Tabs without panels pointed `aria-controls` at missing ids → `TabsTrigger` drops a dangling `aria-controls` |
+| button-name | 13 | 18 | multi-selects without a visible label (featured projects, flat-type specifications), the co-applicant search, icon-only "Download" on phones → labels |
+| scrollable-region-focusable | 11 | 13 | text-only scroll boxes (data tables without row actions, roznamcha, block-wizard preview, payment-schedule preview) → focusable `role="region"` |
+| link-in-text-block | 3 | 10 | "Open block", ledger receipt/demand links → underlined |
+| aria-prohibited-attr, label | 2, 2 | 2, 2 | unread dots → `role="img"`; hidden CSV file input → label |
+
+Form wiring (`components/ui/form.tsx` + `field-context.ts`): a control whose `id` is its `FieldWrapper`'s id now inherits `aria-invalid`, `aria-required` and `aria-describedby` (→ the `role="alert"` error, else the hint) — `Input`, `Textarea`, `Select`, `Combobox`, `MultiSelect` (and everything built on them: money/number/date inputs). Before, only `FormField` render props that spread `field` were wired; the ~110 `FieldWrapper` call sites that pass `id={control.id}` were not. `ErrorState` gives 403 ("You don't have access to this") and 404 ("Not found" — also what a scoped user sees for another project) their own copy without a Retry button.
+
+### Contrast (design tokens) and tap targets
+
+`node docs/qa/contrast.mjs erp` → **53/53** pairs pass (`docs/qa/contrast-results.md`, enforced by `src/lib/__tests__/contrast.test.ts`): `danger` #ef4444 → #dc2626 (white text 3.76 → 4.83:1; hover #b91c1c), `ink-subtle` #64748b → #5d6a7f (4.44 → 5.11:1 on the page surface). The focus indicator is a navy inner ring plus the gold outer ring (`:focus-visible`, `focus-ring`, `focus-ring-inset`), so it reaches 3:1 on light and on navy surfaces (CSS-only change made after this run). Review pass: form-control boundaries were exempted as "informational" at 1.48:1 (a white input on a white card is identified only by its border, WCAG 1.4.11) — inputs, textareas, selects, comboboxes, multi-selects, checkboxes, radios and the switch track now use the new `border-input` token #7c8aa0 (3.50:1 on card, 3.24:1 on ivory; white switch thumb 3.50:1 on the track), hover `navy-400` (4.03:1) instead of the lighter `navy-300`; a control's own `aria-describedby` is merged with the field's error id instead of replacing it. Re-run against the rebuilt bundle (`ONLY=login,masters,crm,smoke`, API :4500 fresh seed in `kkt_h5`): 242 page checks, 39/39 assertions, 242 axe scans (138 at 1440 px, 104 at 390 px) with 0 serious/critical violations, 0 defects. Phone sizes moved from 44 to **48 px**: buttons (`sm`/`md`/`lg`), icon buttons, inputs, selects, comboboxes, multi-selects, page tabs, CMS / master chips, sidebar links, the Back link, toolbar date filters, grid cells.
+
+### IST dates
+
+`lib/format.ts` `formatDate` puts instants on their IST calendar day (and keeps `YYYY-MM-DD` business dates as they are) whatever the browser's zone; `toDateString`, the dashboard greeting hour, the settings FY preview and every `datetime-local` input (lead follow-ups, CMS schedules) use the IST wall clock (`instantToIstInput` / `istInputToInstant`). Unit tests run under `America/Los_Angeles`, `UTC` and `Pacific/Kiritimati` (`src/lib/__tests__/format-tz.test.ts`).
+
+## Result (2026-10-25 run)
 
 **543 page audits in the final run (387 at 1440 px, 156 at 390 px; 156 of them the admin "smoke" walk over every route in `routes.tsx` at both widths), 147/147 flow assertions pass, 40 screenshots, 0 console errors, 0 failed requests (7 deliberate 4xx), no horizontal overflow at 390 px and no primary target under 44 px** after the fixes below. Earlier passes of the same script found the defects listed further down; the fixes were verified by re-running every section against the rebuilt bundle (sections run one after another: the per-IP login limit of 10/min answers 429 when three sections log in concurrently, which is correct behaviour).
 
@@ -64,7 +101,7 @@ Verification: `pnpm --filter @kkt/erp typecheck`, `build` and `test` (11 files, 
 * The payment wizard / dialogs rely on the active rate card: this run activated a QA rate card (`SGH QA …`, same rates + ₹50) and re-priced Available SGH flats, so prices in `kkt_qa_erp` differ from the seed by design. The run also leaves QA blocks (`Tower Q…`), parking slots, two bookings (`BK-2627/0011` active, `/0012` cancelled), a cancelled QA lead, visits, tickets, a banner / post / notice / gallery image and a QA user and role in `kkt_qa_erp`; run `POST /api/v1/admin/reseed` or drop the database before reusing it. The integrity report was **ok with 0 findings** after all of it.
 * Redis' default configuration has 16 databases (0–15), so `TEST_REDIS_URL=redis://…/16` answers `ERR DB index is out of range`; the integration suites ran on db 14. `vitest` runs test files in parallel workers against one database — the three suites pass together only with `--no-file-parallelism` (they interfere when run concurrently), each passes alone.
 * The seed gives the Accounts user 63 unread notifications (one per seeded demand / cheque event); cosmetic.
-* Not covered by this walk: the lockout path (5 failed logins), MFA enrolment, bulk "enable portal for all customers", right to erasure, CSV import on kinds other than area types, touch drag on the phone kanban (Move-to from the drawer was used instead), WCAG contrast measurement (visual check only).
+* Not covered by this walk: the lockout path (5 failed logins), MFA enrolment, bulk "enable portal for all customers", right to erasure, CSV import on kinds other than area types, touch drag on the phone kanban (Move-to from the drawer was used instead). WCAG contrast is measured since 2026-10-26 (`docs/qa/contrast.mjs` + axe).
 
 ## Reproduce
 
@@ -73,6 +110,7 @@ su postgres -c "psql -c 'DROP DATABASE IF EXISTS kkt_qa_erp'"; su postgres -c "p
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/kkt_qa_erp REDIS_URL=redis://localhost:6379/13 API_PORT=4000 API_PUBLIC_URL=http://localhost:4000 \
   RUN_MIGRATIONS_ON_BOOT=true SEED_ON_BOOT=true ERP_ORIGIN=http://localhost:5173 LOG_LEVEL=warn pnpm --filter @kkt/api exec tsx src/server.ts &
 VITE_API_URL=http://localhost:4000 pnpm --filter @kkt/erp build && pnpm --filter @kkt/erp preview --port 5173 --host &
-node docs/qa/erp/browser-qa.cjs                       # full walk, rewrites docs/qa/erp/*.png, prints the summary
+node docs/qa/erp/browser-qa.cjs                       # full walk + axe scans, rewrites docs/qa/erp/*.png, prints the summary
+node docs/qa/contrast.mjs erp                        # design-token contrast
 ONLY=money REPORT=/tmp/qa.jsonl node docs/qa/erp/browser-qa.cjs   # one section; sections one at a time stay under the 10 logins/min limit
 ```

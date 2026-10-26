@@ -178,6 +178,7 @@ export function StepCustomer({ state, update, errors, showErrors, can }: StepPro
           searchPlaceholder="Phone, name or code"
           emptyText="Type to search customers"
           disabled={state.co_applicant_ids.length >= 10}
+          aria-label="Add a co-applicant"
           data-testid="wizard-co-applicant-search"
         />
         {state.co_applicant_ids.length > 0 && <Badge variant="navy" numeric>{state.co_applicant_ids.length} co-applicant{state.co_applicant_ids.length === 1 ? "" : "s"}</Badge>}

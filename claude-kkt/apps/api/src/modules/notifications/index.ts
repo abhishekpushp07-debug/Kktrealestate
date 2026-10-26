@@ -6,11 +6,14 @@ import {
   PortalMarkReadSchema, PortalNotificationCountResponseSchema, PortalNotificationListResponseSchema, type NotificationRecipientType, type NotificationRow, type PortalNotificationRow,
 } from "@kkt/contracts";
 import { notifications } from "@kkt/db";
+import { registerJob } from "../../jobs/index.js";
 import { ApiError } from "../../lib/errors.js";
 import { fromListQuery, paginate } from "../../lib/list.js";
 import { route } from "../../lib/routes.js";
+import { sweepNotifications } from "./sweep.js";
 
 export { notify, notifyRole, withdraw } from "./service.js";
+export { sweepNotifications, SWEEP_TARGETS, SWEEP_BATCH, type SweepResult } from "./sweep.js";
 
 type DbNotification = typeof notifications.$inferSelect;
 
@@ -22,7 +25,7 @@ function toRow(n: DbNotification): NotificationRow {
 }
 
 const SCREEN_BY_ENTITY: Record<string, PortalNotificationRow["screen"]> = {
-  demand: "DEMANDS", payment: "LEDGER", booking: "HOME", block_stage: "CONSTRUCTION", service_request: "REQUEST", notice: "NOTICE", document: "DOCUMENTS", installment: "SCHEDULE",
+  demand: "DEMANDS", booking_other_charge: "DEMANDS", payment: "LEDGER", booking: "HOME", block_stage: "CONSTRUCTION", service_request: "REQUEST", notice: "NOTICE", document: "DOCUMENTS", installment: "SCHEDULE",
 };
 
 function toPortalRow(n: DbNotification): PortalNotificationRow {
@@ -34,6 +37,7 @@ function toPortalRow(n: DbNotification): PortalNotificationRow {
 
 /** Notifications module: staff bell at /notifications and customer bell at /portal/notifications (same storage). */
 export async function notificationsModule(app: FastifyInstance): Promise<void> {
+  registerJob("NOTIFICATION_SWEEP", async ({ db }) => ({ ...(await sweepNotifications(db)) }));
   const recipientOf = (req: { user?: { id: string }; customer?: { customerId: string } }): { type: NotificationRecipientType; id: string } =>
     req.user ? { type: "STAFF", id: req.user.id } : { type: "CUSTOMER", id: req.customer!.customerId };
 

@@ -121,7 +121,7 @@ export function DocumentsPanel({ entityType, entityId, appliesTo, allowShare = t
                     </Badge>
                   )}
                   {rowAction?.(row)}
-                  <Button variant="outline" size="sm" leftIcon={Download} loading={opening === row.id} disabled={locked} onClick={() => void open(row)} data-testid={`document-download-${row.id}`}>
+                  <Button variant="outline" size="sm" leftIcon={Download} loading={opening === row.id} disabled={locked} onClick={() => void open(row)} aria-label={`Download ${row.title || row.file_name}`} data-testid={`document-download-${row.id}`}>
                     <span className="hidden sm:inline">Download</span>
                   </Button>
                 </div>

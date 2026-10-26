@@ -1,5 +1,6 @@
-import { and, asc, count, desc, eq, getTableColumns, getTableName, gt, ilike, lt, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, getTableColumns, getTableName, gt, ilike, isNotNull, isNull, lt, or, sql, type SQL } from "drizzle-orm";
 import type { AnyPgColumn, PgSelect, PgTable, SelectedFields } from "drizzle-orm/pg-core";
+import type { FastifyInstance } from "fastify";
 import type { ListQuery } from "@kkt/contracts";
 import { parseSort } from "@kkt/contracts";
 import type { Executor } from "@kkt/db";
@@ -37,6 +38,8 @@ export interface PaginateOptions {
   exact?: boolean | undefined;
   /** Row threshold (pg_class.reltuples) above which the total is estimated; default COUNT_ESTIMATE_ABOVE. */
   estimateAbove?: number | undefined;
+  /** Set by listPaging() for `format=csv`: the request's query object, under which the export facts (total, next cursor) are recorded. */
+  csvExport?: object | undefined;
 }
 
 /** Tables with more live rows than this (per pg_class) report an estimated `total` unless the caller asks for `exact=true`. */
@@ -106,6 +109,25 @@ function rawSortValue(v: unknown): CursorPayload["v"] {
   return String(v);
 }
 
+/**
+ * Rows strictly after the cursor `(v, id)` in `ORDER BY col <dir>, id <dir>`. PostgreSQL sorts NULL as the largest value (NULLS LAST on
+ * ASC, NULLS FIRST on DESC), so a nullable sort column needs explicit NULL branches: without them a page boundary inside the NULL block
+ * (or, on ASC, any boundary before it) silently ends the listing — the async export would store a truncated file. Not-null columns of
+ * the listed table keep the plain index-friendly condition; columns of joined tables count as nullable (LEFT JOINs).
+ */
+export function keysetAfter(col: AnyPgColumn, idCol: AnyPgColumn, v: unknown, id: string, direction: "asc" | "desc", nullable: boolean): SQL {
+  const cmp = direction === "asc" ? gt : lt;
+  const tie = cmp(idCol, id);
+  if (v === null || v === undefined) {
+    // cursor inside the NULL block: ASC (NULLs last) → only later NULLs; DESC (NULLs first) → later NULLs, then every non-NULL row
+    const laterNulls = and(isNull(col), tie)!;
+    return direction === "asc" ? laterNulls : or(laterNulls, isNotNull(col))!;
+  }
+  const after = or(cmp(col, v), and(eq(col, v), tie))!;
+  // a non-NULL cursor on ASC still has the whole NULL block ahead of it; on DESC the NULLs came first and are done
+  return nullable && direction === "asc" ? or(after, isNull(col))! : after;
+}
+
 /** Resolves the requested sort against the allow-list (400 on unknown fields). */
 export function resolveSort(sort: PaginateOptions["sort"]): { field: string; column: AnyPgColumn; direction: "asc" | "desc" } {
   const parsed = parseSort(sort.requested ?? sort.default);
@@ -163,7 +185,6 @@ export async function paginate<T = Record<string, unknown>>(executor: Executor, 
   const sort = resolveSort(opts.sort);
   const idCol = opts.table.id;
   const dir = sort.direction === "asc" ? asc : desc;
-  const cmp = sort.direction === "asc" ? gt : lt;
   const tsSort = isTimestampColumn(sort.column);
   const conditions: (SQL | undefined)[] = [opts.where, searchCondition(opts.search?.columns ?? [], opts.search?.term)];
   const cursorMode = opts.cursor !== undefined || opts.limit !== undefined;
@@ -171,8 +192,8 @@ export async function paginate<T = Record<string, unknown>>(executor: Executor, 
   const page = cursorMode ? 1 : Math.max(1, opts.page ?? 1);
   if (opts.cursor) {
     const c = decodeCursor(opts.cursor);
-    const v = cursorValue(sort.column, c.v);
-    conditions.push(or(cmp(sort.column, v), and(eq(sort.column, v), cmp(idCol, c.id))));
+    const nullable = !(sort.column.notNull && sort.column.table === opts.table);
+    conditions.push(keysetAfter(sort.column, idCol, cursorValue(sort.column, c.v), c.id, sort.direction, nullable));
   }
   const where = and(...conditions.filter((c): c is SQL => c !== undefined));
   // keyset paging on a timestamp: select its microsecond text key alongside the row so the next cursor is exact
@@ -197,6 +218,7 @@ export async function paginate<T = Record<string, unknown>>(executor: Executor, 
     nextCursor = encodeCursor({ v: rawSortValue(v), id: String(readId(last)) });
   }
   if (withSortKey) for (const row of items as Record<string, unknown>[]) delete row[SORT_KEY];
+  if (opts.csvExport) csvExportFacts.set(opts.csvExport, { total, rows: items.length, cursorMode, nextCursor });
   return { items, total, page, page_size: pageSize, next_cursor: nextCursor };
 }
 
@@ -245,11 +267,72 @@ export function fromListQuery(q: ListQuery): Pick<PaginateOptions, "page" | "pag
   return { page: q.page, page_size: q.page_size, cursor: q.cursor, limit: q.limit, exact: q.exact };
 }
 
-/** Upper bound of rows a synchronous `format=csv` export streams (larger exports belong to a worker job). */
+/** Upper bound of rows a synchronous `format=csv` export streams (larger exports go through `POST /exports`, a worker job). */
 export const CSV_EXPORT_MAX_ROWS = 10_000;
 
-/** Pagination for a list handler: normal paging for JSON, the whole filtered list (capped at CSV_EXPORT_MAX_ROWS) for `format=csv`. */
-export function listPaging(q: ListQuery): Pick<PaginateOptions, "page" | "page_size" | "cursor" | "limit" | "exact"> {
-  if (q.format === "csv") return { page: 1, page_size: CSV_EXPORT_MAX_ROWS, exact: true };
+/** Rows per page when the export job pages a CSV list with `X-Export-Cursor`. */
+export const CSV_EXPORT_PAGE_ROWS = 5_000;
+
+/** Request header that switches a `format=csv` list into keyset pages (`start` for the first page, then the returned cursor). */
+export const EXPORT_CURSOR_HEADER = "x-export-cursor";
+
+/** What a CSV list response reports about its rows (recorded by paginate, turned into X-Export-* headers by the onSend hook). */
+export interface CsvExportFacts {
+  total: number;
+  rows: number;
+  cursorMode: boolean;
+  nextCursor: string | null;
+}
+
+/** Export facts by request query object (the handler's `req.query`); weak so nothing outlives its request. */
+const csvExportFacts = new WeakMap<object, CsvExportFacts>();
+/** Requested keyset page of a CSV export by request query object (from the X-Export-Cursor header). */
+const csvExportCursors = new WeakMap<object, { cursor: string | undefined }>();
+
+/** Export facts recorded for a request's query object (tests and the export job read headers instead). */
+export function csvExportFactsOf(query: object): CsvExportFacts | undefined {
+  return csvExportFacts.get(query);
+}
+
+/**
+ * Pagination for a list handler: normal paging for JSON; for `format=csv` the whole filtered list capped at CSV_EXPORT_MAX_ROWS, or —
+ * when the request carries `X-Export-Cursor` (the async export job) — one keyset page of CSV_EXPORT_PAGE_ROWS rows.
+ * `origin` is the request's own query object (`req.query`); pass it when `q` is a derived copy (e.g. `listPaging({ ...rest, format }, req.query)`),
+ * otherwise the X-Export-* headers and the export job's keyset pages cannot find the request.
+ */
+export function listPaging(q: ListQuery, origin: object = q): Pick<PaginateOptions, "page" | "page_size" | "cursor" | "limit" | "exact" | "csvExport"> {
+  if (q.format === "csv") {
+    const keyset = csvExportCursors.get(origin);
+    if (keyset) return { cursor: keyset.cursor, limit: CSV_EXPORT_PAGE_ROWS, exact: true, csvExport: origin };
+    return { page: 1, page_size: CSV_EXPORT_MAX_ROWS, exact: true, csvExport: origin };
+  }
   return fromListQuery(q);
+}
+
+/**
+ * Installs the CSV export hooks (audit F5): a preHandler that turns `X-Export-Cursor` into a keyset CSV page, and an onSend hook that
+ * answers every CSV list with `X-Export-Total` (rows matching the filters), `X-Export-Rows` (rows in this response),
+ * `X-Export-Truncated: true` when rows were cut at CSV_EXPORT_MAX_ROWS (use POST /exports for the whole list), and
+ * `X-Export-Next-Cursor` on keyset pages that have a next page.
+ */
+export function installListExports(app: FastifyInstance): void {
+  app.addHook("preHandler", async (req) => {
+    const raw = req.headers[EXPORT_CURSOR_HEADER];
+    const value = Array.isArray(raw) ? raw[0] : raw;
+    if (!value || req.method !== "GET" || !req.query || typeof req.query !== "object") return;
+    csvExportCursors.set(req.query, { cursor: value === "start" ? undefined : value });
+  });
+  app.addHook("onSend", async (req, reply, payload) => {
+    if (!req.query || typeof req.query !== "object") return payload;
+    const facts = csvExportFacts.get(req.query);
+    if (!facts) return payload;
+    reply.header("X-Export-Total", String(facts.total));
+    reply.header("X-Export-Rows", String(facts.rows));
+    if (facts.cursorMode) {
+      if (facts.nextCursor) reply.header("X-Export-Next-Cursor", facts.nextCursor);
+    } else if (facts.total > facts.rows) {
+      reply.header("X-Export-Truncated", "true");
+    }
+    return payload;
+  });
 }

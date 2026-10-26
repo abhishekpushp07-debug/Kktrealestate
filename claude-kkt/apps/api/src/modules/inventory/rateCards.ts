@@ -181,7 +181,7 @@ export function registerRateCardRoutes(app: FastifyInstance): void {
       let flatId: string | null = null;
       let flatTypeId: string;
       let floor: number;
-      let floorStart = 1;
+      let floorStart: number;
       let facing: string | null;
       let isCorner: boolean;
       let superBuiltupSqft: number | null = null;

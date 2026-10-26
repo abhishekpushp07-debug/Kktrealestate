@@ -119,7 +119,7 @@ export function ProgressRow({ label, sublabel, percent, trailing, tone = "navy" 
         <span className="money shrink-0 text-xs text-ink-muted">{trailing ?? formatPercent(pct, 0)}</span>
       </div>
       {sublabel && <p className="truncate text-2xs text-ink-subtle">{sublabel}</p>}
-      <div className="h-1.5 overflow-hidden rounded-full bg-navy-50" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)}>
+      <div className="h-1.5 overflow-hidden rounded-full bg-navy-50" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)} aria-label={typeof label === "string" ? label : "Progress"}>
         <span className={cn("block h-full rounded-full", tone === "navy" && "bg-navy-950", tone === "gold" && "bg-gold", tone === "success" && "bg-success")} style={{ width: `${pct}%` }} />
       </div>
     </div>

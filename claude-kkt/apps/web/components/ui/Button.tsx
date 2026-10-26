@@ -25,7 +25,7 @@ const BASE =
   "inline-flex items-center justify-center gap-2 rounded-full font-semibold tracking-wide transition-[background-color,color,transform,box-shadow] duration-300 ease-luxe disabled:opacity-60 disabled:cursor-not-allowed select-none";
 
 export function buttonClasses(variant: Variant = "primary", size: Size = "md", className = ""): string {
-  return `${BASE} ${VARIANTS[variant]} ${variant === "link" ? "min-h-11" : SIZES[size]} ${className}`.trim();
+  return `${BASE} ${VARIANTS[variant]} ${variant === "link" ? "min-h-12" : SIZES[size]} ${className}`.trim();
 }
 
 interface CommonProps {

@@ -65,10 +65,14 @@ export function StatCard({ label, value, hint, delta, icon: Icon, sparkline, loa
             <span
               className={cn(
                 "money inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-semibold",
-                good === null && "bg-surface text-ink-muted",
-                good === true && "bg-success-bg text-success-fg",
-                good === false && "bg-danger-bg text-danger-fg",
+                tone !== "navy" && good === null && "bg-surface text-ink-muted",
+                tone !== "navy" && good === true && "bg-success-bg text-success-fg",
+                tone !== "navy" && good === false && "bg-danger-bg text-danger-fg",
+                // on the navy card the chip is navy-800 with light text (≥ 4.5:1)
                 tone === "navy" && "bg-navy-800",
+                tone === "navy" && good === null && "text-navy-100",
+                tone === "navy" && good === true && "text-[#6ee7b7]",
+                tone === "navy" && good === false && "text-[#fca5a5]",
               )}
             >
               <DeltaIcon className="size-3" aria-hidden="true" />

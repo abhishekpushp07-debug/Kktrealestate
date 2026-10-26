@@ -2,6 +2,7 @@ import { Check, ChevronDown, X } from "lucide-react";
 import { Select as SelectPrimitive } from "radix-ui";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { useFieldAria } from "./field-context";
 
 export interface SelectOption<V extends string = string> {
   value: V;
@@ -45,6 +46,7 @@ export function Select<V extends string = string>({
   name,
   ...aria
 }: SelectProps<V>) {
+  const fieldAria = useFieldAria(id, { invalid, "aria-describedby": aria["aria-describedby"] });
   const selected = options.find((option) => option.value === value);
   return (
     <SelectPrimitive.Root
@@ -55,13 +57,13 @@ export function Select<V extends string = string>({
     >
       <SelectPrimitive.Trigger
         id={id}
-        aria-invalid={invalid || undefined}
         className={cn(
-          "group flex w-full min-w-0 items-center justify-between gap-2 rounded-md border border-border-strong bg-card px-3 text-left text-sm text-ink transition-colors hover:border-navy-300 focus-ring focus-visible:border-gold disabled:cursor-not-allowed disabled:bg-surface disabled:text-ink-subtle data-[placeholder]:text-ink-subtle aria-invalid:border-danger",
-          size === "md" ? "h-11 sm:h-9" : "h-11 text-xs sm:h-8",
+          "group flex w-full min-w-0 items-center justify-between gap-2 rounded-md border border-border-input bg-card px-3 text-left text-sm text-ink transition-colors hover:border-navy-400 focus-ring focus-visible:border-gold disabled:cursor-not-allowed disabled:bg-surface disabled:text-ink-subtle data-[placeholder]:text-ink-subtle aria-invalid:border-danger",
+          size === "md" ? "h-12 sm:h-9" : "h-12 text-xs sm:h-8",
           className,
         )}
         {...aria}
+        {...fieldAria}
       >
         <span className="truncate">
           <SelectPrimitive.Value placeholder={placeholder}>{selected?.label}</SelectPrimitive.Value>

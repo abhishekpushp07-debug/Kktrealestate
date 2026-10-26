@@ -10,7 +10,7 @@ import { Icon } from "@/ui/Icon";
 import { Lightbox, type LightboxImage } from "@/ui/Lightbox";
 import { ProgressBar, ProgressRing } from "@/ui/ProgressRing";
 import { useLayout } from "@/ui/Responsive";
-import { Screen } from "@/ui/Screen";
+import { useDocumentTitle, Screen } from "@/ui/Screen";
 import { SkeletonCard } from "@/ui/Skeleton";
 import { EmptyState, ErrorState, StatusBar } from "@/ui/States";
 import { T } from "@/ui/Text";
@@ -18,6 +18,7 @@ import { colors, radius, space } from "@/ui/theme";
 import { BookingGate, TabHeader } from "./shared";
 
 export function ConstructionScreen(): React.JSX.Element {
+  useDocumentTitle("Construction");
   return <BookingGate title="Construction">{(id) => <Body bookingId={id} />}</BookingGate>;
 }
 
@@ -95,7 +96,7 @@ function StageRow({ stage, isLast, onOpenPhoto }: { stage: PortalConstructionSta
           </View>
           <View style={{ alignItems: "flex-end", gap: 4 }}>
             <StageStatusChip status={stage.status} small />
-            {stage.is_possession ? <T variant="caption" color={colors.gold700}>Possession stage</T> : null}
+            {stage.is_possession ? <T variant="caption" color={colors.goldText}>Possession stage</T> : null}
           </View>
         </View>
         {stage.notes ? (
@@ -107,7 +108,7 @@ function StageRow({ stage, isLast, onOpenPhoto }: { stage: PortalConstructionSta
           <View style={styles.photoGrid}>
             {stage.photos.map((p, i) => (
               <Pressable key={`${p.thumb_url}-${i}`} accessibilityRole="button" accessibilityLabel={p.caption ?? `Photo ${i + 1} of ${stage.name}`} onPress={() => onOpenPhoto(i)} style={({ pressed }) => [{ width: thumbWidth, aspectRatio: 1 }, pressed ? { opacity: 0.8 } : null]}>
-                <Image source={{ uri: p.thumb_url }} style={styles.photo} contentFit="cover" transition={200} />
+                <Image source={{ uri: p.thumb_url }} style={styles.photo} contentFit="cover" transition={200} accessibilityLabel="" />
               </Pressable>
             ))}
           </View>

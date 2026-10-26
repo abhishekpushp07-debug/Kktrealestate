@@ -6,6 +6,8 @@ import type { ReportPresetRow } from "@kkt/contracts";
 import { Button, EmptyState, ErrorState, PageHeader, Skeleton } from "@/components/ui";
 import { describeError } from "@/lib/api";
 import { todayIST } from "@/lib/format";
+import { useAuth } from "@/lib/auth";
+import { ForbiddenPage } from "@/pages/ForbiddenPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 import { PresetsMenu } from "./PresetsMenu";
 import { ReportFilterBar } from "./ReportFilterBar";
@@ -17,7 +19,9 @@ import { findReport, REPORT_GROUP_LABELS, type ReportDefinition } from "./report
 export default function ReportPage() {
   const { key } = useParams<{ key: string }>();
   const report = findReport(key);
+  const { can } = useAuth();
   if (!report) return <NotFoundPage />;
+  if (report.permission && !can(report.permission)) return <ForbiddenPage />;
   return <ReportFrame key={report.slug} report={report} />;
 }
 

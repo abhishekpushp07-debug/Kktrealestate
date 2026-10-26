@@ -10,7 +10,7 @@ import { Icon } from "@/ui/Icon";
 import { Lightbox } from "@/ui/Lightbox";
 import { Money } from "@/ui/Money";
 import { useLayout } from "@/ui/Responsive";
-import { Col, Columns, Screen } from "@/ui/Screen";
+import { useDocumentTitle, Col, Columns, Screen } from "@/ui/Screen";
 import { SkeletonCard } from "@/ui/Skeleton";
 import { EmptyState, ErrorState, StatusBar } from "@/ui/States";
 import { Table } from "@/ui/Table";
@@ -19,6 +19,7 @@ import { colors, radius, space } from "@/ui/theme";
 import { BookingGate, TabHeader } from "./shared";
 
 export function MyFlatScreen(): React.JSX.Element {
+  useDocumentTitle("My Flat");
   return <BookingGate title="My Flat">{(id) => <Body bookingId={id} />}</BookingGate>;
 }
 
@@ -44,7 +45,7 @@ function FlatContent({ d }: { d: PortalMyFlatResponse }): React.JSX.Element {
     <>
       <Card padded={false}>
         <Pressable accessibilityRole={d.floor_plan_url ? "button" : undefined} accessibilityLabel="Floor plan — tap to zoom" disabled={!d.floor_plan_url} onPress={() => setPlan(0)} style={styles.planWrap}>
-          {d.floor_plan_url ? <Image source={{ uri: d.floor_plan_url }} style={StyleSheet.absoluteFill} contentFit="contain" transition={300} /> : (
+          {d.floor_plan_url ? <Image source={{ uri: d.floor_plan_url }} style={StyleSheet.absoluteFill} contentFit="contain" transition={300} accessibilityLabel="Floor plan" /> : (
             <View style={styles.planEmpty}>
               <Icon name="image" size={28} color={colors.inkSubtle} />
               <T variant="small" color={colors.inkMuted}>
@@ -171,7 +172,7 @@ function FlatContent({ d }: { d: PortalMyFlatResponse }): React.JSX.Element {
             {d.specifications.length === 0 ? <EmptyState icon="document" title="Specifications coming soon" style={{ paddingVertical: space.lg }} /> : null}
             {d.specifications.map((s, i) => (
               <View key={`${s.category}-${i}`} style={{ gap: 4, marginBottom: space.md }}>
-                <T variant="label" color={colors.gold700}>
+                <T variant="label" color={colors.goldText}>
                   {s.category}
                 </T>
                 {s.items.map((it, j) => (

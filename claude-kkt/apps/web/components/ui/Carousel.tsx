@@ -53,7 +53,9 @@ export function Carousel({ children, label, className = "", itemClassName = "w-[
     <div className={`relative ${className}`.trim()} role="region" aria-roledescription="carousel" aria-label={label}>
       <div
         ref={trackRef}
-        className="hide-scrollbar flex snap-x snap-mandatory gap-5 overflow-x-auto scroll-smooth pb-2 [-webkit-overflow-scrolling:touch]"
+        // keyboard users can focus the track and scroll it with the arrow keys (it may hold no focusable item)
+        tabIndex={0}
+        className="hide-scrollbar rounded-card focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-500 flex snap-x snap-mandatory gap-5 overflow-x-auto scroll-smooth pb-2 [-webkit-overflow-scrolling:touch]"
       >
         {Array.isArray(children)
           ? children.map((child, i) => (

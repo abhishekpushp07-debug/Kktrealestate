@@ -6,13 +6,14 @@ import { useAuth } from "@/auth/AuthProvider";
 import { Badge } from "@/ui/Chip";
 import { Card } from "@/ui/Card";
 import { Avatar, ListRow } from "@/ui/ListRow";
-import { Screen, Section } from "@/ui/Screen";
+import { useDocumentTitle, Screen, Section } from "@/ui/Screen";
 import { ConfirmDialog } from "@/ui/Sheet";
 import { T } from "@/ui/Text";
 import { colors, space } from "@/ui/theme";
 import { TabHeader } from "./shared";
 
 export function MoreScreen(): React.JSX.Element {
+  useDocumentTitle("More");
   const router = useRouter();
   const { user, logout } = useAuth();
   const unread = useUnreadCount().data?.count ?? 0;

@@ -6,24 +6,26 @@
 import { and, desc, eq, gte, sql, type SQL } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import {
-  AdminJobNameParamsSchema, AdminJobRunFilterSchema, AdminJobRunListResponseSchema, AdminJobRunNowRequestSchema, AdminJobRunRowSchema, AdminJobsResponseSchema,
+  AdminJobEnqueuedResponseSchema, AdminJobNameParamsSchema, AdminJobRunFilterSchema, AdminJobRunListResponseSchema, AdminJobRunNowRequestSchema, AdminJobRunRowSchema, AdminJobsResponseSchema,
   AdminRecomputeRequestSchema, AdminRecomputeResponseSchema, AdminReconcileRequestSchema, AdminReconcileResponseSchema, AdminReseedRequestSchema, AdminReseedResponseSchema,
   AdminSystemResponseSchema, JOB_NAMES, type AdminJobInfo, type AdminJobRunRow, type AdminRecomputeMismatch, type AdminRecomputeResponse, type AdminReconcileResponse,
   type AdminReseedResponse, type AdminSystemResponse, type IntegrityReportResponse, type JobName,
 } from "@kkt/contracts";
 import { bookings, companies, jobRuns, type DB, type Executor } from "@kkt/db";
 import { config } from "../../config.js";
-import { JOB_SCHEDULES, registeredJobs, registerJob, runJob } from "../../jobs/index.js";
+import { JOB_SCHEDULES, partitioningEnabled, registeredJobs, registerJob } from "../../jobs/index.js";
+import { enqueueJob, nextRuns } from "../../jobs/queue.js";
 import { writeAudit } from "../../lib/audit.js";
 import { bumpPermVersion, invalidate } from "../../lib/cache.js";
 import { sendCsv } from "../../lib/csv.js";
 import { ApiError } from "../../lib/errors.js";
 import { listPaging, paginate } from "../../lib/list.js";
+
 import { route } from "../../lib/routes.js";
 import { ensureProjectAccess, scopeFilter, type StaffContext } from "../../lib/scope.js";
 import { CORE_MODULES, discoverModules, selectModules } from "../loader.js";
-import { rebuild } from "../money/services/ledger.js";
-import { adminMeta, iso, requireSuperAdmin, staff } from "./common.js";
+import { rebuild } from "../money/index.js";
+import { adminMeta, idParams, iso, requireSuperAdmin, staff } from "./common.js";
 
 type JobRunRecord = typeof jobRuns.$inferSelect;
 
@@ -160,12 +162,40 @@ export async function systemFacts(app: FastifyInstance): Promise<AdminSystemResp
 // Routes
 // ---------------------------------------------------------------------------
 
-/** Lock held while a job runs on demand so two admins cannot start the same job concurrently. */
-const runLockKey = (name: string) => `job:running:${name}`;
+/** Bounded wait for a queue read (BullMQ's connection waits for Redis indefinitely). */
+async function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([p, new Promise<T>((resolve) => { timer = setTimeout(() => resolve(fallback), ms); })]);
+  } catch {
+    return fallback;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/** BullMQ deduplication id of manual "run now" requests: one pending/running manual run per job name (retries included). */
+export const manualDedupeId = (name: string) => `manual:${name}`;
+
+/** Per-job statistics for GET /admin/jobs. */
+type JobStats = { job_name: string; failures_24h: number; failures_since_success: number };
+
+/**
+ * Monthly partition maintenance (packages/db/partitions): creates the next months' partitions of audit_logs, ledger_entries,
+ * login_events and notifications through `kkt_create_next_partitions()`. Registered always, scheduled and active only with
+ * PARTITIONING_ENABLED=true (the partitioning scripts are opt-in at ~50 M rows).
+ */
+export async function partitionMaintenance(db: DB, monthsAhead = 2): Promise<Record<string, unknown>> {
+  if (!partitioningEnabled()) return { skipped: true, reason: "PARTITIONING_ENABLED is not true" };
+  const rows = await db.execute<{ created: string }>(sql`select kkt_create_next_partitions(${monthsAhead}) as created`);
+  const created = rows.map((r) => r.created).filter(Boolean);
+  return { created, months_ahead: monthsAhead };
+}
 
 /** Registers the admin job and the /admin/* tool routes. */
 export function registerToolRoutes(app: FastifyInstance): void {
   registerJob("STARTUP_RECONCILIATION", async ({ db }) => reconciliationJob(db));
+  registerJob("PARTITION_MAINTENANCE", async ({ db, data }) => partitionMaintenance(db, typeof data["months_ahead"] === "number" ? data["months_ahead"] : 2));
 
   route(app, {
     method: "POST", url: "/admin/recompute", permission: "admin.tools",
@@ -194,19 +224,40 @@ export function registerToolRoutes(app: FastifyInstance): void {
 
   route(app, {
     method: "GET", url: "/admin/jobs", permission: "admin.tools",
-    schema: { response: { 200: AdminJobsResponseSchema }, summary: "Registered jobs with schedules and last runs, recent job_runs, links to run-dues-now / integrity", tags: ["admin"] },
+    schema: { response: { 200: AdminJobsResponseSchema }, summary: "Every job: handler presence, schedule, next run, last run, last success, failure counts; recent runs and related links", tags: ["admin"] },
     handler: async () => {
       const recent = await app.dbReplica.select().from(jobRuns).orderBy(desc(jobRuns.startedAt)).limit(25);
       const names = [...JOB_NAMES];
-      const last = names.length ? await app.dbReplica.execute<{ id: string; job_name: string; started_at: Date; finished_at: Date | null; status: JobRunRecord["status"]; result: JobRunRecord["result"]; error: string | null }>(
-        sql`select distinct on (job_name) id, job_name, started_at, finished_at, status, result, error from job_runs where job_name in ${names} order by job_name, started_at desc`) : [];
-      const lastBy = new Map(last.map((r) => [r.job_name, { id: r.id, job_name: r.job_name, started_at: new Date(r.started_at).toISOString(), finished_at: iso(r.finished_at), status: r.status, result: r.result ?? null, error: r.error }]));
+      type LastRow = { id: string; job_name: string; started_at: Date; finished_at: Date | null; status: JobRunRecord["status"]; result: JobRunRecord["result"]; error: string | null };
+      const toRow = (r: LastRow) => ({ id: r.id, job_name: r.job_name, started_at: new Date(r.started_at).toISOString(), finished_at: iso(r.finished_at), status: r.status, result: r.result ?? null, error: r.error });
+      const [last, lastOk, stats, next] = await Promise.all([
+        app.dbReplica.execute<LastRow>(sql`select distinct on (job_name) id, job_name, started_at, finished_at, status, result, error from job_runs where job_name in ${names} order by job_name, started_at desc`),
+        app.dbReplica.execute<LastRow>(sql`select distinct on (job_name) id, job_name, started_at, finished_at, status, result, error from job_runs where job_name in ${names} and status = 'OK' order by job_name, started_at desc`),
+        app.dbReplica.execute<JobStats>(sql`
+          with last_ok as (select job_name, max(started_at) as at from job_runs where status = 'OK' and job_name in ${names} group by job_name)
+          select r.job_name,
+                 count(*) filter (where r.status = 'FAILED' and r.started_at >= now() - interval '24 hours')::int as failures_24h,
+                 count(*) filter (where r.status = 'FAILED' and r.started_at > coalesce(l.at, '-infinity'::timestamptz))::int as failures_since_success
+          from job_runs r left join last_ok l on l.job_name = r.job_name
+          where r.job_name in ${names} group by r.job_name`),
+        withTimeout(nextRuns(app.jobQueue()), 1_500, new Map<string, string>()),
+      ]);
+      const lastBy = new Map(last.map((r) => [r.job_name, toRow(r)]));
+      const okBy = new Map(lastOk.map((r) => [r.job_name, toRow(r)]));
+      const statsBy = new Map(stats.map((r) => [r.job_name, r]));
       const registered = new Set(registeredJobs());
       const jobs: AdminJobInfo[] = names.map((name) => {
         const s = JOB_SCHEDULES.find((x) => x.name === name);
-        return { name, registered: registered.has(name), cron: s?.cron ?? null, tz: s?.tz ?? null, last_run: lastBy.get(name) ?? null };
+        const st = statsBy.get(name);
+        const enabled = s ? (s.enabled ? s.enabled() : true) : false;
+        return {
+          name, registered: registered.has(name), cron: s?.cron ?? null, tz: s?.tz ?? null, schedule_enabled: enabled,
+          last_run: lastBy.get(name) ?? null, last_success: okBy.get(name) ?? null,
+          failure_count_24h: Number(st?.failures_24h ?? 0), failures_since_success: Number(st?.failures_since_success ?? 0),
+          next_run_at: enabled ? (next.get(name) ?? null) : null,
+        };
       });
-      return { jobs, recent_runs: recent.map(toJobRunRow), links: { run_dues_now: "/api/v1/dues/run", integrity_report: "/api/v1/dues/integrity", integrity_repair: "/api/v1/dues/integrity/repair", recompute: "/api/v1/admin/recompute", reconcile: "/api/v1/admin/reconcile" } };
+      return { jobs, recent_runs: recent.map(toJobRunRow), links: { run_dues_now: "/api/v1/dues/run", integrity_report: "/api/v1/dues/integrity", integrity_repair: "/api/v1/dues/integrity/repair", recompute: "/api/v1/admin/recompute", reconcile: "/api/v1/admin/reconcile", backups: "/api/v1/admin/backups", exports: "/api/v1/exports" } };
     },
   });
 
@@ -233,27 +284,33 @@ export function registerToolRoutes(app: FastifyInstance): void {
   });
 
   route(app, {
-    method: "POST", url: "/admin/jobs/:name/run", permission: "admin.tools",
-    schema: { params: AdminJobNameParamsSchema, body: AdminJobRunNowRequestSchema.optional(), response: { 200: AdminJobRunRowSchema }, summary: "Run a registered job now (in-process, through the core registry; records job_runs)", tags: ["admin"] },
+    method: "GET", url: "/admin/jobs/runs/:id", permission: "admin.tools",
+    schema: { params: idParams, response: { 200: AdminJobRunRowSchema }, summary: "One job run (404 while the enqueued job has not started yet)", tags: ["admin"] },
     handler: async (req) => {
+      const [row] = await app.db.select().from(jobRuns).where(eq(jobRuns.id, req.params.id)).limit(1);
+      if (!row) throw ApiError.notFound("Job run");
+      return toJobRunRow(row);
+    },
+  });
+
+  route(app, {
+    method: "POST", url: "/admin/jobs/:name/run", permission: "admin.tools",
+    schema: { params: AdminJobNameParamsSchema, body: AdminJobRunNowRequestSchema.optional(), response: { 202: AdminJobEnqueuedResponseSchema }, summary: "Enqueue a registered job now (runs on the worker with the normal retry policy); returns the run id to poll", tags: ["admin"] },
+    handler: async (req, reply) => {
       const user = staff(req);
       const name: JobName = req.params.name;
       if (!registeredJobs().includes(name)) throw ApiError.rule(`Job ${name} has no handler registered in this process`, "JOB_NOT_REGISTERED", { registered: registeredJobs() });
-      const lock = await app.redis.set(runLockKey(name), user.id, "EX", 600, "NX");
-      if (!lock) throw ApiError.conflict("JOB_ALREADY_RUNNING", `Job ${name} is already running`);
-      let outcome: Awaited<ReturnType<typeof runJob>>;
-      try {
-        outcome = await runJob(app.db, name, req.body?.data ?? {});
-      } finally {
-        await app.redis.del(runLockKey(name)).catch(() => undefined);
-      }
-      const [row] = await app.db.select().from(jobRuns).where(eq(jobRuns.id, outcome.runId)).limit(1);
-      if (!row) throw ApiError.notFound("Job run");
+      const queue = app.jobQueue();
+      const data = req.body?.data ?? {};
+      // one manual run per job at a time: the dedupe id makes the add atomic in Redis (parallel clicks cannot both enqueue)
+      const queued = await withTimeout(enqueueJob(queue, name, { ...data, __manual: user.id }, { dedupeId: manualDedupeId(name) }), 5_000, null);
+      if (!queued) throw ApiError.unavailable("The job queue (Redis) is not reachable; retry shortly");
+      if (queued.deduplicated) throw ApiError.conflict("JOB_ALREADY_RUNNING", `Job ${name} is already queued or running`, { run_id: queued.runId });
       const meta = adminMeta(req);
       await app.db.transaction(async (tx) => {
-        await writeAudit(tx, { companyId: user.companyId, actor: meta.actor, ip: meta.ip, requestId: meta.requestId, action: "job.run", entityType: "job_run", entityId: row.id, after: { job_name: name, status: row.status, error: row.error, data: req.body?.data ?? {} } });
+        await writeAudit(tx, { companyId: user.companyId, actor: meta.actor, ip: meta.ip, requestId: meta.requestId, action: "job.enqueue", entityType: "job_run", entityId: queued.runId, after: { job_name: name, data } });
       });
-      return toJobRunRow(row);
+      return reply.status(202).send({ run_id: queued.runId, job_id: queued.jobId, job_name: name, status: "QUEUED" as const, queued_at: queued.queuedAt });
     },
   });
 
@@ -282,7 +339,7 @@ export function registerToolRoutes(app: FastifyInstance): void {
       const [company] = await app.db.select({ id: companies.id }).from(companies).limit(1);
       const companyId = company?.id ?? user.companyId;
       const integrity: IntegrityReportResponse = result.integrity ?? await (async () => {
-        const { runReport } = await import("../money/services/integrity.js");
+        const { runReport } = await import("../money/index.js");
         return (await runReport(app.db, { companyId }, { triggeredBy: user.id, persist: false })).report;
       })();
       const meta = adminMeta(req);

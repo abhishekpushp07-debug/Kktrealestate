@@ -4,14 +4,14 @@ import { StyleSheet, View } from "react-native";
 import { T } from "./Text";
 import { colors, fonts } from "./theme";
 
-export function ProgressRing({ percent, size = 132, ticks = 40, children, onNavy }: { percent: number; size?: number; ticks?: number; children?: ReactNode; onNavy?: boolean }): React.JSX.Element {
+export function ProgressRing({ percent, size = 132, ticks = 40, children, onNavy, label = "Construction progress" }: { percent: number; size?: number; ticks?: number; children?: ReactNode; onNavy?: boolean; label?: string }): React.JSX.Element {
   const clamped = Math.max(0, Math.min(100, percent));
   const done = Math.round((clamped / 100) * ticks);
   const tickLen = Math.max(8, size * 0.1);
   const tickW = Math.max(2, size * 0.028);
   const radius = size / 2 - tickLen / 2 - 2;
   return (
-    <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }} accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: clamped }}>
+    <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }} accessibilityRole="progressbar" accessibilityLabel={label} accessibilityValue={{ min: 0, max: 100, now: Math.round(clamped) }}>
       {Array.from({ length: ticks }).map((_, i) => {
         const angle = (360 / ticks) * i;
         const filled = i < done;

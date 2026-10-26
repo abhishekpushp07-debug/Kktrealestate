@@ -1,4 +1,6 @@
 import type { FastifyInstance } from "fastify";
+import { registerJob } from "../../jobs/index.js";
+import { releaseExpiredHolds } from "./holds.js";
 import { registerBlockRoutes } from "./blocks.js";
 import { registerFlatRoutes } from "./flats.js";
 import { registerParkingRoutes } from "./parking.js";
@@ -16,6 +18,12 @@ export { toBlockRows, getBlockRow } from "./blocks.js";
 export { toFlatRows, getFlatRow, manualStatusChanges, statusAudit, defaultHoldUntil, assertHoldUntil, FLAT_SELECT, flatJoins, type FlatSelect } from "./flats.js";
 export { toParkingRows, loadParkingSlot, manualParkingStatus } from "./parking.js";
 export { toRateCardRows } from "./rateCards.js";
+export { releaseExpiredHolds, reserveFlat, releaseFlat } from "./holds.js";
+
+/** Registers the inventory job handlers (HOLD_EXPIRY: release lapsed flat holds; schedule it every 5–15 minutes). */
+export function registerInventoryJobs(): void {
+  registerJob("HOLD_EXPIRY", async ({ db }) => releaseExpiredHolds(db));
+}
 
 /** Inventory module (SPEC §4/§5): projects, parking, blocks (generation, grid, bulk ops), flats, rate cards. */
 export default async function inventoryModule(app: FastifyInstance): Promise<void> {
@@ -24,4 +32,5 @@ export default async function inventoryModule(app: FastifyInstance): Promise<voi
   registerBlockRoutes(app);
   registerFlatRoutes(app);
   registerRateCardRoutes(app);
+  registerInventoryJobs();
 }

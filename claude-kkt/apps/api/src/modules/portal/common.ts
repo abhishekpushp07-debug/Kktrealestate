@@ -10,7 +10,7 @@ import { ListQuerySchema, type PaymentBucket, type PortalBookingSwitcherItem, ty
 import { blocks, bookingCoApplicants, bookings, customers, flatTypes, flats, payments, projects, users, type Executor } from "@kkt/db";
 import { ApiError } from "../../lib/errors.js";
 import type { PortalContext, StaffContext } from "../../lib/scope.js";
-import type { BookingRecord } from "../money/common.js";
+import type { BookingRecord } from "../money/index.js";
 
 /** Portal list query: paging only (search/sort allow-lists are per route; csv is not a portal feature). */
 export const PortalListQuerySchema = ListQuerySchema.pick({ page: true, page_size: true, cursor: true, limit: true, sort: true });

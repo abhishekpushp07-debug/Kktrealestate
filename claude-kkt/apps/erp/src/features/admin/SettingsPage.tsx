@@ -7,7 +7,7 @@ import { z } from "zod";
 import { applyServerErrors, Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, ErrorState, FormError, FormField, FormRow, Input, NumberInput, PageHeader, PageSkeleton, PercentInput, Select, Switch } from "@/components/ui";
 import { api, type ApiClientError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, todayIST } from "@/lib/format";
 import { useMutationWithToast } from "@/lib/queries";
 import { contractResolver } from "@/features/shared/contractResolver";
 import { SETTINGS_PATH } from "./adminApi";
@@ -227,7 +227,7 @@ function SettingsFields({ row }: { row: CompanySettingsRow }) {
   const { control, watch } = useFormContext<SettingsValues>();
   const fyStartMonth = watch("fy_start_month");
   const numbering = watch("numbering");
-  const fy = financialYearCode(new Date(), fyStartMonth);
+  const fy = financialYearCode(new Date(`${todayIST()}T12:00:00`), fyStartMonth);
   return (
         <div className="grid gap-4 xl:grid-cols-2">
           <Card>

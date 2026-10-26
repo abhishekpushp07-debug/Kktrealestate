@@ -1,18 +1,19 @@
 /**
  * Branded A4 PDF generator (SPEC §14 "Branded A4 PDFs"): letterhead (company, legal name, address, GSTIN, RERA line, logo), gold rule,
  * navy title bar, two-column key/value blocks, tables with Indian number formatting right-aligned, "Page x of y", generated-at footer in IST,
- * optional diagonal watermark and the amount-in-words line. Fonts: Helvetica (built in). The ₹ glyph is missing in Helvetica, so amounts are
- * written "Rs. 1,00,000" unless a TrueType font is present under apps/api/assets/fonts (first *.ttf wins), in which case ₹ is used.
+ * optional diagonal watermark and the amount-in-words line.
+ *
+ * Two halves: `BrandedPdf` (this file) RECORDS the document on the request's thread — every value is formatted here (₹ with Indian
+ * grouping, amount in words, IST dates) — and the worker pool (services/pdfPool.ts) RENDERS it with pdfkit in a worker thread
+ * (services/pdfRender.ts), so pdfkit never runs on the event loop. Fonts: DejaVu Sans (regular/bold/oblique) embedded and subset into
+ * every PDF, so amounts print with the rupee sign "₹".
  */
-import { existsSync, readdirSync } from "node:fs";
-import { dirname, join } from "node:path";
 import type { Readable } from "node:stream";
-import { fileURLToPath } from "node:url";
-import PDFDocument from "pdfkit";
 import { amountInWords, formatINR, groupIndian, istParts, formatDateLabel } from "@kkt/domain";
+import { renderPdfBuffer, renderPdfStream } from "./pdfPool.js";
+import { PDF_THEME, resolvePdfFonts, type PdfOp, type PdfRenderTask, type RenderColumn } from "./pdfRender.js";
 
-/** Theme (SPEC §0: royal deep navy + gold). */
-export const PDF_THEME = { navy: "#0B1F3A", gold: "#C9A227", ink: "#1F2937", muted: "#6B7280", rule: "#D1D5DB", zebra: "#F6F3EA", white: "#FFFFFF", danger: "#B00020" } as const;
+export { PDF_THEME };
 
 /** Letterhead content printed at the top of every page. */
 export interface PdfLetterhead {
@@ -64,33 +65,19 @@ export interface KvBlock {
   rows: readonly (readonly [string, string | number | null | undefined])[];
 }
 
-const FONT_DIR_CANDIDATES = [
-  join(dirname(fileURLToPath(import.meta.url)), "../../../../assets/fonts"), // source tree: src/modules/reports/services
-  join(dirname(fileURLToPath(import.meta.url)), "../assets/fonts"), // tsup bundle: dist/<chunk>.js
-  join(process.cwd(), "assets/fonts"),
-  join(process.cwd(), "apps/api/assets/fonts"),
-];
-
-/** First TrueType font found under apps/api/assets/fonts, or null (Helvetica fallback). */
+/** Path of the embedded regular face (DejaVu Sans), or null when it cannot be found. */
 export function findRupeeFont(): string | null {
-  for (const dir of FONT_DIR_CANDIDATES) {
-    try {
-      if (!existsSync(dir)) continue;
-      const ttf = readdirSync(dir).find((f) => /\.ttf$/i.test(f));
-      if (ttf) return join(dir, ttf);
-    } catch {
-      /* unreadable directory: fall through */
-    }
+  try {
+    return resolvePdfFonts().regular;
+  } catch {
+    return null;
   }
-  return null;
 }
 
-const RUPEE_FONT = findRupeeFont();
+/** Currency prefix used on every PDF (the embedded DejaVu Sans has the rupee glyph). */
+export const PDF_CURRENCY_PREFIX = "₹";
 
-/** Currency prefix used on every PDF ("₹" with an embedded TTF, else "Rs. "). */
-export const PDF_CURRENCY_PREFIX = RUPEE_FONT ? "₹" : "Rs. ";
-
-/** Money for PDFs: "Rs. 1,00,00,000" / "-Rs. 1,000" (paise shown only when non-zero). */
+/** Money for PDFs: "₹1,00,00,000" / "-₹1,000" (Indian grouping; paise shown only when non-zero). */
 export function pdfMoney(paise: number): string {
   const negative = paise < 0;
   return `${negative ? "-" : ""}${PDF_CURRENCY_PREFIX}${formatINR(Math.abs(paise), { symbol: false })}`;
@@ -108,158 +95,40 @@ export function pdfDateTimeIST(instant: Date | string): string {
   return `${formatDateLabel(p.date)}, ${String(p.hour).padStart(2, "0")}:${String(p.minute).padStart(2, "0")} IST`;
 }
 
-const A4 = { width: 595.28, height: 841.89 };
-const MARGIN = 40;
-
-type Doc = InstanceType<typeof PDFDocument>;
-
 /**
- * A branded document. Build it with the content methods (kv, table, paragraph, amountInWords …) then `finish()` for the bytes.
- * Page headers/watermarks are drawn on every page; footers (page x of y, generated at) are stamped once the page count is known.
+ * A branded document. Build it with the content methods (kv, table, paragraph, amountInWords …) then `finish()` for the bytes or
+ * `finishStream()` for a stream. The methods only record formatted layout operations; rendering happens in the PDF worker pool, where
+ * page headers/watermarks are drawn on every page and footers (page x of y, generated at) are stamped once the page count is known.
  */
 export class BrandedPdf {
-  readonly doc: Doc;
   private readonly opts: PdfOptions;
-  private readonly pageWidth: number;
-  private readonly pageHeight: number;
-  private readonly bodyTop: number;
-  private readonly bodyBottom: number;
-  private readonly fontRegular: string;
-  private readonly fontBold: string;
-  private readonly fontItalic: string;
+  private readonly ops: PdfOp[] = [];
 
   constructor(opts: PdfOptions) {
     this.opts = opts;
-    const landscape = opts.landscape === true;
-    this.pageWidth = landscape ? A4.height : A4.width;
-    this.pageHeight = landscape ? A4.width : A4.height;
-    this.doc = new PDFDocument({
-      size: "A4",
-      layout: landscape ? "landscape" : "portrait",
-      margins: { top: MARGIN, bottom: MARGIN + 22, left: MARGIN, right: MARGIN },
-      bufferPages: true,
-      autoFirstPage: false,
-      info: { Title: opts.metaTitle ?? opts.title, Author: opts.author ?? opts.letterhead.name, Creator: "KKT", Producer: "KKT (pdfkit)" },
-    });
-    if (RUPEE_FONT) {
-      this.doc.registerFont("KKT-Regular", RUPEE_FONT);
-      this.fontRegular = "KKT-Regular";
-      this.fontBold = "KKT-Regular";
-      this.fontItalic = "KKT-Regular";
-    } else {
-      this.fontRegular = "Helvetica";
-      this.fontBold = "Helvetica-Bold";
-      this.fontItalic = "Helvetica-Oblique";
-    }
-    this.bodyBottom = this.pageHeight - MARGIN - 22;
-    this.bodyTop = MARGIN + 92;
-    this.doc.on("pageAdded", () => this.drawPageChrome());
-    this.doc.addPage();
-  }
-
-  /** Usable width between the margins. */
-  get contentWidth(): number {
-    return this.pageWidth - 2 * MARGIN;
-  }
-
-  /** Current vertical position. */
-  get y(): number {
-    return this.doc.y;
-  }
-
-  private drawPageChrome(): void {
-    const d = this.doc;
-    const lh = this.opts.letterhead;
-    const left = MARGIN;
-    let textLeft = left;
-    const logo = lh.logo;
-    if (logo && isPngOrJpeg(logo)) {
-      try {
-        d.image(logo, left, MARGIN, { fit: [64, 44] });
-        textLeft = left + 76;
-      } catch {
-        textLeft = left;
-      }
-    }
-    const textWidth = this.pageWidth - MARGIN - textLeft;
-    d.font(this.fontBold).fontSize(15).fillColor(PDF_THEME.navy).text(lh.name, textLeft, MARGIN, { width: textWidth, lineBreak: false });
-    let y = MARGIN + 18;
-    const sub: string[] = [];
-    if (lh.legalName && lh.legalName !== lh.name) sub.push(lh.legalName);
-    if (lh.tagline) sub.push(lh.tagline);
-    if (sub.length > 0) {
-      d.font(this.fontItalic).fontSize(8.5).fillColor(PDF_THEME.muted).text(sub.join(" · "), textLeft, y, { width: textWidth, lineBreak: false });
-      y += 11;
-    }
-    const lines: string[] = [];
-    if (lh.addressLine) lines.push(lh.addressLine);
-    const regs = [lh.gstin ? `GSTIN ${lh.gstin}` : null, lh.reraLine ?? null, lh.contactLine ?? null].filter((x): x is string => !!x);
-    if (regs.length > 0) lines.push(regs.join("  ·  "));
-    d.font(this.fontRegular).fontSize(8).fillColor(PDF_THEME.ink);
-    for (const line of lines) {
-      d.text(line, textLeft, y, { width: textWidth, lineBreak: false });
-      y += 10;
-    }
-    // gold rule
-    const ruleY = MARGIN + 58;
-    d.moveTo(left, ruleY).lineTo(this.pageWidth - MARGIN, ruleY).lineWidth(1.6).strokeColor(PDF_THEME.gold).stroke();
-    // title bar
-    const barY = ruleY + 8;
-    d.rect(left, barY, this.contentWidth, 22).fill(PDF_THEME.navy);
-    d.font(this.fontBold).fontSize(11).fillColor(PDF_THEME.white).text(this.opts.title.toUpperCase(), left + 8, barY + 6, { width: this.contentWidth * 0.6, lineBreak: false });
-    if (this.opts.reference) {
-      d.font(this.fontRegular).fontSize(9).fillColor(PDF_THEME.white).text(this.opts.reference, left + this.contentWidth * 0.5 - 8, barY + 7, { width: this.contentWidth * 0.5, align: "right", lineBreak: false });
-    }
-    if (this.opts.watermark) this.drawWatermark(this.opts.watermark);
-    d.fillColor(PDF_THEME.ink).font(this.fontRegular).fontSize(9);
-    d.x = left;
-    d.y = this.bodyTop;
-  }
-
-  private drawWatermark(text: string): void {
-    const d = this.doc;
-    d.save();
-    const cx = this.pageWidth / 2;
-    const cy = this.pageHeight / 2;
-    d.rotate(-35, { origin: [cx, cy] });
-    d.font(this.fontBold).fontSize(84).fillColor(PDF_THEME.danger).fillOpacity(0.12);
-    const w = d.widthOfString(text);
-    d.text(text, cx - w / 2, cy - 42, { lineBreak: false });
-    d.restore();
-    d.fillOpacity(1);
   }
 
   /** Starts a new page when fewer than `needed` points remain. */
-  ensureSpace(needed: number): void {
-    if (this.doc.y + needed > this.bodyBottom) this.doc.addPage();
+  ensureSpace(needed: number): this {
+    this.ops.push({ op: "ensureSpace", needed });
+    return this;
   }
 
   /** Adds vertical space. */
   spacer(h = 8): this {
-    this.doc.y += h;
+    this.ops.push({ op: "spacer", h });
     return this;
   }
 
-  /** Section heading (navy, small caps feel) with a thin gold underline. */
+  /** Section heading (navy) with a thin gold underline. */
   heading(text: string): this {
-    this.ensureSpace(26);
-    const d = this.doc;
-    d.font(this.fontBold).fontSize(10.5).fillColor(PDF_THEME.navy).text(text, MARGIN, d.y, { width: this.contentWidth });
-    const y = d.y + 2;
-    d.moveTo(MARGIN, y).lineTo(MARGIN + 60, y).lineWidth(1).strokeColor(PDF_THEME.gold).stroke();
-    d.y = y + 7;
-    d.fillColor(PDF_THEME.ink).font(this.fontRegular).fontSize(9);
+    this.ops.push({ op: "heading", text });
     return this;
   }
 
   /** Body paragraph. */
   paragraph(text: string, opts: { size?: number; italic?: boolean; color?: string; align?: "left" | "right" | "center" | "justify" } = {}): this {
-    const d = this.doc;
-    d.font(opts.italic ? this.fontItalic : this.fontRegular).fontSize(opts.size ?? 9.5).fillColor(opts.color ?? PDF_THEME.ink);
-    const h = d.heightOfString(text, { width: this.contentWidth, align: opts.align ?? "left" });
-    this.ensureSpace(Math.min(h, 200));
-    d.text(text, MARGIN, d.y, { width: this.contentWidth, align: opts.align ?? "left" });
-    d.y += 6;
+    this.ops.push({ op: "paragraph", text, size: opts.size ?? 9.5, italic: opts.italic === true, color: opts.color ?? PDF_THEME.ink, align: opts.align ?? "left" });
     return this;
   }
 
@@ -270,222 +139,97 @@ export class BrandedPdf {
 
   /** Key/value blocks laid out two per row (label muted, value bold). */
   kv(blocks: readonly KvBlock[]): this {
-    const d = this.doc;
-    const gap = 16;
-    const colWidth = (this.contentWidth - gap) / 2;
-    for (let i = 0; i < blocks.length; i += 2) {
-      const pair = blocks.slice(i, i + 2);
-      const heights = pair.map((b) => this.kvHeight(b, colWidth));
-      const rowHeight = Math.max(...heights);
-      this.ensureSpace(rowHeight + 8);
-      const top = d.y;
-      pair.forEach((b, idx) => this.drawKvBlock(b, MARGIN + idx * (colWidth + gap), top, colWidth));
-      d.y = top + rowHeight + 8;
-      d.x = MARGIN;
-    }
+    this.ops.push({ op: "kv", blocks: blocks.map((b) => ({ title: b.title ?? null, rows: b.rows.map(([k, v]) => [k, valueText(v)] as [string, string]) })) });
     return this;
-  }
-
-  private kvHeight(block: KvBlock, width: number): number {
-    const d = this.doc;
-    let h = block.title ? 16 : 0;
-    const valueWidth = width * 0.6;
-    for (const [, v] of block.rows) {
-      d.font(this.fontBold).fontSize(9);
-      h += Math.max(12, d.heightOfString(valueText(v), { width: valueWidth }) + 3);
-    }
-    return h + 4;
-  }
-
-  private drawKvBlock(block: KvBlock, x: number, top: number, width: number): void {
-    const d = this.doc;
-    let y = top;
-    if (block.title) {
-      d.font(this.fontBold).fontSize(8).fillColor(PDF_THEME.gold).text(block.title.toUpperCase(), x, y, { width, lineBreak: false });
-      y += 14;
-      d.moveTo(x, y - 2).lineTo(x + width, y - 2).lineWidth(0.5).strokeColor(PDF_THEME.rule).stroke();
-      y += 2;
-    }
-    const labelWidth = width * 0.4 - 4;
-    const valueWidth = width * 0.6;
-    for (const [label, v] of block.rows) {
-      d.font(this.fontRegular).fontSize(8.5).fillColor(PDF_THEME.muted).text(label, x, y, { width: labelWidth, lineBreak: false });
-      d.font(this.fontBold).fontSize(9).fillColor(PDF_THEME.ink);
-      const text = valueText(v);
-      const h = d.heightOfString(text, { width: valueWidth });
-      d.text(text, x + width * 0.4, y, { width: valueWidth });
-      y += Math.max(12, h + 3);
-    }
-    d.fillColor(PDF_THEME.ink);
   }
 
   /**
    * Table with a navy header, zebra rows, right-aligned Indian-formatted money and an optional bold totals row; breaks across pages
-   * (header repeated). `rows` beyond what fits are paged automatically.
+   * (header repeated). Cells are formatted here (money → "₹1,00,000", custom renderers) and only strings travel to the renderer.
    */
   table<T extends Record<string, unknown>>(columns: readonly PdfColumn<T>[], rows: readonly T[], opts: { totals?: Record<string, unknown> | null; emptyText?: string; fontSize?: number } = {}): this {
-    const d = this.doc;
-    const fontSize = opts.fontSize ?? 8.5;
-    const weights = columns.map((c) => c.width ?? 1);
-    const totalWeight = weights.reduce((s, w) => s + w, 0);
-    const widths = weights.map((w) => (this.contentWidth * w) / totalWeight);
-    const pad = 4;
     const cellText = (col: PdfColumn<T>, row: T): string => {
       if (col.render) return col.render(row);
       const v = row[col.key];
       if (col.money) return typeof v === "number" ? pdfMoney(v) : v == null ? "" : String(v);
       return valueText(v as string | number | null | undefined);
     };
-    const align = (col: PdfColumn<T>): "left" | "right" | "center" => col.align ?? (col.money ? "right" : "left");
-
-    const drawHeader = (): void => {
-      const y = d.y;
-      d.rect(MARGIN, y, this.contentWidth, 16).fill(PDF_THEME.navy);
-      d.font(this.fontBold).fontSize(fontSize).fillColor(PDF_THEME.white);
-      let x = MARGIN;
-      columns.forEach((c, i) => {
-        const w = widths[i] ?? 0;
-        d.text(c.header, x + pad, y + 4.5, { width: w - 2 * pad, align: align(c), lineBreak: false, ellipsis: true });
-        x += w;
-      });
-      d.y = y + 16;
-      d.fillColor(PDF_THEME.ink).font(this.fontRegular);
-    };
-
-    const rowHeight = (texts: string[]): number => {
-      d.font(this.fontRegular).fontSize(fontSize);
-      let h = 0;
-      texts.forEach((t, i) => {
-        h = Math.max(h, d.heightOfString(t, { width: (widths[i] ?? 0) - 2 * pad }));
-      });
-      return Math.max(14, h + 5);
-    };
-
-    const drawRow = (texts: string[], opt: { zebra: boolean; bold?: boolean; top?: boolean }): void => {
-      const h = rowHeight(texts);
-      if (d.y + h > this.bodyBottom) {
-        d.addPage();
-        drawHeader();
-      }
-      const y = d.y;
-      if (opt.zebra) d.rect(MARGIN, y, this.contentWidth, h).fill(PDF_THEME.zebra);
-      if (opt.top) d.moveTo(MARGIN, y).lineTo(MARGIN + this.contentWidth, y).lineWidth(1).strokeColor(PDF_THEME.gold).stroke();
-      d.font(opt.bold ? this.fontBold : this.fontRegular).fontSize(fontSize).fillColor(PDF_THEME.ink);
-      let x = MARGIN;
-      texts.forEach((t, i) => {
-        const w = widths[i] ?? 0;
-        const col = columns[i]!;
-        d.text(t, x + pad, y + 3, { width: w - 2 * pad, align: align(col) });
-        x += w;
-      });
-      d.moveTo(MARGIN, y + h).lineTo(MARGIN + this.contentWidth, y + h).lineWidth(0.3).strokeColor(PDF_THEME.rule).stroke();
-      d.y = y + h;
-      d.x = MARGIN;
-    };
-
-    this.ensureSpace(40);
-    drawHeader();
-    if (rows.length === 0) {
-      drawRow([opts.emptyText ?? "No rows for the selected filters", ...columns.slice(1).map(() => "")], { zebra: false });
-    }
-    rows.forEach((row, idx) => drawRow(columns.map((c) => cellText(c, row)), { zebra: idx % 2 === 1 }));
+    const rendered: RenderColumn[] = columns.map((c) => ({ header: c.header, width: c.width ?? 1, align: c.align ?? (c.money ? "right" : "left") }));
+    let totals: string[] | null = null;
     if (opts.totals) {
-      const totals = opts.totals;
-      const texts = columns.map((c, i) => {
-        const v = totals[c.key];
+      const t = opts.totals;
+      totals = columns.map((c, i) => {
+        const v = t[c.key];
         if (i === 0 && v === undefined) return "Total";
         if (v === undefined || v === null) return "";
         if (c.money && typeof v === "number") return pdfMoney(v);
         return String(v);
       });
-      drawRow(texts, { zebra: false, bold: true, top: true });
     }
-    d.y += 8;
+    this.ops.push({
+      op: "table",
+      columns: rendered,
+      rows: rows.map((row) => columns.map((c) => cellText(c, row))),
+      totals,
+      emptyText: opts.emptyText ?? "No rows for the selected filters",
+      fontSize: opts.fontSize ?? 8.5,
+    });
     return this;
   }
 
   /** Boxed "Amount in words: Rupees … Only". */
   amountInWords(paise: number, label = "Amount in words"): this {
-    const d = this.doc;
-    const words = amountInWords(paise);
-    d.font(this.fontItalic).fontSize(9.5);
-    const text = `${label}: ${words}`;
-    const h = d.heightOfString(text, { width: this.contentWidth - 16 }) + 12;
-    this.ensureSpace(h + 6);
-    const y = d.y;
-    d.rect(MARGIN, y, this.contentWidth, h).lineWidth(0.6).strokeColor(PDF_THEME.gold).stroke();
-    d.fillColor(PDF_THEME.ink).text(text, MARGIN + 8, y + 6, { width: this.contentWidth - 16 });
-    d.y = y + h + 8;
-    d.x = MARGIN;
+    this.ops.push({ op: "boxedText", text: `${label}: ${amountInWords(paise)}` });
     return this;
   }
 
   /** Big highlighted amount box (receipts). */
   amountBox(label: string, paise: number): this {
-    const d = this.doc;
-    this.ensureSpace(44);
-    const y = d.y;
-    d.rect(MARGIN, y, this.contentWidth, 36).fill(PDF_THEME.zebra);
-    d.font(this.fontRegular).fontSize(9).fillColor(PDF_THEME.muted).text(label, MARGIN + 10, y + 12, { width: this.contentWidth / 2, lineBreak: false });
-    d.font(this.fontBold).fontSize(16).fillColor(PDF_THEME.navy).text(pdfMoney(paise), MARGIN + this.contentWidth / 2 - 10, y + 9, { width: this.contentWidth / 2, align: "right", lineBreak: false });
-    d.y = y + 44;
-    d.x = MARGIN;
-    d.fillColor(PDF_THEME.ink);
+    this.ops.push({ op: "amountBox", label, amount: pdfMoney(paise) });
     return this;
   }
 
   /** Signature block (right-aligned): "For <company>", space, name/title. */
   signature(forName: string, signatoryName: string | null | undefined, signatoryTitle: string | null | undefined): this {
-    const d = this.doc;
-    this.ensureSpace(70);
-    const w = 200;
-    const x = MARGIN + this.contentWidth - w;
-    const y = d.y + 10;
-    d.font(this.fontBold).fontSize(9).fillColor(PDF_THEME.ink).text(`For ${forName}`, x, y, { width: w, align: "right", lineBreak: false });
-    d.moveTo(x + 40, y + 40).lineTo(x + w, y + 40).lineWidth(0.6).strokeColor(PDF_THEME.rule).stroke();
-    d.font(this.fontRegular).fontSize(8.5).text(signatoryName ?? "Authorised Signatory", x, y + 43, { width: w, align: "right", lineBreak: false });
-    if (signatoryTitle) d.fillColor(PDF_THEME.muted).text(signatoryTitle, x, y + 53, { width: w, align: "right", lineBreak: false });
-    d.y = y + 66;
-    d.x = MARGIN;
-    d.fillColor(PDF_THEME.ink);
+    this.ops.push({ op: "signature", forName, name: signatoryName ?? "Authorised Signatory", title: signatoryTitle ?? null });
     return this;
   }
 
-  /** Stamps the footer on every page (page x of y, generated at IST); called exactly once before the document is ended. */
-  private stampFooters(): void {
-    const d = this.doc;
-    const range = d.bufferedPageRange();
-    const generated = `Generated ${pdfDateTimeIST(this.opts.generatedAt ?? new Date())} · ${this.opts.letterhead.name}`;
-    for (let i = range.start; i < range.start + range.count; i += 1) {
-      d.switchToPage(i);
-      // the footer sits inside the bottom margin: lift the margin so the line wrapper never starts a new page while stamping it
-      d.page.margins.bottom = 0;
-      const y = this.pageHeight - MARGIN - 12;
-      d.moveTo(MARGIN, y - 4).lineTo(this.pageWidth - MARGIN, y - 4).lineWidth(0.6).strokeColor(PDF_THEME.gold).stroke();
-      d.font(this.fontRegular).fontSize(7.5).fillColor(PDF_THEME.muted);
-      d.text(generated, MARGIN, y, { width: this.contentWidth * 0.7, lineBreak: false });
-      d.text(`Page ${i - range.start + 1} of ${range.count}`, MARGIN + this.contentWidth * 0.7, y, { width: this.contentWidth * 0.3, align: "right", lineBreak: false });
-    }
+  /** The serialisable render task (letterhead strings, options and the recorded operations). */
+  toTask(): PdfRenderTask {
+    const o = this.opts;
+    const lh = o.letterhead;
+    const sub: string[] = [];
+    if (lh.legalName && lh.legalName !== lh.name) sub.push(lh.legalName);
+    if (lh.tagline) sub.push(lh.tagline);
+    const lines: string[] = [];
+    if (lh.addressLine) lines.push(lh.addressLine);
+    const regs = [lh.gstin ? `GSTIN ${lh.gstin}` : null, lh.reraLine ?? null, lh.contactLine ?? null].filter((x): x is string => !!x);
+    if (regs.length > 0) lines.push(regs.join("  ·  "));
+    const logo = lh.logo && isPngOrJpeg(lh.logo) ? new Uint8Array(lh.logo) : null;
+    return {
+      options: {
+        letterhead: { name: lh.name, subLine: sub.length > 0 ? sub.join(" · ") : null, lines, logo },
+        title: o.title,
+        reference: o.reference ?? null,
+        watermark: o.watermark ?? null,
+        landscape: o.landscape === true,
+        metaTitle: o.metaTitle ?? o.title,
+        author: o.author ?? lh.name,
+        footer: `Generated ${pdfDateTimeIST(o.generatedAt ?? new Date())} · ${lh.name}`,
+      },
+      ops: this.ops.slice(),
+    };
   }
 
-  /** Finishes the document and returns the PDF bytes (documents that are stored or re-sent, e.g. portal signed links). */
+  /** Renders the document in the worker pool and returns the PDF bytes (documents that are stored or re-sent, e.g. portal signed links). */
   finish(): Promise<Buffer> {
-    const d = this.doc;
-    this.stampFooters();
-    return new Promise<Buffer>((resolve, reject) => {
-      const chunks: Buffer[] = [];
-      d.on("data", (c: Buffer) => chunks.push(c));
-      d.on("end", () => resolve(Buffer.concat(chunks)));
-      d.on("error", reject);
-      d.end();
-    });
+    return renderPdfBuffer(this.toTask());
   }
 
-  /** Finishes the document and returns it as a readable stream (reports are piped straight to the HTTP reply, never concatenated). */
-  finishStream(): Readable {
-    this.stampFooters();
-    this.doc.end();
-    return this.doc as unknown as Readable;
+  /** Renders the document in the worker pool as a stream (reports are piped straight to the HTTP reply, never concatenated). */
+  finishStream(): Promise<Readable> {
+    return renderPdfStream(this.toTask());
   }
 }
 
@@ -552,7 +296,7 @@ export async function reportPdf<T extends Record<string, unknown>>(letterhead: P
   return buildReportPdf(letterhead, spec).finish();
 }
 
-/** Generic report PDF as a readable stream (what the report routes send). */
-export function reportPdfStream<T extends Record<string, unknown>>(letterhead: PdfLetterhead, spec: ReportTableSpec<T>): Readable {
+/** Generic report PDF as a readable stream (what the report routes send); resolves once the worker has produced the first bytes. */
+export function reportPdfStream<T extends Record<string, unknown>>(letterhead: PdfLetterhead, spec: ReportTableSpec<T>): Promise<Readable> {
   return buildReportPdf(letterhead, spec).finishStream();
 }

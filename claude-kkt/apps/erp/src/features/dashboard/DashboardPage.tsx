@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { DASHBOARD_ROLE_LABELS, type DashboardResponse } from "@kkt/contracts";
 import { Badge, Button, ErrorState, PageHeader, Select, Skeleton } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
-import { formatRelative } from "@/lib/format";
+import { formatRelative, istHour } from "@/lib/format";
 import { useProjectOptions } from "@/features/shared/options";
 import { AccountsDashboard } from "./AccountsDashboard";
 import { EmployeeDashboard } from "./EmployeeDashboard";
@@ -55,7 +55,7 @@ export default function DashboardPage() {
   const dashboard = useDashboard(projectId);
   const projects = useProjectOptions(scope.allProjects || scope.projectIds.length > 1);
   const firstName = user?.name.split(/\s+/)[0] ?? "";
-  const hour = new Date().getHours();
+  const hour = istHour();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const showProjectFilter = (projects.data?.length ?? 0) > 1 && dashboard.data?.role !== "SALES";
 
