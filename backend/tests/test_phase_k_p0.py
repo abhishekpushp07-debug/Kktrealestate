@@ -18,33 +18,32 @@ def _sync_db():
     return MongoClient(os.environ["MONGO_URL"])[os.environ["DB_NAME"]]
 
 
-_LOOP = asyncio.new_event_loop()
-
-
-def _run(coro):
-    """Motor binds its client to the first loop it sees — keep one loop per process."""
-    return _LOOP.run_until_complete(coro)
+def _py(script: str):
+    """Run app-side async code in a fresh subprocess (xdist workers reuse the process; motor binds to the first loop it sees)."""
+    import json
+    import subprocess
+    out = subprocess.run([sys.executable, "-c", "import asyncio, json, sys\nsys.path.insert(0, '.')\n" + script], cwd=os.path.join(os.path.dirname(__file__), ".."), capture_output=True, text=True, timeout=120, env={**os.environ})
+    assert out.returncode == 0, out.stderr[-2000:]
+    return json.loads(out.stdout.strip().splitlines()[-1]) if out.stdout.strip() else None
 
 
 # ---- 1. job isolation -------------------------------------------------------------------------
 def test_poisoned_booking_does_not_stop_dues_run():
-    from services import job_runs
-
-    async def go():
-        items = [{"id": "ok1"}, {"id": "bad"}, {"id": "ok2"}]
-        seen = []
-
-        async def one(b):
-            if b["id"] == "bad":
-                raise RuntimeError("poisoned")
-            seen.append(b["id"])
-            return 1
-
-        async def gen():
-            for i in items:
-                yield i
-        return await job_runs.run_isolated("TEST_DUES", gen(), one, item_id=lambda b: b["id"]), seen
-    run, seen = _run(go())
+    run, seen = _py("""
+from services import job_runs
+async def go():
+    seen = []
+    async def one(b):
+        if b["id"] == "bad":
+            raise RuntimeError("poisoned")
+        seen.append(b["id"]); return 1
+    async def gen():
+        for i in [{"id": "ok1"}, {"id": "bad"}, {"id": "ok2"}]:
+            yield i
+    run = await job_runs.run_isolated("TEST_DUES", gen(), one, item_id=lambda b: b["id"])
+    print(json.dumps([run, seen], default=str))
+asyncio.run(go())
+""")
     assert seen == ["ok1", "ok2"]
     assert run["status"] == "FAILED" and run["failed_items"] == 1 and run["items"] == 3
     assert run["errors"][0]["item"] == "bad" and "poisoned" in run["errors"][0]["error"]
@@ -52,13 +51,16 @@ def test_poisoned_booking_does_not_stop_dues_run():
 
 
 def test_sweep_marks_stuck_runs_abandoned_and_health_flags_stale(admin_headers):
-    from services import job_runs
     db = _sync_db()
     old = (datetime.now(UTC) - timedelta(hours=3)).isoformat()
     db.job_runs.insert_one({"id": "stuck1", "job": "TEST_STUCK", "started_at": old, "finished_at": None, "status": "RUNNING", "budget_s": 60, "items": 0, "failed_items": 0, "errors": []})
-    _run(job_runs.sweep())
+    h = _py("""
+from services import job_runs
+async def go():
+    await job_runs.sweep(); print(json.dumps(await job_runs.health(), default=str))
+asyncio.run(go())
+""")
     assert db.job_runs.find_one({"id": "stuck1"})["status"] == "ABANDONED"
-    h = _run(job_runs.health())
     assert "DAILY_DUES" in h["jobs"] and "NIGHTLY_INTEGRITY" in h["jobs"]
     r = requests.get(f"{BASE}/api/admin/ops", headers=admin_headers)
     assert r.status_code == 200 and "job_runs" in r.json() and "stale" in r.json()["job_runs"]
@@ -68,8 +70,7 @@ def test_sweep_marks_stuck_runs_abandoned_and_health_flags_stale(admin_headers):
 # ---- 2. invariants ----------------------------------------------------------------------------
 def test_invariant_indexes_and_validators_reject_bad_docs():
     from pymongo.errors import DuplicateKeyError, WriteError
-    from services.invariants import ensure_invariants
-    _run(ensure_invariants())
+    _py("from services.invariants import ensure_invariants\nasyncio.run(ensure_invariants())")
     db = _sync_db()
     flat = f"flat-inv-{uuid.uuid4()}"
     base = {"company_id": "c", "project_id": "p", "block_id": "b", "flat_id": flat, "customer_id": "c", "status": "Active", "agreement_value_paise": 100, "cash_agreed_paise": 60, "account_agreed_paise": 40, "version": 1}
@@ -116,23 +117,27 @@ def test_twenty_parallel_bookings_on_one_flat_exactly_one_wins():
 
 # ---- 3. immutable audit / ledger --------------------------------------------------------------
 def test_app_connection_cannot_update_or_delete_audit_rows():
-    from db import db
-    from services.immutable import ImmutableError
-
-    async def go():
-        aid = f"aud-{uuid.uuid4()}"
-        await db.audit_logs.insert_one({"id": aid, "action": "test", "entity_type": "x", "entity_id": "y", "created_at": datetime.now(UTC).isoformat()})
-        with pytest.raises(ImmutableError):
-            await db.audit_logs.update_one({"id": aid}, {"$set": {"action": "tampered"}})
-        with pytest.raises(ImmutableError):
-            await db.audit_logs.delete_one({"id": aid})
-        with pytest.raises(ImmutableError):
-            await db.ledger_entries.update_many({"booking_id": "none"}, {"$set": {"amount_paise": 0}})
-        with pytest.raises(ImmutableError):
-            await db.ledger_entries.delete_many({"booking_id": "none"})
-        await db.audit_logs.update_one({"id": aid}, {"$set": {"propagated": True}})  # metadata allow-list
-        await db.audit_logs.raw("test cleanup").delete_one({"id": aid})
-    _run(go())
+    res = _py("""
+import uuid
+from datetime import datetime, UTC
+from db import db
+from services.immutable import ImmutableError
+async def go():
+    aid = f"aud-{uuid.uuid4()}"
+    await db.audit_logs.insert_one({"id": aid, "action": "test", "entity_type": "x", "entity_id": "y", "created_at": datetime.now(UTC).isoformat()})
+    blocked = []
+    for name, op in [("update", lambda: db.audit_logs.update_one({"id": aid}, {"$set": {"action": "tampered"}})), ("delete", lambda: db.audit_logs.delete_one({"id": aid})),
+                     ("ledger_update", lambda: db.ledger_entries.update_many({"booking_id": "none"}, {"$set": {"amount_paise": 0}})), ("ledger_delete", lambda: db.ledger_entries.delete_many({"booking_id": "none"}))]:
+        try:
+            await op()
+        except ImmutableError:
+            blocked.append(name)
+    await db.audit_logs.update_one({"id": aid}, {"$set": {"propagated": True}})  # metadata allow-list
+    await db.audit_logs.raw("test cleanup").delete_one({"id": aid})
+    print(json.dumps(blocked))
+asyncio.run(go())
+""")
+    assert res == ["update", "delete", "ledger_update", "ledger_delete"]
 
 
 # ---- 4. durable idempotency ---------------------------------------------------------------------

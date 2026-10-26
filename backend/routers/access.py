@@ -58,10 +58,6 @@ async def get_access(user_id: str, user: dict = Depends(require("admin.access_co
 @router.put("/users/{user_id}")
 async def put_access(user_id: str, body: AccessUpdate, request: Request, user: dict = Depends(require("admin.access_control.manage"))):
     u = await get_or_404(db.users, user_id, "User", {"company_id": user["company_id"]})
-    from services import access_guard
-    access_guard.no_self_change(user, user_id, "roles, direct grants or project scope")
-    await access_guard.guard_target(user, u, body.role_ids, body.project_scope)
-    await access_guard.guard_grants(user, [canonical(d.code) for d in body.direct if d.effect == "allow"], [r for r in body.role_ids if r not in rbac.user_role_ids(u)])
     if body.version is not None and body.version != u.get("version", 1):
         raise ApiError(409, "User was changed by someone else; reload and retry", "VERSION_CONFLICT", {"current_version": u.get("version", 1)})
     roles = await db.roles.find({"id": {"$in": body.role_ids}, "is_active": True}, {"_id": 0, "id": 1, "name": 1}).to_list(None)
@@ -75,6 +71,10 @@ async def put_access(user_id: str, body: AccessUpdate, request: Request, user: d
         raise ApiError(409, "Cannot remove the last active Super Admin", "LAST_SUPER_ADMIN")
     if is_super and any(d.effect == "deny" for d in body.direct):
         raise ApiError(409, "Super Admin cannot be restricted: direct denies are not allowed", "SUPER_ADMIN_UNRESTRICTABLE")
+    from services import access_guard
+    access_guard.no_self_change(user, user_id, "roles, direct grants or project scope")
+    await access_guard.guard_target(user, u, body.role_ids, body.project_scope)
+    await access_guard.guard_grants(user, [canonical(d.code) for d in body.direct if d.effect == "allow"], [r for r in body.role_ids if r not in rbac.user_role_ids(u)])
     if body.project_scope is not None and "*" not in body.project_scope and await db.projects.count_documents({"id": {"$in": body.project_scope}}) != len(set(body.project_scope)):
         raise ApiError(400, "One or more projects in scope do not exist", "INVALID_SCOPE")
     known = {r["code"] for r in registry_rows()}

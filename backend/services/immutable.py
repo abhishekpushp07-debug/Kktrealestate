@@ -9,7 +9,7 @@ import logging
 
 log = logging.getLogger("immutable")
 ALLOWED_SET = {
-    "audit_logs": {"propagated", "propagated_complete", "propagated_at", "snapshot", "snapshot_ctx", "snapshot_before", "archived", "archive_batch"},
+    "audit_logs": {"propagated", "propagated_complete", "propagated_at", "replayed_at", "snapshot", "snapshot_ctx", "snapshot_before", "archived", "archive_batch"},
     "ledger_entries": set(),
 }
 

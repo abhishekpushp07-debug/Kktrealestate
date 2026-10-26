@@ -101,6 +101,8 @@ ERRORS: dict[str, tuple[int, ...]] = {
     "REQUEST_TIMEOUT": (504,),
     "SAME_FLAT": (400,),
     "SCOPE_ESCALATION": (403,),
+    "GRANT_ESCALATION": (403,),
+    "SELF_ACCESS_CHANGE": (409,),
     "SELF_DEACTIVATE": (409,),
     "SELF_ESCALATION": (403,),
     "SENSITIVE_DOCUMENT": (409,),
