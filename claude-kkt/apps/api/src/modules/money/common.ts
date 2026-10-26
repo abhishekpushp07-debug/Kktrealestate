@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { FastifyRequest } from "fastify";
 import { todayIST } from "@kkt/domain";
 import {
@@ -7,7 +7,6 @@ import {
   companies,
   flats,
   ledgerEntries,
-  withAdvisoryLock,
   withTransactionRetry,
   type Address,
   type DB,
@@ -15,6 +14,7 @@ import {
   type Tx,
 } from "@kkt/db";
 import { actorFromRequest, SYSTEM_ACTOR, type AuditActor } from "../../lib/audit.js";
+import { compileSql } from "../../lib/compiledSql.js";
 import { ApiError } from "../../lib/errors.js";
 import type { NumberingCompany } from "../../lib/numbering.js";
 
@@ -101,13 +101,23 @@ export async function loadBooking(
 }
 
 /**
+ * Booking row lock, then the booking advisory lock, in ONE statement: the MATERIALIZED CTE locks the row (FOR UPDATE) before the outer
+ * select takes `pg_advisory_xact_lock(hashtext('booking:<id>'))` — the same key withAdvisoryLock used — so the lock order below holds by
+ * construction and the pair costs one round trip instead of two.
+ */
+const LOCK_BOOKING_SQL = compileSql(sql`with locked as materialized (
+    select ${bookings.id} from ${bookings} where ${bookings.id} = ${sql.placeholder("id")} for update)
+  select pg_advisory_xact_lock(hashtext(${sql.placeholder("key")})) from locked`);
+
+/**
  * Serialises every money operation of a booking (ledger seq, running balances, bucket cap, demand raising).
  * Lock order is always booking row (FOR UPDATE) → advisory lock, so a dues run and a payment on the same booking can never deadlock
  * (the payment path locks the row first; a job that only took the advisory lock would then block on the row while holding the advisory lock).
+ * With a clock, the booking's last ledger instant is read AFTER both locks are held (its own statement, so its snapshot is taken after
+ * the wait: a READ COMMITTED statement that waited for a lock would still read with the snapshot it started with).
  */
 export async function lockBooking(tx: Tx, bookingId: string, clock?: Clock): Promise<void> {
-  await tx.select({ id: bookings.id }).from(bookings).where(eq(bookings.id, bookingId)).for("update");
-  await withAdvisoryLock(tx, `booking:${bookingId}`);
+  await LOCK_BOOKING_SQL.run(tx, { id: bookingId, key: `booking:${bookingId}` });
   if (clock) {
     const [last] = await tx
       .select({ at: ledgerEntries.at })

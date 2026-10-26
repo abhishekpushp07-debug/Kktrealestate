@@ -217,8 +217,13 @@ const EnvSchema = z
     PUBLIC_RATE_LIMIT_PER_MIN: z.coerce.number().int().min(1).default(300),
     /** Per-user limit for staff/portal write requests (POST/PATCH/PUT/DELETE), per minute. */
     WRITE_RATE_LIMIT_PER_MIN: z.coerce.number().int().min(1).default(120),
-    /** Max requests in flight per worker process before the excess is answered 503 + Retry-After (0 = off). */
+    /** Max requests in flight per worker process before the excess is answered 503 + Retry-After (0 = off; 256 in production). */
     API_MAX_INFLIGHT: z.coerce.number().int().min(0).max(100_000).default(0),
+    /**
+     * Event-loop pressure (plugins/loadShed.ts): when the mean event-loop delay of a 500 ms window exceeds this, the process lowers its
+     * in-flight cap to a quarter (never below 8) until the delay falls under half of it again (0 = off).
+     */
+    API_SHED_EVENT_LOOP_DELAY_MS: z.coerce.number().int().min(0).max(60_000).default(500),
     /** Version string reported by /health and /metrics. */
     APP_VERSION: z.string().default("2.0.0"),
     /** Identity of this rollout (set by the deploy pipeline); keys the once-per-deploy boot-job lock. Falls back to GIT_SHA. */
@@ -294,6 +299,7 @@ const MODE_DEFAULTS: Record<"production" | "other", Record<string, string>> = {
     RUN_JOBS_IN_API: "false",
     API_WORKERS: "auto",
     DOCS_PUBLIC: "false",
+    API_MAX_INFLIGHT: "256",
   },
   other: { SEED_ON_BOOT: "true", SEED_DEMO: "true", RUN_JOBS_IN_API: "true", API_WORKERS: "1", DOCS_PUBLIC: "true" },
 };

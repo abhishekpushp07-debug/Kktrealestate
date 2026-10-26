@@ -242,7 +242,7 @@ export function errorHandler(
   const fe = error as FastifyError;
   const status = typeof fe.statusCode === "number" && fe.statusCode >= 400 ? fe.statusCode : 500;
   if (status === 503) {
-    // Load shedding (@fastify/under-pressure) keeps its Retry-After header; the body gets the uniform envelope.
+    // A 503 raised elsewhere (plugin or framework) keeps its Retry-After header; the body gets the uniform envelope.
     if (!reply.hasHeader("Retry-After")) reply.header("Retry-After", "10");
     reply.status(503).send({
       error: {

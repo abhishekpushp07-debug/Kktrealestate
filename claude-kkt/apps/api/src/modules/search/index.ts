@@ -1,12 +1,30 @@
 import type { FastifyInstance } from "fastify";
-import type { Sql } from "postgres";
 import { SearchQuerySchema, SearchResponseSchema, type SearchEntityType, type SearchResult } from "@kkt/contracts";
 import { escapeLike } from "../../lib/list.js";
 import { route } from "../../lib/routes.js";
+import { readWithinBudget } from "../../lib/statementBudget.js";
 import type { StaffContext } from "../../lib/scope.js";
 
-/** Server-side time budget: a search slower than this is cancelled (the query is killed, not abandoned) and answers with no results. */
+/**
+ * Time budget of one search (pool wait + execution): a slower search is stopped by PostgreSQL's own `statement_timeout` (the query is
+ * killed, not abandoned) and answers with no results. See lib/statementBudget.ts for why this is not an out-of-band cancel.
+ */
 const BUDGET_MS = 150;
+
+/** Searches stopped by the budget since the last log line; logged at most once per 10 s (a storm would otherwise log every one). */
+let budgetMisses = 0;
+let budgetLoggedAt = 0;
+function reportBudgetMiss(log: { warn: (obj: object, msg: string) => void }): void {
+  budgetMisses += 1;
+  const now = Date.now();
+  if (now - budgetLoggedAt < 10_000) return;
+  log.warn(
+    { stopped: budgetMisses, budget_ms: BUDGET_MS },
+    "search exceeded its time budget; answered with no results",
+  );
+  budgetMisses = 0;
+  budgetLoggedAt = now;
+}
 
 const ALL_TYPES: readonly SearchEntityType[] = ["PROJECT", "BLOCK", "FLAT", "CUSTOMER", "BOOKING"];
 
@@ -93,23 +111,6 @@ function buildSearch(
   return { text: `select * from (${branches.join(" union all ")}) s order by ord`, params };
 }
 
-/** Runs the search with a hard budget: on timeout the statement is cancelled server-side and an empty list is returned. */
-async function runWithBudget(sql: Sql, text: string, params: unknown[], log: (msg: string) => void): Promise<Row[]> {
-  const query = sql.unsafe(text, params as never[], { prepare: true });
-  const timer = setTimeout(() => {
-    log(`search exceeded ${BUDGET_MS} ms budget; cancelled`);
-    void query.cancel();
-  }, BUDGET_MS);
-  try {
-    return (await query) as unknown as Row[];
-  } catch (e) {
-    if ((e as { code?: string }).code === "57014") return []; // query_canceled
-    throw e;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
 /**
  * Command-palette search across projects, blocks, flats, customers and bookings (ILIKE: prefix on codes/numbers/phones, contains on names;
  * scope-aware; 20 results max). Each entity type is gated by its own read permission: PROJECT/BLOCK/FLAT → project.read,
@@ -133,7 +134,11 @@ export async function searchModule(app: FastifyInstance): Promise<void> {
       const types = permittedTypes(user, q.types ?? ALL_TYPES);
       if (types.size === 0) return { results: [], recent: [] };
       const { text, params } = buildSearch(user, q.q, types, per);
-      const rows = await runWithBudget(app.sql, text, params, (m) => req.log.warn(m));
+      const rows = await readWithinBudget<Row>(app.sql, text, params, BUDGET_MS);
+      if (rows === null) {
+        reportBudgetMiss(req.log);
+        return { results: [], recent: [] };
+      }
       const results: SearchResult[] = rows
         .slice(0, limit)
         .map((r) => ({ type: r.type, id: r.id, label: r.label, sublabel: r.sublabel, href: r.href }));

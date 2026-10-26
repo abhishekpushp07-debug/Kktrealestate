@@ -379,6 +379,7 @@ export function customerRoutes(app: FastifyInstance): void {
         table: customers,
         select: CUSTOMER_SELECT,
         join: (qb) => joinRm(qb),
+        countJoin: false, // the relationship manager is a to-one left join that no filter reads
         where: and(...where.filter((w): w is SQL => w !== undefined)),
         search: {
           columns: [customers.fullName, customers.phone, customers.customerCode, customers.email],

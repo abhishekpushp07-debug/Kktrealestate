@@ -2,7 +2,7 @@
  * Wire-shape mappers for bookings, payments, demands, other charges, ledger rows and schedules. Everything here is batch-oriented
  * (one query per related table for a whole page) so lists never run N+1 queries.
  */
-import { and, asc, eq, getTableColumns, sql } from "drizzle-orm";
+import { and, eq, getTableColumns, sql } from "drizzle-orm";
 import type { PgSelect, PgTable } from "drizzle-orm/pg-core";
 import type {
   AgreementRevisionRow,
@@ -37,6 +37,7 @@ import {
   type Executor,
 } from "@kkt/db";
 import { compareDates, diffDays, schedulePreview, type TowerStage } from "@kkt/domain";
+import { compileSql } from "../../../lib/compiledSql.js";
 import { ApiError } from "../../../lib/errors.js";
 import { ensureProjectAccess, type StaffContext } from "../../../lib/scope.js";
 import { groupBy, iso, snapshotInstallments, todayDate, type BookingRecord } from "../common.js";
@@ -79,15 +80,28 @@ export function bookingJoins(q: PgSelect): PgSelect {
     .leftJoin(users, eq(users.id, bookings.salesUserId));
 }
 
+function prepareBookingSelect(db: Executor) {
+  return bookingJoins(db.select(BOOKING_SELECT).from(bookings).$dynamic())
+    .where(and(eq(bookings.id, sql.placeholder("id")), eq(bookings.companyId, sql.placeholder("companyId"))))
+    .limit(1)
+    .prepare("kkt_booking_select");
+}
+
+/** The booking-select statement prepared once per executor (Drizzle builds the five-join query text once, not per request). */
+const bookingSelectQueries = new WeakMap<Executor, ReturnType<typeof prepareBookingSelect>>();
+
 /** Loads one booking's joined selection (404 when missing or out of the user's project scope). */
 export async function loadBookingSelect(
   db: Executor,
   user: Pick<StaffContext, "companyId" | "allProjects" | "projectIds">,
   id: string,
 ): Promise<BookingSelect> {
-  const rows = (await bookingJoins(db.select(BOOKING_SELECT).from(bookings).$dynamic())
-    .where(and(eq(bookings.id, id), eq(bookings.companyId, user.companyId)))
-    .limit(1)) as unknown as BookingSelect[];
+  let query = bookingSelectQueries.get(db);
+  if (!query) {
+    query = prepareBookingSelect(db);
+    bookingSelectQueries.set(db, query);
+  }
+  const rows = (await query.execute({ id, companyId: user.companyId })) as unknown as BookingSelect[];
   const row = rows[0];
   if (!row) throw ApiError.notFound("Booking");
   ensureProjectAccess(user, row.booking.projectId, "Booking");
@@ -291,58 +305,80 @@ export function recordFromJson<T extends PgTable>(table: T, json: Record<string,
   return out as T["$inferSelect"];
 }
 
-/** A `uuid[]` parameter (drizzle's `sql` would spread a JS array into a tuple, so the literal form `{a,b}` is bound as one text param). */
-function uuidArray(ids: readonly string[]) {
-  return sql`${`{${ids.join(",")}}`}::uuid[]`;
+/** A `uuid[]` parameter value: the array literal `{a,b}`, bound as one text parameter and cast in SQL. */
+function uuidArray(ids: readonly string[]): string {
+  return `{${ids.join(",")}}`;
 }
+
+/** Placeholder of a `uuid[]` value (see uuidArray). */
+const ids$ = sql`${sql.placeholder("ids")}::uuid[]`;
+
+/** The per-table JSON aggregates of the related-data statement; every one is filtered by the `ids` (booking ids) placeholder. */
+const RELATED_COLUMNS = {
+  co: sql`(select coalesce(json_agg(json_build_object('bookingId', ca.booking_id, 'customerId', c.id, 'fullName', c.full_name, 'phone', c.phone)), '[]'::json)
+         from ${bookingCoApplicants} ca join ${customers} c on c.id = ca.customer_id where ca.booking_id = any(${ids$})) as co`,
+  park: sql`(select coalesce(json_agg(json_build_object('bookingId', p.booking_id, 'id', p.id, 'number', p.number, 'slotType', p.slot_type)), '[]'::json)
+         from ${parkingSlots} p where p.booking_id = any(${ids$})) as park`,
+  revs: sql`(select coalesce(json_agg(json_build_object('bookingId', r.booking_id, 'n', r.n)), '[]'::json)
+         from (select booking_id, count(*)::int as n from ${agreementRevisions} where booking_id = any(${ids$}) group by booking_id) r) as revs`,
+  pend: sql`(select coalesce(json_agg(json_build_object('bookingId', x.booking_id, 'bucket', x.bucket, 'n', x.n)), '[]'::json)
+         from (select booking_id, bucket, coalesce(sum(amount_paise), 0)::bigint as n from ${payments}
+               where booking_id = any(${ids$}) and status = 'PENDING' and against = 'FLAT_VALUE' group by booking_id, bucket) x) as pend`,
+  charges: sql`(select coalesce(json_agg(to_jsonb(c) order by c.sort_order, c.created_at), '[]'::json) from ${bookingOtherCharges} c where c.booking_id = any(${ids$})) as charges`,
+  dem: sql`(select coalesce(json_agg(to_jsonb(d) order by d.posted_at, d.installment_seq), '[]'::json) from ${demands} d where d.booking_id = any(${ids$}) and d.status <> 'VOID') as dem`,
+  stages: sql`(select coalesce(json_agg(json_build_object('blockId', s.block_id, 'stageId', s.stage_id, 'name', s.name, 'isPossession', s.is_possession, 'status', s.status, 'completedOn', s.completed_on) order by s.block_id, s.sort_order), '[]'::json)
+         from ${blockStages} s where s.block_id = any(${sql.placeholder("blockIds")}::uuid[])) as stages`,
+  names: sql`(select coalesce(json_agg(json_build_object('id', u.id, 'name', u.name)), '[]'::json) from ${users} u where u.id = any(${sql.placeholder("userIds")}::uuid[])) as names`,
+};
 
 /**
  * Related data of a page of bookings in ONE round trip: every per-table load is a JSON-aggregated scalar subquery of the same statement
- * (a page used to fan out eight parallel queries, each taking a pool connection, which multiplied pool contention under load).
+ * (a page used to fan out eight parallel queries, each taking a pool connection, which multiplied pool contention under load). Compiled
+ * once (lib/compiledSql.ts): building this template per request cost more CPU than running it.
  */
-export async function loadBookingRelated(db: Executor, rows: readonly BookingRecord[]): Promise<BookingRelated> {
-  const ids = [...new Set(rows.map((b) => b.id))];
-  const empty: BookingRelated = {
-    coApplicants: new Map(),
-    parking: new Map(),
-    revisionCounts: new Map(),
-    pending: new Map(),
-    charges: new Map(),
-    demands: new Map(),
-    stages: new Map(),
-    completedByNames: new Map(),
+const RELATED_SQL = compileSql<RelatedJson>(sql`select ${sql.join(Object.values(RELATED_COLUMNS), sql`, `)}`);
+
+/** The booking detail's statement: the related data plus both revision histories (one round trip instead of three). */
+const DETAIL_SQL = compileSql<RelatedJson & DetailJson>(sql`select ${sql.join(Object.values(RELATED_COLUMNS), sql`, `)},
+      (select coalesce(json_agg(to_jsonb(r) order by r.revised_at), '[]'::json) from ${agreementRevisions} r where r.booking_id = any(${ids$})) as arevs,
+      (select coalesce(json_agg(json_build_object('r', to_jsonb(p), 'byName', u.name) order by p.at), '[]'::json)
+         from ${bookingPlanRevisions} p left join ${users} u on u.id = p.by where p.booking_id = any(${ids$})) as prevs`);
+
+/** What the money summary of one booking needs beyond its row (GET /bookings/:id/ledger): pending cheques, charge total, stages, demands. */
+const SUMMARY_SQL = compileSql<
+  Pick<RelatedJson, "pend" | "dem" | "stages"> & { charges_total: number | string }
+>(sql`select
+      ${RELATED_COLUMNS.pend}, ${RELATED_COLUMNS.dem}, ${RELATED_COLUMNS.stages},
+      (select coalesce(sum(c.total_paise), 0)::bigint from ${bookingOtherCharges} c where c.booking_id = any(${ids$})) as charges_total`);
+
+/** JSON shapes of the detail-only columns. */
+interface DetailJson {
+  arevs: Record<string, unknown>[];
+  prevs: { r: Record<string, unknown>; byName: string | null }[];
+}
+
+function relatedValues(rows: readonly BookingRecord[]): Record<string, string> {
+  return {
+    ids: uuidArray([...new Set(rows.map((b) => b.id))]),
+    blockIds: uuidArray([...new Set(rows.map((b) => b.blockId))]),
+    userIds: uuidArray([...new Set(rows.map((b) => b.completedBy).filter((x): x is string => !!x))]),
   };
-  if (ids.length === 0) return empty;
-  const blockIds = [...new Set(rows.map((b) => b.blockId))];
-  const completedBy = [...new Set(rows.map((b) => b.completedBy).filter((x): x is string => !!x))];
-  const result = (await db.execute(sql`
-    select
-      (select coalesce(json_agg(json_build_object('bookingId', ca.booking_id, 'customerId', c.id, 'fullName', c.full_name, 'phone', c.phone)), '[]'::json)
-         from ${bookingCoApplicants} ca join ${customers} c on c.id = ca.customer_id where ca.booking_id = any(${uuidArray(ids)})) as co,
-      (select coalesce(json_agg(json_build_object('bookingId', p.booking_id, 'id', p.id, 'number', p.number, 'slotType', p.slot_type)), '[]'::json)
-         from ${parkingSlots} p where p.booking_id = any(${uuidArray(ids)})) as park,
-      (select coalesce(json_agg(json_build_object('bookingId', r.booking_id, 'n', r.n)), '[]'::json)
-         from (select booking_id, count(*)::int as n from ${agreementRevisions} where booking_id = any(${uuidArray(ids)}) group by booking_id) r) as revs,
-      (select coalesce(json_agg(json_build_object('bookingId', x.booking_id, 'bucket', x.bucket, 'n', x.n)), '[]'::json)
-         from (select booking_id, bucket, coalesce(sum(amount_paise), 0)::bigint as n from ${payments}
-               where booking_id = any(${uuidArray(ids)}) and status = 'PENDING' and against = 'FLAT_VALUE' group by booking_id, bucket) x) as pend,
-      (select coalesce(json_agg(to_jsonb(c) order by c.sort_order, c.created_at), '[]'::json) from ${bookingOtherCharges} c where c.booking_id = any(${uuidArray(ids)})) as charges,
-      (select coalesce(json_agg(to_jsonb(d) order by d.posted_at, d.installment_seq), '[]'::json) from ${demands} d where d.booking_id = any(${uuidArray(ids)}) and d.status <> 'VOID') as dem,
-      (select coalesce(json_agg(json_build_object('blockId', s.block_id, 'stageId', s.stage_id, 'name', s.name, 'isPossession', s.is_possession, 'status', s.status, 'completedOn', s.completed_on) order by s.block_id, s.sort_order), '[]'::json)
-         from ${blockStages} s where s.block_id = any(${uuidArray(blockIds)})) as stages,
-      (select coalesce(json_agg(json_build_object('id', u.id, 'name', u.name)), '[]'::json) from ${users} u where u.id = any(${uuidArray(completedBy)})) as names
-  `)) as unknown as RelatedJson[];
-  const j = result[0];
-  if (!j) return empty;
+}
+
+function pendingByBooking(pend: RelatedJson["pend"]): Map<string, { cash: number; account: number }> {
   const pending = new Map<string, { cash: number; account: number }>();
-  for (const p of j.pend) {
+  for (const p of pend) {
     const cur = pending.get(p.bookingId) ?? { cash: 0, account: 0 };
     if (p.bucket === "CASH") cur.cash += Number(p.n);
     if (p.bucket === "ACCOUNT") cur.account += Number(p.n);
     pending.set(p.bookingId, cur);
   }
+  return pending;
+}
+
+function stagesByBlock(rows: RelatedJson["stages"]): Map<string, TowerStage[]> {
   const stages = new Map<string, TowerStage[]>();
-  for (const s of j.stages) {
+  for (const s of rows) {
     const list = stages.get(s.blockId) ?? [];
     list.push({
       stageId: s.stageId,
@@ -353,6 +389,23 @@ export async function loadBookingRelated(db: Executor, rows: readonly BookingRec
     });
     stages.set(s.blockId, list);
   }
+  return stages;
+}
+
+function emptyRelated(): BookingRelated {
+  return {
+    coApplicants: new Map(),
+    parking: new Map(),
+    revisionCounts: new Map(),
+    pending: new Map(),
+    charges: new Map(),
+    demands: new Map(),
+    stages: new Map(),
+    completedByNames: new Map(),
+  };
+}
+
+function toRelated(j: RelatedJson): BookingRelated {
   return {
     coApplicants: groupBy(
       j.co.map((c) => ({ bookingId: c.bookingId, customer_id: c.customerId, full_name: c.fullName, phone: c.phone })),
@@ -363,7 +416,7 @@ export async function loadBookingRelated(db: Executor, rows: readonly BookingRec
       (p) => p.bookingId,
     ),
     revisionCounts: new Map(j.revs.map((r) => [r.bookingId, Number(r.n)])),
-    pending,
+    pending: pendingByBooking(j.pend),
     charges: groupBy(
       j.charges.map((c) => recordFromJson(bookingOtherCharges, c)),
       (c) => c.bookingId,
@@ -372,9 +425,37 @@ export async function loadBookingRelated(db: Executor, rows: readonly BookingRec
       j.dem.map((d) => recordFromJson(demands, d)),
       (d) => d.bookingId,
     ),
-    stages,
+    stages: stagesByBlock(j.stages),
     completedByNames: new Map(j.names.map((n) => [n.id, n.name])),
   };
+}
+
+/** Related data of a page of bookings (one statement; see RELATED_SQL). */
+export async function loadBookingRelated(db: Executor, rows: readonly BookingRecord[]): Promise<BookingRelated> {
+  if (rows.length === 0) return emptyRelated();
+  const j = (await RELATED_SQL.run(db, relatedValues(rows)))[0];
+  return j ? toRelated(j) : emptyRelated();
+}
+
+/** The money summary of one booking (GET /bookings/:id/ledger): one statement with only what toSummary needs. */
+export async function loadBookingSummary(db: Executor, b: BookingRecord, today = todayDate()): Promise<BookingSummary> {
+  const j = (await SUMMARY_SQL.run(db, relatedValues([b])))[0];
+  const pend = (j ? pendingByBooking(j.pend) : new Map<string, { cash: number; account: number }>()).get(b.id) ?? {
+    cash: 0,
+    account: 0,
+  };
+  const schedule = scheduleRows(
+    b,
+    (j ? stagesByBlock(j.stages) : new Map<string, TowerStage[]>()).get(b.blockId) ?? [],
+    (j?.dem ?? []).map((d) => recordFromJson(demands, d)),
+    today,
+  );
+  return toSummary(b, {
+    pendingCash: pend.cash,
+    pendingAccount: pend.account,
+    otherChargesTotal: Number(j?.charges_total ?? 0),
+    schedule,
+  });
 }
 
 /** The stored flat snapshot in wire shape (full: rooms, areas and price breakup included). */
@@ -391,9 +472,18 @@ function fullFlatSnapshot(b: BookingRecord): BookingDetailResponse["flat_snapsho
 }
 
 /** Booking selection + related → full wire row (every field; detail, `view=full`, CSV). */
-export function toBookingRow(s: BookingSelect, rel: BookingRelated, today = todayDate()): BookingFullRow {
+export function toBookingRow(
+  s: BookingSelect,
+  rel: BookingRelated,
+  today = todayDate(),
+  schedule = scheduleRows(
+    s.booking,
+    rel.stages.get(s.booking.blockId) ?? [],
+    rel.demands.get(s.booking.id) ?? [],
+    today,
+  ),
+): BookingFullRow {
   const b = s.booking;
-  const schedule = scheduleRows(b, rel.stages.get(b.blockId) ?? [], rel.demands.get(b.id) ?? [], today);
   const charges = rel.charges.get(b.id) ?? [];
   const pend = rel.pending.get(b.id) ?? { cash: 0, account: 0 };
   return {
@@ -508,35 +598,27 @@ export function toCompactBookingRow(
   };
 }
 
+/** Co-applicants and pending cheques of a page of bookings (all a compact row needs), compiled once. */
+const COMPACT_SQL = compileSql<Pick<RelatedJson, "co" | "pend">>(
+  sql`select ${RELATED_COLUMNS.co}, ${RELATED_COLUMNS.pend}`,
+);
+
 /** Co-applicants and pending cheques of a page of bookings in one round trip (all a compact row needs). */
 export async function loadCompactRelated(
   db: Executor,
   rows: readonly BookingRecord[],
 ): Promise<Pick<BookingRelated, "coApplicants" | "pending">> {
-  const ids = [...new Set(rows.map((b) => b.id))];
-  if (ids.length === 0) return { coApplicants: new Map(), pending: new Map() };
-  const result = (await db.execute(sql`
-    select
-      (select coalesce(json_agg(json_build_object('bookingId', ca.booking_id, 'customerId', c.id, 'fullName', c.full_name, 'phone', c.phone)), '[]'::json)
-         from ${bookingCoApplicants} ca join ${customers} c on c.id = ca.customer_id where ca.booking_id = any(${uuidArray(ids)})) as co,
-      (select coalesce(json_agg(json_build_object('bookingId', x.booking_id, 'bucket', x.bucket, 'n', x.n)), '[]'::json)
-         from (select booking_id, bucket, coalesce(sum(amount_paise), 0)::bigint as n from ${payments}
-               where booking_id = any(${uuidArray(ids)}) and status = 'PENDING' and against = 'FLAT_VALUE' group by booking_id, bucket) x) as pend
-  `)) as unknown as Pick<RelatedJson, "co" | "pend">[];
-  const j = result[0] ?? { co: [], pend: [] };
-  const pending = new Map<string, { cash: number; account: number }>();
-  for (const p of j.pend) {
-    const cur = pending.get(p.bookingId) ?? { cash: 0, account: 0 };
-    if (p.bucket === "CASH") cur.cash += Number(p.n);
-    if (p.bucket === "ACCOUNT") cur.account += Number(p.n);
-    pending.set(p.bookingId, cur);
-  }
+  if (rows.length === 0) return { coApplicants: new Map(), pending: new Map() };
+  const j = (await COMPACT_SQL.run(db, { ids: uuidArray([...new Set(rows.map((b) => b.id))]) }))[0] ?? {
+    co: [],
+    pend: [],
+  };
   return {
     coApplicants: groupBy(
       j.co.map((c) => ({ bookingId: c.bookingId, customer_id: c.customerId, full_name: c.fullName, phone: c.phone })),
       (c) => c.bookingId,
     ),
-    pending,
+    pending: pendingByBooking(j.pend),
   };
 }
 
@@ -585,38 +667,28 @@ export function toPlanRevisionRow(r: typeof bookingPlanRevisions.$inferSelect, b
   };
 }
 
-/** Full booking detail (row + other charges + schedule + revisions). */
+/**
+ * Full booking detail (row + other charges + schedule + revisions): the joined booking row plus ONE statement for everything related
+ * (DETAIL_SQL), and the schedule is computed once (it feeds both `schedule` and `summary.next_installment`).
+ */
 export async function bookingDetail(db: Executor, s: BookingSelect): Promise<BookingDetailResponse> {
-  const rel = await loadBookingRelated(db, [s.booking]);
+  const j = (await DETAIL_SQL.run(db, relatedValues([s.booking])))[0];
+  const rel = j ? toRelated(j) : emptyRelated();
   const today = todayDate();
-  const row = toBookingRow(s, rel, today);
-  const [revs, planRevs] = await Promise.all([
-    db
-      .select()
-      .from(agreementRevisions)
-      .where(eq(agreementRevisions.bookingId, s.booking.id))
-      .orderBy(asc(agreementRevisions.revisedAt)),
-    db
-      .select({ r: bookingPlanRevisions, byName: users.name })
-      .from(bookingPlanRevisions)
-      .leftJoin(users, eq(users.id, bookingPlanRevisions.by))
-      .where(eq(bookingPlanRevisions.bookingId, s.booking.id))
-      .orderBy(asc(bookingPlanRevisions.at)),
-  ]);
+  const b = s.booking;
+  const schedule = scheduleRows(b, rel.stages.get(b.blockId) ?? [], rel.demands.get(b.id) ?? [], today);
+  const row = toBookingRow(s, rel, today, schedule);
   return {
     ...row,
-    list_price_paise: s.booking.listPricePaise ?? null,
-    price_deviation_reason: s.booking.priceDeviationReason ?? null,
-    price_deviation_by: s.booking.priceDeviationBy ?? null,
-    other_charges: (rel.charges.get(s.booking.id) ?? []).map(toOtherChargeRow),
-    schedule: scheduleRows(
-      s.booking,
-      rel.stages.get(s.booking.blockId) ?? [],
-      rel.demands.get(s.booking.id) ?? [],
-      today,
+    list_price_paise: b.listPricePaise ?? null,
+    price_deviation_reason: b.priceDeviationReason ?? null,
+    price_deviation_by: b.priceDeviationBy ?? null,
+    other_charges: (rel.charges.get(b.id) ?? []).map(toOtherChargeRow),
+    schedule,
+    agreement_revisions: (j?.arevs ?? []).map((r) => toAgreementRevisionRow(recordFromJson(agreementRevisions, r))),
+    plan_revisions: (j?.prevs ?? []).map((x) =>
+      toPlanRevisionRow(recordFromJson(bookingPlanRevisions, x.r), x.byName ?? null),
     ),
-    agreement_revisions: revs.map(toAgreementRevisionRow),
-    plan_revisions: planRevs.map((x) => toPlanRevisionRow(x.r, x.byName ?? null)),
   };
 }
 

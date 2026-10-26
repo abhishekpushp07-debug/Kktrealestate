@@ -57,6 +57,21 @@ export const httpRequestsInFlight = new client.Gauge({
   },
 });
 
+/** Requests answered 503 by load shedding (plugins/loadShed.ts), by reason. */
+export const httpRequestsShed = new client.Counter({
+  name: "http_requests_shed_total",
+  help: "Requests answered 503 by load shedding: reason=inflight (API_MAX_INFLIGHT reached) or event_loop (event-loop delay over API_SHED_EVENT_LOOP_DELAY_MS).",
+  labelNames: ["reason"] as const,
+  registers: [registry],
+});
+
+/** Processes currently in event-loop pressure mode (summed over processes). */
+export const eventLoopPressure = new client.Gauge({
+  name: "api_event_loop_pressure",
+  help: "1 while this process is in event-loop pressure mode (lowered in-flight cap); summed over processes.",
+  registers: [registry],
+});
+
 /** Business counters (docs/OBSERVABILITY.md). */
 export const paymentsPosted = new client.Counter({
   name: "payments_posted_total",

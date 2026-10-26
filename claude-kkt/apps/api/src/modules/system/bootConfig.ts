@@ -57,6 +57,7 @@ export function effectiveConfig(c: Env, extra: { workers: number; role: string }
     trust_proxy: c.TRUST_PROXY,
     rate_limits_per_min: { public: c.PUBLIC_RATE_LIMIT_PER_MIN, writes: c.WRITE_RATE_LIMIT_PER_MIN },
     max_inflight: c.API_MAX_INFLIGHT,
+    shed_event_loop_delay_ms: c.API_SHED_EVENT_LOOP_DELAY_MS,
     tokens: {
       access_minutes: c.ACCESS_TOKEN_MINUTES,
       refresh_days: c.REFRESH_TOKEN_DAYS,

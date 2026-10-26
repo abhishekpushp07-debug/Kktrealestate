@@ -377,34 +377,40 @@ export async function raiseDuesForAll(
  * CANCELLED demands keep their status; paid_paise is still refreshed so reports stay coherent.
  */
 export async function recomputeDemandStatuses(tx: Executor, bookingId: string): Promise<void> {
-  const [b] = await tx
-    .select({ cashPaid: bookings.cashPaidPaise, accountPaid: bookings.accountPaidPaise, status: bookings.status })
-    .from(bookings)
-    .where(eq(bookings.id, bookingId))
-    .limit(1);
+  // both reads in one round trip (pipelined on the transaction's connection)
+  const [[b], rows] = await Promise.all([
+    tx
+      .select({ cashPaid: bookings.cashPaidPaise, accountPaid: bookings.accountPaidPaise, status: bookings.status })
+      .from(bookings)
+      .where(eq(bookings.id, bookingId))
+      .limit(1),
+    tx
+      .select({
+        id: demands.id,
+        cash: demands.cashDemandPaise,
+        account: demands.accountDemandPaise,
+        status: demands.status,
+        paid: demands.paidPaise,
+      })
+      .from(demands)
+      .where(and(eq(demands.bookingId, bookingId), ne(demands.status, "VOID")))
+      .orderBy(asc(demands.postedAt), asc(demands.installmentSeq)),
+  ]);
   if (!b) return;
-  const rows = await tx
-    .select({
-      id: demands.id,
-      cash: demands.cashDemandPaise,
-      account: demands.accountDemandPaise,
-      status: demands.status,
-      paid: demands.paidPaise,
-    })
-    .from(demands)
-    .where(and(eq(demands.bookingId, bookingId), ne(demands.status, "VOID")))
-    .orderBy(asc(demands.postedAt), asc(demands.installmentSeq));
   const results = demandStatuses(
     rows.map((r) => ({ id: r.id, cashPaise: r.cash, accountPaise: r.account })),
     Math.max(0, b.cashPaid),
     Math.max(0, b.accountPaid),
   );
+  const updates: Promise<unknown>[] = [];
   for (const [i, r] of results.entries()) {
     const cur = rows[i]!;
     const nextStatus = cur.status === "CANCELLED" ? "CANCELLED" : r.status;
     if (cur.status === nextStatus && cur.paid === r.paidPaise) continue;
-    await tx.update(demands).set({ status: nextStatus, paidPaise: r.paidPaise }).where(eq(demands.id, r.id));
+    updates.push(tx.update(demands).set({ status: nextStatus, paidPaise: r.paidPaise }).where(eq(demands.id, r.id)));
   }
+  // one round trip for every changed demand (distinct rows, so their order does not matter)
+  await Promise.all(updates);
 }
 
 /**

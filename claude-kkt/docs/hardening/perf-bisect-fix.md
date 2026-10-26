@@ -4,14 +4,14 @@ Throughput on this 4-vCPU box moved by about ±10 % between back-to-back runs of
 
 ## Bisect (one process, `kkt_perf`)
 
-| Stage | `/auth/me` rps | `/public/projects` rps | `/projects` rps | `/bookings` rps | CPU µs/req: `/auth/me` · `/public/projects` · `/projects` |
-|---|---|---|---|---|---|
-| `1a7d012` baseline | 1,586 | 5,948 | 725 | 218 | 1,011 · 260 · 2,085 |
-| `c788f31` foundation | 1,735 | 5,384 | 756 | 210 | 1,028 · 253 · 1,936 |
-| `e744975` tracks | 1,555 | 4,560 | 666 | 455 | 1,053 · 250 · 2,034 |
-| `36010c0` integration | 1,646 | 4,640 | 708 | 492 | 1,040 · 276 · 2,101 |
-| `1f4d32b` verify | 1,525 | 4,776 | 704 | 487 | 1,077 · 293 · 2,079 |
-| fix | 1,533 | 5,549 | 687 | 442 | 1,029 · 223 · 2,099 |
+| Stage                 | `/auth/me` rps | `/public/projects` rps | `/projects` rps | `/bookings` rps | CPU µs/req: `/auth/me` · `/public/projects` · `/projects` |
+| --------------------- | -------------- | ---------------------- | --------------- | --------------- | --------------------------------------------------------- |
+| `1a7d012` baseline    | 1,586          | 5,948                  | 725             | 218             | 1,011 · 260 · 2,085                                       |
+| `c788f31` foundation  | 1,735          | 5,384                  | 756             | 210             | 1,028 · 253 · 1,936                                       |
+| `e744975` tracks      | 1,555          | 4,560                  | 666             | 455             | 1,053 · 250 · 2,034                                       |
+| `36010c0` integration | 1,646          | 4,640                  | 708             | 492             | 1,040 · 276 · 2,101                                       |
+| `1f4d32b` verify      | 1,525          | 4,776                  | 704             | 487             | 1,077 · 293 · 2,079                                       |
+| fix                   | 1,533          | 5,549                  | 687             | 442             | 1,029 · 223 · 2,099                                       |
 
 The cost came in with `e744975` (auth Redis wrappers, telemetry plugin, JWT key ring) and with `36010c0`/`1f4d32b` (per-command Redis timeout, `cached()` budget). The foundation stage costs nothing measurable. `/bookings` got faster from `e744975` on because the list now sends compact rows.
 
@@ -25,6 +25,7 @@ The cost came in with `e744975` (auth Redis wrappers, telemetry plugin, JWT key 
 6. **`plugins/loadShed.ts:28`** (minor): one closure per request is now one shared function.
 
 I checked these and found no cost:
+
 - Redis and Postgres round trips per request are identical to the baseline.
 - The idempotency plugin does no I/O on GET.
 - Database timeouts are per-connection startup settings, and prepared statements are still on.

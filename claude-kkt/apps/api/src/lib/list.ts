@@ -39,8 +39,13 @@ export interface PaginateOptions {
   table: ListableTable;
   /** Drizzle selection object (columns, sql expressions or whole tables); omit to select the whole table row. */
   select?: Record<string, unknown>;
-  /** Adds joins to the dynamic query builder (applied to both the page and the count query). */
+  /** Adds joins to the dynamic query builder (applied to both the page and the count query, unless `countJoin` is false). */
   join?: (q: PgSelect) => PgSelect;
+  /**
+   * `false` when the joins can neither filter nor multiply rows (left joins of a to-one relation that `where` and `search` never
+   * reference): the count query then runs on the base table alone.
+   */
+  countJoin?: boolean;
   where?: SQL | undefined;
   /** ILIKE search across the given columns (term is escaped for %, _ and \). */
   search?: { columns: readonly (AnyPgColumn | SQL)[]; term: string | undefined };
@@ -249,8 +254,22 @@ export async function paginate<T = Record<string, unknown>>(
     ),
   );
   const countBase: PgSelect = executor.select({ total: count() }).from(opts.table).$dynamic();
-  const countQuery = (opts.join ? opts.join(countBase) : countBase).where(countWhere);
-  const [rows, total] = await Promise.all([pageQuery, countRows(executor, opts, countQuery, countWhere)]);
+  const countJoin = opts.join && opts.countJoin !== false ? opts.join : undefined;
+  const countQuery = () => (countJoin ? countJoin(countBase) : countBase).where(countWhere);
+  const countOpts = countJoin === opts.join ? opts : { ...opts, join: countJoin };
+  let rows: unknown[];
+  let total: number;
+  if (!cursorMode && opts.search?.term?.trim()) {
+    // A search usually fits in one page: run the page first, and when it is not full (and not past the end) the total is exact without
+    // a count query — offset + rows on this page. Only a full page (or an empty page past the end) still counts.
+    rows = await pageQuery;
+    total =
+      rows.length < pageSize && (rows.length > 0 || page === 1)
+        ? (page - 1) * pageSize + rows.length
+        : await countRows(executor, countOpts, countQuery(), countWhere);
+  } else {
+    [rows, total] = await Promise.all([pageQuery, countRows(executor, countOpts, countQuery(), countWhere)]);
+  }
   const items = rows as unknown as T[];
   let nextCursor: string | null = null;
   if (cursorMode && items.length > pageSize) {

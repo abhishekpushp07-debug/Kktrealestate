@@ -85,8 +85,7 @@ async function clearedOnCharge(tx: Executor, chargeId: string): Promise<number> 
 }
 
 /** BUCKET CAP RULE: 409 BUCKET_CAP_EXCEEDED with the exact message and {bucket, agreed_paise, paid_paise, amount_paise}. */
-async function assertBucketCap(tx: Executor, b: BookingRecord, bucket: Bucket, amount: number): Promise<void> {
-  const paid = await clearedInBucket(tx, b.id, bucket);
+function assertBucketCapWith(b: BookingRecord, bucket: Bucket, amount: number, paid: number): void {
   const agreed = bucket === "CASH" ? b.cashAgreedPaise : b.accountAgreedPaise;
   const check = bucketCapCheck({ bucket, bucketAgreedPaise: agreed, bucketPaidPaise: paid, amountPaise: amount });
   if (!check.ok)
@@ -99,13 +98,13 @@ async function assertBucketCap(tx: Executor, b: BookingRecord, bucket: Bucket, a
     });
 }
 
+/** BUCKET CAP RULE with the cleared total read under the booking lock. */
+async function assertBucketCap(tx: Executor, b: BookingRecord, bucket: Bucket, amount: number): Promise<void> {
+  assertBucketCapWith(b, bucket, amount, await clearedInBucket(tx, b.id, bucket));
+}
+
 /** Other-charge payments cannot exceed the line total (409 CHARGE_CAP_EXCEEDED). */
-async function assertChargeCap(
-  tx: Executor,
-  line: typeof bookingOtherCharges.$inferSelect,
-  amount: number,
-): Promise<void> {
-  const paid = await clearedOnCharge(tx, line.id);
+function assertChargeCapWith(line: typeof bookingOtherCharges.$inferSelect, amount: number, paid: number): void {
   if (paid + amount > line.totalPaise) {
     throw ApiError.conflict(
       "CHARGE_CAP_EXCEEDED",
@@ -115,28 +114,42 @@ async function assertChargeCap(
   }
 }
 
-/** Applies a CLEARED payment to the ledger and summary (shared by posting and clearing). */
+/** Other-charge cap with the cleared total read under the booking lock. */
+async function assertChargeCap(
+  tx: Executor,
+  line: typeof bookingOtherCharges.$inferSelect,
+  amount: number,
+): Promise<void> {
+  assertChargeCapWith(line, amount, await clearedOnCharge(tx, line.id));
+}
+/**
+ * Applies a CLEARED payment to the ledger and summary (shared by posting and clearing). Both callers hold the booking locks
+ * (lockBooking), so the ledger append does not request them again; the last-payment stamp and the demand-status recompute travel together.
+ */
 async function applyCleared(tx: Tx, b: BookingRecord, p: PaymentRecord, at: Date): Promise<number> {
   let seq: number;
   if (p.against === "FLAT_VALUE") {
-    seq = (await appendEvent(tx, b.id, events.payment(p, at))).row.seq;
+    seq = (await appendEvent(tx, b.id, events.payment(p, at), { locked: true })).row.seq;
   } else {
     const [line] = await tx
       .select()
       .from(bookingOtherCharges)
       .where(eq(bookingOtherCharges.id, p.otherChargeId!))
       .limit(1);
-    seq = (await appendEvent(tx, b.id, events.otherChargePayment(p, line?.name ?? "Other charge", at))).row.seq;
+    seq = (
+      await appendEvent(tx, b.id, events.otherChargePayment(p, line?.name ?? "Other charge", at), { locked: true })
+    ).row.seq;
     await tx
       .update(bookingOtherCharges)
       .set({ paidPaise: sql`${bookingOtherCharges.paidPaise} + ${p.amountPaise}` })
       .where(eq(bookingOtherCharges.id, p.otherChargeId!));
   }
-  await tx.update(bookings).set({ lastPaymentAt: at }).where(eq(bookings.id, b.id));
-  await recomputeDemandStatuses(tx, b.id);
+  await Promise.all([
+    tx.update(bookings).set({ lastPaymentAt: at }).where(eq(bookings.id, b.id)),
+    recomputeDemandStatuses(tx, b.id),
+  ]);
   return seq;
 }
-
 /** Posting result (payment id + the ledger seq it produced; `replayed` when an earlier posting with the same Idempotency-Key was returned). */
 export interface PostResult {
   paymentId: string;
@@ -288,22 +301,43 @@ async function postPaymentTx(
     );
   const clock = new Clock();
   await lockBooking(tx, b.id, clock);
-  if (idempotencyKey) {
+  // Every read the validation needs, in ONE round trip once both booking locks are held (pipelined on the transaction's connection;
+  // each statement still takes its own snapshot after the locks). The checks below run in the same order as before, so a request gets
+  // the same answer; the reads depend only on the request body, never on each other.
+  const flatValue = body.against === "FLAT_VALUE";
+  const [prior, [mode], [acct], paid, [chargeLine], company, recipients] = await Promise.all([
     // serialised behind the booking lock: an identical retry that raced us sees the committed original here
-    const prior = await existingPosting(tx, user.companyId, idempotencyKey, body);
-    if (prior) return prior;
-  }
+    idempotencyKey ? existingPosting(tx, user.companyId, idempotencyKey, body) : Promise.resolve(null),
+    tx
+      .select()
+      .from(paymentModes)
+      .where(and(eq(paymentModes.id, body.payment_mode_id), eq(paymentModes.companyId, user.companyId)))
+      .limit(1),
+    body.bank_account_id
+      ? tx
+          .select({ id: bankAccounts.id, isActive: bankAccounts.isActive })
+          .from(bankAccounts)
+          .where(and(eq(bankAccounts.id, body.bank_account_id), eq(bankAccounts.companyId, user.companyId)))
+          .limit(1)
+      : Promise.resolve([]),
+    flatValue ? clearedInBucket(tx, b.id, body.bucket!) : clearedOnCharge(tx, body.other_charge_id!),
+    flatValue
+      ? Promise.resolve([])
+      : tx
+          .select()
+          .from(bookingOtherCharges)
+          .where(and(eq(bookingOtherCharges.id, body.other_charge_id!), eq(bookingOtherCharges.bookingId, b.id)))
+          .limit(1),
+    loadCompanyRow(tx, user.companyId),
+    bookingRecipients(tx, b),
+  ]);
+  if (prior) return prior;
   if (body.payment_date > today)
     throw ApiError.rule("Payment date cannot be in the future", "PAYMENT_DATE_FUTURE", { today });
   if (body.payment_date < b.bookingDate)
     throw ApiError.rule("Payment date cannot be before the booking date", "PAYMENT_DATE_BEFORE_BOOKING", {
       booking_date: b.bookingDate,
     });
-  const [mode] = await tx
-    .select()
-    .from(paymentModes)
-    .where(and(eq(paymentModes.id, body.payment_mode_id), eq(paymentModes.companyId, user.companyId)))
-    .limit(1);
   if (!mode) throw ApiError.badRequest("payment_mode_id does not exist", { field: "payment_mode_id" });
   if (!mode.isActive) throw ApiError.rule(`Payment mode ${mode.name} is inactive`, "PAYMENT_MODE_INACTIVE");
   if (mode.requiresInstrument) {
@@ -318,30 +352,20 @@ async function postPaymentTx(
       throw ApiError.badRequest("Pick the company bank account credited for non-cash payments", {
         field: "bank_account_id",
       });
-    const [acct] = await tx
-      .select({ id: bankAccounts.id, isActive: bankAccounts.isActive })
-      .from(bankAccounts)
-      .where(and(eq(bankAccounts.id, body.bank_account_id), eq(bankAccounts.companyId, user.companyId)))
-      .limit(1);
     if (!acct) throw ApiError.badRequest("bank_account_id does not exist", { field: "bank_account_id" });
     if (!acct.isActive) throw ApiError.rule("Bank account is inactive", "BANK_ACCOUNT_INACTIVE");
     bankAccountId = acct.id;
   }
   let line: typeof bookingOtherCharges.$inferSelect | null = null;
-  if (body.against === "FLAT_VALUE") {
-    await assertBucketCap(tx, b, body.bucket!, body.amount_paise);
+  if (flatValue) {
+    assertBucketCapWith(b, body.bucket!, body.amount_paise, paid);
   } else {
-    const [l] = await tx
-      .select()
-      .from(bookingOtherCharges)
-      .where(and(eq(bookingOtherCharges.id, body.other_charge_id!), eq(bookingOtherCharges.bookingId, b.id)))
-      .limit(1);
-    if (!l) throw ApiError.badRequest("other_charge_id does not belong to this booking", { field: "other_charge_id" });
-    await assertChargeCap(tx, l, body.amount_paise);
-    line = l;
+    if (!chargeLine)
+      throw ApiError.badRequest("other_charge_id does not belong to this booking", { field: "other_charge_id" });
+    assertChargeCapWith(chargeLine, body.amount_paise, paid);
+    line = chargeLine;
   }
   // validation passed and every row lock is held → the receipt number (sequence row, LAST lock) is allocated
-  const company = await loadCompanyRow(tx, user.companyId);
   const receiptNumber = await nextNumber(tx, numberingOf(company), "receipt", body.payment_date);
   const postedAt = clock.next();
   const cleared = mode.clearsImmediately;
@@ -355,7 +379,7 @@ async function postPaymentTx(
       customerId: b.customerId,
       receiptNumber,
       against: body.against,
-      bucket: body.against === "FLAT_VALUE" ? body.bucket! : null,
+      bucket: flatValue ? body.bucket! : null,
       otherChargeId: line?.id ?? null,
       amountPaise: body.amount_paise,
       paymentDate: body.payment_date,
@@ -383,36 +407,39 @@ async function postPaymentTx(
       .set({ pendingChequesPaise: sql`${bookings.pendingChequesPaise} + ${p.amountPaise}` })
       .where(eq(bookings.id, b.id));
   }
-  await writeAudit(tx, {
-    companyId: b.companyId,
-    actor,
-    action: "payment.post",
-    entityType: "payment",
-    entityId: p.id,
-    after: {
-      receipt_number: receiptNumber,
-      booking_id: b.id,
-      against: p.against,
-      bucket: p.bucket,
-      amount_paise: p.amountPaise,
-      payment_date: p.paymentDate,
-      mode_code: p.modeCode,
-      status: p.status,
-      instrument: p.instrument,
-    },
-    ip: actor.ip ?? null,
-    requestId: actor.requestId ?? null,
-  });
-  await notify(tx, {
-    companyId: b.companyId,
-    recipients: await bookingRecipients(tx, b),
-    type: "PAYMENT_RECEIVED",
-    title: `Payment of ${formatINR(p.amountPaise)} received (receipt ${receiptNumber})`,
-    body: cleared ? `${mode.name} – ${p.bucket ?? line?.name ?? ""}`.trim() : `${mode.name} – subject to realisation`,
-    entityType: "payment",
-    entityId: p.id,
-    link: `/bookings/${b.id}/payments`,
-  });
+  // the audit row and the notification are independent inserts: one round trip
+  await Promise.all([
+    writeAudit(tx, {
+      companyId: b.companyId,
+      actor,
+      action: "payment.post",
+      entityType: "payment",
+      entityId: p.id,
+      after: {
+        receipt_number: receiptNumber,
+        booking_id: b.id,
+        against: p.against,
+        bucket: p.bucket,
+        amount_paise: p.amountPaise,
+        payment_date: p.paymentDate,
+        mode_code: p.modeCode,
+        status: p.status,
+        instrument: p.instrument,
+      },
+      ip: actor.ip ?? null,
+      requestId: actor.requestId ?? null,
+    }),
+    notify(tx, {
+      companyId: b.companyId,
+      recipients,
+      type: "PAYMENT_RECEIVED",
+      title: `Payment of ${formatINR(p.amountPaise)} received (receipt ${receiptNumber})`,
+      body: cleared ? `${mode.name} – ${p.bucket ?? line?.name ?? ""}`.trim() : `${mode.name} – subject to realisation`,
+      entityType: "payment",
+      entityId: p.id,
+      link: `/bookings/${b.id}/payments`,
+    }),
+  ]);
   return { paymentId: p.id, ledgerSeq, replayed: false };
 }
 

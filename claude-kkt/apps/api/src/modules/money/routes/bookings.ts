@@ -65,8 +65,8 @@ import {
   bookingDetail,
   bookingJoins,
   demandJoins,
-  loadBookingRelated,
   loadBookingSelect,
+  loadBookingSummary,
   paymentJoins,
   scheduleRows,
   toBookingRows,
@@ -74,7 +74,6 @@ import {
   toDemandRow,
   toLedgerRow,
   toPaymentRow,
-  toSummary,
   type BookingSelect,
   type DemandSelect,
   type PaymentSelect,
@@ -390,6 +389,9 @@ export function registerBookingRoutes(app: FastifyInstance): void {
     handler: async (req, reply) => {
       const s = await loadBookingSelect(app.dbReplica, req.user!, req.params.id);
       const q = req.query;
+      // the summary statement runs alongside the page (not for CSV, which has no summary)
+      const summary = q.format === "csv" ? null : loadBookingSummary(app.dbReplica, s.booking);
+      summary?.catch(() => undefined); // handled when awaited below; never an unhandled rejection if the page query fails first
       const result = await paginate<LedgerEntryRecord>(app.dbReplica, {
         table: ledgerEntries,
         where: eq(ledgerEntries.bookingId, s.booking.id),
@@ -409,24 +411,7 @@ export function registerBookingRoutes(app: FastifyInstance): void {
           LEDGER_CSV.map((k) => ({ key: k, header: k })),
           rows as unknown as Record<string, unknown>[],
         );
-      const rel = await loadBookingRelated(app.dbReplica, [s.booking]);
-      const pend = rel.pending.get(s.booking.id) ?? { cash: 0, account: 0 };
-      const charges = rel.charges.get(s.booking.id) ?? [];
-      const schedule = scheduleRows(
-        s.booking,
-        rel.stages.get(s.booking.blockId) ?? [],
-        rel.demands.get(s.booking.id) ?? [],
-      );
-      return {
-        ...result,
-        items: rows,
-        summary: toSummary(s.booking, {
-          pendingCash: pend.cash,
-          pendingAccount: pend.account,
-          otherChargesTotal: charges.reduce((t, c) => t + c.totalPaise, 0),
-          schedule,
-        }),
-      };
+      return { ...result, items: rows, summary: await summary! };
     },
   });
 

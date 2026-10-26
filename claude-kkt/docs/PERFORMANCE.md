@@ -223,13 +223,13 @@ and tail latency, not for single-digit differences. The fix run had no non-2xx a
 non-2xx (client timeouts) on the two bookings-list scenarios at 1,000 connections in its two runs, the fix none. `POST /payments` is
 lock-bound on one booking and runs last, after the 1,000-connection storm: 51–65 rps over the fix's runs against 61–73 for the others.
 
-**Not the pipeline (left for module work):** `/bookings/:id` and `/bookings/:id/ledger` are 20–30 % slower than the baseline with the same
+**Not the pipeline (left for module work, done in "Reliability fixes" below):** `/bookings/:id` and `/bookings/:id/ledger` are 20–30 % slower than the baseline with the same
 number of queries (4): the money track's detail payload (price deviation, plan revisions, schedule forecast) costs more Drizzle query
 building and a larger Zod response serialisation (≈ 150 vs 112 µs per request); `/customers?search=` and `POST /payments` (ordered
 locks, Postgres idempotency claim) are 5–15 % slower for the same kind of reason. These are features, not overhead, and were not traded
 away here.
 
-**Open items found on the way:**
+**Open items found on the way** (all three, and the slow module paths above, are fixed in "Reliability fixes" below):
 
 - `@fastify/under-pressure` with `maxEventLoopUtilization: 0.98` (`app.ts`, unchanged since the baseline) can latch under sustained
   saturation: the 503s are cheap, so utilisation stays above the threshold and every request is refused until the load drops. Seen in one
@@ -450,3 +450,238 @@ away here.
 | GET /public/projects/:slug (no auth, cached) | 1000  | 120077   | 0                                                                                 | 209    | 363.6  | 405      | 562    | 4003  |
 | GET /search?q=                               | 1000  | 152933   | 2 (err×1; timeout×1; admitted 152933 = 5054 rps @ p50 143 / p95 267 / p99 387 ms) | 143    | 267.3  | 307      | 387    | 5098  |
 | POST /payments (₹100, 50 conns)              | 50    | 1538     | 0                                                                                 | 929    | 1791.0 | 2134     | 2437   | 51    |
+
+## Reliability fixes (2026-10-26)
+
+Closes the four open items of "Regression fix": the `/search` statement cancel, the overload latch, and the slow booking, customer-search
+and payment paths. Same box (4 vCPU shared with Postgres, Redis and autocannon), database `kkt_rel` (migrated + demo seed by the production
+migrate job, recreated from a template copy before every measurement), Redis db 28, production bundles of the code before and after the
+fix run side by side.
+
+### 1. `/search` cancel race: the 300 s hang, reproduced and removed
+
+- **Cause.** `modules/search/index.ts` stopped a slow search with postgres.js `query.cancel()`. That sends an out-of-band cancel request
+  for the backend PID, so a cancel that lands after the search finished kills whatever that pooled connection runs next. Worse, postgres.js
+  cancels a query that is still waiting in a connection's pipeline by marking it and cancelling it when it becomes active
+  (`connection.js:573`), and that path leaves the query, and every query behind it on that connection, without an answer. A control
+  script (old budget, 25 ms, statements sleeping 15–35 ms interleaved with ordinary queries and a transaction on a pool of two
+  connections) hung the pool within 2–3 rounds in 6 of 6 runs. That is the stuck `GET /masters/payment-modes` of the earlier load test.
+- **Fix** (`lib/statementBudget.ts`, used by `/search`; the API has no other `.cancel()`): the search runs on a reserved connection inside
+  `BEGIN READ ONLY; SET LOCAL statement_timeout = <budget left>`, ended by `ROLLBACK`, with all three messages pipelined (one round trip).
+  PostgreSQL stops only this statement; 57014 still answers 200 with no results. The 150 ms budget still covers the pool wait: a
+  reservation that arrives late is released unused. The transaction ends with ROLLBACK, not COMMIT, because the `SET LOCAL` timeout also
+  applies to the statement that ends it. A COMMIT cancelled by it left the connection in an aborted transaction, and the next user got
+  `25P02`. The first full run showed 21 such 500s; a search-only storm reproduced 26–27 per run, and none have occurred since. If ending
+  the transaction fails for any reason, the helper rolls back again before releasing the connection. The per-search budget warning is
+  now one summary line per 10 s instead of one line per search (37,000 lines in one 30 s storm).
+- **Proof.** `test/integration/search.test.ts`:
+  - 40 rounds of statements finishing just before, at and after a 25 ms budget, interleaved with pipelined queries and a transaction on a
+    2-connection pool: every foreign statement succeeds, nothing hangs, nothing is left idle in a transaction.
+  - A storm of 1–6 ms budgets.
+  - `GET /search` blocked by a lock on an app pool of two: it answers `[]` in budget while other routes on the same pool succeed.
+  - Another session survives (added by the independent verification): a `pg_sleep(3)` on a second connection stays `active` in
+    `pg_stat_activity` and returns normally while searches time out around it, and 100 ms statements queued onto the very pooled
+    connections that just ran timed-out searches all succeed. A mutant that sets a session-level `statement_timeout` fails this test.
+  - The same stress in a script (1,000 rounds): 3,199 timeouts, 7,000 foreign statements, 0 failures, 0 hangs.
+  - `test/unit/statement-budget.test.ts` covers each failure path, including the cancelled end of the transaction.
+- **Cost.** A search now reserves a connection instead of being pipelined and sends two more small statements: +13 % API CPU (638 →
+  721 µs) and +10 % Postgres CPU (320 → 353 µs) per search at 800 rps in one process. Saturated throughput with 4 workers fell 10–34 %
+  (4,429 / 4,425 → 3,158 / 2,921 rps at 200 connections; 4,281 → 4,121 at 1,000, of which 3,642 were admitted). That is still several
+  thousand debounced command-palette searches per second. In exchange there are 0 errors and 0 client timeouts at both levels, where
+  the old bundle had 4–6 at 200 connections and 46 at 1,000.
+
+### 2. Overload latch: bounded, self-recovering shedding
+
+- **Cause.** `@fastify/under-pressure` with `maxEventLoopUtilization: 0.98` measures utilisation **cumulatively since boot** (its
+  default mode). Once a saturated process crosses 0.98 it answers 503 to every request, including `/health` and `/ready` (its hook ignores
+  routes). The cheap 503s keep the loop busy, so it only lets go after idle time equal to about 2 % of the whole uptime. Reproduced with
+  one process, 1,000 connections × 200 s on `/auth/me`:
+  - 96 % of responses were 503 (1,373,757 of 1,427,092), and only 267 rps were admitted against 1,678 unprotected.
+  - Probes answered 503 in 140 of 153 samples.
+  - Everything stayed 503 for **4.1 s after the load stopped**. That time grows with uptime, and it is why the benchmarks needed pauses.
+- **Fix** (`plugins/loadShed.ts`; under-pressure is no longer registered):
+  - **In-flight cap** `API_MAX_INFLIGHT`, now **256 per worker by default in production** (0 elsewhere). The count is released when the
+    response closes, so shedding stops the moment load drops.
+  - **Event-loop pressure** `API_SHED_EVENT_LOOP_DELAY_MS` (default 500 ms), evaluated on each 500 ms window only. It lowers the cap to a
+    quarter (never below 8) and restores it under half the threshold (hysteresis). It only lowers the cap, so a process never refuses
+    everything, and one quiet window ends it.
+  - **Probes never shed:** `/health`, `/ready` and `/metrics`, with and without `/api/v1`.
+  - **Cheap 503s:** the hook runs first, the response is written straight to the socket (hijacked: no exception, error handler,
+    serializer or onSend hooks), and the request is still counted in `http_requests_total{status="503"}` and in the new
+    `http_requests_shed_total{reason}` / `api_event_loop_pressure`. A shed request costs 106 µs of CPU instead of 221 µs on the
+    exception path (a bare Node `http` 503 costs 29 µs on this box).
+  - Logging is one summary line per 10 s.
+- **Result, same reproduction:**
+
+  | 1,000 connections × 200 s on `/auth/me`, then cool-down                                    | before                    | after                                          |
+  | ------------------------------------------------------------------------------------------ | ------------------------- | ---------------------------------------------- |
+  | One process: admitted rps                                                                  | 267 (96 % answered 503)   | **730** (cap 256; the rest are cheap 503s)     |
+  | One process: probe samples with 503 during load                                            | 140 / 153                 | **0**                                          |
+  | One process: time until `/health`, `/ready` and `/auth/me` answer 200 after the load stops | 4.1 s                     | **0.008 s**                                    |
+  | 4 workers: admitted rps                                                                    | 3,145 (58 % answered 503) | **3,743** (no 503: 250 connections per worker) |
+  | 4 workers: probe samples with 503 during load                                              | 46 / 108                  | **0**                                          |
+  | 4 workers: first probes after the load                                                     | 503                       | 200                                            |
+
+  Integration tests (`test/integration/loadshed.test.ts`):
+  - Real-HTTP saturation (100 connections, cap 1): probes answer 200 throughout and the server admits again at once.
+  - Sustained event-loop lag turns pressure on; probes and a lone request are still served; pressure ends by itself.
+  - A single short stall is averaged out.
+  - 503 envelope and metrics.
+  - `test/unit/load-shed.test.ts` covers the cap rules.
+
+- **Trade-off.** With zero-think-time clients that ignore `Retry-After`, a process at its cap spends CPU answering 503s. In the
+  1,000-connection run, 20,941 of about 1.35 M responses (1.5 %) were shed, because cluster round-robin is uneven around 250 connections per
+  worker. Raise `API_MAX_INFLIGHT` if a deployment's clients really keep more than 256 requests per worker in flight. The settings are in
+  `docs/DEPLOY.md` (runtime knobs) and the metrics in `docs/OBSERVABILITY.md`.
+
+### 3. Slow endpoints
+
+Method of the "Regression fix" section: production bundle, `API_WORKERS=1`, autocannon 100 connections × 15 s, best of 2 per endpoint,
+**two interleaved rounds** (before → after → before → after, fresh database copy for each). CPU per request at a fixed rate (booking and
+ledger 200 rps, customers 300 rps, payments 30 rps; ticks of the API process and of all Postgres backends divided by requests served).
+Every response of the four endpoints (detail and ledger of every seeded booking, compact and full bookings lists, three customer
+searches) is byte-identical before and after.
+
+| Endpoint                                  | rps before (r1 / r2) | rps after (r1 / r2) | Δ                           | API CPU µs/req before → after | Postgres CPU µs/req before → after |
+| ----------------------------------------- | -------------------- | ------------------- | --------------------------- | ----------------------------- | ---------------------------------- |
+| `GET /bookings/:id`                       | 478 / 532            | 960 / 968           | **+91 %**                   | 3,062 → 1,763 (−42 %)         | 1,460 → 1,247 (−15 %)              |
+| `GET /bookings/:id/ledger`                | 497 / 543            | 784 / 807           | **+53 %**                   | 2,545 → 1,960 (−23 %)         | 1,522 → 1,054 (−31 %)              |
+| `GET /customers?search=kumar`             | 622 / 681            | 775 / 786           | **+20 %**                   | 2,304 → 1,896 (−18 %)         | 592 → 525 (−11 %)                  |
+| `POST /payments` (one booking, 100 conns) | 73 / 77              | 89 / 90             | **+19 %** (p99 2.3 → 1.8 s) | 12,278 → 11,122 (−9 %)        | 4,834 → 4,356 (−10 %)              |
+| `GET /auth/me` (control, unchanged)       | 1,592 / 1,630        | 1,628 / 1,665       | +2 %                        | 1,060 → 1,072                 | 165 → 159                          |
+
+**Profiles first.** A `--cpu-prof` of `/bookings/:id` put about 17 % of the process in Drizzle building SQL text per request
+(`sqlToQuery`, `buildSelection`, `is()`), against 4–8 % in Zod serialisation. The response size (8 KB detail, 2 KB ledger) was not the
+cost. On `/customers?search=` query building was 21 % (three statements built per request).
+
+- **Bookings detail and ledger** (`money/services/views.ts`, `lib/compiledSql.ts`):
+  - **Statements compiled once.** The related-data statement (co-applicants, parking, revision counts, pending cheques, other charges,
+    demands, tower stages, names) is compiled to SQL text once at module load, with named placeholders, and runs as a prepared
+    statement. The same goes for the compact-list variant used by `GET /bookings`.
+  - **Prepared booking select.** The five-join booking select is a Drizzle prepared query, cached per executor.
+  - **Fewer round trips.** The detail reads both revision histories in the same statement, so it makes two round trips instead of four
+    (no N+1 anywhere).
+  - **Schedule computed once.** It was computed twice per detail: once for `summary.next_installment` and once for `schedule`.
+  - **Ledger summary.** It uses its own small statement (pending cheques, charge total, demands, stages) and runs alongside the page.
+  - **Nothing trimmed.** The ERP reads `schedule`, `plan_snapshot`, `flat_snapshot`, `summary`, `agreement_revisions` and
+    `plan_revisions`; the portal uses its own `/portal` endpoints. The only unread derived field is the ledger's `summary`. Making it
+    optional would be breaking under `docs/VERSIONING.md` (required → optional), so it stays and is now cheap. The OpenAPI snapshot is
+    unchanged.
+- **Customer search** (`lib/list.ts`, `crm/customers.ts`, `crm/customerService.ts`):
+  - **Count strategy.** A search runs its page first. A page that is not full (and not past the end) gives the exact total as offset +
+    rows, so the count query is skipped. That is the usual case for a search. A full page still counts, keeping the planner estimate
+    above 10,000 rows.
+  - **Count without the join.** The count no longer joins the relationship manager (a to-one left join no filter reads).
+  - **Prepared co-applicant load.** The co-applicant query is prepared once.
+  - **Indexes.** With 200,000 customers the four trigram GIN indexes are used: a `BitmapOr` over `full_name`, `phone`, `customer_code` and
+    `email` takes 7 ms for a selective term. A common term (about 1,000 hits) is answered by the planner estimate, not a 130 ms exact
+    count. The column list is what the masked customer row maps, so it is unchanged.
+- **Payments** (`money/services/payments.ts`, `ledger.ts`, `dues.ts`, `common.ts`):
+  - **Lock statement.** The booking row lock and the booking advisory lock are one statement. A `MATERIALIZED` CTE takes `FOR UPDATE`
+    before the outer select takes `pg_advisory_xact_lock`, so the lock order (row → advisory) holds by construction. The ledger instant is
+    still read in its own statement after the locks, because a READ COMMITTED statement that waited for a lock keeps its old snapshot.
+  - **Reads pipelined.** After the locks, every read the validation needs goes out in one pipelined round trip on the transaction's
+    connection:
+    - the idempotent-replay check;
+    - payment mode;
+    - bank account;
+    - cleared bucket or charge total;
+    - charge line;
+    - company row;
+    - notification recipients.
+
+    The checks then run in the original order, so every request gets the same answer.
+
+  - **No re-locking.** The ledger append no longer re-requests locks the caller holds.
+  - **Writes pipelined.** Its two reads travel together, and so do its two writes. The last-payment stamp travels with the demand-status
+    recompute, whose reads and updates are pipelined too. The audit row travels with the notification.
+  - **Shorter critical section.** The booking critical section went from about 22 sequential round trips to about 9. The company-wide
+    receipt-sequence section, from `nextNumber` to COMMIT, went from about 14 to about 6.
+  - **Unchanged:** every rule (bucket cap, charge cap, date rules, mode, instrument and bank checks, idempotency key on the row, receipt
+    numbers allocated last, retry on 40001/40P01) and the lock order. The money, money-hardening, money-review and cross-track-money
+    suites pass unchanged, including the concurrency tests (10 parallel payments, payment + reversal, stage completion vs dues runs vs
+    payments).
+  - **Tried and reverted.** Running the route's two post-commit reads in parallel on the pool. In one benchmark postgres.js then failed
+    two payments with `UNSAFE_TRANSACTION` (a `BEGIN` completing on a connection it no longer considered reserved). The cause sits in the
+    driver's pool dispatch and was not pinned down; in 6 further runs without that change it did not recur.
+
+### 4. Full load test (production bundle, `API_WORKERS=auto`)
+
+Both bundles were run on the same day, each run on a fresh copy of the seeded database. The "after" tables are the last two runs in this
+file. The 200-connection pair was run twice in alternating order:
+
+| Scenario                                         | 200: before (2 runs) | 200: after (2 runs) | 1,000: before | 1,000: after (admitted)    | 1,000 p99: before → after |
+| ------------------------------------------------ | -------------------- | ------------------- | ------------- | -------------------------- | ------------------------- |
+| `GET /auth/me`                                   | 3,373 / 3,551        | 2,936 / 3,134       | 3,673         | 3,284 (3,241)              | 487 → 571 ms              |
+| `GET /projects`                                  | 1,717 / 1,906        | 1,502 / 1,662       | 1,808         | 1,755                      | 2,607 → 1,397 ms          |
+| `GET /customers?search=`                         | 1,656 / 1,631        | **1,819 / 2,142**   | 1,928         | **2,132 (2,109)**          | 1,805 → 1,378 ms          |
+| `GET /bookings`                                  | 1,021 / 1,037        | 933 / 1,031         | 1,105         | 1,062 (966)                | 6,143 → 8,818 ms          |
+| `GET /bookings/:id`                              | 919 / 1,012          | **1,369 / 1,333**   | 1,051         | **1,701 (1,685)**          | 5,639 → **1,187 ms**      |
+| `GET /bookings/:id/ledger`                       | 1,030 / 1,101        | **1,655 / 1,259**   | 1,153         | **1,963 (1,944)**          | 5,711 → **945 ms**        |
+| `GET /dashboard`                                 | 5,463 / 6,186        | 6,147 / 5,645       | 4,658         | 5,229 (5,185)              | 1,209 → 1,346 ms          |
+| `GET /public/projects`                           | 14,143 / 14,885      | 15,023 / 13,332     | 12,474        | 14,200 (13,937)            | 183 → 154 ms              |
+| `GET /search?q=`                                 | 4,429 / 4,425        | 3,158 / 2,921       | 4,281         | 4,121 (3,642)              | 384 → 422 ms              |
+| `POST /payments` (50 conns)                      | 81 / 81              | **99 / 81**         | 67            | **104**                    | 2,600 → **1,113 ms**      |
+| Failed requests (errors + client timeouts + 5xx) | 4 + 6                | **0 + 0**           | 46            | **0** (20,941 shed as 503) |                           |
+
+**Zero-hang evidence:**
+
+- Every run finished within its expected time (454–467 s), and no scenario waited for the 120 s "settle" deadline.
+- After every run, 200 sequential `GET /masters/payment-modes` all answered within 2 s (max 15–35 ms), and `/ready` answered 200.
+- `pg_stat_activity` showed no connection idle in a transaction.
+- The server logs had no `UNSAFE_TRANSACTION`, no `DataRow` protocol error and no level-50 line in the final runs.
+
+**Read with care:**
+
+- The endpoints this round did not touch (`/auth/me`, `/projects`, `/flats`, `/blocks/:id/grid`) came out 3–13 % lower with 4 workers in
+  every pairing: three alternating 15 s `/auth/me` pairs gave −1 %, −6 % and −3 %, and the full runs −12 %.
+- CPU per request in one process is unchanged for them: `/auth/me` 1,060 → 1,072 µs, `/projects` 1,947 → 1,986 µs, `/public/projects`
+  263 → 207 µs. So no per-request cost was found, but the 4-worker gap is not explained either; it is listed as open.
+- The bookings list p99 at 1,000 connections is a queueing tail on this box: one run of either bundle has 6–10 s p99s.
+
+### Still open
+
+- Unexplained 3–13 % lower 4-worker throughput on untouched endpoints (see above; no per-request CPU difference measured).
+- `/search` gave up 10–34 % of its saturated throughput for correctness. A dedicated small search pool would isolate its reservations
+  from the main pool, but it cannot use connection-level timeouts behind PgBouncer (they are role defaults there), so it would keep the
+  transaction.
+- postgres.js `UNSAFE_TRANSACTION` under pool exhaustion: seen once in a benchmark with extra parallel pool reads (reverted). Not seen
+  in any run since, but the driver path is not fully understood.
+
+### Run 2026-10-26T17:45:20.842Z — 200 connections × 30s per scenario — reliability fixes: search budget via SET LOCAL statement_timeout in a read-only transaction, bounded self-recovering load shedding (API_MAX_INFLIGHT=256 production default), compiled/pipelined booking, ledger, customer and payment paths; NODE_ENV=production, API_WORKERS=auto
+
+| Scenario                                     | Conns | Requests | non-2xx | p50 ms | p95 ms | p97.5 ms | p99 ms | req/s |
+| -------------------------------------------- | ----- | -------- | ------- | ------ | ------ | -------- | ------ | ----- |
+| GET /auth/me                                 | 200   | 88058    | 0       | 63     | 112.6  | 129      | 154    | 2936  |
+| GET /projects                                | 200   | 45045    | 0       | 128    | 195.0  | 213      | 237    | 1502  |
+| GET /flats (list, filtered)                  | 200   | 25618    | 0       | 226    | 333.4  | 360      | 399    | 854   |
+| GET /blocks/:id/grid                         | 200   | 40644    | 0       | 139    | 224.3  | 256      | 301    | 1355  |
+| GET /customers (search)                      | 200   | 54557    | 0       | 104    | 162.0  | 177      | 201    | 1819  |
+| GET /bookings (list)                         | 200   | 27979    | 0       | 206    | 304.2  | 326      | 355    | 933   |
+| GET /bookings (list, If-None-Match → 304)    | 200   | 30963    | 0       | 185    | 281.2  | 305      | 336    | 1032  |
+| GET /bookings/:id                            | 200   | 41070    | 0       | 138    | 218.2  | 248      | 290    | 1369  |
+| GET /bookings/:id/ledger                     | 200   | 49647    | 0       | 117    | 170.2  | 183      | 201    | 1655  |
+| GET /dashboard                               | 200   | 184397   | 0       | 29     | 53.0   | 59       | 69     | 6147  |
+| GET /public/projects (no auth, cached)       | 200   | 450701   | 0       | 12     | 24.8   | 28       | 33     | 15023 |
+| GET /public/projects/:slug (no auth, cached) | 200   | 189401   | 0       | 28     | 54.9   | 61       | 72     | 6314  |
+| GET /search?q=                               | 200   | 94713    | 0       | 54     | 128.8  | 144      | 165    | 3158  |
+| POST /payments (₹100, 50 conns)              | 50    | 2960     | 0       | 513    | 1028.6 | 1221     | 1365   | 99    |
+
+### Run 2026-10-26T17:53:13.522Z — 1000 connections × 30s per scenario — reliability fixes: search budget via SET LOCAL statement_timeout in a read-only transaction, bounded self-recovering load shedding (API_MAX_INFLIGHT=256 production default), compiled/pipelined booking, ledger, customer and payment paths; NODE_ENV=production, API_WORKERS=auto
+
+| Scenario                                     | Conns | Requests | non-2xx                                                                        | p50 ms | p95 ms | p97.5 ms | p99 ms | req/s |
+| -------------------------------------------- | ----- | -------- | ------------------------------------------------------------------------------ | ------ | ------ | -------- | ------ | ----- |
+| GET /auth/me                                 | 1000  | 98498    | 419 (503×419; admitted 98079 = 3241 rps @ p50 263 / p95 411 / p99 571 ms)      | 262    | 410.4  | 453      | 571    | 3284  |
+| GET /projects                                | 1000  | 52655    | 0                                                                              | 489    | 804.8  | 898      | 1397   | 1755  |
+| GET /flats (list, filtered)                  | 1000  | 27835    | 490 (503×490; admitted 27345 = 903 rps @ p50 840 / p95 1415 / p99 11327 ms)    | 833    | 1410.6 | 1751     | 11211  | 928   |
+| GET /blocks/:id/grid                         | 1000  | 47554    | 102 (503×102; admitted 47452 = 1573 rps @ p50 553 / p95 827 / p99 3787 ms)     | 552    | 827.3  | 911      | 3770   | 1585  |
+| GET /customers (search)                      | 1000  | 63941    | 305 (503×305; admitted 63636 = 2109 rps @ p50 406 / p95 670 / p99 1418 ms)     | 404    | 670.0  | 758      | 1378   | 2132  |
+| GET /bookings (list)                         | 1000  | 31869    | 2739 (503×2739; admitted 29130 = 966 rps @ p50 797 / p95 1424 / p99 9736 ms)   | 770    | 1389.6 | 1713     | 8818   | 1062  |
+| GET /bookings (list, If-None-Match → 304)    | 1000  | 33787    | 1132 (503×1132; admitted 32655 = 1083 rps @ p50 711 / p95 1261 / p99 8590 ms)  | 702    | 1254.0 | 1457     | 8273   | 1126  |
+| GET /bookings/:id                            | 1000  | 51035    | 65 (503×65; admitted 50970 = 1685 rps @ p50 529 / p95 854 / p99 1187 ms)       | 528    | 854.0  | 946      | 1187   | 1701  |
+| GET /bookings/:id/ledger                     | 1000  | 58877    | 275 (503×275; admitted 58602 = 1944 rps @ p50 467 / p95 728 / p99 946 ms)      | 466    | 728.0  | 815      | 945    | 1963  |
+| GET /dashboard                               | 1000  | 156865   | 229 (503×229; admitted 156636 = 5185 rps @ p50 158 / p95 265 / p99 1360 ms)    | 157    | 265.1  | 316      | 1346   | 5229  |
+| GET /public/projects (no auth, cached)       | 1000  | 426003   | 1076 (503×1076; admitted 424927 = 13937 rps @ p50 64 / p95 125 / p99 155 ms)   | 64     | 125.0  | 138      | 154    | 14200 |
+| GET /public/projects/:slug (no auth, cached) | 1000  | 154074   | 235 (503×235; admitted 153839 = 5018 rps @ p50 178 / p95 303 / p99 417 ms)     | 177    | 302.5  | 340      | 416    | 5136  |
+| GET /search?q=                               | 1000  | 123621   | 13874 (503×13874; admitted 109747 = 3642 rps @ p50 247 / p95 354 / p99 430 ms) | 240    | 348.9  | 378      | 422    | 4121  |
+| POST /payments (₹100, 50 conns)              | 50    | 3123     | 0                                                                              | 511    | 858.5  | 983      | 1113   | 104   |

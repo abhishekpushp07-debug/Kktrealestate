@@ -6,7 +6,6 @@ import multipart from "@fastify/multipart";
 import sensible from "@fastify/sensible";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
-import underPressure from "@fastify/under-pressure";
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from "fastify";
 import fp from "fastify-plugin";
 import { jsonSchemaTransform, serializerCompiler, validatorCompiler } from "fastify-type-provider-zod";
@@ -33,16 +32,6 @@ import loadShedPlugin from "./plugins/loadShed.js";
 import redisPlugin from "./plugins/redis.js";
 import requestContextPlugin, { genReqId } from "./plugins/requestContext.js";
 import telemetryPlugin from "./plugins/telemetry.js";
-
-/** 503 raised by under-pressure load shedding (mapped to the SERVICE_UNAVAILABLE error envelope with Retry-After). */
-class UnavailableError extends Error {
-  readonly statusCode = 503;
-  readonly code = "SERVICE_UNAVAILABLE";
-  constructor() {
-    super("Service under pressure, retry shortly");
-    this.name = "UnavailableError";
-  }
-}
 
 /** Options for buildApp. */
 export interface BuildAppOptions {
@@ -118,6 +107,9 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
   app.setNotFoundHandler(notFoundHandler);
   installRouteRegistry(app);
 
+  // overload protection first, so a shed request costs as little as possible: in-flight cap + event-loop pressure with hysteresis;
+  // probes are never shed (plugins/loadShed.ts)
+  await app.register(loadShedPlugin);
   await app.register(helmet, {
     contentSecurityPolicy: false, // set per response below (API vs docs)
     crossOriginEmbedderPolicy: false,
@@ -159,15 +151,6 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
   });
   await app.register(compress, { global: true, threshold: 1024, encodings: ["br", "gzip", "deflate"] });
   await app.register(etag);
-  await app.register(underPressure, {
-    maxEventLoopDelay: 1000,
-    maxHeapUsedBytes: 0,
-    maxRssBytes: 0,
-    maxEventLoopUtilization: 0.98,
-    retryAfter: 10,
-    exposeStatusRoute: false,
-    customError: UnavailableError,
-  });
   await app.register(multipart, { limits: { fileSize: 15 * 1024 * 1024, files: 5 } });
   await app.register(sensible, { sharedSchemaId: undefined });
   await app.register(swagger, {
@@ -221,7 +204,6 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
   // telemetry before auth: RED metrics for every request, and a METRICS_TOKEN scrape is answered before staff authentication runs
   await app.register(telemetryPlugin);
   await app.register(errorReporterPlugin);
-  await app.register(loadShedPlugin);
   await app.register(authPlugin);
   await app.register(idempotencyPlugin);
 

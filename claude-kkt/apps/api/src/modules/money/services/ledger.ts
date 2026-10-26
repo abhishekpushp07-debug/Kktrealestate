@@ -129,21 +129,32 @@ async function writeSummary(tx: Executor, bookingId: string, summary: LedgerSumm
 /**
  * Appends one event to a booking's ledger under the booking advisory lock: loads the last row (or the empty summary), computes the
  * next row with the domain engine, inserts it (seq = last + 1) and updates the booking's summary columns in the same unit of work.
+ * The two reads travel together, and so do the two writes (pipelined on the transaction's connection: one round trip each).
+ * `locked`: the caller already holds the booking locks (lockBooking) in this transaction, so they are not requested again.
  */
-export async function appendEvent(tx: Tx, bookingId: string, event: LedgerEvent): Promise<AppendResult> {
-  await lockBooking(tx, bookingId);
-  const [booking] = await tx.select().from(bookings).where(eq(bookings.id, bookingId)).limit(1);
+export async function appendEvent(
+  tx: Tx,
+  bookingId: string,
+  event: LedgerEvent,
+  opts: { locked?: boolean } = {},
+): Promise<AppendResult> {
+  if (!opts.locked) await lockBooking(tx, bookingId);
+  const [[booking], [last]] = await Promise.all([
+    tx.select().from(bookings).where(eq(bookings.id, bookingId)).limit(1),
+    tx
+      .select()
+      .from(ledgerEntries)
+      .where(eq(ledgerEntries.bookingId, bookingId))
+      .orderBy(desc(ledgerEntries.seq))
+      .limit(1),
+  ]);
   if (!booking) throw ApiError.notFound("Booking");
-  const [last] = await tx
-    .select()
-    .from(ledgerEntries)
-    .where(eq(ledgerEntries.bookingId, bookingId))
-    .orderBy(desc(ledgerEntries.seq))
-    .limit(1);
   const prev = summaryFromLast(last, booking);
   const next = appendLedgerRow(prev, event);
-  await tx.insert(ledgerEntries).values(rowValues(booking.companyId, bookingId, next.row));
-  await writeSummary(tx, bookingId, next.summary);
+  await Promise.all([
+    tx.insert(ledgerEntries).values(rowValues(booking.companyId, bookingId, next.row)),
+    writeSummary(tx, bookingId, next.summary),
+  ]);
   return next;
 }
 

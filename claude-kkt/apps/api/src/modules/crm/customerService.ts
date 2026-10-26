@@ -195,15 +195,28 @@ export function coApplicantRow(r: DbCoApplicant): CoApplicantRow {
   };
 }
 
+function prepareCoApplicants(db: Executor) {
+  return db
+    .select()
+    .from(coApplicants)
+    .where(sql`${coApplicants.customerId} = any(${sql.placeholder("ids")}::uuid[])`)
+    .orderBy(coApplicants.sortOrder, coApplicants.createdAt)
+    .prepare("kkt_customer_co_applicants");
+}
+
+/** The co-applicant statement prepared once per executor (lists call it on every page). */
+const coApplicantQueries = new WeakMap<Executor, ReturnType<typeof prepareCoApplicants>>();
+
 /** Loads co-applicants for many customers in one query (no N+1). */
 export async function coApplicantsFor(db: Executor, customerIds: string[]): Promise<Map<string, DbCoApplicant[]>> {
   const map = new Map<string, DbCoApplicant[]>();
   if (customerIds.length === 0) return map;
-  const rows = await db
-    .select()
-    .from(coApplicants)
-    .where(inArray(coApplicants.customerId, customerIds))
-    .orderBy(coApplicants.sortOrder, coApplicants.createdAt);
+  let query = coApplicantQueries.get(db);
+  if (!query) {
+    query = prepareCoApplicants(db);
+    coApplicantQueries.set(db, query);
+  }
+  const rows = await query.execute({ ids: `{${customerIds.join(",")}}` });
   for (const r of rows) {
     const list = map.get(r.customerId) ?? [];
     list.push(r);
