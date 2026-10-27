@@ -64,4 +64,4 @@ def test_csv_export_matches(token, example_booking):
     assert r.headers["content-type"].startswith("text/csv")
     lines = [l for l in r.text.splitlines() if ",PAYMENT," in l]
     assert len(lines) == 10
-    assert lines[-1].rstrip().endswith(",0.0,0.0,0.0")
+    assert lines[-1].rstrip().endswith(",0,0,0")  # ₹ cells are plain numbers (no trailing .0)
