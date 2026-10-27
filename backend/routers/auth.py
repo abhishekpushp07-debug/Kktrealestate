@@ -1,14 +1,19 @@
 import hashlib
 import os
-import re
 import secrets
 from datetime import UTC, datetime, timedelta
 
 import pyotp
-from fastapi import APIRouter, Depends, Request
-from passlib.context import CryptContext
+from fastapi import APIRouter, Depends, Request, Response
 from pydantic import EmailStr, field_validator
 
+from core.passwords import (  # noqa: F401 — re-exported for routers.portal/users
+    _DUMMY_HASH,
+    hash_password,
+    pwd_ctx,
+    validate_password_policy,
+    verify_password,
+)
 from db import db
 from deps import (
     ACCESS_MINUTES,
@@ -29,28 +34,8 @@ from utils import (
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 REFRESH_DAYS = int(os.environ.get("REFRESH_TOKEN_DAYS", "7"))
 MAX_FAILED, LOCK_MINUTES, PASSWORD_HISTORY = 5, 15, 5
-_DUMMY_HASH = pwd_ctx.hash("kkt-dummy-timing-equaliser")
-
-
-def hash_password(pw: str) -> str:
-    return pwd_ctx.hash(pw)
-
-
-def verify_password(pw: str, hashed: str) -> bool:
-    try:
-        return pwd_ctx.verify(pw, hashed)
-    except Exception:
-        return False
-
-
-def validate_password_policy(pw: str) -> str:
-    if len(pw) < 8 or not re.search(r"\d", pw) or not re.search(r"[A-Za-z]", pw):
-        raise ValueError("Password must be at least 8 characters with at least 1 letter and 1 number")
-    return pw
 
 
 def _hash_token(token: str) -> str:
@@ -91,8 +76,8 @@ async def issue_refresh_token(user: dict, request: Request) -> str:
 
 
 async def _public_user(user: dict) -> dict:
-    from services import rbac
     from deps import _current_roles_version
+    from services import rbac
     u = strip_private(user)
     eff = await rbac.resolve(user, await _current_roles_version(), now_iso())
     u["role_name"] = eff["role_names"][0] if eff["role_names"] else None
@@ -103,8 +88,45 @@ async def _public_user(user: dict) -> dict:
     return u
 
 
-async def _token_response(user: dict, request: Request) -> dict:
-    return {"access_token": create_access_token(user), "refresh_token": await issue_refresh_token(user, request), "token_type": "bearer",
+RT_COOKIE, CSRF_COOKIE, CSRF_HEADER = "kkt_rt", "kkt_csrf", "x-csrf-token"
+
+
+def _is_https(request: Request) -> bool:
+    return (request.headers.get("x-forwarded-proto") or request.url.scheme) == "https"
+
+
+def _set_session_cookies(response: Response, request: Request, refresh_token: str, csrf: str) -> None:
+    """Browser session: refresh token in an httpOnly SameSite=Strict cookie scoped to /api/auth + a readable CSRF double-submit cookie.
+    The JSON body still carries refresh_token for non-browser API clients (tools, tests); the SPA never stores it."""
+    secure = _is_https(request)
+    max_age = REFRESH_DAYS * 86400
+    response.set_cookie(RT_COOKIE, refresh_token, max_age=max_age, httponly=True, secure=secure, samesite="strict", path="/api/auth")
+    response.set_cookie(CSRF_COOKIE, csrf, max_age=max_age, httponly=False, secure=secure, samesite="strict", path="/")
+
+
+def _clear_session_cookies(response: Response, request: Request) -> None:
+    secure = _is_https(request)
+    response.set_cookie(RT_COOKIE, "", max_age=0, httponly=True, secure=secure, samesite="strict", path="/api/auth")
+    response.set_cookie(CSRF_COOKIE, "", max_age=0, httponly=False, secure=secure, samesite="strict", path="/")
+
+
+def _check_csrf(request: Request, stored: dict | None) -> None:
+    """Cookie-based refresh/logout needs the X-CSRF-Token header: double-submit (== kkt_csrf cookie) or synchronizer (== the token
+    bound to this refresh-token row — covers embedded/iframe contexts where a SameSite=Strict readable cookie is unavailable)."""
+    hdr = request.headers.get(CSRF_HEADER, "")
+    cookie = request.cookies.get(CSRF_COOKIE) or ""
+    bound = (stored or {}).get("csrf") or ""
+    if not hdr or not ((cookie and secrets.compare_digest(cookie, hdr)) or (bound and secrets.compare_digest(bound, hdr))):
+        raise ApiError(403, "CSRF token missing or invalid", "CSRF_REQUIRED")
+
+
+async def _token_response(user: dict, request: Request, response: Response | None = None) -> dict:
+    rt = await issue_refresh_token(user, request)
+    csrf = secrets.token_hex(16)
+    await db.refresh_tokens.update_one({"token_hash": _hash_token(rt)}, {"$set": {"csrf": csrf}})
+    if response is not None:
+        _set_session_cookies(response, request, rt, csrf)
+    return {"access_token": create_access_token(user), "refresh_token": rt, "csrf_token": csrf, "token_type": "bearer",
             "expires_in": ACCESS_MINUTES * 60, "user": await _public_user(user), "must_change_password": bool(user.get("must_change_password"))}
 
 
@@ -129,7 +151,7 @@ class MfaLoginIn(StrictModel):
 
 
 class RefreshIn(StrictModel):
-    refresh_token: str
+    refresh_token: str | None = None  # omitted by the SPA → cookie + CSRF header
 
 
 class LogoutIn(StrictModel):
@@ -159,11 +181,13 @@ class MfaDisableIn(StrictModel):
 async def login_options(request: Request):
     from services.owner_bootstrap import demo_login_allowed
     c = await db.companies.find_one({}, {"_id": 0, "name": 1})
-    return {"demo_accounts": demo_login_allowed(request), "company": (c or {}).get("name")}
+    demo = demo_login_allowed(request)
+    # demo password is served only on demo-gated hosts (preview/localhost); production never sees it
+    return {"demo_accounts": demo, "company": (c or {}).get("name"), **({"demo_password": os.environ.get("DEMO_PASSWORD")} if demo else {})}
 
 
 @router.post("/login")
-async def login(body: LoginIn, request: Request):
+async def login(body: LoginIn, request: Request, response: Response):
     ip = client_ip(request)
     await enforce_rate_limit(f"login:{ip}", 10, 60)
     email = body.email.lower()
@@ -200,13 +224,13 @@ async def login(body: LoginIn, request: Request):
         await _login_event(email, True, request, "password_ok_mfa_pending", user["id"])
         return {"mfa_required": True, "mfa_token": create_access_token(user, "mfa", 5), "user": {"name": user["name"], "email": user["email"]}}
     await _login_event(email, True, request, "ok", user["id"])
-    out = await _token_response(user, request)
+    out = await _token_response(user, request, response)
     out["mfa_setup_required"] = await _mfa_policy_requires(user)
     return out
 
 
 @router.post("/login/mfa")
-async def login_mfa(body: MfaLoginIn, request: Request):
+async def login_mfa(body: MfaLoginIn, request: Request, response: Response):
     import jwt
     try:
         payload = jwt.decode(body.mfa_token, JWT_SECRET, algorithms=[JWT_ALG], audience="erp")
@@ -218,13 +242,20 @@ async def login_mfa(body: MfaLoginIn, request: Request):
         await _login_event(user["email"] if user else "?", False, request, "mfa_failed", payload["sub"])
         raise ApiError(401, "Invalid authentication code", "MFA_INVALID")
     await _login_event(user["email"], True, request, "ok_mfa", user["id"])
-    return await _token_response(user, request)
+    return await _token_response(user, request, response)
 
 
 @router.post("/refresh")
-async def refresh(body: RefreshIn, request: Request):
-    th = _hash_token(body.refresh_token)
+async def refresh(request: Request, response: Response, body: RefreshIn | None = None):
+    raw = body.refresh_token if body else None
+    from_cookie = not raw
+    raw = raw or request.cookies.get(RT_COOKIE)
+    if not raw:
+        raise ApiError(401, "Refresh token required", "INVALID_REFRESH_TOKEN")
+    th = _hash_token(raw)
     stored = await db.refresh_tokens.find_one({"token_hash": th}, {"_id": 0})
+    if from_cookie:
+        _check_csrf(request, stored)
     if not stored:
         raise ApiError(401, "Invalid refresh token", "INVALID_REFRESH_TOKEN")
     if stored["revoked"]:
@@ -238,15 +269,20 @@ async def refresh(body: RefreshIn, request: Request):
     rotated = await db.refresh_tokens.find_one_and_update({"id": stored["id"], "revoked": False}, {"$set": {"revoked": True, "revoked_at": now_iso(), "reason": "rotated"}})
     if rotated is None:
         raise ApiError(401, "Refresh token already used", "REFRESH_TOKEN_REUSED")
-    return await _token_response(user, request)
+    return await _token_response(user, request, response)
 
 
 @router.post("/logout")
-async def logout(body: LogoutIn, user: dict = Depends(get_current_user)):
-    if body.refresh_token:
-        await db.refresh_tokens.update_one({"token_hash": _hash_token(body.refresh_token), "user_id": user["id"]}, {"$set": {"revoked": True, "revoked_at": now_iso(), "reason": "logout"}})
+async def logout(request: Request, response: Response, body: LogoutIn | None = None, user: dict = Depends(get_current_user)):
+    rt = body.refresh_token if body else None
+    if not rt and request.cookies.get(RT_COOKIE):
+        rt = request.cookies.get(RT_COOKIE)
+        _check_csrf(request, await db.refresh_tokens.find_one({"token_hash": _hash_token(rt), "user_id": user["id"]}, {"_id": 0, "csrf": 1}))
+    if rt:
+        await db.refresh_tokens.update_one({"token_hash": _hash_token(rt), "user_id": user["id"]}, {"$set": {"revoked": True, "revoked_at": now_iso(), "reason": "logout"}})
     else:
         await db.refresh_tokens.update_many({"user_id": user["id"], "revoked": False}, {"$set": {"revoked": True, "revoked_at": now_iso(), "reason": "logout_all"}})
+    _clear_session_cookies(response, request)
     return {"ok": True}
 
 

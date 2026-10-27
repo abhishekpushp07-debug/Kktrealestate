@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { loadBootstrap } from "@/lib/bootstrapCache";
-import api, { setLogoutHandler, setPermissionDeniedHandler, tokens } from "@/lib/api";
+import api, { csrfHeaders, restoreSession, setLogoutHandler, setPermissionDeniedHandler, tokens } from "@/lib/api";
 import { canonical } from "@/lib/permissions";
 
 const AuthCtx = createContext(null);
@@ -14,24 +14,27 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   const logout = useCallback(async () => {
-    try { if (tokens.access) await api.post("/auth/logout", { refresh_token: tokens.refresh }); } catch (e) { /* ignore */ }
+    try { if (tokens.access) await api.post("/auth/logout", {}, { headers: csrfHeaders() }); } catch (e) { /* ignore */ }
     tokens.clear();
     setUser(null);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     setLogoutHandler(() => { tokens.clear(); setUser(null); });
+    // No token in memory (fresh tab / reload): try to restore the session from the httpOnly refresh cookie first.
+    (tokens.access ? Promise.resolve() : restoreSession()).catch(() => null).then(() => {
     if (!tokens.access) { setLoading(false); return; }
     Promise.all([qc.fetchQuery({ queryKey: ["fetch", "/auth/me"], queryFn: () => api.get("/auth/me").then((r) => r.data), staleTime: 5 * 60_000 }), qc.fetchQuery({ queryKey: ["fetch", "/settings/company"], queryFn: () => api.get("/settings/company").then((r) => r.data), staleTime: 10 * 60_000 }), loadBootstrap().then((b) => b?.surfaces).catch(() => null)])
       .then(([u, c, sf]) => { setUser(u); setCompany(c); if (sf) setSurfaces(sf); })
       .catch(() => tokens.clear())
       .finally(() => setLoading(false));
+    });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const login = useCallback(async (email, password) => {
     const { data } = await api.post("/auth/login", { email, password });
     if (data.mfa_required) return data;
-    tokens.set(data.access_token, data.refresh_token);
+    tokens.set(data.access_token, data.csrf_token);
     setUser(data.user);
     const c = await api.get("/settings/company");
     qc.setQueryData(["fetch", "/settings/company"], c.data);
@@ -42,7 +45,7 @@ export function AuthProvider({ children }) {
 
   const loginMfa = useCallback(async (mfa_token, code) => {
     const { data } = await api.post("/auth/login/mfa", { mfa_token, code });
-    tokens.set(data.access_token, data.refresh_token);
+    tokens.set(data.access_token, data.csrf_token);
     setUser(data.user);
     const c = await api.get("/settings/company");
     qc.setQueryData(["fetch", "/settings/company"], c.data);

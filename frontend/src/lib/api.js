@@ -9,17 +9,33 @@ function resolveBackend() {
 export const BACKEND = resolveBackend();
 export const API = `${BACKEND}/api`;
 export const portalHref = (portalUrl) => portalUrl || `${window.location.origin}/portal/`;
-export const ACCESS_KEY = "kkt_access_token";
-export const REFRESH_KEY = "kkt_refresh_token";
-
+// Session hardening (CR-7): the access token lives only in memory; the refresh token is an httpOnly SameSite=Strict cookie
+// scoped to /api/auth that the backend sets/rotates/clears. Nothing auth-related is persisted in localStorage.
+// Tabs share the in-memory access token through a BroadcastChannel (a tab without one re-refreshes via the cookie).
+const CSRF_COOKIE = "kkt_csrf";
+export const BASE_PATH = (process.env.REACT_APP_BASE_PATH || process.env.PUBLIC_URL || "/").replace(/\/$/, "");
+const onLogout = { fn: () => { tokens.clear(); window.location.assign(`${BASE_PATH}/login`); } };
+const LEGACY_KEYS = ["kkt_access_token", "kkt_refresh_token"];
+try { LEGACY_KEYS.forEach((k) => localStorage.removeItem(k)); } catch { /* storage unavailable */ }
+let accessToken = null;
+let csrfToken = null;
+// sessionStorage: CSRF token mirror (NOT a credential — useless without the httpOnly refresh cookie) so a reload inside an
+// embedded/iframe context, where the SameSite=Strict readable cookie is unavailable, can still refresh. Non-sensitive (CR-7).
+const CSRF_SS = "kkt_csrf";
+try { csrfToken = sessionStorage.getItem(CSRF_SS) || null; } catch { /* storage unavailable */ }
+const chan = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("kkt-auth") : null;
+export const readCookie = (name) => document.cookie.split("; ").find((c) => c.startsWith(`${name}=`))?.slice(name.length + 1) || "";
+const setCsrf = (c) => { csrfToken = c || null; try { if (c) sessionStorage.setItem(CSRF_SS, c); else sessionStorage.removeItem(CSRF_SS); } catch { /* ignore */ } };
 export const tokens = {
-  get access() { return localStorage.getItem(ACCESS_KEY); },
-  get refresh() { return localStorage.getItem(REFRESH_KEY); },
-  set(a, r) { localStorage.setItem(ACCESS_KEY, a); localStorage.setItem(REFRESH_KEY, r); },
-  clear() { localStorage.removeItem(ACCESS_KEY); localStorage.removeItem(REFRESH_KEY); },
+  get access() { return accessToken; },
+  get csrf() { return csrfToken || readCookie(CSRF_COOKIE) || null; },
+  set(a, csrf) { accessToken = a || null; if (csrf) setCsrf(csrf); chan?.postMessage({ type: "token", access: accessToken, csrf: csrfToken }); },
+  clear() { accessToken = null; setCsrf(null); chan?.postMessage({ type: "logout" }); },
+  adopt(a, csrf) { accessToken = a || null; if (csrf) setCsrf(csrf); },
 };
+if (chan) chan.onmessage = (e) => { if (e.data?.type === "token") tokens.adopt(e.data.access, e.data.csrf); else if (e.data?.type === "logout" && accessToken) { accessToken = null; setCsrf(null); onLogout.fn(); } };
 
-const api = axios.create({ baseURL: API });
+const api = axios.create({ baseURL: API, withCredentials: true });
 
 api.interceptors.request.use((config) => {
   const t = tokens.access;
@@ -35,19 +51,18 @@ export const conflictHandler = { fn: null };
 
 let refreshing = null;
 export const lastError = { request_id: null, at: 0 };
-export const BASE_PATH = (process.env.REACT_APP_BASE_PATH || process.env.PUBLIC_URL || "/").replace(/\/$/, "");
-const onLogout = { fn: () => { tokens.clear(); window.location.assign(`${BASE_PATH}/login`); } };
 export const setLogoutHandler = (fn) => { onLogout.fn = fn; };
 const onDenied = { fn: null };
 export const setPermissionDeniedHandler = (fn) => { onDenied.fn = fn; };
 
 async function doRefresh() {
-  const rt = tokens.refresh;
-  if (!rt) throw new Error("no refresh token");
-  const { data } = await axios.post(`${API}/auth/refresh`, { refresh_token: rt });
-  tokens.set(data.access_token, data.refresh_token);
+  const { data } = await axios.post(`${API}/auth/refresh`, {}, { withCredentials: true, headers: csrfHeaders() });
+  tokens.set(data.access_token, data.csrf_token);
   return data.access_token;
 }
+/** Page load: rebuild the in-memory access token from the cookie session (single-flight). */
+export const restoreSession = () => { refreshing = refreshing || doRefresh().finally(() => { refreshing = null; }); return refreshing; };
+export const csrfHeaders = () => ({ "X-CSRF-Token": tokens.csrf || "" });
 
 api.interceptors.response.use(
   (r) => r,

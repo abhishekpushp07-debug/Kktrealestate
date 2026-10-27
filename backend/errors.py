@@ -56,6 +56,7 @@ ERRORS: dict[str, tuple[int, ...]] = {
     "INVALID_PLC_TYPE": (400,),
     "INVALID_POSITIONS": (422,),
     "INVALID_REFRESH_TOKEN": (401,),
+    "CSRF_REQUIRED": (403,),
     "INVALID_ROLE": (400,),
     "INVALID_ROOM_TYPE": (400,),
     "INVALID_SCOPE": (400,),

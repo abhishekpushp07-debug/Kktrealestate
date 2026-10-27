@@ -8194,6 +8194,12 @@
       ],
       "title": "Launch Date"
      },
+     "load_test": {
+      "default": false,
+      "description": "Phase L: lineage tag \u2014 every record under this project is purgeable via /admin/load-test/purge",
+      "title": "Load Test",
+      "type": "boolean"
+     },
      "milestone_template_id": {
       "anyOf": [
        {
@@ -8945,6 +8951,9 @@
      "launch_date": {
       "title": "Launch Date"
      },
+     "load_test": {
+      "title": "Load Test"
+     },
      "meta": {
       "title": "Meta"
      },
@@ -9052,6 +9061,25 @@
      "items"
     ],
     "title": "ProjectsOutPage",
+    "type": "object"
+   },
+   "PurgeIn": {
+    "additionalProperties": false,
+    "properties": {
+     "confirm": {
+      "title": "Confirm",
+      "type": "string"
+     },
+     "dry_run": {
+      "default": false,
+      "title": "Dry Run",
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "confirm"
+    ],
+    "title": "PurgeIn",
     "type": "object"
    },
    "RateCardIn": {
@@ -12982,6 +13010,75 @@
     "summary": "Integrity Report Route",
     "tags": [
      "construction"
+    ]
+   }
+  },
+  "/api/admin/load-test/lineage": {
+   "get": {
+    "operationId": "lineage_api_admin_load_test_lineage_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Lineage",
+    "tags": [
+     "admin"
+    ]
+   }
+  },
+  "/api/admin/load-test/purge": {
+   "post": {
+    "description": "Removes every document with load_test lineage; refuses (409) if any non-tagged document would be affected. Audit rows stay, marked load_test:true.",
+    "operationId": "purge_api_admin_load_test_purge_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PurgeIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Purge",
+    "tags": [
+     "admin"
     ]
    }
   },
