@@ -72,7 +72,7 @@ async def widgets(user: dict = Depends(require("masters.project.view"))):
         from services.dues_engine import schedule
         up = []
         horizon = (today + timedelta(days=30)).isoformat()
-        async for bk in db.bookings.find({**base, "status": "Active", "payment_plan_snapshot": {"$ne": None}}, {"_id": 0}):
+        async for bk in db.bookings.find({**base, "status": "Active", "payment_plan_snapshot": {"$ne": None}}, {"_id": 0}).batch_size(500):
             blk = await db.blocks.find_one({"id": bk["block_id"]}, {"_id": 0, "construction_stages": 1}) or {}
             for r in schedule(bk, blk, await db.demands.find({"booking_id": bk["id"]}, {"_id": 0}).to_list(None)):
                 if r["status"] == "Not yet due" and r["expected_date"] and r["expected_date"] <= horizon:

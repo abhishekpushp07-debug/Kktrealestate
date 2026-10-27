@@ -82,7 +82,7 @@ async def _run(eid: str, header_line, headers, produce_rows, totals_row):
 
 async def purge_expired():
     cutoff = datetime.now(timezone.utc).isoformat()
-    async for e in db.exports.find({"expires_at": {"$lt": cutoff}}, {"_id": 0, "id": 1, "file": 1}):
+    async for e in db.exports.find({"expires_at": {"$lt": cutoff}}, {"_id": 0, "id": 1, "file": 1}).batch_size(500):
         try:
             os.remove(os.path.join(EXPORT_DIR, e["file"]))
         except FileNotFoundError:

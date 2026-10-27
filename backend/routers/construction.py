@@ -171,7 +171,7 @@ async def set_current_stage(block_id: str, body: StageSetIn, request: Request, u
         raise ApiError(409, "Block was modified by someone else. Reload and retry.", "VERSION_CONFLICT")
     created = []
     from services.portal_notify import notify_booking_parties
-    async for b in db.bookings.find({"block_id": block_id, "status": "Active"}, {"_id": 0}):
+    async for b in db.bookings.find({"block_id": block_id, "status": "Active"}, {"_id": 0}).batch_size(500):
         created += await raise_due_installments(b, posted_at=ts, actor=user)
         for m in marked:
             st = next((s for s in stages if s["stage_id"] == m["stage_id"]), {})
@@ -195,7 +195,7 @@ async def undo_stage(block_id: str, body: UndoIn, request: Request, user: dict =
         raise ApiError(409, "No completed stage to undo", "NOTHING_TO_UNDO")
     last = done[-1]
     dem_q = {"block_id": block_id, "voided": {"$ne": True}, "trigger_stage_id": last["stage_id"]}
-    async for d in db.demands.find({**dem_q, "paid_paise": {"$gt": 0}}, {"_id": 0, "booking_id": 1, "demand_date": 1}):
+    async for d in db.demands.find({**dem_q, "paid_paise": {"$gt": 0}}, {"_id": 0, "booking_id": 1, "demand_date": 1}).batch_size(500):
         # only a payment received after the demand was raised counts; earlier advances auto-allocated FIFO do not block undo
         if await db.payments.count_documents({"booking_id": d["booking_id"], "status": {"$nin": ["Reversed", "Bounced", "Cancelled"]}, "payment_date": {"$gte": d["demand_date"]}}):
             raise ApiError(409, "A demand raised by this stage already has a payment; undo is blocked", "UNDO_BLOCKED_BY_PAYMENTS")
@@ -215,7 +215,7 @@ async def undo_stage(block_id: str, body: UndoIn, request: Request, user: dict =
     retracted = await retract_for_demands(to_void)
     rs = await retract_for_stage(block_id, last["stage_id"], last["name"])
     retracted = {k: retracted[k] + rs[k] for k in retracted}
-    async for b in db.bookings.find({"block_id": block_id, "status": "Active"}, {"_id": 0}):
+    async for b in db.bookings.find({"block_id": block_id, "status": "Active"}, {"_id": 0}).batch_size(500):
         rem = await db.demands.find({"booking_id": b["id"], "voided": {"$ne": True}}, {"_id": 0, "percent": 1, "cumulative_percent": 1}).to_list(None)
         cum = round(sum(d.get("percent") or 0 for d in rem), 2) if all(d.get("percent") is not None for d in rem) else max((d.get("cumulative_percent") or 0 for d in rem), default=0)
         await db.bookings.update_one({"id": b["id"]}, {"$set": {"raised_percent": cum, "construction_percent": cum}})
@@ -352,7 +352,7 @@ async def upcoming_dues(days: int = 90, project_id: str | None = None, format: s
     if project_id:
         q["project_id"] = project_id
     rows = []
-    async for bk in db.bookings.find(q, {"_id": 0}):
+    async for bk in db.bookings.find(q, {"_id": 0}).batch_size(500):
         blk = await db.blocks.find_one({"id": bk["block_id"]}, {"_id": 0, "construction_stages": 1}) or {}
         for r in schedule(bk, blk, await db.demands.find({"booking_id": bk["id"]}, {"_id": 0}).to_list(None)):
             if r["status"] == "Not yet due" and (r["expected_date"] is None or r["expected_date"] <= horizon):

@@ -70,7 +70,7 @@ async def overdue_demand_job():
     today = now_iso()[:10]
     from routers.support import sla_breach_job
     await sla_breach_job()
-    async for d in db.demands.find({"voided": False, "status": {"$in": ["Open", "Partially Paid"]}, "due_date": {"$lt": today}, "overdue_notified": {"$ne": True}}, {"_id": 0}):
+    async for d in db.demands.find({"voided": False, "status": {"$in": ["Open", "Partially Paid"]}, "due_date": {"$lt": today}, "overdue_notified": {"$ne": True}}, {"_id": 0}).batch_size(500):
         b = await db.bookings.find_one({"id": d["booking_id"]}, {"_id": 0, "id": 1, "customer_name": 1, "company_id": 1, "customer_id": 1, "co_applicant_customer_ids": 1})
         if b:
             from services.portal_notify import notify_booking_parties

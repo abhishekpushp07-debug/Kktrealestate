@@ -31,7 +31,7 @@ async def retract(query: dict) -> dict:
     q = {**query, "withdrawn": {"$ne": True}}
     deleted = (await db.notifications.delete_many({**q, "read": False})).deleted_count
     withdrawn = 0
-    async for n in db.notifications.find({**q, "read": True}, {"_id": 0, "id": 1, "body": 1}):
+    async for n in db.notifications.find({**q, "read": True}, {"_id": 0, "id": 1, "body": 1}).batch_size(500):
         await db.notifications.update_one({"id": n["id"]}, {"$set": {"withdrawn": True, "withdrawn_at": now_iso(), "body": f"{n.get('body') or ''} (withdrawn)".strip()}})
         withdrawn += 1
     return {"deleted": deleted, "withdrawn": withdrawn}
@@ -56,7 +56,7 @@ async def retract_for_stage(block_id: str, stage_id: str, stage_name: str) -> di
 async def sweep_notifications() -> dict:
     """Startup: canonical types for customer notifications, fill booking_id from the demand, drop orphans. Idempotent."""
     stats = {"normalized": 0, "deleted": 0}
-    async for n in db.notifications.find({"user_id": {"$regex": "^customer:"}}, {"_id": 0}):
+    async for n in db.notifications.find({"user_id": {"$regex": "^customer:"}}, {"_id": 0}).batch_size(500):
         kind = n.get("type") or n.get("kind")
         ntype = CANONICAL.get(kind, kind)
         upd = {}

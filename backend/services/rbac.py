@@ -95,7 +95,7 @@ async def migrate_legacy_codes() -> int:
     """Idempotent: roles / direct grants still holding coarse codes get the equivalent specific set (behavioural equivalence)."""
     from permissions import LEGACY_EXPANSION, PERMISSION_SET
     n = 0
-    async for r in db.roles.find({}, {"_id": 0, "id": 1, "permissions": 1, "name": 1, "is_system": 1}):
+    async for r in db.roles.find({}, {"_id": 0, "id": 1, "permissions": 1, "name": 1, "is_system": 1}).batch_size(500):
         perms = r.get("permissions") or []
         if r.get("name") == SUPER and r.get("is_system"):
             new = sorted(PERMISSION_SET)
@@ -106,7 +106,7 @@ async def migrate_legacy_codes() -> int:
         if new != perms:
             await db.roles.update_one({"id": r["id"]}, {"$set": {"permissions": new}})
             n += 1
-    async for g in db.user_direct_permissions.find({"code": {"$in": list(LEGACY_EXPANSION)}}, {"_id": 0}):
+    async for g in db.user_direct_permissions.find({"code": {"$in": list(LEGACY_EXPANSION)}}, {"_id": 0}).batch_size(500):
         await db.user_direct_permissions.delete_one({"user_id": g["user_id"], "code": g["code"]})
         for c in expand([g["code"]]):
             await db.user_direct_permissions.update_one({"user_id": g["user_id"], "code": c}, {"$setOnInsert": {**g, "code": c}}, upsert=True)

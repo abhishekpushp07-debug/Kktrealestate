@@ -219,17 +219,15 @@ async def get_dashboard(company_id: str, scope: list[str] | None) -> dict:
 
 async def recompute_all() -> dict:
     t0 = clock.now()
-    bl = [b["id"] for b in await db.blocks.find({}, {"_id": 0, "id": 1}).to_list(None)]
-    for bid in bl:
-        await refresh_block(bid)
-    pr = [p["id"] for p in await db.projects.find({}, {"_id": 0, "id": 1}).to_list(None)]
-    for pid in pr:
-        await refresh_project(pid)
-    cu = [c["id"] for c in await db.customers.find({}, {"_id": 0, "id": 1}).to_list(None)]
-    for cid in cu:
-        await refresh_customer(cid)
+    bl = pr = cu = 0  # Phase J.2: stream ids, never materialise collections
+    async for b in db.blocks.find({}, {"_id": 0, "id": 1}).batch_size(500):
+        await refresh_block(b["id"]); bl += 1
+    async for p in db.projects.find({}, {"_id": 0, "id": 1}).batch_size(500):
+        await refresh_project(p["id"]); pr += 1
+    async for c in db.customers.find({}, {"_id": 0, "id": 1}).batch_size(500):
+        await refresh_customer(c["id"]); cu += 1
     await refresh_dashboards()
-    out = {"blocks": len(bl), "projects": len(pr), "customers": len(cu), "ms": int((clock.now() - t0).total_seconds() * 1000)}
+    out = {"blocks": bl, "projects": pr, "customers": cu, "ms": int((clock.now() - t0).total_seconds() * 1000)}
     await db.settings.update_one({"key": "read_models_v1"}, {"$set": {"value": now_iso()}}, upsert=True)
     return out
 

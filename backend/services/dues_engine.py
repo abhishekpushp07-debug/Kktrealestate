@@ -137,6 +137,6 @@ async def run_dues_for_all(today: date | None = None, actor: dict | None = None)
         n = len(await raise_due_installments(b, today, actor=actor))
         counts["demands_raised"] += n
         return n
-    run = await job_runs.run_isolated("DAILY_DUES", db.bookings.find({"status": "Active", "payment_plan_snapshot": {"$ne": None}}, {"_id": 0}), one, item_id=lambda b: b.get("booking_number") or b.get("id"),
+    run = await job_runs.run_isolated("DAILY_DUES", db.bookings.find({"status": "Active", "payment_plan_snapshot": {"$ne": None}}, {"_id": 0}).batch_size(200), one, item_id=lambda b: b.get("booking_number") or b.get("id"),
                                       result_fn=lambda acc: {**counts, "as_of": (today or clock.today()).isoformat()})
     return {**counts, "as_of": (today or clock.today()).isoformat(), "ran_at": clock.now(None).isoformat(), "job_run": {"id": run["id"], "status": run["status"], "failed_items": run["failed_items"], "errors": run["errors"]}}

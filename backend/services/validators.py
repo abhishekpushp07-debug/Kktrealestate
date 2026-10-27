@@ -53,7 +53,7 @@ async def apply_validators() -> dict:
 async def backfill_price_paise() -> dict:
     """Idempotent: flats.price (rupees, legacy float) → flats.price_paise (int). Keeps `price` until all consumers are switched."""
     n = 0
-    async for f in db.flats.find({"price": {"$ne": None}, "$or": [{"price_paise": {"$exists": False}}, {"price_paise": None}]}, {"_id": 0, "id": 1, "price": 1}):
+    async for f in db.flats.find({"price": {"$ne": None}, "$or": [{"price_paise": {"$exists": False}}, {"price_paise": None}]}, {"_id": 0, "id": 1, "price": 1}).batch_size(500):
         await db.flats.update_one({"id": f["id"]}, {"$set": {"price_paise": round(float(f["price"]) * 100)}})
         n += 1
     legacy = await db.flats.count_documents({"price": {"$exists": True}, "price_paise": {"$type": ["int", "long"]}})

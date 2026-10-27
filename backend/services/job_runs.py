@@ -55,7 +55,7 @@ async def run_isolated(job: str, items, fn, item_id=lambda x: x.get("id", "?"), 
 async def sweep() -> int:
     """JOB_RUN_SWEEP: runs still RUNNING after 2× their budget are ABANDONED (the process died or hung)."""
     n = 0
-    async for r in db.job_runs.find({"status": "RUNNING"}, {"_id": 0, "id": 1, "started_at": 1, "budget_s": 1}):
+    async for r in db.job_runs.find({"status": "RUNNING"}, {"_id": 0, "id": 1, "started_at": 1, "budget_s": 1}).batch_size(500):
         if _now() - datetime.fromisoformat(r["started_at"]) > timedelta(seconds=2 * r.get("budget_s", 600)):
             await db.job_runs.update_one({"id": r["id"]}, {"$set": {"status": "ABANDONED", "finished_at": _now().isoformat()}})
             n += 1

@@ -1,4 +1,10 @@
 import asyncio
+import ctypes as _ct
+
+try:  # Phase J.2: cap glibc malloc arenas (motor thread pool → one arena per thread → RSS grows with data size); must run before any thread starts
+    _ct.CDLL("libc.so.6").mallopt(-8, 2)  # M_ARENA_MAX = 2
+except Exception:  # noqa: BLE001
+    pass
 import logging
 import os
 import time
@@ -123,16 +129,51 @@ async def _integrity():
     logging.getLogger("kkt.integrity").info("[phase7] integrity: ok=%s bookings=%s counts=%s", ir["ok"], ir["bookings_checked"], ir["counts"])
 
 
+ONE_TIME_STEPS = {"sweep_notifications", "seed_if_empty", "seed_phase15", "seed_phase2", "seed_phase3", "seed_marketing_user", "seed_phase5", "migrate_phase7", "seed_phase8", "backfill_demand_installments",
+                  "migrate_phase_g", "seed_phase9", "counters", "startup_phase11", "backfill_price_paise"}
+DAILY_STEPS = {"integrity", "reconcile"}  # O(all rows): at startup only when the last completed run is older than 24 h (nightly jobs own them)
+
+
+async def _watermark_skip(name: str) -> bool:
+    """Phase J.2: never rescan completed migrations. `migrations` holds (step, version) → done_at; daily steps skip within 24 h."""
+    from datetime import UTC, datetime, timedelta
+    if name in ONE_TIME_STEPS:
+        return await db.migrations.find_one({"step": name, "version": VERSION}, {"_id": 1}) is not None
+    if name in DAILY_STEPS:
+        m = await db.migrations.find_one({"step": name}, {"_id": 0, "done_at": 1})
+        return bool(m and m["done_at"] > (datetime.now(UTC) - timedelta(hours=24)).isoformat())
+    return False
+
+
 async def _step(name, coro_fn):
     t0 = time.perf_counter()
     STARTUP["phase"] = name
     try:
+        if await _watermark_skip(name):
+            STARTUP["steps"][name] = "skipped (watermark)"
+            return
         await coro_fn()
         STARTUP["steps"][name] = round(time.perf_counter() - t0, 2)
+        if name in ONE_TIME_STEPS or name in DAILY_STEPS:
+            from datetime import UTC, datetime
+            await db.migrations.update_one({"step": name}, {"$set": {"version": VERSION, "done_at": datetime.now(UTC).isoformat(), "took_s": round(time.perf_counter() - t0, 2)}}, upsert=True)
         logger.info("[startup] %s ok in %.2fs", name, time.perf_counter() - t0)
     except Exception:
         STARTUP["steps"][name] = "failed"
         logger.exception("[startup] %s failed (continuing)", name)
+    finally:
+        _trim_memory()
+
+
+def _trim_memory():
+    """Return freed arenas to the OS after a heavy step (glibc keeps them otherwise → RSS never falls)."""
+    import ctypes
+    import gc
+    gc.collect()
+    try:
+        ctypes.CDLL("libc.so.6").malloc_trim(0)
+    except Exception:  # noqa: BLE001
+        pass
 
 
 async def startup_tasks():
@@ -205,6 +246,9 @@ async def lifespan(app: FastAPI):
         _spawn(__import__("services.invariants", fromlist=["ensure_invariants"]).ensure_invariants())  # Phase K: unique partial indexes + validators (idempotent, background)
         _spawn(__import__("services.loadshed", fromlist=["lag_probe"]).lag_probe())  # Phase K.7: event-loop lag probe
         _spawn(__import__("services.alerts", fromlist=["loop"]).loop())  # Phase K.13: alert rules every minute
+        _spawn(_trim_loop())
+        if os.environ.get("KKT_TRACEMALLOC"):
+            _spawn(_tracemalloc_loop())
         try:
             await asyncio.wait_for(detect_transaction_support(), timeout=2)
         except Exception:
@@ -409,3 +453,26 @@ app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.add_middleware(IdempotencyMiddleware)
 app.add_middleware(ObservabilityMiddleware)
 app.add_middleware(__import__("services.loadshed", fromlist=["LoadShedMiddleware"]).LoadShedMiddleware)  # Phase K.7: outermost — sheds before any work
+
+
+async def _trim_loop():
+    """Every 60 s return freed arenas to the OS (RSS otherwise never falls after a heavy job)."""
+    while True:
+        await asyncio.sleep(60)
+        _trim_memory()
+
+
+async def _tracemalloc_loop():
+    """Phase J.2 profiling aid (KKT_TRACEMALLOC=1): log top allocation sites + RSS every 20 s."""
+    import tracemalloc
+    tracemalloc.start(40)
+    while True:
+        await asyncio.sleep(20)
+        snap = tracemalloc.take_snapshot().statistics("lineno")
+        rss = int(open("/proc/self/statm").read().split()[1]) * 4096 // 1048576
+        logger.warning("[tracemalloc] rss=%sMB traced=%sMB phase=%s", rss, tracemalloc.get_traced_memory()[0] // 1048576, STARTUP.get("phase"))
+        for st in snap[:3]:
+            logger.warning("[tracemalloc]   %s", str(st)[:220])
+        top = tracemalloc.take_snapshot().statistics("traceback")[0]
+        for line in top.traceback.format()[-40:]:
+            logger.warning("[tracemalloc] tb %s", line.strip()[:200])

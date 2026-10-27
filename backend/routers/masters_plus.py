@@ -241,7 +241,7 @@ async def preview_stage_completion(block_id: str, stage_id: str, user: dict = De
     will_mark = [s for s in stages if s["seq"] <= target["seq"] and s["status"] != "Completed"]
     mark_ids = {s["stage_id"] for s in will_mark}
     rows, cash, acct = [], 0, 0
-    async for b in db.bookings.find({"block_id": block_id, "status": "Active"}, {"_id": 0, "id": 1, "booking_number": 1, "customer_name": 1, "cash_agreed_paise": 1, "account_agreed_paise": 1, "payment_plan_snapshot": 1, "payment_plan_id": 1}):
+    async for b in db.bookings.find({"block_id": block_id, "status": "Active"}, {"_id": 0, "id": 1, "booking_number": 1, "customer_name": 1, "cash_agreed_paise": 1, "account_agreed_paise": 1, "payment_plan_snapshot": 1, "payment_plan_id": 1}).batch_size(500):
         raised = {d["installment_seq"] for d in await db.demands.find({"booking_id": b["id"], "voided": {"$ne": True}}, {"_id": 0, "installment_seq": 1}).to_list(None)}
         ins = [i for i in (b.get("payment_plan_snapshot") or {}).get("installments", []) if i["trigger_type"] == "ON_STAGE" and i.get("trigger_stage_id") in mark_ids and i["seq"] not in raised]
         if not ins:

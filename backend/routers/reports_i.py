@@ -226,7 +226,7 @@ async def receivables_forecast(request: Request, project_id: str | None = None, 
     q = {**_scope(user, project_id, block_id), "status": {"$in": LIVE}}
     today = clock.today()
     lines, per_booking = [], []
-    async for b in db.bookings.find(q, {"_id": 0, "id": 1, "booking_number": 1, "customer_name": 1, "project_id": 1, "block_id": 1, "booking_date": 1, "agreement_value_paise": 1, "cash_agreed_paise": 1, "account_agreed_paise": 1, "payment_plan_snapshot": 1, "summary": 1}):
+    async for b in db.bookings.find(q, {"_id": 0, "id": 1, "booking_number": 1, "customer_name": 1, "project_id": 1, "block_id": 1, "booking_date": 1, "agreement_value_paise": 1, "cash_agreed_paise": 1, "account_agreed_paise": 1, "payment_plan_snapshot": 1, "summary": 1}).batch_size(500):
         s = b.get("summary") or {}
         raised = s.get("total_order_raised_paise", 0)
         remaining = b["agreement_value_paise"] - raised
@@ -287,7 +287,7 @@ async def other_charges(request: Request, project_id: str | None = None, block_i
     _, projects, _ = await _names(user["company_id"])
     q = {**_scope(user, project_id, block_id), "status": {"$in": LIVE + ["Cancelled"]}}
     g = {}
-    async for b in db.bookings.find(q, {"_id": 0, "id": 1, "booking_number": 1, "customer_name": 1, "project_id": 1, "other_charges": 1}):
+    async for b in db.bookings.find(q, {"_id": 0, "id": 1, "booking_number": 1, "customer_name": 1, "project_id": 1, "other_charges": 1}).batch_size(500):
         for c in b.get("other_charges") or []:
             k = c.get("name") or "Charge" if group_by == "charge" else (projects.get(b["project_id"], "?") if group_by == "project" else b["booking_number"])
             e = g.setdefault(k, {"group": k, "lines": 0, "agreed_paise": 0, "demanded_paise": 0, "collected_paise": 0, "balance_paise": 0, "_link": f"/bookings/{b['id']}" if group_by == "booking" else None, "customer_name": b["customer_name"] if group_by == "booking" else ""})
@@ -438,7 +438,7 @@ async def construction_vs_plan(request: Request, project_id: str | None = None, 
         agg = {a["_id"]: a for a in await db.demands.aggregate(maxTimeMS=REPORT_MS, pipeline=[{"$match": {"block_id": b["id"], "voided": {"$ne": True}, "trigger_type": {"$in": ["ON_STAGE", "ON_POSSESSION"]}}}, {"$group": {"_id": "$trigger_stage_id", "d": {"$sum": "$total_demand_paise"}, "c": {"$sum": "$paid_paise"}, "bk": {"$addToSet": "$booking_id"}}}]).to_list(None)}
         # expected Udhar per pending stage from live bookings' plan snapshots
         expected, affected = {}, {}
-        async for bk in db.bookings.find({"block_id": b["id"], "status": {"$in": LIVE}}, {"_id": 0, "agreement_value_paise": 1, "payment_plan_snapshot": 1}):
+        async for bk in db.bookings.find({"block_id": b["id"], "status": {"$in": LIVE}}, {"_id": 0, "agreement_value_paise": 1, "payment_plan_snapshot": 1}).batch_size(500):
             for i in (bk.get("payment_plan_snapshot") or {}).get("installments") or []:
                 sid = i.get("trigger_stage_id")
                 if sid:

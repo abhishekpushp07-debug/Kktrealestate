@@ -141,7 +141,7 @@ async def bundle(company_id: str, user: dict | None = None) -> dict:
     if hit:
         return hit
     types: dict[str, list] = {}
-    async for d in db.catalogue_items.find({"company_id": company_id, "is_active": True}, {"_id": 0, "id": 1, "type": 1, "code": 1, "label": 1, "parent_id": 1, "meta": 1}).sort([("type", 1), ("sort_order", 1), ("label", 1)]):
+    async for d in db.catalogue_items.find({"company_id": company_id, "is_active": True}, {"_id": 0, "id": 1, "type": 1, "code": 1, "label": 1, "parent_id": 1, "meta": 1}).sort([("type", 1), ("sort_order", 1), ("label", 1)]).batch_size(500):
         types.setdefault(d.pop("type"), []).append(d)
     for name, (coll, proj) in STRUCTURED.items():
         q = {"is_active": True}

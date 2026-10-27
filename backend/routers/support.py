@@ -141,7 +141,7 @@ async def status_sr(sr_id: str, body: SRStatusIn, request: Request, user: dict =
 
 async def sla_breach_job():
     now = now_iso()
-    async for sr in db.service_requests.find({"status": {"$in": ["New", "In Progress"]}, "sla_due_at": {"$lt": now}, "sla_breached": {"$ne": True}}, {"_id": 0}):
+    async for sr in db.service_requests.find({"status": {"$in": ["New", "In Progress"]}, "sla_due_at": {"$lt": now}, "sla_breached": {"$ne": True}}, {"_id": 0}).batch_size(500):
         await db.service_requests.update_one({"id": sr["id"]}, {"$set": {"sla_breached": True}})
         await write_audit({"id": "system", "name": "SLA job", "company_id": sr["company_id"]}, "service.sla_breach", "service_request", sr["id"], after={"ticket_number": sr["ticket_number"], "assigned_to": sr.get("assigned_to"), "subject": sr["subject"], "customer_name": sr["customer_name"]}, ip=None)
 
@@ -177,7 +177,7 @@ async def create_notice(body: NoticeIn, request: Request, user: dict = Depends(r
     from services.portal_notify import notify_customer
     bq = {"company_id": user["company_id"], "status": "Active", **({"project_id": {"$in": body.project_ids}} if body.project_ids else {})}
     seen = set()
-    async for b in db.bookings.find(bq, {"_id": 0, "customer_id": 1, "co_applicant_customer_ids": 1}):
+    async for b in db.bookings.find(bq, {"_id": 0, "customer_id": 1, "co_applicant_customer_ids": 1}).batch_size(500):
         for cid in [b["customer_id"], *(b.get("co_applicant_customer_ids") or [])]:
             if cid not in seen:
                 seen.add(cid)

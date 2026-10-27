@@ -523,7 +523,7 @@ async def nudge_loop():
     while True:
         try:
             today = clock.now(IST).date().isoformat()
-            async for v in db.site_visits.find({"date": {"$lt": today}, "status": {"$in": ["Confirmed", "Rescheduled"]}, "nudged_on": {"$ne": today}}, {"_id": 0}):
+            async for v in db.site_visits.find({"date": {"$lt": today}, "status": {"$in": ["Confirmed", "Rescheduled"]}, "nudged_on": {"$ne": today}}, {"_id": 0}).batch_size(500):
                 await notify_user(v["company_id"], v.get("assigned_to"), "Mark outcome", f"{v['visit_number']} · {v['name']} · {v['project_name']} · {fmt_date(v['date'])} — mark Completed or No-show", "visit.nudge", "site_visit", v["id"], "/site-visits")
                 await db.site_visits.update_one({"id": v["id"]}, {"$set": {"nudged_on": today}})
         except Exception as e:  # pragma: no cover
