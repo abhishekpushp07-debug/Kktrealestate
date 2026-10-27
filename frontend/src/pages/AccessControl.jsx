@@ -23,7 +23,7 @@ function Tri({ codes, value, onChange, testId, disabled }) {
 
 function SourceBadge({ src }) {
   if (!src?.length) return null;
-  return <span className="ml-1 inline-flex gap-1">{src.map((s, i) => <span key={i} className={cn("pill !px-1.5 !py-0 text-[10px]", s.type === "deny" ? "bg-brick/10 text-brick" : s.type === "allow" ? "bg-sage/15 text-sage" : "bg-warm-100 text-txt-secondary")} data-testid={`perm-source-${s.type}`}>{s.type === "role" ? s.role : s.type}</span>)}</span>;
+  return <span className="ml-1 inline-flex gap-1">{src.map((s) => <span key={`${s.type}-${s.role || s.source || s.label}`} className={cn("pill !px-1.5 !py-0 text-[10px]", s.type === "deny" ? "bg-brick/10 text-brick" : s.type === "allow" ? "bg-sage/15 text-sage" : "bg-warm-100 text-txt-secondary")} data-testid={`perm-source-${s.type}`}>{s.type === "role" ? s.role : s.type}</span>)}</span>;
 }
 
 export function PermissionTree({ tree, value, onToggle, sources = {}, disabled, hideUiOnly }) {

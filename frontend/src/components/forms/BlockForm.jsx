@@ -1,3 +1,4 @@
+/* eslint-disable react/no-array-index-key -- fixed-length skeleton placeholders (never reordered); positional editable rows without ids; data-derived keys would remount inputs on edit */
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, ChevronRight, ChevronLeft } from "lucide-react";
 import { toast } from "sonner";

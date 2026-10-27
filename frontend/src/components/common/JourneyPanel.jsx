@@ -27,7 +27,7 @@ function Detail({ d }) {
       <p>{d.label}</p>
       {d.now && <p className="mt-0.5 break-words font-mono text-[11px]">{fmtVal(d.now)}</p>}
       {d.before !== undefined && <p className="mt-0.5 font-mono text-[11px]">before: {String(d.before)} → now: {fmtVal(d.now)}</p>}
-      {d.rows?.length > 0 && <ul className="mt-1 space-y-0.5 font-mono text-[11px]">{d.rows.slice(0, 6).map((r, i) => <li key={i} className="truncate">{fmtVal(r)}</li>)}</ul>}
+      {d.rows?.length > 0 && <ul className="mt-1 space-y-0.5 font-mono text-[11px]">{d.rows.slice(0, 6).map((r) => <li key={fmtVal(r)} className="truncate">{fmtVal(r)}</li>)}</ul>}
     </div>
   );
 }

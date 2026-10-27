@@ -13,7 +13,7 @@ export function PageHeader({ title, subtitle, crumbs = [], actions, testId }) {
         {crumbs.length > 0 && (
           <nav className="mb-1.5 flex flex-wrap items-center gap-1 text-xs text-txt-secondary" aria-label="Breadcrumb">
             {crumbs.map((c, i) => (
-              <span key={i} className="flex items-center gap-1">
+              <span key={c.to || c.label || c} className="flex items-center gap-1">
                 {c.to ? <Link to={c.to} className="rounded hover:text-ink-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold">{c.label}</Link> : <span className="font-medium text-ink-950" aria-current="page">{c.label}</span>}
                 {i < crumbs.length - 1 && <ChevronRight className="h-3 w-3" aria-hidden="true" />}
               </span>

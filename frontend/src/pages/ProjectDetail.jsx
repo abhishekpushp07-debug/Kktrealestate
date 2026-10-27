@@ -74,8 +74,8 @@ export default function ProjectDetail() {
               <KV label="Address" value={[p.address?.line1, p.address?.city, p.address?.state, p.address?.pincode].filter(Boolean).join(", ")} />
               <KV label="Land area" value={p.land_area_sqft ? `${new Intl.NumberFormat("en-IN").format(p.land_area_sqft)} sq.ft` : "—"} /><KV label="Towers / Units" value={`${p.total_towers} / ${p.total_units}`} mono /><KV label="Parking" value={`${p.parking?.total || 0} slots`} mono />
             </div>
-            {p.landmarks?.length > 0 && <div className="mt-5"><p className="label-xs mb-2">Landmarks</p><div className="flex flex-wrap gap-1.5">{p.landmarks.map((l, i) => <Pill key={i} tone="navy">{l.name} · {l.distance_km} km</Pill>)}</div></div>}
-            {p.approvals?.length > 0 && <div className="mt-4"><p className="label-xs mb-2">Approvals</p><div className="grid gap-2 sm:grid-cols-3">{p.approvals.map((a, i) => <div key={i} className="rounded border bg-warm-50 p-2 text-xs"><p className="font-bold text-ink-950">{a.name}</p><p className="text-txt-secondary">{a.number}</p><p className="text-txt-muted">{fmtDate(a.date)}</p></div>)}</div></div>}
+            {p.landmarks?.length > 0 && <div className="mt-5"><p className="label-xs mb-2">Landmarks</p><div className="flex flex-wrap gap-1.5">{p.landmarks.map((l) => <Pill key={l.name} tone="navy">{l.name} · {l.distance_km} km</Pill>)}</div></div>}
+            {p.approvals?.length > 0 && <div className="mt-4"><p className="label-xs mb-2">Approvals</p><div className="grid gap-2 sm:grid-cols-3">{p.approvals.map((a) => <div key={a.name} className="rounded border bg-warm-50 p-2 text-xs"><p className="font-bold text-ink-950">{a.name}</p><p className="text-txt-secondary">{a.number}</p><p className="text-txt-muted">{fmtDate(a.date)}</p></div>)}</div></div>}
             {p.team_members?.length > 0 && <div className="mt-4"><p className="label-xs mb-2">Team</p><div className="flex flex-wrap gap-1.5">{p.team_members.map((u) => <Pill key={u.id} tone="gold">{u.name}</Pill>)}</div></div>}
           </div>
           <div className="card p-5">

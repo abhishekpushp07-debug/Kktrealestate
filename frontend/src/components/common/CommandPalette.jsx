@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Building2, Grid3X3, Layers, LayoutDashboard, Database, Users, History, Settings, ShieldCheck, Home, Clock, Plus, IndianRupee, PhoneCall, Hammer, Receipt, UserPlus, Keyboard, LifeBuoy, BarChart3 } from "lucide-react";
 import api from "@/lib/api";
@@ -27,6 +27,7 @@ const ACTIONS = [
 export const GO = { p: ["/projects", "Projects"], c: ["/customers", "Customers"], b: ["/bookings", "Bookings"], h: ["/dashboard", "Home"], y: ["/payments", "Payments"], l: ["/leads", "Leads"], s: ["/service-requests", "Service"], r: ["/reports", "Reports"] };
 const ICON = { projects: Building2, blocks: Layers, flats: Home, users: Users, flat_types: Database };
 const LABEL = { projects: "Projects", blocks: "Blocks", flats: "Flats", users: "Users", flat_types: "Flat types" };
+// localStorage: recent palette destinations (labels + routes) — non-sensitive (CR-7)
 const pushRecent = (item) => { const r = JSON.parse(localStorage.getItem("kkt:recent") || "[]").filter((x) => x.to !== item.to); localStorage.setItem("kkt:recent", JSON.stringify([item, ...r].slice(0, 6))); };
 const typing = (e) => /^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName) || e.target?.isContentEditable;
 
@@ -48,6 +49,8 @@ export function CommandPalette() {
   const [groups, setGroups] = useState([]);
   const navigate = useNavigate();
   const { can } = useAuth();
+  const actions = useMemo(() => ACTIONS.filter(([, , , p]) => can(p)), [can]);
+  const pages = useMemo(() => PAGES.filter(([, , , p]) => can(p)), [can]);
   useEffect(() => {
     let pendingG = 0;
     const onKey = (e) => {
@@ -87,13 +90,13 @@ export function CommandPalette() {
         <CommandList data-testid="command-palette-list">
           <CommandEmpty>No results.</CommandEmpty>
           <CommandGroup heading="Actions">
-            {ACTIONS.filter(([, , , p]) => can(p)).map(([l, to, Icon]) => <CommandItem key={to} value={`action ${l}`} onSelect={() => go(to)} data-testid={`palette-action-${l.toLowerCase().replace(/[^a-z]+/g, "-")}`}><Icon className="mr-2 h-4 w-4 text-gold-hover" />{l}</CommandItem>)}
+            {actions.map(([l, to, Icon]) => <CommandItem key={to} value={`action ${l}`} onSelect={() => go(to)} data-testid={`palette-action-${l.toLowerCase().replace(/[^a-z]+/g, "-")}`}><Icon className="mr-2 h-4 w-4 text-gold-hover" />{l}</CommandItem>)}
           </CommandGroup>
           {!q.trim() && recent.length > 0 && <CommandGroup heading="Recent">
             {recent.map((r) => <CommandItem key={r.to} value={`recent ${r.label}`} onSelect={() => go(r.to, r.label)} data-testid="palette-recent"><Clock className="mr-2 h-4 w-4 text-txt-secondary" />{r.label}</CommandItem>)}
           </CommandGroup>}
           <CommandGroup heading="Pages">
-            {PAGES.filter(([, , , p]) => can(p)).map(([l, to, Icon]) => <CommandItem key={to} value={`page ${l}`} onSelect={() => go(to)} data-testid={`palette-page-${l.toLowerCase().replace(/[^a-z]+/g, "-")}`}><Icon className="mr-2 h-4 w-4 text-ink-950" />{l}</CommandItem>)}
+            {pages.map(([l, to, Icon]) => <CommandItem key={to} value={`page ${l}`} onSelect={() => go(to)} data-testid={`palette-page-${l.toLowerCase().replace(/[^a-z]+/g, "-")}`}><Icon className="mr-2 h-4 w-4 text-ink-950" />{l}</CommandItem>)}
           </CommandGroup>
           {groups.map((g) => { const Icon = ICON[g.type] || Home; return (
             <CommandGroup key={g.type} heading={LABEL[g.type] || g.type}>

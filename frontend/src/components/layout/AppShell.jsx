@@ -65,7 +65,7 @@ function Crumbs() {
   const parts = useLocation().pathname.split("/").filter(Boolean);
   return (
     <nav className="hidden min-w-0 items-center gap-1 text-[13px] text-txt-secondary md:flex" aria-label="Breadcrumb">
-      {parts.slice(0, 3).map((p, i) => <span key={i} className="flex items-center gap-1">{i > 0 && <ChevronRight className="h-3.5 w-3.5 text-txt-muted" />}<Link to={"/" + parts.slice(0, i + 1).join("/")} className={cn("truncate hover:text-ink-950", i === parts.length - 1 && "font-semibold text-ink-950")}>{CRUMB[p] || (p.length > 20 ? "Detail" : p)}</Link></span>)}
+      {parts.slice(0, 3).map((p, i) => <span key={parts.slice(0, i + 1).join("/")} className="flex items-center gap-1">{i > 0 && <ChevronRight className="h-3.5 w-3.5 text-txt-muted" />}<Link to={"/" + parts.slice(0, i + 1).join("/")} className={cn("truncate hover:text-ink-950", i === parts.length - 1 && "font-semibold text-ink-950")}>{CRUMB[p] || (p.length > 20 ? "Detail" : p)}</Link></span>)}
     </nav>
   );
 }
@@ -101,6 +101,7 @@ function TopBar({ onMenu }) {
 }
 
 export default function AppShell() {
+  // localStorage: sidebar collapsed flag — non-sensitive UI preference (CR-7)
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("kkt_sb") === "1");
   const { user, company } = useAuth();
   const [mobile, setMobile] = useState(false);

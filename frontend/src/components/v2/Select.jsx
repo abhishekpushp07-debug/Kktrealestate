@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { invalidateCatalogues, useCatalogues } from "@/hooks/useCatalogues";
 
 const RECENT_KEY = "kkt_recent_choices";
+// localStorage: recently-picked option ids per select — non-sensitive UI convenience (CR-7)
 const recent = (key) => JSON.parse(localStorage.getItem(RECENT_KEY) || "{}")[key] || [];
 const remember = (key, v) => { const all = JSON.parse(localStorage.getItem(RECENT_KEY) || "{}"); all[key] = [v, ...(all[key] || []).filter((x) => x !== v)].slice(0, 5); localStorage.setItem(RECENT_KEY, JSON.stringify(all)); };
 

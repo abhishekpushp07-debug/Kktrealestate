@@ -1,5 +1,5 @@
 import { HistoryButton } from "@/components/common/HistoryTimeline";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import api, { errMsg } from "@/lib/api";
@@ -22,6 +22,7 @@ export function FlatDrawer({ flatId, onClose, onChanged }) {
   const [flat, setFlat] = useState(null);
   const [busy, setBusy] = useState(false);
   const [reason, setReason] = useState("");
+  const manualTargets = useMemo(() => ["Available", "Hold", "Blocked"].filter((s) => s !== flat?.status), [flat?.status]);
   const [extendTo, setExtendTo] = useState("");
   const nav = useNavigate();
   const [edit, setEdit] = useState({ price: "", rate_per_sqft: "", notes: "", flat_type_id: null });
@@ -90,7 +91,7 @@ export function FlatDrawer({ flatId, onClose, onChanged }) {
             <p className="mt-1 text-3xl font-extrabold tabular" data-testid="flat-drawer-price">{inrShort(flat.price)}</p>
             <p className="text-xs text-txt-muted">{inr(flat.price)}{flat.rate_per_sqft ? ` · ₹${num(flat.rate_per_sqft)}/sq.ft × ${num(flat.super_builtup_sqft)}` : " · lump sum"}{flat.rate_card?.name ? ` · ${flat.rate_card.name}` : ""}</p>
             {flat.price_source === "manual" && <p className="mt-2 rounded bg-amber-500/15 px-2 py-1 text-xs text-amber-300" data-testid="flat-price-manual-override">Manual override{flat.rate_card_breakup?.length ? ` (was ${flat.rate_card_breakup.map((b) => b.label).join(" + ")})` : ""}</p>}
-            {flat.price_breakup?.length > 0 && <ul className="mt-3 space-y-1 border-t border-white/10 pt-2 text-xs" data-testid="flat-price-breakup">{flat.price_breakup.map((b, i) => <li key={i} className="flex justify-between"><span className="text-txt-muted">{b.label}</span><span className="tabular font-semibold">{inr(b.amount)}</span></li>)}</ul>}
+            {flat.price_breakup?.length > 0 && <ul className="mt-3 space-y-1 border-t border-white/10 pt-2 text-xs" data-testid="flat-price-breakup">{flat.price_breakup.map((b) => <li key={b.label} className="flex justify-between"><span className="text-txt-muted">{b.label}</span><span className="tabular font-semibold">{inr(b.amount)}</span></li>)}</ul>}
           </div>
           <div className="mt-5 grid grid-cols-3 gap-4">
             <KV label="Type" value={`${flat.flat_type?.name} (${flat.flat_type?.bhk} BHK)`} /><KV label="Facing" value={flat.facing} /><KV label="Floor" value={flat.floor} mono />
@@ -98,9 +99,9 @@ export function FlatDrawer({ flatId, onClose, onChanged }) {
           </div>
           <div className="mt-6">
             <p className="label-xs mb-2">Rooms snapshot</p>
-            <table className="w-full text-sm" data-testid="flat-rooms-table"><tbody>{flat.rooms_snapshot?.map((r, i) => <tr key={i} className="border-b border-slate-100"><td className="py-1.5 text-txt-secondary">{r.label}<span className="ml-1 text-[10px] text-txt-muted">{r.room_type_name}</span></td><td className="py-1.5 text-right tabular text-xs text-txt-secondary">{r.length_ft} × {r.width_ft} ft</td><td className="py-1.5 text-right font-semibold tabular">{num(r.area_sqft)} sq.ft</td></tr>)}</tbody></table>
+            <table className="w-full text-sm" data-testid="flat-rooms-table"><tbody>{flat.rooms_snapshot?.map((r) => <tr key={r.label} className="border-b border-slate-100"><td className="py-1.5 text-txt-secondary">{r.label}<span className="ml-1 text-[10px] text-txt-muted">{r.room_type_name}</span></td><td className="py-1.5 text-right tabular text-xs text-txt-secondary">{r.length_ft} × {r.width_ft} ft</td><td className="py-1.5 text-right font-semibold tabular">{num(r.area_sqft)} sq.ft</td></tr>)}</tbody></table>
             <p className="label-xs mb-2 mt-4">Areas snapshot</p>
-            <div className="flex flex-wrap gap-2" data-testid="flat-areas-list">{flat.areas_snapshot?.map((a, i) => <span key={i} className="rounded-md border bg-warm-50 px-2 py-1 text-xs"><b className="text-ink-950">{a.area_type_name}</b> {num(a.value_sqft)}</span>)}</div>
+            <div className="flex flex-wrap gap-2" data-testid="flat-areas-list">{flat.areas_snapshot?.map((a) => <span key={a.area_type_name || a.label} className="rounded-md border bg-warm-50 px-2 py-1 text-xs"><b className="text-ink-950">{a.area_type_name}</b> {num(a.value_sqft)}</span>)}</div>
             {flat.specifications?.length > 0 && <><p className="label-xs mb-2 mt-4">Specifications</p><div className="grid grid-cols-2 gap-1 text-xs" data-testid="flat-specs">{flat.specifications.map((s) => <div key={s.id} className="rounded border bg-white px-2 py-1"><span className="text-txt-muted">{s.category}: </span><b className="text-ink-950">{s.name}</b>{s.brand ? <span className="text-txt-secondary"> · {s.brand}</span> : null}</div>)}</div></>}
             <details className="mt-4"><summary className="label-xs cursor-pointer">History</summary><div className="mt-2"><HistoryTimeline entityType="flat" entityId={flat.id} /></div></details>
           </div>
@@ -110,7 +111,7 @@ export function FlatDrawer({ flatId, onClose, onChanged }) {
               {manual ? <>
                 <Input placeholder="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)} className="mb-2 h-9" data-testid="flat-status-reason" />
                 <div className="flex flex-wrap gap-2">
-                  {["Available", "Hold", "Blocked"].filter((s) => s !== flat.status).map((s) => <Button key={s} size="sm" variant="outline" disabled={busy} onClick={() => changeStatus(s)} data-testid={`flat-status-${s.toLowerCase()}-btn`} className={s === "Hold" ? "border-amber-300 text-amber2 hover:bg-amber2-50" : s === "Blocked" ? "border-slate-300 text-txt-secondary" : "border-emerald-300 text-sage hover:bg-sage-50"}>Mark {s}</Button>)}
+                  {manualTargets.map((s) => <Button key={s} size="sm" variant="outline" disabled={busy} onClick={() => changeStatus(s)} data-testid={`flat-status-${s.toLowerCase()}-btn`} className={s === "Hold" ? "border-amber-300 text-amber2 hover:bg-amber2-50" : s === "Blocked" ? "border-slate-300 text-txt-secondary" : "border-emerald-300 text-sage hover:bg-sage-50"}>Mark {s}</Button>)}
                 </div>
                 <p className="mt-2 text-[11px] text-txt-muted">Booked / Sold are set by the booking engine (Phase 2).</p>
               </> : <p className="text-sm text-txt-secondary">Status is controlled by the booking.</p>}

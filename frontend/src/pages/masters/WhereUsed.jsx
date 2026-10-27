@@ -15,7 +15,7 @@ export function WhereUsedButton({ path, label = "Where used", testId = "where-us
       {data && <div className="space-y-2 text-sm">
         {data.active_bookings > 0 && <p className="rounded-md bg-amber2-50 px-3 py-2 text-xs text-amber2" data-testid="where-used-bookings">{data.active_bookings} active booking(s) carry this in their plan snapshot.</p>}
         {data.references.length === 0 && !data.active_bookings && <p className="text-txt-secondary">Not referenced anywhere — safe to deactivate.</p>}
-        <ul className="divide-y rounded-md border">{data.references.map((r, i) => <li key={i} className="flex items-center justify-between px-3 py-2" data-testid={`where-used-ref-${i}`}><span>{r.label}</span><span className="rounded-full bg-warm-50 px-2 py-0.5 text-[10px] font-bold uppercase text-txt-secondary">{r.type.replace("_", " ")}</span></li>)}</ul>
+        <ul className="divide-y rounded-md border">{data.references.map((r, i) => <li key={r.id || `${r.type}-${r.label}`} className="flex items-center justify-between px-3 py-2" data-testid={`where-used-ref-${i}`}><span>{r.label}</span><span className="rounded-full bg-warm-50 px-2 py-0.5 text-[10px] font-bold uppercase text-txt-secondary">{r.type.replace("_", " ")}</span></li>)}</ul>
       </div>}
     </DialogContent></Dialog>
   </>);

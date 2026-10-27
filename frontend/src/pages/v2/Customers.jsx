@@ -1,3 +1,4 @@
+/* eslint-disable react/no-array-index-key -- fixed-length skeleton placeholders (never reordered) */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { LayoutGrid, Plus, Rows3, Search, UserRound } from "lucide-react";
@@ -25,6 +26,7 @@ export default function Customers() {
   const { label } = useCatalogues();
   const people = usePeople();
   const [sp] = useSearchParams();
+  // localStorage: cards/table view preference — non-sensitive (CR-7)
   const [view, setView] = useState(() => localStorage.getItem("kkt_cust_view") || "cards");
   const [search, setSearch] = useState("");
   const [q, setQ] = useState("");

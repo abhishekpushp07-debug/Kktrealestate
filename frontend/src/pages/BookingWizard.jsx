@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Check, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { toast } from "sonner";
-import api from "@/lib/api";
+import api, { errMsg } from "@/lib/api";
 import { FieldError, useFieldErrors } from "@/lib/formErrors";
 import { useAuth } from "@/context/AuthContext";
 import { useFetch, useMasterOptions } from "@/hooks/useList";
@@ -60,6 +60,7 @@ export default function BookingWizard() {
   const plan = plans?.find((p) => p.id === planId);
   const [busy, setBusy] = useState(false);
   const draftKey = `kkt:booking-draft:${user?.id || "anon"}`;
+  // localStorage: unsaved wizard draft (ids + step, no credentials) — non-sensitive (CR-7)
   const [draft, setDraft] = useState(() => { try { const d = JSON.parse(localStorage.getItem(draftKey) || "null"); return d && d.step > 0 ? d : null; } catch { return null; } });
   useEffect(() => { if (step === 0 && !projectId) return; localStorage.setItem(draftKey, JSON.stringify({ step, projectId, blockId, flat, customer, agr, charges, slots, bookingDate, remarks, planId, acceptMode, saved_at: Date.now() })); }, [step, projectId, blockId, flat, customer, agr, charges, slots, bookingDate, remarks, planId, acceptMode, draftKey]);
   const resume = () => { const d = draft; setStep(d.step); setProjectId(d.projectId); setBlockId(d.blockId); setFlat(d.flat); setCustomer(d.customer); setAgr(d.agr); setCharges(d.charges || []); setSlots(d.slots || []); setBookingDate(d.bookingDate); setRemarks(d.remarks || ""); setPlanId(d.planId || ""); setAcceptMode(d.acceptMode || "In person"); setDraft(null); };
@@ -130,7 +131,7 @@ export default function BookingWizard() {
             <Input type="number" value={agr.total} readOnly={!canEditAgr} onChange={(e) => { const t = Math.round(Number(e.target.value) || 0); setAgr((a) => a.mode === "percent" ? { ...a, total: e.target.value, cash: String(Math.round(t * (Number(a.cashPct) || 0) / 100)), account: String(t - Math.round(t * (Number(a.cashPct) || 0) / 100)) } : { ...a, total: e.target.value, account: String(Math.max(t - cash, 0)) }); }} data-testid="wiz-total" />
             <FieldError name="agreement_value" fields={fe.fields} /><FieldError name="cash_agreed" fields={fe.fields} />
             <div className="mt-2 rounded-lg bg-warm-50 px-3 py-2 text-xs text-txt-secondary" data-testid="wiz-price-breakup">
-              {(flat?.price_breakup || []).map((b, i) => <div key={i} className="flex justify-between"><span>{b.label}</span><span>{inr(b.amount)}</span></div>)}
+              {(flat?.price_breakup || []).map((b) => <div key={b.label} className="flex justify-between"><span>{b.label}</span><span>{inr(b.amount)}</span></div>)}
               <div className="flex justify-between font-semibold text-ink-950"><span>List price</span><span>{inr(listPrice)}</span></div>
               {Number(discount) > 0 && <div className="flex justify-between text-sage"><span>Negotiated discount</span><span>− {inr(Number(discount))}</span></div>}
             </div>

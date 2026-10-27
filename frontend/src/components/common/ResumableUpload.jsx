@@ -1,3 +1,4 @@
+/* eslint-disable react/no-array-index-key -- positional editable rows without ids; data-derived keys would remount inputs on edit */
 import { useRef, useState } from "react";
 import { UploadCloud, RotateCcw } from "lucide-react";
 import api, { errMsg } from "../../lib/api";
@@ -13,6 +14,7 @@ async function sha256Hex(buf) {
 
 export async function uploadResumable(file, meta, onProgress) {
   let up = null;
+  // localStorage: resumable upload id per file fingerprint — non-sensitive (CR-7)
   const saved = localStorage.getItem(fp(file));
   if (saved) { try { up = (await api.get(`/uploads/${saved}`)).data; } catch { localStorage.removeItem(fp(file)); } }
   if (!up || up.state !== "uploading") {

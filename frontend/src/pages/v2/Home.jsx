@@ -1,3 +1,4 @@
+/* eslint-disable react/no-array-index-key -- fixed-length skeleton placeholders (never reordered) */
 import { Link } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AlertTriangle, ArrowRight, CalendarDays, FileWarning, PhoneCall, Receipt, Wallet } from "lucide-react";
@@ -20,7 +21,7 @@ function Attention({ a }) {
   return (
     <Card className="min-w-0 !p-0" testId="attention-list">
       <div className="flex items-center justify-between px-6 pt-5"><h3 className="font-display text-lg">Needs attention</h3><span className="pill bg-brick-50 text-brick">{rows.length}</span></div>
-      <ul className="mt-4 divide-y divide-warm-100">{rows.slice(0, 8).map((r, i) => <li key={i} className="flex items-center gap-4 px-6 py-3"><IconTile icon={r.icon} tone={r.tone} /><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-ink-950">{r.title}</p><p className="truncate text-xs text-txt-secondary">{r.sub}</p></div><Link to={r.to} className="btn btn-secondary btn-sm shrink-0" data-testid={`attention-cta-${i}`}>{r.cta}</Link></li>)}</ul>
+      <ul className="mt-4 divide-y divide-warm-100">{rows.slice(0, 8).map((r, i) => <li key={r.id || `${r.title}-${r.at}`} className="flex items-center gap-4 px-6 py-3"><IconTile icon={r.icon} tone={r.tone} /><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-ink-950">{r.title}</p><p className="truncate text-xs text-txt-secondary">{r.sub}</p></div><Link to={r.to} className="btn btn-secondary btn-sm shrink-0" data-testid={`attention-cta-${i}`}>{r.cta}</Link></li>)}</ul>
     </Card>
   );
 }

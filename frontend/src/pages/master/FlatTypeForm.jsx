@@ -1,3 +1,4 @@
+/* eslint-disable react/no-array-index-key -- positional editable rows without ids; data-derived keys would remount inputs on edit */
 import { useMemo, useState } from "react";
 import { Plus, Trash2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";

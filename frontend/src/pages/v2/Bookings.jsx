@@ -1,3 +1,4 @@
+/* eslint-disable react/no-array-index-key -- fixed-length skeleton placeholders (never reordered) */
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { FileSignature, Plus, Search } from "lucide-react";

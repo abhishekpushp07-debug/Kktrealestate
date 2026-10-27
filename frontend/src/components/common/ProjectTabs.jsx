@@ -1,3 +1,4 @@
+/* eslint-disable react/no-array-index-key -- positional editable rows without ids; data-derived keys would remount inputs on edit */
 import { HistoryButton } from "@/components/common/HistoryTimeline";
 import { useEffect, useState } from "react";
 import { Plus, Play, CheckCircle2 } from "lucide-react";

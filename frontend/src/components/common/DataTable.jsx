@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+/* eslint-disable react/no-array-index-key -- fixed-length skeleton placeholders (never reordered) */
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Columns3, Download, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -27,9 +28,11 @@ export function DataTable({ columns, items = [], total = 0, loading, page = 1, p
   const vrows = virtual ? rv.getVirtualItems() : null;
   const padTop = vrows?.length ? vrows[0].start : 0;
   const padBottom = vrows?.length ? rv.getTotalSize() - vrows[vrows.length - 1].end : 0;
+  // localStorage: hidden-column preference per table — non-sensitive (CR-7)
   const [hidden, setHidden] = useState(() => new Set(JSON.parse(localStorage.getItem(`kkt:cols:${testId}`) || "[]")));
   const toggleCol = (k) => { const n = new Set(hidden); n.has(k) ? n.delete(k) : n.add(k); setHidden(n); localStorage.setItem(`kkt:cols:${testId}`, JSON.stringify([...n])); };
-  const cols = columns.filter((c) => !hidden.has(c.key));
+  const cols = useMemo(() => columns.filter((c) => !hidden.has(c.key)), [columns, hidden]);
+  const labelled = useMemo(() => columns.filter((c) => c.label), [columns]);
   const pages = Math.max(1, Math.ceil(total / pageSize));
   const toggleSort = (key) => { if (setSort) setSort(sort === key ? `-${key}` : key); };
   const allSelected = selectable && items.length > 0 && items.every((r) => selected.has(r[rowKey]));
@@ -58,7 +61,7 @@ export function DataTable({ columns, items = [], total = 0, loading, page = 1, p
               <DropdownMenuContent align="end" className="w-52">
                 <DropdownMenuCheckboxItem checked={!dense} onCheckedChange={() => setDense(!dense)}>Comfortable density</DropdownMenuCheckboxItem>
                 <DropdownMenuSeparator />
-                {columns.filter((c) => c.label).map((c) => <DropdownMenuCheckboxItem key={c.key} checked={!hidden.has(c.key)} onCheckedChange={() => toggleCol(c.key)}>{c.label}</DropdownMenuCheckboxItem>)}
+                {labelled.map((c) => <DropdownMenuCheckboxItem key={c.key} checked={!hidden.has(c.key)} onCheckedChange={() => toggleCol(c.key)}>{c.label}</DropdownMenuCheckboxItem>)}
               </DropdownMenuContent>
             </DropdownMenu>}
             {exportPath && <Button variant="outline" size="sm" className="h-9" onClick={exportCsv} data-testid={`${testId}-export-csv`}><Download className="mr-1 h-4 w-4" />CSV</Button>}
@@ -67,7 +70,7 @@ export function DataTable({ columns, items = [], total = 0, loading, page = 1, p
       )}
       {mobile ? (
         <div className="divide-y divide-slate-100" data-testid={`${testId}-cards`}>
-          {loading ? Array.from({ length: 4 }).map((_, i) => <div key={i} className="space-y-2 p-4"><Skeleton className="h-4 w-2/3" /><Skeleton className="h-3 w-1/2" /><Skeleton className="h-3 w-1/3" /></div>)
+          {loading ? Array.from({ length: 4 }).map((_, i) => <div key={`sk-${i}`} className="space-y-2 p-4"><Skeleton className="h-4 w-2/3" /><Skeleton className="h-3 w-1/2" /><Skeleton className="h-3 w-1/3" /></div>)
             : items.length === 0 ? <div className="p-6">{empty || <EmptyState title="No records found" description="Try adjusting your search or filters." />}</div>
             : items.map((row, idx) => {
               const [first, ...rest] = cardCols;
@@ -97,7 +100,7 @@ export function DataTable({ columns, items = [], total = 0, loading, page = 1, p
               </thead>
               <tbody>
                 {loading ? Array.from({ length: 6 }).map((_, i) => (
-                  <tr key={i} className="border-b border-slate-100">{cols.map((c) => <td key={c.key} className="px-4 py-3"><Skeleton className="h-4 w-full" /></td>)}</tr>
+                  <tr key={`sk-${i}`} className="border-b border-slate-100">{cols.map((c) => <td key={c.key} className="px-4 py-3"><Skeleton className="h-4 w-full" /></td>)}</tr>
                 )) : items.length === 0 ? (
                   <tr><td colSpan={cols.length + (selectable ? 1 : 0)} className="p-6">{empty || <EmptyState title="No records found" description="Try adjusting your search or filters." />}</td></tr>
                 ) : <>{virtual && padTop > 0 && <tr style={{ height: padTop }} />}{(virtual ? vrows.map((v) => [items[v.index], v.index]) : items.map((row, idx) => [row, idx])).map(([row, idx]) => (

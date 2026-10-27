@@ -1,3 +1,4 @@
+/* eslint-disable react/no-array-index-key -- fixed-length skeleton placeholders (never reordered) */
 import { JourneyButton } from "@/components/common/JourneyPanel";
 import { Suspense, lazy, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";

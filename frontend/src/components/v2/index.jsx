@@ -1,3 +1,4 @@
+/* eslint-disable react/no-array-index-key -- fixed-length skeleton placeholders (never reordered) */
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { inr, inrShort, initials } from "@/lib/format";
@@ -100,7 +101,7 @@ export function PageHero({ dark = true, eyebrow, title, subtitle, chips, ring, s
     <section className={cn("relative overflow-hidden rounded-2xl", dark ? "hero" : "card")} data-testid={testId}>
       {cover && <div className="absolute inset-0 bg-cover bg-center opacity-20 blur-xl" style={{ backgroundImage: `url(${cover})` }} />}
       <div className="relative px-6 py-7 md:px-8">
-        {crumbs && <nav className={cn("mb-3 flex flex-wrap items-center gap-1 text-xs", dark ? "text-warm-200/70" : "text-txt-muted")}>{crumbs.map((c, i) => <span key={i} className="flex items-center gap-1">{i > 0 && <ChevronRight className="h-3 w-3" />}{c.to ? <Link to={c.to} className="hover:underline">{c.label}</Link> : <span>{c.label}</span>}</span>)}</nav>}
+        {crumbs && <nav className={cn("mb-3 flex flex-wrap items-center gap-1 text-xs", dark ? "text-warm-200/70" : "text-txt-muted")}>{crumbs.map((c, i) => <span key={c.to || c.label || c} className="flex items-center gap-1">{i > 0 && <ChevronRight className="h-3 w-3" />}{c.to ? <Link to={c.to} className="hover:underline">{c.label}</Link> : <span>{c.label}</span>}</span>)}</nav>}
         <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
           <div className="flex min-w-0 items-start gap-5">
             {ring != null && <div className="flex flex-col items-center gap-1"><ProgressRing value={ring} size={72} stroke={6} light={dark} /><span className={cn("text-[11px] font-semibold", dark ? "text-warm-200/70" : "text-txt-muted")}>Construction</span></div>}
@@ -143,7 +144,7 @@ export function EntityCard({ to, cover, title, subtitle, status, meta = [], coun
           {subtitle ? <p className="truncate text-xs text-txt-secondary">{subtitle}</p> : <span />}
           {status && <StatusPill status={status} />}
         </div>
-        {meta.length > 0 && <div className="mt-3 flex flex-wrap gap-1.5">{meta.map((m, i) => <span key={i} className="pill bg-warm-100 text-txt-secondary">{m}</span>)}</div>}
+        {meta.length > 0 && <div className="mt-3 flex flex-wrap gap-1.5">{meta.map((m) => <span key={String(m)} className="pill bg-warm-100 text-txt-secondary">{m}</span>)}</div>}
         {counts && <MiniBar counts={counts} className="mt-4" legend />}
         {money && <div className="mt-4 grid grid-cols-2 gap-3 border-t border-warm-100 pt-4">{money.map((m) => <div key={m.label}><p className="text-[11px] font-semibold text-txt-secondary">{m.label}</p><Money value={m.value} short className={cn("text-xl", m.tone === "brick" ? "text-brick" : m.tone === "sage" ? "text-sage" : "text-ink-950")} /></div>)}</div>}
         {foot && <div className="mt-4 flex items-end justify-between gap-3 border-t border-warm-100 pt-3 text-xs text-txt-secondary">{foot}</div>}

@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Card, StatusPill } from "@/components/v2";
 import { inr, fmtDate } from "@/lib/format";
 import { useMasterOptions } from "@/hooks/useList";
+import { HistoryButton } from "@/components/common/HistoryTimeline";
 
 const today = () => new Date().toISOString().slice(0, 10);
 

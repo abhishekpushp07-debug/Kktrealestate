@@ -23,7 +23,7 @@ export function TrendSpark({ months = [], values = [], money = true, label, w = 
       <svg width={w} height={h} role="img" aria-label={title} className="overflow-visible">
         <title>{title}</title>
         <polyline points={pts.map((p) => `${p.x},${p.y}`).join(" ")} fill="none" stroke="#C9A227" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
-        {pts.map((p, i) => <g key={i}>
+        {pts.map((p, i) => <g key={`${p.x}-${p.y}`}>
           <rect x={p.x - (w / Math.max(pts.length - 1, 1)) / 2} y={0} width={w / Math.max(pts.length - 1, 1)} height={h} fill="transparent" className={linkFor ? "cursor-pointer" : ""} onMouseEnter={() => setHi(i)} onClick={() => linkFor && nav(linkFor(p.m))} data-testid={testId ? `${testId}-pt-${i}` : undefined} />
           {(i === pts.length - 1 || hi === i) && <circle cx={p.x} cy={p.y} r={hi === i ? 3 : 2} fill={hi === i ? "#8a6d12" : "#C9A227"} />}
         </g>)}
