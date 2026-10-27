@@ -34,7 +34,8 @@
    "sales.agreement.view",
    "sales.booking.cancel",
    "sales.booking.export",
-   "sales.booking.view"
+   "sales.booking.view",
+   "documents.document.view"
   ],
   "catalogue.write": [
    "masters.catalogue.create",
@@ -178,13 +179,21 @@
    "finance.cheque.bounce",
    "finance.cheque.clear",
    "finance.payment.create",
-   "finance.roznamcha.deposit"
+   "finance.roznamcha.deposit",
+   "documents.document.generate",
+   "documents.document.share",
+   "documents.document.bulk",
+   "demands.register.create",
+   "demands.register.void",
+   "demands.register.print"
   ],
   "payment.read": [
    "finance.demand.view",
    "finance.payment.view",
    "finance.refund.view",
-   "finance.roznamcha.view"
+   "finance.roznamcha.view",
+   "documents.document.view",
+   "demands.register.view"
   ],
   "payment.reverse": [
    "finance.payment.reverse",
@@ -208,7 +217,10 @@
   ],
   "receipt.print": [
    "finance.receipt.download",
-   "finance.receipt.print"
+   "finance.receipt.print",
+   "documents.document.generate",
+   "documents.document.view",
+   "demands.register.print"
   ],
   "report.view": [
    "reports.bank_wise.view",

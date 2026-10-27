@@ -26,6 +26,8 @@ REGISTRY = {
     "service": ("Service", {"ticket": ("Tickets", ["view", "create", "edit", "assign", "close", "reopen", "delete", "export"]), "category_sla": ("Categories & SLA", ["edit"]), "portal": ("Customer portal", ["view", "manage"])}),
     "website": ("Website", {"cms": ("Website CMS", ["view", "edit"])}),
     "inventory": ("Inventory control", {"real_status": ("Real inventory status (vs display)", ["view"]), "category": ("Allocation category", ["set"]), "hold": ("Holds", ["create", "release"]), "block": ("Blocks", ["set"]), "display": ("Display status override", ["set"])}),
+    "documents": ("Billing & documents", {"document": ("Generated documents", ["view", "generate", "share", "bulk"])}),
+    "demands": ("Demand register", {"register": ("Demand register", ["view", "create", "void", "print"])}),
     "reports": ("Reports", {k: (lbl, ["view", "export"]) for k, lbl in [("collections", "Collections"), ("outstanding", "Outstanding & ageing"), ("demand_vs_collection", "Demand vs collection"),
                             ("cheque_register", "Cheque register"), ("receivables_forecast", "Receivables forecast"), ("inventory", "Inventory"), ("construction_vs_plan", "Construction vs plan"),
                             ("cancellations_refunds", "Cancellations & refunds"), ("lead_funnel", "Lead funnel"), ("bank_wise", "Bank-wise receipts"), ("roznamcha", "Roznamcha"), ("service_sla", "Service SLA"), ("audit", "Activity / audit"),

@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { CompletenessRing } from "@/components/v2/Completeness";
-import { BadgeCheck, CalendarDays, Eye, EyeOff, FileText, FileWarning, Landmark, LifeBuoy, Lock, Mail, MapPin, MessageSquare, MoreHorizontal, Pencil, Phone, Plus, Printer, Receipt, ShieldCheck, Users } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { BadgeCheck, CalendarDays, Copy, FileText, LifeBuoy, Mail, MessageCircle, MessageSquare, Pencil, Phone, Plus, Printer, Receipt } from "lucide-react";
 import { toast } from "sonner";
 import { HistoryButton } from "@/components/common/HistoryTimeline";
 import api, { errMsg, BASE_PATH } from "@/lib/api";
@@ -10,57 +9,26 @@ import { useAuth } from "@/context/AuthContext";
 import { useFetch } from "@/hooks/useList";
 import { useCatalogues } from "@/hooks/useCatalogues";
 import { cn } from "@/lib/utils";
-import { fmtDate, fmtDateTime, fmtRelative, inr, inrShort } from "@/lib/format";
-import { Card, EmptyState, IconTile, Money, Num, Skeleton, StatTile, StatusPill, Tabs } from "@/components/v2";
-import { Avatar, CommSheet, ScoreRing, Segmented, ThreeLedgers, usePeople } from "@/components/v2/CustomerBits";
+import { fmtDate, inr, inrShort } from "@/lib/format";
+import { Card, EmptyState, Skeleton, StatusPill } from "@/components/v2";
+import { Avatar, CommSheet, ThreeLedgers, usePeople } from "@/components/v2/CustomerBits";
 import { PostPayment } from "@/components/v2/PostPayment";
 import { DocumentsPanel } from "@/components/common/DocumentsPanel";
 import { PortalAccessCard } from "@/components/common/PortalAccessCard";
+import { C360Timeline, BookingRich, DemandsTab, ReceiptsDocsTab, ConstructionTab, ProfileTab } from "@/components/v2/C360Tabs";
 
-const EV = { payment: [Receipt, "sage"], demand: [FileText, "amber"], communication: [MessageSquare, undefined], visit: [CalendarDays, undefined], booking: [FileText, "gold"], service: [LifeBuoy, "brick"], lead: [Users, undefined], kyc: [ShieldCheck, "sage"], refund: [Receipt, "brick"], milestone: [Landmark, "gold"], customer: [Users, undefined], transfer: [FileText, "amber"] };
+const TABS = ["overview", "bookings", "ledger", "demands", "receipts", "construction", "service", "timeline", "kyc", "coapplicants", "notes"];
+const LABEL = { overview: "Overview", bookings: "Bookings", ledger: "Ledger", demands: "Demands", receipts: "Receipts & Documents", construction: "Construction", service: "Service", timeline: "Timeline", kyc: "KYC & Profile", coapplicants: "Co-applicants", notes: "Notes" };
+const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-"];
 
-function BookingCard({ b }) {
-  const ps = b.plan_summary || {}, due = ps.due || {}, paid = (b.summary?.paid_paise || 0), agr = b.agreement_value_paise || 1;
-  const oc = (b.summary?.other_charges_due_paise || 0);
-  const title = [b.block_name, b.flat_snapshot?.flat_number, b.flat_snapshot?.flat_type_code, b.flat_snapshot?.super_builtup_sqft && `${b.flat_snapshot.super_builtup_sqft.toLocaleString("en-IN")} sq ft`].filter(Boolean).join(" · ");
-  const sub = [b.booking_number, b.project_name, ps.plan_name || "No plan"].join(" · ");
-  return (
-    <Link to={`/bookings/${b.id}`} className="block min-w-0" data-testid={`booking-card-${b.booking_number}`}>
-      <Card hover className="min-w-0 !p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1"><p className="truncate text-[15px] font-semibold leading-6 text-ink-950" title={title}>{title}</p><p className="mt-1 truncate text-xs text-txt-secondary" title={sub}>{sub}</p></div>
-          <StatusPill status={b.status} className="shrink-0" />
-        </div>
-        <div className="mt-5"><div className="flex items-center justify-between text-xs leading-6"><span className="text-txt-secondary">Paid <Money value={paid / 100} short className="text-ink-950" /> of <Money value={agr / 100} short className="text-ink-950" /></span><span className="font-semibold text-ink-950">{Math.round((paid / agr) * 100)}%</span></div><div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-warm-100"><span className="block h-full rounded-full bg-sage" style={{ width: `${Math.min(100, (paid / agr) * 100)}%` }} /></div></div>
-        <div className="mt-5 grid grid-cols-3 gap-2">{[["Cash due", due.cash_paise], ["Account due", due.account_paise], ["Other charges", oc]].map(([l, v]) => <div key={l} className="min-w-0 rounded-xl bg-warm-50 px-3 py-2"><p className="truncate text-[11px] font-semibold text-txt-secondary">{l}</p><Money value={(v || 0) / 100} short className={cn("text-base", v > 0 ? "text-brick" : "text-sage")} /></div>)}</div>
-        {b.summary?.total_udhar_paise != null && <p className="mt-3 text-xs text-txt-secondary" data-testid={`booking-card-${b.booking_number}-two-sided`}>Udhar <Money value={b.summary.total_udhar_paise / 100} short className="text-ink-950" /> · Jama <Money value={b.summary.total_jama_paise / 100} short className="text-emerald-700" /> · Balance <Money value={b.summary.balance_paise / 100} short className={b.summary.balance_paise > 0 ? "text-brick" : "text-emerald-700"} /><span className="ml-1 text-[10px]">(Cash {Math.round(b.summary.cash_udhar_paise / 100 - b.summary.cash_jama_paise / 100).toLocaleString("en-IN")} · Account {Math.round(b.summary.account_udhar_paise / 100 - b.summary.account_jama_paise / 100).toLocaleString("en-IN")})</span></p>}
-        {ps.next_installment && <div className="mt-4 flex min-w-0 flex-wrap items-center gap-2 text-xs text-txt-secondary" title={`${ps.next_installment.name} · ${ps.next_installment.trigger_label}`}><span className="pill bg-gold-light text-[#6b5410]">Next · {ps.next_installment.name}</span><span className="truncate">{ps.next_installment.trigger_label}{ps.next_installment.expected_date ? ` · ${fmtDate(ps.next_installment.expected_date)}` : ""}</span><Num s={inr(ps.next_installment.total_paise / 100)} className="ml-auto font-semibold text-ink-950" /></div>}
-        {ps.overdue_count > 0 && <p className="mt-1 text-xs font-semibold text-brick">{ps.overdue_count} overdue demand{ps.overdue_count > 1 ? "s" : ""}</p>}
-      </Card>
-    </Link>
-  );
-}
-
-const KIND_LABEL = { transfer: "Transfers/Revisions", booking: "Bookings", payment: "Payments", demand: "Demands", lead: "Leads", visit: "Visits", service: "Tickets", refund: "Refunds", milestone: "Stages", document: "Documents", customer: "Profile", notice: "Notices", portal: "Portal" };
-const titleOf = (e) => { const a = e.after || {}; return [e.action.replace(/[._]/g, " "), a.receipt_number || a.demand_number || a.refund_number || a.booking_number || a.visit_number || a.ticket_number || a.lead_number || a.milestone_name || ""].filter(Boolean).join(" · "); };
-function TimelineCard({ id }) {
-  const [kind, setKind] = useState("all");
-  const { data, loading } = useFetch(`/customers/${id}/events?limit=120${kind === "all" ? "" : `&kinds=${kind}`}`);
-  const items = data?.items || [];
-  const groups = items.reduce((acc, e) => { const d = fmtDate(e.created_at); (acc[d] = acc[d] || []).push(e); return acc; }, {});
-  const kinds = ["all", ...(data?.kinds || [])];
-  return (
-    <Card className="!p-0" testId="customer-timeline">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-warm-100 px-6 py-4"><h3 className="font-display text-lg">Timeline <span className="text-sm font-normal text-txt-muted">· {items.length} events</span></h3>
-        <div className="flex flex-wrap gap-1.5" data-testid="timeline-filter">{kinds.map((k) => <button key={k} onClick={() => setKind(k)} className={cn("pill", kind === k ? "bg-ink-950 text-warm-50" : "bg-warm-100 text-ink-950")} data-testid={`timeline-chip-${k}`}>{k === "all" ? "All" : KIND_LABEL[k] || k}</button>)}</div></div>
-      <div className="px-6 py-4">{loading ? <Skeleton className="h-40" /> : items.length === 0 ? <p className="py-6 text-center text-sm text-txt-muted">Nothing recorded yet.</p> : Object.entries(groups).map(([day, evs]) => <div key={day} className="mb-5 last:mb-0"><p className="label mb-2">{day}</p><ul className="space-y-2">{evs.map((e) => { const [I, tone] = EV[e.kind] || [FileText, undefined]; const amt = (e.after || {}).amount_paise ?? (e.after || {}).total_paise; return <li key={e.id} className="flex items-center gap-3" data-testid={`timeline-event-${e.kind}`}><IconTile icon={I} tone={tone} /><div className="min-w-0 flex-1"><Link to={e.link} className="block truncate text-sm font-semibold text-ink-950 hover:text-gold">{titleOf(e)}</Link><p className="truncate text-xs text-txt-secondary">{e.actor_name} · {fmtDateTime(e.created_at)}{e.booking_number && e.entity_type !== "booking" ? ` · ${e.booking_number}` : ""}</p></div>{typeof amt === "number" && <Money value={amt / 100} short className={cn("text-base", tone === "sage" ? "text-sage" : "text-ink-950")} />}</li>; })}</ul></div>)}</div>
-    </Card>
-  );
+function Tile({ label, value, hint, tone, testId }) {
+  return <div className={cn("rounded-2xl border border-warm-200 bg-white px-4 py-3 min-h-[88px]", tone === "brick" && "border-brick/30 bg-brick/5", tone === "sage" && "border-sage/30 bg-sage/5")} data-testid={testId}><p className="text-[11px] font-semibold uppercase tracking-wide text-txt-muted">{label}</p><p className={cn("mt-1 font-display text-[22px] leading-7 tabular-nums text-ink-950", tone === "brick" && "text-brick", tone === "sage" && "text-sage")}>{value}</p>{hint && <p className="mt-0.5 truncate text-[11px] text-txt-secondary">{hint}</p>}</div>;
 }
 
 export default function Customer360() {
   const { id } = useParams();
   const nav = useNavigate();
+  const [sp, setSp] = useSearchParams();
   const { can, user, surfaces } = useAuth();
   const { label } = useCatalogues();
   const people = usePeople();
@@ -68,122 +36,94 @@ export default function Customer360() {
   const [reveal, setReveal] = useState(false);
   const [comm, setComm] = useState(false);
   const [pay, setPay] = useState(false);
-  const [tab, setTab] = useState("overview");
+  const tab = TABS.includes(sp.get("tab")) ? sp.get("tab") : "overview";
+  const setTab = useCallback((t) => { const n = new URLSearchParams(sp); n.set("tab", t); setSp(n, { replace: true }); }, [sp, setSp]);
   const panels = useFetch(`/customers/${id}/panels`);
-  const comms = { data: panels.data?.communications, reload: panels.reload };
-  const docInitial = useMemo(() => (panels.data ? { items: panels.data.documents.items, types: panels.data.document_types.items } : null), [panels.data]);
-  const ledg = useFetch(c && c.bookings.length > 0 ? `/customers/${c.id}/ledgers` : null);
+  const P = panels.data;
   const load = useCallback((rev = false) => api.get(`/customers/${id}`, { params: { reveal: rev || undefined } }).then((r) => { if (r.data.id !== id) { nav(`/customers/${r.data.id}`, { replace: true }); return; } setC(r.data); setReveal(rev); }).catch((e) => toast.error(errMsg(e))), [id, nav]);
   useEffect(() => { load(false); }, [load]);
-  if (!c) return <div className="space-y-6"><Skeleton className="h-56 rounded-2xl" /><Skeleton className="h-96 rounded-2xl" /></div>;
+  useEffect(() => {
+    const h = (e) => { if (e.target.closest("input,textarea,select,[contenteditable]")) return; const i = KEYS.indexOf(e.key); if (i >= 0 && i < TABS.length) { e.preventDefault(); setTab(TABS[i]); } if (e.key === "/") { e.preventDefault(); document.querySelector("[data-testid=c360-search]")?.focus(); } if (e.key === "p" && can("finance.payment.create")) setPay(true); };
+    window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h);
+  }, [setTab, can]);
+  const counts = useMemo(() => ({ bookings: c?.bookings.length, demands: P?.counts.demands, receipts: P?.counts.receipts, construction: P?.counts.construction, service: P?.counts.tickets, coapplicants: c?.co_applicants.length }), [c, P]);
+  if (!c) return <div className="space-y-6" data-testid="c360-skeleton"><Skeleton className="h-52 rounded-2xl" /><div className="grid grid-cols-3 gap-3 md:grid-cols-6">{[...Array(6)].map((_, i) => <Skeleton key={i} className="h-[88px] rounded-2xl" />)}</div><Skeleton className="h-96 rounded-2xl" /></div>;
   const active = c.bookings.filter((b) => b.status === "Active");
-  const totDue = c.bookings.reduce((s, b) => s + Math.max(b.summary?.due_paise || 0, 0) + Math.max(b.summary?.other_charges_due_paise || 0, 0), 0);
   const rm = people.find((p) => p.value === c.assigned_sales_user_id)?.label;
-  const setKyc = async (v) => { try { await api.post(`/customers/${id}/kyc-status`, { kyc_status: v, version: c.version }); toast.success(`KYC ${v}`); load(reveal); } catch (e) { toast.error(errMsg(e)); } };
-  const kv = (k) => (reveal ? c[k] : c[`${k}_masked`]) || "—";
-  const T = ledg.data?.totals?.combined;
-  const pendingCheques = T ? T.pending_cheques_paise || 0 : c.bookings.reduce((s, b) => s + (b.summary?.pending_cheques_paise || 0), 0);
-  const agreementTotal = T ? T.agreed_paise || 0 : c.bookings.reduce((s, b) => s + (b.agreement_value_paise || 0), 0), paidTotal = T ? T.paid_paise || 0 : c.bookings.reduce((s, b) => s + (b.summary?.paid_paise || 0), 0);
-  const dueTotal = T ? Math.max(T.due_paise || 0, 0) : totDue;
-  const Left = (
-    <div className="space-y-8">
-      {c.bookings.length > 0 && <section data-testid="financial-summary">
-        <h2 className="mb-4 font-display text-lg text-ink-950">Financial summary</h2>
-        <div className="grid grid-cols-2 gap-6">
-          <StatTile label="Agreement" value={inrShort(agreementTotal / 100)} hint="flat value + other charges" icon={FileText} testId="fin-agreement" />
-          <StatTile label="Paid" value={inrShort(paidTotal / 100)} hint="cleared · all ledgers" icon={Receipt} iconTone="sage" tone="sage" testId="fin-paid" />
-          <StatTile label={dueTotal > 0 ? "Outstanding" : "Outstanding / Advance"} value={inrShort(dueTotal / 100)} hint={(T?.advance_paise || 0) > 0 ? `Advance held ${inrShort((T.advance_paise || 0) / 100)} · Net balance ${inrShort(((T.net_balance_paise ?? (dueTotal - (T.advance_paise || 0))) / 100))}` : dueTotal > 0 ? "due now · all ledgers" : "nothing due"} icon={FileWarning} iconTone={dueTotal > 0 ? "brick" : undefined} tone={dueTotal > 0 ? "brick" : "sage"} testId="fin-due" />
-          <StatTile label="Cheques" value={inrShort(pendingCheques / 100)} hint={pendingCheques > 0 ? "in hand" : "none in hand"} icon={Landmark} iconTone={pendingCheques > 0 ? "amber" : undefined} testId="fin-cheques" />
-        </div>
-        {T && T.total_udhar_paise != null && <div className="mt-4 overflow-hidden rounded-xl border border-warm-200" data-testid="two-sided-breakdown">
-          <table className="w-full text-sm"><thead className="bg-warm-50 text-left text-[11px] font-semibold uppercase tracking-wide text-txt-muted"><tr><th className="px-4 py-2">Ledger (Udhar · Jama · Balance)</th><th className="px-4 py-2 text-right">Udhar (₹)</th><th className="px-4 py-2 text-right">Jama (₹)</th><th className="px-4 py-2 text-right">Balance (₹)</th></tr></thead>
-            <tbody>
-              <tr className="border-t font-semibold text-ink-950" data-testid="two-sided-customer-total"><td className="px-4 py-2">All bookings</td><td className="px-4 py-2 text-right tabular-nums">{inr(T.total_udhar_paise / 100)}</td><td className="px-4 py-2 text-right tabular-nums text-sage">{inr(T.total_jama_paise / 100)}</td><td className={cn("px-4 py-2 text-right tabular-nums", T.balance_paise > 0 ? "text-brick" : "text-sage")}>{inr(T.balance_paise / 100)}</td></tr>
-              {(ledg.data?.bookings || []).map((l) => <tr key={l.booking_id} className="border-t text-txt-secondary" data-testid={`two-sided-${l.booking_number}`}><td className="px-4 py-2"><Link to={`/bookings/${l.booking_id}`} className="font-medium text-ink-950 hover:underline">{l.booking_number}</Link> · {l.status} <span className="text-[11px]">(Cash {inr(((l.cash?.total_udhar_paise || 0) - (l.cash?.total_jama_paise || 0)) / 100)} · Account {inr(((l.account?.total_udhar_paise || 0) - (l.account?.total_jama_paise || 0)) / 100)} · Other {inr(((l.other_charges?.total_udhar_paise || 0) - (l.other_charges?.total_jama_paise || 0)) / 100)})</span></td><td className="px-4 py-2 text-right tabular-nums">{inr((l.combined?.total_udhar_paise || 0) / 100)}</td><td className="px-4 py-2 text-right tabular-nums text-sage">{inr((l.combined?.total_jama_paise || 0) / 100)}</td><td className={cn("px-4 py-2 text-right tabular-nums", (l.combined?.balance_paise || 0) > 0 ? "text-brick" : "text-sage")}>{inr((l.combined?.balance_paise || 0) / 100)}</td></tr>)}
-            </tbody></table>
-        </div>}
-      </section>}
-      <section>
-        <div className="mb-4 flex items-center justify-between"><h2 className="flex items-center gap-2 font-display text-lg text-ink-950">Bookings <span className="pill bg-warm-100 text-txt-secondary">{c.bookings.length}</span></h2>{can("sales.booking.create") && <Link to={`/bookings/new?customer_id=${id}`} className="btn btn-secondary btn-sm" data-testid="c360-new-booking"><Plus className="h-3.5 w-3.5" />New booking</Link>}</div>
-        {c.bookings.length === 0 ? <EmptyState title="No bookings yet" description="Start a booking to open the three ledgers for this customer." testId="bookings-empty" /> : <div className="grid gap-6 md:grid-cols-2">{c.bookings.map((b) => <BookingCard key={b.id} b={b} />)}</div>}
-      </section>
-      {can("finance.ledger.view") && c.bookings.length > 0 && <ThreeLedgers customerId={id} testId="customer-ledgers" />}
-      <TimelineCard id={id} />
-    </div>
-  );
-  const Right = (
-    <div className="space-y-6">
-      <Card testId="profile-card">
-        <h3 className="font-display text-lg">Profile</h3>
-        <div className="mt-3 flex flex-wrap gap-1.5">{(c.preferences?.bhk_ids || []).map((b) => <span key={b} className="pill bg-warm-100 text-txt-secondary">{label("bhk_preference", b)}</span>)}{(c.preferences?.facing_ids || []).map((b) => <span key={b} className="pill bg-warm-100 text-txt-secondary">{label("facing", b)} facing</span>)}{c.preferences?.budget_band_id && <span className="pill bg-gold-light text-[#8a6d12]">{label("budget_band", c.preferences.budget_band_id)}</span>}</div>
-        <dl className="mt-4 space-y-2 text-sm">{[["Occupation", c.occupation], ["Company", c.company_name], ["Income band", c.annual_income_band], ["Source", c.source], ["Residency", label("residency", c.residency_id)], ["Address", [c.address_current?.line1, c.address_current?.city, c.address_current?.state, c.address_current?.pincode].filter(Boolean).join(", ")]].filter(([, v]) => v).map(([k, v]) => <div key={k} className="flex justify-between gap-4"><dt className="text-txt-secondary">{k}</dt><dd className="text-right font-medium text-ink-950">{v}</dd></div>)}</dl>
-        {c.notes && <p className="mt-3 rounded-xl bg-warm-50 p-3 text-xs text-txt-secondary">{c.notes}</p>}
-      </Card>
-      <Card className="!p-0" testId="comms-card">
-        <div className="flex items-center justify-between px-6 pt-5"><h3 className="font-display text-lg">Communication</h3>{can("sales.customer.edit") && <button onClick={() => setComm(true)} className="btn btn-secondary btn-sm" data-testid="log-comm-btn"><Plus className="h-3.5 w-3.5" />Log</button>}</div>
-        <ul className="mt-3 divide-y divide-warm-100">{(comms.data?.items || []).length === 0 && <li className="px-6 py-6"><div className="flex flex-col items-center gap-2 text-center"><IconTile icon={MessageSquare} /><p className="text-sm text-txt-muted">No calls or meetings logged.</p>{can("sales.customer.edit") && <button onClick={() => setComm(true)} className="text-sm font-semibold text-ink-950 hover:text-gold" data-testid="log-first-call">Log first call</button>}</div></li>}{(comms.data?.items || []).map((m) => <li key={m.id} className="px-6 py-3"><p className="text-sm font-semibold text-ink-950">{m.type_label || label("communication_type", m.type_id)}{m.outcome_id && <span className="font-normal text-txt-secondary"> · {m.outcome_label || label("communication_outcome", m.outcome_id)}</span>}</p><p className="text-xs text-txt-secondary">{m.notes || "—"}</p><p className="mt-0.5 text-[11px] text-txt-muted">{m.by_name || m.user_name || ""} · {fmtRelative(m.happened_at || m.created_at)}{m.next_follow_up_at ? ` · follow-up ${fmtDate(m.next_follow_up_at)}` : ""}</p></li>)}</ul>
-      </Card>
-      <Card testId="kyc-card">
-        <div className="flex items-center justify-between"><h3 className="font-display text-lg">KYC & documents</h3><StatusPill status={c.kyc_status} /></div>
-        <dl className="mt-3 space-y-2 text-sm">{[["PAN", kv("pan")], ["Aadhaar", kv("aadhaar")], ["Bank", c.bank?.bank_name ? `${c.bank.bank_name} · ${(reveal ? c.bank.account_number : c.bank.account_number_masked) || "—"}` : "—"]].map(([k, v]) => <div key={k} className="flex items-baseline justify-between gap-4 leading-6"><dt className="flex items-center gap-1.5 text-txt-secondary"><Lock className="h-3.5 w-3.5 translate-y-px text-txt-muted" aria-hidden />{k}</dt><dd className="font-mono text-ink-950">{v}</dd></div>)}</dl>
-        <div className="mt-4 flex flex-wrap items-center gap-2">{can("sales.kyc.reveal") && <button onClick={() => load(!reveal)} className="btn btn-secondary btn-sm" data-testid="kyc-reveal-btn">{reveal ? <><EyeOff className="h-3.5 w-3.5" />Hide</> : <><Eye className="h-3.5 w-3.5" />Reveal</>}</button>}{reveal && <span className="text-[11px] text-amber2">Reveal is audit-logged</span>}{can("sales.kyc.reveal") && <select value={c.kyc_status} onChange={(e) => setKyc(e.target.value)} className="input !h-8 !w-auto !text-xs" aria-label="KYC status" data-testid="kyc-status-select">{["Pending", "Submitted", "Verified", "Rejected"].map((k) => <option key={k}>{k}</option>)}</select>}</div>
-        <div className="mt-5 border-t border-warm-100 pt-4"><DocumentsPanel entityType="customer" entityId={id} canWrite={can("sales.customer.edit")} initial={docInitial} /></div>
-      </Card>
-      <Card testId="coapplicants-card"><h3 className="font-display text-lg">Co-applicants & nominee</h3>{c.co_applicants.length === 0 && !c.nominee?.name && <p className="mt-2 text-sm text-txt-muted">None recorded.</p>}<ul className="mt-3 space-y-2">{c.co_applicants.map((a, i) => <li key={i} className="flex items-center gap-3 rounded-xl bg-warm-50 p-3"><Avatar name={a.name} size={32} /><div className="min-w-0"><p className="text-sm font-semibold text-ink-950">{a.name}</p><p className="text-xs text-txt-secondary">{[a.relation, a.phone].filter(Boolean).join(" · ")}</p></div></li>)}{c.nominee?.name && <li className="flex items-center gap-3 rounded-xl border border-dashed border-warm-200 p-3"><Avatar name={c.nominee.name} size={32} /><div><p className="text-sm font-semibold text-ink-950">{c.nominee.name} <span className="pill bg-warm-100 text-txt-secondary">Nominee</span></p><p className="text-xs text-txt-secondary">{c.nominee.relation}</p></div></li>}</ul></Card>
-      {surfaces?.customer_portal && <PortalAccessCard customerId={id} />}
-      {c.leads.length > 0 && <Card testId="leads-card"><h3 className="font-display text-lg">Lead history</h3>{c.leads.map((l) => <div key={l.id} className="mt-3 text-sm"><p className="font-semibold text-ink-950">{l.lead_number} · {l.status}</p><div className="mt-1 flex flex-wrap gap-1">{l.stage_history.map((s, i) => <span key={i} className="pill bg-warm-100 text-txt-secondary">{s.status} · {fmtDate(s.at)}</span>)}</div></div>)}</Card>}
-    </div>
-  );
+  const S = P?.summary;
+  const phone = (c.phone || "").replace(/\D/g, "");
+  const copy = (t) => { navigator.clipboard?.writeText(t); toast.success("Copied"); };
+  const vip = (c.segment_ids || []).some((s) => /vip|hni|premium/i.test(label("customer_segment", s) || ""));
+  const Act = ({ icon: I, label: l, onClick, to, href, testId, primary }) => { const cls = cn("btn btn-sm", primary ? "btn-primary" : "btn-secondary"); const body = <><I className="h-3.5 w-3.5" strokeWidth={1.75} /><span className="hidden xl:inline">{l}</span></>; return to ? <Link to={to} className={cls} title={l} data-testid={testId}>{body}</Link> : href ? <a href={href} target={href.startsWith("http") ? "_blank" : undefined} rel="noreferrer" className={cls} title={l} data-testid={testId}>{body}</a> : <button onClick={onClick} className={cls} title={l} data-testid={testId}>{body}</button>; };
   return (
-    <div className="space-y-8" data-testid="customer-360">
-      <Card className="!p-6 md:!p-8" testId="customer-hero">
-        <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
+    <div className="space-y-6" data-testid="customer-360">
+      <Card className="!p-6 print:!p-0" testId="customer-hero">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex min-w-0 items-start gap-4">
-            <CompletenessRing customer={c} size={64}><Avatar name={c.full_name} size={64} /></CompletenessRing>
+            <div className={cn("rounded-full p-[3px]", vip ? "bg-gold" : "bg-transparent")}><CompletenessRing customer={c} size={64}><Avatar name={c.full_name} size={64} /></CompletenessRing></div>
             <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                <h1 className="font-display text-[28px] leading-tight text-ink-950" data-testid="hero-title">{c.salutation ? `${c.salutation} ` : ""}{c.full_name}</h1><HistoryButton entityType="customer" entityId={c.id} label={c.customer_code} />
-                <div className="flex flex-wrap items-center gap-1.5">{c.lifecycle_stage && <StatusPill status={c.lifecycle_stage} />}<span className={cn("pill", c.kyc_status === "Verified" ? "bg-gold-light text-[#8a6d12]" : "bg-warm-100 text-txt-secondary")}>{c.kyc_status === "Verified" && <BadgeCheck className="h-3.5 w-3.5" />}KYC {c.kyc_status}</span>{(c.segment_ids || []).map((s) => <span key={s} className="pill bg-warm-100 text-txt-secondary">{label("customer_segment", s)}</span>)}</div>
-              </div>
-              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm leading-6 text-txt-secondary">
-                <a href={`tel:${c.phone}`} className="flex items-center gap-1.5 hover:text-ink-950" data-testid="hero-phone"><Phone className="h-4 w-4" strokeWidth={1.75} />{c.phone}</a>
-                {c.email && <a href={`mailto:${c.email}`} className="flex items-center gap-1.5 hover:text-ink-950"><Mail className="h-4 w-4" strokeWidth={1.75} />{c.email}</a>}
-                {c.address_current?.city && <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4" strokeWidth={1.75} />{c.address_current.city}</span>}
-                {rm && <span className="pill border border-warm-200 bg-white text-txt-secondary"><Avatar name={rm} size={16} className="!text-[8px]" />RM · {rm}</span>}
-                <span className="flex items-center gap-1.5"><ScoreRing value={c.engagement_score || 0} size={22} />Engagement</span>
-              </div>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1"><h1 className="font-display text-[28px] leading-tight text-ink-950" data-testid="hero-title">{c.salutation ? `${c.salutation} ` : ""}{c.full_name}</h1><span className="font-mono text-sm text-txt-secondary" data-testid="hero-cust-number">{c.customer_code}</span><HistoryButton entityType="customer" entityId={c.id} label="History" /></div>
+              <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs" data-testid="hero-chips">{(c.segment_ids || []).map((s) => <span key={s} className={cn("pill", vip ? "bg-gold-light text-[#8a6d12]" : "bg-warm-100 text-txt-secondary")}>{label("customer_segment", s)}</span>)}<span className={cn("pill", c.kyc_status === "Verified" ? "bg-gold-light text-[#8a6d12]" : "bg-warm-100 text-txt-secondary")}>{c.kyc_status === "Verified" && <BadgeCheck className="h-3.5 w-3.5" />}KYC {c.kyc_status}</span>{c.portal_enabled != null && <span className="pill bg-warm-100 text-txt-secondary">Portal {c.portal_enabled ? "active" : "off"}</span>}{rm && <span className="pill border border-warm-200 bg-white text-txt-secondary"><Avatar name={rm} size={16} className="!text-[8px]" />RM · {rm}</span>}<span className="pill bg-warm-100 text-txt-secondary">Customer since {fmtDate(c.created_at)}</span></div>
+              <div className="mt-2 flex flex-wrap items-center gap-x-4 text-sm text-txt-secondary"><span className="flex items-center gap-1.5"><Phone className="h-4 w-4" />{c.phone}</span>{c.email && <span className="flex items-center gap-1.5"><Mail className="h-4 w-4" />{c.email}</span>}</div>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2 xl:justify-end" data-testid="hero-actions">
-            {can("finance.payment.create") && active.length > 0 && <button onClick={() => setPay(true)} className="btn btn-primary" data-testid="hero-post-payment"><Receipt className="h-4 w-4" strokeWidth={1.75} />Post payment</button>}
-            {can("sales.booking.create") && <Link to={`/bookings/new?customer_id=${id}`} className="btn btn-secondary" data-testid="hero-new-booking"><Plus className="h-4 w-4" strokeWidth={1.75} />New booking</Link>}
-            <div className="hidden items-center gap-1 md:flex">
-              {can("sales.customer.edit") && <button onClick={() => setComm(true)} className="btn btn-ghost" data-testid="hero-log-comm"><MessageSquare className="h-4 w-4" strokeWidth={1.75} />Log</button>}
-              {can("finance.ledger.export") && active[0] && <button onClick={() => window.open(`${BASE_PATH}/print/statement/${active[0].id}`, "_blank")} className="btn btn-ghost" data-testid="hero-statement"><Printer className="h-4 w-4" strokeWidth={1.75} />Statement</button>}
-              {can("finance.ledger.export") && active[0] && <button onClick={() => window.open(`${BASE_PATH}/print/allotment/${active[0].id}`, "_blank")} className="btn btn-ghost" data-testid="hero-allotment"><FileText className="h-4 w-4" strokeWidth={1.75} />Allotment</button>}
-              {can("sales.customer.edit") && <Link to={`/customers/${id}/edit`} className="btn btn-ghost" data-testid="customer-edit-btn"><Pencil className="h-4 w-4" strokeWidth={1.75} />Edit</Link>}
-            </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild><button className="btn btn-ghost !px-2" aria-label="More actions" data-testid="hero-more"><MoreHorizontal className="h-5 w-5" strokeWidth={1.75} /></button></DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="v2 w-52 rounded-xl border-warm-200 p-1.5">
-                <DropdownMenuItem className="md:hidden" onClick={() => setComm(true)} data-testid="more-log">Log communication</DropdownMenuItem>
-                {active[0] && <DropdownMenuItem className="md:hidden" onClick={() => window.open(`${BASE_PATH}/print/statement/${active[0].id}`, "_blank")} data-testid="more-statement">Print / download statement</DropdownMenuItem>}
-                <DropdownMenuItem className="md:hidden" onClick={() => window.location.assign(`${BASE_PATH}/customers/${id}/edit`)} data-testid="more-edit">Edit profile</DropdownMenuItem>
-                {surfaces?.customer_portal && <DropdownMenuItem onClick={() => { const el = document.querySelector("[data-testid=portal-access-card]"); el?.scrollIntoView({ behavior: "smooth" }); }} data-testid="more-portal">Share portal login</DropdownMenuItem>}
-                {user?.role_name === "Super Admin" && c.kyc_status !== "Erased" && active.length === 0 && <DropdownMenuItem className="text-brick" onClick={async () => { const reason = window.prompt("Right to erasure — reason (PII anonymised; financial records kept):"); if (!reason) return; try { await api.post(`/admin/customers/${id}/erase`, { confirm: "ERASE", reason }); toast.success("Customer anonymised"); load(); } catch (e) { toast.error(errMsg(e)); } }} data-testid="erase-customer-btn">Erase PII</DropdownMenuItem>}
-              </DropdownMenuContent>
-            </DropdownMenu>
+          <div className="flex flex-wrap items-center gap-1.5 print:hidden" data-testid="hero-actions">
+            <Act icon={Phone} label="Call" href={`tel:${c.phone}`} testId="qa-call" /><Act icon={Copy} label="Copy" onClick={() => copy(c.phone)} testId="qa-copy-phone" /><Act icon={MessageCircle} label="WhatsApp" href={`https://wa.me/${phone.length === 10 ? "91" + phone : phone}`} testId="qa-whatsapp" />{c.email && <Act icon={Mail} label="Email" href={`mailto:${c.email}`} testId="qa-email" />}
+            {can("finance.payment.create") && active.length > 0 && <Act primary icon={Receipt} label="Post payment" onClick={() => setPay(true)} testId="hero-post-payment" />}
+            {can("documents.document.generate") && active[0] && <Act icon={FileText} label="Generate document" to={`/documents?booking_id=${active[0].id}&project_id=${active[0].project_id}&block_id=${active[0].block_id}`} testId="qa-generate-doc" />}
+            {can("sales.customer.edit") && <Act icon={MessageSquare} label="Add note" onClick={() => setComm(true)} testId="qa-add-note" />}
+            {can("service.ticket.create") && <Act icon={LifeBuoy} label="New ticket" to={`/service-requests?new=1&customer_id=${id}`} testId="qa-new-ticket" />}
+            {can("sales.visit.create") && <Act icon={CalendarDays} label="Schedule visit" to={`/site-visits?new=1&customer_id=${id}`} testId="qa-schedule-visit" />}
+            {can("sales.customer.edit") && <Act icon={Pencil} label="Edit" to={`/customers/${id}/edit`} testId="customer-edit-btn" />}
           </div>
         </div>
       </Card>
-      <div className="xl:hidden"><Tabs tabs={[{ value: "overview", label: "Overview" }, { value: "profile", label: "Profile & KYC" }]} value={tab} onChange={setTab} testId="c360-tabs" /></div>
-      <div className="grid gap-6 xl:grid-cols-12">
-        <div className={cn("min-w-0 xl:col-span-8 xl:block", tab !== "overview" && "hidden")}>{Left}</div>
-        <div className={cn("min-w-0 xl:col-span-4 xl:block", tab !== "profile" && "hidden")}>{Right}</div>
+      <div className="grid grid-cols-3 gap-3 md:grid-cols-6" data-testid="key-strip">
+        {!S ? [...Array(6)].map((_, i) => <Skeleton key={i} className="h-[88px] rounded-2xl" />) : <>
+          <Tile label="Total agreement" value={inrShort(S.agreement_paise / 100)} hint={`${c.bookings.length} booking(s)`} testId="kn-agreement" />
+          <Tile label="Udhar (raised)" value={inrShort(S.udhar_paise / 100)} hint="all ledgers" testId="kn-udhar" />
+          <Tile label="Jama (received)" value={inrShort(S.jama_paise / 100)} hint={S.pending_cheques_paise > 0 ? `+ ${inrShort(S.pending_cheques_paise / 100)} cheques in hand` : "cleared"} tone="sage" testId="kn-jama" />
+          <Tile label="Net balance" value={inrShort(S.balance_paise / 100)} hint={S.balance_paise > 0 ? "receivable" : "nothing due"} tone={S.balance_paise > 0 ? undefined : "sage"} testId="kn-balance" />
+          <Tile label="Advance held" value={inrShort(S.advance_paise / 100)} hint={S.advance_paise > 0 ? "paid ahead of demand" : "—"} tone={S.advance_paise > 0 ? "sage" : undefined} testId="kn-advance" />
+          <Tile label="Overdue" value={inrShort(S.overdue_paise / 100)} hint={S.overdue_count ? `${S.overdue_count} demand(s) · oldest ${S.overdue_oldest_days} d` : "none"} tone={S.overdue_paise > 0 ? "brick" : "sage"} testId="kn-overdue" />
+        </>}
       </div>
-      <CommSheet open={comm} onOpenChange={setComm} customerId={id} onSaved={() => { comms.reload(); load(reveal); }} />
-      {pay && <PostPayment open={pay} onOpenChange={setPay} customerId={id} bookingId={active.length === 1 ? active[0].id : undefined} onPosted={() => load(reveal)} />}
-      <span className="hidden">{fmtDateTime(c.created_at)}</span>
+      <div className="sticky top-0 z-20 -mx-2 overflow-x-auto border-b border-warm-200 bg-warm-50/90 px-2 backdrop-blur print:hidden" role="tablist" data-testid="c360-tabs">
+        <div className="flex gap-5">{TABS.map((t, i) => <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={cn("tab whitespace-nowrap", tab === t && "active")} title={`Press ${KEYS[i]}`} data-testid={`tab-${t}`}>{LABEL[t]}{counts[t] != null && <span className="ml-1.5 rounded-full bg-warm-100 px-1.5 py-0.5 text-[10px] text-txt-secondary">{counts[t]}</span>}</button>)}</div>
+      </div>
+      <div data-testid={`c360-panel-${tab}`}>
+        {tab === "overview" && <Overview c={c} P={P} id={id} can={can} onPay={() => setPay(true)} />}
+        {tab === "bookings" && (c.bookings.length === 0 ? <EmptyState title="No bookings yet" description="Start a booking to open the ledgers." action={can("sales.booking.create") && <Link to={`/bookings/new?customer_id=${id}`} className="btn btn-primary btn-sm" data-testid="c360-new-booking"><Plus className="h-3.5 w-3.5" />New booking</Link>} testId="bookings-empty" /> : <div className="grid gap-5 lg:grid-cols-2">{c.bookings.map((b) => <BookingRich key={b.id} b={b} plan={(P?.plans || []).find((p) => p.booking_id === b.id)} can={can} onPay={() => setPay(true)} />)}</div>)}
+        {tab === "ledger" && (can("finance.ledger.view") ? <ThreeLedgers customerId={id} testId="customer-ledgers" /> : <EmptyState title="No permission" description="finance.ledger.view required" />)}
+        {tab === "demands" && <DemandsTab items={P?.demands.items || []} loading={panels.loading} can={can} />}
+        {tab === "receipts" && <ReceiptsDocsTab receipts={P?.receipts.items || []} docs={P?.generated_documents.items || []} can={can} kyc={<DocumentsPanel entityType="customer" entityId={id} canWrite={can("sales.customer.edit")} initial={P ? { items: P.documents.items, types: P.document_types.items } : null} />} />}
+        {tab === "construction" && <ConstructionTab items={P?.construction || []} photos={P?.photos || []} />}
+        {tab === "service" && <Card testId="service-tab"><div className="flex items-center justify-between"><h3 className="font-display text-lg">Open tickets</h3>{can("service.ticket.create") && <Link to={`/service-requests?new=1&customer_id=${id}`} className="btn btn-secondary btn-sm">New ticket</Link>}</div>{(P?.tickets.items || []).length === 0 ? <p className="mt-3 text-sm text-txt-muted">No open tickets.</p> : <ul className="mt-3 divide-y divide-warm-100">{P.tickets.items.map((t) => <li key={t.id} className="flex items-center justify-between py-2 text-sm"><Link to={`/service-requests/${t.id}`} className="font-semibold text-ink-950 hover:text-gold">{t.ticket_number} · {t.subject}</Link><StatusPill status={t.status} /></li>)}</ul></Card>}
+        {tab === "timeline" && <C360Timeline id={id} />}
+        {tab === "kyc" && <ProfileTab c={c} reveal={reveal} onReveal={() => load(!reveal)} can={can} label={label} onKyc={async (v) => { try { await api.post(`/customers/${id}/kyc-status`, { kyc_status: v, version: c.version }); toast.success(`KYC ${v}`); load(reveal); } catch (e) { toast.error(errMsg(e)); } }} portal={surfaces?.customer_portal && <PortalAccessCard customerId={id} />} />}
+        {tab === "coapplicants" && <Card testId="coapplicants-card"><h3 className="font-display text-lg">Co-applicants & nominee</h3>{c.co_applicants.length === 0 && !c.nominee?.name && <p className="mt-2 text-sm text-txt-muted">None recorded.</p>}<ul className="mt-3 grid gap-2 md:grid-cols-2">{c.co_applicants.map((a, i) => <li key={i} className="flex items-center gap-3 rounded-xl bg-warm-50 p-3"><Avatar name={a.name} size={32} /><div><p className="text-sm font-semibold text-ink-950">{a.name}</p><p className="text-xs text-txt-secondary">{[a.relation, a.phone].filter(Boolean).join(" · ")}</p></div></li>)}{c.nominee?.name && <li className="flex items-center gap-3 rounded-xl border border-dashed border-warm-200 p-3"><Avatar name={c.nominee.name} size={32} /><div><p className="text-sm font-semibold text-ink-950">{c.nominee.name} <span className="pill bg-warm-100 text-txt-secondary">Nominee</span></p><p className="text-xs text-txt-secondary">{c.nominee.relation}</p></div></li>}</ul></Card>}
+        {tab === "notes" && <Card className="!p-0" testId="comms-card"><div className="flex items-center justify-between px-6 pt-5"><h3 className="font-display text-lg">Notes & communication</h3>{can("sales.customer.edit") && <button onClick={() => setComm(true)} className="btn btn-secondary btn-sm" data-testid="log-comm-btn"><Plus className="h-3.5 w-3.5" />Add note</button>}</div>{c.notes && <p className="mx-6 mt-3 rounded-xl bg-warm-50 p-3 text-xs text-txt-secondary">{c.notes}</p>}<ul className="mt-3 divide-y divide-warm-100">{(P?.communications.items || []).length === 0 && <li className="px-6 py-6 text-center text-sm text-txt-muted">No notes yet.</li>}{(P?.communications.items || []).map((m) => <li key={m.id} className="px-6 py-3"><p className="text-sm font-semibold text-ink-950">{m.type_label || label("communication_type", m.type_id)}{m.outcome_id && <span className="font-normal text-txt-secondary"> · {m.outcome_label || label("communication_outcome", m.outcome_id)}</span>}</p><p className="text-xs text-txt-secondary">{m.notes || "—"}</p><p className="mt-0.5 text-[11px] text-txt-muted">{m.by_name || m.user_name || ""} · {fmtDate(m.happened_at || m.created_at)}</p></li>)}</ul></Card>}
+      </div>
+      <CommSheet open={comm} onOpenChange={setComm} customerId={id} onSaved={() => { panels.reload(); load(reveal); }} />
+      {pay && <PostPayment open={pay} onOpenChange={setPay} customerId={id} bookingId={active.length === 1 ? active[0].id : undefined} onPosted={() => { load(reveal); panels.reload(); }} />}
+      <span className="hidden">{user?.id}{BASE_PATH}</span>
+    </div>
+  );
+}
+
+function Overview({ c, P, id, can, onPay }) {
+  const n = P?.next_due;
+  return (
+    <div className="grid gap-5 lg:grid-cols-3" data-testid="overview-grid">
+      <Card className={cn("lg:col-span-2", n?.overdue && "border-brick/40")} testId="next-due-card">
+        <p className="label-xs">Next due</p>
+        {!P ? <Skeleton className="mt-2 h-16" /> : !n ? <p className="mt-2 text-sm text-txt-muted">Nothing due — all demands settled and no planned installment pending.</p> : <div className="mt-2 flex flex-wrap items-end justify-between gap-3"><div><p className="font-display text-xl text-ink-950">{n.what}</p><p className="text-xs text-txt-secondary">{n.why}{n.booking_number ? ` · ${n.booking_number}` : ""}</p><p className={cn("mt-1 text-xs font-semibold", n.overdue ? "text-brick" : "text-txt-secondary")}>{n.overdue ? "Overdue since" : n.kind === "demand" ? "Due on" : "Expected"} {n.when ? fmtDate(n.when) : "—"}</p></div><div className="text-right"><p className="font-display text-2xl tabular-nums text-ink-950">{inr((n.amount_paise || 0) / 100)}</p>{can("finance.payment.create") && <button onClick={onPay} className="btn btn-primary btn-sm mt-1" data-testid="next-due-pay">Post payment</button>}</div></div>}
+      </Card>
+      <Card testId="open-tickets-card"><p className="label-xs">Open tickets</p>{(P?.tickets.items || []).length === 0 ? <p className="mt-2 text-sm text-txt-muted">None</p> : P.tickets.items.slice(0, 3).map((t) => <p key={t.id} className="mt-2 truncate text-sm"><Link to={`/service-requests/${t.id}`} className="font-semibold text-ink-950 hover:text-gold">{t.ticket_number}</Link> · {t.subject}</p>)}</Card>
+      <Card className="lg:col-span-2" testId="overview-bookings"><div className="flex items-center justify-between"><p className="label-xs">Bookings</p>{can("sales.booking.create") && <Link to={`/bookings/new?customer_id=${id}`} className="text-xs font-semibold text-ink-950 hover:text-gold" data-testid="c360-new-booking">+ New booking</Link>}</div><div className="mt-2 grid gap-2 md:grid-cols-2">{c.bookings.map((b) => <Link key={b.id} to={`/bookings/${b.id}`} className="rounded-xl border border-warm-200 p-3 hover:border-gold" data-testid={`booking-mini-${b.booking_number}`}><div className="flex items-center justify-between"><p className="truncate text-sm font-semibold text-ink-950">{b.block_name} · {b.flat_snapshot?.flat_number}</p><StatusPill status={b.status} /></div><p className="text-xs text-txt-secondary">{b.booking_number} · {b.plan_summary?.plan_name || "No plan"}</p>{b.summary && <p className="mt-1 text-xs tabular-nums text-txt-secondary">Udhar {inrShort(b.summary.total_udhar_paise / 100)} · Jama <span className="text-sage">{inrShort(b.summary.total_jama_paise / 100)}</span> · Net <span className={b.summary.balance_paise > 0 ? "text-brick" : "text-sage"}>{inrShort(b.summary.balance_paise / 100)}</span></p>}</Link>)}{c.bookings.length === 0 && <p className="text-sm text-txt-muted">No bookings yet.</p>}</div></Card>
+      <Card testId="overview-docs"><p className="label-xs">Recent documents</p>{(P?.generated_documents.items || []).length === 0 ? <p className="mt-2 text-sm text-txt-muted">Nothing generated yet.</p> : P.generated_documents.items.slice(0, 5).map((d) => <p key={d.id} className="mt-2 flex items-center justify-between gap-2 text-sm"><span className="truncate"><span className="font-semibold text-ink-950">{d.type_name}</span> · {d.number}</span><a href={`${BASE_PATH}/api/docgen/${d.id}/download`} target="_blank" rel="noreferrer" className="text-txt-secondary hover:text-ink-950"><Printer className="h-3.5 w-3.5" /></a></p>)}</Card>
+      <div className="lg:col-span-2"><C360Timeline id={id} compact /></div>
+      <Card testId="overview-notes"><p className="label-xs">RM notes</p>{(P?.communications.items || []).slice(0, 4).map((m) => <p key={m.id} className="mt-2 text-xs text-txt-secondary"><span className="font-semibold text-ink-950">{fmtDate(m.happened_at || m.created_at)}</span> · {m.notes || m.type_label}</p>)}{(P?.communications.items || []).length === 0 && <p className="mt-2 text-sm text-txt-muted">No notes.</p>}</Card>
     </div>
   );
 }

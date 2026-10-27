@@ -19,6 +19,8 @@ from services.kyc import (
     validate_pan,
 )
 from services.numbering import generate_number
+from services.money import present_money
+from utils import now_iso
 from utils import (
     ApiError,
     ListParams,
@@ -252,12 +254,51 @@ async def rm_options(user: dict = Depends(require("sales.customer.view"))):
 
 @router.get("/{customer_id}/panels")
 async def customer_panels(customer_id: str, user: dict = Depends(require("sales.customer.view"))):
-    """Phase E0 composite: communications + documents + document types for Customer 360 side panels in one round trip."""
-    comms, docs, types = await asyncio.gather(
-        db.communications.find({"company_id": user["company_id"], "customer_id": customer_id}, {"_id": 0}).sort("created_at", -1).limit(8).to_list(8),
+    """Composite for Customer 360 (one round trip): communications, documents, key numbers (two-sided ledgers), next due,
+    demands, receipts, generated documents, open tickets, construction of their towers."""
+    from services.dues_engine import schedule
+    from services.ledgers import customer_ledgers
+    cid = user["company_id"]
+    today = now_iso()[:10]
+    comms, docs, types, ledg, dems, recs, gdocs, tickets, bookings = await asyncio.gather(
+        db.communications.find({"company_id": cid, "customer_id": customer_id}, {"_id": 0}).sort("created_at", -1).limit(8).to_list(8),
         db.documents.find({"entity_type": "customer", "entity_id": customer_id, "is_active": True}, {"_id": 0}).sort("uploaded_at", -1).to_list(200),
-        db.document_types.find({"is_active": True}, {"_id": 0, "id": 1, "name": 1, "code": 1}).sort("name", 1).to_list(100))
-    return {"communications": {"items": comms}, "documents": {"items": docs}, "document_types": {"items": types}}
+        db.document_types.find({"is_active": True}, {"_id": 0, "id": 1, "name": 1, "code": 1}).sort("name", 1).to_list(100),
+        customer_ledgers(customer_id, cid),
+        db.demands.find({"company_id": cid, "customer_id": customer_id}, {"_id": 0}).sort("demand_date", -1).to_list(300),
+        db.payments.find({"company_id": cid, "customer_id": customer_id}, {"_id": 0, "id": 1, "receipt_number": 1, "payment_date": 1, "amount_paise": 1, "status": 1, "payment_mode_name": 1, "payment_category": 1, "booking_id": 1, "booking_number": 1, "against": 1}).sort("payment_date", -1).to_list(300),
+        db.generated_documents.find({"company_id": cid, "customer_id": customer_id}, {"_id": 0}).sort("generated_at", -1).to_list(100),
+        db.support_tickets.find({"company_id": cid, "customer_id": customer_id, "status": {"$nin": ["Closed", "Resolved"]}}, {"_id": 0, "id": 1, "ticket_number": 1, "subject": 1, "status": 1, "priority": 1, "created_at": 1, "sla_due_at": 1}).sort("created_at", -1).limit(20).to_list(20),
+        db.bookings.find({"company_id": cid, "customer_id": customer_id}, {"_id": 0, "id": 1, "booking_number": 1, "block_id": 1, "block_name": 1, "project_id": 1, "project_name": 1, "status": 1, "payment_plan_snapshot": 1, "flat_snapshot.flat_number": 1, "cash_agreed_paise": 1, "account_agreed_paise": 1, "agreement_value_paise": 1, "booking_date": 1, "milestone_template_snapshot": 1}).to_list(50))
+    T = (ledg.get("totals") or {}).get("combined") or {}
+    live = [d for d in dems if not d.get("voided")]
+    overdue = [d for d in live if d["status"] != "Paid" and d["due_date"] < today]
+    oldest = max(((date.fromisoformat(today) - date.fromisoformat(d["due_date"])).days for d in overdue), default=0)
+    summary = {"agreement_paise": T.get("agreed_paise", 0), "udhar_paise": T.get("total_udhar_paise", 0), "jama_paise": T.get("total_jama_paise", 0), "balance_paise": T.get("balance_paise", 0), "advance_paise": T.get("advance_paise", 0),
+               "overdue_paise": sum(d["total_demand_paise"] - (d.get("paid_paise") or 0) for d in overdue), "overdue_count": len(overdue), "overdue_oldest_days": oldest, "pending_cheques_paise": T.get("pending_cheques_paise", 0)}
+    # next due: earliest unpaid demand, else next planned installment of an active booking
+    nxt = None
+    unpaid = sorted([d for d in live if d["status"] != "Paid"], key=lambda d: d["due_date"])
+    if unpaid:
+        d = unpaid[0]
+        nxt = {"kind": "demand", "what": d.get("installment_name") or d.get("milestone_name"), "when": d["due_date"], "amount_paise": d["total_demand_paise"] - (d.get("paid_paise") or 0), "why": " · ".join(str(x) for x in [d.get("milestone_name"), f"{d.get('percent')}%" if d.get("percent") is not None else None, d.get("trigger")] if x), "booking_number": d.get("booking_number"), "demand_id": d["id"], "booking_id": d["booking_id"], "overdue": d["due_date"] < today}
+    blocks = {b["id"]: b for b in await db.blocks.find({"id": {"$in": list({b["block_id"] for b in bookings if b.get("block_id")})}}, {"_id": 0, "id": 1, "name": 1, "project_id": 1, "construction_percent": 1, "stages": 1, "stage_plan_name": 1, "planned_completion": 1}).to_list(None)}
+    plans = []
+    for b in bookings:
+        blk = blocks.get(b.get("block_id")) or {}
+        rows = schedule(b, blk, [d for d in dems if d["booking_id"] == b["id"]]) if b.get("payment_plan_snapshot") else []
+        raised = [r for r in rows if r.get("demand_id")]
+        plans.append({"booking_id": b["id"], "booking_number": b["booking_number"], "plan_name": (b.get("payment_plan_snapshot") or {}).get("name"), "installments_total": len(rows), "installments_raised": len(raised), "installments_paid": sum(1 for r in raised if r["status"] == "Paid"), "next": next((r for r in rows if not r.get("demand_id")), None), "rows": rows})
+        if not nxt and b["status"] == "Active":
+            n = next((r for r in rows if not r.get("demand_id")), None)
+            if n:
+                nxt = {"kind": "planned", "what": n["name"], "when": n.get("expected_date"), "amount_paise": n.get("total_paise"), "why": n.get("trigger_label"), "booking_number": b["booking_number"], "booking_id": b["id"]}
+    construction = [{"block_id": bid, "block_name": blk.get("name"), "construction_percent": blk.get("construction_percent", 0), "stage_plan_name": blk.get("stage_plan_name"), "planned_completion": blk.get("planned_completion"),
+                     "stages": [{"name": s.get("name"), "status": s.get("status"), "completed_on": s.get("completed_on"), "planned_on": s.get("planned_on")} for s in (blk.get("stages") or [])][:12]} for bid, blk in blocks.items()]
+    photos = await db.files.find({"company_id": cid, "entity_type": "block", "entity_id": {"$in": list(blocks)}, "kind": "construction_photo", "is_active": {"$ne": False}}, {"_id": 0, "id": 1, "entity_id": 1, "created_at": 1, "caption": 1}).sort("created_at", -1).limit(12).to_list(12)
+    return {"communications": {"items": comms}, "documents": {"items": docs}, "document_types": {"items": types}, "summary": summary, "next_due": nxt, "ledgers": ledg,
+            "demands": {"items": present_money(dems)}, "receipts": {"items": present_money(recs)}, "generated_documents": {"items": gdocs}, "tickets": {"items": tickets}, "plans": present_money(plans), "construction": construction, "photos": photos,
+            "counts": {"bookings": len(bookings), "demands": len(live), "receipts": len(recs), "documents": len(gdocs) + len(docs), "tickets": len(tickets), "construction": len(construction)}}
 
 
 @router.get("/{customer_id}", response_model=CustomersOut, response_model_exclude_unset=True)

@@ -234,6 +234,33 @@
  "GET /api/definitions": [
   "admin.definitions.view"
  ],
+ "GET /api/demands/calendar": [
+  "demands.register.view"
+ ],
+ "GET /api/demands/kpis": [
+  "demands.register.view"
+ ],
+ "GET /api/demands/register": [
+  "demands.register.view"
+ ],
+ "GET /api/docgen/booking/{booking_id}/pickers": [
+  "documents.document.view"
+ ],
+ "GET /api/docgen/options": [
+  "documents.document.view"
+ ],
+ "GET /api/docgen/register": [
+  "documents.document.view"
+ ],
+ "GET /api/docgen/shared/{token}": [
+  "<public>"
+ ],
+ "GET /api/docgen/types": [
+  "documents.document.view"
+ ],
+ "GET /api/docgen/{doc_id}/download": [
+  "documents.document.view"
+ ],
  "GET /api/documents": [
   "<authenticated>"
  ],
@@ -1101,6 +1128,30 @@
  ],
  "POST /api/customers/{customer_id}/portal/toggle": [
   "service.portal.manage"
+ ],
+ "POST /api/demands/manual": [
+  "demands.register.create"
+ ],
+ "POST /api/demands/{demand_id}/reminder-sent": [
+  "demands.register.print"
+ ],
+ "POST /api/demands/{demand_id}/unvoid": [
+  "demands.register.void"
+ ],
+ "POST /api/demands/{demand_id}/void": [
+  "demands.register.void"
+ ],
+ "POST /api/docgen/bulk": [
+  "documents.document.bulk"
+ ],
+ "POST /api/docgen/generate": [
+  "documents.document.generate"
+ ],
+ "POST /api/docgen/{doc_id}/sent": [
+  "documents.document.generate"
+ ],
+ "POST /api/docgen/{doc_id}/share": [
+  "documents.document.share"
  ],
  "POST /api/documents": [
   "<authenticated>"

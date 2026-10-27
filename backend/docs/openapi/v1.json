@@ -2201,127 +2201,6 @@
     "title": "BulkGenerateIn",
     "type": "object"
    },
-   "BulkIn": {
-    "properties": {
-     "action": {
-      "enum": [
-       "set_category",
-       "hold",
-       "extend_hold",
-       "release",
-       "block",
-       "unblock",
-       "set_display",
-       "clear_display"
-      ],
-      "title": "Action",
-      "type": "string"
-     },
-     "category_id": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Category Id"
-     },
-     "display_state": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Display State"
-     },
-     "expires_at": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Expires At"
-     },
-     "flat_ids": {
-      "items": {
-       "type": "string"
-      },
-      "maxItems": 500,
-      "minItems": 1,
-      "title": "Flat Ids",
-      "type": "array"
-     },
-     "for_customer_id": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "For Customer Id"
-     },
-     "for_user_id": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "For User Id"
-     },
-     "note": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Note"
-     },
-     "reason": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Reason"
-     },
-     "reason_id": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Reason Id"
-     }
-    },
-    "required": [
-     "flat_ids",
-     "action"
-    ],
-    "title": "BulkIn",
-    "type": "object"
-   },
    "BulkPriceIn": {
     "additionalProperties": false,
     "properties": {
@@ -5549,6 +5428,100 @@
     "title": "FollowUpIn",
     "type": "object"
    },
+   "GenerateIn": {
+    "additionalProperties": false,
+    "properties": {
+     "booking_id": {
+      "title": "Booking Id",
+      "type": "string"
+     },
+     "demand_ids": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Demand Ids"
+     },
+     "note": {
+      "anyOf": [
+       {
+        "maxLength": 300,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Note"
+     },
+     "payment_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Payment Id"
+     },
+     "period_from": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Period From"
+     },
+     "period_to": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Period To"
+     },
+     "preview": {
+      "default": false,
+      "title": "Preview",
+      "type": "boolean"
+     },
+     "refund_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Refund Id"
+     },
+     "type": {
+      "title": "Type",
+      "type": "string"
+     }
+    },
+    "required": [
+     "type",
+     "booking_id"
+    ],
+    "title": "GenerateIn",
+    "type": "object"
+   },
    "GeoPoint": {
     "additionalProperties": false,
     "properties": {
@@ -6480,6 +6453,77 @@
      "line_id"
     ],
     "title": "ManualChargeDemandIn",
+    "type": "object"
+   },
+   "ManualDemandIn": {
+    "additionalProperties": false,
+    "properties": {
+     "account_amount": {
+      "default": 0,
+      "minimum": 0.0,
+      "title": "Account Amount",
+      "type": "number"
+     },
+     "booking_id": {
+      "title": "Booking Id",
+      "type": "string"
+     },
+     "cash_amount": {
+      "default": 0,
+      "minimum": 0.0,
+      "title": "Cash Amount",
+      "type": "number"
+     },
+     "demand_date": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Demand Date"
+     },
+     "due_date": {
+      "title": "Due Date",
+      "type": "string"
+     },
+     "kind": {
+      "default": "manual",
+      "title": "Kind",
+      "type": "string"
+     },
+     "name": {
+      "maxLength": 120,
+      "minLength": 2,
+      "title": "Name",
+      "type": "string"
+     },
+     "note": {
+      "anyOf": [
+       {
+        "maxLength": 300,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Note"
+     },
+     "preview": {
+      "default": false,
+      "title": "Preview",
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "booking_id",
+     "name",
+     "due_date"
+    ],
+    "title": "ManualDemandIn",
     "type": "object"
    },
    "MarkerIn": {
@@ -9603,6 +9647,32 @@
     "title": "SRStatusIn",
     "type": "object"
    },
+   "SentIn": {
+    "additionalProperties": false,
+    "properties": {
+     "channel": {
+      "title": "Channel",
+      "type": "string"
+     },
+     "note": {
+      "anyOf": [
+       {
+        "maxLength": 300,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Note"
+     }
+    },
+    "required": [
+     "channel"
+    ],
+    "title": "SentIn",
+    "type": "object"
+   },
    "SeqIn": {
     "additionalProperties": false,
     "properties": {
@@ -11097,6 +11167,22 @@
     "title": "VisitsOutPage",
     "type": "object"
    },
+   "VoidIn": {
+    "additionalProperties": false,
+    "properties": {
+     "reason": {
+      "maxLength": 300,
+      "minLength": 3,
+      "title": "Reason",
+      "type": "string"
+     }
+    },
+    "required": [
+     "reason"
+    ],
+    "title": "VoidIn",
+    "type": "object"
+   },
    "routers__auth__LoginIn": {
     "additionalProperties": false,
     "properties": {
@@ -11442,6 +11528,155 @@
      }
     },
     "title": "Address",
+    "type": "object"
+   },
+   "routers__docgen__BulkIn": {
+    "additionalProperties": false,
+    "properties": {
+     "demand_ids": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Demand Ids",
+      "type": "array"
+     },
+     "mode": {
+      "default": "merged",
+      "title": "Mode",
+      "type": "string"
+     },
+     "payment_ids": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Payment Ids",
+      "type": "array"
+     }
+    },
+    "title": "BulkIn",
+    "type": "object"
+   },
+   "routers__inventory__BulkIn": {
+    "properties": {
+     "action": {
+      "enum": [
+       "set_category",
+       "hold",
+       "extend_hold",
+       "release",
+       "block",
+       "unblock",
+       "set_display",
+       "clear_display"
+      ],
+      "title": "Action",
+      "type": "string"
+     },
+     "category_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Category Id"
+     },
+     "display_state": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Display State"
+     },
+     "expires_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expires At"
+     },
+     "flat_ids": {
+      "items": {
+       "type": "string"
+      },
+      "maxItems": 500,
+      "minItems": 1,
+      "title": "Flat Ids",
+      "type": "array"
+     },
+     "for_customer_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "For Customer Id"
+     },
+     "for_user_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "For User Id"
+     },
+     "note": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Note"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     },
+     "reason_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason Id"
+     }
+    },
+    "required": [
+     "flat_ids",
+     "action"
+    ],
+    "title": "BulkIn",
     "type": "object"
    },
    "routers__milestones__CompleteIn": {
@@ -18909,7 +19144,7 @@
   },
   "/api/customers/{customer_id}/panels": {
    "get": {
-    "description": "Phase E0 composite: communications + documents + document types for Customer 360 side panels in one round trip.",
+    "description": "Composite for Customer 360 (one round trip): communications, documents, key numbers (two-sided ledgers), next due,\ndemands, receipts, generated documents, open tickets, construction of their towers.",
     "operationId": "customer_panels_api_customers__customer_id__panels_get",
     "parameters": [
      {
@@ -19494,6 +19729,1238 @@
     "summary": "Definitions",
     "tags": [
      "propagation"
+    ]
+   }
+  },
+  "/api/demands/calendar": {
+   "get": {
+    "description": "Per-day totals for one month (YYYY-MM) \u2014 raised or due basis.",
+    "operationId": "calendar_api_demands_calendar_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "month",
+      "required": true,
+      "schema": {
+       "title": "Month",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "basis",
+      "required": false,
+      "schema": {
+       "default": "raised",
+       "title": "Basis",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "project_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Project Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "block_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Block Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Calendar",
+    "tags": [
+     "demands"
+    ]
+   }
+  },
+  "/api/demands/kpis": {
+   "get": {
+    "operationId": "kpis_api_demands_kpis_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "project_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Project Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "block_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Block Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Kpis",
+    "tags": [
+     "demands"
+    ]
+   }
+  },
+  "/api/demands/manual": {
+   "post": {
+    "description": "Manual / other-charge / bounce-charge demand. Flows through the same demands \u2192 ledger Udhar path as plan demands.",
+    "operationId": "manual_demand_api_demands_manual_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ManualDemandIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Manual Demand",
+    "tags": [
+     "demands"
+    ]
+   }
+  },
+  "/api/demands/register": {
+   "get": {
+    "operationId": "register_api_demands_register_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "basis",
+      "required": false,
+      "schema": {
+       "default": "raised",
+       "title": "Basis",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "date_from",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Date From"
+      }
+     },
+     {
+      "in": "query",
+      "name": "date_to",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Date To"
+      }
+     },
+     {
+      "in": "query",
+      "name": "project_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Project Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "block_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Block Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "stage",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Stage"
+      }
+     },
+     {
+      "in": "query",
+      "name": "plan",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Plan"
+      }
+     },
+     {
+      "in": "query",
+      "name": "status",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Status"
+      }
+     },
+     {
+      "in": "query",
+      "name": "source",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Source"
+      }
+     },
+     {
+      "in": "query",
+      "name": "bucket",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Bucket"
+      }
+     },
+     {
+      "in": "query",
+      "name": "customer",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Customer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "include_void",
+      "required": false,
+      "schema": {
+       "default": false,
+       "title": "Include Void",
+       "type": "boolean"
+      }
+     },
+     {
+      "in": "query",
+      "name": "per_group",
+      "required": false,
+      "schema": {
+       "default": 50,
+       "title": "Per Group",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "format",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Format"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Register",
+    "tags": [
+     "demands"
+    ]
+   }
+  },
+  "/api/demands/{demand_id}/reminder-sent": {
+   "post": {
+    "operationId": "reminder_sent_api_demands__demand_id__reminder_sent_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "demand_id",
+      "required": true,
+      "schema": {
+       "title": "Demand Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Reminder Sent",
+    "tags": [
+     "demands"
+    ]
+   }
+  },
+  "/api/demands/{demand_id}/unvoid": {
+   "post": {
+    "operationId": "unvoid_api_demands__demand_id__unvoid_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "demand_id",
+      "required": true,
+      "schema": {
+       "title": "Demand Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Unvoid",
+    "tags": [
+     "demands"
+    ]
+   }
+  },
+  "/api/demands/{demand_id}/void": {
+   "post": {
+    "operationId": "void_demand_api_demands__demand_id__void_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "demand_id",
+      "required": true,
+      "schema": {
+       "title": "Demand Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/VoidIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Void Demand",
+    "tags": [
+     "demands"
+    ]
+   }
+  },
+  "/api/docgen/booking/{booking_id}/pickers": {
+   "get": {
+    "operationId": "pickers_api_docgen_booking__booking_id__pickers_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "booking_id",
+      "required": true,
+      "schema": {
+       "title": "Booking Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Pickers",
+    "tags": [
+     "documents"
+    ]
+   }
+  },
+  "/api/docgen/bulk": {
+   "post": {
+    "description": "Merged PDF (page break per document) or ZIP of individual PDFs; > 50 documents \u2192 async export job.",
+    "operationId": "bulk_api_docgen_bulk_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/routers__docgen__BulkIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Bulk",
+    "tags": [
+     "documents"
+    ]
+   }
+  },
+  "/api/docgen/generate": {
+   "post": {
+    "operationId": "generate_api_docgen_generate_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/GenerateIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Generate",
+    "tags": [
+     "documents"
+    ]
+   }
+  },
+  "/api/docgen/options": {
+   "get": {
+    "description": "Dependent dropdowns: projects \u2192 towers \u2192 bookings (search by customer / CUST / booking no).",
+    "operationId": "options_api_docgen_options_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "project_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Project Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "block_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Block Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "q",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Q"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Options",
+    "tags": [
+     "documents"
+    ]
+   }
+  },
+  "/api/docgen/register": {
+   "get": {
+    "operationId": "register_api_docgen_register_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "project_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Project Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "block_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Block Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "type",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Type"
+      }
+     },
+     {
+      "in": "query",
+      "name": "customer_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Customer Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "booking_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Booking Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "sent",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Sent"
+      }
+     },
+     {
+      "in": "query",
+      "name": "q",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Q"
+      }
+     },
+     {
+      "in": "query",
+      "name": "date_from",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Date From"
+      }
+     },
+     {
+      "in": "query",
+      "name": "date_to",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Date To"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 100,
+       "title": "Limit",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "format",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Format"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Register",
+    "tags": [
+     "documents"
+    ]
+   }
+  },
+  "/api/docgen/shared/{token}": {
+   "get": {
+    "operationId": "shared_api_docgen_shared__token__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "token",
+      "required": true,
+      "schema": {
+       "title": "Token",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Shared",
+    "tags": [
+     "documents"
+    ]
+   }
+  },
+  "/api/docgen/types": {
+   "get": {
+    "operationId": "types_api_docgen_types_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Types",
+    "tags": [
+     "documents"
+    ]
+   }
+  },
+  "/api/docgen/{doc_id}/download": {
+   "get": {
+    "operationId": "download_api_docgen__doc_id__download_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "doc_id",
+      "required": true,
+      "schema": {
+       "title": "Doc Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "download",
+      "required": false,
+      "schema": {
+       "default": 0,
+       "title": "Download",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Download",
+    "tags": [
+     "documents"
+    ]
+   }
+  },
+  "/api/docgen/{doc_id}/sent": {
+   "post": {
+    "operationId": "mark_sent_api_docgen__doc_id__sent_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "doc_id",
+      "required": true,
+      "schema": {
+       "title": "Doc Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SentIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Mark Sent",
+    "tags": [
+     "documents"
+    ]
+   }
+  },
+  "/api/docgen/{doc_id}/share": {
+   "post": {
+    "operationId": "share_api_docgen__doc_id__share_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "doc_id",
+      "required": true,
+      "schema": {
+       "title": "Doc Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Share",
+    "tags": [
+     "documents"
     ]
    }
   },
@@ -21001,7 +22468,7 @@
      "content": {
       "application/json": {
        "schema": {
-        "$ref": "#/components/schemas/BulkIn"
+        "$ref": "#/components/schemas/routers__inventory__BulkIn"
        }
       }
      },
