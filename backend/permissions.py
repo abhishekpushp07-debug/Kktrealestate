@@ -37,7 +37,7 @@ REGISTRY = {
         "settings": ("Company settings", ["view", "edit"]), "definitions": ("Definitions", ["view"]), "system_health": ("System health", ["view"]), "data": ("Data operations", ["reseed", "recompute", "backup", "erase"]), "documentation": ("Documentation", ["view"])}),
 }
 # UI-only codes the frontend checks before showing a control (no dedicated backend route) — part of the registry, counted as used.
-UI_ONLY = {"sales.kyc.view_masked": "Show masked KYC", "sales.kyc.reveal": "Reveal KYC", "sales.lead.assign": "Assign lead", "sales.lead.export": "Export leads", "sales.customer.export": "Export customers",
+UI_ONLY = {"masters.company.view": "Open Masters → Company & letterhead", "sales.kyc.view_masked": "Show masked KYC", "sales.kyc.reveal": "Reveal KYC", "sales.lead.assign": "Assign lead", "sales.lead.export": "Export leads", "sales.customer.export": "Export customers",
            "finance.payment.export": "Export payments", "finance.demand.void": "Void demand", "finance.refund.create": "Create refund", "finance.refund.approve": "Approve refund", "service.ticket.export": "Export tickets",
            "service.category_sla.edit": "Edit categories & SLA", "service.ticket.delete": "Delete ticket", "sales.lead.delete": "Delete lead"}
 
