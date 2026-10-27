@@ -17,6 +17,8 @@ const PAGES = [
   ["Report · Roznamcha Summary", "/reports/roznamcha-summary", BarChart3, "reports.roznamcha.view"], ["Report · Project Sales & Inventory", "/reports/inventory", BarChart3, "reports.inventory.view"], ["Report · Lead Funnel", "/reports/sales-leads", BarChart3, "reports.lead_funnel.view"],
   ["Report · Site Visit Conversion", "/reports/site-visits", BarChart3, "reports.site_visit_conversion.view"], ["Report · Sales Team Performance", "/reports/sales-team", BarChart3, "reports.sales_team.view"], ["Report · Construction vs Plan", "/reports/construction-vs-plan", BarChart3, "reports.construction_vs_plan.view"],
   ["Report · Service SLA", "/reports/service-sla", BarChart3, "reports.service_sla.view"], ["Report · Audit Trail", "/reports/activity", BarChart3, "reports.audit.view"], ["Report · Data Quality", "/reports/data-quality", BarChart3, "reports.data_quality.view"],
+  ["Report · Inventory by Category / Status / Display", "/reports/inventory-control", BarChart3, "reports.inventory_control.view"], ["Report · Landowner Share", "/reports/landowner-share", BarChart3, "reports.inventory_control.view"],
+  ["Report · Hold Register", "/reports/hold-register", BarChart3, "reports.inventory_control.view"], ["Report · Masked Inventory", "/reports/masked-inventory", BarChart3, "inventory.real_status.view"],
 ];
 const ACTIONS = [
   ["New booking", "/bookings/new", Plus, "sales.booking.create"], ["Post payment", "/payments?post=1", IndianRupee, "finance.payment.create"], ["New customer", "/customers/new", UserPlus, "sales.customer.create"],

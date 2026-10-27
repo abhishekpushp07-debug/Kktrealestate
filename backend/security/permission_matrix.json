@@ -675,8 +675,20 @@
  "GET /api/reports/demand-vs-collection-installment": [
   "reports.demand_vs_collection.view"
  ],
+ "GET /api/reports/hold-register": [
+  "reports.inventory_control.view"
+ ],
  "GET /api/reports/inventory": [
   "reports.inventory.view"
+ ],
+ "GET /api/reports/inventory-control": [
+  "reports.inventory_control.view"
+ ],
+ "GET /api/reports/landowner-share": [
+  "reports.inventory_control.view"
+ ],
+ "GET /api/reports/masked-inventory": [
+  "reports.inventory_control.view"
  ],
  "GET /api/reports/other-charges": [
   "reports.other_charges.view"

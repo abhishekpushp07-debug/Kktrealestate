@@ -47,6 +47,10 @@ REPORTS = [
     {"key": "sales-leads", "name": "Lead Funnel & Source Performance", "group": "Sales", "purpose": "Leads by stage and source, conversion %, response time, overdue follow-ups."},
     {"key": "site-visits", "name": "Site Visit Conversion", "group": "Sales", "purpose": "Visits scheduled / completed / no-show and visit → booking conversion per RM / project."},
     {"key": "sales-team", "name": "Sales Team Performance", "group": "Sales", "purpose": "Per RM: leads, visits, bookings, sold value, collections, overdue of their customers."},
+    {"key": "inventory-control", "name": "Inventory by Category / Status / Display", "group": "Sales", "purpose": "Units per allocation category with real status and what customers see; masked count for privileged users. Ties out to the flats master."},
+    {"key": "landowner-share", "name": "Landowner Share", "group": "Sales", "purpose": "Landowner-allocated units per tower: count, share %, area and notional value. Never bookable by the Builder."},
+    {"key": "hold-register", "name": "Hold Register", "group": "Sales", "purpose": "Active / expiring (< 48 h) / expired holds with reason, customer, RM and countdown; hold → booking conversion rate."},
+    {"key": "masked-inventory", "name": "Masked Inventory", "group": "Sales", "purpose": "Units whose displayed status differs from the real one (Show as Sold / Hidden overrides) with reason, who and since when. Requires real-status permission."},
     # Construction
     {"key": "construction-vs-plan", "name": "Construction vs Plan", "group": "Construction", "purpose": "Stage-plan progress per tower, stage demands vs collected, next stage expected Udhar."},
     {"key": "construction-progress", "name": "Construction progress (towers)", "group": "Construction", "purpose": "Per-tower stage status, photos and demands per stage."},
