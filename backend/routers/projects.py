@@ -72,6 +72,7 @@ class ProjectCreate(StrictModel):
     cover_image_url: str | None = None
     default_cash_percent: float = Field(default=0, ge=0, le=100)
     is_published: bool = False
+    load_test: bool = Field(default=False, description="Phase L: lineage tag — every record under this project is purgeable via /admin/load-test/purge")
     show_prices: bool = False
     show_availability: bool = False
     geo: GeoPoint | None = None

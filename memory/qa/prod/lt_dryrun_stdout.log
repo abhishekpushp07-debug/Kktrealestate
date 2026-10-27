@@ -1,0 +1,29 @@
+[setup] creating LT project + 20 users …
+[setup] project LT 20261027_204156 · 240 flats · 20 users · plan LT204156
+[pool] 20 tokens (one login per user)
+
+[stage 50 VUs] warm-up 10s → run 2.0 min → drain 10s
+[stage 50] 12054 req · 81.6 rps · 5xx 0 · errors {'422 VALIDATION_ERROR': 563, '403 PERMISSION_DENIED': 3647, '429': 864, 'client:ConnectTimeout': 25}
+   bookings       n=  1613 p50=    93.2 p95=   249.3 p99=  7592.8 db_p95=5.3
+   construction   n=     4 p50=   138.7 p95=   309.3 p99=   309.3 db_p95=18.7
+   demands        n=  1582 p50=    93.9 p95=   259.6 p99=   391.9 db_p95=5.5
+   home           n=  1586 p50=    95.6 p95=   278.0 p99=   453.1 db_p95=6.0
+   leads          n=   981 p50=   104.3 p95=   454.8 p99= 30001.5 db_p95=36.3
+   notifications  n=  1594 p50=    95.4 p95=   263.3 p99=   362.3 db_p95=13.5
+   other          n=     4 p50=   476.3 p95=   478.0 p99=   478.0 db_p95=54.2
+   reports        n=  3128 p50=    95.2 p95=   278.7 p99=   403.9 db_p95=11.2
+   search         n=  1562 p50=    99.7 p95=   285.6 p99=   438.2 db_p95=43.5
+
+[stage 100 VUs] warm-up 10s → run 2.0 min → drain 10s
+[stage 100] 25369 req · 170.2 rps · 5xx 0 · errors {'429': 8508, '422 VALIDATION_ERROR': 623, '403 PERMISSION_DENIED': 5567}
+   bookings       n=  3364 p50=   146.4 p95=  1091.6 p99=  2264.1 db_p95=7.5
+   demands        n=  3352 p50=   151.3 p95=  1014.7 p99=  2290.9 db_p95=8.1
+   home           n=  3317 p50=   155.5 p95=  1103.1 p99=  2281.5 db_p95=8.5
+   leads          n=  2025 p50=   166.5 p95=  1073.5 p99=  2311.3 db_p95=57.3
+   notifications  n=  3316 p50=   152.7 p95=   941.8 p99=  2347.9 db_p95=22.3
+   other          n=     4 p50=   330.3 p95=   330.3 p99=   330.3 db_p95=0
+   reports        n=  6669 p50=   153.8 p95=   970.4 p99=  2334.3 db_p95=18.5
+   search         n=  3322 p50=   167.3 p95=   948.8 p99=  2104.4 db_p95=74.4
+
+report: /app/memory/qa/prod/loadtest_20261027_204156.md
+LT_EXIT 0

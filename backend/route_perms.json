@@ -1666,6 +1666,24 @@
     "sales.lead.edit"
    ]
   },
+  "load_test:GET /lineage": {
+   "codes": [
+    "admin.data.reseed"
+   ],
+   "fn": "lineage",
+   "legacy": [
+    "admin.data.reseed"
+   ]
+  },
+  "load_test:POST /purge": {
+   "codes": [
+    "admin.data.reseed"
+   ],
+   "fn": "purge",
+   "legacy": [
+    "admin.data.reseed"
+   ]
+  },
   "masters_plus:DELETE /stage-plans/{plan_id}": {
    "codes": [
     "masters.stage_plan.delete"

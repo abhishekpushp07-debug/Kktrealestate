@@ -8,6 +8,7 @@ class _Out(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
 class ProjectsOut(_Out):
+    load_test: Any = None
     cancellation_policy: Any = None
     bounce_policy: Any = None
     _links: Any = None

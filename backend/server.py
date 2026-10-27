@@ -488,6 +488,7 @@ from routers import docgen as _docgen
 from routers import demand_register as _demand_register
 from routers import messaging as _messaging
 from routers import trends as _trends
+from routers import load_test as _load_test
 from routers import exports as _exports
 from routers import files as _files
 from routers import inventory as _inventory
@@ -496,7 +497,7 @@ from routers import access as _access
 for r in (_ops.router, _access.router, _exports.router, _files.router, _inventory.router, auth.router, users.router, roles.router, master.router, projects.router, rate_cards.router, blocks.router, masters_plus.router, flats.router, parking.router,
           settings.router, audit.router, dashboard.router, search.router, imports.router,
           customers.router, leads.router, documents.router, bookings.router, milestones.router, payments.router, roznamcha.router, admin.router, cms.router, public.router, reports.router, notifications.router, pdfs.router, dashboard_widgets.router, portal.router, portal.mgmt, support.router, construction.router, visits.pub, visits.router,
-          catalogues.router, project_setup.router, crm.router, bootstrap.router, home.router, propagation.router, _reports_i.router, _reports_n.router, _docgen.router, _demand_register.router, _messaging.router, _trends.router):
+          catalogues.router, project_setup.router, crm.router, bootstrap.router, home.router, propagation.router, _reports_i.router, _reports_n.router, _docgen.router, _demand_register.router, _messaging.router, _trends.router, _load_test.router):
     api_router.include_router(r)
 
 app.include_router(api_router)

@@ -65,6 +65,9 @@
  "GET /api/admin/integrity-report": [
   "admin.system_health.view"
  ],
+ "GET /api/admin/load-test/lineage": [
+  "admin.data.reseed"
+ ],
  "GET /api/admin/migration-report": [
   "admin.system_health.view"
  ],
@@ -1026,6 +1029,9 @@
  ],
  "POST /api/admin/integrity-repair": [
   "admin.data.recompute"
+ ],
+ "POST /api/admin/load-test/purge": [
+  "admin.data.reseed"
  ],
  "POST /api/admin/recompute-counters": [
   "admin.data.recompute"

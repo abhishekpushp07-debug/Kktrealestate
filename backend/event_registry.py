@@ -76,6 +76,7 @@ EVENTS = {
     "message.retry": {"entity": "message", "surfaces": ["audit", "messaging"]},
     "reminder.sent": {"entity": "booking", "surfaces": ["customer360", "audit", "notifications", "documents"], "roles": ["Sales", "Accounts", "Super Admin"], "title": lambda a: (f"Reminder sent · {a.get('booking_number', '')} · {a.get('days_overdue', '')} days overdue", a.get("to"))},
     "reminder.skipped": {"entity": "booking", "surfaces": ["customer360", "audit", "notifications"], "roles": ["Sales", "Accounts", "Super Admin"], "title": lambda a: (f"Reminder {str(a.get('status', '')).replace('_', ' ')} · {a.get('booking_number', '')}", a.get("channel"))},
+    "admin.load_test_purge": {"entity": "system", "surfaces": ["audit"], "roles": ["Super Admin"]},
     "reminders.run": {"entity": "company", "surfaces": ["audit"]},
     "company.reminders_updated": {"entity": "company", "surfaces": ["audit"]},
     "template.created": {"entity": "message_template", "surfaces": ["audit"]},
