@@ -17,7 +17,7 @@ def routes():
             for d in fn.decorator_list:
                 if isinstance(d, ast.Call) and isinstance(d.func, ast.Attribute) and d.func.attr in ("get", "post", "patch", "put", "delete"):
                     path = d.args[0].value if d.args else ""
-                    codes = [a.value for c in ast.walk(fn.args) if isinstance(c, ast.Call) and getattr(c.func, "id", "") in ("require", "require_any") for a in c.args]
+                    codes = [a.value for c in ast.walk(fn.args) if isinstance(c, ast.Call) and getattr(c.func, "id", "") in ("require", "require_any") for a in c.args if isinstance(a, ast.Constant)]
                     out.append((pathlib.Path(f).stem, d.func.attr.upper(), path, fn.name, codes))
     return out
 

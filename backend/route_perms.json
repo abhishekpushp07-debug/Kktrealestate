@@ -1,303 +1,469 @@
 {
  "LEGACY_EXPANSION": {
-  "agreement.edit": [
-   "masters.payment_plan.assign",
-   "sales.agreement.revise",
-   "sales.booking.transfer"
+  "admin.access_control.manage": [
+   "admin.access_control.manage"
   ],
-  "audit.view": [
-   "admin.audit.export",
-   "admin.audit.view",
-   "reports.audit.view"
+  "admin.audit.archive": [
+   "admin.audit.archive"
   ],
-  "block.write": [
-   "masters.flat.create",
-   "masters.flat.edit",
-   "masters.tower.create",
-   "masters.tower.edit"
+  "admin.audit.export": [
+   "admin.audit.export"
   ],
-  "booking.cancel": [
-   "sales.booking.cancel"
+  "admin.audit.view": [
+   "admin.audit.view"
   ],
-  "booking.create": [
-   "finance.demand.create",
-   "inventory.hold.create",
-   "inventory.hold.release",
-   "sales.booking.create",
-   "sales.booking.edit"
+  "admin.data.backup": [
+   "admin.data.backup"
   ],
-  "booking.read": [
-   "finance.demand.export",
-   "finance.ledger.export",
-   "finance.ledger.view",
-   "finance.refund.view",
-   "sales.agreement.view",
-   "sales.booking.cancel",
-   "sales.booking.export",
-   "sales.booking.view",
-   "documents.document.view"
+  "admin.data.erase": [
+   "admin.data.erase"
   ],
-  "catalogue.write": [
-   "masters.catalogue.create",
-   "masters.catalogue.edit"
+  "admin.data.recompute": [
+   "admin.data.recompute"
   ],
-  "cms.read": [
-   "construction.notice.view",
-   "website.cms.view"
+  "admin.data.reseed": [
+   "admin.data.reseed"
   ],
-  "cms.write": [
-   "construction.notice.create",
-   "construction.notice.delete",
-   "construction.notice.edit",
-   "website.cms.edit"
+  "admin.definitions.view": [
+   "admin.definitions.view"
   ],
-  "construction.undo": [
-   "construction.stage.undo",
-   "construction.update.undo"
+  "admin.documentation.view": [
+   "admin.documentation.view"
   ],
-  "construction.update": [
+  "admin.role.create": [
+   "admin.role.create"
+  ],
+  "admin.role.delete": [
+   "admin.role.delete"
+  ],
+  "admin.role.edit": [
+   "admin.role.edit"
+  ],
+  "admin.role.view": [
+   "admin.role.view"
+  ],
+  "admin.settings.edit": [
+   "admin.settings.edit"
+  ],
+  "admin.settings.view": [
+   "admin.settings.view"
+  ],
+  "admin.system_health.view": [
+   "admin.system_health.view"
+  ],
+  "admin.user.create": [
+   "admin.user.create"
+  ],
+  "admin.user.deactivate": [
+   "admin.user.deactivate",
+   "admin.user.edit"
+  ],
+  "admin.user.edit": [
+   "admin.user.deactivate",
+   "admin.user.edit"
+  ],
+  "admin.user.view": [
+   "admin.role.view",
+   "admin.user.view"
+  ],
+  "construction.notice.create": [
+   "construction.notice.create"
+  ],
+  "construction.notice.delete": [
+   "construction.notice.delete"
+  ],
+  "construction.notice.edit": [
+   "construction.notice.edit"
+  ],
+  "construction.notice.view": [
+   "construction.notice.view"
+  ],
+  "construction.photo.delete": [
+   "construction.photo.delete"
+  ],
+  "construction.photo.upload": [
+   "construction.photo.upload"
+  ],
+  "construction.photo.view": [
+   "construction.stage.view"
+  ],
+  "construction.stage.undo": [
+   "construction.stage.undo"
+  ],
+  "construction.stage.update": [
    "construction.stage.update",
-   "construction.update.complete",
+   "construction.update.complete"
+  ],
+  "construction.stage.view": [
+   "construction.stage.view"
+  ],
+  "construction.update.complete": [
+   "construction.stage.update",
+   "construction.update.complete"
+  ],
+  "construction.update.undo": [
+   "construction.stage.undo"
+  ],
+  "construction.update.view": [
    "construction.update.view"
   ],
-  "customer.kyc_view": [
-   "sales.kyc.edit",
-   "sales.kyc.reveal",
-   "sales.kyc.view_masked"
+  "demands.register.create": [
+   "demands.register.create"
   ],
-  "customer.portal_manage": [
-   "service.portal.manage",
-   "service.portal.view"
+  "demands.register.print": [
+   "demands.register.print"
   ],
-  "customer.read": [
-   "sales.customer.view"
+  "demands.register.view": [
+   "demands.register.view"
   ],
-  "customer.write": [
-   "sales.customer.create",
-   "sales.customer.edit"
+  "demands.register.void": [
+   "demands.register.void"
   ],
-  "flat.status": [
+  "documents.document.bulk": [
+   "documents.document.bulk"
+  ],
+  "documents.document.generate": [
+   "documents.document.generate"
+  ],
+  "documents.document.share": [
+   "documents.document.share"
+  ],
+  "documents.document.view": [
+   "documents.document.view"
+  ],
+  "finance.cheque.bounce": [
+   "finance.cheque.bounce"
+  ],
+  "finance.cheque.clear": [
+   "finance.cheque.clear"
+  ],
+  "finance.demand.create": [
+   "finance.demand.create"
+  ],
+  "finance.demand.export": [
+   "finance.demand.export"
+  ],
+  "finance.demand.view": [
+   "finance.demand.view"
+  ],
+  "finance.ledger.export": [
+   "finance.ledger.export"
+  ],
+  "finance.ledger.view": [
+   "finance.ledger.view"
+  ],
+  "finance.payment.create": [
+   "finance.payment.create"
+  ],
+  "finance.payment.reverse": [
+   "finance.payment.reverse"
+  ],
+  "finance.payment.view": [
+   "finance.payment.view"
+  ],
+  "finance.receipt.download": [
+   "finance.receipt.download"
+  ],
+  "finance.receipt.print": [
+   "finance.receipt.print"
+  ],
+  "finance.refund.pay": [
+   "finance.refund.pay"
+  ],
+  "finance.refund.view": [
+   "finance.refund.view"
+  ],
+  "finance.roznamcha.deposit": [
+   "finance.roznamcha.deposit"
+  ],
+  "finance.roznamcha.opening_balance": [
+   "finance.roznamcha.opening_balance"
+  ],
+  "finance.roznamcha.view": [
+   "finance.roznamcha.view"
+  ],
+  "inventory.block.set": [
    "inventory.block.set",
    "inventory.category.set",
    "inventory.display.set",
    "inventory.hold.create",
-   "inventory.hold.release",
-   "inventory.real_status.view",
-   "masters.allocation_category.create",
-   "masters.allocation_category.delete",
-   "masters.allocation_category.edit",
-   "masters.allocation_category.view",
-   "masters.hold_reason.create",
-   "masters.hold_reason.delete",
-   "masters.hold_reason.edit",
-   "masters.hold_reason.view",
-   "reports.inventory_control.export",
-   "reports.inventory_control.view",
+   "inventory.hold.release"
+  ],
+  "inventory.category.set": [
+   "inventory.block.set",
+   "inventory.category.set",
+   "inventory.display.set",
+   "inventory.hold.create",
+   "inventory.hold.release"
+  ],
+  "inventory.display.set": [
+   "inventory.block.set",
+   "inventory.category.set",
+   "inventory.display.set",
+   "inventory.hold.create",
+   "inventory.hold.release"
+  ],
+  "inventory.hold.create": [
+   "inventory.block.set",
+   "inventory.category.set",
+   "inventory.display.set",
+   "inventory.hold.create",
+   "inventory.hold.release"
+  ],
+  "inventory.hold.release": [
+   "inventory.block.set",
+   "inventory.category.set",
+   "inventory.display.set",
+   "inventory.hold.create",
+   "inventory.hold.release"
+  ],
+  "inventory.real_status.view": [
+   "inventory.real_status.view"
+  ],
+  "masters.catalogue.create": [
+   "masters.catalogue.create"
+  ],
+  "masters.catalogue.edit": [
+   "masters.catalogue.edit"
+  ],
+  "masters.catalogue.view": [
+   "masters.catalogue.view"
+  ],
+  "masters.construction_stage.edit": [
+   "masters.construction_stage.edit"
+  ],
+  "masters.construction_stage.view": [
+   "masters.construction_stage.view"
+  ],
+  "masters.flat.create": [
+   "masters.flat.create"
+  ],
+  "masters.flat.edit": [
+   "masters.flat.edit"
+  ],
+  "masters.flat.view": [
+   "masters.flat.view"
+  ],
+  "masters.payment_plan.assign": [
+   "masters.payment_plan.assign"
+  ],
+  "masters.payment_plan.create": [
+   "masters.payment_plan.create"
+  ],
+  "masters.payment_plan.view": [
+   "masters.payment_plan.view"
+  ],
+  "masters.project.create": [
+   "masters.project.create"
+  ],
+  "masters.project.edit": [
+   "masters.project.edit"
+  ],
+  "masters.project.view": [
+   "masters.project.view",
+   "website.cms.view"
+  ],
+  "masters.rate_card.apply": [
+   "masters.rate_card.apply"
+  ],
+  "masters.rate_card.create": [
+   "masters.rate_card.create"
+  ],
+  "masters.rate_card.edit": [
+   "masters.rate_card.edit"
+  ],
+  "masters.rate_card.view": [
+   "masters.rate_card.view"
+  ],
+  "masters.stage_plan.create": [
+   "masters.stage_plan.create"
+  ],
+  "masters.stage_plan.delete": [
+   "masters.stage_plan.delete"
+  ],
+  "masters.stage_plan.edit": [
+   "masters.stage_plan.edit"
+  ],
+  "masters.stage_plan.view": [
+   "masters.stage_plan.view"
+  ],
+  "masters.tower.create": [
+   "masters.tower.create"
+  ],
+  "masters.tower.edit": [
+   "masters.tower.edit"
+  ],
+  "reports.audit.view": [
+   "reports.audit.view"
+  ],
+  "reports.bank_wise.view": [
+   "reports.bank_wise.view"
+  ],
+  "reports.cancellations_refunds.view": [
+   "reports.cancellations_refunds.view"
+  ],
+  "reports.cash_vs_account.view": [
+   "reports.cash_vs_account.view"
+  ],
+  "reports.cheque_register.view": [
+   "reports.cheque_register.view"
+  ],
+  "reports.collections.view": [
+   "reports.collections.view"
+  ],
+  "reports.construction_vs_plan.view": [
+   "reports.construction_vs_plan.view"
+  ],
+  "reports.data_quality.view": [
+   "reports.data_quality.view"
+  ],
+  "reports.demand_vs_collection.view": [
+   "reports.demand_vs_collection.view"
+  ],
+  "reports.inventory.view": [
+   "reports.inventory.view"
+  ],
+  "reports.inventory_control.view": [
+   "reports.inventory_control.view"
+  ],
+  "reports.lead_funnel.view": [
+   "reports.lead_funnel.view"
+  ],
+  "reports.other_charges.view": [
+   "reports.other_charges.view"
+  ],
+  "reports.outstanding.view": [
+   "reports.outstanding.view"
+  ],
+  "reports.receivables_forecast.view": [
+   "reports.receivables_forecast.view"
+  ],
+  "reports.roznamcha.view": [
+   "reports.roznamcha.view"
+  ],
+  "reports.sales_team.view": [
+   "reports.sales_team.view"
+  ],
+  "reports.service_sla.view": [
+   "reports.service_sla.view"
+  ],
+  "reports.site_visit_conversion.view": [
+   "reports.site_visit_conversion.view"
+  ],
+  "sales.agreement.revise": [
+   "sales.agreement.revise"
+  ],
+  "sales.agreement.view": [
+   "sales.agreement.view"
+  ],
+  "sales.booking.cancel": [
+   "sales.booking.cancel"
+  ],
+  "sales.booking.create": [
+   "sales.booking.create"
+  ],
+  "sales.booking.edit": [
+   "sales.booking.edit"
+  ],
+  "sales.booking.export": [
+   "sales.booking.export"
+  ],
+  "sales.booking.transfer": [
+   "sales.booking.transfer"
+  ],
+  "sales.booking.view": [
+   "sales.booking.view"
+  ],
+  "sales.customer.create": [
+   "sales.customer.create",
+   "sales.lead.edit"
+  ],
+  "sales.customer.edit": [
+   "sales.customer.edit"
+  ],
+  "sales.customer.view": [
+   "sales.customer.view"
+  ],
+  "sales.hold.create": [
    "sales.hold.create",
    "sales.hold.release"
   ],
-  "flat.write": [
-   "masters.flat.edit",
-   "masters.rate_card.apply",
-   "masters.rate_card.create",
-   "masters.rate_card.edit"
+  "sales.hold.release": [
+   "sales.hold.create",
+   "sales.hold.release"
   ],
-  "lead.read": [
-   "sales.lead.view"
+  "sales.kyc.edit": [
+   "sales.kyc.edit"
   ],
-  "lead.write": [
+  "sales.lead.create": [
+   "sales.lead.create"
+  ],
+  "sales.lead.edit": [
    "sales.customer.create",
-   "sales.lead.create",
    "sales.lead.edit"
   ],
-  "master.read": [
-   "masters.allocation_category.view",
-   "masters.amenity.view",
-   "masters.bank_account.view",
-   "masters.block_type.view",
-   "masters.charge_type.view",
-   "masters.construction_stage.view",
-   "masters.document_type.view",
-   "masters.flat_type.view",
-   "masters.floor_plan.view",
-   "masters.hold_reason.view",
-   "masters.payment_mode.view",
-   "masters.payment_plan.view",
-   "masters.plc.view",
-   "masters.specification.view",
-   "masters.stage_plan.view"
+  "sales.lead.view": [
+   "sales.lead.view"
   ],
-  "master.write": [
-   "masters.amenity.create",
-   "masters.amenity.delete",
-   "masters.amenity.edit",
-   "masters.bank_account.create",
-   "masters.bank_account.delete",
-   "masters.bank_account.edit",
-   "masters.block_type.create",
-   "masters.block_type.delete",
-   "masters.block_type.edit",
-   "masters.charge_type.create",
-   "masters.charge_type.delete",
-   "masters.charge_type.edit",
-   "masters.construction_stage.create",
-   "masters.construction_stage.delete",
-   "masters.construction_stage.edit",
-   "masters.document_type.create",
-   "masters.document_type.delete",
-   "masters.document_type.edit",
-   "masters.flat_type.create",
-   "masters.flat_type.delete",
-   "masters.flat_type.edit",
-   "masters.floor_plan.create",
-   "masters.floor_plan.delete",
-   "masters.floor_plan.edit",
-   "masters.payment_mode.create",
-   "masters.payment_mode.delete",
-   "masters.payment_mode.edit",
-   "masters.payment_plan.assign",
-   "masters.payment_plan.create",
-   "masters.payment_plan.delete",
-   "masters.payment_plan.edit",
-   "masters.plc.create",
-   "masters.plc.delete",
-   "masters.plc.edit",
-   "masters.specification.create",
-   "masters.specification.delete",
-   "masters.specification.edit",
-   "masters.stage_plan.create",
-   "masters.stage_plan.delete",
-   "masters.stage_plan.edit"
+  "sales.site_visit.cancel": [
+   "sales.site_visit.cancel",
+   "sales.site_visit.complete",
+   "sales.site_visit.edit"
   ],
-  "milestone.update": [
-   "construction.photo.delete",
-   "construction.photo.upload",
-   "construction.stage.update",
-   "construction.update.complete"
+  "sales.site_visit.complete": [
+   "sales.site_visit.cancel",
+   "sales.site_visit.complete",
+   "sales.site_visit.edit"
   ],
-  "payment.post": [
-   "finance.cheque.bounce",
-   "finance.cheque.clear",
-   "finance.payment.create",
-   "finance.roznamcha.deposit",
-   "documents.document.generate",
-   "documents.document.share",
-   "documents.document.bulk",
-   "demands.register.create",
-   "demands.register.void",
-   "demands.register.print"
+  "sales.site_visit.create": [
+   "sales.site_visit.create"
   ],
-  "payment.read": [
-   "finance.demand.view",
-   "finance.payment.view",
-   "finance.refund.view",
-   "finance.roznamcha.view",
-   "documents.document.view",
-   "demands.register.view"
+  "sales.site_visit.edit": [
+   "sales.site_visit.cancel",
+   "sales.site_visit.complete",
+   "sales.site_visit.edit"
   ],
-  "payment.reverse": [
-   "finance.payment.reverse",
-   "finance.refund.pay"
+  "sales.site_visit.export": [
+   "sales.site_visit.export"
   ],
-  "project.read": [
-   "admin.audit.view",
-   "admin.definitions.view",
-   "construction.photo.view",
-   "construction.stage.view",
-   "construction.update.view",
-   "masters.flat.view",
-   "masters.payment_plan.view",
-   "masters.project.view",
-   "masters.rate_card.view"
+  "sales.site_visit.view": [
+   "sales.site_visit.view"
   ],
-  "project.write": [
-   "masters.construction_stage.edit",
-   "masters.project.create",
-   "masters.project.edit"
+  "service.portal.manage": [
+   "service.portal.manage"
   ],
-  "receipt.print": [
-   "finance.receipt.download",
-   "finance.receipt.print",
-   "documents.document.generate",
-   "documents.document.view",
-   "demands.register.print"
+  "service.portal.view": [
+   "service.portal.view"
   ],
-  "report.view": [
-   "reports.bank_wise.view",
-   "reports.cancellations_refunds.view",
-   "reports.cash_vs_account.export",
-   "reports.cash_vs_account.view",
-   "reports.cheque_register.view",
-   "reports.collections.export",
-   "reports.collections.view",
-   "reports.construction_vs_plan.export",
-   "reports.construction_vs_plan.view",
-   "reports.data_quality.export",
-   "reports.data_quality.view",
-   "reports.demand_vs_collection.view",
-   "reports.inventory.view",
-   "reports.lead_funnel.view",
-   "reports.other_charges.export",
-   "reports.other_charges.view",
-   "reports.outstanding.export",
-   "reports.outstanding.view",
-   "reports.receivables_forecast.export",
-   "reports.receivables_forecast.view",
-   "reports.roznamcha.export",
-   "reports.roznamcha.view",
-   "reports.sales_team.export",
-   "reports.sales_team.view",
-   "reports.service_sla.view",
-   "reports.site_visit_conversion.export",
-   "reports.site_visit_conversion.view"
-  ],
-  "roles.manage": [
-   "admin.access_control.manage",
-   "admin.role.create",
-   "admin.role.delete",
-   "admin.role.edit",
-   "admin.role.view"
-  ],
-  "service.assign": [
+  "service.ticket.assign": [
    "service.ticket.assign"
   ],
-  "service.read": [
-   "service.ticket.view"
-  ],
-  "service.write": [
+  "service.ticket.close": [
    "service.ticket.close",
-   "service.ticket.create",
    "service.ticket.edit",
    "service.ticket.reopen"
   ],
-  "settings.manage": [
-   "admin.audit.archive",
-   "admin.data.backup",
-   "admin.data.erase",
-   "admin.data.recompute",
-   "admin.data.reseed",
-   "admin.documentation.view",
-   "admin.settings.edit",
-   "admin.settings.view",
-   "admin.system_health.view",
-   "finance.roznamcha.opening_balance"
+  "service.ticket.create": [
+   "service.ticket.create"
   ],
-  "users.manage": [
-   "admin.access_control.manage",
-   "admin.user.create",
-   "admin.user.deactivate",
-   "admin.user.edit",
-   "admin.user.view"
+  "service.ticket.edit": [
+   "service.ticket.close",
+   "service.ticket.edit",
+   "service.ticket.reopen"
   ],
-  "visit.read": [
-   "sales.site_visit.export",
-   "sales.site_visit.view"
+  "service.ticket.reopen": [
+   "service.ticket.close",
+   "service.ticket.edit",
+   "service.ticket.reopen"
   ],
-  "visit.write": [
-   "sales.site_visit.cancel",
-   "sales.site_visit.complete",
-   "sales.site_visit.create",
-   "sales.site_visit.edit"
+  "service.ticket.view": [
+   "service.ticket.view"
+  ],
+  "website.cms.edit": [
+   "website.cms.edit"
+  ],
+  "website.cms.view": [
+   "website.cms.view"
   ]
  },
  "ROUTE_PERMS": {
@@ -1243,6 +1409,150 @@
    "fn": "widgets",
    "legacy": [
     "masters.project.view"
+   ]
+  },
+  "demand_register:GET /calendar": {
+   "codes": [
+    "demands.register.view"
+   ],
+   "fn": "calendar",
+   "legacy": [
+    "demands.register.view"
+   ]
+  },
+  "demand_register:GET /kpis": {
+   "codes": [
+    "demands.register.view"
+   ],
+   "fn": "kpis",
+   "legacy": [
+    "demands.register.view"
+   ]
+  },
+  "demand_register:GET /register": {
+   "codes": [
+    "demands.register.view"
+   ],
+   "fn": "register",
+   "legacy": [
+    "demands.register.view"
+   ]
+  },
+  "demand_register:POST /manual": {
+   "codes": [
+    "demands.register.create"
+   ],
+   "fn": "manual_demand",
+   "legacy": [
+    "demands.register.create"
+   ]
+  },
+  "demand_register:POST /{demand_id}/reminder-sent": {
+   "codes": [
+    "demands.register.print"
+   ],
+   "fn": "reminder_sent",
+   "legacy": [
+    "demands.register.print"
+   ]
+  },
+  "demand_register:POST /{demand_id}/unvoid": {
+   "codes": [
+    "demands.register.void"
+   ],
+   "fn": "unvoid",
+   "legacy": [
+    "demands.register.void"
+   ]
+  },
+  "demand_register:POST /{demand_id}/void": {
+   "codes": [
+    "demands.register.void"
+   ],
+   "fn": "void_demand",
+   "legacy": [
+    "demands.register.void"
+   ]
+  },
+  "docgen:GET /booking/{booking_id}/pickers": {
+   "codes": [
+    "documents.document.view"
+   ],
+   "fn": "pickers",
+   "legacy": [
+    "documents.document.view"
+   ]
+  },
+  "docgen:GET /options": {
+   "codes": [
+    "documents.document.view"
+   ],
+   "fn": "options",
+   "legacy": [
+    "documents.document.view"
+   ]
+  },
+  "docgen:GET /register": {
+   "codes": [
+    "documents.document.view"
+   ],
+   "fn": "register",
+   "legacy": [
+    "documents.document.view"
+   ]
+  },
+  "docgen:GET /types": {
+   "codes": [
+    "documents.document.view"
+   ],
+   "fn": "types",
+   "legacy": [
+    "documents.document.view"
+   ]
+  },
+  "docgen:GET /{doc_id}/download": {
+   "codes": [
+    "documents.document.view"
+   ],
+   "fn": "download",
+   "legacy": [
+    "documents.document.view"
+   ]
+  },
+  "docgen:POST /bulk": {
+   "codes": [
+    "documents.document.bulk"
+   ],
+   "fn": "bulk",
+   "legacy": [
+    "documents.document.bulk"
+   ]
+  },
+  "docgen:POST /generate": {
+   "codes": [
+    "documents.document.generate"
+   ],
+   "fn": "generate",
+   "legacy": [
+    "documents.document.generate"
+   ]
+  },
+  "docgen:POST /{doc_id}/sent": {
+   "codes": [
+    "documents.document.generate"
+   ],
+   "fn": "mark_sent",
+   "legacy": [
+    "documents.document.generate"
+   ]
+  },
+  "docgen:POST /{doc_id}/share": {
+   "codes": [
+    "documents.document.share"
+   ],
+   "fn": "share",
+   "legacy": [
+    "documents.document.share"
    ]
   },
   "documents:DELETE /{doc_id}": {
