@@ -252,5 +252,10 @@ async def preview_stage_completion(block_id: str, stage_id: str, user: dict = De
         acct += a
         rows.append({"booking_id": b["id"], "booking_number": b["booking_number"], "customer_name": b.get("customer_name"), "plan_name": (b.get("payment_plan_snapshot") or {}).get("name"), "installments": [i["name"] for i in ins], "cash_paise": c, "account_paise": a, "total_paise": c + a})
     sp = await db.construction_stage_plans.find_one({"block_id": block_id, "is_active": True}, {"_id": 0, "name": 1})
+    active = await db.bookings.count_documents({"block_id": block_id, "status": "Active"})
+    reason = None
+    if not rows:
+        names = " / ".join(s["name"] for s in will_mark) or target["name"]
+        reason = f"No payment plan on this tower has an installment on {names} — 0 dues will be raised ({active} active booking{'s' if active != 1 else ''})"
     return present_money({"stage": {"stage_id": target["stage_id"], "name": target["name"], "seq": target["seq"]}, "will_mark": [{"stage_id": s["stage_id"], "name": s["name"]} for s in will_mark], "stage_plan_name": (sp or {}).get("name"),
-                          "bookings": rows, "bookings_count": len(rows), "cash_paise": cash, "account_paise": acct, "total_paise": cash + acct})
+                          "bookings": rows, "bookings_count": len(rows), "active_bookings": active, "no_dues_reason": reason, "cash_paise": cash, "account_paise": acct, "total_paise": cash + acct})

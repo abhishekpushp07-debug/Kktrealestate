@@ -62,7 +62,8 @@ async def export_csv(params: ListParams = Depends(), entity_type: str | None = N
     rows = db.audit_logs.find(q, {"_id": 0}).sort("created_at", -1).limit(10000)
     rows = [r async for r in rows] + ([r async for r in db.audit_logs_archive.find(q, {"_id": 0}).sort("created_at", -1).limit(10000)] if include_archive else [])
     for r in rows:
-        ch = "; ".join(f"{c['label']}: {c.get('old')} → {c.get('new')}" for c in (r.get("changed_fields") or []))
+        from services.audit_diff import fmt_changes
+        ch = fmt_changes(r.get("changed_fields"))
         w.writerow([r.get("created_at"), r.get("user_name") or r.get("actor_name"), r.get("action"), r.get("module_name"), r.get("entity_type"), r.get("entity_id"), r.get("record_label"), ch, r.get("ip"), r.get("request_id")])
     return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=audit-logs.csv"})
 

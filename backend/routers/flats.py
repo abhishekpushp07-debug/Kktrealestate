@@ -128,7 +128,19 @@ async def update_flat(flat_id: str, body: FlatUpdate, request: Request, user: di
         changes["price_breakup"] = [{"label": f"Rate ₹{changes['rate_per_sqft']:g}/sq.ft × {before.get('super_builtup_sqft') or 0:g}", "amount": changes["price_paise"] / 100}]
     elif "price" in changes and changes["price"] is not None:
         changes["price_paise"] = round(changes["price"] * 100)
-        changes["price_breakup"] = [{"label": "Manual price", "amount": changes["price"]}]
+        rc_breakup = before.get("rate_card_breakup") or (before.get("price_breakup") if before.get("price_source", "rate_card") == "rate_card" and not any(b.get("label") == "Manual price" for b in before.get("price_breakup") or []) else None)
+        formula_paise = round((before.get("rate_per_sqft") or 0) * (before.get("super_builtup_sqft") or 0) * 100)
+        if rc_breakup is None and formula_paise:  # legacy manual rows kept no breakup: the rate-card formula is the source of truth
+            rc_breakup, rc_price = [{"label": f"Base ₹{before.get('rate_per_sqft'):g}/sq.ft × {before.get('super_builtup_sqft'):g}", "amount": formula_paise / 100}], formula_paise
+        else:
+            rc_price = before.get("rate_card_price_paise") if before.get("rate_card_price_paise") is not None else (before.get("price_paise") if before.get("price_source", "rate_card") == "rate_card" else None)
+        if rc_breakup is not None and rc_price is not None and changes["price_paise"] == rc_price:
+            # reverting to the exact rate-card value restores the original breakup
+            changes.update({"price_breakup": rc_breakup, "price_source": "rate_card", "rate_card_breakup": None, "rate_card_price_paise": None})
+        else:
+            changes.update({"price_breakup": [{"label": "Manual price", "amount": changes["price"]}], "price_source": "manual"})
+            if rc_breakup is not None and before.get("rate_card_breakup") is None:  # first override: retain the rate-card breakup
+                changes.update({"rate_card_breakup": rc_breakup, "rate_card_price_paise": rc_price})
     changes.pop("price", None)
     after = await apply_update(db.flats, before, changes, expected_version(request, body.version), "Flat")
     await write_audit(user, "flat.update", "flat", flat_id, before=before, after=after, ip=client_ip(request))

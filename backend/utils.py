@@ -273,7 +273,7 @@ def to_csv(items: list[dict], fields: list[str] | None = None) -> str:
     import json
     if not items:
         return ""
-    fields = fields or [k for k in items[0].keys() if not k.startswith("_")]
+    fields = [f for f in (fields or [k for k in items[0].keys() if not k.startswith("_")]) if not f.endswith("_paise")]  # rupees-only: paise never leave as CSV columns
     buf = io.StringIO()
     w = csv.DictWriter(buf, fieldnames=fields, extrasaction="ignore")
     w.writeheader()

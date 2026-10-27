@@ -75,3 +75,23 @@ def changed_fields(before, after) -> list[dict]:
             continue
         out.append({"field": k, "label": _label(k), "old": _val(o), "new": _val(n), "kind": _kind(k, n if n is not None else o)})
     return out
+
+
+def fmt_change_value(c: dict, v):
+    """Same humaniser as the History sheet (frontend fmtVal): money → ₹ rupees, bool → Yes/No, json → compact JSON. Never raw paise."""
+    import json as _json
+    if v is None or v == "":
+        return "—"
+    k = c.get("kind")
+    if k == "money":
+        from services.money import inr
+        return inr(int(v)) if isinstance(v, (int, float)) else str(v)
+    if k == "bool":
+        return "Yes" if v else "No"
+    if isinstance(v, (dict, list)):
+        return _json.dumps(v, ensure_ascii=False, default=str)
+    return str(v)
+
+
+def fmt_changes(changes: list[dict] | None) -> str:
+    return "; ".join(f"{c.get('label') or c.get('field')}: {fmt_change_value(c, c.get('old'))} → {fmt_change_value(c, c.get('new'))}" for c in (changes or []))

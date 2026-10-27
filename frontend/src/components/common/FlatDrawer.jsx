@@ -73,6 +73,7 @@ export function FlatDrawer({ flatId, onClose, onChanged }) {
             <p className="label-xs text-gold">Listed price</p>
             <p className="mt-1 text-3xl font-extrabold tabular" data-testid="flat-drawer-price">{inrShort(flat.price)}</p>
             <p className="text-xs text-txt-muted">{inr(flat.price)}{flat.rate_per_sqft ? ` · ₹${num(flat.rate_per_sqft)}/sq.ft × ${num(flat.super_builtup_sqft)}` : " · lump sum"}{flat.rate_card?.name ? ` · ${flat.rate_card.name}` : ""}</p>
+            {flat.price_source === "manual" && <p className="mt-2 rounded bg-amber-500/15 px-2 py-1 text-xs text-amber-300" data-testid="flat-price-manual-override">Manual override{flat.rate_card_breakup?.length ? ` (was ${flat.rate_card_breakup.map((b) => b.label).join(" + ")})` : ""}</p>}
             {flat.price_breakup?.length > 0 && <ul className="mt-3 space-y-1 border-t border-white/10 pt-2 text-xs" data-testid="flat-price-breakup">{flat.price_breakup.map((b, i) => <li key={i} className="flex justify-between"><span className="text-txt-muted">{b.label}</span><span className="tabular font-semibold">{inr(b.amount)}</span></li>)}</ul>}
           </div>
           <div className="mt-5 grid grid-cols-3 gap-4">
