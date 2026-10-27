@@ -591,6 +591,7 @@ export const INTEGRITY_FINDING_TYPES = [
   "UNMAPPED_DEMAND",
   "SUMMARY_MISMATCH",
   "PLAN_STAGE_MISSING",
+  "CHECK_FAILED",
 ] as const;
 export const IntegrityFindingTypeSchema = enumSchema(INTEGRITY_FINDING_TYPES);
 export type IntegrityFindingType = z.infer<typeof IntegrityFindingTypeSchema>;
@@ -601,6 +602,7 @@ export const INTEGRITY_FINDING_TYPE_LABELS: LabelMap<IntegrityFindingType> = {
   UNMAPPED_DEMAND: "Demand not mapped to an installment",
   SUMMARY_MISMATCH: "Stored summary differs from recomputation",
   PLAN_STAGE_MISSING: "Plan installment on a stage the tower does not have",
+  CHECK_FAILED: "Booking could not be checked (its data makes the engine fail)",
 };
 
 // ---------------------------------------------------------------------------

@@ -23,7 +23,7 @@ import {
   TabsTrigger,
   Toolbar,
 } from "@/components/ui";
-import { api, type QueryParams } from "@/lib/api";
+import { api, type QueryParams, totalIsEstimate } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { formatDateTime, formatNumber, formatRelative } from "@/lib/format";
 import { useList, useListParams, useMutationWithToast } from "@/lib/queries";
@@ -362,6 +362,7 @@ export default function ServiceRequestsPage() {
             page: list.page,
             pageSize: list.pageSize,
             total: query.data?.total ?? 0,
+            totalIsEstimate: totalIsEstimate(query.data),
             onPageChange: list.setPage,
             onPageSizeChange: list.setPageSize,
           }}

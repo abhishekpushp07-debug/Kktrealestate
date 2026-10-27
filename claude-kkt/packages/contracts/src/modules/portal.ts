@@ -30,18 +30,15 @@ import {
   TimestampSchema,
   listEnvelope,
 } from "../common.js";
-import { TokenPairSchema, SessionRowSchema } from "./auth.js";
+import { LedgerTotalsSchema } from "./bookings.js";
+import { PortalAuthLoginSchema, PortalAuthRefreshSchema, TokenPairSchema, SessionRowSchema } from "./auth.js";
 
 // ---------------------------------------------------------------------------
 // Auth
 // ---------------------------------------------------------------------------
 
-/** Buyer login: phone + password. */
-export const PortalLoginSchema = z.strictObject({
-  phone: PhoneSchema,
-  password: z.string().min(1).max(128),
-  device_name: z.string().trim().max(120).optional(),
-});
+/** Buyer login: phone + password (+ optional company slug, contract C4). The one schema the API validates (auth.ts). */
+export const PortalLoginSchema = PortalAuthLoginSchema;
 export type PortalLogin = z.infer<typeof PortalLoginSchema>;
 
 /** The logged-in customer (masked KYC even to themselves). */
@@ -69,7 +66,8 @@ export const PortalChangePasswordSchema = z
   });
 export type PortalChangePassword = z.infer<typeof PortalChangePasswordSchema>;
 
-export const PortalRefreshSchema = z.strictObject({ refresh_token: z.string().min(16) });
+/** Refresh body: optional in cookie mode (contract C1). The one schema the API validates (auth.ts). */
+export const PortalRefreshSchema = PortalAuthRefreshSchema;
 export type PortalRefresh = z.infer<typeof PortalRefreshSchema>;
 
 export const PortalSessionRowSchema = SessionRowSchema;
@@ -231,7 +229,13 @@ export const PortalLedgerRowSchema = z.object({
   ref_number: z.string().nullable(),
 });
 export type PortalLedgerRow = z.infer<typeof PortalLedgerRowSchema>;
-export const PortalLedgerResponseSchema = listEnvelope(PortalLedgerRowSchema);
+/**
+ * The customer's ledger: rows of the booking's CURRENT epoch only (contract C7; a restated ledger never shows superseded rows) plus the
+ * server-computed `summary` of the current book — clients show dues from it, never from the last row of a page.
+ */
+export const PortalLedgerResponseSchema = listEnvelope(PortalLedgerRowSchema).extend({
+  summary: LedgerTotalsSchema.optional(),
+});
 export type PortalLedgerResponse = z.infer<typeof PortalLedgerResponseSchema>;
 
 export const PortalReceiptRowSchema = z.object({
@@ -499,6 +503,8 @@ export const PortalProfileResponseSchema = z.object({
   relationship_manager: PortalRelationshipManagerSchema.nullable(),
   must_change_password: z.boolean(),
   last_login_at: TimestampSchema.nullable(),
+  /** The customer record's version (contract C6): send it back as If-Match "v<version>" on PATCH /portal/profile. */
+  version: z.int().min(1),
 });
 export type PortalProfileResponse = z.infer<typeof PortalProfileResponseSchema>;
 

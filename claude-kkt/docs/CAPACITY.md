@@ -9,6 +9,10 @@ Every number is labelled **measured** (from a load-test run in this repository) 
 All measurements: production bundle, `API_WORKERS=auto` (4 workers) on a **shared 4-vCPU box** that also ran Postgres, Redis and the
 load generator, seed data (130 flats, 10 bookings), 200 connections, zero think time (docs/PERFORMANCE.md "Run … API_WORKERS=auto").
 Dividing by 4 understates a dedicated core (a quarter of the box went to Postgres/Redis/autocannon), so these are floors.
+**These figures predate phase 7** (keyset lists without counts, two-step payment search, the receipt number taken last, the auth-cache
+scoping and ISR on the website all changed the hot paths) and were taken on the 10-booking demo seed: treat them as the old floor until
+the phase 7 verify run (`pnpm loadtest`, including the new round-robin `POST /payments` scenario that spreads payments over every
+booking with headroom) replaces this table.
 
 | Request type                                           | Box throughput                    | Per core (floor) | CPU per request (≈)                                                                   |
 | ------------------------------------------------------ | --------------------------------- | ---------------- | ------------------------------------------------------------------------------------- |

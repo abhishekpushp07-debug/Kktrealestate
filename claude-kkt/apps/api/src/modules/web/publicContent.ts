@@ -957,6 +957,9 @@ export async function siteIsLive(db: Executor, companyId: string): Promise<boole
 // Sitemap
 // ---------------------------------------------------------------------------
 
+/** Cache-Control of a public media stand-in (the original served while a rendition is pending or failed). */
+export const FALLBACK_MEDIA_CACHE_CONTROL = "public, max-age=60";
+
 /** Latest of several instants (ISO); `fallback` when none is known. */
 function latest(fallback: Date, ...values: (Date | string | null | undefined)[]): string {
   let max = 0;
@@ -1343,7 +1346,9 @@ export function registerPublicContentRoutes(app: FastifyInstance): void {
       if (!file) throw ApiError.notFound("Media");
       reply.header("Content-Type", file.mime);
       reply.header("Content-Disposition", "inline");
-      reply.header("Cache-Control", IMMUTABLE_CACHE_CONTROL);
+      // a rendition that is not ready yet is served by the original as a stand-in: cache that only briefly, so a CDN never keeps the
+      // full-size original under the thumb/medium address for a year (renditions are written by the DOCUMENT_RENDITIONS job)
+      reply.header("Cache-Control", file.fallback ? FALLBACK_MEDIA_CACHE_CONTROL : IMMUTABLE_CACHE_CONTROL);
       crossOriginFile(reply);
       reply.header("X-Content-Type-Options", "nosniff");
       if (file.size !== null) reply.header("Content-Length", String(file.size));

@@ -10,6 +10,7 @@ import { useMasterRows } from "@/features/masters/api";
 import { useProjectOptions } from "@/features/shared/options";
 import { FlatDrawer } from "./FlatDrawer";
 import { FLATS_PATH, useProjectBlocks } from "./api";
+import { totalIsEstimate } from "@/lib/api";
 
 const FLAT_FILTERS = ["project_id", "block_id", "floor", "status", "flat_type_id"] as const;
 
@@ -247,6 +248,7 @@ export function FlatsTable({ blockId, projectId, prefix = "" }: FlatsTableProps)
           page: list.page,
           pageSize: list.pageSize,
           total,
+          totalIsEstimate: totalIsEstimate(query.data),
           onPageChange: list.setPage,
           onPageSizeChange: list.setPageSize,
         }}

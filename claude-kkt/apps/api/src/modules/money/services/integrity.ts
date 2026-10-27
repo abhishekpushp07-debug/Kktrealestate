@@ -28,7 +28,8 @@ import {
   type MoneyActor,
   SYSTEM_MONEY_ACTOR,
 } from "../common.js";
-import { raiseDues, recomputeDemandStatuses, voidDemand, type DemandRecord } from "./dues.js";
+import { logger } from "../../../lib/logger.js";
+import { classifyFailure, raiseDues, recomputeDemandStatuses, voidDemand, type DemandRecord } from "./dues.js";
 import { rebuild } from "./ledger.js";
 
 /** Scope of a report. */
@@ -54,6 +55,7 @@ const EMPTY_COUNTS: IntegrityCounts = {
   UNMAPPED_DEMAND: 0,
   SUMMARY_MISMATCH: 0,
   PLAN_STAGE_MISSING: 0,
+  CHECK_FAILED: 0,
 };
 
 function finding(
@@ -286,11 +288,26 @@ export async function runReport(
   const company = await loadCompanyRow(db, scope.companyId);
   const rows = await bookingsInScope(db, scope);
   const perBooking: BookingFindings[] = [];
+  const failed: IntegrityFinding[] = [];
   for (const b of rows) {
-    const checked = await checkBookingOnSnapshot(db, b.id, today, company.settings.demand_due_days);
+    let checked: BookingFindings | null;
+    try {
+      checked = await checkBookingOnSnapshot(db, b.id, today, company.settings.demand_due_days);
+    } catch (err) {
+      // one booking whose data makes the engine throw (e.g. a malformed plan snapshot) must not hide every other booking's findings:
+      // it is reported as CHECK_FAILED (not repairable) and the run goes on; a database outage still stops the run (the job retries)
+      const f = classifyFailure(err);
+      if (f.outage) throw err;
+      logger.error(
+        { err, booking_id: b.id, booking_number: b.bookingNumber, code: f.code },
+        "integrity: booking check failed",
+      );
+      failed.push(finding("CHECK_FAILED", b, `${f.code}: ${f.message}`, { repairable: false }));
+      continue;
+    }
     if (checked) perBooking.push(checked);
   }
-  const findings = perBooking.flatMap((p) => p.findings);
+  const findings = [...perBooking.flatMap((p) => p.findings), ...failed];
   const counts: IntegrityCounts = { ...EMPTY_COUNTS };
   for (const f of findings) counts[f.type] += 1;
   const ranAt = new Date();
@@ -315,7 +332,7 @@ export async function runReport(
       ran_at: ranAt.toISOString(),
       triggered_by: opts.triggeredBy ?? "system",
       ok: findings.length === 0,
-      bookings_checked: perBooking.length,
+      bookings_checked: perBooking.length + failed.length,
       counts,
       findings,
     },

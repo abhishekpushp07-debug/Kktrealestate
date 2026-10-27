@@ -12,6 +12,7 @@ import { useMasterRows } from "@/features/masters/api";
 import { useProjectOptions } from "@/features/shared/options";
 import { BOOKINGS_PATH } from "./api";
 import { BookingLink, BookingMobileCard, BookingStatusChip, DueAmount, UnitLabel } from "./components";
+import { totalIsEstimate } from "@/lib/api";
 
 const FILTERS = ["project_id", "block_id", "status", "payment_plan_id", "has_due", "has_advance"] as const;
 
@@ -219,6 +220,7 @@ export default function BookingsPage() {
           page: list.page,
           pageSize: list.pageSize,
           total: query.data?.total ?? 0,
+          totalIsEstimate: totalIsEstimate(query.data),
           onPageChange: list.setPage,
           onPageSizeChange: list.setPageSize,
         }}

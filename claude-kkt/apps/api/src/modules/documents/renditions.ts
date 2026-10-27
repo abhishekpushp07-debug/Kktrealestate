@@ -14,7 +14,14 @@ import { availableParallelism } from "node:os";
 import { and, eq, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
-import { documents, storageDeletions, storagePendingObjects, type DB, type Executor } from "@kkt/db";
+import {
+  documents,
+  storageDeletions,
+  storagePendingObjects,
+  type DB,
+  type DocumentVariants,
+  type Executor,
+} from "@kkt/db";
 import { config } from "../../config.js";
 import { enqueueJobWithin } from "../../jobs/queue.js";
 import type { JobContext } from "../../jobs/index.js";
@@ -32,14 +39,8 @@ export const MAX_IMAGE_PIXELS = 50_000_000;
 /** Rendition state of a document (DocumentRow.renditions). */
 export type RenditionStatus = "NONE" | "PENDING" | "READY" | "FAILED";
 
-/** documents.variants as stored (packages/db DocumentVariants plus the rendition state this module records). */
-export interface StoredVariants {
-  thumb_key?: string | null;
-  medium_key?: string | null;
-  width?: number | null;
-  height?: number | null;
-  renditions?: "PENDING" | "READY" | "FAILED" | null;
-}
+/** documents.variants as stored (packages/db DocumentVariants, which carries the rendition state this module records). */
+export type StoredVariants = DocumentVariants;
 
 /** Rendition state of a stored row (legacy rows: renditions present → READY, an image with dimensions only → FAILED). */
 export function renditionStatus(mime: string, variants: StoredVariants | null | undefined): RenditionStatus {
@@ -273,6 +274,15 @@ function isNotFound(err: unknown): boolean {
 }
 
 /**
+ * True when a document references the pending object `p.key` (its original or a rendition). Three EXISTS, each served by its own index
+ * (documents_storage_key_idx, documents_thumb_key_idx, documents_medium_key_idx — src/sql/online/0005_indexes.sql §7), instead of one
+ * OR that forced a sequential scan of documents per pending row.
+ */
+const referencedByDocument = sql`exists (select 1 from ${documents} d where d.storage_key = p.key)
+  or exists (select 1 from ${documents} d where d.variants ->> 'thumb_key' = p.key)
+  or exists (select 1 from ${documents} d where d.variants ->> 'medium_key' = p.key)`;
+
+/**
  * STORAGE_SWEEP: (1) pending objects older than PENDING_ORPHAN_AFTER_MS whose row never committed become queued deletions (one statement,
  * so nothing is lost between the two tables); (2) due storage_deletions are claimed with SKIP LOCKED (a 10-minute lease), deleted, and
  * marked done — or retried later with exponential backoff and an attempt count; (3) image documents still PENDING after ten minutes get
@@ -292,9 +302,7 @@ export async function storageSweep(
         select key from ${storagePendingObjects}
         where created_at < ${cutoff.toISOString()}::timestamptz
         order by created_at limit ${SWEEP_BATCH * 5} for update skip locked)
-        and not exists (
-          select 1 from ${documents} d
-          where d.storage_key = p.key or d.variants ->> 'thumb_key' = p.key or d.variants ->> 'medium_key' = p.key)
+        and not (${referencedByDocument})
       returning p.key, p.company_id, p.purpose)
     insert into ${storageDeletions} (key, company_id, reason)
     select key, company_id, 'ORPHANED_' || upper(purpose) from gone
@@ -303,9 +311,7 @@ export async function storageSweep(
   await db.execute(sql`
     delete from ${storagePendingObjects} p
     where p.created_at < ${cutoff.toISOString()}::timestamptz
-      and exists (
-        select 1 from ${documents} d
-        where d.storage_key = p.key or d.variants ->> 'thumb_key' = p.key or d.variants ->> 'medium_key' = p.key)`);
+      and (${referencedByDocument})`);
 
   let deleted = 0;
   let failed = 0;

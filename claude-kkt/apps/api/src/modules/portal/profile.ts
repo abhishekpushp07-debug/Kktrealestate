@@ -127,6 +127,7 @@ export async function portalProfile(db: Executor, customer: PortalContext): Prom
     relationship_manager: rm,
     must_change_password: row.pu.mustChangePassword,
     last_login_at: iso(row.pu.lastLoginAt),
+    version: c.version,
   };
 }
 

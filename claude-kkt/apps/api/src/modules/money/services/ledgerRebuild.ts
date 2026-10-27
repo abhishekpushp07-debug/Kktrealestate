@@ -9,6 +9,9 @@
  * restated booking gets a `booking.ledger_rebuilt` audit row. The result lists the bookings whose row ORDER changed (a different
  * event/source at some position, or a different row count) separately from those where only figures changed. A booking whose rebuild
  * throws is listed in `failed` and the run goes on.
+ *
+ * Heavy-queue job (contract C8): after every batch the run saves a checkpoint (the last booking id and the result so far) and checks its
+ * abort signal; an attempt interrupted by a deploy or its time budget resumes after the last finished batch instead of starting over.
  */
 import { and, asc, eq, gt, type SQL } from "drizzle-orm";
 import { bookings, type DB } from "@kkt/db";
@@ -60,6 +63,34 @@ export interface LedgerRebuildOptions {
   dryRun?: boolean;
   batchSize?: number;
   actor?: MoneyActor;
+  /** Aborts between bookings (worker shutdown, time budget): the finished batches are kept in the checkpoint. */
+  signal?: AbortSignal | undefined;
+  /** Resume point saved by an earlier, interrupted attempt (job_runs.checkpoint). */
+  checkpoint?: Record<string, unknown> | null | undefined;
+  /** Saves the resume point after each finished batch. */
+  saveCheckpoint?: ((checkpoint: LedgerRebuildCheckpoint) => Promise<void>) | undefined;
+}
+
+/** LEDGER_REBUILD resume point: the last booking id of the last finished batch and the result accumulated up to it. */
+export interface LedgerRebuildCheckpoint extends Record<string, unknown> {
+  after: string;
+  result: LedgerRebuildResult;
+}
+
+function isRebuildCheckpoint(cp: unknown): cp is LedgerRebuildCheckpoint {
+  if (typeof cp !== "object" || cp === null) return false;
+  const c = cp as Record<string, unknown>;
+  const r = c["result"] as Record<string, unknown> | undefined;
+  return (
+    typeof c["after"] === "string" &&
+    /^[0-9a-f-]{36}$/i.test(c["after"]) &&
+    typeof r === "object" &&
+    r !== null &&
+    Number.isInteger(r["bookings_checked"]) &&
+    Array.isArray(r["order_changed"]) &&
+    Array.isArray(r["figures_changed"]) &&
+    Array.isArray(r["failed"])
+  );
 }
 
 const ORDER_FIELDS = new Set(["event", "refId", "row"]);
@@ -75,20 +106,27 @@ interface RebuildOneResult {
 export async function rebuildAllLedgers(db: DB, opts: LedgerRebuildOptions = {}): Promise<LedgerRebuildResult> {
   const batchSize = Math.max(1, Math.min(opts.batchSize ?? LEDGER_REBUILD_BATCH, 5_000));
   const actor = opts.actor ?? SYSTEM_MONEY_ACTOR;
-  const out: LedgerRebuildResult = {
-    dry_run: Boolean(opts.dryRun),
-    batches: 0,
-    bookings_checked: 0,
-    bookings_rebuilt: 0,
-    order_changed_count: 0,
-    figures_changed_count: 0,
-    order_changed: [],
-    figures_changed: [],
-    failed: [],
-    failed_count: 0,
-  };
-  let after: string | null = null;
+  const resume =
+    isRebuildCheckpoint(opts.checkpoint) && opts.checkpoint.result.dry_run === Boolean(opts.dryRun)
+      ? opts.checkpoint
+      : null;
+  const out: LedgerRebuildResult = resume
+    ? structuredClone(resume.result)
+    : {
+        dry_run: Boolean(opts.dryRun),
+        batches: 0,
+        bookings_checked: 0,
+        bookings_rebuilt: 0,
+        order_changed_count: 0,
+        figures_changed_count: 0,
+        order_changed: [],
+        figures_changed: [],
+        failed: [],
+        failed_count: 0,
+      };
+  let after: string | null = resume?.after ?? null;
   for (;;) {
+    opts.signal?.throwIfAborted();
     const where: SQL[] = [];
     if (opts.companyId) where.push(eq(bookings.companyId, opts.companyId));
     if (after) where.push(gt(bookings.id, after));
@@ -101,6 +139,7 @@ export async function rebuildAllLedgers(db: DB, opts: LedgerRebuildOptions = {})
     if (page.length === 0) break;
     out.batches += 1;
     for (const b of page) {
+      opts.signal?.throwIfAborted(); // the half-done batch is redone on resume (rebuilding a booking twice is a no-op)
       out.bookings_checked += 1;
       let r: RebuildOneResult;
       try {
@@ -137,6 +176,7 @@ export async function rebuildAllLedgers(db: DB, opts: LedgerRebuildOptions = {})
     }
     after = page[page.length - 1]!.id;
     if (page.length < batchSize) break;
+    await opts.saveCheckpoint?.({ after, result: out });
   }
   return out;
 }

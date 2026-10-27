@@ -17,7 +17,7 @@ Shared packages: `packages/contracts` (Zod wire schemas, enums, permissions — 
 - [docs/DATA-MODEL.md](docs/DATA-MODEL.md) — every table, constraint and index.
 - [docs/API-CONVENTIONS.md](docs/API-CONVENTIONS.md) — envelopes, headers, idempotency, versions, fixed auth/public/portal surfaces.
 - [docs/SECURITY.md](docs/SECURITY.md), [docs/DEPLOY.md](docs/DEPLOY.md), [docs/SEED.md](docs/SEED.md) (demo logins), [docs/PERFORMANCE.md](docs/PERFORMANCE.md), [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md).
-- [docs/STATUS.md](docs/STATUS.md) — what is built, all verification evidence (588 integration + 55 acceptance tests, browser QA, load test) and the honest open-items list; [docs/hardening/STATUS-after-phase5.md](docs/hardening/STATUS-after-phase5.md) summarises the hardening round.
+- [docs/STATUS.md](docs/STATUS.md) — what is built, all verification evidence (806 integration + 55 acceptance tests after phase 7, browser QA, load test) and the honest open-items list; [docs/hardening/STATUS-after-phase5.md](docs/hardening/STATUS-after-phase5.md) summarises the hardening round.
 - [docs/AUDIT-80-FACTORS.md](docs/AUDIT-80-FACTORS.md) — the 80-factor audit of the previous implementation that motivated this rebuild; [docs/AUDIT-80-FACTORS-V2.md](docs/AUDIT-80-FACTORS-V2.md) scores this implementation on the same factors.
 
 ## Run locally (demo in about 5 minutes)
@@ -45,8 +45,8 @@ Every push runs these in CI (`.github/workflows/ci.yml`). Container images are b
 | Formatting        | `pnpm format:check`                                 | Prettier, whole repo (`docs/SPEC.md` and generated files excluded)                                           |
 | Lint              | `pnpm lint`                                         | ESLint 0 errors / 0 warnings (`--max-warnings 0`), React Compiler rules, `kkt/module-boundaries` as an error |
 | Types             | `pnpm typecheck`                                    | 7/7 packages                                                                                                 |
-| Unit tests        | `pnpm test`, `pnpm --filter @kkt/db test`           | domain 130 · contracts 183 · db 71 · api 133 · erp 162 · web 17 · portal 13                                  |
-| API integration   | `pnpm --filter @kkt/api test:integration`           | 600 tests / 48 files against PostgreSQL 16 + Redis 7                                                         |
+| Unit tests        | `pnpm test`, `pnpm --filter @kkt/db test`           | domain 140 · contracts 244 · db 100 · api 184 · erp 394 · web 40 · portal 72                                 |
+| API integration   | `pnpm --filter @kkt/api test:integration`           | 806 tests / 65 files against PostgreSQL 16 + Redis 7                                                         |
 | Acceptance        | `pnpm test:acceptance`                              | the 13 owner scenarios, 55 tests                                                                             |
 | API compatibility | `pnpm --filter @kkt/api openapi:check`              | no breaking change against `docs/openapi/v1.json`                                                            |
 | Builds            | `pnpm build`, `pnpm --filter @kkt/portal build:web` | API bundle, ERP, website; portal web export                                                                  |

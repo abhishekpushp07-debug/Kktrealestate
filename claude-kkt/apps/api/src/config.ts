@@ -390,6 +390,11 @@ const EnvSchema = z
       }),
     /** Per-IP request limit for public (unauthenticated) routes, per minute. */
     PUBLIC_RATE_LIMIT_PER_MIN: z.coerce.number().int().min(1).default(300),
+    /**
+     * Contract C3: budget per public route group for the website server's OWN calls (valid x-kkt-internal-token, no x-kkt-client-ip —
+     * ISR regenerations have no visitor), per minute; kept apart from any visitor's per-IP bucket.
+     */
+    INTERNAL_RATE_LIMIT_PER_MIN: z.coerce.number().int().min(1).default(6000),
     /** Per-user limit for staff/portal write requests (POST/PATCH/PUT/DELETE), per minute. */
     WRITE_RATE_LIMIT_PER_MIN: z.coerce.number().int().min(1).default(120),
     /** Max requests in flight per worker process before the excess is answered 503 + Retry-After (0 = off; 256 in production). */

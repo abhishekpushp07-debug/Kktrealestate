@@ -58,6 +58,26 @@ export function validInternalToken(given: string | string[] | undefined): boolea
  * `x-kkt-internal-token` (the website's server-side fetches), else Fastify's proxy-aware `req.ip`. Without a valid token both headers are
  * ignored, so nobody can choose their own rate-limit bucket.
  */
+/**
+ * Health / readiness probes (load balancers, Kubernetes, Compose): public, but never rate-limited — a probe that answers 429 would take a
+ * healthy instance out of rotation or restart it (loadShed never sheds them either).
+ */
+const PROBE_URL_RE = /^\/(?:api\/v1\/)?(?:health(?:\/(?:live|ready))?|ready)$/;
+export function isProbeUrl(url: string): boolean {
+  return PROBE_URL_RE.test(url);
+}
+
+/**
+ * The public rate-limit identity of a request (contract C3): the client IP, or `internal` for the website server's own calls (a valid
+ * internal token without a forwarded visitor IP: ISR regenerations), which get their own, larger budget instead of competing with the
+ * visitors that share the web server's IP.
+ */
+export function publicBucketSubject(req: FastifyRequest): { subject: string; limit: number } {
+  if (req.headers[FORWARDED_CLIENT_IP_HEADER] === undefined && validInternalToken(req.headers[INTERNAL_TOKEN_HEADER]))
+    return { subject: "internal", limit: config.INTERNAL_RATE_LIMIT_PER_MIN };
+  return { subject: req.clientIp, limit: config.PUBLIC_RATE_LIMIT_PER_MIN };
+}
+
 export function effectiveClientIp(req: FastifyRequest): string {
   if (validInternalToken(req.headers[INTERNAL_TOKEN_HEADER])) {
     const fwd = req.headers[FORWARDED_CLIENT_IP_HEADER];
@@ -406,9 +426,10 @@ export default fp(
       if ((cfg.public || isPublicPrefix(url)) && !docsGuarded) {
         // Contract C3: one per-IP budget per route group (catalog reads, forms, brochure, visits, files, sign-in) plus the route's own
         // stricter limit where it declares one (forms 5/min, login 10/min).
-        await rateLimit(`pub:${publicRouteGroup(url)}:${req.clientIp}`, config.PUBLIC_RATE_LIMIT_PER_MIN, 60);
-        if (cfg.rateLimit)
-          await rateLimit(`pub:${url}:${req.clientIp}`, cfg.rateLimit.limit, cfg.rateLimit.windowSeconds);
+        if (isProbeUrl(url)) return; // probes: never limited (and no Redis round trip)
+        const { subject, limit } = publicBucketSubject(req);
+        await rateLimit(`pub:${publicRouteGroup(url)}:${subject}`, limit, 60);
+        if (cfg.rateLimit) await rateLimit(`pub:${url}:${subject}`, cfg.rateLimit.limit, cfg.rateLimit.windowSeconds);
         return;
       }
       const audience: TokenAudience = docsGuarded ? "erp" : (cfg.audience ?? "erp");

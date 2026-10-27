@@ -388,6 +388,11 @@ export interface WriteBackupOptions {
   includeSensitive: boolean;
   now?: Date;
   batchSize?: number;
+  /**
+   * Aborts between cursor batches (worker shutdown, time budget). The archive is ONE consistent snapshot, so an interrupted build is not
+   * resumed from a checkpoint: the next attempt starts a fresh snapshot (a mixed-snapshot archive would not restore coherently).
+   */
+  signal?: AbortSignal | undefined;
 }
 
 /**
@@ -445,6 +450,7 @@ export async function writeBackupArchive(db: DB, file: string, opts: WriteBackup
     version = await schemaVersion(tx as unknown as Sql);
     loadOrder = (await fkLoadOrder(tx as unknown as Sql)).filter((n) => byName.has(n));
     for (const t of all) {
+      opts.signal?.throwIfAborted();
       const { where, scope } = tableScope(db, t, opts.companyId, byName);
       const keep: string[] = [];
       const stripped: string[] = [];
@@ -466,6 +472,7 @@ export async function writeBackupArchive(db: DB, file: string, opts: WriteBackup
       let rows = 0;
       const facts = await addEntry(file, async (write) => {
         for await (const chunk of tx.unsafe<{ j: string }[]>(q.sql, q.params as never[]).cursor(batch)) {
+          opts.signal?.throwIfAborted();
           rows += chunk.length;
           await write(`${chunk.map((r) => r.j).join("\n")}\n`);
         }
@@ -642,7 +649,7 @@ export async function loadDoneBackup(db: Executor, id: string, companyId?: strin
 
 /** BACKUP_EXPORT: builds the archive for the backup row in `data.backup_id`, stores it for 24 h and tells the requester. */
 export async function runBackupJob(
-  ctx: Pick<JobContext, "db" | "data" | "attempt" | "maxAttempts" | "runId">,
+  ctx: Pick<JobContext, "db" | "data" | "attempt" | "maxAttempts" | "runId"> & Partial<Pick<JobContext, "signal">>,
 ): Promise<Record<string, unknown>> {
   const id = String(ctx.data["backup_id"] ?? "");
   const [row] = await ctx.db
@@ -670,6 +677,7 @@ export async function runBackupJob(
         companyName: company?.name ?? null,
         includeSensitive: f.include_sensitive,
         now,
+        signal: ctx.signal,
       });
       const size = (await stat(file)).size;
       const sha256 = await fileSha256(file);

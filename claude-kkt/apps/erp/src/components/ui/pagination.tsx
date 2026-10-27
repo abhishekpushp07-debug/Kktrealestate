@@ -8,6 +8,8 @@ export interface PaginationProps {
   page: number;
   pageSize: number;
   total: number;
+  /** The total is the planner's estimate (list meta.total_is_estimate: a filtered list above 10,000 rows): shown as "about n". */
+  totalIsEstimate?: boolean;
   onPageChange: (page: number) => void;
   onPageSizeChange?: (size: number) => void;
   pageSizeOptions?: readonly number[];
@@ -21,6 +23,7 @@ export function Pagination({
   page,
   pageSize,
   total,
+  totalIsEstimate = false,
   onPageChange,
   onPageSizeChange,
   pageSizeOptions = DEFAULT_SIZES,
@@ -56,7 +59,8 @@ export function Pagination({
           </>
         )}
         <span className="money">
-          {from.toLocaleString("en-IN")}–{to.toLocaleString("en-IN")} of {formatNumber(total)}
+          {from.toLocaleString("en-IN")}–{to.toLocaleString("en-IN")} of {totalIsEstimate ? "about " : ""}
+          {formatNumber(total)}
         </span>
       </div>
       <div className="flex items-center gap-1">
@@ -78,7 +82,8 @@ export function Pagination({
           onClick={() => onPageChange(current - 1)}
         />
         <span className="money min-w-16 px-1 text-center">
-          Page {current} / {pages}
+          Page {current} / {totalIsEstimate ? "~" : ""}
+          {pages}
         </span>
         <IconButton
           icon={ChevronRight}

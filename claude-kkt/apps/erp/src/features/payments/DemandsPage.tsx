@@ -29,7 +29,7 @@ import {
   StatusChip,
   Toolbar,
 } from "@/components/ui";
-import { describeError, isApiClientError } from "@/lib/api";
+import { describeError, isApiClientError, totalIsEstimate } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { formatDate, formatDateTime, formatINR, formatINRShort, formatNumber, formatPercent } from "@/lib/format";
 import { useList, useListParams, useMutationWithToast } from "@/lib/queries";
@@ -372,6 +372,7 @@ export default function DemandsPage() {
               page: list.page,
               pageSize: list.pageSize,
               total: query.data?.total ?? 0,
+              totalIsEstimate: totalIsEstimate(query.data),
               onPageChange: list.setPage,
               onPageSizeChange: list.setPageSize,
             }}

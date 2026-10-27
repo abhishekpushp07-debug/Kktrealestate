@@ -6,6 +6,18 @@ Stack under test: API `apps/api` on `:4100` with the demo seed in its own databa
 
 Runner: [`docs/qa/web/browser-qa.cjs`](web/browser-qa.cjs) (`WEB_URL`, `API_URL`, `OUT_DIR`, `ONLY=static,enquiry,brochure,visit,toggles`), PNGs over 300 KB are palette-quantised by [`docs/qa/web/shrink.py`](web/shrink.py). On every page it asserts: zero console errors / page errors, zero failed or ≥ 400 requests (apart from the deliberate 404 / 429 tests), `scrollWidth <= innerWidth`, every visible link/button/field ≥ 44 px tall at 390 px (stretched-link cards count their whole card), and records the time to `networkidle` plus one viewport screenshot per page and width.
 
+## Phase 7 integration 2026-10-27
+
+Stack: API from source on `:4790` (fresh demo seed in `kkt_p7_i`, Redis db 20, `INTERNAL_API_TOKEN`, `WEB_REVALIDATE_URL`), website
+`next build` + `next start --port 3790` with `NODE_OPTIONS=--require=./csp-hook.cjs`. Runner: `WEB_URL=http://localhost:3790
+API_URL=http://localhost:4790 SITE_URL=http://localhost:3790 REDIS_DB=20 node docs/qa/web/browser-qa.cjs`. **Result: 42 page audits,
+151/152 checks, axe 42 scans, 0 serious/critical.** The one failed check ("sitemap.xml … with real lastmod") was the environment:
+`next build` had run against the API of the previous QA seed, so the prerendered `/sitemap.xml` carried that seed's dates and ISR
+served it once (stale-while-revalidate) before regenerating; a moment later the sitemap matched `GET /public/sitemap` exactly, and the
+re-run of the section (`ONLY=static`) passed **89/89 checks, 30 page audits, 0 defects**. While the website was down during the seed,
+the API logged one revalidation warning instead of one every 250 ms (throttle added in this stage). The runner rewrote
+`docs/qa/web/brochure.pdf` with the seeded brochure (same content), as in earlier runs.
+
 ## Phase 7 domain review 2026-10-27 (hash allow-list, sitemap-gated detail slugs)
 
 Stack: API from source on `:4740` (fresh demo seed in `kkt_p7_rdomain_acc`, Redis db 23, `INTERNAL_API_TOKEN`,

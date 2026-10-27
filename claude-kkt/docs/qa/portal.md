@@ -4,6 +4,15 @@
 
 **Result of the final run: 40 screenshots, 0 defects, 0 console errors, 0 failed requests, no horizontal overflow at 390 px, 90/90 related API integration tests green** (`auth`, `portal`, `portal-adversarial`, `service`, `seed`). `pnpm --filter @kkt/contracts|@kkt/api|@kkt/portal typecheck` green; `expo export --platform web` green.
 
+## Phase 7 integration 2026-10-27
+
+Stack: API on `:4790` (the seed of the ERP walk above, `kkt_p7_i`, Redis db 20; restarted after the portal file links moved to the
+LINK_SIGNING_KEYS ring), web export `EXPO_PUBLIC_API_URL=http://localhost:8790 npx expo export --platform web` served on `:8790` by a
+static SPA server that proxies `/api` (same origin). Runner: `PORTAL_URL=http://localhost:8790 API_URL=http://localhost:4790
+PORTAL_DB=kkt_p7_i OUT_DIR=<scratch> node docs/qa/portal/browser-qa.cjs`. Changed under test: ledger `summary` (current epoch), profile
+`version`, ring-signed file links (receipts, demand letters, images, documents). **Result: 50 page checks, 99 assertions, 40
+screenshots, 0 defects; axe 50 scans, 0 violations.**
+
 ## Phase 7 frontend review 2026-10-27
 
 Stack: API on `:4730` (fresh demo seed in `kkt_p7_rfrontend`, Redis db 24, after the ERP walk), web export

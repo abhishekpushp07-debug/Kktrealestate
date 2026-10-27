@@ -293,6 +293,31 @@ describe("public media allow-list", () => {
   });
 });
 
+describe("public media while renditions are pending (phase 7 integration)", () => {
+  it("the original served as a stand-in for a thumb/medium is cached for a minute, never as immutable; real renditions stay immutable", async () => {
+    const cms = await uploadDoc(
+      t,
+      marketing,
+      { entity_type: "CMS", entity_id: t.companyId, title: "Pending renditions" },
+      { name: "pending.png", data: await pngBytes(600, 400) },
+    );
+    const ready = await media(cms, "thumb");
+    expect(ready.statusCode).toBe(200);
+    expect(ready.headers["content-type"]).toBe("image/webp");
+    expect(ready.headers["cache-control"]).toMatch(/immutable/);
+    // as if the DOCUMENT_RENDITIONS job had not run yet: no rendition keys
+    await t.app.sql`update documents set variants = variants - 'thumb_key' - 'medium_key' where id = ${cms}`;
+    for (const variant of ["thumb", "medium"]) {
+      const stand = await media(cms, variant);
+      expect(stand.statusCode).toBe(200);
+      expect(stand.headers["content-type"]).toBe("image/png"); // the original
+      expect(stand.headers["cache-control"]).toBe("public, max-age=60");
+    }
+    const original = await media(cms);
+    expect(original.headers["cache-control"]).toMatch(/immutable/);
+  });
+});
+
 describe("site_live off", () => {
   it("hides projects, media, forms and the scheduler but keeps legal pages reachable", async () => {
     const page = await t.request("POST", "/api/v1/cms/pages", {

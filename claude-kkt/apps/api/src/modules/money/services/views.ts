@@ -12,6 +12,7 @@ import type {
   BookingSummary,
   DemandRow,
   LedgerRow,
+  LedgerTotals,
   OtherChargeRow,
   PaymentRow,
   PlanRevisionRow,
@@ -457,6 +458,21 @@ export async function loadBookingSummary(db: Executor, b: BookingRecord, today =
     otherChargesTotal: Number(j?.charges_total ?? 0),
     schedule,
   });
+}
+
+/**
+ * The C7 totals of a booking's CURRENT book (contract C7: clients show these, never the last row of a page): bucket dues and paid
+ * amounts from the booking's summary columns, total and other-charges dues from the money summary. Staff and portal ledgers share it.
+ */
+export function currentLedgerTotals(b: BookingRecord, sum: BookingSummary): LedgerTotals {
+  return {
+    cash_due_paise: b.cashOrderRaisedPaise - b.cashPaidPaise,
+    account_due_paise: b.accountOrderRaisedPaise - b.accountPaidPaise,
+    total_due_paise: sum.total_due_paise,
+    other_charges_due_paise: sum.other_charges_due_paise,
+    cash_paid_paise: b.cashPaidPaise,
+    account_paid_paise: b.accountPaidPaise,
+  };
 }
 
 /** The stored flat snapshot in wire shape (full: rooms, areas and price breakup included). */

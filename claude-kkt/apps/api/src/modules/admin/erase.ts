@@ -45,6 +45,7 @@ import {
 } from "@kkt/db";
 import { z } from "zod";
 import { writeAudit } from "../../lib/audit.js";
+import { dropCachedResponses, scrubIdempotencyResponses } from "../../plugins/idempotency.js";
 import { bumpAuthVersions } from "../../lib/cache.js";
 import { decryptField, randomToken } from "../../lib/crypto.js";
 import { ApiError } from "../../lib/errors.js";
@@ -237,7 +238,10 @@ export async function eraseCustomer(app: FastifyInstance, input: EraseInput): Pr
               : undefined,
           ),
         ),
-      );
+      )
+      // FOR UPDATE: a DOCUMENT_RENDITIONS run committing its keys meanwhile is waited for and its keys re-read, so the erased customer's
+      // rendition objects are queued for deletion too (their pending records were cleared by that run)
+      .for("update");
     if (docs.length > 0)
       await tx
         .update(documents)
@@ -293,6 +297,8 @@ export async function eraseCustomer(app: FastifyInstance, input: EraseInput): Pr
     const notificationRows = await scrubNotifications(tx, companyId, customerId, textIds, name);
     const ticketRows = await scrubTickets(tx, ticketIds, textIds, name);
     const exportRows = await withdrawExports(tx, companyId, now);
+    // stored idempotent responses naming the customer (create/update/KYC answers) keep their key but lose the body (replay → 410 GONE)
+    const idempotencyScrubbed = await scrubIdempotencyResponses(tx, customerId);
 
     const testimonialRows = await tx
       .update(cmsTestimonials)
@@ -360,6 +366,7 @@ export async function eraseCustomer(app: FastifyInstance, input: EraseInput): Pr
         notifications_scrubbed: notificationRows,
         service_requests_scrubbed: ticketRows,
         exports_withdrawn: exportRows.length,
+        idempotency_responses_scrubbed: idempotencyScrubbed.length,
         storage_deletions_queued: queued.length,
         portal_disabled: portalDisabled,
         sessions_revoked: sessionsRevoked,
@@ -400,7 +407,7 @@ export async function eraseCustomer(app: FastifyInstance, input: EraseInput): Pr
         ledger_entries: Number(kept?.ledger ?? 0),
       },
     };
-    return { response, queued, portalUserId: pu?.id ?? null };
+    return { response, queued, portalUserId: pu?.id ?? null, idempotencyCacheKeys: idempotencyScrubbed };
   });
 
   // After commit: try the deletes right away; each success is marked done, each failure stays queued for STORAGE_SWEEP (retried with
@@ -423,6 +430,7 @@ export async function eraseCustomer(app: FastifyInstance, input: EraseInput): Pr
     }
   }
   if (result.portalUserId) await bumpAuthVersions(app.redis, { portalUsers: [result.portalUserId] }, app.log);
+  await dropCachedResponses(app.redis, result.idempotencyCacheKeys);
   return result.response;
 }
 
@@ -573,9 +581,16 @@ async function withdrawExports(
       and(
         eq(exportsTable.companyId, companyId),
         like(exportsTable.path, "/api/v1/%"),
-        isNotNull(exportsTable.storageKey),
         lt(exportsTable.createdAt, before),
-        or(isNull(exportsTable.expiresAt), sql`${exportsTable.expiresAt} > ${before.toISOString()}::timestamptz`),
+        or(
+          // a stored list export that has not expired yet
+          and(
+            isNotNull(exportsTable.storageKey),
+            or(isNull(exportsTable.expiresAt), sql`${exportsTable.expiresAt} > ${before.toISOString()}::timestamptz`),
+          ),
+          // one still queued or being built: its pages may have been read before the erasure (the job never publishes a withdrawn one)
+          inArray(exportsTable.status, ["QUEUED", "RUNNING"]),
+        ),
       ),
     )
     .returning({ id: exportsTable.id, storageKey: exportsTable.storageKey });

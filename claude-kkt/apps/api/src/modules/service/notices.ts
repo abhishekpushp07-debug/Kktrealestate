@@ -437,7 +437,8 @@ export function noticeRoutes(app: FastifyInstance): void {
     schema: {
       params: idParams,
       response: { 200: NoticeRowSchema },
-      summary: "Unpublish (soft delete) a notice; its bell notifications are withdrawn (If-Match optional)",
+      summary:
+        "Unpublish (soft delete) a notice; its bell notifications are withdrawn (version required: If-Match or body version)",
     },
     handler: async (req) => {
       const user = req.user!;

@@ -4,7 +4,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import fp from "fastify-plugin";
 import type { Redis } from "ioredis";
 import type { Sql } from "postgres";
-import type { DB } from "@kkt/db";
+import type { DB, Executor } from "@kkt/db";
 import { config } from "../config.js";
 import { registerJob } from "../jobs/index.js";
 import { redisUsable } from "../lib/cache.js";
@@ -157,6 +157,47 @@ export async function purgeExpiredIdempotencyKeys(
 /** Marker key of a stored outcome that is NOT a response: the write committed but its answer was lost (a 5xx after COMMIT). */
 export const OUTCOME_UNKNOWN_MARKER = "__kkt_outcome_unknown";
 
+/**
+ * Marker of a stored response withdrawn by a DPDP erasure (admin/erase.ts): the request did succeed, but its body named the erased
+ * customer, so the store keeps only the original status. A replay answers 410 GONE (never a re-execution, never the erased data).
+ */
+export const ERASED_MARKER = "__kkt_erased";
+
+function isErasedRecord(body: unknown): body is { [ERASED_MARKER]: true; original_status: number | null } {
+  return typeof body === "object" && body !== null && (body as Record<string, unknown>)[ERASED_MARKER] === true;
+}
+
+/** Redis key of the cached copy of an idempotent response. */
+export function idempotencyCacheKey(scopeKey: string, key: string): string {
+  return `idem:${scopeKey}:${key}`;
+}
+
+/**
+ * Withdraws every live stored response that mentions `subjectId` (a customer create/update/KYC answer holds the id with the name,
+ * phone and e-mail), keeping the record — and so the key's "already done" protection — but not the personal data. Returns the Redis keys
+ * of their cached copies, which the caller deletes after COMMIT (dropCachedResponses).
+ */
+export async function scrubIdempotencyResponses(tx: Executor, subjectId: string): Promise<string[]> {
+  const rows = await tx.execute<{ scope_key: string; key: string }>(dsql`
+    update idempotency_keys
+       set response_body = jsonb_build_object(${ERASED_MARKER}::text, true, 'original_status', status_code)
+     where expires_at > now()
+       and response_body is not null
+       and not (response_body ? ${ERASED_MARKER}::text)
+       and strpos(response_body::text, ${subjectId}) > 0
+    returning scope_key, key`);
+  return rows.map((r) => idempotencyCacheKey(r.scope_key, r.key));
+}
+
+/** Deletes cached copies of scrubbed responses (best effort; a copy that survives a Redis outage expires with the record's TTL). */
+export async function dropCachedResponses(
+  redis: Pick<Redis, "del" | "status">,
+  keys: readonly string[],
+): Promise<void> {
+  if (keys.length === 0) return;
+  await redisTry("del", () => redis.del(...keys), redis);
+}
+
 /** Lease of an IN_PROGRESS claim in seconds (IDEMPOTENCY_LEASE_SECONDS); the running request renews it every third of it. */
 export function idempotencyLeaseSeconds(): number {
   return config.IDEMPOTENCY_LEASE_SECONDS;
@@ -253,6 +294,14 @@ export default fp(
           path: stored.path,
         });
       }
+      if (isErasedRecord(stored.response_body)) {
+        throw new ApiError(
+          410,
+          "GONE",
+          "This request already succeeded, but the data it returned was erased (DPDP). Do not retry it; look the record up instead.",
+          { original_status: stored.response_body.original_status },
+        );
+      }
       if (isRedactedRecord(stored.response_body)) {
         // the original response carried a one-time secret that is never stored: the request DID succeed, but its secret cannot be shown again
         throw new ApiError(
@@ -303,7 +352,7 @@ export default fp(
       if (keyStr.length > 128) throw ApiError.badRequest("Idempotency-Key too long");
       const scopeKey = req.subjectId ?? req.clientIp;
       const hash = requestHash(req);
-      const redisKey = `idem:${scopeKey}:${keyStr}`;
+      const redisKey = idempotencyCacheKey(scopeKey, keyStr);
       const cached = await cachedResponse(redisKey);
       if (cached) return replay(reply, cached, hash);
       const deadline = Date.now() + WAIT_MS;

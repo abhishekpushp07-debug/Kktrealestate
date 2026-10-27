@@ -38,7 +38,8 @@ export function SlaBadge({
   now,
   className,
 }: {
-  ticket: Pick<ServiceRequestRow, "sla_due_at" | "is_sla_breached" | "status">;
+  ticket: Pick<ServiceRequestRow, "sla_due_at" | "is_sla_breached" | "status"> &
+    Partial<Pick<ServiceRequestRow, "sla_paused_at">>;
   now?: Date;
   className?: string;
 }) {

@@ -50,7 +50,7 @@ import { listPaging, paginate } from "../../lib/list.js";
 import { route } from "../../lib/routes.js";
 import { ensureProjectAccess, scopeFilter, type StaffContext } from "../../lib/scope.js";
 import { CORE_MODULES, discoverModules, selectModules } from "../loader.js";
-import { onSnapshot, rebuild } from "../money/index.js";
+import { onSnapshot, rebuild, type MoneyActor } from "../money/index.js";
 import { adminMeta, idParams, iso, requireSuperAdmin, staff } from "./common.js";
 
 type JobRunRecord = typeof jobRuns.$inferSelect;
@@ -187,11 +187,13 @@ export async function reconcileBookings(
 export async function recomputeBookings(
   db: DB,
   targets: readonly { id: string; bookingNumber: string }[],
+  actor: MoneyActor | null = null,
 ): Promise<AdminRecomputeResponse> {
   const mismatches: AdminRecomputeMismatch[] = [];
   let rows = 0;
   for (const b of targets) {
-    const r = await db.transaction((tx) => rebuild(tx, b.id, { write: true }));
+    // a differing ledger is restated as a new epoch whose ledger_rebuilds row names the admin who asked (contract C7)
+    const r = await db.transaction((tx) => rebuild(tx, b.id, { write: true, reason: "ADMIN_RECOMPUTE", actor }));
     rows += r.rows.length;
     for (const m of r.mismatches)
       mismatches.push({
@@ -406,8 +408,8 @@ export function registerToolRoutes(app: FastifyInstance): void {
         projectId: req.body.project_id,
         all: req.body.all,
       });
-      const result = await recomputeBookings(app.db, targets);
       const meta = adminMeta(req);
+      const result = await recomputeBookings(app.db, targets, meta.actor);
       await app.db.transaction(async (tx) => {
         await writeAudit(tx, {
           companyId: user.companyId,

@@ -76,6 +76,17 @@ export function planStageProblems(details: Record<string, unknown> | undefined):
   return { missing: [...new Set(missing)], stranded };
 }
 
+/** The text as a sentence (a closing full stop added when missing). */
+function sentence(text: string): string {
+  return /[.!?]$/.test(text.trim()) ? text.trim() : `${text.trim()}.`;
+}
+
+function records(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is Record<string, unknown> => typeof entry === "object" && entry !== null)
+    : [];
+}
+
 function preview(items: string[], max = 4): string {
   return items.length > max ? `${items.slice(0, max).join("; ")}; and ${items.length - max} more` : items.join("; ");
 }
@@ -116,6 +127,9 @@ export function messageForError(error: ErrorFacts): string | null {
     case "NOT_FOUND":
       return "That record could not be found.";
     case "GONE": {
+      // an idempotent request whose stored answer was withdrawn by a DPDP erasure (contract: details.original_status)
+      if (typeof details?.original_status === "number")
+        return "This was already done, but the customer's personal data has since been erased. Don't repeat it; look the record up instead.";
       const replacement = typeof details?.replacement === "string" ? ` Use ${details.replacement} instead.` : "";
       return `${error.message || "This feature has been retired."}${replacement} Please update the app.`;
     }
@@ -152,6 +166,41 @@ export function messageForError(error: ErrorFacts): string | null {
       return error.message || "That file type isn't allowed. Upload a PDF, JPG, PNG or WebP.";
     case "LINK_EXPIRED":
       return "This link has expired.";
+    case "BOOKING_CLOSED": {
+      // 409 from a stage undo that would rewrite a completed (handed-over) booking: details.bookings [{booking_number, demand_numbers}]
+      const bookings = records(details?.bookings).map((row) => {
+        const number = typeof row.booking_number === "string" ? row.booking_number : "a booking";
+        const demands = list(row.demand_numbers);
+        return demands.length ? `${number} (${demands.join(", ")})` : number;
+      });
+      return bookings.length
+        ? `This would change closed bookings: ${preview(bookings)}. Reopen them first, or leave the stage completed.`
+        : error.message || "This would change a closed booking. Reopen it first.";
+    }
+    case "FLAT_HAS_BOOKING_HISTORY": {
+      // 409 from a regenerate / structural block edit: details.flats [{flat_number, floor, bookings}]
+      const flats = records(details?.flats).map((row) => {
+        const number = typeof row.flat_number === "string" ? row.flat_number : "a flat";
+        return typeof row.floor === "number" ? `${number} (floor ${row.floor})` : number;
+      });
+      return flats.length
+        ? `These flats have booking history and must keep their number, floor and position: ${preview(flats)}. Change the layout so they stay, or leave the tower as it is.`
+        : error.message || "Some flats of this tower have booking history and cannot be removed.";
+    }
+    case "INVALID_AMOUNT":
+      return typeof details?.rate_card_id === "string"
+        ? `${sentence(error.message || "An amount in the rate card is invalid")} Fix the rate card's PLC rules (percent values take at most 2 decimals).`
+        : error.message || "An amount is invalid.";
+    case "IDEMPOTENT_OUTCOME_UNKNOWN":
+      return "The server may already have saved this, but its answer was lost. Refresh to check before trying again — don't submit it twice.";
+    case "INVALID_CURSOR":
+      return "The list changed its sort or the page link is stale. Go back to the first page.";
+    case "CONSTRAINT_VIOLATION":
+      return error.message || "The change breaks a data rule and was not saved.";
+    case "IN_USE":
+      return typeof details?.usage_count === "number"
+        ? `${sentence(error.message || "This record is in use")} (${details.usage_count.toLocaleString("en-IN")}${details.usage_count >= 10_000 ? "+" : ""} records refer to it.) Deactivate it instead.`
+        : error.message || "This record is in use. Deactivate it instead.";
     default:
       return null;
   }

@@ -821,8 +821,9 @@ export async function cancellationsReport(
       cancelled_by_name: c.by_name ?? null,
       reason: c.reason,
       paid_paise: r.b.cashPaidPaise + r.b.accountPaidPaise + r.b.otherChargesPaidPaise,
-      deduction_paise: c.deduction_paise,
-      refund_paise: c.refund_paise,
+      // money of record lives in the bigint columns (migration 0005); the jsonb copy is history and only a fallback for old rows
+      deduction_paise: r.b.cancellationDeductionPaise ?? c.deduction_paise,
+      refund_paise: r.b.cancellationRefundPaise ?? c.refund_paise,
     };
   });
   return {

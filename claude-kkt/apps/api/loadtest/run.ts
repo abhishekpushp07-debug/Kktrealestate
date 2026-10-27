@@ -10,8 +10,8 @@
  * Each scenario appends one row (p50 / p95 / p97.5 / p99, req/s, non-2xx) to docs/PERFORMANCE.md. p95 is computed from every sampled
  * response (autocannon's histogram object exposes p97.5 but not p95); the other percentiles are autocannon's.
  *
- * The write scenario posts ₹100 FLAT_VALUE/CASH payments to the ACTIVE booking with the most cash headroom, each with a fresh
- * Idempotency-Key. The API's per-user write limit (WRITE_RATE_LIMIT_PER_MIN, default 120/min) and the per-IP public limit
+ * The write scenarios post ₹100 FLAT_VALUE/CASH payments, each with a fresh Idempotency-Key: one to the ACTIVE booking with the most cash
+ * headroom (serialised by that booking's lock), one round-robin over every ACTIVE booking with headroom (the company-wide receipt path). The API's per-user write limit (WRITE_RATE_LIMIT_PER_MIN, default 120/min) and the per-IP public limit
  * (PUBLIC_RATE_LIMIT_PER_MIN, default 300/min) must be raised on the server under test — they are deployment knobs, not business rules;
  * a single load generator looks like one user on one IP — or those scenarios report mostly 429s.
  */
@@ -51,6 +51,8 @@ interface Scenario {
   connections?: number;
   /** Fresh Idempotency-Key on every request (payments). */
   uniqueIdempotencyKey?: boolean;
+  /** JSON bodies sent round-robin (one per request), instead of `body`: spreads writes over several bookings. */
+  bodies?: unknown[];
 }
 
 interface ScenarioResult {
@@ -82,6 +84,7 @@ async function run(s: Scenario, token: string): Promise<ScenarioResult> {
     headers,
     ...(body !== undefined ? { body } : {}),
   };
+  let next = 0;
   const latencies: number[] = [];
   const okLatencies: number[] = [];
   const status: Record<string, number> = {};
@@ -94,11 +97,15 @@ async function run(s: Scenario, token: string): Promise<ScenarioResult> {
     requests: [
       {
         ...base,
-        ...(s.uniqueIdempotencyKey
+        ...(s.uniqueIdempotencyKey || s.bodies
           ? {
               setupRequest: (req: RequestData): RequestData => ({
                 ...req,
-                headers: { ...(req.headers ?? {}), "idempotency-key": randomUUID() },
+                ...(s.bodies ? { body: JSON.stringify(s.bodies[next++ % s.bodies.length]) } : {}),
+                headers: {
+                  ...(req.headers ?? {}),
+                  ...(s.uniqueIdempotencyKey ? { "idempotency-key": randomUUID() } : {}),
+                },
               }),
             }
           : {}),
@@ -175,6 +182,16 @@ interface PaymentMode {
 }
 
 /** Picks the ACTIVE booking with the most cash headroom so thousands of ₹100 payments never hit the bucket cap (a business rule, kept). */
+/** Every ACTIVE booking with room for at least `minPayments` payments of PAYMENT_PAISE in its cash bucket (round-robin write scenario). */
+function paymentTargets(items: BookingRow[], minPayments = 1000): BookingRow[] {
+  return items.filter(
+    (b) =>
+      b.status === "ACTIVE" &&
+      b.summary.cash.agreed_paise - b.summary.cash.paid_paise - b.summary.cash.pending_paise >=
+        minPayments * PAYMENT_PAISE,
+  );
+}
+
 function pickPaymentTarget(items: BookingRow[]): { booking: BookingRow; headroomPaise: number } | null {
   let best: { booking: BookingRow; headroomPaise: number } | null = null;
   for (const b of items) {
@@ -253,6 +270,16 @@ async function main(): Promise<void> {
     );
   } else console.log("write scenario skipped: no ACTIVE booking with cash headroom or no payment mode");
 
+  const spread = paymentTargets(bookings.items);
+  const paymentBody = (bookingId: string, modeId: string) => ({
+    booking_id: bookingId,
+    against: "FLAT_VALUE",
+    bucket: "CASH",
+    amount_paise: PAYMENT_PAISE,
+    payment_date: todayIst(),
+    payment_mode_id: modeId,
+    remarks: "load test",
+  });
   const scenarios: Scenario[] = [
     { name: "GET /auth/me", path: "/auth/me" },
     { name: "GET /projects", path: "/projects?page_size=25" },
@@ -291,15 +318,21 @@ async function main(): Promise<void> {
             method: "POST" as const,
             connections: WRITE_CONNECTIONS,
             uniqueIdempotencyKey: true,
-            body: {
-              booking_id: target.booking.id,
-              against: "FLAT_VALUE",
-              bucket: "CASH",
-              amount_paise: PAYMENT_PAISE,
-              payment_date: todayIst(),
-              payment_mode_id: mode.id,
-              remarks: "load test",
-            },
+            body: paymentBody(target.booking.id, mode.id),
+          },
+        ]
+      : []),
+    // the same write spread round-robin over every booking with headroom: payments of ONE booking serialise on its lock, so only this
+    // scenario shows the company-wide receipt-number path (audit v3 C: the single-booking scenario hid it)
+    ...(mode && spread.length > 1
+      ? [
+          {
+            name: `POST /payments (₹100, round-robin over ${spread.length} bookings, ${WRITE_CONNECTIONS} conns)`,
+            path: "/payments",
+            method: "POST" as const,
+            connections: WRITE_CONNECTIONS,
+            uniqueIdempotencyKey: true,
+            bodies: spread.map((b) => paymentBody(b.id, mode.id)),
           },
         ]
       : []),

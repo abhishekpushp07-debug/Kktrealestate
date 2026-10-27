@@ -690,6 +690,63 @@ describe("ledger, receipts, demands, schedule", () => {
     assertNoLeaks(ledger);
   });
 
+  it("ledger carries the C7 summary and reads the current epoch only: a restated booking never shows superseded rows (phase 7 integration)", async () => {
+    type Totals = {
+      cash_due_paise: number;
+      account_due_paise: number;
+      total_due_paise: number;
+      other_charges_due_paise: number;
+      cash_paid_paise: number;
+      account_paid_paise: number;
+    };
+    type Ledger = List<LedgerRow> & { summary: Totals };
+    const before = await ok<Ledger>(`/api/v1/portal/bookings/${bookingA.id}/ledger`, tokenA);
+    const last = before.items.at(-1)!;
+    expect(before.summary).toEqual({
+      cash_due_paise: last.cash_due_paise,
+      account_due_paise: last.account_due_paise,
+      total_due_paise: last.total_due_paise,
+      other_charges_due_paise: before.summary.other_charges_due_paise,
+      cash_paid_paise: last.cash_paid_paise,
+      account_paid_paise: last.account_paid_paise,
+    });
+    // the staff ledger's summary agrees with the customer's
+    const admin = await t.loginAs("admin");
+    const staff = await t.request<{ summary: Totals }>("GET", `/api/v1/bookings/${bookingA.id}/ledger`, {
+      token: admin.access_token,
+    });
+    expect(staff.status).toBe(200);
+    expect(before.summary).toEqual({
+      cash_due_paise: staff.body.summary.cash_due_paise,
+      account_due_paise: staff.body.summary.account_due_paise,
+      total_due_paise: staff.body.summary.total_due_paise,
+      other_charges_due_paise: staff.body.summary.other_charges_due_paise,
+      cash_paid_paise: staff.body.summary.cash_paid_paise,
+      account_paid_paise: staff.body.summary.account_paid_paise,
+    });
+    // a ledger in a stale order (written by an older engine), below the append-only guard (test-only) → restated as epoch 2
+    await t.app.sql.begin(async (tx) => {
+      await tx`set local session_replication_role = replica`;
+      await tx`update ledger_entries set seq = -1 where booking_id = ${bookingA.id} and seq = 1`;
+      await tx`update ledger_entries set seq = 1 where booking_id = ${bookingA.id} and seq = 2`;
+      await tx`update ledger_entries set seq = 2 where booking_id = ${bookingA.id} and seq = -1`;
+    });
+    const { rebuild } = await import("../../src/modules/money/index.js"); // dynamic: config must see STORAGE_LOCAL_DIR first
+    const res = await t.app.db.transaction((tx) =>
+      rebuild(tx, bookingA.id, { write: true, reason: "ADMIN_RECOMPUTE" }),
+    );
+    expect(res).toMatchObject({ restated: true, epoch: 2 });
+    const after = await ok<Ledger>(`/api/v1/portal/bookings/${bookingA.id}/ledger`, tokenA);
+    expect(after.total).toBe(before.total);
+    expect(after.items.map((r) => r.seq)).toEqual(after.items.map((_, i) => i + 1));
+    expect(after.items.some((r) => r.event === "LEDGER_RESTATED")).toBe(false);
+    expect(after.items.map((r) => [r.event, r.amount_paise, r.total_due_paise])).toEqual(
+      before.items.map((r) => [r.event, r.amount_paise, r.total_due_paise]),
+    );
+    expect(after.summary).toEqual(before.summary);
+    assertNoLeaks(after);
+  });
+
   it("receipts list every payment with status flags; pending cheque shows its instrument", async () => {
     const receipts = await ok<List<Receipt>>(`/api/v1/portal/bookings/${bookingA.id}/receipts`, tokenA);
     expect(receipts.total).toBe(2);
@@ -742,7 +799,7 @@ describe("ledger, receipts, demands, schedule", () => {
 
 describe("PDF links", () => {
   async function expectPdf(link: PdfLink): Promise<void> {
-    expect(link.download_url).toMatch(/\/api\/v1\/portal\/files\/[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
+    expect(link.download_url).toMatch(/\/api\/v1\/portal\/files\/[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
     expect(link.file_name).toMatch(/\.pdf$/);
     expect(new Date(link.expires_at).getTime() - Date.now()).toBeGreaterThan(14 * 60_000);
     expect(new Date(link.expires_at).getTime() - Date.now()).toBeLessThanOrEqual(15 * 60_000 + 1000);
@@ -770,16 +827,23 @@ describe("PDF links", () => {
   it("forged, tampered or expired tokens are 404; expired temp files are swept from storage", async () => {
     const link = await ok<PdfLink>(`/api/v1/portal/bookings/${bookingA.id}/statement.pdf`, tokenA);
     const token = link.download_url.split("/portal/files/")[1]!;
-    const [body, sig] = token.split(".") as [string, string];
+    const [kid, body, sig] = token.split(".") as [string, string, string]; // <kid>.<body>.<sig> on the LINK_SIGNING_KEYS ring
     const flip = (ch: string) => (ch === "A" ? "B" : "A");
     expect(
-      (await fetchFile(`http://localhost:4000/api/v1/portal/files/${body}.${sig.slice(0, -1)}${flip(sig.slice(-1))}`))
-        .statusCode,
+      (
+        await fetchFile(
+          `http://localhost:4000/api/v1/portal/files/${kid}.${body}.${sig.slice(0, -1)}${flip(sig.slice(-1))}`,
+        )
+      ).statusCode,
     ).toBe(404);
     expect(
-      (await fetchFile(`http://localhost:4000/api/v1/portal/files/${body.slice(0, -1)}${flip(body.slice(-1))}.${sig}`))
-        .statusCode,
+      (
+        await fetchFile(
+          `http://localhost:4000/api/v1/portal/files/${kid}.${body.slice(0, -1)}${flip(body.slice(-1))}.${sig}`,
+        )
+      ).statusCode,
     ).toBe(404);
+    expect((await fetchFile(`http://localhost:4000/api/v1/portal/files/zz9.${body}.${sig}`)).statusCode).toBe(404);
     expect((await fetchFile("http://localhost:4000/api/v1/portal/files/not-a-token")).statusCode).toBe(404);
     expect(
       (await fetchFile(`http://localhost:4000/api/v1/portal/files/${"A".repeat(60)}.${"B".repeat(22)}`)).statusCode,
@@ -1273,8 +1337,20 @@ describe("profile", () => {
     expect(r.body.address_current).toMatchObject({ line1: "22 Bailey Road", pincode: "800014" });
     const v1 = (await sqlOne(t.app.sql<{ version: number }[]>`select version from customers where id = ${A}`)).version;
     expect(v1).toBe(v0 + 1);
+    // the profile carries its version (contract C6) and its ETag, so the portal can send If-Match "v<version>"
+    expect((r.body as unknown as { version: number }).version).toBe(v1);
+    const fresh = await t.request<{ version: number }>("GET", "/api/v1/portal/profile", { token: tokenA });
+    expect(fresh.body.version).toBe(v1);
+    expect(fresh.headers["etag"]).toBe(`"v${v1}"`);
+    const viaTag = await t.request<{ version: number }>("PATCH", "/api/v1/portal/profile", {
+      token: tokenA,
+      body: { alt_phone: "+91 98765 43211" },
+      headers: { "if-match": String(fresh.headers["etag"]) },
+    });
+    expect(viaTag.status, viaTag.text).toBe(200);
+    expect(viaTag.body.version).toBe(v1 + 1);
     const audits = await auditRows("customer.portal_profile_update", "CUSTOMER");
-    expect(audits).toHaveLength(1);
+    expect(audits).toHaveLength(2);
     expect(audits[0]).toMatchObject({ actor_type: "CUSTOMER", actor_id: A, entity_id: A });
     // PII is masked in the immutable audit log, with keyed fingerprints so a change stays visible (DPDP, lib/audit.ts)
     expect(audits[0]!.after).toMatchObject({ email: "r***@e***.com", altPhone: "******3211" });

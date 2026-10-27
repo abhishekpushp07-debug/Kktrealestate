@@ -3,6 +3,58 @@
 All notable changes to KKT v2. The API follows docs/VERSIONING.md: additive within `/api/v1`, deprecations announced here with their
 sunset date. Dates are IST.
 
+## [Unreleased] — phase 7 tracks, reviews and integration (v3 audit fixes)
+
+Reports: docs/hardening/phase7-{money,security,platform,domain,frontend,ops}.md, their `phase7-review-*.md` and
+docs/hardening/phase7-integrate.md (the 40-finding table).
+
+### Breaking (deliberate, recorded per docs/VERSIONING.md "Deliberate breaks")
+
+- **`refresh_token` is optional in `TokenPair`** (staff and portal login / refresh responses, contract C1): it is left out when the
+  request asked for cookie mode (`X-KKT-Session: cookie`). Body-mode clients (native portal, API clients) still receive it.
+- **`POST /customers/:id/erase` answers `AdminCustomerEraseResponse`** (it is now a deprecated alias of `POST /admin/customers/:id/erase`,
+  sunset 2027-04-24) instead of the customer row.
+- A refresh-token family has an absolute lifetime (`REFRESH_ABSOLUTE_TTL_DAYS`, 30): past it refresh answers 401 `SESSION_EXPIRED`.
+
+### Added
+
+- Cookie sessions (C1), tenant resolution on sign-in and on the public site (C4), public caching with ETag/304 (C5), client error
+  reporting `POST /api/v1/client-errors` (C2), worker health on `:9465/health` (C8), key rings `JWT_SIGNING_KEYS` / `LINK_SIGNING_KEYS` /
+  `HASH_KEYS` (C9).
+- Ledger as a book of record (C7): `?epoch=`, `epoch`, `current_epoch`, the six `summary` totals, `epoch_totals`,
+  `GET /bookings/:id/ledger/rebuilds`; ledger event `DEMAND_VOIDED`; 409 `BOOKING_CLOSED` on a stage undo that would rewrite a completed
+  booking. The **portal ledger** now reads the current epoch only and carries the same `summary`.
+- `GET /masters/{path}/import-template`, 422 `IMPORT_UNKNOWN_COLUMNS`, 409 `FLAT_HAS_BOOKING_HISTORY`, `flats_preserved`, SLA pause
+  (`sla_paused_at`, `sla_paused_seconds`), `.ics` SEQUENCE / METHOD:CANCEL, `GET /public/sitemap`, opaque visitor tokens.
+- List `meta {total_is_estimate, total_included}`, 400 `INVALID_CURSOR`, 409 `IDEMPOTENT_OUTCOME_UNKNOWN`, `DocumentRow.renditions`,
+  `GET /admin/audit/verify`, jobs `AUDIT_SEAL`, `DOCUMENT_RENDITIONS`, `STORAGE_SWEEP`.
+- `PortalProfileResponse.version` (ETag `"v<n>"`; send it back as If-Match).
+- Integrity finding type `CHECK_FAILED` (a booking the engine cannot check is reported, the run goes on; counts gain `CHECK_FAILED`).
+- An idempotent replay whose stored response was withdrawn by a DPDP erasure answers 410 `GONE` (`details.original_status`).
+
+### Changed
+
+- CORS grants credentials to the ERP / website / portal origins and allows `X-KKT-Session` and `X-KKT-Company`.
+- Health probes are never rate-limited; the website server's own calls (internal token without a visitor IP) have their own budget
+  `INTERNAL_RATE_LIMIT_PER_MIN` (6000/min per route group).
+- Erasure also withdraws QUEUED / RUNNING exports (the job never publishes a withdrawn one) and waits for a rendition run on the
+  customer's documents; the cancellations report reads the refund / deduction columns; admin recompute records the acting admin in
+  `ledger_rebuilds`.
+- LEDGER_REBUILD and REENCRYPT_FIELDS checkpoint per batch and resume; BACKUP_EXPORT stops on its signal (one snapshot, restarts).
+- Swagger UI (`/api/v1/docs/json`) serves the same enriched document as `/api/v1/openapi.json`.
+
+### Database
+
+- Migration 0006 money guards (append-only ledger and rebuilds, frozen payment financial columns). Online file 0005 §7–8:
+  `documents_storage_key_idx` + rendition-key indexes, and the SLA pause backfill for tickets already AWAITING_CUSTOMER.
+
+### Configuration
+
+- New: `REFRESH_ABSOLUTE_TTL_DAYS`, `READ_RATE_LIMIT_PER_MIN`, `EXPORT_RATE_LIMIT_PER_MIN`, `INTERNAL_RATE_LIMIT_PER_MIN`, the C9 rings
+  (+ `_FILE`), `WORKER_HEALTH_PORT`, `WORKER_DRAIN_TIMEOUT_MS`, `WORKER_CRITICAL_CONCURRENCY`, `WORKER_HEAVY_CONCURRENCY`,
+  `UV_THREADPOOL_SIZE`, `IMAGE_CONCURRENCY`, `IDEMPOTENCY_LEASE_SECONDS`, `CLIENT_ERROR_RATE_LIMIT_PER_MIN`,
+  `HEALTH_WORKER_STALE_SECONDS`, `WEB_REVALIDATE_URL`, `WEB_REVALIDATE_TOKEN` (docs/DEPLOY.md).
+
 ## [Unreleased] — phase 7 foundation (v3 audit fixes)
 
 Report: docs/hardening/phase7-foundation.md.

@@ -972,5 +972,58 @@ describe("7. cancellation money lives in bigint columns", () => {
     expect(ledger.items.at(-1)).toMatchObject({ event: "CANCELLATION", amount_paise: -4 * L });
     const check = await t.app.db.transaction((tx) => rebuild(tx, b.id));
     expect(check.rowMismatches).toEqual([]);
+    // the cancellations report reads the columns too (phase 7 integration; it used to print the drifted jsonb copy)
+    const report = await t.request<{ rows: { booking_id: string; refund_paise: number; deduction_paise: number }[] }>(
+      "GET",
+      `/api/v1/reports/cancellations?from=${today}&to=${today}`,
+      { token: admin },
+    );
+    expect(report.status, report.text).toBe(200);
+    expect(report.body.rows.find((x) => x.booking_id === b.id)).toMatchObject({
+      refund_paise: 4 * L,
+      deduction_paise: L,
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe("NIGHTLY_INTEGRITY isolates a booking it cannot check (phase 7 integration, money review follow-up)", () => {
+  it("a booking whose data makes the engine throw is reported as CHECK_FAILED and every other booking is still checked", async () => {
+    const tower = await newTower(1);
+    const good = await book(tower.flats[0]!.id, w.customers[5]!, { payment_plan_id: w.plans.DP });
+    const bad = await book(tower.flats[1]!.id, w.customers[6]!, { payment_plan_id: w.plans.DP });
+    // a manufactured anomaly on the good booking, so the run has a real finding to report besides the failure
+    await t.app.sql`update bookings set cash_paid_paise = cash_paid_paise + 1 where id = ${good.id}`;
+    await t.app
+      .sql`update bookings set plan_snapshot = jsonb_set(plan_snapshot, '{installments,0,percent}', '10.005'::jsonb) where id = ${bad.id}`;
+    let result: Record<string, unknown>;
+    try {
+      result = await nightlyIntegrityJob(t.app.db);
+    } finally {
+      await t.app
+        .sql`update bookings set plan_snapshot = jsonb_set(plan_snapshot, '{installments,0,percent}', '10'::jsonb) where id = ${bad.id}`;
+      await t.app.sql`update bookings set cash_paid_paise = cash_paid_paise - 1 where id = ${good.id}`;
+    }
+    const mine = result[t.companyId] as { ok: boolean; counts: Record<string, number> };
+    expect(mine.ok).toBe(false);
+    expect(mine.counts["CHECK_FAILED"]).toBe(1);
+    expect(mine.counts["SUMMARY_MISMATCH"]).toBeGreaterThanOrEqual(1);
+    const [run] = await t.app.sql<
+      { findings: { type: string; booking_id: string; repairable: boolean; detail: string }[] }[]
+    >`
+      select findings from integrity_runs where company_id = ${t.companyId} order by ran_at desc limit 1`;
+    const failed = run!.findings.filter((f) => f.type === "CHECK_FAILED");
+    expect(failed).toEqual([expect.objectContaining({ booking_id: bad.id, repairable: false })]);
+    expect(failed[0]!.detail).toMatch(/^INVALID_AMOUNT: /);
+    expect(run!.findings.some((f) => f.type === "SUMMARY_MISMATCH" && f.booking_id === good.id)).toBe(true);
+    // the report endpoint shows the same, with the new count present
+    const report = await t.request<{ counts: Record<string, number> }>(
+      "GET",
+      "/api/v1/dues/integrity/runs?page_size=1",
+      {
+        token: admin,
+      },
+    );
+    expect(report.status, report.text).toBe(200);
   });
 });

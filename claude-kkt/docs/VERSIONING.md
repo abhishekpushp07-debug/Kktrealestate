@@ -105,6 +105,10 @@ updated in the same release; the portal is checked against it.
   last-writer-wins without one), and VERSION_REQUIRED moved from 400 to 428. Also tightened in the same release: `page` ≤ 1000 on
   offset lists, PLC value precision, the corrected `BucketCapDetailsSchema`, and one `details.issues` shape for VALIDATION_ERROR. The
   portal app is unaffected (portal routes do not require versions; `PATCH /portal/profile` still accepts a missing If-Match).
+- **Phase 7 (contract C1, security track):** `TokenPair.refresh_token` became optional (left out in cookie mode), and the deprecated
+  alias `POST /customers/:id/erase` answers the canonical `AdminCustomerEraseResponse`. The ERP and the portal web build use cookie
+  mode; the native portal keeps body mode and still receives the token. Snapshot regenerated with `--force` by the platform track;
+  the integration stage's own changes (portal ledger `summary`, profile `version`, `CHECK_FAILED`) are additive.
 
 ## Database changes follow the same rule
 

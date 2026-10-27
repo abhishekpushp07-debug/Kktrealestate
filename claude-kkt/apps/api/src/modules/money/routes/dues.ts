@@ -29,6 +29,7 @@ const ZERO: IntegrityCounts = {
   UNMAPPED_DEMAND: 0,
   SUMMARY_MISMATCH: 0,
   PLAN_STAGE_MISSING: 0,
+  CHECK_FAILED: 0,
 };
 
 export function registerDuesRoutes(app: FastifyInstance): void {

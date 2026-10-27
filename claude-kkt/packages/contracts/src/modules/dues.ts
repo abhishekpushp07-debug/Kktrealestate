@@ -69,6 +69,8 @@ export const IntegrityCountsSchema = z.object({
   SUMMARY_MISMATCH: z.int().min(0),
   /** Bookings whose plan snapshot has an ON_STAGE installment on a stage missing from their tower (never raised; not auto-repairable). Absent on runs stored before it existed. */
   PLAN_STAGE_MISSING: z.int().min(0).default(0),
+  /** Bookings the run could not check (the engine threw on their data; isolated, the run went on). Absent on older runs. */
+  CHECK_FAILED: z.int().min(0).default(0),
 });
 export type IntegrityCounts = z.infer<typeof IntegrityCountsSchema>;
 

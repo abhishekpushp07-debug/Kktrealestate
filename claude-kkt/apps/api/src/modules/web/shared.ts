@@ -180,6 +180,31 @@ export function revalidateWebsite(app: FastifyInstance, tags: readonly string[] 
   return pendingRevalidation;
 }
 
+/** A failing website is reported at warn at most once per this window (a seed with the website down wrote one stack every 250 ms). */
+export const REVALIDATE_WARN_EVERY_MS = 60_000;
+const revalidationFailures = { lastWarnAt: Number.NEGATIVE_INFINITY, suppressed: 0 };
+
+/**
+ * Logs a revalidation failure: at warn when none was warned within REVALIDATE_WARN_EVERY_MS (with the number suppressed since), else at
+ * debug. Returns true when it warned.
+ */
+export function logRevalidationFailure(
+  log: Pick<FastifyInstance["log"], "warn" | "debug">,
+  details: Record<string, unknown>,
+  message: string,
+  now = Date.now(),
+): boolean {
+  if (now - revalidationFailures.lastWarnAt >= REVALIDATE_WARN_EVERY_MS) {
+    log.warn({ ...details, suppressed_since_last: revalidationFailures.suppressed }, message);
+    revalidationFailures.lastWarnAt = now;
+    revalidationFailures.suppressed = 0;
+    return true;
+  }
+  revalidationFailures.suppressed += 1;
+  log.debug(details, message);
+  return false;
+}
+
 function postRevalidation(app: FastifyInstance, url: string, token: string, tags: readonly string[]): Promise<boolean> {
   const attempt = fetch(url, {
     method: "POST",
@@ -188,11 +213,11 @@ function postRevalidation(app: FastifyInstance, url: string, token: string, tags
     signal: AbortSignal.timeout(REVALIDATE_TIMEOUT_MS),
   })
     .then((res) => {
-      if (!res.ok) app.log.warn({ status: res.status }, "website revalidation answered an error");
+      if (!res.ok) logRevalidationFailure(app.log, { status: res.status }, "website revalidation answered an error");
       return res.ok;
     })
     .catch((err: unknown) => {
-      app.log.warn({ err }, "website revalidation failed");
+      logRevalidationFailure(app.log, { err: (err as Error).message }, "website revalidation failed");
       return false;
     });
   return attempt;

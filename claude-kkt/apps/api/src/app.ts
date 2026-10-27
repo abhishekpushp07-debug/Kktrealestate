@@ -22,6 +22,7 @@ import { rolesModule } from "./modules/roles/index.js";
 import { searchModule } from "./modules/search/index.js";
 import { systemModule } from "./modules/system/index.js";
 import { lifecycle } from "./modules/system/lifecycle.js";
+import { enrichOpenApi } from "./modules/system/openapiEnrich.js";
 import { usersModule } from "./modules/users/index.js";
 import authPlugin from "./plugins/auth.js";
 import dbPlugin from "./plugins/db.js";
@@ -126,9 +127,20 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
   });
   await app.register(cors, {
     origin: [config.ERP_ORIGIN, config.WEB_ORIGIN, config.PORTAL_ORIGIN],
-    credentials: false,
+    // contract C1: cookie sessions (kkt_rt / kkt_prt) need credentialed requests from the ERP/portal origins (an explicit list, never
+    // "*"); X-KKT-Session is the CSRF guard of cookie refresh/logout; x-kkt-company is the tenant header of contract C4
+    credentials: true,
     methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Authorization", "Content-Type", "Idempotency-Key", "If-Match", "If-None-Match", "X-Request-Id"],
+    allowedHeaders: [
+      "Authorization",
+      "Content-Type",
+      "Idempotency-Key",
+      "If-Match",
+      "If-None-Match",
+      "X-Request-Id",
+      "X-KKT-Session",
+      "X-KKT-Company",
+    ],
     // Deprecation/Sunset/Link (docs/VERSIONING.md) and X-Trace-Id must be readable by cross-origin browser clients too (dev servers)
     // X-Export-* (lib/list.ts): CSV row counts / truncation, so the ERP can offer POST /exports when a download was cut
     exposedHeaders: [
@@ -184,10 +196,16 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
   });
   // staticCSP off: the docs pages get DOCS_CSP from the onSend hook above (swagger-ui's own policy forced upgrade-insecure-requests and
   // blocked its inline styles)
+  // Swagger UI (/api/v1/docs, /api/v1/docs/json) shows the same enriched document as /api/v1/openapi.json and the committed snapshot
+  // (operationIds, components, error responses, headers, media types); built once, after every route is registered
+  let enrichedDocs: Record<string, unknown> | null = null;
   await app.register(swaggerUi, {
     routePrefix: "/api/v1/docs",
     staticCSP: false,
     uiConfig: { docExpansion: "list", persistAuthorization: true },
+    transformSpecificationClone: true,
+    transformSpecification: (spec) =>
+      (enrichedDocs ??= enrichOpenApi(JSON.parse(JSON.stringify(spec)) as Record<string, unknown>, app.routeRegistry)),
   });
 
   if (opts.offline) {

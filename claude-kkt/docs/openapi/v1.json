@@ -1543,6 +1543,12 @@
                         "counts": {
                           "additionalProperties": false,
                           "properties": {
+                            "CHECK_FAILED": {
+                              "default": 0,
+                              "maximum": 9007199254740991,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
                             "DUPLICATE_DEMAND": { "maximum": 9007199254740991, "minimum": 0, "type": "integer" },
                             "MISSING_DEMAND": { "maximum": 9007199254740991, "minimum": 0, "type": "integer" },
                             "PLAN_STAGE_MISSING": {
@@ -1561,7 +1567,8 @@
                             "DUPLICATE_DEMAND",
                             "UNMAPPED_DEMAND",
                             "SUMMARY_MISMATCH",
-                            "PLAN_STAGE_MISSING"
+                            "PLAN_STAGE_MISSING",
+                            "CHECK_FAILED"
                           ],
                           "type": "object"
                         },
@@ -1630,7 +1637,8 @@
                                   "DUPLICATE_DEMAND",
                                   "UNMAPPED_DEMAND",
                                   "SUMMARY_MISMATCH",
-                                  "PLAN_STAGE_MISSING"
+                                  "PLAN_STAGE_MISSING",
+                                  "CHECK_FAILED"
                                 ],
                                 "type": "string"
                               }
@@ -31129,6 +31137,7 @@
                     "counts": {
                       "additionalProperties": false,
                       "properties": {
+                        "CHECK_FAILED": { "default": 0, "maximum": 9007199254740991, "minimum": 0, "type": "integer" },
                         "DUPLICATE_DEMAND": { "maximum": 9007199254740991, "minimum": 0, "type": "integer" },
                         "MISSING_DEMAND": { "maximum": 9007199254740991, "minimum": 0, "type": "integer" },
                         "PLAN_STAGE_MISSING": {
@@ -31147,7 +31156,8 @@
                         "DUPLICATE_DEMAND",
                         "UNMAPPED_DEMAND",
                         "SUMMARY_MISMATCH",
-                        "PLAN_STAGE_MISSING"
+                        "PLAN_STAGE_MISSING",
+                        "CHECK_FAILED"
                       ],
                       "type": "object"
                     },
@@ -31216,7 +31226,8 @@
                               "DUPLICATE_DEMAND",
                               "UNMAPPED_DEMAND",
                               "SUMMARY_MISMATCH",
-                              "PLAN_STAGE_MISSING"
+                              "PLAN_STAGE_MISSING",
+                              "CHECK_FAILED"
                             ],
                             "type": "string"
                           }
@@ -31327,6 +31338,12 @@
                         "counts": {
                           "additionalProperties": false,
                           "properties": {
+                            "CHECK_FAILED": {
+                              "default": 0,
+                              "maximum": 9007199254740991,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
                             "DUPLICATE_DEMAND": { "maximum": 9007199254740991, "minimum": 0, "type": "integer" },
                             "MISSING_DEMAND": { "maximum": 9007199254740991, "minimum": 0, "type": "integer" },
                             "PLAN_STAGE_MISSING": {
@@ -31345,7 +31362,8 @@
                             "DUPLICATE_DEMAND",
                             "UNMAPPED_DEMAND",
                             "SUMMARY_MISMATCH",
-                            "PLAN_STAGE_MISSING"
+                            "PLAN_STAGE_MISSING",
+                            "CHECK_FAILED"
                           ],
                           "type": "object"
                         },
@@ -31414,7 +31432,8 @@
                                   "DUPLICATE_DEMAND",
                                   "UNMAPPED_DEMAND",
                                   "SUMMARY_MISMATCH",
-                                  "PLAN_STAGE_MISSING"
+                                  "PLAN_STAGE_MISSING",
+                                  "CHECK_FAILED"
                                 ],
                                 "type": "string"
                               }
@@ -31539,6 +31558,12 @@
                           "counts": {
                             "additionalProperties": false,
                             "properties": {
+                              "CHECK_FAILED": {
+                                "default": 0,
+                                "maximum": 9007199254740991,
+                                "minimum": 0,
+                                "type": "integer"
+                              },
                               "DUPLICATE_DEMAND": { "maximum": 9007199254740991, "minimum": 0, "type": "integer" },
                               "MISSING_DEMAND": { "maximum": 9007199254740991, "minimum": 0, "type": "integer" },
                               "PLAN_STAGE_MISSING": {
@@ -31557,7 +31582,8 @@
                               "DUPLICATE_DEMAND",
                               "UNMAPPED_DEMAND",
                               "SUMMARY_MISMATCH",
-                              "PLAN_STAGE_MISSING"
+                              "PLAN_STAGE_MISSING",
+                              "CHECK_FAILED"
                             ],
                             "type": "object"
                           },
@@ -53037,7 +53063,7 @@
           "503": { "$ref": "#/components/responses/ServiceUnavailable" }
         },
         "security": [{ "bearerAuth": [] }],
-        "summary": "Unpublish (soft delete) a notice; its bell notifications are withdrawn (If-Match optional)",
+        "summary": "Unpublish (soft delete) a notice; its bell notifications are withdrawn (version required: If-Match or body version)",
         "tags": ["notices"]
       },
       "get": {
@@ -58182,6 +58208,26 @@
                     "next_cursor": { "type": ["string", "null"] },
                     "page": { "maximum": 9007199254740991, "minimum": 1, "type": "integer" },
                     "page_size": { "maximum": 200, "minimum": 1, "type": "integer" },
+                    "summary": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "account_due_paise": { "$ref": "#/components/schemas/SignedMoneyPaise" },
+                        "account_paid_paise": { "$ref": "#/components/schemas/SignedMoneyPaise" },
+                        "cash_due_paise": { "$ref": "#/components/schemas/SignedMoneyPaise" },
+                        "cash_paid_paise": { "$ref": "#/components/schemas/SignedMoneyPaise" },
+                        "other_charges_due_paise": { "$ref": "#/components/schemas/SignedMoneyPaise" },
+                        "total_due_paise": { "$ref": "#/components/schemas/SignedMoneyPaise" }
+                      },
+                      "required": [
+                        "cash_due_paise",
+                        "account_due_paise",
+                        "total_due_paise",
+                        "other_charges_due_paise",
+                        "cash_paid_paise",
+                        "account_paid_paise"
+                      ],
+                      "type": "object"
+                    },
                     "total": { "maximum": 9007199254740991, "minimum": 0, "type": "integer" }
                   },
                   "required": ["items", "total", "page", "page_size", "next_cursor"],
@@ -59087,7 +59133,8 @@
                         },
                         { "type": "null" }
                       ]
-                    }
+                    },
+                    "version": { "maximum": 9007199254740991, "minimum": 1, "type": "integer" }
                   },
                   "required": [
                     "customer_id",
@@ -59104,13 +59151,15 @@
                     "co_applicants",
                     "relationship_manager",
                     "must_change_password",
-                    "last_login_at"
+                    "last_login_at",
+                    "version"
                   ],
                   "type": "object"
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Default Response",
+            "headers": { "ETag": { "$ref": "#/components/headers/ETag" } }
           },
           "304": { "$ref": "#/components/responses/NotModified" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
@@ -59262,7 +59311,8 @@
                         },
                         { "type": "null" }
                       ]
-                    }
+                    },
+                    "version": { "maximum": 9007199254740991, "minimum": 1, "type": "integer" }
                   },
                   "required": [
                     "customer_id",
@@ -59279,13 +59329,15 @@
                     "co_applicants",
                     "relationship_manager",
                     "must_change_password",
-                    "last_login_at"
+                    "last_login_at",
+                    "version"
                   ],
                   "type": "object"
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Default Response",
+            "headers": { "ETag": { "$ref": "#/components/headers/ETag" } }
           },
           "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" },

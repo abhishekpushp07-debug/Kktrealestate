@@ -163,7 +163,14 @@ describe("migrations", () => {
     expect(defs.get("flats_hold_until_idx")).toMatch(
       /INDEX .* \(status, hold_until\) WHERE \(status = 'HOLD'::flat_status\)/,
     );
-    expect(rows).toHaveLength(9);
+    // online file 0005 §7 (phase 7 integration): the storage sweep's rendition-key lookups
+    expect(defs.get("documents_thumb_key_idx")).toMatch(
+      /INDEX .* \(\(\(variants ->> 'thumb_key'::text\)\)\) WHERE \(\(variants ->> 'thumb_key'::text\) IS NOT NULL\)/,
+    );
+    expect(defs.get("documents_medium_key_idx")).toMatch(
+      /INDEX .* \(\(\(variants ->> 'medium_key'::text\)\)\) WHERE \(\(variants ->> 'medium_key'::text\) IS NOT NULL\)/,
+    );
+    expect(rows).toHaveLength(11);
   });
 
   it("creates the NULLS NOT DISTINCT constraint on payment_plan_assignments", async () => {

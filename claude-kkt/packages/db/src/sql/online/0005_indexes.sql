@@ -198,3 +198,17 @@ $$;
 ALTER TABLE "bookings" VALIDATE CONSTRAINT "bookings_ledger_epoch_chk";
 ALTER TABLE "bookings" VALIDATE CONSTRAINT "bookings_cancellation_amounts_nonneg_chk";
 ALTER TABLE "companies" VALIDATE CONSTRAINT "companies_slug_format_chk";
+
+-- 7. documents.storage_key (phase 7 integration, platform review): discardStagedUpload and both STORAGE_SWEEP queries look stored
+--    objects up by key (original and rendition keys); without these indexes each pending row cost a sequential scan of documents.
+CREATE INDEX CONCURRENTLY IF NOT EXISTS "documents_storage_key_idx" ON "documents" USING btree ("storage_key");
+CREATE INDEX CONCURRENTLY IF NOT EXISTS "documents_thumb_key_idx" ON "documents" USING btree ((variants ->> 'thumb_key'))
+  WHERE variants ->> 'thumb_key' IS NOT NULL;
+CREATE INDEX CONCURRENTLY IF NOT EXISTS "documents_medium_key_idx" ON "documents" USING btree ((variants ->> 'medium_key'))
+  WHERE variants ->> 'medium_key' IS NOT NULL;
+
+-- 8. SLA pause backfill (phase 7 integration, domain review): tickets already AWAITING_CUSTOMER when the pause semantics shipped had no
+--    sla_paused_at, so their clock kept running until their next status change. Their pause starts at their last update; idempotent
+--    (the API sets sla_paused_at whenever a ticket enters AWAITING_CUSTOMER, so a re-run finds nothing).
+UPDATE "service_requests" SET "sla_paused_at" = "updated_at"
+WHERE "status" = 'AWAITING_CUSTOMER' AND "sla_paused_at" IS NULL;

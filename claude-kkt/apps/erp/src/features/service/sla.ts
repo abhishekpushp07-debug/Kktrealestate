@@ -7,20 +7,26 @@ export type SlaState =
   | { kind: "none" }
   | { kind: "stopped"; breached: boolean }
   | { kind: "breached"; overdueMs: number }
-  | { kind: "due"; remainingMs: number; urgent: boolean };
+  | { kind: "due"; remainingMs: number; urgent: boolean }
+  /** AWAITING_CUSTOMER: the clock is paused (sla_paused_at); `remainingMs` was left when it paused (negative = already late then). */
+  | { kind: "paused"; remainingMs: number };
 
 /** Under two hours left counts as urgent. */
 export const SLA_URGENT_MS = 2 * 60 * 60 * 1000;
 
 /** Derives the SLA display state of a ticket at `now`. */
 export function slaState(
-  ticket: Pick<ServiceRequestRow, "sla_due_at" | "is_sla_breached" | "status">,
+  ticket: Pick<ServiceRequestRow, "sla_due_at" | "is_sla_breached" | "status"> &
+    Partial<Pick<ServiceRequestRow, "sla_paused_at">>,
   now: Date = new Date(),
 ): SlaState {
   if (SLA_STOPPED_STATUSES.includes(ticket.status)) return { kind: "stopped", breached: ticket.is_sla_breached };
   if (!ticket.sla_due_at) return { kind: "none" };
   const due = Date.parse(ticket.sla_due_at);
   if (Number.isNaN(due)) return { kind: "none" };
+  // a paused clock (AWAITING_CUSTOMER) never breaches: the server moves the deadline by the pause when the ticket resumes
+  const pausedAt = ticket.sla_paused_at ? Date.parse(ticket.sla_paused_at) : Number.NaN;
+  if (!ticket.is_sla_breached && !Number.isNaN(pausedAt)) return { kind: "paused", remainingMs: due - pausedAt };
   const remaining = due - now.getTime();
   if (ticket.is_sla_breached || remaining < 0) return { kind: "breached", overdueMs: Math.max(0, -remaining) };
   return { kind: "due", remainingMs: remaining, urgent: remaining <= SLA_URGENT_MS };
@@ -49,6 +55,12 @@ export function slaLabel(state: SlaState): { text: string; tone: "danger" | "war
       return { text: `Breached ${formatDuration(state.overdueMs)} ago`, tone: "danger" };
     case "due":
       return { text: `Due in ${formatDuration(state.remainingMs)}`, tone: state.urgent ? "warning" : "neutral" };
+    case "paused":
+      return {
+        text:
+          state.remainingMs > 0 ? `Paused · ${formatDuration(state.remainingMs)} left` : "Paused · awaiting customer",
+        tone: "neutral",
+      };
   }
 }
 

@@ -396,7 +396,7 @@ describe("customer-bound file links", () => {
       photo.medium_url,
     ];
     for (const link of links) {
-      expect(link).toMatch(/\/api\/v1\/portal\/files\/[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
+      expect(link).toMatch(/\/api\/v1\/portal\/files\/[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
       const decoded = verifyPortalFileToken(await tokenOf(link));
       expect(decoded, link).not.toBeNull();
       expect(decoded!.customerId).toBe(A);

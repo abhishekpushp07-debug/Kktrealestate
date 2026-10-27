@@ -22,6 +22,7 @@ export const documents = pgTable(
     mime: text("mime").notNull(),
     sizeBytes: bigint("size_bytes", { mode: "number" }).notNull(),
     sha256: text("sha256").notNull(),
+    /** Indexed by documents_storage_key_idx (src/sql/online/0005_indexes.sql §7; built CONCURRENTLY outside the drizzle journal). */
     storageKey: text("storage_key").notNull(),
     variants: jsonb("variants").$type<DocumentVariants>(),
     isSensitive: boolean("is_sensitive").notNull().default(false),

@@ -24,7 +24,7 @@ import {
   IdSchema,
   type ExportRow,
 } from "@kkt/contracts";
-import { exports as exportsTable, roles, storagePendingObjects, users, type DB } from "@kkt/db";
+import { exports as exportsTable, roles, storageDeletions, storagePendingObjects, users, type DB } from "@kkt/db";
 import { config } from "../../config.js";
 import { registerJob, type JobContext } from "../../jobs/index.js";
 import { enqueueJobWithin } from "../../jobs/queue.js";
@@ -219,7 +219,13 @@ export async function runCsvExport(
   const [row] = await ctx.db.select().from(exportsTable).where(eq(exportsTable.id, exportId)).limit(1);
   if (!row) return { skipped: true, reason: "export not found" };
   if (row.status === "DONE") return { skipped: true, reason: "already done" };
-  await ctx.db.update(exportsTable).set({ status: "RUNNING", error: null }).where(eq(exportsTable.id, row.id));
+  // only a live export runs: one withdrawn meanwhile (FAILED by a DPDP erasure) must never be rebuilt from data read after it
+  const [started] = await ctx.db
+    .update(exportsTable)
+    .set({ status: "RUNNING", error: null })
+    .where(and(eq(exportsTable.id, row.id), inArray(exportsTable.status, ["QUEUED", "RUNNING"])))
+    .returning({ id: exportsTable.id });
+  if (!started) return { skipped: true, reason: `export is ${row.status}` };
   try {
     const key = `exports/${row.companyId}/${row.id}.csv`;
     const store = storage();
@@ -314,8 +320,10 @@ export async function runCsvExport(
       return { rows, pages, resumed_at_page: resume.pages };
     })();
     const now = new Date();
-    await ctx.db.transaction(async (tx) => {
-      await tx
+    const published = await ctx.db.transaction(async (tx) => {
+      // DONE only while still RUNNING: an erasure that withdrew the export while it ran (its pages may hold the erased customer) wins,
+      // and the file just stored is queued for deletion instead of being published
+      const [done] = await tx
         .update(exportsTable)
         .set({
           status: "DONE",
@@ -325,7 +333,12 @@ export async function runCsvExport(
           expiresAt: new Date(now.getTime() + EXPORT_TTL_DAYS * 86_400_000),
           error: null,
         })
-        .where(eq(exportsTable.id, row.id));
+        .where(and(eq(exportsTable.id, row.id), eq(exportsTable.status, "RUNNING")))
+        .returning({ id: exportsTable.id });
+      if (!done) {
+        await tx.insert(storageDeletions).values({ key, companyId: row.companyId, reason: "EXPORT_WITHDRAWN" });
+        return false;
+      }
       await notify(tx, {
         companyId: row.companyId,
         recipients: [{ type: "STAFF", id: row.userId }],
@@ -336,7 +349,12 @@ export async function runCsvExport(
         entityId: row.id,
         link: "/exports",
       });
+      return true;
     });
+    if (!published) {
+      await store.remove(key).catch(() => undefined); // best effort now; the storage_deletions row retries it (STORAGE_SWEEP)
+      return { export_id: row.id, withdrawn: true, rows: counts.rows };
+    }
     return {
       export_id: row.id,
       rows: counts.rows,
@@ -352,7 +370,7 @@ export async function runCsvExport(
         error: (err as Error).message.slice(0, 1000),
         ...(final ? { finishedAt: new Date(), expiresAt: new Date(Date.now() + EXPORT_TTL_DAYS * 86_400_000) } : {}),
       })
-      .where(eq(exportsTable.id, row.id));
+      .where(and(eq(exportsTable.id, row.id), eq(exportsTable.status, "RUNNING"))); // never revives a withdrawn export
     throw err;
   }
 }

@@ -246,11 +246,14 @@ export function registerMoneyJobs(app: FastifyInstance | null): void {
   registerJob("NIGHTLY_INTEGRITY", async ({ db }) => nightlyIntegrityJob(db));
   registerJob("OVERDUE_NOTIFICATIONS", async ({ db }) => overdueNotifications(db, app));
   // admin job (POST /admin/jobs/LEDGER_REBUILD/run, data: {company_id?, dry_run?, batch_size?}); never scheduled
-  registerJob("LEDGER_REBUILD", async ({ db, data }) => ({
+  registerJob("LEDGER_REBUILD", async ({ db, data, signal, checkpoint, saveCheckpoint }) => ({
     ...(await rebuildAllLedgers(db, {
       companyId: typeof data["company_id"] === "string" ? data["company_id"] : undefined,
       dryRun: data["dry_run"] === true,
       ...(typeof data["batch_size"] === "number" ? { batchSize: data["batch_size"] } : {}),
+      signal,
+      checkpoint,
+      saveCheckpoint,
     })),
   }));
 }

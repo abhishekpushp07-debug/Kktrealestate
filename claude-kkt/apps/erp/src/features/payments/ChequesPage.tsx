@@ -20,6 +20,7 @@ import { useTabParam } from "@/features/inventory/components";
 import { useProjectOptions } from "@/features/shared/options";
 import { CHEQUES_PATH, useCheques } from "./api";
 import { PaymentActionButtons, PaymentActionDialogs, type PaymentActionState } from "./PaymentActions";
+import { totalIsEstimate } from "@/lib/api";
 
 const TABS = ["PENDING", "BOUNCED"] as const;
 type Tab = (typeof TABS)[number];
@@ -264,6 +265,7 @@ export default function ChequesPage() {
           page: list.page,
           pageSize: list.pageSize,
           total: query.data?.total ?? 0,
+          totalIsEstimate: totalIsEstimate(query.data),
           onPageChange: list.setPage,
           onPageSizeChange: list.setPageSize,
         }}

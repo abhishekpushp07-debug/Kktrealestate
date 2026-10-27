@@ -10,7 +10,7 @@
  * Generated PDFs have no document row: they are rendered when the customer asks for the link, written to object storage under a temporary
  * key, indexed in Redis for 15 minutes and swept when expired (opportunistically on every new link and as the PORTAL_FILE_CLEANUP job).
  */
-import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { Readable } from "node:stream";
 import { and, eq } from "drizzle-orm";
 import type { DocumentVariant, JobName, PortalPdfLinkResponse } from "@kkt/contracts";
@@ -18,6 +18,7 @@ import { documents, type Executor } from "@kkt/db";
 import type { Redis } from "ioredis";
 import { config } from "../../config.js";
 import { registerJob } from "../../jobs/index.js";
+import { signLinkBody, verifyLinkBody } from "../../lib/crypto.js";
 import {
   SIGNED_LINK_TTL_SECONDS,
   documentStorage as storage,
@@ -41,8 +42,12 @@ const VARIANT_CODES: readonly DocumentVariant[] = ["original", "thumb", "medium"
 /** kind (1) ‖ customer id (16) ‖ ref id (16) ‖ variant (1) ‖ expiry seconds (48-bit). */
 const TOKEN_BODY_BYTES = 1 + 16 + 16 + 1 + 6;
 const TOKEN_SIG_BYTES = 16; // HMAC-SHA256 truncated to 128 bits
-/** Key for portal file tokens, derived from the JWT secret with its own context (a token can never pass as another signed payload). */
-const tokenKey = createHash("sha256").update("kkt-portal-files-v2").update(":").update(config.JWT_SECRET).digest();
+/**
+ * Key family of portal file tokens on the LINK_SIGNING_KEYS ring (contract C9): `<kid>.<body>.<sig>`, signed by the active key and
+ * verified by kid, so a key rotation keeps issued links valid while their key stays configured (tokens live 15 minutes). The label
+ * separates them from every other signed link (a token can never pass as another signed payload).
+ */
+export const PORTAL_FILE_LINK_LABEL = "kkt-portal-files-v3";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Decoded, verified portal file token. */
@@ -85,8 +90,7 @@ function encodeToken(t: PortalFileToken): string {
   uuidBytes(t.refId).copy(body, 17);
   body[33] = VARIANT_CODES.indexOf(t.variant);
   body.writeUIntBE(Math.max(0, Math.min(t.exp, 2 ** 48 - 1)), 34, 6);
-  const sig = createHmac("sha256", tokenKey).update(body).digest().subarray(0, TOKEN_SIG_BYTES);
-  return `${body.toString("base64url")}.${sig.toString("base64url")}`;
+  return signLinkBody(PORTAL_FILE_LINK_LABEL, body, TOKEN_SIG_BYTES);
 }
 
 /** Signs a portal file token for a customer (exported for tests and the other portal screens). */
@@ -103,14 +107,13 @@ export function signPortalFile(
 }
 
 /**
- * Verifies a portal file token (canonical re-encoding compared in constant time); null when malformed, forged or expired.
- * Only the canonical spelling verifies: no base64 padding-bit twiddling, no signature truncation.
+ * Verifies a portal file token (ring key by kid, canonical encoding, constant-time comparison: lib/crypto.ts verifyLinkBody); null when
+ * malformed, forged, signed by a key no longer in the ring, or expired.
  */
 export function verifyPortalFileToken(token: string): PortalFileToken | null {
-  const dot = token.lastIndexOf(".");
-  if (dot <= 0 || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token)) return null;
-  const body = Buffer.from(token.slice(0, dot), "base64url");
-  if (body.length !== TOKEN_BODY_BYTES) return null;
+  if (token.split(".").length !== 3) return null; // ring tokens only (the pre-ring compact form expired with its 15 minutes)
+  const body = verifyLinkBody(PORTAL_FILE_LINK_LABEL, token, TOKEN_SIG_BYTES);
+  if (!body || body.length !== TOKEN_BODY_BYTES) return null;
   const kind = KIND_CODES[body[0]!];
   const variant = VARIANT_CODES[body[33]!];
   if (!kind || !variant) return null;
@@ -121,9 +124,6 @@ export function verifyPortalFileToken(token: string): PortalFileToken | null {
     variant,
     exp: body.readUIntBE(34, 6),
   };
-  const expected = Buffer.from(encodeToken(decoded));
-  const given = Buffer.from(token);
-  if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
   if (decoded.exp < Math.floor(Date.now() / 1000)) return null;
   return decoded;
 }

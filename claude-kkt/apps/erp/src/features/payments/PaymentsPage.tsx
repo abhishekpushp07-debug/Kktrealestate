@@ -18,6 +18,7 @@ import { useProjectOptions } from "@/features/shared/options";
 import { PAYMENTS_PATH } from "./api";
 import { PaymentDialog } from "./PaymentDialog";
 import { PaymentsTable } from "./PaymentsTable";
+import { totalIsEstimate } from "@/lib/api";
 
 const FILTERS = ["project_id", "status", "mode_code", "against", "from", "to"] as const;
 
@@ -128,6 +129,7 @@ export default function PaymentsPage() {
           page: list.page,
           pageSize: list.pageSize,
           total: query.data?.total ?? 0,
+          totalIsEstimate: totalIsEstimate(query.data),
           onPageChange: list.setPage,
           onPageSizeChange: list.setPageSize,
         }}

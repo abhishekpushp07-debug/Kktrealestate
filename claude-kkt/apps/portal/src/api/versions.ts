@@ -7,7 +7,7 @@ export const VERSION_CONFLICT_COPY =
   "Your details were changed somewhere else (another device or our team) while you were editing. We have loaded the latest " +
   "version — please check it and save again.";
 
-/** The resource's numeric `version`, when the API sent one (forward compatible: the profile contract does not carry it yet). */
+/** The resource's numeric `version` (PortalProfileResponse carries it since phase 7; tolerant of an older API without it). */
 export function profileVersion(resource: object): number | undefined {
   const v = (resource as { version?: unknown }).version;
   return typeof v === "number" && Number.isInteger(v) && v > 0 ? v : undefined;

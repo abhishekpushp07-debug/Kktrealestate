@@ -194,6 +194,8 @@ export interface DocumentVariants {
   medium_key?: string | null;
   width?: number | null;
   height?: number | null;
+  /** Rendition state recorded by the DOCUMENT_RENDITIONS job (apps/api documents/renditions.ts); absent on legacy rows. */
+  renditions?: "PENDING" | "READY" | "FAILED" | null;
 }
 
 export interface Brand {

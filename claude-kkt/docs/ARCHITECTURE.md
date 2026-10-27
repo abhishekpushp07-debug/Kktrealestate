@@ -137,9 +137,15 @@ Each phase ends with its tests green before the next starts.
 
 - **Sessions (contract C1).** The ERP and the portal web build keep the access token in memory only; the refresh token is the HttpOnly,
   SameSite=Strict cookie the API sets when login / refresh / logout carry `X-KKT-Session: cookie` (`kkt_rt`, `kkt_prt`). On load the
-  session is restored by a cookie refresh; browser storage holds only a "signed in on this browser" flag. Refreshes are single-flight
-  and serialised across tabs with a Web Lock (a rotated token is single-use). The native portal keeps the refresh token in
-  SecureStore and uses body mode. `apps/erp/src/lib/api.ts`, `apps/portal/src/api/session.ts`.
+  session is restored by a cookie refresh; no token is stored in the browser. Refreshes are single-flight and serialised across tabs
+  with a Web Lock (a rotated token is single-use). A refresh answered 409 / 429 / 5xx (or a network error) keeps the session; only
+  400 / 401 / 403 / 404 sign out. A refresh that returns another user's token (the cookie is shared by the tabs of the origin) is not
+  used for the pending call: the tab reloads its user ("user-changed"). The native portal keeps the refresh token in SecureStore and
+  uses body mode. The API grants credentialed CORS to the ERP / portal / website origins only. `apps/erp/src/lib/api.ts`,
+  `apps/portal/src/api/session.ts`.
+- **Browser storage.** The ERP keeps a "signed in on this browser" flag, an owner id (`kkt.erp.owner`), layout preferences, navigation
+  recents and the booking wizard's local draft — all wiped when another user signs in and on sign-out; customer / booking search hits
+  are never stored. The portal web build keeps the flag and its persisted allow-list below.
 - **Nothing sensitive at rest in the browser.** The portal persists only notices, request categories and construction progress
   (`apps/portal/src/api/persistPolicy.ts`); booking, payment, demand, ledger, profile/KYC, document and notification data stay in
   memory. The web build keeps no user snapshot.
@@ -147,12 +153,15 @@ Each phase ends with its tests green before the next starts.
   first then promote: ₹99,96,000 → "₹1 Cr"), used by the ERP, the portal and the website; `packages/domain` runs the same algorithm for
   receipts and PDFs, and a golden table (`INR_GOLDEN_CASES`) is asserted against all of them.
 - **Ledger (contract C7).** The ERP shows dues from the ledger's server `summary` (or `epoch_totals` for an older epoch), pages through
-  ledger, demands and payments, and links to the rebuild history; the portal reads every page of its ledger.
+  ledger, demands and payments, and links to the rebuild history; the portal ledger (current epoch only) carries the same C7 `summary`,
+  which the portal shows instead of a row.
 - **Unsaved edits.** The ERP runs on a data router (`createBrowserRouter`); one `NavigationGuardHost` (`useBlocker` + `beforeunload`)
   reads a registry fed by `useUnsavedChangesGuard(dirty)`; every `SheetContent` / `DialogContent` asks before Esc, an outside click or
   the close button throws a dirty form away (a sheet counts only while open; a successful save resets its "any edit" tracking).
 - **Versions (contract C6).** ERP calls to version-required endpoints send `If-Match: "v<version>"` (or the body version) from the loaded
-  row; 409 `VERSION_CONFLICT` opens the reload prompt. The portal sends its profile's version when the API provides one.
+  row; 409 `VERSION_CONFLICT` opens the reload prompt. The portal sends its profile's `version` (PortalProfileResponse) as If-Match.
+  Error codes with details (BOOKING_CLOSED, FLAT_HAS_BOOKING_HISTORY, IN_USE, INVALID_AMOUNT, IDEMPOTENT_OUTCOME_UNKNOWN,
+  INVALID_CURSOR) read as plain sentences (`apps/erp/src/lib/errorMessages.ts`); estimated list totals show as "about n".
 - **Errors (contract C2).** Root error boundaries (ERP and portal), the ERP route error page and window `error` /
   `unhandledrejection` report to `POST /api/v1/client-errors` (deduped, sampled, capped, no query strings). A chunk that vanished with a
   deploy (`vite:preloadError`) reloads the ERP once. React Query never retries a 4xx and waits for `Retry-After` on 429 / 503.

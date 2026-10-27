@@ -36,7 +36,7 @@ export const serviceRequests = pgTable(
     slaBreachedAt: timestamp("sla_breached_at", { withTimezone: true }),
     /** Set while the SLA clock is paused (AWAITING_CUSTOMER); NULL while it runs (migration 0005). */
     slaPausedAt: timestamp("sla_paused_at", { withTimezone: true }),
-    /** Seconds the SLA clock has been paused in total; the effective deadline is sla_due_at + this. */
+    /** Seconds the SLA clock has been paused in the current SLA window; each pause is already added to sla_due_at on resume. */
     slaPausedSeconds: integer("sla_paused_seconds").notNull().default(0),
     resolvedAt: timestamp("resolved_at", { withTimezone: true }),
     closedAt: timestamp("closed_at", { withTimezone: true }),

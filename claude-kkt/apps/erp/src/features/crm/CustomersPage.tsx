@@ -11,6 +11,7 @@ import { useSalesUserOptions } from "@/features/inventory/api";
 import { BulkPortalEnableDialog } from "./BulkPortalEnableDialog";
 import { CustomerFormSheet } from "./CustomerFormSheet";
 import { CUSTOMERS_PATH } from "./api";
+import { totalIsEstimate } from "@/lib/api";
 
 const CUSTOMER_FILTERS = ["kyc_status", "relationship_manager_id", "tag", "portal_enabled"] as const;
 
@@ -224,6 +225,7 @@ export default function CustomersPage() {
           page: list.page,
           pageSize: list.pageSize,
           total,
+          totalIsEstimate: totalIsEstimate(query.data),
           onPageChange: list.setPage,
           onPageSizeChange: list.setPageSize,
         }}

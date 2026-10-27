@@ -6,6 +6,15 @@ Stack under test: API `apps/api` on `:4000` with the demo seed on its own databa
 
 Runner: [`docs/qa/erp/browser-qa.cjs`](erp/browser-qa.cjs) (`ERP_URL`, `API_URL`, `OUT_DIR`, `REPORT`, `WIPE=1`, `ONLY=login,roles,masters,inventory,crm,money,misc,hardening,smoke`). On every page it asserts: zero console errors / page errors, zero failed or ≥ 400 API requests (apart from the deliberate 4xx probes listed below), `document.documentElement.scrollWidth <= window.innerWidth`, and at 390 px that every **primary** target is ≥ 44 px tall (action buttons, tabs, sidebar / drawer / Back links; switches toggle through their 44 px label row and desktop-only breadcrumb crumbs count as secondary). It records every sub-44 px element, takes one palette-quantised viewport screenshot per listed page and width (`docs/qa/erp/<page>-<width>.png`, 40 files, 13–167 KB each, 2.1 MB in all), and verifies every flow through the API afterwards (status, ledger rows, audit rows, stage records, files).
 
+## Phase 7 integration 2026-10-27
+
+Stack: API from source on `:4790` (fresh demo seed in `kkt_p7_i`, Redis db 20, `API_PUBLIC_URL=http://localhost:4790`, jobs in the
+API), ERP built with `VITE_API_URL=""` and served by `vite preview --port 5790` with `KKT_API_PROXY_TARGET=http://localhost:4790`
+(same origin, C1 cookies). Runner: `ERP_URL=http://localhost:5790 API_URL=http://localhost:4790 OUT_DIR=<scratch> node
+docs/qa/erp/browser-qa.cjs` (full walk, screenshots outside the repo). Changed under test: credentialed CORS, new error copy, estimated
+totals, paused SLA badge, `flats_preserved` toast. **Result: 585 page checks, 217/217 assertions, 40 screenshots, 0 defects; axe 534
+scans (353 at 1440 px, 181 at 390 px), 0 violations.**
+
 ## Phase 7 frontend review 2026-10-27
 
 Stack: API (`tsx src/server.ts`) on `:4730` with a fresh demo seed in `kkt_p7_rfrontend` (Redis db 24, `API_PUBLIC_URL=http://localhost:4730`

@@ -307,6 +307,13 @@ export interface ListEnvelope<T> {
   page: number;
   page_size: number;
   next_cursor: string | null;
+  /** List facts (platform track): `total_is_estimate` when a large filtered total is the planner's estimate. */
+  meta?: { total_is_estimate: boolean; total_included: boolean };
+}
+
+/** True when a list's total is an estimate (show "about n"; the last page number is approximate). */
+export function totalIsEstimate(list: { meta?: { total_is_estimate?: boolean } } | undefined | null): boolean {
+  return list?.meta?.total_is_estimate === true;
 }
 
 /* ------------------------------------------------------------------ */

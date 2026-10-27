@@ -66,7 +66,8 @@ export default function BlockDetailPage() {
         { version: row.version },
       ),
     successMessage: (result) =>
-      `${formatNumber(result.flats_created)} flats generated across ${formatNumber(result.floors_with_units)} floors`,
+      `${formatNumber(result.flats_created)} flats generated across ${formatNumber(result.floors_with_units)} floors` +
+      (result.flats_preserved ? `; ${formatNumber(result.flats_preserved)} with booking history kept in place` : ""),
     invalidate: [[BLOCKS_PATH], [FLATS_PATH], [PROJECTS_PATH]],
     entityLabel: "This block",
   });

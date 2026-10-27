@@ -27,6 +27,7 @@ import {
   type PortalDemandRow,
   type PortalDocumentRow,
   type PortalHomeResponse,
+  type LedgerTotals,
   type PortalLedgerRow,
   type PortalMyFlatResponse,
   type PortalPdfLinkResponse,
@@ -64,7 +65,7 @@ import { route } from "../../lib/routes.js";
 import type { PortalContext } from "../../lib/scope.js";
 import { blockStageTimeline, constructionPercent, deriveProgress } from "../construction/index.js";
 import { documentsSharedWithCustomer, loadRows, publicMediaUrl, type DocumentRecord } from "../documents/index.js";
-import { nonVoidDemands, scheduleRows } from "../money/index.js";
+import { currentLedgerTotals, epochRows, loadBookingSummary, nonVoidDemands, scheduleRows } from "../money/index.js";
 import { allotmentLetterPdf, customerStatementPdf, demandLetterPdf, receiptPdf } from "../reports/index.js";
 import { customerProjectIdsSubquery } from "../service/index.js";
 import {
@@ -478,11 +479,15 @@ export async function portalLedger(
   customer: PortalContext,
   bookingId: string,
   q: z.infer<typeof PortalListQuerySchema>,
-): Promise<ListResult<PortalLedgerRow>> {
+): Promise<ListResult<PortalLedgerRow> & { summary: LedgerTotals }> {
   const owned = await loadOwnedBooking(db, customer, bookingId);
+  // C7: the summary runs alongside the page; handled when awaited, never an unhandled rejection if the page query fails first
+  const summary = loadBookingSummary(db, owned.booking);
+  summary.catch(() => undefined);
   const result = await paginate<LedgerEntryRecord>(db, {
     table: ledgerEntries,
-    where: eq(ledgerEntries.bookingId, owned.booking.id),
+    // current epoch only: after a restatement the superseded rows (seq restarts at 1 per epoch) must not interleave (contract C7)
+    where: epochRows(owned.booking.id, owned.booking.ledgerEpoch),
     sort: {
       allowed: { seq: ledgerEntries.seq, entry_date: ledgerEntries.entryDate },
       default: "seq",
@@ -493,7 +498,11 @@ export async function portalLedger(
     cursor: q.cursor,
     limit: q.limit,
   });
-  return { ...result, items: result.items.map(toPortalLedgerRow) };
+  return {
+    ...result,
+    items: result.items.map(toPortalLedgerRow),
+    summary: currentLedgerTotals(owned.booking, await summary),
+  };
 }
 
 interface PaymentSel {

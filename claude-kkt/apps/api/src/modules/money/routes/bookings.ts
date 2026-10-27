@@ -71,6 +71,7 @@ import {
   bookingJoins,
   demandJoins,
   loadBookingSelect,
+  currentLedgerTotals,
   loadBookingSummary,
   paymentJoins,
   scheduleRows,
@@ -449,15 +450,7 @@ export function registerBookingRoutes(app: FastifyInstance): void {
         epoch,
         current_epoch: current,
         // C7 totals of the current book, flat on the summary: clients use these, never the last row of a page
-        summary: {
-          ...sum,
-          cash_due_paise: b.cashOrderRaisedPaise - b.cashPaidPaise,
-          account_due_paise: b.accountOrderRaisedPaise - b.accountPaidPaise,
-          total_due_paise: sum.total_due_paise,
-          other_charges_due_paise: sum.other_charges_due_paise,
-          cash_paid_paise: b.cashPaidPaise,
-          account_paid_paise: b.accountPaidPaise,
-        },
+        summary: { ...sum, ...currentLedgerTotals(b, sum) },
         epoch_totals: ledgerTotals(last),
       };
     },

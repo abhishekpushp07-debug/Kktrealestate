@@ -780,6 +780,23 @@ describe("admin · recompute / reconcile", () => {
     expect(audits.length).toBeGreaterThanOrEqual(2);
     expect(audits.at(-1)!.after).toMatchObject({ bookings_rebuilt: 1, mismatches_fixed: 2 });
   });
+
+  it("a recompute that restates a ledger records the admin and reason ADMIN_RECOMPUTE in ledger_rebuilds (phase 7 integration)", async () => {
+    const [b] = await t.app.sql<{ block_id: string; customer_id: string; ledger_epoch: number }[]>`
+      select block_id, customer_id, ledger_epoch from bookings where id = ${bookingId}`;
+    // a demand inserted behind the API never reached the ledger, so the canonical book differs and is restated
+    await t.app
+      .sql`insert into demands (company_id, booking_id, project_id, block_id, customer_id, demand_number, installment_seq,
+      installment_name, trigger_type, percent, cumulative_percent, cash_demand_paise, account_demand_paise, total_demand_paise, demand_date, due_date)
+      values (${t.companyId}, ${bookingId}, ${projectId}, ${b!.block_id}, ${b!.customer_id}, 'DM-RCP/0001', 1, 'On booking', 'ON_BOOKING',
+      10, 10, 40000000, 25000000, 65000000, current_date, current_date + 15)`;
+    const re = await t.request("POST", "/api/v1/admin/recompute", { token: ops, body: { booking_id: bookingId } });
+    expect(re.status, re.text).toBe(200);
+    const [opsUser] = await t.app.sql<{ id: string }[]>`select id from users where email = 'ops@sgb.in'`;
+    const rebuilds = await t.app.sql<{ reason: string; actor_id: string | null; to_epoch: number }[]>`
+      select reason, actor_id, to_epoch from ledger_rebuilds where booking_id = ${bookingId} order by at desc`;
+    expect(rebuilds[0]).toEqual({ reason: "ADMIN_RECOMPUTE", actor_id: opsUser!.id, to_epoch: b!.ledger_epoch + 1 });
+  });
 });
 
 describe("admin · jobs", () => {

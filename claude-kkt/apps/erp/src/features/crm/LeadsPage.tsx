@@ -26,7 +26,7 @@ import {
   TabsTrigger,
   Toolbar,
 } from "@/components/ui";
-import { api, type QueryParams } from "@/lib/api";
+import { api, type QueryParams, totalIsEstimate } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { formatDateTime, formatNumber, formatPhone, formatRelative } from "@/lib/format";
 import { useList, useListParams, useMutationWithToast } from "@/lib/queries";
@@ -399,6 +399,7 @@ function LeadsTable({ list, onOpen }: { list: ReturnType<typeof useListParams>; 
         page: list.page,
         pageSize: list.pageSize,
         total,
+        totalIsEstimate: totalIsEstimate(query.data),
         onPageChange: list.setPage,
         onPageSizeChange: list.setPageSize,
       }}
