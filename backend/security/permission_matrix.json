@@ -11,6 +11,9 @@
  "DELETE /api/documents/{doc_id}": [
   "<authenticated>"
  ],
+ "DELETE /api/files/{file_id}": [
+  "construction.photo.upload"
+ ],
  "DELETE /api/master/milestone-templates/{rest:path}": [
   "masters.construction_stage.view"
  ],
@@ -245,6 +248,18 @@
  ],
  "GET /api/exports/{export_id}/download": [
   "<public>"
+ ],
+ "GET /api/files": [
+  "<authenticated>"
+ ],
+ "GET /api/files/variants/{name}": [
+  "<public>"
+ ],
+ "GET /api/files/{file_id}/download": [
+  "<public>"
+ ],
+ "GET /api/files/{file_id}/url": [
+  "<authenticated>"
  ],
  "GET /api/flats": [
   "masters.project.view"
@@ -736,6 +751,9 @@
  "GET /api/stage-plans/{plan_id}/where-used": [
   "masters.stage_plan.view"
  ],
+ "GET /api/uploads/{upload_id}": [
+  "<authenticated>"
+ ],
  "GET /api/users": [
   "admin.user.view"
  ],
@@ -775,6 +793,9 @@
  ],
  "PATCH /api/documents/{doc_id}/share": [
   "sales.customer.edit"
+ ],
+ "PATCH /api/files/{file_id}": [
+  "construction.photo.upload"
  ],
  "PATCH /api/flats/{flat_id}": [
   "masters.flat.edit"
@@ -1380,6 +1401,12 @@
  "POST /api/stage-plans/{plan_id}/copy": [
   "masters.stage_plan.create"
  ],
+ "POST /api/uploads/init": [
+  "<authenticated>"
+ ],
+ "POST /api/uploads/{upload_id}/complete": [
+  "<authenticated>"
+ ],
  "POST /api/users": [
   "admin.user.create"
  ],
@@ -1391,5 +1418,8 @@
  ],
  "PUT /api/projects/{project_id}/setup/{section}": [
   "masters.project.edit"
+ ],
+ "PUT /api/uploads/{upload_id}/parts/{n}": [
+  "<authenticated>"
  ]
 }

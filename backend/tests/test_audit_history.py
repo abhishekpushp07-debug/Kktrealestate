@@ -14,7 +14,7 @@ db = MongoClient(os.environ["MONGO_URL"])[os.environ["DB_NAME"]]
 ROUTERS = pathlib.Path(__file__).resolve().parents[1] / "routers"
 # Mutation routes that do not change a business record: sessions/tokens, exports/previews, searches, read-model refreshes, idempotent ops.
 EXEMPT_FILES = {"auth.py", "public.py", "ops.py", "search.py", "pdfs.py", "propagation.py", "bootstrap.py", "dashboard.py", "dashboard_widgets.py", "home.py", "reports.py", "portal.py"}
-EXEMPT_ROUTES = {"admin.py": {"reseed", "reseed_status", "recompute_counters", "reconcile", "replay", "refresh_read_models", "rebuild", "story_marker"}, "bookings.py": {"recompute", "cancellation_preview", "preview_cancel", "preview_transfer"}, "notifications.py": {"mark_read", "mark_all_read", "read_all"},
+EXEMPT_ROUTES = {"files.py": {"upload_init", "upload_part"}, "admin.py": {"reseed", "reseed_status", "recompute_counters", "reconcile", "replay", "refresh_read_models", "rebuild", "story_marker"}, "bookings.py": {"recompute", "cancellation_preview", "preview_cancel", "preview_transfer"}, "notifications.py": {"mark_read", "mark_all_read", "read_all"},
                  "imports.py": {"preview", "preview_import"}, "documents.py": {"download", "presign"}, "support.py": set()}
 
 

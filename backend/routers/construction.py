@@ -94,7 +94,7 @@ async def block_construction(block_id: str, user: dict = Depends(require("constr
         a = agg.get(s["stage_id"], {})
         s["demands"] = {"count": a.get("n", 0), "total_paise": a.get("total_paise", 0), "paid_paise": a.get("paid_paise", 0)}
     cur = next((s for s in reversed(stages) if s["status"] == "Completed"), None)
-    return present_money({"block": {k: block.get(k) for k in ("id", "name", "code", "version")}, "construction_percent": round(done * 100 / len(stages)) if stages else 0, "stages": stages, "current_stage": cur, "next_stage": next((s for s in stages if s["status"] == "Pending"), None),
+    return present_money({"block": {k: block.get(k) for k in ("id", "name", "code", "version", "project_id")}, "construction_percent": round(done * 100 / len(stages)) if stages else 0, "stages": stages, "current_stage": cur, "next_stage": next((s for s in stages if s["status"] == "Pending"), None),
                           "active_bookings": await db.bookings.count_documents({"block_id": block_id, "status": "Active"})})
 
 
