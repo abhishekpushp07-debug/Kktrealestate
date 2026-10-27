@@ -19369,19 +19369,33 @@
      {
       "in": "query",
       "name": "exp",
-      "required": true,
+      "required": false,
       "schema": {
-       "title": "Exp",
-       "type": "integer"
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Exp"
       }
      },
      {
       "in": "query",
       "name": "sig",
-      "required": true,
+      "required": false,
       "schema": {
-       "title": "Sig",
-       "type": "string"
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Sig"
       }
      }
     ],
