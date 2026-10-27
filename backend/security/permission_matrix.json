@@ -282,6 +282,9 @@
  "GET /api/files/variants/{name}": [
   "<public>"
  ],
+ "GET /api/files/{file_id}": [
+  "<authenticated>"
+ ],
  "GET /api/files/{file_id}/download": [
   "<public>"
  ],
@@ -958,7 +961,8 @@
   "admin.role.edit"
  ],
  "PATCH /api/settings/company": [
-  "admin.settings.edit"
+  "admin.settings.edit",
+  "masters.company.edit"
  ],
  "PATCH /api/site-visits/{visit_id}": [
   "sales.site_visit.edit"
@@ -1152,6 +1156,9 @@
  ],
  "POST /api/docgen/{doc_id}/share": [
   "documents.document.share"
+ ],
+ "POST /api/docgen/{doc_id}/void": [
+  "documents.document.generate"
  ],
  "POST /api/documents": [
   "<authenticated>"

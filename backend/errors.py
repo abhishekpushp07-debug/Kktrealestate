@@ -8,7 +8,7 @@ ERRORS: dict[str, tuple[int, ...]] = {
     "AREA_HIERARCHY": (422,),
     "BAD_PARAM": (400,),
     "BELOW_PAID": (409,),
-    "BOOKING_NOT_ACTIVE": (409,),
+    "BOOKING_NOT_ACTIVE": (409, 422),
     "BUCKET_EXCEEDS_AGREED": (409,),
     "CANNOT_REOPEN": (409,),
     "CASH_INSUFFICIENT": (422,),

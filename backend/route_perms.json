@@ -229,6 +229,9 @@
   "masters.catalogue.view": [
    "masters.catalogue.view"
   ],
+  "masters.company.edit": [
+   "admin.settings.edit"
+  ],
   "masters.construction_stage.edit": [
    "masters.construction_stage.edit"
   ],
@@ -1555,6 +1558,15 @@
     "documents.document.share"
    ]
   },
+  "docgen:POST /{doc_id}/void": {
+   "codes": [
+    "documents.document.generate"
+   ],
+   "fn": "void_document",
+   "legacy": [
+    "documents.document.generate"
+   ]
+  },
   "documents:DELETE /{doc_id}": {
    "codes": [
     "sales.customer.delete"
@@ -2811,7 +2823,8 @@
    ],
    "fn": "update_company",
    "legacy": [
-    "admin.settings.edit"
+    "admin.settings.edit",
+    "masters.company.edit"
    ]
   },
   "support:DELETE /notices/{notice_id}": {
