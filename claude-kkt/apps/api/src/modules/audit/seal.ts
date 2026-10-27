@@ -10,8 +10,9 @@
  * mismatch. Both tables are append-only (triggers) and the application role cannot UPDATE/DELETE them (0002_privileges.sql); the seal
  * hashes can additionally be shipped off-site (e.g. the backup manifest) for WORM-style evidence.
  *
- * Rows younger than the lag (default 10 minutes) are left for the next run: a transaction that wrote an audit row at T may commit after a
- * later row, and sealing past it would leave it outside every seal.
+ * Rows younger than the lag (default 10 minutes) — and rows not older than the start of the oldest transaction still open — are left for
+ * the next run: a transaction that wrote an audit row at T may commit after a later row, and sealing past it would leave it outside every
+ * seal.
  */
 import { createHash } from "node:crypto";
 import { sql } from "drizzle-orm";
@@ -32,6 +33,17 @@ const ROW_TEXT = sql.raw(`concat_ws('|',
   coalesce(a.ip, '∅'), coalesce(a.request_id, '∅'),
   to_char(a.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'))`);
 const ROW_DIGEST = sql`encode(sha256(convert_to(${ROW_TEXT}, 'UTF8')), 'hex')`;
+
+/**
+ * Start of the oldest transaction still open in this database (another client session), or +infinity. An audit row's created_at is its
+ * transaction's start, so a transaction open longer than the lag (a long job, a bulk import) can still commit rows dated before rows that
+ * are already old enough: sealing past its start would leave those rows outside every seal, and verify would then report the seal's row
+ * count as tampered (a false alarm). Sessions of other roles show no xact_start to a non-superuser, which is fine: audit rows are written
+ * by the application role, whose sessions are visible.
+ */
+const OLDEST_OPEN_TRANSACTION = sql.raw(`coalesce((select min(s.xact_start) from pg_stat_activity s
+      where s.datname = current_database() and s.pid <> pg_backend_pid() and s.backend_type = 'client backend'
+        and s.xact_start is not null), 'infinity'::timestamptz)`);
 
 /** Chain step: SHA-256 hex of the previous hash and the row digests. */
 export function chainHash(prevHash: string | null, digests: readonly string[]): string {
@@ -79,6 +91,7 @@ async function nextDigests(
     select a.id::text as id, ${ROW_DIGEST} as digest from audit_logs a
     where a.company_id = ${companyId}::uuid ${after}
       and a.created_at < now() - make_interval(secs => ${lagSeconds})
+      and a.created_at < ${OLDEST_OPEN_TRANSACTION}
     order by a.created_at, a.id limit ${limit}`);
 }
 

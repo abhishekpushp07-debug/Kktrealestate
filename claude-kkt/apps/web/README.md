@@ -35,7 +35,10 @@ CMS pages (about, gallery, blog posts, legal and other CMS pages, sitemap, robot
 API calls `POST /api/revalidate` after a CMS or project-website write (API env `WEB_REVALIDATE_URL` + `WEB_REVALIDATE_TOKEN`; the
 route purges the `kkt-public` Data Cache tag and re-renders the site on its next request). Detail routes (`/projects/[slug]`,
 `/blog/[slug]`, `/[slug]` CMS pages) are not prerendered at build (`generateStaticParams` returns `[]`): each is rendered on its first
-request, then cached. `/projects` (filters) and `/blog` (`?page`) read the URL query and `/visit/[token]` is per visitor: they render
+request, then cached — but only for a slug the cached sitemap (`GET /public/sitemap`, purged with the rest on every CMS write)
+lists: a made-up slug is a 404 without an API call or a cache entry (`isKnownPath`), so random URLs can neither grow the Data Cache
+(never evicted on disk) nor spend the web server's API rate-limit budget; without a sitemap (API down) the detail is asked for
+directly. `/projects` (filters) and `/blog` (`?page`) read the URL query and `/visit/[token]` is per visitor: they render
 per request on top of the same cached data. Every server read goes through `lib/api.ts` → `unstable_cache` (tag `kkt-public`): a 404 is
 cached like any answer (an unpublished project or post disappears instead of the last good copy being served), a 5xx / network failure
 is never cached and is retried once with a 10 s lifetime, which also shortens the page's own revalidation — so `next build` needs no
@@ -46,7 +49,9 @@ API (pages rendered without one regenerate 10 s after the first request) and a b
 ISR HTML is built once and served to everybody (and by a CDN), so it cannot carry a per-request nonce, and Next.js inlines each page's
 RSC payload as inline scripts. Instead of `'unsafe-inline'`, `middleware.ts` gives ISR pages `script-src 'self' 'kkt-inline-hashes'` and
 **`csp-hook.cjs`** (loaded with `node --require` before Next creates its server: `pnpm start`, the Docker `CMD`) replaces the placeholder
-with the SHA-256 of every inline script of the HTML actually sent. A 304 drops the policy so the browser keeps the one it stored with the 200. Pages rendered per request keep the per-request nonce policy (`'nonce-…' 'strict-dynamic'`). `compress: false` in `next.config.ts`
+with the SHA-256 of the inline scripts of the HTML actually sent that are exactly Next's RSC payload (`self.__next_f=…||[]`, `self.__next_f.push(<JSON data>)`;
+`isFrameworkScript`). Any other inline script — e.g. one an injection slipped into the HTML — gets no hash, so the browser blocks it (the
+hook logs `[csp-hook] inline script is not a Next.js payload` once per script). A 304 drops the policy so the browser keeps the one it stored with the 200. Pages rendered per request keep the per-request nonce policy (`'nonce-…' 'strict-dynamic'`). `compress: false` in `next.config.ts`
 (the hook must see the plain body; Caddy compresses). **Always start the production server with the hook** — without it the placeholder
 reaches the browser, which then blocks every inline script (fail closed: the page does not hydrate). `next dev` uses the nonce policy
 everywhere and needs no hook.

@@ -435,11 +435,24 @@ function safeDecrypt(token: string | null): string | null {
   }
 }
 
-/** `text` with every identifier replaced by `replacement` (SQL, case-insensitive literal match). */
+/**
+ * PostgreSQL regex matching `id` as a whole token, case-insensitively with the `i` flag: not preceded or followed by a letter or digit, so
+ * erasing "Ravi Kumar" never rewrites "Ravi Kumaran", and an e-mail never matches inside a longer one.
+ */
+function tokenPattern(id: string): string {
+  return `(?<![[:alnum:]_])${escapeRegex(id)}(?![[:alnum:]_])`;
+}
+
+/** `text` with every identifier (a whole token, case-insensitive) replaced by `replacement`. */
 function scrubText(column: SQL | ReturnType<typeof sql.raw>, ids: readonly string[], replacement: string): SQL {
   let expr: SQL = sql`${column}`;
-  for (const id of ids) expr = sql`regexp_replace(${expr}, ${escapeRegex(id)}, ${replacement}, 'gi')`;
+  for (const id of ids) expr = sql`regexp_replace(${expr}, ${tokenPattern(id)}, ${replacement}, 'gi')`;
   return expr;
+}
+
+/** True when `column` mentions `id` as a whole token (case-insensitive). */
+function mentions(column: SQL, id: string): SQL {
+  return sql`(${column} ~* ${tokenPattern(id)})`;
 }
 
 function escapeRegex(v: string): string {
@@ -456,7 +469,7 @@ async function scrubDrafts(tx: Executor, companyId: string, needles: readonly st
     .where(
       and(
         eq(bookingDrafts.companyId, companyId),
-        or(...terms.map((t) => sql`strpos(lower(${bookingDrafts.payload}::text), lower(${t})) > 0`)),
+        or(...terms.map((t) => mentions(sql`${bookingDrafts.payload}::text`, t))),
       ),
     )
     .returning({ id: bookingDrafts.id });
@@ -485,9 +498,9 @@ async function scrubNotifications(
       ),
     )
     .returning({ id: notifications.id });
-  const mentions = textIds.map(
+  const named = textIds.map(
     (t) =>
-      sql`(strpos(lower(${notifications.title}), lower(${t})) > 0 or strpos(lower(coalesce(${notifications.body}, '')), lower(${t})) > 0)`,
+      sql`(${mentions(sql`${notifications.title}`, t)} or ${mentions(sql`coalesce(${notifications.body}, '')`, t)})`,
   );
   const staff = await tx
     .update(notifications)
@@ -499,7 +512,7 @@ async function scrubNotifications(
       and(
         eq(notifications.companyId, companyId),
         eq(notifications.recipientType, "STAFF"),
-        or(and(eq(notifications.entityType, "customer"), eq(notifications.entityId, customerId)), ...mentions),
+        or(and(eq(notifications.entityType, "customer"), eq(notifications.entityId, customerId)), ...named),
       ),
     )
     .returning({ id: notifications.id });

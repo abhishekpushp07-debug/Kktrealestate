@@ -71,6 +71,11 @@ export function clearRefreshCookie(reply: FastifyReply, aud: TokenAudience): voi
   );
 }
 
+/** True when a refresh failed because the session itself is dead (401), not for a transient reason (409 lock timeout, 429, 5xx). */
+export function isDeadSession(err: unknown): boolean {
+  return err instanceof ApiError && err.statusCode === 401;
+}
+
 /**
  * The refresh token of a refresh request: the body's `refresh_token` (body mode), else the audience's cookie — but only with the
  * `X-KKT-Session: cookie` header (CSRF guard: a cookie alone is refused with 403 FORBIDDEN `details.reason = SESSION_HEADER_REQUIRED`).

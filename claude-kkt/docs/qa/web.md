@@ -6,6 +6,19 @@ Stack under test: API `apps/api` on `:4100` with the demo seed in its own databa
 
 Runner: [`docs/qa/web/browser-qa.cjs`](web/browser-qa.cjs) (`WEB_URL`, `API_URL`, `OUT_DIR`, `ONLY=static,enquiry,brochure,visit,toggles`), PNGs over 300 KB are palette-quantised by [`docs/qa/web/shrink.py`](web/shrink.py). On every page it asserts: zero console errors / page errors, zero failed or ≥ 400 requests (apart from the deliberate 404 / 429 tests), `scrollWidth <= innerWidth`, every visible link/button/field ≥ 44 px tall at 390 px (stretched-link cards count their whole card), and records the time to `networkidle` plus one viewport screenshot per page and width.
 
+## Phase 7 domain review 2026-10-27 (hash allow-list, sitemap-gated detail slugs)
+
+Stack: API from source on `:4740` (fresh demo seed in `kkt_p7_rdomain_acc`, Redis db 23, `INTERNAL_API_TOKEN`,
+`WEB_REVALIDATE_URL=http://localhost:3740/api/revalidate`), website `next build` + `next start` with `NODE_OPTIONS=--require=./csp-hook.cjs`
+on `:3740`; runner `WEB_URL=http://localhost:3740 API_URL=http://localhost:4740 SITE_URL=http://localhost:3740 REDIS_DB=23` (screenshots to a
+scratch `OUT_DIR`). **Result: 42 page audits, 152/152 checks, 0 defects; axe 42 scans, 0 serious/critical**, and the website log has no
+`[csp-hook] inline script is not a Next.js payload` line (every inline script Next emitted was recognised and hashed; no CSP violation).
+
+Changed under test: `csp-hook.cjs` hashes only scripts that are exactly Next's RSC payload (`self.__next_f.push(<JSON>)`), so an inline script
+injected into the HTML is no longer vouched for; `/projects/<slug>`, `/blog/<slug>` and `/<slug>` answer 404 for a slug the cached sitemap does
+not list without calling the API — 93 requests for made-up slugs added **0** Data Cache files (before: one never-evicted file each, 31 for 31
+`/projects/<random>` requests) and the real project page still renders (200).
+
 ## Phase 7 domain track 2026-10-27 (ISR, hashed CSP, C2/C3/C4, sitemap)
 
 Stack: API from source (`tsx src/server.ts`) on `:4610` (fresh demo seed in `kkt_p7_d`, Redis db 10, `INTERNAL_API_TOKEN`,

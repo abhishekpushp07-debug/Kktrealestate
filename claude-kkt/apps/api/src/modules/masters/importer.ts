@@ -109,7 +109,8 @@ export function csvRecordToInput(def: MasterKindDef, values: Record<string, stri
   const shape = shapeOf(def.createSchema);
   const out: Record<string, unknown> = {};
   for (const [k, raw] of Object.entries(values)) {
-    const field = shape[k];
+    // own keys only: `shape` is a plain object, so `shape["constructor"]` would be Object.prototype.constructor (500 on coercion)
+    const field = Object.hasOwn(shape, k) ? shape[k] : undefined;
     if (!field) continue; // unknown columns are ignored (strict schemas would reject them)
     const v = coerceCsvValue(field, raw);
     if (v !== undefined) out[k] = v;
@@ -207,9 +208,11 @@ export function suggestColumn(unknown: string, expected: readonly string[]): str
 export function checkImportHeader(def: MasterKindDef, headers: readonly string[]): { ignored: string[] } {
   const shape = importShape(def);
   const expected = Object.keys(shape);
-  const exportOnly = new Set(def.csvColumns.filter((c) => !(c in shape)));
+  // Object.hasOwn, never `in`: a header named like an Object.prototype member (`constructor`, `toString`, `__proto__`) is unknown
+  const known = (h: string): boolean => Object.hasOwn(shape, h);
+  const exportOnly = new Set(def.csvColumns.filter((c) => !known(c)));
   const named = headers.filter((h) => h !== "");
-  const unknown = named.filter((h) => !(h in shape) && !exportOnly.has(h));
+  const unknown = named.filter((h) => !known(h) && !exportOnly.has(h));
   if (unknown.length > 0) {
     const suggestions: Record<string, string> = {};
     for (const u of unknown) {

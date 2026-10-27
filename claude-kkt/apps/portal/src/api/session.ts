@@ -23,7 +23,30 @@ export interface SessionStore {
   remove(key: string): Promise<void>;
 }
 
-export type SessionListener = (event: "expired") => void;
+/**
+ * "expired": the session is over (sign in again). "user-changed": a refresh returned another customer's token — the browser's cookie was
+ * re-issued to someone else who signed in in another tab — so this tab drops the previous customer's data and loads the new one.
+ */
+export type SessionEvent = "expired" | "user-changed";
+export type SessionListener = (event: SessionEvent) => void;
+
+/** `sub` of a JWT access token (the portal user id); null when it cannot be read. Only compared, never trusted for authorisation. */
+export function tokenSubject(token: string | null | undefined): string | null {
+  const payload = token?.split(".")[1];
+  if (!payload) return null;
+  try {
+    const json = atob(
+      payload
+        .replace(/-/g, "+")
+        .replace(/_/g, "/")
+        .padEnd(Math.ceil(payload.length / 4) * 4, "="),
+    );
+    const sub = (JSON.parse(json) as { sub?: unknown }).sub;
+    return typeof sub === "string" ? sub : null;
+  } catch {
+    return null;
+  }
+}
 
 export interface PortalSession {
   readonly mode: SessionMode;
@@ -40,6 +63,8 @@ export interface PortalSession {
   authTransport(): { headers: Record<string, string>; includeCredentials: boolean };
   onExpired(listener: SessionListener): () => void;
   notifyExpired(): void;
+  /** A refresh returned another customer's token (see SessionEvent). */
+  notifyUserChanged(): void;
 }
 
 export function createSession(mode: SessionMode, store: SessionStore): PortalSession {
@@ -107,6 +132,9 @@ export function createSession(mode: SessionMode, store: SessionStore): PortalSes
     },
     notifyExpired() {
       for (const listener of listeners) listener("expired");
+    },
+    notifyUserChanged() {
+      for (const listener of listeners) listener("user-changed");
     },
   };
 }

@@ -141,15 +141,26 @@ SELECT kkt_ensure_trigger('companies', 'companies_set_slug',
   'BEFORE INSERT OR UPDATE OF slug ON {table} FOR EACH ROW EXECUTE FUNCTION companies_set_slug_fn()');
 
 -- 6. Partial unique indexes (database-enforced invariants, DATA-MODEL §H).
---    drizzle-kit emits these in the generated migration; they are repeated here with
---    IF NOT EXISTS so a database whose migration predates them is still covered.
-CREATE UNIQUE INDEX IF NOT EXISTS demands_booking_seq_nonvoid_uq
-  ON demands (booking_id, installment_seq) WHERE status <> 'VOID';
-CREATE UNIQUE INDEX IF NOT EXISTS bookings_one_active_per_flat_uq
-  ON bookings (flat_id) WHERE status = 'ACTIVE';
-CREATE UNIQUE INDEX IF NOT EXISTS rate_cards_one_active_uq
-  ON rate_cards (project_id) WHERE status = 'ACTIVE';
-CREATE UNIQUE INDEX IF NOT EXISTS bank_accounts_one_default_uq
-  ON bank_accounts (company_id) WHERE is_default;
-CREATE UNIQUE INDEX IF NOT EXISTS construction_stages_one_possession_uq
-  ON construction_stages (company_id) WHERE is_possession;
+--    drizzle-kit emits these in the generated migration; they are repeated here so a database whose migration predates them is still
+--    covered. Only a MISSING index is created: a plain `CREATE INDEX IF NOT EXISTS` takes its SHARE lock on the table before it notices
+--    the index exists, so every re-run of this file would queue behind any open write transaction on the table and stall every write
+--    that arrives meanwhile (packages/db/test/online.test.ts re-applies this file while a writer holds the tables).
+DO $$
+BEGIN
+  IF to_regclass('public.demands_booking_seq_nonvoid_uq') IS NULL THEN
+    CREATE UNIQUE INDEX demands_booking_seq_nonvoid_uq ON demands (booking_id, installment_seq) WHERE status <> 'VOID';
+  END IF;
+  IF to_regclass('public.bookings_one_active_per_flat_uq') IS NULL THEN
+    CREATE UNIQUE INDEX bookings_one_active_per_flat_uq ON bookings (flat_id) WHERE status = 'ACTIVE';
+  END IF;
+  IF to_regclass('public.rate_cards_one_active_uq') IS NULL THEN
+    CREATE UNIQUE INDEX rate_cards_one_active_uq ON rate_cards (project_id) WHERE status = 'ACTIVE';
+  END IF;
+  IF to_regclass('public.bank_accounts_one_default_uq') IS NULL THEN
+    CREATE UNIQUE INDEX bank_accounts_one_default_uq ON bank_accounts (company_id) WHERE is_default;
+  END IF;
+  IF to_regclass('public.construction_stages_one_possession_uq') IS NULL THEN
+    CREATE UNIQUE INDEX construction_stages_one_possession_uq ON construction_stages (company_id) WHERE is_possession;
+  END IF;
+END;
+$$;

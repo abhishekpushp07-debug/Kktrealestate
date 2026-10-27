@@ -146,8 +146,82 @@ export function parseConcurrentIndex(statement: string): ConcurrentIndexStatemen
 /** What happened to one online statement (returned by {@link applyOnlineSql} for logs and tests). */
 export interface OnlineStatementResult {
   statement: string;
-  action: "applied" | "applied-without-concurrently" | "skipped-unique-on-partitioned";
+  action: "applied" | "applied-per-partition" | "skipped-unique-on-partitioned";
   droppedInvalidIndex?: string;
+  /** For "applied-per-partition": the partition indexes built concurrently and attached in this run. */
+  partitionIndexes?: string[];
+  /** How many times a statement was retried after a lock wait ran past the lock timeout. */
+  lockRetries?: number;
+}
+
+/** Default `lock_timeout` (ms) of the migration's DDL: a statement that cannot get its table lock in time gives up and is retried. */
+export const DEFAULT_MIGRATION_LOCK_TIMEOUT_MS = 5_000;
+/** Default number of retries after a lock timeout (with backoff 0.5 s, 1 s, 2 s … capped at 30 s: about 1.5 minutes in all). */
+export const DEFAULT_MIGRATION_LOCK_RETRIES = 8;
+
+/** The SQLSTATE carried by `err` (following Drizzle's `cause` wrappers), or null. */
+function sqlState(err: unknown): string | null {
+  let e: unknown = err;
+  for (let depth = 0; depth < 8 && e !== null && typeof e === "object"; depth += 1) {
+    const code = (e as { code?: unknown }).code;
+    if (typeof code === "string" && /^[0-9A-Z]{5}$/.test(code)) return code;
+    e = (e as { cause?: unknown }).cause;
+  }
+  return null;
+}
+
+/** Retry settings of {@link withLockRetry}. */
+export interface LockRetryOptions {
+  /** Retries after a lock timeout (default {@link DEFAULT_MIGRATION_LOCK_RETRIES}). */
+  lockRetries?: number;
+  /** First backoff delay in ms, doubled on every retry and capped at 30 s (default 500). */
+  lockRetryDelayMs?: number;
+  log?: (line: string) => void;
+}
+
+/**
+ * Runs `fn` (a migration step that is safe to run again: a single statement, or a script that ran as one transaction) and retries it
+ * when it failed with 55P03 lock_not_available, i.e. its table lock was not granted within `lock_timeout`. Waiting without a timeout
+ * would be worse than failing: an ALTER TABLE queued behind a long transaction blocks every later reader and writer of that table
+ * until it gets its lock. Returns how many retries it took.
+ */
+export async function withLockRetry<T>(
+  what: string,
+  fn: () => Promise<T>,
+  options: LockRetryOptions = {},
+): Promise<{ value: T; retries: number }> {
+  const retries = options.lockRetries ?? DEFAULT_MIGRATION_LOCK_RETRIES;
+  const base = options.lockRetryDelayMs ?? 500;
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return { value: await fn(), retries: attempt };
+    } catch (err) {
+      if (sqlState(err) !== "55P03" || attempt >= retries) throw err;
+      const delay = Math.min(30_000, base * 2 ** attempt);
+      options.log?.(
+        `[db] ${what}: table lock not granted within lock_timeout, retry ${attempt + 1}/${retries} in ${delay} ms`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+}
+
+/** Options of {@link applyOnlineSql}. */
+export interface OnlineSqlOptions extends LockRetryOptions {
+  /**
+   * `lock_timeout` (ms) for the statements that take a blocking table lock (ALTER TABLE, DO blocks, the parent index of a partitioned
+   * table, ATTACH), each retried on a timeout. Index builds CONCURRENTLY run without a lock timeout: their waits never block reads or
+   * writes. Unset: the session's own setting applies to everything.
+   */
+  lockTimeoutMs?: number;
+}
+
+const quoteIdent = (name: string): string => `"${name.replace(/"/g, '""')}"`;
+
+/** Name of the index a partition gets for a partitioned parent index (≤ 63 bytes, stable across runs). */
+export function partitionIndexName(parentIndex: string, partition: string): string {
+  const name = `${partition}_${parentIndex}`;
+  return Buffer.byteLength(name) <= 63 ? name : `${name.slice(0, 50)}_${sha256(name).slice(0, 12)}`;
 }
 
 /**
@@ -155,41 +229,139 @@ export interface OnlineStatementResult {
  * `CREATE INDEX CONCURRENTLY` and `ALTER TABLE … VALIDATE CONSTRAINT` do not block writes. Before a `CREATE INDEX CONCURRENTLY` an
  * INVALID index of the same name — the leftover of a build that was interrupted (crash, deploy timeout, lock cancel) — is dropped
  * (`DROP INDEX CONCURRENTLY`), since `IF NOT EXISTS` would otherwise keep the broken index forever. PostgreSQL cannot build an index
- * concurrently on a partitioned table: there the statement runs without CONCURRENTLY, and a UNIQUE one is skipped (a unique index on a
- * partitioned table must contain the partition key; packages/db/partitions enforces such uniqueness with a trigger).
+ * concurrently on a partitioned table, so there the runner does what the PostgreSQL manual prescribes for an online build: the parent
+ * index is created `ON ONLY` the parent (no partition is scanned), each partition's index is built CONCURRENTLY and attached, and the
+ * parent index becomes valid when the last one is attached. A UNIQUE one is skipped there (a unique index on a partitioned table must
+ * contain the partition key; packages/db/partitions enforces such uniqueness with a trigger). All statements run on one connection
+ * (reserved from the pool when `sql` is a pool).
  */
-export async function applyOnlineSql(sql: Sql, text: string): Promise<OnlineStatementResult[]> {
-  const results: OnlineStatementResult[] = [];
-  for (const statement of splitSqlStatements(text)) {
-    const idx = parseConcurrentIndex(statement);
-    if (!idx) {
-      await sql.unsafe(statement);
-      results.push({ statement, action: "applied" });
-      continue;
-    }
-    const result: OnlineStatementResult = { statement, action: "applied" };
-    const invalid = await sql<{ name: string }[]>`
+export async function applyOnlineSql(
+  sql: Sql,
+  text: string,
+  options: OnlineSqlOptions = {},
+): Promise<OnlineStatementResult[]> {
+  const pooled = typeof (sql as { release?: unknown }).release !== "function";
+  const conn: Sql = pooled ? ((await sql.reserve()) as unknown as Sql) : sql;
+  const managed = options.lockTimeoutMs !== undefined;
+  const setLockTimeout = async (ms: number) => {
+    if (managed) await conn.unsafe(`SET lock_timeout = ${Math.max(0, Math.floor(ms))}`);
+  };
+  const blocking = async (what: string, statement: string): Promise<number> => {
+    await setLockTimeout(options.lockTimeoutMs ?? 0);
+    const { retries } = await withLockRetry(what, () => conn.unsafe(statement), options);
+    return retries;
+  };
+  const dropInvalid = async (index: string): Promise<boolean> => {
+    const invalid = await conn<{ name: string }[]>`
       SELECT c.relname AS name FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
-      WHERE c.relname = ${idx.index} AND c.relnamespace = 'public'::regnamespace AND NOT i.indisvalid`;
-    if (invalid.length > 0) {
-      await sql.unsafe(`DROP INDEX CONCURRENTLY IF EXISTS public."${idx.index.replace(/"/g, '""')}"`);
-      result.droppedInvalidIndex = idx.index;
-    }
-    const [target] = await sql<{ kind: string }[]>`
-      SELECT c.relkind::text AS kind FROM pg_class c WHERE c.relname = ${idx.table} AND c.relnamespace = 'public'::regnamespace`;
-    if (target?.kind === "p") {
-      if (idx.unique) {
-        result.action = "skipped-unique-on-partitioned";
-      } else {
-        await sql.unsafe(statement.replace(/\bCONCURRENTLY\s+/i, ""));
-        result.action = "applied-without-concurrently";
+      WHERE c.relname = ${index} AND c.relnamespace = 'public'::regnamespace AND NOT i.indisvalid`;
+    if (invalid.length === 0) return false;
+    await setLockTimeout(0);
+    await conn.unsafe(`DROP INDEX CONCURRENTLY IF EXISTS public.${quoteIdent(index)}`);
+    return true;
+  };
+  const results: OnlineStatementResult[] = [];
+  try {
+    for (const statement of splitSqlStatements(text)) {
+      const idx = parseConcurrentIndex(statement);
+      if (!idx) {
+        const retries = await blocking("online statement", statement);
+        results.push({ statement, action: "applied", ...(retries > 0 ? { lockRetries: retries } : {}) });
+        continue;
       }
-    } else {
-      await sql.unsafe(statement);
+      const result: OnlineStatementResult = { statement, action: "applied" };
+      const [target] = await conn<{ kind: string }[]>`
+        SELECT c.relkind::text AS kind FROM pg_class c WHERE c.relname = ${idx.table} AND c.relnamespace = 'public'::regnamespace`;
+      if (target?.kind === "p") {
+        if (idx.unique) result.action = "skipped-unique-on-partitioned";
+        else {
+          result.partitionIndexes = await buildPartitionedIndex(
+            conn,
+            idx,
+            statement,
+            blocking,
+            dropInvalid,
+            setLockTimeout,
+          );
+          result.action = "applied-per-partition";
+        }
+        results.push(result);
+        continue;
+      }
+      if (await dropInvalid(idx.index)) result.droppedInvalidIndex = idx.index;
+      // a concurrent build waits for older transactions without blocking anyone: no lock timeout for it
+      await setLockTimeout(0);
+      await conn.unsafe(statement);
+      results.push(result);
     }
-    results.push(result);
+  } finally {
+    if (managed) await conn.unsafe("RESET lock_timeout").catch(() => undefined);
+    if (pooled) (conn as unknown as { release: () => void }).release();
   }
   return results;
+}
+
+/**
+ * Online index build on a partitioned table: `CREATE INDEX … ON ONLY parent` (catalog only, invalid until complete), then for every
+ * partition without an attached index `CREATE INDEX CONCURRENTLY` + `ALTER INDEX parent ATTACH PARTITION`. Resumable: an interrupted
+ * run leaves attached partitions attached and an INVALID partition index, which the next run drops and builds again. A parent index
+ * that is already valid is left alone. Returns the partition indexes built in this run.
+ */
+async function buildPartitionedIndex(
+  conn: Sql,
+  idx: ConcurrentIndexStatement,
+  statement: string,
+  blocking: (what: string, statement: string) => Promise<number>,
+  dropInvalid: (index: string) => Promise<boolean>,
+  setLockTimeout: (ms: number) => Promise<void>,
+): Promise<string[]> {
+  const stripped = stripComments(statement);
+  const head = CONCURRENT_INDEX.exec(stripped)!;
+  const tail = stripped.slice(head[0].length);
+  const [parent] = await conn<{ valid: boolean }[]>`
+    SELECT i.indisvalid AS valid FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
+    WHERE c.relname = ${idx.index} AND c.relnamespace = 'public'::regnamespace`;
+  if (parent?.valid) return [];
+  if (!parent)
+    await blocking(
+      `index ${idx.index}`,
+      `CREATE INDEX IF NOT EXISTS ${quoteIdent(idx.index)} ON ONLY public.${quoteIdent(idx.table)}${tail}`,
+    );
+  const parts = await conn<{ part: string; kind: string; attached: string | null }[]>`
+    SELECT c.relname AS part, c.relkind::text AS kind,
+           (SELECT ci.relname FROM pg_inherits ii JOIN pg_index x ON x.indexrelid = ii.inhrelid JOIN pg_class ci ON ci.oid = ii.inhrelid
+            WHERE ii.inhparent = to_regclass(${`public.${quoteIdent(idx.index)}`}) AND x.indrelid = c.oid LIMIT 1) AS attached
+    FROM pg_inherits i JOIN pg_class c ON c.oid = i.inhrelid
+    WHERE i.inhparent = to_regclass(${`public.${quoteIdent(idx.table)}`})
+    ORDER BY c.relname`;
+  const built: string[] = [];
+  for (const p of parts) {
+    if (p.attached) continue;
+    const child = partitionIndexName(idx.index, p.part);
+    if (p.kind === "p") {
+      // a sub-partitioned partition: same procedure one level down
+      await buildPartitionedIndex(
+        conn,
+        { unique: false, index: child, table: p.part },
+        `CREATE INDEX CONCURRENTLY IF NOT EXISTS ${quoteIdent(child)} ON public.${quoteIdent(p.part)}${tail}`,
+        blocking,
+        dropInvalid,
+        setLockTimeout,
+      );
+    } else {
+      await dropInvalid(child);
+      await setLockTimeout(0);
+      await conn.unsafe(
+        `CREATE INDEX CONCURRENTLY IF NOT EXISTS ${quoteIdent(child)} ON public.${quoteIdent(p.part)}${tail}`,
+      );
+    }
+    await blocking(
+      `attach ${child}`,
+      `ALTER INDEX public.${quoteIdent(idx.index)} ATTACH PARTITION public.${quoteIdent(child)}`,
+    );
+    built.push(child);
+  }
+  return built;
 }
 
 /** Options of {@link migrateHandle}. */
@@ -198,6 +370,18 @@ export interface MigrateOptions {
   reapplyAll?: boolean;
   /** Called with a line per applied/skipped file (default: silent). */
   log?: (line: string) => void;
+  /**
+   * `lock_timeout` (ms) of the migration's blocking DDL (default {@link DEFAULT_MIGRATION_LOCK_TIMEOUT_MS}; 0 waits forever). A step
+   * whose table lock is not granted in time is rolled back and retried ({@link withLockRetry}) instead of queueing behind a long
+   * transaction while every later query on that table queues behind it. Index builds CONCURRENTLY never time out on locks.
+   * {@link runMigrations} applies it to the drizzle journal too (as a connection parameter); {@link migrateHandle} applies it to the
+   * hand-written and online files, and the journal step follows the handle's own setting.
+   */
+  lockTimeoutMs?: number;
+  /** Retries after a lock timeout (default {@link DEFAULT_MIGRATION_LOCK_RETRIES}). */
+  lockRetries?: number;
+  /** First retry delay in ms (default 500, doubled per retry, capped at 30 s). */
+  lockRetryDelayMs?: number;
 }
 
 /** What one migration run did with the hand-written files. */
@@ -231,62 +415,84 @@ async function schemaMarker(sql: Sql): Promise<string> {
  * A hand-written file in src/sql is (re-)applied when its sha256 differs from the one recorded in `drizzle.kkt_schema_files`, or when a
  * new drizzle migration was applied since (those files may need to cover new tables — e.g. the updated_at triggers); an online file only
  * when its sha256 changed. The record is written after the file succeeded, so an interrupted file runs again on the next deploy. The
- * handle needs a pool of at least 2 connections and should be opened with `timeouts: false` (index builds can be slow).
+ * handle needs a pool of at least 2 connections and no statement timeout (index builds can be slow); blocking DDL runs under
+ * `lock_timeout` with retries (MigrateOptions.lockTimeoutMs).
  */
 export async function migrateHandle(handle: DbHandle, options: MigrateOptions = {}): Promise<MigrateReport> {
   const reapplyAll = options.reapplyAll ?? (process.env["KKT_MIGRATE_REAPPLY_SQL"] ?? "").toLowerCase() === "true";
   const log = options.log ?? (() => undefined);
+  const lockTimeoutMs = options.lockTimeoutMs ?? DEFAULT_MIGRATION_LOCK_TIMEOUT_MS;
+  const retry: LockRetryOptions = {
+    log,
+    ...(options.lockRetries !== undefined ? { lockRetries: options.lockRetries } : {}),
+    ...(options.lockRetryDelayMs !== undefined ? { lockRetryDelayMs: options.lockRetryDelayMs } : {}),
+  };
   const report: MigrateReport = { applied: [], skipped: [], online: {} };
   await withSessionAdvisoryLock(handle, MIGRATION_LOCK_KEY, async () => {
-    const sql = handle.sql;
-    await sql.unsafe("CREATE EXTENSION IF NOT EXISTS citext");
-    await sql.unsafe("CREATE EXTENSION IF NOT EXISTS pg_trgm");
-    await drizzleMigrate(handle.db, { migrationsFolder: MIGRATIONS_FOLDER });
-    await ensureSchemaFilesTable(sql);
-    const marker = await schemaMarker(sql);
-    const recorded = new Map(
-      (
-        await sql<
-          { file: string; sha256: string; schema_marker: string | null }[]
-        >`SELECT file, sha256, schema_marker FROM drizzle.kkt_schema_files`
-      ).map((r) => [r.file, r]),
+    await handle.sql.unsafe("CREATE EXTENSION IF NOT EXISTS citext");
+    await handle.sql.unsafe("CREATE EXTENSION IF NOT EXISTS pg_trgm");
+    // the journal runs as one transaction: a lock timeout rolls all of it back, so running it again is safe
+    await withLockRetry(
+      "drizzle migrations",
+      () => drizzleMigrate(handle.db, { migrationsFolder: MIGRATIONS_FOLDER }),
+      retry,
     );
-    const record = async (file: string, sum: string, fileMarker: string | null) => {
-      await sql`
-        INSERT INTO drizzle.kkt_schema_files (file, sha256, schema_marker, applied_at) VALUES (${file}, ${sum}, ${fileMarker}, now())
-        ON CONFLICT (file) DO UPDATE SET sha256 = EXCLUDED.sha256, schema_marker = EXCLUDED.schema_marker, applied_at = now()`;
-    };
+    // everything after the journal runs on one reserved connection with the migration's own session limits
+    const sql = (await handle.sql.reserve()) as unknown as Sql;
+    try {
+      await sql.unsafe("SET statement_timeout = 0");
+      await sql.unsafe(`SET lock_timeout = ${Math.max(0, Math.floor(lockTimeoutMs))}`);
+      await ensureSchemaFilesTable(sql);
+      const marker = await schemaMarker(sql);
+      const recorded = new Map(
+        (
+          await sql<
+            { file: string; sha256: string; schema_marker: string | null }[]
+          >`SELECT file, sha256, schema_marker FROM drizzle.kkt_schema_files`
+        ).map((r) => [r.file, r]),
+      );
+      const record = async (file: string, sum: string, fileMarker: string | null) => {
+        await sql`
+          INSERT INTO drizzle.kkt_schema_files (file, sha256, schema_marker, applied_at) VALUES (${file}, ${sum}, ${fileMarker}, now())
+          ON CONFLICT (file) DO UPDATE SET sha256 = EXCLUDED.sha256, schema_marker = EXCLUDED.schema_marker, applied_at = now()`;
+      };
 
-    for (const path of await listSqlFiles()) {
-      const file = path.slice(SQL_FOLDER.length + 1);
-      const text = await readFile(path, "utf8");
-      const sum = sha256(text);
-      const prev = recorded.get(file);
-      if (!reapplyAll && prev && prev.sha256 === sum && prev.schema_marker === marker) {
-        report.skipped.push(file);
-        log(`[db] ${file}: unchanged, skipped`);
-        continue;
+      for (const path of await listSqlFiles()) {
+        const file = path.slice(SQL_FOLDER.length + 1);
+        const text = await readFile(path, "utf8");
+        const sum = sha256(text);
+        const prev = recorded.get(file);
+        if (!reapplyAll && prev && prev.sha256 === sum && prev.schema_marker === marker) {
+          report.skipped.push(file);
+          log(`[db] ${file}: unchanged, skipped`);
+          continue;
+        }
+        // a multi-statement script runs as one implicit transaction: a lock timeout rolls the whole file back before the retry
+        await withLockRetry(file, () => sql.unsafe(text), retry);
+        await record(file, sum, marker);
+        report.applied.push(file);
+        log(`[db] ${file}: applied`);
       }
-      await sql.unsafe(text);
-      await record(file, sum, marker);
-      report.applied.push(file);
-      log(`[db] ${file}: applied`);
-    }
 
-    for (const path of await listOnlineSqlFiles()) {
-      const file = path.slice(SQL_FOLDER.length + 1);
-      const text = await readFile(path, "utf8");
-      const sum = sha256(text);
-      const prev = recorded.get(file);
-      if (!reapplyAll && prev && prev.sha256 === sum) {
-        report.skipped.push(file);
-        log(`[db] ${file}: unchanged, skipped`);
-        continue;
+      for (const path of await listOnlineSqlFiles()) {
+        const file = path.slice(SQL_FOLDER.length + 1);
+        const text = await readFile(path, "utf8");
+        const sum = sha256(text);
+        const prev = recorded.get(file);
+        if (!reapplyAll && prev && prev.sha256 === sum) {
+          report.skipped.push(file);
+          log(`[db] ${file}: unchanged, skipped`);
+          continue;
+        }
+        report.online[file] = await applyOnlineSql(sql, text, { ...retry, lockTimeoutMs });
+        await sql.unsafe(`SET lock_timeout = ${Math.max(0, Math.floor(lockTimeoutMs))}`);
+        await record(file, sum, null);
+        report.applied.push(file);
+        log(`[db] ${file}: applied online (${report.online[file].length} statements)`);
       }
-      report.online[file] = await applyOnlineSql(sql, text);
-      await record(file, sum, null);
-      report.applied.push(file);
-      log(`[db] ${file}: applied online (${report.online[file].length} statements)`);
+    } finally {
+      await sql.unsafe("RESET lock_timeout; RESET statement_timeout").catch(() => undefined);
+      (sql as unknown as { release: () => void }).release();
     }
   });
   return report;
@@ -297,7 +503,15 @@ export async function runMigrations(
   url: string = process.env["DATABASE_URL"] ?? DEFAULT_DATABASE_URL,
   options: MigrateOptions = {},
 ): Promise<MigrateReport> {
-  const handle = createDb(url, { max: 2, timeouts: false });
+  // statement and idle limits off (index builds are slow), lock timeout on for the journal's DDL (see MigrateOptions.lockTimeoutMs)
+  const handle = createDb(url, {
+    max: 2,
+    timeouts: {
+      statementTimeoutMs: 0,
+      idleInTransactionTimeoutMs: 0,
+      lockTimeoutMs: options.lockTimeoutMs ?? DEFAULT_MIGRATION_LOCK_TIMEOUT_MS,
+    },
+  });
   try {
     return await migrateHandle(handle, options);
   } finally {

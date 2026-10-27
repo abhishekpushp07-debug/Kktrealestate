@@ -87,11 +87,9 @@ ALTER TABLE "companies" ALTER COLUMN "slug" SET NOT NULL;--> statement-breakpoin
 ALTER TABLE "companies" ADD CONSTRAINT "companies_slug_format_chk" CHECK ("companies"."slug" ~ '^[a-z0-9]+(-[a-z0-9]+)*$') NOT VALID;--> statement-breakpoint
 -- security / operations columns
 ALTER TABLE "users" ADD COLUMN "totp_last_step" bigint;--> statement-breakpoint
+-- refresh_tokens can hold millions of rows: its family_started_at backfill runs in committed batches from src/sql/online/0005_indexes.sql,
+-- not here (one UPDATE inside this transaction would hold a row lock on every session until COMMIT and stall every sign-in and refresh)
 ALTER TABLE "refresh_tokens" ADD COLUMN "family_started_at" timestamp with time zone DEFAULT now() NOT NULL;--> statement-breakpoint
-UPDATE "refresh_tokens" r
-SET "family_started_at" = f.started
-FROM (SELECT "family_id", min("created_at") AS started FROM "refresh_tokens" GROUP BY "family_id") f
-WHERE r."family_id" = f."family_id" AND r."family_started_at" IS DISTINCT FROM f.started;--> statement-breakpoint
 ALTER TABLE "idempotency_keys" ADD COLUMN "committed_at" timestamp with time zone;--> statement-breakpoint
 ALTER TABLE "idempotency_keys" ADD COLUMN "lease_expires_at" timestamp with time zone;--> statement-breakpoint
 ALTER TABLE "job_runs" ADD COLUMN "heartbeat_at" timestamp with time zone;--> statement-breakpoint

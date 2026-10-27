@@ -1,5 +1,5 @@
 import { createHash, timingSafeEqual } from "node:crypto";
-import { isIP } from "node:net";
+import { isIP, Socket } from "node:net";
 import fp from "fastify-plugin";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { sql } from "drizzle-orm";
@@ -87,17 +87,24 @@ export function publicRouteGroup(url: string): PublicRouteGroup {
 }
 
 /**
- * True for a bulk export request (the stricter per-subject export budget): a `format=csv` / `export=CSV` list, or POST /exports. The
- * continuation pages of a keyset export (X-Export-Cursor other than `start`, as the export job pages a list) count as reads.
+ * True for a request made in-process with `app.inject` (the EXPORT_CSV job's pages, the POST /exports preflight): it has no network
+ * socket. A network client can never produce one, so this is what makes in-process-only request headers trustworthy.
+ */
+export function isInProcessRequest(req: FastifyRequest): boolean {
+  return !(req.raw.socket instanceof Socket);
+}
+
+/**
+ * True for a bulk export request (the stricter per-subject export budget): a `format=csv` / `export=CSV` list, or POST /exports. Pages of
+ * an asynchronous export (X-Export-Cursor, in-process only — the header is stripped from network requests) are the EXPORT_CSV job's own
+ * work, already budgeted and audited at POST /exports, and are not counted here.
  */
 export function isExportRequest(req: FastifyRequest, url: string): boolean {
   if (req.method === "POST") return url === "/api/v1/exports";
   if (req.method !== "GET") return false;
   const q = (req.query ?? {}) as Record<string, unknown>;
   const csv = String(q["format"] ?? "").toLowerCase() === "csv" || String(q["export"] ?? "").toUpperCase() === "CSV";
-  if (!csv) return false;
-  const cursor = req.headers[EXPORT_CURSOR_HEADER];
-  return cursor === undefined || cursor === "start";
+  return csv && req.headers[EXPORT_CURSOR_HEADER] === undefined;
 }
 
 type StaffRow = {
@@ -384,6 +391,11 @@ export default fp(
     }
 
     app.addHook("onRequest", async (req) => {
+      // X-Export-Cursor switches a CSV list into unbudgeted, unaudited keyset pages for the EXPORT_CSV job (lib/list.ts). Only the job's
+      // in-process calls may use it: from a network client it would page the whole table past the export budget and the export audit row
+      // (review of phase 7), so it is dropped before the list hooks can see it and the request is an ordinary (capped, audited) CSV export.
+      if (req.headers[EXPORT_CURSOR_HEADER] !== undefined && !isInProcessRequest(req))
+        delete req.headers[EXPORT_CURSOR_HEADER];
       req.clientIp = effectiveClientIp(req);
       const url = req.routeOptions.url;
       if (!url) return; // unknown route: let the 404 handler answer
@@ -481,6 +493,8 @@ export default fp(
      * POST /exports). Each answers 429 RATE_LIMITED with Retry-After.
      */
     async function subjectRateLimits(req: FastifyRequest, url: string, subjectId: string): Promise<void> {
+      // the EXPORT_CSV job's in-process pages: budgeted once, at POST /exports (a large export must not throttle itself or its owner)
+      if (req.headers[EXPORT_CURSOR_HEADER] !== undefined) return;
       if (WRITE_METHODS.has(req.method)) await rateLimit(`w:${subjectId}`, config.WRITE_RATE_LIMIT_PER_MIN, 60);
       else if (req.method === "GET" || req.method === "HEAD")
         await rateLimit(`r:${subjectId}`, config.READ_RATE_LIMIT_PER_MIN, 60);

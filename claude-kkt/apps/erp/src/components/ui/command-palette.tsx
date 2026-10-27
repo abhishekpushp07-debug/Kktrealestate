@@ -1,6 +1,7 @@
 import { Command } from "cmdk";
 import { Clock, CornerDownLeft, Search, type LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { isPersistableRecent, RECENT_COMMANDS_KEY } from "@/lib/browserData";
 import { cn, readStorage, useDebouncedValue, useOnChange, writeStorage } from "@/lib/utils";
 import { Kbd } from "./kbd";
 import { Spinner } from "./spinner";
@@ -36,9 +37,25 @@ export interface CommandPaletteProps {
   /** localStorage key for recent items. */
   recentKey?: string;
   maxRecent?: number;
+  /**
+   * Which recent items may be written to localStorage (default: navigation entries only). The others (customer, booking, flat search
+   * hits carry names and phones) stay in memory for this page load: no PII at rest in the browser (audit v3 D1).
+   */
+  persistRecent?: (item: CommandItem) => boolean;
 }
 
-const DEFAULT_RECENT_KEY = "kkt.erp.recent";
+/** Recents as stored: only the persistable ones (a list written by an older build may hold search hits; they are dropped). */
+export function storedRecents(raw: unknown, persistRecent: (item: CommandItem) => boolean): CommandItem[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (entry): entry is CommandItem =>
+      typeof entry === "object" &&
+      entry !== null &&
+      typeof (entry as CommandItem).id === "string" &&
+      typeof (entry as CommandItem).label === "string" &&
+      persistRecent(entry as CommandItem),
+  );
+}
 
 function matches(item: CommandItem, query: string): boolean {
   if (!query) return true;
@@ -74,13 +91,20 @@ export function CommandPalette({
   onSearch,
   onSelect,
   placeholder = "Search projects, flats, customers, bookings…",
-  recentKey = DEFAULT_RECENT_KEY,
+  recentKey = RECENT_COMMANDS_KEY,
   maxRecent = 8,
+  persistRecent = isPersistableRecent,
 }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
   // Results of the last finished search, tagged with the query they answer; `loading` is derived from the tag.
   const [search, setSearch] = useState<{ query: string; items: readonly CommandItem[] }>(NO_SEARCH);
-  const [recent, setRecent] = useState<CommandItem[]>(() => readStorage<CommandItem[]>(recentKey, []));
+  const [recent, setRecent] = useState<CommandItem[]>(() => {
+    const raw = readStorage<unknown>(recentKey, []);
+    const kept = storedRecents(raw, persistRecent);
+    // purge entries an older build stored (search hits with customer names / phones)
+    if (Array.isArray(raw) && kept.length !== raw.length) writeStorage(recentKey, kept);
+    return kept;
+  });
   const debounced = useDebouncedValue(query.trim(), 250);
   const searching = Boolean(onSearch && open && debounced.length >= 2);
   const results = searching ? search.items : NO_SEARCH.items;
@@ -112,11 +136,11 @@ export function CommandPalette({
       const { icon: _icon, ...storable } = item;
       const next = [storable, ...recent.filter((entry) => entry.id !== item.id)].slice(0, maxRecent);
       setRecent(next);
-      writeStorage(recentKey, next);
+      writeStorage(recentKey, next.filter(persistRecent));
       onOpenChange(false);
       onSelect(item);
     },
-    [recent, maxRecent, recentKey, onOpenChange, onSelect],
+    [recent, maxRecent, recentKey, onOpenChange, onSelect, persistRecent],
   );
 
   const filteredGroups = useMemo(

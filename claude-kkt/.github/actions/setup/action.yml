@@ -17,6 +17,8 @@ runs:
         node-version: ${{ inputs.node-version }}
     - name: pnpm through corepack (version from package.json "packageManager")
       shell: bash
+      # never wait on corepack's interactive "about to download pnpm" confirmation
+      env: { COREPACK_ENABLE_DOWNLOAD_PROMPT: "0" }
       run: |
         corepack enable
         pnpm --version

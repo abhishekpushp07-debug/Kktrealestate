@@ -58,8 +58,11 @@ async function main(): Promise<number> {
     console.error(`refusing to restore without --confirm\n${USAGE}`);
     return 2;
   }
-  // The application config is loaded by the modules the restore uses; point it at the target unless the caller already configured one.
-  process.env["DATABASE_URL"] ??= values["database-url"];
+  // The application config is loaded by the modules the restore uses; point it at the target unless the caller already configured one
+  // — as DATABASE_URL or as the secret file DATABASE_URL_FILE (inside the API image): setting both is a configuration error. The restore
+  // itself always connects to --database-url.
+  if (process.env["DATABASE_URL"] === undefined && process.env["DATABASE_URL_FILE"] === undefined)
+    process.env["DATABASE_URL"] = values["database-url"];
   const { restoreBackup } = await import("../modules/admin/restore.js");
   const result = await restoreBackup({
     file: values.file,

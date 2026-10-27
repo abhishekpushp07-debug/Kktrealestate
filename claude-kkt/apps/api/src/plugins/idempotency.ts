@@ -10,6 +10,7 @@ import { registerJob } from "../jobs/index.js";
 import { redisUsable } from "../lib/cache.js";
 import { ApiError } from "../lib/errors.js";
 import { logger } from "../lib/logger.js";
+import { idempotencyOutcomeUnknownTotal } from "../lib/metrics.js";
 import { installVersionPolicy } from "../lib/version.js";
 import { requestStore, type IdempotencyClaimState } from "./requestContext.js";
 
@@ -381,6 +382,7 @@ export default fp(
         }
         // the write committed but this response is an error: never release the key for a re-run
         if (status >= 500) {
+          idempotencyOutcomeUnknownTotal.inc();
           await storeOutcome(
             ctx,
             req,
@@ -459,7 +461,8 @@ function wrapTransactions(app: FastifyInstance): void {
   const original = (db.transaction as DB["transaction"]).bind(app.db);
   const wrapped: DB["transaction"] = (fn, txConfig) => {
     const claim = requestStore()?.idempotency;
-    if (!claim) return original(fn, txConfig);
+    // a READ ONLY transaction cannot write (and would fail on the mark with 25006): there is nothing to mark
+    if (!claim || txConfig?.accessMode === "read only") return original(fn, txConfig);
     return original(async (tx) => {
       const result = await fn(tx);
       await tx.execute(
@@ -476,10 +479,18 @@ function wrapTransactions(app: FastifyInstance): void {
   const client = app.sql as unknown as { unsafe?: (...a: unknown[]) => unknown };
   if (typeof client.unsafe !== "function") return;
   const unsafe = client.unsafe.bind(app.sql) as (...a: unknown[]) => unknown;
+  const sql = app.sql;
   client.unsafe = (...args: unknown[]) => {
     const claim = requestStore()?.idempotency;
-    if (claim && !claim.autocommitWrite && typeof args[0] === "string" && WRITE_SQL.test(args[0]))
+    if (claim && !claim.autocommitWrite && typeof args[0] === "string" && WRITE_SQL.test(args[0])) {
       claim.autocommitWrite = true;
+      // durable too (not only in this process's memory): if the instance dies before it stores the response, a retry after the lease
+      // lapsed must answer IDEMPOTENT_OUTCOME_UNKNOWN instead of taking the claim over and writing again. Sent ahead of the write (the
+      // query object must be returned as is), on the tagged-template path, which does not come back through this wrapper.
+      void sql`update idempotency_keys set committed_at = coalesce(committed_at, now()) where id = ${claim.id}`.catch(
+        (err: unknown) => logger.warn({ err: (err as Error).message }, "idempotency: autocommit mark failed"),
+      );
+    }
     return unsafe(...args);
   };
 }

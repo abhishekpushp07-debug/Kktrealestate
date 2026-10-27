@@ -19,7 +19,10 @@ const credentialsSchema = z.object({
   company: z
     .string()
     .trim()
-    .regex(/^$|^[a-z0-9]+(?:-[a-z0-9]+)*$/i, "Use the company code your administrator gave you (letters, digits, hyphens)"),
+    .regex(
+      /^$|^[a-z0-9]+(?:-[a-z0-9]+)*$/i,
+      "Use the company code your administrator gave you (letters, digits, hyphens)",
+    ),
 });
 type Credentials = z.infer<typeof credentialsSchema>;
 

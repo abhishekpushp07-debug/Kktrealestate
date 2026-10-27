@@ -33,7 +33,7 @@ import {
   type Tx,
 } from "@kkt/db";
 import { amountInWords, bucketCapCheck, formatINR, type Bucket } from "@kkt/domain";
-import { stripSensitive, writeAudit } from "../../../lib/audit.js";
+import { redactForAudit, writeAudit } from "../../../lib/audit.js";
 import { decryptField } from "../../../lib/crypto.js";
 import { ApiError } from "../../../lib/errors.js";
 import { isUniqueViolation } from "../../../lib/pgErrors.js";
@@ -443,7 +443,8 @@ async function postPaymentTx(
     entityId: p.id,
     link: `/bookings/${b.id}/payments`,
   }));
-  const after = stripSensitive({
+  // the same audit form writeAudit stores (sensitive keys stripped, PII masked)
+  const after = redactForAudit({
     receipt_number: RECEIPT_TOKEN,
     booking_id: b.id,
     against: p.against,

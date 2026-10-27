@@ -65,21 +65,65 @@ function runResult(s: RunSummary): Record<string, unknown> {
  * `bookings_failed` per company and in total, the failures are counted in kkt_dues_booking_failures_total and Super Admins get one bell
  * per run; the run itself completes so one poison booking never blocks every later booking. Integrity is NIGHTLY_INTEGRITY's job.
  */
-export async function dailyDues(db: DB): Promise<Record<string, unknown>> {
-  return duesRun(db, "DAILY_DUES");
+export async function dailyDues(db: DB, opts: DuesRunOptions = {}): Promise<Record<string, unknown>> {
+  return duesRun(db, "DAILY_DUES", opts);
 }
 
-async function duesRun(db: DB, job: "DAILY_DUES" | "DUES_CATCHUP"): Promise<Record<string, unknown>> {
+/** Options of a scheduled dues run. */
+export interface DuesRunOptions {
+  /** This is the job's last attempt (default true: a direct call is its own last attempt); earlier attempts do not bell. */
+  finalAttempt?: boolean;
+}
+
+/** Thrown by a dues run whose only problem left is transient (lock / statement timeouts …): the attempt fails so BullMQ retries it. */
+export class DuesRetryableError extends Error {
+  constructor(
+    readonly job: string,
+    readonly retryable: number,
+    readonly result: Record<string, unknown>,
+  ) {
+    super(
+      `${job}: ${retryable} booking${retryable === 1 ? "" : "s"} hit a transient database condition; the run is retried (every other booking was processed)`,
+    );
+    this.name = "DuesRetryableError";
+  }
+}
+
+/**
+ * One dues run over every company. Per-booking data failures are isolated (the run completes, Super Admins get one bell per company);
+ * a booking that failed for a transient reason makes the attempt FAIL after every booking was processed, so BullMQ retries it (raising
+ * is idempotent — the retry only raises what is still missing) and the job framework alerts when the last attempt fails too; a database
+ * outage stops the run at once (raiseDuesForAll rethrows it) with the same retry.
+ */
+async function duesRun(
+  db: DB,
+  job: "DAILY_DUES" | "DUES_CATCHUP",
+  opts: DuesRunOptions = {},
+): Promise<Record<string, unknown>> {
+  const finalAttempt = opts.finalAttempt ?? true;
   const today = todayDate();
   const out: Record<string, unknown> = { as_of: today };
+  const runs: [string, RunSummary][] = [];
   let failed = 0;
+  let retryable = 0;
   for (const companyId of await companyIds(db)) {
     const s = await raiseDuesForAll(db, today, { companyId });
     failed += s.failures.length;
-    await notifyDuesFailures(db, job, companyId, s);
+    retryable += s.retryableFailures;
+    runs.push([companyId, s]);
     out[companyId] = runResult(s);
   }
   out["bookings_failed"] = failed;
+  // the bell goes out once: when the run finishes, or on the last attempt (an attempt that will be retried does not bell)
+  if (retryable === 0 || finalAttempt)
+    for (const [companyId, s] of runs) await notifyDuesFailures(db, job, companyId, s);
+  if (retryable > 0) {
+    logger.warn(
+      { job, bookings_failed: failed, retryable },
+      "dues: transient failures; the attempt fails and is retried",
+    );
+    throw new DuesRetryableError(job, retryable, out);
+  }
   return out;
 }
 
@@ -97,8 +141,8 @@ export async function nightlyIntegrityJob(db: DB): Promise<Record<string, unknow
  * Dues catch-up (SPEC §10 "at startup"): the same idempotent engine run as DAILY_DUES for every company, without the integrity
  * report — safe to enqueue at every boot and after any missed 00:30 run (demands are unique per installment, so nothing is raised twice).
  */
-export async function duesCatchup(db: DB): Promise<Record<string, unknown>> {
-  return duesRun(db, "DUES_CATCHUP");
+export async function duesCatchup(db: DB, opts: DuesRunOptions = {}): Promise<Record<string, unknown>> {
+  return duesRun(db, "DUES_CATCHUP", opts);
 }
 
 const overdueKey = (demandId: string, today: string) => `overdue:${demandId}:${today}`;
@@ -193,8 +237,12 @@ export async function overdueNotifications(db: DB, app: FastifyInstance | null):
  * keeps overdue notices to once per demand per day). The worker / boot sequence should enqueue DUES_CATCHUP (and STARTUP_RECONCILIATION) at start.
  */
 export function registerMoneyJobs(app: FastifyInstance | null): void {
-  registerJob("DAILY_DUES", async ({ db }) => dailyDues(db));
-  registerJob("DUES_CATCHUP", async ({ db }) => duesCatchup(db));
+  registerJob("DAILY_DUES", async ({ db, attempt, maxAttempts }) =>
+    dailyDues(db, { finalAttempt: attempt >= maxAttempts }),
+  );
+  registerJob("DUES_CATCHUP", async ({ db, attempt, maxAttempts }) =>
+    duesCatchup(db, { finalAttempt: attempt >= maxAttempts }),
+  );
   registerJob("NIGHTLY_INTEGRITY", async ({ db }) => nightlyIntegrityJob(db));
   registerJob("OVERDUE_NOTIFICATIONS", async ({ db }) => overdueNotifications(db, app));
   // admin job (POST /admin/jobs/LEDGER_REBUILD/run, data: {company_id?, dry_run?, batch_size?}); never scheduled

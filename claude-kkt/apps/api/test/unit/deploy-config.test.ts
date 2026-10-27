@@ -140,6 +140,22 @@ describe("docker-compose.yml (quick start)", () => {
     expect(c.WORKER_HEALTH_PORT).toBe(9465);
     expect(seconds(w.stop_grace_period)).toBeGreaterThanOrEqual(c.WORKER_DRAIN_TIMEOUT_MS / 1000 + 30);
   });
+
+  it("the quick start (no PgBouncer) keeps every pool under Postgres max_connections on an 8-core host", () => {
+    // API_WORKERS=auto runs one HTTP worker per core; the second job worker (phase 7) must not push the total to the limit
+    const s = composeServices("docker-compose.yml", vars);
+    const pool = (name: string) => boot(envOf(s[name]!)).DATABASE_POOL_MAX;
+    const replicas = (name: string) => Number(s[name]!.deploy?.replicas ?? 1);
+    // (the migrate service has exited before the API and the workers start: depends_on service_completed_successfully)
+    const total = replicas("api") * 8 * pool("api") + replicas("worker") * pool("worker");
+    const maxConnections = Number(
+      /^max_connections\s*=\s*(\d+)/m.exec(
+        readFileSync(join(ROOT, "infra", "postgres", "postgresql.conf"), "utf8"),
+      )![1],
+    );
+    // headroom: superuser_reserved_connections, the backup/drill, psql sessions
+    expect(total).toBeLessThanOrEqual(maxConnections - 10);
+  });
 });
 
 describe("docker-compose.prod.yml", () => {

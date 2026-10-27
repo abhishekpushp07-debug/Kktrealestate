@@ -37,6 +37,11 @@ const { getProject, getPost, getVisit, getSiteSettings, listProjects, sanitizeFo
 type Call = { url: string; init: RequestInit };
 let calls: Call[] = [];
 let respond: (url: string) => Response;
+/** GET /public/sitemap (kept apart from `calls`); null = the API answers 404 there, so lib/api.ts cannot gate detail slugs. */
+let sitemap: { path: string; updated_at: string; priority: number }[] | null = null;
+let sitemapCalls = 0;
+/** unstable_cache calls other than the sitemap's (which detail reads consult first). */
+const dataCacheCalls = () => cacheCalls.filter((c) => !c.tags.includes("sitemap"));
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -46,12 +51,18 @@ beforeEach(() => {
   cacheCalls.length = 0;
   store.clear();
   incoming.clear();
+  sitemap = null;
+  sitemapCalls = 0;
   process.env.API_INTERNAL_URL = "http://api.internal:4000";
   delete process.env.INTERNAL_API_TOKEN;
   delete process.env.KKT_COMPANY_SLUG;
   respond = (url) =>
     url.includes("/site") ? json({ company_name: "X" }) : json({ slug: "sgh", name: "Shree Ganesh Heights" });
   vi.stubGlobal("fetch", async (url: string, init: RequestInit) => {
+    if (url.endsWith("/api/v1/public/sitemap")) {
+      sitemapCalls += 1;
+      return sitemap ? json({ entries: sitemap }) : json({ error: { code: "NOT_FOUND", message: "Not found" } }, 404);
+    }
     calls.push({ url, init });
     return respond(url);
   });
@@ -73,7 +84,7 @@ describe("ISR reads (lib/api.ts)", () => {
     expect(calls[0]!.init.cache).toBe("no-store"); // the cache is ours (unstable_cache), not fetch's
     expect(headerOf(calls[0]!, "x-forwarded-for")).toBeUndefined();
     expect(headerOf(calls[0]!, "x-kkt-client-ip")).toBeUndefined();
-    expect(cacheCalls[0]).toMatchObject({ revalidate: 60, tags: ["kkt-public", "projects", "project:sgh"] });
+    expect(dataCacheCalls()[0]).toMatchObject({ revalidate: 60, tags: ["kkt-public", "projects", "project:sgh"] });
     await getSiteSettings();
     expect(cacheCalls.at(-1)).toMatchObject({ revalidate: 300, tags: ["kkt-public", "site"] });
     await listProjects();
@@ -93,8 +104,8 @@ describe("ISR reads (lib/api.ts)", () => {
       ++n === 1 ? json({ error: { code: "INTERNAL_ERROR", message: "boom" } }, 500) : json({ slug: "sgh" });
     expect(await getProject("sgh")).toMatchObject({ slug: "sgh" });
     expect(calls).toHaveLength(2);
-    expect(cacheCalls.map((c) => c.revalidate)).toEqual([60, 10]);
-    expect(cacheCalls[1]!.keyParts).toContain("retry");
+    expect(dataCacheCalls().map((c) => c.revalidate)).toEqual([60, 10]);
+    expect(dataCacheCalls()[1]!.keyParts).toContain("retry");
   });
 
   it("a network failure degrades lists to empty and details to the error boundary", async () => {
@@ -103,6 +114,36 @@ describe("ISR reads (lib/api.ts)", () => {
     });
     expect(await listProjects()).toEqual([]);
     await expect(getProject("sgh")).rejects.toMatchObject({ code: "NETWORK" });
+  });
+});
+
+describe("detail slugs are checked against the cached sitemap (no API call, no cache entry for a made-up slug)", () => {
+  const entry = (path: string) => ({ path, updated_at: "2026-10-01T00:00:00.000Z", priority: 0.5 });
+
+  it("an unknown project / post slug is a 404 without a detail fetch or a Data Cache entry", async () => {
+    sitemap = [entry("/"), entry("/projects/sgh"), entry("/blog/hello"), entry("/terms")];
+    for (let i = 0; i < 5; i++) {
+      await expect(getProject(`made-up-${i}`)).rejects.toThrow("NEXT_NOT_FOUND");
+      await expect(getPost(`made-up-${i}`)).rejects.toThrow("NEXT_NOT_FOUND");
+    }
+    expect(calls).toHaveLength(0);
+    expect(dataCacheCalls()).toHaveLength(0);
+    expect(sitemapCalls).toBe(1); // the sitemap itself is one cached read
+    expect(await api.isKnownPath("/terms")).toBe(true);
+    expect(await api.isKnownPath("/made-up")).toBe(false);
+  });
+
+  it("a listed slug is fetched as before", async () => {
+    sitemap = [entry("/projects/sgh")];
+    expect(await getProject("sgh")).toMatchObject({ slug: "sgh" });
+    expect(calls.map((c) => c.url)).toEqual(["http://api.internal:4000/api/v1/public/projects/sgh"]);
+  });
+
+  it("without a sitemap (API down / older API) every slug is asked for directly", async () => {
+    sitemap = null;
+    expect(await api.isKnownPath("/projects/anything")).toBe(true);
+    expect(await getProject("sgh")).toMatchObject({ slug: "sgh" });
+    expect(calls).toHaveLength(1);
   });
 });
 

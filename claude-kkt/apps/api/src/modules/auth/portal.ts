@@ -35,7 +35,7 @@ import {
   rotateRefresh,
 } from "./service.js";
 import { resetPointOf } from "./lockout.js";
-import { clearRefreshCookie, refreshTokenOf, tokenPair, wantsCookie } from "./cookies.js";
+import { clearRefreshCookie, isDeadSession, refreshTokenOf, tokenPair, wantsCookie } from "./cookies.js";
 import { securityRedis } from "../../plugins/auth.js";
 
 /** The one message of a failed customer sign-in (unknown phone and wrong password alike). */
@@ -206,7 +206,9 @@ export async function portalAuthRoutes(app: FastifyInstance): Promise<void> {
         });
         return tokenPair(req, reply, t);
       } catch (err) {
-        if (wantsCookie(req)) clearRefreshCookie(reply, "portal");
+        // a dead cookie session (401: invalid, reused, expired, inactive) clears its cookie so the browser stops presenting it; a transient
+        // failure (lock timeout, overload, database outage) keeps it, so the next refresh can still succeed
+        if (wantsCookie(req) && isDeadSession(err)) clearRefreshCookie(reply, "portal");
         throw err;
       }
     },

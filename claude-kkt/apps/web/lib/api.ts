@@ -348,13 +348,37 @@ export async function listProjects(filters: ProjectListFilters = {}): Promise<Pr
   return Array.isArray(result.data) ? result.data : result.data.items;
 }
 
+/** The answer for a detail path the site does not have (no API call, nothing cached). */
+function notFoundResult<T>(): FetchResult<T> {
+  return { ok: false, status: 404, error: new ApiError({ status: 404, code: "NOT_FOUND", message: "Not found" }) };
+}
+
+/** Every public path of the site (GET /public/sitemap, cached like the other CMS reads); null when the API could not say. */
+const knownPaths = cache(async (): Promise<Set<string> | null> => {
+  const entries = await getSitemap();
+  return Array.isArray(entries) ? new Set(entries.map((e) => e.path)) : null;
+});
+
+/**
+ * Whether a detail path (`/projects/<slug>`, `/blog/<slug>`, `/<cms page>`) exists, judged from the cached sitemap, which lists every
+ * published project, post and CMS page and is purged with the rest on every CMS / project-website write. An unknown slug is answered
+ * 404 without asking the API: otherwise every random URL would add a Data Cache entry that is never evicted (disk growth) and an API
+ * call counted against the web server's shared rate-limit budget (ISR reads carry no visitor IP), so a flood of made-up slugs could
+ * starve the real pages. When the sitemap is unavailable (API down, build) the detail is asked for directly, as before.
+ */
+export async function isKnownPath(path: string): Promise<boolean> {
+  const known = await knownPaths();
+  return known === null || known.has(path);
+}
+
 /** One project detail fetch per request (React cache): metadata and page body share it. */
-const projectDetail = cache((slug: string) =>
-  serverGet<ProjectDetail>(`/projects/${encodeURIComponent(slug)}`, {
+const projectDetail = cache(async (slug: string): Promise<FetchResult<ProjectDetail>> => {
+  if (!(await isKnownPath(`/projects/${slug}`))) return notFoundResult();
+  return serverGet<ProjectDetail>(`/projects/${encodeURIComponent(slug)}`, {
     tags: ["projects", `project:${slug}`],
     revalidate: CATALOG_REVALIDATE_SECONDS,
-  }),
-);
+  });
+});
 
 export async function getProject(slug: string): Promise<ProjectDetail> {
   return unwrapDetail(await projectDetail(slug));
@@ -387,12 +411,13 @@ export async function listPosts(page = 1): Promise<ListEnvelope<PostCard>> {
   );
 }
 
-const postDetail = cache((slug: string) =>
-  serverGet<PostDetail>(`/posts/${encodeURIComponent(slug)}`, {
+const postDetail = cache(async (slug: string): Promise<FetchResult<PostDetail>> => {
+  if (!(await isKnownPath(`/blog/${slug}`))) return notFoundResult();
+  return serverGet<PostDetail>(`/posts/${encodeURIComponent(slug)}`, {
     tags: ["posts", `post:${slug}`],
     revalidate: CMS_REVALIDATE_SECONDS,
-  }),
-);
+  });
+});
 
 export async function getPost(slug: string): Promise<PostDetail> {
   return unwrapDetail(await postDetail(slug));

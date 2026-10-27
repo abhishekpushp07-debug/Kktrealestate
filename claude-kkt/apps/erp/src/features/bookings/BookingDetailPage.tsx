@@ -253,14 +253,19 @@ export default function BookingDetailPage() {
         <TabsContent value="overview">
           <OverviewTab booking={row} />
         </TabsContent>
-        <TabsContent value="ledger">{tab === "ledger" && <LedgerTab bookingId={row.id} />}</TabsContent>
+        <TabsContent value="ledger">{tab === "ledger" && <LedgerTab key={row.id} bookingId={row.id} />}</TabsContent>
         <TabsContent value="schedule">
           {tab === "schedule" && <ScheduleTab bookingId={row.id} initial={row.schedule} />}
         </TabsContent>
-        <TabsContent value="demands">{tab === "demands" && <DemandsTab bookingId={row.id} />}</TabsContent>
+        <TabsContent value="demands">{tab === "demands" && <DemandsTab key={row.id} bookingId={row.id} />}</TabsContent>
         <TabsContent value="payments">
           {tab === "payments" && (
-            <PaymentsTab booking={row} highlightId={params.get("highlight")} onPostPayment={() => openPayment()} />
+            <PaymentsTab
+              key={row.id}
+              booking={row}
+              highlightId={params.get("highlight")}
+              onPostPayment={() => openPayment()}
+            />
           )}
         </TabsContent>
         <TabsContent value="charges">

@@ -122,8 +122,20 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
     };
   }, [refreshUser]);
 
-  // The client tells us when the refresh token is rejected.
-  useEffect(() => session.onExpired(() => void signOutLocally()), [signOutLocally]);
+  // The client tells us when the refresh token is rejected, or when the browser's session now belongs to another customer (signed in
+  // in another tab): then everything of the previous customer is dropped and the new one is loaded.
+  useEffect(
+    () =>
+      session.onExpired((event) => {
+        if (event === "expired") {
+          void signOutLocally();
+          return;
+        }
+        queryClient.clear();
+        void refreshUser();
+      }),
+    [signOutLocally, refreshUser],
+  );
 
   const login = useCallback<AuthContextValue["login"]>(
     async (phoneInput, password) => {

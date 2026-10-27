@@ -232,7 +232,11 @@ export const tokens = {
 /* Auth events (the AuthProvider listens for forced sign-out)           */
 /* ------------------------------------------------------------------ */
 
-export type AuthEvent = "unauthenticated";
+/**
+ * "unauthenticated": the session is over (sign in again). "user-changed": the browser's refresh cookie now belongs to another user
+ * (signed out and in as someone else in another tab); this tab must drop the previous user's data and load the new user.
+ */
+export type AuthEvent = "unauthenticated" | "user-changed";
 type AuthListener = (event: AuthEvent) => void;
 const authListeners = new Set<AuthListener>();
 
@@ -352,6 +356,8 @@ async function readBody(response: Response): Promise<unknown> {
 }
 
 let refreshInFlight: Promise<boolean> | null = null;
+/** Why the last refresh failed WITHOUT ending the session (overload, lock timeout, rate limit, network); null after a success. */
+let lastTransientRefreshError: ApiClientError | null = null;
 
 interface RefreshResponse {
   access_token: string;
@@ -359,9 +365,46 @@ interface RefreshResponse {
 }
 
 /**
+ * True when a failed refresh answer means the session is over (401 invalid / reused / expired / SESSION_EXPIRED, 403, 400, 404).
+ * A 408, 409 (refresh-token lock timeout), 425, 429 (refresh rate limit, e.g. an office behind one NAT) or any 5xx is transient: the
+ * API keeps the cookie for those (auth/cookies.ts isDeadSession), so the browser must keep the session too and try again later.
+ */
+export function isDeadRefreshStatus(status: number): boolean {
+  if (status < 400 || status >= 500) return false;
+  return status !== 408 && status !== 409 && status !== 425 && status !== 429;
+}
+
+/** `sub` of a JWT access token (the user id); null when it cannot be read. Only compared, never trusted for authorisation. */
+export function tokenSubject(token: string | null): string | null {
+  const payload = token?.split(".")[1];
+  if (!payload) return null;
+  try {
+    const json = atob(
+      payload
+        .replace(/-/g, "+")
+        .replace(/_/g, "/")
+        .padEnd(Math.ceil(payload.length / 4) * 4, "="),
+    );
+    const sub = (JSON.parse(json) as { sub?: unknown }).sub;
+    return typeof sub === "string" ? sub : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The transient failure of the last refresh (thrown to the caller instead of signing the user out). */
+function transientRefreshError(): ApiClientError {
+  return (
+    lastTransientRefreshError ??
+    new ApiClientError({ status: 0, code: "NETWORK_ERROR", message: "Could not renew the session; try again." })
+  );
+}
+
+/**
  * Rotates the session through the HttpOnly refresh cookie (contract C1: empty body + `X-KKT-Session: cookie`). Single-flight:
- * concurrent callers share one network call. A 4xx (no cookie, reused or expired token, SESSION_EXPIRED past the absolute
- * lifetime) signs the user out; a network error keeps the session for a later retry.
+ * concurrent callers share one network call. A dead-session answer (isDeadRefreshStatus: no cookie, reused or expired token,
+ * SESSION_EXPIRED past the absolute lifetime) signs the user out; a transient one (409 lock timeout, 429, 5xx, network) keeps the
+ * session for a later retry and the caller sees that error instead.
  */
 export function refreshSession(): Promise<boolean> {
   if (refreshInFlight) return refreshInFlight;
@@ -378,9 +421,13 @@ export function refreshSession(): Promise<boolean> {
         headers: { Accept: "application/json", [SESSION_MODE_HEADER]: "cookie" },
       });
       if (!response.ok) {
-        if (response.status >= 400 && response.status < 500) {
+        const body = await readBody(response).catch(() => undefined);
+        if (isDeadRefreshStatus(response.status)) {
+          lastTransientRefreshError = null;
           tokens.clear();
           emitAuthEvent("unauthenticated");
+        } else {
+          lastTransientRefreshError = parseErrorEnvelope(response.status, body, response.headers);
         }
         return false;
       }
@@ -390,9 +437,29 @@ export function refreshSession(): Promise<boolean> {
         emitAuthEvent("unauthenticated");
         return false;
       }
+      lastTransientRefreshError = null;
+      // The cookie is shared by every tab: if another tab signed out and in as someone else, this refresh returns THAT user's token.
+      // Never carry on (or retry the pending call) as a different user than the one this tab shows.
+      const before = tokenSubject(tokens.getAccess());
+      const after = tokenSubject(data.access_token);
       tokens.setAccess(data.access_token);
+      if (before !== null && after !== null && before !== after) {
+        lastTransientRefreshError = new ApiClientError({
+          status: 409,
+          code: "SESSION_CHANGED",
+          message: "Another user signed in on this browser. Your view has been reloaded for them.",
+        });
+        emitAuthEvent("user-changed");
+        return false;
+      }
       return true;
-    } catch {
+    } catch (cause) {
+      lastTransientRefreshError = new ApiClientError({
+        status: 0,
+        code: "NETWORK_ERROR",
+        message: "Network request failed",
+        cause,
+      });
       return false;
     }
   };
@@ -456,7 +523,8 @@ async function execute(method: HttpMethod, path: string, options: RequestOptions
   const useAuth = options.auth !== false;
   const prepared = prepare(method, path, options);
   if (useAuth && !tokens.getAccess() && tokens.hasSession()) {
-    await refreshSession();
+    // A transient refresh failure keeps the session: report it instead of sending the call without a token (a 401 → sign-out).
+    if (!(await refreshSession()) && tokens.hasSession()) throw transientRefreshError();
   }
   let response = await send(prepared, useAuth);
   if (response.status === 401 && useAuth) {
@@ -468,6 +536,7 @@ async function execute(method: HttpMethod, path: string, options: RequestOptions
     if (code === "TOKEN_EXPIRED" || (code === "UNAUTHENTICATED" && tokens.hasSession())) {
       const refreshed = await refreshSession();
       if (refreshed) response = await send(prepared, useAuth);
+      else if (tokens.hasSession()) throw transientRefreshError();
     }
     if (response.status === 401) {
       tokens.clear();

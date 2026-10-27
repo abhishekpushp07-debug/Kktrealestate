@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { LegalPageView } from "@/components/layout/LegalPageView";
-import { findPage } from "@/lib/api";
+import { findPage, isKnownPath } from "@/lib/api";
 import { markdownToText } from "@/lib/markdown";
 import { pageMetadata } from "@/lib/seo";
 
@@ -23,7 +23,8 @@ const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const { slug } = await params;
-  const page = SLUG.test(slug) ? await findPage(slug) : null;
+  // an unknown slug is a 404 without an API call or a cache entry (lib/api.ts isKnownPath)
+  const page = SLUG.test(slug) && (await isKnownPath(`/${slug}`)) ? await findPage(slug) : null;
   if (!page) return { title: "Page not found", robots: { index: false, follow: false } };
   return pageMetadata({
     title: page.seo?.title?.trim() || page.title,
@@ -34,6 +35,6 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 
 export default async function CmsPage({ params }: { params: Params }) {
   const { slug } = await params;
-  if (!SLUG.test(slug)) notFound();
+  if (!SLUG.test(slug) || !(await isKnownPath(`/${slug}`))) notFound();
   return <LegalPageView slug={slug} eyebrow="Information" />;
 }

@@ -12,6 +12,8 @@ paths = [
   '''(^|/)pnpm-lock\.yaml$''',
   '''(^|/)apps/[^/]+/test/''',
   '''(^|/)packages/[^/]+/test/''',
+  '''(^|/)__tests__/''',
+  '''\.test\.(ts|tsx|mjs|js)$''',
   '''(^|/)docs/''',
   '''(^|/)\.env\.example$''',
   '''(^|/)infra/k8s/secret\.example\.yaml$''',
@@ -23,4 +25,12 @@ regexes = [
   '''dev-only-[A-Za-z0-9-]+''',
   '''CHANGE-ME[A-Za-z0-9_./=-]*''',
   '''change-me[A-Za-z0-9_./=-]*''',
+  # the same CI / nightly / development-only keys base64-encoded (FIELD_ENCRYPTION_KEY must be base64): "ci-only-…", "nightly-only-…",
+  # "dev-only-…" — the prefix is all a match needs, the values are public by design
+  '''Y2ktb25seS1[A-Za-z0-9+/=]*''',
+  '''bmlnaHRseS1vbmx5LW[A-Za-z0-9+/=]*''',
+  '''ZGV2LW9ubHkt[A-Za-z0-9+/=]*''',
+  # the CI smoke's metrics token and the quick-start header's example first-login password
+  '''ci-metrics-token-[0-9]+''',
+  '''First-Login-2026x''',
 ]

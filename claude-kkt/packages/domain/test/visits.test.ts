@@ -252,6 +252,18 @@ describe("icsForVisit revisions (UID / SEQUENCE / DTSTAMP / METHOD)", () => {
     expect(() => icsForVisit({ ...base, sequence: -1 })).toThrow(RangeError);
     expect(() => icsForVisit({ ...base, sequence: 1.5 })).toThrow(RangeError);
   });
+  it("an e-mail that is not a plain address (line break, quotes, delimiters) is left out instead of injecting properties", () => {
+    const ics = icsForVisit({
+      ...base,
+      stamp: "2026-10-26T05:00:00Z",
+      organizer: { name: "Builder", email: "sales@sgb.example\r\nATTACH:https://evil.example/x" },
+      attendee: { name: "Visitor", email: 'a"b@example.com' },
+    });
+    expect(ics).not.toContain("ORGANIZER");
+    expect(ics).not.toContain("ATTENDEE");
+    expect(ics).not.toContain("ATTACH");
+    expect(ics).not.toContain("evil.example");
+  });
 });
 
 describe("misc", () => {

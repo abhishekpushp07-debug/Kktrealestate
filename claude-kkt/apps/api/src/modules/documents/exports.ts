@@ -175,16 +175,38 @@ function failureText(status: number, body: string): string {
  * EXPORT_CSV: runs the list route page by page as the requesting user and stores the CSV. A failure on the last attempt marks the
  * export FAILED (earlier attempts put it back to QUEUED for the retry).
  */
-/** Storage key of page `n` of an export while it is being built. */
-export function exportPartKey(companyId: string, exportId: string, n: number): string {
-  return `exports/${companyId}/${exportId}-part-${n}.csv`;
+/**
+ * Storage key of page `n` of an export while it is being built. `run` is a nonce of the build (kept in the checkpoint, new on a fresh
+ * start), so the parts of an abandoned build that the sweep queued for deletion can never be the parts of a later build.
+ */
+export function exportPartKey(companyId: string, exportId: string, run: string, n: number): string {
+  return `exports/${companyId}/${exportId}-part-${run}-${n}.csv`;
 }
 
-/** Resume point of EXPORT_CSV: the next page's cursor and what is already stored. */
+/** Resume point of EXPORT_CSV: the build nonce, the next page's cursor and what is already stored. */
 interface ExportCheckpoint {
+  run: string;
   cursor: string;
   rows: number;
   pages: number;
+}
+
+/**
+ * Refreshes the pending records of a build's stored parts (STORAGE_SWEEP treats pending objects older than an hour as orphans, and a
+ * resumed build can outlive that) and returns the keys still recorded. A part whose record is gone was queued for deletion by the sweep.
+ */
+export async function touchExportParts(db: DB, companyId: string, exportId: string, run: string): Promise<Set<string>> {
+  const rows = await db
+    .update(storagePendingObjects)
+    .set({ createdAt: new Date() })
+    .where(
+      and(
+        eq(storagePendingObjects.purpose, "export-part"),
+        like(storagePendingObjects.key, `exports/${companyId}/${exportId}-part-${run}-%`),
+      ),
+    )
+    .returning({ key: storagePendingObjects.key });
+  return new Set(rows.map((r) => r.key));
 }
 
 export async function runCsvExport(
@@ -203,13 +225,23 @@ export async function runCsvExport(
     const store = storage();
     // resume where an interrupted attempt stopped, as long as every part it stored is still there
     const saved = ctx.checkpoint as Partial<ExportCheckpoint> | null | undefined;
-    let resume: ExportCheckpoint = { cursor: "start", rows: 0, pages: 0 };
-    if (saved && typeof saved.cursor === "string" && Number.isInteger(saved.pages) && Number.isInteger(saved.rows)) {
-      const parts = await Promise.all(
-        Array.from({ length: saved.pages! }, (_, n) => store.exists(exportPartKey(row.companyId, row.id, n))),
-      );
-      if (parts.every(Boolean)) resume = { cursor: saved.cursor, rows: saved.rows!, pages: saved.pages! };
+    let resume: ExportCheckpoint = { run: randomUUID().slice(0, 8), cursor: "start", rows: 0, pages: 0 };
+    if (
+      saved &&
+      typeof saved.run === "string" &&
+      /^[0-9a-f]{8}$/.test(saved.run) &&
+      typeof saved.cursor === "string" &&
+      Number.isInteger(saved.pages) &&
+      Number.isInteger(saved.rows)
+    ) {
+      // the parts must still be recorded as pending (refreshed first, so the sweep cannot take them now) and still be in storage
+      const recorded = await touchExportParts(ctx.db, row.companyId, row.id, saved.run);
+      const keys = Array.from({ length: saved.pages! }, (_, n) => exportPartKey(row.companyId, row.id, saved.run!, n));
+      const present = await Promise.all(keys.map((k) => (recorded.has(k) ? store.exists(k) : Promise.resolve(false))));
+      if (present.every(Boolean))
+        resume = { run: saved.run, cursor: saved.cursor, rows: saved.rows!, pages: saved.pages! };
     }
+    const run = resume.run;
     const counts = await (async () => {
       let { rows, pages, cursor } = resume;
       let token = await internalToken(ctx.db, row.userId);
@@ -248,14 +280,16 @@ export async function runCsvExport(
         if (pageRows === undefined && !next && counted >= csvExportLimits.maxRows)
           throw new Error(`${row.path} cannot page its CSV export; it returned ${counted} rows without paging facts`);
         // the page becomes a part object (recorded as pending first, so an abandoned export's parts are swept), then the checkpoint
-        const part = exportPartKey(row.companyId, row.id, pages);
+        const part = exportPartKey(row.companyId, row.id, run, pages);
         await recordPendingObject(ctx.db, part, row.companyId, "export-part");
         await store.put(part, Buffer.from(body, "utf8"), "text/csv");
         rows += counted;
         pages += 1;
         if (!next) break;
         cursor = next;
-        await ctx.saveCheckpoint?.({ cursor, rows, pages });
+        // keep the parts of a long (or resumed) build from ageing into the sweep's orphan window while the build is alive
+        await touchExportParts(ctx.db, row.companyId, row.id, run);
+        await ctx.saveCheckpoint?.({ run, cursor, rows, pages });
       }
       // join the parts into one file (streamed through a temp file), store it, then drop the parts
       await withTempDir("export", async (dir) => {
@@ -263,7 +297,7 @@ export async function runCsvExport(
         const out = createWriteStream(file);
         try {
           for (let n = 0; n < pages; n++) {
-            const bytes = await store.get(exportPartKey(row.companyId, row.id, n));
+            const bytes = await store.get(exportPartKey(row.companyId, row.id, run, n));
             if (!out.write(bytes)) await new Promise<void>((resolve) => out.once("drain", () => resolve()));
           }
         } finally {
@@ -273,7 +307,7 @@ export async function runCsvExport(
         await storeFile(store, key, file, "text/csv");
       });
       for (let n = 0; n < pages; n++) {
-        const part = exportPartKey(row.companyId, row.id, n);
+        const part = exportPartKey(row.companyId, row.id, run, n);
         await store.remove(part).catch(() => undefined);
         await ctx.db.delete(storagePendingObjects).where(eq(storagePendingObjects.key, part));
       }

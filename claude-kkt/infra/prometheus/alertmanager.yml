@@ -61,7 +61,9 @@ inhibit_rules:
   # no worker at all explains the queue backlog, a missing replica and stale daily jobs / seals: page once, for the cause
   - source_matchers: [alertname="KktWorkerHeartbeatStale"]
     target_matchers:
-      [alertname=~"KktWorkerReplicaDown|KktJobQueueBacklog|KktDailyJobStale|KktAuditSealStale|KktIntegrityReportStale"]
+      [
+        alertname=~"KktWorkerReplicaDown|KktJobQueueBacklog|KktDailyJobStale|KktAuditSealStale|KktAuditSealFailed|KktIntegrityReportStale",
+      ]
   # the audit-seal page already covers the generic "job failed" warning for AUDIT_SEAL
   - source_matchers: [alertname="KktAuditSealFailed"]
     target_matchers: [alertname="KktJobFailed"]

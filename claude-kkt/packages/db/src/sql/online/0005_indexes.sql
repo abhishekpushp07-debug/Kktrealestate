@@ -82,6 +82,31 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS "demands_installment_name_trgm_idx" ON "
 CREATE INDEX CONCURRENTLY IF NOT EXISTS "payments_instrument_number_trgm_idx" ON "payments" USING gin (("instrument" ->> 'number') gin_trgm_ops);
 
 -- 3. companies.slug is unique (contract C4): build the index online, then attach it as the constraint the Drizzle schema declares.
+--    The migration's backfill numbers equal slugs ("acme", "acme-2" …), but a company whose own name slugifies to such a suffixed form
+--    ("Acme", "Acme", "Acme 2") would still collide with one; any duplicate left gets the next free suffix first, or the unique build
+--    would fail on every deploy. (A no-op once the index exists: duplicates cannot exist then.)
+DO $$
+DECLARE
+  d record;
+  n int;
+  candidate text;
+BEGIN
+  FOR d IN
+    SELECT x.id, x.slug
+    FROM (SELECT id, slug, row_number() OVER (PARTITION BY slug ORDER BY created_at, id) AS rn FROM companies) x
+    WHERE x.rn > 1
+    ORDER BY x.slug, x.rn
+  LOOP
+    n := 2;
+    LOOP
+      candidate := d.slug || '-' || n;
+      EXIT WHEN NOT EXISTS (SELECT 1 FROM companies WHERE slug = candidate);
+      n := n + 1;
+    END LOOP;
+    UPDATE companies SET slug = candidate WHERE id = d.id;
+  END LOOP;
+END
+$$;
 CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS "companies_slug_uq" ON "companies" USING btree ("slug");
 DO $$
 BEGIN
@@ -93,14 +118,15 @@ $$;
 
 -- 4. Ledger epochs (contract C7): UNIQUE (booking_id, epoch, seq) replaces UNIQUE (booking_id, seq), so a rebuild can write epoch n+1
 --    next to the rows of epoch n instead of deleting them. The new index is built online and swapped in with two catalog-only steps.
+--    Every ALTER below is guarded by a catalog check: ALTER TABLE takes its ACCESS EXCLUSIVE lock before it looks for the constraint, so
+--    an unguarded "DROP CONSTRAINT IF EXISTS" would lock the whole ledger (reads included) on every re-run of this file.
 CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS "ledger_entries_booking_epoch_seq_uq" ON "ledger_entries" USING btree ("booking_id", "epoch", "seq");
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_partitioned_table WHERE partrelid = 'public.ledger_entries'::regclass) THEN
-    -- Partitioned by packages/db/partitions: a unique index must contain created_at, so (booking_id, epoch, seq) is a plain index and
-    -- the trigger enforces uniqueness (same function as partitions/001_functions.sql).
-    CREATE INDEX IF NOT EXISTS "ledger_entries_booking_epoch_seq_uq" ON "ledger_entries" USING btree ("booking_id", "epoch", "seq");
-    DROP INDEX IF EXISTS "ledger_entries_booking_seq_uq";
+    -- Partitioned by packages/db/partitions before this migration: a unique index must contain created_at, so uniqueness is the
+    -- trigger's job (same function as partitions/001_functions.sql, now per epoch). Replacing the function body takes no table lock;
+    -- the plain (booking_id, seq) index the partitioning kept serves its lookup, so no index is rebuilt over the partitions here.
     CREATE OR REPLACE FUNCTION ledger_entries_booking_seq_unique_fn() RETURNS trigger
     LANGUAGE plpgsql AS $fn$
     BEGIN
@@ -117,21 +143,58 @@ BEGIN
       RETURN NEW;
     END;
     $fn$;
-    DROP TRIGGER IF EXISTS ledger_entries_booking_seq_unique ON public.ledger_entries;
-    CREATE TRIGGER ledger_entries_booking_seq_unique BEFORE INSERT OR UPDATE OF booking_id, epoch, seq ON public.ledger_entries
-      FOR EACH ROW EXECUTE FUNCTION ledger_entries_booking_seq_unique_fn();
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_trigger
+      WHERE tgrelid = 'public.ledger_entries'::regclass AND tgname = 'ledger_entries_booking_seq_unique' AND NOT tgisinternal
+    ) THEN
+      CREATE TRIGGER ledger_entries_booking_seq_unique BEFORE INSERT OR UPDATE OF booking_id, epoch, seq ON public.ledger_entries
+        FOR EACH ROW EXECUTE FUNCTION ledger_entries_booking_seq_unique_fn();
+    END IF;
   ELSE
     IF NOT EXISTS (
       SELECT 1 FROM pg_constraint WHERE conname = 'ledger_entries_booking_epoch_seq_uq' AND conrelid = 'public.ledger_entries'::regclass
     ) THEN
       ALTER TABLE "ledger_entries" ADD CONSTRAINT "ledger_entries_booking_epoch_seq_uq" UNIQUE USING INDEX "ledger_entries_booking_epoch_seq_uq";
     END IF;
-    ALTER TABLE "ledger_entries" DROP CONSTRAINT IF EXISTS "ledger_entries_booking_seq_uq";
+    IF EXISTS (
+      SELECT 1 FROM pg_constraint WHERE conname = 'ledger_entries_booking_seq_uq' AND conrelid = 'public.ledger_entries'::regclass
+    ) THEN
+      ALTER TABLE "ledger_entries" DROP CONSTRAINT "ledger_entries_booking_seq_uq";
+    END IF;
   END IF;
 END
 $$;
 
--- 5. Constraints added NOT VALID by the migration are validated here (SHARE UPDATE EXCLUSIVE: reads and writes continue).
+-- 5. refresh_tokens.family_started_at (contract C1 absolute session lifetime): the migration added it with DEFAULT now(); each family
+--    gets the creation time of its first token, in batches of 2,000 families that commit one by one (COMMIT inside a top-level DO
+--    block), so no sign-in or refresh waits on more than one batch's row locks. Re-running it only revisits rows that still differ.
+DO $$
+DECLARE
+  last_family uuid := '00000000-0000-0000-0000-000000000000';
+  batch_end uuid;
+BEGIN
+  LOOP
+    -- the last family of the next batch (uuid has no max(); no row leaves batch_end NULL)
+    SELECT f.family_id INTO batch_end
+    FROM (SELECT DISTINCT family_id FROM refresh_tokens WHERE family_id > last_family ORDER BY family_id LIMIT 2000) f
+    ORDER BY f.family_id DESC
+    LIMIT 1;
+    EXIT WHEN batch_end IS NULL;
+    UPDATE refresh_tokens r
+    SET family_started_at = f.started
+    FROM (
+      SELECT family_id, min(created_at) AS started FROM refresh_tokens
+      WHERE family_id > last_family AND family_id <= batch_end
+      GROUP BY family_id
+    ) f
+    WHERE r.family_id = f.family_id AND r.family_started_at IS DISTINCT FROM f.started;
+    COMMIT;
+    last_family := batch_end;
+  END LOOP;
+END
+$$;
+
+-- 6. Constraints added NOT VALID by the migration are validated here (SHARE UPDATE EXCLUSIVE: reads and writes continue).
 ALTER TABLE "bookings" VALIDATE CONSTRAINT "bookings_ledger_epoch_chk";
 ALTER TABLE "bookings" VALIDATE CONSTRAINT "bookings_cancellation_amounts_nonneg_chk";
 ALTER TABLE "companies" VALIDATE CONSTRAINT "companies_slug_format_chk";

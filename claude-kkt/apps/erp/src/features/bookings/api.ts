@@ -60,6 +60,18 @@ export function useBookingDetail(id: string | null | undefined): UseQueryResult<
   });
 }
 
+/**
+ * placeholderData for the paged booking tabs: keep the previous page on screen while the next page of the SAME booking loads, but
+ * never show another booking's rows and dues while this booking's first page loads (key[2] is the booking id in every key below).
+ */
+export function previousPageOfSameBooking<T>(
+  previous: T | undefined,
+  previousQuery: { queryKey: readonly unknown[] } | undefined,
+  bookingId: string | null | undefined,
+): T | undefined {
+  return previousQuery && previousQuery.queryKey[2] === (bookingId ?? "") ? previous : undefined;
+}
+
 /** One page of the booking ledger (contract C7): `epoch` omitted = the current book of record. */
 export interface LedgerPageParams {
   page: number;
@@ -96,7 +108,7 @@ export function useBookingLedger(
     queryKey: bookingKeys.ledger(id ?? "", params),
     queryFn: ({ signal }) => fetchBookingLedger(id ?? "", params, signal),
     enabled: Boolean(id),
-    placeholderData: (previous) => previous,
+    placeholderData: (previous, previousQuery) => previousPageOfSameBooking(previous, previousQuery, id),
   });
 }
 
@@ -144,7 +156,7 @@ export function useBookingDemandsPage(
         { signal },
       ),
     enabled: Boolean(id),
-    placeholderData: (previous) => previous,
+    placeholderData: (previous, previousQuery) => previousPageOfSameBooking(previous, previousQuery, id),
   });
 }
 
@@ -163,7 +175,7 @@ export function useBookingPaymentsPage(
         { signal },
       ),
     enabled: Boolean(id),
-    placeholderData: (previous) => previous,
+    placeholderData: (previous, previousQuery) => previousPageOfSameBooking(previous, previousQuery, id),
   });
 }
 

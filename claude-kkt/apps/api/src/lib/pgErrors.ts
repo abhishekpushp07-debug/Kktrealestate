@@ -150,6 +150,9 @@ export function mapIntegrityError(err: unknown): ApiError | null {
   }
 }
 
+/** Highest `usage_count` an IN_USE mapped from a 23503 reports (the count is "at least this many" beyond it). */
+export const USAGE_COUNT_CAP = 10_000;
+
 /**
  * For a 409 IN_USE mapped from a 23503: counts the rows of the referencing table that still point at the key named in the error
  * detail (`Key (id)=(…) is still referenced from table "bookings"`), using the constraint's own column. Falls back to the mapped error
@@ -162,14 +165,22 @@ export async function withUsageCount(db: Executor, err: unknown, mapped: ApiErro
   if (mapped.code !== "IN_USE" || !constraint || key === undefined) return mapped;
   try {
     const rows = (await db.execute(sql`
-      SELECT c.conrelid::regclass::text AS tbl, a.attname::text AS col
+      SELECT c.conrelid::regclass::text AS tbl, a.attname::text AS col, format_type(a.atttypid, a.atttypmod) AS typ
       FROM pg_constraint c JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = c.conkey[1]
       WHERE c.conname = ${constraint} AND c.contype = 'f' AND array_length(c.conkey, 1) = 1
-      LIMIT 1`)) as unknown as { tbl: string; col: string }[];
+      LIMIT 1`)) as unknown as { tbl: string; col: string; typ: string }[];
     const ref = rows[0];
-    if (!ref || !/^[a-z_][a-z0-9_]*$/.test(ref.tbl) || !/^[a-z_][a-z0-9_]*$/.test(ref.col)) return mapped;
+    if (
+      !ref ||
+      !/^[a-z_][a-z0-9_]*$/.test(ref.tbl) ||
+      !/^[a-z_][a-z0-9_]*$/.test(ref.col) ||
+      !/^[a-z][a-z0-9 _]*(\(\d+(,\d+)?\))?$/.test(ref.typ)
+    )
+      return mapped;
+    // The key is cast to the column's type (never the column to text): the comparison then uses the index every FK column has
+    // (online/0005_indexes.sql), and the count stops at USAGE_COUNT_CAP so a hugely referenced row never turns the 409 into a long scan.
     const counted = (await db.execute(
-      sql`SELECT count(*)::int AS n FROM ${sql.identifier(ref.tbl)} WHERE ${sql.identifier(ref.col)}::text = ${key}`,
+      sql`SELECT count(*)::int AS n FROM (SELECT 1 FROM ${sql.identifier(ref.tbl)} WHERE ${sql.identifier(ref.col)} = CAST(${key} AS ${sql.raw(ref.typ)}) LIMIT ${USAGE_COUNT_CAP}) AS used`,
     )) as unknown as { n: number }[];
     const n = Number(counted[0]?.n ?? 0);
     if (n < 1) return mapped;

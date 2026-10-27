@@ -179,7 +179,7 @@ tests:
               summary: No job worker heartbeat for more than a minute
               description: "Nothing consumes the job queues: daily dues, integrity, audit seal, notifications and backups stop. Check `docker compose ps worker` / `kubectl -n kkt get pods -l app.kubernetes.io/name=worker`, GET :9465/health and the worker logs."
 
-  # one of the two workers stops answering scrapes
+  # one of the two workers hangs: its target stays (scrapes fail, up = 0)
   - interval: 1m
     input_series:
       - series: up{job="kkt-worker", instance="worker-1"}
@@ -198,14 +198,35 @@ tests:
           - exp_labels:
               severity: warning
               component: jobs
-              job: kkt-worker
-              instance: worker-2
             exp_annotations:
-              summary: Job worker worker-2 is not answering metrics scrapes
-              description: The other replica keeps the queues moving; restore the second one before it is needed (docker compose up -d worker / kubectl describe pod).
+              summary: Only 1 job worker(s) answering, fewer than in the last 6 hours
+              description: The remaining replicas keep the queues moving; restore the missing one before it is needed (docker compose ps worker / kubectl -n kkt get pods -l app.kubernetes.io/name=worker). After an intentional scale-down this clears within 6 hours.
       - eval_time: 12m
         alertname: KktWorkerHeartbeatStale
         exp_alerts: []
+
+  # one of the two workers is stopped: service discovery drops its target (no up series at all after minute 10 + the 5 m lookback)
+  - interval: 1m
+    input_series:
+      - series: up{job="kkt-worker", instance="worker-1"}
+        values: 1x40
+      - series: up{job="kkt-worker", instance="worker-2"}
+        values: 1x10
+      - series: kkt_worker_heartbeat_timestamp_seconds{job="kkt-worker", instance="worker-1"}
+        values: 0+60x40
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: KktWorkerReplicaDown
+        exp_alerts: []
+      - eval_time: 30m
+        alertname: KktWorkerReplicaDown
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              component: jobs
+            exp_annotations:
+              summary: Only 1 job worker(s) answering, fewer than in the last 6 hours
+              description: The remaining replicas keep the queues moving; restore the missing one before it is needed (docker compose ps worker / kubectl -n kkt get pods -l app.kubernetes.io/name=worker). After an intentional scale-down this clears within 6 hours.
 
   # DAILY_DUES per-booking failures: a code's first failure (new series) and an increment of an existing series both alert
   - interval: 1m
@@ -319,15 +340,37 @@ tests:
               summary: Object-store deletions failed 10 or more times
               description: STORAGE_SWEEP keeps retrying daily, but erased or orphaned files are still in the bucket (DPDP erasure may be incomplete). Check the bucket credentials/policy and the worker logs.
 
-  # audit seal: a failed AUDIT_SEAL run pages; no success for an hour warns
+  # audit seal: a failed attempt that the next run fixes does not page (kkt_job_failures_24h stays at 1 for a day, but the seal keeps
+  # succeeding every 15 minutes)
   - interval: 1m
     input_series:
       - series: kkt_job_failures_24h{job="kkt-api", instance="api-1", job_name="AUDIT_SEAL"}
-        values: 0 0 1x15
+        values: 0 0 1x60
+      - series: kkt_job_last_success_timestamp_seconds{job="kkt-api", instance="api-1", job_name="AUDIT_SEAL"}
+        values: 0x14 900x14 1800x14 2700x14
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: KktAuditSealFailed
+        exp_alerts: []
+      - eval_time: 55m
+        alertname: KktAuditSealFailed
+        exp_alerts: []
+
+  # audit seal: failures and no successful seal for more than 30 minutes (two scheduled runs) pages; no success for an hour also warns
+  - interval: 1m
+    input_series:
+      - series: kkt_job_failures_24h{job="kkt-api", instance="api-1", job_name="AUDIT_SEAL"}
+        values: 0 0 1x100
       - series: kkt_job_last_success_timestamp_seconds{job="kkt-api", instance="api-1", job_name="AUDIT_SEAL"}
         values: "0x100"
     alert_rule_test:
       - eval_time: 10m
+        alertname: KktAuditSealFailed
+        exp_alerts: []
+      - eval_time: 33m
+        alertname: KktAuditSealFailed
+        exp_alerts: []
+      - eval_time: 40m
         alertname: KktAuditSealFailed
         exp_alerts:
           - exp_labels:
@@ -337,7 +380,7 @@ tests:
             exp_annotations:
               summary: The audit-log seal job failed
               description: "Run GET /api/v1/admin/audit/verify for each company: first_mismatch names the changed, removed or back-dated row. Treat a chain break as a security incident."
-      - eval_time: 10m
+      - eval_time: 40m
         alertname: KktAuditSealStale
         exp_alerts: []
       - eval_time: 90m
@@ -349,6 +392,54 @@ tests:
             exp_annotations:
               summary: No successful audit-log seal for more than an hour
               description: AUDIT_SEAL runs every 15 minutes; unsealed audit rows are not tamper-evident yet. Check the workers (KktWorkerHeartbeatStale) and the job's last error.
+
+  # audit seal: a seal that never succeeded (no success series at all) pages too
+  - interval: 1m
+    input_series:
+      - series: kkt_job_failures_24h{job="kkt-api", instance="api-1", job_name="AUDIT_SEAL"}
+        values: 1x20
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: KktAuditSealFailed
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: KktAuditSealFailed
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              component: security
+              job_name: AUDIT_SEAL
+            exp_annotations:
+              summary: The audit-log seal job failed
+              description: "Run GET /api/v1/admin/audit/verify for each company: first_mismatch names the changed, removed or back-dated row. Treat a chain break as a security incident."
+
+  # base backups (backup.sh status.prom): the newest is 691,000 s (8 days minus 200 s) older than the test clock's epoch, so it crosses
+  # 8 days at 200 s and the alert fires an hour later; a base backup that keeps pace with the clock never alerts
+  - interval: 1m
+    input_series:
+      - series: kkt_backup_last_base_backup_timestamp_seconds{job="node", instance="node-exporter:9100"}
+        values: "-691000x130"
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: KktBaseBackupStale
+        exp_alerts: []
+      - eval_time: 2h
+        alertname: KktBaseBackupStale
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              component: backup
+            exp_annotations:
+              summary: No base backup for more than 8 days
+              description: 'Point-in-time recovery needs a recent base backup plus the WAL archived since. Look for "pg_basebackup FAILED" in `docker compose logs backup`, fix the cause and take one now: `docker compose exec backup sh /opt/kkt/backup.sh base` (docs/RESTORE.md).'
+  - interval: 1m
+    input_series:
+      - series: kkt_backup_last_base_backup_timestamp_seconds{job="node", instance="node-exporter:9100"}
+        values: "0+60x130"
+    alert_rule_test:
+      - eval_time: 2h
+        alertname: KktBaseBackupStale
+        exp_alerts: []
 
   # Alertmanager cannot deliver pages
   - interval: 1m

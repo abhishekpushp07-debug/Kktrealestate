@@ -52,6 +52,8 @@ export {
   type ClosedBookingRef,
   type DuesFailure,
   failureCode,
+  classifyFailure,
+  type FailureClass,
 } from "./services/dues.js";
 export {
   runReport,

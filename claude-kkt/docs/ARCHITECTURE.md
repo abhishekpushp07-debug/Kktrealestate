@@ -104,8 +104,9 @@ Targets: 1,000 concurrent staff, list pages < 300 ms server time, ERP pages < 1.
 - **Caching tiers** — public API in Redis (60 s, per company) and CDN (contract C5: catalog `s-maxage=60`, CMS `s-maxage=300`, with
   stale-while-revalidate, a strong ETag and 304); website pages via ISR (catalog pages regenerate every 60 s, CMS pages every 300 s, all of
   them at once when the API calls the website's `/api/revalidate` after a CMS or project-website write; server reads cached with
-  `unstable_cache` under the `kkt-public` tag, a 404 cached too so unpublished content disappears, a failure never cached). ISR HTML keeps a
-  strict CSP without nonces: `apps/web/csp-hook.cjs` lists the SHA-256 of every inline script of the HTML it sends; pages rendered per request
+  `unstable_cache` under the `kkt-public` tag, a 404 cached too so unpublished content disappears, a failure never cached; detail slugs the cached sitemap does not list are a 404
+  without an API call or cache entry). ISR HTML keeps a
+  strict CSP without nonces: `apps/web/csp-hook.cjs` lists the SHA-256 of each inline script of the HTML it sends that is exactly Next's RSC payload (`self.__next_f.push(<JSON>)`; any other inline script gets no hash and is blocked); pages rendered per request
   (`/visit/<token>`, `/projects`, `/blog`) keep the per-request nonce policy; media immutable for a year; lists carry a body-hash ETag and answer 304 to a matching If-None-Match (no ERP code sends it yet); single versioned resources carry `ETag: "v<version>"`, the If-Match token of the next write (contract C6, docs/API-CONVENTIONS.md "Versions"); the ERP keeps a 15 s stale-while-revalidate client cache.
 - **Read/write split ready** — Drizzle client has `primary` and `replica` handles; reports and public reads use `replica` when `DATABASE_REPLICA_URL` is set.
 - **Partitioning plan** — `audit_logs`, `ledger_entries`, `login_events`, `notifications` can be converted to monthly range partitions (UTC months on `created_at`, no row copy) by the opt-in scripts in `packages/db/partitions` (see its README; off by default, switch on at ~50 M rows); job PARTITION_MAINTENANCE keeps two months ahead when `PARTITIONING_ENABLED=true`.

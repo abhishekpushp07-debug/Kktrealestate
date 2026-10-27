@@ -109,7 +109,12 @@ export async function writeAuditMany(tx: Executor, entries: readonly AuditEntry[
 // Loading with scope (404 outside the user's projects, never 403)
 // ---------------------------------------------------------------------------
 
-/** Loads a project of the company the user may see; 404 when missing or out of scope. */
+/**
+ * Loads a project of the company the user may see; 404 when missing or out of scope. `forUpdate` locks the row FOR NO KEY UPDATE: it
+ * serialises every writer that locks the project (activations, parking, block creation, PATCH) exactly like FOR UPDATE, but does not
+ * block the FOR KEY SHARE lock a child INSERT's foreign-key check takes (bookings, payments, demands, leads… of the project), so a
+ * booking that locked its flat first can never deadlock with it.
+ */
 export async function loadProject(
   db: Executor,
   user: StaffContext,
@@ -123,7 +128,7 @@ export async function loadProject(
     .where(and(eq(projects.id, projectId), eq(projects.companyId, user.companyId)))
     .limit(1)
     .$dynamic();
-  const [row] = await (forUpdate ? q.for("update") : q);
+  const [row] = await (forUpdate ? q.for("no key update") : q);
   if (!row) throw ApiError.notFound("Project");
   return row;
 }
@@ -481,11 +486,15 @@ export function translateDomainError(err: unknown, context?: { rateCardId?: stri
   if (err instanceof PricingError) throw ApiError.rule(err.message, err.code);
   if (err instanceof MoneyError) {
     const card = context?.rateCardId ?? null;
-    const message = card
+    // only a percent (PLC value) failure points at plc_rules; any other money failure (e.g. a price beyond the safe range) does not
+    const plc = card !== null && /^Percent\b/.test(err.message);
+    const message = plc
       ? `Rate card ${card} cannot price this flat: ${err.message}. Correct the PLC rule value (at most 2 decimals) and retry.`
-      : err.message;
+      : card
+        ? `Rate card ${card} cannot price this flat: ${err.message}`
+        : err.message;
     throw new ApiError(422, "INVALID_AMOUNT", message, {
-      issues: [{ path: card ? "plc_rules" : "", message: err.message, code: "money" }],
+      issues: [{ path: plc ? "plc_rules" : "", message: err.message, code: "money" }],
       ...(card ? { rate_card_id: card } : {}),
     });
   }

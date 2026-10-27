@@ -135,12 +135,49 @@ const TIMESTAMP_TEXT_RE = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z
 const DATE_TEXT_RE = /^\d{4}-\d{2}-\d{2}$/;
 const NUMERIC_TEXT_RE = /^-?\d{1,30}(\.\d{1,20})?$/;
 
-/** True for a parseable timestamp in the sort-key or ISO spelling. */
+/** True for a real calendar day (Date.parse accepts 2024-02-30 and rolls it over; Postgres refuses it with 22008). */
+function validCalendarDate(text: string): boolean {
+  const y = Number(text.slice(0, 4));
+  const m = Number(text.slice(5, 7));
+  const d = Number(text.slice(8, 10));
+  if (y < 1 || m < 1 || m > 12 || d < 1) return false;
+  return d <= new Date(Date.UTC(y, m, 0)).getUTCDate();
+}
+
+/** True for a parseable timestamp in the sort-key or ISO spelling (a real calendar day and clock time, offset within ±15:59). */
 function validTimestampText(v: string): boolean {
-  if (!TIMESTAMP_TEXT_RE.test(v)) return false;
+  if (!TIMESTAMP_TEXT_RE.test(v) || !validCalendarDate(v)) return false;
+  const hh = Number(v.slice(11, 13));
+  const mi = Number(v.slice(14, 16));
+  const ss = Number(v.slice(17, 19));
+  if (hh > 23 || mi > 59 || ss > 59) return false;
+  const offset = /([+-])(\d{2}):?(\d{2})$/.exec(v);
+  if (offset && (Number(offset[2]) > 15 || Number(offset[3]) > 59)) return false;
   const iso = v.replace(" ", "T");
   return !Number.isNaN(Date.parse(/(Z|[+-]\d{2}:?\d{2})$/.test(iso) ? iso : `${iso}Z`));
 }
+
+/** Integer column ranges (a value outside reaches Postgres as 22003 "out of range"). */
+const INT_RANGE: Record<string, readonly [number, number]> = {
+  PgSmallInt: [-32_768, 32_767],
+  PgInteger: [-2_147_483_648, 2_147_483_647],
+  PgSerial: [-2_147_483_648, 2_147_483_647],
+  PgBigInt53: [Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER],
+  PgBigSerial53: [Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER],
+};
+const BIGINT_MIN = -(2n ** 63n);
+const BIGINT_MAX = 2n ** 63n - 1n;
+
+/** True for an int8 value given as a number or an integer string. */
+function validBigInt(v: string | number | boolean): boolean {
+  if (typeof v === "number") return Number.isSafeInteger(v);
+  if (typeof v !== "string" || !/^-?\d{1,19}$/.test(v)) return false;
+  const n = BigInt(v);
+  return n >= BIGINT_MIN && n <= BIGINT_MAX;
+}
+
+/** Text Postgres can store (a NUL character is 22021 "invalid byte sequence"). */
+const storableText = (v: string): boolean => !v.includes("\u0000");
 
 /** Decodes a cursor; 400 INVALID_CURSOR when it is not one this API issued (shape only — see checkCursorValue for the types). */
 export function decodeCursor(raw: string): CursorPayload {
@@ -169,26 +206,36 @@ export function decodeCursor(raw: string): CursorPayload {
  * reaching Postgres as a bad cast). Text-like columns accept any string.
  */
 export function checkCursorValue(col: AnyPgColumn, idCol: AnyPgColumn, c: CursorPayload): void {
-  if (idCol.columnType === "PgUUID" && !UUID_TEXT_RE.test(c.id)) throw invalidCursor("malformed row id");
+  if (idCol.columnType === "PgUUID" ? !UUID_TEXT_RE.test(c.id) : !storableText(c.id))
+    throw invalidCursor("malformed row id");
   const v = c.v;
   if (v === null) return;
   const t = col.columnType;
+  const range = INT_RANGE[t];
+  const enumValues =
+    t === "PgEnumColumn" ? (col as unknown as { enumValues?: readonly string[] }).enumValues : undefined;
   const ok =
     t === "PgTimestamp" || t === "PgTimestampString"
       ? typeof v === "string" && validTimestampText(v)
       : t === "PgDate" || t === "PgDateString"
-        ? typeof v === "string" && DATE_TEXT_RE.test(v) && !Number.isNaN(Date.parse(v))
-        : t === "PgInteger" || t === "PgSmallInt" || t === "PgBigInt53" || t === "PgSerial" || t === "PgBigSerial53"
-          ? typeof v === "number" && Number.isSafeInteger(v)
-          : t === "PgReal" || t === "PgDoublePrecision"
-            ? typeof v === "number" && Number.isFinite(v)
-            : t === "PgNumeric" || t === "PgNumericNumber" || t === "PgBigInt64"
-              ? (typeof v === "number" && Number.isFinite(v)) || (typeof v === "string" && NUMERIC_TEXT_RE.test(v))
-              : t === "PgUUID"
-                ? typeof v === "string" && UUID_TEXT_RE.test(v)
-                : t === "PgBoolean"
-                  ? typeof v === "boolean"
-                  : typeof v === "string" || typeof v === "number" || typeof v === "boolean";
+        ? typeof v === "string" && DATE_TEXT_RE.test(v) && validCalendarDate(v)
+        : range
+          ? typeof v === "number" && Number.isSafeInteger(v) && v >= range[0] && v <= range[1]
+          : t === "PgBigInt64"
+            ? validBigInt(v)
+            : t === "PgReal" || t === "PgDoublePrecision"
+              ? typeof v === "number" && Number.isFinite(v)
+              : t === "PgNumeric" || t === "PgNumericNumber"
+                ? (typeof v === "number" && Number.isFinite(v)) || (typeof v === "string" && NUMERIC_TEXT_RE.test(v))
+                : t === "PgUUID"
+                  ? typeof v === "string" && UUID_TEXT_RE.test(v)
+                  : t === "PgBoolean"
+                    ? typeof v === "boolean"
+                    : enumValues
+                      ? typeof v === "string" && enumValues.includes(v)
+                      : typeof v === "string"
+                        ? storableText(v)
+                        : typeof v === "number" || typeof v === "boolean";
   if (!ok) throw invalidCursor("sort value does not match the sort column");
 }
 

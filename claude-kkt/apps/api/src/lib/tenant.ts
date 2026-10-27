@@ -19,6 +19,12 @@ export const COMPANY_HEADER = "x-kkt-company";
 
 /** How long a slug / host / single-company answer is reused in this process (companies change rarely; a new host waits ≤ 30 s). */
 const CACHE_TTL_MS = 30_000;
+/**
+ * Most entries the cache holds. Slugs and hosts come from unauthenticated requests (`x-kkt-company`, Host), and misses are cached too
+ * (so a flood of unknown names costs one query each per 30 s, not one per request): without a bound, random names would grow the map
+ * for the life of the process. The oldest entry is evicted first (a Map iterates in insertion order and a refresh re-inserts).
+ */
+export const TENANT_CACHE_MAX_ENTRIES = 1_000;
 const cache = new Map<string, { id: string | null; at: number }>();
 
 /** Drops the process-local cache (tests; after a company's slug or hosts change). */
@@ -26,11 +32,24 @@ export function clearTenantCache(): void {
   cache.clear();
 }
 
+/** Number of entries in the process-local cache (tests). */
+export function tenantCacheSize(): number {
+  return cache.size;
+}
+
 async function cachedLookup(key: string, load: () => Promise<string | null>, cacheMiss = true): Promise<string | null> {
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.id;
   const id = await load();
-  if (id !== null || cacheMiss) cache.set(key, { id, at: Date.now() });
+  if (id !== null || cacheMiss) {
+    cache.delete(key);
+    while (cache.size >= TENANT_CACHE_MAX_ENTRIES) {
+      const oldest = cache.keys().next().value;
+      if (oldest === undefined) break;
+      cache.delete(oldest);
+    }
+    cache.set(key, { id, at: Date.now() });
+  }
   return id;
 }
 

@@ -382,21 +382,30 @@ jobs:
           done
       - name: Shell scripts
         run: shellcheck -s sh -S warning infra/backup/backup.sh infra/postgres/init/02-passwords.sh infra/scripts/gen-secrets.sh
-      - name: Backup encryption round trip (age and openssl modes, tamper refusal)
+      # scripts/ci/backup-sh.test.mjs: encryption round trips (age + openssl), tamper refusal, failures that must never count as a backup
+      # (failed pg_dump, a cipher failing at the end of the stream, a failed base backup), WAL archiving, retention — with age installed
+      # here, so the age cases run too (the supply-chain job skips them)
+      - name: backup.sh (age and openssl modes, failure propagation, retention)
         run: |
-          sudo apt-get install -y -qq age > /dev/null
-          for mode in age openssl; do
-            d=$(mktemp -d); export BACKUP_DIR="$d/b" BACKUP_ENCRYPTION_KEY_FILE="$d/key"
-            if [ $mode = age ]; then age-keygen -o "$d/key" 2> /dev/null; else openssl rand -hex 32 > "$d/key"; fi
-            mkdir -p "$BACKUP_DIR/wal"; head -c 1048576 /dev/urandom > "$d/seg"
-            sh infra/backup/backup.sh wal-push "$d/seg" 000000010000000000000001
-            sh infra/backup/backup.sh wal-fetch 000000010000000000000001 "$d/out" && cmp "$d/seg" "$d/out"
-            if [ $mode = age ]; then f="$BACKUP_DIR/wal/000000010000000000000001.age"; else f="$BACKUP_DIR/wal/000000010000000000000001.enc"; fi
-            printf X | dd of="$f" bs=1 seek=2000 conv=notrunc 2> /dev/null
-            if sh infra/backup/backup.sh decrypt "$f" /dev/null; then echo "::error::$mode accepted a tampered file"; exit 1; fi
-          done
+          sudo apt-get update -qq && sudo apt-get install -y -qq age > /dev/null
+          node --test scripts/ci/backup-sh.test.mjs
+      # the same script under the image's busybox sh and tools: WAL round trip with age, openssl encrypt/decrypt, prune of a crashed base
       - name: Backup image (age + backup.sh on postgres:16-alpine)
-        run: docker build -q -t kkt-backup:ci infra/backup && docker run --rm --entrypoint sh kkt-backup:ci -c 'age --version && sh -n /opt/kkt/backup.sh'
+        run: |
+          docker build -q -t kkt-backup:ci infra/backup
+          docker run --rm --entrypoint sh kkt-backup:ci -c '
+            set -e
+            age --version && sh -n /opt/kkt/backup.sh
+            d=$(mktemp -d); export BACKUP_DIR=$d/b BACKUP_ENCRYPTION_KEY_FILE=$d/age.key
+            age-keygen -o $d/age.key 2> /dev/null; openssl rand -hex 32 > $d/hex.key
+            mkdir -p $d/b/wal $d/b/base/20000101T000000Z.partial; head -c 200000 /dev/urandom > $d/seg
+            sh /opt/kkt/backup.sh wal-push $d/seg 000000010000000000000001
+            sh /opt/kkt/backup.sh wal-fetch 000000010000000000000001 $d/out && cmp $d/seg $d/out
+            BACKUP_ENCRYPTION_KEY_FILE=$d/hex.key sh /opt/kkt/backup.sh encrypt $d/seg $d/x.enc
+            BACKUP_ENCRYPTION_KEY_FILE=$d/hex.key sh /opt/kkt/backup.sh decrypt $d/x.enc - | cmp - $d/seg
+            touch -d "2000-01-01 00:00:00" $d/b/base/20000101T000000Z.partial
+            sh /opt/kkt/backup.sh prune && test ! -e $d/b/base/20000101T000000Z.partial
+            echo "backup.sh ok under busybox"'
 
   images:
     name: Container images + SBOM (build; push on main)

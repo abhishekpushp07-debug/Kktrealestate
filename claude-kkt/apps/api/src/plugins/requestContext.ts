@@ -53,6 +53,18 @@ export function runWithRequestStore<T>(store: RequestStore, fn: () => T): T {
   return storage.run(store, fn);
 }
 
+/**
+ * Runs `fn` with the request's idempotency claim hidden from the commit marker (plugins/idempotency.ts): for bookkeeping writes that are
+ * NOT the outcome of the request and are undone on failure — e.g. the storage_pending_objects record an upload writes before its
+ * transaction and removes again when the upload fails. Without it such an autocommit write would pin the Idempotency-Key ("something
+ * committed"), so a failed upload could never be retried with its key (5xx → IDEMPOTENT_OUTCOME_UNKNOWN, 4xx stored and replayed).
+ */
+export function withoutCommitTracking<T>(fn: () => T): T {
+  const store = storage.getStore();
+  if (!store?.idempotency) return fn();
+  return storage.run({ ...store, idempotency: undefined }, fn);
+}
+
 /** Cache-Control of a public cache policy. */
 export function publicCacheControl(p: CachePolicy): string {
   return `public, s-maxage=${Math.max(0, Math.floor(p.sMaxAge))}, stale-while-revalidate=${Math.max(0, Math.floor(p.staleWhileRevalidate))}`;

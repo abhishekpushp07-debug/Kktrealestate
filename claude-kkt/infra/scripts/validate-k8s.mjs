@@ -11,6 +11,7 @@
 //  - the worker (contract C8): ≥ 2 replicas, startup/readiness/liveness httpGet /health on container port 9465, a grace period of at
 //    least WORKER_DRAIN_TIMEOUT_MS + 30 s, a PodDisruptionBudget, and a liveness window longer than the grace period
 //  - every API/worker/migrate container gets the contract C9 key rings (JWT_SIGNING_KEYS, LINK_SIGNING_KEYS, HASH_KEYS) as _FILE secrets
+//  - the Namespace (and only it) carries app.kubernetes.io/component: namespace, the label the deploy workflow excludes
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseAllDocuments } from "yaml";
@@ -217,6 +218,23 @@ for (const { file, obj } of byKind("Ingress")) {
       )
         fail(`${file} Ingress ${rule.host}${p.path}`, "service port missing");
     }
+}
+
+// the deploy workflow (.github/workflows/deploy.yml) applies everything except the Namespace, selected by this label: a Namespace without
+// it would be applied by a namespaced service account (forbidden), and a workload with it would never be deployed
+for (const { file, obj } of docs) {
+  const isNs = obj.kind === "Namespace";
+  const label = obj.metadata?.labels?.["app.kubernetes.io/component"];
+  if (isNs && label !== "namespace")
+    fail(
+      `${file} Namespace/${obj.metadata.name}`,
+      "needs label app.kubernetes.io/component: namespace (skipped by the deploy workflow)",
+    );
+  if (!isNs && label === "namespace")
+    fail(
+      `${file} ${obj.kind}/${obj.metadata?.name}`,
+      "app.kubernetes.io/component: namespace is reserved for the Namespace",
+    );
 }
 
 if (errors.length) {

@@ -582,6 +582,26 @@ const PHOTO = path.join(TMP, "snag.jpg");
     expect((await bodyText(page)).includes("A-803") && !(await bodyText(page)).includes("Something went wrong"), `"Try again" recovers once the data is good (${w})`, page);
     drain(page); // the deliberate crash logged its own console errors
     await check(page, "p7-recovered", { noShot: true });
+    if (w === 1440) {
+      // Review (phase 7): sign-out with an expired access token (the app left open past its lifetime). The first logout answers
+      // 401 TOKEN_EXPIRED; the client must refresh and log out again, so the server revokes the session and clears kkt_prt.
+      let expiredOnce = false;
+      await page.route("**/api/v1/portal/auth/logout", (route) => {
+        if (expiredOnce) return route.continue();
+        expiredOnce = true;
+        return route.fulfill({ status: 401, contentType: "application/json", body: JSON.stringify({ error: { code: "TOKEN_EXPIRED", message: "Access token expired" } }) });
+      });
+      const refreshed = page.waitForResponse((r) => r.url().includes("/api/v1/portal/auth/refresh"), { timeout: 15000 }).catch(() => null);
+      const loggedOut = page.waitForResponse((r) => r.url().includes("/api/v1/portal/auth/logout") && r.status() === 204, { timeout: 15000 }).catch(() => null);
+      await page.getByRole("button", { name: "Sign out", exact: true }).first().click();
+      const [ref, out] = await Promise.all([refreshed, loggedOut]);
+      await page.waitForURL(/\/login/, { timeout: 10000 }).catch(() => null);
+      expect(Boolean(ref && ref.status() === 200 && out), `sign-out after the access token expired refreshes, then logs out (204) (${w})`, page);
+      const prtAfter = (await ctx.cookies()).find((c) => c.name === "kkt_prt");
+      expect(!prtAfter && new URL(page.url()).pathname.startsWith("/login"), `sign-out clears the kkt_prt cookie and shows the sign-in page (${w})`, page);
+      await page.unroute("**/api/v1/portal/auth/logout");
+      drain(page); // the deliberate 401 is logged by the browser
+    }
     await ctx.close();
   }
 

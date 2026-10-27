@@ -230,14 +230,20 @@ the full git SHA, default the commit the workflow runs on):
 
 1. The job runs in a GitHub **environment**: give `production` (and ideally `staging`) **required reviewers** and the `KUBECONFIG_B64`
    secret (base64 kubeconfig of a deploy service account limited to namespace `kkt`) under Settings → Environments. The job waits for
-   an approval before it touches the cluster; one deployment per environment at a time.
+   an approval before it touches the cluster; one deployment per environment at a time. The workflow never applies the Namespace
+   (created once at bootstrap; `namespace.yaml` carries `app.kubernetes.io/component: namespace` and every apply uses the selector
+   `app.kubernetes.io/component!=namespace`), so a namespaced Role is enough: `get/list/watch/create/update/patch/delete` on
+   configmaps, services, deployments, replicasets (read), jobs, horizontalpodautoscalers, poddisruptionbudgets, networkpolicies and
+   ingresses, plus `get/list` on pods, `get` on pods/log and `create` on pods/exec (the smoke checks).
 2. It checks out the commit of the images, verifies the four images exist for that tag, and renders `infra/k8s` (or
    `infra/k8s/overlays/<environment>` when present) with every image set to that tag; `:latest` or the placeholder in the output fails
    the run; a server-side dry run validates the result.
 3. **Migrate first**: shared objects (ConfigMap, Services, policies) are applied, the previous `migrate` Job is deleted, the new one is
    applied and must complete (15 minutes, 2 retries). If it fails nothing else changed — the running version keeps serving.
 4. Everything is applied and `kubectl rollout status` waits for every Deployment (`ROLLOUT_TIMEOUT` 10 min); then smoke checks:
-   `/api/v1/health/ready` and the full `/api/v1/health` (status `ok`) from inside an API pod, and `:9465/health` of every worker.
+   `/api/v1/health/ready` and the full `/api/v1/health` (status `ok`) from inside an API pod, and `:9465/health` of every worker —
+   pods of the new version only (old pods still terminating, e.g. a worker draining for up to 180 s with `/health` = 503, are skipped;
+   no running worker at all fails the check).
 5. **Automatic rollback**: if a rollout or a smoke check fails, every Deployment whose revision changed in this run gets
    `kubectl rollout undo --to-revision=<the revision recorded before the apply>` and the job fails; the summary shows the images before
    and after.
@@ -279,8 +285,10 @@ shards), acceptance, OpenAPI compatibility, builds + an API **and worker** start
 - **Images**: plain `docker buildx` (no third-party build actions) with `--sbom=true --provenance=mode=max`; the SPDX SBOM of every
   image (api, erp, web, portal, backup) is kept as a workflow artifact for 90 days and attached to the pushed image.
 - **Infra**: `docker compose config` of both stacks (no `:latest`), every mounted secret produced by `gen-secrets.sh`, kustomize render
-  with a SHA tag + kubeconform + `validate-k8s.mjs`, `promtool check/test rules`, `amtool check-config`, Caddy, nginx, shellcheck, an
-  encrypt → tamper → refuse round trip of `backup.sh` in both modes, and the backup image build.
+  with a SHA tag + kubeconform + `validate-k8s.mjs`, `promtool check/test rules`, `amtool check-config`, Caddy, nginx, shellcheck,
+  `scripts/ci/backup-sh.test.mjs` with age installed (both encryption modes, tamper refusal, a failed dump / cipher / base backup never
+  counted as a backup, WAL archiving, retention), and the backup image build with a WAL / encrypt / prune round trip under its busybox
+  shell.
 - **Nightly** (`nightly.yml`): the load gate runs on the scale seed when `pnpm --filter @kkt/api seed:scale` exists (else the demo seed)
   and fails when any scenario's p95 exceeds its limit in `scripts/ci/load-thresholds.json` (lists 300 ms, cached public reads 100 ms,
   payments 800 ms) or more than 1% of its requests fail; plus browser QA.

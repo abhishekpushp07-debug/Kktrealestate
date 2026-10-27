@@ -511,10 +511,10 @@ function ReplyComposer({ ticket }: { ticket: ServiceRequestDetailResponse }) {
       api.post<ServiceMessageRow>(
         `${SERVICE_PATH}/${ticket.id}/messages`,
         {
-        body: body.trim(),
-        is_internal: internal,
-        attachment_ids: attachments.map((doc) => doc.id),
-        ...(nextStatus ? { status: nextStatus } : {}),
+          body: body.trim(),
+          is_internal: internal,
+          attachment_ids: attachments.map((doc) => doc.id),
+          ...(nextStatus ? { status: nextStatus } : {}),
         },
         { version: ticket.version },
       ),

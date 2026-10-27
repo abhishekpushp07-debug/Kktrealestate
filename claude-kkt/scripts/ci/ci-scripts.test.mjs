@@ -1,4 +1,4 @@
-// Tests of the CI gate scripts: node --test scripts/ci/   (run by the "Supply chain" job of .github/workflows/ci.yml)
+// Tests of the CI gate scripts: node --test scripts/ci/*.test.mjs   (run by the "Supply chain" job of .github/workflows/ci.yml)
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -60,6 +60,43 @@ test("CHECK / FOREIGN KEY constraints on existing tables need NOT VALID; UNIQUE 
   assert.deepEqual(lint('ALTER TABLE "p" ADD CONSTRAINT "u" UNIQUE USING INDEX "p_a_uq";'), []);
   // a table created in the same file may get validated constraints straight away
   assert.deepEqual(lint('CREATE TABLE "n" ("a" int);\nALTER TABLE "n" ADD CONSTRAINT "c" CHECK ("a" > 0);'), []);
+});
+
+test("unnamed constraints (ADD CHECK / FOREIGN KEY / UNIQUE / PRIMARY KEY) follow the same rules as named ones", () => {
+  assert.deepEqual(lint("ALTER TABLE demands ADD CHECK (a >= 0);"), ["constraint-not-valid"]);
+  assert.deepEqual(lint("ALTER TABLE demands ADD CHECK (a >= 0) NOT VALID;"), []);
+  assert.deepEqual(lint("ALTER TABLE p ADD FOREIGN KEY (b) REFERENCES b(id);"), ["constraint-not-valid"]);
+  // NOT VALID is honoured (it used to be taken for `ADD COLUMN … REFERENCES` and always flagged)
+  assert.deepEqual(lint("ALTER TABLE p ADD FOREIGN KEY (b) REFERENCES b(id) NOT VALID;"), []);
+  assert.deepEqual(lint("ALTER TABLE p ADD UNIQUE (a);"), ["unique-without-index"]);
+  assert.deepEqual(lint("ALTER TABLE p ADD PRIMARY KEY (a);"), ["unique-without-index"]);
+  assert.deepEqual(lint("ALTER TABLE p ADD UNIQUE USING INDEX p_a_uq;"), []);
+});
+
+test("statements inside DO blocks (idempotent constraint adds) are linted like top-level ones", () => {
+  const wrap = (body) => `DO $$ BEGIN\n  ${body}\nEXCEPTION WHEN duplicate_object THEN null;\nEND $$;`;
+  assert.deepEqual(lint(wrap('ALTER TABLE "p" ADD CONSTRAINT "f" FOREIGN KEY ("b") REFERENCES "b"("id");')), [
+    "constraint-not-valid",
+  ]);
+  assert.deepEqual(
+    lint(wrap('ALTER TABLE "p" ADD CONSTRAINT "f" FOREIGN KEY ("b") REFERENCES "b"("id") NOT VALID;')),
+    [],
+  );
+  assert.deepEqual(lint("DO $do$ BEGIN CREATE INDEX x ON bookings (a); END $do$;"), ["index-not-concurrent"]);
+  assert.deepEqual(
+    lint(
+      "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'c') THEN ALTER TABLE t ADD CONSTRAINT c CHECK (a > 0); END IF; END $$;",
+    ),
+    ["constraint-not-valid"],
+  );
+  assert.deepEqual(lint("DO $$ BEGIN RAISE NOTICE 'hello; world'; END $$;"), []);
+  // an allow comment before the DO covers its body
+  assert.deepEqual(
+    lint(
+      "-- lint-migrations: allow constraint-not-valid — companies holds one row per tenant\nDO $$ BEGIN ALTER TABLE companies ADD CHECK (a > 0); END $$;",
+    ),
+    [],
+  );
 });
 
 test("ALTER COLUMN TYPE on an existing table is rejected", () => {
@@ -262,4 +299,28 @@ test("load gate: p95 per route, failure ratio and scenario count; only the last 
     "POST /payments (₹100, 10 conns): 2.00% non-2xx (limit 1%)",
   ]);
   assert.match(gate(rows, t).failures[0], /only 3 scenario\(s\) ran/);
+});
+
+// ---- deploy workflow (static checks of what cannot run outside a cluster) ----------------------------------------------------------
+
+test("deploy workflow: never applies the Namespace (namespaced service account) and smoke-checks only pods of the new version", async () => {
+  const { parse } = await import("yaml");
+  const wf = parse(readFileSync(join(ROOT, ".github", "workflows", "deploy.yml"), "utf8"));
+  const ns = parse(readFileSync(join(ROOT, "infra", "k8s", "namespace.yaml"), "utf8"));
+  assert.equal(ns.metadata.labels["app.kubernetes.io/component"], "namespace");
+  assert.equal(wf.env.NOT_NAMESPACE, "app.kubernetes.io/component!=namespace");
+  const steps = wf.jobs.deploy.steps;
+  const applies = steps
+    .flatMap((s) => (s.run ?? "").split("\n"))
+    .filter((l) => /kubectl apply\b.*rendered\.yaml/.test(l));
+  assert.ok(applies.length >= 4, "dry run, shared objects, migrate Job, everything");
+  for (const l of applies)
+    assert.ok(
+      /-l "\$NOT_NAMESPACE"|component=migrate|notin \([^)]*\bnamespace\b/.test(l),
+      `apply without the namespace exclusion: ${l}`,
+    );
+  const smoke = steps.find((s) => s.id === "smoke").run;
+  assert.match(smoke, /deletionTimestamp/, "terminating (draining) pods are skipped");
+  assert.match(smoke, /no running worker pod/, "no worker at all fails instead of passing vacuously");
+  assert.doesNotMatch(smoke, /exec deploy\//);
 });

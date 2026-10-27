@@ -38,7 +38,18 @@ export {
   SQL_FOLDER,
   MIGRATION_LOCK_KEY,
   SCHEMA_FILES_TABLE,
+  DEFAULT_MIGRATION_LOCK_TIMEOUT_MS,
+  DEFAULT_MIGRATION_LOCK_RETRIES,
+  withLockRetry,
+  partitionIndexName,
 } from "./migrate.js";
-export type { MigrateOptions, MigrateReport, OnlineStatementResult, ConcurrentIndexStatement } from "./migrate.js";
+export type {
+  MigrateOptions,
+  MigrateReport,
+  OnlineStatementResult,
+  ConcurrentIndexStatement,
+  OnlineSqlOptions,
+  LockRetryOptions,
+} from "./migrate.js";
 export { resetDatabase, resetRefusalReason } from "./reset.js";
 export type { ResetGuards } from "./reset.js";

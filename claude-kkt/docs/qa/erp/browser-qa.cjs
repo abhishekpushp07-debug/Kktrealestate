@@ -2176,6 +2176,34 @@ async function sectionPhase7(browser, ids) {
       expect(/default_amount_paise/.test(header) && !/default_amount(,|$)/.test(header), `charge-type template header uses default_amount_paise (${header.slice(0, 80)}) (${width})`, page);
       await check(page, "p7-import-template");
       await page.keyboard.press("Escape");
+
+      // Review (phase 7): no PII at rest — a customer picked in the palette is not written to localStorage; sign-out forgets the
+      // user-scoped keys (recents, local booking draft, owner) so the next user of this browser sees nothing of them.
+      await goto(page, "/");
+      const phoneSearch = page.getByRole("button", { name: /search/i }).first();
+      if (width === 390 && (await phoneSearch.isVisible().catch(() => false))) await phoneSearch.click();
+      else await page.keyboard.press("Control+k");
+      const paletteInput = page.locator("[cmdk-input]").last();
+      await paletteInput.waitFor({ state: "visible", timeout: 8000 });
+      await paletteInput.fill("Priya");
+      await page.waitForTimeout(1200);
+      await settle(page);
+      await page.locator("[cmdk-item]", { hasText: /Priya/ }).first().click();
+      await settle(page);
+      const browserData = await page.evaluate(() => ({
+        recent: localStorage.getItem("kkt.erp.recent") || "[]",
+        owner: localStorage.getItem("kkt.erp.owner"),
+      }));
+      const recentIds = JSON.parse(browserData.recent).map((item) => item.id);
+      expect(recentIds.every((id) => id.startsWith("nav:")) && !/Priya/.test(browserData.recent), `a customer picked in the palette is not stored in localStorage (${recentIds.join(",") || "none"}) (${width})`, page);
+      expect(Boolean(browserData.owner), `the user-scoped browser data names its owner (${width})`, page);
+      await page.getByTestId("user-menu-trigger").click();
+      await page.getByTestId("user-menu-logout").click();
+      await page.waitForURL(/\/login/, { timeout: 10000 });
+      const leftKeys = await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("kkt.erp.")));
+      expect(!leftKeys.some((k) => ["kkt.erp.recent", "kkt.erp.booking-draft", "kkt.erp.owner", "kkt.erp.session"].includes(k)), `sign-out leaves no user-scoped keys (${leftKeys.join(",") || "none"}) (${width})`, page);
+      const rtAfter = (await context.cookies()).find((c) => c.name === "kkt_rt");
+      expect(!rtAfter, `sign-out clears the kkt_rt cookie (${width})`, page);
     } catch (e) { log(`[${width}] phase7 EXCEPTION ${e.message.slice(0, 300)}`); summary.defects.push({ page: `phase7-${width}`, kind: "exception", detail: e.message.replace(/\x1b\[[0-9;]*m/g, "").slice(0, 900) }); }
     await context.close();
   }

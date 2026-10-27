@@ -5,8 +5,10 @@
  * the page's React Server Components payload as inline <script> elements whose content differs per page. Instead of allowing inline
  * scripts wholesale ('unsafe-inline'), this hook lists the SHA-256 hash of every inline script of the HTML actually sent: middleware.ts
  * gives ISR pages the policy `script-src 'self' 'kkt-inline-hashes'`, and the hook replaces the `'kkt-inline-hashes'` placeholder with
- * `'sha256-…'` sources computed over the response body just before the headers leave the process. An injected inline script has no
- * matching hash and does not run. Pages rendered per request keep the nonce policy (no placeholder: the hook leaves them alone).
+ * `'sha256-…'` sources computed over the response body just before the headers leave the process. Only scripts that are exactly
+ * Next.js's RSC payload (`self.__next_f.push(<JSON data>)`, isFrameworkScript) are hashed: any other inline script in the body — e.g.
+ * markup an injection slipped past the renderer — gets no hash and does not run. Pages rendered per request keep the nonce policy (no
+ * placeholder: the hook leaves them alone).
  *
  * Fail closed: without the hook (e.g. `next start` run without it) the placeholder reaches the browser, which ignores the unknown source
  * and blocks every inline script — the page does not hydrate, it never runs unlisted code.
@@ -32,7 +34,77 @@ function isExecutable(attrs) {
   return type === "" || type === "module" || type === "text/javascript" || type === "application/javascript";
 }
 
-/** SHA-256 CSP sources (`'sha256-<base64>'`) of every executable inline script of an HTML document, in order, without duplicates. */
+/**
+ * End of the JSON array starting at `src[start]` ("["): the index just past its closing "]", or -1. A linear scan that tracks strings and
+ * escapes (the payload is JSON.parse'd afterwards, so this only has to find the boundary).
+ */
+function jsonArrayEnd(src, start) {
+  if (src[start] !== "[") return -1;
+  let depth = 0;
+  let inString = false;
+  for (let i = start; i < src.length; i++) {
+    const c = src[i];
+    if (inString) {
+      if (c === "\\") i++;
+      else if (c === '"') inString = false;
+    } else if (c === '"') inString = true;
+    else if (c === "[" || c === "{") depth++;
+    else if (c === "]" || c === "}") {
+      depth--;
+      if (depth === 0) return c === "]" ? i + 1 : -1;
+    }
+  }
+  return -1;
+}
+
+const NEXT_INIT = /^self\.__next_f\s*=\s*self\.__next_f\s*\|\|\s*\[\]/;
+const NEXT_INIT_PUSH = /^\(self\.__next_f\s*=\s*self\.__next_f\s*\|\|\s*\[\]\)\.push\(/;
+const NEXT_PUSH = /^self\.__next_f\.push\(/;
+
+/**
+ * True when an inline script is nothing but Next.js's React Server Components payload: a sequence of `self.__next_f=self.__next_f||[]`,
+ * `(self.__next_f=self.__next_f||[]).push(<JSON array>)` and `self.__next_f.push(<JSON array>)` statements whose arguments are pure
+ * JSON data. Only those are hashed: an inline script that reached the HTML any other way (an injection the rendering missed) gets no
+ * hash, so the browser blocks it — the policy never vouches for code merely because it is in the response.
+ */
+function isFrameworkScript(source) {
+  let rest = source.trim();
+  if (rest === "") return false;
+  while (rest.length > 0) {
+    let m = NEXT_INIT_PUSH.exec(rest) || NEXT_PUSH.exec(rest);
+    if (m) {
+      const start = m[0].length;
+      const end = jsonArrayEnd(rest, start);
+      if (end < 0 || rest[end] !== ")") return false;
+      try {
+        JSON.parse(rest.slice(start, end));
+      } catch {
+        return false;
+      }
+      rest = rest.slice(end + 1);
+    } else if ((m = NEXT_INIT.exec(rest))) {
+      rest = rest.slice(m[0].length);
+    } else return false;
+    rest = rest.replace(/^\s*;?\s*/, "");
+  }
+  return true;
+}
+
+/** Inline scripts left without a hash are reported once per distinct start (they are blocked by the browser). */
+const reportedUnknown = new Set();
+function reportUnknown(source) {
+  const head = source.trim().slice(0, 80);
+  if (reportedUnknown.has(head) || reportedUnknown.size > 100) return;
+  reportedUnknown.add(head);
+  console.warn(
+    `[csp-hook] inline script is not a Next.js payload; left without a hash (blocked): ${JSON.stringify(head)}`,
+  );
+}
+
+/**
+ * SHA-256 CSP sources (`'sha256-<base64>'`) of the Next.js payload scripts (isFrameworkScript) of an HTML document, in order, without
+ * duplicates. External scripts and data blocks (JSON-LD) are not scripts; any other executable inline script is not listed.
+ */
 function inlineScriptHashes(html) {
   const out = [];
   const seen = new Set();
@@ -41,9 +113,12 @@ function inlineScriptHashes(html) {
   while ((m = re.exec(html)) !== null) {
     const attrs = m[1] ?? "";
     if (/\bsrc\s*=/i.test(attrs) || !isExecutable(attrs)) continue;
-    const source = `'sha256-${createHash("sha256")
-      .update(m[2] ?? "", "utf8")
-      .digest("base64")}'`;
+    const body = m[2] ?? "";
+    if (!isFrameworkScript(body)) {
+      reportUnknown(body);
+      continue;
+    }
+    const source = `'sha256-${createHash("sha256").update(body, "utf8").digest("base64")}'`;
     if (!seen.has(source)) {
       seen.add(source);
       out.push(source);
@@ -171,4 +246,4 @@ function install() {
 
 if (process.env.KKT_CSP_HOOK !== "off") install();
 
-module.exports = { PLACEHOLDER, inlineScriptHashes, applyHashes, instrument, install };
+module.exports = { PLACEHOLDER, isFrameworkScript, inlineScriptHashes, applyHashes, instrument, install };

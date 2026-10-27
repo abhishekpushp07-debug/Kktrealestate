@@ -127,12 +127,15 @@ groups:
           description: "Nothing consumes the job queues: daily dues, integrity, audit seal, notifications and backups stop. Check `docker compose ps worker` / `kubectl -n kkt get pods -l app.kubernetes.io/name=worker`, GET :9465/health and the worker logs."
 
       - alert: KktWorkerReplicaDown
-        expr: up{job="kkt-worker"} == 0
+        # fewer workers answer than in the last 6 hours. `up == 0` alone misses the usual case: the workers are discovered through DNS
+        # (Compose) or pod annotations (Kubernetes), so a stopped or deleted worker is not a failing target, it is no target at all.
+        # A hung worker (target present, scrape failing) counts as down too. All workers gone: KktWorkerHeartbeatStale (critical).
+        expr: count(up{job="kkt-worker"} == 1) < max_over_time(count(up{job="kkt-worker"})[6h:1m])
         for: 5m
         labels: { severity: warning, component: jobs }
         annotations:
-          summary: "Job worker {{ $labels.instance }} is not answering metrics scrapes"
-          description: "The other replica keeps the queues moving; restore the second one before it is needed (docker compose up -d worker / kubectl describe pod)."
+          summary: "Only {{ $value }} job worker(s) answering, fewer than in the last 6 hours"
+          description: "The remaining replicas keep the queues moving; restore the missing one before it is needed (docker compose ps worker / kubectl -n kkt get pods -l app.kubernetes.io/name=worker). After an intentional scale-down this clears within 6 hours."
 
   - name: kkt-data
     rules:
@@ -156,8 +159,14 @@ groups:
           description: "Those bookings got no installment demands. ERP → Admin → Jobs → DAILY_DUES lists them (bookings_failed); fix the data, then re-run the job."
 
       - alert: KktAuditSealFailed
-        # the AUDIT_SEAL job extends the per-company hash chain over audit_logs; a failure can mean a broken chain (tampering) or a stuck job
-        expr: max by (job_name) (kkt_job_failures_24h{job_name="AUDIT_SEAL"}) > 0
+        # the AUDIT_SEAL job extends the per-company hash chain over audit_logs; a failure can mean a broken chain (tampering) or a stuck job.
+        # kkt_job_failures_24h stays > 0 for a day after ONE failed attempt, so on its own it would page hourly for 24 h after a blip that the
+        # retry or the next run (every 15 min) already fixed: page only while no seal has succeeded for 30 minutes (two scheduled runs) — or
+        # never succeeded at all (no success series).
+        expr: |
+          max by (job_name) (kkt_job_failures_24h{job_name="AUDIT_SEAL"}) > 0
+            unless on (job_name)
+              (time() - max by (job_name) (kkt_job_last_success_timestamp_seconds{job_name="AUDIT_SEAL"}) <= 1800)
         for: 5m
         labels: { severity: critical, component: security }
         annotations:
@@ -196,6 +205,16 @@ groups:
         annotations:
           summary: "No successful database backup (dump + restore drill) for more than 26 hours"
           description: "Check `docker compose logs backup` (docs/RESTORE.md). WAL archiving keeps PITR possible meanwhile — verify /backups/wal is growing."
+
+      - alert: KktBaseBackupStale
+        # the weekly base backup is the starting point of point-in-time recovery; its failure does not fail the nightly dump cycle
+        # (KktBackupStale), so it has its own signal (backup.sh status.prom; 0 = no base backup at all)
+        expr: time() - max(kkt_backup_last_base_backup_timestamp_seconds) > 8 * 86400
+        for: 1h
+        labels: { severity: warning, component: backup }
+        annotations:
+          summary: "No base backup for more than 8 days"
+          description: 'Point-in-time recovery needs a recent base backup plus the WAL archived since. Look for "pg_basebackup FAILED" in `docker compose logs backup`, fix the cause and take one now: `docker compose exec backup sh /opt/kkt/backup.sh base` (docs/RESTORE.md).'
 
   - name: kkt-dependencies
     rules:

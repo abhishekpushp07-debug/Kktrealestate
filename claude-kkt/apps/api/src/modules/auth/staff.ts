@@ -46,7 +46,7 @@ import {
   rotateRefresh,
   type LoginAccount,
 } from "./service.js";
-import { clearRefreshCookie, refreshTokenOf, tokenPair, wantsCookie } from "./cookies.js";
+import { clearRefreshCookie, isDeadSession, refreshTokenOf, tokenPair, wantsCookie } from "./cookies.js";
 import { resetPointOf, type LockTarget } from "./lockout.js";
 import { authCompanyView, authUserView } from "./views.js";
 import { securityRedis } from "../../plugins/auth.js";
@@ -282,8 +282,9 @@ export async function staffAuthRoutes(app: FastifyInstance): Promise<void> {
         });
         return tokenPair(req, reply, tokens);
       } catch (err) {
-        // a dead cookie session clears its cookie so the browser stops presenting it
-        if (wantsCookie(req)) clearRefreshCookie(reply, "erp");
+        // a dead cookie session (401: invalid, reused, expired, inactive) clears its cookie so the browser stops presenting it; a transient
+        // failure (lock timeout, overload, database outage) keeps it, so the next refresh can still succeed
+        if (wantsCookie(req) && isDeadSession(err)) clearRefreshCookie(reply, "erp");
         throw err;
       }
     },

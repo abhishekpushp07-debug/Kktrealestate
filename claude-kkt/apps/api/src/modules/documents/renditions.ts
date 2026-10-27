@@ -9,6 +9,7 @@
  *  - STORAGE_SWEEP (critical queue, every 10 minutes) turns uploads that never committed (storage_pending_objects older than an hour)
  *    into queued deletions, retries storage_deletions with exponential backoff, and re-enqueues renditions that never ran.
  */
+import { randomBytes } from "node:crypto";
 import { availableParallelism } from "node:os";
 import { and, eq, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
@@ -20,6 +21,7 @@ import type { JobContext } from "../../jobs/index.js";
 import { logger } from "../../lib/logger.js";
 import { storageSweepTotal } from "../../lib/metrics.js";
 import type { Storage } from "../../lib/storage.js";
+import { withoutCommitTracking } from "../../plugins/requestContext.js";
 
 /** Rendition widths (px). */
 export const THUMB_WIDTH = 480;
@@ -111,14 +113,20 @@ export async function makeVariants(
 // Pending objects (written to storage before their row commits)
 // ---------------------------------------------------------------------------
 
-/** Records `key` as written-but-not-committed (autocommit, BEFORE the bytes are written). */
+/**
+ * Records `key` as written-but-not-committed (autocommit, BEFORE the bytes are written). Bookkeeping, not the request's outcome: it never
+ * pins the request's Idempotency-Key (plugins/requestContext.ts withoutCommitTracking).
+ */
 export async function recordPendingObject(
   db: Executor,
   key: string,
   companyId: string | null,
   purpose: string,
 ): Promise<void> {
-  await db.insert(storagePendingObjects).values({ key, companyId, purpose }).onConflictDoNothing();
+  // awaited INSIDE the untracked scope: a drizzle query runs when it is awaited, not when it is built
+  await withoutCommitTracking(async () => {
+    await db.insert(storagePendingObjects).values({ key, companyId, purpose }).onConflictDoNothing();
+  });
 }
 
 /** Forgets pending keys (inside the transaction that commits their owning row). */
@@ -194,9 +202,9 @@ export async function renderDocument(
     return { document_id: doc.id, status: "FAILED", reason: (err as Error).message.slice(0, 200) };
   }
   signal?.throwIfAborted();
-  const base = doc.storageKey.replace(/\.[a-z0-9]+$/i, "");
-  const thumbKey = `${base}_thumb.webp`;
-  const mediumKey = `${base}_medium.webp`;
+  // keys unique per run: a run that failed after its writes leaves orphans the sweep queues for deletion, and such a queued deletion must
+  // never hit the objects of a later run that succeeded (deterministic keys would be reused and deleted under the READY row)
+  const { thumbKey, mediumKey } = renditionKeys(doc.storageKey);
   for (const key of [thumbKey, mediumKey]) await recordPendingObject(db, key, doc.companyId, "rendition");
   await store.put(thumbKey, img.thumb, "image/webp");
   await store.put(mediumKey, img.medium, "image/webp");
@@ -208,17 +216,32 @@ export async function renderDocument(
     renditions: "READY",
   };
   const updated = await db.transaction(async (tx) => {
+    // only a live row that has no renditions yet: a concurrent run that recorded its own keys first wins, and this run's objects stay
+    // pending (the sweep removes them) instead of replacing keys that would then belong to nothing
     const rows = await tx
       .update(documents)
       .set({ variants: next as typeof doc.variants })
-      .where(and(eq(documents.id, doc.id), eq(documents.isDeleted, false)))
+      .where(
+        and(
+          eq(documents.id, doc.id),
+          eq(documents.isDeleted, false),
+          sql`coalesce(${documents.variants} ->> 'thumb_key', '') = ''`,
+        ),
+      )
       .returning({ id: documents.id });
     // the pending records go in the same transaction: committed → the keys belong to the row; rolled back → the sweep removes them
     if (rows.length > 0) await clearPendingObjects(tx, [thumbKey, mediumKey]);
     return rows.length > 0;
   });
-  if (!updated) return { document_id: doc.id, status: "SKIPPED", reason: "deleted meanwhile" };
+  if (!updated) return { document_id: doc.id, status: "SKIPPED", reason: "deleted or rendered meanwhile" };
   return { document_id: doc.id, status: "READY" };
+}
+
+/** Storage keys of one rendition run: `<original stem>_thumb_<nonce>.webp` / `_medium_<nonce>.webp` (a fresh nonce per run). */
+export function renditionKeys(storageKey: string): { thumbKey: string; mediumKey: string } {
+  const base = storageKey.replace(/\.[a-z0-9]+$/i, "");
+  const nonce = randomBytes(6).toString("hex");
+  return { thumbKey: `${base}_thumb_${nonce}.webp`, mediumKey: `${base}_medium_${nonce}.webp` };
 }
 
 /** DOCUMENT_RENDITIONS handler. */

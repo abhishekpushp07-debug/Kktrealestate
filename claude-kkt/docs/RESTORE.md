@@ -23,7 +23,10 @@ Dumps and base backups are encrypted while they stream (no plaintext on disk), e
 script refuses to run (`BACKUP_ENCRYPTION=none` is an explicit development-only opt-out). `kkt_backup_encrypted` in `status.prom`
 reports the mode. **Keep the key outside the backup host** (password manager / vault): a backup without its key is unrecoverable; keep
 retired keys as long as backups made with them are retained. Helper commands (inside the `backup` or `postgres` container):
-`sh /opt/kkt/backup.sh decrypt <file> <out|->`, `… encrypt <in|-> <out>`, `… drill <dump>`, `… prune`, `… wal-fetch <segment> <path>`.
+`sh /opt/kkt/backup.sh decrypt <file> <out|->`, `… encrypt <in|-> <out>`, `… drill <dump>`, `… base` (one base backup now), `… prune`,
+`… wal-fetch <segment> <path>`. A step that fails is never recorded as a backup: a failed `pg_dump`, or a cipher that fails at the end
+of the stream (disk full), removes the partial file and its MAC and fails the run even without the restore drill
+(`scripts/ci/backup-sh.test.mjs` covers both modes, failure propagation, WAL archiving and retention).
 
 ## What is backed up
 
@@ -37,8 +40,10 @@ retired keys as long as backups made with them are retained. Helper commands (in
 | Off-site copy        | `BACKUP_UPLOAD_CMD` runs after every successful cycle (e.g. `rclone sync /backups remote:kkt-backups` or `aws s3 sync /backups s3://kkt-backups/` from an image that has the tool)                                                                             | per night      | your second region / provider              |
 | Application export   | `POST /api/v1/admin/backup` (Super Admin): a ZIP with one file per table, manifest with row counts and checksums, `manifest.sig` (HMAC under `LINK_SIGNING_KEYS`)                                                                                              | on demand      | object storage, signed link                |
 
-Monitoring: the backup service writes `/backups/status.prom` (`kkt_backup_last_success_timestamp_seconds`, dump size, WAL file count);
-node-exporter's textfile collector exposes it and the alert **KktBackupStale** fires when no successful dump + drill happened for 26 h
+Monitoring: the backup service writes `/backups/status.prom` (`kkt_backup_last_success_timestamp_seconds`, dump size,
+`kkt_backup_last_base_backup_timestamp_seconds`, WAL file count); node-exporter's textfile collector exposes it, the alert
+**KktBaseBackupStale** fires when the newest complete base backup is older than 8 days (a failed weekly base backup does not fail the
+nightly cycle; take one with `… exec backup sh /opt/kkt/backup.sh base`) and **KktBackupStale** when no successful dump + drill happened for 26 h
 (docs/OBSERVABILITY.md). Kubernetes deployments use the managed database's automated backups and point-in-time recovery instead (set
 the retention to ≥ 14 days) and keep the application export for portability.
 
@@ -147,7 +152,8 @@ key, key family `kkt-backup-manifest-v1`, with the key id). One backup per compa
 or running is 409 JOB_ALREADY_RUNNING). The restore CLI loads it into an **empty** database:
 
 ```bash
-# inside the API image (it ships as dist/cli/restore.js), with the installation's environment (LINK_SIGNING_KEYS[_FILE], keys):
+# inside the API image (it ships as dist/cli/restore.js), with the installation's environment (LINK_SIGNING_KEYS[_FILE], keys; the
+# configuration's own DATABASE_URL / DATABASE_URL_FILE is left alone — the restore always connects to --database-url):
 node dist/cli/restore.js --file kkt-backup-2026-10-25.zip --verify-only                 # signature + checksums, no database
 node dist/cli/restore.js --file kkt-backup-2026-10-25.zip --database-url postgres://kkt_owner:…@host:5432/kkt_new --confirm
 # from a checkout: pnpm --filter @kkt/api restore -- <same arguments>

@@ -15,7 +15,8 @@ import { bookings, type DB } from "@kkt/db";
 import { writeAudit } from "../../../lib/audit.js";
 import { moneyTransaction, SYSTEM_MONEY_ACTOR, type MoneyActor } from "../common.js";
 import type { LedgerRowDifference } from "@kkt/domain";
-import { failureCode } from "./dues.js";
+import { logger } from "../../../lib/logger.js";
+import { classifyFailure } from "./dues.js";
 import { rebuild, type SummaryMismatch } from "./ledger.js";
 
 /** Bookings per batch (one id-ordered page; each booking is still its own transaction). */
@@ -46,8 +47,10 @@ export interface LedgerRebuildResult {
   order_changed: LedgerRebuildChange[];
   /** Bookings where only amounts/running balances or the summary columns differed. */
   figures_changed: LedgerRebuildChange[];
-  /** Bookings whose rebuild failed (isolated: the run went on), with the error code. */
+  /** Bookings whose rebuild failed (isolated: the run went on), with the error code (the first LEDGER_REBUILD_LIST_LIMIT). */
   failed: { booking_id: string; booking_number: string; code: string }[];
+  /** How many bookings failed in all. */
+  failed_count: number;
 }
 
 /** Options of rebuildAllLedgers. */
@@ -82,6 +85,7 @@ export async function rebuildAllLedgers(db: DB, opts: LedgerRebuildOptions = {})
     order_changed: [],
     figures_changed: [],
     failed: [],
+    failed_count: 0,
   };
   let after: string | null = null;
   for (;;) {
@@ -102,8 +106,17 @@ export async function rebuildAllLedgers(db: DB, opts: LedgerRebuildOptions = {})
       try {
         r = await rebuildOne(db, b, opts.dryRun === true, actor);
       } catch (err) {
+        const f = classifyFailure(err);
+        // a database outage is no booking's failure: stop, so the job attempt fails and is retried (rebuilt bookings are not touched
+        // again — the job only restates ledgers that still differ)
+        if (f.outage) throw err;
+        out.failed_count += 1;
         if (out.failed.length < LEDGER_REBUILD_LIST_LIMIT)
-          out.failed.push({ booking_id: b.id, booking_number: b.bookingNumber, code: failureCode(err) });
+          out.failed.push({ booking_id: b.id, booking_number: b.bookingNumber, code: f.code });
+        logger.error(
+          { err, booking_id: b.id, booking_number: b.bookingNumber, code: f.code },
+          "ledger rebuild: booking failed",
+        );
         continue;
       }
       if (!r.changed) continue;

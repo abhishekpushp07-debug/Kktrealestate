@@ -116,7 +116,7 @@ describe("uploads: no storage I/O or image work inside a transaction, renditions
       // only the original was written; no rendition yet, and nothing left pending
       const keys = storedKeys();
       expect(keys.length).toBe(before + 1);
-      expect(keys.some((k) => k.endsWith("_thumb.webp"))).toBe(false);
+      expect(keys.some((k) => /_thumb_[0-9a-f]{12}\.webp$/.test(k))).toBe(false);
       expect(await t.app.sql`select key from storage_pending_objects`).toHaveLength(0);
       // the renditions job was enqueued on the HEAVY queue
       const { Queue } = await import("bullmq");
@@ -350,7 +350,8 @@ describe("EXPORT_CSV checkpoints (heavy queue)", () => {
       ).rejects.toThrow();
       expect(saved).toMatchObject({ rows: 10, pages: 1 });
       const [co] = await t.app.sql<{ company_id: string }[]>`select company_id from exports where id = ${exportId}`;
-      expect(await svc.storage().exists(exportPartKey(co!.company_id, exportId, 0))).toBe(true);
+      const run = String((saved as unknown as { run: string }).run);
+      expect(await svc.storage().exists(exportPartKey(co!.company_id, exportId, run, 0))).toBe(true);
       // the next attempt resumes from it
       const out = await runCsvExport({ ...ctx, attempt: 2, checkpoint: saved, saveCheckpoint: async () => undefined });
       expect(out).toMatchObject({ rows: 25, pages: 3, resumed_at_page: 1 });
@@ -362,7 +363,7 @@ describe("EXPORT_CSV checkpoints (heavy queue)", () => {
       const ids = csv.slice(1).map((l) => l.split(",")[0]);
       expect(new Set(ids).size).toBe(25);
       for (let n = 0; n < 3; n++)
-        expect(await svc.storage().exists(exportPartKey(co!.company_id, exportId, n))).toBe(false);
+        expect(await svc.storage().exists(exportPartKey(co!.company_id, exportId, run, n))).toBe(false);
       expect(
         await t.app.sql`select 1 from storage_pending_objects where key like ${`exports/%${exportId}%`}`,
       ).toHaveLength(0);

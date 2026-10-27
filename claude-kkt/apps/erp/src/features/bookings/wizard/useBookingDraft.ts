@@ -1,11 +1,13 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { BookingDraftRow } from "@kkt/contracts";
+import { LOCAL_DRAFT_KEY } from "@/lib/browserData";
 import { readStorage, useOnChange, writeStorage } from "@/lib/utils";
 import { bookingKeys, deleteDraft, saveDraft } from "../api";
 import { toDraftPayload, wizardHasContent, type WizardState } from "../bookingMath";
 
-export const LOCAL_DRAFT_KEY = "kkt.erp.booking-draft";
+// The local draft belongs to the user who wrote it: lib/browserData.ts removes it when another user signs in on this browser.
+export { LOCAL_DRAFT_KEY };
 
 /** What the browser keeps: the full UI state (incl. split mode) plus the server draft id. */
 export interface LocalDraft {

@@ -38,12 +38,16 @@ src/
   lib/
     api.ts                 fetch client: bearer in memory, refresh token in the HttpOnly kkt_rt cookie (contract C1,
                            X-KKT-Session: cookie; nothing token-like in localStorage), single-flight cookie refresh
-                           on 401 TOKEN_EXPIRED, auto Idempotency-Key on POST, If-Match from `version`,
+                           on 401 TOKEN_EXPIRED (only a 400/401/403/404 refresh answer signs out; 409/429/5xx/network keep
+                           the session; a refresh that returns another user's token never re-sends the call),
+                           auto Idempotency-Key on POST, If-Match from `version`,
                            error envelope → ApiClientError, get/post/patch/put/delete/upload/download/list/exportCsv
     format.ts              formatINR (₹1,00,00,000), formatINRShort (₹1.2 Cr / ₹45 L), paise↔rupee input,
                            amountInWords (Indian), formatDate (24 Oct 2026), formatDateTime (IST), percent, sqft
     auth.tsx               AuthProvider / useAuth: login (MFA step), logout, me, can/canAny/canAll, project scope,
-                           mustChangePassword gate, session restore
+                           mustChangePassword gate, session restore (transient failures retried with backoff)
+    browserData.ts         per-user localStorage (local booking draft, palette recents — navigation entries only): wiped
+                           when another user signs in on the browser and on sign-out (audit v3 D1)
     queries.ts             useListParams (URL-synced page/page_size/q/sort/filters), useList, useItem,
                            useMutationWithToast (toasts + 409 VERSION_CONFLICT → dialog)
     permissions.ts         NAV_GROUPS with required permission codes, filterNav(can), findNavItem

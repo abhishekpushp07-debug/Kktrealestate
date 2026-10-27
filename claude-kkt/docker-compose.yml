@@ -123,6 +123,9 @@ services:
     environment:
       <<: *api-env
       DATABASE_URL: postgres://kkt_app:${KKT_APP_DB_PASSWORD}@postgres:5432/kkt
+      # no PgBouncer here: every pool is a Postgres connection (max_connections 200). Two workers × 8 (three concurrent jobs, their
+      # follow-up queries and the health/heartbeat checks) + 2 API replicas × API_WORKERS × 10 must stay under it (docs/CAPACITY.md §5)
+      DATABASE_POOL_MAX: ${WORKER_DATABASE_POOL_MAX:-8}
       WORKER_HEALTH_PORT: "9465"
       WORKER_DRAIN_TIMEOUT_MS: "120000"
     volumes: ["storage:/data/storage"]

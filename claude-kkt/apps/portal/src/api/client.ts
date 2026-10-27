@@ -43,7 +43,7 @@ import {
 } from "@kkt/contracts";
 import { secureStorage } from "@/lib/storage";
 import { fetchAllPages } from "./paging";
-import { createSession } from "./session";
+import { createSession, tokenSubject } from "./session";
 import { noteDeprecation } from "./deprecation";
 import { ApiError, apiErrorFromBody } from "./errors";
 import { buildMultipart, type LocalFile } from "@/lib/upload";
@@ -204,7 +204,19 @@ async function doRefresh(): Promise<string> {
     throw err;
   }
   const pair = parseJson(await res.text()) as TokenPair;
+  // The kkt_prt cookie is shared by every tab: after a sign-out and a sign-in as another customer in another tab, this refresh returns
+  // THAT customer's token. Never carry on (or re-send the pending call) as someone other than the customer this tab shows.
+  const before = tokenSubject(session.accessToken);
+  const after = tokenSubject(pair.access_token);
   await session.setTokens(pair);
+  if (before !== null && after !== null && before !== after) {
+    session.notifyUserChanged();
+    throw new ApiError({
+      status: 409,
+      code: "SESSION_CHANGED",
+      message: "Another account signed in on this browser. The app has been reloaded for it.",
+    });
+  }
   return pair.access_token;
 }
 
@@ -319,8 +331,13 @@ export const api = {
         sessionTransport: true,
       }),
     refresh: () => refreshAccessToken(),
+    /**
+     * Revokes this session (or every device) and, on web, clears the kkt_prt cookie. The route needs a live access token, so an expired
+     * one is refreshed first like any other call: with `noRefresh` a customer who left the app open past the access lifetime got a 401,
+     * the server session stayed valid and the HttpOnly cookie stayed in the browser for up to REFRESH_ABSOLUTE_TTL_DAYS.
+     */
     logout: (body: { refresh_token?: string; all_devices?: boolean }) =>
-      request<void>("/auth/logout", { method: "POST", body, noRefresh: true, sessionTransport: true }),
+      request<void>("/auth/logout", { method: "POST", body, sessionTransport: true }),
     me: () => get<PortalUser>("/auth/me"),
     changePassword: (body: PortalChangePassword) => post<void>("/auth/change-password", body),
     sessions: async () => itemsOf<PortalSessionRow>(await get<unknown>("/auth/sessions")),

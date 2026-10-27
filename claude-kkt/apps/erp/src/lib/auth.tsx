@@ -1,6 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, isApiClientError, onAuthEvent, tokens } from "@/lib/api";
+import { claimBrowserData, forgetBrowserData } from "@/lib/browserData";
 import type { Permission, PermissionRequirement } from "@/lib/permissions";
 
 /* ------------------------------------------------------------------ */
@@ -142,6 +143,17 @@ interface LoginPayload {
   user?: unknown;
 }
 
+/** Waits between attempts to restore a session on load after a transient failure (about 30 s in all). */
+export const RESTORE_RETRY_DELAYS_MS: readonly number[] = [1_000, 2_000, 4_000, 8_000, 15_000];
+
+/** The wait before restore attempt n + 1: the server's Retry-After when it sent one (capped at 30 s), else the backoff table. */
+export function restoreRetryDelay(n: number, error: unknown): number {
+  const fallback = RESTORE_RETRY_DELAYS_MS[Math.min(n, RESTORE_RETRY_DELAYS_MS.length - 1)] ?? 1_000;
+  if (isApiClientError(error) && error.retryAfterSeconds !== undefined)
+    return Math.min(Math.max(error.retryAfterSeconds * 1000, 250), 30_000);
+  return fallback;
+}
+
 /* ------------------------------------------------------------------ */
 /* Provider                                                             */
 /* ------------------------------------------------------------------ */
@@ -176,6 +188,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const raw = await api.get<unknown>("/auth/me");
       const me = normaliseMe(raw);
       if (!me) throw new Error("Unexpected /auth/me response");
+      // Data another user left in this browser (local booking draft, recents) is removed before this user's pages read it.
+      claimBrowserData(me.user.id);
       if (mounted.current) {
         setUser(me.user);
         setCompany(me.company);
@@ -187,23 +201,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         clearSession();
         return null;
       }
-      // Network or server failure: keep whatever we had, but stop blocking the UI.
-      if (mounted.current)
-        setStatus((prev) => (prev === "loading" ? (tokens.hasSession() ? "authenticated" : "anonymous") : prev));
+      // Network or server failure: keep whatever we had (a signed-in user stays signed in). While the session is still being
+      // restored (no user yet) the caller decides: the restore effect retries with backoff before giving up.
       throw error;
     }
   }, [clearSession]);
 
-  // Restore the session on load.
+  // Restore the session on load. A transient failure (the refresh answered 429 / 409 / 5xx, or the network is down) keeps the
+  // session and is retried with backoff while the loader shows; only a dead session (401) signs out. Without a user there is no
+  // shell to show, so after the last attempt the sign-in page appears (the cookie is still valid: a reload restores it).
   useEffect(() => {
     if (!tokens.hasSession()) return;
-    // refreshMe sets state only after awaiting GET /auth/me (an external system); the compiler does not model the await.
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- state is set asynchronously, after the network response
-    refreshMe().catch(() => undefined);
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const attempt = (n: number) => {
+      // refreshMe sets state only after awaiting GET /auth/me (an external system).
+      refreshMe().catch((error: unknown) => {
+        if (cancelled || !tokens.hasSession() || n >= RESTORE_RETRY_DELAYS_MS.length) {
+          if (!cancelled && mounted.current) setStatus((prev) => (prev === "loading" ? "anonymous" : prev));
+          return;
+        }
+        timer = setTimeout(() => attempt(n + 1), restoreRetryDelay(n, error));
+      });
+    };
+    attempt(0);
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) clearTimeout(timer);
+    };
   }, [refreshMe]);
 
-  // Forced sign-out (refresh failed / 401 after retry).
-  useEffect(() => onAuthEvent(() => clearSession()), [clearSession]);
+  // Forced sign-out (refresh failed / 401 after retry), or another user signed in on this browser (another tab): drop everything of
+  // the previous user and load the user the session now belongs to.
+  useEffect(
+    () =>
+      onAuthEvent((event) => {
+        if (event === "unauthenticated") {
+          clearSession();
+          return;
+        }
+        queryClient.clear();
+        if (!mounted.current) return;
+        setUser(null);
+        setCompany(null);
+        setStatus("loading");
+        refreshMe().catch(() => {
+          if (mounted.current) setStatus((prev) => (prev === "loading" ? "anonymous" : prev));
+        });
+      }),
+    [clearSession, queryClient, refreshMe],
+  );
 
   const finishLogin = useCallback(
     async (payload: LoginPayload): Promise<LoginResult> => {
@@ -216,6 +263,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // The refresh token stays in the HttpOnly cookie; only the access token is kept, in memory.
       tokens.setAccess(payload.access_token);
       const provisional = normaliseUser(payload.user);
+      if (provisional) claimBrowserData(provisional.id);
       const forced = payload.must_change_password === true || provisional?.must_change_password === true;
       if (provisional && mounted.current) {
         setUser({ ...provisional, must_change_password: forced });
@@ -259,6 +307,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       /* the session is gone either way */
     } finally {
+      // An explicit sign-out leaves nothing of this user in the browser (the server keeps the booking drafts).
+      forgetBrowserData();
       clearSession();
     }
   }, [clearSession]);

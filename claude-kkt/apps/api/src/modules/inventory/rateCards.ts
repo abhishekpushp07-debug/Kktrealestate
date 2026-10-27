@@ -576,8 +576,14 @@ export function registerRateCardRoutes(app: FastifyInstance): void {
       const version = expectedVersion(req, body);
       return app.db.transaction(async (tx) => {
         const existing = await loadRateCard(tx, user, req.params.id, true);
-        // Serialise activations per project (the partial unique index is the last line of defence).
-        await tx.select({ id: projects.id }).from(projects).where(eq(projects.id, existing.projectId)).for("update");
+        // Serialise activations per project (the partial unique index is the last line of defence). FOR NO KEY UPDATE, not FOR UPDATE:
+        // a concurrent booking locks its flat first and then INSERTs bookings, whose project FK takes FOR KEY SHARE on this row; FOR
+        // UPDATE would block that while the apply below waits for the booking's flat — a deadlock (40P01) for one of the two.
+        await tx
+          .select({ id: projects.id })
+          .from(projects)
+          .where(eq(projects.id, existing.projectId))
+          .for("no key update");
         if (existing.status === "ACTIVE")
           throw ApiError.rule(`Rate card ${existing.name} is already Active`, "RATE_CARD_ALREADY_ACTIVE");
         if (existing.status === "SUPERSEDED")

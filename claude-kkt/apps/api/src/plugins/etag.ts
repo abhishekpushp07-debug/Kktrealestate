@@ -40,6 +40,9 @@ export default fp(
         tag = `"${createHash("sha1").update(payload).digest("base64")}"`;
         reply.header("ETag", tag);
       }
+      // A conditional request only short-circuits a read: a write that already ran must still return its body (RFC 9110 §13.1.2
+      // answers 412 there, never 304, and a client should not send If-None-Match on a write in the first place).
+      if (req.method !== "GET" && req.method !== "HEAD") return payload;
       const inm = req.headers["if-none-match"];
       if (inm && (inm === tag || inm === `W/${tag}` || `W/${inm}` === tag)) {
         reply.code(304);

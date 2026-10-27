@@ -181,6 +181,15 @@ export const IST_VTIMEZONE: readonly string[] = [
   "END:VTIMEZONE",
 ];
 
+/**
+ * True for an address that can be written as a `mailto:` value as is: one @, no whitespace, controls, quotes or iCalendar/URI
+ * delimiters. Anything else (e.g. a stored value with a line break, which would start a new iCalendar property) is left out of the file.
+ */
+function isIcsEmail(email: string): boolean {
+  if (email.length > 254 || [...email].some((c) => c.charCodeAt(0) < 0x20 || c.charCodeAt(0) === 0x7f)) return false;
+  return /^[^\s@"<>;:,\\]+@[^\s@"<>;:,\\]+$/.test(email);
+}
+
 /** Quotes a CN parameter value (RFC 5545 §3.2: DQUOTE-delimited, no DQUOTE / control characters inside). */
 function icsParam(text: string): string {
   return `"${text.replace(/["\r\n\\]/g, " ").trim()}"`;
@@ -215,8 +224,9 @@ export function icsForVisit(input: VisitICSInput): string {
     `DESCRIPTION:${icsEscape(input.description)}`,
     `LOCATION:${icsEscape(input.location)}`,
   ];
-  if (input.organizer) lines.push(`ORGANIZER;CN=${icsParam(input.organizer.name)}:mailto:${input.organizer.email}`);
-  if (input.attendee)
+  if (input.organizer && isIcsEmail(input.organizer.email))
+    lines.push(`ORGANIZER;CN=${icsParam(input.organizer.name)}:mailto:${input.organizer.email}`);
+  if (input.attendee && isIcsEmail(input.attendee.email))
     lines.push(
       `ATTENDEE;CN=${icsParam(input.attendee.name)};ROLE=REQ-PARTICIPANT;PARTSTAT=${cancel ? "DECLINED" : "ACCEPTED"}:mailto:${input.attendee.email}`,
     );

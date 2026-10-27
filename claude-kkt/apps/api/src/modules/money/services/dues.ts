@@ -8,7 +8,7 @@ import type { ChargeDemandAt, DuesFailure } from "@kkt/contracts";
 import { bookingOtherCharges, bookings, demands, payments, type DB, type Executor, type Tx } from "@kkt/db";
 import { addDays, demandStageId, demandStatuses, evaluateDues, formatINR, type TowerStage } from "@kkt/domain";
 import { writeAudit } from "../../../lib/audit.js";
-import { ApiError, databaseErrorCode, mapMoneyError } from "../../../lib/errors.js";
+import { ApiError, databaseErrorCode, mapDatabaseError, mapMoneyError } from "../../../lib/errors.js";
 import { logger } from "../../../lib/logger.js";
 import { nextNumber } from "../../../lib/numbering.js";
 import { duesBookingFailures } from "../metrics.js";
@@ -325,16 +325,59 @@ export interface RunSummary {
   notifications: number;
   /** Bookings whose unit of work failed (isolated: the run went on); empty on a clean run. */
   failures: (DuesFailure & { company_id: string })[];
+  /**
+   * How many of `failures` were transient database conditions (lock timeout, statement timeout, a serialization failure that outlived
+   * its retries): the data is fine, a later attempt will succeed. The scheduled jobs fail the attempt when this is > 0 so BullMQ retries.
+   */
+  retryableFailures: number;
 }
 
-/** Machine-readable code of a per-booking failure (ApiError code, INVALID_AMOUNT, SQLSTATE_<code> or INTERNAL_ERROR). */
-export function failureCode(err: unknown): string {
-  if (err instanceof ApiError) return err.code;
+/** A per-booking failure, classified (see {@link classifyFailure}). */
+export interface FailureClass {
+  /** ApiError code, INVALID_AMOUNT, a retryable database code (LOCK_TIMEOUT, CONFLICT_RETRY, SERVICE_UNAVAILABLE), SQLSTATE_<code> or INTERNAL_ERROR. */
+  code: string;
+  /** Safe to show to an admin: the ApiError / money message, or a generic text (never raw database or stack text). */
+  message: string;
+  /** Transient: retrying the same booking later is expected to succeed. */
+  retryable: boolean;
+  /** The database itself is unavailable (connection refused / dropped, shutting down, too many connections): no later booking can succeed. */
+  outage: boolean;
+}
+
+/**
+ * Classifies a per-booking failure. Data problems (an ApiError, a domain money error, a constraint) are the booking's own and isolated;
+ * transient database conditions are retryable; a database outage stops the run (raiseDuesForAll rethrows it). Messages of anything that
+ * is not an ApiError / money error are replaced by a generic text: the raw text (SQL, constraint names, values) goes to the log only —
+ * like every 500 the API answers.
+ */
+export function classifyFailure(err: unknown): FailureClass {
+  if (err instanceof ApiError) return { code: err.code, message: err.message, retryable: false, outage: false };
   const money = mapMoneyError(err);
-  if (money) return money.code;
+  if (money) return { code: money.code, message: money.message, retryable: false, outage: false };
+  const transient = mapDatabaseError(err);
+  if (transient) {
+    const outage = transient.code === "SERVICE_UNAVAILABLE" && transient.details?.["reason"] !== "statement_timeout";
+    return { code: transient.code, message: transient.message, retryable: true, outage };
+  }
   const sqlstate = databaseErrorCode(err);
-  if (sqlstate) return `SQLSTATE_${sqlstate}`;
-  return "INTERNAL_ERROR";
+  if (sqlstate)
+    return {
+      code: `SQLSTATE_${sqlstate}`,
+      message: `Database error ${sqlstate} (details in the server log)`,
+      retryable: false,
+      outage: false,
+    };
+  return {
+    code: "INTERNAL_ERROR",
+    message: "Internal error (details in the server log)",
+    retryable: false,
+    outage: false,
+  };
+}
+
+/** Machine-readable code of a per-booking failure ({@link classifyFailure}). */
+export function failureCode(err: unknown): string {
+  return classifyFailure(err).code;
 }
 
 /**
@@ -344,7 +387,10 @@ export function failureCode(err: unknown): string {
  *      snapshot, status) and its tower's stages read, so a revision, plan change, cancellation or stage undo that committed while we
  *      waited is seen — never a stale copy read before the lock;
  *   2. a booking whose unit of work throws is rolled back, logged, counted (kkt_dues_booking_failures_total) and listed in `failures`
- *      (booking id + number + error code), and the run continues with the next booking.
+ *      (booking id + number + error code + a message safe to show), and the run continues with the next booking; transient database
+ *      conditions (lock / statement timeout, exhausted serialization retries) are counted in `retryableFailures` as well;
+ *   3. a database OUTAGE (connection refused or dropped, server shutting down, too many connections) is not a booking's failure: the run
+ *      stops and the error is rethrown, so the scheduled job is retried by BullMQ and the admin route answers 503 SERVICE_UNAVAILABLE.
  * Time triggers (DAYS_AFTER_BOOKING, ON_DATE) are evaluated against `today`.
  */
 export async function raiseDuesForAll(
@@ -372,6 +418,7 @@ export async function raiseDuesForAll(
     demandNumbers: [],
     notifications: 0,
     failures: [],
+    retryableFailures: 0,
   };
   for (const { id, companyId, bookingNumber } of ids) {
     summary.bookingsChecked += 1;
@@ -397,12 +444,21 @@ export async function raiseDuesForAll(
         summary.notifications += result.notifications;
       }
     } catch (err) {
-      const code = failureCode(err);
-      const message = err instanceof Error ? err.message : String(err);
-      summary.failures.push({ booking_id: id, booking_number: bookingNumber, company_id: companyId, code, message });
+      const { code, message, retryable, outage } = classifyFailure(err);
       duesBookingFailures.inc({ code });
+      if (outage) {
+        // the database is gone: every later booking would fail the same way. Stop and rethrow, so the job attempt fails and BullMQ
+        // retries it (demands are unique per installment: a re-run raises only what is still missing) and the admin route answers 503.
+        logger.error(
+          { err, booking_id: id, booking_number: bookingNumber, code, bookings_done: summary.bookingsChecked - 1 },
+          "dues: database unavailable; the run stops and will be retried",
+        );
+        throw err;
+      }
+      summary.failures.push({ booking_id: id, booking_number: bookingNumber, company_id: companyId, code, message });
+      if (retryable) summary.retryableFailures += 1;
       logger.error(
-        { err, booking_id: id, booking_number: bookingNumber, code },
+        { err, booking_id: id, booking_number: bookingNumber, code, retryable },
         "dues: booking failed; the run continues",
       );
     }

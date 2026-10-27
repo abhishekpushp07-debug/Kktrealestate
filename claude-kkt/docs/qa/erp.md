@@ -6,6 +6,19 @@ Stack under test: API `apps/api` on `:4000` with the demo seed on its own databa
 
 Runner: [`docs/qa/erp/browser-qa.cjs`](erp/browser-qa.cjs) (`ERP_URL`, `API_URL`, `OUT_DIR`, `REPORT`, `WIPE=1`, `ONLY=login,roles,masters,inventory,crm,money,misc,hardening,smoke`). On every page it asserts: zero console errors / page errors, zero failed or ≥ 400 API requests (apart from the deliberate 4xx probes listed below), `document.documentElement.scrollWidth <= window.innerWidth`, and at 390 px that every **primary** target is ≥ 44 px tall (action buttons, tabs, sidebar / drawer / Back links; switches toggle through their 44 px label row and desktop-only breadcrumb crumbs count as secondary). It records every sub-44 px element, takes one palette-quantised viewport screenshot per listed page and width (`docs/qa/erp/<page>-<width>.png`, 40 files, 13–167 KB each, 2.1 MB in all), and verifies every flow through the API afterwards (status, ledger rows, audit rows, stage records, files).
 
+## Phase 7 frontend review 2026-10-27
+
+Stack: API (`tsx src/server.ts`) on `:4730` with a fresh demo seed in `kkt_p7_rfrontend` (Redis db 24, `API_PUBLIC_URL=http://localhost:4730`
+so signed file links resolve); ERP built with `VITE_API_URL=""` and served by `vite preview --port 5730` with
+`KKT_API_PROXY_TARGET=http://localhost:4730`. Runner: `ERP_URL=http://localhost:5730 API_URL=http://localhost:4730 OUT_DIR=<outside the
+repo> node docs/qa/erp/browser-qa.cjs` (full walk).
+
+**Result: 585 page checks, 217/217 assertions, 0 defects, 0 console errors, 0 failed requests, no overflow; axe 534 scans, 534 clean
+(serious/critical 0).** The `phase7` section gained four assertions per width for the review's fixes: a customer picked in the command
+palette is not written to localStorage (recents keep navigation entries only), the user-scoped browser data names its owner
+(`kkt.erp.owner`), sign-out leaves none of `kkt.erp.recent` / `kkt.erp.booking-draft` / `kkt.erp.owner` / `kkt.erp.session`, and
+sign-out clears the `kkt_rt` cookie. The committed screenshots are unchanged.
+
 ## Phase 7 frontend track 2026-10-27
 
 Stack: API (`tsx src/server.ts`) on `:4710` with a fresh demo seed in `kkt_p7_fe` (Redis db 12) plus the worker; ERP built with

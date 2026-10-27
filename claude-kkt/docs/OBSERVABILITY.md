@@ -88,7 +88,9 @@ database load by the number of workers. A failing database or Redis reports `0` 
   not stop within 30 s of the abort is given up (FAILED, retried by BullMQ). Counted in `kkt_job_interruptions_total{reason="timeout"}`.
 - **Checkpoints.** Heavy handlers call `ctx.saveCheckpoint({...})` after each batch (`job_runs.checkpoint`) and read `ctx.checkpoint` on
   start: a retry, a stall recovery or the next deploy resumes there. A run that finishes OK clears its checkpoint. EXPORT_CSV stores
-  each page as a part object and resumes at the next page.
+  each page as a part object (keys carry a per-build nonce kept in the checkpoint; the parts' pending records are refreshed at every
+  page so STORAGE_SWEEP never takes them from a live build) and resumes at the next page; when a resumed build finds a part gone or no
+  longer recorded, it starts over under a new nonce.
 - **Graceful drain (SIGTERM/SIGINT).** The worker stops fetching, interrupts heavy jobs (they save their checkpoint at the next batch and
   go back to their queue WITHOUT using an attempt; the job_runs row stays RUNNING with `result.interrupted`), and waits up to
   `WORKER_DRAIN_TIMEOUT_MS` (120 s) for in-flight critical jobs. Critical jobs still running then are interrupted the same way; only a

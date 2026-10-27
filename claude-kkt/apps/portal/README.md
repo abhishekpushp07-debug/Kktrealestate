@@ -33,7 +33,9 @@ src/app/                 expo-router routes (file-based). Root _layout gates: lo
   (app)/_layout.tsx      responsive shell: sidebar ≥ 1024 px, bottom tabs on phones (tab bar never covers content)
   (app)/{index,flat,payments,construction}.tsx   tab roots
   (app)/more/**          More hub + documents, requests, notices, notifications, profile, sessions, bank details
-src/api/client.ts        the ONLY HTTP module: fetch, single-flight refresh on 401 TOKEN_EXPIRED, Idempotency-Key on POST,
+src/api/client.ts        the ONLY HTTP module: fetch, single-flight refresh on 401 TOKEN_EXPIRED (also before sign-out, so an
+                         expired access token still revokes the session and clears kkt_prt; a refresh that returns another
+                         customer's token never re-sends the call), Idempotency-Key on POST,
                          If-Match from a version, error envelope → ApiError, one typed function per Appendix C endpoint,
                          every page of the ledger / receipts / demands (api/paging.ts)
 src/api/session.ts       contract C1: access token in memory; web = HttpOnly kkt_prt cookie (X-KKT-Session: cookie, only a

@@ -44,6 +44,9 @@ Uniqueness that does not include `created_at` cannot be a unique index on a part
 `ledger_entries_booking_seq_unique`, which takes a transaction-scoped advisory lock on `(booking, epoch, seq)` and raises the same
 `23505 ledger_entries_booking_epoch_seq_uq` error on a duplicate
 (race-free under READ COMMITTED, the isolation level the API uses; the money module also serialises ledger appends per booking).
+A database partitioned BEFORE migration 0005 keeps its plain `(booking_id, seq)` index (it serves the trigger's lookup); the online file
+only swaps in the epoch-aware trigger function, so no index is rebuilt over the partitions. New non-unique indexes on a partitioned table
+are built online by the migration runner: `ON ONLY` the parent, then `CONCURRENTLY` per partition and attached (docs/DATA-MODEL.md §J).
 
 ## Keeping months ahead
 

@@ -4,6 +4,18 @@
 
 **Result of the final run: 40 screenshots, 0 defects, 0 console errors, 0 failed requests, no horizontal overflow at 390 px, 90/90 related API integration tests green** (`auth`, `portal`, `portal-adversarial`, `service`, `seed`). `pnpm --filter @kkt/contracts|@kkt/api|@kkt/portal typecheck` green; `expo export --platform web` green.
 
+## Phase 7 frontend review 2026-10-27
+
+Stack: API on `:4730` (fresh demo seed in `kkt_p7_rfrontend`, Redis db 24, after the ERP walk), web export
+`EXPO_PUBLIC_API_URL=http://localhost:8730 npx expo export --platform web` served on `:8730` by a static SPA server that proxies `/api` to
+the API (same origin). Runner: `PORTAL_URL=http://localhost:8730 API_URL=http://localhost:4730 PORTAL_DB=kkt_p7_rfrontend OUT_DIR=<outside
+the repo> node docs/qa/portal/browser-qa.cjs`.
+
+**Result: 50 page checks, 99 assertions, 0 defects, 0 console errors, 0 failed requests, no overflow; axe 50 scans, 0 violations.** New
+in the phase-7 block (1440 px): the first `POST /portal/auth/logout` is answered 401 `TOKEN_EXPIRED` (an access token that expired while
+the app was open); the client refreshes and logs out again (204), `kkt_prt` is cleared and the sign-in page shows. Before the review's
+fix the logout was sent without a refresh, so the session and the HttpOnly cookie survived the sign-out.
+
 ## Phase 7 frontend track 2026-10-27
 
 Stack: API on `:4710` (demo seed in `kkt_p7_fe`, Redis db 12, the same instance the ERP walk used before), web export

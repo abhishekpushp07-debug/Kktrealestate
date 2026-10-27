@@ -55,33 +55,65 @@ import { adminMeta, idParams, iso, requireSuperAdmin, staff } from "./common.js"
 
 type JobRunRecord = typeof jobRuns.$inferSelect;
 
+/** Who reads a job result: their company, and whether it is the only tenant of the installation (nothing to hide from anyone then). */
+export interface JobResultViewer {
+  companyId: string;
+  soleTenant: boolean;
+}
+
+/** The viewer of job results for a staff caller of `companyId` (one indexed query: is there any other company?). */
+export async function jobResultViewer(db: Executor, companyId: string): Promise<JobResultViewer> {
+  const others = await db
+    .select({ id: companies.id })
+    .from(companies)
+    .where(sql`${companies.id} <> ${companyId}::uuid`)
+    .limit(1);
+  return { companyId, soleTenant: others.length === 0 };
+}
+
+const UUID_KEY_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /**
- * The part of a job result one tenant may read (audit B: job_runs is a platform table, but results can carry tenant data). Convention for
- * job results: tenant-neutral counters at the top level, tenant data under `by_company: {<company id>: {...}}` — a reader sees the top
- * level merged with their own company's entry and nothing of the others; a result naming another `company_id` is hidden entirely.
+ * The part of a job result one tenant may read (audit B: job_runs is a platform table, but results can carry tenant data). Rules:
+ * - a result naming a `company_id` is shown whole to that company and hidden from every other;
+ * - per-company entries — under `by_company: {<company id>: {...}}` (merged into the top level for their company) or as top-level keys
+ *   that are company ids (the dues and integrity jobs' `{<company id>: {...}}`) — are shown to their own company only;
+ * - any other object or array (booking numbers, flat numbers, failures of a run over every company) is shown only when the reader's company
+ *   is the only tenant of the installation: with several, only the scalar counters of a cross-company run are visible.
+ * A job that wants its tenant detail visible stores it per company (by_company) or names its `company_id`.
  */
 export function companyJobResult(
   result: Record<string, unknown> | null | undefined,
-  companyId: string,
+  viewer: JobResultViewer,
 ): Record<string, unknown> | null {
   if (!result) return null;
-  if (typeof result["company_id"] === "string" && result["company_id"] !== companyId) return null;
+  const { companyId } = viewer;
+  if (typeof result["company_id"] === "string") return result["company_id"] === companyId ? result : null;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(result)) {
+    if (k === "by_company") continue;
+    if (UUID_KEY_RE.test(k)) {
+      if (k.toLowerCase() === companyId.toLowerCase()) out[k] = v;
+      continue;
+    }
+    if (v !== null && typeof v === "object" && !viewer.soleTenant) continue;
+    out[k] = v;
+  }
   const byCompany = result["by_company"];
-  if (!byCompany || typeof byCompany !== "object") return result;
-  const { by_company: _all, ...rest } = result;
-  const own = (byCompany as Record<string, unknown>)[companyId];
-  return { ...rest, ...(own && typeof own === "object" ? (own as Record<string, unknown>) : {}) };
+  const own =
+    byCompany && typeof byCompany === "object" ? (byCompany as Record<string, unknown>)[companyId] : undefined;
+  return { ...out, ...(own && typeof own === "object" ? (own as Record<string, unknown>) : {}) };
 }
 
-/** Wire row of a job run, its result reduced to what `companyId` may read (companyJobResult). */
-export function toJobRunRow(r: JobRunRecord, companyId: string): AdminJobRunRow {
+/** Wire row of a job run, its result reduced to what the viewer may read (companyJobResult). */
+export function toJobRunRow(r: JobRunRecord, viewer: JobResultViewer): AdminJobRunRow {
   return {
     id: r.id,
     job_name: r.jobName,
     started_at: r.startedAt.toISOString(),
     finished_at: iso(r.finishedAt),
     status: r.status,
-    result: companyJobResult(r.result ?? null, companyId),
+    result: companyJobResult(r.result ?? null, viewer),
     error: r.error,
   };
 }
@@ -227,6 +259,7 @@ function parseInfo(info: string, key: string): string | null {
 
 /** Versions, database size, table row estimates, Redis memory, job health (job results reduced to `companyId`'s view). */
 export async function systemFacts(app: FastifyInstance, companyId: string): Promise<AdminSystemResponse> {
+  const viewer = await jobResultViewer(app.dbReplica, companyId);
   const since = new Date(Date.now() - 24 * 3600 * 1000);
   const [pg, dbInfo, tables, runs, runStats, redisServer, redisMemory, redisClients] = await Promise.all([
     app.db
@@ -301,7 +334,7 @@ export async function systemFacts(app: FastifyInstance, companyId: string): Prom
         started_at: new Date(r.started_at).toISOString(),
         finished_at: iso(r.finished_at),
         status: r.status,
-        result: companyJobResult(r.result ?? null, companyId),
+        result: companyJobResult(r.result ?? null, viewer),
         error: r.error,
       })),
     },
@@ -429,7 +462,7 @@ export function registerToolRoutes(app: FastifyInstance): void {
       tags: ["admin"],
     },
     handler: async (req) => {
-      const companyId = staff(req).companyId;
+      const viewer = await jobResultViewer(app.dbReplica, staff(req).companyId);
       const recent = await app.dbReplica.select().from(jobRuns).orderBy(desc(jobRuns.startedAt)).limit(25);
       const names = [...JOB_NAMES];
       type LastRow = {
@@ -447,7 +480,7 @@ export function registerToolRoutes(app: FastifyInstance): void {
         started_at: new Date(r.started_at).toISOString(),
         finished_at: iso(r.finished_at),
         status: r.status,
-        result: companyJobResult(r.result ?? null, companyId),
+        result: companyJobResult(r.result ?? null, viewer),
         error: r.error,
       });
       const [last, lastOk, stats, next] = await Promise.all([
@@ -489,7 +522,7 @@ export function registerToolRoutes(app: FastifyInstance): void {
       });
       return {
         jobs,
-        recent_runs: recent.map((r) => toJobRunRow(r, companyId)),
+        recent_runs: recent.map((r) => toJobRunRow(r, viewer)),
         links: {
           run_dues_now: "/api/v1/dues/run",
           integrity_report: "/api/v1/dues/integrity",
@@ -535,8 +568,8 @@ export function registerToolRoutes(app: FastifyInstance): void {
         },
         ...listPaging(q),
       });
-      const companyId = staff(req).companyId;
-      const items = r.items.map((x) => toJobRunRow(x, companyId));
+      const viewer = await jobResultViewer(app.dbReplica, staff(req).companyId);
+      const items = r.items.map((x) => toJobRunRow(x, viewer));
       if (q.format === "csv")
         return sendCsv(reply, "job-runs.csv", jobRunCsv, items as unknown as Record<string, unknown>[]);
       return { ...r, items };
@@ -556,7 +589,7 @@ export function registerToolRoutes(app: FastifyInstance): void {
     handler: async (req) => {
       const [row] = await app.db.select().from(jobRuns).where(eq(jobRuns.id, req.params.id)).limit(1);
       if (!row) throw ApiError.notFound("Job run");
-      return toJobRunRow(row, staff(req).companyId);
+      return toJobRunRow(row, await jobResultViewer(app.db, staff(req).companyId));
     },
   });
 

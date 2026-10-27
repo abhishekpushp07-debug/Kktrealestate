@@ -28,6 +28,7 @@ import { config } from "../../config.js";
 import { sha256, signLinkBody, verifyLinkBody } from "../../lib/crypto.js";
 import { ApiError } from "../../lib/errors.js";
 import { createStorage, type Storage } from "../../lib/storage.js";
+import { withoutCommitTracking } from "../../plugins/requestContext.js";
 import {
   clearPendingObjects,
   imageSlots,
@@ -267,7 +268,10 @@ export async function discardStagedUpload(db: DB, staged: StagedUpload): Promise
       .limit(1);
     if (owned) return;
     await storage().remove(staged.key);
-    await db.delete(storagePendingObjects).where(eq(storagePendingObjects.key, staged.key));
+    // bookkeeping of a failed upload, not an outcome: it must not pin the request's Idempotency-Key
+    await withoutCommitTracking(async () => {
+      await db.delete(storagePendingObjects).where(eq(storagePendingObjects.key, staged.key));
+    });
   } catch {
     /* left pending: the sweep removes it once it is an hour old */
   }

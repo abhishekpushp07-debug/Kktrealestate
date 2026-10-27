@@ -141,6 +141,21 @@ function topLevelSplit(s) {
   return parts;
 }
 
+/**
+ * A `DO $$ BEGIN … END $$` block (the usual way to make ALTER TABLE … ADD CONSTRAINT idempotent: `EXCEPTION WHEN duplicate_object`)
+ * runs its statements with the same locks as top-level ones: lint the statements of its body. They keep the block's line and leading
+ * comments (an allow comment before the DO covers its body). Other statements pass through unchanged.
+ */
+function expandDoBlock(st) {
+  const m = /^DO\s+(?:LANGUAGE\s+\w+\s+)?(\$[A-Za-z_]*\$)([\s\S]*)\1/i.exec(st.sql);
+  if (!m) return [st];
+  const inner = splitStatements(m[2])
+    // `BEGIN ALTER …`, `IF NOT EXISTS (…) THEN ALTER …`, `ELSE ALTER …`: the statement after the control-flow keywords
+    .map((x) => x.sql.replace(/^(?:BEGIN\s+|(?:IF|ELSIF)\b.*?\bTHEN\s+|ELSE\s+)+/i, "").trim())
+    .filter((sql) => sql && !/^(?:END|EXCEPTION|WHEN|RAISE|NULL|PERFORM|RETURN|DECLARE)\b/i.test(sql));
+  return inner.length === 0 ? [st] : inner.map((sql) => ({ ...st, sql }));
+}
+
 /** Column of a CHECK expression of the form (col IS NOT NULL), else null. */
 function notNullCheckColumn(expr) {
   const m = new RegExp(String.raw`^\(*\s*(${IDENT})\s+IS\s+NOT\s+NULL\s*\)*$`, "i").exec(expr.trim());
@@ -166,7 +181,7 @@ export function lintMigrations(files, targets = null, exemptions = []) {
   for (const { path, text } of files) {
     const online = path.replace(/\\/g, "/").includes("/src/sql/online/");
     const created = new Set();
-    for (const st of splitStatements(text)) {
+    for (const st of splitStatements(text).flatMap(expandDoBlock)) {
       const allowed = new Set([...st.raw.matchAll(/--\s*lint-migrations:\s*allow\s+([\w-]+)/g)].map((m) => m[1]));
       const flag = (rule, msg, table) => {
         if (allowed.has(rule)) return;
@@ -213,12 +228,13 @@ export function lintMigrations(files, targets = null, exemptions = []) {
         for (const action of topLevelSplit(m[2])) {
           let a;
           if (
+            // named (ADD CONSTRAINT c CHECK …) or unnamed (ADD CHECK …, ADD FOREIGN KEY …): the same locks either way
             (a = new RegExp(
-              String.raw`^ADD\s+CONSTRAINT\s+(${IDENT})\s+(CHECK|FOREIGN\s+KEY|UNIQUE|PRIMARY\s+KEY)\b(.*)$`,
+              String.raw`^ADD\s+(?:CONSTRAINT\s+(${IDENT})\s+)?(CHECK|FOREIGN\s+KEY|UNIQUE|PRIMARY\s+KEY)\b(.*)$`,
               "i",
             ).exec(action))
           ) {
-            const cname = name(a[1]);
+            const cname = a[1] ? name(a[1]) : "(unnamed)";
             const kind = a[2].toUpperCase().replace(/\s+/g, " ");
             const rest = a[3];
             const notValid = /\bNOT\s+VALID\s*$/i.test(rest);

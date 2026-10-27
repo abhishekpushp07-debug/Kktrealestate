@@ -12,6 +12,7 @@ import {
   listSqlFiles,
   MIGRATIONS_FOLDER,
   parseConcurrentIndex,
+  partitionIndexName,
   runMigrations,
   SQL_FOLDER,
   splitSqlStatements,
@@ -159,7 +160,8 @@ describe("online runner", () => {
       CREATE TABLE online_probe (id int PRIMARY KEY, code text);
       INSERT INTO online_probe VALUES (1, 'a'), (2, 'a');
       CREATE TABLE online_probe_parted (id int, created_at timestamptz NOT NULL, code text) PARTITION BY RANGE (created_at);
-      CREATE TABLE online_probe_parted_all PARTITION OF online_probe_parted DEFAULT;`);
+      CREATE TABLE online_probe_parted_all PARTITION OF online_probe_parted DEFAULT;
+      CREATE TABLE online_probe_parted_y2025 PARTITION OF online_probe_parted FOR VALUES FROM ('2025-01-01') TO ('2026-01-01');`);
   });
   afterAll(async () => {
     await handle.sql.unsafe("DROP TABLE IF EXISTS online_probe, online_probe_parted CASCADE");
@@ -208,16 +210,174 @@ describe("online runner", () => {
     expect(chk?.v).toBe(true);
   });
 
-  it("on a partitioned table builds a plain index without CONCURRENTLY and skips a UNIQUE one", async () => {
+  it("on a partitioned table builds the index online partition by partition (ON ONLY + CONCURRENTLY + ATTACH) and skips a UNIQUE one", async () => {
     const results = await applyOnlineSql(
       handle.sql,
       `CREATE INDEX CONCURRENTLY IF NOT EXISTS online_probe_parted_code_idx ON online_probe_parted (code);
        CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS online_probe_parted_id_uq ON online_probe_parted (id);`,
+      { lockTimeoutMs: 1_000, lockRetries: 0 },
     );
-    expect(results.map((r) => r.action)).toEqual(["applied-without-concurrently", "skipped-unique-on-partitioned"]);
-    const idx = await handle.sql<{ name: string }[]>`
-      SELECT indexname AS name FROM pg_indexes WHERE tablename = 'online_probe_parted' ORDER BY 1`;
-    expect(idx.map((r) => r.name)).toEqual(["online_probe_parted_code_idx"]);
+    expect(results.map((r) => r.action)).toEqual(["applied-per-partition", "skipped-unique-on-partitioned"]);
+    expect(results[0]!.partitionIndexes).toEqual([
+      partitionIndexName("online_probe_parted_code_idx", "online_probe_parted_all"),
+      partitionIndexName("online_probe_parted_code_idx", "online_probe_parted_y2025"),
+    ]);
+    const idx = await handle.sql<{ name: string; valid: boolean; parent: string | null }[]>`
+      SELECT c.relname AS name, i.indisvalid AS valid,
+             (SELECT p.relname FROM pg_inherits h JOIN pg_class p ON p.oid = h.inhparent WHERE h.inhrelid = c.oid) AS parent
+      FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
+      WHERE i.indrelid IN ('online_probe_parted'::regclass, 'online_probe_parted_all'::regclass, 'online_probe_parted_y2025'::regclass)
+      ORDER BY 1`;
+    expect(idx).toEqual([
+      {
+        name: "online_probe_parted_all_online_probe_parted_code_idx",
+        valid: true,
+        parent: "online_probe_parted_code_idx",
+      },
+      { name: "online_probe_parted_code_idx", valid: true, parent: null },
+      {
+        name: "online_probe_parted_y2025_online_probe_parted_code_idx",
+        valid: true,
+        parent: "online_probe_parted_code_idx",
+      },
+    ]);
+    // a re-run finds the valid parent index and builds nothing
+    const again = await applyOnlineSql(
+      handle.sql,
+      "CREATE INDEX CONCURRENTLY IF NOT EXISTS online_probe_parted_code_idx ON online_probe_parted (code);",
+    );
+    expect(again[0]).toMatchObject({ action: "applied-per-partition", partitionIndexes: [] });
+    // a new partition gets the index from PostgreSQL itself
+    await handle.sql.unsafe(
+      "CREATE TABLE online_probe_parted_y2026 PARTITION OF online_probe_parted FOR VALUES FROM ('2026-01-01') TO ('2027-01-01')",
+    );
+    const [n] = await handle.sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM pg_index WHERE indrelid = 'online_probe_parted_y2026'::regclass`;
+    expect(n?.n).toBe(1);
+  });
+
+  it("an interrupted partition-wise build resumes: attached partitions are kept, the rest are built and attached", async () => {
+    await handle.sql.unsafe(`
+      CREATE INDEX online_probe_parted_id_idx ON ONLY online_probe_parted (id);
+      CREATE INDEX online_probe_parted_all_online_probe_parted_id_idx ON online_probe_parted_all (id);
+      ALTER INDEX online_probe_parted_id_idx ATTACH PARTITION online_probe_parted_all_online_probe_parted_id_idx;`);
+    const [before] = await handle.sql<{ valid: boolean }[]>`
+      SELECT indisvalid AS valid FROM pg_index WHERE indexrelid = 'online_probe_parted_id_idx'::regclass`;
+    expect(before?.valid).toBe(false);
+    const [r] = await applyOnlineSql(
+      handle.sql,
+      "CREATE INDEX CONCURRENTLY IF NOT EXISTS online_probe_parted_id_idx ON online_probe_parted (id);",
+    );
+    expect(r!.partitionIndexes).toEqual([
+      partitionIndexName("online_probe_parted_id_idx", "online_probe_parted_y2025"),
+      partitionIndexName("online_probe_parted_id_idx", "online_probe_parted_y2026"),
+    ]);
+    const [after] = await handle.sql<{ valid: boolean }[]>`
+      SELECT indisvalid AS valid FROM pg_index WHERE indexrelid = 'online_probe_parted_id_idx'::regclass`;
+    expect(after?.valid).toBe(true);
+  });
+
+  it("long partition index names stay within 63 bytes and stable", () => {
+    const name = partitionIndexName("payments_instrument_number_trgm_idx", "ledger_entries_2026_10_with_a_long_suffix");
+    expect(Buffer.byteLength(name)).toBeLessThanOrEqual(63);
+    expect(name).toBe(
+      partitionIndexName("payments_instrument_number_trgm_idx", "ledger_entries_2026_10_with_a_long_suffix"),
+    );
+  });
+});
+
+describe("migration locks (lock_timeout + retry; nothing re-locks a table on a re-run)", () => {
+  let blocker: postgres.Sql;
+  beforeAll(async () => {
+    blocker = postgres(TEST_DATABASE_URL, { max: 1, onnotice: () => undefined });
+    await handle.sql.unsafe(`
+      DROP TABLE IF EXISTS lock_probe;
+      CREATE TABLE lock_probe (id int PRIMARY KEY, code text);
+      INSERT INTO lock_probe VALUES (1, 'a');`);
+  });
+  afterAll(async () => {
+    await blocker?.end({ timeout: 5 });
+    await handle.sql.unsafe("DROP TABLE IF EXISTS lock_probe");
+  });
+
+  /** Holds `lock` inside an open transaction on the blocker connection until the returned release() is called. */
+  async function hold(lock: string): Promise<() => Promise<void>> {
+    let release!: () => void;
+    const released = new Promise<void>((resolve) => (release = resolve));
+    let ready!: () => void;
+    const holding = new Promise<void>((resolve) => (ready = resolve));
+    const tx = blocker.begin(async (sql) => {
+      await sql.unsafe(lock);
+      ready();
+      await released;
+    });
+    await holding;
+    return async () => {
+      release();
+      await tx;
+    };
+  }
+
+  it("a blocking statement gives up after lock_timeout instead of queueing behind a long transaction (55P03 without retries)", async () => {
+    const release = await hold("SELECT * FROM lock_probe");
+    try {
+      const started = Date.now();
+      await expect(
+        applyOnlineSql(handle.sql, "ALTER TABLE lock_probe ADD COLUMN IF NOT EXISTS extra int;", {
+          lockTimeoutMs: 200,
+          lockRetries: 0,
+        }),
+      ).rejects.toMatchObject({ code: "55P03" });
+      expect(Date.now() - started).toBeLessThan(5_000);
+      // meanwhile nobody else was stuck behind the ALTER: a plain read and write go through at once
+      await handle.sql`UPDATE lock_probe SET code = 'b' WHERE id = 1`;
+    } finally {
+      await release();
+    }
+  });
+
+  it("…and is retried with backoff until the lock is free", async () => {
+    const release = await hold("SELECT * FROM lock_probe");
+    setTimeout(() => void release(), 700);
+    const lines: string[] = [];
+    const [r] = await applyOnlineSql(handle.sql, "ALTER TABLE lock_probe ADD COLUMN IF NOT EXISTS extra int;", {
+      lockTimeoutMs: 200,
+      lockRetries: 10,
+      lockRetryDelayMs: 100,
+      log: (l) => lines.push(l),
+    });
+    expect(r!.lockRetries).toBeGreaterThanOrEqual(1);
+    expect(lines.some((l) => l.includes("retry 1/10"))).toBe(true);
+    const [col] = await handle.sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM information_schema.columns WHERE table_name = 'lock_probe' AND column_name = 'extra'`;
+    expect(col?.n).toBe(1);
+  });
+
+  it("CREATE INDEX CONCURRENTLY is never cut off by the lock timeout (its waits block no one)", async () => {
+    const release = await hold("UPDATE lock_probe SET code = 'c' WHERE id = 1");
+    setTimeout(() => void release(), 800);
+    const [r] = await applyOnlineSql(
+      handle.sql,
+      "CREATE INDEX CONCURRENTLY IF NOT EXISTS lock_probe_code_idx ON lock_probe (code);",
+      { lockTimeoutMs: 100, lockRetries: 0 },
+    );
+    expect(r!.action).toBe("applied");
+    const [v] = await handle.sql<{ valid: boolean }[]>`
+      SELECT indisvalid AS valid FROM pg_index WHERE indexrelid = 'lock_probe_code_idx'::regclass`;
+    expect(v?.valid).toBe(true);
+  });
+
+  it("re-applying the trigger file and the online file while writers hold the busiest tables takes no blocking lock", async () => {
+    const release = await hold(
+      "LOCK TABLE bookings, demands, rate_cards, bank_accounts, construction_stages, companies, ledger_entries, payments IN ROW EXCLUSIVE MODE",
+    );
+    try {
+      await handle.sql`UPDATE drizzle.kkt_schema_files SET sha256 = 'changed' WHERE file IN ('0001_triggers.sql', 'online/0005_indexes.sql')`;
+      const report = await runMigrations(TEST_DATABASE_URL, { lockTimeoutMs: 500, lockRetries: 0 });
+      expect(report.applied).toEqual(["0001_triggers.sql", "online/0005_indexes.sql"]);
+    } finally {
+      await release();
+    }
   });
 });
 
@@ -413,6 +573,8 @@ describe("migration 0005 on existing data (upgrade from 0004)", () => {
         >`INSERT INTO companies (name) VALUES ('Shree Ganesh Builders') RETURNING id`;
         await fresh`INSERT INTO companies (name, created_at) VALUES ('Shree Ganesh Builders!', now() + interval '1 second')`;
         await fresh`INSERT INTO companies (name) VALUES ('***')`;
+        // its own name slugifies to the suffix the backfill gives the second company above: the online file renumbers it
+        await fresh`INSERT INTO companies (name, created_at) VALUES ('Shree Ganesh Builders 2', now() + interval '2 seconds')`;
         const companyId = c1!.id;
         const [bt] = await fresh<
           { id: string }[]
@@ -450,6 +612,12 @@ describe("migration 0005 on existing data (upgrade from 0004)", () => {
           INSERT INTO refresh_tokens (company_id, subject_type, subject_id, family_id, token_hash, expires_at, created_at)
           VALUES (${companyId}, 'STAFF', gen_random_uuid(), ${family}, 'h1', now() + interval '7 days', '2026-01-01T00:00:00Z'),
                  (${companyId}, 'STAFF', gen_random_uuid(), ${family}, 'h2', now() + interval '7 days', '2026-01-05T00:00:00Z')`;
+        // enough families for several backfill batches (2,000 families each)
+        await fresh`
+          INSERT INTO refresh_tokens (company_id, subject_type, subject_id, family_id, token_hash, expires_at, created_at)
+          SELECT ${companyId}, 'CUSTOMER', gen_random_uuid(), f.id, 'bulk-' || f.n || '-' || k, now() + interval '7 days',
+                 timestamptz '2026-02-01T00:00:00Z' + (f.n || ' minutes')::interval + (k || ' days')::interval
+          FROM (SELECT gen_random_uuid() AS id, n FROM generate_series(1, 4500) AS n) f, generate_series(0, 1) AS k`;
       } finally {
         await fresh.end({ timeout: 5 });
       }
@@ -467,14 +635,20 @@ describe("migration 0005 on existing data (upgrade from 0004)", () => {
           "company",
           "shree-ganesh-builders",
           "shree-ganesh-builders-2",
+          "shree-ganesh-builders-2-2",
         ]);
         const [b] = await after<{ r: number; d: number; j: Record<string, unknown> }[]>`
           SELECT cancellation_refund_paise::int AS r, cancellation_deduction_paise::int AS d, cancellation AS j FROM bookings`;
         expect([b?.r, b?.d]).toEqual([150000, 50000]);
         expect(b?.j).toMatchObject({ refund_paise: 150000, deduction_paise: 50000 }); // the jsonb stays as the history record
-        const fam = await after<{ s: string }[]>`SELECT DISTINCT family_started_at::text AS s FROM refresh_tokens`;
+        const fam = await after<{ s: string }[]>`
+          SELECT DISTINCT family_started_at::text AS s FROM refresh_tokens WHERE family_id = '5f0c7a9e-1111-4222-8333-944455556666'`;
         expect(fam).toHaveLength(1);
         expect(fam[0]!.s).toMatch(/^2026-01-01 00:00:00/);
+        const [wrong] = await after<{ n: number; families: number }[]>`
+          SELECT count(*) FILTER (WHERE r.family_started_at <> f.started)::int AS n, count(DISTINCT r.family_id)::int AS families
+          FROM refresh_tokens r JOIN (SELECT family_id, min(created_at) AS started FROM refresh_tokens GROUP BY family_id) f USING (family_id)`;
+        expect(wrong).toEqual({ n: 0, families: 4501 });
         const notValid = await after`SELECT conname FROM pg_constraint WHERE NOT convalidated`;
         expect(notValid).toHaveLength(0);
         expect(await after.unsafe(UNINDEXED_FKS)).toEqual([]);

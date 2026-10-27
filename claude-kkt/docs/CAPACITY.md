@@ -37,7 +37,8 @@ reads) ~1.5 ms; cacheable public reads that reach the API ~0.2 ms.
   fail or redeploy and the other still runs at ~25 % CPU. The measured box already served 1,000 _zero-think-time_ connections at 1.5–8k
   rps per endpoint, an order of magnitude above this load.
 - **Database (primary):** 4 vCPU / 16 GB, `shared_buffers` 4 GB, SSD. Pools: 2 replicas × 2 workers × `DATABASE_POOL_MAX` 10 = 40
-  client connections + worker 4 → PgBouncer → ≤ 60 server connections (well under `max_connections` 200).
+  client connections + 2 job workers × `DATABASE_POOL_MAX` (20 by default in Compose production, 10 from the Kubernetes ConfigMap)
+  → PgBouncer → ≤ 60 server connections (well under `max_connections` 200).
 - **Redis:** ~2–3 commands per request (auth MGET, rate limit) → < 1,500 ops/s; 1 GB `noeviction` is generous.
 - **Worker:** 2 containers × 2 vCPU (phase 7: two replicas for availability, not throughput — BullMQ runs each job once, schedules are
   de-duplicated; per worker `WORKER_CRITICAL_CONCURRENCY` 2 + `WORKER_HEAVY_CONCURRENCY` 1); nightly dues/integrity over thousands of
@@ -118,7 +119,10 @@ stale-while-revalidate=300` and are cached in Redis for 60 s; media and build as
 ## 5. Pool and connection arithmetic
 
 `client connections = API replicas × workers per replica × DATABASE_POOL_MAX (+ replica pools) + worker replicas (2) × worker pool + migrate (2)`.
-Without PgBouncer this must stay under Postgres `max_connections` (200 in `infra/postgres/postgresql.conf`) minus admin/backup headroom.
+Without PgBouncer this must stay under Postgres `max_connections` (200 in `infra/postgres/postgresql.conf`) minus admin/backup headroom:
+the quick start (`docker-compose.yml`, no PgBouncer) therefore gives each of its two job workers a pool of 8
+(`WORKER_DATABASE_POOL_MAX`), so 2 API replicas × 8 cores × 10 + 2 × 8 = 176 stays under it (checked by
+`apps/api/test/unit/deploy-config.test.ts`); on a host with more cores set `API_WORKERS` or `DATABASE_POOL_MAX` lower.
 With PgBouncer it must stay under `max_client_conn`, and `default_pool_size` × databases ≤ `max_db_connections` (150 in Compose).
 PgBouncer's limits apply per PgBouncer process: with N PgBouncer replicas the server side is N × `max_db_connections`, which must stay
 under Postgres `max_connections` minus headroom (Kubernetes ships 2 × 70 = 140). The

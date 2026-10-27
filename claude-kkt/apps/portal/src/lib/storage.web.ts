@@ -1,5 +1,6 @@
-// Storage abstraction (web): refresh token in localStorage (per API-CONVENTIONS Appendix A),
-// everything else in AsyncStorage's web shim. Same surface as storage.ts.
+// Storage abstraction (web). The refresh token is NOT kept here: on web it is the HttpOnly kkt_prt cookie (contract C1,
+// src/api/session.ts); `secureStorage` only holds the "signed in on this browser" hint and deletes the legacy token key.
+// Everything else goes through AsyncStorage's web shim. Same surface as storage.ts.
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 function local(): Storage | null {

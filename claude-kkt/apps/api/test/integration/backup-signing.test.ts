@@ -7,7 +7,7 @@
  */
 import { spawn } from "node:child_process";
 import { createHmac } from "node:crypto";
-import { createWriteStream, mkdtempSync } from "node:fs";
+import { createWriteStream, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { finished } from "node:stream/promises";
@@ -48,12 +48,15 @@ async function repack(
   return out;
 }
 
-function runCli(args: string[]): Promise<{ code: number | null; out: string }> {
+function runCli(
+  args: string[],
+  env: NodeJS.ProcessEnv = { ...process.env },
+): Promise<{ code: number | null; out: string }> {
   return new Promise((resolve) => {
     let out = "";
     const child = spawn(process.execPath, ["--import", "tsx", "src/cli/restore.ts", ...args], {
       cwd: API_DIR,
-      env: { ...process.env, LOG_LEVEL: "fatal" },
+      env: { ...env, LOG_LEVEL: "fatal" },
       stdio: ["ignore", "pipe", "pipe"],
     });
     child.stdout.on("data", (c: Buffer) => (out += c.toString()));
@@ -156,6 +159,24 @@ describe("signed backup manifests", () => {
     const bad = await runCli(["--", "--file", unsigned, "--verify-only"]);
     expect(bad.code).toBe(1);
     expect(bad.out).toMatch(/restore failed: manifest\.sig is missing/);
+  });
+
+  it("the CLI runs with the installation's environment, where the database URL is a secret file (DATABASE_URL_FILE)", async () => {
+    // inside the API image (docs/RESTORE.md: `node dist/cli/restore.js … --confirm`) DATABASE_URL_FILE is set; the CLI used to add
+    // DATABASE_URL from --database-url on top, and the configuration refused "set either DATABASE_URL or DATABASE_URL_FILE"
+    const urlFile = join(dir, "database_url");
+    writeFileSync(urlFile, process.env["TEST_DATABASE_URL"] ?? NOWHERE);
+    const { DATABASE_URL: _drop, ...rest } = process.env;
+    const unsigned = await repack(good, "cli-env-unsigned.zip", (n, text) => (n === "manifest.sig" ? null : text));
+    const r = await runCli(["--file", unsigned, "--database-url", NOWHERE, "--confirm"], {
+      ...rest,
+      DATABASE_URL_FILE: urlFile,
+    });
+    expect(r.code).toBe(1);
+    expect(r.out).not.toMatch(/not both/);
+    expect(r.out).toMatch(/restore failed: manifest\.sig is missing/);
+    const ok = await runCli(["--file", good, "--verify-only"], { ...rest, DATABASE_URL_FILE: urlFile });
+    expect(ok.code, ok.out).toBe(0);
   });
 });
 

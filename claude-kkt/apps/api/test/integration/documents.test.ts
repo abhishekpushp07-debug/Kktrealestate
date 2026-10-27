@@ -202,8 +202,8 @@ describe("upload", () => {
     >`select storage_key, variants, sha256 from documents where id = ${doc.id}`;
     expect(row!.storage_key).toMatch(new RegExp(`^${t.companyId}/\\d{4}/\\d{2}/[0-9a-f-]{36}\\.png$`));
     expect(row!.storage_key.toLowerCase()).not.toContain("holiday");
-    expect(row!.variants.thumb_key).toMatch(/_thumb\.webp$/);
-    expect(row!.variants.medium_key).toMatch(/_medium\.webp$/);
+    expect(row!.variants.thumb_key).toMatch(/_thumb_[0-9a-f]{12}\.webp$/);
+    expect(row!.variants.medium_key).toMatch(/_medium_[0-9a-f]{12}\.webp$/);
     const { createHash } = await import("node:crypto");
     expect(row!.sha256).toBe(createHash("sha256").update(png).digest("hex"));
     expect(existsSync(join(STORAGE_DIR, row!.storage_key))).toBe(true);

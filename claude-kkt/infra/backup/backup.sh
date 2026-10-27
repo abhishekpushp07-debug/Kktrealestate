@@ -26,6 +26,7 @@
 # Commands:
 #   backup.sh                      scheduler (the backup service)
 #   backup.sh once                 one cycle now (before an upgrade; drills)
+#   backup.sh base                 one encrypted base backup now (e.g. after KktBaseBackupStale), then retention
 #   backup.sh wal-push %p %f       archive_command: encrypt one WAL segment into /backups/wal
 #   backup.sh wal-fetch %f %p      restore_command (PITR): decrypt one archived segment
 #   backup.sh decrypt IN OUT|-     decrypt a dump / base backup / WAL file (verifies authenticity first); "-" = stdout
@@ -85,20 +86,32 @@ resolve_mode() {
 mac_key() { printf 'kkt-backup-mac:%s' "$(tr -d '\r\n' < "$KEY_FILE")" | openssl dgst -sha256 -r | cut -d' ' -f1; }
 mac_of() { openssl dgst -sha256 -mac HMAC -macopt "hexkey:$(mac_key)" -r "$1" | cut -d' ' -f1; }
 
-# encrypt_file IN|- OUT: writes OUT (and OUT.hmac in openssl mode) atomically via OUT.partial
+# encrypt_file IN|- OUT: writes OUT (and OUT.hmac in openssl mode) atomically via OUT.partial. Every step is checked explicitly: the
+# function is mostly called where `set -e` is suspended (a pipeline followed by ||, `if`), so a cipher that fails at the very end (ENOSPC
+# on the last block) must still fail the call instead of publishing a truncated file — with a valid MAC — as a good backup.
 encrypt_file() {
   in="$1"; out="$2"
+  rm -f "$out.partial"
   case "$MODE" in
-    none) if [ "$in" = - ]; then cat > "$out.partial"; else cat "$in" > "$out.partial"; fi ;;
+    none)
+      if [ "$in" = - ]; then cat > "$out.partial" || return 1; else cat "$in" > "$out.partial" || return 1; fi ;;
     age)
-      recipient=$(age-keygen -y "$KEY_FILE")
-      if [ "$in" = - ]; then age -e -r "$recipient" -o "$out.partial"; else age -e -r "$recipient" -o "$out.partial" "$in"; fi ;;
+      recipient=$(age-keygen -y "$KEY_FILE") || return 1
+      [ -n "$recipient" ] || return 1
+      if [ "$in" = - ]; then age -e -r "$recipient" -o "$out.partial" || return 1
+      else age -e -r "$recipient" -o "$out.partial" "$in" || return 1; fi ;;
     openssl)
-      if [ "$in" = - ]; then set -- -in /dev/stdin; else set -- -in "$in"; fi
-      openssl enc -aes-256-ctr -pbkdf2 -iter "$BACKUP_PBKDF2_ITER" -salt -pass "file:$KEY_FILE" "$@" -out "$out.partial"
-      mac_of "$out.partial" > "$out.hmac" ;;
+      # stdin / stdout are openssl's defaults: naming /dev/stdin or /dev/stdout fails (ENXIO) when they are sockets (e.g. a process
+      # spawned by node, systemd or a container runtime)
+      if [ "$in" = - ]; then set --; else set -- -in "$in"; fi
+      openssl enc -aes-256-ctr -pbkdf2 -iter "$BACKUP_PBKDF2_ITER" -salt -pass "file:$KEY_FILE" "$@" -out "$out.partial" || return 1
+      mac=$(mac_of "$out.partial") || return 1
+      # mac_of is a pipeline (its status is cut's): an empty or malformed digest means openssl dgst failed
+      case "$mac" in "" | *[!0-9a-f]*) return 1 ;; esac
+      [ "${#mac}" -eq 64 ] || return 1
+      printf '%s\n' "$mac" > "$out.hmac" || return 1 ;;
   esac
-  mv "$out.partial" "$out"
+  mv "$out.partial" "$out" || return 1
 }
 
 # decrypt_file IN OUT|-: refuses a file whose authentication fails (age: per-chunk tags; openssl: the HMAC sidecar, checked first)
@@ -117,7 +130,7 @@ decrypt_file() {
     openssl)
       [ -f "$in.hmac" ] || die "$in.hmac is missing: refusing an unauthenticated file"
       [ "$(mac_of "$in")" = "$(cat "$in.hmac")" ] || die "$in failed authentication (wrong key, corrupted or modified)"
-      if [ "$out" = - ]; then set -- -out /dev/stdout; else set -- -out "$out"; fi
+      if [ "$out" = - ]; then set --; else set -- -out "$out"; fi
       openssl enc -d -aes-256-ctr -pbkdf2 -iter "$BACKUP_PBKDF2_ITER" -pass "file:$KEY_FILE" -in "$in" "$@" ;;
   esac
 }
@@ -126,10 +139,16 @@ decrypt_file() {
 
 latest() { ls -t "$@" 2>/dev/null | head -1; }
 
-write_status() { # $1 = ok|failed, $2 = what
+write_status() { # $1 = ok|failed|base (ok = a full dump cycle succeeded; the others keep the last success time), $2 = what
   now=$(date -u +%s)
   tmp="$BACKUP_DIR/.status.prom.tmp"
   last_dump=$(latest "$DUMPS"/kkt-*.dump "$DUMPS"/kkt-*.dump.age "$DUMPS"/kkt-*.dump.enc)
+  # newest complete base backup (directory names are UTC timestamps; *.partial = in progress or crashed)
+  base_ts=0
+  for d in "$BASES"/*/; do
+    case "$d" in *.partial/) continue ;; esac
+    for f in "$d"base.tar.gz "$d"base.tar.gz.age "$d"base.tar.gz.enc; do [ -f "$f" ] && base_ts=$(stat -c %Y "$f"); done
+  done
   {
     echo "# HELP kkt_backup_last_run_timestamp_seconds Unix time of the last backup run."
     echo "# TYPE kkt_backup_last_run_timestamp_seconds gauge"
@@ -141,6 +160,9 @@ write_status() { # $1 = ok|failed, $2 = what
     echo "# HELP kkt_backup_last_dump_bytes Size of the latest logical dump (encrypted)."
     echo "# TYPE kkt_backup_last_dump_bytes gauge"
     echo "kkt_backup_last_dump_bytes $(if [ -n "$last_dump" ]; then stat -c %s "$last_dump"; else echo 0; fi)"
+    echo "# HELP kkt_backup_last_base_backup_timestamp_seconds Unix time of the newest complete base backup (PITR starting point; 0 = none)."
+    echo "# TYPE kkt_backup_last_base_backup_timestamp_seconds gauge"
+    echo "kkt_backup_last_base_backup_timestamp_seconds $base_ts"
     echo "# HELP kkt_backup_encrypted 1 when dumps, base backups and WAL are written encrypted (age or openssl)."
     echo "# TYPE kkt_backup_encrypted gauge"
     echo "kkt_backup_encrypted $(if [ "$MODE" = none ]; then echo 0; else echo 1; fi)"
@@ -178,8 +200,13 @@ dump() {
   file="$DUMPS/kkt-$ts.dump$EXT"
   log "pg_dump start -> $file"
   start=$(date +%s)
-  encrypt_from "$file" pg_dump --format=custom --compress=6 --no-owner --no-privileges "$PGDATABASE"
-  (cd "$DUMPS" && sha256sum "$(basename "$file")" > "$(basename "$file").sha256")
+  # explicit checks: dump() runs inside `if dump && verify` where `set -e` is suspended, so a failed step must return 1 itself
+  if ! encrypt_from "$file" pg_dump --format=custom --compress=6 --no-owner --no-privileges "$PGDATABASE"; then
+    log "pg_dump FAILED (dump or encryption)"; return 1
+  fi
+  if ! (cd "$DUMPS" && sha256sum "$(basename "$file")" > "$(basename "$file").sha256"); then
+    rm -f "$file" "$file.hmac" "$file.sha256"; log "pg_dump FAILED (checksum)"; return 1
+  fi
   log "pg_dump done ($(stat -c %s "$file") bytes, $(( $(date +%s) - start )) s, encryption $MODE)"
   LAST_DUMP="$file"
 }
@@ -239,6 +266,8 @@ basebackup() {
 
 retention() {
   find "$DUMPS" -maxdepth 1 -name 'kkt-*.dump*' -mtime +"$DUMP_RETENTION_DAYS" -print -delete | sed 's/^/deleted /' || true
+  # base backups that crashed half-way (a .partial directory older than a day: never a running one) only waste space
+  find "$BASES" -mindepth 1 -maxdepth 1 -type d -name '*.partial' -mtime +0 -print -exec rm -rf {} \; | sed 's/^/deleted /' || true
   # keep the newest BASE_BACKUPS_KEEP base backups (directory names are UTC timestamps: glob order = oldest first)
   total=0
   for d in "$BASES"/*/; do
@@ -262,9 +291,19 @@ retention() {
   return 0
 }
 
+has_base_backup() {
+  for d in "$BASES"/*/; do
+    case "$d" in *.partial/) continue ;; esac
+    [ -d "$d" ] && return 0
+  done
+  return 1
+}
+
 cycle() {
   if dump && verify; then
-    if [ "$(date -u +%u)" = "$BASEBACKUP_WEEKDAY" ] || [ -z "$(ls -A "$BASES" 2>/dev/null)" ]; then basebackup || log "pg_basebackup FAILED"; fi
+    # weekly, and whenever no complete base backup exists yet (first run, or only crashed .partial attempts); a failure keeps the dump
+    # cycle green but shows in kkt_backup_last_base_backup_timestamp_seconds (alert KktBaseBackupStale)
+    if [ "$(date -u +%u)" = "$BASEBACKUP_WEEKDAY" ] || ! has_base_backup; then basebackup || log "pg_basebackup FAILED"; fi
     retention
     if [ -n "${BACKUP_UPLOAD_CMD:-}" ]; then
       if sh -c "$BACKUP_UPLOAD_CMD"; then log "off-site upload ok"; else log "off-site upload FAILED"; fi
@@ -309,10 +348,12 @@ mkdir -p "$DUMPS" "$BASES" "$WAL"
 
 case "$cmd" in
   once) cycle; exit $? ;;
+  # refreshes status.prom (base-backup timestamp) without claiming a dump success
+  base) basebackup && retention && write_status base "base backup on demand"; exit $? ;;
   drill) drill "$2"; exit $? ;;
   prune) retention; exit 0 ;;
   "") ;;
-  *) die "unknown command $cmd (once | drill FILE | prune | wal-push %p %f | wal-fetch %f %p | encrypt IN OUT | decrypt IN OUT)" ;;
+  *) die "unknown command $cmd (once | base | drill FILE | prune | wal-push %p %f | wal-fetch %f %p | encrypt IN OUT | decrypt IN OUT)" ;;
 esac
 
 log "scheduler started: daily at $BACKUP_TIME_UTC UTC, base backup on weekday $BASEBACKUP_WEEKDAY, dumps kept $DUMP_RETENTION_DAYS days, encryption $MODE"
