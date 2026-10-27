@@ -249,6 +249,7 @@ async def lifespan(app: FastAPI):
         _spawn(_trim_loop())
         if os.environ.get("KKT_TRACEMALLOC"):
             _spawn(_tracemalloc_loop())
+        _spawn(_memory_loop())
         try:
             await asyncio.wait_for(detect_transaction_support(), timeout=2)
         except Exception:
@@ -469,11 +470,31 @@ async def _tracemalloc_loop():
     tracemalloc.start(40)
     while True:
         await asyncio.sleep(20)
+        import gc
+        unreachable = gc.collect()
+        _trim_memory()
         snap = tracemalloc.take_snapshot().statistics("lineno")
         rss = int(open("/proc/self/statm").read().split()[1]) * 4096 // 1048576
-        logger.warning("[tracemalloc] rss=%sMB traced=%sMB phase=%s", rss, tracemalloc.get_traced_memory()[0] // 1048576, STARTUP.get("phase"))
+        logger.warning("[tracemalloc] rss=%sMB traced=%sMB gc_unreachable=%s phase=%s", rss, tracemalloc.get_traced_memory()[0] // 1048576, unreachable, STARTUP.get("phase"))
         for st in snap[:3]:
             logger.warning("[tracemalloc]   %s", str(st)[:220])
         top = tracemalloc.take_snapshot().statistics("traceback")[0]
         for line in top.traceback.format()[-40:]:
             logger.warning("[tracemalloc] tb %s", line.strip()[:200])
+        import gc
+        big = []
+        for o in gc.get_objects():
+            if isinstance(o, (list, dict)) and len(o) > 2000:
+                big.append(o)
+        big.sort(key=len, reverse=True)
+        for o in big[:6]:
+            refs = [type(r).__name__ for r in gc.get_referrers(o)[:4]]
+            sample = (list(o)[:3] if isinstance(o, dict) else [type(x).__name__ for x in o[:2]])
+            logger.warning("[tracemalloc] big %s len=%s refs=%s sample=%s", type(o).__name__, len(o), refs, str(sample)[:160])
+
+
+async def _memory_loop():
+    """Phase J.2: decoded-document cycles (cursor batches, request scopes) linger until gen-2 GC; collect + trim every 20 s so RSS tracks live data, not history."""
+    while True:
+        await asyncio.sleep(20)
+        await asyncio.to_thread(_trim_memory)

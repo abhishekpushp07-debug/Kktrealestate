@@ -1,4 +1,5 @@
 """Phase 4 reports: server-side aggregations, CSV/PDF export, saved presets."""
+import os
 from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Request, Response
@@ -94,6 +95,7 @@ def _default_kpis(payload: dict, columns: list[tuple], totals: dict | None, rows
 
 
 async def respond(request: Request, fmt: str | None, payload: dict, title: str, company: dict, columns: list[tuple], rows: list[dict], totals: dict | None = None, filename="report", landscape=False):
+    REPORT_VIEW_MAX = int(os.environ.get("REPORT_VIEW_MAX", "2000"))
     if fmt in ("csv", "pdf") and getattr(request.state, "perm_code", "").startswith("reports."):
         exp = request.state.perm_code.rsplit(".", 1)[0] + ".export"
         if exp not in request.state.perms:
@@ -151,7 +153,8 @@ async def respond(request: Request, fmt: str | None, payload: dict, title: str, 
         d.table([c[1] for c in columns], [[cell(c, r) for c in columns] for r in rows[:2000]], widths=[c[3] if len(c) > 3 else 1 for c in columns], align_right=num_cols,
                 totals=[("TOTAL" if i == 0 else (_pdf.inr(totals.get(c[0])) if i in money_cols and totals.get(c[0]) is not None else totals.get(c[0], ""))) for i, c in enumerate(columns)] if totals else None)
         return Response(content=d.build(), media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="{filename}.pdf"'})
-    return present_money({**payload, "columns": [{"key": c[0], "label": c[1], "type": c[2]} for c in columns], "rows": rows, "totals": totals})
+    view_rows = rows[:REPORT_VIEW_MAX]  # Phase J.2: on-screen view is bounded; full data via CSV (sync ≤10k, else async export)
+    return present_money({**payload, "columns": [{"key": c[0], "label": c[1], "type": c[2]} for c in columns], "rows": view_rows, "totals": totals, "total_rows": len(rows), "truncated": len(rows) > len(view_rows)})
 
 
 @router.get("")
@@ -199,33 +202,66 @@ async def outstanding(request: Request, project_id: str | None = None, block_id:
     today = clock.today()
     from services import ttlcache
     import hashlib
+    import heapq
     import json
-    async def _load():  # Phase J5 hot path #2: full ageing pass is O(open demands) → cached 60 s per scope
-        _b = await db.bookings.find(q, {"_id": 0, "id": 1, "booking_number": 1, "customer_name": 1, "project_code": 1, "block_code": 1, "flat_snapshot.flat_number": 1, "summary": 1, "project_id": 1, "block_id": 1}).max_time_ms(REPORT_MS).to_list(None)
-        _a, _p = await ageing_for_bookings(q, today)
-        return _b, _a, _p
-    bks, ageing, per_bk = await ttlcache.cached(f"rep:outstanding:{hashlib.sha1(json.dumps(q, sort_keys=True).encode()).hexdigest()}:{today}", 60, _load)
-    rows = []
-    for b in bks:
+    REPORT_VIEW_MAX = int(os.environ.get("REPORT_VIEW_MAX", "2000"))
+    KEYS = ("raised_paise", "paid_paise", "cash_due_paise", "account_due_paise", "other_due_paise", "due_paise", "overdue_paise")
+
+    def _row(b, a):
         s = b.get("summary") or {}
-        a = per_bk.get(b["id"], {})
-        rows.append({"booking_number": b["booking_number"], "customer_name": b["customer_name"], "unit": f"{b['project_code']} {b.get('block_code', '')}-{(b.get('flat_snapshot') or {}).get('flat_number', '')}", "project_id": b["project_id"], "block_id": b["block_id"],
-                     "raised_paise": s.get("total_order_raised_paise", 0), "paid_paise": s.get("paid_paise", 0), "cash_due_paise": s.get("cash_due_paise", 0), "account_due_paise": s.get("account_due_paise", 0),
-                     "other_due_paise": s.get("other_charges_due_paise", 0), "due_paise": definitions.outstanding(s)["total_paise"], "overdue_paise": sum(v for k, v in a.items() if k != "Not due"), **{f"age_{k}": v for k, v in a.items()}})
-    if group_by in ("project", "block"):
-        g = {}
-        for r in rows:
-            k = r["unit"].split(" ")[0] if group_by == "project" else r["unit"].rsplit("-", 1)[0]
-            e = g.setdefault(k, {"booking_number": k, "customer_name": "", "unit": "", "raised_paise": 0, "paid_paise": 0, "cash_due_paise": 0, "account_due_paise": 0, "other_due_paise": 0, "due_paise": 0, "overdue_paise": 0})
-            for kk in ("raised_paise", "paid_paise", "cash_due_paise", "account_due_paise", "other_due_paise", "due_paise", "overdue_paise"):
-                e[kk] += r[kk]
-        rows = list(g.values())
-    rows.sort(key=lambda r: -r["due_paise"])
-    totals = {k: sum(r[k] for r in rows) for k in ("raised_paise", "paid_paise", "cash_due_paise", "account_due_paise", "other_due_paise", "due_paise", "overdue_paise")}
+        return {"booking_number": b["booking_number"], "customer_name": b["customer_name"], "unit": f"{b['project_code']} {b.get('block_code', '')}-{(b.get('flat_snapshot') or {}).get('flat_number', '')}", "project_id": b["project_id"], "block_id": b["block_id"],
+                "raised_paise": s.get("total_order_raised_paise", 0), "paid_paise": s.get("paid_paise", 0), "cash_due_paise": s.get("cash_due_paise", 0), "account_due_paise": s.get("account_due_paise", 0),
+                "other_due_paise": s.get("other_charges_due_paise", 0), "due_paise": definitions.outstanding(s)["total_paise"], "overdue_paise": sum(v for k, v in a.items() if k != "Not due"), **{f"age_{k}": v for k, v in a.items()}}
+
+    async def _stream(keep_all: bool):
+        """Phase J.2: O(batch) memory — bookings stream in 500s, ageing per batch; keeps totals, ageing bands, top-N view rows (heap), group rollups."""
+        proj = {"_id": 0, "id": 1, "booking_number": 1, "customer_name": 1, "project_code": 1, "block_code": 1, "flat_snapshot.flat_number": 1, "summary": 1, "project_id": 1, "block_id": 1}
+        ageing, totals, heap, groups, all_rows, n, batch = {}, dict.fromkeys(KEYS, 0), [], {}, [], 0, []
+
+        async def flush():
+            _, per_bk = await definitions.ageing_for_bookings({**q, "id": {"$in": [x["id"] for x in batch]}}, today)
+            for x in batch:
+                r = _row(x, per_bk.get(x["id"], {}))
+                for k in KEYS:
+                    totals[k] += r[k]
+                for k, v in per_bk.get(x["id"], {}).items():
+                    ageing[k] = ageing.get(k, 0) + v
+                if group_by in ("project", "block"):
+                    gk = r["unit"].split(" ")[0] if group_by == "project" else r["unit"].rsplit("-", 1)[0]
+                    e = groups.setdefault(gk, {"booking_number": gk, "customer_name": "", "unit": "", **dict.fromkeys(KEYS, 0)})
+                    for k in KEYS:
+                        e[k] += r[k]
+                elif keep_all:
+                    all_rows.append(r)
+                else:
+                    item = (r["due_paise"], r["booking_number"], r)
+                    heapq.heappush(heap, item) if len(heap) < REPORT_VIEW_MAX else (heapq.heappushpop(heap, item) if item[0] > heap[0][0] else None)
+            batch.clear()
+        async for b in db.bookings.find(q, proj).max_time_ms(REPORT_MS).batch_size(500):
+            batch.append(b)
+            n += 1
+            if len(batch) >= 500:
+                await flush()
+        if batch:
+            await flush()
+        if group_by in ("project", "block"):
+            rows = list(groups.values())
+        else:
+            rows = all_rows if keep_all else [h[2] for h in heap]
+        rows.sort(key=lambda r: -r["due_paise"])
+        return {"rows": rows, "totals": totals, "ageing": ageing, "n": n}
+    if format == "csv":
+        res = await _stream(True)  # full export: explicit, uncached; >10k rows → async export job
+    else:
+        res = await ttlcache.cached(f"rep:outstanding:{group_by}:{hashlib.sha1(json.dumps(q, sort_keys=True).encode()).hexdigest()}:{today}", 60, lambda: _stream(False))
+    rows, totals, ageing = res["rows"], res["totals"], res["ageing"]
     cols = [("booking_number", "Booking" if group_by == "customer" else group_by.title(), "str", 1.1), ("customer_name", "Customer", "str", 1.4), ("unit", "Unit", "str", 1), ("raised_paise", "Raised", "money"), ("paid_paise", "Paid", "money"),
             ("cash_due_paise", "Cash due", "money"), ("account_due_paise", "Account due", "money"), ("other_due_paise", "Charges due", "money"), ("due_paise", "Total due", "money"), ("overdue_paise", "Overdue", "money")]
     top = sorted([r for r in rows if r["overdue_paise"] > 0], key=lambda r: -r["overdue_paise"])[:10] if group_by == "customer" else []
-    return await respond(request, format, {"ageing": [{"bucket": k, "amount_paise": v} for k, v in ageing.items()], "top_overdue": top, "filters_text": f"As of {_pdf.fmt_date(today.isoformat())}"}, "Outstanding & Ageing", await _company(user), cols, rows, totals, "outstanding", landscape=True)
+    out = await respond(request, format, {"ageing": [{"bucket": k, "amount_paise": v} for k, v in ageing.items()], "top_overdue": top, "filters_text": f"As of {_pdf.fmt_date(today.isoformat())}"}, "Outstanding & Ageing", await _company(user), cols, rows, totals, "outstanding", landscape=True)
+    if isinstance(out, dict):
+        out["total_rows"], out["truncated"] = res["n"], res["n"] > len(rows)
+    return out
 
 
 # ---------- 3. Advances ----------
