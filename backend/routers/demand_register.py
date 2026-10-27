@@ -255,6 +255,7 @@ async def void_demand(demand_id: str, body: VoidIn, request: Request, user: dict
     await db.demands.update_one({"id": demand_id}, {"$set": {"voided": True, "status": "Voided", "voided_at": ts, "voided_by": user["id"], "voided_by_name": user["name"], "void_reason": body.reason, "updated_at": ts}})
     await rebuild(d["booking_id"])
     b = await db.bookings.find_one({"id": d["booking_id"]}, {"_id": 0, "summary": 1, "booking_number": 1})
+    ttlcache.invalidate(f"dreg:{user['company_id']}")
     await write_audit(user, "demand.void", "booking", d["booking_id"], before={"demand_number": d["demand_number"], "status": d["status"], "total_paise": d["total_demand_paise"]}, after={"demand_number": d["demand_number"], "status": "Voided", "reason": body.reason, "udhar_delta_paise": -d["total_demand_paise"]}, ip=client_ip(request))
     return {"ok": True, "demand_number": d["demand_number"], "udhar_delta_paise": -d["total_demand_paise"], "balance_after_paise": (b.get("summary") or {}).get("balance_paise"), "booking_number": b.get("booking_number")}
 
@@ -272,5 +273,6 @@ async def reminder_sent(demand_id: str, request: Request, user: dict = Depends(r
     ensure_project_access(user, d["project_id"])
     ts = now_iso()
     await db.demands.update_one({"id": demand_id}, {"$set": {"reminder_sent_at": ts, "reminder_sent_by": user["id"]}, "$push": {"reminders": {"at": ts, "by": user["id"], "by_name": user["name"]}}})
+    ttlcache.invalidate(f"dreg:{user['company_id']}")
     await write_audit(user, "demand.reminder_sent", "booking", d["booking_id"], after={"demand_number": d["demand_number"]}, ip=client_ip(request))
     return {"ok": True, "reminder_sent_at": ts}

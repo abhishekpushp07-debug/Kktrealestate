@@ -10,7 +10,7 @@ import { Card, EmptyState, Skeleton, StatusPill } from "@/components/v2";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 
-const Sel = ({ value, onChange, children, testId, disabled }) => <select className="input !h-9 text-sm" value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} data-testid={testId}>{children}</select>;
+const Sel = ({ value, onChange, children, testId, disabled }) => <select className="input !h-9 !w-auto text-sm" value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} data-testid={testId}>{children}</select>;
 const Kpi = ({ label, value, hint, tone, testId }) => <div className={cn("rounded-2xl border border-warm-200 bg-white px-4 py-3", tone === "brick" && "border-brick/30 bg-brick/5")} data-testid={testId}><p className="text-[11px] font-semibold uppercase text-txt-muted">{label}</p><p className={cn("font-display text-[22px] tabular-nums text-ink-950", tone === "brick" && "text-brick")}>{value ?? "—"}</p>{hint && <p className="text-[11px] text-txt-secondary">{hint}</p>}</div>;
 const Tot = ({ t, bold }) => <>{["cash_paise", "account_paise", "other_paise", "total_paise", "paid_paise", "balance_paise"].map((k) => <td key={k} className={cn("px-3 py-2 text-right tabular-nums", bold && "font-semibold text-ink-950", k === "paid_paise" && "text-sage", k === "balance_paise" && t[k] > 0 && "text-brick")}>{inr(t[k] / 100)}</td>)}</>;
 const month0 = () => new Date().toISOString().slice(0, 7);

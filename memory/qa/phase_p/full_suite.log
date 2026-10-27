@@ -1,0 +1,123 @@
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [ 12%]
+........................................................................ [ 25%]
+........................................................................ [ 37%]
+........................................................................ [ 50%]
+........................................................................ [ 62%]
+........F.....F..s...................................................... [ 75%]
+........................................................................ [ 87%]
+.......F............................s................................... [100%]
+=================================== FAILURES ===================================
+_____________ test_every_mutation_route_writes_audit_or_is_exempt ______________
+[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
+
+    def test_every_mutation_route_writes_audit_or_is_exempt():
+        """Static walk of every router: each POST/PATCH/PUT/DELETE handler must call write_audit (directly or via an auditing service helper) or be an exempt non-record route."""
+        helpers = set()
+        for p in (ROUTERS.parent / "services").glob("*.py"):
+            tree = ast.parse(p.read_text())
+            for fn in [n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]:
+                if _audits(fn, set()):
+                    helpers.add(fn.name)
+        for _ in range(2):  # transitive: router-local helpers that call auditing helpers
+            for p in ROUTERS.glob("*.py"):
+                for fn in [n for n in ast.walk(ast.parse(p.read_text())) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]:
+                    if _audits(fn, helpers):
+                        helpers.add(fn.name)
+        missing = []
+        for p in sorted(ROUTERS.glob("*.py")):
+            if p.name in EXEMPT_FILES:
+                continue
+            for fn in [n for n in ast.walk(ast.parse(p.read_text())) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]:
+                methods = [d.func.attr for d in fn.decorator_list if isinstance(d, ast.Call) and isinstance(d.func, ast.Attribute) and d.func.attr in ("post", "patch", "put", "delete")]
+                if not methods or fn.name in EXEMPT_ROUTES.get(p.name, set()):
+                    continue
+                if not _audits(fn, helpers):
+                    missing.append(f"{p.name}:{fn.name}")
+>       assert not missing, missing
+E       AssertionError: ['demand_register.py:unvoid']
+E       assert not ['demand_register.py:unvoid']
+
+tests/test_audit_history.py:93: AssertionError
+_____________________ test_openapi_all_routes_require_auth _____________________
+[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
+
+client = <httpx.Client object at 0xfc0048247b90>
+
+    def test_openapi_all_routes_require_auth(client):
+        spec = client.get("/api/openapi.json").json()
+        unguarded = []
+        checked = 0
+        for path, methods in spec["paths"].items():
+            if path.startswith(PUBLIC_PREFIXES):
+                continue
+            for m in methods:
+                if m not in ("get", "post", "patch", "put", "delete"):
+                    continue
+                url = path
+                for seg in [s for s in path.split("/") if s.startswith("{")]:
+                    url = url.replace(seg, "00000000-0000-0000-0000-000000000000")
+                r = client.request(m.upper(), url, json={} if m in ("post", "patch", "put") else None)
+                checked += 1
+                if r.status_code != 401:
+                    unguarded.append((m, path, r.status_code))
+        assert checked > 100
+>       assert not unguarded, unguarded
+E       AssertionError: [('get', '/api/docgen/shared/{token}', 410)]
+E       assert not [('get', '/api/docgen/shared/{token}', 410)]
+
+tests/test_phase_4.py:50: AssertionError
+_______________ test_every_code_registered_with_matching_status ________________
+[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
+
+    def test_every_code_registered_with_matching_status():
+        found = _scan()
+        assert found, "scanner found nothing — pattern broken"
+        unregistered = sorted(c for c in found if c not in ERRORS)
+        mismatched = sorted(f"{c}: used {sorted(found[c])} registered {ERRORS[c]}" for c in found if c in ERRORS and not found[c] <= set(ERRORS[c]))
+>       assert not unregistered, f"unregistered error codes: {unregistered} (add to errors.py)"
+E       AssertionError: unregistered error codes: ['ALREADY_VOIDED', 'HAS_PAYMENTS', 'STATE_FINAL'] (add to errors.py)
+E       assert not ['ALREADY_VOIDED', 'HAS_PAYMENTS', 'STATE_FINAL']
+
+tests/test_error_registry.py:26: AssertionError
+=============================== warnings summary ===============================
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+  /root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+tests/test_phase_k_p1.py::test_loadshed_sheds_with_prebuilt_503_and_exempts_probes
+  /root/.venv/lib/python3.11/site-packages/starlette/testclient.py:41: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    [], typing.ContextManager[anyio.abc.BlockingPortal]
+
+tests/test_kkt_erp.py::TestBlock::test_create_block_and_generation
+tests/test_kkt_erp.py::TestFlatType::test_create_flat_type_auto_area
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+  /root/.venv/lib/python3.11/site-packages/_pytest/fixtures.py:1313: PytestRemovedIn10Warning: Class-scoped fixture defined as instance method is deprecated.
+  Instance attributes set in this fixture will NOT be visible to test methods,
+  as each test gets a new instance while the fixture runs only once per class.
+  Use @classmethod decorator and set attributes on cls instead.
+  See https://docs.pytest.org/en/stable/deprecations.html#class-scoped-fixture-as-instance-method
+    fixturefunc = resolve_fixture_function(fixturedef, request)
+
+tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources
+  /root/.venv/lib/python3.11/site-packages/_pytest/python.py:171: PytestReturnNotNoneWarning: Test functions should return None, but tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources returned <class 'str'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_audit_history.py::test_every_mutation_route_writes_audit_or_is_exempt
+FAILED tests/test_phase_4.py::test_openapi_all_routes_require_auth - Assertio...
+FAILED tests/test_error_registry.py::test_every_code_registered_with_matching_status
+3 failed, 571 passed, 2 skipped, 10 warnings in 532.26s (0:08:52)
+SUITE_EXIT 1
