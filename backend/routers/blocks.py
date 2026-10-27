@@ -163,8 +163,10 @@ async def _validate_block_refs(block_type_id: str | None, mt_id: str | None):
         raise ApiError(400, "Milestone template not found", "INVALID_MILESTONE_TEMPLATE")
 
 
-async def _attach_counts(blocks: list[dict]):
+async def _attach_counts(blocks: list[dict], user: dict | None = None):
     from services.counters import present_counts
+    from services import inventory as _inv
+    await _inv.display_unit_counts(blocks, "block_id", user)
     pids = list({b["project_id"] for b in blocks})
     pmap = {p["id"]: p for p in await db.projects.find({"id": {"$in": pids}}, {"_id": 0, "id": 1, "name": 1, "code": 1}).to_list(None)}
     btids = list({b["block_type_id"] for b in blocks})
@@ -192,7 +194,7 @@ async def list_blocks(params: ListParams = Depends(), project_id: str | None = N
     if not params.include_inactive:
         q["is_active"] = True
     res = await paginate(db.blocks, q, params, params.sort_spec(["name", "code", "status", "created_at"]), {"floor_plans": 0, "position_flat_types": 0})
-    res["items"] = await _attach_counts(res["items"])
+    res["items"] = await _attach_counts(res["items"], user)
     return res
 
 
@@ -227,13 +229,13 @@ async def create_block(body: BlockCreate, request: Request, user: dict = Depends
         raise
     await write_audit(user, "block.create", "block", doc["id"], after={**doc, "flats_generated": len(flats)}, ip=client_ip(request))
     doc["flats_generated"] = len(flats)
-    return (await _attach_counts([doc]))[0]
+    return (await _attach_counts([doc], user))[0]
 
 
 @router.get("/{block_id}", response_model=BlocksOut, response_model_exclude_unset=True)
 async def get_block(block_id: str, user: dict = Depends(require("masters.project.view"))):
     block = await _load_block(block_id, user)
-    block = (await _attach_counts([block]))[0]
+    block = (await _attach_counts([block], user))[0]
     tids = [p["floor_plan_template_id"] for p in block.get("floor_plans") or [] if p.get("floor_plan_template_id")]
     tmap = {t["id"]: t for t in await db.floor_plan_templates.find({"id": {"$in": tids}}, {"_id": 0}).to_list(None)}
     ftids = {x["flat_type_id"] for p in block.get("floor_plans") or [] for x in (p.get("positions") or tmap.get(p.get("floor_plan_template_id"), {}).get("positions", []))}
@@ -277,7 +279,7 @@ async def update_block(block_id: str, body: BlockUpdate, request: Request, user:
         flats = await generate_flats(after, None, user)
         after["flats_generated"] = len(flats)
     await write_audit(user, "block.update", "block", block_id, before=before, after=after, ip=client_ip(request))
-    return (await _attach_counts([after]))[0]
+    return (await _attach_counts([after], user))[0]
 
 
 @router.post("/{block_id}/generate-flats")

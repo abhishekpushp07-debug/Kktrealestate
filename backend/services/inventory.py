@@ -64,6 +64,23 @@ def status_key(user: dict | None):
     return {"$cond": [{"$eq": ["$display_override", True]}, overridden, mirrored]}
 
 
+async def display_unit_counts(docs: list[dict], field: str, user: dict | None) -> list[dict]:
+    """Non-privileged viewers: overwrite cached `unit_counts` (real) with display-layer counts so tower/project cards cannot leak masked inventory."""
+    if not docs or can_see_real(user):
+        return docs
+    ids = [d["id"] for d in docs]
+    rows = await db.flats.aggregate([{"$match": {field: {"$in": ids}, "is_active": True}}, {"$group": {"_id": {"k": f"${field}", "s": status_key(user)}, "n": {"$sum": 1}}}]).to_list(None)
+    agg: dict = {i: {"available": 0, "hold": 0, "booked": 0, "sold": 0, "blocked": 0, "total": 0} for i in ids}
+    for r in rows:
+        s = r["_id"]["s"]
+        if s:  # Hidden → None: not counted at all
+            agg[r["_id"]["k"]][s.lower()] += r["n"]
+            agg[r["_id"]["k"]]["total"] += r["n"]
+    for d in docs:
+        d["unit_counts"] = {**(d.get("unit_counts") or {}), **agg[d["id"]]}
+    return docs
+
+
 def bookable_filter(customer_id: str | None, user: dict) -> dict:
     """Booking wizard: Builder-saleable AND (Available, or Hold for this customer / this RM). Masked/blocked/landowner never appear."""
     ors = [{"status": "Available"}]

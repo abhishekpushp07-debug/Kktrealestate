@@ -62,8 +62,11 @@ async def widgets(user: dict = Depends(require("masters.project.view"))):
         mb = await db.bookings.aggregate([{"$match": mine}, {"$group": {"_id": None, "n": {"$sum": 1}, "v": {"$sum": "$agreement_value_paise"}}}]).to_list(1)
         out["my_bookings_month"] = {"count": mb[0]["n"] if mb else 0, "value_paise": mb[0]["v"] if mb else 0}
     projects = await db.projects.find({"company_id": cid, "is_active": True, **project_scope_filter(user, "id")}, {"_id": 0, "id": 1, "name": 1, "code": 1, "unit_counts": 1}).to_list(None)
+    from services import inventory as _inv
+    await _inv.display_unit_counts(projects, "project_id", user)
     out["inventory_by_project"] = [{"project": p["code"], "name": p["name"], **(p.get("unit_counts") or {})} for p in projects]
     blocks = await db.blocks.find({**base, "is_active": True}, {"_id": 0, "id": 1, "name": 1, "code": 1, "project_code": 1, "construction_percent": 1, "milestones": 1, "unit_counts": 1}).sort("code", 1).to_list(None)
+    await _inv.display_unit_counts(blocks, "block_id", user)
     out["construction"] = [{"id": b["id"], "block": f"{b.get('project_code', '')} {b['name']}", "percent": b.get("construction_percent", 0), "next_milestone": next((m["name"] for m in b.get("milestones") or [] if m["status"] == "Pending"), None), "available": (b.get("unit_counts") or {}).get("available", 0), "total": (b.get("unit_counts") or {}).get("total", 0)} for b in blocks]
     if "finance.payment.view" in perms or "sales.booking.view" in perms:
         m0 = today.replace(day=1).isoformat()

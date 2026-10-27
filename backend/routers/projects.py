@@ -166,8 +166,9 @@ async def status_counts(match: dict, user: dict | None = None) -> dict:
     return counts
 
 
-async def _attach_counts(projects: list[dict]):
+async def _attach_counts(projects: list[dict], user: dict | None = None):
     from services.counters import present_counts
+    await inv.display_unit_counts(projects, "project_id", user)
     for p in projects:
         present_counts(p)
         p["block_count"] = p.get("block_count", 0)
@@ -187,7 +188,7 @@ async def list_projects(params: ListParams = Depends(), status: str | None = Non
 
         from utils import to_csv
         return Response(to_csv(res["items"], ["code", "name", "project_type", "status", "rera_number", "launch_date", "expected_possession_date"]), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=projects.csv"})
-    res["items"] = await _attach_counts(res["items"])
+    res["items"] = await _attach_counts(res["items"], user)
     return res
 
 
