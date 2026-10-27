@@ -1,0 +1,1002 @@
+[
+ {
+  "shape": "list bookings sort booking_number",
+  "coll": "bookings",
+  "verdict": "ok",
+  "cold_ms": 2.2,
+  "warm_p95_ms": 1.6,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list bookings sort -booking_number",
+  "coll": "bookings",
+  "verdict": "ok",
+  "cold_ms": 1.5,
+  "warm_p95_ms": 1.6,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list bookings sort booking_date",
+  "coll": "bookings",
+  "verdict": "ok",
+  "cold_ms": 1.5,
+  "warm_p95_ms": 1.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list bookings sort -booking_date",
+  "coll": "bookings",
+  "verdict": "ok",
+  "cold_ms": 1.6,
+  "warm_p95_ms": 1.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list bookings sort created_at",
+  "coll": "bookings",
+  "verdict": "ok",
+  "cold_ms": 1.6,
+  "warm_p95_ms": 1.7,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list bookings sort -created_at",
+  "coll": "bookings",
+  "verdict": "ok",
+  "cold_ms": 1.6,
+  "warm_p95_ms": 1.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list bookings sort status",
+  "coll": "bookings",
+  "verdict": "ok",
+  "cold_ms": 1.5,
+  "warm_p95_ms": 1.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list bookings sort -status",
+  "coll": "bookings",
+  "verdict": "ok",
+  "cold_ms": 1.5,
+  "warm_p95_ms": 1.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list bookings sort customer_name",
+  "coll": "bookings",
+  "verdict": "ok",
+  "cold_ms": 1.5,
+  "warm_p95_ms": 1.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list bookings sort -customer_name",
+  "coll": "bookings",
+  "verdict": "ok",
+  "cold_ms": 1.5,
+  "warm_p95_ms": 1.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list bookings by project",
+  "coll": "bookings",
+  "verdict": "ok",
+  "cold_ms": 1.5,
+  "warm_p95_ms": 1.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list payments sort payment_date",
+  "coll": "payments",
+  "verdict": "ok",
+  "cold_ms": 0.7,
+  "warm_p95_ms": 0.6,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list payments sort -payment_date",
+  "coll": "payments",
+  "verdict": "ok",
+  "cold_ms": 0.6,
+  "warm_p95_ms": 0.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list payments sort receipt_number",
+  "coll": "payments",
+  "verdict": "ok",
+  "cold_ms": 0.6,
+  "warm_p95_ms": 0.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list payments sort -receipt_number",
+  "coll": "payments",
+  "verdict": "ok",
+  "cold_ms": 0.5,
+  "warm_p95_ms": 0.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list payments sort amount_paise",
+  "coll": "payments",
+  "verdict": "ok",
+  "cold_ms": 0.6,
+  "warm_p95_ms": 0.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list payments sort -amount_paise",
+  "coll": "payments",
+  "verdict": "ok",
+  "cold_ms": 0.6,
+  "warm_p95_ms": 0.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list payments sort status",
+  "coll": "payments",
+  "verdict": "ok",
+  "cold_ms": 0.6,
+  "warm_p95_ms": 0.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list payments sort -status",
+  "coll": "payments",
+  "verdict": "ok",
+  "cold_ms": 0.6,
+  "warm_p95_ms": 0.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list payments sort created_at",
+  "coll": "payments",
+  "verdict": "ok",
+  "cold_ms": 0.6,
+  "warm_p95_ms": 0.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list payments sort -created_at",
+  "coll": "payments",
+  "verdict": "ok",
+  "cold_ms": 0.6,
+  "warm_p95_ms": 0.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list payments by project",
+  "coll": "payments",
+  "verdict": "ok",
+  "cold_ms": 0.6,
+  "warm_p95_ms": 0.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list demands sort due_date",
+  "coll": "demands",
+  "verdict": "ok",
+  "cold_ms": 0.5,
+  "warm_p95_ms": 0.4,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list demands sort -due_date",
+  "coll": "demands",
+  "verdict": "ok",
+  "cold_ms": 0.5,
+  "warm_p95_ms": 0.4,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list demands sort demand_date",
+  "coll": "demands",
+  "verdict": "ok",
+  "cold_ms": 0.5,
+  "warm_p95_ms": 0.4,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list demands sort -demand_date",
+  "coll": "demands",
+  "verdict": "ok",
+  "cold_ms": 0.5,
+  "warm_p95_ms": 0.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list demands sort total_demand_paise",
+  "coll": "demands",
+  "verdict": "ok",
+  "cold_ms": 0.5,
+  "warm_p95_ms": 0.4,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list demands sort -total_demand_paise",
+  "coll": "demands",
+  "verdict": "ok",
+  "cold_ms": 0.5,
+  "warm_p95_ms": 0.4,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list demands sort customer_name",
+  "coll": "demands",
+  "verdict": "ok",
+  "cold_ms": 0.5,
+  "warm_p95_ms": 0.4,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list demands sort -customer_name",
+  "coll": "demands",
+  "verdict": "ok",
+  "cold_ms": 0.5,
+  "warm_p95_ms": 0.4,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list demands by project",
+  "coll": "demands",
+  "verdict": "ok",
+  "cold_ms": 0.5,
+  "warm_p95_ms": 0.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list customers sort full_name",
+  "coll": "customers",
+  "verdict": "ok",
+  "cold_ms": 0.7,
+  "warm_p95_ms": 0.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list customers sort -full_name",
+  "coll": "customers",
+  "verdict": "ok",
+  "cold_ms": 0.6,
+  "warm_p95_ms": 0.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list customers sort customer_code",
+  "coll": "customers",
+  "verdict": "ok",
+  "cold_ms": 0.5,
+  "warm_p95_ms": 0.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list customers sort -customer_code",
+  "coll": "customers",
+  "verdict": "ok",
+  "cold_ms": 0.6,
+  "warm_p95_ms": 0.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list customers sort created_at",
+  "coll": "customers",
+  "verdict": "ok",
+  "cold_ms": 0.6,
+  "warm_p95_ms": 0.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list customers sort -created_at",
+  "coll": "customers",
+  "verdict": "ok",
+  "cold_ms": 0.6,
+  "warm_p95_ms": 0.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list customers sort kyc_status",
+  "coll": "customers",
+  "verdict": "ok",
+  "cold_ms": 0.6,
+  "warm_p95_ms": 0.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list customers sort -kyc_status",
+  "coll": "customers",
+  "verdict": "ok",
+  "cold_ms": 0.6,
+  "warm_p95_ms": 0.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list customers sort phone",
+  "coll": "customers",
+  "verdict": "ok",
+  "cold_ms": 0.6,
+  "warm_p95_ms": 0.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list customers sort -phone",
+  "coll": "customers",
+  "verdict": "ok",
+  "cold_ms": 0.6,
+  "warm_p95_ms": 0.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list customers sort engagement_score",
+  "coll": "customers",
+  "verdict": "ok",
+  "cold_ms": 0.6,
+  "warm_p95_ms": 0.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list customers sort -engagement_score",
+  "coll": "customers",
+  "verdict": "ok",
+  "cold_ms": 0.6,
+  "warm_p95_ms": 0.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list customers sort lifecycle_stage",
+  "coll": "customers",
+  "verdict": "ok",
+  "cold_ms": 0.6,
+  "warm_p95_ms": 0.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list customers sort -lifecycle_stage",
+  "coll": "customers",
+  "verdict": "ok",
+  "cold_ms": 0.6,
+  "warm_p95_ms": 0.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list customers by project",
+  "coll": "customers",
+  "verdict": "ok",
+  "cold_ms": 0.3,
+  "warm_p95_ms": 0.2,
+  "keys": 0,
+  "docs": 0,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list leads sort name",
+  "coll": "leads",
+  "verdict": "ok",
+  "cold_ms": 0.5,
+  "warm_p95_ms": 0.4,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list leads sort -name",
+  "coll": "leads",
+  "verdict": "ok",
+  "cold_ms": 0.7,
+  "warm_p95_ms": 0.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list leads sort lead_number",
+  "coll": "leads",
+  "verdict": "ok",
+  "cold_ms": 0.5,
+  "warm_p95_ms": 0.4,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list leads sort -lead_number",
+  "coll": "leads",
+  "verdict": "ok",
+  "cold_ms": 0.5,
+  "warm_p95_ms": 0.4,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list leads sort created_at",
+  "coll": "leads",
+  "verdict": "ok",
+  "cold_ms": 0.5,
+  "warm_p95_ms": 0.4,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list leads sort -created_at",
+  "coll": "leads",
+  "verdict": "ok",
+  "cold_ms": 0.5,
+  "warm_p95_ms": 0.4,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list leads sort status",
+  "coll": "leads",
+  "verdict": "ok",
+  "cold_ms": 0.5,
+  "warm_p95_ms": 0.4,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list leads sort -status",
+  "coll": "leads",
+  "verdict": "ok",
+  "cold_ms": 0.6,
+  "warm_p95_ms": 0.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list leads sort next_follow_up_at",
+  "coll": "leads",
+  "verdict": "ok",
+  "cold_ms": 0.5,
+  "warm_p95_ms": 0.4,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list leads sort -next_follow_up_at",
+  "coll": "leads",
+  "verdict": "ok",
+  "cold_ms": 0.5,
+  "warm_p95_ms": 0.4,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list leads by project",
+  "coll": "leads",
+  "verdict": "ok",
+  "cold_ms": 0.5,
+  "warm_p95_ms": 0.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list flats sort flat_number",
+  "coll": "flats",
+  "verdict": "ok",
+  "cold_ms": 1.2,
+  "warm_p95_ms": 1.0,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list flats sort -flat_number",
+  "coll": "flats",
+  "verdict": "ok",
+  "cold_ms": 1.0,
+  "warm_p95_ms": 1.0,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list flats sort floor",
+  "coll": "flats",
+  "verdict": "ok",
+  "cold_ms": 1.0,
+  "warm_p95_ms": 1.0,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list flats sort -floor",
+  "coll": "flats",
+  "verdict": "ok",
+  "cold_ms": 1.0,
+  "warm_p95_ms": 1.0,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list flats sort status",
+  "coll": "flats",
+  "verdict": "ok",
+  "cold_ms": 1.1,
+  "warm_p95_ms": 1.0,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list flats sort -status",
+  "coll": "flats",
+  "verdict": "ok",
+  "cold_ms": 1.0,
+  "warm_p95_ms": 1.0,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list flats sort price_paise",
+  "coll": "flats",
+  "verdict": "ok",
+  "cold_ms": 1.0,
+  "warm_p95_ms": 1.0,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list flats sort -price_paise",
+  "coll": "flats",
+  "verdict": "ok",
+  "cold_ms": 1.0,
+  "warm_p95_ms": 1.0,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list flats by project",
+  "coll": "flats",
+  "verdict": "ok",
+  "cold_ms": 1.0,
+  "warm_p95_ms": 1.0,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list audit_logs sort created_at",
+  "coll": "audit_logs",
+  "verdict": "ok",
+  "cold_ms": 0.5,
+  "warm_p95_ms": 0.4,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list audit_logs sort -created_at",
+  "coll": "audit_logs",
+  "verdict": "ok",
+  "cold_ms": 0.4,
+  "warm_p95_ms": 0.4,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list service_tickets sort created_at",
+  "coll": "service_tickets",
+  "verdict": "ok",
+  "cold_ms": 0.4,
+  "warm_p95_ms": 0.4,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list service_tickets sort -created_at",
+  "coll": "service_tickets",
+  "verdict": "ok",
+  "cold_ms": 0.4,
+  "warm_p95_ms": 0.4,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list service_tickets sort status",
+  "coll": "service_tickets",
+  "verdict": "ok",
+  "cold_ms": 0.5,
+  "warm_p95_ms": 0.4,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list service_tickets sort -status",
+  "coll": "service_tickets",
+  "verdict": "ok",
+  "cold_ms": 0.5,
+  "warm_p95_ms": 0.4,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list service_tickets sort priority",
+  "coll": "service_tickets",
+  "verdict": "ok",
+  "cold_ms": 0.4,
+  "warm_p95_ms": 0.3,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list service_tickets sort -priority",
+  "coll": "service_tickets",
+  "verdict": "ok",
+  "cold_ms": 0.4,
+  "warm_p95_ms": 0.3,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list service_tickets by project",
+  "coll": "service_tickets",
+  "verdict": "ok",
+  "cold_ms": 0.4,
+  "warm_p95_ms": 0.4,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list documents sort created_at",
+  "coll": "documents",
+  "verdict": "ok",
+  "cold_ms": 0.5,
+  "warm_p95_ms": 0.4,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list documents sort -created_at",
+  "coll": "documents",
+  "verdict": "ok",
+  "cold_ms": 0.4,
+  "warm_p95_ms": 0.4,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list documents sort kind",
+  "coll": "documents",
+  "verdict": "ok",
+  "cold_ms": 0.4,
+  "warm_p95_ms": 0.4,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list documents sort -kind",
+  "coll": "documents",
+  "verdict": "ok",
+  "cold_ms": 0.5,
+  "warm_p95_ms": 0.4,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "list documents by project",
+  "coll": "documents",
+  "verdict": "ok",
+  "cold_ms": 0.4,
+  "warm_p95_ms": 0.4,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "search customers by name prefix",
+  "coll": "customers",
+  "verdict": "ok",
+  "cold_ms": 0.7,
+  "warm_p95_ms": 0.6,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "search customers by phone",
+  "coll": "customers",
+  "verdict": "ok",
+  "cold_ms": 0.6,
+  "warm_p95_ms": 0.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "search bookings by number",
+  "coll": "bookings",
+  "verdict": "ok",
+  "cold_ms": 1.7,
+  "warm_p95_ms": 1.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "customer 360 bookings",
+  "coll": "bookings",
+  "verdict": "ok",
+  "cold_ms": 0.3,
+  "warm_p95_ms": 0.2,
+  "keys": 1,
+  "docs": 1,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "booking ledger",
+  "coll": "ledger_entries",
+  "verdict": "ok",
+  "cold_ms": 0.4,
+  "warm_p95_ms": 0.4,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "booking payments",
+  "coll": "payments",
+  "verdict": "ok",
+  "cold_ms": 0.4,
+  "warm_p95_ms": 0.4,
+  "keys": 33,
+  "docs": 33,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "booking demands",
+  "coll": "demands",
+  "verdict": "ok",
+  "cold_ms": 0.3,
+  "warm_p95_ms": 0.3,
+  "keys": 20,
+  "docs": 20,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "audit by entity",
+  "coll": "audit_logs",
+  "verdict": "ok",
+  "cold_ms": 0.5,
+  "warm_p95_ms": 0.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "cheques pending",
+  "coll": "payments",
+  "verdict": "ok",
+  "cold_ms": 0.3,
+  "warm_p95_ms": 0.2,
+  "keys": 0,
+  "docs": 0,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "overdue demands",
+  "coll": "demands",
+  "verdict": "ok",
+  "cold_ms": 0.6,
+  "warm_p95_ms": 0.5,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT,SORT_MERGE"
+ },
+ {
+  "shape": "flats by block",
+  "coll": "flats",
+  "verdict": "ok",
+  "cold_ms": 1.1,
+  "warm_p95_ms": 1.0,
+  "keys": 50,
+  "docs": 50,
+  "stages": "FETCH,IXSCAN,LIMIT"
+ },
+ {
+  "shape": "report collections by month",
+  "coll": "payments",
+  "verdict": "ok",
+  "cold_ms": 517.8,
+  "warm_p95_ms": 506.6,
+  "keys": 183112,
+  "docs": 183112,
+  "stages": "FETCH,IXSCAN,PROJECTION_SIMPLE"
+ },
+ {
+  "shape": "report collections by project",
+  "coll": "payments",
+  "verdict": "ok",
+  "cold_ms": 486.3,
+  "warm_p95_ms": 486.4,
+  "keys": 183112,
+  "docs": 183112,
+  "stages": "FETCH,IXSCAN,PROJECTION_SIMPLE"
+ },
+ {
+  "shape": "report outstanding by project",
+  "coll": "bookings",
+  "verdict": "ok",
+  "cold_ms": 89.3,
+  "warm_p95_ms": 89.5,
+  "keys": 30000,
+  "docs": 30000,
+  "stages": "FETCH,IXSCAN,PROJECTION_DEFAULT"
+ },
+ {
+  "shape": "dashboard: cheques to clear",
+  "coll": "payments",
+  "verdict": "ok",
+  "cold_ms": 0.4,
+  "warm_p95_ms": 0.3,
+  "keys": 0,
+  "docs": 0,
+  "stages": "IXSCAN,PROJECTION_COVERED"
+ },
+ {
+  "shape": "dashboard: collected this month",
+  "coll": "payments",
+  "verdict": "ok",
+  "cold_ms": 1654.7,
+  "warm_p95_ms": 1654.1,
+  "keys": 649987,
+  "docs": 649987,
+  "stages": "FETCH,IXSCAN,PROJECTION_SIMPLE"
+ },
+ {
+  "shape": "project summary read model",
+  "coll": "bookings",
+  "verdict": "ok",
+  "cold_ms": 3.1,
+  "warm_p95_ms": 2.9,
+  "keys": 1200,
+  "docs": 1200,
+  "stages": "FETCH,IXSCAN,PROJECTION_DEFAULT"
+ },
+ {
+  "shape": "leads pipeline",
+  "coll": "leads",
+  "verdict": "ok",
+  "cold_ms": 73.3,
+  "warm_p95_ms": 73.7,
+  "keys": 100000,
+  "docs": 0,
+  "stages": "IXSCAN,PROJECTION_COVERED"
+ },
+ {
+  "shape": "inventory by status",
+  "coll": "flats",
+  "verdict": "ok",
+  "cold_ms": 2.1,
+  "warm_p95_ms": 2.1,
+  "keys": 2400,
+  "docs": 0,
+  "stages": "IXSCAN,PROJECTION_COVERED"
+ },
+ {
+  "shape": "ageing: open demands",
+  "coll": "demands",
+  "verdict": "ok",
+  "cold_ms": 138.4,
+  "warm_p95_ms": 139.7,
+  "keys": 33262,
+  "docs": 33261,
+  "stages": "FETCH,IXSCAN,PROJECTION_SIMPLE"
+ }
+]
