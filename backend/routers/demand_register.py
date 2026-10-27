@@ -223,9 +223,11 @@ async def manual_demand(body: ManualDemandIn, request: Request, user: dict = Dep
     if body.preview:
         return {"preview": True, "effect": effect}
     co = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0})
-    seqs = [d.get("installment_seq") or 0 for d in await db.demands.find({"booking_id": b["id"]}, {"_id": 0, "installment_seq": 1}).to_list(None)]
+    prev = await db.demands.find({"booking_id": b["id"], "voided": {"$ne": True}}, {"_id": 0, "installment_seq": 1, "cumulative_percent": 1}).to_list(None)
+    seqs = [d.get("installment_seq") or 0 for d in prev]
+    cum = max([d.get("cumulative_percent") or 0 for d in prev] or [0])  # manual demands add Udhar by amount; they do not move the plan's % orders
     d = {**base_doc(user, user["company_id"]), "booking_id": b["id"], "customer_id": b["customer_id"], "customer_name": b.get("customer_name"), "booking_number": b["booking_number"], "project_id": b["project_id"], "block_id": b.get("block_id"), "flat_id": b.get("flat_id"), "flat_number": (b.get("flat_snapshot") or {}).get("flat_number"), "project_name": b.get("project_name"), "block_name": b.get("block_name"),
-         "demand_number": await generate_number("demand", co, date.fromisoformat(dd)), "installment_seq": max(seqs or [0]) + 100, "installment_name": body.name, "milestone_name": body.name, "trigger": SOURCES[body.kind], "trigger_type": "MANUAL", "percent": None, "cumulative_percent": None, "source": body.kind, "note": body.note,
+         "demand_number": await generate_number("demand", co, date.fromisoformat(dd)), "installment_seq": max(seqs or [0]) + 100, "installment_name": body.name, "milestone_name": body.name, "trigger": SOURCES[body.kind], "trigger_type": "MANUAL", "percent": None, "cumulative_percent": cum, "source": body.kind, "note": body.note,
          "cash_demand_paise": cash, "account_demand_paise": acct, "total_demand_paise": cash + acct, "demand_date": dd, "due_date": body.due_date, "status": "Open", "paid_paise": 0, "voided": False, "posted_at": now_iso()}
     await db.demands.insert_one(d)
     d.pop("_id", None)

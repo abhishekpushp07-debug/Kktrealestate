@@ -55,7 +55,8 @@ async def rebuild(booking_id: str) -> list[dict]:
     for seq, (at, _, kind, src) in enumerate(events, start=1):
         amount, category, ref, note = 0, None, None, None
         if kind == "DEMAND":
-            pct = src["cumulative_percent"]
+            if src.get("cumulative_percent") is not None:  # manual/other demands carry no plan %, they add Udhar by amount only
+                pct = src["cumulative_percent"]
             amount = src["total_demand_paise"]
             ref = src["demand_number"]
             note = f"{src.get('installment_name') or src['milestone_name']} ({src.get('percent') if src.get('percent') is not None else pct}%)"

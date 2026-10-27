@@ -274,7 +274,7 @@ async def shared(token: str):
     link = await db.doc_share_links.find_one({"token": token}, {"_id": 0})
     if not link or link["expires_at"] < time.time():
         raise ApiError(410, "This link has expired", "LINK_EXPIRED")
-    sysuser = {"id": link["created_by"], "company_id": link["company_id"], "permissions": ["*"], "name": "share-link", "project_scope": None}
+    sysuser = {"id": link["created_by"], "company_id": link["company_id"], "permissions": ["*"], "name": "share-link", "project_scope": ["*"]}
     data, name, _, _ = await _build(GenerateIn(**link["params"]), sysuser)
     return _pdf.pdf_response(data, link["filename"] or name, True)
 
