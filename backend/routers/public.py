@@ -53,7 +53,7 @@ def memo_public(fn):
 
 def cached(request: Request, payload) -> Response:
     body = json.dumps(payload, default=str, separators=(",", ":")) if not isinstance(payload, str) else payload
-    etag = '"' + hashlib.md5(body.encode()).hexdigest() + '"'
+    etag = '"' + hashlib.sha256(body.encode()).hexdigest() + '"'
     headers = {"Cache-Control": "public, max-age=60", "ETag": etag}
     if etag in [t.strip().removeprefix("W/") for t in request.headers.get("if-none-match", "").split(",")]:
         return Response(status_code=304, headers=headers)

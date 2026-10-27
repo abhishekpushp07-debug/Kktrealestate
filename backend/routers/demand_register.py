@@ -179,7 +179,7 @@ async def register(request: Request, basis: str = "raised", date_from: str | Non
     body = {k: v for k, v in data.items() if k != "_rows"}
     import hashlib
     import json
-    etag = '"' + hashlib.md5(json.dumps(body, sort_keys=True, default=str).encode()).hexdigest()[:16] + '"'
+    etag = '"' + hashlib.sha256(json.dumps(body, sort_keys=True, default=str).encode()).hexdigest()[:16] + '"'
     if request.headers.get("if-none-match") == etag:
         return Response(status_code=304, headers={"ETag": etag})
     return Response(content=json.dumps(body, default=str), media_type="application/json", headers={"ETag": etag, "Cache-Control": "private, max-age=30"})

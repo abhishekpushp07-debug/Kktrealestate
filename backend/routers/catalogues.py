@@ -136,7 +136,7 @@ async def seed_catalogues():
 
 async def bundle(company_id: str, user: dict | None = None) -> dict:
     version = await current_version()
-    key = f"catalogues:{company_id}:{version}:{'*' if not user or '*' in (user.get('project_scope') or []) else hashlib.md5(','.join(sorted(user['project_scope'])).encode()).hexdigest()[:8]}"
+    key = f"catalogues:{company_id}:{version}:{'*' if not user or '*' in (user.get('project_scope') or []) else hashlib.sha256(','.join(sorted(user['project_scope'])).encode()).hexdigest()[:8]}"
     hit = await cache.get(key)
     if hit:
         return hit
