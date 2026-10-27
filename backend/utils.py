@@ -185,9 +185,11 @@ async def paginate(coll, query: dict, params: ListParams, sort, projection: dict
         items = await coll.find(query, proj).sort(sort).limit(10000).to_list(10000)
         return {"items": items, "total": len(items), "page": 1, "page_size": len(items), "next_cursor": None, "_csv": True}
     if params.page == 1 and not params.search:
+        import copy
+
         from services import ttlcache
         ck = f"list:{coll.name}:{hashlib.md5(repr((query, sort, proj, params.page_size, params.with_total)).encode()).hexdigest()}"
-        return await ttlcache.cached(ck, 5, lambda: _page(coll, query, params, sort, proj, budget_ms))
+        return copy.deepcopy(await ttlcache.cached(ck, 5, lambda: _page(coll, query, params, sort, proj, budget_ms)))  # callers shape/enrich in place; never leak one viewer's shaping to another
     return await _page(coll, query, params, sort, proj, budget_ms)
 
 

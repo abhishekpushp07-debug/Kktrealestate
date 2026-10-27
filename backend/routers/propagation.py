@@ -149,7 +149,7 @@ async def journey(audit_id: str, user: dict = Depends(require("admin.audit.view"
 
 @router.get("/journey/entity/{entity_type}/{entity_id}")
 async def journey_entity(entity_type: str, entity_id: str, limit: int = 30, user: dict = Depends(require("admin.audit.view"))):
-    rows = await db.audit_logs.find({"company_id": user["company_id"], "entity_type": entity_type, "entity_id": entity_id}, {"_id": 0, "id": 1, "action": 1, "actor_name": 1, "created_at": 1, "after": 1, "surfaces": 1, "propagated_complete": 1}).sort("created_at", -1).limit(min(limit, 100)).to_list(None)
+    rows = await db.audit_logs.find({"company_id": user["company_id"], "entity_type": entity_type, "entity_id": entity_id}, {"_id": 0, "id": 1, "action": 1, "actor_name": 1, "created_at": 1, "after": 1, "before": 1, "surfaces": 1, "propagated_complete": 1}).sort("created_at", -1).limit(min(limit, 100)).to_list(None)
     return {"items": rows}
 
 

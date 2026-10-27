@@ -9,6 +9,9 @@ MODULES = {"project": "Project Master", "block": "Tower / Block", "flat": "Flat"
            "settings": "Settings", "setting": "Settings", "refund": "Refund", "company": "Company", "charge_type": "Charge Type", "payment_plan": "Payment Plan", "stage_plan": "Construction Stage Plan", "rate_card": "Rate Card",
            "parking": "Parking", "document": "Document", "notice": "Notice", "cms": "Website CMS", "stage": "Construction Stage", "roznamcha": "Roznamcha"}
 LABEL_KEYS = ("booking_number", "receipt_number", "demand_number", "visit_number", "ticket_number", "full_name", "customer_name", "flat_number", "name", "title", "email", "code")
+FIELD_LABELS = {"allocation_category_code": "Category", "display_state": "Displayed as", "display_override": "Display override", "display_reason": "Display reason", "status": "Status", "hold": "Hold", "block": "Block"}
+CATEGORY_NAMES = {"BUILDER": "Builder saleable", "LANDOWNER": "Landowner share", "INVESTOR": "Investor share", "BANK": "Bank/mortgage", "RESERVE": "Management reserve", "SAMPLE": "Sample/show flat", "SOCIETY": "Society/common"}
+SKIP_PAIRED = {"allocation_category_id"}  # shown via its *_code twin
 
 
 def module_name(entity_type: str | None) -> str:
@@ -25,7 +28,7 @@ def record_label(before, after) -> str | None:
 
 
 def _label(field: str) -> str:
-    return field.replace("_paise", "").replace("_", " ").strip().capitalize()
+    return FIELD_LABELS.get(field) or field.replace("_paise", "").replace("_", " ").strip().capitalize()
 
 
 def _kind(field: str, v) -> str:
@@ -65,10 +68,13 @@ def changed_fields(before, after) -> list[dict]:
         return []
     out = []
     for k in sorted(set(before) | set(after)):
-        if k in SKIP or k.startswith("_"):
+        if k in SKIP or k in SKIP_PAIRED or k.startswith("_"):
             continue
         o, n = before.get(k), after.get(k)
         if o == n or (not k.endswith("_paise") and f"{k}_paise" in before | after):
+            continue
+        if k == "allocation_category_code":
+            out.append({"field": k, "label": "Category", "old": CATEGORY_NAMES.get(o or "BUILDER", o), "new": CATEGORY_NAMES.get(n or "BUILDER", n), "kind": "text"})
             continue
         if SENSITIVE.search(k):
             out.append({"field": k, "label": _label(k), "old": MASKED if o is not None else None, "new": MASKED if n is not None else None, "kind": "masked"})

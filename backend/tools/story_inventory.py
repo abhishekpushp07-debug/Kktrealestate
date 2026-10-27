@@ -32,8 +32,9 @@ async def main():
     n_lo = min(round(len(flats) * 0.4), max(0, len(avail) - 18))  # booked/sold units cannot become landowner share; keep 18 open units for holds/blocks/masks
     lo_ids = [f["id"] for f in avail][:n_lo]
     await db.flats.update_many({"id": {"$in": lo_ids}}, {"$set": {"allocation_category_id": lo["id"], "allocation_category_code": "LANDOWNER", "bookable": False, "updated_at": now_iso()}, "$inc": {"version": 1}})
-    for fid in lo_ids:
-        await write_audit(admin, "flat.category_changed", "flat", fid, after={"allocation_category_code": "LANDOWNER", "reason": "Landowner share per JDA"})
+    for f in [x for x in avail if x["id"] in set(lo_ids)]:
+        await write_audit(admin, "flat.category_changed", "flat", f["id"], before={"allocation_category_code": f.get("allocation_category_code") or "BUILDER", "bookable": True, "flat_number": f["flat_number"]},
+                          after={"allocation_category_code": "LANDOWNER", "bookable": False, "reason": "Landowner share per JDA", "flat_number": f["flat_number"]})
     rest = [f for f in avail if f["id"] not in set(lo_ids)]
     cust = await db.customers.find({"is_active": True}, {"_id": 0, "id": 1}).limit(6).to_list(6)
     holds, blocked, masked = rest[:6], rest[6:9], rest[9:17]
@@ -41,18 +42,18 @@ async def main():
         exp = (now + timedelta(hours=20 if i < 2 else 24 * (3 + i))).isoformat()
         h = {"reason_id": reason["id"], "for_customer_id": cust[i % len(cust)]["id"] if cust else None, "for_user_id": sales["id"], "note": "Story: customer interest", "expires_at": exp, "created_by": admin["id"], "created_at": now_iso()}
         await db.flats.update_one({"id": f["id"]}, {"$set": {"status": "Hold", "hold": h, "status_changed_at": now_iso(), "status_changed_by": admin["id"], "status_reason": "Customer interest"}, "$inc": {"version": 1}})
-        await write_audit(admin, "flat.held", "flat", f["id"], after={"status": "Hold", "hold": h, "flat_number": f["flat_number"]})
+        await write_audit(admin, "flat.held", "flat", f["id"], before={"status": "Available", "hold": None}, after={"status": "Hold", "hold": h, "flat_number": f["flat_number"]})
     for f in blocked:
         b = {"reason": "Legal/documentation", "note": "Story: title clearance pending", "created_by": admin["id"], "created_at": now_iso()}
         await db.flats.update_one({"id": f["id"]}, {"$set": {"status": "Blocked", "block": b, "status_changed_at": now_iso(), "status_changed_by": admin["id"], "status_reason": "Legal"}, "$inc": {"version": 1}})
-        await write_audit(admin, "flat.blocked", "flat", f["id"], after={"status": "Blocked", "block": b, "flat_number": f["flat_number"]})
+        await write_audit(admin, "flat.blocked", "flat", f["id"], before={"status": "Available", "block": None}, after={"status": "Blocked", "block": b, "flat_number": f["flat_number"]})
     for f in masked:
         await db.flats.update_one({"id": f["id"]}, {"$set": {"display_state": "Show as Sold", "display_override": True, "display_set_by": admin["id"], "display_set_at": now_iso(), "display_reason": "Management: hold back from market"}, "$inc": {"version": 1}})
-        await write_audit(admin, "flat.display_changed", "flat", f["id"], after={"display_state": "Show as Sold", "display_override": True, "reason": "Management: hold back from market", "flat_number": f["flat_number"]})
+        await write_audit(admin, "flat.display_changed", "flat", f["id"], before={"display_state": "Show as Available", "display_override": False}, after={"display_state": "Show as Sold", "display_override": True, "reason": "Management: hold back from market", "flat_number": f["flat_number"]})
     # one expired-and-released hold in history (flat is Available now)
     hist = rest[17] if len(rest) > 17 else rest[-1]
     old = {"reason_id": reason["id"], "for_user_id": sales["id"], "expires_at": (now - timedelta(days=2)).isoformat(), "created_by": admin["id"], "created_at": (now - timedelta(days=9)).isoformat()}
-    await write_audit(admin, "flat.held", "flat", hist["id"], after={"status": "Hold", "hold": old, "flat_number": hist["flat_number"]})
+    await write_audit(admin, "flat.held", "flat", hist["id"], before={"status": "Available", "hold": None}, after={"status": "Hold", "hold": old, "flat_number": hist["flat_number"]})
     await write_audit({"id": None, "company_id": proj["company_id"], "full_name": "Hold expiry sweep"}, "flat.hold_expired", "flat", hist["id"], before={"status": "Hold", "hold": old}, after={"status": "Available", "flat_number": hist["flat_number"]})
     await db.settings.update_one({"key": "story_inventory_v1"}, {"$set": {"value": {"block_id": block["id"], "landowner": len(lo_ids), "holds": len(holds), "blocked": len(blocked), "masked": len(masked), "applied_at": now_iso(), "id": str(uuid.uuid4())}}}, upsert=True)
     print({"tower": block["name"], "flats": len(flats), "landowner": len(lo_ids), "holds": len(holds), "blocked": len(blocked), "masked": len(masked)})

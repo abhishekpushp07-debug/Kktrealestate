@@ -185,7 +185,8 @@ async def report_holds(project_id: str | None = None, block_id: str | None = Non
     users = {u["id"]: u.get("full_name") for u in await db.users.find({"id": {"$in": list({(r["hold"] or {}).get("for_user_id") for r in active} - {None})}}, {"_id": 0, "id": 1, "full_name": 1}).to_list(None)}
     custs = {c["id"]: c.get("full_name") for c in await db.customers.find({"id": {"$in": list({(r["hold"] or {}).get("for_customer_id") for r in active} - {None})}}, {"_id": 0, "id": 1, "full_name": 1}).to_list(None)}
     items = [{"flat_id": r["id"], "flat_number": r["flat_number"], "tower": bl.get(r["block_id"], {}).get("name"), "expires_at": r["hold"]["expires_at"], "state": "legacy (no expiry)" if not r["hold"]["expires_at"] else "expiring" if r["hold"]["expires_at"] <= soon else "active",
-              "rm": users.get(r["hold"].get("for_user_id")), "customer": custs.get(r["hold"].get("for_customer_id")), "reason_id": r["hold"].get("reason_id"), "note": r["hold"].get("note")} for r in sorted(active, key=lambda r: r["hold"]["expires_at"] or "")]
+              "hours_left": round((datetime.fromisoformat(r["hold"]["expires_at"]) - datetime.now(timezone.utc)).total_seconds() / 3600, 1) if r["hold"]["expires_at"] else None,
+              "rm": users.get(r["hold"].get("for_user_id")), "rm_user_id": r["hold"].get("for_user_id"), "customer": custs.get(r["hold"].get("for_customer_id")), "reason_id": r["hold"].get("reason_id"), "note": r["hold"].get("note")} for r in sorted(active, key=lambda r: r["hold"]["expires_at"] or "")]
     return {"items": items, "history": hist[:50], "totals": {"active": len(items), "expiring_48h": sum(1 for i in items if i["state"] == "expiring"), "expired_released": expired, "released_manually": released, "held_total": held,
             "conversion_rate_pct": round(100 * booked_from_hold / held, 1) if held else None}, "as_of": now, "tie_out": {"flats_on_hold": sum(1 for r in rows if r["status"] == "Hold")}}
 

@@ -67,10 +67,36 @@ def test_masked_flat_indistinguishable_from_sold_for_non_privileged(admin_header
         sgrid = requests.get(f"{BASE}/api/blocks/{f['block_id']}/grid", headers=sales).json()
         scell = next(x for fl in sgrid["floors"] for x in fl["flats"] if x["id"] == f["id"])
         assert scell["status"] == "Sold" and "masked" not in scell and "display_state" not in scell
-        # a real Sold flat and the masked one have the identical key set for the Sales user
+        # a real Sold flat and the masked one have the identical key set AND null-pattern for the Sales user — across the whole company
         real_sold = next((x for fl in sgrid["floors"] for x in fl["flats"] if x["status"] == "Sold" and x["id"] != f["id"]), None)
         if real_sold:
             assert set(real_sold) == set(scell)
+        def _all(h):
+            out, page = [], 1
+            while True:
+                r = requests.get(f"{BASE}/api/flats", params={"page_size": 200, "page": page}, headers=h).json()
+                out += r["items"]
+                if len(r["items"]) < 200:
+                    return out
+                page += 1
+        allf, allp = _all(sales), _all(admin_headers)
+        masked_ids = {x["id"] for x in allp if x.get("masked") and x["display_state"] == "Show as Sold"}
+        real_ids = {x["id"] for x in allp if x["inventory_state"] in ("Booked", "Sold")}
+        sm = [x for x in allf if x["id"] in masked_ids]
+        sr = [x for x in allf if x["id"] in real_ids]
+        assert sm and sr, (len(allf), len(allp), len(masked_ids), len(real_ids), next(x for x in allp if x["id"] == f["id"]), mongo.flats.find_one({"id": f["id"]}, {"_id": 0, "status": 1, "display_state": 1, "display_override": 1, "flat_number": 1}), requests.get(f"{BASE}/api/flats/{f['id']}", headers=admin_headers).json()["inventory_state"])
+        assert all(x["status"] == "Sold" for x in sm + sr) and not any("booking_id" in x for x in sm + sr)
+        keysets = {frozenset(x) for x in sm + sr}
+        assert len(keysets) == 1, [sorted(a ^ b) for a in keysets for b in keysets if a != b][:1]
+        for k in keysets.pop():
+            real_nulls = {x.get(k) is None for x in sr}
+            assert {x.get(k) is None for x in sm} <= real_nulls, (k, [x.get(k) for x in sm][:3])
+        # non-privileged summary counts are by DISPLAYED status only and tie to the shaped flat list
+        summ = requests.get(f"{BASE}/api/inventory/summary", params={"block_id": f["block_id"]}, headers=sales).json()
+        assert summ["privileged"] is False and not any(k in summ["counters"] for k in ("shown_as_sold_masked", "masked", "booked", "blocked"))
+        shaped = [x for x in allf if x["block_id"] == f["block_id"]]
+        by = {s: sum(1 for x in shaped if x["status"] == s) for s in ("Available", "Hold", "Sold")}
+        assert summ["counters"]["available"] == by["Available"] and summ["counters"]["held"] == by["Hold"] and summ["counters"]["sold"] == by["Sold"] and summ["counters"]["total"] == len(shaped), (summ, by)
         # wizard never lists it; booking attempt reads as Sold
         wiz = requests.get(f"{BASE}/api/blocks/{f['block_id']}/grid", params={"bookable_for": ""}, headers=sales).json()
         assert all(x["id"] != f["id"] for fl in wiz["floors"] for x in fl["flats"])
@@ -110,8 +136,14 @@ def test_wizard_excludes_landowner_blocked_and_booking_rejects_unsaleable(admin_
     cust = requests.get(f"{BASE}/api/customers", params={"page_size": 1}, headers=admin_headers).json()["items"][0]
     r = requests.post(f"{BASE}/api/bookings", json={"flat_id": a["id"], "customer_id": cust["id"], "booking_date": datetime.now(timezone.utc).date().isoformat(), "agreement_value": 1000000, "cash_agreed": 1000000, "account_agreed": 0}, headers=admin_headers)
     assert r.status_code in (409, 422) and (r.json().get("code") == "FLAT_NOT_SALEABLE" or r.status_code == 422), r.text
-    # counters + Journey
+    # counters + Journey (before→after inline on the entity journey AND humanised in History)
     summ = requests.get(f"{BASE}/api/inventory/summary", params={"block_id": a["block_id"]}, headers=admin_headers).json()
+    jr = requests.get(f"{BASE}/api/journey/entity/flat/{a['id']}", headers=admin_headers).json()["items"]
+    cat = next(i for i in jr if i["action"] == "flat.category_changed")
+    assert cat.get("before") and cat.get("after") and cat["after"]["allocation_category_code"] == "LANDOWNER", cat
+    hist = requests.get(f"{BASE}/api/audit-logs/entity/flat/{a['id']}", headers=admin_headers).json()["items"]
+    ch = next(i for i in hist if i["action"] == "flat.category_changed")["changed_fields"]
+    assert any(c["label"] == "Category" and c["old"] == "Builder saleable" and c["new"] == "Landowner share" for c in ch), ch
     assert summ["privileged"] and summ["counters"]["landowner"] >= 1 and summ["counters"]["blocked"] >= 1
     assert mongo.audit_logs.find_one({"action": "flat.category_changed", "entity_id": a["id"]}) and mongo.audit_logs.find_one({"action": "flat.blocked", "entity_id": b["id"]})
     _bulk(admin_headers, flat_ids=[a["id"]], action="set_category", category_id=cats["BUILDER"]["id"])

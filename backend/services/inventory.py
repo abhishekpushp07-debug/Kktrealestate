@@ -37,8 +37,11 @@ def shape(flat: dict, user: dict | None) -> dict | None:
         return flat
     if disp == "Hidden":
         return None
-    out = {k: v for k, v in flat.items() if k not in PRIVILEGED_FIELDS and k not in ("masked", "status_changed_by", "status_reason")}
+    out = {k: v for k, v in flat.items() if k not in PRIVILEGED_FIELDS and k not in ("masked", "status_changed_by", "status_reason", "booking_id")}  # booking_id stripped for everyone non-privileged: a masked flat has none
     out["status"] = DISPLAY_TO_STATUS[disp]
+    if "created_at" in out:  # full documents: key always present and non-null so a masked flat cannot be told apart from a genuinely sold one
+        masked = bool(flat.get("display_override")) and disp != MIRROR.get(flat.get("status"))
+        out["status_changed_at"] = (flat.get("display_set_at") if masked else None) or flat.get("status_changed_at") or flat.get("updated_at") or flat.get("created_at")
     if flat.get("status") == "Hold" and disp == "Show as Hold":
         h = flat.get("hold") or {}
         out["hold"] = {k: h.get(k) for k in ("expires_at", "for_customer_id", "for_user_id", "reason_id")}  # sales users work holds; no display metadata
@@ -124,10 +127,13 @@ async def counters(match: dict, privileged: bool) -> dict:
     c = rows[0] if rows else {k: 0 for k in ("total", "saleable", "landowner", "other_categories", "held", "held_expiring_48h", "blocked", "booked", "sold", "available", "shown_as_sold_masked")}
     c.pop("_id", None)
     if not privileged:
-        c["sold"] = c["sold"] + c.pop("shown_as_sold_masked")  # display layer: masked units count as sold for everyone else
-        c["available"] = c["available"] - sum(1 for _ in [])  # keep key set identical
-        masked_avail = await db.flats.count_documents({**match, "is_active": True, "status": "Available", "display_override": True, "display_state": {"$in": ["Show as Sold", "Hidden", "Show as Hold"]}})
-        c["available"] -= masked_avail
+        # DISPLAY layer only: no masked/booked/blocked buckets — a masked flat counts under "sold" exactly as it is shown; Hidden flats are not counted.
+        disp = await db.flats.aggregate([{"$match": {**match, "is_active": True}}, {"$group": {"_id": status_key(None), "n": {"$sum": 1}}}]).to_list(None)
+        by = {r["_id"]: r["n"] for r in disp}
+        hidden = by.pop(None, 0)
+        c = {"total": c["total"] - hidden, "saleable": c["saleable"], "landowner": c["landowner"], "other_categories": c["other_categories"],
+             "available": by.get("Available", 0), "held": by.get("Hold", 0), "sold": by.get("Sold", 0),
+             "held_expiring_48h": await db.flats.count_documents({**match, "is_active": True, "status": "Hold", "display_override": {"$ne": True}, "hold.expires_at": {"$lte": soon}})}
     return c
 
 
