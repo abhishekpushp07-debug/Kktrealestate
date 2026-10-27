@@ -65,10 +65,12 @@ async def _check(cl):
 RUN = """
 import asyncio, os, sys
 sys.path.insert(0, %r)
-from server import app, lifespan, startup_tasks
+from server import app, lifespan, startup_tasks, STARTUP
 from db import db
 async def main():
     async with lifespan(app):
+        while not STARTUP.get("done"):  # let the boot-time run finish first; racing it for the startup lease made the explicit pass skip migrations
+            await asyncio.sleep(0.2)
         await db.locks.delete_many({"name": "startup"})
         await startup_tasks()
 asyncio.run(main())
@@ -87,8 +89,12 @@ def test_startup_idempotent_on_pre_phase7_db():
     cl = loop.run_until_complete(_prepare())
     try:
         log1 = _run_startup()
-        assert "integrity: ok=True" in log1, log1[-2000:]
-        loop.run_until_complete(_check(cl))
+        assert "integrity: ok=True" in log1, log1[-20000:]
+        try:
+            loop.run_until_complete(_check(cl))
+        except AssertionError:
+            print("STARTUP LOG TAIL:", log1[-20000:])
+            raise
         before = {n: loop.run_until_complete(cl[DST][n].count_documents({})) for n in ("catalogue_items", "demands", "payment_plans", "construction_stages", "project_summaries")}
         _run_startup()  # second boot: no duplicates, no re-seeding
         after = {n: loop.run_until_complete(cl[DST][n].count_documents({})) for n in before}
