@@ -44,6 +44,7 @@ async def ops(window: int = 900, user: dict = Depends(require("admin.system_heal
         "caches": {"ttlcache": __import__("services.ttlcache", fromlist=["snapshot"]).snapshot()},
         "alerts": __import__("services.alerts", fromlist=["LAST"]).LAST,
         "backup": await _backup_status(),
+        "storage": await __import__("routers.files", fromlist=["storage_usage"]).storage_usage(),
         "job_runs": await __import__("services.job_runs", fromlist=["health"]).health(),
         "read_models": {"last_full_refresh": (rm or {}).get("value"), "oldest_project_summary_age_s": staleness_s},
         "cache": __import__("services.ttlcache", fromlist=["HITS"]).HITS, "db_pool": {"config": POOL, "live": POOL_STATS, "server": {"connections": (srv.get("connections") or {}), "opcounters": (srv.get("opcounters") or {}),

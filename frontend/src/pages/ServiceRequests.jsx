@@ -4,6 +4,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { AlertTriangle, LifeBuoy, Lock, Paperclip, Send, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import api, { errMsg } from "@/lib/api";
+import { ResumableUpload } from "@/components/common/ResumableUpload";
+import { FileGallery } from "@/components/common/FileGallery";
 import { undoToast } from "@/lib/undo";
 import { useAuth } from "@/context/AuthContext";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -38,11 +40,14 @@ function Detail({ id }) {
   const [internal, setInternal] = useState(false);
   const load = () => api.get(`/service-requests/${id}`).then((r) => setSr(r.data)).catch((e) => toast.error(errMsg(e)));
   useEffect(() => { load(); if (can("service.ticket.assign")) api.get("/users?page_size=100").then((r) => setUsers(r.data.items)).catch(() => {}); }, [id]); // eslint-disable-line
+  const [filesKey, setFilesKey] = useState(0);
   const post = async (path, body, ok) => { try { await api.post(`/service-requests/${id}/${path}`, body); toast.success(ok); setMsg(""); load(); } catch (e) { toast.error(errMsg(e)); } };
   const openAttachment = async (idx, name) => { try { const { data } = await api.get(`/service-requests/${id}/attachments/${idx}`, { responseType: "blob" }); const url = URL.createObjectURL(data); const a = document.createElement("a"); a.href = url; a.download = name; a.target = "_blank"; a.click(); setTimeout(() => URL.revokeObjectURL(url), 5000); } catch (e) { toast.error(errMsg(e)); } };
   if (!sr) return <div className="p-6 text-sm text-txt-muted">Loading…</div>;
   return (
     <div data-testid="sr-detail">
+      <div className="card mb-4 p-4" data-testid="sr-attachments-card"><div className="mb-2 flex items-center gap-2"><h3 className="text-sm font-bold">Attachments</h3><div className="ml-auto"><ResumableUpload testId="sr-upload" meta={{ kind: "ticket_attachment", entity_type: "ticket", entity_id: id, project_id: sr.project_id }} onDone={() => setFilesKey((k) => k + 1)} label="Attach file" /></div></div>
+        <FileGallery query={{ entity_type: "ticket", entity_id: id }} canEdit={can("service.ticket.assign")} refreshKey={filesKey} columns={8} /></div>
       <PageHeader title={sr.subject} subtitle={`${sr.ticket_number} · ${sr.category} · ${sr.priority} · raised ${fmtDateTime(sr.created_at)}`} crumbs={[{ label: "Service Requests", to: "/service-requests" }, { label: sr.ticket_number }]}
         actions={<div className="flex flex-wrap items-center gap-2"><HistoryButton entityType="service_request" entityId={sr.id} label={sr.ticket_number} />
           <StatusPill status={sr.status} testId="sr-status" />

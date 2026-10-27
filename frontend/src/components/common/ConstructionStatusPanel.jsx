@@ -60,7 +60,7 @@ export function ConstructionStatusPanel({ blockId, onChanged }) {
           </li>)}
         </ol>
       </div>
-      <ConstructionPhotos blockId={blockId} milestones={data.stages.map((s) => ({ seq: s.seq, name: s.name, status: s.status, progress_note: s.progress_note }))} />
+      <ConstructionPhotos blockId={blockId} projectId={data.block?.project_id} milestones={data.stages.map((s) => ({ seq: s.seq, name: s.name, status: s.status, progress_note: s.progress_note }))} />
       <Dialog open={undoOpen} onOpenChange={setUndoOpen}><DialogContent data-testid="cs-undo-dialog"><DialogHeader><DialogTitle>Undo “{data.current_stage?.name}”</DialogTitle></DialogHeader>
         <div className="space-y-3 text-sm">
           <p className="text-txt-secondary">The stage goes back to Pending and the installment demands it raised are voided for every active booking in this tower.</p>

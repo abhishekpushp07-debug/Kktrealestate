@@ -135,13 +135,15 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
         if not surfaces_enabled(request) and (request.url.path.startswith("/api/public/") or request.url.path.startswith("/api/portal/") or request.url.path in ("/api/public", "/api/portal")):
             return JSONResponse(status_code=404, content={"detail": "Not found", "code": "NOT_FOUND", "request_id": rid, "error": {"code": "NOT_FOUND", "message": "Not found", "details": [], "request_id": rid}})
         cl = request.headers.get("content-length")
-        if cl and cl.isdigit() and int(cl) > MAX_BODY:
+        limit = (5 * 1024 * 1024 + 1024) if "/api/uploads/" in request.url.path and "/parts/" in request.url.path else MAX_BODY
+        if cl and cl.isdigit() and int(cl) > limit:
             return JSONResponse(status_code=413, content={"detail": "Request body too large (max 2 MB)", "code": "PAYLOAD_TOO_LARGE", "request_id": rid, "error": {"code": "PAYLOAD_TOO_LARGE", "message": "Request body too large (max 2 MB)", "details": [], "request_id": rid}})
         t0 = time.perf_counter()
         acc = [0.0, 0]
         token = DB_MS.set(acc)
         try:
-            response = await asyncio.wait_for(call_next(request), timeout=REQUEST_TIMEOUT_S)
+            budget = 900.0 if request.url.path.endswith("/complete") and "/api/uploads/" in request.url.path else REQUEST_TIMEOUT_S
+            response = await asyncio.wait_for(call_next(request), timeout=budget)
         except asyncio.TimeoutError:
             logger.error(json.dumps({"request_id": rid, "path": request.url.path, "error": "timeout"}))
             response = JSONResponse(status_code=504, content={"detail": "Request timed out", "code": "REQUEST_TIMEOUT", "request_id": rid, "error": {"code": "REQUEST_TIMEOUT", "message": "Request timed out", "details": [], "request_id": rid}})
