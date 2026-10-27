@@ -56,7 +56,8 @@ async def retract_for_stage(block_id: str, stage_id: str, stage_name: str) -> di
 async def sweep_notifications() -> dict:
     """Startup: canonical types for customer notifications, fill booking_id from the demand, drop orphans. Idempotent."""
     stats = {"normalized": 0, "deleted": 0}
-    async for n in db.notifications.find({"user_id": {"$regex": "^customer:"}}, {"_id": 0}).batch_size(500):
+    # Phase J.2: O(changed) — rows already normalised carry swept_v=2 and are skipped (watermark per row; no full rescan on later boots)
+    async for n in db.notifications.find({"user_id": {"$regex": "^customer:"}, "swept_v": {"$ne": 2}}, {"_id": 0}).batch_size(500):
         kind = n.get("type") or n.get("kind")
         ntype = CANONICAL.get(kind, kind)
         upd = {}
@@ -82,9 +83,9 @@ async def sweep_notifications() -> dict:
             upd["withdrawn"] = False
         if "link" not in n or n.get("link") is None:
             upd["link"] = PORTAL_LINKS.get(ntype)
-        if upd:
-            await db.notifications.update_one({"id": n["id"]}, {"$set": upd})
-            stats["normalized"] += 1
+        upd["swept_v"] = 2
+        await db.notifications.update_one({"id": n["id"]}, {"$set": upd})
+        stats["normalized"] += 1
     if stats["normalized"] or stats["deleted"]:
         logger.info("[notify] sweep: %s", stats)
     return stats
