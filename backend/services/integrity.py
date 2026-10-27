@@ -32,41 +32,52 @@ async def backfill_demand_installments() -> int:
     return n
 
 
+async def _plan_findings(bk: dict, today: date) -> list[dict]:
+    findings: list[dict] = []
+    block = await db.blocks.find_one({"id": bk["block_id"]}, {"_id": 0, "construction_stages": 1}) or {}
+    demands = await db.demands.find({"booking_id": bk["id"], "voided": {"$ne": True}}, {"_id": 0}).to_list(None)
+    absorbed = {s for d in demands for s in d.get("absorbed_installment_seqs") or []}
+    catch_up = [d for d in demands if d.get("trigger_type") == "CATCH_UP"]
+    absorbed |= {d.get("installment_seq") for d in catch_up}
+    by_seq: dict = {}
+    for d in demands:
+        if d.get("trigger_type") == "CATCH_UP":
+            continue
+        if d.get("installment_seq") is None:
+            findings.append(_f(bk, "unmapped_demand", d, "Demand has no installment mapping"))
+            continue
+        by_seq.setdefault(d["installment_seq"], []).append(d)
+    for ins in sorted(bk["payment_plan_snapshot"]["installments"], key=lambda x: x["seq"]):
+        td = trigger_date(ins, bk, block)
+        satisfied = bool(td and td <= today)
+        ds = by_seq.get(ins["seq"], [])
+        if len(ds) > 1:
+            for d in sorted(ds, key=lambda x: x.get("created_at") or "")[1:]:
+                findings.append(_f(bk, "duplicate_demand", d, f"Installment {ins['seq']} '{ins['name']}' raised {len(ds)} times"))
+        if ds and not satisfied and ins["seq"] not in absorbed and not ds[0].get("rebound_at"):  # re-bound after a transfer: raised legitimately in the old tower
+            findings.append(_f(bk, "unsatisfied_trigger", ds[0], f"'{ins['name']}' raised but trigger not met ({ins['trigger_type']})"))
+        if not ds and satisfied and ins["seq"] not in absorbed:
+            findings.append({"booking_id": bk["id"], "booking_number": bk["booking_number"], "kind": "missing_demand", "installment_seq": ins["seq"], "installment_name": ins["name"], "detail": f"'{ins['name']}' triggered on {td.isoformat()} but not raised", "demand_number": None, "paid_paise": 0})
+    raised_sum = sum(d["total_demand_paise"] for d in demands)
+    sm = bk.get("summary") or {}
+    paid_sum = sum(d["total_demand_paise"] for d in demands if d["status"] == "Paid")
+    if sm.get("total_order_raised_paise", 0) != raised_sum and not (bk.get("transfers") and raised_sum > sm.get("total_order_raised_paise", 0) and paid_sum >= sm.get("total_order_raised_paise", 0)):
+        # transferred to a cheaper unit: installments already PAID at the old price exceed cum% × new agreement — the excess is an advance, not a mismatch
+        findings.append({"booking_id": bk["id"], "booking_number": bk["booking_number"], "kind": "summary_mismatch", "installment_seq": None, "installment_name": None, "demand_number": None, "paid_paise": 0, "detail": f"summary raised {sm.get('total_order_raised_paise', 0)} ≠ demands {raised_sum}"})
+    return findings
+
+
 async def integrity_report(today: date | None = None) -> dict:
     today = today or clock.today()
     findings, bookings_checked = [], 0
     async for bk in db.bookings.find({"status": "Active", "payment_plan_snapshot": {"$ne": None}}, {"_id": 0}).batch_size(500):
         bookings_checked += 1
-        block = await db.blocks.find_one({"id": bk["block_id"]}, {"_id": 0, "construction_stages": 1}) or {}
-        demands = await db.demands.find({"booking_id": bk["id"], "voided": {"$ne": True}}, {"_id": 0}).to_list(None)
-        absorbed = {s for d in demands for s in d.get("absorbed_installment_seqs") or []}
-        catch_up = [d for d in demands if d.get("trigger_type") == "CATCH_UP"]
-        absorbed |= {d.get("installment_seq") for d in catch_up}
-        by_seq: dict = {}
-        for d in demands:
-            if d.get("trigger_type") == "CATCH_UP":
-                continue
-            if d.get("installment_seq") is None:
-                findings.append(_f(bk, "unmapped_demand", d, "Demand has no installment mapping"))
-                continue
-            by_seq.setdefault(d["installment_seq"], []).append(d)
-        for ins in sorted(bk["payment_plan_snapshot"]["installments"], key=lambda x: x["seq"]):
-            td = trigger_date(ins, bk, block)
-            satisfied = bool(td and td <= today)
-            ds = by_seq.get(ins["seq"], [])
-            if len(ds) > 1:
-                for d in sorted(ds, key=lambda x: x.get("created_at") or "")[1:]:
-                    findings.append(_f(bk, "duplicate_demand", d, f"Installment {ins['seq']} '{ins['name']}' raised {len(ds)} times"))
-            if ds and not satisfied and ins["seq"] not in absorbed and not ds[0].get("rebound_at"):  # re-bound after a transfer: raised legitimately in the old tower
-                findings.append(_f(bk, "unsatisfied_trigger", ds[0], f"'{ins['name']}' raised but trigger not met ({ins['trigger_type']})"))
-            if not ds and satisfied and ins["seq"] not in absorbed:
-                findings.append({"booking_id": bk["id"], "booking_number": bk["booking_number"], "kind": "missing_demand", "installment_seq": ins["seq"], "installment_name": ins["name"], "detail": f"'{ins['name']}' triggered on {td.isoformat()} but not raised", "demand_number": None, "paid_paise": 0})
-        raised_sum = sum(d["total_demand_paise"] for d in demands)
-        sm = bk.get("summary") or {}
-        paid_sum = sum(d["total_demand_paise"] for d in demands if d["status"] == "Paid")
-        if sm.get("total_order_raised_paise", 0) != raised_sum and not (bk.get("transfers") and raised_sum > sm.get("total_order_raised_paise", 0) and paid_sum >= sm.get("total_order_raised_paise", 0)):
-            # transferred to a cheaper unit: installments already PAID at the old price exceed cum% × new agreement — the excess is an advance, not a mismatch
-            findings.append({"booking_id": bk["id"], "booking_number": bk["booking_number"], "kind": "summary_mismatch", "installment_seq": None, "installment_name": None, "demand_number": None, "paid_paise": 0, "detail": f"summary raised {sm.get('total_order_raised_paise', 0)} ≠ demands {raised_sum}"})
+        found = await _plan_findings(bk, today)
+        if found:  # read-skew guard: a stage completion / payment in flight (demands written, summary not yet) is not a finding — re-check once on a fresh doc
+            await asyncio.sleep(0.2)
+            fresh = await db.bookings.find_one({"id": bk["id"], "status": "Active", "payment_plan_snapshot": {"$ne": None}}, {"_id": 0})
+            found = await _plan_findings(fresh, today) if fresh else []
+        findings += found
     findings += await referential_findings()
     counts: dict = {}
     for f in findings:

@@ -138,7 +138,7 @@ def test_stages_forward_only_and_undo_roundtrip(admin_headers):
     nxt = ms["next_seq"]
     assert nxt is not None
     # stages are sequential: completing seq+1 catches up seq too (both marked, both audited), undo walks back one at a time
-    done = requests.post(f"{API_B}/blocks/{blk['id']}/milestones/{nxt + 1}/complete", headers=h, json={"completed_on": date.today().isoformat()})
+    done = requests.post(f"{API_B}/blocks/{blk['id']}/milestones/{nxt + 1}/complete", headers={**h, "Connection": "close"}, timeout=120, json={"completed_on": date.today().isoformat()})
     assert done.status_code == 200 and done.json().get("audit_id") and len(done.json()["marked"]) == 2, done.text
     after = requests.get(f"{API_B}/blocks/{blk['id']}/milestones", headers=h).json()
     assert after["next_seq"] in (None, nxt + 2) and after["construction_percent"] > ms["construction_percent"]
