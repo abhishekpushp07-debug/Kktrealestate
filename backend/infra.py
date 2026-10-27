@@ -1,7 +1,7 @@
 import asyncio
-import os
 import json
 import logging
+import os
 import time
 import uuid
 from collections import defaultdict
@@ -12,8 +12,12 @@ from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse, Response
 
+from core.jobs import JOBS, record_job, timed_job  # noqa: F401 — re-exported (server, routers.ops)
 from db import db
 from dbtiming import DB_MS
+from deps import _BYPASS_HDR
+from services import clock
+from services.clock import REQ_CTX
 
 logger = logging.getLogger("kkt.http")
 
@@ -48,7 +52,6 @@ from collections import deque  # noqa: E402
 RING: deque = deque(maxlen=20000)  # (ts, route_group, status, ms, db_ms, rid, path, dbq)
 SLOW: deque = deque(maxlen=50)
 ERRORS: dict[str, int] = defaultdict(int)
-JOBS: dict[str, dict] = {}
 _GROUPS = (("GET /api/bootstrap", "bootstrap"), ("/api/dashboard", "dashboard"), ("/api/home", "dashboard"), ("/api/search", "search"), ("/api/reports", "reports"),
            ("/api/customers/", "customer_detail"), ("/api/bookings/", "booking_detail"), ("/api/payments", "payments"), ("/api/customers", "customers"), ("/api/bookings", "bookings"),
            ("/api/flats", "inventory"), ("/api/leads", "crm"), ("/api/site-visits", "crm"), ("/api/service-requests", "support"), ("/api/admin", "admin"), ("/api/auth", "auth"))
@@ -62,23 +65,6 @@ def route_group(method: str, path: str) -> str:
                 continue
             return g
     return "other"
-
-
-def record_job(name: str, started: float, ok: bool, result=None, error: str | None = None):
-    JOBS[name] = {"last_run": datetime.now(timezone.utc).isoformat(), "duration_ms": round((time.perf_counter() - started) * 1000, 1), "ok": ok,
-                  "result": (result if isinstance(result, (int, float, str, bool, type(None))) else {k: v for k, v in (result or {}).items() if isinstance(v, (int, float, str, bool))} if isinstance(result, dict) else str(result)[:200]),
-                  "error": error, "runs": JOBS.get(name, {}).get("runs", 0) + 1}
-
-
-async def timed_job(name: str, coro_fn, *a, **kw):
-    t = time.perf_counter()
-    try:
-        res = await coro_fn(*a, **kw)
-        record_job(name, t, True, res)
-        return res
-    except Exception as e:  # noqa: BLE001
-        record_job(name, t, False, None, f"{type(e).__name__}: {e}"[:300])
-        raise
 
 
 def ops_snapshot(window_s: int = 900) -> dict:
@@ -125,10 +111,7 @@ def surfaces_enabled(request: Request | None = None) -> bool:
 class ObservabilityMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         rid = request.headers.get("x-request-id") or uuid.uuid4().hex[:16]
-        from deps import _BYPASS_HDR
         _BYPASS_HDR.set(request.headers.get("x-rate-limit-bypass"))
-        from services import clock
-        from services.clock import REQ_CTX
         clock.set_as_of(request.headers.get("x-as-of") if clock.enabled() and request.headers.get("x-as-of") and request.headers.get("x-rate-limit-bypass") == os.environ.get("LOGIN_RATE_LIMIT_BYPASS_TOKEN") else None)
         request.state.request_id = rid
         REQ_CTX.set({"request_id": rid, "user_agent": (request.headers.get("user-agent") or "")[:200]})

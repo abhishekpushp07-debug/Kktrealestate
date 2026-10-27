@@ -8,8 +8,11 @@ import logging
 from collections import defaultdict
 from collections.abc import Awaitable, Callable
 
+from core.money import money_snapshot as _money
+from core.types import new_id, now_iso
 from db import db
 from event_registry import spec_for
+from services.audit_diff import action_kind, changed_fields, mask, module_name, record_label
 
 logger = logging.getLogger("kkt.events")
 
@@ -40,7 +43,6 @@ class EventBus:
         return audit_id
 
     async def _run(self, evt: dict) -> dict:
-        from utils import now_iso
         out = {}
         for name, h in self.handlers(evt["topic"]):
             try:
@@ -53,7 +55,6 @@ class EventBus:
 
     async def replay(self, audit_doc: dict) -> dict:
         """Re-run all subscribers for an outbox row (idempotent). Used by the reconciliation sweep and tests."""
-        from utils import now_iso
         evt = {"topic": "entity.changed", "actor": {"id": audit_doc.get("actor_id"), "name": audit_doc.get("actor_name"), "company_id": audit_doc.get("company_id")},
                "action": audit_doc["action"], "entity_type": audit_doc["entity_type"], "entity_id": audit_doc["entity_id"], "before": audit_doc.get("before"), "after": audit_doc.get("after"),
                "company_id": audit_doc.get("company_id"), "audit_id": audit_doc["id"], "replay": True}
@@ -71,9 +72,7 @@ bus = EventBus()
 
 
 async def _insert_audit(evt: dict) -> str:
-    from utils import new_id, now_iso
     actor = evt.get("actor")
-    from services.audit_diff import action_kind, changed_fields, mask, module_name, record_label
     before, after = mask(evt.get("before")), mask(evt.get("after"))
     doc = {"id": new_id(), "company_id": evt.get("company_id"), "actor_id": actor["id"] if actor else "system", "actor_name": (actor.get("name") or "System") if actor else "System",
            "user_id": actor["id"] if actor else None, "user_name": (actor.get("name") or "System") if actor else "System", "actor_type": "user" if actor and actor.get("id") else "system",
@@ -99,7 +98,6 @@ MONEY_ENTITIES = {"payment", "booking", "demand", "refund", "flat", "block"}
 async def surface_snapshot(company_id: str, booking_id: str | None, flat_id: str | None, project_id: str | None, day: str) -> dict:
     """Values of every money/status surface a booking-context entry can move. Cheap raw aggregates (never read models, which lag)."""
     from datetime import date as _d
-    from services.read_models import _money
     snap = {}
     if booking_id:
         b = await db.bookings.find_one({"id": booking_id}, {"_id": 0, "summary": 1, "status": 1, "customer_id": 1, "flat_id": 1, "block_id": 1, "project_id": 1, "cash_agreed_paise": 1, "account_agreed_paise": 1, "agreement_value_paise": 1, "flat_snapshot.flat_number": 1})
@@ -166,8 +164,8 @@ async def snapshot_subscriber(evt: dict):
 
 async def reconcile_outbox(max_age_s: int = 60, limit: int = 200) -> dict:
     """Replay incomplete outbox rows older than max_age_s. Returns health counters (also exposed in /api/admin/ops)."""
-    from datetime import UTC, datetime, timedelta
-    from utils import now_iso
+    from datetime import timedelta
+
     cutoff = (clock.now() - timedelta(seconds=max_age_s)).isoformat()
     rows = await db.audit_logs.find({"propagated_complete": False, "created_at": {"$lt": cutoff}}, {"_id": 0}).sort("created_at", 1).limit(limit).to_list(None)
     for r in rows:
@@ -177,8 +175,8 @@ async def reconcile_outbox(max_age_s: int = 60, limit: int = 200) -> dict:
 
 
 async def outbox_health() -> dict:
-    from datetime import UTC, datetime
-    from utils import now_iso
+    from datetime import datetime
+
     unprop = await db.audit_logs.count_documents({"propagated_complete": False})
     oldest = await db.audit_logs.find({"propagated_complete": False}, {"_id": 0, "created_at": 1}).sort("created_at", 1).limit(1).to_list(1)
     lag = 0

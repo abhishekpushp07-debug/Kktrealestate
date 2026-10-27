@@ -7,8 +7,9 @@ import jwt
 from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from core.errors import ApiError
+from core.types import now_iso
 from db import db
-from utils import ApiError
 
 bearer = HTTPBearer(auto_error=False)
 
@@ -63,7 +64,6 @@ async def get_current_user(request: Request, creds: HTTPAuthorizationCredentials
     if not user or not user.get("is_active", False):
         raise ApiError(401, "User inactive or not found", "USER_INACTIVE")
     from services import rbac
-    from utils import now_iso
     eff = await rbac.resolve(user, await _current_roles_version(), now_iso())
     user["permissions"] = set(eff["permissions"])
     user["role_name"] = eff["role_names"][0] if eff["role_names"] else None

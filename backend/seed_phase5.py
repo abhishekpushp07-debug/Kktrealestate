@@ -1,4 +1,5 @@
 import os
+
 """Phase 5 seed: portal accounts, service categories/requests, notices, construction photos, shared docs, SLA. Idempotent."""
 import logging
 from datetime import UTC, datetime, timedelta
@@ -25,7 +26,7 @@ async def seed_phase5():
     for name, spec in SYSTEM_ROLES.items():
         await db.roles.update_one({"name": name, "is_system": True}, {"$set": {"permissions": spec["permissions"]}})
     await db.settings.update_one({"key": "roles_version"}, {"$inc": {"value": 1}}, upsert=True)
-    from routers.auth import hash_password
+    from core.passwords import hash_password
     pw = hash_password("Buyer@12345")
     # second booking for the owner's example customer (co-applicant on BK-2526-0002) to exercise the switcher
     c1 = await db.customers.find_one({"customer_code": "CUST-2526-0001"}, {"_id": 0, "id": 1})

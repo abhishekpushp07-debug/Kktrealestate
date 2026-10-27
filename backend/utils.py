@@ -5,23 +5,16 @@ import base64
 import json
 import os
 import re
-import uuid
-from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import HTTPException, Query, Request
+from fastapi import Query, Request
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from core.errors import ApiError  # noqa: F401 — re-exported
+from core.types import base_doc, new_id, now_iso  # noqa: F401 — re-exported
 from db import db
 
 _CTRL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
-
-
-class ApiError(HTTPException):
-    def __init__(self, status_code: int, detail: str, code: str = "ERROR", extra: dict | None = None):
-        super().__init__(status_code=status_code, detail=detail)
-        self.code = code
-        self.extra = extra
 
 
 class StrictModel(BaseModel):
@@ -31,14 +24,6 @@ class StrictModel(BaseModel):
     @classmethod
     def _strip_ctrl(cls, v):
         return _CTRL.sub("", v) if isinstance(v, str) else v
-
-
-def now_iso() -> str:
-    return clock.now().isoformat()
-
-
-def new_id() -> str:
-    return str(uuid.uuid4())
 
 
 def with_price(doc):
@@ -74,12 +59,6 @@ def client_ip(request: Request) -> str:
     if fwd:
         return fwd.split(",")[0].strip()
     return request.client.host if request.client else ""
-
-
-def base_doc(user: dict | None, company_id: str) -> dict:
-    ts = now_iso()
-    return {"id": new_id(), "company_id": company_id, "created_at": ts, "updated_at": ts,
-            "created_by": user["id"] if user else "system", "is_active": True, "deleted_at": None, "version": 1}
 
 
 class ListParams:
@@ -188,7 +167,7 @@ async def paginate(coll, query: dict, params: ListParams, sort, projection: dict
         import copy
 
         from services import ttlcache
-        ck = f"list:{coll.name}:{hashlib.md5(repr((query, sort, proj, params.page_size, params.with_total)).encode()).hexdigest()}"
+        ck = f"list:{coll.name}:{hashlib.sha256(repr((query, sort, proj, params.page_size, params.with_total)).encode()).hexdigest()}"
         return copy.deepcopy(await ttlcache.cached(ck, 5, lambda: _page(coll, query, params, sort, proj, budget_ms)))  # callers shape/enrich in place; never leak one viewer's shaping to another
     return await _page(coll, query, params, sort, proj, budget_ms)
 

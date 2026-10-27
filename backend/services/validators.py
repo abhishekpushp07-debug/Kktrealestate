@@ -29,15 +29,28 @@ SCHEMAS = {
 }
 
 
+# Phase K money invariants ($expr) — merged with SCHEMAS by both apply_validators() and invariants.ensure_invariants()
+MONEY_NN = {"bsonType": ["int", "long"], "minimum": 0}
+
+VALIDATORS = {
+    "bookings": {"$jsonSchema": {"bsonType": "object", "properties": {"agreement_value_paise": MONEY_NN, "cash_agreed_paise": MONEY_NN, "account_agreed_paise": MONEY_NN}},
+                 # cash + account == agreement, expressed with $expr (ints only)
+                 "$expr": {"$or": [{"$not": [{"$isNumber": "$agreement_value_paise"}]}, {"$eq": [{"$add": ["$cash_agreed_paise", "$account_agreed_paise"]}, "$agreement_value_paise"]}]}},
+    "payments": {"$jsonSchema": {"bsonType": "object", "required": ["amount_paise"], "properties": {"amount_paise": {"bsonType": ["int", "long"], "minimum": 1}}}},
+    "demands": {"$jsonSchema": {"bsonType": "object", "properties": {"total_demand_paise": MONEY_NN, "cash_demand_paise": MONEY_NN, "account_demand_paise": MONEY_NN, "paid_paise": MONEY_NN}},
+                "$expr": {"$or": [{"$not": [{"$isNumber": "$cash_demand_paise"}]}, {"$not": [{"$isNumber": "$account_demand_paise"}]}, {"$eq": [{"$add": ["$cash_demand_paise", "$account_demand_paise"]}, "$total_demand_paise"]}]}},
+}
+
+
+
 async def apply_validators() -> dict:
     """collMod each collection with its $jsonSchema (creating empty collections if needed). Safe on Atlas; idempotent."""
     out = {}
     existing = set(await db.list_collection_names())
     for name, schema in SCHEMAS.items():
         validator = {"$jsonSchema": {"bsonType": "object", **schema}}
-        from services.invariants import VALIDATORS as _INV  # Phase K: keep money $expr invariants when re-applying schemas
-        if name in _INV and "$expr" in _INV[name]:
-            validator = {"$and": [validator, {"$expr": _INV[name]["$expr"]}]}
+        if name in VALIDATORS and "$expr" in VALIDATORS[name]:  # Phase K: keep money $expr invariants when re-applying schemas
+            validator = {"$and": [validator, {"$expr": VALIDATORS[name]["$expr"]}]}
         try:
             if name not in existing:
                 await db.create_collection(name, validator=validator, validationLevel="moderate", validationAction="error")

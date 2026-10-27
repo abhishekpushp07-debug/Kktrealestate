@@ -12,20 +12,9 @@ from pymongo import ASCENDING
 from pymongo.errors import OperationFailure
 
 from db import db
+from services.validators import SCHEMAS, VALIDATORS  # noqa: F401 — VALIDATORS re-exported (money $expr invariants live beside SCHEMAS)
 
 log = logging.getLogger("invariants")
-MONEY = {"bsonType": ["int", "long"], "minimum": 0}
-
-VALIDATORS = {
-    "bookings": {"$jsonSchema": {"bsonType": "object", "properties": {"agreement_value_paise": MONEY, "cash_agreed_paise": MONEY, "account_agreed_paise": MONEY}},
-                 # cash + account == agreement, expressed with $expr (ints only)
-                 "$expr": {"$or": [{"$not": [{"$isNumber": "$agreement_value_paise"}]}, {"$eq": [{"$add": ["$cash_agreed_paise", "$account_agreed_paise"]}, "$agreement_value_paise"]}]}},
-    "payments": {"$jsonSchema": {"bsonType": "object", "required": ["amount_paise"], "properties": {"amount_paise": {"bsonType": ["int", "long"], "minimum": 1}}}},
-    "demands": {"$jsonSchema": {"bsonType": "object", "properties": {"total_demand_paise": MONEY, "cash_demand_paise": MONEY, "account_demand_paise": MONEY, "paid_paise": MONEY}},
-                "$expr": {"$or": [{"$not": [{"$isNumber": "$cash_demand_paise"}]}, {"$not": [{"$isNumber": "$account_demand_paise"}]}, {"$eq": [{"$add": ["$cash_demand_paise", "$account_demand_paise"]}, "$total_demand_paise"]}]}},
-}
-
-
 async def ensure_invariants() -> dict:
     out = {"indexes": [], "validators": []}
     specs = [
@@ -48,7 +37,7 @@ async def ensure_invariants() -> dict:
         await db.idempotency_claims.create_index("created_at", expireAfterSeconds=24 * 3600, name="ttl_idem_claims")
     except OperationFailure:
         pass
-    from services.validators import SCHEMAS  # merge: schema (existing) AND money invariants ($expr) — never replace the schema validator
+    # merge: schema (existing) AND money invariants ($expr) — never replace the schema validator
     for coll, rule in VALIDATORS.items():
         schema = {"$jsonSchema": {"bsonType": "object", **SCHEMAS[coll]}} if coll in SCHEMAS else rule.get("$jsonSchema") and {"$jsonSchema": rule["$jsonSchema"]}
         parts = [p for p in (schema, {"$expr": rule["$expr"]} if "$expr" in rule else None) if p]

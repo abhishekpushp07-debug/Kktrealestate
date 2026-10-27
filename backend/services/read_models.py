@@ -1,15 +1,17 @@
 """Derived read models (recomputable, never a source of truth):
    project_summaries, block_summaries, customer_summaries, dashboard_snapshots.
    Maintained by the event bus (debounced ≤2 s) + a 60 s sweep; `recompute_all()` rebuilds everything."""
-from services import clock
 import asyncio
 import hashlib
 import logging
-from datetime import UTC, date, datetime, timedelta
+from datetime import datetime, timedelta
 
+from core.jobs import timed_job
+from core.money import money_snapshot
+from core.types import now_iso
 from db import db
-from events import bus
-from utils import now_iso
+from events import bus, reconcile_outbox
+from services import clock
 
 log = logging.getLogger("kkt.readmodels")
 _dirty = {"projects": set(), "blocks": set(), "customers": set(), "all": False, "task": None}
@@ -86,29 +88,7 @@ async def _on_change(evt: dict):
 
 
 # ---------- computations ----------
-async def _money(match: dict) -> dict:
-    from services.definitions import cleared_payments_match, live_bookings_match, overdue_demands_match
-    today = clock.today().isoformat()
-    month = today[:7]
-    agg = await db.bookings.aggregate([{"$match": live_bookings_match(match)}, {"$group": {"_id": None, "n": {"$sum": 1}, "agreed": {"$sum": "$agreement_value_paise"}, "paid": {"$sum": "$summary.paid_paise"},
-                                                                                                             "cash_due": {"$sum": {"$max": ["$summary.cash_due_paise", 0]}}, "acc_due": {"$sum": {"$max": ["$summary.account_due_paise", 0]}}, "oc_due": {"$sum": {"$max": ["$summary.other_charges_due_paise", 0]}},
-                                                                                                             "outstanding": {"$sum": {"$ifNull": ["$summary.outstanding_paise", {"$add": [{"$max": ["$summary.cash_due_paise", 0]}, {"$max": ["$summary.account_due_paise", 0]}, {"$max": ["$summary.other_charges_due_paise", 0]}]}]}},
-                                                                                                             "advance": {"$sum": {"$ifNull": ["$summary.advance_paise", 0]}},
-                                                                                                             "oc_paid": {"$sum": "$summary.other_charges_paid_paise"}, "pending": {"$sum": "$summary.pending_cheques_paise"}}}]).to_list(1)
-    a = agg[0] if agg else {}
-    col = await db.payments.aggregate([{"$match": cleared_payments_match(match)}, {"$group": {"_id": None, "total": {"$sum": "$amount_paise"}, "mtd": {"$sum": {"$cond": [{"$eq": [{"$substr": ["$payment_date", 0, 7]}, month]}, "$amount_paise", 0]}}}}]).to_list(1)
-    c = col[0] if col else {}
-    from services.definitions import ageing_for_bookings, overdue_of
-    od = await db.demands.aggregate([{"$match": overdue_demands_match(extra=match)}, {"$group": {"_id": None, "n": {"$sum": 1}}}]).to_list(1)
-    bands, _ = await ageing_for_bookings(match)
-    o = {"n": od[0]["n"] if od else 0, "amt": overdue_of(bands)}
-    rf = await db.refunds.aggregate([{"$match": {**match, "status": "Paid"}}, {"$group": {"_id": None, "s": {"$sum": "$amount_paise"}}}]).to_list(1)
-    return {"bookings": a.get("n", 0), "agreement_paise": a.get("agreed", 0), "paid_paise": a.get("paid", 0) + a.get("oc_paid", 0), "collections_total_paise": c.get("total", 0), "collections_mtd_paise": c.get("mtd", 0),
-            "outstanding": {"cash_paise": a.get("cash_due", 0), "account_paise": a.get("acc_due", 0), "other_charges_paise": a.get("oc_due", 0), "total_paise": a.get("outstanding", 0)},
-            "advance_paise": a.get("advance", 0), "refunds_paid_paise": (rf[0]["s"] if rf else 0),
-            "overdue": {"count": o.get("n", 0), "amount_paise": o.get("amt", 0)}, "pending_cheques_paise": a.get("pending", 0)}
-
-
+_money = money_snapshot  # kept name: read-model internals call _money
 async def _units(match: dict) -> dict:
     rows = await db.flats.aggregate([{"$match": {**match, "is_active": True}}, {"$group": {"_id": "$status", "n": {"$sum": 1}, "value": {"$sum": {"$ifNull": ["$price", 0]}}}}]).to_list(None)
     by = {r["_id"]: r["n"] for r in rows}
@@ -190,7 +170,7 @@ async def refresh_customer(customer_id: str) -> dict | None:
 
 
 def scope_hash(scope: list[str] | None) -> str:
-    return "*" if not scope or "*" in scope else hashlib.md5(",".join(sorted(scope)).encode()).hexdigest()[:12]
+    return "*" if not scope or "*" in scope else hashlib.sha256(",".join(sorted(scope)).encode()).hexdigest()[:12]
 
 
 async def refresh_dashboards():
@@ -244,9 +224,7 @@ async def sweep_loop():
         await asyncio.sleep(60)
         try:
             stale = now_iso()
-            from infra import timed_job
             await timed_job("read_model_flush", flush)
-            from events import reconcile_outbox
             await timed_job("outbox_reconcile", reconcile_outbox)
             for p in await db.project_summaries.find({"computed_at": {"$lt": (clock.now() - timedelta(minutes=10)).isoformat()}}, {"_id": 0, "project_id": 1}).to_list(50):
                 await refresh_project(p["project_id"])

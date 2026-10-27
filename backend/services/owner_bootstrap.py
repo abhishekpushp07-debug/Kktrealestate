@@ -5,6 +5,7 @@ import os
 
 from fastapi import Request
 
+from core.passwords import hash_password, validate_password_policy
 from db import db
 from utils import base_doc, now_iso
 
@@ -43,7 +44,6 @@ async def ensure_owner() -> str:
     role = await db.roles.find_one({"name": "Super Admin", "is_system": True}, {"_id": 0, "id": 1})
     if not company or not role:
         return "deferred"  # fresh DB: seed_if_empty has not run yet; retried after seeding
-    from routers.auth import hash_password, validate_password_policy
     try:
         validate_password_policy(password)
     except ValueError as e:
