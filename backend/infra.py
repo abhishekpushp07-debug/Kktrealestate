@@ -142,7 +142,7 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
         acc = [0.0, 0]
         token = DB_MS.set(acc)
         try:
-            budget = 900.0 if request.url.path.endswith("/complete") and "/api/uploads/" in request.url.path else REQUEST_TIMEOUT_S
+            budget = 900.0 if "/api/uploads/" in request.url.path and ("/parts/" in request.url.path or request.url.path.endswith("/complete")) else REQUEST_TIMEOUT_S
             response = await asyncio.wait_for(call_next(request), timeout=budget)
         except asyncio.TimeoutError:
             logger.error(json.dumps({"request_id": rid, "path": request.url.path, "error": "timeout"}))

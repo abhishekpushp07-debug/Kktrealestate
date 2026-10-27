@@ -230,8 +230,8 @@ def test_notifications_website_enquiry(client, sales, marketing, accounts):
     # accounts should not get lead.create
     assert not any(i.get("kind") == "lead.create" for i in a_items), "accounts should not get lead.create"
 
-    lead_notif = next((i for i in s_items if i.get("kind") == "lead.create"), None)
-    assert lead_notif, "no lead.create for sales"
+    lead_notif = next((i for i in s_items if i.get("kind") == "lead.create" and "New website enquiry" in (i.get("title") or "")), None)  # other workers create non-website leads concurrently
+    assert lead_notif, "no website lead.create for sales"
     assert "New website enquiry" in (lead_notif.get("title") or "")
 
     # mark read
