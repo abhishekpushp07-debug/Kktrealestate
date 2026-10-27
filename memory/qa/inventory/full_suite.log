@@ -4,17 +4,83 @@ bringing up nodes...
 ........................................................................ [ 12%]
 ........................................................................ [ 25%]
 ........................................................................ [ 37%]
-.......................................................................s [ 50%]
-........................................................................ [ 63%]
-............................................F........................... [ 75%]
+........................................................................ [ 50%]
+........................................................s............... [ 63%]
+......F................................................................. [ 75%]
 ........................................................................ [ 88%]
-....../root/.venv/lib/python3.11/site-packages/_pytest/main.py:365: PluggyTeardownRaisedWarning: A plugin raised an exception during an old-style hookwrapper teardown.
-Plugin: 280995897767120, Hook: pytest_sessionfinish
-OSError: cannot send (already closed?)
-For more information see https://pluggy.readthedocs.io/en/stable/api_reference.html#pluggy.PluggyTeardownRaisedWarning
-  config.hook.pytest_sessionfinish(
-/root/.venv/lib/python3.11/site-packages/_pytest/main.py:365: PluggyTeardownRaisedWarning: A plugin raised an exception during an old-style hookwrapper teardown.
-Plugin: 278705172411600, Hook: pytest_sessionfinish
-OSError: cannot send (already closed?)
-For more information see https://pluggy.readthedocs.io/en/stable/api_reference.html#pluggy.PluggyTeardownRaisedWarning
-  config.hook.pytest_sessionfinish(
+...............................s...................................      [100%]
+=================================== FAILURES ===================================
+______________________ test_owner_flow_udhar_jama_balance ______________________
+[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
+
+ctx = {'admin': {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mY...5b57aa', 'created_at': '2026-10-27T11:18:58.581052+00:00', 'updated_at': '2026-10-27T11:18:58.581052+00:00', ...}, ...}
+
+    def test_owner_flow_udhar_jama_balance(ctx):
+        h = ctx["admin"]
+        b = _book(ctx)
+        ctx["booking"] = b
+        led = _get(h, f"/bookings/{b['id']}/ledger")
+        rows = led["rows"]
+        assert rows and rows[0]["type"] == "DEMAND" and rows[0]["udhar_paise"] > 0 and rows[0]["jama_paise"] == 0  # Booking row
+        bal0 = rows[-1]["balance_paise"]
+        # construction update: stage 2 (first real stage) — preview then confirm
+        stage = _get(h, f"/blocks/{ctx['tower']['id']}/construction")["stages"][1]
+        pv = _get(h, f"/blocks/{ctx['tower']['id']}/stages/{stage['stage_id']}/preview")
+        assert pv["bookings_count"] >= 1 and pv["stage_plan_name"] == "zed" and pv["total_paise"] > 0
+        mine = next(x for x in pv["bookings"] if x["booking_id"] == b["id"])
+        pct = next(i["percent"] for i in ctx["plan"]["installments"] if i.get("trigger_stage_id") == stage["stage_id"])
+        assert mine["total_paise"] == round(b["cash_agreed_paise"] * pct / 100) + round(b["account_agreed_paise"] * pct / 100)
+        r = requests.post(f"{BASE}/blocks/{ctx['tower']['id']}/construction/stage", headers=h, json={"stage_id": stage["stage_id"], "completed_on": "2026-10-25"}, timeout=60)
+        assert r.status_code == 200, r.text
+        assert r.json()["demands_raised"] >= 1
+        led = _get(h, f"/bookings/{b['id']}/ledger")
+        dem = [x for x in led["rows"] if x["type"] == "DEMAND"]
+        assert len(dem) == 2 and stage["name"] in dem[-1]["note"] and dem[-1]["udhar_paise"] == mine["total_paise"]
+        assert led["rows"][-1]["balance_paise"] == bal0 + mine["total_paise"]
+        # Jama: post a cash receipt
+        modes = {m["code"]: m for m in _get(h, "/master/payment-modes", page_size=50)["items"]}
+        r = requests.post(f"{BASE}/payments", headers={**h, "Idempotency-Key": str(uuid.uuid4())}, json={"booking_id": b["id"], "amount": 100_000, "payment_mode_id": modes["CASH"]["id"], "payment_category": "Cash", "payment_date": "2026-10-26"}, timeout=60)
+        assert r.status_code == 201, r.text
+        led = _get(h, f"/bookings/{b['id']}/ledger")
+        jama = [x for x in led["rows"] if x["type"] == "PAYMENT"]
+>       assert jama and jama[-1]["jama_paise"] == 1_00_000_00 and jama[-1]["mode"] == "Cash"
+E       AssertionError: assert ([{'id': '21ac5bde-5e3f-4527-a54d-a3633b4ddf45', 'booking_id': '6e64fdf4-c7b8-4054-99c1-e6336c3aad06', 'seq': 3, 'at': ...c7c45', 'booking_id': '6e64fdf4-c7b8-4054-99c1-e6336c3aad06', 'seq': 4, 'at': '2026-10-27T11:19:00.359921+00:00', ...}] and 50000 == 10000000)
+
+tests/test_phase_m_masters.py:154: AssertionError
+=============================== warnings summary ===============================
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+  /root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+tests/test_phase_k_p1.py::test_loadshed_sheds_with_prebuilt_503_and_exempts_probes
+  /root/.venv/lib/python3.11/site-packages/starlette/testclient.py:41: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    [], typing.ContextManager[anyio.abc.BlockingPortal]
+
+tests/test_kkt_erp.py::TestBlock::test_create_block_and_generation
+tests/test_kkt_erp.py::TestFlatType::test_create_flat_type_auto_area
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+  /root/.venv/lib/python3.11/site-packages/_pytest/fixtures.py:1313: PytestRemovedIn10Warning: Class-scoped fixture defined as instance method is deprecated.
+  Instance attributes set in this fixture will NOT be visible to test methods,
+  as each test gets a new instance while the fixture runs only once per class.
+  Use @classmethod decorator and set attributes on cls instead.
+  See https://docs.pytest.org/en/stable/deprecations.html#class-scoped-fixture-as-instance-method
+    fixturefunc = resolve_fixture_function(fixturedef, request)
+
+tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources
+  /root/.venv/lib/python3.11/site-packages/_pytest/python.py:171: PytestReturnNotNoneWarning: Test functions should return None, but tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources returned <class 'str'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_phase_m_masters.py::test_owner_flow_udhar_jama_balance - As...
+1 failed, 568 passed, 2 skipped, 10 warnings in 501.97s (0:08:21)
+SUITE_EXIT 1

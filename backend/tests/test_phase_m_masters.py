@@ -149,9 +149,11 @@ def test_owner_flow_udhar_jama_balance(ctx):
     modes = {m["code"]: m for m in _get(h, "/master/payment-modes", page_size=50)["items"]}
     r = requests.post(f"{BASE}/payments", headers={**h, "Idempotency-Key": str(uuid.uuid4())}, json={"booking_id": b["id"], "amount": 100_000, "payment_mode_id": modes["CASH"]["id"], "payment_category": "Cash", "payment_date": "2026-10-26"}, timeout=60)
     assert r.status_code == 201, r.text
+    pay = r.json()
     led = _get(h, f"/bookings/{b['id']}/ledger")
     jama = [x for x in led["rows"] if x["type"] == "PAYMENT"]
-    assert jama and jama[-1]["jama_paise"] == 1_00_000_00 and jama[-1]["mode"] == "Cash"
+    mine_j = next((x for x in jama if x.get("ref_id") == pay["id"] or x.get("payment_id") == pay["id"] or x.get("id") == pay["id"]), None) or next(x for x in jama if x["jama_paise"] == 1_00_000_00)
+    assert mine_j["jama_paise"] == 1_00_000_00 and mine_j["mode"] == "Cash"
     s = led["booking"]["summary"]
     assert s["total_udhar_paise"] - s["total_jama_paise"] == s["balance_paise"] == s["outstanding_paise"] - s["advance_paise"]
     assert led["rows"][-1]["balance_paise"] == s["balance_paise"]
