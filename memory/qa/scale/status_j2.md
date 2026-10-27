@@ -36,5 +36,5 @@ Root causes found with tracemalloc + gc walk (`KKT_TRACEMALLOC=1`):
 - Playwright proof: `j4_upload_progress.jpeg` (4 files 0 %→100 %), `j4_gallery_thumbs.jpeg`, `j4_gallery_and_docs.jpeg` (3 thumbnails + deed.pdf row), `j4_lightbox_large.jpeg` (large variant URL `/api/files/variants/<sha256>.webp`), download event `deed.pdf` via signed link, `j2_system_health_storage.jpeg`.
 
 ## 3. Gate
-- Full suite: see commit log / final message (one clean pass required; flaky tests made deterministic: integrity read-skew re-check, live-total cursor bound, audit-archive ≥, forced startup in idempotence test).
+- Full suite: **548 passed, 2 skipped, 0 failed** (kkt_test, 4 workers, 377 s) — memory/qa/scale/full_suite_j2.log. Flaky tests made deterministic (integrity read-skew re-check, live-total cursor bound, audit-archive ≥, startup-lease race in the idempotence test).
 - Registry: `routes 270 unmapped []`. Health 0.19 s. Deployment agent: WARN only (empty CORS_ORIGINS = intentional same-origin). Headline numbers test included in the suite.
