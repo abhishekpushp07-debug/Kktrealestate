@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useFetch } from "@/hooks/useList";
 import { fmtDate, fmtRelative, inr, inrShort } from "@/lib/format";
 import { Card, EmptyState, EntityCard, IconTile, Num, SegmentBar, Skeleton, SkeletonCards, StatTile, Timeline } from "@/components/v2";
+import { TrendSpark, monthLabel } from "@/components/common/TrendSpark";
 
 const greet = () => { const h = new Date().getHours(); return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening"; };
 const tip = { contentStyle: { borderRadius: 12, border: "1px solid #EAE4D8", boxShadow: "0 8px 24px rgba(20,16,8,.08)", fontSize: 12 }, formatter: (v) => inr(v) };
@@ -27,6 +28,7 @@ function Attention({ a }) {
 export default function Home() {
   const { user } = useAuth();
   const { data, loading } = useFetch("/dashboard/home");
+  const { data: trends } = useFetch("/trends?scope=company&months=12");
   const first = (user?.name || "").split(" ")[0];
   const t = data?.totals, c = data?.counts;
   return (
@@ -45,6 +47,12 @@ export default function Home() {
           <StatTile label="Collected this month" value={inrShort(t.collections_mtd_paise / 100)} hint={`${inrShort(t.outstanding_paise / 100)} outstanding${t.advance_paise ? ` · advance held ${inrShort(t.advance_paise / 100)}` : ""}`} icon={Wallet} iconTone="gold" testId="tile-collections" />
         </>}
       </section>
+      {trends && <section className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4" data-testid="trend-row">
+        {[["Collected", "collections", true, (m) => `/reports/collections-v2?date_from=${m}-01&date_to=${m}-31`, "tile-trend-collected"], ["Outstanding (month end)", "outstanding_eom", true, (m) => `/reports/outstanding-v2?date_to=${m}-31`, "tile-trend-outstanding"], ["Demands raised", "demands", true, (m) => `/demands?basis=raised&date_from=${m}-01&date_to=${m}-31`, "tile-trend-demands"], ["Bookings", "bookings", false, (m) => `/bookings?date_from=${m}-01&date_to=${m}-31`, "tile-trend-bookings"]].map(([label, k, money, link, tid]) => {
+          const v = trends[k] || [], last = v[v.length - 1] || 0, prev = v[v.length - 2] || 0, delta = prev ? Math.round(((last - prev) / prev) * 100) : null;
+          return <Card key={k} className="flex items-center justify-between gap-4 !p-5" testId={tid}><div className="min-w-0"><p className="stat-label">{label} · {monthLabel(trends.months[trends.months.length - 1])}</p><p className="stat-value font-display text-ink-950">{money ? inrShort(last / 100) : last}</p><p className="stat-hint">{delta == null ? "12-month trend" : `${delta >= 0 ? "▲" : "▼"} ${Math.abs(delta)}% vs ${monthLabel(trends.months[trends.months.length - 2])}`}</p></div><TrendSpark months={trends.months} values={v} money={money} label={label} linkFor={link} testId={`${tid}-spark`} /></Card>;
+        })}
+      </section>}
       <section>
         <div className="mb-4 flex items-center justify-between"><h2 className="font-display text-2xl">Projects</h2><Link to="/projects" className="flex items-center gap-1 text-sm font-semibold text-ink-950 hover:text-gold" data-testid="home-all-projects">All projects <ArrowRight className="h-4 w-4" /></Link></div>
         {loading ? <SkeletonCards n={2} /> : <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3" data-testid="projects-strip">{data.projects.map((p) => <EntityCard key={p.project_id} to={`/projects/${p.project_id}`} cover={p.cover_image_url || null} initialsOf={p.name} title={p.name} subtitle={[p.city, `${p.towers} towers · ${p.units.total} units`].filter(Boolean).join(" · ")} status={p.status} progress={p.progress_pct} counts={p.units.by_status} money={[{ label: "Collected", value: p.paid_paise / 100 }, { label: "Outstanding", value: p.outstanding.total_paise / 100, tone: p.outstanding.total_paise ? "brick" : "sage" }]} testId={`project-card-${p.code}`} />)}</div>}

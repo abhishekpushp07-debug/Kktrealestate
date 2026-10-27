@@ -9,7 +9,7 @@ export const MASTER_GROUPS = [
   { label: "Finance", items: [["Payment Plans", "/masters/payment-plans", "masters.payment_plan.view"], ["Charge types", "/masters/m/charge-types", "masters.charge_type.view"], ["Bank accounts", "/masters/m/bank-accounts", "masters.bank_account.view"], ["Payment modes", "/masters/m/payment-modes", "masters.payment_mode.view"], ["Cancellation / Bounce policy defaults", "/settings?tab=policies", "admin.settings.view"]] },
   { label: "Sales", items: [["Lead sources & stages", "/settings?tab=sales", "admin.settings.view"], ["Catalogues (brochures)", "/catalogues", "masters.catalogue.view"]] },
   { label: "Service", items: [["Categories & SLA targets", "/settings?tab=service", "admin.settings.view"]] },
-  { label: "Documents & Notices", items: [["Company & letterhead", "/masters/company", "masters.company.view"], ["Document types", "/masters/m/document-types", "masters.document_type.view"], ["Notice templates", "/website/notices", "website.cms.view"]] },
+  { label: "Documents & Notices", items: [["Company & letterhead", "/masters/company", "masters.company.view"], ["Message templates", "/masters/templates", "masters.template.view"], ["Document types", "/masters/m/document-types", "masters.document_type.view"], ["Notice templates", "/website/notices", "website.cms.view"]] },
   { label: "People", items: [["Users", "/users", "admin.user.view"], ["Roles", "/admin/access-control", "admin.access_control.manage"]] },
 ];
 

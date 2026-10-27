@@ -17,6 +17,8 @@ const Catalogues = lazy(() => import("@/pages/v2/Catalogues"));
 const BlockDetail = lazy(() => import("@/pages/BlockDetail"));
 const DocumentsPage = lazy(() => import("@/pages/v2/Documents"));
 const DemandsPage = lazy(() => import("@/pages/v2/Demands"));
+const MessagingPage = lazy(() => import("@/pages/v2/Messaging"));
+const TemplatesMaster = lazy(() => import("@/pages/masters/Templates"));
 const Flats = lazy(() => import("@/pages/Flats"));
 const MasterPage = lazy(() => import("@/pages/master/MasterPage"));
 const MastersHub = lazy(() => import("@/pages/masters/MastersHub"));
@@ -79,7 +81,7 @@ function PrintGuard({ children }) {
 const R = [
   ["website/settings", "website.cms.edit", SiteSettingsPage], ["website/notices", "website.cms.view", Notices], ["website/:coll", "website.cms.view", CmsCollection], ["dashboard", "masters.project.view", Dashboard], ["projects", "masters.project.view", Projects], ["projects/new", "masters.project.create", ProjectSetup], ["projects/:id/setup", "masters.project.edit", ProjectSetup], ["projects/:id", "masters.project.view", ProjectDetail], ["settings/catalogues", "masters.catalogue.view", Catalogues], ["blocks/:id", "masters.project.view", BlockDetail], ["flats", "masters.project.view", Flats],
 ["users", "admin.user.view", Users], ["admin/access-control", "admin.access_control.manage", AccessControl], ["admin/audit-logs", "admin.audit.view", AuditLog], ["roles", "admin.role.view", Roles], ["audit", "admin.audit.view", AuditLog], ["settings", "admin.settings.view", Settings], ["settings/definitions", "masters.project.view", Definitions], ["customers", "sales.customer.view", Customers], ["customers/new", "sales.customer.create", CustomerForm], ["customers/:id/edit", "sales.customer.edit", CustomerForm], ["customers/:id", "sales.customer.view", CustomerDetail], ["leads", "sales.lead.view", Leads],
-  ["bookings", "sales.booking.view", Bookings], ["bookings/new", "sales.booking.create", BookingWizard], ["bookings/:id", "sales.booking.view", BookingDetail], ["payments", "finance.payment.view", Payments], ["documents", "documents.document.view", DocumentsPage], ["demands", "demands.register.view", DemandsPage], ["roznamcha", "finance.roznamcha.view", Roznamcha], ["reports/exports", "reports.*", Exports], ["reports", "reports.*", Reports], ["reports/:key", "reports.*", Reports], ["service-requests", "service.ticket.view", ServiceRequests], ["service-requests/:id", "service.ticket.view", ServiceRequests],
+  ["bookings", "sales.booking.view", Bookings], ["bookings/new", "sales.booking.create", BookingWizard], ["bookings/:id", "sales.booking.view", BookingDetail], ["payments", "finance.payment.view", Payments], ["documents", "documents.document.view", DocumentsPage], ["demands", "demands.register.view", DemandsPage], ["messaging", "messaging.message.view", MessagingPage], ["roznamcha", "finance.roznamcha.view", Roznamcha], ["reports/exports", "reports.*", Exports], ["reports", "reports.*", Reports], ["reports/:key", "reports.*", Reports], ["service-requests", "service.ticket.view", ServiceRequests], ["service-requests/:id", "service.ticket.view", ServiceRequests],
 ];
 
 function MasterKindRedirect() { const { kind } = useParams(); return <Navigate to={`/masters/m/${kind}`} replace />; }
@@ -101,6 +103,7 @@ export default function ErpApp() {
             <Route path="flats" element={<Guard perm="masters.flat.view"><FlatsMaster /></Guard>} />
             <Route path="projects" element={<Guard perm="masters.project.view"><ProjectsMaster /></Guard>} />
             <Route path="company" element={<Guard perm="masters.company.view"><CompanyMaster /></Guard>} />
+            <Route path="templates" element={<Guard perm="masters.template.view"><TemplatesMaster /></Guard>} />
             <Route path="payment-plans" element={<Guard perm="masters.payment_plan.view"><PaymentPlans /></Guard>} />
             <Route path="rate-cards" element={<Navigate to="/projects" replace />} />
           </Route>

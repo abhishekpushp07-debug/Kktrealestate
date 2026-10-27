@@ -1,7 +1,7 @@
 import monogram from "@/assets/kkt-monogram.svg";
 import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { BarChart3, Building2, ChevronLeft, ChevronRight, Database, Files, FileSignature, FileText, Funnel, Globe, HardHat, Home, KeyRound, LifeBuoy, LogOut, Menu, Plus, Receipt, Search, Settings, UserRound, X } from "lucide-react";
+import { Send, BarChart3, Building2, ChevronLeft, ChevronRight, Database, Files, FileSignature, FileText, Funnel, Globe, HardHat, Home, KeyRound, LifeBuoy, LogOut, Menu, Plus, Receipt, Search, Settings, UserRound, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { initials } from "@/lib/format";
@@ -24,6 +24,7 @@ const NAV = [
   { to: "/payments", label: "Payments", icon: Receipt, perm: "finance.payment.view", match: ["/payments", "/roznamcha"] },
   { to: "/demands", label: "Demands", icon: FileText, perm: "demands.register.view", match: ["/demands"] },
   { to: "/documents", label: "Documents", icon: Files, perm: "documents.document.view", match: ["/documents"] },
+  { to: "/messaging", label: "Messaging", icon: Send, perm: "messaging.message.view", match: ["/messaging"] },
   { to: "/service-requests", label: "Service", icon: LifeBuoy, perm: "service.ticket.view", match: ["/service-requests"] },
   { to: "/reports", label: "Reports", icon: BarChart3, perm: "reports.*", match: ["/reports"] },
   { to: "/website/settings", label: "Website", icon: Globe, perm: "website.cms.view", match: ["/website"], surface: "public_website" },

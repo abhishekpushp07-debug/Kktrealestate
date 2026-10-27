@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Field } from "@/components/common/Bits";
 import { HistoryButton } from "@/components/common/HistoryTimeline";
 import { uploadResumable } from "@/components/common/ResumableUpload";
+import { ReminderSettings } from "@/components/common/ReminderSettings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -70,6 +71,7 @@ export default function CompanyMaster() {
         <Field label="Tagline"><Input value={c.letterhead_tagline || ""} onChange={(e) => set("letterhead_tagline", e.target.value)} disabled={!canEdit} data-testid="co-tagline" /></Field>
       </section>
       <section className="space-y-3"><h2 className="text-base font-bold text-ink-950">Logo</h2><LogoControl fileId={c.logo_file_id} onChange={(id) => set("logo_file_id", id)} canEdit={canEdit} /></section>
+      <div className="border-t border-warm-100 pt-6"><ReminderSettings canEdit={canEdit} /></div>
       <section className="grid gap-4 md:grid-cols-2">
         <Field label="Authorised signatory — name"><Input value={c.authorised_signatory_name || ""} onChange={(e) => set("authorised_signatory_name", e.target.value)} disabled={!canEdit} data-testid="co-signatory" /></Field>
         <Field label="Authorised signatory — designation"><Input value={c.authorised_signatory_designation || ""} onChange={(e) => set("authorised_signatory_designation", e.target.value)} placeholder="Authorised Signatory" disabled={!canEdit} data-testid="co-designation" /></Field>

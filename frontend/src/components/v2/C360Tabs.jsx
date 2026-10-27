@@ -6,6 +6,7 @@ import { BASE_PATH } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { fmtDate, fmtDateTime, inr, inrShort } from "@/lib/format";
 import { Card, EmptyState, Skeleton, StatusPill } from "@/components/v2";
+import { SendReminderButton } from "@/components/common/SendReminderButton";
 
 const KIND_LABEL = { transfer: "Transfers", booking: "Bookings", payment: "Payments", demand: "Demands", lead: "Leads", visit: "Visits", service: "Tickets", refund: "Refunds", milestone: "Stages", document: "Documents", customer: "Profile", notice: "Notices", portal: "Portal" };
 const titleOf = (e) => { const a = e.after || {}; return [e.action.replace(/[._]/g, " "), a.receipt_number || a.demand_number || a.refund_number || a.booking_number || a.number || ""].filter(Boolean).join(" · "); };
@@ -41,6 +42,7 @@ export function BookingRich({ b, plan, can, onPay }) {
         {can("finance.payment.create") && b.status === "Active" && <button onClick={onPay} className="btn btn-primary btn-sm" data-testid={`bc-pay-${b.booking_number}`}><Receipt className="h-3.5 w-3.5" />Post payment</button>}
         {can("finance.ledger.export") && <a href={`${BASE_PATH}/print/statement/${b.id}`} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm" data-testid={`bc-statement-${b.booking_number}`}><Printer className="h-3.5 w-3.5" />Statement</a>}
         {can("documents.document.generate") && <Link to={`/documents?booking_id=${b.id}&project_id=${b.project_id}&block_id=${b.block_id}&type=demand`} className="btn btn-secondary btn-sm" data-testid={`bc-demand-letters-${b.booking_number}`}><FileText className="h-3.5 w-3.5" />Demand letters</Link>}
+        {can("messaging.message.send") && b.status === "Active" && ps.overdue_count > 0 && <SendReminderButton bookingId={b.id} testId={`bc-remind-${b.booking_number}`} />}
         {can("sales.booking.edit") && b.status === "Active" && <Link to={`/bookings/${b.id}?action=transfer`} className="btn btn-ghost btn-sm">Transfer</Link>}
         {can("sales.booking.cancel") && b.status === "Active" && <Link to={`/bookings/${b.id}?action=cancel`} className="btn btn-ghost btn-sm text-brick">Cancel</Link>}
       </div>

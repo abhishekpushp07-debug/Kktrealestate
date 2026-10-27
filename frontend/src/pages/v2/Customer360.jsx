@@ -4,6 +4,7 @@ import { CompletenessRing } from "@/components/v2/Completeness";
 import { BadgeCheck, CalendarDays, Copy, FileText, LifeBuoy, Mail, MessageCircle, MessageSquare, Pencil, Phone, Plus, Printer, Receipt } from "lucide-react";
 import { toast } from "sonner";
 import { HistoryButton } from "@/components/common/HistoryTimeline";
+import { TrendSpark } from "@/components/common/TrendSpark";
 import api, { errMsg, BASE_PATH } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useFetch } from "@/hooks/useList";
@@ -21,8 +22,8 @@ const TABS = ["overview", "bookings", "ledger", "demands", "receipts", "construc
 const LABEL = { overview: "Overview", bookings: "Bookings", ledger: "Ledger", demands: "Demands", receipts: "Receipts & Documents", construction: "Construction", service: "Service", timeline: "Timeline", kyc: "KYC & Profile", coapplicants: "Co-applicants", notes: "Notes" };
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-"];
 
-function Tile({ label, value, hint, tone, testId }) {
-  return <div className={cn("rounded-2xl border border-warm-200 bg-white px-4 py-3 min-h-[88px]", tone === "brick" && "border-brick/30 bg-brick/5", tone === "sage" && "border-sage/30 bg-sage/5")} data-testid={testId}><p className="text-[11px] font-semibold uppercase tracking-wide text-txt-muted">{label}</p><p className={cn("mt-1 font-display text-[22px] leading-7 tabular-nums text-ink-950", tone === "brick" && "text-brick", tone === "sage" && "text-sage")}>{value}</p>{hint && <p className="mt-0.5 truncate text-[11px] text-txt-secondary">{hint}</p>}</div>;
+function Tile({ label, value, hint, tone, testId, spark }) {
+  return <div className={cn("rounded-2xl border border-warm-200 bg-white px-4 py-3 min-h-[88px]", tone === "brick" && "border-brick/30 bg-brick/5", tone === "sage" && "border-sage/30 bg-sage/5")} data-testid={testId}><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="text-[11px] font-semibold uppercase tracking-wide text-txt-muted">{label}</p><p className={cn("mt-1 font-display text-[22px] leading-7 tabular-nums text-ink-950", tone === "brick" && "text-brick", tone === "sage" && "text-sage")}>{value}</p>{hint && <p className="mt-0.5 truncate text-[11px] text-txt-secondary">{hint}</p>}</div>{spark}</div></div>;
 }
 
 export default function Customer360() {
@@ -40,6 +41,7 @@ export default function Customer360() {
   const setTab = useCallback((t) => { const n = new URLSearchParams(sp); n.set("tab", t); setSp(n, { replace: true }); }, [sp, setSp]);
   const inclCancelled = sp.get("cancelled") === "1";
   const panels = useFetch(`/customers/${id}/panels${inclCancelled ? "?include_cancelled=true" : ""}`);
+  const { data: tr } = useFetch(`/trends?scope=customer&id=${id}&months=12`);
   const P = panels.data;
   const load = useCallback((rev = false) => api.get(`/customers/${id}`, { params: { reveal: rev || undefined } }).then((r) => { if (r.data.id !== id) { nav(`/customers/${r.data.id}`, { replace: true }); return; } setC(r.data); setReveal(rev); }).catch((e) => toast.error(errMsg(e))), [id, nav]);
   useEffect(() => { load(false); }, [load]);
@@ -83,9 +85,9 @@ export default function Customer360() {
       <div className="grid grid-cols-3 gap-3 md:grid-cols-6" data-testid="key-strip">
         {!S ? [...Array(6)].map((_, i) => <Skeleton key={i} className="h-[88px] rounded-2xl" />) : <>
           <Tile label="Total agreement" value={inrShort(S.agreement_paise / 100)} hint={`${P.counts.bookings} ${inclCancelled ? "" : "live "}booking(s)`} testId="kn-agreement" />
-          <Tile label="Udhar (raised)" value={inrShort(S.udhar_paise / 100)} hint="all ledgers" testId="kn-udhar" />
-          <Tile label="Jama (received)" value={inrShort(S.jama_paise / 100)} hint={S.pending_cheques_paise > 0 ? `+ ${inrShort(S.pending_cheques_paise / 100)} cheques in hand` : "cleared"} tone="sage" testId="kn-jama" />
-          <Tile label="Net balance" value={inrShort(S.balance_paise / 100)} hint={S.balance_paise > 0 ? "receivable" : "nothing due"} tone={S.balance_paise > 0 ? undefined : "sage"} testId="kn-balance" />
+          <Tile label="Udhar (raised)" value={inrShort(S.udhar_paise / 100)} hint="all ledgers" testId="kn-udhar" spark={tr && <TrendSpark months={tr.months} values={tr.demands} label="Demands raised" w={64} h={26} linkFor={(m) => `/demands?customer=${c.customer_code}&basis=raised&date_from=${m}-01&date_to=${m}-31`} testId="kn-udhar-spark" />} />
+          <Tile label="Jama (received)" value={inrShort(S.jama_paise / 100)} hint={S.pending_cheques_paise > 0 ? `+ ${inrShort(S.pending_cheques_paise / 100)} cheques in hand` : "cleared"} tone="sage" testId="kn-jama" spark={tr && <TrendSpark months={tr.months} values={tr.collections} label="Collections" w={64} h={26} linkFor={(m) => `/payments?customer_id=${id}&date_from=${m}-01&date_to=${m}-31`} testId="kn-jama-spark" />} />
+          <Tile label="Net balance" value={inrShort(S.balance_paise / 100)} hint={S.balance_paise > 0 ? "receivable" : "nothing due"} tone={S.balance_paise > 0 ? undefined : "sage"} testId="kn-balance" spark={tr && <TrendSpark months={tr.months} values={tr.outstanding_eom} label="Outstanding at month end" w={64} h={26} testId="kn-balance-spark" />} />
           <Tile label="Advance held" value={inrShort(S.advance_paise / 100)} hint={S.advance_paise > 0 ? "paid ahead of demand" : "—"} tone={S.advance_paise > 0 ? "sage" : undefined} testId="kn-advance" />
           <Tile label="Overdue" value={inrShort(S.overdue_paise / 100)} hint={S.overdue_count ? `${S.overdue_count} demand(s) · oldest ${S.overdue_oldest_days} d` : "none"} tone={S.overdue_paise > 0 ? "brick" : "sage"} testId="kn-overdue" />
         </>}
