@@ -4,48 +4,11 @@ bringing up nodes...
 ........................................................................ [ 12%]
 ........................................................................ [ 25%]
 ........................................................................ [ 37%]
-.............................F...................................s...... [ 50%]
+........................................................................ [ 50%]
 ........................................................................ [ 63%]
-........................................................................ [ 75%]
+........s............................................................... [ 75%]
 ........................................................................ [ 88%]
-.............F.................s...................................      [100%]
-=================================== FAILURES ===================================
-______________ test_rate_card_create_activate_apply_to_available _______________
-[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
-
-admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDd...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDk0NzcwLCJleHAiOjE3OTMwOTU2NzB9.nrKj6dX8X0b5H88D6ChaQ4mOXyLCafR7YrsbDb-gJuM'}
-
-    def test_rate_card_create_activate_apply_to_available(admin_headers):
-        h = admin_headers
-        sgh = next(p for p in requests.get(f"{API}/projects", headers=h).json()["items"] if p["code"] == "SGH")
-        existing = requests.get(f"{API}/projects/{sgh['id']}/rate-cards", headers=h).json()["items"]
-        base = next((rc for rc in existing if rc["status"] == "Active"), existing[0])
-        body = {"rates": [{k: v for k, v in x.items() if k in ("flat_type_id", "rate_per_sqft", "lump_sum")} for x in base["rates"]], "plc_rules": [{k: v for k, v in x.items() if k in ("plc_type_id", "value", "applies", "floor_gte", "facings")} for x in base.get("plc_rules") or []]}
-        r = requests.post(f"{API}/projects/{sgh['id']}/rate-cards", headers=h, json={**body, "name": f"Story rewrite {uuid.uuid4().hex[:4]}", "effective_from": date.today().isoformat()})
-        assert r.status_code == 201, r.text
-        rc = r.json()
-        assert rc["status"] == "Draft"
-        assert requests.post(f"{API}/projects/{sgh['id']}/rate-cards/{rc['id']}/activate", headers=h).status_code == 200
-        avail = requests.get(f"{API}/flats?project_id={sgh['id']}&status=Available&page_size=1", headers=h).json()["total"]
-        ap = requests.post(f"{API}/projects/{sgh['id']}/rate-cards/{rc['id']}/apply", headers=h).json()
->       assert ap["flats_updated"] == avail, (ap, avail)
-E       AssertionError: ({'flats_updated': 37, 'skipped_no_rate': 0, 'include_non_saleable': False, 'untouched_non_available': 83}, 57)
-E       assert 37 == 57
-
-tests/test_story_behaviours.py:143: AssertionError
-______________________ test_snapshot_exists_and_not_stale ______________________
-[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
-
-    def test_snapshot_exists_and_not_stale():
-        assert os.path.exists(PATH), "missing backend/docs/openapi/v1.json — run: python -m tools.openapi_snapshot --write"
-        old, live = json.load(open(PATH)), _live()
-        assert not breaking_diff(old, live), breaking_diff(old, live)
->       assert not stale(old, live), "OpenAPI snapshot stale — run: cd /app/backend && python -m tools.openapi_snapshot --write"
-E       AssertionError: OpenAPI snapshot stale — run: cd /app/backend && python -m tools.openapi_snapshot --write
-E       assert not True
-E        +  where True = stale({'components': {'schemas': {'AccessUpdate': {'additionalProperties': False, 'properties': {'direct': {'default': [], '...tent': {...}, 'description': 'Successful Response'}}, 'security': [{'HTTPBearer': []}], 'summary': 'Tree', ...}}, ...}}, {'openapi': '3.1.0', 'info': {'title': 'KKT Real Estate ERP', 'version': '11.0.0'}, 'paths': {'/api/health': {'get': {..., 'title': 'AllocationCategoryUpdate'}, ...}, 'securitySchemes': {'HTTPBearer': {'type': 'http', 'scheme': 'bearer'}}}})
-
-tests/test_openapi_snapshot.py:24: AssertionError
+...............................s...................................      [100%]
 =============================== warnings summary ===============================
 ../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
 ../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
@@ -79,8 +42,5 @@ tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources
     warnings.warn(
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-=========================== short test summary info ============================
-FAILED tests/test_story_behaviours.py::test_rate_card_create_activate_apply_to_available
-FAILED tests/test_openapi_snapshot.py::test_snapshot_exists_and_not_stale - A...
-2 failed, 567 passed, 2 skipped, 10 warnings in 498.50s (0:08:18)
-SUITE_EXIT 1
+569 passed, 2 skipped, 10 warnings in 511.32s (0:08:31)
+SUITE_EXIT 0
