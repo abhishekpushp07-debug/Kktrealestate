@@ -1,6 +1,6 @@
 /**
  * Generators of the scale seed (docs/SEED.md "Production-size data"). Each section builds its rows in memory from the company context
- * and streams them with COPY inside the caller's transaction, in FK order: staff → projects / towers / stages / rate cards / flats →
+ * and inserts them in batches (scaleLoad.ts) inside the caller's transaction, in FK order: staff → projects / towers / stages / rate cards / flats →
  * customers + portal logins → leads → bookings + demands + payments + ledgers → service requests → audit rows → sequences.
  */
 import type { Sql } from "postgres";
@@ -19,7 +19,7 @@ import {
 } from "@kkt/domain";
 import { encryptField, keyedHash } from "../lib/crypto.js";
 import { allocate, staffFor, type CompanyCtx, type StaffRef } from "./scaleCompany.js";
-import { copyObjects, type CopyRow } from "./scaleCopy.js";
+import { insertObjects, type LoadRow } from "./scaleLoad.js";
 import {
   LOCALITIES,
   OCCUPATIONS,
@@ -51,21 +51,16 @@ export interface GenState {
   /** Rows written per table. */
   written: Record<string, number>;
   /** Audit rows collected by every section, written last. */
-  audit: CopyRow[];
+  audit: LoadRow[];
   /** Back-dated audit rows are only written while no seal covers them (audit/seal.ts). */
   historicalAudit: boolean;
   log: (msg: string) => void;
 }
 
-/** Copies object rows and records the count. */
-export async function load(
-  st: GenState,
-  table: string,
-  rows: readonly CopyRow[],
-  json: readonly string[] = [],
-): Promise<void> {
+/** Inserts object rows and records the count. */
+export async function load(st: GenState, table: string, rows: readonly LoadRow[]): Promise<void> {
   if (rows.length === 0) return;
-  st.written[table] = (st.written[table] ?? 0) + (await copyObjects(st.tx, table, rows, json));
+  st.written[table] = (st.written[table] ?? 0) + (await insertObjects(st.tx, table, rows));
 }
 
 /** Queues one audit row (same columns as lib/audit.ts writes; PII never in `after`). */
@@ -148,7 +143,8 @@ const ROLE_SCOPED: Record<SystemRoleName, number> = {
 
 /**
  * `count` staff logins (every role at least once, then the mix above), password SCALE_STAFF_PASSWORD, e-mails `<role>.<nnn>@<domain>`
- * (the scale company's first Super Admin is `admin@pid.in`); scoped users get 1–3 of the company's new projects.
+ * (the scale company's first Super Admin is `admin@pid.in`); scoped users get 1–3 of the company's new projects. Returns the
+ * user_project_scopes rows, loaded once the projects exist.
  */
 export async function genStaff(
   st: GenState,
@@ -156,13 +152,13 @@ export async function genStaff(
   count: number,
   projectIds: readonly string[],
   passwordHash: string,
-): Promise<void> {
-  const rng = st.rng.fork(`staff-${c.id}`);
+): Promise<LoadRow[]> {
+  const rng = st.rng.fork(`staff-${c.key}`);
   const roles: SystemRoleName[] = ROLE_MIX.map(([r]) => r);
   while (roles.length < count) roles.push(rng.weighted(ROLE_MIX));
   const perRole = new Map<SystemRoleName, number>();
-  const users: CopyRow[] = [];
-  const scopes: CopyRow[] = [];
+  const users: LoadRow[] = [];
+  const scopes: LoadRow[] = [];
   for (const role of roles) {
     const n = (perRole.get(role) ?? 0) + 1;
     perRole.set(role, n);
@@ -194,7 +190,7 @@ export async function genStaff(
     c.staff.push({ id, name, role, allProjects: !scoped, projectIds: mine });
   }
   await load(st, "users", users);
-  await load(st, "user_project_scopes", scopes);
+  return scopes;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------
@@ -245,7 +241,7 @@ export function genProjects(
   codePrefix: string,
   blocksPerProject: number,
 ): ProjectGen[] {
-  const rng = st.rng.fork(`projects-${c.id}`);
+  const rng = st.rng.fork(`projects-${c.key}`);
   const m = c.masters;
   return names.map((name, pi) => {
     const launch = addDays(st.today, -rng.int(150, 1650));
@@ -365,10 +361,10 @@ function genTower(rng: Rng, c: CompanyCtx, p: ProjectGen, bi: number, pi: number
 
 /** Loads projects (+ website / visit settings, amenities, plan assignments, rate cards) and towers (+ stages). */
 export async function loadProjects(st: GenState, c: CompanyCtx, projects: readonly ProjectGen[]): Promise<void> {
-  const rng = st.rng.fork(`project-rows-${c.id}`);
+  const rng = st.rng.fork(`project-rows-${c.key}`);
   const admin = superAdmin(c);
   const m = c.masters;
-  const rows: Record<string, CopyRow[]> = {
+  const rows: Record<string, LoadRow[]> = {
     projects: [],
     project_website_settings: [],
     project_visit_settings: [],
@@ -537,18 +533,13 @@ export async function loadProjects(st: GenState, c: CompanyCtx, projects: readon
       });
     });
   }
-  const json: Record<string, string[]> = {
-    projects: ["address"],
-    project_website_settings: ["highlights"],
-    blocks: ["floor_plans"],
-  };
-  for (const [table, list] of Object.entries(rows)) await load(st, table, list, json[table] ?? []);
+  for (const [table, list] of Object.entries(rows)) await load(st, table, list);
 }
 
 /** Loads every flat (booked ones carry their booking) and refreshes the unit counts of the company's towers and projects. */
 export async function loadFlats(st: GenState, c: CompanyCtx, projects: readonly ProjectGen[]): Promise<void> {
   const admin = superAdmin(c);
-  const rows: CopyRow[] = [];
+  const rows: LoadRow[] = [];
   for (const p of projects)
     for (const b of p.blocks)
       for (const f of b.flats) {
@@ -585,7 +576,7 @@ export async function loadFlats(st: GenState, c: CompanyCtx, projects: readonly 
           updated_at: f.bookedAt ?? created,
         });
       }
-  await load(st, "flats", rows, ["rooms_snapshot", "areas_snapshot", "price_breakup"]);
+  await load(st, "flats", rows);
   const counts = (key: string) => `
     select ${key}, jsonb_build_object('available', count(*) filter (where status = 'AVAILABLE'), 'hold', count(*) filter (where status = 'HOLD'),
       'blocked', count(*) filter (where status = 'BLOCKED'), 'booked', count(*) filter (where status = 'BOOKED'),
@@ -684,7 +675,7 @@ export function genBookings(
   prospects: number,
   counter: Counter,
 ): { bookings: BookingGen[]; customers: CustomerGen[] } {
-  const rng = st.rng.fork(`bookings-${c.id}`);
+  const rng = st.rng.fork(`bookings-${c.key}`);
   const towers = projects.flatMap((p) =>
     p.blocks.map((b) => ({ p, b, w: (0.5 + rng.next()) * (1 + b.stagesDone / 7) })),
   );
@@ -740,7 +731,7 @@ export function genBookings(
   for (const cu of byTime([...customers], (x) => x.createdAt))
     cu.code = allocate(c, "customer", toISTDateString(cu.createdAt), "CUST-");
   for (const bk of byTime([...bookings], (x) => x.createdAt)) bk.number = allocate(c, "booking", bk.bookingDate, "BK-");
-  const mrng = st.rng.fork(`money-${c.id}`);
+  const mrng = st.rng.fork(`money-${c.key}`);
   for (const bk of bookings) {
     const input: ScaleBookingInput = {
       id: bk.id,
@@ -778,8 +769,8 @@ export async function loadCustomers(
   portalHash: string,
 ): Promise<void> {
   const rng = st.rng.fork("customers");
-  const rows: CopyRow[] = [];
-  const portal: CopyRow[] = [];
+  const rows: LoadRow[] = [];
+  const portal: LoadRow[] = [];
   for (const cu of customers) {
     const c = cu.company;
     const n = cu.name;
@@ -847,7 +838,7 @@ export async function loadCustomers(
       cu.createdAt,
     );
   }
-  await load(st, "customers", rows, ["address_current"]);
+  await load(st, "customers", rows);
   await load(st, "portal_users", portal);
 }
 
@@ -879,7 +870,7 @@ export async function loadLeads(
   bookings: readonly BookingGen[],
   count: number,
 ): Promise<void> {
-  const rng = st.rng.fork(`leads-${c.id}`);
+  const rng = st.rng.fork(`leads-${c.key}`);
   interface LeadGen {
     id: string;
     createdAt: Date;
@@ -941,8 +932,8 @@ export async function loadLeads(
           : new Date(Math.min(st.now.getTime(), createdAt.getTime() + rng.int(1, 40) * 86_400_000)),
     });
   }
-  const rows: CopyRow[] = [];
-  const history: CopyRow[] = [];
+  const rows: LoadRow[] = [];
+  const history: LoadRow[] = [];
   for (const l of byTime(leads, (x) => x.createdAt)) {
     const number = allocate(c, "lead", toISTDateString(l.createdAt), "LD-");
     const open = l.stage !== "CONVERTED" && l.stage !== "LOST";
@@ -996,7 +987,7 @@ export async function loadLeads(
       l.createdAt,
     );
   }
-  await load(st, "leads", rows, ["utm"]);
+  await load(st, "leads", rows);
   await load(st, "lead_stage_history", history);
 }
 
@@ -1007,7 +998,7 @@ export async function loadLeads(
 /** Writes the bookings with the books the ledger engine derives for them (scaleMoney.bookBooks). */
 export async function loadBooks(st: GenState, bookings: readonly BookingGen[]): Promise<void> {
   const rng = st.rng.fork("books");
-  const rows: Record<"bookings" | "demands" | "payments" | "ledger_entries", CopyRow[]> = {
+  const rows: Record<"bookings" | "demands" | "payments" | "ledger_entries", LoadRow[]> = {
     bookings: [],
     demands: [],
     payments: [],
@@ -1228,9 +1219,9 @@ export async function loadBooks(st: GenState, bookings: readonly BookingGen[]): 
         created_at: new Date(r.at),
       });
   }
-  await load(st, "bookings", rows.bookings, ["flat_snapshot", "plan_snapshot"]);
+  await load(st, "bookings", rows.bookings);
   await load(st, "demands", rows.demands);
-  await load(st, "payments", rows.payments, ["instrument"]);
+  await load(st, "payments", rows.payments);
   await load(st, "ledger_entries", rows.ledger_entries);
 }
 
@@ -1265,7 +1256,7 @@ export async function loadTickets(
   count: number,
 ): Promise<void> {
   if (bookings.length === 0 || c.masters.serviceCategories.length === 0) return;
-  const rng = st.rng.fork(`tickets-${c.id}`);
+  const rng = st.rng.fork(`tickets-${c.key}`);
   const now = st.now.getTime();
   const created: { id: string; bk: BookingGen; at: Date }[] = [];
   for (let i = 0; i < count; i++) {
@@ -1274,8 +1265,8 @@ export async function loadTickets(
     const ms = rng.chance(0.25) ? now - rng.int(1, 30 * 24) * 3_600_000 : from + rng.next() * (now - from);
     created.push({ id: rng.uuid(), bk, at: new Date(Math.max(from, Math.min(ms, now - 60_000))) });
   }
-  const rows: CopyRow[] = [];
-  const messages: CopyRow[] = [];
+  const rows: LoadRow[] = [];
+  const messages: LoadRow[] = [];
   for (const t of byTime(created, (x) => x.at)) {
     const number = allocate(c, "ticket", toISTDateString(t.at), "SR-");
     const cat = rng.pick(c.masters.serviceCategories);
@@ -1403,7 +1394,6 @@ export async function finish(st: GenState, companies: readonly CompanyCtx[]): Pr
     st,
     "audit_logs",
     byTime(st.audit, (r) => r["created_at"] as Date),
-    ["after"],
   );
   for (const c of companies)
     for (const key of c.touched) {

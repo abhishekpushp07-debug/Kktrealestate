@@ -6,7 +6,7 @@
  * Builds ON TOP of the demo seed (run first when the database has no projects): a second company with its own roles, masters and staff,
  * and at factor 1 — demo data included — 2 companies, 20 projects, ~400 towers, ~41 000 flats, 25 000 customers with portal logins,
  * 60 000 leads, 15 000 bookings with their demands, ~160 000 payments and ledgers, 30 000 service requests, ~200 staff across roles and
- * project scopes, and the audit rows of all of it. Rows are streamed with COPY in one transaction (scaleCopy.ts, scaleGen.ts).
+ * project scopes, and the audit rows of all of it. Rows are inserted in large JSON batches in one transaction (scaleLoad.ts, scaleGen.ts).
  *
  * Money comes from the production engines, never from hand-computed balances (scaleMoney.ts): flats are generated and priced by domain
  * `generateFlats` / `priceFlat`, plan snapshots by the money module's `buildPlanSnapshot`, demands by domain `evaluateDues`, and the
@@ -43,6 +43,7 @@ import {
   loadLeads,
   loadProjects,
   loadTickets,
+  load,
   type BookingGen,
   type Counter,
   type CustomerGen,
@@ -183,8 +184,15 @@ async function generate(st: GenState, companies: readonly CompanyCtx[], factor: 
     const names = c.isDemo ? PROJECT_NAMES.demo : PROJECT_NAMES.scale;
     const projects = genProjects(st, c, names, c.isDemo ? "SGB" : "PID", v.blocksPerProject);
     const projectIds = projects.map((p) => p.id);
-    await genStaff(st, c, Math.max(SYSTEM_ROLE_NAMES.length, Math.round(v.staff * share)), projectIds, staffHash);
+    const scopes = await genStaff(
+      st,
+      c,
+      Math.max(SYSTEM_ROLE_NAMES.length, Math.round(v.staff * share)),
+      projectIds,
+      staffHash,
+    );
     await loadProjects(st, c, projects);
+    await load(st, "user_project_scopes", scopes);
     const nBookings = Math.round(v.bookings * share);
     const prospects = Math.max(0, Math.round(v.customers * share) - nBookings);
     const { bookings, customers } = genBookings(st, c, projects, nBookings, prospects, counter);

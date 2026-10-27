@@ -57,6 +57,8 @@ export interface Masters {
 /** Everything the generators know about one company. */
 export interface CompanyCtx {
   id: string;
+  /** Stable name of the company in PRNG stream labels ("demo" / "scale"): ids are random, labels must not be. */
+  key: string;
   domain: string;
   isDemo: boolean;
   fyStartMonth: number;
@@ -346,6 +348,7 @@ export async function loadCompany(app: FastifyInstance, companyId: string, isDem
   const flatTypes = flatTypeRows.map(({ r }) => flatTypeToDomain(r));
   return {
     id: companyId,
+    key: isDemo ? "demo" : "scale",
     domain: isDemo ? "sgb.in" : SCALE_COMPANY.domain,
     isDemo,
     fyStartMonth: company.fy_start_month,

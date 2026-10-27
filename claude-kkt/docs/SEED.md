@@ -115,3 +115,68 @@ Images are generated placeholders (SVG/PNG rendered by sharp with project/stage 
 - Before validating, the seed runs the `LEDGER_REBUILD` step (`rebuildAllLedgers`, a no-op when every ledger is already in the canonical posting order), so a seeded database is canonical by construction.
 - The seed validates itself (and `test/integration/seed.test.ts` re-checks through the API): zero integrity findings, the ten SPEC §11 ledger rows to the paise, booking #1 COMPLETED and P1 SOLD, Tower C = 52 flats without 13xx/7xx, every customer's portal login sees only their bookings, and the counts above.
 - Known deviation: rating a RESOLVED ticket closes it (service rule), so the RESOLVED defect/snag ticket is left unrated (the customer can rate it from the portal) and the CLOSED possession ticket carries the rating 5.
+
+## Production-size data (`seed:scale`)
+
+`pnpm --filter @kkt/api seed:scale [--factor 1] [--seed 20261027] [--no-verify]` (apps/api/src/seed/scale.ts) builds a production-size
+dataset **on top of** the demo seed: on an empty database it migrates and runs the demo seed first, then adds the volume below in one
+transaction, runs `ANALYZE`, and runs the real integrity report for both companies — the command fails if the report finds anything, or (at
+factor ≥ 1) if a total is below the targets. It is refused when `NODE_ENV=production` and skipped when the scale company already has
+projects. Measured on the 4-vCPU build box: **4 min 46 s** in total (demo seed 37 s, generation + load 2 min, `ANALYZE` + integrity report
+of 15,009 bookings 2 min).
+
+| Totals at factor 1 (demo data included) | Rows | Target |
+| --- | ---: | ---: |
+| companies (demo + **Patliputra Infra Developers**) | 2 | 2 |
+| projects (2 demo + 12 + 6) | 20 | 20 |
+| blocks (towers of 24–28 floors, 4 flats per floor; every third tower has FP-4-PREMIUM on its top four floors) | 401 | 400 |
+| flats (generated and priced by domain `generateFlats` / `priceFlat` from each project's ACTIVE rate card) | 41,286 | 40,000 |
+| customers (encrypted PAN / Aadhaar + keyed hashes for 75 %; KYC 60 % VERIFIED, 15 % SUBMITTED) | 25,012 | 25,000 |
+| portal users (one per customer) | 25,012 | 25,000 |
+| leads (40 % of bookings came from a CONVERTED lead; the rest across NEW … LOST) + 110,235 stage-history rows | 60,008 | 60,000 |
+| bookings (all ACTIVE) | 15,010 | 15,000 |
+| demands | 96,725 | — |
+| payments (CLEARED, cheques PENDING / BOUNCED + re-paid) | 213,074 | 150,000 |
+| ledger rows (epoch 1) | 309,314 | — |
+| service requests (+ 81,532 messages) | 30,005 | 30,000 |
+| staff users (every role; Project Admins, 60 % of Sales, half of Employees and 30 % of Accounts scoped to 1–3 projects) | 206 | 200 |
+| audit rows | 460,246 | — |
+
+`--factor` scales every volume (projects stay 18 new; towers per project, customers, bookings, leads, tickets and staff scale; the
+integration test uses 0.01). `--seed` picks the PRNG stream: the same seed, factor and run date give the same dataset (only ciphertexts
+differ, by their random IVs). `SCALE_FACTOR` / `SCALE_SEED` are the environment equivalents.
+
+**How the money is made — the production engines, never hand-computed balances** (apps/api/src/seed/scaleMoney.ts):
+
+- each booking takes its project's plan snapshot from the money module's `buildPlanSnapshot` (Standard CLP 70 %, Down Payment 15 %,
+  Flexi 15 %), agreement = list price, Cash 0–30 % in whole ₹10,000;
+- demands are exactly what domain `evaluateDues` finds due today for the plan snapshot and the tower's stage history, stamped with the
+  instant the live path raises them (the booking's own catch-up, the stage completion, or the 02:00 DAILY_DUES run) and numbered per FY in
+  that order;
+- payments follow the demands (94 % of demands due more than a month ago are paid, in one or two tranches per bucket; Account by NEFT /
+  loan disbursement / cheque, Cash in cash or UPI; 8 % only half) and never exceed what a bucket raised, so never its agreed amount;
+  cheques clear three days later, stay PENDING while that is ahead (counted in `pending_cheques_paise`), and 2 % bounce and are paid
+  again by NEFT;
+- the ledger rows, the booking summary columns and every demand's status / paid amount are derived by the ledger service's own event
+  builders (`events.demand`, `events.payment`, `demandAmountsFor`) fed to domain `deriveLedger` and `demandStatuses` — the same
+  derivation `rebuild()` and the integrity report compare against. The run then **proves** it: the integrity report over every ACTIVE
+  booking of both companies must come back with zero findings (it did: 12,009 + 3,000 bookings, 0 findings).
+
+**Tenancy and numbering.** The scale company gets the six system roles and a copy of the demo company's masters with new ids (every
+reference — FK columns, uuid arrays, ids inside jsonb such as flat-type rooms — rewritten to the copy), so the tenants share nothing. Every
+document number (customer, booking, demand, receipt `SGB/…` / `PID/…`, lead, ticket) is allocated per company, scope and financial year in
+posting order, and the `sequences` rows are advanced, so the API continues each series (tested).
+
+**Logins.** Generated staff: `<role>.<nnn>@sgb.in` (demo company) and `<role>.<nnn>@pid.in` (scale company; its first Super Admin is
+`admin@pid.in`), e.g. `sales.001@sgb.in`, `accounts.004@pid.in` — password **`Scale@12345`**. Generated buyers sign in to the portal with
+their phone (`61…` / `62…` series, apps/api/src/seed/scaleData.ts `seriesPhone`) and **`Welcome@123`**. Like the demo company, the scale
+company has `force_mfa_for_admins` off so the published logins work without an authenticator. The demo logins above are unchanged.
+
+**Not generated** (side effects whose volume does not matter for capacity, or that need files): notifications, documents / photos,
+site visits and brochure downloads beyond the demo's, cancellations, agreement / plan revisions and other-charge lines. Audit rows are
+back-dated to the business instant only while no audit seal exists yet; on a database whose audit log is already sealed they are stamped
+with the load time instead (a back-dated row under a seal would read as tampering, apps/api/src/modules/audit/seal.ts).
+
+**Loading.** Rows are inserted in JSON batches of 5,000 (`INSERT … SELECT … FROM jsonb_populate_recordset`, apps/api/src/seed/scaleLoad.ts)
+inside one transaction, so a failure leaves nothing half-written. (COPY FROM STDIN through postgres.js was tried first; its writable never
+settles when the server rejects the data, so a constraint violation hung the seed instead of failing it.)
