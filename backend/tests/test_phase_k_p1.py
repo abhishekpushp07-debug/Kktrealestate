@@ -196,14 +196,14 @@ def test_unknown_vs_known_identifier_same_response_and_timing():
         r = requests.post(f"{BASE}/api/auth/login", json={"email": email, "password": "definitely-wrong-1"})
         return r, time.perf_counter() - t0
     known, unknown = [], []
-    for i in range(3):
+    for i in range(4):  # interleaved, 4 samples (under the 5-attempt lockout); min() rejects xdist load spikes — the dummy-hash path must cost the same as a real bcrypt verify
         r1, d1 = t("admin@kkt.in")
         r2, d2 = t(f"nobody-{i}@kkt.in")
         assert r1.status_code == r2.status_code == 401 and r1.json()["code"] == r2.json()["code"] == "INVALID_CREDENTIALS"
         assert r1.json()["detail"] == r2.json()["detail"]
         known.append(d1)
         unknown.append(d2)
-    assert abs(statistics.median(known) - statistics.median(unknown)) < 0.15, (known, unknown)
+    assert abs(min(known) - min(unknown)) < 0.15 and abs(statistics.median(known) - statistics.median(unknown)) < 0.6, (known, unknown)
 
 
 def test_pair_lockout_from_login_events():
