@@ -252,8 +252,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      # installed so the CI script tests can import the workspace's yaml parser (the deploy workflow test)
       - uses: ./.github/actions/setup
-        with: { install: "false" }
       # high/critical advisories of production dependencies fail unless allowlisted with a reason and an expiry
       # (scripts/ci/audit-allowlist.json: node-forge via @expo/cli is the only accepted one)
       - name: pnpm audit --prod gate

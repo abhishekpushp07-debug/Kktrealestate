@@ -149,6 +149,12 @@ write_status() { # $1 = ok|failed|base (ok = a full dump cycle succeeded; the ot
     case "$d" in *.partial/) continue ;; esac
     for f in "$d"base.tar.gz "$d"base.tar.gz.age "$d"base.tar.gz.enc; do [ -f "$f" ] && base_ts=$(stat -c %Y "$f"); done
   done
+  # archived WAL segments on disk (HMAC sidecars of the openssl mode excluded)
+  wal_files=0
+  for f in "$WAL"/*; do
+    [ -f "$f" ] || continue
+    case "$f" in *.hmac) ;; *) wal_files=$((wal_files + 1)) ;; esac
+  done
   {
     echo "# HELP kkt_backup_last_run_timestamp_seconds Unix time of the last backup run."
     echo "# TYPE kkt_backup_last_run_timestamp_seconds gauge"
@@ -168,7 +174,7 @@ write_status() { # $1 = ok|failed|base (ok = a full dump cycle succeeded; the ot
     echo "kkt_backup_encrypted $(if [ "$MODE" = none ]; then echo 0; else echo 1; fi)"
     echo "# HELP kkt_backup_wal_archive_files Archived WAL segments on disk."
     echo "# TYPE kkt_backup_wal_archive_files gauge"
-    echo "kkt_backup_wal_archive_files $(ls "$WAL" 2>/dev/null | grep -cv '\.hmac$' || true)"
+    echo "kkt_backup_wal_archive_files $wal_files"
   } > "$tmp" && mv "$tmp" "$BACKUP_DIR/status.prom"
   log "status: $1 ($2)"
 }
