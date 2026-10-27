@@ -83,7 +83,7 @@ def test_public_api_leak_scan(base_url):
     for path in ["/api/public/site", "/api/public/projects", "/api/portal/config"]:
         r = requests.get(base_url + path)
         assert r.status_code == 200, (path, r.status_code)
-        def walk(o, trail=""):
+        def walk(o, trail="", path=path):
             if isinstance(o, dict):
                 for k, v in o.items():
                     assert k not in forbidden, (path, trail + "." + k)

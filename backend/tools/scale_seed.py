@@ -54,6 +54,7 @@ def bulk(coll, docs, batch=20_000):
 async def apply_rules(target):
     os.environ["DB_NAME"] = target
     import importlib
+
     import db as dbmod
     importlib.reload(dbmod)
     from services import invariants, validators
@@ -116,7 +117,7 @@ def main(target: str, scale: float, drop: bool):
     print(f"[customers] {len(customers)} {round(time.time() - t0)}s", flush=True)
 
     # bookings: one Active per flat (unique partial index), cash+account == agreement
-    bookings, payments, demands, ledger, flat_ids = [], [], [], [], set()
+    bookings, payments, demands, ledger = [], [], [], []
     pay_per = max(1, T["payments"] // T["bookings"])
     dem_per = max(1, T["demands"] // T["bookings"])
     pay_tpl, dem_tpl, led_tpl = tpl["payments"], tpl["demands"], tpl["ledger_entries"]

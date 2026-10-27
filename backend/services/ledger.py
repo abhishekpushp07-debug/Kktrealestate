@@ -17,7 +17,7 @@ def _oc_totals(lines: list[dict]) -> tuple[int, int]:
     return sum(l.get("demanded_paise", 0) for l in lines), sum(l.get("paid_paise", 0) for l in lines)
 
 
-async def rebuild(booking_id: str) -> list[dict]:
+async def rebuild(booking_id: str) -> list[dict]:  # noqa: C901 — pre-existing (41); tracked in CR backlog
     b = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
     if not b:
         return []

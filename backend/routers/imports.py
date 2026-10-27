@@ -62,7 +62,7 @@ async def _parse(file: UploadFile) -> list[dict]:
     return rows
 
 
-async def _validate_rows(kind: str, rows: list[dict], project_id: str | None, user: dict) -> list[dict]:
+async def _validate_rows(kind: str, rows: list[dict], project_id: str | None, user: dict) -> list[dict]:  # noqa: C901 — pre-existing (35); tracked in CR backlog
     out = []
     if kind == "flat-pricing":
         if not project_id:

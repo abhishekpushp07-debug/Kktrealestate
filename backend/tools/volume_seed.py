@@ -16,6 +16,7 @@ import uuid
 from datetime import date, timedelta
 
 import httpx
+from _env import DEMO_PASSWORD
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 R = random.Random(42)
@@ -64,7 +65,7 @@ async def page_all(api, path, **params):
 
 
 async def main(base, scale):
-    api = Api(base, "admin@kkt.in", "Kkt@12345")
+    api = Api(base, "admin@kkt.in", DEMO_PASSWORD)
     await api.login()
     charge_types = (await api.get("/api/master/charge-types"))["items"] if True else []
     bts = (await api.get("/api/master/block-types"))["items"]
@@ -73,7 +74,6 @@ async def main(base, scale):
     plans = [p for p in (await api.get("/api/master/payment-plans"))["items"] if p.get("is_active", True)]
     modes = {m["code"]: m for m in (await api.get("/api/master/payment-modes"))["items"]}
     banks = (await api.get("/api/master/bank-accounts"))["items"]
-    mts = []
     users = (await api.get("/api/users", page_size=50))["items"]
     sales = [u for u in users if "sales" in (u.get("role_name") or "").lower()] or users
 

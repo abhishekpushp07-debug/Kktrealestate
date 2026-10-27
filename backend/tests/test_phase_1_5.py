@@ -8,11 +8,13 @@ import pyotp
 import pytest
 import requests
 
+TEST_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
+
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://royal-realty-hub-2.preview.emergentagent.com").rstrip("/")
 API = f"{BASE_URL}/api"
-ADMIN = {"email": "admin@kkt.in", "password": "Kkt@12345"}
-EMPLOYEE = {"email": "employee@kkt.in", "password": "Kkt@12345"}
-PASSWORD = "Kkt@12345"
+ADMIN = {"email": "admin@kkt.in", "password": TEST_PASSWORD}
+EMPLOYEE = {"email": "employee@kkt.in", "password": TEST_PASSWORD}
+PASSWORD = TEST_PASSWORD
 
 
 # ---------- shared session + tokens ----------
@@ -194,7 +196,6 @@ class TestTowerC:
         # refuge floor 7 - find row where floor==7
         floor7 = next((r for r in rows if r.get("floor") == 7), None)
         if floor7 is not None:
-            kind = floor7.get("kind") or (floor7.get("units", [{}])[0].get("kind") if floor7.get("units") else None)
             # no actual flat units on floor 7
             unit_count = len([u for u in floor7.get("units", []) if u.get("kind") not in ("refuge", "skip")])
             assert unit_count == 0, f"Floor 7 should be refuge w/ 0 units, got {unit_count}"
@@ -414,7 +415,7 @@ class TestMFA:
         r = s.post(f"{API}/auth/login", json=EMPLOYEE, timeout=15)
         assert r.status_code == 200, r.text
         tok = r.json()["access_token"]
-        rtok = r.json().get("refresh_token")
+        r.json().get("refresh_token")
         H = {"Authorization": f"Bearer {tok}", "Content-Type": "application/json"}
 
         try:
@@ -488,7 +489,7 @@ class TestSessions:
         time.sleep(1)
         s2 = requests.post(f"{API}/auth/login", json=ADMIN, timeout=15).json()
         tok1, rtok1 = s1["access_token"], s1["refresh_token"]
-        tok2, rtok2 = s2["access_token"], s2["refresh_token"]
+        rtok2 = s2["refresh_token"]
 
         lst = requests.get(f"{API}/auth/sessions", headers=_h(tok1), timeout=15)
         assert lst.status_code == 200
@@ -496,7 +497,7 @@ class TestSessions:
         assert len(sessions) >= 2
 
         # Identify session "other" than tok1's — try to find one that is NOT current
-        current = next((s for s in sessions if s.get("is_current") or s.get("current")), None)
+        next((s for s in sessions if s.get("is_current") or s.get("current")), None)
         other = next(
             (s for s in sessions if (not s.get("is_current") and not s.get("current"))),
             None,

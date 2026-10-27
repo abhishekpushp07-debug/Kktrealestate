@@ -28,16 +28,8 @@ async def _snapshot_totals(booking_id: str) -> dict:
     return {"rows": len(rows), "final_due": rows[-1]["total_due_paise"] if rows else 0, "final_oc_due": rows[-1]["other_charges_due_paise"] if rows else 0, "sum_amount": sum(r["amount_paise"] for r in rows)}
 
 
-async def migrate_phase7() -> dict:
-    if await db.settings.find_one({"key": "migration_phase7_done"}):
-        return {}
-    company = await db.companies.find_one({}, {"_id": 0})
-    if not company:
-        return {}
-    cid = company["id"]
-    logger.info("Phase 7 migration starting")
-    report = {"started_at": now_iso(), "bookings_checked": 0, "bookings_changed": [], "plans_created": [], "stages_created": 0}
-    # 1. stage master
+async def _ensure_stage_master(cid: str, report: dict) -> dict:
+    """1. stage master"""
     stage_by_name = {s["name"]: s for s in await db.construction_stages.find({}, {"_id": 0}).to_list(None)}
     for i, name in enumerate(STAGES):
         if name not in stage_by_name:
@@ -45,7 +37,11 @@ async def migrate_phase7() -> dict:
             await db.construction_stages.update_one({"name": name}, {"$setOnInsert": doc}, upsert=True)  # idempotent under concurrent boot
             stage_by_name[name] = await db.construction_stages.find_one({"name": name}, {"_id": 0})
             report["stages_created"] += 1
-    # 2. templates → stage sequences + CLP plans
+    return stage_by_name
+
+
+async def _templates_to_plans(cid: str, stage_by_name: dict, report: dict) -> dict:
+    """2. templates → stage sequences + CLP plans"""
     templates = await db.milestone_templates.find({}, {"_id": 0}).to_list(None)
     plan_by_template = {}
     for t in templates:
@@ -75,7 +71,11 @@ async def migrate_phase7() -> dict:
             await db.payment_plans.insert_one(plan)
             report["plans_created"].append(pname)
         plan_by_template[t["id"]] = (plan, seq_entries)
-    # 3. projects/blocks: sequences, stage records, assignments
+    return plan_by_template
+
+
+async def _apply_sequences_to_projects_blocks(cid: str, plan_by_template: dict, report: dict) -> None:
+    """3. projects/blocks: sequences, stage records, assignments"""
     async for p in db.projects.find({"company_id": cid}, {"_id": 0}):
         tp = plan_by_template.get(p.get("milestone_template_id"))
         if tp and not p.get("construction_stage_sequence"):
@@ -103,7 +103,10 @@ async def migrate_phase7() -> dict:
                 if s and s["seq"] != m["seq"]:
                     await db.construction_photos.update_many({"block_id": b["id"], "milestone_seq": m["seq"], "rekeyed": {"$ne": True}}, {"$set": {"milestone_seq": s["seq"], "stage_id": s["stage_id"], "rekeyed": True}})
             await db.blocks.update_one({"id": b["id"]}, {"$set": {"construction_stages": stages, "milestones": legacy_milestones(stages), "construction_percent": round(sum(1 for s in stages if s["status"] == "Completed") * 100 / len(stages)) if stages else 0}})
-    # 4. bookings: snapshot + map demands; verify ledger unchanged
+
+
+async def _snapshot_bookings_and_verify_ledgers(cid: str, plan_by_template: dict, report: dict) -> None:
+    """4. bookings: snapshot + map demands; verify ledger unchanged"""
     from routers.construction import build_snapshot
     async for bk in db.bookings.find({"company_id": cid}, {"_id": 0}):
         report["bookings_checked"] += 1
@@ -137,6 +140,21 @@ async def migrate_phase7() -> dict:
     async for blk in db.blocks.find({"construction_stages": {"$exists": True}}, {"_id": 0, "id": 1, "construction_stages": 1}):
         st = blk.get("construction_stages") or []
         await db.blocks.update_one({"id": blk["id"]}, {"$set": {"construction_percent": round(sum(1 for s in st if s["status"] == "Completed") * 100 / len(st)) if st else 0}})
+
+
+async def migrate_phase7() -> dict:
+    if await db.settings.find_one({"key": "migration_phase7_done"}):
+        return {}
+    company = await db.companies.find_one({}, {"_id": 0})
+    if not company:
+        return {}
+    cid = company["id"]
+    logger.info("Phase 7 migration starting")
+    report = {"started_at": now_iso(), "bookings_checked": 0, "bookings_changed": [], "plans_created": [], "stages_created": 0}
+    stage_by_name = await _ensure_stage_master(cid, report)
+    plan_by_template = await _templates_to_plans(cid, stage_by_name, report)
+    await _apply_sequences_to_projects_blocks(cid, plan_by_template, report)
+    await _snapshot_bookings_and_verify_ledgers(cid, plan_by_template, report)
     report["finished_at"] = now_iso()
     report["ok"] = not report["bookings_changed"]
     await db.settings.update_one({"key": "migration_phase7_report"}, {"$set": {"value": report}}, upsert=True)

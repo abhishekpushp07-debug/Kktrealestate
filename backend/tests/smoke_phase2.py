@@ -1,19 +1,19 @@
 import asyncio
 import io
-import json
 import os
-import sys
 import uuid
 
 import httpx
 from dotenv import load_dotenv
+
+TEST_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
 
 load_dotenv("/app/frontend/.env")
 API = os.environ["REACT_APP_BACKEND_URL"].rstrip("/") + "/api"
 
 
 async def login(c, email):
-    r = await c.post("/auth/login", json={"email": email, "password": "Kkt@12345"})
+    r = await c.post("/auth/login", json={"email": email, "password": TEST_PASSWORD})
     return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
 
@@ -75,7 +75,7 @@ async def main():
         r = await c.post(f"/blocks/{bk['block_id']}/milestones/{ms['next_seq']}/undo", json={"reason": "test"}, headers=H)
         print("undo (no payment after) ->", r.status_code, r.json().get("demands_voided"))
         r = await c.post(f"/blocks/{bk['block_id']}/milestones/{ms['next_seq']}/complete", json={"completed_on": "2026-09-15"}, headers=H)
-        p = (await c.post("/payments", json={**pay, "payment_category": "Cash", "amount": 100000, "payment_mode_id": modes["CASH"]["id"], "instrument": None, "bank_account_id": None, "payment_date": "2026-09-16"}, headers={**A, "Idempotency-Key": str(uuid.uuid4())})).json()
+        (await c.post("/payments", json={**pay, "payment_category": "Cash", "amount": 100000, "payment_mode_id": modes["CASH"]["id"], "instrument": None, "bank_account_id": None, "payment_date": "2026-09-16"}, headers={**A, "Idempotency-Key": str(uuid.uuid4())})).json()
         r = await c.post(f"/blocks/{bk['block_id']}/milestones/{ms['next_seq']}/undo", json={"reason": "test"}, headers=H)
         print("undo after payment ->", r.status_code, r.json().get("code"))
         d = (await c.get(f"/bookings/{bk['id']}", headers=H)).json()["demands"]

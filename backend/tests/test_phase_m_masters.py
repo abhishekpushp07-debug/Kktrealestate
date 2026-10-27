@@ -1,10 +1,14 @@
 """Phase M: Stage master → named Stage Plan → project+tower Payment Plan (% rows) → booking → Construction update raises Udhar; Jama via receipt; Undo voids. Two-sided ledger law."""
+import os
 import uuid
 
 import pytest
 import requests
 
-from tests.conftest import BASE as ROOT, session_token
+from tests.conftest import BASE as ROOT
+from tests.conftest import session_token
+
+TEST_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
 
 BASE = f"{ROOT}/api"
 
@@ -17,7 +21,7 @@ def _get(h, p, **q):
 
 @pytest.fixture(scope="module")
 def admin():
-    return {"Authorization": f"Bearer {session_token('admin@kkt.in', 'Kkt@12345')}"}
+    return {"Authorization": f"Bearer {session_token('admin@kkt.in', TEST_PASSWORD)}"}
 
 
 @pytest.fixture(scope="module")
@@ -47,7 +51,6 @@ def test_stage_master_quick_add_and_booking_pseudo_stage(ctx):
 
 def test_stage_plan_create_sets_tower_sequence(ctx):
     h, st = ctx["admin"], ctx["stages"]
-    names = {s["name"]: s for s in st}
     poss = next((s for s in st if s.get("is_possession")), None)
     pick = [ctx["booking_stage"]] + [s for s in st if s["code"] not in ("BOOKING",) and not s.get("is_possession")][:4] + ([poss] if poss else [])
     pick.insert(2, ctx["basement"])

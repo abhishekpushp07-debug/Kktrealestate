@@ -148,7 +148,7 @@ def _ev(at, type_, title, subtitle=None, amount=None, **refs):
     return {"at": at, "type": type_, "title": title, "subtitle": subtitle, "amount_paise": amount, "refs": {k: v for k, v in refs.items() if v}}
 
 
-async def build_timeline(customer_id: str, company_id: str) -> list[dict]:
+async def build_timeline(customer_id: str, company_id: str) -> list[dict]:  # noqa: C901 — pre-existing (26); tracked in CR backlog
     c = await db.customers.find_one({"id": customer_id, "company_id": company_id}, {"_id": 0, "phone": 1, "created_at": 1, "customer_code": 1})
     if not c:
         return []

@@ -5,12 +5,14 @@ ERP portal management, ERP service requests RBAC, ERP notices, ERP photos, ERP d
 """
 import io
 import os
-import uuid
 import time
-import struct
-import zlib
+import uuid
+
 import pytest
 import requests
+
+TEST_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
+
 
 def _load_base():
     v = os.environ.get("REACT_APP_BACKEND_URL")
@@ -30,7 +32,7 @@ BASE = _load_base()
 ERP_LOGIN = f"{BASE}/api/auth/login"
 PORTAL_LOGIN = f"{BASE}/api/portal/auth/login"
 
-ERP_PW = "Kkt@12345"
+ERP_PW = TEST_PASSWORD
 PORTAL_PW = "Buyer@12345"
 
 
@@ -229,7 +231,6 @@ class TestServiceRequests:
         assert rc.status_code == 200
         bk = requests.get(f"{BASE}/api/portal/bookings", headers=_hdr(tok)).json()
         bid = [b for b in (bk.get("items") or bk) if b["booking_number"] == "BK-2526-0001"][0]["id"]
-        files = {}
         data = {"booking_id": bid, "category": "Payment query", "subject": "TEST SR", "description": "test desc", "priority": "Medium"}
         r = requests.post(
             f"{BASE}/api/portal/service-requests",
@@ -282,7 +283,6 @@ class TestErpPortalMgmt:
         # create new customer
         # unique phone + pan per run
         phone_last10 = f"9000{uuid.uuid4().int % 1000000:06d}"
-        pan = f"TEST{uuid.uuid4().hex[:5].upper()}K"[:10]
         payload = {
             "full_name": "TEST_Portal New",
             "phone": f"+91{phone_last10}",

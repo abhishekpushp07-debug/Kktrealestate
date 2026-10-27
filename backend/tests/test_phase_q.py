@@ -3,7 +3,7 @@ send-now path (document register + message + timeline), reminder settings valida
 import asyncio
 import os
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 
 import pytest
 import requests
@@ -16,7 +16,13 @@ mongo = MongoClient(os.environ["MONGO_URL"])[os.environ.get("KKT_TEST_DB", "kkt_
 
 
 def test_channel_interface_and_not_configured():
-    from services.messaging.adapters import CHANNELS, EmailResend, SmsAdapter, WhatsAppAdapter, assert_safe_email
+    from services.messaging.adapters import (
+        CHANNELS,
+        EmailResend,
+        SmsAdapter,
+        WhatsAppAdapter,
+        assert_safe_email,
+    )
     assert set(CHANNELS) == {"email", "whatsapp", "sms"}
     for a in (WhatsAppAdapter(), SmsAdapter()):
         assert a.configured() is False and a.needs
@@ -26,7 +32,7 @@ def test_channel_interface_and_not_configured():
         assert_safe_email("x", '<form><input></form>')
     with pytest.raises(ValueError):
         assert_safe_email("x", '<a href="http://bit.ly/x">x</a>')
-    assert_safe_email("ok", '<p><a href="https://kkt.example.com/a">Open on kkt.example.com</a></p>') is None
+    assert assert_safe_email("ok", '<p><a href="https://kkt.example.com/a">Open on kkt.example.com</a></p>') is None
 
 
 def test_pick_channel_consent_and_contact():
@@ -39,7 +45,12 @@ def test_pick_channel_consent_and_contact():
 
 
 def test_template_render_en_hi_and_unknown_placeholder():
-    from services.messaging.templates import SEEDED, render, to_html, unknown_placeholders
+    from services.messaging.templates import (
+        SEEDED,
+        render,
+        to_html,
+        unknown_placeholders,
+    )
     ctx = {"customer_name": "Ravi", "amount": "1,00,000", "booking_number": "BK-1", "flat": "A-101", "tower": "A", "project": "P", "due_date": "01 Jan 2026", "days_overdue": 7, "company": "KKT", "rm_name": "RM", "rm_phone": "9", "document_link": "https://x.example.com/d"}
     for code, t in SEEDED.items():
         for lang in ("en", "hi"):
@@ -132,8 +143,9 @@ def test_void_watermark_deterministic(admin_headers):
     v1 = requests.get(f"{BASE}/api/docgen/{doc['id']}/download", headers=admin_headers).content
     v2 = requests.get(f"{BASE}/api/docgen/{doc['id']}/download", headers=admin_headers).content
     assert v1 == v2 and v1 != clean and len(v1) > len(clean)
-    from pypdf import PdfReader
     import io
+
+    from pypdf import PdfReader
     txt = PdfReader(io.BytesIO(v1)).pages[0].extract_text()
     assert "VOID" in txt and "Voided on" in txt and "watermark test" in txt
     assert watermark(clean, "VOID", "x") == watermark(clean, "VOID", "x")

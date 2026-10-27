@@ -404,7 +404,7 @@ MASTER_FEATURE = {"allocation-categories": "allocation_category", "hold-reasons"
                   "spec-categories": "specification", "spec-items": "specification", "room-types": "flat_type", "area-types": "flat_type", "flat-types": "flat_type", "block-types": "block_type", "amenities": "amenity", "payment-modes": "payment_mode", "document-types": "document_type"}
 
 
-def _register(kind: str, coll_name: str, InModel, search_fields: list[str], usage_fn, label: str):
+def _register(kind: str, coll_name: str, InModel, search_fields: list[str], usage_fn, label: str):  # noqa: C901 — pre-existing (35); tracked in CR backlog
     feat = MASTER_FEATURE[kind]
     P_VIEW, P_CREATE, P_EDIT, P_DELETE = (f"masters.{feat}.{a}" for a in ("view", "create", "edit", "delete"))
     UpdateModel = _partial(InModel)
@@ -446,7 +446,7 @@ def _register(kind: str, coll_name: str, InModel, search_fields: list[str], usag
                     d["usage_count"] = None
         if res.pop("_csv", False):
             return Response(to_csv(res["items"]), media_type="text/csv", headers={"Content-Disposition": f"attachment; filename={coll_name}.csv"})
-        etag = '"' + hashlib.md5(json.dumps(res, sort_keys=True, default=str).encode()).hexdigest() + '"'
+        etag = '"' + hashlib.sha256(json.dumps(res, sort_keys=True, default=str).encode()).hexdigest() + '"'
         if request.headers.get("if-none-match") == etag:
             return Response(status_code=304, headers={"ETag": etag, "Cache-Control": "private, max-age=60"})
         response.headers["ETag"] = etag

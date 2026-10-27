@@ -46,7 +46,7 @@ _EVENT = {"set_category": "flat.category_changed", "hold": "flat.held", "extend_
 
 
 @router.post("/bulk")
-async def bulk(body: BulkIn, request: Request, user: dict = Depends(require_any("inventory.category.set", "inventory.hold.create", "inventory.hold.release", "inventory.block.set", "inventory.display.set"))):
+async def bulk(body: BulkIn, request: Request, user: dict = Depends(require_any("inventory.category.set", "inventory.hold.create", "inventory.hold.release", "inventory.block.set", "inventory.display.set"))):  # noqa: C901 — pre-existing (27); tracked in CR backlog
     if _PERM[body.action] not in user["permissions"]:
         raise ApiError(403, f"Missing permission: {_PERM[body.action]}", "PERMISSION_DENIED")
     flats = await db.flats.find({"id": {"$in": body.flat_ids}, "is_active": True, **project_scope_filter(user)}, {"_id": 0}).to_list(None)

@@ -129,6 +129,6 @@ async def run_overdue_reminders(as_of: str | None = None, force_window: bool = F
         totals["companies"] += 1
         ids = await db.demands.distinct("booking_id", {"company_id": co["id"], "voided": {"$ne": True}, "status": {"$in": ["Open", "Partially Paid"]}, "due_date": {"$lt": as_of}})
         bookings = db.bookings.find({"id": {"$in": ids}, "status": "Active"}, {"_id": 0})
-        run = await job_runs.run_isolated("OVERDUE_REMINDERS", bookings, lambda b: _process_booking(b, as_of, cfg), result_fn=lambda acc: {"bookings": len(acc), "messages": sum(len(x.get("sent", [])) for x in acc), "escalated": sum(1 for x in acc if x.get("escalated"))})
+        run = await job_runs.run_isolated("OVERDUE_REMINDERS", bookings, lambda b, _cfg=cfg: _process_booking(b, as_of, _cfg), result_fn=lambda acc: {"bookings": len(acc), "messages": sum(len(x.get("sent", [])) for x in acc), "escalated": sum(1 for x in acc if x.get("escalated"))})
         totals["runs"].append(run)
     return totals

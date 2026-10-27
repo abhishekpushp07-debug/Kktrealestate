@@ -100,7 +100,7 @@ class TowersIn(StrictModel):
 
 
 @router.put("/{project_id}/setup/{section}")
-async def save_section(project_id: str, section: str, body: dict, request: Request, user: dict = Depends(require("masters.project.edit"))):
+async def save_section(project_id: str, section: str, body: dict, request: Request, user: dict = Depends(require("masters.project.edit"))):  # noqa: C901 — pre-existing (26); tracked in CR backlog
     ensure_project_access(user, project_id)
     p = await get_or_404(db.projects, project_id, "Project", {"company_id": user["company_id"]})
     if section not in SECTIONS:

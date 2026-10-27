@@ -6,6 +6,8 @@ import os
 import pytest
 import requests
 
+TEST_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
+
 BASE = os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:8001").rstrip("/") + "/api"
 H = {"X-Rate-Limit-Bypass": "kkt-test-bypass-local"}
 HN = os.path.join(os.path.dirname(__file__), "..", "..", "memory", "qa", "story", "headline_numbers.json")
@@ -13,7 +15,7 @@ HN = os.path.join(os.path.dirname(__file__), "..", "..", "memory", "qa", "story"
 
 @pytest.fixture(scope="module")
 def Hd():
-    r = requests.post(f"{BASE}/auth/login", json={"email": "admin@kkt.in", "password": "Kkt@12345"}, headers=H, timeout=30)
+    r = requests.post(f"{BASE}/auth/login", json={"email": "admin@kkt.in", "password": TEST_PASSWORD}, headers=H, timeout=30)
     return {**H, "Authorization": f"Bearer {r.json()['access_token']}"}
 
 
@@ -29,7 +31,7 @@ def expected(Hd):
 def test_story_headline_numbers_unchanged(Hd, expected):
     """Structural/contractual numbers (sold value, inventory, cancellations, cheque register) must be byte-identical.
     Flow numbers that other tests legitimately move (collected/outstanding) are checked against the story anchor instead."""
-    home = requests.get(f"{BASE}/dashboard/home", params={"fresh": 1}, headers=Hd, timeout=60).json()["totals"]
+    requests.get(f"{BASE}/dashboard/home", params={"fresh": 1}, headers=Hd, timeout=60).json()["totals"]
     story_blocks = [b for b in requests.get(f"{BASE}/blocks", params={"page_size": 50}, headers=Hd, timeout=30).json()["items"] if b["name"] in ("Tower A", "Tower B", "Tower C", "Villa Block V")]
     assert sum(b.get("total_units") or b.get("units") or 0 for b in story_blocks) in (expected["units"], 0) or len(story_blocks) == 4
     canc = requests.get(f"{BASE}/reports/cancellations", params={"from_date": "2025-04-01", "to_date": expected["as_of"]}, headers=Hd, timeout=60).json()
