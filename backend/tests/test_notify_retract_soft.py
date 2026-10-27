@@ -43,5 +43,6 @@ def test_retract_is_soft_and_hidden(seeded):
 
 
 def test_module_has_no_hard_deletes():
-    src = open(os.path.join(os.path.dirname(__file__), "..", "services", "portal_notify.py")).read()
+    with open(os.path.join(os.path.dirname(__file__), "..", "services", "portal_notify.py")) as fh:
+        src = fh.read()
     assert "delete_one" not in src and "delete_many" not in src
