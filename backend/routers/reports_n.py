@@ -90,7 +90,7 @@ async def hold_register(request: Request, project_id: str | None = None, block_i
     held = [r for r in rows if r["status"] == "Hold"]
     uids = {(r.get("hold") or {}).get("for_user_id") for r in held} - {None}
     cids = {(r.get("hold") or {}).get("for_customer_id") for r in held} - {None}
-    users = {u["id"]: u.get("full_name") for u in await db.users.find({"id": {"$in": list(uids)}}, {"_id": 0, "id": 1, "full_name": 1}).to_list(None)}
+    users = {u["id"]: u.get("name") or u.get("full_name") for u in await db.users.find({"id": {"$in": list(uids)}}, {"_id": 0, "id": 1, "name": 1, "full_name": 1}).to_list(None)}
     custs = {c["id"]: c.get("full_name") for c in await db.customers.find({"id": {"$in": list(cids)}}, {"_id": 0, "id": 1, "full_name": 1}).to_list(None)}
     active = []
     for r in sorted(held, key=lambda r: (r.get("hold") or {}).get("expires_at") or ""):
@@ -128,7 +128,7 @@ async def masked_inventory(request: Request, project_id: str | None = None, bloc
     rows, bl = await _flats(user, project_id, block_id)
     masked = [r for r in rows if r.get("display_override") and inv.effective_display(r) != inv.MIRROR.get(r["status"])]
     uids = {r.get("display_set_by") for r in rows if r.get("display_override")} - {None}
-    users = {u["id"]: u.get("full_name") for u in await db.users.find({"id": {"$in": list(uids)}}, {"_id": 0, "id": 1, "full_name": 1}).to_list(None)}
+    users = {u["id"]: u.get("name") or u.get("full_name") for u in await db.users.find({"id": {"$in": list(uids)}}, {"_id": 0, "id": 1, "name": 1, "full_name": 1}).to_list(None)}
     items = [{"group": r["flat_number"], "tower": bl.get(r["block_id"], {}).get("name"), "real": r["status"], "displayed": r["display_state"], "reason": r.get("display_reason") or "—", "since": r.get("display_set_at"), "by": users.get(r.get("display_set_by")) or "—", "value_paise": int(r.get("price_paise") or 0), "_link": _link(r)} for r in sorted(masked, key=lambda r: (r["block_id"], r["flat_number"]))]
     cols = [("group", "Flat", "str", 0.8), ("tower", "Tower", "str", 1.0), ("real", "Real status", "str", 0.9), ("displayed", "Displayed as", "str", 1.1), ("reason", "Reason", "str", 1.6), ("since", "Since", "date", 0.9), ("by", "Set by", "str", 1.1), ("value_paise", "List value", "money")]
     totals = {"value_paise": sum(i["value_paise"] for i in items)}
