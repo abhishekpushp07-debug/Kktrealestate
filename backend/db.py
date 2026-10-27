@@ -1,3 +1,4 @@
+import logging
 import os
 from pathlib import Path
 
@@ -63,6 +64,33 @@ async def ensure_indexes():
     await db.login_events.create_index([("created_at", DESCENDING)])
     await db.login_events.create_index("email")
     await db.login_events.create_index([("email", ASCENDING), ("ip", ASCENDING), ("success", ASCENDING), ("created_at", DESCENDING)])
+    # Phase J2: compound keyset indexes (company, sort_key, id) for every allowed list sort + read-path indexes proven on kkt_scale (tools/explain_audit.py → 0 COLLSCAN / 0 in-memory sort)
+    from tools.explain_audit import LIST_SORTS
+    for coll, keys in LIST_SORTS.items():
+        for k in keys:
+            spec = ([("company_id", ASCENDING)] if coll != "audit_logs" else []) + [(k, ASCENDING), ("id", ASCENDING)]
+            await _safe_index(db[coll], spec, f"ks_company_{k}_id")
+        if coll != "audit_logs":
+            await _safe_index(db[coll], [("company_id", ASCENDING), ("project_id", ASCENDING), (keys[0], DESCENDING), ("id", DESCENDING)], f"ks_project_{keys[0]}_id")
+    for coll, spec, name in [
+        ("customers", [("company_id", ASCENDING), ("is_active", ASCENDING), ("full_name", ASCENDING)], "search_name"),
+        ("bookings", [("company_id", ASCENDING), ("booking_number", ASCENDING)], "search_booking_number"),
+        ("bookings", [("customer_id", ASCENDING), ("booking_date", DESCENDING)], "c360_bookings"),
+        ("bookings", [("company_id", ASCENDING), ("status", ASCENDING), ("project_id", ASCENDING)], "active_by_project"),
+        ("bookings", [("project_id", ASCENDING), ("status", ASCENDING), ("block_id", ASCENDING)], "project_block_summary"),
+        ("payments", [("booking_id", ASCENDING), ("payment_date", DESCENDING)], "booking_payments"),
+        ("payments", [("company_id", ASCENDING), ("status", ASCENDING), ("payment_date", ASCENDING)], "status_date"),
+        ("payments", [("company_id", ASCENDING), ("status", ASCENDING), ("project_id", ASCENDING), ("payment_date", ASCENDING)], "status_project_date"),
+        ("demands", [("booking_id", ASCENDING), ("voided", ASCENDING), ("installment_seq", ASCENDING)], "booking_installments"),
+        ("demands", [("company_id", ASCENDING), ("voided", ASCENDING), ("status", ASCENDING), ("due_date", ASCENDING)], "overdue"),
+        ("ledger_entries", [("booking_id", ASCENDING), ("seq", ASCENDING)], "booking_seq"),
+        ("audit_logs", [("entity_type", ASCENDING), ("entity_id", ASCENDING), ("created_at", DESCENDING)], "entity_time"),
+        ("flats", [("block_id", ASCENDING), ("is_active", ASCENDING), ("floor", ASCENDING), ("position", ASCENDING)], "block_grid"),
+        ("flats", [("project_id", ASCENDING), ("is_active", ASCENDING), ("status", ASCENDING)], "project_status"),
+        ("leads", [("company_id", ASCENDING), ("is_active", ASCENDING), ("status", ASCENDING)], "pipeline"),
+    ]:
+        await _safe_index(db[coll], spec, name)
+
     await db.counters.create_index([("scope", ASCENDING), ("key", ASCENDING)], unique=True)
     await db.settings.create_index("key", unique=True)
     for c in ("floor_plan_templates", "plc_types", "spec_categories", "spec_items", "rate_cards", "parking_slots"):
@@ -168,3 +196,11 @@ async def ensure_indexes():
     await db.login_events.create_index([("account_id", ASCENDING), ("success", ASCENDING), ("created_at", DESCENDING)])
     await db.portal_accounts.create_index("customer_id")
     await db.audit_logs.create_index([("company_id", ASCENDING), ("created_at", DESCENDING)])
+
+
+async def _safe_index(coll, spec, name):
+    """Idempotent: ignores 'already exists with a different name' (older ad-hoc indexes) so startup never fails on index drift."""
+    try:
+        await coll.create_index(spec, name=name, background=True)
+    except Exception as e:  # noqa: BLE001
+        logging.getLogger("db").info("index %s.%s skipped: %s", coll.name, name, str(e)[:80])

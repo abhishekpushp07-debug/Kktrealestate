@@ -1,0 +1,72 @@
+{
+  "target": "kkt_scale",
+  "scale": 1.0,
+  "build_s": 289,
+  "integrity_sample": {
+    "checked": 200,
+    "mismatches": 0
+  },
+  "db_storage_mb": 1007.3,
+  "collections": {
+    "projects": {
+      "count": 25,
+      "size_mb": 0.1,
+      "storage_mb": 0.0
+    },
+    "blocks": {
+      "count": 300,
+      "size_mb": 2.6,
+      "storage_mb": 0.3
+    },
+    "flats": {
+      "count": 60000,
+      "size_mb": 196.3,
+      "storage_mb": 31.2
+    },
+    "customers": {
+      "count": 40000,
+      "size_mb": 45.0,
+      "storage_mb": 6.3
+    },
+    "bookings": {
+      "count": 30000,
+      "size_mb": 147.5,
+      "storage_mb": 20.9
+    },
+    "payments": {
+      "count": 990000,
+      "size_mb": 1254.9,
+      "storage_mb": 221.5
+    },
+    "demands": {
+      "count": 600000,
+      "size_mb": 506.1,
+      "storage_mb": 88.3
+    },
+    "ledger_entries": {
+      "count": 1590000,
+      "size_mb": 1058.3,
+      "storage_mb": 185.6
+    },
+    "audit_logs": {
+      "count": 3000000,
+      "size_mb": 1389.0,
+      "storage_mb": 391.1
+    },
+    "leads": {
+      "count": 100000,
+      "size_mb": 67.3,
+      "storage_mb": 14.1
+    },
+    "service_tickets": {
+      "count": 50000,
+      "size_mb": 22.1,
+      "storage_mb": 8.6
+    },
+    "documents": {
+      "count": 200000,
+      "size_mb": 119.0,
+      "storage_mb": 39.0
+    }
+  }
+}
