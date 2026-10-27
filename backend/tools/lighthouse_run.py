@@ -37,6 +37,8 @@ with sync_playwright() as p:
     ctx.close()
 
 rows = []
+import os
+if os.environ.get("LH_ONLY"): screens = {k: v for k, v in screens.items() if k in os.environ["LH_ONLY"].split(",")}
 for name, path in screens.items():
     out = os.path.join(OUT, name)
     cmd = [LH, f"{BASE}{path}", "--preset=desktop", "--quiet", "--output=json", "--output=html", f"--output-path={out}", "--chrome-flags=--headless=new --no-sandbox --disable-dev-shm-usage --user-data-dir=" + profile,
