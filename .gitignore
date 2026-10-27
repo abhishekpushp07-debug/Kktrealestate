@@ -101,3 +101,5 @@ credentials.json
 # Build output (platform rebuilds)
 frontend/build/
 .emergent/
+backups/
+exports/
