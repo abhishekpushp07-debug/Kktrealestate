@@ -42,6 +42,9 @@ def shape(flat: dict, user: dict | None) -> dict | None:
     if "created_at" in out:  # full documents: key always present and non-null so a masked flat cannot be told apart from a genuinely sold one
         masked = bool(flat.get("display_override")) and disp != MIRROR.get(flat.get("status"))
         out["status_changed_at"] = (flat.get("display_set_at") if masked else None) or flat.get("status_changed_at") or flat.get("updated_at") or flat.get("created_at")
+        out.setdefault("allocation_category_code", "BUILDER")
+        out.setdefault("allocation_category_id", None)
+        out.setdefault("bookable", True)
     if flat.get("status") == "Hold" and disp == "Show as Hold":
         h = flat.get("hold") or {}
         out["hold"] = {k: h.get(k) for k in ("expires_at", "for_customer_id", "for_user_id", "reason_id")}  # sales users work holds; no display metadata

@@ -2,4 +2,95 @@ bringing up nodes...
 bringing up nodes...
 
 ........................................................................ [ 12%]
-...................................................
+........................................................................ [ 25%]
+........................................................................ [ 37%]
+........................................................................ [ 50%]
+........................................................................ [ 63%]
+.................s.........................F............................ [ 75%]
+........................................................................ [ 88%]
+...............................s...................................      [100%]
+=================================== FAILURES ===================================
+_______ test_masked_flat_indistinguishable_from_sold_for_non_privileged ________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDd...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDk4MjM0LCJleHAiOjE3OTMwOTkxMzR9.Y7J2b6FAV5Uq3CYcWz34mLDxwBZq62jbyec91KICidg'}
+
+    def test_masked_flat_indistinguishable_from_sold_for_non_privileged(admin_headers):
+        sales = _sales_headers()
+        f = _avail_flats(admin_headers, 1)[0]
+        r = _bulk(admin_headers, flat_ids=[f["id"]], action="set_display", display_state="Show as Sold", reason="hold back")
+        assert r.status_code == 200 and r.json()["done"] == 1
+        priv = requests.get(f"{BASE}/api/flats/{f['id']}", headers=admin_headers).json()
+        assert priv["status"] == "Available" and priv["inventory_state"] == "Available" and priv["display_state"] == "Show as Sold" and priv["masked"] is True
+        grid = requests.get(f"{BASE}/api/blocks/{f['block_id']}/grid", headers=admin_headers).json()
+        cell = next(x for fl in grid["floors"] for x in fl["flats"] if x["id"] == f["id"])
+        assert cell["masked"] is True and cell["status"] == "Available"
+        if sales:
+            s = requests.get(f"{BASE}/api/flats/{f['id']}", headers=sales).json()
+            assert s["status"] == "Sold" and not any(k in s for k in ("display_state", "display_override", "inventory_state", "masked", "display_reason"))
+            sgrid = requests.get(f"{BASE}/api/blocks/{f['block_id']}/grid", headers=sales).json()
+            scell = next(x for fl in sgrid["floors"] for x in fl["flats"] if x["id"] == f["id"])
+            assert scell["status"] == "Sold" and "masked" not in scell and "display_state" not in scell
+            # a real Sold flat and the masked one have the identical key set AND null-pattern for the Sales user — across the whole company
+            real_sold = next((x for fl in sgrid["floors"] for x in fl["flats"] if x["status"] == "Sold" and x["id"] != f["id"]), None)
+            if real_sold:
+                assert set(real_sold) == set(scell)
+            def _all(h):
+                out, page = [], 1
+                while True:
+                    r = requests.get(f"{BASE}/api/flats", params={"page_size": 200, "page": page}, headers=h).json()
+                    out += r["items"]
+                    if len(r["items"]) < 200:
+                        return out
+                    page += 1
+            allf, allp = _all(sales), _all(admin_headers)
+            masked_ids = {x["id"] for x in allp if x.get("masked") and x["display_state"] == "Show as Sold"}
+            real_ids = {x["id"] for x in allp if x["inventory_state"] in ("Booked", "Sold")}
+            sm = [x for x in allf if x["id"] in masked_ids]
+            sr = [x for x in allf if x["id"] in real_ids]
+            assert sm and sr, (len(allf), len(allp), len(masked_ids), len(real_ids), next(x for x in allp if x["id"] == f["id"]), mongo.flats.find_one({"id": f["id"]}, {"_id": 0, "status": 1, "display_state": 1, "display_override": 1, "flat_number": 1}), requests.get(f"{BASE}/api/flats/{f['id']}", headers=admin_headers).json()["inventory_state"])
+            assert all(x["status"] == "Sold" for x in sm + sr) and not any("booking_id" in x for x in sm + sr)
+            keysets = {frozenset(x) for x in sm + sr}
+>           assert len(keysets) == 1, [sorted(a ^ b) for a in keysets for b in keysets if a != b][:1]
+E           AssertionError: [['allocation_category_code', 'allocation_category_id', 'bookable']]
+E           assert 2 == 1
+E            +  where 2 = len({frozenset({'block_code', 'block_id', 'block_name', 'builtup_sqft', 'carpet_sqft', 'company_id', ...}), frozenset({'allocation_category_code', 'allocation_category_id', 'block_code', 'block_id', 'block_name', 'bookable', ...})})
+
+tests/test_phase_n_inventory.py:90: AssertionError
+=============================== warnings summary ===============================
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+  /root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+tests/test_phase_k_p1.py::test_loadshed_sheds_with_prebuilt_503_and_exempts_probes
+  /root/.venv/lib/python3.11/site-packages/starlette/testclient.py:41: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    [], typing.ContextManager[anyio.abc.BlockingPortal]
+
+tests/test_kkt_erp.py::TestBlock::test_create_block_and_generation
+tests/test_kkt_erp.py::TestFlatType::test_create_flat_type_auto_area
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+  /root/.venv/lib/python3.11/site-packages/_pytest/fixtures.py:1313: PytestRemovedIn10Warning: Class-scoped fixture defined as instance method is deprecated.
+  Instance attributes set in this fixture will NOT be visible to test methods,
+  as each test gets a new instance while the fixture runs only once per class.
+  Use @classmethod decorator and set attributes on cls instead.
+  See https://docs.pytest.org/en/stable/deprecations.html#class-scoped-fixture-as-instance-method
+    fixturefunc = resolve_fixture_function(fixturedef, request)
+
+tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources
+  /root/.venv/lib/python3.11/site-packages/_pytest/python.py:171: PytestReturnNotNoneWarning: Test functions should return None, but tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources returned <class 'str'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_phase_n_inventory.py::test_masked_flat_indistinguishable_from_sold_for_non_privileged
+1 failed, 568 passed, 2 skipped, 10 warnings in 489.71s (0:08:09)
+SUITE_EXIT 1

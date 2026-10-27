@@ -121,6 +121,9 @@ async def generate_flats(block: dict, floors: list[int] | None, user: dict | Non
                 docs.append(build_flat(block, fts[p["flat_type_id"]], floor, p["position"], seq, user, p))
     if not docs:
         return []
+    builder = await db.allocation_categories.find_one({"company_id": block["company_id"], "code": "BUILDER"}, {"_id": 0, "id": 1})  # Phase N: every new flat is Builder-saleable
+    for d in docs:
+        d.update({"allocation_category_id": builder["id"] if builder else None, "allocation_category_code": "BUILDER", "bookable": True, "display_state": None, "display_override": False})
     async with unit_of_work() as uow:
         ids = [d["id"] for d in docs]
         uow.on_rollback(lambda: db.flats.delete_many({"id": {"$in": ids}}))
