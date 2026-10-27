@@ -40,6 +40,8 @@ async def ops(window: int = 900, user: dict = Depends(require("admin.system_heal
         "requests": {k: snap[k] for k in ("window_s", "requests", "rps", "p50_ms", "p95_ms", "by_group", "slow", "errors_by_code")},
         "jobs": snap["jobs"],
         "load_shed": __import__("services.loadshed", fromlist=["snapshot"]).snapshot(),
+        "pool": {**__import__("dbtiming").POOL_STATS, "max_pool_size": __import__("db").POOL["maxPoolSize"]},
+        "caches": {"ttlcache": __import__("services.ttlcache", fromlist=["snapshot"]).snapshot()},
         "alerts": __import__("services.alerts", fromlist=["LAST"]).LAST,
         "backup": await _backup_status(),
         "job_runs": await __import__("services.job_runs", fromlist=["health"]).health(),

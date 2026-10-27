@@ -196,9 +196,15 @@ from services.definitions import ageing_for_bookings  # noqa: E402
 async def outstanding(request: Request, project_id: str | None = None, block_id: str | None = None, group_by: str = "customer", format: str | None = None, user: dict = Depends(require("reports.outstanding.view"))):
     _strict_params(request, {'block_id', 'group_by', 'project_id'})
     q = {**_scope(user, project_id, block_id), "status": {"$in": ["Active", "Completed"]}}
-    bks = await db.bookings.find(q, {"_id": 0, "id": 1, "booking_number": 1, "customer_name": 1, "project_code": 1, "block_code": 1, "flat_snapshot.flat_number": 1, "summary": 1, "project_id": 1, "block_id": 1}).to_list(None)
     today = clock.today()
-    ageing, per_bk = await ageing_for_bookings(q, today)
+    from services import ttlcache
+    import hashlib
+    import json
+    async def _load():  # Phase J5 hot path #2: full ageing pass is O(open demands) → cached 60 s per scope
+        _b = await db.bookings.find(q, {"_id": 0, "id": 1, "booking_number": 1, "customer_name": 1, "project_code": 1, "block_code": 1, "flat_snapshot.flat_number": 1, "summary": 1, "project_id": 1, "block_id": 1}).max_time_ms(REPORT_MS).to_list(None)
+        _a, _p = await ageing_for_bookings(q, today)
+        return _b, _a, _p
+    bks, ageing, per_bk = await ttlcache.cached(f"rep:outstanding:{hashlib.sha1(json.dumps(q, sort_keys=True).encode()).hexdigest()}:{today}", 60, _load)
     rows = []
     for b in bks:
         s = b.get("summary") or {}

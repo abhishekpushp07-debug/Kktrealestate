@@ -122,8 +122,15 @@ async def _compensate(booking_id: str, comp: dict):
 
 
 async def _payment_totals(q: dict) -> dict:
-    agg = await db.payments.aggregate([{"$match": q}, {"$group": {"_id": "$status", "n": {"$sum": 1}, "s": {"$sum": "$amount_paise"}}}]).to_list(None)
-    return present_money({a["_id"]: {"count": a["n"], "amount_paise": a["s"]} for a in agg})
+    """Phase J5 hot path #1: status totals over the whole scope are O(matched rows) → cached 30 s per query shape (invalidated naturally; the list itself is live)."""
+    import hashlib
+    import json
+    from services import ttlcache
+    async def compute():
+        agg = await db.payments.aggregate([{"$match": q}, {"$group": {"_id": "$status", "n": {"$sum": 1}, "s": {"$sum": "$amount_paise"}}}], maxTimeMS=20000).to_list(None)
+        return present_money({a["_id"]: {"count": a["n"], "amount_paise": a["s"]} for a in agg})
+    unfiltered = set(q) <= {"company_id", "project_id", "voided"}  # whole-scope totals change slowly → 5 min; filtered views 30 s
+    return await ttlcache.cached(f"paytot:{hashlib.sha1(json.dumps(q, sort_keys=True, default=str).encode()).hexdigest()}", 300 if unfiltered else 30, compute)
 
 
 @router.get("/demands")

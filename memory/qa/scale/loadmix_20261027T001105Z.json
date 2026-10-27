@@ -1,0 +1,217 @@
+{
+  "meta": {
+    "base": "http://127.0.0.1:8002",
+    "levels": [
+      100,
+      300,
+      600
+    ],
+    "seconds": 15,
+    "at": "20261027T001105Z",
+    "note": "Sandbox: ONE uvicorn worker, shared CPU with the preview stack and MongoDB on the same container. Production capacity = measured per-worker RPS \u00d7 workers (ESTIMATE)."
+  },
+  "results": [
+    {
+      "users": 100,
+      "requests": 392,
+      "rps": 13.4,
+      "p50_ms": 3770.0,
+      "p95_ms": 16082.6,
+      "p99_ms": 22220.9,
+      "errors": {
+        "503 OVERLOADED": 226,
+        "RemoteProtocolError": 13
+      },
+      "5xx_non_shed": 0,
+      "shed_503": 226,
+      "rss_mb_before": 567.8,
+      "rss_mb_after": 606.5,
+      "hot_paths": [
+        {
+          "scenario": "home",
+          "p95_ms": 20386.9,
+          "n": 71,
+          "db_p95_ms": 163.2
+        },
+        {
+          "scenario": "customer_360",
+          "p95_ms": 16795.8,
+          "n": 39,
+          "db_p95_ms": 561.4
+        },
+        {
+          "scenario": "customer_create",
+          "p95_ms": 16285.8,
+          "n": 13,
+          "db_p95_ms": 3369.5
+        },
+        {
+          "scenario": "payments_list",
+          "p95_ms": 15868.3,
+          "n": 71,
+          "db_p95_ms": 7344.3
+        },
+        {
+          "scenario": "booking_ledger",
+          "p95_ms": 11399.3,
+          "n": 46,
+          "db_p95_ms": 241.6
+        },
+        {
+          "scenario": "search",
+          "p95_ms": 11375.8,
+          "n": 56,
+          "db_p95_ms": 1017.6
+        },
+        {
+          "scenario": "bookings_list",
+          "p95_ms": 11240.9,
+          "n": 69,
+          "db_p95_ms": 363.6
+        },
+        {
+          "scenario": "report_outstanding",
+          "p95_ms": 11209.0,
+          "n": 14,
+          "db_p95_ms": 78.6
+        }
+      ],
+      "kind": "measured"
+    },
+    {
+      "users": 300,
+      "requests": 410,
+      "rps": 9.8,
+      "p50_ms": 18742.0,
+      "p95_ms": 28037.1,
+      "p99_ms": 33987.7,
+      "errors": {
+        "503 OVERLOADED": 228,
+        "RemoteProtocolError": 5
+      },
+      "5xx_non_shed": 0,
+      "shed_503": 228,
+      "rss_mb_before": 772.9,
+      "rss_mb_after": 1100.3,
+      "hot_paths": [
+        {
+          "scenario": "report_outstanding",
+          "p95_ms": 41970.1,
+          "n": 18,
+          "db_p95_ms": 13587.4
+        },
+        {
+          "scenario": "payments_list",
+          "p95_ms": 33931.5,
+          "n": 74,
+          "db_p95_ms": 14923.4
+        },
+        {
+          "scenario": "home",
+          "p95_ms": 28021.8,
+          "n": 69,
+          "db_p95_ms": 477.8
+        },
+        {
+          "scenario": "customer_create",
+          "p95_ms": 24318.4,
+          "n": 13,
+          "db_p95_ms": 4677.0
+        },
+        {
+          "scenario": "customer_360",
+          "p95_ms": 23907.0,
+          "n": 45,
+          "db_p95_ms": 2797.5
+        },
+        {
+          "scenario": "search",
+          "p95_ms": 23688.5,
+          "n": 53,
+          "db_p95_ms": 2854.8
+        },
+        {
+          "scenario": "booking_ledger",
+          "p95_ms": 23603.4,
+          "n": 49,
+          "db_p95_ms": 428.3
+        },
+        {
+          "scenario": "bookings_list",
+          "p95_ms": 23487.9,
+          "n": 84,
+          "db_p95_ms": 816.7
+        }
+      ],
+      "kind": "measured"
+    },
+    {
+      "users": 600,
+      "requests": 719,
+      "rps": 11.9,
+      "p50_ms": 44364.5,
+      "p95_ms": 59081.5,
+      "p99_ms": 60415.6,
+      "errors": {
+        "503 OVERLOADED": 392,
+        "RemoteProtocolError": 16,
+        "ReadTimeout": 21
+      },
+      "5xx_non_shed": 0,
+      "shed_503": 392,
+      "rss_mb_before": 1138.2,
+      "rss_mb_after": 1871.3,
+      "hot_paths": [
+        {
+          "scenario": "payments_list",
+          "p95_ms": 59092.0,
+          "n": 105,
+          "db_p95_ms": 15888.0
+        },
+        {
+          "scenario": "customer_create",
+          "p95_ms": 49634.4,
+          "n": 27,
+          "db_p95_ms": 5413.0
+        },
+        {
+          "scenario": "home",
+          "p95_ms": 49624.9,
+          "n": 120,
+          "db_p95_ms": 91.9
+        },
+        {
+          "scenario": "bookings_list",
+          "p95_ms": 49624.7,
+          "n": 154,
+          "db_p95_ms": 808.5
+        },
+        {
+          "scenario": "customer_360",
+          "p95_ms": 49615.7,
+          "n": 58,
+          "db_p95_ms": 1488.7
+        },
+        {
+          "scenario": "search",
+          "p95_ms": 49615.3,
+          "n": 126,
+          "db_p95_ms": 1293.4
+        },
+        {
+          "scenario": "report_outstanding",
+          "p95_ms": 49610.0,
+          "n": 33,
+          "db_p95_ms": 284.8
+        },
+        {
+          "scenario": "booking_ledger",
+          "p95_ms": 49594.6,
+          "n": 59,
+          "db_p95_ms": 573.6
+        }
+      ],
+      "kind": "measured"
+    }
+  ]
+}

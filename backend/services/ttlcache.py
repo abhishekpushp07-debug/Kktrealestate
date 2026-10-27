@@ -1,21 +1,35 @@
-"""Tiny in-process TTL cache for expensive read endpoints (per worker; use Redis for multi-node)."""
+"""Tiny in-process TTL cache for expensive read endpoints (per worker; use Redis for multi-node).
+Phase J6: bounded LRU (TTLCACHE_MAX entries, default 2000, oldest evicted) + single-flight so 100 concurrent misses compute once."""
+import asyncio
+import os
 import time
+from collections import OrderedDict
 
-_store: dict[str, tuple[float, object]] = {}
+MAX_ENTRIES = int(os.environ.get("TTLCACHE_MAX", "2000"))
+_store: OrderedDict[str, tuple[float, object]] = OrderedDict()
+_inflight: dict[str, asyncio.Future] = {}
+STATS = {"evictions": 0, "coalesced": 0}
 
 
 def get(key: str):
     v = _store.get(key)
     if v and v[0] > time.monotonic():
+        _store.move_to_end(key)
         return v[1]
     _store.pop(key, None)
     return None
 
 
 def put(key: str, value, ttl: float = 10.0):
-    if len(_store) > 2000:
-        _store.clear()
+    while len(_store) >= MAX_ENTRIES:
+        _store.popitem(last=False)
+        STATS["evictions"] += 1
     _store[key] = (time.monotonic() + ttl, value)
+    _store.move_to_end(key)
+
+
+def snapshot() -> dict:
+    return {"entries": len(_store), "max_entries": MAX_ENTRIES, "inflight": len(_inflight), **STATS, **HITS}
 
 
 def invalidate(prefix: str):
@@ -52,14 +66,28 @@ async def cached(key: str, ttl: float, compute):
     if hit is not None:
         HITS["hit"] += 1
         return hit
+    fut = _inflight.get(key)
+    if fut is not None:  # single-flight: wait for the in-progress compute
+        STATS["coalesced"] += 1
+        HITS["hit"] += 1
+        return await asyncio.shield(fut)
     HITS["miss"] += 1
-    val = await compute()
-    if use_redis:
-        from services import cache
-        await cache.set("ttl:" + key, json.loads(json.dumps(val, default=str)), max(1, int(ttl)))
-    else:
-        put(key, val, ttl)
-    return val
+    fut = asyncio.get_running_loop().create_future()
+    _inflight[key] = fut
+    try:
+        val = await compute()
+        if use_redis:
+            from services import cache
+            await cache.set("ttl:" + key, json.loads(json.dumps(val, default=str)), max(1, int(ttl)))
+        else:
+            put(key, val, ttl)
+        fut.set_result(val)
+        return val
+    except BaseException as e:
+        fut.set_exception(e)
+        raise
+    finally:
+        _inflight.pop(key, None)
 
 
 def _subscribe():

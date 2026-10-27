@@ -12,7 +12,7 @@ load_dotenv(Path(__file__).parent / ".env")
 #   MONGO_MAX_POOL (50)  max sockets per process      MONGO_MIN_POOL (5)   warm sockets kept open
 #   MONGO_WAIT_QUEUE_MS (5000) wait for a free socket  MONGO_SST_MS (5000)  server selection timeout
 #   MONGO_CONNECT_MS (5000) TCP connect               MONGO_SOCKET_MS (30000) per-operation socket timeout
-POOL = {"maxPoolSize": int(os.environ.get("MONGO_MAX_POOL", "50")), "minPoolSize": int(os.environ.get("MONGO_MIN_POOL", "5")),
+POOL = {"maxPoolSize": int(os.environ.get("MONGO_MAX_POOL", "100")), "minPoolSize": int(os.environ.get("MONGO_MIN_POOL", "5")),
         "waitQueueTimeoutMS": int(os.environ.get("MONGO_WAIT_QUEUE_MS", "5000")), "serverSelectionTimeoutMS": int(os.environ.get("MONGO_SST_MS", "5000")),
         "connectTimeoutMS": int(os.environ.get("MONGO_CONNECT_MS", "5000")), "socketTimeoutMS": int(os.environ.get("MONGO_SOCKET_MS", "30000")),
         "maxIdleTimeMS": 120000, "heartbeatFrequencyMS": 10000}

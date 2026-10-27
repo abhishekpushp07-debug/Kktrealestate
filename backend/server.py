@@ -263,10 +263,10 @@ async def validation_exc_handler(request: Request, exc: RequestValidationError):
 @app.exception_handler(Exception)
 async def unhandled_exc_handler(request: Request, exc: Exception):
     rid = getattr(request.state, "request_id", None)
-    from pymongo.errors import AutoReconnect, ExecutionTimeout, NetworkTimeout, OperationFailure, ServerSelectionTimeoutError, WriteConcernError
+    from pymongo.errors import AutoReconnect, ConnectionFailure, ExecutionTimeout, NetworkTimeout, OperationFailure, ServerSelectionTimeoutError, WaitQueueTimeoutError, WriteConcernError
     if isinstance(exc, ExecutionTimeout):  # Phase K.8/K.11: retryable DB envelopes
         return _retryable(rid, 503, "QUERY_TIMEOUT", "Query exceeded its time budget; narrow the filters or retry", "5")
-    if isinstance(exc, (AutoReconnect, NetworkTimeout, ServerSelectionTimeoutError, WriteConcernError)):
+    if isinstance(exc, (AutoReconnect, NetworkTimeout, ServerSelectionTimeoutError, WriteConcernError, WaitQueueTimeoutError, ConnectionFailure)):  # J6: pool wait-queue timeouts are retryable DB_TIMEOUT
         logger.warning("transient db error: %s", exc)
         return _retryable(rid, 503, "DB_TIMEOUT", "Database temporarily unavailable; retry shortly", "2")
     if isinstance(exc, OperationFailure) and (exc.code in (112, 251, 246) or exc.has_error_label("TransientTransactionError")):
