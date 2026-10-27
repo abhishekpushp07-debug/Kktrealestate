@@ -86,7 +86,7 @@ def test_masked_flat_indistinguishable_from_sold_for_non_privileged(admin_header
         assert next(b for b in sp["blocks"] if b["id"] == f["block_id"])["inventory"]["Available"] == sb["Available"]
         # tower cards (/blocks) and the flats list status filter are display-based too
         card = next(b for b in requests.get(f"{BASE}/api/blocks", params={"page_size": 100}, headers=sales).json()["items"] if b["id"] == f["block_id"])
-        assert card["inventory"]["Booked"] == 0 and card["inventory"]["Available"] == sb["Available"]
+        assert card["inventory"]["Booked"] == 0 and card["inventory"]["Available"] == sb["Available"], (card["name"], card["inventory"], sb)
         lst = requests.get(f"{BASE}/api/flats", params={"block_id": f["block_id"], "status": "Available", "page_size": 200}, headers=sales).json()["items"]
         assert all(x["id"] != f["id"] for x in lst) and all(x["status"] == "Available" for x in lst)
         srch = requests.get(f"{BASE}/api/search", params={"q": f["flat_number"], "scope": "flats"}, headers=sales).json()

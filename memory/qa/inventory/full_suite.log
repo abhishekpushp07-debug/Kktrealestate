@@ -1,13 +1,48 @@
-bringing up nodes...
-bringing up nodes...
-
-........................................................................ [ 12%]
-........................................................................ [ 25%]
-........................................................................ [ 37%]
-.............................F.........................................s [ 50%]
-........................................................................ [ 63%]
-................................/root/.venv/lib/python3.11/site-packages/_pytest/main.py:365: PluggyTeardownRaisedWarning: A plugin raised an exception during an old-style hookwrapper teardown.
-Plugin: 274579048544656, Hook: pytest_sessionfinish
-OSError: cannot send (already closed?)
-For more information see https://pluggy.readthedocs.io/en/stable/api_reference.html#pluggy.PluggyTeardownRaisedWarning
-  config.hook.pytest_sessionfinish(
+ImportError while loading conftest '/app/backend/tests/conftest.py'.
+tests/conftest.py:102: in <module>
+    _snapshot_preview_into_test_db()
+tests/conftest.py:60: in _snapshot_preview_into_test_db
+    dst[name].create_index(list(ix["key"].items()), name=ix["name"], **opts)
+/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/collection.py:2369: in create_index
+    return (self._create_indexes([index], session, **cmd_options))[0]
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/pymongo/_csot.py:126: in csot_wrapper
+    return func(self, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/collection.py:2251: in _create_indexes
+    return self.database.client._retryable_write(False, inner, session, _Op.CREATE_INDEXES)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/mongo_client.py:2099: in _retryable_write
+    return self._retry_with_session(retryable, func, s, bulk, operation, operation_id)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/mongo_client.py:1969: in _retry_with_session
+    return self._retry_internal(
+/root/.venv/lib/python3.11/site-packages/pymongo/_csot.py:126: in csot_wrapper
+    return func(self, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/mongo_client.py:2022: in _retry_internal
+    ).run()
+      ^^^^^
+/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/mongo_client.py:2890: in run
+    res = self._read() if self._is_read else self._write()
+                                             ^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/mongo_client.py:3103: in _write
+    return self._func(self._session, conn, self._retryable)  # type: ignore
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/collection.py:2241: in inner
+    self._command(
+/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/collection.py:600: in _command
+    return conn.command(
+/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/helpers.py:51: in inner
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/pool.py:396: in command
+    return run_command(
+/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/command_runner.py:440: in run_command
+    docs, _, _ = _run_command(
+/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/command_runner.py:214: in _run_command
+    helpers_shared._check_command_response(
+/root/.venv/lib/python3.11/site-packages/pymongo/helpers_shared.py:317: in _check_command_response
+    raise DuplicateKeyError(errmsg, code, response, max_wire_version)
+E   pymongo.errors.DuplicateKeyError: Index build failed: 2b575f8f-b354-4333-96d7-ed53da6732e0: Collection kkt_test.locks ( 31dcc161-5d57-416d-b774-b40217224527 ) :: caused by :: E11000 duplicate key error collection: kkt_test.locks index: name_1 dup key: { name: "scheduler" }, full error: {'ok': 0.0, 'errmsg': 'Index build failed: 2b575f8f-b354-4333-96d7-ed53da6732e0: Collection kkt_test.locks ( 31dcc161-5d57-416d-b774-b40217224527 ) :: caused by :: E11000 duplicate key error collection: kkt_test.locks index: name_1 dup key: { name: "scheduler" }', 'code': 11000, 'codeName': 'DuplicateKey', 'keyPattern': {'name': 1}, 'keyValue': {'name': 'scheduler'}}
+SUITE_EXIT 4
