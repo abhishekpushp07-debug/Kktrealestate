@@ -173,15 +173,21 @@ async def activate_rate_card(project_id: str, rc_id: str, request: Request, user
 
 
 @router.post("/{rc_id}/apply")
-async def apply_rate_card(project_id: str, rc_id: str, request: Request, user: dict = Depends(require("masters.rate_card.apply"))):
-    """Recompute price + breakup for Available flats only. Hold/Booked/Sold/Blocked keep their price."""
+async def apply_rate_card(project_id: str, rc_id: str, request: Request, include_non_saleable: bool = False, preview: bool = False, user: dict = Depends(require("masters.rate_card.apply"))):
+    """Recompute price + breakup for Available flats only. Hold/Booked/Sold/Blocked keep their price. Phase N: Builder-saleable only unless include_non_saleable."""
     ensure_project_access(user, project_id)
     rc = await get_or_404(db.rate_cards, rc_id, "Rate card", {"project_id": project_id})
     if rc["status"] != "Active":
         raise ApiError(409, "Activate the rate card before applying", "NOT_ACTIVE")
+    base_q = {"project_id": project_id, "status": "Available", "is_active": True}
+    sale_q = {**base_q, "bookable": {"$ne": False}}
+    if preview:
+        n_sale = await db.flats.count_documents(sale_q)
+        n_all = await db.flats.count_documents(base_q)
+        return {"preview": True, "saleable": n_sale, "non_saleable": n_all - n_sale, "will_update": n_all if include_non_saleable else n_sale}
     plc_types = {p["id"]: p for p in await db.plc_types.find({"id": {"$in": [r["plc_type_id"] for r in rc["plc_rules"]]}}, {"_id": 0}).to_list(None)}
     blocks = {b["id"]: b for b in await db.blocks.find({"project_id": project_id, "is_active": True}, {"_id": 0, "id": 1, "floor_start": 1, "floors": 1, "skip_floors": 1}).to_list(None)}
-    flats = await db.flats.find({"project_id": project_id, "status": "Available", "is_active": True}, {"_id": 0, "id": 1, "flat_type_id": 1, "floor": 1, "super_builtup_sqft": 1, "is_corner": 1, "facing": 1, "block_id": 1}).to_list(None)
+    flats = await db.flats.find(base_q if include_non_saleable else sale_q, {"_id": 0, "id": 1, "flat_type_id": 1, "floor": 1, "super_builtup_sqft": 1, "is_corner": 1, "facing": 1, "block_id": 1}).to_list(None)
     tops = {}
     for f in flats:
         tops[f["block_id"]] = max(tops.get(f["block_id"], 0), f["floor"])
@@ -194,5 +200,5 @@ async def apply_rate_card(project_id: str, rc_id: str, request: Request, user: d
         ops.append(UpdateOne({"id": f["id"], "status": "Available"}, {"$set": {"price_paise": round(total * 100), "price_breakup": breakup, "rate_per_sqft": rate, "rate_card_id": rc_id, "updated_at": now_iso()}, "$inc": {"version": 1}}))
     updated = (await db.flats.bulk_write(ops)).modified_count if ops else 0
     await db.rate_cards.update_one({"id": rc_id}, {"$set": {"applied_at": now_iso(), "applied_count": updated}})
-    await write_audit(user, "rate_card.apply", "rate_card", rc_id, after={"flats_updated": updated, "skipped_no_rate": skipped}, ip=client_ip(request))
-    return {"flats_updated": updated, "skipped_no_rate": skipped, "untouched_non_available": await db.flats.count_documents({"project_id": project_id, "status": {"$ne": "Available"}})}
+    await write_audit(user, "rate_card.apply", "rate_card", rc_id, after={"flats_updated": updated, "skipped_no_rate": skipped, "include_non_saleable": include_non_saleable}, ip=client_ip(request))
+    return {"flats_updated": updated, "skipped_no_rate": skipped, "include_non_saleable": include_non_saleable, "untouched_non_available": await db.flats.count_documents({"project_id": project_id, "status": {"$ne": "Available"}})}

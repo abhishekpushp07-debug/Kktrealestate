@@ -22,13 +22,27 @@ def init_storage(force: bool = False):
 
 
 def _put(path: str, data: bytes, content_type: str) -> dict:
+    """Timeout scales with payload (200 MB under load needs > 120 s); transient 5xx / timeouts retried 3× with backoff."""
+    import time
     key = init_storage()
-    resp = requests.put(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key, "Content-Type": content_type}, data=data, timeout=120)
-    if resp.status_code == 404:
-        key = init_storage(force=True)
-        resp = requests.put(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key, "Content-Type": content_type}, data=data, timeout=120)
-    resp.raise_for_status()
-    return resp.json()
+    timeout = 120 + len(data) // (1024 * 1024)
+    last = None
+    for attempt in range(3):
+        try:
+            resp = requests.put(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key, "Content-Type": content_type}, data=data, timeout=timeout)
+            if resp.status_code == 404:
+                key = init_storage(force=True)
+                resp = requests.put(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key, "Content-Type": content_type}, data=data, timeout=timeout)
+            if resp.status_code >= 500:
+                raise requests.HTTPError(f"storage {resp.status_code}", response=resp)
+            resp.raise_for_status()
+            return resp.json()
+        except (requests.HTTPError, requests.ConnectionError, requests.Timeout) as e:  # noqa: PERF203
+            if isinstance(e, requests.HTTPError) and e.response is not None and e.response.status_code < 500:
+                raise
+            last = e
+            time.sleep(1.5 * (attempt + 1))
+    raise last
 
 
 def _get(path: str) -> tuple[bytes, str]:

@@ -35,6 +35,11 @@ export default function BookingWizard() {
   const [flat, setFlat] = useState(null);
   const [flatQ, setFlatQ] = useState("");
   const [customer, setCustomer] = useState(null);
+  useEffect(() => {  // prefill from ?flat=&customer_id= (Customer 360 "New booking", Flat drawer "Convert hold → booking")
+    const fid = sp.get("flat"), cid = sp.get("customer_id");
+    if (cid) api.get(`/customers/${cid}`).then((r) => setCustomer(r.data)).catch(() => {});
+    if (fid) api.get(`/flats/${fid}`).then((r) => { const f = r.data; setProjectId(f.project_id); setBlockId(f.block_id); setFlat(f); setStep(cid ? 3 : 2); }).catch((e) => toast.error(errMsg(e)));
+  }, []); // eslint-disable-line
   const [leads, setLeads] = useState([]);
   const [leadId, setLeadId] = useState("");
   useEffect(() => { if (!customer?.phone) { setLeads([]); setLeadId(""); return; } api.get("/leads", { params: { search: customer.phone, page_size: 20 } }).then((r) => { const open = (r.data.items || []).filter((l) => !["Converted", "Lost"].includes(l.status)); setLeads(open); setLeadId(open[0]?.id || ""); }).catch(() => setLeads([])); }, [customer?.id]); // eslint-disable-line react-hooks/exhaustive-deps

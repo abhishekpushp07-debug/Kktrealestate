@@ -126,6 +126,8 @@ class BulkPriceIn(StrictModel):
     floor_rise_per_sqft: float | None = Field(default=None, ge=0)
     floors: list[int] | None = None
     only_available: bool = True
+    include_non_saleable: bool = False
+    preview: bool = False
 
 
 class BulkStatusIn(StrictModel):
@@ -316,6 +318,12 @@ async def bulk_price(block_id: str, body: BulkPriceIn, request: Request, user: d
     q = {"block_id": block_id, "is_active": True, "status": {"$in": ["Available"] if body.only_available else ["Available", "Hold", "Blocked"]}}
     if body.floors:
         q["floor"] = {"$in": body.floors}
+    if body.preview:
+        n_all = await db.flats.count_documents(q)
+        n_sale = await db.flats.count_documents({**q, "bookable": {"$ne": False}})
+        return {"preview": True, "saleable": n_sale, "non_saleable": n_all - n_sale, "will_update": n_all if body.include_non_saleable else n_sale}
+    if not body.include_non_saleable:  # Phase N: landowner / investor / bank / reserve / sample / society keep their price unless explicitly included
+        q["bookable"] = {"$ne": False}
     flats = await db.flats.find(q, {"_id": 0, "id": 1, "floor": 1, "super_builtup_sqft": 1}).to_list(None)
     ops, rise = [], body.floor_rise_per_sqft or 0
     for f in flats:
@@ -379,4 +387,5 @@ async def block_grid(block_id: str, bookable_for: str | None = None, user: dict 
                     "kind": "refuge" if fl in refuge else "podium" if fl in podium else "units", "flats": by_floor.get(fl, [])} for fl in sorted(labels, reverse=True)],
         "counts": {**counts, "total": len(flats)},
         "price_range": {"min": min(prices) if prices else None, "max": max(prices) if prices else None},
+        "privileged": inv.can_see_real(user),
     }

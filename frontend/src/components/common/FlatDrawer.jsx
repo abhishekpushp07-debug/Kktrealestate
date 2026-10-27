@@ -1,5 +1,6 @@
 import { HistoryButton } from "@/components/common/HistoryTimeline";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import api, { errMsg } from "@/lib/api";
 import { undoToast } from "@/lib/undo";
@@ -21,6 +22,8 @@ export function FlatDrawer({ flatId, onClose, onChanged }) {
   const [flat, setFlat] = useState(null);
   const [busy, setBusy] = useState(false);
   const [reason, setReason] = useState("");
+  const [extendTo, setExtendTo] = useState("");
+  const nav = useNavigate();
   const [edit, setEdit] = useState({ price: "", rate_per_sqft: "", notes: "", flat_type_id: null });
   const { options: ftOptions } = useMasterOptions("flat-types");
 
@@ -61,6 +64,10 @@ export function FlatDrawer({ flatId, onClose, onChanged }) {
   };
 
   const manual = flat && ["Available", "Hold", "Blocked"].includes(flat.status);
+  const extendHold = async () => {
+    setBusy(true);
+    try { await api.post("/inventory/bulk", { flat_ids: [flatId], action: "extend_hold", expires_at: new Date(extendTo).toISOString() }); const r = await api.get(`/flats/${flatId}`); setFlat(r.data); setExtendTo(""); toast.success(`${r.data.flat_number}: hold extended`); onChanged?.(); } catch (e) { toast.error(errMsg(e)); } finally { setBusy(false); }
+  };
   return (
     <Sheet open={!!flatId} onOpenChange={(o) => !o && onClose()}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-lg" data-testid="flat-drawer">
@@ -70,6 +77,13 @@ export function FlatDrawer({ flatId, onClose, onChanged }) {
             <p className="text-sm text-txt-secondary">{flat.project_name} · {flat.block_name} · Floor {flat.floor} · Position {flat.position}</p>
             {flat.inventory_state && <div className="mt-2 flex flex-wrap gap-2 text-xs" data-testid="flat-layers"><span className="rounded bg-ink-100 px-2 py-0.5">Real: <b>{flat.inventory_state}</b></span><span className={`rounded px-2 py-0.5 ${flat.masked ? "bg-amber-100 text-amber-900" : "bg-ink-100"}`} data-testid="flat-display-layer">Displayed: <b>{flat.display_state}</b>{flat.masked ? " · masked" : ""}</span>{flat.allocation_category_code && <span className="rounded bg-ink-100 px-2 py-0.5" data-testid="flat-category">{flat.allocation_category_code}{flat.bookable ? "" : " · not saleable"}</span>}</div>}
             {flat.hold?.expires_at && <p className="mt-1 text-xs text-amber-700" data-testid="flat-hold-expiry">Hold expires {new Date(flat.hold.expires_at).toLocaleString()} ({Math.max(0, Math.round((new Date(flat.hold.expires_at) - Date.now()) / 36e5))} h left){flat.hold.for_customer_id ? " · reserved for a customer" : ""}</p>}
+            {flat.status === "Hold" && (can("sales.booking.create") || can("inventory.hold.create")) && <div className="mt-2 flex flex-wrap items-center gap-2" data-testid="flat-hold-actions">
+              {can("sales.booking.create") && (flat.bookable !== false) && <Button size="sm" className="bg-ink-950 hover:bg-ink-800" onClick={() => nav(`/bookings/new?flat=${flat.id}${flat.hold?.for_customer_id ? `&customer_id=${flat.hold.for_customer_id}` : ""}`)} data-testid="flat-convert-hold-btn">Convert hold → booking</Button>}
+              {can("inventory.hold.create") && <>
+                <Input type="datetime-local" value={extendTo} onChange={(e) => setExtendTo(e.target.value)} className="h-8 w-52 text-xs" data-testid="flat-extend-input" />
+                <Button size="sm" variant="outline" disabled={busy || !extendTo} onClick={extendHold} data-testid="flat-extend-hold-btn">Extend hold</Button>
+              </>}
+            </div>}
           </SheetHeader>
           <div className="mt-6 rounded-xl bg-ink-950 p-5 text-white">
             <p className="label-xs text-gold">Listed price</p>

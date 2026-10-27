@@ -12,21 +12,27 @@ from tests.conftest import BASE  # noqa: E402
 
 
 def test_backup_manifest_and_restore_drill_records_job_run():
+    """Deterministic under xdist: snapshot the (busy) test DB into a quiescent copy first, then back up + drill that copy so verify compares like with like."""
+    import subprocess
+    from pymongo import MongoClient
     from tools.backup import run_backup
+    src, quiet = os.environ["DB_NAME"], "kkt_drill_src_test"
+    MongoClient(os.environ["MONGO_URL"]).drop_database(quiet)
+    dump = subprocess.run(["mongodump", f"--uri={os.environ['MONGO_URL']}", f"--db={src}", "--archive", "--quiet"], capture_output=True, timeout=600, check=True)
+    subprocess.run(["mongorestore", f"--uri={os.environ['MONGO_URL']}", "--archive", f"--nsFrom={src}.*", f"--nsTo={quiet}.*", "--quiet"], input=dump.stdout, capture_output=True, timeout=600, check=True)
     out = tempfile.mkdtemp()
-    m = run_backup(out)
+    m = run_backup(out, db_name=quiet)
     assert m["sha256"] and m["bytes"] > 1000 and os.path.exists(os.path.join(out, m["archive"]))
     import json
-    import subprocess
     proc = subprocess.run([sys.executable, "-c", f"import asyncio, json, sys\nsys.path.insert(0, '.')\nfrom tools.restore_drill import drill_job\nprint(json.dumps(asyncio.run(drill_job({os.path.join(out, m['archive'])!r}, scratch='kkt_restore_drill_test')), default=str))"],
-                          cwd=os.path.join(os.path.dirname(__file__), ".."), capture_output=True, text=True, timeout=240, env={**os.environ})
+                          cwd=os.path.join(os.path.dirname(__file__), ".."), capture_output=True, text=True, timeout=600, env={**os.environ, "DB_NAME": quiet})
     assert proc.returncode == 0, proc.stderr[-2000:]
     run = json.loads(proc.stdout.strip().splitlines()[-1])
     assert run["status"] == "OK", run
     assert run["result"]["verify"]["ledger_totals_match"] is True
     assert run["result"]["verify"]["mismatches"] == []
-    from pymongo import MongoClient
     MongoClient(os.environ["MONGO_URL"]).drop_database("kkt_restore_drill_test")
+    MongoClient(os.environ["MONGO_URL"]).drop_database(quiet)
 
 
 def test_ops_has_backup_and_alerts_cards(admin_headers):

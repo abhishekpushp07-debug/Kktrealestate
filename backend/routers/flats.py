@@ -70,7 +70,12 @@ async def list_flats(
     if floor is not None:
         q["floor"] = floor
     if status:
-        q["status"] = {"$in": status.split(",")}
+        wanted = status.split(",")
+        if inv.can_see_real(user):
+            q["status"] = {"$in": wanted}
+        else:  # display layer: a masked Available flat must not surface under status=Available (and vice-versa)
+            disp = [d for d, s in inv.DISPLAY_TO_STATUS.items() if s in wanted]
+            q["$or"] = [{"display_override": True, "display_state": {"$in": disp}}, {"display_override": {"$ne": True}, "status": {"$in": [k for k, v in inv.MIRROR.items() if v in disp]}}]
     if bookable_for is not None:  # booking wizard: saleable + (Available or Hold for this customer / RM), never masked-as-sold/hidden
         q.update(inv.bookable_filter(bookable_for or None, user))
     if category:

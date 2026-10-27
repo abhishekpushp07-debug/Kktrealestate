@@ -1,5 +1,5 @@
 import { HistoryButton } from "@/components/common/HistoryTimeline";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, Play, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import api, { errMsg } from "@/lib/api";
@@ -64,8 +64,12 @@ export function RateCardsTab({ projectId, onApplied }) {
   const { data, loading, reload } = useFetch(`/projects/${projectId}/rate-cards`);
   const { can } = useAuth();
   const [open, setOpen] = useState(false);
+  const [inclNS, setInclNS] = useState(false);
+  const [preview, setPreview] = useState(null);
+  const active = (data?.items || []).find((rc) => rc.status === "Active");
+  useEffect(() => { if (!active) return; api.post(`/projects/${projectId}/rate-cards/${active.id}/apply`, null, { params: { preview: true, include_non_saleable: inclNS } }).then((r) => setPreview(r.data)).catch(() => setPreview(null)); }, [active?.id, inclNS, projectId]); // eslint-disable-line
   const act = async (rc, action) => {
-    try { const r = await api.post(`/projects/${projectId}/rate-cards/${rc.id}/${action}`); toast.success(action === "apply" ? `${r.data.flats_updated} Available flats re-priced · ${r.data.untouched_non_available} on Hold/Blocked untouched` : "Rate card activated"); reload(); onApplied?.(); } catch (e) { toast.error(errMsg(e)); }
+    try { const r = await api.post(`/projects/${projectId}/rate-cards/${rc.id}/${action}`, null, action === "apply" ? { params: { include_non_saleable: inclNS } } : undefined); toast.success(action === "apply" ? `${r.data.flats_updated} Available flats re-priced · ${r.data.untouched_non_available} on Hold/Blocked untouched${inclNS ? " · non-saleable included" : ""}` : "Rate card activated"); reload(); onApplied?.(); } catch (e) { toast.error(errMsg(e)); }
   };
   const items = data?.items || [];
   return (
@@ -82,6 +86,7 @@ export function RateCardsTab({ projectId, onApplied }) {
                 {rc.status === "Draft" && <Button size="sm" variant="outline" onClick={() => act(rc, "activate")} data-testid={`rc-activate-${rc.id}`}><CheckCircle2 className="mr-1 h-3.5 w-3.5" />Activate</Button>}
                 {rc.status === "Active" && <Button size="sm" onClick={() => act(rc, "apply")} className="bg-gold text-ink-950 hover:bg-gold-hover" data-testid={`rc-apply-${rc.id}`}><Play className="mr-1 h-3.5 w-3.5" />Apply to Available flats</Button>}
               </div>}
+              {rc.status === "Active" && can("masters.rate_card.edit") && <div className="mt-2 space-y-1 text-xs"><label className="flex items-center gap-2"><input type="checkbox" checked={inclNS} onChange={(e) => setInclNS(e.target.checked)} data-testid={`rc-include-non-saleable-${rc.id}`} />Include non-saleable categories (default off)</label>{preview && <p className="text-txt-secondary" data-testid={`rc-apply-preview-${rc.id}`}><b className="text-ink-950">{preview.will_update}</b> flats will be repriced · {preview.saleable} Builder-saleable · {preview.non_saleable} non-saleable {inclNS ? "included" : "kept"}</p>}</div>}
             </div>
           ))}
         </div>

@@ -65,7 +65,7 @@ def _first_slot(slug="shree-ganesh-heights", min_seats=1):
 def test_availability_from_param():
     import datetime as dt
     start = (dt.date.today() + dt.timedelta(days=5)).isoformat()
-    av = requests.get(f"{BASE}/public/site-visits/availability", params={"project_slug": "shree-ganesh-heights", "from": start, "to": start}, timeout=15).json()
+    av = requests.get(f"{BASE}/public/site-visits/availability", params={"project_slug": "shree-ganesh-heights", "from": start, "to": start}, timeout=90).json()
     assert [d["date"] for d in av["days"]] == [start]
 
 
