@@ -18,7 +18,7 @@ STRIP = {"bookings": ["payment_plan_snapshot", "payment_plan_id", "plan_acceptan
          "blocks": ["construction_stages", "construction_stage_sequence", "default_cash_percent"], "projects": ["website.site_visits", "website.brochure_gate_enabled", "construction_stage_sequence", "default_cash_percent"],
          "customers": ["lifecycle_stage", "engagement_score", "segment_ids", "preferences", "consent", "profile_migrated", "occupation_id", "salutation_id"], "companies": ["demand_due_days"],
          "notifications": ["withdrawn"]}
-DROP = ["payment_plans", "payment_plan_assignments", "construction_stages", "catalogue_items", "project_summaries", "block_summaries", "customer_summaries", "dashboard_snapshots", "communications", "site_visits", "brochure_downloads", "locks", "cache"]
+DROP = ["migrations", "payment_plans", "payment_plan_assignments", "construction_stages", "catalogue_items", "project_summaries", "block_summaries", "customer_summaries", "dashboard_snapshots", "communications", "site_visits", "brochure_downloads", "locks", "cache"]
 SETTINGS_DROP = ["sla_hours", "catalogues_version", "read_models_v1", "customers_profile_v1", "seed_phase7_done", "migration_phase7_done", "seed_phase9_done", "counters_v1", "roles_version"]
 
 

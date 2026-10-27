@@ -236,7 +236,7 @@ async def lifespan(app: FastAPI):
         logger.error("[startup] MongoDB unreachable at boot (%s); serving health only until it recovers", e)
     if STARTUP["db"] == "ok":
         try:
-            await asyncio.wait_for(ensure_indexes(), timeout=3)
+            await asyncio.wait_for(ensure_indexes(), timeout=float(os.environ.get("INDEX_BUDGET_S", "30")))
             logger.info("[startup] indexes ensured in %.2fs", time.perf_counter() - t0)
         except asyncio.TimeoutError:
             logger.warning("[startup] index budget exceeded; finishing index creation in background")
