@@ -169,24 +169,24 @@ const REVIEW_SCHEMA = {
   required: ["scope", "findings_closed", "findings_still_open", "defects_found_and_fixed", "defects_found_not_fixed", "tests_passing", "typecheck_passing", "cross_track_items"],
 };
 
-const REVIEWS = [
-  {
-    key: "backend", db: "kkt_p7_r1", redis: "16", accRedis: "17",
-    scope: "the money, security, platform and domain tracks (everything changed under apps/api and packages in this round, plus the foundation)",
-    owns: "apps/api/** and packages/**",
-  },
-  {
-    key: "frontend-ops", db: "kkt_p7_r2", redis: "18", accRedis: "19",
-    scope: "the frontend, website (apps/web) and ops tracks",
-    owns: "apps/erp/**, apps/portal/**, apps/web/**, infra/**, .github/**, docker-compose*.yml, scripts/ci/**, docs/qa/**",
-  },
-];
+const FOUNDATION_REVIEW = {
+  key: "foundation", db: "kkt_p7_rf", redis: "28", accRedis: "29",
+  owns: "packages/db/**, apps/api/src/lib/{errors,pgErrors,version,tenant}.ts, apps/api/src/plugins/etag.ts, packages/contracts/src/{errors,rules}.ts and their tests",
+};
+const REVIEWS = [FOUNDATION_REVIEW].concat(TRACKS).map((t, i) => ({
+  key: t.key,
+  db: "kkt_p7_r" + t.key,
+  redis: t.key === "foundation" ? "28" : String(16 + (i - 1) * 2),
+  accRedis: t.key === "foundation" ? "29" : String(17 + (i - 1) * 2),
+  scope: t.key === "foundation" ? "the FOUNDATION stage (docs/hardening/phase7-foundation.md): online migrations, migration 0005, privileges, error mapping, contracts, required versions, tenant resolution" : "the " + t.key.toUpperCase() + " track (docs/hardening/phase7-" + t.key + ".md) and the audit findings it was assigned",
+  owns: t.owns,
+}));
 
 function reviewPrompt(r) {
   return COMMON + "\n" + CONTRACTS + "\n" + [
-    "TASK — ADVERSARIAL REVIEW of " + r.scope + ". The implementers' reports are in docs/hardening/phase7-*.md; the diff is 'git diff HEAD' (the round is uncommitted on top of HEAD). Do not trust the reports: for every audit finding in the track(s) you review, read the changed code and try to break it — race conditions, transactions and locks, tenant and project scope leaks, error paths that still return 500, idempotency/version semantics, money rounding, SPEC rule regressions, missing tests, docs that now contradict the code, contract drift between API and clients.",
-    "Your databases: " + r.db + " / " + r.db + "_acc; Redis " + r.redis + " / " + r.accRedis + ". You may edit " + r.owns + " to fix every real defect you find, each with a test; another reviewer works in parallel on the rest, so do not edit outside that set (list such items under cross_track_items).",
-    "Then run the relevant suites in full (backend: pnpm typecheck, all unit tests, the FULL API integration suite and the acceptance suite on your databases; frontend-ops: ERP/portal/web tests, builds, the three browser QA runners against an API on your databases on ports 4720/5720/3720/8720, and YAML/k8s validation) and fix failures. Write docs/hardening/phase7-review-" + r.key + ".md and return the structured result.",
+    "TASK — ADVERSARIAL REVIEW of " + r.scope + ". The implementers' reports are in docs/hardening/phase7-*.md; the round's diff is 'git diff 34c075e' (commit 34c075e is the state before phase 7; the foundation and tracks are committed on top of it, and any uncommitted changes are from this review stage). Do not trust the reports: for every audit finding in the track(s) you review, read the changed code and try to break it — race conditions, transactions and locks, tenant and project scope leaks, error paths that still return 500, idempotency/version semantics, money rounding, SPEC rule regressions, missing tests, docs that now contradict the code, contract drift between API and clients.",
+    "Your databases: " + r.db + " / " + r.db + "_acc; Redis " + r.redis + " / " + r.accRedis + ". You may edit " + r.owns + " to fix every real defect you find, each with a test; one reviewer per track works in parallel on the other tracks, so do not edit outside that set (list such items under cross_track_items with the exact change). Test files for code you own are yours too.",
+    "Then run the relevant suites in full and fix failures: for API/package scopes pnpm typecheck, all unit tests, the FULL API integration suite and the acceptance suite on your databases; for the frontend scope ERP/portal tests, builds and the ERP and portal browser QA runners against an API on your databases (ports 4730/5730/8730); for the domain scope also the web tests, build and website QA runner (ports 4740/3740); for the ops scope YAML/k8s validation, the CI script tests and the backup/restore tests. Write docs/hardening/phase7-review-" + r.key + ".md and return the structured result.",
   ].join("\n");
 }
 
