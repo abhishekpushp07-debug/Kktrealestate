@@ -1,0 +1,150 @@
+# API: stateless HTTP replicas (node:cluster workers per pod = CPU limit), autoscaled on CPU, at most one replica down at a time.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: kkt
+  labels: { app.kubernetes.io/name: api, app.kubernetes.io/part-of: kkt, app.kubernetes.io/component: api }
+spec:
+  replicas: 3
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels: { app.kubernetes.io/name: api }
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: api, app.kubernetes.io/part-of: kkt, app.kubernetes.io/component: api }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9464"
+        prometheus.io/path: /metrics
+    spec:
+      automountServiceAccountToken: false
+      # SIGTERM → /ready answers 503 and the endpoint is removed; preStop gives kube-proxy/ingress time to notice before the server
+      # stops accepting connections; in-flight requests then finish (SHUTDOWN_TIMEOUT_MS 25 s) before the pools close
+      terminationGracePeriodSeconds: 45
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector: { matchLabels: { app.kubernetes.io/name: api } }
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector: { matchLabels: { app.kubernetes.io/name: api } }
+      containers:
+        - name: api
+          image: kkt-api
+          imagePullPolicy: IfNotPresent
+          args: ["node", "--import", "./dist/telemetry.js", "dist/server.js"]
+          ports:
+            - { name: http, containerPort: 4000 }
+            - { name: metrics, containerPort: 9464 }
+          envFrom:
+            - configMapRef: { name: kkt-config }
+          env:
+            # one HTTP worker per CPU of the limit (rounded up)
+            - name: API_WORKERS
+              valueFrom: { resourceFieldRef: { containerName: api, resource: limits.cpu, divisor: "1" } }
+            - { name: DATABASE_URL_FILE, value: /run/secrets/kkt/database_url }
+            - { name: REDIS_URL_FILE, value: /run/secrets/kkt/redis_url }
+            - { name: JWT_SECRET_FILE, value: /run/secrets/kkt/jwt_secret }
+            - { name: FIELD_ENCRYPTION_KEY_FILE, value: /run/secrets/kkt/field_encryption_key }
+            - { name: HASH_KEY_FILE, value: /run/secrets/kkt/hash_key }
+            # key rings (contract C9; docs/DEPLOY.md "Secrets and key rotation")
+            - { name: JWT_SIGNING_KEYS_FILE, value: /run/secrets/kkt/jwt_signing_keys }
+            - { name: LINK_SIGNING_KEYS_FILE, value: /run/secrets/kkt/link_signing_keys }
+            - { name: HASH_KEYS_FILE, value: /run/secrets/kkt/hash_keys }
+            - { name: INTERNAL_API_TOKEN_FILE, value: /run/secrets/kkt/internal_api_token }
+            - { name: WEB_REVALIDATE_TOKEN_FILE, value: /run/secrets/kkt/web_revalidate_token }
+            - { name: METRICS_TOKEN_FILE, value: /run/secrets/kkt/metrics_token }
+            # 5xx / failed-job webhook: opt in once the Secret's error_webhook_url holds a real URL (gen-secrets.sh writes the placeholder
+            # "unused", which is not a URL and would stop the pod at boot with "ERROR_WEBHOOK_URL: Invalid URL")
+            # - { name: ERROR_WEBHOOK_URL_FILE, value: /run/secrets/kkt/error_webhook_url }
+          resources:
+            requests: { cpu: "1", memory: 768Mi }
+            limits: { cpu: "2", memory: 2Gi }
+          # liveness never touches dependencies (/health/live): a database or Redis outage must not restart every replica; readiness
+          # (/health/ready = DB + Redis + not draining) takes the pod out of the Service instead. /api/v1/health is the full report
+          # (503 when a dependency is down) for dashboards and humans, not for probes.
+          startupProbe:
+            httpGet: { path: /api/v1/health/live, port: http }
+            periodSeconds: 3
+            failureThreshold: 40
+          readinessProbe:
+            httpGet: { path: /api/v1/health/ready, port: http }
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          livenessProbe:
+            httpGet: { path: /api/v1/health/live, port: http }
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 4
+          lifecycle:
+            preStop:
+              exec: { command: ["sleep", "8"] }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: secrets, mountPath: /run/secrets/kkt, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: secrets
+          secret: { secretName: kkt-secrets, defaultMode: 0440 }
+        - name: tmp
+          emptyDir: { sizeLimit: 1Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+  namespace: kkt
+  labels: { app.kubernetes.io/name: api, app.kubernetes.io/part-of: kkt }
+spec:
+  selector: { app.kubernetes.io/name: api }
+  ports:
+    - { name: http, port: 4000, targetPort: http }
+    - { name: metrics, port: 9464, targetPort: metrics }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: api
+  namespace: kkt
+  labels: { app.kubernetes.io/name: api, app.kubernetes.io/part-of: kkt }
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: api }
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+    - type: Resource
+      resource: { name: cpu, target: { type: Utilization, averageUtilization: 65 } }
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies: [{ type: Percent, value: 100, periodSeconds: 60 }]
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies: [{ type: Pods, value: 1, periodSeconds: 120 }]
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: api
+  namespace: kkt
+  labels: { app.kubernetes.io/name: api, app.kubernetes.io/part-of: kkt }
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: api }

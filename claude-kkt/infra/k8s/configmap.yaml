@@ -1,0 +1,42 @@
+# Non-secret configuration shared by the API, the worker and the migrate Job (docs/DEPLOY.md "Kubernetes"). Secrets are in
+# secret.example.yaml (mounted as files, read through *_FILE variables).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kkt-config
+  namespace: kkt
+  labels: { app.kubernetes.io/part-of: kkt }
+data:
+  NODE_ENV: production
+  API_PORT: "4000"
+  METRICS_PORT: "9464"
+  API_PUBLIC_URL: https://erp.kkt.example.in
+  ERP_ORIGIN: https://erp.kkt.example.in
+  WEB_ORIGIN: https://www.kkt.example.in
+  PORTAL_ORIGIN: https://my.kkt.example.in
+  # the ingress controller and the pods live on private pod networks: trust X-Forwarded-For from them only
+  TRUST_PROXY: uniquelocal
+  STORAGE_DRIVER: s3
+  S3_BUCKET: kkt-documents
+  S3_REGION: ap-south-1
+  RUN_MIGRATIONS_ON_BOOT: "false"
+  SEED_ON_BOOT: "false"
+  SEED_DEMO: "false"
+  RUN_JOBS_IN_API: "false"
+  DATABASE_POOL_MAX: "10"
+  DATABASE_PREPARE: "true"
+  API_MAX_INFLIGHT: "256"
+  SHUTDOWN_TIMEOUT_MS: "25000"
+  SHUTDOWN_DRAIN_DELAY_MS: "0"
+  LOG_LEVEL: info
+  OTEL_SERVICE_NAME: kkt-api
+  # libuv pool shared by argon2, sharp, zlib and fs (default 4)
+  UV_THREADPOOL_SIZE: "16"
+  # job worker (contract C8): health/metrics port and how long a stop waits for critical jobs (worker.yaml grace period = this + 60 s)
+  WORKER_HEALTH_PORT: "9465"
+  WORKER_DRAIN_TIMEOUT_MS: "120000"
+  # the website's on-demand revalidation after CMS / project-website writes (token: kkt-secrets web_revalidate_token)
+  WEB_REVALIDATE_URL: http://web:3000/api/revalidate
+  # OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector.observability:4318
+  # BOOTSTRAP_COMPANY_NAME / BOOTSTRAP_ADMIN_EMAIL belong to the migrate Job only (migrate-job.yaml): the configuration requires the
+  # e-mail and the password together, and the API/worker never receive the password.

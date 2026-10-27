@@ -1,0 +1,61 @@
+# PORTAL static web build served by unprivileged nginx (CSP and security headers in apps/portal/nginx.conf).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: portal
+  namespace: kkt
+  labels: { app.kubernetes.io/name: portal, app.kubernetes.io/part-of: kkt, app.kubernetes.io/component: frontend }
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels: { app.kubernetes.io/name: portal }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: portal, app.kubernetes.io/part-of: kkt, app.kubernetes.io/component: frontend }
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: portal
+          image: kkt-portal
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { name: http, containerPort: 8080 }
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 30
+          resources:
+            requests: { cpu: 50m, memory: 32Mi }
+            limits: { cpu: 500m, memory: 128Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+            - { name: conf, mountPath: /etc/nginx/conf.d }
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        # the image renders /etc/nginx/templates/default.conf.template into conf.d at start
+        - name: conf
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: portal
+  namespace: kkt
+  labels: { app.kubernetes.io/name: portal, app.kubernetes.io/part-of: kkt }
+spec:
+  selector: { app.kubernetes.io/name: portal }
+  ports:
+    - { name: http, port: 80, targetPort: http }

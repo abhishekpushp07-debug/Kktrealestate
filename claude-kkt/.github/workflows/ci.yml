@@ -1,0 +1,478 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "22"
+  TURBO_TELEMETRY_DISABLED: "1"
+  # insecure CI-only secrets (dev/test defaults are used by the test suites themselves)
+  JWT_SECRET: ci-only-secret-ci-only-secret-ci-only-secret
+  FIELD_ENCRYPTION_KEY: Y2ktb25seS1rZXktY2ktb25seS1rZXktY2ktb25seS0wMQ==
+  HASH_KEY: ci-only-hash-key
+
+jobs:
+  install:
+    name: Install (pnpm store cache)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup
+
+  lint:
+    name: Lint (eslint)
+    needs: install
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup
+      - run: pnpm lint
+
+  format:
+    name: Format (prettier --check)
+    needs: install
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup
+      - run: pnpm format:check
+
+  typecheck:
+    name: Typecheck
+    needs: install
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup
+      - run: pnpm typecheck
+
+  unit:
+    name: Unit tests (every package)
+    needs: install
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup
+      - name: contracts, domain
+        run: pnpm --filter @kkt/contracts --filter @kkt/domain test
+      - name: ERP
+        run: pnpm --filter @kkt/erp test
+      - name: web, portal
+        run: pnpm --filter @kkt/web --filter @kkt/portal test
+      - name: API unit (incl. OpenAPI compatibility, S3 driver, metrics, error registry)
+        run: pnpm --filter @kkt/api test
+
+  db:
+    name: Database (migrations, constraints, triggers)
+    needs: install
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres, POSTGRES_DB: kkt_test }
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/kkt_test
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/kkt_test
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup
+      - run: pnpm --filter @kkt/db migrate && pnpm --filter @kkt/db test
+
+  api-integration:
+    name: API integration (shard ${{ matrix.shard }}/3)
+    needs: install
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix: { shard: [1, 2, 3] }
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres, POSTGRES_DB: postgres }
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/kkt_api_test
+      TEST_REDIS_URL: redis://localhost:6379/1
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup
+      - name: Integration files of this shard (one database per job, files run serially)
+        run: pnpm --filter @kkt/api exec vitest run --dir test/integration --no-file-parallelism --shard=${{ matrix.shard }}/3
+
+  acceptance:
+    name: Acceptance scenarios
+    needs: install
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres, POSTGRES_DB: postgres }
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      ACCEPTANCE_DATABASE_URL: postgres://postgres:postgres@localhost:5432/kkt_acceptance
+      ACCEPTANCE_REDIS_URL: redis://localhost:6379/12
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup
+      - run: pnpm --filter @kkt/api test:acceptance
+
+  openapi:
+    name: OpenAPI compatibility (docs/openapi/v1.json)
+    needs: install
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup
+      # prints every breaking / additive difference and fails on breaking ones (docs/VERSIONING.md)
+      - run: pnpm --filter @kkt/api openapi:check
+      - name: The committed snapshot is current (additive changes need `pnpm --filter @kkt/api openapi`)
+        run: |
+          pnpm --filter @kkt/api openapi
+          git diff --exit-code --stat docs/openapi/v1.json || { echo "::error::docs/openapi/v1.json is out of date: run pnpm --filter @kkt/api openapi and commit it"; exit 1; }
+
+  build:
+    name: Builds + API start smoke
+    needs: install
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres, POSTGRES_DB: kkt_smoke }
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup
+      - name: API bundle
+        run: pnpm --filter @kkt/api build
+      - name: Production secrets for the smoke (contract C9 rings; production refuses placeholders)
+        run: |
+          {
+            echo "JWT_SECRET=$(openssl rand -hex 48)"
+            echo "HASH_KEY=$(openssl rand -hex 32)"
+            echo "FIELD_ENCRYPTION_KEY=$(openssl rand -base64 32)"
+            echo "JWT_SIGNING_KEYS=j1:$(openssl genpkey -algorithm ed25519 -outform DER | base64 -w0)"
+            echo "LINK_SIGNING_KEYS=l1:$(openssl rand -hex 32)"
+          } >> "$GITHUB_ENV"
+      - name: HASH_KEYS = h1:HASH_KEY
+        run: echo "HASH_KEYS=h1:$HASH_KEY" >> "$GITHUB_ENV"
+      - name: API + worker start smoke (production mode, 2 HTTP workers, migrate job first, C8 worker health)
+        working-directory: apps/api
+        env:
+          NODE_ENV: production
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/kkt_smoke
+          REDIS_URL: redis://localhost:6379/3
+          API_PORT: "4000"
+          METRICS_PORT: "9464"
+          METRICS_TOKEN: ci-metrics-token-0123456789
+          API_WORKERS: "2"
+          STORAGE_LOCAL_DIR: /tmp/kkt-storage
+          BOOTSTRAP_COMPANY_NAME: CI Builders
+          BOOTSTRAP_ADMIN_EMAIL: owner@ci.test
+          BOOTSTRAP_ADMIN_PASSWORD: Ci-owner-password-2026!
+        run: |
+          SEED_ON_BOOT=true node dist/server.js migrate
+          node --import ./dist/telemetry.js dist/server.js > /tmp/api.log 2>&1 &
+          echo $! > /tmp/api.pid
+          WORKER_HEALTH_PORT=9465 WORKER_DRAIN_TIMEOUT_MS=20000 node --import ./dist/telemetry.js dist/worker.js > /tmp/worker.log 2>&1 &
+          echo $! > /tmp/worker.pid
+          for _ in $(seq 1 60); do curl -sf http://localhost:4000/api/v1/health/ready > /dev/null && break; sleep 1; done
+          curl -sf http://localhost:4000/api/v1/health/live > /dev/null
+          curl -sf http://localhost:4000/api/v1/health/ready | grep -q '"ready":true'
+          curl -sf http://localhost:4000/api/v1/ready | grep -q '"ready":true'
+          # contract C8: the worker answers 200 once it consumes both queues with a fresh heartbeat; the API then sees it too
+          for _ in $(seq 1 60); do curl -sf http://localhost:9465/health > /dev/null && break; sleep 1; done
+          curl -sf http://localhost:9465/health | tee /dev/stderr | grep -q '"status":"ok"'
+          curl -sf -H "Authorization: Bearer $METRICS_TOKEN" http://localhost:9465/metrics | grep -q '^kkt_worker_heartbeat_timestamp_seconds '
+          curl -sf http://localhost:4000/api/v1/health | tee /dev/stderr | grep -q '"status":"ok"'
+          curl -sf -H "Authorization: Bearer $METRICS_TOKEN" http://localhost:9464/metrics | grep -q '^http_requests_total{route="/api/v1/health"'
+          curl -sf -H "Authorization: Bearer $METRICS_TOKEN" http://localhost:4000/api/v1/metrics | grep -q '^db_pool_max_connections 40'
+          for p in worker api; do kill -TERM "$(cat /tmp/$p.pid)"; done
+          for _ in $(seq 1 60); do kill -0 "$(cat /tmp/api.pid)" 2> /dev/null || kill -0 "$(cat /tmp/worker.pid)" 2> /dev/null || break; sleep 1; done
+          if kill -0 "$(cat /tmp/api.pid)" 2> /dev/null; then echo "::error::the API did not stop on SIGTERM"; exit 1; fi
+          if kill -0 "$(cat /tmp/worker.pid)" 2> /dev/null; then echo "::error::the worker did not drain and stop on SIGTERM"; exit 1; fi
+          grep -q '"msg":"shutdown complete"' /tmp/api.log
+      - name: Show the API and worker logs on failure
+        if: failure()
+        run: cat /tmp/api.log /tmp/worker.log || true
+      - name: ERP
+        run: pnpm --filter @kkt/erp build
+      - name: Website
+        run: pnpm --filter @kkt/web build
+      - name: Portal web export
+        run: pnpm --filter @kkt/portal build:web
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: builds
+          retention-days: 7
+          path: |
+            apps/api/dist
+            apps/erp/dist
+            apps/portal/dist
+
+  supply-chain:
+    name: Supply chain (dependency audit, action pins, CI script tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      # installed so the CI script tests can import the workspace's yaml parser (the deploy workflow test)
+      - uses: ./.github/actions/setup
+      # high/critical advisories of production dependencies fail unless allowlisted with a reason and an expiry
+      # (scripts/ci/audit-allowlist.json: node-forge via @expo/cli is the only accepted one)
+      - name: pnpm audit --prod gate
+        run: node scripts/ci/audit-gate.mjs
+      # every third-party action pinned by commit SHA (scripts/ci/action-pins-pending.json lists the ones still being verified)
+      - name: Action pins
+        run: node scripts/ci/check-action-pins.mjs
+      - name: Tests of the CI scripts (migration lint, audit gate, pin gate, load gate)
+        run: node --test scripts/ci/*.test.mjs
+
+  secrets:
+    name: Secret scanning (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with: { fetch-depth: 0 }
+      - name: gitleaks (release binary, checksum verified)
+        env: { GITLEAKS_VERSION: "8.21.2" }
+        run: |
+          base="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          curl -sSLO "$base/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSLO "$base/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          grep " gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz\$" "gitleaks_${GITLEAKS_VERSION}_checksums.txt" | sha256sum -c -
+          tar xzf "gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" gitleaks
+      - name: Scan the commits of this push / pull request
+        env:
+          RANGE_PR: ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then range="$RANGE_PR";
+          elif [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ]; then range="$BEFORE..$GITHUB_SHA";
+          else range="-50"; fi
+          ./gitleaks git --config .github/gitleaks.toml --redact --no-banner --log-opts="$range" .
+      - name: Scan the working tree
+        run: ./gitleaks dir --config .github/gitleaks.toml --redact --no-banner .
+
+  migration-lint:
+    name: Migration lint (online-safe DDL in new migrations)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with: { fetch-depth: 0 }
+      - uses: ./.github/actions/setup
+        with: { install: "false" }
+      # new files under packages/db/drizzle, packages/db/src/sql and packages/db/src/sql/online since the PR base / the previous push:
+      # no blocking CREATE INDEX, CHECK/FK without NOT VALID, ALTER COLUMN TYPE or unprotected SET NOT NULL (docs/DATA-MODEL.md §J)
+      - name: lint-migrations
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          base="${PR_BASE:-$BEFORE}"
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then base="$(git rev-list --max-parents=0 HEAD | tail -1)"; fi
+          node scripts/ci/lint-migrations.mjs --base "$base"
+
+  infra:
+    name: Infra (compose, k8s, Prometheus, Alertmanager, Caddy, nginx, scripts)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup
+      - name: Secret files for the compose renders (gen-secrets.sh, the documented path)
+        run: |
+          sh infra/scripts/gen-secrets.sh infra/secrets > /dev/null
+          echo "JWT_SIGNING_KEYS=j1:$(openssl genpkey -algorithm ed25519 -outform DER | base64 -w0)" >> "$GITHUB_ENV"
+      - name: docker compose config (quick start + production, every profile)
+        env:
+          JWT_SECRET: x
+          FIELD_ENCRYPTION_KEY: x
+          HASH_KEY: x
+          LINK_SIGNING_KEYS: l1:x
+          HASH_KEYS: h1:x
+          POSTGRES_PASSWORD: x
+          KKT_OWNER_DB_PASSWORD: x
+          KKT_APP_DB_PASSWORD: x
+          DOMAIN: kkt.example.in
+          IMAGE_TAG: ${{ github.sha }}
+          BOOTSTRAP_ADMIN_EMAIL: owner@kkt.example.in
+        run: |
+          docker compose -f docker-compose.yml config -q
+          docker compose -f docker-compose.prod.yml --profile monitoring --profile minio --profile security-redis config -q
+          if docker compose -f docker-compose.prod.yml config 2>&1 | grep -q ':latest'; then echo "::error::docker-compose.prod.yml renders a :latest image"; exit 1; fi
+      - name: Every secret docker-compose.prod.yml mounts is produced by gen-secrets.sh
+        env: { DOMAIN: kkt.example.in, BOOTSTRAP_ADMIN_EMAIL: owner@kkt.example.in, IMAGE_TAG: "${{ github.sha }}" }
+        run: |
+          for s in $(docker compose -f docker-compose.prod.yml config --format json 2>/dev/null | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>console.log(Object.values(JSON.parse(d).secrets).map(s=>s.file.split("/").pop()).join(" ")))'); do
+            test -s "infra/secrets/$s" || { echo "::error::gen-secrets.sh does not create $s"; exit 1; }
+          done
+      - name: Kubernetes manifests (kustomize with a SHA tag, kubeconform schemas, semantic checks)
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz | tar xz kubeconform
+          curl -sSL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.4.3/kustomize_v5.4.3_linux_amd64.tar.gz" | tar xz kustomize
+          cp -r infra/k8s /tmp/k8s-render
+          (cd /tmp/k8s-render && "$GITHUB_WORKSPACE/kustomize" edit set image \
+            kkt-api=ghcr.io/acme/kkt-api:${{ github.sha }} kkt-web=ghcr.io/acme/kkt-web:${{ github.sha }} \
+            kkt-erp=ghcr.io/acme/kkt-erp:${{ github.sha }} kkt-portal=ghcr.io/acme/kkt-portal:${{ github.sha }})
+          ./kustomize build /tmp/k8s-render > /tmp/k8s.yaml
+          if grep -n ':latest' /tmp/k8s.yaml; then echo "::error::a rendered manifest uses :latest"; exit 1; fi
+          ./kubeconform -strict -summary -kubernetes-version 1.30.0 /tmp/k8s.yaml infra/k8s/secret.example.yaml
+          node infra/scripts/validate-k8s.mjs infra/k8s
+      - name: Prometheus rules, rule unit tests, dashboard queries, Alertmanager config
+        run: |
+          curl -sSL https://github.com/prometheus/prometheus/releases/download/v2.55.1/prometheus-2.55.1.linux-amd64.tar.gz | tar xz --strip-components=1 prometheus-2.55.1.linux-amd64/promtool
+          ./promtool check rules infra/prometheus/alerts.yml
+          ./promtool test rules infra/prometheus/alerts.test.yml
+          node infra/scripts/dashboard-rules.mjs infra/grafana/kkt-api.json > /tmp/dashboard-rules.yml
+          ./promtool check rules /tmp/dashboard-rules.yml
+          sed 's#/run/secrets/metrics_token#/tmp/metrics_token#' infra/prometheus/prometheus.yml > infra/prometheus/ci-prometheus.yml && echo token > /tmp/metrics_token
+          ./promtool check config infra/prometheus/ci-prometheus.yml
+          mkdir -p /tmp/am && sed 's#/run/secrets/#/tmp/am/#' infra/prometheus/alertmanager.yml > /tmp/am/alertmanager.yml
+          for f in pagerduty_routing_key opsgenie_api_key; do echo key > /tmp/am/$f; done
+          echo https://hooks.slack.com/services/T0/B0/x > /tmp/am/error_webhook_url
+          docker run --rm -v /tmp/am:/tmp/am:ro --entrypoint amtool prom/alertmanager:v0.27.0 check-config /tmp/am/alertmanager.yml
+      - name: Caddyfile
+        run: docker run --rm -e DOMAIN=kkt.example.in -v "$PWD/infra/caddy:/etc/caddy:ro" caddy:2.8-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+      - name: nginx configs of the ERP and portal images (rendered like the image does, then nginx -t)
+        run: |
+          for app in erp portal; do
+            mkdir -p /tmp/nginx-$app
+            # shellcheck disable=SC2016 # the literal ${CSP_CONNECT_SRC} is the variable list for envsubst
+            CSP_CONNECT_SRC="'self'" envsubst '${CSP_CONNECT_SRC}' < apps/$app/nginx.conf > /tmp/nginx-$app/default.conf
+            docker run --rm -v /tmp/nginx-$app:/etc/nginx/conf.d:ro nginxinc/nginx-unprivileged:1.27-alpine nginx -t
+          done
+      - name: Shell scripts
+        run: shellcheck -s sh -S warning infra/backup/backup.sh infra/postgres/init/02-passwords.sh infra/scripts/gen-secrets.sh
+      # scripts/ci/backup-sh.test.mjs: encryption round trips (age + openssl), tamper refusal, failures that must never count as a backup
+      # (failed pg_dump, a cipher failing at the end of the stream, a failed base backup), WAL archiving, retention — with age installed
+      # here, so the age cases run too (the supply-chain job skips them)
+      - name: backup.sh (age and openssl modes, failure propagation, retention)
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq age > /dev/null
+          node --test scripts/ci/backup-sh.test.mjs
+      # the same script under the image's busybox sh and tools: WAL round trip with age, openssl encrypt/decrypt, prune of a crashed base
+      - name: Backup image (age + backup.sh on postgres:16-alpine)
+        run: |
+          docker build -q -t kkt-backup:ci infra/backup
+          docker run --rm --entrypoint sh kkt-backup:ci -c '
+            set -e
+            age --version && sh -n /opt/kkt/backup.sh
+            d=$(mktemp -d); export BACKUP_DIR=$d/b BACKUP_ENCRYPTION_KEY_FILE=$d/age.key
+            age-keygen -o $d/age.key 2> /dev/null; openssl rand -hex 32 > $d/hex.key
+            mkdir -p $d/b/wal $d/b/base/20000101T000000Z.partial; head -c 200000 /dev/urandom > $d/seg
+            sh /opt/kkt/backup.sh wal-push $d/seg 000000010000000000000001
+            sh /opt/kkt/backup.sh wal-fetch 000000010000000000000001 $d/out && cmp $d/seg $d/out
+            BACKUP_ENCRYPTION_KEY_FILE=$d/hex.key sh /opt/kkt/backup.sh encrypt $d/seg $d/x.enc
+            BACKUP_ENCRYPTION_KEY_FILE=$d/hex.key sh /opt/kkt/backup.sh decrypt $d/x.enc - | cmp - $d/seg
+            touch -d "2000-01-01 00:00:00" $d/b/base/20000101T000000Z.partial
+            sh /opt/kkt/backup.sh prune && test ! -e $d/b/base/20000101T000000Z.partial
+            echo "backup.sh ok under busybox"'
+
+  images:
+    name: Container images + SBOM (build; push on main)
+    needs:
+      [
+        lint,
+        format,
+        typecheck,
+        unit,
+        db,
+        api-integration,
+        acceptance,
+        openapi,
+        build,
+        infra,
+        supply-chain,
+        secrets,
+        migration-lint,
+      ]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { app: api, context: ., file: apps/api/Dockerfile }
+          - { app: erp, context: ., file: apps/erp/Dockerfile }
+          - { app: web, context: ., file: apps/web/Dockerfile }
+          - { app: portal, context: ., file: apps/portal/Dockerfile }
+          - { app: backup, context: infra/backup, file: infra/backup/Dockerfile }
+    # plain docker buildx (no third-party build actions): immutable git-SHA tags only (never :latest; the deploy workflow and
+    # docker-compose.prod.yml IMAGE_TAG reference them), BuildKit SBOM (SPDX) + provenance attestations, the SBOM kept as an artifact
+    env:
+      PUSH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: buildx builder (the docker-container driver is needed for attestations)
+        run: docker buildx create --name kkt --driver docker-container --use && docker buildx inspect --bootstrap > /dev/null
+      - name: Log in to GHCR
+        if: env.PUSH == 'true'
+        env: { TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
+        run: echo "$TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Build (push on main) with SBOM and provenance
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          image="ghcr.io/$owner/kkt-${{ matrix.app }}"
+          mkdir -p sbom
+          if [ "$PUSH" = true ]; then
+            docker buildx build --file ${{ matrix.file }} --sbom=true --provenance=mode=max \
+              --tag "$image:$GITHUB_SHA" --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+              --cache-from "type=registry,ref=$image:buildcache" --cache-to "type=registry,ref=$image:buildcache,mode=max" \
+              --push ${{ matrix.context }}
+            docker buildx imagetools inspect "$image:$GITHUB_SHA" --format '{{ json .SBOM }}' > "sbom/kkt-${{ matrix.app }}.sbom.json"
+          else
+            # pull requests: the same build, exported locally; BuildKit writes the SBOM attestation next to the filesystem
+            docker buildx build --file ${{ matrix.file }} --sbom=true \
+              --cache-from "type=registry,ref=$image:buildcache" \
+              --output "type=local,dest=/tmp/rootfs" ${{ matrix.context }}
+            cp /tmp/rootfs/sbom*.json "sbom/kkt-${{ matrix.app }}.sbom.json"
+          fi
+          test -s "sbom/kkt-${{ matrix.app }}.sbom.json" || { echo "::error::no SBOM for ${{ matrix.app }}"; exit 1; }
+          node -e 'const s=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));const t=JSON.stringify(s);if(!/spdx/i.test(t))throw new Error("not an SPDX document");console.log("SBOM ok:",(t.match(/"SPDXID"/g)||[]).length,"SPDX elements")' "sbom/kkt-${{ matrix.app }}.sbom.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sbom-${{ matrix.app }}
+          path: sbom/
+          retention-days: 90

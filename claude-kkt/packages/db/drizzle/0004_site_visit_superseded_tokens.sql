@@ -1,0 +1,2 @@
+ALTER TABLE "site_visits" ADD COLUMN "superseded_token_hashes" text[] DEFAULT '{}'::text[] NOT NULL;--> statement-breakpoint
+CREATE INDEX "site_visits_superseded_token_hashes_idx" ON "site_visits" USING gin ("superseded_token_hashes");

@@ -1,0 +1,36 @@
+# Three hosts, one backend: /api on every host goes to the API Service; everything else to the host's front end.
+# ingress-nginx + cert-manager (TLS). HSTS comes from the controller; the ERP/portal pods set CSP and frame headers themselves.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kkt
+  namespace: kkt
+  labels: { app.kubernetes.io/part-of: kkt }
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    nginx.ingress.kubernetes.io/proxy-body-size: 16m
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    # retry an idempotent request on another API pod when one is draining or restarting
+    nginx.ingress.kubernetes.io/proxy-next-upstream: error timeout http_502 http_503
+    nginx.ingress.kubernetes.io/proxy-next-upstream-tries: "3"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [erp.kkt.example.in, www.kkt.example.in, my.kkt.example.in]
+      secretName: kkt-tls
+  rules:
+    - host: erp.kkt.example.in
+      http:
+        paths:
+          - { path: /api, pathType: Prefix, backend: { service: { name: api, port: { name: http } } } }
+          - { path: /, pathType: Prefix, backend: { service: { name: erp, port: { name: http } } } }
+    - host: www.kkt.example.in
+      http:
+        paths:
+          - { path: /api, pathType: Prefix, backend: { service: { name: api, port: { name: http } } } }
+          - { path: /, pathType: Prefix, backend: { service: { name: web, port: { name: http } } } }
+    - host: my.kkt.example.in
+      http:
+        paths:
+          - { path: /api, pathType: Prefix, backend: { service: { name: api, port: { name: http } } } }
+          - { path: /, pathType: Prefix, backend: { service: { name: portal, port: { name: http } } } }

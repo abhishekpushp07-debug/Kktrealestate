@@ -1,0 +1,154 @@
+name: Nightly (load gate + browser QA)
+
+on:
+  schedule:
+    # 03:00 IST
+    - cron: "30 21 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "22"
+  PLAYWRIGHT_VERSION: "1.63.0"
+  DATABASE_URL: postgres://postgres:postgres@localhost:5432/kkt_nightly
+  REDIS_URL: redis://localhost:6379/0
+  JWT_SECRET: nightly-only-secret-nightly-only-secret-0123
+  FIELD_ENCRYPTION_KEY: bmlnaHRseS1vbmx5LWtleS1uaWdodGx5LW9ubHkta2V5MDE=
+  # ≥ 32 bytes: the load test runs the API with NODE_ENV=production, which refuses short or placeholder secrets (contract C9)
+  HASH_KEY: nightly-only-hash-key-nightly-only-hash-key-01
+  HASH_KEYS: h1:nightly-only-hash-key-nightly-only-hash-key-01
+  LINK_SIGNING_KEYS: l1:nightly-only-link-key-nightly-only-link-key-01
+
+jobs:
+  loadtest-smoke:
+    name: Load gate (production bundle, 2 workers, p95 per route)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres, POSTGRES_DB: kkt_nightly }
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup
+      - run: pnpm --filter @kkt/api build
+      - name: Ed25519 JWT signing key (contract C9)
+        run: echo "JWT_SIGNING_KEYS=j1:$(openssl genpkey -algorithm ed25519 -outform DER | base64 -w0)" >> "$GITHUB_ENV"
+      - name: Migrate + demo seed (+ the scale seed when the API has one), start the API
+        working-directory: apps/api
+        run: |
+          NODE_ENV=development SEED_ON_BOOT=true SEED_DEMO=true node dist/server.js migrate
+          # production-size data (thousands of flats/bookings, months of ledger) when the scale seed exists: latency measured on a
+          # 10-booking demo seed says little (audit v3 C1/C8)
+          if node -e 'process.exit(require("./package.json").scripts?.["seed:scale"] ? 0 : 1)'; then
+            NODE_ENV=development pnpm --filter @kkt/api seed:scale
+            echo "SEED_PROFILE=scale" >> "$GITHUB_ENV"
+          else
+            echo "::notice::apps/api has no seed:scale script yet: the load gate runs on the demo seed"
+            echo "SEED_PROFILE=demo" >> "$GITHUB_ENV"
+          fi
+          NODE_ENV=production SEED_ON_BOOT=false RUN_MIGRATIONS_ON_BOOT=false API_WORKERS=2 LOG_LEVEL=warn TRUST_PROXY=loopback \
+            PUBLIC_RATE_LIMIT_PER_MIN=1000000 WRITE_RATE_LIMIT_PER_MIN=1000000 READ_RATE_LIMIT_PER_MIN=1000000 STORAGE_LOCAL_DIR=/tmp/kkt-storage \
+            node dist/server.js > /tmp/api.log 2>&1 &
+          for _ in $(seq 1 60); do curl -sf http://localhost:4000/api/v1/ready > /dev/null && break; sleep 1; done
+      - name: Load test (results as an artifact) and gate (p95 per route, scripts/ci/load-thresholds.json)
+        env:
+          {
+            BASE: "http://localhost:4000",
+            CONNECTIONS: "50",
+            WRITE_CONNECTIONS: "10",
+            DURATION: "10",
+            LABEL: "nightly gate",
+            OUT: /tmp/loadtest.md,
+          }
+        run: |
+          echo "# Nightly load gate (seed: $SEED_PROFILE)" > /tmp/loadtest.md
+          pnpm --filter @kkt/api loadtest
+          cat /tmp/loadtest.md >> "$GITHUB_STEP_SUMMARY"
+          # every scenario served requests, ≤ 1% non-2xx, and its p95 is within the route's limit
+          node scripts/ci/load-gate.mjs /tmp/loadtest.md | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: API log on failure
+        if: failure()
+        run: tail -n 200 /tmp/api.log || true
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with: { name: loadtest, path: /tmp/loadtest.md, retention-days: 30 }
+
+  browser-qa:
+    name: Browser QA (ERP, website, portal; 1440 + 390 px, axe)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres, POSTGRES_DB: kkt_nightly }
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup
+      - name: Playwright + Chromium
+        run: |
+          npm install -g "playwright@${PLAYWRIGHT_VERSION}"
+          npx -y "playwright@${PLAYWRIGHT_VERSION}" install --with-deps chromium
+      - name: Build everything
+        run: |
+          pnpm --filter @kkt/api build
+          VITE_API_URL=http://localhost:4000 pnpm --filter @kkt/erp build
+          NEXT_PUBLIC_API_URL=http://localhost:4000 API_INTERNAL_URL=http://localhost:4000 pnpm --filter @kkt/web build
+          EXPO_PUBLIC_API_URL=http://localhost:4000 pnpm --filter @kkt/portal build:web
+      - name: Start API (demo data), ERP, website, portal
+        run: |
+          cd apps/api
+          NODE_ENV=development SEED_ON_BOOT=true SEED_DEMO=true node dist/server.js migrate
+          NODE_ENV=development RUN_MIGRATIONS_ON_BOOT=false SEED_ON_BOOT=false RUN_JOBS_IN_API=false LOG_LEVEL=warn \
+            PUBLIC_RATE_LIMIT_PER_MIN=1000000 WRITE_RATE_LIMIT_PER_MIN=1000000 STORAGE_LOCAL_DIR=/tmp/kkt-storage \
+            node dist/server.js > /tmp/api.log 2>&1 &
+          cd ../erp && npx vite preview --port 5173 --strictPort > /tmp/erp.log 2>&1 &
+          # never a bare `next start`: ISR pages need the CSP hook (apps/web/csp-hook.cjs, docs/DEPLOY.md)
+          cd ../web && PORT=3000 API_INTERNAL_URL=http://localhost:4000 pnpm --filter @kkt/web start > /tmp/web.log 2>&1 &
+          cd ../portal && npx -y serve@14 -s dist -l 8081 > /tmp/portal.log 2>&1 &
+          for url in http://localhost:4000/api/v1/ready http://localhost:5173 http://localhost:3000 http://localhost:8081; do
+            for _ in $(seq 1 90); do curl -sf "$url" > /dev/null && break; sleep 1; done
+          done
+      - name: ERP QA
+        env:
+          {
+            NODE_PATH: /usr/local/lib/node_modules,
+            ERP_URL: "http://localhost:5173",
+            API_URL: "http://localhost:4000",
+            OUT_DIR: /tmp/qa/erp,
+          }
+        run: mkdir -p "$OUT_DIR" && node docs/qa/erp/browser-qa.cjs
+      - name: Website QA
+        if: always()
+        env:
+          {
+            NODE_PATH: /usr/local/lib/node_modules,
+            WEB_URL: "http://localhost:3000",
+            API_URL: "http://localhost:4000",
+            OUT_DIR: /tmp/qa/web,
+          }
+        run: mkdir -p "$OUT_DIR" && node docs/qa/web/browser-qa.cjs
+      - name: Portal QA
+        if: always()
+        env: { NODE_PATH: /usr/local/lib/node_modules, API_URL: "http://localhost:4000", OUT_DIR: /tmp/qa/portal }
+        run: mkdir -p "$OUT_DIR" && node docs/qa/portal/browser-qa.cjs
+      - name: Server logs
+        if: failure()
+        run: tail -n 200 /tmp/api.log /tmp/erp.log /tmp/web.log /tmp/portal.log || true
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with: { name: browser-qa, path: /tmp/qa, retention-days: 14 }

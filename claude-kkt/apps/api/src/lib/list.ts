@@ -1,0 +1,594 @@
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  getTableColumns,
+  getTableName,
+  gt,
+  ilike,
+  isNotNull,
+  isNull,
+  lt,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
+import type { AnyPgColumn, PgSelect, PgTable, SelectedFields } from "drizzle-orm/pg-core";
+import type { FastifyInstance } from "fastify";
+import type { ListMeta, ListQuery } from "@kkt/contracts";
+import { parseSort } from "@kkt/contracts";
+import type { Executor } from "@kkt/db";
+import { ApiError } from "./errors.js";
+
+/** A table with an `id` column (used as the keyset tiebreaker). */
+export type ListableTable = PgTable & { id: AnyPgColumn };
+
+/** Paginated result envelope (docs/API-CONVENTIONS.md). */
+export interface ListResult<T> {
+  items: T[];
+  total: number;
+  page: number;
+  page_size: number;
+  next_cursor: string | null;
+  /** How `total` was obtained (contracts ListMetaSchema); always set by paginate(). */
+  meta?: ListMeta;
+}
+
+/** Options for paginate(). */
+export interface PaginateOptions {
+  table: ListableTable;
+  /** Drizzle selection object (columns, sql expressions or whole tables); omit to select the whole table row. */
+  select?: Record<string, unknown>;
+  /** Adds joins to the dynamic query builder (applied to both the page and the count query, unless `countJoin` is false). */
+  join?: (q: PgSelect) => PgSelect;
+  /**
+   * `false` when the joins can neither filter nor multiply rows (left joins of a to-one relation that `where` and `search` never
+   * reference): the count query then runs on the base table alone.
+   */
+  countJoin?: boolean;
+  where?: SQL | undefined;
+  /** ILIKE search across the given columns (term is escaped for %, _ and \). */
+  search?: { columns: readonly (AnyPgColumn | SQL)[]; term: string | undefined };
+  /** Allow-listed sort fields; `requested` is `field` or `-field`. */
+  sort: { allowed: Record<string, AnyPgColumn>; default: string; requested?: string | undefined };
+  page?: number;
+  page_size?: number;
+  cursor?: string | undefined;
+  limit?: number | undefined;
+  /** `true` forces an exact `count(*)`; otherwise tables above `estimateAbove` rows answer with the planner's estimate (ARCHITECTURE §6). */
+  exact?: boolean | undefined;
+  /**
+   * Keyset mode only: count the filtered rows too (`include_total=true`). Without it a cursor page runs no count(*) / EXPLAIN at all and
+   * reports `total` = rows in this page with `meta.total_included = false`. `exact` implies it.
+   */
+  includeTotal?: boolean | undefined;
+  /** Row threshold (pg_class.reltuples) above which the total is estimated; default COUNT_ESTIMATE_ABOVE. */
+  estimateAbove?: number | undefined;
+  /** Set by listPaging() for `format=csv`: the request's query object, under which the export facts (total, next cursor) are recorded. */
+  csvExport?: object | undefined;
+}
+
+/** Tables with more live rows than this (per pg_class) report an estimated `total` unless the caller asks for `exact=true`. */
+export const COUNT_ESTIMATE_ABOVE = 10_000;
+
+/** Name of the hidden select key carrying the microsecond-exact sort value of timestamp sorts (stripped from the items). */
+const SORT_KEY = "__kkt_sort_key";
+
+/** True for timestamp / timestamptz columns, whose JS Date values lose the microseconds Postgres stores. */
+export function isTimestampColumn(col: AnyPgColumn): boolean {
+  return col.columnType === "PgTimestamp" || col.columnType === "PgTimestampString";
+}
+
+/**
+ * Microsecond-exact text key of a timestamp column (`YYYY-MM-DD HH24:MI:SS.US`, UTC). Keyset cursors on timestamp sorts carry this
+ * text instead of a JS Date (millisecond precision), so rows written in the same millisecond are never skipped between pages.
+ */
+export function timestampSortKey(col: AnyPgColumn): SQL<string> {
+  return sql<string>`to_char(${col} at time zone 'UTC', 'YYYY-MM-DD HH24:MI:SS.US')`;
+}
+
+/** The parameter a microsecond text key compares against: the column's own type, so the comparison stays index-friendly. */
+function timestampParam(col: AnyPgColumn, key: string): SQL {
+  const withTimezone = (col as unknown as { withTimezone?: boolean }).withTimezone === true;
+  return withTimezone ? sql`(${key}::timestamp at time zone 'UTC')` : sql`${key}::timestamp`;
+}
+
+/** Escapes a search term for use inside an ILIKE pattern. */
+export function escapeLike(term: string): string {
+  return term.replace(/[\\%_]/g, (m) => `\\${m}`);
+}
+
+/** Builds an ILIKE "contains" condition over several columns, or undefined for an empty term. */
+export function searchCondition(columns: readonly (AnyPgColumn | SQL)[], term: string | undefined): SQL | undefined {
+  const t = term?.trim();
+  if (!t) return undefined;
+  const pattern = `%${escapeLike(t)}%`;
+  const parts = columns.map((c) => ilike(c as AnyPgColumn, pattern));
+  return parts.length === 1 ? parts[0] : or(...parts);
+}
+
+interface CursorPayload {
+  v: string | number | boolean | null;
+  id: string;
+  /** Sort the cursor was issued for (`field` / `-field`); absent in cursors issued before it was recorded. */
+  s?: string;
+}
+
+/** Cursor = base64url(JSON [sortValue, id, sort]). */
+export function encodeCursor(p: CursorPayload): string {
+  return Buffer.from(JSON.stringify(p.s === undefined ? [p.v, p.id] : [p.v, p.id, p.s])).toString("base64url");
+}
+
+/** 400 INVALID_CURSOR in the validation-issue shape (path `cursor`). */
+export function invalidCursor(reason: string): ApiError {
+  return new ApiError(400, "INVALID_CURSOR", `Invalid cursor: ${reason}. Start again without a cursor.`, {
+    issues: [{ path: "cursor", message: reason, code: "invalid_cursor" }],
+  });
+}
+
+const CURSOR_RE = /^[A-Za-z0-9_-]+$/;
+const UUID_TEXT_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Microsecond sort key (timestampSortKey) or an ISO timestamp. */
+const TIMESTAMP_TEXT_RE = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:?\d{2})?$/;
+const DATE_TEXT_RE = /^\d{4}-\d{2}-\d{2}$/;
+const NUMERIC_TEXT_RE = /^-?\d{1,30}(\.\d{1,20})?$/;
+
+/** True for a real calendar day (Date.parse accepts 2024-02-30 and rolls it over; Postgres refuses it with 22008). */
+function validCalendarDate(text: string): boolean {
+  const y = Number(text.slice(0, 4));
+  const m = Number(text.slice(5, 7));
+  const d = Number(text.slice(8, 10));
+  if (y < 1 || m < 1 || m > 12 || d < 1) return false;
+  return d <= new Date(Date.UTC(y, m, 0)).getUTCDate();
+}
+
+/** True for a parseable timestamp in the sort-key or ISO spelling (a real calendar day and clock time, offset within ±15:59). */
+function validTimestampText(v: string): boolean {
+  if (!TIMESTAMP_TEXT_RE.test(v) || !validCalendarDate(v)) return false;
+  const hh = Number(v.slice(11, 13));
+  const mi = Number(v.slice(14, 16));
+  const ss = Number(v.slice(17, 19));
+  if (hh > 23 || mi > 59 || ss > 59) return false;
+  const offset = /([+-])(\d{2}):?(\d{2})$/.exec(v);
+  if (offset && (Number(offset[2]) > 15 || Number(offset[3]) > 59)) return false;
+  const iso = v.replace(" ", "T");
+  return !Number.isNaN(Date.parse(/(Z|[+-]\d{2}:?\d{2})$/.test(iso) ? iso : `${iso}Z`));
+}
+
+/** Integer column ranges (a value outside reaches Postgres as 22003 "out of range"). */
+const INT_RANGE: Record<string, readonly [number, number]> = {
+  PgSmallInt: [-32_768, 32_767],
+  PgInteger: [-2_147_483_648, 2_147_483_647],
+  PgSerial: [-2_147_483_648, 2_147_483_647],
+  PgBigInt53: [Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER],
+  PgBigSerial53: [Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER],
+};
+const BIGINT_MIN = -(2n ** 63n);
+const BIGINT_MAX = 2n ** 63n - 1n;
+
+/** True for an int8 value given as a number or an integer string. */
+function validBigInt(v: string | number | boolean): boolean {
+  if (typeof v === "number") return Number.isSafeInteger(v);
+  if (typeof v !== "string" || !/^-?\d{1,19}$/.test(v)) return false;
+  const n = BigInt(v);
+  return n >= BIGINT_MIN && n <= BIGINT_MAX;
+}
+
+/** Text Postgres can store (a NUL character is 22021 "invalid byte sequence"). */
+const storableText = (v: string): boolean => !v.includes("\u0000");
+
+/** Decodes a cursor; 400 INVALID_CURSOR when it is not one this API issued (shape only — see checkCursorValue for the types). */
+export function decodeCursor(raw: string): CursorPayload {
+  let parsed: unknown;
+  try {
+    if (!CURSOR_RE.test(raw)) throw new Error("bad");
+    parsed = JSON.parse(Buffer.from(raw, "base64url").toString("utf8")) as unknown;
+  } catch {
+    throw invalidCursor("not a cursor issued by this list");
+  }
+  if (
+    !Array.isArray(parsed) ||
+    (parsed.length !== 2 && parsed.length !== 3) ||
+    typeof parsed[1] !== "string" ||
+    (parsed.length === 3 && typeof parsed[2] !== "string")
+  )
+    throw invalidCursor("not a cursor issued by this list");
+  const v = parsed[0] as unknown;
+  if (v !== null && typeof v !== "string" && typeof v !== "number" && typeof v !== "boolean")
+    throw invalidCursor("not a cursor issued by this list");
+  return { v, id: parsed[1], ...(parsed.length === 3 ? { s: parsed[2] as string } : {}) };
+}
+
+/**
+ * Rejects a cursor whose values cannot belong to the sort column / id column (so a tampered cursor answers 400 INVALID_CURSOR instead of
+ * reaching Postgres as a bad cast). Text-like columns accept any string.
+ */
+export function checkCursorValue(col: AnyPgColumn, idCol: AnyPgColumn, c: CursorPayload): void {
+  if (idCol.columnType === "PgUUID" ? !UUID_TEXT_RE.test(c.id) : !storableText(c.id))
+    throw invalidCursor("malformed row id");
+  const v = c.v;
+  if (v === null) return;
+  const t = col.columnType;
+  const range = INT_RANGE[t];
+  const enumValues =
+    t === "PgEnumColumn" ? (col as unknown as { enumValues?: readonly string[] }).enumValues : undefined;
+  const ok =
+    t === "PgTimestamp" || t === "PgTimestampString"
+      ? typeof v === "string" && validTimestampText(v)
+      : t === "PgDate" || t === "PgDateString"
+        ? typeof v === "string" && DATE_TEXT_RE.test(v) && validCalendarDate(v)
+        : range
+          ? typeof v === "number" && Number.isSafeInteger(v) && v >= range[0] && v <= range[1]
+          : t === "PgBigInt64"
+            ? validBigInt(v)
+            : t === "PgReal" || t === "PgDoublePrecision"
+              ? typeof v === "number" && Number.isFinite(v)
+              : t === "PgNumeric" || t === "PgNumericNumber"
+                ? (typeof v === "number" && Number.isFinite(v)) || (typeof v === "string" && NUMERIC_TEXT_RE.test(v))
+                : t === "PgUUID"
+                  ? typeof v === "string" && UUID_TEXT_RE.test(v)
+                  : t === "PgBoolean"
+                    ? typeof v === "boolean"
+                    : enumValues
+                      ? typeof v === "string" && enumValues.includes(v)
+                      : typeof v === "string"
+                        ? storableText(v)
+                        : typeof v === "number" || typeof v === "boolean";
+  if (!ok) throw invalidCursor("sort value does not match the sort column");
+}
+
+function cursorValue(col: AnyPgColumn, v: CursorPayload["v"]): unknown {
+  if (v === null) return null;
+  if (isTimestampColumn(col) && typeof v === "string") return timestampParam(col, v);
+  return col.dataType === "date" && typeof v === "string" ? new Date(v) : v;
+}
+
+function rawSortValue(v: unknown): CursorPayload["v"] {
+  if (v instanceof Date) return v.toISOString();
+  if (v === null || typeof v === "string" || typeof v === "number" || typeof v === "boolean") return v;
+  return String(v);
+}
+
+/**
+ * Rows strictly after the cursor `(v, id)` in `ORDER BY col <dir>, id <dir>`. PostgreSQL sorts NULL as the largest value (NULLS LAST on
+ * ASC, NULLS FIRST on DESC), so a nullable sort column needs explicit NULL branches: without them a page boundary inside the NULL block
+ * (or, on ASC, any boundary before it) silently ends the listing — the async export would store a truncated file. Not-null columns of
+ * the listed table keep the plain index-friendly condition; columns of joined tables count as nullable (LEFT JOINs).
+ */
+export function keysetAfter(
+  col: AnyPgColumn,
+  idCol: AnyPgColumn,
+  v: unknown,
+  id: string,
+  direction: "asc" | "desc",
+  nullable: boolean,
+): SQL {
+  const cmp = direction === "asc" ? gt : lt;
+  const tie = cmp(idCol, id);
+  if (v === null || v === undefined) {
+    // cursor inside the NULL block: ASC (NULLs last) → only later NULLs; DESC (NULLs first) → later NULLs, then every non-NULL row
+    const laterNulls = and(isNull(col), tie)!;
+    return direction === "asc" ? laterNulls : or(laterNulls, isNotNull(col))!;
+  }
+  const after = or(cmp(col, v), and(eq(col, v), tie))!;
+  // a non-NULL cursor on ASC still has the whole NULL block ahead of it; on DESC the NULLs came first and are done
+  return nullable && direction === "asc" ? or(after, isNull(col))! : after;
+}
+
+/** Resolves the requested sort against the allow-list (400 on unknown fields). */
+export function resolveSort(sort: PaginateOptions["sort"]): {
+  field: string;
+  column: AnyPgColumn;
+  direction: "asc" | "desc";
+} {
+  const parsed = parseSort(sort.requested ?? sort.default);
+  const column = sort.allowed[parsed.field];
+  if (!column) throw ApiError.badRequest(`Cannot sort by "${parsed.field}"`, { allowed: Object.keys(sort.allowed) });
+  return { field: parsed.field, column, direction: parsed.direction };
+}
+
+/**
+ * Estimated row count of a filtered select from the planner (`EXPLAIN (FORMAT JSON)`), used for big tables instead of `count(*)`.
+ * Falls back to null when the plan cannot be read, in which case the caller counts exactly.
+ */
+async function plannerEstimate(executor: Executor, query: PgSelect): Promise<number | null> {
+  try {
+    const rows = (await executor.execute(sql`explain (format json) ${query}`)) as unknown as Record<string, unknown>[];
+    const raw = rows[0]?.["QUERY PLAN"];
+    const plan = (typeof raw === "string" ? JSON.parse(raw) : raw) as { Plan?: { "Plan Rows"?: number } }[] | undefined;
+    const n = plan?.[0]?.Plan?.["Plan Rows"];
+    return typeof n === "number" && Number.isFinite(n) ? Math.max(0, Math.round(n)) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** How long a table's pg_class row estimate is reused before being re-read (it only decides exact vs estimated counting). */
+const TABLE_ESTIMATE_TTL_MS = 60_000;
+const tableEstimates = new Map<string, { n: number; at: number }>();
+
+/**
+ * Live-row estimate of a table from pg_class (−1 when the table was never analysed), cached per process for TABLE_ESTIMATE_TTL_MS so a
+ * list request costs two queries (page + count), not three. The estimate only picks the counting strategy, so staleness is harmless.
+ */
+async function tableEstimate(executor: Executor, table: PgTable): Promise<number> {
+  const name = getTableName(table);
+  const hit = tableEstimates.get(name);
+  const now = Date.now();
+  if (hit && now - hit.at < TABLE_ESTIMATE_TTL_MS) return hit.n;
+  const rows = (await executor.execute(
+    sql`select reltuples::float8 as n from pg_class where oid = ${`"${name}"`}::regclass`,
+  )) as unknown as { n: number | string }[];
+  const n = Number(rows[0]?.n ?? -1);
+  tableEstimates.set(name, { n, at: now });
+  return n;
+}
+
+/** Forgets cached table estimates (tests that switch between exact and estimated counting). */
+export function resetTableEstimates(): void {
+  tableEstimates.clear();
+  estimateCache.clear();
+}
+
+/**
+ * Runs a list query: offset mode (`page`/`page_size`, total via count(*)) or keyset mode (`cursor`+`limit`, cursor = base64url(sortValue,id,sort);
+ * no count unless `includeTotal`/`exact`),
+ * with ILIKE search, allow-listed sort and optional joins. One page query + one count query. Timestamp sorts page on a microsecond-exact
+ * key; tables above `estimateAbove` rows report the planner's estimate as `total` unless `exact` is set.
+ */
+export async function paginate<T = Record<string, unknown>>(
+  executor: Executor,
+  opts: PaginateOptions,
+): Promise<ListResult<T>> {
+  const sort = resolveSort(opts.sort);
+  const idCol = opts.table.id;
+  const dir = sort.direction === "asc" ? asc : desc;
+  const tsSort = isTimestampColumn(sort.column);
+  const conditions: (SQL | undefined)[] = [opts.where, searchCondition(opts.search?.columns ?? [], opts.search?.term)];
+  const cursorMode = opts.cursor !== undefined || opts.limit !== undefined;
+  const pageSize = cursorMode ? (opts.limit ?? 25) : (opts.page_size ?? 25);
+  const page = cursorMode ? 1 : Math.max(1, opts.page ?? 1);
+  const sortSpec = `${sort.direction === "desc" ? "-" : ""}${sort.field}`;
+  if (opts.cursor) {
+    const c = decodeCursor(opts.cursor);
+    // a cursor carries the sort it was issued for: reusing it under another sort would silently skip or repeat rows
+    if (c.s !== undefined && c.s !== sortSpec) throw invalidCursor(`issued for sort "${c.s}", not "${sortSpec}"`);
+    checkCursorValue(sort.column, idCol, c);
+    const nullable = !(sort.column.notNull && sort.column.table === opts.table);
+    conditions.push(keysetAfter(sort.column, idCol, cursorValue(sort.column, c.v), c.id, sort.direction, nullable));
+  }
+  const where = and(...conditions.filter((c): c is SQL => c !== undefined));
+  // keyset paging on a timestamp: select its microsecond text key alongside the row so the next cursor is exact
+  const withSortKey = cursorMode && tsSort;
+  const selection: SelectedFields | undefined = withSortKey
+    ? ({ ...(opts.select ?? getTableColumns(opts.table)), [SORT_KEY]: timestampSortKey(sort.column) } as SelectedFields)
+    : (opts.select as SelectedFields | undefined);
+  const base: PgSelect = (selection ? executor.select(selection) : executor.select()).from(opts.table).$dynamic();
+  let pageQuery: PgSelect = opts.join ? opts.join(base) : base;
+  pageQuery = pageQuery
+    .where(where)
+    .orderBy(dir(sort.column), dir(idCol))
+    .limit(pageSize + (cursorMode ? 1 : 0));
+  if (!cursorMode) pageQuery = pageQuery.offset((page - 1) * pageSize);
+  const countWhere = and(
+    ...[opts.where, searchCondition(opts.search?.columns ?? [], opts.search?.term)].filter(
+      (c): c is SQL => c !== undefined,
+    ),
+  );
+  const countBase: PgSelect = executor.select({ total: count() }).from(opts.table).$dynamic();
+  const countJoin = opts.join && opts.countJoin !== false ? opts.join : undefined;
+  const countQuery = () => (countJoin ? countJoin(countBase) : countBase).where(countWhere);
+  const countOpts = countJoin === opts.join ? opts : { ...opts, join: countJoin };
+  let rows: unknown[];
+  let total: number;
+  // keyset pages count only on request (include_total / exact): the count is the expensive half of a page on a big table
+  const counted = !cursorMode || opts.includeTotal === true || opts.exact === true;
+  const estimate = { value: false };
+  if (!counted) {
+    rows = await pageQuery;
+    total = Math.min(rows.length, pageSize);
+  } else if (!cursorMode && opts.search?.term?.trim()) {
+    // A search usually fits in one page: run the page first, and when it is not full (and not past the end) the total is exact without
+    // a count query — offset + rows on this page. Only a full page (or an empty page past the end) still counts.
+    rows = await pageQuery;
+    total =
+      rows.length < pageSize && (rows.length > 0 || page === 1)
+        ? (page - 1) * pageSize + rows.length
+        : await countRows(executor, countOpts, countQuery(), countWhere, estimate);
+  } else {
+    [rows, total] = await Promise.all([pageQuery, countRows(executor, countOpts, countQuery(), countWhere, estimate)]);
+  }
+  const items = rows as unknown as T[];
+  let nextCursor: string | null = null;
+  if (cursorMode && items.length > pageSize) {
+    items.length = pageSize;
+    const last = items[items.length - 1] as Record<string, unknown>;
+    const v = withSortKey ? last[SORT_KEY] : readSortValue(last, opts, sort.column, sort.field);
+    nextCursor = encodeCursor({ v: rawSortValue(v), id: String(readId(last)), s: sortSpec });
+  }
+  if (withSortKey) for (const row of items as Record<string, unknown>[]) delete row[SORT_KEY];
+  if (opts.csvExport)
+    csvExportFacts.set(opts.csvExport, { total: counted ? total : null, rows: items.length, cursorMode, nextCursor });
+  return {
+    items,
+    total,
+    page,
+    page_size: pageSize,
+    next_cursor: nextCursor,
+    meta: { total_is_estimate: estimate.value, total_included: counted },
+  };
+}
+
+/** Exact `count(*)` for small tables or `exact=true`; the planner's estimate of the filtered query above the threshold. */
+async function countRows(
+  executor: Executor,
+  opts: PaginateOptions,
+  countQuery: PgSelect,
+  where: SQL | undefined,
+  /** Set to true when the returned number is the planner's estimate. */
+  estimated: { value: boolean } = { value: false },
+): Promise<number> {
+  const exact = async () => {
+    const totals = (await countQuery) as { total?: number | string }[];
+    return Number(totals[0]?.total ?? 0);
+  };
+  if (opts.exact) return exact();
+  const threshold = opts.estimateAbove ?? COUNT_ESTIMATE_ABOVE;
+  if ((await tableEstimate(executor, opts.table)) <= threshold) return exact();
+  const idsBase: PgSelect = executor.select({ id: opts.table.id }).from(opts.table).$dynamic();
+  const query = (opts.join ? opts.join(idsBase) : idsBase).where(where);
+  // the estimate is approximate by contract (meta.total_is_estimate): the same filtered list asked again within a few seconds reuses it
+  // instead of planning the joined query once more (EXPLAIN of a five-join list costs 2–7 ms of database CPU per request)
+  const compiled = query.toSQL();
+  const key = `${compiled.sql}\u0000${JSON.stringify(compiled.params)}`;
+  const now = Date.now();
+  const hit = estimateCache.get(key);
+  if (hit && now - hit.at < ESTIMATE_TTL_MS) {
+    estimated.value = true;
+    return hit.n;
+  }
+  const estimate = await plannerEstimate(executor, query);
+  if (estimate === null) return exact();
+  estimateCache.delete(key);
+  estimateCache.set(key, { n: estimate, at: now });
+  if (estimateCache.size > ESTIMATE_CACHE_MAX) estimateCache.delete(estimateCache.keys().next().value!);
+  estimated.value = true;
+  return estimate;
+}
+
+/** How long a planner estimate of one filtered list (same SQL and parameters) is reused, and how many are kept per process. */
+const ESTIMATE_TTL_MS = 10_000;
+const ESTIMATE_CACHE_MAX = 2_000;
+const estimateCache = new Map<string, { n: number; at: number }>();
+
+/** Reads the sort value back from the last row: a flat select key, a nested table selection, or the full-row property. */
+function readSortValue(
+  last: Record<string, unknown>,
+  opts: PaginateOptions,
+  column: AnyPgColumn,
+  field: string,
+): unknown {
+  for (const [k, c] of Object.entries(opts.select ?? {})) {
+    if (c === column) return last[k];
+    if (c && typeof c === "object" && !("queryChunks" in (c as object))) {
+      const nestedKey = columnKey(c as PgTable, column);
+      if (nestedKey !== undefined) return (last[k] as Record<string, unknown> | undefined)?.[nestedKey];
+    }
+  }
+  const key = columnKey(opts.table, column) ?? field;
+  return last[key];
+}
+
+/** Reads the row id from a flat or nested selection. */
+function readId(last: Record<string, unknown>): unknown {
+  if (last["id"] !== undefined) return last["id"];
+  for (const v of Object.values(last))
+    if (v && typeof v === "object" && "id" in (v as object)) return (v as { id: unknown }).id;
+  return undefined;
+}
+
+/** Finds the TS property name of a column on a table (for reading the sort value back from a full-row select). */
+function columnKey(table: PgTable, column: AnyPgColumn): string | undefined {
+  for (const [k, v] of Object.entries(table as unknown as Record<string, unknown>)) if (v === column) return k;
+  return undefined;
+}
+
+/** A list query as handlers hold it (`include_total` optional for literals built by hand). */
+export type ListQueryLike = Omit<ListQuery, "include_total"> & { include_total?: boolean | undefined };
+
+/** Maps the common ListQuery pagination fields onto paginate() options (search/sort are passed explicitly by the caller). */
+export function fromListQuery(
+  q: ListQueryLike,
+): Pick<PaginateOptions, "page" | "page_size" | "cursor" | "limit" | "exact" | "includeTotal"> {
+  return {
+    page: q.page,
+    page_size: q.page_size,
+    cursor: q.cursor,
+    limit: q.limit,
+    exact: q.exact,
+    includeTotal: q.include_total ?? false,
+  };
+}
+
+/** Upper bound of rows a synchronous `format=csv` export streams (larger exports go through `POST /exports`, a worker job). */
+export const CSV_EXPORT_MAX_ROWS = 10_000;
+
+/** Rows per page when the export job pages a CSV list with `X-Export-Cursor`. */
+export const CSV_EXPORT_PAGE_ROWS = 5_000;
+
+/** Effective CSV export limits (default CSV_EXPORT_MAX_ROWS / CSV_EXPORT_PAGE_ROWS; integration tests lower them to exercise the cap). */
+export const csvExportLimits: { maxRows: number; pageRows: number } = {
+  maxRows: CSV_EXPORT_MAX_ROWS,
+  pageRows: CSV_EXPORT_PAGE_ROWS,
+};
+
+/** Request header that switches a `format=csv` list into keyset pages (`start` for the first page, then the returned cursor). */
+export const EXPORT_CURSOR_HEADER = "x-export-cursor";
+
+/** What a CSV list response reports about its rows (recorded by paginate, turned into X-Export-* headers by the onSend hook). */
+export interface CsvExportFacts {
+  /** Rows matching the filters; null on a keyset page that did not count (the export job pages on X-Export-Next-Cursor). */
+  total: number | null;
+  rows: number;
+  cursorMode: boolean;
+  nextCursor: string | null;
+}
+
+/** Export facts by request query object (the handler's `req.query`); weak so nothing outlives its request. */
+const csvExportFacts = new WeakMap<object, CsvExportFacts>();
+/** Requested keyset page of a CSV export by request query object (from the X-Export-Cursor header). */
+const csvExportCursors = new WeakMap<object, { cursor: string | undefined }>();
+
+/** Export facts recorded for a request's query object (tests and the export job read headers instead). */
+export function csvExportFactsOf(query: object): CsvExportFacts | undefined {
+  return csvExportFacts.get(query);
+}
+
+/**
+ * Pagination for a list handler: normal paging for JSON; for `format=csv` the whole filtered list capped at CSV_EXPORT_MAX_ROWS, or —
+ * when the request carries `X-Export-Cursor` (the async export job) — one keyset page of CSV_EXPORT_PAGE_ROWS rows.
+ * `origin` is the request's own query object (`req.query`); pass it when `q` is a derived copy (e.g. `listPaging({ ...rest, format }, req.query)`),
+ * otherwise the X-Export-* headers and the export job's keyset pages cannot find the request.
+ */
+export function listPaging(
+  q: ListQueryLike,
+  origin: object = q,
+): Pick<PaginateOptions, "page" | "page_size" | "cursor" | "limit" | "exact" | "includeTotal" | "csvExport"> {
+  if (q.format === "csv") {
+    const keyset = csvExportCursors.get(origin);
+    // keyset export pages never count (a 1M-row export would run 200 count(*)s); the job pages on X-Export-Next-Cursor
+    if (keyset) return { cursor: keyset.cursor, limit: csvExportLimits.pageRows, csvExport: origin };
+    return { page: 1, page_size: csvExportLimits.maxRows, exact: true, csvExport: origin };
+  }
+  return fromListQuery(q);
+}
+
+/**
+ * Installs the CSV export hooks (audit F5): a preHandler that turns `X-Export-Cursor` into a keyset CSV page, and an onSend hook that
+ * answers every CSV list with `X-Export-Total` (rows matching the filters), `X-Export-Rows` (rows in this response),
+ * `X-Export-Truncated: true` when rows were cut at CSV_EXPORT_MAX_ROWS (use POST /exports for the whole list), and
+ * `X-Export-Next-Cursor` on keyset pages that have a next page.
+ */
+export function installListExports(app: FastifyInstance): void {
+  app.addHook("preHandler", async (req) => {
+    const raw = req.headers[EXPORT_CURSOR_HEADER];
+    const value = Array.isArray(raw) ? raw[0] : raw;
+    if (!value || req.method !== "GET" || !req.query || typeof req.query !== "object") return;
+    csvExportCursors.set(req.query, { cursor: value === "start" ? undefined : value });
+  });
+  app.addHook("onSend", async (req, reply, payload) => {
+    if (!req.query || typeof req.query !== "object") return payload;
+    const facts = csvExportFacts.get(req.query);
+    if (!facts) return payload;
+    if (facts.total !== null) reply.header("X-Export-Total", String(facts.total));
+    reply.header("X-Export-Rows", String(facts.rows));
+    if (facts.cursorMode) {
+      if (facts.nextCursor) reply.header("X-Export-Next-Cursor", facts.nextCursor);
+    } else if (facts.total !== null && facts.total > facts.rows) {
+      reply.header("X-Export-Truncated", "true");
+    }
+    return payload;
+  });
+}

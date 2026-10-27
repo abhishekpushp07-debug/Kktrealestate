@@ -1,0 +1,11 @@
+{
+  "$comment": "Statements of migration files that predate scripts/ci/lint-migrations.mjs (or that this track cannot annotate) and are safe for a stated reason. New migrations annotate exceptions inline instead: `-- lint-migrations: allow <rule> — <reason>`.",
+  "exemptions": [
+    {
+      "file": "packages/db/drizzle/0005_online_foundation.sql",
+      "rule": "set-not-null",
+      "table": "companies",
+      "reason": "companies holds one row per tenant (a handful): the NOT NULL scan right after the slug backfill takes milliseconds."
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kkt
+  labels:
+    app.kubernetes.io/part-of: kkt
+    # created once at bootstrap (docs/DEPLOY.md); the deploy workflow skips it by this label, so its service account needs no
+    # cluster-scoped rights
+    app.kubernetes.io/component: namespace
+    # every pod runs as non-root, without privilege escalation, with a RuntimeDefault seccomp profile
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/warn: restricted

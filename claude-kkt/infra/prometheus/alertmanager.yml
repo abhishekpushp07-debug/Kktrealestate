@@ -1,0 +1,73 @@
+# Alert routing (docker-compose.prod.yml --profile monitoring; Kubernetes: the same file in your Alertmanager).
+#   severity=critical → "pager": PagerDuty (Events API v2), so a human is woken up; also posted to Slack for the record.
+#   everything else   → "slack": the Slack-compatible webhook (the same secret the API's error reporter uses), grouped.
+# Keys are secret files (infra/scripts/gen-secrets.sh writes placeholders): infra/secrets/pagerduty_routing_key (PagerDuty service →
+# Integrations → Events API v2 → Integration Key) and infra/secrets/error_webhook_url. Opsgenie instead of PagerDuty: replace the
+# pagerduty_configs block of "pager" with the commented opsgenie_configs block and put the API key in infra/secrets/opsgenie_api_key.
+# A pager that cannot deliver raises KktAlertmanagerNotificationsFailing (to Slack). Validated in CI with `amtool check-config`.
+route:
+  receiver: slack
+  group_by: [alertname, component, job_name, route]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers: [severity="critical"]
+      receiver: pager
+      group_wait: 10s
+      group_interval: 1m
+      repeat_interval: 1h
+      # keep going: the next route also posts the page to Slack
+      continue: true
+    - matchers: [severity="critical"]
+      receiver: slack
+      repeat_interval: 1h
+
+receivers:
+  - name: pager
+    pagerduty_configs:
+      - routing_key_file: /run/secrets/pagerduty_routing_key
+        send_resolved: true
+        severity: critical
+        description: "{{ .CommonLabels.alertname }}: {{ .CommonAnnotations.summary }}"
+        details:
+          component: "{{ .CommonLabels.component }}"
+          description: '{{ range .Alerts }}{{ .Annotations.description }}{{ "\n" }}{{ end }}'
+          firing: "{{ .Alerts.Firing | len }}"
+    # opsgenie_configs:
+    #   - api_key_file: /run/secrets/opsgenie_api_key
+    #     priority: P1
+    #     send_resolved: true
+    #     message: '{{ .CommonLabels.alertname }}: {{ .CommonAnnotations.summary }}'
+    #     description: '{{ range .Alerts }}{{ .Annotations.description }}{{ "\n" }}{{ end }}'
+  - name: slack
+    slack_configs:
+      - api_url_file: /run/secrets/error_webhook_url
+        send_resolved: true
+        title: "{{ .Status | toUpper }} {{ .CommonLabels.alertname }} ({{ .CommonLabels.severity }})"
+        text: '{{ range .Alerts }}{{ .Annotations.summary }} — {{ .Annotations.description }}{{ "\n" }}{{ end }}'
+
+inhibit_rules:
+  # when the API is down, do not also alert on its latency/5xx/shedding
+  - source_matchers: [alertname="KktApiDown"]
+    target_matchers: [component="api"]
+    equal: [job]
+  # the critical twin of an alert silences its warning twin
+  - source_matchers: [alertname="KktApi5xxRateCritical"]
+    target_matchers: [alertname="KktApi5xxRateHigh"]
+  - source_matchers: [alertname="KktDiskSpaceCritical"]
+    target_matchers: [alertname=~"KktDiskSpaceLow|KktDiskWillFillIn24h"]
+    equal: [instance, mountpoint]
+  # no worker at all explains the queue backlog, a missing replica and stale daily jobs / seals: page once, for the cause
+  - source_matchers: [alertname="KktWorkerHeartbeatStale"]
+    target_matchers:
+      [
+        alertname=~"KktWorkerReplicaDown|KktJobQueueBacklog|KktDailyJobStale|KktAuditSealStale|KktAuditSealFailed|KktIntegrityReportStale",
+      ]
+  # the audit-seal page already covers the generic "job failed" warning for AUDIT_SEAL
+  - source_matchers: [alertname="KktAuditSealFailed"]
+    target_matchers: [alertname="KktJobFailed"]
+    equal: [job_name]
+  # with Postgres or Redis down, everything that depends on them is noise
+  - source_matchers: [alertname=~"KktDbDown|KktRedisDown"]
+    target_matchers: [component=~"api|jobs|money|frontend", severity="warning"]

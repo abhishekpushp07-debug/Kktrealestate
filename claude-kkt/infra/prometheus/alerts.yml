@@ -1,0 +1,299 @@
+# KKT alert rules (docs/OBSERVABILITY.md has the runbook for each). Validated in CI with `promtool check rules` and unit-tested with
+# `promtool test rules infra/prometheus/alerts.test.yml`.
+groups:
+  - name: kkt-api
+    rules:
+      - alert: KktApiDown
+        expr: up{job="kkt-api"} == 0
+        for: 2m
+        labels: { severity: critical, component: api }
+        annotations:
+          summary: "API replica {{ $labels.instance }} is not answering metrics scrapes"
+          description: "The container is down or its primary process is stuck. Check `docker compose ps api` / `kubectl get pods`, then the replica's logs."
+
+      - alert: KktApi5xxRateHigh
+        expr: |
+          sum(rate(http_requests_total{job="kkt-api", status=~"5..", status!="503"}[5m]))
+            / sum(rate(http_requests_total{job="kkt-api"}[5m])) > 0.01
+        for: 5m
+        labels: { severity: warning, component: api }
+        annotations:
+          summary: "More than 1% of API requests fail with 5xx"
+          description: "5xx ratio {{ $value | humanizePercentage }} over 5 minutes. The error webhook carries request ids; search the logs by request_id / trace_id."
+
+      - alert: KktApi5xxRateCritical
+        expr: |
+          sum(rate(http_requests_total{job="kkt-api", status=~"5..", status!="503"}[5m]))
+            / sum(rate(http_requests_total{job="kkt-api"}[5m])) > 0.05
+        for: 2m
+        labels: { severity: critical, component: api }
+        annotations:
+          summary: "More than 5% of API requests fail with 5xx"
+          description: "5xx ratio {{ $value | humanizePercentage }}. Likely a dependency outage or a bad release: check KktDbDown/KktRedisDown, then roll back."
+
+      - alert: KktApiShedding
+        expr: |
+          sum(rate(http_requests_total{job="kkt-api", status="503"}[5m]))
+            / sum(rate(http_requests_total{job="kkt-api"}[5m])) > 0.05
+        for: 10m
+        labels: { severity: warning, component: api }
+        annotations:
+          summary: "The API is shedding load (503) on more than 5% of requests"
+          description: "In-flight cap (API_MAX_INFLIGHT) or event-loop pressure. Add replicas/CPU (docs/CAPACITY.md) or look for a slow query holding the pool."
+
+      - alert: KktApiLatencyP95High
+        expr: |
+          histogram_quantile(0.95, sum by (le, route) (rate(http_request_duration_seconds_bucket{job="kkt-api", route!~"/(api/v1/)?(health|ready|metrics)|unmatched"}[5m]))) > 0.3
+          and on (route) sum by (route) (rate(http_requests_total{job="kkt-api"}[5m])) > 0.2
+        for: 10m
+        labels: { severity: warning, component: api }
+        annotations:
+          summary: "p95 latency of {{ $labels.route }} is above 300 ms"
+          description: "p95 {{ $value | humanizeDuration }} for 10 minutes (target: list pages < 300 ms). Check the route's trace and pg_stat_statements."
+
+      - alert: KktEventLoopLagHigh
+        expr: max by (instance) (nodejs_eventloop_lag_p99_seconds{job="kkt-api"}) > 0.5
+        for: 5m
+        labels: { severity: warning, component: api }
+        annotations:
+          summary: "Event-loop lag p99 above 500 ms on {{ $labels.instance }}"
+          description: "CPU-bound work in the request path (PDF/image rendering, large CSV) or CPU starvation of the container."
+
+      - alert: KktLoginFailuresSpike
+        expr: sum by (audience) (rate(logins_failed_total{job="kkt-api"}[5m])) * 60 > 30
+        for: 10m
+        labels: { severity: warning, component: security }
+        annotations:
+          summary: "More than 30 failed {{ $labels.audience }} logins per minute"
+          description: "Possible credential stuffing. Lockouts and per-IP limits apply; review login_events by IP in the ERP audit pages."
+
+      - alert: KktClientErrorRateHigh
+        # front-end errors reported through POST /api/v1/client-errors (contract C2), counted per app by the API
+        expr: sum by (app) (rate(kkt_client_errors_total[10m])) * 60 > 10
+        for: 10m
+        labels: { severity: warning, component: frontend }
+        annotations:
+          summary: "More than 10 front-end errors per minute from the {{ $labels.app }} app"
+          description: 'Usually a bad release of that app or an API contract change it does not handle. Search the API logs for msg "client error reported" with client_error.app={{ $labels.app }} (release, url and stack are in the line); roll the app back if it started with a deploy.'
+
+      - alert: KktProcessErrors
+        # unhandled rejections / uncaught exceptions caught by the fatal hooks (apps/api/src/lib/processErrors.ts); the second branch
+        # catches the first error of a fresh process, whose counter series did not exist 10 minutes ago
+        expr: |
+          sum by (role, kind) (increase(kkt_process_errors_total[10m])) > 0
+            or sum by (role, kind) (kkt_process_errors_total unless kkt_process_errors_total offset 10m) > 0
+        labels: { severity: warning, component: api }
+        annotations:
+          summary: "{{ $labels.kind }} in the {{ $labels.role }} process"
+          description: "A promise rejection or exception escaped every handler. The log line carries the stack; an uncaught exception restarts the process."
+
+  - name: kkt-jobs
+    rules:
+      - alert: KktJobFailed
+        # job metrics are labelled job_name: the scrape owns `job` (= kkt-api)
+        expr: max by (job_name) (kkt_job_failures_24h) > 0
+        for: 5m
+        labels: { severity: warning, component: jobs }
+        annotations:
+          summary: "Job {{ $labels.job_name }} failed in the last 24 h"
+          description: "{{ $value }} FAILED run(s) in job_runs. ERP → Admin → Jobs shows the error; re-run after fixing (failed runs are retried with backoff first)."
+
+      - alert: KktDailyJobStale
+        expr: time() - max by (job_name) (kkt_job_last_success_timestamp_seconds{job_name=~"DAILY_DUES|NIGHTLY_INTEGRITY"}) > 26 * 3600
+        for: 15m
+        labels: { severity: critical, component: jobs }
+        annotations:
+          summary: "{{ $labels.job_name }} has not succeeded for more than 26 hours"
+          description: "Time-triggered dues or the integrity report did not run. Is the worker container running? Check `docker compose logs worker`."
+
+      - alert: KktJobQueueBacklog
+        expr: max(kkt_jobs_queue_depth{state="wait"}) > 100
+        for: 15m
+        labels: { severity: warning, component: jobs }
+        annotations:
+          summary: "More than 100 jobs waiting in the queue"
+          description: "The workers are down or too slow (exports, backups). Check KktWorkerHeartbeatStale and the worker logs; look for a stuck job, or add a worker replica."
+
+  - name: kkt-worker
+    rules:
+      - alert: KktWorkerHeartbeatStale
+        # contract C8: every worker writes a heartbeat every 15 s and exports it on :9465/metrics. absent() covers "no worker is scraped
+        # at all" (every replica down: its series disappears 5 minutes after the last scrape)
+        expr: (time() - max(kkt_worker_heartbeat_timestamp_seconds) > 60) or absent(kkt_worker_heartbeat_timestamp_seconds)
+        for: 2m
+        labels: { severity: critical, component: jobs }
+        annotations:
+          summary: "No job worker heartbeat for more than a minute"
+          description: "Nothing consumes the job queues: daily dues, integrity, audit seal, notifications and backups stop. Check `docker compose ps worker` / `kubectl -n kkt get pods -l app.kubernetes.io/name=worker`, GET :9465/health and the worker logs."
+
+      - alert: KktWorkerReplicaDown
+        # fewer workers answer than in the last 6 hours. `up == 0` alone misses the usual case: the workers are discovered through DNS
+        # (Compose) or pod annotations (Kubernetes), so a stopped or deleted worker is not a failing target, it is no target at all.
+        # A hung worker (target present, scrape failing) counts as down too. All workers gone: KktWorkerHeartbeatStale (critical).
+        expr: count(up{job="kkt-worker"} == 1) < max_over_time(count(up{job="kkt-worker"})[6h:1m])
+        for: 5m
+        labels: { severity: warning, component: jobs }
+        annotations:
+          summary: "Only {{ $value }} job worker(s) answering, fewer than in the last 6 hours"
+          description: "The remaining replicas keep the queues moving; restore the missing one before it is needed (docker compose ps worker / kubectl -n kkt get pods -l app.kubernetes.io/name=worker). After an intentional scale-down this clears within 6 hours."
+
+  - name: kkt-data
+    rules:
+      - alert: KktIntegrityFindings
+        expr: max(kkt_integrity_findings) > 0
+        for: 5m
+        labels: { severity: critical, component: money }
+        annotations:
+          summary: "The integrity report has {{ $value }} finding(s)"
+          description: "Ledger/summary/demand mismatches. ERP → Admin → Integrity lists them; repair is audited. Money is never auto-corrected."
+
+      - alert: KktDuesBookingFailures
+        # DAILY_DUES isolates a failing booking (rolled back, counted, the run completes): money for that booking is NOT raised. The second
+        # branch catches a code's first failure, whose counter series did not exist a day ago (increase() needs two samples).
+        expr: |
+          sum by (code) (increase(kkt_dues_booking_failures_total[1d])) > 0
+            or sum by (code) (kkt_dues_booking_failures_total unless kkt_dues_booking_failures_total offset 1d) > 0
+        labels: { severity: warning, component: money }
+        annotations:
+          summary: "DAILY_DUES skipped bookings in the last 24 h ({{ $labels.code }})"
+          description: "Those bookings got no installment demands. ERP → Admin → Jobs → DAILY_DUES lists them (bookings_failed); fix the data, then re-run the job."
+
+      - alert: KktAuditSealFailed
+        # the AUDIT_SEAL job extends the per-company hash chain over audit_logs; a failure can mean a broken chain (tampering) or a stuck job.
+        # kkt_job_failures_24h stays > 0 for a day after ONE failed attempt, so on its own it would page hourly for 24 h after a blip that the
+        # retry or the next run (every 15 min) already fixed: page only while no seal has succeeded for 30 minutes (two scheduled runs) — or
+        # never succeeded at all (no success series).
+        expr: |
+          max by (job_name) (kkt_job_failures_24h{job_name="AUDIT_SEAL"}) > 0
+            unless on (job_name)
+              (time() - max by (job_name) (kkt_job_last_success_timestamp_seconds{job_name="AUDIT_SEAL"}) <= 1800)
+        for: 5m
+        labels: { severity: critical, component: security }
+        annotations:
+          summary: "The audit-log seal job failed"
+          description: "Run GET /api/v1/admin/audit/verify for each company: first_mismatch names the changed, removed or back-dated row. Treat a chain break as a security incident."
+
+      - alert: KktAuditSealStale
+        expr: time() - max(kkt_job_last_success_timestamp_seconds{job_name="AUDIT_SEAL"}) > 3600
+        for: 15m
+        labels: { severity: warning, component: security }
+        annotations:
+          summary: "No successful audit-log seal for more than an hour"
+          description: "AUDIT_SEAL runs every 15 minutes; unsealed audit rows are not tamper-evident yet. Check the workers (KktWorkerHeartbeatStale) and the job's last error."
+
+      - alert: KktStorageDeletionGaveUp
+        expr: |
+          sum(increase(kkt_storage_sweep_objects_total{action="deletion_gave_up"}[1d])) > 0
+            or sum(kkt_storage_sweep_objects_total{action="deletion_gave_up"} unless kkt_storage_sweep_objects_total{action="deletion_gave_up"} offset 1d) > 0
+        labels: { severity: warning, component: storage }
+        annotations:
+          summary: "Object-store deletions failed 10 or more times"
+          description: "STORAGE_SWEEP keeps retrying daily, but erased or orphaned files are still in the bucket (DPDP erasure may be incomplete). Check the bucket credentials/policy and the worker logs."
+
+      - alert: KktIntegrityReportStale
+        expr: time() - max(kkt_integrity_last_run_timestamp_seconds) > 26 * 3600
+        for: 15m
+        labels: { severity: warning, component: money }
+        annotations:
+          summary: "No integrity report for more than 26 hours"
+          description: "NIGHTLY_INTEGRITY did not run; see KktDailyJobStale."
+
+      - alert: KktBackupStale
+        expr: time() - max(kkt_backup_last_success_timestamp_seconds) > 26 * 3600
+        for: 15m
+        labels: { severity: critical, component: backup }
+        annotations:
+          summary: "No successful database backup (dump + restore drill) for more than 26 hours"
+          description: "Check `docker compose logs backup` (docs/RESTORE.md). WAL archiving keeps PITR possible meanwhile — verify /backups/wal is growing."
+
+      - alert: KktBaseBackupStale
+        # the weekly base backup is the starting point of point-in-time recovery; its failure does not fail the nightly dump cycle
+        # (KktBackupStale), so it has its own signal (backup.sh status.prom; 0 = no base backup at all)
+        expr: time() - max(kkt_backup_last_base_backup_timestamp_seconds) > 8 * 86400
+        for: 1h
+        labels: { severity: warning, component: backup }
+        annotations:
+          summary: "No base backup for more than 8 days"
+          description: 'Point-in-time recovery needs a recent base backup plus the WAL archived since. Look for "pg_basebackup FAILED" in `docker compose logs backup`, fix the cause and take one now: `docker compose exec backup sh /opt/kkt/backup.sh base` (docs/RESTORE.md).'
+
+  - name: kkt-dependencies
+    rules:
+      - alert: KktDbDown
+        expr: max(kkt_db_up) == 0
+        for: 1m
+        labels: { severity: critical, component: database }
+        annotations:
+          summary: "The API cannot query Postgres"
+          description: "Readiness fails, so the load balancer stops sending traffic. Check postgres and pgbouncer containers."
+
+      - alert: KktDbPoolSaturation
+        # every API replica reports the same database-wide pg_stat_activity counts: de-duplicate across instances (max), then add the states
+        expr: sum(max by (state) (kkt_db_connections)) / max(kkt_db_max_connections) > 0.8
+        for: 5m
+        labels: { severity: warning, component: database }
+        annotations:
+          summary: "Postgres connections above 80% of max_connections"
+          description: "{{ $value | humanizePercentage }} in use. Lower DATABASE_POOL_MAX × workers × replicas, or route through PgBouncer (docs/CAPACITY.md)."
+
+      - alert: KktDbActiveConnectionsHigh
+        expr: max(kkt_db_connections{state="active"}) > 0.5 * max(kkt_db_max_connections)
+        for: 5m
+        labels: { severity: warning, component: database }
+        annotations:
+          summary: "More than half of Postgres max_connections are executing queries"
+          description: "Queries are queueing in the database (slow query, lock wait). Look at pg_stat_activity and pg_stat_statements."
+
+      - alert: KktRedisDown
+        expr: max(kkt_redis_up) == 0 or max(redis_up) == 0
+        for: 1m
+        labels: { severity: critical, component: redis }
+        annotations:
+          summary: "Redis is unreachable"
+          description: "Authentication falls back to the database, but rate limits, caches and the job queue are degraded. Restart redis; data is on the AOF volume."
+
+      - alert: KktRedisMemoryHigh
+        expr: max(redis_memory_used_bytes / redis_memory_max_bytes) > 0.85 and max(redis_memory_max_bytes) > 0
+        for: 10m
+        labels: { severity: warning, component: redis }
+        annotations:
+          summary: "Redis memory above 85% of maxmemory"
+          description: "Redis runs with noeviction: at 100% writes fail. Raise REDIS_MAXMEMORY or move caches to a separate instance."
+
+  - name: kkt-alerting
+    rules:
+      - alert: KktAlertmanagerNotificationsFailing
+        # a page that cannot be delivered is the worst failure mode: this one goes to the Slack receiver (warning)
+        expr: sum by (integration) (rate(alertmanager_notifications_failed_total[15m])) > 0
+        for: 15m
+        labels: { severity: warning, component: alerting }
+        annotations:
+          summary: "Alertmanager cannot deliver {{ $labels.integration }} notifications"
+          description: "Check the receiver's key file (infra/secrets/pagerduty_routing_key / opsgenie_api_key / error_webhook_url) and `docker compose logs alertmanager`."
+
+  - name: kkt-host
+    rules:
+      - alert: KktDiskSpaceLow
+        expr: |
+          (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs"}) < 0.15
+        for: 10m
+        labels: { severity: warning, component: host }
+        annotations:
+          summary: "Less than 15% disk free on {{ $labels.mountpoint }}"
+          description: "WAL archive, dumps and Docker logs grow here. Check backup retention (DUMP_RETENTION_DAYS, BASE_BACKUPS_KEEP)."
+
+      - alert: KktDiskSpaceCritical
+        expr: |
+          (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs"}) < 0.05
+        for: 5m
+        labels: { severity: critical, component: host }
+        annotations:
+          summary: "Less than 5% disk free on {{ $labels.mountpoint }}"
+          description: "Postgres stops accepting writes when its disk is full. Free space now (old dumps, docker image prune)."
+
+      - alert: KktDiskWillFillIn24h
+        expr: predict_linear(node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"}[6h], 24 * 3600) < 0
+        for: 30m
+        labels: { severity: warning, component: host }
+        annotations:
+          summary: "{{ $labels.mountpoint }} will be full within 24 hours at the current rate"
+          description: "Usually a stuck WAL archive cleanup or runaway logs."

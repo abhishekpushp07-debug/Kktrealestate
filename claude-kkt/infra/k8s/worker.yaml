@@ -1,0 +1,113 @@
+# Job worker: BullMQ consumers of the critical and heavy queues (daily dues, integrity, audit seal, notifications, exports, backups).
+# Two replicas: BullMQ runs each job once across workers and the schedules are deduplicated, so a node loss or a rollout never stops
+# the jobs. RollingUpdate with maxUnavailable 0: the new pod is Ready (its C8 health answers 200) before an old one drains.
+# Health (contract C8): GET :9465/health → 200 while Redis answers, the 15 s heartbeat is fresh and both queues are consumed, 503
+# otherwise (also while draining); GET :9465/metrics → the heartbeat gauge and job counters (METRICS_TOKEN bearer).
+# Stop: SIGTERM → heavy jobs checkpoint and return to the queue at once, critical jobs get WORKER_DRAIN_TIMEOUT_MS (120 s, configmap)
+# to finish; terminationGracePeriodSeconds = that + 60 s for the queue close and the pools.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: kkt
+  labels: { app.kubernetes.io/name: worker, app.kubernetes.io/part-of: kkt, app.kubernetes.io/component: worker }
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels: { app.kubernetes.io/name: worker }
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: worker, app.kubernetes.io/part-of: kkt, app.kubernetes.io/component: worker }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9465"
+        prometheus.io/path: /metrics
+    spec:
+      automountServiceAccountToken: false
+      # WORKER_DRAIN_TIMEOUT_MS (120000) + 60 s
+      terminationGracePeriodSeconds: 180
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector: { matchLabels: { app.kubernetes.io/name: worker } }
+      containers:
+        - name: worker
+          image: kkt-api
+          imagePullPolicy: IfNotPresent
+          args: ["node", "--import", "./dist/telemetry.js", "dist/worker.js"]
+          ports:
+            - { name: health, containerPort: 9465 }
+          envFrom:
+            - configMapRef: { name: kkt-config }
+          env:
+            - { name: OTEL_SERVICE_NAME, value: kkt-worker }
+            - { name: DATABASE_URL_FILE, value: /run/secrets/kkt/database_url }
+            - { name: REDIS_URL_FILE, value: /run/secrets/kkt/redis_url }
+            - { name: JWT_SECRET_FILE, value: /run/secrets/kkt/jwt_secret }
+            - { name: FIELD_ENCRYPTION_KEY_FILE, value: /run/secrets/kkt/field_encryption_key }
+            - { name: HASH_KEY_FILE, value: /run/secrets/kkt/hash_key }
+            # key rings (contract C9; docs/DEPLOY.md "Secrets and key rotation")
+            - { name: JWT_SIGNING_KEYS_FILE, value: /run/secrets/kkt/jwt_signing_keys }
+            - { name: LINK_SIGNING_KEYS_FILE, value: /run/secrets/kkt/link_signing_keys }
+            - { name: HASH_KEYS_FILE, value: /run/secrets/kkt/hash_keys }
+            - { name: INTERNAL_API_TOKEN_FILE, value: /run/secrets/kkt/internal_api_token }
+            - { name: WEB_REVALIDATE_TOKEN_FILE, value: /run/secrets/kkt/web_revalidate_token }
+            - { name: METRICS_TOKEN_FILE, value: /run/secrets/kkt/metrics_token }
+            # 5xx / failed-job webhook: opt in once the Secret's error_webhook_url holds a real URL (gen-secrets.sh writes the placeholder
+            # "unused", which is not a URL and would stop the pod at boot with "ERROR_WEBHOOK_URL: Invalid URL")
+            # - { name: ERROR_WEBHOOK_URL_FILE, value: /run/secrets/kkt/error_webhook_url }
+          resources:
+            requests: { cpu: 500m, memory: 512Mi }
+            limits: { cpu: "2", memory: 2Gi }
+          startupProbe:
+            httpGet: { path: /health, port: health }
+            periodSeconds: 5
+            failureThreshold: 36
+          # Ready = consuming both queues with a fresh heartbeat (the rollout waits for it; 503 while draining)
+          readinessProbe:
+            httpGet: { path: /health, port: health }
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 2
+          # restart only after 4 minutes of failures: longer than the drain (so a stopping worker is never killed early) and than a short
+          # Redis blip; a worker whose consumers died or whose event loop hangs is replaced
+          livenessProbe:
+            httpGet: { path: /health, port: health }
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 8
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: secrets, mountPath: /run/secrets/kkt, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: secrets
+          secret: { secretName: kkt-secrets, defaultMode: 0440 }
+        - name: tmp
+          emptyDir: { sizeLimit: 4Gi }
+---
+# at most one worker down at a time (node drains, cluster upgrades)
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: worker
+  namespace: kkt
+  labels: { app.kubernetes.io/name: worker, app.kubernetes.io/part-of: kkt }
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: worker }

@@ -1,0 +1,96 @@
+# Marketing website (Next.js standalone). Calls the API in-cluster (API_INTERNAL_URL); public pages are CDN-cacheable (docs/CAPACITY.md).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: kkt
+  labels: { app.kubernetes.io/name: web, app.kubernetes.io/part-of: kkt, app.kubernetes.io/component: frontend }
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels: { app.kubernetes.io/name: web }
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: web, app.kubernetes.io/part-of: kkt, app.kubernetes.io/component: frontend }
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: web
+          image: kkt-web
+          imagePullPolicy: IfNotPresent
+          env:
+            - { name: API_INTERNAL_URL, value: "http://api:4000" }
+            # contract C3 token and the revalidation route's token, loaded from the files by the image's entrypoint
+            - { name: INTERNAL_API_TOKEN_FILE, value: /run/secrets/kkt/internal_api_token }
+            - { name: WEB_REVALIDATE_TOKEN_FILE, value: /run/secrets/kkt/web_revalidate_token }
+            # contract C4, only for an API that serves several companies:
+            # - { name: KKT_COMPANY_SLUG, value: my-builders }
+          ports:
+            - { name: http, containerPort: 3000 }
+          readinessProbe:
+            httpGet: { path: /robots.txt, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /robots.txt, port: http }
+            periodSeconds: 30
+            timeoutSeconds: 5
+          resources:
+            requests: { cpu: 250m, memory: 256Mi }
+            limits: { cpu: "1", memory: 1Gi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            # Next.js image-optimizer and ISR cache
+            - { name: cache, mountPath: /app/apps/web/.next/cache }
+            - { name: tmp, mountPath: /tmp }
+            - { name: secrets, mountPath: /run/secrets/kkt, readOnly: true }
+      volumes:
+        # only the two keys the website needs
+        - name: secrets
+          secret:
+            secretName: kkt-secrets
+            defaultMode: 0440
+            items:
+              - { key: internal_api_token, path: internal_api_token }
+              - { key: web_revalidate_token, path: web_revalidate_token }
+        - name: cache
+          emptyDir: { sizeLimit: 2Gi }
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: kkt
+  labels: { app.kubernetes.io/name: web, app.kubernetes.io/part-of: kkt }
+spec:
+  selector: { app.kubernetes.io/name: web }
+  ports:
+    - { name: http, port: 3000, targetPort: http }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: web
+  namespace: kkt
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: web }
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource: { name: cpu, target: { type: Utilization, averageUtilization: 70 } }

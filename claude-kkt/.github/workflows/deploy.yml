@@ -1,0 +1,182 @@
+name: Deploy (Kubernetes)
+
+# Manual, reviewed deployment of an image set CI already built and pushed (docs/DEPLOY.md "Deploying and rolling back").
+#   1. the images ghcr.io/<owner>/kkt-{api,web,erp,portal}:<image_tag> must exist (CI pushes the git-SHA tag after every gate passed);
+#   2. the GitHub environment (staging / production) holds KUBECONFIG_B64 and requires reviewers (Settings → Environments → Required
+#      reviewers): the job waits for an approval before it touches the cluster;
+#   3. manifests are rendered from the SAME commit as the images (checkout at image_tag), with every image set to that immutable tag;
+#   4. the migrate Job runs first and must complete (migrations are expand-only, so the running version keeps working on the new schema);
+#   5. everything is applied, every Deployment's rollout is awaited, and the API and the workers are smoke-checked;
+#   6. on any failure after the apply, `kubectl rollout undo` returns every Deployment to its previous ReplicaSet automatically.
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment (GitHub environment with required reviewers)
+        type: choice
+        options: [staging, production]
+        default: staging
+      image_tag:
+        description: Image tag to deploy = the full git SHA CI built (leave empty for the commit this workflow runs on)
+        type: string
+        required: false
+
+concurrency:
+  # one deployment per environment at a time; never cancel one half-way
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: read
+
+env:
+  NAMESPACE: kkt
+  KUBECTL_VERSION: v1.30.6
+  KUSTOMIZE_VERSION: v5.4.3
+  ROLLOUT_TIMEOUT: 10m
+  # label selector of every apply: everything but the Namespace (infra/k8s/namespace.yaml, component=namespace)
+  NOT_NAMESPACE: app.kubernetes.io/component!=namespace
+
+jobs:
+  deploy:
+    name: Deploy ${{ inputs.image_tag || github.sha }} to ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment:
+      name: ${{ inputs.environment }}
+    steps:
+      - name: Resolve the tag
+        id: tag
+        env: { INPUT_TAG: "${{ inputs.image_tag }}" }
+        run: |
+          tag="${INPUT_TAG:-$GITHUB_SHA}"
+          if ! printf '%s' "$tag" | grep -Eq '^[0-9a-f]{40}$'; then echo "::error::image_tag must be a full 40-character git SHA (immutable), got '$tag'"; exit 1; fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "registry=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+      # the manifests of the commit the images were built from
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with: { ref: "${{ steps.tag.outputs.tag }}" }
+      - name: The images exist for this tag
+        env:
+          {
+            TOKEN: "${{ secrets.GITHUB_TOKEN }}",
+            REG: "${{ steps.tag.outputs.registry }}",
+            TAG: "${{ steps.tag.outputs.tag }}",
+          }
+        run: |
+          echo "$TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          for app in api web erp portal; do
+            docker buildx imagetools inspect "$REG/kkt-$app:$TAG" > /dev/null || { echo "::error::$REG/kkt-$app:$TAG was not pushed (did CI pass on this commit?)"; exit 1; }
+          done
+      - name: kubectl + kustomize (checksums verified)
+        run: |
+          curl -sSLO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+          curl -sSLO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl.sha256"
+          echo "$(cat kubectl.sha256)  kubectl" | sha256sum -c -
+          k="kustomize_${KUSTOMIZE_VERSION}_linux_amd64.tar.gz"
+          curl -sSLO "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2F${KUSTOMIZE_VERSION}/$k"
+          curl -sSLO "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2F${KUSTOMIZE_VERSION}/checksums.txt"
+          grep " $k\$" checksums.txt | sha256sum -c -
+          tar xzf "$k" kustomize
+          chmod +x kubectl kustomize && sudo mv kubectl kustomize /usr/local/bin/
+      - name: Cluster credentials
+        env: { KUBECONFIG_B64: "${{ secrets.KUBECONFIG_B64 }}" }
+        run: |
+          test -n "$KUBECONFIG_B64" || { echo "::error::the ${{ inputs.environment }} environment has no KUBECONFIG_B64 secret"; exit 1; }
+          mkdir -p ~/.kube && printf '%s' "$KUBECONFIG_B64" | base64 -d > ~/.kube/config && chmod 600 ~/.kube/config
+          kubectl version --output=yaml > /dev/null
+      - name: Render (immutable image tags; infra/k8s/overlays/<environment> when present)
+        env:
+          {
+            REG: "${{ steps.tag.outputs.registry }}",
+            TAG: "${{ steps.tag.outputs.tag }}",
+            ENV_NAME: "${{ inputs.environment }}",
+          }
+        run: |
+          dir=infra/k8s
+          if [ -f "infra/k8s/overlays/$ENV_NAME/kustomization.yaml" ]; then dir="infra/k8s/overlays/$ENV_NAME"; fi
+          (cd "$dir" && kustomize edit set image \
+            "kkt-api=$REG/kkt-api:$TAG" "kkt-web=$REG/kkt-web:$TAG" "kkt-erp=$REG/kkt-erp:$TAG" "kkt-portal=$REG/kkt-portal:$TAG")
+          kustomize build "$dir" > /tmp/rendered.yaml
+          if grep -n ':latest\|set-by-deploy-workflow' /tmp/rendered.yaml; then echo "::error::an image is not pinned to $TAG"; exit 1; fi
+          # the Namespace (cluster-scoped, created once at bootstrap: docs/DEPLOY.md) is never applied here, so the deploy service account
+          # needs no cluster-wide rights; every apply below carries this selector
+          kubectl apply --dry-run=server -f /tmp/rendered.yaml -l "$NOT_NAMESPACE" > /dev/null
+      - name: Record the current revisions (for the summary and the rollback)
+        run: |
+          kubectl -n "$NAMESPACE" get deployments -o custom-columns='NAME:.metadata.name,IMAGE:.spec.template.spec.containers[0].image,REVISION:.metadata.annotations.deployment\.kubernetes\.io/revision' --no-headers | tee /tmp/before.txt || true
+      - name: Migrate (Job first; must complete before any Deployment rolls)
+        run: |
+          # configuration, secrets references, services, policies — everything except the workloads that run the new code
+          kubectl apply -f /tmp/rendered.yaml -l 'app.kubernetes.io/component notin (api,worker,frontend,migrate,namespace)'
+          # a Job's pod template is immutable: replace the previous run
+          kubectl -n "$NAMESPACE" delete job migrate --ignore-not-found --wait=true
+          kubectl apply -f /tmp/rendered.yaml -l app.kubernetes.io/component=migrate
+          # up to 15 minutes; the Job retries twice (backoffLimit) before it reports Failed
+          for _ in $(seq 1 180); do
+            if [ "$(kubectl -n "$NAMESPACE" get job migrate -o jsonpath='{.status.succeeded}')" = "1" ]; then
+              kubectl -n "$NAMESPACE" logs job/migrate --tail=50
+              exit 0
+            fi
+            if kubectl -n "$NAMESPACE" get job migrate -o jsonpath='{.status.conditions[?(@.type=="Failed")].status}' | grep -q True; then break; fi
+            sleep 5
+          done
+          kubectl -n "$NAMESPACE" logs job/migrate --tail=200 || true
+          echo "::error::the migrate Job failed or timed out: nothing else was changed (the running version keeps serving)"
+          exit 1
+      - name: Apply and wait for every rollout
+        id: rollout
+        run: |
+          kubectl apply -f /tmp/rendered.yaml -l "$NOT_NAMESPACE"
+          for d in $(kubectl -n "$NAMESPACE" get deployments -o name); do
+            kubectl -n "$NAMESPACE" rollout status "$d" --timeout="$ROLLOUT_TIMEOUT"
+          done
+      - name: Smoke checks (API full health, worker C8 health)
+        id: smoke
+        run: |
+          # pods of the new version only: after `rollout status` the old pods may still be terminating (a worker drains for up to
+          # 180 s and answers 503 meanwhile), and they must neither fail the smoke nor stand in for the new ones
+          live_pods() {
+            kubectl -n "$NAMESPACE" get pods -l "app.kubernetes.io/name=$1" \
+              -o go-template='{{range .items}}{{if not .metadata.deletionTimestamp}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}'
+          }
+          api=$(live_pods api | head -n 1)
+          test -n "$api" || { echo "::error::no running api pod"; exit 1; }
+          kubectl -n "$NAMESPACE" exec "$api" -- wget -qO- http://127.0.0.1:4000/api/v1/health/ready
+          for _ in $(seq 1 12); do
+            if kubectl -n "$NAMESPACE" exec "$api" -- wget -qO- http://127.0.0.1:4000/api/v1/health | grep -q '"status":"ok"'; then break; fi
+            sleep 10
+          done
+          kubectl -n "$NAMESPACE" exec "$api" -- wget -qO- http://127.0.0.1:4000/api/v1/health | grep -q '"status":"ok"'
+          workers=$(live_pods worker)
+          test -n "$workers" || { echo "::error::no running worker pod"; exit 1; }
+          for p in $workers; do
+            kubectl -n "$NAMESPACE" exec "$p" -- wget -qO- http://127.0.0.1:9465/health | grep -q '"status":"ok"' ||
+              { echo "::error::worker $p is not healthy"; exit 1; }
+          done
+      - name: Automatic rollback (kubectl rollout undo)
+        if: failure() && (steps.rollout.outcome == 'failure' || steps.smoke.outcome == 'failure')
+        run: |
+          echo "::error::rollout or smoke check failed: undoing every Deployment this run changed"
+          undone=""
+          while read -r name _image revision; do
+            now=$(kubectl -n "$NAMESPACE" get deployment "$name" -o jsonpath='{.metadata.annotations.deployment\.kubernetes\.io/revision}')
+            if [ -n "$revision" ] && [ "$now" != "$revision" ]; then
+              kubectl -n "$NAMESPACE" rollout undo "deployment/$name" --to-revision="$revision" && undone="$undone $name"
+            fi
+          done < /tmp/before.txt
+          for name in $undone; do kubectl -n "$NAMESPACE" rollout status "deployment/$name" --timeout="$ROLLOUT_TIMEOUT" || true; done
+          echo "rolled back:${undone:- nothing (first deployment?)}"
+          kubectl -n "$NAMESPACE" get deployments -o wide
+          exit 1
+      - name: Summary
+        if: always()
+        env: { TAG: "${{ steps.tag.outputs.tag }}" }
+        run: |
+          {
+            echo "### Deploy $TAG → ${{ inputs.environment }} (${{ job.status }})"
+            echo '```'; echo "before:"; cat /tmp/before.txt 2> /dev/null || true
+            echo "after:"; kubectl -n "$NAMESPACE" get deployments -o custom-columns='NAME:.metadata.name,IMAGE:.spec.template.spec.containers[0].image,READY:.status.readyReplicas' --no-headers 2> /dev/null || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

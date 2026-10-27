@@ -1,0 +1,15 @@
+{
+  "$comment": "Third-party actions still referenced by tag because their commit SHA could not be verified when the pin gate was introduced (no network access in that session). scripts/ci/check-action-pins.mjs accepts them until `expires`; pin them (`<action>@<40-hex SHA> # vX.Y.Z`, e.g. from the action's release page or `git ls-remote https://github.com/github/codeql-action refs/tags/v3.*`) and delete the entry. Renovate (renovate.json, helpers:pinGitHubActionDigests) opens the pinning PR automatically.",
+  "pending": [
+    {
+      "action": "github/codeql-action/init",
+      "reason": "CodeQL (SAST) workflow; SHA of the v3 release not verifiable offline",
+      "expires": "2026-12-31"
+    },
+    {
+      "action": "github/codeql-action/analyze",
+      "reason": "CodeQL (SAST) workflow; SHA of the v3 release not verifiable offline",
+      "expires": "2026-12-31"
+    }
+  ]
+}

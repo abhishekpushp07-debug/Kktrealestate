@@ -1,0 +1,526 @@
+import { createHash, timingSafeEqual } from "node:crypto";
+import { isIP, Socket } from "node:net";
+import fp from "fastify-plugin";
+import type { FastifyInstance, FastifyRequest } from "fastify";
+import { sql } from "drizzle-orm";
+import type { Redis } from "ioredis";
+import { config } from "../config.js";
+import { authVersionKey, PERM_VERSION_KEY, redisUsable, withinBudget } from "../lib/cache.js";
+import { loadCompany } from "../lib/company.js";
+import { ApiError } from "../lib/errors.js";
+import { EXPORT_CURSOR_HEADER } from "../lib/list.js";
+import { logger } from "../lib/logger.js";
+import { verifyAccessToken, type AccessClaims, type TokenAudience } from "../lib/jwt.js";
+import { clientIp, enforceRateLimit } from "../lib/rateLimit.js";
+import { isDocsUrl, isPublicPrefix, permissionAlternatives } from "../lib/routes.js";
+import { requiresAdminMfa, type PortalContext, type StaffContext } from "../lib/scope.js";
+
+declare module "fastify" {
+  interface FastifyRequest {
+    /** Authenticated staff member (staff routes only). */
+    user?: StaffContext;
+    /** Authenticated portal customer (portal routes only). */
+    customer?: PortalContext;
+    /** Access-token claims of the current request (set on authenticated routes). */
+    authClaims?: AccessClaims;
+  }
+}
+
+/** The only routes a user who must change their password may still call (staff and portal): change-password, logout, me. */
+const PASSWORD_CHANGE_EXEMPT = ["/auth/change-password", "/auth/logout", "/auth/me"];
+/** Routes an admin without MFA may still call while MFA is being forced (self-service + enrolment). */
+const MFA_EXEMPT = [
+  ...PASSWORD_CHANGE_EXEMPT,
+  "/auth/sessions",
+  "/auth/mfa/enroll",
+  "/auth/mfa/verify",
+  "/auth/mfa/disable",
+];
+const WRITE_METHODS = new Set(["POST", "PATCH", "PUT", "DELETE"]);
+const USER_CACHE_TTL = 30;
+
+/** Header carrying the shared INTERNAL_API_TOKEN of a trusted server-side caller (the website's SSR, contract C3). */
+export const INTERNAL_TOKEN_HEADER = "x-kkt-internal-token";
+/** Header with the visitor's IP that a trusted server-side caller forwards (honoured only with a valid internal token). */
+export const FORWARDED_CLIENT_IP_HEADER = "x-kkt-client-ip";
+
+const digest = (v: string) => createHash("sha256").update(v).digest();
+
+/** Constant-time check of the internal token (compares SHA-256 digests, so neither content nor length leaks through timing). */
+export function validInternalToken(given: string | string[] | undefined): boolean {
+  const expected = config.INTERNAL_API_TOKEN;
+  if (!expected || typeof given !== "string" || given.length === 0) return false;
+  return timingSafeEqual(digest(given), digest(expected));
+}
+
+/**
+ * The client IP of a request (contract C3): the visitor IP forwarded in `x-kkt-client-ip` when the request carries a valid
+ * `x-kkt-internal-token` (the website's server-side fetches), else Fastify's proxy-aware `req.ip`. Without a valid token both headers are
+ * ignored, so nobody can choose their own rate-limit bucket.
+ */
+/**
+ * Health / readiness probes (load balancers, Kubernetes, Compose): public, but never rate-limited — a probe that answers 429 would take a
+ * healthy instance out of rotation or restart it (loadShed never sheds them either).
+ */
+const PROBE_URL_RE = /^\/(?:api\/v1\/)?(?:health(?:\/(?:live|ready))?|ready)$/;
+export function isProbeUrl(url: string): boolean {
+  return PROBE_URL_RE.test(url);
+}
+
+/**
+ * The public rate-limit identity of a request (contract C3): the client IP, or `internal` for the website server's own calls (a valid
+ * internal token without a forwarded visitor IP: ISR regenerations), which get their own, larger budget instead of competing with the
+ * visitors that share the web server's IP.
+ */
+export function publicBucketSubject(req: FastifyRequest): { subject: string; limit: number } {
+  if (req.headers[FORWARDED_CLIENT_IP_HEADER] === undefined && validInternalToken(req.headers[INTERNAL_TOKEN_HEADER]))
+    return { subject: "internal", limit: config.INTERNAL_RATE_LIMIT_PER_MIN };
+  return { subject: req.clientIp, limit: config.PUBLIC_RATE_LIMIT_PER_MIN };
+}
+
+export function effectiveClientIp(req: FastifyRequest): string {
+  if (validInternalToken(req.headers[INTERNAL_TOKEN_HEADER])) {
+    const fwd = req.headers[FORWARDED_CLIENT_IP_HEADER];
+    const ip = typeof fwd === "string" ? fwd.trim() : "";
+    if (isIP(ip) !== 0) return ip.slice(0, 64);
+  }
+  return clientIp(req);
+}
+
+/** Public route groups with their own per-IP budget (contract C3): a burst on one never starves another. */
+export type PublicRouteGroup = "auth" | "forms" | "brochure" | "visits" | "files" | "catalog";
+
+/** The public route group of a registered route url. */
+export function publicRouteGroup(url: string): PublicRouteGroup {
+  if (url.startsWith("/api/v1/auth/") || url.startsWith("/api/v1/portal/auth/")) return "auth";
+  if (url.startsWith("/api/v1/public/enquiries")) return "forms";
+  if (url.startsWith("/api/v1/public/brochure")) return "brochure";
+  if (url.startsWith("/api/v1/public/site-visits") || url.endsWith("/visit-availability")) return "visits";
+  if (
+    url.startsWith("/api/v1/files/") ||
+    url.startsWith("/api/v1/portal/files/") ||
+    url.startsWith("/api/v1/exports/download/") ||
+    url.startsWith("/api/v1/admin/backups/download/")
+  )
+    return "files";
+  return "catalog";
+}
+
+/**
+ * True for a request made in-process with `app.inject` (the EXPORT_CSV job's pages, the POST /exports preflight): it has no network
+ * socket. A network client can never produce one, so this is what makes in-process-only request headers trustworthy.
+ */
+export function isInProcessRequest(req: FastifyRequest): boolean {
+  return !(req.raw.socket instanceof Socket);
+}
+
+/**
+ * True for a bulk export request (the stricter per-subject export budget): a `format=csv` / `export=CSV` list, or POST /exports. Pages of
+ * an asynchronous export (X-Export-Cursor, in-process only — the header is stripped from network requests) are the EXPORT_CSV job's own
+ * work, already budgeted and audited at POST /exports, and are not counted here.
+ */
+export function isExportRequest(req: FastifyRequest, url: string): boolean {
+  if (req.method === "POST") return url === "/api/v1/exports";
+  if (req.method !== "GET") return false;
+  const q = (req.query ?? {}) as Record<string, unknown>;
+  const csv = String(q["format"] ?? "").toLowerCase() === "csv" || String(q["export"] ?? "").toUpperCase() === "CSV";
+  return csv && req.headers[EXPORT_CURSOR_HEADER] === undefined;
+}
+
+type StaffRow = {
+  id: string;
+  company_id: string;
+  name: string;
+  email: string;
+  role_id: string;
+  is_active: boolean;
+  must_change_password: boolean;
+  mfa_enabled: boolean;
+  all_projects: boolean;
+  role_name: string;
+  is_system: boolean;
+  permissions: string[];
+  role_active: boolean;
+  project_ids: string[];
+};
+type PortalRow = {
+  id: string;
+  customer_id: string;
+  company_id: string;
+  phone: string;
+  is_enabled: boolean;
+  locked_until: string | null;
+  must_change_password: boolean;
+  full_name: string;
+  customer_active: boolean;
+};
+
+/** Key of the revoked-session marker set when a refresh family is revoked (logout, reuse, admin). */
+export function revokedSessionKey(sid: string): string {
+  return `revoked:sid:${sid}`;
+}
+
+/**
+ * The Redis that holds security state (revocation markers, rate limits): `app.redisSecurity` when the platform plugin provides one
+ * (REDIS_SECURITY_URL, a `noeviction` instance), otherwise the shared `app.redis`.
+ */
+export function securityRedis(app: FastifyInstance): Redis {
+  return (app as unknown as { redisSecurity?: Redis }).redisSecurity ?? app.redis;
+}
+
+/** Budget for one Redis round trip on the authentication path before the database answers instead. */
+const REDIS_AUTH_BUDGET_MS = 250;
+
+/**
+ * Runs a Redis command with a short budget; `{ok: false}` when Redis is down, slow or errors (the caller falls back to the database).
+ * A client that is known to be disconnected (`client`, lib/cache redisUsable) is skipped without waiting at all.
+ */
+async function redisTry<T>(
+  what: string,
+  fn: () => Promise<T>,
+  client?: Redis,
+): Promise<{ ok: true; value: T } | { ok: false }> {
+  if (client && !redisUsable(client)) return { ok: false };
+  try {
+    const value = await withinBudget(fn(), REDIS_AUTH_BUDGET_MS, `redis ${what}`);
+    return { ok: true, value };
+  } catch (err) {
+    logger.warn({ err: (err as Error).message, what }, "redis unavailable on the auth path; using the database");
+    return { ok: false };
+  }
+}
+
+/**
+ * Marks session families revoked so their (still unexpired) access tokens are rejected immediately. Best effort: the database
+ * (refresh_tokens.revoked_at) is the source of truth and the auth plugin consults it whenever the marker store cannot be read.
+ */
+export async function markSessionsRevoked(redis: Redis, sids: readonly string[]): Promise<void> {
+  if (sids.length === 0) return;
+  const ttl = (config.ACCESS_TOKEN_MINUTES + 2) * 60;
+  if (await writeMarkers(redis, sids, ttl)) return;
+  logger.error(
+    { sessions: sids.length },
+    "could not write revocation markers; enforced from the database and this process, retried in the background",
+  );
+  const until = Date.now() + ttl * 1000;
+  for (const sid of sids) pendingRevocations.set(sid, until);
+  scheduleMarkerRetry(redis);
+}
+
+async function writeMarkers(redis: Redis, sids: readonly string[], ttlSeconds: number): Promise<boolean> {
+  const pipe = redis.multi();
+  for (const sid of sids) pipe.set(revokedSessionKey(sid), "1", "EX", ttlSeconds);
+  const r = await redisTry("revocation marker write", () => pipe.exec());
+  return r.ok && (r.value ?? []).every(([err]) => !err);
+}
+
+/**
+ * Revocations whose marker could not be written (Redis down): this process rejects them at once, and a background retry writes the
+ * markers as soon as Redis answers again so every other instance (whose cached rows would otherwise still pass) learns about them too.
+ */
+const pendingRevocations = new Map<string, number>();
+let markerRetry: NodeJS.Timeout | null = null;
+
+function scheduleMarkerRetry(redis: Redis): void {
+  if (markerRetry) return;
+  markerRetry = setInterval(() => {
+    const now = Date.now();
+    for (const [sid, until] of pendingRevocations) if (until <= now) pendingRevocations.delete(sid);
+    if (pendingRevocations.size === 0) {
+      if (markerRetry) clearInterval(markerRetry);
+      markerRetry = null;
+      return;
+    }
+    const sids = [...pendingRevocations.keys()];
+    const ttl = Math.max(
+      1,
+      Math.ceil((Math.max(...sids.map((sid) => pendingRevocations.get(sid) ?? now)) - now) / 1000),
+    );
+    void writeMarkers(redis, sids, ttl).then((ok) => {
+      if (!ok) return;
+      for (const sid of sids) pendingRevocations.delete(sid);
+      logger.info({ sessions: sids.length }, "revocation markers written after Redis recovered");
+    });
+  }, 2_000);
+  markerRetry.unref();
+}
+
+/** True while this process knows a session is revoked but could not yet publish the marker. */
+function pendingRevoked(sid: string): boolean {
+  const until = pendingRevocations.get(sid);
+  return until !== undefined && until > Date.now();
+}
+
+/** Marks one session family revoked (see markSessionsRevoked). */
+export async function markSessionRevoked(redis: Redis, sid: string): Promise<void> {
+  await markSessionsRevoked(redis, [sid]);
+}
+
+function bearer(req: FastifyRequest): string | null {
+  const h = req.headers.authorization;
+  if (!h) return null;
+  const [scheme, token] = h.split(" ");
+  return scheme?.toLowerCase() === "bearer" && token ? token.trim() : null;
+}
+
+/** True when the route url (minus `:param` segments) is one of the auth self-service suffixes, under `/api/v1` or `/api/v1/portal`. */
+function endsWithAny(url: string, suffixes: readonly string[]): boolean {
+  const clean = url.replace(/\/:[^/]+/g, "");
+  return suffixes.some((s) => clean === `/api/v1${s}` || clean === `/api/v1/portal${s}`);
+}
+
+/** Auth plugin: client IP, public rate limits, bearer verification per audience, staff RBAC + scope, portal identity, write rate limits. */
+export default fp(
+  async (app) => {
+    app.decorateRequest("user", undefined);
+    app.decorateRequest("customer", undefined);
+    app.decorateRequest("authClaims", undefined);
+
+    /**
+     * Cached row + revocation marker from Redis. A cached row is valid only while every auth version it was stored under still matches
+     * (global generation + the scoped versions in `versionKeys`: user / portal user, role, company), so a change invalidates exactly the
+     * subjects it concerns (lib/cache.ts bumpAuthVersions). Revocation lives in the security Redis, the row cache in the shared one; when
+     * either cannot be read the database answers (user/role/permissions from the tables, revocation from refresh_tokens), so a Redis
+     * outage degrades to slower requests instead of 500s and never un-revokes a session.
+     */
+    async function cachedState<Row>(
+      cacheKey: string,
+      versionKeys: readonly string[],
+      sid: string,
+    ): Promise<{ row: Row | null; version: string | null; revoked: boolean | null }> {
+      const sec = securityRedis(app);
+      const keys = [PERM_VERSION_KEY, ...versionKeys];
+      const versionOf = (values: (string | null)[]) => values.map((v) => v ?? "0").join(":");
+      if (sec === app.redis) {
+        const r = await redisTry(
+          "auth mget",
+          () => app.redis.mget(...keys, cacheKey, revokedSessionKey(sid)),
+          app.redis,
+        );
+        if (!r.ok) return { row: null, version: null, revoked: null };
+        const version = versionOf(r.value.slice(0, keys.length));
+        const raw = r.value[keys.length] ?? null;
+        const revoked = r.value[keys.length + 1];
+        return { row: fromCache<Row>(raw, version), version, revoked: Boolean(revoked) };
+      }
+      const [cache, marker] = await Promise.all([
+        redisTry("auth cache mget", () => app.redis.mget(...keys, cacheKey), app.redis),
+        redisTry("revocation marker read", () => sec.get(revokedSessionKey(sid)), sec),
+      ]);
+      const version = cache.ok ? versionOf(cache.value.slice(0, keys.length)) : null;
+      return {
+        row: cache.ok && version !== null ? fromCache<Row>(cache.value[keys.length] ?? null, version) : null,
+        version,
+        revoked: marker.ok ? Boolean(marker.value) : null,
+      };
+    }
+
+    function fromCache<Row>(raw: string | null, version: string): Row | null {
+      if (!raw) return null;
+      try {
+        const cached = JSON.parse(raw) as { v: string; row: Row };
+        return cached.v === version ? cached.row : null;
+      } catch {
+        return null;
+      }
+    }
+
+    async function storeCache(key: string, version: string | null, row: unknown): Promise<void> {
+      if (version === null) return; // Redis was unreadable a moment ago: do not wait on it again
+      await redisTry(
+        "auth cache write",
+        () => app.redis.set(key, JSON.stringify({ v: version, row }), "EX", USER_CACHE_TTL),
+        app.redis,
+      );
+    }
+
+    /** Session revocation from the database: a family is revoked once any of its refresh tokens carries revoked_at. */
+    const revokedSql = (sid: string) =>
+      sql`exists (select 1 from refresh_tokens rt where rt.family_id = ${sid}::uuid and rt.revoked_at is not null)`;
+
+    /**
+     * The staff auth row. Cached under the versions of the user, the role named by the token (`rid`) and the company; a token without
+     * `rid` (minted before it existed) always reads the database, and a row whose role differs from the token's `rid` (role changed since
+     * the token was issued) is not cached, because the cache entry would not be invalidated by edits of its real role.
+     */
+    async function loadStaff(claims: AccessClaims): Promise<StaffRow> {
+      const userId = claims.sub;
+      const sid = claims.sid;
+      if (pendingRevoked(sid)) throw ApiError.unauthenticated("Session has been revoked", "SESSION_REVOKED");
+      const userKey = `perm:user:${userId}`;
+      const rid = typeof claims.rid === "string" ? claims.rid : null;
+      const versionKeys = [
+        authVersionKey("user", userId),
+        authVersionKey("role", rid ?? "none"),
+        authVersionKey("company", claims.cid),
+      ];
+      const state = await cachedState<StaffRow>(userKey, versionKeys, sid);
+      if (state.revoked === true) throw ApiError.unauthenticated("Session has been revoked", "SESSION_REVOKED");
+      if (state.row && rid && state.row.role_id === rid && state.revoked === false) return state.row;
+      const rows = await app.db.execute<StaffRow & { session_revoked: boolean }>(sql`
+      select u.id, u.company_id, u.name, u.email, u.role_id, u.is_active, u.must_change_password, u.mfa_enabled, u.all_projects,
+             r.name as role_name, r.is_system, r.permissions, r.is_active as role_active,
+             coalesce((select array_agg(s.project_id) from user_project_scopes s where s.user_id = u.id), '{}'::uuid[]) as project_ids,
+             ${revokedSql(sid)} as session_revoked
+      from users u join roles r on r.id = u.role_id where u.id = ${userId}`);
+      const found = rows[0];
+      if (!found) throw ApiError.unauthenticated("User no longer exists", "INVALID_TOKEN");
+      if (found.session_revoked) throw ApiError.unauthenticated("Session has been revoked", "SESSION_REVOKED");
+      const { session_revoked: _r, ...row } = found;
+      if (!state.row && rid && row.role_id === rid && row.company_id === claims.cid)
+        await storeCache(userKey, state.version, row);
+      return row;
+    }
+
+    async function loadPortal(claims: AccessClaims): Promise<PortalRow> {
+      const portalUserId = claims.sub;
+      const sid = claims.sid;
+      if (pendingRevoked(sid)) throw ApiError.unauthenticated("Session has been revoked", "SESSION_REVOKED");
+      const key = `perm:portal:${portalUserId}`;
+      const state = await cachedState<PortalRow>(
+        key,
+        [authVersionKey("portal", portalUserId), authVersionKey("company", claims.cid)],
+        sid,
+      );
+      if (state.revoked === true) throw ApiError.unauthenticated("Session has been revoked", "SESSION_REVOKED");
+      if (state.row && state.revoked === false) return state.row;
+      const rows = await app.db.execute<PortalRow & { session_revoked: boolean }>(sql`
+      select pu.id, pu.customer_id, pu.company_id, pu.phone, pu.is_enabled, pu.locked_until, pu.must_change_password, c.full_name, c.is_active as customer_active,
+             ${revokedSql(sid)} as session_revoked
+      from portal_users pu join customers c on c.id = pu.customer_id where pu.id = ${portalUserId}`);
+      const found = rows[0];
+      if (!found) throw ApiError.unauthenticated("Account no longer exists", "INVALID_TOKEN");
+      if (found.session_revoked) throw ApiError.unauthenticated("Session has been revoked", "SESSION_REVOKED");
+      const { session_revoked: _r, ...row } = found;
+      if (!state.row && row.company_id === claims.cid) await storeCache(key, state.version, row);
+      return row;
+    }
+
+    /** Rate limits live in the security Redis; when it cannot be reached they fail open (logged) — the DB-backed lockout still applies. */
+    async function rateLimit(bucket: string, limit: number, windowSeconds: number): Promise<void> {
+      const sec = securityRedis(app);
+      if (!redisUsable(sec)) return; // disconnected: fail open at once (the DB-backed login lockout still applies)
+      try {
+        // Same budget as the other Redis reads on this path: a down Redis (client retrying with an offline queue) must not add seconds to
+        // every request before failing open.
+        await withinBudget(enforceRateLimit(sec, bucket, limit, windowSeconds), REDIS_AUTH_BUDGET_MS, "rate limit");
+      } catch (err) {
+        if (err instanceof ApiError) throw err;
+        logger.warn({ err: (err as Error).message, bucket }, "rate limit store unavailable; request allowed");
+      }
+    }
+
+    app.addHook("onRequest", async (req) => {
+      // X-Export-Cursor switches a CSV list into unbudgeted, unaudited keyset pages for the EXPORT_CSV job (lib/list.ts). Only the job's
+      // in-process calls may use it: from a network client it would page the whole table past the export budget and the export audit row
+      // (review of phase 7), so it is dropped before the list hooks can see it and the request is an ordinary (capped, audited) CSV export.
+      if (req.headers[EXPORT_CURSOR_HEADER] !== undefined && !isInProcessRequest(req))
+        delete req.headers[EXPORT_CURSOR_HEADER];
+      req.clientIp = effectiveClientIp(req);
+      const url = req.routeOptions.url;
+      if (!url) return; // unknown route: let the 404 handler answer
+      const cfg = req.routeOptions.config;
+      // API docs (audit D): with DOCS_PUBLIC off (the production default) the OpenAPI document and Swagger UI need a staff token with
+      // admin.tools; they are authenticated below exactly like a staff route that declares that permission
+      const docsGuarded = !config.DOCS_PUBLIC && isDocsUrl(url);
+      if ((cfg.public || isPublicPrefix(url)) && !docsGuarded) {
+        // Contract C3: one per-IP budget per route group (catalog reads, forms, brochure, visits, files, sign-in) plus the route's own
+        // stricter limit where it declares one (forms 5/min, login 10/min).
+        if (isProbeUrl(url)) return; // probes: never limited (and no Redis round trip)
+        const { subject, limit } = publicBucketSubject(req);
+        await rateLimit(`pub:${publicRouteGroup(url)}:${subject}`, limit, 60);
+        if (cfg.rateLimit) await rateLimit(`pub:${url}:${subject}`, cfg.rateLimit.limit, cfg.rateLimit.windowSeconds);
+        return;
+      }
+      const audience: TokenAudience = docsGuarded ? "erp" : (cfg.audience ?? "erp");
+      const permission = docsGuarded ? "admin.tools" : cfg.permission;
+      const token = bearer(req);
+      if (!token) throw ApiError.unauthenticated("Missing bearer token");
+      const result = await verifyAccessToken(token, audience);
+      if (!result.ok) {
+        if (result.reason === "WRONG_AUDIENCE")
+          throw ApiError.unauthenticated("Token is not valid for this surface", "INVALID_AUDIENCE");
+        if (result.reason === "EXPIRED") throw ApiError.unauthenticated("Access token expired", "TOKEN_EXPIRED");
+        throw ApiError.unauthenticated("Invalid access token", "INVALID_TOKEN");
+      }
+      const claims = result.claims;
+      req.authClaims = claims;
+      req.subjectId = claims.sub;
+
+      if (audience === "erp") {
+        const row = await loadStaff(claims);
+        if (!row.is_active || !row.role_active) throw ApiError.unauthenticated("User is inactive", "USER_INACTIVE");
+        const user: StaffContext = {
+          id: row.id,
+          companyId: row.company_id,
+          name: row.name,
+          email: row.email,
+          roleId: row.role_id,
+          roleName: row.role_name,
+          isSystemRole: row.is_system,
+          permissions: new Set(row.permissions),
+          allProjects: row.all_projects,
+          projectIds: row.project_ids ?? [],
+          mustChangePassword: row.must_change_password,
+          mfaEnabled: row.mfa_enabled,
+          sessionId: claims.sid,
+        };
+        req.user = user;
+        if (user.mustChangePassword && !endsWithAny(url, PASSWORD_CHANGE_EXEMPT))
+          throw new ApiError(403, "PASSWORD_CHANGE_REQUIRED", "You must change your password before continuing");
+        // Admin MFA is decided by what the role can do (settings/users/roles/admin tools, or the Super Admin system role), not its name.
+        if (!claims.mfa && requiresAdminMfa(user) && !endsWithAny(url, MFA_EXEMPT)) {
+          const company = await loadCompany(app.db, app.redis, user.companyId);
+          if (company.settings.force_mfa_for_admins !== false)
+            throw new ApiError(403, "MFA_REQUIRED", "Multi-factor authentication is required for administrators");
+        }
+        if (permission) {
+          const alternatives = permissionAlternatives(permission);
+          if (!alternatives.some((p) => user.permissions.has(p)))
+            throw ApiError.forbidden(`Missing permission ${alternatives.join(" or ")}`, {
+              permission: alternatives[0],
+              alternatives,
+            });
+        }
+        await subjectRateLimits(req, url, user.id);
+        return;
+      }
+
+      const row = await loadPortal(claims);
+      if (!row.is_enabled || !row.customer_active)
+        throw ApiError.unauthenticated("Portal access is disabled", "USER_INACTIVE");
+      if (row.locked_until && new Date(row.locked_until).getTime() > Date.now())
+        throw ApiError.locked("Account is temporarily locked", {
+          locked_until: new Date(row.locked_until).toISOString(),
+        });
+      const customer: PortalContext = {
+        portalUserId: row.id,
+        customerId: row.customer_id,
+        companyId: row.company_id,
+        phone: row.phone,
+        name: row.full_name,
+        mustChangePassword: row.must_change_password,
+        sessionId: claims.sid,
+      };
+      req.customer = customer;
+      if (customer.mustChangePassword && !endsWithAny(url, PASSWORD_CHANGE_EXEMPT))
+        throw new ApiError(403, "PASSWORD_CHANGE_REQUIRED", "You must change your password before continuing");
+      await subjectRateLimits(req, url, customer.portalUserId);
+    });
+
+    /**
+     * Per-subject budgets of an authenticated request (audit D: one stolen token could scrape the customer base): writes
+     * (WRITE_RATE_LIMIT_PER_MIN), reads (READ_RATE_LIMIT_PER_MIN) and, on top, bulk exports (EXPORT_RATE_LIMIT_PER_MIN: CSV lists and
+     * POST /exports). Each answers 429 RATE_LIMITED with Retry-After.
+     */
+    async function subjectRateLimits(req: FastifyRequest, url: string, subjectId: string): Promise<void> {
+      // the EXPORT_CSV job's in-process pages: budgeted once, at POST /exports (a large export must not throttle itself or its owner)
+      if (req.headers[EXPORT_CURSOR_HEADER] !== undefined) return;
+      if (WRITE_METHODS.has(req.method)) await rateLimit(`w:${subjectId}`, config.WRITE_RATE_LIMIT_PER_MIN, 60);
+      else if (req.method === "GET" || req.method === "HEAD")
+        await rateLimit(`r:${subjectId}`, config.READ_RATE_LIMIT_PER_MIN, 60);
+      if (isExportRequest(req, url)) await rateLimit(`x:${subjectId}`, config.EXPORT_RATE_LIMIT_PER_MIN, 60);
+    }
+  },
+  { name: "auth", dependencies: ["db", "redis"] },
+);

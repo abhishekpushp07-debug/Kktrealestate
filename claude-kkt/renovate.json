@@ -1,0 +1,90 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Dependency updates for KKT (docs/DEPLOY.md \"CI gates\"): weekly, grouped, lockfile maintenance; GitHub Actions and Docker images pinned by digest/SHA with the version kept in a comment. Every PR runs the full CI (audit gate, tests, images).",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":semanticCommitsDisabled",
+    "helpers:pinGitHubActionDigests",
+    "docker:pinDigests",
+    ":timezone(Asia/Kolkata)"
+  ],
+  "schedule": ["before 6am on monday"],
+  "prConcurrentLimit": 8,
+  "prHourlyLimit": 4,
+  "rangeStrategy": "auto",
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 6am on monday"]
+  },
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "schedule": ["at any time"],
+    "labels": ["security"]
+  },
+  "osvVulnerabilityAlerts": true,
+  "postUpdateOptions": ["pnpmDedupe"],
+  "packageRules": [
+    {
+      "description": "GitHub Actions in one weekly PR (SHA pins + version comments)",
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions"
+    },
+    {
+      "description": "Base images and service images (Dockerfiles, compose, k8s) in one weekly PR, pinned by digest",
+      "matchManagers": ["dockerfile", "docker-compose", "kubernetes"],
+      "groupName": "container images"
+    },
+    {
+      "description": "Major Postgres / Redis / Node versions need a migration plan: never automatic",
+      "matchPackageNames": ["postgres", "redis", "node"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
+    },
+    {
+      "description": "Non-major npm updates of production dependencies, one weekly PR",
+      "matchManagers": ["npm"],
+      "matchDepTypes": ["dependencies"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "production dependencies (non-major)"
+    },
+    {
+      "description": "Non-major npm updates of dev dependencies, one weekly PR",
+      "matchManagers": ["npm"],
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "dev dependencies (non-major)"
+    },
+    {
+      "description": "Families that must move together",
+      "matchPackageNames": ["/^@opentelemetry\\//"],
+      "groupName": "OpenTelemetry"
+    },
+    {
+      "matchPackageNames": ["/^@aws-sdk\\//"],
+      "groupName": "AWS SDK"
+    },
+    {
+      "matchPackageNames": ["/^@fastify\\//", "fastify", "fastify-plugin", "fastify-type-provider-zod"],
+      "groupName": "Fastify"
+    },
+    {
+      "matchPackageNames": ["/^expo/", "/^@expo\\//", "react-native", "/^react-native-/"],
+      "groupName": "Expo SDK",
+      "description": "Expo packages follow the SDK version (npx expo install --fix)"
+    },
+    {
+      "matchPackageNames": ["react", "react-dom", "@types/react", "@types/react-dom"],
+      "groupName": "React"
+    },
+    {
+      "matchPackageNames": ["drizzle-orm", "drizzle-kit"],
+      "groupName": "Drizzle"
+    },
+    {
+      "description": "Security-relevant image decoders: update as soon as released",
+      "matchPackageNames": ["sharp"],
+      "schedule": ["at any time"]
+    }
+  ]
+}

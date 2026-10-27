@@ -1,0 +1,86 @@
+# Three domains, one backend (docs/DEPLOY.md). Caddy terminates TLS (automatic certificates for real domains), adds the security
+# headers every surface shares, and proxies /api/* on each host to the API replicas. The ERP and portal origins (nginx) set their own
+# Content-Security-Policy (apps/erp/nginx.conf, apps/portal/nginx.conf); the "?" prefix below only fills a header the upstream did not
+# set, so the origin's stricter policy always wins.
+{
+	servers {
+		protocols h1 h2 h3
+		# Caddy itself is the edge: X-Forwarded-For from clients is replaced, never trusted (the API trusts only private ranges).
+	}
+}
+
+(security_headers) {
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		?X-Frame-Options "DENY"
+		?Referrer-Policy "strict-origin-when-cross-origin"
+		?Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()"
+		?Cross-Origin-Opener-Policy "same-origin"
+		# fallback for anything an upstream serves without a policy: nothing may frame it, no plugins, no base-tag hijack
+		?Content-Security-Policy "frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
+		-Server
+		-X-Powered-By
+	}
+}
+
+(api) {
+	# Prometheus scrapes METRICS_PORT on the private network; the metrics route is never served at the edge. This must be a `handle`
+	# with a single path matcher: Caddy runs `handle` before `respond` in its directive order, and sorts sibling `handle` blocks with
+	# path matchers by specificity, so /api/v1/metrics wins over /api/* (a named matcher or a bare `respond` would be shadowed by the
+	# /api/* proxy). /metrics is not under /api and reaches the front end, which has no such route.
+	handle /api/v1/metrics {
+		respond 404
+	}
+	handle /api/* {
+		reverse_proxy {
+			# every API replica (Compose DNS returns one A record per container), re-resolved every 5 s as replicas come and go
+			dynamic a api 4000 {
+				refresh 5s
+			}
+			lb_policy least_conn
+			# passive health: a replica that refuses connections or answers 502/503 (draining, lost Postgres/Redis) is skipped for
+			# 10 s, and the request is retried on another replica for up to 5 s
+			fail_duration 10s
+			max_fails 2
+			unhealthy_status 502 503
+			lb_try_duration 5s
+			lb_try_interval 250ms
+			transport http {
+				dial_timeout 3s
+				response_header_timeout 60s
+			}
+		}
+	}
+}
+
+erp.{$DOMAIN} {
+	encode zstd gzip
+	import security_headers
+	import api
+	handle {
+		reverse_proxy erp:8080
+	}
+}
+
+www.{$DOMAIN} {
+	encode zstd gzip
+	import security_headers
+	import api
+	handle {
+		reverse_proxy web:3000
+	}
+}
+
+{$DOMAIN} {
+	redir https://www.{$DOMAIN}{uri} permanent
+}
+
+my.{$DOMAIN} {
+	encode zstd gzip
+	import security_headers
+	import api
+	handle {
+		reverse_proxy portal:8080
+	}
+}

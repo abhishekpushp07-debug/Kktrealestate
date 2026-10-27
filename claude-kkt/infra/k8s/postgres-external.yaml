@@ -1,0 +1,12 @@
+# Postgres is a managed service (RDS / Cloud SQL / Azure Database, PostgreSQL 16, with automated backups + PITR). This ExternalName
+# Service gives it the in-cluster name "postgres" that pgbouncer.ini and database_owner_url use. Run infra/postgres/init/01-roles.sql
+# once against it as the admin user (docs/DEPLOY.md "Database roles").
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: kkt
+  labels: { app.kubernetes.io/part-of: kkt, app.kubernetes.io/name: postgres }
+spec:
+  type: ExternalName
+  externalName: kkt-db.example.ap-south-1.rds.amazonaws.com

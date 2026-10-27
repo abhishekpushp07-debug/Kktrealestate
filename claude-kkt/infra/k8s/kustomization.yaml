@@ -1,0 +1,26 @@
+# Deployed by .github/workflows/deploy.yml (docs/DEPLOY.md "Kubernetes"): it sets every image to the immutable git-SHA tag CI pushed
+#   kustomize edit set image kkt-api=ghcr.io/<owner>/kkt-api:<sha> kkt-web=… kkt-erp=… kkt-portal=…
+# runs the migrate Job first, applies, waits for the rollouts and undoes them on failure. Never deploy a moving tag (:latest): a rollout
+# must be reproducible and a rollback must return to exactly the previous image. The placeholder tag below is deliberately unpullable,
+# so applying this directory without setting the tags fails instead of running something unknown.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: kkt
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - postgres-external.yaml
+  - pgbouncer.yaml
+  - migrate-job.yaml
+  - api.yaml
+  - worker.yaml
+  - web.yaml
+  - erp.yaml
+  - portal.yaml
+  - ingress.yaml
+  - networkpolicy.yaml
+images:
+  - { name: kkt-api, newName: ghcr.io/OWNER/kkt-api, newTag: set-by-deploy-workflow }
+  - { name: kkt-web, newName: ghcr.io/OWNER/kkt-web, newTag: set-by-deploy-workflow }
+  - { name: kkt-erp, newName: ghcr.io/OWNER/kkt-erp, newTag: set-by-deploy-workflow }
+  - { name: kkt-portal, newName: ghcr.io/OWNER/kkt-portal, newTag: set-by-deploy-workflow }

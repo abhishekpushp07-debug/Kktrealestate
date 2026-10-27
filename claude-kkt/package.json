@@ -1,0 +1,58 @@
+{
+  "name": "claude-kkt",
+  "private": true,
+  "version": "2.0.0",
+  "description": "KKT Real Estate ERP v2 - one backend, three front doors (website, ERP, customer portal)",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "test": "turbo run test",
+    "test:acceptance": "pnpm --filter @kkt/api test:acceptance",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint && eslint --max-warnings 0 eslint.config.mjs scripts infra",
+    "db:migrate": "pnpm --filter @kkt/db migrate",
+    "db:seed": "pnpm --filter @kkt/api seed",
+    "db:reset": "pnpm --filter @kkt/db reset && pnpm --filter @kkt/api seed",
+    "api": "pnpm --filter @kkt/api dev",
+    "erp": "pnpm --filter @kkt/erp dev",
+    "web": "pnpm --filter @kkt/web dev",
+    "portal": "pnpm --filter @kkt/portal web",
+    "loadtest": "pnpm --filter @kkt/api loadtest",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.15.0",
+    "eslint": "^10.13.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.13.0",
+    "prettier": "^3.5.0",
+    "turbo": "^2.5.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.72.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "argon2",
+      "esbuild",
+      "sharp",
+      "msgpackr-extract",
+      "@tailwindcss/oxide",
+      "unrs-resolver",
+      "sharp"
+    ],
+    "overrides": {
+      "@fastify/static": ">=10.1.2",
+      "postcss": ">=8.5.23",
+      "@expo/cli>zod": "^4.6.7",
+      "next>sharp": "^0.35.5"
+    }
+  }
+}

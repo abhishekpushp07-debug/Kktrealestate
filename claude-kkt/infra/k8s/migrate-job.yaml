@@ -1,0 +1,64 @@
+# One-shot migrations (+ first-boot seed) as kkt_owner, directly against Postgres (not PgBouncer: the migration lock is a session
+# advisory lock). The deploy workflow (.github/workflows/deploy.yml, docs/DEPLOY.md) deletes the previous Job, applies this one with the
+# new image tag and waits for it to complete before any Deployment rolls; Argo CD runs it as a PreSync hook.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrate
+  namespace: kkt
+  labels: { app.kubernetes.io/name: migrate, app.kubernetes.io/part-of: kkt, app.kubernetes.io/component: migrate }
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 1800
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: migrate, app.kubernetes.io/part-of: kkt, app.kubernetes.io/component: migrate }
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: migrate
+          image: kkt-api
+          imagePullPolicy: IfNotPresent
+          args: ["node", "dist/server.js", "migrate"]
+          envFrom:
+            - configMapRef: { name: kkt-config }
+          env:
+            - { name: SEED_ON_BOOT, value: "true" }
+            # first-boot bootstrap (ignored once a company exists): the company and the one Super Admin
+            - { name: BOOTSTRAP_COMPANY_NAME, value: My Builders Pvt Ltd }
+            - { name: BOOTSTRAP_ADMIN_EMAIL, value: owner@kkt.example.in }
+            - { name: DATABASE_URL_FILE, value: /run/secrets/kkt/database_owner_url }
+            - { name: REDIS_URL_FILE, value: /run/secrets/kkt/redis_url }
+            - { name: JWT_SECRET_FILE, value: /run/secrets/kkt/jwt_secret }
+            - { name: FIELD_ENCRYPTION_KEY_FILE, value: /run/secrets/kkt/field_encryption_key }
+            - { name: HASH_KEY_FILE, value: /run/secrets/kkt/hash_key }
+            - { name: JWT_SIGNING_KEYS_FILE, value: /run/secrets/kkt/jwt_signing_keys }
+            - { name: LINK_SIGNING_KEYS_FILE, value: /run/secrets/kkt/link_signing_keys }
+            - { name: HASH_KEYS_FILE, value: /run/secrets/kkt/hash_keys }
+            - { name: BOOTSTRAP_ADMIN_PASSWORD_FILE, value: /run/secrets/kkt/bootstrap_admin_password }
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits: { cpu: "1", memory: 1Gi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: secrets, mountPath: /run/secrets/kkt, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: secrets
+          secret: { secretName: kkt-secrets, defaultMode: 0440 }
+        - name: tmp
+          emptyDir: {}
