@@ -72,7 +72,7 @@ export const bookingDrafts = pgTable(
     version: integer("version").notNull().default(1),
   },
   (t) => [
-    index("booking_drafts_user_updated_idx").on(t.userId, t.updatedAt.desc()),
+    index("booking_drafts_user_updated_idx").on(t.userId, t.updatedAt.desc().nullsFirst()),
     index("booking_drafts_company_id_idx").on(t.companyId),
   ],
 );
@@ -143,11 +143,20 @@ export const bookings = pgTable(
     uniqueIndex("bookings_one_active_per_flat_uq")
       .on(t.flatId)
       .where(sql`${t.status} = 'ACTIVE'`),
-    index("bookings_company_project_status_date_idx").on(t.companyId, t.projectId, t.status, t.bookingDate.desc()),
+    index("bookings_company_project_status_date_idx").on(
+      t.companyId,
+      t.projectId,
+      t.status,
+      t.bookingDate.desc().nullsFirst(),
+    ),
     index("bookings_block_status_idx").on(t.blockId, t.status),
     index("bookings_customer_idx").on(t.customerId),
     index("bookings_payment_plan_idx").on(t.paymentPlanId),
-    index("bookings_company_booking_date_idx").on(t.companyId, t.bookingDate.desc(), t.id.desc()),
+    index("bookings_company_booking_date_idx").on(
+      t.companyId,
+      t.bookingDate.desc().nullsFirst(),
+      t.id.desc().nullsFirst(),
+    ),
     trgm("bookings_booking_number_trgm_idx", t.bookingNumber),
     check(
       "bookings_agreement_split_chk",
@@ -237,7 +246,7 @@ export const agreementRevisions = pgTable(
     ...appendOnly(),
   },
   (t) => [
-    index("agreement_revisions_booking_idx").on(t.bookingId, t.revisedAt.desc()),
+    index("agreement_revisions_booking_idx").on(t.bookingId, t.revisedAt.desc().nullsFirst()),
     index("agreement_revisions_company_id_idx").on(t.companyId),
   ],
 );
@@ -258,7 +267,7 @@ export const bookingPlanRevisions = pgTable(
     ...appendOnly(),
   },
   (t) => [
-    index("booking_plan_revisions_booking_idx").on(t.bookingId, t.at.desc()),
+    index("booking_plan_revisions_booking_idx").on(t.bookingId, t.at.desc().nullsFirst()),
     index("booking_plan_revisions_company_id_idx").on(t.companyId),
   ],
 );

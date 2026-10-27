@@ -61,8 +61,8 @@ export const leads = pgTable(
     index("leads_company_phone_project_idx").on(t.companyId, t.phone, t.projectId),
     index("leads_company_stage_idx").on(t.companyId, t.stage),
     index("leads_assigned_follow_up_idx").on(t.assignedUserId, t.nextFollowUpAt),
-    index("leads_company_source_created_idx").on(t.companyId, t.source, t.createdAt.desc()),
-    index("leads_company_created_idx").on(t.companyId, t.createdAt.desc(), t.id.desc()),
+    index("leads_company_source_created_idx").on(t.companyId, t.source, t.createdAt.desc().nullsFirst()),
+    index("leads_company_created_idx").on(t.companyId, t.createdAt.desc().nullsFirst(), t.id.desc().nullsFirst()),
     trgm("leads_full_name_trgm_idx", t.fullName),
     trgm("leads_phone_trgm_idx", t.phone),
     trgm("leads_lead_number_trgm_idx", t.leadNumber),
@@ -86,7 +86,7 @@ export const leadStageHistory = pgTable(
     reason: text("reason"),
     at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("lead_stage_history_lead_idx").on(t.leadId, t.at.desc())],
+  (t) => [index("lead_stage_history_lead_idx").on(t.leadId, t.at.desc().nullsFirst())],
 );
 
 export const leadFollowUps = pgTable(
@@ -102,7 +102,7 @@ export const leadFollowUps = pgTable(
     byUserId: uuid("by_user_id"),
     ...versioned(),
   },
-  (t) => [index("lead_follow_ups_lead_idx").on(t.leadId, t.createdAt.desc())],
+  (t) => [index("lead_follow_ups_lead_idx").on(t.leadId, t.createdAt.desc().nullsFirst())],
 );
 
 export const leadActivities = pgTable(
@@ -118,7 +118,7 @@ export const leadActivities = pgTable(
     actorId: uuid("actor_id"),
     at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("lead_activities_lead_idx").on(t.leadId, t.at.desc())],
+  (t) => [index("lead_activities_lead_idx").on(t.leadId, t.at.desc().nullsFirst())],
 );
 
 export const siteVisits = pgTable(
@@ -164,7 +164,11 @@ export const siteVisits = pgTable(
     index("site_visits_project_slot_idx").on(t.projectId, t.visitDate, t.slotStart, t.status),
     index("site_visits_assignee_date_idx").on(t.assigneeUserId, t.visitDate),
     index("site_visits_lead_status_idx").on(t.leadId, t.status),
-    index("site_visits_company_visit_date_idx").on(t.companyId, t.visitDate.desc(), t.id.desc()),
+    index("site_visits_company_visit_date_idx").on(
+      t.companyId,
+      t.visitDate.desc().nullsFirst(),
+      t.id.desc().nullsFirst(),
+    ),
     index("site_visits_superseded_token_hashes_idx").using("gin", t.supersededTokenHashes),
     check("site_visits_visitors_chk", sql`${t.visitors} BETWEEN 1 AND 6`),
     index("site_visits_customer_id_idx").on(t.customerId),
@@ -188,7 +192,7 @@ export const brochureDownloads = pgTable(
     ...appendOnly(),
   },
   (t) => [
-    index("brochure_downloads_project_created_idx").on(t.projectId, t.createdAt.desc()),
+    index("brochure_downloads_project_created_idx").on(t.projectId, t.createdAt.desc().nullsFirst()),
     index("brochure_downloads_company_id_idx").on(t.companyId),
     index("brochure_downloads_lead_id_idx").on(t.leadId),
   ],
@@ -214,8 +218,8 @@ export const enquiries = pgTable(
     ...versioned(),
   },
   (t) => [
-    index("enquiries_company_read_created_idx").on(t.companyId, t.isRead, t.createdAt.desc()),
-    index("enquiries_company_created_idx").on(t.companyId, t.createdAt.desc(), t.id.desc()),
+    index("enquiries_company_read_created_idx").on(t.companyId, t.isRead, t.createdAt.desc().nullsFirst()),
+    index("enquiries_company_created_idx").on(t.companyId, t.createdAt.desc().nullsFirst(), t.id.desc().nullsFirst()),
     index("enquiries_flat_type_id_idx").on(t.flatTypeId),
     index("enquiries_lead_id_idx").on(t.leadId),
     index("enquiries_project_id_idx").on(t.projectId),

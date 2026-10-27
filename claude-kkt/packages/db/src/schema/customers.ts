@@ -75,7 +75,7 @@ export const customers = pgTable(
     index("customers_company_phone_idx").on(t.companyId, t.phone),
     index("customers_company_pan_hash_idx").on(t.companyId, t.panHash),
     index("customers_company_full_name_idx").on(t.companyId, t.fullName),
-    index("customers_company_created_idx").on(t.companyId, t.createdAt.desc(), t.id.desc()),
+    index("customers_company_created_idx").on(t.companyId, t.createdAt.desc().nullsFirst(), t.id.desc().nullsFirst()),
     // Database twin of crm/customerService.ts assertNoDuplicate: one live (not erased) customer per phone and per PAN in a company.
     uniqueIndex("customers_company_phone_live_uq")
       .on(t.companyId, t.phone)

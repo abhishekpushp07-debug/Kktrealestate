@@ -386,7 +386,10 @@ export function customerRoutes(app: FastifyInstance): void {
       if (q.project_id) {
         ensureProjectAccess(user, q.project_id); // scoped users cannot probe foreign projects (404)
         where.push(
-          sql`exists (select 1 from ${bookings} b where b.project_id = ${q.project_id} and (b.customer_id = ${customers.id} or exists (select 1 from ${bookingCoApplicants} bc where bc.booking_id = b.id and bc.customer_id = ${customers.id})))`,
+          // primary or co-applicant as two index lookups (an OR inside one EXISTS reads every booking of the project per customer)
+          sql`(exists (select 1 from ${bookings} b where b.customer_id = ${customers.id} and b.project_id = ${q.project_id})
+            or exists (select 1 from ${bookingCoApplicants} bc join ${bookings} b on b.id = bc.booking_id
+              where bc.customer_id = ${customers.id} and b.project_id = ${q.project_id}))`,
         );
       }
       if (q.has_active_booking === true) where.push(gt(CUSTOMER_SELECT.activeBookings, 0));

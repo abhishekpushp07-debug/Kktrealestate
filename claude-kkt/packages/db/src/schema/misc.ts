@@ -40,7 +40,7 @@ export const integrityRuns = pgTable(
     counts: jsonb("counts").$type<Record<string, number>>().notNull().default({}),
     findings: jsonb("findings").$type<JsonObject[]>().notNull().default([]),
   },
-  (t) => [index("integrity_runs_company_ran_idx").on(t.companyId, t.ranAt.desc())],
+  (t) => [index("integrity_runs_company_ran_idx").on(t.companyId, t.ranAt.desc().nullsFirst())],
 );
 
 /**
@@ -71,7 +71,7 @@ export const exports = pgTable(
     expiresAt: timestamp("expires_at", { withTimezone: true }),
   },
   (t) => [
-    index("exports_user_created_idx").on(t.userId, t.createdAt.desc()),
+    index("exports_user_created_idx").on(t.userId, t.createdAt.desc().nullsFirst()),
     index("exports_status_expires_idx").on(t.status, t.expiresAt),
     check("exports_row_count_nonneg_chk", sql`${t.rowCount} IS NULL OR ${t.rowCount} >= 0`),
     index("exports_company_id_idx").on(t.companyId),

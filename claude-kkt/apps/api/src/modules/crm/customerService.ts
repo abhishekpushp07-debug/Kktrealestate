@@ -149,11 +149,16 @@ export interface CustomerSelect {
 const rm = users;
 // Correlated sub-selects spell the outer column as "customers"."id" on purpose: Drizzle renders selected columns unqualified
 // when the query has a single table, and an unqualified "id" inside the sub-select would bind to the inner table.
-/** Active bookings where the customer is primary or co-applicant. */
+/**
+ * Active bookings where the customer is primary or co-applicant: the primary count plus the co-applicant count (bookings where the
+ * customer is not also the primary), two index lookups (bookings_customer_idx, booking_co_applicants_customer_idx). The former single
+ * `customer_id = … OR EXISTS (…)` could use no index and read every ACTIVE booking of the database for each listed customer (300 ms per
+ * customers page at 15,000 bookings, docs/PERFORMANCE.md "Production-size run").
+ */
 export const activeBookingCountSql = sql<number>`(
-  select count(*)::int from ${bookings} b
-  where b.status = 'ACTIVE' and (b.customer_id = "customers"."id" or exists (
-    select 1 from ${bookingCoApplicants} bc where bc.booking_id = b.id and bc.customer_id = "customers"."id")))`;
+  (select count(*)::int from ${bookings} b where b.customer_id = "customers"."id" and b.status = 'ACTIVE')
+  + (select count(*)::int from ${bookingCoApplicants} bc join ${bookings} b on b.id = bc.booking_id
+     where bc.customer_id = "customers"."id" and b.status = 'ACTIVE' and b.customer_id <> "customers"."id"))`;
 const kycVerifierNameSql = sql<
   string | null
 >`(select u.name from ${users} u where u.id = "customers"."kyc_verified_by")`;
@@ -724,8 +729,9 @@ function scopeOf(user: CustomerWriteContext["user"]): CustomerScope | undefined 
 /** Number of ACTIVE bookings where the customer is primary or co-applicant. */
 export async function activeBookingCount(db: Executor, customerId: string): Promise<number> {
   const rows = await db.execute<{ n: number | string }>(sql`
-    select count(*)::int as n from ${bookings} b
-    where b.status = 'ACTIVE' and (b.customer_id = ${customerId} or exists (select 1 from ${bookingCoApplicants} bc where bc.booking_id = b.id and bc.customer_id = ${customerId}))`);
+    select (select count(*)::int from ${bookings} b where b.customer_id = ${customerId} and b.status = 'ACTIVE')
+      + (select count(*)::int from ${bookingCoApplicants} bc join ${bookings} b on b.id = bc.booking_id
+         where bc.customer_id = ${customerId} and b.status = 'ACTIVE' and b.customer_id <> ${customerId}) as n`);
   return Number(rows[0]?.n ?? 0);
 }
 

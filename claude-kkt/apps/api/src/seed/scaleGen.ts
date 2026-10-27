@@ -798,7 +798,7 @@ export async function loadCustomers(
       },
       same_as_current: true,
       occupation: rng.pick(OCCUPATIONS),
-      source: rng.pick(["Walk-in", "Website", "Referral", "Broker", "Campaign"]),
+      source: rng.pick(["WALK_IN", "WEBSITE", "REFERRAL", "BROKER", "CAMPAIGN"] as const),
       relationship_manager_id: cu.rm.id,
       pan_enc: pan ? encryptField(pan) : null,
       pan_hash: pan ? keyedHash(pan) : null,

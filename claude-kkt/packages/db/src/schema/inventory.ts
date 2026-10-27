@@ -414,7 +414,7 @@ export const rateCards = pgTable(
     uniqueIndex("rate_cards_one_active_uq")
       .on(t.projectId)
       .where(sql`${t.status} = 'ACTIVE'`),
-    index("rate_cards_project_idx").on(t.projectId, t.effectiveFrom.desc()),
+    index("rate_cards_project_idx").on(t.projectId, t.effectiveFrom.desc().nullsFirst()),
     index("rate_cards_company_id_idx").on(t.companyId),
   ],
 );

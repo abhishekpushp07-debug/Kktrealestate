@@ -51,7 +51,11 @@ export const serviceRequests = pgTable(
     index("service_requests_company_status_priority_idx").on(t.companyId, t.status, t.priority),
     index("service_requests_customer_idx").on(t.customerId),
     index("service_requests_assignee_status_idx").on(t.assigneeUserId, t.status),
-    index("service_requests_company_created_idx").on(t.companyId, t.createdAt.desc(), t.id.desc()),
+    index("service_requests_company_created_idx").on(
+      t.companyId,
+      t.createdAt.desc().nullsFirst(),
+      t.id.desc().nullsFirst(),
+    ),
     trgm("service_requests_subject_trgm_idx", t.subject),
     trgm("service_requests_ticket_number_trgm_idx", t.ticketNumber),
     check("service_requests_rating_chk", sql`${t.rating} IS NULL OR ${t.rating} BETWEEN 1 AND 5`),
@@ -100,7 +104,7 @@ export const notifications = pgTable(
     ...appendOnly(),
   },
   (t) => [
-    index("notifications_recipient_idx").on(t.recipientType, t.recipientId, t.isRead, t.createdAt.desc()),
+    index("notifications_recipient_idx").on(t.recipientType, t.recipientId, t.isRead, t.createdAt.desc().nullsFirst()),
     index("notifications_entity_idx").on(t.entityType, t.entityId),
     index("notifications_company_id_idx").on(t.companyId),
   ],

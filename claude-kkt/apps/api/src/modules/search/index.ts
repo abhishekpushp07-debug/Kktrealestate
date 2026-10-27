@@ -62,7 +62,8 @@ function customerScopeSql(user: StaffContext, params: unknown[]): string {
   if (user.projectIds.length === 0) return ownUnlinked;
   params.push(user.projectIds);
   const p = `$${params.length}::uuid[]`;
-  return `(exists (select 1 from bookings sb where sb.project_id = any(${p}) and (sb.customer_id = c.id or exists (select 1 from booking_co_applicants sbc where sbc.booking_id = sb.id and sbc.customer_id = c.id)))
+  return `(exists (select 1 from bookings sb where sb.customer_id = c.id and sb.project_id = any(${p}))
+    or exists (select 1 from booking_co_applicants sbc join bookings sb on sb.id = sbc.booking_id where sbc.customer_id = c.id and sb.project_id = any(${p}))
     or exists (select 1 from leads sl where sl.customer_id = c.id and sl.project_id = any(${p}))
     or exists (select 1 from site_visits sv where sv.customer_id = c.id and sv.project_id = any(${p}))
     or ${ownUnlinked})`;

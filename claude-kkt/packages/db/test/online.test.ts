@@ -94,6 +94,7 @@ describe("checksummed hand-written SQL", () => {
     ]);
     expect((await listOnlineSqlFiles()).map((f) => f.slice(SQL_FOLDER.length + 1))).toEqual([
       "online/0005_indexes.sql",
+      "online/0006_list_order_indexes.sql",
     ]);
   });
 
@@ -107,6 +108,7 @@ describe("checksummed hand-written SQL", () => {
       "0002_privileges.sql",
       "0006_money_guards.sql",
       "online/0005_indexes.sql",
+      "online/0006_list_order_indexes.sql",
     ]);
     const after = await handle.sql<{ oid: number }[]>`
       SELECT t.oid::int AS oid FROM pg_trigger t WHERE t.tgname IN ('set_updated_at', 'audit_logs_immutable') ORDER BY t.oid`;
@@ -148,6 +150,7 @@ describe("checksummed hand-written SQL", () => {
       "0002_privileges.sql",
       "0006_money_guards.sql",
       "online/0005_indexes.sql",
+      "online/0006_list_order_indexes.sql",
     ]);
     expect(report.online["online/0005_indexes.sql"]!.every((r) => r.action === "applied")).toBe(true);
   });
@@ -401,6 +404,41 @@ describe("migration 0005: indexes", () => {
     expect(invalid).toHaveLength(0);
   });
 
+  it("migration 0006: no index key is DESC NULLS LAST, so every newest-first list (ORDER BY col DESC) can read its index in order", async () => {
+    const rows = await handle.sql<{ name: string }[]>`
+      SELECT indexname AS name FROM pg_indexes WHERE schemaname = 'public' AND indexdef LIKE '%DESC NULLS LAST%' ORDER BY 1`;
+    expect(rows).toEqual([]);
+    const [def] = await handle.sql<{ def: string }[]>`
+      SELECT indexdef AS def FROM pg_indexes WHERE indexname = 'payments_company_date_idx'`;
+    expect(def?.def).toContain("(company_id, payment_date DESC, id DESC)");
+    expect(await handle.sql`SELECT 1 FROM pg_class WHERE relname LIKE '%\\_nl' AND relkind = 'i'`).toHaveLength(0);
+  });
+
+  it("migration 0006 is idempotent and swaps an old-order index online (rename, build, drop)", async () => {
+    await handle.sql.unsafe(`
+      DROP INDEX "service_requests_company_created_idx";
+      CREATE INDEX "service_requests_company_created_idx" ON "service_requests" ("company_id", "created_at" DESC NULLS LAST, "id" DESC NULLS LAST)`);
+    const report = await runMigrations(TEST_DATABASE_URL, { reapplyAll: true });
+    expect(report.online["online/0006_list_order_indexes.sql"]!.length).toBe(33 * 3);
+    const [def] = await handle.sql<{ def: string }[]>`
+      SELECT indexdef AS def FROM pg_indexes WHERE indexname = 'service_requests_company_created_idx'`;
+    expect(def?.def).toContain("(company_id, created_at DESC, id DESC)");
+    expect(
+      await handle.sql`SELECT 1 FROM pg_indexes WHERE indexname = 'service_requests_company_created_idx_nl'`,
+    ).toHaveLength(0);
+    // with the scans that need no index off, the plan reads the index in order: no Sort node (the old index needed one)
+    const plan = await handle.sql.begin(async (tx) => {
+      await tx.unsafe("SET LOCAL enable_seqscan = off");
+      await tx.unsafe("SET LOCAL enable_bitmapscan = off");
+      return tx.unsafe<{ "QUERY PLAN": string }[]>(`
+        EXPLAIN SELECT id FROM service_requests WHERE company_id = '00000000-0000-4000-8000-000000000001'
+        ORDER BY created_at DESC, id DESC LIMIT 25`);
+    });
+    const text = plan.map((r) => r["QUERY PLAN"]).join("\n");
+    expect(text).toContain("service_requests_company_created_idx");
+    expect(text).not.toMatch(/Sort/);
+  });
+
   it("the planner uses the new trigram indexes for the demand-number and cheque-number searches", async () => {
     await handle.sql.begin(async (tx) => {
       await tx`SET LOCAL enable_seqscan = off`;
@@ -627,6 +665,7 @@ describe("migration 0005 on existing data (upgrade from 0004)", () => {
         "0002_privileges.sql",
         "0006_money_guards.sql",
         "online/0005_indexes.sql",
+        "online/0006_list_order_indexes.sql",
       ]);
       const after = postgres(url, { max: 1, onnotice: () => undefined });
       try {

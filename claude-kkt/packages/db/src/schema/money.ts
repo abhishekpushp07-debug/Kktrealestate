@@ -82,7 +82,7 @@ export const demands = pgTable(
     index("demands_company_status_due_idx").on(t.companyId, t.status, t.dueDate),
     index("demands_block_stage_idx").on(t.blockId, t.triggerStageId),
     index("demands_booking_posted_idx").on(t.bookingId, t.postedAt),
-    index("demands_company_posted_idx").on(t.companyId, t.postedAt.desc(), t.id.desc()),
+    index("demands_company_posted_idx").on(t.companyId, t.postedAt.desc().nullsFirst(), t.id.desc().nullsFirst()),
     // migration 0005 (built CONCURRENTLY by src/sql/online/0005_indexes.sql): the demands list search
     trgm("demands_demand_number_trgm_idx", t.demandNumber),
     trgm("demands_installment_name_trgm_idx", t.installmentName),
@@ -146,8 +146,8 @@ export const payments = pgTable(
   (t) => [
     unique("payments_company_receipt_uq").on(t.companyId, t.receiptNumber),
     index("payments_booking_status_idx").on(t.bookingId, t.status),
-    index("payments_company_date_idx").on(t.companyId, t.paymentDate.desc(), t.id.desc()),
-    index("payments_project_date_idx").on(t.projectId, t.paymentDate.desc()),
+    index("payments_company_date_idx").on(t.companyId, t.paymentDate.desc().nullsFirst(), t.id.desc().nullsFirst()),
+    index("payments_project_date_idx").on(t.projectId, t.paymentDate.desc().nullsFirst()),
     index("payments_company_status_date_idx").on(t.companyId, t.status, t.paymentDate),
     check("payments_amount_positive_chk", sql`${t.amountPaise} > 0`),
     // A retried POST /payments carrying the same Idempotency-Key can never post a second receipt, even if the response cache was lost.
@@ -229,7 +229,7 @@ export const ledgerRebuilds = pgTable(
     summary: jsonb("summary").$type<Record<string, unknown>>().notNull().default({}),
   },
   (t) => [
-    index("ledger_rebuilds_booking_at_idx").on(t.bookingId, t.at.desc()),
+    index("ledger_rebuilds_booking_at_idx").on(t.bookingId, t.at.desc().nullsFirst()),
     index("ledger_rebuilds_company_id_idx").on(t.companyId),
     index("ledger_rebuilds_actor_id_idx").on(t.actorId),
     check("ledger_rebuilds_epochs_chk", sql`${t.toEpoch} > ${t.fromEpoch} AND ${t.fromEpoch} >= 1`),

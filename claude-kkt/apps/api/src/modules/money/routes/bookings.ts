@@ -291,7 +291,9 @@ export function registerBookingRoutes(app: FastifyInstance): void {
       if (q.block_id) where.push(eq(bookings.blockId, q.block_id));
       if (q.customer_id)
         where.push(
-          sql`(${bookings.customerId} = ${q.customer_id}::uuid or exists (select 1 from booking_co_applicants ca where ca.booking_id = ${bookings.id} and ca.customer_id = ${q.customer_id}::uuid))`,
+          // primary or co-applicant: the booking ids come from two index lookups (an OR with a correlated EXISTS reads every booking)
+          sql`${bookings.id} in (select xb.id from bookings xb where xb.customer_id = ${q.customer_id}::uuid
+            union all select ca.booking_id from booking_co_applicants ca where ca.customer_id = ${q.customer_id}::uuid)`,
         );
       if (q.status) where.push(eq(bookings.status, q.status));
       if (q.payment_plan_id) where.push(eq(bookings.paymentPlanId, q.payment_plan_id));

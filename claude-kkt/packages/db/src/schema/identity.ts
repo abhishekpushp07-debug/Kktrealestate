@@ -145,7 +145,7 @@ export const passwordHistory = pgTable(
     passwordHash: text("password_hash").notNull(),
     ...appendOnly(),
   },
-  (t) => [index("password_history_subject_idx").on(t.subjectId, t.createdAt.desc())],
+  (t) => [index("password_history_subject_idx").on(t.subjectId, t.createdAt.desc().nullsFirst())],
 );
 
 export const refreshTokens = pgTable(
@@ -194,7 +194,7 @@ export const loginEvents = pgTable(
     ...appendOnly(),
   },
   (t) => [
-    index("login_events_created_idx").on(t.createdAt.desc()),
+    index("login_events_created_idx").on(t.createdAt.desc().nullsFirst()),
     index("login_events_identifier_idx").on(t.identifier),
     index("login_events_company_id_idx").on(t.companyId),
   ],
@@ -221,10 +221,10 @@ export const auditLogs = pgTable(
     ...appendOnly(),
   },
   (t) => [
-    index("audit_logs_entity_idx").on(t.entityType, t.entityId, t.createdAt.desc()),
-    index("audit_logs_actor_idx").on(t.actorId, t.createdAt.desc()),
-    index("audit_logs_created_idx").on(t.createdAt.desc()),
-    index("audit_logs_company_created_idx").on(t.companyId, t.createdAt.desc(), t.id.desc()),
+    index("audit_logs_entity_idx").on(t.entityType, t.entityId, t.createdAt.desc().nullsFirst()),
+    index("audit_logs_actor_idx").on(t.actorId, t.createdAt.desc().nullsFirst()),
+    index("audit_logs_created_idx").on(t.createdAt.desc().nullsFirst()),
+    index("audit_logs_company_created_idx").on(t.companyId, t.createdAt.desc().nullsFirst(), t.id.desc().nullsFirst()),
   ],
 );
 
@@ -281,7 +281,7 @@ export const jobRuns = pgTable(
     /** Resume point of a heavy job interrupted by a deploy (e.g. last processed id); job-specific JSON. */
     checkpoint: jsonb("checkpoint").$type<JsonObject>(),
   },
-  (t) => [index("job_runs_name_started_idx").on(t.jobName, t.startedAt.desc())],
+  (t) => [index("job_runs_name_started_idx").on(t.jobName, t.startedAt.desc().nullsFirst())],
 );
 
 /**
@@ -302,7 +302,7 @@ export const auditSeals = pgTable(
     sealedAt: timestamp("sealed_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    index("audit_seals_company_sealed_idx").on(t.companyId, t.sealedAt.desc()),
+    index("audit_seals_company_sealed_idx").on(t.companyId, t.sealedAt.desc().nullsFirst()),
     check("audit_seals_row_count_chk", sql`${t.rowCount} > 0`),
   ],
 );

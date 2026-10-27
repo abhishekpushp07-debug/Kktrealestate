@@ -64,8 +64,11 @@ export function customerScopeCondition(
     user.projectIds.map((id) => sql`${id}::uuid`),
     sql`, `,
   );
-  return sql`(exists (select 1 from bookings sb where sb.project_id in (${ids}) and (sb.customer_id = ${customerId}
-        or exists (select 1 from booking_co_applicants sbc where sbc.booking_id = sb.id and sbc.customer_id = ${customerId})))
+  // primary and co-applicant as two index lookups (bookings_customer_idx, booking_co_applicants_customer_idx): one EXISTS with
+  // `customer_id = … OR EXISTS (co-applicant)` could use no index and read every booking of the scoped projects per customer tested
+  return sql`(exists (select 1 from bookings sb where sb.customer_id = ${customerId} and sb.project_id in (${ids}))
+    or exists (select 1 from booking_co_applicants sbc join bookings sb on sb.id = sbc.booking_id
+      where sbc.customer_id = ${customerId} and sb.project_id in (${ids}))
     or exists (select 1 from leads sl where sl.customer_id = ${customerId} and sl.project_id in (${ids}))
     or exists (select 1 from site_visits sv where sv.customer_id = ${customerId} and sv.project_id in (${ids}))
     or ${ownUnlinked})`;

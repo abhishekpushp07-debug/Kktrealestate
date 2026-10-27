@@ -69,6 +69,61 @@ describe("scale seed", () => {
     ).toBe(0);
   });
 
+  it("every staff and portal read of the generated rows passes its response schema", async () => {
+    const admin = (await t.loginAs("admin")).access_token;
+    const pid = (await t.login("admin@pid.in", scale.SCALE_STAFF_PASSWORD)).access_token;
+    for (const token of [admin, pid]) {
+      const lists = [
+        "/projects",
+        "/blocks",
+        "/flats",
+        "/customers",
+        "/customers?search=kumar",
+        "/leads",
+        "/bookings",
+        "/bookings?view=full",
+        "/payments",
+        "/demands",
+        "/service-requests",
+        "/users",
+        "/audit-logs",
+      ];
+      for (const path of lists) {
+        const r = await t.request<List<{ id: string }>>(
+          "GET",
+          `/api/v1${path}${path.includes("?") ? "&" : "?"}page_size=200`,
+          {
+            token,
+          },
+        );
+        expect(r.status, `${path}: ${r.text.slice(0, 300)}`).toBe(200);
+      }
+      const bookings = await t.request<List<{ id: string }>>("GET", "/api/v1/bookings?page_size=5", { token });
+      for (const b of bookings.body.items)
+        for (const suffix of ["", "/ledger", "/demands", "/payments", "/schedule"]) {
+          const r = await t.request("GET", `/api/v1/bookings/${b.id}${suffix}`, { token });
+          expect(r.status, `${b.id}${suffix}: ${r.text.slice(0, 300)}`).toBe(200);
+        }
+      const customers = await t.request<List<{ id: string }>>("GET", "/api/v1/customers?page_size=3", { token });
+      for (const c of customers.body.items) {
+        const r = await t.request("GET", `/api/v1/customers/${c.id}`, { token });
+        expect(r.status, r.text.slice(0, 300)).toBe(200);
+      }
+      const tickets = await t.request<List<{ id: string }>>("GET", "/api/v1/service-requests?page_size=3", { token });
+      for (const x of tickets.body.items) {
+        const r = await t.request("GET", `/api/v1/service-requests/${x.id}`, { token });
+        expect(r.status, r.text.slice(0, 300)).toBe(200);
+      }
+      const leads = await t.request<List<{ id: string }>>("GET", "/api/v1/leads?page_size=3", { token });
+      for (const x of leads.body.items) {
+        const r = await t.request("GET", `/api/v1/leads/${x.id}`, { token });
+        expect(r.status, r.text.slice(0, 300)).toBe(200);
+      }
+      const dash = await t.request("GET", "/api/v1/dashboard", { token });
+      expect(dash.status, dash.text.slice(0, 300)).toBe(200);
+    }
+  });
+
   it("is idempotent: a second run is skipped", async () => {
     const again = await scale.seedScale(t.app, { factor: 0.01, log: () => undefined });
     expect(again.skipped).toBe(true);
@@ -132,6 +187,12 @@ describe("scale seed", () => {
     expect(ledger.status, ledger.text).toBe(200);
     expect(ledger.body.summary.cash_due_paise).toBe(Number(b!.cash_due));
     expect(ledger.body.summary.account_due_paise).toBe(Number(b!.account_due));
+    for (const suffix of ["home", "flat", "receipts", "demands", "schedule", "construction", "documents"]) {
+      const r = await t.request("GET", `/api/v1/portal/bookings/${b!.id}/${suffix}`, { token });
+      expect(r.status, `${suffix}: ${r.text.slice(0, 300)}`).toBe(200);
+    }
+    const requests = await t.request("GET", "/api/v1/portal/requests", { token });
+    expect(requests.status, requests.text.slice(0, 300)).toBe(200);
   });
 
   it("the API continues every number series after the generated rows (payment, booking, ticket)", async () => {

@@ -137,7 +137,7 @@ export const cmsPosts = pgTable(
   },
   (t) => [
     unique("cms_posts_company_slug_uq").on(t.companyId, t.slug),
-    index("cms_posts_company_status_published_idx").on(t.companyId, t.status, t.publishedAt.desc()),
+    index("cms_posts_company_status_published_idx").on(t.companyId, t.status, t.publishedAt.desc().nullsFirst()),
     index("cms_posts_author_user_id_idx").on(t.authorUserId),
   ],
 );

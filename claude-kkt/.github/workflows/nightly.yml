@@ -55,8 +55,8 @@ jobs:
             echo "::notice::apps/api has no seed:scale script yet: the load gate runs on the demo seed"
             echo "SEED_PROFILE=demo" >> "$GITHUB_ENV"
           fi
-          NODE_ENV=production SEED_ON_BOOT=false RUN_MIGRATIONS_ON_BOOT=false API_WORKERS=2 LOG_LEVEL=warn \
-            PUBLIC_RATE_LIMIT_PER_MIN=1000000 WRITE_RATE_LIMIT_PER_MIN=1000000 STORAGE_LOCAL_DIR=/tmp/kkt-storage \
+          NODE_ENV=production SEED_ON_BOOT=false RUN_MIGRATIONS_ON_BOOT=false API_WORKERS=2 LOG_LEVEL=warn TRUST_PROXY=loopback \
+            PUBLIC_RATE_LIMIT_PER_MIN=1000000 WRITE_RATE_LIMIT_PER_MIN=1000000 READ_RATE_LIMIT_PER_MIN=1000000 STORAGE_LOCAL_DIR=/tmp/kkt-storage \
             node dist/server.js > /tmp/api.log 2>&1 &
           for _ in $(seq 1 60); do curl -sf http://localhost:4000/api/v1/ready > /dev/null && break; sleep 1; done
       - name: Load test (results as an artifact) and gate (p95 per route, scripts/ci/load-thresholds.json)

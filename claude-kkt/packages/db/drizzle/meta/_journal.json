@@ -43,6 +43,13 @@
       "when": 1793045956063,
       "tag": "0005_online_foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793089638755,
+      "tag": "0006_list_order_indexes",
+      "breakpoints": true
     }
   ]
 }

@@ -18,6 +18,7 @@ const EXPECTED_MIGRATIONS = [
   "0003_job_run_abandoned",
   "0004_site_visit_superseded_tokens",
   "0005_online_foundation",
+  "0006_list_order_indexes",
 ] as const;
 
 /** Replaces the database name in a postgres URL. */

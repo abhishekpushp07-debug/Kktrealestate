@@ -8,7 +8,8 @@
  * default 30), LABEL (free text for the run heading), SCENARIOS (regex filter on scenario names), LT_EMAIL / LT_PASSWORD (the admin that
  * discovers the data), LT_STAFF_PASSWORD (password of the generated staff, default the scale seed's), LT_STAFF_LOGINS (staff to sign in,
  * default 60: half scoped to a few projects, half on every project), LT_PORTAL_LOGINS (buyers to sign in, default 200), LT_PORTAL_PASSWORD,
- * LT_PAYMENT_BOOKINGS (bookings the spread payment scenario rotates over, default 2000), OUT (markdown file; default docs/PERFORMANCE.md;
+ * LT_PAYMENT_BOOKINGS (bookings the spread payment scenario rotates over, default 2000), LT_COMPANY (company slug the public scenarios
+ * send as `x-kkt-company`, default the demo builder's), OUT (markdown file; default docs/PERFORMANCE.md;
  * "-" prints only).
  *
  * Users: the generated staff of the scale seed (`pnpm --filter @kkt/api seed:scale`, docs/SEED.md) are found through GET /users and signed
@@ -47,6 +48,8 @@ const STAFF_LOGINS = Number(process.env["LT_STAFF_LOGINS"] ?? 60);
 const PORTAL_LOGINS = Number(process.env["LT_PORTAL_LOGINS"] ?? 200);
 const PORTAL_PASSWORD = process.env["LT_PORTAL_PASSWORD"] ?? "Welcome@123";
 const PAYMENT_BOOKINGS = Number(process.env["LT_PAYMENT_BOOKINGS"] ?? 2000);
+/** Company the public scenarios ask for (`x-kkt-company`, as the website sends it once a database serves several companies). */
+const PUBLIC_COMPANY = process.env["LT_COMPANY"] ?? "shree-ganesh-builders";
 const OUT =
   process.env["OUT"] ?? join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "docs", "PERFORMANCE.md");
 /** Amount of each load-test payment (₹100). */
@@ -63,6 +66,7 @@ interface Req {
   path: string;
   token?: string;
   body?: unknown;
+  headers?: Record<string, string>;
 }
 
 interface Scenario {
@@ -100,6 +104,7 @@ function requestData(s: Scenario, r: Req): RequestData {
       "content-type": "application/json",
       ...(r.token ? { authorization: `Bearer ${r.token}` } : {}),
       ...(s.headers ?? {}),
+      ...(r.headers ?? {}),
       ...(s.uniqueIdempotencyKey ? { "idempotency-key": randomUUID() } : {}),
     },
     ...(r.body !== undefined ? { body: JSON.stringify(r.body) } : {}),
@@ -261,10 +266,23 @@ async function inBatches<T, R>(items: readonly T[], width: number, fn: (x: T) =>
   return out;
 }
 
+/**
+ * A distinct client address per sign-in: login is limited to 10 per minute per client IP (a route rule, not a knob), so the server
+ * under test runs with TRUST_PROXY=loopback and the runner passes X-Forwarded-For like the reverse proxy in front of the API does.
+ */
+let clientCounter = 0;
+function clientIp(): Record<string, string> {
+  clientCounter += 1;
+  return {
+    "x-forwarded-for": `10.${(clientCounter >> 16) & 255}.${(clientCounter >> 8) & 255}.${clientCounter & 255}`,
+  };
+}
+
 async function staffLogin(email: string, password: string): Promise<string> {
   const r = await json<{ access_token: string }>(`${API}/auth/login`, {
     method: "POST",
     body: JSON.stringify({ email, password }),
+    headers: clientIp(),
   });
   return r.access_token;
 }
@@ -314,6 +332,7 @@ async function signInBuyers(): Promise<{ token: string; bookingId: string }[]> {
     const r = await json<{ access_token: string }>(`${API}/portal/auth/login`, {
       method: "POST",
       body: JSON.stringify({ phone, password: PORTAL_PASSWORD }),
+      headers: clientIp(),
     });
     const mine = await json<{ booking_id: string }[]>(`${API}/portal/bookings`, {
       headers: { authorization: `Bearer ${r.access_token}` },
@@ -337,7 +356,10 @@ async function main(): Promise<void> {
   const scopedCount = staff.filter((s) => s.scoped).length;
   console.log(`${staff.length} staff (${scopedCount} scoped), ${buyers.length} buyers signed in`);
 
-  const publicProjects = await json<{ items?: { slug: string }[] } | { slug: string }[]>(`${API}/public/projects`);
+  const pub = { "x-kkt-company": PUBLIC_COMPANY };
+  const publicProjects = await json<{ items?: { slug: string }[] } | { slug: string }[]>(`${API}/public/projects`, {
+    headers: pub,
+  });
   const slugs = (Array.isArray(publicProjects) ? publicProjects : (publicProjects.items ?? [])).map((p) => p.slug);
   const bookingsEtag = (await fetch(`${API}/bookings?page_size=25`, { headers: auth })).headers.get("etag");
 
@@ -429,13 +451,13 @@ async function main(): Promise<void> {
           },
         ]
       : []),
-    { name: "GET /public/site (no auth, cached)", requests: [{ path: "/public/site" }] },
-    { name: "GET /public/projects (no auth, cached)", requests: [{ path: "/public/projects" }] },
+    { name: "GET /public/site (no auth, cached)", requests: [{ path: "/public/site", headers: pub }] },
+    { name: "GET /public/projects (no auth, cached)", requests: [{ path: "/public/projects", headers: pub }] },
     ...(slugs.length > 0
       ? [
           {
             name: `GET /public/projects/:slug (no auth, cached, ${slugs.length} projects)`,
-            requests: slugs.map((slug) => ({ path: `/public/projects/${slug}` })),
+            requests: slugs.map((slug) => ({ path: `/public/projects/${slug}`, headers: pub })),
           },
         ]
       : []),
