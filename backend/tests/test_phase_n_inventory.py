@@ -27,9 +27,12 @@ def _sales_headers():
 
 
 def _avail_flats(h, n):
-    rows = requests.get(f"{BASE}/api/flats", params={"status": "Available", "page_size": 60}, headers=h).json()["items"]
+    import random
+    rows = requests.get(f"{BASE}/api/flats", params={"status": "Available", "page_size": 200}, headers=h).json()["items"]
     rows = [f for f in rows if f.get("bookable", True) and not f.get("masked")]
     assert len(rows) >= n, len(rows)
+    rows = rows[10:] if len(rows) > n + 10 else rows  # other modules mutate the first few Available flats under xdist; stay clear of them
+    random.shuffle(rows)
     return rows[:n]
 
 

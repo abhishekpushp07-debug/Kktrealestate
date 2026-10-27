@@ -6,57 +6,25 @@ bringing up nodes...
 ........................................................................ [ 37%]
 ........................................................................ [ 50%]
 ........................................................................ [ 63%]
-.................s.........................F............................ [ 75%]
-........................................................................ [ 88%]
+.................s...................................................... [ 75%]
+..........................F............................................. [ 88%]
 ...............................s...................................      [100%]
 =================================== FAILURES ===================================
-_______ test_masked_flat_indistinguishable_from_sold_for_non_privileged ________
-[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+______ test_manual_price_override_then_revert_restores_rate_card_breakup _______
+[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
 
-admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDd...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDk4MjM0LCJleHAiOjE3OTMwOTkxMzR9.Y7J2b6FAV5Uq3CYcWz34mLDxwBZq62jbyec91KICidg'}
+admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDd...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDk4ODMxLCJleHAiOjE3OTMwOTk3MzF9.rwbJ-oSC6QKwOqo4HDcryEyS6l-_VW0vI6Wzc8aeMHw'}
 
-    def test_masked_flat_indistinguishable_from_sold_for_non_privileged(admin_headers):
-        sales = _sales_headers()
-        f = _avail_flats(admin_headers, 1)[0]
-        r = _bulk(admin_headers, flat_ids=[f["id"]], action="set_display", display_state="Show as Sold", reason="hold back")
-        assert r.status_code == 200 and r.json()["done"] == 1
-        priv = requests.get(f"{BASE}/api/flats/{f['id']}", headers=admin_headers).json()
-        assert priv["status"] == "Available" and priv["inventory_state"] == "Available" and priv["display_state"] == "Show as Sold" and priv["masked"] is True
-        grid = requests.get(f"{BASE}/api/blocks/{f['block_id']}/grid", headers=admin_headers).json()
-        cell = next(x for fl in grid["floors"] for x in fl["flats"] if x["id"] == f["id"])
-        assert cell["masked"] is True and cell["status"] == "Available"
-        if sales:
-            s = requests.get(f"{BASE}/api/flats/{f['id']}", headers=sales).json()
-            assert s["status"] == "Sold" and not any(k in s for k in ("display_state", "display_override", "inventory_state", "masked", "display_reason"))
-            sgrid = requests.get(f"{BASE}/api/blocks/{f['block_id']}/grid", headers=sales).json()
-            scell = next(x for fl in sgrid["floors"] for x in fl["flats"] if x["id"] == f["id"])
-            assert scell["status"] == "Sold" and "masked" not in scell and "display_state" not in scell
-            # a real Sold flat and the masked one have the identical key set AND null-pattern for the Sales user — across the whole company
-            real_sold = next((x for fl in sgrid["floors"] for x in fl["flats"] if x["status"] == "Sold" and x["id"] != f["id"]), None)
-            if real_sold:
-                assert set(real_sold) == set(scell)
-            def _all(h):
-                out, page = [], 1
-                while True:
-                    r = requests.get(f"{BASE}/api/flats", params={"page_size": 200, "page": page}, headers=h).json()
-                    out += r["items"]
-                    if len(r["items"]) < 200:
-                        return out
-                    page += 1
-            allf, allp = _all(sales), _all(admin_headers)
-            masked_ids = {x["id"] for x in allp if x.get("masked") and x["display_state"] == "Show as Sold"}
-            real_ids = {x["id"] for x in allp if x["inventory_state"] in ("Booked", "Sold")}
-            sm = [x for x in allf if x["id"] in masked_ids]
-            sr = [x for x in allf if x["id"] in real_ids]
-            assert sm and sr, (len(allf), len(allp), len(masked_ids), len(real_ids), next(x for x in allp if x["id"] == f["id"]), mongo.flats.find_one({"id": f["id"]}, {"_id": 0, "status": 1, "display_state": 1, "display_override": 1, "flat_number": 1}), requests.get(f"{BASE}/api/flats/{f['id']}", headers=admin_headers).json()["inventory_state"])
-            assert all(x["status"] == "Sold" for x in sm + sr) and not any("booking_id" in x for x in sm + sr)
-            keysets = {frozenset(x) for x in sm + sr}
->           assert len(keysets) == 1, [sorted(a ^ b) for a in keysets for b in keysets if a != b][:1]
-E           AssertionError: [['allocation_category_code', 'allocation_category_id', 'bookable']]
-E           assert 2 == 1
-E            +  where 2 = len({frozenset({'block_code', 'block_id', 'block_name', 'builtup_sqft', 'carpet_sqft', 'company_id', ...}), frozenset({'allocation_category_code', 'allocation_category_id', 'block_code', 'block_id', 'block_name', 'bookable', ...})})
+    def test_manual_price_override_then_revert_restores_rate_card_breakup(admin_headers):
+        f = _flat(admin_headers)
+        orig_breakup, orig_price = f["price_breakup"], f["price"]
+        r = requests.patch(f"{BASE}/api/flats/{f['id']}", json={"price": orig_price + 50000, "version": f["version"]}, headers=admin_headers)
+>       assert r.status_code == 200, r.text
+E       AssertionError: {"detail":"Flat was modified by someone else (current version 12). Reload and retry.","code":"VERSION_CONFLICT","request_id":"adb06ab165ce4855","current":{"id":"dd1b33c6-ea8b-4c05-8f15-47b4937c670c","company_id":"61e35c1c-91c6-43c9-a732-2f790d5b57aa","created_at":"2026-10-26T20:33:06.384296+00:00","updated_at":"2026-10-27T11:04:11.478007+00:00","created_by":"b63b8b19-94ac-4c8e-845b-faf8019d7a8e","is_active":true,"deleted_at":null,"version":12,"project_id":"c170483e-f746-40df-9f1f-e6d798328039","block_id":"00080cc4-567d-4276-8cb3-86d3b91981f9","flat_type_id":"d83ac4c1-3794-49e5-9983-f02c2547f374","flat_type_code":"2BHK-A","flat_number":"M2-201","floor":2,"floor_label":"2","position":1,"facing":"E","is_corner":false,"status":"Hold","rooms_snapshot":[{"room_type_id":"77248ca3-c6d8-4253-b1e0-751540626984","label":"Living Room","length_ft":16,"width_ft":12,"area_sqft":192,"room_type_name":"Living Room","room_type_code":"LIVING"},{"room_type_id":"7586d37d-be87-42c6-937e-b233c2029975","label":"Master Bedroom","length_ft":14,"width_ft":11,"area_sqft":154,"room_type_name":"Master Bedroom","room_type_code":"MBED"},{"room_type_id":"dff74e8e-990a-4d27-ab7f-663d845eaf25","label":"Bedroom 2","length_ft":12,"width_ft":10,"area_sqft":120,"room_type_name":"Bedroom","room_type_code":"BED"},{"room_type_id":"d428f2fd-49e1-4b74-a401-a864f6510659","label":"Kitchen","length_ft":10,"width_ft":8,"area_sqft":80,"room_type_name":"Kitchen","room_type_code":"KITCHEN"},{"room_type_id":"ae25bc2a-e91c-49f0-b092-58ad0479a69b","label":"Bathroom 1","length_ft":7,"width_ft":5,"area_sqft":35,"room_type_name":"Bathroom","room_type_code":"BATH"},{"room_type_id":"ae25bc2a-e91c-49f0-b092-58ad0479a69b","label":"Bathroom 2","length_ft":6,"width_ft":5,"area_sqft":30,"room_type_name":"Bathroom","room_type_code":"BATH"},{"room_type_id":"0d6f342b-1ecb-4983-b3b8-bacd77ef04d8","label":"Balcony","length_ft":10,"width_ft":4,"area_sqft":40,"room_type_name":"Balcony","room_type_code":"BALCONY"}],"areas_snapshot":[{"area_type_id":"0714d2f8-b492-4edc-9114-27d8ba3c86b2","value_sqft":680,"area_type_name":"Carpet Area","area_type_code":"CARPET"},{"area_type_id":"fe3de2e3-df21-486a-b6a9-616edfde5eaa","value_sqft":790,"area_type_name":"Built-up Area","area_type_code":"BUILTUP"},{"area_type_id":"6b26cca3-8431-441b-b380-324b344f69c3","value_sqft":1050,"area_type_name":"Super Built-up Area","area_type_code":"SUPER_BUILTUP"},{"area_type_id":"834ab95e-6a6b-4dcb-9142-18a5780ed3ff","value_sqft":40,"area_type_name":"Balcony Area","area_type_code":"BALCONY"}],"carpet_sqft":680,"builtup_sqft":790,"super_builtup_sqft":1050,"rate_per_sqft":4375.0,"price_paise":459375000,"price_breakup":[{"label":"Base ₹4200/sq.ft × 1050","amount":4410000.0},{"label":"Floor Rise ₹25/sq.ft","amount":26250.0},{"label":"Park Facing ₹150/sq.ft","amount":157500.0}],"rate_card_id":"964c6d51-a14b-43f5-98e8-33f7e52a6c94","notes":null,"allocation_category_code":"BUILDER","allocation_category_id":"a0dc6d47-90e1-481a-966a-ea6d4fb86c4e","bookable":true,"display_override":false,"booking_id":null,"status_changed_at":"2026-10-27T11:04:11.478007+00:00","status_changed_by":"b63b8b19-94ac-4c8e-845b-faf8019d7a8e","hold":{"reason_id":"f205cd59-b86b-4fbf-ac50-d1949fb666df","for_customer_id":null,"for_user_id":"b63b8b19-94ac-4c8e-845b-faf8019d7a8e","note":null,"expires_at":"2026-10-27T13:04:11.473262+00:00","created_by":"b63b8b19-94ac-4c8e-845b-faf8019d7a8e","created_at":"2026-10-27T11:04:11.478007+00:00"},"status_reason":null,"display_reason":"test done","display_set_at":"2026-10-27T11:04:10.571715+00:00","display_set_by":"b63b8b19-94ac-4c8e-845b-faf8019d7a8e","display_state":null},"error":{"code":"VERSION_CONFLICT","message":"Flat was modified by someone else (current version 12). Reload and retry.","details":[{"current":{"id":"dd1b33c6-ea8b-4c05-8f15-47b4937c670c","company_id":"61e35c1c-91c6-43c9-a732-2f790d5b57aa","created_at":"2026-10-26T20:33:06.384296+00:00","updated_at":"2026-10-27T11:04:11.478007+00:00","created_by":"b63b8b19-94ac-4c8e-845b-faf8019d7a8e","is_active":true,"deleted_at":null,"version":12,"project_id":"c170483e-f746-40df-9f1f-e6d798328039","block_id":"00080cc4-567d-4276-8cb3-86d3b91981f9","flat_type_id":"d83ac4c1-3794-49e5-9983-f02c2547f374","flat_type_code":"2BHK-A","flat_number":"M2-201","floor":2,"floor_label":"2","position":1,"facing":"E","is_corner":false,"status":"Hold","rooms_snapshot":[{"room_type_id":"77248ca3-c6d8-4253-b1e0-751540626984","label":"Living Room","length_ft":16,"width_ft":12,"area_sqft":192,"room_type_name":"Living Room","room_type_code":"LIVING"},{"room_type_id":"7586d37d-be87-42c6-937e-b233c2029975","label":"Master Bedroom","length_ft":14,"width_ft":11,"area_sqft":154,"room_type_name":"Master Bedroom","room_type_code":"MBED"},{"room_type_id":"dff74e8e-990a-4d27-ab7f-663d845eaf25","label":"Bedroom 2","length_ft":12,"width_ft":10,"area_sqft":120,"room_type_name":"Bedroom","room_type_code":"BED"},{"room_type_id":"d428f2fd-49e1-4b74-a401-a864f6510659","label":"Kitchen","length_ft":10,"width_ft":8,"area_sqft":80,"room_type_name":"Kitchen","room_type_code":"KITCHEN"},{"room_type_id":"ae25bc2a-e91c-49f0-b092-58ad0479a69b","label":"Bathroom 1","length_ft":7,"width_ft":5,"area_sqft":35,"room_type_name":"Bathroom","room_type_code":"BATH"},{"room_type_id":"ae25bc2a-e91c-49f0-b092-58ad0479a69b","label":"Bathroom 2","length_ft":6,"width_ft":5,"area_sqft":30,"room_type_name":"Bathroom","room_type_code":"BATH"},{"room_type_id":"0d6f342b-1ecb-4983-b3b8-bacd77ef04d8","label":"Balcony","length_ft":10,"width_ft":4,"area_sqft":40,"room_type_name":"Balcony","room_type_code":"BALCONY"}],"areas_snapshot":[{"area_type_id":"0714d2f8-b492-4edc-9114-27d8ba3c86b2","value_sqft":680,"area_type_name":"Carpet Area","area_type_code":"CARPET"},{"area_type_id":"fe3de2e3-df21-486a-b6a9-616edfde5eaa","value_sqft":790,"area_type_name":"Built-up Area","area_type_code":"BUILTUP"},{"area_type_id":"6b26cca3-8431-441b-b380-324b344f69c3","value_sqft":1050,"area_type_name":"Super Built-up Area","area_type_code":"SUPER_BUILTUP"},{"area_type_id":"834ab95e-6a6b-4dcb-9142-18a5780ed3ff","value_sqft":40,"area_type_name":"Balcony Area","area_type_code":"BALCONY"}],"carpet_sqft":680,"builtup_sqft":790,"super_builtup_sqft":1050,"rate_per_sqft":4375.0,"price_paise":459375000,"price_breakup":[{"label":"Base ₹4200/sq.ft × 1050","amount":4410000.0},{"label":"Floor Rise ₹25/sq.ft","amount":26250.0},{"label":"Park Facing ₹150/sq.ft","amount":157500.0}],"rate_card_id":"964c6d51-a14b-43f5-98e8-33f7e52a6c94","notes":null,"allocation_category_code":"BUILDER","allocation_category_id":"a0dc6d47-90e1-481a-966a-ea6d4fb86c4e","bookable":true,"display_override":false,"booking_id":null,"status_changed_at":"2026-10-27T11:04:11.478007+00:00","status_changed_by":"b63b8b19-94ac-4c8e-845b-faf8019d7a8e","hold":{"reason_id":"f205cd59-b86b-4fbf-ac50-d1949fb666df","for_customer_id":null,"for_user_id":"b63b8b19-94ac-4c8e-845b-faf8019d7a8e","note":null,"expires_at":"2026-10-27T13:04:11.473262+00:00","created_by":"b63b8b19-94ac-4c8e-845b-faf8019d7a8e","created_at":"2026-10-27T11:04:11.478007+00:00"},"status_reason":null,"display_reason":"test done","display_set_at":"2026-10-27T11:04:10.571715+00:00","display_set_by":"b63b8b19-94ac-4c8e-845b-faf8019d7a8e","display_state":null}}],"request_id":"adb06ab165ce4855"}}
+E       assert 409 == 200
+E        +  where 409 = <Response [409]>.status_code
 
-tests/test_phase_n_inventory.py:90: AssertionError
+tests/test_prepublish_fixes.py:20: AssertionError
 =============================== warnings summary ===============================
 ../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
 ../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
@@ -91,6 +59,6 @@ tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
 =========================== short test summary info ============================
-FAILED tests/test_phase_n_inventory.py::test_masked_flat_indistinguishable_from_sold_for_non_privileged
-1 failed, 568 passed, 2 skipped, 10 warnings in 489.71s (0:08:09)
+FAILED tests/test_prepublish_fixes.py::test_manual_price_override_then_revert_restores_rate_card_breakup
+1 failed, 568 passed, 2 skipped, 10 warnings in 500.90s (0:08:20)
 SUITE_EXIT 1
