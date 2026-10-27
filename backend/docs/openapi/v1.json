@@ -33638,7 +33638,7 @@
   },
   "/api/messaging/webhooks/resend": {
    "post": {
-    "description": "Delivery events \u2192 delivered / bounced. Requires RESEND_WEBHOOK_SECRET (svix signature); without it the endpoint reports not configured \u2014 nothing is faked.",
+    "description": "Delivery events \u2192 delivered / bounced. Requires RESEND_WEBHOOK_SECRET (svix signature); without it the endpoint answers 409 NOT_CONFIGURED \u2014 nothing is faked.",
     "operationId": "resend_webhook_api_messaging_webhooks_resend_post",
     "responses": {
      "200": {

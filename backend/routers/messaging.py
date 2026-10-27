@@ -178,13 +178,13 @@ async def preview_template(code: str, booking_id: str, lang: str = "en", user: d
 
 @router.post("/webhooks/resend")
 async def resend_webhook(request: Request):
-    """Delivery events → delivered / bounced. Requires RESEND_WEBHOOK_SECRET (svix signature); without it the endpoint reports not configured — nothing is faked."""
+    """Delivery events → delivered / bounced. Requires RESEND_WEBHOOK_SECRET (svix signature); without it the endpoint answers 409 NOT_CONFIGURED — nothing is faked."""
     import hashlib
     import hmac
     import os
     secret = os.environ.get("RESEND_WEBHOOK_SECRET")
     if not secret:
-        raise ApiError(503, "Delivery webhooks are not configured (RESEND_WEBHOOK_SECRET)", "NOT_CONFIGURED")
+        raise ApiError(409, "Delivery webhooks are not configured (RESEND_WEBHOOK_SECRET)", "NOT_CONFIGURED")
     raw = await request.body()
     sig = request.headers.get("svix-signature", "")
     ts, mid = request.headers.get("svix-timestamp", ""), request.headers.get("svix-id", "")

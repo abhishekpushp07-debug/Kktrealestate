@@ -174,9 +174,6 @@
    "masters.stage_plan.delete",
    "masters.stage_plan.edit"
   ],
-  "masters.company.edit": [
-   "admin.settings.edit"
-  ],
   "milestone.update": [
    "construction.photo.delete",
    "construction.photo.upload",

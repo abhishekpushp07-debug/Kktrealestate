@@ -123,9 +123,6 @@ def main():
         prev = json.loads((ROOT / "route_perms.json").read_text()).get("LEGACY_EXPANSION", {})
     except Exception:  # noqa: BLE001
         prev = {}
-    for k, v in exp.items():
-        if k not in prev and k != "".join(sorted(v)) and k not in {c for cs in v for c in [cs]}:
-            prev[k] = sorted(v)
     out = {"ROUTE_PERMS": rp, "LEGACY_EXPANSION": {k: sorted(v) for k, v in sorted(prev.items())}}
     (ROOT / "route_perms.json").write_text(json.dumps(out, indent=1, sort_keys=True))
     print("routes", len(rp), "unmapped", unmapped)

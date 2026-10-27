@@ -78,7 +78,7 @@ ERRORS: dict[str, tuple[int, ...]] = {
     "NOT_CLEARED": (409,),
     "NOT_DRAFT": (409,),
     "NOT_FOUND": (404,),
-    "NOT_CONFIGURED": (503,),
+    "NOT_CONFIGURED": (409,),
     "NO_OVERDUE": (422,),
     "LINK_INVALID": (401,),
     "DOCUMENT_VOIDED": (409,),
