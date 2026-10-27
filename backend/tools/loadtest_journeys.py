@@ -22,6 +22,16 @@ GROUPS = {"leads": "/api/leads", "visits": "/api/site-visits", "customers": "/ap
           "receipt_pdf": "/receipt", "customer360": "/panels", "ledger": "/ledger", "reports": "/api/reports/", "service": "/api/service-requests", "notifications": "/api/notifications", "search": "/api/search", "home": "/api/dashboard"}
 
 
+def verhoeff(num11: str) -> str:
+    d = [[0,1,2,3,4,5,6,7,8,9],[1,2,3,4,0,6,7,8,9,5],[2,3,4,0,1,7,8,9,5,6],[3,4,0,1,2,8,9,5,6,7],[4,0,1,2,3,9,5,6,7,8],[5,9,8,7,6,0,4,3,2,1],[6,5,9,8,7,1,0,4,3,2],[7,6,5,9,8,2,1,0,4,3],[8,7,6,5,9,3,2,1,0,4],[9,8,7,6,5,4,3,2,1,0]]
+    pm = [[0,1,2,3,4,5,6,7,8,9],[1,5,7,6,2,8,3,0,9,4],[5,8,0,3,7,9,6,1,4,2],[8,9,1,6,0,4,3,5,2,7],[9,4,5,3,1,2,6,8,7,0],[4,2,8,6,5,7,3,9,0,1],[2,7,9,3,8,0,6,4,1,5],[7,0,4,6,9,1,3,2,5,8]]
+    inv = [0,4,3,2,1,5,6,7,8,9]
+    c = 0
+    for i, ch in enumerate(reversed(num11)):
+        c = d[c][pm[(i + 1) % 8][int(ch)]]
+    return num11 + str(inv[c])
+
+
 def pct(xs, p):
     if not xs:
         return 0
@@ -157,6 +167,7 @@ class Journey:
 
     def __init__(self, c, pool, S, M, vu, tower_vu=None):
         self.c, self.pool, self.S, self.M, self.vu, self.tower_vu = c, pool, S, M, vu, tower_vu
+        self.role = S["users"][vu % len(S["users"])]["role"]
         self.booking = None
 
     async def call(self, method, path, body=None, params=None, timeout=30, idem=True, accept=(200, 201)):
@@ -174,12 +185,12 @@ class Journey:
 
     async def write_slice(self):
         S, today = self.S, date.today()
-        n = random.randint(10 ** 7, 10 ** 8 - 1)
-        ld = await self.call("POST", "/api/leads", {"name": f"LT Lead {n}", "phone": f"+917{n:08d}"[:13], "project_id": S["project"]["id"], "source": random.choice(["Website", "Walk-in", "Referral", "Broker"]), "notes": "load_test"})
+        n = random.randint(10 ** 8, 10 ** 9 - 1)
+        ld = await self.call("POST", "/api/leads", {"name": f"LT Lead {n}", "phone": f"7{n:09d}", "project_id": S["project"]["id"], "source": random.choice(["Website", "Walk-in", "Referral", "Broker"]), "notes": "load_test"})
         if not ld:
             return
         await self.call("POST", "/api/site-visits", {"project_id": S["project"]["id"], "date": today.isoformat(), "slot_start": random.choice(["10:00", "11:00", "12:00", "15:00"]), "lead_id": ld["id"]})
-        cu = await self.call("POST", "/api/customers", {"full_name": f"LT Customer {n}", "phone": f"+918{n:08d}"[:13], "email": f"lt{n}@loadtest.kkt-erp.in", "tags": ["load_test"], "pan": f"LTPAN{n % 10000:04d}X", "aadhaar": f"{n % 10**12:012d}"[:12],
+        cu = await self.call("POST", "/api/customers", {"full_name": f"LT Customer {n}", "phone": f"8{n:09d}", "email": f"lt{n}@loadtest.kkt-erp.in", "tags": ["load_test"], "pan": f"LTPAN{n % 10000:04d}X", "aadhaar": verhoeff(f"{n:09d}{n % 100:02d}"),
                                                         "address_current": {"line1": "LT street", "city": "Patna", "state": "Bihar", "pincode": "800001"}})
         if not cu:
             return
@@ -199,17 +210,18 @@ class Journey:
         await self.call("POST", "/api/payments", {"booking_id": bk["id"], "against": "FLAT_VALUE", "payment_category": "Cash", "amount": round(price * 0.04, 2), "payment_date": today.isoformat(), "payment_mode_id": S["modes"]["CASH"], "remarks": "load_test"})
         chq = await self.call("POST", "/api/payments", {"booking_id": bk["id"], "against": "FLAT_VALUE", "payment_category": "Account", "amount": round(price * 0.06, 2), "payment_date": today.isoformat(), "payment_mode_id": S["modes"]["CHEQUE"],
                                                         "instrument": {"number": f"LT{n % 10**6:06d}", "date": today.isoformat(), "bank_name": "SBI"}, "bank_account_id": S["bank"]["id"], "remarks": "load_test"})
-        if chq and isinstance(chq, dict):
-            await self.call("POST", f"/api/payments/{chq['id']}/clear", {"cleared_on": today.isoformat()}, accept=(200, 201, 403, 409, 422))
+        if chq and isinstance(chq, dict) and self.role == "Accounts":
+            await self.call("POST", f"/api/payments/{chq['id']}/clear", {"cleared_on": today.isoformat()}, accept=(200, 201, 409, 422))
             await self.call("GET", f"/api/payments/{chq['id']}/receipt", timeout=60, accept=(200,))
         await self.call("POST", "/api/service-requests", {"customer_id": cu["id"], "booking_id": bk["id"], "category": "Plumbing", "priority": "Medium", "subject": "LT ticket", "description": "load_test"}, accept=(200, 201, 422))
 
     async def read_slice(self):
         S = self.S
         bk = self.booking
-        reads = [("GET", "/api/dashboard/home", None), ("GET", "/api/bookings", {"project_id": S["project"]["id"], "page_size": 20}), ("GET", "/api/search", {"q": "LT", "limit": 8}),
-                 ("GET", "/api/reports/collections", {"project_id": S["project"]["id"]}), ("GET", "/api/reports/outstanding", {"project_id": S["project"]["id"]}), ("GET", "/api/notifications", {"page_size": 10}),
-                 ("GET", "/api/demands/register", {"project_id": S["project"]["id"]})]
+        reads = [("GET", "/api/dashboard/home", None), ("GET", "/api/bookings", {"project_id": S["project"]["id"], "page_size": 20}), ("GET", "/api/search", {"q": "LT", "limit": 8}), ("GET", "/api/notifications", {"page_size": 10}),
+                 ("GET", "/api/leads", {"project_id": S["project"]["id"], "page_size": 20})]
+        if self.role == "Accounts":  # role-aware: Sales has no reports/demand-register permission
+            reads += [("GET", "/api/reports/collections", {"project_id": S["project"]["id"]}), ("GET", "/api/reports/outstanding", {"project_id": S["project"]["id"]}), ("GET", "/api/demands/register", {"project_id": S["project"]["id"]}), ("GET", "/api/payments", {"page_size": 20})]
         if bk:
             reads += [("GET", f"/api/customers/{bk['customer_id']}/panels", None), ("GET", f"/api/bookings/{bk['id']}/ledger", None)]
         for m, p, q in random.sample(reads, k=min(5, len(reads))):

@@ -1,0 +1,366 @@
+{
+ "ts": "20261027_205020",
+ "base": "https://royal-realty-hub-2.preview.emergentagent.com",
+ "project": "LT 20261027_205020",
+ "stages": [
+  {
+   "vus": 50,
+   "duration_s": 162,
+   "requests": 11794,
+   "rps": 72.9,
+   "stopped": null,
+   "errors": {
+    "403 PERMISSION_DENIED": 1782,
+    "409 SLOT_UNAVAILABLE": 333,
+    "422 VALIDATION_ERROR": 36,
+    "429": 1476,
+    "client:ConnectTimeout": 9,
+    "409 DUPLICATE_PAN": 3
+   },
+   "timeouts": 9,
+   "n5xx": 0,
+   "groups": {
+    "bookings": {
+     "n": 2092,
+     "p50": 161.8,
+     "p95": 2603.1,
+     "p99": 5562.4,
+     "db_p95_ms": 1047.6
+    },
+    "construction": {
+     "n": 4,
+     "p50": 345.3,
+     "p95": 442.2,
+     "p99": 442.2,
+     "db_p95_ms": 44.2
+    },
+    "customers": {
+     "n": 1338,
+     "p50": 203.2,
+     "p95": 548.2,
+     "p99": 1904.5,
+     "db_p95_ms": 165.8
+    },
+    "demands": {
+     "n": 434,
+     "p50": 154.6,
+     "p95": 377.0,
+     "p99": 500.6,
+     "db_p95_ms": 13.1
+    },
+    "home": {
+     "n": 1178,
+     "p50": 176.4,
+     "p95": 648.9,
+     "p99": 898.5,
+     "db_p95_ms": 83.9
+    },
+    "leads": {
+     "n": 2007,
+     "p50": 160.7,
+     "p95": 562.0,
+     "p99": 3442.0,
+     "db_p95_ms": 127.1
+    },
+    "notifications": {
+     "n": 1164,
+     "p50": 148.2,
+     "p95": 404.9,
+     "p99": 1728.8,
+     "db_p95_ms": 58.5
+    },
+    "other": {
+     "n": 4,
+     "p50": 183.6,
+     "p95": 480.9,
+     "p99": 480.9,
+     "db_p95_ms": 59.6
+    },
+    "payments": {
+     "n": 925,
+     "p50": 164.1,
+     "p95": 497.9,
+     "p99": 646.3,
+     "db_p95_ms": 81.0
+    },
+    "reports": {
+     "n": 937,
+     "p50": 167.4,
+     "p95": 466.6,
+     "p99": 636.9,
+     "db_p95_ms": 67.3
+    },
+    "search": {
+     "n": 1131,
+     "p50": 159.0,
+     "p95": 433.0,
+     "p99": 1443.2,
+     "db_p95_ms": 136.3
+    },
+    "service": {
+     "n": 240,
+     "p50": 338.1,
+     "p95": 952.4,
+     "p99": 1103.2,
+     "db_p95_ms": 346.0
+    },
+    "visits": {
+     "n": 340,
+     "p50": 193.2,
+     "p95": 538.1,
+     "p99": 633.3,
+     "db_p95_ms": 85.7
+    }
+   },
+   "ops": [
+    {
+     "t": 1793134324,
+     "health": "ok",
+     "db_ping_ms": 0.67,
+     "rss_mb": 137.0,
+     "shed": null,
+     "pool": null,
+     "inflight": null
+    },
+    {
+     "t": 1793134340,
+     "health": "ok",
+     "db_ping_ms": 18.1,
+     "rss_mb": 156.3,
+     "shed": null,
+     "pool": null,
+     "inflight": null
+    },
+    {
+     "t": 1793134355,
+     "health": "ok",
+     "db_ping_ms": 10.29,
+     "rss_mb": 156.3,
+     "shed": null,
+     "pool": null,
+     "inflight": null
+    },
+    {
+     "t": 1793134371,
+     "health": "ok",
+     "db_ping_ms": 1.18,
+     "rss_mb": 156.3,
+     "shed": null,
+     "pool": null,
+     "inflight": null
+    },
+    {
+     "t": 1793134386,
+     "health": "ok",
+     "db_ping_ms": 1.17,
+     "rss_mb": 156.3,
+     "shed": null,
+     "pool": null,
+     "inflight": null
+    },
+    {
+     "t": 1793134402,
+     "health": "ok",
+     "db_ping_ms": 3.84,
+     "rss_mb": 156.3,
+     "shed": null,
+     "pool": null,
+     "inflight": null
+    },
+    {
+     "t": 1793134417,
+     "health": "ok",
+     "db_ping_ms": 13.99,
+     "rss_mb": 156.3,
+     "shed": null,
+     "pool": null,
+     "inflight": null
+    },
+    {
+     "t": 1793134432,
+     "health": "ok",
+     "db_ping_ms": 24.18,
+     "rss_mb": 158.1,
+     "shed": null,
+     "pool": null,
+     "inflight": null
+    },
+    {
+     "t": 1793134448,
+     "health": "ok",
+     "db_ping_ms": 0.66,
+     "rss_mb": 158.1,
+     "shed": null,
+     "pool": null,
+     "inflight": null
+    }
+   ]
+  },
+  {
+   "vus": 100,
+   "duration_s": 151,
+   "requests": 27421,
+   "rps": 181.4,
+   "stopped": null,
+   "errors": {
+    "403 PERMISSION_DENIED": 1538,
+    "409 SLOT_UNAVAILABLE": 370,
+    "422 VALIDATION_ERROR": 35,
+    "503": 47,
+    "429": 14039,
+    "409 DUPLICATE_PAN": 11
+   },
+   "timeouts": 0,
+   "n5xx": 47,
+   "groups": {
+    "bookings": {
+     "n": 4050,
+     "p50": 181.8,
+     "p95": 685.7,
+     "p99": 1092.1,
+     "db_p95_ms": 25.3
+    },
+    "construction": {
+     "n": 4,
+     "p50": 235.4,
+     "p95": 241.3,
+     "p99": 241.3,
+     "db_p95_ms": 31.3
+    },
+    "customers": {
+     "n": 743,
+     "p50": 297.2,
+     "p95": 796.3,
+     "p99": 1794.9,
+     "db_p95_ms": 145.5
+    },
+    "demands": {
+     "n": 963,
+     "p50": 176.8,
+     "p95": 668.7,
+     "p99": 948.4,
+     "db_p95_ms": 11.0
+    },
+    "home": {
+     "n": 4006,
+     "p50": 191.8,
+     "p95": 710.5,
+     "p99": 1098.9,
+     "db_p95_ms": 51.1
+    },
+    "leads": {
+     "n": 6245,
+     "p50": 189.4,
+     "p95": 729.6,
+     "p99": 1393.7,
+     "db_p95_ms": 119.7
+    },
+    "notifications": {
+     "n": 4050,
+     "p50": 188.6,
+     "p95": 664.6,
+     "p99": 972.2,
+     "db_p95_ms": 60.9
+    },
+    "other": {
+     "n": 4,
+     "p50": 397.7,
+     "p95": 417.6,
+     "p99": 417.6,
+     "db_p95_ms": 25.7
+    },
+    "payments": {
+     "n": 946,
+     "p50": 189.8,
+     "p95": 656.1,
+     "p99": 983.5,
+     "db_p95_ms": 33.5
+    },
+    "reports": {
+     "n": 1898,
+     "p50": 202.6,
+     "p95": 695.4,
+     "p99": 1069.8,
+     "db_p95_ms": 61.3
+    },
+    "search": {
+     "n": 4034,
+     "p50": 195.6,
+     "p95": 696.6,
+     "p99": 1060.2,
+     "db_p95_ms": 117.4
+    },
+    "visits": {
+     "n": 478,
+     "p50": 292.8,
+     "p95": 815.8,
+     "p99": 2008.7,
+     "db_p95_ms": 85.6
+    }
+   },
+   "ops": [
+    {
+     "t": 1793134486,
+     "health": "ok",
+     "db_ping_ms": 14.48,
+     "rss_mb": 158.1,
+     "shed": null,
+     "pool": null,
+     "inflight": null
+    },
+    {
+     "t": 1793134501,
+     "error": "Expecting value: line 1 column 1 (char 0)"
+    },
+    {
+     "t": 1793134517,
+     "error": "Expecting value: line 1 column 1 (char 0)"
+    },
+    {
+     "t": 1793134532,
+     "error": "Expecting value: line 1 column 1 (char 0)"
+    },
+    {
+     "t": 1793134548,
+     "health": "ok",
+     "db_ping_ms": 0.71,
+     "rss_mb": null,
+     "shed": null,
+     "pool": null,
+     "inflight": null
+    },
+    {
+     "t": 1793134565,
+     "health": "ok",
+     "db_ping_ms": 62.75,
+     "rss_mb": 163.4,
+     "shed": null,
+     "pool": null,
+     "inflight": null
+    },
+    {
+     "t": 1793134581,
+     "health": "ok",
+     "db_ping_ms": 0.54,
+     "rss_mb": null,
+     "shed": null,
+     "pool": null,
+     "inflight": null
+    },
+    {
+     "t": 1793134596,
+     "health": "ok",
+     "db_ping_ms": 15.11,
+     "rss_mb": 163.4,
+     "shed": null,
+     "pool": null,
+     "inflight": null
+    },
+    {
+     "t": 1793134612,
+     "error": "Expecting value: line 1 column 1 (char 0)"
+    }
+   ]
+  }
+ ]
+}
