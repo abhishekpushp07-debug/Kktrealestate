@@ -140,6 +140,7 @@ def watermark(pdf_bytes: bytes, word: str, footer: str | None = None) -> bytes:
     from pypdf import PdfReader, PdfWriter
     from reportlab.lib.pagesizes import A4
     from reportlab.pdfgen import canvas as _canvas
+    from reportlab.lib.units import mm as _mm
     src = PdfReader(io.BytesIO(pdf_bytes))
     out = PdfWriter()
     for page in src.pages:
@@ -157,7 +158,7 @@ def watermark(pdf_bytes: bytes, word: str, footer: str | None = None) -> bytes:
         if footer:
             c.setFillColorRGB(0.72, 0.11, 0.11)
             c.setFont("Helvetica-Bold", 8)
-            c.drawString(14 * mm, 5 * mm, footer[:180])
+            c.drawString(14 * _mm, 5 * _mm, footer[:180])
         c.showPage()
         c.save()
         page.merge_page(PdfReader(io.BytesIO(buf.getvalue())).pages[0])

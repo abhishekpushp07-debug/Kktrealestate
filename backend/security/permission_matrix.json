@@ -450,6 +450,27 @@
  "GET /api/master/spec-items/{item_id}": [
   "masters.specification.view"
  ],
+ "GET /api/messaging/channels": [
+  "messaging.message.view"
+ ],
+ "GET /api/messaging/messages": [
+  "messaging.message.view"
+ ],
+ "GET /api/messaging/messages/{message_id}": [
+  "messaging.message.view"
+ ],
+ "GET /api/messaging/reminder-log": [
+  "messaging.message.view"
+ ],
+ "GET /api/messaging/reminders/settings": [
+  "<authenticated>"
+ ],
+ "GET /api/messaging/templates": [
+  "masters.template.view"
+ ],
+ "GET /api/messaging/templates/{code}/preview": [
+  "masters.template.view"
+ ],
  "GET /api/metrics": [
   "admin.system_health.view"
  ],
@@ -823,6 +844,10 @@
  "GET /api/stage-plans/{plan_id}/where-used": [
   "masters.stage_plan.view"
  ],
+ "GET /api/trends": [
+  "reports.collections.view",
+  "sales.customer.view"
+ ],
  "GET /api/uploads/{upload_id}": [
   "<authenticated>"
  ],
@@ -932,6 +957,13 @@
  ],
  "PATCH /api/master/spec-items/{item_id}": [
   "masters.specification.edit"
+ ],
+ "PATCH /api/messaging/reminders/settings": [
+  "masters.company.edit",
+  "messaging.message.configure"
+ ],
+ "PATCH /api/messaging/templates/{template_id}": [
+  "masters.template.edit"
  ],
  "PATCH /api/notices/{notice_id}": [
   "construction.notice.edit"
@@ -1398,6 +1430,21 @@
  ],
  "POST /api/master/spec-items/{item_id}/restore": [
   "masters.specification.edit"
+ ],
+ "POST /api/messaging/messages/{message_id}/retry": [
+  "messaging.message.send"
+ ],
+ "POST /api/messaging/reminders/run": [
+  "messaging.message.configure"
+ ],
+ "POST /api/messaging/reminders/send-now": [
+  "messaging.message.send"
+ ],
+ "POST /api/messaging/templates": [
+  "masters.template.edit"
+ ],
+ "POST /api/messaging/webhooks/resend": [
+  "<public>"
  ],
  "POST /api/notices": [
   "construction.notice.create"

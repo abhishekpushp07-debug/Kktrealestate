@@ -120,7 +120,7 @@ class CustomerIn(StrictModel):
     whatsapp_phone: str | None = Field(default=None, description="Defaults to phone")
     preferred_channel: Literal["email", "whatsapp", "sms"] | None = None
     consent: dict | None = Field(default=None, description="{email, whatsapp, sms, marketing}: email defaults true when an email is given")
-    language: Literal["en", "hi"] | None = None
+    preferred_language: Literal["en", "hi"] | None = Field(default=None, description="en | hi (stored as preferred_language — `language` is reserved by Mongo text indexes)")
 
     @field_validator("phone", "alt_phone", "whatsapp_phone")
     @classmethod

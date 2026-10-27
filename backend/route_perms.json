@@ -1777,6 +1777,116 @@
     "masters.stage_plan.create"
    ]
   },
+  "messaging:GET /channels": {
+   "codes": [
+    "messaging.message.view"
+   ],
+   "fn": "channels",
+   "legacy": [
+    "messaging.message.view"
+   ]
+  },
+  "messaging:GET /messages": {
+   "codes": [
+    "messaging.message.view"
+   ],
+   "fn": "list_messages",
+   "legacy": [
+    "messaging.message.view"
+   ]
+  },
+  "messaging:GET /messages/{message_id}": {
+   "codes": [
+    "messaging.message.view"
+   ],
+   "fn": "get_message",
+   "legacy": [
+    "messaging.message.view"
+   ]
+  },
+  "messaging:GET /reminder-log": {
+   "codes": [
+    "messaging.message.view"
+   ],
+   "fn": "reminder_log",
+   "legacy": [
+    "messaging.message.view"
+   ]
+  },
+  "messaging:GET /templates": {
+   "codes": [
+    "masters.template.view"
+   ],
+   "fn": "list_templates",
+   "legacy": [
+    "masters.template.view"
+   ]
+  },
+  "messaging:GET /templates/{code}/preview": {
+   "codes": [
+    "masters.template.view"
+   ],
+   "fn": "preview_template",
+   "legacy": [
+    "masters.template.view"
+   ]
+  },
+  "messaging:PATCH /reminders/settings": {
+   "codes": [
+    "messaging.message.configure",
+    "masters.company.edit"
+   ],
+   "fn": "set_settings",
+   "legacy": [
+    "messaging.message.configure",
+    "masters.company.edit"
+   ]
+  },
+  "messaging:PATCH /templates/{template_id}": {
+   "codes": [
+    "masters.template.edit"
+   ],
+   "fn": "update_template",
+   "legacy": [
+    "masters.template.edit"
+   ]
+  },
+  "messaging:POST /messages/{message_id}/retry": {
+   "codes": [
+    "messaging.message.send"
+   ],
+   "fn": "retry",
+   "legacy": [
+    "messaging.message.send"
+   ]
+  },
+  "messaging:POST /reminders/run": {
+   "codes": [
+    "messaging.message.configure"
+   ],
+   "fn": "run_now",
+   "legacy": [
+    "messaging.message.configure"
+   ]
+  },
+  "messaging:POST /reminders/send-now": {
+   "codes": [
+    "messaging.message.send"
+   ],
+   "fn": "send_now",
+   "legacy": [
+    "messaging.message.send"
+   ]
+  },
+  "messaging:POST /templates": {
+   "codes": [
+    "masters.template.edit"
+   ],
+   "fn": "create_template",
+   "legacy": [
+    "masters.template.edit"
+   ]
+  },
   "milestones:GET /{block_id}/milestones": {
    "codes": [
     "construction.stage.view"
@@ -2819,6 +2929,17 @@
     "service.ticket.close",
     "service.ticket.reopen",
     "service.ticket.edit"
+   ]
+  },
+  "trends:GET ": {
+   "codes": [
+    "reports.collections.view",
+    "sales.customer.view"
+   ],
+   "fn": "get_trends",
+   "legacy": [
+    "reports.collections.view",
+    "sales.customer.view"
    ]
   },
   "users:GET ": {

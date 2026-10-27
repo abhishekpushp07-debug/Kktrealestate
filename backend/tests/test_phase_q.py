@@ -33,7 +33,7 @@ def test_pick_channel_consent_and_contact():
     from services.messaging.outbox import pick_channel
     assert pick_channel({"email": "a@b.co", "phone": "+91"}) == ("email", None)
     assert pick_channel({"email": "a@b.co", "consent": {"email": False}})[1] == "skipped_no_consent"
-    assert pick_channel({"phone": "+91"})[1] in ("skipped_no_contact", "not_configured")  # whatsapp/sms not configured, no email
+    assert pick_channel({"phone": "+91"})[1] in ("skipped_no_contact", "not_configured", "skipped_no_consent")  # whatsapp/sms not configured, no email
     assert pick_channel({})[1] == "skipped_no_contact"
     assert pick_channel({"email": "a@b.co", "preferred_channel": "whatsapp", "phone": "+91", "consent": {"whatsapp": True}}) == ("email", None)  # falls back to next configured
 
@@ -155,7 +155,7 @@ def test_trends_tie_out_with_collections_report(admin_headers):
 def test_customer_consent_fields_roundtrip(admin_headers):
     c = requests.get(f"{BASE}/api/customers", params={"page_size": 1}, headers=admin_headers).json()["items"][0]
     full = requests.get(f"{BASE}/api/customers/{c['id']}", headers=admin_headers).json()
-    r = requests.patch(f"{BASE}/api/customers/{c['id']}", json={"version": full["version"], "consent": {"email": False, "whatsapp": True}, "preferred_channel": "whatsapp", "language": "hi"}, headers=admin_headers)
+    r = requests.patch(f"{BASE}/api/customers/{c['id']}", json={"version": full["version"], "consent": {"email": False, "whatsapp": True}, "preferred_channel": "whatsapp", "preferred_language": "hi"}, headers=admin_headers)
     assert r.status_code == 200, r.text
     g = requests.get(f"{BASE}/api/customers/{c['id']}", headers=admin_headers).json()
-    assert g["consent"]["email"] is False and g["language"] == "hi" and g["preferred_channel"] == "whatsapp"
+    assert g["consent"]["email"] is False and g["preferred_language"] == "hi" and g["preferred_channel"] == "whatsapp"

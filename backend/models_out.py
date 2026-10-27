@@ -226,6 +226,9 @@ class CustomersOut(_Out):
     company_id: Any = None
     company_name: Any = None
     consent: Any = None
+    preferred_channel: Any = None
+    preferred_language: Any = None
+    whatsapp_phone: Any = None
     count: Any = None
     created_at: Any = None
     created_by: Any = None

@@ -3418,6 +3418,19 @@
       ],
       "title": "Company Name"
      },
+     "consent": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "{email, whatsapp, sms, marketing}: email defaults true when an email is given",
+      "title": "Consent"
+     },
      "dob": {
       "anyOf": [
        {
@@ -3545,6 +3558,38 @@
       "title": "Phone",
       "type": "string"
      },
+     "preferred_channel": {
+      "anyOf": [
+       {
+        "enum": [
+         "email",
+         "whatsapp",
+         "sms"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Preferred Channel"
+     },
+     "preferred_language": {
+      "anyOf": [
+       {
+        "enum": [
+         "en",
+         "hi"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "en | hi (stored as preferred_language \u2014 `language` is reserved by Mongo text indexes)",
+      "title": "Preferred Language"
+     },
      "residency_id": {
       "anyOf": [
        {
@@ -3612,6 +3657,18 @@
       },
       "title": "Tags",
       "type": "array"
+     },
+     "whatsapp_phone": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Defaults to phone",
+      "title": "Whatsapp Phone"
      }
     },
     "required": [
@@ -3723,6 +3780,19 @@
        }
       ],
       "title": "Company Name"
+     },
+     "consent": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "{email, whatsapp, sms, marketing}: email defaults true when an email is given",
+      "title": "Consent"
      },
      "dob": {
       "anyOf": [
@@ -3882,6 +3952,38 @@
       ],
       "title": "Phone"
      },
+     "preferred_channel": {
+      "anyOf": [
+       {
+        "enum": [
+         "email",
+         "whatsapp",
+         "sms"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Preferred Channel"
+     },
+     "preferred_language": {
+      "anyOf": [
+       {
+        "enum": [
+         "en",
+         "hi"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "en | hi (stored as preferred_language \u2014 `language` is reserved by Mongo text indexes)",
+      "title": "Preferred Language"
+     },
      "residency_id": {
       "anyOf": [
        {
@@ -3966,6 +4068,18 @@
        }
       ],
       "title": "Version"
+     },
+     "whatsapp_phone": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Defaults to phone",
+      "title": "Whatsapp Phone"
      }
     },
     "title": "CustomerUpdate",
@@ -4165,6 +4279,12 @@
      "preferences": {
       "title": "Preferences"
      },
+     "preferred_channel": {
+      "title": "Preferred Channel"
+     },
+     "preferred_language": {
+      "title": "Preferred Language"
+     },
      "profile_migrated": {
       "title": "Profile Migrated"
      },
@@ -4212,6 +4332,9 @@
      },
      "version": {
       "title": "Version"
+     },
+     "whatsapp_phone": {
+      "title": "Whatsapp Phone"
      }
     },
     "title": "CustomersOut",
@@ -9202,6 +9325,73 @@
     "title": "RefundPayIn",
     "type": "object"
    },
+   "ReminderSettingsIn": {
+    "additionalProperties": false,
+    "properties": {
+     "cc_rm": {
+      "default": true,
+      "title": "Cc Rm",
+      "type": "boolean"
+     },
+     "channel_order": {
+      "default": [
+       "email",
+       "whatsapp",
+       "sms"
+      ],
+      "items": {
+       "enum": [
+        "email",
+        "whatsapp",
+        "sms"
+       ],
+       "type": "string"
+      },
+      "title": "Channel Order",
+      "type": "array"
+     },
+     "enabled": {
+      "default": true,
+      "title": "Enabled",
+      "type": "boolean"
+     },
+     "escalate_days": {
+      "default": 45,
+      "maximum": 365.0,
+      "minimum": 1.0,
+      "title": "Escalate Days",
+      "type": "integer"
+     },
+     "thresholds": {
+      "default": [
+       7,
+       15,
+       30
+      ],
+      "items": {
+       "type": "integer"
+      },
+      "maxItems": 6,
+      "minItems": 1,
+      "title": "Thresholds",
+      "type": "array"
+     },
+     "window_from": {
+      "default": "10:00",
+      "pattern": "^\\d{2}:\\d{2}$",
+      "title": "Window From",
+      "type": "string"
+     },
+     "window_to": {
+      "default": "18:00",
+      "pattern": "^\\d{2}:\\d{2}$",
+      "title": "Window To",
+      "type": "string"
+     }
+    },
+    "title": "ReminderSettingsIn",
+    "type": "object"
+   },
    "ReorderIn": {
     "additionalProperties": false,
     "properties": {
@@ -9681,6 +9871,32 @@
      "status"
     ],
     "title": "SRStatusIn",
+    "type": "object"
+   },
+   "SendNowIn": {
+    "additionalProperties": false,
+    "properties": {
+     "booking_id": {
+      "title": "Booking Id",
+      "type": "string"
+     },
+     "threshold": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "7 | 15 | 30 or null = pick by days overdue",
+      "title": "Threshold"
+     }
+    },
+    "required": [
+     "booking_id"
+    ],
+    "title": "SendNowIn",
     "type": "object"
    },
    "SentIn": {
@@ -10412,6 +10628,60 @@
      "reason"
     ],
     "title": "SwapIn",
+    "type": "object"
+   },
+   "TemplateIn": {
+    "additionalProperties": false,
+    "properties": {
+     "code": {
+      "maxLength": 40,
+      "minLength": 3,
+      "pattern": "^[a-z0-9_]+$",
+      "title": "Code",
+      "type": "string"
+     },
+     "en": {
+      "additionalProperties": true,
+      "description": "{subject, body}",
+      "title": "En",
+      "type": "object"
+     },
+     "hi": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Hi"
+     },
+     "name": {
+      "maxLength": 80,
+      "minLength": 2,
+      "title": "Name",
+      "type": "string"
+     },
+     "version": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Version"
+     }
+    },
+    "required": [
+     "code",
+     "name",
+     "en"
+    ],
+    "title": "TemplateIn",
     "type": "object"
    },
    "ToggleIn": {
@@ -32649,6 +32919,743 @@
     ]
    }
   },
+  "/api/messaging/channels": {
+   "get": {
+    "description": "Each channel is either really configured or says so \u2014 the UI renders 'Connect provider' with the fields it needs.",
+    "operationId": "channels_api_messaging_channels_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Channels",
+    "tags": [
+     "messaging"
+    ]
+   }
+  },
+  "/api/messaging/messages": {
+   "get": {
+    "operationId": "list_messages_api_messaging_messages_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "status",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Status"
+      }
+     },
+     {
+      "in": "query",
+      "name": "channel",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Channel"
+      }
+     },
+     {
+      "in": "query",
+      "name": "customer_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Customer Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "booking_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Booking Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "template_code",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Template Code"
+      }
+     },
+     {
+      "in": "query",
+      "name": "date_from",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Date From"
+      }
+     },
+     {
+      "in": "query",
+      "name": "date_to",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Date To"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 100,
+       "title": "Limit",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Messages",
+    "tags": [
+     "messaging"
+    ]
+   }
+  },
+  "/api/messaging/messages/{message_id}": {
+   "get": {
+    "operationId": "get_message_api_messaging_messages__message_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "message_id",
+      "required": true,
+      "schema": {
+       "title": "Message Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Get Message",
+    "tags": [
+     "messaging"
+    ]
+   }
+  },
+  "/api/messaging/messages/{message_id}/retry": {
+   "post": {
+    "operationId": "retry_api_messaging_messages__message_id__retry_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "message_id",
+      "required": true,
+      "schema": {
+       "title": "Message Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Retry",
+    "tags": [
+     "messaging"
+    ]
+   }
+  },
+  "/api/messaging/reminder-log": {
+   "get": {
+    "description": "Reports: sent / failed / skipped by reason, per project \u2014 ties out to the messages collection (same filter).",
+    "operationId": "reminder_log_api_messaging_reminder_log_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "date_from",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Date From"
+      }
+     },
+     {
+      "in": "query",
+      "name": "date_to",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Date To"
+      }
+     },
+     {
+      "in": "query",
+      "name": "project_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Project Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Reminder Log",
+    "tags": [
+     "messaging"
+    ]
+   }
+  },
+  "/api/messaging/reminders/run": {
+   "post": {
+    "operationId": "run_now_api_messaging_reminders_run_post",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "as_of",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "As Of"
+      }
+     },
+     {
+      "in": "query",
+      "name": "force_window",
+      "required": false,
+      "schema": {
+       "default": true,
+       "title": "Force Window",
+       "type": "boolean"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Run Now",
+    "tags": [
+     "messaging"
+    ]
+   }
+  },
+  "/api/messaging/reminders/send-now": {
+   "post": {
+    "description": "Manual 'Send reminder now' \u2014 same path as the nightly job; the response is the real provider answer.",
+    "operationId": "send_now_api_messaging_reminders_send_now_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SendNowIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Send Now",
+    "tags": [
+     "messaging"
+    ]
+   }
+  },
+  "/api/messaging/reminders/settings": {
+   "get": {
+    "operationId": "get_settings_api_messaging_reminders_settings_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Get Settings",
+    "tags": [
+     "messaging"
+    ]
+   },
+   "patch": {
+    "operationId": "set_settings_api_messaging_reminders_settings_patch",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ReminderSettingsIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Set Settings",
+    "tags": [
+     "messaging"
+    ]
+   }
+  },
+  "/api/messaging/templates": {
+   "get": {
+    "operationId": "list_templates_api_messaging_templates_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Templates",
+    "tags": [
+     "messaging"
+    ]
+   },
+   "post": {
+    "operationId": "create_template_api_messaging_templates_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TemplateIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Create Template",
+    "tags": [
+     "messaging"
+    ]
+   }
+  },
+  "/api/messaging/templates/{code}/preview": {
+   "get": {
+    "description": "Render against a real booking (no send).",
+    "operationId": "preview_template_api_messaging_templates__code__preview_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "code",
+      "required": true,
+      "schema": {
+       "title": "Code",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "booking_id",
+      "required": true,
+      "schema": {
+       "title": "Booking Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "lang",
+      "required": false,
+      "schema": {
+       "default": "en",
+       "title": "Lang",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Preview Template",
+    "tags": [
+     "messaging"
+    ]
+   }
+  },
+  "/api/messaging/templates/{template_id}": {
+   "patch": {
+    "operationId": "update_template_api_messaging_templates__template_id__patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "template_id",
+      "required": true,
+      "schema": {
+       "title": "Template Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TemplateIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Update Template",
+    "tags": [
+     "messaging"
+    ]
+   }
+  },
+  "/api/messaging/webhooks/resend": {
+   "post": {
+    "description": "Delivery events \u2192 delivered / bounced. Requires RESEND_WEBHOOK_SECRET (svix signature); without it the endpoint reports not configured \u2014 nothing is faked.",
+    "operationId": "resend_webhook_api_messaging_webhooks_resend_post",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Resend Webhook",
+    "tags": [
+     "messaging"
+    ]
+   }
+  },
   "/api/metrics": {
    "get": {
     "operationId": "metrics_api_metrics_get",
@@ -45014,6 +46021,82 @@
     "summary": "Stage Plan Usage",
     "tags": [
      "masters-plus"
+    ]
+   }
+  },
+  "/api/trends": {
+   "get": {
+    "description": "Per-month: collections (Jama cleared), demands (Udhar raised), outstanding_eom, bookings. \u03a3 collections == Collections report for the same range.",
+    "operationId": "get_trends_api_trends_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "scope",
+      "required": false,
+      "schema": {
+       "default": "company",
+       "pattern": "^(company|project|customer)$",
+       "title": "Scope",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "months",
+      "required": false,
+      "schema": {
+       "default": 12,
+       "maximum": 36,
+       "minimum": 3,
+       "title": "Months",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Get Trends",
+    "tags": [
+     "trends"
     ]
    }
   },

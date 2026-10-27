@@ -61,7 +61,7 @@ async def send_reminder(booking: dict, *, threshold: int | None, actor: dict | N
     days = (date.fromisoformat(as_of) - date.fromisoformat(oldest["due_date"])).days
     code = f"reminder_day{threshold}" if threshold in (7, 15, 30) else ("reminder_day30" if days >= 30 else "reminder_day15" if days >= 15 else "reminder_day7")
     tpl = await templates.get_template(booking["company_id"], code) or {}
-    lang = customer.get("language") if customer.get("language") in ("en", "hi") else "en"
+    lang = customer.get("preferred_language") if customer.get("preferred_language") in ("en", "hi") else "en"
     channel, skip = outbox.pick_channel(customer, cfg["channel_order"])
     doc, link = await _reminder_document(booking, actor, threshold)
     ctx = await _ctx(booking, customer, company, oldest, days, link)

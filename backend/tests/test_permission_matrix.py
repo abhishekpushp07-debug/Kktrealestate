@@ -11,7 +11,7 @@ import requests
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-OPEN_EXACT = {"/api/health", "/api/ready", "/api/auth/login", "/api/auth/login-options", "/api/auth/login/mfa", "/api/auth/refresh", "/api/auth/logout", "/api/openapi.json", "/api/portal/auth/login", "/api/portal/auth/refresh",
+OPEN_EXACT = {"/api/health", "/api/ready", "/api/messaging/webhooks/resend", "/api/auth/login", "/api/auth/login-options", "/api/auth/login/mfa", "/api/auth/refresh", "/api/auth/logout", "/api/openapi.json", "/api/portal/auth/login", "/api/portal/auth/refresh",
               "/api/portal/config", "/api/admin/backups/{backup_id}/download", "/api/exports/{export_id}/download", "/api/files/{file_id}/download", "/api/files/variants/{name}", "/api/docgen/shared/{token}"}  # signed-token download links (15 min)
 ALWAYS_SKIP = ("/api/admin/reseed", "/api/admin/backup", "/api/admin/docs/regenerate", "/api/admin/integrity/repair")
 
