@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0",
     "seed": "tsx src/seed/run.ts",
+    "seed:scale": "tsx src/seed/scale.ts",
     "restore": "tsx src/cli/restore.ts",
     "test": "vitest run --dir test/unit",
     "test:integration": "vitest run --dir test/integration --no-file-parallelism",
