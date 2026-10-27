@@ -49,6 +49,21 @@ def shape_list(items: list[dict], user: dict | None) -> list[dict]:
     return [s for s in (shape(f, user) for f in items) if s is not None]
 
 
+def public_available_filter() -> dict:
+    """Public/portal: display layer only — shown-as-Available, i.e. real Available with no override, or overridden to Show as Available."""
+    return {"$or": [{"status": "Available", "display_override": {"$ne": True}}, {"display_override": True, "display_state": "Show as Available"}]}
+
+
+def status_key(user: dict | None):
+    """Aggregation group key: real `$status` for privileged viewers; the DISPLAY layer mapped back to a legacy status for everyone else
+    (Hidden → null, so dashboards/counters cannot leak masked inventory)."""
+    if can_see_real(user):
+        return "$status"
+    mirrored = {"$switch": {"branches": [{"case": {"$eq": ["$status", s]}, "then": DISPLAY_TO_STATUS[d]} for s, d in MIRROR.items()], "default": None}}
+    overridden = {"$switch": {"branches": [{"case": {"$eq": ["$display_state", d]}, "then": st} for d, st in DISPLAY_TO_STATUS.items()], "default": None}}
+    return {"$cond": [{"$eq": ["$display_override", True]}, overridden, mirrored]}
+
+
 def bookable_filter(customer_id: str | None, user: dict) -> dict:
     """Booking wizard: Builder-saleable AND (Available, or Hold for this customer / this RM). Masked/blocked/landowner never appear."""
     ors = [{"status": "Available"}]

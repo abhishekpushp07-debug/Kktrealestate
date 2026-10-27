@@ -74,6 +74,19 @@ def test_masked_flat_indistinguishable_from_sold_for_non_privileged(admin_header
         # wizard never lists it; booking attempt reads as Sold
         wiz = requests.get(f"{BASE}/api/blocks/{f['block_id']}/grid", params={"bookable_for": ""}, headers=sales).json()
         assert all(x["id"] != f["id"] for fl in wiz["floors"] for x in fl["flats"])
+        # dashboard / project / search counters for Sales are display-based: the masked flat counts as Sold, never Available
+        import time
+        time.sleep(0.2)
+        sd = requests.get(f"{BASE}/api/dashboard", headers=sales).json()
+        ad = requests.get(f"{BASE}/api/dashboard", headers=admin_headers).json()
+        sb = next(b for b in sd["blocks"] if b["id"] == f["block_id"])["inventory"]
+        ab = next(b for b in ad["blocks"] if b["id"] == f["block_id"])["inventory"]
+        assert sb["Booked"] == 0 and sb["Available"] <= ab["Available"] and sb["total"] == ab["total"]
+        sp = requests.get(f"{BASE}/api/projects/{f['project_id']}", headers=sales).json()
+        assert next(b for b in sp["blocks"] if b["id"] == f["block_id"])["inventory"]["Available"] == sb["Available"]
+        srch = requests.get(f"{BASE}/api/search", params={"q": f["flat_number"], "scope": "flats"}, headers=sales).json()
+        hit = next((i for g in srch["groups"] for i in g["items"] if i.get("id") == f["id"]), None)
+        assert hit is None or (hit["status"] == "Sold" and "masked" not in hit)
     _bulk(admin_headers, flat_ids=[f["id"]], action="clear_display", reason="test done")
     assert requests.get(f"{BASE}/api/flats/{f['id']}", headers=admin_headers).json()["masked"] is False
 

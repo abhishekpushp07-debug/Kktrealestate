@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 
 from db import db
 from services import clock
+from services import inventory as inv
 from deps import project_scope_filter, require
 from routers.projects import STATUSES, status_counts
 
@@ -13,7 +14,7 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 @router.get("")
 async def dashboard(user: dict = Depends(require("masters.project.view"))):
     from services import ttlcache
-    ck = f"dash:{user['company_id']}:{','.join(sorted(user.get('project_scope') or []))}"
+    ck = f"dash:{user['company_id']}:{int(inv.can_see_real(user))}:{','.join(sorted(user.get('project_scope') or []))}"
     hit = ttlcache.get(ck)
     if hit is not None:
         return hit
@@ -25,15 +26,17 @@ async def dashboard(user: dict = Depends(require("masters.project.view"))):
 async def _dashboard(user: dict):
     scope = project_scope_filter(user)
     base = {"company_id": user["company_id"], **scope}
-    inventory = await status_counts(base)
+    inventory = await status_counts(base, user)
+    sk = inv.status_key(user)
     projects = await db.projects.find({"company_id": user["company_id"], "is_active": True, **project_scope_filter(user, "id")}, {"_id": 0, "id": 1, "name": 1, "code": 1, "status": 1, "project_type": 1, "address.city": 1}).sort("name", 1).to_list(50)
     pids = [p["id"] for p in projects]
-    rows = await db.flats.aggregate([{"$match": {"project_id": {"$in": pids}, "is_active": True}}, {"$group": {"_id": {"p": "$project_id", "s": "$status"}, "n": {"$sum": 1}, "v": {"$sum": {"$divide": [{"$ifNull": ["$price_paise", 0]}, 100]}}}}]).to_list(None)
+    rows = await db.flats.aggregate([{"$match": {"project_id": {"$in": pids}, "is_active": True}}, {"$group": {"_id": {"p": "$project_id", "s": sk}, "n": {"$sum": 1}, "v": {"$sum": {"$divide": [{"$ifNull": ["$price_paise", 0]}, 100]}}}}]).to_list(None)
     cmap = {pid: {s: 0 for s in STATUSES} for pid in pids}
     vmap = {pid: 0 for pid in pids}
     for r in rows:
-        cmap[r["_id"]["p"]][r["_id"]["s"]] = r["n"]
-        vmap[r["_id"]["p"]] += r["v"]
+        if r["_id"]["s"] in STATUSES:
+            cmap[r["_id"]["p"]][r["_id"]["s"]] = r["n"]
+            vmap[r["_id"]["p"]] += r["v"]
     for p in projects:
         c = cmap[p["id"]]
         c["total"] = sum(c[s] for s in STATUSES)
@@ -41,10 +44,11 @@ async def _dashboard(user: dict):
         p["inventory_value"] = round(vmap[p["id"]], 2)
     blocks = await db.blocks.find({"company_id": user["company_id"], "is_active": True, **scope}, {"_id": 0, "id": 1, "name": 1, "code": 1, "project_id": 1, "floors": 1, "flats_per_floor": 1, "construction_percent": 1, "status": 1}).sort("code", 1).to_list(100)
     pname = {p["id"]: p["name"] for p in projects}
-    brows = await db.flats.aggregate([{"$match": {"block_id": {"$in": [b["id"] for b in blocks]}, "is_active": True}}, {"$group": {"_id": {"b": "$block_id", "s": "$status"}, "n": {"$sum": 1}}}]).to_list(None)
+    brows = await db.flats.aggregate([{"$match": {"block_id": {"$in": [b["id"] for b in blocks]}, "is_active": True}}, {"$group": {"_id": {"b": "$block_id", "s": sk}, "n": {"$sum": 1}}}]).to_list(None)
     bmap = {b["id"]: {s: 0 for s in STATUSES} for b in blocks}
     for r in brows:
-        bmap[r["_id"]["b"]][r["_id"]["s"]] = r["n"]
+        if r["_id"]["s"] in STATUSES:
+            bmap[r["_id"]["b"]][r["_id"]["s"]] = r["n"]
     for b in blocks:
         b["project_name"] = pname.get(b["project_id"])
         c = bmap[b["id"]]

@@ -5,6 +5,7 @@ import time
 from fastapi import APIRouter, Depends, Query
 
 from db import db
+from services import inventory as inv
 from utils import with_price
 from deps import get_current_user, project_scope_filter
 
@@ -37,7 +38,7 @@ async def global_search(q: str = Query(min_length=1, max_length=60), limit: int 
             tasks.append(db.projects.find({"company_id": cid, "is_active": True, **project_scope_filter(user, "id"), "$or": [{"code": rx}, {"name": any_rx}, {"address.city": rx}]}, {"_id": 0, "id": 1, "name": 1, "code": 1, "status": 1, "address.city": 1}).limit(limit).max_time_ms(SEARCH_MS).to_list(limit))
             tasks.append(db.blocks.find({"company_id": cid, "is_active": True, **project_scope_filter(user), "$or": [{"code": rx}, {"name": any_rx}]}, {"_id": 0, "id": 1, "name": 1, "code": 1, "project_id": 1, "status": 1}).limit(limit).max_time_ms(SEARCH_MS).to_list(limit))
         keys.append("flats")
-        tasks.append(db.flats.find({"company_id": cid, "is_active": True, **project_scope_filter(user), "flat_number": rx}, {"_id": 0, "id": 1, "flat_number": 1, "block_id": 1, "project_id": 1, "status": 1, "price_paise": 1, "flat_type_code": 1}).limit(limit).max_time_ms(SEARCH_MS).to_list(limit))
+        tasks.append(db.flats.find({"company_id": cid, "is_active": True, **project_scope_filter(user), "flat_number": rx}, {"_id": 0, "id": 1, "flat_number": 1, "block_id": 1, "project_id": 1, "status": 1, "display_state": 1, "display_override": 1, "price_paise": 1, "flat_type_code": 1}).limit(limit).max_time_ms(SEARCH_MS).to_list(limit))
     if scope == "all" and "admin.user.view" in perms:
         keys.append("users")
         tasks.append(db.users.find({"company_id": cid, "is_active": True, "$or": [{"name": any_rx}, {"email": rx}]}, {"_id": 0, "id": 1, "name": 1, "email": 1, "role_id": 1}).limit(limit).max_time_ms(SEARCH_MS).to_list(limit))
@@ -46,6 +47,8 @@ async def global_search(q: str = Query(min_length=1, max_length=60), limit: int 
         tasks.append(db.flat_types.find({"company_id": cid, "is_active": True, "$or": [{"name": any_rx}, {"code": rx}]}, {"_id": 0, "id": 1, "name": 1, "code": 1, "bhk": 1}).limit(limit).max_time_ms(SEARCH_MS).to_list(limit))
     results = await asyncio.gather(*tasks) if tasks else []
     groups = dict(zip(keys, results))
+    if groups.get("flats"):
+        groups["flats"] = inv.shape_list(groups["flats"], user)
     pids = {x["project_id"] for k in ("blocks", "flats") for x in groups.get(k, [])}
     if pids:
         pm = {p["id"]: p["code"] for p in await db.projects.find({"id": {"$in": list(pids)}}, {"_id": 0, "id": 1, "code": 1}).max_time_ms(SEARCH_MS).to_list(None)}

@@ -12,6 +12,7 @@ from pydantic import Field, field_validator
 from db import db
 from deps import enforce_rate_limit
 from routers.cms import get_site
+from services import inventory as inv
 from services.kyc import normalize_phone
 from services.numbering import generate_number
 from storage import get_object
@@ -102,7 +103,7 @@ async def _project_card(p: dict, flat_types: dict) -> dict:
         if web.get("starting_price_override"):
             card["starting_price"] = web["starting_price_override"]
         else:
-            m = await db.flats.find({"project_id": p["id"], "status": "Available", "price_paise": {"$gt": 0}}, {"_id": 0, "price_paise": 1}).sort("price_paise", 1).limit(1).to_list(1)
+            m = await db.flats.find({"project_id": p["id"], **inv.public_available_filter(), "price_paise": {"$gt": 0}}, {"_id": 0, "price_paise": 1}).sort("price_paise", 1).limit(1).to_list(1)
             card["starting_price"] = m[0]["price_paise"] / 100 if m else None
     return card
 
@@ -159,22 +160,27 @@ async def project_detail(slug: str, request: Request, _=Depends(public_guard)):
             if s["flat_type_id"] == fid:
                 cfg["specifications"].setdefault(s.get("category_name") or "General", []).append({"name": s["name"], "value": s.get("brand") or s.get("description")})
         if show_prices:
-            m = await db.flats.find({"project_id": p["id"], "flat_type_id": fid, "status": "Available", "price_paise": {"$gt": 0}}, {"_id": 0, "price_paise": 1}).sort("price_paise", 1).limit(1).to_list(1)
+            m = await db.flats.find({"project_id": p["id"], "flat_type_id": fid, **inv.public_available_filter(), "price_paise": {"$gt": 0}}, {"_id": 0, "price_paise": 1}).sort("price_paise", 1).limit(1).to_list(1)
             cfg["starting_price"] = m[0]["price_paise"] / 100 if m else None
         configs.append(cfg)
     availability = None
     if web.get("show_availability"):
         availability = []
         for b in await db.blocks.find({"project_id": p["id"], "is_active": True}, {"_id": 0}).sort("code", 1).to_list(50):
-            flats = await db.flats.find({"block_id": b["id"], "is_active": True}, {"_id": 0, "flat_number": 1, "floor": 1, "floor_label": 1, "position": 1, "status": 1, "flat_type_code": 1, "price": 1}).sort([("floor", -1), ("position", 1)]).to_list(None)
+            flats = await db.flats.find({"block_id": b["id"], "is_active": True}, {"_id": 0, "flat_number": 1, "floor": 1, "floor_label": 1, "position": 1, "status": 1, "display_state": 1, "display_override": 1, "flat_type_code": 1, "price_paise": 1}).sort([("floor", -1), ("position", 1)]).to_list(None)
             floors = {}
+            shown_avail = 0
             for f in flats:
-                unit = {"number": f["flat_number"], "type": f.get("flat_type_code"), "available": f["status"] == "Available"}
-                if show_prices and f["status"] == "Available":
+                disp = inv.effective_display(f)
+                if disp == "Hidden":
+                    continue
+                unit = {"number": f["flat_number"], "type": f.get("flat_type_code"), "available": disp == "Show as Available"}
+                shown_avail += unit["available"]
+                if show_prices and unit["available"]:
                     unit["price"] = f["price_paise"] / 100 if f.get("price_paise") else None
                 floors.setdefault(f["floor"], {"floor": f["floor"], "label": f.get("floor_label") or str(f["floor"]), "units": []})["units"].append(unit)
             c = b.get("unit_counts") or {}
-            availability.append({"name": b["name"], "code": b["code"], "total": c.get("total", 0), "available": c.get("available", 0), "construction_percent": b.get("construction_percent", 0) if web.get("show_construction_progress") else None,
+            availability.append({"name": b["name"], "code": b["code"], "total": c.get("total", 0), "available": shown_avail, "construction_percent": b.get("construction_percent", 0) if web.get("show_construction_progress") else None,
                                  "milestones": [{"name": m["name"], "percent": m["cumulative_percent"], "done": m["status"] == "Completed"} for m in b.get("milestones") or []] if web.get("show_construction_progress") else None,
                                  "floors": sorted(floors.values(), key=lambda x: -x["floor"])})
     gallery = [pick(g, ("image_url", "caption", "category")) for g in await db.cms_gallery.find({"project_id": p["id"], "is_active": True}, {"_id": 0}).sort("order", 1).to_list(60)]

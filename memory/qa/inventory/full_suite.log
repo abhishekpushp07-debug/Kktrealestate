@@ -4,191 +4,836 @@ bringing up nodes...
 ........................................................................ [ 12%]
 ........................................................................ [ 25%]
 ........................................................................ [ 38%]
-......F.............................................F................... [ 51%]
-.....................s.................F................................ [ 63%]
-................................................F.................F..... [ 76%]
-........................................................................ [ 89%]
-................s..........................................F             [100%]
-=================================== FAILURES ===================================
-____________ test_invariant_indexes_and_validators_reject_bad_docs _____________
+F....................................................................... [ 51%]
+........................................................................ [ 63%]
+...........s............................................................ [ 76%]
+.......................................................................E [ 89%]
+EFFF...FFF..EEFEE.FF..FsF.FF.....F..FFF.F....EEEEEEFF.E.F.EE             [100%]
+==================================== ERRORS ====================================
+________ ERROR at setup of TestFlatType.test_create_flat_type_auto_area ________
 [gw1] linux -- Python 3.11.17 /root/.venv/bin/python
 
-    def test_invariant_indexes_and_validators_reject_bad_docs():
-        from pymongo.errors import DuplicateKeyError, WriteError
->       _py("from services.invariants import ensure_invariants\nasyncio.run(ensure_invariants())")
+self = <tests.test_kkt_erp.TestFlatType object at 0xfb45b1976090>
 
-tests/test_phase_k_p0.py:73: 
+    @pytest.fixture(scope="class")
+    def master_ids(self):
+        h = _h("admin@kkt.in")
+>       rt = requests.get(f"{API}/master/room-types?page_size=100", headers=h).json()["items"]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'items'
+
+tests/test_kkt_erp.py:186: KeyError
+____ ERROR at setup of TestFlatType.test_create_flat_type_invalid_hierarchy ____
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+self = <tests.test_kkt_erp.TestFlatType object at 0xfb45b1976090>
+
+    @pytest.fixture(scope="class")
+    def master_ids(self):
+        h = _h("admin@kkt.in")
+>       rt = requests.get(f"{API}/master/room-types?page_size=100", headers=h).json()["items"]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'items'
+
+tests/test_kkt_erp.py:186: KeyError
+_______________ ERROR at setup of TestHealthHeaders.test_auth_me _______________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+    @pytest.fixture(scope="session")
+    def admin_token():
+        if "admin" not in _tokens:
+>           _tokens["admin"] = _login(ADMIN)["access_token"]
+                               ^^^^^^^^^^^^^
+
+tests/test_phase_1_5.py:32: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_phase_1_5.py:25: in _login
+    r.raise_for_status()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-script = 'from services.invariants import ensure_invariants\nasyncio.run(ensure_invariants())'
+self = <Response [401]>
 
-    def _py(script: str):
-        """Run app-side async code in a fresh subprocess (xdist workers reuse the process; motor binds to the first loop it sees)."""
-        import json
-        import subprocess
-        out = subprocess.run([sys.executable, "-c", "import asyncio, json, sys\nsys.path.insert(0, '.')\n" + script], cwd=os.path.join(os.path.dirname(__file__), ".."), capture_output=True, text=True, timeout=120, env={**os.environ})
->       assert out.returncode == 0, out.stderr[-2000:]
-E       AssertionError: ated: Index already exists with a different name: uniq_idem_claim, full error: {'ok': 0.0, 'errmsg': 'Index already exists with a different name: uniq_idem_claim', 'code': 85, 'codeName': 'IndexOptionsConfl
-E         Traceback (most recent call last):
-E           File "<string>", line 4, in <module>
-E           File "/usr/local/lib/python3.11/asyncio/runners.py", line 190, in run
-E             return runner.run(main)
-E                    ^^^^^^^^^^^^^^^^
-E           File "/usr/local/lib/python3.11/asyncio/runners.py", line 118, in run
-E             return self._loop.run_until_complete(task)
-E                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-E           File "/usr/local/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
-E             return future.result()
-E                    ^^^^^^^^^^^^^^^
-E           File "/app/backend/services/invariants.py", line 51, in ensure_invariants
-E             from services.validators import SCHEMAS  # merge: schema (existing) AND money invariants ($expr) — never replace the schema validator
-E             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-E           File "/app/backend/services/validators.py", line 17, in <module>
-E             "flats": {"required": ["id", "company_id", "project_id", "block_id", "flat_number", "status"], "properties": {"id": STR, "block_id": STR, "flat_number": {"bsonType": "string", "minLength": 1}, "status": {"enum": ["Available", "Hold", "Booked", "Sold", "Blocked", "Allotted", "Not for sale"]}, "display_state": {"enum": ["Show as Available", "Show as Sold", "Show as Hold", "Hidden", null]}, "bookable": {"bsonType": "bool"}, "floor": {"bsonType": ["int", "long"]}, "price_paise": {"bsonType": ["int", "long", "null"]}}},
-E                                                                                                                                                                                                                                                                                                                                                                                                            ^^^^
-E         NameError: name 'null' is not defined
-E         
-E       assert 1 == 0
-E        +  where 1 = CompletedProcess(args=['/root/.venv/bin/python', '-c', "import asyncio, json, sys\nsys.path.insert(0, '.')\nfrom servi...                                                                      ^^^^\nNameError: name \'null\' is not defined\n').returncode
+    def raise_for_status(self) -> None:
+        """Raises :class:`HTTPError`, if one occurred."""
+    
+        http_error_msg = ""
+        if isinstance(self.reason, bytes):
+            # We attempt to decode utf-8 first because some servers
+            # choose to localize their reason strings. If the string
+            # isn't utf-8, we fall back to iso-8859-1 for all other
+            # encodings. (See PR #3538)
+            try:
+                reason = self.reason.decode("utf-8")
+            except UnicodeDecodeError:
+                reason = self.reason.decode("iso-8859-1")
+        else:
+            reason = self.reason
+    
+        if 400 <= self.status_code < 500:
+            http_error_msg = (
+                f"{self.status_code} Client Error: {reason} for url: {self.url}"
+            )
+    
+        elif 500 <= self.status_code < 600:
+            http_error_msg = (
+                f"{self.status_code} Server Error: {reason} for url: {self.url}"
+            )
+    
+        if http_error_msg:
+>           raise HTTPError(http_error_msg, response=self)
+E           requests.exceptions.HTTPError: 401 Client Error: Unauthorized for url: http://127.0.0.1:8021/api/auth/login
 
-tests/test_phase_k_p0.py:26: AssertionError
-____________ test_registry_complete_every_guarded_route_registered _____________
+/root/.venv/lib/python3.11/site-packages/requests/models.py:1167: HTTPError
+__ ERROR at setup of TestServiceRequests.test_categories_and_create_and_reply __
 [gw1] linux -- Python 3.11.17 /root/.venv/bin/python
 
-admin = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDd...wiaWF0IjoxNzkzMDkxNDUwLCJleHAiOjE3OTMwOTIzNTB9.Hw--oRfa5e6dyH8ckOeLr26KOFLj8nEFLWM9XwWRQh4', 'X-Rate-Limit-Bypass': ''}
+    @pytest.fixture(scope="module")
+    def portal_amit():
+        r = _portal_login("9431012345")
+>       assert r.status_code == 200, r.text
+E       AssertionError: {"detail":"Invalid phone or password","code":"INVALID_CREDENTIALS","request_id":"36a32cdd44a7465c","error":{"code":"INVALID_CREDENTIALS","message":"Invalid phone or password","details":[],"request_id":"36a32cdd44a7465c"}}
+E       assert 401 == 200
+E        +  where 401 = <Response [401]>.status_code
 
-    def test_registry_complete_every_guarded_route_registered(admin):
-        reg = requests.get(f"{BASE}/admin/access/registry", headers=admin, timeout=20).json()
-        assert reg["unregistered"] == [], reg["unregistered"]
-        from permissions import ALL_PERMISSIONS
-        codes = {r["code"] for r in reg["items"]}
->       assert set(ALL_PERMISSIONS) <= codes
-E       AssertionError: assert {'admin.acces...a.erase', ...} <= {'admin.acces...a.erase', ...}
-E         
-E         Extra items in the left set:
-E         'masters.hold_reason.delete'
-E         'masters.allocation_category.create'
-E         'masters.hold_reason.view'
-E         'inventory.real_status.view'
-E         'masters.hold_reason.create'...
-E         
-E         ...Full output truncated (11 lines hidden), use '-vv' to show
+tests/test_phase_5.py:79: AssertionError
+_______________ ERROR at setup of TestErpNotices.test_crud_admin _______________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
 
-tests/test_rbac.py:49: AssertionError
-___________________ test_expiry_sweep_releases_and_notifies ____________________
-[gw2] linux -- Python 3.11.17 /root/.venv/bin/python
+    @pytest.fixture(scope="module")
+    def admin_tok():
+>       return _erp_login("admin@kkt.in")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDd...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDkxNDUwLCJleHAiOjE3OTMwOTIzNTB9.Hw--oRfa5e6dyH8ckOeLr26KOFLj8nEFLWM9XwWRQh4'}
+tests/test_phase_5.py:63: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-    def test_expiry_sweep_releases_and_notifies(admin_headers):
-        f = _avail_flats(admin_headers, 1)[0]
-        reason = requests.get(f"{BASE}/api/master/hold-reasons", headers=admin_headers).json()["items"][0]
-        assert _bulk(admin_headers, flat_ids=[f["id"]], action="hold", reason_id=reason["id"], expires_at=(datetime.now(timezone.utc) + timedelta(hours=2)).isoformat()).json()["done"] == 1
-        past = (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat()
-        mongo.flats.update_one({"id": f["id"]}, {"$set": {"hold.expires_at": past}})
-        os.environ["DB_NAME"] = mongo.name
-        import importlib
-        for m in ("db", "services.inventory"):
-            sys.modules.pop(m, None)
-        inv = importlib.import_module("services.inventory")
-        run = asyncio.run(inv.expire_holds())
->       assert run["status"] == "OK", run
-E       AssertionError: {'id': 'HOLD_EXPIRY_SWEEP-1793091511782', 'job': 'HOLD_EXPIRY_SWEEP', 'started_at': '2026-10-27T08:58:31.782062+00:00', 'finished_at': '2026-10-27T08:58:31.788976+00:00', ...}
-E       assert 'FAILED' == 'OK'
-E         
-E         - OK
-E         + FAILED
+email = 'admin@kkt.in'
 
-tests/test_phase_n_inventory.py:115: AssertionError
------------------------------- Captured log call -------------------------------
-WARNING  jobs:job_runs.py:30 [job HOLD_EXPIRY_SWEEP] item 6cc7b401-5fba-4072-b4ea-dc358c6524ca failed: RuntimeError: Task <Task pending name='Task-42' coro=<expire_holds() running at /app/backend/services/inventory.py:127> cb=[_run_until_complete_cb() at /usr/local/lib/python3.11/asyncio/base_events.py:181]> got Future <Future pending cb=[_chain_future.<locals>._call_check_cancel() at /usr/local/lib/
-___________________________ test_integrity_report_ok ___________________________
-[gw2] linux -- Python 3.11.17 /root/.venv/bin/python
+    def _erp_login(email):
+        r = requests.post(ERP_LOGIN, json={"email": email, "password": ERP_PW})
+>       assert r.status_code == 200, (email, r.status_code, r.text)
+E       AssertionError: ('admin@kkt.in', 401, '{"detail":"Invalid email or password","code":"INVALID_CREDENTIALS","request_id":"10ee80d319b244...r":{"code":"INVALID_CREDENTIALS","message":"Invalid email or password","details":[],"request_id":"10ee80d319b2442e"}}')
+E       assert 401 == 200
+E        +  where 401 = <Response [401]>.status_code
 
-H = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDd...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDkxNDUwLCJleHAiOjE3OTMwOTIzNTB9.Hw--oRfa5e6dyH8ckOeLr26KOFLj8nEFLWM9XwWRQh4'}
+tests/test_phase_5.py:46: AssertionError
+__________ ERROR at setup of TestErpNotices.test_sales_forbidden_post __________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
 
-    def test_integrity_report_ok(H):
-        body = None
-        for _ in range(4):  # other xdist workers may be mid-write; summaries settle within a second
-            r = requests.get(f"{BASE}/api/admin/integrity-report?fresh=1", headers=H, timeout=15)
-            assert r.status_code == 200
-            body = r.json()
-            if body.get("ok") is True:
+    @pytest.fixture(scope="module")
+    def sales_tok():
+>       return _erp_login("sales@kkt.in")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_phase_5.py:68: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+email = 'sales@kkt.in'
+
+    def _erp_login(email):
+        r = requests.post(ERP_LOGIN, json={"email": email, "password": ERP_PW})
+>       assert r.status_code == 200, (email, r.status_code, r.text)
+E       AssertionError: ('sales@kkt.in', 401, '{"detail":"Invalid email or password","code":"INVALID_CREDENTIALS","request_id":"8216d7fb976649...r":{"code":"INVALID_CREDENTIALS","message":"Invalid email or password","details":[],"request_id":"8216d7fb976649ec"}}')
+E       assert 401 == 200
+E        +  where 401 = <Response [401]>.status_code
+
+tests/test_phase_5.py:46: AssertionError
+_____ ERROR at setup of TestRefreshRotation.test_refresh_rotate_and_reuse ______
+[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
+
+    @pytest.fixture(scope="module")
+    def portal_amit():
+        r = _portal_login("9431012345")
+>       assert r.status_code == 200, r.text
+E       AssertionError: {"detail":"Invalid phone or password","code":"INVALID_CREDENTIALS","request_id":"cfdd78e7b5134307","error":{"code":"INVALID_CREDENTIALS","message":"Invalid phone or password","details":[],"request_id":"cfdd78e7b5134307"}}
+E       assert 401 == 200
+E        +  where 401 = <Response [401]>.status_code
+
+tests/test_phase_5.py:79: AssertionError
+____ ERROR at setup of TestPortalData.test_booking_detail_and_subresources _____
+[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
+
+    @pytest.fixture(scope="module")
+    def portal_amit():
+        r = _portal_login("9431012345")
+>       assert r.status_code == 200, r.text
+E       AssertionError: {"detail":"Invalid phone or password","code":"INVALID_CREDENTIALS","request_id":"cfdd78e7b5134307","error":{"code":"INVALID_CREDENTIALS","message":"Invalid phone or password","details":[],"request_id":"cfdd78e7b5134307"}}
+E       assert 401 == 200
+E        +  where 401 = <Response [401]>.status_code
+
+tests/test_phase_5.py:79: AssertionError
+__________________ ERROR at setup of TestPortalPDFs.test_pdfs __________________
+[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
+
+    @pytest.fixture(scope="module")
+    def portal_amit():
+        r = _portal_login("9431012345")
+>       assert r.status_code == 200, r.text
+E       AssertionError: {"detail":"Invalid phone or password","code":"INVALID_CREDENTIALS","request_id":"cfdd78e7b5134307","error":{"code":"INVALID_CREDENTIALS","message":"Invalid phone or password","details":[],"request_id":"cfdd78e7b5134307"}}
+E       assert 401 == 200
+E        +  where 401 = <Response [401]>.status_code
+
+tests/test_phase_5.py:79: AssertionError
+_ ERROR at setup of TestConstructionAndHiddenPhoto.test_construction_and_hidden _
+[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
+
+    @pytest.fixture(scope="module")
+    def portal_amit():
+        r = _portal_login("9431012345")
+>       assert r.status_code == 200, r.text
+E       AssertionError: {"detail":"Invalid phone or password","code":"INVALID_CREDENTIALS","request_id":"cfdd78e7b5134307","error":{"code":"INVALID_CREDENTIALS","message":"Invalid phone or password","details":[],"request_id":"cfdd78e7b5134307"}}
+E       assert 401 == 200
+E        +  where 401 = <Response [401]>.status_code
+
+tests/test_phase_5.py:79: AssertionError
+_______ ERROR at setup of TestNotices.test_portal_notices_and_mark_read ________
+[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
+
+    @pytest.fixture(scope="module")
+    def portal_amit():
+        r = _portal_login("9431012345")
+>       assert r.status_code == 200, r.text
+E       AssertionError: {"detail":"Invalid phone or password","code":"INVALID_CREDENTIALS","request_id":"cfdd78e7b5134307","error":{"code":"INVALID_CREDENTIALS","message":"Invalid phone or password","details":[],"request_id":"cfdd78e7b5134307"}}
+E       assert 401 == 200
+E        +  where 401 = <Response [401]>.status_code
+
+tests/test_phase_5.py:79: AssertionError
+___________ ERROR at setup of TestProfileBank.test_patch_me_and_bank ___________
+[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
+
+    @pytest.fixture(scope="module")
+    def portal_amit():
+        r = _portal_login("9431012345")
+>       assert r.status_code == 200, r.text
+E       AssertionError: {"detail":"Invalid phone or password","code":"INVALID_CREDENTIALS","request_id":"cfdd78e7b5134307","error":{"code":"INVALID_CREDENTIALS","message":"Invalid phone or password","details":[],"request_id":"cfdd78e7b5134307"}}
+E       assert 401 == 200
+E        +  where 401 = <Response [401]>.status_code
+
+tests/test_phase_5.py:79: AssertionError
+_____ ERROR at setup of TestPortalPhase7.test_portal_booking_payment_plan ______
+[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
+
+self = <tests.test_phase_7.TestPortalPhase7 object at 0xfbb1a081d690>
+
+    @pytest.fixture(scope="class")
+    def ptoken(self):
+        r = requests.post(f"{API}/portal/auth/login", json={"phone": PORTAL_PHONE, "password": PORTAL_PASS}, timeout=15)
+>       assert r.status_code == 200, r.text
+E       AssertionError: {"detail":"Invalid phone or password","code":"INVALID_CREDENTIALS","request_id":"bd1b7d035c974abd","error":{"code":"INVALID_CREDENTIALS","message":"Invalid phone or password","details":[],"request_id":"bd1b7d035c974abd"}}
+E       assert 401 == 200
+E        +  where 401 = <Response [401]>.status_code
+
+tests/test_phase_7.py:250: AssertionError
+________ ERROR at setup of TestProjectSetupBundle.test_get_setup_shape _________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+auth_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDd...xNzkzMDkyMTQ5LCJleHAiOjE3OTMwOTMwNDl9.jiZI8kvtmK5a27cj0WIVwmC2mlp6xQsGMppIs6fIixQ', 'Content-Type': 'application/json'}
+
+    @pytest.fixture(scope="module")
+    def project_id(auth_headers):
+        r = requests.get(f"{API}/projects", headers=auth_headers, timeout=20)
+        assert r.status_code == 200
+        body = r.json()
+        items = body.get("items", body) if isinstance(body, dict) else body
+        for p in items:
+            if p.get("code") == "SGH":
+                return p["id"]
+>       return items[0]["id"]
+               ^^^^^^^^
+E       IndexError: list index out of range
+
+tests/test_phase_11b.py:34: IndexError
+________ ERROR at setup of TestFlatsPagination.test_flats_page_size_200 ________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+auth_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDd...xNzkzMDkyMTQ5LCJleHAiOjE3OTMwOTMwNDl9.jiZI8kvtmK5a27cj0WIVwmC2mlp6xQsGMppIs6fIixQ', 'Content-Type': 'application/json'}
+
+    @pytest.fixture(scope="module")
+    def project_id(auth_headers):
+        r = requests.get(f"{API}/projects", headers=auth_headers, timeout=20)
+        assert r.status_code == 200
+        body = r.json()
+        items = body.get("items", body) if isinstance(body, dict) else body
+        for p in items:
+            if p.get("code") == "SGH":
+                return p["id"]
+>       return items[0]["id"]
+               ^^^^^^^^
+E       IndexError: list index out of range
+
+tests/test_phase_11b.py:34: IndexError
+=================================== FAILURES ===================================
+________________ test_bookings_sorted_walk_is_lossless[1-name] _________________
+[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
+
+Hd = {'X-Rate-Limit-Bypass': 'kkt-test-bypass-local', 'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWI...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDkyMTQ5LCJleHAiOjE3OTMwOTMwNDl9.jiZI8kvtmK5a27cj0WIVwmC2mlp6xQsGMppIs6fIixQ'}
+sort = 'name', limit = 1
+
+    @pytest.mark.parametrize("sort", ["created_at", "-created_at", "name", "-booking_date", "booking_date"])
+    @pytest.mark.parametrize("limit", (1, 7, 20))
+    def test_bookings_sorted_walk_is_lossless(Hd, sort, limit):
+        seen, total, _ = walk(Hd, "/bookings", limit, {"sort": sort})
+>       assert len(seen) == len(set(seen)) == total, (sort, limit, len(seen), total)
+E       AssertionError: ('name', 1, 88, 87)
+E       assert 88 == 87
+E        +  where 88 = len({'02d58183-0695-4b00-827f-9b6acdac2821', '043812bd-c473-4263-936b-8f8294eb8819', '05839afd-e743-4b99-907d-c7e2621e99e8...7fe7-3a9c-46ea-85a6-d608e6c04b49', '06c34ae6-2ed2-434d-952b-30a80b009ec9', '10c51e75-9b62-4424-b711-d27fb5e8eadc', ...})
+E        +    where {'02d58183-0695-4b00-827f-9b6acdac2821', '043812bd-c473-4263-936b-8f8294eb8819', '05839afd-e743-4b99-907d-c7e2621e99e8...7fe7-3a9c-46ea-85a6-d608e6c04b49', '06c34ae6-2ed2-434d-952b-30a80b009ec9', '10c51e75-9b62-4424-b711-d27fb5e8eadc', ...} = set(['02d58183-0695-4b00-827f-9b6acdac2821', '043812bd-c473-4263-936b-8f8294eb8819', '05839afd-e743-4b99-907d-c7e2621e99e8...7fe7-3a9c-46ea-85a6-d608e6c04b49', '06c34ae6-2ed2-434d-952b-30a80b009ec9', '10c51e75-9b62-4424-b711-d27fb5e8eadc', ...])
+
+tests/test_pagination_lossless.py:89: AssertionError
+____________ TestMasterDeactivate.test_deactivate_room_type_in_use _____________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+self = <tests.test_kkt_erp.TestMasterDeactivate object at 0xfb45b1976cd0>
+
+    def test_deactivate_room_type_in_use(self):
+        h = _h("admin@kkt.in")
+>       fts = requests.get(f"{API}/master/flat-types?page_size=5", headers=h).json()["items"]
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'items'
+
+tests/test_kkt_erp.py:359: KeyError
+____________ TestMasterDeactivate.test_deactivate_unused_room_type _____________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+self = <tests.test_kkt_erp.TestMasterDeactivate object at 0xfb45b19740d0>
+
+    def test_deactivate_unused_room_type(self):
+        h = _h("admin@kkt.in")
+        payload = {"name": f"TEST_RT_{uuid.uuid4().hex[:6]}", "code": f"TRT{uuid.uuid4().hex[:4].upper()}"}
+        c = requests.post(f"{API}/master/room-types", headers=h, json=payload)
+>       assert c.status_code == 201
+E       assert 401 == 201
+E        +  where 401 = <Response [401]>.status_code
+
+tests/test_kkt_erp.py:370: AssertionError
+_____________________ test_seeded_localities_have_pincode ______________________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+    def test_seeded_localities_have_pincode():
+        rows = list(db.catalogue_items.find({"type": "locality", "is_system": True}, {"_id": 0, "label": 1, "meta": 1}))
+>       assert rows, "no seeded localities"
+E       AssertionError: no seeded localities
+E       assert []
+
+tests/test_locality_pincodes.py:11: AssertionError
+___________________________ test_ops_snapshot_shape ____________________________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDd...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDkyMTQ5LCJleHAiOjE3OTMwOTMwNDl9.jiZI8kvtmK5a27cj0WIVwmC2mlp6xQsGMppIs6fIixQ'}
+
+    def test_ops_snapshot_shape(admin_headers):
+        requests.get(f"{BASE}/api/bookings?page_size=5", headers=admin_headers, timeout=15)
+        r = requests.get(f"{BASE}/api/admin/ops", headers=admin_headers, timeout=15)
+>       assert r.status_code == 200, r.text[:200]
+E       AssertionError: {"detail":"User inactive or not found","code":"USER_INACTIVE","request_id":"1a202d24a39f47f3","error":{"code":"USER_INACTIVE","message":"User inactive or not found","details":[],"request_id":"1a202d24
+E       assert 401 == 200
+E        +  where 401 = <Response [401]>.status_code
+
+tests/test_ops.py:12: AssertionError
+______________________ test_ops_requires_settings_manage _______________________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+    def test_ops_requires_settings_manage():
+        from tests.conftest import session_token
+        sales_headers = {"Authorization": f"Bearer {session_token('sales@kkt.in', 'Kkt@12345')}"}
+        r = requests.get(f"{BASE}/api/admin/ops", headers=sales_headers, timeout=15)
+>       assert r.status_code in (403, 404)
+E       assert 401 in (403, 404)
+E        +  where 401 = <Response [401]>.status_code
+
+tests/test_ops.py:23: AssertionError
+________________ TestDashboardHome.test_get_dashboard_home_200 _________________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+self = <tests.test_phase_11b.TestDashboardHome object at 0xfb45773baad0>
+auth_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDd...xNzkzMDkyMTQ5LCJleHAiOjE3OTMwOTMwNDl9.jiZI8kvtmK5a27cj0WIVwmC2mlp6xQsGMppIs6fIixQ', 'Content-Type': 'application/json'}
+
+    def test_get_dashboard_home_200(self, auth_headers):
+        r = requests.get(f"{API}/dashboard/home", headers=auth_headers, timeout=20)
+>       assert r.status_code == 200, r.text
+E       AssertionError: {"detail":"User inactive or not found","code":"USER_INACTIVE","request_id":"0938c7d83f2c48c6","error":{"code":"USER_INACTIVE","message":"User inactive or not found","details":[],"request_id":"0938c7d83f2c48c6"}}
+E       assert 401 == 200
+E        +  where 401 = <Response [401]>.status_code
+
+tests/test_phase_11b.py:41: AssertionError
+___________ TestServiceRequests.test_internal_note_hidden_on_portal ____________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+self = <tests.test_phase_5.TestServiceRequests object at 0xfb45768fdcd0>
+
+    def test_internal_note_hidden_on_portal(self):
+        r = _portal_login("9431023456")
+>       assert r.status_code == 200
+E       assert 401 == 200
+E        +  where 401 = <Response [401]>.status_code
+
+tests/test_phase_5.py:253: AssertionError
+____ test_job_failed_alert_self_clears_after_ok_run_and_can_be_acknowledged ____
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDd...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDkyMTQ5LCJleHAiOjE3OTMwOTMwNDl9.jiZI8kvtmK5a27cj0WIVwmC2mlp6xQsGMppIs6fIixQ'}
+
+    def test_job_failed_alert_self_clears_after_ok_run_and_can_be_acknowledged(admin_headers):
+        now = datetime.now(timezone.utc)
+        job = f"TEST_JOB_{uuid.uuid4().hex[:6]}"
+        mongo.job_runs.insert_one({"id": uuid.uuid4().hex, "job": job, "status": "ABANDONED", "started_at": (now - timedelta(hours=2)).isoformat(), "finished_at": (now - timedelta(hours=1)).isoformat(), "items": 0, "failed_items": 0, "errors": []})
+        r = requests.post(f"{BASE}/api/admin/alerts/job_failed/ack", json={"note": "one-off: process restart during backup"}, headers=admin_headers)
+>       assert r.status_code == 200, r.text
+E       AssertionError: {"detail":"User inactive or not found","code":"USER_INACTIVE","request_id":"f7304ba15a5c464b","error":{"code":"USER_INACTIVE","message":"User inactive or not found","details":[],"request_id":"f7304ba15a5c464b"}}
+E       assert 401 == 200
+E        +  where 401 = <Response [401]>.status_code
+
+tests/test_prepublish_alerts_csv.py:29: AssertionError
+__________________ test_price_paise_is_the_only_stored_price ___________________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+    def test_price_paise_is_the_only_stored_price():
+        from pymongo import MongoClient
+        d = MongoClient(os.environ["MONGO_URL"])[os.environ["DB_NAME"]]
+        assert d.flats.count_documents({"price": {"$exists": True}}) == 0, "legacy rupee `price` still stored"
+        assert d.flats.count_documents({"price_paise": {"$type": "double"}}) == 0
+>       assert d.flats.count_documents({"price_paise": {"$type": ["int", "long"]}}) > 0
+E       AssertionError: assert 0 > 0
+E        +  where 0 = count_documents({'price_paise': {'$type': ['int', 'long']}})
+E        +    where count_documents = Collection(Database(MongoClient(host=['localhost:27017'], document_class=dict, tz_aware=False, connect=True), 'kkt_test'), 'flats').count_documents
+E        +      where Collection(Database(MongoClient(host=['localhost:27017'], document_class=dict, tz_aware=False, connect=True), 'kkt_test'), 'flats') = Database(MongoClient(host=['localhost:27017'], document_class=dict, tz_aware=False, connect=True), 'kkt_test').flats
+
+tests/test_price_truth.py:15: AssertionError
+_______________________ test_pdfs_and_csv_have_no_paise ________________________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+base_url = 'http://127.0.0.1:8021'
+admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDd...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDkyMTQ5LCJleHAiOjE3OTMwOTMwNDl9.jiZI8kvtmK5a27cj0WIVwmC2mlp6xQsGMppIs6fIixQ'}
+
+    def test_pdfs_and_csv_have_no_paise(base_url, admin_headers):
+>       bk = next(x for x in requests.get(f"{base_url}/api/bookings?page_size=50&search=BK-2526-0001", headers=admin_headers).json()["items"] if x["booking_number"] == "BK-2526-0001")
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'items'
+
+tests/test_rupees_only.py:33: KeyError
+_______________ test_erp_core_routes_do_not_leak_internal_fields _______________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+base_url = 'http://127.0.0.1:8021'
+admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDd...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDkyMTQ5LCJleHAiOjE3OTMwOTMwNDl9.jiZI8kvtmK5a27cj0WIVwmC2mlp6xQsGMppIs6fIixQ'}
+
+    def test_erp_core_routes_do_not_leak_internal_fields(base_url, admin_headers):
+        hits = []
+        for r in ROUTES:
+            resp = requests.get(base_url + r, headers=admin_headers, params={"page_size": 20})
+            if resp.status_code == 404:
+                continue
+>           assert resp.status_code == 200, (r, resp.status_code)
+E           AssertionError: ('/api/projects', 401)
+E           assert 401 == 200
+E            +  where 401 = <Response [401]>.status_code
+
+tests/test_erp_leak_scan.py:25: AssertionError
+______________________ TestLockout.test_lockout_new_user _______________________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+self = <tests.test_kkt_erp.TestLockout object at 0xfb45b1974a90>
+
+    def test_lockout_new_user(self):
+        admin_h = _h("admin@kkt.in")
+        # Get a Sales role id
+        roles = requests.get(f"{API}/roles", headers=admin_h).json()
+>       role_id = next(r["id"] for r in roles["items"] if r["name"] == "Sales")
+                                        ^^^^^^^^^^^^^^
+E       KeyError: 'items'
+
+tests/test_kkt_erp.py:108: KeyError
+____________________ TestSettings.test_bank_account_masked _____________________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+self = <tests.test_kkt_erp.TestSettings object at 0xfb45b1990790>
+
+    def test_bank_account_masked(self):
+        h = _h("admin@kkt.in")
+        acct = "99887766554433"
+        r = requests.patch(f"{API}/settings/company", headers=h, json={
+            "bank_account": {"bank_name": "HDFC", "account_name": "KKT", "account_number": acct, "ifsc": "HDFC0001"}
+        })
+>       assert r.status_code == 200, r.text
+E       AssertionError: {"detail":"User inactive or not found","code":"USER_INACTIVE","request_id":"8aa6940bdc4442d1","error":{"code":"USER_INACTIVE","message":"User inactive or not found","details":[],"request_id":"8aa6940bdc4442d1"}}
+E       assert 401 == 200
+E        +  where 401 = <Response [401]>.status_code
+
+tests/test_kkt_erp.py:446: AssertionError
+_________ TestOptimisticConcurrency.test_version_conflict_and_success __________
+[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
+
+self = <tests.test_phase_1_5.TestOptimisticConcurrency object at 0xfbb1a13ac3d0>
+admin_token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDdhOGUiLCJjaWQiOiI2MWUzNWMx...oiYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDkyMzk3LCJleHAiOjE3OTMwOTMyOTd9.S7CdrFvhqW6dqPtbNrZ96rCuaCh4Uelc35Aual5RnQE'
+
+    def test_version_conflict_and_success(self, admin_token):
+        r = requests.get(f"{API}/projects", headers=_h(admin_token), timeout=15)
+        assert r.status_code == 200
+        projects = r.json().get("items", r.json() if isinstance(r.json(), list) else [])
+        sgh = next((p for p in projects if p.get("code") == "SGH"), None)
+>       assert sgh, "SGH project not found"
+E       AssertionError: SGH project not found
+E       assert None
+
+tests/test_phase_1_5.py:78: AssertionError
+_______________________ TestCursorPagination.test_cursor _______________________
+[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
+
+self = <tests.test_phase_1_5.TestCursorPagination object at 0xfbb1a13ad950>
+admin_token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDdhOGUiLCJjaWQiOiI2MWUzNWMx...oiYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDkyMzk3LCJleHAiOjE3OTMwOTMyOTd9.S7CdrFvhqW6dqPtbNrZ96rCuaCh4Uelc35Aual5RnQE'
+
+    def test_cursor(self, admin_token):
+        r1 = requests.get(f"{API}/flats", headers=_h(admin_token), params={"limit": 10}, timeout=15)
+        assert r1.status_code == 200
+        d1 = r1.json()
+        cursor = d1.get("next_cursor")
+>       assert cursor, f"No next_cursor in response: {list(d1.keys())}"
+E       AssertionError: No next_cursor in response: ['items', 'total', 'page', 'page_size', 'next_cursor', 'total_estimated']
+E       assert None
+
+tests/test_phase_1_5.py:153: AssertionError
+_________________________ TestTowerC.test_tower_c_grid _________________________
+[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
+
+self = <tests.test_phase_1_5.TestTowerC object at 0xfbb1a13ae090>
+admin_token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDdhOGUiLCJjaWQiOiI2MWUzNWMx...oiYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDkyMzk3LCJleHAiOjE3OTMwOTMyOTd9.S7CdrFvhqW6dqPtbNrZ96rCuaCh4Uelc35Aual5RnQE'
+
+    def test_tower_c_grid(self, admin_token):
+        projects = requests.get(f"{API}/projects", headers=_h(admin_token), timeout=15).json()
+        projects = projects.get("items", projects) if isinstance(projects, dict) else projects
+>       sgh = next(p for p in projects if p["code"] == "SGH")
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       StopIteration
+
+tests/test_phase_1_5.py:171: StopIteration
+___________________ TestParking.test_parking_list_bulk_patch ___________________
+[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
+
+self = <tests.test_phase_1_5.TestParking object at 0xfbb1a13ae790>
+admin_token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDdhOGUiLCJjaWQiOiI2MWUzNWMx...oiYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDkyMzk3LCJleHAiOjE3OTMwOTMyOTd9.S7CdrFvhqW6dqPtbNrZ96rCuaCh4Uelc35Aual5RnQE'
+
+    def test_parking_list_bulk_patch(self, admin_token):
+        projects = requests.get(f"{API}/projects", headers=_h(admin_token), timeout=15).json()
+        projects = projects.get("items", projects) if isinstance(projects, dict) else projects
+>       sgh = next(p for p in projects if p["code"] == "SGH")
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       StopIteration
+
+tests/test_phase_1_5.py:209: StopIteration
+__________________ TestSearchHistory.test_search_and_history ___________________
+[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
+
+self = <tests.test_phase_1_5.TestSearchHistory object at 0xfbb1a13af610>
+admin_token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDdhOGUiLCJjaWQiOiI2MWUzNWMx...oiYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDkyMzk3LCJleHAiOjE3OTMwOTMyOTd9.S7CdrFvhqW6dqPtbNrZ96rCuaCh4Uelc35Aual5RnQE'
+
+    def test_search_and_history(self, admin_token):
+        s = requests.get(f"{API}/search", headers=_h(admin_token), params={"q": "A-10"}, timeout=15)
+        assert s.status_code == 200
+        sj = s.json()
+        # grouped results — look for flats
+        found = False
+        for key in ("flats", "results", "groups"):
+            v = sj.get(key)
+            if v:
+                found = True
                 break
-            time.sleep(1.5)
->       assert body.get("ok") is True, body.get("findings")
-E       AssertionError: [{'kind': 'ledger_due_mismatch', 'detail': 'last ledger outstanding 331837500 ≠ summary due 265500000', 'booking_id': '02d58183-0695-4b00-827f-9b6acdac2821', 'booking_number': 'BK-2627-0022', ...}]
-E       assert False is True
-E        +  where False = <built-in method get of dict object at 0xfb2740434100>('ok')
-E        +    where <built-in method get of dict object at 0xfb2740434100> = {'ok': False, 'as_of': '2026-10-27', 'ran_at': '2026-10-27T08:58:45.483827+00:00', 'bookings_checked': 80, ...}.get
+        assert found or sj, f"Search returned nothing: {sj}"
+    
+        projects = requests.get(f"{API}/projects", headers=_h(admin_token), timeout=15).json()
+        projects = projects.get("items", projects) if isinstance(projects, dict) else projects
+>       sgh = next(p for p in projects if p["code"] == "SGH")
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       StopIteration
 
-tests/test_phase_b4_backend_sanity.py:40: AssertionError
-_______________ test_every_code_registered_with_matching_status ________________
-[gw2] linux -- Python 3.11.17 /root/.venv/bin/python
+tests/test_phase_1_5.py:343: StopIteration
+______ TestErpPortalMgmt.test_new_customer_enable_and_temp_password_flow _______
+[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
 
-    def test_every_code_registered_with_matching_status():
-        found = _scan()
-        assert found, "scanner found nothing — pattern broken"
-        unregistered = sorted(c for c in found if c not in ERRORS)
-        mismatched = sorted(f"{c}: used {sorted(found[c])} registered {ERRORS[c]}" for c in found if c in ERRORS and not found[c] <= set(ERRORS[c]))
->       assert not unregistered, f"unregistered error codes: {unregistered} (add to errors.py)"
-E       AssertionError: unregistered error codes: ['FLAT_NOT_SALEABLE', 'HOLD_EXPIRY_PAST', 'HOLD_EXPIRY_REQUIRED'] (add to errors.py)
-E       assert not ['FLAT_NOT_SALEABLE', 'HOLD_EXPIRY_PAST', 'HOLD_EXPIRY_REQUIRED']
+self = <tests.test_phase_5.TestErpPortalMgmt object at 0xfbb1a07fe990>
+admin_tok = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDdhOGUiLCJjaWQiOiI2MWUzNWMx...oiYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDkyNDAyLCJleHAiOjE3OTMwOTMzMDJ9.x5frGbRCu9_U1Rla7Kc1f3wEcTnGFRdEmK_nrP5xGk0'
 
-tests/test_error_registry.py:26: AssertionError
+    def test_new_customer_enable_and_temp_password_flow(self, admin_tok):
+        # create new customer
+        # unique phone + pan per run
+        phone_last10 = f"9000{uuid.uuid4().int % 1000000:06d}"
+        pan = f"TEST{uuid.uuid4().hex[:5].upper()}K"[:10]
+        payload = {
+            "full_name": "TEST_Portal New",
+            "phone": f"+91{phone_last10}",
+            "email": f"test_portal_{uuid.uuid4().hex[:6]}@example.com",
+        }
+        r = requests.post(
+            f"{BASE}/api/customers", json=payload, headers=_hdr(admin_tok, idem=True)
+        )
+        if r.status_code not in (200, 201):
+>           pytest.fail(f"create customer failed: {r.status_code} {r.text[:300]}")
+E           Failed: create customer failed: 500 {"detail":"Internal server error","code":"INTERNAL_ERROR","request_id":"91e05e1deaf24847","error":{"code":"INTERNAL_ERROR","message":"Internal server error","details":[],"request_id":"91e05e1deaf24847"}}
+
+tests/test_phase_5.py:295: Failed
+___ TestErpConstructionPhotos.test_upload_valid_and_invalid_and_patch_delete ___
+[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
+
+self = <tests.test_phase_5.TestErpConstructionPhotos object at 0xfbb1a0809090>
+admin_tok = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDdhOGUiLCJjaWQiOiI2MWUzNWMx...oiYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDkyNDAyLCJleHAiOjE3OTMwOTMzMDJ9.x5frGbRCu9_U1Rla7Kc1f3wEcTnGFRdEmK_nrP5xGk0'
+
+    def test_upload_valid_and_invalid_and_patch_delete(self, admin_tok):
+        blocks = requests.get(f"{BASE}/api/blocks", headers=_hdr(admin_tok)).json()
+        bitems = blocks.get("items") or blocks
+        # pick a block with completed milestones (any block)
+>       block_id = bitems[0]["id"]
+                   ^^^^^^^^^
+E       KeyError: 0
+
+tests/test_phase_5.py:432: KeyError
 ___________________ test_startup_idempotent_on_pre_phase7_db ___________________
-[gw2] linux -- Python 3.11.17 /root/.venv/bin/python
+[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
 
     def test_startup_idempotent_on_pre_phase7_db():
         loop = asyncio.new_event_loop()
         cl = loop.run_until_complete(_prepare())
         try:
->           log1 = _run_startup()
-                   ^^^^^^^^^^^^^^
+            log1 = _run_startup()
+>           assert "integrity: ok=True" in log1, log1[-20000:]
+E           AssertionError: (trapped) error reading bcrypt version
+E             Traceback (most recent call last):
+E               File "/root/.venv/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+E                 version = _bcrypt.__about__.__version__
+E                           ^^^^^^^^^^^^^^^^^
+E             AttributeError: module 'bcrypt' has no attribute '__about__'
+E             index audit_logs.entity_time skipped: Index already exists with a different name: audit_entity_created, full error: {'
+E             index ledger_entries.[('booking_id', 1), ('seq', 1)] skipped: Index already exists with a different name: booking_seq, full error: {'ok': 0.0, 'errmsg': 'Index already exists with a 
+E             [startup] indexes ensured in 2.85s
+E             UoW mode: ordered-writes+compensation
+E             KKT backend serving after 2.87s (uow=ordered-writes+compensation); background startup tasks running
+E             [leader] agent-env-a2ad8b1d-236b-431e-8c34-6627548d7c1b:8463 acquired scheduler
+E             [startup] seed_if_empty ok in 0.03s
+E             [startup] seed_phase15 ok in 0.00s
+E             Object storage initialized
+E             [startup] seed_phase3 ok in 0.00s
+E             [phase7] nightly integrity: ok=False counts={'orphan_booking_flat': 80}
+E             [startup] system_roles ok in 0.37s
+E             [startup] seed_marketing_user ok in 0.00s
+E             [startup] owner_bootstrap ok in 0.00s
+E             [startup] migrate_phase7 ok in 0.00s
+E             [startup] seed_phase7 ok in 0.00s
+E             [startup] backfill_demand_installments ok in 0.00s
+E             [startup] migrate_phase_g ok in 0.00s
+E             [notify] sweep: {'normalized': 1321, 'deleted': 228}
+E             [startup] sweep_notifications ok in 4.81s
+E             [phase7] integrity: ok=False bookings=0 counts={'orphan_booking_flat': 80}
+E             [startup] integrity_report ok in 0.11s
+E             [startup] inventory_masters ok in 0.00s
+E             [startup] counters ok in 0.00s
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             Ledger reconciliation found 2 mismatches: [{'booking_id': '02d58183-0695-4b00-827f-9b6acdac2821', 'diff': {'cash_order_raised_paise': (338321300, 131348300), 'account_order_raised_paise': (225547500, 87565500), 'total_order_raised_paise': (563868800, 218913800), 'cash_due_paise': (199012500, -7960500), 'account_due_paise': (132675000, -5307000), 'due_paise': (331837500, 150000), 'outstanding_paise': (331837500, 150000), 'advance_paise': (0, 13267500), 'net_balance_paise': (331837500, -13117500)}}, {'booking_id': 'b37988d9-fd4e-4c92-ae52-ac7bf8929870', 'diff': {'other_udhar_paise': (41300000, 0)}}]
+E             [startup] reconcile ok in 0.84s
+E             [phase11] customer profiles migrated: 202
+E             [phase11] read models: {'blocks': 0, 'projects': 0, 'customers': 202, 'ms': 2099}
+E             [startup] startup_phase11 ok in 2.43s
+E             [startup] schema_validators ok in 0.01s
+E             [startup] price_paise_backfill ok in 0.00s
+E             [startup] background tasks complete in 9.2s: {'seed_if_empty': 0.0, 'seed_phase15': 0.0, 'seed_phase3': 0.0, 'system_roles': 0.37, 'seed_marketing_user': 0.0, 'owner_bootstrap': 0.0, 'migrate_phase7': 0.0, 'seed_phase7': 0.0, 'backfill_demand_installments': 0.0, 'migrate_phase_g': 0.0, 'sweep_notifications': 4.81, 'integrity_report': 0.11, 'inventory_masters': 0.0, 'counters': 0.0, 'reconcile': 0.84, 'startup_phase11': 2.43, 'schema_validators': 0.01, 'price_paise_backfill': 0.0}
+E             [startup] seed_if_empty ok in 0.00s
+E             [startup] seed_phase15 ok in 0.00s
+E             [startup] seed_phase3 ok in 0.00s
+E             [startup] system_roles ok in 0.12s
+E             [startup] seed_marketing_user ok in 0.00s
+E             [startup] owner_bootstrap ok in 0.00s
+E             [startup] migrate_phase7 ok in 0.00s
+E             [startup] seed_phase7 ok in 0.00s
+E             [startup] backfill_demand_installments ok in 0.00s
+E             [startup] migrate_phase_g ok in 0.00s
+E             [startup] sweep_notifications ok in 0.00s
+E             [phase7] integrity: ok=False bookings=0 counts={'orphan_booking_flat': 80, 'ledger_due_mismatch': 1}
+E             [startup] integrity_report ok in 0.72s
+E             [startup] inventory_masters ok in 0.00s
+E             [startup] counters ok in 0.00s
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             raw access to ledger_entries: ledger projection rebuild
+E             [startup] reconcile ok in 0.93s
+E             [startup] startup_phase11 ok in 0.01s
+E             [startup] schema_validators ok in 0.01s
+E             [startup] price_paise_backfill ok in 0.00s
+E             [startup] background tasks complete in 2.4s: {'seed_if_empty': 0.0, 'seed_phase15': 0.0, 'seed_phase3': 0.0, 'system_roles': 0.12, 'seed_marketing_user': 0.0, 'owner_bootstrap': 0.0, 'migrate_phase7': 0.0, 'seed_phase7': 0.0, 'backfill_demand_installments': 0.0, 'migrate_phase_g': 0.0, 'sweep_notifications': 0.0, 'integrity_report': 0.72, 'inventory_masters': 0.0, 'counters': 0.0, 'reconcile': 0.93, 'startup_phase11': 0.01, 'schema_validators': 0.01, 'price_paise_backfill': 0.0}
+E             
+E           assert 'integrity: ok=True' in '(trapped) error reading bcrypt version\nTraceback (most recent call last):\n  File "/root/.venv/lib/python3.11/site-p...\': 0.0, \'reconcile\': 0.93, \'startup_phase11\': 0.01, \'schema_validators\': 0.01, \'price_paise_backfill\': 0.0}\n'
 
-tests/test_startup_migrations.py:91: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-tests/test_startup_migrations.py:82: in _run_startup
-    r = subprocess.run([sys.executable, "-c", RUN % os.path.join(os.path.dirname(__file__), "..")], env=env, cwd=os.path.join(os.path.dirname(__file__), ".."), capture_output=True, text=True, timeout=240)
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-/usr/local/lib/python3.11/subprocess.py:550: in run
-    stdout, stderr = process.communicate(input, timeout=timeout)
-                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-/usr/local/lib/python3.11/subprocess.py:1209: in communicate
-    stdout, stderr = self._communicate(input, endtime, timeout)
-                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-/usr/local/lib/python3.11/subprocess.py:2116: in _communicate
-    self._check_timeout(endtime, orig_timeout, stdout, stderr)
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-
-self = <Popen: returncode: -9 args: ['/root/.venv/bin/python', '-c', '\nimport asyn...>
-endtime = 84040.014846017, orig_timeout = 240, stdout_seq = []
-stderr_seq = [b'(trapped) error reading bcrypt version\nTraceback (most recent call last):\n  File "/root/.venv/lib/python3.11/site...tion\n', b'KKT backend serving after 4.35s (uow=ordered-writes+compensation); background startup tasks running\n', ...]
-skip_check_and_raise = False
-
-    def _check_timeout(self, endtime, orig_timeout, stdout_seq, stderr_seq,
-                       skip_check_and_raise=False):
-        """Convenience for checking if a timeout has expired."""
-        if endtime is None:
-            return
-        if skip_check_and_raise or _time() > endtime:
->           raise TimeoutExpired(
-                    self.args, orig_timeout,
-                    output=b''.join(stdout_seq) if stdout_seq else None,
-                    stderr=b''.join(stderr_seq) if stderr_seq else None)
-E           subprocess.TimeoutExpired: Command '['/root/.venv/bin/python', '-c', '\nimport asyncio, os, sys\nsys.path.insert(0, \'/app/backend/tests/..\')\nfrom server import app, lifespan, startup_tasks, STARTUP\nfrom db import db\nasync def main():\n    async with lifespan(app):\n        while not STARTUP.get("done"):  # let the boot-time run finish first; racing it for the startup lease made the explicit pass skip migrations\n            await asyncio.sleep(0.2)\n        await db.locks.delete_many({"name": "startup"})\n        await startup_tasks()\nasyncio.run(main())\n']' timed out after 240 seconds
-
-/usr/local/lib/python3.11/subprocess.py:1253: TimeoutExpired
+tests/test_startup_migrations.py:92: AssertionError
 =============================== warnings summary ===============================
-../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
-../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
 ../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
 ../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
   /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
     import multipart
 
-../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
-../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
 ../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
 ../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
   /root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
@@ -201,7 +846,6 @@ tests/test_phase_k_p1.py::test_loadshed_sheds_with_prebuilt_503_and_exempts_prob
 tests/test_kkt_erp.py::TestBlock::test_create_block_and_generation
 tests/test_kkt_erp.py::TestFlatType::test_create_flat_type_auto_area
 tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
-tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
   /root/.venv/lib/python3.11/site-packages/_pytest/fixtures.py:1313: PytestRemovedIn10Warning: Class-scoped fixture defined as instance method is deprecated.
   Instance attributes set in this fixture will NOT be visible to test methods,
   as each test gets a new instance while the fixture runs only once per class.
@@ -209,19 +853,44 @@ tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
   See https://docs.pytest.org/en/stable/deprecations.html#class-scoped-fixture-as-instance-method
     fixturefunc = resolve_fixture_function(fixturedef, request)
 
-tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources
-  /root/.venv/lib/python3.11/site-packages/_pytest/python.py:171: PytestReturnNotNoneWarning: Test functions should return None, but tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources returned <class 'str'>.
-  Did you mean to use `assert` instead of `return`?
-  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
-    warnings.warn(
-
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
 =========================== short test summary info ============================
-FAILED tests/test_phase_k_p0.py::test_invariant_indexes_and_validators_reject_bad_docs
-FAILED tests/test_rbac.py::test_registry_complete_every_guarded_route_registered
-FAILED tests/test_phase_n_inventory.py::test_expiry_sweep_releases_and_notifies
-FAILED tests/test_phase_b4_backend_sanity.py::test_integrity_report_ok - Asse...
-FAILED tests/test_error_registry.py::test_every_code_registered_with_matching_status
+FAILED tests/test_pagination_lossless.py::test_bookings_sorted_walk_is_lossless[1-name]
+FAILED tests/test_kkt_erp.py::TestMasterDeactivate::test_deactivate_room_type_in_use
+FAILED tests/test_kkt_erp.py::TestMasterDeactivate::test_deactivate_unused_room_type
+FAILED tests/test_locality_pincodes.py::test_seeded_localities_have_pincode
+FAILED tests/test_ops.py::test_ops_snapshot_shape - AssertionError: {"detail"...
+FAILED tests/test_ops.py::test_ops_requires_settings_manage - assert 401 in (...
+FAILED tests/test_phase_11b.py::TestDashboardHome::test_get_dashboard_home_200
+FAILED tests/test_phase_5.py::TestServiceRequests::test_internal_note_hidden_on_portal
+FAILED tests/test_prepublish_alerts_csv.py::test_job_failed_alert_self_clears_after_ok_run_and_can_be_acknowledged
+FAILED tests/test_price_truth.py::test_price_paise_is_the_only_stored_price
+FAILED tests/test_rupees_only.py::test_pdfs_and_csv_have_no_paise - KeyError:...
+FAILED tests/test_erp_leak_scan.py::test_erp_core_routes_do_not_leak_internal_fields
+FAILED tests/test_kkt_erp.py::TestLockout::test_lockout_new_user - KeyError: ...
+FAILED tests/test_kkt_erp.py::TestSettings::test_bank_account_masked - Assert...
+FAILED tests/test_phase_1_5.py::TestOptimisticConcurrency::test_version_conflict_and_success
+FAILED tests/test_phase_1_5.py::TestCursorPagination::test_cursor - Assertion...
+FAILED tests/test_phase_1_5.py::TestTowerC::test_tower_c_grid - StopIteration
+FAILED tests/test_phase_1_5.py::TestParking::test_parking_list_bulk_patch - S...
+FAILED tests/test_phase_1_5.py::TestSearchHistory::test_search_and_history - ...
+FAILED tests/test_phase_5.py::TestErpPortalMgmt::test_new_customer_enable_and_temp_password_flow
+FAILED tests/test_phase_5.py::TestErpConstructionPhotos::test_upload_valid_and_invalid_and_patch_delete
 FAILED tests/test_startup_migrations.py::test_startup_idempotent_on_pre_phase7_db
-6 failed, 556 passed, 2 skipped, 14 warnings in 406.90s (0:06:46)
+ERROR tests/test_kkt_erp.py::TestFlatType::test_create_flat_type_auto_area - ...
+ERROR tests/test_kkt_erp.py::TestFlatType::test_create_flat_type_invalid_hierarchy
+ERROR tests/test_phase_1_5.py::TestHealthHeaders::test_auth_me - requests.exc...
+ERROR tests/test_phase_5.py::TestServiceRequests::test_categories_and_create_and_reply
+ERROR tests/test_phase_5.py::TestErpNotices::test_crud_admin - AssertionError...
+ERROR tests/test_phase_5.py::TestErpNotices::test_sales_forbidden_post - Asse...
+ERROR tests/test_phase_5.py::TestRefreshRotation::test_refresh_rotate_and_reuse
+ERROR tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources
+ERROR tests/test_phase_5.py::TestPortalPDFs::test_pdfs - AssertionError: {"de...
+ERROR tests/test_phase_5.py::TestConstructionAndHiddenPhoto::test_construction_and_hidden
+ERROR tests/test_phase_5.py::TestNotices::test_portal_notices_and_mark_read
+ERROR tests/test_phase_5.py::TestProfileBank::test_patch_me_and_bank - Assert...
+ERROR tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+ERROR tests/test_phase_11b.py::TestProjectSetupBundle::test_get_setup_shape
+ERROR tests/test_phase_11b.py::TestFlatsPagination::test_flats_page_size_200
+22 failed, 525 passed, 2 skipped, 8 warnings, 15 errors in 475.19s (0:07:55)
 SUITE_EXIT 1

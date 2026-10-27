@@ -5,6 +5,7 @@ from pydantic import Field, field_validator
 
 from db import db
 from models_out import ProjectsOut, ProjectsOutPage
+from services import inventory as inv
 from deps import ensure_project_access, project_scope_filter, require
 from utils import (
     ApiError,
@@ -152,13 +153,14 @@ async def _validate_refs(amenity_ids: list[str] | None, mt_id: str | None, team:
         raise ApiError(400, "Milestone template not found", "INVALID_MILESTONE_TEMPLATE")
 
 
-async def status_counts(match: dict) -> dict:
-    rows = await db.flats.aggregate([{"$match": {**match, "is_active": True}}, {"$group": {"_id": "$status", "n": {"$sum": 1}, "value": {"$sum": {"$divide": [{"$ifNull": ["$price_paise", 0]}, 100]}}}}]).to_list(None)
+async def status_counts(match: dict, user: dict | None = None) -> dict:
+    rows = await db.flats.aggregate([{"$match": {**match, "is_active": True}}, {"$group": {"_id": inv.status_key(user), "n": {"$sum": 1}, "value": {"$sum": {"$divide": [{"$ifNull": ["$price_paise", 0]}, 100]}}}}]).to_list(None)
     counts = {s: 0 for s in STATUSES}
     value = 0
     for r in rows:
-        counts[r["_id"]] = r["n"]
-        value += r["value"]
+        if r["_id"] in counts:
+            counts[r["_id"]] = r["n"]
+            value += r["value"]
     counts["total"] = sum(counts[s] for s in STATUSES)
     counts["inventory_value"] = round(value, 2)
     return counts
@@ -218,17 +220,17 @@ async def get_project(project_id: str, user: dict = Depends(require("masters.pro
     ensure_project_access(user, project_id)
     p = await get_or_404(db.projects, project_id, "Project", {"company_id": user["company_id"]})
     blocks = await db.blocks.find({"project_id": project_id, "is_active": True}, {"_id": 0, "position_flat_types": 0}).sort("code", 1).to_list(None)
-    rows = await db.flats.aggregate([{"$match": {"project_id": project_id, "is_active": True}}, {"$group": {"_id": {"b": "$block_id", "s": "$status"}, "n": {"$sum": 1}}}]).to_list(None)
+    rows = await db.flats.aggregate([{"$match": {"project_id": project_id, "is_active": True}}, {"$group": {"_id": {"b": "$block_id", "s": inv.status_key(user)}, "n": {"$sum": 1}}}]).to_list(None)
     bmap = {b["id"]: {s: 0 for s in STATUSES} for b in blocks}
     for r in rows:
-        if r["_id"]["b"] in bmap:
+        if r["_id"]["b"] in bmap and r["_id"]["s"] in STATUSES:
             bmap[r["_id"]["b"]][r["_id"]["s"]] = r["n"]
     for b in blocks:
         c = bmap[b["id"]]
         c["total"] = sum(c[s] for s in STATUSES)
         b["inventory"] = c
     p["blocks"] = blocks
-    p["inventory"] = await status_counts({"project_id": project_id})
+    p["inventory"] = await status_counts({"project_id": project_id}, user)
     p["total_towers"] = len(blocks)
     p["total_units"] = p["inventory"]["total"]
     pk = await db.parking_slots.aggregate([{"$match": {"project_id": project_id, "is_active": True}}, {"$group": {"_id": "$status", "n": {"$sum": 1}}}]).to_list(None)
