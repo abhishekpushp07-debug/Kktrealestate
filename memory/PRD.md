@@ -582,3 +582,9 @@ See `/app/memory/prd_phase11c.md`. Tested: `/app/test_reports/iteration_13.json`
 - CR-7: in-memory access token, httpOnly refresh cookie (/api/auth), CSRF double-submit + synchronizer fallback, BroadcastChannel tab sharing, legacy localStorage tokens purged; `tests/test_session_cookies.py`.
 - CR-8: MD5 → SHA-256 (6 sites). CR-11: DataTable split (useTableState + Toolbar/Header/Pagination).
 - NOT done: CR-9 handler-registry refactors of `infra.dispatch`, `build_docs_pdf.render`, `db.ensure_indexes` (all already ≤ 25 complexity); CR-11 splits of ConstructionStatusPanel, CommandPalette, BookingOps TransferDialog; Portal (parked) cookie session; 6 noqa'd complex functions.
+
+## Phase CR.1 — remaining review items (2026-10-27) — DONE
+- CR-11: ConstructionStatusPanel (useConstructionStatus + StageRow + Undo/Confirm dialogs), CommandPalette (useKeyboardNav/usePaletteSearch + PaletteResults), TransferDialog (useTransferValidation + Swap/Transfer steps); DataTable done earlier.
+- CR-9: all six C901>25 functions refactored (ledger.rebuild → _collect_events + _Running handlers; imports per-kind validators; inventory._plan; project_setup per-section savers; master module helpers; crm event helpers) — zero `noqa: C901`.
+- CR-6: `hooks/useRowKeys.js` stable per-row keys (minted on add, follow rows through edit/remove) on all 14 positional-row sites; skeletons mapped by value; zero eslint-disable. craco `no-undef`=error (caught 3 latent runtime refs).
+- `test_one_outstanding_number` deterministic: reconcile-ledgers + quiet-window snapshot, strict equality.
