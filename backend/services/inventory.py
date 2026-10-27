@@ -45,6 +45,8 @@ def shape(flat: dict, user: dict | None) -> dict | None:
         out.setdefault("allocation_category_code", "BUILDER")
         out.setdefault("allocation_category_id", None)
         out.setdefault("bookable", True)
+        for k in ("notes", "rate_card_id", "price_source", "rate_card_breakup", "rate_card_price_paise", "block_code", "project_code"):  # canonical key set for every full flat payload
+            out.setdefault(k, None)
     if flat.get("status") == "Hold" and disp == "Show as Hold":
         h = flat.get("hold") or {}
         out["hold"] = {k: h.get(k) for k in ("expires_at", "for_customer_id", "for_user_id", "reason_id")}  # sales users work holds; no display metadata

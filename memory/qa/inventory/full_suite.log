@@ -4,61 +4,17 @@ bringing up nodes...
 ........................................................................ [ 12%]
 ........................................................................ [ 25%]
 ........................................................................ [ 37%]
-........................................................................ [ 50%]
+.......................................................................s [ 50%]
 ........................................................................ [ 63%]
-.................s...................................................... [ 75%]
-..........................F............................................. [ 88%]
-...............................s...................................      [100%]
-=================================== FAILURES ===================================
-______ test_manual_price_override_then_revert_restores_rate_card_breakup _______
-[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
-
-admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDd...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDk4ODMxLCJleHAiOjE3OTMwOTk3MzF9.rwbJ-oSC6QKwOqo4HDcryEyS6l-_VW0vI6Wzc8aeMHw'}
-
-    def test_manual_price_override_then_revert_restores_rate_card_breakup(admin_headers):
-        f = _flat(admin_headers)
-        orig_breakup, orig_price = f["price_breakup"], f["price"]
-        r = requests.patch(f"{BASE}/api/flats/{f['id']}", json={"price": orig_price + 50000, "version": f["version"]}, headers=admin_headers)
->       assert r.status_code == 200, r.text
-E       AssertionError: {"detail":"Flat was modified by someone else (current version 12). Reload and retry.","code":"VERSION_CONFLICT","request_id":"adb06ab165ce4855","current":{"id":"dd1b33c6-ea8b-4c05-8f15-47b4937c670c","company_id":"61e35c1c-91c6-43c9-a732-2f790d5b57aa","created_at":"2026-10-26T20:33:06.384296+00:00","updated_at":"2026-10-27T11:04:11.478007+00:00","created_by":"b63b8b19-94ac-4c8e-845b-faf8019d7a8e","is_active":true,"deleted_at":null,"version":12,"project_id":"c170483e-f746-40df-9f1f-e6d798328039","block_id":"00080cc4-567d-4276-8cb3-86d3b91981f9","flat_type_id":"d83ac4c1-3794-49e5-9983-f02c2547f374","flat_type_code":"2BHK-A","flat_number":"M2-201","floor":2,"floor_label":"2","position":1,"facing":"E","is_corner":false,"status":"Hold","rooms_snapshot":[{"room_type_id":"77248ca3-c6d8-4253-b1e0-751540626984","label":"Living Room","length_ft":16,"width_ft":12,"area_sqft":192,"room_type_name":"Living Room","room_type_code":"LIVING"},{"room_type_id":"7586d37d-be87-42c6-937e-b233c2029975","label":"Master Bedroom","length_ft":14,"width_ft":11,"area_sqft":154,"room_type_name":"Master Bedroom","room_type_code":"MBED"},{"room_type_id":"dff74e8e-990a-4d27-ab7f-663d845eaf25","label":"Bedroom 2","length_ft":12,"width_ft":10,"area_sqft":120,"room_type_name":"Bedroom","room_type_code":"BED"},{"room_type_id":"d428f2fd-49e1-4b74-a401-a864f6510659","label":"Kitchen","length_ft":10,"width_ft":8,"area_sqft":80,"room_type_name":"Kitchen","room_type_code":"KITCHEN"},{"room_type_id":"ae25bc2a-e91c-49f0-b092-58ad0479a69b","label":"Bathroom 1","length_ft":7,"width_ft":5,"area_sqft":35,"room_type_name":"Bathroom","room_type_code":"BATH"},{"room_type_id":"ae25bc2a-e91c-49f0-b092-58ad0479a69b","label":"Bathroom 2","length_ft":6,"width_ft":5,"area_sqft":30,"room_type_name":"Bathroom","room_type_code":"BATH"},{"room_type_id":"0d6f342b-1ecb-4983-b3b8-bacd77ef04d8","label":"Balcony","length_ft":10,"width_ft":4,"area_sqft":40,"room_type_name":"Balcony","room_type_code":"BALCONY"}],"areas_snapshot":[{"area_type_id":"0714d2f8-b492-4edc-9114-27d8ba3c86b2","value_sqft":680,"area_type_name":"Carpet Area","area_type_code":"CARPET"},{"area_type_id":"fe3de2e3-df21-486a-b6a9-616edfde5eaa","value_sqft":790,"area_type_name":"Built-up Area","area_type_code":"BUILTUP"},{"area_type_id":"6b26cca3-8431-441b-b380-324b344f69c3","value_sqft":1050,"area_type_name":"Super Built-up Area","area_type_code":"SUPER_BUILTUP"},{"area_type_id":"834ab95e-6a6b-4dcb-9142-18a5780ed3ff","value_sqft":40,"area_type_name":"Balcony Area","area_type_code":"BALCONY"}],"carpet_sqft":680,"builtup_sqft":790,"super_builtup_sqft":1050,"rate_per_sqft":4375.0,"price_paise":459375000,"price_breakup":[{"label":"Base ₹4200/sq.ft × 1050","amount":4410000.0},{"label":"Floor Rise ₹25/sq.ft","amount":26250.0},{"label":"Park Facing ₹150/sq.ft","amount":157500.0}],"rate_card_id":"964c6d51-a14b-43f5-98e8-33f7e52a6c94","notes":null,"allocation_category_code":"BUILDER","allocation_category_id":"a0dc6d47-90e1-481a-966a-ea6d4fb86c4e","bookable":true,"display_override":false,"booking_id":null,"status_changed_at":"2026-10-27T11:04:11.478007+00:00","status_changed_by":"b63b8b19-94ac-4c8e-845b-faf8019d7a8e","hold":{"reason_id":"f205cd59-b86b-4fbf-ac50-d1949fb666df","for_customer_id":null,"for_user_id":"b63b8b19-94ac-4c8e-845b-faf8019d7a8e","note":null,"expires_at":"2026-10-27T13:04:11.473262+00:00","created_by":"b63b8b19-94ac-4c8e-845b-faf8019d7a8e","created_at":"2026-10-27T11:04:11.478007+00:00"},"status_reason":null,"display_reason":"test done","display_set_at":"2026-10-27T11:04:10.571715+00:00","display_set_by":"b63b8b19-94ac-4c8e-845b-faf8019d7a8e","display_state":null},"error":{"code":"VERSION_CONFLICT","message":"Flat was modified by someone else (current version 12). Reload and retry.","details":[{"current":{"id":"dd1b33c6-ea8b-4c05-8f15-47b4937c670c","company_id":"61e35c1c-91c6-43c9-a732-2f790d5b57aa","created_at":"2026-10-26T20:33:06.384296+00:00","updated_at":"2026-10-27T11:04:11.478007+00:00","created_by":"b63b8b19-94ac-4c8e-845b-faf8019d7a8e","is_active":true,"deleted_at":null,"version":12,"project_id":"c170483e-f746-40df-9f1f-e6d798328039","block_id":"00080cc4-567d-4276-8cb3-86d3b91981f9","flat_type_id":"d83ac4c1-3794-49e5-9983-f02c2547f374","flat_type_code":"2BHK-A","flat_number":"M2-201","floor":2,"floor_label":"2","position":1,"facing":"E","is_corner":false,"status":"Hold","rooms_snapshot":[{"room_type_id":"77248ca3-c6d8-4253-b1e0-751540626984","label":"Living Room","length_ft":16,"width_ft":12,"area_sqft":192,"room_type_name":"Living Room","room_type_code":"LIVING"},{"room_type_id":"7586d37d-be87-42c6-937e-b233c2029975","label":"Master Bedroom","length_ft":14,"width_ft":11,"area_sqft":154,"room_type_name":"Master Bedroom","room_type_code":"MBED"},{"room_type_id":"dff74e8e-990a-4d27-ab7f-663d845eaf25","label":"Bedroom 2","length_ft":12,"width_ft":10,"area_sqft":120,"room_type_name":"Bedroom","room_type_code":"BED"},{"room_type_id":"d428f2fd-49e1-4b74-a401-a864f6510659","label":"Kitchen","length_ft":10,"width_ft":8,"area_sqft":80,"room_type_name":"Kitchen","room_type_code":"KITCHEN"},{"room_type_id":"ae25bc2a-e91c-49f0-b092-58ad0479a69b","label":"Bathroom 1","length_ft":7,"width_ft":5,"area_sqft":35,"room_type_name":"Bathroom","room_type_code":"BATH"},{"room_type_id":"ae25bc2a-e91c-49f0-b092-58ad0479a69b","label":"Bathroom 2","length_ft":6,"width_ft":5,"area_sqft":30,"room_type_name":"Bathroom","room_type_code":"BATH"},{"room_type_id":"0d6f342b-1ecb-4983-b3b8-bacd77ef04d8","label":"Balcony","length_ft":10,"width_ft":4,"area_sqft":40,"room_type_name":"Balcony","room_type_code":"BALCONY"}],"areas_snapshot":[{"area_type_id":"0714d2f8-b492-4edc-9114-27d8ba3c86b2","value_sqft":680,"area_type_name":"Carpet Area","area_type_code":"CARPET"},{"area_type_id":"fe3de2e3-df21-486a-b6a9-616edfde5eaa","value_sqft":790,"area_type_name":"Built-up Area","area_type_code":"BUILTUP"},{"area_type_id":"6b26cca3-8431-441b-b380-324b344f69c3","value_sqft":1050,"area_type_name":"Super Built-up Area","area_type_code":"SUPER_BUILTUP"},{"area_type_id":"834ab95e-6a6b-4dcb-9142-18a5780ed3ff","value_sqft":40,"area_type_name":"Balcony Area","area_type_code":"BALCONY"}],"carpet_sqft":680,"builtup_sqft":790,"super_builtup_sqft":1050,"rate_per_sqft":4375.0,"price_paise":459375000,"price_breakup":[{"label":"Base ₹4200/sq.ft × 1050","amount":4410000.0},{"label":"Floor Rise ₹25/sq.ft","amount":26250.0},{"label":"Park Facing ₹150/sq.ft","amount":157500.0}],"rate_card_id":"964c6d51-a14b-43f5-98e8-33f7e52a6c94","notes":null,"allocation_category_code":"BUILDER","allocation_category_id":"a0dc6d47-90e1-481a-966a-ea6d4fb86c4e","bookable":true,"display_override":false,"booking_id":null,"status_changed_at":"2026-10-27T11:04:11.478007+00:00","status_changed_by":"b63b8b19-94ac-4c8e-845b-faf8019d7a8e","hold":{"reason_id":"f205cd59-b86b-4fbf-ac50-d1949fb666df","for_customer_id":null,"for_user_id":"b63b8b19-94ac-4c8e-845b-faf8019d7a8e","note":null,"expires_at":"2026-10-27T13:04:11.473262+00:00","created_by":"b63b8b19-94ac-4c8e-845b-faf8019d7a8e","created_at":"2026-10-27T11:04:11.478007+00:00"},"status_reason":null,"display_reason":"test done","display_set_at":"2026-10-27T11:04:10.571715+00:00","display_set_by":"b63b8b19-94ac-4c8e-845b-faf8019d7a8e","display_state":null}}],"request_id":"adb06ab165ce4855"}}
-E       assert 409 == 200
-E        +  where 409 = <Response [409]>.status_code
-
-tests/test_prepublish_fixes.py:20: AssertionError
-=============================== warnings summary ===============================
-../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
-../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
-  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
-    import multipart
-
-../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
-../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
-  /root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
-    from crypt import crypt as _crypt
-
-tests/test_phase_k_p1.py::test_loadshed_sheds_with_prebuilt_503_and_exempts_probes
-  /root/.venv/lib/python3.11/site-packages/starlette/testclient.py:41: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
-    [], typing.ContextManager[anyio.abc.BlockingPortal]
-
-tests/test_kkt_erp.py::TestBlock::test_create_block_and_generation
-tests/test_kkt_erp.py::TestFlatType::test_create_flat_type_auto_area
-tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
-tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
-  /root/.venv/lib/python3.11/site-packages/_pytest/fixtures.py:1313: PytestRemovedIn10Warning: Class-scoped fixture defined as instance method is deprecated.
-  Instance attributes set in this fixture will NOT be visible to test methods,
-  as each test gets a new instance while the fixture runs only once per class.
-  Use @classmethod decorator and set attributes on cls instead.
-  See https://docs.pytest.org/en/stable/deprecations.html#class-scoped-fixture-as-instance-method
-    fixturefunc = resolve_fixture_function(fixturedef, request)
-
-tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources
-  /root/.venv/lib/python3.11/site-packages/_pytest/python.py:171: PytestReturnNotNoneWarning: Test functions should return None, but tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources returned <class 'str'>.
-  Did you mean to use `assert` instead of `return`?
-  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
-    warnings.warn(
-
--- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-=========================== short test summary info ============================
-FAILED tests/test_prepublish_fixes.py::test_manual_price_override_then_revert_restores_rate_card_breakup
-1 failed, 568 passed, 2 skipped, 10 warnings in 500.90s (0:08:20)
-SUITE_EXIT 1
+............................................F........................... [ 75%]
+........................................................................ [ 88%]
+....../root/.venv/lib/python3.11/site-packages/_pytest/main.py:365: PluggyTeardownRaisedWarning: A plugin raised an exception during an old-style hookwrapper teardown.
+Plugin: 280995897767120, Hook: pytest_sessionfinish
+OSError: cannot send (already closed?)
+For more information see https://pluggy.readthedocs.io/en/stable/api_reference.html#pluggy.PluggyTeardownRaisedWarning
+  config.hook.pytest_sessionfinish(
+/root/.venv/lib/python3.11/site-packages/_pytest/main.py:365: PluggyTeardownRaisedWarning: A plugin raised an exception during an old-style hookwrapper teardown.
+Plugin: 278705172411600, Hook: pytest_sessionfinish
+OSError: cannot send (already closed?)
+For more information see https://pluggy.readthedocs.io/en/stable/api_reference.html#pluggy.PluggyTeardownRaisedWarning
+  config.hook.pytest_sessionfinish(

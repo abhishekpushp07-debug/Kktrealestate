@@ -33,7 +33,10 @@ def _avail_flats(h, n):
     assert len(rows) >= n, len(rows)
     rows = rows[10:] if len(rows) > n + 10 else rows  # other modules mutate the first few Available flats under xdist; stay clear of them
     random.shuffle(rows)
-    return rows[:n]
+    by_block: dict = {}
+    for f in rows:
+        by_block.setdefault(f["block_id"], []).append(f)
+    return max(by_block.values(), key=len)[:n]  # same tower, so per-block counters tie out
 
 
 def _bulk(h, **body):
