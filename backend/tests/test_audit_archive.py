@@ -31,7 +31,7 @@ def test_archive_moves_only_rows_older_than_retention(admin_headers, mongo):
     assert mongo.audit_logs.find_one({"id": old_id}) is None and mongo.audit_logs.find_one({"id": new_id}) is not None
     arch = mongo.audit_logs_archive.find_one({"id": old_id})
     assert arch and arch["after"] == {"x": 1} and arch["archived_at"]
-    assert mongo.audit_logs.count_documents({}) + res["moved"] == hot_before + 1  # +1: the archive run itself is audited; nothing is deleted
+    assert mongo.audit_logs.count_documents({}) + res["moved"] >= hot_before + 1  # +1: the archive run itself is audited; nothing is deleted (≥: other xdist workers write audit rows concurrently)
     # archive is searchable through the central page toggle, hot default excludes it
     hot = requests.get(f"{API}/audit-logs", headers=admin_headers, params={"entity_type": "flat", "entity_id": "e-old"}, timeout=20).json()
     assert all(i["id"] != old_id for i in hot["items"])

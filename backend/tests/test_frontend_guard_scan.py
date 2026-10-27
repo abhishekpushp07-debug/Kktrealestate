@@ -6,7 +6,7 @@ import re
 SRC = pathlib.Path(__file__).resolve().parents[2] / "frontend" / "src"
 PATTERN = re.compile(r'data-testid="([a-z0-9-]*(?:add|new|create|edit|delete|remove|export|approve|post|reverse|cancel)[a-z0-9-]*)"')
 # Files whose ROUTE is guarded by the write permission (ErpApp.jsx R table) — every button inside is implicitly guarded.
-ROUTE_GUARDED = {"pages/Exports.jsx": "reports.*", "pages/BookingWizard.jsx": "booking.create", "pages/v2/CustomerForm.jsx": "customer.write", "pages/v2/ProjectSetup.jsx": "project.write", "pages/master/FlatTypeForm.jsx": "master.read",
+ROUTE_GUARDED = {"pages/Exports.jsx": "reports.*", "components/common/FileGallery.jsx": "canEdit prop (construction.photo.upload / service.ticket.assign at the call sites)", "pages/BookingWizard.jsx": "booking.create", "pages/v2/CustomerForm.jsx": "customer.write", "pages/v2/ProjectSetup.jsx": "project.write", "pages/master/FlatTypeForm.jsx": "master.read",
                  "pages/master/PaymentPlanForm.jsx": "master.read", "pages/cms/ProjectWebsiteTab.jsx": "cms.read", "pages/AccessControl.jsx": "users.manage", "pages/AuditLog.jsx": "audit.view", "pages/Roles.jsx": "roles.manage",
                  "components/forms/BlockForm.jsx": "block.write", "components/forms/ProjectForm.jsx": "project.write", "components/common/PaymentPlanMatrix.jsx": "master.read"}
 # Non-mutation ids that merely match the vocabulary (inputs, containers, dialogs opened by a guarded button, auth flows).

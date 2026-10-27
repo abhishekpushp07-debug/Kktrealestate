@@ -137,6 +137,8 @@ DAILY_STEPS = {"integrity", "reconcile"}  # O(all rows): at startup only when th
 async def _watermark_skip(name: str) -> bool:
     """Phase J.2: never rescan completed migrations. `migrations` holds (step, version) → done_at; daily steps skip within 24 h."""
     from datetime import UTC, datetime, timedelta
+    if os.environ.get("KKT_FORCE_STARTUP"):
+        return False
     if name in ONE_TIME_STEPS:
         return await db.migrations.find_one({"step": name, "version": VERSION}, {"_id": 1}) is not None
     if name in DAILY_STEPS:

@@ -76,7 +76,7 @@ asyncio.run(main())
 
 
 def _run_startup():
-    env = {**os.environ, "DB_NAME": DST}
+    env = {**os.environ, "DB_NAME": DST, "KKT_FORCE_STARTUP": "1"}
     r = subprocess.run([sys.executable, "-c", RUN % os.path.join(os.path.dirname(__file__), "..")], env=env, cwd=os.path.join(os.path.dirname(__file__), ".."), capture_output=True, text=True, timeout=240)
     assert r.returncode == 0, r.stderr[-3000:]
     return r.stderr

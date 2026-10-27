@@ -49,7 +49,7 @@ def walk(Hd, path, limit, extra):
         total = d["total"] if total is None else total
         seen += [x["id"] for x in d["items"]]
         cur, pages = d.get("next_cursor"), pages + 1
-        assert pages <= total // limit + 10, f"{path}: walked {pages} pages for total {total} at limit {limit}"  # +10: rows created concurrently by other xdist workers
+        assert pages <= d["total"] // limit + 10, f"{path}: walked {pages} pages for live total {d['total']} at limit {limit}"  # live total: rows created concurrently by other xdist workers (dues engine, fixtures)
         if not cur:
             return seen, total, pages
 

@@ -1,5 +1,6 @@
 """Phase 7 integrity check: installment demands vs. plan triggers (stage state / time) per booking, plus repair."""
 from services import clock
+import asyncio
 import logging
 from datetime import date
 
@@ -174,4 +175,10 @@ async def _booking_ledger_findings(bk: dict, out: list) -> None:
         out.append(_rf("summary_paid_mismatch", f"summary cash {sm.get('cash_paid_paise')}≠{cash_paid} / account {sm.get('account_paid_paise')}≠{acc_paid}", booking_id=bk["id"], booking_number=bk["booking_number"]))
     last = await db.ledger_entries.find_one({"booking_id": bk["id"]}, {"_id": 0, "outstanding_paise": 1}, sort=[("seq", -1)])
     if last and sm and last.get("outstanding_paise") is not None and sm.get("due_paise") is not None and last["outstanding_paise"] != sm["due_paise"]:
-        out.append(_rf("ledger_due_mismatch", f"last ledger outstanding {last['outstanding_paise']} ≠ summary due {sm['due_paise']}", booking_id=bk["id"], booking_number=bk["booking_number"]))
+        # read skew guard: a payment in flight (ledger appended, summary not yet written) is not a finding — re-read once before reporting
+        await asyncio.sleep(0.2)
+        fresh = await db.bookings.find_one({"id": bk["id"]}, {"_id": 0, "summary.due_paise": 1}) or {}
+        last = await db.ledger_entries.find_one({"booking_id": bk["id"]}, {"_id": 0, "outstanding_paise": 1}, sort=[("seq", -1)])
+        due = (fresh.get("summary") or {}).get("due_paise")
+        if last and due is not None and last.get("outstanding_paise") != due:
+            out.append(_rf("ledger_due_mismatch", f"last ledger outstanding {last['outstanding_paise']} ≠ summary due {due}", booking_id=bk["id"], booking_number=bk["booking_number"]))
