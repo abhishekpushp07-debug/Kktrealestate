@@ -26,10 +26,11 @@ def public_notification(n: dict) -> dict:
     return {"id": n["id"], "type": n.get("type") or CANONICAL.get(n.get("kind"), n.get("kind")), "title": n["title"], "body": n.get("body"), "booking_id": n.get("booking_id"), "entity_type": n.get("entity_type"), "entity_id": n.get("entity_id"), "is_read": bool(n.get("read")), "withdrawn": bool(n.get("withdrawn")), "created_at": n["created_at"]}
 
 
-async def retract(query: dict) -> dict:
-    """Unread → deleted; already read → withdrawn (body suffixed). Applies to customer and ERP notifications alike."""
+async def retract(query: dict, reason: str = "entity_voided") -> dict:
+    """Unread → soft-retracted (hidden, out of unread counts); already read → withdrawn (body suffixed). No deletes.
+    Applies to customer and ERP notifications alike. `deleted` is kept in the return shape for the unread-retracted count."""
     q = {**query, "withdrawn": {"$ne": True}}
-    deleted = (await db.notifications.delete_many({**q, "read": False})).deleted_count
+    deleted = (await db.notifications.update_many({**q, "read": False}, {"$set": {"withdrawn": True, "retracted": True, "retracted_at": now_iso(), "reason": reason}})).modified_count
     withdrawn = 0
     async for n in db.notifications.find({**q, "read": True}, {"_id": 0, "id": 1, "body": 1}).batch_size(500):
         await db.notifications.update_one({"id": n["id"]}, {"$set": {"withdrawn": True, "withdrawn_at": now_iso(), "body": f"{n.get('body') or ''} (withdrawn)".strip()}})
