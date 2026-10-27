@@ -95,7 +95,7 @@ export default function BlockDetail() {
       <PageHeader crumbs={[{ label: "Projects", to: "/projects" }, { label: block?.project_code || "…", to: `/projects/${b.project_id}` }, { label: b.code }]} title={b.name}
         subtitle={`${block?.block_type_name || ""} · ${b.floors} floors${b.skip_floors?.length ? ` (skips ${b.skip_floors.join(", ")})` : ""}${b.refuge_floors?.length ? ` · refuge ${b.refuge_floors.join(", ")}` : ""} · numbering e.g. ${previewNumber(b)}`}
         actions={<>
-          <button type="button" className="btn btn-secondary" onClick={() => window.print()} data-testid="print-grid-btn" className="print:hidden"><Printer className="mr-1.5 h-4 w-4" />Print</button>
+          <button type="button" className="btn btn-secondary print:hidden" onClick={() => window.print()} data-testid="print-grid-btn"><Printer className="mr-1.5 h-4 w-4" />Print</button>
           <button type="button" className="btn btn-secondary" onClick={() => setShowMilestones(!showMilestones)} data-testid="block-milestones-btn"><Milestone className="mr-1.5 h-4 w-4" />Construction Status</button>
           <button type="button" className="btn btn-secondary" onClick={() => setShowHistory(!showHistory)} data-testid="block-history-btn"><History className="mr-1.5 h-4 w-4" />History</button>
           {can("masters.flat.edit") && <button type="button" className="btn btn-secondary" onClick={() => setBulkOpen(true)} data-testid="bulk-price-btn"><IndianRupee className="mr-1.5 h-4 w-4" />Bulk price</button>}
@@ -114,7 +114,7 @@ export default function BlockDetail() {
             <span className="label-xs">Colour by</span>
             {[["status", "Status"], ["type", "Flat type"], ["price", "Price band"]].map(([m, l]) => <button key={m} onClick={() => setMode(m)} className={cn("rounded-full border px-3 py-1 text-xs font-semibold", mode === m ? "border-ink-950 bg-ink-950 text-white" : "bg-white hover:border-gold")} data-testid={`grid-mode-${m}`}>{l}</button>)}
             {multi.size > 0 && can("sales.hold.create") && <div className="ml-auto flex items-center gap-2 rounded-md bg-gold-light px-3 py-1.5 text-xs" data-testid="grid-bulk-bar"><b>{multi.size} selected</b>
-              {["Available", "Hold", "Blocked"].map((s) => <button type="button" className="btn btn-primary" key={s} size="sm" variant="outline" className="h-7" onClick={() => bulkStatus(s)} data-testid={`grid-bulk-${s.toLowerCase()}`}>→ {s}</button>)}
+              {["Available", "Hold", "Blocked"].map((s) => <button type="button" className="btn btn-primary h-7" key={s} onClick={() => bulkStatus(s)} data-testid={`grid-bulk-${s.toLowerCase()}`}>→ {s}</button>)}
               <button onClick={() => setMulti(new Set())} className="text-txt-secondary underline">clear</button></div>}
             {multi.size === 0 && <span className="ml-auto text-[11px] text-txt-muted">Ctrl/⌘-click to multi-select · Shift for range</span>}
           </div>
