@@ -38,3 +38,8 @@ Root causes found with tracemalloc + gc walk (`KKT_TRACEMALLOC=1`):
 ## 3. Gate
 - Full suite: **548 passed, 2 skipped, 0 failed** (kkt_test, 4 workers, 377 s) — memory/qa/scale/full_suite_j2.log. Flaky tests made deterministic (integrity read-skew re-check, live-total cursor bound, audit-archive ≥, startup-lease race in the idempotence test).
 - Registry: `routes 270 unmapped []`. Health 0.19 s. Deployment agent: WARN only (empty CORS_ORIGINS = intentional same-origin). Headline numbers test included in the suite.
+
+## Pre-publish (27 Oct 2026)
+- job_failed alert cause: `BACKUP` run started 00:01:22 UTC was left RUNNING when the backend process restarted during Phase J.2 work (mongodump interrupted); `JOB_RUN_SWEEP` marked it ABANDONED at 01:08. One-off — the next scheduled BACKUP finished OK. Rule now self-clears after the next OK run of the job; Super Admin can acknowledge (audited `alert.acknowledge`, fingerprinted so it re-fires when a different job fails). Firing now: [].
+- CSV ₹ cells: plain integers / 2 dp (utils.csv_num), tested.
+- Full suite: 554 passed, 2 skipped, 0 failed (full_suite_prepublish.log). Headline test in suite; integrity fresh ok=true; health 0.10 s; deployment agent WARN only (CORS same-origin).
