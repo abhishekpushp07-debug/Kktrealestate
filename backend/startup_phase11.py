@@ -61,6 +61,13 @@ async def startup_phase11():
     added = await seed_catalogues()
     await migrate_customer_profiles()
     if not await db.settings.find_one({"key": "read_models_v1"}):
-        log.info("[phase11] read models: %s", await recompute_all())
+        for attempt in (1, 2):  # under heavy concurrent load a budgeted aggregation may time out once; the rebuild is idempotent
+            try:
+                log.info("[phase11] read models: %s", await recompute_all())
+                break
+            except Exception:  # noqa: BLE001
+                log.exception("[phase11] read-model rebuild attempt %s failed", attempt)
+                if attempt == 2:
+                    raise
     if added:
         log.info("[phase11] catalogue items seeded: %s", added)
