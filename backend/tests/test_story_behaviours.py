@@ -139,7 +139,12 @@ def test_rate_card_create_activate_apply_to_available(admin_headers):
     assert rc["status"] == "Draft"
     assert requests.post(f"{API}/projects/{sgh['id']}/rate-cards/{rc['id']}/activate", headers=h).status_code == 200
     avail = requests.get(f"{API}/flats?project_id={sgh['id']}&status=Available&page_size=1", headers=h).json()["total"]
+    saleable = requests.get(f"{API}/flats?project_id={sgh['id']}&status=Available&category=BUILDER&page_size=1", headers=h).json()["total"]
+    pv = requests.post(f"{API}/projects/{sgh['id']}/rate-cards/{rc['id']}/apply", headers=h, params={"preview": "true"}).json()
+    assert pv["will_update"] == saleable and pv["saleable"] + pv["non_saleable"] == avail, (pv, avail, saleable)
     ap = requests.post(f"{API}/projects/{sgh['id']}/rate-cards/{rc['id']}/apply", headers=h).json()
-    assert ap["flats_updated"] == avail, (ap, avail)
+    assert ap["flats_updated"] == saleable, (ap, saleable)  # Phase N: Builder-saleable only by default; landowner/investor/... keep their price
+    ap2 = requests.post(f"{API}/projects/{sgh['id']}/rate-cards/{rc['id']}/apply", headers=h, params={"include_non_saleable": "true"}).json()
+    assert ap2["flats_updated"] == avail, (ap2, avail)
     booked = requests.get(f"{API}/flats?project_id={sgh['id']}&status=Booked&page_size=1", headers=h).json()["items"][0]
     assert booked["status"] == "Booked", "apply never touches booked flats"

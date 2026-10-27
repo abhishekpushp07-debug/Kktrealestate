@@ -2351,9 +2351,19 @@
       ],
       "title": "Floors"
      },
+     "include_non_saleable": {
+      "default": false,
+      "title": "Include Non Saleable",
+      "type": "boolean"
+     },
      "only_available": {
       "default": true,
       "title": "Only Available",
+      "type": "boolean"
+     },
+     "preview": {
+      "default": false,
+      "title": "Preview",
       "type": "boolean"
      },
      "price": {
@@ -36027,7 +36037,7 @@
   },
   "/api/projects/{project_id}/rate-cards/{rc_id}/apply": {
    "post": {
-    "description": "Recompute price + breakup for Available flats only. Hold/Booked/Sold/Blocked keep their price.",
+    "description": "Recompute price + breakup for Available flats only. Hold/Booked/Sold/Blocked keep their price. Phase N: Builder-saleable only unless include_non_saleable.",
     "operationId": "apply_rate_card_api_projects__project_id__rate_cards__rc_id__apply_post",
     "parameters": [
      {
@@ -36046,6 +36056,26 @@
       "schema": {
        "title": "Rc Id",
        "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "include_non_saleable",
+      "required": false,
+      "schema": {
+       "default": false,
+       "title": "Include Non Saleable",
+       "type": "boolean"
+      }
+     },
+     {
+      "in": "query",
+      "name": "preview",
+      "required": false,
+      "schema": {
+       "default": false,
+       "title": "Preview",
+       "type": "boolean"
       }
      }
     ],
@@ -38855,6 +38885,100 @@
     ]
    }
   },
+  "/api/reports/hold-register": {
+   "get": {
+    "operationId": "hold_register_api_reports_hold_register_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "project_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Project Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "block_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Block Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "group_by",
+      "required": false,
+      "schema": {
+       "default": "active",
+       "title": "Group By",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "format",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Format"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Hold Register",
+    "tags": [
+     "reports"
+    ]
+   }
+  },
   "/api/reports/inventory": {
    "get": {
     "operationId": "inventory_api_reports_inventory_get",
@@ -38928,6 +39052,258 @@
      }
     ],
     "summary": "Inventory",
+    "tags": [
+     "reports"
+    ]
+   }
+  },
+  "/api/reports/inventory-control": {
+   "get": {
+    "operationId": "inventory_control_api_reports_inventory_control_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "project_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Project Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "block_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Block Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "format",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Format"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Inventory Control",
+    "tags": [
+     "reports"
+    ]
+   }
+  },
+  "/api/reports/landowner-share": {
+   "get": {
+    "operationId": "landowner_share_api_reports_landowner_share_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "project_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Project Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "block_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Block Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "format",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Format"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Landowner Share",
+    "tags": [
+     "reports"
+    ]
+   }
+  },
+  "/api/reports/masked-inventory": {
+   "get": {
+    "operationId": "masked_inventory_api_reports_masked_inventory_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "project_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Project Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "block_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Block Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "format",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Format"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Masked Inventory",
     "tags": [
      "reports"
     ]
