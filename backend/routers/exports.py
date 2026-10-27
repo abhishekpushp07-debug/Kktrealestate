@@ -109,9 +109,9 @@ async def get_export(export_id: str, user: dict = Depends(get_current_user)):
 
 
 @router.get("/{export_id}/download")
-async def download(export_id: str, exp: int, sig: str, request: Request):
-    if exp < time.time() or not hmac.compare_digest(sig, _sign(export_id, exp)):
-        raise ApiError(403, "Download link expired or invalid; open the Exports page for a fresh link", "EXPORT_LINK_INVALID")
+async def download(export_id: str, request: Request, exp: int | None = None, sig: str | None = None):
+    if not exp or not sig or exp < time.time() or not hmac.compare_digest(sig, _sign(export_id, exp)):
+        raise ApiError(401 if not sig else 403, "Download link expired or invalid; open the Exports page for a fresh link", "EXPORT_LINK_INVALID")
     e = await db.exports.find_one({"id": export_id}, {"_id": 0})
     if not e or e["status"] != "DONE":
         raise ApiError(404, "Export not ready", "NOT_FOUND")

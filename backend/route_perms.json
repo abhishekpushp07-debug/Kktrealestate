@@ -1,71 +1,5 @@
 {
  "LEGACY_EXPANSION": {
-  "admin.access_control.manage": [
-   "admin.access_control.manage"
-  ],
-  "admin.audit.archive": [
-   "admin.audit.archive"
-  ],
-  "admin.audit.export": [
-   "admin.audit.export"
-  ],
-  "admin.audit.view": [
-   "admin.audit.view"
-  ],
-  "admin.data.backup": [
-   "admin.data.backup"
-  ],
-  "admin.data.erase": [
-   "admin.data.erase"
-  ],
-  "admin.data.recompute": [
-   "admin.data.recompute"
-  ],
-  "admin.data.reseed": [
-   "admin.data.reseed"
-  ],
-  "admin.definitions.view": [
-   "admin.definitions.view"
-  ],
-  "admin.documentation.view": [
-   "admin.documentation.view"
-  ],
-  "admin.role.create": [
-   "admin.role.create"
-  ],
-  "admin.role.delete": [
-   "admin.role.delete"
-  ],
-  "admin.role.edit": [
-   "admin.role.edit"
-  ],
-  "admin.role.view": [
-   "admin.role.view"
-  ],
-  "admin.settings.edit": [
-   "admin.settings.edit"
-  ],
-  "admin.settings.view": [
-   "admin.settings.view"
-  ],
-  "admin.system_health.view": [
-   "admin.system_health.view"
-  ],
-  "admin.user.create": [
-   "admin.user.create"
-  ],
-  "admin.user.deactivate": [
-   "admin.user.deactivate",
-   "admin.user.edit"
-  ],
-  "admin.user.edit": [
-   "admin.user.deactivate",
-   "admin.user.edit"
-  ],
-  "admin.user.view": [
-   "admin.role.view",
-   "admin.user.view"
-  ],
   "agreement.edit": [
    "masters.payment_plan.assign",
    "sales.agreement.revise",
@@ -114,37 +48,6 @@
    "construction.notice.edit",
    "website.cms.edit"
   ],
-  "construction.notice.create": [
-   "construction.notice.create"
-  ],
-  "construction.notice.delete": [
-   "construction.notice.delete"
-  ],
-  "construction.notice.edit": [
-   "construction.notice.edit"
-  ],
-  "construction.notice.view": [
-   "construction.notice.view"
-  ],
-  "construction.photo.delete": [
-   "construction.photo.delete"
-  ],
-  "construction.photo.upload": [
-   "construction.photo.upload"
-  ],
-  "construction.photo.view": [
-   "construction.stage.view"
-  ],
-  "construction.stage.undo": [
-   "construction.stage.undo"
-  ],
-  "construction.stage.update": [
-   "construction.stage.update",
-   "construction.update.complete"
-  ],
-  "construction.stage.view": [
-   "construction.stage.view"
-  ],
   "construction.undo": [
    "construction.stage.undo",
    "construction.update.undo"
@@ -152,16 +55,6 @@
   "construction.update": [
    "construction.stage.update",
    "construction.update.complete",
-   "construction.update.view"
-  ],
-  "construction.update.complete": [
-   "construction.stage.update",
-   "construction.update.complete"
-  ],
-  "construction.update.undo": [
-   "construction.stage.undo"
-  ],
-  "construction.update.view": [
    "construction.update.view"
   ],
   "customer.kyc_view": [
@@ -179,57 +72,6 @@
   "customer.write": [
    "sales.customer.create",
    "sales.customer.edit"
-  ],
-  "finance.cheque.bounce": [
-   "finance.cheque.bounce"
-  ],
-  "finance.cheque.clear": [
-   "finance.cheque.clear"
-  ],
-  "finance.demand.create": [
-   "finance.demand.create"
-  ],
-  "finance.demand.export": [
-   "finance.demand.export"
-  ],
-  "finance.demand.view": [
-   "finance.demand.view"
-  ],
-  "finance.ledger.export": [
-   "finance.ledger.export"
-  ],
-  "finance.ledger.view": [
-   "finance.ledger.view"
-  ],
-  "finance.payment.create": [
-   "finance.payment.create"
-  ],
-  "finance.payment.reverse": [
-   "finance.payment.reverse"
-  ],
-  "finance.payment.view": [
-   "finance.payment.view"
-  ],
-  "finance.receipt.download": [
-   "finance.receipt.download"
-  ],
-  "finance.receipt.print": [
-   "finance.receipt.print"
-  ],
-  "finance.refund.pay": [
-   "finance.refund.pay"
-  ],
-  "finance.refund.view": [
-   "finance.refund.view"
-  ],
-  "finance.roznamcha.deposit": [
-   "finance.roznamcha.deposit"
-  ],
-  "finance.roznamcha.opening_balance": [
-   "finance.roznamcha.opening_balance"
-  ],
-  "finance.roznamcha.view": [
-   "finance.roznamcha.view"
   ],
   "flat.status": [
    "sales.hold.create",
@@ -306,79 +148,6 @@
    "masters.stage_plan.delete",
    "masters.stage_plan.edit"
   ],
-  "masters.catalogue.create": [
-   "masters.catalogue.create"
-  ],
-  "masters.catalogue.edit": [
-   "masters.catalogue.edit"
-  ],
-  "masters.catalogue.view": [
-   "masters.catalogue.view"
-  ],
-  "masters.construction_stage.edit": [
-   "masters.construction_stage.edit"
-  ],
-  "masters.construction_stage.view": [
-   "masters.construction_stage.view"
-  ],
-  "masters.flat.create": [
-   "masters.flat.create"
-  ],
-  "masters.flat.edit": [
-   "masters.flat.edit"
-  ],
-  "masters.flat.view": [
-   "masters.flat.view"
-  ],
-  "masters.payment_plan.assign": [
-   "masters.payment_plan.assign"
-  ],
-  "masters.payment_plan.create": [
-   "masters.payment_plan.create"
-  ],
-  "masters.payment_plan.view": [
-   "masters.payment_plan.view"
-  ],
-  "masters.project.create": [
-   "masters.project.create"
-  ],
-  "masters.project.edit": [
-   "masters.project.edit"
-  ],
-  "masters.project.view": [
-   "masters.project.view",
-   "website.cms.view"
-  ],
-  "masters.rate_card.apply": [
-   "masters.rate_card.apply"
-  ],
-  "masters.rate_card.create": [
-   "masters.rate_card.create"
-  ],
-  "masters.rate_card.edit": [
-   "masters.rate_card.edit"
-  ],
-  "masters.rate_card.view": [
-   "masters.rate_card.view"
-  ],
-  "masters.stage_plan.create": [
-   "masters.stage_plan.create"
-  ],
-  "masters.stage_plan.delete": [
-   "masters.stage_plan.delete"
-  ],
-  "masters.stage_plan.edit": [
-   "masters.stage_plan.edit"
-  ],
-  "masters.stage_plan.view": [
-   "masters.stage_plan.view"
-  ],
-  "masters.tower.create": [
-   "masters.tower.create"
-  ],
-  "masters.tower.edit": [
-   "masters.tower.edit"
-  ],
   "milestone.update": [
    "construction.photo.delete",
    "construction.photo.upload",
@@ -450,60 +219,6 @@
    "reports.site_visit_conversion.export",
    "reports.site_visit_conversion.view"
   ],
-  "reports.audit.view": [
-   "reports.audit.view"
-  ],
-  "reports.bank_wise.view": [
-   "reports.bank_wise.view"
-  ],
-  "reports.cancellations_refunds.view": [
-   "reports.cancellations_refunds.view"
-  ],
-  "reports.cash_vs_account.view": [
-   "reports.cash_vs_account.view"
-  ],
-  "reports.cheque_register.view": [
-   "reports.cheque_register.view"
-  ],
-  "reports.collections.view": [
-   "reports.collections.view"
-  ],
-  "reports.construction_vs_plan.view": [
-   "reports.construction_vs_plan.view"
-  ],
-  "reports.data_quality.view": [
-   "reports.data_quality.view"
-  ],
-  "reports.demand_vs_collection.view": [
-   "reports.demand_vs_collection.view"
-  ],
-  "reports.inventory.view": [
-   "reports.inventory.view"
-  ],
-  "reports.lead_funnel.view": [
-   "reports.lead_funnel.view"
-  ],
-  "reports.other_charges.view": [
-   "reports.other_charges.view"
-  ],
-  "reports.outstanding.view": [
-   "reports.outstanding.view"
-  ],
-  "reports.receivables_forecast.view": [
-   "reports.receivables_forecast.view"
-  ],
-  "reports.roznamcha.view": [
-   "reports.roznamcha.view"
-  ],
-  "reports.sales_team.view": [
-   "reports.sales_team.view"
-  ],
-  "reports.service_sla.view": [
-   "reports.service_sla.view"
-  ],
-  "reports.site_visit_conversion.view": [
-   "reports.site_visit_conversion.view"
-  ],
   "roles.manage": [
    "admin.access_control.manage",
    "admin.role.create",
@@ -511,119 +226,10 @@
    "admin.role.edit",
    "admin.role.view"
   ],
-  "sales.agreement.revise": [
-   "sales.agreement.revise"
-  ],
-  "sales.agreement.view": [
-   "sales.agreement.view"
-  ],
-  "sales.booking.cancel": [
-   "sales.booking.cancel"
-  ],
-  "sales.booking.create": [
-   "sales.booking.create"
-  ],
-  "sales.booking.edit": [
-   "sales.booking.edit"
-  ],
-  "sales.booking.export": [
-   "sales.booking.export"
-  ],
-  "sales.booking.transfer": [
-   "sales.booking.transfer"
-  ],
-  "sales.booking.view": [
-   "sales.booking.view"
-  ],
-  "sales.customer.create": [
-   "sales.customer.create",
-   "sales.lead.edit"
-  ],
-  "sales.customer.edit": [
-   "sales.customer.edit"
-  ],
-  "sales.customer.view": [
-   "sales.customer.view"
-  ],
-  "sales.hold.create": [
-   "sales.hold.create",
-   "sales.hold.release"
-  ],
-  "sales.hold.release": [
-   "sales.hold.create",
-   "sales.hold.release"
-  ],
-  "sales.kyc.edit": [
-   "sales.kyc.edit"
-  ],
-  "sales.lead.create": [
-   "sales.lead.create"
-  ],
-  "sales.lead.edit": [
-   "sales.customer.create",
-   "sales.lead.edit"
-  ],
-  "sales.lead.view": [
-   "sales.lead.view"
-  ],
-  "sales.site_visit.cancel": [
-   "sales.site_visit.cancel",
-   "sales.site_visit.complete",
-   "sales.site_visit.edit"
-  ],
-  "sales.site_visit.complete": [
-   "sales.site_visit.cancel",
-   "sales.site_visit.complete",
-   "sales.site_visit.edit"
-  ],
-  "sales.site_visit.create": [
-   "sales.site_visit.create"
-  ],
-  "sales.site_visit.edit": [
-   "sales.site_visit.cancel",
-   "sales.site_visit.complete",
-   "sales.site_visit.edit"
-  ],
-  "sales.site_visit.export": [
-   "sales.site_visit.export"
-  ],
-  "sales.site_visit.view": [
-   "sales.site_visit.view"
-  ],
   "service.assign": [
    "service.ticket.assign"
   ],
-  "service.portal.manage": [
-   "service.portal.manage"
-  ],
-  "service.portal.view": [
-   "service.portal.view"
-  ],
   "service.read": [
-   "service.ticket.view"
-  ],
-  "service.ticket.assign": [
-   "service.ticket.assign"
-  ],
-  "service.ticket.close": [
-   "service.ticket.close",
-   "service.ticket.edit",
-   "service.ticket.reopen"
-  ],
-  "service.ticket.create": [
-   "service.ticket.create"
-  ],
-  "service.ticket.edit": [
-   "service.ticket.close",
-   "service.ticket.edit",
-   "service.ticket.reopen"
-  ],
-  "service.ticket.reopen": [
-   "service.ticket.close",
-   "service.ticket.edit",
-   "service.ticket.reopen"
-  ],
-  "service.ticket.view": [
    "service.ticket.view"
   ],
   "service.write": [
@@ -660,12 +266,6 @@
    "sales.site_visit.complete",
    "sales.site_visit.create",
    "sales.site_visit.edit"
-  ],
-  "website.cms.edit": [
-   "website.cms.edit"
-  ],
-  "website.cms.view": [
-   "website.cms.view"
   ]
  },
  "ROUTE_PERMS": {

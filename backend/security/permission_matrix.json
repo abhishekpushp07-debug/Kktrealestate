@@ -237,6 +237,15 @@
  "GET /api/documents/{doc_id}/download": [
   "<authenticated>"
  ],
+ "GET /api/exports": [
+  "<authenticated>"
+ ],
+ "GET /api/exports/{export_id}": [
+  "<authenticated>"
+ ],
+ "GET /api/exports/{export_id}/download": [
+  "<public>"
+ ],
  "GET /api/flats": [
   "masters.project.view"
  ],

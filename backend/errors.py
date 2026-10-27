@@ -102,7 +102,7 @@ ERRORS: dict[str, tuple[int, ...]] = {
     "SAME_FLAT": (400,),
     "SCOPE_ESCALATION": (403,),
     "EXPORT_LIMIT": (429,),
-    "EXPORT_LINK_INVALID": (403,),
+    "EXPORT_LINK_INVALID": (401, 403),
     "EXPORT_EXPIRED": (410,),
     "GRANT_ESCALATION": (403,),
     "SELF_ACCESS_CHANGE": (409,),
