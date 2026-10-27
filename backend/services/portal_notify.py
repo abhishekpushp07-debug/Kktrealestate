@@ -53,9 +53,14 @@ async def retract_for_stage(block_id: str, stage_id: str, stage_name: str) -> di
     return await retract({"$or": [{"stage_id": stage_id}, {"kind": "stage.completed", "entity_type": "block", "entity_id": block_id, "title": {"$regex": re.escape(stage_name)}}]})
 
 
+async def _withdraw_orphan(n: dict) -> None:
+    """Startup sweep never deletes: orphaned rows are soft-withdrawn (same shape retract() uses for read rows)."""
+    await db.notifications.update_one({"id": n["id"]}, {"$set": {"withdrawn": True, "withdrawn_at": now_iso(), "orphan": True, "swept_v": 2, "body": f"{n.get('body') or ''} (withdrawn)".strip()}})
+
+
 async def sweep_notifications() -> dict:
-    """Startup: canonical types for customer notifications, fill booking_id from the demand, drop orphans. Idempotent."""
-    stats = {"normalized": 0, "deleted": 0}
+    """Startup: canonical types for customer notifications, fill booking_id from the demand, soft-withdraw orphans (no deletes). Idempotent."""
+    stats = {"normalized": 0, "withdrawn": 0}
     # Phase J.2: O(changed) — rows already normalised carry swept_v=2 and are skipped (watermark per row; no full rescan on later boots)
     async for n in db.notifications.find({"user_id": {"$regex": "^customer:"}, "swept_v": {"$ne": 2}}, {"_id": 0}).batch_size(500):
         kind = n.get("type") or n.get("kind")
@@ -69,15 +74,15 @@ async def sweep_notifications() -> dict:
                 m = _DM.search(n.get("body") or "")
                 dem = await db.demands.find_one({"demand_number": m.group(1)}, {"_id": 0, "id": 1, "booking_id": 1, "voided": 1}) if m else None
             if not dem or dem.get("voided"):
-                await db.notifications.delete_one({"id": n["id"]})
-                stats["deleted"] += 1
+                await _withdraw_orphan(n)
+                stats["withdrawn"] += 1
                 continue
             upd.update(entity_type="demand", entity_id=dem["id"], booking_id=dem["booking_id"])
         elif ntype in ("ticket.reply", "notice.published", "stage.completed"):
             coll = {"ticket.reply": db.service_requests, "notice.published": db.notices, "stage.completed": db.blocks}[ntype]
             if n.get("entity_id") and not await coll.find_one({"id": n["entity_id"]}, {"_id": 0, "id": 1}):
-                await db.notifications.delete_one({"id": n["id"]})
-                stats["deleted"] += 1
+                await _withdraw_orphan(n)
+                stats["withdrawn"] += 1
                 continue
         if "withdrawn" not in n:
             upd["withdrawn"] = False
@@ -86,6 +91,6 @@ async def sweep_notifications() -> dict:
         upd["swept_v"] = 2
         await db.notifications.update_one({"id": n["id"]}, {"$set": upd})
         stats["normalized"] += 1
-    if stats["normalized"] or stats["deleted"]:
+    if stats["normalized"] or stats["withdrawn"]:
         logger.info("[notify] sweep: %s", stats)
     return stats
