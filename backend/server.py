@@ -287,7 +287,7 @@ async def lifespan(app: FastAPI):
     from services.read_models import sweep_loop
     from routers.visits import nudge_loop
     _spawn(startup_tasks())
-    _spawn(run_as_leader("scheduler", _overdue_loop, _dues_loop, nudge_loop, sweep_loop, _audit_archive_loop))
+    _spawn(run_as_leader("scheduler", _overdue_loop, _dues_loop, nudge_loop, sweep_loop, _audit_archive_loop, _reminders_loop, _message_send_loop))
     _spawn(init_storage_async())
     logger.info("KKT backend serving after %.2fs (uow=%s); background startup tasks running", time.perf_counter() - t0, UOW_STATE["mode"])
     yield
@@ -404,6 +404,34 @@ async def _audit_archive_loop():
             logging.getLogger("kkt").exception("audit archive job failed")
 
 
+async def _reminders_loop():
+    """Phase Q: OVERDUE_REMINDERS — checks hourly, sends only inside the owner's IST window; thresholds dedupe via unique index so hourly re-checks never double-send."""
+    from services.messaging.reminders import run_overdue_reminders
+    while True:
+        try:
+            await timed_job("overdue_reminders", run_overdue_reminders)
+        except Exception:
+            logging.getLogger("kkt").exception("reminders job failed")
+        await asyncio.sleep(3600)
+
+
+async def _message_send_loop():
+    """Phase Q: MESSAGE_SEND outbox — queued messages with due next_attempt_at, ×3 backoff."""
+    from services.messaging.outbox import ensure_indexes, run_message_send
+    from services.trends import backfill_once
+    try:
+        await ensure_indexes()
+        await backfill_once()
+    except Exception:
+        logging.getLogger("kkt").exception("messaging indexes / trends backfill failed")
+    while True:
+        try:
+            await run_message_send()
+        except Exception:
+            logging.getLogger("kkt").exception("message send job failed")
+        await asyncio.sleep(60)
+
+
 async def _overdue_loop():
     from routers.notifications import overdue_demand_job
     while True:
@@ -458,6 +486,8 @@ from routers import reports_i as _reports_i
 from routers import reports_n as _reports_n
 from routers import docgen as _docgen
 from routers import demand_register as _demand_register
+from routers import messaging as _messaging
+from routers import trends as _trends
 from routers import exports as _exports
 from routers import files as _files
 from routers import inventory as _inventory
@@ -466,7 +496,7 @@ from routers import access as _access
 for r in (_ops.router, _access.router, _exports.router, _files.router, _inventory.router, auth.router, users.router, roles.router, master.router, projects.router, rate_cards.router, blocks.router, masters_plus.router, flats.router, parking.router,
           settings.router, audit.router, dashboard.router, search.router, imports.router,
           customers.router, leads.router, documents.router, bookings.router, milestones.router, payments.router, roznamcha.router, admin.router, cms.router, public.router, reports.router, notifications.router, pdfs.router, dashboard_widgets.router, portal.router, portal.mgmt, support.router, construction.router, visits.pub, visits.router,
-          catalogues.router, project_setup.router, crm.router, bootstrap.router, home.router, propagation.router, _reports_i.router, _reports_n.router, _docgen.router, _demand_register.router):
+          catalogues.router, project_setup.router, crm.router, bootstrap.router, home.router, propagation.router, _reports_i.router, _reports_n.router, _docgen.router, _demand_register.router, _messaging.router, _trends.router):
     api_router.include_router(r)
 
 app.include_router(api_router)

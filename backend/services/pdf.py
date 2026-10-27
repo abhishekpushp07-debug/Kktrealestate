@@ -135,6 +135,39 @@ async def company_for_pdf(company_id: str, projection: dict | None = None) -> di
     return c
 
 
+def watermark(pdf_bytes: bytes, word: str, footer: str | None = None) -> bytes:
+    """Deterministic overlay on every page: diagonal word at 12 % alpha + footer line (e.g. 'Voided on … by … — reason')."""
+    from pypdf import PdfReader, PdfWriter
+    from reportlab.lib.pagesizes import A4
+    from reportlab.pdfgen import canvas as _canvas
+    src = PdfReader(io.BytesIO(pdf_bytes))
+    out = PdfWriter()
+    for page in src.pages:
+        w, h = float(page.mediabox.width) or A4[0], float(page.mediabox.height) or A4[1]
+        buf = io.BytesIO()
+        c = _canvas.Canvas(buf, pagesize=(w, h), invariant=1)
+        c.setCreator("KKT ERP")
+        c.saveState()
+        c.setFillColorRGB(0.72, 0.11, 0.11, alpha=0.12)
+        c.setFont("Helvetica-Bold", 110)
+        c.translate(w / 2, h / 2)
+        c.rotate(60)
+        c.drawCentredString(0, -30, word)
+        c.restoreState()
+        if footer:
+            c.setFillColorRGB(0.72, 0.11, 0.11)
+            c.setFont("Helvetica-Bold", 8)
+            c.drawString(14 * mm, 5 * mm, footer[:180])
+        c.showPage()
+        c.save()
+        page.merge_page(PdfReader(io.BytesIO(buf.getvalue())).pages[0])
+        out.add_page(page)
+    out.add_metadata({"/Producer": "KKT ERP", "/CreationDate": "D:20200101000000Z", "/ModDate": "D:20200101000000Z"})
+    res = io.BytesIO()
+    out.write(res)
+    return res.getvalue()
+
+
 def pdf_response(content: bytes, filename: str, download: bool = False):
     from fastapi import Response
     disp = "attachment" if download else "inline"

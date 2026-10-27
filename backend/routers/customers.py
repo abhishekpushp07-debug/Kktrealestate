@@ -117,8 +117,12 @@ class CustomerIn(StrictModel):
     co_applicants: list[CoApplicant] = []
     notes: str | None = None
     tags: list[str] = []
+    whatsapp_phone: str | None = Field(default=None, description="Defaults to phone")
+    preferred_channel: Literal["email", "whatsapp", "sms"] | None = None
+    consent: dict | None = Field(default=None, description="{email, whatsapp, sms, marketing}: email defaults true when an email is given")
+    language: Literal["en", "hi"] | None = None
 
-    @field_validator("phone", "alt_phone")
+    @field_validator("phone", "alt_phone", "whatsapp_phone")
     @classmethod
     def _ph(cls, v):
         return normalize_phone(v)

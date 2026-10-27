@@ -13,7 +13,7 @@ REGISTRY = {
         "project": ("Projects", ["view", "create", "edit"]), "tower": ("Towers / blocks", ["create", "edit"]), "flat": ("Flats & parking", ["view", "create", "edit"]),
         "floor_plan": ("Floor plans", ["view", "create", "edit", "delete"]), "rate_card": ("Rate cards", ["view", "create", "edit", "apply"]), "plc": ("PLC types", ["view", "create", "edit", "delete"]),
         "payment_plan": ("Payment plans", ["view", "create", "edit", "delete", "assign"]), "construction_stage": ("Construction stages", ["view", "create", "edit", "delete"]), "stage_plan": ("Construction stage plans", ["view", "create", "edit", "delete"]), "charge_type": ("Charge types", ["view", "create", "edit", "delete"]),
-        "bank_account": ("Bank accounts", ["view", "create", "edit", "delete"]), "catalogue": ("Catalogues", ["view", "create", "edit"]), "company": ("Company & letterhead", ["view", "edit"]),
+        "bank_account": ("Bank accounts", ["view", "create", "edit", "delete"]), "catalogue": ("Catalogues", ["view", "create", "edit"]), "company": ("Company & letterhead", ["view", "edit"]), "template": ("Message templates", ["view", "edit"]),
         "flat_type": ("Flat / room / area types", ["view", "create", "edit", "delete"]), "block_type": ("Block types", ["view", "create", "edit", "delete"]), "specification": ("Specifications", ["view", "create", "edit", "delete"]), "amenity": ("Amenities", ["view", "create", "edit", "delete"]), "payment_mode": ("Payment modes", ["view", "create", "edit", "delete"]), "document_type": ("Document types", ["view", "create", "edit", "delete"]),
         "allocation_category": ("Allocation categories", ["view", "create", "edit", "delete"]), "hold_reason": ("Hold reasons", ["view", "create", "edit", "delete"])}),
     "sales": ("Sales & CRM", {
@@ -28,6 +28,7 @@ REGISTRY = {
     "inventory": ("Inventory control", {"real_status": ("Real inventory status (vs display)", ["view"]), "category": ("Allocation category", ["set"]), "hold": ("Holds", ["create", "release"]), "block": ("Blocks", ["set"]), "display": ("Display status override", ["set"])}),
     "documents": ("Billing & documents", {"document": ("Generated documents", ["view", "generate", "share", "bulk"])}),
     "demands": ("Demand register", {"register": ("Demand register", ["view", "create", "void", "print"])}),
+    "messaging": ("Messaging & reminders", {"message": ("Messages", ["view", "send", "configure"])}),
     "reports": ("Reports", {k: (lbl, ["view", "export"]) for k, lbl in [("collections", "Collections"), ("outstanding", "Outstanding & ageing"), ("demand_vs_collection", "Demand vs collection"),
                             ("cheque_register", "Cheque register"), ("receivables_forecast", "Receivables forecast"), ("inventory", "Inventory"), ("construction_vs_plan", "Construction vs plan"),
                             ("cancellations_refunds", "Cancellations & refunds"), ("lead_funnel", "Lead funnel"), ("bank_wise", "Bank-wise receipts"), ("roznamcha", "Roznamcha"), ("service_sla", "Service SLA"), ("audit", "Activity / audit"),

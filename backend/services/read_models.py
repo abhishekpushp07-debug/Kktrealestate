@@ -53,6 +53,13 @@ async def flush():
             await refresh_customer(cid)
         if ps or bs or cs:
             await refresh_dashboards()
+        if ps or bs or cs:
+            try:
+                from services import trends as _trends
+                cos = {c["id"] for c in await db.companies.find({}, {"_id": 0, "id": 1}).to_list(None)}
+                await _trends.on_dirty(set(ps), set(cs), cos)
+            except Exception:  # noqa: BLE001
+                __import__("logging").getLogger("kkt").exception("trends refresh")
     except Exception:
         log.exception("read model refresh failed")
 

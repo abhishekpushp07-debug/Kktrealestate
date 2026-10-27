@@ -204,17 +204,24 @@ async def pickers(booking_id: str, user: dict = Depends(require("documents.docum
 
 @router.post("/generate")
 async def generate(body: GenerateIn, request: Request, user: dict = Depends(require("documents.document.generate"))):
+    if body.preview:
+        await _ctx(body.booking_id, user)
+        data, name, _, _ = await _build(body, user)
+        return _pdf.pdf_response(data, name, False)
+    return await generate_internal(body, user, ip=client_ip(request))
+
+
+async def generate_internal(body: GenerateIn, user: dict, ip: str = "", extra: dict | None = None) -> dict:
+    """Shared by the API and the reminder job (system actor): build → register → audit."""
     b, c, co = await _ctx(body.booking_id, user)
     data, name, number, entity_id = await _build(body, user)
-    if body.preview:
-        return _pdf.pdf_response(data, name, False)
-    doc = {**base_doc(user, user["company_id"]), "type": body.type, "type_name": TYPES[body.type], "number": number, "filename": name, "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data), "pages": None,
+    doc = {**(extra or {}), **base_doc(user, user["company_id"]), "type": body.type, "type_name": TYPES[body.type], "number": number, "filename": name, "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data), "pages": None,
            "booking_id": b["id"], "booking_number": b["booking_number"], "customer_id": b["customer_id"], "customer_name": c.get("full_name"), "customer_code": c.get("customer_code"), "project_id": b["project_id"], "project_name": b.get("project_name"), "block_id": b.get("block_id"), "block_name": b.get("block_name"),
            "params": {k: v for k, v in body.model_dump().items() if k not in ("preview",) and v not in (None, [], False)}, "generated_by": user["id"], "generated_by_name": user["name"], "generated_at": now_iso(), "sent": None, "note": body.note}
     await db.generated_documents.insert_one(doc)
     doc.pop("_id", None)
-    await write_audit(user, "document.generated", "generated_document", doc["id"], after={"type": body.type, "number": number, "booking_number": b["booking_number"], "customer_name": c.get("full_name"), "bytes": len(data)}, ip=client_ip(request))
-    await write_audit(user, "document.generated", "booking", b["id"], after={"type": body.type, "number": number, "document_id": doc["id"]}, ip=client_ip(request))
+    await write_audit(user if user.get("id") != "system" else None, "document.generated", "generated_document", doc["id"], after={"type": body.type, "number": number, "booking_number": b["booking_number"], "customer_name": c.get("full_name"), "bytes": len(data)}, ip=ip, company_id=user["company_id"])
+    await write_audit(user, "document.generated", "booking", b["id"], after={"type": body.type, "number": number, "document_id": doc["id"]}, ip=ip, company_id=user["company_id"])
     return doc
 
 
@@ -261,7 +268,7 @@ async def _doc(doc_id: str, user: dict) -> dict:
 async def download(doc_id: str, download: int = 0, user: dict = Depends(require("documents.document.view"))):
     d = await _doc(doc_id, user)
     data, name, _, _ = await _build(GenerateIn(**d["params"]), user)  # deterministic rebuild — same builders, same bytes
-    return _pdf.pdf_response(data, d["filename"] or name, bool(download))
+    return _pdf.pdf_response(_void_mark(d, data), d["filename"] or name, bool(download))
 
 
 @router.post("/{doc_id}/share")
@@ -275,6 +282,12 @@ async def share(doc_id: str, request: Request, user: dict = Depends(require("doc
     await db.doc_share_links.insert_one({"token": token, "doc_id": doc_id, "company_id": user["company_id"], "expires_at": exp, "created_by": user["id"], "created_at": now_iso(), "params": d["params"], "filename": d["filename"]})
     await write_audit(user, "document.shared", "generated_document", doc_id, after={"number": d["number"], "expires_in_min": 15}, ip=client_ip(request))
     return {"url": f"/api/docgen/shared/{token}", "expires_at": exp, "expires_in_sec": 900}
+
+
+def _void_mark(d: dict, data: bytes) -> bytes:
+    if not d.get("voided"):
+        return data
+    return _pdf.watermark(data, "VOID", f"Voided on {_pdf.fmt_date((d.get('voided_at') or '')[:10])} by {d.get('voided_by_name', '')} — {d.get('void_reason', '')}")
 
 
 def _sign(doc_id: str, exp: int, nonce: str) -> str:
@@ -295,6 +308,8 @@ async def shared(token: str):
     await db.doc_share_links.update_one({"token": token}, {"$inc": {"opens": 1}, "$set": {"last_opened_at": now_iso()}})
     sysuser = {"id": link["created_by"], "company_id": link["company_id"], "permissions": ["*"], "name": "share-link", "project_scope": ["*"]}
     data, name, _, _ = await _build(GenerateIn(**link["params"]), sysuser)
+    _d = await db.generated_documents.find_one({"id": link["doc_id"]}, {"_id": 0, "voided": 1, "voided_at": 1, "voided_by_name": 1, "void_reason": 1}) or {}
+    data = _void_mark(_d, data)
     return _pdf.pdf_response(data, link["filename"] or name, True)
 
 
