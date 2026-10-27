@@ -520,3 +520,11 @@ See `/app/memory/prd_phase11c.md`. Tested: `/app/test_reports/iteration_13.json`
 - P2: CSV formula neutralisation DONE. **Not done:** async large exports (>10k rows job + download), 80-factor self-score; paginate() budget parameter.
 - Proof: memory/qa/phase_k/ (3 screenshots, status.md, full_suite.log). Suite 534 passed / 2 skipped; headline 3/3; tie-outs 82/82; integrity ok; registry 0 unmapped.
 
+
+## Phase J — scale (2026-10-27) — DONE 7/9 (J4 not done, J6 partial)
+- K leftovers: async exports (#17) with Exports page, 80-factor self-score (#18, 734/1000), paginate(budget_ms) + estimated totals >10k; one clean full pass (540 passed / 2 skipped) with the two flaky tests fixed deterministically.
+- J1 kkt_scale fixture 6.66 M rows in 289 s (validators + invariants enforced, integrity sample 0 mismatches). J2 explain audit 100 shapes 84 → 0 flagged; 51 indexes ported to ensure_indexes. J3 estimated totals, budgets, X-Export-* headers.
+- J5/J6 sandbox load (1 worker): 0 non-shed 5xx at 100/300/600 users; p95 and RSS targets NOT met on sandbox; top-5 hot paths fixed (payments totals cache, outstanding cache, home single-flight, pool 100 + DB_TIMEOUT, keyset indexes); tier estimate in load_report.md.
+- NOT DONE: J4 photos/documents pipeline (resumable upload, magic bytes, EXIF strip, WebP variants, signed URLs, virtualised galleries, legal hold). Backlog P0 for next phase.
+- Regression fixed: route_perms.json LEGACY_EXPANSION restored (role users had lost permissions after K.3 regen).
+- Proof: memory/qa/scale/ (seed_report.json, explain_report.md, load_report.md, loadmix_*.md, full_suite.log, phase_j_exports_page.jpeg, status.md), memory/qa/audit80/self_score.md.
