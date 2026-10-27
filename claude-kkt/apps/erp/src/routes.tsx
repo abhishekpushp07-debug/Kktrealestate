@@ -1,8 +1,9 @@
-import { lazy, type ComponentType, type LazyExoticComponent } from "react";
-import { Navigate, Outlet, Route, Routes, useParams } from "react-router-dom";
+import { lazy, type ComponentType, type LazyExoticComponent, type ReactNode } from "react";
+import { createBrowserRouter, createRoutesFromElements, Navigate, Outlet, Route, useParams } from "react-router-dom";
 import { PermissionRoute } from "@/components/auth/PermissionRoute";
 import { ProtectedRoute, PublicOnlyRoute } from "@/components/auth/ProtectedRoute";
 import { AppShell } from "@/components/layout/AppShell";
+import { RootLayout, RouteErrorPage } from "@/components/layout/RootLayout";
 import { NAV_ITEMS } from "@/lib/permissions";
 import { ForbiddenPage } from "@/pages/ForbiddenPage";
 
@@ -132,9 +133,9 @@ function FlatLinkRedirect() {
 }
 
 /** Every nav item gets a (lazy) route; extra account routes and error pages live inside the shell. */
-export function AppRoutes() {
+export function appRouteTree(): ReactNode {
   return (
-    <Routes>
+    <>
       <Route
         path="/login"
         element={
@@ -387,6 +388,21 @@ export function AppRoutes() {
         <Route path="/forbidden" element={<ForbiddenPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
-    </Routes>
+    </>
+  );
+}
+
+/**
+ * The ERP's data router (createBrowserRouter + RouterProvider): needed for useBlocker, which the unsaved-changes guard uses
+ * (components/NavigationGuard.tsx). The pathless root route holds the providers; its errorElement catches anything a page's own
+ * boundary does not, including a lazy chunk that fails to load after a deploy.
+ */
+export function createAppRouter(): ReturnType<typeof createBrowserRouter> {
+  return createBrowserRouter(
+    createRoutesFromElements(
+      <Route element={<RootLayout />} errorElement={<RouteErrorPage />}>
+        {appRouteTree()}
+      </Route>,
+    ),
   );
 }

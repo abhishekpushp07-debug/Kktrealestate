@@ -238,6 +238,12 @@ async function staticWalk(browser) {
   // sitemap + robots via request
   const sm = await (await fetch(`${WEB}/sitemap.xml`)).text();
   want(sm.includes(`<loc>${SITE}/projects/shree-ganesh-heights</loc>`) && sm.includes("/projects/ganesh-green-villas") && sm.includes(`/blog/${postSlug}`) && !sm.includes("ggv-block-q-handover"), "sitemap.xml lists published content only");
+  // every public URL the API knows (ALL posts, CMS pages, projects) is in sitemap.xml with the API's lastmod
+  const apiMap = await (await fetch(`${API}/api/v1/public/sitemap`)).json();
+  const missing = apiMap.entries.filter((e) => !sm.includes(`<loc>${SITE}${e.path === "/" ? "/" : e.path}</loc>`));
+  const postUrls = apiMap.entries.filter((e) => e.path.startsWith("/blog/"));
+  const lastmodOk = postUrls.every((e) => sm.includes(`${SITE}${e.path}</loc>\n<lastmod>${new Date(e.updated_at).toISOString()}`) || sm.includes(`<lastmod>${new Date(e.updated_at).toISOString()}</lastmod>`));
+  want(missing.length === 0 && postUrls.length > 0 && lastmodOk, "sitemap.xml lists every public URL of /public/sitemap (all posts, CMS pages) with real lastmod", `${postUrls.length} posts · missing ${missing.map((e) => e.path).join(", ") || "none"}`);
   const rb = await (await fetch(`${WEB}/robots.txt`)).text();
   want(/Allow: \//.test(rb) && rb.includes(`Sitemap: ${SITE}/sitemap.xml`) && rb.includes("Disallow: /visit/"), "robots.txt allows crawl, hides /visit/");
 }
@@ -539,17 +545,32 @@ async function toggleFlows(browser) {
 // Security headers (strict nonce CSP), click-to-load embeds under the CSP, visitor IP forwarding to the API
 // ---------------------------------------------------------------------------
 async function securityFlow(browser) {
+  const { createHash } = require("node:crypto");
+  // ISR page (static HTML shared by everyone): hash-based policy — every executable inline script is listed by its SHA-256, external
+  // scripts only from this origin, no 'unsafe-inline', no nonce (apps/web/csp-hook.cjs)
   const res = await fetch(`${WEB}/projects/shree-ganesh-heights`);
   const csp = res.headers.get("content-security-policy") ?? "";
   const html = await res.text();
-  const nonce = /'nonce-([A-Za-z0-9+/=]+)'/.exec(csp)?.[1];
-  want(Boolean(nonce) && /script-src [^;]*'strict-dynamic'/.test(csp) && !/script-src [^;]*'unsafe-inline'/.test(csp), "CSP: script-src is nonce + strict-dynamic (no unsafe-inline)", csp.slice(0, 160));
+  const scriptSrc = /script-src ([^;]*)/.exec(csp)?.[1] ?? "";
+  want(/^'self'( 'sha256-[A-Za-z0-9+/=]+')+$/.test(scriptSrc.trim()), "ISR page CSP: script-src is 'self' + SHA-256 hashes only (no unsafe-inline, no placeholder)", csp.slice(0, 160));
   want(/frame-ancestors 'none'/.test(csp) && /object-src 'none'/.test(csp) && /base-uri 'self'/.test(csp) && /frame-src https:/.test(csp), "CSP: frame-ancestors/object-src/base-uri locked, https frames allowed for click-to-load embeds");
-  const scripts = [...html.matchAll(/<script\b([^>]*)>/g)].map((m) => m[1]).filter((a) => !/application\/ld\+json/.test(a));
-  want(scripts.length > 0 && scripts.every((a) => a.includes(`nonce="${nonce}"`)), "every executable <script> carries the request nonce", `${scripts.filter((a) => !a.includes(`nonce="${nonce}"`)).length}/${scripts.length} without`);
+  const inline = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)].filter((m) => !/\bsrc\s*=/i.test(m[1]) && !/application\/ld\+json/.test(m[1]));
+  const listed = (body) => scriptSrc.includes(`'sha256-${createHash("sha256").update(body, "utf8").digest("base64")}'`);
+  want(inline.length > 0 && inline.every((m) => listed(m[2])), "every executable inline <script> of the ISR page is listed by its hash", `${inline.filter((m) => !listed(m[2])).length}/${inline.length} unlisted`);
+  const external = [...html.matchAll(/<script\b[^>]*\bsrc="([^"]+)"/g)].map((m) => m[1]);
+  want(external.every((src) => src.startsWith("/_next/")), "external scripts come from this origin only", external.filter((src) => !src.startsWith("/_next/")).join(", "));
+  want(/s-maxage=\d+/.test(res.headers.get("cache-control") ?? "") && /HIT|STALE|MISS/.test(res.headers.get("x-nextjs-cache") ?? ""), "project page is ISR (shared-cacheable)", `${res.headers.get("cache-control")} · ${res.headers.get("x-nextjs-cache")}`);
   want(res.headers.get("x-frame-options") === "DENY" && res.headers.get("x-content-type-options") === "nosniff" && Boolean(res.headers.get("referrer-policy")) && Boolean(res.headers.get("permissions-policy")), "X-Frame-Options / nosniff / Referrer-Policy / Permissions-Policy present");
-  const res2 = await fetch(`${WEB}/projects/shree-ganesh-heights`);
-  want(/'nonce-([^']+)'/.exec(res2.headers.get("content-security-policy") ?? "")?.[1] !== nonce, "nonce changes per request");
+  // pages rendered per request (query-driven / per visitor): strict per-request nonce
+  const dyn = await fetch(`${WEB}/projects?city=Patna`);
+  const dynCsp = dyn.headers.get("content-security-policy") ?? "";
+  const dynHtml = await dyn.text();
+  const nonce = /'nonce-([A-Za-z0-9+/=]+)'/.exec(dynCsp)?.[1];
+  want(Boolean(nonce) && /script-src [^;]*'strict-dynamic'/.test(dynCsp) && !/script-src [^;]*'unsafe-inline'/.test(dynCsp), "per-request page CSP: nonce + strict-dynamic (no unsafe-inline)", dynCsp.slice(0, 160));
+  const scripts = [...dynHtml.matchAll(/<script\b([^>]*)>/g)].map((m) => m[1]).filter((a) => !/application\/ld\+json/.test(a));
+  want(scripts.length > 0 && scripts.every((a) => a.includes(`nonce="${nonce}"`)), "every executable <script> of a per-request page carries the request nonce", `${scripts.filter((a) => !a.includes(`nonce="${nonce}"`)).length}/${scripts.length} without`);
+  const dyn2 = await fetch(`${WEB}/projects?city=Patna`);
+  want(/'nonce-([^']+)'/.exec(dyn2.headers.get("content-security-policy") ?? "")?.[1] !== nonce, "nonce changes per request");
 
   // embeds load only after the click and the CSP lets the iframe in (no violation reported)
   const h = await newPage(browser, 1440);
@@ -566,13 +587,29 @@ async function securityFlow(browser) {
   h.reset();
   await h.ctx.close();
 
-  // the web server forwards the visitor's address: the API rate-limits that address, not the web server's
+  // front-end errors are reported to the API (contract C2): an uncaught error posts {app: "web", message, url without query/token}
+  {
+    const hh = await newPage(browser, 1440);
+    await hh.page.goto(`${WEB}/about?utm_source=qa`, { waitUntil: "domcontentloaded" });
+    await settle(hh.page);
+    const reported = hh.page.waitForRequest((r) => r.url().endsWith("/api/v1/client-errors") && r.method() === "POST", { timeout: 8000 }).catch(() => null);
+    await hh.page.evaluate(() => setTimeout(() => { throw new Error("qa-probe uncaught error"); }, 0));
+    const req = await reported;
+    const body = req ? JSON.parse(req.postData() ?? "{}") : {};
+    want(Boolean(req) && body.app === "web" && /qa-probe/.test(body.message ?? "") && body.url === `${WEB}/about`, "uncaught error → POST /api/v1/client-errors (app web, URL without query)", req ? JSON.stringify(body).slice(0, 160) : "no report");
+    const res = req ? await req.response() : null;
+    want(res?.status() === 202, "client error report accepted (202)", String(res?.status()));
+    await hh.ctx.close();
+  }
+
+  // per-visitor renders (the visit manage page: never cached) forward the visitor's address (x-kkt-client-ip with the internal token,
+  // contract C3): the API rate-limits that address, not the web server's. Cached (ISR) renders call the API without a visitor.
   if (REDIS_DB !== null) {
     const { execSync } = require("node:child_process");
     const ip = `203.0.113.${10 + Math.floor(Math.random() * 200)}`;
-    const r = await fetch(`${WEB}/projects/shree-ganesh-heights`, { headers: { "x-forwarded-for": ip } });
+    const r = await fetch(`${WEB}/visit/qa-unknown-token-${Date.now()}`, { headers: { "x-forwarded-for": ip } });
     const keys = execSync(`redis-cli -n ${REDIS_DB} --scan --pattern 'rl:pub:*${ip}*'`).toString().trim();
-    want(r.status === 200 && keys.length > 0, "detail render is rate-limited under the visitor's IP (x-forwarded-for forwarded to the API)", `${ip}: ${keys.split("\n")[0] ?? "no key"}`);
+    want(r.status === 404 && keys.length > 0, "per-visitor render is rate-limited under the visitor's IP (forwarded to the API)", `${ip}: ${keys.split("\n")[0] ?? "no key"}`);
   }
 }
 

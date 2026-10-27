@@ -2,6 +2,7 @@
  * Payment posting algorithm (SPEC §11): validate → bucket cap (the only block) → insert payment → ledger PAYMENT row + summary → receipt →
  * notifications; clearing, bouncing and reversal of instruments; receipt and demand-letter data.
  */
+import { randomUUID } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
 import type {
   DemandLetterData,
@@ -12,6 +13,7 @@ import type {
   ReceiptData,
 } from "@kkt/contracts";
 import {
+  auditLogs,
   bankAccounts,
   blocks,
   bookingOtherCharges,
@@ -21,6 +23,7 @@ import {
   demands,
   flats,
   ledgerEntries,
+  notifications,
   paymentModes,
   payments,
   projects,
@@ -30,10 +33,9 @@ import {
   type Tx,
 } from "@kkt/db";
 import { amountInWords, bucketCapCheck, formatINR, type Bucket } from "@kkt/domain";
-import { writeAudit } from "../../../lib/audit.js";
+import { stripSensitive, writeAudit } from "../../../lib/audit.js";
 import { decryptField } from "../../../lib/crypto.js";
 import { ApiError } from "../../../lib/errors.js";
-import { nextNumber } from "../../../lib/numbering.js";
 import { isUniqueViolation } from "../../../lib/pgErrors.js";
 import { ensureProjectAccess, type StaffContext } from "../../../lib/scope.js";
 import { applyUpdate } from "../../../lib/version.js";
@@ -54,7 +56,8 @@ import {
 } from "../common.js";
 import { bookingRecipients, recomputeDemandStatuses } from "./dues.js";
 import { reopenCompletedBooking } from "./bookings.js";
-import { appendEvent, events } from "./ledger.js";
+import { appendEvent, epochRows, events, prepareAppend, writeSummary } from "./ledger.js";
+import { NUMBER, RECEIPT_TOKEN, insertWithNumber, withNumber } from "./receipts.js";
 import { bankLabel } from "./views.js";
 
 export type PaymentRecord = typeof payments.$inferSelect;
@@ -244,12 +247,13 @@ async function existingPosting(
     throw new ApiError(422, "IDEMPOTENCY_MISMATCH", "Idempotency-Key was already used with a different payment", {
       receipt_number: p.receiptNumber,
     });
+  // the payment's row in the booking's CURRENT epoch (a restatement may have moved it to another seq)
   const [row] = await db
     .select({ seq: ledgerEntries.seq })
     .from(ledgerEntries)
     .where(
       and(
-        eq(ledgerEntries.bookingId, p.bookingId),
+        epochRows(p.bookingId),
         eq(ledgerEntries.refId, p.id),
         sql`${ledgerEntries.event} in ('PAYMENT', 'OTHER_CHARGE_PAYMENT')`,
       ),
@@ -362,82 +366,145 @@ async function postPaymentTx(
     assertChargeCapWith(chargeLine, body.amount_paise, paid);
     line = chargeLine;
   }
-  // validation passed and every row lock is held → the receipt number (sequence row, LAST lock) is allocated
-  const receiptNumber = await nextNumber(tx, numberingOf(company), "receipt", body.payment_date);
+  // validation passed and every row lock is held. Everything that does not carry the receipt number is written first; the receipt
+  // number (the company-wide sequence row, the LAST lock) is allocated by the final statement together with every row that carries it,
+  // so the sequence row stays locked for one statement + COMMIT instead of the whole posting (services/receipts.ts).
   const postedAt = clock.next();
   const cleared = mode.clearsImmediately;
-  const [p] = await tx
-    .insert(payments)
-    .values({
-      companyId: b.companyId,
-      bookingId: b.id,
-      projectId: b.projectId,
-      blockId: b.blockId,
-      customerId: b.customerId,
-      receiptNumber,
-      against: body.against,
-      bucket: flatValue ? body.bucket! : null,
-      otherChargeId: line?.id ?? null,
-      amountPaise: body.amount_paise,
-      paymentDate: body.payment_date,
-      paymentModeId: mode.id,
-      modeCode: mode.code,
-      instrument: body.instrument ?? null,
-      bankAccountId,
-      remarks: body.remarks ?? null,
-      receivedBy: user.id,
-      status: cleared ? "CLEARED" : "PENDING",
-      clearedAt: cleared ? postedAt : null,
-      clearedBy: cleared ? user.id : null,
-      postedAt,
-      idempotencyKey,
-      createdBy: user.id,
-    })
-    .returning();
-  if (!p) throw new Error("payment insert returned no row");
-  let ledgerSeq: number | null = null;
+  const p: PaymentRecord = {
+    id: randomUUID(),
+    companyId: b.companyId,
+    bookingId: b.id,
+    projectId: b.projectId,
+    blockId: b.blockId,
+    customerId: b.customerId,
+    receiptNumber: RECEIPT_TOKEN,
+    against: body.against,
+    bucket: flatValue ? body.bucket! : null,
+    otherChargeId: line?.id ?? null,
+    amountPaise: body.amount_paise,
+    paymentDate: body.payment_date,
+    paymentModeId: mode.id,
+    modeCode: mode.code,
+    instrument: body.instrument ?? null,
+    bankAccountId,
+    remarks: body.remarks ?? null,
+    receivedBy: user.id,
+    status: cleared ? "CLEARED" : "PENDING",
+    clearedAt: cleared ? postedAt : null,
+    clearedBy: cleared ? user.id : null,
+    bouncedAt: null,
+    bouncedBy: null,
+    bounceReason: null,
+    reversedAt: null,
+    reversedBy: null,
+    reversalReason: null,
+    receiptCancelled: false,
+    postedAt,
+    idempotencyKey,
+    createdAt: postedAt,
+    updatedAt: postedAt,
+    createdBy: user.id,
+    version: 1,
+  };
+  let ledgerRow: Awaited<ReturnType<typeof prepareAppend>> | null = null;
   if (cleared) {
-    ledgerSeq = await applyCleared(tx, b, p, postedAt);
+    ledgerRow = await prepareAppend(
+      tx,
+      b.id,
+      flatValue ? events.payment(p, postedAt) : events.otherChargePayment(p, line?.name ?? "Other charge", postedAt),
+    );
+    // summary columns first (the demand-status recompute reads them), then the rest of the cleared-payment bookkeeping in one round trip
+    await writeSummary(tx, b.id, ledgerRow.summary);
+    await Promise.all([
+      tx.update(bookings).set({ lastPaymentAt: postedAt }).where(eq(bookings.id, b.id)),
+      recomputeDemandStatuses(tx, b.id),
+      line
+        ? tx
+            .update(bookingOtherCharges)
+            .set({ paidPaise: sql`${bookingOtherCharges.paidPaise} + ${p.amountPaise}` })
+            .where(eq(bookingOtherCharges.id, line.id))
+        : Promise.resolve(),
+    ]);
   } else {
     await tx
       .update(bookings)
       .set({ pendingChequesPaise: sql`${bookings.pendingChequesPaise} + ${p.amountPaise}` })
       .where(eq(bookings.id, b.id));
   }
-  // the audit row and the notification are independent inserts: one round trip
-  await Promise.all([
-    writeAudit(tx, {
-      companyId: b.companyId,
-      actor,
-      action: "payment.post",
-      entityType: "payment",
-      entityId: p.id,
-      after: {
-        receipt_number: receiptNumber,
-        booking_id: b.id,
-        against: p.against,
-        bucket: p.bucket,
-        amount_paise: p.amountPaise,
-        payment_date: p.paymentDate,
-        mode_code: p.modeCode,
-        status: p.status,
-        instrument: p.instrument,
-      },
-      ip: actor.ip ?? null,
-      requestId: actor.requestId ?? null,
-    }),
-    notify(tx, {
-      companyId: b.companyId,
-      recipients,
-      type: "PAYMENT_RECEIVED",
-      title: `Payment of ${formatINR(p.amountPaise)} received (receipt ${receiptNumber})`,
-      body: cleared ? `${mode.name} – ${p.bucket ?? line?.name ?? ""}`.trim() : `${mode.name} – subject to realisation`,
-      entityType: "payment",
-      entityId: p.id,
-      link: `/bookings/${b.id}/payments`,
-    }),
+  const notifyRows = dedupeRecipients(recipients).map((r) => ({
+    companyId: b.companyId,
+    recipientType: r.type,
+    recipientId: r.id,
+    type: "PAYMENT_RECEIVED",
+    title: `Payment of ${formatINR(p.amountPaise)} received (receipt ${RECEIPT_TOKEN})`,
+    body: cleared ? `${mode.name} – ${p.bucket ?? line?.name ?? ""}`.trim() : `${mode.name} – subject to realisation`,
+    entityType: "payment",
+    entityId: p.id,
+    link: `/bookings/${b.id}/payments`,
+  }));
+  const after = stripSensitive({
+    receipt_number: RECEIPT_TOKEN,
+    booking_id: b.id,
+    against: p.against,
+    bucket: p.bucket,
+    amount_paise: p.amountPaise,
+    payment_date: p.paymentDate,
+    mode_code: p.modeCode,
+    status: p.status,
+    instrument: p.instrument,
+  });
+  // FINAL STATEMENT (then COMMIT): receipt number + payment + ledger row + audit row + notifications
+  await insertWithNumber(tx, numberingOf(company), "receipt", body.payment_date, [
+    { table: payments, rows: [p], computed: () => ({ receiptNumber: NUMBER }) },
+    ...(ledgerRow
+      ? [
+          {
+            table: ledgerEntries,
+            rows: [ledgerRow.values],
+            computed: (r: Record<string, unknown>) => ({ refNumber: NUMBER, label: withNumber(String(r["label"])) }),
+          },
+        ]
+      : []),
+    {
+      table: auditLogs,
+      rows: [
+        {
+          companyId: b.companyId,
+          actorType: actor.type,
+          actorId: actor.id,
+          actorName: actor.name,
+          action: "payment.post",
+          entityType: "payment",
+          entityId: p.id,
+          before: null,
+          after,
+          ip: actor.ip ?? null,
+          requestId: actor.requestId ?? null,
+        },
+      ],
+      computed: () => ({
+        after: sql`jsonb_set(${JSON.stringify(after)}::jsonb, '{receipt_number}', to_jsonb(num.receipt))`,
+      }),
+    },
+    {
+      table: notifications,
+      rows: notifyRows,
+      computed: (r: Record<string, unknown>) => ({ title: withNumber(String(r["title"])) }),
+    },
   ]);
-  return { paymentId: p.id, ledgerSeq, replayed: false };
+  return { paymentId: p.id, ledgerSeq: ledgerRow?.row.seq ?? null, replayed: false };
+}
+
+/** Recipients deduplicated by (type, id), in order (notifications/service.ts notify() does the same). */
+function dedupeRecipients<T extends { type: string; id: string }>(recipients: readonly T[]): T[] {
+  const seen = new Set<string>();
+  return recipients.filter((r) => {
+    const k = `${r.type}:${r.id}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
 }
 
 /** Loads a payment of the company inside the user's scope, locked, with its booking. */

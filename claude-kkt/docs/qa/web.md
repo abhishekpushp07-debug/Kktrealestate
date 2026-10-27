@@ -6,6 +6,28 @@ Stack under test: API `apps/api` on `:4100` with the demo seed in its own databa
 
 Runner: [`docs/qa/web/browser-qa.cjs`](web/browser-qa.cjs) (`WEB_URL`, `API_URL`, `OUT_DIR`, `ONLY=static,enquiry,brochure,visit,toggles`), PNGs over 300 KB are palette-quantised by [`docs/qa/web/shrink.py`](web/shrink.py). On every page it asserts: zero console errors / page errors, zero failed or ≥ 400 requests (apart from the deliberate 404 / 429 tests), `scrollWidth <= innerWidth`, every visible link/button/field ≥ 44 px tall at 390 px (stretched-link cards count their whole card), and records the time to `networkidle` plus one viewport screenshot per page and width.
 
+## Phase 7 domain track 2026-10-27 (ISR, hashed CSP, C2/C3/C4, sitemap)
+
+Stack: API from source (`tsx src/server.ts`) on `:4610` (fresh demo seed in `kkt_p7_d`, Redis db 10, `INTERNAL_API_TOKEN`,
+`WEB_REVALIDATE_URL=http://localhost:3610/api/revalidate`, `WEB_REVALIDATE_TOKEN`), website `next build` + **`pnpm start`** (i.e.
+`next start` with `NODE_OPTIONS=--require=./csp-hook.cjs`) on `:3610` with the same `INTERNAL_API_TOKEN` / `WEB_REVALIDATE_TOKEN`;
+runner `WEB_URL=http://localhost:3610 API_URL=http://localhost:4610 SITE_URL=http://localhost:3610 REDIS_DB=10 node docs/qa/web/browser-qa.cjs`.
+
+**Result (full run): 42 page audits, 152/152 checks, 40 screenshots, 0 defects; axe 42 scans (19 at 1440 px, 23 at 390 px), 0
+serious/critical** (9 colour-contrast nodes re-verified as axe stacking false positives).
+
+Changed / new checks: ISR pages carry `script-src 'self'` + the SHA-256 of every inline script of the page (74/74 listed on the project
+page, no `unsafe-inline`, no placeholder), external scripts only from `/_next/`, the project page is shared-cacheable
+(`s-maxage`, `x-nextjs-cache`); per-request pages (`/projects?city=…`) keep the nonce policy, every script carries the nonce and it
+changes per request; an uncaught error posts `{app: "web", …}` to `/api/v1/client-errors` (URL without query) and is accepted (202);
+`sitemap.xml` lists every URL of `GET /public/sitemap` with its real lastmod; the per-visitor render (`/visit/<token>`) is rate-limited
+under the visitor's IP (`rl:pub:visits:<ip>` via `x-kkt-client-ip` + the internal token). Unpublish / site-live toggles show within
+seconds (on-demand revalidation) instead of the cache window.
+
+Found and fixed during the run: a 304 answer to a revalidated document carried the hash placeholder, and a 304's headers replace the
+cached response's, so the browser blocked every inline script on the second visit; `csp-hook.cjs` now drops the policy from a 304 (the
+browser keeps the one stored with the 200 — same ETag, same body, same hashes).
+
 ## Integration stage 2026-10-26 (phase 5 frontend wiring)
 
 Stack: API on `:4600` (fresh demo seed in `kkt_h6`, Redis db 22), website `next build` + `next start` on `:3600` with `NEXT_PUBLIC_API_URL=API_INTERNAL_URL=http://localhost:4600`, `NEXT_PUBLIC_SITE_URL=http://localhost:3600`; runner `WEB_URL=http://localhost:3600 API_URL=http://localhost:4600 SITE_URL=http://localhost:3600 REDIS_DB=22 node docs/qa/web/browser-qa.cjs`.

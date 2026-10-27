@@ -108,7 +108,14 @@ type Booking = {
   };
   other_charges: OtherCharge[];
 };
-type LedgerRow = { seq: number; event: string; ref_number: string | null; other_charges_due_paise: number };
+type LedgerRow = {
+  seq: number;
+  event: string;
+  ref_number: string | null;
+  other_charges_due_paise: number;
+  amount_paise: number;
+  note: string | null;
+};
 type List<T> = { items: T[]; total: number };
 type Notification = {
   recipient_type: string;
@@ -1281,15 +1288,48 @@ describe("possession stage: ON_POSSESSION installments and on-possession other c
     const line = bk2.other_charges.find((x) => x.id === registryLine.id)!;
     expect(line).toMatchObject({ demand_number: null, demanded_at: null, due_date: null, paid_paise: 0 });
     expect(bk2.summary.other_charges_due_paise).toBe(0);
-    const ledger = await t.request<List<LedgerRow>>("GET", `/api/v1/bookings/${b2.id}/ledger?page_size=200`, {
+    type EpochLedger = List<LedgerRow> & { epoch: number; current_epoch: number };
+    const ledger = await t.request<EpochLedger>("GET", `/api/v1/bookings/${b2.id}/ledger?page_size=200`, {
       token: admin,
     });
     expect(ledger.status, ledger.text).toBe(200);
+    // contract C7: the un-demanded charge leaves the canonical ledger, so b2's book was restated as epoch 2 (reason CONSTRUCTION_CHARGE)
+    expect(ledger.body).toMatchObject({ epoch: 2, current_epoch: 2 });
     expect(ledger.body.items.filter((row) => row.event === "OTHER_CHARGE_DEMAND")).toHaveLength(0);
-    expect(
-      ledger.body.items.filter((row) => row.ref_number !== null && voidedNumbers.includes(row.ref_number)),
-    ).toHaveLength(0);
+    // the voided ON_POSSESSION demand stays in the book with its DEMAND_VOIDED row
+    const voidedRows = ledger.body.items.filter(
+      (row) => row.ref_number !== null && voidedNumbers.includes(row.ref_number),
+    );
+    expect(voidedRows.map((row) => [row.event, row.amount_paise])).toEqual([
+      ["DEMAND", 5 * L],
+      ["DEMAND_VOIDED", -5 * L],
+    ]);
     expect(ledger.body.items[ledger.body.items.length - 1]!.other_charges_due_paise).toBe(0);
+    // epoch 1 is history: it still shows the charge demand and is closed by a LEDGER_RESTATED row
+    const old = await t.request<EpochLedger>("GET", `/api/v1/bookings/${b2.id}/ledger?page_size=200&epoch=1`, {
+      token: admin,
+    });
+    expect(old.status, old.text).toBe(200);
+    expect(old.body).toMatchObject({ epoch: 1, current_epoch: 2 });
+    expect(old.body.items.filter((row) => row.event === "OTHER_CHARGE_DEMAND")).toHaveLength(1);
+    expect(old.body.items.at(-1)).toMatchObject({
+      event: "LEDGER_RESTATED",
+      amount_paise: 0,
+      note: "CONSTRUCTION_CHARGE",
+    });
+    const rebuilds = await t.request<List<{ reason: string; from_epoch: number; to_epoch: number }>>(
+      "GET",
+      `/api/v1/bookings/${b2.id}/ledger/rebuilds`,
+      { token: admin },
+    );
+    expect(rebuilds.status, rebuilds.text).toBe(200);
+    expect(rebuilds.body.items).toMatchObject([{ reason: "CONSTRUCTION_CHARGE", from_epoch: 1, to_epoch: 2 }]);
+    // b1 had no charge: its book only gained the DEMAND_VOIDED row, no restatement
+    const b1Ledger = await t.request<EpochLedger>("GET", `/api/v1/bookings/${b1.id}/ledger?page_size=200`, {
+      token: admin,
+    });
+    expect(b1Ledger.body).toMatchObject({ epoch: 1, current_epoch: 1 });
+    expect(b1Ledger.body.items.at(-1)?.event).toBe("DEMAND_VOIDED");
     expect(await auditRows("other_charge.undemand", registryLine.id)).toBe(1);
     expect(await auditRows("construction.undo", possession.id)).toBe(1);
     const c = await construction(w.sgh.towerId);

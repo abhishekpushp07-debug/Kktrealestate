@@ -4,15 +4,19 @@
  * finding (e) would otherwise report as SUMMARY_MISMATCH once per booking.
  *
  * Bookings are processed in id order in batches; each booking is rebuilt in its own retrying transaction under the booking lock, and a
- * ledger is rewritten ONLY when it differs from the canonical rebuild (`rebuild(…, { write: "if-changed" })`), so running the job again
- * is a no-op. Every rewritten booking gets a `booking.ledger_rebuilt` audit row. The result lists the bookings whose row ORDER changed
- * (a different event/source at some position, or a different row count) separately from those where only figures changed.
+ * ledger is restated ONLY when it differs from the canonical rebuild (`rebuild(…, { write: "if-changed", reason: "LEDGER_REBUILD" })`):
+ * the canonical rows become a new epoch and the old one stays as history (contract C7) — so running the job again is a no-op. Every
+ * restated booking gets a `booking.ledger_rebuilt` audit row. The result lists the bookings whose row ORDER changed (a different
+ * event/source at some position, or a different row count) separately from those where only figures changed. A booking whose rebuild
+ * throws is listed in `failed` and the run goes on.
  */
 import { and, asc, eq, gt, type SQL } from "drizzle-orm";
 import { bookings, type DB } from "@kkt/db";
 import { writeAudit } from "../../../lib/audit.js";
 import { moneyTransaction, SYSTEM_MONEY_ACTOR, type MoneyActor } from "../common.js";
-import { rebuild } from "./ledger.js";
+import type { LedgerRowDifference } from "@kkt/domain";
+import { failureCode } from "./dues.js";
+import { rebuild, type SummaryMismatch } from "./ledger.js";
 
 /** Bookings per batch (one id-ordered page; each booking is still its own transaction). */
 export const LEDGER_REBUILD_BATCH = 200;
@@ -42,6 +46,8 @@ export interface LedgerRebuildResult {
   order_changed: LedgerRebuildChange[];
   /** Bookings where only amounts/running balances or the summary columns differed. */
   figures_changed: LedgerRebuildChange[];
+  /** Bookings whose rebuild failed (isolated: the run went on), with the error code. */
+  failed: { booking_id: string; booking_number: string; code: string }[];
 }
 
 /** Options of rebuildAllLedgers. */
@@ -54,6 +60,13 @@ export interface LedgerRebuildOptions {
 }
 
 const ORDER_FIELDS = new Set(["event", "refId", "row"]);
+
+interface RebuildOneResult {
+  changed: boolean;
+  written: boolean;
+  rowMismatches: LedgerRowDifference[];
+  mismatches: SummaryMismatch[];
+}
 
 /** Rebuilds every booking ledger (of one company, or all) in canonical order; see the module comment. */
 export async function rebuildAllLedgers(db: DB, opts: LedgerRebuildOptions = {}): Promise<LedgerRebuildResult> {
@@ -68,6 +81,7 @@ export async function rebuildAllLedgers(db: DB, opts: LedgerRebuildOptions = {})
     figures_changed_count: 0,
     order_changed: [],
     figures_changed: [],
+    failed: [],
   };
   let after: string | null = null;
   for (;;) {
@@ -84,29 +98,14 @@ export async function rebuildAllLedgers(db: DB, opts: LedgerRebuildOptions = {})
     out.batches += 1;
     for (const b of page) {
       out.bookings_checked += 1;
-      const r = await moneyTransaction(db, async (tx) => {
-        const rb = await rebuild(tx, b.id, { write: opts.dryRun ? false : "if-changed" });
-        const changed = rb.mismatches.length > 0 || rb.rowMismatches.length > 0;
-        if (rb.written) {
-          await writeAudit(tx, {
-            companyId: b.companyId,
-            actor,
-            action: "booking.ledger_rebuilt",
-            entityType: "booking",
-            entityId: b.id,
-            before: { ledger_rows: rb.stored["ledger_rows"] ?? 0 },
-            after: {
-              ledger_rows: rb.recomputed["ledger_rows"] ?? 0,
-              order_changed: rb.rowMismatches.some((d) => ORDER_FIELDS.has(d.field)),
-              first_position: rb.rowMismatches[0]?.position ?? null,
-              summary_fields: rb.mismatches.map((m) => m.field),
-            },
-            ip: actor.ip ?? null,
-            requestId: actor.requestId ?? null,
-          });
-        }
-        return { changed, written: rb.written, rowMismatches: rb.rowMismatches, mismatches: rb.mismatches };
-      });
+      let r: RebuildOneResult;
+      try {
+        r = await rebuildOne(db, b, opts.dryRun === true, actor);
+      } catch (err) {
+        if (out.failed.length < LEDGER_REBUILD_LIST_LIMIT)
+          out.failed.push({ booking_id: b.id, booking_number: b.bookingNumber, code: failureCode(err) });
+        continue;
+      }
       if (!r.changed) continue;
       if (r.written) out.bookings_rebuilt += 1;
       const change: LedgerRebuildChange = {
@@ -127,4 +126,38 @@ export async function rebuildAllLedgers(db: DB, opts: LedgerRebuildOptions = {})
     if (page.length < batchSize) break;
   }
   return out;
+}
+
+/** One booking's rebuild in its own retrying transaction (restated only when it differs; audited when it was). */
+async function rebuildOne(
+  db: DB,
+  b: { id: string; bookingNumber: string; companyId: string },
+  dryRun: boolean,
+  actor: MoneyActor,
+): Promise<RebuildOneResult> {
+  return moneyTransaction(db, async (tx) => {
+    const rb = await rebuild(tx, b.id, { write: dryRun ? false : "if-changed", reason: "LEDGER_REBUILD", actor });
+    const changed = rb.mismatches.length > 0 || rb.rowMismatches.length > 0;
+    if (rb.written) {
+      await writeAudit(tx, {
+        companyId: b.companyId,
+        actor,
+        action: "booking.ledger_rebuilt",
+        entityType: "booking",
+        entityId: b.id,
+        before: { ledger_rows: rb.stored["ledger_rows"] ?? 0 },
+        after: {
+          ledger_rows: rb.recomputed["ledger_rows"] ?? 0,
+          epoch: rb.epoch,
+          restated: rb.restated,
+          order_changed: rb.rowMismatches.some((d) => ORDER_FIELDS.has(d.field)),
+          first_position: rb.rowMismatches[0]?.position ?? null,
+          summary_fields: rb.mismatches.map((m) => m.field),
+        },
+        ip: actor.ip ?? null,
+        requestId: actor.requestId ?? null,
+      });
+    }
+    return { changed, written: rb.written, rowMismatches: rb.rowMismatches, mismatches: rb.mismatches };
+  });
 }

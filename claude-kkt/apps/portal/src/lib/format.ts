@@ -1,42 +1,28 @@
 // Formatting helpers: Indian rupee grouping (₹1,00,00,000), short forms (₹1.2 Cr / ₹45 L),
 // dates and times rendered in IST, relative times. All money arrives as integer paise.
 
+import { formatInr, formatInrShort, groupIndian } from "@kkt/contracts";
+
 const IST = "Asia/Kolkata";
 
-/** Groups an integer rupee string the Indian way: 1234567 → "12,34,567". */
-export function groupIndian(rupees: string): string {
-  if (rupees.length <= 3) return rupees;
-  const last3 = rupees.slice(-3);
-  const rest = rupees.slice(0, -3);
-  const parts: string[] = [];
-  for (let i = rest.length; i > 0; i -= 2) parts.unshift(rest.slice(Math.max(0, i - 2), i));
-  return `${parts.join(",")},${last3}`;
-}
+/** Groups an integer rupee string the Indian way: 1234567 → "12,34,567" (the shared @kkt/contracts helper). */
+export { groupIndian };
 
-/** ₹ with Indian grouping; paise shown only when non-zero (or `showPaise`). Negative → "−₹…". */
+/*
+ * Money delegates to @kkt/contracts moneyFormat, the one INR formatter the portal, the ERP and the website share (BigInt
+ * arithmetic, SPEC short forms Cr / L only, "round first, then promote": ₹99,96,000 is "₹1 Cr"). Negatives print "-₹…".
+ */
+
+/** ₹ with Indian grouping; paise shown only when non-zero (or `showPaise`). Negative → "-₹…". */
 export function formatINR(paise: number, opts: { showPaise?: boolean; signed?: boolean } = {}): string {
-  const negative = paise < 0;
-  const abs = Math.abs(Math.round(paise));
-  const rupees = Math.floor(abs / 100);
-  const p = abs % 100;
-  const body = groupIndian(String(rupees));
-  const withPaise = opts.showPaise || p !== 0 ? `${body}.${String(p).padStart(2, "0")}` : body;
-  const sign = negative ? "−" : opts.signed ? "+" : "";
-  return `${sign}₹${withPaise}`;
+  if (!Number.isFinite(paise)) return "—";
+  return formatInr(paise, { paise: opts.showPaise ? "always" : "auto", signed: opts.signed === true });
 }
 
-/** Short Indian money form: ₹1.2 Cr, ₹45 L, ₹12.5 K, ₹850. */
+/** Short Indian money form: ₹1.2 Cr, ₹45 L, ₹12,500 (full rupees below a lakh). */
 export function formatINRShort(paise: number): string {
-  const negative = paise < 0;
-  const rupees = Math.abs(paise) / 100;
-  const fmt = (v: number, unit: string) => {
-    const rounded = v >= 100 ? Math.round(v) : Math.round(v * 10) / 10;
-    return `${negative ? "−" : ""}₹${rounded.toLocaleString("en-IN", { maximumFractionDigits: 1 })}${unit}`;
-  };
-  if (rupees >= 1_00_00_000) return fmt(rupees / 1_00_00_000, " Cr");
-  if (rupees >= 1_00_000) return fmt(rupees / 1_00_000, " L");
-  if (rupees >= 10_000) return fmt(rupees / 1_000, " K");
-  return `${negative ? "−" : ""}₹${groupIndian(String(Math.round(rupees)))}`;
+  if (!Number.isFinite(paise)) return "—";
+  return formatInrShort(paise);
 }
 
 /** Percent with at most one decimal: 33.333 → "33.3%". */

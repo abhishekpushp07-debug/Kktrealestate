@@ -1,5 +1,5 @@
 import { authenticator } from "otplib";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createPortalCustomer } from "./fixtures.js";
 import { buildTestApp, CREDS, type ErrorBody, type TestContext } from "./helpers.js";
 
@@ -270,67 +270,78 @@ describe("password change", () => {
 
 describe("MFA", () => {
   it("enrols, verifies, requires the code at login and can be disabled", async () => {
-    const login = await t.loginAs("accounts");
-    const enroll = await t.request<{ secret: string; otpauth_url: string }>("POST", "/api/v1/auth/mfa/enroll", {
-      token: login.access_token,
-    });
-    expect(enroll.status).toBe(200);
-    expect(enroll.body.otpauth_url).toContain("otpauth://totp/");
-    const bad = await t.request<ErrorBody>("POST", "/api/v1/auth/mfa/verify", {
-      token: login.access_token,
-      body: { code: "000000" },
-    });
-    expect(bad.status).toBe(422);
-    const verify = await t.request("POST", "/api/v1/auth/mfa/verify", {
-      token: login.access_token,
-      body: { code: authenticator.generate(enroll.body.secret) },
-    });
-    expect(verify.status).toBe(200);
-    const ip = "10.243.0.1";
-    const step1 = await t.request<{ mfa_required: boolean; mfa_token: string }>("POST", "/api/v1/auth/login", {
-      ip,
-      body: CREDS.accounts,
-    });
-    expect(step1.status).toBe(200);
-    expect(step1.body.mfa_required).toBe(true);
-    const wrong = await t.request<ErrorBody>("POST", "/api/v1/auth/login/mfa", {
-      ip,
-      body: { mfa_token: step1.body.mfa_token, code: "123456" },
-    });
-    expect(wrong.status).toBe(401);
-    // the MFA token is bound to the client IP of the password step
-    const elsewhere = await t.request<ErrorBody>("POST", "/api/v1/auth/login/mfa", {
-      ip: "10.243.0.2",
-      body: { mfa_token: step1.body.mfa_token, code: authenticator.generate(enroll.body.secret) },
-    });
-    expect(elsewhere.status).toBe(401);
-    expect(elsewhere.body.error.code).toBe("INVALID_TOKEN");
-    const step2 = await t.request<{ access_token: string; user: { mfa_enabled: boolean } }>(
-      "POST",
-      "/api/v1/auth/login/mfa",
-      { ip, body: { mfa_token: step1.body.mfa_token, code: authenticator.generate(enroll.body.secret) } },
-    );
-    expect(step2.status).toBe(200);
-    expect(step2.body.user.mfa_enabled).toBe(true);
-    const inline = await t.request<{ access_token: string }>("POST", "/api/v1/auth/login", {
-      body: { ...CREDS.accounts, mfa_code: authenticator.generate(enroll.body.secret) },
-    });
-    expect(inline.status).toBe(200);
-    expect(inline.body.access_token).toBeTruthy();
-    const disable = await t.request("POST", "/api/v1/auth/mfa/disable", {
-      token: step2.body.access_token,
-      body: { password: CREDS.accounts.password, code: authenticator.generate(enroll.body.secret) },
-    });
-    expect(disable.status).toBe(200);
-    const plain = await t.request<{ access_token: string; mfa_required?: boolean }>("POST", "/api/v1/auth/login", {
-      body: CREDS.accounts,
-    });
-    expect(plain.status).toBe(200);
-    expect(plain.body.access_token).toBeTruthy();
-    const [row] = await t.app.sql<
-      { mfa_secret_enc: string | null }[]
-    >`select mfa_secret_enc from users where email = ${CREDS.accounts.email}`;
-    expect(row!.mfa_secret_enc).toBeNull();
+    // A TOTP step is consumed once (replay protection): every use below happens in the next 30 s step (only Date is faked, so the
+    // server's otplib and JWT clocks move with it; timers and the database keep real time).
+    vi.useFakeTimers({ toFake: ["Date"], now: Date.now() });
+    const nextStep = () => vi.setSystemTime(Date.now() + 30_000);
+    try {
+      const login = await t.loginAs("accounts");
+      const enroll = await t.request<{ secret: string; otpauth_url: string }>("POST", "/api/v1/auth/mfa/enroll", {
+        token: login.access_token,
+      });
+      expect(enroll.status).toBe(200);
+      expect(enroll.body.otpauth_url).toContain("otpauth://totp/");
+      const bad = await t.request<ErrorBody>("POST", "/api/v1/auth/mfa/verify", {
+        token: login.access_token,
+        body: { code: "000000" },
+      });
+      expect(bad.status).toBe(422);
+      const verify = await t.request("POST", "/api/v1/auth/mfa/verify", {
+        token: login.access_token,
+        body: { code: authenticator.generate(enroll.body.secret) },
+      });
+      expect(verify.status).toBe(200);
+      const ip = "10.243.0.1";
+      const step1 = await t.request<{ mfa_required: boolean; mfa_token: string }>("POST", "/api/v1/auth/login", {
+        ip,
+        body: CREDS.accounts,
+      });
+      expect(step1.status).toBe(200);
+      expect(step1.body.mfa_required).toBe(true);
+      const wrong = await t.request<ErrorBody>("POST", "/api/v1/auth/login/mfa", {
+        ip,
+        body: { mfa_token: step1.body.mfa_token, code: "123456" },
+      });
+      expect(wrong.status).toBe(401);
+      // the MFA token is bound to the client IP of the password step
+      const elsewhere = await t.request<ErrorBody>("POST", "/api/v1/auth/login/mfa", {
+        ip: "10.243.0.2",
+        body: { mfa_token: step1.body.mfa_token, code: authenticator.generate(enroll.body.secret) },
+      });
+      expect(elsewhere.status).toBe(401);
+      expect(elsewhere.body.error.code).toBe("INVALID_TOKEN");
+      nextStep();
+      const step2 = await t.request<{ access_token: string; user: { mfa_enabled: boolean } }>(
+        "POST",
+        "/api/v1/auth/login/mfa",
+        { ip, body: { mfa_token: step1.body.mfa_token, code: authenticator.generate(enroll.body.secret) } },
+      );
+      expect(step2.status).toBe(200);
+      expect(step2.body.user.mfa_enabled).toBe(true);
+      nextStep();
+      const inline = await t.request<{ access_token: string }>("POST", "/api/v1/auth/login", {
+        body: { ...CREDS.accounts, mfa_code: authenticator.generate(enroll.body.secret) },
+      });
+      expect(inline.status).toBe(200);
+      expect(inline.body.access_token).toBeTruthy();
+      nextStep();
+      const disable = await t.request("POST", "/api/v1/auth/mfa/disable", {
+        token: step2.body.access_token,
+        body: { password: CREDS.accounts.password, code: authenticator.generate(enroll.body.secret) },
+      });
+      expect(disable.status).toBe(200);
+      const plain = await t.request<{ access_token: string; mfa_required?: boolean }>("POST", "/api/v1/auth/login", {
+        body: CREDS.accounts,
+      });
+      expect(plain.status).toBe(200);
+      expect(plain.body.access_token).toBeTruthy();
+      const [row] = await t.app.sql<
+        { mfa_secret_enc: string | null }[]
+      >`select mfa_secret_enc from users where email = ${CREDS.accounts.email}`;
+      expect(row!.mfa_secret_enc).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("force_mfa_for_admins blocks admins without MFA (403 MFA_REQUIRED) except the enrolment routes", async () => {

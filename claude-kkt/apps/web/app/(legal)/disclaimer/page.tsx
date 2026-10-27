@@ -5,6 +5,9 @@ import { findPage } from "@/lib/api";
 import { markdownToText } from "@/lib/markdown";
 import { pageMetadata } from "@/lib/seo";
 
+/** CMS legal page: regenerated every 5 minutes or on a CMS write. */
+export const revalidate = 300;
+
 export async function generateMetadata(): Promise<Metadata> {
   const page = await findPage("disclaimer");
   return pageMetadata({

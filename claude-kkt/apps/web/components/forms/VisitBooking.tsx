@@ -49,7 +49,7 @@ export function VisitBooking({
   heading,
   tone = "light",
 }: VisitBookingProps) {
-  const { apiUrl, siteUrl, brandName } = useSiteConfig();
+  const { apiUrl, companySlug, siteUrl, brandName } = useSiteConfig();
   const id = useId();
   const [projectSlug, setProjectSlug] = useState(defaultProjectSlug ?? projects[0]?.slug ?? "");
   // Availability answer tagged with the request it belongs to; `loading` and the error are derived from the tag.
@@ -99,7 +99,7 @@ export function VisitBooking({
   useEffect(() => {
     if (!projectSlug || requestKey === null) return;
     let current = true; // a newer request (or unmount) supersedes this one
-    publicClient(apiUrl)
+    publicClient(apiUrl, companySlug)
       .getVisitAvailability(projectSlug, from, addDays(from, DAYS_AHEAD - 1))
       .then(
         (result) => {
@@ -127,7 +127,7 @@ export function VisitBooking({
     return () => {
       current = false;
     };
-  }, [apiUrl, from, projectSlug, requestKey]);
+  }, [apiUrl, companySlug, from, projectSlug, requestKey]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -155,7 +155,7 @@ export function VisitBooking({
       website: values.website as "",
     };
     try {
-      const result = await publicClient(apiUrl).bookSiteVisit(body);
+      const result = await publicClient(apiUrl, companySlug).bookSiteVisit(body);
       setStatus({ kind: "success", result });
     } catch (error) {
       if (isApiError(error) && error.code === "SLOT_FULL") {

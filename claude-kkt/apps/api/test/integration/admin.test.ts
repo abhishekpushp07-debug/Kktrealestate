@@ -551,8 +551,18 @@ describe("admin · right to erasure", () => {
       testimonials: 0,
       portal_disabled: true,
       sessions_revoked: 1,
+      booking_drafts: 0,
+      notifications: 0,
+      service_requests: 0,
+      exports_removed: 0,
+      storage_deletions_queued: 1,
     });
     expect(r.body.financial_rows_kept).toEqual({ bookings: 1, payments: 1, demands: 0, ledger_entries: 0 });
+    // the document's bytes were queued for deletion in the erasure transaction and removed right after (marked done)
+    const queued = await t.app.sql<
+      { key: string; reason: string; done: boolean }[]
+    >`select key, reason, done_at is not null as done from storage_deletions where key = ${docKey}`;
+    expect(queued).toEqual([{ key: docKey, reason: "CUSTOMER_ERASED", done: true }]);
 
     const [c] = await t.app.sql<Record<string, unknown>[]>`select * from customers where id = ${customerId}`;
     expect(c!["full_name"]).toBe("Erased customer CUST-3230");
@@ -821,10 +831,17 @@ describe("admin · jobs", () => {
     expect(run.body).toMatchObject({ job_name: "STARTUP_RECONCILIATION", status: "QUEUED" });
     const done = await waitForRun(t.app, run.body.run_id);
     expect(done).toMatchObject({ status: "OK", error: null });
-    expect(done.result).toMatchObject({ bookings_checked: expect.any(Number) });
+    // stored per company (audit B): the raw job_runs row keeps every tenant's findings apart …
+    expect(done.result).toMatchObject({
+      companies: 1,
+      by_company: { [t.companyId]: { bookings_checked: expect.any(Number) } },
+    });
     const one = await t.request<JobRun>("GET", `/api/v1/admin/jobs/runs/${run.body.run_id}`, { token: admin });
     expect(one.status).toBe(200);
     expect(one.body).toMatchObject({ id: run.body.run_id, status: "OK" });
+    // … and the API shows a tenant admin only their own company's slice, flattened
+    expect(one.body.result).toMatchObject({ companies: 1, bookings_checked: expect.any(Number) });
+    expect(one.body.result).not.toHaveProperty("by_company");
     expect(
       (await t.request("GET", "/api/v1/admin/jobs/runs/11111111-1111-4111-8111-111111111111", { token: admin })).status,
     ).toBe(404);

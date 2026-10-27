@@ -35,6 +35,7 @@ import { useAuth } from "@/lib/auth";
 import { formatNumber } from "@/lib/format";
 import { useMutationWithToast } from "@/lib/queries";
 import { cn, useOnChange } from "@/lib/utils";
+import { useUnsavedChangesGuard } from "@/lib/unsaved";
 import { contractResolver } from "@/features/shared/contractResolver";
 import { businessRuleIssues } from "@/features/shared/errors";
 import { DocumentsPanel, UploadDocumentDialog } from "../DocumentsPanel";
@@ -142,6 +143,8 @@ function WebsiteForm({ project, row }: { project: ProjectRow; row: ProjectWebsit
   const canWrite = can("cms.write");
   const resolver = useMemo(() => contractResolver<WebsiteValues, unknown>(FormSchema), []);
   const form = useForm<WebsiteValues, unknown, unknown>({ resolver, defaultValues: toValues(row), mode: "onTouched" });
+  // Leaving with unsaved edits (sidebar, Cmd+K, back, reload) asks first (audit v3 H3).
+  useUnsavedChangesGuard(form.formState.isDirty);
   const control = controlOf(form);
   const [serverError, setServerError] = useState<unknown>(null);
   const [blockers, setBlockers] = useState<string[]>([]);

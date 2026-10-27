@@ -5,6 +5,7 @@ import {
   buildListQuery,
   buildQueryString,
   describeError,
+  onAuthEvent,
   parseErrorEnvelope,
   tokens,
 } from "@/lib/api";
@@ -87,7 +88,7 @@ describe("request pipeline", () => {
       setItem: (key: string, value: string) => void store.set(key, value),
       removeItem: (key: string) => void store.delete(key),
     });
-    tokens.setRefresh("refresh-1");
+    vi.stubGlobal("__store", store);
   });
 
   afterEach(() => {
@@ -96,10 +97,10 @@ describe("request pipeline", () => {
     tokens.clear();
   });
 
-  it("refreshes once on 401 TOKEN_EXPIRED and retries with the same Idempotency-Key", async () => {
+  it("refreshes once on 401 TOKEN_EXPIRED through the HttpOnly cookie and retries with the same Idempotency-Key", async () => {
     fetchMock
       .mockResolvedValueOnce(jsonResponse(401, { error: { code: "TOKEN_EXPIRED", message: "expired" } }))
-      .mockResolvedValueOnce(jsonResponse(200, { access_token: "fresh-access", refresh_token: "refresh-2" }))
+      .mockResolvedValueOnce(jsonResponse(200, { access_token: "fresh-access", token_type: "Bearer", expires_in: 900 }))
       .mockResolvedValueOnce(jsonResponse(201, { id: "b1", version: 1 }));
 
     const result = await api.post<{ id: string }>("/bookings", { flat_id: "f1" });
@@ -114,13 +115,66 @@ describe("request pipeline", () => {
 
     expect(firstUrl).toBe("/api/v1/bookings");
     expect(refreshUrl).toBe("/api/v1/auth/refresh");
-    expect(JSON.parse(String(refreshInit.body))).toEqual({ refresh_token: "refresh-1" });
+    // contract C1: empty body, the cookie travels with credentials and the CSRF header
+    expect(refreshInit.body).toBeUndefined();
+    expect(refreshInit.credentials).toBe("include");
+    expect(new Headers(refreshInit.headers).get("X-KKT-Session")).toBe("cookie");
     expect(retryUrl).toBe("/api/v1/bookings");
     expect(firstHeaders.get("Authorization")).toBe("Bearer expired-access");
     expect(retryHeaders.get("Authorization")).toBe("Bearer fresh-access");
     expect(firstHeaders.get("Idempotency-Key")).toBeTruthy();
     expect(retryHeaders.get("Idempotency-Key")).toBe(firstHeaders.get("Idempotency-Key"));
-    expect(tokens.getRefresh()).toBe("refresh-2");
+    expect(tokens.getAccess()).toBe("fresh-access");
+    // nothing token-like is stored in the browser: only the "signed in here" hint
+    const store = (globalThis as unknown as { __store: Map<string, string> }).__store;
+    expect([...store.entries()]).toEqual([["kkt.erp.session", "1"]]);
+  });
+
+  it("a 401 SESSION_EXPIRED from the cookie refresh signs the user out", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(401, { error: { code: "TOKEN_EXPIRED", message: "expired" } }))
+      .mockResolvedValueOnce(jsonResponse(401, { error: { code: "SESSION_EXPIRED", message: "Session ended" } }))
+      .mockResolvedValueOnce(jsonResponse(401, { error: { code: "UNAUTHENTICATED", message: "no token" } }));
+    const events: string[] = [];
+    const off = onAuthEvent((event) => events.push(event));
+    await expect(api.get("/auth/me")).rejects.toMatchObject({ status: 401 });
+    off();
+    expect(tokens.getAccess()).toBeNull();
+    expect(tokens.hasSession()).toBe(false);
+    expect(events).toContain("unauthenticated");
+  });
+
+  it("restores a session on load from the cookie when only the hint is present", async () => {
+    tokens.clear();
+    const store = (globalThis as unknown as { __store: Map<string, string> }).__store;
+    store.set("kkt.erp.session", "1");
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(200, { access_token: "restored", token_type: "Bearer", expires_in: 900 }))
+      .mockResolvedValueOnce(jsonResponse(200, { user: { id: "u1", name: "A" } }));
+    await api.get("/auth/me");
+    const [refreshUrl, refreshInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [meUrl, meInit] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(refreshUrl).toBe("/api/v1/auth/refresh");
+    expect(refreshInit.credentials).toBe("include");
+    expect(meUrl).toBe("/api/v1/auth/me");
+    expect(new Headers(meInit.headers).get("Authorization")).toBe("Bearer restored");
+  });
+
+  it("login and logout use the cookie transport (header + credentials), other calls do not", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(200, { access_token: "a1", token_type: "Bearer", expires_in: 900 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(jsonResponse(200, { items: [] }));
+    await api.post("/auth/login", { email: "a@b.in", password: "x" }, { auth: false, cookieSession: true });
+    await api.post("/auth/logout", undefined, { cookieSession: true });
+    await api.get("/projects");
+    const calls = fetchMock.mock.calls as Array<[string, RequestInit]>;
+    for (const [, init] of calls.slice(0, 2)) {
+      expect(init.credentials).toBe("include");
+      expect(new Headers(init.headers).get("X-KKT-Session")).toBe("cookie");
+    }
+    expect(calls[2]?.[1].credentials).toBeUndefined();
+    expect(new Headers(calls[2]?.[1].headers).get("X-KKT-Session")).toBeNull();
   });
 
   it("sends If-Match from the version option and throws ApiClientError on failure", async () => {
@@ -134,6 +188,7 @@ describe("request pipeline", () => {
       status: 409,
     });
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(new Headers(init.headers).get("If-Match")).toBe('"2"');
+    // contract C6: the ETag form "v<version>"
+    expect(new Headers(init.headers).get("If-Match")).toBe('"v2"');
   });
 });

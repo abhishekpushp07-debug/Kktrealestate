@@ -16,25 +16,55 @@ pnpm --filter @kkt/web typecheck
 pnpm --filter @kkt/web build && pnpm --filter @kkt/web start
 ```
 
-| Variable                 | Purpose                                                                                                  |
-| ------------------------ | -------------------------------------------------------------------------------------------------------- |
-| `NEXT_PUBLIC_API_URL`    | Browser-facing API origin (form POSTs, availability, media URLs, image optimizer allow-list)             |
-| `API_INTERNAL_URL`       | In-cluster API origin used by the Next.js server for data fetching (falls back to `NEXT_PUBLIC_API_URL`) |
-| `NEXT_PUBLIC_PORTAL_URL` | "Customer Login" target (the CMS `portal_url` wins when set)                                             |
-| `NEXT_PUBLIC_ERP_URL`    | "Staff login" link in the footer                                                                         |
-| `NEXT_PUBLIC_SITE_URL`   | Canonical origin: `metadataBase`, canonical URLs, sitemap                                                |
+| Variable                          | Purpose                                                                                                              |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_API_URL`             | Browser-facing API origin (form POSTs, availability, media URLs, image optimizer allow-list)                         |
+| `API_INTERNAL_URL`                | In-cluster API origin used by the Next.js server for data fetching (falls back to `NEXT_PUBLIC_API_URL`)             |
+| `NEXT_PUBLIC_PORTAL_URL`          | "Customer Login" target (the CMS `portal_url` wins when set)                                                         |
+| `NEXT_PUBLIC_ERP_URL`             | "Staff login" link in the footer                                                                                     |
+| `NEXT_PUBLIC_SITE_URL`            | Canonical origin: `metadataBase`, canonical URLs, sitemap                                                            |
+| `INTERNAL_API_TOKEN`              | The API's `INTERNAL_API_TOKEN` (contract C3): server calls send it so the API limits per visitor                     |
+| `KKT_COMPANY_SLUG`                | The builder this site serves on a multi-company API (contract C4, sent as `x-kkt-company`); unset = the only company |
+| `WEB_REVALIDATE_TOKEN`            | Secret of `POST /api/revalidate` (the API's `WEB_REVALIDATE_TOKEN`); unset = the route answers 404                   |
+| `GIT_SHA` / `NEXT_PUBLIC_RELEASE` | Release reported with front-end errors (contract C2)                                                                 |
 
-The build never calls the API: every route is `dynamic = "force-dynamic"` (set once in `app/layout.tsx`), and server
-fetches use `next: { revalidate: 60, tags }` so data is still cached for 60 s across requests. Network failures degrade to
-empty states on list pages and to the error boundary on detail pages; a 404 from the API becomes `notFound()`.
+### Rendering and caching (ISR)
 
-### Visitor IP forwarding (per-visitor rate limits)
+Pages are statically rendered and regenerated in the background (ISR): catalog pages (home, project detail, contact) every 60 s,
+CMS pages (about, gallery, blog posts, legal and other CMS pages, sitemap, robots) every 300 s — and all of them at once when the
+API calls `POST /api/revalidate` after a CMS or project-website write (API env `WEB_REVALIDATE_URL` + `WEB_REVALIDATE_TOKEN`; the
+route purges the `kkt-public` Data Cache tag and re-renders the site on its next request). Detail routes (`/projects/[slug]`,
+`/blog/[slug]`, `/[slug]` CMS pages) are not prerendered at build (`generateStaticParams` returns `[]`): each is rendered on its first
+request, then cached. `/projects` (filters) and `/blog` (`?page`) read the URL query and `/visit/[token]` is per visitor: they render
+per request on top of the same cached data. Every server read goes through `lib/api.ts` → `unstable_cache` (tag `kkt-public`): a 404 is
+cached like any answer (an unpublished project or post disappears instead of the last good copy being served), a 5xx / network failure
+is never cached and is retried once with a 10 s lifetime, which also shortens the page's own revalidation — so `next build` needs no
+API (pages rendered without one regenerate 10 s after the first request) and a brief outage never sticks.
 
-The API rate-limits public reads per client IP (`PUBLIC_RATE_LIMIT_PER_MIN`). Server-side renders call the API from the
-web server, so without help every visitor would share the web server's bucket. `lib/api.ts` therefore sends the
-incoming request's `x-forwarded-for` chain (or `x-real-ip`) on every **uncached** server fetch (project/post/page detail,
-visit availability, the visit manage page). Cached list fetches (`revalidate: 60`) are shared by all visitors and go out
-without it, so the Data Cache is not split per visitor. Only well-formed IPv4/IPv6 hops are forwarded (at most ten).
+### Content-Security-Policy and `csp-hook.cjs`
+
+ISR HTML is built once and served to everybody (and by a CDN), so it cannot carry a per-request nonce, and Next.js inlines each page's
+RSC payload as inline scripts. Instead of `'unsafe-inline'`, `middleware.ts` gives ISR pages `script-src 'self' 'kkt-inline-hashes'` and
+**`csp-hook.cjs`** (loaded with `node --require` before Next creates its server: `pnpm start`, the Docker `CMD`) replaces the placeholder
+with the SHA-256 of every inline script of the HTML actually sent. A 304 drops the policy so the browser keeps the one it stored with the 200. Pages rendered per request keep the per-request nonce policy (`'nonce-…' 'strict-dynamic'`). `compress: false` in `next.config.ts`
+(the hook must see the plain body; Caddy compresses). **Always start the production server with the hook** — without it the placeholder
+reaches the browser, which then blocks every inline script (fail closed: the page does not hydrate). `next dev` uses the nonce policy
+everywhere and needs no hook.
+
+### Error reporting (contract C2)
+
+`components/ErrorReporter.tsx` (uncaught errors, unhandled rejections), the segment error boundaries (`ErrorView`) and `app/global-error.tsx`
+(root layout failures) post `{app: "web", message, stack, url, release, user_agent, extra}` to `POST /api/v1/client-errors` (keepalive,
+silent, at most five per page load, duplicates dropped). The URL loses its query string and fragment and `/visit/<token>` becomes
+`/visit/[token]`; no form contents are ever sent.
+
+### Visitor IP forwarding (per-visitor rate limits, contract C3)
+
+The API rate-limits public reads per client IP and route group. Every server-side call sends `x-kkt-internal-token`
+(`INTERNAL_API_TOKEN`); per-visitor (uncached) calls — the visit manage page — also send `x-kkt-client-ip` (the right-most hop of the
+incoming `x-forwarded-for`, or `x-real-ip`) and the sanitised `x-forwarded-for` chain. With a valid token the API limits the forwarded
+visitor address; cached (ISR) renders run without a visitor and count against the web server, which is a handful of calls per minute.
+Only well-formed IPv4/IPv6 hops are forwarded (at most ten).
 
 The API honours `X-Forwarded-For` only from peers listed in its `TRUST_PROXY` (default `loopback`; see
 `docs/SECURITY.md`) and takes the right-most untrusted hop as the client. Deployment rules:
@@ -54,21 +84,21 @@ Verified by `docs/qa/web/browser-qa.cjs` (`ONLY=security`, `REDIS_DB=<api redis 
 
 ### Security headers and Content-Security-Policy
 
-`middleware.ts` sets a strict, per-request CSP built by `lib/csp.ts`: `script-src 'self' 'nonce-…' 'strict-dynamic'`
-(Next.js stamps the nonce on its own scripts; no `unsafe-inline`, no `unsafe-eval` outside `next dev`),
-`frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'`, `form-action 'self'`, images/media/fetches limited to
-this origin and `NEXT_PUBLIC_API_URL` (plus YouTube poster thumbnails), and `frame-src https:` so the click-to-load
-embeds (YouTube/Vimeo players, 360° tours, maps — any https URL the CMS holds) work once the visitor clicks; nothing
-third-party loads before that and the iframe is sandboxed. `next.config.ts` adds `X-Frame-Options: DENY`, `nosniff`,
-`Referrer-Policy`, `Permissions-Policy`, HSTS and `Cross-Origin-Opener-Policy`. Because the policy carries a nonce,
-every page renders dynamically (they already did: `force-dynamic` in `app/layout.tsx`).
+`middleware.ts` sets the CSP built by `lib/csp.ts` (see "Content-Security-Policy and `csp-hook.cjs`" above for the two script policies):
+no `unsafe-inline`, no `unsafe-eval` outside `next dev`, `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'`,
+`form-action 'self'`, images/media/fetches limited to this origin and `NEXT_PUBLIC_API_URL` (plus YouTube poster thumbnails), and
+`frame-src https:` so the click-to-load embeds (YouTube/Vimeo players, 360° tours, maps — any https URL the CMS holds) work once the
+visitor clicks; nothing third-party loads before that and the iframe is sandboxed. `next.config.ts` adds `X-Frame-Options: DENY`,
+`nosniff`, `Referrer-Policy`, `Permissions-Policy`, HSTS and `Cross-Origin-Opener-Policy`.
 
 ### Tests
 
-`pnpm --filter @kkt/web test` (vitest, `test/`): CSP directives, visitor-IP forwarding (`x-forwarded-for` on uncached
-fetches only, sanitised), and the form fields' `aria-invalid` / `aria-describedby` wiring. Browser behaviour, axe-core
-scans and the security headers are checked by `docs/qa/web/browser-qa.cjs`. `next build` skips ESLint (`eslint.ignoreDuringBuilds`);
-lint runs as its own step (`pnpm --filter @kkt/web lint`).
+`pnpm --filter @kkt/web test` (vitest, `test/`): both CSP policies and which routes get which, `csp-hook.cjs` on a real HTTP server
+(streamed and `writeHead` HTML, 304, non-HTML and nonce responses), ISR reads (cache tags and lifetimes, 404 cached, 5xx retried with
+10 s, network failures), the C3/C4 headers, the on-demand revalidation route (token, tags), the error reporter (URL redaction, caps),
+and the form fields' `aria-invalid` / `aria-describedby` wiring. Browser behaviour, the hashed CSP on real pages, axe-core scans and the
+security headers are checked by `docs/qa/web/browser-qa.cjs` against a production build started with `pnpm start` (the hook loaded).
+`next build` skips ESLint (`eslint.ignoreDuringBuilds`); lint runs as its own step (`pnpm --filter @kkt/web lint`).
 
 ### Build-time vs runtime configuration
 
@@ -109,7 +139,8 @@ components/
   hidden honeypot `website: ""`, an `Idempotency-Key`, and UTM parameters captured from the URL; they surface
   `{ error: { code, message } }` including `429 RATE_LIMITED` (with `Retry-After`) and `409 SLOT_FULL` (availability is
   refreshed and the slot cleared).
-- **Brochure gate** remembers `visitor_token` (plus the visitor's own details) in `localStorage`; later downloads skip
+- **Brochure gate** remembers only the opaque `visitor_token` (a signed lead reference, no personal data; entries of older releases that
+  also held name/phone/e-mail are rewritten without them) in `localStorage`; later downloads skip
   the form and navigate straight to the signed `download_url`. A rejected token clears the memory and shows the form.
 - **Site visits**: 14-day date strip from the live availability endpoint (IST), slot chips with "N left", 1–6 visitors;
   success shows visit number, date/time, address, maps link, `.ics` download and the manage link. `/visit/[token]` shows

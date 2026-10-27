@@ -1,4 +1,12 @@
-import type { LedgerRow, OtherChargeInput, PlanAcceptanceMode } from "@kkt/contracts";
+import type {
+  LedgerRebuildReason,
+  LedgerResponse,
+  LedgerRow,
+  LedgerTotals,
+  OtherChargeInput,
+  PlanAcceptanceMode,
+} from "@kkt/contracts";
+import { formatINR } from "@/lib/format";
 
 /* ------------------------------------------------------------------ */
 /* Cash / Account split with auto-balance                               */
@@ -499,7 +507,7 @@ export function wizardHasContent(state: WizardState): boolean {
 /* ------------------------------------------------------------------ */
 
 function inr(paise: number): string {
-  return `₹${(paise / 100).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+  return formatINR(paise);
 }
 
 /**
@@ -555,3 +563,45 @@ export function priceDeviationProblem(details: Record<string, unknown> | undefin
   if (needs.includes("price_deviation_reason")) return `Give a reason for the price deviation.${listText}`;
   return `The agreement value differs from the list price.${listText}`;
 }
+
+/* ------------------------------------------------------------------ */
+/* Ledger totals (contract C7)                                          */
+/* ------------------------------------------------------------------ */
+
+/** The six C7 totals of a ledger response, plus which book they describe. */
+export interface LedgerFooterTotals extends LedgerTotals {
+  /** "current" = the booking's book of record (`summary`); "epoch" = the end of an older, superseded epoch (`epoch_totals`). */
+  source: "current" | "epoch";
+  epoch: number;
+}
+
+/**
+ * Totals to show under the ledger: the server-computed `summary` for the current epoch, `epoch_totals` for an older one.
+ * Never derived from the rows on screen: a page holds at most page_size rows, so its last row is not the booking's balance.
+ */
+export function ledgerFooterTotals(
+  response: Pick<LedgerResponse, "epoch" | "current_epoch" | "summary" | "epoch_totals">,
+): LedgerFooterTotals {
+  const current = response.epoch === response.current_epoch;
+  const totals: LedgerTotals = current ? response.summary : response.epoch_totals;
+  return {
+    source: current ? "current" : "epoch",
+    epoch: response.epoch,
+    cash_due_paise: totals.cash_due_paise,
+    account_due_paise: totals.account_due_paise,
+    total_due_paise: totals.total_due_paise,
+    other_charges_due_paise: totals.other_charges_due_paise,
+    cash_paid_paise: totals.cash_paid_paise,
+    account_paid_paise: totals.account_paid_paise,
+  };
+}
+
+export const LEDGER_REBUILD_REASON_LABELS: Readonly<Record<LedgerRebuildReason, string>> = {
+  AGREEMENT_REVISION: "Agreement revision",
+  PLAN_CHANGE: "Payment plan change",
+  STAGE_UNDO: "Construction stage undo",
+  CONSTRUCTION_CHARGE: "Construction charge",
+  INTEGRITY_REPAIR: "Integrity repair",
+  ADMIN_RECOMPUTE: "Admin recompute",
+  LEDGER_REBUILD: "Ledger rebuild",
+};

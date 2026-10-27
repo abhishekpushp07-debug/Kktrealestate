@@ -1,14 +1,14 @@
-import { count, eq, or, sql } from "drizzle-orm";
+import { and, count, eq, or, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
   IdSchema,
   LogoutSchema,
   OkResponseSchema,
+  PortalAuthLoginSchema,
+  PortalAuthRefreshSchema,
   PortalChangePasswordSchema,
   PortalLoginResponseSchema,
-  PortalLoginSchema,
-  PortalRefreshSchema,
   PortalSessionRowSchema,
   PortalUserSchema,
   type PortalUser,
@@ -16,7 +16,7 @@ import {
 import { bookingCoApplicants, bookings, customers, portalUsers, type Executor } from "@kkt/db";
 import { normalizeIndianPhone } from "@kkt/domain";
 import { writeAudit } from "../../lib/audit.js";
-import { bumpPermVersion } from "../../lib/cache.js";
+import { bumpAuthVersions } from "../../lib/cache.js";
 import { ApiError } from "../../lib/errors.js";
 import { hashPassword, verifyPassword } from "../../lib/password.js";
 import { route } from "../../lib/routes.js";
@@ -26,13 +26,16 @@ import {
   failLogin,
   familyOfSession,
   listSessions,
+  loginCompanyId,
   newPasswordHash,
+  pickLoginAccount,
   recordLoginEvent,
   revokeAllFamilies,
   revokeFamily,
   rotateRefresh,
 } from "./service.js";
 import { resetPointOf } from "./lockout.js";
+import { clearRefreshCookie, refreshTokenOf, tokenPair, wantsCookie } from "./cookies.js";
 import { securityRedis } from "../../plugins/auth.js";
 
 /** The one message of a failed customer sign-in (unknown phone and wrong password alike). */
@@ -83,18 +86,31 @@ export async function portalAuthRoutes(app: FastifyInstance): Promise<void> {
     public: true,
     rateLimit: { limit: 10, windowSeconds: 60 },
     schema: {
-      body: PortalLoginSchema,
+      body: PortalAuthLoginSchema,
       response: { 200: PortalLoginResponseSchema },
-      summary: "Customer login (phone + password)",
+      summary:
+        "Customer login (phone + password; optional company slug, contract C4). With X-KKT-Session: cookie the refresh token is set as the kkt_prt cookie",
     },
-    handler: async (req) => {
+    handler: async (req, reply) => {
       const phone = normalizeIndianPhone(req.body.phone) ?? req.body.phone;
-      const [pu] = await app.db.select().from(portalUsers).where(eq(portalUsers.phone, phone)).limit(1);
+      // Contract C4: resolve the company first; a phone is unique per company only.
+      const companyId = await loginCompanyId(app, req, req.body.company);
+      const matches = await app.db
+        .select()
+        .from(portalUsers)
+        .where(
+          companyId
+            ? and(eq(portalUsers.phone, phone), eq(portalUsers.companyId, companyId))
+            : eq(portalUsers.phone, phone),
+        )
+        .limit(2);
+      const pu = pickLoginAccount(matches, companyId);
       const target = {
         subjectType: "CUSTOMER" as const,
         identifier: phone,
         ip: req.clientIp,
         resetAt: resetPointOf(pu),
+        companyId: pu?.companyId ?? companyId,
       };
       const account = pu
         ? {
@@ -156,14 +172,7 @@ export async function portalAuthRoutes(app: FastifyInstance): Promise<void> {
             ip: req.clientIp,
             requestId: req.id,
           });
-          return {
-            access_token: tokens.access_token,
-            refresh_token: tokens.refresh_token,
-            token_type: tokens.token_type,
-            expires_in: tokens.expires_in,
-            audience: tokens.audience,
-            user,
-          };
+          return { ...tokenPair(req, reply, tokens), user };
         });
       } finally {
         release();
@@ -177,28 +186,29 @@ export async function portalAuthRoutes(app: FastifyInstance): Promise<void> {
     public: true,
     rateLimit: { limit: 60, windowSeconds: 60 },
     schema: {
-      body: PortalRefreshSchema,
+      body: PortalAuthRefreshSchema.nullish(),
       response: { 200: PortalLoginResponseSchema.omit({ user: true }) },
-      summary: "Rotate a customer refresh token",
+      summary:
+        "Rotate a customer refresh token (body refresh_token, or the kkt_prt cookie with X-KKT-Session: cookie); 401 SESSION_EXPIRED past the absolute lifetime",
     },
-    handler: async (req) => {
-      const t = await rotateRefresh(app, req, req.body.refresh_token, "portal", async (tx, subjectId) => {
-        const [pu] = await tx.select().from(portalUsers).where(eq(portalUsers.id, subjectId)).limit(1);
-        if (!pu || !pu.isEnabled) return null;
-        return {
-          companyId: pu.companyId,
-          mfa: false,
-          mustChangePassword: pu.mustChangePassword,
-          actor: { type: "CUSTOMER", id: pu.customerId, name: null },
-        };
-      });
-      return {
-        access_token: t.access_token,
-        refresh_token: t.refresh_token,
-        token_type: t.token_type,
-        expires_in: t.expires_in,
-        audience: t.audience,
-      };
+    handler: async (req, reply) => {
+      const raw = refreshTokenOf(req, "portal", req.body?.refresh_token);
+      try {
+        const t = await rotateRefresh(app, req, raw, "portal", async (tx, subjectId) => {
+          const [pu] = await tx.select().from(portalUsers).where(eq(portalUsers.id, subjectId)).limit(1);
+          if (!pu || !pu.isEnabled) return null;
+          return {
+            companyId: pu.companyId,
+            mfa: false,
+            mustChangePassword: pu.mustChangePassword,
+            actor: { type: "CUSTOMER", id: pu.customerId, name: null },
+          };
+        });
+        return tokenPair(req, reply, t);
+      } catch (err) {
+        if (wantsCookie(req)) clearRefreshCookie(reply, "portal");
+        throw err;
+      }
     },
   });
 
@@ -206,7 +216,7 @@ export async function portalAuthRoutes(app: FastifyInstance): Promise<void> {
     method: "POST",
     url: "/portal/auth/logout",
     audience: "portal",
-    schema: { body: LogoutSchema.optional(), response: { 204: z.null() }, summary: "Customer logout" },
+    schema: { body: LogoutSchema.nullish(), response: { 204: z.null() }, summary: "Customer logout" },
     handler: async (req, reply) => {
       const c = req.customer!;
       const all = req.body?.all_devices === true;
@@ -225,6 +235,7 @@ export async function portalAuthRoutes(app: FastifyInstance): Promise<void> {
           requestId: req.id,
         });
       });
+      if (wantsCookie(req)) clearRefreshCookie(reply, "portal");
       return reply.code(204).send();
     },
   });
@@ -269,7 +280,8 @@ export async function portalAuthRoutes(app: FastifyInstance): Promise<void> {
           requestId: req.id,
         });
       });
-      await bumpPermVersion(app.redis);
+      // only this customer's cached identity is re-read (audit C: this used to invalidate every cached principal)
+      await bumpAuthVersions(app.redis, { portalUsers: [c.portalUserId] }, req.log);
       return { ok: true as const };
     },
   });

@@ -299,9 +299,11 @@ describe("scenario 9 — jump two stages ahead", () => {
       expect(ds.filter((d) => d.status !== "VOID").map((d) => d.installment_seq)).toEqual([1, 2, 3, 4]);
       const after = await getBooking(h, admin, bk.id);
       expect(after.summary.raised_percent).toBe(30);
-      expect((await ledgerOf(h, admin, bk.id)).some((row) => row.ref_number === slabDemands[i]!.demand_number)).toBe(
-        false,
-      ); // ledger rebuilt without the voided demand
+      // contract C7: the ledger is a book of record — the voided demand keeps its DEMAND row and a DEMAND_VOIDED row takes it back out
+      const slabRows = (await ledgerOf(h, admin, bk.id)).filter(
+        (row) => row.ref_number === slabDemands[i]!.demand_number,
+      );
+      expect(slabRows.map((row) => row.event)).toEqual(["DEMAND", "DEMAND_VOIDED"]);
     }
     // SPEC L205 retraction: the buyer's bell no longer shows the slab demand (read → withdrawn, unread → deleted); counts exclude withdrawn
     const notes = await portalNotes(vikram);

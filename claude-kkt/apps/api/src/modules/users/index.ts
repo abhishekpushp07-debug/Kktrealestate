@@ -18,7 +18,7 @@ import {
 } from "@kkt/contracts";
 import { passwordHistory, projects, roles, userProjectScopes, users, type Executor } from "@kkt/db";
 import { actorFromRequest, writeAudit } from "../../lib/audit.js";
-import { bumpPermVersion } from "../../lib/cache.js";
+import { bumpAuthVersions } from "../../lib/cache.js";
 import { sendCsv } from "../../lib/csv.js";
 import { temporaryPassword } from "../../lib/crypto.js";
 import { ApiError } from "../../lib/errors.js";
@@ -292,7 +292,7 @@ export async function usersModule(app: FastifyInstance): Promise<void> {
         });
         return view;
       });
-      await bumpPermVersion(app.redis);
+      // a new account has no cached auth row: nothing to invalidate
       reply.header("Cache-Control", "no-store"); // may carry a one-time password
       return reply.code(201).send({ ...row, ...(body.password ? {} : { temp_password: plain }) });
     },
@@ -366,7 +366,7 @@ export async function usersModule(app: FastifyInstance): Promise<void> {
         });
         return after;
       });
-      await bumpPermVersion(app.redis);
+      await bumpAuthVersions(app.redis, { users: [req.params.id] }, req.log);
       return row;
     },
   });
@@ -411,7 +411,7 @@ export async function usersModule(app: FastifyInstance): Promise<void> {
           });
           return { id: updated.id, is_active: updated.isActive, version: updated.version };
         });
-        await bumpPermVersion(app.redis);
+        await bumpAuthVersions(app.redis, { users: [req.params.id] }, req.log);
         return result;
       },
     });
@@ -470,7 +470,7 @@ export async function usersModule(app: FastifyInstance): Promise<void> {
         });
         return { id: updated.id, version: updated.version };
       });
-      await bumpPermVersion(app.redis);
+      await bumpAuthVersions(app.redis, { users: [req.params.id] }, req.log);
       return { ...result, ...(req.body.new_password ? {} : { temp_password: plain }) };
     },
   });
@@ -539,7 +539,7 @@ export async function usersModule(app: FastifyInstance): Promise<void> {
         });
         return after;
       });
-      await bumpPermVersion(app.redis);
+      await bumpAuthVersions(app.redis, { users: [req.params.id] }, req.log);
       return row;
     },
   });

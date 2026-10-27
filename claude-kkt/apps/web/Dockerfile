@@ -25,8 +25,10 @@ WORKDIR /app
 COPY --from=build --chown=kkt:kkt /repo/apps/web/.next/standalone ./
 COPY --from=build --chown=kkt:kkt /repo/apps/web/.next/static ./apps/web/.next/static
 COPY --from=build --chown=kkt:kkt /repo/apps/web/public ./apps/web/public
+# hash-based CSP of ISR pages (see apps/web/csp-hook.cjs): loaded before Next.js creates its HTTP server
+COPY --from=build --chown=kkt:kkt /repo/apps/web/csp-hook.cjs ./apps/web/csp-hook.cjs
 USER kkt
 EXPOSE 3000
 HEALTHCHECK --interval=15s --timeout=3s --start-period=30s --retries=3 CMD wget -qO- http://127.0.0.1:3000/ > /dev/null || exit 1
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["node", "apps/web/server.js"]
+CMD ["node", "--require", "./apps/web/csp-hook.cjs", "apps/web/server.js"]

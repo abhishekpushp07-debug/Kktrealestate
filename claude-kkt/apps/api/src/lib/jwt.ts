@@ -12,19 +12,20 @@ export interface AccessClaimsInput {
   sid: string; // refresh-token family id (session)
   mfa?: boolean; // MFA satisfied for this session
   pwd?: boolean; // must change password
+  rid?: string; // staff: role id at issue time (keys the role version of the auth cache)
 }
 export type AccessClaims = AccessClaimsInput & JWTPayload & { typ: "access" };
 
-/** One Ed25519 signing/verification key derived from a secret; `kid` is a fingerprint of the public key (stable across instances). */
+/** One Ed25519 signing/verification key; `kid` goes into the token header and selects the key on verification. */
 export interface SigningKey {
   kid: string;
   privateKey: KeyObject;
   publicKey: KeyObject;
-  /** The current JWT_SECRET (signs new tokens); previous secrets only verify. */
+  /** The first key of the ring signs new tokens; the others only verify (rotation window). */
   current: boolean;
 }
 
-/** Deterministically derive an Ed25519 key pair from a secret so every API instance signs/verifies the same tokens without shared files. */
+/** Deterministically derive an Ed25519 key pair from a secret (non-production fallback when JWT_SIGNING_KEYS is unset). */
 function deriveKeyPair(secret: string): { privateKey: KeyObject; publicKey: KeyObject } {
   const seed = createHash("sha256").update("kkt-jwt-ed25519-v1:").update(secret).digest();
   const pkcs8 = Buffer.concat([Buffer.from("302e020100300506032b657004220420", "hex"), seed]);
@@ -33,7 +34,7 @@ function deriveKeyPair(secret: string): { privateKey: KeyObject; publicKey: KeyO
   return { privateKey, publicKey };
 }
 
-/** Key id: first 16 base64url characters of the SHA-256 of the public key (SPKI DER). Reveals nothing about the secret. */
+/** Fingerprint key id of a derived key: first 16 base64url characters of the SHA-256 of the public key (SPKI DER). */
 function keyId(publicKey: KeyObject): string {
   return createHash("sha256")
     .update(publicKey.export({ format: "der", type: "spki" }))
@@ -41,31 +42,39 @@ function keyId(publicKey: KeyObject): string {
     .slice(0, 16);
 }
 
-/** The secrets the cached ring was derived from (current first). */
-let ringSecrets: readonly string[] | null = null;
+/** What the cached ring was built from: the JWT_SIGNING_KEYS array, JWT_SECRET and a copy of JWT_PREVIOUS_SECRETS. */
+let ringSource: { keys: unknown; secret: string; previous: string[] } | null = null;
 let ring: SigningKey[] = [];
 
-/** True when the configured secrets are still the ones the ring was built from (no allocation: this runs on every request). */
+/** True when the configuration still matches the cached ring (no allocation: this runs on every request). */
 function ringIsCurrent(): boolean {
-  if (ringSecrets === null || ringSecrets[0] !== config.JWT_SECRET) return false;
+  if (ringSource === null || ringSource.keys !== config.JWT_SIGNING_KEYS || ringSource.secret !== config.JWT_SECRET)
+    return false;
   const previous = config.JWT_PREVIOUS_SECRETS;
-  if (ringSecrets.length !== previous.length + 1) return false;
-  for (let i = 0; i < previous.length; i++) if (ringSecrets[i + 1] !== previous[i]) return false;
+  if (ringSource.previous.length !== previous.length) return false;
+  for (let i = 0; i < previous.length; i++) if (ringSource.previous[i] !== previous[i]) return false;
   return true;
 }
 
 /**
- * Signing key ring: JWT_SECRET (current, signs) followed by JWT_PREVIOUS_SECRETS (verify only), so a rotation keeps every token issued in
- * the last ACCESS_TOKEN_MINUTES valid. Rebuilt when the configuration changes (tests rotate in-process).
+ * Signing key ring (contract C9): JWT_SIGNING_KEYS (`<kid>:<base64 PKCS8 DER Ed25519 key>`, first signs, every key verifies the tokens
+ * carrying its kid and is published in the JWKS). Outside production, when JWT_SIGNING_KEYS is unset, the ring is derived from JWT_SECRET
+ * (signs) and JWT_PREVIOUS_SECRETS (verify only) with fingerprint kids, as before. Rebuilt when the configuration changes.
  */
 export function signingKeys(): SigningKey[] {
   if (ringIsCurrent()) return ring;
-  const secrets = [config.JWT_SECRET, ...config.JWT_PREVIOUS_SECRETS];
-  ring = secrets.map((secret, i) => {
-    const pair = deriveKeyPair(secret);
-    return { kid: keyId(pair.publicKey), ...pair, current: i === 0 };
-  });
-  ringSecrets = secrets;
+  if (config.JWT_SIGNING_KEYS.length > 0) {
+    ring = config.JWT_SIGNING_KEYS.map((k, i) => {
+      const privateKey = createPrivateKey({ key: k.der, format: "der", type: "pkcs8" });
+      return { kid: k.kid, privateKey, publicKey: createPublicKey(privateKey), current: i === 0 };
+    });
+  } else {
+    ring = [config.JWT_SECRET, ...config.JWT_PREVIOUS_SECRETS].map((secret, i) => {
+      const pair = deriveKeyPair(secret);
+      return { kid: keyId(pair.publicKey), ...pair, current: i === 0 };
+    });
+  }
+  ringSource = { keys: config.JWT_SIGNING_KEYS, secret: config.JWT_SECRET, previous: [...config.JWT_PREVIOUS_SECRETS] };
   return ring;
 }
 
@@ -96,7 +105,7 @@ export type VerifyResult =
  */
 function candidates(token: string): SigningKey[] {
   const keys = signingKeys();
-  if (keys.length === 1) return keys;
+  if (keys.length === 1 && config.JWT_SIGNING_KEYS.length === 0) return keys;
   let kid: string | undefined;
   try {
     kid = decodeProtectedHeader(token).kid;
@@ -104,7 +113,10 @@ function candidates(token: string): SigningKey[] {
     return [];
   }
   const named = keys.filter((k) => k.kid === kid);
-  return named.length > 0 ? named : keys;
+  // An explicit ring verifies by kid only (a token naming no configured key is invalid); the derived ring also accepts kid-less tokens
+  // minted before kids were fingerprints.
+  if (named.length > 0 || config.JWT_SIGNING_KEYS.length > 0) return named;
+  return keys;
 }
 
 const VERIFY_OPTIONS = { issuer: ISSUER, clockTolerance: 30, algorithms: ["EdDSA"] };
@@ -133,7 +145,7 @@ export async function verifyAccessToken(token: string, audience: TokenAudience):
   return { ok: false, reason: "INVALID" };
 }
 
-/** Public JWK set for external verifiers (e.g. an edge proxy): every key that can still verify a live token, current first. */
+/** Public JWK set for external verifiers (e.g. an edge proxy): every key of the ring (each verifies tokens carrying its kid), current first. */
 export async function publicJwks(): Promise<{ keys: Record<string, unknown>[] }> {
   const keys = await Promise.all(
     signingKeys().map(async (k) => ({ ...(await exportJWK(k.publicKey)), kid: k.kid, use: "sig", alg: "EdDSA" })),

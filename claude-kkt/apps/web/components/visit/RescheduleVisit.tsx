@@ -36,7 +36,7 @@ interface RescheduleVisitProps {
 
 /** The visitor moves their own visit to another open slot (POST /public/site-visits/:token/reschedule). */
 export function RescheduleVisit({ visit, token, onCancel, onMoved, onExpired }: RescheduleVisitProps) {
-  const { apiUrl } = useSiteConfig();
+  const { apiUrl, companySlug } = useSiteConfig();
   const [days, setDays] = useState<VisitDay[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [reloadKey, setReloadKey] = useState(0);
@@ -54,7 +54,7 @@ export function RescheduleVisit({ visit, token, onCancel, onMoved, onExpired }: 
   // Availability of the next two weeks (re-read after SLOT_FULL / SLOT_INVALID through reloadKey).
   useEffect(() => {
     let cancelled = false;
-    publicClient(apiUrl)
+    publicClient(apiUrl, companySlug)
       .getVisitAvailability(visit.project_slug, from, addDays(from, DAYS_AHEAD - 1))
       .then(
         (result) => {
@@ -79,7 +79,7 @@ export function RescheduleVisit({ visit, token, onCancel, onMoved, onExpired }: 
     return () => {
       cancelled = true;
     };
-  }, [apiUrl, from, visit.project_slug, visit.visit_date, visit.slot_start, reloadKey]);
+  }, [apiUrl, companySlug, from, visit.project_slug, visit.visit_date, visit.slot_start, reloadKey]);
 
   function reload() {
     setLoading(true);
@@ -94,7 +94,7 @@ export function RescheduleVisit({ visit, token, onCancel, onMoved, onExpired }: 
     setBusy(true);
     setError(null);
     try {
-      const result = await publicClient(apiUrl).rescheduleSiteVisit(token, {
+      const result = await publicClient(apiUrl, companySlug).rescheduleSiteVisit(token, {
         date: selectedDate,
         start: selectedSlot.start,
         website: website as "",

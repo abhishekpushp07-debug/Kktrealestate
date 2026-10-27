@@ -7,6 +7,9 @@ import { getVisit, isApiError } from "@/lib/api";
 import type { SiteVisitManage } from "@/lib/types";
 import { siteGate } from "@/lib/gate";
 
+/** Per visitor (a secret manage token): rendered per request, never cached, and served with the strict nonce CSP (middleware.ts). */
+export const dynamic = "force-dynamic";
+
 type Params = Promise<{ token: string }>;
 type Search = Promise<Record<string, string | string[] | undefined>>;
 

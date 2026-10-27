@@ -13,6 +13,9 @@ import { Markdown } from "@/lib/markdown";
 import { brandName, breadcrumbJsonLd, pageMetadata } from "@/lib/seo";
 import type { SiteSettings } from "@/lib/types";
 
+/** CMS content: regenerated every 5 minutes, or at once on a CMS write (API → /api/revalidate). */
+export const revalidate = 300;
+
 export async function generateMetadata(): Promise<Metadata> {
   const closed = await closedMetadata();
   if (closed) return closed;

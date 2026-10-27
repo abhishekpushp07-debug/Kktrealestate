@@ -186,7 +186,8 @@ export function formatINR(paise: number, options: FormatINROptions = {}): string
   const p = abs % 100;
   const showPaise = mode === "always" || (mode === "auto" && p !== 0);
   const body = groupIndian(String(rupees)) + (showPaise ? `.${String(p).padStart(2, "0")}` : "");
-  return `${negative ? "-" : ""}${symbol}${body}`;
+  // An amount shown as zero carries no sign ("₹0", never "-₹0"), like packages/contracts moneyFormat.
+  return `${negative && abs !== 0 ? "-" : ""}${symbol}${body}`;
 }
 
 const CRORE_PAISE = 10_000_000n * 100n;
@@ -220,7 +221,7 @@ export function formatINRShort(paise: number): string {
   if (rupees === 100_000n) {
     return `${sign}₹1 L`;
   }
-  return `${sign}₹${groupIndian(rupees.toString())}`;
+  return `${rupees === 0n ? "" : sign}₹${groupIndian(rupees.toString())}`;
 }
 
 const ONES = [

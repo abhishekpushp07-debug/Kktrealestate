@@ -408,7 +408,7 @@ describe("public project detail", () => {
   it("serves the allow-listed detail with cache headers, grid, configurations, progress and aliases for apps/web", async () => {
     const r = await pub<Detail>(`/api/v1/public/projects/${wp.slug}`);
     expect(r.status, r.text).toBe(200);
-    expect(r.headers["cache-control"]).toBe("public, max-age=60, s-maxage=60, stale-while-revalidate=300");
+    expect(r.headers["cache-control"]).toBe("public, s-maxage=60, stale-while-revalidate=300"); // contract C5 (catalog)
     expect(r.headers["etag"]).toBeTruthy();
     const d = r.body;
     expect(d.name).toBe("Shree Ganesh Heights");
@@ -815,7 +815,8 @@ describe("brochure lead gate", () => {
       { body: { project_slug: wp.slug, visitor_token: visitorToken, website: "" } },
     );
     expect(r.status, r.text).toBe(200);
-    expect(r.body.visitor_token).toBe(visitorToken);
+    // the reply carries a fresh opaque token for the same visitor (phase 7: lead reference, no readable PII)
+    expect(r.body.visitor_token).toMatch(/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
     const [lead] = await t.app.sql<{ id: string }[]>`select id from leads where phone = ${phone}`;
     expect(
       (

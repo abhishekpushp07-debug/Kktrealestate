@@ -126,7 +126,11 @@ describe("migrations", () => {
     }
     expect(initial).toContain('UNIQUE NULLS NOT DISTINCT("plan_id","project_id","block_id")');
     const files = await listSqlFiles(SQL_FOLDER);
-    expect(files.map((f) => f.split("/").pop())).toEqual(["0001_triggers.sql", "0002_privileges.sql"]);
+    expect(files.map((f) => f.split("/").pop())).toEqual([
+      "0001_triggers.sql",
+      "0002_privileges.sql",
+      "0006_money_guards.sql",
+    ]);
   });
 
   it("creates the partial unique indexes with the required WHERE clauses", async () => {

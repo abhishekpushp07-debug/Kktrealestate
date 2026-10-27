@@ -19,8 +19,21 @@ export const RunDuesRequestSchema = z.strictObject({
 });
 export type RunDuesRequest = z.infer<typeof RunDuesRequestSchema>;
 
+/** A booking the engine could not process (per-booking isolation: the run went on with the others). */
+export const DuesFailureSchema = z.object({
+  booking_id: IdSchema,
+  booking_number: z.string().nullable(),
+  /** API error code (ApiError), INVALID_AMOUNT (domain money error), `SQLSTATE_<code>` (database) or INTERNAL_ERROR. */
+  code: z.string(),
+  message: z.string(),
+});
+export type DuesFailure = z.infer<typeof DuesFailureSchema>;
+
 export const RunDuesResponseSchema = z.object({
   bookings_processed: z.int().min(0),
+  /** Bookings whose unit of work failed (their demands were not raised; every other booking was). */
+  bookings_failed: z.int().min(0).optional(),
+  failures: z.array(DuesFailureSchema).optional(),
   /** Alias of bookings_processed (SPEC §10 wording). */
   bookings_checked: z.int().min(0).optional(),
   demands_raised: z.int().min(0),
@@ -92,6 +105,8 @@ export const IntegrityRepairResponseSchema = z.object({
   ledgers_rebuilt: z.int().min(0),
   summaries_fixed: z.int().min(0),
   skipped_with_payments: z.array(z.string()),
+  /** Demands the report flagged but whose trigger was satisfied again when the repair re-checked them under the booking lock (kept). */
+  kept_now_satisfied: z.array(z.string()).optional(),
   report_after: IntegrityReportResponseSchema,
 });
 export type IntegrityRepairResponse = z.infer<typeof IntegrityRepairResponseSchema>;

@@ -80,6 +80,17 @@ export const ERROR_CODES = [
   "CONSTRAINT_VIOLATION",
   "INVALID_AMOUNT",
   "COMPANY_REQUIRED",
+  // phase 7 security track: a refresh-token family past its absolute lifetime (contract C1)
+  "SESSION_EXPIRED",
+  // phase 7 money track: a stage undo would rewrite a cancelled / handed-over booking (details.bookings)
+  "BOOKING_CLOSED",
+  // phase 7 platform track: malformed / foreign keyset cursor; a retried write whose first attempt committed but whose answer was lost
+  "INVALID_CURSOR",
+  "IDEMPOTENT_OUTCOME_UNKNOWN",
+  // phase 7 domain track: regenerate / structural block edit would delete flats that have bookings (details.flats)
+  "FLAT_HAS_BOOKING_HISTORY",
+  // phase 7 domain track: a master CSV import whose header names unknown / misnamed columns (details.unknown_columns, expected_columns)
+  "IMPORT_UNKNOWN_COLUMNS",
 ] as const;
 
 /** An error code literal. */
@@ -166,6 +177,12 @@ export const ERROR_STATUS: Readonly<Record<ErrorCode, number>> = {
   CONSTRAINT_VIOLATION: 422,
   INVALID_AMOUNT: 422,
   COMPANY_REQUIRED: 400,
+  SESSION_EXPIRED: 401,
+  BOOKING_CLOSED: 409,
+  INVALID_CURSOR: 400,
+  IDEMPOTENT_OUTCOME_UNKNOWN: 409,
+  FLAT_HAS_BOOKING_HISTORY: 409,
+  IMPORT_UNKNOWN_COLUMNS: 422,
 };
 
 /** Returns the HTTP status for an error code. */

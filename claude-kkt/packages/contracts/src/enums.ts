@@ -835,6 +835,9 @@ export const JOB_NAMES = [
   "PARTITION_MAINTENANCE",
   "JOB_RUN_SWEEP",
   "LEDGER_REBUILD",
+  "AUDIT_SEAL",
+  "DOCUMENT_RENDITIONS",
+  "STORAGE_SWEEP",
 ] as const;
 export const JobNameSchema = enumSchema(JOB_NAMES);
 export type JobName = z.infer<typeof JobNameSchema>;
@@ -857,4 +860,7 @@ export const JOB_NAME_LABELS: LabelMap<JobName> = {
   PARTITION_MAINTENANCE: "Create next month's partitions (PARTITIONING_ENABLED only)",
   JOB_RUN_SWEEP: "Mark abandoned job runs (every 15 minutes)",
   LEDGER_REBUILD: "Rebuild every booking ledger in canonical order (admin)",
+  AUDIT_SEAL: "Seal new audit log rows into the hash chain (every 15 minutes)",
+  DOCUMENT_RENDITIONS: "Generate image thumbnails and medium renditions of an upload",
+  STORAGE_SWEEP: "Remove orphaned uploads and retry queued storage deletions (every 10 minutes)",
 };

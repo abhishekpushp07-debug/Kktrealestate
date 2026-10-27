@@ -1,13 +1,29 @@
+import { generateKeyPairSync } from "node:crypto";
 import Fastify from "fastify";
 import { describe, expect, it } from "vitest";
-import { loadConfig, parseFieldKeys, parseTrustProxy, SECRET_FILE_VARS } from "../../src/config.js";
+import {
+  loadConfig,
+  parseFieldKeys,
+  parseJwtSigningKeys,
+  parseTrustProxy,
+  placeholderProblem,
+  SECRET_FILE_VARS,
+} from "../../src/config.js";
 
+/** A base64 PKCS8 DER Ed25519 private key (JWT_SIGNING_KEYS entry value). */
+const edKey = () =>
+  generateKeyPairSync("ed25519").privateKey.export({ format: "der", type: "pkcs8" }).toString("base64");
+
+/** A complete production secret set (contract C9: explicit rings, no template values, 32+ bytes). */
 const PROD_SECRETS = {
   NODE_ENV: "production",
-  JWT_SECRET: "p".repeat(48),
-  FIELD_ENCRYPTION_KEY: "f".repeat(44),
-  HASH_KEY: "h".repeat(32),
-  DATABASE_URL: "postgres://app:secret@db:5432/kkt",
+  JWT_SECRET: "Jw7qR2xLm9vTz4pKs8dNc1fGh6bYe3uAo5iW",
+  FIELD_ENCRYPTION_KEY: "Zk3mQ9vT2xLp8wR4nC7bY1dF6gH0jK5sA2uE9iO3tWq=",
+  HASH_KEY: "Hk4zP8sWq2mXv6nRt1cLb9dFg3jYe7uAo0iQ",
+  JWT_SIGNING_KEYS: `ed1:${edKey()}`,
+  LINK_SIGNING_KEYS: "l1:Lk5yN3wQa8pZr2mTv7cXb1dFh6jGe4uSo9iP",
+  HASH_KEYS: "h2:Hs8tB5vM1qWx7zKp3nRc9dLf2gJy6eUa4iOw",
+  DATABASE_URL: "postgres://app:Pg5tR8wQ2mZx@db:5432/kkt",
   REDIS_URL: "redis://cache:6379/0",
 } as const;
 
@@ -178,13 +194,17 @@ describe("<NAME>_FILE secrets", () => {
         "METRICS_TOKEN",
         "BOOTSTRAP_ADMIN_PASSWORD",
         "ERROR_WEBHOOK_URL",
+        "JWT_SIGNING_KEYS",
+        "LINK_SIGNING_KEYS",
+        "HASH_KEYS",
+        "INTERNAL_API_TOKEN",
       ].sort(),
     );
   });
 
   it("reads each value from its file (trimmed), satisfying production requirements", () => {
     const files: Record<string, string> = {
-      "/run/secrets/jwt": `${"j".repeat(40)}\n`,
+      "/run/secrets/jwt": "Jt9wQ4mZ7xLp2vR8nC3bY6dF1gH5jK0sA4uE\n",
       "/run/secrets/db": "postgres://app:pw@db/kkt\n",
       "/run/secrets/redis": "redis://cache:6379/2",
       "/run/secrets/metrics": "metrics-token-0123456789",
@@ -205,7 +225,7 @@ describe("<NAME>_FILE secrets", () => {
       },
       { readFile: read },
     );
-    expect(c.JWT_SECRET).toBe("j".repeat(40));
+    expect(c.JWT_SECRET).toBe("Jt9wQ4mZ7xLp2vR8nC3bY6dF1gH5jK0sA4uE");
     expect(c.DATABASE_URL).toBe("postgres://app:pw@db/kkt");
     expect(c.REDIS_URL).toBe("redis://cache:6379/2");
     expect(c.METRICS_TOKEN).toBe("metrics-token-0123456789");
@@ -262,5 +282,74 @@ describe("key rotation inputs", () => {
       "https://hooks.example/x",
       9100,
     ]);
+  });
+});
+
+describe("production secrets (contract C9)", () => {
+  it("refuses to boot without the explicit key rings", () => {
+    const { JWT_SIGNING_KEYS: _j, LINK_SIGNING_KEYS: _l, HASH_KEYS: _h, ...noRings } = PROD_SECRETS;
+    const msg = failure(noRings);
+    expect(msg).toMatch(/JWT_SIGNING_KEYS is required in production/);
+    expect(msg).toMatch(/LINK_SIGNING_KEYS is required in production/);
+    expect(msg).toMatch(/HASH_KEYS is required in production/);
+    // outside production they are derived (JWT_SECRET / HASH_KEY) as before
+    const dev = loadConfig({ NODE_ENV: "development" });
+    expect(dev.JWT_SIGNING_KEYS).toEqual([]);
+    expect(dev.HASH_KEY_RING.map((k) => k.kid)).toEqual(["h1"]);
+  });
+
+  it("refuses template values from the examples, single-character fills and secrets under 32 bytes", () => {
+    for (const [key, value] of [
+      ["JWT_SECRET", "CHANGE-ME-at-least-32-characters-long-random"], // infra/k8s/secret.example.yaml
+      ["JWT_SECRET", "change-me-use-openssl-rand-base64-48"], // .env.example
+      ["FIELD_ENCRYPTION_KEY", "changeme-changeme-changeme-changeme-0001"],
+      ["HASH_KEY", "placeholder-hash-key-value-0123456789abc"],
+      ["HASH_KEY", "this-is-an-example-value-0123456789abcdef"],
+      ["JWT_SECRET", "x".repeat(48)],
+      ["HASH_KEY", "Hk4zP8sWq2mXv6nR"], // 16 bytes
+      ["LINK_SIGNING_KEYS", `l1:${"X".repeat(40)}`],
+      ["HASH_KEYS", "h2:CHANGE-ME-at-least-16-chars-0123456789"],
+      ["METRICS_TOKEN", "CHANGE-ME-at-least-16-chars"],
+      ["INTERNAL_API_TOKEN", "change-me-internal-api-token-0123456789"],
+    ] as const) {
+      expect(failure({ ...PROD_SECRETS, [key]: value }), `${key}=${value}`).toMatch(new RegExp(key.replace(/S$/, "")));
+    }
+    expect(failure({ ...PROD_SECRETS, DATABASE_URL: "postgres://kkt_app:CHANGE-ME@pgbouncer:6432/kkt" })).toMatch(
+      /DATABASE_URL carries a placeholder password/,
+    );
+    expect(
+      failure({
+        ...PROD_SECRETS,
+        BOOTSTRAP_ADMIN_EMAIL: "a@b.in",
+        BOOTSTRAP_ADMIN_PASSWORD: "CHANGE-ME-first-admin-password",
+      }),
+    ).toMatch(/BOOTSTRAP_ADMIN_PASSWORD is a placeholder/);
+    // the same values are fine outside production (dev defaults are exactly such values)
+    expect(
+      loadConfig({ NODE_ENV: "development", JWT_SECRET: "CHANGE-ME-at-least-32-characters-long-random" }).JWT_SECRET,
+    ).toMatch(/CHANGE-ME/);
+    expect(placeholderProblem("Jw7qR2xLm9vTz4pKs8dNc1fGh6bYe3uAo5iW")).toBeNull();
+    expect(placeholderProblem("short")).toMatch(/32 bytes/);
+  });
+
+  it("accepts a complete production set; rings are ordered, active first, HASH_KEY joins the hash ring as h1", () => {
+    const c = loadConfig({ ...PROD_SECRETS, JWT_SIGNING_KEYS: `ed2:${edKey()},ed1:${edKey()}` });
+    expect(c.JWT_SIGNING_KEYS.map((k) => k.kid)).toEqual(["ed2", "ed1"]);
+    expect(c.LINK_SIGNING_KEYS.map((k) => k.kid)).toEqual(["l1"]);
+    expect(c.HASH_KEY_RING.map((k) => k.kid)).toEqual(["h2", "h1"]);
+    expect(failure({ ...PROD_SECRETS, HASH_KEYS: `h1:${"Q".repeat(20)}w${"R".repeat(20)}` })).toMatch(
+      /key id h1 is HASH_KEY/,
+    );
+  });
+
+  it("JWT_SIGNING_KEYS entries must be base64 PKCS8 DER Ed25519 private keys", () => {
+    const rsa = generateKeyPairSync("rsa", { modulusLength: 1024 })
+      .privateKey.export({ format: "der", type: "pkcs8" })
+      .toString("base64");
+    expect(() => parseJwtSigningKeys(`r1:${rsa}`)).toThrow(/not a base64 PKCS8 DER Ed25519/);
+    expect(() => parseJwtSigningKeys("e1:not-base64-at-all")).toThrow(/Ed25519/);
+    const k = edKey();
+    expect(() => parseJwtSigningKeys(`e1:${k},e1:${k}`)).toThrow(/twice/);
+    expect(parseJwtSigningKeys(`e1:${k}`)[0]!.kid).toBe("e1");
   });
 });

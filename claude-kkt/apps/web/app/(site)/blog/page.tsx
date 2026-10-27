@@ -10,6 +10,9 @@ import { listPosts } from "@/lib/api";
 import { closedMetadata, siteGate } from "@/lib/gate";
 import { breadcrumbJsonLd, pageMetadata } from "@/lib/seo";
 
+/** Reads ?page, so it renders per request; its API data is cached 5 minutes (lib/api.ts). */
+export const revalidate = 300;
+
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 function readPage(params: Record<string, string | string[] | undefined>): number {

@@ -20,7 +20,7 @@ import {
   type DemandRow,
   type PaymentRow,
 } from "@kkt/contracts";
-import { bookings, customers, demands, flats, payments, projects } from "@kkt/db";
+import { customers, demands, payments, projects } from "@kkt/db";
 import { diffDays } from "@kkt/domain";
 import { sendCsv } from "../../../lib/csv.js";
 import { listPaging, paginate } from "../../../lib/list.js";
@@ -29,6 +29,7 @@ import { ensureProjectAccess, scopeFilter } from "../../../lib/scope.js";
 import { expectedVersion, withOptionalVersion } from "../../../lib/version.js";
 import { actorOf, loadBooking, todayDate } from "../common.js";
 import { bouncePayment, clearPayment, postPayment, receiptData, reversePayment } from "../services/payments.js";
+import { resolveSearchRefs, searchWhere } from "../services/search.js";
 import {
   DEMAND_SELECT,
   PAYMENT_SELECT,
@@ -168,6 +169,15 @@ export function registerPaymentRoutes(app: FastifyInstance): void {
     if (q.bank_account_id) where.push(eq(payments.bankAccountId, q.bank_account_id));
     if (q.from) where.push(gte(payments.paymentDate, q.from));
     if (q.to) where.push(lte(payments.paymentDate, q.to));
+    // search: matching bookings (number / flat) and customers (name) resolved first through their trigram indexes, then payments
+    // filtered by those ids OR their own indexed columns (receipt number, instrument number) — services/search.ts
+    where.push(
+      searchWhere(await resolveSearchRefs(app.dbReplica, user.companyId, q.search), user.companyId, {
+        booking: payments.bookingId,
+        customer: payments.customerId,
+        own: [payments.receiptNumber, sql`(${payments.instrument} ->> 'number')`],
+      }),
+    );
     // the instrument date lives inside the jsonb; selecting the same expression lets paginate() read the keyset cursor value back
     const instrumentDateCol = sql<string>`(${payments.instrument} ->> 'date')`;
     const result = await paginate<PaymentSelect>(app.dbReplica, {
@@ -175,16 +185,8 @@ export function registerPaymentRoutes(app: FastifyInstance): void {
       select: { ...PAYMENT_SELECT, instrumentDate: instrumentDateCol },
       join: paymentJoins,
       where: and(...where.filter((w): w is SQL => w !== undefined)),
-      search: {
-        columns: [
-          payments.receiptNumber,
-          bookings.bookingNumber,
-          customers.fullName,
-          flats.flatNumber,
-          sql`(${payments.instrument} ->> 'number')`,
-        ],
-        term: q.search,
-      },
+      // the condition is in `where`; the term still tells paginate() a search page usually needs no count query
+      search: { columns: [], term: q.search },
       sort: {
         allowed: {
           payment_date: payments.paymentDate,
@@ -371,21 +373,20 @@ export function registerPaymentRoutes(app: FastifyInstance): void {
         where.push(sql`${demands.status} in ('OPEN', 'PARTIALLY_PAID') and ${demands.dueDate} < ${today}::date`);
       if (q.from) where.push(gte(demands.demandDate, q.from));
       if (q.to) where.push(lte(demands.demandDate, q.to));
+      // search: bookings / customers resolved first (trigram), then demand ids OR own trigram columns (services/search.ts)
+      where.push(
+        searchWhere(await resolveSearchRefs(app.dbReplica, user.companyId, q.search), user.companyId, {
+          booking: demands.bookingId,
+          customer: demands.customerId,
+          own: [demands.demandNumber, demands.installmentName],
+        }),
+      );
       const result = await paginate<DemandSelect>(app.dbReplica, {
         table: demands,
         select: DEMAND_SELECT,
         join: demandJoins,
         where: and(...where.filter((w): w is SQL => w !== undefined)),
-        search: {
-          columns: [
-            demands.demandNumber,
-            bookings.bookingNumber,
-            customers.fullName,
-            flats.flatNumber,
-            demands.installmentName,
-          ],
-          term: q.search,
-        },
+        search: { columns: [], term: q.search },
         sort: {
           allowed: {
             due_date: demands.dueDate,

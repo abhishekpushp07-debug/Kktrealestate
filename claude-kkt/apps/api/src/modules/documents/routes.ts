@@ -34,9 +34,9 @@ import {
   loadJoined,
   signedUrl,
   storage,
-  storeBuffer,
   streamDocument,
   toDocumentRow,
+  uploadDocument,
   variantKey,
   variantMeta,
   verifyLinkToken,
@@ -134,9 +134,10 @@ export function registerDocumentRoutes(app: FastifyInstance): void {
       const upload = uploadOf(req);
       const meta = parseUploadMeta(upload.fields);
       assertEntityWrite(user, meta.entity_type);
-      const view = await app.db.transaction(async (tx) => {
-        await requireEntity(tx, user, meta.entity_type, meta.entity_id);
-        const row = await storeBuffer(tx, {
+      // validation and the storage write happen before the (short) transaction; renditions follow in a job (service.uploadDocument)
+      const view = await uploadDocument(
+        app,
+        {
           companyId: user.companyId,
           entityType: meta.entity_type,
           entityId: meta.entity_id,
@@ -148,20 +149,26 @@ export function registerDocumentRoutes(app: FastifyInstance): void {
           sharedWithCustomer: meta.shared_with_customer,
           uploadedBy: user.id,
           uploadedByType: "STAFF",
-        });
-        const joined = await loadJoined(tx, user.companyId, row.id);
-        const doc = toDocumentRow(joined!);
-        await writeAudit(tx, {
-          companyId: user.companyId,
-          actor: actorFromRequest(req),
-          action: `${ENTITY}.upload`,
-          entityType: ENTITY,
-          entityId: row.id,
-          after: auditSnapshot(doc),
-          ...auditMeta(req),
-        });
-        return doc;
-      });
+        },
+        async (tx, row) => {
+          // re-checked under the transaction: the entity may have been removed while the file was being written
+          await requireEntity(tx, user, meta.entity_type, meta.entity_id);
+          const joined = await loadJoined(tx, user.companyId, row.id);
+          const doc = toDocumentRow(joined!);
+          await writeAudit(tx, {
+            companyId: user.companyId,
+            actor: actorFromRequest(req),
+            action: `${ENTITY}.upload`,
+            entityType: ENTITY,
+            entityId: row.id,
+            after: auditSnapshot(doc),
+            ...auditMeta(req),
+          });
+          return doc;
+        },
+        // a caller who may not attach to this entity is refused before anything is written to storage
+        { before: async () => void (await requireEntity(app.db, user, meta.entity_type, meta.entity_id)) },
+      );
       return reply.code(201).send({ document: view });
     },
   });
@@ -341,7 +348,9 @@ export function registerDocumentRoutes(app: FastifyInstance): void {
       const j = await loadForStaff(app, user, req.params.id, { hideSensitive: false });
       if (j.doc.isSensitive && !canSeeSensitive(user))
         throw ApiError.forbidden("Missing permission customer.kyc_view", { permission: "customer.kyc_view" });
-      const variant = req.query.variant;
+      // an image whose renditions do not exist yet (or failed) links its original: "the original is served until they exist"
+      const variant =
+        !variantKey(j.doc, req.query.variant) && j.doc.mime.startsWith("image/") ? "original" : req.query.variant;
       if (!variantKey(j.doc, variant)) throw ApiError.notFound(`${variant} variant`);
       const link = signedUrl(j.doc.id, variant, SIGNED_LINK_TTL_SECONDS);
       const meta = variantMeta(j.doc, variant);
@@ -371,6 +380,8 @@ export function registerDocumentRoutes(app: FastifyInstance): void {
       params: z.object({ token: z.string().min(1).max(100) }),
       response: { 200: z.any() },
       summary: "Stream a file through a signed, short-lived link (any malformed, forged or expired token is 404)",
+      description:
+        "Binary body: the document bytes (application/pdf, image/jpeg, image/png, image/webp), `Content-Disposition` inline for images and attachment otherwise.",
     },
     handler: async (req, reply) => {
       const link = verifyLinkToken(req.params.token);
@@ -383,7 +394,11 @@ export function registerDocumentRoutes(app: FastifyInstance): void {
         "Content-Disposition",
         `${inline ? "inline" : "attachment"}; filename="${asciiName(file.fileName)}"; filename*=UTF-8''${encodeURIComponent(file.fileName)}`,
       );
-      reply.header("Cache-Control", `private, max-age=${SIGNED_LINK_TTL_SECONDS}`);
+      // the original standing in for a pending rendition must not be cached as that rendition
+      reply.header(
+        "Cache-Control",
+        file.fallback ? "private, no-cache" : `private, max-age=${SIGNED_LINK_TTL_SECONDS}`,
+      );
       reply.header("X-Content-Type-Options", "nosniff");
       // Signed links are embedded as <img>/<iframe> by the ERP on another origin (the token is the credential).
       reply.header("Cross-Origin-Resource-Policy", "cross-origin");

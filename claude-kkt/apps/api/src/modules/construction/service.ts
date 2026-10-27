@@ -839,7 +839,9 @@ async function possessionChargeLines(tx: Tx, blockId: string): Promise<Possessio
  * on/after one of its demands blocks it (409 UNDO_BLOCKED with details.reasons); otherwise demands are void, ledgers rebuilt, the stage's
  * completion data cleared, % recomputed, "stage completed" notifications withdrawn (unread deleted, read flagged) and the undo audited.
  * For the possession stage the on-possession other charges it demanded are un-demanded as well (a paid one blocks the undo), and the
- * affected ledgers are rebuilt from source.
+ * affected ledgers are restated from source (a new epoch, reason CONSTRUCTION_CHARGE). Closed bookings are never rewritten: CANCELLED ones
+ * are skipped (their ledgers are closed), and an undo that would void a demand of a COMPLETED (handed-over) booking — or undo the
+ * possession stage a handover rests on — answers 409 BOOKING_CLOSED listing them (money.voidDemandsForStage).
  */
 export async function undoStage(
   tx: Tx,
@@ -865,24 +867,13 @@ export async function undoStage(
       { latest_stage_id: latestCompleted?.stageId ?? null, latest_stage_name: latestCompleted?.name ?? null },
     );
   }
-  // lock order (money/common.ts): block row (held) → every booking the undo may touch, ascending id, before any of them is read
+  // lock order (money/common.ts): block row (held) → every booking the undo may touch or must check, ascending id, before any of them is
+  // read. Only ACTIVE bookings are rewritten; COMPLETED (handed-over) ones are checked and answer 409 BOOKING_CLOSED when the undo would
+  // rewrite them; CANCELLED ones are closed books and are left alone (money.voidDemandsForStage).
   const touched = await tx
     .select({ id: bookings.id })
     .from(bookings)
-    .where(
-      and(
-        eq(bookings.blockId, block.id),
-        or(
-          eq(bookings.status, "ACTIVE"),
-          exists(
-            tx
-              .select({ one: sql`1` })
-              .from(demands)
-              .where(and(eq(demands.bookingId, bookings.id), ne(demands.status, "VOID"))),
-          ),
-        ),
-      ),
-    );
+    .where(and(eq(bookings.blockId, block.id), inArray(bookings.status, ["ACTIVE", "COMPLETED"])));
   await lockBookingsInOrder(
     tx,
     touched.map((b) => b.id),
@@ -942,7 +933,9 @@ export async function undoStage(
       requestId: actor.requestId ?? null,
     });
   }
-  for (const bookingId of new Set(chargeLines.map((c) => c.booking.id))) await rebuild(tx, bookingId, { write: true });
+  // an un-demanded charge leaves the canonical ledger: the booking's book is restated as a new epoch (contract C7), never rewritten
+  for (const bookingId of new Set(chargeLines.map((c) => c.booking.id)))
+    await rebuild(tx, bookingId, { write: true, reason: "CONSTRUCTION_CHARGE", actor });
   await tx
     .update(blockStages)
     .set({

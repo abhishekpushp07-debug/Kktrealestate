@@ -9,6 +9,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Readable } from "node:stream";
+import { signLinkBody, verifyLinkBody } from "../../lib/crypto.js";
 import type { Storage } from "../../lib/storage.js";
 
 /** Optional streaming capabilities a storage driver may offer on top of {@link Storage}. */
@@ -71,4 +72,36 @@ export function verifyFileToken(
 /** HMAC key of one token family, derived from JWT_SECRET with its own context label. */
 export function fileTokenKey(label: string, jwtSecret: string): Buffer {
   return createHash("sha256").update(`${label}:`).update(jwtSecret).digest();
+}
+
+/** Body of a ring-signed file token: file id (16 B) ‖ expiry (6 B, seconds). */
+function fileTokenBody(id: string, exp: number): Buffer {
+  const body = Buffer.alloc(22);
+  Buffer.from(id.replace(/-/g, ""), "hex").copy(body, 0);
+  body.writeUIntBE(Math.max(0, Math.min(exp, 2 ** 48 - 1)), 16, 6);
+  return body;
+}
+
+/**
+ * Download token for a generated file signed with the LINK_SIGNING_KEYS ring (contract C9): `<kid>.<body>.<sig>` (≤ 64 chars with kids
+ * of up to 8 characters, inside the 100-character route-parameter limit). `label` separates token families (exports, backups). Older
+ * ring keys keep verifying their links after a rotation.
+ */
+export function signRingFileToken(label: string, id: string, exp: number): string {
+  return signLinkBody(label, fileTokenBody(id, exp));
+}
+
+/** File id of a valid, unexpired ring token (or a legacy compact token MAC'd with a ring key); null otherwise. */
+export function verifyRingFileToken(
+  label: string,
+  token: string,
+  nowSeconds = Math.floor(Date.now() / 1000),
+): string | null {
+  if (token.length > 100) return null;
+  const body = verifyLinkBody(label, token);
+  if (!body || body.length !== 22) return null;
+  const hex = body.subarray(0, 16).toString("hex");
+  const exp = body.readUIntBE(16, 6);
+  if (exp < nowSeconds) return null;
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }

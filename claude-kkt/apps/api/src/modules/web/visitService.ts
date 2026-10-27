@@ -14,6 +14,7 @@ import {
   notifications,
   projectVisitSettings,
   projects,
+  siteSettings,
   siteVisits,
   users,
   withAdvisoryLock,
@@ -398,26 +399,63 @@ export function manageUrl(token: string): string {
   return `${webOrigin}/visit/${encodeURIComponent(token)}`;
 }
 
-/** iCalendar text for a visit (Asia/Kolkata, 1-hour reminder). */
-export function visitIcs(v: DbVisit, projectName: string, settings: DbVisitSettings | null, token: string): string {
+/** Options of visitIcs. */
+export interface VisitIcsOptions {
+  /** DTSTAMP (the generation instant); defaults to now. */
+  now?: Date;
+  /** ORGANIZER: the builder's brand name and contact e-mail (site settings); omitted when no e-mail is configured. */
+  organizer?: { name: string; email: string } | null;
+}
+
+/** ORGANIZER of a company's visit invitations: the website brand and contact e-mail (null when no e-mail is configured). */
+export async function visitOrganizer(db: Executor, companyId: string): Promise<{ name: string; email: string } | null> {
+  const [row] = await db
+    .select({ brand: siteSettings.brand, contacts: siteSettings.contacts })
+    .from(siteSettings)
+    .where(eq(siteSettings.companyId, companyId))
+    .limit(1);
+  const email = row?.contacts?.email ?? null;
+  return email ? { name: row?.brand?.name ?? "Site visits", email } : null;
+}
+
+/**
+ * iCalendar text for a visit (Asia/Kolkata). UID `<visit id>@kkt` never changes, SEQUENCE is `site_visits.ics_sequence` (incremented by
+ * every reschedule and the cancellation), DTSTAMP is the generation time: a calendar client that imported an earlier file updates that
+ * event (METHOD:REQUEST, with a 1-hour reminder) or removes it (METHOD:CANCEL + STATUS:CANCELLED for a cancelled visit). The CANCEL
+ * variant carries no visitor details beyond what the calendar already holds.
+ */
+export function visitIcs(
+  v: DbVisit,
+  projectName: string,
+  settings: DbVisitSettings | null,
+  token: string,
+  opts: VisitIcsOptions = {},
+): string {
+  const cancelled = v.status === "CANCELLED";
   const location = [settings?.siteOfficeAddress, settings?.mapsLink].filter(Boolean).join(" · ") || projectName;
-  const description = [
-    `Site visit ${v.visitNumber} for ${v.name} (${v.visitors} visitor${v.visitors === 1 ? "" : "s"}).`,
-    settings?.instructions ?? null,
-    `Manage: ${manageUrl(token)}`,
-  ]
-    .filter(Boolean)
-    .join("\n");
+  const description = cancelled
+    ? `Site visit ${v.visitNumber} has been cancelled.`
+    : [
+        `Site visit ${v.visitNumber} for ${v.name} (${v.visitors} visitor${v.visitors === 1 ? "" : "s"}).`,
+        settings?.instructions ?? null,
+        `Manage: ${manageUrl(token)}`,
+      ]
+        .filter(Boolean)
+        .join("\n");
   return icsForVisit({
     uid: `${v.id}@kkt`,
-    summary: `Site visit: ${projectName}`,
+    summary: `${cancelled ? "Cancelled: " : ""}Site visit: ${projectName}`,
     description,
     location,
     date: v.visitDate,
     start: clock(v.slotStart),
     end: clock(v.slotEnd),
-    stamp: v.createdAt,
-    url: manageUrl(token),
+    stamp: opts.now ?? new Date(),
+    url: cancelled ? null : manageUrl(token),
+    sequence: v.icsSequence,
+    method: cancelled ? "CANCEL" : "REQUEST",
+    organizer: opts.organizer ?? null,
+    attendee: v.email ? { name: v.name, email: v.email } : null,
   });
 }
 
@@ -702,6 +740,8 @@ export async function cancelVisit(
       status: "CANCELLED",
       cancelReason: reason,
       manageTokenExpiresAt: new Date(),
+      // a new calendar revision: the CANCEL invitation must outrank every REQUEST the visitor imported
+      icsSequence: sql`${siteVisits.icsSequence} + 1`,
       version: sql`${siteVisits.version} + 1`,
     })
     .where(eq(siteVisits.id, visit.id))
@@ -769,6 +809,8 @@ export async function rescheduleVisit(
       supersededTokenHashes: visit.manageTokenHash
         ? [...visit.supersededTokenHashes, visit.manageTokenHash].slice(-SUPERSEDED_TOKENS_KEPT)
         : visit.supersededTokenHashes,
+      // a new calendar revision: the updated REQUEST replaces the event imported from the earlier .ics (same UID)
+      icsSequence: sql`${siteVisits.icsSequence} + 1`,
       version: sql`${siteVisits.version} + 1`,
     })
     .where(eq(siteVisits.id, visit.id))

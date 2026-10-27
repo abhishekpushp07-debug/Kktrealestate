@@ -24,6 +24,14 @@ import { resolveMediaUrl } from "@/lib/media";
 import { breadcrumbJsonLd, faqJsonLd, pageMetadata, projectJsonLd } from "@/lib/seo";
 import { NO_ADDRESS, type Amenity, type ProjectDetail } from "@/lib/types";
 
+/** ISR: rendered on first request, regenerated every 60 s (prices, availability) or at once on a website-settings write; an unpublished project answers 404. */
+export const revalidate = 60;
+
+/** No build-time prerender (the build needs no API): each slug is rendered on its first request, then cached. */
+export function generateStaticParams(): { slug: string }[] {
+  return [];
+}
+
 type Params = Promise<{ slug: string }>;
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {

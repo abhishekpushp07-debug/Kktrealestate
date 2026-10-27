@@ -3,17 +3,25 @@ import type { AnyPgColumn, PgTable, PgUpdateSetSource } from "drizzle-orm/pg-cor
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
-import { companies, documents, projects, type Executor } from "@kkt/db";
+import { documents, projects, type Executor } from "@kkt/db";
 import { DEFAULT_NUMBER_PATTERN, financialYear, formatNumber } from "@kkt/domain";
 import { config } from "../../config.js";
 import type { AuditActor } from "../../lib/audit.js";
 import { CACHE_BUDGET_MS, cached, redisUsable, withinBudget } from "../../lib/cache.js";
 import { ApiError } from "../../lib/errors.js";
+import { resolveCompanyId } from "../../lib/tenant.js";
 import type { NumberingCompany, NumberingScope } from "../../lib/numbering.js";
 import { versionConflict, type VersionedTable } from "../../lib/version.js";
 
-/** Cache-Control for every public JSON GET (docs/API-CONVENTIONS.md Appendix B). */
-export const PUBLIC_CACHE_CONTROL = "public, max-age=60, s-maxage=60, stale-while-revalidate=300";
+/**
+ * Shared-cache policies of the public GETs (contract C5, plugins/requestContext.ts): `Cache-Control: public, s-maxage, stale-while-revalidate`,
+ * a strong body ETag and 304 on If-None-Match. Catalog reads (projects, availability grids, prices) refresh within a minute; CMS content
+ * (site, posts, pages, people, gallery, sitemap, robots) within five — CMS writes also revalidate the website on demand (WEB_REVALIDATE_URL).
+ */
+export const CATALOG_CACHE_POLICY = { public: true, sMaxAge: 60, staleWhileRevalidate: 300 } as const;
+export const CMS_CACHE_POLICY = { public: true, sMaxAge: 300, staleWhileRevalidate: 3600 } as const;
+/** Visit availability (SPEC "cached ~60 s") changes with every booking: a short stale window (the booking re-checks capacity anyway). */
+export const AVAILABILITY_CACHE_POLICY = { public: true, sMaxAge: 60, staleWhileRevalidate: 30 } as const;
 /** Cache-Control for immutable media bytes (document ids never change content). */
 export const IMMUTABLE_CACHE_CONTROL = "public, max-age=31536000, immutable";
 /** Redis TTL of the public read cache. */
@@ -69,10 +77,18 @@ export function clock(value: string | null | undefined): string {
   return (value ?? "").slice(0, 5);
 }
 
-/** Sets the public cache headers on a reply. */
+/** Vary of public responses (Cache-Control comes from the route's cachePolicy; the platform hook adds `x-kkt-company`). */
 export function publicHeaders(reply: FastifyReply): void {
-  reply.header("Cache-Control", PUBLIC_CACHE_CONTROL);
   reply.header("Vary", "Accept-Encoding");
+}
+
+/**
+ * The company whose website a public request reads (contract C4, lib/tenant.ts): `x-kkt-company` slug, else the Host matched against
+ * `companies.hosts`, else the only company; 400 COMPANY_REQUIRED otherwise (several companies and nothing names one). Never "the first
+ * company created".
+ */
+export async function publicCompany(app: FastifyInstance, req: FastifyRequest): Promise<string> {
+  return resolveCompanyId(app, req);
 }
 
 type CacheEnvelope<T> = { ok: true; value: T } | { ok: false };
@@ -109,19 +125,21 @@ export function publicCacheKey(req: FastifyRequest): string {
 }
 
 /**
- * Read-through cache for public GETs keyed by generation + route + validated inputs (60 s). `fn` returns null for "not found", which is
- * cached too so an unpublished slug cannot be used to hammer the database.
+ * Read-through cache for public GETs keyed by generation + company + route + validated inputs (60 s). The company is resolved first
+ * (contract C4) and handed to `fn`; it is part of the key, so two builders' sites never share an entry. `fn` returns null for
+ * "not found", which is cached too so an unpublished slug cannot be used to hammer the database.
  */
 export async function publicCached<T>(
   app: FastifyInstance,
   req: FastifyRequest,
   reply: FastifyReply,
-  fn: () => Promise<T | null>,
+  fn: (companyId: string) => Promise<T | null>,
   notFoundEntity = "Resource",
 ): Promise<T> {
-  const key = `${PUBLIC_CACHE_PREFIX}${await publicCacheVersion(app)}:${publicCacheKey(req)}`;
+  const companyId = await publicCompany(app, req);
+  const key = `${PUBLIC_CACHE_PREFIX}${await publicCacheVersion(app)}:${companyId}:${publicCacheKey(req)}`;
   const env = await cached<CacheEnvelope<T>>(app.redis, key, PUBLIC_CACHE_SECONDS, async () => {
-    const value = await fn();
+    const value = await fn(companyId);
     return value === null ? { ok: false } : { ok: true, value };
   });
   if (!env.ok) throw ApiError.notFound(notFoundEntity);
@@ -131,16 +149,53 @@ export async function publicCached<T>(
 
 /**
  * Invalidates every cached public response by bumping the generation counter. Called after every CMS / website-settings / visit-settings
- * write and after bookings. `_pathPrefix` is accepted for call-site compatibility; invalidation is always global (entries expire in 60 s).
+ * write and after bookings. Invalidation of the API's Redis cache is always global (entries expire in 60 s); a call WITHOUT a path prefix
+ * (CMS and project-website writes) also asks the website to revalidate its ISR pages (best-effort, never blocks or fails the write).
  */
-export async function bustPublicCache(app: FastifyInstance, _pathPrefix = ""): Promise<void> {
+export async function bustPublicCache(app: FastifyInstance, pathPrefix = ""): Promise<void> {
   await app.redis.incr(PUBLIC_CACHE_VERSION_KEY).catch(() => undefined);
+  if (!pathPrefix) revalidateWebsite(app);
 }
 
-/** The one company whose website this API serves (single tenant today). */
-export async function publicCompanyId(db: Executor): Promise<string | null> {
-  const [c] = await db.select({ id: companies.id }).from(companies).orderBy(companies.createdAt).limit(1);
-  return c?.id ?? null;
+/** Timeout of one on-demand revalidation call to the website. */
+const REVALIDATE_TIMEOUT_MS = 3000;
+/** Writes within this window share one revalidation call (a bulk CMS edit or the demo seed triggers one, not hundreds). */
+const REVALIDATE_COALESCE_MS = 250;
+let pendingRevalidation: Promise<boolean> | null = null;
+
+/**
+ * Best-effort on-demand ISR revalidation (apps/web `POST /api/revalidate`): POSTs `{tags: ["kkt-public"]}` with the shared secret in
+ * `x-kkt-revalidate-token`. Fire-and-forget: a failure is logged at warn and the pages refresh on their own schedule (60–300 s); calls
+ * within 250 ms are coalesced into one. Off unless WEB_REVALIDATE_URL and WEB_REVALIDATE_TOKEN are both set. Returns the attempt.
+ */
+export function revalidateWebsite(app: FastifyInstance, tags: readonly string[] = ["kkt-public"]): Promise<boolean> {
+  const url = config.WEB_REVALIDATE_URL;
+  const token = config.WEB_REVALIDATE_TOKEN;
+  if (!url || !token) return Promise.resolve(false);
+  if (pendingRevalidation) return pendingRevalidation;
+  pendingRevalidation = new Promise<void>((resolve) => setTimeout(resolve, REVALIDATE_COALESCE_MS).unref()).then(() => {
+    pendingRevalidation = null;
+    return postRevalidation(app, url, token, tags);
+  });
+  return pendingRevalidation;
+}
+
+function postRevalidation(app: FastifyInstance, url: string, token: string, tags: readonly string[]): Promise<boolean> {
+  const attempt = fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-kkt-revalidate-token": token },
+    body: JSON.stringify({ tags }),
+    signal: AbortSignal.timeout(REVALIDATE_TIMEOUT_MS),
+  })
+    .then((res) => {
+      if (!res.ok) app.log.warn({ status: res.status }, "website revalidation answered an error");
+      return res.ok;
+    })
+    .catch((err: unknown) => {
+      app.log.warn({ err }, "website revalidation failed");
+      return false;
+    });
+  return attempt;
 }
 
 /**

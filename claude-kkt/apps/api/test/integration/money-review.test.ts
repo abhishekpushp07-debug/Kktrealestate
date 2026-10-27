@@ -249,9 +249,10 @@ describe("canonical order survives a stage undo and a cleared post-dated cheque"
     expect(clear.status, clear.text).toBe(200);
     const live = await ledgerOf(b.id);
     expect(live.map((r) => r.event)).toEqual(["DEMAND", "DEMAND", "PAYMENT", "PAYMENT"]);
-    // Foundation raises a 5th row; undoing it voids that demand and rebuilds the whole ledger
+    // Foundation raises a 5th row; undoing it voids that demand: the book keeps the row and appends its DEMAND_VOIDED (contract C7)
     await stageStatus(tower.id, w.stages.FOUNDATION, addDays(today, -1));
-    expect((await ledgerOf(b.id)).length).toBe(5);
+    const withFoundation = await ledgerOf(b.id);
+    expect(withFoundation.length).toBe(5);
     const undo = await t.request("POST", `/api/v1/blocks/${tower.id}/construction/undo`, {
       token: admin,
       body: {
@@ -263,7 +264,14 @@ describe("canonical order survives a stage undo and a cleared post-dated cheque"
     });
     expect(undo.status, undo.text).toBe(200);
     const rebuilt = await ledgerOf(b.id);
-    expect(rebuilt.map(ledgerKey)).toEqual(live.map(ledgerKey));
+    // every earlier row keeps its seq, source and running balances; the voided demand is taken back out by a 6th row
+    expect(rebuilt.slice(0, 5).map(ledgerKey)).toEqual(withFoundation.map(ledgerKey));
+    expect(rebuilt.slice(0, 4).map(ledgerKey)).toEqual(live.map(ledgerKey));
+    expect(rebuilt).toHaveLength(6);
+    const voidRow = rebuilt[5]!;
+    expect(voidRow).toMatchObject({ event: "DEMAND_VOIDED", ref_id: withFoundation[4]!.ref_id });
+    expect(voidRow.amount_paise).toBe(-withFoundation[4]!.amount_paise);
+    expect(ledgerKey(voidRow).slice(4)).toEqual(ledgerKey(live[3]!).slice(4)); // balances back to where they were before Foundation
     expect((await integrity(b.id)).ok).toBe(true);
   });
 });

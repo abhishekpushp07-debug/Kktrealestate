@@ -176,8 +176,10 @@ describe("standalone worker process", () => {
       "STARTUP_RECONCILIATION",
     ]);
     expect(boot.every((r) => r.status === "OK")).toBe(true);
+    // reconciliation results are stored per company (security track: tenants read only their own slice)
     expect(boot.find((r) => r.job_name === "STARTUP_RECONCILIATION")!.result).toMatchObject({
-      bookings_checked: expect.any(Number),
+      companies: expect.any(Number),
+      by_company: { [t.companyId]: { bookings_checked: expect.any(Number) } },
     });
     expect(boot.some((r) => JSON.stringify(r.result).includes("implemented"))).toBe(false);
     expect(await t.app.redis.keys(`boot:jobs:*:${deploy}`)).toHaveLength(1);
@@ -399,7 +401,7 @@ describe("idempotency durability", () => {
     expect(other.body.error.code).toBe("IDEMPOTENCY_MISMATCH");
   });
 
-  it("an IN_PROGRESS record older than 60 s is abandoned (crashed instance): the retry with the same body takes it over and runs", async () => {
+  it("an IN_PROGRESS record whose lease lapsed and that never committed is abandoned (crashed instance): the retry with the same body takes it over and runs", async () => {
     slowCalls = 0;
     const key = `crash-${randomUUID()}`;
     const ok = await t.request<{ n: number }>("POST", "/api/v1/_test/slow", {
@@ -416,9 +418,9 @@ describe("idempotency durability", () => {
       body: { v: 7 },
       headers: { "idempotency-key": key },
     });
-    // a still-fresh claim makes the duplicate wait; age it past the abandon threshold while it waits
+    // a still-leased claim makes the duplicate wait; let the lease lapse (no heartbeat: its instance "died") while it waits
     await new Promise((r) => setTimeout(r, 150));
-    await t.app.sql`update idempotency_keys set created_at = now() - interval '61 seconds' where key = ${key}`;
+    await t.app.sql`update idempotency_keys set lease_expires_at = now() - interval '1 second' where key = ${key}`;
     const retried = await fresh;
     expect(retried.status).toBe(201);
     expect(retried.headers["idempotent-replayed"]).toBeUndefined();
@@ -429,7 +431,7 @@ describe("idempotency durability", () => {
     expect(row!.status_code).toBe(201);
     // an abandoned claim is never taken over by a DIFFERENT request
     await t.app
-      .sql`update idempotency_keys set status_code = null, response_body = null, created_at = now() - interval '61 seconds' where key = ${key}`;
+      .sql`update idempotency_keys set status_code = null, response_body = null, lease_expires_at = now() - interval '1 second' where key = ${key}`;
     await t.app.redis.flushdb();
     const mismatch = await t.request<ErrorBody>("POST", "/api/v1/_test/slow", {
       token: admin,

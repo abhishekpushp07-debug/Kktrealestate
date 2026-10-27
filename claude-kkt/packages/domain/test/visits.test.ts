@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   availability,
   icsEscape,
@@ -189,6 +189,68 @@ describe("icsForVisit", () => {
         end: "11:00",
       }),
     ).toThrow();
+  });
+});
+
+describe("icsForVisit revisions (UID / SEQUENCE / DTSTAMP / METHOD)", () => {
+  const base = {
+    uid: "6f1c2a7e-0000-4000-8000-000000000001@kkt",
+    summary: "Site visit: Shree Ganesh Heights",
+    description: "Visit SV-2526/0001",
+    location: "Bailey Road, Patna",
+    date: "2026-10-30",
+    start: "10:00",
+    end: "11:00",
+  };
+  it("defaults to METHOD:REQUEST, SEQUENCE:0, STATUS:CONFIRMED with the reminder", () => {
+    const ics = icsForVisit({ ...base, stamp: "2026-10-26T05:00:00Z" });
+    expect(ics).toContain("METHOD:REQUEST\r\n");
+    expect(ics).not.toContain("METHOD:PUBLISH");
+    expect(ics).toContain(`UID:${base.uid}\r\nSEQUENCE:0\r\nDTSTAMP:20261026T050000Z\r\n`);
+    expect(ics).toContain("STATUS:CONFIRMED");
+    expect(ics).toContain("BEGIN:VALARM");
+  });
+  it("DTSTAMP is the generation time when no stamp is given (never the visit's start)", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(new Date("2026-10-27T08:09:10Z"));
+      expect(icsForVisit(base)).toContain("DTSTAMP:20261027T080910Z");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("a reschedule keeps the UID and raises SEQUENCE", () => {
+    const first = icsForVisit({ ...base, stamp: "2026-10-26T05:00:00Z" });
+    const moved = icsForVisit({ ...base, start: "12:00", end: "13:00", sequence: 1, stamp: "2026-10-26T06:00:00Z" });
+    const uid = (s: string) => /UID:(.*)\r\n/.exec(s)![1];
+    expect(uid(moved)).toBe(uid(first));
+    expect(moved).toContain("SEQUENCE:1");
+    expect(moved).toContain("DTSTART;TZID=Asia/Kolkata:20261030T120000");
+  });
+  it("METHOD:CANCEL carries STATUS:CANCELLED and no reminder", () => {
+    const ics = icsForVisit({ ...base, method: "CANCEL", sequence: 2, stamp: "2026-10-26T07:00:00Z" });
+    expect(ics).toContain("METHOD:CANCEL\r\n");
+    expect(ics).toContain("SEQUENCE:2");
+    expect(ics).toContain("STATUS:CANCELLED");
+    expect(ics).not.toContain("STATUS:CONFIRMED");
+    expect(ics).not.toContain("VALARM");
+    expect(ics.indexOf("STATUS:CANCELLED")).toBeLessThan(ics.indexOf("END:VEVENT"));
+  });
+  it("ORGANIZER / ATTENDEE are emitted (quoted CN, folded at 75 octets) and the sequence must be a non-negative integer", () => {
+    const ics = icsForVisit({
+      ...base,
+      stamp: "2026-10-26T05:00:00Z",
+      organizer: { name: "Shree Ganesh Builders", email: "sales@sgb.example" },
+      attendee: { name: 'Rajesh "Raju" Kumar Sinha', email: "rajesh@example.com" },
+    });
+    const unfolded = ics.replace(/\r\n /g, "");
+    expect(unfolded).toContain('ORGANIZER;CN="Shree Ganesh Builders":mailto:sales@sgb.example');
+    expect(unfolded).toContain(
+      'ATTENDEE;CN="Rajesh  Raju  Kumar Sinha";ROLE=REQ-PARTICIPANT;PARTSTAT=ACCEPTED:mailto:rajesh@example.com',
+    );
+    expect(ics.split("\r\n").every((l) => new TextEncoder().encode(l).length <= 75)).toBe(true);
+    expect(() => icsForVisit({ ...base, sequence: -1 })).toThrow(RangeError);
+    expect(() => icsForVisit({ ...base, sequence: 1.5 })).toThrow(RangeError);
   });
 });
 

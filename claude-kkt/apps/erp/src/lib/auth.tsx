@@ -45,7 +45,8 @@ export interface AuthContextValue {
   company: AuthCompany | null;
   mustChangePassword: boolean;
   scope: ProjectScope;
-  login: (email: string, password: string) => Promise<LoginResult>;
+  /** `company` = the company slug, needed only on multi-company installs (400 COMPANY_REQUIRED). */
+  login: (email: string, password: string, company?: string) => Promise<LoginResult>;
   completeMfa: (mfaToken: string, code: string) => Promise<LoginResult>;
   logout: () => Promise<void>;
   refreshMe: () => Promise<AuthUser | null>;
@@ -135,6 +136,7 @@ interface LoginPayload {
   mfa_required?: boolean;
   mfa_token?: string;
   access_token?: string;
+  /** Absent in cookie mode (contract C1): the refresh token is the HttpOnly kkt_rt cookie. */
   refresh_token?: string;
   must_change_password?: boolean;
   user?: unknown;
@@ -208,10 +210,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (payload.mfa_required && payload.mfa_token) {
         return { kind: "mfa", mfaToken: payload.mfa_token };
       }
-      if (!payload.access_token || !payload.refresh_token) {
-        throw new Error("Login response did not include tokens");
+      if (!payload.access_token) {
+        throw new Error("Login response did not include an access token");
       }
-      tokens.setPair(payload.access_token, payload.refresh_token);
+      // The refresh token stays in the HttpOnly cookie; only the access token is kept, in memory.
+      tokens.setAccess(payload.access_token);
       const provisional = normaliseUser(payload.user);
       const forced = payload.must_change_password === true || provisional?.must_change_password === true;
       if (provisional && mounted.current) {
@@ -225,8 +228,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const login = useCallback(
-    async (email: string, password: string): Promise<LoginResult> => {
-      const payload = await api.post<LoginPayload>("/auth/login", { email, password }, { auth: false });
+    async (email: string, password: string, company?: string): Promise<LoginResult> => {
+      const slug = company?.trim().toLowerCase();
+      const payload = await api.post<LoginPayload>(
+        "/auth/login",
+        { email, password, ...(slug ? { company: slug } : {}) },
+        { auth: false, cookieSession: true },
+      );
       return finishLogin(payload);
     },
     [finishLogin],
@@ -234,16 +242,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const completeMfa = useCallback(
     async (mfaToken: string, code: string): Promise<LoginResult> => {
-      const payload = await api.post<LoginPayload>("/auth/login/mfa", { mfa_token: mfaToken, code }, { auth: false });
+      const payload = await api.post<LoginPayload>(
+        "/auth/login/mfa",
+        { mfa_token: mfaToken, code },
+        { auth: false, cookieSession: true },
+      );
       return finishLogin(payload);
     },
     [finishLogin],
   );
 
   const logout = useCallback(async () => {
-    const refreshToken = tokens.getRefresh();
     try {
-      if (refreshToken) await api.post<void>("/auth/logout", { refresh_token: refreshToken });
+      // Revokes this session's refresh family and clears the HttpOnly cookie (contract C1).
+      if (tokens.hasSession()) await api.post<void>("/auth/logout", undefined, { cookieSession: true });
     } catch {
       /* the session is gone either way */
     } finally {

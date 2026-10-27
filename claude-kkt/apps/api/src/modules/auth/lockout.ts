@@ -34,6 +34,8 @@ export interface LockTarget {
   ip: string;
   /** The account's `locked_until` when it lies in the past (expired lock, admin unlock, password reset); null otherwise. */
   resetAt: Date | null;
+  /** The company the sign-in resolved to (contract C4); recorded on login events of unknown identifiers so they stay tenant-scoped. */
+  companyId?: string | null;
 }
 
 /** Current counters and the lock they imply. */

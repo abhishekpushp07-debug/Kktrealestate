@@ -19,6 +19,9 @@ import { Markdown } from "@/lib/markdown";
 import { brandName, breadcrumbJsonLd } from "@/lib/seo";
 import { NO_CONTACTS, type HomeSection, type SiteSettings } from "@/lib/types";
 
+/** Home: featured projects and prices (catalog) every 60 s; CMS sections follow the same refresh. */
+export const revalidate = 60;
+
 export async function generateMetadata(): Promise<Metadata> {
   return (await closedMetadata()) ?? { alternates: { canonical: "/" }, openGraph: { url: "/" } };
 }

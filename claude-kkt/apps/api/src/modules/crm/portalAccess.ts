@@ -15,13 +15,13 @@ import {
 import { bookingCoApplicants, bookings, customers, passwordHistory, portalUsers, type Executor } from "@kkt/db";
 import { writeAudit } from "../../lib/audit.js";
 import { sendCsv } from "../../lib/csv.js";
-import { bumpPermVersion } from "../../lib/cache.js";
+import { bumpAuthVersions } from "../../lib/cache.js";
 import { temporaryPassword } from "../../lib/crypto.js";
 import { ApiError } from "../../lib/errors.js";
 import { hashPassword } from "../../lib/password.js";
 import { translatePgError } from "../../lib/pgErrors.js";
 import { route } from "../../lib/routes.js";
-import { ensureProjectAccess, scopeFilter } from "../../lib/scope.js";
+import { ensureProjectAccess } from "../../lib/scope.js";
 import { revokeAllFamilies } from "../auth/index.js";
 import {
   loadCustomerSelect,
@@ -123,15 +123,17 @@ async function portalAction(
   const meta = metaOf(req);
   const plain = action === "ENABLE" || action === "RESET_PASSWORD" ? temporaryPassword() : null;
   const hash = plain ? await hashPassword(plain) : null;
+  let portalUserId: string | null = null;
   const view = await app.db.transaction(async (tx) => {
-    const sel = await loadCustomerSelect(tx, user.companyId, customerId, true);
+    const sel = await loadCustomerSelect(tx, user.companyId, customerId, true, user);
     const customer = sel.c;
     if (action === "ENABLE") {
-      await enablePortal(tx, app, customer, user.id, hash!, meta);
+      portalUserId = (await enablePortal(tx, app, customer, user.id, hash!, meta)).id;
       return portalAccessView(tx, user.companyId, customer, plain);
     }
     const pu = await portalUserOf(tx, customer.id);
     if (!pu) throw ApiError.rule("Portal access has not been enabled for this customer", "PORTAL_NOT_ENABLED");
+    portalUserId = pu.id;
     if (action === "RESET_PASSWORD") {
       if (!pu.isEnabled)
         throw ApiError.rule("Portal access is disabled; enable it to issue a new password", "PORTAL_NOT_ENABLED");
@@ -188,7 +190,8 @@ async function portalAction(
     });
     return portalAccessView(tx, user.companyId, customer);
   });
-  await bumpPermVersion(app.redis);
+  // only this customer's cached portal identity is re-read
+  if (portalUserId) await bumpAuthVersions(app.redis, { portalUsers: [portalUserId] }, req.log);
   return view;
 }
 
@@ -211,7 +214,7 @@ export function portalAccessRoutes(app: FastifyInstance): void {
       summary: "Portal access state (last login, sessions, login link)",
     },
     handler: async (req) => {
-      const sel = await loadCustomerSelect(app.dbReplica, req.user!.companyId, req.params.id);
+      const sel = await loadCustomerSelect(app.dbReplica, req.user!.companyId, req.params.id, false, req.user!);
       return portalAccessView(app.dbReplica, req.user!.companyId, sel.c);
     },
   });
@@ -266,8 +269,18 @@ export function portalAccessRoutes(app: FastifyInstance): void {
     handler: async (req, reply) => {
       const user = req.user!;
       if (req.body.project_id) ensureProjectAccess(user, req.body.project_id);
-      const scope = scopeFilter(user, bookings.projectId);
-      // Customers (primary or co-applicant) with an ACTIVE booking in scope; those already enabled are counted separately.
+      // Customers (primary or co-applicant) with an ACTIVE booking in scope; those already enabled are counted separately. The booking
+      // of the raw sub-select is aliased `b`, so the scope is spelled on `b.project_id` (audit G: a Drizzle column condition here rendered
+      // "bookings"."project_id", an invalid FROM reference → 500 for every scoped user).
+      const scopeIds = user.allProjects
+        ? null
+        : user.projectIds.length > 0
+          ? sql.join(
+              user.projectIds.map((id) => sql`${id}::uuid`),
+              sql`, `,
+            )
+          : null;
+      const scope = user.allProjects ? sql`` : scopeIds ? sql`and b.project_id in (${scopeIds})` : sql`and false`;
       const candidates = await app.db
         .select({
           c: customers,
@@ -280,7 +293,7 @@ export function portalAccessRoutes(app: FastifyInstance): void {
           and(
             eq(customers.companyId, user.companyId),
             eq(customers.isActive, true),
-            sql`exists (select 1 from ${bookings} b where b.status = 'ACTIVE' ${scope ? sql`and ${scope}` : sql``} ${req.body.project_id ? sql`and b.project_id = ${req.body.project_id}` : sql``}
+            sql`exists (select 1 from ${bookings} b where b.status = 'ACTIVE' ${scope} ${req.body.project_id ? sql`and b.project_id = ${req.body.project_id}` : sql``}
                       and (b.customer_id = "customers"."id" or exists (select 1 from ${bookingCoApplicants} bc where bc.booking_id = b.id and bc.customer_id = "customers"."id")))`,
           ),
         )
@@ -290,6 +303,7 @@ export function portalAccessRoutes(app: FastifyInstance): void {
       if (req.body.dry_run)
         return { dry_run: true, enabled: todo.length, already_enabled: alreadyEnabled, credentials: [] };
       const credentials: PortalBulkCredential[] = [];
+      const enabledPortalUsers: string[] = [];
       const meta = metaOf(req);
       let failed = 0;
       for (const r of todo) {
@@ -301,6 +315,7 @@ export function portalAccessRoutes(app: FastifyInstance): void {
             const [fresh] = await tx.select().from(customers).where(eq(customers.id, r.c.id)).limit(1).for("update");
             if (!fresh) return;
             const pu = await enablePortal(tx, app, fresh, user.id, hash, meta);
+            enabledPortalUsers.push(pu.id);
             credentials.push({
               customer_id: fresh.id,
               customer_code: fresh.customerCode,
@@ -338,9 +353,7 @@ export function portalAccessRoutes(app: FastifyInstance): void {
           },
         }),
       );
-      await bumpPermVersion(app.redis).catch((err: unknown) =>
-        req.log.warn({ err }, "permission cache bump failed after portal bulk enable"),
-      );
+      await bumpAuthVersions(app.redis, { portalUsers: enabledPortalUsers }, req.log);
       reply.header("Cache-Control", "no-store"); // one-time passwords: never cached by a browser or proxy
       if (req.query.format === "csv") {
         reply.header("Pragma", "no-cache");

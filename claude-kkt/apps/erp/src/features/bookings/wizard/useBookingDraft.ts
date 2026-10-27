@@ -80,6 +80,8 @@ export function useBookingDraft({
   });
   /** Whether the current draft id exists on the server (resumed, or saved at least once): discard only deletes those. */
   const persistedRef = useRef(persisted);
+  /** Version of the server draft (from the last save); DELETE needs it (contract C6). Null = look it up on discard. */
+  const versionRef = useRef<number | null>(null);
   useEffect(() => {
     if (persisted) persistedRef.current = true;
   }, [persisted]);
@@ -108,6 +110,7 @@ export function useBookingDraft({
       const row: BookingDraftRow = await saveDraft({ id: id ?? undefined, step: currentStep, payload });
       lastServerSnapshot.current = snapshot;
       persistedRef.current = true;
+      versionRef.current = row.version;
       if (row.id !== id) onDraftId(row.id);
       persistLocal(current, currentStep, row.id);
       setLastSavedAt(row.updated_at);
@@ -163,7 +166,7 @@ export function useBookingDraft({
     setLastSavedAt(null);
     if (id) {
       try {
-        await deleteDraft(id);
+        await deleteDraft(id, versionRef.current);
       } catch {
         /* already gone */
       }

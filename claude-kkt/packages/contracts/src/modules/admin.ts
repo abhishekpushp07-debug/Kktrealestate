@@ -196,7 +196,7 @@ const CompanySettingsBase = z.strictObject({
     demand_due_days: z.int().min(0).max(365).default(15),
     default_gst_percent: z.number().min(0).max(28, "GST cannot exceed 28 %").default(5),
     round_robin_enabled: z.boolean().default(true),
-    force_mfa_for_admins: z.boolean().default(false),
+    force_mfa_for_admins: z.boolean().default(true),
     sla_hours: z.strictObject({
       LOW: z.int().min(1).max(720).default(72),
       MEDIUM: z.int().min(1).max(720).default(48),
@@ -479,6 +479,16 @@ export const AdminCustomerEraseResponseSchema = z.object({
     testimonials: z.int().min(0).default(0),
     portal_disabled: z.boolean(),
     sessions_revoked: z.int().min(0),
+    /** Booking-wizard drafts whose payload named the customer (payload emptied). */
+    booking_drafts: z.int().min(0).default(0),
+    /** Notifications to the customer withdrawn, and staff notifications about them scrubbed. */
+    notifications: z.int().min(0).default(0),
+    /** Service requests of the customer whose text was scrubbed (subject, description, the customer's own messages). */
+    service_requests: z.int().min(0).default(0),
+    /** Export files made before the erasure that may contain the customer, withdrawn and queued for deletion. */
+    exports_removed: z.int().min(0).default(0),
+    /** Storage objects (documents, renditions, export files) queued in storage_deletions (STORAGE_SWEEP retries them). */
+    storage_deletions_queued: z.int().min(0).default(0),
   }),
   financial_rows_kept: z.object({
     bookings: z.int().min(0),
@@ -515,3 +525,40 @@ export const AdminSystemResponseSchema = z.object({
   }),
 });
 export type AdminSystemResponse = z.infer<typeof AdminSystemResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// Audit log tamper evidence (AUDIT_SEAL hash chain)
+// ---------------------------------------------------------------------------
+
+/** Why a seal does not verify. */
+export const AuditChainMismatchReasonSchema = z.enum([
+  "CHAIN_BROKEN",
+  "BOUNDARY_MISSING",
+  "ROW_COUNT",
+  "HASH_MISMATCH",
+]);
+export type AuditChainMismatchReason = z.infer<typeof AuditChainMismatchReasonSchema>;
+
+/** GET /admin/audit/verify: the company's audit hash chain recomputed from its first seal; `first_mismatch` names where it breaks. */
+export const AuditVerifyResponseSchema = z.object({
+  ok: z.boolean(),
+  company_id: IdSchema,
+  seals_checked: z.int().min(0),
+  rows_checked: z.int().min(0),
+  /** Rows written after the last seal (sealed by the next AUDIT_SEAL run); null when the chain is broken. */
+  unsealed_rows: z.int().min(0).nullable(),
+  last_sealed_at: TimestampSchema.nullable(),
+  first_mismatch: z
+    .object({
+      seal_id: z.int().min(1),
+      sealed_at: TimestampSchema,
+      first_audit_id: IdSchema,
+      last_audit_id: IdSchema,
+      reason: AuditChainMismatchReasonSchema,
+      expected: z.union([z.string(), z.int(), z.null()]).optional(),
+      actual: z.union([z.string(), z.int(), z.null()]).optional(),
+    })
+    .nullable(),
+  verified_at: TimestampSchema,
+});
+export type AuditVerifyResponse = z.infer<typeof AuditVerifyResponseSchema>;

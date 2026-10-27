@@ -4,17 +4,19 @@
  * with the ledger. Pure maths lives in @kkt/domain (evaluateDues, installmentAmounts, demandStatuses).
  */
 import { and, asc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
-import type { ChargeDemandAt } from "@kkt/contracts";
+import type { ChargeDemandAt, DuesFailure } from "@kkt/contracts";
 import { bookingOtherCharges, bookings, demands, payments, type DB, type Executor, type Tx } from "@kkt/db";
 import { addDays, demandStageId, demandStatuses, evaluateDues, formatINR, type TowerStage } from "@kkt/domain";
 import { writeAudit } from "../../../lib/audit.js";
+import { ApiError, databaseErrorCode, mapMoneyError } from "../../../lib/errors.js";
+import { logger } from "../../../lib/logger.js";
 import { nextNumber } from "../../../lib/numbering.js";
+import { duesBookingFailures } from "../metrics.js";
 import { notify, notifyRole, withdraw } from "../../notifications/index.js";
 import {
   ACCOUNTS_ROLES,
   Clock,
   loadCompanyRow,
-  loadTowerStagesMany,
   lockBooking,
   lockBookingsInOrder,
   moneyTransaction,
@@ -27,7 +29,9 @@ import {
   type MoneyActor,
   SYSTEM_MONEY_ACTOR,
 } from "../common.js";
-import { appendEvent, events, rebuild } from "./ledger.js";
+import { appendEvent, demandAmountsFor, events, rebuild } from "./ledger.js";
+
+export type { DuesFailure } from "@kkt/contracts";
 
 export type DemandRecord = typeof demands.$inferSelect;
 export type OtherChargeRecord = typeof bookingOtherCharges.$inferSelect;
@@ -319,10 +323,28 @@ export interface RunSummary {
   demandsRaised: number;
   demandNumbers: string[];
   notifications: number;
+  /** Bookings whose unit of work failed (isolated: the run went on); empty on a clean run. */
+  failures: (DuesFailure & { company_id: string })[];
+}
+
+/** Machine-readable code of a per-booking failure (ApiError code, INVALID_AMOUNT, SQLSTATE_<code> or INTERNAL_ERROR). */
+export function failureCode(err: unknown): string {
+  if (err instanceof ApiError) return err.code;
+  const money = mapMoneyError(err);
+  if (money) return money.code;
+  const sqlstate = databaseErrorCode(err);
+  if (sqlstate) return `SQLSTATE_${sqlstate}`;
+  return "INTERNAL_ERROR";
 }
 
 /**
- * Daily job / admin "run dues now": every ACTIVE booking in scope, one short transaction per booking so locks stay brief.
+ * Daily job / boot catch-up / admin "run dues now": every ACTIVE booking in scope, each in its OWN short transaction (moneyTransaction,
+ * retried on 40001/40P01) so locks stay brief and one booking can never stop the others:
+ *   1. the booking row is locked first (row FOR UPDATE + advisory lock, lockBooking) and only THEN are the booking (agreed amounts, plan
+ *      snapshot, status) and its tower's stages read, so a revision, plan change, cancellation or stage undo that committed while we
+ *      waited is seen — never a stale copy read before the lock;
+ *   2. a booking whose unit of work throws is rolled back, logged, counted (kkt_dues_booking_failures_total) and listed in `failures`
+ *      (booking id + number + error code), and the run continues with the next booking.
  * Time triggers (DAYS_AFTER_BOOKING, ON_DATE) are evaluated against `today`.
  */
 export async function raiseDuesForAll(
@@ -339,34 +361,50 @@ export async function raiseDuesForAll(
     scope.companyId ? eq(bookings.companyId, scope.companyId) : undefined,
   );
   const ids = await db
-    .select({ id: bookings.id, companyId: bookings.companyId, blockId: bookings.blockId })
+    .select({ id: bookings.id, companyId: bookings.companyId, bookingNumber: bookings.bookingNumber })
     .from(bookings)
     .where(where)
     .orderBy(asc(bookings.bookingDate), asc(bookings.id));
   const companies = new Map<string, CompanyRecord>();
-  // tower stages once per block for the whole run (not once per booking)
-  const stagesByBlock = await loadTowerStagesMany(
-    db,
-    ids.map((b) => b.blockId),
-  );
-  const summary: RunSummary = { bookingsChecked: 0, demandsRaised: 0, demandNumbers: [], notifications: 0 };
-  for (const { id, companyId, blockId } of ids) {
-    let company = companies.get(companyId);
-    if (!company) {
-      company = await loadCompanyRow(db, companyId);
-      companies.set(companyId, company);
-    }
-    const towerStages = stagesByBlock.get(blockId) ?? [];
-    const result = await moneyTransaction(db, async (tx) => {
-      const [b] = await tx.select().from(bookings).where(eq(bookings.id, id)).limit(1);
-      if (!b || b.status !== "ACTIVE") return null;
-      return raiseDues(tx, b, { today, actor, company, towerStages });
-    });
+  const summary: RunSummary = {
+    bookingsChecked: 0,
+    demandsRaised: 0,
+    demandNumbers: [],
+    notifications: 0,
+    failures: [],
+  };
+  for (const { id, companyId, bookingNumber } of ids) {
     summary.bookingsChecked += 1;
-    if (result) {
-      summary.demandsRaised += result.raised.length;
-      summary.demandNumbers.push(...result.raised.map((d) => d.demandNumber));
-      summary.notifications += result.notifications;
+    try {
+      let company = companies.get(companyId);
+      if (!company) {
+        company = await loadCompanyRow(db, companyId);
+        companies.set(companyId, company);
+      }
+      const co = company;
+      const result = await moneyTransaction(db, async (tx) => {
+        // lock FIRST, read after: the agreed amounts, plan snapshot, status and tower stages are those in force once we hold the booking
+        const clock = new Clock();
+        await lockBooking(tx, id, clock);
+        const [b] = await tx.select().from(bookings).where(eq(bookings.id, id)).limit(1);
+        if (!b || b.status !== "ACTIVE") return null;
+        const towerStages = await loadTowerStages(tx, b.blockId);
+        return raiseDues(tx, b, { today, actor, company: co, towerStages, clock });
+      });
+      if (result) {
+        summary.demandsRaised += result.raised.length;
+        summary.demandNumbers.push(...result.raised.map((d) => d.demandNumber));
+        summary.notifications += result.notifications;
+      }
+    } catch (err) {
+      const code = failureCode(err);
+      const message = err instanceof Error ? err.message : String(err);
+      summary.failures.push({ booking_id: id, booking_number: bookingNumber, company_id: companyId, code, message });
+      duesBookingFailures.inc({ code });
+      logger.error(
+        { err, booking_id: id, booking_number: bookingNumber, code },
+        "dues: booking failed; the run continues",
+      );
     }
   }
   return summary;
@@ -463,11 +501,56 @@ async function demandFunding(
 /** Result of voiding stage demands. */
 export type VoidStageResult = { blocked: true; reasons: string[] } | { blocked: false; voided: DemandRecord[] };
 
+/** A closed booking a stage undo would have to rewrite (409 BOOKING_CLOSED details.bookings). */
+export interface ClosedBookingRef {
+  booking_id: string;
+  booking_number: string;
+  status: string;
+  /** Demands of the stage the undo would void ([] when the booking was handed over on this possession stage). */
+  demand_numbers: string[];
+}
+
+/**
+ * Voids one demand and appends its DEMAND_VOIDED ledger row (contract C7: the demand never vanishes from the book). The caller holds the
+ * booking locks; `clock` (which observed the booking's last ledger instant) gives the void its posting instant.
+ */
+async function voidAndRecord(
+  tx: Tx,
+  d: DemandRecord,
+  reason: string,
+  clock: Clock,
+  set: { paidPaise?: number } = {},
+): Promise<DemandRecord> {
+  const voidedAt = clock.next();
+  const [[v], [agreed]] = await Promise.all([
+    tx
+      .update(demands)
+      .set({ status: "VOID", voidedAt, voidReason: reason, ...set })
+      .where(eq(demands.id, d.id))
+      .returning(),
+    tx
+      .select({ cash_agreed_paise: bookings.cashAgreedPaise, account_agreed_paise: bookings.accountAgreedPaise })
+      .from(bookings)
+      .where(eq(bookings.id, d.bookingId)),
+  ]);
+  if (!v || !agreed) throw new Error("demand or booking vanished while being voided");
+  // what the ledger raised for this demand under the agreement in force now — the same amounts a rebuild takes back
+  await appendEvent(tx, d.bookingId, events.demandVoided(v, demandAmountsFor(v, agreed), voidedAt), { locked: true });
+  return v;
+}
+
 /**
  * UNDO RULE (SPEC §9): demands raised by a stage (ON_STAGE on that stage, or ON_POSSESSION when it is the possession stage) are voided,
  * unless any of them has been paid by a CLEARED payment dated on/after the demand – then the undo is blocked with reasons. Earlier advances
- * that were auto-applied never block (they return to credit). Voided demands lose their notifications (withdraw rule) and every affected
- * ledger is rebuilt. Each affected booking is locked (row + advisory) before anything is read, so a concurrent payment cannot slip in.
+ * that were auto-applied never block (they return to credit). Voided demands lose their notifications (withdraw rule) and each leaves a
+ * DEMAND_VOIDED row on its ledger. Each affected booking is locked (row + advisory) before anything is read, so a concurrent payment
+ * cannot slip in.
+ *
+ * Only OPEN (ACTIVE) bookings are rewritten — SPEC §10 runs the engine for "every Active booking", and a cancelled booking's ledger is
+ * closed (SPEC §12). CANCELLED bookings are skipped: their demands were already CANCELLED with the ledger and stay as the record of what
+ * was raised. A COMPLETED (handed-over) booking is never rewritten either: when the undo would void one of its demands — or when the stage
+ * is the possession stage its handover rests on (SPEC §12 "allowed when the possession stage is complete") — the undo answers
+ * 409 BOOKING_CLOSED listing those bookings (reopen them first).
  */
 export async function voidDemandsForStage(
   tx: Tx,
@@ -480,27 +563,62 @@ export async function voidDemandsForStage(
   const stage = towerStages.find((s) => s.stageId === stageId);
   const candidateIds = (
     await tx
-      .select({ bookingId: demands.bookingId })
-      .from(demands)
-      .where(and(eq(demands.blockId, blockId), ne(demands.status, "VOID")))
-      .groupBy(demands.bookingId)
-      .orderBy(asc(demands.bookingId))
-  ).map((r) => r.bookingId);
-  for (const id of candidateIds) await lockBooking(tx, id);
-  const rows = candidateIds.length
-    ? await tx
-        .select()
-        .from(demands)
-        .where(and(inArray(demands.bookingId, candidateIds), ne(demands.status, "VOID")))
-        .orderBy(asc(demands.bookingId), asc(demands.postedAt))
-    : [];
+      .select({ id: bookings.id })
+      .from(bookings)
+      .where(and(eq(bookings.blockId, blockId), inArray(bookings.status, ["ACTIVE", "COMPLETED"])))
+      .orderBy(asc(bookings.id))
+  ).map((r) => r.id);
+  const clock = new Clock();
+  for (const id of candidateIds) await lockBooking(tx, id, clock);
+  // statuses re-read under the locks (a booking may have been completed / cancelled while we waited)
+  const [bookingRows, rows] = candidateIds.length
+    ? await Promise.all([
+        tx
+          .select({ id: bookings.id, bookingNumber: bookings.bookingNumber, status: bookings.status })
+          .from(bookings)
+          .where(inArray(bookings.id, candidateIds)),
+        tx
+          .select()
+          .from(demands)
+          .where(and(inArray(demands.bookingId, candidateIds), ne(demands.status, "VOID")))
+          .orderBy(asc(demands.bookingId), asc(demands.postedAt)),
+      ])
+    : [[], []];
+  const bookingById = new Map(bookingRows.map((b) => [b.id, b]));
   // ON_STAGE demands carry trigger_stage_id; ON_POSSESSION ones are attributed through demandStageId (possession stage of the tower)
-  const targets = rows.filter((d) => {
+  const raisedByStage = rows.filter((d) => {
     if (d.triggerStageId === stageId) return true;
     if (d.triggerType === "ON_POSSESSION" && stage?.isPossession)
       return demandStageId({ triggerType: "ON_POSSESSION", triggerStageId: d.triggerStageId }, towerStages) === stageId;
     return false;
   });
+  const closed = new Map<string, ClosedBookingRef>();
+  for (const b of bookingRows)
+    if (b.status === "COMPLETED" && stage?.isPossession)
+      closed.set(b.id, { booking_id: b.id, booking_number: b.bookingNumber, status: b.status, demand_numbers: [] });
+  for (const d of raisedByStage) {
+    const b = bookingById.get(d.bookingId);
+    if (!b || b.status === "ACTIVE") continue;
+    const ref = closed.get(b.id) ?? {
+      booking_id: b.id,
+      booking_number: b.bookingNumber,
+      status: b.status,
+      demand_numbers: [],
+    };
+    ref.demand_numbers.push(d.demandNumber);
+    closed.set(b.id, ref);
+  }
+  if (closed.size > 0) {
+    const list = [...closed.values()].sort((a, b) => a.booking_number.localeCompare(b.booking_number));
+    throw ApiError.conflict(
+      "BOOKING_CLOSED",
+      `Cannot undo ${stage?.name ?? "this stage"}: it would rewrite handed-over booking${list.length === 1 ? "" : "s"} ${list
+        .map((b) => b.booking_number)
+        .join(", ")}; reopen ${list.length === 1 ? "it" : "them"} first`,
+      { bookings: list },
+    );
+  }
+  const targets = raisedByStage.filter((d) => bookingById.get(d.bookingId)?.status === "ACTIVE");
   if (targets.length === 0) return { blocked: false, voided: [] };
   const reasons: string[] = [];
   const fundingCache = new Map<string, Map<string, { receipt: string; date: string }[]>>();
@@ -518,15 +636,9 @@ export async function voidDemandsForStage(
       );
   }
   if (reasons.length > 0) return { blocked: true, reasons };
-  const voidedAt = new Date();
   const voided: DemandRecord[] = [];
   for (const d of targets) {
-    const [v] = await tx
-      .update(demands)
-      .set({ status: "VOID", voidedAt, voidReason: reason, paidPaise: 0 })
-      .where(eq(demands.id, d.id))
-      .returning();
-    if (v) voided.push(v);
+    voided.push(await voidAndRecord(tx, d, reason, clock, { paidPaise: 0 }));
     await withdraw(tx, "demand", d.id);
     await writeAudit(tx, {
       companyId: d.companyId,
@@ -541,24 +653,32 @@ export async function voidDemandsForStage(
     });
   }
   for (const bookingId of new Set(targets.map((d) => d.bookingId))) {
-    await rebuild(tx, bookingId, { write: true });
+    // the DEMAND_VOIDED rows are already in the book; the rebuild only checks it (and restates an epoch that does not match)
+    await rebuild(tx, bookingId, { write: true, reason: "STAGE_UNDO", actor });
     await recomputeDemandStatuses(tx, bookingId);
   }
   return { blocked: false, voided };
 }
 
-/** Voids one demand (integrity repair, plan change) when it has no money applied; returns false when it has. */
+/**
+ * Voids one demand (integrity repair, plan change) when it has no money applied — appending its DEMAND_VOIDED ledger row — and returns
+ * false when it has money applied. The caller holds the booking locks; pass the unit of work's `clock` (it observed the booking's last
+ * ledger instant) so the void is ordered after every earlier event.
+ */
 export async function voidDemand(
   tx: Tx,
   d: DemandRecord,
   reason: string,
   actor: MoneyActor = SYSTEM_MONEY_ACTOR,
+  opts: { clock?: Clock } = {},
 ): Promise<boolean> {
   if (d.paidPaise > 0) return false;
-  await tx
-    .update(demands)
-    .set({ status: "VOID", voidedAt: new Date(), voidReason: reason })
-    .where(eq(demands.id, d.id));
+  let clock = opts.clock;
+  if (!clock) {
+    clock = new Clock();
+    await lockBooking(tx, d.bookingId, clock);
+  }
+  await voidAndRecord(tx, d, reason, clock);
   await withdraw(tx, "demand", d.id);
   await writeAudit(tx, {
     companyId: d.companyId,

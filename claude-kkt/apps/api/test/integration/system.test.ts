@@ -19,8 +19,9 @@ describe("system", () => {
       uptime_seconds: number;
     }>("GET", "/health");
     expect(r.status).toBe(200);
-    expect(r.body.status).toBe("ok");
-    expect(r.body.checks).toEqual({ database: true, redis: true, storage: true });
+    // no job worker runs in this test, so its heartbeat is missing: degraded, never down
+    expect(r.body.status).toBe("degraded");
+    expect(r.body.checks).toEqual({ database: true, redis: true, storage: true, worker: false, migrations: true });
     expect(r.body.db_ping_ms).toBeGreaterThanOrEqual(0);
     expect(r.headers["x-request-id"]).toBeTruthy();
   });

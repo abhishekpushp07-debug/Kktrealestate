@@ -59,6 +59,8 @@ const imageOrigins = remotePatterns
 const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
+  // csp-hook.cjs hashes the inline scripts of each HTML response, so it must see the plain body: the reverse proxy (Caddy) compresses.
+  compress: false,
   reactStrictMode: true,
   transpilePackages: ["@kkt/contracts"],
   // Lint runs as its own step (`pnpm lint` with the repo's flat config, see eslint.config.mjs) so the build does not fail on style rules.

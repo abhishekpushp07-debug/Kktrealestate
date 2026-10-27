@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildCsp, createNonce } from "@/lib/csp";
+import { buildCsp, createNonce, INLINE_HASHES_PLACEHOLDER, usesNonce } from "@/lib/csp";
 
 function directives(csp: string): Map<string, string> {
   return new Map(
@@ -38,6 +38,23 @@ describe("website Content-Security-Policy", () => {
     expect(csp.get("img-src")).toContain("https://i.ytimg.com");
     expect(csp.get("img-src")).toContain("https://api.example.com");
     expect(csp.get("connect-src")).toBe("'self' https://api.example.com");
+  });
+
+  it("ISR pages get the hash policy: 'self' + the placeholder csp-hook.cjs fills, never unsafe-inline, no nonce", () => {
+    const isr = directives(buildCsp({ apiOrigin: "https://api.example.com", https: true }));
+    expect(isr.get("script-src")).toBe(`'self' ${INLINE_HASHES_PLACEHOLDER}`);
+    expect(isr.get("script-src")).not.toContain("unsafe-inline");
+    expect(isr.get("script-src")).not.toContain("nonce-");
+    expect(isr.get("frame-ancestors")).toBe("'none'");
+  });
+
+  it("only per-request pages (secret token / query-driven) use the nonce policy; next dev uses it everywhere", () => {
+    expect(usesNonce("/visit/abc")).toBe(true);
+    expect(usesNonce("/projects")).toBe(true);
+    expect(usesNonce("/blog")).toBe(true);
+    for (const isr of ["/", "/projects/sgh", "/blog/a-post", "/about", "/privacy", "/terms", "/gallery", "/contact"])
+      expect(usesNonce(isr), isr).toBe(false);
+    expect(usesNonce("/about", true)).toBe(true);
   });
 
   it("dev mode adds only what React Refresh needs", () => {

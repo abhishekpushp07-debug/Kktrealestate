@@ -133,6 +133,53 @@ export function recordJobRun(job: string, status: "OK" | "FAILED", seconds: numb
   jobDuration.observe({ job_name: job }, seconds);
 }
 
+/** Front-end errors reported through POST /api/v1/client-errors (contract C2), by app. */
+export const clientErrorsTotal = new client.Counter({
+  name: "kkt_client_errors_total",
+  help: "Front-end errors reported by the ERP, portal and website (POST /api/v1/client-errors), by app.",
+  labelNames: ["app"] as const,
+  registers: [registry],
+});
+
+/** Process-level failures caught by the fatal hooks (lib/processErrors.ts), by kind and process role. */
+export const processErrorsTotal = new client.Counter({
+  name: "kkt_process_errors_total",
+  help: "Unhandled promise rejections and uncaught exceptions by kind (unhandled_rejection | uncaught_exception) and role (api | worker).",
+  labelNames: ["kind", "role"] as const,
+  registers: [registry],
+});
+
+/** Unix time of the job worker's last heartbeat (written to Redis every 15 s; contract C8). Set by the worker process. */
+export const workerHeartbeat = new client.Gauge({
+  name: "kkt_worker_heartbeat_timestamp_seconds",
+  help: "Unix time of this job worker's last heartbeat (contract C8); alert when time() minus it grows past a minute.",
+  aggregator: "max",
+  registers: [registry],
+});
+
+/** Job attempts stopped at their time budget (JOB_TIMEOUT_MS) or interrupted by a shutdown, by job and reason. */
+export const jobInterruptionsTotal = new client.Counter({
+  name: "kkt_job_interruptions_total",
+  help: "Job attempts stopped by their time budget (reason=timeout) or by a worker shutdown (reason=shutdown; heavy jobs resume from their checkpoint).",
+  labelNames: ["job_name", "reason"] as const,
+  registers: [registry],
+});
+
+/** Storage objects handled by STORAGE_SWEEP: orphans removed, queued deletions done or failed (retried with backoff). */
+export const storageSweepTotal = new client.Counter({
+  name: "kkt_storage_sweep_objects_total",
+  help: "Objects handled by STORAGE_SWEEP by action (orphan_queued: an upload that never committed was queued for deletion | deletion_done | deletion_failed | deletion_gave_up: 10+ failures, still retried daily).",
+  labelNames: ["action"] as const,
+  registers: [registry],
+});
+
+/** Idempotent requests whose first attempt committed but answered an error (the key is kept; retries get IDEMPOTENT_OUTCOME_UNKNOWN). */
+export const idempotencyOutcomeUnknownTotal = new client.Counter({
+  name: "kkt_idempotency_outcome_unknown_total",
+  help: "Idempotent writes that committed but answered 5xx (the key is kept and retries answer 409 IDEMPOTENT_OUTCOME_UNKNOWN).",
+  registers: [registry],
+});
+
 /** Configured DB pool size of this process (summed over processes: compare with kkt_db_max_connections). */
 export const dbPoolMax = new client.Gauge({
   name: "db_pool_max_connections",
@@ -172,13 +219,15 @@ export interface DependencyProbes {
       exec(): Promise<[Error | null, unknown][] | null>;
     };
   };
-  /** BullMQ queue name (default kkt-jobs) and key prefix (default bull). */
-  queueName?: string;
+  /** BullMQ queue names (default the critical and heavy job queues) and key prefix (default bull). */
+  queueName?: string | readonly string[];
   queuePrefix?: string;
   /** Minimum seconds between two refreshes (default 10). */
   minIntervalSeconds?: number;
 }
 
+/** The job queues (jobs/index.ts CRITICAL_QUEUE / HEAVY_QUEUE; spelled out here so metrics never import the job registry). */
+const DEFAULT_QUEUES = ["kkt-jobs", "kkt-jobs-heavy"] as const;
 const LIST_STATES = ["wait", "active", "paused"] as const;
 const ZSET_STATES = ["delayed", "prioritized", "failed", "waiting-children"] as const;
 
@@ -192,6 +241,7 @@ interface DependencySnapshot {
   integrityFindings: number | null;
   integrityLastRun: number | null;
   demands: number | null;
+  /** `<queue>\u0000<state>` → jobs. */
   queue: Record<string, number>;
 }
 
@@ -260,14 +310,25 @@ async function takeSnapshot(p: DependencyProbes): Promise<DependencySnapshot> {
   const redis = async () => {
     await p.redis.ping();
     s.redisUp = 1;
-    const prefix = `${p.queuePrefix ?? "bull"}:${p.queueName ?? "kkt-jobs"}`;
+    const names =
+      p.queueName === undefined ? DEFAULT_QUEUES : typeof p.queueName === "string" ? [p.queueName] : p.queueName;
     const pipe = p.redis.pipeline();
-    for (const st of LIST_STATES) pipe.llen(`${prefix}:${st}`);
-    for (const st of ZSET_STATES) pipe.zcard(`${prefix}:${st}`);
+    const keys: [string, string][] = [];
+    for (const q of names) {
+      const prefix = `${p.queuePrefix ?? "bull"}:${q}`;
+      for (const st of LIST_STATES) {
+        pipe.llen(`${prefix}:${st}`);
+        keys.push([q, st]);
+      }
+      for (const st of ZSET_STATES) {
+        pipe.zcard(`${prefix}:${st}`);
+        keys.push([q, st]);
+      }
+    }
     const res = (await pipe.exec()) ?? [];
-    [...LIST_STATES, ...ZSET_STATES].forEach((st, i) => {
+    keys.forEach(([q, st], i) => {
       const r = res[i];
-      if (r && !r[0]) s.queue[st] = Number(r[1] ?? 0);
+      if (r && !r[0]) s.queue[`${q}\u0000${st}`] = Number(r[1] ?? 0);
     });
   };
   await Promise.all([
@@ -343,9 +404,17 @@ depGauge("kkt_integrity_findings", "Findings of the latest integrity run, summed
 depGauge("kkt_integrity_last_run_timestamp_seconds", "Unix time of the latest integrity run.", [], (g, s) => {
   if (s.integrityLastRun !== null) g.set(s.integrityLastRun);
 });
-depGauge("kkt_jobs_queue_depth", "BullMQ jobs by state.", ["state"], (g, s) => {
-  for (const [state, n] of Object.entries(s.queue)) g.set({ state }, n);
-});
+depGauge(
+  "kkt_jobs_queue_depth",
+  "BullMQ jobs by queue (kkt-jobs = critical, kkt-jobs-heavy) and state.",
+  ["queue", "state"],
+  (g, s) => {
+    for (const [key, n] of Object.entries(s.queue)) {
+      const [queue, state] = key.split("\u0000") as [string, string];
+      g.set({ queue, state }, n);
+    }
+  },
+);
 
 /** Turns the dependency collector on in this process (call in exactly one process per host: worker 0 or the single process). */
 export function enableDependencyMetrics(p: DependencyProbes): void {

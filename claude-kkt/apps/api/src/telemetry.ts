@@ -12,8 +12,10 @@
  * Standard OTEL_* variables apply (OTEL_EXPORTER_OTLP_HEADERS, OTEL_TRACES_SAMPLER / OTEL_TRACES_SAMPLER_ARG — parentbased_traceidratio
  * with 0.1 is a sane production choice — OTEL_RESOURCE_ATTRIBUTES). Docs: docs/OBSERVABILITY.md.
  *
- * This file must stay free of application imports (config, logger): it runs before them.
+ * This file must stay free of application imports (config, logger): it runs before them. It imports only src/preload.ts (UV_THREADPOOL_SIZE).
  */
+// first: size the libuv thread pool before anything can use it (src/preload.ts)
+import "./preload.js";
 import { register } from "node:module";
 
 const endpoint = process.env["OTEL_EXPORTER_OTLP_ENDPOINT"];
@@ -21,7 +23,7 @@ const endpoint = process.env["OTEL_EXPORTER_OTLP_ENDPOINT"];
 /** Shutdown hook published for server.ts (modules/system/shutdown.ts shutdownTelemetry flushes pending spans on graceful exit). */
 export const TELEMETRY_SHUTDOWN = Symbol.for("kkt.telemetry.shutdown");
 
-const IGNORED_PATHS = /^\/(api\/v1\/)?(health|ready|metrics)(\?|$)/;
+const IGNORED_PATHS = /^\/(api\/v1\/)?(health|ready|metrics)(\/(live|ready))?(\?|$)/;
 
 async function start(): Promise<void> {
   if (!endpoint) return;

@@ -46,16 +46,26 @@ function scopeSql(user: StaffContext, column: string, params: unknown[]): string
 }
 
 /**
- * A project-scoped user only finds customers linked to a project in scope: primary applicant or co-applicant on a booking there, or the
- * customer of a lead for one of those projects. All-project users see every customer.
+ * A project-scoped user only finds customers in their scope — the same rule as every customer route (lib/scope.ts
+ * customerScopeCondition): primary applicant or co-applicant on a booking in one of their projects, the customer of a lead or a site visit
+ * for one, or a record they created themselves that is not linked to any project yet. All-project users see every customer.
  */
 function customerScopeSql(user: StaffContext, params: unknown[]): string {
   if (user.allProjects) return "true";
-  if (user.projectIds.length === 0) return "false";
+  params.push(user.id);
+  const uid = `$${params.length}::uuid`;
+  const ownUnlinked = `(c.created_by = ${uid}
+      and not exists (select 1 from bookings xb where xb.customer_id = c.id)
+      and not exists (select 1 from booking_co_applicants xbc where xbc.customer_id = c.id)
+      and not exists (select 1 from leads xl where xl.customer_id = c.id and xl.project_id is not null)
+      and not exists (select 1 from site_visits xv where xv.customer_id = c.id))`;
+  if (user.projectIds.length === 0) return ownUnlinked;
   params.push(user.projectIds);
   const p = `$${params.length}::uuid[]`;
   return `(exists (select 1 from bookings sb where sb.project_id = any(${p}) and (sb.customer_id = c.id or exists (select 1 from booking_co_applicants sbc where sbc.booking_id = sb.id and sbc.customer_id = c.id)))
-    or exists (select 1 from leads sl where sl.customer_id = c.id and sl.project_id = any(${p})))`;
+    or exists (select 1 from leads sl where sl.customer_id = c.id and sl.project_id = any(${p}))
+    or exists (select 1 from site_visits sv where sv.customer_id = c.id and sv.project_id = any(${p}))
+    or ${ownUnlinked})`;
 }
 
 /** Entity types the caller may see: each one needs its own read permission (customers carry PII, bookings carry money). */

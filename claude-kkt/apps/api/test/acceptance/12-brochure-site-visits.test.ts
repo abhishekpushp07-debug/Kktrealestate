@@ -259,11 +259,11 @@ describe("scenario 12 — site-visit scheduler", () => {
     });
     expect(restored.status, restored.text).toBe(200);
     expect((await availability()).map((d) => d.date)).toContain(target.date);
-    // cached public GET (SPEC L223 "Cache ~60 s")
+    // cached public GET (SPEC L223 "Cache ~60 s"; contract C5: shared caches only, s-maxage)
     expect(
       (await h.request("GET", `/api/v1/public/projects/${SGH}/visit-availability?from=${h.today}&to=${h.today}`))
         .headers["cache-control"],
-    ).toContain("max-age=60");
+    ).toContain("s-maxage=60");
   });
 
   it("the last seat is booked, one more is 409 SLOT_FULL; the .ics is in Asia/Kolkata with a 1-hour reminder; the lead moves to Site Visit Scheduled", async () => {

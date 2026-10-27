@@ -304,3 +304,17 @@ export function createStorage(): Storage {
   }
   return new LocalStorage(resolve(config.STORAGE_LOCAL_DIR));
 }
+
+/** Key of this process's health object (`health/<host>-<pid>.txt`, characters the key check accepts). */
+export function healthKey(host: string, pid: number = process.pid): string {
+  return `health/${host.replace(/[^a-z0-9_-]/gi, "-").slice(0, 60) || "host"}-${pid}.txt`;
+}
+
+/**
+ * A real round trip to the object store for /health: writes a tiny object and checks it exists. Throws on failure (the caller reports the
+ * message, never credentials).
+ */
+export async function probeStorage(store: Storage, key: string): Promise<void> {
+  await store.put(key, Buffer.from(new Date().toISOString()), "text/plain");
+  if (!(await store.exists(key))) throw new Error("health object written but not found");
+}

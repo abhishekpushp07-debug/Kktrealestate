@@ -69,6 +69,7 @@ import { assertFilterScope } from "./projects.js";
 import {
   allStagesPending,
   applyPriceUpdates,
+  areasToDb,
   assertStageSequence,
   blockToDefinition,
   breakupToDb,
@@ -84,6 +85,7 @@ import {
   patchBody,
   refreshProjectCounts,
   refreshUnitCounts,
+  roomsToDb,
   snapshotBlockStages,
   translateDomainError,
   writeAuditMany,
@@ -280,6 +282,137 @@ async function generateInto(
   await writeAuditMany(tx, generationAudits(req, block, inserted, drafts, action));
   await refreshUnitCounts(tx, block.id);
   return { created: inserted.length, floorsWithUnits: unitFloors(def).length, rateCard };
+}
+
+/** Flats of a block that ever had a booking (any status, cancelled ones included): bookings.flat_id keeps them alive. */
+async function flatsWithBookingHistory(
+  tx: Executor,
+  blockId: string,
+): Promise<{ id: string; flatNumber: string; floor: number; position: number; bookings: number }[]> {
+  const rows = await tx
+    .select({
+      id: flats.id,
+      flatNumber: flats.flatNumber,
+      floor: flats.floor,
+      position: flats.position,
+      bookings: sql<number>`count(${bookings.id})::int`,
+    })
+    .from(flats)
+    .innerJoin(bookings, eq(bookings.flatId, flats.id))
+    .where(eq(flats.blockId, blockId))
+    .groupBy(flats.id)
+    .orderBy(asc(flats.floor), asc(flats.position));
+  return rows.map((r) => ({ ...r, bookings: Number(r.bookings) }));
+}
+
+/**
+ * Replaces every flat of a block (all AVAILABLE — the callers check) with a fresh generation. A flat with booking history (a cancelled
+ * booking still references it) cannot be deleted: when the new layout has a flat with the same number on the same floor and position,
+ * that flat is regenerated IN PLACE (same id, history kept); otherwise the whole change answers 409 FLAT_HAS_BOOKING_HISTORY listing them.
+ */
+async function regenerateInto(
+  tx: Executor,
+  req: Parameters<typeof meta>[0],
+  block: DbBlock,
+  action: string,
+): Promise<{ created: number; preserved: number; floorsWithUnits: number }> {
+  const def = blockToDefinition(block);
+  const { drafts, rateCard } = await draftFlats(tx, block.companyId, block.projectId, def);
+  const history = await flatsWithBookingHistory(tx, block.id);
+  const draftByNumber = new Map(drafts.map((d) => [d.flatNumber, d]));
+  const lost = history.filter((h) => {
+    const d = draftByNumber.get(h.flatNumber);
+    return !d || d.floor !== h.floor || d.position !== h.position;
+  });
+  if (lost.length > 0)
+    throw ApiError.conflict(
+      "FLAT_HAS_BOOKING_HISTORY",
+      `${lost.length} flat(s) of ${block.name} have booking history (${lost
+        .slice(0, 10)
+        .map((f) => f.flatNumber)
+        .join(", ")}${lost.length > 10 ? ", …" : ""}); this change would delete them`,
+      {
+        flats: lost.map((f) => ({
+          id: f.id,
+          flat_number: f.flatNumber,
+          floor: f.floor,
+          position: f.position,
+          bookings: f.bookings,
+        })),
+      },
+    );
+  const keep = new Map(history.map((h) => [h.flatNumber, h.id]));
+  const keepIds = [...keep.values()];
+  await tx.delete(flats).where(
+    keepIds.length > 0
+      ? and(
+          eq(flats.blockId, block.id),
+          sql`${flats.id} not in (${sql.join(
+            keepIds.map((id) => sql`${id}::uuid`),
+            sql`, `,
+          )})`,
+        )
+      : eq(flats.blockId, block.id),
+  );
+  const rateCardFor = (flatTypeId: string): string | null =>
+    rateCard && rateCard.card.rates.some((r) => r.flatTypeId === flatTypeId) ? rateCard.id : null;
+  const kept: { id: string; flatNumber: string }[] = [];
+  const preservedAudits: AuditEntry[] = [];
+  for (const d of drafts) {
+    const id = keep.get(d.flatNumber);
+    if (!id) continue;
+    const [before] = await tx
+      .select({ flatTypeCode: flats.flatTypeCode, pricePaise: flats.pricePaise })
+      .from(flats)
+      .where(eq(flats.id, id));
+    await tx
+      .update(flats)
+      .set({
+        floorLabel: d.floorLabel,
+        flatTypeId: d.flatTypeId,
+        flatTypeCode: d.flatTypeCode,
+        facing: d.facing,
+        isCorner: d.isCorner,
+        roomsSnapshot: roomsToDb(d.roomsSnapshot),
+        areasSnapshot: areasToDb(d.areasSnapshot),
+        carpetSqft: d.carpetSqft,
+        builtupSqft: d.builtupSqft,
+        superBuiltupSqft: d.superBuiltupSqft,
+        ratePerSqftPaise: d.ratePerSqftPaise,
+        pricePaise: d.pricePaise,
+        priceBreakup: breakupToDb(d.priceBreakup),
+        rateCardId: rateCardFor(d.flatTypeId),
+        version: sql`${flats.version} + 1`,
+      })
+      .where(and(eq(flats.id, id), eq(flats.status, "AVAILABLE")));
+    kept.push({ id, flatNumber: d.flatNumber });
+    preservedAudits.push({
+      companyId: block.companyId,
+      ...meta(req),
+      action: "flat.regenerate_in_place",
+      entityType: "flat",
+      entityId: id,
+      before: { flat_type_code: before?.flatTypeCode, price_paise: before?.pricePaise },
+      after: {
+        flat_number: d.flatNumber,
+        flat_type_code: d.flatTypeCode,
+        price_paise: d.pricePaise,
+        reason: "booking_history",
+      },
+    });
+  }
+  const fresh = drafts.filter((d) => !keep.has(d.flatNumber));
+  let inserted: { id: string; flatNumber: string }[] = [];
+  try {
+    inserted = await insertDrafts(tx, block, fresh, rateCard, req.user?.id ?? null);
+  } catch (e) {
+    translatePgError(e, "A flat with this number");
+  }
+  const audits = generationAudits(req, block, inserted, fresh, action);
+  if (audits[0]) audits[0] = { ...audits[0], after: { ...audits[0].after, flats_preserved: kept.length } };
+  await writeAuditMany(tx, [...audits, ...preservedAudits]);
+  await refreshUnitCounts(tx, block.id);
+  return { created: inserted.length + kept.length, preserved: kept.length, floorsWithUnits: unitFloors(def).length };
 }
 
 const BLOCK_CSV = [
@@ -612,9 +745,9 @@ export function registerBlockRoutes(app: FastifyInstance): void {
           );
         }
         if (touched.length > 0 && flatCount > 0) {
-          // Flats must always mirror the block definition: a structural change on a block whose flats are all Available regenerates them atomically.
-          await tx.delete(flats).where(eq(flats.blockId, existing.id));
-          await generateInto(tx, req, updated, "block.regenerate_flats");
+          // Flats must always mirror the block definition: a structural change on a block whose flats are all Available regenerates them
+          // atomically (flats with booking history in place, or 409 FLAT_HAS_BOOKING_HISTORY when the change would delete them).
+          await regenerateInto(tx, req, updated, "block.regenerate_flats");
           updated = await loadBlock(tx, user, existing.id);
         }
         const [after] = await toBlockRows(tx, [updated]);
@@ -708,17 +841,15 @@ export function registerBlockRoutes(app: FastifyInstance): void {
             { total },
           );
         const updated = await applyUpdate(tx, blocks, block.id, version, {}, "block");
-        if (total > 0) await tx.delete(flats).where(eq(flats.blockId, block.id));
-        const result = await generateInto(
-          tx,
-          req,
-          updated,
-          total > 0 ? "block.regenerate_flats" : "block.generate_flats",
-        );
+        const result =
+          total > 0
+            ? await regenerateInto(tx, req, updated, "block.regenerate_flats")
+            : { ...(await generateInto(tx, req, updated, "block.generate_flats")), preserved: 0 };
         return {
           block_id: block.id,
           flats_created: result.created,
           floors_with_units: result.floorsWithUnits,
+          flats_preserved: result.preserved,
           version: updated.version,
         };
       });
@@ -1083,6 +1214,7 @@ export function registerBlockRoutes(app: FastifyInstance): void {
             breakup: breakupToDb(r.breakup),
           })),
           null,
+          body.only_available ? ["AVAILABLE"] : ["AVAILABLE", "HOLD", "BLOCKED"],
         );
         const byId = new Map(rows.map((r) => [r.id, r]));
         await writeAuditMany(

@@ -1,44 +1,41 @@
 import type { MetadataRoute } from "next";
 
-import { getSiteSettings, listPosts, listProjects } from "@/lib/api";
+import { getSitemap } from "@/lib/api";
 import { siteUrl } from "@/lib/env";
 
-export const dynamic = "force-dynamic";
+/** Regenerated every 5 minutes and on every CMS / project-website write (API → /api/revalidate). */
+export const revalidate = 300;
 
-/** Built from the API's published content only: unpublished projects and draft posts never appear. */
+type ChangeFrequency = NonNullable<MetadataRoute.Sitemap[number]["changeFrequency"]>;
+
+function changeFrequency(path: string): ChangeFrequency {
+  if (path === "/" || path === "/projects") return "daily";
+  if (path.startsWith("/projects/") || path === "/blog" || path === "/gallery") return "weekly";
+  return path.startsWith("/blog/") ? "monthly" : "yearly";
+}
+
+/**
+ * Built from GET /public/sitemap: every published project, ALL published posts and CMS pages and the static pages, each with the API's
+ * lastmod (the newest change of what the page shows, never "now"). Unpublished projects and draft posts never appear; while the site is
+ * not live only the legal pages are listed. When the API is unreachable the legal pages are listed and the file regenerates in 10 s.
+ */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = siteUrl();
-  const [site, projects, posts] = await Promise.all([getSiteSettings(), listProjects(), listPosts(1)]);
-  const now = new Date();
-
-  const legal: MetadataRoute.Sitemap = [
-    { url: `${base}/privacy`, lastModified: now, changeFrequency: "yearly", priority: 0.2 },
-    { url: `${base}/disclaimer`, lastModified: now, changeFrequency: "yearly", priority: 0.2 },
-  ];
-  if (site && site.site_live === false) return legal;
-
-  const statics: MetadataRoute.Sitemap = [
-    { url: `${base}/`, lastModified: now, changeFrequency: "daily", priority: 1 },
-    { url: `${base}/projects`, lastModified: now, changeFrequency: "daily", priority: 0.9 },
-    { url: `${base}/about`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
-    { url: `${base}/gallery`, lastModified: now, changeFrequency: "weekly", priority: 0.5 },
-    { url: `${base}/blog`, lastModified: now, changeFrequency: "weekly", priority: 0.6 },
-    { url: `${base}/contact`, lastModified: now, changeFrequency: "monthly", priority: 0.7 },
-  ];
-
-  const projectUrls: MetadataRoute.Sitemap = projects.map((p) => ({
-    url: `${base}/projects/${encodeURIComponent(p.slug)}`,
-    lastModified: now,
-    changeFrequency: "weekly",
-    priority: 0.9,
-  }));
-
-  const postUrls: MetadataRoute.Sitemap = posts.items.map((post) => ({
-    url: `${base}/blog/${encodeURIComponent(post.slug)}`,
-    lastModified: post.published_at ? new Date(post.published_at) : now,
-    changeFrequency: "monthly",
-    priority: 0.5,
-  }));
-
-  return [...statics, ...projectUrls, ...postUrls, ...legal];
+  const entries = (await getSitemap()) ?? [];
+  const legal = ["/privacy", "/disclaimer"];
+  const seen = new Set<string>();
+  const out: MetadataRoute.Sitemap = [];
+  for (const e of entries) {
+    if (seen.has(e.path)) continue;
+    seen.add(e.path);
+    out.push({
+      url: `${base}${e.path === "/" ? "/" : e.path.split("/").map(encodeURIComponent).join("/")}`,
+      lastModified: new Date(e.updated_at),
+      changeFrequency: changeFrequency(e.path),
+      priority: e.priority,
+    });
+  }
+  for (const path of legal)
+    if (!seen.has(path)) out.push({ url: `${base}${path}`, changeFrequency: "yearly", priority: 0.2 });
+  return out;
 }

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { enrichOpenApi } from "./openapiEnrich.js";
 
 /** Path of the committed v1 snapshot (docs/openapi/v1.json at the repository root). */
 export const OPENAPI_SNAPSHOT = join(
@@ -29,15 +30,16 @@ function sortKeys(v: unknown): unknown {
 }
 
 /**
- * Generates the public OpenAPI document of /api/v1 from the code without Postgres or Redis (an offline app). The result is normalised so
- * the committed snapshot only changes when the API changes: environment-specific `servers`/`info.version` are fixed and keys are sorted.
+ * Generates the public OpenAPI document of /api/v1 from the code without Postgres or Redis (an offline app), enriched with operationIds,
+ * shared components, error responses, header parameters and media types (openapiEnrich.ts). The result is normalised so the committed
+ * snapshot only changes when the API changes: environment-specific `servers`/`info.version` are fixed and keys are sorted.
  */
 export async function generateOpenApi(): Promise<Json> {
   const { buildApp } = await import("../../app.js");
   const app = await buildApp({ logger: false, offline: true });
   try {
     await app.ready();
-    const doc = JSON.parse(JSON.stringify(app.swagger())) as Json;
+    const doc = enrichOpenApi(JSON.parse(JSON.stringify(app.swagger())) as Json, app.routeRegistry);
     const pkg = JSON.parse(
       readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "package.json"), "utf8"),
     ) as { version: string };

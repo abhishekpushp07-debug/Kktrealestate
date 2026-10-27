@@ -10,6 +10,7 @@ import type {
   PublicAvailabilityCell,
   PublicAvailabilityGrid,
   PublicBanner,
+  PublicBrochureRepeatRequest,
   PublicBrochureRequest,
   PublicBrochureResponse,
   PublicConfiguration,
@@ -27,6 +28,7 @@ import type {
   PublicProjectDetail,
   PublicProjectsQuery,
   PublicSiteResponse,
+  PublicSitemapEntry,
   PublicStagePhoto,
   PublicStageProgress,
   PublicTestimonial,
@@ -114,6 +116,10 @@ export type UtmParams = Utm;
 export type EnquiryRequest = PublicEnquiryInput;
 export type EnquiryResult = PublicEnquiryResponse;
 export type BrochureRequest = PublicBrochureRequest;
+/** One public URL of GET /public/sitemap (path + lastmod). */
+export type SitemapEntry = PublicSitemapEntry;
+/** Returning device: only the remembered opaque visitor token (the API looks the visitor up). */
+export type BrochureRepeatRequest = PublicBrochureRepeatRequest;
 export type BrochureResult = PublicBrochureResponse;
 
 // ---------------------------------------------------------------------------

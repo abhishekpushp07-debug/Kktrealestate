@@ -2,16 +2,26 @@
  * Fetch-based API client for the KKT staff API.
  *
  * - Base URL = VITE_API_URL + "/api/v1" (empty VITE_API_URL = same origin, dev proxy).
- * - Access token lives in memory; the refresh token in localStorage ("kkt.erp.refresh").
- * - 401 TOKEN_EXPIRED → single-flight POST /auth/refresh, then the request is retried once.
+ * - Sessions (contract C1): the access token lives in memory only; the refresh token is an HttpOnly cookie (kkt_rt, Path=/api/v1/auth)
+ *   the API sets when login/refresh/logout carry `X-KKT-Session: cookie`. No script can read it and nothing token-like is stored in
+ *   localStorage — only a "signed in on this browser" hint (kkt.erp.session = "1"), so a first visit does not probe /auth/refresh.
+ *   On load the session is restored by a cookie refresh.
+ * - 401 TOKEN_EXPIRED → single-flight POST /auth/refresh (cookie), then the request is retried once.
  * - Every POST carries an Idempotency-Key (crypto.randomUUID) unless one is supplied.
- * - `version` option → `If-Match: "<version>"` header for optimistic concurrency.
+ * - `version` option → `If-Match: "v<version>"` header for optimistic concurrency (contract C6).
  * - Error envelopes {error:{code,message,details,request_id}} become ApiClientError.
  */
 
 import { messageForError } from "./errorMessages";
 
-export const REFRESH_TOKEN_KEY = "kkt.erp.refresh";
+/** Legacy key of the refresh token (pre-C1 builds kept it in localStorage); removed on load. */
+export const LEGACY_REFRESH_TOKEN_KEY = "kkt.erp.refresh";
+/** "Signed in on this browser" hint: a flag, never a token. */
+export const SESSION_HINT_KEY = "kkt.erp.session";
+/** Header that selects the HttpOnly refresh cookie (contract C1). */
+export const SESSION_MODE_HEADER = "X-KKT-Session";
+/** Web Lock name that serialises refreshes across tabs (a rotated refresh token is single-use). */
+export const REFRESH_LOCK = "kkt.erp.refresh.rotate";
 
 /* ------------------------------------------------------------------ */
 /* Errors                                                               */
@@ -197,29 +207,24 @@ function storageSet(key: string, value: string | null): void {
   }
 }
 
+// A refresh token left by a pre-cookie build must not linger in localStorage.
+storageSet(LEGACY_REFRESH_TOKEN_KEY, null);
+
 export const tokens = {
   getAccess(): string | null {
     return accessToken;
   },
   setAccess(token: string | null): void {
     accessToken = token;
-  },
-  getRefresh(): string | null {
-    return storageGet(REFRESH_TOKEN_KEY);
-  },
-  setRefresh(token: string | null): void {
-    storageSet(REFRESH_TOKEN_KEY, token);
-  },
-  setPair(access: string, refresh: string): void {
-    accessToken = access;
-    storageSet(REFRESH_TOKEN_KEY, refresh);
+    if (token) storageSet(SESSION_HINT_KEY, "1");
   },
   clear(): void {
     accessToken = null;
-    storageSet(REFRESH_TOKEN_KEY, null);
+    storageSet(SESSION_HINT_KEY, null);
   },
+  /** True when a session may exist: an access token in memory, or the hint that a refresh cookie was issued on this browser. */
   hasSession(): boolean {
-    return accessToken !== null || storageGet(REFRESH_TOKEN_KEY) !== null;
+    return accessToken !== null || storageGet(SESSION_HINT_KEY) === "1";
   },
 };
 
@@ -309,14 +314,21 @@ export type HttpMethod = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 export interface RequestOptions {
   query?: QueryParams;
   body?: unknown;
-  /** Row version → `If-Match: "<version>"`. */
+  /** Row version → `If-Match: "v<version>"` (the API's ETag form, contract C6). */
   version?: number;
+  /** Send `X-KKT-Session: cookie` with credentials (login / logout: the API sets or clears the HttpOnly refresh cookie). */
+  cookieSession?: boolean;
   /** Override the generated Idempotency-Key (POST only). */
   idempotencyKey?: string;
   headers?: Record<string, string>;
   signal?: AbortSignal;
   /** Attach the bearer token (default true). */
   auth?: boolean;
+}
+
+/** `If-Match` value for a row version: the API's ETag form `"v<n>"` (contract C6). */
+export function versionTag(version: number): string {
+  return `"v${version}"`;
 }
 
 function newIdempotencyKey(): string {
@@ -343,31 +355,27 @@ let refreshInFlight: Promise<boolean> | null = null;
 
 interface RefreshResponse {
   access_token: string;
-  refresh_token: string;
   expires_in?: number;
 }
 
-/** Rotates the refresh token. Single-flight: concurrent callers share one network call. */
+/**
+ * Rotates the session through the HttpOnly refresh cookie (contract C1: empty body + `X-KKT-Session: cookie`). Single-flight:
+ * concurrent callers share one network call. A 4xx (no cookie, reused or expired token, SESSION_EXPIRED past the absolute
+ * lifetime) signs the user out; a network error keeps the session for a later retry.
+ */
 export function refreshSession(): Promise<boolean> {
   if (refreshInFlight) return refreshInFlight;
-  if (!tokens.getRefresh()) {
+  if (!tokens.hasSession()) {
     tokens.clear();
     emitAuthEvent("unauthenticated");
     return Promise.resolve(false);
   }
   const rotate = async (): Promise<boolean> => {
-    // Re-read inside the lock: another tab (print window, second tab) may have rotated the token meanwhile.
-    const refreshToken = tokens.getRefresh();
-    if (!refreshToken) {
-      tokens.clear();
-      emitAuthEvent("unauthenticated");
-      return false;
-    }
     try {
       const response = await fetch(`${apiBaseUrl()}/auth/refresh`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ refresh_token: refreshToken }),
+        credentials: "include",
+        headers: { Accept: "application/json", [SESSION_MODE_HEADER]: "cookie" },
       });
       if (!response.ok) {
         if (response.status >= 400 && response.status < 500) {
@@ -377,23 +385,23 @@ export function refreshSession(): Promise<boolean> {
         return false;
       }
       const data = (await readBody(response)) as Partial<RefreshResponse> | undefined;
-      if (!data?.access_token || !data.refresh_token) {
+      if (!data?.access_token) {
         tokens.clear();
         emitAuthEvent("unauthenticated");
         return false;
       }
-      tokens.setPair(data.access_token, data.refresh_token);
+      tokens.setAccess(data.access_token);
       return true;
     } catch {
       return false;
     }
   };
-  // Rotating refresh tokens are single-use and the server revokes the whole family on reuse, so tabs of the same
-  // origin (a receipt print window, a second ERP tab) must never refresh concurrently: serialise through a Web Lock.
+  // Rotating refresh tokens are single-use and the server revokes the whole family on reuse, so tabs of the same origin
+  // (a receipt print window, a second ERP tab) share the cookie and must never refresh concurrently: serialise through a Web Lock.
   const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
   // Promises flatten at runtime; `.then` keeps the declared type honest without a cast.
   const granted: Promise<boolean> = locks
-    ? locks.request(`${REFRESH_TOKEN_KEY}.rotate`, () => rotate()).then((value: unknown) => value === true)
+    ? locks.request(REFRESH_LOCK, () => rotate()).then((value: unknown) => value === true)
     : rotate();
   const pending: Promise<boolean> = granted.finally(() => {
     refreshInFlight = null;
@@ -422,9 +430,12 @@ function prepare(method: HttpMethod, path: string, options: RequestOptions): Pre
     }
   }
   if (method === "POST") headers.set("Idempotency-Key", options.idempotencyKey ?? newIdempotencyKey());
-  if (options.version !== undefined) headers.set("If-Match", `"${options.version}"`);
+  if (options.version !== undefined) headers.set("If-Match", versionTag(options.version));
   const url = `${apiBaseUrl()}${path.startsWith("/") ? path : `/${path}`}${buildQueryString(options.query)}`;
-  return { url, headers, init: { method, body, signal: options.signal } };
+  // Cookie-carrying calls (login / logout) say so; everything else is bearer-only.
+  const credentials: RequestCredentials | undefined = options.cookieSession ? "include" : undefined;
+  if (options.cookieSession) headers.set(SESSION_MODE_HEADER, "cookie");
+  return { url, headers, init: { method, body, signal: options.signal, ...(credentials ? { credentials } : {}) } };
 }
 
 async function send(prepared: PreparedRequest, useAuth: boolean): Promise<Response> {
@@ -444,7 +455,7 @@ async function send(prepared: PreparedRequest, useAuth: boolean): Promise<Respon
 async function execute(method: HttpMethod, path: string, options: RequestOptions): Promise<Response> {
   const useAuth = options.auth !== false;
   const prepared = prepare(method, path, options);
-  if (useAuth && !tokens.getAccess() && tokens.getRefresh()) {
+  if (useAuth && !tokens.getAccess() && tokens.hasSession()) {
     await refreshSession();
   }
   let response = await send(prepared, useAuth);
@@ -454,7 +465,7 @@ async function execute(method: HttpMethod, path: string, options: RequestOptions
       .json()
       .catch(() => undefined);
     const code = isEnvelope(peek) ? peek.error.code : "UNAUTHENTICATED";
-    if (code === "TOKEN_EXPIRED" || (code === "UNAUTHENTICATED" && tokens.getRefresh())) {
+    if (code === "TOKEN_EXPIRED" || (code === "UNAUTHENTICATED" && tokens.hasSession())) {
       const refreshed = await refreshSession();
       if (refreshed) response = await send(prepared, useAuth);
     }
@@ -621,3 +632,33 @@ export const api = {
 };
 
 export type Api = typeof api;
+
+/** Result of fetchAllPages: every row, the server's total and whether the row ceiling cut the walk short. */
+export interface AllPages<T> {
+  items: T[];
+  total: number;
+  truncated: boolean;
+}
+
+/**
+ * Walks a list endpoint page by page (page_size 200, the server's page bound is 1000) until every row is read, instead of
+ * silently keeping the first page. `maxRows` is a safety ceiling; `truncated` tells the caller when it was hit.
+ */
+export async function fetchAllPages<T>(
+  path: string,
+  params: Omit<ListParams, "page" | "page_size"> = {},
+  options: { signal?: AbortSignal; pageSize?: number; maxRows?: number } = {},
+): Promise<AllPages<T>> {
+  const pageSize = options.pageSize ?? 200;
+  const maxRows = options.maxRows ?? 20_000;
+  const items: T[] = [];
+  let total = 0;
+  for (let page = 1; page <= 1000; page += 1) {
+    const envelope = await api.list<T>(path, { ...params, page, page_size: pageSize }, { signal: options.signal });
+    items.push(...envelope.items);
+    total = envelope.total;
+    if (envelope.items.length < pageSize || items.length >= total) break;
+    if (items.length >= maxRows) return { items, total, truncated: true };
+  }
+  return { items, total: Math.max(total, items.length), truncated: false };
+}

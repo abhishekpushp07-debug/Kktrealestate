@@ -10,14 +10,15 @@ import type {
   ChargeTypeRow,
   CustomerRow,
   DemandRow,
-  LedgerRow,
+  LedgerRebuildRow,
+  LedgerResponse,
   ParkingSlotRow,
   PaymentRow,
   SchedulePreviewRequest,
   SchedulePreviewResponse,
   ScheduleResponse,
 } from "@kkt/contracts";
-import { api, saveBlob, type ApiClientError, type ListEnvelope, type ListParams } from "@/lib/api";
+import { api, buildListQuery, fetchAllPages, saveBlob, type ApiClientError, type ListEnvelope } from "@/lib/api";
 import { useApiQuery } from "@/features/inventory/api";
 import { useMasterRows } from "@/features/masters/api";
 
@@ -33,10 +34,14 @@ export const AUDIT_PATH = "/audit-logs";
 
 export const bookingKeys = {
   detail: (id: string) => [BOOKINGS_PATH, "detail", id] as const,
-  ledger: (id: string, params: ListParams) => [BOOKINGS_PATH, "ledger", id, params] as const,
+  ledger: (id: string, params: LedgerPageParams) => [BOOKINGS_PATH, "ledger", id, params] as const,
+  ledgerRebuilds: (id: string) => [BOOKINGS_PATH, "ledger", id, "rebuilds"] as const,
   schedule: (id: string) => [BOOKINGS_PATH, "schedule", id] as const,
   demands: (id: string) => [BOOKINGS_PATH, "demands", id] as const,
+  demandsPage: (id: string, page: number, pageSize: number) => [BOOKINGS_PATH, "demands", id, page, pageSize] as const,
   payments: (id: string) => [BOOKINGS_PATH, "payments", id] as const,
+  paymentsPage: (id: string, page: number, pageSize: number) =>
+    [BOOKINGS_PATH, "payments", id, page, pageSize] as const,
   history: (id: string) => [AUDIT_PATH, "entity", "booking", id] as const,
   drafts: [DRAFTS_PATH, "mine"] as const,
   applicablePlans: (blockId: string, onDate: string) => ["/blocks", "applicable-plans", blockId, onDate] as const,
@@ -55,14 +60,56 @@ export function useBookingDetail(id: string | null | undefined): UseQueryResult<
   });
 }
 
+/** One page of the booking ledger (contract C7): `epoch` omitted = the current book of record. */
+export interface LedgerPageParams {
+  page: number;
+  page_size: number;
+  epoch?: number | null;
+}
+
+export const LEDGER_PAGE_SIZE = 100;
+
+/**
+ * GET /bookings/:id/ledger — one page of one epoch plus the server-computed C7 `summary` (current book) and `epoch_totals`.
+ * Dues are always read from those totals, never from the last row of a page (a long ledger spans several pages).
+ */
+/** One ledger page of one epoch, sorted by seq (the query behind useBookingLedger). */
+export function fetchBookingLedger(
+  id: string,
+  params: LedgerPageParams,
+  signal?: AbortSignal,
+): Promise<LedgerResponse> {
+  return api.get<LedgerResponse>(`${BOOKINGS_PATH}/${id}/ledger`, {
+    signal,
+    query: {
+      ...buildListQuery({ page: params.page, page_size: params.page_size, sort: "seq" }),
+      epoch: params.epoch ?? undefined,
+    },
+  });
+}
+
 export function useBookingLedger(
   id: string | null | undefined,
-  params: ListParams = { page_size: 200, sort: "seq" },
-): UseQueryResult<ListEnvelope<LedgerRow>, ApiClientError> {
-  return useQuery<ListEnvelope<LedgerRow>, ApiClientError, ListEnvelope<LedgerRow>, readonly unknown[]>({
+  params: LedgerPageParams = { page: 1, page_size: LEDGER_PAGE_SIZE },
+): UseQueryResult<LedgerResponse, ApiClientError> {
+  return useQuery<LedgerResponse, ApiClientError, LedgerResponse, readonly unknown[]>({
     queryKey: bookingKeys.ledger(id ?? "", params),
-    queryFn: ({ signal }) => api.list<LedgerRow>(`${BOOKINGS_PATH}/${id}/ledger`, params, { signal }),
+    queryFn: ({ signal }) => fetchBookingLedger(id ?? "", params, signal),
     enabled: Boolean(id),
+    placeholderData: (previous) => previous,
+  });
+}
+
+/** GET /bookings/:id/ledger/rebuilds — every restatement of the ledger (newest first). */
+export function useLedgerRebuilds(
+  id: string | null | undefined,
+  options: { enabled?: boolean } = {},
+): UseQueryResult<ListEnvelope<LedgerRebuildRow>, ApiClientError> {
+  return useQuery<ListEnvelope<LedgerRebuildRow>, ApiClientError, ListEnvelope<LedgerRebuildRow>, readonly unknown[]>({
+    queryKey: bookingKeys.ledgerRebuilds(id ?? ""),
+    queryFn: ({ signal }) =>
+      api.list<LedgerRebuildRow>(`${BOOKINGS_PATH}/${id}/ledger/rebuilds`, { page_size: 100, sort: "-at" }, { signal }),
+    enabled: Boolean(id) && options.enabled !== false,
   });
 }
 
@@ -72,23 +119,51 @@ export function useBookingSchedule(id: string | null | undefined): UseQueryResul
   });
 }
 
+/** Every demand of a booking, all pages (the demand-letter fallback needs the whole set). */
 export function useBookingDemands(id: string | null | undefined): UseQueryResult<DemandRow[], ApiClientError> {
-  return useQuery<ListEnvelope<DemandRow>, ApiClientError, DemandRow[], readonly unknown[]>({
+  return useQuery<DemandRow[], ApiClientError, DemandRow[], readonly unknown[]>({
     queryKey: bookingKeys.demands(id ?? ""),
-    queryFn: ({ signal }) =>
-      api.list<DemandRow>(`${BOOKINGS_PATH}/${id}/demands`, { page_size: 200, sort: "demand_date" }, { signal }),
-    select: (data) => data.items,
+    queryFn: async ({ signal }) =>
+      (await fetchAllPages<DemandRow>(`${BOOKINGS_PATH}/${id}/demands`, { sort: "demand_date" }, { signal })).items,
     enabled: Boolean(id),
   });
 }
 
-export function useBookingPayments(id: string | null | undefined): UseQueryResult<PaymentRow[], ApiClientError> {
-  return useQuery<ListEnvelope<PaymentRow>, ApiClientError, PaymentRow[], readonly unknown[]>({
-    queryKey: bookingKeys.payments(id ?? ""),
+/** One page of a booking's demands (the Demands tab pages through all of them). */
+export function useBookingDemandsPage(
+  id: string | null | undefined,
+  page: number,
+  pageSize: number,
+): UseQueryResult<ListEnvelope<DemandRow>, ApiClientError> {
+  return useQuery<ListEnvelope<DemandRow>, ApiClientError, ListEnvelope<DemandRow>, readonly unknown[]>({
+    queryKey: bookingKeys.demandsPage(id ?? "", page, pageSize),
     queryFn: ({ signal }) =>
-      api.list<PaymentRow>(`${BOOKINGS_PATH}/${id}/payments`, { page_size: 200, sort: "-payment_date" }, { signal }),
-    select: (data) => data.items,
+      api.list<DemandRow>(
+        `${BOOKINGS_PATH}/${id}/demands`,
+        { page, page_size: pageSize, sort: "demand_date" },
+        { signal },
+      ),
     enabled: Boolean(id),
+    placeholderData: (previous) => previous,
+  });
+}
+
+/** One page of a booking's payments, newest first (the Payments tab pages through all of them). */
+export function useBookingPaymentsPage(
+  id: string | null | undefined,
+  page: number,
+  pageSize: number,
+): UseQueryResult<ListEnvelope<PaymentRow>, ApiClientError> {
+  return useQuery<ListEnvelope<PaymentRow>, ApiClientError, ListEnvelope<PaymentRow>, readonly unknown[]>({
+    queryKey: bookingKeys.paymentsPage(id ?? "", page, pageSize),
+    queryFn: ({ signal }) =>
+      api.list<PaymentRow>(
+        `${BOOKINGS_PATH}/${id}/payments`,
+        { page, page_size: pageSize, sort: "-payment_date" },
+        { signal },
+      ),
+    enabled: Boolean(id),
+    placeholderData: (previous) => previous,
   });
 }
 
@@ -252,8 +327,20 @@ export function saveDraft(body: BookingDraftUpsert): Promise<BookingDraftRow> {
   return api.put<BookingDraftRow>(DRAFTS_PATH, body);
 }
 
-export function deleteDraft(id: string): Promise<void> {
-  return api.delete(`${DRAFTS_PATH}/${id}`);
+/**
+ * `DELETE /booking-drafts/:id` needs the draft's version (If-Match "v<n>", contract C6). When the caller does not know it (a draft
+ * resumed from another device), it is read from my drafts first.
+ */
+export async function deleteDraft(id: string, version?: number | null): Promise<void> {
+  let known = version ?? null;
+  if (known === null) {
+    const mine = await api.get<ListEnvelope<BookingDraftRow> | BookingDraftRow[]>(DRAFTS_PATH);
+    const rows = Array.isArray(mine) ? mine : mine.items;
+    const row = rows.find((draft) => draft.id === id);
+    if (!row) return; // already gone
+    known = row.version;
+  }
+  await api.delete(`${DRAFTS_PATH}/${id}`, { version: known });
 }
 
 /* ------------------------------------------------------------------ */

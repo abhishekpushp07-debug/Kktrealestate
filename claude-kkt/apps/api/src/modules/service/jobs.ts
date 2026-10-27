@@ -1,6 +1,6 @@
 /**
- * Hourly SLA breach check ("sla-breach-check"): open tickets past `sla_due_at` not yet flagged get `sla_breached_at` and the assignee
- * plus Super Admin are notified exactly once. The same sweep delivers "notice.published" for notices whose publish_at has arrived.
+ * Hourly SLA breach check ("sla-breach-check"): open tickets past `sla_due_at` not yet flagged (and not paused AWAITING_CUSTOMER) get
+ * `sla_breached_at` and the assignee plus Super Admin are notified once per SLA window (a reopen clears the flag and starts a new window). The same sweep delivers "notice.published" for notices whose publish_at has arrived.
  */
 import { and, eq, isNull, lt, notInArray, sql } from "drizzle-orm";
 import type { JobName, SlaBreachCheckResult } from "@kkt/contracts";
@@ -26,6 +26,8 @@ export async function slaBreachCheck(
       and(
         notInArray(serviceRequests.status, [...TERMINAL_STATUSES]),
         isNull(serviceRequests.slaBreachedAt),
+        // the clock is paused while the ticket awaits the customer (the deadline moves on when it resumes)
+        isNull(serviceRequests.slaPausedAt),
         lt(serviceRequests.slaDueAt, now),
       ),
     );
@@ -39,6 +41,8 @@ export async function slaBreachCheck(
           and(
             eq(serviceRequests.id, id),
             isNull(serviceRequests.slaBreachedAt),
+            isNull(serviceRequests.slaPausedAt),
+            lt(serviceRequests.slaDueAt, now),
             notInArray(serviceRequests.status, [...TERMINAL_STATUSES]),
           ),
         )
@@ -62,7 +66,11 @@ export async function slaBreachCheck(
         action: "service_request.sla_breach",
         entityType: TICKET_ENTITY,
         entityId: t.id,
-        after: { sla_due_at: base.body, sla_breached_at: now.toISOString(), status: t.status },
+        after: {
+          sla_due_at: t.slaDueAt ? new Date(t.slaDueAt).toISOString() : null,
+          sla_breached_at: now.toISOString(),
+          status: t.status,
+        },
       });
     });
   }

@@ -5,7 +5,18 @@ import { config } from "../config.js";
 import { eventLoopPressure, httpRequestsShed, recordRequest } from "../lib/metrics.js";
 
 /** Probe routes that are never shed (load balancers and scrapers must always reach them). */
-const PROBES = new Set(["/health", "/ready", "/api/v1/health", "/api/v1/ready", "/metrics", "/api/v1/metrics"]);
+const PROBES = new Set([
+  "/health",
+  "/ready",
+  "/health/live",
+  "/health/ready",
+  "/api/v1/health",
+  "/api/v1/ready",
+  "/api/v1/health/live",
+  "/api/v1/health/ready",
+  "/metrics",
+  "/api/v1/metrics",
+]);
 
 /** Event-loop delay sampling window (ms) and histogram resolution (ms). */
 const SAMPLE_MS = 500;
@@ -55,7 +66,7 @@ export interface LoadShedState {
  *   Pressure only lowers the cap — a process never refuses everything — and a window without load ends it, so it cannot latch.
  *   (This replaces @fastify/under-pressure's `maxEventLoopUtilization`, which measured utilisation cumulatively since boot: once a
  *   saturated process crossed 0.98 it answered 503 to every request, probes included, until idle time made up 2 % of its uptime.)
- * - **Never shed:** /health, /ready, /metrics (with and without /api/v1).
+ * - **Never shed:** /health, /health/live, /health/ready, /ready, /metrics (with and without /api/v1).
  * - **Cheap:** the hook runs first of all onRequest hooks (app.ts registers this plugin before helmet, CORS and telemetry) and a shed
  *   request is written straight to the socket (no exception, error handler, serializer, onSend hooks or per-request log line);
  *   `http_requests_total{status="503"}` and `http_requests_shed_total{reason}` count them, and one summary line is logged per 10 s.

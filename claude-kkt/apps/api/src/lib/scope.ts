@@ -42,6 +42,35 @@ export function scopeFilter(
   return inArray(projectIdColumn, user.projectIds);
 }
 
+/**
+ * Project scope of CUSTOMERS (SPEC §1: scoped users must not learn other projects exist). A project-scoped user sees a customer who is
+ * linked to one of their projects — primary applicant or co-applicant on a booking there, the customer of a lead for it, or of a site
+ * visit to it — or whom they created themselves and who is not linked to any project yet (a fresh record on its way to a booking).
+ * `customerId` is the SQL of the customer id being tested (a column of the outer query, or a parameter); undefined for all-project users.
+ * The inner tables are aliased, so an unqualified outer column can never bind to them.
+ */
+export function customerScopeCondition(
+  user: Pick<StaffContext, "id" | "allProjects" | "projectIds">,
+  customerId: SQL = sql.raw(`"customers"."id"`),
+): SQL | undefined {
+  if (user.allProjects) return undefined;
+  const ownUnlinked = sql`exists (select 1 from customers sc where sc.id = ${customerId} and sc.created_by = ${user.id}
+      and not exists (select 1 from bookings xb where xb.customer_id = ${customerId})
+      and not exists (select 1 from booking_co_applicants xbc where xbc.customer_id = ${customerId})
+      and not exists (select 1 from leads xl where xl.customer_id = ${customerId} and xl.project_id is not null)
+      and not exists (select 1 from site_visits xv where xv.customer_id = ${customerId}))`;
+  if (user.projectIds.length === 0) return ownUnlinked;
+  const ids = sql.join(
+    user.projectIds.map((id) => sql`${id}::uuid`),
+    sql`, `,
+  );
+  return sql`(exists (select 1 from bookings sb where sb.project_id in (${ids}) and (sb.customer_id = ${customerId}
+        or exists (select 1 from booking_co_applicants sbc where sbc.booking_id = sb.id and sbc.customer_id = ${customerId})))
+    or exists (select 1 from leads sl where sl.customer_id = ${customerId} and sl.project_id in (${ids}))
+    or exists (select 1 from site_visits sv where sv.customer_id = ${customerId} and sv.project_id in (${ids}))
+    or ${ownUnlinked})`;
+}
+
 /** Throws 404 (never 403) when a scoped user touches a project outside their scope, so other projects stay undiscoverable. */
 export function ensureProjectAccess(
   user: Pick<StaffContext, "allProjects" | "projectIds">,
@@ -68,6 +97,22 @@ export const SUPER_ADMIN_ROLE_NAME = "Super Admin";
 /** True when the caller holds the Super Admin SYSTEM role (a custom role named "Super Admin" does not count). */
 export function isSuperAdmin(user: Pick<StaffContext, "roleName" | "isSystemRole">): boolean {
   return user.roleName === SUPER_ADMIN_ROLE_NAME && user.isSystemRole;
+}
+
+/** Permissions that make a role an administrator for the MFA rule (settings, users, roles, admin tools). */
+export const MFA_ADMIN_PERMISSIONS: readonly Permission[] = [
+  "settings.manage",
+  "users.manage",
+  "roles.manage",
+  "admin.tools",
+];
+
+/**
+ * True when `force_mfa_for_admins` applies to this user: the role holds any of MFA_ADMIN_PERMISSIONS, or it is the Super Admin system
+ * role. Decided by what the role can do, never by its name, so a renamed or custom all-powerful role cannot escape MFA.
+ */
+export function requiresAdminMfa(user: Pick<StaffContext, "permissions" | "roleName" | "isSystemRole">): boolean {
+  return isSuperAdmin(user) || MFA_ADMIN_PERMISSIONS.some((p) => user.permissions.has(p));
 }
 
 /** Reasons carried in `details.reason` of the 403s that stop privilege escalation through user and role management. */

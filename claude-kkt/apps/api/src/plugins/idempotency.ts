@@ -1,13 +1,17 @@
-import fp from "fastify-plugin";
-import type { FastifyReply, FastifyRequest } from "fastify";
-import type { Sql } from "postgres";
 import { createHash } from "node:crypto";
-import { registerJob } from "../jobs/index.js";
+import { sql as dsql } from "drizzle-orm";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import fp from "fastify-plugin";
 import type { Redis } from "ioredis";
+import type { Sql } from "postgres";
+import type { DB } from "@kkt/db";
+import { config } from "../config.js";
+import { registerJob } from "../jobs/index.js";
 import { redisUsable } from "../lib/cache.js";
 import { ApiError } from "../lib/errors.js";
 import { logger } from "../lib/logger.js";
 import { installVersionPolicy } from "../lib/version.js";
+import { requestStore, type IdempotencyClaimState } from "./requestContext.js";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -26,7 +30,10 @@ declare module "fastify" {
 const TTL_SECONDS = 24 * 3600;
 /** How long a concurrent duplicate waits for the in-flight request to finish before giving up with 409. */
 const WAIT_MS = 10_000;
-/** An IN_PROGRESS record older than this is considered abandoned (crashed instance); a retry with the same key and body takes it over. */
+/**
+ * Legacy rule for claims written before leases existed (`lease_expires_at` NULL): such an IN_PROGRESS record older than this is
+ * considered abandoned. Current claims carry a lease renewed by a heartbeat (IDEMPOTENCY_LEASE_SECONDS) instead.
+ */
 export const IDEMPOTENCY_ABANDON_SECONDS = 60;
 /** Budget of one Redis round trip on the idempotency fast path (Redis is only a cache; Postgres decides). */
 const REDIS_BUDGET_MS = 200;
@@ -79,6 +86,8 @@ interface Row {
   status_code: number | null;
   response_body: unknown;
   path: string;
+  committed_at: Date | string | null;
+  lease_lapsed: boolean;
 }
 
 /**
@@ -144,15 +153,49 @@ export async function purgeExpiredIdempotencyKeys(
   return { deleted, batches };
 }
 
+/** Marker key of a stored outcome that is NOT a response: the write committed but its answer was lost (a 5xx after COMMIT). */
+export const OUTCOME_UNKNOWN_MARKER = "__kkt_outcome_unknown";
+
+/** Lease of an IN_PROGRESS claim in seconds (IDEMPOTENCY_LEASE_SECONDS); the running request renews it every third of it. */
+export function idempotencyLeaseSeconds(): number {
+  return config.IDEMPOTENCY_LEASE_SECONDS;
+}
+
+function isOutcomeUnknown(
+  body: unknown,
+): body is { [OUTCOME_UNKNOWN_MARKER]: true; original_status: number; request_id: string | null } {
+  return (
+    typeof body === "object" && body !== null && (body as Record<string, unknown>)[OUTCOME_UNKNOWN_MARKER] === true
+  );
+}
+
+/** 409 IDEMPOTENT_OUTCOME_UNKNOWN: the first attempt committed, its response was lost; look the resource up instead of re-sending. */
+function outcomeUnknown(details: Record<string, unknown>): ApiError {
+  return new ApiError(
+    409,
+    "IDEMPOTENT_OUTCOME_UNKNOWN",
+    "A request with this Idempotency-Key already committed its changes, but its response was lost. Do not retry with a new key: look the resource up (list or GET) to see what was created or changed.",
+    { ...details, retry_with_new_key: false, action: "LOOKUP_RESOURCE" },
+  );
+}
+
+/** Statements that write (a write outside a transaction commits on its own and can no longer be released for a retry). */
+const WRITE_SQL = /^\s*(with\b[\s\S]*?\)\s*)?(insert|update|delete|merge)\b/i;
+
 /**
  * Idempotency for creates. Routes opt in with `config.idempotent: true | "required"`. Scope = authenticated subject id (or client IP for
  * public routes) + key. Postgres is the source of truth and Redis only a cache:
- *  - preHandler claims the key with an IN_PROGRESS row (`status_code IS NULL`, insert … on conflict), so concurrent duplicates on any
- *    instance wait for the winner and replay its response, with or without Redis;
- *  - onSend stores a 2xx response in the same row (and in Redis); a non-2xx response releases the claim so the client may retry;
- *  - a claim still IN_PROGRESS after IDEMPOTENCY_ABANDON_SECONDS is abandoned (the instance died between COMMIT and storing): a retry
- *    with the same body takes it over and runs again — resource-level uniqueness (e.g. `payments` unique idempotency key) makes that
- *    retry return the original resource instead of a duplicate.
+ *  - preHandler claims the key with an IN_PROGRESS row (`status_code IS NULL`, insert … on conflict) holding a lease
+ *    (`lease_expires_at`, IDEMPOTENCY_LEASE_SECONDS) that a heartbeat renews while the request runs; concurrent duplicates on any instance
+ *    wait for it and replay its response, with or without Redis;
+ *  - every transaction the handler opens through `app.db.transaction` (directly, withTransactionRetry or moneyTransaction) marks the
+ *    claim `committed_at` as its last statement, so the mark commits exactly when the write does (the request's AsyncLocalStorage
+ *    store, plugins/requestContext.ts, tells the transaction which claim is running);
+ *  - onSend stores a 2xx response in the row (and in Redis). A non-2xx response releases the claim only when nothing committed
+ *    (`committed_at IS NULL`, checked in the same DELETE, and no autocommit write ran); after a commit a 4xx is stored and replayed like a
+ *    success, and a 5xx is stored as "outcome unknown": a retry with the key answers 409 IDEMPOTENT_OUTCOME_UNKNOWN;
+ *  - a claim whose lease lapsed (its instance died) is taken over by a retry with the same body only when it never committed; a committed
+ *    claim without a stored response answers 409 IDEMPOTENT_OUTCOME_UNKNOWN.
  * Replays carry `Idempotent-Replayed: true`; the same key with a different body is 422 IDEMPOTENCY_MISMATCH.
  */
 export default fp(
@@ -160,31 +203,41 @@ export default fp(
     const sql = app.sql as Sql;
     installVersionPolicy(app);
     registerJob("IDEMPOTENCY_PURGE", async () => purgeExpiredIdempotencyKeys(sql));
+    installCommitMarker(app);
 
     async function cachedResponse(redisKey: string): Promise<StoredResponse | null> {
       const raw = await redisTry("get", () => app.redis.get(redisKey), app.redis);
       return raw ? (JSON.parse(raw) as StoredResponse) : null;
     }
 
-    /** Claims the key: inserts the IN_PROGRESS row, or takes over an expired one or an abandoned one with the same request hash. */
-    async function claim(scopeKey: string, key: string, req: FastifyRequest, hash: string): Promise<boolean> {
-      const rows = await sql`
-      insert into idempotency_keys (scope_key, key, method, path, request_hash, status_code, response_body, expires_at)
-      values (${scopeKey}, ${key}, ${req.method}, ${req.url}, ${hash}, null, null, now() + make_interval(secs => ${TTL_SECONDS}))
+    /**
+     * Claims the key: inserts the IN_PROGRESS row, or takes over an expired one, or one with the same request hash whose lease lapsed and
+     * that never committed (rows written before leases existed fall back to the old 60 s age rule).
+     */
+    async function claim(scopeKey: string, key: string, req: FastifyRequest, hash: string): Promise<string | null> {
+      const lease = idempotencyLeaseSeconds();
+      const rows = await sql<{ id: string }[]>`
+      insert into idempotency_keys (scope_key, key, method, path, request_hash, status_code, response_body, expires_at, lease_expires_at)
+      values (${scopeKey}, ${key}, ${req.method}, ${req.url}, ${hash}, null, null, now() + make_interval(secs => ${TTL_SECONDS}),
+              now() + make_interval(secs => ${lease}))
       on conflict (scope_key, key) do update
         set method = excluded.method, path = excluded.path, request_hash = excluded.request_hash, status_code = null, response_body = null,
-            created_at = now(), expires_at = excluded.expires_at
+            created_at = now(), expires_at = excluded.expires_at, lease_expires_at = excluded.lease_expires_at, committed_at = null
         where idempotency_keys.expires_at <= now()
-           or (idempotency_keys.status_code is null and idempotency_keys.request_hash = excluded.request_hash
-               and idempotency_keys.created_at < now() - make_interval(secs => ${IDEMPOTENCY_ABANDON_SECONDS}))
+           or (idempotency_keys.status_code is null and idempotency_keys.committed_at is null
+               and idempotency_keys.request_hash = excluded.request_hash
+               and (idempotency_keys.lease_expires_at < now()
+                    or (idempotency_keys.lease_expires_at is null
+                        and idempotency_keys.created_at < now() - make_interval(secs => ${IDEMPOTENCY_ABANDON_SECONDS}))))
       returning id`;
-      return rows.length === 1;
+      return rows[0]?.id ?? null;
     }
 
     async function current(scopeKey: string, key: string): Promise<Row | null> {
-      const rows = await sql<
-        Row[]
-      >`select request_hash, status_code, response_body, path from idempotency_keys where scope_key = ${scopeKey} and key = ${key} and expires_at > now()`;
+      const rows = await sql<Row[]>`
+        select request_hash, status_code, response_body, path, committed_at,
+               (lease_expires_at is not null and lease_expires_at < now()) as lease_lapsed
+        from idempotency_keys where scope_key = ${scopeKey} and key = ${key} and expires_at > now()`;
       return rows[0] ?? null;
     }
 
@@ -192,6 +245,13 @@ export default fp(
       if (stored.request_hash !== hash)
         throw new ApiError(422, "IDEMPOTENCY_MISMATCH", "Idempotency-Key was already used with a different request");
       reply.header("Idempotent-Replayed", "true");
+      if (isOutcomeUnknown(stored.response_body)) {
+        throw outcomeUnknown({
+          original_status: stored.response_body.original_status,
+          original_request_id: stored.response_body.request_id,
+          path: stored.path,
+        });
+      }
       if (isRedactedRecord(stored.response_body)) {
         // the original response carried a one-time secret that is never stored: the request DID succeed, but its secret cannot be shown again
         throw new ApiError(
@@ -206,6 +266,27 @@ export default fp(
         );
       }
       return reply.status(stored.status_code).send(stored.response_body);
+    }
+
+    /** Renews the claim's lease every third of the lease while the request runs (stops on its own after the record's TTL). */
+    function startHeartbeat(id: string): NodeJS.Timeout {
+      const lease = idempotencyLeaseSeconds();
+      const started = Date.now();
+      const timer = setInterval(
+        () => {
+          if (Date.now() - started > TTL_SECONDS * 1000) {
+            clearInterval(timer);
+            return;
+          }
+          sql`update idempotency_keys set lease_expires_at = now() + make_interval(secs => ${lease})
+              where id = ${id} and status_code is null`.catch((err: unknown) =>
+            logger.warn({ err: (err as Error).message }, "idempotency: lease renewal failed"),
+          );
+        },
+        Math.max(250, Math.floor((lease * 1000) / 3)),
+      );
+      timer.unref();
+      return timer;
     }
 
     app.addHook("preHandler", async (req: FastifyRequest, reply: FastifyReply) => {
@@ -227,8 +308,12 @@ export default fp(
       const deadline = Date.now() + WAIT_MS;
       let pause = 25;
       for (;;) {
-        if (await claim(scopeKey, keyStr, req, hash)) {
-          req.idempotency = { scopeKey, key: keyStr, hash, redisKey };
+        const id = await claim(scopeKey, keyStr, req, hash);
+        if (id) {
+          const state: IdempotencyClaimState = { id, committed: false, autocommitWrite: false };
+          req.idempotency = { scopeKey, key: keyStr, hash, redisKey, id, state, heartbeat: startHeartbeat(id) };
+          const store = requestStore();
+          if (store) store.idempotency = state;
           return;
         }
         const row = await current(scopeKey, keyStr);
@@ -245,6 +330,13 @@ export default fp(
             },
             hash,
           );
+        // committed, but the instance died before it stored the response (its lease lapsed): never run it again
+        if (row && row.committed_at !== null && row.lease_lapsed)
+          throw outcomeUnknown({
+            original_status: null,
+            committed_at: new Date(row.committed_at).toISOString(),
+            path: row.path,
+          });
         // IN_PROGRESS on this or another instance (or released a moment ago): wait and look again
         if (Date.now() > deadline)
           throw new ApiError(409, "IDEMPOTENCY_IN_PROGRESS", "An identical request is already being processed");
@@ -255,48 +347,160 @@ export default fp(
       }
     });
 
+    /** Stops the lease heartbeat and detaches the claim from the request's async context. */
+    function release(req: FastifyRequest): void {
+      const ctx = req.idempotency;
+      if (!ctx) return;
+      clearInterval(ctx.heartbeat);
+      const store = requestStore();
+      if (store?.idempotency === ctx.state) store.idempotency = undefined;
+    }
+
     app.addHook("onSend", async (req, reply, payload) => {
       const ctx = req.idempotency;
       if (!ctx) return payload;
+      release(req);
       req.idempotency = undefined;
       try {
-        if (reply.statusCode >= 200 && reply.statusCode < 300) {
+        const status = reply.statusCode;
+        if (status >= 200 && status < 300) {
           const parsed: unknown = typeof payload === "string" && payload.length > 0 ? JSON.parse(payload) : null;
           // one-time secrets (temporary passwords, bearer links) never reach the store: neither the row nor the Redis copy
           const secrets = req.routeOptions.config.oneTimeSecrets;
           const redacted = secrets?.length ? redactOneTimeSecrets(parsed, secrets) : null;
           // a response that carried no secret this time (e.g. POST /users with an explicit password) is stored and replayed normally
           const body: unknown = redacted && redacted[SECRET_REDACTED_MARKER].length > 0 ? redacted : parsed;
-          await sql`update idempotency_keys set status_code = ${reply.statusCode}, response_body = ${JSON.stringify(body)}::jsonb, path = ${req.url}
-                  where scope_key = ${ctx.scopeKey} and key = ${ctx.key} and request_hash = ${ctx.hash}`;
-          const record: StoredResponse = {
-            request_hash: ctx.hash,
-            status_code: reply.statusCode,
-            response_body: body,
-            path: req.url,
-          };
-          await redisTry(
-            "set",
-            () => app.redis.set(ctx.redisKey, JSON.stringify(record), "EX", TTL_SECONDS),
-            app.redis,
+          await storeOutcome(ctx, req, status, body, true);
+          return payload;
+        }
+        if (!ctx.state.autocommitWrite) {
+          // nothing committed (checked in the same statement): release the claim so the client may retry with the same key
+          const released = await sql`delete from idempotency_keys
+            where id = ${ctx.id} and status_code is null and committed_at is null returning 1`;
+          if (released.length > 0) return payload;
+        }
+        // the write committed but this response is an error: never release the key for a re-run
+        if (status >= 500) {
+          await storeOutcome(
+            ctx,
+            req,
+            status,
+            { [OUTCOME_UNKNOWN_MARKER]: true, original_status: status, request_id: String(req.id) },
+            false,
           );
         } else {
-          // only successes are remembered: release the claim so the client may retry with the same key
-          await sql`delete from idempotency_keys where scope_key = ${ctx.scopeKey} and key = ${ctx.key} and status_code is null`;
+          const parsed: unknown = typeof payload === "string" && payload.length > 0 ? safeJson(payload) : null;
+          await storeOutcome(ctx, req, status, parsed, true);
         }
+        req.log.warn(
+          { status, idempotency_key: ctx.key, outcome: status >= 500 ? "unknown" : "stored" },
+          "idempotency: error response after the request committed; the key is kept",
+        );
       } catch (err) {
-        // the claim stays IN_PROGRESS and is taken over after IDEMPOTENCY_ABANDON_SECONDS; resource-level keys prevent duplicates
+        // the claim stays IN_PROGRESS; when it committed a retry answers IDEMPOTENT_OUTCOME_UNKNOWN once its lease lapses
         req.log.error({ err }, "idempotency: failed to store the response");
       }
       return payload;
     });
+
+    // belt and braces: whatever path the response took, the heartbeat stops with it (a client abort does not stop it: the handler may
+    // still be running, and its lease must stay alive until it finishes)
+    app.addHook("onResponse", async (req) => release(req));
+
+    async function storeOutcome(
+      ctx: NonNullable<FastifyRequest["idempotency"]>,
+      req: FastifyRequest,
+      status: number,
+      body: unknown,
+      cache: boolean,
+    ): Promise<void> {
+      await sql`update idempotency_keys set status_code = ${status}, response_body = ${JSON.stringify(body)}::jsonb, path = ${req.url},
+                  lease_expires_at = null
+                where id = ${ctx.id} and request_hash = ${ctx.hash}`;
+      if (!cache) return;
+      const record: StoredResponse = {
+        request_hash: ctx.hash,
+        status_code: status,
+        response_body: body,
+        path: req.url,
+      };
+      await redisTry("set", () => app.redis.set(ctx.redisKey, JSON.stringify(record), "EX", TTL_SECONDS), app.redis);
+    }
   },
-  { name: "idempotency", dependencies: ["redis", "db"] },
+  { name: "idempotency", dependencies: ["redis", "db", "request-context"] },
 );
+
+function safeJson(text: string): unknown {
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return { raw: text.slice(0, 2000) };
+  }
+}
+
+/**
+ * Commit marker (audit F3): wraps `app.db.transaction` so that, while the running request holds an idempotency claim, the transaction's
+ * last statement sets `committed_at` on the claim — it commits (or rolls back) together with the handler's own writes. A write statement
+ * outside any transaction (autocommit) flags the claim too, since it cannot be undone either. Requests without a claim, jobs and tests
+ * pay one AsyncLocalStorage lookup per transaction.
+ */
+export function installCommitMarker(app: FastifyInstance): void {
+  try {
+    wrapTransactions(app);
+  } catch {
+    // an offline app (OpenAPI generation) has stub handles that throw on use: nothing to mark there
+  }
+}
+
+function wrapTransactions(app: FastifyInstance): void {
+  const db = app.db as unknown as { transaction?: unknown };
+  if (typeof db.transaction !== "function" || MARKED.has(db)) return;
+  MARKED.add(db);
+  const original = (db.transaction as DB["transaction"]).bind(app.db);
+  const wrapped: DB["transaction"] = (fn, txConfig) => {
+    const claim = requestStore()?.idempotency;
+    if (!claim) return original(fn, txConfig);
+    return original(async (tx) => {
+      const result = await fn(tx);
+      await tx.execute(
+        dsql`update idempotency_keys set committed_at = coalesce(committed_at, now()) where id = ${claim.id}`,
+      );
+      return result;
+    }, txConfig).then((result) => {
+      claim.committed = true;
+      return result;
+    });
+  };
+  (db as { transaction: DB["transaction"] }).transaction = wrapped;
+  // autocommit writes: drizzle runs every pooled (non-transaction) statement through `sql.unsafe`
+  const client = app.sql as unknown as { unsafe?: (...a: unknown[]) => unknown };
+  if (typeof client.unsafe !== "function") return;
+  const unsafe = client.unsafe.bind(app.sql) as (...a: unknown[]) => unknown;
+  client.unsafe = (...args: unknown[]) => {
+    const claim = requestStore()?.idempotency;
+    if (claim && !claim.autocommitWrite && typeof args[0] === "string" && WRITE_SQL.test(args[0]))
+      claim.autocommitWrite = true;
+    return unsafe(...args);
+  };
+}
+
+const MARKED = new WeakSet<object>();
 
 declare module "fastify" {
   interface FastifyRequest {
-    idempotency?: { scopeKey: string; key: string; hash: string; redisKey: string } | undefined;
+    idempotency?:
+      | {
+          scopeKey: string;
+          key: string;
+          hash: string;
+          redisKey: string;
+          /** idempotency_keys.id of the claim. */
+          id: string;
+          /** Shared with the request's async store (commit marker). */
+          state: IdempotencyClaimState;
+          heartbeat: NodeJS.Timeout;
+        }
+      | undefined;
     subjectId?: string;
     clientIp: string;
   }

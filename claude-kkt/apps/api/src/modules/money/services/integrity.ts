@@ -16,6 +16,7 @@ import { evaluateDues, normalizeLabel, triggerDate, type TowerStage } from "@kkt
 import { writeAudit } from "../../../lib/audit.js";
 import { notifyRole } from "../../notifications/index.js";
 import {
+  Clock,
   INTEGRITY_ROLES,
   loadCompanyRow,
   lockBooking,
@@ -101,6 +102,7 @@ async function checkBooking(
   nonVoid: readonly DemandRecord[],
   today: string,
   defaultDueDays: number,
+  opts: { ledger?: boolean } = {},
 ): Promise<BookingFindings> {
   const out: BookingFindings = { booking: b, findings: [], voidable: [], missing: 0, summaryMismatch: false };
   const installments = snapshotInstallments(b.planSnapshot);
@@ -208,6 +210,8 @@ async function checkBooking(
     }
   }
   // (e) stored figures AND the stored ledger row by row (order, amounts, running balances) against a rebuild in canonical order
+  // (skipped by repair's re-check under the lock: the repair rebuilds the ledger anyway)
+  if (opts.ledger === false) return out;
   const rb = await rebuild(db, b.id);
   if (rb.mismatches.length > 0 || rb.rowMismatches.length > 0) {
     out.summaryMismatch = true;
@@ -337,31 +341,52 @@ export async function repair(
   let rebuilt = 0;
   let summariesFixed = 0;
   const skipped: string[] = [];
+  const keptSatisfied: string[] = [];
+  const company = await loadCompanyRow(db, scope.companyId);
   for (const p of targets) {
     // counted per committed transaction (the unit of work may be retried on 40001 / 40P01)
     const r = await moneyTransaction(db, async (tx) => {
-      const c = { voided: 0, raised: 0, summaryFixed: false, skipped: [] as string[] };
-      // lock order (money/common.ts): the booking first, then its demand rows. The report above ran without locks, so the voidable
-      // demands are re-read under the booking lock: a payment applied since the report must never be voided away.
-      await lockBooking(tx, p.booking.id);
-      const ids = p.voidable.map((d) => d.id);
-      const current = ids.length
-        ? await tx
-            .select()
-            .from(demands)
-            .where(and(inArray(demands.id, ids), ne(demands.status, "VOID")))
-            .orderBy(asc(demands.postedAt), asc(demands.installmentSeq))
-        : [];
-      for (const d of current) {
-        const ok = await voidDemand(tx, d, "Integrity repair: demand not justified by the plan/stages", actor);
+      const c = { voided: 0, raised: 0, summaryFixed: false, skipped: [] as string[], kept: [] as string[] };
+      // lock order (money/common.ts): the booking first, then its demand rows. The report above ran without locks, so the booking is
+      // CHECKED AGAIN under its lock — booking row, tower stages and demands re-read — and a demand is voided only when the admin confirmed
+      // it (it was in the report) AND it is still unjustified now: a stage completed since the report justifies its demand again, and a
+      // payment applied since the report must never be voided away.
+      const clock = new Clock();
+      await lockBooking(tx, p.booking.id, clock);
+      const [fresh] = await tx
+        .select()
+        .from(bookings)
+        .where(and(eq(bookings.id, p.booking.id), inArray(bookings.status, ["ACTIVE", "COMPLETED"])))
+        .limit(1);
+      if (!fresh) return c; // cancelled since the report: its ledger is closed and left alone
+      const [stages, nonVoid] = await Promise.all([
+        loadTowerStages(tx, fresh.blockId),
+        tx
+          .select()
+          .from(demands)
+          .where(and(eq(demands.bookingId, fresh.id), ne(demands.status, "VOID")))
+          .orderBy(asc(demands.postedAt), asc(demands.installmentSeq)),
+      ]);
+      const now = await checkBooking(tx, fresh, stages, nonVoid, todayDate(), company.settings.demand_due_days, {
+        ledger: false,
+      });
+      const confirmed = new Set(p.voidable.map((d) => d.id));
+      const stillVoidable = new Set(now.voidable.map((d) => d.id));
+      for (const d of nonVoid) {
+        if (!confirmed.has(d.id)) continue;
+        if (!stillVoidable.has(d.id)) {
+          c.kept.push(d.demandNumber);
+          continue;
+        }
+        const ok = await voidDemand(tx, d, "Integrity repair: demand not justified by the plan/stages", actor, {
+          clock,
+        });
         if (ok) c.voided += 1;
         else c.skipped.push(d.demandNumber);
       }
-      if (p.missing > 0 && p.booking.status === "ACTIVE") {
-        const [fresh] = await tx.select().from(bookings).where(eq(bookings.id, p.booking.id)).limit(1);
-        if (fresh) c.raised += (await raiseDues(tx, fresh, { actor })).raised.length;
-      }
-      const rb = await rebuild(tx, p.booking.id, { write: true });
+      if (now.missing > 0 && fresh.status === "ACTIVE")
+        c.raised += (await raiseDues(tx, fresh, { actor, clock, company, towerStages: stages })).raised.length;
+      const rb = await rebuild(tx, p.booking.id, { write: true, reason: "INTEGRITY_REPAIR", actor });
       c.summaryFixed = p.summaryMismatch || rb.mismatches.length > 0 || rb.rowMismatches.length > 0;
       await recomputeDemandStatuses(tx, p.booking.id);
       await writeAudit(tx, {
@@ -374,7 +399,8 @@ export async function repair(
           findings: p.findings.map((f) => f.type),
           voided: c.voided,
           skipped_with_payments: c.skipped,
-          missing_raised: p.missing,
+          kept_now_satisfied: c.kept,
+          missing_raised: c.raised,
         },
         ip: actor.ip ?? null,
         requestId: actor.requestId ?? null,
@@ -386,6 +412,7 @@ export async function repair(
     rebuilt += 1;
     if (r.summaryFixed) summariesFixed += 1;
     skipped.push(...r.skipped);
+    keptSatisfied.push(...r.kept);
   }
   const after = await runReport(db, scope, { triggeredBy: actor.id ?? null });
   return {
@@ -394,6 +421,7 @@ export async function repair(
     ledgers_rebuilt: rebuilt,
     summaries_fixed: summariesFixed,
     skipped_with_payments: [...new Set(skipped)],
+    kept_now_satisfied: [...new Set(keptSatisfied)],
     report_after: after.report,
   };
 }

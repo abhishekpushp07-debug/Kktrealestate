@@ -2,17 +2,15 @@
  * Formatting helpers: Indian rupee grouping, short forms (₹1.2 Cr / ₹45 L), dates in IST.
  */
 
+import { formatInr, formatInrShort } from "@kkt/contracts/moneyFormat";
+
 const IST = "Asia/Kolkata";
-const CRORE = 1_00_00_000;
-const LAKH = 1_00_000;
 
-const inrFull = new Intl.NumberFormat("en-IN", {
-  style: "currency",
-  currency: "INR",
-  maximumFractionDigits: 0,
-});
-
-const inrNumber = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
+/*
+ * Money delegates to @kkt/contracts/moneyFormat (a zod-free subpath, so client bundles do not pull the schemas): the one INR
+ * formatter the website, the ERP and the portal share. BigInt arithmetic, SPEC short forms Cr / L only, "round first, then
+ * promote": ₹99,96,000 is "₹1 Cr", never "₹100 L".
+ */
 
 function trimZero(n: number, digits: number): string {
   return n
@@ -21,21 +19,16 @@ function trimZero(n: number, digits: number): string {
     .replace(/(\.\d*?)0+$/, "$1");
 }
 
-/** Full Indian grouping: 100000000 paise → ₹10,00,000 */
+/** Full Indian grouping, rounded to rupees: 100000000 paise → ₹10,00,000 */
 export function formatINR(paise: number | null | undefined): string {
   if (paise === null || paise === undefined || !Number.isFinite(paise)) return "—";
-  return inrFull.format(Math.round(paise / 100));
+  return formatInr(paise, { paise: "never" });
 }
 
 /** Short form: ₹1.2 Cr · ₹45 L · ₹12,500 */
 export function formatINRShort(paise: number | null | undefined): string {
   if (paise === null || paise === undefined || !Number.isFinite(paise)) return "—";
-  const rupees = Math.round(paise / 100);
-  const abs = Math.abs(rupees);
-  const sign = rupees < 0 ? "-" : "";
-  if (abs >= CRORE) return `${sign}₹${trimZero(abs / CRORE, 2)} Cr`;
-  if (abs >= LAKH) return `${sign}₹${trimZero(abs / LAKH, 1)} L`;
-  return `${sign}₹${inrNumber.format(abs)}`;
+  return formatInrShort(paise);
 }
 
 /** "Starting ₹1.2 Cr*" style label, or null when prices are hidden. */

@@ -43,14 +43,49 @@ export function siteUrl(): string {
   return stripTrailingSlash(readEnv("NEXT_PUBLIC_SITE_URL") ?? DEFAULTS.siteUrl);
 }
 
+/**
+ * Shared secret the API expects in `x-kkt-internal-token` (its INTERNAL_API_TOKEN, contract C3): with it the API rate-limits server-side
+ * renders per visitor (`x-kkt-client-ip`) instead of per web server. Server only — never shipped to the browser.
+ */
+export function internalApiToken(): string | undefined {
+  return readEnv("INTERNAL_API_TOKEN");
+}
+
+/** The builder this website serves on a multi-company API (contract C4: sent as `x-kkt-company`); unset = the API's only company. */
+export function companySlug(): string | undefined {
+  const slug = readEnv("KKT_COMPANY_SLUG")?.toLowerCase();
+  return slug && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug) ? slug : undefined;
+}
+
+/** Secret the API sends to POST /api/revalidate (`x-kkt-revalidate-token`; the API's WEB_REVALIDATE_TOKEN). Server only. */
+export function revalidateToken(): string | undefined {
+  return readEnv("WEB_REVALIDATE_TOKEN");
+}
+
+/** Build / release identifier attached to client error reports (contract C2). */
+export function releaseId(): string | undefined {
+  return readEnv("GIT_SHA") ?? readEnv("NEXT_PUBLIC_RELEASE");
+}
+
 /** Values safe to ship to the browser. */
 export interface SiteConfig {
   apiUrl: string;
   portalUrl: string;
   erpUrl: string;
   siteUrl: string;
+  /** `x-kkt-company` for browser calls (null on single-company installs). */
+  companySlug: string | null;
+  /** Release reported with client errors (null when unknown). */
+  release: string | null;
 }
 
 export function siteConfig(): SiteConfig {
-  return { apiUrl: publicApiUrl(), portalUrl: portalUrl(), erpUrl: erpUrl(), siteUrl: siteUrl() };
+  return {
+    apiUrl: publicApiUrl(),
+    portalUrl: portalUrl(),
+    erpUrl: erpUrl(),
+    siteUrl: siteUrl(),
+    companySlug: companySlug() ?? null,
+    release: releaseId() ?? null,
+  };
 }

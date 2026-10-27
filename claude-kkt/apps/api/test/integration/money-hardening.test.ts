@@ -352,6 +352,8 @@ describe("2. canonical ledger order (posting order) and row-level integrity (e)"
   it("finding (e) compares the stored ledger row by row: two swapped rows with identical aggregates are flagged and repaired", async () => {
     const before = await ledgerOf(g1.id);
     await t.app.sql.begin(async (tx) => {
+      // manufacture the corruption below the append-only guard (src/sql/0006_money_guards.sql): test-only, as the superuser
+      await tx`set local session_replication_role = replica`;
       await tx`update ledger_entries set seq = -2 where booking_id = ${g1.id} and seq = 2`;
       await tx`update ledger_entries set seq = 2 where booking_id = ${g1.id} and seq = 3`;
       await tx`update ledger_entries set seq = 3 where booking_id = ${g1.id} and seq = -2`;
@@ -368,9 +370,13 @@ describe("2. canonical ledger order (posting order) and row-level integrity (e)"
     );
     expect(repaired.status, repaired.text).toBe(200);
     expect(repaired.body.report_after.findings.filter((x) => x.booking_id === g1.id)).toEqual([]);
+    // the repair restated the book as a new epoch (contract C7): the current epoch is the canonical ledger again
     expect((await ledgerOf(g1.id)).map((r) => [r.seq, r.event, r.ref_id])).toEqual(
       before.map((r) => [r.seq, r.event, r.ref_id]),
     );
+    const rebuilds = await t.app.sql<{ reason: string; from_epoch: number; to_epoch: number }[]>`
+      select reason, from_epoch, to_epoch from ledger_rebuilds where booking_id = ${g1.id}`;
+    expect(rebuilds).toEqual([{ reason: "INTEGRITY_REPAIR", from_epoch: 1, to_epoch: 2 }]);
   });
 });
 

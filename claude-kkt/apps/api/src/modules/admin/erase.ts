@@ -1,11 +1,18 @@
 /**
- * Right to erasure (SPEC §2): anonymises a customer's PII once they have no ACTIVE booking (as primary or co-applicant), keeping every
- * financial row (bookings, demands, payments, ledger) intact and never touching audit history. Co-applicants are anonymised, the portal
- * login is disabled with its sessions revoked, customer documents are soft-deleted and removed from storage, and every other copy of the
- * PII goes too: leads (linked or sharing the phone), site visits, website enquiries with the phone, portal login events (identifier) and
- * testimonials (unpublished). This is the ONLY erasure implementation: POST /customers/:id/erase (crm) delegates here.
+ * Right to erasure (SPEC §2, DPDP): anonymises a customer's PII once they have no ACTIVE booking (as primary or co-applicant), keeping
+ * every financial row (bookings, demands, payments, ledger) intact. Co-applicants are anonymised, the portal login is disabled with its
+ * sessions revoked, customer documents are soft-deleted, and every other copy of the PII goes too: leads (linked or sharing the phone),
+ * site visits, website enquiries with the phone, portal login events (identifier), testimonials (unpublished), booking-wizard drafts that
+ * name the customer, the customer's notifications (withdrawn) and staff notifications about them (scrubbed), the text of their service
+ * requests (subject, description, rating comment, their own messages; staff messages are scrubbed of the name/phone/e-mail), and export
+ * files made before the erasure (withdrawn). Every storage object involved (documents and renditions, ticket attachments, export files) is
+ * queued in `storage_deletions` inside the same transaction, so a failed delete is retried by STORAGE_SWEEP instead of being forgotten.
+ *
+ * Audit history is immutable (DB trigger + revoked privileges): rows written before the erasure keep what they recorded (new rows mask
+ * PII, lib/audit.ts). One `customer.erased` row records counts and the reason, never the PII. This is the ONLY erasure implementation:
+ * POST /admin/customers/:id/erase is canonical; POST /customers/:id/erase (crm) is a deprecated alias that delegates here.
  */
-import { and, eq, exists, inArray, or, sql } from "drizzle-orm";
+import { and, eq, exists, inArray, isNotNull, isNull, like, lt, or, sql, type SQL } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import {
   AdminCustomerEraseRequestSchema,
@@ -15,6 +22,7 @@ import {
 } from "@kkt/contracts";
 import {
   bookingCoApplicants,
+  bookingDrafts,
   bookings,
   cmsTestimonials,
   coApplicants,
@@ -22,21 +30,26 @@ import {
   demands,
   documents,
   enquiries,
+  exports as exportsTable,
   leads,
   ledgerEntries,
   loginEvents,
+  notifications,
   payments,
   portalUsers,
+  serviceRequestMessages,
+  serviceRequests,
   siteVisits,
+  storageDeletions,
   type Executor,
 } from "@kkt/db";
 import { z } from "zod";
 import { writeAudit } from "../../lib/audit.js";
-import { bumpPermVersion } from "../../lib/cache.js";
-import { randomToken } from "../../lib/crypto.js";
+import { bumpAuthVersions } from "../../lib/cache.js";
+import { decryptField, randomToken } from "../../lib/crypto.js";
 import { ApiError } from "../../lib/errors.js";
 import { hashPassword } from "../../lib/password.js";
-import { route } from "../../lib/routes.js";
+import { route, type Deprecation } from "../../lib/routes.js";
 import { createStorage, type Storage } from "../../lib/storage.js";
 import { revokeAllFamilies } from "../auth/index.js";
 import { adminMeta, requireSuperAdmin, staff, type AdminMeta } from "./common.js";
@@ -200,15 +213,29 @@ export async function eraseCustomer(app: FastifyInstance, input: EraseInput): Pr
       portalDisabled = true;
     }
 
+    // The customer's service requests (their text is scrubbed below; their attachments go with the customer's documents).
+    const tickets = await tx
+      .select({ id: serviceRequests.id })
+      .from(serviceRequests)
+      .where(and(eq(serviceRequests.companyId, companyId), eq(serviceRequests.customerId, customerId)));
+    const ticketIds = tickets.map((t) => t.id);
     const docs = await tx
       .select({ id: documents.id, storageKey: documents.storageKey, variants: documents.variants })
       .from(documents)
       .where(
         and(
           eq(documents.companyId, companyId),
-          eq(documents.entityType, "CUSTOMER"),
-          eq(documents.entityId, customerId),
           eq(documents.isDeleted, false),
+          or(
+            and(eq(documents.entityType, "CUSTOMER"), eq(documents.entityId, customerId)),
+            ticketIds.length > 0
+              ? and(
+                  eq(documents.entityType, "SERVICE_REQUEST"),
+                  inArray(documents.entityId, ticketIds),
+                  eq(documents.uploadedByType, "CUSTOMER"),
+                )
+              : undefined,
+          ),
         ),
       );
     if (docs.length > 0)
@@ -251,6 +278,22 @@ export async function eraseCustomer(app: FastifyInstance, input: EraseInput): Pr
       .set({ identifier: phone })
       .where(and(eq(loginEvents.subjectType, "CUSTOMER"), inArray(loginEvents.identifier, phones)))
       .returning({ id: loginEvents.id });
+    // Identifiers as they may appear in free text and drafts: the old name, phones, e-mail and the plaintext PAN/Aadhaar (decrypted here,
+    // in-process, from the values being erased; never stored or logged).
+    const plainIds = [safeDecrypt(c.panEnc), safeDecrypt(c.aadhaarEnc)].filter(
+      (v): v is string => typeof v === "string" && v.length >= 4,
+    );
+    const textIds = [c.fullName, ...phones, ...(c.email ? [c.email] : [])].filter((v) => v.trim().length >= 3);
+    const draftRows = await scrubDrafts(tx, companyId, [
+      customerId,
+      ...phones,
+      ...plainIds,
+      ...(c.email ? [c.email] : []),
+    ]);
+    const notificationRows = await scrubNotifications(tx, companyId, customerId, textIds, name);
+    const ticketRows = await scrubTickets(tx, ticketIds, textIds, name);
+    const exportRows = await withdrawExports(tx, companyId, now);
+
     const testimonialRows = await tx
       .update(cmsTestimonials)
       .set({
@@ -262,6 +305,20 @@ export async function eraseCustomer(app: FastifyInstance, input: EraseInput): Pr
       })
       .where(and(eq(cmsTestimonials.companyId, companyId), eq(cmsTestimonials.customerId, customerId)))
       .returning({ id: cmsTestimonials.id });
+
+    // Every storage object of the erasure is queued in the same transaction (contract with the platform track's STORAGE_SWEEP): an object
+    // whose delete fails right after commit is retried by the sweep instead of being forgotten.
+    const keys = [
+      ...docs.flatMap((d) => [d.storageKey, d.variants?.thumb_key, d.variants?.medium_key]),
+      ...exportRows.map((e) => e.storageKey),
+    ].filter((k): k is string => typeof k === "string" && k.length > 0);
+    const queued =
+      keys.length > 0
+        ? await tx
+            .insert(storageDeletions)
+            .values(keys.map((key) => ({ key, companyId, reason: "CUSTOMER_ERASED" })))
+            .returning({ id: storageDeletions.id, key: storageDeletions.key })
+        : [];
 
     const [kept] = await tx
       .select({
@@ -299,6 +356,11 @@ export async function eraseCustomer(app: FastifyInstance, input: EraseInput): Pr
         enquiries_anonymised: enquiryRows.length,
         login_events_anonymised: loginRows.length,
         testimonials_withdrawn: testimonialRows.length,
+        booking_drafts_scrubbed: draftRows,
+        notifications_scrubbed: notificationRows,
+        service_requests_scrubbed: ticketRows,
+        exports_withdrawn: exportRows.length,
+        storage_deletions_queued: queued.length,
         portal_disabled: portalDisabled,
         sessions_revoked: sessionsRevoked,
         financial_rows_kept: {
@@ -325,6 +387,11 @@ export async function eraseCustomer(app: FastifyInstance, input: EraseInput): Pr
         testimonials: testimonialRows.length,
         portal_disabled: portalDisabled,
         sessions_revoked: sessionsRevoked,
+        booking_drafts: draftRows,
+        notifications: notificationRows,
+        service_requests: ticketRows,
+        exports_removed: exportRows.length,
+        storage_deletions_queued: queued.length,
       },
       financial_rows_kept: {
         bookings: Number(kept?.bookings ?? 0),
@@ -333,40 +400,192 @@ export async function eraseCustomer(app: FastifyInstance, input: EraseInput): Pr
         ledger_entries: Number(kept?.ledger ?? 0),
       },
     };
-    return { response, docs };
+    return { response, queued, portalUserId: pu?.id ?? null };
   });
 
-  // After commit: the bytes leave storage (best effort, logged) and the cached portal identity dies with the next request.
+  // After commit: try the deletes right away; each success is marked done, each failure stays queued for STORAGE_SWEEP (retried with
+  // backoff) — nothing is forgotten when storage is briefly unavailable.
   const store = storage();
-  for (const d of result.docs) {
-    const keys = [d.storageKey, d.variants?.thumb_key, d.variants?.medium_key].filter(
-      (k): k is string => typeof k === "string" && k.length > 0,
-    );
-    for (const k of keys) {
-      try {
-        await store.remove(k);
-      } catch (err) {
-        app.log.warn({ err, key: k }, "erase: could not remove document from storage");
-      }
+  for (const q of result.queued) {
+    try {
+      await store.remove(q.key);
+      await app.db.update(storageDeletions).set({ doneAt: new Date() }).where(eq(storageDeletions.id, q.id));
+    } catch (err) {
+      app.log.warn({ err, key: q.key }, "erase: storage delete failed; left queued for the storage sweep");
+      await app.db
+        .update(storageDeletions)
+        .set({
+          attempts: sql`${storageDeletions.attempts} + 1`,
+          lastError: String((err as Error).message).slice(0, 500),
+        })
+        .where(eq(storageDeletions.id, q.id))
+        .catch(() => undefined);
     }
   }
-  await bumpPermVersion(app.redis);
+  if (result.portalUserId) await bumpAuthVersions(app.redis, { portalUsers: [result.portalUserId] }, app.log);
   return result.response;
 }
 
-/** POST /admin/customers/:id/erase. */
-export function registerEraseRoutes(app: FastifyInstance): void {
+/** Plaintext of a ciphertext, or null when it cannot be read (its key is gone or it is malformed): erasure never fails on it. */
+function safeDecrypt(token: string | null): string | null {
+  try {
+    return decryptField(token);
+  } catch {
+    return null;
+  }
+}
+
+/** `text` with every identifier replaced by `replacement` (SQL, case-insensitive literal match). */
+function scrubText(column: SQL | ReturnType<typeof sql.raw>, ids: readonly string[], replacement: string): SQL {
+  let expr: SQL = sql`${column}`;
+  for (const id of ids) expr = sql`regexp_replace(${expr}, ${escapeRegex(id)}, ${replacement}, 'gi')`;
+  return expr;
+}
+
+function escapeRegex(v: string): string {
+  return v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Booking-wizard drafts of the company whose payload mentions the customer (id, phone, e-mail, PAN, Aadhaar): payload emptied. */
+async function scrubDrafts(tx: Executor, companyId: string, needles: readonly string[]): Promise<number> {
+  const terms = needles.filter((n) => n.length >= 4);
+  if (terms.length === 0) return 0;
+  const rows = await tx
+    .update(bookingDrafts)
+    .set({ payload: { erased: true }, step: 1, version: sql`${bookingDrafts.version} + 1`, updatedAt: new Date() })
+    .where(
+      and(
+        eq(bookingDrafts.companyId, companyId),
+        or(...terms.map((t) => sql`strpos(lower(${bookingDrafts.payload}::text), lower(${t})) > 0`)),
+      ),
+    )
+    .returning({ id: bookingDrafts.id });
+  return rows.length;
+}
+
+/**
+ * The customer's own notifications are withdrawn and emptied; staff notifications about the customer (entity = the customer, or text
+ * naming them) keep their event but lose the name, phone and e-mail.
+ */
+async function scrubNotifications(
+  tx: Executor,
+  companyId: string,
+  customerId: string,
+  textIds: readonly string[],
+  erasedName: string,
+): Promise<number> {
+  const own = await tx
+    .update(notifications)
+    .set({ title: "Notification withdrawn", body: null, link: null, isWithdrawn: true })
+    .where(
+      and(
+        eq(notifications.companyId, companyId),
+        eq(notifications.recipientType, "CUSTOMER"),
+        eq(notifications.recipientId, customerId),
+      ),
+    )
+    .returning({ id: notifications.id });
+  const mentions = textIds.map(
+    (t) =>
+      sql`(strpos(lower(${notifications.title}), lower(${t})) > 0 or strpos(lower(coalesce(${notifications.body}, '')), lower(${t})) > 0)`,
+  );
+  const staff = await tx
+    .update(notifications)
+    .set({
+      title: scrubText(sql`${notifications.title}`, textIds, erasedName),
+      body: sql`case when ${notifications.body} is null then null else ${scrubText(sql`${notifications.body}`, textIds, erasedName)} end`,
+    })
+    .where(
+      and(
+        eq(notifications.companyId, companyId),
+        eq(notifications.recipientType, "STAFF"),
+        or(and(eq(notifications.entityType, "customer"), eq(notifications.entityId, customerId)), ...mentions),
+      ),
+    )
+    .returning({ id: notifications.id });
+  return own.length + staff.length;
+}
+
+/** The customer's service requests: subject/description/rating comment replaced, their own messages emptied, staff messages scrubbed. */
+async function scrubTickets(
+  tx: Executor,
+  ticketIds: readonly string[],
+  textIds: readonly string[],
+  erasedName: string,
+): Promise<number> {
+  if (ticketIds.length === 0) return 0;
+  const ids = [...ticketIds];
+  const rows = await tx
+    .update(serviceRequests)
+    .set({
+      subject: "Service request (customer erased)",
+      description: null,
+      ratingComment: null,
+      version: sql`${serviceRequests.version} + 1`,
+    })
+    .where(inArray(serviceRequests.id, ids))
+    .returning({ id: serviceRequests.id });
+  await tx
+    .update(serviceRequestMessages)
+    .set({ body: "[removed: customer erased]", authorName: erasedName, attachmentIds: sql`'{}'::uuid[]` })
+    .where(and(inArray(serviceRequestMessages.ticketId, ids), eq(serviceRequestMessages.authorType, "CUSTOMER")));
+  if (textIds.length > 0)
+    await tx
+      .update(serviceRequestMessages)
+      .set({ body: scrubText(sql`${serviceRequestMessages.body}`, textIds, erasedName) })
+      .where(
+        and(inArray(serviceRequestMessages.ticketId, ids), sql`${serviceRequestMessages.authorType} <> 'CUSTOMER'`),
+      );
+  return rows.length;
+}
+
+/**
+ * Export files of the company made before the erasure that are still stored (list exports: any of them may hold the customer's row):
+ * marked FAILED with the reason and their files queued for deletion. Backups (`admin:backup`) are not touched: they keep the encrypted
+ * identifiers and expire with their own retention (docs/SECURITY.md).
+ */
+async function withdrawExports(
+  tx: Executor,
+  companyId: string,
+  before: Date,
+): Promise<{ id: string; storageKey: string | null }[]> {
+  return tx
+    .update(exportsTable)
+    .set({
+      status: "FAILED",
+      error: "Withdrawn: a customer it may contain was erased (DPDP); export again",
+      expiresAt: before,
+    })
+    .where(
+      and(
+        eq(exportsTable.companyId, companyId),
+        like(exportsTable.path, "/api/v1/%"),
+        isNotNull(exportsTable.storageKey),
+        lt(exportsTable.createdAt, before),
+        or(isNull(exportsTable.expiresAt), sql`${exportsTable.expiresAt} > ${before.toISOString()}::timestamptz`),
+      ),
+    )
+    .returning({ id: exportsTable.id, storageKey: exportsTable.storageKey });
+}
+
+/**
+ * Registers the erasure route at `url`: one definition (Super Admin, idempotent, AdminCustomerEraseRequest → AdminCustomerEraseResponse)
+ * shared by the canonical route and the deprecated alias, so both answer identically (the alias adds Deprecation/Sunset/Link headers).
+ */
+export function registerCustomerEraseRoute(app: FastifyInstance, url: string, deprecated?: Deprecation): void {
   route(app, {
     method: "POST",
-    url: "/admin/customers/:id/erase",
+    url,
     permission: "admin.tools",
     idempotent: true,
+    ...(deprecated ? { deprecated } : {}),
     schema: {
       params: z.object({ id: IdSchema }),
       body: AdminCustomerEraseRequestSchema,
       response: { 200: AdminCustomerEraseResponseSchema },
-      summary:
-        "Right to erasure (Super Admin): anonymise PII (customer, co-applicants, portal login, documents, leads, site visits, enquiries, testimonials) when no booking is ACTIVE; financial rows and audit history stay (409 HAS_ACTIVE_BOOKING)",
+      summary: deprecated
+        ? "Right to erasure (deprecated alias of POST /admin/customers/:id/erase; same request, response and idempotency)"
+        : "Right to erasure (Super Admin): anonymise PII (customer, co-applicants, portal login, documents, leads, site visits, enquiries, testimonials, drafts, notifications, service-request text, prior exports) when no booking is ACTIVE; financial rows and audit history stay (409 HAS_ACTIVE_BOOKING)",
       tags: ["admin"],
     },
     handler: async (req) => {
@@ -380,4 +599,12 @@ export function registerEraseRoutes(app: FastifyInstance): void {
       });
     },
   });
+}
+
+/**
+ * POST /admin/customers/:id/erase (canonical). Its deprecated alias POST /customers/:id/erase is registered by the CRM module (so a
+ * CRM-only build keeps it) and delegates to eraseCustomer with the same request/response schemas and idempotency.
+ */
+export function registerEraseRoutes(app: FastifyInstance): void {
+  registerCustomerEraseRoute(app, "/admin/customers/:id/erase");
 }

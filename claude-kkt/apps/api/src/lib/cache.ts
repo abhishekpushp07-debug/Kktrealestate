@@ -99,10 +99,75 @@ export async function invalidate(redis: Redis, prefix: string): Promise<number> 
   return removed;
 }
 
-/** Redis key under which the permission-cache generation lives; bumping it invalidates every cached user/role. */
+/**
+ * Redis key of the GLOBAL auth-cache generation. Bumping it invalidates every cached staff and portal auth row at once, so it is kept for
+ * whole-dataset events only (reseed, restore). Everything else bumps a scoped version (bumpAuthVersions).
+ */
 export const PERM_VERSION_KEY = "perm:version";
 
-/** Bumps the permission cache generation (call after any role/user/scope change). */
+/** Bumps the global auth-cache generation (reseed / restore only; per-subject changes use bumpAuthVersions). */
 export async function bumpPermVersion(redis: Redis): Promise<number> {
   return redis.incr(PERM_VERSION_KEY);
+}
+
+/** What an auth-cache version is kept for: a staff user, a portal user, a role (permission edits) or a company (auth settings). */
+export type AuthVersionScope = "user" | "portal" | "role" | "company";
+
+/** Redis key of one scoped auth-cache version. */
+export function authVersionKey(scope: AuthVersionScope, id: string): string {
+  return `authv:${scope}:${id}`;
+}
+
+/**
+ * Version keys outlive every cached auth row (30 s) by far, so a key that expired after a day of silence can never make an old row match
+ * again (a missing key reads as "0" and every row cached under a later value has expired long before).
+ */
+export const AUTH_VERSION_TTL_SECONDS = 86_400;
+
+/** Subjects whose cached auth rows must be re-read (see bumpAuthVersions). */
+export interface AuthVersionTargets {
+  users?: readonly string[];
+  portalUsers?: readonly string[];
+  roles?: readonly string[];
+  companies?: readonly string[];
+}
+
+/** Budget of a version bump: past it the bump is logged and abandoned (cached rows then expire within their 30 s TTL). */
+const BUMP_BUDGET_MS = 1_000;
+
+/**
+ * Invalidates the cached auth rows of exactly these subjects (audit C: one portal password change used to invalidate every cached
+ * principal): a staff user's password, sessions or state → `users`; a portal user's → `portalUsers`; a role's permissions or state →
+ * `roles` (every holder re-reads); a company's auth settings → `companies`. One pipeline; never throws (a failure is logged and the rows
+ * expire with their 30 s TTL — session revocation itself never depends on this, it has its own markers and the database).
+ */
+export async function bumpAuthVersions(
+  redis: Redis,
+  targets: AuthVersionTargets,
+  log: { warn: (obj: object, msg: string) => void } = console,
+): Promise<void> {
+  const keys = [
+    ...(targets.users ?? []).map((id) => authVersionKey("user", id)),
+    ...(targets.portalUsers ?? []).map((id) => authVersionKey("portal", id)),
+    ...(targets.roles ?? []).map((id) => authVersionKey("role", id)),
+    ...(targets.companies ?? []).map((id) => authVersionKey("company", id)),
+  ];
+  if (keys.length === 0) return;
+  if (!redisUsable(redis)) {
+    log.warn(
+      { keys: keys.length },
+      "auth cache version bump skipped: Redis is disconnected (cached rows expire within 30 s)",
+    );
+    return;
+  }
+  try {
+    const pipe = redis.multi();
+    for (const k of keys) pipe.incr(k).expire(k, AUTH_VERSION_TTL_SECONDS);
+    await withinBudget(pipe.exec(), BUMP_BUDGET_MS, "auth version bump");
+  } catch (err) {
+    log.warn(
+      { err: (err as Error).message, keys: keys.length },
+      "auth cache version bump failed (cached rows expire within 30 s)",
+    );
+  }
 }

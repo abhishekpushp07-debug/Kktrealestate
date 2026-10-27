@@ -27,6 +27,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { formatDateTime } from "@/lib/format";
 import { useMutationWithToast } from "@/lib/queries";
+import { useUnsavedChangesGuard } from "@/lib/unsaved";
 import { controlOf, Notice } from "@/features/inventory/components";
 import { contractResolver } from "@/features/shared/contractResolver";
 import { useProjectOptions } from "@/features/shared/options";
@@ -174,6 +175,8 @@ function SiteSettingsForm({ row }: { row: SiteSettingsRow }) {
   const projects = useProjectOptions();
   const resolver = useMemo(() => contractResolver<SiteValues, unknown>(FormSchema), []);
   const form = useForm<SiteValues, unknown, unknown>({ resolver, defaultValues: toValues(row), mode: "onTouched" });
+  // Leaving with unsaved edits (sidebar, Cmd+K, back, reload) asks first (audit v3 H3).
+  useUnsavedChangesGuard(form.formState.isDirty);
   const control = controlOf(form);
   const [serverError, setServerError] = useState<unknown>(null);
 

@@ -497,7 +497,6 @@ export const MASTER_CONFIGS: Readonly<Record<MasterKind, AnyMasterConfig>> = {
     columns: ROOM_TYPE_COLUMNS,
     defaultSort: "sort_order",
     searchPlaceholder: "Search room types…",
-    csv: { columns: ["name", "code", "sort_order"], example: "Master Bedroom,MBR,1" },
     createSchema: RoomTypeCreateSchema,
     defaults: () => ({ name: "", code: "", sort_order: 0 }),
     toValues: (row) => ({ name: row.name, code: row.code, sort_order: row.sort_order }),
@@ -520,7 +519,6 @@ export const MASTER_CONFIGS: Readonly<Record<MasterKind, AnyMasterConfig>> = {
     columns: AREA_TYPE_COLUMNS,
     defaultSort: "sort_order",
     searchPlaceholder: "Search area types…",
-    csv: { columns: ["name", "code", "sort_order"], example: "Carpet,CARPET,1" },
     createSchema: AreaTypeCreateSchema,
     defaults: () => ({ name: "", code: "", sort_order: 0 }),
     toValues: (row) => ({ name: row.name, code: row.code, sort_order: row.sort_order }),
@@ -550,10 +548,6 @@ export const MASTER_CONFIGS: Readonly<Record<MasterKind, AnyMasterConfig>> = {
     columns: FLAT_TYPE_COLUMNS,
     defaultSort: "name",
     searchPlaceholder: "Search flat types…",
-    csv: {
-      columns: ["name", "code", "bhk", "facing", "description", "base_rate_per_sqft", "base_price"],
-      example: "3BHK-A,3BHK_A,3,East,Corner unit,4500,",
-    },
     createSchema: FlatTypeFormSchema,
     defaults: () => ({
       name: "",
@@ -602,7 +596,6 @@ export const MASTER_CONFIGS: Readonly<Record<MasterKind, AnyMasterConfig>> = {
     columns: BLOCK_TYPE_COLUMNS,
     defaultSort: "name",
     searchPlaceholder: "Search block types…",
-    csv: { columns: ["name", "code", "has_floors"], example: "Tower,TOWER,true" },
     createSchema: BlockTypeCreateSchema,
     defaults: () => ({ name: "", code: "", has_floors: true }),
     toValues: (row) => ({ name: row.name, code: row.code, has_floors: row.has_floors }),
@@ -641,10 +634,6 @@ export const MASTER_CONFIGS: Readonly<Record<MasterKind, AnyMasterConfig>> = {
     columns: FLOOR_PLAN_COLUMNS,
     defaultSort: "name",
     searchPlaceholder: "Search templates…",
-    csv: {
-      columns: ["name", "code", "position", "flat_type_code", "facing", "is_corner"],
-      example: "Plan A,PLAN_A,1,3BHK_A,East,true",
-    },
     createSchema: FloorPlanTemplateFormSchema,
     defaults: () => ({ name: "", code: "", flats_per_floor: 4, positions: resizePositions([], 4) }),
     toValues: (row) => ({
@@ -675,7 +664,6 @@ export const MASTER_CONFIGS: Readonly<Record<MasterKind, AnyMasterConfig>> = {
     columns: AMENITY_COLUMNS,
     defaultSort: "name",
     searchPlaceholder: "Search amenities…",
-    csv: { columns: ["name", "category", "icon"], example: "Swimming Pool,Leisure,waves" },
     createSchema: AmenityCreateSchema,
     defaults: () => ({ name: "", category: null, icon: null }),
     toValues: (row) => ({ name: row.name, category: row.category, icon: row.icon }),
@@ -710,7 +698,6 @@ export const MASTER_CONFIGS: Readonly<Record<MasterKind, AnyMasterConfig>> = {
     columns: CONSTRUCTION_STAGE_COLUMNS,
     defaultSort: "sort_order",
     searchPlaceholder: "Search stages…",
-    csv: { columns: ["name", "code", "sort_order", "is_possession"], example: "Foundation,FOUNDATION,2,false" },
     createSchema: ConstructionStageCreateSchema,
     defaults: () => ({ name: "", code: "", sort_order: 0, is_possession: false }),
     toValues: (row) => ({
@@ -752,23 +739,6 @@ export const MASTER_CONFIGS: Readonly<Record<MasterKind, AnyMasterConfig>> = {
     columns: PAYMENT_PLAN_COLUMNS,
     defaultSort: "name",
     searchPlaceholder: "Search plans…",
-    csv: {
-      columns: [
-        "name",
-        "code",
-        "plan_type",
-        "grace_days",
-        "seq",
-        "installment_name",
-        "percent",
-        "trigger_type",
-        "trigger_days",
-        "trigger_stage_code",
-        "trigger_date",
-        "due_days",
-      ],
-      example: "Standard CLP,CLP_STD,CONSTRUCTION_LINKED,7,1,On booking,10,ON_BOOKING,,,,0",
-    },
     createSchema: PaymentPlanCreateSchema,
     defaults: () => ({
       name: "",
@@ -814,10 +784,6 @@ export const MASTER_CONFIGS: Readonly<Record<MasterKind, AnyMasterConfig>> = {
     columns: CHARGE_TYPE_COLUMNS,
     defaultSort: "name",
     searchPlaceholder: "Search charges…",
-    csv: {
-      columns: ["name", "code", "default_amount", "is_taxable", "default_gst_percent", "demand_at"],
-      example: "Maintenance Deposit,MAINT_DEP,50000,true,18,ON_POSSESSION",
-    },
     createSchema: ChargeTypeCreateSchema,
     defaults: () => ({
       name: "",
@@ -849,10 +815,6 @@ export const MASTER_CONFIGS: Readonly<Record<MasterKind, AnyMasterConfig>> = {
     columns: PAYMENT_MODE_COLUMNS,
     defaultSort: "sort_order",
     searchPlaceholder: "Search modes…",
-    csv: {
-      columns: ["name", "code", "requires_instrument", "clears_immediately", "is_cash", "sort_order"],
-      example: "Cheque,CHEQUE,true,false,false,2",
-    },
     createSchema: PaymentModeCreateSchema,
     defaults: () => ({
       name: "",
@@ -884,10 +846,6 @@ export const MASTER_CONFIGS: Readonly<Record<MasterKind, AnyMasterConfig>> = {
     columns: BANK_ACCOUNT_COLUMNS,
     defaultSort: "bank_name",
     searchPlaceholder: "Search bank or account name…",
-    csv: {
-      columns: ["bank_name", "branch", "account_name", "account_number", "ifsc", "is_default", "is_escrow"],
-      example: "HDFC Bank,MG Road,Shree Ganesh Builders,50100123456789,HDFC0001234,true,false",
-    },
     createSchema: BankAccountCreateFormSchema,
     editSchema: BankAccountEditFormSchema,
     defaults: () => ({
@@ -926,7 +884,6 @@ export const MASTER_CONFIGS: Readonly<Record<MasterKind, AnyMasterConfig>> = {
     columns: DOCUMENT_TYPE_COLUMNS,
     defaultSort: "name",
     searchPlaceholder: "Search document types…",
-    csv: { columns: ["name", "code", "applies_to", "is_kyc"], example: "PAN Card,PAN,CUSTOMER,true" },
     createSchema: DocumentTypeCreateSchema,
     defaults: () => ({ name: "", code: "", applies_to: [], is_kyc: false }),
     toValues: (row) => ({ name: row.name, code: row.code, applies_to: [...row.applies_to], is_kyc: row.is_kyc }),
@@ -945,7 +902,6 @@ export const MASTER_CONFIGS: Readonly<Record<MasterKind, AnyMasterConfig>> = {
     columns: PLC_TYPE_COLUMNS,
     defaultSort: "name",
     searchPlaceholder: "Search PLC types…",
-    csv: { columns: ["name", "code", "calc_mode"], example: "Park Facing,PARK_FACING,PER_SQFT" },
     createSchema: PlcTypeCreateSchema,
     defaults: () => ({ name: "", code: "", calc_mode: null }),
     toValues: (row) => ({ name: row.name, code: row.code, calc_mode: row.calc_mode }),
@@ -963,7 +919,6 @@ export const MASTER_CONFIGS: Readonly<Record<MasterKind, AnyMasterConfig>> = {
     columns: SPEC_CATEGORY_COLUMNS,
     defaultSort: "sort_order",
     searchPlaceholder: "Search categories…",
-    csv: { columns: ["name", "sort_order"], example: "Flooring,1" },
     createSchema: SpecCategoryCreateSchema,
     defaults: () => ({ name: "", sort_order: 0 }),
     toValues: (row) => ({ name: row.name, sort_order: row.sort_order }),
@@ -984,10 +939,6 @@ export const MASTER_CONFIGS: Readonly<Record<MasterKind, AnyMasterConfig>> = {
     columns: SPEC_ITEM_COLUMNS,
     defaultSort: "sort_order",
     searchPlaceholder: "Search items…",
-    csv: {
-      columns: ["category_name", "name", "description", "sort_order"],
-      example: "Flooring,Vitrified tiles 600×600,Kajaria or equivalent,1",
-    },
     createSchema: SpecItemCreateSchema,
     defaults: () => ({ category_id: null, name: "", description: null, sort_order: 0 }),
     toValues: (row) => ({
@@ -1014,7 +965,6 @@ export const MASTER_CONFIGS: Readonly<Record<MasterKind, AnyMasterConfig>> = {
     columns: SERVICE_CATEGORY_COLUMNS,
     defaultSort: "sort_order",
     searchPlaceholder: "Search categories…",
-    csv: { columns: ["name", "sort_order", "default_priority"], example: "Plumbing,1,HIGH" },
     createSchema: ServiceCategoryCreateSchema,
     defaults: () => ({ name: "", sort_order: 0, default_priority: "MEDIUM" }),
     toValues: (row) => ({ name: row.name, sort_order: row.sort_order, default_priority: row.default_priority }),

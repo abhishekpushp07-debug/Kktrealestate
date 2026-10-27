@@ -165,9 +165,23 @@ export const BlockGenerateFlatsResponseSchema = z.object({
   block_id: IdSchema,
   flats_created: z.int().min(0),
   floors_with_units: z.int().min(0),
+  /** Flats with booking history regenerated in place (same id) instead of deleted; 0 on a first generation / append. */
+  flats_preserved: z.int().min(0).optional(),
   version: z.int(),
 });
 export type BlockGenerateFlatsResponse = z.infer<typeof BlockGenerateFlatsResponseSchema>;
+
+/** One flat in `details.flats` of 409 FLAT_HAS_BOOKING_HISTORY (regenerate / structural edit would delete a flat bookings reference). */
+export const FlatHistoryRefSchema = z.object({
+  id: IdSchema,
+  flat_number: z.string(),
+  floor: z.int(),
+  position: z.int(),
+  bookings: z.int().min(1),
+});
+/** `details` of 409 FLAT_HAS_BOOKING_HISTORY. */
+export const FlatHasBookingHistoryDetailsSchema = z.object({ flats: z.array(FlatHistoryRefSchema).min(1) });
+export type FlatHasBookingHistoryDetails = z.infer<typeof FlatHasBookingHistoryDetailsSchema>;
 
 /** Replace a block's stage sequence (ordered stage ids); allowed while no stage is completed. */
 export const BlockStageSequenceUpdateSchema = z.strictObject({

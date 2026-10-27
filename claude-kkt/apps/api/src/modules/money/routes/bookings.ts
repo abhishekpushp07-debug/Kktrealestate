@@ -19,6 +19,8 @@ import {
   DemandLetterDataSchema,
   DemandListResponseSchema,
   IdSchema,
+  LedgerListQuerySchema,
+  LedgerRebuildListResponseSchema,
   LedgerResponseSchema,
   ListQuerySchema,
   OtherChargeAddSchema,
@@ -27,6 +29,7 @@ import {
   ScheduleResponseSchema,
   type BookingDraftRow,
   type BookingRow,
+  type LedgerRebuildRow,
 } from "@kkt/contracts";
 import {
   bookingDrafts,
@@ -35,6 +38,7 @@ import {
   demands,
   flats,
   ledgerEntries,
+  ledgerRebuilds,
   payments,
   projects,
   type Executor,
@@ -57,6 +61,7 @@ import {
   updateBooking,
 } from "../services/bookings.js";
 import { nonVoidDemands } from "../services/dues.js";
+import { epochRows, ledgerTotals } from "../services/ledger.js";
 import { demandLetterData } from "../services/payments.js";
 import {
   BOOKING_SELECT,
@@ -79,6 +84,9 @@ import {
   type PaymentSelect,
 } from "../services/views.js";
 import type { LedgerEntryRecord } from "../services/ledger.js";
+
+/** A ledger_rebuilds row with the acting staff user's name (GET /bookings/:id/ledger/rebuilds). */
+type LedgerRebuildSelect = { r: typeof ledgerRebuilds.$inferSelect; actorName: string | null };
 import { loadTowerStages } from "../common.js";
 
 const idParams = z.object({ id: IdSchema });
@@ -390,19 +398,33 @@ export function registerBookingRoutes(app: FastifyInstance): void {
     permission: "booking.read",
     schema: {
       params: idParams,
-      querystring: ListQuerySchema,
+      querystring: LedgerListQuerySchema,
       response: { 200: LedgerResponseSchema },
-      summary: "Two-bucket ledger: rows with running balances (paged, seq ascending) + current summary (csv)",
+      summary:
+        "Two-bucket ledger (contract C7): rows of the current epoch (or ?epoch=n, an older one) with running balances (paged, seq ascending), epoch / current_epoch, the current summary with its C7 totals and the totals at the end of the epoch returned (csv)",
     },
     handler: async (req, reply) => {
       const s = await loadBookingSelect(app.dbReplica, req.user!, req.params.id);
       const q = req.query;
-      // the summary statement runs alongside the page (not for CSV, which has no summary)
+      const current = s.booking.ledgerEpoch;
+      const epoch = q.epoch ?? current;
+      if (epoch > current) throw ApiError.notFound("Ledger epoch");
+      // the summary and the epoch's last row run alongside the page (not for CSV, which has no summary)
       const summary = q.format === "csv" ? null : loadBookingSummary(app.dbReplica, s.booking);
       summary?.catch(() => undefined); // handled when awaited below; never an unhandled rejection if the page query fails first
+      const lastRow =
+        q.format === "csv"
+          ? null
+          : app.dbReplica
+              .select()
+              .from(ledgerEntries)
+              .where(epochRows(s.booking.id, epoch))
+              .orderBy(desc(ledgerEntries.seq))
+              .limit(1);
+      lastRow?.catch(() => undefined);
       const result = await paginate<LedgerEntryRecord>(app.dbReplica, {
         table: ledgerEntries,
-        where: eq(ledgerEntries.bookingId, s.booking.id),
+        where: epochRows(s.booking.id, epoch),
         search: { columns: [ledgerEntries.label, ledgerEntries.refNumber], term: q.search },
         sort: {
           allowed: { seq: ledgerEntries.seq, entry_date: ledgerEntries.entryDate },
@@ -415,11 +437,74 @@ export function registerBookingRoutes(app: FastifyInstance): void {
       if (q.format === "csv")
         return sendCsv(
           reply,
-          `ledger-${s.booking.bookingNumber.replace(/\//g, "-")}.csv`,
+          `ledger-${s.booking.bookingNumber.replace(/\//g, "-")}${epoch === current ? "" : `-epoch-${epoch}`}.csv`,
           LEDGER_CSV.map((k) => ({ key: k, header: k })),
           rows as unknown as Record<string, unknown>[],
         );
-      return { ...result, items: rows, summary: await summary! };
+      const b = s.booking;
+      const [sum, [last]] = await Promise.all([summary!, lastRow!]);
+      return {
+        ...result,
+        items: rows,
+        epoch,
+        current_epoch: current,
+        // C7 totals of the current book, flat on the summary: clients use these, never the last row of a page
+        summary: {
+          ...sum,
+          cash_due_paise: b.cashOrderRaisedPaise - b.cashPaidPaise,
+          account_due_paise: b.accountOrderRaisedPaise - b.accountPaidPaise,
+          total_due_paise: sum.total_due_paise,
+          other_charges_due_paise: sum.other_charges_due_paise,
+          cash_paid_paise: b.cashPaidPaise,
+          account_paid_paise: b.accountPaidPaise,
+        },
+        epoch_totals: ledgerTotals(last),
+      };
+    },
+  });
+
+  route(app, {
+    method: "GET",
+    url: "/bookings/:id/ledger/rebuilds",
+    permission: "booking.read",
+    schema: {
+      params: idParams,
+      querystring: ListQuerySchema,
+      response: { 200: LedgerRebuildListResponseSchema },
+      summary:
+        "Restatements of the booking's ledger (contract C7): from_epoch → to_epoch, reason, actor, at and what changed (newest first)",
+    },
+    handler: async (req) => {
+      const s = await loadBookingSelect(app.dbReplica, req.user!, req.params.id);
+      const q = req.query;
+      const result = await paginate<LedgerRebuildSelect>(app.dbReplica, {
+        table: ledgerRebuilds,
+        select: {
+          r: ledgerRebuilds,
+          actorName: sql<string | null>`(select u.name from users u where u.id = ${ledgerRebuilds.actorId})`,
+        },
+        where: eq(ledgerRebuilds.bookingId, s.booking.id),
+        sort: {
+          allowed: { at: ledgerRebuilds.at, to_epoch: ledgerRebuilds.toEpoch },
+          default: "-to_epoch",
+          requested: q.sort,
+        },
+        exact: true,
+        ...listPaging(q),
+      });
+      return {
+        ...result,
+        items: result.items.map(({ r, actorName }) => ({
+          id: r.id,
+          booking_id: r.bookingId,
+          from_epoch: r.fromEpoch,
+          to_epoch: r.toEpoch,
+          reason: r.reason as LedgerRebuildRow["reason"],
+          actor: r.actorId ? { id: r.actorId, name: actorName } : null,
+          at: r.at.toISOString(),
+          summary: r.summary as unknown as LedgerRebuildRow["summary"],
+        })),
+      };
     },
   });
 

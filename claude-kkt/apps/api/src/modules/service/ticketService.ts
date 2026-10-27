@@ -137,11 +137,15 @@ export const TICKET_SORTABLE = {
   ticket_number: serviceRequests.ticketNumber,
 };
 
-/** Condition: open ticket past its SLA (flagged by the job, or simply overdue right now). */
+/** Condition: open ticket past its SLA (flagged by the job, or simply overdue right now and not paused awaiting the customer). */
 export function slaBreachedCondition(now: Date): SQL {
   return or(
     isNotNull(serviceRequests.slaBreachedAt),
-    and(lt(serviceRequests.slaDueAt, now), notInArray(serviceRequests.status, [...TERMINAL_STATUSES])),
+    and(
+      lt(serviceRequests.slaDueAt, now),
+      isNull(serviceRequests.slaPausedAt),
+      notInArray(serviceRequests.status, [...TERMINAL_STATUSES]),
+    ),
   )!;
 }
 
@@ -187,7 +191,11 @@ export function toTicketRow(j: TicketJoined, now = new Date()): ServiceRequestRo
     assignee_name: j.assigneeName,
     sla_due_at: iso(t.slaDueAt),
     sla_breached_at: iso(t.slaBreachedAt),
-    is_sla_breached: t.slaBreachedAt !== null || (t.slaDueAt ? isSlaBreached(t.slaDueAt, now, terminal) : false),
+    is_sla_breached:
+      t.slaBreachedAt !== null ||
+      (t.slaDueAt && t.slaPausedAt === null ? isSlaBreached(t.slaDueAt, now, terminal) : false),
+    sla_paused_at: iso(t.slaPausedAt),
+    sla_paused_seconds: t.slaPausedSeconds,
     resolved_at: iso(t.resolvedAt),
     closed_at: iso(t.closedAt),
     reopened_count: t.reopenedCount,
@@ -220,6 +228,8 @@ export function toCustomerTicketRow(j: TicketJoined, now = new Date()): Customer
     sla_due_at: _c,
     sla_breached_at: _d,
     is_sla_breached: _e,
+    sla_paused_at: _f,
+    sla_paused_seconds: _g,
     ...rest
   } = toTicketRow(j, now);
   return { ...rest, can_reopen: canReopen(j.sr, now), can_rate: canRate(j.sr) };
@@ -650,12 +660,52 @@ export function assertTransition(from: ServiceStatus, to: ServiceStatus): void {
 }
 
 /** Column changes implied by a transition (resolved_at / closed_at stamps, reopen counter). */
-export function statusPatch(
-  current: Pick<DbTicket, "status" | "resolvedAt">,
+/** The SLA fields statusPatch reads. */
+export type SlaState = Pick<
+  DbTicket,
+  "status" | "resolvedAt" | "priority" | "slaDueAt" | "slaPausedAt" | "slaPausedSeconds"
+>;
+
+/**
+ * SLA clock changes of a status transition (pure):
+ * - entering AWAITING_CUSTOMER pauses the clock (`sla_paused_at = now`);
+ * - leaving it resumes: the pause length is added to `sla_due_at` (the effective deadline) and to `sla_paused_seconds`;
+ * - a reopen (RESOLVED → IN_PROGRESS) starts a fresh SLA window from the reopen time and clears `sla_breached_at`, so the breach job
+ *   flags (and alerts) the reopened ticket again when the new deadline passes.
+ * `slaHours` is needed for the reopen only.
+ */
+export function slaPatch(
+  current: SlaState,
   to: ServiceStatus,
   now: Date,
+  slaHours?: SlaHours,
 ): Record<string, unknown> {
-  const patch: Record<string, unknown> = { status: to };
+  const patch: Record<string, unknown> = {};
+  if (current.status === "RESOLVED" && to === "IN_PROGRESS") {
+    patch["slaDueAt"] = new Date(slaDueAt(now, current.priority, slaHours ?? DEFAULT_SLA_HOURS));
+    patch["slaBreachedAt"] = null;
+    patch["slaPausedAt"] = null;
+    patch["slaPausedSeconds"] = 0;
+    return patch;
+  }
+  if (current.status === "AWAITING_CUSTOMER" && to !== "AWAITING_CUSTOMER" && current.slaPausedAt) {
+    const paused = Math.max(0, Math.floor((now.getTime() - new Date(current.slaPausedAt).getTime()) / 1000));
+    if (current.slaDueAt) patch["slaDueAt"] = new Date(new Date(current.slaDueAt).getTime() + paused * 1000);
+    patch["slaPausedSeconds"] = current.slaPausedSeconds + paused;
+    patch["slaPausedAt"] = null;
+  } else if (to === "AWAITING_CUSTOMER" && current.status !== "AWAITING_CUSTOMER") {
+    patch["slaPausedAt"] = now;
+  }
+  return patch;
+}
+
+export function statusPatch(
+  current: SlaState,
+  to: ServiceStatus,
+  now: Date,
+  slaHours?: SlaHours,
+): Record<string, unknown> {
+  const patch: Record<string, unknown> = { status: to, ...slaPatch(current, to, now, slaHours) };
   if (to === "RESOLVED") patch["resolvedAt"] = now;
   if (to === "CLOSED") {
     patch["closedAt"] = now;
@@ -667,6 +717,16 @@ export function statusPatch(
     patch["closedAt"] = null;
   }
   return patch;
+}
+
+/** SLA hours of the ticket's company when the transition is a reopen (the only one that needs them). */
+async function reopenSlaHours(
+  tx: Executor,
+  t: SlaState & { companyId: string },
+  to: ServiceStatus,
+): Promise<SlaHours | undefined> {
+  if (!(t.status === "RESOLVED" && to === "IN_PROGRESS")) return undefined;
+  return slaHoursOf(await companyRow(tx, t.companyId));
 }
 
 /** 409 TICKET_CLOSED: a closed ticket accepts no messages, edits or assignment (state conflict, like REOPEN_WINDOW_CLOSED / ALREADY_RATED). */
@@ -710,7 +770,7 @@ async function notifyStaffOfCustomer(tx: Executor, t: DbTicket, title: string, b
 // Staff mutations
 // ---------------------------------------------------------------------------
 
-/** PATCH: priority (re-derives sla_due_at from created_at + hours), category, subject, description. */
+/** PATCH: priority (moves sla_due_at by the difference in SLA hours), category, subject, description. */
 export async function updateTicket(
   tx: Executor,
   ctx: TicketWriteContext,
@@ -733,8 +793,12 @@ export async function updateTicket(
     changes["categoryId"] = (await resolveCategory(tx, ctx.user.companyId, patch.category_id)).id;
   if (patch.priority !== undefined && patch.priority !== existing.sr.priority) {
     changes["priority"] = patch.priority;
-    const company = await companyRow(tx, ctx.user.companyId);
-    changes["slaDueAt"] = new Date(slaDueAt(existing.sr.createdAt, patch.priority, slaHoursOf(company)));
+    const hours = slaHoursOf(await companyRow(tx, ctx.user.companyId));
+    // shift the current deadline by the difference in hours: keeps the reopen base and every pause already added to it
+    const delta = (hours[patch.priority] - hours[existing.sr.priority]) * 3_600_000;
+    changes["slaDueAt"] = existing.sr.slaDueAt
+      ? new Date(new Date(existing.sr.slaDueAt).getTime() + delta)
+      : new Date(slaDueAt(existing.sr.createdAt, patch.priority, hours));
   }
   await applyUpdate(tx, serviceRequests, id, expectedVersion, changes, TICKET_ENTITY);
   const updated = (await loadTicket(tx, ctx.user.companyId, id, { includeInternal: true }))!;
@@ -809,7 +873,7 @@ export async function changeStatus(
   const existing = await requireStaffTicket(tx, ctx.user, id, true);
   assertTransition(existing.sr.status, status);
   const now = new Date();
-  const patch = statusPatch(existing.sr, status, now);
+  const patch = statusPatch(existing.sr, status, now, await reopenSlaHours(tx, existing.sr, status));
   const noteText = note?.trim();
   if (noteText) {
     await tx.insert(serviceRequestMessages).values({
@@ -879,7 +943,10 @@ export async function addStaffMessage(
   let patch: Record<string, unknown> = { lastMessageAt: now };
   if (input.status !== undefined && input.status !== existing.sr.status) {
     assertTransition(existing.sr.status, input.status);
-    patch = { ...patch, ...statusPatch(existing.sr, input.status, now) };
+    patch = {
+      ...patch,
+      ...statusPatch(existing.sr, input.status, now, await reopenSlaHours(tx, existing.sr, input.status)),
+    };
   } else if (input.status === undefined && !input.is_internal && existing.sr.status === "NEW") {
     patch = { ...patch, ...statusPatch(existing.sr, "IN_PROGRESS", now) };
   }
@@ -1046,7 +1113,7 @@ export async function reopenByCustomer(
       },
     );
   }
-  const patch = statusPatch(existing.sr, "IN_PROGRESS", now);
+  const patch = statusPatch(existing.sr, "IN_PROGRESS", now, await reopenSlaHours(tx, existing.sr, "IN_PROGRESS"));
   const reasonText = reason?.trim();
   if (reasonText) {
     await tx.insert(serviceRequestMessages).values({

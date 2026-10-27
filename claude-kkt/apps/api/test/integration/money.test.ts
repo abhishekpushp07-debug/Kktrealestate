@@ -1345,7 +1345,17 @@ describe("auto-dues engine, FIFO statuses, undo rule, plan change, integrity (SP
       advance_paise: L,
     });
     expect(b.summary.raised_percent).toBe(10);
-    expect((await ledgerOf(u1.id)).some((r) => r.ref_number === d2.demand_number)).toBe(false);
+    // contract C7: the voided demand stays in the book and a DEMAND_VOIDED row takes it back out (the advance returns to credit)
+    const afterVoid = await ledgerOf(u1.id);
+    expect(afterVoid.filter((r) => r.ref_number === d2.demand_number).map((r) => [r.event, r.amount_paise])).toEqual([
+      ["DEMAND", 5 * L],
+      ["DEMAND_VOIDED", -5 * L],
+    ]);
+    expect(afterVoid.at(-1)).toMatchObject({
+      event: "DEMAND_VOIDED",
+      cash_order_raised_paise: 6 * L,
+      cash_due_paise: -L,
+    });
     await resetStage(t, U(), w.stages.EXCAVATION); // what the construction module does in the same unit of work
     const clean = await integrity(u1.id);
     expect(clean.ok, JSON.stringify(clean.findings)).toBe(true);
@@ -1455,7 +1465,8 @@ describe("auto-dues engine, FIFO statuses, undo rule, plan change, integrity (SP
     const demands = await demandsOf(b4.id);
     expect(demands.map((d) => d.status).sort()).toEqual(["OPEN", "VOID"]);
     const ledger = await ledgerOf(b4.id);
-    expect(ledger.map((r) => r.event)).toEqual(["PLAN_CHANGE", "DEMAND"]);
+    // contract C7: the old plan's demand stays in the book, voided by a compensating row, before the PLAN_CHANGE marker
+    expect(ledger.map((r) => r.event)).toEqual(["DEMAND", "DEMAND_VOIDED", "PLAN_CHANGE", "DEMAND"]);
     expect(ledger.at(-1)?.total_due_paise).toBe(10 * L);
     expect((await integrity(b4.id)).ok).toBe(true);
     await pay(payBody(b4.id, "CASH", L, w.modes.CASH));

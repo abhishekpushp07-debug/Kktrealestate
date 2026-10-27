@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 
 import "./globals.css";
 
+import { ErrorReporter } from "@/components/ErrorReporter";
 import { JsonLd } from "@/components/JsonLd";
 import { SiteConfigProvider } from "@/components/SiteConfigProvider";
 import { getSiteSettings } from "@/lib/api";
@@ -12,9 +13,12 @@ import { resolveMediaUrl } from "@/lib/media";
 import { brandName, organizationJsonLd, websiteJsonLd } from "@/lib/seo";
 import { NO_SEO_DEFAULTS } from "@/lib/types";
 
-// Every route renders at request time (data is cached 60 s via fetch tags), so `next build`
-// never needs a running API and content changes (publish / unpublish / site_live) show within a minute.
-export const dynamic = "force-dynamic";
+// Pages are statically rendered and regenerated in the background (ISR): catalog pages every 60 s, CMS pages every 300 s
+// (each page exports its own `revalidate`), and at once when the API calls /api/revalidate after a CMS or project-website
+// write. Server reads are cached by lib/api.ts (tag `kkt-public`); a page rendered while the API is unreachable is
+// regenerated after 10 s. Per-visitor pages (/visit/[token]) and the filter/pagination pages that read searchParams
+// (/projects, /blog) render per request on top of the same cached data.
+export const revalidate = 300;
 
 const cormorant = Cormorant_Garamond({
   subsets: ["latin"],
@@ -109,6 +113,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           }}
         >
           {children}
+          <ErrorReporter />
         </SiteConfigProvider>
         <JsonLd data={[organizationJsonLd(site, config.apiUrl), websiteJsonLd(site)]} />
       </body>

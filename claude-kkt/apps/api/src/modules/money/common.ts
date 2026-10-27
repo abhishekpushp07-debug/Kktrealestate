@@ -119,11 +119,12 @@ const LOCK_BOOKING_SQL = compileSql(sql`with locked as materialized (
 export async function lockBooking(tx: Tx, bookingId: string, clock?: Clock): Promise<void> {
   await LOCK_BOOKING_SQL.run(tx, { id: bookingId, key: `booking:${bookingId}` });
   if (clock) {
+    // the last row of the newest epoch (a restatement copies every instant into the new epoch)
     const [last] = await tx
       .select({ at: ledgerEntries.at })
       .from(ledgerEntries)
       .where(eq(ledgerEntries.bookingId, bookingId))
-      .orderBy(desc(ledgerEntries.seq))
+      .orderBy(desc(ledgerEntries.epoch), desc(ledgerEntries.seq))
       .limit(1);
     clock.observe(last?.at ?? null);
   }

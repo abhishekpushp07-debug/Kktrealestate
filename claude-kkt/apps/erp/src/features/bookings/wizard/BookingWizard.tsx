@@ -15,10 +15,11 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { formatDateTime, formatRelative, todayIST } from "@/lib/format";
 import { useMutationWithToast } from "@/lib/queries";
+import { useUnsavedChangesGuard } from "@/lib/unsaved";
 import { BREAKPOINTS, cn, useMediaQuery, useOnChange } from "@/lib/utils";
 import { useFlatDetail } from "@/features/inventory/api";
 import { Notice } from "@/features/inventory/components";
-import { BOOKINGS_PATH, bookingKeys, useApplicablePlans, useMyDrafts } from "../api";
+import { BOOKINGS_PATH, bookingKeys, deleteDraft, useApplicablePlans, useMyDrafts } from "../api";
 import {
   emptyWizardState,
   firstIncompleteStep,
@@ -65,6 +66,8 @@ interface ResumeCandidate {
   payload: Record<string, unknown>;
   updated_at: string;
   label: string;
+  /** Server draft version (DELETE needs it); null for a local-only draft. */
+  version: number | null;
 }
 
 function candidateFromServer(row: BookingDraftRow): ResumeCandidate {
@@ -78,6 +81,7 @@ function candidateFromServer(row: BookingDraftRow): ResumeCandidate {
     payload: row.payload,
     updated_at: row.updated_at,
     label: parts.length ? parts.join(" · ") : "Unnamed draft",
+    version: row.version,
   };
 }
 
@@ -89,6 +93,7 @@ function candidateFromLocal(draft: LocalDraft): ResumeCandidate {
     payload: draft.payload,
     updated_at: draft.updated_at,
     label: "Draft saved on this device",
+    version: null,
   };
 }
 
@@ -281,17 +286,10 @@ export default function BookingWizard() {
     persisted: draftPersisted,
   });
 
-  // Unsaved-changes guard.
+  // Unsaved-changes guard: in-app navigation (sidebar, Cmd+K, back) asks and a reload asks, until the draft is saved on the
+  // server (then "Resume booking" brings it back, so leaving loses nothing).
   const dirty = wizardHasContent(state) && !submitted;
-  useEffect(() => {
-    if (!dirty) return;
-    const handler = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = "";
-    };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [dirty]);
+  const leaveGuard = useUnsavedChangesGuard(dirty && draft.status !== "saved");
 
   const steps = useMemo<Step[]>(
     () =>
@@ -359,6 +357,7 @@ export default function BookingWizard() {
       setSubmitted(true);
       await draft.discard();
       clearLocalDraft();
+      leaveGuard.allowNavigation();
       navigate(`/bookings/${booking.id}`, { replace: true });
     },
     onError: (error) => {
@@ -427,6 +426,7 @@ export default function BookingWizard() {
     else await draft.flush();
     await reservation.release("Booking wizard cancelled");
     setSubmitted(true);
+    leaveGuard.allowNavigation();
     navigate("/bookings");
   };
 
@@ -512,7 +512,7 @@ export default function BookingWizard() {
                 clearLocalDraft();
                 if (resumeCandidate.id) {
                   try {
-                    await api.delete(`/booking-drafts/${resumeCandidate.id}`);
+                    await deleteDraft(resumeCandidate.id, resumeCandidate.version);
                   } catch {
                     /* ignore */
                   }

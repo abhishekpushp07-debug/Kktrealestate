@@ -1,23 +1,12 @@
 import { format as dfFormat, isValid, parseISO } from "date-fns";
+import { formatInr, formatInrShort, groupIndian } from "@kkt/contracts/moneyFormat";
 
 /* ------------------------------------------------------------------ */
 /* Indian number grouping                                               */
 /* ------------------------------------------------------------------ */
 
-/** "12500000" → "1,25,00,000" (Indian 3-2-2 grouping of an integer digit string). */
-export function groupIndian(digits: string): string {
-  const clean = digits.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
-  if (clean.length <= 3) return clean;
-  const last3 = clean.slice(-3);
-  let rest = clean.slice(0, -3);
-  const groups: string[] = [];
-  while (rest.length > 2) {
-    groups.unshift(rest.slice(-2));
-    rest = rest.slice(0, -2);
-  }
-  if (rest) groups.unshift(rest);
-  return `${groups.join(",")},${last3}`;
-}
+/** "12500000" → "1,25,00,000" (Indian 3-2-2 grouping of an integer digit string; the shared @kkt/contracts helper). */
+export { groupIndian };
 
 /** Indian-grouped plain number (counts, areas). */
 export function formatNumber(value: number, decimals = 0): string {
@@ -38,9 +27,11 @@ export function formatSqft(value: number | null | undefined): string {
 /* ------------------------------------------------------------------ */
 /* Money (integer paise on the wire)                                    */
 /* ------------------------------------------------------------------ */
+/* Both formatters delegate to @kkt/contracts moneyFormat, the one INR formatter the ERP, the portal and the website share
+   (BigInt arithmetic; golden table in src/lib/__tests__/money-golden.test.ts). This module only adds the "—" for missing values. */
 
 export interface FormatINROptions {
-  /** auto = show paise only when non-zero (default); always / never force it. */
+  /** auto = show paise only when non-zero (default); always = two decimals; never = rounded half-up to rupees. */
   decimals?: "auto" | "always" | "never";
   /** Prefix a "+" for positive amounts (deltas). */
   signed?: boolean;
@@ -49,43 +40,20 @@ export interface FormatINROptions {
 }
 
 /** 1_00_00_000_00 paise → "₹1,00,00,000"; 12_50_000_50 → "₹12,50,000.50". */
-export function formatINR(paise: number | null | undefined, options: FormatINROptions = {}): string {
-  if (paise === null || paise === undefined || !Number.isFinite(paise)) return "—";
+export function formatINR(paise: number | bigint | null | undefined, options: FormatINROptions = {}): string {
+  if (paise === null || paise === undefined || (typeof paise === "number" && !Number.isFinite(paise))) return "—";
   const { decimals = "auto", signed = false, bare = false } = options;
-  const rounded = Math.round(paise);
-  const negative = rounded < 0;
-  const abs = Math.abs(rounded);
-  const rupees = Math.floor(abs / 100);
-  const p = abs % 100;
-  let text = groupIndian(String(rupees));
-  if (decimals === "always" || (decimals === "auto" && p !== 0)) {
-    text += `.${String(p).padStart(2, "0")}`;
-  }
-  const symbol = bare ? "" : "₹";
-  const sign = negative ? "-" : signed && rounded > 0 ? "+" : "";
-  return `${sign}${symbol}${text}`;
+  return formatInr(paise, { paise: decimals, signed, symbol: !bare });
 }
 
 function trimZeros(fixed: string): string {
   return fixed.includes(".") ? fixed.replace(/\.?0+$/, "") : fixed;
 }
 
-/** 1_20_00_000_00 → "₹1.2 Cr"; 45_00_000_00 → "₹45 L"; 85_000_00 → "₹85,000". */
-export function formatINRShort(paise: number | null | undefined, options: { bare?: boolean } = {}): string {
-  if (paise === null || paise === undefined || !Number.isFinite(paise)) return "—";
-  const negative = paise < 0;
-  const rupees = Math.abs(paise) / 100;
-  const symbol = options.bare ? "" : "₹";
-  const sign = negative ? "-" : "";
-  const lakhs = Math.round((rupees / 1e5) * 10) / 10;
-  if (rupees >= 1e7 || lakhs >= 100) {
-    const crores = Math.round((rupees / 1e7) * 100) / 100;
-    return `${sign}${symbol}${trimZeros(crores.toFixed(2))} Cr`;
-  }
-  if (rupees >= 1e5) {
-    return `${sign}${symbol}${trimZeros(lakhs.toFixed(1))} L`;
-  }
-  return `${sign}${symbol}${groupIndian(String(Math.round(rupees)))}`;
+/** 1_20_00_000_00 → "₹1.2 Cr"; 45_00_000_00 → "₹45 L"; ₹99,96,000 → "₹1 Cr"; 85_000_00 → "₹85,000". */
+export function formatINRShort(paise: number | bigint | null | undefined, options: { bare?: boolean } = {}): string {
+  if (paise === null || paise === undefined || (typeof paise === "number" && !Number.isFinite(paise))) return "—";
+  return formatInrShort(paise, { symbol: !options.bare });
 }
 
 /** Paise → text for a rupee input: "12,50,000.50" / "12,50,000" (empty for null). */

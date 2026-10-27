@@ -4,7 +4,7 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { Redis } from "ioredis";
 import type { SessionRow, UserType } from "@kkt/contracts";
 import { PASSWORD_POLICY } from "@kkt/contracts";
-import { loginEvents, passwordHistory, portalUsers, refreshTokens, users, type Executor } from "@kkt/db";
+import { companies, loginEvents, passwordHistory, portalUsers, refreshTokens, users, type Executor } from "@kkt/db";
 import { config } from "../../config.js";
 import { writeAudit, type AuditActor } from "../../lib/audit.js";
 import { SUPER_ADMIN_ROLE_NAME } from "../../lib/scope.js";
@@ -12,6 +12,7 @@ import { notifyRole } from "../notifications/index.js";
 import { loginLockState, lockedError, PAIR_LOCK_ATTEMPTS, reserveLoginAttempt, type LockTarget } from "./lockout.js";
 import { randomToken, sha256 } from "../../lib/crypto.js";
 import { ApiError } from "../../lib/errors.js";
+import { COMPANY_HEADER, companyIdByHost, companyIdBySlug, normaliseHost } from "../../lib/tenant.js";
 import { signAccessToken, type TokenAudience } from "../../lib/jwt.js";
 import { hashPassword, matchesHistory, passwordPolicyProblems } from "../../lib/password.js";
 import { markSessionRevoked, markSessionsRevoked, securityRedis } from "../../plugins/auth.js";
@@ -32,6 +33,21 @@ export interface IssuedTokens {
   expires_in: number;
   audience: TokenAudience;
   family_id: string;
+  /** End of the family's absolute lifetime (REFRESH_ABSOLUTE_TTL_DAYS after sign-in; rotation never extends it). */
+  session_expires_at: Date;
+}
+
+/** Flags carried into a new access token. */
+export interface SessionFlags {
+  mfa: boolean;
+  mustChangePassword: boolean;
+  /** Staff: role id (access-token claim `rid`, keys the auth cache's role version). */
+  roleId?: string | undefined;
+}
+
+/** End of the absolute lifetime of a family started at `startedAt` (contract C1). */
+export function familyExpiresAt(startedAt: Date): Date {
+  return new Date(startedAt.getTime() + config.REFRESH_ABSOLUTE_TTL_DAYS * 86_400_000);
 }
 
 function requestMeta(req: FastifyRequest): { ip: string; userAgent: string | null } {
@@ -44,23 +60,29 @@ export async function createSession(
   tx: Executor,
   subject: SessionSubject,
   req: FastifyRequest,
-  flags: { mfa: boolean; mustChangePassword: boolean },
+  flags: SessionFlags,
 ): Promise<IssuedTokens> {
   const familyId = randomUUID();
-  return issueTokens(tx, subject, familyId, req, flags);
+  return issueTokens(tx, subject, familyId, new Date(), req, flags);
 }
 
+/**
+ * Inserts the family's next refresh token and signs its access token. A token lives REFRESH_TOKEN_DAYS but never past the family's
+ * absolute end (`family_started_at` + REFRESH_ABSOLUTE_TTL_DAYS), which every rotation copies unchanged.
+ */
 async function issueTokens(
   tx: Executor,
   subject: SessionSubject,
   familyId: string,
+  familyStartedAt: Date,
   req: FastifyRequest,
-  flags: { mfa: boolean; mustChangePassword: boolean },
+  flags: SessionFlags,
   replaces?: { id: string },
 ): Promise<IssuedTokens> {
   const raw = `rt_${randomToken(32)}`;
   const meta = requestMeta(req);
-  const expiresAt = new Date(Date.now() + config.REFRESH_TOKEN_DAYS * 86_400_000);
+  const absoluteEnd = familyExpiresAt(familyStartedAt);
+  const expiresAt = new Date(Math.min(Date.now() + config.REFRESH_TOKEN_DAYS * 86_400_000, absoluteEnd.getTime()));
   const [inserted] = await tx
     .insert(refreshTokens)
     .values({
@@ -68,6 +90,7 @@ async function issueTokens(
       subjectType: subject.type,
       subjectId: subject.id,
       familyId,
+      familyStartedAt,
       tokenHash: sha256(raw),
       expiresAt,
       userAgent: meta.userAgent,
@@ -87,6 +110,7 @@ async function issueTokens(
     sid: familyId,
     mfa: flags.mfa,
     pwd: flags.mustChangePassword,
+    ...(flags.roleId ? { rid: flags.roleId } : {}),
   });
   return {
     access_token: access,
@@ -95,7 +119,56 @@ async function issueTokens(
     expires_in: config.ACCESS_TOKEN_MINUTES * 60,
     audience: subject.aud,
     family_id: familyId,
+    session_expires_at: absoluteEnd,
   };
+}
+
+/**
+ * The company a sign-in names (contract C4), before any account is looked up: the body's `company` slug, else the `x-kkt-company` header
+ * (an unknown slug → 400 COMPANY_REQUIRED), else the request Host in `companies.hosts`, else the only company. Null when several companies
+ * exist and nothing names one — the caller then resolves the identifier across companies (loginCandidates).
+ */
+export async function loginCompanyId(
+  app: Pick<FastifyInstance, "db">,
+  req: Pick<FastifyRequest, "headers" | "hostname">,
+  slug: string | undefined,
+): Promise<string | null> {
+  const header = req.headers[COMPANY_HEADER];
+  const named = (slug ?? (Array.isArray(header) ? header[0] : header))?.trim();
+  if (named) {
+    const id = await companyIdBySlug(app.db, named);
+    if (!id)
+      throw new ApiError(400, "COMPANY_REQUIRED", `No company has the slug "${named.slice(0, 100)}"`, {
+        company: named.slice(0, 100),
+      });
+    return id;
+  }
+  const host = normaliseHost(req.hostname);
+  if (host) {
+    const id = await companyIdByHost(app.db, host);
+    if (id) return id;
+  }
+  // The single-company fallback is read fresh (not from the 30 s tenant cache): a sign-in must never attribute its login event to a
+  // company that was replaced a moment ago (reseed, restore). One indexed query; argon2 dominates a sign-in anyway.
+  const rows = await app.db.select({ id: companies.id }).from(companies).limit(2);
+  return rows.length === 1 ? rows[0]!.id : null;
+}
+
+/**
+ * Picks the account of a sign-in among the rows matching the identifier: within the resolved company when there is one; without a
+ * company, the single matching row (none → null, answered like a wrong password: no enumeration), and 400 COMPANY_REQUIRED when the
+ * identifier exists in more than one company (the client must name the company).
+ */
+export function pickLoginAccount<T extends { companyId: string }>(
+  rows: readonly T[],
+  companyId: string | null,
+): T | null {
+  if (companyId) return rows.find((r) => r.companyId === companyId) ?? null;
+  if (rows.length > 1)
+    throw new ApiError(400, "COMPANY_REQUIRED", "This sign-in exists in several companies: name the company", {
+      field: "company",
+    });
+  return rows[0] ?? null;
 }
 
 /** Revokes every live token of a family and flags the session so outstanding access tokens die immediately. */
@@ -202,7 +275,13 @@ export async function rotateRefresh(
   loadSubject: (
     tx: Executor,
     subjectId: string,
-  ) => Promise<{ companyId: string; mfa: boolean; mustChangePassword: boolean; actor: AuditActor } | null>,
+  ) => Promise<{
+    companyId: string;
+    mfa: boolean;
+    mustChangePassword: boolean;
+    roleId?: string;
+    actor: AuditActor;
+  } | null>,
 ): Promise<IssuedTokens> {
   const expectedType: UserType = aud === "erp" ? "STAFF" : "CUSTOMER";
   const [row] = await app.db
@@ -232,6 +311,13 @@ export async function rotateRefresh(
     );
   };
   if (row.revokedAt || row.replacedById) return reuse();
+  // Absolute lifetime (contract C1): past it the whole family ends, whatever the sliding expiry of its latest token says.
+  if (familyExpiresAt(row.familyStartedAt).getTime() <= Date.now()) {
+    await app.db.transaction(async (tx) => {
+      await revokeFamily(tx, securityRedis(app), row.familyId, "SESSION_EXPIRED");
+    });
+    throw ApiError.unauthenticated("Session expired; sign in again", "SESSION_EXPIRED");
+  }
   if (row.expiresAt.getTime() <= Date.now()) throw ApiError.unauthenticated("Refresh token expired", "TOKEN_EXPIRED");
   const outcome = await app.db.transaction(async (tx) => {
     const subject = await loadSubject(tx, row.subjectId);
@@ -247,8 +333,9 @@ export async function rotateRefresh(
       tx,
       { type: row.subjectType, id: row.subjectId, companyId: row.companyId, aud },
       row.familyId,
+      row.familyStartedAt,
       req,
-      { mfa: subject.mfa, mustChangePassword: subject.mustChangePassword },
+      { mfa: subject.mfa, mustChangePassword: subject.mustChangePassword, roleId: subject.roleId },
       { id: row.id },
     );
     return { kind: "ok" as const, tokens };
@@ -316,7 +403,7 @@ export async function assertLoginAllowed(
   if (state) until = state.lockedUntil;
   if (until || !state) {
     await recordLoginEvent(db, {
-      companyId: account?.companyId ?? null,
+      companyId: account?.companyId ?? target.companyId ?? null,
       subjectType: target.subjectType,
       identifier: target.identifier,
       success: false,
@@ -343,7 +430,7 @@ export async function failLogin(
 ): Promise<never> {
   const state = await app.db.transaction(async (tx) => {
     await recordLoginEvent(tx, {
-      companyId: account?.companyId ?? null,
+      companyId: account?.companyId ?? target.companyId ?? null,
       subjectType: target.subjectType,
       identifier: target.identifier,
       success: false,

@@ -213,8 +213,13 @@ export const ListQuerySchema = z.object({
   sort: SortSchema.optional(),
   include_inactive: BoolQuerySchema.default(false),
   format: z.enum(["csv"]).optional(),
-  /** Force an exact `total` (large tables otherwise report the planner's estimate). */
+  /** Force an exact `total` (large tables otherwise report the planner's estimate; `meta.total_is_estimate` says which). */
   exact: BoolQuerySchema.default(false),
+  /**
+   * Keyset mode (`cursor`/`limit`) skips counting: without `include_total=true` the envelope's `total` is the number of rows in this page
+   * and `meta.total_included` is false (page on with `next_cursor`). Offset mode always counts.
+   */
+  include_total: BoolQuerySchema.default(false),
 });
 export type ListQuery = z.infer<typeof ListQuerySchema>;
 
@@ -222,6 +227,17 @@ export type ListQuery = z.infer<typeof ListQuerySchema>;
 export function parseSort(sort: string): { field: string; direction: "asc" | "desc" } {
   return sort.startsWith("-") ? { field: sort.slice(1), direction: "desc" } : { field: sort, direction: "asc" };
 }
+
+/**
+ * How `total` of a list envelope was obtained (absent on lists that do not page through the shared helper; read it as exact then):
+ * - `total_is_estimate` — true when `total` is the planner's estimate (tables above ~10k rows without `exact=true`), false when counted;
+ * - `total_included` — false in keyset mode without `include_total=true`: nothing was counted and `total` is the row count of this page.
+ */
+export const ListMetaSchema = z.object({
+  total_is_estimate: z.boolean(),
+  total_included: z.boolean(),
+});
+export type ListMeta = z.infer<typeof ListMetaSchema>;
 
 /** Builds the list envelope schema for an item schema. */
 export function listEnvelope<T extends z.ZodType>(itemSchema: T) {
@@ -231,6 +247,7 @@ export function listEnvelope<T extends z.ZodType>(itemSchema: T) {
     page: z.int().min(1),
     page_size: z.int().min(1).max(MAX_PAGE_SIZE),
     next_cursor: z.string().nullable(),
+    meta: ListMetaSchema.optional(),
   });
 }
 
@@ -241,6 +258,7 @@ export interface ListEnvelope<T> {
   page: number;
   page_size: number;
   next_cursor: string | null;
+  meta?: ListMeta;
 }
 
 // ---------------------------------------------------------------------------

@@ -1,3 +1,4 @@
+import { generateKeyPairSync } from "node:crypto";
 import { spawn } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -166,7 +167,10 @@ describe("server.ts migrate in production mode (end to end, scratch database)", 
       REDIS_URL: process.env["REDIS_URL"],
       JWT_SECRET: "first-boot-test-jwt-secret-0123456789abcdef-xyz",
       FIELD_ENCRYPTION_KEY: "Zmlyc3QtYm9vdC10ZXN0LWZpZWxkLWtleS0wMTIzNDU2Nzg5",
-      HASH_KEY: "first-boot-test-hash-key-0123",
+      // contract C9: production needs the explicit rings (an Ed25519 JWT key, link and hash keys) and no secret under 32 bytes
+      HASH_KEYS: "h1:first-boot-test-hash-key-0123456789abcdef",
+      JWT_SIGNING_KEYS: `fb1:${generateKeyPairSync("ed25519").privateKey.export({ format: "der", type: "pkcs8" }).toString("base64")}`,
+      LINK_SIGNING_KEYS: "l1:first-boot-test-link-key-0123456789abcdef",
       LOG_LEVEL: "info",
       SEED_ON_BOOT: "false",
       SEED_DEMO: "false",

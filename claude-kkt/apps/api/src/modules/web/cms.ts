@@ -75,8 +75,8 @@ import {
 import {
   DOCUMENT_SELECT,
   loadJoined,
-  storeBuffer,
   toDocumentRow,
+  uploadDocument,
   withDocumentJoins,
   type DocumentJoined,
 } from "../documents/index.js";
@@ -938,17 +938,18 @@ function registerMedia(app: FastifyInstance): void {
     handler: async (req, reply) => {
       const user = req.user!;
       const upload = await readUpload(req);
-      const view = await app.db.transaction(async (tx) => {
-        const row = await storeBuffer(tx, {
-          companyId: user.companyId,
-          entityType: "CMS",
-          entityId: user.companyId,
-          buffer: upload.buffer,
-          filename: upload.filename,
-          title: upload.fields["title"] ?? null,
-          uploadedBy: user.id,
-          uploadedByType: "STAFF",
-        });
+      // validation + storage write before the short transaction, renditions in a job (documents/service.ts uploadDocument)
+      const input = {
+        companyId: user.companyId,
+        entityType: "CMS" as const,
+        entityId: user.companyId,
+        buffer: upload.buffer,
+        filename: upload.filename,
+        title: upload.fields["title"] ?? null,
+        uploadedBy: user.id,
+        uploadedByType: "STAFF" as const,
+      };
+      const view = await uploadDocument(app, input, async (tx, row) => {
         const doc = toDocumentRow((await loadJoined(tx, user.companyId, row.id))!);
         await writeAudit(tx, {
           companyId: user.companyId,

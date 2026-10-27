@@ -70,8 +70,9 @@ import {
   isPublicDocument,
   loadDocuments,
   publicCached,
-  publicCompanyId,
   publicHeaders,
+  CATALOG_CACHE_POLICY,
+  CMS_CACHE_POLICY,
   webOrigin,
   type DocumentRecord,
 } from "./shared.js";
@@ -240,6 +241,7 @@ export async function buildProjectCards(
       construction_percent: progress.get(p.id) ?? null,
       is_featured: featured.has(p.id),
       tagline: w.highlights[0] ?? null,
+      updated_at: latest(new Date(p.updatedAt), w.updatedAt, p.updatedAt),
     };
   });
 }
@@ -955,38 +957,75 @@ export async function siteIsLive(db: Executor, companyId: string): Promise<boole
 // Sitemap
 // ---------------------------------------------------------------------------
 
-async function sitemapEntries(
+/** Latest of several instants (ISO); `fallback` when none is known. */
+function latest(fallback: Date, ...values: (Date | string | null | undefined)[]): string {
+  let max = 0;
+  for (const v of values) {
+    const ms = v ? new Date(v).getTime() : NaN;
+    if (Number.isFinite(ms) && ms > max) max = ms;
+  }
+  return new Date(max > 0 ? max : fallback.getTime()).toISOString();
+}
+
+/**
+ * Every public URL of the website with a real lastmod (SPEC §15 "sitemap generated from published content"): published projects (their
+ * website settings / project row), ALL published posts, every published CMS page, and the static pages, each stamped with the newest
+ * change of the content it shows (home: settings, banners, sections, testimonials, featured projects, posts; about: settings + people;
+ * gallery: gallery rows; blog: posts; contact: settings). Never "now". Empty while the site is not live.
+ */
+export async function sitemapEntries(
   db: Executor,
   companyId: string,
 ): Promise<{ path: string; updated_at: string; priority: number }[]> {
-  if (!(await siteIsLive(db, companyId))) return [];
-  const now = new Date().toISOString();
-  const [published, posts, pages] = await Promise.all([
+  const site = await loadSiteSettings(db, companyId);
+  if (site && !site.siteLive) return [];
+  const [published, posts, pages, [m]] = await Promise.all([
     publishedProjects(db, companyId),
     db
-      .select({ slug: cmsPosts.slug, updatedAt: cmsPosts.updatedAt })
+      .select({ slug: cmsPosts.slug, updatedAt: cmsPosts.updatedAt, publishedAt: cmsPosts.publishedAt })
       .from(cmsPosts)
-      .where(and(eq(cmsPosts.companyId, companyId), publishedPostCondition())),
+      .where(and(eq(cmsPosts.companyId, companyId), publishedPostCondition()))
+      .orderBy(desc(cmsPosts.publishedAt), desc(cmsPosts.id)),
     db
       .select({ slug: cmsPages.slug, updatedAt: cmsPages.updatedAt })
       .from(cmsPages)
-      .where(and(eq(cmsPages.companyId, companyId), eq(cmsPages.isPublished, true))),
+      .where(and(eq(cmsPages.companyId, companyId), eq(cmsPages.isPublished, true)))
+      .orderBy(asc(cmsPages.slug)),
+    db.execute<{
+      banners: string | null;
+      sections: string | null;
+      testimonials: string | null;
+      gallery: string | null;
+      people: string | null;
+    }>(sql`
+      select (select max(updated_at) from cms_banners where company_id = ${companyId}::uuid) as banners,
+             (select max(updated_at) from cms_home_sections where company_id = ${companyId}::uuid) as sections,
+             (select max(updated_at) from cms_testimonials where company_id = ${companyId}::uuid) as testimonials,
+             (select max(updated_at) from cms_gallery where company_id = ${companyId}::uuid) as gallery,
+             (select max(updated_at) from cms_people where company_id = ${companyId}::uuid) as people`),
   ]);
+  const settingsAt = site?.updatedAt ?? null;
+  // a fixed fallback (not "now") keeps lastmod stable when nothing has been edited yet
+  const epoch = new Date(settingsAt ?? 0);
+  const projectAt = published.map((p) => latest(epoch, p.w.updatedAt, p.p.updatedAt));
+  const postAt = posts.map((p) => latest(epoch, p.updatedAt, p.publishedAt));
+  const projectsLast = latest(epoch, settingsAt, ...projectAt);
+  const blogLast = latest(epoch, ...postAt);
   const seen = new Set<string>();
   return [
-    { path: "/", updated_at: now, priority: 1 },
-    { path: "/projects", updated_at: now, priority: 0.9 },
-    ...published.map((p) => ({
-      path: `/projects/${p.w.slug}`,
-      updated_at: p.w.updatedAt.toISOString(),
-      priority: 0.9,
-    })),
-    { path: "/about", updated_at: now, priority: 0.5 },
-    { path: "/gallery", updated_at: now, priority: 0.5 },
-    { path: "/blog", updated_at: now, priority: 0.6 },
-    ...posts.map((p) => ({ path: `/blog/${p.slug}`, updated_at: p.updatedAt.toISOString(), priority: 0.6 })),
-    { path: "/contact", updated_at: now, priority: 0.5 },
-    ...pages.map((p) => ({ path: `/${p.slug}`, updated_at: p.updatedAt.toISOString(), priority: 0.3 })),
+    {
+      path: "/",
+      updated_at: latest(epoch, settingsAt, m?.banners, m?.sections, m?.testimonials, projectsLast, blogLast),
+      priority: 1,
+    },
+    { path: "/projects", updated_at: projectsLast, priority: 0.9 },
+    ...published.map((p, i) => ({ path: `/projects/${p.w.slug}`, updated_at: projectAt[i]!, priority: 0.9 })),
+    { path: "/about", updated_at: latest(epoch, settingsAt, m?.people), priority: 0.5 },
+    { path: "/gallery", updated_at: latest(epoch, m?.gallery), priority: 0.5 },
+    { path: "/blog", updated_at: blogLast, priority: 0.6 },
+    ...posts.map((p, i) => ({ path: `/blog/${p.slug}`, updated_at: postAt[i]!, priority: 0.6 })),
+    { path: "/contact", updated_at: latest(epoch, settingsAt), priority: 0.5 },
+    ...pages.map((p) => ({ path: `/${p.slug}`, updated_at: latest(epoch, p.updatedAt), priority: 0.3 })),
   ].filter((e) => (seen.has(e.path) ? false : (seen.add(e.path), true)));
 }
 
@@ -1000,37 +1039,32 @@ function xmlEscape(s: string): string {
 
 const slugParams = z.object({ slug: SlugSchema });
 
-async function companyOr404(app: FastifyInstance): Promise<string> {
-  const id = await publicCompanyId(app.dbReplica);
-  if (!id) throw ApiError.notFound("Site");
-  return id;
-}
-
 export function registerPublicContentRoutes(app: FastifyInstance): void {
   route(app, {
     method: "GET",
     url: "/public/site",
     public: true,
+    cachePolicy: CMS_CACHE_POLICY,
     schema: {
       response: { 200: PublicSiteResponseSchema },
       summary: "Site settings (allow-listed) plus home-page content; coming-soon payload when the site is not live",
     },
     handler: async (req, reply) =>
-      publicCached(app, req, reply, async () => buildSite(app.dbReplica, await companyOr404(app))),
+      publicCached(app, req, reply, async (companyId) => buildSite(app.dbReplica, companyId)),
   });
 
   route(app, {
     method: "GET",
     url: "/public/projects",
     public: true,
+    cachePolicy: CATALOG_CACHE_POLICY,
     schema: {
       querystring: PublicProjectsQuerySchema,
       response: { 200: z.array(PublicProjectCardSchema) },
       summary: "Published project cards (empty when the site is not live)",
     },
     handler: async (req, reply) =>
-      publicCached(app, req, reply, async () => {
-        const companyId = await companyOr404(app);
+      publicCached(app, req, reply, async (companyId) => {
         if (!(await siteIsLive(app.dbReplica, companyId))) return [];
         const q = req.query;
         const items = await publishedProjects(app.dbReplica, companyId);
@@ -1053,6 +1087,7 @@ export function registerPublicContentRoutes(app: FastifyInstance): void {
     method: "GET",
     url: "/public/projects/:slug",
     public: true,
+    cachePolicy: CATALOG_CACHE_POLICY,
     schema: {
       params: slugParams,
       response: { 200: PublicProjectDetailSchema },
@@ -1063,8 +1098,7 @@ export function registerPublicContentRoutes(app: FastifyInstance): void {
         app,
         req,
         reply,
-        async () => {
-          const companyId = await companyOr404(app);
+        async (companyId) => {
           if (!(await siteIsLive(app.dbReplica, companyId))) return null;
           return buildProjectDetail(
             app.dbReplica,
@@ -1081,14 +1115,14 @@ export function registerPublicContentRoutes(app: FastifyInstance): void {
     method: "GET",
     url: "/public/posts",
     public: true,
+    cachePolicy: CMS_CACHE_POLICY,
     schema: {
       querystring: PublicListQuerySchema,
       response: { 200: listEnvelope(PublicPostCardSchema) },
       summary: "Published blog posts",
     },
     handler: async (req, reply) =>
-      publicCached(app, req, reply, async () => {
-        const companyId = await companyOr404(app);
+      publicCached(app, req, reply, async (companyId) => {
         const { page, page_size } = req.query;
         if (!(await siteIsLive(app.dbReplica, companyId)))
           return { items: [], total: 0, page, page_size, next_cursor: null };
@@ -1130,14 +1164,14 @@ export function registerPublicContentRoutes(app: FastifyInstance): void {
     method: "GET",
     url: "/public/posts/:slug",
     public: true,
+    cachePolicy: CMS_CACHE_POLICY,
     schema: { params: slugParams, response: { 200: PublicPostDetailSchema }, summary: "One published post" },
     handler: async (req, reply) =>
       publicCached(
         app,
         req,
         reply,
-        async () => {
-          const companyId = await companyOr404(app);
+        async (companyId) => {
           if (!(await siteIsLive(app.dbReplica, companyId))) return null;
           const [r] = await app.dbReplica
             .select()
@@ -1171,6 +1205,7 @@ export function registerPublicContentRoutes(app: FastifyInstance): void {
     method: "GET",
     url: "/public/pages/:slug",
     public: true,
+    cachePolicy: CMS_CACHE_POLICY,
     schema: {
       params: slugParams,
       response: { 200: PublicPageSchema },
@@ -1182,8 +1217,7 @@ export function registerPublicContentRoutes(app: FastifyInstance): void {
         app,
         req,
         reply,
-        async () => {
-          const companyId = await companyOr404(app);
+        async (companyId) => {
           const [r] = await app.dbReplica
             .select()
             .from(cmsPages)
@@ -1212,6 +1246,7 @@ export function registerPublicContentRoutes(app: FastifyInstance): void {
     method: "GET",
     url: "/public/gallery",
     public: true,
+    cachePolicy: CMS_CACHE_POLICY,
     schema: {
       querystring: z.object({ project: SlugSchema.optional(), category: z.string().max(60).optional() }),
       response: { 200: PublicGalleryResponseSchema },
@@ -1222,8 +1257,7 @@ export function registerPublicContentRoutes(app: FastifyInstance): void {
         app,
         req,
         reply,
-        async () => {
-          const companyId = await companyOr404(app);
+        async (companyId) => {
           if (!(await siteIsLive(app.dbReplica, companyId))) return { items: [], projects: [] };
           const slugs = await publishedSlugs(app.dbReplica, companyId);
           let projectId: string | null = null;
@@ -1260,10 +1294,10 @@ export function registerPublicContentRoutes(app: FastifyInstance): void {
     method: "GET",
     url: "/public/people",
     public: true,
+    cachePolicy: CMS_CACHE_POLICY,
     schema: { response: { 200: z.array(PublicPersonSchema) }, summary: "Leadership / people" },
     handler: async (req, reply) =>
-      publicCached(app, req, reply, async () => {
-        const companyId = await companyOr404(app);
+      publicCached(app, req, reply, async (companyId) => {
         if (!(await siteIsLive(app.dbReplica, companyId))) return [];
         const rows = await app.dbReplica
           .select()
@@ -1321,13 +1355,14 @@ export function registerPublicContentRoutes(app: FastifyInstance): void {
     method: "GET",
     url: "/public/sitemap",
     public: true,
+    cachePolicy: CMS_CACHE_POLICY,
     schema: {
       response: { 200: PublicSitemapResponseSchema },
       summary: "Sitemap entries as JSON (published projects, posts, pages)",
     },
     handler: async (req, reply) =>
-      publicCached(app, req, reply, async () => ({
-        entries: await sitemapEntries(app.dbReplica, await companyOr404(app)),
+      publicCached(app, req, reply, async (companyId) => ({
+        entries: await sitemapEntries(app.dbReplica, companyId),
       })),
   });
 
@@ -1335,10 +1370,11 @@ export function registerPublicContentRoutes(app: FastifyInstance): void {
     method: "GET",
     url: "/public/sitemap.xml",
     public: true,
+    cachePolicy: CMS_CACHE_POLICY,
     schema: { response: { 200: z.string() }, summary: "sitemap.xml generated from published content" },
     handler: async (req, reply) => {
-      const entries = await publicCached(app, req, reply, async () => ({
-        entries: await sitemapEntries(app.dbReplica, await companyOr404(app)),
+      const entries = await publicCached(app, req, reply, async (companyId) => ({
+        entries: await sitemapEntries(app.dbReplica, companyId),
       }));
       const body = [
         `<?xml version="1.0" encoding="UTF-8"?>`,
@@ -1358,10 +1394,11 @@ export function registerPublicContentRoutes(app: FastifyInstance): void {
     method: "GET",
     url: "/public/robots.txt",
     public: true,
+    cachePolicy: CMS_CACHE_POLICY,
     schema: { response: { 200: z.string() }, summary: "robots.txt (Disallow everything while the site is not live)" },
     handler: async (req, reply) => {
-      const live = await publicCached(app, req, reply, async () => ({
-        live: await siteIsLive(app.dbReplica, await companyOr404(app)),
+      const live = await publicCached(app, req, reply, async (companyId) => ({
+        live: await siteIsLive(app.dbReplica, companyId),
       }));
       const body = live.live
         ? `User-agent: *\nAllow: /\nDisallow: /visit/\nDisallow: /api/\nSitemap: ${webOrigin}/sitemap.xml\n`

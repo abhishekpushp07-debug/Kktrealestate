@@ -2,6 +2,7 @@ import { SpanStatusCode, trace } from "@opentelemetry/api";
 import type { FastifyInstance, FastifyReply, FastifyRequest, HTTPMethods, RouteOptions } from "fastify";
 import { z } from "zod";
 import type { Permission } from "@kkt/contracts";
+import type { CachePolicy } from "../plugins/requestContext.js";
 import { ApiError } from "./errors.js";
 
 /** Any Zod schema. */
@@ -27,6 +28,8 @@ export interface RouteSchema<B, Q, P> {
   description?: string;
   tags?: string[];
   hide?: boolean;
+  /** Explicit OpenAPI operationId (default: derived from method and path, modules/system/openapiEnrich.ts). */
+  operationId?: string;
 }
 
 /** Route definition accepted by route(). Exactly one of permission (staff), audience (portal) or public must be set. */
@@ -46,6 +49,13 @@ export interface RouteDef<B extends AnyZod | undefined, Q extends AnyZod | undef
    */
   oneTimeSecrets?: readonly string[];
   rateLimit?: { limit: number; windowSeconds: number; by?: "ip" | "subject" };
+  /**
+   * Public CDN caching of an anonymous GET (contract C5, plugins/requestContext.ts): `Cache-Control: public, s-maxage, stale-while-revalidate`,
+   * a strong body ETag and 304 on a matching If-None-Match. Without it every response is `no-store`; authenticated requests always are.
+   */
+  cachePolicy?: CachePolicy;
+  /** Request body limit in bytes for this route (default: the app's 2 MB). */
+  bodyLimit?: number;
   /**
    * Marks the operation deprecated (docs/VERSIONING.md): every response carries `Deprecation: @<since>` (RFC 9745), `Sunset: <HTTP-date>`
    * (RFC 8594) and `Link` headers, and the OpenAPI operation is flagged `deprecated`. After the sunset date the route is replaced with
@@ -227,6 +237,7 @@ export function route<
   if (def.schema.summary) schema["summary"] = def.schema.summary;
   if (def.schema.description) schema["description"] = def.schema.description;
   if (def.schema.hide) schema["hide"] = true;
+  if (def.schema.operationId) schema["operationId"] = def.schema.operationId;
   if (def.permission) schema["security"] = [{ bearerAuth: [] }];
   if (def.audience) schema["security"] = [{ portalBearerAuth: [] }];
   let onSend: RouteOptions["onSend"] | undefined;
@@ -260,9 +271,11 @@ export function route<
       ...(def.oneTimeSecrets?.length ? { oneTimeSecrets: def.oneTimeSecrets } : {}),
       ...(def.idempotent ? { responseFields: responseFields(def.schema.response) } : {}),
       ...(def.rateLimit ? { rateLimit: def.rateLimit } : {}),
+      ...(def.cachePolicy ? { cachePolicy: def.cachePolicy } : {}),
       ...(def.deprecated ? { sunset: def.deprecated.sunset } : {}),
     },
     ...(onSend ? { onSend } : {}),
+    ...(def.bodyLimit ? { bodyLimit: def.bodyLimit } : {}),
     // the span carries the full route pattern (`/api/v1/bookings/:id`), like the server span and the metrics `route` label
     handler: traced(
       {

@@ -112,9 +112,14 @@ export const ServiceRequestRowSchema = z.object({
   status: ServiceStatusSchema,
   assignee_user_id: IdSchema.nullable(),
   assignee_name: z.string().nullable(),
+  /** Effective SLA deadline: shifted forward by every AWAITING_CUSTOMER pause when the ticket resumes; reset from the reopen time. */
   sla_due_at: TimestampSchema.nullable(),
   sla_breached_at: TimestampSchema.nullable(),
   is_sla_breached: z.boolean(),
+  /** Set while the SLA clock is paused (status AWAITING_CUSTOMER): the deadline moves on by the pause length on resume. */
+  sla_paused_at: TimestampSchema.nullable().optional(),
+  /** Seconds the clock was paused in the current SLA window (already added to sla_due_at; reset on reopen). */
+  sla_paused_seconds: z.int().min(0).optional(),
   resolved_at: TimestampSchema.nullable(),
   closed_at: TimestampSchema.nullable(),
   reopened_count: z.int().min(0),
@@ -175,6 +180,8 @@ export const CustomerTicketRowSchema = ServiceRequestRowSchema.omit({
   sla_due_at: true,
   sla_breached_at: true,
   is_sla_breached: true,
+  sla_paused_at: true,
+  sla_paused_seconds: true,
 }).extend({
   can_reopen: z.boolean(),
   can_rate: z.boolean(),

@@ -28,6 +28,7 @@ import { useAuth } from "@/lib/auth";
 import { formatDate } from "@/lib/format";
 import { useMutationWithToast } from "@/lib/queries";
 import { cn } from "@/lib/utils";
+import { useUnsavedChangesGuard } from "@/lib/unsaved";
 import { contractResolver } from "@/features/shared/contractResolver";
 import { inventoryKeys, PROJECTS_PATH, useVisitSettings } from "../api";
 import { controlOf, Notice } from "../components";
@@ -115,6 +116,8 @@ function VisitSettingsForm({ project, row }: { project: ProjectRow; row: VisitSe
   const canWrite = can("project.write") || can("visit.write");
   const resolver = useMemo(() => contractResolver<VisitValues, unknown>(FormSchema), []);
   const form = useForm<VisitValues, unknown, unknown>({ resolver, defaultValues: toValues(row), mode: "onTouched" });
+  // Leaving with unsaved edits (sidebar, Cmd+K, back, reload) asks first (audit v3 H3).
+  useUnsavedChangesGuard(form.formState.isDirty);
   const control = controlOf(form);
   const [serverError, setServerError] = useState<unknown>(null);
   const [newBlackout, setNewBlackout] = useState<string | null>(null);

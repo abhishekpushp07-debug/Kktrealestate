@@ -121,6 +121,119 @@ function issues(err: z.ZodError): string[] {
   return err.issues.map((i) => `${i.path.join(".") || "row"}: ${i.message}`);
 }
 
+/** True when the field may be left out of a create body (optional or with a default somewhere in its wrapper chain). */
+export function isOptionalField(schema: z.ZodType): boolean {
+  let s = schema;
+  for (let i = 0; i < 10; i++) {
+    const d = defOf(s);
+    if (d.type === "optional" || d.type === "default") return true;
+    if ((d.type === "nullable" || d.type === "readonly" || d.type === "catch") && d.innerType) {
+      s = d.innerType;
+      continue;
+    }
+    return false;
+  }
+  return false;
+}
+
+/** Removes optional/default wrappers at the top of a field (an UPDATE row must never receive a create-time default). */
+function stripDefaults(field: z.ZodType): z.ZodType {
+  let s = field;
+  for (let i = 0; i < 10; i++) {
+    const d = defOf(s);
+    if ((d.type === "optional" || d.type === "default") && d.innerType) s = d.innerType;
+    else return s;
+  }
+  return s;
+}
+
+/** The kind's import columns: the create schema's fields in declaration order. */
+export function importShape(def: MasterKindDef): Record<string, z.ZodType> {
+  return shapeOf(def.createSchema);
+}
+
+const partialSchemas = new WeakMap<MasterKindDef, z.ZodType>();
+/**
+ * Schema for an UPDATE row: every create field optional WITHOUT its default (Zod 4 would otherwise fill `demand_at: MANUAL`,
+ * `default_amount_paise: 0`, `spec_item_ids: []` … for every column the CSV leaves out), unknown keys refused.
+ */
+export function partialImportSchema(def: MasterKindDef): z.ZodType {
+  let schema = partialSchemas.get(def);
+  if (!schema) {
+    const out: Record<string, z.ZodType> = {};
+    for (const [k, field] of Object.entries(importShape(def))) out[k] = stripDefaults(field).optional();
+    schema = z.strictObject(out);
+    partialSchemas.set(def, schema);
+  }
+  return schema;
+}
+
+/** Levenshtein distance (small strings: header names). */
+function distance(a: string, b: string): number {
+  const prev = Array.from({ length: b.length + 1 }, (_v, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let diag = prev[0]!;
+    prev[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const tmp = prev[j]!;
+      prev[j] = Math.min(prev[j]! + 1, prev[j - 1]! + 1, diag + (a[i - 1] === b[j - 1] ? 0 : 1));
+      diag = tmp;
+    }
+  }
+  return prev[b.length]!;
+}
+
+/** The expected column an unknown header most likely means (`default_amount` → `default_amount_paise`), if any is close. */
+export function suggestColumn(unknown: string, expected: readonly string[]): string | null {
+  const u = unknown
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+  if (expected.includes(u)) return u;
+  let best: { name: string; score: number } | null = null;
+  for (const e of expected) {
+    let score = distance(u, e);
+    if (e.startsWith(`${u}_`) || e === `${u}_paise` || e === `${u}_id` || e === `${u}_ids`) score = 0.5;
+    if (score <= Math.max(2, Math.floor(e.length / 4)) && (!best || score < best.score)) best = { name: e, score };
+  }
+  return best?.name ?? null;
+}
+
+/**
+ * Checks a CSV header against the kind's columns: unknown or misnamed columns are 422 IMPORT_UNKNOWN_COLUMNS listing them with the
+ * expected names (they used to be dropped silently, so a mistyped money column imported as "unchanged" or as its default). Export-only
+ * columns of the kind's own CSV export (`id`, `version`, `is_active`, looked-up names) are accepted and ignored.
+ */
+export function checkImportHeader(def: MasterKindDef, headers: readonly string[]): { ignored: string[] } {
+  const shape = importShape(def);
+  const expected = Object.keys(shape);
+  const exportOnly = new Set(def.csvColumns.filter((c) => !(c in shape)));
+  const named = headers.filter((h) => h !== "");
+  const unknown = named.filter((h) => !(h in shape) && !exportOnly.has(h));
+  if (unknown.length > 0) {
+    const suggestions: Record<string, string> = {};
+    for (const u of unknown) {
+      const g = suggestColumn(u, expected);
+      if (g) suggestions[u] = g;
+    }
+    throw new ApiError(
+      422,
+      "IMPORT_UNKNOWN_COLUMNS",
+      `Unknown column(s) for ${def.path}: ${unknown
+        .map((u) => (suggestions[u] ? `${u} (did you mean ${suggestions[u]}?)` : u))
+        .join(", ")}. Expected columns: ${expected.join(", ")}`,
+      {
+        kind: def.kind,
+        unknown_columns: unknown,
+        suggestions,
+        expected_columns: expected,
+        required_columns: expected.filter((k) => !isOptionalField(shape[k]!)),
+      },
+    );
+  }
+  return { ignored: named.filter((h) => exportOnly.has(h)) };
+}
+
 /** Loads the existing rows for a set of business keys in one query (case-insensitive), keyed by lower-cased key. */
 async function existingByKeys(
   db: Executor,
@@ -152,8 +265,23 @@ async function existingByKeys(
 export const MasterCsvImportBodySchema = MasterCsvImportRequestSchema.extend({ partial: z.boolean().default(false) });
 export type MasterCsvImportBody = z.infer<typeof MasterCsvImportBodySchema>;
 
+type PreviewRow = MasterCsvImportRow & { input?: Record<string, unknown>; key?: string };
+
+/** Validates one row for the action it will take: CREATE → the full create schema (defaults apply); UPDATE → the partial schema. */
+function validateFor(
+  def: MasterKindDef,
+  action: "CREATE" | "UPDATE",
+  input: Record<string, unknown>,
+): { ok: true; data: Record<string, unknown> } | { ok: false; errors: string[] } {
+  const result = (action === "CREATE" ? def.createSchema : partialImportSchema(def)).safeParse(input);
+  if (!result.success) return { ok: false, errors: issues(result.error) };
+  return { ok: true, data: result.data as Record<string, unknown> };
+}
+
 /**
  * Previews (and with commit=true applies, in one transaction) a CSV import for one master kind.
+ * The header is checked first (unknown columns → 422 IMPORT_UNKNOWN_COLUMNS). A row whose business key exists is an UPDATE that writes
+ * only the columns present in the CSV with a non-empty cell; a new key is a CREATE validated by the create schema (defaults apply).
  * With errors present a commit is refused (422 IMPORT_HAS_ERRORS) unless `partial` is set, in which case only CREATE/UPDATE rows are applied.
  */
 export async function importMasterCsv(
@@ -164,19 +292,30 @@ export async function importMasterCsv(
   const def = kindDef(body.kind);
   const parsed = parseCsvObjects(body.csv);
   if (parsed.headers.length === 0) throw ApiError.badRequest("CSV has no header line");
-  const rows: (MasterCsvImportRow & { input?: Record<string, unknown>; key?: string })[] = [];
+  const { ignored } = checkImportHeader(def, parsed.headers);
+  const keySchema = importShape(def)[def.keyField];
+  const rows: PreviewRow[] = [];
   const seenKeys = new Map<string, number>();
   for (const rec of parsed.rows) {
     const input = csvRecordToInput(def, rec.values);
-    const result = def.createSchema.safeParse(input);
-    if (!result.success) {
-      rows.push({ line: rec.line, action: "ERROR", data: input, errors: issues(result.error) });
+    const rawKey = input[def.keyField];
+    if (rawKey === undefined || rawKey === "") {
+      rows.push({ line: rec.line, action: "ERROR", data: input, errors: [`${def.keyField} is required`] });
       continue;
     }
-    const data = result.data as Record<string, unknown>;
-    const key = String(data[def.keyField] ?? "").trim();
+    const keyResult = keySchema ? keySchema.safeParse(rawKey) : { success: true as const, data: rawKey };
+    if (!keyResult.success) {
+      rows.push({
+        line: rec.line,
+        action: "ERROR",
+        data: input,
+        errors: keyResult.error.issues.map((i) => `${def.keyField}: ${i.message}`),
+      });
+      continue;
+    }
+    const key = String(keyResult.data ?? "").trim();
     if (!key) {
-      rows.push({ line: rec.line, action: "ERROR", data, errors: [`${def.keyField} is required`] });
+      rows.push({ line: rec.line, action: "ERROR", data: input, errors: [`${def.keyField} is required`] });
       continue;
     }
     const dupLine = seenKeys.get(key.toLowerCase());
@@ -184,21 +323,23 @@ export async function importMasterCsv(
       rows.push({
         line: rec.line,
         action: "SKIP",
-        data,
+        data: input,
         errors: [`Duplicate ${def.keyField} "${key}" (first seen on line ${dupLine})`],
       });
       continue;
     }
     seenKeys.set(key.toLowerCase(), rec.line);
-    rows.push({ line: rec.line, action: "CREATE", data, errors: [], input: data, key });
+    rows.push({ line: rec.line, action: "CREATE", data: input, errors: [], input, key });
   }
-  const existing = await existingByKeys(
-    app.db,
-    def,
-    ctx.companyId,
-    rows.flatMap((r) => (r.key ? [r.key] : [])),
-  );
-  for (const r of rows) if (r.key && existing.has(r.key.toLowerCase())) r.action = "UPDATE";
+  const keys = rows.flatMap((r) => (r.key ? [r.key] : []));
+  const existing = await existingByKeys(app.db, def, ctx.companyId, keys);
+  for (const r of rows) {
+    if (!r.input || !r.key) continue;
+    const action = existing.has(r.key.toLowerCase()) ? "UPDATE" : "CREATE";
+    const v = validateFor(def, action, r.input);
+    if (v.ok) Object.assign(r, { action, data: v.data });
+    else Object.assign(r, { action: "ERROR", errors: v.errors, input: undefined, key: undefined });
+  }
   if (body.commit) {
     const errorLines = rows.filter((r) => r.action === "ERROR").map((r) => r.line);
     if (errorLines.length > 0 && !body.partial)
@@ -218,13 +359,18 @@ export async function importMasterCsv(
       for (const r of rows) {
         if (!r.input || !r.key || r.action === "ERROR" || r.action === "SKIP") continue;
         const row = live.get(r.key.toLowerCase());
-        if (row) {
-          r.action = "UPDATE";
-          await updateMaster(tx, def, ctx, String(row["id"]), Number(row["version"]), r.input);
-        } else {
-          r.action = "CREATE";
-          await createMaster(tx, def, ctx, r.input);
-        }
+        const action = row ? "UPDATE" : "CREATE";
+        const v = action === r.action ? { ok: true as const, data: r.data } : validateFor(def, action, r.input);
+        if (!v.ok)
+          throw ApiError.rule(
+            `Line ${r.line} changed from ${r.action} to ${action} since the preview and is no longer valid: ${v.errors.join("; ")}`,
+            "IMPORT_HAS_ERRORS",
+            { error_lines: [r.line] },
+          );
+        r.action = action;
+        r.data = v.data;
+        if (row) await updateMaster(tx, def, ctx, String(row["id"]), Number(row["version"]), v.data);
+        else await createMaster(tx, def, ctx, v.data);
       }
     });
   }
@@ -235,6 +381,7 @@ export async function importMasterCsv(
     committed: body.commit,
     rows: rows.map(({ line, action, data, errors }) => ({ line, action, data, errors })),
     summary,
+    ...(ignored.length > 0 ? { ignored_columns: ignored } : {}),
   };
 }
 

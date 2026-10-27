@@ -14,6 +14,10 @@
  *
  * Additive (allowed within v1): new paths/operations, new optional request properties/parameters, new response properties, new enum
  * values in requests; new enum values in responses are reported as notices (clients must tolerate unknown values).
+ *
+ * Not compared at all (documentation, never breaking): operationIds, components (schemas are compared through the `$ref`s that use them),
+ * error (non-2xx) responses, response headers, media types other than the JSON body. The protocol headers Idempotency-Key, If-Match and
+ * If-None-Match appearing on an operation are notices, required or not (the API enforced them before the document showed them).
  */
 
 type Json = Record<string, unknown>;
@@ -239,6 +243,12 @@ function tightenedBounds(b: Bounds, c: Bounds): string[] {
   return out;
 }
 
+/**
+ * Header parameters whose appearance documents existing behaviour (the API enforced them before the document declared them): never
+ * breaking. Everything else that becomes required is.
+ */
+const DOCUMENTED_HEADERS = /^header:(idempotency-key|if-match|if-none-match)$/i;
+
 /** Options of {@link diffOpenApi}. */
 export interface DiffOptions {
   /** "Today" for sunset checks (default: now). */
@@ -320,6 +330,11 @@ export function diffOpenApi(base: Json, current: Json, opts: DiffOptions = {}): 
       if (!bn) {
         // only the topmost new node counts: required fields inside a new optional object do not affect old clients
         if (parentMissing(path, bq)) continue;
+        // the protocol headers the API always honoured (idempotency, versions, caching) are documentation when they appear
+        if (DOCUMENTED_HEADERS.test(path)) {
+          out.notices.push(`${key}: request "${path}" documented${cn.required ? " (required)" : ""}`);
+          continue;
+        }
         if (cn.required) out.breaking.push(`${key}: request "${path}" added as required`);
         else out.additive.push(`${key}: request "${path}" added (optional)`);
         continue;

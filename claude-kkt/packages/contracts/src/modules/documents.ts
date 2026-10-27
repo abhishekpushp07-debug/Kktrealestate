@@ -45,6 +45,11 @@ export const DocumentRowSchema = z.object({
   width: z.int().nullable(),
   height: z.int().nullable(),
   has_variants: z.boolean(),
+  /**
+   * Image renditions (webp thumb ≈480 px, medium ≈1080 px), produced by a background job after the upload: PENDING until they exist (the
+   * thumb/medium URLs serve the original meanwhile), READY, FAILED (undecodable image; the original is served), NONE for non-images.
+   */
+  renditions: z.enum(["NONE", "PENDING", "READY", "FAILED"]),
   thumb_url: z.string().nullable(),
   medium_url: z.string().nullable(),
   is_sensitive: z.boolean(),

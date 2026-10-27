@@ -13,6 +13,7 @@ interface Page {
   page: number;
   page_size: number;
   next_cursor: string | null;
+  meta?: { total_is_estimate: boolean; total_included: boolean };
 }
 
 beforeAll(async () => {
@@ -37,7 +38,7 @@ async function walk(query: string, limit: number): Promise<{ ids: string[]; page
   let cursor: string | null = null;
   let pages = 0;
   for (let guard = 0; guard < 50; guard++) {
-    const url = `${URL}?${query}&limit=${limit}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
+    const url = `${URL}?${query}&include_total=true&limit=${limit}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
     const r: { status: number; text: string; body: Page } = await t.request<Page>("GET", url, { token });
     expect(r.status, r.text).toBe(200);
     expect(r.body.items.length).toBeLessThanOrEqual(limit);
@@ -54,10 +55,11 @@ async function walk(query: string, limit: number): Promise<{ ids: string[]; page
 }
 
 describe("list envelope and headers", () => {
-  it("every list carries exactly {items,total,page,page_size,next_cursor}, X-Request-Id, ETag and honours If-None-Match", async () => {
+  it("every list carries exactly {items,total,page,page_size,next_cursor,meta}, X-Request-Id, ETag and honours If-None-Match", async () => {
     const r = await t.request<Page>("GET", `${URL}?page_size=10`, { token });
     expect(r.status).toBe(200);
-    expect(Object.keys(r.body).sort()).toEqual(["items", "next_cursor", "page", "page_size", "total"]);
+    expect(Object.keys(r.body).sort()).toEqual(["items", "meta", "next_cursor", "page", "page_size", "total"]);
+    expect(r.body.meta).toEqual({ total_is_estimate: false, total_included: true });
     expect(r.body.items).toHaveLength(10);
     expect(r.body.total).toBe(TOTAL);
     expect(r.body.page).toBe(1);
@@ -132,20 +134,84 @@ describe("pagination on a 60-row fixture", () => {
       (i) => i.id,
     );
     expect(byName.ids).toEqual(names);
-    // a cursor from one sort cannot be replayed under another sort order silently: it still yields a valid page and no duplicates overall
+    // a cursor is bound to the sort it was issued for: replaying it under another sort is 400 INVALID_CURSOR, never a skewed page
     const first = await t.request<Page>("GET", `${URL}?sort=name&limit=5`, { token });
-    const skewed = await t.request<ErrorBody | Page>(
+    const skewed = await t.request<ErrorBody>(
       "GET",
       `${URL}?sort=-name&limit=5&cursor=${encodeURIComponent(first.body.next_cursor!)}`,
       { token },
     );
-    expect([200, 400]).toContain(skewed.status);
+    expect(skewed.status).toBe(400);
+    expect(skewed.body.error.code).toBe("INVALID_CURSOR");
     const bad = await t.request<ErrorBody>(
       "GET",
       `${URL}?limit=5&cursor=${encodeURIComponent(Buffer.from('["x"]').toString("base64url"))}`,
       { token },
     );
     expect(bad.status).toBe(400);
+    expect(bad.body.error.code).toBe("INVALID_CURSOR");
+  });
+
+  it("malformed or tampered cursors answer 400 INVALID_CURSOR (never a 500 from a bad cast)", async () => {
+    const enc = (v: unknown) => encodeURIComponent(Buffer.from(JSON.stringify(v)).toString("base64url"));
+    const id = "00000000-0000-4000-8000-000000000000";
+    const cases = [
+      "%%%not-base64%%%",
+      encodeURIComponent("bm90IGpzb24"), // "not json"
+      enc({ v: 1, id }),
+      enc([0, "not-a-uuid"]), // id column is a uuid
+      enc(["not-a-number", id, "sort_order"]), // sort_order is an integer column
+      enc([{ nested: true }, id]),
+      enc([1, id, "-sort_order"]), // issued for another sort
+    ];
+    for (const [i, c] of cases.entries()) {
+      const r = await t.request<ErrorBody>("GET", `${URL}?sort=sort_order&limit=5&cursor=${c}`, { token });
+      expect(r.status, `case ${i}: ${r.text}`).toBe(400);
+      expect(r.body.error.code, `case ${i}`).toBe("INVALID_CURSOR");
+      expect(r.body.error.details?.["issues"], `case ${i}`).toEqual([
+        expect.objectContaining({ path: "cursor", code: "invalid_cursor" }),
+      ]);
+    }
+    // a timestamp sort with a value that is not a timestamp (the audit's SQLSTATE 22007 path)
+    const ts = await t.request<ErrorBody>(
+      "GET",
+      `${URL}?sort=created_at&limit=5&cursor=${enc(["yesterday", id, "created_at"])}`,
+      { token },
+    );
+    expect(ts.status, ts.text).toBe(400);
+    expect(ts.body.error.code).toBe("INVALID_CURSOR");
+    // the well-formed cursors of a real walk keep working
+    const ok = await t.request<Page>("GET", `${URL}?sort=created_at&limit=5`, { token });
+    const next = await t.request<Page>(
+      "GET",
+      `${URL}?sort=created_at&limit=5&cursor=${encodeURIComponent(ok.body.next_cursor!)}`,
+      { token },
+    );
+    expect(next.status, next.text).toBe(200);
+    expect(next.body.items).toHaveLength(5);
+  });
+
+  it("keyset pages skip the count unless include_total=true; offset pages always count", async () => {
+    const page = await t.request<Page>("GET", `${URL}?sort=name&limit=7`, { token });
+    expect(page.status).toBe(200);
+    expect(page.body.items).toHaveLength(7);
+    expect(page.body.total).toBe(7); // the rows of this page: nothing was counted
+    expect(page.body.meta).toEqual({ total_is_estimate: false, total_included: false });
+    expect(page.body.next_cursor).not.toBeNull();
+    const counted = await t.request<Page>("GET", `${URL}?sort=name&limit=7&include_total=true`, { token });
+    expect(counted.body.total).toBe(TOTAL);
+    expect(counted.body.meta).toEqual({ total_is_estimate: false, total_included: true });
+    const exact = await t.request<Page>("GET", `${URL}?sort=name&limit=7&exact=true`, { token });
+    expect(exact.body.total).toBe(TOTAL);
+    expect(exact.body.meta?.total_included).toBe(true);
+  });
+
+  it("page above the bound answers 400 with the cursor-mode hint", async () => {
+    const r = await t.request<ErrorBody>("GET", `${URL}?page=1001`, { token });
+    expect(r.status).toBe(400);
+    expect(r.body.error.code).toBe("VALIDATION_ERROR");
+    expect(r.body.error.message).toMatch(/cursor/);
+    expect(JSON.stringify(r.body.error.details)).toMatch(/next_cursor/);
   });
 
   it("keyset paging respects search and include_inactive filters and ends with next_cursor null", async () => {

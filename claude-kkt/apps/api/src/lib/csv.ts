@@ -1,5 +1,7 @@
 import { Readable } from "node:stream";
-import type { FastifyReply } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { actorFromRequest, writeAudit } from "./audit.js";
+import { EXPORT_CURSOR_HEADER } from "./list.js";
 
 /** Parses RFC 4180 CSV text (quoted fields, doubled quotes, embedded newlines, CRLF) into rows of strings. */
 export function parseCsv(text: string): string[][] {
@@ -108,7 +110,58 @@ export interface CsvColumn<T> {
   value?: (row: T) => unknown;
 }
 
-/** Streams rows as `text/csv` with RFC 4180 quoting and a `Content-Disposition: attachment` header. */
+/** Query keys of a list request that are paging/format mechanics rather than filters (left out of the export audit row). */
+const NON_FILTER_KEYS = new Set(["format", "export", "page", "page_size", "limit", "cursor", "exact"]);
+
+/** The entity an export is about: the first static segment of the route after /api/v1 (e.g. `customers`, `reports`). */
+function exportEntity(url: string): string {
+  const seg = url
+    .replace(/^\/api\/v1\//, "")
+    .split("/")
+    .find((x) => x && !x.startsWith(":"));
+  return (seg ?? "export").slice(0, 60);
+}
+
+/**
+ * Writes the `export.csv` audit row of a CSV export (audit D: bulk PII reads left no trail): actor, the list route, its filters, the row
+ * count, and whether it is a page of an asynchronous export (X-Export-Cursor). The continuation pages of a keyset export are not
+ * recorded again (the first page and POST /exports are). Unauthenticated requests write nothing (there is no tenant).
+ */
+export async function auditCsvExport(req: FastifyRequest, filename: string, rowCount: number): Promise<void> {
+  const companyId = req.user?.companyId ?? req.customer?.companyId;
+  if (!companyId) return;
+  const cursor = req.headers[EXPORT_CURSOR_HEADER];
+  if (typeof cursor === "string" && cursor !== "start") return;
+  const url = req.routeOptions.url ?? req.url.split("?")[0] ?? "";
+  const query = (req.query ?? {}) as Record<string, unknown>;
+  const filters: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(query)) if (!NON_FILTER_KEYS.has(k) && v !== undefined) filters[k] = v;
+  const params = (req.params ?? {}) as Record<string, unknown>;
+  const db = (req.server as FastifyInstance).db;
+  await writeAudit(db, {
+    companyId,
+    actor: actorFromRequest(req),
+    action: "export.csv",
+    entityType: exportEntity(url),
+    entityId: null,
+    after: {
+      route: url,
+      file_name: filename,
+      filters,
+      ...(Object.keys(params).length > 0 ? { params } : {}),
+      row_count: rowCount,
+      async_export: typeof cursor === "string",
+    },
+    ip: req.clientIp ?? null,
+    requestId: req.id,
+  });
+}
+
+/**
+ * Streams rows as `text/csv` with RFC 4180 quoting and a `Content-Disposition: attachment` header. Every export is audited first
+ * (auditCsvExport): the audit row is committed before the first byte of data is produced, so no CSV leaves the API without its trail
+ * (when the audit write fails the stream errors before any row).
+ */
 export function sendCsv<T extends Record<string, unknown>>(
   reply: FastifyReply,
   filename: string,
@@ -116,9 +169,12 @@ export function sendCsv<T extends Record<string, unknown>>(
   rows: Iterable<T>,
 ): FastifyReply {
   const safeName = filename.replace(/[^A-Za-z0-9._-]/g, "_");
+  const list = Array.isArray(rows) ? (rows as readonly T[]) : [...rows];
+  const req = reply.request;
   async function* lines(): AsyncGenerator<string> {
+    await auditCsvExport(req, safeName, list.length);
     yield `${columns.map((c) => csvField(c.header)).join(",")}\r\n`;
-    for (const row of rows) yield `${columns.map((c) => csvField(c.value ? c.value(row) : row[c.key])).join(",")}\r\n`;
+    for (const row of list) yield `${columns.map((c) => csvField(c.value ? c.value(row) : row[c.key])).join(",")}\r\n`;
   }
   reply.header("Content-Type", "text/csv; charset=utf-8");
   reply.header("Content-Disposition", `attachment; filename="${safeName}"`);

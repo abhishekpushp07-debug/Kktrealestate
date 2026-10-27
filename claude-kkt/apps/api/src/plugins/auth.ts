@@ -1,16 +1,19 @@
+import { createHash, timingSafeEqual } from "node:crypto";
+import { isIP } from "node:net";
 import fp from "fastify-plugin";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { sql } from "drizzle-orm";
 import type { Redis } from "ioredis";
 import { config } from "../config.js";
-import { PERM_VERSION_KEY, redisUsable, withinBudget } from "../lib/cache.js";
+import { authVersionKey, PERM_VERSION_KEY, redisUsable, withinBudget } from "../lib/cache.js";
 import { loadCompany } from "../lib/company.js";
 import { ApiError } from "../lib/errors.js";
+import { EXPORT_CURSOR_HEADER } from "../lib/list.js";
 import { logger } from "../lib/logger.js";
 import { verifyAccessToken, type AccessClaims, type TokenAudience } from "../lib/jwt.js";
 import { clientIp, enforceRateLimit } from "../lib/rateLimit.js";
 import { isDocsUrl, isPublicPrefix, permissionAlternatives } from "../lib/routes.js";
-import type { PortalContext, StaffContext } from "../lib/scope.js";
+import { requiresAdminMfa, type PortalContext, type StaffContext } from "../lib/scope.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -33,9 +36,69 @@ const MFA_EXEMPT = [
   "/auth/mfa/verify",
   "/auth/mfa/disable",
 ];
-const ADMIN_ROLES = new Set(["Super Admin", "Project Admin"]);
 const WRITE_METHODS = new Set(["POST", "PATCH", "PUT", "DELETE"]);
 const USER_CACHE_TTL = 30;
+
+/** Header carrying the shared INTERNAL_API_TOKEN of a trusted server-side caller (the website's SSR, contract C3). */
+export const INTERNAL_TOKEN_HEADER = "x-kkt-internal-token";
+/** Header with the visitor's IP that a trusted server-side caller forwards (honoured only with a valid internal token). */
+export const FORWARDED_CLIENT_IP_HEADER = "x-kkt-client-ip";
+
+const digest = (v: string) => createHash("sha256").update(v).digest();
+
+/** Constant-time check of the internal token (compares SHA-256 digests, so neither content nor length leaks through timing). */
+export function validInternalToken(given: string | string[] | undefined): boolean {
+  const expected = config.INTERNAL_API_TOKEN;
+  if (!expected || typeof given !== "string" || given.length === 0) return false;
+  return timingSafeEqual(digest(given), digest(expected));
+}
+
+/**
+ * The client IP of a request (contract C3): the visitor IP forwarded in `x-kkt-client-ip` when the request carries a valid
+ * `x-kkt-internal-token` (the website's server-side fetches), else Fastify's proxy-aware `req.ip`. Without a valid token both headers are
+ * ignored, so nobody can choose their own rate-limit bucket.
+ */
+export function effectiveClientIp(req: FastifyRequest): string {
+  if (validInternalToken(req.headers[INTERNAL_TOKEN_HEADER])) {
+    const fwd = req.headers[FORWARDED_CLIENT_IP_HEADER];
+    const ip = typeof fwd === "string" ? fwd.trim() : "";
+    if (isIP(ip) !== 0) return ip.slice(0, 64);
+  }
+  return clientIp(req);
+}
+
+/** Public route groups with their own per-IP budget (contract C3): a burst on one never starves another. */
+export type PublicRouteGroup = "auth" | "forms" | "brochure" | "visits" | "files" | "catalog";
+
+/** The public route group of a registered route url. */
+export function publicRouteGroup(url: string): PublicRouteGroup {
+  if (url.startsWith("/api/v1/auth/") || url.startsWith("/api/v1/portal/auth/")) return "auth";
+  if (url.startsWith("/api/v1/public/enquiries")) return "forms";
+  if (url.startsWith("/api/v1/public/brochure")) return "brochure";
+  if (url.startsWith("/api/v1/public/site-visits") || url.endsWith("/visit-availability")) return "visits";
+  if (
+    url.startsWith("/api/v1/files/") ||
+    url.startsWith("/api/v1/portal/files/") ||
+    url.startsWith("/api/v1/exports/download/") ||
+    url.startsWith("/api/v1/admin/backups/download/")
+  )
+    return "files";
+  return "catalog";
+}
+
+/**
+ * True for a bulk export request (the stricter per-subject export budget): a `format=csv` / `export=CSV` list, or POST /exports. The
+ * continuation pages of a keyset export (X-Export-Cursor other than `start`, as the export job pages a list) count as reads.
+ */
+export function isExportRequest(req: FastifyRequest, url: string): boolean {
+  if (req.method === "POST") return url === "/api/v1/exports";
+  if (req.method !== "GET") return false;
+  const q = (req.query ?? {}) as Record<string, unknown>;
+  const csv = String(q["format"] ?? "").toLowerCase() === "csv" || String(q["export"] ?? "").toUpperCase() === "CSV";
+  if (!csv) return false;
+  const cursor = req.headers[EXPORT_CURSOR_HEADER];
+  return cursor === undefined || cursor === "start";
+}
 
 type StaffRow = {
   id: string;
@@ -187,32 +250,39 @@ export default fp(
     app.decorateRequest("authClaims", undefined);
 
     /**
-     * Cached row + revocation marker from Redis. Revocation lives in the security Redis, the row cache in the shared one; when either
-     * cannot be read the database answers (user/role/permissions from the tables, revocation from refresh_tokens), so a Redis outage
-     * degrades to slower requests instead of 500s and never un-revokes a session.
+     * Cached row + revocation marker from Redis. A cached row is valid only while every auth version it was stored under still matches
+     * (global generation + the scoped versions in `versionKeys`: user / portal user, role, company), so a change invalidates exactly the
+     * subjects it concerns (lib/cache.ts bumpAuthVersions). Revocation lives in the security Redis, the row cache in the shared one; when
+     * either cannot be read the database answers (user/role/permissions from the tables, revocation from refresh_tokens), so a Redis
+     * outage degrades to slower requests instead of 500s and never un-revokes a session.
      */
     async function cachedState<Row>(
       cacheKey: string,
+      versionKeys: readonly string[],
       sid: string,
     ): Promise<{ row: Row | null; version: string | null; revoked: boolean | null }> {
       const sec = securityRedis(app);
+      const keys = [PERM_VERSION_KEY, ...versionKeys];
+      const versionOf = (values: (string | null)[]) => values.map((v) => v ?? "0").join(":");
       if (sec === app.redis) {
         const r = await redisTry(
           "auth mget",
-          () => app.redis.mget(PERM_VERSION_KEY, cacheKey, revokedSessionKey(sid)),
+          () => app.redis.mget(...keys, cacheKey, revokedSessionKey(sid)),
           app.redis,
         );
         if (!r.ok) return { row: null, version: null, revoked: null };
-        const [version, raw, revoked] = r.value;
-        return { row: fromCache<Row>(raw ?? null, version ?? "0"), version: version ?? "0", revoked: Boolean(revoked) };
+        const version = versionOf(r.value.slice(0, keys.length));
+        const raw = r.value[keys.length] ?? null;
+        const revoked = r.value[keys.length + 1];
+        return { row: fromCache<Row>(raw, version), version, revoked: Boolean(revoked) };
       }
       const [cache, marker] = await Promise.all([
-        redisTry("auth cache mget", () => app.redis.mget(PERM_VERSION_KEY, cacheKey), app.redis),
+        redisTry("auth cache mget", () => app.redis.mget(...keys, cacheKey), app.redis),
         redisTry("revocation marker read", () => sec.get(revokedSessionKey(sid)), sec),
       ]);
-      const version = cache.ok ? (cache.value[0] ?? "0") : null;
+      const version = cache.ok ? versionOf(cache.value.slice(0, keys.length)) : null;
       return {
-        row: cache.ok ? fromCache<Row>(cache.value[1] ?? null, version ?? "0") : null,
+        row: cache.ok && version !== null ? fromCache<Row>(cache.value[keys.length] ?? null, version) : null,
         version,
         revoked: marker.ok ? Boolean(marker.value) : null,
       };
@@ -241,12 +311,25 @@ export default fp(
     const revokedSql = (sid: string) =>
       sql`exists (select 1 from refresh_tokens rt where rt.family_id = ${sid}::uuid and rt.revoked_at is not null)`;
 
-    async function loadStaff(userId: string, sid: string): Promise<StaffRow> {
+    /**
+     * The staff auth row. Cached under the versions of the user, the role named by the token (`rid`) and the company; a token without
+     * `rid` (minted before it existed) always reads the database, and a row whose role differs from the token's `rid` (role changed since
+     * the token was issued) is not cached, because the cache entry would not be invalidated by edits of its real role.
+     */
+    async function loadStaff(claims: AccessClaims): Promise<StaffRow> {
+      const userId = claims.sub;
+      const sid = claims.sid;
       if (pendingRevoked(sid)) throw ApiError.unauthenticated("Session has been revoked", "SESSION_REVOKED");
       const userKey = `perm:user:${userId}`;
-      const state = await cachedState<StaffRow>(userKey, sid);
+      const rid = typeof claims.rid === "string" ? claims.rid : null;
+      const versionKeys = [
+        authVersionKey("user", userId),
+        authVersionKey("role", rid ?? "none"),
+        authVersionKey("company", claims.cid),
+      ];
+      const state = await cachedState<StaffRow>(userKey, versionKeys, sid);
       if (state.revoked === true) throw ApiError.unauthenticated("Session has been revoked", "SESSION_REVOKED");
-      if (state.row && state.revoked === false) return state.row;
+      if (state.row && rid && state.row.role_id === rid && state.revoked === false) return state.row;
       const rows = await app.db.execute<StaffRow & { session_revoked: boolean }>(sql`
       select u.id, u.company_id, u.name, u.email, u.role_id, u.is_active, u.must_change_password, u.mfa_enabled, u.all_projects,
              r.name as role_name, r.is_system, r.permissions, r.is_active as role_active,
@@ -257,14 +340,21 @@ export default fp(
       if (!found) throw ApiError.unauthenticated("User no longer exists", "INVALID_TOKEN");
       if (found.session_revoked) throw ApiError.unauthenticated("Session has been revoked", "SESSION_REVOKED");
       const { session_revoked: _r, ...row } = found;
-      if (!state.row) await storeCache(userKey, state.version, row);
+      if (!state.row && rid && row.role_id === rid && row.company_id === claims.cid)
+        await storeCache(userKey, state.version, row);
       return row;
     }
 
-    async function loadPortal(portalUserId: string, sid: string): Promise<PortalRow> {
+    async function loadPortal(claims: AccessClaims): Promise<PortalRow> {
+      const portalUserId = claims.sub;
+      const sid = claims.sid;
       if (pendingRevoked(sid)) throw ApiError.unauthenticated("Session has been revoked", "SESSION_REVOKED");
       const key = `perm:portal:${portalUserId}`;
-      const state = await cachedState<PortalRow>(key, sid);
+      const state = await cachedState<PortalRow>(
+        key,
+        [authVersionKey("portal", portalUserId), authVersionKey("company", claims.cid)],
+        sid,
+      );
       if (state.revoked === true) throw ApiError.unauthenticated("Session has been revoked", "SESSION_REVOKED");
       if (state.row && state.revoked === false) return state.row;
       const rows = await app.db.execute<PortalRow & { session_revoked: boolean }>(sql`
@@ -275,7 +365,7 @@ export default fp(
       if (!found) throw ApiError.unauthenticated("Account no longer exists", "INVALID_TOKEN");
       if (found.session_revoked) throw ApiError.unauthenticated("Session has been revoked", "SESSION_REVOKED");
       const { session_revoked: _r, ...row } = found;
-      if (!state.row) await storeCache(key, state.version, row);
+      if (!state.row && row.company_id === claims.cid) await storeCache(key, state.version, row);
       return row;
     }
 
@@ -294,7 +384,7 @@ export default fp(
     }
 
     app.addHook("onRequest", async (req) => {
-      req.clientIp = clientIp(req);
+      req.clientIp = effectiveClientIp(req);
       const url = req.routeOptions.url;
       if (!url) return; // unknown route: let the 404 handler answer
       const cfg = req.routeOptions.config;
@@ -302,8 +392,11 @@ export default fp(
       // admin.tools; they are authenticated below exactly like a staff route that declares that permission
       const docsGuarded = !config.DOCS_PUBLIC && isDocsUrl(url);
       if ((cfg.public || isPublicPrefix(url)) && !docsGuarded) {
-        const rl = cfg.rateLimit ?? { limit: config.PUBLIC_RATE_LIMIT_PER_MIN, windowSeconds: 60 };
-        await rateLimit(`pub:${cfg.rateLimit ? url : "all"}:${req.clientIp}`, rl.limit, rl.windowSeconds);
+        // Contract C3: one per-IP budget per route group (catalog reads, forms, brochure, visits, files, sign-in) plus the route's own
+        // stricter limit where it declares one (forms 5/min, login 10/min).
+        await rateLimit(`pub:${publicRouteGroup(url)}:${req.clientIp}`, config.PUBLIC_RATE_LIMIT_PER_MIN, 60);
+        if (cfg.rateLimit)
+          await rateLimit(`pub:${url}:${req.clientIp}`, cfg.rateLimit.limit, cfg.rateLimit.windowSeconds);
         return;
       }
       const audience: TokenAudience = docsGuarded ? "erp" : (cfg.audience ?? "erp");
@@ -322,7 +415,7 @@ export default fp(
       req.subjectId = claims.sub;
 
       if (audience === "erp") {
-        const row = await loadStaff(claims.sub, claims.sid);
+        const row = await loadStaff(claims);
         if (!row.is_active || !row.role_active) throw ApiError.unauthenticated("User is inactive", "USER_INACTIVE");
         const user: StaffContext = {
           id: row.id,
@@ -342,9 +435,10 @@ export default fp(
         req.user = user;
         if (user.mustChangePassword && !endsWithAny(url, PASSWORD_CHANGE_EXEMPT))
           throw new ApiError(403, "PASSWORD_CHANGE_REQUIRED", "You must change your password before continuing");
-        if (!claims.mfa && ADMIN_ROLES.has(user.roleName) && !endsWithAny(url, MFA_EXEMPT)) {
+        // Admin MFA is decided by what the role can do (settings/users/roles/admin tools, or the Super Admin system role), not its name.
+        if (!claims.mfa && requiresAdminMfa(user) && !endsWithAny(url, MFA_EXEMPT)) {
           const company = await loadCompany(app.db, app.redis, user.companyId);
-          if (company.settings.force_mfa_for_admins)
+          if (company.settings.force_mfa_for_admins !== false)
             throw new ApiError(403, "MFA_REQUIRED", "Multi-factor authentication is required for administrators");
         }
         if (permission) {
@@ -355,11 +449,11 @@ export default fp(
               alternatives,
             });
         }
-        if (WRITE_METHODS.has(req.method)) await rateLimit(`w:${user.id}`, config.WRITE_RATE_LIMIT_PER_MIN, 60);
+        await subjectRateLimits(req, url, user.id);
         return;
       }
 
-      const row = await loadPortal(claims.sub, claims.sid);
+      const row = await loadPortal(claims);
       if (!row.is_enabled || !row.customer_active)
         throw ApiError.unauthenticated("Portal access is disabled", "USER_INACTIVE");
       if (row.locked_until && new Date(row.locked_until).getTime() > Date.now())
@@ -378,9 +472,20 @@ export default fp(
       req.customer = customer;
       if (customer.mustChangePassword && !endsWithAny(url, PASSWORD_CHANGE_EXEMPT))
         throw new ApiError(403, "PASSWORD_CHANGE_REQUIRED", "You must change your password before continuing");
-      if (WRITE_METHODS.has(req.method))
-        await rateLimit(`w:${customer.portalUserId}`, config.WRITE_RATE_LIMIT_PER_MIN, 60);
+      await subjectRateLimits(req, url, customer.portalUserId);
     });
+
+    /**
+     * Per-subject budgets of an authenticated request (audit D: one stolen token could scrape the customer base): writes
+     * (WRITE_RATE_LIMIT_PER_MIN), reads (READ_RATE_LIMIT_PER_MIN) and, on top, bulk exports (EXPORT_RATE_LIMIT_PER_MIN: CSV lists and
+     * POST /exports). Each answers 429 RATE_LIMITED with Retry-After.
+     */
+    async function subjectRateLimits(req: FastifyRequest, url: string, subjectId: string): Promise<void> {
+      if (WRITE_METHODS.has(req.method)) await rateLimit(`w:${subjectId}`, config.WRITE_RATE_LIMIT_PER_MIN, 60);
+      else if (req.method === "GET" || req.method === "HEAD")
+        await rateLimit(`r:${subjectId}`, config.READ_RATE_LIMIT_PER_MIN, 60);
+      if (isExportRequest(req, url)) await rateLimit(`x:${subjectId}`, config.EXPORT_RATE_LIMIT_PER_MIN, 60);
+    }
   },
   { name: "auth", dependencies: ["db", "redis"] },
 );

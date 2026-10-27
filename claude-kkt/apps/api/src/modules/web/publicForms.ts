@@ -1,7 +1,8 @@
 /**
  * Public forms (SPEC §15): website enquiries and the brochure lead gate. 5/min/IP, honeypot (silently dropped with a believable 200),
- * leads through the CRM service (dedupe rule), signed 15-minute brochure links counted once per link, 180-day visitor tokens.
+ * leads through the CRM service (dedupe rule), signed 15-minute brochure links counted once per link, 180-day opaque visitor tokens.
  */
+import { randomUUID } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
@@ -15,11 +16,19 @@ import {
   SlugSchema,
 } from "@kkt/contracts";
 import { UtmSchema } from "@kkt/contracts";
-import { brochureDownloads, flatTypes, projectWebsiteSettings, type Executor } from "@kkt/db";
+import { brochureDownloads, flatTypes, leads, projectWebsiteSettings, type Executor } from "@kkt/db";
 import { normalizeIndianPhone, todayIST } from "@kkt/domain";
 import { writeAudit } from "../../lib/audit.js";
 import { loadCompany } from "../../lib/company.js";
-import { keyedHash, randomToken, safeEqual, sha256, signPayload, verifyPayload } from "../../lib/crypto.js";
+import {
+  keyedHash,
+  keyedHashMatches,
+  randomToken,
+  sha256,
+  signLinkBody,
+  verifyLinkBody,
+  verifyPayload,
+} from "../../lib/crypto.js";
 import { ApiError } from "../../lib/errors.js";
 import { route } from "../../lib/routes.js";
 import { createEnquiry, createOrTouchLead } from "../crm/index.js";
@@ -35,7 +44,7 @@ import {
   isHoneypotTripped,
   loadDocuments,
   noStore,
-  publicCompanyId,
+  publicCompany,
   publicMeta,
   relaxHoneypot,
   userAgent,
@@ -60,12 +69,17 @@ const BrochureBody = z.strictObject({
   source_page: z.string().trim().max(300).optional().nullable(),
 });
 
-interface VisitorPayload extends Record<string, string | number> {
+/** Legacy (≤ phase 6) visitor token payload: phone, name and e-mail readable by anyone holding the token. Still honoured until it expires. */
+interface LegacyVisitorPayload extends Record<string, string | number> {
   v: 1;
   ph: string;
   nm: string;
   em: string;
 }
+/** Link-ring label of visitor tokens (contract C9 LINK_SIGNING_KEYS). */
+const VISITOR_LABEL = "kkt-visitor-v2";
+const VISITOR_TOKEN_VERSION = 2;
+
 /**
  * Brochure link token `<nonce>.<exp base36>.<hmac128 hex>`: HMAC-signed and short-lived; the brochure_downloads row (found by the token's
  * sha256) binds it to the project and records the single counted download. Kept compact so the URL parameter stays well under router limits.
@@ -84,33 +98,58 @@ export function verifyBrochureToken(token: string, now = Date.now()): boolean {
   const [nonce, expRaw, sig] = parts as [string, string, string];
   const exp = parseInt(expRaw, 36);
   if (!Number.isFinite(exp) || exp * 1000 < now) return false;
-  return safeEqual(sig, keyedHash(`brochure:${nonce}:${expRaw}`).slice(0, 32));
+  // every HASH_KEYS key is tried, so links issued just before a key rotation keep working for their 15 minutes
+  return keyedHashMatches(`brochure:${nonce}:${expRaw}`, sig, 32);
 }
 
-/** Signed visitor token (180 days) so a returning device skips the form. */
-export function signVisitorToken(phone: string, name: string, email: string | null): string {
-  return signPayload(
-    { v: 1, ph: phone, nm: name, em: email ?? "" } satisfies VisitorPayload,
-    VISITOR_TOKEN_DAYS * 86_400,
-  );
+/**
+ * Opaque visitor token (180 days) so a returning device skips the form: `<kid>.<body>.<hmac>` where body = version (1 byte) + lead id
+ * (16 bytes) + expiry (uint32 seconds), MAC'd with the link-signing ring. It carries no readable personal data; the server looks the
+ * visitor (name, phone, e-mail) up from the lead. Honeypot replies sign a random id, so their tokens look the same and resolve to nobody.
+ */
+export function signVisitorToken(leadId: string, now = Date.now()): string {
+  const body = Buffer.alloc(21);
+  body[0] = VISITOR_TOKEN_VERSION;
+  Buffer.from(leadId.replace(/-/g, ""), "hex").copy(body, 1);
+  body.writeUInt32BE(Math.floor(now / 1000) + VISITOR_TOKEN_DAYS * 86_400, 17);
+  return signLinkBody(VISITOR_LABEL, body);
 }
 
-/** Verifies a visitor token; null when forged/expired. */
-export function verifyVisitorToken(
+/** The lead id an opaque visitor token names; null when forged, expired or not a v2 token. */
+export function parseVisitorToken(token: string | null | undefined, now = Date.now()): { leadId: string } | null {
+  if (!token || token.split(".").length !== 3) return null;
+  const body = verifyLinkBody(VISITOR_LABEL, token);
+  if (!body || body.length !== 21 || body[0] !== VISITOR_TOKEN_VERSION) return null;
+  if (body.readUInt32BE(17) * 1000 < now) return null;
+  const hex = body.subarray(1, 17).toString("hex");
+  return {
+    leadId: `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`,
+  };
+}
+
+/** A returning visitor's details from their token; null when the token is unknown, expired, of another company or the lead is gone. */
+export async function lookupVisitor(
+  db: Executor,
+  companyId: string,
   token: string | null | undefined,
-): { phone: string; name: string; email: string | null } | null {
+): Promise<{ phone: string; name: string; email: string | null } | null> {
   if (!token) return null;
-  const data = verifyPayload<VisitorPayload>(token);
+  const ref = parseVisitorToken(token);
+  if (ref) {
+    const [lead] = await db
+      .select({ phone: leads.phone, name: leads.fullName, email: leads.email })
+      .from(leads)
+      .where(and(eq(leads.id, ref.leadId), eq(leads.companyId, companyId)))
+      .limit(1);
+    const phone = lead ? normalizeIndianPhone(lead.phone) : null;
+    return lead && phone ? { phone, name: lead.name, email: lead.email ?? null } : null;
+  }
+  // transition: a pre-phase-7 token (readable payload) is honoured until it expires; the reply replaces it with an opaque one
+  const data = verifyPayload<LegacyVisitorPayload>(token);
   if (!data || data.v !== 1 || typeof data.ph !== "string" || typeof data.nm !== "string") return null;
   const phone = normalizeIndianPhone(data.ph);
   if (!phone) return null;
   return { phone, name: data.nm, email: data.em ? String(data.em) : null };
-}
-
-async function companyOr404(db: Executor): Promise<string> {
-  const id = await publicCompanyId(db);
-  if (!id) throw ApiError.notFound("Site");
-  return id;
 }
 
 function validation(path: string, message: string): ApiError {
@@ -132,7 +171,7 @@ export function registerPublicFormRoutes(app: FastifyInstance): void {
     handler: async (req, reply) => {
       noStore(reply);
       const body = req.body;
-      const companyId = await companyOr404(app.db);
+      const companyId = await publicCompany(app, req);
       let projectId: string | null = null;
       let flatTypeId: string | null = null;
       if (body.project_slug) {
@@ -221,7 +260,7 @@ export function registerPublicFormRoutes(app: FastifyInstance): void {
       const body = req.body;
       const signed = signBrochureToken(BROCHURE_LINK_MINUTES * 60);
       const expiresAt = signed.expiresAt;
-      const companyId = await companyOr404(app.db);
+      const companyId = await publicCompany(app, req);
       const project = await livePublishedProject(app.db, companyId, body.project_slug);
       if (!project) throw ApiError.notFound("Project");
       const brochureId = project.w.brochureDocumentId;
@@ -229,7 +268,7 @@ export function registerPublicFormRoutes(app: FastifyInstance): void {
       const brochure = brochureId ? docs.get(brochureId) : undefined;
       if (!brochure || brochure.isSensitive || brochure.mime !== "application/pdf") throw ApiError.notFound("Brochure");
 
-      const returning = verifyVisitorToken(body.visitor_token);
+      const returning = await lookupVisitor(app.db, companyId, body.visitor_token);
       let who: { phone: string; name: string; email: string | null };
       if (returning) who = returning;
       else {
@@ -244,8 +283,7 @@ export function registerPublicFormRoutes(app: FastifyInstance): void {
         return {
           download_url: `${apiOrigin}/api/v1/public/brochure/${signed.token}`,
           expires_at: expiresAt.toISOString(),
-          visitor_token:
-            body.visitor_token && returning ? body.visitor_token : signVisitorToken(who.phone, who.name, who.email),
+          visitor_token: signVisitorToken(randomUUID()),
           file_name: brochure.fileName,
         };
       }
@@ -311,13 +349,12 @@ export function registerPublicFormRoutes(app: FastifyInstance): void {
           },
           ...publicMeta(req),
         });
-        return token;
+        return { token, leadId: lead.id };
       });
       return {
-        download_url: `${apiOrigin}/api/v1/public/brochure/${result}`,
+        download_url: `${apiOrigin}/api/v1/public/brochure/${result.token}`,
         expires_at: expiresAt.toISOString(),
-        visitor_token:
-          body.visitor_token && returning ? body.visitor_token : signVisitorToken(who.phone, who.name, who.email),
+        visitor_token: signVisitorToken(result.leadId),
         file_name: brochure.fileName,
       };
     },

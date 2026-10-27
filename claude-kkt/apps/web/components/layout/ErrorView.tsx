@@ -2,12 +2,17 @@
 
 import { useEffect } from "react";
 
+import { useSiteConfig } from "@/components/SiteConfigProvider";
 import { Button } from "@/components/ui/Button";
+import { reportClientError } from "@/lib/errorReporter";
 
 export function ErrorView({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  const { apiUrl, release } = useSiteConfig();
   useEffect(() => {
     console.error(error);
-  }, [error]);
+    // contract C2: the error boundary's catch is reported to the API (digest links it to the server log of a render error)
+    void reportClientError(apiUrl, error, { release, extra: { kind: "error-boundary" } });
+  }, [error, apiUrl, release]);
   return (
     <div className="bg-navy-900 text-ivory-100">
       <div className="container-site flex min-h-[70vh] flex-col items-start justify-center py-32">

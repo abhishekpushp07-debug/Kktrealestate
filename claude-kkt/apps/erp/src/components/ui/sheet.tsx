@@ -2,6 +2,7 @@ import { X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import type { ComponentProps, HTMLAttributes, ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { useDirtyClose } from "./dirty-close";
 
 export const Sheet = DialogPrimitive.Root;
 export const SheetTrigger = DialogPrimitive.Trigger;
@@ -21,6 +22,10 @@ export interface SheetContentProps extends ComponentProps<typeof DialogPrimitive
   size?: SheetSize;
   side?: "right" | "left";
   hideClose?: boolean;
+  /** The hosted form's dirty flag (e.g. react-hook-form `formState.isDirty`); omitted = any edit inside counts as dirty. */
+  dirty?: boolean;
+  /** false = never ask before closing (read-only drawers). */
+  guardUnsaved?: boolean;
 }
 
 /** Right-side drawer: full height, flex column (header / scrollable body / sticky footer). */
@@ -30,8 +35,16 @@ export function SheetContent({
   size = "md",
   side = "right",
   hideClose = false,
+  dirty,
+  guardUnsaved = true,
+  onEscapeKeyDown,
+  onInteractOutside,
+  onInputCapture,
+  onChangeCapture,
   ...props
 }: SheetContentProps) {
+  // A sheet hosting a form asks before Esc / outside click / the close button throw its edits away (audit v3 H3).
+  const guard = useDirtyClose({ dirty, guard: guardUnsaved });
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-navy-950/55 data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out" />
@@ -45,12 +58,31 @@ export function SheetContent({
           className,
         )}
         {...props}
+        onEscapeKeyDown={(event) => {
+          onEscapeKeyDown?.(event);
+          guard.intercept(event);
+        }}
+        onInteractOutside={(event) => {
+          onInteractOutside?.(event);
+          guard.intercept(event);
+        }}
+        onInputCapture={(event) => {
+          onInputCapture?.(event);
+          guard.trackEdit(event);
+        }}
+        onChangeCapture={(event) => {
+          onChangeCapture?.(event);
+          guard.trackEdit(event);
+        }}
+        data-dirty={guard.dirty ? "true" : undefined}
       >
         {children}
+        {guard.elements}
         {!hideClose && (
           <DialogPrimitive.Close
             className="absolute right-3 top-3.5 rounded-sm p-1 text-ink-subtle transition-colors hover:bg-navy-50 hover:text-navy-950 focus-ring"
             aria-label="Close"
+            onClick={guard.intercept}
           >
             <X className="size-4" aria-hidden="true" />
           </DialogPrimitive.Close>

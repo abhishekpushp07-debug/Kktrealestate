@@ -1,5 +1,12 @@
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
-import type { ActiveStateResponse, MasterCsvImportResponse, MasterKind, MasterRow } from "@kkt/contracts";
+import type {
+  ActiveStateResponse,
+  ImportUnknownColumnsDetails,
+  MasterCsvImportResponse,
+  MasterImportTemplate,
+  MasterKind,
+  MasterRow,
+} from "@kkt/contracts";
 import { api, type ApiClientError, type ListEnvelope } from "@/lib/api";
 import type { MasterSlug } from "./types";
 
@@ -16,7 +23,51 @@ export function masterPath(slug: MasterSlug): string {
 export const masterKeys = {
   all: (slug: MasterSlug) => [masterPath(slug)] as const,
   options: (slug: MasterSlug, includeInactive: boolean) => [masterPath(slug), "options", includeInactive] as const,
+  importTemplate: (slug: MasterSlug) => [masterPath(slug), "import-template"] as const,
 };
+
+/**
+ * The canonical CSV template of a master (`GET /masters/{path}/import-template`): header in create-schema order, column types,
+ * required flags, enum values and an example row valid for this company. The ERP keeps no column lists of its own.
+ */
+export function useImportTemplate(
+  slug: MasterSlug,
+  enabled = true,
+): UseQueryResult<MasterImportTemplate, ApiClientError> {
+  return useQuery<MasterImportTemplate, ApiClientError>({
+    queryKey: masterKeys.importTemplate(slug),
+    queryFn: ({ signal }) => api.get<MasterImportTemplate>(`${masterPath(slug)}/import-template`, { signal }),
+    staleTime: 5 * 60_000,
+    enabled,
+  });
+}
+
+/** One line per template column: "default_amount_paise (number, required)" / "demand_at (one of: ON_BOOKING, …)". */
+export function describeTemplateColumns(template: MasterImportTemplate): string[] {
+  return template.columns.map((column) => {
+    const facts: string[] = [
+      column.type === "enum" && column.values ? `one of: ${column.values.join(", ")}` : column.type,
+    ];
+    if (column.type === "list")
+      facts[0] = column.values ? `list of ${column.values.join(" | ")}, "|"-separated` : `"|"-separated list`;
+    if (column.type === "json") facts[0] = "JSON";
+    if (column.required) facts.push("required");
+    if (column.key) facts.push("match key");
+    return `${column.name} (${facts.join(", ")})`;
+  });
+}
+
+/** 422 IMPORT_UNKNOWN_COLUMNS details → readable lines ("default_amount → did you mean default_amount_paise?"). */
+export function unknownColumnLines(details: Record<string, unknown> | undefined): string[] {
+  const data = details as Partial<ImportUnknownColumnsDetails> | undefined;
+  const unknown = Array.isArray(data?.unknown_columns) ? data.unknown_columns : [];
+  const suggestions = data?.suggestions && typeof data.suggestions === "object" ? data.suggestions : {};
+  return unknown.map((column) =>
+    suggestions[column]
+      ? `“${column}” is not a column — did you mean “${suggestions[column]}”?`
+      : `“${column}” is not a column.`,
+  );
+}
 
 export interface MasterOptionsParams {
   includeInactive?: boolean;

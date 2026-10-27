@@ -536,6 +536,30 @@ export async function reviseAgreement(
       })
       .returning();
     if (!rev) throw new Error("revision insert returned no row");
+    // recompute every non-void demand (telescoping) and the adjustment to the raised figures
+    const existing = await nonVoidDemands(tx, b.id);
+    let cashAdj = 0;
+    let accountAdj = 0;
+    const recut: { id: string; cash: number; account: number }[] = [];
+    for (const d of existing) {
+      const was = demandAmountsFor(d, before);
+      const now = demandAmountsFor(d, after);
+      cashAdj += now.cashPaise - was.cashPaise;
+      accountAdj += now.accountPaise - was.accountPaise;
+      if (now.cashPaise !== d.cashDemandPaise || now.accountPaise !== d.accountDemandPaise)
+        recut.push({ id: d.id, cash: now.cashPaise, account: now.accountPaise });
+    }
+    // the AGREEMENT_CHANGE row is appended while the booking still carries the agreement in force BEFORE the revision, so the row's
+    // amount is the change of the agreement value — exactly the row a rebuild derives (no restatement needed afterwards)
+    await appendEvent(
+      tx,
+      b.id,
+      events.agreementChange(
+        { id: rev.id, revisedAt, reason: body.reason, after },
+        { cash: cashAdj, account: accountAdj },
+      ),
+      { locked: true },
+    );
     await applyUpdate(
       tx,
       bookings,
@@ -548,35 +572,13 @@ export async function reviseAgreement(
       },
       "booking",
     );
-    // recompute every non-void demand (telescoping) and the adjustment to the raised figures
-    const existing = await nonVoidDemands(tx, b.id);
-    let cashAdj = 0;
-    let accountAdj = 0;
-    for (const d of existing) {
-      const was = demandAmountsFor(d, before);
-      const now = demandAmountsFor(d, after);
-      cashAdj += now.cashPaise - was.cashPaise;
-      accountAdj += now.accountPaise - was.accountPaise;
-      if (now.cashPaise !== d.cashDemandPaise || now.accountPaise !== d.accountDemandPaise) {
-        await tx
-          .update(demands)
-          .set({
-            cashDemandPaise: now.cashPaise,
-            accountDemandPaise: now.accountPaise,
-            totalDemandPaise: now.cashPaise + now.accountPaise,
-          })
-          .where(eq(demands.id, d.id));
-      }
-    }
-    await appendEvent(
-      tx,
-      b.id,
-      events.agreementChange(
-        { id: rev.id, revisedAt, reason: body.reason, after },
-        { cash: cashAdj, account: accountAdj },
-      ),
-    );
-    await rebuild(tx, b.id, { write: true });
+    for (const d of recut)
+      await tx
+        .update(demands)
+        .set({ cashDemandPaise: d.cash, accountDemandPaise: d.account, totalDemandPaise: d.cash + d.account })
+        .where(eq(demands.id, d.id));
+    // the AGREEMENT_CHANGE row is in the book; the rebuild checks it (an epoch that does not match is restated, never rewritten)
+    await rebuild(tx, b.id, { write: true, reason: "AGREEMENT_REVISION", actor });
     await recomputeDemandStatuses(tx, b.id);
     await writeAudit(tx, {
       companyId: b.companyId,
@@ -637,7 +639,9 @@ export async function changePlan(
     const loaded = await resolveBookingPlan(tx, b.companyId, b.projectId, b.blockId, todayDate(), body.payment_plan_id);
     if (loaded.plan.id === b.paymentPlanId) throw ApiError.rule("The booking already uses this plan", "SAME_PLAN");
     const after = buildPlanSnapshot(loaded, company.settings.demand_due_days);
-    for (const d of existing) await voidDemand(tx, d, `Plan changed to ${loaded.plan.name}: ${body.reason}`, actor);
+    // each voided demand leaves a DEMAND_VOIDED row on the ledger (contract C7)
+    for (const d of existing)
+      await voidDemand(tx, d, `Plan changed to ${loaded.plan.name}: ${body.reason}`, actor, { clock });
     const at = clock.next();
     const [rev] = await tx
       .insert(bookingPlanRevisions)
@@ -668,8 +672,14 @@ export async function changePlan(
       },
       "booking",
     );
-    // voided demands leave the ledger; the PLAN_CHANGE marker row is derived from the revision; then catch-up from the new plan
-    await rebuild(tx, b.id, { write: true });
+    // the PLAN_CHANGE marker row (the same row a rebuild derives from the revision), the check rebuild, then catch-up from the new plan
+    await appendEvent(
+      tx,
+      b.id,
+      events.planChange({ id: rev.id, at, reason: body.reason, afterName: after.name }, { cash: 0, account: 0 }),
+      { locked: true },
+    );
+    await rebuild(tx, b.id, { write: true, reason: "PLAN_CHANGE", actor });
     const fresh = await loadBooking(tx, b.companyId, b.id);
     await raiseDues(tx, fresh, { today: todayDate(), actor, clock, company });
     await writeAudit(tx, {

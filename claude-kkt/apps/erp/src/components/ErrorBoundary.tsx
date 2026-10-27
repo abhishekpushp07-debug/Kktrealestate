@@ -1,6 +1,8 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { useLocation } from "react-router-dom";
 import { ErrorState } from "@/components/ui/error-state";
+import { isChunkLoadError, reloadOnceForChunkError } from "@/lib/chunkReload";
+import { reportClientError } from "@/lib/errorReporting";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -21,6 +23,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   override componentDidCatch(error: Error, info: ErrorInfo): void {
+    // A lazy chunk that vanished with a deploy: reload once to fetch the new build (lib/chunkReload.ts).
+    if (isChunkLoadError(error) && reloadOnceForChunkError()) return;
     this.props.onError?.(error, info);
   }
 
@@ -47,8 +51,16 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 }
 
-/** Error boundary that resets whenever the route changes. */
+function reportRouteError(error: Error, info: ErrorInfo): void {
+  reportClientError(error, { source: "page", componentStack: info.componentStack });
+}
+
+/** Error boundary that resets whenever the route changes; what it catches is reported (POST /client-errors). */
 export function RouteErrorBoundary({ children }: { children: ReactNode }) {
   const location = useLocation();
-  return <ErrorBoundary key={location.pathname}>{children}</ErrorBoundary>;
+  return (
+    <ErrorBoundary key={location.pathname} onError={reportRouteError}>
+      {children}
+    </ErrorBoundary>
+  );
 }

@@ -42,7 +42,7 @@ export function PresetsMenu({ reportKey, params, onApply }: PresetsMenuProps) {
   });
 
   const remove = useMutationWithToast<void, ReportPresetRow>({
-    mutationFn: (preset) => deletePreset(preset.id),
+    mutationFn: (preset) => deletePreset(preset.id, preset.version),
     successMessage: "Preset deleted",
     invalidate,
   });

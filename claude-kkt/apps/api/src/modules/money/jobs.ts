@@ -2,6 +2,7 @@
  * Scheduled jobs of the money module (registered through the core job registry): DAILY_DUES (00:30 IST), NIGHTLY_INTEGRITY (00:45),
  * OVERDUE_NOTIFICATIONS (01:15) and DUES_CATCHUP (enqueue at worker/API boot — SPEC §10 "at startup": a server down across 00:30 IST
  * must not leave time-triggered dues unraised until the next night). Each works per company so the single-tenant setup needs no special casing.
+ * The integrity report runs exactly once a night — as NIGHTLY_INTEGRITY (jobs/index.ts JOB_SCHEDULES), never again inside DAILY_DUES.
  */
 import { and, eq, inArray, lt, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
@@ -10,29 +11,75 @@ import { formatINR } from "@kkt/domain";
 import { registerJob } from "../../jobs/index.js";
 import { rebuildAllLedgers } from "./services/ledgerRebuild.js";
 import { notify, notifyRole } from "../notifications/index.js";
+import { logger } from "../../lib/logger.js";
 import { ACCOUNTS_ROLES, moneyTransaction, todayDate } from "./common.js";
-import { bookingRecipients, raiseDuesForAll } from "./services/dues.js";
+import { bookingRecipients, raiseDuesForAll, type RunSummary } from "./services/dues.js";
 import { nightlyIntegrity } from "./services/integrity.js";
 
 async function companyIds(db: DB): Promise<string[]> {
   return (await db.select({ id: companies.id }).from(companies)).map((c) => c.id);
 }
 
-/** Daily dues: raise time-triggered installments for every active booking, then report integrity (findings notify Super Admin + Accounts). */
+/** Roles notified (once per run and company) when bookings failed in a dues run. */
+export const DUES_FAILURE_ROLES = ["Super Admin"] as const;
+
+/**
+ * One JOB_FAILED bell per company and run listing the bookings that failed (their demands were not raised; everyone else's were).
+ * Best effort: a failure to notify is logged, never turns a finished run into a failed one.
+ */
+async function notifyDuesFailures(db: DB, job: string, companyId: string, s: RunSummary): Promise<void> {
+  if (s.failures.length === 0) return;
+  const shown = s.failures
+    .slice(0, 10)
+    .map((f) => `${f.booking_number ?? f.booking_id} (${f.code})`)
+    .join(", ");
+  try {
+    await db.transaction((tx) =>
+      notifyRole(tx, companyId, DUES_FAILURE_ROLES, {
+        type: "JOB_FAILED",
+        title: `${job}: dues not raised for ${s.failures.length} booking${s.failures.length === 1 ? "" : "s"}`,
+        body: `${shown}${s.failures.length > 10 ? ", …" : ""}. Every other booking was processed; fix these and run dues again.`,
+        entityType: "job",
+        entityId: null,
+        link: "/admin/jobs",
+      }),
+    );
+  } catch (err) {
+    logger.error({ err, job, company_id: companyId }, "dues: could not notify the failed bookings");
+  }
+}
+
+/** The per-company result of a dues run (job_runs.result): counts, demand numbers and the failed bookings with their error codes. */
+function runResult(s: RunSummary): Record<string, unknown> {
+  return {
+    bookings_checked: s.bookingsChecked,
+    demands_raised: s.demandsRaised,
+    demand_numbers: s.demandNumbers,
+    bookings_failed: s.failures.length,
+    failures: s.failures.map((f) => ({ booking_id: f.booking_id, booking_number: f.booking_number, code: f.code })),
+  };
+}
+
+/**
+ * Daily dues: raise time-triggered installments for every active booking (per-booking isolation, see raiseDuesForAll). The result carries
+ * `bookings_failed` per company and in total, the failures are counted in kkt_dues_booking_failures_total and Super Admins get one bell
+ * per run; the run itself completes so one poison booking never blocks every later booking. Integrity is NIGHTLY_INTEGRITY's job.
+ */
 export async function dailyDues(db: DB): Promise<Record<string, unknown>> {
+  return duesRun(db, "DAILY_DUES");
+}
+
+async function duesRun(db: DB, job: "DAILY_DUES" | "DUES_CATCHUP"): Promise<Record<string, unknown>> {
   const today = todayDate();
   const out: Record<string, unknown> = { as_of: today };
+  let failed = 0;
   for (const companyId of await companyIds(db)) {
     const s = await raiseDuesForAll(db, today, { companyId });
-    const report = await nightlyIntegrity(db, companyId);
-    out[companyId] = {
-      bookings_checked: s.bookingsChecked,
-      demands_raised: s.demandsRaised,
-      demand_numbers: s.demandNumbers,
-      integrity_ok: report.ok,
-      integrity_findings: report.findings.length,
-    };
+    failed += s.failures.length;
+    await notifyDuesFailures(db, job, companyId, s);
+    out[companyId] = runResult(s);
   }
+  out["bookings_failed"] = failed;
   return out;
 }
 
@@ -51,17 +98,7 @@ export async function nightlyIntegrityJob(db: DB): Promise<Record<string, unknow
  * report — safe to enqueue at every boot and after any missed 00:30 run (demands are unique per installment, so nothing is raised twice).
  */
 export async function duesCatchup(db: DB): Promise<Record<string, unknown>> {
-  const today = todayDate();
-  const out: Record<string, unknown> = { as_of: today };
-  for (const companyId of await companyIds(db)) {
-    const s = await raiseDuesForAll(db, today, { companyId });
-    out[companyId] = {
-      bookings_checked: s.bookingsChecked,
-      demands_raised: s.demandsRaised,
-      demand_numbers: s.demandNumbers,
-    };
-  }
-  return out;
+  return duesRun(db, "DUES_CATCHUP");
 }
 
 const overdueKey = (demandId: string, today: string) => `overdue:${demandId}:${today}`;

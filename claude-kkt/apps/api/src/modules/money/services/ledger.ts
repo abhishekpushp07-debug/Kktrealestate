@@ -1,9 +1,15 @@
 /**
- * Two-bucket ledger persistence (SPEC §11): appendEvent is the O(1) hot path under the booking advisory lock; rebuild derives every
- * row again from the source tables (demands, payments, other charges, revisions, cancellation) with the same domain engine and
- * reports where the stored summary disagrees — used by admin recompute, agreement/plan revisions and the integrity report (e).
+ * Two-bucket ledger persistence (SPEC §11) — the booking ledger is a BOOK OF RECORD (contract C7): rows are only ever appended.
+ *   - appendEvent is the O(1) hot path under the booking advisory lock: one row at the end of the booking's CURRENT epoch
+ *     (bookings.ledger_epoch). A voided demand appends a DEMAND_VOIDED row; it never vanishes from the ledger.
+ *   - rebuild derives every row again from the source tables (demands — voided ones included —, payments, other charges, revisions,
+ *     cancellation) with the same domain engine and compares them with the current epoch row by row. With `write`, a differing result is
+ *     written as a NEW epoch (ledger_epoch + 1) with a ledger_rebuilds row (reason, actor, summary diff) and the superseded epoch is closed
+ *     by a LEDGER_RESTATED row; an identical result writes nothing. Nothing is ever UPDATEd or DELETEd (src/sql/0006_money_guards.sql).
+ * Every reader (ledger endpoint, summaries, integrity, reports, portal) reads the current epoch; older epochs stay readable as history.
  */
-import { and, asc, desc, eq, inArray, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql, type SQL } from "drizzle-orm";
+import type { LedgerRebuildReason, LedgerRebuildSummary, LedgerTotals } from "@kkt/contracts";
 import {
   appendLedgerRow,
   bpOfPaise,
@@ -12,6 +18,7 @@ import {
   emptyLedgerSummary,
   ledgerEntryDate,
   toBasisPoints,
+  todayIST,
   type LedgerEvent,
   type LedgerRow,
   type LedgerRowDifference,
@@ -24,13 +31,14 @@ import {
   bookings,
   demands,
   ledgerEntries,
+  ledgerRebuilds,
   payments,
   type AgreementValues,
   type Executor,
   type Tx,
 } from "@kkt/db";
 import { ApiError } from "../../../lib/errors.js";
-import { lockBooking, type BookingRecord } from "../common.js";
+import { lockBooking, type BookingRecord, type MoneyActor } from "../common.js";
 
 /** A stored ledger row. */
 export type LedgerEntryRecord = typeof ledgerEntries.$inferSelect;
@@ -54,10 +62,36 @@ export interface RebuildResult {
   summary: LedgerSummary;
   /** Aggregate figures (booking summary columns, row count, final dues) that differ. */
   mismatches: SummaryMismatch[];
-  /** Row-by-row differences between the stored ledger and the rebuild (event, source id, amounts, every running balance). */
+  /** Row-by-row differences between the current epoch and the rebuild (event, source id, amounts, every running balance). */
   rowMismatches: LedgerRowDifference[];
   stored: Record<string, number>;
   recomputed: Record<string, number>;
+}
+
+/** Options of rebuild(). */
+export interface RebuildOptions {
+  /**
+   * Write the result: `true` and `"if-changed"` behave the same since the ledger became append-only (contract C7) — a result that differs
+   * from the current epoch is written as a new epoch, the booking summary columns are corrected when they differ, and an identical result
+   * writes nothing. Without `write` the rebuild only compares (integrity finding e).
+   */
+  write?: boolean | "if-changed";
+  /** Why the ledger is being rebuilt (ledger_rebuilds.reason); default ADMIN_RECOMPUTE. */
+  reason?: LedgerRebuildReason;
+  /** Who caused it (a STAFF actor is recorded as ledger_rebuilds.actor_id; anything else is the system). */
+  actor?: MoneyActor | null;
+}
+
+/** What a written rebuild did. */
+export interface RebuildWrite {
+  /** True when anything was written (a new epoch and/or corrected summary columns). */
+  written: boolean;
+  /** True when the rows differed and were written as a new epoch. */
+  restated: boolean;
+  /** The booking's current epoch after the call. */
+  epoch: number;
+  /** ledger_rebuilds.id of the restatement, when one was written. */
+  rebuildId: string | null;
 }
 
 /** Opening summary of a booking from its last ledger row (bucket figures) and its stored other-charge columns. */
@@ -84,11 +118,33 @@ function summaryFromLast(last: LedgerEntryRecord | undefined, booking: BookingRe
   };
 }
 
+/**
+ * The booking's current epoch as a scalar subquery: lets a ledger read filter on (booking_id, epoch) — the leading columns of
+ * ledger_entries_booking_epoch_seq_uq — without a separate round trip for bookings.ledger_epoch.
+ */
+export function currentEpochOf(bookingId: string | SQL): SQL<number> {
+  return sql<number>`(select ${bookings.ledgerEpoch} from ${bookings} where ${bookings.id} = ${bookingId})`;
+}
+
+/** WHERE clause of a booking's ledger rows in one epoch (default: the current one). */
+export function epochRows(bookingId: string, epoch?: number): SQL {
+  return and(
+    eq(ledgerEntries.bookingId, bookingId),
+    eq(ledgerEntries.epoch, epoch ?? currentEpochOf(bookingId)),
+  ) as SQL;
+}
+
 /** Insert values for a derived ledger row. */
-function rowValues(companyId: string, bookingId: string, row: LedgerRow): typeof ledgerEntries.$inferInsert {
+function rowValues(
+  companyId: string,
+  bookingId: string,
+  row: LedgerRow,
+  epoch: number,
+): typeof ledgerEntries.$inferInsert {
   return {
     companyId,
     bookingId,
+    epoch,
     seq: row.seq,
     at: new Date(row.at),
     entryDate: row.entryDate,
@@ -111,7 +167,7 @@ function rowValues(companyId: string, bookingId: string, row: LedgerRow): typeof
 }
 
 /** Writes the summary columns of a booking from a ledger summary (raised % = Σ percent of non-void demands). */
-async function writeSummary(tx: Executor, bookingId: string, summary: LedgerSummary): Promise<void> {
+export async function writeSummary(tx: Executor, bookingId: string, summary: LedgerSummary): Promise<void> {
   await tx
     .update(bookings)
     .set({
@@ -139,23 +195,29 @@ export async function appendEvent(
   opts: { locked?: boolean } = {},
 ): Promise<AppendResult> {
   if (!opts.locked) await lockBooking(tx, bookingId);
+  const next = await prepareAppend(tx, bookingId, event);
+  await Promise.all([tx.insert(ledgerEntries).values(next.values), writeSummary(tx, bookingId, next.summary)]);
+  return next;
+}
+
+/**
+ * The next ledger row of a booking's current epoch — computed, NOT written — with its insert values. For a caller that must write the
+ * row later in its own statement (payment posting writes it in the same statement that allocates the receipt number). The caller holds
+ * the booking locks and writes nothing else to the ledger in between.
+ */
+export async function prepareAppend(
+  tx: Executor,
+  bookingId: string,
+  event: LedgerEvent,
+): Promise<AppendResult & { values: typeof ledgerEntries.$inferInsert }> {
   const [[booking], [last]] = await Promise.all([
     tx.select().from(bookings).where(eq(bookings.id, bookingId)).limit(1),
-    tx
-      .select()
-      .from(ledgerEntries)
-      .where(eq(ledgerEntries.bookingId, bookingId))
-      .orderBy(desc(ledgerEntries.seq))
-      .limit(1),
+    tx.select().from(ledgerEntries).where(epochRows(bookingId)).orderBy(desc(ledgerEntries.seq)).limit(1),
   ]);
   if (!booking) throw ApiError.notFound("Booking");
   const prev = summaryFromLast(last, booking);
   const next = appendLedgerRow(prev, event);
-  await Promise.all([
-    tx.insert(ledgerEntries).values(rowValues(booking.companyId, bookingId, next.row)),
-    writeSummary(tx, bookingId, next.summary),
-  ]);
-  return next;
+  return { ...next, values: rowValues(booking.companyId, bookingId, next.row, booking.ledgerEpoch) };
 }
 
 /** Agreement values in force at an instant, given the revisions in time order and the booking's current values. */
@@ -199,6 +261,27 @@ export const events = {
       at: d.postedAt.toISOString(),
       label: d.installmentName,
       note: d.triggerLabel,
+      refNumber: d.demandNumber,
+      refId: d.id,
+      cashPaise: amounts.cashPaise,
+      accountPaise: amounts.accountPaise,
+    };
+  },
+  /**
+   * The compensating row of a voided demand (contract C7): it takes back exactly what the ledger raised for the demand by the time it was
+   * voided — the demand's telescoping amounts under the agreement in force at the void (its DEMAND row plus every AGREEMENT_CHANGE
+   * re-cut since). The live void and the rebuild compute it the same way (demandAmountsFor), so they produce the same row.
+   */
+  demandVoided(
+    d: Pick<DemandRecord, "id" | "installmentName" | "demandNumber" | "voidReason">,
+    amounts: { cashPaise: number; accountPaise: number },
+    at: Date,
+  ): LedgerEvent {
+    return {
+      kind: "DEMAND_VOIDED",
+      at: at.toISOString(),
+      label: `${d.installmentName} (voided)`,
+      note: d.voidReason,
       refNumber: d.demandNumber,
       refId: d.id,
       cashPaise: amounts.cashPaise,
@@ -318,6 +401,12 @@ export const events = {
   },
 };
 
+/** The instant a VOID demand was voided (voided_at; rows voided before that column was always set fall back to updated_at); null otherwise. */
+function voidInstant(d: Pick<DemandRecord, "status" | "voidedAt" | "updatedAt">): Date | null {
+  if (d.status !== "VOID") return null;
+  return d.voidedAt ?? d.updatedAt;
+}
+
 /** Rebuilds the event list of a booking from its source tables. */
 export async function sourceEvents(
   db: Executor,
@@ -325,11 +414,8 @@ export async function sourceEvents(
 ): Promise<{ events: LedgerEvent[]; opening: LedgerSummary }> {
   const id = booking.id;
   const [demandRows, paymentRows, chargeRows, revisionRows, planRevisionRows] = await Promise.all([
-    db
-      .select()
-      .from(demands)
-      .where(and(eq(demands.bookingId, id), ne(demands.status, "VOID")))
-      .orderBy(asc(demands.postedAt)),
+    // voided demands included: their DEMAND row stays in the book and a DEMAND_VOIDED row takes it back out
+    db.select().from(demands).where(eq(demands.bookingId, id)).orderBy(asc(demands.postedAt)),
     db
       .select()
       .from(payments)
@@ -352,9 +438,16 @@ export async function sourceEvents(
     account_agreed_paise: booking.accountAgreedPaise,
   };
   const initial = revisionRows[0]?.before ?? current;
+  const cancelledAt = booking.cancellation ? new Date(booking.cancellation.at).getTime() : null;
   const out: LedgerEvent[] = [];
-  for (const d of demandRows)
+  for (const d of demandRows) {
     out.push(events.demand(d, demandAmountsFor(d, agreedAt(revisionRows, current, d.postedAt))));
+    const voidedAt = voidInstant(d);
+    // a void after the ledger was closed (a cancelled booking touched by an older stage undo) is not a ledger event: the closed book
+    // keeps the demand as it stood at closing
+    if (voidedAt && (cancelledAt === null || voidedAt.getTime() < cancelledAt))
+      out.push(events.demandVoided(d, demandAmountsFor(d, agreedAt(revisionRows, current, voidedAt)), voidedAt));
+  }
   for (const c of chargeRows) if (c.demandedAt) out.push(events.otherChargeDemand(c, c.demandedAt));
   const chargeName = new Map(chargeRows.map((c) => [c.id, c.name]));
   for (const p of paymentRows) {
@@ -372,7 +465,10 @@ export async function sourceEvents(
     let cash = 0;
     let account = 0;
     for (const d of demandRows) {
+      // the demands live when the revision re-cut them: raised before it and not voided before it
       if (d.postedAt.getTime() > r.revisedAt.getTime()) continue;
+      const voidedAt = voidInstant(d);
+      if (voidedAt && voidedAt.getTime() <= r.revisedAt.getTime()) continue;
       const before = demandAmountsFor(d, r.before);
       const after = demandAmountsFor(d, r.after);
       cash += after.cashPaise - before.cashPaise;
@@ -387,7 +483,15 @@ export async function sourceEvents(
         { cash: 0, account: 0 },
       ),
     );
-  if (booking.cancellation) out.push(events.cancellation(booking.cancellation));
+  if (booking.cancellation)
+    out.push(
+      events.cancellation({
+        ...booking.cancellation,
+        // the money columns (migration 0005) are the source of truth; the jsonb keeps the history text
+        refund_paise: booking.cancellationRefundPaise ?? booking.cancellation.refund_paise,
+        deduction_paise: booking.cancellationDeductionPaise ?? booking.cancellation.deduction_paise,
+      }),
+    );
   return {
     events: out,
     opening: emptyLedgerSummary({
@@ -416,28 +520,140 @@ function summaryFigures(s: {
   };
 }
 
+/** The six C7 totals of a ledger position (a stored row, a derived summary, or nothing yet). */
+export function ledgerTotals(
+  x:
+    | Pick<
+        LedgerEntryRecord,
+        | "cashDuePaise"
+        | "accountDuePaise"
+        | "totalDuePaise"
+        | "otherChargesDuePaise"
+        | "cashPaidCumPaise"
+        | "accountPaidCumPaise"
+      >
+    | null
+    | undefined,
+): LedgerTotals {
+  return {
+    cash_due_paise: x?.cashDuePaise ?? 0,
+    account_due_paise: x?.accountDuePaise ?? 0,
+    total_due_paise: x?.totalDuePaise ?? 0,
+    other_charges_due_paise: x?.otherChargesDuePaise ?? 0,
+    cash_paid_paise: x?.cashPaidCumPaise ?? 0,
+    account_paid_paise: x?.accountPaidCumPaise ?? 0,
+  };
+}
+
+/** C7 totals of a domain summary. */
+function summaryTotals(s: LedgerSummary): LedgerTotals {
+  return {
+    cash_due_paise: s.cashDuePaise,
+    account_due_paise: s.accountDuePaise,
+    total_due_paise: s.totalDuePaise,
+    other_charges_due_paise: s.otherChargesDuePaise,
+    cash_paid_paise: s.cashPaidPaise,
+    account_paid_paise: s.accountPaidPaise,
+  };
+}
+
+/**
+ * Writes a restatement (contract C7): the canonical rows as epoch n + 1, a ledger_rebuilds row (reason, actor, summary diff), a
+ * LEDGER_RESTATED row closing epoch n (zero amount, its last balances carried, ref_id = the rebuild) and bookings.ledger_epoch = n + 1.
+ * Inserts only. The caller holds the booking locks.
+ */
+async function writeEpoch(
+  tx: Executor,
+  booking: BookingRecord,
+  storedRows: readonly LedgerEntryRecord[],
+  derived: { rows: LedgerRow[]; summary: LedgerSummary },
+  rowMismatches: readonly LedgerRowDifference[],
+  opts: RebuildOptions,
+): Promise<string> {
+  const from = booking.ledgerEpoch;
+  const to = from + 1;
+  const at = new Date();
+  const reason: LedgerRebuildReason = opts.reason ?? "ADMIN_RECOMPUTE";
+  const last = storedRows[storedRows.length - 1];
+  const summary: LedgerRebuildSummary = {
+    rows_before: storedRows.length,
+    rows_after: derived.rows.length,
+    differences: rowMismatches.map((d) => ({ ...d })),
+    before: ledgerTotals(last),
+    after: summaryTotals(derived.summary),
+  };
+  const [log] = await tx
+    .insert(ledgerRebuilds)
+    .values({
+      companyId: booking.companyId,
+      bookingId: booking.id,
+      fromEpoch: from,
+      toEpoch: to,
+      reason,
+      actorId: opts.actor?.type === "STAFF" ? (opts.actor.id ?? null) : null,
+      at,
+      summary: summary as unknown as Record<string, unknown>,
+    })
+    .returning({ id: ledgerRebuilds.id });
+  if (!log) throw new Error("ledger_rebuilds insert returned no row");
+  const writes: Promise<unknown>[] = [];
+  if (last)
+    writes.push(
+      tx.insert(ledgerEntries).values({
+        companyId: booking.companyId,
+        bookingId: booking.id,
+        epoch: from,
+        seq: last.seq + 1,
+        at,
+        entryDate: todayIST(at),
+        event: "LEDGER_RESTATED",
+        label: `Ledger restated as epoch ${to}`,
+        bucket: null,
+        amountPaise: 0,
+        cashPaidCumPaise: last.cashPaidCumPaise,
+        accountPaidCumPaise: last.accountPaidCumPaise,
+        cashOrderRaisedPaise: last.cashOrderRaisedPaise,
+        accountOrderRaisedPaise: last.accountOrderRaisedPaise,
+        cashDuePaise: last.cashDuePaise,
+        accountDuePaise: last.accountDuePaise,
+        totalDuePaise: last.totalDuePaise,
+        otherChargesDuePaise: last.otherChargesDuePaise,
+        refNumber: null,
+        refId: log.id,
+        note: reason,
+      }),
+    );
+  if (derived.rows.length > 0)
+    writes.push(
+      tx.insert(ledgerEntries).values(derived.rows.map((r) => rowValues(booking.companyId, booking.id, r, to))),
+    );
+  writes.push(tx.update(bookings).set({ ledgerEpoch: to }).where(eq(bookings.id, booking.id)));
+  await Promise.all(writes);
+  return log.id;
+}
+
 /**
  * Derives the whole ledger again from the source tables — in the canonical posting order the live path appends in (domain
- * sortLedgerEvents) — and compares it with the stored booking summary AND, row by row, with the stored ledger (integrity finding e).
- * With `write` (admin recompute / repair / revisions / undo) the stored rows and summary are replaced by the recomputation (under the booking lock).
+ * sortLedgerEvents) — and compares it with the stored booking summary AND, row by row, with the current epoch (integrity finding e).
+ * With `write` (admin recompute / repair / revisions / undo / LEDGER_REBUILD, under the booking lock) a differing result becomes a new
+ * epoch (see writeEpoch) and differing summary columns are corrected; an identical result writes nothing.
  */
 export async function rebuild(
   tx: Executor,
   bookingId: string,
-  opts: { write?: boolean | "if-changed" } = {},
-): Promise<RebuildResult & { written: boolean }> {
-  if (opts.write) await lockBooking(tx as Tx, bookingId);
+  opts: RebuildOptions = {},
+): Promise<RebuildResult & RebuildWrite> {
+  const write = opts.write === true || opts.write === "if-changed";
+  if (write) await lockBooking(tx as Tx, bookingId);
   const [booking] = await tx.select().from(bookings).where(eq(bookings.id, bookingId)).limit(1);
   if (!booking) throw ApiError.notFound("Booking");
-  const { events, opening } = await sourceEvents(tx, booking);
+  const [{ events, opening }, storedRows] = await Promise.all([
+    sourceEvents(tx, booking),
+    tx.select().from(ledgerEntries).where(epochRows(bookingId, booking.ledgerEpoch)).orderBy(asc(ledgerEntries.seq)),
+  ]);
   const derived = deriveLedger(events, opening);
   const stored = summaryFigures(booking);
   const recomputed = summaryFigures(derived.summary);
-  const storedRows = await tx
-    .select()
-    .from(ledgerEntries)
-    .where(eq(ledgerEntries.bookingId, bookingId))
-    .orderBy(asc(ledgerEntries.seq));
   const last = storedRows[storedRows.length - 1];
   stored["ledger_rows"] = storedRows.length;
   recomputed["ledger_rows"] = derived.rows.length;
@@ -452,29 +668,38 @@ export async function rebuild(
     if (s !== r) mismatches.push({ field, stored: s, recomputed: r });
   }
   const rowMismatches = diffLedgerRows(storedRows, derived.rows);
-  // "if-changed" (LEDGER_REBUILD): rewrite only a ledger/summary that differs from the canonical rebuild
-  const write =
-    opts.write === true || (opts.write === "if-changed" && (mismatches.length > 0 || rowMismatches.length > 0));
-  if (write) {
-    await tx.delete(ledgerEntries).where(eq(ledgerEntries.bookingId, bookingId));
-    if (derived.rows.length > 0)
-      await tx.insert(ledgerEntries).values(derived.rows.map((r) => rowValues(booking.companyId, bookingId, r)));
-    await writeSummary(tx, bookingId, derived.summary);
+  const out: RebuildWrite = { written: false, restated: false, epoch: booking.ledgerEpoch, rebuildId: null };
+  if (write && rowMismatches.length > 0) {
+    out.rebuildId = await writeEpoch(tx, booking, storedRows, derived, rowMismatches, opts);
+    out.restated = true;
+    out.epoch = booking.ledgerEpoch + 1;
   }
-  return {
-    rows: derived.rows,
-    summary: derived.summary,
-    mismatches,
-    rowMismatches,
-    stored,
-    recomputed,
-    written: write,
-  };
+  if (write && (out.restated || mismatches.length > 0)) {
+    await writeSummary(tx, bookingId, derived.summary);
+    out.written = true;
+  }
+  return { rows: derived.rows, summary: derived.summary, mismatches, rowMismatches, stored, recomputed, ...out };
 }
 
-/** Stored ledger rows of a booking in seq order. */
-export async function ledgerRows(db: Executor, bookingId: string): Promise<LedgerEntryRecord[]> {
-  return db.select().from(ledgerEntries).where(eq(ledgerEntries.bookingId, bookingId)).orderBy(asc(ledgerEntries.seq));
+/** Stored ledger rows of a booking in seq order: the current epoch (the book of record), or an older one when `epoch` is given. */
+export async function ledgerRows(db: Executor, bookingId: string, epoch?: number): Promise<LedgerEntryRecord[]> {
+  return db.select().from(ledgerEntries).where(epochRows(bookingId, epoch)).orderBy(asc(ledgerEntries.seq));
+}
+
+/** Restatements of a booking's ledger (newest first), with the acting staff user's name. */
+export async function ledgerRebuildRows(
+  db: Executor,
+  bookingId: string,
+): Promise<(typeof ledgerRebuilds.$inferSelect & { actorName: string | null })[]> {
+  const rows = await db
+    .select({
+      r: ledgerRebuilds,
+      actorName: sql<string | null>`(select u.name from users u where u.id = ${ledgerRebuilds.actorId})`,
+    })
+    .from(ledgerRebuilds)
+    .where(eq(ledgerRebuilds.bookingId, bookingId))
+    .orderBy(desc(ledgerRebuilds.at), desc(ledgerRebuilds.toEpoch));
+  return rows.map((x) => ({ ...x.r, actorName: x.actorName }));
 }
 
 /** Business date of an event (re-exported for callers that need the same rule). */

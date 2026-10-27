@@ -11,7 +11,7 @@ import type { JobName } from "@kkt/contracts";
 import { jobRuns, type DB } from "@kkt/db";
 import { config } from "../config.js";
 import { logger } from "../lib/logger.js";
-import { defaultJobOptions, JOB_SCHEDULES, QUEUE_NAME } from "./index.js";
+import { defaultJobOptions, HEAVY_QUEUE_NAME, JOB_SCHEDULES, QUEUE_NAME, queueKindOf } from "./index.js";
 
 /** Connection options BullMQ needs, parsed from the main REDIS_URL (BullMQ never shares the security Redis). */
 export function bullConnection(
@@ -29,9 +29,36 @@ export function bullConnection(
   };
 }
 
-/** A new queue handle on the main Redis (callers close it). */
+/** Heavy-queue handles created next to a critical queue (enqueueJob routes heavy jobs there; closed with their critical queue). */
+const heavySiblings = new WeakMap<Queue, Queue>();
+
+/**
+ * A new handle on the CRITICAL queue on the main Redis (callers close it). Heavy jobs handed to it are routed to the heavy queue by
+ * enqueueJob (a sibling handle on the same Redis, opened on first use and closed together with this one).
+ */
 export function createQueue(url?: string): Queue {
   return new Queue(QUEUE_NAME, { connection: bullConnection(url), defaultJobOptions: defaultJobOptions() });
+}
+
+/** The queue a job must be added to: `queue` itself, or (for a heavy job handed to the critical queue) its heavy sibling. */
+export function queueFor(queue: Queue, name: string): Queue {
+  if (queueKindOf(name) !== "heavy" || queue.name === HEAVY_QUEUE_NAME) return queue;
+  let heavy = heavySiblings.get(queue);
+  if (!heavy) {
+    const created = new Queue(HEAVY_QUEUE_NAME, {
+      connection: queue.opts.connection,
+      prefix: queue.opts.prefix,
+      defaultJobOptions: defaultJobOptions(),
+    });
+    heavy = created;
+    heavySiblings.set(queue, created);
+    const close = queue.close.bind(queue);
+    queue.close = async () => {
+      await created.close().catch(() => undefined);
+      await close();
+    };
+  }
+  return heavy;
 }
 
 /** What enqueueJob hands back: the job_runs id the first attempt will use, and the BullMQ job id (the same uuid). */
@@ -56,7 +83,7 @@ export async function enqueueJob(
   opts: { runId?: string; delayMs?: number; dedupeId?: string } = {},
 ): Promise<EnqueuedJob> {
   const runId = opts.runId ?? randomUUID();
-  const job = await queue.add(
+  const job = await queueFor(queue, name).add(
     name,
     { ...data, __run_id: runId },
     {
@@ -113,8 +140,10 @@ export interface ScheduleResult {
 export const schedulerId = (name: string) => `schedule:${name}`;
 
 /**
- * Upserts the repeatable schedules (idempotent by scheduler id). A job without a handler is skipped with a warning instead of failing the
- * boot (a module that is not deployed yet), and a disabled schedule is removed so it stops firing.
+ * Upserts the repeatable schedules on the critical queue (idempotent by scheduler id: every worker runs this at boot, and two workers
+ * upserting the same scheduler id leave ONE schedule whose iterations have deterministic job ids, so a slot never runs twice). A job
+ * without a handler is skipped with a warning instead of failing the boot (a module that is not deployed yet), and a disabled schedule
+ * is removed so it stops firing.
  */
 export async function registerSchedules(
   queue: Queue,

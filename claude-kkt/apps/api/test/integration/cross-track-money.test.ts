@@ -215,6 +215,8 @@ describe("item 7: LEDGER_REBUILD brings legacy ledgers into canonical order", ()
     // simulate a ledger written by the old business-date order: the last two rows swapped
     const last = canonical.length;
     await t.app.sql.begin(async (tx) => {
+      // below the append-only guard (src/sql/0006_money_guards.sql): test-only, as the superuser
+      await tx`set local session_replication_role = replica`;
       await tx`update ledger_entries set seq = -seq where booking_id = ${legacy.id} and seq in (${last - 1}, ${last})`;
       await tx`update ledger_entries set seq = case seq when ${-(last - 1)}::int then ${last}::int else ${last - 1}::int end where booking_id = ${legacy.id} and seq < 0`;
     });
@@ -252,6 +254,14 @@ describe("item 7: LEDGER_REBUILD brings legacy ledgers into canonical order", ()
     expect((await ledgerOf(legacy.id)).map((r) => [r.seq, r.event, r.ref_id, r.total_due_paise])).toEqual(
       canonical.map((r) => [r.seq, r.event, r.ref_id, r.total_due_paise]),
     );
+    // restated, never rewritten (contract C7): epoch 1 keeps the legacy order and is closed; epoch 2 is the canonical book
+    expect(
+      await t.app.sql`select reason, from_epoch, to_epoch from ledger_rebuilds where booking_id = ${legacy.id}`,
+    ).toEqual([{ reason: "LEDGER_REBUILD", from_epoch: 1, to_epoch: 2 }]);
+    const epoch1 = await t.app.sql<{ event: string }[]>`
+      select event from ledger_entries where booking_id = ${legacy.id} and epoch = 1 order by seq`;
+    expect(epoch1).toHaveLength(last + 1);
+    expect(epoch1.at(-1)?.event).toBe("LEDGER_RESTATED");
     expect((await integrity()).ok).toBe(true);
     const audit = await t.app.sql<
       { entity_id: string; after: { order_changed: boolean } }[]

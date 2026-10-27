@@ -32,6 +32,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { formatDateTime } from "@/lib/format";
 import { useMutationWithToast } from "@/lib/queries";
+import { useUnsavedChangesGuard } from "@/lib/unsaved";
 import { controlOf, Notice } from "@/features/inventory/components";
 import { contractResolver } from "@/features/shared/contractResolver";
 import { NotFoundPage } from "@/pages/NotFoundPage";
@@ -129,6 +130,8 @@ function PostEditor({ row }: { row: CmsPostRow | null }) {
     defaultValues: row ? toValues(row) : EMPTY,
     mode: "onTouched",
   });
+  // Leaving with unsaved edits (sidebar, Cmd+K, back, reload) asks first (audit v3 H3).
+  useUnsavedChangesGuard(form.formState.isDirty);
   const control = controlOf(form);
   const [serverError, setServerError] = useState<unknown>(null);
   const [confirm, setConfirm] = useState<PostStatus | null>(null);

@@ -3,8 +3,10 @@
  * any GET list route under /api/v1 the caller may read (checked against the route registry, the caller's permissions and a preflight
  * request with the caller's own token), stores an `exports` row and enqueues job EXPORT_CSV. The job runs the route in-process
  * (`app.inject`) as that user with a short-lived internal access token (aud erp), pages through ALL rows with keyset CSV pages
- * (`X-Export-Cursor` → `X-Export-Next-Cursor`, lib/list.ts), streams them into a temp file and stores it; the user gets an EXPORT_READY
- * bell. Files are downloadable for 7 days through a signed 15-minute link (`POST /exports/:id/link`); EXPORT_CLEANUP removes them.
+ * (`X-Export-Cursor` → `X-Export-Next-Cursor`, lib/list.ts) and stores each page as a part object (tracked in storage_pending_objects)
+ * with a checkpoint `{cursor, rows, pages}` after it (heavy queue: a deploy interrupts the job between pages and the next worker resumes
+ * at the checkpoint instead of starting over); the parts are then joined into the file and removed. The user gets an EXPORT_READY bell.
+ * Files are downloadable for 7 days through a signed 15-minute link (`POST /exports/:id/link`); EXPORT_CLEANUP removes them.
  */
 import { randomUUID } from "node:crypto";
 import { createWriteStream } from "node:fs";
@@ -22,7 +24,7 @@ import {
   IdSchema,
   type ExportRow,
 } from "@kkt/contracts";
-import { exports as exportsTable, roles, users, type DB } from "@kkt/db";
+import { exports as exportsTable, roles, storagePendingObjects, users, type DB } from "@kkt/db";
 import { config } from "../../config.js";
 import { registerJob, type JobContext } from "../../jobs/index.js";
 import { enqueueJobWithin } from "../../jobs/queue.js";
@@ -33,7 +35,8 @@ import { signAccessToken } from "../../lib/jwt.js";
 import { csvExportLimits, EXPORT_CURSOR_HEADER, fromListQuery, paginate } from "../../lib/list.js";
 import { permissionAlternatives, route, type RegistryEntry } from "../../lib/routes.js";
 import { notify } from "../notifications/index.js";
-import { fileTokenKey, signFileToken, storeFile, verifyFileToken, withTempDir } from "./files.js";
+import { signRingFileToken, storeFile, verifyRingFileToken, withTempDir } from "./files.js";
+import { recordPendingObject } from "./renditions.js";
 import { storage } from "./service.js";
 
 type ExportRecord = typeof exportsTable.$inferSelect;
@@ -70,7 +73,8 @@ async function activeExports(db: DB, userId: string): Promise<number> {
 /** Lifetime of the internal access token one export page is fetched with (a new one is minted when it runs low). */
 const INTERNAL_TOKEN_MINUTES = 5;
 
-const linkKey = fileTokenKey("kkt-export-link-v1", config.JWT_SECRET);
+/** Token family of export download links (LINK_SIGNING_KEYS ring, contract C9). */
+const EXPORT_LINK_LABEL = "kkt-export-link-v1";
 const idParams = z.object({ id: IdSchema });
 
 /** File name of an export: last static path segment + date + short id. */
@@ -171,8 +175,21 @@ function failureText(status: number, body: string): string {
  * EXPORT_CSV: runs the list route page by page as the requesting user and stores the CSV. A failure on the last attempt marks the
  * export FAILED (earlier attempts put it back to QUEUED for the retry).
  */
+/** Storage key of page `n` of an export while it is being built. */
+export function exportPartKey(companyId: string, exportId: string, n: number): string {
+  return `exports/${companyId}/${exportId}-part-${n}.csv`;
+}
+
+/** Resume point of EXPORT_CSV: the next page's cursor and what is already stored. */
+interface ExportCheckpoint {
+  cursor: string;
+  rows: number;
+  pages: number;
+}
+
 export async function runCsvExport(
-  ctx: Pick<JobContext, "db" | "app" | "data" | "attempt" | "maxAttempts">,
+  ctx: Pick<JobContext, "db" | "app" | "data" | "attempt" | "maxAttempts"> &
+    Partial<Pick<JobContext, "signal" | "checkpoint" | "saveCheckpoint">>,
 ): Promise<Record<string, unknown>> {
   const exportId = String(ctx.data["export_id"] ?? "");
   const app = ctx.app;
@@ -183,60 +200,85 @@ export async function runCsvExport(
   await ctx.db.update(exportsTable).set({ status: "RUNNING", error: null }).where(eq(exportsTable.id, row.id));
   try {
     const key = `exports/${row.companyId}/${row.id}.csv`;
-    const counts = await withTempDir("export", async (dir) => {
-      const file = join(dir, "export.csv");
-      const out = createWriteStream(file);
-      let rows = 0;
-      let pages = 0;
+    const store = storage();
+    // resume where an interrupted attempt stopped, as long as every part it stored is still there
+    const saved = ctx.checkpoint as Partial<ExportCheckpoint> | null | undefined;
+    let resume: ExportCheckpoint = { cursor: "start", rows: 0, pages: 0 };
+    if (saved && typeof saved.cursor === "string" && Number.isInteger(saved.pages) && Number.isInteger(saved.rows)) {
+      const parts = await Promise.all(
+        Array.from({ length: saved.pages! }, (_, n) => store.exists(exportPartKey(row.companyId, row.id, n))),
+      );
+      if (parts.every(Boolean)) resume = { cursor: saved.cursor, rows: saved.rows!, pages: saved.pages! };
+    }
+    const counts = await (async () => {
+      let { rows, pages, cursor } = resume;
       let token = await internalToken(ctx.db, row.userId);
       let tokenAt = Date.now();
-      let cursor = "start";
       const query = (row.query ?? {}) as Record<string, unknown>;
-      try {
-        for (;;) {
-          if (Date.now() - tokenAt > (INTERNAL_TOKEN_MINUTES - 1) * 60_000) {
-            token = await internalToken(ctx.db, row.userId);
-            tokenAt = Date.now();
-          }
-          const res = await app.inject({
-            method: "GET",
-            url: exportUrl(row.path, query, { format: "csv" }),
-            headers: {
-              authorization: `Bearer ${token}`,
-              [EXPORT_CURSOR_HEADER]: cursor,
-              "x-request-id": `export-${row.id.slice(0, 8)}-${pages}`,
-            },
-          });
-          if (res.statusCode !== 200) throw new Error(failureText(res.statusCode, res.body));
-          if (!String(res.headers["content-type"] ?? "").startsWith("text/csv"))
-            throw new Error(`${row.path} does not produce CSV (format=csv)`);
-          let body = res.body;
-          if (pages > 0) {
-            const nl = body.indexOf("\r\n");
-            body = nl === -1 ? "" : body.slice(nl + 2);
-          }
-          if (!out.write(body)) await new Promise<void>((resolve) => out.once("drain", () => resolve()));
-          const pageRows = header(res.headers, "x-export-rows");
-          const counted = pageRows !== undefined ? Number(pageRows) : Math.max(0, parseCsv(res.body).length - 1);
-          rows += counted;
-          pages += 1;
-          const next = header(res.headers, "x-export-next-cursor");
-          if (header(res.headers, "x-export-truncated") === "true")
-            throw new Error(`${row.path} cannot page its CSV export; it stopped at its row cap`);
-          // A route that reports no export facts (no paginate()/listPaging()) cannot keyset-page: a full cap's worth of rows means it may
-          // have cut the list, so fail loudly instead of storing a silently truncated file.
-          if (pageRows === undefined && !next && counted >= csvExportLimits.maxRows)
-            throw new Error(`${row.path} cannot page its CSV export; it returned ${counted} rows without paging facts`);
-          if (!next) break;
-          cursor = next;
+      for (;;) {
+        ctx.signal?.throwIfAborted();
+        if (Date.now() - tokenAt > (INTERNAL_TOKEN_MINUTES - 1) * 60_000) {
+          token = await internalToken(ctx.db, row.userId);
+          tokenAt = Date.now();
         }
-      } finally {
-        out.end();
-        await finished(out);
+        const res = await app.inject({
+          method: "GET",
+          url: exportUrl(row.path, query, { format: "csv" }),
+          headers: {
+            authorization: `Bearer ${token}`,
+            [EXPORT_CURSOR_HEADER]: cursor,
+            "x-request-id": `export-${row.id.slice(0, 8)}-${pages}`,
+          },
+        });
+        if (res.statusCode !== 200) throw new Error(failureText(res.statusCode, res.body));
+        if (!String(res.headers["content-type"] ?? "").startsWith("text/csv"))
+          throw new Error(`${row.path} does not produce CSV (format=csv)`);
+        let body = res.body;
+        if (pages > 0) {
+          const nl = body.indexOf("\r\n");
+          body = nl === -1 ? "" : body.slice(nl + 2);
+        }
+        const pageRows = header(res.headers, "x-export-rows");
+        const counted = pageRows !== undefined ? Number(pageRows) : Math.max(0, parseCsv(res.body).length - 1);
+        const next = header(res.headers, "x-export-next-cursor");
+        if (header(res.headers, "x-export-truncated") === "true")
+          throw new Error(`${row.path} cannot page its CSV export; it stopped at its row cap`);
+        // A route that reports no export facts (no paginate()/listPaging()) cannot keyset-page: a full cap's worth of rows means it may
+        // have cut the list, so fail loudly instead of storing a silently truncated file.
+        if (pageRows === undefined && !next && counted >= csvExportLimits.maxRows)
+          throw new Error(`${row.path} cannot page its CSV export; it returned ${counted} rows without paging facts`);
+        // the page becomes a part object (recorded as pending first, so an abandoned export's parts are swept), then the checkpoint
+        const part = exportPartKey(row.companyId, row.id, pages);
+        await recordPendingObject(ctx.db, part, row.companyId, "export-part");
+        await store.put(part, Buffer.from(body, "utf8"), "text/csv");
+        rows += counted;
+        pages += 1;
+        if (!next) break;
+        cursor = next;
+        await ctx.saveCheckpoint?.({ cursor, rows, pages });
       }
-      await storeFile(storage(), key, file, "text/csv");
-      return { rows, pages };
-    });
+      // join the parts into one file (streamed through a temp file), store it, then drop the parts
+      await withTempDir("export", async (dir) => {
+        const file = join(dir, "export.csv");
+        const out = createWriteStream(file);
+        try {
+          for (let n = 0; n < pages; n++) {
+            const bytes = await store.get(exportPartKey(row.companyId, row.id, n));
+            if (!out.write(bytes)) await new Promise<void>((resolve) => out.once("drain", () => resolve()));
+          }
+        } finally {
+          out.end();
+          await finished(out);
+        }
+        await storeFile(store, key, file, "text/csv");
+      });
+      for (let n = 0; n < pages; n++) {
+        const part = exportPartKey(row.companyId, row.id, n);
+        await store.remove(part).catch(() => undefined);
+        await ctx.db.delete(storagePendingObjects).where(eq(storagePendingObjects.key, part));
+      }
+      return { rows, pages, resumed_at_page: resume.pages };
+    })();
     const now = new Date();
     await ctx.db.transaction(async (tx) => {
       await tx
@@ -261,7 +303,12 @@ export async function runCsvExport(
         link: "/exports",
       });
     });
-    return { export_id: row.id, rows: counts.rows, pages: counts.pages };
+    return {
+      export_id: row.id,
+      rows: counts.rows,
+      pages: counts.pages,
+      ...(counts.resumed_at_page > 0 ? { resumed_at_page: counts.resumed_at_page } : {}),
+    };
   } catch (err) {
     const final = ctx.attempt >= ctx.maxAttempts;
     await ctx.db
@@ -317,7 +364,7 @@ export async function cleanupExports(db: DB, batch = 500): Promise<Record<string
 export function exportLink(id: string): { download_url: string; expires_at: string } {
   const exp = Math.floor(Date.now() / 1000) + EXPORT_LINK_TTL_SECONDS;
   return {
-    download_url: `${config.API_PUBLIC_URL}/api/v1/exports/download/${signFileToken(linkKey, id, exp)}`,
+    download_url: `${config.API_PUBLIC_URL}/api/v1/exports/download/${signRingFileToken(EXPORT_LINK_LABEL, id, exp)}`,
     expires_at: new Date(exp * 1000).toISOString(),
   };
 }
@@ -526,7 +573,7 @@ export function registerExportRoutes(app: FastifyInstance): void {
       tags: ["exports"],
     },
     handler: async (req, reply) => {
-      const id = verifyFileToken(linkKey, req.params.token);
+      const id = verifyRingFileToken(EXPORT_LINK_LABEL, req.params.token);
       if (!id) throw ApiError.notFound("Export");
       const [r] = await app.db
         .select()

@@ -9,34 +9,29 @@ import { Modal } from "@/components/ui/Modal";
 import { DownloadIcon } from "@/components/ui/icons";
 import { absoluteApiUrl, friendlyErrorMessage, isApiError, publicClient } from "@/lib/api";
 import { canonicalPhone } from "@/lib/format";
-import type { BrochureRequest } from "@/lib/types";
+import type { BrochureRepeatRequest, BrochureRequest } from "@/lib/types";
 
 const STORAGE_KEY = "kkt:brochure-visitor";
 
+/**
+ * What the device remembers: ONLY the opaque visitor token (a signed reference the API resolves to the visitor; it carries no name,
+ * phone or e-mail). Entries written by older releases also held the visitor's details: they are rewritten without them on first read.
+ */
 interface RememberedVisitor {
   visitor_token: string;
-  name: string;
-  phone: string;
-  email?: string;
 }
 
 function readVisitor(): RememberedVisitor | null {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<RememberedVisitor>;
-    if (
-      typeof parsed.visitor_token === "string" &&
-      typeof parsed.name === "string" &&
-      typeof parsed.phone === "string"
-    ) {
-      return {
-        visitor_token: parsed.visitor_token,
-        name: parsed.name,
-        phone: parsed.phone,
-        ...(parsed.email ? { email: parsed.email } : {}),
-      };
+    const parsed = JSON.parse(raw) as Partial<RememberedVisitor> & Record<string, unknown>;
+    if (typeof parsed.visitor_token === "string" && parsed.visitor_token.length >= 16) {
+      const visitor = { visitor_token: parsed.visitor_token };
+      if (Object.keys(parsed).length > 1) writeVisitor(visitor); // drop personal details stored by older releases
+      return visitor;
     }
+    window.localStorage.removeItem(STORAGE_KEY);
   } catch {
     // storage unavailable
   }
@@ -45,7 +40,7 @@ function readVisitor(): RememberedVisitor | null {
 
 function writeVisitor(visitor: RememberedVisitor | null) {
   try {
-    if (visitor) window.localStorage.setItem(STORAGE_KEY, JSON.stringify(visitor));
+    if (visitor) window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ visitor_token: visitor.visitor_token }));
     else window.localStorage.removeItem(STORAGE_KEY);
   } catch {
     // storage unavailable
@@ -66,11 +61,11 @@ type GateState =
   | { kind: "ready"; downloadUrl: string; expiresAt: string };
 
 /**
- * Brochure lead gate. First download asks for name/phone/consent; the returned visitor_token is
+ * Brochure lead gate. First download asks for name/phone/consent; the returned opaque visitor_token (no personal data) is
  * remembered on the device so later downloads skip the form (the activity is still logged server-side).
  */
 export function BrochureGate({ open, onClose, projectSlug, projectName }: BrochureGateProps) {
-  const { apiUrl, brandName } = useSiteConfig();
+  const { apiUrl, companySlug, brandName } = useSiteConfig();
   const id = useId();
   // The gate is mounted when it opens (see BrochureButton), so each opening starts fresh and the device's remembered
   // visitor is read once, in the browser.
@@ -84,18 +79,13 @@ export function BrochureGate({ open, onClose, projectSlug, projectName }: Brochu
 
   /** Requests the signed link; every state change happens when the response (or failure) arrives. */
   const send = useCallback(
-    (body: BrochureRequest, viaToken: boolean): Promise<void> =>
-      publicClient(apiUrl)
+    (body: BrochureRequest | BrochureRepeatRequest, viaToken: boolean): Promise<void> =>
+      publicClient(apiUrl, companySlug)
         .requestBrochure(body)
         .then(
           (result) => {
             const url = absoluteApiUrl(apiUrl, result.download_url);
-            writeVisitor({
-              visitor_token: result.visitor_token,
-              name: body.name,
-              phone: body.phone,
-              ...(body.email ? { email: body.email } : {}),
-            });
+            writeVisitor({ visitor_token: result.visitor_token });
             setState({ kind: "ready", downloadUrl: url, expiresAt: result.expires_at });
             window.location.assign(url);
           },
@@ -116,24 +106,13 @@ export function BrochureGate({ open, onClose, projectSlug, projectName }: Brochu
             setState({ kind: "error", message: friendlyErrorMessage(error) });
           },
         ),
-    [apiUrl],
+    [apiUrl, companySlug],
   );
 
   // A remembered device skips the form: ask for the link straight away (`remembered` only ever changes to null).
   useEffect(() => {
     if (!remembered) return;
-    void send(
-      {
-        project_slug: projectSlug,
-        name: remembered.name,
-        phone: remembered.phone,
-        ...(remembered.email ? { email: remembered.email } : {}),
-        consent: true,
-        website: "",
-        visitor_token: remembered.visitor_token,
-      },
-      true,
-    );
+    void send({ project_slug: projectSlug, website: "", visitor_token: remembered.visitor_token }, true);
   }, [remembered, projectSlug, send]);
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -185,7 +164,7 @@ export function BrochureGate({ open, onClose, projectSlug, projectName }: Brochu
         </div>
       ) : remembered && state.kind === "requesting" ? (
         <div className="py-6 text-center" role="status" aria-live="polite">
-          <p className="font-display text-2xl text-navy-900">Welcome back, {remembered.name.split(" ")[0]}.</p>
+          <p className="font-display text-2xl text-navy-900">Welcome back.</p>
           <p className="mt-2 text-sm text-ink-muted">Preparing your brochure…</p>
         </div>
       ) : (

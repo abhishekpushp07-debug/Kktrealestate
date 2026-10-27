@@ -36,7 +36,8 @@ import {
   isHoneypotTripped,
   noStore,
   publicCached,
-  publicCompanyId,
+  publicCompany,
+  AVAILABILITY_CACHE_POLICY,
   publicMeta,
   relaxHoneypot,
 } from "./shared.js";
@@ -51,11 +52,13 @@ import {
   isSupersededManageToken,
   loadVisitSelect,
   loadVisitSettings,
+  manageTokenExpiry,
   manageUrl,
   matchSlot,
   projectAvailability,
   rescheduleVisit,
   visitIcs,
+  visitOrganizer,
   type DbVisitSettings,
   type VisitSelect,
 } from "./visitService.js";
@@ -96,15 +99,12 @@ const RescheduleBody = z
 const tokenParams = z.object({ token: z.string().min(16).max(200) });
 const slugParams = z.object({ slug: SlugSchema });
 
-async function companyOr404(db: Executor): Promise<string> {
-  const id = await publicCompanyId(db);
-  if (!id) throw ApiError.notFound("Site");
-  return id;
-}
-
 /** The published project behind a slug while the site is live; 404 otherwise (unpublished projects are invisible everywhere). */
-async function publishedBySlug(db: Executor, slug: string): Promise<{ companyId: string; project: PublishedProject }> {
-  const companyId = await companyOr404(db);
+async function publishedBySlug(
+  db: Executor,
+  companyId: string,
+  slug: string,
+): Promise<{ companyId: string; project: PublishedProject }> {
   const project = await livePublishedProject(db, companyId, slug);
   if (!project) throw ApiError.notFound("Project");
   return { companyId, project };
@@ -173,6 +173,25 @@ async function visitByToken(
   return withSettings(db, row);
 }
 
+/**
+ * Like visitByToken for the .ics file, except that a CANCELLED visit's link keeps serving its METHOD:CANCEL file until the visit's
+ * original link expiry (slot end + 24 h), so a calendar that imported the invitation can remove the event. Rotated links stay 410.
+ */
+async function visitIcsByToken(
+  db: Executor,
+  token: string,
+): Promise<{ row: VisitSelect; settings: DbVisitSettings | null; slug: string }> {
+  const row = await loadVisitByToken(db, token, { includeExpired: true });
+  if (!row) {
+    if (await isSupersededManageToken(db, token)) throw linkExpired();
+    throw ApiError.notFound("Site visit");
+  }
+  const cancelledRecently =
+    row.v.status === "CANCELLED" && manageTokenExpiry(row.v.visitDate, clock(row.v.slotEnd)).getTime() > Date.now();
+  if (isManageLinkExpired(row.v) && !cancelledRecently) throw linkExpired();
+  return withSettings(db, row);
+}
+
 /** Adds the project's visit settings and public slug to a loaded visit. */
 async function withSettings(
   db: Executor,
@@ -194,6 +213,7 @@ export function registerPublicVisitRoutes(app: FastifyInstance): void {
     method: "GET",
     url: "/public/projects/:slug/visit-availability",
     public: true,
+    cachePolicy: AVAILABILITY_CACHE_POLICY,
     schema: {
       params: slugParams,
       querystring: PublicVisitAvailabilityQuerySchema,
@@ -205,8 +225,8 @@ export function registerPublicVisitRoutes(app: FastifyInstance): void {
         app,
         req,
         reply,
-        async () => {
-          const { project } = await publishedBySlug(app.dbReplica, req.params.slug);
+        async (companyId) => {
+          const { project } = await publishedBySlug(app.dbReplica, companyId, req.params.slug);
           const settings = await loadVisitSettings(app.dbReplica, project.p.id);
           if (!settings || !settings.enabled) return [];
           const range = clampRange(settings, req.query.from, req.query.to);
@@ -233,7 +253,7 @@ export function registerPublicVisitRoutes(app: FastifyInstance): void {
       const body = req.body;
       const date = (body.visit_date ?? body.date)!;
       const start = (body.slot_start ?? body.start)!;
-      const { companyId, project } = await publishedBySlug(app.db, body.project_slug);
+      const { companyId, project } = await publishedBySlug(app.db, await publicCompany(app, req), body.project_slug);
       const settings = await loadVisitSettings(app.db, project.p.id);
       if (!settings || !settings.enabled)
         throw ApiError.rule("Site visits are not open for this project", "VISITS_DISABLED");
@@ -314,7 +334,7 @@ export function registerPublicVisitRoutes(app: FastifyInstance): void {
       summary: "iCalendar file of a visit (Asia/Kolkata, 1-hour reminder)",
     },
     handler: async (req, reply) => {
-      const { row, settings } = await visitByToken(app.dbReplica, req.params.token);
+      const { row, settings } = await visitIcsByToken(app.dbReplica, req.params.token);
       noStore(reply);
       reply.header("Content-Type", "text/calendar; charset=utf-8");
       crossOriginFile(reply);
@@ -322,7 +342,8 @@ export function registerPublicVisitRoutes(app: FastifyInstance): void {
         "Content-Disposition",
         `attachment; filename="site-visit-${row.v.visitNumber.replace(/[^A-Za-z0-9-]/g, "-")}.ics"`,
       );
-      return reply.send(visitIcs(row.v, row.projectName ?? "Site visit", settings, req.params.token));
+      const organizer = await visitOrganizer(app.dbReplica, row.v.companyId);
+      return reply.send(visitIcs(row.v, row.projectName ?? "Site visit", settings, req.params.token, { organizer }));
     },
   });
 

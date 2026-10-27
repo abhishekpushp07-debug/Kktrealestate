@@ -226,6 +226,14 @@ the ERP and login, home, payments and construction in the portal raise no CSP vi
 capability probe, which Zod catches (it falls back to its interpreter) — add `z.config({ jitless: true })` at app start to silence it.
 The Swagger UI renders all operations with no violation.
 
+**Website (`www.`, `apps/web`)**: the CSP comes from the app itself (`middleware.ts`, `lib/csp.ts`). Its ISR pages carry a hash-based
+policy that `apps/web/csp-hook.cjs` fills in per response, so the production server **must** start with the hook: the image's `CMD` is
+`node --require ./apps/web/csp-hook.cjs apps/web/server.js`, and outside Docker use `pnpm --filter @kkt/web start` (never a bare
+`next start` / `node server.js`: the placeholder would reach browsers and block every inline script). Next's own gzip is off
+(`compress: false`); Caddy compresses. The website's environment: `INTERNAL_API_TOKEN` (= the API's, contract C3), `KKT_COMPANY_SLUG`
+(multi-company APIs, contract C4), `WEB_REVALIDATE_TOKEN` (= the API's, see below) and `GIT_SHA` (release in error reports); see
+apps/web/README.md.
+
 ## Environment variables
 
 See `.env.example` (every variable documented inline). Configuration is validated once at boot (`apps/api/src/config.ts`); an invalid or
@@ -260,6 +268,11 @@ whitespace is trimmed; setting both `<NAME>` and `<NAME>_FILE` is an error, as i
 | `TRUST_PROXY`                                        | `loopback` | Which peers may set `X-Forwarded-For` (Fastify `trustProxy`, so `req.ip` is the proxy-aware client IP used by rate limits, lockouts and audit rows). `false`, `true` (trust every hop — only behind a proxy that overwrites the header), or a comma list of `loopback`, `linklocal`, `uniquelocal`, IPs and CIDRs (`10.0.0.0/8`). The client is the right-most untrusted hop, so a caller cannot choose its own IP. An unknown entry is a boot error. Behind a load balancer on a private network use e.g. `uniquelocal` or its subnet. |
 | `STORAGE_DRIVER`                                     | `local`    | `local` or `s3`. `s3` requires `S3_BUCKET` and `S3_REGION`; `S3_ACCESS_KEY`/`S3_SECRET_KEY` are optional (unset = IAM role / default AWS chain) but must be set together. `S3_ENDPOINT` for S3-compatible stores.                                                                                                                                                                                                                                                                                                                       |
 | `INTERNAL_API_TOKEN`                                 | —          | Shared secret (≥ 32 chars) for internal callers such as the website's SSR; off when unset.                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+
+**On-demand website revalidation** (phase 7): `WEB_REVALIDATE_URL` (the website's `https://www.<domain>/api/revalidate`) and
+`WEB_REVALIDATE_TOKEN` (≥ 32 chars, the same value as the website's `WEB_REVALIDATE_TOKEN`): after every CMS or project-website write the
+API POSTs `{tags: ["kkt-public"]}` with `x-kkt-revalidate-token`, best-effort (3 s timeout, calls within 250 ms coalesced, a failure is
+logged at warn and the pages refresh on their 60–300 s ISR schedule). Off unless both are set.
 
 ### Database and Redis safety limits
 

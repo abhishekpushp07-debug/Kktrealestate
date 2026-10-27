@@ -407,9 +407,10 @@ describe("customer-bound file links", () => {
     const png = await sharp({ create: { width: 32, height: 32, channels: 3, background: "#0B1F3A" } })
       .png()
       .toBuffer();
-    const { storeBuffer } = await import("../../src/modules/documents/index.js");
-    const stored = await t.app.db.transaction((tx) =>
-      storeBuffer(tx, {
+    const { uploadDocument } = await import("../../src/modules/documents/index.js");
+    const stored = await uploadDocument(
+      t.app,
+      {
         companyId: t.companyId,
         entityType: "BOOKING",
         entityId: A1,
@@ -418,7 +419,8 @@ describe("customer-bound file links", () => {
         uploadedBy: admin.user.id,
         uploadedByType: "STAFF",
         sharedWithCustomer: true,
-      }),
+      },
+      async (_tx, row) => row,
     );
     const storedLink = await ok<PdfLink>(`/api/v1/portal/bookings/${A1}/documents/${stored.id}/download`, tokenA);
     for (const link of [statement.download_url, storedLink.download_url]) {
@@ -453,9 +455,10 @@ describe("customer-bound file links", () => {
     const png = await sharp({ create: { width: 32, height: 32, channels: 3, background: "#C9A227" } })
       .png()
       .toBuffer();
-    const { storeBuffer } = await import("../../src/modules/documents/index.js");
-    const doc = await t.app.db.transaction((tx) =>
-      storeBuffer(tx, {
+    const { uploadDocument } = await import("../../src/modules/documents/index.js");
+    const doc = await uploadDocument(
+      t.app,
+      {
         companyId: t.companyId,
         entityType: "BOOKING",
         entityId: A1,
@@ -464,7 +467,8 @@ describe("customer-bound file links", () => {
         uploadedBy: admin.user.id,
         uploadedByType: "STAFF",
         sharedWithCustomer: true,
-      }),
+      },
+      async (_tx, row) => row,
     );
     const live = await ok<PdfLink>(`/api/v1/portal/bookings/${A1}/documents/${doc.id}/download`, tokenA);
     expect((await fetchFile(live.download_url)).statusCode).toBe(200);

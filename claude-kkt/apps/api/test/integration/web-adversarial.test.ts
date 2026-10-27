@@ -48,7 +48,8 @@ const pathOf = (url: string) => {
 };
 const NUMBER_RE = (prefix: string) => new RegExp(`^${prefix}\\d{4}/\\d{4}$`);
 const BROCHURE_TOKEN_RE = /^[A-Za-z0-9_-]{16}\.[0-9a-z]+\.[0-9a-f]{32}$/;
-const SIGNED_PAYLOAD_RE = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
+/** Opaque visitor token (phase 7): `<kid>.<lead reference + expiry>.<hmac>`. */
+const SIGNED_PAYLOAD_RE = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
 
 const VISIT_SETTINGS = {
   enabled: true,

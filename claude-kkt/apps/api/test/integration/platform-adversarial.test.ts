@@ -257,7 +257,10 @@ describe("jobs: run now, boot lock, schedules, alerts", () => {
   });
 
   it("exports and backups carry their company in the job payload (tenant-scoped alerts)", async () => {
-    const queue = t.app.jobQueue();
+    // both are heavy jobs: enqueued through the app's queue, they land on the heavy queue (jobs/queue.ts queueFor)
+    const { queueFor } = await import("../../src/jobs/queue.js");
+    const queue = queueFor(t.app.jobQueue(), "BACKUP_EXPORT");
+    expect(queue.name).toBe("kkt-jobs-heavy");
     await queue.obliterate({ force: true });
     const exp = await t.request<{ id: string }>("POST", "/api/v1/exports", {
       token: admin,
@@ -409,7 +412,8 @@ describe("worker load guards", () => {
 // ---------------------------------------------------------------------------
 describe("queue outage", () => {
   it("POST /exports and POST /admin/backup answer 503 (row FAILED) instead of hanging when the queue's Redis does not answer", async () => {
-    const queue = t.app.jobQueue();
+    const { queueFor } = await import("../../src/jobs/queue.js");
+    const queue = queueFor(t.app.jobQueue(), "BACKUP_EXPORT");
     const add = queue.add.bind(queue);
     (queue as unknown as { add: () => Promise<never> }).add = () => new Promise<never>(() => undefined);
     try {

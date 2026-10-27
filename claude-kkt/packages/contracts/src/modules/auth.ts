@@ -1,9 +1,21 @@
 import { z } from "zod";
 import { TokenAudienceSchema, UserTypeSchema } from "../enums.js";
-import { EmailSchema, IdSchema, PasswordSchema, TimestampSchema, VersionSchema } from "../common.js";
+import { EmailSchema, IdSchema, PasswordSchema, PhoneSchema, TimestampSchema, VersionSchema } from "../common.js";
 import { PermissionSchema } from "../permissions.js";
 
-/** Staff login body (email + password, optional TOTP code). */
+/** A company slug (lowercase kebab, `companies.slug`): names the tenant of a sign-in (contract C4). */
+export const CompanySlugSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .max(100)
+  .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "Company slug: lowercase letters, digits and hyphens");
+export type CompanySlug = z.infer<typeof CompanySlugSchema>;
+
+/**
+ * Staff login body (email + password, optional TOTP code). `company` (slug) names the tenant when the request does not (header
+ * `x-kkt-company`, a company host, or a single-company install); an e-mail present in several companies without one → 400 COMPANY_REQUIRED.
+ */
 export const StaffLoginSchema = z.strictObject({
   email: EmailSchema,
   password: z.string().min(1).max(128),
@@ -12,6 +24,7 @@ export const StaffLoginSchema = z.strictObject({
     .regex(/^\d{6}$/)
     .optional(),
   device_name: z.string().trim().max(120).optional(),
+  company: CompanySlugSchema.optional(),
 });
 export type StaffLogin = z.infer<typeof StaffLoginSchema>;
 
@@ -35,10 +48,13 @@ export const AuthUserSchema = z.object({
 });
 export type AuthUser = z.infer<typeof AuthUserSchema>;
 
-/** Token pair issued on login/refresh. */
+/**
+ * Token pair issued on login/refresh. `refresh_token` is absent in cookie mode (request header `X-KKT-Session: cookie`, contract C1): the
+ * token then lives in the HttpOnly cookie `kkt_rt` (staff, Path=/api/v1/auth) or `kkt_prt` (portal, Path=/api/v1/portal/auth).
+ */
 export const TokenPairSchema = z.object({
   access_token: z.string(),
-  refresh_token: z.string(),
+  refresh_token: z.string().optional(),
   token_type: z.literal("Bearer"),
   expires_in: z.int().min(1),
   audience: TokenAudienceSchema,
@@ -85,8 +101,8 @@ export type AuthCompany = z.infer<typeof AuthCompanySchema>;
 export const AuthMeResponseSchema = z.object({ user: AuthUserSchema, company: AuthCompanySchema });
 export type AuthMeResponse = z.infer<typeof AuthMeResponseSchema>;
 
-/** Refresh body. */
-export const RefreshTokenSchema = z.strictObject({ refresh_token: z.string().min(16) });
+/** Refresh body: the refresh token in body mode; omitted in cookie mode (the cookie + `X-KKT-Session: cookie` header carry it). */
+export const RefreshTokenSchema = z.strictObject({ refresh_token: z.string().min(16).optional() });
 export type RefreshToken = z.infer<typeof RefreshTokenSchema>;
 
 /** Logout body (omit refresh_token to revoke only the current session). */
@@ -163,6 +179,28 @@ export const LoginEventRowSchema = z.object({
   created_at: TimestampSchema,
 });
 export type LoginEventRow = z.infer<typeof LoginEventRowSchema>;
+
+/** Header value that selects the cookie transport of refresh tokens (contract C1). */
+export const SESSION_COOKIE_MODE = "cookie" as const;
+/** Request header naming the session transport. */
+export const SESSION_MODE_HEADER = "X-KKT-Session" as const;
+
+/**
+ * Customer login body as the API accepts it: the portal contract's phone + password plus the optional `company` slug (contract C4). Kept
+ * here because the portal contract module imports this one (no import cycle); `PortalLoginSchema` (modules/portal.ts) is the same minus
+ * `company`.
+ */
+export const PortalAuthLoginSchema = z.strictObject({
+  phone: PhoneSchema,
+  password: z.string().min(1).max(128),
+  device_name: z.string().trim().max(120).optional(),
+  company: CompanySlugSchema.optional(),
+});
+export type PortalAuthLogin = z.infer<typeof PortalAuthLoginSchema>;
+
+/** Customer refresh body: optional in cookie mode (contract C1). */
+export const PortalAuthRefreshSchema = z.strictObject({ refresh_token: z.string().min(16).optional() });
+export type PortalAuthRefresh = z.infer<typeof PortalAuthRefreshSchema>;
 
 /** Password policy as exposed to clients. */
 export const PasswordPolicySchema = z.object({

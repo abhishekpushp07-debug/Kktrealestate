@@ -17,7 +17,7 @@ import {
 } from "@kkt/contracts";
 import { roles, users, type Executor } from "@kkt/db";
 import { actorFromRequest, writeAudit } from "../../lib/audit.js";
-import { bumpPermVersion } from "../../lib/cache.js";
+import { bumpAuthVersions } from "../../lib/cache.js";
 import { sendCsv } from "../../lib/csv.js";
 import { ApiError } from "../../lib/errors.js";
 import { listPaging, paginate } from "../../lib/list.js";
@@ -65,6 +65,13 @@ export async function getRoleRow(db: Executor, companyId: string, id: string): P
   return toRow(r);
 }
 
+/** GET /permissions is an alias of GET /roles/permissions (audit F: undeprecated duplicate); retired after the sunset (docs/VERSIONING.md). */
+export const PERMISSIONS_ALIAS_DEPRECATION = {
+  since: "2026-10-26",
+  sunset: "2027-04-24",
+  replacement: "GET /api/v1/roles/permissions",
+} as const;
+
 /** `dashboard.view` gates sign-in self-service (me, logout, change-password, sessions); a role without it could never use the ERP. */
 const REQUIRED_PERMISSION = "dashboard.view";
 
@@ -94,15 +101,26 @@ export async function rolesModule(app: FastifyInstance): Promise<void> {
       permissions: g.permissions.map((p) => ({ code: p.code, label: p.label })),
     })),
   };
-  for (const url of ["/roles/permissions", "/permissions"]) {
-    route(app, {
-      method: "GET",
-      url,
-      permission: "roles.manage",
-      schema: { response: { 200: PermissionCatalogResponseSchema }, summary: "Permission catalog", tags: ["roles"] },
-      handler: async () => catalog,
-    });
-  }
+  route(app, {
+    method: "GET",
+    url: "/roles/permissions",
+    permission: "roles.manage",
+    schema: { response: { 200: PermissionCatalogResponseSchema }, summary: "Permission catalog", tags: ["roles"] },
+    handler: async () => catalog,
+  });
+  // The old alias answers exactly like the canonical route and announces its retirement (Deprecation / Sunset / Link headers).
+  route(app, {
+    method: "GET",
+    url: "/permissions",
+    permission: "roles.manage",
+    deprecated: PERMISSIONS_ALIAS_DEPRECATION,
+    schema: {
+      response: { 200: PermissionCatalogResponseSchema },
+      summary: "Permission catalog (deprecated alias of GET /roles/permissions)",
+      tags: ["roles"],
+    },
+    handler: async () => catalog,
+  });
 
   route(app, {
     method: "GET",
@@ -181,7 +199,7 @@ export async function rolesModule(app: FastifyInstance): Promise<void> {
         });
         return view;
       });
-      await bumpPermVersion(app.redis);
+      // a new role has no holders yet: nothing cached to invalidate
       return reply.code(201).send(row);
     },
   });
@@ -238,7 +256,7 @@ export async function rolesModule(app: FastifyInstance): Promise<void> {
         });
         return after;
       });
-      await bumpPermVersion(app.redis);
+      await bumpAuthVersions(app.redis, { roles: [req.params.id] }, req.log);
       return row;
     },
   });
@@ -290,7 +308,7 @@ export async function rolesModule(app: FastifyInstance): Promise<void> {
           });
           return { id: updated.id, is_active: updated.isActive, version: updated.version };
         });
-        await bumpPermVersion(app.redis);
+        await bumpAuthVersions(app.redis, { roles: [req.params.id] }, req.log);
         return result;
       },
     });

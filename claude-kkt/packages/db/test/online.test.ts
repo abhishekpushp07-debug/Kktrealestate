@@ -89,6 +89,7 @@ describe("checksummed hand-written SQL", () => {
     expect((await listSqlFiles()).map((f) => f.slice(SQL_FOLDER.length + 1))).toEqual([
       "0001_triggers.sql",
       "0002_privileges.sql",
+      "0006_money_guards.sql",
     ]);
     expect((await listOnlineSqlFiles()).map((f) => f.slice(SQL_FOLDER.length + 1))).toEqual([
       "online/0005_indexes.sql",
@@ -100,7 +101,12 @@ describe("checksummed hand-written SQL", () => {
       SELECT t.oid::int AS oid FROM pg_trigger t WHERE t.tgname IN ('set_updated_at', 'audit_logs_immutable') ORDER BY t.oid`;
     const report = await runMigrations(TEST_DATABASE_URL);
     expect(report.applied).toEqual([]);
-    expect(report.skipped).toEqual(["0001_triggers.sql", "0002_privileges.sql", "online/0005_indexes.sql"]);
+    expect(report.skipped).toEqual([
+      "0001_triggers.sql",
+      "0002_privileges.sql",
+      "0006_money_guards.sql",
+      "online/0005_indexes.sql",
+    ]);
     const after = await handle.sql<{ oid: number }[]>`
       SELECT t.oid::int AS oid FROM pg_trigger t WHERE t.tgname IN ('set_updated_at', 'audit_logs_immutable') ORDER BY t.oid`;
     expect(after).toEqual(before);
@@ -125,7 +131,7 @@ describe("checksummed hand-written SQL", () => {
     await handle.sql.unsafe("CREATE TABLE IF NOT EXISTS probe_new_table (id int PRIMARY KEY, updated_at timestamptz)");
     try {
       const report = await runMigrations(TEST_DATABASE_URL);
-      expect(report.applied).toEqual(["0001_triggers.sql", "0002_privileges.sql"]);
+      expect(report.applied).toEqual(["0001_triggers.sql", "0002_privileges.sql", "0006_money_guards.sql"]);
       const [trg] = await handle.sql<{ n: number }[]>`
         SELECT count(*)::int AS n FROM pg_trigger WHERE tgrelid = 'probe_new_table'::regclass AND tgname = 'set_updated_at'`;
       expect(trg?.n).toBe(1);
@@ -136,7 +142,12 @@ describe("checksummed hand-written SQL", () => {
 
   it("KKT_MIGRATE_REAPPLY_SQL / reapplyAll re-applies every file", async () => {
     const report = await runMigrations(TEST_DATABASE_URL, { reapplyAll: true });
-    expect(report.applied).toEqual(["0001_triggers.sql", "0002_privileges.sql", "online/0005_indexes.sql"]);
+    expect(report.applied).toEqual([
+      "0001_triggers.sql",
+      "0002_privileges.sql",
+      "0006_money_guards.sql",
+      "online/0005_indexes.sql",
+    ]);
     expect(report.online["online/0005_indexes.sql"]!.every((r) => r.action === "applied")).toBe(true);
   });
 });
@@ -443,7 +454,12 @@ describe("migration 0005 on existing data (upgrade from 0004)", () => {
         await fresh.end({ timeout: 5 });
       }
       const report = await runMigrations(url);
-      expect(report.applied).toEqual(["0001_triggers.sql", "0002_privileges.sql", "online/0005_indexes.sql"]);
+      expect(report.applied).toEqual([
+        "0001_triggers.sql",
+        "0002_privileges.sql",
+        "0006_money_guards.sql",
+        "online/0005_indexes.sql",
+      ]);
       const after = postgres(url, { max: 1, onnotice: () => undefined });
       try {
         const slugs = await after<{ slug: string }[]>`SELECT slug FROM companies ORDER BY created_at, slug`;

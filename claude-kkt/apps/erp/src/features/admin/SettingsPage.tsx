@@ -35,6 +35,7 @@ import { api, type ApiClientError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { formatDateTime, todayIST } from "@/lib/format";
 import { useMutationWithToast } from "@/lib/queries";
+import { useUnsavedChangesGuard } from "@/lib/unsaved";
 import { contractResolver } from "@/features/shared/contractResolver";
 import { SETTINGS_PATH } from "./adminApi";
 import { DEFAULT_NUMBER_FORMAT, financialYearCode, renderNumber } from "./numbering";
@@ -254,6 +255,8 @@ function SettingsForm({ row }: { row: CompanySettingsRow }) {
   const { refreshMe } = useAuth();
   const resolver = useMemo(() => contractResolver<SettingsValues, unknown>(SettingsFormSchema), []);
   const form = useForm<SettingsValues, unknown, unknown>({ resolver, defaultValues: toValues(row), mode: "onTouched" });
+  // Leaving with unsaved edits (sidebar, Cmd+K, back, reload) asks first (audit v3 H3).
+  useUnsavedChangesGuard(form.formState.isDirty);
   const [serverError, setServerError] = useState<unknown>(null);
 
   useEffect(() => {

@@ -370,7 +370,7 @@ describe("money world: flats regeneration after a cancelled booking, other-charg
     expect(demands.body.items.every((d) => Number.isInteger(d.version) && d.version >= 1)).toBe(true);
   });
 
-  it("cancelling writes the refund/deduction money columns; regenerating the tower afterwards is 409 IN_USE (was 500)", async () => {
+  it("cancelling writes the refund/deduction money columns; regenerating the tower afterwards keeps that flat in place (was 500)", async () => {
     const cur = await t.request<{ version: number }>("GET", `/api/v1/bookings/${bookingId}`, { token: admin });
     const cancel = await t.request("POST", `/api/v1/bookings/${bookingId}/cancel`, {
       token: admin,
@@ -381,13 +381,15 @@ describe("money world: flats regeneration after a cancelled booking, other-charg
       SELECT cancellation_refund_paise AS r, cancellation_deduction_paise AS d FROM bookings WHERE id = ${bookingId}`;
     expect(row).toEqual({ r: 0, d: 0 });
     const block = await t.request<{ version: number }>("GET", `/api/v1/blocks/${w.ggv.towerId}`, { token: admin });
-    const regen = await t.request<ErrorBody>("POST", `/api/v1/blocks/${w.ggv.towerId}/generate-flats`, {
-      token: admin,
-      body: { version: block.body.version, regenerate: true },
-    });
-    expect(regen.status, regen.text).toBe(409);
-    expect(regen.body.error.code).toBe("IN_USE");
-    expect(regen.body.error.details).toMatchObject({ referenced_by: "bookings", usage_count: 1 });
+    const regen = await t.request<{ flats_preserved: number }>(
+      "POST",
+      `/api/v1/blocks/${w.ggv.towerId}/generate-flats`,
+      { token: admin, body: { version: block.body.version, regenerate: true } },
+    );
+    // phase 7 domain track: the flat with booking history is regenerated in place (same id); a change that would delete it is 409
+    // FLAT_HAS_BOOKING_HISTORY (inventory-phase7.test.ts)
+    expect(regen.status, regen.text).toBe(200);
+    expect(regen.body.flats_preserved).toBe(1);
   });
 });
 

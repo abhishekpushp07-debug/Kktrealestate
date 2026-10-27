@@ -35,7 +35,7 @@ export function ManageVisit({
   token: string;
   justMoved?: boolean;
 }) {
-  const { apiUrl } = useSiteConfig();
+  const { apiUrl, companySlug } = useSiteConfig();
   const router = useRouter();
   const [visit, setVisit] = useState(initial);
   const [confirming, setConfirming] = useState(false);
@@ -67,7 +67,7 @@ export function ManageVisit({
     setBusy(true);
     setError(null);
     try {
-      const updated = await publicClient(apiUrl).cancelSiteVisit(token);
+      const updated = await publicClient(apiUrl, companySlug).cancelSiteVisit(token);
       setVisit(updated ?? { ...visit, status: "CANCELLED", can_cancel: false });
       setConfirming(false);
     } catch (err) {

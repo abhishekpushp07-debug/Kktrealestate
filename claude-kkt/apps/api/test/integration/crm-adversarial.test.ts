@@ -609,10 +609,20 @@ describe("right to erasure", () => {
       body: { confirm: "ERASE", reason: "Customer request" },
     });
     expect(denied.status).toBe(403);
-    const erased = await t.request<Customer & { erased_at: string | null; email: string | null }>(
+    // the deprecated alias answers exactly like POST /admin/customers/:id/erase (same response) and announces its sunset
+    const eraseCall = await t.request<{ erased_at: string; full_name: string }>(
       "POST",
       `/api/v1/customers/${cid}/erase`,
       { token: admin.access_token, body: { confirm: "ERASE", reason: "Customer request under DPDP" } },
+    );
+    expect(eraseCall.status, eraseCall.text).toBe(200);
+    expect(eraseCall.body.full_name).toBe(`Erased customer ${conv.body.customer_code}`);
+    expect(eraseCall.headers["deprecation"]).toMatch(/^@\d+$/);
+    expect(String(eraseCall.headers["link"])).toContain("/api/v1/admin/customers/:id/erase");
+    const erased = await t.request<Customer & { erased_at: string | null; email: string | null }>(
+      "GET",
+      `/api/v1/customers/${cid}`,
+      { token: admin.access_token },
     );
     expect(erased.status, erased.text).toBe(200);
     expect(erased.body.erased_at).toBeTruthy();

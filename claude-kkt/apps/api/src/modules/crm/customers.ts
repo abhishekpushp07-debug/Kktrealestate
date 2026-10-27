@@ -1,8 +1,10 @@
-import { and, desc, eq, gt, isNull, or, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
   ActiveStateResponseSchema,
+  AdminCustomerEraseRequestSchema,
+  AdminCustomerEraseResponseSchema,
   CoApplicantInputSchema,
   CoApplicantListResponseSchema,
   CoApplicantRowSchema,
@@ -11,7 +13,6 @@ import {
   CustomerCreateSchema,
   CustomerDuplicateCheckResponseSchema,
   CustomerDuplicateCheckSchema,
-  CustomerEraseSchema,
   CustomerFilterSchema,
   CustomerGetQuerySchema,
   CustomerKycUpdateSchema,
@@ -43,21 +44,24 @@ import {
 import { normalizePAN } from "@kkt/domain";
 import { writeAudit } from "../../lib/audit.js";
 import { sendCsv } from "../../lib/csv.js";
-import { keyedHash } from "../../lib/crypto.js";
+import { keyedHashes } from "../../lib/crypto.js";
 import { ApiError } from "../../lib/errors.js";
 import { listPaging, paginate } from "../../lib/list.js";
 import { route } from "../../lib/routes.js";
 import {
   assertPermission,
+  customerScopeCondition,
   ensureProjectAccess,
   isSuperAdmin,
   scopeFilter,
   type StaffContext,
 } from "../../lib/scope.js";
-import { eraseCustomer } from "../admin/index.js";
+import { maskPhone } from "../../lib/audit.js";
 import { applyUpdate, assertVersion, expectedVersion, withOptionalVersion } from "../../lib/version.js";
+import { eraseCustomer } from "../admin/index.js";
 import { revokeAllFamilies } from "../auth/index.js";
-import { bumpPermVersion } from "../../lib/cache.js";
+import { bumpAuthVersions } from "../../lib/cache.js";
+import { leadScopeCondition } from "./leadService.js";
 import {
   CUSTOMER_SELECT,
   activeBookingCount,
@@ -93,12 +97,25 @@ async function customer360(
   db: Executor,
   companyId: string,
   id: string,
-  user: FastifyRequest["user"],
+  user: StaffContext,
 ): Promise<Customer360Response> {
-  const sel = await loadCustomerSelect(db, companyId, id);
+  // 404 for a customer outside the caller's project scope; every section below is limited to the scope as well
+  const sel = await loadCustomerSelect(db, companyId, id, false, user);
   const cas = await coApplicantsFor(db, [id]);
   const customer = customerRow(sel, cas.get(id) ?? []);
-  const scope = user ? scopeFilter(user, bookings.projectId) : undefined;
+  const scope = scopeFilter(user, bookings.projectId);
+  const paymentScope = scopeFilter(user, payments.projectId);
+  // tickets: those raised on a booking in scope, plus booking-less tickets of this (in-scope) customer
+  // (the aliased sub-select spells the scope on `tb.project_id`; a Drizzle column condition would render "bookings"."project_id")
+  const scopeIds = sql.join(
+    user.projectIds.map((pid) => sql`${pid}::uuid`),
+    sql`, `,
+  );
+  const ticketScope = user.allProjects
+    ? undefined
+    : user.projectIds.length === 0
+      ? sql`${serviceRequests.bookingId} is null`
+      : sql`(${serviceRequests.bookingId} is null or exists (select 1 from ${bookings} tb where tb.id = ${serviceRequests.bookingId} and tb.project_id in (${scopeIds})))`;
   const [bookingRows, paymentRows, docRows, leadRows, ticketRows, portal] = await Promise.all([
     db
       .select({
@@ -127,13 +144,7 @@ async function customer360(
       .select({ p: payments, bookingNumber: bookings.bookingNumber })
       .from(payments)
       .innerJoin(bookings, eq(bookings.id, payments.bookingId))
-      .where(
-        and(
-          eq(payments.companyId, companyId),
-          eq(payments.customerId, id),
-          scope ? scopeFilter(user!, payments.projectId) : undefined,
-        ),
-      )
+      .where(and(eq(payments.companyId, companyId), eq(payments.customerId, id), paymentScope))
       .orderBy(desc(payments.paymentDate), desc(payments.postedAt))
       .limit(10),
     db
@@ -154,13 +165,19 @@ async function customer360(
       .select({ l: leads, projectName: projects.name })
       .from(leads)
       .leftJoin(projects, eq(projects.id, leads.projectId))
-      .where(and(eq(leads.companyId, companyId), or(eq(leads.customerId, id), eq(leads.phone, sel.c.phone))))
+      .where(
+        and(
+          eq(leads.companyId, companyId),
+          or(eq(leads.customerId, id), eq(leads.phone, sel.c.phone)),
+          leadScopeCondition(user),
+        ),
+      )
       .orderBy(desc(leads.createdAt))
       .limit(50),
     db
       .select()
       .from(serviceRequests)
-      .where(and(eq(serviceRequests.companyId, companyId), eq(serviceRequests.customerId, id)))
+      .where(and(eq(serviceRequests.companyId, companyId), eq(serviceRequests.customerId, id), ticketScope))
       .orderBy(desc(serviceRequests.createdAt))
       .limit(50),
     portalAccessView(db, companyId, sel.c),
@@ -168,7 +185,7 @@ async function customer360(
   const [payCount] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(payments)
-    .where(and(eq(payments.companyId, companyId), eq(payments.customerId, id)));
+    .where(and(eq(payments.companyId, companyId), eq(payments.customerId, id), paymentScope));
   return {
     customer,
     bookings: bookingRows.map((r) => ({
@@ -337,6 +354,13 @@ async function kycTransition(
   return { reopened };
 }
 
+/** POST /customers/:id/erase is a deprecated alias of POST /admin/customers/:id/erase. */
+export const CUSTOMER_ERASE_ALIAS_DEPRECATION = {
+  since: "2026-10-26",
+  sunset: "2027-04-24",
+  replacement: "POST /api/v1/admin/customers/:id/erase",
+} as const;
+
 /** /customers routes: list, create, get (masked / audited reveal), update, KYC, co-applicants, 360, deactivate/activate, erase, duplicate check. */
 export function customerRoutes(app: FastifyInstance): void {
   route(app, {
@@ -351,7 +375,8 @@ export function customerRoutes(app: FastifyInstance): void {
     handler: async (req, reply) => {
       const q = req.query;
       const user = req.user!;
-      const where: (SQL | undefined)[] = [eq(customers.companyId, user.companyId)];
+      // project scope (SPEC §1): a scoped user lists only customers linked to their projects (or their own unlinked records)
+      const where: (SQL | undefined)[] = [eq(customers.companyId, user.companyId), customerScopeCondition(user)];
       if (!q.include_inactive) where.push(eq(customers.isActive, true));
       if (q.kyc_status) where.push(eq(customers.kycStatus, q.kyc_status));
       if (q.relationship_manager_id) where.push(eq(customers.relationshipManagerId, q.relationship_manager_id));
@@ -456,12 +481,15 @@ export function customerRoutes(app: FastifyInstance): void {
       summary: "Find customers sharing a phone or PAN",
     },
     handler: async (req) => {
-      const companyId = req.user!.companyId;
+      const user = req.user!;
+      const companyId = user.companyId;
       const conds: SQL[] = [];
       const phone = req.body.phone ? canonicalPhone(req.body.phone) : null;
-      const panHash = req.body.pan ? keyedHash(normalizePAN(req.body.pan)) : null;
+      // every key of the HASH_KEYS ring: a PAN hashed before a rotation is still found
+      const panHashes = req.body.pan ? keyedHashes(normalizePAN(req.body.pan)) : [];
       if (phone) conds.push(eq(customers.phone, phone));
-      if (panHash) conds.push(eq(customers.panHash, panHash));
+      if (panHashes.length > 0) conds.push(inArray(customers.panHash, panHashes));
+      const visible = customerScopeCondition(user);
       const rows = await app.dbReplica
         .select({
           id: customers.id,
@@ -469,6 +497,7 @@ export function customerRoutes(app: FastifyInstance): void {
           name: customers.fullName,
           phone: customers.phone,
           panHash: customers.panHash,
+          inScope: visible ? sql<boolean>`${visible}` : sql<boolean>`true`,
         })
         .from(customers)
         .where(
@@ -480,11 +509,13 @@ export function customerRoutes(app: FastifyInstance): void {
           ),
         )
         .limit(20);
+      // A duplicate outside the caller's project scope is still reported (one person, one record), but without the name and the full
+      // phone: the caller learns that the person exists, not who they are or where they booked.
       const matches: CustomerDuplicateMatch[] = rows.map((r) => ({
         customer_id: r.id,
         customer_code: r.code,
-        full_name: r.name,
-        phone: r.phone,
+        full_name: r.inScope ? r.name : "Existing customer (outside your projects)",
+        phone: r.inScope ? r.phone : (maskPhone(r.phone) ?? ""),
         matched_on: phone && r.phone === phone ? "PHONE" : "PAN",
       }));
       return { matches };
@@ -511,10 +542,11 @@ export function customerRoutes(app: FastifyInstance): void {
     },
     handler: async (req) => {
       const user = req.user!;
-      if (!req.query.reveal) return getCustomerRow(app.dbReplica, user.companyId, req.params.id);
+      if (!req.query.reveal) return getCustomerRow(app.dbReplica, user.companyId, req.params.id, user);
       assertPermission(user, "customer.kyc_view");
       return app.db.transaction(async (tx) => {
-        const sel = await loadCustomerSelect(tx, user.companyId, req.params.id);
+        // scope first: a customer of another project is 404 even for a customer.kyc_view holder
+        const sel = await loadCustomerSelect(tx, user.companyId, req.params.id, false, user);
         const cas = await listCoApplicants(tx, req.params.id);
         const masked = customerRow(sel, cas);
         await writeAudit(tx, {
@@ -526,6 +558,8 @@ export function customerRoutes(app: FastifyInstance): void {
           after: {
             fields: ["pan", "aadhaar", "bank_account_number", "co_applicants"],
             customer_code: sel.c.customerCode,
+            filters: { customer_id: req.params.id, reveal: true },
+            row_count: 1 + cas.length,
           },
         });
         return revealedRow(masked, sel.c, cas);
@@ -566,7 +600,7 @@ export function customerRoutes(app: FastifyInstance): void {
       const user = req.user!;
       const body = req.body;
       return app.db.transaction(async (tx) => {
-        const sel = await loadCustomerSelect(tx, user.companyId, req.params.id, true);
+        const sel = await loadCustomerSelect(tx, user.companyId, req.params.id, true, user);
         const c = sel.c;
         if (c.erasedAt)
           throw ApiError.rule("This customer record was erased and can no longer be edited", "CUSTOMER_ERASED");
@@ -586,7 +620,7 @@ export function customerRoutes(app: FastifyInstance): void {
         // DB time on purpose: the same clock as updated_at, so "edited since the rejection" compares like with like.
         else Object.assign(changes, { kycVerifiedBy: user.id, kycVerifiedAt: sql`now()` });
         await applyUpdate(tx, customers, req.params.id, version, changes, "customer");
-        const after = await getCustomerRow(tx, user.companyId, req.params.id);
+        const after = await getCustomerRow(tx, user.companyId, req.params.id, user);
         await writeAudit(tx, {
           companyId: user.companyId,
           ...metaOf(req),
@@ -617,7 +651,7 @@ export function customerRoutes(app: FastifyInstance): void {
       summary: "Co-applicants of a customer (masked)",
     },
     handler: async (req) => {
-      await loadCustomerSelect(app.dbReplica, req.user!.companyId, req.params.id);
+      await loadCustomerSelect(app.dbReplica, req.user!.companyId, req.params.id, false, req.user!);
       return { items: (await listCoApplicants(app.dbReplica, req.params.id)).map(coApplicantRow) };
     },
   });
@@ -636,7 +670,7 @@ export function customerRoutes(app: FastifyInstance): void {
     handler: async (req, reply) => {
       const user = req.user!;
       const row = await app.db.transaction(async (tx) => {
-        const sel = await loadCustomerSelect(tx, user.companyId, req.params.id, true);
+        const sel = await loadCustomerSelect(tx, user.companyId, req.params.id, true, user);
         if (sel.c.erasedAt)
           throw ApiError.rule("This customer record was erased and can no longer be edited", "CUSTOMER_ERASED");
         const [agg] = await tx
@@ -685,7 +719,7 @@ export function customerRoutes(app: FastifyInstance): void {
       const { version: _v, ...patch } = req.body;
       const version = expectedVersion(req, req.body);
       return app.db.transaction(async (tx) => {
-        const sel = await loadCustomerSelect(tx, user.companyId, req.params.id, true);
+        const sel = await loadCustomerSelect(tx, user.companyId, req.params.id, true, user);
         if (sel.c.erasedAt)
           throw ApiError.rule("This customer record was erased and can no longer be edited", "CUSTOMER_ERASED");
         const [existing] = await tx
@@ -725,7 +759,7 @@ export function customerRoutes(app: FastifyInstance): void {
     handler: async (req, reply) => {
       const user = req.user!;
       await app.db.transaction(async (tx) => {
-        const sel = await loadCustomerSelect(tx, user.companyId, req.params.id, true);
+        const sel = await loadCustomerSelect(tx, user.companyId, req.params.id, true, user);
         if (sel.c.erasedAt)
           throw ApiError.rule("This customer record was erased and can no longer be edited", "CUSTOMER_ERASED");
         const [existing] = await tx
@@ -783,8 +817,9 @@ export function customerRoutes(app: FastifyInstance): void {
       },
       handler: async (req) => {
         const user = req.user!;
+        let portalUserId: string | null = null;
         const result = await app.db.transaction(async (tx) => {
-          const sel = await loadCustomerSelect(tx, user.companyId, req.params.id, true);
+          const sel = await loadCustomerSelect(tx, user.companyId, req.params.id, true, user);
           if (sel.c.erasedAt)
             throw ApiError.rule("An erased customer record cannot be reactivated or deactivated", "CUSTOMER_ERASED");
           if (action === "deactivate") {
@@ -815,6 +850,7 @@ export function customerRoutes(app: FastifyInstance): void {
               .limit(1)
               .for("update");
             if (pu) {
+              portalUserId = pu.id;
               await revokeAllFamilies(tx, securityRedis(app), "CUSTOMER", pu.id, "CUSTOMER_DEACTIVATED");
               if (pu.isEnabled)
                 await tx
@@ -834,36 +870,39 @@ export function customerRoutes(app: FastifyInstance): void {
           });
           return { id: updated.id, is_active: updated.isActive, version: updated.version };
         });
-        await bumpPermVersion(app.redis);
+        // only this customer's cached portal identity is re-read (its sessions are already revoked above)
+        if (portalUserId) await bumpAuthVersions(app.redis, { portalUsers: [portalUserId] }, req.log);
         return result;
       },
     });
   }
 
-  // One erasure implementation (admin/erase.ts): same guarantees (co-applicants anonymised, documents removed, leads/visits/enquiries/
-  // testimonials scrubbed, portal disabled, financial rows kept) and the same `customer.erased` audit row as POST /admin/customers/:id/erase.
+  // Deprecated alias of POST /admin/customers/:id/erase (audit F: two contracts for one destructive operation). It delegates to the one
+  // erasure implementation (admin eraseCustomer) with the canonical route's request and response schemas and idempotency, and sends
+  // Deprecation / Sunset / Link headers until its sunset (docs/VERSIONING.md).
   route(app, {
     method: "POST",
     url: "/customers/:id/erase",
     permission: "admin.tools",
+    idempotent: true,
+    deprecated: CUSTOMER_ERASE_ALIAS_DEPRECATION,
     schema: {
       params: idParams,
-      body: CustomerEraseSchema,
-      response: { 200: CustomerRowSchema },
+      body: AdminCustomerEraseRequestSchema,
+      response: { 200: AdminCustomerEraseResponseSchema },
       summary:
-        "Right to erasure (Super Admin): anonymise PII when no booking is ACTIVE (409 HAS_ACTIVE_BOOKING); financial records stay. Same implementation as POST /admin/customers/:id/erase",
+        "Right to erasure (deprecated alias of POST /admin/customers/:id/erase; same request, response and idempotency)",
     },
     handler: async (req) => {
       const user = req.user!;
       if (!isSuperAdmin(user))
         throw new ApiError(403, "SUPER_ADMIN_ONLY", "Only the Super Admin role may perform this action");
-      await eraseCustomer(app, {
+      return eraseCustomer(app, {
         companyId: user.companyId,
         customerId: req.params.id,
-        reason: req.body.reason,
+        reason: req.body.reason ?? null,
         meta: metaOf(req),
       });
-      return getCustomerRow(app.db, user.companyId, req.params.id);
     },
   });
 

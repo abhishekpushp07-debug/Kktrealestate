@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   AuditLogFilterSchema,
   AuditLogListResponseSchema,
+  AuditVerifyResponseSchema,
   IdSchema,
   ListQuerySchema,
   LoginEventRowSchema,
@@ -13,9 +14,16 @@ import {
   type LoginEventRow,
 } from "@kkt/contracts";
 import { auditLogs, loginEvents } from "@kkt/db";
+import { registerJob } from "../../jobs/index.js";
 import { sendCsv } from "../../lib/csv.js";
 import { listPaging, paginate } from "../../lib/list.js";
 import { route } from "../../lib/routes.js";
+import { sealAuditLog, verifyAuditChain } from "./seal.js";
+
+export { sealAuditLog, verifyAuditChain, chainHash, AUDIT_SEAL_LAG_SECONDS } from "./seal.js";
+
+/** Schedule the AUDIT_SEAL job runs on (jobs/index.ts JOB_SCHEDULES carries it): every 15 minutes, IST. */
+export const AUDIT_SEAL_SCHEDULE = { name: "AUDIT_SEAL", cron: "*/15 * * * *", tz: "Asia/Kolkata" } as const;
 
 type DbAudit = typeof auditLogs.$inferSelect;
 type DbLogin = typeof loginEvents.$inferSelect;
@@ -58,8 +66,31 @@ const LoginEventFilterSchema = ListQuerySchema.extend({
   to: z.iso.date().optional(),
 });
 
-/** Audit module: read-only views of audit_logs and login_events (permission audit.view). */
+/**
+ * Audit module: read-only views of audit_logs and login_events (permission audit.view), the AUDIT_SEAL job (hash chain over new rows,
+ * see seal.ts) and GET /admin/audit/verify (recomputes the caller's company chain).
+ */
 export async function auditModule(app: FastifyInstance): Promise<void> {
+  registerJob("AUDIT_SEAL", async ({ db, data }) =>
+    sealAuditLog(db, {
+      lagSeconds: typeof data["lag_seconds"] === "number" ? data["lag_seconds"] : undefined,
+      batchSize: typeof data["batch_size"] === "number" ? data["batch_size"] : undefined,
+    }),
+  );
+
+  route(app, {
+    method: "GET",
+    url: "/admin/audit/verify",
+    permission: "admin.tools",
+    schema: {
+      response: { 200: AuditVerifyResponseSchema },
+      summary:
+        "Recompute the company's audit-log hash chain (AUDIT_SEAL) and report the first mismatch (changed, removed or back-dated rows, removed seals)",
+      tags: ["admin"],
+    },
+    handler: async (req) => verifyAuditChain(app.db, req.user!.companyId),
+  });
+
   async function listAudit(companyId: string, q: z.infer<typeof AuditLogFilterSchema>, extra: SQL[] = []) {
     const where: (SQL | undefined)[] = [eq(auditLogs.companyId, companyId), ...extra];
     if (q.actor_type) where.push(eq(auditLogs.actorType, q.actor_type));
@@ -140,9 +171,9 @@ export async function auditModule(app: FastifyInstance): Promise<void> {
     },
     handler: async (req, reply) => {
       const q = req.query;
-      const where: (SQL | undefined)[] = [
-        sql`(${loginEvents.companyId} = ${req.user!.companyId} or ${loginEvents.companyId} is null)`,
-      ];
+      // strictly the caller's tenant (audit B: rows without a company — unknown identifiers before contract C4 — were shown to every
+      // tenant); sign-ins now record the company they resolved to, unknown identifiers included
+      const where: (SQL | undefined)[] = [eq(loginEvents.companyId, req.user!.companyId)];
       if (q.identifier) where.push(eq(loginEvents.identifier, q.identifier));
       if (q.success !== undefined) where.push(eq(loginEvents.success, q.success));
       if (q.subject_type) where.push(eq(loginEvents.subjectType, q.subject_type));

@@ -22,7 +22,9 @@ describe("formatINR", () => {
   it("shows paise only when present (or forced) and handles negatives", () => {
     expect(formatINR(12_50_000_50)).toBe("₹12,50,000.50");
     expect(formatINR(12_50_000_00, { decimals: "always" })).toBe("₹12,50,000.00");
-    expect(formatINR(12_50_000_50, { decimals: "never" })).toBe("₹12,50,000");
+    // "never" rounds half-up like the receipts (packages/domain), it does not truncate
+    expect(formatINR(12_50_000_50, { decimals: "never" })).toBe("₹12,50,001");
+    expect(formatINR(12_50_000_49, { decimals: "never" })).toBe("₹12,50,000");
     expect(formatINR(-6_00_000_00)).toBe("-₹6,00,000");
     expect(formatINR(6_00_000_00, { signed: true })).toBe("+₹6,00,000");
     expect(formatINR(null)).toBe("—");

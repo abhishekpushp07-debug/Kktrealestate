@@ -66,7 +66,7 @@ export function EnquiryForm({
   heading,
   compact = false,
 }: EnquiryFormProps) {
-  const { apiUrl, whatsapp, phone: sitePhone, brandName } = useSiteConfig();
+  const { apiUrl, companySlug, whatsapp, phone: sitePhone, brandName } = useSiteConfig();
   const utm = useUtmParams();
   const id = useId();
   const options = flatTypes && flatTypes.length ? flatTypes : DEFAULT_FLAT_TYPES;
@@ -118,7 +118,7 @@ export function EnquiryForm({
     };
 
     try {
-      const result = await publicClient(apiUrl).createEnquiry(body);
+      const result = await publicClient(apiUrl, companySlug).createEnquiry(body);
       setStatus({ kind: "success", reference: result.reference_number });
     } catch (error) {
       if (

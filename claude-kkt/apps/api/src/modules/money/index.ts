@@ -20,6 +20,12 @@ export {
   appendEvent,
   rebuild,
   ledgerRows,
+  ledgerRebuildRows,
+  ledgerTotals,
+  epochRows,
+  currentEpochOf,
+  type RebuildOptions,
+  type RebuildWrite,
   sourceEvents,
   events,
   demandAmountsFor,
@@ -43,6 +49,9 @@ export {
   type RunSummary,
   type DuesScope,
   type VoidStageResult,
+  type ClosedBookingRef,
+  type DuesFailure,
+  failureCode,
 } from "./services/dues.js";
 export {
   runReport,

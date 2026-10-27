@@ -26,6 +26,7 @@ type DocRow = {
   width: number | null;
   height: number | null;
   has_variants: boolean;
+  renditions: "NONE" | "PENDING" | "READY" | "FAILED";
   thumb_url: string | null;
   medium_url: string | null;
   is_sensitive: boolean;
@@ -94,6 +95,10 @@ async function upload(
   };
 }
 
+/**
+ * Uploads and, for an image, plays the worker: the upload answers with `renditions: PENDING` (it never waits for them), then the
+ * DOCUMENT_RENDITIONS work runs and the row is re-read as a client would see it afterwards.
+ */
 async function uploadOk(
   token: string,
   fields: Record<string, unknown>,
@@ -101,7 +106,23 @@ async function uploadOk(
 ): Promise<DocRow> {
   const r = await upload(token, fields, file);
   expect(r.status, r.text).toBe(201);
-  return r.body.document;
+  const doc = r.body.document;
+  if (!doc.mime.startsWith("image/")) {
+    expect(doc.renditions).toBe("NONE");
+    return doc;
+  }
+  expect(doc.renditions).toBe("PENDING");
+  expect(doc.has_variants).toBe(false);
+  return renderNow(doc.id);
+}
+
+/** Runs the renditions of one document now (what the DOCUMENT_RENDITIONS job does) and returns its row. */
+async function renderNow(id: string): Promise<DocRow> {
+  const svc = await import("../../src/modules/documents/service.js");
+  const { renderDocument } = await import("../../src/modules/documents/renditions.js");
+  await renderDocument(t.app.db, svc.storage(), id);
+  const [row] = await t.app.sql<{ company_id: string }[]>`select company_id from documents where id = ${id}`;
+  return svc.toDocumentRow((await svc.loadJoined(t.app.db, row!.company_id, id, { includeDeleted: true }))!) as DocRow;
 }
 
 function pathOf(url: string): string {
@@ -289,9 +310,9 @@ describe("upload", () => {
     const r = await upload(admin, { entity_type: "CUSTOMER", entity_id: customerId }, { name: "huge.pdf", data: big });
     expect(r.status, r.text).toBe(413);
     expect(r.body.error.code).toBe("PAYLOAD_TOO_LARGE");
-    const { storeBuffer } = await import("../../src/modules/documents/service.js");
+    const { prepareUpload } = await import("../../src/modules/documents/service.js");
     await expect(
-      storeBuffer(t.app.db, {
+      prepareUpload(t.app.db, {
         companyId: t.companyId,
         entityType: "CUSTOMER",
         entityId: customerId,
@@ -592,7 +613,9 @@ describe("sensitivity and permissions", () => {
     const all = await t.request<ListBody>("GET", "/api/v1/documents?page_size=200", { token: projectsUser });
     expect(all.status, all.text).toBe(200);
     expect(all.body.items.map((d) => d.id)).not.toContain(projectDoc.id);
-    expect(all.body.items.map((d) => d.id)).toContain(plainId);
+    // customer documents follow the customer's project scope (security track): this customer is linked to no project of the caller
+    expect(all.body.items.map((d) => d.id)).not.toContain(plainId);
+    expect((await t.request("GET", `/api/v1/documents/${plainId}`, { token: projectsUser })).status).toBe(404);
     const adminAll = await t.request<ListBody>("GET", "/api/v1/documents?page_size=200", { token: admin });
     expect(adminAll.body.items.map((d) => d.id)).toContain(projectDoc.id);
   });
@@ -738,10 +761,11 @@ describe("list conventions", () => {
 });
 
 describe("service functions for other modules", () => {
-  it("storeBuffer, listForEntity, documentsSharedWithCustomer, streamDocument and publicMediaUrl", async () => {
+  it("uploadDocument, listForEntity, documentsSharedWithCustomer, streamDocument and publicMediaUrl", async () => {
     const svc = await import("../../src/modules/documents/service.js");
-    const stored = await t.app.db.transaction((tx) =>
-      svc.storeBuffer(tx, {
+    const stored = await svc.uploadDocument(
+      t.app,
+      {
         companyId: t.companyId,
         entityType: "CUSTOMER",
         entityId: customerId,
@@ -751,8 +775,15 @@ describe("service functions for other modules", () => {
         sharedWithCustomer: true,
         uploadedBy: null,
         uploadedByType: "SYSTEM",
-      }),
+      },
+      async (_tx, row) => row,
     );
+    // until the renditions exist a thumb request is answered with the original
+    const early = await svc.streamDocument(t.app.db, stored.id, "thumb");
+    expect(early?.mime).toBe("image/png");
+    expect(early?.fallback).toBe(true);
+    early?.stream.destroy();
+    await renderNow(stored.id);
     expect(stored.fileName).toBe("passwd.png");
     expect(stored.storageKey).not.toContain("..");
     expect(stored.uploadedByType).toBe("SYSTEM");
@@ -864,9 +895,9 @@ describe("adversarial: uploads", () => {
     expect(r.body.error.code).toBe("PAYLOAD_TOO_LARGE");
     expect(r.body.error.details?.["max_pixels"]).toBe(50_000_000);
     expect(await t.app.sql`select count(*)::int as n from documents where title = 'Bomb'`).toEqual([{ n: 0 }]);
-    const { storeBuffer } = await import("../../src/modules/documents/service.js");
+    const { prepareUpload } = await import("../../src/modules/documents/service.js");
     await expect(
-      storeBuffer(t.app.db, {
+      prepareUpload(t.app.db, {
         companyId: t.companyId,
         entityType: "CUSTOMER",
         entityId: customerId,
@@ -878,7 +909,7 @@ describe("adversarial: uploads", () => {
     ).rejects.toMatchObject({ statusCode: 413, code: "PAYLOAD_TOO_LARGE" });
   });
 
-  it("keeps the original when variant generation fails (truncated image): no variants, thumb link 404, original downloadable", async () => {
+  it("keeps the original when variant generation fails (truncated image): no variants, renditions FAILED, the original stands in", async () => {
     const broken = craftedPng(100, 100);
     const doc = await uploadOk(
       admin,
@@ -887,13 +918,17 @@ describe("adversarial: uploads", () => {
     );
     expect(doc.mime).toBe("image/png");
     expect(doc.has_variants).toBe(false);
-    expect(doc.thumb_url).toBeNull();
-    expect(doc.medium_url).toBeNull();
+    expect(doc.renditions).toBe("FAILED");
+    // the thumb/medium links serve the original (phase 7: "the original is served until renditions exist")
+    expect(doc.thumb_url).toMatch(/\/api\/v1\/files\//);
+    expect((await fetchFile(doc.thumb_url!)).headers["content-type"]).toBe("image/png");
     expect(doc.width).toBe(100);
     expect(doc.height).toBe(100);
-    expect((await t.request("POST", `/api/v1/documents/${doc.id}/link?variant=thumb`, { token: admin })).status).toBe(
-      404,
-    );
+    const thumbLink = await t.request<LinkBody>("POST", `/api/v1/documents/${doc.id}/link?variant=thumb`, {
+      token: admin,
+    });
+    expect(thumbLink.status).toBe(200);
+    expect(thumbLink.body.mime).toBe("image/png");
     const link = await t.request<LinkBody>("POST", `/api/v1/documents/${doc.id}/link`, { token: admin });
     expect(link.status, link.text).toBe(200);
     const res = await fetchFile(link.body.download_url);
@@ -1138,8 +1173,9 @@ describe("adversarial: streaming, tenancy and lists", () => {
       { id: string }[]
     >`insert into customers (company_id, customer_code, full_name, phone) values (${other!.id}, 'CUST-0001', 'Foreign Buyer', '9000000001') returning id`;
     const svc = await import("../../src/modules/documents/service.js");
-    const foreign = await t.app.db.transaction((tx) =>
-      svc.storeBuffer(tx, {
+    const foreign = await svc.uploadDocument(
+      t.app,
+      {
         companyId: other!.id,
         entityType: "CUSTOMER",
         entityId: otherCustomer!.id,
@@ -1148,7 +1184,8 @@ describe("adversarial: streaming, tenancy and lists", () => {
         title: "Foreign",
         uploadedBy: null,
         uploadedByType: "SYSTEM",
-      }),
+      },
+      async (_tx, row) => row,
     );
     expect((await t.request("GET", `/api/v1/documents/${foreign.id}`, { token: admin })).status).toBe(404);
     expect((await t.request("POST", `/api/v1/documents/${foreign.id}/link`, { token: admin })).status).toBe(404);

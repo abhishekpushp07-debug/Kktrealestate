@@ -22,6 +22,42 @@ import type { DbRow, MasterKindDef, WriteContext } from "./types.js";
 
 const idParams = z.object({ id: IdSchema });
 
+type FieldDef = { type: string; innerType?: z.ZodType };
+const fieldDef = (s: z.ZodType): FieldDef => (s as unknown as { _zod: { def: FieldDef } })._zod.def;
+
+/** True when a field applies a default somewhere in its optional/default wrapper chain. */
+function hasDefault(field: z.ZodType): boolean {
+  let s = field;
+  for (let i = 0; i < 10; i++) {
+    const d = fieldDef(s);
+    if (d.type === "default") return true;
+    if (d.type === "optional" && d.innerType) s = d.innerType;
+    else return false;
+  }
+  return false;
+}
+
+/**
+ * An update (PATCH) body schema that never fills create-time defaults: Zod 4 applies `.default()` even inside `.partial()`, so a
+ * schema built that way (the payment plan update) reset `grace_days` to 0 on every PATCH that left it out. Only rebuilt when a field
+ * actually carries a default (the rebuilt object is strict, like every update schema).
+ */
+export function withoutDefaults(schema: z.ZodType): z.ZodType {
+  const shape = (schema as unknown as { shape?: Record<string, z.ZodType> }).shape;
+  if (!shape || !Object.values(shape).some(hasDefault)) return schema;
+  const out: Record<string, z.ZodType> = {};
+  for (const [k, field] of Object.entries(shape)) {
+    let inner = field;
+    for (let i = 0; i < 10; i++) {
+      const d = fieldDef(inner);
+      if ((d.type === "optional" || d.type === "default") && d.innerType) inner = d.innerType;
+      else break;
+    }
+    out[k] = inner === field ? field : inner.optional();
+  }
+  return z.strictObject(out);
+}
+
 function ctxOf(app: FastifyInstance, req: FastifyRequest): WriteContext {
   const user = req.user!;
   return { app, req, user, companyId: user.companyId };
@@ -249,7 +285,7 @@ export function registerMasterKind(app: FastifyInstance, def: MasterKindDef): vo
     permission: "master.write",
     schema: {
       params: idParams,
-      body: withOptionalVersion(def.updateSchema),
+      body: withOptionalVersion(withoutDefaults(def.updateSchema)),
       response: { 200: def.rowSchema },
       summary: `Update ${label}`,
       tags: ["masters"],

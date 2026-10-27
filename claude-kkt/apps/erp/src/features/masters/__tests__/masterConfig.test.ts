@@ -26,12 +26,12 @@ describe("masterConfig registry", () => {
     expect(getMasterConfig(undefined)).toBeUndefined();
   });
 
-  it("gives every kind columns, a form, defaults, csv columns and a sort", () => {
+  it("gives every kind columns, a form, defaults and a sort (CSV templates come from the API)", () => {
     for (const config of MASTER_CONFIG_LIST) {
       expect(config.columns.length, config.kind).toBeGreaterThan(0);
       expect(config.defaultSort, config.kind).toMatch(/^-?[a-z_]+$/);
-      expect(config.csv.columns.length, config.kind).toBeGreaterThan(0);
-      expect(config.csv.example.split(",").length, config.kind).toBe(config.csv.columns.length);
+      // audit v3 G1: no hand-kept import columns (they drifted: default_amount vs default_amount_paise)
+      expect("csv" in config, config.kind).toBe(false);
       expect(Boolean(config.Form) || Boolean(config.fields?.length), `${config.kind} needs a Form or fields`).toBe(
         true,
       );

@@ -92,8 +92,10 @@ describe("prometheus metrics (prom-client)", () => {
       expect(text).toContain('kkt_job_failures_24h{job_name="DAILY_DUES"} 2');
       expect(text).toContain('kkt_job_last_success_timestamp_seconds{job_name="DAILY_DUES"} 1760000000');
       expect(text).toContain("kkt_integrity_findings 4");
-      expect(text).toContain('kkt_jobs_queue_depth{state="wait"} 0');
-      expect(text).toContain('kkt_jobs_queue_depth{state="failed"} 5');
+      expect(text).toContain('kkt_jobs_queue_depth{queue="kkt-jobs",state="wait"} 0');
+      expect(text).toContain('kkt_jobs_queue_depth{queue="kkt-jobs",state="failed"} 5');
+      // the heavy queue (backups, exports, rebuilds, renditions) is reported next to the critical one
+      expect(text).toContain('kkt_jobs_queue_depth{queue="kkt-jobs-heavy",state="wait"} 7');
       expect(text).toContain("demands_raised_total 7");
       expect(queries).toBeLessThanOrEqual(5); // one snapshot per scrape, shared by every gauge
       demands = 10;

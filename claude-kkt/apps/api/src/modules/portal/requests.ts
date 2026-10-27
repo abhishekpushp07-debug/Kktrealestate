@@ -35,7 +35,7 @@ import type { ListResult } from "../../lib/list.js";
 import { installMultipartIdempotency, uploadOf, type ParsedUpload } from "../../lib/multipart.js";
 import { route } from "../../lib/routes.js";
 import type { PortalContext } from "../../lib/scope.js";
-import { loadJoined, storeBuffer, toDocumentRow } from "../documents/index.js";
+import { loadJoined, toDocumentRow, uploadDocument } from "../documents/index.js";
 import {
   addCustomerMessage,
   createTicketForCustomer,
@@ -182,78 +182,88 @@ export async function addRequestAttachment(
     if (!parsed.success) throw ApiError.invalid("message_id", "message_id must be a UUID");
     messageId = parsed.data;
   }
-  return app.db.transaction(async (tx) => {
-    const t = await requireCustomerTicket(tx, ticketId, customer.customerId, true);
-    if (t.sr.status === "CLOSED")
-      throw ApiError.conflict("TICKET_CLOSED", "This request is closed and can no longer be changed", {
-        status: t.sr.status,
+  // the file is validated and written to storage BEFORE the transaction (documents/service.ts uploadDocument); the ticket checks run
+  // first without a lock (nothing is written for a foreign or closed ticket) and again under the row lock inside the transaction
+  const closed = (status: string) =>
+    ApiError.conflict("TICKET_CLOSED", "This request is closed and can no longer be changed", { status });
+  const uploadInput = {
+    companyId: customer.companyId,
+    entityType: "SERVICE_REQUEST" as const,
+    entityId: ticketId,
+    buffer: upload.buffer,
+    filename: upload.filename,
+    uploadedBy: customer.customerId,
+    uploadedByType: "CUSTOMER" as const,
+  };
+  const precheck = async () => {
+    const t = await requireCustomerTicket(app.db, ticketId, customer.customerId, false);
+    if (t.sr.status === "CLOSED") throw closed(t.sr.status);
+  };
+  return uploadDocument(
+    app,
+    uploadInput,
+    async (tx, row) => {
+      const t = await requireCustomerTicket(tx, ticketId, customer.customerId, true);
+      if (t.sr.status === "CLOSED") throw closed(t.sr.status);
+      let message: { id: string; attachmentIds: string[] } | null = null;
+      if (messageId) {
+        const [msg] = await tx
+          .select({ id: serviceRequestMessages.id, attachmentIds: serviceRequestMessages.attachmentIds })
+          .from(serviceRequestMessages)
+          .where(
+            and(
+              eq(serviceRequestMessages.id, messageId),
+              eq(serviceRequestMessages.ticketId, t.sr.id),
+              eq(serviceRequestMessages.authorType, "CUSTOMER"),
+              eq(serviceRequestMessages.authorId, customer.customerId),
+              eq(serviceRequestMessages.isInternal, false),
+            ),
+          )
+          .limit(1)
+          .for("update");
+        if (!msg) throw ApiError.notFound("Message");
+        message = msg;
+      }
+      if (message && message.attachmentIds.length >= 10)
+        throw ApiError.invalid("message_id", "A message may carry at most 10 attachments");
+      if (message)
+        await tx
+          .update(serviceRequestMessages)
+          .set({ attachmentIds: [...message.attachmentIds, row.id] })
+          .where(eq(serviceRequestMessages.id, message.id));
+      const joined = await loadJoined(tx, customer.companyId, row.id);
+      const doc = toDocumentRow(joined!);
+      await writeAudit(tx, {
+        companyId: customer.companyId,
+        actor: { type: "CUSTOMER", id: customer.customerId, name: customer.name },
+        action: "document.upload",
+        entityType: "document",
+        entityId: row.id,
+        after: {
+          entity_type: "SERVICE_REQUEST",
+          entity_id: t.sr.id,
+          ticket_number: t.sr.ticketNumber,
+          message_id: message?.id ?? null,
+          file_name: doc.file_name,
+          mime: doc.mime,
+          size_bytes: doc.size_bytes,
+        },
+        ip: m.ip ?? null,
+        requestId: m.requestId ?? null,
       });
-    let message: { id: string; attachmentIds: string[] } | null = null;
-    if (messageId) {
-      const [msg] = await tx
-        .select({ id: serviceRequestMessages.id, attachmentIds: serviceRequestMessages.attachmentIds })
-        .from(serviceRequestMessages)
-        .where(
-          and(
-            eq(serviceRequestMessages.id, messageId),
-            eq(serviceRequestMessages.ticketId, t.sr.id),
-            eq(serviceRequestMessages.authorType, "CUSTOMER"),
-            eq(serviceRequestMessages.authorId, customer.customerId),
-            eq(serviceRequestMessages.isInternal, false),
-          ),
-        )
-        .limit(1)
-        .for("update");
-      if (!msg) throw ApiError.notFound("Message");
-      message = msg;
-    }
-    const row = await storeBuffer(tx, {
-      companyId: customer.companyId,
-      entityType: "SERVICE_REQUEST",
-      entityId: t.sr.id,
-      buffer: upload.buffer,
-      filename: upload.filename,
-      uploadedBy: customer.customerId,
-      uploadedByType: "CUSTOMER",
-    });
-    if (message && message.attachmentIds.length >= 10)
-      throw ApiError.invalid("message_id", "A message may carry at most 10 attachments");
-    if (message)
-      await tx
-        .update(serviceRequestMessages)
-        .set({ attachmentIds: [...message.attachmentIds, row.id] })
-        .where(eq(serviceRequestMessages.id, message.id));
-    const joined = await loadJoined(tx, customer.companyId, row.id);
-    const doc = toDocumentRow(joined!);
-    await writeAudit(tx, {
-      companyId: customer.companyId,
-      actor: { type: "CUSTOMER", id: customer.customerId, name: customer.name },
-      action: "document.upload",
-      entityType: "document",
-      entityId: row.id,
-      after: {
-        entity_type: "SERVICE_REQUEST",
-        entity_id: t.sr.id,
-        ticket_number: t.sr.ticketNumber,
-        message_id: message?.id ?? null,
+      return {
+        document_id: doc.id,
+        kind: "ATTACHMENT",
+        title: doc.title,
+        document_type_name: doc.document_type_name,
         file_name: doc.file_name,
         mime: doc.mime,
         size_bytes: doc.size_bytes,
-      },
-      ip: m.ip ?? null,
-      requestId: m.requestId ?? null,
-    });
-    return {
-      document_id: doc.id,
-      kind: "ATTACHMENT",
-      title: doc.title,
-      document_type_name: doc.document_type_name,
-      file_name: doc.file_name,
-      mime: doc.mime,
-      size_bytes: doc.size_bytes,
-      shared_at: doc.created_at,
-    };
-  });
+        shared_at: doc.created_at,
+      };
+    },
+    { before: precheck },
+  );
 }
 
 /** Registers the /portal/requests routes. */

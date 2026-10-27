@@ -12,6 +12,8 @@ export default defineConfig({
       REDIS_URL: process.env.TEST_REDIS_URL ?? "redis://localhost:6379/1",
       WRITE_RATE_LIMIT_PER_MIN: "100000",
       PUBLIC_RATE_LIMIT_PER_MIN: "100000",
+      READ_RATE_LIMIT_PER_MIN: "100000",
+      EXPORT_RATE_LIMIT_PER_MIN: "100000",
       RUN_JOBS_IN_API: "false",
       LOG_LEVEL: "fatal",
     },

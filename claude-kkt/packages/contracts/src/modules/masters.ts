@@ -454,14 +454,67 @@ export const MasterCsvImportRowSchema = z.object({
 });
 export type MasterCsvImportRow = z.infer<typeof MasterCsvImportRowSchema>;
 
-/** Import preview / result. */
+/**
+ * Import preview / result. UPDATE rows carry (in `data`) and apply ONLY the columns present in the CSV with a non-empty cell: an omitted
+ * column or an empty cell leaves the stored value unchanged (no create-time defaults). `ignored_columns` lists export-only columns
+ * (e.g. `id`, `version`, `is_active`, `category_name`) that the importer accepted but does not write.
+ */
 export const MasterCsvImportResponseSchema = z.object({
   kind: MasterKindSchema,
   committed: z.boolean(),
   rows: z.array(MasterCsvImportRowSchema),
   summary: z.object({ create: z.int(), update: z.int(), skip: z.int(), error: z.int() }),
+  ignored_columns: z.array(z.string()).optional(),
 });
 export type MasterCsvImportResponse = z.infer<typeof MasterCsvImportResponseSchema>;
+
+/** `details` of 422 IMPORT_UNKNOWN_COLUMNS: the header names the importer does not know, with the expected names. */
+export const ImportUnknownColumnsDetailsSchema = z.object({
+  kind: MasterKindSchema,
+  unknown_columns: z.array(z.string()).min(1),
+  /** Best guess per unknown column (e.g. `default_amount` → `default_amount_paise`), when one is close enough. */
+  suggestions: z.record(z.string(), z.string()),
+  expected_columns: z.array(z.string()),
+  required_columns: z.array(z.string()),
+});
+export type ImportUnknownColumnsDetails = z.infer<typeof ImportUnknownColumnsDetailsSchema>;
+
+/** How a template cell is written: plain text/number/boolean, a `|`-separated list, or JSON (arrays of objects). */
+export const ImportColumnTypeSchema = z.enum(["string", "number", "boolean", "enum", "list", "json"]);
+export type ImportColumnType = z.infer<typeof ImportColumnTypeSchema>;
+
+/** One column of a master's canonical import template. */
+export const ImportTemplateColumnSchema = z.object({
+  name: z.string(),
+  required: z.boolean(),
+  type: ImportColumnTypeSchema,
+  /** Allowed values of an enum column (or of the items of an enum list). */
+  values: z.array(z.string()).optional(),
+  /** True for the business key that decides CREATE vs UPDATE. */
+  key: z.boolean(),
+});
+export type ImportTemplateColumn = z.infer<typeof ImportTemplateColumnSchema>;
+
+/**
+ * GET /masters/{path}/import-template — the canonical CSV header for one master and an example row valid for the caller's company
+ * (references such as room/area/flat type ids are filled from its active masters). `?format=csv` downloads `csv` as a file.
+ */
+export const MasterImportTemplateSchema = z.object({
+  kind: MasterKindSchema,
+  path: z.string(),
+  key_field: z.string(),
+  columns: z.array(ImportTemplateColumnSchema),
+  header: z.array(z.string()),
+  /** Example row (cell text, exactly as it appears in `csv`). */
+  example: z.record(z.string(), z.string()),
+  /** Header line + example line, RFC 4180 quoted. */
+  csv: z.string(),
+  /** Why the example could not reference real data (e.g. no active room type yet); the example then needs editing. */
+  notes: z.array(z.string()),
+});
+export type MasterImportTemplate = z.infer<typeof MasterImportTemplateSchema>;
+export const MasterImportTemplateQuerySchema = z.strictObject({ format: z.enum(["json", "csv"]).default("json") });
+export type MasterImportTemplateQuery = z.infer<typeof MasterImportTemplateQuerySchema>;
 
 /** Area type codes a flat type needs for the super ≥ built-up ≥ carpet check. */
 export const STRUCTURAL_AREA_CODES = ["CARPET", "BUILT_UP", "SUPER_BUILT_UP"] as const satisfies readonly z.infer<

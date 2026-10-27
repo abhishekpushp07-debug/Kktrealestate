@@ -42,6 +42,13 @@ export async function uploadMultipart(
   const res = await t.app.inject({ method: "POST", url, headers, payload });
   const ct = String(res.headers["content-type"] ?? "");
   const body = ct.includes("application/json") && res.body ? (JSON.parse(res.body) as unknown) : res.body;
+  // renditions are a background job (DOCUMENT_RENDITIONS); play the worker so fixtures see the webp variants like a deployed system
+  const doc = (body as { document?: { id?: string; mime?: string } } | null)?.document;
+  if (res.statusCode === 201 && doc?.id && doc.mime?.startsWith("image/")) {
+    const { renderDocument } = await import("../../../src/modules/documents/renditions.js");
+    const { storage } = await import("../../../src/modules/documents/service.js");
+    await renderDocument(t.app.db, storage(), doc.id);
+  }
   return {
     status: res.statusCode,
     body: body as { document: { id: string; file_name: string; mime: string } } & { error?: { code: string } },

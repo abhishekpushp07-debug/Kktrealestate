@@ -78,7 +78,8 @@ export function CoApplicantsCard({ customer }: { customer: CustomerRow }) {
   const invalidate = [crmKeys.customer360(customer.id), [CUSTOMERS_PATH]];
 
   const remove = useMutationWithToast<void, CoApplicantRow>({
-    mutationFn: (row) => api.delete(`${path}/${row.id}`),
+    // DELETE needs the row version (If-Match "v<n>", contract C6); a stale one is 409 VERSION_CONFLICT.
+    mutationFn: (row) => api.delete(`${path}/${row.id}`, { version: row.version }),
     successMessage: (_data, row) => `${row.full_name} removed`,
     invalidate,
   });

@@ -36,11 +36,11 @@ import {
 import { config } from "../../config.js";
 import { actorFromRequest, writeAudit, type AuditActor } from "../../lib/audit.js";
 import { loadCompany } from "../../lib/company.js";
-import { decryptField, encryptField, keyedHash } from "../../lib/crypto.js";
+import { decryptField, encryptField, keyedHash, keyedHashes } from "../../lib/crypto.js";
 import { ApiError } from "../../lib/errors.js";
 import { nextNumber } from "../../lib/numbering.js";
 import { translatePgError } from "../../lib/pgErrors.js";
-import type { StaffContext } from "../../lib/scope.js";
+import { customerScopeCondition, type StaffContext } from "../../lib/scope.js";
 import { applyUpdate } from "../../lib/version.js";
 import type { Redis } from "ioredis";
 
@@ -317,18 +317,31 @@ export function revealedRow(row: CustomerRow, c: DbCustomer, cas: DbCoApplicant[
   };
 }
 
-/** Loads the joined selection for one customer of the company; 404 when missing. */
+/** The caller whose project scope limits which customers exist for them (lib/scope.ts customerScopeCondition). */
+export type CustomerScope = Pick<StaffContext, "id" | "allProjects" | "projectIds">;
+
+/**
+ * Loads the joined selection for one customer of the company; 404 when missing — and, with `scope`, when the customer lies outside the
+ * caller's project scope (never 403: other projects' customers stay undiscoverable).
+ */
 export async function loadCustomerSelect(
   db: Executor,
   companyId: string,
   id: string,
   forUpdate = false,
+  scope?: CustomerScope,
 ): Promise<CustomerSelect> {
   const q = db
     .select(CUSTOMER_SELECT)
     .from(customers)
     .leftJoin(users, eq(users.id, customers.relationshipManagerId))
-    .where(and(eq(customers.id, id), eq(customers.companyId, companyId)))
+    .where(
+      and(
+        eq(customers.id, id),
+        eq(customers.companyId, companyId),
+        scope ? customerScopeCondition(scope, sql`${id}::uuid`) : undefined,
+      ),
+    )
     .limit(1);
   const rows = (forUpdate ? await q.for("update", { of: customers }) : await q) as CustomerSelect[];
   const row = rows[0];
@@ -336,9 +349,14 @@ export async function loadCustomerSelect(
   return row;
 }
 
-/** Masked customer row by id; 404 when missing. */
-export async function getCustomerRow(db: Executor, companyId: string, id: string): Promise<CustomerRow> {
-  const sel = await loadCustomerSelect(db, companyId, id);
+/** Masked customer row by id; 404 when missing (or outside `scope`). */
+export async function getCustomerRow(
+  db: Executor,
+  companyId: string,
+  id: string,
+  scope?: CustomerScope,
+): Promise<CustomerRow> {
+  const sel = await loadCustomerSelect(db, companyId, id, false, scope);
   const cas = await coApplicantsFor(db, [id]);
   return customerRow(sel, cas.get(id) ?? []);
 }
@@ -362,17 +380,29 @@ export async function lockCustomerKeys(
   if (panHash) await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`customer:${companyId}:pan:${panHash}`}))`);
 }
 
-/** 409 DUPLICATE_CUSTOMER (details.existing {id, customer_code, matched_on}) when another live customer carries the phone or PAN. */
+/** The keyed hashes a PAN may be stored under (every HASH_KEYS ring key, active first); empty for no PAN. */
+export function panLookupHashes(pan: string | null | undefined): string[] {
+  if (!pan) return [];
+  return keyedHashes(normalizePAN(pan));
+}
+
+/**
+ * 409 DUPLICATE_CUSTOMER (details.existing {id, customer_code, matched_on}) when another live customer carries the phone or PAN.
+ * `panHash` is the active-key hash being written; `panHashes` (optional) adds the hashes under older ring keys, so a duplicate stored
+ * before a HASH_KEYS rotation is still found.
+ */
 export async function assertNoDuplicate(
   tx: Executor,
   companyId: string,
   phone: string | null,
   panHash: string | null,
   excludeId: string | null,
+  panHashes: readonly string[] = [],
 ): Promise<void> {
   const conds: SQL[] = [];
   if (phone) conds.push(eq(customers.phone, phone));
-  if (panHash) conds.push(eq(customers.panHash, panHash));
+  const hashes = [...new Set([...(panHash ? [panHash] : []), ...(panHash ? panHashes : [])])];
+  if (hashes.length > 0) conds.push(inArray(customers.panHash, hashes));
   if (conds.length === 0) return;
   const rows = await tx
     .select({
@@ -549,7 +579,8 @@ export async function replaceCoApplicants(
 
 /** Who creates the customer (staff request or the system, e.g. a lead conversion by a job). */
 export interface CustomerWriteContext {
-  user: Pick<StaffContext, "id" | "companyId">;
+  /** The writer; with `allProjects`/`projectIds` (a staff request) updates are limited to customers in the writer's project scope. */
+  user: Pick<StaffContext, "id" | "companyId"> & Partial<Pick<StaffContext, "allProjects" | "projectIds">>;
   redis: Redis;
   meta: WriteMeta;
 }
@@ -572,6 +603,7 @@ export async function createCustomer(
     cols["phone"] as string,
     (cols["panHash"] as string | null) ?? null,
     null,
+    panLookupHashes(body.pan),
   );
   const company = await loadCompany(tx, ctx.redis, ctx.user.companyId);
   const code = await nextNumber(tx, company, "customer", todayIST());
@@ -616,7 +648,7 @@ export async function updateCustomer(
   version: number,
   body: CustomerUpdate,
 ): Promise<CustomerRow> {
-  const sel = await loadCustomerSelect(tx, ctx.user.companyId, id, true);
+  const sel = await loadCustomerSelect(tx, ctx.user.companyId, id, true, scopeOf(ctx.user));
   if (sel.c.erasedAt)
     throw ApiError.rule("This customer record was erased and can no longer be edited", "CUSTOMER_ERASED");
   const before = customerRow(sel, (await coApplicantsFor(tx, [id])).get(id) ?? []);
@@ -630,9 +662,12 @@ export async function updateCustomer(
   const panHash = patch.pan !== undefined ? ((cols["panHash"] as string | null) ?? null) : null;
   // A submitted or verified KYC vouches for specific identifiers: changing PAN or Aadhaar sends the file back to PENDING, so the new values
   // go through submission and an independent verification again (maker-checker) instead of inheriting the old VERIFIED badge.
+  // (compared under every hash key: re-entering the same PAN after a HASH_KEYS rotation is not a change)
+  const sameHash = (plain: string | null | undefined, stored: string | null, canon: (v: string) => string) =>
+    plain ? stored !== null && keyedHashes(canon(plain)).includes(stored) : stored === null;
   const identifiersChanged =
-    (patch.pan !== undefined && ((cols["panHash"] as string | null) ?? null) !== sel.c.panHash) ||
-    (patch.aadhaar !== undefined && ((cols["aadhaarHash"] as string | null) ?? null) !== sel.c.aadhaarHash);
+    (patch.pan !== undefined && !sameHash(patch.pan, sel.c.panHash, normalizePAN)) ||
+    (patch.aadhaar !== undefined && !sameHash(patch.aadhaar, sel.c.aadhaarHash, normalizeAadhaar));
   const kycReset = identifiersChanged && (sel.c.kycStatus === "SUBMITTED" || sel.c.kycStatus === "VERIFIED");
   if (kycReset)
     Object.assign(cols, {
@@ -643,7 +678,7 @@ export async function updateCustomer(
       kycVerifiedAt: null,
     });
   await lockCustomerKeys(tx, ctx.user.companyId, phone, panHash);
-  await assertNoDuplicate(tx, ctx.user.companyId, phone, panHash, id);
+  await assertNoDuplicate(tx, ctx.user.companyId, phone, panHash, id, patch.pan ? panLookupHashes(patch.pan) : []);
   await withCustomerUniqueGuard(tx, ctx.user.companyId, phone, panHash, id, (sp) =>
     applyUpdate(sp, customers, id, version, cols, "customer"),
   );
@@ -678,6 +713,12 @@ export async function updateCustomer(
     });
   }
   return after;
+}
+
+/** The project scope of a writer, when the context carries one. */
+function scopeOf(user: CustomerWriteContext["user"]): CustomerScope | undefined {
+  if (user.allProjects === undefined || user.projectIds === undefined) return undefined;
+  return { id: user.id, allProjects: user.allProjects, projectIds: user.projectIds };
 }
 
 /** Number of ACTIVE bookings where the customer is primary or co-applicant. */

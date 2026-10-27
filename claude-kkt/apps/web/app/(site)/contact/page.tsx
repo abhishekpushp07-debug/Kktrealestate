@@ -12,6 +12,9 @@ import { closedMetadata, siteGate } from "@/lib/gate";
 import { brandName, breadcrumbJsonLd, pageMetadata } from "@/lib/seo";
 import { NO_CONTACTS } from "@/lib/types";
 
+/** CMS content (contacts, offices) and the project picker: regenerated every 5 minutes or on demand. */
+export const revalidate = 300;
+
 export async function generateMetadata(): Promise<Metadata> {
   const closed = await closedMetadata();
   if (closed) return closed;

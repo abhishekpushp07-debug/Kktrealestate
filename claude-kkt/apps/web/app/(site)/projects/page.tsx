@@ -12,6 +12,9 @@ import { closedMetadata, siteGate } from "@/lib/gate";
 import { breadcrumbJsonLd, pageMetadata } from "@/lib/seo";
 import type { ProjectListFilters } from "@/lib/types";
 
+/** Reads the filter query, so it renders per request; its API data is cached 60 s (lib/api.ts). */
+export const revalidate = 60;
+
 type SearchParams = Record<string, string | string[] | undefined>;
 
 function pick(params: SearchParams, key: string, max = 60): string | undefined {

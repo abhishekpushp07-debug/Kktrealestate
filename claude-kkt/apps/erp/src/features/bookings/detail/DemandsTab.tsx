@@ -1,13 +1,13 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { FileText } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { DEMAND_STATUS_LABELS, type DemandRow } from "@kkt/contracts";
 import { Badge, Button, DataTable, StatusChip } from "@/components/ui";
 import { formatDate, formatINR, formatINRShort, formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { openDemandLetter } from "@/features/payments/DemandsPage";
 import { AGEING_ROW_CLASS, ageingLabel, ageingTone } from "@/features/payments/paymentMath";
-import { useBookingDemands } from "../api";
+import { useBookingDemandsPage } from "../api";
 
 function DemandCard({ row }: { row: DemandRow }) {
   return (
@@ -52,10 +52,13 @@ function DemandCard({ row }: { row: DemandRow }) {
   );
 }
 
-/** Demands raised on this booking with status, due date, amounts and the letter PDF. */
+/** Demands raised on this booking with status, due date, amounts and the letter PDF; pages through all of them. */
 export function DemandsTab({ bookingId }: { bookingId: string }) {
-  const demands = useBookingDemands(bookingId);
-  const rows = demands.data ?? [];
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const demands = useBookingDemandsPage(bookingId, page, pageSize);
+  const rows = demands.data?.items ?? [];
+  const total = demands.data?.total ?? 0;
 
   const columns = useMemo<ColumnDef<DemandRow, unknown>[]>(
     () => [
@@ -168,6 +171,20 @@ export function DemandsTab({ bookingId }: { bookingId: string }) {
           : AGEING_ROW_CLASS[ageingTone(row.days_overdue)] || undefined
       }
       mobileCard={(row) => <DemandCard row={row} />}
+      pagination={
+        total > 0
+          ? {
+              page,
+              pageSize,
+              total,
+              onPageChange: setPage,
+              onPageSizeChange: (size) => {
+                setPageSize(size);
+                setPage(1);
+              },
+            }
+          : undefined
+      }
       emptyState={{
         title: "No demands yet",
         description:

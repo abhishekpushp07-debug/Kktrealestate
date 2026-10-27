@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, or, type SQL } from "drizzle-orm";
+import { and, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import type { DocumentEntityType, Permission } from "@kkt/contracts";
 import {
   blockStages,
@@ -13,7 +13,7 @@ import {
   type Executor,
 } from "@kkt/db";
 import { ApiError } from "../../lib/errors.js";
-import { assertPermission, ensureProjectAccess, type StaffContext } from "../../lib/scope.js";
+import { assertPermission, customerScopeCondition, ensureProjectAccess, type StaffContext } from "../../lib/scope.js";
 
 /** Where a document hangs: the owning entity and, when it has one, its project (for scope checks). */
 export interface EntityRef {
@@ -25,8 +25,11 @@ export interface EntityRef {
   customerId: string | null;
 }
 
-/** Entity types that carry no project (visible to every scoped user). */
-export const UNSCOPED_ENTITY_TYPES: readonly DocumentEntityType[] = ["CUSTOMER", "CMS", "COMPANY"];
+/**
+ * Entity types that carry no project and are visible to every scoped user. CUSTOMER documents (KYC scans included) are NOT among them:
+ * they follow the customer's project scope (lib/scope.ts customerScopeCondition; SPEC §1, audit D).
+ */
+export const UNSCOPED_ENTITY_TYPES: readonly DocumentEntityType[] = ["CMS", "COMPANY"];
 
 /** Extra permission (besides document.write) needed to attach or edit documents of an entity kind. */
 export const ENTITY_WRITE_PERMISSION: Readonly<Record<DocumentEntityType, Permission>> = {
@@ -147,16 +150,24 @@ export async function resolveEntity(
   }
 }
 
-/** Resolves the entity or throws 404 (also for a project outside the user's scope, so foreign projects stay undiscoverable). */
+/**
+ * Resolves the entity or throws 404 (also for a project outside the user's scope, so foreign projects stay undiscoverable). A customer is
+ * in scope when linked to one of the user's projects (booking, lead, site visit) or created by them and not linked anywhere yet.
+ */
 export async function requireEntity(
   executor: Executor,
-  user: Pick<StaffContext, "companyId" | "allProjects" | "projectIds">,
+  user: Pick<StaffContext, "id" | "companyId" | "allProjects" | "projectIds">,
   entityType: DocumentEntityType,
   entityId: string,
 ): Promise<EntityRef> {
   const ref = await resolveEntity(executor, user.companyId, entityType, entityId);
   if (!ref) throw ApiError.notFound(ENTITY_LABEL[entityType]);
   if (ref.projectId) ensureProjectAccess(user, ref.projectId, ENTITY_LABEL[entityType]);
+  if (entityType === "CUSTOMER" && !user.allProjects) {
+    const cond = customerScopeCondition(user, sql`${entityId}::uuid`);
+    const [hit] = await executor.execute<{ ok: number }>(sql`select 1 as ok where ${cond ?? sql`true`}`);
+    if (!hit) throw ApiError.notFound(ENTITY_LABEL[entityType]);
+  }
   return ref;
 }
 
@@ -172,14 +183,20 @@ export function assertEntityWrite(user: Pick<StaffContext, "permissions">, entit
  */
 export function documentScopeCondition(
   executor: Executor,
-  user: Pick<StaffContext, "allProjects" | "projectIds">,
+  user: Pick<StaffContext, "id" | "allProjects" | "projectIds">,
 ): SQL | undefined {
   if (user.allProjects) return undefined;
   const unscoped = inArray(documents.entityType, [...UNSCOPED_ENTITY_TYPES]);
+  // customer documents follow the customer's scope (the documents row is the outer query: its entity_id is the customer id)
+  const customerDocs = and(
+    eq(documents.entityType, "CUSTOMER"),
+    customerScopeCondition(user, sql`${documents.entityId}`),
+  );
   const pids = user.projectIds;
-  if (pids.length === 0) return unscoped;
+  if (pids.length === 0) return or(unscoped, customerDocs);
   return or(
     unscoped,
+    customerDocs,
     and(eq(documents.entityType, "PROJECT"), inArray(documents.entityId, pids)),
     and(
       eq(documents.entityType, "BOOKING"),

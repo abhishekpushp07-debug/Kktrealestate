@@ -81,13 +81,6 @@ export interface MasterPageProps {
   config: AnyMasterConfig;
 }
 
-export interface MasterCsvSpec {
-  /** Header row expected by `POST /masters/import`. */
-  columns: readonly string[];
-  /** One example data row. */
-  example: string;
-}
-
 export interface MasterConfig<Row extends MasterRow, Values extends FieldValues, Output> {
   kind: MasterKind;
   slug: MasterSlug;
@@ -99,7 +92,6 @@ export interface MasterConfig<Row extends MasterRow, Values extends FieldValues,
   columns: ColumnDef<Row, unknown>[];
   defaultSort: string;
   searchPlaceholder: string;
-  csv: MasterCsvSpec;
   /** Validates the form state and yields the create payload. */
   createSchema: z.ZodType<Output>;
   /** Validates an edit (defaults to `createSchema`); the output is sent with `version`. */

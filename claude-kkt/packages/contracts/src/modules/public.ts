@@ -192,6 +192,8 @@ export const PublicProjectCardSchema = z.object({
   construction_percent: z.number().nullable(),
   is_featured: z.boolean(),
   tagline: z.string().nullable().optional(),
+  /** Last change of the project or its website settings (the website's sitemap lastmod / ISR). */
+  updated_at: TimestampSchema.optional(),
 });
 export type PublicProjectCard = z.infer<typeof PublicProjectCardSchema>;
 
@@ -631,6 +633,10 @@ export const PublicSiteResponseSchema = PublicSiteSettingsSchema.extend({
 });
 export type PublicSiteResponse = z.infer<typeof PublicSiteResponseSchema>;
 
+/**
+ * `GET /public/sitemap`: every public URL of the website (static pages, published projects, ALL published posts, every published CMS
+ * page at `/<slug>`) with `updated_at` = the newest change of the content the page shows (never "now"). Empty while the site is not live.
+ */
 export const PublicSitemapEntrySchema = z.object({
   path: z.string(),
   updated_at: TimestampSchema,

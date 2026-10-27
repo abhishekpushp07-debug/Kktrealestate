@@ -70,6 +70,8 @@ export function registerDuesRoutes(app: FastifyInstance): void {
           bookings_checked: s.bookingsChecked,
           demands_raised: s.demandsRaised,
           demand_numbers: s.demandNumbers,
+          bookings_failed: s.failures.length,
+          failures: s.failures.map((f) => ({ booking_id: f.booking_id, code: f.code })),
         },
         ip: req.clientIp,
         requestId: req.id,
@@ -80,6 +82,14 @@ export function registerDuesRoutes(app: FastifyInstance): void {
         demands_raised: s.demandsRaised,
         demand_numbers: s.demandNumbers,
         notifications_sent: s.notifications,
+        // per-booking isolation: a booking that failed is listed here and every other booking was processed
+        bookings_failed: s.failures.length,
+        failures: s.failures.map(({ booking_id, booking_number, code, message }) => ({
+          booking_id,
+          booking_number,
+          code,
+          message,
+        })),
         started_at: startedAt.toISOString(),
         finished_at: new Date().toISOString(),
       };

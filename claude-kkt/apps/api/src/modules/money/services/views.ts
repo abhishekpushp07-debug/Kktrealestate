@@ -540,8 +540,9 @@ export function toBookingRow(
           by: b.cancellation.by,
           by_name: b.cancellation.by_name,
           reason: b.cancellation.reason,
-          deduction_paise: b.cancellation.deduction_paise,
-          refund_paise: b.cancellation.refund_paise,
+          // money columns (migration 0005) first; the jsonb copy is history only
+          deduction_paise: b.cancellationDeductionPaise ?? b.cancellation.deduction_paise,
+          refund_paise: b.cancellationRefundPaise ?? b.cancellation.refund_paise,
         }
       : null,
     completed_at: iso(b.completedAt),

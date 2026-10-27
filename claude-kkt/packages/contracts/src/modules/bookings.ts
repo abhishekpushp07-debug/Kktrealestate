@@ -16,6 +16,7 @@ import {
   BoolQuerySchema,
   DateStringSchema,
   IdSchema,
+  IntQuerySchema,
   ListQuerySchema,
   MoneyBreakupLineSchema,
   NoteSchema,
@@ -598,9 +599,84 @@ export type OtherChargeDemandLine = z.infer<typeof OtherChargeDemandLineSchema>;
 export const LedgerQuerySchema = z.object({ format: z.enum(["csv"]).optional() });
 export type LedgerQuery = z.infer<typeof LedgerQuerySchema>;
 
-/** Booking ledger: every row plus the booking's current summary. */
-export const LedgerResponseSchema = LedgerListResponseSchema.extend({ summary: BookingSummarySchema });
+/**
+ * Server-computed ledger totals (contract C7): clients read dues and paid figures from here, never from the last row of a page.
+ * Due figures are signed (negative = advance).
+ */
+export const LedgerTotalsSchema = z.object({
+  cash_due_paise: SignedPaiseSchema,
+  account_due_paise: SignedPaiseSchema,
+  total_due_paise: SignedPaiseSchema,
+  other_charges_due_paise: SignedPaiseSchema,
+  cash_paid_paise: SignedPaiseSchema,
+  account_paid_paise: SignedPaiseSchema,
+});
+export type LedgerTotals = z.infer<typeof LedgerTotalsSchema>;
+
+/** GET /bookings/:id/ledger query: the list options plus `epoch` (an older epoch of the book; default = the current one). */
+export const LedgerListQuerySchema = ListQuerySchema.extend({ epoch: IntQuerySchema.min(1).optional() });
+export type LedgerListQuery = z.infer<typeof LedgerListQuerySchema>;
+
+/**
+ * Booking ledger (contract C7): the rows of one epoch (paged) plus
+ *   - `epoch` (the epoch these rows belong to) and `current_epoch` (the booking's book of record; older epochs are superseded history),
+ *   - `summary`: the booking's CURRENT summary, with the six C7 totals flat on it (cash/account/total/other-charges due, cash/account paid),
+ *   - `epoch_totals`: the same six totals as at the end of the epoch returned (equal to the summary's for the current epoch).
+ */
+export const LedgerResponseSchema = LedgerListResponseSchema.extend({
+  epoch: z.int().min(1),
+  current_epoch: z.int().min(1),
+  summary: BookingSummarySchema.extend(LedgerTotalsSchema.shape),
+  epoch_totals: LedgerTotalsSchema,
+});
 export type LedgerResponse = z.infer<typeof LedgerResponseSchema>;
+
+/** Why a booking's ledger was restated into a new epoch (ledger_rebuilds.reason). */
+export const LEDGER_REBUILD_REASONS = [
+  "AGREEMENT_REVISION",
+  "PLAN_CHANGE",
+  "STAGE_UNDO",
+  "CONSTRUCTION_CHARGE",
+  "INTEGRITY_REPAIR",
+  "ADMIN_RECOMPUTE",
+  "LEDGER_REBUILD",
+] as const;
+export const LedgerRebuildReasonSchema = z.enum(LEDGER_REBUILD_REASONS);
+export type LedgerRebuildReason = z.infer<typeof LedgerRebuildReasonSchema>;
+
+/** One row-level difference between the superseded epoch and its restatement. */
+export const LedgerRowDifferenceSchema = z.object({
+  position: z.int().min(1),
+  field: z.string(),
+  stored: z.union([z.string(), z.number()]).nullable(),
+  recomputed: z.union([z.string(), z.number()]).nullable(),
+});
+export type LedgerRowDifferenceRow = z.infer<typeof LedgerRowDifferenceSchema>;
+
+/** What a rebuild changed: row counts, the first ≤ 20 row differences and the C7 totals before and after. */
+export const LedgerRebuildSummarySchema = z.object({
+  rows_before: z.int().min(0),
+  rows_after: z.int().min(0),
+  differences: z.array(LedgerRowDifferenceSchema),
+  before: LedgerTotalsSchema,
+  after: LedgerTotalsSchema,
+});
+export type LedgerRebuildSummary = z.infer<typeof LedgerRebuildSummarySchema>;
+
+/** GET /bookings/:id/ledger/rebuilds row: the ledger moved from `from_epoch` to `to_epoch`. `actor` is null for system runs. */
+export const LedgerRebuildRowSchema = z.object({
+  id: IdSchema,
+  booking_id: IdSchema,
+  from_epoch: z.int().min(1),
+  to_epoch: z.int().min(2),
+  reason: LedgerRebuildReasonSchema,
+  actor: z.object({ id: IdSchema, name: z.string().nullable() }).nullable(),
+  at: TimestampSchema,
+  summary: LedgerRebuildSummarySchema,
+});
+export type LedgerRebuildRow = z.infer<typeof LedgerRebuildRowSchema>;
+export const LedgerRebuildListResponseSchema = listEnvelope(LedgerRebuildRowSchema);
+export type LedgerRebuildListResponse = z.infer<typeof LedgerRebuildListResponseSchema>;
 
 /** The caller's saved wizard drafts (newest first). */
 export const BookingDraftListResponseSchema = z.object({ items: z.array(BookingDraftRowSchema) });

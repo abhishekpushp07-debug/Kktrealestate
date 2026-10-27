@@ -803,9 +803,10 @@ describe("PDF links", () => {
     const png = await sharp({ create: { width: 64, height: 48, channels: 3, background: "#0B1F3A" } })
       .png()
       .toBuffer();
-    const { storeBuffer, signedUrl } = await import("../../src/modules/documents/index.js");
-    const doc = await t.app.db.transaction((tx) =>
-      storeBuffer(tx, {
+    const { uploadDocument, signedUrl } = await import("../../src/modules/documents/index.js");
+    const doc = await uploadDocument(
+      t.app,
+      {
         companyId: t.companyId,
         entityType: "BOOKING",
         entityId: bookingA.id,
@@ -814,7 +815,8 @@ describe("PDF links", () => {
         uploadedBy: admin.user.id,
         uploadedByType: "STAFF",
         sharedWithCustomer: true,
-      }),
+      },
+      async (_tx, row) => row,
     );
     const link = await ok<PdfLink>(`/api/v1/portal/bookings/${bookingA.id}/documents/${doc.id}/download`, tokenA);
     expect(link.download_url).toMatch(/\/api\/v1\/portal\/files\//);
@@ -1274,7 +1276,10 @@ describe("profile", () => {
     const audits = await auditRows("customer.portal_profile_update", "CUSTOMER");
     expect(audits).toHaveLength(1);
     expect(audits[0]).toMatchObject({ actor_type: "CUSTOMER", actor_id: A, entity_id: A });
-    expect(audits[0]!.after).toMatchObject({ email: "rajesh.sinha@example.com", altPhone: "9876543211" });
+    // PII is masked in the immutable audit log, with keyed fingerprints so a change stays visible (DPDP, lib/audit.ts)
+    expect(audits[0]!.after).toMatchObject({ email: "r***@e***.com", altPhone: "******3211" });
+    expect(audits[0]!.after).toHaveProperty("email_fp");
+    expect(JSON.stringify(audits[0]!.after)).not.toContain("rajesh.sinha@example.com");
     // stale version via If-Match
     const stale = await t.request<ErrorBody>("PATCH", "/api/v1/portal/profile", {
       token: tokenA,

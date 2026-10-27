@@ -1,5 +1,5 @@
 import { ArrowLeft, ArrowRight, Check, Plus, Sparkles, Trash2, Wand2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   BLOCK_STATUSES,
@@ -39,6 +39,7 @@ import {
 import { api, isApiClientError } from "@/lib/api";
 import { formatDate, formatINR, formatNumber } from "@/lib/format";
 import { useMutationWithToast } from "@/lib/queries";
+import { useUnsavedChangesGuard } from "@/lib/unsaved";
 import { cn } from "@/lib/utils";
 import NotFoundPage from "@/pages/NotFoundPage";
 import { useMasterRows } from "@/features/masters/api";
@@ -188,15 +189,8 @@ export default function BlockWizard() {
     setState((prev) => ({ ...prev, ...patch }));
   };
 
-  // Unsaved guard (browser navigation / reload).
-  useEffect(() => {
-    if (!touched) return;
-    const handler = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-    };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [touched]);
+  // Unsaved-changes guard: in-app navigation (sidebar, Cmd+K, back) and reloads ask while the wizard has edits.
+  const leaveGuard = useUnsavedChangesGuard(touched);
 
   const blockType = blockTypes.data?.find((type) => type.id === state.block_type_id) ?? null;
   const hasFloors = blockType?.has_floors ?? true;
@@ -291,6 +285,7 @@ export default function BlockWizard() {
     invalidate: [[BLOCKS_PATH], [FLATS_PATH], [PROJECTS_PATH]],
     onSuccess: (saved) => {
       setTouched(false);
+      leaveGuard.allowNavigation();
       navigate(`/blocks/${saved.id}`, { replace: true });
     },
   });
@@ -708,6 +703,7 @@ export default function BlockWizard() {
         variant="destructive"
         onConfirm={() => {
           setTouched(false);
+          leaveGuard.allowNavigation();
           navigate(backTo);
         }}
       />

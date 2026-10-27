@@ -2,6 +2,7 @@ import { X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import type { ComponentProps, HTMLAttributes, ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { useDirtyClose } from "./dirty-close";
 
 export const Dialog = DialogPrimitive.Root;
 export const DialogTrigger = DialogPrimitive.Trigger;
@@ -20,9 +21,27 @@ export interface DialogContentProps extends ComponentProps<typeof DialogPrimitiv
   size?: DialogSize;
   /** Hide the top-right close button. */
   hideClose?: boolean;
+  /** The hosted form's dirty flag (e.g. react-hook-form `formState.isDirty`); omitted = any edit inside counts as dirty. */
+  dirty?: boolean;
+  /** false = never ask before closing (read-only dialogs, pickers). */
+  guardUnsaved?: boolean;
 }
 
-export function DialogContent({ className, children, size = "md", hideClose = false, ...props }: DialogContentProps) {
+export function DialogContent({
+  className,
+  children,
+  size = "md",
+  hideClose = false,
+  dirty,
+  guardUnsaved = true,
+  onEscapeKeyDown,
+  onInteractOutside,
+  onInputCapture,
+  onChangeCapture,
+  ...props
+}: DialogContentProps) {
+  // A dialog hosting a form asks before Esc / outside click / the close button throw its edits away (audit v3 H3).
+  const guard = useDirtyClose({ dirty, guard: guardUnsaved });
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-navy-950/55 backdrop-blur-[1px] data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out" />
@@ -33,12 +52,31 @@ export function DialogContent({ className, children, size = "md", hideClose = fa
           className,
         )}
         {...props}
+        onEscapeKeyDown={(event) => {
+          onEscapeKeyDown?.(event);
+          guard.intercept(event);
+        }}
+        onInteractOutside={(event) => {
+          onInteractOutside?.(event);
+          guard.intercept(event);
+        }}
+        onInputCapture={(event) => {
+          onInputCapture?.(event);
+          guard.trackEdit(event);
+        }}
+        onChangeCapture={(event) => {
+          onChangeCapture?.(event);
+          guard.trackEdit(event);
+        }}
+        data-dirty={guard.dirty ? "true" : undefined}
       >
         {children}
+        {guard.elements}
         {!hideClose && (
           <DialogPrimitive.Close
             className="absolute right-3 top-3 rounded-sm p-1 text-ink-subtle transition-colors hover:bg-navy-50 hover:text-navy-950 focus-ring"
             aria-label="Close"
+            onClick={guard.intercept}
           >
             <X className="size-4" aria-hidden="true" />
           </DialogPrimitive.Close>

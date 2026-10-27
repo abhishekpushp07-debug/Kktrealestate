@@ -201,7 +201,7 @@ describe("visit settings and availability", () => {
     expect(await availability(D(20), D(25))).toEqual([]);
     const r = await t.request("GET", `/api/v1/public/projects/${wp.slug}/visit-availability`);
     expect(r.status).toBe(200);
-    expect(r.headers["cache-control"]).toBe("public, max-age=60, s-maxage=60, stale-while-revalidate=300");
+    expect(r.headers["cache-control"]).toBe("public, s-maxage=60, stale-while-revalidate=30"); // contract C5
     expect((await t.request("GET", `/api/v1/public/projects/nope-${Date.now()}/visit-availability`)).status).toBe(404);
     await patchSettings({ ...BASE_SETTINGS, min_lead_hours: 1 });
   });
@@ -354,6 +354,19 @@ describe("public booking", () => {
     expect(ics.body).toContain("BEGIN:VALARM");
     expect(ics.body).toContain("TRIGGER:-PT1H");
     expect(ics.body).toContain(r.body.visit_number);
+    // phase 7: a new invitation is METHOD:REQUEST, revision 0, with a stable per-visit UID and DTSTAMP = generation time
+    const [visitRow] = await t.app.sql<
+      { id: string }[]
+    >`select id from site_visits where visit_number = ${r.body.visit_number}`;
+    expect(ics.body).toContain("METHOD:REQUEST");
+    expect(ics.body).toContain(`UID:${visitRow!.id}@kkt`);
+    expect(ics.body).toContain("SEQUENCE:0");
+    expect(ics.body).toContain("STATUS:CONFIRMED");
+    const stamp = /DTSTAMP:(\d{8}T\d{6}Z)/.exec(ics.body)![1]!;
+    const stampMs = Date.parse(
+      `${stamp.slice(0, 4)}-${stamp.slice(4, 6)}-${stamp.slice(6, 8)}T${stamp.slice(9, 11)}:${stamp.slice(11, 13)}:${stamp.slice(13, 15)}Z`,
+    );
+    expect(Math.abs(Date.now() - stampMs)).toBeLessThan(60_000);
     const token = r.body.manage_url.split("/visit/")[1]!;
     const manage = await t.request<Manage>("GET", `/api/v1/public/site-visits/${token}`);
     expect(manage.status, manage.text).toBe(200);
@@ -419,7 +432,14 @@ describe("public booking", () => {
     expect(again.status).toBe(410);
     expect(again.body.error.code).toBe("LINK_EXPIRED");
     expect((await t.request("GET", `/api/v1/public/site-visits/${token}`)).status).toBe(410);
-    expect((await t.request("GET", `/api/v1/public/site-visits/${token}.ics`)).status).toBe(410);
+    // …except the .ics, which now serves the cancellation (same UID, higher SEQUENCE) so calendars drop the event; no visitor details
+    const cancelIcs = await t.request("GET", `/api/v1/public/site-visits/${token}.ics`);
+    expect(cancelIcs.status, cancelIcs.text).toBe(200);
+    expect(cancelIcs.text).toContain("METHOD:CANCEL");
+    expect(cancelIcs.text).toContain("STATUS:CANCELLED");
+    expect(cancelIcs.text).toContain("SEQUENCE:1");
+    expect(cancelIcs.text).not.toContain("BEGIN:VALARM");
+    expect(cancelIcs.text).not.toContain("/visit/");
     // the lead with two upcoming visits keeps SITE_VISIT_SCHEDULED after one cancellation
     const tokenA = twoA.body.manage_url.split("/visit/")[1]!;
     expect(
@@ -807,6 +827,13 @@ describe("manage links: expiry, rotation and visitor self-reschedule", () => {
     const ics = await t.request("GET", `/api/v1/public/site-visits/${moved.body.manage_token}.ics`);
     expect(ics.status).toBe(200);
     expect(ics.text).toContain(`DTSTART;TZID=Asia/Kolkata:${D(12).replace(/-/g, "")}T110000`);
+    // the moved invitation updates the imported event: same UID, SEQUENCE 1, METHOD:REQUEST
+    const [mv] = await t.app.sql<{ id: string; seq: number }[]>`
+      select id, ics_sequence as seq from site_visits where visit_number = ${r.body.visit_number}`;
+    expect(mv!.seq).toBe(1);
+    expect(ics.text).toContain(`UID:${mv!.id}@kkt`);
+    expect(ics.text).toContain("SEQUENCE:1");
+    expect(ics.text).toContain("METHOD:REQUEST");
     // seats moved with it, and the audit names the rotation
     const days = await availability(D(11), D(12));
     expect(days.find((d) => d.date === D(12))!.slots.find((s) => s.start === "11:00")!.available).toBe(1);

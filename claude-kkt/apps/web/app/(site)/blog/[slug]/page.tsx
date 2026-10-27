@@ -13,6 +13,14 @@ import { Markdown, markdownToText } from "@/lib/markdown";
 import { resolveMediaUrl } from "@/lib/media";
 import { articleJsonLd, breadcrumbJsonLd, pageMetadata } from "@/lib/seo";
 
+/** ISR: rendered on first request, regenerated every 5 minutes or on a CMS write; an unpublished post answers 404. */
+export const revalidate = 300;
+
+/** No build-time prerender (the build needs no API): each slug is rendered on its first request, then cached. */
+export function generateStaticParams(): { slug: string }[] {
+  return [];
+}
+
 type Params = Promise<{ slug: string }>;
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {

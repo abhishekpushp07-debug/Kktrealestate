@@ -326,3 +326,78 @@ describe("demandStatuses", () => {
     expect(demandStatuses([{ id: "z", cashPaise: 0, accountPaise: 0 }], 0, 0)[0]?.status).toBe("PAID");
   });
 });
+
+describe("DEMAND_VOIDED (contract C7: a voided demand leaves a compensating row)", () => {
+  const demand: LedgerEvent = {
+    kind: "DEMAND",
+    at: "2026-04-01T10:00:00.000Z",
+    label: "Plinth",
+    refId: "d1",
+    cashPaise: L(6),
+    accountPaise: L(4),
+  };
+  const voided: LedgerEvent = {
+    kind: "DEMAND_VOIDED",
+    at: "2026-04-03T10:00:00.000Z",
+    label: "Plinth voided",
+    refId: "d1",
+    cashPaise: L(6),
+    accountPaise: L(4),
+  };
+
+  it("takes the demand back out of the order raised; the row amount is negative and the DEMAND row stays", () => {
+    const { rows, summary } = deriveLedger(
+      [demand, voided],
+      emptyLedgerSummary({ cashAgreedPaise: L(60), accountAgreedPaise: L(40) }),
+    );
+    expect(rows.map((r) => r.event)).toEqual(["DEMAND", "DEMAND_VOIDED"]);
+    expect(rows[1]).toMatchObject({
+      amountPaise: -L(10),
+      bucket: null,
+      cashOrderRaisedPaise: 0,
+      accountOrderRaisedPaise: 0,
+    });
+    expect(summary).toMatchObject({ cashOrderRaisedPaise: 0, accountOrderRaisedPaise: 0, totalDuePaise: 0 });
+  });
+
+  it("an earlier advance returns to credit (negative due) once the funded demand is voided", () => {
+    const paid: LedgerEvent = { kind: "PAYMENT", at: "2026-04-02T10:00:00.000Z", bucket: "CASH", amountPaise: L(6) };
+    const { summary } = deriveLedger([demand, paid, voided]);
+    expect(summary.cashDuePaise).toBe(-L(6));
+    expect(summary.accountDuePaise).toBe(0);
+  });
+
+  it("sorts after demands, agreement and plan changes and before payments of the same instant; append equals derive", () => {
+    const at = "2026-05-01T00:00:00.000Z";
+    const sameInstant: LedgerEvent[] = [
+      { kind: "PAYMENT", at, bucket: "CASH", amountPaise: 1 },
+      { ...voided, at },
+      { kind: "PLAN_CHANGE", at },
+      { ...demand, at, refId: "d0" },
+    ];
+    expect(sortLedgerEvents(sameInstant).map((e) => e.kind)).toEqual([
+      "DEMAND",
+      "PLAN_CHANGE",
+      "DEMAND_VOIDED",
+      "PAYMENT",
+    ]);
+    let s = emptyLedgerSummary();
+    const appended = [demand, voided].map((e) => {
+      const next = appendLedgerRow(s, e);
+      s = next.summary;
+      return next.row;
+    });
+    expect(appended).toEqual(deriveLedger([demand, voided]).rows);
+  });
+
+  it("rejects negative magnitudes and a voided demand on a closed ledger", () => {
+    expect(() => deriveLedger([demand, { ...voided, cashPaise: -1 }])).toThrow(LedgerError);
+    const closed: LedgerEvent = {
+      kind: "CANCELLATION",
+      at: "2026-04-02T00:00:00.000Z",
+      refundPaise: 0,
+      deductionPaise: 0,
+    };
+    expect(() => deriveLedger([demand, closed, voided])).toThrow(/closed/);
+  });
+});

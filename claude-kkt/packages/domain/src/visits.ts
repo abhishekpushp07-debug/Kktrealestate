@@ -108,9 +108,20 @@ export interface VisitICSInput {
   /** "HH:mm" IST. */
   start: string;
   end: string;
-  /** Creation instant for DTSTAMP; defaults to the start instant. */
+  /** DTSTAMP: the instant the file is generated (RFC 5545); defaults to now. */
   stamp?: string | Date;
   url?: string | null;
+  /**
+   * SEQUENCE (RFC 5545 §3.8.7.4): the revision of the event. A calendar client replaces the event it holds under the same UID only when
+   * the sequence is higher, so it must grow with every reschedule / cancellation (site_visits.ics_sequence). Defaults to 0.
+   */
+  sequence?: number;
+  /** "REQUEST" (default: new or updated visit) or "CANCEL" (METHOD:CANCEL + STATUS:CANCELLED, no reminder). */
+  method?: "REQUEST" | "CANCEL";
+  /** ORGANIZER (iTIP REQUEST/CANCEL carry one): the builder's address. */
+  organizer?: { name: string; email: string } | null;
+  /** ATTENDEE: the visitor, when an e-mail address is known. */
+  attendee?: { name: string; email: string } | null;
 }
 
 /** Escapes text for an iCalendar property value. */
@@ -170,20 +181,33 @@ export const IST_VTIMEZONE: readonly string[] = [
   "END:VTIMEZONE",
 ];
 
-/** Builds a valid VCALENDAR text for a site visit in Asia/Kolkata with a 1-hour-before reminder. */
+/** Quotes a CN parameter value (RFC 5545 §3.2: DQUOTE-delimited, no DQUOTE / control characters inside). */
+function icsParam(text: string): string {
+  return `"${text.replace(/["\r\n\\]/g, " ").trim()}"`;
+}
+
+/**
+ * Builds a VCALENDAR text for a site visit in Asia/Kolkata. The UID is stable per visit, SEQUENCE is the visit's revision and DTSTAMP the
+ * generation time, so a calendar client updates (METHOD:REQUEST) or removes (METHOD:CANCEL, STATUS:CANCELLED) the event it imported
+ * earlier instead of adding a duplicate. A REQUEST carries a 1-hour-before reminder.
+ */
 export function icsForVisit(input: VisitICSInput): string {
   assertDateString(input.date, "date");
-  const startMs = istDateTimeMs(input.date, input.start);
-  const stamp = input.stamp ?? new Date(startMs);
+  istDateTimeMs(input.date, input.start);
+  const sequence = input.sequence ?? 0;
+  if (!Number.isInteger(sequence) || sequence < 0) throw new RangeError(`Invalid SEQUENCE ${String(sequence)}`);
+  const cancel = input.method === "CANCEL";
+  const stamp = input.stamp ?? new Date();
   const lines: string[] = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
     "PRODID:-//KKT//Site Visit//EN",
     "CALSCALE:GREGORIAN",
-    "METHOD:PUBLISH",
+    `METHOD:${cancel ? "CANCEL" : "REQUEST"}`,
     ...IST_VTIMEZONE,
     "BEGIN:VEVENT",
     `UID:${icsEscape(input.uid)}`,
+    `SEQUENCE:${sequence}`,
     `DTSTAMP:${icsUtc(stamp)}`,
     `DTSTART;TZID=Asia/Kolkata:${icsLocal(input.date, input.start)}`,
     `DTEND;TZID=Asia/Kolkata:${icsLocal(input.date, input.end)}`,
@@ -191,19 +215,24 @@ export function icsForVisit(input: VisitICSInput): string {
     `DESCRIPTION:${icsEscape(input.description)}`,
     `LOCATION:${icsEscape(input.location)}`,
   ];
+  if (input.organizer) lines.push(`ORGANIZER;CN=${icsParam(input.organizer.name)}:mailto:${input.organizer.email}`);
+  if (input.attendee)
+    lines.push(
+      `ATTENDEE;CN=${icsParam(input.attendee.name)};ROLE=REQ-PARTICIPANT;PARTSTAT=${cancel ? "DECLINED" : "ACCEPTED"}:mailto:${input.attendee.email}`,
+    );
   if (input.url) {
     lines.push(`URL:${input.url}`);
   }
-  lines.push(
-    "STATUS:CONFIRMED",
-    "BEGIN:VALARM",
-    "ACTION:DISPLAY",
-    `DESCRIPTION:${icsEscape(`Reminder: ${input.summary}`)}`,
-    "TRIGGER:-PT1H",
-    "END:VALARM",
-    "END:VEVENT",
-    "END:VCALENDAR",
-  );
+  lines.push(`STATUS:${cancel ? "CANCELLED" : "CONFIRMED"}`);
+  if (!cancel)
+    lines.push(
+      "BEGIN:VALARM",
+      "ACTION:DISPLAY",
+      `DESCRIPTION:${icsEscape(`Reminder: ${input.summary}`)}`,
+      "TRIGGER:-PT1H",
+      "END:VALARM",
+    );
+  lines.push("END:VEVENT", "END:VCALENDAR");
   return `${lines.map(icsFold).join("\r\n")}\r\n`;
 }
 

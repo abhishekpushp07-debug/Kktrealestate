@@ -15,6 +15,11 @@ import { formatTime } from "@/lib/format";
 const credentialsSchema = z.object({
   email: z.email("Enter a valid email address"),
   password: z.string().min(1, "Enter your password"),
+  /** Company code (slug); asked for only on multi-company installs (400 COMPANY_REQUIRED, contract C4). */
+  company: z
+    .string()
+    .trim()
+    .regex(/^$|^[a-z0-9]+(?:-[a-z0-9]+)*$/i, "Use the company code your administrator gave you (letters, digits, hyphens)"),
 });
 type Credentials = z.infer<typeof credentialsSchema>;
 
@@ -47,6 +52,9 @@ function loginErrorMessage(error: unknown): string {
       const suffix = typeof until === "string" ? ` Try again after ${formatTime(until)}.` : " Try again in 15 minutes.";
       return `Too many failed attempts — this account is temporarily locked.${suffix}`;
     }
+    if (error.code === "COMPANY_REQUIRED")
+      return "This server hosts more than one company. Enter your company code and sign in again.";
+    if (error.code === "SESSION_EXPIRED") return "Your session has ended. Sign in again.";
     if (error.code === "RATE_LIMITED" || error.status === 429) {
       return error.retryAfterSeconds
         ? `Too many sign-in attempts. Try again in ${error.retryAfterSeconds} seconds.`
@@ -66,10 +74,11 @@ export default function LoginPage() {
   const [mfaToken, setMfaToken] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<unknown>(null);
+  const [askCompany, setAskCompany] = useState(false);
 
   const credentials = useForm<Credentials>({
     resolver: zodResolver(credentialsSchema),
-    defaultValues: { email: "", password: "" },
+    defaultValues: { email: "", password: "", company: "" },
   });
   const mfa = useForm<MfaForm>({ resolver: zodResolver(mfaSchema), defaultValues: { code: "" } });
 
@@ -97,8 +106,9 @@ export default function LoginPage() {
   const submitCredentials = credentials.handleSubmit(async (values) => {
     setError(null);
     try {
-      finish(await login(values.email.trim(), values.password));
+      finish(await login(values.email.trim(), values.password, values.company || undefined));
     } catch (cause) {
+      if (isApiClientError(cause) && cause.code === "COMPANY_REQUIRED") setAskCompany(true);
       if (isApiClientError(cause) && cause.code === "MFA_REQUIRED" && typeof cause.details?.mfa_token === "string") {
         finish({ kind: "mfa", mfaToken: cause.details.mfa_token });
         return;
@@ -225,6 +235,24 @@ export default function LoginPage() {
                   </div>
                 )}
               </FieldWrapper>
+              {askCompany && (
+                <FieldWrapper
+                  label="Company code"
+                  required
+                  hint="Ask your administrator for your company's code."
+                  error={credentials.formState.errors.company?.message}
+                >
+                  {(control) => (
+                    <Input
+                      {...credentials.register("company")}
+                      {...control}
+                      autoComplete="organization"
+                      placeholder="shree-ganesh-builders"
+                      data-testid="login-company-input"
+                    />
+                  )}
+                </FieldWrapper>
+              )}
               <Button
                 type="submit"
                 variant="gold"

@@ -6,6 +6,10 @@ import { Markdown } from "@/lib/markdown";
 /** Renders a CMS legal page (/pages/:slug); a missing or unpublished page is a 404. */
 export async function LegalPageView({ slug, eyebrow }: { slug: string; eyebrow: string }) {
   const page = await getPage(slug);
+  if (!page)
+    return (
+      <PageHeader eyebrow={eyebrow} title="This page is being prepared" lead="Please check back in a moment." compact />
+    );
   return (
     <>
       <PageHeader

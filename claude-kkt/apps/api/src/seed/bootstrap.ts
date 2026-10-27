@@ -82,14 +82,24 @@ const DEMO_COMPANY = {
   },
 } as const;
 
+/**
+ * Company settings of a production first boot. `force_mfa_for_admins` is ON (audit D): every role that can manage settings, users,
+ * roles or admin tools must enrol TOTP before using the ERP; the Super Admin enrols right after the first sign-in.
+ */
 const DEFAULT_SETTINGS = {
   demand_due_days: 15,
   default_gst_percent: 5,
   round_robin_enabled: true,
-  force_mfa_for_admins: false,
+  force_mfa_for_admins: true,
   sla_hours: { LOW: 72, MEDIUM: 48, HIGH: 24, URGENT: 8 },
   booking_hold_hours: 48,
 };
+
+/**
+ * The demo company (development, tests, SEED_DEMO) explicitly turns forced admin MFA OFF: its published demo logins (docs/SEED.md) must
+ * work without an authenticator app. Never used for a production first boot.
+ */
+const DEMO_SETTINGS = { ...DEFAULT_SETTINGS, force_mfa_for_admins: false };
 const DEFAULT_NUMBERING = {
   customer: { prefix: "CUST-" },
   booking: { prefix: "BK-" },
@@ -189,7 +199,7 @@ export async function ensureBootstrap(db: DB, opts: { mode?: BootstrapMode } = {
             letterhead: { ...DEMO_COMPANY.letterhead },
             fyStartMonth: 4,
             numbering: { ...DEFAULT_NUMBERING, receipt: { prefix: "SGB/" } },
-            settings: DEFAULT_SETTINGS,
+            settings: DEMO_SETTINGS,
           })
           .returning();
       }

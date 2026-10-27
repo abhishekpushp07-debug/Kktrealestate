@@ -19,7 +19,8 @@ export type LedgerEventKind =
   | "OTHER_CHARGE_DEMAND"
   | "OTHER_CHARGE_PAYMENT"
   | "OTHER_CHARGE_REVERSAL"
-  | "CANCELLATION";
+  | "CANCELLATION"
+  | "DEMAND_VOIDED";
 
 interface LedgerEventBase {
   /** Instant (RFC 3339) or business date (YYYY-MM-DD) of the event. */
@@ -34,6 +35,15 @@ interface LedgerEventBase {
 
 export interface DemandEvent extends LedgerEventBase {
   kind: "DEMAND";
+  cashPaise: number;
+  accountPaise: number;
+}
+/**
+ * A raised demand was voided (stage undo, plan change, integrity repair): the compensating row of contract C7 — the DEMAND row stays in
+ * the ledger and this row takes the same amounts back out of the order raised (positive magnitudes; the row amount is negative).
+ */
+export interface DemandVoidedEvent extends LedgerEventBase {
+  kind: "DEMAND_VOIDED";
   cashPaise: number;
   accountPaise: number;
 }
@@ -89,7 +99,8 @@ export type LedgerEvent =
   | OtherChargeDemandEvent
   | OtherChargePaymentEvent
   | OtherChargeReversalEvent
-  | CancellationEvent;
+  | CancellationEvent
+  | DemandVoidedEvent;
 
 export interface LedgerSummary {
   seq: number;
@@ -149,16 +160,18 @@ export function ledgerKindPriority(kind: LedgerEventKind): number {
       return 2;
     case "PLAN_CHANGE":
       return 3;
-    case "PAYMENT":
+    case "DEMAND_VOIDED":
       return 4;
-    case "OTHER_CHARGE_PAYMENT":
+    case "PAYMENT":
       return 5;
-    case "REVERSAL":
+    case "OTHER_CHARGE_PAYMENT":
       return 6;
-    case "OTHER_CHARGE_REVERSAL":
+    case "REVERSAL":
       return 7;
-    case "CANCELLATION":
+    case "OTHER_CHARGE_REVERSAL":
       return 8;
+    case "CANCELLATION":
+      return 9;
     default: {
       const never: never = kind;
       throw new LedgerError(`Unknown ledger event kind ${String(never)}`);
@@ -239,6 +252,24 @@ function applyEvent(
         accountOrderRaisedPaise: prev.accountOrderRaisedPaise + event.accountPaise,
       });
       return { next, amountPaise: event.cashPaise + event.accountPaise, bucket: null, label: event.label ?? "Demand" };
+    }
+    case "DEMAND_VOIDED": {
+      assertPaise(event.cashPaise, "cashPaise");
+      assertPaise(event.accountPaise, "accountPaise");
+      if (event.cashPaise < 0 || event.accountPaise < 0) {
+        throw new LedgerError("A voided demand's amounts are positive magnitudes");
+      }
+      const next = withDerived({
+        ...prev,
+        cashOrderRaisedPaise: prev.cashOrderRaisedPaise - event.cashPaise,
+        accountOrderRaisedPaise: prev.accountOrderRaisedPaise - event.accountPaise,
+      });
+      return {
+        next,
+        amountPaise: -(event.cashPaise + event.accountPaise),
+        bucket: null,
+        label: event.label ?? "Demand voided",
+      };
     }
     case "PAYMENT": {
       const amount = positive(event.amountPaise, "Payment amount");

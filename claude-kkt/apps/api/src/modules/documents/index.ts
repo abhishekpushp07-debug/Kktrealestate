@@ -1,9 +1,16 @@
 import type { FastifyInstance } from "fastify";
+import { registerJob } from "../../jobs/index.js";
 import { registerExportRoutes } from "./exports.js";
+import { renditionsJob, storageSweep } from "./renditions.js";
+import { storage as documentStorage } from "./service.js";
 import { registerDocumentRoutes } from "./routes.js";
 
 export {
-  storeBuffer,
+  uploadDocument,
+  prepareUpload,
+  stageUpload,
+  insertStagedDocument,
+  discardStagedUpload,
   signedUrl,
   publicMediaUrl,
   streamDocument,
@@ -21,6 +28,8 @@ export {
   SIGNED_LINK_TTL_SECONDS,
   MAX_IMAGE_PIXELS,
   type StoreBufferInput,
+  type PreparedUpload,
+  type StagedUpload,
   type DocumentRecord,
   type DocumentJoined,
   type DocumentStream,
@@ -39,6 +48,16 @@ export {
 } from "./exports.js";
 export { storage as documentStorage } from "./service.js";
 export {
+  renderDocument,
+  requestRenditions,
+  storageSweep,
+  renditionStatus,
+  imageSlots,
+  deletionBackoffMs,
+  PENDING_ORPHAN_AFTER_MS,
+  type RenditionStatus,
+} from "./renditions.js";
+export {
   resolveEntity,
   requireEntity,
   assertEntityWrite,
@@ -48,11 +67,17 @@ export {
 } from "./entities.js";
 
 /**
- * Documents & media module (SPEC §13, §2, §16): multipart uploads validated by file signature, uuid storage keys, webp variants,
- * KYC sensitivity rules, soft delete, signed 15-minute links and the public `/files/:token` stream; plus the asynchronous CSV exports
- * (`/exports`, jobs EXPORT_CSV and EXPORT_CLEANUP). Auto-registered under /api/v1.
+ * Documents & media module (SPEC §13, §2, §16): multipart uploads validated by file signature, uuid storage keys (written outside any
+ * transaction, tracked in storage_pending_objects until their row commits), webp renditions by the DOCUMENT_RENDITIONS job, KYC
+ * sensitivity rules, soft delete, signed 15-minute links and the public `/files/:token` stream; the STORAGE_SWEEP job; plus the
+ * asynchronous CSV exports (`/exports`, jobs EXPORT_CSV and EXPORT_CLEANUP). Auto-registered under /api/v1.
  */
 export default async function documentsModule(app: FastifyInstance): Promise<void> {
   registerDocumentRoutes(app);
   registerExportRoutes(app);
+  // renditions run on the heavy queue after the upload committed; the sweep cleans up uploads that never committed (jobs/index.ts)
+  registerJob("DOCUMENT_RENDITIONS", async (ctx) => renditionsJob(ctx, documentStorage()));
+  registerJob("STORAGE_SWEEP", async (ctx) =>
+    storageSweep(ctx.db, documentStorage(), { app: ctx.app, ...(ctx.signal ? { signal: ctx.signal } : {}) }),
+  );
 }

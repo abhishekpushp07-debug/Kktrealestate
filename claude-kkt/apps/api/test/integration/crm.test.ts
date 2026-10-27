@@ -1266,13 +1266,33 @@ describe("portal access card, bulk enable, deactivate, 360", () => {
 // Scope
 // ---------------------------------------------------------------------------
 describe("scope", () => {
-  it("customers and leads are company-scoped, but project_id filters and references respect the caller's project scope (404, never 403)", async () => {
+  it("customers follow the caller's project scope (SPEC §1: a scoped user learns nothing of other projects' customers); project_id filters and references answer 404, never 403", async () => {
     const leadsAll = await t.request<{ total: number }>("GET", "/api/v1/leads", { token: scoped.access_token });
     expect(leadsAll.status).toBe(200);
     expect(leadsAll.body.total).toBeGreaterThan(0);
+    // The Project Admin here has no project assigned: the company's customers (all linked to other projects or created by others) do
+    // not exist for them — list, CSV export, profile, 360, edit (audit D: these used to be company-scoped only).
+    const adminAll = await t.request<{ total: number; items: Customer[] }>("GET", "/api/v1/customers", {
+      token: admin.access_token,
+    });
+    expect(adminAll.body.total).toBeGreaterThan(0);
     const customersAll = await t.request<{ total: number }>("GET", "/api/v1/customers", { token: scoped.access_token });
     expect(customersAll.status).toBe(200);
-    expect(customersAll.body.total).toBeGreaterThan(0);
+    expect(customersAll.body.total).toBe(0);
+    const csvOut = await t.request("GET", "/api/v1/customers?format=csv", { token: scoped.access_token });
+    expect(csvOut.status).toBe(200);
+    expect(csvOut.text.trim().split("\r\n")).toHaveLength(1); // header only
+    const foreign = adminAll.body.items[0]!;
+    for (const url of [`/api/v1/customers/${foreign.id}`, `/api/v1/customers/${foreign.id}/360`]) {
+      const r = await t.request<ErrorBody>("GET", url, { token: scoped.access_token });
+      expect(r.status, url).toBe(404);
+      expect(r.body.error.code).toBe("NOT_FOUND");
+    }
+    const patch = await t.request<ErrorBody>("PATCH", `/api/v1/customers/${foreign.id}`, {
+      token: scoped.access_token,
+      body: { notes: "should never land", version: foreign.version },
+    });
+    expect(patch.status).toBe(404);
     for (const url of [
       `/api/v1/leads?project_id=${projectA}`,
       `/api/v1/customers?project_id=${projectA}`,
@@ -1293,14 +1313,13 @@ describe("scope", () => {
       body: { project_id: projectA, dry_run: true },
     });
     expect(bulk.status).toBe(404);
-    // the 360 of a scoped user hides bookings in foreign projects
-    const s360 = await t.request<{ bookings: unknown[] }>(
+    // the 360 of a customer outside the caller's projects does not exist for them
+    const s360 = await t.request<ErrorBody>(
       "GET",
       `/api/v1/customers/${(await t.request<{ items: Customer[] }>("GET", "/api/v1/customers?search=9876500011", { token: admin.access_token })).body.items[0]!.id}/360`,
       { token: scoped.access_token },
     );
-    expect(s360.status).toBe(200);
-    expect(s360.body.bookings).toEqual([]);
+    expect(s360.status).toBe(404);
     const adminFiltered = await t.request<{ total: number }>("GET", `/api/v1/leads?project_id=${projectA}`, {
       token: admin.access_token,
     });

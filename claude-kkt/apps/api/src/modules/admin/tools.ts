@@ -55,15 +55,33 @@ import { adminMeta, idParams, iso, requireSuperAdmin, staff } from "./common.js"
 
 type JobRunRecord = typeof jobRuns.$inferSelect;
 
-/** Wire row of a job run. */
-export function toJobRunRow(r: JobRunRecord): AdminJobRunRow {
+/**
+ * The part of a job result one tenant may read (audit B: job_runs is a platform table, but results can carry tenant data). Convention for
+ * job results: tenant-neutral counters at the top level, tenant data under `by_company: {<company id>: {...}}` — a reader sees the top
+ * level merged with their own company's entry and nothing of the others; a result naming another `company_id` is hidden entirely.
+ */
+export function companyJobResult(
+  result: Record<string, unknown> | null | undefined,
+  companyId: string,
+): Record<string, unknown> | null {
+  if (!result) return null;
+  if (typeof result["company_id"] === "string" && result["company_id"] !== companyId) return null;
+  const byCompany = result["by_company"];
+  if (!byCompany || typeof byCompany !== "object") return result;
+  const { by_company: _all, ...rest } = result;
+  const own = (byCompany as Record<string, unknown>)[companyId];
+  return { ...rest, ...(own && typeof own === "object" ? (own as Record<string, unknown>) : {}) };
+}
+
+/** Wire row of a job run, its result reduced to what `companyId` may read (companyJobResult). */
+export function toJobRunRow(r: JobRunRecord, companyId: string): AdminJobRunRow {
   return {
     id: r.id,
     job_name: r.jobName,
     started_at: r.startedAt.toISOString(),
     finished_at: iso(r.finishedAt),
     status: r.status,
-    result: r.result ?? null,
+    result: companyJobResult(r.result ?? null, companyId),
     error: r.error,
   };
 }
@@ -155,18 +173,28 @@ export async function recomputeBookings(
   return { bookings_rebuilt: targets.length, ledger_rows_rewritten: rows, mismatches_found: mismatches };
 }
 
-/** Startup/nightly reconciliation job body: dry run over every booking of every company; the summary lands in job_runs.result. */
+/**
+ * Startup/nightly reconciliation job body: a dry run over every booking, per company. The result keeps each company's findings (booking
+ * numbers, money mismatches) under `by_company[<company id>]`, so a tenant admin reading job_runs sees only their own (companyJobResult);
+ * the top level holds only the number of companies.
+ */
 export async function reconciliationJob(db: DB): Promise<Record<string, unknown>> {
-  const all = await db
-    .select({ id: bookings.id, bookingNumber: bookings.bookingNumber })
-    .from(bookings)
-    .orderBy(bookings.bookingNumber);
-  const r = await reconcileBookings(db, all);
-  return {
-    bookings_checked: r.bookings_checked,
-    bookings_with_mismatches: r.bookings_with_mismatches,
-    mismatches: r.mismatches.slice(0, 100),
-  };
+  const list = await db.select({ id: companies.id }).from(companies).orderBy(companies.createdAt);
+  const byCompany: Record<string, Record<string, unknown>> = {};
+  for (const c of list) {
+    const targets = await db
+      .select({ id: bookings.id, bookingNumber: bookings.bookingNumber })
+      .from(bookings)
+      .where(eq(bookings.companyId, c.id))
+      .orderBy(bookings.bookingNumber);
+    const r = await reconcileBookings(db, targets);
+    byCompany[c.id] = {
+      bookings_checked: r.bookings_checked,
+      bookings_with_mismatches: r.bookings_with_mismatches,
+      mismatches: r.mismatches.slice(0, 100),
+    };
+  }
+  return { companies: list.length, by_company: byCompany };
 }
 
 // ---------------------------------------------------------------------------
@@ -197,8 +225,8 @@ function parseInfo(info: string, key: string): string | null {
   return m?.[1]?.trim() ?? null;
 }
 
-/** Versions, database size, table row estimates, Redis memory, job health. */
-export async function systemFacts(app: FastifyInstance): Promise<AdminSystemResponse> {
+/** Versions, database size, table row estimates, Redis memory, job health (job results reduced to `companyId`'s view). */
+export async function systemFacts(app: FastifyInstance, companyId: string): Promise<AdminSystemResponse> {
   const since = new Date(Date.now() - 24 * 3600 * 1000);
   const [pg, dbInfo, tables, runs, runStats, redisServer, redisMemory, redisClients] = await Promise.all([
     app.db
@@ -273,7 +301,7 @@ export async function systemFacts(app: FastifyInstance): Promise<AdminSystemResp
         started_at: new Date(r.started_at).toISOString(),
         finished_at: iso(r.finished_at),
         status: r.status,
-        result: r.result ?? null,
+        result: companyJobResult(r.result ?? null, companyId),
         error: r.error,
       })),
     },
@@ -400,7 +428,8 @@ export function registerToolRoutes(app: FastifyInstance): void {
         "Every job: handler presence, schedule, next run, last run, last success, failure counts; recent runs and related links",
       tags: ["admin"],
     },
-    handler: async () => {
+    handler: async (req) => {
+      const companyId = staff(req).companyId;
       const recent = await app.dbReplica.select().from(jobRuns).orderBy(desc(jobRuns.startedAt)).limit(25);
       const names = [...JOB_NAMES];
       type LastRow = {
@@ -418,7 +447,7 @@ export function registerToolRoutes(app: FastifyInstance): void {
         started_at: new Date(r.started_at).toISOString(),
         finished_at: iso(r.finished_at),
         status: r.status,
-        result: r.result ?? null,
+        result: companyJobResult(r.result ?? null, companyId),
         error: r.error,
       });
       const [last, lastOk, stats, next] = await Promise.all([
@@ -460,7 +489,7 @@ export function registerToolRoutes(app: FastifyInstance): void {
       });
       return {
         jobs,
-        recent_runs: recent.map(toJobRunRow),
+        recent_runs: recent.map((r) => toJobRunRow(r, companyId)),
         links: {
           run_dues_now: "/api/v1/dues/run",
           integrity_report: "/api/v1/dues/integrity",
@@ -506,7 +535,8 @@ export function registerToolRoutes(app: FastifyInstance): void {
         },
         ...listPaging(q),
       });
-      const items = r.items.map(toJobRunRow);
+      const companyId = staff(req).companyId;
+      const items = r.items.map((x) => toJobRunRow(x, companyId));
       if (q.format === "csv")
         return sendCsv(reply, "job-runs.csv", jobRunCsv, items as unknown as Record<string, unknown>[]);
       return { ...r, items };
@@ -526,7 +556,7 @@ export function registerToolRoutes(app: FastifyInstance): void {
     handler: async (req) => {
       const [row] = await app.db.select().from(jobRuns).where(eq(jobRuns.id, req.params.id)).limit(1);
       if (!row) throw ApiError.notFound("Job run");
-      return toJobRunRow(row);
+      return toJobRunRow(row, staff(req).companyId);
     },
   });
 
@@ -594,7 +624,7 @@ export function registerToolRoutes(app: FastifyInstance): void {
       summary: "Versions, database size and row estimates, Redis memory, loaded modules, job health",
       tags: ["admin"],
     },
-    handler: async () => systemFacts(app),
+    handler: async (req) => systemFacts(app, staff(req).companyId),
   });
 
   route(app, {
@@ -627,7 +657,7 @@ export function registerToolRoutes(app: FastifyInstance): void {
       // Everything cached about the old rows is stale now.
       await invalidate(app.redis, "company:");
       await invalidate(app.redis, "perm:");
-      await bumpPermVersion(app.redis);
+      await bumpPermVersion(app.redis); // a reseed replaces every subject: the global generation, not per-subject versions
       const [company] = await app.db.select({ id: companies.id }).from(companies).limit(1);
       const companyId = company?.id ?? user.companyId;
       const integrity: IntegrityReportResponse =

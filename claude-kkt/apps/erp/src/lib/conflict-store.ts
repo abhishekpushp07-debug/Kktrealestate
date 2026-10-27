@@ -49,7 +49,8 @@ export function conflictDetailsFrom(details: Record<string, unknown> | undefined
   changedBy: string | null;
   changedAt: string | null;
 } {
-  const current = details?.current;
+  // contract C6: `current_version` (the legacy `current` is read when an older API answers)
+  const current = typeof details?.current_version === "number" ? details.current_version : details?.current;
   const changedBy = details?.changed_by;
   const changedAt = details?.changed_at;
   return {

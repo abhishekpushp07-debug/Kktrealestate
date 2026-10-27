@@ -507,12 +507,17 @@ function ReplyComposer({ ticket }: { ticket: ServiceRequestDetailResponse }) {
 
   const send = useMutationWithToast<ServiceMessageRow, void>({
     mutationFn: () =>
-      api.post<ServiceMessageRow>(`${SERVICE_PATH}/${ticket.id}/messages`, {
+      // A staff reply / internal note carries the ticket's version (If-Match "v<n>", contract C6).
+      api.post<ServiceMessageRow>(
+        `${SERVICE_PATH}/${ticket.id}/messages`,
+        {
         body: body.trim(),
         is_internal: internal,
         attachment_ids: attachments.map((doc) => doc.id),
         ...(nextStatus ? { status: nextStatus } : {}),
-      }),
+        },
+        { version: ticket.version },
+      ),
     successMessage: internal ? "Internal note added" : "Reply sent to the customer",
     invalidate: serviceInvalidations(ticket.id),
     onSuccess: () => {

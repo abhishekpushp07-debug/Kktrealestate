@@ -1,3 +1,5 @@
+// first: size the libuv thread pool before any module can use it (production also preloads it through telemetry.js)
+import "./preload.js";
 import cluster from "node:cluster";
 import { availableParallelism } from "node:os";
 import { createDb, runMigrations } from "@kkt/db";
@@ -12,6 +14,7 @@ import {
   setupPrimaryAggregation,
   setupWorkerAggregation,
 } from "./lib/metrics.js";
+import { installProcessErrorHandlers } from "./lib/processErrors.js";
 import { createStorage } from "./lib/storage.js";
 import { effectiveConfig } from "./modules/system/bootConfig.js";
 import { startMetricsServer } from "./modules/system/metricsServer.js";
@@ -125,14 +128,19 @@ async function serve(opts: { index: number; runJobs: boolean; prepare: boolean; 
     : null;
 
   let stopping = false;
-  const shutdown = (signal: string) => {
-    if (stopping) return;
+  const settings = shutdownSettingsFromEnv();
+  const shutdown = (signal: string, fatal = false): Promise<void> => {
+    if (stopping) return Promise.resolve();
     stopping = true;
-    void gracefulShutdown(
+    return gracefulShutdown(
       {
         app,
-        jobs,
+        // in-process jobs drain inside the HTTP shutdown deadline (the standalone worker has its own WORKER_DRAIN_TIMEOUT_MS)
+        jobs: jobs ? { close: () => jobs!.close(Math.max(1_000, settings.timeoutMs - 5_000)) } : null,
         log: logger,
+        settings,
+        // after an uncaught exception the process exits non-zero even when the drain itself went well
+        ...(fatal ? { exit: (code: number) => process.exit(code === 0 ? 1 : code) } : {}),
         inflight: () => app.inflightRequests?.() ?? 0,
         after: [
           () =>
@@ -147,10 +155,16 @@ async function serve(opts: { index: number; runJobs: boolean; prepare: boolean; 
       signal,
     );
   };
-  process.on("SIGTERM", () => shutdown("SIGTERM"));
-  process.on("SIGINT", () => shutdown("SIGINT"));
+  process.on("SIGTERM", () => void shutdown("SIGTERM"));
+  process.on("SIGINT", () => void shutdown("SIGINT"));
   // a cluster worker is told to stop by its primary (signal forwarded) or by a disconnect when the primary dies
-  if (cluster.isWorker) cluster.worker?.on("disconnect", () => shutdown("disconnect"));
+  if (cluster.isWorker) cluster.worker?.on("disconnect", () => void shutdown("disconnect"));
+  installProcessErrorHandlers({
+    role: "api",
+    log: logger,
+    shutdown: (reason) => shutdown(reason, true),
+    deadlineMs: settings.timeoutMs + 5_000,
+  });
 }
 
 /** Primary of a multi-process boot: prepares the database once, serves aggregated metrics, forks the workers and replaces crashed ones. */
@@ -222,6 +236,19 @@ async function supervise(count: number): Promise<void> {
   };
   process.on("SIGTERM", () => stop("SIGTERM"));
   process.on("SIGINT", () => stop("SIGINT"));
+  // the primary only supervises: an uncaught exception there stops the workers gracefully and exits non-zero
+  installProcessErrorHandlers({
+    role: "api",
+    log: logger,
+    shutdown: () =>
+      new Promise<void>((resolve) => {
+        stop("SIGTERM");
+        cluster.on("exit", () => {
+          if (Object.keys(cluster.workers ?? {}).length === 0) resolve();
+        });
+      }),
+    deadlineMs: settings.timeoutMs + 10_000,
+  });
 }
 
 /** `node dist/server.js migrate`: the one-shot migrate job (Compose service / Kubernetes Job). Runs as the database owner role. */

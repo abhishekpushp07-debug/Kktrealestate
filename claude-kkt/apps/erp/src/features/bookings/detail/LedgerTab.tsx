@@ -1,14 +1,21 @@
 import type { ColumnDef } from "@tanstack/react-table";
-import { Download } from "lucide-react";
+import { Download, History } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { LEDGER_EVENT_LABELS, MONEY_CATEGORY_LABELS, type LedgerRow } from "@kkt/contracts";
-import { Badge, Button, DataTable } from "@/components/ui";
+import { Badge, Button, DataTable, ErrorState, Select, SimpleDialog } from "@/components/ui";
 import { api } from "@/lib/api";
-import { formatDate, formatINR, formatINRShort } from "@/lib/format";
+import { formatDate, formatDateTime, formatINR, formatINRShort } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { BOOKINGS_PATH, useBookingLedger } from "../api";
-import { LEDGER_AMOUNT_CLASS, ledgerAmountTone, ledgerCategory } from "../bookingMath";
+import { BOOKINGS_PATH, LEDGER_PAGE_SIZE, useBookingLedger, useLedgerRebuilds } from "../api";
+import {
+  LEDGER_AMOUNT_CLASS,
+  LEDGER_REBUILD_REASON_LABELS,
+  ledgerAmountTone,
+  ledgerCategory,
+  ledgerFooterTotals,
+  type LedgerFooterTotals,
+} from "../bookingMath";
 import { DueAmount } from "../components";
 
 const EVENT_VARIANT: Readonly<
@@ -129,11 +136,117 @@ function LedgerCard({ row }: { row: LedgerRow }) {
   );
 }
 
-/** SPEC §11 ledger table: one row per event with running balances; advances green, dues red. */
+/** Restatements of the ledger (GET /bookings/:id/ledger/rebuilds): from → to epoch, reason, who, when and the totals moved. */
+function RebuildHistoryDialog({
+  bookingId,
+  open,
+  onOpenChange,
+  onViewEpoch,
+}: {
+  bookingId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onViewEpoch: (epoch: number) => void;
+}) {
+  const rebuilds = useLedgerRebuilds(bookingId, { enabled: open });
+  const rows = rebuilds.data?.items ?? [];
+  return (
+    <SimpleDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      size="lg"
+      title="Ledger rebuild history"
+      description="The ledger is append-only: a restatement writes a new epoch and keeps the old one readable."
+    >
+      {rebuilds.isPending ? (
+        <p className="text-sm text-ink-muted">Loading…</p>
+      ) : rebuilds.error ? (
+        <ErrorState error={rebuilds.error} onRetry={() => void rebuilds.refetch()} />
+      ) : rows.length === 0 ? (
+        <p className="text-sm text-ink-muted" data-testid="ledger-rebuilds-empty">
+          This ledger has never been restated.
+        </p>
+      ) : (
+        <ol className="space-y-3" data-testid="ledger-rebuilds">
+          {rows.map((row) => (
+            <li key={row.id} className="rounded-md border border-border p-3 text-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="font-semibold text-navy-950">
+                  Epoch {row.from_epoch} → {row.to_epoch} · {LEDGER_REBUILD_REASON_LABELS[row.reason]}
+                </p>
+                <p className="text-xs text-ink-muted">
+                  {formatDateTime(row.at)} · {row.actor?.name ?? "System"}
+                </p>
+              </div>
+              <p className="money mt-1 text-xs text-ink-muted">
+                Rows {row.summary.rows_before} → {row.summary.rows_after} · total due{" "}
+                {formatINR(row.summary.before.total_due_paise)} → {formatINR(row.summary.after.total_due_paise)}
+                {row.summary.differences.length > 0 ? ` · ${row.summary.differences.length} row difference(s)` : ""}
+              </p>
+              <Button
+                size="xs"
+                variant="link"
+                className="mt-1 px-0"
+                onClick={() => {
+                  onViewEpoch(row.from_epoch);
+                  onOpenChange(false);
+                }}
+              >
+                View epoch {row.from_epoch}
+              </Button>
+            </li>
+          ))}
+        </ol>
+      )}
+    </SimpleDialog>
+  );
+}
+
+/** Totals under the ledger, from the server's C7 summary (or the epoch's own totals for an older epoch). */
+function LedgerTotalsBar({ totals }: { totals: LedgerFooterTotals }) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-ink-muted" data-testid="ledger-totals">
+      {totals.source === "epoch" && <span className="font-semibold text-warning-fg">End of epoch {totals.epoch}:</span>}
+      <span>
+        Cash due <DueAmount paise={totals.cash_due_paise} />
+      </span>
+      <span>
+        Account due <DueAmount paise={totals.account_due_paise} />
+      </span>
+      <span>
+        Total due <DueAmount paise={totals.total_due_paise} />
+      </span>
+      <span>
+        Other charges due <DueAmount paise={totals.other_charges_due_paise} />
+      </span>
+      <span className="money">
+        Paid cash {formatINR(totals.cash_paid_paise)} · account {formatINR(totals.account_paid_paise)}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * SPEC §11 ledger table: one row per event with running balances; advances green, dues red. Pages through every row of the
+ * chosen epoch (contract C7); the dues under the table come from the server summary, never from the last row on screen.
+ */
 export function LedgerTab({ bookingId }: { bookingId: string }) {
-  const ledger = useBookingLedger(bookingId);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(LEDGER_PAGE_SIZE);
+  const [epoch, setEpoch] = useState<number | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const ledger = useBookingLedger(bookingId, { page, page_size: pageSize, epoch });
   const [exporting, setExporting] = useState(false);
-  const rows = ledger.data?.items ?? [];
+  const data = ledger.data;
+  const rows = data?.items ?? [];
+  const currentEpoch = data?.current_epoch ?? 1;
+  const shownEpoch = data?.epoch ?? epoch ?? currentEpoch;
+  const totals = data ? ledgerFooterTotals(data) : null;
+
+  const viewEpoch = (next: number | null) => {
+    setEpoch(next === null || next === currentEpoch ? null : next);
+    setPage(1);
+  };
 
   const columns = useMemo<ColumnDef<LedgerRow, unknown>[]>(
     () => [
@@ -239,8 +352,6 @@ export function LedgerTab({ bookingId }: { bookingId: string }) {
     [],
   );
 
-  const last = rows[rows.length - 1];
-
   return (
     <div className="space-y-3" data-testid="ledger-tab">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -248,28 +359,64 @@ export function LedgerTab({ bookingId }: { bookingId: string }) {
           One row per event with running balances. <span className="font-semibold text-success-fg">Green</span> =
           advance (paid beyond what is raised), <span className="font-semibold text-danger-fg">red</span> = due.
         </p>
-        <Button
-          size="sm"
-          variant="outline"
-          leftIcon={Download}
-          loading={exporting}
-          onClick={async () => {
-            setExporting(true);
-            try {
-              await api.exportCsv(
-                `${BOOKINGS_PATH}/${bookingId}/ledger`,
-                { page_size: 200, sort: "seq" },
-                "ledger.csv",
-              );
-            } finally {
-              setExporting(false);
-            }
-          }}
-          data-testid="ledger-csv"
-        >
-          CSV
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-ink-muted" data-testid="ledger-epoch">
+            Epoch {shownEpoch}
+            {shownEpoch === currentEpoch ? " (current)" : ` of ${currentEpoch} (superseded)`}
+          </span>
+          {currentEpoch > 1 && (
+            <Select
+              aria-label="Ledger epoch"
+              size="sm"
+              className="w-36"
+              value={String(shownEpoch)}
+              onValueChange={(value) => value && viewEpoch(Number(value))}
+              options={Array.from({ length: currentEpoch }, (_, index) => currentEpoch - index).map((value) => ({
+                value: String(value),
+                label: value === currentEpoch ? `Epoch ${value} (current)` : `Epoch ${value}`,
+              }))}
+            />
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            leftIcon={History}
+            onClick={() => setHistoryOpen(true)}
+            data-testid="ledger-rebuilds-open"
+          >
+            Rebuild history
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            leftIcon={Download}
+            loading={exporting}
+            onClick={async () => {
+              setExporting(true);
+              try {
+                await api.exportCsv(
+                  `${BOOKINGS_PATH}/${bookingId}/ledger`,
+                  { sort: "seq", filters: { epoch: epoch ?? undefined } },
+                  "ledger.csv",
+                );
+              } finally {
+                setExporting(false);
+              }
+            }}
+            data-testid="ledger-csv"
+          >
+            CSV
+          </Button>
+        </div>
       </div>
+      {shownEpoch !== currentEpoch && (
+        <p className="rounded-md border border-warning/40 bg-warning-bg px-3 py-2 text-xs text-warning-fg">
+          You are viewing superseded epoch {shownEpoch}. The book of record is epoch {currentEpoch}.{" "}
+          <button type="button" className="font-semibold underline" onClick={() => viewEpoch(null)}>
+            Back to the current ledger
+          </button>
+        </p>
+      )}
       <DataTable
         columns={columns}
         data={rows}
@@ -281,25 +428,28 @@ export function LedgerTab({ bookingId }: { bookingId: string }) {
         maxHeight="60vh"
         mobileCard={(row) => <LedgerCard row={row} />}
         emptyState={{ title: "Ledger is empty", description: "Demands and payments will appear here as they happen." }}
-        footer={
-          last ? (
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-ink-muted">
-              <span>
-                Cash due <DueAmount paise={last.cash_due_paise} />
-              </span>
-              <span>
-                Account due <DueAmount paise={last.account_due_paise} />
-              </span>
-              <span>
-                Total due <DueAmount paise={last.total_due_paise} />
-              </span>
-              <span>
-                Other charges due <DueAmount paise={last.other_charges_due_paise} />
-              </span>
-            </div>
-          ) : undefined
+        pagination={
+          data && data.total > 0
+            ? {
+                page,
+                pageSize,
+                total: data.total,
+                onPageChange: setPage,
+                onPageSizeChange: (size) => {
+                  setPageSize(size);
+                  setPage(1);
+                },
+              }
+            : undefined
         }
+        footer={totals ? <LedgerTotalsBar totals={totals} /> : undefined}
         data-testid="ledger-table"
+      />
+      <RebuildHistoryDialog
+        bookingId={bookingId}
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
+        onViewEpoch={(value) => viewEpoch(value)}
       />
     </div>
   );

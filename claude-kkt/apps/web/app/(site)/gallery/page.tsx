@@ -7,6 +7,9 @@ import { getGallery } from "@/lib/api";
 import { closedMetadata, siteGate } from "@/lib/gate";
 import { breadcrumbJsonLd, pageMetadata } from "@/lib/seo";
 
+/** CMS gallery: regenerated every 5 minutes or on demand. */
+export const revalidate = 300;
+
 export async function generateMetadata(): Promise<Metadata> {
   const closed = await closedMetadata();
   if (closed) return closed;

@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Check, ClipboardCopy, FileUp, Upload } from "lucide-react";
+import { Check, ClipboardCopy, Download, FileUp, Upload } from "lucide-react";
 import { useRef, useState, type ChangeEvent } from "react";
 import { toast } from "sonner";
 import type { MasterCsvImportResponse, MasterCsvImportRow } from "@kkt/contracts";
@@ -13,14 +13,16 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  ErrorState,
   FormError,
   StatusChip,
   Textarea,
   type StatusTone,
 } from "@/components/ui";
+import { isApiClientError, saveBlob } from "@/lib/api";
 import { formatNumber } from "@/lib/format";
 import { cn, useOnChange } from "@/lib/utils";
-import { importMasterCsv, masterPath } from "./api";
+import { describeTemplateColumns, importMasterCsv, masterPath, unknownColumnLines, useImportTemplate } from "./api";
 import type { AnyMasterConfig } from "./types";
 
 export interface CsvImportDialogProps {
@@ -68,7 +70,12 @@ export function CsvImportDialog({ config, open, onOpenChange }: CsvImportDialogP
     setError(null);
   });
 
-  const header = config.csv.columns.join(",");
+  // The template comes from the API (GET /masters/{path}/import-template): the same column names the importer validates.
+  const template = useImportTemplate(config.slug, open);
+  const header = template.data?.header.join(",") ?? "";
+  const example = template.data ? (template.data.csv.split(/\r?\n/)[1] ?? "") : "";
+  const unknownColumns =
+    isApiClientError(error) && error.code === "IMPORT_UNKNOWN_COLUMNS" ? unknownColumnLines(error.details) : [];
   const stale = preview !== null && previewedCsv !== csv;
   const canPreview = csv.trim().length > 0 && busy === null;
   const canCommit =
@@ -117,7 +124,8 @@ export function CsvImportDialog({ config, open, onOpenChange }: CsvImportDialogP
 
   const copyHeader = async () => {
     try {
-      await navigator.clipboard.writeText(`${header}\n${config.csv.example}`);
+      if (!template.data) return;
+      await navigator.clipboard.writeText(template.data.csv);
       setHeaderCopied(true);
       window.setTimeout(() => setHeaderCopied(false), 1500);
     } catch {
@@ -127,7 +135,11 @@ export function CsvImportDialog({ config, open, onOpenChange }: CsvImportDialogP
 
   return (
     <Dialog open={open} onOpenChange={(next) => busy === null && onOpenChange(next)}>
-      <DialogContent size="xl" data-testid={`csv-import-dialog-${config.slug}`}>
+      <DialogContent
+        size="xl"
+        dirty={csv.trim() !== "" && !preview?.committed}
+        data-testid={`csv-import-dialog-${config.slug}`}
+      >
         <DialogHeader>
           <DialogTitle>Import {config.label.toLowerCase()} from CSV</DialogTitle>
           <DialogDescription>
@@ -136,21 +148,63 @@ export function CsvImportDialog({ config, open, onOpenChange }: CsvImportDialogP
           </DialogDescription>
         </DialogHeader>
         <DialogBody className="space-y-4">
-          <div className="rounded-md border border-border bg-surface/60 p-3 text-xs">
+          <div className="rounded-md border border-border bg-surface/60 p-3 text-xs" data-testid="csv-template">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="label-caps">Expected columns</span>
-              <Button
-                variant="ghost"
-                size="xs"
-                leftIcon={headerCopied ? Check : ClipboardCopy}
-                onClick={() => void copyHeader()}
-                data-testid="csv-copy-template-btn"
-              >
-                {headerCopied ? "Copied" : "Copy template"}
-              </Button>
+              <span className="flex gap-1">
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  leftIcon={headerCopied ? Check : ClipboardCopy}
+                  onClick={() => void copyHeader()}
+                  disabled={!template.data}
+                  data-testid="csv-copy-template-btn"
+                >
+                  {headerCopied ? "Copied" : "Copy template"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  leftIcon={Download}
+                  disabled={!template.data}
+                  onClick={() =>
+                    template.data &&
+                    saveBlob(
+                      new Blob([template.data.csv], { type: "text/csv;charset=utf-8" }),
+                      `${template.data.path}-import-template.csv`,
+                    )
+                  }
+                  data-testid="csv-download-template-btn"
+                >
+                  Download
+                </Button>
+              </span>
             </div>
-            <code className="mt-1 block break-all font-mono text-ink">{header}</code>
-            <code className="block break-all font-mono text-ink-subtle">{config.csv.example}</code>
+            {template.isPending ? (
+              <p className="mt-1 text-ink-subtle">Loading the template…</p>
+            ) : template.error ? (
+              <ErrorState error={template.error} onRetry={() => void template.refetch()} compact />
+            ) : template.data ? (
+              <>
+                <code className="mt-1 block break-all font-mono text-ink" data-testid="csv-template-header">
+                  {header}
+                </code>
+                <code className="block break-all font-mono text-ink-subtle">{example}</code>
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-ink-muted">Column reference</summary>
+                  <ul className="mt-1 list-disc space-y-0.5 pl-4 text-ink-muted">
+                    {describeTemplateColumns(template.data).map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ul>
+                </details>
+                {template.data.notes.map((line) => (
+                  <p key={line} className="mt-1 text-warning-fg">
+                    {line}
+                  </p>
+                ))}
+              </>
+            ) : null}
           </div>
 
           <div className="space-y-2">
@@ -186,7 +240,7 @@ export function CsvImportDialog({ config, open, onOpenChange }: CsvImportDialogP
                 setError(null);
               }}
               rows={6}
-              placeholder={`${header}\n${config.csv.example}`}
+              placeholder={header ? `${header}\n${example}` : "Paste the CSV here"}
               className="font-mono text-xs"
               spellCheck={false}
               data-testid="csv-import-textarea"
@@ -198,7 +252,22 @@ export function CsvImportDialog({ config, open, onOpenChange }: CsvImportDialogP
             </p>
           </div>
 
-          {error !== null && <FormError error={error} />}
+          {unknownColumns.length > 0 ? (
+            <div
+              role="alert"
+              className="rounded-md border border-danger/30 bg-danger-bg px-3 py-2 text-sm text-danger-fg"
+              data-testid="csv-unknown-columns"
+            >
+              <p className="font-semibold">The header has columns this import does not know:</p>
+              <ul className="mt-1 list-disc pl-5">
+                {unknownColumns.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            error !== null && <FormError error={error} />
+          )}
 
           {preview && (
             <div className="space-y-2">
@@ -219,6 +288,11 @@ export function CsvImportDialog({ config, open, onOpenChange }: CsvImportDialogP
                   {preview.summary.error} error
                 </Badge>
                 {stale && <span className="text-warning-fg">The text changed since this preview — run it again.</span>}
+                {preview.ignored_columns && preview.ignored_columns.length > 0 && (
+                  <span className="text-ink-subtle" data-testid="csv-ignored-columns">
+                    Not imported (export-only): {preview.ignored_columns.join(", ")}
+                  </span>
+                )}
               </div>
               <div className="max-h-72 overflow-auto rounded-md border border-border scrollbar-thin">
                 <table className="w-full min-w-[36rem] text-xs">

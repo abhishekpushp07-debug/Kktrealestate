@@ -6,8 +6,6 @@ function deriveKey(secret: string, context: string): Buffer {
   return createHash("sha256").update(context).update(":").update(secret).digest();
 }
 
-const hashKey = deriveKey(config.HASH_KEY, "kkt-hash-v1");
-
 // ---------------------------------------------------------------------------
 // Field-encryption key ring (FIELD_ENCRYPTION_KEYS `kid:secret,…`, first = active; FIELD_ENCRYPTION_KEY is always kid `k1`)
 // ---------------------------------------------------------------------------
@@ -74,9 +72,50 @@ export function reencryptField(token: string | null | undefined): string | null 
   return encryptField(decryptField(token));
 }
 
-/** Keyed hash (HMAC-SHA256) for duplicate detection on encrypted identifiers (PAN, Aadhaar). Input is canonicalised by the caller. */
+// ---------------------------------------------------------------------------
+// Keyed-hash ring (HASH_KEYS `kid:secret,…`, first = active; HASH_KEY is kid `h1`) — contract C9
+// ---------------------------------------------------------------------------
+
+interface HashKey {
+  kid: string;
+  key: Buffer;
+}
+let hashSource: unknown = null;
+let hashKeys: HashKey[] = [];
+
+/** The derived hash keys, active first; rebuilt when `config.HASH_KEY_RING` is replaced (tests swap it to simulate a rotation). */
+function hashRing(): HashKey[] {
+  const source = config.HASH_KEY_RING;
+  if (hashSource === source && hashKeys.length > 0) return hashKeys;
+  hashKeys = source.map((k) => ({ kid: k.kid, key: deriveKey(k.secret, "kkt-hash-v1") }));
+  if (hashKeys.length === 0) throw new Error("keyed-hash key ring is empty");
+  hashSource = source;
+  return hashKeys;
+}
+
+/** Key id new keyed hashes are written with (the first entry of the ring). */
+export function activeHashKeyId(): string {
+  return hashRing()[0]!.kid;
+}
+
+/**
+ * Keyed hash (HMAC-SHA256, active key) for duplicate detection on encrypted identifiers (PAN, Aadhaar). Input is canonicalised by the
+ * caller. Every new write stores this value; lookups use keyedHashes() so rows hashed under an older key are still found.
+ */
 export function keyedHash(value: string): string {
-  return createHmac("sha256", hashKey).update(value).digest("hex");
+  return createHmac("sha256", hashRing()[0]!.key).update(value).digest("hex");
+}
+
+/** The keyed hash of `value` under every configured key, active first (lookups and duplicate checks during a HASH_KEYS rotation). */
+export function keyedHashes(value: string): string[] {
+  return [...new Set(hashRing().map((k) => createHmac("sha256", k.key).update(value).digest("hex")))];
+}
+
+/** True when `candidate` is the keyed hash (or its first `prefixLength` hex chars) of `value` under any configured key (constant time). */
+export function keyedHashMatches(value: string, candidate: string, prefixLength?: number): boolean {
+  let ok = false;
+  for (const h of keyedHashes(value)) if (safeEqual(prefixLength ? h.slice(0, prefixLength) : h, candidate)) ok = true;
+  return ok;
 }
 
 /** SHA-256 hex of a token (refresh tokens, manage tokens, brochure links are stored hashed). */
@@ -106,45 +145,148 @@ export function temporaryPassword(): string {
   return chars.join("");
 }
 
-/** HMAC keys for signed payloads: the current JWT_SECRET signs, previous secrets (JWT_PREVIOUS_SECRETS) still verify during a rotation. */
-let signSource: unknown = null;
-let signKeys: Buffer[] = [];
-function signingKeys(): Buffer[] {
-  const source = `${config.JWT_SECRET}\u0000${config.JWT_PREVIOUS_SECRETS.join("\u0000")}`;
-  if (signSource !== source) {
-    signKeys = [config.JWT_SECRET, ...config.JWT_PREVIOUS_SECRETS].map((s) => deriveKey(s, "kkt-sign-v1"));
-    signSource = source;
-  }
-  return signKeys;
+// ---------------------------------------------------------------------------
+// Link-signing ring (LINK_SIGNING_KEYS `kid:secret,…`, first = active) — contract C9
+// ---------------------------------------------------------------------------
+
+/** One derived link key: HMAC-SHA256 key for one token family (`label`) under one ring entry. */
+export interface LinkKey {
+  kid: string;
+  key: Buffer;
 }
 
-/** Sign a short-lived payload (download links, visit manage links, backup links): returns `payload.exp.sig` in base64url. */
+let linkSource: string | null = null;
+const linkKeyCache = new Map<string, LinkKey[]>();
+
+/**
+ * The link-signing ring, active first (contract C9): LINK_SIGNING_KEYS, else — outside production only, where config allows it to be
+ * unset — JWT_SECRET followed by JWT_PREVIOUS_SECRETS (kid `j<fingerprint>`): the very HMAC keys links were signed with before the ring.
+ */
+export function linkKeyRing(): readonly { kid: string; secret: string }[] {
+  if (config.LINK_SIGNING_KEYS.length > 0) return config.LINK_SIGNING_KEYS;
+  // kid = a fingerprint of the secret, so a link keeps naming its key when JWT_SECRET rotates into JWT_PREVIOUS_SECRETS
+  return [config.JWT_SECRET, ...config.JWT_PREVIOUS_SECRETS].map((secret) => ({
+    kid: `j${createHash("sha256").update("kkt-link-kid:").update(secret).digest("hex").slice(0, 8)}`,
+    secret,
+  }));
+}
+
+/**
+ * The HMAC keys of one link family (`label`, e.g. `kkt-files-v1`, `kkt-export-link-v1`), active first. Each key is
+ * SHA-256(`<label>:<secret>`) — the derivation the file, export and backup links have always used, so with the derived non-production
+ * ring (JWT_SECRET first) existing links keep verifying.
+ */
+export function linkKeys(label: string): LinkKey[] {
+  const ring = linkKeyRing();
+  const source = ring.map((k) => `${k.kid}\u0000${k.secret}`).join("\u0001");
+  if (linkSource !== source) {
+    linkKeyCache.clear();
+    linkSource = source;
+  }
+  let keys = linkKeyCache.get(label);
+  if (!keys) {
+    keys = ring.map((k) => ({ kid: k.kid, key: deriveKey(k.secret, label) }));
+    if (keys.length === 0) throw new Error("link-signing key ring is empty");
+    linkKeyCache.set(label, keys);
+  }
+  return keys;
+}
+
+/** The active link key of a family. */
+export function activeLinkKey(label: string): LinkKey {
+  return linkKeys(label)[0]!;
+}
+
+const KID_RE = /^[A-Za-z0-9_-]{1,32}$/;
+
+/**
+ * Signs a compact binary link body: `<kid>.<base64url body>.<base64url HMAC(kid "." body) truncated to sigBytes>`. The kid names the
+ * ring key, so a rotation keeps older links verifiable for as long as their key stays configured.
+ */
+export function signLinkBody(label: string, body: Buffer, sigBytes = 16): string {
+  const { kid, key } = activeLinkKey(label);
+  const b = body.toString("base64url");
+  const sig = createHmac("sha256", key).update(`${kid}.${b}`).digest().subarray(0, sigBytes).toString("base64url");
+  return `${kid}.${b}.${sig}`;
+}
+
+/**
+ * Verifies a token from signLinkBody (or a legacy kid-less `<body>.<sig>` compact token — MAC over the raw body bytes, as the file,
+ * export and backup links were signed before the ring — tried against every ring key)
+ * and returns its body; null when malformed or forged. Compared in constant time over the canonical re-encoding.
+ */
+export function verifyLinkBody(label: string, token: string, sigBytes = 16): Buffer | null {
+  const parts = token.split(".");
+  if (parts.length === 3) {
+    const [kid, b, sig] = parts as [string, string, string];
+    if (!KID_RE.test(kid) || !/^[A-Za-z0-9_-]+$/.test(b) || !/^[A-Za-z0-9_-]+$/.test(sig)) return null;
+    const key = linkKeys(label).find((k) => k.kid === kid);
+    if (!key) return null;
+    const body = Buffer.from(b, "base64url");
+    if (body.toString("base64url") !== b) return null;
+    const expected = createHmac("sha256", key.key)
+      .update(`${kid}.${b}`)
+      .digest()
+      .subarray(0, sigBytes)
+      .toString("base64url");
+    return safeEqual(expected, sig) ? body : null;
+  }
+  if (parts.length === 2) {
+    const [b, sig] = parts as [string, string];
+    if (!/^[A-Za-z0-9_-]+$/.test(b) || !/^[A-Za-z0-9_-]+$/.test(sig)) return null;
+    const body = Buffer.from(b, "base64url");
+    if (body.toString("base64url") !== b) return null;
+    let ok = false;
+    for (const k of linkKeys(label)) {
+      const expected = createHmac("sha256", k.key).update(body).digest().subarray(0, sigBytes).toString("base64url");
+      if (safeEqual(expected, sig)) ok = true;
+    }
+    return ok ? body : null;
+  }
+  return null;
+}
+
+/** Link family of the generic signed payloads below (MFA step tokens, visitor tokens, manage links). */
+const PAYLOAD_LABEL = "kkt-sign-v1";
+/** Payload key carrying the link-signing kid (inside the signed JSON, so the token keeps its `<payload>.<sig>` shape). */
+const PAYLOAD_KID = "_k";
+
+/**
+ * Sign a short-lived JSON payload (MFA step tokens, visitor tokens): `<payload>.<sig>` in base64url, HMAC-SHA256 under the active
+ * LINK_SIGNING_KEYS key over the payload text. The kid travels inside the signed payload (`_k`), so the token format is the one clients
+ * and the website honeypot have always seen.
+ */
 export function signPayload(payload: Record<string, string | number>, ttlSeconds: number): string {
   const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
-  const body = Buffer.from(JSON.stringify({ ...payload, exp })).toString("base64url");
-  const sig = createHmac("sha256", signingKeys()[0]!).update(body).digest("base64url");
-  return `${body}.${sig}`;
+  const { kid, key } = activeLinkKey(PAYLOAD_LABEL);
+  const body = Buffer.from(JSON.stringify({ ...payload, exp, [PAYLOAD_KID]: kid })).toString("base64url");
+  return `${body}.${createHmac("sha256", key).update(body).digest("base64url")}`;
 }
 
-/** Verify a signed payload (current or a previous secret); returns the payload or null when forged/expired. */
+/**
+ * Verify a signed payload with the ring key its `_k` names (a payload without one — signed before the ring — is tried against every
+ * configured key). Returns the payload without `_k`, or null when forged, expired or signed by a key that is no longer configured.
+ */
 export function verifyPayload<T extends Record<string, unknown>>(token: string): (T & { exp: number }) | null {
   const dot = token.lastIndexOf(".");
   if (dot <= 0) return null;
-  const body = token.slice(0, dot),
-    sig = token.slice(dot + 1);
-  const a = Buffer.from(sig);
-  const valid = signingKeys().some((key) => {
-    const b = Buffer.from(createHmac("sha256", key).update(body).digest("base64url"));
-    return a.length === b.length && timingSafeEqual(a, b);
-  });
-  if (!valid) return null;
+  const body = token.slice(0, dot);
+  const sig = token.slice(dot + 1);
+  let data: (T & { exp: number; [PAYLOAD_KID]?: unknown }) | null;
   try {
-    const data = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as T & { exp: number };
-    if (typeof data.exp !== "number" || data.exp < Math.floor(Date.now() / 1000)) return null;
-    return data;
+    data = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as T & { exp: number };
   } catch {
     return null;
   }
+  if (!data || typeof data !== "object") return null;
+  const named = data[PAYLOAD_KID];
+  const keys = linkKeys(PAYLOAD_LABEL).filter((k) => (typeof named === "string" ? k.kid === named : true));
+  let valid = false;
+  for (const k of keys) if (safeEqual(createHmac("sha256", k.key).update(body).digest("base64url"), sig)) valid = true;
+  if (!valid) return null;
+  if (typeof data.exp !== "number" || data.exp < Math.floor(Date.now() / 1000)) return null;
+  const { [PAYLOAD_KID]: _kid, ...rest } = data;
+  return rest as T & { exp: number };
 }
 
 /** Constant-time string compare. */

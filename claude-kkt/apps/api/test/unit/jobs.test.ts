@@ -43,6 +43,8 @@ describe("job registry", () => {
       "EXPORT_CLEANUP@10 3 * * *",
       "PARTITION_MAINTENANCE@20 2 * * *",
       "JOB_RUN_SWEEP@*/15 * * * *",
+      "AUDIT_SEAL@*/15 * * * *",
+      "STORAGE_SWEEP@*/10 * * * *",
     ]);
     expect(JOB_SCHEDULES.every((s) => s.tz === "Asia/Kolkata")).toBe(true);
     expect(partitioningEnabled({})).toBe(false);

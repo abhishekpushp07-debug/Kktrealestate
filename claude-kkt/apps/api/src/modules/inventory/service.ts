@@ -26,6 +26,7 @@ import {
 } from "@kkt/db";
 import {
   FlatGenerationError,
+  MoneyError,
   PricingError,
   generateFlats,
   resolveFlatPrice,
@@ -471,10 +472,23 @@ export async function loadTemplates(
   };
 }
 
-/** Converts domain engine failures into 422 BUSINESS_RULE errors. */
-export function translateDomainError(err: unknown): never {
+/**
+ * Converts domain engine failures into 422s: generation / pricing rules → BUSINESS_RULE; a MoneyError (e.g. a stored PERCENT PLC with
+ * more than 2 decimals, which the contract now refuses but older rows may hold) → INVALID_AMOUNT naming the rate card, never a 500.
+ */
+export function translateDomainError(err: unknown, context?: { rateCardId?: string | null }): never {
   if (err instanceof FlatGenerationError) throw ApiError.rule(err.message, err.code, err.details);
   if (err instanceof PricingError) throw ApiError.rule(err.message, err.code);
+  if (err instanceof MoneyError) {
+    const card = context?.rateCardId ?? null;
+    const message = card
+      ? `Rate card ${card} cannot price this flat: ${err.message}. Correct the PLC rule value (at most 2 decimals) and retry.`
+      : err.message;
+    throw new ApiError(422, "INVALID_AMOUNT", message, {
+      issues: [{ path: card ? "plc_rules" : "", message: err.message, code: "money" }],
+      ...(card ? { rate_card_id: card } : {}),
+    });
+  }
   throw err;
 }
 
@@ -497,7 +511,7 @@ export function priceWith(
     });
     return { price, rateCardId: usesCard ? rateCard.id : null };
   } catch (e) {
-    translateDomainError(e);
+    translateDomainError(e, { rateCardId: rateCard?.id ?? null });
   }
 }
 
@@ -662,6 +676,15 @@ export async function repriceFlats(
     eq(flats.projectId, where.projectId),
     where.blockId ? eq(flats.blockId, where.blockId) : undefined,
   ].filter((c): c is NonNullable<typeof c> => c !== undefined);
+  // Lock every flat this may re-price, in id order (the order bulk edit and bulk status use), before reading statuses: a booking
+  // that locked a flat first commits BOOKED and this read then sees it (READ COMMITTED re-reads after the lock wait).
+  if (!dryRun)
+    await tx
+      .select({ id: flats.id })
+      .from(flats)
+      .where(and(...conditions, eq(flats.status, "AVAILABLE")))
+      .orderBy(asc(flats.id))
+      .for("update");
   const rows = await tx
     .select({
       id: flats.id,
@@ -727,28 +750,46 @@ export async function repriceFlats(
       },
     });
   }
-  if (!dryRun && updates.length > 0) await applyPriceUpdates(tx, updates, card.id);
+  if (dryRun || updates.length === 0)
+    return {
+      repriced: updates.length,
+      skipped_not_available: skippedNotAvailable,
+      skipped_no_rate: skippedNoRate,
+      changes,
+    };
+  // the UPDATE re-checks AVAILABLE itself, so a flat that left AVAILABLE in between is never re-priced
+  const written = new Set(await applyPriceUpdates(tx, updates, card.id, ["AVAILABLE"]));
+  const kept = changes.filter((c) => written.has(c.id));
   return {
-    repriced: updates.length,
-    skipped_not_available: skippedNotAvailable,
+    repriced: kept.length,
+    skipped_not_available: skippedNotAvailable + (changes.length - kept.length),
     skipped_no_rate: skippedNoRate,
-    changes,
+    changes: kept,
   };
 }
 
-/** Applies many price updates in one statement (version bumped per flat). */
+/**
+ * Applies many price updates in one statement (version bumped per flat) to the flats whose status is still one of `statuses`
+ * (BOOKED/SOLD are never re-priced: the booking engine owns their price). Returns the ids actually updated.
+ */
 export async function applyPriceUpdates(
   tx: Executor,
   updates: readonly { id: string; price: number; rate: number | null; breakup: PriceBreakupLine[] }[],
   rateCardId: string | null,
-): Promise<void> {
-  if (updates.length === 0) return;
+  statuses: readonly ("AVAILABLE" | "HOLD" | "BLOCKED")[] = ["AVAILABLE"],
+): Promise<string[]> {
+  if (updates.length === 0 || statuses.length === 0) return [];
   const payload = JSON.stringify(updates.map((u) => ({ id: u.id, price: u.price, rate: u.rate, breakup: u.breakup })));
-  await tx.execute(sql`
+  const rows = await tx.execute<{ id: string }>(sql`
     update flats f
        set price_paise = x.price, rate_per_sqft_paise = x.rate, price_breakup = x.breakup, rate_card_id = ${rateCardId}::uuid, version = f.version + 1
       from jsonb_to_recordset(${payload}::jsonb) as x(id uuid, price bigint, rate bigint, breakup jsonb)
-     where f.id = x.id`);
+     where f.id = x.id and f.status::text in (${sql.join(
+       statuses.map((st) => sql`${st}`),
+       sql`, `,
+     )})
+    returning f.id`);
+  return rows.map((r) => r.id);
 }
 
 /** Positions across the widest floor of a block (for the grid). */

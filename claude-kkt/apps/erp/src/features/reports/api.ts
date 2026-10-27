@@ -87,6 +87,7 @@ export function createPreset(body: ReportPresetCreate): Promise<ReportPresetRow>
   return api.post<ReportPresetRow>(PRESETS_PATH, body);
 }
 
-export function deletePreset(id: string): Promise<void> {
-  return api.delete(`${PRESETS_PATH}/${id}`);
+/** DELETE needs the preset's version (If-Match "v<n>", contract C6). */
+export function deletePreset(id: string, version: number): Promise<void> {
+  return api.delete(`${PRESETS_PATH}/${id}`, { version });
 }

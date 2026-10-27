@@ -31,7 +31,7 @@ export {
   isFloorPlanDocument,
   type PublishedProject,
 } from "./publicContent.js";
-export { signVisitorToken, verifyVisitorToken, FORM_RATE_LIMIT } from "./publicForms.js";
+export { signVisitorToken, parseVisitorToken, lookupVisitor, FORM_RATE_LIMIT } from "./publicForms.js";
 export { availabilityCachePath } from "./publicVisits.js";
 export {
   ensureVisitSettings,
@@ -73,7 +73,11 @@ export {
   documentUrls,
   isPublicDocument,
   fakeNumber,
-  PUBLIC_CACHE_CONTROL,
+  CATALOG_CACHE_POLICY,
+  CMS_CACHE_POLICY,
+  AVAILABILITY_CACHE_POLICY,
+  publicCompany,
+  revalidateWebsite,
   PUBLIC_CACHE_VERSION_KEY,
   IMMUTABLE_CACHE_CONTROL,
 } from "./shared.js";

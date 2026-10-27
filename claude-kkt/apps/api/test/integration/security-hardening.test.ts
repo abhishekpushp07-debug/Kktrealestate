@@ -742,14 +742,18 @@ describe("customer privacy and integrity", () => {
     });
     expect(denied.status).toBe(403);
     expect(denied.body.error.code).toBe("SUPER_ADMIN_ONLY");
+    const erase = await t.request<{ full_name: string; anonymised: { co_applicants: number } }>(
+      "POST",
+      `/api/v1/customers/${c.id}/erase`,
+      { token: admin, body: { confirm: "ERASE", reason: "Customer request under DPDP" } },
+    );
+    expect(erase.status).toBe(200);
+    expect(erase.body.anonymised.co_applicants).toBe(1); // AdminCustomerEraseResponse: the alias delegates to the admin erasure
     const erased = await t.request<{
       full_name: string;
       erased_at: string;
       co_applicants: { full_name: string; phone: string | null; pan_masked: string | null }[];
-    }>("POST", `/api/v1/customers/${c.id}/erase`, {
-      token: admin,
-      body: { confirm: "ERASE", reason: "Customer request under DPDP" },
-    });
+    }>("GET", `/api/v1/customers/${c.id}`, { token: admin });
     expect(erased.status).toBe(200);
     expect(erased.body.full_name).toMatch(/^Erased customer /);
     expect(erased.body.co_applicants).toEqual([
