@@ -2782,6 +2782,18 @@
       "description": "Hot audit window; older rows move to audit_logs_archive monthly",
       "title": "Audit Retention Months"
      },
+     "authorised_signatory_designation": {
+      "anyOf": [
+       {
+        "maxLength": 120,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorised Signatory Designation"
+     },
      "authorised_signatory_name": {
       "anyOf": [
        {
@@ -2914,6 +2926,18 @@
       ],
       "title": "Letterhead Email"
      },
+     "letterhead_footer_note": {
+      "anyOf": [
+       {
+        "maxLength": 300,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Letterhead Footer Note"
+     },
      "letterhead_phone": {
       "anyOf": [
        {
@@ -2937,6 +2961,18 @@
        }
       ],
       "title": "Letterhead Tagline"
+     },
+     "logo_file_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "File id from the upload pipeline; its 320px WebP variant prints on every PDF",
+      "title": "Logo File Id"
      },
      "logo_url": {
       "anyOf": [
@@ -11167,6 +11203,22 @@
     "title": "VisitsOutPage",
     "type": "object"
    },
+   "VoidDocIn": {
+    "additionalProperties": false,
+    "properties": {
+     "reason": {
+      "maxLength": 300,
+      "minLength": 3,
+      "title": "Reason",
+      "type": "string"
+     }
+    },
+    "required": [
+     "reason"
+    ],
+    "title": "VoidDocIn",
+    "type": "object"
+   },
    "VoidIn": {
     "additionalProperties": false,
     "properties": {
@@ -19155,6 +19207,18 @@
        "title": "Customer Id",
        "type": "string"
       }
+     },
+     {
+      "description": "Tiles/ledgers/bookings_count exclude Cancelled bookings by default (refunds/forfeiture shown separately)",
+      "in": "query",
+      "name": "include_cancelled",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Tiles/ledgers/bookings_count exclude Cancelled bookings by default (refunds/forfeiture shown separately)",
+       "title": "Include Cancelled",
+       "type": "boolean"
+      }
      }
     ],
     "responses": {
@@ -20641,6 +20705,22 @@
      },
      {
       "in": "query",
+      "name": "voided",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Voided"
+      }
+     },
+     {
+      "in": "query",
       "name": "q",
       "required": false,
       "schema": {
@@ -20747,6 +20827,7 @@
   },
   "/api/docgen/shared/{token}": {
    "get": {
+    "description": "Signed link: `{doc_id}.{exp}.{nonce}.{hmac}` \u2014 tampered \u2192 401 LINK_INVALID, expired \u2192 410 LINK_EXPIRED (checked in that order).",
     "operationId": "shared_api_docgen_shared__token__get",
     "parameters": [
      {
@@ -20959,6 +21040,62 @@
      }
     ],
     "summary": "Share",
+    "tags": [
+     "documents"
+    ]
+   }
+  },
+  "/api/docgen/{doc_id}/void": {
+   "post": {
+    "description": "Audited void: the document stays in the register (flagged Voided, share links revoked) but leaves KPIs.",
+    "operationId": "void_document_api_docgen__doc_id__void_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "doc_id",
+      "required": true,
+      "schema": {
+       "title": "Doc Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/VoidDocIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Void Document",
     "tags": [
      "documents"
     ]
@@ -21553,6 +21690,49 @@
      }
     ],
     "summary": "Delete File",
+    "tags": [
+     "files"
+    ]
+   },
+   "get": {
+    "operationId": "file_meta_api_files__file_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "file_id",
+      "required": true,
+      "schema": {
+       "title": "File Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "File Meta",
     "tags": [
      "files"
     ]
@@ -39707,6 +39887,42 @@
       }
      },
      {
+      "description": "Receipt date \u2265 (YYYY-MM-DD); same name as the Demand Register",
+      "in": "query",
+      "name": "date_from",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Receipt date \u2265 (YYYY-MM-DD); same name as the Demand Register",
+       "title": "Date From"
+      }
+     },
+     {
+      "description": "Receipt date \u2264 (YYYY-MM-DD)",
+      "in": "query",
+      "name": "date_to",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Receipt date \u2264 (YYYY-MM-DD)",
+       "title": "Date To"
+      }
+     },
+     {
       "in": "query",
       "name": "project_id",
       "required": false,
@@ -40221,6 +40437,42 @@
       }
      },
      {
+      "description": "Demand raised date \u2265 (YYYY-MM-DD); same name as the Demand Register",
+      "in": "query",
+      "name": "date_from",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Demand raised date \u2265 (YYYY-MM-DD); same name as the Demand Register",
+       "title": "Date From"
+      }
+     },
+     {
+      "description": "Demand raised date \u2264 (YYYY-MM-DD)",
+      "in": "query",
+      "name": "date_to",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Demand raised date \u2264 (YYYY-MM-DD)",
+       "title": "Date To"
+      }
+     },
+     {
       "in": "query",
       "name": "format",
       "required": false,
@@ -40302,6 +40554,42 @@
         }
        ],
        "title": "Block Id"
+      }
+     },
+     {
+      "description": "Demand raised date \u2265 (YYYY-MM-DD); same name as the Demand Register",
+      "in": "query",
+      "name": "date_from",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Demand raised date \u2265 (YYYY-MM-DD); same name as the Demand Register",
+       "title": "Date From"
+      }
+     },
+     {
+      "description": "Demand raised date \u2264 (YYYY-MM-DD)",
+      "in": "query",
+      "name": "date_to",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Demand raised date \u2264 (YYYY-MM-DD)",
+       "title": "Date To"
       }
      },
      {
@@ -40914,6 +41202,42 @@
        "default": "customer",
        "title": "Group By",
        "type": "string"
+      }
+     },
+     {
+      "description": "Accepted for parity with the Demand Register; a point-in-time report ignores it",
+      "in": "query",
+      "name": "date_from",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Accepted for parity with the Demand Register; a point-in-time report ignores it",
+       "title": "Date From"
+      }
+     },
+     {
+      "description": "As-of date for ageing (YYYY-MM-DD); default today",
+      "in": "query",
+      "name": "date_to",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "As-of date for ageing (YYYY-MM-DD); default today",
+       "title": "Date To"
       }
      },
      {
@@ -43409,6 +43733,7 @@
   },
   "/api/settings/company": {
    "get": {
+    "description": "Letterhead fields (name, address, GSTIN, RERA, logo_file_id, signatory, footer note) feed every generated PDF.",
     "operationId": "get_company_api_settings_company_get",
     "responses": {
      "200": {
