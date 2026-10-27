@@ -13,7 +13,7 @@ REGISTRY = {
         "project": ("Projects", ["view", "create", "edit"]), "tower": ("Towers / blocks", ["create", "edit"]), "flat": ("Flats & parking", ["view", "create", "edit"]),
         "floor_plan": ("Floor plans", ["view", "create", "edit", "delete"]), "rate_card": ("Rate cards", ["view", "create", "edit", "apply"]), "plc": ("PLC types", ["view", "create", "edit", "delete"]),
         "payment_plan": ("Payment plans", ["view", "create", "edit", "delete", "assign"]), "construction_stage": ("Construction stages", ["view", "create", "edit", "delete"]), "stage_plan": ("Construction stage plans", ["view", "create", "edit", "delete"]), "charge_type": ("Charge types", ["view", "create", "edit", "delete"]),
-        "bank_account": ("Bank accounts", ["view", "create", "edit", "delete"]), "catalogue": ("Catalogues", ["view", "create", "edit"]),
+        "bank_account": ("Bank accounts", ["view", "create", "edit", "delete"]), "catalogue": ("Catalogues", ["view", "create", "edit"]), "company": ("Company & letterhead", ["view", "edit"]),
         "flat_type": ("Flat / room / area types", ["view", "create", "edit", "delete"]), "block_type": ("Block types", ["view", "create", "edit", "delete"]), "specification": ("Specifications", ["view", "create", "edit", "delete"]), "amenity": ("Amenities", ["view", "create", "edit", "delete"]), "payment_mode": ("Payment modes", ["view", "create", "edit", "delete"]), "document_type": ("Document types", ["view", "create", "edit", "delete"]),
         "allocation_category": ("Allocation categories", ["view", "create", "edit", "delete"]), "hold_reason": ("Hold reasons", ["view", "create", "edit", "delete"])}),
     "sales": ("Sales & CRM", {

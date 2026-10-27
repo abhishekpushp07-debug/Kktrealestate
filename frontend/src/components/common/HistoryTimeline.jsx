@@ -52,12 +52,13 @@ export function HistoryTimeline({ entityType, entityId }) {
   );
 }
 
-export function HistoryButton({ entityType, entityId, label }) {
+export function HistoryButton({ entityType, entityId, label, compact = false, testId = "history-button" }) {
   const [open, setOpen] = useState(false);
   if (!entityId) return null;
   return (
     <>
-      <Button variant="outline" size="sm" onClick={() => setOpen(true)} data-testid="history-button"><History className="mr-1.5 h-4 w-4" />History</Button>
+      {compact ? <button type="button" onClick={() => setOpen(true)} className="btn btn-ghost btn-sm" title="History" data-testid={testId}><History className="h-3.5 w-3.5" /></button>
+        : <Button variant="outline" size="sm" onClick={() => setOpen(true)} data-testid={testId}><History className="mr-1.5 h-4 w-4" />History</Button>}
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent className="w-full overflow-y-auto sm:max-w-xl" data-testid="history-sheet">
           <SheetHeader><SheetTitle className="flex items-center justify-between gap-2"><span>History{label ? ` · ${label}` : ""}</span><Link to={`/admin/audit-logs?record=${entityId}`} className="inline-flex items-center gap-1 text-xs font-normal text-txt-secondary hover:text-ink-950" data-testid="history-open-central">Audit logs <ExternalLink className="h-3 w-3" /></Link></SheetTitle></SheetHeader>

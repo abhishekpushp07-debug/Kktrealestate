@@ -49,7 +49,12 @@ def test_documents_generate_register_share_sent_and_deterministic(admin_headers)
     assert sh["expires_in_sec"] == 900
     anon = requests.get(f"{BASE}{sh['url']}")
     assert anon.status_code == 200 and anon.content.startswith(b"%PDF")
-    assert requests.get(f"{BASE}/api/docgen/shared/not-a-token").status_code == 410
+    assert requests.get(f"{BASE}/api/docgen/shared/not-a-token").status_code == 401  # tampered / malformed → LINK_INVALID
+    tok = sh["url"].rsplit("/", 1)[1]
+    did, exp, nonce, sig = tok.split(".")
+    bad = requests.get(f"{BASE}/api/docgen/shared/{did}.{exp}.{nonce}.{'0' * len(sig)}")
+    assert bad.status_code == 401 and bad.json()["code"] == "LINK_INVALID"
+    assert requests.get(f"{BASE}/api/docgen/shared/{did}.{int(exp) + 1}.{nonce}.{sig}").status_code == 401
     st = requests.post(f"{BASE}/api/docgen/{doc['id']}/sent", json={"channel": "whatsapp", "note": "sent"}, headers=admin_headers)
     assert st.status_code == 200 and st.json()["sent"]["channel"] == "whatsapp"
     assert requests.post(f"{BASE}/api/docgen/{doc['id']}/sent", json={"channel": "pigeon"}, headers=admin_headers).status_code == 422
@@ -90,7 +95,8 @@ def test_demand_register_grouping_ties_out_to_ledger_udhar(admin_headers):
             assert p["totals"]["total_paise"] == sum(t["totals"]["total_paise"] for t in p["towers"])
         assert all((x["due_date"] if d["basis"] == "due" else x["demand_date"]) == g["date"] for p in g["projects"] for t in p["towers"] for x in t["rows"])
     # vs ledger: Σ DEMAND Udhar rows across bookings == Σ register total (non-void, same company)
-    led = sum(e["amount_paise"] for e in mongo.ledger_entries.find({"type": "DEMAND"}, {"amount_paise": 1}))
+    live_ids = [b["id"] for b in mongo.bookings.find({"status": {"$in": ["Active", "Completed"]}}, {"id": 1})]
+    led = sum(e["amount_paise"] for e in mongo.ledger_entries.find({"type": "DEMAND", "booking_id": {"$in": live_ids}}, {"amount_paise": 1}))
     assert led == d["totals"]["total_paise"], (led, d["totals"]["total_paise"])
     assert requests.get(f"{BASE}/api/demands/register", params={"basis": "raised"}, headers={**admin_headers, "If-None-Match": r.headers["ETag"]}).status_code == 304
     due = requests.get(f"{BASE}/api/demands/register", params={"basis": "due", "per_group": 500}, headers=admin_headers).json()

@@ -6,7 +6,7 @@ from pydantic import Field
 
 from crypto import decrypt_field, encrypt_field, mask
 from db import db
-from deps import get_current_user, require
+from deps import require_any, get_current_user, require
 from utils import (
     ApiError,
     StrictModel,
@@ -52,6 +52,9 @@ class CompanyUpdate(StrictModel):
     letterhead_tagline: str | None = Field(default=None, max_length=200)
     letterhead_phone: str | None = Field(default=None, max_length=40)
     letterhead_email: str | None = Field(default=None, max_length=120)
+    letterhead_footer_note: str | None = Field(default=None, max_length=300)
+    authorised_signatory_designation: str | None = Field(default=None, max_length=120)
+    logo_file_id: str | None = Field(default=None, description="File id from the upload pipeline; its 320px WebP variant prints on every PDF")
     default_gst_percent: float | None = Field(default=None, ge=0, le=28)
     mfa_required_for_admin_roles: bool | None = None
     accent: Literal["gold", "teal"] | None = None
@@ -89,17 +92,18 @@ def present(company: dict) -> dict:
 
 @router.get("/company")
 async def get_company(user: dict = Depends(get_current_user)):
+    """Letterhead fields (name, address, GSTIN, RERA, logo_file_id, signatory, footer note) feed every generated PDF."""
     company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0})
     if not company:
         raise ApiError(404, "Company not found", "NOT_FOUND")
     out = present(company)
-    if "admin.settings.view" not in user["permissions"]:
+    if "admin.settings.view" not in user["permissions"] and "masters.company.view" not in user["permissions"] and "*" not in user["permissions"]:
         out = {k: out[k] for k in ("id", "name", "brand", "legal_name", "logo_url", "financial_year_start_month", "accent") if k in out}
     return out
 
 
 @router.patch("/company")
-async def update_company(body: CompanyUpdate, request: Request, user: dict = Depends(require("admin.settings.edit"))):
+async def update_company(body: CompanyUpdate, request: Request, user: dict = Depends(require_any("admin.settings.edit", "masters.company.edit"))):
     before = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0})
     changes = body.model_dump(exclude_unset=True)
     changes.pop("version", None)

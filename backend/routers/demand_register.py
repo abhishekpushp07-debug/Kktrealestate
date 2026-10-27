@@ -7,13 +7,15 @@ from pydantic import Field
 
 from db import db
 from deps import ensure_project_access, project_scope_filter, require
-from services import ttlcache
+from services import definitions, ttlcache
 from services.ledger import rebuild
+from services.ledgers import booking_ledgers
 from services.numbering import generate_number
 from utils import ApiError, StrictModel, base_doc, client_ip, now_iso, write_audit
 
 router = APIRouter(prefix="/demands", tags=["demands"])
-STATUSES = ("Open", "Partially Paid", "Paid", "Overdue", "Voided")
+STATUSES = ("Open", "Partially Paid", "Paid", "Overdue", "Voided", "Cancelled")
+CLOSED = ["Voided", "Cancelled"]  # closed by void or by booking cancellation — never in totals/KPIs
 SOURCES = {"plan_stage": "Auto: plan × stage", "on_booking": "Auto: on booking", "manual": "Manual", "other_charge": "Other charge", "bounce": "Bounce charge"}
 
 
@@ -30,6 +32,8 @@ def _source(d: dict) -> str:
 def _status(d: dict, today: str) -> str:
     if d.get("voided") or d.get("status") == "Voided":
         return "Voided"
+    if d.get("status") == "Cancelled":
+        return "Cancelled"
     if d.get("status") == "Paid":
         return "Paid"
     if d["due_date"] < today:
@@ -38,7 +42,7 @@ def _status(d: dict, today: str) -> str:
 
 
 def _age_band(d: dict, today: str) -> str | None:
-    if d.get("status") == "Paid" or d.get("voided") or d["due_date"] >= today:
+    if d.get("status") in ("Paid", "Cancelled") or d.get("voided") or d["due_date"] >= today:
         return None
     days = (date.fromisoformat(today) - date.fromisoformat(d["due_date"])).days
     return "0-30" if days <= 30 else "31-60" if days <= 60 else "61-90" if days <= 90 else "90+"
@@ -54,8 +58,8 @@ def _row(d: dict, today: str) -> dict:
     paid = d.get("paid_paise") or 0
     return {"id": d["id"], "demand_number": d["demand_number"], "demand_date": d["demand_date"], "due_date": d["due_date"], "customer_id": d.get("customer_id"), "customer_name": d.get("customer_name"), "booking_id": d["booking_id"], "booking_number": d.get("booking_number"), "flat_number": d.get("flat_number"),
             "project_id": d.get("project_id"), "project_name": d.get("project_name"), "block_id": d.get("block_id"), "block_name": d.get("block_name"), "why": _why(d), "installment_name": d.get("installment_name"), "percent": d.get("percent"), "stage": d.get("milestone_name"),
-            "cash_paise": d.get("cash_demand_paise") or 0, "account_paise": d.get("account_demand_paise") or 0, "other_paise": other, "total_paise": d.get("total_demand_paise") or 0, "paid_paise": paid, "balance_paise": 0 if d.get("voided") else max((d.get("total_demand_paise") or 0) - paid, 0),
-            "status": _status(d, today), "age_band": _age_band(d, today), "source": _source(d), "source_label": SOURCES.get(_source(d)), "voided": bool(d.get("voided")), "void_reason": d.get("void_reason"), "reminder_sent_at": d.get("reminder_sent_at")}
+            "cash_paise": d.get("cash_demand_paise") or 0, "account_paise": d.get("account_demand_paise") or 0, "other_paise": other, "total_paise": d.get("total_demand_paise") or 0, "paid_paise": paid, "balance_paise": 0 if (d.get("voided") or d.get("status") == "Cancelled") else max((d.get("total_demand_paise") or 0) - paid, 0),
+            "status": _status(d, today), "age_band": _age_band(d, today), "source": _source(d), "source_label": SOURCES.get(_source(d)), "voided": bool(d.get("voided")) or d.get("status") == "Cancelled", "void_reason": d.get("void_reason"), "reminder_sent_at": d.get("reminder_sent_at")}
 
 
 def _tot(rows: list[dict]) -> dict:
@@ -63,11 +67,30 @@ def _tot(rows: list[dict]) -> dict:
     return {"count": len(rows), "cash_paise": sum(r["cash_paise"] for r in live), "account_paise": sum(r["account_paise"] for r in live), "other_paise": sum(r["other_paise"] for r in live), "total_paise": sum(r["total_paise"] for r in live), "paid_paise": sum(r["paid_paise"] for r in live), "balance_paise": sum(r["balance_paise"] for r in live)}
 
 
+async def _dead_booking_ids(company_id: str) -> list[str]:
+    """Bookings that are not live (Cancelled / transferred-away): their demands never count — even Paid ones belong to the cancellation record."""
+    key = f"dreg-dead:{company_id}"
+    hit = ttlcache.get(key)
+    if hit is not None:
+        return hit
+    ids = [b["id"] for b in await db.bookings.find({"company_id": company_id, "status": {"$nin": definitions.LIVE_BOOKING_STATUSES}}, {"_id": 0, "id": 1}).to_list(None)]
+    ttlcache.put(key, ids, 30)
+    return ids
+
+
+async def _live_only(q: dict, company_id: str) -> dict:
+    dead = await _dead_booking_ids(company_id)
+    if dead:
+        q["booking_id"] = {"$nin": dead}
+    return q
+
+
 def _filter(user, project_id, block_id, stage, plan, status, source, customer, basis, date_from, date_to, bucket, include_void):
     today = now_iso()[:10]
     q: dict = {"company_id": user["company_id"], **project_scope_filter(user)}
-    if not include_void and status != "Voided":
+    if not include_void and status not in ("Voided", "Cancelled"):
         q["voided"] = {"$ne": True}
+        q["status"] = {"$nin": CLOSED}
     for k, v in (("project_id", project_id), ("block_id", block_id), ("milestone_name", stage), ("plan_name", plan)):
         if v:
             q[k] = v
@@ -77,13 +100,15 @@ def _filter(user, project_id, block_id, stage, plan, status, source, customer, b
     if status == "Paid":
         q["status"] = "Paid"
     elif status == "Overdue":
-        q.update({"status": {"$ne": "Paid"}, "due_date": {"$lt": today, **(q.get("due_date") or {})}})
+        q.update({"status": {"$in": definitions.OPEN_DEMAND_STATUSES}, "due_date": {"$lt": today, **(q.get("due_date") or {})}})
     elif status == "Open":
-        q.update({"status": {"$ne": "Paid"}, "paid_paise": {"$in": [0, None]}, "due_date": {"$gte": today, **(q.get("due_date") or {})}})
+        q.update({"status": {"$in": definitions.OPEN_DEMAND_STATUSES}, "paid_paise": {"$in": [0, None]}, "due_date": {"$gte": today, **(q.get("due_date") or {})}})
     elif status == "Partially Paid":
-        q.update({"status": {"$ne": "Paid"}, "paid_paise": {"$gt": 0}, "due_date": {"$gte": today, **(q.get("due_date") or {})}})
+        q.update({"status": {"$in": definitions.OPEN_DEMAND_STATUSES}, "paid_paise": {"$gt": 0}, "due_date": {"$gte": today, **(q.get("due_date") or {})}})
     elif status == "Voided":
         q["voided"] = True
+    elif status == "Cancelled":
+        q["status"] = "Cancelled"
     if bucket in ("cash", "account"):
         q[f"{bucket}_demand_paise"] = {"$gt": 0}
     if customer:
@@ -117,6 +142,8 @@ async def register(request: Request, basis: str = "raised", date_from: str | Non
     if basis not in ("raised", "due"):
         raise ApiError(400, "basis must be raised | due", "UNKNOWN_PARAM")
     q, field, today = _filter(user, project_id, block_id, stage, plan, status, source, customer, basis, date_from, date_to, bucket, include_void)
+    if not include_void:
+        await _live_only(q, user["company_id"])
     key = f"dreg:{user['company_id']}:{hash(repr(sorted(q.items(), key=str)))}:{per_group}:{source}:{int(bool(user.get('project_scope')))}"
 
     async def compute():
@@ -164,7 +191,8 @@ async def calendar(month: str, basis: str = "raised", project_id: str | None = N
     field = "due_date" if basis == "due" else "demand_date"
     y, m = int(month[:4]), int(month[5:7])
     start, end = date(y, m, 1).isoformat(), (date(y + (m == 12), (m % 12) + 1, 1) - timedelta(days=1)).isoformat()
-    q = {"company_id": user["company_id"], **project_scope_filter(user), "voided": {"$ne": True}, field: {"$gte": start, "$lte": end}, **({"project_id": project_id} if project_id else {}), **({"block_id": block_id} if block_id else {})}
+    q = {"company_id": user["company_id"], **project_scope_filter(user), "voided": {"$ne": True}, "status": {"$nin": CLOSED}, field: {"$gte": start, "$lte": end}, **({"project_id": project_id} if project_id else {}), **({"block_id": block_id} if block_id else {})}
+    await _live_only(q, user["company_id"])
     rows = await db.demands.aggregate([{"$match": q}, {"$group": {"_id": f"${field}", "n": {"$sum": 1}, "total_paise": {"$sum": "$total_demand_paise"}, "paid_paise": {"$sum": {"$ifNull": ["$paid_paise", 0]}}}}, {"$sort": {"_id": 1}}]).to_list(None)
     return {"month": month, "basis": basis, "days": [{"date": r["_id"], "count": r["n"], "total_paise": r["total_paise"], "paid_paise": r["paid_paise"]} for r in rows], "max_paise": max([r["total_paise"] for r in rows] or [0])}
 
@@ -172,20 +200,23 @@ async def calendar(month: str, basis: str = "raised", project_id: str | None = N
 @router.get("/kpis")
 async def kpis(project_id: str | None = None, block_id: str | None = None, user: dict = Depends(require("demands.register.view"))):
     today = now_iso()[:10]
-    base = {"company_id": user["company_id"], **project_scope_filter(user), "voided": {"$ne": True}, **({"project_id": project_id} if project_id else {}), **({"block_id": block_id} if block_id else {})}
+    base = {"company_id": user["company_id"], **project_scope_filter(user), "voided": {"$ne": True}, "status": {"$nin": CLOSED}, **({"project_id": project_id} if project_id else {}), **({"block_id": block_id} if block_id else {})}
+    # Overdue ₹ is THE definitions number: ageing bands of live bookings' outstanding (same function the Outstanding report uses)
+    bands, _ = await definitions.ageing_for_bookings(definitions.live_bookings_match({"company_id": user["company_id"], **project_scope_filter(user), **({"project_id": project_id} if project_id else {}), **({"block_id": block_id} if block_id else {})}))
+    overdue_paise = definitions.overdue_of(bands)
+    overdue_n = await db.demands.count_documents(definitions.overdue_demands_match(extra=base))
+    await _live_only(base, user["company_id"])
     wk_end = (date.fromisoformat(today) + timedelta(days=7)).isoformat()
     agg = await db.demands.aggregate([{"$match": base}, {"$group": {"_id": None,
         "raised_today": {"$sum": {"$cond": [{"$eq": ["$demand_date", today]}, "$total_demand_paise", 0]}}, "raised_today_n": {"$sum": {"$cond": [{"$eq": ["$demand_date", today]}, 1, 0]}},
         "raised_month": {"$sum": {"$cond": [{"$eq": [{"$substr": ["$demand_date", 0, 7]}, today[:7]]}, "$total_demand_paise", 0]}}, "raised_month_n": {"$sum": {"$cond": [{"$eq": [{"$substr": ["$demand_date", 0, 7]}, today[:7]]}, 1, 0]}},
         "due_week": {"$sum": {"$cond": [{"$and": [{"$gte": ["$due_date", today]}, {"$lte": ["$due_date", wk_end]}, {"$ne": ["$status", "Paid"]}]}, {"$subtract": ["$total_demand_paise", {"$ifNull": ["$paid_paise", 0]}]}, 0]}},
         "due_week_n": {"$sum": {"$cond": [{"$and": [{"$gte": ["$due_date", today]}, {"$lte": ["$due_date", wk_end]}, {"$ne": ["$status", "Paid"]}]}, 1, 0]}},
-        "overdue": {"$sum": {"$cond": [{"$and": [{"$lt": ["$due_date", today]}, {"$ne": ["$status", "Paid"]}]}, {"$subtract": ["$total_demand_paise", {"$ifNull": ["$paid_paise", 0]}]}, 0]}},
-        "overdue_n": {"$sum": {"$cond": [{"$and": [{"$lt": ["$due_date", today]}, {"$ne": ["$status", "Paid"]}]}, 1, 0]}},
         "raised_all": {"$sum": "$total_demand_paise"}, "paid_all": {"$sum": {"$ifNull": ["$paid_paise", 0]}}}}]).to_list(1)
     a = agg[0] if agg else {}
     g = lambda k: a.get(k, 0)  # noqa: E731
     return {"raised_today_paise": g("raised_today"), "raised_today_count": g("raised_today_n"), "raised_month_paise": g("raised_month"), "raised_month_count": g("raised_month_n"), "due_week_paise": g("due_week"), "due_week_count": g("due_week_n"),
-            "overdue_paise": g("overdue"), "overdue_count": g("overdue_n"), "collection_pct": round(100 * g("paid_all") / g("raised_all"), 1) if g("raised_all") else None, "as_of": today}
+            "overdue_paise": overdue_paise, "overdue_count": overdue_n, "overdue_basis": "definitions.ageing_for_bookings (== Outstanding report)", "collection_pct": round(100 * g("paid_all") / g("raised_all"), 1) if g("raised_all") else None, "as_of": today}
 
 
 class ManualDemandIn(StrictModel):
@@ -208,7 +239,7 @@ async def manual_demand(body: ManualDemandIn, request: Request, user: dict = Dep
         raise ApiError(404, "Booking not found", "NOT_FOUND")
     ensure_project_access(user, b["project_id"])
     if b["status"] != "Active":
-        raise ApiError(409, f"Booking is {b['status']} — demands can only be raised on Active bookings", "BOOKING_NOT_ACTIVE")
+        raise ApiError(422, f"Booking is {b['status']} — demands can only be raised on Active bookings", "BOOKING_NOT_ACTIVE")
     cash, acct = round(body.cash_amount * 100), round(body.account_amount * 100)
     if cash + acct <= 0:
         raise ApiError(422, "Amount must be greater than zero", "VALIDATION_ERROR")
@@ -227,11 +258,12 @@ async def manual_demand(body: ManualDemandIn, request: Request, user: dict = Dep
     seqs = [d.get("installment_seq") or 0 for d in prev]
     cum = max([d.get("cumulative_percent") or 0 for d in prev] or [0])  # manual demands add Udhar by amount; they do not move the plan's % orders
     d = {**base_doc(user, user["company_id"]), "booking_id": b["id"], "customer_id": b["customer_id"], "customer_name": b.get("customer_name"), "booking_number": b["booking_number"], "project_id": b["project_id"], "block_id": b.get("block_id"), "flat_id": b.get("flat_id"), "flat_number": (b.get("flat_snapshot") or {}).get("flat_number"), "project_name": b.get("project_name"), "block_name": b.get("block_name"),
-         "demand_number": await generate_number("demand", co, date.fromisoformat(dd)), "installment_seq": max(seqs or [0]) + 100, "installment_name": body.name, "milestone_name": body.name, "trigger": SOURCES[body.kind], "trigger_type": "MANUAL", "percent": None, "cumulative_percent": cum, "source": body.kind, "note": body.note,
+         "demand_number": await generate_number("demand", co, date.fromisoformat(dd)), "installment_seq": max(seqs or [0]) + 100, "milestone_seq": max(seqs or [0]) + 100, "installment_name": body.name, "milestone_name": body.name, "trigger": SOURCES[body.kind], "trigger_type": "MANUAL", "percent": None, "cumulative_percent": cum, "source": body.kind, "note": body.note,
          "cash_demand_paise": cash, "account_demand_paise": acct, "total_demand_paise": cash + acct, "demand_date": dd, "due_date": body.due_date, "status": "Open", "paid_paise": 0, "voided": False, "posted_at": now_iso()}
     await db.demands.insert_one(d)
     d.pop("_id", None)
     await rebuild(b["id"])
+    await write_audit(user, "demand.create", "demand", d["id"], after={"demand_number": d["demand_number"], "total_paise": d["total_demand_paise"], "kind": body.kind, "booking_number": b["booking_number"]}, ip=client_ip(request))
     await write_audit(user, "demand.create", "booking", b["id"], after={"demand_number": d["demand_number"], "total_paise": d["total_demand_paise"], "amount_paise": d["total_demand_paise"], "source": body.kind, "name": body.name, "due_date": body.due_date, "manual": True}, ip=client_ip(request))
     ttlcache.invalidate(f"dreg:{user['company_id']}")
     return {**_row(d, today), "effect": effect}
@@ -252,12 +284,18 @@ async def void_demand(demand_id: str, body: VoidIn, request: Request, user: dict
     if (d.get("paid_paise") or 0) > 0:
         raise ApiError(409, "Demand has receipts against it — reverse the receipts first", "HAS_PAYMENTS")
     ts = now_iso()
+    b0 = await db.bookings.find_one({"id": d["booking_id"]}, {"_id": 0})
+    udhar_before = ((await booking_ledgers(b0))["combined"]["summary"].get("total_udhar_paise", 0)) if b0 else 0
     await db.demands.update_one({"id": demand_id}, {"$set": {"voided": True, "status": "Voided", "voided_at": ts, "voided_by": user["id"], "voided_by_name": user["name"], "void_reason": body.reason, "updated_at": ts}})
     await rebuild(d["booking_id"])
-    b = await db.bookings.find_one({"id": d["booking_id"]}, {"_id": 0, "summary": 1, "booking_number": 1})
+    b = await db.bookings.find_one({"id": d["booking_id"]}, {"_id": 0})
+    L = (await booking_ledgers(b))["combined"]["summary"] if b else {}
+    delta = L.get("total_udhar_paise", 0) - udhar_before  # real ledger delta: 0 when the ledger never carried it (e.g. demand already Cancelled)
     ttlcache.invalidate(f"dreg:{user['company_id']}")
-    await write_audit(user, "demand.void", "booking", d["booking_id"], before={"demand_number": d["demand_number"], "status": d["status"], "total_paise": d["total_demand_paise"]}, after={"demand_number": d["demand_number"], "status": "Voided", "reason": body.reason, "udhar_delta_paise": -d["total_demand_paise"]}, ip=client_ip(request))
-    return {"ok": True, "demand_number": d["demand_number"], "udhar_delta_paise": -d["total_demand_paise"], "balance_after_paise": (b.get("summary") or {}).get("balance_paise"), "booking_number": b.get("booking_number")}
+    after = {"demand_number": d["demand_number"], "status": "Voided", "reason": body.reason, "udhar_delta_paise": delta, "ledger_held_it": delta != 0}
+    await write_audit(user, "demand.void", "booking", d["booking_id"], before={"demand_number": d["demand_number"], "status": d["status"], "total_paise": d["total_demand_paise"]}, after=after, ip=client_ip(request))
+    await write_audit(user, "demand.void", "demand", demand_id, before={"status": d["status"], "total_paise": d["total_demand_paise"]}, after=after, ip=client_ip(request))
+    return {"ok": True, "demand_number": d["demand_number"], "udhar_delta_paise": delta, "ledger_held_it": delta != 0, "balance_after_paise": L.get("balance_paise"), "booking_number": (b or {}).get("booking_number")}
 
 
 @router.post("/{demand_id}/unvoid")
@@ -274,5 +312,6 @@ async def reminder_sent(demand_id: str, request: Request, user: dict = Depends(r
     ts = now_iso()
     await db.demands.update_one({"id": demand_id}, {"$set": {"reminder_sent_at": ts, "reminder_sent_by": user["id"]}, "$push": {"reminders": {"at": ts, "by": user["id"], "by_name": user["name"]}}})
     ttlcache.invalidate(f"dreg:{user['company_id']}")
+    await write_audit(user, "demand.reminder_sent", "demand", d["id"], after={"demand_number": d["demand_number"]}, ip=client_ip(request))
     await write_audit(user, "demand.reminder_sent", "booking", d["booking_id"], after={"demand_number": d["demand_number"]}, ip=client_ip(request))
     return {"ok": True, "reminder_sent_at": ts}

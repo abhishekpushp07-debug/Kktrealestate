@@ -253,29 +253,38 @@ async def rm_options(user: dict = Depends(require("sales.customer.view"))):
 
 
 @router.get("/{customer_id}/panels")
-async def customer_panels(customer_id: str, user: dict = Depends(require("sales.customer.view"))):
+async def customer_panels(customer_id: str, include_cancelled: bool = Query(False, description="Tiles/ledgers/bookings_count exclude Cancelled bookings by default (refunds/forfeiture shown separately)"), user: dict = Depends(require("sales.customer.view"))):
     """Composite for Customer 360 (one round trip): communications, documents, key numbers (two-sided ledgers), next due,
     demands, receipts, generated documents, open tickets, construction of their towers."""
+    from services.definitions import LIVE_BOOKING_STATUSES
     from services.dues_engine import schedule
     from services.ledgers import customer_ledgers
     cid = user["company_id"]
     today = now_iso()[:10]
-    comms, docs, types, ledg, dems, recs, gdocs, tickets, bookings = await asyncio.gather(
+    statuses = None if include_cancelled else LIVE_BOOKING_STATUSES
+    comms, docs, types, ledg, dems, recs, gdocs, tickets, bookings, portal = await asyncio.gather(
         db.communications.find({"company_id": cid, "customer_id": customer_id}, {"_id": 0}).sort("created_at", -1).limit(8).to_list(8),
         db.documents.find({"entity_type": "customer", "entity_id": customer_id, "is_active": True}, {"_id": 0}).sort("uploaded_at", -1).to_list(200),
         db.document_types.find({"is_active": True}, {"_id": 0, "id": 1, "name": 1, "code": 1}).sort("name", 1).to_list(100),
-        customer_ledgers(customer_id, cid),
+        customer_ledgers(customer_id, cid, statuses),
         db.demands.find({"company_id": cid, "customer_id": customer_id}, {"_id": 0}).sort("demand_date", -1).to_list(300),
         db.payments.find({"company_id": cid, "customer_id": customer_id}, {"_id": 0, "id": 1, "receipt_number": 1, "payment_date": 1, "amount_paise": 1, "status": 1, "payment_mode_name": 1, "payment_category": 1, "booking_id": 1, "booking_number": 1, "against": 1}).sort("payment_date", -1).to_list(300),
         db.generated_documents.find({"company_id": cid, "customer_id": customer_id}, {"_id": 0}).sort("generated_at", -1).to_list(100),
         db.support_tickets.find({"company_id": cid, "customer_id": customer_id, "status": {"$nin": ["Closed", "Resolved"]}}, {"_id": 0, "id": 1, "ticket_number": 1, "subject": 1, "status": 1, "priority": 1, "created_at": 1, "sla_due_at": 1}).sort("created_at", -1).limit(20).to_list(20),
-        db.bookings.find({"company_id": cid, "customer_id": customer_id}, {"_id": 0, "id": 1, "booking_number": 1, "block_id": 1, "block_name": 1, "project_id": 1, "project_name": 1, "status": 1, "payment_plan_snapshot": 1, "flat_snapshot.flat_number": 1, "cash_agreed_paise": 1, "account_agreed_paise": 1, "agreement_value_paise": 1, "booking_date": 1, "milestone_template_snapshot": 1}).to_list(50))
+        db.bookings.find({"company_id": cid, "customer_id": customer_id}, {"_id": 0, "id": 1, "booking_number": 1, "block_id": 1, "block_name": 1, "project_id": 1, "project_name": 1, "status": 1, "payment_plan_snapshot": 1, "flat_snapshot.flat_number": 1, "cash_agreed_paise": 1, "account_agreed_paise": 1, "agreement_value_paise": 1, "booking_date": 1, "milestone_template_snapshot": 1}).to_list(50),
+        db.portal_accounts.find_one({"customer_id": customer_id}, {"_id": 0, "is_active": 1, "last_login_at": 1}))
     T = (ledg.get("totals") or {}).get("combined") or {}
-    live = [d for d in dems if not d.get("voided")]
+    live_bk = {b["id"] for b in bookings if statuses is None or b["status"] in statuses}
+    live = [d for d in dems if not d.get("voided") and d.get("status") != "Cancelled" and d["booking_id"] in live_bk]
     overdue = [d for d in live if d["status"] != "Paid" and d["due_date"] < today]
+    cancelled = [b for b in bookings if b["status"] == "Cancelled"]
+    refunds = await db.refunds.find({"booking_id": {"$in": [b["id"] for b in cancelled]}}, {"_id": 0, "booking_id": 1, "amount_paise": 1, "status": 1}).to_list(50) if cancelled else []
+    canc_rows = await db.bookings.find({"id": {"$in": [b["id"] for b in cancelled]}}, {"_id": 0, "id": 1, "cancellation.forfeiture_paise": 1, "cancellation.refund_paise": 1, "cancellation.received_paise": 1}).to_list(50) if cancelled else []
     oldest = max(((date.fromisoformat(today) - date.fromisoformat(d["due_date"])).days for d in overdue), default=0)
     summary = {"agreement_paise": T.get("agreed_paise", 0), "udhar_paise": T.get("total_udhar_paise", 0), "jama_paise": T.get("total_jama_paise", 0), "balance_paise": T.get("balance_paise", 0), "advance_paise": T.get("advance_paise", 0),
-               "overdue_paise": sum(d["total_demand_paise"] - (d.get("paid_paise") or 0) for d in overdue), "overdue_count": len(overdue), "overdue_oldest_days": oldest, "pending_cheques_paise": T.get("pending_cheques_paise", 0)}
+               "overdue_paise": sum(d["total_demand_paise"] - (d.get("paid_paise") or 0) for d in overdue), "overdue_count": len(overdue), "overdue_oldest_days": oldest, "pending_cheques_paise": T.get("pending_cheques_paise", 0),
+               "include_cancelled": include_cancelled, "rule": "Tiles, ledgers and bookings_count use live bookings (Active/Completed) unless include_cancelled=1",
+               "cancelled": {"count": len(cancelled), "received_paise": sum((r.get("cancellation") or {}).get("received_paise") or 0 for r in canc_rows), "forfeiture_paise": sum((r.get("cancellation") or {}).get("forfeiture_paise") or 0 for r in canc_rows), "refund_paise": sum((r.get("cancellation") or {}).get("refund_paise") or 0 for r in canc_rows), "refunds": refunds}}
     # next due: earliest unpaid demand, else next planned installment of an active booking
     nxt = None
     unpaid = sorted([d for d in live if d["status"] != "Paid"], key=lambda d: d["due_date"])
@@ -298,7 +307,8 @@ async def customer_panels(customer_id: str, user: dict = Depends(require("sales.
     photos = await db.files.find({"company_id": cid, "entity_type": "block", "entity_id": {"$in": list(blocks)}, "kind": "construction_photo", "is_active": {"$ne": False}}, {"_id": 0, "id": 1, "entity_id": 1, "created_at": 1, "caption": 1}).sort("created_at", -1).limit(12).to_list(12)
     return {"communications": {"items": comms}, "documents": {"items": docs}, "document_types": {"items": types}, "summary": summary, "next_due": nxt, "ledgers": ledg,
             "demands": {"items": present_money(dems)}, "receipts": {"items": present_money(recs)}, "generated_documents": {"items": gdocs}, "tickets": {"items": tickets}, "plans": present_money(plans), "construction": construction, "photos": photos,
-            "counts": {"bookings": len(bookings), "demands": len(live), "receipts": len(recs), "documents": len(gdocs) + len(docs), "tickets": len(tickets), "construction": len(construction)}}
+            "portal_enabled": bool(portal and portal.get("is_active")), "portal_last_login_at": (portal or {}).get("last_login_at"),
+            "counts": {"bookings": len(live_bk), "bookings_all": len(bookings), "demands": len(live), "receipts": len(recs), "documents": len(gdocs) + len(docs), "tickets": len(tickets), "construction": len(construction)}}
 
 
 @router.get("/{customer_id}", response_model=CustomersOut, response_model_exclude_unset=True)

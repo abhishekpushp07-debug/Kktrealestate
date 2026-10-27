@@ -3,6 +3,7 @@
 import asyncio
 import hashlib
 import hmac
+import secrets
 import io
 import os
 import time
@@ -55,7 +56,7 @@ async def _ctx(booking_id: str, user: dict):
     if not b:
         raise ApiError(404, "Booking not found", "NOT_FOUND")
     ensure_project_access(user, b["project_id"])
-    c, co = await asyncio.gather(db.customers.find_one({"id": b["customer_id"]}, {"_id": 0}), db.companies.find_one({"id": user["company_id"]}, {"_id": 0}))
+    c, co = await asyncio.gather(db.customers.find_one({"id": b["customer_id"]}, {"_id": 0}), _pdf.company_for_pdf(user["company_id"], {"_id": 0}))
     return b, c or {}, co or {}
 
 
@@ -218,11 +219,15 @@ async def generate(body: GenerateIn, request: Request, user: dict = Depends(requ
 
 
 @router.get("/register")
-async def register(project_id: str | None = None, block_id: str | None = None, type: str | None = None, customer_id: str | None = None, booking_id: str | None = None, sent: str | None = None, q: str | None = None, date_from: str | None = None, date_to: str | None = None, limit: int = 100, format: str | None = None, user: dict = Depends(require("documents.document.view"))):
+async def register(project_id: str | None = None, block_id: str | None = None, type: str | None = None, customer_id: str | None = None, booking_id: str | None = None, sent: str | None = None, voided: str | None = None, q: str | None = None, date_from: str | None = None, date_to: str | None = None, limit: int = 100, format: str | None = None, user: dict = Depends(require("documents.document.view"))):
     f = {"company_id": user["company_id"], **project_scope_filter(user)}
     for k, v in (("project_id", project_id), ("block_id", block_id), ("type", type), ("customer_id", customer_id), ("booking_id", booking_id)):
         if v:
             f[k] = v
+    if voided == "yes":
+        f["voided"] = True
+    elif voided == "no":
+        f["voided"] = {"$ne": True}
     if sent == "yes":
         f["sent"] = {"$ne": None}
     elif sent == "no":
@@ -235,7 +240,7 @@ async def register(project_id: str | None = None, block_id: str | None = None, t
         f["$or"] = [{"customer_name": rx}, {"number": rx}, {"booking_number": rx}, {"customer_code": rx}]
     items = await db.generated_documents.find(f, {"_id": 0}).sort("generated_at", -1).limit(max(1, min(limit, 500))).to_list(None)
     today = now_iso()[:10]
-    kp = await db.generated_documents.aggregate([{"$match": {"company_id": user["company_id"], **project_scope_filter(user)}}, {"$group": {"_id": None, "total": {"$sum": 1}, "today": {"$sum": {"$cond": [{"$gte": ["$generated_at", today]}, 1, 0]}}, "month": {"$sum": {"$cond": [{"$gte": ["$generated_at", today[:7]]}, 1, 0]}}, "unsent": {"$sum": {"$cond": [{"$eq": ["$sent", None]}, 1, 0]}}}}]).to_list(1)
+    kp = await db.generated_documents.aggregate([{"$match": {"company_id": user["company_id"], **project_scope_filter(user), "voided": {"$ne": True}}}, {"$group": {"_id": None, "total": {"$sum": 1}, "today": {"$sum": {"$cond": [{"$gte": ["$generated_at", today]}, 1, 0]}}, "month": {"$sum": {"$cond": [{"$gte": ["$generated_at", today[:7]]}, 1, 0]}}, "unsent": {"$sum": {"$cond": [{"$eq": ["$sent", None]}, 1, 0]}}}}]).to_list(1)
     kpis = {k: (kp[0][k] if kp else 0) for k in ("total", "today", "month", "unsent")}
     kpis["active_links"] = await db.doc_share_links.count_documents({"company_id": user["company_id"], "expires_at": {"$gt": time.time()}})
     if format == "csv":
@@ -262,21 +267,52 @@ async def download(doc_id: str, download: int = 0, user: dict = Depends(require(
 @router.post("/{doc_id}/share")
 async def share(doc_id: str, request: Request, user: dict = Depends(require("documents.document.share"))):
     d = await _doc(doc_id, user)
-    exp = time.time() + 15 * 60
-    token = hmac.new(os.environ["JWT_SECRET"].encode(), f"{doc_id}:{exp}".encode(), hashlib.sha256).hexdigest()[:40]
+    if d.get("voided"):
+        raise ApiError(409, "Document is voided", "DOCUMENT_VOIDED")
+    exp = int(time.time()) + 15 * 60
+    nonce = secrets.token_urlsafe(8)
+    token = f"{doc_id}.{exp}.{nonce}.{_sign(doc_id, exp, nonce)}"
     await db.doc_share_links.insert_one({"token": token, "doc_id": doc_id, "company_id": user["company_id"], "expires_at": exp, "created_by": user["id"], "created_at": now_iso(), "params": d["params"], "filename": d["filename"]})
     await write_audit(user, "document.shared", "generated_document", doc_id, after={"number": d["number"], "expires_in_min": 15}, ip=client_ip(request))
     return {"url": f"/api/docgen/shared/{token}", "expires_at": exp, "expires_in_sec": 900}
 
 
+def _sign(doc_id: str, exp: int, nonce: str) -> str:
+    return hmac.new(os.environ["JWT_SECRET"].encode(), f"{doc_id}.{exp}.{nonce}".encode(), hashlib.sha256).hexdigest()[:32]
+
+
 @router.get("/shared/{token}")
 async def shared(token: str):
-    link = await db.doc_share_links.find_one({"token": token}, {"_id": 0})
-    if not link or link["expires_at"] < time.time():
+    """Signed link: `{doc_id}.{exp}.{nonce}.{hmac}` — tampered → 401 LINK_INVALID, expired → 410 LINK_EXPIRED (checked in that order)."""
+    parts = token.split(".")
+    if len(parts) != 4 or not parts[1].isdigit() or not hmac.compare_digest(parts[3], _sign(parts[0], int(parts[1]), parts[2])):
+        raise ApiError(401, "This link is not valid", "LINK_INVALID")
+    if int(parts[1]) < time.time():
         raise ApiError(410, "This link has expired", "LINK_EXPIRED")
+    link = await db.doc_share_links.find_one({"token": token}, {"_id": 0})
+    if not link:
+        raise ApiError(401, "This link is not valid", "LINK_INVALID")
+    await db.doc_share_links.update_one({"token": token}, {"$inc": {"opens": 1}, "$set": {"last_opened_at": now_iso()}})
     sysuser = {"id": link["created_by"], "company_id": link["company_id"], "permissions": ["*"], "name": "share-link", "project_scope": ["*"]}
     data, name, _, _ = await _build(GenerateIn(**link["params"]), sysuser)
     return _pdf.pdf_response(data, link["filename"] or name, True)
+
+
+class VoidDocIn(StrictModel):
+    reason: str = Field(min_length=3, max_length=300)
+
+
+@router.post("/{doc_id}/void")
+async def void_document(doc_id: str, body: VoidDocIn, request: Request, user: dict = Depends(require("documents.document.generate"))):
+    """Audited void: the document stays in the register (flagged Voided, share links revoked) but leaves KPIs."""
+    d = await _doc(doc_id, user)
+    if d.get("voided"):
+        raise ApiError(409, "Document is already voided", "ALREADY_VOIDED")
+    v = {"voided": True, "voided_at": now_iso(), "voided_by": user["id"], "voided_by_name": user["name"], "void_reason": body.reason}
+    await db.generated_documents.update_one({"id": doc_id}, {"$set": v})
+    await db.doc_share_links.delete_many({"doc_id": doc_id})
+    await write_audit(user, "document.voided", "generated_document", doc_id, before={"number": d["number"], "voided": False}, after={"number": d["number"], **v}, ip=client_ip(request))
+    return {**d, **v}
 
 
 @router.post("/{doc_id}/sent")

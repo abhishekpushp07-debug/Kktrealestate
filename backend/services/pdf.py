@@ -116,6 +116,25 @@ def verify_code(doc_type: str, entity_id: str) -> str:
     return hmac.new(key, f"{doc_type}:{entity_id}".encode(), hashlib.sha256).hexdigest()[:8].upper()
 
 
+async def company_for_pdf(company_id: str, projection: dict | None = None) -> dict:
+    """Company + letterhead logo bytes (320px WebP variant from the file pipeline; falls back to the monogram)."""
+    from db import db
+    c = await db.companies.find_one({"id": company_id}, projection or {"_id": 0, "bank_account": 0}) or {}
+    fid = c.get("logo_file_id")
+    if fid:
+        f = await db.files.find_one({"id": fid, "is_active": {"$ne": False}}, {"_id": 0, "variant_names": 1, "storage_key": 1})
+        name = ((f or {}).get("variant_names") or {}).get("thumb")
+        try:
+            import storage
+            if name:
+                c["_logo_bytes"] = (await storage.get_object(f"variants/{name}"))[0]
+            elif f:
+                c["_logo_bytes"] = (await storage.get_object(f["storage_key"]))[0]
+        except Exception:  # noqa: BLE001 — logo unavailable → monogram
+            pass
+    return c
+
+
 def pdf_response(content: bytes, filename: str, download: bool = False):
     from fastapi import Response
     disp = "attachment" if download else "inline"
@@ -216,7 +235,10 @@ class BrandedDoc:
         canvas.line(left, 14 * mm, right, 14 * mm)
         canvas.setFont("Helvetica", 7.5)
         canvas.setFillColor(colors.HexColor("#64748B"))
-        canvas.drawString(left, 10 * mm, f"{c.get('name', 'KKT')} · Computer-generated document, no signature required unless stamped.")
+        canvas.drawString(left, 10 * mm, c.get("letterhead_footer_note") or f"{c.get('name', 'KKT')} · Computer-generated document, no signature required unless stamped.")
+        regs = " · ".join(filter(None, [f"GSTIN {c['gstin']}" if c.get("gstin") else None, f"RERA {c['rera_registration']}" if c.get("rera_registration") else None]))
+        if regs:
+            canvas.drawRightString(right, 10 * mm, regs)
         tail = f"Generated {self.generated} IST" + (f" · Verification {self.verify}" if self.verify else "")
         canvas.drawString(left, 6.5 * mm, tail)
         canvas.restoreState()

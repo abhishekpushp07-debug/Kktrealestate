@@ -94,6 +94,11 @@ async def repair(actor: dict | None = None) -> dict:
     before = await integrity_report()
     ts, voided, skipped, touched = now_iso(), [], [], set()
     for f in before["findings"]:
+        if f["kind"] == "open_demand_on_inactive_booking":  # close it the way cancellation would have
+            await db.demands.update_one({"id": f["demand_id"]}, {"$set": {"status": "Cancelled", "cancelled_at": ts, "closed_by": "integrity_repair"}})
+            voided.append(f["demand_number"])
+            touched.add(f["booking_id"])
+            continue
         if f["kind"] in ("unsatisfied_trigger", "duplicate_demand"):
             d = await db.demands.find_one({"id": f["demand_id"]}, {"_id": 0, "demand_date": 1, "booking_id": 1})
             # same rule as stage undo: a payment dated on/after the demand blocks; earlier advances auto-applied FIFO do not
@@ -119,10 +124,22 @@ def _rf(kind: str, detail: str, **ids) -> dict:
     return {"kind": kind, "detail": detail, "booking_id": ids.get("booking_id"), "booking_number": ids.get("booking_number"), "installment_seq": None, "installment_name": None, "demand_number": None, "paid_paise": 0, **{k: v for k, v in ids.items() if k not in ("booking_id", "booking_number")}}
 
 
+async def open_demand_on_inactive_booking_findings() -> list[dict]:
+    """Law: cancellation closes every open demand. An Open/Partially Paid demand on a non-live booking is a finding (nightly + ?fresh=1)."""
+    from services.definitions import LIVE_BOOKING_STATUSES, OPEN_DEMAND_STATUSES
+    out = []
+    rows = await db.demands.aggregate([{"$match": {"voided": {"$ne": True}, "status": {"$in": OPEN_DEMAND_STATUSES}}},
+                                       {"$lookup": {"from": "bookings", "localField": "booking_id", "foreignField": "id", "as": "b", "pipeline": [{"$project": {"_id": 0, "status": 1, "booking_number": 1}}]}}, {"$unwind": "$b"},
+                                       {"$match": {"b.status": {"$nin": LIVE_BOOKING_STATUSES}}}, {"$project": {"_id": 0, "id": 1, "demand_number": 1, "booking_id": 1, "status": 1, "paid_paise": 1, "b": 1}}]).to_list(None)
+    for r in rows:
+        out.append({**_rf("open_demand_on_inactive_booking", f"{r['demand_number']} is {r['status']} but booking {r['b']['booking_number']} is {r['b']['status']}", booking_id=r["booking_id"], booking_number=r["b"]["booking_number"]), "demand_id": r["id"], "demand_number": r["demand_number"], "paid_paise": r.get("paid_paise") or 0})
+    return out
+
+
 async def referential_findings() -> list[dict]:
     """Orphans, flat↔booking status consistency, per-booking ledger invariants, bucket caps and counters vs max numbers.
     Phase J.2: streams every large collection (projections + async for); memory is O(ids), never O(documents)."""
-    out: list[dict] = []
+    out: list[dict] = await open_demand_on_inactive_booking_findings()
     projects = {p["id"] for p in await db.projects.find({}, {"_id": 0, "id": 1}).to_list(None)}
     blocks = {b["id"]: b["project_id"] async for b in db.blocks.find({}, {"_id": 0, "id": 1, "project_id": 1})}
     for bid, pid in blocks.items():

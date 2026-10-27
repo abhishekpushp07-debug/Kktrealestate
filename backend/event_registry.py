@@ -66,6 +66,7 @@ EVENTS = {
     "document.generated": {"entity": "generated_document", "surfaces": ["customer360", "audit", "documents"], "roles": ["Accounts", "Super Admin"], "title": lambda a: (f"{a.get('type', 'Document').title()} generated · {a.get('number', '')}", a.get("customer_name"))},
     "document.shared": {"entity": "generated_document", "surfaces": ["audit", "documents"]},
     "document.sent": {"entity": "generated_document", "surfaces": ["customer360", "audit", "documents"]},
+    "document.voided": {"entity": "generated_document", "surfaces": ["customer360", "audit", "documents"], "roles": ["Accounts", "Super Admin"], "title": lambda a: (f"Document voided · {a.get('number', '')}", a.get("void_reason"))},
     "demand.void": {"entity": "booking", "surfaces": MONEY + ["notifications"], "roles": ["Accounts", "Super Admin"], "title": lambda a: (f"Demand voided · {a.get('demand_number', '')}", a.get("reason"))},
     "demand.reminder_sent": {"entity": "booking", "surfaces": MONEY, "title": None},
     "notice.create": {"entity": "notice", "surfaces": ["customer360", "audit", "notifications"]},

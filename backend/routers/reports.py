@@ -2,7 +2,7 @@
 import os
 from datetime import date, datetime, timedelta
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import JSONResponse
 from pymongo import ReturnDocument
 
@@ -76,8 +76,7 @@ def _dates(from_date, to_date):
 
 
 async def _company(user):
-    c = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0, "bank_account": 0})
-    return c or {}
+    return await _pdf.company_for_pdf(user["company_id"])
 
 
 def _scope(user, project_id=None, block_id=None):
@@ -168,10 +167,10 @@ async def list_reports(user: dict = Depends(require("reports.collections.view"))
 
 # ---------- 1. Collections ----------
 @router.get("/collections")
-async def collections(request: Request, from_date: str | None = None, to_date: str | None = None, project_id: str | None = None, block_id: str | None = None, mode: str | None = None,
+async def collections(request: Request, from_date: str | None = None, to_date: str | None = None, date_from: str | None = Query(None, description="Receipt date ≥ (YYYY-MM-DD); same name as the Demand Register"), date_to: str | None = Query(None, description="Receipt date ≤ (YYYY-MM-DD)"), project_id: str | None = None, block_id: str | None = None, mode: str | None = None,
                       category: str | None = None, status: str | None = None, group_by: str = "day", format: str | None = None, user: dict = Depends(require("reports.collections.view"))):
-    _strict_params(request, {'from_date', 'category', 'status', 'to_date', 'group_by', 'mode', 'block_id', 'project_id'})
-    f, t = _dates(from_date, to_date)
+    _strict_params(request, {'from_date', 'category', 'status', 'to_date', 'date_from', 'date_to', 'group_by', 'mode', 'block_id', 'project_id'})
+    f, t = _dates(date_from or from_date, date_to or to_date)
     q = {**_scope(user, project_id, block_id), "payment_date": {"$gte": f, "$lte": t}, "status": status or "Cleared"}
     if mode:
         q["payment_mode_code"] = mode
@@ -200,10 +199,10 @@ from services.definitions import ageing_for_bookings  # noqa: E402
 
 
 @router.get("/outstanding")
-async def outstanding(request: Request, project_id: str | None = None, block_id: str | None = None, group_by: str = "customer", format: str | None = None, user: dict = Depends(require("reports.outstanding.view"))):
-    _strict_params(request, {'block_id', 'group_by', 'project_id'})
+async def outstanding(request: Request, project_id: str | None = None, block_id: str | None = None, group_by: str = "customer", date_from: str | None = Query(None, description="Accepted for parity with the Demand Register; a point-in-time report ignores it"), date_to: str | None = Query(None, description="As-of date for ageing (YYYY-MM-DD); default today"), format: str | None = None, user: dict = Depends(require("reports.outstanding.view"))):
+    _strict_params(request, {'block_id', 'group_by', 'project_id', 'date_from', 'date_to'})
     q = {**_scope(user, project_id, block_id), "status": {"$in": ["Active", "Completed"]}}
-    today = clock.today()
+    today = date.fromisoformat(date_to) if date_to else clock.today()
     from services import ttlcache
     import hashlib
     import heapq
@@ -286,12 +285,14 @@ async def advances(request: Request, project_id: str | None = None, format: str 
 # ---------- 4. Demand vs collection ----------
 @router.get("/demand-vs-collection")
 @router.get("/demand-vs-collection-installment")
-async def demand_vs_collection(request: Request, project_id: str | None = None, block_id: str | None = None, format: str | None = None, user: dict = Depends(require("reports.demand_vs_collection.view"))):
-    _strict_params(request, {'block_id', 'project_id'})
-    q = {**_scope(user, project_id, block_id), "voided": False}
+async def demand_vs_collection(request: Request, project_id: str | None = None, block_id: str | None = None, date_from: str | None = Query(None, description="Demand raised date ≥ (YYYY-MM-DD); same name as the Demand Register"), date_to: str | None = Query(None, description="Demand raised date ≤ (YYYY-MM-DD)"), format: str | None = None, user: dict = Depends(require("reports.demand_vs_collection.view"))):
+    _strict_params(request, {'block_id', 'project_id', 'date_from', 'date_to'})
+    q = {**_scope(user, project_id, block_id), "voided": {"$ne": True}, "status": {"$nin": ["Voided", "Cancelled"]}}
+    if date_from or date_to:
+        q["demand_date"] = {**({"$gte": date_from} if date_from else {}), **({"$lte": date_to} if date_to else {})}
     rows = await db.demands.aggregate(maxTimeMS=REPORT_MS, pipeline=[{"$match": q}, {"$group": {"_id": {"block_id": "$block_id", "seq": "$milestone_seq", "name": "$milestone_name", "pct": "$cumulative_percent"}, "cash_demand_paise": {"$sum": "$cash_demand_paise"}, "account_demand_paise": {"$sum": "$account_demand_paise"}, "demand_paise": {"$sum": "$total_demand_paise"}, "collected_paise": {"$sum": "$paid_paise"}, "count": {"$sum": 1}}}, {"$sort": {"_id.block_id": 1, "_id.seq": 1}}]).to_list(None)
     blocks = {b["id"]: f"{b.get('project_code', '')} {b['name']}" for b in await db.blocks.find({"company_id": user["company_id"]}, {"_id": 0, "id": 1, "name": 1, "project_code": 1}).to_list(None)}
-    out = [{"block": blocks.get(r["_id"]["block_id"], "?"), "milestone": f"{r['_id']['seq']}. {r['_id']['name']}", "percent": r["_id"]["pct"], "count": r["count"], "cash_demand_paise": r["cash_demand_paise"], "account_demand_paise": r["account_demand_paise"], "demand_paise": r["demand_paise"], "collected_paise": r["collected_paise"],
+    out = [{"block": blocks.get(r["_id"]["block_id"], "?"), "milestone": f"{r['_id'].get('seq') or '·'}. {r['_id'].get('name') or 'Manual / other'}", "percent": r["_id"].get("pct"), "count": r["count"], "cash_demand_paise": r["cash_demand_paise"], "account_demand_paise": r["account_demand_paise"], "demand_paise": r["demand_paise"], "collected_paise": r["collected_paise"],
             "pct_collected": round(100 * r["collected_paise"] / r["demand_paise"], 1) if r["demand_paise"] else 0} for r in rows]
     totals = {k: sum(r[k] for r in out) for k in ("count", "cash_demand_paise", "account_demand_paise", "demand_paise", "collected_paise")}
     totals["pct_collected"] = round(100 * totals["collected_paise"] / totals["demand_paise"], 1) if totals["demand_paise"] else 0
@@ -503,7 +504,7 @@ async def build_statement_pdf(booking_id: str, user: dict) -> tuple[bytes, str]:
         d.small(f"Revision {_pdf.fmt_date(r.get('at') or r.get('revised_at'))}: {_pdf.inr(r.get('old_agreement_value_paise') or r.get('before', {}).get('agreement_value_paise'))} → {_pdf.inr(r.get('new_agreement_value_paise') or r.get('after', {}).get('agreement_value_paise'))} — {r.get('reason', '')}")
     d.h2("Milestone schedule")
     d.table(["#", "Milestone", "Cum %", "Cash demand", "Account demand", "Total", "Due date", "Paid", "Balance", "Status"],
-            [[x["milestone_seq"], x["milestone_name"], f"{x['cumulative_percent']}%", _pdf.inr(x["cash_demand_paise"]), _pdf.inr(x["account_demand_paise"]), _pdf.inr(x["total_demand_paise"]), _pdf.fmt_date(x["due_date"]), _pdf.inr(x.get("paid_paise", 0)), _pdf.inr(x["total_demand_paise"] - x.get("paid_paise", 0)), x["status"]] for x in demands],
+            [[x.get("milestone_seq") or x.get("installment_seq") or "", x.get("milestone_name") or x.get("installment_name") or "", f"{x['cumulative_percent']}%" if x.get("percent") is not None or x.get("cumulative_percent") is not None else "—", _pdf.inr(x["cash_demand_paise"]), _pdf.inr(x["account_demand_paise"]), _pdf.inr(x["total_demand_paise"]), _pdf.fmt_date(x["due_date"]), _pdf.inr(x.get("paid_paise", 0)), _pdf.inr(x["total_demand_paise"] - x.get("paid_paise", 0)), x["status"]] for x in demands],
             widths=[0.4, 1.6, 0.6, 1, 1, 1, 0.9, 1, 1, 0.8], align_right=[3, 4, 5, 7, 8])
     d.h2("Ledger (Udhar / Jama)")
     rows = [[_pdf.fmt_date(e["date"]), f"{e['type'].replace('_', ' ').title()} — {e.get('note') or ''}" + (f" [{e['tag']}]" if e.get("tag") else "") + (f" · {e['ref']}" if e.get("ref") else ""),

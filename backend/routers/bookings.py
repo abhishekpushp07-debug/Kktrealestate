@@ -338,6 +338,8 @@ async def cancel_booking(booking_id: str, body: CancelIn, request: Request, user
         await db.leads.update_one({"id": b["lead_id"]}, {"$set": {"status": "Lost", "lost_reason": "Booking cancelled", "updated_at": ts}})
     await rebuild(booking_id)
     rf = await create_refund({**b, "status": "Cancelled"}, pv["deduction_paise"], user, policy, preview=pv, pre_summary=pre_summary)
+    from services import ttlcache
+    ttlcache.invalidate("dreg")  # demand register + dead-booking cache
     await write_audit(user, "booking.cancel", "booking", booking_id, before={"status": "Active", "booking_number": b["booking_number"]}, after={"status": "Cancelled", **{k: canc[k] for k in ("reason", "received_paise", "deduction_paise", "refund_paise", "forfeiture_paise")}, "booking_number": b["booking_number"]}, ip=client_ip(request))
     await write_audit(user, "flat.status", "flat", b["flat_id"], before={"status": "Booked", "flat_number": b.get("flat_number")}, after={"status": "Available", "reason": "Booking cancelled", "flat_number": b.get("flat_number")}, ip=client_ip(request))
     out = _present(await db.bookings.find_one({"id": booking_id}, {"_id": 0}))
@@ -485,7 +487,8 @@ async def demand_letter(booking_id: str, demand_id: str, user: dict = Depends(re
     from services.money import amount_in_words
     b = await _load(booking_id, user)
     d = await get_or_404(db.demands, demand_id, "Demand", {"booking_id": booking_id})
-    company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0, "bank_account": 0})
+    from services.pdf import company_for_pdf
+    company = await company_for_pdf(user["company_id"])
     bank = await db.bank_accounts.find_one({"company_id": user["company_id"], "is_default": True}, {"_id": 0, "bank_name": 1, "account_name": 1, "ifsc": 1, "branch": 1, "account_number_enc": 1})
     if bank:
         from crypto import decrypt_field

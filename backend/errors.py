@@ -78,6 +78,8 @@ ERRORS: dict[str, tuple[int, ...]] = {
     "NOT_CLEARED": (409,),
     "NOT_DRAFT": (409,),
     "NOT_FOUND": (404,),
+    "LINK_INVALID": (401,),
+    "DOCUMENT_VOIDED": (409,),
     "ALREADY_VOIDED": (409,),
     "HAS_PAYMENTS": (409,),
     "STATE_FINAL": (409,),

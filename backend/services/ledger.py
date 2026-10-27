@@ -191,6 +191,8 @@ async def rebuild(booking_id: str) -> list[dict]:
 
 async def create_demand(booking: dict, company: dict, milestone: dict, completed_on: date, due_days: int, posted_at: str) -> dict | None:
     """Incremental demand for a booking when construction moves to milestone.cumulative_percent."""
+    if booking.get("status") != "Active":  # law: no demands on cancelled / transferred-away bookings
+        return None
     new_pct = milestone["cumulative_percent"]
     old_pct = booking.get("construction_percent", 0)
     c_old, a_old = _orders(booking["cash_agreed_paise"], booking["account_agreed_paise"], old_pct)

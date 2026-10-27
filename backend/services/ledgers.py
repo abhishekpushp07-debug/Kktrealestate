@@ -95,8 +95,8 @@ async def booking_ledgers(booking: dict) -> dict:
     return present_money({"booking_id": booking["id"], "booking_number": booking["booking_number"], "status": booking["status"], **out})
 
 
-async def customer_ledgers(customer_id: str, company_id: str) -> dict:
-    bookings = await db.bookings.find({"customer_id": customer_id, "company_id": company_id}, {"_id": 0, "agreement_revisions": 0, "milestone_template_snapshot": 0, "payment_plan_snapshot": 0}).to_list(None)
+async def customer_ledgers(customer_id: str, company_id: str, statuses: list[str] | None = None) -> dict:
+    bookings = await db.bookings.find({"customer_id": customer_id, "company_id": company_id, **({"status": {"$in": statuses}} if statuses else {})}, {"_id": 0, "agreement_revisions": 0, "milestone_template_snapshot": 0, "payment_plan_snapshot": 0}).to_list(None)
     per = [await booking_ledgers(b) for b in bookings]
     grand = {k: {"agreed_paise": 0, "raised_paise": 0, "paid_paise": 0, "due_paise": 0, "outstanding_paise": 0, "advance_paise": 0, "net_balance_paise": 0, "pending_cheques_paise": 0, "total_udhar_paise": 0, "total_jama_paise": 0, "balance_paise": 0} for k in (*BUCKETS, "combined")}
     for pl in per:
