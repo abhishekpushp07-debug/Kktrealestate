@@ -4,49 +4,11 @@ bringing up nodes...
 ........................................................................ [ 12%]
 ........................................................................ [ 25%]
 ........................................................................ [ 37%]
-........................................................................ [ 50%]
-........................................................s............... [ 63%]
-......F................................................................. [ 75%]
+.......................................................................s [ 50%]
+........................................................................ [ 63%]
+........................................................................ [ 75%]
 ........................................................................ [ 88%]
 ...............................s...................................      [100%]
-=================================== FAILURES ===================================
-______________________ test_owner_flow_udhar_jama_balance ______________________
-[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
-
-ctx = {'admin': {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mY...5b57aa', 'created_at': '2026-10-27T11:18:58.581052+00:00', 'updated_at': '2026-10-27T11:18:58.581052+00:00', ...}, ...}
-
-    def test_owner_flow_udhar_jama_balance(ctx):
-        h = ctx["admin"]
-        b = _book(ctx)
-        ctx["booking"] = b
-        led = _get(h, f"/bookings/{b['id']}/ledger")
-        rows = led["rows"]
-        assert rows and rows[0]["type"] == "DEMAND" and rows[0]["udhar_paise"] > 0 and rows[0]["jama_paise"] == 0  # Booking row
-        bal0 = rows[-1]["balance_paise"]
-        # construction update: stage 2 (first real stage) — preview then confirm
-        stage = _get(h, f"/blocks/{ctx['tower']['id']}/construction")["stages"][1]
-        pv = _get(h, f"/blocks/{ctx['tower']['id']}/stages/{stage['stage_id']}/preview")
-        assert pv["bookings_count"] >= 1 and pv["stage_plan_name"] == "zed" and pv["total_paise"] > 0
-        mine = next(x for x in pv["bookings"] if x["booking_id"] == b["id"])
-        pct = next(i["percent"] for i in ctx["plan"]["installments"] if i.get("trigger_stage_id") == stage["stage_id"])
-        assert mine["total_paise"] == round(b["cash_agreed_paise"] * pct / 100) + round(b["account_agreed_paise"] * pct / 100)
-        r = requests.post(f"{BASE}/blocks/{ctx['tower']['id']}/construction/stage", headers=h, json={"stage_id": stage["stage_id"], "completed_on": "2026-10-25"}, timeout=60)
-        assert r.status_code == 200, r.text
-        assert r.json()["demands_raised"] >= 1
-        led = _get(h, f"/bookings/{b['id']}/ledger")
-        dem = [x for x in led["rows"] if x["type"] == "DEMAND"]
-        assert len(dem) == 2 and stage["name"] in dem[-1]["note"] and dem[-1]["udhar_paise"] == mine["total_paise"]
-        assert led["rows"][-1]["balance_paise"] == bal0 + mine["total_paise"]
-        # Jama: post a cash receipt
-        modes = {m["code"]: m for m in _get(h, "/master/payment-modes", page_size=50)["items"]}
-        r = requests.post(f"{BASE}/payments", headers={**h, "Idempotency-Key": str(uuid.uuid4())}, json={"booking_id": b["id"], "amount": 100_000, "payment_mode_id": modes["CASH"]["id"], "payment_category": "Cash", "payment_date": "2026-10-26"}, timeout=60)
-        assert r.status_code == 201, r.text
-        led = _get(h, f"/bookings/{b['id']}/ledger")
-        jama = [x for x in led["rows"] if x["type"] == "PAYMENT"]
->       assert jama and jama[-1]["jama_paise"] == 1_00_000_00 and jama[-1]["mode"] == "Cash"
-E       AssertionError: assert ([{'id': '21ac5bde-5e3f-4527-a54d-a3633b4ddf45', 'booking_id': '6e64fdf4-c7b8-4054-99c1-e6336c3aad06', 'seq': 3, 'at': ...c7c45', 'booking_id': '6e64fdf4-c7b8-4054-99c1-e6336c3aad06', 'seq': 4, 'at': '2026-10-27T11:19:00.359921+00:00', ...}] and 50000 == 10000000)
-
-tests/test_phase_m_masters.py:154: AssertionError
 =============================== warnings summary ===============================
 ../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
 ../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
@@ -80,7 +42,5 @@ tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources
     warnings.warn(
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-=========================== short test summary info ============================
-FAILED tests/test_phase_m_masters.py::test_owner_flow_udhar_jama_balance - As...
-1 failed, 568 passed, 2 skipped, 10 warnings in 501.97s (0:08:21)
-SUITE_EXIT 1
+569 passed, 2 skipped, 10 warnings in 481.18s (0:08:01)
+SUITE_EXIT 0
