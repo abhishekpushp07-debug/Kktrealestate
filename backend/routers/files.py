@@ -222,6 +222,14 @@ async def variant(name: str):
     return StreamingResponse(storage.iter_object(f"variants/{name}"), media_type="image/webp", headers={"Cache-Control": "public, max-age=31536000, immutable"})
 
 
+@router.get("/files/{file_id}")
+async def file_meta(file_id: str, user: dict = Depends(get_current_user)):
+    f = await db.files.find_one({"id": file_id, "company_id": user.get("company_id"), "is_active": {"$ne": False}}, {"_id": 0})
+    if not f:
+        raise ApiError(404, "File not found", "NOT_FOUND")
+    return present(f)
+
+
 @router.get("/files/{file_id}/url")
 async def file_url(file_id: str, user: dict = Depends(get_current_user)):
     f = await db.files.find_one({"id": file_id, "company_id": user.get("company_id")}, {"_id": 0, "id": 1})

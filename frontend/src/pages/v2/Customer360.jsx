@@ -38,7 +38,8 @@ export default function Customer360() {
   const [pay, setPay] = useState(false);
   const tab = TABS.includes(sp.get("tab")) ? sp.get("tab") : "overview";
   const setTab = useCallback((t) => { const n = new URLSearchParams(sp); n.set("tab", t); setSp(n, { replace: true }); }, [sp, setSp]);
-  const panels = useFetch(`/customers/${id}/panels`);
+  const inclCancelled = sp.get("cancelled") === "1";
+  const panels = useFetch(`/customers/${id}/panels${inclCancelled ? "?include_cancelled=true" : ""}`);
   const P = panels.data;
   const load = useCallback((rev = false) => api.get(`/customers/${id}`, { params: { reveal: rev || undefined } }).then((r) => { if (r.data.id !== id) { nav(`/customers/${r.data.id}`, { replace: true }); return; } setC(r.data); setReveal(rev); }).catch((e) => toast.error(errMsg(e))), [id, nav]);
   useEffect(() => { load(false); }, [load]);
@@ -63,7 +64,7 @@ export default function Customer360() {
             <div className={cn("rounded-full p-[3px]", vip ? "bg-gold" : "bg-transparent")}><CompletenessRing customer={c} size={64}><Avatar name={c.full_name} size={64} /></CompletenessRing></div>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1"><h1 className="font-display text-[28px] leading-tight text-ink-950" data-testid="hero-title">{c.salutation ? `${c.salutation} ` : ""}{c.full_name}</h1><span className="font-mono text-sm text-txt-secondary" data-testid="hero-cust-number">{c.customer_code}</span><HistoryButton entityType="customer" entityId={c.id} label="History" /></div>
-              <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs" data-testid="hero-chips">{(c.segment_ids || []).map((s) => <span key={s} className={cn("pill", vip ? "bg-gold-light text-[#8a6d12]" : "bg-warm-100 text-txt-secondary")}>{label("customer_segment", s)}</span>)}<span className={cn("pill", c.kyc_status === "Verified" ? "bg-gold-light text-[#8a6d12]" : "bg-warm-100 text-txt-secondary")}>{c.kyc_status === "Verified" && <BadgeCheck className="h-3.5 w-3.5" />}KYC {c.kyc_status}</span>{c.portal_enabled != null && <span className="pill bg-warm-100 text-txt-secondary">Portal {c.portal_enabled ? "active" : "off"}</span>}{rm && <span className="pill border border-warm-200 bg-white text-txt-secondary"><Avatar name={rm} size={16} className="!text-[8px]" />RM · {rm}</span>}<span className="pill bg-warm-100 text-txt-secondary">Customer since {fmtDate(c.created_at)}</span></div>
+              <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs" data-testid="hero-chips">{(c.segment_ids || []).length ? (c.segment_ids || []).map((s) => <span key={s} className={cn("pill", vip ? "bg-gold-light text-[#8a6d12]" : "bg-warm-100 text-txt-secondary")} data-testid="chip-segment">{label("customer_segment", s)}</span>) : <span className="pill bg-warm-50 text-txt-muted" data-testid="chip-segment">No segment</span>}<span className={cn("pill", c.kyc_status === "Verified" ? "bg-gold-light text-[#8a6d12]" : "bg-warm-100 text-txt-secondary")}>{c.kyc_status === "Verified" && <BadgeCheck className="h-3.5 w-3.5" />}KYC {c.kyc_status}</span>{P && <span className={cn("pill", P.portal_enabled ? "bg-sage/15 text-sage" : "bg-warm-100 text-txt-secondary")} data-testid="chip-portal">Portal {P.portal_enabled ? "active" : "not enabled"}</span>}{rm && <span className="pill border border-warm-200 bg-white text-txt-secondary"><Avatar name={rm} size={16} className="!text-[8px]" />RM · {rm}</span>}<span className="pill bg-warm-100 text-txt-secondary">Customer since {fmtDate(c.created_at)}</span></div>
               <div className="mt-2 flex flex-wrap items-center gap-x-4 text-sm text-txt-secondary"><span className="flex items-center gap-1.5"><Phone className="h-4 w-4" />{c.phone}</span>{c.email && <span className="flex items-center gap-1.5"><Mail className="h-4 w-4" />{c.email}</span>}</div>
             </div>
           </div>
@@ -78,9 +79,10 @@ export default function Customer360() {
           </div>
         </div>
       </Card>
+      {S?.cancelled?.count > 0 && <div className="flex flex-wrap items-center gap-3 text-xs text-txt-secondary print:hidden" data-testid="cancelled-rule"><label className="flex cursor-pointer items-center gap-1.5"><input type="checkbox" checked={inclCancelled} onChange={(e) => { const n = new URLSearchParams(sp); if (e.target.checked) n.set("cancelled", "1"); else n.delete("cancelled"); setSp(n, { replace: true }); }} data-testid="include-cancelled-toggle" />Include {S.cancelled.count} cancelled booking(s) in totals</label><span className="text-txt-muted">Cancelled: received {inrShort(S.cancelled.received_paise / 100)} · forfeited {inrShort(S.cancelled.forfeiture_paise / 100)} · refund {inrShort(S.cancelled.refund_paise / 100)}</span></div>}
       <div className="grid grid-cols-3 gap-3 md:grid-cols-6" data-testid="key-strip">
         {!S ? [...Array(6)].map((_, i) => <Skeleton key={i} className="h-[88px] rounded-2xl" />) : <>
-          <Tile label="Total agreement" value={inrShort(S.agreement_paise / 100)} hint={`${c.bookings.length} booking(s)`} testId="kn-agreement" />
+          <Tile label="Total agreement" value={inrShort(S.agreement_paise / 100)} hint={`${P.counts.bookings} ${inclCancelled ? "" : "live "}booking(s)`} testId="kn-agreement" />
           <Tile label="Udhar (raised)" value={inrShort(S.udhar_paise / 100)} hint="all ledgers" testId="kn-udhar" />
           <Tile label="Jama (received)" value={inrShort(S.jama_paise / 100)} hint={S.pending_cheques_paise > 0 ? `+ ${inrShort(S.pending_cheques_paise / 100)} cheques in hand` : "cleared"} tone="sage" testId="kn-jama" />
           <Tile label="Net balance" value={inrShort(S.balance_paise / 100)} hint={S.balance_paise > 0 ? "receivable" : "nothing due"} tone={S.balance_paise > 0 ? undefined : "sage"} testId="kn-balance" />
