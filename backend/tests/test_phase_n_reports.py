@@ -9,12 +9,14 @@ from pymongo import MongoClient
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from tests.conftest import BASE  # noqa: E402
 
+TEST_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
+
 mongo = MongoClient(os.environ["MONGO_URL"])[os.environ.get("KKT_TEST_DB", "kkt_test")]
 KEYS = ["inventory-control", "landowner-share", "hold-register", "masked-inventory"]
 
 
 def _login(email):
-    r = requests.post(f"{BASE}/api/auth/login", json={"email": email, "password": "Kkt@12345"})
+    r = requests.post(f"{BASE}/api/auth/login", json={"email": email, "password": TEST_PASSWORD})
     return {"Authorization": f"Bearer {r.json()['access_token']}"} if r.status_code == 200 else None
 
 

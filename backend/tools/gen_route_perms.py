@@ -4,7 +4,6 @@ import ast
 import glob
 import json
 import pathlib
-import re
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 

@@ -6,9 +6,11 @@ import uuid
 import pytest
 import requests
 
+TEST_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
+
 BASE = os.environ.get("REACT_APP_BACKEND_URL") or open("/app/frontend/.env").read().split("REACT_APP_BACKEND_URL=")[1].split("\n")[0].strip()
 API = BASE.rstrip("/") + "/api"
-PASS = "Kkt@12345"
+PASS = TEST_PASSWORD
 
 
 def _login(email):

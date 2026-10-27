@@ -2,8 +2,12 @@
 Payment Plan Master + Assignments, Auto Dues engine, migration integrity, downstream."""
 import os
 import uuid
+
 import pytest
 import requests
+
+TEST_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
+
 
 def _load_frontend_env():
     try:
@@ -20,7 +24,7 @@ BASE_URL = (os.environ.get("REACT_APP_BACKEND_URL") or _load_frontend_env() or "
 API = f"{BASE_URL}/api"
 
 ADMIN_EMAIL = "admin@kkt.in"
-ADMIN_PASS = "Kkt@12345"
+ADMIN_PASS = TEST_PASSWORD
 PORTAL_PHONE = "9431012345"
 PORTAL_PASS = "Buyer@12345"
 

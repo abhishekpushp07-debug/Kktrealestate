@@ -1,15 +1,20 @@
 """Phase I reports: every registered report answers JSON + CSV + PDF, carries totals, honours ETag/304 and its permission code."""
+import os
+
 import pytest
 import requests
 
-from tests.conftest import BASE as ROOT, session_token
+from tests.conftest import BASE as ROOT
+from tests.conftest import session_token
+
+TEST_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
 
 API = f"{ROOT}/api"
 NEW = ["collections-v2", "outstanding-v2", "cash-vs-account", "receivables-forecast", "other-charges", "roznamcha-summary", "site-visits", "sales-team", "construction-vs-plan", "data-quality"]
 
 
 def _h():
-    return {"Authorization": f"Bearer {session_token('admin@kkt.in', 'Kkt@12345')}"}
+    return {"Authorization": f"Bearer {session_token('admin@kkt.in', TEST_PASSWORD)}"}
 
 
 def test_registry_lists_every_phase_i_report_with_purpose():

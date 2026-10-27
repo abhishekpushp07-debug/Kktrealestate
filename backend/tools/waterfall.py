@@ -9,12 +9,13 @@ import sys
 import time
 
 import httpx
+from _env import DEMO_PASSWORD
 
 TOK_HDR = {"X-Rate-Limit-Bypass": "kkt-test-bypass-local"}
 
 
 def login(c):
-    r = c.post("/api/auth/login", json={"email": "admin@kkt.in", "password": "Kkt@12345"}, headers=TOK_HDR)
+    r = c.post("/api/auth/login", json={"email": "admin@kkt.in", "password": DEMO_PASSWORD}, headers=TOK_HDR)
     r.raise_for_status()
     return r.json()["access_token"]
 

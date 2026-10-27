@@ -1,7 +1,6 @@
 """Phase K P1 proofs: load shedding, query budgets, anti-escalation rules, DB lockout + constant-time login, retryable envelopes."""
 import os
 import sys
-import threading
 import time
 import uuid
 
@@ -19,8 +18,9 @@ def _sync_db():
 
 # ---- 7. load shedding ---------------------------------------------------------------------------
 def test_loadshed_sheds_with_prebuilt_503_and_exempts_probes():
-    from starlette.testclient import TestClient
     from fastapi import FastAPI
+    from starlette.testclient import TestClient
+
     from services import loadshed
     app = FastAPI()
     app.add_middleware(loadshed.LoadShedMiddleware)
@@ -64,6 +64,7 @@ def test_query_timeout_envelope():
     from fastapi import FastAPI
     from pymongo.errors import ExecutionTimeout
     from starlette.testclient import TestClient
+
     import server
     app = FastAPI()
     app.add_exception_handler(Exception, server.unhandled_exc_handler)
@@ -88,6 +89,7 @@ def test_transient_db_errors_map_to_retryable_envelopes():
     from fastapi import FastAPI
     from pymongo.errors import AutoReconnect, OperationFailure
     from starlette.testclient import TestClient
+
     import server
     app = FastAPI()
     app.add_exception_handler(Exception, server.unhandled_exc_handler)

@@ -10,6 +10,8 @@ import pytest
 from dotenv import load_dotenv
 from pypdf import PdfReader
 
+TEST_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
+
 load_dotenv("/app/frontend/.env")
 BASE = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
 
@@ -28,7 +30,7 @@ def client():
 
 def _tok(client, email):
     for _ in range(3):  # private test backend under 4-worker load: tolerate one transient 5xx
-        r = client.post("/api/auth/login", json={"email": email, "password": "Kkt@12345"})
+        r = client.post("/api/auth/login", json={"email": email, "password": TEST_PASSWORD})
         if r.status_code < 500:
             break
     assert r.status_code == 200, f"{email} login failed: {r.text}"
@@ -226,7 +228,7 @@ def test_notifications_website_enquiry(client, sales, marketing, accounts):
     acct_after, a_items = unread(accounts)
 
     assert sales_after > sales_before, f"sales unread not increased ({sales_before}->{sales_after})"
-    assert mktg_after > mktg_before, f"marketing unread not increased"
+    assert mktg_after > mktg_before, "marketing unread not increased"
     # accounts should not get lead.create
     assert not any(i.get("kind") == "lead.create" for i in a_items), "accounts should not get lead.create"
 

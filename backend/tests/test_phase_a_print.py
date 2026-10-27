@@ -4,11 +4,13 @@ import os
 
 import requests
 
+TEST_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
+
 BASE = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
 
 
 def _admin():
-    r = requests.post(f"{BASE}/api/auth/login", json={"email": "admin@kkt.in", "password": "Kkt@12345"})
+    r = requests.post(f"{BASE}/api/auth/login", json={"email": "admin@kkt.in", "password": TEST_PASSWORD})
     assert r.status_code == 200, r.text
     return {"Authorization": f"Bearer {r.json()['access_token']}"}
 

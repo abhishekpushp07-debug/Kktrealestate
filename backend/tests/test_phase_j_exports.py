@@ -44,6 +44,7 @@ def test_list_endpoint_reports_total_estimated_flag(admin_headers):
 
 def test_paginate_budget_param_exists():
     import inspect
+
     from utils import paginate
     assert "budget_ms" in inspect.signature(paginate).parameters
 

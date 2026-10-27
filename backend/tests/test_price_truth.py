@@ -1,5 +1,4 @@
 """ONE price truth: flats store only integer `price_paise`; rupee `price` is derived at the API edge. Compare with the pre-switch snapshot."""
-import json
 import os
 
 import requests

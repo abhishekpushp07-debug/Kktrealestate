@@ -5,11 +5,12 @@ import os
 import subprocess
 import sys
 
+from _env import DEMO_PASSWORD
 from playwright.sync_api import sync_playwright
 
 BASE, OUT = sys.argv[1].rstrip("/"), sys.argv[2]
 LH = "/tmp/lh/node_modules/.bin/lighthouse"
-EMAIL, PASSWORD = os.environ.get("KKT_EMAIL", "admin@kkt.in"), os.environ.get("KKT_PASSWORD", "Kkt@12345")
+EMAIL, PASSWORD = os.environ.get("KKT_EMAIL", "admin@kkt.in"), os.environ.get("KKT_PASSWORD", DEMO_PASSWORD)
 os.makedirs(OUT, exist_ok=True)
 
 with sync_playwright() as p:
@@ -38,6 +39,7 @@ with sync_playwright() as p:
 
 rows = []
 import os
+
 if os.environ.get("LH_ONLY"): screens = {k: v for k, v in screens.items() if k in os.environ["LH_ONLY"].split(",")}
 for name, path in screens.items():
     out = os.path.join(OUT, name)

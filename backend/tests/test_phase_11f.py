@@ -1,8 +1,14 @@
 """Phase 11F regression: catalogue-driven customer profile, project default split, cancel booking."""
-import os, time, requests, pytest
+import os
+import time
+
+import pytest
+import requests
+
+TEST_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
 
 BASE = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
-ADMIN = {"email": "admin@kkt.in", "password": "Kkt@12345"}
+ADMIN = {"email": "admin@kkt.in", "password": TEST_PASSWORD}
 
 
 @pytest.fixture(scope="session")

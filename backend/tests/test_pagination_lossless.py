@@ -6,6 +6,8 @@ import pytest
 import requests
 from pymongo import MongoClient
 
+TEST_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
+
 BASE = os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:8001").rstrip("/") + "/api"
 H = {"X-Rate-Limit-Bypass": "kkt-test-bypass-local"}
 MONGO = MongoClient(os.environ["MONGO_URL"])[os.environ["DB_NAME"]]
@@ -32,7 +34,7 @@ SIZES = (1, 7, 20, 100)
 
 @pytest.fixture(scope="module")
 def Hd():
-    r = requests.post(f"{BASE}/auth/login", json={"email": "admin@kkt.in", "password": "Kkt@12345"}, headers=H, timeout=30)
+    r = requests.post(f"{BASE}/auth/login", json={"email": "admin@kkt.in", "password": TEST_PASSWORD}, headers=H, timeout=30)
     assert r.status_code == 200, r.text
     return {**H, "Authorization": f"Bearer {r.json()['access_token']}"}
 

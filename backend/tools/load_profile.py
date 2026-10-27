@@ -15,13 +15,14 @@ import time
 import uuid
 
 import httpx
+from _env import DEMO_PASSWORD
 
 TOK = {"X-Rate-Limit-Bypass": "kkt-test-bypass-local"}
 R = random.Random(7)
 
 
 async def login(c, email):
-    r = await c.post("/api/auth/login", json={"email": email, "password": "Kkt@12345"}, headers=TOK)
+    r = await c.post("/api/auth/login", json={"email": email, "password": DEMO_PASSWORD}, headers=TOK)
     r.raise_for_status()
     return r.json()["access_token"]
 

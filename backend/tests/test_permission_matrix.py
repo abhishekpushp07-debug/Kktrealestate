@@ -4,10 +4,12 @@ Rules: /api/public/* and /api/health|ready → open; /api/portal/* → portal to
 everything else → 401 anonymous, 401/403 for a portal token, 403 for roles missing the permission, and never a 5xx."""
 import os
 import sys
+import time
 
 import pytest
-import time
 import requests
+
+TEST_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -103,7 +105,7 @@ def test_anonymous_and_portal_tokens_rejected_everywhere(base_url, who):
     assert not bad, bad
 
 
-ROLE_USERS = {"Sales": ("sales@kkt.in", "Kkt@12345"), "Accounts": ("accounts@kkt.in", "Kkt@12345"), "Employee": ("employee@kkt.in", "Kkt@12345")}
+ROLE_USERS = {"Sales": ("sales@kkt.in", TEST_PASSWORD), "Accounts": ("accounts@kkt.in", TEST_PASSWORD), "Employee": ("employee@kkt.in", TEST_PASSWORD)}
 
 
 @pytest.mark.parametrize("role", list(ROLE_USERS))

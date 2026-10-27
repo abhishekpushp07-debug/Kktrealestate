@@ -1,15 +1,19 @@
 """Phase M.1: tower creation never needs a project version; statement PDF prints the two-sided ledger."""
+import os
 import uuid
 
 import requests
 
-from tests.conftest import BASE as ROOT, session_token
+from tests.conftest import BASE as ROOT
+from tests.conftest import session_token
+
+TEST_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
 
 API = f"{ROOT}/api"
 
 
 def _h():
-    return {"Authorization": f"Bearer {session_token('admin@kkt.in', 'Kkt@12345')}"}
+    return {"Authorization": f"Bearer {session_token('admin@kkt.in', TEST_PASSWORD)}"}
 
 
 def test_tower_create_without_project_version_and_cosmetic_patch_without_version():

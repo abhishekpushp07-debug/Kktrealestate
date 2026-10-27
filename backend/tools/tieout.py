@@ -3,7 +3,10 @@ Usage: python tools/tieout.py [--base URL]  → prints PASS/FAIL table and write
 import argparse
 import os
 import sys
-from datetime import date, datetime, timezone, timedelta
+from datetime import date, datetime, timedelta, timezone
+
+from _env import DEMO_PASSWORD
+
 IST = timezone(timedelta(hours=5, minutes=30))
 
 import requests
@@ -16,7 +19,7 @@ BYPASS = {"X-Rate-Limit-Bypass": os.environ.get("LOGIN_RATE_LIMIT_BYPASS_TOKEN",
 
 def main(base):
     A = base.rstrip("/") + "/api"
-    tok = requests.post(f"{A}/auth/login", json={"email": "admin@kkt.in", "password": "Kkt@12345"}, headers=BYPASS, timeout=20).json()["access_token"]
+    tok = requests.post(f"{A}/auth/login", json={"email": "admin@kkt.in", "password": DEMO_PASSWORD}, headers=BYPASS, timeout=20).json()["access_token"]
     H = {"Authorization": f"Bearer {tok}"}
     db = MongoClient(os.environ["MONGO_URL"])[os.environ["DB_NAME"]]
     cid = db.companies.find_one({})["id"]
@@ -128,8 +131,10 @@ def main(base):
     tie("Σ Udhar − Σ Jama == outstanding − advance (every booking)", 0, bad2, "two-sided ledger law")
 
     # Phase I: every report has its own tie-out set (tools/tieout_reports.py) — folded in so this stays the one scoreboard
+    import contextlib
+    import io
+
     from tools.tieout_reports import main as reports_main
-    import io, contextlib
     buf = io.StringIO()
     with contextlib.redirect_stdout(buf):
         reports_ok = reports_main(base)

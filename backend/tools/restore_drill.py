@@ -49,6 +49,7 @@ async def drill_job(archive: str | None = None, scratch: str = "kkt_restore_dril
         v = await asyncio.to_thread(verify_scratch, scratch, src)
         # integrity on the scratch DB (same code path, pointed at scratch via a second client)
         from motor.motor_asyncio import AsyncIOMotorClient
+
         from services import integrity
         scratch_db = AsyncIOMotorClient(os.environ["MONGO_URL"])[scratch]
         orig = integrity.db

@@ -11,12 +11,13 @@ import time
 import uuid
 
 import httpx
-import pytest
 from dotenv import load_dotenv
+
+TEST_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
 
 load_dotenv("/app/frontend/.env")
 BASE = os.environ["REACT_APP_BACKEND_URL"].rstrip("/") + "/api"
-PWD = "Kkt@12345"
+PWD = TEST_PASSWORD
 
 
 # ---------- helpers ----------

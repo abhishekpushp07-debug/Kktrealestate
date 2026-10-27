@@ -73,8 +73,9 @@ def test_bulk_merged_pdf_and_zip(admin_headers):
     ids = [r["id"] for r in rows]
     m = requests.post(f"{BASE}/api/docgen/bulk", json={"demand_ids": ids, "mode": "merged"}, headers=admin_headers)
     assert m.status_code == 200 and m.content.startswith(b"%PDF")
-    from pypdf import PdfReader
     import io
+
+    from pypdf import PdfReader
     singles = sum(len(PdfReader(io.BytesIO(requests.get(f"{BASE}/api/bookings/{r['booking_id']}/demands/{r['id']}/letter.pdf", headers=admin_headers).content)).pages) for r in rows)
     assert len(PdfReader(io.BytesIO(m.content)).pages) == singles  # page break per document, nothing lost
     z = requests.post(f"{BASE}/api/docgen/bulk", json={"demand_ids": ids, "mode": "zip"}, headers=admin_headers)

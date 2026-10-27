@@ -5,12 +5,14 @@ import pytest
 import requests
 from pymongo import MongoClient
 
+TEST_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
+
 BASE = os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:8001").rstrip("/") + "/api"
 BYPASS = {"X-Rate-Limit-Bypass": os.environ.get("LOGIN_RATE_LIMIT_BYPASS_TOKEN", "")}
 db = MongoClient(os.environ["MONGO_URL"])[os.environ["DB_NAME"]]
 
 
-def _login(email, pw="Kkt@12345"):
+def _login(email, pw=TEST_PASSWORD):
     r = requests.post(f"{BASE}/auth/login", json={"email": email, "password": pw}, headers=BYPASS, timeout=20)
     assert r.status_code == 200, r.text
     return {"Authorization": f"Bearer {r.json()['access_token']}", **BYPASS}
@@ -28,7 +30,7 @@ PROBE = "rbac-probe@kkt.in"
 def sales_user(admin):
     """Throwaway Sales user so concurrent xdist workers never see a mutated demo account."""
     db.users.delete_one({"email": PROBE})
-    r = requests.post(f"{BASE}/users", json={"name": "RBAC Probe", "email": PROBE, "password": "Kkt@12345", "role_ids": [_role("Sales")]}, headers=admin, timeout=20)
+    r = requests.post(f"{BASE}/users", json={"name": "RBAC Probe", "email": PROBE, "password": TEST_PASSWORD, "role_ids": [_role("Sales")]}, headers=admin, timeout=20)
     assert r.status_code == 201, r.text
     u = r.json()
     acc = requests.get(f"{BASE}/admin/access/users/{u['id']}", headers=admin, timeout=20).json()

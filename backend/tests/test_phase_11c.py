@@ -1,6 +1,13 @@
 """Phase 11C backend tests — Customers filters/rm-options, Payments demands/idempotency/cap, Customer ledgers combined, Home ageing_counts."""
-import os, uuid, pytest, requests
+import os
+import uuid
 from pathlib import Path
+
+import pytest
+import requests
+
+TEST_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
+
 
 def _load_env():
     v = os.environ.get("REACT_APP_BACKEND_URL")
@@ -20,7 +27,7 @@ _TOKEN = {}
 def _login():
     if "t" in _TOKEN:
         return _TOKEN["t"]
-    r = requests.post(f"{API}/auth/login", json={"email": "admin@kkt.in", "password": "Kkt@12345"}, timeout=15)
+    r = requests.post(f"{API}/auth/login", json={"email": "admin@kkt.in", "password": TEST_PASSWORD}, timeout=15)
     r.raise_for_status()
     _TOKEN["t"] = r.json()["access_token"]
     return _TOKEN["t"]

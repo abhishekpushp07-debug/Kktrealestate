@@ -1,11 +1,17 @@
 """Phase B4 — backend sanity curl via requests."""
-import os, time, requests, pytest
+import os
+import time
+
+import pytest
+import requests
+
+TEST_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
 
 BASE = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
 
 @pytest.fixture(scope="module")
 def token():
-    r = requests.post(f"{BASE}/api/auth/login", json={"email":"admin@kkt.in","password":"Kkt@12345"}, timeout=15)
+    r = requests.post(f"{BASE}/api/auth/login", json={"email":"admin@kkt.in","password":TEST_PASSWORD}, timeout=15)
     assert r.status_code == 200, r.text
     return r.json()["access_token"]
 

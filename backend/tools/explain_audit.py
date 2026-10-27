@@ -4,7 +4,6 @@ Usage: DB_NAME=kkt_scale python tools/explain_audit.py [--fix] [--out /app/memor
 import argparse
 import json
 import os
-import statistics
 import sys
 import time
 

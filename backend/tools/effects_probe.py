@@ -11,6 +11,7 @@ import uuid
 from datetime import date
 
 import requests
+from _env import DEMO_PASSWORD
 
 BYPASS = {"X-Rate-Limit-Bypass": os.environ.get("LOGIN_RATE_LIMIT_BYPASS_TOKEN", "kkt-test-bypass-local")}
 OUT = "/app/memory/qa/journey/probes"
@@ -239,7 +240,7 @@ def customer_edit(api, ctx):
 
 
 def run(name, base, keep):
-    api = Api(base, "admin@kkt.in", "Kkt@12345")
+    api = Api(base, "admin@kkt.in", DEMO_PASSWORD)
     ctx = pick_context(api)
     before = surfaces(api, ctx)
     t0 = time.time()

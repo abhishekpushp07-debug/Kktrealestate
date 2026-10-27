@@ -1,5 +1,6 @@
 """Phase 3 seed: website CMS content. Idempotent."""
 import logging
+import os
 from datetime import date, timedelta
 
 from db import db
@@ -111,8 +112,8 @@ async def seed_phase3():
 
 async def _seed_brochure(sgh: dict):
     """Seed a real PDF brochure for SGH so the public brochure gate is exercisable."""
-    from storage import APP_NAME, put_object
     from services.pdf import brochure_pdf
+    from storage import APP_NAME, put_object
     try:
         data = brochure_pdf(sgh)
     except Exception:
@@ -137,7 +138,7 @@ async def seed_marketing_user():
         return
     cid = company["id"]
     if not await db.users.find_one({"email": "marketing@kkt.in"}):
-        from routers.auth import hash_password
+        from core.passwords import hash_password
         role = await db.roles.find_one({"name": "Marketing"}, {"_id": 0, "id": 1})
         if role:
-            await db.users.insert_one({**base_doc(None, cid), "name": "Priya Marketing", "email": "marketing@kkt.in", "phone": None, "role_id": role["id"], "project_scope": [], "password_hash": hash_password("Kkt@12345"), "failed_attempts": 0, "locked_until": None, "must_change_password": False})
+            await db.users.insert_one({**base_doc(None, cid), "name": "Priya Marketing", "email": "marketing@kkt.in", "phone": None, "role_id": role["id"], "project_scope": [], "password_hash": hash_password(os.environ["DEMO_PASSWORD"]), "failed_attempts": 0, "locked_until": None, "must_change_password": False})

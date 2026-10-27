@@ -8,6 +8,8 @@ from pymongo import MongoClient
 
 from services.audit_diff import MASKED, changed_fields, mask
 
+TEST_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
+
 BASE = os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:8001").rstrip("/") + "/api"
 BYPASS = {"X-Rate-Limit-Bypass": os.environ.get("LOGIN_RATE_LIMIT_BYPASS_TOKEN", "")}
 db = MongoClient(os.environ["MONGO_URL"])[os.environ["DB_NAME"]]
@@ -19,7 +21,7 @@ EXEMPT_ROUTES = {"files.py": {"upload_init", "upload_part"}, "admin.py": {"resee
 
 
 def _admin():
-    r = requests.post(f"{BASE}/auth/login", json={"email": "admin@kkt.in", "password": "Kkt@12345"}, headers=BYPASS, timeout=20)
+    r = requests.post(f"{BASE}/auth/login", json={"email": "admin@kkt.in", "password": TEST_PASSWORD}, headers=BYPASS, timeout=20)
     return {"Authorization": f"Bearer {r.json()['access_token']}", **BYPASS}
 
 

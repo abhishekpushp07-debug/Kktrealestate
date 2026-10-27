@@ -1,13 +1,16 @@
 """Phase 11B backend tests: dashboard/home + project_setup PUT sections with correct payload shapes."""
 import os
+
 import pytest
 import requests
+
+TEST_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://royal-realty-hub-2.preview.emergentagent.com").rstrip("/")
 API = f"{BASE_URL}/api"
 
 ADMIN_EMAIL = "admin@kkt.in"
-ADMIN_PASSWORD = "Kkt@12345"
+ADMIN_PASSWORD = TEST_PASSWORD
 
 _cache = {}
 

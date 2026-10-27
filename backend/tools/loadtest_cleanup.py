@@ -5,6 +5,7 @@ import os
 import sys
 
 import requests
+from _env import DEMO_PASSWORD
 
 
 def main():
@@ -13,7 +14,7 @@ def main():
     ap.add_argument("--confirm", required=True)
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--email", default=os.environ.get("LT_ADMIN_EMAIL", "admin@kkt.in"))
-    ap.add_argument("--password", default=os.environ.get("LT_ADMIN_PASSWORD", "Kkt@12345"))
+    ap.add_argument("--password", default=os.environ.get("LT_ADMIN_PASSWORD", DEMO_PASSWORD))
     a = ap.parse_args()
     if a.confirm != "PURGE":
         sys.exit("refusing: --confirm PURGE required")

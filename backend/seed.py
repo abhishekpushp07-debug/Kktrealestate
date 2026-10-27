@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 
 from crypto import encrypt_field
 from db import db, ensure_indexes
@@ -8,7 +9,7 @@ from services.flat_generation import generate_flats, unit_floors
 from utils import base_doc, now_iso, write_audit
 
 logger = logging.getLogger("kkt.seed")
-SEED_PASSWORD = "Kkt@12345"
+SEED_PASSWORD = os.environ["DEMO_PASSWORD"]  # demo credential lives in backend/.env, never in source
 
 
 async def _insert(coll: str, company_id: str, data: dict, entity_type: str | None = None) -> dict:
@@ -27,7 +28,7 @@ async def seed_if_empty():
 
 
 async def seed():
-    from routers.auth import hash_password
+    from core.passwords import hash_password
 
     company = await _insert("companies", "", {
         "name": "KKT Constructions", "brand": "KKT", "legal_name": "KKT Constructions Pvt. Ltd.", "short_code": "KKT", "tagline": "Building trust, delivering homes",

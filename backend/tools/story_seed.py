@@ -10,6 +10,7 @@ import uuid
 from datetime import date, timedelta
 
 import httpx
+from _env import DEMO_PASSWORD
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 R = random.Random(2526)
@@ -29,7 +30,7 @@ class Api:
         self.c = httpx.AsyncClient(base_url=base, timeout=120, headers={"X-Rate-Limit-Bypass": BYPASS})
         self.calls = 0
 
-    async def login(self, email="admin@kkt.in", password="Kkt@12345"):
+    async def login(self, email="admin@kkt.in", password=DEMO_PASSWORD):
         r = await self.c.post("/api/auth/login", json={"email": email, "password": password})
         r.raise_for_status()
         self.c.headers["Authorization"] = f"Bearer {r.json()['access_token']}"
@@ -93,7 +94,7 @@ class Story:
         emails = {u["email"]: u for u in users}
         for name, email, role in (("Neha Singh", "sales@kkt.in", "Sales"), ("Rohit Kumar", "sales2@kkt.in", "Sales"), ("Sunil Das", "support@kkt.in", "Accounts")):
             if email not in emails:
-                emails[email] = await a.post("/api/users", {"name": name, "email": email, "phone": f"98765{R.randint(10000, 99999)}", "password": "Kkt@12345", "role_id": roles[role]}, as_of=START)
+                emails[email] = await a.post("/api/users", {"name": name, "email": email, "phone": f"98765{R.randint(10000, 99999)}", "password": DEMO_PASSWORD, "role_id": roles[role]}, as_of=START)
         self.rms = [emails["sales@kkt.in"], emails["sales2@kkt.in"]]
         self.support = emails["support@kkt.in"]
         self.stage_ids = {}

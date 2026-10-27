@@ -3,6 +3,8 @@ import os
 
 import requests
 
+TEST_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
+
 BASE = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
 
 
@@ -18,6 +20,6 @@ def test_ops_snapshot_shape(admin_headers):
 
 def test_ops_requires_settings_manage():
     from tests.conftest import session_token
-    sales_headers = {"Authorization": f"Bearer {session_token('sales@kkt.in', 'Kkt@12345')}"}
+    sales_headers = {"Authorization": f"Bearer {session_token('sales@kkt.in', TEST_PASSWORD)}"}
     r = requests.get(f"{BASE}/api/admin/ops", headers=sales_headers, timeout=15)
     assert r.status_code in (403, 404)

@@ -8,9 +8,10 @@ import json
 import os
 import sys
 import time
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 
 import requests
+from _env import DEMO_PASSWORD
 
 HN = os.path.join(os.path.dirname(__file__), "..", "..", "memory", "qa", "story", "headline_numbers.json")
 OUT_DIR = "/app/memory/qa/prod"
@@ -111,7 +112,7 @@ def main():
     check("owner login", bool(login().get("access_token")))
     lo = requests.get(f"{base}/api/auth/login-options", timeout=30).json()
     check("login-options demo_accounts=false (host gating)", lo.get("demo_accounts") is False, lo)
-    d = requests.post(f"{base}/api/auth/login", json={"email": "admin@kkt.in", "password": "Kkt@12345"}, timeout=30)
+    d = requests.post(f"{base}/api/auth/login", json={"email": "admin@kkt.in", "password": DEMO_PASSWORD}, timeout=30)
     check("demo login refused", d.status_code in (401, 403) if lo.get("demo_accounts") is False else True, d.status_code)
     after = {"bookings": s.get(f"{base}/api/bookings?page_size=1", timeout=60).json().get("total"), "customers": s.get(f"{base}/api/customers?page_size=1", timeout=60).json().get("total"), "payments": s.get(f"{base}/api/payments?page_size=1", timeout=60).json().get("total")}
     log(lines, f"after: {json.dumps(after)}")

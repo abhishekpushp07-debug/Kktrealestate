@@ -14,7 +14,8 @@ export default function Login() {
   const navigate = useNavigate();
   const loc = useLocation();
   const [demoAllowed, setDemoAllowed] = useState(false);
-  useEffect(() => { api.get("/auth/login-options").then((r) => setDemoAllowed(Boolean(r.data?.demo_accounts))).catch(() => setDemoAllowed(false)); }, []);
+  const [demoPassword, setDemoPassword] = useState("");
+  useEffect(() => { api.get("/auth/login-options").then((r) => { setDemoAllowed(Boolean(r.data?.demo_accounts)); setDemoPassword(r.data?.demo_password || ""); }).catch(() => setDemoAllowed(false)); }, []);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
@@ -71,8 +72,8 @@ export default function Login() {
           </div>
           {demoAllowed && !mfa && (
             <div className="mt-12 border-t border-warm-200 pt-8" data-testid="login-demo-accounts">
-              <p className="label !text-ink-950/70">Demo accounts <span className="normal-case tracking-normal text-txt-muted">· password Kkt@12345</span></p>
-              <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Demo accounts">{DEMO.map(([r, e]) => <button key={e} type="button" onClick={() => { setEmail(e); setPassword("Kkt@12345"); }} aria-pressed={email === e} className={`pill h-9 border px-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${email === e ? "border-ink-950 bg-ink-950 text-warm-50" : "border-warm-200 bg-white text-txt-secondary hover:border-gold hover:bg-gold-light hover:text-ink-950 active:scale-[0.98]"}`} data-testid={`demo-${r.toLowerCase().replace(" ", "-")}`}>{r}</button>)}</div>
+              <p className="label !text-ink-950/70">Demo accounts <span className="normal-case tracking-normal text-txt-muted">· password {demoPassword}</span></p>
+              <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Demo accounts">{DEMO.map(([r, e]) => <button key={e} type="button" onClick={() => { setEmail(e); setPassword(demoPassword); }} aria-pressed={email === e} className={`pill h-9 border px-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${email === e ? "border-ink-950 bg-ink-950 text-warm-50" : "border-warm-200 bg-white text-txt-secondary hover:border-gold hover:bg-gold-light hover:text-ink-950 active:scale-[0.98]"}`} data-testid={`demo-${r.toLowerCase().replace(" ", "-")}`}>{r}</button>)}</div>
             </div>
           )}
         </form>

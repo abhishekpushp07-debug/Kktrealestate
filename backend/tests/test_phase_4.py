@@ -5,6 +5,8 @@ import httpx
 import pytest
 from dotenv import load_dotenv
 
+TEST_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
+
 load_dotenv("/app/frontend/.env")
 BASE = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
 PUBLIC_PREFIXES = ("/api/public", "/api/files/variants/", "/api/files/{file_id}/download", "/api/auth/login", "/api/auth/refresh", "/api/auth/forgot", "/api/auth/reset", "/api/health", "/api/ready", "/api/openapi.json", "/api/docs", "/api/admin/backups/", "/api/portal/auth/login", "/api/portal/auth/refresh", "/api/portal/config", "/api/docgen/shared/", "/api/messaging/webhooks/")
@@ -18,14 +20,14 @@ def client():
 
 @pytest.fixture(scope="module")
 def admin(client):
-    r = client.post("/api/auth/login", json={"email": "admin@kkt.in", "password": "Kkt@12345"})
+    r = client.post("/api/auth/login", json={"email": "admin@kkt.in", "password": TEST_PASSWORD})
     assert r.status_code == 200, r.text
     return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
 
 @pytest.fixture(scope="module")
 def accounts(client):
-    r = client.post("/api/auth/login", json={"email": "accounts@kkt.in", "password": "Kkt@12345"})
+    r = client.post("/api/auth/login", json={"email": "accounts@kkt.in", "password": TEST_PASSWORD})
     return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
 

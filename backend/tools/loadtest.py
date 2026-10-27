@@ -13,6 +13,7 @@ from collections import Counter
 from datetime import datetime, timezone
 
 import httpx
+from _env import DEMO_PASSWORD
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -181,7 +182,7 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", default=os.environ.get("LOADTEST_BASE", "http://127.0.0.1:8001"))
     ap.add_argument("--email", default="admin@kkt.in")
-    ap.add_argument("--password", default="Kkt@12345")
+    ap.add_argument("--password", default=DEMO_PASSWORD)
     ap.add_argument("--users", type=int, default=5)
     ap.add_argument("--seconds", type=int, default=10)
     ap.add_argument("--out", default="/app/memory/qa/load")

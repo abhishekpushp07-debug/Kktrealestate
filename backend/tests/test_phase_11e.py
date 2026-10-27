@@ -1,8 +1,14 @@
 """Phase 11E backend smoke: reports CSV + presets, master flat-types usage, roles PATCH, service status, quick-customer create."""
-import os, time, requests, pytest
+import os
+import time
+
+import pytest
+import requests
+
+TEST_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
 
 BASE = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
-ADMIN = {"email": "admin@kkt.in", "password": "Kkt@12345"}
+ADMIN = {"email": "admin@kkt.in", "password": TEST_PASSWORD}
 
 
 @pytest.fixture(scope="session")

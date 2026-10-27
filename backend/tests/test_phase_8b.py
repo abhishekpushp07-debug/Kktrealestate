@@ -1,14 +1,17 @@
 """Phase 8B backend sanity tests: public API, pagination guard, milestones legacy next_seq."""
 import os
-import requests
+
 import pytest
+import requests
+
+TEST_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://royal-realty-hub-2.preview.emergentagent.com").rstrip("/")
 
 
 @pytest.fixture(scope="module")
 def admin_token():
-    r = requests.post(f"{BASE_URL}/api/auth/login", json={"email": "admin@kkt.in", "password": "Kkt@12345"})
+    r = requests.post(f"{BASE_URL}/api/auth/login", json={"email": "admin@kkt.in", "password": TEST_PASSWORD})
     assert r.status_code == 200, r.text
     data = r.json()
     assert "access_token" in data

@@ -1,9 +1,10 @@
 """Phase D — backend performance / observability smoke tests."""
+import json
 import os
 import time
-import urllib.request
 import urllib.error
-import json
+import urllib.request
+
 import pytest
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
@@ -14,7 +15,7 @@ if not BASE_URL:
                 BASE_URL = line.split("=", 1)[1].strip().rstrip("/")
 
 ADMIN_EMAIL = "admin@kkt.in"
-ADMIN_PASSWORD = "Kkt@12345"
+ADMIN_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
 
 
 def _raw_request(method, path, headers=None, body=None):
@@ -123,9 +124,13 @@ def test_cors_evil_origin():
     # Report-only; do not fail (ingress may inject)
 
 
-import requests
 from datetime import date
+
+import requests
+
 from tests.conftest import BASE as _B
+
+
 API_B = f"{_B}/api"
 
 

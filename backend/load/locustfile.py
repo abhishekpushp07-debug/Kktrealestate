@@ -9,7 +9,7 @@ import uuid
 
 from locust import FastHttpUser, between, events, task
 
-PWD = os.environ.get("KKT_PWD", "Kkt@12345")
+PWD = os.environ.get("KKT_PWD", os.environ["DEMO_PASSWORD"])
 STATE = {"token": None, "etags": {}, "booking": None, "customers": [], "blocks": [], "mode": None, "portal": None}
 
 

@@ -15,6 +15,7 @@ from collections import Counter, defaultdict
 from datetime import date, datetime, timezone
 
 import httpx
+from _env import DEMO_PASSWORD
 
 OUT_DIR = "/app/memory/qa/prod"
 BYPASS = os.environ.get("LOGIN_RATE_LIMIT_BYPASS_TOKEN", "")
@@ -267,7 +268,7 @@ async def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", required=True)
     ap.add_argument("--email", default=os.environ.get("LT_ADMIN_EMAIL", "admin@kkt.in"))
-    ap.add_argument("--password", default=os.environ.get("LT_ADMIN_PASSWORD", "Kkt@12345"))
+    ap.add_argument("--password", default=os.environ.get("LT_ADMIN_PASSWORD", DEMO_PASSWORD))
     ap.add_argument("--stages", default="500,1000,2000")
     ap.add_argument("--stage-min", type=float, default=4)
     ap.add_argument("--warmup-s", type=int, default=20)

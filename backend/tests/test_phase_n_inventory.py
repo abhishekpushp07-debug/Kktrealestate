@@ -1,5 +1,4 @@
 """Phase N — inventory control: visibility shaping, saleability in the wizard, mandatory hold expiry, expiry sweep, category → counters/Journey, report tie-outs."""
-import asyncio
 import os
 import sys
 from datetime import datetime, timedelta, timezone
@@ -9,6 +8,8 @@ from pymongo import MongoClient
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from tests.conftest import BASE  # noqa: E402
+
+TEST_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
 
 mongo = MongoClient(os.environ["MONGO_URL"])[os.environ.get("KKT_TEST_DB", "kkt_test")]
 
@@ -21,7 +22,7 @@ def _login(email, password):
 
 def _sales_headers():
     try:
-        return _login("sales@kkt.in", "Kkt@12345")
+        return _login("sales@kkt.in", TEST_PASSWORD)
     except AssertionError:
         return None
 

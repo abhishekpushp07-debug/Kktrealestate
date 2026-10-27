@@ -3,9 +3,10 @@ Usage: python tools/tieout_reports.py [--base URL]  → prints PASS/FAIL lines a
 import argparse
 import os
 import sys
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 
 import requests
+from _env import DEMO_PASSWORD
 from dotenv import load_dotenv
 from pymongo import MongoClient
 
@@ -19,7 +20,7 @@ F0, F1 = "2020-01-01", "2030-12-31"
 
 def main(base):
     A = base.rstrip("/") + "/api"
-    tok = requests.post(f"{A}/auth/login", json={"email": "admin@kkt.in", "password": "Kkt@12345"}, headers=BYPASS, timeout=20).json()["access_token"]
+    tok = requests.post(f"{A}/auth/login", json={"email": "admin@kkt.in", "password": DEMO_PASSWORD}, headers=BYPASS, timeout=20).json()["access_token"]
     H = {"Authorization": f"Bearer {tok}"}
     db = MongoClient(os.environ["MONGO_URL"])[os.environ["DB_NAME"]]
     cid = db.companies.find_one({})["id"]
@@ -66,7 +67,12 @@ def main(base):
         inv("collections-v2", "/reports/collections-v2", "total_paise", by, from_date=F0, to_date=F1)
 
     # 2 Outstanding & ageing — law: Outstanding · Advance held · Net balance
-    from services.definitions import ageing_bands, overdue_of, outstanding, advance, net_balance
+    from services.definitions import (
+        advance,
+        ageing_bands,
+        net_balance,
+        outstanding,
+    )
     o = g("/reports/outstanding-v2")
     raw_out = sum(outstanding(b.get("summary") or {})["total_paise"] for b in live)
     raw_adv = sum(advance(b.get("summary") or {}) for b in live)

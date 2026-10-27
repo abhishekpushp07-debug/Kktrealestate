@@ -12,7 +12,7 @@ CLERK = ["finance.payment.view", "finance.payment.create", "finance.receipt.prin
 
 def test_legacy_expansion_is_behaviourally_equivalent():
     """Every route a coarse code used to open is opened by its expansion, and the expansion opens nothing the coarse code did not."""
-    from permissions import LEGACY_EXPANSION, ROUTE_PERMS, PERMISSION_SET
+    from permissions import LEGACY_EXPANSION, PERMISSION_SET, ROUTE_PERMS
     assert all(c in PERMISSION_SET for v in LEGACY_EXPANSION.values() for c in v)
     for legacy, specific in LEGACY_EXPANSION.items():
         legacy_routes = {k for k, v in ROUTE_PERMS.items() if legacy in v.get("legacy", [])}
@@ -21,7 +21,7 @@ def test_legacy_expansion_is_behaviourally_equivalent():
 
 
 def test_system_roles_cover_their_legacy_routes():
-    from permissions import SYSTEM_ROLES, ROUTE_PERMS, _LEGACY_ROLES
+    from permissions import _LEGACY_ROLES, ROUTE_PERMS, SYSTEM_ROLES
     for name, spec in _LEGACY_ROLES.items():
         if spec["permissions"] is None:  # Super Admin / Admin: everything
             continue

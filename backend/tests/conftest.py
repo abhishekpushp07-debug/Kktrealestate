@@ -2,8 +2,8 @@
 that calls `requests.post(.../auth/login)` or `requests.post(.../portal/auth/login)` by caching the first successful response."""
 import os
 import subprocess
-import time
 import sys
+import time
 
 import pytest
 import requests
@@ -19,6 +19,7 @@ if "REACT_APP_BACKEND_URL" not in os.environ:
                 os.environ["REACT_APP_BACKEND_URL"] = line.split("=", 1)[1].strip()
 
 BASE = os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:8001").rstrip("/")
+TEST_PASSWORD = os.environ.get("TEST_PASSWORD") or os.environ["DEMO_PASSWORD"]  # seeded-user password (backend/.env); never a literal in source
 # ---------------------------------------------------------------------------------------------------------------------------------
 # R0d — TEST DB ISOLATION. The suite NEVER runs against the preview database. The controller process snapshots the preview story DB
 # into `kkt_test` (deterministic story output == fixture), starts a private backend on :8011 bound to it, and points every test there.
@@ -187,7 +188,8 @@ _TOKEN_FILE = "/tmp/kkt_test_tokens.json"
 def _file_get(key):
     """Cross-process (xdist) token share so the whole suite needs ≤1 real login per account."""
     try:
-        import json, time
+        import json
+        import time
         d = json.load(open(_TOKEN_FILE))
         e = d.get("|".join(map(str, key)))
         if e and time.time() - e["at"] < 600:
@@ -198,7 +200,8 @@ def _file_get(key):
 
 def _file_put(key, body):
     try:
-        import json, time
+        import json
+        import time
         try:
             d = json.load(open(_TOKEN_FILE))
         except Exception:
@@ -312,7 +315,7 @@ def base_url():
 
 @pytest.fixture(scope="session")
 def admin_headers():
-    return {"Authorization": f"Bearer {session_token('admin@kkt.in', 'Kkt@12345')}"}
+    return {"Authorization": f"Bearer {session_token('admin@kkt.in', TEST_PASSWORD)}"}
 
 
 @pytest.fixture(scope="session")

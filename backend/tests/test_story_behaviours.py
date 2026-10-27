@@ -1,4 +1,5 @@
 """Story-anchored rewrites of the legacy demo-seed tests (see tests/RETIRED_TESTS.md). Runs only against the isolated kkt_test snapshot."""
+import os
 import uuid
 from datetime import date
 
@@ -7,12 +8,14 @@ import requests
 
 from tests.conftest import BASE, session_token
 
+TEST_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
+
 API = f"{BASE}/api"
 PORTAL_PHONE, PORTAL_PW = "9431023456", "Buyer@12345"  # Priya Verma — story portal persona
 
 
 def H(email):
-    return {"Authorization": f"Bearer {session_token(email, 'Kkt@12345')}"}
+    return {"Authorization": f"Bearer {session_token(email, TEST_PASSWORD)}"}
 
 
 def _modes(h):
@@ -73,6 +76,7 @@ def test_kyc_masked_for_sales_revealed_for_accounts(admin_headers):
 # ---- Roznamcha (replaces test_roznamcha) ----
 def test_roznamcha_identity_on_story_cash_day(admin_headers):
     import os
+
     from pymongo import MongoClient
     db = MongoClient(os.environ["MONGO_URL"])[os.environ["DB_NAME"]]
     d = db.payments.find_one({"payment_mode_code": "CASH", "status": "Cleared"}, {"payment_date": 1})["payment_date"]

@@ -12,7 +12,7 @@ from datetime import date
 import requests
 from locust import HttpUser, between, events, task
 
-PASSWORD = os.environ.get("LT_PASSWORD", "Kkt@12345")
+PASSWORD = os.environ.get("LT_PASSWORD", os.environ["DEMO_PASSWORD"])
 ACCOUNTS = ["admin@kkt.in", "accounts@kkt.in", "sales@kkt.in", "projectadmin@kkt.in", "employee@kkt.in", "marketing@kkt.in"]
 _s = {"tokens": {}, "blocks": [], "projects": [], "bookings": [], "slugs": [], "modes": {}, "bank": None}
 

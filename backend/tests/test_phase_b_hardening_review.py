@@ -12,19 +12,21 @@ Covers:
 - Anchor booking BK-2526-0001 (22 ledger rows, due==0)
 - Health endpoint fast + security headers
 """
-import os
 import hashlib
 import io
+import os
 import time
 import uuid
 
 import pytest
 import requests
 
+TEST_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
+
 BASE = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
 API = f"{BASE}/api"
 
-ADMIN = {"email": "admin@kkt.in", "password": "Kkt@12345"}
+ADMIN = {"email": "admin@kkt.in", "password": TEST_PASSWORD}
 PORTAL = {"phone": "9431023456", "password": "Buyer@12345"}
 ANCHOR_BK = "BK-2526-0001"
 

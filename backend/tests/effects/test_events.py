@@ -1,4 +1,5 @@
 import time
+
 """Phase G effect-assertion tests: for every canonical event, the ACTUAL propagation == the registry's EXPECTED surfaces,
 the outbox row is complete, and replaying the outbox row is idempotent (no duplicate notifications, no number changes)."""
 import datetime
@@ -7,6 +8,7 @@ import uuid
 
 import pytest
 import requests
+TEST_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
 
 BASE = os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:8001").rstrip("/")
 API = f"{BASE}/api"
@@ -16,7 +18,7 @@ TODAY = datetime.date.today().isoformat()
 
 @pytest.fixture(scope="module")
 def H():
-    r = requests.post(f"{API}/auth/login", json={"email": "admin@kkt.in", "password": "Kkt@12345"}, headers=BYPASS, timeout=30)
+    r = requests.post(f"{API}/auth/login", json={"email": "admin@kkt.in", "password": TEST_PASSWORD}, headers=BYPASS, timeout=30)
     assert r.status_code == 200, r.text
     return {"Authorization": f"Bearer {r.json()['access_token']}", **BYPASS}
 

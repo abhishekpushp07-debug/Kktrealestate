@@ -5,8 +5,11 @@ what the frontend does on an Undo click, and then assert via GET + audit log tha
 the revert actually hit the database.
 """
 import os
+
 import pytest
 import requests
+
+TEST_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL").rstrip("/")
 API = f"{BASE_URL}/api"
@@ -15,14 +18,14 @@ HDRS_BYPASS = {"X-Rate-Limit-Bypass": "kkt-test-bypass-local"}
 
 @pytest.fixture(scope="module")
 def admin_token():
-    r = requests.post(f"{API}/auth/login", json={"email": "admin@kkt.in", "password": "Kkt@12345"}, headers=HDRS_BYPASS, timeout=30)
+    r = requests.post(f"{API}/auth/login", json={"email": "admin@kkt.in", "password": TEST_PASSWORD}, headers=HDRS_BYPASS, timeout=30)
     assert r.status_code == 200, r.text
     return r.json()["access_token"]
 
 
 @pytest.fixture(scope="module")
 def accounts_token():
-    r = requests.post(f"{API}/auth/login", json={"email": "accounts@kkt.in", "password": "Kkt@12345"}, headers=HDRS_BYPASS, timeout=30)
+    r = requests.post(f"{API}/auth/login", json={"email": "accounts@kkt.in", "password": TEST_PASSWORD}, headers=HDRS_BYPASS, timeout=30)
     assert r.status_code == 200, r.text
     return r.json()["access_token"]
 

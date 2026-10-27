@@ -6,6 +6,8 @@ import pytest
 import requests
 from pymongo import MongoClient
 
+TEST_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
+
 API = os.environ["REACT_APP_BACKEND_URL"].rstrip("/") + "/api"
 db = MongoClient(os.environ["MONGO_URL"])[os.environ["DB_NAME"]]
 
@@ -25,7 +27,7 @@ EXPECTED = [  # (category, amount ₹, cash_due, account_due, total_due) after e
 
 @pytest.fixture(scope="module")
 def token():
-    r = requests.post(f"{API}/auth/login", json={"email": "admin@kkt.in", "password": "Kkt@12345"}, timeout=30)
+    r = requests.post(f"{API}/auth/login", json={"email": "admin@kkt.in", "password": TEST_PASSWORD}, timeout=30)
     r.raise_for_status()
     return r.json()["access_token"]
 

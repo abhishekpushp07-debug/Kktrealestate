@@ -1,4 +1,5 @@
 import pytest
+
 """Phase 11A — code-review fixes, canonical additions, API packeting, index audit. Run per file (login limiter)."""
 import os
 import threading
@@ -9,10 +10,12 @@ from datetime import date, timedelta
 import requests
 from dotenv import load_dotenv
 
+TEST_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
+
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", ".env"))
 BASE = os.environ["REACT_APP_BACKEND_URL"].rstrip("/") + "/api"
-PWD = "Kkt@12345"
+PWD = TEST_PASSWORD
 _tok = {}
 
 
@@ -145,7 +148,8 @@ def test_visit_links_revoked_on_completed():
     r = requests.post(f"{BASE}/site-visits/{vid}/complete", headers=H(), json={"note": "done"}, timeout=15)
     assert r.status_code == 200, r.text
     assert requests.get(f"{BASE.rsplit('/api', 1)[0]}{ics}", timeout=15).status_code == 410
-    import base64, json
+    import base64
+    import json
     raw = ics.rsplit("/", 1)[1].replace(".ics", "").split(".")[0]
     payload = json.loads(base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)))
     assert payload.get("exp"), "signed visit links must carry an expiry"

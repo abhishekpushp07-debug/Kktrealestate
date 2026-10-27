@@ -5,10 +5,11 @@ import os
 import sys
 
 import requests
+from _env import DEMO_PASSWORD
 
 A = os.environ.get("STORY_BASE_URL", "http://localhost:8001") + "/api"
 H = {"X-Rate-Limit-Bypass": os.environ.get("LOGIN_RATE_LIMIT_BYPASS_TOKEN", "kkt-test-bypass-local")}
-H["Authorization"] = "Bearer " + requests.post(A + "/auth/login", json={"email": "admin@kkt.in", "password": "Kkt@12345"}, headers=H, timeout=30).json()["access_token"]
+H["Authorization"] = "Bearer " + requests.post(A + "/auth/login", json={"email": "admin@kkt.in", "password": DEMO_PASSWORD}, headers=H, timeout=30).json()["access_token"]
 AS_OF = sys.argv[1] if len(sys.argv) > 1 else "2026-10-26"
 OUT = "/app/memory/qa/story"
 g = lambda p, **k: requests.get(A + p, headers=H, params=k, timeout=60).json()  # noqa: E731

@@ -1,5 +1,4 @@
 """Phase K P0 proofs: job isolation, invariants + concurrency, immutable audit/ledger, durable idempotency branches, cap-headroom warning."""
-import asyncio
 import os
 import sys
 import threading

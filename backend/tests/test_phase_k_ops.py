@@ -1,5 +1,4 @@
 """Phase K.12/13 proofs: backup + restore drill end-to-end on the test DB; alert rules with synthetic snapshots."""
-import asyncio
 import os
 import sys
 import tempfile
@@ -10,11 +9,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from tests.conftest import BASE  # noqa: E402
 
 
-
 def test_backup_manifest_and_restore_drill_records_job_run():
     """Deterministic under xdist: snapshot the (busy) test DB into a quiescent copy first, then back up + drill that copy so verify compares like with like."""
     import subprocess
+
     from pymongo import MongoClient
+
     from tools.backup import run_backup
     src, quiet = os.environ["DB_NAME"], "kkt_drill_src_test"
     MongoClient(os.environ["MONGO_URL"]).drop_database(quiet)

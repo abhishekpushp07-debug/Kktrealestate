@@ -1,7 +1,7 @@
 """Audit retention: old rows move to audit_logs_archive (never deleted), archive is read-only and searchable via include_archive."""
 import os
 import uuid
-from datetime import timedelta, date
+from datetime import date, timedelta
 
 import pytest
 import requests

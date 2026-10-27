@@ -3,6 +3,8 @@ import os
 
 import requests
 
+TEST_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
+
 # host gating is decided from the Host/X-Forwarded-Host the backend sees; the preview ingress rewrites those, so hit the backend directly
 BASE = os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:8001").rstrip("/") + "/api"
 BYPASS = {"X-Rate-Limit-Bypass": os.environ.get("LOGIN_RATE_LIMIT_BYPASS_TOKEN", "")}
@@ -26,13 +28,13 @@ def test_owner_login_super_admin():
 
 
 def test_demo_login_refused_on_production_host():
-    r = _login("admin@kkt.in", "Kkt@12345", "billpe.com")
+    r = _login("admin@kkt.in", TEST_PASSWORD, "billpe.com")
     assert r.status_code == 401, r.text
     assert r.json()["code"] == "DEMO_LOGIN_DISABLED"
 
 
 def test_demo_login_allowed_on_preview_host():
-    r = _login("admin@kkt.in", "Kkt@12345", "kkt.preview.emergentagent.com")
+    r = _login("admin@kkt.in", TEST_PASSWORD, "kkt.preview.emergentagent.com")
     assert r.status_code == 200, r.text
 
 

@@ -1,12 +1,15 @@
 """Phase C refocus backend tests: parked public/portal APIs, bootstrap surfaces, company settings, receipt PDF, CSV, health."""
+import json as _json
 import os
 import time
-import re
+import urllib.error
+import urllib.request
+
 import pytest
 import requests
-import urllib.request
-import urllib.error
-import json as _json
+
+TEST_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
+
 
 def _raw_get(path):
     """Bypass the shared conftest's auto-injected X-Rate-Limit-Bypass header."""
@@ -20,7 +23,7 @@ def _raw_get(path):
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://royal-realty-hub-2.preview.emergentagent.com").rstrip("/")
 ADMIN_EMAIL = "admin@kkt.in"
-ADMIN_PASSWORD = "Kkt@12345"
+ADMIN_PASSWORD = TEST_PASSWORD
 
 
 @pytest.fixture(scope="module")
