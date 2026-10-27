@@ -138,7 +138,15 @@ async def referential_findings() -> list[dict]:
         if bk["status"] in ("Active", "Completed"):
             live_by_flat.setdefault(bk["flat_id"], []).append((bk["id"], bk["booking_number"]))
         if bk["status"] == "Active":
-            await _booking_ledger_findings(bk, out)
+            tmp: list = []
+            await _booking_ledger_findings(bk, tmp)
+            if tmp:  # read-skew guard: a payment in flight (ledger/payment written, summary not yet) is not a finding — re-check once on a fresh doc
+                await asyncio.sleep(0.2)
+                fresh = await db.bookings.find_one({"id": bk["id"]}, proj)
+                tmp = []
+                if fresh:
+                    await _booking_ledger_findings(fresh, tmp)
+            out.extend(tmp)
     del customers
     for fid, bks in live_by_flat.items():
         if len(bks) > 1:
