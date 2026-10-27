@@ -1,0 +1,12 @@
+{
+  "$comment": "Accepted high/critical advisories of `pnpm audit --prod` (scripts/ci/audit-gate.mjs). Every entry needs a reason and an expiry (YYYY-MM-DD): after it the gate fails again, so the risk is re-decided rather than forgotten. Remove an entry as soon as the advisory no longer appears (the gate warns about unused entries).",
+  "entries": [
+    {
+      "id": "GHSA-86w9-cpqp-85rv",
+      "module": "node-forge",
+      "paths": ["apps__portal>expo>@expo/cli>node-forge"],
+      "reason": "node-forge <=1.4.0 RSA PKCS#1 v1.5 signature verification accepts extra nested DigestAlgorithm elements; no patched release exists. It is reached only through @expo/cli (the portal's build/dev tooling: `expo export` for the web build, dev-server certificates). The shipped portal is a static web export plus native binaries; neither bundles node-forge nor verifies RSA signatures with it, and no API or website code depends on it.",
+      "expires": "2027-01-31"
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 /**
- * Restore of a backup archive (audit B9; CLI src/cli/restore.ts). Steps: verify the sha256 of every file against manifest.json → check the
+ * Restore of a backup archive (audit B9; CLI src/cli/restore.ts). Steps: verify manifest.sig (HMAC of manifest.json under the
+ * LINK_SIGNING_KEYS ring: unsigned, re-signed or edited archives are refused) and the sha256 of every file against manifest.json → check the
  * target is empty (before touching it) → migrate it → load the tables parents-first in foreign-key order inside ONE transaction with `json_populate_recordset`
  * (PostgreSQL converts every value; no trigger is disabled — the append-only guards never block INSERT) → compare each table's row count
  * with the manifest → run the integrity report for every company. Nothing is written when a check fails before the load, and the load
@@ -11,7 +12,14 @@ import type { Readable } from "node:stream";
 import yauzl, { type Entry, type ZipFile } from "yauzl";
 import type { Sql } from "postgres";
 import { createDb, runMigrations } from "@kkt/db";
-import { BACKUP_FORMAT, fkLoadOrder, schemaVersion, type BackupManifest } from "./backup.js";
+import {
+  BACKUP_FORMAT,
+  BACKUP_SIGNATURE_FILE,
+  fkLoadOrder,
+  schemaVersion,
+  verifyBackupManifest,
+  type BackupManifest,
+} from "./backup.js";
 
 /** Rows per INSERT … SELECT FROM json_populate_recordset. */
 const LOAD_BATCH = 2_000;
@@ -35,6 +43,8 @@ export interface RestoreOptions {
 
 /** Outcome of restoreBackup(). */
 export interface RestoreResult {
+  /** LINK_SIGNING_KEYS key id that signed the archive's manifest. */
+  signed_by: string;
   manifest: Pick<
     BackupManifest,
     "format" | "generated_at" | "app_version" | "company" | "include_sensitive" | "schema" | "table_count" | "row_count"
@@ -128,6 +138,79 @@ function notEmpty(tables: readonly string[]): Error {
   );
 }
 
+async function entryBytes(zip: ZipFile, entry: Entry): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  for await (const c of await entryStream(zip, entry)) chunks.push(c as Buffer);
+  return Buffer.concat(chunks);
+}
+
+/** Outcome of verifyBackupArchive(). */
+export interface VerifiedArchive {
+  manifest: BackupManifest;
+  /** LINK_SIGNING_KEYS key id that signed the manifest. */
+  signed_by: string;
+  files_verified: number;
+}
+
+/**
+ * Authenticity and integrity of an open archive, before anything is written anywhere: manifest.sig must verify against the exact bytes of
+ * manifest.json under the LINK_SIGNING_KEYS ring (unsigned, re-signed elsewhere or edited → refused), the format must be this build's,
+ * every listed file must be present with its sha256, and the archive may hold no file the signed manifest does not list.
+ */
+async function verifyOpenArchive(
+  zip: ZipFile,
+  entries: Map<string, Entry>,
+  log: (msg: string) => void,
+): Promise<VerifiedArchive> {
+  const manifestEntry = entries.get("manifest.json");
+  if (!manifestEntry) throw new Error("manifest.json is missing: not a KKT backup");
+  const manifestBytes = await entryBytes(zip, manifestEntry);
+  const sigEntry = entries.get(BACKUP_SIGNATURE_FILE);
+  if (!sigEntry)
+    throw new Error(
+      `${BACKUP_SIGNATURE_FILE} is missing: the archive is not signed (unsigned backups are refused; this build restores ${BACKUP_FORMAT})`,
+    );
+  const { kid } = verifyBackupManifest(manifestBytes, (await entryBytes(zip, sigEntry)).toString("utf8"));
+  const manifest = JSON.parse(manifestBytes.toString("utf8")) as BackupManifest;
+  if (manifest.format !== BACKUP_FORMAT)
+    throw new Error(`unsupported backup format ${manifest.format} (this build restores ${BACKUP_FORMAT})`);
+  log(`manifest signature ok (key ${kid})`);
+
+  const listed = new Set<string>(["manifest.json", BACKUP_SIGNATURE_FILE]);
+  log(`verifying ${manifest.tables.length + Object.keys(manifest.files ?? {}).length} checksums`);
+  for (const t of manifest.tables) {
+    listed.add(t.file);
+    const e = entries.get(t.file);
+    if (!e) throw new Error(`${t.file} listed in manifest.json is missing from the archive`);
+    if ((await entrySha256(zip, e)) !== t.sha256)
+      throw new Error(`checksum mismatch for ${t.file}: the archive is corrupt or was modified`);
+  }
+  for (const [name, sum] of Object.entries(manifest.files ?? {})) {
+    listed.add(name);
+    const e = entries.get(name);
+    if (!e || (await entrySha256(zip, e)) !== sum) throw new Error(`checksum mismatch for ${name}`);
+  }
+  const extra = [...entries.keys()].filter((n) => !listed.has(n));
+  if (extra.length > 0)
+    throw new Error(
+      `the archive holds files the signed manifest does not list (${extra.slice(0, 5).join(", ")}): refusing it`,
+    );
+  return { manifest, signed_by: kid, files_verified: listed.size - 2 };
+}
+
+/** Verifies a backup archive's signature and checksums without touching any database (CLI --verify-only). Throws on any failure. */
+export async function verifyBackupArchive(
+  file: string,
+  log: (msg: string) => void = () => undefined,
+): Promise<VerifiedArchive> {
+  const { zip, entries } = await openZip(file);
+  try {
+    return await verifyOpenArchive(zip, entries, log);
+  } finally {
+    zip.close();
+  }
+}
+
 /** Restores a backup archive into an empty database. Throws (writing nothing) on any failed check. */
 export async function restoreBackup(opts: RestoreOptions): Promise<RestoreResult> {
   const started = Date.now();
@@ -135,24 +218,8 @@ export async function restoreBackup(opts: RestoreOptions): Promise<RestoreResult
   if (!opts.confirm) throw new Error("restore needs --confirm: it loads a full backup into the target database");
   const { zip, entries } = await openZip(opts.file);
   try {
-    const manifestEntry = entries.get("manifest.json");
-    if (!manifestEntry) throw new Error("manifest.json is missing: not a KKT backup");
-    const manifest = JSON.parse(await entryText(zip, manifestEntry)) as BackupManifest;
-    if (manifest.format !== BACKUP_FORMAT)
-      throw new Error(`unsupported backup format ${manifest.format} (this build restores ${BACKUP_FORMAT})`);
-
-    // 1. integrity of the archive
-    log(`verifying ${manifest.tables.length + Object.keys(manifest.files ?? {}).length} checksums`);
-    for (const t of manifest.tables) {
-      const e = entries.get(t.file);
-      if (!e) throw new Error(`${t.file} listed in manifest.json is missing from the archive`);
-      if ((await entrySha256(zip, e)) !== t.sha256)
-        throw new Error(`checksum mismatch for ${t.file}: the archive is corrupt or was modified`);
-    }
-    for (const [name, sum] of Object.entries(manifest.files ?? {})) {
-      const e = entries.get(name);
-      if (!e || (await entrySha256(zip, e)) !== sum) throw new Error(`checksum mismatch for ${name}`);
-    }
+    // 1. authenticity and integrity of the archive
+    const { manifest, signed_by } = await verifyOpenArchive(zip, entries, log);
     const stripped = manifest.tables.filter((t) => t.stripped_columns.length > 0);
     if (!manifest.include_sensitive && stripped.length > 0 && !opts.allowStripped) {
       throw new Error(
@@ -251,7 +318,7 @@ export async function restoreBackup(opts: RestoreOptions): Promise<RestoreResult
         }
       }
       const { tables: _t, files: _f, load_order: _o, batch_size: _b, node_version: _n, ...head } = manifest;
-      return { manifest: head, tables, load_order: order, integrity, duration_ms: Date.now() - started };
+      return { signed_by, manifest: head, tables, load_order: order, integrity, duration_ms: Date.now() - started };
     } finally {
       await handle.close();
     }

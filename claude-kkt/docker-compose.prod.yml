@@ -4,17 +4,27 @@
 #     talks to Postgres directly as kkt_owner, and the API replicas start only after it completed;
 #   * object storage is S3-compatible by default (AWS S3, Cloudflare R2, or the bundled MinIO with `--profile minio`);
 #   * Redis is persistent and never evicts (optional dedicated security Redis with `--profile security-redis`);
-#   * Postgres archives WAL to the backup volume and the backup service takes nightly dumps (restore-tested) + weekly base backups;
-#   * Prometheus + Grafana + exporters with `--profile monitoring` (infra/prometheus, infra/grafana).
+#   * Postgres archives WAL to the backup volume and the backup service takes nightly dumps (restore-tested) + weekly base backups, all
+#     encrypted (age; infra/backup/backup.sh, image infra/backup/Dockerfile);
+#   * two job workers (contract C8 health on :9465, drained on stop within WORKER_DRAIN_TIMEOUT_MS);
+#   * Prometheus + Alertmanager (critical → pager, warnings → Slack) + Grafana + exporters with `--profile monitoring`.
+#   * images are immutable tags: IMAGE_TAG (the git SHA CI pushed, or a release) is required; KKT_IMAGE_PREFIX names the registry
+#     (default "kkt" = images built on this host with `--build`). Rollback = the previous IMAGE_TAG (docs/DEPLOY.md).
 #
 #   sh infra/scripts/gen-secrets.sh infra/secrets
-#   cp .env.example .env   # DOMAIN, S3_*, BOOTSTRAP_COMPANY_NAME, BOOTSTRAP_ADMIN_EMAIL, … (no secrets in .env)
+#   cp .env.example .env   # DOMAIN, IMAGE_TAG, S3_*, BOOTSTRAP_COMPANY_NAME, BOOTSTRAP_ADMIN_EMAIL, … (no secrets in .env)
 #   docker compose -f docker-compose.prod.yml --profile monitoring up -d --build
 
 x-secret-env: &secret-env
   JWT_SECRET_FILE: /run/secrets/jwt_secret
   FIELD_ENCRYPTION_KEY_FILE: /run/secrets/field_encryption_key
   HASH_KEY_FILE: /run/secrets/hash_key
+  # key rings (contract C9; first entry active, older ones verify/look up only — rotation in docs/DEPLOY.md)
+  JWT_SIGNING_KEYS_FILE: /run/secrets/jwt_signing_keys
+  LINK_SIGNING_KEYS_FILE: /run/secrets/link_signing_keys
+  HASH_KEYS_FILE: /run/secrets/hash_keys
+  INTERNAL_API_TOKEN_FILE: /run/secrets/internal_api_token
+  WEB_REVALIDATE_TOKEN_FILE: /run/secrets/web_revalidate_token
   REDIS_URL_FILE: /run/secrets/redis_url
   METRICS_TOKEN_FILE: /run/secrets/metrics_token
   # set these in .env only when the option is used (empty = unset)
@@ -45,6 +55,11 @@ x-api-env: &api-env
   OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
   OTEL_SERVICE_NAME: kkt-api
   LOG_LEVEL: ${LOG_LEVEL:-info}
+  # libuv pool shared by argon2, sharp, zlib and fs (default 4 is too small; set before the pool starts, apps/api/src/preload.ts)
+  UV_THREADPOOL_SIZE: ${UV_THREADPOOL_SIZE:-16}
+  # the website's on-demand revalidation after CMS / project-website writes (best-effort; token = web_revalidate_token)
+  WEB_REVALIDATE_URL: http://web:3000/api/revalidate
+  GIT_SHA: ${IMAGE_TAG:?set IMAGE_TAG (the image tag to run, e.g. the git SHA CI pushed)}
 
 x-logging: &logging
   driver: json-file
@@ -52,25 +67,28 @@ x-logging: &logging
 
 services:
   postgres:
-    image: postgres:16-alpine
+    # postgres:16-alpine + age (infra/backup/Dockerfile): archive_command encrypts every WAL segment before it reaches /backups
+    build: { context: ./infra/backup }
+    image: kkt-backup:16
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
       POSTGRES_DB: kkt
+      BACKUP_ENCRYPTION_KEY_FILE: /run/secrets/backup_encryption_key
     command:
       - postgres
       - -c
       - config_file=/etc/postgresql/postgresql.conf
       - -c
       - hba_file=/etc/postgresql/pg_hba.conf
-      # continuous WAL archiving to the backup volume (point-in-time recovery: docs/RESTORE.md)
+      # continuous, encrypted WAL archiving to the backup volume (point-in-time recovery: docs/RESTORE.md)
       - -c
       - archive_mode=on
       - -c
-      - archive_command=test ! -f /backups/wal/%f && cp %p /backups/wal/%f
+      - archive_command=sh /opt/kkt/backup.sh wal-push %p %f
       - -c
       - archive_timeout=300
-    secrets: [postgres_password, kkt_owner_db_password, kkt_app_db_password]
+    secrets: [postgres_password, kkt_owner_db_password, kkt_app_db_password, backup_encryption_key]
     volumes:
       - pgdata:/var/lib/postgresql/data
       - backups:/backups
@@ -170,7 +188,7 @@ services:
   # one-shot: migrations as kkt_owner directly against Postgres (session advisory lock, DDL), then the first-boot seed; exits 0
   migrate:
     build: { context: ., dockerfile: apps/api/Dockerfile }
-    image: ${KKT_API_IMAGE:-kkt-api:latest}
+    image: ${KKT_IMAGE_PREFIX:-kkt}-api:${IMAGE_TAG:?set IMAGE_TAG}
     command: ["node", "dist/server.js", "migrate"]
     environment:
       <<: *api-env
@@ -185,8 +203,13 @@ services:
     secrets:
       [
         jwt_secret,
+        jwt_signing_keys,
+        link_signing_keys,
+        hash_keys,
         field_encryption_key,
         hash_key,
+        internal_api_token,
+        web_revalidate_token,
         redis_url,
         redis_security_url,
         metrics_token,
@@ -203,7 +226,7 @@ services:
     restart: "no"
 
   api:
-    image: ${KKT_API_IMAGE:-kkt-api:latest}
+    image: ${KKT_IMAGE_PREFIX:-kkt}-api:${IMAGE_TAG:?set IMAGE_TAG}
     environment:
       <<: *api-env
       DATABASE_URL_FILE: /run/secrets/database_url
@@ -216,8 +239,63 @@ services:
     secrets:
       [
         jwt_secret,
+        jwt_signing_keys,
+        link_signing_keys,
+        hash_keys,
         field_encryption_key,
         hash_key,
+        internal_api_token,
+        web_revalidate_token,
+        redis_url,
+        redis_security_url,
+        metrics_token,
+        s3_access_key,
+        s3_secret_key,
+        error_webhook_url,
+        database_url,
+      ]
+    # liveness only (the process answers HTTP); dependency outages show in /api/v1/health/ready and /api/v1/health, not here
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO /dev/null http://127.0.0.1:4000/api/v1/health/live || exit 1"]
+      interval: 15s
+      timeout: 3s
+      start_period: 40s
+      retries: 3
+    volumes: ["storage:/data/storage"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      pgbouncer: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    deploy:
+      replicas: ${API_REPLICAS:-2}
+      resources: { limits: { cpus: "${API_CPUS:-2}", memory: 2g } }
+    stop_grace_period: 40s
+    logging: *logging
+    restart: unless-stopped
+
+  # BullMQ consumers of the critical and heavy queues (dues, integrity, audit seal, notifications, exports, backups). Two replicas: BullMQ
+  # runs each job once across workers and the schedules are deduplicated, so a worker can die or be redeployed without stopping the jobs.
+  worker:
+    image: ${KKT_IMAGE_PREFIX:-kkt}-api:${IMAGE_TAG:?set IMAGE_TAG}
+    command: ["node", "--import", "./dist/telemetry.js", "dist/worker.js"]
+    environment:
+      <<: *api-env
+      DATABASE_URL_FILE: /run/secrets/database_url
+      OTEL_SERVICE_NAME: kkt-worker
+      # contract C8: GET :9465/health (200 ok / 503) and :9465/metrics (heartbeat gauge, job counters; METRICS_TOKEN bearer)
+      WORKER_HEALTH_PORT: "9465"
+      # on stop: heavy jobs checkpoint and go back to the queue at once, critical jobs get this long to finish
+      WORKER_DRAIN_TIMEOUT_MS: ${WORKER_DRAIN_TIMEOUT_MS:-120000}
+    secrets:
+      [
+        jwt_secret,
+        jwt_signing_keys,
+        link_signing_keys,
+        hash_keys,
+        field_encryption_key,
+        hash_key,
+        internal_api_token,
+        web_revalidate_token,
         redis_url,
         redis_security_url,
         metrics_token,
@@ -232,53 +310,29 @@ services:
       pgbouncer: { condition: service_healthy }
       redis: { condition: service_healthy }
     deploy:
-      replicas: ${API_REPLICAS:-2}
-      resources: { limits: { cpus: "${API_CPUS:-2}", memory: 2g } }
-    stop_grace_period: 40s
-    logging: *logging
-    restart: unless-stopped
-
-  worker:
-    image: ${KKT_API_IMAGE:-kkt-api:latest}
-    command: ["node", "--import", "./dist/telemetry.js", "dist/worker.js"]
-    environment:
-      <<: *api-env
-      DATABASE_URL_FILE: /run/secrets/database_url
-      OTEL_SERVICE_NAME: kkt-worker
-    secrets:
-      [
-        jwt_secret,
-        field_encryption_key,
-        hash_key,
-        redis_url,
-        redis_security_url,
-        metrics_token,
-        s3_access_key,
-        s3_secret_key,
-        error_webhook_url,
-        database_url,
-      ]
-    volumes: ["storage:/data/storage"]
-    depends_on:
-      migrate: { condition: service_completed_successfully }
-      pgbouncer: { condition: service_healthy }
-      redis: { condition: service_healthy }
-    # exactly one worker: BullMQ runs each job once across workers, but one is enough and keeps job logs in one place
-    deploy: { replicas: 1, resources: { limits: { cpus: "2", memory: 2g } } }
-    healthcheck: { disable: true }
-    stop_grace_period: 120s
+      replicas: ${WORKER_REPLICAS:-2}
+      resources: { limits: { cpus: "2", memory: 2g } }
+    # 200 only while Redis answers, the heartbeat is fresh and both queues are consumed (503 while draining)
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO /dev/null http://127.0.0.1:9465/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      start_period: 60s
+      retries: 4
+    # WORKER_DRAIN_TIMEOUT_MS (120 s) + 60 s for the checkpoint, the queue close and the pools: Docker sends SIGKILL after this
+    stop_grace_period: 180s
     logging: *logging
     restart: unless-stopped
 
   erp:
     build: { context: ., dockerfile: apps/erp/Dockerfile, args: { VITE_API_URL: "" } }
-    image: ${KKT_ERP_IMAGE:-kkt-erp:latest}
+    image: ${KKT_IMAGE_PREFIX:-kkt}-erp:${IMAGE_TAG:?set IMAGE_TAG}
     logging: *logging
     restart: unless-stopped
 
   portal:
     build: { context: ., dockerfile: apps/portal/Dockerfile, args: { EXPO_PUBLIC_API_URL: "https://my.${DOMAIN}" } }
-    image: ${KKT_PORTAL_IMAGE:-kkt-portal:latest}
+    image: ${KKT_IMAGE_PREFIX:-kkt}-portal:${IMAGE_TAG:?set IMAGE_TAG}
     logging: *logging
     restart: unless-stopped
 
@@ -291,9 +345,17 @@ services:
         NEXT_PUBLIC_PORTAL_URL: https://my.${DOMAIN}
         NEXT_PUBLIC_ERP_URL: https://erp.${DOMAIN}
         NEXT_PUBLIC_SITE_URL: https://www.${DOMAIN}
-    image: ${KKT_WEB_IMAGE:-kkt-web:latest}
+    image: ${KKT_IMAGE_PREFIX:-kkt}-web:${IMAGE_TAG:?set IMAGE_TAG}
     environment:
       API_INTERNAL_URL: http://api:4000
+      # contract C3 (server-side fetches carry the visitor IP under this token) and the revalidation route's token; the image loads
+      # <NAME>_FILE into <NAME> at start
+      INTERNAL_API_TOKEN_FILE: /run/secrets/internal_api_token
+      WEB_REVALIDATE_TOKEN_FILE: /run/secrets/web_revalidate_token
+      # contract C4: only for an API that serves several companies
+      KKT_COMPANY_SLUG: ${KKT_COMPANY_SLUG:-}
+      GIT_SHA: ${IMAGE_TAG}
+    secrets: [internal_api_token, web_revalidate_token]
     depends_on: { api: { condition: service_healthy } }
     deploy:
       replicas: ${WEB_REPLICAS:-2}
@@ -312,24 +374,26 @@ services:
     logging: *logging
     restart: unless-stopped
 
-  # nightly pg_dump with a restore drill, weekly base backups, retention, WAL cleanup (infra/backup/backup.sh, docs/RESTORE.md)
+  # nightly encrypted pg_dump with a restore drill, weekly encrypted base backups, retention, WAL cleanup (infra/backup/backup.sh,
+  # docs/RESTORE.md). Same image as postgres (age + the script baked in).
   backup:
-    image: postgres:16-alpine
+    build: { context: ./infra/backup }
+    image: kkt-backup:16
     entrypoint: ["sh", "/opt/kkt/backup.sh"]
     environment:
       PGHOST: postgres
       PGUSER: postgres
       PGDATABASE: kkt
       PGPASSWORD_FILE: /run/secrets/postgres_password
+      BACKUP_ENCRYPTION_KEY_FILE: /run/secrets/backup_encryption_key
       BACKUP_TIME_UTC: ${BACKUP_TIME_UTC:-21:00}
       DUMP_RETENTION_DAYS: ${DUMP_RETENTION_DAYS:-14}
       BASE_BACKUPS_KEEP: ${BASE_BACKUPS_KEEP:-2}
       BACKUP_UPLOAD_CMD: ${BACKUP_UPLOAD_CMD:-}
-    secrets: [postgres_password]
+    secrets: [postgres_password, backup_encryption_key]
     user: "70:70"
     volumes:
       - backups:/backups
-      - ./infra/backup/backup.sh:/opt/kkt/backup.sh:ro
     depends_on: { postgres: { condition: service_healthy } }
     logging: *logging
     restart: unless-stopped
@@ -352,7 +416,8 @@ services:
     profiles: ["monitoring"]
     command: ["--config.file=/etc/alertmanager/alertmanager.yml"]
     volumes: ["./infra/prometheus/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro"]
-    secrets: [error_webhook_url]
+    # warnings → Slack-compatible webhook; critical → PagerDuty (or Opsgenie: see alertmanager.yml)
+    secrets: [error_webhook_url, pagerduty_routing_key, opsgenie_api_key]
     logging: *logging
     restart: unless-stopped
 
@@ -419,6 +484,14 @@ secrets:
   s3_secret_key: { file: ./infra/secrets/s3_secret_key }
   grafana_admin_password: { file: ./infra/secrets/grafana_admin_password }
   error_webhook_url: { file: ./infra/secrets/error_webhook_url }
+  jwt_signing_keys: { file: ./infra/secrets/jwt_signing_keys }
+  link_signing_keys: { file: ./infra/secrets/link_signing_keys }
+  hash_keys: { file: ./infra/secrets/hash_keys }
+  internal_api_token: { file: ./infra/secrets/internal_api_token }
+  web_revalidate_token: { file: ./infra/secrets/web_revalidate_token }
+  backup_encryption_key: { file: ./infra/secrets/backup_encryption_key }
+  pagerduty_routing_key: { file: ./infra/secrets/pagerduty_routing_key }
+  opsgenie_api_key: { file: ./infra/secrets/opsgenie_api_key }
 
 volumes:
   pgdata: {}

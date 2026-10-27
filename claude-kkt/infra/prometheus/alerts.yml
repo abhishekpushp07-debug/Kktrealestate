@@ -67,6 +67,26 @@ groups:
           summary: "More than 30 failed {{ $labels.audience }} logins per minute"
           description: "Possible credential stuffing. Lockouts and per-IP limits apply; review login_events by IP in the ERP audit pages."
 
+      - alert: KktClientErrorRateHigh
+        # front-end errors reported through POST /api/v1/client-errors (contract C2), counted per app by the API
+        expr: sum by (app) (rate(kkt_client_errors_total[10m])) * 60 > 10
+        for: 10m
+        labels: { severity: warning, component: frontend }
+        annotations:
+          summary: "More than 10 front-end errors per minute from the {{ $labels.app }} app"
+          description: 'Usually a bad release of that app or an API contract change it does not handle. Search the API logs for msg "client error reported" with client_error.app={{ $labels.app }} (release, url and stack are in the line); roll the app back if it started with a deploy.'
+
+      - alert: KktProcessErrors
+        # unhandled rejections / uncaught exceptions caught by the fatal hooks (apps/api/src/lib/processErrors.ts); the second branch
+        # catches the first error of a fresh process, whose counter series did not exist 10 minutes ago
+        expr: |
+          sum by (role, kind) (increase(kkt_process_errors_total[10m])) > 0
+            or sum by (role, kind) (kkt_process_errors_total unless kkt_process_errors_total offset 10m) > 0
+        labels: { severity: warning, component: api }
+        annotations:
+          summary: "{{ $labels.kind }} in the {{ $labels.role }} process"
+          description: "A promise rejection or exception escaped every handler. The log line carries the stack; an uncaught exception restarts the process."
+
   - name: kkt-jobs
     rules:
       - alert: KktJobFailed
@@ -92,7 +112,27 @@ groups:
         labels: { severity: warning, component: jobs }
         annotations:
           summary: "More than 100 jobs waiting in the queue"
-          description: "The worker is down or too slow (exports, backups). Check the worker logs; scale is one worker by design, so look for a stuck job."
+          description: "The workers are down or too slow (exports, backups). Check KktWorkerHeartbeatStale and the worker logs; look for a stuck job, or add a worker replica."
+
+  - name: kkt-worker
+    rules:
+      - alert: KktWorkerHeartbeatStale
+        # contract C8: every worker writes a heartbeat every 15 s and exports it on :9465/metrics. absent() covers "no worker is scraped
+        # at all" (every replica down: its series disappears 5 minutes after the last scrape)
+        expr: (time() - max(kkt_worker_heartbeat_timestamp_seconds) > 60) or absent(kkt_worker_heartbeat_timestamp_seconds)
+        for: 2m
+        labels: { severity: critical, component: jobs }
+        annotations:
+          summary: "No job worker heartbeat for more than a minute"
+          description: "Nothing consumes the job queues: daily dues, integrity, audit seal, notifications and backups stop. Check `docker compose ps worker` / `kubectl -n kkt get pods -l app.kubernetes.io/name=worker`, GET :9465/health and the worker logs."
+
+      - alert: KktWorkerReplicaDown
+        expr: up{job="kkt-worker"} == 0
+        for: 5m
+        labels: { severity: warning, component: jobs }
+        annotations:
+          summary: "Job worker {{ $labels.instance }} is not answering metrics scrapes"
+          description: "The other replica keeps the queues moving; restore the second one before it is needed (docker compose up -d worker / kubectl describe pod)."
 
   - name: kkt-data
     rules:
@@ -103,6 +143,43 @@ groups:
         annotations:
           summary: "The integrity report has {{ $value }} finding(s)"
           description: "Ledger/summary/demand mismatches. ERP → Admin → Integrity lists them; repair is audited. Money is never auto-corrected."
+
+      - alert: KktDuesBookingFailures
+        # DAILY_DUES isolates a failing booking (rolled back, counted, the run completes): money for that booking is NOT raised. The second
+        # branch catches a code's first failure, whose counter series did not exist a day ago (increase() needs two samples).
+        expr: |
+          sum by (code) (increase(kkt_dues_booking_failures_total[1d])) > 0
+            or sum by (code) (kkt_dues_booking_failures_total unless kkt_dues_booking_failures_total offset 1d) > 0
+        labels: { severity: warning, component: money }
+        annotations:
+          summary: "DAILY_DUES skipped bookings in the last 24 h ({{ $labels.code }})"
+          description: "Those bookings got no installment demands. ERP → Admin → Jobs → DAILY_DUES lists them (bookings_failed); fix the data, then re-run the job."
+
+      - alert: KktAuditSealFailed
+        # the AUDIT_SEAL job extends the per-company hash chain over audit_logs; a failure can mean a broken chain (tampering) or a stuck job
+        expr: max by (job_name) (kkt_job_failures_24h{job_name="AUDIT_SEAL"}) > 0
+        for: 5m
+        labels: { severity: critical, component: security }
+        annotations:
+          summary: "The audit-log seal job failed"
+          description: "Run GET /api/v1/admin/audit/verify for each company: first_mismatch names the changed, removed or back-dated row. Treat a chain break as a security incident."
+
+      - alert: KktAuditSealStale
+        expr: time() - max(kkt_job_last_success_timestamp_seconds{job_name="AUDIT_SEAL"}) > 3600
+        for: 15m
+        labels: { severity: warning, component: security }
+        annotations:
+          summary: "No successful audit-log seal for more than an hour"
+          description: "AUDIT_SEAL runs every 15 minutes; unsealed audit rows are not tamper-evident yet. Check the workers (KktWorkerHeartbeatStale) and the job's last error."
+
+      - alert: KktStorageDeletionGaveUp
+        expr: |
+          sum(increase(kkt_storage_sweep_objects_total{action="deletion_gave_up"}[1d])) > 0
+            or sum(kkt_storage_sweep_objects_total{action="deletion_gave_up"} unless kkt_storage_sweep_objects_total{action="deletion_gave_up"} offset 1d) > 0
+        labels: { severity: warning, component: storage }
+        annotations:
+          summary: "Object-store deletions failed 10 or more times"
+          description: "STORAGE_SWEEP keeps retrying daily, but erased or orphaned files are still in the bucket (DPDP erasure may be incomplete). Check the bucket credentials/policy and the worker logs."
 
       - alert: KktIntegrityReportStale
         expr: time() - max(kkt_integrity_last_run_timestamp_seconds) > 26 * 3600
@@ -162,6 +239,17 @@ groups:
         annotations:
           summary: "Redis memory above 85% of maxmemory"
           description: "Redis runs with noeviction: at 100% writes fail. Raise REDIS_MAXMEMORY or move caches to a separate instance."
+
+  - name: kkt-alerting
+    rules:
+      - alert: KktAlertmanagerNotificationsFailing
+        # a page that cannot be delivered is the worst failure mode: this one goes to the Slack receiver (warning)
+        expr: sum by (integration) (rate(alertmanager_notifications_failed_total[15m])) > 0
+        for: 15m
+        labels: { severity: warning, component: alerting }
+        annotations:
+          summary: "Alertmanager cannot deliver {{ $labels.integration }} notifications"
+          description: "Check the receiver's key file (infra/secrets/pagerduty_routing_key / opsgenie_api_key / error_webhook_url) and `docker compose logs alertmanager`."
 
   - name: kkt-host
     rules:

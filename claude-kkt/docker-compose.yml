@@ -4,6 +4,10 @@
 #   export DOMAIN=kkt.in JWT_SECRET=$(openssl rand -hex 48) FIELD_ENCRYPTION_KEY=$(openssl rand -base64 32) HASH_KEY=$(openssl rand -hex 32) \
 #          POSTGRES_PASSWORD=$(openssl rand -hex 24) KKT_OWNER_DB_PASSWORD=$(openssl rand -hex 24) KKT_APP_DB_PASSWORD=$(openssl rand -hex 24) \
 #          BOOTSTRAP_COMPANY_NAME="My Builders" BOOTSTRAP_ADMIN_EMAIL=owner@example.in BOOTSTRAP_ADMIN_PASSWORD='First-Login-2026x'
+#   # key rings (contract C9, required in production; docs/DEPLOY.md "Secrets and key rotation"): keep these values — losing HASH_KEYS
+#   # breaks duplicate checks, rotating JWT/link keys only signs users out / expires links
+#   export JWT_SIGNING_KEYS="j1:$(openssl genpkey -algorithm ed25519 -outform DER | base64 | tr -d '\n')" \
+#          LINK_SIGNING_KEYS="l1:$(openssl rand -hex 32)" HASH_KEYS="h1:$HASH_KEY"
 #   docker compose up -d --build
 #
 # Boot order (no first-boot race): postgres → migrate (one-shot: migrations + first-boot seed as kkt_owner, then exits) → api replicas
@@ -14,6 +18,13 @@ x-api-env: &api-env
   JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
   FIELD_ENCRYPTION_KEY: ${FIELD_ENCRYPTION_KEY:?set FIELD_ENCRYPTION_KEY}
   HASH_KEY: ${HASH_KEY:?set HASH_KEY}
+  JWT_SIGNING_KEYS: ${JWT_SIGNING_KEYS:?set JWT_SIGNING_KEYS (j1:<base64 PKCS8 Ed25519 key>, see the header)}
+  LINK_SIGNING_KEYS: ${LINK_SIGNING_KEYS:?set LINK_SIGNING_KEYS (l1:<random hex>, see the header)}
+  HASH_KEYS: ${HASH_KEYS:?set HASH_KEYS (h1:<the HASH_KEY value>, see the header)}
+  # optional: the website's server-side fetches (contract C3) and its revalidation route (both ≥ 32 characters)
+  INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-}
+  WEB_REVALIDATE_TOKEN: ${WEB_REVALIDATE_TOKEN:-}
+  UV_THREADPOOL_SIZE: "16"
   API_PUBLIC_URL: https://erp.${DOMAIN:-kkt.local}
   ERP_ORIGIN: https://erp.${DOMAIN:-kkt.local}
   WEB_ORIGIN: https://www.${DOMAIN:-kkt.local}
@@ -112,13 +123,23 @@ services:
     environment:
       <<: *api-env
       DATABASE_URL: postgres://kkt_app:${KKT_APP_DB_PASSWORD}@postgres:5432/kkt
+      WORKER_HEALTH_PORT: "9465"
+      WORKER_DRAIN_TIMEOUT_MS: "120000"
     volumes: ["storage:/data/storage"]
     depends_on:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
-    # the worker has no HTTP listener; the image's API health check does not apply
-    healthcheck: { disable: true }
-    stop_grace_period: 120s
+    # two consumers: a job survives one worker dying or being replaced (BullMQ runs each job once; schedules are deduplicated)
+    deploy: { replicas: 2 }
+    # contract C8: 200 while Redis answers, the heartbeat is fresh and both queues are consumed
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO /dev/null http://127.0.0.1:9465/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      start_period: 60s
+      retries: 4
+    # WORKER_DRAIN_TIMEOUT_MS + 60 s
+    stop_grace_period: 180s
     restart: unless-stopped
 
   erp:
@@ -136,6 +157,9 @@ services:
         NEXT_PUBLIC_SITE_URL: https://www.${DOMAIN:-kkt.local}
     environment:
       API_INTERNAL_URL: http://api:4000
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-}
+      WEB_REVALIDATE_TOKEN: ${WEB_REVALIDATE_TOKEN:-}
+      KKT_COMPANY_SLUG: ${KKT_COMPANY_SLUG:-}
     depends_on: [api]
     restart: unless-stopped
 

@@ -5,8 +5,8 @@
 #
 #   sh infra/scripts/gen-secrets.sh [secrets-dir]        # default ./infra/secrets (git-ignored)
 #
-# Back the directory up somewhere safe (a password manager / vault): FIELD_ENCRYPTION_KEY and HASH_KEY cannot be regenerated without
-# losing access to encrypted KYC fields and duplicate checks (docs/SECURITY.md key rotation).
+# Back the directory up somewhere safe (a password manager / vault): FIELD_ENCRYPTION_KEY, HASH_KEY/HASH_KEYS and the backup encryption
+# key cannot be regenerated without losing access to encrypted KYC fields, duplicate checks and backups (docs/DEPLOY.md key rotation).
 set -eu
 DIR="${1:-./infra/secrets}"
 mkdir -p "$DIR"
@@ -29,6 +29,28 @@ put hash_key "$(rand 32)"
 put metrics_token "$(rand 24)"
 put bootstrap_admin_password "$(rand 12)Aa1!"
 put grafana_admin_password "$(rand 16)"
+
+# Key rings (contract C9; docs/DEPLOY.md "Secrets and key rotation"): `<kid>:<value>` entries, comma separated, the first one active.
+#  - jwt_signing_keys: Ed25519 private keys (base64 PKCS8 DER) that sign access tokens; every key is published in the JWKS.
+#  - link_signing_keys: HMAC secrets of signed links (downloads, exports, backups and backup manifests, MFA step and visitor tokens).
+#  - hash_keys: keyed-hash (lookup/duplicate-check) secrets; kid h1 is the legacy HASH_KEY, so existing hashes keep matching.
+put jwt_signing_keys "j1:$(openssl genpkey -algorithm ed25519 -outform DER | base64 | tr -d '\n')"
+put link_signing_keys "l1:$(rand 32)"
+put hash_keys "h1:$(get hash_key)"
+# internal callers (contract C3: the website's server-side fetches) and the website's on-demand revalidation route
+put internal_api_token "$(rand 32)"
+put web_revalidate_token "$(rand 32)"
+# backup encryption (infra/backup/backup.sh): an age identity when age-keygen is installed (the kkt-backup image has it), otherwise a
+# 256-bit secret for the openssl fallback. Keep a copy OFF the backup host: without it no dump, base backup or WAL file can be read.
+if command -v age-keygen > /dev/null 2>&1; then
+  put backup_encryption_key "$(age-keygen 2> /dev/null | grep '^AGE-SECRET-KEY-')"
+else
+  put backup_encryption_key "$(rand 32)"
+fi
+# on-call paging for critical alerts (infra/prometheus/alertmanager.yml): the PagerDuty Events v2 routing key (or the Opsgenie API
+# key when you switch the "pager" receiver to opsgenie_configs). Replace the placeholder before enabling --profile monitoring.
+put pagerduty_routing_key "unused-set-the-pagerduty-routing-key"
+put opsgenie_api_key "unused-set-the-opsgenie-api-key"
 
 # derived connection strings (the API/worker go through PgBouncer as kkt_app; the migrate job talks to Postgres as kkt_owner)
 put database_url "postgres://kkt_app:$(get kkt_app_db_password)@pgbouncer:6432/kkt"

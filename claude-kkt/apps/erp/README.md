@@ -9,8 +9,9 @@ The staff application for KKT v2. Dense, data-first, royal navy + gold. Talks on
 pnpm --filter @kkt/erp dev        # http://localhost:5173 — /api is proxied to VITE_API_URL || http://localhost:4000
 pnpm --filter @kkt/erp typecheck  # tsc --noEmit (strict, noUnchecked­IndexedAccess, no `any`)
 pnpm --filter @kkt/erp test       # vitest (format + api client units)
-pnpm --filter @kkt/erp build      # tsc + vite build → dist/ (served by nginx.conf / Dockerfile)
-pnpm --filter @kkt/erp preview
+pnpm --filter @kkt/erp build      # tsc + vite build → dist/ (served by nginx.conf / Dockerfile) + bundle budget
+pnpm --filter @kkt/erp budget     # scripts/bundle-budget.mjs on an existing dist/ (first-load JS ≤ 275 KB gzip, chunk ≤ 130 KB)
+pnpm --filter @kkt/erp preview    # KKT_API_PROXY_TARGET=http://localhost:4000 with a VITE_API_URL="" build = same-origin cookies
 ```
 
 Never run `pnpm install` from inside this package while other workspace packages are being
@@ -28,13 +29,16 @@ Copy `.env.example` to `.env.local` if you need to point at a remote API during 
 
 ```
 src/
-  main.tsx, app.tsx        bootstrap: QueryClient (staleTime 15 s, retry 1 but never on 4xx, no refetch on focus),
-                           BrowserRouter, AuthProvider, Toaster, ErrorBoundary, Suspense, VersionConflictHost
+  main.tsx, app.tsx        bootstrap: QueryClient (staleTime 15 s; never retries a 4xx, waits for Retry-After on 429/503 —
+                           lib/queryRetry.ts), data router (createBrowserRouter + RouterProvider; root layout with
+                           AuthProvider, VersionConflictHost, NavigationGuardHost), Toaster, ErrorBoundary → client-errors,
+                           chunk-load reload (lib/chunkReload.ts), web fonts applied after first paint (lib/fonts.ts)
   routes.tsx               lazy routes generated from the nav; /login, /change-password, /forbidden, 404
   styles/index.css         Tailwind v4 @theme tokens (navy, gold, surface, status chips, semantic, fonts, radii, motion)
   lib/
-    api.ts                 fetch client: bearer in memory, refresh in localStorage (kkt.erp.refresh), single-flight
-                           refresh on 401 TOKEN_EXPIRED, auto Idempotency-Key on POST, If-Match from `version`,
+    api.ts                 fetch client: bearer in memory, refresh token in the HttpOnly kkt_rt cookie (contract C1,
+                           X-KKT-Session: cookie; nothing token-like in localStorage), single-flight cookie refresh
+                           on 401 TOKEN_EXPIRED, auto Idempotency-Key on POST, If-Match from `version`,
                            error envelope → ApiClientError, get/post/patch/put/delete/upload/download/list/exportCsv
     format.ts              formatINR (₹1,00,00,000), formatINRShort (₹1.2 Cr / ₹45 L), paise↔rupee input,
                            amountInWords (Indian), formatDate (24 Oct 2026), formatDateTime (IST), percent, sqft

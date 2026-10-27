@@ -15,6 +15,8 @@ import { FileViewerHost } from "@/api/files";
 import { persistOptions, queryClient } from "@/api/queries";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { BookingProvider } from "@/booking/BookingProvider";
+import { installWebErrorReporting } from "@/lib/reporter";
+import { ErrorBoundary } from "@/ui/ErrorBoundary";
 import { Icon } from "@/ui/Icon";
 import { ToastProvider } from "@/ui/Toast";
 import { UpdateNotice } from "@/ui/UpdateNotice";
@@ -23,6 +25,9 @@ import { colors } from "@/ui/theme";
 // Zod's JIT probes `new Function("")`, which the web build's Content-Security-Policy (no 'unsafe-eval') reports; parse without it.
 z.config({ jitless: true });
 
+// Web: uncaught errors and unhandled rejections go to POST /api/v1/client-errors (render errors: the ErrorBoundary below).
+installWebErrorReporting();
+
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
 SplashScreen.setOptions?.({ fade: true, duration: 300 });
 
@@ -30,18 +35,20 @@ export default function RootLayout(): React.JSX.Element {
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
-        <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
-          <AuthProvider>
-            <BookingProvider>
-              <ToastProvider>
-                <StatusBar style="light" />
-                <Gate />
-                <UpdateNotice />
-                <FileViewerHost />
-              </ToastProvider>
-            </BookingProvider>
-          </AuthProvider>
-        </PersistQueryClientProvider>
+        <ErrorBoundary>
+          <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
+            <AuthProvider>
+              <BookingProvider>
+                <ToastProvider>
+                  <StatusBar style="light" />
+                  <Gate />
+                  <UpdateNotice />
+                  <FileViewerHost />
+                </ToastProvider>
+              </BookingProvider>
+            </AuthProvider>
+          </PersistQueryClientProvider>
+        </ErrorBoundary>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

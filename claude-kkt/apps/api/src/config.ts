@@ -25,6 +25,7 @@ export const SECRET_FILE_VARS = [
   "LINK_SIGNING_KEYS",
   "HASH_KEYS",
   "INTERNAL_API_TOKEN",
+  "WEB_REVALIDATE_TOKEN",
 ] as const;
 
 /** Fastify `trustProxy` value: `false` (socket address only), `true` (trust every hop — only behind a proxy that strips spoofed headers) or proxy-addr names/addresses/CIDRs. */

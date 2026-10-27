@@ -11,6 +11,7 @@ import {
   type PortalScheduleRow,
 } from "@kkt/contracts";
 import { api } from "@/api/client";
+import { ledgerTotals } from "@/api/paging";
 import { refreshBooking, useDemands, useLedger, useReceipts, useSchedule } from "@/api/queries";
 import { daysUntil, formatDate, formatINR } from "@/lib/format";
 import { Card, Divider } from "@/ui/Card";
@@ -183,7 +184,8 @@ function Ledger({ bookingId }: { bookingId: string }): React.JSX.Element {
         body="Demands and payments will be listed here in order, with running totals."
       />
     );
-  const last = rows[rows.length - 1];
+  // C7: dues from the server summary when sent, else from the last row of the complete ledger (all pages), never a page's last row.
+  const last = ledgerTotals(q.data);
   return (
     <>
       {q.isError ? <StatusBar text="Showing saved ledger — couldn't refresh." tone="warning" /> : null}

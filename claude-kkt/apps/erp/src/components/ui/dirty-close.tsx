@@ -1,6 +1,6 @@
 import { Dialog as DialogPrimitive } from "radix-ui";
-import { useRef, useState, type ReactNode, type SyntheticEvent } from "react";
-import { isTrackedEdit, useUnsavedChangesGuard } from "@/lib/unsaved";
+import { useEffect, useRef, useState, type ReactNode, type SyntheticEvent } from "react";
+import { isTrackedEdit, subscribeSaved, useUnsavedChangesGuard } from "@/lib/unsaved";
 import { ConfirmDialog } from "./confirm-dialog";
 
 export interface DirtyCloseOptions {
@@ -28,9 +28,14 @@ export interface DirtyCloseGuard {
 export function useDirtyClose({ dirty: dirtyProp, guard = true }: DirtyCloseOptions): DirtyCloseGuard {
   const [edited, setEdited] = useState(false);
   const [asking, setAsking] = useState(false);
+  // SheetContent / DialogContent stay mounted while the sheet is closed (only the Radix content unmounts), so the guard counts only
+  // while the content is open: the probe below lives inside the content and reports its mount; closing forgets the edits.
+  const [open, setOpen] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
-  const dirty = guard && (dirtyProp ?? edited);
+  const dirty = guard && open && (dirtyProp ?? edited);
   const registry = useUnsavedChangesGuard(dirty);
+  // A successful save (any mutation) applies the edits made so far: "any edit" tracking starts over.
+  useEffect(() => subscribeSaved(() => setEdited(false)), []);
 
   return {
     dirty,
@@ -40,10 +45,22 @@ export function useDirtyClose({ dirty: dirtyProp, guard = true }: DirtyCloseOpti
       setAsking(true);
     },
     trackEdit: (event) => {
+      // Only the user's own edits count: Radix Select's hidden native <select> and form libraries dispatch synthetic (untrusted)
+      // change events when a value is set programmatically (e.g. a drawer loading its record), which must not mark the form dirty.
+      if (event.nativeEvent.isTrusted === false) return;
       if (guard && dirtyProp === undefined && !edited && isTrackedEdit(event.target)) setEdited(true);
     },
     elements: (
       <>
+        <OpenProbe
+          onChange={(isOpen) => {
+            setOpen(isOpen);
+            if (!isOpen) {
+              setEdited(false);
+              setAsking(false);
+            }
+          }}
+        />
         <DialogPrimitive.Close ref={closeRef} hidden tabIndex={-1} aria-hidden="true" data-dirty-close="" />
         <ConfirmDialog
           open={asking}
@@ -62,4 +79,17 @@ export function useDirtyClose({ dirty: dirtyProp, guard = true }: DirtyCloseOpti
       </>
     ),
   };
+}
+
+/** Rendered inside the Radix content: reports when the sheet / dialog content mounts (opens) and unmounts (closes). */
+function OpenProbe({ onChange }: { onChange: (open: boolean) => void }): null {
+  const latest = useRef(onChange);
+  useEffect(() => {
+    latest.current = onChange;
+  });
+  useEffect(() => {
+    latest.current(true);
+    return () => latest.current(false);
+  }, []);
+  return null;
 }

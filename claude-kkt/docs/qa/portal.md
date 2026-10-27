@@ -4,6 +4,28 @@
 
 **Result of the final run: 40 screenshots, 0 defects, 0 console errors, 0 failed requests, no horizontal overflow at 390 px, 90/90 related API integration tests green** (`auth`, `portal`, `portal-adversarial`, `service`, `seed`). `pnpm --filter @kkt/contracts|@kkt/api|@kkt/portal typecheck` green; `expo export --platform web` green.
 
+## Phase 7 frontend track 2026-10-27
+
+Stack: API on `:4710` (demo seed in `kkt_p7_fe`, Redis db 12, the same instance the ERP walk used before), web export
+`EXPO_PUBLIC_API_URL=http://localhost:8710 npx expo export --platform web` served on `:8710` by a static SPA server that proxies
+`/api` to the API (same origin, as `my.<domain>` behind Caddy, so the HttpOnly `kkt_prt` cookie of contract C1 applies). Runner:
+`PORTAL_URL=http://localhost:8710 API_URL=http://localhost:4710 PORTAL_DB=kkt_p7_fe OUT_DIR=<outside the repo> node docs/qa/portal/browser-qa.cjs`.
+
+**Result: 50 page checks, 97 assertions, 0 defects, 0 console errors, 0 failed requests, no overflow, no primary target under 48 px;
+axe 50 scans (25 + 25), 0 violations.** Runner updates: staff replies send the ticket version (`If-Match`, now required), the
+"New" status filter is matched exactly (a request left by an interrupted run is also named "New …"), the cache key is v3.
+
+New phase-7 block (both widths, Pooja Mishra):
+
+| Check | Result |
+| --- | --- |
+| Refresh token | `kkt_prt` cookie, HttpOnly, SameSite=Strict, Path=/api/v1/portal/auth |
+| Browser storage | only `kkt.portal.session` (flag) and `kkt.portal.cache.v3`; no token, no `kkt.portal.user`, no `kkt.portal.refresh`, no v2 cache |
+| Persisted cache | after opening Payments → Ledger, the persisted cache holds no booking number, amount, due, receipt, PAN or phone |
+| Ledger | read through the paged `/ledger` calls (all 200) |
+| Reload | restores the session through the cookie (booking A-803 on screen) |
+| ErrorBoundary | a malformed home answer crashes the render → recovery screen (`error-boundary-1440.png`) and `POST /api/v1/client-errors` → 202; "Try again" (which drops the query cache) recovers once the data is good |
+
 ## Integration stage 2026-10-26 (phase 5 frontend wiring)
 
 Stack: API on `:4600` (demo seed in `kkt_h6`, Redis db 22), `EXPO_PUBLIC_API_URL=http://localhost:4600 npx expo export --platform web` served by a static SPA server on `:8681`; runner `PORTAL_URL=http://localhost:8681 API_URL=http://localhost:4600 PORTAL_DB=kkt_h6 node docs/qa/portal/browser-qa.cjs`.

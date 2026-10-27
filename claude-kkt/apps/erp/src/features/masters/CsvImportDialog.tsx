@@ -154,7 +154,7 @@ export function CsvImportDialog({ config, open, onOpenChange }: CsvImportDialogP
               <span className="flex gap-1">
                 <Button
                   variant="ghost"
-                  size="xs"
+                  size="sm"
                   leftIcon={headerCopied ? Check : ClipboardCopy}
                   onClick={() => void copyHeader()}
                   disabled={!template.data}
@@ -164,7 +164,7 @@ export function CsvImportDialog({ config, open, onOpenChange }: CsvImportDialogP
                 </Button>
                 <Button
                   variant="ghost"
-                  size="xs"
+                  size="sm"
                   leftIcon={Download}
                   disabled={!template.data}
                   onClick={() =>

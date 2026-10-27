@@ -3,7 +3,8 @@ import { useState } from "react";
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from "react-native";
 import { KYC_STATUS_LABELS, PortalProfileUpdateSchema, type PortalProfileResponse } from "@kkt/contracts";
 import { errorMessage } from "@/api/client";
-import { queryClient, useProfile, useUpdateProfile } from "@/api/queries";
+import { keys, queryClient, useProfile, useUpdateProfile } from "@/api/queries";
+import { isVersionConflict, profileVersion, VERSION_CONFLICT_COPY } from "@/api/versions";
 import { useAuth } from "@/auth/AuthProvider";
 import { formatDateTime } from "@/lib/format";
 import { openTel, openWhatsApp } from "@/lib/links";
@@ -120,10 +121,17 @@ function ProfileBody({ d }: { d: PortalProfileResponse }): React.JSX.Element {
       return;
     }
     try {
-      await update.mutateAsync(parsed.data);
+      // The profile's version (when the API sends one) goes out as If-Match (contract C6); a stale edit answers 409.
+      await update.mutateAsync({ body: parsed.data, version: profileVersion(d) });
       await refreshUser();
       toast.success("Profile updated");
     } catch (e) {
+      if (isVersionConflict(e)) {
+        // Someone (the customer on another device, or staff) changed the profile meanwhile: reload it and ask to re-check.
+        await queryClient.invalidateQueries({ queryKey: keys.profile });
+        setError(VERSION_CONFLICT_COPY);
+        return;
+      }
       setError(errorMessage(e, "Could not save your changes."));
     }
   };

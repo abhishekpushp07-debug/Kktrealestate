@@ -1,6 +1,6 @@
 import { ShieldX } from "lucide-react";
 import { useState } from "react";
-import type { CustomerRow } from "@kkt/contracts";
+import type { AdminCustomerEraseResponse, CustomerRow } from "@kkt/contracts";
 import { Button, FieldWrapper, Input, SimpleDialog, Textarea } from "@/components/ui";
 import { api, describeError } from "@/lib/api";
 import { useMutationWithToast } from "@/lib/queries";
@@ -22,7 +22,8 @@ export interface EraseCustomerDialogProps {
 
 /**
  * Mount with a `key` that changes when it opens (the form starts empty each time).
- * Right to erasure (Super Admin): POST /customers/:id/erase {confirm:"ERASE", reason}. Personal data of the customer, co-applicants, portal
+ * Right to erasure (Super Admin): POST /admin/customers/:id/erase {confirm:"ERASE", reason} (the canonical route; POST
+ * /customers/:id/erase is a deprecated alias). Personal data of the customer, co-applicants, portal
  * login, documents, leads, visits and enquiries is anonymised; bookings, payments, demands and the ledger stay. 409 HAS_ACTIVE_BOOKING
  * while a booking is active.
  */
@@ -31,9 +32,9 @@ export function EraseCustomerDialog({ customer, open, onOpenChange }: EraseCusto
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const erase = useMutationWithToast<CustomerRow, void>({
+  const erase = useMutationWithToast<AdminCustomerEraseResponse, void>({
     mutationFn: () =>
-      api.post<CustomerRow>(`${CUSTOMERS_PATH}/${customer.id}/erase`, {
+      api.post<AdminCustomerEraseResponse>(`/admin/customers/${customer.id}/erase`, {
         confirm: ERASE_CONFIRM_WORD,
         reason: reason.trim(),
       }),

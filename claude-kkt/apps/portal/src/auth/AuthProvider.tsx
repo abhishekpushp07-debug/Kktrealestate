@@ -1,8 +1,9 @@
 // Authentication state for the portal: phone + password login, must_change_password gate,
-// logout (this device / all devices), restore on launch from the stored refresh token with a
-// cached user snapshot so the shell renders instantly, and session-expiry handling.
+// logout (this device / all devices), restore on launch (web: a refresh through the HttpOnly cookie; native: the refresh token in
+// SecureStore, with a cached user snapshot so the shell renders instantly), and session-expiry handling. The web build keeps no
+// user snapshot and no token in browser storage (contract C1, audit v3 D1).
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { normalisePhone, PortalLoginSchema, type PortalUser } from "@kkt/contracts";
+import { normalisePhone, PortalAuthLoginSchema, type PortalUser } from "@kkt/contracts";
 import { Platform } from "react-native";
 import { api, ApiError, session } from "@/api/client";
 import { clearPersistedCache, queryClient, keys } from "@/api/queries";
@@ -10,6 +11,10 @@ import { kvStorage } from "@/lib/storage";
 import { toLoginFailure, type LoginFailure } from "./loginFailure";
 
 const USER_KEY = "kkt.portal.user";
+/** Native only: the user snapshot that lets the shell render before /me answers. The browser keeps nothing (PII at rest). */
+const KEEP_USER_SNAPSHOT = Platform.OS !== "web";
+/** Company slug for multi-company installs (contract C4): a builder's portal build names its tenant; empty = resolved by host. */
+const COMPANY_SLUG = (process.env.EXPO_PUBLIC_KKT_COMPANY ?? "").trim() || undefined;
 
 export type AuthStatus = "booting" | "anonymous" | "authenticated";
 
@@ -56,7 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
   const alive = useRef(true);
 
   const persistUser = useCallback(async (u: PortalUser | null) => {
-    if (u) await kvStorage.set(USER_KEY, JSON.stringify(u));
+    if (u && KEEP_USER_SNAPSHOT) await kvStorage.set(USER_KEY, JSON.stringify(u));
     else await kvStorage.remove(USER_KEY);
   }, []);
 
@@ -89,11 +94,12 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
     alive.current = true;
     void (async () => {
       const hasRefresh = await session.load();
+      if (!KEEP_USER_SNAPSHOT) await kvStorage.remove(USER_KEY); // a pre-C1 web build stored one
       if (!hasRefresh) {
         setStatus("anonymous");
         return;
       }
-      const cached = await kvStorage.get(USER_KEY);
+      const cached = KEEP_USER_SNAPSHOT ? await kvStorage.get(USER_KEY) : null;
       if (cached) {
         try {
           const parsed = JSON.parse(cached) as PortalUser;
@@ -121,7 +127,12 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
 
   const login = useCallback<AuthContextValue["login"]>(
     async (phoneInput, password) => {
-      const parsed = PortalLoginSchema.safeParse({ phone: phoneInput, password, device_name: deviceName() });
+      const parsed = PortalAuthLoginSchema.safeParse({
+        phone: phoneInput,
+        password,
+        device_name: deviceName(),
+        ...(COMPANY_SLUG ? { company: COMPANY_SLUG } : {}),
+      });
       if (!parsed.success) {
         const phoneIssue = parsed.error.issues.find((i) => i.path[0] === "phone");
         return {

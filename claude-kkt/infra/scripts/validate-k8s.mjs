@@ -4,7 +4,13 @@
 //  - named probe/service ports exist on the container; envFrom ConfigMaps exist; every *_FILE path under /run/secrets/kkt names a key
 //    of the kkt-secrets template; mounted Secrets/ConfigMaps exist
 //  - every container runs as non-root, drops all capabilities, forbids privilege escalation and sets CPU/memory requests and limits
-//  - the api Deployment has readiness /api/v1/ready and liveness /api/v1/health
+//  - the api Deployment probes: readiness /api/v1/health/ready, liveness and startup /api/v1/health/live (never the full /api/v1/health,
+//    which answers 503 when a dependency is down and would restart every replica)
+//  - images: no tag in the workloads (kustomize sets the immutable git-SHA tag), every kkt image is listed in kustomization.yaml, and no
+//    ":latest" / "newTag: latest" anywhere
+//  - the worker (contract C8): ≥ 2 replicas, startup/readiness/liveness httpGet /health on container port 9465, a grace period of at
+//    least WORKER_DRAIN_TIMEOUT_MS + 30 s, a PodDisruptionBudget, and a liveness window longer than the grace period
+//  - every API/worker/migrate container gets the contract C9 key rings (JWT_SIGNING_KEYS, LINK_SIGNING_KEYS, HASH_KEYS) as _FILE secrets
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseAllDocuments } from "yaml";
@@ -107,8 +113,70 @@ for (const { file, obj } of workloads) {
 }
 
 const api = find("Deployment", "api")?.obj.spec.template.spec.containers[0];
-if (api?.readinessProbe?.httpGet?.path !== "/api/v1/ready") fail("api.yaml", "readiness probe must be /api/v1/ready");
-if (api?.livenessProbe?.httpGet?.path !== "/api/v1/health") fail("api.yaml", "liveness probe must be /api/v1/health");
+if (api?.readinessProbe?.httpGet?.path !== "/api/v1/health/ready")
+  fail("api.yaml", "readiness probe must be /api/v1/health/ready");
+if (api?.livenessProbe?.httpGet?.path !== "/api/v1/health/live")
+  fail("api.yaml", "liveness probe must be /api/v1/health/live (dependency-free)");
+if (api?.startupProbe && api.startupProbe.httpGet?.path !== "/api/v1/health/live")
+  fail("api.yaml", "startup probe must be /api/v1/health/live");
+
+// images: immutable tags come from kustomize (the deploy workflow sets the git SHA); never a moving tag
+const kustomImages = new Map((kustom.images ?? []).map((i) => [i.name, i]));
+for (const [name, i] of kustomImages)
+  if (!i.newTag || i.newTag === "latest" || i.digest === "latest")
+    fail("kustomization.yaml", `image ${name} needs an explicit newTag (not latest)`);
+for (const f of readdirSync(dir).filter((n) => n.endsWith(".yaml")))
+  if (/:latest\b(?!\))/.test(readFileSync(join(dir, f), "utf8").replace(/^\s*#.*$/gm, ""))) fail(f, 'uses ":latest"');
+for (const { file, obj } of workloads)
+  for (const c of obj.spec.template.spec.containers) {
+    const [repo, tag] = c.image.split(/:(?=[^/]+$)/);
+    if (repo.startsWith("kkt-")) {
+      if (tag)
+        fail(`${file} ${c.name}`, `image ${c.image}: leave the tag to kustomize (images: in kustomization.yaml)`);
+      if (!kustomImages.has(repo))
+        fail(`${file} ${c.name}`, `image ${repo} is not listed under images: in kustomization.yaml`);
+    } else if (!tag) fail(`${file} ${c.name}`, `third-party image ${c.image} needs a pinned tag`);
+  }
+
+// the job worker (contract C8)
+const config = find("ConfigMap", "kkt-config")?.obj.data ?? {};
+const workerDep = find("Deployment", "worker")?.obj;
+if (!workerDep) fail("worker.yaml", "worker Deployment missing");
+else {
+  const pod = workerDep.spec.template.spec;
+  const c = pod.containers[0];
+  if ((workerDep.spec.replicas ?? 1) < 2) fail("worker.yaml", "run at least 2 worker replicas");
+  const healthPort = (c.ports ?? []).find((p) => p.containerPort === 9465);
+  if (!healthPort) fail("worker.yaml", "the worker must expose its C8 health port 9465");
+  for (const probe of ["startupProbe", "readinessProbe", "livenessProbe"]) {
+    const g = c[probe]?.httpGet;
+    if (!g || g.path !== "/health" || (g.port !== 9465 && g.port !== healthPort?.name))
+      fail("worker.yaml", `${probe} must be httpGet /health on port 9465`);
+  }
+  const drainMs = Number(config.WORKER_DRAIN_TIMEOUT_MS ?? 120000);
+  const grace = pod.terminationGracePeriodSeconds ?? 30;
+  if (grace < drainMs / 1000 + 30)
+    fail(
+      "worker.yaml",
+      `terminationGracePeriodSeconds ${grace} < WORKER_DRAIN_TIMEOUT_MS/1000 + 30 (${drainMs / 1000 + 30})`,
+    );
+  const l = c.livenessProbe ?? {};
+  if ((l.periodSeconds ?? 10) * (l.failureThreshold ?? 3) <= grace)
+    fail("worker.yaml", "the liveness failure window must exceed the grace period (a draining worker answers 503)");
+  if (!byKind("PodDisruptionBudget").some((d) => selects(d.obj.spec.selector, workerDep.spec.template.metadata.labels)))
+    fail("worker.yaml", "the worker needs a PodDisruptionBudget");
+}
+
+// key rings (contract C9) wherever the API's configuration is loaded
+for (const name of ["api", "worker", "migrate"]) {
+  const w = find("Deployment", name) ?? find("Job", name);
+  const c = w?.obj.spec.template.spec.containers[0];
+  if (!c) continue;
+  const env = new Set((c.env ?? []).map((e) => e.name));
+  for (const ring of ["JWT_SIGNING_KEYS", "LINK_SIGNING_KEYS", "HASH_KEYS"])
+    if (!env.has(`${ring}_FILE`))
+      fail(`${w.file} ${name}`, `${ring}_FILE missing (required in production, contract C9)`);
+}
 
 const podLabels = workloads.map((w) => w.obj.spec.template.metadata.labels);
 for (const { file, obj } of byKind("Service")) {

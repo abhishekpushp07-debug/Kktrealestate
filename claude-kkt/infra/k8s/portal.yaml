@@ -22,7 +22,7 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: portal
-          image: kkt-portal:latest
+          image: kkt-portal
           imagePullPolicy: IfNotPresent
           ports:
             - { name: http, containerPort: 8080 }

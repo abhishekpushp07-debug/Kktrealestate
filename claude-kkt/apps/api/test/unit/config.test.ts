@@ -198,6 +198,7 @@ describe("<NAME>_FILE secrets", () => {
         "LINK_SIGNING_KEYS",
         "HASH_KEYS",
         "INTERNAL_API_TOKEN",
+        "WEB_REVALIDATE_TOKEN",
       ].sort(),
     );
   });

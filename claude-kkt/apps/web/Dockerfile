@@ -27,8 +27,22 @@ COPY --from=build --chown=kkt:kkt /repo/apps/web/.next/static ./apps/web/.next/s
 COPY --from=build --chown=kkt:kkt /repo/apps/web/public ./apps/web/public
 # hash-based CSP of ISR pages (see apps/web/csp-hook.cjs): loaded before Next.js creates its HTTP server
 COPY --from=build --chown=kkt:kkt /repo/apps/web/csp-hook.cjs ./apps/web/csp-hook.cjs
+# <NAME>_FILE → <NAME> for the website's secrets (Docker/Kubernetes secret files; contract C3 token, revalidation token)
+COPY --chmod=0755 <<'EOF' /usr/local/bin/kkt-file-env
+#!/bin/sh
+set -e
+for name in INTERNAL_API_TOKEN WEB_REVALIDATE_TOKEN; do
+  eval "file=\${${name}_FILE:-}"
+  if [ -n "$file" ]; then
+    value="$(cat "$file")"
+    export "$name=$value"
+    unset "${name}_FILE"
+  fi
+done
+exec "$@"
+EOF
 USER kkt
 EXPOSE 3000
 HEALTHCHECK --interval=15s --timeout=3s --start-period=30s --retries=3 CMD wget -qO- http://127.0.0.1:3000/ > /dev/null || exit 1
-ENTRYPOINT ["/sbin/tini", "--"]
+ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/kkt-file-env"]
 CMD ["node", "--require", "./apps/web/csp-hook.cjs", "apps/web/server.js"]

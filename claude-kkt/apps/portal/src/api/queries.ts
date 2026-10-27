@@ -1,5 +1,6 @@
-// TanStack Query layer: one hook per endpoint, keys scoped by booking id, cache persisted to
-// AsyncStorage (7 days) so the last data renders instantly and refreshes in the background.
+// TanStack Query layer: one hook per endpoint, keys scoped by booking id. Only non-personal, non-financial screens (notices,
+// construction progress, request categories) are persisted to AsyncStorage (7 days) so they open instantly from the last copy;
+// booking, payment, demand, ledger, profile/KYC, document and notification data stay in memory (src/api/persistPolicy.ts, audit v3 D1).
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
 import { focusManager, onlineManager, QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -14,7 +15,9 @@ import type {
   ServiceStatus,
 } from "@kkt/contracts";
 import { AppState, Platform } from "react-native";
-import { api, ApiError } from "./client";
+import { api } from "./client";
+import { CACHE_STORAGE_KEY, LEGACY_CACHE_STORAGE_KEYS, shouldPersistQuery } from "./persistPolicy";
+import { queryRetryDelay, shouldRetryQuery } from "./retry";
 import type { LocalFile } from "@/lib/upload";
 
 const DAY = 24 * 60 * 60_000;
@@ -29,7 +32,9 @@ export const queryClient = new QueryClient({
       // Cached screens render instantly from the persisted cache and ALWAYS refresh in the background when opened (SPEC §16), even
       // when the cached copy is younger than staleTime — staff may have acted (resolved a request, posted a payment) meanwhile.
       refetchOnMount: "always",
-      retry: (count, err) => !(err instanceof ApiError && err.status >= 400 && err.status < 500) && count < 2,
+      // never a 4xx; 429 / 503 after the server's Retry-After; other failures twice with backoff (src/api/retry.ts)
+      retry: shouldRetryQuery,
+      retryDelay: queryRetryDelay,
       refetchOnWindowFocus: true,
       refetchOnReconnect: true,
     },
@@ -39,7 +44,7 @@ export const queryClient = new QueryClient({
 
 export const persister = createAsyncStoragePersister({
   storage: AsyncStorage,
-  key: "kkt.portal.cache.v2",
+  key: CACHE_STORAGE_KEY,
   throttleTime: 1000,
 });
 
@@ -47,11 +52,11 @@ export const persistOptions = {
   persister,
   maxAge: CACHE_MAX_AGE,
   buster: "portal-2.0",
-  dehydrateOptions: {
-    shouldDehydrateQuery: (q: { queryKey: readonly unknown[]; state: { status: string } }) =>
-      q.state.status === "success" && q.queryKey[0] !== "pdf" && q.queryKey[0] !== "request-categories",
-  },
+  dehydrateOptions: { shouldDehydrateQuery: shouldPersistQuery },
 };
+
+// Earlier builds persisted booking and payment data under older keys: delete them on start.
+for (const legacy of LEGACY_CACHE_STORAGE_KEYS) void AsyncStorage.removeItem(legacy).catch(() => undefined);
 
 export async function clearPersistedCache(): Promise<void> {
   queryClient.clear();
@@ -120,11 +125,19 @@ export const useHome = (id: string | null) =>
 export const useFlat = (id: string | null) =>
   useQuery({ queryKey: keys.flat(id ?? ""), queryFn: () => api.bookings.flat(id ?? ""), enabled: enabled(id) });
 export const useLedger = (id: string | null) =>
-  useQuery({ queryKey: keys.ledger(id ?? ""), queryFn: () => api.bookings.ledger(id ?? ""), enabled: enabled(id) });
+  useQuery({ queryKey: keys.ledger(id ?? ""), queryFn: () => api.bookings.ledgerAll(id ?? ""), enabled: enabled(id) });
 export const useReceipts = (id: string | null) =>
-  useQuery({ queryKey: keys.receipts(id ?? ""), queryFn: () => api.bookings.receipts(id ?? ""), enabled: enabled(id) });
+  useQuery({
+    queryKey: keys.receipts(id ?? ""),
+    queryFn: () => api.bookings.receiptsAll(id ?? ""),
+    enabled: enabled(id),
+  });
 export const useDemands = (id: string | null) =>
-  useQuery({ queryKey: keys.demands(id ?? ""), queryFn: () => api.bookings.demands(id ?? ""), enabled: enabled(id) });
+  useQuery({
+    queryKey: keys.demands(id ?? ""),
+    queryFn: () => api.bookings.demandsAll(id ?? ""),
+    enabled: enabled(id),
+  });
 export const useSchedule = (id: string | null) =>
   useQuery({ queryKey: keys.schedule(id ?? ""), queryFn: () => api.bookings.schedule(id ?? ""), enabled: enabled(id) });
 export const useConstruction = (id: string | null) =>
@@ -247,7 +260,8 @@ export function useMarkRead() {
 export function useUpdateProfile() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: PortalProfileUpdate) => api.profile.update(body),
+    mutationFn: ({ body, version }: { body: PortalProfileUpdate; version?: number }) =>
+      api.profile.update(body, version),
     onSuccess: (profile) => qc.setQueryData(keys.profile, profile),
   });
 }

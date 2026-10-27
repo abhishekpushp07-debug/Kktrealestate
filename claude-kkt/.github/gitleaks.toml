@@ -1,0 +1,26 @@
+# gitleaks configuration (CI job "Secret scanning", .github/workflows/ci.yml): the default rules plus allowlists for the values that are
+# deliberately public — CI-only test secrets, documented placeholders and test fixtures. Never allowlist a real secret: rotate it.
+title = "kkt gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Test fixtures, CI-only values and documented placeholders"
+paths = [
+  '''(^|/)node_modules/''',
+  '''(^|/)pnpm-lock\.yaml$''',
+  '''(^|/)apps/[^/]+/test/''',
+  '''(^|/)packages/[^/]+/test/''',
+  '''(^|/)docs/''',
+  '''(^|/)\.env\.example$''',
+  '''(^|/)infra/k8s/secret\.example\.yaml$''',
+]
+regexes = [
+  # CI / nightly / development-only values (insecure by design, never used in production: production refuses them at boot)
+  '''ci-only-[A-Za-z0-9-]+''',
+  '''nightly-only-[A-Za-z0-9-]+''',
+  '''dev-only-[A-Za-z0-9-]+''',
+  '''CHANGE-ME[A-Za-z0-9_./=-]*''',
+  '''change-me[A-Za-z0-9_./=-]*''',
+]

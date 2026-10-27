@@ -1,0 +1,31 @@
+# Node 22 + pnpm (the version in package.json "packageManager", through corepack) + the pnpm store cache + a frozen install.
+# Every third-party action is pinned by commit SHA (scripts/ci/check-action-pins.mjs); Renovate bumps the SHA and the version comment.
+name: Setup (Node, pnpm, install)
+description: Installs Node and pnpm, restores the pnpm store and runs pnpm install --frozen-lockfile
+inputs:
+  node-version:
+    description: Node.js version
+    default: "22"
+  install:
+    description: Run pnpm install --frozen-lockfile
+    default: "true"
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version: ${{ inputs.node-version }}
+    - name: pnpm through corepack (version from package.json "packageManager")
+      shell: bash
+      run: |
+        corepack enable
+        pnpm --version
+        echo "PNPM_STORE=$(pnpm store path --silent)" >> "$GITHUB_ENV"
+    - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ env.PNPM_STORE }}
+        key: pnpm-store-${{ runner.os }}-node${{ inputs.node-version }}-${{ hashFiles('pnpm-lock.yaml') }}
+        restore-keys: pnpm-store-${{ runner.os }}-node${{ inputs.node-version }}-
+    - if: inputs.install == 'true'
+      shell: bash
+      run: pnpm install --frozen-lockfile

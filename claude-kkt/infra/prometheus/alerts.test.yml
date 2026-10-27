@@ -129,3 +129,242 @@ tests:
             exp_annotations:
               summary: "Postgres connections above 80% of max_connections"
               description: "90% in use. Lower DATABASE_POOL_MAX × workers × replicas, or route through PgBouncer (docs/CAPACITY.md)."
+
+  # ---- phase 7 alerts (worker heartbeat C8, dues isolation, client errors C2, process errors, storage sweep, audit seal, paging) ----
+
+  # worker heartbeat: advancing, then stuck at 600 s from minute 10 (Redis writes failing while /metrics still answers)
+  - interval: 1m
+    input_series:
+      - series: kkt_worker_heartbeat_timestamp_seconds{job="kkt-worker", instance="worker-1"}
+        values: 0+60x10 600x10
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: KktWorkerHeartbeatStale
+        exp_alerts: []
+      - eval_time: 16m
+        alertname: KktWorkerHeartbeatStale
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              component: jobs
+            exp_annotations:
+              summary: No job worker heartbeat for more than a minute
+              description: "Nothing consumes the job queues: daily dues, integrity, audit seal, notifications and backups stop. Check `docker compose ps worker` / `kubectl -n kkt get pods -l app.kubernetes.io/name=worker`, GET :9465/health and the worker logs."
+
+  # every worker gone: the last scrape is at minute 5; the stale value then absent() keep the alert firing
+  - interval: 1m
+    input_series:
+      - series: kkt_worker_heartbeat_timestamp_seconds{job="kkt-worker", instance="worker-1"}
+        values: 0+60x5
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: KktWorkerHeartbeatStale
+        exp_alerts: []
+      - eval_time: 9m
+        alertname: KktWorkerHeartbeatStale
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              component: jobs
+            exp_annotations:
+              summary: No job worker heartbeat for more than a minute
+              description: "Nothing consumes the job queues: daily dues, integrity, audit seal, notifications and backups stop. Check `docker compose ps worker` / `kubectl -n kkt get pods -l app.kubernetes.io/name=worker`, GET :9465/health and the worker logs."
+      - eval_time: 14m
+        alertname: KktWorkerHeartbeatStale
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              component: jobs
+            exp_annotations:
+              summary: No job worker heartbeat for more than a minute
+              description: "Nothing consumes the job queues: daily dues, integrity, audit seal, notifications and backups stop. Check `docker compose ps worker` / `kubectl -n kkt get pods -l app.kubernetes.io/name=worker`, GET :9465/health and the worker logs."
+
+  # one of the two workers stops answering scrapes
+  - interval: 1m
+    input_series:
+      - series: up{job="kkt-worker", instance="worker-1"}
+        values: 1x15
+      - series: up{job="kkt-worker", instance="worker-2"}
+        values: 1 1 1 0x12
+      - series: kkt_worker_heartbeat_timestamp_seconds{job="kkt-worker", instance="worker-1"}
+        values: 0+60x15
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: KktWorkerReplicaDown
+        exp_alerts: []
+      - eval_time: 12m
+        alertname: KktWorkerReplicaDown
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              component: jobs
+              job: kkt-worker
+              instance: worker-2
+            exp_annotations:
+              summary: Job worker worker-2 is not answering metrics scrapes
+              description: The other replica keeps the queues moving; restore the second one before it is needed (docker compose up -d worker / kubectl describe pod).
+      - eval_time: 12m
+        alertname: KktWorkerHeartbeatStale
+        exp_alerts: []
+
+  # DAILY_DUES per-booking failures: a code's first failure (new series) and an increment of an existing series both alert
+  - interval: 1m
+    input_series:
+      - series: kkt_dues_booking_failures_total{job="kkt-worker", instance="worker-1", code="BOOKING_LOCKED"}
+        values: _x30 1x30
+      - series: kkt_dues_booking_failures_total{job="kkt-worker", instance="worker-2", code="PLAN_MISSING"}
+        values: 0x20 3x30
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: KktDuesBookingFailures
+        exp_alerts: []
+      - eval_time: 45m
+        alertname: KktDuesBookingFailures
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              component: money
+              code: BOOKING_LOCKED
+            exp_annotations:
+              summary: DAILY_DUES skipped bookings in the last 24 h (BOOKING_LOCKED)
+              description: Those bookings got no installment demands. ERP → Admin → Jobs → DAILY_DUES lists them (bookings_failed); fix the data, then re-run the job.
+          - exp_labels:
+              severity: warning
+              component: money
+              code: PLAN_MISSING
+            exp_annotations:
+              summary: DAILY_DUES skipped bookings in the last 24 h (PLAN_MISSING)
+              description: Those bookings got no installment demands. ERP → Admin → Jobs → DAILY_DUES lists them (bookings_failed); fix the data, then re-run the job.
+
+  # a counter unchanged for more than a day does not alert; a fresh increment does
+  - interval: 1m
+    input_series:
+      - series: kkt_dues_booking_failures_total{job="kkt-worker", instance="worker-1", code="OLD"}
+        values: 3x1500
+      - series: kkt_dues_booking_failures_total{job="kkt-worker", instance="worker-1", code="NEW"}
+        values: 0x1480 1x20
+    alert_rule_test:
+      - eval_time: 25h
+        alertname: KktDuesBookingFailures
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              component: money
+              code: NEW
+            exp_annotations:
+              summary: DAILY_DUES skipped bookings in the last 24 h (NEW)
+              description: Those bookings got no installment demands. ERP → Admin → Jobs → DAILY_DUES lists them (bookings_failed); fix the data, then re-run the job.
+
+  # front-end errors: 20/min from the ERP alerts, 2/min from the portal does not
+  - interval: 1m
+    input_series:
+      - series: kkt_client_errors_total{job="kkt-api", instance="api-1", app="erp"}
+        values: 0+20x40
+      - series: kkt_client_errors_total{job="kkt-api", instance="api-1", app="portal"}
+        values: 0+2x40
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: KktClientErrorRateHigh
+        exp_alerts: []
+      - eval_time: 30m
+        alertname: KktClientErrorRateHigh
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              component: frontend
+              app: erp
+            exp_annotations:
+              summary: More than 10 front-end errors per minute from the erp app
+              description: Usually a bad release of that app or an API contract change it does not handle. Search the API logs for msg "client error reported" with client_error.app=erp (release, url and stack are in the line); roll the app back if it started with a deploy.
+
+  # process errors: the first unhandled rejection of a process alerts; ten quiet minutes later it resolves
+  - interval: 1m
+    input_series:
+      - series: kkt_process_errors_total{job="kkt-worker", instance="worker-1", role="worker", kind="unhandled_rejection"}
+        values: _x10 1x20
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: KktProcessErrors
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              component: api
+              role: worker
+              kind: unhandled_rejection
+            exp_annotations:
+              summary: unhandled_rejection in the worker process
+              description: A promise rejection or exception escaped every handler. The log line carries the stack; an uncaught exception restarts the process.
+      - eval_time: 28m
+        alertname: KktProcessErrors
+        exp_alerts: []
+
+  # storage deletions that gave up (other sweep actions do not count)
+  - interval: 1m
+    input_series:
+      - series: kkt_storage_sweep_objects_total{job="kkt-worker", instance="worker-1", action="deletion_gave_up"}
+        values: _x5 1x20
+      - series: kkt_storage_sweep_objects_total{job="kkt-worker", instance="worker-1", action="deletion_done"}
+        values: 0+5x25
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: KktStorageDeletionGaveUp
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: KktStorageDeletionGaveUp
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              component: storage
+            exp_annotations:
+              summary: Object-store deletions failed 10 or more times
+              description: STORAGE_SWEEP keeps retrying daily, but erased or orphaned files are still in the bucket (DPDP erasure may be incomplete). Check the bucket credentials/policy and the worker logs.
+
+  # audit seal: a failed AUDIT_SEAL run pages; no success for an hour warns
+  - interval: 1m
+    input_series:
+      - series: kkt_job_failures_24h{job="kkt-api", instance="api-1", job_name="AUDIT_SEAL"}
+        values: 0 0 1x15
+      - series: kkt_job_last_success_timestamp_seconds{job="kkt-api", instance="api-1", job_name="AUDIT_SEAL"}
+        values: "0x100"
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: KktAuditSealFailed
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              component: security
+              job_name: AUDIT_SEAL
+            exp_annotations:
+              summary: The audit-log seal job failed
+              description: "Run GET /api/v1/admin/audit/verify for each company: first_mismatch names the changed, removed or back-dated row. Treat a chain break as a security incident."
+      - eval_time: 10m
+        alertname: KktAuditSealStale
+        exp_alerts: []
+      - eval_time: 90m
+        alertname: KktAuditSealStale
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              component: security
+            exp_annotations:
+              summary: No successful audit-log seal for more than an hour
+              description: AUDIT_SEAL runs every 15 minutes; unsealed audit rows are not tamper-evident yet. Check the workers (KktWorkerHeartbeatStale) and the job's last error.
+
+  # Alertmanager cannot deliver pages
+  - interval: 1m
+    input_series:
+      - series: alertmanager_notifications_failed_total{job="alertmanager", instance="alertmanager:9093", integration="pagerduty"}
+        values: 0+1x40
+      - series: alertmanager_notifications_failed_total{job="alertmanager", instance="alertmanager:9093", integration="slack"}
+        values: "0x40"
+    alert_rule_test:
+      - eval_time: 35m
+        alertname: KktAlertmanagerNotificationsFailing
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              component: alerting
+              integration: pagerduty
+            exp_annotations:
+              summary: Alertmanager cannot deliver pagerduty notifications
+              description: Check the receiver's key file (infra/secrets/pagerduty_routing_key / opsgenie_api_key / error_webhook_url) and `docker compose logs alertmanager`.

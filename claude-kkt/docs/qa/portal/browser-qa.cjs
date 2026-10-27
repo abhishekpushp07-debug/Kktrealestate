@@ -37,7 +37,9 @@ async function staffLogin() {
 }
 async function staffReply(ticketId, body, isInternal) {
   const t = await staffLogin();
-  const r = await fetch(`${API}/service-requests/${ticketId}/messages`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${t}`, "idempotency-key": crypto.randomUUID() }, body: JSON.stringify({ body, is_internal: isInternal, attachment_ids: [] }) });
+  // a staff reply needs the ticket's version (contract C6, phase 7 foundation)
+  const cur = await (await fetch(`${API}/service-requests/${ticketId}`, { headers: { authorization: `Bearer ${t}` } })).json();
+  const r = await fetch(`${API}/service-requests/${ticketId}/messages`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${t}`, "idempotency-key": crypto.randomUUID(), "if-match": `"v${cur.version}"` }, body: JSON.stringify({ body, is_internal: isInternal, attachment_ids: [] }) });
   if (!r.ok) throw new Error(`staff reply failed ${r.status} ${await r.text()}`);
   return r.json();
 }
@@ -295,7 +297,7 @@ const PHOTO = path.join(TMP, "snag.jpg");
     txt = await bodyText(page);
     expect(txt.includes("SR-2627/0005") && txt.includes("Closed"), "requests list shows seeded closed ticket", page);
     await check(page, "requests");
-    await page.getByRole("button", { name: "New" }).click();
+    await page.getByRole("button", { name: "New", exact: true }).click();
     await settle(page);
     // submit empty: field errors are announced (role=alert) and wired to the inputs (aria-invalid + aria-describedby)
     await page.getByRole("button", { name: "Submit request" }).click();
@@ -521,7 +523,7 @@ const PHOTO = path.join(TMP, "snag.jpg");
       json.unshift({ booking_id: ids.rajeshBooking, booking_number: "BK-FORGED", project_name: "Ganesh Green Villas", block_name: "Block P", flat_number: "P1", role: "PRIMARY", status: "ACTIVE" });
       await route.fulfill({ response: res, json });
     });
-    await page.evaluate(() => { localStorage.setItem("kkt.portal.booking", "__FORGED__"); localStorage.removeItem("kkt.portal.cache.v2"); });
+    await page.evaluate(() => { localStorage.setItem("kkt.portal.booking", "__FORGED__"); localStorage.removeItem("kkt.portal.cache.v3"); });
     await page.reload({ waitUntil: "load" });
     await settle(page, 1200);
     await page.getByRole("button", { name: "Switch booking" }).click().catch(() => null);
@@ -533,6 +535,53 @@ const PHOTO = path.join(TMP, "snag.jpg");
     const r404 = page.mon.responses.filter((r) => r.url.includes(`/portal/bookings/${ids.rajeshBooking}/`));
     expect(r404.length > 0 && r404.every((r) => r.status === 404), `API answered 404 for the foreign booking (${r404.length} calls)`, page);
     await page.unroute("**/api/v1/portal/bookings");
+    await ctx.close();
+  }
+
+  // =====================================================================
+  // Phase 7 (both widths) — cookie session (C1), nothing sensitive persisted, ledger paging, ErrorBoundary + client errors (C2)
+  // =====================================================================
+  for (const [w, h] of [[1440, 900], [390, 844]]) {
+    const { ctx, page } = await openPage(browser, w, h, `p7-${w}`);
+    await login(page, "9876543219");
+    const cookies = await ctx.cookies();
+    const prt = cookies.find((c) => c.name === "kkt_prt");
+    expect(Boolean(prt && prt.httpOnly && prt.sameSite === "Strict" && prt.path === "/api/v1/portal/auth"), `refresh token is the HttpOnly SameSite=Strict kkt_prt cookie (${w})`, page);
+    await goto(page, "/payments");
+    await page.getByRole("tab", { name: "Ledger" }).click();
+    await settle(page);
+    await sleep(1800); // the persister is throttled (1 s)
+    const stored = await page.evaluate(() => Object.fromEntries(Object.keys(localStorage).map((k) => [k, localStorage.getItem(k) || ""])));
+    const all = JSON.stringify(stored);
+    expect(!/rt_[A-Za-z0-9_-]{20}|eyJ[A-Za-z0-9_-]{20}/.test(all), `no token in localStorage (${Object.keys(stored).join(", ")}) (${w})`, page);
+    expect(!("kkt.portal.user" in stored) && !("kkt.portal.refresh" in stored) && !("kkt.portal.cache.v2" in stored), `no user snapshot, refresh token or old cache in localStorage (${w})`, page);
+    expect(!/booking_number|amount_paise|cash_due_paise|receipt_number|pan_masked|9876543219/.test(stored["kkt.portal.cache.v3"] || ""), `the persisted query cache holds no booking, payment, ledger or profile data (${w})`, page);
+    const ledgerCalls = page.mon.responses.filter((r) => r.url.includes("/ledger"));
+    expect(ledgerCalls.length >= 1 && ledgerCalls.every((r) => r.status === 200), `ledger read page by page (${ledgerCalls.length} calls) (${w})`, page);
+    await page.reload({ waitUntil: "load" });
+    await settle(page, 1200);
+    expect(!new URL(page.url()).pathname.startsWith("/login") && (await bodyText(page)).includes("A-803"), `reload restores the session through the cookie (${w})`, page);
+    await check(page, "p7-session-restored", { noShot: true });
+    // ErrorBoundary: a malformed home payload crashes the render → recovery screen + POST /client-errors (202)
+    await page.route("**/api/v1/portal/bookings/*/home", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "{}" }));
+    const reported = page.waitForResponse((r) => r.url().includes("/api/v1/client-errors"), { timeout: 15000 }).catch(() => null);
+    await page.goto(`${PORTAL}/`, { waitUntil: "load" });
+    await settle(page, 1500);
+    const crashed = (await bodyText(page)).includes("Something went wrong");
+    const rep = await reported;
+    expect(crashed, `a render crash shows the recovery screen (${w})`, page);
+    expect(Boolean(rep && rep.status() === 202), `the crash is reported to POST /api/v1/client-errors → 202 (${w})`, page);
+    if (w === 1440 && report.shots < MAX_SHOTS) {
+      const buf = await page.screenshot({ fullPage: false });
+      fs.writeFileSync(path.join(OUT, `error-boundary-${w}.png`), await sharp(buf).png({ palette: true, compressionLevel: 9 }).toBuffer());
+      report.shots += 1;
+    }
+    await page.unroute("**/api/v1/portal/bookings/*/home");
+    await page.getByRole("button", { name: "Try again" }).click();
+    await settle(page, 1500);
+    expect((await bodyText(page)).includes("A-803") && !(await bodyText(page)).includes("Something went wrong"), `"Try again" recovers once the data is good (${w})`, page);
+    drain(page); // the deliberate crash logged its own console errors
+    await check(page, "p7-recovered", { noShot: true });
     await ctx.close();
   }
 

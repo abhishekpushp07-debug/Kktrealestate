@@ -1,0 +1,18 @@
+{
+  "$comment": "p95 latency limits (ms) of the nightly load gate (scripts/ci/load-gate.mjs; .github/workflows/nightly.yml: 50 read connections, 10 write connections, 10 s per scenario, 2 API workers on a GitHub-hosted runner). The first matching pattern (regex on the scenario name) wins. The SPEC target is < 300 ms for list pages; cached public reads must be far below it (a 304 revalidation still runs the list query, so it shares the list limit); a payment posts a receipt, ledger rows and an audit row under the company receipt lock. Tighten as the measured numbers improve (docs/PERFORMANCE.md); never loosen without recording why.",
+  "max_non2xx_ratio": 0.01,
+  "min_scenarios": 10,
+  "p95_ms": [
+    { "pattern": "^GET /public/", "max": 100 },
+    { "pattern": "If-None-Match", "max": 300 },
+    { "pattern": "^GET /auth/me", "max": 150 },
+    { "pattern": "^GET /dashboard", "max": 300 },
+    { "pattern": "^GET /search", "max": 300 },
+    { "pattern": "^GET /bookings/:id/ledger", "max": 300 },
+    { "pattern": "^GET /bookings/:id", "max": 300 },
+    { "pattern": "^GET /blocks/:id/grid", "max": 300 },
+    { "pattern": "^GET ", "max": 300 },
+    { "pattern": "^POST /payments", "max": 800 }
+  ],
+  "default_max": 300
+}

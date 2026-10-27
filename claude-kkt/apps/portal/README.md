@@ -33,11 +33,14 @@ src/app/                 expo-router routes (file-based). Root _layout gates: lo
   (app)/_layout.tsx      responsive shell: sidebar ≥ 1024 px, bottom tabs on phones (tab bar never covers content)
   (app)/{index,flat,payments,construction}.tsx   tab roots
   (app)/more/**          More hub + documents, requests, notices, notifications, profile, sessions, bank details
-src/api/client.ts        the ONLY HTTP module: fetch, tokens (access in memory, refresh in SecureStore/localStorage),
-                         single-flight refresh on 401 TOKEN_EXPIRED, Idempotency-Key on POST, error envelope → ApiError,
-                         one typed function per Appendix C endpoint
-src/api/queries.ts       TanStack Query hooks (keys scoped by booking id), AsyncStorage-persisted cache (7 days),
-                         networkMode "offlineFirst" → cached screens render instantly, refresh in background
+src/api/client.ts        the ONLY HTTP module: fetch, single-flight refresh on 401 TOKEN_EXPIRED, Idempotency-Key on POST,
+                         If-Match from a version, error envelope → ApiError, one typed function per Appendix C endpoint,
+                         every page of the ledger / receipts / demands (api/paging.ts)
+src/api/session.ts       contract C1: access token in memory; web = HttpOnly kkt_prt cookie (X-KKT-Session: cookie, only a
+                         "signed in" flag in localStorage, restored by a cookie refresh on load); native = SecureStore + body
+src/api/queries.ts       TanStack Query hooks (keys scoped by booking id), networkMode "offlineFirst"; only notices, request
+                         categories and construction progress are persisted (api/persistPolicy.ts) — booking, payment,
+                         ledger, profile and document data stay in memory; retries honour Retry-After (api/retry.ts)
 src/api/files(.web).tsx  signed PDF links: in-app viewer / new tab on web; download + share sheet on phones
                          (platform variants MUST share the default file's extension — Metro tries x.web.ts before x.ts
                          but x.ts before x.web.tsx — see metro.config.js)
@@ -47,7 +50,9 @@ src/screens/             one component per screen
 src/ui/                  design system: theme tokens, Text, Icon (drawn, no icon-font dependency), Button, Card, Chip,
                          Skeleton, States, Screen/Header, Field, Sheet, Toast, ProgressRing, SegmentedControl,
                          Money, Table, Markdown, ZoomableImage/Lightbox, Attachments, shell/ (Sidebar, TabBar, …)
-src/lib/                 format (₹ Indian grouping, short forms, IST dates), storage, haptics, links, upload
+src/lib/                 format (₹ via @kkt/contracts moneyFormat, IST dates), storage, haptics, links, upload,
+                         errorReporting + reporter (contract C2: POST /api/v1/client-errors from the root ErrorBoundary
+                         in src/ui/ErrorBoundary.tsx and, on web, window error / unhandledrejection)
 ```
 
 ## Fonts

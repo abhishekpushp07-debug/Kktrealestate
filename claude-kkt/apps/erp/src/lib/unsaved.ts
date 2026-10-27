@@ -47,9 +47,22 @@ export function subscribeUnsaved(listener: () => void): () => void {
   return () => listeners.delete(listener);
 }
 
-/** Called by the query client's mutation cache on every successful mutation. */
+const savedListeners = new Set<() => void>();
+
+/**
+ * Called by the query client's mutation cache on every successful mutation. Sheets and dialogs that track "any edit" (no form dirty
+ * flag of their own) treat it as "the edits so far were applied" and become clean again (e.g. a drawer whose status select and
+ * reason were just saved); the next edit marks them dirty again.
+ */
 export function noteSaved(now = Date.now()): void {
   savedAt = now;
+  for (const listener of savedListeners) listener();
+}
+
+/** Subscribe to successful saves (lib/unsaved.ts noteSaved). */
+export function subscribeSaved(listener: () => void): () => void {
+  savedListeners.add(listener);
+  return () => savedListeners.delete(listener);
 }
 
 /** Test helper: forget every source and the last save. */
@@ -104,6 +117,8 @@ export function useUnsavedChangesGuard(dirty: boolean): UnsavedChangesGuard {
 export function isTrackedEdit(target: EventTarget | null): boolean {
   if (typeof Element === "undefined" || !(target instanceof Element)) return false;
   if (target.closest("[data-no-dirty]")) return false;
+  // hidden mirrors (Radix Select's native <select>, visually hidden inputs) are not something the user edits
+  if (target.closest('[aria-hidden="true"]')) return false;
   const tag = target.tagName;
   if (tag === "TEXTAREA" || tag === "SELECT") return true;
   if (tag !== "INPUT") return (target as HTMLElement).isContentEditable === true;

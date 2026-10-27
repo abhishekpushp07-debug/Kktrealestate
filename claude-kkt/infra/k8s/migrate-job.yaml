@@ -1,6 +1,6 @@
 # One-shot migrations (+ first-boot seed) as kkt_owner, directly against Postgres (not PgBouncer: the migration lock is a session
-# advisory lock). Run it before rolling out a new image: `kubectl -n kkt delete job migrate --ignore-not-found && kubectl apply -f
-# migrate-job.yaml && kubectl -n kkt wait --for=condition=complete job/migrate --timeout=10m`, or let Argo CD run it as a PreSync hook.
+# advisory lock). The deploy workflow (.github/workflows/deploy.yml, docs/DEPLOY.md) deletes the previous Job, applies this one with the
+# new image tag and waits for it to complete before any Deployment rolls; Argo CD runs it as a PreSync hook.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -28,7 +28,7 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: migrate
-          image: kkt-api:latest
+          image: kkt-api
           imagePullPolicy: IfNotPresent
           args: ["node", "dist/server.js", "migrate"]
           envFrom:
@@ -43,6 +43,9 @@ spec:
             - { name: JWT_SECRET_FILE, value: /run/secrets/kkt/jwt_secret }
             - { name: FIELD_ENCRYPTION_KEY_FILE, value: /run/secrets/kkt/field_encryption_key }
             - { name: HASH_KEY_FILE, value: /run/secrets/kkt/hash_key }
+            - { name: JWT_SIGNING_KEYS_FILE, value: /run/secrets/kkt/jwt_signing_keys }
+            - { name: LINK_SIGNING_KEYS_FILE, value: /run/secrets/kkt/link_signing_keys }
+            - { name: HASH_KEYS_FILE, value: /run/secrets/kkt/hash_keys }
             - { name: BOOTSTRAP_ADMIN_PASSWORD_FILE, value: /run/secrets/kkt/bootstrap_admin_password }
           resources:
             requests: { cpu: 250m, memory: 512Mi }

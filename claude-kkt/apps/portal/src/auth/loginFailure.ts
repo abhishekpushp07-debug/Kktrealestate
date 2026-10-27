@@ -4,7 +4,7 @@
 import { ApiError } from "@/api/errors";
 
 export interface LoginFailure {
-  code: "INVALID_CREDENTIALS" | "LOCKED" | "RATE_LIMITED" | "VALIDATION" | "NETWORK" | "OTHER";
+  code: "INVALID_CREDENTIALS" | "LOCKED" | "RATE_LIMITED" | "VALIDATION" | "NETWORK" | "COMPANY_REQUIRED" | "OTHER";
   message: string;
   lockedUntil?: string;
   retryAfterSeconds?: number;
@@ -35,6 +35,12 @@ export function toLoginFailure(e: unknown): LoginFailure {
       const wait = e.retryAfterSeconds ? `Try again in ${e.retryAfterSeconds} seconds.` : "Try again in a moment.";
       return { code: "RATE_LIMITED", message: `Too many attempts. ${wait}`, retryAfterSeconds: e.retryAfterSeconds };
     }
+    if (e.code === "COMPANY_REQUIRED")
+      // a multi-company install whose build names no company (EXPO_PUBLIC_KKT_COMPANY) and whose host maps to none
+      return {
+        code: "COMPANY_REQUIRED",
+        message: "This app is not set up for your builder yet. Please use the link your builder sent you.",
+      };
     if (e.code === "VALIDATION_ERROR")
       return { code: "VALIDATION", message: "Enter a valid 10-digit mobile number and your password." };
     if (e.isNetwork) return { code: "NETWORK", message: e.message };

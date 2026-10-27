@@ -131,3 +131,30 @@ Targets: 1,000 concurrent staff, list pages < 300 ms server time, ERP pages < 1.
 | 10    | Seed (zero integrity findings), acceptance suite, load test, docs                                                | all                                   |
 
 Each phase ends with its tests green before the next starts.
+
+## 8. Front ends (ERP and customer portal)
+
+- **Sessions (contract C1).** The ERP and the portal web build keep the access token in memory only; the refresh token is the HttpOnly,
+  SameSite=Strict cookie the API sets when login / refresh / logout carry `X-KKT-Session: cookie` (`kkt_rt`, `kkt_prt`). On load the
+  session is restored by a cookie refresh; browser storage holds only a "signed in on this browser" flag. Refreshes are single-flight
+  and serialised across tabs with a Web Lock (a rotated token is single-use). The native portal keeps the refresh token in
+  SecureStore and uses body mode. `apps/erp/src/lib/api.ts`, `apps/portal/src/api/session.ts`.
+- **Nothing sensitive at rest in the browser.** The portal persists only notices, request categories and construction progress
+  (`apps/portal/src/api/persistPolicy.ts`); booking, payment, demand, ledger, profile/KYC, document and notification data stay in
+  memory. The web build keeps no user snapshot.
+- **Money formatting.** One formatter, `packages/contracts/src/moneyFormat.ts` (BigInt, Indian grouping, short forms Cr / L only, round
+  first then promote: ₹99,96,000 → "₹1 Cr"), used by the ERP, the portal and the website; `packages/domain` runs the same algorithm for
+  receipts and PDFs, and a golden table (`INR_GOLDEN_CASES`) is asserted against all of them.
+- **Ledger (contract C7).** The ERP shows dues from the ledger's server `summary` (or `epoch_totals` for an older epoch), pages through
+  ledger, demands and payments, and links to the rebuild history; the portal reads every page of its ledger.
+- **Unsaved edits.** The ERP runs on a data router (`createBrowserRouter`); one `NavigationGuardHost` (`useBlocker` + `beforeunload`)
+  reads a registry fed by `useUnsavedChangesGuard(dirty)`; every `SheetContent` / `DialogContent` asks before Esc, an outside click or
+  the close button throws a dirty form away (a sheet counts only while open; a successful save resets its "any edit" tracking).
+- **Versions (contract C6).** ERP calls to version-required endpoints send `If-Match: "v<version>"` (or the body version) from the loaded
+  row; 409 `VERSION_CONFLICT` opens the reload prompt. The portal sends its profile's version when the API provides one.
+- **Errors (contract C2).** Root error boundaries (ERP and portal), the ERP route error page and window `error` /
+  `unhandledrejection` report to `POST /api/v1/client-errors` (deduped, sampled, capped, no query strings). A chunk that vanished with a
+  deploy (`vite:preloadError`) reloads the ERP once. React Query never retries a 4xx and waits for `Retry-After` on 429 / 503.
+- **Bundle budget.** `pnpm --filter @kkt/erp build` ends with `scripts/bundle-budget.mjs` (Vite manifest + gzip sizes): first-load JS
+  ≤ 275 KB gzip, CSS ≤ 20 KB, any chunk ≤ 130 KB, charts and the heavy pages (reports, wizards, dashboard, detail pages) lazy. Web fonts
+  are preloaded and applied after the first paint.

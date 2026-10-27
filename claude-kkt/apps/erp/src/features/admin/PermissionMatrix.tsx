@@ -12,11 +12,11 @@ export interface PermissionGroupLike {
   permissions: ReadonlyArray<{ code: string; label: string }>;
 }
 
-/** `GET /permissions` with the contracts' PERMISSION_GROUPS as the offline fallback. */
+/** `GET /roles/permissions` (canonical; `/permissions` is a deprecated alias) with the contracts' PERMISSION_GROUPS as the offline fallback. */
 export function usePermissionCatalog(enabled = true): { groups: readonly PermissionGroupLike[]; loading: boolean } {
   const query = useQuery<unknown, Error, PermissionGroupResponse[] | null>({
-    queryKey: ["/permissions"],
-    queryFn: ({ signal }) => api.get<unknown>("/permissions", { signal }),
+    queryKey: ["/roles/permissions"],
+    queryFn: ({ signal }) => api.get<unknown>("/roles/permissions", { signal }),
     select: normalisePermissionCatalog,
     staleTime: 10 * 60_000,
     retry: false,

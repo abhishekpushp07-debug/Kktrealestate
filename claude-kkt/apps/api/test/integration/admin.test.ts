@@ -291,8 +291,9 @@ describe("admin · backup", () => {
     }
 
     const names = (await readZipEntries(zipFile)).map((e) => e.name);
-    expect(names).toHaveLength(tables.length + 2);
-    expect(names).toEqual(expect.arrayContaining(["manifest.json", "RESTORE.md"]));
+    // + manifest.json, manifest.sig (HMAC of the manifest under LINK_SIGNING_KEYS), RESTORE.md
+    expect(names).toHaveLength(tables.length + 3);
+    expect(names).toEqual(expect.arrayContaining(["manifest.json", "manifest.sig", "RESTORE.md"]));
     for (const tbl of tables) expect(names).toContain(`tables/${tbl.name}.ndjson`);
     const manifest = JSON.parse(await readZipText(zipFile, "manifest.json")) as {
       format: string;
@@ -301,7 +302,7 @@ describe("admin · backup", () => {
       row_count: number;
       tables: { name: string; rows: number; stripped_columns: string[] }[];
     };
-    expect(manifest.format).toBe("kkt-backup/2");
+    expect(manifest.format).toBe("kkt-backup/3");
     expect(manifest.include_sensitive).toBe(false);
     expect(manifest.table_count).toBe(tables.length);
     expect(manifest.row_count).toBe(first.row_count);

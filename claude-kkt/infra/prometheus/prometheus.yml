@@ -1,5 +1,6 @@
-# Prometheus for the Compose production stack (docker-compose.prod.yml --profile monitoring). Kubernetes: the api Service carries
-# prometheus.io annotations / use a ServiceMonitor on port "metrics" (infra/k8s/api.yaml) with the same alert rules.
+# Prometheus for the Compose production stack (docker-compose.prod.yml --profile monitoring). Kubernetes: the api pods (port 9464) and
+# the worker pods (port 9465) carry prometheus.io annotations / use PodMonitors with job labels kkt-api and kkt-worker, and the same
+# alert rules.
 global:
   scrape_interval: 15s
   evaluation_interval: 30s
@@ -16,6 +17,13 @@ scrape_configs:
   - job_name: kkt-api
     authorization: { type: Bearer, credentials_file: /run/secrets/metrics_token }
     dns_sd_configs: [{ names: [api], type: A, port: 9464, refresh_interval: 30s }]
+  # every job worker serves its own registry (heartbeat gauge, job counters, dues failures) on the C8 port; one target per replica
+  - job_name: kkt-worker
+    authorization: { type: Bearer, credentials_file: /run/secrets/metrics_token }
+    dns_sd_configs: [{ names: [worker], type: A, port: 9465, refresh_interval: 30s }]
+  # notification failures (KktAlertmanagerNotificationsFailing)
+  - job_name: alertmanager
+    static_configs: [{ targets: ["alertmanager:9093"] }]
   - job_name: postgres
     static_configs: [{ targets: ["postgres-exporter:9187"] }]
   - job_name: redis

@@ -42,7 +42,7 @@ spec:
           labelSelector: { matchLabels: { app.kubernetes.io/name: api } }
       containers:
         - name: api
-          image: kkt-api:latest
+          image: kkt-api
           imagePullPolicy: IfNotPresent
           args: ["node", "--import", "./dist/telemetry.js", "dist/server.js"]
           ports:
@@ -59,6 +59,12 @@ spec:
             - { name: JWT_SECRET_FILE, value: /run/secrets/kkt/jwt_secret }
             - { name: FIELD_ENCRYPTION_KEY_FILE, value: /run/secrets/kkt/field_encryption_key }
             - { name: HASH_KEY_FILE, value: /run/secrets/kkt/hash_key }
+            # key rings (contract C9; docs/DEPLOY.md "Secrets and key rotation")
+            - { name: JWT_SIGNING_KEYS_FILE, value: /run/secrets/kkt/jwt_signing_keys }
+            - { name: LINK_SIGNING_KEYS_FILE, value: /run/secrets/kkt/link_signing_keys }
+            - { name: HASH_KEYS_FILE, value: /run/secrets/kkt/hash_keys }
+            - { name: INTERNAL_API_TOKEN_FILE, value: /run/secrets/kkt/internal_api_token }
+            - { name: WEB_REVALIDATE_TOKEN_FILE, value: /run/secrets/kkt/web_revalidate_token }
             - { name: METRICS_TOKEN_FILE, value: /run/secrets/kkt/metrics_token }
             # 5xx / failed-job webhook: opt in once the Secret's error_webhook_url holds a real URL (gen-secrets.sh writes the placeholder
             # "unused", which is not a URL and would stop the pod at boot with "ERROR_WEBHOOK_URL: Invalid URL")
@@ -66,17 +72,20 @@ spec:
           resources:
             requests: { cpu: "1", memory: 768Mi }
             limits: { cpu: "2", memory: 2Gi }
+          # liveness never touches dependencies (/health/live): a database or Redis outage must not restart every replica; readiness
+          # (/health/ready = DB + Redis + not draining) takes the pod out of the Service instead. /api/v1/health is the full report
+          # (503 when a dependency is down) for dashboards and humans, not for probes.
           startupProbe:
-            httpGet: { path: /api/v1/health, port: http }
+            httpGet: { path: /api/v1/health/live, port: http }
             periodSeconds: 3
             failureThreshold: 40
           readinessProbe:
-            httpGet: { path: /api/v1/ready, port: http }
+            httpGet: { path: /api/v1/health/ready, port: http }
             periodSeconds: 5
             timeoutSeconds: 3
             failureThreshold: 2
           livenessProbe:
-            httpGet: { path: /api/v1/health, port: http }
+            httpGet: { path: /api/v1/health/live, port: http }
             periodSeconds: 15
             timeoutSeconds: 5
             failureThreshold: 4

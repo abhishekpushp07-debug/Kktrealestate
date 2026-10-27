@@ -4,12 +4,14 @@
  * through a server-side cursor (batches of 5,000, no row cap) and streams it as NDJSON (`tables/<name>.ndjson`, one `row_to_json` object
  * per line: exact Postgres values — microsecond timestamps, numerics, arrays, jsonb) into a ZIP (archiver) written to a temp file and then
  * to storage. `manifest.json` carries row counts, the schema version (applied migrations), a sha256 per file, the FK load order and the
- * stripped columns; `RESTORE.md` explains the restore CLI (`pnpm --filter @kkt/api restore`, modules/admin/restore.ts).
+ * stripped columns; `manifest.sig` is an HMAC-SHA256 of the exact manifest bytes under the LINK_SIGNING_KEYS ring (contract C9, key family
+ * `kkt-backup-manifest-v1`), so the restore refuses an unsigned archive or one whose manifest (and therefore any file) was changed;
+ * `RESTORE.md` explains the restore CLI (`pnpm --filter @kkt/api restore`, modules/admin/restore.ts).
  * Rows are scoped to the caller's tenant (company_id, the company row itself, or the parent row's company for child tables without
  * company_id). Encrypted/hashed columns (*_enc, password_hash, mfa_*, token_hash, pan/aadhaar hashes, idempotency response bodies) are
  * stripped unless the caller asks for `include_sensitive` (a full disaster-recovery backup needs them).
  */
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, createHmac, randomUUID } from "node:crypto";
 import { createWriteStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { join } from "node:path";
@@ -47,16 +49,10 @@ import { config } from "../../config.js";
 import { registerJob, type JobContext } from "../../jobs/index.js";
 import { enqueueJobWithin } from "../../jobs/queue.js";
 import { writeAudit } from "../../lib/audit.js";
+import { activeLinkKey, linkKeys, safeEqual, signLinkBody, verifyLinkBody } from "../../lib/crypto.js";
 import { ApiError } from "../../lib/errors.js";
 import { route } from "../../lib/routes.js";
-import {
-  documentStorage,
-  fileTokenKey,
-  signFileToken,
-  storeFile,
-  verifyFileToken,
-  withTempDir,
-} from "../documents/index.js";
+import { documentStorage, storeFile, withTempDir } from "../documents/index.js";
 import { notify } from "../notifications/index.js";
 import { adminMeta, idParams, requireSuperAdmin, staff } from "./common.js";
 
@@ -64,8 +60,19 @@ import { adminMeta, idParams, requireSuperAdmin, staff } from "./common.js";
 export const BACKUP_TTL_SECONDS = 24 * 3600;
 /** Lifetime of one signed download link. */
 export const BACKUP_LINK_TTL_SECONDS = 15 * 60;
-/** Archive format tag written to manifest.json (2 = NDJSON per table, sha256 per file, FK load order). */
-export const BACKUP_FORMAT = "kkt-backup/2";
+/**
+ * Archive format tag written to manifest.json (2 = NDJSON per table, sha256 per file, FK load order; 3 = 2 + manifest.sig, an HMAC of
+ * manifest.json under the LINK_SIGNING_KEYS ring). The restore accepts 3 only: older archives are unsigned.
+ */
+export const BACKUP_FORMAT = "kkt-backup/3";
+/** Archive entry holding the manifest signature. */
+export const BACKUP_SIGNATURE_FILE = "manifest.sig";
+/** Format tag of manifest.sig. */
+export const BACKUP_SIGNATURE_FORMAT = "kkt-backup-sig/1";
+/** Key family (label) of manifest signatures in the LINK_SIGNING_KEYS ring. */
+export const BACKUP_MANIFEST_LABEL = "kkt-backup-manifest-v1";
+/** Key family (label) of backup download links in the LINK_SIGNING_KEYS ring. */
+export const BACKUP_LINK_LABEL = "kkt-backup-link-v1";
 /** Rows fetched per cursor batch while streaming a table into the archive. */
 export const BACKUP_BATCH_SIZE = 5_000;
 /** `exports.path` of backup rows. */
@@ -129,8 +136,63 @@ export interface BackupManifest {
   /** Tables parents-first (foreign keys), the order the restore CLI loads them in. */
   load_order: string[];
   tables: BackupManifestTable[];
-  /** sha256 of RESTORE.md (manifest.json cannot carry its own). */
+  /** sha256 of RESTORE.md (manifest.json cannot carry its own; manifest.sig authenticates it). */
   files: Record<string, string>;
+}
+
+/** Content of manifest.sig: HMAC-SHA256 over the exact bytes of manifest.json. */
+export interface BackupSignature {
+  format: typeof BACKUP_SIGNATURE_FORMAT;
+  alg: "HMAC-SHA256";
+  /** LINK_SIGNING_KEYS key id that signed (older ring keys keep verifying after a rotation). */
+  kid: string;
+  /** Informational: sha256 of manifest.json. */
+  manifest_sha256: string;
+  /** base64url HMAC. */
+  signature: string;
+}
+
+/** Signs the exact bytes of manifest.json with the active LINK_SIGNING_KEYS key (key family kkt-backup-manifest-v1). */
+export function signBackupManifest(manifestBytes: Buffer): BackupSignature {
+  const { kid, key } = activeLinkKey(BACKUP_MANIFEST_LABEL);
+  return {
+    format: BACKUP_SIGNATURE_FORMAT,
+    alg: "HMAC-SHA256",
+    kid,
+    manifest_sha256: createHash("sha256").update(manifestBytes).digest("hex"),
+    signature: createHmac("sha256", key).update(manifestBytes).digest("base64url"),
+  };
+}
+
+/**
+ * Verifies manifest.sig against the exact bytes of manifest.json; returns the signing kid or throws with the reason (malformed, a key
+ * that is not in LINK_SIGNING_KEYS, or a signature that does not match — the manifest was modified or signed by another installation).
+ */
+export function verifyBackupManifest(manifestBytes: Buffer, signatureText: string): { kid: string } {
+  let sig: Partial<BackupSignature>;
+  try {
+    sig = JSON.parse(signatureText) as Partial<BackupSignature>;
+  } catch {
+    throw new Error(`${BACKUP_SIGNATURE_FILE} is not valid JSON: refusing an unsigned archive`);
+  }
+  if (
+    sig?.format !== BACKUP_SIGNATURE_FORMAT ||
+    sig.alg !== "HMAC-SHA256" ||
+    typeof sig.kid !== "string" ||
+    typeof sig.signature !== "string"
+  )
+    throw new Error(`${BACKUP_SIGNATURE_FILE} is malformed: refusing an unsigned archive`);
+  const key = linkKeys(BACKUP_MANIFEST_LABEL).find((k) => k.kid === sig.kid);
+  if (!key)
+    throw new Error(
+      `the backup was signed with key ${sig.kid}, which is not in LINK_SIGNING_KEYS: restore with the key ring that was active when the backup was made`,
+    );
+  const expected = createHmac("sha256", key.key).update(manifestBytes).digest("base64url");
+  if (!safeEqual(expected, sig.signature))
+    throw new Error(
+      "the manifest signature does not match: the archive was modified or was not produced by this installation",
+    );
+  return { kid: sig.kid };
 }
 
 export const RESTORE_MD = `# Restoring a KKT backup
@@ -138,8 +200,9 @@ export const RESTORE_MD = `# Restoring a KKT backup
 This archive was produced by \`POST /api/v1/admin/backup\` (job BACKUP_EXPORT). It holds one NDJSON file per table under \`tables/\`
 (one JSON object per line, produced by PostgreSQL's \`row_to_json\`: snake_case column names, exact values — timestamps with
 microseconds, money as integer paise, arrays and jsonb as JSON), \`manifest.json\` (row counts, schema version, sha256 of every file,
-the foreign-key load order, stripped columns) and this file. Every table was read inside one repeatable-read snapshot, so the archive is
-consistent across tables.
+the foreign-key load order, stripped columns), \`manifest.sig\` (an HMAC-SHA256 of manifest.json under the installation's
+LINK_SIGNING_KEYS ring) and this file. Every table was read inside one repeatable-read snapshot, so the archive is consistent across
+tables.
 
 ## With the restore CLI (recommended)
 
@@ -148,7 +211,9 @@ pnpm --filter @kkt/api restore -- --file <backup.zip> --database-url postgres://
 \`\`\`
 
 The CLI
-1. verifies the sha256 of every file against \`manifest.json\` (a corrupt or edited archive is refused before anything is written);
+1. verifies \`manifest.sig\` (an unsigned archive, an edited manifest or a key that is not in LINK_SIGNING_KEYS is refused), then the
+   sha256 of every file against \`manifest.json\` (a corrupt or edited archive is refused before anything is written); run it with the
+   LINK_SIGNING_KEYS ring of the installation that made the backup (\`--verify-only\` checks an archive without a database);
 2. runs the migrations of this application version on the target (it must be an EMPTY database; the CLI refuses a database that has rows);
 3. loads the tables parents-first in foreign-key order (\`manifest.json → load_order\`, recomputed from the target's catalog) inside one
    transaction, using \`json_populate_recordset\` so PostgreSQL converts every value itself. No trigger has to be disabled: the
@@ -433,7 +498,12 @@ export async function writeBackupArchive(db: DB, file: string, opts: WriteBackup
     tables,
     files: { "RESTORE.md": restoreFacts.sha256 },
   };
-  archive.append(`${JSON.stringify(manifest, null, 2)}\n`, { name: "manifest.json", date: now });
+  const manifestBytes = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+  archive.append(manifestBytes, { name: "manifest.json", date: now });
+  archive.append(`${JSON.stringify(signBackupManifest(manifestBytes), null, 2)}\n`, {
+    name: BACKUP_SIGNATURE_FILE,
+    date: now,
+  });
   await archive.finalize();
   await written;
   if (archiveError) throw archiveError;
@@ -497,17 +567,30 @@ export function toBackupRow(r: ExportRecord): AdminBackupRow {
   };
 }
 
-/** Key for the compact signed link tokens (derived from JWT_SECRET with its own context label). */
-const linkKey = fileTokenKey("kkt-backup-link-v1", config.JWT_SECRET);
-
-/** Signed token for a backup id (`exp` = unix seconds). */
-export function signBackupToken(id: string, exp: number): string {
-  return signFileToken(linkKey, id, exp);
+/** Body of a backup link token: backup id (16 B) ‖ expiry (6 B, unix seconds). */
+function backupTokenBody(id: string, exp: number): Buffer {
+  const body = Buffer.alloc(22);
+  Buffer.from(id.replace(/-/g, ""), "hex").copy(body, 0);
+  body.writeUIntBE(Math.max(0, Math.min(exp, 2 ** 48 - 1)), 16, 6);
+  return body;
 }
 
-/** Backup id of a valid, unexpired token; null when malformed, forged or expired. */
-export function verifyBackupToken(token: string): string | null {
-  return verifyFileToken(linkKey, token);
+/**
+ * Signed token for a backup id (`exp` = unix seconds): `<kid>.<body>.<sig>` under the LINK_SIGNING_KEYS ring (contract C9, key family
+ * kkt-backup-link-v1); older ring keys keep verifying after a rotation.
+ */
+export function signBackupToken(id: string, exp: number): string {
+  return signLinkBody(BACKUP_LINK_LABEL, backupTokenBody(id, exp));
+}
+
+/** Backup id of a valid, unexpired token (or a legacy kid-less token MAC'd with a ring key); null when malformed, forged or expired. */
+export function verifyBackupToken(token: string, nowSeconds = Math.floor(Date.now() / 1000)): string | null {
+  if (token.length > 100) return null;
+  const body = verifyLinkBody(BACKUP_LINK_LABEL, token);
+  if (!body || body.length !== 22) return null;
+  if (body.readUIntBE(16, 6) < nowSeconds) return null;
+  const hex = body.subarray(0, 16).toString("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 /** Signed download link for a stored backup (15 minutes). */

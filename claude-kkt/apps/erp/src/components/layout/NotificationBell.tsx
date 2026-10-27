@@ -88,7 +88,8 @@ export function NotificationBell() {
         <Button
           variant="ghost"
           className="relative size-9 px-0"
-          aria-label={count > 0 ? `Notifications, ${count} unread` : "Notifications"}
+          // the accessible name contains the visible badge text ("99+" above 99; WCAG 2.5.3 label-in-name)
+          aria-label={count > 0 ? `Notifications, ${badge} unread` : "Notifications"}
           title="Notifications"
           data-testid="notification-bell"
         >

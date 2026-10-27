@@ -6,6 +6,38 @@ Stack under test: API `apps/api` on `:4000` with the demo seed on its own databa
 
 Runner: [`docs/qa/erp/browser-qa.cjs`](erp/browser-qa.cjs) (`ERP_URL`, `API_URL`, `OUT_DIR`, `REPORT`, `WIPE=1`, `ONLY=login,roles,masters,inventory,crm,money,misc,hardening,smoke`). On every page it asserts: zero console errors / page errors, zero failed or ≥ 400 API requests (apart from the deliberate 4xx probes listed below), `document.documentElement.scrollWidth <= window.innerWidth`, and at 390 px that every **primary** target is ≥ 44 px tall (action buttons, tabs, sidebar / drawer / Back links; switches toggle through their 44 px label row and desktop-only breadcrumb crumbs count as secondary). It records every sub-44 px element, takes one palette-quantised viewport screenshot per listed page and width (`docs/qa/erp/<page>-<width>.png`, 40 files, 13–167 KB each, 2.1 MB in all), and verifies every flow through the API afterwards (status, ledger rows, audit rows, stage records, files).
 
+## Phase 7 frontend track 2026-10-27
+
+Stack: API (`tsx src/server.ts`) on `:4710` with a fresh demo seed in `kkt_p7_fe` (Redis db 12) plus the worker; ERP built with
+`VITE_API_URL=""` (same origin, like production behind Caddy) and served by `vite preview --port 5710` with
+`KKT_API_PROXY_TARGET=http://localhost:4710`, so the HttpOnly `kkt_rt` cookie (contract C1) works without cross-origin CORS. Runner:
+`ERP_URL=http://localhost:5710 API_URL=http://localhost:4710 OUT_DIR=<outside the repo> node docs/qa/erp/browser-qa.cjs`.
+
+**Result (full walk, fresh seed): 585 page checks (404 at 1440 px, 181 at 390 px), 209/209 assertions, 0 console errors, 0 failed
+requests, no overflow, no primary target under 48 px; axe 534 scans, 533 clean.** The one axe hit (`target-size` on the cheques
+"Instrument date" header after the bounce flow) was a horizontally scrolled table, not the toast the earlier stages blamed: the runner
+now scrolls the table back before the check. The re-run of `money` + `phase7` then found the bell's accessible name "Notifications,
+132 unread" did not contain its visible "99+" badge (`label-content-name-mismatch`, only above 99 unread) — fixed in
+`NotificationBell.tsx`. Re-run `money,phase7`: **81 checks, 64/64 assertions, 0 defects, axe 81 scans, 0 serious/critical.**
+
+Two regressions of the new unsaved-changes guard were found by the walk and fixed before the final run: `SheetContent` stays mounted
+while its sheet is closed, so a form edited and then saved kept the registry dirty and the next in-app navigation asked "Leave without
+saving?" (the guard now counts only while the Radix content is open, and a successful save resets "any edit" tracking); Radix Select's
+hidden native `<select>` dispatches untrusted change events when a drawer loads its record (now ignored, as is anything under
+`aria-hidden`).
+
+New section **`phase7`** (`ONLY=phase7`, both widths):
+
+| Area | Checked |
+| --- | --- |
+| Session (C1) | after sign-in localStorage holds only `kkt.erp.session` (no token); the refresh token is the `kkt_rt` cookie (HttpOnly, SameSite=Strict, Path=/api/v1/auth); a full reload restores the session through the cookie |
+| Unsaved sheet | new-customer sheet with an edit: Esc asks "Discard unsaved changes?"; "Keep editing" keeps the sheet; the close button asks again; "Discard changes" closes it (`unsaved-sheet-prompt-1440.png`) |
+| Unsaved page | Settings with an edited tagline ("Unsaved changes"): a sidebar link asks "Leave without saving?"; "Stay on this page" keeps the edit; "Leave and discard" navigates and nothing was saved (API) (`unsaved-settings-prompt-1440.png`) |
+| Ledger (C7) | booking ledger totals rendered from the server `summary`, the epoch label, the rebuild history panel (`ledger-rebuilds-1440.png`) |
+| Import templates | the charge-types CSV dialog reads `GET /masters/charge-types/import-template` (200) and its header uses `default_amount_paise` |
+
+The portal-side checks are in `docs/qa/portal.md`.
+
 ## Verify stage 2026-10-26 (phase 5: lint refactors)
 
 The verify stage moved about 50 ERP files off "set state in an effect" (dialog/sheet resets via `useOnChange`, derived loading flags,

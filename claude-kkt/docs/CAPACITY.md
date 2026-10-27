@@ -39,7 +39,9 @@ reads) ~1.5 ms; cacheable public reads that reach the API ~0.2 ms.
 - **Database (primary):** 4 vCPU / 16 GB, `shared_buffers` 4 GB, SSD. Pools: 2 replicas × 2 workers × `DATABASE_POOL_MAX` 10 = 40
   client connections + worker 4 → PgBouncer → ≤ 60 server connections (well under `max_connections` 200).
 - **Redis:** ~2–3 commands per request (auth MGET, rate limit) → < 1,500 ops/s; 1 GB `noeviction` is generous.
-- **Worker:** 1 container, 2 vCPU; nightly dues/integrity over thousands of bookings take seconds to minutes.
+- **Worker:** 2 containers × 2 vCPU (phase 7: two replicas for availability, not throughput — BullMQ runs each job once, schedules are
+  de-duplicated; per worker `WORKER_CRITICAL_CONCURRENCY` 2 + `WORKER_HEAVY_CONCURRENCY` 1); nightly dues/integrity over thousands of
+  bookings take seconds to minutes. `UV_THREADPOOL_SIZE=16` in every API/worker container (argon2, sharp, zlib share the libuv pool).
 - **Latency target** (< 300 ms list pages): met at 200 hammering connections on the shared box for every list except the old full-row
   bookings page; with dedicated API cores and the database on its own machine the queueing that dominates p95 shrinks further.
 
@@ -98,7 +100,7 @@ stale-while-revalidate=300` and are cached in Redis for 60 s; media and build as
 | PostgreSQL           | primary 8 vCPU / 32 GB + 3 read replicas 8 vCPU / 32 GB, PgBouncer 2 × 1 vCPU per endpoint |
 | Redis                | managed, 2 GB, primary + replica; separate small security Redis                            |
 | Object storage + CDN | S3 + CloudFront/Cloudflare for media and static assets                                     |
-| Worker               | 1 × 2 vCPU (unchanged)                                                                     |
+| Worker               | 2 × 2 vCPU (unchanged; the second replica is for availability)                             |
 
 ## 4. Read-replica routing plan
 
@@ -115,7 +117,7 @@ stale-while-revalidate=300` and are cached in Redis for 60 s; media and build as
 
 ## 5. Pool and connection arithmetic
 
-`client connections = API replicas × workers per replica × DATABASE_POOL_MAX (+ replica pools) + worker pool (4) + migrate (2)`.
+`client connections = API replicas × workers per replica × DATABASE_POOL_MAX (+ replica pools) + worker replicas (2) × worker pool + migrate (2)`.
 Without PgBouncer this must stay under Postgres `max_connections` (200 in `infra/postgres/postgresql.conf`) minus admin/backup headroom.
 With PgBouncer it must stay under `max_client_conn`, and `default_pool_size` × databases ≤ `max_db_connections` (150 in Compose).
 PgBouncer's limits apply per PgBouncer process: with N PgBouncer replicas the server side is N × `max_db_connections`, which must stay
@@ -137,5 +139,7 @@ under Postgres `max_connections` minus headroom (Kubernetes ships 2 × 70 = 140)
 
 `BASE=https://erp.<staging> CONNECTIONS=… pnpm loadtest` against a staging stack sized as above, with the database on its own machine,
 a production-sized synthetic dataset and the API, database and generator on separate hosts; watch the Grafana dashboard
-(`KKT API`) for p95 per route, event-loop lag, connections vs max and Redis memory while ramping. The nightly CI job runs a small smoke
-profile only — it guards against regressions, not capacity.
+(`KKT API`) for p95 per route, event-loop lag, connections vs max and Redis memory while ramping. The nightly CI job is a regression
+gate, not a capacity test: 50 read / 10 write connections on a GitHub runner, on the scale seed when `pnpm --filter @kkt/api seed:scale`
+exists (else the demo seed), failing when a route's p95 exceeds its limit in `scripts/ci/load-thresholds.json` (lists 300 ms, cached
+public reads 100 ms, payments 800 ms) or more than 1% of its requests fail.

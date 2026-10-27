@@ -1,7 +1,10 @@
 // The ONLY place the portal talks HTTP. Fetch-based, typed against @kkt/contracts (Appendix C).
 //  - base: EXPO_PUBLIC_API_URL + /api/v1/portal
-//  - access token in memory; refresh token in SecureStore (native) / localStorage (web)
-//  - single-flight refresh on 401 TOKEN_EXPIRED (and proactively when only a refresh token exists)
+//  - sessions (contract C1, src/api/session.ts): access token in memory only; web uses the HttpOnly refresh cookie (X-KKT-Session:
+//    cookie, nothing token-like in localStorage), native keeps the refresh token in SecureStore and sends it in the body
+//  - single-flight refresh on 401 TOKEN_EXPIRED (and proactively on cold start, which restores the session); 401 SESSION_EXPIRED
+//    (past the absolute lifetime) signs out
+//  - If-Match: "v<version>" when the caller passes a version (contract C6)
 //  - Idempotency-Key on every POST; error envelope parsed into ApiError
 import { fetch as expoFetch } from "expo/fetch";
 import { Platform } from "react-native";
@@ -15,7 +18,7 @@ import {
   type PortalDocumentRow,
   type PortalHomeResponse,
   type PortalLedgerResponse,
-  type PortalLogin,
+  type PortalAuthLogin,
   type PortalLoginResponse,
   type PortalMarkRead,
   type PortalMyFlatResponse,
@@ -39,6 +42,8 @@ import {
   type TokenPair,
 } from "@kkt/contracts";
 import { secureStorage } from "@/lib/storage";
+import { fetchAllPages } from "./paging";
+import { createSession } from "./session";
 import { noteDeprecation } from "./deprecation";
 import { ApiError, apiErrorFromBody } from "./errors";
 import { buildMultipart, type LocalFile } from "@/lib/upload";
@@ -51,8 +56,6 @@ export const API_ORIGIN = (process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:
 export const PORTAL_BASE = `${API_ORIGIN}/api/v1/portal`;
 export const ERP_URL = process.env.EXPO_PUBLIC_ERP_URL ?? "";
 
-const REFRESH_KEY = "kkt.portal.refresh";
-
 // ---------------------------------------------------------------------------
 // Errors
 // ---------------------------------------------------------------------------
@@ -63,47 +66,11 @@ export { ApiError, errorMessage, isApiErrorInstance, type ClientErrorCode } from
 // Tokens
 // ---------------------------------------------------------------------------
 
-let accessToken: string | null = null;
-let refreshToken: string | null = null;
-let refreshLoaded = false;
-
-type SessionListener = (event: "expired") => void;
-const sessionListeners = new Set<SessionListener>();
-
-export const session = {
-  get accessToken(): string | null {
-    return accessToken;
-  },
-  get hasRefreshToken(): boolean {
-    return refreshToken !== null;
-  },
-  async load(): Promise<boolean> {
-    if (!refreshLoaded) {
-      refreshToken = await secureStorage.get(REFRESH_KEY);
-      refreshLoaded = true;
-    }
-    return refreshToken !== null;
-  },
-  async setTokens(pair: Pick<TokenPair, "access_token" | "refresh_token">): Promise<void> {
-    accessToken = pair.access_token;
-    refreshToken = pair.refresh_token;
-    refreshLoaded = true;
-    await secureStorage.set(REFRESH_KEY, pair.refresh_token);
-  },
-  async clear(): Promise<void> {
-    accessToken = null;
-    refreshToken = null;
-    refreshLoaded = true;
-    await secureStorage.remove(REFRESH_KEY);
-  },
-  onExpired(listener: SessionListener): () => void {
-    sessionListeners.add(listener);
-    return () => sessionListeners.delete(listener);
-  },
-};
+/** The session (src/api/session.ts): cookie transport in the browser, SecureStore + body mode in the native apps. */
+export const session = createSession(Platform.OS === "web" ? "cookie" : "body", secureStorage);
 
 function notifyExpired(): void {
-  for (const l of sessionListeners) l("expired");
+  session.notifyExpired();
 }
 
 // ---------------------------------------------------------------------------
@@ -128,6 +95,10 @@ interface RequestOptions {
   /** Set when the call is itself the refresh/login call (never triggers a refresh). */
   noRefresh?: boolean;
   idempotencyKey?: string;
+  /** Login / refresh / logout: the session transport (web: `X-KKT-Session: cookie` + credentials, so the API manages kkt_prt). */
+  sessionTransport?: boolean;
+  /** Resource version → `If-Match: "v<version>"` (contract C6). */
+  version?: number;
 }
 
 function uuid(): string {
@@ -165,6 +136,13 @@ async function send(url: string, o: RequestOptions, token: string | null): Promi
   const headers: Record<string, string> = { Accept: "application/json" };
   if (token && o.auth !== false) headers.Authorization = `Bearer ${token}`;
   if (o.idempotencyKey) headers["Idempotency-Key"] = o.idempotencyKey;
+  if (typeof o.version === "number") headers["If-Match"] = `"v${o.version}"`;
+  let credentials: "include" | undefined;
+  if (o.sessionTransport) {
+    const transport = session.authTransport();
+    Object.assign(headers, transport.headers);
+    if (transport.includeCredentials) credentials = "include";
+  }
   let body: string | FormData | undefined;
   if (o.form) {
     body = o.form; // the runtime adds the multipart boundary; never set Content-Type here
@@ -172,7 +150,7 @@ async function send(url: string, o: RequestOptions, token: string | null): Promi
     headers["Content-Type"] = "application/json";
     body = JSON.stringify(o.body);
   }
-  const init = { method: o.method ?? "GET", headers, body };
+  const init = { method: o.method ?? "GET", headers, body, ...(credentials ? { credentials } : {}) };
   // Multipart on native must go through expo/fetch (it can serialise Blob parts read from file://).
   if (o.form && Platform.OS !== "web") return expoFetch(url, init);
   return fetch(url, init);
@@ -201,13 +179,13 @@ async function toApiError(res: HttpResponse): Promise<ApiError> {
 let refreshing: Promise<string> | null = null;
 
 async function doRefresh(): Promise<string> {
-  await session.load();
-  if (!refreshToken) throw new ApiError({ status: 401, code: "UNAUTHENTICATED", message: "Please sign in again." });
+  if (!(await session.load()))
+    throw new ApiError({ status: 401, code: "UNAUTHENTICATED", message: "Please sign in again." });
   let res: HttpResponse;
   try {
     res = await send(
       buildUrl("/auth/refresh"),
-      { method: "POST", body: { refresh_token: refreshToken }, auth: false },
+      { method: "POST", body: session.refreshBody(), auth: false, sessionTransport: true },
       null,
     );
   } catch {
@@ -230,9 +208,20 @@ async function doRefresh(): Promise<string> {
   return pair.access_token;
 }
 
+/** Web Lock that serialises cookie refreshes across tabs: a rotated refresh token is single-use, and reuse revokes the family. */
+const REFRESH_LOCK = "kkt.portal.refresh.rotate";
+
+function rotateSerialised(): Promise<string> {
+  const locks = (
+    globalThis.navigator as { locks?: { request<T>(name: string, cb: () => Promise<T>): Promise<T> } } | undefined
+  )?.locks;
+  if (session.mode !== "cookie" || !locks) return doRefresh();
+  return locks.request(REFRESH_LOCK, doRefresh);
+}
+
 export function refreshAccessToken(): Promise<string> {
   if (!refreshing) {
-    refreshing = doRefresh().finally(() => {
+    refreshing = rotateSerialised().finally(() => {
       refreshing = null;
     });
   }
@@ -242,11 +231,10 @@ export function refreshAccessToken(): Promise<string> {
 async function request<T>(path: string, o: RequestOptions = {}): Promise<T> {
   const url = buildUrl(path, o.query);
   const needsAuth = o.auth !== false;
-  let token = accessToken;
-  // Cold start: we only hold a refresh token → get an access token first (single-flight).
+  let token = session.accessToken;
+  // Cold start: no access token in memory but a session to restore (cookie / stored refresh token) → refresh first (single-flight).
   if (needsAuth && !token && !o.noRefresh) {
-    await session.load();
-    if (refreshToken) token = await refreshAccessToken();
+    if (await session.load()) token = await refreshAccessToken();
   }
   let res: HttpResponse;
   try {
@@ -255,8 +243,7 @@ async function request<T>(path: string, o: RequestOptions = {}): Promise<T> {
     if (res.status === 401 && needsAuth && !o.noRefresh) {
       const err = await toApiError(res);
       if (err.code === "TOKEN_EXPIRED" || err.code === "UNAUTHENTICATED") {
-        await session.load();
-        if (refreshToken) {
+        if (await session.load()) {
           const fresh = await refreshAccessToken();
           res = await send(url, o, fresh);
           noteDeprecation(path, res.headers);
@@ -293,7 +280,8 @@ const post = <T>(path: string, body?: unknown, extra: Omit<RequestOptions, "meth
     idempotencyKey: extra.idempotencyKey ?? newIdempotencyKey(),
     ...extra,
   });
-const patch = <T>(path: string, body: unknown) => request<T>(path, { method: "PATCH", body });
+const patch = <T>(path: string, body: unknown, version?: number) =>
+  request<T>(path, { method: "PATCH", body, version });
 const del = <T>(path: string) => request<T>(path, { method: "DELETE" });
 
 /** Accepts either a bare array or a `{ items }` envelope (sessions/bookings shapes are arrays in Appendix C). */
@@ -322,11 +310,17 @@ export interface PortalRequestCategory {
 
 export const api = {
   auth: {
-    login: (body: PortalLogin) =>
-      request<PortalLoginResponse>("/auth/login", { method: "POST", body, auth: false, noRefresh: true }),
+    login: (body: PortalAuthLogin) =>
+      request<PortalLoginResponse>("/auth/login", {
+        method: "POST",
+        body,
+        auth: false,
+        noRefresh: true,
+        sessionTransport: true,
+      }),
     refresh: () => refreshAccessToken(),
     logout: (body: { refresh_token?: string; all_devices?: boolean }) =>
-      request<void>("/auth/logout", { method: "POST", body, noRefresh: true }),
+      request<void>("/auth/logout", { method: "POST", body, noRefresh: true, sessionTransport: true }),
     me: () => get<PortalUser>("/auth/me"),
     changePassword: (body: PortalChangePassword) => post<void>("/auth/change-password", body),
     sessions: async () => itemsOf<PortalSessionRow>(await get<unknown>("/auth/sessions")),
@@ -339,8 +333,17 @@ export const api = {
     flat: (id: string) => get<PortalMyFlatResponse>(`/bookings/${id}/flat`),
     ledger: (id: string, q: PageQuery = {}) =>
       get<PortalLedgerResponse>(`/bookings/${id}/ledger`, { page: q.page, page_size: q.page_size ?? 200 }),
+    /** Every ledger row (all pages, seq order): the dues shown are those after the true last row. */
+    ledgerAll: (id: string) =>
+      fetchAllPages((page, page_size) => get<PortalLedgerResponse>(`/bookings/${id}/ledger`, { page, page_size })),
     receipts: (id: string, q: PageQuery = {}) =>
       get<PortalReceiptListResponse>(`/bookings/${id}/receipts`, { page: q.page, page_size: q.page_size ?? 200 }),
+    receiptsAll: (id: string) =>
+      fetchAllPages((page, page_size) =>
+        get<PortalReceiptListResponse>(`/bookings/${id}/receipts`, { page, page_size }),
+      ),
+    demandsAll: (id: string) =>
+      fetchAllPages((page, page_size) => get<PortalDemandListResponse>(`/bookings/${id}/demands`, { page, page_size })),
     receiptPdf: (id: string, paymentId: string) =>
       get<PortalPdfLinkResponse>(`/bookings/${id}/receipts/${paymentId}/pdf`),
     demands: (id: string, q: PageQuery = {}) =>
@@ -392,7 +395,8 @@ export const api = {
   },
   profile: {
     get: () => get<PortalProfileResponse>("/profile"),
-    update: (body: PortalProfileUpdate) => patch<PortalProfileResponse>("/profile", body),
+    /** `version` (when the profile carries one) → If-Match; a stale edit answers 409 VERSION_CONFLICT. */
+    update: (body: PortalProfileUpdate, version?: number) => patch<PortalProfileResponse>("/profile", body, version),
   },
 };
 

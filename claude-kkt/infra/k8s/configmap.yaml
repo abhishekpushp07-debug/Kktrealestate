@@ -30,6 +30,13 @@ data:
   SHUTDOWN_DRAIN_DELAY_MS: "0"
   LOG_LEVEL: info
   OTEL_SERVICE_NAME: kkt-api
+  # libuv pool shared by argon2, sharp, zlib and fs (default 4)
+  UV_THREADPOOL_SIZE: "16"
+  # job worker (contract C8): health/metrics port and how long a stop waits for critical jobs (worker.yaml grace period = this + 60 s)
+  WORKER_HEALTH_PORT: "9465"
+  WORKER_DRAIN_TIMEOUT_MS: "120000"
+  # the website's on-demand revalidation after CMS / project-website writes (token: kkt-secrets web_revalidate_token)
+  WEB_REVALIDATE_URL: http://web:3000/api/revalidate
   # OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector.observability:4318
   # BOOTSTRAP_COMPANY_NAME / BOOTSTRAP_ADMIN_EMAIL belong to the migrate Job only (migrate-job.yaml): the configuration requires the
   # e-mail and the password together, and the API/worker never receive the password.

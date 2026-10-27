@@ -103,12 +103,16 @@ it again is a no-op. A freshly seeded demo database already ends with this step.
 export DOMAIN=kkt.in JWT_SECRET=$(openssl rand -hex 48) FIELD_ENCRYPTION_KEY=$(openssl rand -base64 32) HASH_KEY=$(openssl rand -hex 32) \
        POSTGRES_PASSWORD=$(openssl rand -hex 24) KKT_OWNER_DB_PASSWORD=$(openssl rand -hex 24) KKT_APP_DB_PASSWORD=$(openssl rand -hex 24) \
        BOOTSTRAP_COMPANY_NAME="My Builders" BOOTSTRAP_ADMIN_EMAIL=owner@example.in BOOTSTRAP_ADMIN_PASSWORD='First-Login-2026x'
+# key rings (contract C9; required in production — see "Secrets and key rotation")
+export JWT_SIGNING_KEYS="j1:$(openssl genpkey -algorithm ed25519 -outform DER | base64 | tr -d '\n')" \
+       LINK_SIGNING_KEYS="l1:$(openssl rand -hex 32)" HASH_KEYS="h1:$HASH_KEY"
 docker compose up -d --build       # add SEED_DEMO=true to load the Shree Ganesh demo dataset instead of an empty company
 ```
 
 Boot order: `postgres` (first start runs `infra/postgres/init/*`: roles `kkt_owner`/`kkt_app`, passwords) → `migrate` (as `kkt_owner`;
 exits) → two `api` replicas and the `worker` (as `kkt_app`). Replicas never migrate or seed (`RUN_MIGRATIONS_ON_BOOT=false`,
-`SEED_ON_BOOT=false`; they only check that a company exists, see "First boot"), so the first-boot race of earlier versions is gone. Redis is persistent (AOF) and `noeviction`. Caddy terminates
+`SEED_ON_BOOT=false`; they only check that a company exists, see "First boot"), so the first-boot race of earlier versions is gone. Two
+workers run with the C8 health check on `:9465/health`. Redis is persistent (AOF) and `noeviction`. Caddy terminates
 TLS for `www.`, `erp.` and `my.` and load-balances `/api/*` over every API replica. Keep these secrets somewhere safe: losing
 `FIELD_ENCRYPTION_KEY` or `HASH_KEY` loses the encrypted KYC fields. Passwords must be URL-safe (hex) because they go into connection
 strings. Uploaded files live on the `storage` volume — fine for one VM; use S3 (`STORAGE_DRIVER=s3`, `S3_*`) to survive host loss.
@@ -119,6 +123,8 @@ strings. Uploaded files live on the `storage` volume — fine for one VM; use S3
 sh infra/scripts/gen-secrets.sh            # infra/secrets/* (git-ignored; directory 0700, files 0644 so non-root containers can read the
                                            # bind-mounted files); prints the first Super Admin password
 cat > .env <<EOF                           # no secrets in .env
+IMAGE_TAG=3f2c1a9d…                        # required: the immutable tag to run (git SHA CI pushed, or your own build's tag)
+KKT_IMAGE_PREFIX=ghcr.io/acme/kkt          # registry images; leave unset (= "kkt") to build on this host with --build
 DOMAIN=kkt.in
 S3_BUCKET=kkt-documents
 S3_REGION=ap-south-1
@@ -134,15 +140,21 @@ later upgrade's migrate run fail. Once a company exists the values are ignored.
 
 What runs:
 
-- **postgres** (16, tuned `infra/postgres/postgresql.conf`, SCRAM-only `pg_hba.conf`) with `archive_mode=on`: every WAL segment is
-  copied to the `backups` volume within 5 minutes (`archive_timeout=300`). Not published on any port.
+- **postgres** (16 + age: image `kkt-backup:16` built from `infra/backup/Dockerfile`, tuned `infra/postgres/postgresql.conf`,
+  SCRAM-only `pg_hba.conf`) with `archive_mode=on`: every WAL segment is **encrypted** (`backup.sh wal-push`, key
+  `infra/secrets/backup_encryption_key`) into the `backups` volume within 5 minutes (`archive_timeout=300`). Not published on any port.
 - **pgbouncer** (1.24, transaction pooling, `infra/pgbouncer/pgbouncer.ini`): the API and the worker connect here as `kkt_app`
   (`infra/secrets/database_url`). `max_prepared_statements` keeps the API's named prepared statements (`DATABASE_PREPARE=true`)
   working; with a PgBouncer older than 1.21 set `DATABASE_PREPARE=false`. PgBouncer ignores the per-connection timeouts the API sends
   as startup parameters, so they are role defaults of `kkt_app` instead (`statement_timeout` 15 s, `lock_timeout` 5 s,
   `idle_in_transaction_session_timeout` 30 s). Clients wait at most 10 s for a server connection (`query_wait_timeout`).
 - **migrate** (one-shot, as `kkt_owner`, directly to Postgres) → **api** (`API_REPLICAS`, default 2; `API_WORKERS=auto` per container
-  bounded by `API_CPUS`; `DATABASE_POOL_MAX=10` per worker; `API_MAX_INFLIGHT=256`; 6 s drain delay) and one **worker**.
+  bounded by `API_CPUS`; `DATABASE_POOL_MAX=10` per worker; `API_MAX_INFLIGHT=256`; 6 s drain delay; container health check
+  `/api/v1/health/live`) and two **workers** (`WORKER_REPLICAS`, default 2: BullMQ runs each job once across them and the schedules are
+  de-duplicated). Each worker serves contract C8 on `:9465` (`GET /health` 200 while Redis answers, its 15 s heartbeat is fresh and both
+  queues are consumed; `GET /metrics` with the metrics token) and Compose health-checks it. On stop a worker checkpoints its heavy jobs
+  back to the queue at once and gives critical jobs `WORKER_DRAIN_TIMEOUT_MS` (120 s) to finish; `stop_grace_period` is 180 s
+  (= drain + 60 s) so Docker never SIGKILLs a draining worker.
 - **redis** (password, AOF `everysec`, `noeviction`, `REDIS_MAXMEMORY` default 1 GB); `--profile security-redis` adds a dedicated
   instance for revocation markers, locks and rate limits (set `KKT_REDIS_SECURITY_URL_FILE=/run/secrets/redis_security_url`).
 - **Object storage**: `STORAGE_DRIVER=s3` by default. AWS S3 / R2: `S3_BUCKET`, `S3_REGION`, and either an instance role or static keys
@@ -150,18 +162,19 @@ What runs:
   `KKT_S3_SECRET_KEY_FILE=/run/secrets/s3_secret_key`). Self-hosted: `--profile minio` with `S3_ENDPOINT=http://minio:9000`
   (path-style addressing is used whenever `S3_ENDPOINT` is set). Enable bucket versioning and default encryption on the bucket.
 - **backup**: nightly `pg_dump` + automatic restore drill into a scratch database, weekly physical base backup, retention and WAL
-  cleanup, status file for alerting (docs/RESTORE.md).
+  cleanup, status file for alerting (docs/RESTORE.md). Dumps, base backups and WAL are written **encrypted** (age; openssl fallback) —
+  the off-site copy (`BACKUP_UPLOAD_CMD`) only ever sees ciphertext. Keep a copy of `infra/secrets/backup_encryption_key` off the host.
 - **caddy**: TLS, HTTP/3, security headers, `/api/*` to every API replica (re-resolved every 5 s; draining or failing replicas are
   skipped and the request retried on another for up to 5 s); `/api/v1/metrics` is not served at the edge.
-- `--profile monitoring`: Prometheus (`infra/prometheus`, scrapes every API container's `METRICS_PORT` with the metrics token),
-  Alertmanager (to the same Slack-compatible webhook as the error reporter), Grafana on `127.0.0.1:3001` (dashboard `KKT API`,
+- `--profile monitoring`: Prometheus (`infra/prometheus`, scrapes every API container's `METRICS_PORT` and every worker's `:9465` with
+  the metrics token), Alertmanager (`severity=critical` → PagerDuty with `infra/secrets/pagerduty_routing_key`, or Opsgenie — see
+  `infra/prometheus/alertmanager.yml`; everything else, and a copy of every page, → the Slack-compatible webhook; inhibit rules keep one
+  page per cause), Grafana on `127.0.0.1:3001` (dashboard `KKT API`,
   admin password in `infra/secrets/grafana_admin_password`), postgres/redis/node exporters (disk alerts, backup age via the
   textfile collector). Docs: docs/OBSERVABILITY.md.
 
-**Upgrades.** `docker compose -f docker-compose.prod.yml build && docker compose -f docker-compose.prod.yml up -d`: the migrate service
-runs first; API replicas are replaced after it succeeds. Migrations are additive within a release (docs/VERSIONING.md), so old replicas
-keep working against the new schema while they drain. **Rollback**: redeploy the previous image tag (`KKT_API_IMAGE`); a migration is
-never rolled back automatically — restore (docs/RESTORE.md) if a release damaged data. The hardening round's migrations are all
+**Upgrades and rollback**: see "Deploying and rolling back" below (set the new `IMAGE_TAG`, `pull`, `up -d`; rollback = the previous
+`IMAGE_TAG`). A migration is never rolled back automatically — restore (docs/RESTORE.md) if a release damaged data. The hardening round's migrations are all
 additive: 0002 (constraints, indexes, backfills), 0003 (enum value `ABANDONED`) and 0004 (`site_visits.superseded_token_hashes`, a
 column with a constant default — metadata-only on PostgreSQL 16 — plus a GIN index built on the small `site_visits` table).
 
@@ -171,27 +184,108 @@ column with a constant default — metadata-only on PostgreSQL 16 — plus a GIN
 kubectl apply -f infra/k8s/namespace.yaml
 kubectl -n kkt create secret generic kkt-secrets --from-file=infra/secrets/   # edit database_url/owner_url/redis_url for the cluster first
 psql "$ADMIN_URL" -v ON_ERROR_STOP=1 -f infra/postgres/init/01-roles.sql        # once, against the managed Postgres; then set passwords
-cd infra/k8s && kustomize edit set image kkt-api=ghcr.io/acme/kkt-api:2.1.0 kkt-web=… kkt-erp=… kkt-portal=…
-kubectl apply -k infra/k8s
+# then every release through the reviewed deploy workflow (GitHub → Actions → "Deploy (Kubernetes)" → environment + image tag),
+# which does the equivalent of:
+cd infra/k8s && kustomize edit set image kkt-api=ghcr.io/acme/kkt-api:<git sha> kkt-web=… kkt-erp=… kkt-portal=…
+kustomize build . | kubectl apply -f -    # after the migrate Job completed; see "Deploying and rolling back"
 ```
 
+The manifests carry no image tag at all (`image: kkt-api`) and `kustomization.yaml` holds the unpullable placeholder
+`set-by-deploy-workflow`: applying the directory without setting the git-SHA tags fails instead of running an unknown build, and no
+manifest can drift to `:latest` (CI renders with a SHA and rejects `:latest`; `validate-k8s.mjs` checks it too).
+
 - **api** Deployment (3 → 20 replicas by CPU via the HPA, `maxUnavailable: 0` rollouts, PodDisruptionBudget `maxUnavailable: 1`,
-  spread over zones and nodes): readiness `/api/v1/ready` (fails while draining or when Postgres/Redis are unreachable), liveness
-  `/api/v1/health`, startup probe; `API_WORKERS` is set from the container's CPU limit; non-root, read-only root filesystem, all
+  spread over zones and nodes): readiness `/api/v1/health/ready` (fails while draining or when Postgres/Redis are unreachable),
+  liveness and startup `/api/v1/health/live` (dependency-free: a database outage takes pods out of the Service instead of restarting
+  every replica; the full report `/api/v1/health` answers 503 when a dependency is down and is for dashboards, not probes); `API_WORKERS` is set from the container's CPU limit; non-root, read-only root filesystem, all
   capabilities dropped; `preStop` sleeps 8 s so endpoints are removed before the server stops accepting connections.
 - **migrate** Job (Argo CD PreSync hook, or `kubectl apply -f migrate-job.yaml && kubectl wait --for=condition=complete job/migrate`
   before updating the Deployments; the first-boot `BOOTSTRAP_COMPANY_NAME` / `BOOTSTRAP_ADMIN_EMAIL` are set in `migrate-job.yaml`,
-  never in the shared ConfigMap — the API and worker would refuse an admin e-mail without its password), **worker** Deployment (1 replica, `Recreate`), **pgbouncer** Deployment (2 replicas) in front of
+  never in the shared ConfigMap — the API and worker would refuse an admin e-mail without its password), **worker** Deployment (2
+  replicas, RollingUpdate with `maxUnavailable: 0` so the new worker is Ready before an old one drains, PodDisruptionBudget
+  `minAvailable: 1`; startup/readiness/liveness `httpGet :9465/health` — liveness tolerates 4 minutes of failures, longer than the drain,
+  so a stopping worker is never killed early; `terminationGracePeriodSeconds: 180` = `WORKER_DRAIN_TIMEOUT_MS` + 60 s; scraped on
+  `:9465` via pod annotations), **pgbouncer** Deployment (2 replicas) in front of
   the managed Postgres (`postgres` ExternalName Service), **web** (HPA), **erp** and **portal** (static nginx) Deployments.
 - **Ingress** for the three hosts (ingress-nginx + cert-manager; `/api` → api on every host; retries on 502/503).
 - **NetworkPolicy**: deny all ingress by default; the ingress controller reaches the front ends and the API; only `web` calls the API
-  in-cluster; only the API/worker/migrate reach PgBouncer; Prometheus in `monitoring` reaches only the metrics port; the front ends
-  have no egress except DNS (and the API for `web`).
+  in-cluster; the API and the workers reach `web:3000` for on-demand revalidation; only the API/worker/migrate reach PgBouncer;
+  Prometheus in `monitoring` reaches only the API metrics port (9464) and the worker C8 port (9465); the front ends have no egress
+  except DNS (and the API for `web`).
+- **Website secrets**: `web` mounts only `internal_api_token` and `web_revalidate_token` from `kkt-secrets`; its image entrypoint turns
+  `INTERNAL_API_TOKEN_FILE` / `WEB_REVALIDATE_TOKEN_FILE` into the variables Next.js reads.
 - **Error webhook** (5xx and failed jobs): put the real URL into the Secret's `error_webhook_url` key, then uncomment
   `ERROR_WEBHOOK_URL_FILE` in `api.yaml` and `worker.yaml`. It is off by default because `gen-secrets.sh` writes the placeholder
   `unused` there, which is not a URL and would stop the pods at boot.
 - Validate locally: `kustomize build infra/k8s | kubeconform -strict -summary` and `node infra/scripts/validate-k8s.mjs` (selectors,
   ports, probes, secret keys, security contexts, resources — both run in CI).
+
+## Deploying and rolling back
+
+Images are immutable: CI pushes `ghcr.io/<owner>/kkt-{api,erp,web,portal,backup}:<git sha>` (with an SPDX SBOM and provenance
+attestation) only after every gate passed on `main`, and nothing deploys `:latest`.
+
+**Kubernetes — `.github/workflows/deploy.yml`** (Actions → "Deploy (Kubernetes)" → environment `staging` | `production`, image tag =
+the full git SHA, default the commit the workflow runs on):
+
+1. The job runs in a GitHub **environment**: give `production` (and ideally `staging`) **required reviewers** and the `KUBECONFIG_B64`
+   secret (base64 kubeconfig of a deploy service account limited to namespace `kkt`) under Settings → Environments. The job waits for
+   an approval before it touches the cluster; one deployment per environment at a time.
+2. It checks out the commit of the images, verifies the four images exist for that tag, and renders `infra/k8s` (or
+   `infra/k8s/overlays/<environment>` when present) with every image set to that tag; `:latest` or the placeholder in the output fails
+   the run; a server-side dry run validates the result.
+3. **Migrate first**: shared objects (ConfigMap, Services, policies) are applied, the previous `migrate` Job is deleted, the new one is
+   applied and must complete (15 minutes, 2 retries). If it fails nothing else changed — the running version keeps serving.
+4. Everything is applied and `kubectl rollout status` waits for every Deployment (`ROLLOUT_TIMEOUT` 10 min); then smoke checks:
+   `/api/v1/health/ready` and the full `/api/v1/health` (status `ok`) from inside an API pod, and `:9465/health` of every worker.
+5. **Automatic rollback**: if a rollout or a smoke check fails, every Deployment whose revision changed in this run gets
+   `kubectl rollout undo --to-revision=<the revision recorded before the apply>` and the job fails; the summary shows the images before
+   and after.
+
+Manual rollback (any time): re-run the workflow with the previous good SHA (preferred: reviewed, migrations are a no-op), or
+`kubectl -n kkt rollout undo deployment/api deployment/worker deployment/web deployment/erp deployment/portal` and
+`kubectl -n kkt rollout status deployment/<name>`; `kubectl -n kkt rollout history deployment/api` lists the revisions.
+
+**Docker Compose** (`docker-compose.prod.yml`): set `IMAGE_TAG=<sha>` in `.env`, then
+`docker compose -f docker-compose.prod.yml pull && docker compose -f docker-compose.prod.yml up -d` (the migrate service runs first; API
+and workers are replaced after it succeeded). Rollback: put the previous `IMAGE_TAG` back and run the same two commands. Keep the last
+few tags noted (e.g. in `.env` comments).
+
+**Why rollback is safe after a migration**: migrations are expand-only within a release (new tables/columns with defaults, constraints
+`NOT VALID` then validated online, indexes built `CONCURRENTLY` — enforced for new migrations by `scripts/ci/lint-migrations.mjs`), so
+the previous version keeps working on the new schema. A destructive change (dropping a column, tightening a type) ships in a later
+release than the code that stopped using it (docs/VERSIONING.md, docs/DATA-MODEL.md §J). Data damaged by a bad release is restored
+from backups (docs/RESTORE.md), never by rolling a migration back.
+
+## CI gates
+
+`.github/workflows/ci.yml` publishes images only when every job passed: lint, format, typecheck, unit, database, API integration (3
+shards), acceptance, OpenAPI compatibility, builds + an API **and worker** start smoke in production mode, infra, and:
+
+- **Supply chain**: `scripts/ci/audit-gate.mjs` runs `pnpm audit --prod` and fails on any high/critical advisory that is not in
+  `scripts/ci/audit-allowlist.json` (each entry: advisory id, module, optional dependency paths, reason, expiry — an expired entry
+  fails the build; the only one today is node-forge via `@expo/cli`, which has no patched release and is build tooling only);
+  `scripts/ci/check-action-pins.mjs` requires every third-party action to be pinned by commit SHA with the version in a comment
+  (`scripts/ci/action-pins-pending.json` lists the CodeQL actions whose SHAs are still to be verified, with an expiry); the CI scripts'
+  own tests (`node --test scripts/ci/*.test.mjs`).
+- **Secret scanning**: gitleaks (release binary, checksum-verified) over the pushed commits and the working tree with
+  `.github/gitleaks.toml` (default rules; only CI-only values, templates and test fixtures are allow-listed).
+- **SAST**: `.github/workflows/codeql.yml` (JavaScript/TypeScript, `security-extended`, on every push/PR and weekly).
+- **Migration lint**: `scripts/ci/lint-migrations.mjs --base <PR base>` rejects, in new migration files, `CREATE INDEX` on an existing
+  table outside `packages/db/src/sql/online` (and non-`CONCURRENTLY` ones inside it), `ADD CONSTRAINT … CHECK/FOREIGN KEY` (or
+  `ADD COLUMN … REFERENCES`) without `NOT VALID`, `UNIQUE`/`PRIMARY KEY` constraints without `USING INDEX`, `ALTER COLUMN … TYPE`, and
+  `SET NOT NULL` without a prior validated `CHECK (col IS NOT NULL)`. Exceptions: `-- lint-migrations: allow <rule> — <reason>` right
+  before the statement (or `scripts/ci/migration-lint-exemptions.json` for files that predate the rule).
+- **Images**: plain `docker buildx` (no third-party build actions) with `--sbom=true --provenance=mode=max`; the SPDX SBOM of every
+  image (api, erp, web, portal, backup) is kept as a workflow artifact for 90 days and attached to the pushed image.
+- **Infra**: `docker compose config` of both stacks (no `:latest`), every mounted secret produced by `gen-secrets.sh`, kustomize render
+  with a SHA tag + kubeconform + `validate-k8s.mjs`, `promtool check/test rules`, `amtool check-config`, Caddy, nginx, shellcheck, an
+  encrypt → tamper → refuse round trip of `backup.sh` in both modes, and the backup image build.
+- **Nightly** (`nightly.yml`): the load gate runs on the scale seed when `pnpm --filter @kkt/api seed:scale` exists (else the demo seed)
+  and fails when any scenario's p95 exceeds its limit in `scripts/ci/load-thresholds.json` (lists 300 ms, cached public reads 100 ms,
+  payments 800 ms) or more than 1% of its requests fail; plus browser QA.
+- **Renovate** (`renovate.json`): weekly grouped PRs (Actions, container images, production / dev dependencies, framework families),
+  lockfile maintenance, digest pinning of actions and images, security updates at any time; major Postgres/Redis/Node never automatic.
 
 ## Database roles
 
@@ -301,6 +395,36 @@ migrate job when no long report or backup transaction is running, or expect it t
 | `FIELD_ENCRYPTION_KEYS` | —       | Optional key ring `kid:base64key,kid:base64key`; the first entry encrypts new values. `FIELD_ENCRYPTION_KEY` is always key id `k1` and stays readable; key ids are 1–32 of `A-Za-z0-9_-`, secrets ≥ 32 characters. |
 | `JWT_PREVIOUS_SECRETS`  | —       | Comma list of previous JWT secrets accepted for verification only (each ≥ 32 characters), for a rotation window.                                                                                                   |
 
+### Secrets and key rotation
+
+Contract C9: three rings, each a comma list of `<kid>:<value>` with the **first entry active** and the others accepted for verification
+or lookup only; each also as `<NAME>_FILE` (Compose: `infra/secrets/<name>`, Kubernetes: keys of `kkt-secrets`). In production all three
+are required and placeholder / short values stop the boot; outside production they are derived from `JWT_SECRET` / `HASH_KEY` when unset.
+
+| Ring                | Value                                      | Generate                                                                                                                                                                                                                         | Used for                                                                                  |
+| ------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `JWT_SIGNING_KEYS`  | base64 PKCS8 DER of an Ed25519 private key | `node -e "const k=require('crypto').generateKeyPairSync('ed25519').privateKey;console.log('j2:'+k.export({type:'pkcs8',format:'der'}).toString('base64'))"` (or `openssl genpkey -algorithm ed25519 -outform DER \| base64 -w0`) | access tokens (every key is published in the JWKS)                                        |
+| `LINK_SIGNING_KEYS` | ≥ 32 random bytes                          | `echo "l2:$(openssl rand -hex 32)"`                                                                                                                                                                                              | signed links (downloads, exports, backups), backup manifests, MFA step and visitor tokens |
+| `HASH_KEYS`         | ≥ 32 random bytes                          | `echo "h2:$(openssl rand -hex 32)"`                                                                                                                                                                                              | keyed lookup hashes (phone/PAN/Aadhaar duplicate checks); `h1` is always `HASH_KEY`       |
+
+`infra/scripts/gen-secrets.sh` writes `j1:…`, `l1:…` and `h1:<hash_key>` (plus `internal_api_token`, `web_revalidate_token`,
+`backup_encryption_key`, `pagerduty_routing_key`). Rotation, with no downtime:
+
+1. **JWT**: prepend the new key (`j2:<new>,j1:<old>`) and roll the API and workers — new tokens carry kid `j2`, tokens signed with
+   `j1` keep verifying; after `ACCESS_TOKEN_MINUTES` (15) remove `j1`. Refresh tokens are opaque database rows, so nobody is signed out.
+2. **Links**: prepend `l2:<new>`; links already sent keep working while `l1` stays listed. Keep a retired key as long as you keep
+   application backups signed with it (the restore CLI verifies `manifest.sig` with the ring), or restore those with the old ring in
+   `LINK_SIGNING_KEYS`.
+3. **Hashes**: prepend `h2:<new>` (keep `h1`), roll, then run job `REENCRYPT_FIELDS` (ERP → Admin → Jobs), which rehashes every
+   identifier to the active key; lookups try every key meanwhile. Remove `h1` only after the job finished — never remove `HASH_KEY`
+   while `h1` hashes exist.
+4. **Field encryption** (`FIELD_ENCRYPTION_KEYS`) works the same way: new key first, `REENCRYPT_FIELDS`, then retire the old one.
+5. **Backup encryption key**: a new key only affects new files; keep every old key as long as backups encrypted with it are retained
+   (`DUMP_RETENTION_DAYS`, `BASE_BACKUPS_KEEP`, the off-site copy). Store the keys outside the backup host (password manager / vault).
+
+Compose: edit the file under `infra/secrets/` and `docker compose -f docker-compose.prod.yml up -d --force-recreate api worker migrate`.
+Kubernetes: update the Secret (or the External Secrets source) and `kubectl -n kkt rollout restart deployment/api deployment/worker`.
+
 ### Observability
 
 | Variable                      | Default   | Meaning                                                                                                                                                                                                                                                                                                                   |
@@ -328,10 +452,25 @@ migrate job when no long report or backup transaction is running, or expect it t
 
 The production API image defaults to `API_WORKERS=auto`. `auto` counts the CPUs Node can use (`os.availableParallelism()`); give the container a CPU limit (Compose `deploy.resources.limits.cpus`, Kubernetes sets `API_WORKERS` from `limits.cpu`), otherwise a container on a 32-core host forks 32 workers × `DATABASE_POOL_MAX` connections. `--scale api=N` / the HPA multiplies this across containers; PgBouncer keeps the server side bounded.
 
+### Job worker and runtime (phase 7)
+
+| Variable                      | Default  | Meaning                                                                                                                                                                                       |
+| ----------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `WORKER_HEALTH_PORT`          | `9465`   | The worker's contract C8 listener: `GET /health` (200 / 503) and `GET /metrics` (metrics token). Compose health check and Kubernetes probes use it; Prometheus scrapes it (job `kkt-worker`). |
+| `WORKER_DRAIN_TIMEOUT_MS`     | `120000` | On SIGTERM heavy jobs checkpoint and return to the queue at once; critical jobs get this long. The orchestrator's grace period must be ≥ this + 60 s (Compose 180 s, Kubernetes 180 s).       |
+| `WORKER_CRITICAL_CONCURRENCY` | `2`      | Parallel jobs per worker on the critical queue (dues, integrity, seal, notifications).                                                                                                        |
+| `WORKER_HEAVY_CONCURRENCY`    | `1`      | Parallel jobs per worker on the heavy queue (exports, backups, ledger rebuilds, re-encryption).                                                                                               |
+| `UV_THREADPOOL_SIZE`          | `16`     | libuv threads shared by argon2, sharp, zlib and fs (Node's default 4); set in the images, the Compose files and the ConfigMap.                                                                |
+| `IMAGE_TAG`                   | —        | `docker-compose.prod.yml` only: the immutable image tag to run (required); also exported to the containers as `GIT_SHA`. `KKT_IMAGE_PREFIX` (default `kkt`) names the registry path.          |
+| `WORKER_REPLICAS`             | `2`      | `docker-compose.prod.yml` only: number of job workers.                                                                                                                                        |
+
 ## Backups and restore
 
 See docs/RESTORE.md: the Compose production stack archives WAL continuously and takes nightly logical dumps (each one restored into a
 scratch database as a drill) and weekly base backups; managed Postgres on Kubernetes uses the provider's automated backups + PITR. The
 application-level export (`POST /api/v1/admin/backup`, Super Admin) and its restore CLI cover moving a company between installations.
 The CLI ships in the API image: `node dist/cli/restore.js --file <backup.zip> --database-url <empty database> --confirm` (from a
-checkout: `pnpm --filter @kkt/api restore -- …`). It needs the API's environment (secrets) because it runs the integrity report.
+checkout: `pnpm --filter @kkt/api restore -- …`). It needs the API's environment (secrets) because it runs the integrity report, and the
+`LINK_SIGNING_KEYS` ring of the installation that made the archive: the archive's `manifest.sig` (HMAC of `manifest.json`) must verify,
+so unsigned, edited or foreign archives are refused (`--verify-only` checks an archive without a database). Database dumps, base backups
+and WAL are encrypted with `infra/secrets/backup_encryption_key` (age); `sh /opt/kkt/backup.sh decrypt <file> -` reads one.

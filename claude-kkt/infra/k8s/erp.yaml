@@ -22,7 +22,7 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: erp
-          image: kkt-erp:latest
+          image: kkt-erp
           imagePullPolicy: IfNotPresent
           ports:
             - { name: http, containerPort: 8080 }

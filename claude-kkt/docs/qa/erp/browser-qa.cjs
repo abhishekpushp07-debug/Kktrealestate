@@ -1,6 +1,6 @@
 // Browser QA for apps/erp — see docs/qa/erp.md. Run from the repo root with the API on :4000 (demo seed) and the ERP build served on :5173:
 //   node docs/qa/erp/browser-qa.cjs                      # full walk (wipes docs/qa/erp/*.png first)
-//   ONLY=login,roles,masters,inventory,crm,money,misc,hardening,smoke node docs/qa/erp/browser-qa.cjs
+//   ONLY=login,roles,masters,inventory,crm,money,misc,hardening,phase7,smoke node docs/qa/erp/browser-qa.cjs
 // Env: ERP_URL, API_URL, OUT_DIR, ONLY, WIPE=1 (wipe PNGs even with ONLY), REPORT (path of the JSONL results file).
 const { chromium } = require("playwright");
 const fs = require("node:fs");
@@ -1335,6 +1335,9 @@ async function sectionMoney(browser, ids) {
         await dlg.getByRole("button", { name: /bounce|confirm/i }).last().click();
         await toast(page, /bounced/i);
         await settle(page);
+        // Clicking the row action scrolled the wide table sideways; a header sort button half-scrolled under the card edge is
+        // "partially obscured" for axe (target-size). Scroll back to the start, as a user reading the table would.
+        await page.evaluate(() => { for (const el of document.querySelectorAll("table")) { let p = el.parentElement; while (p) { if (p.scrollLeft) p.scrollLeft = 0; p = p.parentElement; } } });
         await check(page, "cheques-after");
         // reverse NEFT from the booking payments tab
         await goto(page, `/bookings/${created.bookingId}?tab=payments`);
@@ -2081,6 +2084,103 @@ async function sectionSmoke(browser, ids) {
   }
 }
 
+/* ---- phase 7: unsaved-changes guard, cookie session, ledger summary/epochs, import templates, bundle ---- */
+async function sectionPhase7(browser, ids) {
+  for (const width of [1440, 390]) {
+    const { context, page } = await newContext(browser, width);
+    try {
+      await login(page, "admin");
+      // C1: nothing token-like in localStorage; the HttpOnly cookie restores the session on reload
+      const stored = await page.evaluate(() => Object.keys(localStorage).map((k) => [k, localStorage.getItem(k) || ""]));
+      expect(!stored.some(([, v]) => /^(rt_|eyJ)/.test(v) || v.length > 64), `no token in localStorage after login (${stored.map(([k]) => k).join(",")}) (${width})`, page);
+      const cookies = await context.cookies();
+      const rt = cookies.find((c) => c.name === "kkt_rt");
+      expect(Boolean(rt && rt.httpOnly && rt.sameSite === "Strict" && rt.path === "/api/v1/auth"), `refresh token is the HttpOnly SameSite=Strict kkt_rt cookie on /api/v1/auth (${width})`, page);
+      await goto(page, "/customers");
+      await page.reload({ waitUntil: "domcontentloaded" });
+      await settle(page);
+      expect(new URL(page.url()).pathname === "/customers", `reload restores the session through the cookie (${width})`, page);
+      await check(page, "p7-session-restored");
+
+      // Unsaved changes: a dirty sheet asks before Esc / close button
+      await page.getByTestId("customer-new-btn").click();
+      const sheet = page.getByRole("dialog").first();
+      await sheet.waitFor({ state: "visible" });
+      await sheet.locator('input:not([type=hidden]):not([type=search])').first().fill("QA Unsaved");
+      await page.keyboard.press("Escape");
+      const discard = page.getByRole("alertdialog").or(page.getByRole("dialog", { name: /Discard unsaved changes/ }));
+      await page.getByText("Discard unsaved changes?").waitFor({ state: "visible", timeout: 5000 });
+      expect(true, `Esc on a dirty sheet asks "Discard unsaved changes?" (${width})`, page);
+      await check(page, "p7-sheet-discard-prompt", { shot: width === 1440 ? "unsaved-sheet-prompt" : false });
+      await page.getByRole("button", { name: "Keep editing" }).click();
+      await page.waitForTimeout(300);
+      expect(await sheet.isVisible(), `"Keep editing" keeps the sheet and its input (${width})`, page);
+      await sheet.getByRole("button", { name: "Close" }).last().click();
+      await page.getByText("Discard unsaved changes?").waitFor({ state: "visible", timeout: 5000 });
+      await page.getByRole("button", { name: "Discard changes" }).click();
+      await page.waitForTimeout(500);
+      expect((await page.getByRole("dialog").count()) === 0, `"Discard changes" closes the sheet (${width})`, page);
+      void discard;
+
+      // Settings: dirty form blocks in-app navigation (data router + useBlocker)
+      await goto(page, "/admin/settings");
+      const tagline = page.getByTestId("settings-tagline");
+      await tagline.fill(`QA tagline ${stamp}`);
+      await page.getByText("Unsaved changes").waitFor({ state: "visible" });
+      // in-app navigation through the sidebar (the phone opens the nav drawer first)
+      const leaveViaSidebar = async () => {
+        if (width === 390) { await page.getByTestId("topbar-menu-btn").click(); await page.waitForTimeout(400); }
+        await page.locator('[data-testid="sidebar-dashboard-link"]:visible').first().click();
+      };
+      await leaveViaSidebar();
+      await page.getByText("Leave without saving?").waitFor({ state: "visible", timeout: 5000 });
+      expect(true, `a sidebar link on dirty settings asks "Leave without saving?" (${width})`, page);
+      await check(page, "p7-settings-leave-prompt", { shot: width === 1440 ? "unsaved-settings-prompt" : false });
+      await page.getByRole("button", { name: "Stay on this page" }).click();
+      await page.waitForTimeout(300);
+      expect(new URL(page.url()).pathname.startsWith("/admin/settings") && (await tagline.inputValue()) === `QA tagline ${stamp}`, `"Stay on this page" keeps the edits (${width})`, page);
+      if (width === 390) await page.keyboard.press("Escape"); // the drawer stayed open behind the prompt
+      await page.waitForTimeout(200);
+      await leaveViaSidebar();
+      await page.getByText("Leave without saving?").waitFor({ state: "visible", timeout: 5000 });
+      await page.getByRole("button", { name: "Leave and discard" }).click();
+      await page.waitForTimeout(500);
+      await settle(page);
+      expect(!new URL(page.url()).pathname.startsWith("/admin/settings"), `"Leave and discard" navigates away (${width})`, page);
+      const saved = (await apiGet("/settings/company")).body;
+      expect(!JSON.stringify(saved || {}).includes(`QA tagline ${stamp}`), `discarded settings were not saved (${width})`, page);
+
+      // C7: ledger dues from the server summary, epoch label, rebuild history
+      await goto(page, `/bookings/${ids.bookingRajesh.id}`);
+      await page.getByRole("tab", { name: "Ledger" }).click();
+      await page.getByTestId("ledger-tab").waitFor({ state: "visible" });
+      await settle(page);
+      const ledger = (await apiGet(`/bookings/${ids.bookingRajesh.id}/ledger?page_size=1`)).body;
+      const totals = await page.getByTestId("ledger-totals").innerText();
+      expect(Boolean(ledger && ledger.summary) && /due/i.test(totals), `ledger totals render from the C7 summary (${totals.replace(/\s+/g, " ").slice(0, 90)}) (${width})`, page);
+      expect(/epoch|book/i.test(await page.getByTestId("ledger-epoch").innerText()), `ledger shows its epoch (${width})`, page);
+      await page.getByTestId("ledger-rebuilds-open").click();
+      await page.locator('[data-testid="ledger-rebuilds"], [data-testid="ledger-rebuilds-empty"]').first().waitFor({ state: "visible", timeout: 8000 });
+      expect(true, `rebuild history opens (${width})`, page);
+      await check(page, "p7-ledger-rebuilds", { shot: width === 1440 ? "ledger-rebuilds" : false });
+      await page.keyboard.press("Escape");
+
+      // Import templates come from the API
+      await goto(page, "/masters/charge-types");
+      const [tplResp] = await Promise.all([
+        page.waitForResponse((r) => r.url().includes("/masters/charge-types/import-template"), { timeout: 15000 }),
+        page.getByTestId("master-import-csv-btn").click(),
+      ]);
+      expect(tplResp.status() === 200, `the CSV dialog reads GET /masters/charge-types/import-template (${width})`, page);
+      const header = await page.getByTestId("csv-template-header").innerText();
+      expect(/default_amount_paise/.test(header) && !/default_amount(,|$)/.test(header), `charge-type template header uses default_amount_paise (${header.slice(0, 80)}) (${width})`, page);
+      await check(page, "p7-import-template");
+      await page.keyboard.press("Escape");
+    } catch (e) { log(`[${width}] phase7 EXCEPTION ${e.message.slice(0, 300)}`); summary.defects.push({ page: `phase7-${width}`, kind: "exception", detail: e.message.replace(/\x1b\[[0-9;]*m/g, "").slice(0, 900) }); }
+    await context.close();
+  }
+}
+
 /* ------------------------------------------------------------------ main */
 (async () => {
   await sharp({ create: { width: 1600, height: 700, channels: 3, background: { r: 11, g: 31, b: 58 } } }).png().toFile(PNG);
@@ -2099,6 +2199,7 @@ async function sectionSmoke(browser, ids) {
   if (run("money")) await sectionMoney(browser, ids);
   if (run("misc")) await sectionMisc(browser, ids);
   if (run("hardening")) await sectionHardening(browser, ids);
+  if (run("phase7")) await sectionPhase7(browser, ids);
   if (run("smoke")) await sectionSmoke(browser, ids);
   await browser.close();
   const mins = ((Date.now() - t0) / 60000).toFixed(1);

@@ -685,3 +685,21 @@ file. The 200-connection pair was run twice in alternating order:
 | GET /public/projects/:slug (no auth, cached) | 1000  | 154074   | 235 (503×235; admitted 153839 = 5018 rps @ p50 178 / p95 303 / p99 417 ms)     | 177    | 302.5  | 340      | 416    | 5136  |
 | GET /search?q=                               | 1000  | 123621   | 13874 (503×13874; admitted 109747 = 3642 rps @ p50 247 / p95 354 / p99 430 ms) | 240    | 348.9  | 378      | 422    | 4121  |
 | POST /payments (₹100, 50 conns)              | 50    | 3123     | 0                                                                              | 511    | 858.5  | 983      | 1113   | 104   |
+
+## ERP bundle (phase 7, audit v3 C9)
+
+Measured with `apps/erp/scripts/bundle-budget.mjs` (gzip -9 of the built files; first load = the entry chunk, its static imports and
+its CSS, i.e. what `index.html` loads before the first paint). Same source tree, `VITE_API_URL=""`, Vite 6 production build.
+
+| Build                                                     | First-load JS (gzip)                                               | First-load CSS | All JS (gzip) | Chunks |
+| --------------------------------------------------------- | ------------------------------------------------------------------ | -------------- | ------------- | ------ |
+| Before (catch-all `vendor` chunk, whole contracts barrel) | **350.4 KB** (index 65.5 · react 99.1 · query 32.4 · vendor 153.3) | 15.1 KB        | 803.6 KB      | 123    |
+| After                                                     | **258.7 KB** (index 68.4 · react 99.1 · query 10.2 · ui 81.0)      | 15.1 KB        | 803.5 KB      | 132    |
+
+What changed: the 527 KB catch-all `vendor` chunk (react-hook-form, zod helpers, date-fns, recharts' redux/immer/decimal.js, Radix…)
+was split — only the shell's UI libraries form the first-load `ui` chunk; recharts and everything only it uses (redux toolkit, immer,
+decimal.js-light, d3) go to the lazy `charts` chunk; form and table libraries ride with the lazy pages that use them. `@kkt/contracts`
+is marked side-effect free for Rollup, so schema modules the ERP does not reference are dropped. The Google Fonts stylesheet is
+preloaded and applied from `main.tsx` after the first paint instead of blocking it. Total JS is unchanged (−26 % on the first load).
+The budget (first-load JS ≤ 275 KB, CSS ≤ 20 KB, any chunk ≤ 130 KB, charts and heavy pages lazy) runs at the end of
+`pnpm --filter @kkt/erp build`; `pnpm --filter @kkt/erp budget` re-checks an existing `dist/`.

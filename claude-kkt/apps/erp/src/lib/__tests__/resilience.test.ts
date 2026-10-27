@@ -3,6 +3,8 @@
  * reporting (contract C2: body shape, dedupe, sampling, budget, privacy) and the React Query retry policy (Retry-After on 429/503,
  * never other 4xx).
  */
+import fs from "node:fs";
+import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ApiClientError, parseErrorEnvelope } from "@/lib/api";
 import { CHUNK_RELOAD_KEY, isChunkLoadError, reloadOnceForChunkError, type ReloadEnv } from "@/lib/chunkReload";
@@ -24,6 +26,7 @@ import {
   resetUnsavedRegistry,
   setUnsavedSource,
   shouldBlockNavigation,
+  subscribeSaved,
   subscribeUnsaved,
 } from "@/lib/unsaved";
 
@@ -65,6 +68,24 @@ describe("unsaved-changes registry and blocker decision", () => {
     expect(
       shouldBlockNavigation(settings, { pathname: "/blocks/1", search: "" }, { now: 1_000 + SAVE_GRACE_MS + 1 }),
     ).toBe(true);
+  });
+
+  it("announces successful saves, so a drawer tracking 'any edit' becomes clean after its action was saved", () => {
+    let saves = 0;
+    const off = subscribeSaved(() => (saves += 1));
+    noteSaved(5_000);
+    noteSaved(6_000);
+    off();
+    noteSaved(7_000);
+    expect(saves).toBe(2);
+  });
+
+  it("the sheet / dialog guard only counts while its content is open and resets on a save (regression: a closed sheet blocked navigation)", () => {
+    const src = fs.readFileSync(path.resolve(__dirname, "../../components/ui/dirty-close.tsx"), "utf8");
+    expect(src).toMatch(/const dirty = guard && open && \(dirtyProp \?\? edited\)/);
+    expect(src).toMatch(/subscribeSaved\(\(\) => setEdited\(false\)\)/);
+    expect(src).toMatch(/nativeEvent\.isTrusted === false/);
+    expect(src).toMatch(/<OpenProbe/);
   });
 });
 
