@@ -1,0 +1,227 @@
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [ 12%]
+........................................................................ [ 25%]
+........................................................................ [ 38%]
+......F.............................................F................... [ 51%]
+.....................s.................F................................ [ 63%]
+................................................F.................F..... [ 76%]
+........................................................................ [ 89%]
+................s..........................................F             [100%]
+=================================== FAILURES ===================================
+____________ test_invariant_indexes_and_validators_reject_bad_docs _____________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+    def test_invariant_indexes_and_validators_reject_bad_docs():
+        from pymongo.errors import DuplicateKeyError, WriteError
+>       _py("from services.invariants import ensure_invariants\nasyncio.run(ensure_invariants())")
+
+tests/test_phase_k_p0.py:73: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+script = 'from services.invariants import ensure_invariants\nasyncio.run(ensure_invariants())'
+
+    def _py(script: str):
+        """Run app-side async code in a fresh subprocess (xdist workers reuse the process; motor binds to the first loop it sees)."""
+        import json
+        import subprocess
+        out = subprocess.run([sys.executable, "-c", "import asyncio, json, sys\nsys.path.insert(0, '.')\n" + script], cwd=os.path.join(os.path.dirname(__file__), ".."), capture_output=True, text=True, timeout=120, env={**os.environ})
+>       assert out.returncode == 0, out.stderr[-2000:]
+E       AssertionError: ated: Index already exists with a different name: uniq_idem_claim, full error: {'ok': 0.0, 'errmsg': 'Index already exists with a different name: uniq_idem_claim', 'code': 85, 'codeName': 'IndexOptionsConfl
+E         Traceback (most recent call last):
+E           File "<string>", line 4, in <module>
+E           File "/usr/local/lib/python3.11/asyncio/runners.py", line 190, in run
+E             return runner.run(main)
+E                    ^^^^^^^^^^^^^^^^
+E           File "/usr/local/lib/python3.11/asyncio/runners.py", line 118, in run
+E             return self._loop.run_until_complete(task)
+E                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           File "/usr/local/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
+E             return future.result()
+E                    ^^^^^^^^^^^^^^^
+E           File "/app/backend/services/invariants.py", line 51, in ensure_invariants
+E             from services.validators import SCHEMAS  # merge: schema (existing) AND money invariants ($expr) — never replace the schema validator
+E             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           File "/app/backend/services/validators.py", line 17, in <module>
+E             "flats": {"required": ["id", "company_id", "project_id", "block_id", "flat_number", "status"], "properties": {"id": STR, "block_id": STR, "flat_number": {"bsonType": "string", "minLength": 1}, "status": {"enum": ["Available", "Hold", "Booked", "Sold", "Blocked", "Allotted", "Not for sale"]}, "display_state": {"enum": ["Show as Available", "Show as Sold", "Show as Hold", "Hidden", null]}, "bookable": {"bsonType": "bool"}, "floor": {"bsonType": ["int", "long"]}, "price_paise": {"bsonType": ["int", "long", "null"]}}},
+E                                                                                                                                                                                                                                                                                                                                                                                                            ^^^^
+E         NameError: name 'null' is not defined
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/root/.venv/bin/python', '-c', "import asyncio, json, sys\nsys.path.insert(0, '.')\nfrom servi...                                                                      ^^^^\nNameError: name \'null\' is not defined\n').returncode
+
+tests/test_phase_k_p0.py:26: AssertionError
+____________ test_registry_complete_every_guarded_route_registered _____________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+admin = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDd...wiaWF0IjoxNzkzMDkxNDUwLCJleHAiOjE3OTMwOTIzNTB9.Hw--oRfa5e6dyH8ckOeLr26KOFLj8nEFLWM9XwWRQh4', 'X-Rate-Limit-Bypass': ''}
+
+    def test_registry_complete_every_guarded_route_registered(admin):
+        reg = requests.get(f"{BASE}/admin/access/registry", headers=admin, timeout=20).json()
+        assert reg["unregistered"] == [], reg["unregistered"]
+        from permissions import ALL_PERMISSIONS
+        codes = {r["code"] for r in reg["items"]}
+>       assert set(ALL_PERMISSIONS) <= codes
+E       AssertionError: assert {'admin.acces...a.erase', ...} <= {'admin.acces...a.erase', ...}
+E         
+E         Extra items in the left set:
+E         'masters.hold_reason.delete'
+E         'masters.allocation_category.create'
+E         'masters.hold_reason.view'
+E         'inventory.real_status.view'
+E         'masters.hold_reason.create'...
+E         
+E         ...Full output truncated (11 lines hidden), use '-vv' to show
+
+tests/test_rbac.py:49: AssertionError
+___________________ test_expiry_sweep_releases_and_notifies ____________________
+[gw2] linux -- Python 3.11.17 /root/.venv/bin/python
+
+admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDd...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDkxNDUwLCJleHAiOjE3OTMwOTIzNTB9.Hw--oRfa5e6dyH8ckOeLr26KOFLj8nEFLWM9XwWRQh4'}
+
+    def test_expiry_sweep_releases_and_notifies(admin_headers):
+        f = _avail_flats(admin_headers, 1)[0]
+        reason = requests.get(f"{BASE}/api/master/hold-reasons", headers=admin_headers).json()["items"][0]
+        assert _bulk(admin_headers, flat_ids=[f["id"]], action="hold", reason_id=reason["id"], expires_at=(datetime.now(timezone.utc) + timedelta(hours=2)).isoformat()).json()["done"] == 1
+        past = (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat()
+        mongo.flats.update_one({"id": f["id"]}, {"$set": {"hold.expires_at": past}})
+        os.environ["DB_NAME"] = mongo.name
+        import importlib
+        for m in ("db", "services.inventory"):
+            sys.modules.pop(m, None)
+        inv = importlib.import_module("services.inventory")
+        run = asyncio.run(inv.expire_holds())
+>       assert run["status"] == "OK", run
+E       AssertionError: {'id': 'HOLD_EXPIRY_SWEEP-1793091511782', 'job': 'HOLD_EXPIRY_SWEEP', 'started_at': '2026-10-27T08:58:31.782062+00:00', 'finished_at': '2026-10-27T08:58:31.788976+00:00', ...}
+E       assert 'FAILED' == 'OK'
+E         
+E         - OK
+E         + FAILED
+
+tests/test_phase_n_inventory.py:115: AssertionError
+------------------------------ Captured log call -------------------------------
+WARNING  jobs:job_runs.py:30 [job HOLD_EXPIRY_SWEEP] item 6cc7b401-5fba-4072-b4ea-dc358c6524ca failed: RuntimeError: Task <Task pending name='Task-42' coro=<expire_holds() running at /app/backend/services/inventory.py:127> cb=[_run_until_complete_cb() at /usr/local/lib/python3.11/asyncio/base_events.py:181]> got Future <Future pending cb=[_chain_future.<locals>._call_check_cancel() at /usr/local/lib/
+___________________________ test_integrity_report_ok ___________________________
+[gw2] linux -- Python 3.11.17 /root/.venv/bin/python
+
+H = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNjNiOGIxOS05NGFjLTRjOGUtODQ1Yi1mYWY4MDE5ZDd...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzkzMDkxNDUwLCJleHAiOjE3OTMwOTIzNTB9.Hw--oRfa5e6dyH8ckOeLr26KOFLj8nEFLWM9XwWRQh4'}
+
+    def test_integrity_report_ok(H):
+        body = None
+        for _ in range(4):  # other xdist workers may be mid-write; summaries settle within a second
+            r = requests.get(f"{BASE}/api/admin/integrity-report?fresh=1", headers=H, timeout=15)
+            assert r.status_code == 200
+            body = r.json()
+            if body.get("ok") is True:
+                break
+            time.sleep(1.5)
+>       assert body.get("ok") is True, body.get("findings")
+E       AssertionError: [{'kind': 'ledger_due_mismatch', 'detail': 'last ledger outstanding 331837500 ≠ summary due 265500000', 'booking_id': '02d58183-0695-4b00-827f-9b6acdac2821', 'booking_number': 'BK-2627-0022', ...}]
+E       assert False is True
+E        +  where False = <built-in method get of dict object at 0xfb2740434100>('ok')
+E        +    where <built-in method get of dict object at 0xfb2740434100> = {'ok': False, 'as_of': '2026-10-27', 'ran_at': '2026-10-27T08:58:45.483827+00:00', 'bookings_checked': 80, ...}.get
+
+tests/test_phase_b4_backend_sanity.py:40: AssertionError
+_______________ test_every_code_registered_with_matching_status ________________
+[gw2] linux -- Python 3.11.17 /root/.venv/bin/python
+
+    def test_every_code_registered_with_matching_status():
+        found = _scan()
+        assert found, "scanner found nothing — pattern broken"
+        unregistered = sorted(c for c in found if c not in ERRORS)
+        mismatched = sorted(f"{c}: used {sorted(found[c])} registered {ERRORS[c]}" for c in found if c in ERRORS and not found[c] <= set(ERRORS[c]))
+>       assert not unregistered, f"unregistered error codes: {unregistered} (add to errors.py)"
+E       AssertionError: unregistered error codes: ['FLAT_NOT_SALEABLE', 'HOLD_EXPIRY_PAST', 'HOLD_EXPIRY_REQUIRED'] (add to errors.py)
+E       assert not ['FLAT_NOT_SALEABLE', 'HOLD_EXPIRY_PAST', 'HOLD_EXPIRY_REQUIRED']
+
+tests/test_error_registry.py:26: AssertionError
+___________________ test_startup_idempotent_on_pre_phase7_db ___________________
+[gw2] linux -- Python 3.11.17 /root/.venv/bin/python
+
+    def test_startup_idempotent_on_pre_phase7_db():
+        loop = asyncio.new_event_loop()
+        cl = loop.run_until_complete(_prepare())
+        try:
+>           log1 = _run_startup()
+                   ^^^^^^^^^^^^^^
+
+tests/test_startup_migrations.py:91: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_startup_migrations.py:82: in _run_startup
+    r = subprocess.run([sys.executable, "-c", RUN % os.path.join(os.path.dirname(__file__), "..")], env=env, cwd=os.path.join(os.path.dirname(__file__), ".."), capture_output=True, text=True, timeout=240)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/subprocess.py:550: in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/subprocess.py:1209: in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/subprocess.py:2116: in _communicate
+    self._check_timeout(endtime, orig_timeout, stdout, stderr)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Popen: returncode: -9 args: ['/root/.venv/bin/python', '-c', '\nimport asyn...>
+endtime = 84040.014846017, orig_timeout = 240, stdout_seq = []
+stderr_seq = [b'(trapped) error reading bcrypt version\nTraceback (most recent call last):\n  File "/root/.venv/lib/python3.11/site...tion\n', b'KKT backend serving after 4.35s (uow=ordered-writes+compensation); background startup tasks running\n', ...]
+skip_check_and_raise = False
+
+    def _check_timeout(self, endtime, orig_timeout, stdout_seq, stderr_seq,
+                       skip_check_and_raise=False):
+        """Convenience for checking if a timeout has expired."""
+        if endtime is None:
+            return
+        if skip_check_and_raise or _time() > endtime:
+>           raise TimeoutExpired(
+                    self.args, orig_timeout,
+                    output=b''.join(stdout_seq) if stdout_seq else None,
+                    stderr=b''.join(stderr_seq) if stderr_seq else None)
+E           subprocess.TimeoutExpired: Command '['/root/.venv/bin/python', '-c', '\nimport asyncio, os, sys\nsys.path.insert(0, \'/app/backend/tests/..\')\nfrom server import app, lifespan, startup_tasks, STARTUP\nfrom db import db\nasync def main():\n    async with lifespan(app):\n        while not STARTUP.get("done"):  # let the boot-time run finish first; racing it for the startup lease made the explicit pass skip migrations\n            await asyncio.sleep(0.2)\n        await db.locks.delete_many({"name": "startup"})\n        await startup_tasks()\nasyncio.run(main())\n']' timed out after 240 seconds
+
+/usr/local/lib/python3.11/subprocess.py:1253: TimeoutExpired
+=============================== warnings summary ===============================
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+  /root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+tests/test_phase_k_p1.py::test_loadshed_sheds_with_prebuilt_503_and_exempts_probes
+  /root/.venv/lib/python3.11/site-packages/starlette/testclient.py:41: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    [], typing.ContextManager[anyio.abc.BlockingPortal]
+
+tests/test_kkt_erp.py::TestBlock::test_create_block_and_generation
+tests/test_kkt_erp.py::TestFlatType::test_create_flat_type_auto_area
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+  /root/.venv/lib/python3.11/site-packages/_pytest/fixtures.py:1313: PytestRemovedIn10Warning: Class-scoped fixture defined as instance method is deprecated.
+  Instance attributes set in this fixture will NOT be visible to test methods,
+  as each test gets a new instance while the fixture runs only once per class.
+  Use @classmethod decorator and set attributes on cls instead.
+  See https://docs.pytest.org/en/stable/deprecations.html#class-scoped-fixture-as-instance-method
+    fixturefunc = resolve_fixture_function(fixturedef, request)
+
+tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources
+  /root/.venv/lib/python3.11/site-packages/_pytest/python.py:171: PytestReturnNotNoneWarning: Test functions should return None, but tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources returned <class 'str'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_phase_k_p0.py::test_invariant_indexes_and_validators_reject_bad_docs
+FAILED tests/test_rbac.py::test_registry_complete_every_guarded_route_registered
+FAILED tests/test_phase_n_inventory.py::test_expiry_sweep_releases_and_notifies
+FAILED tests/test_phase_b4_backend_sanity.py::test_integrity_report_ok - Asse...
+FAILED tests/test_error_registry.py::test_every_code_registered_with_matching_status
+FAILED tests/test_startup_migrations.py::test_startup_idempotent_on_pre_phase7_db
+6 failed, 556 passed, 2 skipped, 14 warnings in 406.90s (0:06:46)
+SUITE_EXIT 1

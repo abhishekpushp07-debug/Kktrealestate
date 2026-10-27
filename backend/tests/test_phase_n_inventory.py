@@ -106,12 +106,12 @@ def test_expiry_sweep_releases_and_notifies(admin_headers):
     assert _bulk(admin_headers, flat_ids=[f["id"]], action="hold", reason_id=reason["id"], expires_at=(datetime.now(timezone.utc) + timedelta(hours=2)).isoformat()).json()["done"] == 1
     past = (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat()
     mongo.flats.update_one({"id": f["id"]}, {"$set": {"hold.expires_at": past}})
-    os.environ["DB_NAME"] = mongo.name
-    import importlib
-    for m in ("db", "services.inventory"):
-        sys.modules.pop(m, None)
-    inv = importlib.import_module("services.inventory")
-    run = asyncio.run(inv.expire_holds())
+    import json
+    import subprocess
+    out = subprocess.run([sys.executable, "-c", "import asyncio, json, sys\nsys.path.insert(0, '.')\nfrom services import inventory as inv\nprint(json.dumps(asyncio.run(inv.expire_holds()), default=str))"],
+                         cwd=os.path.join(os.path.dirname(__file__), ".."), capture_output=True, text=True, timeout=120, env={**os.environ, "DB_NAME": mongo.name})
+    assert out.returncode == 0, out.stderr[-2000:]
+    run = json.loads(out.stdout.strip().splitlines()[-1])
     assert run["status"] == "OK", run
     g = requests.get(f"{BASE}/api/flats/{f['id']}", headers=admin_headers).json()
     assert g["status"] == "Available" and not g.get("hold")

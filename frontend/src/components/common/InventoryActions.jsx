@@ -39,7 +39,7 @@ export function InventoryActions({ flatIds, open, onClose, onDone }) {
   };
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent className="w-[420px] sm:max-w-[420px]" data-testid="inventory-actions-sheet">
+      <SheetContent className="w-[400px] overflow-y-auto sm:max-w-[400px]" data-testid="inventory-actions-sheet">
         <SheetHeader><SheetTitle>Inventory actions · {flatIds.length} unit(s)</SheetTitle></SheetHeader>
         <div className="mt-4 flex flex-wrap gap-1.5">{actions.map(([k, l]) => <button key={k} type="button" onClick={() => setAction(k)} className={`rounded-full border px-3 py-1 text-xs font-semibold ${action === k ? "border-ink-950 bg-ink-950 text-white" : "bg-white"}`} data-testid={`inv-action-${k}`}>{l}</button>)}</div>
         <div className="mt-5 space-y-3 text-sm">

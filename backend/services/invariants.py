@@ -32,7 +32,7 @@ async def ensure_invariants() -> dict:
         ("bookings", [("flat_id", ASCENDING)], "uniq_active_booking_per_flat", {"status": "Active"}),
         ("payments", [("idempotency_key", ASCENDING)], "uniq_payment_idempotency_key", {"idempotency_key": {"$type": "string"}}),
         ("customers", [("company_id", ASCENDING), ("pan_hash", ASCENDING)], "uniq_active_pan_hash", {"is_active": True, "pan_hash": {"$type": "string"}}),
-        ("idempotency_claims", [("owner", ASCENDING), ("key", ASCENDING)], "owner_1_key_1", None),
+        ("idempotency_claims", [("owner", ASCENDING), ("key", ASCENDING)], "uniq_idem_claim", None),
     ]
     for coll, keys, name, pfe in specs:
         try:
