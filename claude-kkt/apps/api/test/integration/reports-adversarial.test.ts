@@ -609,6 +609,11 @@ describe("dashboard cache and scope", () => {
     );
     expect(dashboardCacheKey(a, "PROJECT_ADMIN", {})).not.toBe(dashboardCacheKey(a, "OWNER", {}));
     expect(dashboardCacheKey(c, "OWNER", {})).toBe(dashboardCacheKey({ ...c, projectIds: ["p1", "p2"] }, "OWNER", {}));
+    // production-size run: users with the same role and scope share one entry, except the SALES dashboard (its widgets are the caller's)
+    const d: StaffContext = { ...base, id: "u3", allProjects: false, projectIds: ["p1"] };
+    expect(dashboardCacheKey(a, "PROJECT_ADMIN", {})).toBe(dashboardCacheKey(d, "PROJECT_ADMIN", {}));
+    expect(dashboardCacheKey(a, "OWNER", {})).toBe(dashboardCacheKey(d, "OWNER", {}));
+    expect(dashboardCacheKey(a, "SALES", {})).not.toBe(dashboardCacheKey(d, "SALES", {}));
   });
 
   it("a scoped Project Admin's dashboard shows only SGH even right after the Owner's dashboard was cached; out-of-scope project filters are 404", async () => {

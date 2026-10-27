@@ -3,7 +3,7 @@
  * when the customer is its primary applicant or a co-applicant, anything else is 404 — plus the synthetic, project-scoped reader
  * context the portal hands to the staff-side services it reuses (money views, report PDFs), and small wire mappers.
  */
-import { and, asc, desc, eq, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, sql, type SQL } from "drizzle-orm";
 import type { FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
@@ -58,10 +58,10 @@ export interface OwnedBooking {
 
 /** Condition: the customer is the booking's primary applicant or one of its co-applicants. */
 export function memberCondition(customerId: string): SQL {
-  return or(
-    eq(bookings.customerId, customerId),
-    sql`exists (select 1 from ${bookingCoApplicants} bc where bc.booking_id = ${bookings.id} and bc.customer_id = ${customerId})`,
-  )!;
+  // the customer's booking ids from two index lookups (bookings_customer_idx, booking_co_applicants_customer_idx); the former
+  // `customer_id = … OR EXISTS (co-applicant)` could use no index and read every booking of the company on each portal request
+  return sql`${bookings.id} in (select mb.id from ${bookings} mb where mb.customer_id = ${customerId}::uuid
+    union all select mc.booking_id from ${bookingCoApplicants} mc where mc.customer_id = ${customerId}::uuid)`;
 }
 
 function ownedSelect(customerId: string) {

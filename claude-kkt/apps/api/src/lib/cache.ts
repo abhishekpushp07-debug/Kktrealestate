@@ -87,6 +87,37 @@ export async function cached<T>(
   return value;
 }
 
+/**
+ * Read-through cache of a ready-made TEXT value (e.g. a serialized response body): like {@link cached}, but the string is stored and
+ * returned as is — no JSON.parse on a hit, so a large body costs one Redis GET and nothing else.
+ */
+export async function cachedText(
+  redis: Redis,
+  key: string,
+  ttlSeconds: number,
+  fn: () => Promise<string>,
+  budgetMs = CACHE_BUDGET_MS,
+): Promise<string> {
+  let healthy = redisUsable(redis);
+  if (healthy) {
+    try {
+      const hit = await withinBudget(redis.get(key), budgetMs, "cache read");
+      if (hit !== null && hit !== undefined) return hit;
+    } catch {
+      healthy = false;
+    }
+  }
+  const value = await fn();
+  if (healthy) {
+    try {
+      await withinBudget(redis.set(key, value, "EX", ttlSeconds), budgetMs, "cache write");
+    } catch {
+      /* best effort */
+    }
+  }
+  return value;
+}
+
 /** Deletes every key starting with `prefix` (SCAN + DEL in batches; safe on large keyspaces). */
 export async function invalidate(redis: Redis, prefix: string): Promise<number> {
   let cursor = "0";

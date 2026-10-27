@@ -329,6 +329,7 @@ async function tableEstimate(executor: Executor, table: PgTable): Promise<number
 /** Forgets cached table estimates (tests that switch between exact and estimated counting). */
 export function resetTableEstimates(): void {
   tableEstimates.clear();
+  estimateCache.clear();
 }
 
 /**
@@ -437,11 +438,30 @@ async function countRows(
   const threshold = opts.estimateAbove ?? COUNT_ESTIMATE_ABOVE;
   if ((await tableEstimate(executor, opts.table)) <= threshold) return exact();
   const idsBase: PgSelect = executor.select({ id: opts.table.id }).from(opts.table).$dynamic();
-  const estimate = await plannerEstimate(executor, (opts.join ? opts.join(idsBase) : idsBase).where(where));
+  const query = (opts.join ? opts.join(idsBase) : idsBase).where(where);
+  // the estimate is approximate by contract (meta.total_is_estimate): the same filtered list asked again within a few seconds reuses it
+  // instead of planning the joined query once more (EXPLAIN of a five-join list costs 2–7 ms of database CPU per request)
+  const compiled = query.toSQL();
+  const key = `${compiled.sql}\u0000${JSON.stringify(compiled.params)}`;
+  const now = Date.now();
+  const hit = estimateCache.get(key);
+  if (hit && now - hit.at < ESTIMATE_TTL_MS) {
+    estimated.value = true;
+    return hit.n;
+  }
+  const estimate = await plannerEstimate(executor, query);
   if (estimate === null) return exact();
+  estimateCache.delete(key);
+  estimateCache.set(key, { n: estimate, at: now });
+  if (estimateCache.size > ESTIMATE_CACHE_MAX) estimateCache.delete(estimateCache.keys().next().value!);
   estimated.value = true;
   return estimate;
 }
+
+/** How long a planner estimate of one filtered list (same SQL and parameters) is reused, and how many are kept per process. */
+const ESTIMATE_TTL_MS = 10_000;
+const ESTIMATE_CACHE_MAX = 2_000;
+const estimateCache = new Map<string, { n: number; at: number }>();
 
 /** Reads the sort value back from the last row: a flat select key, a nested table selection, or the full-row property. */
 function readSortValue(

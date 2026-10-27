@@ -35,7 +35,7 @@ import {
   fakeNumber,
   isHoneypotTripped,
   noStore,
-  publicCached,
+  sendPublicCached,
   publicCompany,
   AVAILABILITY_CACHE_POLICY,
   publicMeta,
@@ -221,7 +221,7 @@ export function registerPublicVisitRoutes(app: FastifyInstance): void {
       summary: "Available visit slots per day (IST); hides past, blackout and full slots",
     },
     handler: async (req, reply) =>
-      publicCached(
+      sendPublicCached(
         app,
         req,
         reply,

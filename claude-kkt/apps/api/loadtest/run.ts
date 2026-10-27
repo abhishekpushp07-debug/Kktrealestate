@@ -96,13 +96,30 @@ function percentile(sorted: number[], p: number): number {
   return sorted[idx]!;
 }
 
+/**
+ * Access tokens live ACCESS_TOKEN_MINUTES (15 by default) and a full run lasts longer, so every token issued at the start is re-issued
+ * before a scenario once it is TOKEN_REFRESH_MS old: requests keep naming the original token and are sent with the current one.
+ */
+const TOKEN_REFRESH_MS = 8 * 60_000;
+const liveToken = new Map<string, string>();
+const relogin = new Map<string, () => Promise<string>>();
+function current(token: string): string {
+  return liveToken.get(token) ?? token;
+}
+async function refreshTokens(): Promise<void> {
+  await inBatches([...relogin.entries()], 8, async ([original, login]) => {
+    liveToken.set(original, await login());
+    return true;
+  });
+}
+
 function requestData(s: Scenario, r: Req): RequestData {
   return {
     method: s.method ?? "GET",
     path: `/api/v1${r.path}`,
     headers: {
       "content-type": "application/json",
-      ...(r.token ? { authorization: `Bearer ${r.token}` } : {}),
+      ...(r.token ? { authorization: `Bearer ${current(r.token)}` } : {}),
       ...(s.headers ?? {}),
       ...(r.headers ?? {}),
       ...(s.uniqueIdempotencyKey ? { "idempotency-key": randomUUID() } : {}),
@@ -213,6 +230,7 @@ interface Staff {
   role: string;
   scoped: boolean;
   token: string;
+  permissions: string[];
   projects: string[];
   blocks: string[];
   bookings: string[];
@@ -242,7 +260,7 @@ async function settle(token: string): Promise<void> {
   let streak = 0;
   while (streak < 3) {
     const t0 = performance.now();
-    const ok = await fetch(`${API}/auth/me`, { headers: { authorization: `Bearer ${token}` } })
+    const ok = await fetch(`${API}/auth/me`, { headers: { authorization: `Bearer ${current(token)}` } })
       .then((r) => r.ok)
       .catch(() => false);
     streak = ok && performance.now() - t0 < SETTLE_MS ? streak + 1 : 0;
@@ -278,17 +296,18 @@ function clientIp(): Record<string, string> {
   };
 }
 
-async function staffLogin(email: string, password: string): Promise<string> {
-  const r = await json<{ access_token: string }>(`${API}/auth/login`, {
+async function staffLogin(email: string, password: string): Promise<{ token: string; permissions: string[] }> {
+  const r = await json<{ access_token: string; user: { permissions: string[] } }>(`${API}/auth/login`, {
     method: "POST",
     body: JSON.stringify({ email, password }),
     headers: clientIp(),
   });
-  return r.access_token;
+  return { token: r.access_token, permissions: r.user.permissions };
 }
 
 /** Signs in a mix of scoped and all-project staff and learns, per user, projects / towers / bookings it may read. */
-async function signInStaff(adminToken: string): Promise<Staff[]> {
+async function signInStaff(admin: { token: string; permissions: string[] }): Promise<Staff[]> {
+  const adminToken = admin.token;
   const auth = { authorization: `Bearer ${adminToken}` };
   const users: UserRow[] = [];
   for (let page = 1; page <= 5; page++) {
@@ -299,19 +318,21 @@ async function signInStaff(adminToken: string): Promise<Staff[]> {
   const generated = users.filter((u) => /\.\d{3}@/.test(u.email) && u.role_name !== "Super Admin");
   const scoped = generated.filter((u) => !u.all_projects).slice(0, Math.ceil(STAFF_LOGINS / 2));
   const wide = generated.filter((u) => u.all_projects).slice(0, STAFF_LOGINS - scoped.length);
-  const signedIn = await inBatches([...scoped, ...wide], 8, async (u) => ({
-    email: u.email,
-    role: u.role_name,
-    scoped: !u.all_projects,
-    token: await staffLogin(u.email, STAFF_PASSWORD),
-  }));
+  const signedIn = await inBatches([...scoped, ...wide], 8, async (u) => {
+    const session = await staffLogin(u.email, STAFF_PASSWORD);
+    relogin.set(session.token, async () => (await staffLogin(u.email, STAFF_PASSWORD)).token);
+    return { email: u.email, role: u.role_name, scoped: !u.all_projects, ...session };
+  });
   const pool =
-    signedIn.length > 0 ? signedIn : [{ email: EMAIL, role: "Super Admin", scoped: false, token: adminToken }];
+    signedIn.length > 0
+      ? signedIn
+      : [{ email: EMAIL, role: "Super Admin", scoped: false, token: adminToken, permissions: admin.permissions }];
   return inBatches(pool, 8, async (u) => {
     const h = { authorization: `Bearer ${u.token}` };
-    const projects = (
-      await json<{ items: { id: string }[] }>(`${API}/projects?page_size=50`, { headers: h })
-    ).items.map((p) => p.id);
+    const can = (permission: string) => u.permissions.includes(permission);
+    const projects = can("project.read")
+      ? (await json<{ items: { id: string }[] }>(`${API}/projects?page_size=50`, { headers: h })).items.map((p) => p.id)
+      : [];
     const blocks = projects.length
       ? (
           await json<{ items: { id: string }[] }>(`${API}/blocks?project_id=${projects[0]}&page_size=10`, {
@@ -319,9 +340,9 @@ async function signInStaff(adminToken: string): Promise<Staff[]> {
           })
         ).items.map((b) => b.id)
       : [];
-    const bookings = (
-      await json<{ items: { id: string }[] }>(`${API}/bookings?page_size=25`, { headers: h })
-    ).items.map((b) => b.id);
+    const bookings = can("booking.read")
+      ? (await json<{ items: { id: string }[] }>(`${API}/bookings?page_size=25`, { headers: h })).items.map((b) => b.id)
+      : [];
     return { ...u, projects, blocks, bookings };
   });
 }
@@ -333,6 +354,14 @@ async function signInBuyers(): Promise<{ token: string; bookingId: string }[]> {
       method: "POST",
       body: JSON.stringify({ phone, password: PORTAL_PASSWORD }),
       headers: clientIp(),
+    });
+    relogin.set(r.access_token, async () => {
+      const again = await json<{ access_token: string }>(`${API}/portal/auth/login`, {
+        method: "POST",
+        body: JSON.stringify({ phone, password: PORTAL_PASSWORD }),
+        headers: clientIp(),
+      });
+      return again.access_token;
     });
     const mine = await json<{ booking_id: string }[]>(`${API}/portal/bookings`, {
       headers: { authorization: `Bearer ${r.access_token}` },
@@ -348,10 +377,12 @@ async function signInBuyers(): Promise<{ token: string; bookingId: string }[]> {
 }
 
 async function main(): Promise<void> {
-  const adminToken = await staffLogin(EMAIL, PASSWORD);
+  const admin = await staffLogin(EMAIL, PASSWORD);
+  const adminToken = admin.token;
+  relogin.set(adminToken, async () => (await staffLogin(EMAIL, PASSWORD)).token);
   const auth = { authorization: `Bearer ${adminToken}` };
   console.log("signing in staff and buyers …");
-  const staff = await signInStaff(adminToken);
+  const staff = await signInStaff(admin);
   const buyers = await signInBuyers();
   const scopedCount = staff.filter((s) => s.scoped).length;
   console.log(`${staff.length} staff (${scopedCount} scoped), ${buyers.length} buyers signed in`);
@@ -394,25 +425,32 @@ async function main(): Promise<void> {
     remarks: "load test",
   });
 
-  /** (user, path) pairs over every signed-in user, each path built from what that user may read. */
-  const perStaff = (paths: (s: Staff) => string[]): Req[] =>
-    staff.flatMap((s) => paths(s).map((path) => ({ path, token: s.token })));
+  /** (user, path) pairs over every signed-in user holding `permission`, each path built from what that user may read. */
+  const perStaff = (permission: string, paths: (s: Staff) => string[]): Req[] =>
+    staff
+      .filter((s) => s.permissions.includes(permission))
+      .flatMap((s) => paths(s).map((path) => ({ path, token: s.token })));
   const searches = ["kumar", "sinha", "verma", "singh", "gupta", "prasad", "sharma", "yadav"];
   const scenarios: Scenario[] = [
-    { name: "GET /auth/me", requests: perStaff(() => ["/auth/me"]) },
-    { name: "GET /projects", requests: perStaff(() => ["/projects?page_size=25"]) },
+    { name: "GET /auth/me", requests: perStaff("dashboard.view", () => ["/auth/me"]) },
+    { name: "GET /projects", requests: perStaff("project.read", () => ["/projects?page_size=25"]) },
     {
       name: "GET /flats (list, filtered)",
-      requests: perStaff((s) => s.projects.slice(0, 5).map((p) => `/flats?project_id=${p}&page_size=50`)),
+      requests: perStaff("project.read", (s) =>
+        s.projects.slice(0, 5).map((p) => `/flats?project_id=${p}&page_size=50`),
+      ),
     },
-    { name: "GET /blocks/:id/grid", requests: perStaff((s) => s.blocks.slice(0, 5).map((b) => `/blocks/${b}/grid`)) },
+    {
+      name: "GET /blocks/:id/grid",
+      requests: perStaff("project.read", (s) => s.blocks.slice(0, 5).map((b) => `/blocks/${b}/grid`)),
+    },
     {
       name: "GET /customers (search)",
-      requests: perStaff((s) =>
+      requests: perStaff("customer.read", (s) =>
         searches.slice(0, 3).map((q, i) => `/customers?search=${searches[(i + s.email.length) % 8] ?? q}&page_size=25`),
       ),
     },
-    { name: "GET /bookings (list)", requests: perStaff(() => ["/bookings?page_size=25"]) },
+    { name: "GET /bookings (list)", requests: perStaff("booking.read", () => ["/bookings?page_size=25"]) },
     ...(bookingsEtag
       ? [
           {
@@ -422,18 +460,24 @@ async function main(): Promise<void> {
           },
         ]
       : []),
-    { name: "GET /bookings/:id", requests: perStaff((s) => s.bookings.slice(0, 10).map((b) => `/bookings/${b}`)) },
+    {
+      name: "GET /bookings/:id",
+      requests: perStaff("booking.read", (s) => s.bookings.slice(0, 10).map((b) => `/bookings/${b}`)),
+    },
     {
       name: "GET /bookings/:id/ledger",
-      requests: perStaff((s) => s.bookings.slice(0, 10).map((b) => `/bookings/${b}/ledger`)),
+      requests: perStaff("booking.read", (s) => s.bookings.slice(0, 10).map((b) => `/bookings/${b}/ledger`)),
     },
-    { name: "GET /payments (list)", requests: perStaff(() => ["/payments?page_size=25"]) },
-    { name: "GET /leads (list)", requests: perStaff(() => ["/leads?page_size=25"]) },
-    { name: "GET /service-requests (list)", requests: perStaff(() => ["/service-requests?page_size=25"]) },
-    { name: "GET /dashboard", requests: perStaff(() => ["/dashboard"]) },
+    { name: "GET /payments (list)", requests: perStaff("payment.post", () => ["/payments?page_size=25"]) },
+    { name: "GET /leads (list)", requests: perStaff("lead.read", () => ["/leads?page_size=25"]) },
+    {
+      name: "GET /service-requests (list)",
+      requests: perStaff("service.read", () => ["/service-requests?page_size=25"]),
+    },
+    { name: "GET /dashboard", requests: perStaff("dashboard.view", () => ["/dashboard"]) },
     {
       name: "GET /search?q=",
-      requests: perStaff((s) => [`/search?q=${["T01", "BK-", "A-1", "Kumar"][s.email.length % 4]}`]),
+      requests: perStaff("project.read", (s) => [`/search?q=${["T01", "BK-", "A-1", "Kumar"][s.email.length % 4]}`]),
     },
     ...(buyers.length > 0
       ? [
@@ -492,7 +536,12 @@ async function main(): Promise<void> {
   ].filter((s) => s.requests.length > 0 && (!FILTER || FILTER.test(s.name)));
 
   const results: ScenarioResult[] = [];
+  let signedAt = Date.now();
   for (const s of scenarios) {
+    if (Date.now() - signedAt > TOKEN_REFRESH_MS) {
+      await refreshTokens();
+      signedAt = Date.now();
+    }
     await settle(adminToken);
     process.stdout.write(`▶ ${s.name} … `);
     const r = await run(s);

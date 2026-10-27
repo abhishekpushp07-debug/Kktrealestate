@@ -371,3 +371,9 @@ END
 $$;
 CREATE INDEX CONCURRENTLY IF NOT EXISTS "integrity_runs_company_ran_idx" ON "integrity_runs" USING btree ("company_id", "ran_at" DESC);
 DROP INDEX CONCURRENTLY IF EXISTS "integrity_runs_company_ran_idx_nl";
+
+-- New indexes of migration 0006 (production-size run, docs/PERFORMANCE.md): the flats list's default order inside a project and across
+-- the company (no sort of a project's ~2,300 flats per page), and parking looked up by booking.
+CREATE INDEX CONCURRENTLY IF NOT EXISTS "flats_project_number_idx" ON "flats" USING btree ("project_id", "flat_number", "id");
+CREATE INDEX CONCURRENTLY IF NOT EXISTS "flats_company_number_idx" ON "flats" USING btree ("company_id", "flat_number", "id");
+CREATE INDEX CONCURRENTLY IF NOT EXISTS "parking_slots_booking_id_idx" ON "parking_slots" USING btree ("booking_id");

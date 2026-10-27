@@ -70,6 +70,7 @@ import {
   isPublicDocument,
   loadDocuments,
   publicCached,
+  sendPublicCached,
   publicHeaders,
   CATALOG_CACHE_POLICY,
   CMS_CACHE_POLICY,
@@ -1053,7 +1054,7 @@ export function registerPublicContentRoutes(app: FastifyInstance): void {
       summary: "Site settings (allow-listed) plus home-page content; coming-soon payload when the site is not live",
     },
     handler: async (req, reply) =>
-      publicCached(app, req, reply, async (companyId) => buildSite(app.dbReplica, companyId)),
+      sendPublicCached(app, req, reply, async (companyId) => buildSite(app.dbReplica, companyId)),
   });
 
   route(app, {
@@ -1067,7 +1068,7 @@ export function registerPublicContentRoutes(app: FastifyInstance): void {
       summary: "Published project cards (empty when the site is not live)",
     },
     handler: async (req, reply) =>
-      publicCached(app, req, reply, async (companyId) => {
+      sendPublicCached(app, req, reply, async (companyId) => {
         if (!(await siteIsLive(app.dbReplica, companyId))) return [];
         const q = req.query;
         const items = await publishedProjects(app.dbReplica, companyId);
@@ -1097,7 +1098,7 @@ export function registerPublicContentRoutes(app: FastifyInstance): void {
       summary: "Published project detail (404 when unpublished)",
     },
     handler: async (req, reply) =>
-      publicCached(
+      sendPublicCached(
         app,
         req,
         reply,
@@ -1125,7 +1126,7 @@ export function registerPublicContentRoutes(app: FastifyInstance): void {
       summary: "Published blog posts",
     },
     handler: async (req, reply) =>
-      publicCached(app, req, reply, async (companyId) => {
+      sendPublicCached(app, req, reply, async (companyId) => {
         const { page, page_size } = req.query;
         if (!(await siteIsLive(app.dbReplica, companyId)))
           return { items: [], total: 0, page, page_size, next_cursor: null };
@@ -1170,7 +1171,7 @@ export function registerPublicContentRoutes(app: FastifyInstance): void {
     cachePolicy: CMS_CACHE_POLICY,
     schema: { params: slugParams, response: { 200: PublicPostDetailSchema }, summary: "One published post" },
     handler: async (req, reply) =>
-      publicCached(
+      sendPublicCached(
         app,
         req,
         reply,
@@ -1216,7 +1217,7 @@ export function registerPublicContentRoutes(app: FastifyInstance): void {
         "One published page (privacy, disclaimer, about…); legal pages stay reachable while the site is not live",
     },
     handler: async (req, reply) =>
-      publicCached(
+      sendPublicCached(
         app,
         req,
         reply,
@@ -1256,7 +1257,7 @@ export function registerPublicContentRoutes(app: FastifyInstance): void {
       summary: "Published gallery images, optionally for one project",
     },
     handler: async (req, reply) =>
-      publicCached(
+      sendPublicCached(
         app,
         req,
         reply,
@@ -1300,7 +1301,7 @@ export function registerPublicContentRoutes(app: FastifyInstance): void {
     cachePolicy: CMS_CACHE_POLICY,
     schema: { response: { 200: z.array(PublicPersonSchema) }, summary: "Leadership / people" },
     handler: async (req, reply) =>
-      publicCached(app, req, reply, async (companyId) => {
+      sendPublicCached(app, req, reply, async (companyId) => {
         if (!(await siteIsLive(app.dbReplica, companyId))) return [];
         const rows = await app.dbReplica
           .select()
@@ -1366,7 +1367,7 @@ export function registerPublicContentRoutes(app: FastifyInstance): void {
       summary: "Sitemap entries as JSON (published projects, posts, pages)",
     },
     handler: async (req, reply) =>
-      publicCached(app, req, reply, async (companyId) => ({
+      sendPublicCached(app, req, reply, async (companyId) => ({
         entries: await sitemapEntries(app.dbReplica, companyId),
       })),
   });

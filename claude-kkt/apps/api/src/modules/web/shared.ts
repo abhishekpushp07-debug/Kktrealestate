@@ -7,7 +7,7 @@ import { documents, projects, type Executor } from "@kkt/db";
 import { DEFAULT_NUMBER_PATTERN, financialYear, formatNumber } from "@kkt/domain";
 import { config } from "../../config.js";
 import type { AuditActor } from "../../lib/audit.js";
-import { CACHE_BUDGET_MS, cached, redisUsable, withinBudget } from "../../lib/cache.js";
+import { CACHE_BUDGET_MS, cached, cachedText, redisUsable, withinBudget } from "../../lib/cache.js";
 import { ApiError } from "../../lib/errors.js";
 import { resolveCompanyId } from "../../lib/tenant.js";
 import type { NumberingCompany, NumberingScope } from "../../lib/numbering.js";
@@ -145,6 +145,36 @@ export async function publicCached<T>(
   if (!env.ok) throw ApiError.notFound(notFoundEntity);
   publicHeaders(reply);
   return env.value;
+}
+
+/** Cached marker of a "not found" public body (a real body is JSON and never starts with a NUL character). */
+const NOT_FOUND_BODY = "\u0000404";
+
+/**
+ * {@link publicCached} for a route that answers the value itself: the cache holds the SERIALIZED body — produced once per fill by the
+ * route's own response serializer (`reply.serialize`, i.e. the Zod response schema still validates it) — and a hit is sent as bytes
+ * without parsing, re-validating or re-serializing. A project page carries its whole availability grid (~0.5 MB for a 2,300-flat
+ * project), which took ~40 ms of CPU per cached hit before (docs/PERFORMANCE.md "Production-size run"). Returns the sent reply.
+ */
+export async function sendPublicCached<T>(
+  app: FastifyInstance,
+  req: FastifyRequest,
+  reply: FastifyReply,
+  fn: (companyId: string) => Promise<T | null>,
+  notFoundEntity = "Resource",
+): Promise<FastifyReply> {
+  const companyId = await publicCompany(app, req);
+  const key = `${PUBLIC_CACHE_PREFIX}${await publicCacheVersion(app)}:${companyId}:body:${publicCacheKey(req)}`;
+  const body = await cachedText(app.redis, key, PUBLIC_CACHE_SECONDS, async () => {
+    const value = await fn(companyId);
+    if (value === null) return NOT_FOUND_BODY;
+    const out = reply.serialize(value);
+    return typeof out === "string" ? out : Buffer.from(out as ArrayBuffer).toString("utf8");
+  });
+  if (body === NOT_FOUND_BODY) throw ApiError.notFound(notFoundEntity);
+  publicHeaders(reply);
+  reply.header("Content-Type", "application/json; charset=utf-8");
+  return reply.send(Buffer.from(body));
 }
 
 /**

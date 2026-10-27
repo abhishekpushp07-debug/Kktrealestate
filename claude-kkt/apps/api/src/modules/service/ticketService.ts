@@ -458,15 +458,18 @@ export async function assertAttachments(
 
 /** Condition: the customer is primary applicant or co-applicant of the booking row. */
 function bookingMemberCondition(customerId: string): SQL {
-  return or(
-    eq(bookings.customerId, customerId),
-    sql`exists (select 1 from ${bookingCoApplicants} bc where bc.booking_id = ${bookings.id} and bc.customer_id = ${customerId})`,
-  )!;
+  return sql`${bookings.id} in (${memberBookingIds(customerId)})`;
+}
+
+/** Ids of the bookings where the customer is primary or co-applicant: two index lookups (an OR with a correlated EXISTS reads every booking). */
+function memberBookingIds(customerId: string): SQL {
+  return sql`select mb.id from ${bookings} mb where mb.customer_id = ${customerId}::uuid
+    union all select mc.booking_id from ${bookingCoApplicants} mc where mc.customer_id = ${customerId}::uuid`;
 }
 
 /** Project ids of the customer's ACTIVE/COMPLETED bookings (primary or co-applicant). */
 export function customerProjectIdsSubquery(customerId: string): SQL {
-  return sql`(select b.project_id from ${bookings} b where b.status in ('ACTIVE', 'COMPLETED') and (b.customer_id = ${customerId} or exists (select 1 from ${bookingCoApplicants} bc where bc.booking_id = b.id and bc.customer_id = ${customerId})))`;
+  return sql`(select b.project_id from ${bookings} b where b.status in ('ACTIVE', 'COMPLETED') and b.id in (${memberBookingIds(customerId)}))`;
 }
 
 // ---------------------------------------------------------------------------

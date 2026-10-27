@@ -368,6 +368,9 @@ export const flats = pgTable(
       sql`${t.pricePaise} >= 0 AND (${t.ratePerSqftPaise} IS NULL OR ${t.ratePerSqftPaise} >= 0)`,
     ),
     index("flats_flat_type_id_idx").on(t.flatTypeId),
+    // migration 0006 (online): the flats list's default order (flat_number, id) inside a project and across the company
+    index("flats_project_number_idx").on(t.projectId, t.flatNumber, t.id),
+    index("flats_company_number_idx").on(t.companyId, t.flatNumber, t.id),
   ],
 );
 
@@ -392,6 +395,8 @@ export const parkingSlots = pgTable(
     index("parking_slots_project_status_idx").on(t.projectId, t.status),
     check("parking_slots_price_nonneg_chk", sql`${t.pricePaise} >= 0`),
     index("parking_slots_company_id_idx").on(t.companyId),
+    // migration 0006 (online): every flats page and booking detail looks its parking up by booking (booking_id has no FK on purpose)
+    index("parking_slots_booking_id_idx").on(t.bookingId),
   ],
 );
 

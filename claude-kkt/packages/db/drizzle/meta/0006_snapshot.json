@@ -1,5 +1,5 @@
 {
-  "id": "75b1007e-2fb2-4f88-9b5f-6a348f048715",
+  "id": "e1fbf34c-1fe3-4965-9856-6acebe82fecf",
   "prevId": "a4d20aec-7168-4691-a6ee-3813a913427a",
   "version": "7",
   "dialect": "postgresql",
@@ -8702,6 +8702,60 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "flats_project_number_idx": {
+          "name": "flats_project_number_idx",
+          "columns": [
+            {
+              "expression": "project_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "flat_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "flats_company_number_idx": {
+          "name": "flats_company_number_idx",
+          "columns": [
+            {
+              "expression": "company_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "flat_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -8897,6 +8951,21 @@
           "columns": [
             {
               "expression": "company_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "parking_slots_booking_id_idx": {
+          "name": "parking_slots_booking_id_idx",
+          "columns": [
+            {
+              "expression": "booking_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

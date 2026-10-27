@@ -86,11 +86,20 @@ export function dashboardRoleFor(user: Pick<StaffContext, "roleName" | "permissi
   }
 }
 
-/** Redis key: role + user id + scope + project filter. */
+/**
+ * Redis key: role + scope + project filter, plus the user id for the SALES dashboard only — the one whose widgets are the caller's own
+ * (assigned leads, own bookings). Every other dashboard is a function of company, role and project scope, so all users with the same
+ * role and scope share one entry: at production size a dashboard costs up to a few hundred ms of database time to build, and 200 staff
+ * each rebuilding their own copy every 15 s was the dashboard's tail (docs/PERFORMANCE.md "Production-size run").
+ */
 export function dashboardCacheKey(user: StaffContext, role: DashboardRole, q: DashboardQuery): string {
   const scope = user.allProjects ? "all" : [...user.projectIds].sort().join(",");
-  return `dash:${user.companyId}:${role}:${user.id}:${scope}:${q.project_id ?? "-"}`;
+  const owner = role === "SALES" ? user.id : "-";
+  return `dash:${user.companyId}:${role}:${owner}:${scope}:${q.project_id ?? "-"}`;
 }
+
+/** Builds in flight per cache key in this process: concurrent misses of one key share one build (no stampede when an entry expires). */
+const building = new Map<string, Promise<DashboardResponse>>();
 
 /** The caller's dashboard (cached 15 s). */
 export async function dashboardFor(
@@ -101,9 +110,15 @@ export async function dashboardFor(
 ): Promise<DashboardResponse> {
   if (q.project_id) ensureProjectAccess(user, q.project_id);
   const role = dashboardRoleFor(user);
-  return cached(redis, dashboardCacheKey(user, role, q), DASHBOARD_TTL_SECONDS, () =>
-    buildDashboard(db, user, role, q),
-  );
+  const key = dashboardCacheKey(user, role, q);
+  return cached(redis, key, DASHBOARD_TTL_SECONDS, () => {
+    let pending = building.get(key);
+    if (!pending) {
+      pending = buildDashboard(db, user, role, q).finally(() => building.delete(key));
+      building.set(key, pending);
+    }
+    return pending;
+  });
 }
 
 async function buildDashboard(

@@ -419,7 +419,7 @@ describe("migration 0005: indexes", () => {
       DROP INDEX "service_requests_company_created_idx";
       CREATE INDEX "service_requests_company_created_idx" ON "service_requests" ("company_id", "created_at" DESC NULLS LAST, "id" DESC NULLS LAST)`);
     const report = await runMigrations(TEST_DATABASE_URL, { reapplyAll: true });
-    expect(report.online["online/0006_list_order_indexes.sql"]!.length).toBe(33 * 3);
+    expect(report.online["online/0006_list_order_indexes.sql"]!.length).toBe(33 * 3 + 3);
     const [def] = await handle.sql<{ def: string }[]>`
       SELECT indexdef AS def FROM pg_indexes WHERE indexname = 'service_requests_company_created_idx'`;
     expect(def?.def).toContain("(company_id, created_at DESC, id DESC)");
