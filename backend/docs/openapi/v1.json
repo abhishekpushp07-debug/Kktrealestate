@@ -9289,6 +9289,24 @@
     "title": "ReasonIn",
     "type": "object"
    },
+   "RefreshBodyIn": {
+    "additionalProperties": false,
+    "properties": {
+     "refresh_token": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Refresh Token"
+     }
+    },
+    "title": "RefreshBodyIn",
+    "type": "object"
+   },
    "RefreshIn": {
     "additionalProperties": false,
     "properties": {
@@ -14708,11 +14726,18 @@
      "content": {
       "application/json": {
        "schema": {
-        "$ref": "#/components/schemas/LogoutIn"
+        "anyOf": [
+         {
+          "$ref": "#/components/schemas/LogoutIn"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "title": "Body"
        }
       }
-     },
-     "required": true
+     }
     },
     "responses": {
      "200": {
@@ -14888,11 +14913,18 @@
      "content": {
       "application/json": {
        "schema": {
-        "$ref": "#/components/schemas/RefreshIn"
+        "anyOf": [
+         {
+          "$ref": "#/components/schemas/RefreshBodyIn"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "title": "Body"
        }
       }
-     },
-     "required": true
+     }
     },
     "responses": {
      "200": {

@@ -150,7 +150,7 @@ class MfaLoginIn(StrictModel):
     code: str
 
 
-class RefreshIn(StrictModel):
+class RefreshBodyIn(StrictModel):
     refresh_token: str | None = None  # omitted by the SPA → cookie + CSRF header
 
 
@@ -246,7 +246,7 @@ async def login_mfa(body: MfaLoginIn, request: Request, response: Response):
 
 
 @router.post("/refresh")
-async def refresh(request: Request, response: Response, body: RefreshIn | None = None):
+async def refresh(request: Request, response: Response, body: RefreshBodyIn | None = None):
     raw = body.refresh_token if body else None
     from_cookie = not raw
     raw = raw or request.cookies.get(RT_COOKIE)

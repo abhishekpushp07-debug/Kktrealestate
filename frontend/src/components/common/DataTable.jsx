@@ -1,14 +1,12 @@
 /* eslint-disable react/no-array-index-key -- fixed-length skeleton placeholders (never reordered) */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Columns3, Download, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
-import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { EmptyState } from "./Bits";
+import { useTableState } from "./datatable/useTableState";
+import { TableHeader, TablePagination, TableToolbar } from "./datatable/Parts";
 
 function useIsMobile() {
   const [m, setM] = useState(() => window.matchMedia("(max-width: 767px)").matches);
@@ -18,26 +16,17 @@ function useIsMobile() {
 
 /* DataTable v2: min column widths, sticky first column, right-edge scroll affordance, card rows < 768px, sticky totals footer, page-size picker. */
 export function DataTable({ columns, items = [], total = 0, loading, page = 1, pageSize = 20, setPage, setPageSize, pageSizes = [20, 50, 100], search, setSearch, sort, setSort, rowKey = "id", onRowClick, searchPlaceholder = "Search…", toolbar, empty, testId = "data-table", dense: denseDefault = true, exportPath, selectable, selected = new Set(), onSelect, footer, cardTitle, cardFields }) {
-  const [dense, setDense] = useState(denseDefault);
-  const scrollRef = useRef(null);
-  const [atEnd, setAtEnd] = useState(true);
   const mobile = useIsMobile();
+  const { dense, setDense, hidden, toggleCol, cols, labelled, toggleSort, scrollRef, atEnd, onScroll } = useTableState({ columns, items, sort, setSort, testId, denseDefault });
   const virtual = items.length > 100 && !mobile;
   const rowH = dense ? 38 : 46;
   const rv = useVirtualizer({ count: items.length, getScrollElement: () => scrollRef.current, estimateSize: () => rowH, overscan: 12, enabled: virtual });
   const vrows = virtual ? rv.getVirtualItems() : null;
   const padTop = vrows?.length ? vrows[0].start : 0;
   const padBottom = vrows?.length ? rv.getTotalSize() - vrows[vrows.length - 1].end : 0;
-  // localStorage: hidden-column preference per table — non-sensitive (CR-7)
-  const [hidden, setHidden] = useState(() => new Set(JSON.parse(localStorage.getItem(`kkt:cols:${testId}`) || "[]")));
-  const toggleCol = (k) => { const n = new Set(hidden); n.has(k) ? n.delete(k) : n.add(k); setHidden(n); localStorage.setItem(`kkt:cols:${testId}`, JSON.stringify([...n])); };
-  const cols = useMemo(() => columns.filter((c) => !hidden.has(c.key)), [columns, hidden]);
-  const labelled = useMemo(() => columns.filter((c) => c.label), [columns]);
   const pages = Math.max(1, Math.ceil(total / pageSize));
-  const toggleSort = (key) => { if (setSort) setSort(sort === key ? `-${key}` : key); };
   const allSelected = selectable && items.length > 0 && items.every((r) => selected.has(r[rowKey]));
-  const onScroll = () => { const el = scrollRef.current; if (el) setAtEnd(el.scrollWidth - el.clientWidth - el.scrollLeft < 4); };
-  useEffect(() => { onScroll(); }, [items, cols.length]); // eslint-disable-line
+  const onSelectAll = (c) => onSelect(c ? new Set([...selected, ...items.map((r) => r[rowKey])]) : new Set([...selected].filter((id) => !items.some((r) => r[rowKey] === id))));
   const exportCsv = async () => {
     const { default: api } = await import("@/lib/api");
     const r = await api.get(exportPath, { params: { format: "csv", search: search || undefined }, responseType: "blob" });
@@ -47,27 +36,7 @@ export function DataTable({ columns, items = [], total = 0, loading, page = 1, p
   const cardCols = cardFields ? cols.filter((c) => cardFields.includes(c.key)) : cols.slice(0, 6);
   return (
     <div className="card overflow-hidden" data-testid={testId}>
-      {(setSearch || toolbar || exportPath) && (
-        <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-3">
-          {setSearch && (
-            <div className="relative w-full sm:w-72">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-txt-secondary" />
-              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={searchPlaceholder} className="h-9 pl-8" data-testid={`${testId}-search`} />
-            </div>
-          )}
-          <div className="ml-auto flex flex-wrap items-center gap-2">{toolbar}
-            {!mobile && <DropdownMenu>
-              <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="h-9" aria-label="Columns" data-testid={`${testId}-columns-btn`}><Columns3 className="h-4 w-4" /></Button></DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52">
-                <DropdownMenuCheckboxItem checked={!dense} onCheckedChange={() => setDense(!dense)}>Comfortable density</DropdownMenuCheckboxItem>
-                <DropdownMenuSeparator />
-                {labelled.map((c) => <DropdownMenuCheckboxItem key={c.key} checked={!hidden.has(c.key)} onCheckedChange={() => toggleCol(c.key)}>{c.label}</DropdownMenuCheckboxItem>)}
-              </DropdownMenuContent>
-            </DropdownMenu>}
-            {exportPath && <Button variant="outline" size="sm" className="h-9" onClick={exportCsv} data-testid={`${testId}-export-csv`}><Download className="mr-1 h-4 w-4" />CSV</Button>}
-          </div>
-        </div>
-      )}
+      {(setSearch || toolbar || exportPath) && <TableToolbar {...{ testId, search, setSearch, searchPlaceholder, toolbar, mobile, dense, setDense, labelled, hidden, toggleCol, exportPath, exportCsv }} />}
       {mobile ? (
         <div className="divide-y divide-slate-100" data-testid={`${testId}-cards`}>
           {loading ? Array.from({ length: 4 }).map((_, i) => <div key={`sk-${i}`} className="space-y-2 p-4"><Skeleton className="h-4 w-2/3" /><Skeleton className="h-3 w-1/2" /><Skeleton className="h-3 w-1/3" /></div>)
@@ -86,18 +55,7 @@ export function DataTable({ columns, items = [], total = 0, loading, page = 1, p
         <div className="scroll-fade" data-end={atEnd ? "true" : "false"}>
           <div ref={scrollRef} onScroll={onScroll} className="overflow-auto" style={{ maxHeight: "calc(100vh - 290px)" }} data-virtualized={virtual ? "true" : undefined}>
             <table className="w-full text-[13px]">
-              <thead className="sticky top-0 z-10 bg-warm-50">
-                <tr className="border-b border-warm-200">
-                  {selectable && <th className="w-8 px-3 py-2.5"><Checkbox checked={allSelected} onCheckedChange={(c) => onSelect(c ? new Set([...selected, ...items.map((r) => r[rowKey])]) : new Set([...selected].filter((id) => !items.some((r) => r[rowKey] === id))))} data-testid={`${testId}-select-all`} /></th>}
-                  {cols.map((c, i) => (
-                    <th key={c.key} style={{ minWidth: c.minWidth || (c.align === "right" ? 120 : 110) }} className={cn("whitespace-nowrap px-4 py-2.5 text-left label-xs", c.align === "right" && "text-right", c.sortable && "cursor-pointer select-none hover:text-ink-950", i === 0 && "sticky left-0 z-20 bg-warm-50", c.className)} onClick={() => c.sortable && toggleSort(c.key)} data-testid={`${testId}-col-${c.key}`}>
-                      <span className="inline-flex items-center gap-1">{c.label}
-                        {c.sortable && (sort === c.key ? <ArrowUp className="h-3 w-3 text-gold" /> : sort === `-${c.key}` ? <ArrowDown className="h-3 w-3 text-gold" /> : <ArrowUpDown className="h-3 w-3 opacity-50" />)}
-                      </span>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
+              <TableHeader {...{ cols, sort, toggleSort, testId, selectable, allSelected, onSelectAll }} />
               <tbody>
                 {loading ? Array.from({ length: 6 }).map((_, i) => (
                   <tr key={`sk-${i}`} className="border-b border-slate-100">{cols.map((c) => <td key={c.key} className="px-4 py-3"><Skeleton className="h-4 w-full" /></td>)}</tr>
@@ -116,14 +74,7 @@ export function DataTable({ columns, items = [], total = 0, loading, page = 1, p
           </div>
         </div>
       )}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-4 py-2.5 text-xs text-txt-secondary">
-        <span data-testid={`${testId}-total`}>{total} record{total === 1 ? "" : "s"} · page {page} of {pages}</span>
-        <div className="flex items-center gap-2">
-          {setPageSize && <select className="h-7 rounded-md border border-slate-300 bg-white px-1.5 text-xs text-ink-950" value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} aria-label="Rows per page" data-testid={`${testId}-page-size`}>{pageSizes.map((n) => <option key={n} value={n}>{n} / page</option>)}</select>}
-          <Button variant="outline" size="sm" className="h-7 border-slate-300 px-2 text-ink-950" disabled={page <= 1} onClick={() => setPage?.(page - 1)} aria-label="Previous page" data-testid={`${testId}-prev`}><ChevronLeft className="h-3.5 w-3.5" /></Button>
-          <Button variant="outline" size="sm" className="h-7 border-slate-300 px-2 text-ink-950" disabled={page >= pages} onClick={() => setPage?.(page + 1)} aria-label="Next page" data-testid={`${testId}-next`}><ChevronRight className="h-3.5 w-3.5" /></Button>
-        </div>
-      </div>
+      <TablePagination {...{ testId, total, page, pages, pageSize, setPage, setPageSize, pageSizes }} />
     </div>
   );
 }
