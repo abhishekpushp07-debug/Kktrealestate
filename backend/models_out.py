@@ -137,8 +137,18 @@ class BlocksOutPage(_Out):
 
 class FlatsOut(_Out):
     _links: Any = None
-    areas_snapshot: Any = None
+    inventory_state: Any = None
+    display_state: Any = None
+    display_override: Any = None
+    display_reason: Any = None
+    display_set_at: Any = None
+    masked: Any = None
+    allocation_category_id: Any = None
+    allocation_category_code: Any = None
+    bookable: Any = None
+    hold: Any = None
     block: Any = None
+    areas_snapshot: Any = None
     block_code: Any = None
     block_id: Any = None
     block_name: Any = None

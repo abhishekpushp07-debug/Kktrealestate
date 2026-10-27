@@ -10,6 +10,7 @@ import { inrShort, num } from "@/lib/format";
 import { PageHeader, KV, Field } from "@/components/common/Bits";
 import { StatusChip, STATUS_STYLES } from "@/components/common/StatusChip";
 import { FlatDrawer } from "@/components/common/FlatDrawer";
+import { InventoryActions } from "@/components/common/InventoryActions";
 import { HistoryTimeline } from "@/components/common/HistoryTimeline";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -54,6 +55,7 @@ export default function BlockDetail() {
   const { data: block, reload: reloadBlock } = useFetch(`/blocks/${id}`);
   const { can } = useAuth();
   const [selected, setSelected] = useState(sp.get("flat"));
+  const [invOpen, setInvOpen] = useState(false);
   const [mode, setMode] = useState("status");
   const [multi, setMulti] = useState(new Set());
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -113,8 +115,8 @@ export default function BlockDetail() {
           <div className="mb-3 flex flex-wrap items-center gap-2 print:hidden">
             <span className="label-xs">Colour by</span>
             {[["status", "Status"], ["type", "Flat type"], ["price", "Price band"]].map(([m, l]) => <button key={m} onClick={() => setMode(m)} className={cn("rounded-full border px-3 py-1 text-xs font-semibold", mode === m ? "border-ink-950 bg-ink-950 text-white" : "bg-white hover:border-gold")} data-testid={`grid-mode-${m}`}>{l}</button>)}
-            {multi.size > 0 && can("sales.hold.create") && <div className="ml-auto flex items-center gap-2 rounded-md bg-gold-light px-3 py-1.5 text-xs" data-testid="grid-bulk-bar"><b>{multi.size} selected</b>
-              {["Available", "Hold", "Blocked"].map((s) => <button type="button" className="btn btn-primary h-7" key={s} onClick={() => bulkStatus(s)} data-testid={`grid-bulk-${s.toLowerCase()}`}>→ {s}</button>)}
+            {multi.size > 0 && (can("sales.hold.create") || can("inventory.hold.create") || can("inventory.category.set") || can("inventory.display.set")) && <div className="ml-auto flex items-center gap-2 rounded-md bg-gold-light px-3 py-1.5 text-xs" data-testid="grid-bulk-bar"><b>{multi.size} selected</b>
+              <button type="button" className="btn btn-primary h-7" onClick={() => setInvOpen(true)} data-testid="grid-bulk-inventory">Inventory actions…</button>
               <button onClick={() => setMulti(new Set())} className="text-txt-secondary underline">clear</button></div>}
             {multi.size === 0 && <span className="ml-auto text-[11px] text-txt-muted">Ctrl/⌘-click to multi-select · Shift for range</span>}
           </div>
@@ -133,7 +135,7 @@ export default function BlockDetail() {
                       return (
                         <Tooltip key={f.id}>
                           <TooltipTrigger asChild>
-                            <button onClick={(e) => (e.ctrlKey || e.metaKey || e.shiftKey) ? toggleMulti(f.id, e.shiftKey) : setSelected(f.id)} className={cn("grid-tile", tileClass(f), multi.has(f.id) && "ring-2 ring-gold ring-offset-1")} data-testid={`grid-flat-${f.flat_number}`} data-status={f.status}>
+                            <button onClick={(e) => (e.ctrlKey || e.metaKey || e.shiftKey) ? toggleMulti(f.id, e.shiftKey) : setSelected(f.id)} className={cn("grid-tile", tileClass(f), multi.has(f.id) && "ring-2 ring-gold ring-offset-1")} data-testid={`grid-flat-${f.flat_number}`} data-status={f.status} data-display={f.display_state || ""} data-masked={f.masked ? "1" : "0"} data-category={f.allocation_category_code || ""}>{f.masked && <span className="absolute right-0.5 top-0.5 rounded bg-amber-500 px-1 text-[9px] font-bold text-white" title={`Displayed as: ${f.display_state}`} data-testid={`grid-masked-${f.flat_number}`}>M</span>}{f.allocation_category_code && f.allocation_category_code !== "BUILDER" && <span className="absolute left-0.5 top-0.5 rounded bg-ink-950/70 px-1 text-[9px] font-bold text-white" title={f.allocation_category_code} data-testid={`grid-category-${f.flat_number}`}>{f.allocation_category_code[0]}</span>}
                               <div className="flex items-center justify-between"><span className="text-sm font-extrabold">{f.flat_number}</span><span className="text-[10px] font-semibold opacity-70">{f.flat_type_code}{f.is_corner ? " ◆" : ""}</span></div>
                               <div className="flex items-end justify-between"><span className="text-[10px] opacity-70">{num(f.super_builtup_sqft)} sq.ft</span><span className="text-xs font-bold tabular">{inrShort(f.price)}</span></div>
                             </button>
@@ -161,6 +163,7 @@ export default function BlockDetail() {
           <div className="card p-5"><p className="label-xs mb-2">Legend</p><div className="flex flex-wrap gap-1.5">{mode === "status" ? ["Available", "Hold", "Booked", "Sold", "Blocked"].map((s) => <StatusChip key={s} status={s} />) : mode === "type" ? types.map((t, i) => <span key={t} className={cn("rounded-full border px-2 py-0.5 text-[11px] font-semibold", TYPE_COLORS[i % TYPE_COLORS.length])}>{t}</span>) : <span className="text-xs text-txt-secondary">{inrShort(min)} → {inrShort(max)} (5 bands)</span>}</div><p className="mt-3 text-xs text-txt-secondary">◆ corner unit. Click a tile for the flat drawer with price breakup.</p></div>
         </div>
       </div>
+      <InventoryActions flatIds={[...multi]} open={invOpen} onClose={() => setInvOpen(false)} onDone={() => { setMulti(new Set()); refresh(); }} />
       <FlatDrawer flatId={selected} onClose={() => { setSelected(null); if (sp.get("flat")) setSp({}); }} onChanged={refresh} />
       {bulkOpen && block && <BulkPriceDialog block={block} open={bulkOpen} onOpenChange={setBulkOpen} onDone={refresh} />}
       <Dialog open={floorsOpen} onOpenChange={setFloorsOpen}>

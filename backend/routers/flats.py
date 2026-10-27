@@ -7,6 +7,7 @@ from db import db
 from models_out import FlatsOut, FlatsOutPage
 from deps import ensure_project_access, project_scope_filter, require, require_any
 from services.flat_generation import resnapshot_flat
+from services import inventory as inv
 from utils import (
     ApiError,
     ListParams,
@@ -57,7 +58,7 @@ async def _enrich(items: list[dict]):
 @router.get("", response_model=FlatsOutPage, response_model_exclude_unset=True)
 async def list_flats(
     params: ListParams = Depends(), project_id: str | None = None, block_id: str | None = None,
-    floor: int | None = None, status: str | None = None, flat_type_id: str | None = None,
+    floor: int | None = None, status: str | None = None, flat_type_id: str | None = None, bookable_for: str | None = None, category: str | None = None, display: str | None = None, hold_expiring: bool | None = None,
     user: dict = Depends(require("masters.project.view")),
 ):
     q = {"company_id": user["company_id"], **project_scope_filter(user), **search_filter(params.search, ["flat_number", "flat_type_code"])}
@@ -70,6 +71,15 @@ async def list_flats(
         q["floor"] = floor
     if status:
         q["status"] = {"$in": status.split(",")}
+    if bookable_for is not None:  # booking wizard: saleable + (Available or Hold for this customer / RM), never masked-as-sold/hidden
+        q.update(inv.bookable_filter(bookable_for or None, user))
+    if category:
+        q["allocation_category_code"] = {"$in": category.split(",")}
+    if display and inv.can_see_real(user):
+        q["$or"] = [{"display_override": True, "display_state": {"$in": display.split(",")}}] + ([{"display_override": {"$ne": True}, "status": {"$in": [k for k, v in inv.MIRROR.items() if v in display.split(",")]}}])
+    if hold_expiring:
+        q["status"] = "Hold"
+        q["hold.expires_at"] = {"$lte": (__import__("datetime").datetime.now(__import__("datetime").timezone.utc) + __import__("datetime").timedelta(hours=48)).isoformat()}
     if flat_type_id:
         q["flat_type_id"] = flat_type_id
     if not params.include_inactive:
@@ -83,16 +93,20 @@ async def list_flats(
 
         from utils import to_csv
         await _enrich(res["items"])
+        res["items"] = inv.shape_list(res["items"], user)
         return Response(to_csv([with_price(i) for i in res["items"]], ["flat_number", "project_code", "block_code", "floor", "position", "flat_type_code", "facing", "status", "carpet_sqft", "builtup_sqft", "super_builtup_sqft", "rate_per_sqft", "price"]), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=flats.csv"})
     res["items"] = await _enrich(res["items"])
-    res["items"] = [with_price(i) for i in res["items"]]
+    res["items"] = inv.shape_list([with_price(i) for i in res["items"]], user)
     return res
 
 
 async def _load_flat(flat_id: str, user: dict) -> dict:
     flat = await get_or_404(db.flats, flat_id, "Flat", {"company_id": user["company_id"]})
     ensure_project_access(user, flat["project_id"])
-    return with_price(flat)
+    shaped = inv.shape(flat, user)
+    if shaped is None:
+        raise ApiError(404, "Flat not found", "NOT_FOUND")
+    return with_price(shaped)
 
 
 @router.get("/{flat_id}", response_model=FlatsOut, response_model_exclude_unset=True)

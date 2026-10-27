@@ -62,7 +62,7 @@ export default function BookingWizard() {
   useUnsavedGuard(step > 0 && !busy, "Your booking draft is saved locally, but unsent changes will be lost if you leave. Continue?");
   const { data: projects } = useFetch("/projects?page_size=50");
   const { data: blocks } = useFetch(projectId ? `/blocks?project_id=${projectId}&page_size=50` : null, [projectId]);
-  const { data: grid } = useFetch(blockId ? `/blocks/${blockId}/grid` : null, [blockId]);
+  const { data: grid } = useFetch(blockId ? `/blocks/${blockId}/grid?bookable_for=${encodeURIComponent(customer?.id || "")}` : null, [blockId, customer?.id]);
   const { data: parking } = useFetch(projectId ? `/parking?project_id=${projectId}&page_size=100` : null, [projectId]);
   const { items: chargeTypes } = useMasterOptions("charge-types");
   const { data: company } = useFetch("/settings/company");

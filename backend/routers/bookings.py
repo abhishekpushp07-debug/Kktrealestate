@@ -123,8 +123,16 @@ async def create_booking(body: BookingIn, request: Request, user: dict = Depends
     ensure_project_access(user, flat["project_id"])
     if flat["status"] not in ("Available", "Hold"):
         raise ApiError(409, f"Flat {flat['flat_number']} is {flat['status']}", "FLAT_NOT_AVAILABLE")
-    if flat["status"] == "Hold" and flat.get("status_changed_by") not in (user["id"], None) and "sales.hold.release" not in user["permissions"]:
-        raise ApiError(409, f"Flat {flat['flat_number']} is on Hold by another user", "FLAT_HELD_BY_OTHER")
+    if flat.get("bookable") is False:  # Phase N: Landowner / Investor / Bank / Reserve / Sample / Society are never bookable until re-categorised
+        raise ApiError(409, f"Flat {flat['flat_number']} is {flat.get('allocation_category_code', 'not saleable').title()} share — not saleable", "FLAT_NOT_SALEABLE")
+    if flat.get("display_override") and flat.get("display_state") in ("Show as Sold", "Hidden") and "inventory.real_status.view" not in user["permissions"]:
+        raise ApiError(409, f"Flat {flat['flat_number']} is Sold", "FLAT_NOT_AVAILABLE")  # masked units are indistinguishable from sold for non-privileged users
+    if flat["status"] == "Hold":
+        h = flat.get("hold") or {}
+        held_for_customer = h.get("for_customer_id") == body.customer_id
+        held_by_me = (h.get("for_user_id") or flat.get("status_changed_by")) in (user["id"], None)
+        if not held_for_customer and not held_by_me and "sales.hold.release" not in user["permissions"]:
+            raise ApiError(409, f"Flat {flat['flat_number']} is on Hold by another user", "FLAT_HELD_BY_OTHER")
     customer = await get_or_404(db.customers, body.customer_id, "Customer", {"company_id": user["company_id"], "is_active": True})
     if body.co_applicant_customer_ids and await db.customers.count_documents({"id": {"$in": body.co_applicant_customer_ids}}) != len(set(body.co_applicant_customer_ids)):
         raise ApiError(400, "Unknown co-applicant customer", "INVALID_CO_APPLICANT")
@@ -158,7 +166,7 @@ async def create_booking(body: BookingIn, request: Request, user: dict = Depends
         if free != len(set(body.parking_slot_ids)):
             raise ApiError(409, "One or more parking slots are not available", "PARKING_NOT_AVAILABLE")
     posted_at = now_iso()
-    doc = {**base_doc(user, user["company_id"]), "booking_number": await generate_number("booking", company, body.booking_date),
+    doc = {**base_doc(user, user["company_id"]), "from_hold": flat["status"] == "Hold", "booking_number": await generate_number("booking", company, body.booking_date),
            "project_id": flat["project_id"], "project_code": project["code"], "project_name": project["name"], "block_id": flat["block_id"], "block_code": block["code"], "block_name": block["name"], "flat_id": flat["id"],
            "customer_id": customer["id"], "customer_name": customer["full_name"], "customer_code": customer["customer_code"], "customer_phone": customer.get("phone"),
            "co_applicant_customer_ids": body.co_applicant_customer_ids, "booking_date": body.booking_date.isoformat(),
@@ -169,7 +177,7 @@ async def create_booking(body: BookingIn, request: Request, user: dict = Depends
            "plan_acceptance": {"accepted_on": body.booking_date.isoformat(), "accepted_by_user_id": user["id"], "mode": body.plan_acceptance_mode} if plan else None, "other_charges": charges, "parking_slot_ids": body.parking_slot_ids, "sales_user_id": body.sales_user_id or user["id"], "lead_id": body.lead_id,
            "broker_name": body.broker_name, "remarks": body.remarks, "status": "Active", "cancellation": None, "agreement_revisions": [], "summary": {}}
     async with unit_of_work() as uow:
-        upd = await guarded_update(db.flats, {"id": flat["id"], "status": {"$in": ["Available", "Hold"]}}, {"$set": {"status": "Booked", "booking_id": doc["id"], "status_changed_at": posted_at, "status_changed_by": user["id"], "updated_at": posted_at}, "$inc": {"version": 1}}, uow)
+        upd = await guarded_update(db.flats, {"id": flat["id"], "status": {"$in": ["Available", "Hold"]}}, {"$set": {"status": "Booked", "booking_id": doc["id"], "hold": None, "status_changed_at": posted_at, "status_changed_by": user["id"], "updated_at": posted_at}, "$inc": {"version": 1}}, uow)
         if not upd:
             raise ApiError(409, f"Flat {flat['flat_number']} was just taken by another booking", "FLAT_NOT_AVAILABLE")
         uow.on_rollback(lambda: db.flats.update_one({"id": flat["id"]}, {"$set": {"status": flat["status"], "booking_id": None}}))

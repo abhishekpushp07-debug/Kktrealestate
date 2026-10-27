@@ -68,6 +68,8 @@ export function FlatDrawer({ flatId, onClose, onChanged }) {
           <SheetHeader>
             <SheetTitle className="flex items-center gap-3 text-2xl font-extrabold text-ink-950"><span data-testid="flat-drawer-number">{flat.flat_number}</span><StatusChip status={flat.status} testId="flat-drawer-status" /><HistoryButton entityType="flat" entityId={flat.id} label={flat.flat_number} /></SheetTitle>
             <p className="text-sm text-txt-secondary">{flat.project_name} · {flat.block_name} · Floor {flat.floor} · Position {flat.position}</p>
+            {flat.inventory_state && <div className="mt-2 flex flex-wrap gap-2 text-xs" data-testid="flat-layers"><span className="rounded bg-ink-100 px-2 py-0.5">Real: <b>{flat.inventory_state}</b></span><span className={`rounded px-2 py-0.5 ${flat.masked ? "bg-amber-100 text-amber-900" : "bg-ink-100"}`} data-testid="flat-display-layer">Displayed: <b>{flat.display_state}</b>{flat.masked ? " · masked" : ""}</span>{flat.allocation_category_code && <span className="rounded bg-ink-100 px-2 py-0.5" data-testid="flat-category">{flat.allocation_category_code}{flat.bookable ? "" : " · not saleable"}</span>}</div>}
+            {flat.hold?.expires_at && <p className="mt-1 text-xs text-amber-700" data-testid="flat-hold-expiry">Hold expires {new Date(flat.hold.expires_at).toLocaleString()} ({Math.max(0, Math.round((new Date(flat.hold.expires_at) - Date.now()) / 36e5))} h left){flat.hold.for_customer_id ? " · reserved for a customer" : ""}</p>}
           </SheetHeader>
           <div className="mt-6 rounded-xl bg-ink-950 p-5 text-white">
             <p className="label-xs text-gold">Listed price</p>

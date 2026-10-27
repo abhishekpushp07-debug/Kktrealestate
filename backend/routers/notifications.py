@@ -103,3 +103,11 @@ async def mark_read(notification_id: str, user: dict = Depends(require("masters.
 async def mark_all_read(user: dict = Depends(require("masters.project.view"))):
     r = await db.notifications.update_many({"user_id": user["id"], "read": False}, {"$set": {"read": True, "read_at": now_iso()}})
     return {"ok": True, "updated": r.modified_count}
+
+
+async def notify_users(company_id: str, user_ids: list[str], title: str, body: str, kind: str, entity_type: str, entity_id: str, link: str | None = None):
+    ids = [u for u in dict.fromkeys(user_ids) if u]
+    if not ids:
+        return
+    now = now_iso()
+    await db.notifications.insert_many([{**base_doc(None, company_id), "user_id": u, "title": title, "body": body, "kind": kind, "entity_type": entity_type, "entity_id": entity_id, "link": link, "read": False, "created_at": now} for u in ids])

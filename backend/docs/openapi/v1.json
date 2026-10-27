@@ -78,6 +78,135 @@
     "title": "AddFloorsIn",
     "type": "object"
    },
+   "AllocationCategoryIn": {
+    "additionalProperties": false,
+    "properties": {
+     "bookable": {
+      "default": false,
+      "title": "Bookable",
+      "type": "boolean"
+     },
+     "code": {
+      "maxLength": 30,
+      "minLength": 1,
+      "title": "Code",
+      "type": "string"
+     },
+     "colour": {
+      "anyOf": [
+       {
+        "maxLength": 9,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Colour"
+     },
+     "name": {
+      "maxLength": 80,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+     },
+     "sort_order": {
+      "default": 0,
+      "title": "Sort Order",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "name",
+     "code"
+    ],
+    "title": "AllocationCategoryIn",
+    "type": "object"
+   },
+   "AllocationCategoryUpdate": {
+    "additionalProperties": false,
+    "properties": {
+     "bookable": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Bookable"
+     },
+     "code": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Code"
+     },
+     "colour": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Colour"
+     },
+     "is_active": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Is Active"
+     },
+     "name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     },
+     "sort_order": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Sort Order"
+     },
+     "version": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Version"
+     }
+    },
+    "title": "AllocationCategoryUpdate",
+    "type": "object"
+   },
    "AmenityIn": {
     "additionalProperties": false,
     "properties": {
@@ -2070,6 +2199,127 @@
      "type"
     ],
     "title": "BulkGenerateIn",
+    "type": "object"
+   },
+   "BulkIn": {
+    "properties": {
+     "action": {
+      "enum": [
+       "set_category",
+       "hold",
+       "extend_hold",
+       "release",
+       "block",
+       "unblock",
+       "set_display",
+       "clear_display"
+      ],
+      "title": "Action",
+      "type": "string"
+     },
+     "category_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Category Id"
+     },
+     "display_state": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Display State"
+     },
+     "expires_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expires At"
+     },
+     "flat_ids": {
+      "items": {
+       "type": "string"
+      },
+      "maxItems": 500,
+      "minItems": 1,
+      "title": "Flat Ids",
+      "type": "array"
+     },
+     "for_customer_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "For Customer Id"
+     },
+     "for_user_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "For User Id"
+     },
+     "note": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Note"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     },
+     "reason_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason Id"
+     }
+    },
+    "required": [
+     "flat_ids",
+     "action"
+    ],
+    "title": "BulkIn",
     "type": "object"
    },
    "BulkPriceIn": {
@@ -4818,6 +5068,12 @@
    },
    "FlatsOut": {
     "properties": {
+     "allocation_category_code": {
+      "title": "Allocation Category Code"
+     },
+     "allocation_category_id": {
+      "title": "Allocation Category Id"
+     },
      "areas_snapshot": {
       "title": "Areas Snapshot"
      },
@@ -4832,6 +5088,9 @@
      },
      "block_name": {
       "title": "Block Name"
+     },
+     "bookable": {
+      "title": "Bookable"
      },
      "booking_id": {
       "title": "Booking Id"
@@ -4863,6 +5122,18 @@
      "deleted_at": {
       "title": "Deleted At"
      },
+     "display_override": {
+      "title": "Display Override"
+     },
+     "display_reason": {
+      "title": "Display Reason"
+     },
+     "display_set_at": {
+      "title": "Display Set At"
+     },
+     "display_state": {
+      "title": "Display State"
+     },
      "facing": {
       "title": "Facing"
      },
@@ -4887,14 +5158,23 @@
      "floor_label": {
       "title": "Floor Label"
      },
+     "hold": {
+      "title": "Hold"
+     },
      "id": {
       "title": "Id"
+     },
+     "inventory_state": {
+      "title": "Inventory State"
      },
      "is_active": {
       "title": "Is Active"
      },
      "is_corner": {
       "title": "Is Corner"
+     },
+     "masked": {
+      "title": "Masked"
      },
      "meta": {
       "title": "Meta"
@@ -5293,6 +5573,96 @@
      }
     },
     "title": "HTTPValidationError",
+    "type": "object"
+   },
+   "HoldReasonIn": {
+    "additionalProperties": false,
+    "properties": {
+     "code": {
+      "maxLength": 30,
+      "minLength": 1,
+      "title": "Code",
+      "type": "string"
+     },
+     "name": {
+      "maxLength": 80,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+     },
+     "sort_order": {
+      "default": 0,
+      "title": "Sort Order",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "name",
+     "code"
+    ],
+    "title": "HoldReasonIn",
+    "type": "object"
+   },
+   "HoldReasonUpdate": {
+    "additionalProperties": false,
+    "properties": {
+     "code": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Code"
+     },
+     "is_active": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Is Active"
+     },
+     "name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     },
+     "sort_order": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Sort Order"
+     },
+     "version": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Version"
+     }
+    },
+    "title": "HoldReasonUpdate",
     "type": "object"
    },
    "InstallmentIn": {
@@ -14800,6 +15170,22 @@
        "title": "Block Id",
        "type": "string"
       }
+     },
+     {
+      "in": "query",
+      "name": "bookable_for",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Bookable For"
+      }
      }
     ],
     "responses": {
@@ -19953,6 +20339,70 @@
      },
      {
       "in": "query",
+      "name": "bookable_for",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Bookable For"
+      }
+     },
+     {
+      "in": "query",
+      "name": "category",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Category"
+      }
+     },
+     {
+      "in": "query",
+      "name": "display",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Display"
+      }
+     },
+     {
+      "in": "query",
+      "name": "hold_expiring",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "boolean"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Hold Expiring"
+      }
+     },
+     {
+      "in": "query",
       "name": "page",
       "required": false,
       "schema": {
@@ -20531,6 +20981,414 @@
     "summary": "Preview",
     "tags": [
      "imports"
+    ]
+   }
+  },
+  "/api/inventory/bulk": {
+   "post": {
+    "operationId": "bulk_api_inventory_bulk_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/BulkIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Bulk",
+    "tags": [
+     "inventory"
+    ]
+   }
+  },
+  "/api/inventory/definitions": {
+   "get": {
+    "operationId": "definitions_api_inventory_definitions_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Definitions",
+    "tags": [
+     "inventory"
+    ]
+   }
+  },
+  "/api/inventory/reports/by-category": {
+   "get": {
+    "operationId": "report_by_category_api_inventory_reports_by_category_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "project_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Project Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "block_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Block Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Report By Category",
+    "tags": [
+     "inventory"
+    ]
+   }
+  },
+  "/api/inventory/reports/hold-register": {
+   "get": {
+    "operationId": "report_holds_api_inventory_reports_hold_register_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "project_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Project Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "block_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Block Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Report Holds",
+    "tags": [
+     "inventory"
+    ]
+   }
+  },
+  "/api/inventory/reports/landowner-share": {
+   "get": {
+    "operationId": "report_landowner_api_inventory_reports_landowner_share_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "project_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Project Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "block_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Block Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Report Landowner",
+    "tags": [
+     "inventory"
+    ]
+   }
+  },
+  "/api/inventory/reports/masked": {
+   "get": {
+    "operationId": "report_masked_api_inventory_reports_masked_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "project_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Project Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "block_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Block Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Report Masked",
+    "tags": [
+     "inventory"
+    ]
+   }
+  },
+  "/api/inventory/summary": {
+   "get": {
+    "operationId": "summary_api_inventory_summary_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "project_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Project Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "block_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Block Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Summary",
+    "tags": [
+     "inventory"
     ]
    }
   },
@@ -21382,6 +22240,518 @@
     "summary": "Move Stage",
     "tags": [
      "leads"
+    ]
+   }
+  },
+  "/api/master/allocation-categories": {
+   "get": {
+    "operationId": "list_allocation_categories_api_master_allocation_categories_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "include_usage",
+      "required": false,
+      "schema": {
+       "default": false,
+       "title": "Include Usage",
+       "type": "boolean"
+      }
+     },
+     {
+      "in": "query",
+      "name": "page",
+      "required": false,
+      "schema": {
+       "default": 1,
+       "minimum": 1,
+       "title": "Page",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "page_size",
+      "required": false,
+      "schema": {
+       "default": 20,
+       "maximum": 200,
+       "minimum": 1,
+       "title": "Page Size",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "search",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Search"
+      }
+     },
+     {
+      "in": "query",
+      "name": "sort",
+      "required": false,
+      "schema": {
+       "default": "name",
+       "title": "Sort",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "include_inactive",
+      "required": false,
+      "schema": {
+       "default": false,
+       "title": "Include Inactive",
+       "type": "boolean"
+      }
+     },
+     {
+      "description": "Cursor mode: last seen id from next_cursor",
+      "in": "query",
+      "name": "cursor",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Cursor mode: last seen id from next_cursor",
+       "title": "Cursor"
+      }
+     },
+     {
+      "description": "Cursor mode page size (max 100). Walk with next_cursor; the cursor is an opaque keyset token on (sort, id) and must be reused with the same sort.",
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maximum": 100,
+         "minimum": 1,
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Cursor mode page size (max 100). Walk with next_cursor; the cursor is an opaque keyset token on (sort, id) and must be reused with the same sort.",
+       "title": "Limit"
+      }
+     },
+     {
+      "description": "csv for CSV export",
+      "in": "query",
+      "name": "format",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "csv for CSV export",
+       "title": "Format"
+      }
+     },
+     {
+      "description": "Compute total (expensive). Default: yes in page mode (legacy UI), no in cursor mode",
+      "in": "query",
+      "name": "with_total",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "boolean"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Compute total (expensive). Default: yes in page mode (legacy UI), no in cursor mode",
+       "title": "With Total"
+      }
+     },
+     {
+      "description": "Comma-separated projection to widen/narrow list items",
+      "in": "query",
+      "name": "fields",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 400,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Comma-separated projection to widen/narrow list items",
+       "title": "Fields"
+      }
+     },
+     {
+      "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
+      "in": "query",
+      "name": "include",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 200,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
+       "title": "Include"
+      }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Allocation Categories",
+    "tags": [
+     "master",
+     "master:allocation-categories"
+    ]
+   },
+   "post": {
+    "operationId": "create_allocation_categories_api_master_allocation_categories_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AllocationCategoryIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Create Allocation Categories",
+    "tags": [
+     "master",
+     "master:allocation-categories"
+    ]
+   }
+  },
+  "/api/master/allocation-categories/{item_id}": {
+   "get": {
+    "operationId": "get_allocation_categories_api_master_allocation_categories__item_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "item_id",
+      "required": true,
+      "schema": {
+       "title": "Item Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Get Allocation Categories",
+    "tags": [
+     "master",
+     "master:allocation-categories"
+    ]
+   },
+   "patch": {
+    "operationId": "update_allocation_categories_api_master_allocation_categories__item_id__patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "item_id",
+      "required": true,
+      "schema": {
+       "title": "Item Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AllocationCategoryUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Update Allocation Categories",
+    "tags": [
+     "master",
+     "master:allocation-categories"
+    ]
+   }
+  },
+  "/api/master/allocation-categories/{item_id}/activate": {
+   "post": {
+    "operationId": "activate_allocation_categories_api_master_allocation_categories__item_id__activate_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "item_id",
+      "required": true,
+      "schema": {
+       "title": "Item Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Activate Allocation Categories",
+    "tags": [
+     "master",
+     "master:allocation-categories"
+    ]
+   }
+  },
+  "/api/master/allocation-categories/{item_id}/deactivate": {
+   "post": {
+    "operationId": "deactivate_allocation_categories_api_master_allocation_categories__item_id__deactivate_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "item_id",
+      "required": true,
+      "schema": {
+       "title": "Item Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Deactivate Allocation Categories",
+    "tags": [
+     "master",
+     "master:allocation-categories"
+    ]
+   }
+  },
+  "/api/master/allocation-categories/{item_id}/restore": {
+   "post": {
+    "operationId": "restore_allocation_categories_api_master_allocation_categories__item_id__restore_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "item_id",
+      "required": true,
+      "schema": {
+       "title": "Item Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Restore Allocation Categories",
+    "tags": [
+     "master",
+     "master:allocation-categories"
     ]
    }
   },
@@ -26035,6 +27405,518 @@
     "tags": [
      "master",
      "master:floor-plan-templates"
+    ]
+   }
+  },
+  "/api/master/hold-reasons": {
+   "get": {
+    "operationId": "list_hold_reasons_api_master_hold_reasons_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "include_usage",
+      "required": false,
+      "schema": {
+       "default": false,
+       "title": "Include Usage",
+       "type": "boolean"
+      }
+     },
+     {
+      "in": "query",
+      "name": "page",
+      "required": false,
+      "schema": {
+       "default": 1,
+       "minimum": 1,
+       "title": "Page",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "page_size",
+      "required": false,
+      "schema": {
+       "default": 20,
+       "maximum": 200,
+       "minimum": 1,
+       "title": "Page Size",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "search",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Search"
+      }
+     },
+     {
+      "in": "query",
+      "name": "sort",
+      "required": false,
+      "schema": {
+       "default": "name",
+       "title": "Sort",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "include_inactive",
+      "required": false,
+      "schema": {
+       "default": false,
+       "title": "Include Inactive",
+       "type": "boolean"
+      }
+     },
+     {
+      "description": "Cursor mode: last seen id from next_cursor",
+      "in": "query",
+      "name": "cursor",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Cursor mode: last seen id from next_cursor",
+       "title": "Cursor"
+      }
+     },
+     {
+      "description": "Cursor mode page size (max 100). Walk with next_cursor; the cursor is an opaque keyset token on (sort, id) and must be reused with the same sort.",
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maximum": 100,
+         "minimum": 1,
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Cursor mode page size (max 100). Walk with next_cursor; the cursor is an opaque keyset token on (sort, id) and must be reused with the same sort.",
+       "title": "Limit"
+      }
+     },
+     {
+      "description": "csv for CSV export",
+      "in": "query",
+      "name": "format",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "csv for CSV export",
+       "title": "Format"
+      }
+     },
+     {
+      "description": "Compute total (expensive). Default: yes in page mode (legacy UI), no in cursor mode",
+      "in": "query",
+      "name": "with_total",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "boolean"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Compute total (expensive). Default: yes in page mode (legacy UI), no in cursor mode",
+       "title": "With Total"
+      }
+     },
+     {
+      "description": "Comma-separated projection to widen/narrow list items",
+      "in": "query",
+      "name": "fields",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 400,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Comma-separated projection to widen/narrow list items",
+       "title": "Fields"
+      }
+     },
+     {
+      "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
+      "in": "query",
+      "name": "include",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 200,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Comma-separated related docs to embed (see PRD 'API packeting')",
+       "title": "Include"
+      }
+     },
+     {
+      "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+      "in": "query",
+      "name": "exact",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Phase J3: force an exact count above 10,000 rows (default: estimated)",
+       "title": "Exact",
+       "type": "boolean"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Hold Reasons",
+    "tags": [
+     "master",
+     "master:hold-reasons"
+    ]
+   },
+   "post": {
+    "operationId": "create_hold_reasons_api_master_hold_reasons_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/HoldReasonIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Create Hold Reasons",
+    "tags": [
+     "master",
+     "master:hold-reasons"
+    ]
+   }
+  },
+  "/api/master/hold-reasons/{item_id}": {
+   "get": {
+    "operationId": "get_hold_reasons_api_master_hold_reasons__item_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "item_id",
+      "required": true,
+      "schema": {
+       "title": "Item Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Get Hold Reasons",
+    "tags": [
+     "master",
+     "master:hold-reasons"
+    ]
+   },
+   "patch": {
+    "operationId": "update_hold_reasons_api_master_hold_reasons__item_id__patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "item_id",
+      "required": true,
+      "schema": {
+       "title": "Item Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/HoldReasonUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Update Hold Reasons",
+    "tags": [
+     "master",
+     "master:hold-reasons"
+    ]
+   }
+  },
+  "/api/master/hold-reasons/{item_id}/activate": {
+   "post": {
+    "operationId": "activate_hold_reasons_api_master_hold_reasons__item_id__activate_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "item_id",
+      "required": true,
+      "schema": {
+       "title": "Item Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Activate Hold Reasons",
+    "tags": [
+     "master",
+     "master:hold-reasons"
+    ]
+   }
+  },
+  "/api/master/hold-reasons/{item_id}/deactivate": {
+   "post": {
+    "operationId": "deactivate_hold_reasons_api_master_hold_reasons__item_id__deactivate_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "item_id",
+      "required": true,
+      "schema": {
+       "title": "Item Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Deactivate Hold Reasons",
+    "tags": [
+     "master",
+     "master:hold-reasons"
+    ]
+   }
+  },
+  "/api/master/hold-reasons/{item_id}/restore": {
+   "post": {
+    "operationId": "restore_hold_reasons_api_master_hold_reasons__item_id__restore_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "item_id",
+      "required": true,
+      "schema": {
+       "title": "Item Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Restore Hold Reasons",
+    "tags": [
+     "master",
+     "master:hold-reasons"
     ]
    }
   },

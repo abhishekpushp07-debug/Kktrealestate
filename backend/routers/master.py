@@ -296,6 +296,30 @@ async def _usage_none(doc_id):
     return 0, ""
 
 
+async def _usage_allocation_category(doc_id):
+    n = await db.flats.count_documents({"allocation_category_id": doc_id, "is_active": True})
+    return n, f"{n} flat(s)" if n else ""
+
+
+async def _usage_hold_reason(doc_id):
+    n = await db.flats.count_documents({"status": "Hold", "hold.reason_id": doc_id})
+    return n, f"{n} active hold(s)" if n else ""
+
+
+class AllocationCategoryIn(StrictModel):
+    name: str = Field(min_length=1, max_length=80)
+    code: str = Field(min_length=1, max_length=30)
+    bookable: bool = False
+    colour: str | None = Field(default=None, max_length=9)
+    sort_order: int = 0
+
+
+class HoldReasonIn(StrictModel):
+    name: str = Field(min_length=1, max_length=80)
+    code: str = Field(min_length=1, max_length=30)
+    sort_order: int = 0
+
+
 async def _usage_floor_plan(doc_id):
     return await db.blocks.count_documents({"is_active": True, "floor_plans.floor_plan_template_id": doc_id}), "block(s)"
 
@@ -330,6 +354,8 @@ MASTERS = {
     "payment-modes": ("payment_modes", PaymentModeIn, ["name", "code"], _usage_none, "Payment Mode"),
     "bank-accounts": ("bank_accounts", BankAccountIn, ["bank_name", "account_name", "ifsc"], _usage_none, "Bank Account"),
     "document-types": ("document_types", DocumentTypeIn, ["name", "code"], _usage_none, "Document Type"),
+    "allocation-categories": ("allocation_categories", AllocationCategoryIn, ["name", "code"], _usage_allocation_category, "Allocation Category"),
+    "hold-reasons": ("hold_reasons", HoldReasonIn, ["name", "code"], _usage_hold_reason, "Hold Reason"),
 }
 
 
@@ -374,7 +400,7 @@ def _prepare_bank_in(data: dict) -> dict:
     return data
 
 
-MASTER_FEATURE = {"floor-plan-templates": "floor_plan", "plc-types": "plc", "construction-stages": "construction_stage", "payment-plans": "payment_plan", "charge-types": "charge_type", "bank-accounts": "bank_account",
+MASTER_FEATURE = {"allocation-categories": "allocation_category", "hold-reasons": "hold_reason", "floor-plan-templates": "floor_plan", "plc-types": "plc", "construction-stages": "construction_stage", "payment-plans": "payment_plan", "charge-types": "charge_type", "bank-accounts": "bank_account",
                   "spec-categories": "specification", "spec-items": "specification", "room-types": "flat_type", "area-types": "flat_type", "flat-types": "flat_type", "block-types": "block_type", "amenities": "amenity", "payment-modes": "payment_mode", "document-types": "document_type"}
 
 

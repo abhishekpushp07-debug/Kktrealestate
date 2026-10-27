@@ -353,16 +353,22 @@ async def bulk_status(block_id: str, body: BulkStatusIn, request: Request, user:
 
 
 @router.get("/{block_id}/grid")
-async def block_grid(block_id: str, user: dict = Depends(require("masters.project.view"))):
+async def block_grid(block_id: str, bookable_for: str | None = None, user: dict = Depends(require("masters.project.view"))):
     block = await _load_block(block_id, user)
-    flats = await db.flats.find({"block_id": block_id, "is_active": True}, {"_id": 0, "id": 1, "flat_number": 1, "floor": 1, "floor_label": 1, "position": 1, "status": 1, "price_paise": 1, "flat_type_code": 1, "flat_type_id": 1, "super_builtup_sqft": 1, "facing": 1, "is_corner": 1, "version": 1}).sort([("floor", -1), ("position", 1)]).to_list(None)
+    from services import inventory as _inv
+    _q = {"block_id": block_id, "is_active": True}
+    if bookable_for is not None:  # booking wizard: server-side saleability filter (saleable + Available / held for this customer or RM)
+        _q.update(_inv.bookable_filter(bookable_for or None, user))
+    flats = await db.flats.find(_q, {"_id": 0, "id": 1, "flat_number": 1, "floor": 1, "floor_label": 1, "position": 1, "status": 1, "price_paise": 1, "flat_type_code": 1, "flat_type_id": 1, "super_builtup_sqft": 1, "facing": 1, "is_corner": 1, "version": 1, "display_state": 1, "display_override": 1, "allocation_category_code": 1, "bookable": 1, "hold": 1, "block": 1}).sort([("floor", -1), ("position", 1)]).to_list(None)
+    from services import inventory as inv
+    flats = inv.shape_list(flats, user)  # Phase N: display layer for non-privileged viewers (server-side)
     by_floor: dict[int, list] = {}
     for f in flats:
         with_price(f)
         by_floor.setdefault(f["floor"], []).append(f)
     counts = {s: 0 for s in STATUSES}
     for f in flats:
-        counts[f["status"]] += 1
+        counts[f["status"]] = counts.get(f["status"], 0) + 1
     refuge, podium = set(block.get("refuge_floors") or []), set(block.get("podium_floors") or [])
     labels = floor_labels(block)
     prices = [f["price_paise"] / 100 for f in flats if f.get("price_paise")]

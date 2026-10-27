@@ -21,6 +21,8 @@
   ],
   "booking.create": [
    "finance.demand.create",
+   "inventory.hold.create",
+   "inventory.hold.release",
    "sales.booking.create",
    "sales.booking.edit"
   ],
@@ -74,6 +76,22 @@
    "sales.customer.edit"
   ],
   "flat.status": [
+   "inventory.block.set",
+   "inventory.category.set",
+   "inventory.display.set",
+   "inventory.hold.create",
+   "inventory.hold.release",
+   "inventory.real_status.view",
+   "masters.allocation_category.create",
+   "masters.allocation_category.delete",
+   "masters.allocation_category.edit",
+   "masters.allocation_category.view",
+   "masters.hold_reason.create",
+   "masters.hold_reason.delete",
+   "masters.hold_reason.edit",
+   "masters.hold_reason.view",
+   "reports.inventory_control.export",
+   "reports.inventory_control.view",
    "sales.hold.create",
    "sales.hold.release"
   ],
@@ -92,6 +110,7 @@
    "sales.lead.edit"
   ],
   "master.read": [
+   "masters.allocation_category.view",
    "masters.amenity.view",
    "masters.bank_account.view",
    "masters.block_type.view",
@@ -100,6 +119,7 @@
    "masters.document_type.view",
    "masters.flat_type.view",
    "masters.floor_plan.view",
+   "masters.hold_reason.view",
    "masters.payment_mode.view",
    "masters.payment_plan.view",
    "masters.plc.view",
@@ -1331,6 +1351,77 @@
    "fn": "preview",
    "legacy": [
     "masters.flat.create"
+   ]
+  },
+  "inventory:GET /definitions": {
+   "codes": [
+    "masters.project.view"
+   ],
+   "fn": "definitions",
+   "legacy": [
+    "masters.project.view"
+   ]
+  },
+  "inventory:GET /reports/by-category": {
+   "codes": [
+    "reports.inventory_control.view"
+   ],
+   "fn": "report_by_category",
+   "legacy": [
+    "reports.inventory_control.view"
+   ]
+  },
+  "inventory:GET /reports/hold-register": {
+   "codes": [
+    "reports.inventory_control.view"
+   ],
+   "fn": "report_holds",
+   "legacy": [
+    "reports.inventory_control.view"
+   ]
+  },
+  "inventory:GET /reports/landowner-share": {
+   "codes": [
+    "reports.inventory_control.view"
+   ],
+   "fn": "report_landowner",
+   "legacy": [
+    "reports.inventory_control.view"
+   ]
+  },
+  "inventory:GET /reports/masked": {
+   "codes": [
+    "inventory.real_status.view"
+   ],
+   "fn": "report_masked",
+   "legacy": [
+    "inventory.real_status.view"
+   ]
+  },
+  "inventory:GET /summary": {
+   "codes": [
+    "masters.project.view"
+   ],
+   "fn": "summary",
+   "legacy": [
+    "masters.project.view"
+   ]
+  },
+  "inventory:POST /bulk": {
+   "codes": [
+    "inventory.category.set",
+    "inventory.hold.create",
+    "inventory.hold.release",
+    "inventory.block.set",
+    "inventory.display.set"
+   ],
+   "fn": "bulk",
+   "legacy": [
+    "inventory.category.set",
+    "inventory.hold.create",
+    "inventory.hold.release",
+    "inventory.block.set",
+    "inventory.display.set"
    ]
   },
   "leads:GET ": {

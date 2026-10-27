@@ -178,6 +178,24 @@ def _trim_memory():
         pass
 
 
+async def _inventory_masters():
+    """Phase N: allocation categories + hold reasons seeded per company; flats backfilled to Builder saleable."""
+    from services import inventory as inv
+    async for c in db.companies.find({}, {"_id": 0, "id": 1}):
+        await inv.ensure_masters(c["id"])
+        await inv.backfill(c["id"])
+
+
+async def _hold_expiry_loop():
+    from services import inventory as inv
+    while True:
+        try:
+            await inv.expire_holds()
+        except Exception:  # noqa: BLE001
+            logger.exception("[hold-expiry] sweep failed")
+        await asyncio.sleep(900)
+
+
 async def startup_tasks():
     """Heavy, idempotent work moved out of lifespan: runs once per deploy on the lease holder, never blocks serving."""
     from services.leader import try_acquire
@@ -198,7 +216,7 @@ async def startup_tasks():
     steps = [("seed_if_empty", seed_if_empty), ("seed_phase15", seed_phase15), ("seed_phase2", seed_phase2), ("seed_phase3", seed_phase3), ("system_roles", _system_roles),
              ("seed_marketing_user", seed_marketing_user), ("owner_bootstrap", _owner_bootstrap), ("seed_phase5", seed_phase5), ("migrate_phase7", migrate_phase7), ("seed_phase7", seed_phase7),
              ("backfill_demand_installments", backfill_demand_installments), ("migrate_phase_g", _migrate_phase_g), ("sweep_notifications", sweep_notifications), ("integrity_report", _integrity),
-             ("seed_phase9", seed_phase9), ("counters", _counters_once), ("reconcile", _reconcile), ("startup_phase11", startup_phase11), ("schema_validators", apply_validators), ("price_paise_backfill", backfill_price_paise)]
+             ("seed_phase9", seed_phase9), ("inventory_masters", _inventory_masters), ("counters", _counters_once), ("reconcile", _reconcile), ("startup_phase11", startup_phase11), ("schema_validators", apply_validators), ("price_paise_backfill", backfill_price_paise)]
     if await db.settings.find_one({"key": "story_mode", "value": True}):  # demo-data seeds are replaced by the Phase H story (admin/reseed story=true)
         steps = [s for s in steps if s[0] not in ("seed_phase2", "seed_phase5", "seed_phase9")]
 
@@ -252,6 +270,7 @@ async def lifespan(app: FastAPI):
         if os.environ.get("KKT_TRACEMALLOC"):
             _spawn(_tracemalloc_loop())
         _spawn(_memory_loop())
+        _spawn(_hold_expiry_loop())  # Phase N: HOLD_EXPIRY_SWEEP every 15 min
         try:
             await asyncio.wait_for(detect_transaction_support(), timeout=2)
         except Exception:
@@ -438,9 +457,10 @@ from routers import ops as _ops
 from routers import reports_i as _reports_i
 from routers import exports as _exports
 from routers import files as _files
+from routers import inventory as _inventory
 from routers import propagation
 from routers import access as _access
-for r in (_ops.router, _access.router, _exports.router, _files.router, auth.router, users.router, roles.router, master.router, projects.router, rate_cards.router, blocks.router, masters_plus.router, flats.router, parking.router,
+for r in (_ops.router, _access.router, _exports.router, _files.router, _inventory.router, auth.router, users.router, roles.router, master.router, projects.router, rate_cards.router, blocks.router, masters_plus.router, flats.router, parking.router,
           settings.router, audit.router, dashboard.router, search.router, imports.router,
           customers.router, leads.router, documents.router, bookings.router, milestones.router, payments.router, roznamcha.router, admin.router, cms.router, public.router, reports.router, notifications.router, pdfs.router, dashboard_widgets.router, portal.router, portal.mgmt, support.router, construction.router, visits.pub, visits.router,
           catalogues.router, project_setup.router, crm.router, bootstrap.router, home.router, propagation.router, _reports_i.router):
