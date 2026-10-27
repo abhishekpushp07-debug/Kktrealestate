@@ -1596,6 +1596,15 @@
     "admin.system_health.view"
    ]
   },
+  "ops:POST /alerts/{alert_id}/ack": {
+   "codes": [
+    "admin.system_health.view"
+   ],
+   "fn": "ack_alert",
+   "legacy": [
+    "admin.system_health.view"
+   ]
+  },
   "parking:GET ": {
    "codes": [
     "masters.flat.view"

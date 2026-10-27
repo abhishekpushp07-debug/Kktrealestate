@@ -267,6 +267,14 @@ def csv_safe(v):
     return v
 
 
+def csv_num(v):
+    """₹ cells: whole rupees as plain integers, two decimals only when paise exist; numeric (no separators) so spreadsheets can sum."""
+    if isinstance(v, float) and v == v and v not in (float("inf"), float("-inf")):
+        r = round(v, 2)
+        return int(r) if r == int(r) else f"{r:.2f}"
+    return v
+
+
 def to_csv(items: list[dict], fields: list[str] | None = None) -> str:
     import csv
     import io
@@ -278,5 +286,5 @@ def to_csv(items: list[dict], fields: list[str] | None = None) -> str:
     w = csv.DictWriter(buf, fieldnames=fields, extrasaction="ignore")
     w.writeheader()
     for it in items:
-        w.writerow({k: csv_safe(json.dumps(v) if isinstance(v, (dict, list)) else v) for k, v in it.items() if k in fields})
+        w.writerow({k: csv_safe(json.dumps(v) if isinstance(v, (dict, list)) else csv_num(v)) for k, v in it.items() if k in fields})
     return buf.getvalue()

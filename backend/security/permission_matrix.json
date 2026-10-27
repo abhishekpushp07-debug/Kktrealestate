@@ -898,6 +898,9 @@
  "POST /api/admin/access/roles/{role_id}/clone": [
   "admin.role.create"
  ],
+ "POST /api/admin/alerts/{alert_id}/ack": [
+  "admin.system_health.view"
+ ],
  "POST /api/admin/audit/archive": [
   "admin.audit.archive"
  ],

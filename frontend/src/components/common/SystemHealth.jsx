@@ -19,6 +19,8 @@ export function SystemHealthCard() {
     return () => { alive = false; clearTimeout(t); };
   }, [tick, user?.role_name]);
   if (user?.role_name !== "Super Admin") return null;
+  const isSuper = true;
+  const ack = async (id) => { try { await api.post(`/admin/alerts/${id}/ack`, { note: "Acknowledged from System Health" }); setTick((x) => x + 1); } catch (e) { setErr(e?.response?.data?.error?.message || "Could not acknowledge"); } };
   const groups = Object.entries(d?.requests?.by_group || {});
   const jobs = Object.entries(d?.jobs || {});
   return (
@@ -62,7 +64,7 @@ export function SystemHealthCard() {
             </div>
             {d.alerts && (
               <div data-testid="ops-alerts"><p className="label">Alerts {d.alerts.firing?.length ? <span className="ml-1 rounded-full bg-brick/10 px-2 py-0.5 text-xs font-semibold text-brick">{d.alerts.firing.length} firing</span> : <span className="ml-1 rounded-full bg-sage/10 px-2 py-0.5 text-xs font-semibold text-sage">all clear</span>}</p>
-                <ul className="mt-2 space-y-1 text-sm">{(d.alerts.firing || []).map((a) => <li key={a.id} className="flex justify-between gap-2" data-testid={`ops-alert-${a.id}`}><span>{a.message}</span><span className="text-xs uppercase text-txt-muted">{a.severity}</span></li>)}</ul>
+                <ul className="mt-2 space-y-1 text-sm">{(d.alerts.firing || []).map((a) => <li key={a.id} className="flex justify-between gap-2" data-testid={`ops-alert-${a.id}`}><span>{a.message}</span><span className="text-xs uppercase text-txt-muted">{a.severity}</span>{isSuper && <button type="button" className="text-xs text-gold underline" data-testid={`ops-alert-ack-${a.id}`} onClick={() => ack(a.id)}>Acknowledge</button>}</li>)}</ul>
                 <p className="mt-2 text-xs text-txt-muted">Rules: backend/ops/alerts.yaml · evaluated {d.alerts.evaluated_at ? new Date(d.alerts.evaluated_at).toLocaleTimeString() : "not yet"}{d.load_shed ? ` · shed ${d.load_shed.shed_total} · in-flight ${d.load_shed.inflight}/${d.load_shed.cap}` : ""}</p>
               </div>
             )}

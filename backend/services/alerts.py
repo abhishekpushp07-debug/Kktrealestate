@@ -39,7 +39,12 @@ async def build_snapshot() -> dict:
     since = (datetime.now(timezone.utc) - timedelta(minutes=15)).isoformat()
     day = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
     jh = await job_runs.health()
-    failed = await db.job_runs.distinct("job", {"status": {"$in": ["FAILED", "ABANDONED"]}, "started_at": {"$gte": day}})
+    failed = []  # self-clearing: a FAILED/ABANDONED run only fires until the next OK run of that job
+    for j in await db.job_runs.distinct("job", {"status": {"$in": ["FAILED", "ABANDONED"]}, "started_at": {"$gte": day}}):
+        bad = await db.job_runs.find_one({"job": j, "status": {"$in": ["FAILED", "ABANDONED"]}}, {"_id": 0, "finished_at": 1, "started_at": 1}, sort=[("started_at", -1)])
+        ok = await db.job_runs.find_one({"job": j, "status": "OK", "started_at": {"$gt": bad["started_at"]}}, {"_id": 0, "id": 1})
+        if not ok:
+            failed.append(j)
     integ = await db.settings.find_one({"key": "integrity_last_report"}, {"_id": 0, "value": 1})
     lb = await db.settings.find_one({"key": "last_backup"}, {"_id": 0, "value": 1})
     age_h = None
@@ -55,8 +60,32 @@ async def build_snapshot() -> dict:
             "integrity_findings": len((integ or {}).get("value", {}).get("findings", []) or []), "backup_age_h": age_h, "db_ok": db_ok}
 
 
+def fingerprint(rule: dict, snap: dict) -> str:
+    """Values the rule looked at — an acknowledgement is valid while these are unchanged (re-fires when e.g. another job fails)."""
+    import json
+    import re
+    keys = sorted(set(re.findall(r"snap\['(\w+)'\]", rule.get("condition", ""))))
+    return json.dumps({k: snap.get(k) for k in keys}, sort_keys=True, default=str)
+
+
+async def acknowledge(alert_id: str, user: dict, note: str | None) -> dict:
+    rules = {r["id"]: r for r in load_rules()}
+    if alert_id not in rules:
+        raise ValueError(alert_id)
+    snap = await build_snapshot()
+    ack = {"at": datetime.now(timezone.utc).isoformat(), "by": user["id"], "by_name": user.get("full_name") or user.get("email"), "note": note, "fingerprint": fingerprint(rules[alert_id], snap)}
+    await db.settings.update_one({"key": "alerts_acked"}, {"$set": {f"value.{alert_id}": ack}}, upsert=True)
+    LAST["firing"] = [f for f in LAST["firing"] if f["id"] != alert_id]
+    return ack
+
+
 async def evaluate_and_notify() -> list[dict]:
-    firing = evaluate(load_rules(), await build_snapshot())
+    rules = load_rules()
+    snap = await build_snapshot()
+    firing = evaluate(rules, snap)
+    acked = ((await db.settings.find_one({"key": "alerts_acked"}, {"_id": 0, "value": 1})) or {}).get("value") or {}
+    by_id = {r["id"]: r for r in rules}
+    firing = [f for f in firing if not (f["id"] in acked and acked[f["id"]].get("fingerprint") == fingerprint(by_id[f["id"]], snap))]
     LAST.update({"evaluated_at": datetime.now(timezone.utc).isoformat(), "firing": firing})
     if firing:
         today = datetime.now(timezone.utc).date().isoformat()

@@ -11586,6 +11586,64 @@
     ]
    }
   },
+  "/api/admin/alerts/{alert_id}/ack": {
+   "post": {
+    "description": "Super Admin clears a resolved alert; it stays cleared while the values the rule looked at are unchanged, and re-fires when they change.",
+    "operationId": "ack_alert_api_admin_alerts__alert_id__ack_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "alert_id",
+      "required": true,
+      "schema": {
+       "title": "Alert Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "additionalProperties": true,
+        "title": "Body",
+        "type": "object"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Ack Alert",
+    "tags": [
+     "admin"
+    ]
+   }
+  },
   "/api/admin/audit/archive": {
    "post": {
     "operationId": "run_audit_archive_api_admin_audit_archive_post",

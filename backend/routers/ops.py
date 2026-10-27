@@ -3,11 +3,12 @@ from services import clock
 import os
 import time
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 
 from db import POOL, db
 from dbtiming import POOL_STATS
 from deps import require
+from utils import ApiError, client_ip, write_audit
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -60,3 +61,17 @@ async def _backup_status() -> dict:
     v = (lb or {}).get("value")
     age_h = round((datetime.now(timezone.utc) - datetime.fromisoformat(v["created_at"])).total_seconds() / 3600, 1) if v else None
     return {"last_backup": v, "age_h": age_h, "stale": age_h is None or age_h > 26, "last_restore_drill": (rd or {}).get("value"), "note": "App-level mongodump export; managed Atlas snapshots are separate"}
+
+
+@router.post("/alerts/{alert_id}/ack")
+async def ack_alert(alert_id: str, body: dict, request: Request, user: dict = Depends(require("admin.system_health.view"))):
+    """Super Admin clears a resolved alert; it stays cleared while the values the rule looked at are unchanged, and re-fires when they change."""
+    if "Super Admin" not in (user.get("role_names") or user.get("roles") or []):
+        raise ApiError(403, "Only Super Admin can acknowledge alerts", "PERMISSION_DENIED")
+    from services import alerts
+    try:
+        ack = await alerts.acknowledge(alert_id, user, (body or {}).get("note"))
+    except ValueError:
+        raise ApiError(404, f"Unknown alert '{alert_id}'", "NOT_FOUND")
+    await write_audit(user, "alert.acknowledge", "alert", alert_id, after={"note": ack["note"], "fingerprint": ack["fingerprint"]}, ip=client_ip(request))
+    return {"ok": True, "alert_id": alert_id, "ack": ack}
