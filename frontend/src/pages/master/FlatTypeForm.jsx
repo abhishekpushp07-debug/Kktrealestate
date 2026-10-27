@@ -1,4 +1,3 @@
-/* eslint-disable react/no-array-index-key -- positional editable rows without ids; data-derived keys would remount inputs on edit */
 import { useMemo, useState } from "react";
 import { Plus, Trash2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
@@ -9,6 +8,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Combobox } from "@/components/common/Combobox";
 import { Field } from "@/components/v2";
 import { cn } from "@/lib/utils";
+import { useRowKeys } from "@/hooks/useRowKeys";
 
 const FACINGS = ["N", "S", "E", "W", "NE", "NW", "SE", "SW"];
 const newRoom = () => ({ room_type_id: null, label: "", length_ft: "", width_ft: "", area_sqft: "" });
@@ -17,6 +17,8 @@ const Section = ({ title, aside, children, testId }) => <section className="roun
 
 export function FlatTypeForm({ item, open, onOpenChange, onSaved }) {
   const [form, setForm] = useState(item ? { ...item, rooms: item.rooms.map((r) => ({ ...r })), areas: item.areas.map((a) => ({ ...a })), spec_item_ids: item.spec_item_ids || [] } : { name: "", code: "", bhk: 2, facing: null, description: "", rooms: [newRoom()], areas: [newArea()], base_rate_per_sqft: "", base_price: "", spec_item_ids: [] });
+  const roomRows = useRowKeys(form.rooms);
+  const areaRows = useRowKeys(form.areas);
   const [busy, setBusy] = useState(false);
   const { options: roomOptions, items: roomTypes } = useMasterOptions("room-types");
   const { options: areaOptions, items: areaTypes } = useMasterOptions("area-types");
@@ -73,7 +75,7 @@ export function FlatTypeForm({ item, open, onOpenChange, onSaved }) {
           <Section title={`Rooms · ${form.rooms.length}`} testId="ft-rooms-section" aside={<span className="text-sm text-txt-secondary">Total <b className="font-display text-base text-ink-950 tabular-nums" data-testid="ft-rooms-total">{num(roomTotal)}</b> sq ft</span>}>
             <div className="mb-2 hidden grid-cols-[1.3fr_1.2fr_72px_72px_88px_32px] gap-2 text-[11px] font-semibold uppercase tracking-wider text-txt-muted md:grid"><span>Room type</span><span>Label</span><span>L (ft)</span><span>W (ft)</span><span className="text-right">Sq ft</span><span /></div>
             <div className="space-y-2">
-              {form.rooms.map((r, i) => <div key={i} className="grid grid-cols-2 items-center gap-2 rounded-xl bg-white p-2 md:grid-cols-[1.3fr_1.2fr_72px_72px_88px_32px] md:bg-transparent md:p-0" data-testid={`ft-room-row-${i}`}>
+              {roomRows.map(({ k, row: r }, i) => <div key={k} className="grid grid-cols-2 items-center gap-2 rounded-xl bg-white p-2 md:grid-cols-[1.3fr_1.2fr_72px_72px_88px_32px] md:bg-transparent md:p-0" data-testid={`ft-room-row-${i}`}>
                 <Combobox options={roomOptions} value={r.room_type_id} onChange={(v) => setRoom(i, "room_type_id", v)} placeholder="Type" testId={`ft-room-${i}-type`} />
                 <input className={inp} value={r.label} onChange={(e) => setRoom(i, "label", e.target.value)} placeholder="Master Bedroom" required data-testid={`ft-room-${i}-label`} />
                 <input className={inp} type="number" step="0.1" min={0} value={r.length_ft} onChange={(e) => setRoom(i, "length_ft", e.target.value)} placeholder="L" required data-testid={`ft-room-${i}-length`} />
@@ -86,7 +88,7 @@ export function FlatTypeForm({ item, open, onOpenChange, onSaved }) {
           </Section>
           <Section title={`Areas · ${form.areas.length}`} testId="ft-areas-section" aside={sbu ? <span className="text-sm text-txt-secondary">Super built-up <b className="font-display text-base text-ink-950 tabular-nums">{num(sbu)}</b> sq ft</span> : null}>
             <div className="space-y-2">
-              {form.areas.map((a, i) => <div key={i} className="grid grid-cols-[1fr_140px_32px] items-center gap-2" data-testid={`ft-area-row-${i}`}>
+              {areaRows.map(({ k, row: a }, i) => <div key={k} className="grid grid-cols-[1fr_140px_32px] items-center gap-2" data-testid={`ft-area-row-${i}`}>
                 <Combobox options={areaOptions} value={a.area_type_id} onChange={(v) => setArea(i, "area_type_id", v)} placeholder="Area type" testId={`ft-area-${i}-type`} />
                 <input className={cn(inp, "text-right tabular-nums")} type="number" step="0.01" min={0} value={a.value_sqft} onChange={(e) => setArea(i, "value_sqft", e.target.value)} placeholder="sq ft" required data-testid={`ft-area-${i}-value`} />
                 <button type="button" onClick={() => set("areas", form.areas.filter((_, idx) => idx !== i))} disabled={form.areas.length === 1} className="grid h-10 w-8 place-items-center text-txt-muted hover:text-brick disabled:opacity-30" aria-label="Remove area" data-testid={`ft-area-${i}-remove`}><Trash2 className="h-4 w-4" /></button>

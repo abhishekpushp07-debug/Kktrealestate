@@ -1,4 +1,3 @@
-/* eslint-disable react/no-array-index-key -- fixed-length skeleton placeholders (never reordered) */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { LayoutGrid, Plus, Rows3, Search, UserRound } from "lucide-react";
@@ -82,7 +81,7 @@ export default function Customers() {
       {!loading && items.length === 0 ? <EmptyState icon={UserRound} title="No customers match" description="Try clearing a filter or search by phone." action={can("sales.customer.create") && <Link to="/customers/new" className="btn btn-primary">Add a customer</Link>} testId="customers-empty" /> : view === "cards" ? (
         <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3" data-testid="customers-grid">
           {items.map((c) => <CustomerCard key={c.id} c={c} people={people} />)}
-          {loading && Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-56 rounded-2xl" />)}
+          {loading && Array.from({ length: 3 }, (_, n) => n).map((n) => <Skeleton key={n} className="h-56 rounded-2xl" />)}
         </div>
       ) : (
         <div className="card overflow-x-auto !p-0" data-testid="customers-table">

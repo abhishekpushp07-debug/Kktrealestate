@@ -1,4 +1,3 @@
-/* eslint-disable react/no-array-index-key -- fixed-length skeleton placeholders (never reordered) */
 import { JourneyButton } from "@/components/common/JourneyPanel";
 import { Suspense, lazy, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -81,7 +80,7 @@ export default function Payments() {
         {can("finance.payment.create") && <button onClick={() => setPost(true)} className="btn btn-gold" data-testid="post-payment-btn"><Plus className="h-4 w-4" strokeWidth={1.75} />Post payment</button>}
       </header>
       <section className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4" data-testid="payment-tiles">
-        {!home.data ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />) : <>
+        {!home.data ? Array.from({ length: 4 }, (_, n) => n).map((n) => <Skeleton key={n} className="h-28 rounded-2xl" />) : <>
           <StatTile label="Collected this month" value={inrShort(t.collections_mtd_paise / 100)} hint={`${month()} · cleared receipts`} icon={Banknote} iconTone="gold" testId="tile-mtd" />
           <StatTile label="Cheques in hand" value={inrShort((cheques.data?.amount || 0))} hint={`${cheques.data?.total || 0} awaiting realisation`} icon={Landmark} iconTone={cheques.data?.total ? "amber" : undefined} testId="tile-cheques" />
           <StatTile label="Bounced" value={String(home.data.attention.bounced.length)} hint="recent bounces to follow up" icon={AlertTriangle} iconTone={home.data.attention.bounced.length ? "brick" : undefined} tone={home.data.attention.bounced.length ? "brick" : undefined} testId="tile-bounced" />

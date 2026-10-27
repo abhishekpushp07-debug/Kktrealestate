@@ -1,4 +1,3 @@
-/* eslint-disable react/no-array-index-key -- positional editable rows without ids; data-derived keys would remount inputs on edit */
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -10,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { HistoryButton } from "@/components/common/HistoryTimeline";
 import { WhereUsedButton } from "./WhereUsed";
 import { useProjectTowers } from "./useProjectTowers";
+import { useRowKeys } from "@/hooks/useRowKeys";
 
 export default function PaymentPlans() {
   const { can } = useAuth();
@@ -44,8 +44,10 @@ function PaymentPlanForm({ onClose, onSaved }) {
   const [stagePlans, setStagePlans] = useState([]);
   const [spId, setSpId] = useState("");
   const [rows, setRows] = useState([]);
+  const keyedRows = useRowKeys(rows);
   const [adv, setAdv] = useState(false);
   const [advanced, setAdvanced] = useState([]);
+  const advRows = useRowKeys(advanced);
   const [err, setErr] = useState(null);
   const [touched, setTouched] = useState(false);
   useEffect(() => { if (!blockId) { setStagePlans([]); setSpId(""); return; } api.get(`/stage-plans?block_id=${blockId}`).then((r) => { const act = r.data.items.filter((p) => p.is_active); setStagePlans(act); setSpId(act[0]?.id || ""); }); }, [blockId]);
@@ -73,7 +75,7 @@ function PaymentPlanForm({ onClose, onSaved }) {
       {sp && <div data-testid="pp-rows">
         <div className="mb-2 flex items-center gap-3"><p className="label-xs">Rows from stage plan “{sp.name}”</p><span className={cn("ml-auto rounded-full px-3 py-1 text-xs font-bold", total === 100 ? "bg-emerald-100 text-emerald-800" : "bg-brick-50 text-brick")} data-testid="pp-total-badge">Total {total.toFixed(2)}%{total !== 100 && " — must be exactly 100.00%"}</span></div>
         <table className="w-full text-sm"><thead className="text-left text-[11px] uppercase text-txt-secondary"><tr><th className="px-2 py-1">#</th><th className="px-2 py-1">Stage</th><th className="px-2 py-1 w-40">%</th><th className="w-10" /></tr></thead>
-          <tbody>{rows.map((r, i) => { const dup = dupes.includes(r.stage_id); return <tr key={i} className={cn("border-t", dup && "bg-brick-50/40")} data-testid={`pp-row-${i + 1}`}>
+          <tbody>{keyedRows.map(({ k, row: r }, i) => { const dup = dupes.includes(r.stage_id); return <tr key={k} className={cn("border-t", dup && "bg-brick-50/40")} data-testid={`pp-row-${i + 1}`}>
             <td className="px-2 py-1 text-xs text-txt-secondary">{i + 1}</td>
             <td className="px-2 py-1"><select className="h-9 w-full rounded-md border px-2 text-sm" value={r.stage_id} onChange={(e) => setRows((a) => a.map((x, j) => j === i ? { ...x, stage_id: e.target.value } : x))} data-testid={`pp-row-stage-${i + 1}`}>{sp.stages.map((s) => <option key={s.stage_id} value={s.stage_id}>{s.name}</option>)}</select>{dup && <p className="text-[11px] font-semibold text-brick" data-testid={`pp-row-dup-${i + 1}`}>This stage appears twice</p>}</td>
             <td className="px-2 py-1"><Input type="number" step="0.01" min="0" max="100" value={r.percent} onChange={(e) => setRows((a) => a.map((x, j) => j === i ? { ...x, percent: e.target.value } : x))} className="h-9 text-right" data-testid={`pp-row-pct-${i + 1}`} /></td>
@@ -83,7 +85,7 @@ function PaymentPlanForm({ onClose, onSaved }) {
           <Button size="sm" variant="outline" onClick={() => setRows((a) => [...a, { stage_id: (unused[0] || sp.stages[0]).stage_id, percent: "" }])} data-testid="pp-add-row"><Plus className="mr-1 h-3.5 w-3.5" />Add stage row</Button>
           <button type="button" className="flex items-center gap-1 text-xs text-txt-secondary" onClick={() => setAdv((o) => !o)} data-testid="pp-advanced-toggle"><ChevronDown className={cn("h-3.5 w-3.5 transition-transform", adv && "rotate-180")} />Advanced (days-after-booking / on-date installments)</button>
         </div>
-        {adv && <div className="mt-2 space-y-2 rounded-md border p-3" data-testid="pp-advanced">{advanced.map((a, i) => <div key={i} className="grid gap-2 md:grid-cols-5"><Input placeholder="Name" value={a.name} onChange={(e) => setAdvanced((x) => x.map((y, j) => j === i ? { ...y, name: e.target.value } : y))} /><select className="h-10 rounded-md border px-2 text-sm" value={a.trigger_type} onChange={(e) => setAdvanced((x) => x.map((y, j) => j === i ? { ...y, trigger_type: e.target.value } : y))}><option value="DAYS_AFTER_BOOKING">Days after booking</option><option value="ON_DATE">On date</option></select>{a.trigger_type === "ON_DATE" ? <Input type="date" value={a.trigger_date || ""} onChange={(e) => setAdvanced((x) => x.map((y, j) => j === i ? { ...y, trigger_date: e.target.value } : y))} /> : <Input type="number" placeholder="Days" value={a.trigger_days || ""} onChange={(e) => setAdvanced((x) => x.map((y, j) => j === i ? { ...y, trigger_days: e.target.value } : y))} />}<Input type="number" step="0.01" placeholder="%" value={a.percent} onChange={(e) => setAdvanced((x) => x.map((y, j) => j === i ? { ...y, percent: e.target.value } : y))} /><Button size="sm" variant="outline" onClick={() => setAdvanced((x) => x.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button></div>)}<Button size="sm" variant="outline" onClick={() => setAdvanced((x) => [...x, { name: "", trigger_type: "DAYS_AFTER_BOOKING", trigger_days: "", percent: "" }])} data-testid="pp-advanced-add">Add advanced row</Button></div>}
+        {adv && <div className="mt-2 space-y-2 rounded-md border p-3" data-testid="pp-advanced">{advRows.map(({ k, row: a }, i) => <div key={k} className="grid gap-2 md:grid-cols-5"><Input placeholder="Name" value={a.name} onChange={(e) => setAdvanced((x) => x.map((y, j) => j === i ? { ...y, name: e.target.value } : y))} /><select className="h-10 rounded-md border px-2 text-sm" value={a.trigger_type} onChange={(e) => setAdvanced((x) => x.map((y, j) => j === i ? { ...y, trigger_type: e.target.value } : y))}><option value="DAYS_AFTER_BOOKING">Days after booking</option><option value="ON_DATE">On date</option></select>{a.trigger_type === "ON_DATE" ? <Input type="date" value={a.trigger_date || ""} onChange={(e) => setAdvanced((x) => x.map((y, j) => j === i ? { ...y, trigger_date: e.target.value } : y))} /> : <Input type="number" placeholder="Days" value={a.trigger_days || ""} onChange={(e) => setAdvanced((x) => x.map((y, j) => j === i ? { ...y, trigger_days: e.target.value } : y))} />}<Input type="number" step="0.01" placeholder="%" value={a.percent} onChange={(e) => setAdvanced((x) => x.map((y, j) => j === i ? { ...y, percent: e.target.value } : y))} /><Button size="sm" variant="outline" onClick={() => setAdvanced((x) => x.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button></div>)}<Button size="sm" variant="outline" onClick={() => setAdvanced((x) => [...x, { name: "", trigger_type: "DAYS_AFTER_BOOKING", trigger_days: "", percent: "" }])} data-testid="pp-advanced-add">Add advanced row</Button></div>}
       </div>}
       {err && <p className="rounded-md bg-brick-50 px-3 py-2 text-sm text-brick" data-testid="pp-error">{err}</p>}
       <div className="flex gap-2"><Button className="bg-ink-950 hover:bg-ink-800" disabled={!valid} onClick={save} data-testid="pp-save">Save payment plan</Button><Button variant="outline" onClick={onClose} data-testid="pp-cancel">Cancel</Button></div>

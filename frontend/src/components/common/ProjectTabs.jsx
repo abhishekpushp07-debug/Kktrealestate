@@ -1,4 +1,3 @@
-/* eslint-disable react/no-array-index-key -- positional editable rows without ids; data-derived keys would remount inputs on edit */
 import { HistoryButton } from "@/components/common/HistoryTimeline";
 import { useEffect, useState } from "react";
 import { Plus, Play, CheckCircle2 } from "lucide-react";
@@ -15,11 +14,13 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Pill } from "@/components/common/StatusChip";
 import { EmptyState, Field } from "@/components/common/Bits";
 import { Combobox } from "@/components/common/Combobox";
+import { useRowKeys } from "@/hooks/useRowKeys";
 
 function RateCardForm({ projectId, onClose, onSaved }) {
   const { items: flatTypes } = useMasterOptions("flat-types");
   const { options: plcOptions } = useMasterOptions("plc-types", (x) => ({ value: x.id, label: x.name, sub: x.calc }));
   const [form, setForm] = useState({ name: "", effective_from: new Date().toISOString().slice(0, 10), rates: {}, plc_rules: [] });
+  const plcRows = useRowKeys(form.plc_rules);
   const [busy, setBusy] = useState(false);
   const submit = async () => {
     const rates = flatTypes.filter((f) => form.rates[f.id]).map((f) => (form.rates[f.id].mode === "lump" ? { flat_type_id: f.id, lump_sum: Number(form.rates[f.id].value) } : { flat_type_id: f.id, rate_per_sqft: Number(form.rates[f.id].value) }));
@@ -43,8 +44,8 @@ function RateCardForm({ projectId, onClose, onSaved }) {
                 <Input type="number" className="h-8" value={r.value} onChange={(e) => setForm({ ...form, rates: { ...form.rates, [f.id]: { ...r, value: e.target.value } } })} data-testid={`rc-rate-${f.code}`} /></div>); })}
           </div>
           <div className="rounded-lg border p-3"><p className="mb-2 text-sm font-bold text-ink-950">PLC rules</p>
-            {form.plc_rules.map((r, i) => (
-              <div key={i} className="mb-2 grid grid-cols-[1fr_120px_90px_80px] items-center gap-2">
+            {plcRows.map(({ k, row: r }, i) => (
+              <div key={k} className="mb-2 grid grid-cols-[1fr_120px_90px_80px] items-center gap-2">
                 <Combobox options={plcOptions} value={r.plc_type_id} onChange={(v) => setForm({ ...form, plc_rules: form.plc_rules.map((x, j) => j === i ? { ...x, plc_type_id: v } : x) })} placeholder="PLC type" testId={`rc-plc-${i}`} />
                 <Select value={r.applies} onValueChange={(v) => setForm({ ...form, plc_rules: form.plc_rules.map((x, j) => j === i ? { ...x, applies: v } : x) })}><SelectTrigger className="h-8"><SelectValue /></SelectTrigger><SelectContent>{["all", "floors_gte", "corner", "facing_in", "top_floor"].map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent></Select>
                 <Input type="number" className="h-8" placeholder="value" value={r.value} onChange={(e) => setForm({ ...form, plc_rules: form.plc_rules.map((x, j) => j === i ? { ...x, value: e.target.value } : x) })} />

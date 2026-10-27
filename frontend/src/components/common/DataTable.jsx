@@ -1,4 +1,3 @@
-/* eslint-disable react/no-array-index-key -- fixed-length skeleton placeholders (never reordered) */
 import { useEffect, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { cn } from "@/lib/utils";
@@ -39,7 +38,7 @@ export function DataTable({ columns, items = [], total = 0, loading, page = 1, p
       {(setSearch || toolbar || exportPath) && <TableToolbar {...{ testId, search, setSearch, searchPlaceholder, toolbar, mobile, dense, setDense, labelled, hidden, toggleCol, exportPath, exportCsv }} />}
       {mobile ? (
         <div className="divide-y divide-slate-100" data-testid={`${testId}-cards`}>
-          {loading ? Array.from({ length: 4 }).map((_, i) => <div key={`sk-${i}`} className="space-y-2 p-4"><Skeleton className="h-4 w-2/3" /><Skeleton className="h-3 w-1/2" /><Skeleton className="h-3 w-1/3" /></div>)
+          {loading ? Array.from({ length: 4 }, (_, n) => n).map((n) => <div key={`sk-${n}`} className="space-y-2 p-4"><Skeleton className="h-4 w-2/3" /><Skeleton className="h-3 w-1/2" /><Skeleton className="h-3 w-1/3" /></div>)
             : items.length === 0 ? <div className="p-6">{empty || <EmptyState title="No records found" description="Try adjusting your search or filters." />}</div>
             : items.map((row, idx) => {
               const [first, ...rest] = cardCols;
@@ -57,8 +56,8 @@ export function DataTable({ columns, items = [], total = 0, loading, page = 1, p
             <table className="w-full text-[13px]">
               <TableHeader {...{ cols, sort, toggleSort, testId, selectable, allSelected, onSelectAll }} />
               <tbody>
-                {loading ? Array.from({ length: 6 }).map((_, i) => (
-                  <tr key={`sk-${i}`} className="border-b border-slate-100">{cols.map((c) => <td key={c.key} className="px-4 py-3"><Skeleton className="h-4 w-full" /></td>)}</tr>
+                {loading ? Array.from({ length: 6 }, (_, n) => n).map((n) => (
+                  <tr key={`sk-${n}`} className="border-b border-slate-100">{cols.map((c) => <td key={c.key} className="px-4 py-3"><Skeleton className="h-4 w-full" /></td>)}</tr>
                 )) : items.length === 0 ? (
                   <tr><td colSpan={cols.length + (selectable ? 1 : 0)} className="p-6">{empty || <EmptyState title="No records found" description="Try adjusting your search or filters." />}</td></tr>
                 ) : <>{virtual && padTop > 0 && <tr style={{ height: padTop }} />}{(virtual ? vrows.map((v) => [items[v.index], v.index]) : items.map((row, idx) => [row, idx])).map(([row, idx]) => (

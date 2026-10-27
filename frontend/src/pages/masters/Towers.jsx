@@ -1,4 +1,3 @@
-/* eslint-disable react/no-array-index-key -- positional editable rows without ids; data-derived keys would remount inputs on edit */
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Plus } from "lucide-react";
@@ -9,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { HistoryButton } from "@/components/common/HistoryTimeline";
 import { useProjectTowers } from "./useProjectTowers";
+import { useRowKeys } from "@/hooks/useRowKeys";
 
 const sel = "h-10 w-full rounded-md border px-3 text-sm";
 
@@ -45,6 +45,7 @@ function TowerForm({ tower, projects, onClose, onSaved }) {
   const [flatTypes, setFlatTypes] = useState([]);
   const [stagePlans, setStagePlans] = useState([]);
   const [positions, setPositions] = useState([]);
+  const posRows = useRowKeys(positions);
   const [err, setErr] = useState(null);
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
   useEffect(() => { api.get("/master/block-types?page_size=50").then((r) => setTypes(r.data.items)); api.get("/master/flat-types?page_size=100").then((r) => setFlatTypes(r.data.items)); }, []);
@@ -83,7 +84,7 @@ function TowerForm({ tower, projects, onClose, onSaved }) {
         <label className="block text-sm"><span className="label-xs">Default cash % override</span><Input type="number" min="0" max="100" value={f.default_cash_percent} onChange={(e) => set("default_cash_percent", e.target.value)} data-testid="tower-cash-pct" /></label>
         {isNew && <label className="block text-sm md:col-span-2"><span className="label-xs">Stage plan (optional — copied to this tower)</span><select className={sel} value={f.stage_plan_id} onChange={(e) => set("stage_plan_id", e.target.value)} disabled={!f.project_id} data-testid="tower-stage-plan"><option value="">None — assign later in Masters → Stage Plans</option>{stagePlans.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.block_name})</option>)}</select></label>}
       </div>
-      {isNew && <div data-testid="tower-positions"><p className="label-xs mb-1">Flat type per position (template for every floor)</p><div className="flex flex-wrap gap-2">{positions.map((p, i) => <label key={i} className="text-xs"><span className="mr-1 font-semibold">#{p.position}</span><select className="h-9 rounded-md border px-2 text-xs" value={p.flat_type_id} onChange={(e) => setPositions((a) => a.map((x, j) => j === i ? { ...x, flat_type_id: e.target.value } : x))} data-testid={`tower-pos-${p.position}`}>{flatTypes.map((ft) => <option key={ft.id} value={ft.id}>{ft.name}</option>)}</select></label>)}</div></div>}
+      {isNew && <div data-testid="tower-positions"><p className="label-xs mb-1">Flat type per position (template for every floor)</p><div className="flex flex-wrap gap-2">{posRows.map(({ k, row: p }, i) => <label key={k} className="text-xs"><span className="mr-1 font-semibold">#{p.position}</span><select className="h-9 rounded-md border px-2 text-xs" value={p.flat_type_id} onChange={(e) => setPositions((a) => a.map((x, j) => j === i ? { ...x, flat_type_id: e.target.value } : x))} data-testid={`tower-pos-${p.position}`}>{flatTypes.map((ft) => <option key={ft.id} value={ft.id}>{ft.name}</option>)}</select></label>)}</div></div>}
       {missing.length > 0 && <p className="text-[11px] font-semibold text-brick" data-testid="tower-required">{missing.map(([, l]) => l).join(", ")} required</p>}
       {err && <p className="rounded-md bg-brick-50 px-3 py-2 text-sm text-brick" data-testid="tower-error">{err}</p>}
       <div className="flex gap-2"><Button className="bg-ink-950 hover:bg-ink-800" disabled={missing.length > 0} onClick={save} data-testid="tower-save">{isNew ? "Create tower & generate flats" : "Save"}</Button><Button variant="outline" onClick={onClose} data-testid="tower-cancel">Cancel</Button></div>

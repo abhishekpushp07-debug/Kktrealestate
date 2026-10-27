@@ -1,4 +1,3 @@
-/* eslint-disable react/no-array-index-key -- positional editable rows without ids; data-derived keys would remount inputs on edit */
 import { useEffect, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -8,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/common/DateInput";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Field } from "@/components/common/Bits";
+import { useRowKeys } from "@/hooks/useRowKeys";
 
 export const TRIGGERS = [["ON_BOOKING", "On booking"], ["DAYS_AFTER_BOOKING", "Days after booking"], ["ON_STAGE", "On construction stage"], ["ON_POSSESSION", "On possession"], ["ON_DATE", "On a fixed date"]];
 const PLAN_TYPES = ["CLP", "Down Payment", "Time Linked", "Flexi", "Custom"];
@@ -15,6 +15,7 @@ const blankIns = (seq) => ({ seq, name: "", percent: "", trigger_type: "ON_STAGE
 
 export function PaymentPlanForm({ item, open, onOpenChange, onSaved }) {
   const [form, setForm] = useState(item ? { ...item, installments: item.installments.map((i) => ({ ...i, trigger_days: i.trigger_days ?? "", trigger_stage_id: i.trigger_stage_id ?? "", trigger_date: i.trigger_date ?? "", due_days: i.due_days ?? "" })) } : { name: "", code: "", description: "", plan_type: "CLP", grace_days: 0, installments: [{ ...blankIns(1), name: "Booking amount", percent: 10, trigger_type: "ON_BOOKING" }, blankIns(2)] });
+  const insRows = useRowKeys(form.installments);
   const [stages, setStages] = useState([]);
   const [busy, setBusy] = useState(false);
   useEffect(() => { api.get("/master/construction-stages?page_size=100").then((r) => setStages(r.data.items)).catch(() => {}); }, []);
@@ -41,7 +42,7 @@ export function PaymentPlanForm({ item, open, onOpenChange, onSaved }) {
           <div className="rounded-lg border p-3">
             <div className="mb-2 flex items-center justify-between"><p className="label-xs">Installments (% applies equally to Cash and Account buckets)</p><span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${ok ? "bg-sage-50 text-sage" : "bg-brick-50 text-brick"}`} data-testid="pp-sum">Σ {sum.toFixed(2)}% {ok ? "✓" : "≠ 100"}</span></div>
             <div className="space-y-2">
-              {form.installments.map((ins, i) => <div key={i} className="grid grid-cols-[28px_1fr_90px_170px_1fr_80px_32px] items-center gap-2" data-testid={`pp-row-${i}`}>
+              {insRows.map(({ k, row: ins }, i) => <div key={k} className="grid grid-cols-[28px_1fr_90px_170px_1fr_80px_32px] items-center gap-2" data-testid={`pp-row-${i}`}>
                 <span className="text-sm font-bold text-ink-950">{i + 1}</span>
                 <Input className="h-9" placeholder="Name" value={ins.name} onChange={(e) => setI(i, "name", e.target.value)} required data-testid={`pp-row-${i}-name`} />
                 <Input className="h-9 tabular" type="number" step="0.01" min="0.01" max="100" placeholder="%" value={ins.percent} onChange={(e) => setI(i, "percent", e.target.value)} required data-testid={`pp-row-${i}-pct`} />

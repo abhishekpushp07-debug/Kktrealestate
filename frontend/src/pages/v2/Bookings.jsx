@@ -1,4 +1,3 @@
-/* eslint-disable react/no-array-index-key -- fixed-length skeleton placeholders (never reordered) */
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { FileSignature, Plus, Search } from "lucide-react";
@@ -47,7 +46,7 @@ export default function Bookings() {
         <Select options={(projects?.items || []).map((p) => ({ value: p.id, label: p.name, sub: p.code }))} value={f.project_id} onChange={(v) => setF({ ...f, project_id: v })} placeholder="All projects" allowAdd={false} className="w-56" testId="filter-project" />
         <div className="flex gap-1.5">{["", ...STATUSES].map((s) => <button key={s} onClick={() => setF({ ...f, status: s })} className={cn("pill border transition-colors", f.status === s ? "border-ink-950 bg-ink-950 text-warm-50" : "border-warm-200 bg-white text-txt-secondary hover:border-gold")} data-testid={`chip-status-${(s || "all").toLowerCase()}`}>{s || "All"}</button>)}</div>
       </section>
-      {list.loading && list.items.length === 0 ? <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-56 rounded-2xl" />)}</div> : list.items.length === 0 ? <EmptyState icon={FileSignature} title="No bookings" description="Bookings appear here once a unit is sold." testId="bookings-empty" /> : (
+      {list.loading && list.items.length === 0 ? <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">{Array.from({ length: 6 }, (_, n) => n).map((n) => <Skeleton key={n} className="h-56 rounded-2xl" />)}</div> : list.items.length === 0 ? <EmptyState icon={FileSignature} title="No bookings" description="Bookings appear here once a unit is sold." testId="bookings-empty" /> : (
         <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3" data-testid="bookings-grid">{list.items.map((b) => <BookingTile key={b.id} b={b} />)}</div>
       )}
       {pages > 1 && <div className="flex items-center justify-center gap-2" data-testid="bookings-pager"><button disabled={list.page <= 1} onClick={() => list.setPage(list.page - 1)} className="btn btn-secondary btn-sm">Previous</button><span className="text-xs text-txt-secondary">Page {list.page} of {pages}</span><button disabled={list.page >= pages} onClick={() => list.setPage(list.page + 1)} className="btn btn-secondary btn-sm">Next</button></div>}

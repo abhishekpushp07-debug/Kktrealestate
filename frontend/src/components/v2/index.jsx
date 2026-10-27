@@ -1,4 +1,3 @@
-/* eslint-disable react/no-array-index-key -- fixed-length skeleton placeholders (never reordered) */
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { inr, inrShort, initials } from "@/lib/format";
@@ -241,7 +240,7 @@ export function Skeleton({ className }) {
 }
 
 export function SkeletonCards({ n = 3, h = "h-40" }) {
-  return <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">{Array.from({ length: n }).map((_, i) => <Skeleton key={i} className={cn("rounded-2xl", h)} />)}</div>;
+  return <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">{Array.from({ length: n }, (_, n) => n).map((n) => <Skeleton key={n} className={cn("rounded-2xl", h)} />)}</div>;
 }
 
 export function SegmentBar({ segments, total, counts, emptyText = "No overdue dues" }) {

@@ -1,4 +1,3 @@
-/* eslint-disable react/no-array-index-key -- positional editable rows without ids; data-derived keys would remount inputs on edit */
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -9,6 +8,7 @@ import { inr } from "@/lib/format";
 import { Card, Field, FormSection, PageHero, Skeleton, Stepper, CELL } from "@/components/v2";
 import { Select } from "@/components/v2/Select";
 import { cn } from "@/lib/utils";
+import { useRowKeys } from "@/hooks/useRowKeys";
 
 const STEPS = ["Basics", "Towers", "Floor plans", "Stages", "Payment plans", "Pricing", "Review"];
 const PATTERNS = [["{block}-{floor}{pos2}", "A-1201"], ["{floor}{pos2}", "1201"], ["{block}{seq}", "A017"]];
@@ -49,12 +49,13 @@ function Basics({ p, setP, cats }) {
 const newTower = (code, i) => ({ _new: true, name: `Tower ${String.fromCharCode(65 + i)}`, code: String.fromCharCode(65 + i), block_type_id: null, floors: 12, floor_start: 1, skip_floors: "", refuge_floors: "", podium_floors: "", numbering_pattern: "{block}-{floor}{pos2}", flats_per_floor: 4, floor_plans: [] });
 
 function Towers({ towers, setTowers, code }) {
+  const towerRows = useRowKeys(towers);
   const upd = (i, patch) => setTowers(towers.map((t, j) => (j === i ? { ...t, ...patch } : t)));
   const example = (t) => { const [pat] = PATTERNS.find(([k]) => k === t.numbering_pattern) || PATTERNS[0]; return pat.replace("{block}", t.code || "A").replace("{floor}", String(t.floor_start + 1)).replace("{pos2}", "02").replace("{seq}", "007"); };
   return (
     <div className="space-y-6">
-      {towers.map((t, i) => (
-        <FormSection key={t.id || i} title={t.name || `Tower ${i + 1}`} helper={t.id ? `${t.units?.total || 0} units generated · structural fields locked` : "New tower — units are generated at the end"}>
+      {towerRows.map(({ k, row: t }, i) => (
+        <FormSection key={t.id || k} title={t.name || `Tower ${i + 1}`} helper={t.id ? `${t.units?.total || 0} units generated · structural fields locked` : "New tower — units are generated at the end"}>
           <Field label="Tower name" required><input className="input" value={t.name} onChange={(e) => upd(i, { name: e.target.value })} data-testid={`tower-${i}-name`} /></Field>
           <Field label="Code" required><input className="input uppercase" value={t.code} disabled={!!t.id} onChange={(e) => upd(i, { code: e.target.value.toUpperCase().slice(0, 10) })} data-testid={`tower-${i}-code`} /></Field>
           <Field label="Block type" required><Select type="block_types" value={t.block_type_id} onChange={(v) => upd(i, { block_type_id: v })} allowAdd={false} testId={`tower-${i}-type`} /></Field>
@@ -72,37 +73,46 @@ function Towers({ towers, setTowers, code }) {
   );
 }
 
+function FloorRange({ t, i, r, ri, setR, flatTypes }) {
+  const posRows = useRowKeys(r.positions);
+  return (
+    <div className="mt-5 rounded-2xl border border-warm-200 p-4">
+    <div className="grid gap-4 md:grid-cols-3">
+      <Field label="From floor"><input type="number" className="input" disabled={!!t.id} value={r.from_floor} onChange={(e) => setR(ri, { from_floor: Number(e.target.value) })} /></Field>
+      <Field label="To floor"><input type="number" className="input" disabled={!!t.id} value={r.to_floor} onChange={(e) => setR(ri, { to_floor: Number(e.target.value) })} /></Field>
+      <Field label="Use a template instead"><Select type="floor_plan_templates" value={r.floor_plan_template_id} disabled={!!t.id} onChange={(v) => setR(ri, { floor_plan_template_id: v, positions: v ? null : Array.from({ length: t.flats_per_floor || 4 }, (_, k) => ({ position: k + 1, flat_type_id: null, facing: null })) })} allowAdd={false} testId={`fp-${i}-${ri}-template`} /></Field>
+    </div>
+    {!r.floor_plan_template_id && (
+      <div className="mt-4">
+        <p className="label mb-2">Positions on each floor</p>
+        <div className="space-y-2">{posRows.map(({ k, row: pos }, pi) => <div key={k} className="grid items-center gap-3 md:grid-cols-[48px_1fr_140px_40px]"><span className="cell bg-warm-100 text-ink-950">{String(pos.position).padStart(2, "0")}</span><Select options={flatTypes} value={pos.flat_type_id} disabled={!!t.id} onChange={(v) => setR(ri, { positions: r.positions.map((x, k) => (k === pi ? { ...x, flat_type_id: v } : x)) })} placeholder="Flat type" allowAdd={false} testId={`fp-${i}-${ri}-pos-${pi}`} /><Select options={FACINGS} value={pos.facing} disabled={!!t.id} onChange={(v) => setR(ri, { positions: r.positions.map((x, k) => (k === pi ? { ...x, facing: v } : x)) })} placeholder="Facing" />{!t.id && <button type="button" onClick={() => setR(ri, { positions: r.positions.filter((_, k) => k !== pi).map((x, k) => ({ ...x, position: k + 1 })) })} className="text-txt-muted hover:text-brick" aria-label="Remove position"><Trash2 className="h-4 w-4" /></button>}</div>)}</div>
+        {!t.id && <button type="button" onClick={() => setR(ri, { positions: [...(r.positions || []), { position: (r.positions?.length || 0) + 1, flat_type_id: null, facing: null }] })} className="btn btn-ghost btn-sm mt-3"><Plus className="h-3.5 w-3.5" />Add position</button>}
+        <div className="mt-4"><p className="label mb-2">Preview · floors {r.from_floor}–{r.to_floor}</p><div className="flex flex-wrap gap-1.5">{(r.positions || []).map((pos) => <span key={pos.position} className={cn("cell", pos.flat_type_id ? CELL.Available : "bg-warm-100 text-txt-muted")} title={flatTypes.find((f) => f.value === pos.flat_type_id)?.label}>{flatTypes.find((f) => f.value === pos.flat_type_id)?.sub || "?"}</span>)}<span className="ml-2 self-center text-xs text-txt-muted">× {Math.max(0, r.to_floor - r.from_floor + 1 - chips(t.skip_floors).length - chips(t.refuge_floors).length)} floors = {(r.positions || []).length * Math.max(0, r.to_floor - r.from_floor + 1 - chips(t.skip_floors).length - chips(t.refuge_floors).length)} units</span></div></div>
+      </div>
+    )}
+    </div>
+  );
+}
+
+function TowerFloorPlan({ t, i, upd, flatTypes }) {
+      const ranges = t.floor_plans?.length ? t.floor_plans : [{ from_floor: t.floor_start, to_floor: t.floor_start + t.floors - 1, positions: Array.from({ length: t.flats_per_floor || 4 }, (_, k) => ({ position: k + 1, flat_type_id: null, facing: null })) }];
+      const setR = (ri, patch) => upd(i, ranges.map((r, j) => (j === ri ? { ...r, ...patch } : r)));
+  const rangeRows = useRowKeys(ranges);
+  return (
+    <Card testId={`fp-tower-${i}`}>
+    <div className="flex items-center justify-between"><h3 className="font-display text-lg">{t.name}</h3>{t.id ? <span className="pill bg-warm-100 text-txt-secondary">Locked — units exist</span> : <button type="button" onClick={() => upd(i, [...ranges, { from_floor: ranges.at(-1).to_floor + 1, to_floor: t.floor_start + t.floors - 1, positions: ranges.at(-1).positions.map((p) => ({ ...p })) }])} className="btn btn-ghost btn-sm"><Plus className="h-3.5 w-3.5" />Add floor range</button>}</div>
+      {rangeRows.map(({ k, row: r }, ri) => <FloorRange key={k} t={t} i={i} r={r} ri={ri} setR={setR} flatTypes={flatTypes} />)}
+    </Card>
+  );
+}
+
 function FloorPlans({ towers, setTowers, cats }) {
+  const towerRows = useRowKeys(towers);
   const flatTypes = cats.opts("flat_types");
   const upd = (i, fp) => setTowers(towers.map((t, j) => (j === i ? { ...t, floor_plans: fp } : t)));
   return (
     <div className="space-y-6">
-      {towers.map((t, i) => {
-        const ranges = t.floor_plans?.length ? t.floor_plans : [{ from_floor: t.floor_start, to_floor: t.floor_start + t.floors - 1, positions: Array.from({ length: t.flats_per_floor || 4 }, (_, k) => ({ position: k + 1, flat_type_id: null, facing: null })) }];
-        const setR = (ri, patch) => upd(i, ranges.map((r, j) => (j === ri ? { ...r, ...patch } : r)));
-        return (
-          <Card key={t.id || i} testId={`fp-tower-${i}`}>
-            <div className="flex items-center justify-between"><h3 className="font-display text-lg">{t.name}</h3>{t.id ? <span className="pill bg-warm-100 text-txt-secondary">Locked — units exist</span> : <button type="button" onClick={() => upd(i, [...ranges, { from_floor: ranges.at(-1).to_floor + 1, to_floor: t.floor_start + t.floors - 1, positions: ranges.at(-1).positions.map((p) => ({ ...p })) }])} className="btn btn-ghost btn-sm"><Plus className="h-3.5 w-3.5" />Add floor range</button>}</div>
-            {ranges.map((r, ri) => (
-              <div key={ri} className="mt-5 rounded-2xl border border-warm-200 p-4">
-                <div className="grid gap-4 md:grid-cols-3">
-                  <Field label="From floor"><input type="number" className="input" disabled={!!t.id} value={r.from_floor} onChange={(e) => setR(ri, { from_floor: Number(e.target.value) })} /></Field>
-                  <Field label="To floor"><input type="number" className="input" disabled={!!t.id} value={r.to_floor} onChange={(e) => setR(ri, { to_floor: Number(e.target.value) })} /></Field>
-                  <Field label="Use a template instead"><Select type="floor_plan_templates" value={r.floor_plan_template_id} disabled={!!t.id} onChange={(v) => setR(ri, { floor_plan_template_id: v, positions: v ? null : Array.from({ length: t.flats_per_floor || 4 }, (_, k) => ({ position: k + 1, flat_type_id: null, facing: null })) })} allowAdd={false} testId={`fp-${i}-${ri}-template`} /></Field>
-                </div>
-                {!r.floor_plan_template_id && (
-                  <div className="mt-4">
-                    <p className="label mb-2">Positions on each floor</p>
-                    <div className="space-y-2">{(r.positions || []).map((pos, pi) => <div key={pi} className="grid items-center gap-3 md:grid-cols-[48px_1fr_140px_40px]"><span className="cell bg-warm-100 text-ink-950">{String(pos.position).padStart(2, "0")}</span><Select options={flatTypes} value={pos.flat_type_id} disabled={!!t.id} onChange={(v) => setR(ri, { positions: r.positions.map((x, k) => (k === pi ? { ...x, flat_type_id: v } : x)) })} placeholder="Flat type" allowAdd={false} testId={`fp-${i}-${ri}-pos-${pi}`} /><Select options={FACINGS} value={pos.facing} disabled={!!t.id} onChange={(v) => setR(ri, { positions: r.positions.map((x, k) => (k === pi ? { ...x, facing: v } : x)) })} placeholder="Facing" />{!t.id && <button type="button" onClick={() => setR(ri, { positions: r.positions.filter((_, k) => k !== pi).map((x, k) => ({ ...x, position: k + 1 })) })} className="text-txt-muted hover:text-brick" aria-label="Remove position"><Trash2 className="h-4 w-4" /></button>}</div>)}</div>
-                    {!t.id && <button type="button" onClick={() => setR(ri, { positions: [...(r.positions || []), { position: (r.positions?.length || 0) + 1, flat_type_id: null, facing: null }] })} className="btn btn-ghost btn-sm mt-3"><Plus className="h-3.5 w-3.5" />Add position</button>}
-                    <div className="mt-4"><p className="label mb-2">Preview · floors {r.from_floor}–{r.to_floor}</p><div className="flex flex-wrap gap-1.5">{(r.positions || []).map((pos, pi) => <span key={pi} className={cn("cell", pos.flat_type_id ? CELL.Available : "bg-warm-100 text-txt-muted")} title={flatTypes.find((f) => f.value === pos.flat_type_id)?.label}>{flatTypes.find((f) => f.value === pos.flat_type_id)?.sub || "?"}</span>)}<span className="ml-2 self-center text-xs text-txt-muted">× {Math.max(0, r.to_floor - r.from_floor + 1 - chips(t.skip_floors).length - chips(t.refuge_floors).length)} floors = {(r.positions || []).length * Math.max(0, r.to_floor - r.from_floor + 1 - chips(t.skip_floors).length - chips(t.refuge_floors).length)} units</span></div></div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </Card>
-        );
-      })}
+      {towerRows.map(({ k, row: t }, i) => <TowerFloorPlan key={t.id || k} t={t} i={i} upd={upd} flatTypes={flatTypes} />)}
     </div>
   );
 }
@@ -147,13 +157,14 @@ function Plans({ setup, assign, setAssign, towers }) {
 }
 
 function Pricing({ towers, setTowers, cats }) {
+  const towerRows = useRowKeys(towers);
   const ft = cats.opts("flat_types");
   const upd = (i, patch) => setTowers(towers.map((t, j) => (j === i ? { ...t, ...patch } : t)));
   const sample = ft[0];
   return (
     <div className="space-y-6">
-      {towers.map((t, i) => { const sbu = sample?.meta?.super_builtup_sqft || 1000; const rate = Number(t.rate_per_sqft) || sample?.meta?.base_rate_per_sqft || 0; const price = rate * sbu + (Number(t.floor_rise_per_sqft) || 0) * 5 * sbu; return (
-        <FormSection key={t.id || i} title={t.name} helper={sample ? `Sample: ${sample.label} (${sbu} sq.ft) on the 6th floor ≈ ${inr(price)}` : "Add flat types in Settings → Catalogues to preview prices"}>
+      {towerRows.map(({ k, row: t }, i) => { const sbu = sample?.meta?.super_builtup_sqft || 1000; const rate = Number(t.rate_per_sqft) || sample?.meta?.base_rate_per_sqft || 0; const price = rate * sbu + (Number(t.floor_rise_per_sqft) || 0) * 5 * sbu; return (
+        <FormSection key={t.id || k} title={t.name} helper={sample ? `Sample: ${sample.label} (${sbu} sq.ft) on the 6th floor ≈ ${inr(price)}` : "Add flat types in Settings → Catalogues to preview prices"}>
           <Field label="Base rate (₹ / sq.ft)" hint="Blank = flat type's own rate"><input type="number" className="input" value={t.rate_per_sqft ?? ""} onChange={(e) => upd(i, { rate_per_sqft: e.target.value === "" ? null : Number(e.target.value) })} data-testid={`price-${i}-rate`} /></Field>
           <Field label="Floor rise (₹ / sq.ft / floor)"><input type="number" className="input" value={t.floor_rise_per_sqft ?? ""} onChange={(e) => upd(i, { floor_rise_per_sqft: e.target.value === "" ? null : Number(e.target.value) })} data-testid={`price-${i}-rise`} /></Field>
           <Field label="Cash share % override" hint="Blank = project default"><input type="number" min="0" max="100" step="0.5" className="input" value={t.default_cash_percent ?? ""} onChange={(e) => upd(i, { default_cash_percent: e.target.value === "" ? null : Number(e.target.value) })} data-testid={`price-${i}-cash`} /></Field>

@@ -1,4 +1,3 @@
-/* eslint-disable react/no-array-index-key -- positional editable rows without ids; data-derived keys would remount inputs on edit */
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ExternalLink } from "lucide-react";
@@ -10,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { ImageUpload } from "./CmsCollection";
 import { BrochureStats } from "@/components/common/BrochureStats";
+import { useRowKeys } from "@/hooks/useRowKeys";
 
 const VISIT_DEFAULTS = { enabled: false, visit_days: [0, 1, 2, 3, 4, 5, 6], start_time: "10:00", end_time: "18:00", slot_minutes: 60, capacity_per_slot: 3, min_lead_hours: 3, max_days_ahead: 30, blackout_dates: [], site_office_address: "", maps_url: "", instructions: "" };
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -45,6 +45,7 @@ const unlines = (s) => s.split("\n").map((x) => x.trim()).filter(Boolean);
 export function ProjectWebsiteTab({ projectId, slugDefault }) {
   const { can } = useAuth();
   const [d, setD] = useState(null);
+  const heroRows = useRowKeys(d?.hero_images);
   const [busy, setBusy] = useState(false);
   const load = () => api.get(`/cms/projects/${projectId}/website`).then((r) => setD({ ...r.data.website, version: r.data.version, faqsText: JSON.stringify(r.data.website.faqs || [], null, 2) }));
   useEffect(() => { load(); }, [projectId]); // eslint-disable-line
@@ -75,7 +76,7 @@ export function ProjectWebsiteTab({ projectId, slugDefault }) {
           <Field label="SEO description"><Textarea rows={2} value={d.seo_description || ""} disabled={ro} onChange={(e) => set("seo_description")(e.target.value)} /></Field>
         </div>
         <div className="space-y-4">
-          <Field label="Hero images (first is the cover)"><div className="space-y-2">{(d.hero_images || []).map((u, i) => <div key={i} className="flex gap-2"><ImageUpload value={u} onChange={(v) => set("hero_images")(d.hero_images.map((x, j) => j === i ? v : x))} disabled={ro} /><Button variant="ghost" size="sm" disabled={ro} onClick={() => set("hero_images")(d.hero_images.filter((_, j) => j !== i))}>Remove</Button></div>)}{!ro && <Button variant="outline" size="sm" onClick={() => set("hero_images")([...(d.hero_images || []), ""])} data-testid="pw-add-hero">Add image</Button>}</div></Field>
+          <Field label="Hero images (first is the cover)"><div className="space-y-2">{heroRows.map(({ k, row: u }, i) => <div key={k} className="flex gap-2"><ImageUpload value={u} onChange={(v) => set("hero_images")(d.hero_images.map((x, j) => j === i ? v : x))} disabled={ro} /><Button variant="ghost" size="sm" disabled={ro} onClick={() => set("hero_images")(d.hero_images.filter((_, j) => j !== i))}>Remove</Button></div>)}{!ro && <Button variant="outline" size="sm" onClick={() => set("hero_images")([...(d.hero_images || []), ""])} data-testid="pw-add-hero">Add image</Button>}</div></Field>
           <Field label="Video embed URLs (one per line, YouTube/Vimeo)"><Textarea rows={2} value={lines(d.video_urls)} disabled={ro} onChange={(e) => set("video_urls")(unlines(e.target.value))} /></Field>
           <Field label="Virtual tour embed URLs (one per line)"><Textarea rows={2} value={lines(d.virtual_tour_urls)} disabled={ro} onChange={(e) => set("virtual_tour_urls")(unlines(e.target.value))} /></Field>
           <Field label="Google Maps embed URL"><Input value={d.map_embed_url || ""} disabled={ro} onChange={(e) => set("map_embed_url")(e.target.value)} /></Field>

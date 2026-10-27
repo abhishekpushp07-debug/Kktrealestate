@@ -1,4 +1,3 @@
-/* eslint-disable react/no-array-index-key -- fixed-length skeleton placeholders (never reordered); positional editable rows without ids; data-derived keys would remount inputs on edit */
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, ChevronRight, ChevronLeft } from "lucide-react";
 import { toast } from "sonner";
@@ -11,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Combobox } from "@/components/common/Combobox";
 import { Field } from "@/components/common/Bits";
+import { useRowKeys } from "@/hooks/useRowKeys";
 
 const PATTERNS = [["{block}-{floor}{pos2}", "A-101 (block-floor+position)"], ["{floor}{pos2}", "101 (floor+position)"], ["{block}{seq}", "A1, A2 … (block+sequence)"]];
 const STEPS = ["Type & floors", "Floor plans", "Pricing", "Preview"];
@@ -19,6 +19,7 @@ const parseList = (s) => String(s || "").split(",").map((x) => x.trim()).filter(
 export function BlockForm({ open, onOpenChange, project, onSaved }) {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState({ name: "", code: "", block_type_id: null, floors: 8, floor_start: 1, ground_floor_label: "", skip_floors: "", refuge_floors: "", podium_floors: "", numbering_pattern: "{block}-{floor}{pos2}", milestone_template_id: project?.milestone_template_id || null, rate_per_sqft: "", floor_rise_per_sqft: "", status: "Planning", floor_plans: [{ from_floor: 1, to_floor: 8, floor_plan_template_id: null }] });
+  const fpRows = useRowKeys(form.floor_plans);
   const [busy, setBusy] = useState(false);
   const { options: btOptions, items: blockTypes } = useMasterOptions("block-types");
   const { options: fpOptions, items: templates } = useMasterOptions("floor-plan-templates", (x) => ({ value: x.id, label: x.name, sub: `${x.flats_per_floor}/floor` }));
@@ -78,8 +79,8 @@ export function BlockForm({ open, onOpenChange, project, onSaved }) {
           {step === 1 && <>
             <p className="text-sm text-slate-600">Assign a floor plan template to each floor range. Templates define flats per floor, flat types, facing and corners.</p>
             <div className="space-y-2" data-testid="block-floor-plans">
-              {form.floor_plans.map((p, i) => (
-                <div key={i} className="grid grid-cols-[90px_90px_1fr_32px] items-center gap-2" data-testid={`floor-plan-row-${i}`}>
+              {fpRows.map(({ k, row: p }, i) => (
+                <div key={k} className="grid grid-cols-[90px_90px_1fr_32px] items-center gap-2" data-testid={`floor-plan-row-${i}`}>
                   <Input type="number" value={p.from_floor} onChange={(e) => set("floor_plans", form.floor_plans.map((x, j) => j === i ? { ...x, from_floor: Number(e.target.value) } : x))} className="h-9" data-testid={`floor-plan-${i}-from`} />
                   <Input type="number" value={p.to_floor} onChange={(e) => set("floor_plans", form.floor_plans.map((x, j) => j === i ? { ...x, to_floor: Number(e.target.value) } : x))} className="h-9" data-testid={`floor-plan-${i}-to`} />
                   <Combobox options={fpOptions} value={p.floor_plan_template_id} onChange={(v) => set("floor_plans", form.floor_plans.map((x, j) => j === i ? { ...x, floor_plan_template_id: v } : x))} placeholder="Floor plan template" testId={`floor-plan-${i}-template`} />
@@ -104,7 +105,7 @@ export function BlockForm({ open, onOpenChange, project, onSaved }) {
             <div className="max-h-80 space-y-1 overflow-auto rounded-md border p-2" data-testid="block-preview-grid">
               {[...labels].reverse().map((f) => { const p = preview.find((x) => x.floor === f); return (
                 <div key={f} className="flex items-center gap-2 text-xs"><span className="w-10 rounded bg-navy px-1.5 py-1 text-center font-bold text-gold">{f === 0 && form.ground_floor_label ? form.ground_floor_label : f}</span>
-                  {p ? <div className="flex flex-1 gap-1">{Array.from({ length: p.count }).map((_, i) => <span key={i} className="flex-1 rounded border border-emerald-200 bg-emerald-50 py-1 text-center text-[10px] text-emerald-700">{form.numbering_pattern === "{block}{seq}" ? "" : `${form.code}-${f}${String(i + 1).padStart(2, "0")}`}</span>)}<span className="ml-1 text-slate-400">{p.name}</span></div> : <span className="flex-1 rounded border border-dashed border-slate-300 py-1 text-center text-[10px] text-slate-400">{noUnit.has(f) ? "refuge / podium — no units" : "—"}</span>}
+                  {p ? <div className="flex flex-1 gap-1">{Array.from({ length: p.count }, (_, n) => n).map((n) => <span key={n} className="flex-1 rounded border border-emerald-200 bg-emerald-50 py-1 text-center text-[10px] text-emerald-700">{form.numbering_pattern === "{block}{seq}" ? "" : `${form.code}-${f}${String(i + 1).padStart(2, "0")}`}</span>)}<span className="ml-1 text-slate-400">{p.name}</span></div> : <span className="flex-1 rounded border border-dashed border-slate-300 py-1 text-center text-[10px] text-slate-400">{noUnit.has(f) ? "refuge / podium — no units" : "—"}</span>}
                 </div>); })}
             </div>
           </>}

@@ -1,4 +1,3 @@
-/* eslint-disable react/no-array-index-key -- positional editable rows without ids; data-derived keys would remount inputs on edit */
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
@@ -11,6 +10,7 @@ import { useCatalogues } from "@/hooks/useCatalogues";
 import { Card, Field, FormSection, Skeleton } from "@/components/v2";
 import { Select } from "@/components/v2/Select";
 import { Avatar, usePeople } from "@/components/v2/CustomerBits";
+import { useRowKeys } from "@/hooks/useRowKeys";
 
 const PAN = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
 const verhoeff = (num) => { const d = [[0,1,2,3,4,5,6,7,8,9],[1,2,3,4,0,6,7,8,9,5],[2,3,4,0,1,7,8,9,5,6],[3,4,0,1,2,8,9,5,6,7],[4,0,1,2,3,9,5,6,7,8],[5,9,8,7,6,0,4,3,2,1],[6,5,9,8,7,1,0,4,3,2],[7,6,5,9,8,2,1,0,4,3],[8,7,6,5,9,3,2,1,0,4],[9,8,7,6,5,4,3,2,1,0]], p = [[0,1,2,3,4,5,6,7,8,9],[1,5,7,6,2,8,3,0,9,4],[5,8,0,3,7,9,6,1,4,2],[8,9,1,6,0,4,3,5,2,7],[9,4,5,3,1,2,6,8,7,0],[4,2,8,6,5,7,3,9,0,1],[2,7,9,3,8,0,6,4,1,5],[7,0,4,6,9,1,3,2,5,8]]; let c = 0; [...num].reverse().forEach((ch, i) => { c = d[c][p[i % 8][Number(ch)]]; }); return c === 0; };
@@ -23,6 +23,7 @@ export default function CustomerForm() {
   const { label, opts } = useCatalogues();
   const fe = useFieldErrors();
   const [f, setF] = useState({ ...EMPTY, rm_user_id: user?.id || null });
+  const coRows = useRowKeys(f.co_applicants);
   const localityPin = opts("locality", f.city_id).find((o) => o.value === f.locality_id)?.meta?.pincode || "";
   const people = usePeople();
   const { data: projects } = useFetch("/projects?page_size=100&with_total=false");
@@ -110,7 +111,7 @@ export default function CustomerForm() {
           <Card>
             <div className="mb-4 flex items-center justify-between"><h3 className="font-display text-lg">Co-applicants</h3><button type="button" onClick={() => set("co_applicants", [...f.co_applicants, { name: "", relation_id: null, phone: "" }])} className="btn btn-secondary btn-sm" data-testid="add-coapplicant"><Plus className="h-3.5 w-3.5" />Add</button></div>
             {f.co_applicants.length === 0 && <p className="text-sm text-txt-muted">None added.</p>}
-            {f.co_applicants.map((c, i) => <div key={i} className="mb-3 grid grid-cols-[1fr_1fr_1fr_auto] items-end gap-2" data-testid={`coapp-${i}`}><Field label="Relation"><Select type="relation" value={c.relation_id} onChange={(v) => set("co_applicants", f.co_applicants.map((x, j) => (j === i ? { ...x, relation_id: v } : x)))} /></Field><Field label="Name"><input className="input" value={c.name} onChange={(e) => set("co_applicants", f.co_applicants.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} /></Field><Field label="Phone"><input className="input" value={c.phone} onChange={(e) => set("co_applicants", f.co_applicants.map((x, j) => (j === i ? { ...x, phone: e.target.value } : x)))} /></Field><button type="button" onClick={() => set("co_applicants", f.co_applicants.filter((_, j) => j !== i))} className="btn btn-ghost !h-10 !w-10 !px-0 text-brick" aria-label="Remove"><Trash2 className="h-4 w-4" /></button></div>)}
+            {coRows.map(({ k, row: c }, i) => <div key={k} className="mb-3 grid grid-cols-[1fr_1fr_1fr_auto] items-end gap-2" data-testid={`coapp-${i}`}><Field label="Relation"><Select type="relation" value={c.relation_id} onChange={(v) => set("co_applicants", f.co_applicants.map((x, j) => (j === i ? { ...x, relation_id: v } : x)))} /></Field><Field label="Name"><input className="input" value={c.name} onChange={(e) => set("co_applicants", f.co_applicants.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} /></Field><Field label="Phone"><input className="input" value={c.phone} onChange={(e) => set("co_applicants", f.co_applicants.map((x, j) => (j === i ? { ...x, phone: e.target.value } : x)))} /></Field><button type="button" onClick={() => set("co_applicants", f.co_applicants.filter((_, j) => j !== i))} className="btn btn-ghost !h-10 !w-10 !px-0 text-brick" aria-label="Remove"><Trash2 className="h-4 w-4" /></button></div>)}
           </Card>
           <FormSection title="Nominee">
             <Field label="Relation"><Select type="relation" value={f.nominee.relation_id} onChange={(v) => set("nominee", { ...f.nominee, relation_id: v })} testId="sel-nominee-relation" /></Field>

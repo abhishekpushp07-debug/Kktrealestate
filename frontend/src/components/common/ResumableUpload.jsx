@@ -1,8 +1,8 @@
-/* eslint-disable react/no-array-index-key -- positional editable rows without ids; data-derived keys would remount inputs on edit */
 import { useRef, useState } from "react";
 import { UploadCloud, RotateCcw } from "lucide-react";
 import api, { errMsg } from "../../lib/api";
 import { toast } from "sonner";
+import { useRowKeys } from "@/hooks/useRowKeys";
 
 const PART = 5 * 1024 * 1024;
 const fp = (f) => `kkt.upload.${f.name}.${f.size}.${f.lastModified}`;
@@ -38,6 +38,7 @@ export async function uploadResumable(file, meta, onProgress) {
 export function ResumableUpload({ meta, accept = "image/*,.pdf,.docx,.xlsx,.mp4", multiple = true, onDone, label = "Upload", testId = "resumable-upload" }) {
   const ref = useRef();
   const [rows, setRows] = useState([]);
+  const keyedRows = useRowKeys(rows);
   const run = async (files) => {
     const list = [...files];
     setRows(list.map((f) => ({ name: f.name, pct: 0, state: "uploading" })));
@@ -60,8 +61,8 @@ export function ResumableUpload({ meta, accept = "image/*,.pdf,.docx,.xlsx,.mp4"
       <button type="button" className="btn-secondary h-9 gap-2 text-sm" data-testid={`${testId}-button`} onClick={() => ref.current?.click()}><UploadCloud className="h-4 w-4" />{label}</button>
       {rows.length > 0 && (
         <ul className="mt-3 space-y-1.5" data-testid={`${testId}-progress`}>
-          {rows.map((r, i) => (
-            <li key={i} className="text-xs" data-testid={`${testId}-row-${i}`} data-state={r.state}>
+          {keyedRows.map(({ k, row: r }, i) => (
+            <li key={k} className="text-xs" data-testid={`${testId}-row-${i}`} data-state={r.state}>
               <div className="flex items-center justify-between gap-2"><span className="truncate">{r.name}</span><span className="tabular-nums">{r.state === "failed" ? "failed" : `${r.pct}%`}</span>
                 {r.state === "failed" && <button type="button" className="inline-flex items-center gap-1 text-gold" onClick={() => retry(r)} data-testid={`${testId}-resume-${i}`}><RotateCcw className="h-3 w-3" />Resume</button>}</div>
               <div className="mt-1 h-1.5 w-full overflow-hidden rounded bg-ink-100"><div className={`h-full transition-[width] duration-200 ${r.state === "failed" ? "bg-red-500" : "bg-gold"}`} style={{ width: `${r.pct}%` }} /></div>

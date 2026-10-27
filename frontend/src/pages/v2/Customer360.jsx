@@ -1,4 +1,3 @@
-/* eslint-disable react/no-array-index-key -- fixed-length skeleton placeholders (never reordered) */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { CompletenessRing } from "@/components/v2/Completeness";
@@ -51,7 +50,7 @@ export default function Customer360() {
     window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h);
   }, [setTab, can]);
   const counts = useMemo(() => ({ bookings: c?.bookings.length, demands: P?.counts.demands, receipts: P?.counts.receipts, construction: P?.counts.construction, service: P?.counts.tickets, coapplicants: c?.co_applicants.length }), [c, P]);
-  if (!c) return <div className="space-y-6" data-testid="c360-skeleton"><Skeleton className="h-52 rounded-2xl" /><div className="grid grid-cols-3 gap-3 md:grid-cols-6">{[...Array(6)].map((_, i) => <Skeleton key={i} className="h-[88px] rounded-2xl" />)}</div><Skeleton className="h-96 rounded-2xl" /></div>;
+  if (!c) return <div className="space-y-6" data-testid="c360-skeleton"><Skeleton className="h-52 rounded-2xl" /><div className="grid grid-cols-3 gap-3 md:grid-cols-6">{Array.from({ length: 6 }, (_, n) => n).map((n) => <Skeleton key={n} className="h-[88px] rounded-2xl" />)}</div><Skeleton className="h-96 rounded-2xl" /></div>;
   const active = c.bookings.filter((b) => b.status === "Active");
   const rm = people.find((p) => p.value === c.assigned_sales_user_id)?.label;
   const S = P?.summary;
@@ -84,7 +83,7 @@ export default function Customer360() {
       </Card>
       {S?.cancelled?.count > 0 && <div className="flex flex-wrap items-center gap-3 text-xs text-txt-secondary print:hidden" data-testid="cancelled-rule"><label className="flex cursor-pointer items-center gap-1.5"><input type="checkbox" checked={inclCancelled} onChange={(e) => { const n = new URLSearchParams(sp); if (e.target.checked) n.set("cancelled", "1"); else n.delete("cancelled"); setSp(n, { replace: true }); }} data-testid="include-cancelled-toggle" />Include {S.cancelled.count} cancelled booking(s) in totals</label><span className="text-txt-muted">Cancelled: received {inrShort(S.cancelled.received_paise / 100)} · forfeited {inrShort(S.cancelled.forfeiture_paise / 100)} · refund {inrShort(S.cancelled.refund_paise / 100)}</span></div>}
       <div className="grid grid-cols-3 gap-3 md:grid-cols-6" data-testid="key-strip">
-        {!S ? [...Array(6)].map((_, i) => <Skeleton key={i} className="h-[88px] rounded-2xl" />) : <>
+        {!S ? Array.from({ length: 6 }, (_, n) => n).map((n) => <Skeleton key={n} className="h-[88px] rounded-2xl" />) : <>
           <Tile label="Total agreement" value={inrShort(S.agreement_paise / 100)} hint={`${P.counts.bookings} ${inclCancelled ? "" : "live "}booking(s)`} testId="kn-agreement" />
           <Tile label="Udhar (raised)" value={inrShort(S.udhar_paise / 100)} hint="all ledgers" testId="kn-udhar" spark={tr && <TrendSpark months={tr.months} values={tr.demands} label="Demands raised" w={64} h={26} linkFor={(m) => `/demands?customer=${c.customer_code}&basis=raised&date_from=${m}-01&date_to=${m}-31`} testId="kn-udhar-spark" />} />
           <Tile label="Jama (received)" value={inrShort(S.jama_paise / 100)} hint={S.pending_cheques_paise > 0 ? `+ ${inrShort(S.pending_cheques_paise / 100)} cheques in hand` : "cleared"} tone="sage" testId="kn-jama" spark={tr && <TrendSpark months={tr.months} values={tr.collections} label="Collections" w={64} h={26} linkFor={(m) => `/payments?customer_id=${id}&date_from=${m}-01&date_to=${m}-31`} testId="kn-jama-spark" />} />
