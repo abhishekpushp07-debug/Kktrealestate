@@ -448,10 +448,10 @@ for r in (_ops.router, _access.router, _exports.router, _files.router, auth.rout
 
 app.include_router(api_router)
 
-_cors_list = [o.strip() for o in (os.environ.get("CORS_ORIGINS") or "").split(",") if o.strip() and o.strip() != "*"]
-# ERP is same-origin (served at `/`): default DENY. Explicit origins only via CORS_ORIGINS; "*" is ignored (never wildcard + credentials).
-if _cors_list:
-    app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=_cors_list, allow_methods=["*"], allow_headers=["*"], expose_headers=["X-Request-ID", "X-Response-Time", "ETag", "Idempotent-Replayed", "Content-Disposition"])
+_cors_list, _cors_regex = __import__("services.cors", fromlist=["parse_cors_origins"]).parse_cors_origins(os.environ.get("CORS_ORIGINS"))
+# ERP is same-origin (served at `/`): default DENY. Explicit origins or a single-level host wildcard (https://*.emergent.host) via CORS_ORIGINS; "*" is ignored (never wildcard + credentials).
+if _cors_list or _cors_regex:
+    app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=_cors_list, allow_origin_regex=_cors_regex, allow_methods=["*"], allow_headers=["*"], expose_headers=["X-Request-ID", "X-Response-Time", "ETag", "Idempotent-Replayed", "Content-Disposition"])
 app.add_middleware(ETagMiddleware)
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.add_middleware(IdempotencyMiddleware)
