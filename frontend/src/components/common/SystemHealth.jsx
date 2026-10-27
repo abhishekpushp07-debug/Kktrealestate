@@ -72,6 +72,13 @@ export function SystemHealthCard() {
                 <p className="mt-1 text-xs text-txt-muted">{d.backup.last_restore_drill ? `Last restore drill: ${d.backup.last_restore_drill.integrity_ok ? "integrity ok" : "integrity findings"} · ${new Date(d.backup.last_restore_drill.at).toLocaleString()}` : "No restore drill yet"} · {d.backup.note}</p>
               </div>
             )}
+            {Array.isArray(d.storage) && (
+              <div data-testid="ops-storage"><p className="label">Storage by project (files pipeline)</p>
+                {d.storage.length === 0 ? <p className="mt-2 text-sm text-txt-muted">No files uploaded yet</p> : (
+                  <ul className="mt-2 space-y-1 text-sm">{d.storage.slice(0, 8).map((s) => <li key={s.project_id || "none"} className="flex justify-between" data-testid={`ops-storage-${s.project_id || "none"}`}><span className="truncate">{s.project}</span><span className="tabular-nums text-txt-muted">{s.files} files · {(s.bytes / 1048576).toFixed(1)} MB</span></li>)}</ul>
+                )}
+              </div>
+            )}
           </div>
         </>
       )}
