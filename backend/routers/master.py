@@ -404,7 +404,56 @@ MASTER_FEATURE = {"allocation-categories": "allocation_category", "hold-reasons"
                   "spec-categories": "specification", "spec-items": "specification", "room-types": "flat_type", "area-types": "flat_type", "flat-types": "flat_type", "block-types": "block_type", "amenities": "amenity", "payment-modes": "payment_mode", "document-types": "document_type"}
 
 
-def _register(kind: str, coll_name: str, InModel, search_fields: list[str], usage_fn, label: str):  # noqa: C901 — pre-existing (35); tracked in CR backlog
+async def _ensure_unique(coll, label: str, has_code: bool, company_id: str, data: dict, exclude_id: str | None = None) -> None:
+    ors = [{"name": data["name"]}] if data.get("name") else []
+    if has_code and data.get("code"):
+        ors.append({"code": data["code"]})
+    if not ors:
+        return
+    q = {"company_id": company_id, "$or": ors}
+    if exclude_id:
+        q["id"] = {"$ne": exclude_id}
+    if await coll.find_one(q):
+        raise ApiError(409, f"{label} with the same name or code already exists", "DUPLICATE")
+
+
+def _stamp_active(changes: dict) -> None:
+    changes["updated_at"] = now_iso()
+    if changes.get("is_active") is False:
+        changes["deleted_at"] = now_iso()
+    elif changes.get("is_active") is True:
+        changes["deleted_at"] = None
+
+
+async def _validate_flat_type_update(InModel, before: dict, changes: dict) -> None:
+    merged = {**before, **changes}
+    if "rooms" in changes or "areas" in changes:
+        InModel.model_validate({k: merged[k] for k in InModel.model_fields if k in merged})
+    await validate_flat_type_payload(merged)
+
+
+async def _annotate_usage(items: list[dict], usage_fn) -> None:
+    for d in items:
+        try:
+            cnt, lbl = await usage_fn(d["id"])
+            d["usage_count"], d["usage_label"] = cnt, lbl
+        except Exception:
+            d["usage_count"] = None
+
+
+def _list_response(res: dict, request: Request, response: Response, coll_name: str):
+    """CSV export or ETag/304 handling for a paginated master list."""
+    if res.pop("_csv", False):
+        return Response(to_csv(res["items"]), media_type="text/csv", headers={"Content-Disposition": f"attachment; filename={coll_name}.csv"})
+    etag = '"' + hashlib.sha256(json.dumps(res, sort_keys=True, default=str).encode()).hexdigest() + '"'
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers={"ETag": etag, "Cache-Control": "private, max-age=60"})
+    response.headers["ETag"] = etag
+    response.headers["Cache-Control"] = "private, max-age=60"
+    return res
+
+
+def _register(kind: str, coll_name: str, InModel, search_fields: list[str], usage_fn, label: str):
     feat = MASTER_FEATURE[kind]
     P_VIEW, P_CREATE, P_EDIT, P_DELETE = (f"masters.{feat}.{a}" for a in ("view", "create", "edit", "delete"))
     UpdateModel = _partial(InModel)
@@ -417,16 +466,7 @@ def _register(kind: str, coll_name: str, InModel, search_fields: list[str], usag
         return _present_bank(doc) if is_bank else doc
 
     async def _dup_check(company_id: str, data: dict, exclude_id: str | None = None):
-        ors = [{"name": data["name"]}] if data.get("name") else []
-        if has_code and data.get("code"):
-            ors.append({"code": data["code"]})
-        if not ors:
-            return
-        q = {"company_id": company_id, "$or": ors}
-        if exclude_id:
-            q["id"] = {"$ne": exclude_id}
-        if await coll.find_one(q):
-            raise ApiError(409, f"{label} with the same name or code already exists", "DUPLICATE")
+        await _ensure_unique(coll, label, has_code, company_id, data, exclude_id)
 
     async def list_items(request: Request, response: Response, params: ListParams = Depends(), include_usage: bool = False, user: dict = Depends(require(P_VIEW))):
         q = {"company_id": user["company_id"], **search_filter(params.search, search_fields)}
@@ -438,20 +478,8 @@ def _register(kind: str, coll_name: str, InModel, search_fields: list[str], usag
         res = await paginate(coll, q, params, sort)
         res["items"] = [present(d) for d in res["items"]]
         if include_usage and usage_fn:
-            for d in res["items"]:
-                try:
-                    cnt, lbl = await usage_fn(d["id"])
-                    d["usage_count"], d["usage_label"] = cnt, lbl
-                except Exception:
-                    d["usage_count"] = None
-        if res.pop("_csv", False):
-            return Response(to_csv(res["items"]), media_type="text/csv", headers={"Content-Disposition": f"attachment; filename={coll_name}.csv"})
-        etag = '"' + hashlib.sha256(json.dumps(res, sort_keys=True, default=str).encode()).hexdigest() + '"'
-        if request.headers.get("if-none-match") == etag:
-            return Response(status_code=304, headers={"ETag": etag, "Cache-Control": "private, max-age=60"})
-        response.headers["ETag"] = etag
-        response.headers["Cache-Control"] = "private, max-age=60"
-        return res
+            await _annotate_usage(res["items"], usage_fn)
+        return _list_response(res, request, response, coll_name)
 
     async def create_item(body: InModel, request: Request, user: dict = Depends(require(P_CREATE))):
         data = body.model_dump()
@@ -485,19 +513,12 @@ def _register(kind: str, coll_name: str, InModel, search_fields: list[str], usag
             changes["code"] = changes["code"].upper()
         await _dup_check(user["company_id"], changes, exclude_id=item_id)
         if is_flat_type:
-            merged = {**before, **changes}
-            if "rooms" in changes or "areas" in changes:
-                InModel.model_validate({k: merged[k] for k in InModel.model_fields if k in merged})
-            await validate_flat_type_payload(merged)
+            await _validate_flat_type_update(InModel, before, changes)
         if is_bank:
             changes = _prepare_bank_in(changes)
             if changes.get("is_default"):
                 await coll.update_many({"company_id": user["company_id"], "id": {"$ne": item_id}}, {"$set": {"is_default": False}})
-        changes["updated_at"] = now_iso()
-        if changes.get("is_active") is False:
-            changes["deleted_at"] = now_iso()
-        elif changes.get("is_active") is True:
-            changes["deleted_at"] = None
+        _stamp_active(changes)
         after = await apply_update(coll, before, changes, expected_version(request, changes.get("version")), label)
         await write_audit(user, f"{coll_name}.update", coll_name, item_id, before=present(before), after=present(after), ip=client_ip(request))
         return present(after)

@@ -62,107 +62,139 @@ async def _parse(file: UploadFile) -> list[dict]:
     return rows
 
 
-async def _validate_rows(kind: str, rows: list[dict], project_id: str | None, user: dict) -> list[dict]:  # noqa: C901 — pre-existing (35); tracked in CR backlog
-    out = []
-    if kind == "flat-pricing":
-        if not project_id:
-            raise ApiError(422, "project_id is required for flat pricing import", "VALIDATION_ERROR")
-        ensure_project_access(user, project_id)
-        numbers = [r.get("flat_number", "").strip() for r in rows]
-        flats = {f["flat_number"]: f for f in await db.flats.find({"project_id": project_id, "flat_number": {"$in": numbers}}, {"_id": 0, "id": 1, "flat_number": 1, "status": 1, "super_builtup_sqft": 1}).to_list(None)}
-        seen = set()
-        for i, r in enumerate(rows, start=2):
-            errors, fn = [], r.get("flat_number", "").strip()
-            f = flats.get(fn)
-            if not fn:
-                errors.append("flat_number is required")
-            elif not f:
-                errors.append(f"flat {fn} not found in project")
-            elif f["status"] not in ("Available", "Hold", "Blocked"):
-                errors.append(f"flat {fn} is {f['status']}; price locked by booking")
-            if fn in seen:
-                errors.append("duplicate flat_number in file")
-            seen.add(fn)
-            price, rate = _num(r.get("price"), "price", errors), _num(r.get("rate_per_sqft"), "rate_per_sqft", errors)
-            if price is None and rate is None:
-                errors.append("price or rate_per_sqft required")
-            if rate is not None and f:
-                price = round(rate * (f.get("super_builtup_sqft") or 0), 2)
-            out.append({"row": i, "data": {"flat_number": fn, "flat_id": f["id"] if f else None, "price_paise": round(price * 100) if price is not None else None, "rate_per_sqft": rate}, "errors": errors})
-    elif kind == "parking-slots":
-        if not project_id:
-            raise ApiError(422, "project_id is required for parking import", "VALIDATION_ERROR")
-        ensure_project_access(user, project_id)
-        existing = set(await db.parking_slots.distinct("number", {"project_id": project_id}))
-        seen = set()
-        for i, r in enumerate(rows, start=2):
-            errors, n = [], r.get("number", "").strip()
-            if not n:
-                errors.append("number is required")
-            if n in existing:
-                errors.append(f"slot {n} already exists")
-            if n in seen:
-                errors.append("duplicate number in file")
-            seen.add(n)
-            t = r.get("type", "").strip().title()
-            if t not in ("Covered", "Open", "Stilt", "Basement"):
-                errors.append("type must be Covered/Open/Stilt/Basement")
-            out.append({"row": i, "data": {"number": n, "type": t, "level": r.get("level") or None, "price": _num(r.get("price"), "price", errors)}, "errors": errors})
-    elif kind == "amenities":
-        names = set(await db.amenities.distinct("name", {"company_id": user["company_id"]}))
-        for i, r in enumerate(rows, start=2):
-            errors = []
-            try:
-                data = AmenityIn.model_validate({k: (r.get(k) or None) for k in ("name", "category", "icon", "description")}).model_dump()
-                if data["name"] in names:
-                    errors.append(f"amenity '{data['name']}' already exists")
-            except Exception as e:
-                data = dict(r)
-                errors.append(str(e).split("\n")[1].strip() if "\n" in str(e) else str(e))
-            out.append({"row": i, "data": data, "errors": errors})
-    elif kind == "flat-types":
-        ats = {a["code"]: a["id"] for a in await db.area_types.find({"company_id": user["company_id"], "is_active": True}, {"_id": 0, "id": 1, "code": 1}).to_list(None)}
-        rts = {r["name"].lower(): r["id"] for r in await db.room_types.find({"company_id": user["company_id"], "is_active": True}, {"_id": 0, "id": 1, "name": 1}).to_list(None)}
-        codes = set(await db.flat_types.distinct("code", {"company_id": user["company_id"]}))
-        for i, r in enumerate(rows, start=2):
-            errors, rooms = [], []
-            for part in (r.get("rooms") or "").split(";"):
-                if not part.strip():
-                    continue
-                try:
-                    label, dims = part.split(":")
-                    L, W = dims.lower().split("x")
-                    rt = next((rid for name, rid in rts.items() if name in label.strip().lower() or label.strip().lower() in name), None) or rts.get("bedroom")
-                    if not rt:
-                        errors.append(f"room type not found for '{label}'")
-                    rooms.append({"room_type_id": rt, "label": label.strip(), "length_ft": float(L), "width_ft": float(W)})
-                except Exception:
-                    errors.append(f"bad room spec '{part}' (use Label:LxW)")
-            areas = [{"area_type_id": ats.get(c), "value_sqft": _num(r.get(k), k, errors)} for c, k in (("CARPET", "carpet_sqft"), ("BUILTUP", "builtup_sqft"), ("SUPER_BUILTUP", "super_builtup_sqft")) if r.get(k)]
-            if any(a["area_type_id"] is None for a in areas):
-                errors.append("area types CARPET/BUILTUP/SUPER_BUILTUP must exist")
-            payload = {"name": r.get("name"), "code": (r.get("code") or "").upper(), "bhk": _num(r.get("bhk"), "bhk", errors, True), "facing": r.get("facing") or None,
-                       "rooms": rooms, "areas": [a for a in areas if a["value_sqft"] is not None], "base_rate_per_sqft": _num(r.get("base_rate_per_sqft"), "base_rate_per_sqft", errors), "base_price": _num(r.get("base_price"), "base_price", errors)}
-            if payload["code"] in codes:
-                errors.append(f"code {payload['code']} already exists")
-            if not errors:
-                try:
-                    payload = FlatTypeIn.model_validate(payload).model_dump()
-                    await validate_flat_type_payload(payload)
-                except ApiError as e:
-                    errors.append(e.detail)
-                except Exception as e:
-                    errors.append(str(e).split("\n")[1].strip() if "\n" in str(e) else str(e))
-            out.append({"row": i, "data": payload, "errors": errors})
-    else:
-        for i, r in enumerate(rows, start=2):
-            errors = []
-            if not r.get("full_name"):
-                errors.append("full_name is required")
-            if not (r.get("phone") or r.get("email")):
-                errors.append("phone or email is required")
-            out.append({"row": i, "data": dict(r), "errors": errors + ["customers collection arrives in Phase 2 — validation only"]})
+async def _validate_flat_pricing(rows: list[dict], project_id: str | None, user: dict) -> list[dict]:
+    """flat-pricing rows: flat must exist in the project and be price-unlocked; price or rate_per_sqft."""
+    out: list[dict] = []
+    if not project_id:
+        raise ApiError(422, "project_id is required for flat pricing import", "VALIDATION_ERROR")
+    ensure_project_access(user, project_id)
+    numbers = [r.get("flat_number", "").strip() for r in rows]
+    flats = {f["flat_number"]: f for f in await db.flats.find({"project_id": project_id, "flat_number": {"$in": numbers}}, {"_id": 0, "id": 1, "flat_number": 1, "status": 1, "super_builtup_sqft": 1}).to_list(None)}
+    seen = set()
+    for i, r in enumerate(rows, start=2):
+        errors, fn = [], r.get("flat_number", "").strip()
+        f = flats.get(fn)
+        if not fn:
+            errors.append("flat_number is required")
+        elif not f:
+            errors.append(f"flat {fn} not found in project")
+        elif f["status"] not in ("Available", "Hold", "Blocked"):
+            errors.append(f"flat {fn} is {f['status']}; price locked by booking")
+        if fn in seen:
+            errors.append("duplicate flat_number in file")
+        seen.add(fn)
+        price, rate = _num(r.get("price"), "price", errors), _num(r.get("rate_per_sqft"), "rate_per_sqft", errors)
+        if price is None and rate is None:
+            errors.append("price or rate_per_sqft required")
+        if rate is not None and f:
+            price = round(rate * (f.get("super_builtup_sqft") or 0), 2)
+        out.append({"row": i, "data": {"flat_number": fn, "flat_id": f["id"] if f else None, "price_paise": round(price * 100) if price is not None else None, "rate_per_sqft": rate}, "errors": errors})
     return out
+
+
+async def _validate_parking(rows: list[dict], project_id: str | None, user: dict) -> list[dict]:
+    """parking-slots rows: unique number, known type."""
+    out: list[dict] = []
+    if not project_id:
+        raise ApiError(422, "project_id is required for parking import", "VALIDATION_ERROR")
+    ensure_project_access(user, project_id)
+    existing = set(await db.parking_slots.distinct("number", {"project_id": project_id}))
+    seen = set()
+    for i, r in enumerate(rows, start=2):
+        errors, n = [], r.get("number", "").strip()
+        if not n:
+            errors.append("number is required")
+        if n in existing:
+            errors.append(f"slot {n} already exists")
+        if n in seen:
+            errors.append("duplicate number in file")
+        seen.add(n)
+        t = r.get("type", "").strip().title()
+        if t not in ("Covered", "Open", "Stilt", "Basement"):
+            errors.append("type must be Covered/Open/Stilt/Basement")
+        out.append({"row": i, "data": {"number": n, "type": t, "level": r.get("level") or None, "price": _num(r.get("price"), "price", errors)}, "errors": errors})
+    return out
+
+
+async def _validate_amenities(rows: list[dict], user: dict) -> list[dict]:
+    """amenities rows via AmenityIn."""
+    out: list[dict] = []
+    names = set(await db.amenities.distinct("name", {"company_id": user["company_id"]}))
+    for i, r in enumerate(rows, start=2):
+        errors = []
+        try:
+            data = AmenityIn.model_validate({k: (r.get(k) or None) for k in ("name", "category", "icon", "description")}).model_dump()
+            if data["name"] in names:
+                errors.append(f"amenity '{data['name']}' already exists")
+        except Exception as e:
+            data = dict(r)
+            errors.append(str(e).split("\n")[1].strip() if "\n" in str(e) else str(e))
+        out.append({"row": i, "data": data, "errors": errors})
+    return out
+
+
+async def _validate_flat_types(rows: list[dict], user: dict) -> list[dict]:
+    """flat-types rows: Label:LxW room specs, CARPET/BUILTUP/SUPER_BUILTUP areas, FlatTypeIn + payload validation."""
+    out: list[dict] = []
+    ats = {a["code"]: a["id"] for a in await db.area_types.find({"company_id": user["company_id"], "is_active": True}, {"_id": 0, "id": 1, "code": 1}).to_list(None)}
+    rts = {r["name"].lower(): r["id"] for r in await db.room_types.find({"company_id": user["company_id"], "is_active": True}, {"_id": 0, "id": 1, "name": 1}).to_list(None)}
+    codes = set(await db.flat_types.distinct("code", {"company_id": user["company_id"]}))
+    for i, r in enumerate(rows, start=2):
+        errors, rooms = [], []
+        for part in (r.get("rooms") or "").split(";"):
+            if not part.strip():
+                continue
+            try:
+                label, dims = part.split(":")
+                L, W = dims.lower().split("x")
+                rt = next((rid for name, rid in rts.items() if name in label.strip().lower() or label.strip().lower() in name), None) or rts.get("bedroom")
+                if not rt:
+                    errors.append(f"room type not found for '{label}'")
+                rooms.append({"room_type_id": rt, "label": label.strip(), "length_ft": float(L), "width_ft": float(W)})
+            except Exception:
+                errors.append(f"bad room spec '{part}' (use Label:LxW)")
+        areas = [{"area_type_id": ats.get(c), "value_sqft": _num(r.get(k), k, errors)} for c, k in (("CARPET", "carpet_sqft"), ("BUILTUP", "builtup_sqft"), ("SUPER_BUILTUP", "super_builtup_sqft")) if r.get(k)]
+        if any(a["area_type_id"] is None for a in areas):
+            errors.append("area types CARPET/BUILTUP/SUPER_BUILTUP must exist")
+        payload = {"name": r.get("name"), "code": (r.get("code") or "").upper(), "bhk": _num(r.get("bhk"), "bhk", errors, True), "facing": r.get("facing") or None,
+                   "rooms": rooms, "areas": [a for a in areas if a["value_sqft"] is not None], "base_rate_per_sqft": _num(r.get("base_rate_per_sqft"), "base_rate_per_sqft", errors), "base_price": _num(r.get("base_price"), "base_price", errors)}
+        if payload["code"] in codes:
+            errors.append(f"code {payload['code']} already exists")
+        if not errors:
+            try:
+                payload = FlatTypeIn.model_validate(payload).model_dump()
+                await validate_flat_type_payload(payload)
+            except ApiError as e:
+                errors.append(e.detail)
+            except Exception as e:
+                errors.append(str(e).split("\n")[1].strip() if "\n" in str(e) else str(e))
+        out.append({"row": i, "data": payload, "errors": errors})
+    return out
+
+
+async def _validate_customers(rows: list[dict]) -> list[dict]:
+    """customers: validation only."""
+    out: list[dict] = []
+    for i, r in enumerate(rows, start=2):
+        errors = []
+        if not r.get("full_name"):
+            errors.append("full_name is required")
+        if not (r.get("phone") or r.get("email")):
+            errors.append("phone or email is required")
+        out.append({"row": i, "data": dict(r), "errors": errors + ["customers collection arrives in Phase 2 — validation only"]})
+    return out
+
+
+async def _validate_rows(kind: str, rows: list[dict], project_id: str | None, user: dict) -> list[dict]:
+    if kind == "flat-pricing":
+        return await _validate_flat_pricing(rows, project_id, user)
+    if kind == "parking-slots":
+        return await _validate_parking(rows, project_id, user)
+    if kind == "amenities":
+        return await _validate_amenities(rows, user)
+    if kind == "flat-types":
+        return await _validate_flat_types(rows, user)
+    return await _validate_customers(rows)
 
 
 @router.post("/{kind}/preview")

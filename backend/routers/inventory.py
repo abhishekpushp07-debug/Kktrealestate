@@ -45,8 +45,50 @@ _PERM = {"set_category": "inventory.category.set", "hold": "inventory.hold.creat
 _EVENT = {"set_category": "flat.category_changed", "hold": "flat.held", "extend_hold": "flat.hold_extended", "release": "flat.released", "block": "flat.blocked", "unblock": "flat.unblocked", "set_display": "flat.display_changed", "clear_display": "flat.display_changed"}
 
 
+def _plan(f: dict, body, user: dict, cat: dict | None, exp, now: str) -> tuple[dict | None, str | None]:
+    """Decide the flat update for one bulk action: (update, None) or (None, skip reason)."""
+    upd, why = None, None
+    if body.action == "set_category":
+        if f["status"] in ("Booked", "Sold") and not cat["bookable"]:
+            why = "booked/sold units stay Builder saleable"
+        else:
+            upd = {"allocation_category_id": cat["id"], "allocation_category_code": cat["code"], "bookable": bool(cat["bookable"])}
+    elif body.action == "hold":
+        if f["status"] != "Available":
+            why = f"is {f['status']}"
+        else:
+            upd = {"status": "Hold", "status_changed_at": now, "status_changed_by": user["id"], "status_reason": body.note, "hold": {"reason_id": body.reason_id, "for_customer_id": body.for_customer_id, "for_user_id": body.for_user_id or user["id"], "note": body.note, "expires_at": exp, "created_by": user["id"], "created_at": now}}
+    elif body.action == "extend_hold":
+        if f["status"] != "Hold":
+            why = "not on hold"
+        else:
+            upd = {"hold.expires_at": exp, "hold.expiry_warned": False, "hold.extended_by": user["id"], "hold.extended_at": now}
+    elif body.action == "release":
+        if f["status"] != "Hold":
+            why = "not on hold"
+        elif (f.get("hold") or {}).get("for_user_id") not in (user["id"], None) and "inventory.hold.release" not in user["permissions"]:
+            why = "held by another RM"
+        else:
+            upd = {"status": "Available", "status_changed_at": now, "status_changed_by": user["id"], "status_reason": body.note or "Released", "hold": None}
+    elif body.action == "block":
+        if f["status"] not in ("Available", "Hold"):
+            why = f"is {f['status']}"
+        else:
+            upd = {"status": "Blocked", "status_changed_at": now, "status_changed_by": user["id"], "status_reason": body.reason, "hold": None, "block": {"reason": body.reason, "note": body.note, "created_by": user["id"], "created_at": now}}
+    elif body.action == "unblock":
+        if f["status"] != "Blocked":
+            why = "not blocked"
+        else:
+            upd = {"status": "Available", "status_changed_at": now, "status_changed_by": user["id"], "status_reason": body.note or "Unblocked", "block": None}
+    elif body.action == "set_display":
+        upd = {"display_state": body.display_state, "display_override": True, "display_set_by": user["id"], "display_set_at": now, "display_reason": body.reason}
+    elif body.action == "clear_display":
+        upd = {"display_state": None, "display_override": False, "display_set_by": user["id"], "display_set_at": now, "display_reason": body.reason}
+    return upd, why
+
+
 @router.post("/bulk")
-async def bulk(body: BulkIn, request: Request, user: dict = Depends(require_any("inventory.category.set", "inventory.hold.create", "inventory.hold.release", "inventory.block.set", "inventory.display.set"))):  # noqa: C901 — pre-existing (27); tracked in CR backlog
+async def bulk(body: BulkIn, request: Request, user: dict = Depends(require_any("inventory.category.set", "inventory.hold.create", "inventory.hold.release", "inventory.block.set", "inventory.display.set"))):
     if _PERM[body.action] not in user["permissions"]:
         raise ApiError(403, f"Missing permission: {_PERM[body.action]}", "PERMISSION_DENIED")
     flats = await db.flats.find({"id": {"$in": body.flat_ids}, "is_active": True, **project_scope_filter(user)}, {"_id": 0}).to_list(None)
@@ -54,7 +96,7 @@ async def bulk(body: BulkIn, request: Request, user: dict = Depends(require_any(
         raise ApiError(404, "One or more flats not found in your projects", "NOT_FOUND")
     now = now_iso()
     done, skipped = [], []
-    cat = None
+    cat, exp = None, None
     if body.action == "set_category":
         cat = await db.allocation_categories.find_one({"id": body.category_id, "company_id": user["company_id"], "is_active": True}, {"_id": 0})
         if not cat:
@@ -70,43 +112,7 @@ async def bulk(body: BulkIn, request: Request, user: dict = Depends(require_any(
     if body.action in ("set_display", "block") and not (body.reason or "").strip():
         raise ApiError(422, "A reason is required", "VALIDATION_ERROR")
     for f in flats:
-        upd, why = None, None
-        if body.action == "set_category":
-            if f["status"] in ("Booked", "Sold") and not cat["bookable"]:
-                why = "booked/sold units stay Builder saleable"
-            else:
-                upd = {"allocation_category_id": cat["id"], "allocation_category_code": cat["code"], "bookable": bool(cat["bookable"])}
-        elif body.action == "hold":
-            if f["status"] != "Available":
-                why = f"is {f['status']}"
-            else:
-                upd = {"status": "Hold", "status_changed_at": now, "status_changed_by": user["id"], "status_reason": body.note, "hold": {"reason_id": body.reason_id, "for_customer_id": body.for_customer_id, "for_user_id": body.for_user_id or user["id"], "note": body.note, "expires_at": exp, "created_by": user["id"], "created_at": now}}
-        elif body.action == "extend_hold":
-            if f["status"] != "Hold":
-                why = "not on hold"
-            else:
-                upd = {"hold.expires_at": exp, "hold.expiry_warned": False, "hold.extended_by": user["id"], "hold.extended_at": now}
-        elif body.action == "release":
-            if f["status"] != "Hold":
-                why = "not on hold"
-            elif (f.get("hold") or {}).get("for_user_id") not in (user["id"], None) and "inventory.hold.release" not in user["permissions"]:
-                why = "held by another RM"
-            else:
-                upd = {"status": "Available", "status_changed_at": now, "status_changed_by": user["id"], "status_reason": body.note or "Released", "hold": None}
-        elif body.action == "block":
-            if f["status"] not in ("Available", "Hold"):
-                why = f"is {f['status']}"
-            else:
-                upd = {"status": "Blocked", "status_changed_at": now, "status_changed_by": user["id"], "status_reason": body.reason, "hold": None, "block": {"reason": body.reason, "note": body.note, "created_by": user["id"], "created_at": now}}
-        elif body.action == "unblock":
-            if f["status"] != "Blocked":
-                why = "not blocked"
-            else:
-                upd = {"status": "Available", "status_changed_at": now, "status_changed_by": user["id"], "status_reason": body.note or "Unblocked", "block": None}
-        elif body.action == "set_display":
-            upd = {"display_state": body.display_state, "display_override": True, "display_set_by": user["id"], "display_set_at": now, "display_reason": body.reason}
-        elif body.action == "clear_display":
-            upd = {"display_state": None, "display_override": False, "display_set_by": user["id"], "display_set_at": now, "display_reason": body.reason}
+        upd, why = _plan(f, body, user, cat, exp, now)
         if why:
             skipped.append({"flat_id": f["id"], "flat_number": f["flat_number"], "reason": why})
             continue

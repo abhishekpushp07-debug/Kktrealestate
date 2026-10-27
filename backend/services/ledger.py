@@ -17,14 +17,8 @@ def _oc_totals(lines: list[dict]) -> tuple[int, int]:
     return sum(l.get("demanded_paise", 0) for l in lines), sum(l.get("paid_paise", 0) for l in lines)
 
 
-async def rebuild(booking_id: str) -> list[dict]:  # noqa: C901 — pre-existing (41); tracked in CR backlog
-    b = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
-    if not b:
-        return []
-    demands = await db.demands.find({"booking_id": booking_id, "voided": {"$ne": True}}, {"_id": 0}).to_list(None)
-    payments = await db.payments.find({"booking_id": booking_id, "status": {"$in": ["Cleared", "Reversed"]}}, {"_id": 0}).to_list(None)
-    revisions = b.get("agreement_revisions") or []
-    lines = {l["line_id"]: dict(l, paid_paise=0) for l in (b.get("other_charges") or [])}
+def _collect_events(b: dict, demands: list[dict], payments: list[dict], lines: dict, refunds: list[dict]) -> list[tuple]:
+    """Chronological ledger events: (at, order, kind, source)."""
     events = []
     for d in demands:
         events.append((d["posted_at"], 0, "DEMAND", d))
@@ -36,95 +30,122 @@ async def rebuild(booking_id: str) -> list[dict]:  # noqa: C901 — pre-existing
         events.append((p["posted_at"], 1, kind, p))
         if p["status"] == "Reversed":
             events.append((p["reversal"]["at"], 2, "REVERSAL", p))
-    for r in revisions:
+    for r in b.get("agreement_revisions") or []:
         events.append((r["at"], 0, "AGREEMENT_CHANGE", r))
     if b.get("cancellation"):
         events.append((b["cancellation"]["at"], 3, "CANCELLATION", b["cancellation"]))
-    refunds = await db.refunds.find({"booking_id": booking_id, "status": "Paid"}, {"_id": 0}).to_list(None)
     for rf in refunds:
         events.append((rf["paid_at"], 4, "REFUND", rf))
     for t in b.get("transfers") or []:
         events.append((t["at"], 0, "TRANSFER", t))
     events.sort(key=lambda e: (e[0], e[1]))
+    return events
 
-    cash_agreed = revisions[0]["before"]["cash_agreed_paise"] if revisions else b["cash_agreed_paise"]
-    account_agreed = revisions[0]["before"]["account_agreed_paise"] if revisions else b["account_agreed_paise"]
-    pct, cash_paid, account_paid, last_pay = 0, 0, 0, None
-    closed = False
-    rows = []
-    for seq, (at, _, kind, src) in enumerate(events, start=1):
-        amount, category, ref, note = 0, None, None, None
-        if kind == "DEMAND":
-            if src.get("cumulative_percent") is not None:  # manual/other demands carry no plan %, they add Udhar by amount only
-                pct = src["cumulative_percent"]
-            amount = src["total_demand_paise"]
-            ref = src["demand_number"]
-            note = f"{src.get('installment_name') or src['milestone_name']} ({src.get('percent') if src.get('percent') is not None else pct}%)"
-        elif kind == "PAYMENT":
-            amount = src["amount_paise"]
-            category = src["payment_category"]
-            ref = src["receipt_number"]
-            if category == "Cash":
-                cash_paid += amount
-            else:
-                account_paid += amount
-            if src["status"] != "Reversed":
-                last_pay = max(last_pay or "", src["payment_date"])
-        elif kind == "OTHER_CHARGE_PAYMENT":
-            amount = src["amount_paise"]
-            ref = src["receipt_number"]
-            line = lines.get(src.get("other_charge_line_id"))
+
+class _Running:
+    """Running ledger state; one handler per event kind returns (amount, category, ref, note) and mutates the running totals."""
+
+    def __init__(self, b: dict, revisions: list[dict], lines: dict):
+        self.cash_agreed = revisions[0]["before"]["cash_agreed_paise"] if revisions else b["cash_agreed_paise"]
+        self.account_agreed = revisions[0]["before"]["account_agreed_paise"] if revisions else b["account_agreed_paise"]
+        self.pct, self.cash_paid, self.account_paid, self.last_pay = 0, 0, 0, None
+        self.closed = False
+        self.lines = lines
+
+    def apply(self, kind: str, src: dict) -> tuple:
+        return getattr(self, f"_{kind.lower()}")(src)
+
+    def _bucket(self, category, amount):
+        if category == "Cash":
+            self.cash_paid += amount
+        else:
+            self.account_paid += amount
+
+    def _touch_last_pay(self, src):
+        if src["status"] != "Reversed":
+            self.last_pay = max(self.last_pay or "", src["payment_date"])
+
+    def _demand(self, src):
+        if src.get("cumulative_percent") is not None:  # manual/other demands carry no plan %, they add Udhar by amount only
+            self.pct = src["cumulative_percent"]
+        note = f"{src.get('installment_name') or src['milestone_name']} ({src.get('percent') if src.get('percent') is not None else self.pct}%)"
+        return src["total_demand_paise"], None, src["demand_number"], note
+
+    def _payment(self, src):
+        amount, category = src["amount_paise"], src["payment_category"]
+        self._bucket(category, amount)
+        self._touch_last_pay(src)
+        return amount, category, src["receipt_number"], None
+
+    def _other_charge_payment(self, src):
+        amount, note = src["amount_paise"], None
+        line = self.lines.get(src.get("other_charge_line_id"))
+        if line:
+            line["paid_paise"] += amount
+            note = line["name"]
+        self._touch_last_pay(src)
+        return amount, None, src["receipt_number"], note
+
+    def _reversal(self, src):
+        amount, category = -src["amount_paise"], None
+        if src["against"] == "OTHER_CHARGE":
+            line = self.lines.get(src.get("other_charge_line_id"))
             if line:
                 line["paid_paise"] += amount
-                note = line["name"]
-            if src["status"] != "Reversed":
-                last_pay = max(last_pay or "", src["payment_date"])
-        elif kind == "REVERSAL":
+        else:
+            category = src["payment_category"]
+            self._bucket(category, amount)
+        return amount, category, src["receipt_number"], src["reversal"].get("reason")
+
+    def _other_charge_demand(self, src):
+        return src["demanded_paise"], None, None, src["name"]
+
+    def _agreement_change(self, src):
+        self.cash_agreed, self.account_agreed = src["after"]["cash_agreed_paise"], src["after"]["account_agreed_paise"]
+        amount = (self.cash_agreed + self.account_agreed) - (src["before"]["cash_agreed_paise"] + src["before"]["account_agreed_paise"])
+        return amount, None, None, src.get("reason")
+
+    def _cancellation(self, src):
+        self.closed = True
+        return 0, None, None, f"{src.get('reason')} · refund payable {src.get('refund_paise', 0) / 100:,.0f} · deduction {src.get('deduction_paise', 0) / 100:,.0f}"
+
+    def _refund(self, src):
+        amount, category = -src["amount_paise"], src.get("bucket")
+        note = f"Refund paid · {src.get('mode') or ''} {src.get('reference') or ''}".strip()
+        if category == "Cash":
+            self.cash_paid += amount
+        elif category == "Account":
+            self.account_paid += amount
+        else:
+            for line in self.lines.values():
+                if line.get("paid_paise", 0) > 0:
+                    take = min(line["paid_paise"], -amount)
+                    line["paid_paise"] -= take
+                    amount += take
+                    if amount >= 0:
+                        break
             amount = -src["amount_paise"]
-            ref = src["receipt_number"]
-            note = src["reversal"].get("reason")
-            if src["against"] == "OTHER_CHARGE":
-                line = lines.get(src.get("other_charge_line_id"))
-                if line:
-                    line["paid_paise"] += amount
-            else:
-                category = src["payment_category"]
-                if category == "Cash":
-                    cash_paid += amount
-                else:
-                    account_paid += amount
-        elif kind == "OTHER_CHARGE_DEMAND":
-            amount = src["demanded_paise"]
-            note = src["name"]
-        elif kind == "AGREEMENT_CHANGE":
-            cash_agreed, account_agreed = src["after"]["cash_agreed_paise"], src["after"]["account_agreed_paise"]
-            amount = (cash_agreed + account_agreed) - (src["before"]["cash_agreed_paise"] + src["before"]["account_agreed_paise"])
-            note = src.get("reason")
-        elif kind == "CANCELLATION":
-            amount = 0
-            closed = True
-            note = f"{src.get('reason')} · refund payable {src.get('refund_paise', 0) / 100:,.0f} · deduction {src.get('deduction_paise', 0) / 100:,.0f}"
-        elif kind == "REFUND":
-            amount = -src["amount_paise"]
-            category = src.get("bucket")
-            ref = src.get("refund_number")
-            note = f"Refund paid · {src.get('mode') or ''} {src.get('reference') or ''}".strip()
-            if category == "Cash":
-                cash_paid += amount
-            elif category == "Account":
-                account_paid += amount
-            else:
-                for line in lines.values():
-                    if line.get("paid_paise", 0) > 0:
-                        take = min(line["paid_paise"], -amount)
-                        line["paid_paise"] -= take
-                        amount += take
-                        if amount >= 0:
-                            break
-                amount = -src["amount_paise"]
-        elif kind == "TRANSFER":
-            amount = 0
-            note = f"Transferred {src.get('from_flat')} → {src.get('to_flat')} · {src.get('reason') or ''}"
+        return amount, category, src.get("refund_number"), note
+
+    def _transfer(self, src):
+        return 0, None, None, f"Transferred {src.get('from_flat')} → {src.get('to_flat')} · {src.get('reason') or ''}"
+
+
+async def rebuild(booking_id: str) -> list[dict]:
+    b = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
+    if not b:
+        return []
+    demands = await db.demands.find({"booking_id": booking_id, "voided": {"$ne": True}}, {"_id": 0}).to_list(None)
+    payments = await db.payments.find({"booking_id": booking_id, "status": {"$in": ["Cleared", "Reversed"]}}, {"_id": 0}).to_list(None)
+    revisions = b.get("agreement_revisions") or []
+    lines = {l["line_id"]: dict(l, paid_paise=0) for l in (b.get("other_charges") or [])}
+    refunds = await db.refunds.find({"booking_id": booking_id, "status": "Paid"}, {"_id": 0}).to_list(None)
+    events = _collect_events(b, demands, payments, lines, refunds)
+    acc = _Running(b, revisions, lines)
+    rows = []
+    for seq, (at, _, kind, src) in enumerate(events, start=1):
+        amount, category, ref, note = acc.apply(kind, src)
+        pct, cash_paid, account_paid, closed, cash_agreed, account_agreed = acc.pct, acc.cash_paid, acc.account_paid, acc.closed, acc.cash_agreed, acc.account_agreed
         c_ord, a_ord = (cash_paid, account_paid) if closed else _orders(cash_agreed, account_agreed, pct)
         oc_dem, oc_paid = _oc_totals(list(lines.values()))
         if closed:
@@ -140,6 +161,7 @@ async def rebuild(booking_id: str) -> list[dict]:  # noqa: C901 — pre-existing
             "other_charges_due_paise": oc_dem - oc_paid,
         })
     two_sided(rows, events)
+    pct, cash_paid, account_paid, last_pay = acc.pct, acc.cash_paid, acc.account_paid, acc.last_pay
     # final summary
     pct_now = b.get("raised_percent", b.get("construction_percent", pct))
     c_ord, a_ord = _orders(b["cash_agreed_paise"], b["account_agreed_paise"], pct_now)

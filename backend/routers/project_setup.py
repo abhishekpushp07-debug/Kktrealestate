@@ -99,72 +99,87 @@ class TowersIn(StrictModel):
     towers: list[dict]  # [{id, name?, status?, version}] — basic fields only; structural edits go through /blocks
 
 
+async def _save_stages(p: dict, body: dict, blocks: dict, user: dict) -> dict:
+    project_id = p["id"]
+    data = StagesIn(**body)
+    if data.project_sequence is not None:
+        seq = [x.model_dump() for x in data.project_sequence]
+        await _validate_seq(seq)
+        q = {"id": project_id, **({"version": data.version} if data.version is not None else {})}
+        if not (await db.projects.update_one(q, {"$set": {"construction_stage_sequence": seq, "updated_at": now_iso()}, "$inc": {"version": 1}})).matched_count:
+            raise ApiError(409, "Project was modified by someone else. Reload and retry.", "VERSION_CONFLICT")
+    for bid, seq in data.tower_sequences.items():
+        if bid not in blocks:
+            raise ApiError(404, "Tower does not belong to this project", "TOWER_NOT_IN_PROJECT")
+        if await db.bookings.count_documents({"block_id": bid, "status": "Active"}) and seq is not None:
+            done = {s["stage_id"] for s in blocks[bid].get("construction_stages") or [] if s.get("status") == "Completed"}
+            if done - {x.stage_id for x in seq}:
+                raise ApiError(409, "Cannot remove a completed stage from a tower with active bookings", "STAGE_COMPLETED_LOCKED")
+        seqd = [x.model_dump() for x in seq] if seq is not None else None
+        if seqd:
+            await _validate_seq(seqd)
+        await db.blocks.update_one({"id": bid}, {"$set": {"construction_stage_sequence": seqd, "updated_at": now_iso()}, "$inc": {"version": 1}})
+        await ensure_block_stages({**blocks[bid], "construction_stage_sequence": seqd})
+    return body
+
+
+async def _save_plans(p: dict, body: dict, blocks: dict, user: dict) -> dict:
+    project_id = p["id"]
+    data = PlansIn(**body)
+    plans = {pl["id"]: pl for pl in await db.payment_plans.find({"id": {"$in": [a.payment_plan_id for a in data.assignments]}, "is_active": True}, {"_id": 0}).to_list(None)}
+    for a in data.assignments:
+        if a.payment_plan_id not in plans:
+            raise ApiError(422, "Unknown or inactive payment plan", "VALIDATION_ERROR")
+        if a.block_id and a.block_id not in blocks:
+            raise ApiError(404, "Tower does not belong to this project", "TOWER_NOT_IN_PROJECT")
+        for b in ([blocks[a.block_id]] if a.block_id else blocks.values()):
+            await _check_plan_fits(plans[a.payment_plan_id], b, project_wide=not a.block_id)
+    if sum(1 for a in data.assignments if a.is_default and not a.block_id) > 1 or any(sum(1 for a in data.assignments if a.is_default and a.block_id == bid) > 1 for bid in blocks):
+        raise ApiError(422, "Only one default plan per scope", "VALIDATION_ERROR")
+    in_use = {a["payment_plan_id"] for a in await db.bookings.find({"project_id": project_id, "status": "Active"}, {"_id": 0, "payment_plan_id": 1}).to_list(None)}
+    keep = {(a.payment_plan_id, a.block_id) for a in data.assignments}
+    for old in await db.payment_plan_assignments.find({"project_id": project_id, "is_active": True}, {"_id": 0}).to_list(None):
+        if (old["payment_plan_id"], old.get("block_id")) not in keep:
+            await db.payment_plan_assignments.update_one({"id": old["id"]}, {"$set": {"is_active": False, "effective_to": now_iso()[:10]}})
+    for a in data.assignments:
+        pl, b = plans[a.payment_plan_id], blocks.get(a.block_id) if a.block_id else None
+        setv = {"is_active": True, "is_default": a.is_default, "plan_name": pl["name"], "plan_code": pl.get("code"), "block_name": b["name"] if b else None, "project_name": p["name"], "effective_to": None}
+        ins = {k: v for k, v in base_doc(user, user["company_id"]).items() if k not in setv}
+        await db.payment_plan_assignments.update_one({"project_id": project_id, "block_id": a.block_id, "payment_plan_id": a.payment_plan_id},
+                                                     {"$set": setv, "$setOnInsert": {**ins, "effective_from": now_iso()[:10]}}, upsert=True)
+    body = {"assignments": [a.model_dump() for a in data.assignments], "plans_in_use": sorted(in_use)}
+    return body
+
+
+async def _save_pricing(p: dict, body: dict, blocks: dict, user: dict) -> dict:
+    data = PricingIn(**body)
+    for r in data.block_rates:
+        if r.block_id not in blocks:
+            raise ApiError(404, "Tower does not belong to this project", "TOWER_NOT_IN_PROJECT")
+        await db.blocks.update_one({"id": r.block_id}, {"$set": {"rate_per_sqft": r.rate_per_sqft, "floor_rise_per_sqft": r.floor_rise_per_sqft, "default_cash_percent": r.default_cash_percent, "updated_at": now_iso()}, "$inc": {"version": 1}})
+    return body
+
+
+async def _save_towers(p: dict, body: dict, blocks: dict, user: dict) -> dict:
+    data = TowersIn(**body)
+    for t in data.towers:
+        if t.get("id") not in blocks:
+            raise ApiError(404, "Tower does not belong to this project", "TOWER_NOT_IN_PROJECT")
+        upd = {k: t[k] for k in ("name", "status", "ground_floor_label") if k in t}
+        if upd:
+            q = {"id": t["id"], **({"version": t["version"]} if t.get("version") is not None else {})}
+            if not (await db.blocks.update_one(q, {"$set": {**upd, "updated_at": now_iso()}, "$inc": {"version": 1}})).matched_count:
+                raise ApiError(409, f"Tower {blocks[t['id']]['name']} was modified by someone else", "VERSION_CONFLICT")
+    return body
+
+
 @router.put("/{project_id}/setup/{section}")
-async def save_section(project_id: str, section: str, body: dict, request: Request, user: dict = Depends(require("masters.project.edit"))):  # noqa: C901 — pre-existing (26); tracked in CR backlog
+async def save_section(project_id: str, section: str, body: dict, request: Request, user: dict = Depends(require("masters.project.edit"))):
     ensure_project_access(user, project_id)
     p = await get_or_404(db.projects, project_id, "Project", {"company_id": user["company_id"]})
     if section not in SECTIONS:
         raise ApiError(404, f"Unknown setup section; one of {', '.join(SECTIONS)}", "NOT_FOUND")
     blocks = {b["id"]: b for b in await db.blocks.find({"project_id": project_id, "is_active": True}, {"_id": 0}).to_list(200)}
-    if section == "stages":
-        data = StagesIn(**body)
-        if data.project_sequence is not None:
-            seq = [x.model_dump() for x in data.project_sequence]
-            await _validate_seq(seq)
-            q = {"id": project_id, **({"version": data.version} if data.version is not None else {})}
-            if not (await db.projects.update_one(q, {"$set": {"construction_stage_sequence": seq, "updated_at": now_iso()}, "$inc": {"version": 1}})).matched_count:
-                raise ApiError(409, "Project was modified by someone else. Reload and retry.", "VERSION_CONFLICT")
-        for bid, seq in data.tower_sequences.items():
-            if bid not in blocks:
-                raise ApiError(404, "Tower does not belong to this project", "TOWER_NOT_IN_PROJECT")
-            if await db.bookings.count_documents({"block_id": bid, "status": "Active"}) and seq is not None:
-                done = {s["stage_id"] for s in blocks[bid].get("construction_stages") or [] if s.get("status") == "Completed"}
-                if done - {x.stage_id for x in seq}:
-                    raise ApiError(409, "Cannot remove a completed stage from a tower with active bookings", "STAGE_COMPLETED_LOCKED")
-            seqd = [x.model_dump() for x in seq] if seq is not None else None
-            if seqd:
-                await _validate_seq(seqd)
-            await db.blocks.update_one({"id": bid}, {"$set": {"construction_stage_sequence": seqd, "updated_at": now_iso()}, "$inc": {"version": 1}})
-            await ensure_block_stages({**blocks[bid], "construction_stage_sequence": seqd})
-    elif section == "plans":
-        data = PlansIn(**body)
-        plans = {pl["id"]: pl for pl in await db.payment_plans.find({"id": {"$in": [a.payment_plan_id for a in data.assignments]}, "is_active": True}, {"_id": 0}).to_list(None)}
-        for a in data.assignments:
-            if a.payment_plan_id not in plans:
-                raise ApiError(422, "Unknown or inactive payment plan", "VALIDATION_ERROR")
-            if a.block_id and a.block_id not in blocks:
-                raise ApiError(404, "Tower does not belong to this project", "TOWER_NOT_IN_PROJECT")
-            for b in ([blocks[a.block_id]] if a.block_id else blocks.values()):
-                await _check_plan_fits(plans[a.payment_plan_id], b, project_wide=not a.block_id)
-        if sum(1 for a in data.assignments if a.is_default and not a.block_id) > 1 or any(sum(1 for a in data.assignments if a.is_default and a.block_id == bid) > 1 for bid in blocks):
-            raise ApiError(422, "Only one default plan per scope", "VALIDATION_ERROR")
-        in_use = {a["payment_plan_id"] for a in await db.bookings.find({"project_id": project_id, "status": "Active"}, {"_id": 0, "payment_plan_id": 1}).to_list(None)}
-        keep = {(a.payment_plan_id, a.block_id) for a in data.assignments}
-        for old in await db.payment_plan_assignments.find({"project_id": project_id, "is_active": True}, {"_id": 0}).to_list(None):
-            if (old["payment_plan_id"], old.get("block_id")) not in keep:
-                await db.payment_plan_assignments.update_one({"id": old["id"]}, {"$set": {"is_active": False, "effective_to": now_iso()[:10]}})
-        for a in data.assignments:
-            pl, b = plans[a.payment_plan_id], blocks.get(a.block_id) if a.block_id else None
-            setv = {"is_active": True, "is_default": a.is_default, "plan_name": pl["name"], "plan_code": pl.get("code"), "block_name": b["name"] if b else None, "project_name": p["name"], "effective_to": None}
-            ins = {k: v for k, v in base_doc(user, user["company_id"]).items() if k not in setv}
-            await db.payment_plan_assignments.update_one({"project_id": project_id, "block_id": a.block_id, "payment_plan_id": a.payment_plan_id},
-                                                         {"$set": setv, "$setOnInsert": {**ins, "effective_from": now_iso()[:10]}}, upsert=True)
-        body = {"assignments": [a.model_dump() for a in data.assignments], "plans_in_use": sorted(in_use)}
-    elif section == "pricing":
-        data = PricingIn(**body)
-        for r in data.block_rates:
-            if r.block_id not in blocks:
-                raise ApiError(404, "Tower does not belong to this project", "TOWER_NOT_IN_PROJECT")
-            await db.blocks.update_one({"id": r.block_id}, {"$set": {"rate_per_sqft": r.rate_per_sqft, "floor_rise_per_sqft": r.floor_rise_per_sqft, "default_cash_percent": r.default_cash_percent, "updated_at": now_iso()}, "$inc": {"version": 1}})
-    else:  # towers: light fields only
-        data = TowersIn(**body)
-        for t in data.towers:
-            if t.get("id") not in blocks:
-                raise ApiError(404, "Tower does not belong to this project", "TOWER_NOT_IN_PROJECT")
-            upd = {k: t[k] for k in ("name", "status", "ground_floor_label") if k in t}
-            if upd:
-                q = {"id": t["id"], **({"version": t["version"]} if t.get("version") is not None else {})}
-                if not (await db.blocks.update_one(q, {"$set": {**upd, "updated_at": now_iso()}, "$inc": {"version": 1}})).matched_count:
-                    raise ApiError(409, f"Tower {blocks[t['id']]['name']} was modified by someone else", "VERSION_CONFLICT")
+    body = await {"stages": _save_stages, "plans": _save_plans, "pricing": _save_pricing, "towers": _save_towers}[section](p, body, blocks, user)
     await write_audit(user, f"project.setup.{section}", "project", project_id, after={"section": section, **({k: v for k, v in body.items() if k != "version"} if isinstance(body, dict) else {})}, ip=client_ip(request))
     return await get_setup(project_id, user)

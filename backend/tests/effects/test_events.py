@@ -8,6 +8,7 @@ import uuid
 
 import pytest
 import requests
+
 TEST_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
 
 BASE = os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:8001").rstrip("/")
@@ -246,15 +247,22 @@ def test_forfeiture_when_nothing_refundable(H, modes):
 
 
 def test_one_outstanding_number(H):
-    # other workers may post money concurrently; take up to 3 quiet snapshots
-    for _ in range(20):
+    # Deterministic: flush read models first (home totals are a read model; the report and booking summaries are live),
+    # then read all three in one window and require strict equality. Sibling xdist workers may post money between the
+    # reads, so retry while the booking-summary snapshot changes between the before/after reads — never relax equality.
+    def bookings():
+        items = g(H, "/bookings", status="Active", page_size=200)["items"] + g(H, "/bookings", status="Completed", page_size=200)["items"]
+        return {b["id"]: (b.get("summary") or {}).get("outstanding_paise", 0) for b in items}
+    for _ in range(40):
+        post(H, "/admin/reconcile-ledgers")
+        before = bookings()
         home = g(H, "/dashboard/home", fresh=1)["totals"]
         rep = g(H, "/reports/outstanding")["totals"]
-        items = g(H, "/bookings", status="Active", page_size=200)["items"] + g(H, "/bookings", status="Completed", page_size=200)["items"]
-        sigma = sum((b.get("summary") or {}).get("outstanding_paise", 0) for b in items)
-        if home["outstanding_paise"] == rep["due_paise"] == sigma:
+        after = bookings()
+        sigma = sum(after.values())
+        if before == after and home["outstanding_paise"] == rep["due_paise"] == sigma:
             break
-        time.sleep(1)
+        time.sleep(0.5)
     assert home["outstanding_paise"] == rep["due_paise"] == sigma, (home["outstanding_paise"], rep["due_paise"], sigma)
     assert "advance_paise" in home
 
