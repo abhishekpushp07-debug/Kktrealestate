@@ -46,6 +46,7 @@ EVENTS = {
     "stage.photo": {"entity": "block", "surfaces": ["blocks", "customer360", "audit"]},
     "flat.status": {"entity": "flat", "surfaces": INVENTORY + ["notifications"], "roles": ["Sales"], "title": lambda a: ("Unit on hold", f"{a.get('flat_number', '')} · {a.get('reason', '')}") if a.get("status") == "Hold" else None},
     "flat.price": {"entity": "flat", "surfaces": INVENTORY},
+    "flat.create": {"entity": "flat", "surfaces": INVENTORY + ["wizard", "public", "portal"], "title": None},  # X.3 single-flat add (structure builder / wizard quick-add)
     "flat.category_changed": {"entity": "flat", "surfaces": INVENTORY + ["wizard", "public", "portal"], "title": None},
     "flat.held": {"entity": "flat", "surfaces": INVENTORY + ["wizard", "public", "portal", "notifications"], "roles": ["Sales"], "title": lambda a: ("Unit on hold", f"{a.get('flat_number', '')} · until {str((a.get('hold') or {}).get('expires_at', ''))[:16].replace('T', ' ')}")},
     "flat.hold_extended": {"entity": "flat", "surfaces": INVENTORY + ["notifications"], "title": None},
