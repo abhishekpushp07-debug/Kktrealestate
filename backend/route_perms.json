@@ -2789,6 +2789,33 @@
     "masters.company.edit"
    ]
   },
+  "structure:GET /projects/{project_id}/structure": {
+   "codes": [
+    "masters.project.view"
+   ],
+   "fn": "project_structure",
+   "legacy": [
+    "masters.project.view"
+   ]
+  },
+  "structure:POST /blocks/{block_id}/flats": {
+   "codes": [
+    "masters.flat.create"
+   ],
+   "fn": "add_single_flat",
+   "legacy": [
+    "masters.flat.create"
+   ]
+  },
+  "structure:POST /blocks/{block_id}/floors/preview": {
+   "codes": [
+    "masters.tower.edit"
+   ],
+   "fn": "floors_preview",
+   "legacy": [
+    "masters.tower.edit"
+   ]
+  },
   "support:DELETE /notices/{notice_id}": {
    "codes": [
     "construction.notice.delete"

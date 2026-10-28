@@ -13,6 +13,7 @@ const Dashboard = lazy(() => import("@/pages/v2/Home"));
 const Projects = lazy(() => import("@/pages/v2/Projects"));
 const ProjectDetail = lazy(() => import("@/pages/v2/ProjectWorkspace"));
 const ProjectSetup = lazy(() => import("@/pages/v2/ProjectSetup"));
+const ProjectStructure = lazy(() => import("@/pages/v2/ProjectStructure"));
 const Catalogues = lazy(() => import("@/pages/v2/Catalogues"));
 const BlockDetail = lazy(() => import("@/pages/BlockDetail"));
 const DocumentsPage = lazy(() => import("@/pages/v2/Documents"));
@@ -79,7 +80,7 @@ function PrintGuard({ children }) {
 }
 
 const R = [
-  ["website/settings", "website.cms.edit", SiteSettingsPage], ["website/notices", "website.cms.view", Notices], ["website/:coll", "website.cms.view", CmsCollection], ["dashboard", "masters.project.view", Dashboard], ["projects", "masters.project.view", Projects], ["projects/new", "masters.project.create", ProjectSetup], ["projects/:id/setup", "masters.project.edit", ProjectSetup], ["projects/:id", "masters.project.view", ProjectDetail], ["settings/catalogues", "masters.catalogue.view", Catalogues], ["blocks/:id", "masters.project.view", BlockDetail], ["flats", "masters.project.view", Flats],
+  ["website/settings", "website.cms.edit", SiteSettingsPage], ["website/notices", "website.cms.view", Notices], ["website/:coll", "website.cms.view", CmsCollection], ["dashboard", "masters.project.view", Dashboard], ["projects", "masters.project.view", Projects], ["projects/new", "masters.project.create", ProjectSetup], ["projects/:id/setup", "masters.project.edit", ProjectSetup], ["projects/:id/structure", "masters.project.view", ProjectStructure], ["projects/:id", "masters.project.view", ProjectDetail], ["settings/catalogues", "masters.catalogue.view", Catalogues], ["blocks/:id", "masters.project.view", BlockDetail], ["flats", "masters.project.view", Flats],
 ["users", "admin.user.view", Users], ["admin/access-control", "admin.access_control.manage", AccessControl], ["admin/audit-logs", "admin.audit.view", AuditLog], ["roles", "admin.role.view", Roles], ["audit", "admin.audit.view", AuditLog], ["settings", "admin.settings.view", Settings], ["settings/definitions", "masters.project.view", Definitions], ["customers", "sales.customer.view", Customers], ["customers/new", "sales.customer.create", CustomerForm], ["customers/:id/edit", "sales.customer.edit", CustomerForm], ["customers/:id", "sales.customer.view", CustomerDetail], ["leads", "sales.lead.view", Leads],
   ["bookings", "sales.booking.view", Bookings], ["bookings/new", "sales.booking.create", BookingWizard], ["bookings/:id", "sales.booking.view", BookingDetail], ["payments", "finance.payment.view", Payments], ["documents", "documents.document.view", DocumentsPage], ["demands", "demands.register.view", DemandsPage], ["messaging", "messaging.message.view", MessagingPage], ["roznamcha", "finance.roznamcha.view", Roznamcha], ["reports/exports", "reports.*", Exports], ["reports", "reports.*", Reports], ["reports/:key", "reports.*", Reports], ["service-requests", "service.ticket.view", ServiceRequests], ["service-requests/:id", "service.ticket.view", ServiceRequests],
 ];

@@ -4,10 +4,10 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import Field
 
 from db import db
-from models_out import FlatsOut, FlatsOutPage
 from deps import ensure_project_access, project_scope_filter, require, require_any
-from services.flat_generation import resnapshot_flat
+from models_out import FlatsOut, FlatsOutPage
 from services import inventory as inv
+from services.flat_generation import resnapshot_flat
 from utils import (
     ApiError,
     ListParams,
@@ -29,6 +29,7 @@ MANUAL_STATUSES = {"Available", "Hold", "Blocked"}
 
 
 class FlatUpdate(StrictModel):
+    flat_number: str | None = Field(default=None, min_length=1, max_length=20)
     flat_type_id: str | None = None
     facing: Literal["N", "S", "E", "W", "NE", "NW", "SE", "SW"] | None = None
     rate_per_sqft: float | None = Field(default=None, ge=0)
@@ -137,6 +138,10 @@ async def update_flat(flat_id: str, body: FlatUpdate, request: Request, user: di
     changes.pop("version", None)
     if not changes:
         raise ApiError(400, "No changes supplied", "NO_CHANGES")
+    if "flat_number" in changes:
+        changes["flat_number"] = changes["flat_number"].strip()
+        if changes["flat_number"] != before["flat_number"] and await db.flats.find_one({"block_id": before["block_id"], "flat_number": changes["flat_number"], "id": {"$ne": flat_id}}, {"_id": 0, "id": 1}):
+            raise ApiError(409, f"Duplicate: flat number {changes['flat_number']} already exists in this tower", "DUPLICATE_FLAT")
     if "flat_type_id" in changes and changes["flat_type_id"] != before["flat_type_id"]:
         if before["status"] != "Available":
             raise ApiError(409, "Flat type can only be changed while the flat is Available", "NOT_AVAILABLE")

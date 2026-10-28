@@ -5,8 +5,8 @@ from pydantic import Field, field_validator, model_validator
 from pymongo import UpdateOne
 
 from db import db
-from models_out import BlocksOut, BlocksOutPage
 from deps import ensure_project_access, project_scope_filter, require, require_any
+from models_out import BlocksOut, BlocksOutPage
 from routers.projects import STATUSES
 from services.flat_generation import floor_labels, generate_flats, unit_floors
 from utils import (
@@ -118,6 +118,8 @@ class BlockUpdate(StrictModel):
 class AddFloorsIn(StrictModel):
     count: int = Field(ge=1, le=50)
     floor_plan_template_id: str | None = None
+    flats_per_floor: int | None = Field(default=None, ge=1, le=50)  # X.3: inline positions (N flats of one type per floor)
+    flat_type_id: str | None = None
 
 
 class BulkPriceIn(StrictModel):
@@ -164,8 +166,8 @@ async def _validate_block_refs(block_type_id: str | None, mt_id: str | None):
 
 
 async def _attach_counts(blocks: list[dict], user: dict | None = None):
-    from services.counters import present_counts
     from services import inventory as _inv
+    from services.counters import present_counts
     await _inv.display_unit_counts(blocks, "block_id", user)
     pids = list({b["project_id"] for b in blocks})
     pmap = {p["id"]: p for p in await db.projects.find({"id": {"$in": pids}}, {"_id": 0, "id": 1, "name": 1, "code": 1}).to_list(None)}
@@ -297,15 +299,9 @@ async def regenerate_flats(block_id: str, request: Request, user: dict = Depends
 @router.post("/{block_id}/floors")
 async def add_floors(block_id: str, body: AddFloorsIn, request: Request, user: dict = Depends(require("masters.tower.edit"))):
     block = await _load_block(block_id, user)
-    old_labels = floor_labels(block)
-    new_block = {**block, "floors": block["floors"] + body.count}
-    new_labels = [f for f in floor_labels(new_block) if f not in old_labels]
-    plans = list(block.get("floor_plans") or [])
-    last = plans[-1] if plans else None
-    tmpl = body.floor_plan_template_id or (last or {}).get("floor_plan_template_id")
-    if tmpl or (last and last.get("positions")):
-        plans.append({"from_floor": new_labels[0], "to_floor": new_labels[-1], "floor_plan_template_id": tmpl, "positions": None if tmpl else last["positions"]})
-    new_block["floor_plans"] = plans
+    from routers.structure import _extended
+    new_block, new_labels = _extended(block, body)
+    plans = new_block["floor_plans"]
     flats = await generate_flats(new_block, new_labels, user)
     await db.blocks.update_one({"id": block_id}, {"$set": {"floors": new_block["floors"], "floor_plans": plans, "updated_at": now_iso()}, "$inc": {"version": 1}})
     await write_audit(user, "block.add_floors", "block", block_id, before={"floors": block["floors"]}, after={"floors": new_block["floors"], "flats_added": len(flats)}, ip=client_ip(request))
