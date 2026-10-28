@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import APIRouter, Depends, Request
 
 from db import db
@@ -202,9 +203,26 @@ async def create_backup(request: Request, include_sensitive: bool = False, user:
 
 @router.get("/backups")
 async def list_backups(user: dict = Depends(require("admin.data.backup"))):
+    """Super Admin: in-app JSON exports (`items`) + Z.1 mongodump archives on disk, disk usage and the retention policy."""
     if user.get("role_name") != "Super Admin":
         raise ApiError(403, "Super Admin only", "FORBIDDEN")
-    return {"items": await db.backups.find({"company_id": user["company_id"]}, {"_id": 0, "data": 0, "download_token": 0}).sort("created_at", -1).limit(20).to_list(20)}
+    from tools import backup as bk
+    items, archives, lb, skip = await asyncio.gather(
+        db.backups.find({"company_id": user["company_id"]}, {"_id": 0, "data": 0, "download_token": 0}).sort("created_at", -1).limit(20).to_list(20),
+        asyncio.to_thread(bk.list_archives), db.settings.find_one({"key": "last_backup"}, {"_id": 0, "value": 1}), db.settings.find_one({"key": "last_backup_skip"}, {"_id": 0, "value": 1}))
+    disk = bk.disk_usage()
+    return {"items": items, "archives": list(reversed(archives)), "archives_total_bytes": sum(a["bytes"] for a in archives), "disk": disk, "policy": bk.policy(),
+            "last_backup": (lb or {}).get("value"), "last_skip": (skip or {}).get("value"), "warning": disk["used_pct"] is not None and disk["used_pct"] >= 80}
+
+
+@router.post("/backups/prune")
+async def prune_backups(request: Request, user: dict = Depends(require("admin.data.backup"))):
+    if user.get("role_name") != "Super Admin":
+        raise ApiError(403, "Super Admin only", "FORBIDDEN")
+    from tools import backup as bk
+    res = await asyncio.to_thread(bk.prune)
+    await write_audit(user, "backup.prune", "system", "backup", after={"removed": res["removed"], "remaining": res["remaining"], "total_bytes": res["total_bytes"]}, ip=client_ip(request))
+    return {**res, "disk": bk.disk_usage()}
 
 
 @router.get("/backups/{backup_id}/download")

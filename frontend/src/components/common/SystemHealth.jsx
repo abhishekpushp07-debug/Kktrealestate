@@ -1,10 +1,38 @@
 import { useEffect, useState } from "react";
-import { Activity, Database, RefreshCw, Timer } from "lucide-react";
+import { Activity, Database, HardDrive, RefreshCw, Timer } from "lucide-react";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
 const ms = (v) => (v == null ? "—" : `${Math.round(v)} ms`);
 const Tone = ({ v, warn, bad }) => <span className={v == null ? "" : v > bad ? "text-brick font-semibold" : v > warn ? "text-amber-700" : "text-sage-700"}>{ms(v)}</span>;
+
+const mb = (b) => (b == null ? "—" : b >= 1073741824 ? `${(b / 1073741824).toFixed(2)} GB` : `${(b / 1048576).toFixed(1)} MB`);
+
+/** Z.1 — disk % + archives + last backup, warning badge at ≥ 80 % used; audited prune. */
+function DiskBackups({ tick, onPruned }) {
+  const [b, setB] = useState(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { let alive = true; api.get("/admin/backups").then((r) => alive && setB(r.data)).catch(() => {}); return () => { alive = false; }; }, [tick]);
+  if (!b) return null;
+  const used = b.disk?.used_pct ?? 0;
+  const prune = async () => { setBusy(true); try { await api.post("/admin/backups/prune"); onPruned?.(); } finally { setBusy(false); } };
+  return (
+    <div className="mb-5 rounded-xl border border-warm-200 bg-warm-50/60 p-4" data-testid="ops-disk-backups">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="label flex items-center gap-2"><HardDrive className="h-3.5 w-3.5" />Disk &amp; backups
+          {b.warning && <span className="rounded-full bg-brick/10 px-2 py-0.5 text-xs font-semibold text-brick" data-testid="ops-disk-warning">Disk {used}% used</span>}</p>
+        <button className="btn btn-ghost btn-sm" onClick={prune} disabled={busy} data-testid="ops-backups-prune">Prune now</button>
+      </div>
+      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-warm-100"><div className={`h-full ${used >= 80 ? "bg-brick" : "bg-sage"}`} style={{ width: `${Math.min(used, 100)}%` }} /></div>
+      <div className="mt-3 grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
+        <div data-testid="ops-disk-pct"><p className="label">Disk</p><p className="font-display text-xl">{used}%</p><p className="text-xs text-txt-muted">{mb(b.disk?.free_bytes)} free of {mb(b.disk?.total_bytes)}</p></div>
+        <div data-testid="ops-last-backup"><p className="label">Last backup</p><p className="font-display text-xl">{b.last_backup ? mb(b.last_backup.bytes) : "—"}</p><p className="text-xs text-txt-muted">{b.last_backup ? new Date(b.last_backup.created_at).toLocaleString() : b.last_skip ? `skipped: ${b.last_skip.reason}` : "never"}</p></div>
+        <div data-testid="ops-archives"><p className="label">Archives</p><p className="font-display text-xl">{b.archives.length}</p><p className="text-xs text-txt-muted">{mb(b.archives_total_bytes)} on disk</p></div>
+        <div data-testid="ops-policy"><p className="label">Policy</p><p className="text-sm">keep {b.policy.keep_per_db} / db · {b.policy.keep_test_db} for test DBs</p><p className="text-xs text-txt-muted">cap {mb(b.policy.max_total_mb * 1048576)} · min free {b.policy.min_free_pct}%</p></div>
+      </div>
+    </div>
+  );
+}
 
 export function SystemHealthCard() {
   const { user } = useAuth();
@@ -25,6 +53,7 @@ export function SystemHealthCard() {
   const jobs = Object.entries(d?.jobs || {});
   return (
     <section className="card p-6" data-testid="system-health-card">
+      <DiskBackups tick={tick} onPruned={() => setTick((x) => x + 1)} />
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3"><span className="grid h-9 w-9 place-items-center rounded-[10px] bg-warm-100"><Activity className="h-5 w-5" strokeWidth={1.75} /></span>
           <div><h3 className="font-display text-lg">System health</h3><p className="text-sm text-txt-muted">Rolling {Math.round((d?.requests?.window_s || 900) / 60)} min · auto-refresh 30 s · read-only</p></div></div>

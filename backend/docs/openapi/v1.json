@@ -12930,6 +12930,7 @@
   },
   "/api/admin/backups": {
    "get": {
+    "description": "Super Admin: in-app JSON exports (`items`) + Z.1 mongodump archives on disk, disk usage and the retention policy.",
     "operationId": "list_backups_api_admin_backups_get",
     "responses": {
      "200": {
@@ -12947,6 +12948,30 @@
      }
     ],
     "summary": "List Backups",
+    "tags": [
+     "admin"
+    ]
+   }
+  },
+  "/api/admin/backups/prune": {
+   "post": {
+    "operationId": "prune_backups_api_admin_backups_prune_post",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Prune Backups",
     "tags": [
      "admin"
     ]

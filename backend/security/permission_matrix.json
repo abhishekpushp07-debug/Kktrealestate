@@ -1047,6 +1047,9 @@
  "POST /api/admin/backup": [
   "admin.data.backup"
  ],
+ "POST /api/admin/backups/prune": [
+  "admin.data.backup"
+ ],
  "POST /api/admin/customers/{customer_id}/erase": [
   "admin.data.erase"
  ],

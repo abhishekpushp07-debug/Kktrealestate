@@ -426,6 +426,15 @@
     "admin.data.backup"
    ]
   },
+  "admin:POST /backups/prune": {
+   "codes": [
+    "admin.data.backup"
+   ],
+   "fn": "prune_backups",
+   "legacy": [
+    "admin.data.backup"
+   ]
+  },
   "admin:POST /customers/{customer_id}/erase": {
    "codes": [
     "admin.data.erase"

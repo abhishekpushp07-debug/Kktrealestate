@@ -456,7 +456,17 @@ async def _db_ping_ms():
 def _health_payload(ping):
     return {"status": "ok" if ping is not None else "degraded", "db": STARTUP["db"], "db_ping_ms": ping, "service": "kkt-erp", "version": VERSION,
             "uptime_s": round(time.time() - START_TIME), "startup": {"phase": STARTUP["phase"], "done": STARTUP["done"], "started_at": STARTUP["started_at"]},
-            "transaction_mode": UOW_STATE["mode"], "transactions_supported": UOW_STATE["transactions"], "workers": os.environ.get("WEB_CONCURRENCY", "1"), "pid": os.getpid()}
+            "transaction_mode": UOW_STATE["mode"], "transactions_supported": UOW_STATE["transactions"], "workers": os.environ.get("WEB_CONCURRENCY", "1"), "pid": os.getpid(),
+            "disk_free_pct": _disk_free_pct()}
+
+
+def _disk_free_pct():
+    try:
+        import shutil
+        u = shutil.disk_usage(os.environ.get("BACKUP_DIR", "/app/backups") if os.path.isdir(os.environ.get("BACKUP_DIR", "/app/backups")) else "/app")
+        return round(100 * u.free / u.total, 1)
+    except OSError:
+        return None
 
 
 @api_router.get("/health", tags=["system"])
