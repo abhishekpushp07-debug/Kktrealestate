@@ -19,6 +19,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { ContextActions } from "@/components/common/ContextActions";
 
 const TYPE_COLORS = ["border-sky-300 bg-sky-50", "border-violet-300 bg-violet-50", "border-rose-300 bg-rose-50", "border-teal-300 bg-teal-50", "border-orange-300 bg-orange-50", "border-lime-300 bg-lime-50"];
 const BAND_COLORS = ["border-emerald-200 bg-sage-50", "border-lime-300 bg-lime-50", "border-amber-300 bg-amber2-50", "border-orange-300 bg-orange-100", "border-red-300 bg-red-100"];
@@ -116,6 +117,13 @@ export default function BlockDetail() {
           {can("masters.flat.create") && <button type="button" className="btn btn-secondary" onClick={() => setFloorsOpen(true)} data-testid="add-floors-btn"><ArrowUpFromLine className="mr-1.5 h-4 w-4" />Add floors</button>}
           {can("masters.flat.create") && <button type="button" className="btn btn-secondary" onClick={regenerate} data-testid="regenerate-flats-btn"><RefreshCw className="mr-1.5 h-4 w-4" />Regenerate</button>}
         </>} />
+      <ContextActions className="mt-4" testId="tower-context-actions" items={[
+        { label: "Assign stage plan", to: `/master/stage-plans?project_id=${b.project_id}&block_id=${id}`, perm: "masters.stage_plan.view", primary: true },
+        { label: "Payment plans here", to: `/projects/${b.project_id}?tab=plans&block_id=${id}`, perm: "masters.payment_plan.view" },
+        { label: "Construction update", to: `/construction?project=${b.project_id}&tower=${id}`, perm: "construction.stage.update" },
+        { label: "Bookings of this tower", to: `/bookings?project_id=${b.project_id}&block_id=${id}`, perm: "sales.booking.view" },
+        { label: "Project Statement", to: `/reports/project-statement?project_id=${b.project_id}&block_id=${id}`, perm: "reports.project_statement.view" },
+      ]} />
       <div className="mb-5 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <div className="card p-4"><p className="label-xs">Units</p><p className="mt-1 text-2xl font-extrabold tabular text-ink-950" data-testid="grid-count-total">{grid.counts.total}</p></div>
         {["Available", "Hold", "Booked", "Sold", "Blocked"].map((s) => <div key={s} className={cn("rounded-xl border p-4", STATUS_STYLES[s].tile)} data-testid={`grid-count-${s.toLowerCase()}`}><p className="label-xs opacity-80">{s}</p><p className="mt-1 text-2xl font-extrabold tabular">{grid.counts[s]}</p></div>)}

@@ -10,6 +10,7 @@ import { ConstructionStatusPanel } from "@/components/common/ConstructionStatusP
 import { PaymentPlanMatrix } from "@/components/common/PaymentPlanMatrix";
 import { RateCardsTab, ParkingTab } from "@/components/common/ProjectTabs";
 import { cn } from "@/lib/utils";
+import { ContextActions } from "@/components/common/ContextActions";
 
 const ProjectWebsiteTab = lazy(() => import("@/pages/cms/ProjectWebsiteTab").then((m) => ({ default: m.ProjectWebsiteTab })));
 const FlatsTable = lazy(() => import("@/components/common/FlatsTable"));
@@ -95,6 +96,15 @@ export default function ProjectWorkspace() {
         chips={<>{p.rera_number && <span className="pill pill-hero">RERA {p.rera_number}</span>}<HistoryButton entityType="project" entityId={p.id} label={p.code} /><span className="pill pill-hero">{s.towers.length} towers</span><StatusPill status={p.status} /></>}
         actions={<>{can("masters.project.edit") && <Link to={`/projects/${id}/setup`} className="btn btn-secondary !border-white/15 !bg-ink-800 !text-warm-50 hover:!bg-ink-700" data-testid="edit-setup-btn"><Pencil className="h-4 w-4" strokeWidth={1.75} />Edit setup</Link>}{can("sales.booking.create") && <Link to={`/bookings/new?project_id=${id}`} className="btn btn-gold" data-testid="new-booking-btn">New booking <ArrowUpRight className="h-4 w-4" strokeWidth={1.75} /></Link>}</>}
         stats={[{ label: "Units sold", value: `${(units?.by_status?.Booked || 0) + (units?.by_status?.Sold || 0)} / ${units?.total ?? "—"}`, hint: `${units?.available ?? "—"} available` }, { label: "Collected", value: inrShort((sum?.paid_paise || 0) / 100), hint: `${inrShort((sum?.collections_mtd_paise || 0) / 100)} this month` }, { label: "Outstanding", value: inrShort((sum?.outstanding?.total_paise || 0) / 100), hint: `${sum?.overdue?.count || 0} overdue`, tone: sum?.outstanding?.total_paise ? undefined : "sage" }, { label: "Upcoming stage", value: s.towers.map((t) => t.construction.next).find(Boolean) || "—", hint: s.towers.map((t) => `${t.name} ${t.construction.percent}%`).join(" · ") }]} testId="project-hero" />
+      <ContextActions testId="project-context-actions" items={[
+        { label: "Add tower", to: `/projects/${id}/setup?section=towers`, perm: "masters.project.edit", primary: true },
+        { label: "Stage plan", to: `/master/stage-plans?project_id=${id}`, perm: "masters.stage_plan.view" },
+        { label: "Payment plan", to: `/projects/${id}?tab=plans`, perm: "masters.payment_plan.view" },
+        { label: "Construction update", to: `/construction?project=${id}`, perm: "construction.stage.update" },
+        { label: "New booking", to: `/bookings/new?project=${id}`, perm: "sales.booking.create" },
+        { label: "New lead", to: `/leads?new=1&project_id=${id}`, perm: "sales.lead.create" },
+        { label: "Project Statement", to: `/reports/project-statement?project_id=${id}`, perm: "reports.project_statement.view" },
+      ]} />
       <Tabs tabs={TABS.map(([v, l]) => ({ value: v, label: l }))} value={tab} onChange={(v) => setSp({ tab: v })} testId="project-tabs" />
       <Suspense fallback={<Skeleton className="h-80 rounded-2xl" />}>
         {tab === "overview" && <Overview s={s} p={p} />}

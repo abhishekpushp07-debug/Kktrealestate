@@ -309,7 +309,7 @@ async def customer_panels(customer_id: str, include_cancelled: bool = Query(Fals
     construction = [{"block_id": bid, "block_name": blk.get("name"), "construction_percent": blk.get("construction_percent", 0), "stage_plan_name": blk.get("stage_plan_name"), "planned_completion": blk.get("planned_completion"),
                      "stages": [{"name": s.get("name"), "status": s.get("status"), "completed_on": s.get("completed_on"), "planned_on": s.get("planned_on")} for s in (blk.get("stages") or [])][:12]} for bid, blk in blocks.items()]
     photos = await db.files.find({"company_id": cid, "entity_type": "block", "entity_id": {"$in": list(blocks)}, "kind": "construction_photo", "is_active": {"$ne": False}}, {"_id": 0, "id": 1, "entity_id": 1, "created_at": 1, "caption": 1}).sort("created_at", -1).limit(12).to_list(12)
-    return {"communications": {"items": comms}, "documents": {"items": docs}, "document_types": {"items": types}, "summary": summary, "next_due": nxt, "ledgers": ledg,
+    return {"communications": {"items": comms}, "documents": {"items": docs}, "document_types": {"items": types}, "summary": present_money(summary), "next_due": nxt, "ledgers": present_money(ledg),
             "demands": {"items": present_money(dems)}, "receipts": {"items": present_money(recs)}, "generated_documents": {"items": gdocs}, "tickets": {"items": tickets}, "plans": present_money(plans), "construction": construction, "photos": photos,
             "portal_enabled": bool(portal and portal.get("is_active")), "portal_last_login_at": (portal or {}).get("last_login_at"),
             "counts": {"bookings": len(live_bk), "bookings_all": len(bookings), "demands": len(live), "receipts": len(recs), "documents": len(gdocs) + len(docs), "tickets": len(tickets), "construction": len(construction)}}
@@ -328,6 +328,7 @@ async def get_customer(customer_id: str, request: Request, reveal: bool = Query(
         await write_audit(user, "customer.kyc_reveal", "customer", customer_id, after={"revealed": ["pan", "aadhaar", "bank.account_number"]}, ip=client_ip(request))
     out = present(doc, do_reveal)
     out["bookings"] = await db.bookings.find({"$or": [{"customer_id": customer_id}, {"co_applicant_customer_ids": customer_id}]}, {"_id": 0, "id": 1, "booking_number": 1, "status": 1, "flat_snapshot": 1, "project_id": 1, "agreement_value_paise": 1, "summary": 1, "booking_date": 1, "payment_plan_snapshot": 1, "block_id": 1, "cash_agreed_paise": 1, "account_agreed_paise": 1}).to_list(50)
+    out["bookings"] = present_money(out["bookings"])
     from services.dues_engine import schedule
     today = clock.today().isoformat()
     for bk in out["bookings"]:
