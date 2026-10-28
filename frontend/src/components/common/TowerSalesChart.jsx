@@ -15,7 +15,7 @@ function Row({ r, cats, projectId }) {
         {cats.filter((c) => r[c]).map((c) => (
           <Link key={c} to={`/flats?project_id=${projectId}&block_id=${r.block_id}&status=${CAT[c][2]}`} style={{ width: `${(r[c] / total) * 100}%`, background: CAT[c][1] }} className="flex items-center justify-center text-[11px] font-semibold text-white/95 transition-opacity hover:opacity-80" title={`${CAT[c][0]}: ${r[c]}`} data-testid={`tower-sales-seg-${r.code}-${c}`}>{r[c] / total > 0.08 ? r[c] : ""}</Link>))}
       </div>
-      <span className="text-right tabular-nums text-txt-secondary" data-testid={`tower-sales-pct-${r.code}`}><b className="text-ink-950">{r.sold_pct}%</b> · {r.total}</span>
+      <span className="text-right tabular-nums text-txt-secondary" data-testid={`tower-sales-pct-${r.code}`}>Sold <b className="text-ink-950">{r.sold_pct}%</b> · {r.total} units</span>
     </div>
   );
 }
@@ -34,7 +34,7 @@ export function TowerSalesChart({ projectId, compact, className }) {
         {data.can_toggle && <div className="flex rounded-lg border border-warm-200 text-xs" role="radiogroup" aria-label="Status view">{["real", "display"].map((v) => <button key={v} role="radio" aria-checked={view === v} onClick={() => setView(v)} className={cn("px-2 py-0.5 capitalize", view === v ? "bg-ink-950 text-white" : "text-txt-secondary")} data-testid={`tower-sales-view-${v}`}>{v}</button>)}</div>}
       </div>
       <div className={cn("mt-3 space-y-2", compact && "max-h-56 overflow-y-auto pr-1")}>{data.towers.map((r) => <Row key={r.block_id} r={r} cats={cats} projectId={projectId} />)}</div>
-      <p className="mt-3 border-t border-warm-100 pt-2 text-sm" data-testid="tower-sales-total">Project total: <b>{data.total.sold}</b> sold / booked of <b>{data.total.total}</b> units · <b>{data.total.sold_pct}%</b>{data.total.available != null && ` · ${data.total.available} available`}{data.total.hold ? ` · ${data.total.hold} on hold` : ""}</p>
+      <p className="mt-3 border-t border-warm-100 pt-2 text-sm" data-testid="tower-sales-total">Project total: <b>{data.total.sold}</b> sold / booked of <b>{data.total.total}</b> units · Sold <b>{data.total.sold_pct}%</b>{data.total.available != null && ` · ${data.total.available} available`}{data.total.hold ? ` · ${data.total.hold} on hold` : ""}</p>
     </div>
   );
 }

@@ -107,13 +107,9 @@ async def tower_sales(project_id: str, view: str = "display", user: dict = Depen
         row = per.get(f["block_id"])
         if row is None:
             continue
-        if real:
-            cat = _real_cat(f)
-        else:
-            shaped = inv.shape(f, user)
-            if shaped is None:
-                continue
-            cat = {"Sold": "sold", "Booked": "sold", "Hold": "hold"}.get(shaped["status"], "available")
+        cat = _real_cat(f) if real else inv.display_category(f)  # display path is viewer-independent: admin view=display == Sales payload
+        if cat is None:
+            continue
         row[cat] += 1
     rows = list(per.values())
     for r in rows:

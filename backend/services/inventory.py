@@ -25,6 +25,12 @@ def effective_display(flat: dict) -> str:
     return flat.get("display_state") if flat.get("display_override") and flat.get("display_state") else MIRROR.get(flat.get("status"), "Show as Available")
 
 
+def display_category(flat: dict) -> str | None:
+    """Sales-facing bucket (sold / available / hold) from the DISPLAY layer only — identical for every viewer; Hidden → None."""
+    st = DISPLAY_TO_STATUS[effective_display(flat)]
+    return None if st is None else {"Sold": "sold", "Hold": "hold"}.get(st, "available")
+
+
 def shape(flat: dict, user: dict | None) -> dict | None:
     """Server-side response shaping. Non-privileged viewers get the DISPLAY layer as `status` and cannot tell a masked flat from a sold one;
     Hidden flats are dropped. Privileged viewers get both layers (`inventory_state` + `display_state`/`display_override`)."""

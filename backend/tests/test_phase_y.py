@@ -34,6 +34,9 @@ def test_tower_sales_real_vs_display_masking():
     for t in disp["towers"]:
         assert "landowner" not in t and "blocked" not in t and t["total"] == t["sold"] + t["available"] + t["hold"]
     assert requests.get(f"{BASE}/api/projects/{pid}/tower-sales", headers=_hdr("employee@kkt.in"), timeout=30).status_code == 403
+    admin_disp = requests.get(f"{BASE}/api/projects/{pid}/tower-sales", params={"view": "display"}, headers=A, timeout=60).json()
+    strip = lambda d: {k: v for k, v in d.items() if k != "can_toggle"}  # noqa: E731
+    assert strip(admin_disp) == strip(disp), "admin view=display must be byte-for-byte the Sales payload"
 
 
 def test_wizard_co_applicants_linked_on_letter_and_idempotent():
