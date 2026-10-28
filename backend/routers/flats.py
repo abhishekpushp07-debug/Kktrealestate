@@ -29,6 +29,7 @@ MANUAL_STATUSES = {"Available", "Hold", "Blocked"}
 
 
 class FlatUpdate(StrictModel):
+    is_active: bool | None = None  # False = soft-retire (Available flats only; audited, counts refreshed)
     flat_number: str | None = Field(default=None, min_length=1, max_length=20)
     flat_type_id: str | None = None
     facing: Literal["N", "S", "E", "W", "NE", "NW", "SE", "SW"] | None = None
@@ -166,8 +167,17 @@ async def update_flat(flat_id: str, body: FlatUpdate, request: Request, user: di
             if rc_breakup is not None and before.get("rate_card_breakup") is None:  # first override: retain the rate-card breakup
                 changes.update({"rate_card_breakup": rc_breakup, "rate_card_price_paise": rc_price})
     changes.pop("price", None)
+    if changes.get("is_active") is False:
+        if before["status"] != "Available" or before.get("booking_id"):
+            raise ApiError(409, f"Cannot retire {before['flat_number']}: status is {before['status']}", "IN_USE")
+        changes["deleted_at"] = now_iso()
+    if changes.get("is_active") is True:
+        changes["deleted_at"] = None
     after = await apply_update(db.flats, before, changes, expected_version(request, body.version), "Flat")
-    await write_audit(user, "flat.update", "flat", flat_id, before=before, after=after, ip=client_ip(request))
+    if "is_active" in changes:
+        from services.counters import refresh_counts
+        await refresh_counts(before["block_id"], before["project_id"])
+    await write_audit(user, "flat.retire" if changes.get("is_active") is False else "flat.update", "flat", flat_id, before=before, after=after, ip=client_ip(request))
     return with_price((await _enrich([after]))[0])
 
 
