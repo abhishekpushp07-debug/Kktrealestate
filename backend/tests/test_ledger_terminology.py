@@ -9,6 +9,21 @@ import pytest
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 WORD = re.compile(r"\b(udhar|jama)\b", re.I)
+# User-facing tile/label text must say "Balance" (status Due / Advance / Settled), never "Net balance".
+TILE_LABEL = re.compile(r'(?:label|title)=["\'][^"\']*Net balance', re.I)
+
+
+def test_frontend_tiles_do_not_say_net_balance():
+    hits = []
+    for dp, dn, fn in os.walk(os.path.join(ROOT, "frontend", "src")):
+        for f in fn:
+            if f.endswith((".js", ".jsx")):
+                p = os.path.join(dp, f)
+                with open(p) as fh:
+                    for i, line in enumerate(fh, 1):
+                        if TILE_LABEL.search(line):
+                            hits.append(f"{os.path.relpath(p, ROOT)}:{i}")
+    assert hits == [], hits
 
 
 def test_frontend_has_no_udhar_jama():

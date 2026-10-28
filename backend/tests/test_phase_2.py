@@ -7,6 +7,7 @@ documents, roznamcha, leads, performance.
 import asyncio
 import io
 import os
+import pytest
 import time
 import uuid
 
@@ -72,6 +73,7 @@ def _cash_remaining(booking_id):
 # ---------- Milestones ----------
 # ---------- KYC ----------
 # ---------- Documents ----------
+@pytest.mark.load_sensitive
 def test_documents_upload_download_rbac():
     cust = httpx.get(f"{BASE}/customers?page_size=1", headers=H("admin@kkt.in")).json()["items"][0]
     files = {"file": ("t.png", io.BytesIO(b"\x89PNG\r\n\x1a\n" + b"0" * 50), "image/png")}

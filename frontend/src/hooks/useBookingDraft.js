@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
  * Debounced writes; cleared on booking success or discard. */
 export function useBookingDraft(key, slice, active) {
   const [draft, setDraft] = useState(() => {
-    try { const d = JSON.parse(sessionStorage.getItem(key) || "null"); return d && d.step > 0 ? d : null; } catch { return null; }
+    try { const d = JSON.parse(sessionStorage.getItem(key) || "null"); return d && (d.step > 0 || d.projectId) ? d : null; } catch { return null; }
   });
   const timer = useRef();
   useEffect(() => {

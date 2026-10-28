@@ -1,5 +1,6 @@
 """Phase 9 — brochure lead gate + site visit scheduler."""
 import os
+import pytest
 import time
 
 import requests
@@ -25,6 +26,7 @@ def phone():
     return "98" + str(int(time.time() * 1000))[-8:]
 
 
+@pytest.mark.load_sensitive
 def test_brochure_rate_limit():
     # The preview ingress NATs each new connection through a different egress IP, which splits a per-IP counter;
     # exercise the limiter on a single stable path (local backend when reachable, else one keep-alive session).

@@ -349,3 +349,20 @@ def work_booking(admin_headers, anchor_booking):
     r = requests.get(f"{BASE}/api/bookings", params={"status": "Active", "page_size": 50}, headers=admin_headers).json()
     items = r["items"] if isinstance(r, dict) else r
     return next(b for b in sorted(items, key=lambda x: x["booking_number"], reverse=True) if b["booking_number"] not in (anchor_booking["booking_number"], "BK-2526-0009", "BK-2526-0013"))
+
+
+# Cross-worker reader/writer lock: tests marked `load_sensitive` take an exclusive flock, every other test a shared one,
+# so the marked tests run alone (no concurrent load from the other xdist worker) while everything else stays parallel.
+_LOCK_PATH = os.path.join(os.path.dirname(__file__), ".load_sensitive.lock")
+
+
+@pytest.fixture(autouse=True)
+def _load_sensitive_lock(request):
+    import fcntl
+    exclusive = request.node.get_closest_marker("load_sensitive") is not None
+    with open(_LOCK_PATH, "a+") as fh:
+        fcntl.flock(fh, fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH)
+        try:
+            yield
+        finally:
+            fcntl.flock(fh, fcntl.LOCK_UN)

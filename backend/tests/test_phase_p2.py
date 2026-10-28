@@ -3,6 +3,7 @@ overdue tie-out register == Outstanding report, Customer 360 live-bookings rule,
 import hashlib
 import hmac
 import os
+import pytest
 import sys
 import time
 
@@ -52,6 +53,7 @@ def test_void_reports_real_ledger_delta_zero_when_ledger_never_held_it(admin_hea
     assert v.status_code == 200 and v.json()["udhar_delta_paise"] == 0 and v.json()["ledger_held_it"] is False
 
 
+@pytest.mark.load_sensitive
 def test_register_overdue_equals_outstanding_report_overdue(admin_headers):
     k = requests.get(f"{BASE}/api/demands/kpis", headers=admin_headers).json()
     rep = requests.get(f"{BASE}/api/reports/outstanding", headers=admin_headers).json()
