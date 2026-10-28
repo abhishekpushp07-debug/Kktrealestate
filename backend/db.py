@@ -164,6 +164,7 @@ async def ensure_indexes():
     await _ci(db.backups, "expires_at", expireAfterSeconds=86400)
     await _ci(db.report_presets, [("user_id", ASCENDING), ("report_key", ASCENDING)])
     await _ci(db.documents, [("entity_type", ASCENDING), ("entity_id", ASCENDING)])
+    await _ci(db.user_home_layouts, [("user_id", ASCENDING), ("company_id", ASCENDING)], unique=True)
     await _ci(db.contra_entries, "date")
     # ---- Phase 11A: canonical additions + ESR-aligned compound indexes for every list/search path ----
     await _ci(db.catalogue_items, "id", unique=True)

@@ -1485,6 +1485,33 @@
     "masters.project.view"
    ]
   },
+  "home_layout:DELETE /home-layout": {
+   "codes": [
+    "masters.project.view"
+   ],
+   "fn": "reset_layout",
+   "legacy": [
+    "masters.project.view"
+   ]
+  },
+  "home_layout:GET /home-layout": {
+   "codes": [
+    "masters.project.view"
+   ],
+   "fn": "get_layout",
+   "legacy": [
+    "masters.project.view"
+   ]
+  },
+  "home_layout:PUT /home-layout": {
+   "codes": [
+    "masters.project.view"
+   ],
+   "fn": "put_layout",
+   "legacy": [
+    "masters.project.view"
+   ]
+  },
   "imports:GET /template/{kind}": {
    "codes": [
     "masters.project.view"
