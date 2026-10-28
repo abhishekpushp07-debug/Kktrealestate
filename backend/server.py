@@ -1,5 +1,9 @@
 import asyncio
 import ctypes as _ct
+import gc
+import shutil
+import tracemalloc
+from datetime import UTC, datetime, timedelta, timezone
 
 try:  # Phase J.2: cap glibc malloc arenas (motor thread pool → one arena per thread → RSS grows with data size); must run before any thread starts
     _ct.CDLL("libc.so.6").mallopt(-8, 2)  # M_ARENA_MAX = 2
@@ -11,6 +15,7 @@ import time
 from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
+from pymongo.errors import AutoReconnect, ConnectionFailure, ExecutionTimeout, NetworkTimeout, OperationFailure, ServerSelectionTimeoutError, WaitQueueTimeoutError, WriteConcernError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.gzip import GZipMiddleware
@@ -18,6 +23,25 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 
 from db import client, db, ensure_indexes
+from migrate_phase_g import migrate_phase_g
+from routers.notifications import overdue_demand_job
+from routers.visits import nudge_loop, seed_phase9
+from services import inventory as inv
+from services.audit_archive import archive_old_rows
+from services.audit_archive import ensure_indexes as ensure_audit_archive_indexes
+from services.dues_engine import run_dues_for_all
+from services.integrity import backfill_demand_installments, integrity_report
+from services.leader import run_as_leader, try_acquire
+from services.messaging.outbox import ensure_indexes as ensure_outbox_indexes
+from services.messaging.outbox import run_message_send
+from services.messaging.reminders import run_overdue_reminders
+from services.owner_bootstrap import ensure_owner, mark_demo_accounts
+from services.portal_notify import sweep_notifications
+from services.rbac import migrate_legacy_codes, register_routes
+from services.read_models import sweep_loop
+from services.trends import backfill_once
+from services.validators import apply_validators, backfill_price_paise
+from startup_phase11 import startup_phase11
 from deps import require
 from infra import (
     timed_job,
@@ -91,7 +115,6 @@ _BG_TASKS: set = set()
 
 
 async def _owner_bootstrap():
-    from services.owner_bootstrap import ensure_owner, mark_demo_accounts
     STARTUP["owner_bootstrap"] = await ensure_owner()
     await mark_demo_accounts()
 
@@ -104,7 +127,6 @@ async def _system_roles():
         else:
             await db.roles.update_one({'name': name, 'is_system': True}, {'$set': {'permissions': spec['permissions']}})
     await db.settings.update_one({'key': 'roles_version'}, {'$inc': {'value': 1}}, upsert=True)
-    from services.rbac import migrate_legacy_codes, register_routes
     STARTUP["unregistered_permissions"] = await register_routes(app)
     STARTUP["rbac_migrated"] = await migrate_legacy_codes()
 
@@ -122,8 +144,6 @@ async def _reconcile():
 
 
 async def _integrity():
-    from infra import timed_job
-    from services.integrity import integrity_report
     ir = await timed_job("integrity", integrity_report)
     await db.settings.update_one({"key": "integrity_last_report"}, {"$set": {"value": ir}}, upsert=True)
     logging.getLogger("kkt.integrity").info("[phase7] integrity: ok=%s bookings=%s counts=%s", ir["ok"], ir["bookings_checked"], ir["counts"])
@@ -136,7 +156,6 @@ DAILY_STEPS = {"integrity", "reconcile"}  # O(all rows): at startup only when th
 
 async def _watermark_skip(name: str) -> bool:
     """Phase J.2: never rescan completed migrations. `migrations` holds (step, version) → done_at; daily steps skip within 24 h."""
-    from datetime import UTC, datetime, timedelta
     if os.environ.get("KKT_FORCE_STARTUP"):
         return False
     if name in ONE_TIME_STEPS:
@@ -169,25 +188,21 @@ async def _step(name, coro_fn):
 
 def _trim_memory():
     """Return freed arenas to the OS after a heavy step (glibc keeps them otherwise → RSS never falls)."""
-    import ctypes
-    import gc
     gc.collect()
     try:
-        ctypes.CDLL("libc.so.6").malloc_trim(0)
+        _ct.CDLL("libc.so.6").malloc_trim(0)
     except Exception:  # noqa: BLE001
         pass
 
 
 async def _inventory_masters():
     """Phase N: allocation categories + hold reasons seeded per company; flats backfilled to Builder saleable."""
-    from services import inventory as inv
     async for c in db.companies.find({}, {"_id": 0, "id": 1}):
         await inv.ensure_masters(c["id"])
         await inv.backfill(c["id"])
 
 
 async def _hold_expiry_loop():
-    from services import inventory as inv
     while True:
         try:
             await inv.expire_holds()
@@ -198,12 +213,6 @@ async def _hold_expiry_loop():
 
 async def startup_tasks():
     """Heavy, idempotent work moved out of lifespan: runs once per deploy on the lease holder, never blocks serving."""
-    from services.leader import try_acquire
-    from services.integrity import backfill_demand_installments
-    from services.portal_notify import sweep_notifications
-    from routers.visits import seed_phase9
-    from startup_phase11 import startup_phase11
-    from services.validators import apply_validators, backfill_price_paise
     STARTUP["started_at"] = __import__("datetime").datetime.now(__import__("datetime").UTC).isoformat()
     try:
         leader = await try_acquire("startup")
@@ -232,7 +241,6 @@ async def startup_tasks():
 
 
 async def _migrate_phase_g():
-    from migrate_phase_g import migrate_phase_g
     if await db.settings.find_one({"key": "migration_phase_g"}, {"_id": 1}):
         return {"skipped": True}
     return await migrate_phase_g(dry_run=False)
@@ -278,14 +286,10 @@ async def lifespan(app: FastAPI):
     STARTUP["essential_done"] = True
     if STARTUP["db"] == "ok":
         try:
-            from services.owner_bootstrap import ensure_owner, mark_demo_accounts
             STARTUP["owner_bootstrap"] = await asyncio.wait_for(ensure_owner(), timeout=3)
             await asyncio.wait_for(mark_demo_accounts(), timeout=2)
         except Exception:
             logger.exception("[startup] owner bootstrap failed (will retry after seeding)")
-    from services.leader import run_as_leader
-    from services.read_models import sweep_loop
-    from routers.visits import nudge_loop
     _spawn(startup_tasks())
     _spawn(run_as_leader("scheduler", _overdue_loop, _dues_loop, nudge_loop, sweep_loop, _audit_archive_loop, _reminders_loop, _message_send_loop))
     _spawn(init_storage_async())
@@ -329,7 +333,6 @@ async def validation_exc_handler(request: Request, exc: RequestValidationError):
 @app.exception_handler(Exception)
 async def unhandled_exc_handler(request: Request, exc: Exception):
     rid = getattr(request.state, "request_id", None)
-    from pymongo.errors import AutoReconnect, ConnectionFailure, ExecutionTimeout, NetworkTimeout, OperationFailure, ServerSelectionTimeoutError, WaitQueueTimeoutError, WriteConcernError
     if isinstance(exc, ExecutionTimeout):  # Phase K.8/K.11: retryable DB envelopes
         return _retryable(rid, 503, "QUERY_TIMEOUT", "Query exceeded its time budget; narrow the filters or retry", "5")
     if isinstance(exc, (AutoReconnect, NetworkTimeout, ServerSelectionTimeoutError, WriteConcernError, WaitQueueTimeoutError, ConnectionFailure)):  # J6: pool wait-queue timeouts are retryable DB_TIMEOUT
@@ -350,15 +353,12 @@ api_router = APIRouter(prefix="/api")
 
 async def _dues_loop():
     """Daily at 00:30 IST (+ once on startup): raise time-triggered installments."""
-    from datetime import datetime, timedelta, timezone
-    from services.dues_engine import run_dues_for_all
     ist = timezone(timedelta(hours=5, minutes=30))
     while True:
         try:
             res = await timed_job("dues_engine", run_dues_for_all)
             if res["demands_raised"]:
                 logger.info("Dues engine raised %s demands", res["demands_raised"])
-            from services.integrity import integrity_report
             from routers.notifications import notify_roles
             from services import job_runs as _jr
             _run = await _jr.start("NIGHTLY_INTEGRITY")
@@ -390,10 +390,8 @@ async def _dues_loop():
 
 
 async def _audit_archive_loop():
-    from datetime import UTC, datetime, timedelta
 
-    from services.audit_archive import archive_old_rows, ensure_indexes
-    await ensure_indexes()
+    await ensure_audit_archive_indexes()
     while True:
         now = datetime.now(UTC)
         nxt = (now.replace(day=1, hour=2, minute=0, second=0, microsecond=0) + timedelta(days=32)).replace(day=1)
@@ -406,7 +404,6 @@ async def _audit_archive_loop():
 
 async def _reminders_loop():
     """Phase Q: OVERDUE_REMINDERS — checks hourly, sends only inside the owner's IST window; thresholds dedupe via unique index so hourly re-checks never double-send."""
-    from services.messaging.reminders import run_overdue_reminders
     while True:
         try:
             await timed_job("overdue_reminders", run_overdue_reminders)
@@ -417,10 +414,8 @@ async def _reminders_loop():
 
 async def _message_send_loop():
     """Phase Q: MESSAGE_SEND outbox — queued messages with due next_attempt_at, ×3 backoff."""
-    from services.messaging.outbox import ensure_indexes, run_message_send
-    from services.trends import backfill_once
     try:
-        await ensure_indexes()
+        await ensure_outbox_indexes()
         await backfill_once()
     except Exception:
         logging.getLogger("kkt").exception("messaging indexes / trends backfill failed")
@@ -433,7 +428,6 @@ async def _message_send_loop():
 
 
 async def _overdue_loop():
-    from routers.notifications import overdue_demand_job
     while True:
         try:
             await timed_job("overdue_notifications", overdue_demand_job)
@@ -462,7 +456,6 @@ def _health_payload(ping):
 
 def _disk_free_pct():
     try:
-        import shutil
         u = shutil.disk_usage(os.environ.get("BACKUP_DIR", "/app/backups") if os.path.isdir(os.environ.get("BACKUP_DIR", "/app/backups")) else "/app")
         return round(100 * u.free / u.total, 1)
     except OSError:
@@ -536,11 +529,9 @@ async def _trim_loop():
 
 async def _tracemalloc_loop():
     """Phase J.2 profiling aid (KKT_TRACEMALLOC=1): log top allocation sites + RSS every 20 s."""
-    import tracemalloc
     tracemalloc.start(40)
     while True:
         await asyncio.sleep(20)
-        import gc
         unreachable = gc.collect()
         _trim_memory()
         snap = tracemalloc.take_snapshot().statistics("lineno")
@@ -551,7 +542,6 @@ async def _tracemalloc_loop():
         top = tracemalloc.take_snapshot().statistics("traceback")[0]
         for line in top.traceback.format()[-40:]:
             logger.warning("[tracemalloc] tb %s", line.strip()[:200])
-        import gc
         big = []
         for o in gc.get_objects():
             if isinstance(o, (list, dict)) and len(o) > 2000:

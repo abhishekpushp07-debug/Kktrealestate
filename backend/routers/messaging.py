@@ -1,4 +1,9 @@
 """Phase Q: messaging API — channels, message log, templates (Masters → Templates), reminder settings, send-now, Resend webhook, reminder log report."""
+import base64
+import hashlib
+import hmac
+import os
+from datetime import date
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Request
@@ -7,7 +12,7 @@ from pydantic import Field
 from db import db
 from deps import ensure_project_access, get_current_user, project_scope_filter, require, require_any
 from services.messaging import outbox, reminders, templates
-from utils import ApiError, StrictModel, client_ip, now_iso, write_audit
+from utils import ApiError, StrictModel, base_doc, client_ip, now_iso, write_audit
 
 router = APIRouter(prefix="/messaging", tags=["messaging"])
 
@@ -134,7 +139,6 @@ async def create_template(body: TemplateIn, request: Request, user: dict = Depen
     _check(body.model_dump())
     if await db.message_templates.find_one({"company_id": user["company_id"], "code": body.code}):
         raise ApiError(409, "A template with this code exists", "DUPLICATE")
-    from utils import base_doc
     doc = {**base_doc(user, user["company_id"]), **body.model_dump(exclude={"version"})}
     await db.message_templates.insert_one(doc)
     doc.pop("_id", None)
@@ -169,7 +173,6 @@ async def preview_template(code: str, booking_id: str, lang: str = "en", user: d
     c = await db.customers.find_one({"id": b["customer_id"]}, {"_id": 0}) or {}
     co = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0}) or {}
     d = await db.demands.find_one({"booking_id": b["id"], "voided": {"$ne": True}, "status": {"$in": ["Open", "Partially Paid"]}}, {"_id": 0}, sort=[("due_date", 1)]) or {"total_demand_paise": 0, "paid_paise": 0, "due_date": now_iso()[:10]}
-    from datetime import date
     days = max((date.today() - date.fromisoformat(d["due_date"])).days, 0)
     ctx = await reminders._ctx(b, c, co, d, days, (__import__("os").environ.get("ERP_PUBLIC_URL") or "") + "/api/docgen/shared/preview")
     v = t.get(lang if lang in ("en", "hi") else "en") or t["en"]
@@ -179,9 +182,6 @@ async def preview_template(code: str, booking_id: str, lang: str = "en", user: d
 @router.post("/webhooks/resend")
 async def resend_webhook(request: Request):
     """Delivery events → delivered / bounced. Requires RESEND_WEBHOOK_SECRET (svix signature); without it the endpoint answers 409 NOT_CONFIGURED — nothing is faked."""
-    import hashlib
-    import hmac
-    import os
     secret = os.environ.get("RESEND_WEBHOOK_SECRET")
     if not secret:
         raise ApiError(409, "Delivery webhooks are not configured (RESEND_WEBHOOK_SECRET)", "NOT_CONFIGURED")
@@ -189,7 +189,6 @@ async def resend_webhook(request: Request):
     sig = request.headers.get("svix-signature", "")
     ts, mid = request.headers.get("svix-timestamp", ""), request.headers.get("svix-id", "")
     key = secret.split("_", 1)[1] if secret.startswith("whsec_") else secret
-    import base64
     expect = base64.b64encode(hmac.new(base64.b64decode(key), f"{mid}.{ts}.{raw.decode()}".encode(), hashlib.sha256).digest()).decode()
     if not any(hmac.compare_digest(expect, s.split(",", 1)[-1]) for s in sig.split(" ") if s):
         raise ApiError(401, "Bad webhook signature", "LINK_INVALID")

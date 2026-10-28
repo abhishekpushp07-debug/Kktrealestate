@@ -1,0 +1,3091 @@
+{
+ "allocation_categories.company_id_1_code_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "code",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "amenities.company_id_1_is_active_1_name_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "is_active",
+    1
+   ],
+   [
+    "name",
+    1
+   ]
+  ]
+ },
+ "amenities.id_1": {
+  "key": [
+   [
+    "id",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "area_types.company_id_1_is_active_1_name_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "is_active",
+    1
+   ],
+   [
+    "name",
+    1
+   ]
+  ]
+ },
+ "area_types.id_1": {
+  "key": [
+   [
+    "id",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "audit_logs.actor_id_1": {
+  "key": [
+   [
+    "actor_id",
+    1
+   ]
+  ]
+ },
+ "audit_logs.audit_entity_created": {
+  "key": [
+   [
+    "entity_type",
+    1
+   ],
+   [
+    "entity_id",
+    1
+   ],
+   [
+    "created_at",
+    -1
+   ]
+  ]
+ },
+ "audit_logs.company_id_1_created_at_-1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "created_at",
+    -1
+   ]
+  ]
+ },
+ "audit_logs.created_at_-1": {
+  "key": [
+   [
+    "created_at",
+    -1
+   ]
+  ]
+ },
+ "audit_logs.ks_company_created_at_id": {
+  "key": [
+   [
+    "created_at",
+    1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "audit_logs.propagated_complete_1_created_at_1": {
+  "key": [
+   [
+    "propagated_complete",
+    1
+   ],
+   [
+    "created_at",
+    1
+   ]
+  ]
+ },
+ "backups.expires_at_1": {
+  "expireAfterSeconds": 86400,
+  "key": [
+   [
+    "expires_at",
+    1
+   ]
+  ]
+ },
+ "bank_accounts.company_id_1_is_active_1_name_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "is_active",
+    1
+   ],
+   [
+    "name",
+    1
+   ]
+  ]
+ },
+ "bank_accounts.id_1": {
+  "key": [
+   [
+    "id",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "block_summaries.block_id_1": {
+  "key": [
+   [
+    "block_id",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "block_summaries.project_id_1": {
+  "key": [
+   [
+    "project_id",
+    1
+   ]
+  ]
+ },
+ "block_types.company_id_1_is_active_1_name_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "is_active",
+    1
+   ],
+   [
+    "name",
+    1
+   ]
+  ]
+ },
+ "block_types.id_1": {
+  "key": [
+   [
+    "id",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "blocks.id_1": {
+  "key": [
+   [
+    "id",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "blocks.name_text_code_text": {
+  "key": [
+   [
+    "_fts",
+    "text"
+   ],
+   [
+    "_ftsx",
+    1
+   ]
+  ]
+ },
+ "blocks.project_id_1_code_1": {
+  "key": [
+   [
+    "project_id",
+    1
+   ],
+   [
+    "code",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "bookings.active_by_project": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "status",
+    1
+   ],
+   [
+    "project_id",
+    1
+   ]
+  ]
+ },
+ "bookings.block_id_1_status_1": {
+  "key": [
+   [
+    "block_id",
+    1
+   ],
+   [
+    "status",
+    1
+   ]
+  ]
+ },
+ "bookings.booking_number_1": {
+  "key": [
+   [
+    "booking_number",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "bookings.c360_bookings": {
+  "key": [
+   [
+    "customer_id",
+    1
+   ],
+   [
+    "booking_date",
+    -1
+   ]
+  ]
+ },
+ "bookings.company_id_1_customer_id_1_booking_date_-1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "customer_id",
+    1
+   ],
+   [
+    "booking_date",
+    -1
+   ]
+  ]
+ },
+ "bookings.company_id_1_project_id_1_status_1_booking_date_-1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "project_id",
+    1
+   ],
+   [
+    "status",
+    1
+   ],
+   [
+    "booking_date",
+    -1
+   ]
+  ]
+ },
+ "bookings.company_id_1_status_1_booking_date_-1_id_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "status",
+    1
+   ],
+   [
+    "booking_date",
+    -1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "bookings.customer_id_1": {
+  "key": [
+   [
+    "customer_id",
+    1
+   ]
+  ]
+ },
+ "bookings.customer_name_1": {
+  "key": [
+   [
+    "customer_name",
+    1
+   ]
+  ]
+ },
+ "bookings.flat_id_1": {
+  "key": [
+   [
+    "flat_id",
+    1
+   ]
+  ]
+ },
+ "bookings.id_1": {
+  "key": [
+   [
+    "id",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "bookings.ks_company_booking_date_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "booking_date",
+    1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "bookings.ks_company_booking_number_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "booking_number",
+    1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "bookings.ks_company_created_at_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "created_at",
+    1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "bookings.ks_company_customer_name_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "customer_name",
+    1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "bookings.ks_company_status_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "status",
+    1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "bookings.ks_project_booking_number_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "project_id",
+    1
+   ],
+   [
+    "booking_number",
+    -1
+   ],
+   [
+    "id",
+    -1
+   ]
+  ]
+ },
+ "bookings.project_block_summary": {
+  "key": [
+   [
+    "project_id",
+    1
+   ],
+   [
+    "status",
+    1
+   ],
+   [
+    "block_id",
+    1
+   ]
+  ]
+ },
+ "bookings.project_id_1_status_1": {
+  "key": [
+   [
+    "project_id",
+    1
+   ],
+   [
+    "status",
+    1
+   ]
+  ]
+ },
+ "bookings.search_booking_number": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "booking_number",
+    1
+   ]
+  ]
+ },
+ "bookings.tower_sales_pace": {
+  "key": [
+   [
+    "project_id",
+    1
+   ],
+   [
+    "status",
+    1
+   ],
+   [
+    "booking_date",
+    -1
+   ]
+  ]
+ },
+ "brochure_downloads.lead_id_1_at_-1": {
+  "key": [
+   [
+    "lead_id",
+    1
+   ],
+   [
+    "at",
+    -1
+   ]
+  ]
+ },
+ "brochure_downloads.project_id_1_at_-1": {
+  "key": [
+   [
+    "project_id",
+    1
+   ],
+   [
+    "at",
+    -1
+   ]
+  ]
+ },
+ "cache.expires_at_1": {
+  "expireAfterSeconds": 0,
+  "key": [
+   [
+    "expires_at",
+    1
+   ]
+  ]
+ },
+ "cache.key_1": {
+  "key": [
+   [
+    "key",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "catalogue_items.company_id_1_type_1_code_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "type",
+    1
+   ],
+   [
+    "code",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "catalogue_items.company_id_1_type_1_is_active_1_sort_order_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "type",
+    1
+   ],
+   [
+    "is_active",
+    1
+   ],
+   [
+    "sort_order",
+    1
+   ]
+  ]
+ },
+ "catalogue_items.id_1": {
+  "key": [
+   [
+    "id",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "charge_types.company_id_1_is_active_1_name_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "is_active",
+    1
+   ],
+   [
+    "name",
+    1
+   ]
+  ]
+ },
+ "charge_types.id_1": {
+  "key": [
+   [
+    "id",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "communications.company_id_1_customer_id_1_happened_at_-1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "customer_id",
+    1
+   ],
+   [
+    "happened_at",
+    -1
+   ]
+  ]
+ },
+ "communications.company_id_1_lead_id_1_happened_at_-1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "lead_id",
+    1
+   ],
+   [
+    "happened_at",
+    -1
+   ]
+  ]
+ },
+ "communications.id_1": {
+  "key": [
+   [
+    "id",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "companies.id_1": {
+  "key": [
+   [
+    "id",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "construction_stages.name_1": {
+  "key": [
+   [
+    "name",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "contra_entries.date_1": {
+  "key": [
+   [
+    "date",
+    1
+   ]
+  ]
+ },
+ "contra_entries.id_1": {
+  "key": [
+   [
+    "id",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "counters.scope_1_key_1": {
+  "key": [
+   [
+    "scope",
+    1
+   ],
+   [
+    "key",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "customer_summaries.company_id_1_engagement_score_-1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "engagement_score",
+    -1
+   ]
+  ]
+ },
+ "customer_summaries.customer_id_1": {
+  "key": [
+   [
+    "customer_id",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "customers.company_id_1_assigned_sales_user_id_1_next_follow_up_at_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "assigned_sales_user_id",
+    1
+   ],
+   [
+    "next_follow_up_at",
+    1
+   ]
+  ]
+ },
+ "customers.company_id_1_full_name_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "full_name",
+    1
+   ]
+  ]
+ },
+ "customers.company_id_1_is_active_1_created_at_-1_id_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "is_active",
+    1
+   ],
+   [
+    "created_at",
+    -1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "customers.company_id_1_lifecycle_stage_1_engagement_score_-1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "lifecycle_stage",
+    1
+   ],
+   [
+    "engagement_score",
+    -1
+   ]
+  ]
+ },
+ "customers.company_id_1_phone_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "phone",
+    1
+   ]
+  ]
+ },
+ "customers.customer_code_1": {
+  "key": [
+   [
+    "customer_code",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "customers.full_name_text_phone_text_customer_code_text": {
+  "key": [
+   [
+    "_fts",
+    "text"
+   ],
+   [
+    "_ftsx",
+    1
+   ]
+  ]
+ },
+ "customers.id_1": {
+  "key": [
+   [
+    "id",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "customers.ks_company_created_at_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "created_at",
+    1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "customers.ks_company_customer_code_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "customer_code",
+    1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "customers.ks_company_engagement_score_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "engagement_score",
+    1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "customers.ks_company_full_name_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "full_name",
+    1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "customers.ks_company_kyc_status_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "kyc_status",
+    1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "customers.ks_company_lifecycle_stage_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "lifecycle_stage",
+    1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "customers.ks_company_phone_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "phone",
+    1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "customers.ks_project_full_name_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "project_id",
+    1
+   ],
+   [
+    "full_name",
+    -1
+   ],
+   [
+    "id",
+    -1
+   ]
+  ]
+ },
+ "customers.pan_hash_1": {
+  "key": [
+   [
+    "pan_hash",
+    1
+   ]
+  ]
+ },
+ "customers.search_name": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "is_active",
+    1
+   ],
+   [
+    "full_name",
+    1
+   ]
+  ]
+ },
+ "customers.uniq_active_phone": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "phone",
+    1
+   ]
+  ],
+  "partialFilterExpression": {
+   "is_active": true
+  },
+  "unique": true
+ },
+ "dashboard_snapshots.company_id_1_scope_hash_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "scope_hash",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "demands.block_id_1_milestone_seq_1": {
+  "key": [
+   [
+    "block_id",
+    1
+   ],
+   [
+    "milestone_seq",
+    1
+   ]
+  ]
+ },
+ "demands.booking_id_1_installment_seq_1": {
+  "key": [
+   [
+    "booking_id",
+    1
+   ],
+   [
+    "installment_seq",
+    1
+   ]
+  ],
+  "partialFilterExpression": {
+   "installment_seq": {
+    "$type": "int"
+   },
+   "voided": false
+  },
+  "unique": true
+ },
+ "demands.booking_id_1_posted_at_1": {
+  "key": [
+   [
+    "booking_id",
+    1
+   ],
+   [
+    "posted_at",
+    1
+   ]
+  ]
+ },
+ "demands.booking_installments": {
+  "key": [
+   [
+    "booking_id",
+    1
+   ],
+   [
+    "voided",
+    1
+   ],
+   [
+    "installment_seq",
+    1
+   ]
+  ]
+ },
+ "demands.company_id_1_status_1_due_date_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "status",
+    1
+   ],
+   [
+    "due_date",
+    1
+   ]
+  ]
+ },
+ "demands.customer_id_1_status_1_due_date_1": {
+  "key": [
+   [
+    "customer_id",
+    1
+   ],
+   [
+    "status",
+    1
+   ],
+   [
+    "due_date",
+    1
+   ]
+  ]
+ },
+ "demands.id_1": {
+  "key": [
+   [
+    "id",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "demands.ks_company_customer_name_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "customer_name",
+    1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "demands.ks_company_demand_date_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "demand_date",
+    1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "demands.ks_company_due_date_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "due_date",
+    1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "demands.ks_company_total_demand_paise_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "total_demand_paise",
+    1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "demands.ks_project_due_date_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "project_id",
+    1
+   ],
+   [
+    "due_date",
+    -1
+   ],
+   [
+    "id",
+    -1
+   ]
+  ]
+ },
+ "demands.overdue": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "voided",
+    1
+   ],
+   [
+    "status",
+    1
+   ],
+   [
+    "due_date",
+    1
+   ]
+  ]
+ },
+ "demands.project_id_1_status_1_due_date_1": {
+  "key": [
+   [
+    "project_id",
+    1
+   ],
+   [
+    "status",
+    1
+   ],
+   [
+    "due_date",
+    1
+   ]
+  ],
+  "partialFilterExpression": {
+   "status": {
+    "$in": [
+     "Open",
+     "Partially Paid"
+    ]
+   }
+  }
+ },
+ "demands.uniq_demand_number": {
+  "key": [
+   [
+    "demand_number",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "document_types.company_id_1_is_active_1_name_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "is_active",
+    1
+   ],
+   [
+    "name",
+    1
+   ]
+  ]
+ },
+ "document_types.id_1": {
+  "key": [
+   [
+    "id",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "documents.entity_type_1_entity_id_1": {
+  "key": [
+   [
+    "entity_type",
+    1
+   ],
+   [
+    "entity_id",
+    1
+   ]
+  ]
+ },
+ "documents.id_1": {
+  "key": [
+   [
+    "id",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "documents.ks_company_created_at_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "created_at",
+    1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "documents.ks_company_kind_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "kind",
+    1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "documents.ks_project_created_at_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "project_id",
+    1
+   ],
+   [
+    "created_at",
+    -1
+   ],
+   [
+    "id",
+    -1
+   ]
+  ]
+ },
+ "files.company_id_1_entity_type_1_entity_id_1_created_at_-1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "entity_type",
+    1
+   ],
+   [
+    "entity_id",
+    1
+   ],
+   [
+    "created_at",
+    -1
+   ]
+  ]
+ },
+ "files.project_id_1_is_active_1": {
+  "key": [
+   [
+    "project_id",
+    1
+   ],
+   [
+    "is_active",
+    1
+   ]
+  ]
+ },
+ "flat_types.company_id_1_is_active_1_name_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "is_active",
+    1
+   ],
+   [
+    "name",
+    1
+   ]
+  ]
+ },
+ "flat_types.id_1": {
+  "key": [
+   [
+    "id",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "flats.block_grid": {
+  "key": [
+   [
+    "block_id",
+    1
+   ],
+   [
+    "is_active",
+    1
+   ],
+   [
+    "floor",
+    1
+   ],
+   [
+    "position",
+    1
+   ]
+  ]
+ },
+ "flats.block_id_1_allocation_category_code_1": {
+  "key": [
+   [
+    "block_id",
+    1
+   ],
+   [
+    "allocation_category_code",
+    1
+   ]
+  ]
+ },
+ "flats.block_id_1_display_state_1": {
+  "key": [
+   [
+    "block_id",
+    1
+   ],
+   [
+    "display_state",
+    1
+   ]
+  ]
+ },
+ "flats.block_id_1_flat_number_1": {
+  "key": [
+   [
+    "block_id",
+    1
+   ],
+   [
+    "flat_number",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "flats.block_id_1_floor_1_position_1": {
+  "key": [
+   [
+    "block_id",
+    1
+   ],
+   [
+    "floor",
+    1
+   ],
+   [
+    "position",
+    1
+   ]
+  ]
+ },
+ "flats.company_id_1_status_1_project_id_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "status",
+    1
+   ],
+   [
+    "project_id",
+    1
+   ]
+  ]
+ },
+ "flats.flat_number_1": {
+  "key": [
+   [
+    "flat_number",
+    1
+   ]
+  ]
+ },
+ "flats.flat_number_text": {
+  "key": [
+   [
+    "_fts",
+    "text"
+   ],
+   [
+    "_ftsx",
+    1
+   ]
+  ]
+ },
+ "flats.id_1": {
+  "key": [
+   [
+    "id",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "flats.ks_company_flat_number_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "flat_number",
+    1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "flats.ks_company_floor_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "floor",
+    1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "flats.ks_company_price_paise_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "price_paise",
+    1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "flats.ks_company_status_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "status",
+    1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "flats.ks_project_flat_number_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "project_id",
+    1
+   ],
+   [
+    "flat_number",
+    -1
+   ],
+   [
+    "id",
+    -1
+   ]
+  ]
+ },
+ "flats.project_id_1_status_1": {
+  "key": [
+   [
+    "project_id",
+    1
+   ],
+   [
+    "status",
+    1
+   ]
+  ]
+ },
+ "flats.project_status": {
+  "key": [
+   [
+    "project_id",
+    1
+   ],
+   [
+    "is_active",
+    1
+   ],
+   [
+    "status",
+    1
+   ]
+  ]
+ },
+ "flats.status_1_hold.expires_at_1": {
+  "key": [
+   [
+    "status",
+    1
+   ],
+   [
+    "hold.expires_at",
+    1
+   ]
+  ]
+ },
+ "floor_plan_templates.company_id_1_is_active_1_name_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "is_active",
+    1
+   ],
+   [
+    "name",
+    1
+   ]
+  ]
+ },
+ "floor_plan_templates.id_1": {
+  "key": [
+   [
+    "id",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "hold_reasons.company_id_1_code_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "code",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "idempotency_claims.ttl_idem_claims": {
+  "expireAfterSeconds": 86400,
+  "key": [
+   [
+    "created_at",
+    1
+   ]
+  ]
+ },
+ "idempotency_claims.uniq_idem_claim": {
+  "key": [
+   [
+    "owner",
+    1
+   ],
+   [
+    "key",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "idempotency_keys.created_at_1": {
+  "expireAfterSeconds": 86400,
+  "key": [
+   [
+    "created_at",
+    1
+   ]
+  ]
+ },
+ "idempotency_keys.user_id_1_key_1": {
+  "key": [
+   [
+    "user_id",
+    1
+   ],
+   [
+    "key",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "leads.company_id_1_assigned_to_1_next_follow_up_at_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "assigned_to",
+    1
+   ],
+   [
+    "next_follow_up_at",
+    1
+   ]
+  ]
+ },
+ "leads.company_id_1_phone_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "phone",
+    1
+   ]
+  ]
+ },
+ "leads.company_id_1_project_id_1_status_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "project_id",
+    1
+   ],
+   [
+    "status",
+    1
+   ]
+  ]
+ },
+ "leads.company_id_1_source_1_is_read_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "source",
+    1
+   ],
+   [
+    "is_read",
+    1
+   ]
+  ]
+ },
+ "leads.company_id_1_status_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "status",
+    1
+   ]
+  ]
+ },
+ "leads.company_id_1_status_1_created_at_-1_id_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "status",
+    1
+   ],
+   [
+    "created_at",
+    -1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "leads.id_1": {
+  "key": [
+   [
+    "id",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "leads.ks_company_created_at_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "created_at",
+    1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "leads.ks_company_lead_number_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "lead_number",
+    1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "leads.ks_company_name_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "name",
+    1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "leads.ks_company_next_follow_up_at_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "next_follow_up_at",
+    1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "leads.ks_company_status_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "status",
+    1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "leads.ks_project_name_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "project_id",
+    1
+   ],
+   [
+    "name",
+    -1
+   ],
+   [
+    "id",
+    -1
+   ]
+  ]
+ },
+ "leads.next_follow_up_at_1": {
+  "key": [
+   [
+    "next_follow_up_at",
+    1
+   ]
+  ]
+ },
+ "leads.pipeline": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "is_active",
+    1
+   ],
+   [
+    "status",
+    1
+   ]
+  ]
+ },
+ "ledger_entries.booking_id_1_ref_1": {
+  "key": [
+   [
+    "booking_id",
+    1
+   ],
+   [
+    "ref",
+    1
+   ]
+  ]
+ },
+ "ledger_entries.booking_seq": {
+  "key": [
+   [
+    "booking_id",
+    1
+   ],
+   [
+    "seq",
+    1
+   ]
+  ]
+ },
+ "ledger_entries.id_1": {
+  "key": [
+   [
+    "id",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "locks.name_1": {
+  "key": [
+   [
+    "name",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "login_events.account_id_1_success_1_created_at_-1": {
+  "key": [
+   [
+    "account_id",
+    1
+   ],
+   [
+    "success",
+    1
+   ],
+   [
+    "created_at",
+    -1
+   ]
+  ]
+ },
+ "login_events.created_at_-1": {
+  "key": [
+   [
+    "created_at",
+    -1
+   ]
+  ]
+ },
+ "login_events.email_1": {
+  "key": [
+   [
+    "email",
+    1
+   ]
+  ]
+ },
+ "login_events.email_1_ip_1_success_1_created_at_-1": {
+  "key": [
+   [
+    "email",
+    1
+   ],
+   [
+    "ip",
+    1
+   ],
+   [
+    "success",
+    1
+   ],
+   [
+    "created_at",
+    -1
+   ]
+  ]
+ },
+ "milestone_templates.company_id_1_is_active_1_name_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "is_active",
+    1
+   ],
+   [
+    "name",
+    1
+   ]
+  ]
+ },
+ "milestone_templates.id_1": {
+  "key": [
+   [
+    "id",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "notifications.audit_id_1_user_id_1": {
+  "key": [
+   [
+    "audit_id",
+    1
+   ],
+   [
+    "user_id",
+    1
+   ]
+  ]
+ },
+ "notifications.swept_v_1_user_id_1": {
+  "key": [
+   [
+    "swept_v",
+    1
+   ],
+   [
+    "user_id",
+    1
+   ]
+  ]
+ },
+ "notifications.user_id_1_read_1_created_at_-1": {
+  "key": [
+   [
+    "user_id",
+    1
+   ],
+   [
+    "read",
+    1
+   ],
+   [
+    "created_at",
+    -1
+   ]
+  ]
+ },
+ "notifications.user_id_1_withdrawn_1_read_1": {
+  "key": [
+   [
+    "user_id",
+    1
+   ],
+   [
+    "withdrawn",
+    1
+   ],
+   [
+    "read",
+    1
+   ]
+  ]
+ },
+ "parking_slots.id_1": {
+  "key": [
+   [
+    "id",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "parking_slots.project_id_1_number_1": {
+  "key": [
+   [
+    "project_id",
+    1
+   ],
+   [
+    "number",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "parking_slots.project_id_1_status_1": {
+  "key": [
+   [
+    "project_id",
+    1
+   ],
+   [
+    "status",
+    1
+   ]
+  ]
+ },
+ "payment_modes.company_id_1_is_active_1_name_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "is_active",
+    1
+   ],
+   [
+    "name",
+    1
+   ]
+  ]
+ },
+ "payment_modes.id_1": {
+  "key": [
+   [
+    "id",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "payment_plan_assignments.project_id_1_block_id_1_is_active_1": {
+  "key": [
+   [
+    "project_id",
+    1
+   ],
+   [
+    "block_id",
+    1
+   ],
+   [
+    "is_active",
+    1
+   ]
+  ]
+ },
+ "payment_plans.plan_name_scope": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "project_id",
+    1
+   ],
+   [
+    "block_id",
+    1
+   ],
+   [
+    "name",
+    1
+   ]
+  ],
+  "partialFilterExpression": {
+   "is_active": true
+  },
+  "unique": true
+ },
+ "payments.booking_id_1_against_1_payment_category_1_status_1": {
+  "key": [
+   [
+    "booking_id",
+    1
+   ],
+   [
+    "against",
+    1
+   ],
+   [
+    "payment_category",
+    1
+   ],
+   [
+    "status",
+    1
+   ]
+  ]
+ },
+ "payments.booking_id_1_status_1": {
+  "key": [
+   [
+    "booking_id",
+    1
+   ],
+   [
+    "status",
+    1
+   ]
+  ]
+ },
+ "payments.booking_payments": {
+  "key": [
+   [
+    "booking_id",
+    1
+   ],
+   [
+    "payment_date",
+    -1
+   ]
+  ]
+ },
+ "payments.company_id_1_payment_date_-1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "payment_date",
+    -1
+   ]
+  ]
+ },
+ "payments.company_id_1_status_1_payment_date_-1_id_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "status",
+    1
+   ],
+   [
+    "payment_date",
+    -1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "payments.company_id_1_status_1_payment_mode_code_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "status",
+    1
+   ],
+   [
+    "payment_mode_code",
+    1
+   ]
+  ],
+  "partialFilterExpression": {
+   "status": "Pending"
+  }
+ },
+ "payments.customer_id_1": {
+  "key": [
+   [
+    "customer_id",
+    1
+   ]
+  ]
+ },
+ "payments.id_1": {
+  "key": [
+   [
+    "id",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "payments.ks_company_amount_paise_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "amount_paise",
+    1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "payments.ks_company_created_at_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "created_at",
+    1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "payments.ks_company_payment_date_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "payment_date",
+    1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "payments.ks_company_receipt_number_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "receipt_number",
+    1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "payments.ks_company_status_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "status",
+    1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "payments.ks_project_payment_date_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "project_id",
+    1
+   ],
+   [
+    "payment_date",
+    -1
+   ],
+   [
+    "id",
+    -1
+   ]
+  ]
+ },
+ "payments.payments_totals_by_category": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "payment_category",
+    1
+   ],
+   [
+    "status",
+    1
+   ],
+   [
+    "amount_paise",
+    1
+   ]
+  ]
+ },
+ "payments.payments_totals_covered": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "status",
+    1
+   ],
+   [
+    "amount_paise",
+    1
+   ]
+  ]
+ },
+ "payments.project_id_1_payment_date_-1": {
+  "key": [
+   [
+    "project_id",
+    1
+   ],
+   [
+    "payment_date",
+    -1
+   ]
+  ]
+ },
+ "payments.receipt_number_1": {
+  "key": [
+   [
+    "receipt_number",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "payments.status_date": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "status",
+    1
+   ],
+   [
+    "payment_date",
+    1
+   ]
+  ]
+ },
+ "payments.status_project_date": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "status",
+    1
+   ],
+   [
+    "project_id",
+    1
+   ],
+   [
+    "payment_date",
+    1
+   ]
+  ]
+ },
+ "plc_types.company_id_1_is_active_1_name_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "is_active",
+    1
+   ],
+   [
+    "name",
+    1
+   ]
+  ]
+ },
+ "plc_types.id_1": {
+  "key": [
+   [
+    "id",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "portal_accounts.customer_id_1": {
+  "key": [
+   [
+    "customer_id",
+    1
+   ]
+  ]
+ },
+ "portal_refresh_tokens.ttl_expires_dt": {
+  "expireAfterSeconds": 0,
+  "key": [
+   [
+    "expires_dt",
+    1
+   ]
+  ]
+ },
+ "project_summaries.company_id_1_project_id_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "project_id",
+    1
+   ]
+  ]
+ },
+ "project_summaries.project_id_1": {
+  "key": [
+   [
+    "project_id",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "projects.company_id_1_code_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "code",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "projects.id_1": {
+  "key": [
+   [
+    "id",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "projects.name_text_code_text_address.city_text": {
+  "key": [
+   [
+    "_fts",
+    "text"
+   ],
+   [
+    "_ftsx",
+    1
+   ]
+  ]
+ },
+ "rate_cards.id_1": {
+  "key": [
+   [
+    "id",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "rate_cards.project_id_1_status_1": {
+  "key": [
+   [
+    "project_id",
+    1
+   ],
+   [
+    "status",
+    1
+   ]
+  ]
+ },
+ "rate_limits.bucket_1_slot_1": {
+  "key": [
+   [
+    "bucket",
+    1
+   ],
+   [
+    "slot",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "rate_limits.expires_at_1": {
+  "expireAfterSeconds": 0,
+  "key": [
+   [
+    "expires_at",
+    1
+   ]
+  ]
+ },
+ "refresh_tokens.token_hash_1": {
+  "key": [
+   [
+    "token_hash",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "refresh_tokens.ttl_expires_dt": {
+  "expireAfterSeconds": 0,
+  "key": [
+   [
+    "expires_dt",
+    1
+   ]
+  ]
+ },
+ "refresh_tokens.user_id_1": {
+  "key": [
+   [
+    "user_id",
+    1
+   ]
+  ]
+ },
+ "refunds.booking_id_1_status_1": {
+  "key": [
+   [
+    "booking_id",
+    1
+   ],
+   [
+    "status",
+    1
+   ]
+  ]
+ },
+ "refunds.company_id_1_paid_date_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "paid_date",
+    1
+   ]
+  ]
+ },
+ "report_cache.expires_at_1": {
+  "expireAfterSeconds": 0,
+  "key": [
+   [
+    "expires_at",
+    1
+   ]
+  ]
+ },
+ "report_presets.user_id_1_report_key_1": {
+  "key": [
+   [
+    "user_id",
+    1
+   ],
+   [
+    "report_key",
+    1
+   ]
+  ]
+ },
+ "roles.company_id_1_name_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "name",
+    1
+   ]
+  ]
+ },
+ "roles.id_1": {
+  "key": [
+   [
+    "id",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "room_types.company_id_1_is_active_1_name_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "is_active",
+    1
+   ],
+   [
+    "name",
+    1
+   ]
+  ]
+ },
+ "room_types.id_1": {
+  "key": [
+   [
+    "id",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "service_requests.company_id_1_status_1_created_at_-1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "status",
+    1
+   ],
+   [
+    "created_at",
+    -1
+   ]
+  ]
+ },
+ "service_requests.customer_id_1_created_at_-1": {
+  "key": [
+   [
+    "customer_id",
+    1
+   ],
+   [
+    "created_at",
+    -1
+   ]
+  ]
+ },
+ "service_tickets.ks_company_created_at_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "created_at",
+    1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "service_tickets.ks_company_priority_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "priority",
+    1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "service_tickets.ks_company_status_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "status",
+    1
+   ],
+   [
+    "id",
+    1
+   ]
+  ]
+ },
+ "service_tickets.ks_project_created_at_id": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "project_id",
+    1
+   ],
+   [
+    "created_at",
+    -1
+   ],
+   [
+    "id",
+    -1
+   ]
+  ]
+ },
+ "settings.key_1": {
+  "key": [
+   [
+    "key",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "site_visits.company_id_1_date_1_slot_start_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "date",
+    1
+   ],
+   [
+    "slot_start",
+    1
+   ]
+  ]
+ },
+ "site_visits.lead_id_1_status_1_date_1": {
+  "key": [
+   [
+    "lead_id",
+    1
+   ],
+   [
+    "status",
+    1
+   ],
+   [
+    "date",
+    1
+   ]
+  ]
+ },
+ "site_visits.project_id_1_date_1_status_1": {
+  "key": [
+   [
+    "project_id",
+    1
+   ],
+   [
+    "date",
+    1
+   ],
+   [
+    "status",
+    1
+   ]
+  ]
+ },
+ "spec_categories.company_id_1_is_active_1_name_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "is_active",
+    1
+   ],
+   [
+    "name",
+    1
+   ]
+  ]
+ },
+ "spec_categories.id_1": {
+  "key": [
+   [
+    "id",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "spec_items.company_id_1_is_active_1_name_1": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "is_active",
+    1
+   ],
+   [
+    "name",
+    1
+   ]
+  ]
+ },
+ "spec_items.id_1": {
+  "key": [
+   [
+    "id",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "uploads.created_at_1": {
+  "expireAfterSeconds": 172800,
+  "key": [
+   [
+    "created_at",
+    1
+   ]
+  ]
+ },
+ "uploads.file_id_1": {
+  "key": [
+   [
+    "file_id",
+    1
+   ]
+  ]
+ },
+ "user_home_layouts.user_id_1_company_id_1": {
+  "key": [
+   [
+    "user_id",
+    1
+   ],
+   [
+    "company_id",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "users.email_1": {
+  "key": [
+   [
+    "email",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "users.id_1": {
+  "key": [
+   [
+    "id",
+    1
+   ]
+  ],
+  "unique": true
+ },
+ "users.name_text_email_text": {
+  "key": [
+   [
+    "_fts",
+    "text"
+   ],
+   [
+    "_ftsx",
+    1
+   ]
+  ]
+ }
+}

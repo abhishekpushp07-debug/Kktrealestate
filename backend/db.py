@@ -40,7 +40,8 @@ async def _ci(coll, *args, **kwargs):
         logging.getLogger("kkt.db").warning("index %s.%s skipped: %s", coll.name, args[0], str(e)[:120])
 
 
-async def ensure_indexes():
+async def _indexes_auth():
+    """users, refresh tokens (TTL mirror), roles."""
     await _ci(db.users, "email", unique=True)
     await _ci(db.users, "id", unique=True)
     await _ci(db.refresh_tokens, "token_hash", unique=True)
@@ -49,6 +50,10 @@ async def ensure_indexes():
     await _ci(db.portal_refresh_tokens, "expires_dt", expireAfterSeconds=0, name="ttl_expires_dt")
     await _ci(db.roles, "id", unique=True)
     await _ci(db.roles, [("company_id", ASCENDING), ("name", ASCENDING)])
+
+
+async def _indexes_masters_inventory():
+    """masters, projects/blocks/flats, bookings, customers, demands, payments, ledger, files, locks, cache."""
     for c in MASTER_COLLECTIONS:
         await db[c].create_index("id", unique=True)
         await db[c].create_index([("company_id", ASCENDING), ("is_active", ASCENDING), ("name", ASCENDING)])
@@ -82,6 +87,10 @@ async def ensure_indexes():
     await _ci(db.login_events, [("created_at", DESCENDING)])
     await _ci(db.login_events, "email")
     await _ci(db.login_events, [("email", ASCENDING), ("ip", ASCENDING), ("success", ASCENDING), ("created_at", DESCENDING)])
+
+
+async def _indexes_list_sorts():
+    """Phase J2 keyset indexes for every allowed list sort + read-path indexes."""
     # Phase J2: compound keyset indexes (company, sort_key, id) for every allowed list sort + read-path indexes proven on kkt_scale (tools/explain_audit.py → 0 COLLSCAN / 0 in-memory sort)
     from tools.explain_audit import LIST_SORTS
     for coll, keys in LIST_SORTS.items():
@@ -112,6 +121,10 @@ async def ensure_indexes():
 
     await _ci(db.counters, [("scope", ASCENDING), ("key", ASCENDING)], unique=True)
     await _ci(db.settings, "key", unique=True)
+
+
+async def _indexes_catalogues():
+    """catalogue collections."""
     for c in ("floor_plan_templates", "plc_types", "spec_categories", "spec_items", "rate_cards", "parking_slots"):
         await db[c].create_index("id", unique=True)
     await _ci(db.rate_cards, [("project_id", ASCENDING), ("status", ASCENDING)])
@@ -122,6 +135,10 @@ async def ensure_indexes():
     await _ci(db.flats, [("flat_number", "text")])
     await _ci(db.flats, "flat_number")
     await _ci(db.users, [("name", "text"), ("email", "text")])
+
+
+async def _indexes_business_compound():
+    """per-company compound indexes for business collections + payment_plans migration."""
     for c in ("customers", "leads", "bookings", "payments", "demands", "documents", "ledger_entries", "contra_entries"):
         await db[c].create_index("id", unique=True)
     await _ci(db.customers, [("company_id", ASCENDING), ("phone", ASCENDING)])
@@ -167,6 +184,10 @@ async def ensure_indexes():
     await _ci(db.documents, [("entity_type", ASCENDING), ("entity_id", ASCENDING)])
     await _ci(db.user_home_layouts, [("user_id", ASCENDING), ("company_id", ASCENDING)], unique=True)
     await _ci(db.contra_entries, "date")
+
+
+async def _indexes_phase11a():
+    """Phase 11A canonical additions + ESR-aligned compound indexes."""
     # ---- Phase 11A: canonical additions + ESR-aligned compound indexes for every list/search path ----
     await _ci(db.catalogue_items, "id", unique=True)
     await _ci(db.catalogue_items, [("company_id", ASCENDING), ("type", ASCENDING), ("code", ASCENDING)], unique=True)
@@ -219,6 +240,14 @@ async def ensure_indexes():
     await _ci(db.audit_logs, [("company_id", ASCENDING), ("created_at", DESCENDING)])
 
 
+async def ensure_indexes():
+    """Idempotent index set, one helper per collection group (CR-2 C9). Guarded by tests/test_index_snapshot.py."""
+    await _indexes_auth()
+    await _indexes_masters_inventory()
+    await _indexes_list_sorts()
+    await _indexes_catalogues()
+    await _indexes_business_compound()
+    await _indexes_phase11a()
 async def _safe_index(coll, spec, name):
     """Idempotent: ignores 'already exists with a different name' (older ad-hoc indexes) so startup never fails on index drift."""
     try:

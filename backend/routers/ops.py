@@ -7,6 +7,8 @@ from fastapi import APIRouter, Depends, Request
 
 from db import POOL, db
 from dbtiming import POOL_STATS
+from routers.files import storage_usage
+from services import alerts, job_runs, loadshed, ttlcache
 from deps import require
 from utils import ApiError, client_ip, write_audit
 
@@ -40,15 +42,15 @@ async def ops(window: int = 900, user: dict = Depends(require("admin.system_heal
         "process": {"pid": os.getpid(), "rss_mb": rss_mb, "db_name": os.environ.get("DB_NAME")},
         "requests": {k: snap[k] for k in ("window_s", "requests", "rps", "p50_ms", "p95_ms", "by_group", "slow", "errors_by_code")},
         "jobs": snap["jobs"],
-        "load_shed": __import__("services.loadshed", fromlist=["snapshot"]).snapshot(),
-        "pool": {**__import__("dbtiming").POOL_STATS, "max_pool_size": __import__("db").POOL["maxPoolSize"]},
-        "caches": {"ttlcache": __import__("services.ttlcache", fromlist=["snapshot"]).snapshot()},
-        "alerts": __import__("services.alerts", fromlist=["LAST"]).LAST,
+        "load_shed": loadshed.snapshot(),
+        "pool": {**POOL_STATS, "max_pool_size": POOL["maxPoolSize"]},
+        "caches": {"ttlcache": ttlcache.snapshot()},
+        "alerts": alerts.LAST,
         "backup": await _backup_status(),
-        "storage": await __import__("routers.files", fromlist=["storage_usage"]).storage_usage(),
-        "job_runs": await __import__("services.job_runs", fromlist=["health"]).health(),
+        "storage": await storage_usage(),
+        "job_runs": await job_runs.health(),
         "read_models": {"last_full_refresh": (rm or {}).get("value"), "oldest_project_summary_age_s": staleness_s},
-        "cache": __import__("services.ttlcache", fromlist=["HITS"]).HITS, "db_pool": {"config": POOL, "live": POOL_STATS, "server": {"connections": (srv.get("connections") or {}), "opcounters": (srv.get("opcounters") or {}),
+        "cache": ttlcache.HITS, "db_pool": {"config": POOL, "live": POOL_STATS, "server": {"connections": (srv.get("connections") or {}), "opcounters": (srv.get("opcounters") or {}),
                                                                    "version": srv.get("version")} if srv else None},
     }
 

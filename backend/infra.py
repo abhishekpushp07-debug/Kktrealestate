@@ -1,11 +1,13 @@
 import asyncio
+import gzip
+import hashlib
 import json
 import logging
 import os
 import time
 import uuid
 from collections import defaultdict
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 import jwt
 from fastapi import Request
@@ -16,7 +18,7 @@ from core.jobs import JOBS, record_job, timed_job  # noqa: F401 — re-exported 
 from db import db
 from dbtiming import DB_MS
 from deps import _BYPASS_HDR
-from services import clock
+from services import clock, ttlcache
 from services.clock import REQ_CTX
 
 logger = logging.getLogger("kkt.http")
@@ -108,6 +110,49 @@ def surfaces_enabled(request: Request | None = None) -> bool:
     return bool(tok) and request is not None and request.headers.get("x-rate-limit-bypass") == tok
 
 
+def _err_json(status: int, code: str, msg: str, rid: str) -> JSONResponse:
+    return JSONResponse(status_code=status, content={"detail": msg, "code": code, "request_id": rid, "error": {"code": code, "message": msg, "details": [], "request_id": rid}})
+
+
+_SECURITY_HEADERS = {"X-Content-Type-Options": "nosniff", "X-Frame-Options": "DENY", "Referrer-Policy": "no-referrer",
+                     "Strict-Transport-Security": "max-age=63072000; includeSubDomains", "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+                     "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"}
+
+
+def _reject_early(request: Request, rid: str) -> JSONResponse | None:
+    """Surfaces-off 404 for public/portal, and the body-size cap (uploads parts get 5 MB, everything else MAX_BODY)."""
+    path = request.url.path
+    if not surfaces_enabled(request) and (path.startswith("/api/public/") or path.startswith("/api/portal/") or path in ("/api/public", "/api/portal")):
+        return _err_json(404, "NOT_FOUND", "Not found", rid)
+    cl = request.headers.get("content-length")
+    limit = (5 * 1024 * 1024 + 1024) if "/api/uploads/" in path and "/parts/" in path else MAX_BODY
+    if cl and cl.isdigit() and int(cl) > limit:
+        return _err_json(413, "PAYLOAD_TOO_LARGE", "Request body too large (max 2 MB)", rid)
+    return None
+
+
+def _record_metrics(request: Request, response, ms: float, acc: list, rid: str) -> None:
+    """Ring buffers, per-route histogram and the structured access log (API paths only)."""
+    if request.method in ("POST", "PUT", "PATCH", "DELETE") and response.status_code < 400:
+        ttlcache.invalidate("list:")  # any successful write drops first-page list caches (writes that bypass the event bus included)
+    RING.append((time.time(), route_group(request.method, request.url.path), response.status_code, ms, acc[0], rid, request.url.path, acc[1]))
+    if ms > 500:
+        SLOW.append(RING[-1])
+    if response.status_code >= 400:
+        ERRORS[str(response.status_code)] += 1
+    m = METRICS[_route_key(request)]
+    m["count"] += 1
+    m["total_ms"] += ms
+    m["max_ms"] = max(m["max_ms"], ms)
+    if response.status_code >= 500:
+        m["errors"] += 1
+    bucket = next((str(b) for b in BUCKETS if ms <= b), "inf")
+    m["buckets"][bucket] += 1
+    entry = {"request_id": rid, "method": request.method, "path": request.url.path, "status": response.status_code,
+             "duration_ms": round(ms, 1), "user_id": getattr(request.state, "user_id", None)}
+    (logger.warning if ms > 500 else logger.info)(json.dumps({**entry, "slow": True} if ms > 500 else entry))
+
+
 class ObservabilityMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         rid = request.headers.get("x-request-id") or uuid.uuid4().hex[:16]
@@ -115,12 +160,9 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
         clock.set_as_of(request.headers.get("x-as-of") if clock.enabled() and request.headers.get("x-as-of") and request.headers.get("x-rate-limit-bypass") == os.environ.get("LOGIN_RATE_LIMIT_BYPASS_TOKEN") else None)
         request.state.request_id = rid
         REQ_CTX.set({"request_id": rid, "user_agent": (request.headers.get("user-agent") or "")[:200]})
-        if not surfaces_enabled(request) and (request.url.path.startswith("/api/public/") or request.url.path.startswith("/api/portal/") or request.url.path in ("/api/public", "/api/portal")):
-            return JSONResponse(status_code=404, content={"detail": "Not found", "code": "NOT_FOUND", "request_id": rid, "error": {"code": "NOT_FOUND", "message": "Not found", "details": [], "request_id": rid}})
-        cl = request.headers.get("content-length")
-        limit = (5 * 1024 * 1024 + 1024) if "/api/uploads/" in request.url.path and "/parts/" in request.url.path else MAX_BODY
-        if cl and cl.isdigit() and int(cl) > limit:
-            return JSONResponse(status_code=413, content={"detail": "Request body too large (max 2 MB)", "code": "PAYLOAD_TOO_LARGE", "request_id": rid, "error": {"code": "PAYLOAD_TOO_LARGE", "message": "Request body too large (max 2 MB)", "details": [], "request_id": rid}})
+        early = _reject_early(request, rid)
+        if early is not None:
+            return early
         t0 = time.perf_counter()
         acc = [0.0, 0]
         token = DB_MS.set(acc)
@@ -129,49 +171,19 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
             response = await asyncio.wait_for(call_next(request), timeout=budget)
         except asyncio.TimeoutError:
             logger.error(json.dumps({"request_id": rid, "path": request.url.path, "error": "timeout"}))
-            response = JSONResponse(status_code=504, content={"detail": "Request timed out", "code": "REQUEST_TIMEOUT", "request_id": rid, "error": {"code": "REQUEST_TIMEOUT", "message": "Request timed out", "details": [], "request_id": rid}})
+            response = _err_json(504, "REQUEST_TIMEOUT", "Request timed out", rid)
         except Exception:
             logger.exception(json.dumps({"request_id": rid, "path": request.url.path, "error": "unhandled"}))
-            response = JSONResponse(status_code=500, content={"detail": "Internal server error", "code": "INTERNAL_ERROR", "request_id": rid, "error": {"code": "INTERNAL_ERROR", "message": "Internal server error", "details": [], "request_id": rid}})
+            response = _err_json(500, "INTERNAL_ERROR", "Internal server error", rid)
         finally:
             DB_MS.reset(token)
         ms = (time.perf_counter() - t0) * 1000
         response.headers["X-Request-ID"] = rid
         response.headers["X-Response-Time"] = f"{ms:.1f}ms"
         response.headers["Server-Timing"] = f"db;dur={acc[0]:.1f}, dbq;dur={acc[1]};desc=\"queries\", app;dur={max(ms - acc[0], 0):.1f}"
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
-        response.headers["Referrer-Policy"] = "no-referrer"
-        response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
-        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
-        response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+        response.headers.update(_SECURITY_HEADERS)
         if request.url.path.startswith("/api"):
-            if request.method in ("POST", "PUT", "PATCH", "DELETE") and response.status_code < 400:
-                from services import ttlcache
-                ttlcache.invalidate("list:")  # any successful write drops first-page list caches (writes that bypass the event bus included)
-            RING.append((time.time(), route_group(request.method, request.url.path), response.status_code, ms, acc[0], rid, request.url.path, acc[1]))
-            if ms > 500:
-                SLOW.append(RING[-1])
-            if response.status_code >= 400:
-                ERRORS[str(response.status_code)] += 1
-            m = METRICS[_route_key(request)]
-            m["count"] += 1
-            m["total_ms"] += ms
-            m["max_ms"] = max(m["max_ms"], ms)
-            if response.status_code >= 500:
-                m["errors"] += 1
-            for b in BUCKETS:
-                if ms <= b:
-                    m["buckets"][str(b)] += 1
-                    break
-            else:
-                m["buckets"]["inf"] += 1
-            entry = {"request_id": rid, "method": request.method, "path": request.url.path, "status": response.status_code,
-                     "duration_ms": round(ms, 1), "user_id": getattr(request.state, "user_id", None)}
-            if ms > 500:
-                logger.warning(json.dumps({**entry, "slow": True}))
-            else:
-                logger.info(json.dumps(entry))
+            _record_metrics(request, response, ms, acc, rid)
         return response
 
 
@@ -185,12 +197,50 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
     def _err(status, code, msg, headers=None):
         return JSONResponse(status_code=status, headers=headers or {}, content={"detail": msg, "code": code, "error": {"code": code, "message": msg}})
 
+    async def _resolve_existing(self, owner: str, key: str, request, body_hash: str, now):
+        """Claim already exists: replay / mismatch / reused / in-progress (wait ≤10 s, take over claims abandoned > 60 s). None = proceed."""
+        deadline = time.time() + 10
+        while True:
+            existing = await db.idempotency_claims.find_one({"owner": owner, "key": key}, {"_id": 0})
+            if not existing:
+                return self._err(409, "IDEMPOTENCY_IN_PROGRESS", "Request with this Idempotency-Key is still being processed; retry shortly", {"Retry-After": "2"})
+            if existing["path"] != request.url.path:
+                return self._err(422, "IDEMPOTENCY_KEY_REUSED", "Idempotency-Key already used for a different endpoint")
+            if existing["body_hash"] != body_hash:
+                return self._err(422, "IDEMPOTENCY_MISMATCH", "Idempotency-Key was used with a different request body")
+            if existing["state"] == "done":
+                if existing.get("secret_redacted"):
+                    return self._err(409, "IDEMPOTENT_SECRET_REPLAY", "This response carried a one-time secret and cannot be replayed; issue a new request")
+                return Response(content=existing["body"], status_code=existing["status"], media_type="application/json", headers={"Idempotent-Replayed": "true"})
+            upd = existing["updated_at"]
+            upd = upd if upd.tzinfo else upd.replace(tzinfo=UTC)
+            if now - upd > timedelta(seconds=60):
+                r = await db.idempotency_claims.update_one({"owner": owner, "key": key, "state": "in_progress", "updated_at": existing["updated_at"]}, {"$set": {"updated_at": now}})
+                if r.modified_count:
+                    return None
+            if time.time() >= deadline:
+                return self._err(409, "IDEMPOTENCY_IN_PROGRESS", "Request with this Idempotency-Key is still being processed; retry shortly", {"Retry-After": "2"})
+            await asyncio.sleep(0.25)
+
+    async def _store(self, owner: str, key: str, response, body: bytes) -> None:
+        """Persist a replayable copy (gzip-decoded); 5xx or undecodable bodies release the claim instead."""
+        stored = body
+        if response.headers.get("content-encoding") == "gzip":
+            try:
+                stored = gzip.decompress(body)
+            except (EOFError, OSError):
+                stored = None
+        if response.status_code < 500 and stored is not None:
+            text = stored.decode("utf-8", "replace")
+            redacted = response.status_code < 300 and any(f'"{k}"' in text for k in self.SECRET_KEYS)
+            await db.idempotency_claims.update_one({"owner": owner, "key": key}, {"$set": {"state": "done", "status": response.status_code, "body": "" if redacted else text, "secret_redacted": redacted, "updated_at": datetime.now(UTC)}})
+        else:
+            await db.idempotency_claims.delete_one({"owner": owner, "key": key})
+
     async def dispatch(self, request, call_next):
         key = request.headers.get("idempotency-key")
         if request.method != "POST" or not key or not request.url.path.startswith("/api"):
             return await call_next(request)
-        import hashlib
-        from datetime import timedelta
         auth = request.headers.get("authorization", "")
         try:
             sub = jwt.decode(auth[7:], options={"verify_signature": False}).get("sub") if auth.lower().startswith("bearer ") else None
@@ -203,47 +253,16 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         try:
             await db.idempotency_claims.insert_one({"owner": owner, "key": key, "path": request.url.path, "body_hash": body_hash, "state": "in_progress", "created_at": now, "updated_at": now})
         except Exception:
-            deadline = time.time() + 10
-            while True:
-                existing = await db.idempotency_claims.find_one({"owner": owner, "key": key}, {"_id": 0})
-                if not existing:
-                    return self._err(409, "IDEMPOTENCY_IN_PROGRESS", "Request with this Idempotency-Key is still being processed; retry shortly", {"Retry-After": "2"})
-                if existing["path"] != request.url.path:
-                    return self._err(422, "IDEMPOTENCY_KEY_REUSED", "Idempotency-Key already used for a different endpoint")
-                if existing["body_hash"] != body_hash:
-                    return self._err(422, "IDEMPOTENCY_MISMATCH", "Idempotency-Key was used with a different request body")
-                if existing["state"] == "done":
-                    if existing.get("secret_redacted"):
-                        return self._err(409, "IDEMPOTENT_SECRET_REPLAY", "This response carried a one-time secret and cannot be replayed; issue a new request")
-                    return Response(content=existing["body"], status_code=existing["status"], media_type="application/json", headers={"Idempotent-Replayed": "true"})
-                upd = existing["updated_at"]
-                upd = upd if upd.tzinfo else upd.replace(tzinfo=UTC)
-                if now - upd > timedelta(seconds=60):
-                    r = await db.idempotency_claims.update_one({"owner": owner, "key": key, "state": "in_progress", "updated_at": existing["updated_at"]}, {"$set": {"updated_at": now}})
-                    if r.modified_count:
-                        break
-                if time.time() >= deadline:
-                    return self._err(409, "IDEMPOTENCY_IN_PROGRESS", "Request with this Idempotency-Key is still being processed; retry shortly", {"Retry-After": "2"})
-                await asyncio.sleep(0.25)
+            early = await self._resolve_existing(owner, key, request, body_hash, now)
+            if early is not None:
+                return early
         try:
             response = await call_next(request)
         except Exception:
             await db.idempotency_claims.delete_one({"owner": owner, "key": key, "state": "in_progress"})
             raise
         body = b"".join([chunk async for chunk in response.body_iterator])
-        stored = body
-        if response.headers.get("content-encoding") == "gzip":
-            import gzip
-            try:
-                stored = gzip.decompress(body)
-            except (EOFError, OSError):
-                stored = None
-        if response.status_code < 500 and stored is not None:
-            text = stored.decode("utf-8", "replace")
-            redacted = response.status_code < 300 and any(f'"{k}"' in text for k in self.SECRET_KEYS)
-            await db.idempotency_claims.update_one({"owner": owner, "key": key}, {"$set": {"state": "done", "status": response.status_code, "body": "" if redacted else text, "secret_redacted": redacted, "updated_at": datetime.now(UTC)}})
-        else:
-            await db.idempotency_claims.delete_one({"owner": owner, "key": key})
+        await self._store(owner, key, response, body)
         return Response(content=body, status_code=response.status_code, media_type=response.media_type, headers=dict(response.headers))
 
 
