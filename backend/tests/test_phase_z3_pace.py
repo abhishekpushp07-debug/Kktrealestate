@@ -28,9 +28,11 @@ def test_weekly_series_ties_out_and_cancel_removes_from_week():
     d = _ts(A, pid, "real", 52)
     assert len(d["weeks"]) == 52 and all(len(t["series"]) == 52 for t in d["towers"])
     for t in d["towers"]:
-        assert sum(t["series"]) <= t["sold"] and t["last4"] == sum(t["series"][-4:]) and t["pace"] in ("fast", "steady", "slow")
+        assert sum(t["series"]) <= t["sold"] and t["last4"] == sum(t["series"][-4:]) and t["pace"] in ("fast", "steady", "slow", "sold_out")
         if t["last4"] == 0 and t["available"] > 0:
             assert t["pace"] == "slow"
+        if t["available"] == 0 and t["last4"] == 0 and t["sold"] > 0:
+            assert t["pace"] == "sold_out"
     assert d["total"]["series"] == [sum(t["series"][i] for t in d["towers"]) for i in range(52)]
     # book today in a selling tower → this week's bucket +1 for that tower; cancel → back to baseline
     sold_blocks = {t["block_id"]: t for t in d["towers"] if t["sold"] > 0}

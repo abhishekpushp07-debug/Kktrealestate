@@ -84,10 +84,19 @@ def test_kyc_files_linked_on_booking_idempotent_and_gated():
     assert {f["id"] for f in files} == {pan2["id"], aad["id"]}
     # access: employee (no sales.customer.edit / kyc.reveal) → masked list entries, 403 on signed-link issuance
     assert requests.get(f"{BASE}/api/files/{aad['id']}/url", headers=E, timeout=30).status_code == 403
-    assert requests.get(f"{BASE}/api/files/{aad['id']}", headers=E, timeout=30).status_code == 403
-    S = _hdr("sales@kkt.in")  # sales.customer.edit, no kyc.reveal → may open, audited
-    assert requests.get(f"{BASE}/api/files/{aad['id']}/url", headers=S, timeout=30).status_code == 200
+    em = requests.get(f"{BASE}/api/files/{aad['id']}", headers=E, timeout=30)
+    assert em.status_code == 200 and em.json()["locked"] is True and em.json()["url"] is None and "size" not in em.json()
+    S = _hdr("sales@kkt.in")  # sales.customer.edit but no sales.kyc.reveal → may upload, may NOT view
+    assert requests.get(f"{BASE}/api/files/{aad['id']}/url", headers=S, timeout=30).status_code == 403
+    meta = requests.get(f"{BASE}/api/files/{aad['id']}", headers=S, timeout=30).json()
+    assert meta["locked"] is True and meta["url"] is None and meta["filename"] == "Masked" and not {"size", "sha256", "storage_key"} & set(meta)
+    masked = requests.get(f"{BASE}/api/files", params={"kind": "kyc", "customer_id": cid}, headers=S, timeout=30).json()["items"]
+    assert masked and all(m["locked"] and m["url"] is None and m["filename"] == "Masked" and m["variants"] == {} and "size" not in m for m in masked)
+    other = _upload(S, png, "other-id.png", {"entity_type": "co_applicant", "entity_id": co_id, "kind": "kyc_other", "customer_id": cid, "booking_id": bid})
+    assert other["locked"] is True and other["url"] is None and other["filename"] == "Masked"  # upload ok, nothing viewable handed back
+    # Super Admin: 200 + audited kyc.view
+    assert requests.get(f"{BASE}/api/files/{aad['id']}/url", headers=A, timeout=30).status_code == 200
     audit = requests.get(f"{BASE}/api/audit-logs", params={"entity_type": "file", "entity_id": aad["id"], "page_size": 20}, headers=A, timeout=30)
-    if audit.status_code == 200:
-        assert any(a.get("action") == "kyc.view" for a in audit.json().get("items", []))
+    assert audit.status_code == 200, audit.text
+    assert any(a.get("action") == "kyc.view" for a in audit.json().get("items", []))
     requests.post(f"{BASE}/api/bookings/{bid}/cancel", json={"reason": "Z.2 test artefact", "deduction": 0, "refund": 0}, headers={**A, "Idempotency-Key": str(uuid.uuid4())}, timeout=60)

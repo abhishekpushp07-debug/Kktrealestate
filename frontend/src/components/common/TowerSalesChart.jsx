@@ -5,7 +5,7 @@ import { Card, Skeleton, Sparkline, UNIT_COLORS } from "@/components/v2";
 import { cn } from "@/lib/utils";
 
 const CAT = { sold: ["Sold / Booked", UNIT_COLORS.Sold, "Booked"], available: ["Available", UNIT_COLORS.Available, "Available"], hold: ["Hold", UNIT_COLORS.Hold, "Hold"], landowner: ["Landowner", "#8a6d12", "Available"], blocked: ["Blocked / Other", UNIT_COLORS.Blocked, "Blocked"] };
-const PACE = { fast: ["Fast", "bg-sage/15 text-sage-700"], steady: ["Steady", "bg-warm-100 text-txt-secondary"], slow: ["Slow", "bg-brick/10 text-brick"] };
+const PACE = { fast: ["Fast", "bg-sage/15 text-sage-700"], steady: ["Steady", "bg-warm-100 text-txt-secondary"], slow: ["Slow", "bg-brick/10 text-brick"], sold_out: ["Sold out", "bg-ink-950 text-warm-50"] };
 
 /** Z.3 — weekly sold sparkline + last-4-weeks total + pace badge; tooltip lists week-by-week counts. */
 function Pace({ r, weeks }) {

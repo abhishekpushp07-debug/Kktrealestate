@@ -56,10 +56,9 @@ def present(f: dict, user: dict | None = None) -> dict:
     out["variants"] = {k: f"/api/files/variants/{v}" for k, v in (f.get("variant_names") or {}).items()}
     out.pop("variant_names", None)
     if f.get("kind") in kyc.KYC_KINDS and user is not None and not kyc.can_open(user):
-        out["locked"] = True
-        out["variants"] = {}
-        out["url"] = None
-        return out
+        # masked entry: id, kind, status, timestamps, links — never filename/size/hash/thumbnail/url
+        keep = ("id", "kind", "entity_type", "entity_id", "customer_id", "booking_id", "created_at", "is_active", "is_sensitive", "variants_state", "version")
+        return {**{k: out.get(k) for k in keep}, "filename": "Masked", "locked": True, "variants": {}, "url": None}
     out["url"] = signed_url(f["id"])
     return out
 
@@ -257,9 +256,9 @@ async def file_meta(file_id: str, request: Request, user: dict = Depends(get_cur
     f = await db.files.find_one({"id": file_id, "company_id": user.get("company_id"), "is_active": {"$ne": False}}, {"_id": 0})
     if not f:
         raise ApiError(404, "File not found", "NOT_FOUND")
-    if f.get("kind") in kyc.KYC_KINDS:
+    if f.get("kind") in kyc.KYC_KINDS and kyc.can_open(user):
         await kyc.gate(user, f, client_ip(request))
-    return present(f, user)
+    return present(f, user)  # non-reveal users get the masked shape (kind / status / completeness only)
 
 
 @router.get("/files/{file_id}/url")

@@ -11,14 +11,14 @@ LABEL = {"kyc_pan": "PAN", "kyc_aadhaar": "Aadhaar", "kyc_other": "Other ID"}
 
 
 def can_open(user: dict) -> bool:
-    p = user.get("permissions") or []
-    return "sales.kyc.reveal" in p or "sales.customer.edit" in p
+    """Viewing a KYC file needs sales.kyc.reveal (Super Admin unrestricted); sales.customer.edit only allows upload/replace."""
+    return user.get("role_name") == "Super Admin" or "sales.kyc.reveal" in (user.get("permissions") or [])
 
 
 async def gate(user: dict, f: dict, ip: str = ""):
     """Raise 403 for users who may not open KYC files; otherwise record an audited kyc.view."""
     if not can_open(user):
-        raise ApiError(403, "KYC document: sales.kyc.reveal or sales.customer.edit required", "FORBIDDEN")
+        raise ApiError(403, "KYC document: sales.kyc.reveal required", "FORBIDDEN")
     await write_audit(user, "kyc.view", "file", f["id"], after={"kind": f.get("kind"), "co_applicant_id": f.get("entity_id"), "customer_id": f.get("customer_id")}, ip=ip)
 
 

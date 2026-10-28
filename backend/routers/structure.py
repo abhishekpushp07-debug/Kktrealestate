@@ -140,7 +140,7 @@ async def tower_sales(project_id: str, view: str = "display", weeks: int = 12, u
     median = sorted(r["last4"] for r in rows if r["available"] > 0 or r["last4"] > 0)
     med = (median[len(median) // 2] if median else 0)
     for r in rows:
-        r["pace"] = "slow" if r["last4"] == 0 and r["available"] > 0 else "fast" if r["last4"] > med and r["last4"] > 0 else "steady"
+        r["pace"] = "sold_out" if r["available"] == 0 and r["last4"] == 0 and r["sold"] > 0 else "slow" if r["last4"] == 0 and r["available"] > 0 else "fast" if r["last4"] > med and r["last4"] > 0 else "steady"
     total = {c: sum(r[c] for r in rows) for c in cats}
     total["total"] = sum(total[c] for c in cats)
     total["sold_pct"] = round(100 * total["sold"] / total["total"], 1) if total["total"] else 0
