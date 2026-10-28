@@ -12,7 +12,7 @@ const recent = (key) => JSON.parse(localStorage.getItem(RECENT_KEY) || "{}")[key
 const remember = (key, v) => { const all = JSON.parse(localStorage.getItem(RECENT_KEY) || "{}"); all[key] = [v, ...(all[key] || []).filter((x) => x !== v)].slice(0, 5); localStorage.setItem(RECENT_KEY, JSON.stringify(all)); };
 
 // Searchable combobox. `options` = [{value,label,sub}] or `type` = catalogue type (bound to the bundle; "+ Add new" when permitted).
-export function Select({ options: optionsProp, type, parentId, value, onChange, placeholder = "Select…", testId, disabled, className, multiple = false, allowAdd = true, recentKey, clearable = true }) {
+export function Select({ options: optionsProp, type, parentId, value, onChange, placeholder = "Select…", testId, disabled, className, multiple = false, allowAdd = true, recentKey, clearable = true, onCreateNew, createLabel = "Create new…" }) {
   const { opts } = useCatalogues();
   const { can } = useAuth();
   const options = useMemo(() => optionsProp || (type ? opts(type, parentId) : []), [optionsProp, type, parentId, opts]);
@@ -62,6 +62,7 @@ export function Select({ options: optionsProp, type, parentId, value, onChange, 
               const on = multiple ? (value || []).includes(o.value) : o.value === value;
               return <li key={o.value} role="option" aria-selected={on} onMouseEnter={() => setHi(i)} onClick={() => pick(o)} className={cn("flex cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm", i === hi && "bg-warm-100", on && "font-semibold")} data-testid={testId ? `${testId}-opt-${o.value}` : undefined} aria-label={o.label}><span className="min-w-0 truncate">{o.label}{o.sub && <span className="ml-2 text-xs text-txt-muted" aria-hidden="true">{o.sub}</span>}</span>{on && <Check className="h-4 w-4 text-gold" />}</li>;
             })}
+            {onCreateNew && <li onClick={() => { setOpen(false); onCreateNew(q.trim()); }} className="mt-1 flex cursor-pointer items-center gap-2 rounded-lg border-t border-warm-100 px-3 py-2.5 text-sm font-semibold text-ink-950 hover:bg-warm-100" data-testid={testId ? `${testId}-create-new` : "select-create-new"}><Plus className="h-4 w-4 text-gold" />{createLabel}</li>}
             {canAdd && <li onClick={add} onMouseEnter={() => setHi(filtered.length)} className={cn("mt-1 flex cursor-pointer items-center gap-2 rounded-lg border-t border-warm-100 px-3 py-2.5 text-sm font-semibold text-ink-950", hi === filtered.length && "bg-warm-100")} data-testid={testId ? `${testId}-add` : undefined}><Plus className="h-4 w-4 text-gold" />{adding ? "Adding…" : `Add "${q.trim()}"`}</li>}
           </ul>
         </div>

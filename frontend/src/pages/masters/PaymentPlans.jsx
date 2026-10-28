@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import api, { errMsg } from "@/lib/api";
@@ -14,7 +15,8 @@ import { useRowKeys } from "@/hooks/useRowKeys";
 export default function PaymentPlans() {
   const { can } = useAuth();
   const [items, setItems] = useState([]);
-  const [creating, setCreating] = useState(false);
+  const [qs] = useSearchParams();
+  const [creating, setCreating] = useState(qs.get("new") === "1");
   const [q, setQ] = useState("");
   const load = () => api.get("/payment-plans/structured").then((r) => setItems(r.data.items)).catch((e) => toast.error(errMsg(e)));
   useEffect(() => { load(); }, []);

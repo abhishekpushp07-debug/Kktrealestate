@@ -25,7 +25,11 @@ const PAGES = [
 ];
 const ACTIONS = [
   ["New booking", "/bookings/new", Plus, "sales.booking.create"], ["Post payment", "/payments?post=1", IndianRupee, "finance.payment.create"], ["New customer", "/customers/new", UserPlus, "sales.customer.create"],
-  ["New lead", "/leads?new=1", PhoneCall, "sales.lead.create"], ["Log a call", "/customers?log=1", PhoneCall, "sales.customer.create"], ["Mark construction stage", "/projects", Hammer, "masters.tower.edit"], ["Roznamcha (today)", "/payments?tab=roznamcha", Receipt, "finance.payment.view"],
+  ["New lead", "/leads?new=1", PhoneCall, "sales.lead.create"], ["Log a call", "/customers?log=1", PhoneCall, "sales.customer.create"], ["Mark construction stage", "/construction", Hammer, "construction.stage.update"], ["Roznamcha (today)", "/payments?tab=roznamcha", Receipt, "finance.payment.view"],
+  ["Raise manual demand", "/demands?new=manual", Plus, "demands.register.create"], ["Generate document", "/documents?mode=generate", Plus, "documents.document.generate"], ["Place a hold", "/flats?hold=1", Plus, "inventory.hold.create"],
+  ["New project", "/projects/new", Plus, "masters.project.create"], ["New tower", "/masters/towers?new=1", Plus, "masters.tower.create"], ["Add floors / flats", "/masters/towers?structure=1", Plus, "masters.flat.create"], ["New flat type", "/masters/m/flat-types?new=1", Plus, "masters.flat_type.create"],
+  ["New construction stage", "/masters/m/construction-stages?new=1", Plus, "masters.construction_stage.create"], ["New stage plan", "/masters/stage-plans?new=1", Plus, "masters.stage_plan.create"], ["New payment plan", "/masters/payment-plans?new=1", Plus, "masters.payment_plan.create"],
+  ["New site visit", "/site-visits?new=1", Plus, "sales.site_visit.create"], ["New user", "/users?new=1", Plus, "admin.user.create"], ["New role", "/roles?new=1", Plus, "admin.role.create"],
 ];
 // localStorage: recent palette destinations (labels + routes) — non-sensitive (CR-7)
 const pushRecent = (item) => { const r = JSON.parse(localStorage.getItem("kkt:recent") || "[]").filter((x) => x.to !== item.to); localStorage.setItem("kkt:recent", JSON.stringify([item, ...r].slice(0, 6))); };

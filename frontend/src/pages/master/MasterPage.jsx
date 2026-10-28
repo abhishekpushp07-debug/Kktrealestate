@@ -1,6 +1,6 @@
 import { HistoryButton } from "@/components/common/HistoryTimeline";
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Plus, Pencil, Ban, RotateCcw, LayoutGrid, List, ChevronRight, Link2, Search } from "lucide-react";
 import { toast } from "sonner";
 import api, { errMsg } from "@/lib/api";
@@ -38,7 +38,8 @@ export default function MasterPage() {
   const [view, setView] = useState("cards");
   const [q, setQ] = useState("");
   const list = useList(`/master/${cfg.kind}`, { include_inactive: showInactive || undefined, include_usage: true, page_size: 100 });
-  const [editing, setEditing] = useState(undefined);
+  const [qs] = useSearchParams();
+  const [editing, setEditing] = useState(qs.get("new") === "1" ? null : undefined);
   const [confirm, setConfirm] = useState(null);
   const write = can("masters.payment_plan.edit");
   const items = (list.items || list.rows || []).filter((r) => !q || JSON.stringify(r).toLowerCase().includes(q.toLowerCase()));

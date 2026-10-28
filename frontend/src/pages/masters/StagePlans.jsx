@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { ArrowDown, ArrowUp, Copy, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import api, { errMsg } from "@/lib/api";
@@ -13,7 +14,8 @@ export default function StagePlans() {
   const { can } = useAuth();
   const [items, setItems] = useState([]);
   const [stages, setStages] = useState([]);
-  const [editing, setEditing] = useState(null);
+  const [qs] = useSearchParams();
+  const [editing, setEditing] = useState(qs.get("new") === "1" ? {} : null);
   const [q, setQ] = useState("");
   const load = () => Promise.all([api.get("/stage-plans"), api.get("/master/construction-stages?page_size=100")]).then(([a, b]) => { setItems(a.data.items); setStages(b.data.items.filter((s) => s.is_active)); }).catch((e) => toast.error(errMsg(e)));
   useEffect(() => { load(); }, []);

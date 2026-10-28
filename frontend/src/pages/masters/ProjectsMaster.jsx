@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import api, { errMsg } from "@/lib/api";
@@ -11,7 +11,8 @@ import { HistoryButton } from "@/components/common/HistoryTimeline";
 export default function ProjectsMaster() {
   const { can } = useAuth();
   const [items, setItems] = useState([]);
-  const [editing, setEditing] = useState(null);
+  const [qs] = useSearchParams();
+  const [editing, setEditing] = useState(qs.get("new") === "1" ? {} : null);
   const load = () => api.get("/projects?page_size=200").then((r) => setItems(r.data.items)).catch((e) => toast.error(errMsg(e)));
   useEffect(() => { load(); }, []);
   return (

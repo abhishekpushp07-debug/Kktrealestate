@@ -4,10 +4,13 @@ import api, { errMsg } from "@/lib/api";
 import { useFetch } from "@/hooks/useList";
 import { Field } from "@/components/v2";
 import { Select } from "@/components/v2/Select";
+import { QuickCreateSelect } from "@/components/common/QuickCreateSelect";
+import { useCatalogues } from "@/hooks/useCatalogues";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 /** Add N floors to a tower — floor-plan template OR "N flats of one type per floor"; live numbering preview from POST /blocks/{id}/floors/preview. */
 export function AddFloorsSheet({ tower: t, onClose, onSaved }) {
+  const { opts } = useCatalogues();
   const { data: tmpls } = useFetch("/master/floor-plan-templates?page_size=100");
   const [f, setF] = useState({ count: 1, mode: t.floor_plans?.length ? "same" : "simple", floor_plan_template_id: "", flats_per_floor: 4, flat_type_id: "" });
   const [preview, setPreview] = useState(null);
@@ -39,7 +42,7 @@ export function AddFloorsSheet({ tower: t, onClose, onSaved }) {
           </div></Field>
         {f.mode === "simple" && <div className="grid grid-cols-[100px_1fr] gap-3">
           <Field label="Flats / floor"><input type="number" min="1" max="50" className="input !h-10" value={f.flats_per_floor} onChange={(e) => setF({ ...f, flats_per_floor: e.target.value })} data-testid="floors-per-floor" /></Field>
-          <Field label="Flat type"><Select type="flat_types" value={f.flat_type_id} onChange={(v) => setF({ ...f, flat_type_id: v })} allowAdd={false} clearable={false} testId="floors-flat-type" /></Field></div>}
+          <Field label="Flat type"><QuickCreateSelect kind="flat_type" options={opts("flat_types")} value={f.flat_type_id} onChange={(v) => setF({ ...f, flat_type_id: v })} allowAdd={false} clearable={false} testId="floors-flat-type" /></Field></div>}
         {f.mode === "template" && <Field label="Template"><Select options={(tmpls?.items || []).map((x) => ({ value: x.id, label: x.name, sub: `${x.flats_per_floor} flats / floor` }))} value={f.floor_plan_template_id} onChange={(v) => setF({ ...f, floor_plan_template_id: v })} allowAdd={false} clearable={false} testId="floors-template" /></Field>}
         <div className="rounded-xl border border-warm-200 bg-white p-3" data-testid="floors-preview">
           <p className="label-xs mb-1">Preview</p>
@@ -59,6 +62,7 @@ export function AddFloorsSheet({ tower: t, onClose, onSaved }) {
 
 /** Add one flat at floor/position with an explicit (or pattern) number; duplicates are rejected server-side (409) and shown inline. */
 export function AddFlatSheet({ tower: t, floor, onClose, onSaved }) {
+  const { opts } = useCatalogues();
   const [f, setF] = useState({ floor: floor ?? t.unit_floors?.[0] ?? t.floor_start, position: "", flat_type_id: "", flat_number: "" });
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -74,7 +78,7 @@ export function AddFlatSheet({ tower: t, floor, onClose, onSaved }) {
           <Field label="Floor" required><select className="input !h-10" value={f.floor} onChange={(e) => setF({ ...f, floor: e.target.value })} data-testid="flat-floor">{(t.all_floors || []).map((x) => <option key={x} value={x}>{x}</option>)}</select></Field>
           <Field label="Position" required><input type="number" min="1" max="50" className="input !h-10" value={f.position} onChange={(e) => setF({ ...f, position: e.target.value })} data-testid="flat-position" /></Field>
         </div>
-        <Field label="Flat type" required><Select type="flat_types" value={f.flat_type_id} onChange={(v) => setF({ ...f, flat_type_id: v })} allowAdd={false} clearable={false} testId="flat-type" /></Field>
+        <Field label="Flat type" required><QuickCreateSelect kind="flat_type" options={opts("flat_types")} value={f.flat_type_id} onChange={(v) => setF({ ...f, flat_type_id: v })} allowAdd={false} clearable={false} testId="flat-type" /></Field>
         <Field label="Flat number" hint={`Leave blank to follow the tower pattern ${t.numbering_pattern}`}><input className="input !h-10" value={f.flat_number} onChange={(e) => setF({ ...f, flat_number: e.target.value })} placeholder={`${t.code}-${f.floor}${String(f.position || 1).padStart(2, "0")}`} data-testid="flat-number" /></Field>
         {err && <p className="rounded-lg border border-brick/30 bg-brick/5 px-3 py-2 text-xs text-brick" data-testid="flat-error">{err}</p>}
         <div className="flex justify-end gap-2"><button className="btn btn-secondary" onClick={onClose}>Cancel</button>

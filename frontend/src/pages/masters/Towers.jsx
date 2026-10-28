@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import api, { errMsg } from "@/lib/api";
@@ -17,7 +17,8 @@ export default function Towers() {
   const { projects } = useProjectTowers();
   const [projectId, setProjectId] = useState("");
   const [items, setItems] = useState([]);
-  const [editing, setEditing] = useState(null);
+  const [qs] = useSearchParams();
+  const [editing, setEditing] = useState(qs.get("new") === "1" ? {} : null);
   const load = () => api.get(`/blocks?page_size=200${projectId ? `&project_id=${projectId}` : ""}`).then((r) => setItems(r.data.items)).catch((e) => toast.error(errMsg(e)));
   useEffect(() => { load(); }, [projectId]); // eslint-disable-line
   return (
