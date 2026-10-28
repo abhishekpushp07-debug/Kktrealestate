@@ -14,6 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { ContextActions } from "@/components/common/ContextActions";
 
 function UserSheet({ item, roles, projects, onClose, onSaved, onReset }) {
   const [form, setForm] = useState(item ? { ...item, password: "" } : { name: "", email: "", phone: "", role_id: null, project_scope: ["*"], password: "", is_active: true });
@@ -78,6 +79,12 @@ export default function Users() {
         <div><p className="label">Settings</p><h1 className="mt-1 font-display text-4xl text-ink-950">Users & Roles</h1><p className="mt-2 text-sm text-txt-secondary">Who can sign in, what they can do, and which projects they see.</p></div>
         <div className="flex gap-2"><Link to="/admin/access-control" className="btn btn-secondary" data-testid="access-control-link">Access control</Link><Link to="/roles" className="btn btn-secondary" data-testid="roles-link">Roles & permissions</Link>{can("admin.user.view") && <button onClick={() => setEditing(null)} className="btn btn-primary" data-testid="new-user-btn"><Plus className="h-4 w-4" />Invite user</button>}</div>
       </header>
+      <ContextActions testId="users-context-actions" items={[
+        { label: "Add user", onClick: () => setEditing(null), perm: "admin.user.create", primary: true },
+        { label: "New role", to: "/roles?new=1", perm: "admin.role.create" },
+        { label: "Access control", to: "/admin/access-control", perm: "admin.access_control.manage" },
+        { label: "Audit trail", to: "/reports/activity", perm: "admin.audit.view" },
+      ]} />
       <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
         <StatTile label="Active users" value={String(all.filter((u) => u.is_active).length)} hint={`${all.length} total`} icon={UserCheck} testId="users-tile-active" />
         <StatTile label="MFA enabled" value={String(all.filter((u) => u.mfa_enabled).length)} hint="two-factor on" icon={ShieldCheck} iconTone={all.some((u) => !u.mfa_enabled) ? "amber" : "sage"} testId="users-tile-mfa" />

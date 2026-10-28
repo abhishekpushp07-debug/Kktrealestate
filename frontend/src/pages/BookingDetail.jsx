@@ -24,6 +24,8 @@ import { Avatar, ThreeLedgers } from "@/components/v2/CustomerBits";
 import { PostPayment } from "@/components/v2/PostPayment";
 import { JourneyButton } from "@/components/common/JourneyPanel";
 import { RefundsTab, TransferDialog } from "@/components/common/BookingOps";
+import { ContextActions } from "@/components/common/ContextActions";
+import { SendReminderButton } from "@/components/common/SendReminderButton";
 
 const TABS = ["overview", "ledgers", "schedule", "ledger", "demands", "payments", "charges", "refunds", "documents", "revisions", "history"];
 
@@ -85,6 +87,14 @@ export default function BookingDetail() {
         </div>
         <div className="mt-6 border-t border-warm-200 pt-6"><div className="flex items-center justify-between text-xs text-txt-secondary"><span>Paid <Money value={s.paid} short className="text-ink-950" /> of <Money value={b.agreement_value} short className="text-ink-950" /></span><span className="font-semibold text-ink-950">{Math.round((s.paid / (b.agreement_value || 1)) * 100)}%</span></div><div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-warm-100"><span className="block h-full rounded-full bg-sage" style={{ width: `${Math.min(100, (s.paid / (b.agreement_value || 1)) * 100)}%` }} /></div></div>
       </Card>
+      <ContextActions testId="booking-context-actions" items={[
+        { label: "Post payment", to: `/payments?new=1&booking_id=${b.id}`, perm: "finance.payment.create", primary: true },
+        { label: "Raise manual demand", to: `/demands?new=manual&project_id=${b.project_id}&block_id=${b.block_id}&booking_id=${b.id}`, perm: "demands.register.create" },
+        { label: "Generate document", to: `/documents?mode=generate&project_id=${b.project_id}&block_id=${b.block_id}&booking_id=${b.id}`, perm: "documents.document.generate" },
+        { label: "Send reminder", perm: "messaging.message.send", node: <SendReminderButton bookingId={b.id} testId="ca-send-reminder-btn" className="btn btn-secondary btn-sm" /> },
+        { label: "Customer 360", to: `/customers/${b.customer_id}`, perm: "sales.customer.view" },
+        { label: "Project Statement", to: `/reports/project-statement?project_id=${b.project_id}&block_id=${b.block_id}`, perm: "reports.project_statement.view" },
+      ]} />
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-5">
         <Stat label="Agreement" value={inr(b.agreement_value)} hint={`order raised ${inr(s.total_order_raised)}`} />
         <Stat label="Cash" value={inr(s.cash_paid)} hint={`of ${inr(b.cash_agreed)} · due ${inr(Math.max(s.cash_due, 0))}`} tone={s.cash_due > 0 ? undefined : "sage"} />

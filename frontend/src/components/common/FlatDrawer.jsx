@@ -16,6 +16,7 @@ import { StatusChip } from "./StatusChip";
 import { KV, Field } from "./Bits";
 import { Combobox } from "./Combobox";
 import { HistoryTimeline } from "./HistoryTimeline";
+import { ContextActions } from "@/components/common/ContextActions";
 
 export function FlatDrawer({ flatId, onClose, onChanged }) {
   const { can } = useAuth();
@@ -86,6 +87,13 @@ export function FlatDrawer({ flatId, onClose, onChanged }) {
               </>}
             </div>}
           </SheetHeader>
+          <ContextActions className="mt-4" testId="flat-context-actions" items={[
+            { label: "Book this flat", to: `/bookings/new?project=${flat.project_id}&block=${flat.block_id}&flat=${flat.id}${flat.hold?.for_customer_id ? `&customer_id=${flat.hold.for_customer_id}` : ""}`, perm: "sales.booking.create", primary: true,
+              disabledReason: flat.bookable === false ? `${flat.allocation_category_name || flat.allocation_category_code || "Non-saleable"} — not builder-saleable` : ["Booked", "Sold"].includes(flat.status) ? "Already booked" : flat.status === "Blocked" ? `Blocked${flat.block_reason ? ` — ${flat.block_reason}` : ""} — release first` : flat.status === "Hold" && !flat.hold?.for_customer_id ? "On hold — release or convert the hold first" : undefined },
+            { label: "Construction update", to: `/construction?project=${flat.project_id}&tower=${flat.block_id}`, perm: "construction.stage.update" },
+            { label: "Generate document", to: `/documents?mode=generate&project_id=${flat.project_id}&block_id=${flat.block_id}`, perm: "documents.document.generate" },
+            { label: "Tower", to: `/blocks/${flat.block_id}`, perm: "masters.flat.view" },
+          ]} />
           <div className="mt-6 rounded-xl bg-ink-950 p-5 text-white">
             <p className="label-xs text-gold">Listed price</p>
             <p className="mt-1 text-3xl font-extrabold tabular" data-testid="flat-drawer-price">{inrShort(flat.price)}</p>

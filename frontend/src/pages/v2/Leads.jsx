@@ -16,18 +16,19 @@ import { Avatar, Segmented, usePeople } from "@/components/v2/CustomerBits";
 import { Calendar, LeadVisits, NewVisit, VisitActions } from "@/pages/SiteVisits";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ContextActions } from "@/components/common/ContextActions";
 
 const SOURCES = ["Walk-in", "Website", "Referral", "Broker", "Campaign", "Brochure", "Site Visit"];
 const BANDS = [["Under ₹50 L", 0, 5000000], ["₹50 L – ₹1 Cr", 5000000, 10000000], ["₹1 – 1.5 Cr", 10000000, 15000000], ["₹1.5 – 2.5 Cr", 15000000, 25000000], ["Above ₹2.5 Cr", 25000000, null]];
 const STAGE_STATUS = { New: "New", Contacted: "Scheduled", "Site Visit Scheduled": "Pending", "Site Visit Done": "In Progress", Negotiation: "Open", Converted: "Completed", Lost: "Cancelled" };
 const todayIso = () => new Date().toISOString().slice(0, 10);
 
-function LeadForm({ open, onOpenChange, onSaved }) {
+function LeadForm({ open, onOpenChange, onSaved, initial }) {
   const { user } = useAuth();
   const people = usePeople();
   const { data: projects } = useFetch("/projects?page_size=50");
   const { data: flatTypes } = useFetch("/master/flat-types?page_size=100");
-  const [f, setF] = useState({ name: "", phone: "", email: "", project_id: null, flat_type_id: null, band: null, source: "Walk-in", assigned_to: user?.id || null, city_id: null, notes: "" });
+  const [f, setF] = useState({ name: "", phone: "", email: "", project_id: null, flat_type_id: null, band: null, source: "Walk-in", assigned_to: user?.id || null, city_id: null, notes: "", ...initial });
   const [busy, setBusy] = useState(false);
   const submit = async (e) => {
     e.preventDefault(); setBusy(true);
@@ -91,7 +92,8 @@ export default function Leads() {
   const [sp, setSp] = useSearchParams();
   const tab = sp.get("tab") || (sp.get("source") === "Website" ? "enquiries" : "pipeline");
   const [board, setBoard] = useState(null);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(sp.get("new") === "1");
+  const [leadInit] = useState(sp.get("project_id") ? { project_id: sp.get("project_id") } : {});
   const [sel, setSel] = useState(null);
   const [lost, setLost] = useState(null);
   const [reason, setReason] = useState("");
@@ -139,6 +141,12 @@ export default function Leads() {
         <div><p className="label">Sales funnel</p><h1 className="mt-1 font-display text-4xl text-ink-950">Leads & Visits</h1></div>
         <div className="flex flex-wrap gap-2"><Select options={(projects?.items || []).map((p) => ({ value: p.id, label: p.name, sub: p.code }))} value={projectId} onChange={setProjectId} placeholder="All projects" allowAdd={false} className="w-52" testId="leads-filter-project" />{can("sales.site_visit.create") && <button onClick={() => setNewVisit(true)} className="btn btn-secondary" data-testid="visits-new"><CalendarDays className="h-4 w-4" strokeWidth={1.75} />Book visit</button>}{can("sales.lead.create") && <button onClick={() => setOpen(true)} className="btn btn-primary" data-testid="new-lead-btn"><Plus className="h-4 w-4" strokeWidth={1.75} />New lead</button>}</div>
       </header>
+      <ContextActions testId="lead-context-actions" items={[
+        { label: "New lead", onClick: () => setOpen(true), perm: "sales.lead.create", primary: true },
+        { label: "Schedule site visit", onClick: () => setNewVisit(true), perm: "sales.site_visit.create" },
+        { label: "New customer", to: "/customers/new", perm: "sales.customer.create" },
+        { label: "New booking", to: "/bookings/new", perm: "sales.booking.create" },
+      ]} />
       <section className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4" data-testid="lead-tiles">
         {!board ? [1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-28 rounded-2xl" />) : <>
           <StatTile label="New today" value={String(kpis.newToday)} hint={`${all.length} leads in pipeline`} icon={UserPlus} testId="tile-new" />
@@ -168,7 +176,7 @@ export default function Leads() {
         <p className="mt-3 text-xs text-txt-secondary">{brochure.data?.brochure_leads_week ?? 0} brochure leads this week{brochure.data?.total ? ` · ${brochure.data.total} all-time for this project` : ""}</p>
         {can("sales.lead.export") && <button onClick={() => nav("/leads?tab=list")} className="btn btn-secondary btn-sm mt-4"><Download className="h-3.5 w-3.5" />See brochure leads</button>}
       </Card>}
-      {open && <LeadForm open={open} onOpenChange={setOpen} onSaved={refresh} />}
+      {open && <LeadForm open={open} onOpenChange={setOpen} onSaved={refresh} initial={leadInit} />}
       {sel && <LeadDrawer lead={sel} onClose={() => setSel(null)} onChanged={refresh} />}
       {newVisit && <NewVisit open onClose={() => setNewVisit(false)} onSaved={() => { visits.reload(); today.reload(); }} />}
       <Dialog open={!!lost} onOpenChange={(o) => !o && setLost(null)}><DialogContent className="v2" data-testid="lead-lost-dialog"><DialogHeader><DialogTitle className="font-display text-2xl">Mark {lost?.name} as Lost</DialogTitle><DialogDescription>A reason is required.</DialogDescription></DialogHeader>

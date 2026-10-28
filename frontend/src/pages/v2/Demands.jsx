@@ -11,6 +11,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Button } from "@/components/ui/button";
 import { HistoryButton } from "@/components/common/HistoryTimeline";
 import { SendReminderButton } from "@/components/common/SendReminderButton";
+import { useSearchParams } from "react-router-dom";
 
 const Sel = ({ value, onChange, children, testId, disabled }) => <select className="input !h-9 !w-auto text-sm" value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} data-testid={testId}>{children}</select>;
 const Kpi = ({ label, value, hint, tone, testId }) => <div className={cn("rounded-2xl border border-warm-200 bg-white px-4 py-3", tone === "brick" && "border-brick/30 bg-brick/5")} data-testid={testId}><p className="text-[11px] font-semibold uppercase text-txt-muted">{label}</p><p className={cn("font-display text-[22px] tabular-nums text-ink-950", tone === "brick" && "text-brick")}>{value ?? "—"}</p>{hint && <p className="text-[11px] text-txt-secondary">{hint}</p>}</div>;
@@ -28,7 +29,9 @@ export default function Demands() {
   const [cal, setCal] = useState(null);
   const [month, setMonth] = useState(month0());
   const [open, setOpen] = useState({});
-  const [manual, setManual] = useState(false);
+  const [qs] = useSearchParams();
+  const [manual, setManual] = useState(qs.get("new") === "manual");
+  const [manualInit] = useState({ project_id: qs.get("project_id") || "", block_id: qs.get("block_id") || "", booking_id: qs.get("booking_id") || "" });
   const [voidRow, setVoidRow] = useState(null);
   const params = useMemo(() => ({ basis, ...Object.fromEntries(Object.entries(f).filter(([, v]) => v)) }), [basis, f]);
   const load = () => { api.get("/demands/register", { params }).then((r) => { setData(r.data); setOpen((o) => Object.keys(o).length ? o : Object.fromEntries(r.data.groups.slice(0, 1).map((g) => [g.date, true]))); }).catch((e) => toast.error(errMsg(e))); api.get("/demands/kpis", { params: { project_id: f.project_id || undefined, block_id: f.block_id || undefined } }).then((r) => setKpis(r.data)); };
@@ -66,7 +69,7 @@ export default function Demands() {
           <tbody>{data.groups.map((g) => <GroupRows key={g.date} g={g} open={open} toggle={toggle} can={can} onVoid={setVoidRow} onRemind={remind} />)}
             <tr className="border-t-2 border-ink-950 bg-warm-50 font-semibold text-ink-950" data-testid="demands-grand-total"><td className="px-3 py-2">Total · {data.row_count} demand(s)</td><Tot t={data.totals} bold /><td className="px-3 py-2 text-right">{data.totals.count}</td></tr></tbody></table></div>}
       </Card>
-      <ManualSheet open={manual} onOpenChange={setManual} opts={opts} onSaved={load} />
+      <ManualSheet open={manual} onOpenChange={setManual} opts={opts} onSaved={load} initial={manualInit} />
       <VoidDialog row={voidRow} onClose={() => setVoidRow(null)} onDone={load} />
     </div>
   );
@@ -98,8 +101,8 @@ function GroupT({ tk, t, to, toggle, can, onVoid, onRemind, today }) {
   </>);
 }
 
-function ManualSheet({ open, onOpenChange, opts, onSaved }) {
-  const [f, setF] = useState({ project_id: "", block_id: "", booking_id: "", kind: "manual", name: "", cash_amount: "", account_amount: "", due_date: "", note: "" });
+function ManualSheet({ open, onOpenChange, opts, onSaved, initial }) {
+  const [f, setF] = useState({ project_id: "", block_id: "", booking_id: "", ...initial, kind: "manual", name: "", cash_amount: "", account_amount: "", due_date: "", note: "" });
   const [bk, setBk] = useState([]);
   const [effect, setEffect] = useState(null);
   const [towers, setTowers] = useState([]);

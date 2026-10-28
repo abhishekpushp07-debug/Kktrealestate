@@ -18,6 +18,7 @@ import { DocumentsPanel } from "@/components/common/DocumentsPanel";
 import { PortalAccessCard } from "@/components/common/PortalAccessCard";
 import { C360Timeline, BookingRich, DemandsTab, ReceiptsDocsTab, ConstructionTab, ProfileTab } from "@/components/v2/C360Tabs";
 import { ContextActions } from "@/components/common/ContextActions";
+import { SendReminderButton } from "@/components/common/SendReminderButton";
 import { BalanceCell } from "@/components/common/BalanceCell";
 
 const TABS = ["overview", "bookings", "ledger", "demands", "receipts", "construction", "service", "timeline", "kyc", "coapplicants", "notes"];
@@ -86,11 +87,12 @@ export default function Customer360() {
       {S?.cancelled?.count > 0 && <div className="flex flex-wrap items-center gap-3 text-xs text-txt-secondary print:hidden" data-testid="cancelled-rule"><label className="flex cursor-pointer items-center gap-1.5"><input type="checkbox" checked={inclCancelled} onChange={(e) => { const n = new URLSearchParams(sp); if (e.target.checked) n.set("cancelled", "1"); else n.delete("cancelled"); setSp(n, { replace: true }); }} data-testid="include-cancelled-toggle" />Include {S.cancelled.count} cancelled booking(s) in totals</label><span className="text-txt-muted">Cancelled: received {inrShort(S.cancelled.received_paise / 100)} · forfeited {inrShort(S.cancelled.forfeiture_paise / 100)} · refund {inrShort(S.cancelled.refund_paise / 100)}</span></div>}
       <ContextActions testId="customer-context-actions" items={[
         { label: "New booking", to: `/bookings/new?customer_id=${id}`, perm: "sales.booking.create", primary: true },
-        { label: "Post payment", to: `/payments?new=1&customer_id=${id}`, perm: "finance.payment.create" },
-        { label: "Raise demand", to: `/demands?new=manual&customer_id=${id}`, perm: "demands.register.create" },
-        { label: "Generate document", to: `/documents?mode=generate&customer_id=${id}`, perm: "documents.document.generate" },
-        { label: "Schedule visit", to: `/site-visits?new=1&customer_id=${id}`, perm: "sales.site_visit.create" },
-        { label: "New ticket", to: `/service-requests?new=1&customer_id=${id}`, perm: "service.ticket.create" },
+        { label: "Post payment", to: `/payments?new=1&customer_id=${id}${active[0] ? `&booking_id=${active[0].id}` : ""}`, perm: "finance.payment.create" },
+        { label: "Raise manual demand", to: active[0] ? `/demands?new=manual&project_id=${active[0].project_id}&block_id=${active[0].block_id}&booking_id=${active[0].id}` : undefined, perm: "demands.register.create", disabledReason: active[0] ? undefined : "No live booking" },
+        { label: "Generate document", to: `/documents?mode=generate&customer_id=${id}${active[0] ? `&project_id=${active[0].project_id}&block_id=${active[0].block_id}&booking_id=${active[0].id}` : ""}`, perm: "documents.document.generate" },
+        { label: "Add co-applicant", onClick: () => setTab("coapplicants"), perm: "sales.customer.edit" },
+        { label: "Add note", onClick: () => setComm(true), perm: "sales.customer.edit" },
+        active[0] ? { label: "Send reminder", perm: "messaging.message.send", node: <SendReminderButton bookingId={active[0].id} testId="ca-send-reminder-btn" className="btn btn-secondary btn-sm" /> } : null,
       ]} />
       <div className="grid grid-cols-3 gap-3 md:grid-cols-6" data-testid="key-strip">
         {!S ? Array.from({ length: 6 }, (_, n) => n).map((n) => <Skeleton key={n} className="h-[88px] rounded-2xl" />) : <>

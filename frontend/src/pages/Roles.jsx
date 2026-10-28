@@ -1,7 +1,7 @@
 import { HistoryButton } from "@/components/common/HistoryTimeline";
 import { useAuth } from "@/context/AuthContext";
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Plus, Lock, Trash2, Search, Check, Minus, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import api, { errMsg } from "@/lib/api";
@@ -82,7 +82,8 @@ export default function Roles() {
   const { can } = useAuth();
   const { data: roles, loading, reload } = useFetch("/roles?page_size=100");
   const { data: perms } = useFetch("/permissions");
-  const [selected, setSelected] = useState(null);
+  const [qs] = useSearchParams();
+  const [selected, setSelected] = useState(qs.get("new") === "1" ? "new" : null);
   const items = roles?.items || [];
   const current = selected === "new" ? {} : items.find((r) => r.id === selected) || items[0];
   return (

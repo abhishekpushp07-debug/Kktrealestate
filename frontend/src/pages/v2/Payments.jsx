@@ -63,6 +63,7 @@ export default function Payments() {
   const [sp, setSp] = useSearchParams();
   const tab = sp.get("tab") || "receipts";
   const [post, setPost] = useState(!!sp.get("new"));
+  const [prefill] = useState({ customerId: sp.get("customer_id") || undefined, bookingId: sp.get("booking_id") || undefined });
   const [act, setAct] = useState(null);
   const [f, setF] = useState({ status: sp.get("status") || "", payment_category: "", date_from: "", date_to: "" });
   const list = useList("/payments", Object.fromEntries(Object.entries(f).filter(([, v]) => v)), { sort: "-payment_date", pageSize: 20 });
@@ -103,7 +104,7 @@ export default function Payments() {
       {tab === "cheques" && <Card className="!p-0" testId="cheques-card">{(cheques.data?.items || []).length === 0 ? <div className="p-6"><EmptyState icon={Landmark} title="No cheques in hand" description="Cheques and DDs wait here until they are cleared or bounced." testId="cheques-empty" /></div> : <ul className="divide-y divide-warm-100" data-testid="cheques-list">{cheques.data.items.map((p) => <Row key={p.id} p={p} can={can} onAct={setAct} nav={nav} />)}</ul>}</Card>}
       {tab === "demands" && <Card className="!p-0" testId="demands-card">{demands.items.length === 0 ? <div className="p-6"><EmptyState icon={FileWarning} title="No open demands" testId="demands-empty" /></div> : <ul className="divide-y divide-warm-100" data-testid="demands-list">{demands.items.map((d) => { const bal = (d.total_demand_paise || 0) - (d.paid_paise || 0), late = d.due_date < new Date().toISOString().slice(0, 10); return <li key={d.id} className="flex flex-wrap items-center gap-3 px-6 py-3 md:flex-nowrap" data-testid={`demand-${d.demand_number}`}><span className={cn("icon-tile", late ? "brick" : "amber")}><FileWarning /></span><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-ink-950">{d.customer_name} <span className="font-mono text-xs font-normal text-txt-muted">{d.demand_number}</span></p><p className="truncate text-xs text-txt-secondary">{d.installment_name || d.milestone_name} · {d.project_name || d.project_code} {d.flat_number || ""} · due {fmtDate(d.due_date)}</p></div><Money value={bal / 100} className={cn("text-lg", late ? "text-brick" : "text-ink-950")} /><StatusPill status={late ? "Overdue" : d.status} /><button onClick={() => nav(`/bookings/${d.booking_id}`)} className="btn btn-secondary btn-sm" data-testid={`demand-open-${d.demand_number}`}>Open</button></li>; })}</ul>}</Card>}
       {tab === "roznamcha" && <div className="v2-embed" data-testid="roznamcha-embed"><Suspense fallback={<Skeleton className="h-96 rounded-2xl" />}><Roznamcha /></Suspense></div>}
-      {post && <PostPayment open={post} onOpenChange={setPost} onPosted={reload} />}
+      {post && <PostPayment open={post} onOpenChange={setPost} onPosted={reload} customerId={prefill.customerId} bookingId={prefill.bookingId} />}
       {act && <ReasonSheet item={act} onClose={() => setAct(null)} onDone={reload} />}
       <span className="hidden">{c?.cheques_pending}</span>
     </div>
