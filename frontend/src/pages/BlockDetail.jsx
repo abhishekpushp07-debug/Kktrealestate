@@ -20,6 +20,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { ContextActions } from "@/components/common/ContextActions";
+import { ConnectedTo } from "@/components/common/ConnectedTo";
 
 const TYPE_COLORS = ["border-sky-300 bg-sky-50", "border-violet-300 bg-violet-50", "border-rose-300 bg-rose-50", "border-teal-300 bg-teal-50", "border-orange-300 bg-orange-50", "border-lime-300 bg-lime-50"];
 const BAND_COLORS = ["border-emerald-200 bg-sage-50", "border-lime-300 bg-lime-50", "border-amber-300 bg-amber2-50", "border-orange-300 bg-orange-100", "border-red-300 bg-red-100"];
@@ -171,6 +172,7 @@ export default function BlockDetail() {
           </TooltipProvider>
         </div>
         <div className="space-y-4 print:hidden">
+          <ConnectedTo entity="tower" id={id} defaultOpen={["project", "payment_plans", "stage_plans"]} />
           <div className="card p-5">
             <h2 className="mb-3 text-base font-bold text-ink-950">Block details</h2>
             <div className="grid grid-cols-2 gap-3">

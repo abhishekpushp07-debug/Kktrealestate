@@ -9,6 +9,7 @@ import { ContextActions } from "@/components/common/ContextActions";
 import { TowerNode } from "@/components/structure/TowerNode";
 import { AddFloorsSheet, AddFlatSheet } from "@/components/structure/StructureSheets";
 import { cn } from "@/lib/utils";
+import { ConnectedTo } from "@/components/common/ConnectedTo";
 
 function Checklist({ r, towers, onFix }) {
   const items = [...r.project_checks.map((c) => ({ ...c, scope: "Project" })), ...towers.flatMap((t) => t.checks.map((c) => ({ ...c, scope: t.name, block_id: t.id })))];
@@ -57,7 +58,7 @@ export default function ProjectStructure() {
           {data.towers.length === 0 && <Card testId="structure-empty"><p className="text-sm text-txt-muted">No towers yet. Add the first tower to start generating floors and flats.</p></Card>}
           {data.towers.map((t) => <TowerNode key={t.id} tower={t} projectId={id} can={can} onAddFloors={() => setSheet({ kind: "floors", tower: t })} onAddFlat={(floor) => setSheet({ kind: "flat", tower: t, floor })} onChanged={reload} />)}
         </div>
-        <Checklist r={data.readiness} towers={data.towers} onFix={onFix} />
+        <div className="space-y-6"><Checklist r={data.readiness} towers={data.towers} onFix={onFix} /><ConnectedTo entity="project" id={id} /></div>
       </div>
       {sheet?.kind === "floors" && <AddFloorsSheet tower={sheet.tower} onClose={() => setSheet(null)} onSaved={(n) => { toast.success(`${n} flat(s) generated`); setSheet(null); reload(); }} />}
       {sheet?.kind === "flat" && <AddFlatSheet tower={sheet.tower} floor={sheet.floor} onClose={() => setSheet(null)} onSaved={(f) => { toast.success(`Flat ${f.flat_number} added`); setSheet(null); reload(); }} />}

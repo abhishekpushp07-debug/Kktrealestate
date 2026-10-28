@@ -26,6 +26,7 @@ import { JourneyButton } from "@/components/common/JourneyPanel";
 import { RefundsTab, TransferDialog } from "@/components/common/BookingOps";
 import { ContextActions } from "@/components/common/ContextActions";
 import { SendReminderButton } from "@/components/common/SendReminderButton";
+import { ConnectedTo } from "@/components/common/ConnectedTo";
 
 const TABS = ["overview", "ledgers", "schedule", "ledger", "demands", "payments", "charges", "refunds", "documents", "revisions", "history"];
 
@@ -102,6 +103,7 @@ export default function BookingDetail() {
         <Stat label="Outstanding" value={inr(s.outstanding ?? Math.max(s.due, 0))} hint={(s.advance ?? 0) > 0 ? `Advance held ${inr(s.advance)}` : s.pending_cheques > 0 ? `${inr(s.pending_cheques)} cheques in hand` : "no pending cheques"} tone={(s.outstanding ?? s.due) > 0 ? "brick" : "sage"} />
         <Stat label="Other charges" value={inr(s.other_charges_paid)} hint={`demanded ${inr(s.other_charges_demanded)} · due ${inr(Math.max(s.other_charges_due, 0))}`} />
       </div>
+      <details className="rounded-2xl border border-warm-200 bg-white px-4 py-2" data-testid="booking-connected-details"><summary className="cursor-pointer text-sm font-semibold">Connected to</summary><ConnectedTo entity="booking" id={id} className="!border-0 !p-2" /></details>
       <Tabs tabs={TABS.map((t) => ({ value: t, label: t === "ledger" ? "Statement" : t[0].toUpperCase() + t.slice(1) }))} value={tab} onChange={setTab} testId="booking-tabs" />
       <div className="hidden">{TABS.map((t) => <span key={t} data-testid={`booking-tab-${t}`} />)}</div>
       {tab === "overview" && <div className="grid gap-6 lg:grid-cols-3" data-testid="booking-overview">

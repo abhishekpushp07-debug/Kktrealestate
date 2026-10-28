@@ -17,6 +17,7 @@ import { KV, Field } from "./Bits";
 import { Combobox } from "./Combobox";
 import { HistoryTimeline } from "./HistoryTimeline";
 import { ContextActions } from "@/components/common/ContextActions";
+import { ConnectedTo } from "@/components/common/ConnectedTo";
 
 export function FlatDrawer({ flatId, onClose, onChanged }) {
   const { can } = useAuth();
@@ -137,6 +138,7 @@ export function FlatDrawer({ flatId, onClose, onChanged }) {
               <Button size="sm" disabled={busy} onClick={save} className="bg-ink-950 hover:bg-ink-800" data-testid="flat-edit-save">Save changes</Button>
             </div>
           )}
+          <ConnectedTo entity="flat" id={flat.id} className="mt-6" />
         </>}
       </SheetContent>
     </Sheet>

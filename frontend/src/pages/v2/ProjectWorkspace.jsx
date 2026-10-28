@@ -11,6 +11,7 @@ import { PaymentPlanMatrix } from "@/components/common/PaymentPlanMatrix";
 import { RateCardsTab, ParkingTab } from "@/components/common/ProjectTabs";
 import { cn } from "@/lib/utils";
 import { ContextActions } from "@/components/common/ContextActions";
+import { ConnectedTo } from "@/components/common/ConnectedTo";
 
 const ProjectWebsiteTab = lazy(() => import("@/pages/cms/ProjectWebsiteTab").then((m) => ({ default: m.ProjectWebsiteTab })));
 const FlatsTable = lazy(() => import("@/components/common/FlatsTable"));
@@ -108,7 +109,7 @@ export default function ProjectWorkspace() {
       ]} />
       <Tabs tabs={TABS.map(([v, l]) => ({ value: v, label: l }))} value={tab} onChange={(v) => setSp({ tab: v })} testId="project-tabs" />
       <Suspense fallback={<Skeleton className="h-80 rounded-2xl" />}>
-        {tab === "overview" && <Overview s={s} p={p} />}
+        {tab === "overview" && <><Overview s={s} p={p} /><ConnectedTo entity="project" id={id} /></>}
         {tab === "towers" && <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">{s.towers.map((t) => <TowerCard key={t.id} t={t} pid={id} />)}</div>}
         {tab === "inventory" && <Card className="!p-4"><FlatsTable fixed={{ project_id: id }} blocks={p.blocks} /></Card>}
         {tab === "construction" && <Construction s={s} />}
