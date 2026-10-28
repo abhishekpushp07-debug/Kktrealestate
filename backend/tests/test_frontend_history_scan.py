@@ -9,7 +9,7 @@ HISTORY_SURFACES = {
     "booking": ["pages/BookingDetail.jsx"], "demand": ["pages/BookingDetail.jsx"], "refund": ["components/common/BookingOps.jsx"],
     "customer": ["pages/v2/Customer360.jsx", "pages/v2/Customers.jsx"], "lead": ["pages/Leads.jsx", "pages/v2/Leads.jsx"], "site_visit": ["pages/SiteVisits.jsx"],
     "payment": ["pages/v2/Payments.jsx", "components/common/LedgerTable.jsx"], "project": ["pages/ProjectDetail.jsx"], "block": ["pages/BlockDetail.jsx"],
-    "flat": ["components/common/FlatDrawer.jsx"], "rate_card": ["components/common/ProjectTabs.jsx"], "catalogue_item": ["pages/v2/Catalogues.jsx"],
+    "flat": ["components/common/FlatDrawer.jsx", "components/common/flatdrawer/FlatActions.jsx"], "rate_card": ["components/common/ProjectTabs.jsx"], "catalogue_item": ["pages/v2/Catalogues.jsx"],
     "notice": ["pages/cms/Notices.jsx"], "role": ["pages/Roles.jsx"], "user": ["pages/Users.jsx"], "service_request": ["pages/ServiceRequests.jsx", "pages/v2/ServiceRequests.jsx"],
     "master": ["pages/master/MasterPage.jsx"], "company": ["pages/Settings.jsx"],
 }
