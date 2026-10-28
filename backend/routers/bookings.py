@@ -250,6 +250,8 @@ async def get_booking(booking_id: str, user: dict = Depends(require("sales.booki
         db.demands.find({"booking_id": booking_id}, {"_id": 0}).sort("posted_at", 1).to_list(100),
         db.payments.find({"booking_id": booking_id}, {"_id": 0}).sort("posted_at", 1).to_list(500),
         db.blocks.find_one({"id": b["block_id"]}, {"_id": 0, "milestones": 1, "construction_percent": 1}))
+    if b.get("customer") and "co_applicants" in b["customer"]:  # names only — sealed PII never leaves the customer endpoint
+        b["customer"]["co_applicants"] = [{"name": c.get("name"), "relation": c.get("relation"), "phone": c.get("phone")} for c in b["customer"]["co_applicants"] or []]
     b["block_milestones"] = (blk or {}).get("milestones") or []
     return _present(b)
 
