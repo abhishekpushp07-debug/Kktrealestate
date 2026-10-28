@@ -18,6 +18,7 @@ from fastapi.responses import StreamingResponse
 import storage
 from db import db
 from deps import get_current_user, require
+from services import kyc_files as kyc
 from services.filesig import sniff
 from utils import ApiError, client_ip, write_audit
 
@@ -26,10 +27,11 @@ router = APIRouter(tags=["files"])
 PART_SIZE = 5 * 1024 * 1024
 MAX_SIZE = 500 * 1024 * 1024
 LINK_TTL_S = 900
-ALLOWED = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp", ".pdf": "application/pdf",
+ALLOWED = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp", ".pdf": "application/pdf", ".heic": "image/heic",
            ".mp4": "video/mp4", ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
-SIGS_EXTRA = {"video/mp4": lambda b: b[4:8] == b"ftyp", "application/vnd.openxmlformats-officedocument.wordprocessingml.document": lambda b: b[:2] == b"PK",
+SIGS_EXTRA = {"video/mp4": lambda b: b[4:8] == b"ftyp", "image/heic": lambda b: b[4:8] == b"ftyp", "application/vnd.openxmlformats-officedocument.wordprocessingml.document": lambda b: b[:2] == b"PK",
               "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": lambda b: b[:2] == b"PK"}
+VARIANT_MIMES = ("image/jpeg", "image/png", "image/webp")
 VARIANTS = {"thumb": 320, "medium": 1024, "large": 2048}
 _SECRET = (os.environ.get("JWT_SECRET") or "files-dev").encode()
 
@@ -47,12 +49,18 @@ def signed_url(fid: str) -> str:
     return f"/api/files/{fid}/download?exp={exp}&sig={_sign(fid, exp)}"
 
 
-def present(f: dict) -> dict:
-    """Public shape: never the storage key. Variants are addressed by immutable content-hash names."""
+def present(f: dict, user: dict | None = None) -> dict:
+    """Public shape: never the storage key. Variants are addressed by immutable content-hash names.
+    Z.2: KYC files are masked (no url / variants, `locked`) for viewers who may not open them."""
     out = {k: v for k, v in f.items() if k not in ("_id", "storage_key")}
-    out["url"] = signed_url(f["id"])
     out["variants"] = {k: f"/api/files/variants/{v}" for k, v in (f.get("variant_names") or {}).items()}
     out.pop("variant_names", None)
+    if f.get("kind") in kyc.KYC_KINDS and user is not None and not kyc.can_open(user):
+        out["locked"] = True
+        out["variants"] = {}
+        out["url"] = None
+        return out
+    out["url"] = signed_url(f["id"])
     return out
 
 
@@ -77,9 +85,20 @@ async def upload_init(body: dict, request: Request, user: dict = Depends(get_cur
     if ext not in ALLOWED:
         raise ApiError(415, f"File type {ext or '(none)'} is not allowed", "FILE_TYPE_NOT_ALLOWED", {"allowed": sorted(ALLOWED)})
     uid = uuid.uuid4().hex
+    kind = body.get("kind", "document")
+    if kind in kyc.KYC_KINDS:  # Z.2: co-applicant KYC — same permission as adding a co-applicant, 10 MB, PDF/JPG/PNG/HEIC only
+        if "sales.customer.edit" not in user["permissions"]:
+            raise ApiError(403, "Missing permission: sales.customer.edit", "FORBIDDEN")
+        if body.get("entity_type") != "co_applicant" or not body.get("entity_id"):
+            raise ApiError(422, "KYC files attach to a co-applicant (entity_type=co_applicant, entity_id)", "VALIDATION_ERROR")
+        if size > kyc.KYC_MAX:
+            raise ApiError(413, "KYC file must be 10 MB or smaller", "FILE_TOO_LARGE")
+        if ext not in kyc.KYC_EXT:
+            raise ApiError(415, "KYC files: PDF, JPG, PNG or HEIC", "FILE_TYPE_NOT_ALLOWED", {"allowed": list(kyc.KYC_EXT)})
     parts = (size + PART_SIZE - 1) // PART_SIZE
     doc = {"id": uid, "user_id": user["id"], "company_id": user.get("company_id"), "filename": body["filename"], "size": size, "parts": parts, "part_size": PART_SIZE, "received": {},
-           "entity_type": body.get("entity_type"), "entity_id": body.get("entity_id"), "project_id": body.get("project_id"), "kind": body.get("kind", "document"), "caption": body.get("caption"),
+           "entity_type": body.get("entity_type"), "entity_id": body.get("entity_id"), "project_id": body.get("project_id"), "kind": kind, "caption": body.get("caption"),
+           "customer_id": body.get("customer_id"), "booking_id": body.get("booking_id"),
            "state": "uploading", "created_at": datetime.now(timezone.utc).isoformat(), "expires_at": (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()}
     await db.uploads.insert_one({**doc})
     doc.pop("_id", None)
@@ -143,17 +162,22 @@ async def upload_complete(upload_id: str, request: Request, user: dict = Depends
         await storage.put_stream(key, spool, mime, size)
     sha = total.hexdigest()
     fid = str(uuid.uuid4())
+    is_kyc = u.get("kind") in kyc.KYC_KINDS
     doc = {"id": fid, "company_id": u["company_id"], "entity_type": u["entity_type"], "entity_id": u["entity_id"], "project_id": u["project_id"], "kind": u["kind"], "caption": u.get("caption"),
-           "filename": u["filename"], "content_type": mime, "size": size, "sha256": sha, "storage_key": key, "is_image": mime.startswith("image/"), "variant_names": {}, "variants_state": "pending" if mime.startswith("image/") else "n/a",
+           "customer_id": u.get("customer_id"), "booking_id": u.get("booking_id"), "is_sensitive": is_kyc,
+           "filename": u["filename"], "content_type": mime, "size": size, "sha256": sha, "storage_key": key, "is_image": mime in VARIANT_MIMES, "variant_names": {}, "variants_state": "pending" if mime in VARIANT_MIMES else "n/a",
            "legal_hold": False, "retention_until": None, "uploaded_by": user["id"], "created_at": datetime.now(timezone.utc).isoformat(), "version": 1, "is_active": True}
     await db.files.insert_one({**doc})
+    if is_kyc:  # one live file per co-applicant + kind: a re-upload replaces (soft) the previous one
+        await db.files.update_many({"entity_type": "co_applicant", "entity_id": u["entity_id"], "kind": u["kind"], "is_active": True, "id": {"$ne": fid}},
+                                   {"$set": {"is_active": False, "deleted_at": doc["created_at"], "replaced_by": fid}})
     await db.uploads.update_one({"id": upload_id}, {"$set": {"state": "completed", "file_id": fid}})
     for i in range(1, u["parts"] + 1):
         await storage.delete_object(_part_key(upload_id, i))
-    await write_audit(user, "file.upload", u["entity_type"] or "file", u["entity_id"] or fid, after={"file_id": fid, "filename": u["filename"], "size": size, "sha256": sha}, ip=client_ip(request))
+    await write_audit(user, "kyc.upload" if is_kyc else "file.upload", u["entity_type"] or "file", u["entity_id"] or fid, after={"file_id": fid, "filename": u["filename"], "size": size, "sha256": sha, "kind": u["kind"]}, ip=client_ip(request))
     if doc["is_image"]:
         asyncio.create_task(variants_job([fid]))
-    return present(doc)
+    return present(doc, user)
 
 
 # ---- variants job -----------------------------------------------------------------------------------------------------
@@ -199,19 +223,25 @@ async def variants_job(file_ids: list[str]) -> dict:
 
 # ---- read / serve -------------------------------------------------------------------------------------------------------
 @router.get("/files")
-async def list_files(entity_type: str | None = None, entity_id: str | None = None, project_id: str | None = None, kind: str | None = None, cursor: str | None = None, limit: int = 60,
+async def list_files(entity_type: str | None = None, entity_id: str | None = None, project_id: str | None = None, kind: str | None = None, customer_id: str | None = None, cursor: str | None = None, limit: int = 60,
                      user: dict = Depends(get_current_user)):
     q = {"company_id": user.get("company_id"), "is_active": True}
     for k, v in (("entity_type", entity_type), ("entity_id", entity_id), ("project_id", project_id), ("kind", kind)):
         if v:
-            q[k] = v
+            q[k] = {"$in": v.split(",")} if "," in v else v
+    if customer_id:
+        q["customer_id"] = customer_id
+    if kind == "kyc" or (kind and set(kind.split(",")) <= set(kyc.KYC_KINDS)):
+        q["kind"] = {"$in": list(kyc.KYC_KINDS)} if kind == "kyc" else q["kind"]
+        if "sales.customer.view" not in user["permissions"]:
+            raise ApiError(403, "Missing permission: sales.customer.view", "FORBIDDEN")
     if cursor:
         q["created_at"] = {"$lt": cursor}
     limit = max(1, min(limit, 200))
     rows = await db.files.find(q, {"_id": 0}).sort([("created_at", -1)]).limit(limit + 1).to_list(limit + 1)
     more = len(rows) > limit
     rows = rows[:limit]
-    return {"items": [present(f) for f in rows], "next_cursor": rows[-1]["created_at"] if more and rows else None}
+    return {"items": [present(f, user) for f in rows], "next_cursor": rows[-1]["created_at"] if more and rows else None}
 
 
 @router.get("/files/variants/{name}")
@@ -223,18 +253,22 @@ async def variant(name: str):
 
 
 @router.get("/files/{file_id}")
-async def file_meta(file_id: str, user: dict = Depends(get_current_user)):
+async def file_meta(file_id: str, request: Request, user: dict = Depends(get_current_user)):
     f = await db.files.find_one({"id": file_id, "company_id": user.get("company_id"), "is_active": {"$ne": False}}, {"_id": 0})
     if not f:
         raise ApiError(404, "File not found", "NOT_FOUND")
-    return present(f)
+    if f.get("kind") in kyc.KYC_KINDS:
+        await kyc.gate(user, f, client_ip(request))
+    return present(f, user)
 
 
 @router.get("/files/{file_id}/url")
-async def file_url(file_id: str, user: dict = Depends(get_current_user)):
-    f = await db.files.find_one({"id": file_id, "company_id": user.get("company_id")}, {"_id": 0, "id": 1})
+async def file_url(file_id: str, request: Request, user: dict = Depends(get_current_user)):
+    f = await db.files.find_one({"id": file_id, "company_id": user.get("company_id")}, {"_id": 0, "id": 1, "kind": 1, "entity_id": 1, "customer_id": 1})
     if not f:
         raise ApiError(404, "File not found", "NOT_FOUND")
+    if f.get("kind") in kyc.KYC_KINDS:  # signed links for KYC files are issued only to permitted users, every issue audited
+        await kyc.gate(user, f, client_ip(request))
     return {"url": signed_url(file_id), "expires_in_s": LINK_TTL_S}
 
 

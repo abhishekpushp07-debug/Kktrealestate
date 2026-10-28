@@ -113,23 +113,43 @@ async def list_bookings(params: ListParams = Depends(), project_id: str | None =
     res = await paginate(db.bookings, q, params, params.sort_spec(["booking_number", "booking_date", "created_at", "status", "customer_name"], "-booking_date"), {"agreement_revisions": 0, "milestone_template_snapshot": 0, "payment_plan_snapshot": 0})
     from services.includes import expand
     res["items"] = present_money(await expand(res["items"], params.include, "bookings"))
+    await _kyc_badges(res["items"])
     if res.pop("_csv", False):
         rows = [{**i, "flat_number": i["flat_snapshot"]["flat_number"], **{k: v for k, v in i["summary"].items() if not k.endswith("_paise")}} for i in res["items"]]
         return Response(to_csv(rows, ["booking_number", "booking_date", "customer_name", "project_code", "block_code", "flat_number", "status", "agreement_value", "cash_agreed", "account_agreed", "construction_percent", "cash_paid", "account_paid", "paid", "cash_due", "account_due", "due", "other_charges_due"]), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=bookings.csv"})
     return res
 
 
-def _merge_co_applicants(existing: list[dict], incoming: list) -> list[dict] | None:
-    """Append only co-applicants not already on the customer (same name + phone) — idempotent on wizard retries."""
-    seen = {((c.get("name") or "").strip().lower(), c.get("phone") or None) for c in existing}
-    out = []
+async def _kyc_badges(items: list[dict]) -> None:
+    """Z.2: per-booking co-applicant KYC completeness for list cards (two queries for the whole page)."""
+    from services.kyc_files import completeness, files_for
+    cids = list({i["customer_id"] for i in items if i.get("customer_id")})
+    if not cids:
+        return
+    custs = {c["id"]: c.get("co_applicants") or [] for c in await db.customers.find({"id": {"$in": cids}}, {"_id": 0, "id": 1, "co_applicants.id": 1, "co_applicants.name": 1}).to_list(None)}
+    files = await files_for([c["id"] for cos in custs.values() for c in cos if c.get("id")])
+    for i in items:
+        i["kyc_completeness"] = completeness(custs.get(i.get("customer_id"), []), files)
+
+
+def _merge_co_applicants(existing: list[dict], incoming: list) -> tuple[list[dict] | None, dict[str, str]]:
+    """Append only co-applicants not already on the customer (same name + phone) — idempotent on wizard retries.
+    Returns (new rows, {client id → final id}) so KYC files uploaded against a client id follow the deduped row."""
+    import uuid
+    seen = {((c.get("name") or "").strip().lower(), c.get("phone") or None): c.get("id") for c in existing}
+    out, id_map = [], {}
     for c in incoming:
         d = c.model_dump()
+        d["id"] = d.get("id") or str(uuid.uuid4())
         k = (d["name"].strip().lower(), d.get("phone") or None)
-        if k not in seen:
-            seen.add(k)
-            out.append(d)
-    return out or None
+        if k in seen:
+            if seen[k]:
+                id_map[d["id"]] = seen[k]
+            continue
+        seen[k] = d["id"]
+        id_map[d["id"]] = d["id"]
+        out.append(d)
+    return (out or None), id_map
 
 
 @router.post("", status_code=201)
@@ -153,7 +173,7 @@ async def create_booking(body: BookingIn, request: Request, user: dict = Depends
         raise ApiError(400, "Unknown co-applicant customer", "INVALID_CO_APPLICANT")
     block = await get_or_404(db.blocks, flat["block_id"], "Block")
     project = await get_or_404(db.projects, flat["project_id"], "Project")
-    new_co = _merge_co_applicants(customer.get("co_applicants") or [], body.co_applicants)
+    new_co, co_id_map = _merge_co_applicants(customer.get("co_applicants") or [], body.co_applicants)
     company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0})
     milestones = block.get("milestones") or []
     if not milestones:
@@ -211,6 +231,9 @@ async def create_booking(body: BookingIn, request: Request, user: dict = Depends
             uow.on_rollback(lambda: db.customers.update_one({"id": customer["id"]}, {"$set": {"co_applicants": prev_co}}))
             await write_audit(user, "customer.update", "customer", customer["id"], before={"co_applicants": [c.get("name") for c in prev_co]}, after={"co_applicants": [c.get("name") for c in prev_co] + [c["name"] for c in new_co], "via": "booking_wizard"}, ip=client_ip(request))
         doc.pop("_id", None)
+        if co_id_map:
+            from services.kyc_files import link_on_booking
+            await link_on_booking(co_id_map, customer["id"], doc["id"])  # Z.2: KYC files uploaded in the wizard follow their co-applicant
         lines = raise_other_charges(doc, "on_booking", posted_at)
         if lines:
             doc["other_charges"] = lines
@@ -251,7 +274,11 @@ async def get_booking(booking_id: str, user: dict = Depends(require("sales.booki
         db.payments.find({"booking_id": booking_id}, {"_id": 0}).sort("posted_at", 1).to_list(500),
         db.blocks.find_one({"id": b["block_id"]}, {"_id": 0, "milestones": 1, "construction_percent": 1}))
     if b.get("customer") and "co_applicants" in b["customer"]:  # names only — sealed PII never leaves the customer endpoint
-        b["customer"]["co_applicants"] = [{"name": c.get("name"), "relation": c.get("relation"), "phone": c.get("phone")} for c in b["customer"]["co_applicants"] or []]
+        from services.kyc_files import annotate, completeness
+        cos = [{"id": c.get("id"), "name": c.get("name"), "relation": c.get("relation"), "phone": c.get("phone")} for c in b["customer"]["co_applicants"] or []]
+        await annotate(cos)
+        b["customer"]["co_applicants"] = cos
+        b["kyc_completeness"] = completeness(cos, {c["id"]: c["kyc"] for c in cos if c.get("id")})
     b["block_milestones"] = (blk or {}).get("milestones") or []
     return _present(b)
 

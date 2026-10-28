@@ -8,6 +8,7 @@ import { fmtDate } from "@/lib/format";
 import { Card, EmptyState, Money, Skeleton, StatusPill } from "@/components/v2";
 import { Select } from "@/components/v2/Select";
 import { Avatar } from "@/components/v2/CustomerBits";
+import { KycBadge } from "@/components/common/KycSlots";
 
 const STATUSES = ["Active", "Completed", "Cancelled"];
 
@@ -21,6 +22,7 @@ export function BookingTile({ b }) {
           <div className="min-w-0 flex-1"><p className="truncate font-display text-base font-semibold text-ink-950">{b.customer_name}</p><p className="truncate text-xs text-txt-secondary">{b.booking_number} · {fmtDate(b.booking_date)}</p></div>
           <StatusPill status={b.status} />
         </div>
+        {b.kyc_completeness?.total > 0 && <div className="mt-2"><KycBadge k={b.kyc_completeness} testId={`booking-kyc-${b.booking_number}`} /></div>}
         <div className="mt-3 flex flex-wrap gap-1.5"><span className="pill bg-ink-950 text-warm-50">{b.flat_snapshot?.flat_number}</span><span className="pill bg-warm-100 text-txt-secondary">{b.project_code} · {b.block_code || b.block_name}</span>{b.flat_snapshot?.flat_type_code && <span className="pill bg-warm-100 text-txt-secondary">{b.flat_snapshot.flat_type_code}</span>}{b.payment_plan_name && <span className="pill bg-warm-100 text-txt-secondary">{b.payment_plan_name}</span>}</div>
         <div className="mt-4"><div className="flex items-center justify-between text-xs text-txt-secondary"><span>Agreement <Money value={agr / 100} short className="text-ink-950" /></span><span className="font-semibold text-ink-950">{Math.round((paid / agr) * 100)}% paid</span></div><div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-warm-100"><span className="block h-full rounded-full bg-sage" style={{ width: `${Math.min(100, (paid / agr) * 100)}%` }} /></div></div>
         <div className="mt-4 grid grid-cols-3 gap-2 border-t border-warm-100 pt-3">{[["Cash due", s.cash_due_paise], ["Account due", s.account_due_paise], ["Charges due", s.other_charges_due_paise]].map(([l, v]) => <div key={l}><p className="text-[11px] font-semibold text-txt-secondary">{l}</p><Money value={Math.max(v || 0, 0) / 100} short className={cn("text-base", v > 0 ? "text-brick" : "text-sage")} /></div>)}</div>

@@ -208,6 +208,7 @@ class FlatsOutPage(_Out):
 
 
 class CustomersOut(_Out):
+    kyc_completeness: Any = None
     _links: Any = None
     aadhaar: Any = None
     aadhaar_masked: Any = None
@@ -304,6 +305,7 @@ class CustomersOutPage(_Out):
 
 
 class BookingsOut(_Out):
+    kyc_completeness: Any = None
     transfers: Any = None
     lead_id: Any = None
     refund: Any = None

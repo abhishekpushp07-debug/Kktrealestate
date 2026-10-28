@@ -1,3 +1,4 @@
+import uuid
 import asyncio
 from datetime import UTC, date, datetime
 from typing import Literal
@@ -66,6 +67,7 @@ class Nominee(StrictModel):
 
 
 class CoApplicant(StrictModel):
+    id: str | None = None  # Z.2: stable id so KYC files can be linked (client-generated in the wizard, server-filled otherwise)
     name: str = Field(min_length=1, max_length=120)
     relation: str | None = None
     phone: str | None = None
@@ -166,7 +168,7 @@ def _prepare(data: dict) -> dict:
     if "bank" in data and data["bank"] is not None:
         data["bank"] = seal(data["bank"], ("account_number",))
     if "co_applicants" in data and data["co_applicants"] is not None:
-        data["co_applicants"] = [seal(c) for c in data["co_applicants"]]
+        data["co_applicants"] = [seal({**c, "id": c.get("id") or str(uuid.uuid4())}) for c in data["co_applicants"]]
     return seal(data)
 
 
@@ -327,6 +329,9 @@ async def get_customer(customer_id: str, request: Request, reveal: bool = Query(
     if do_reveal:
         await write_audit(user, "customer.kyc_reveal", "customer", customer_id, after={"revealed": ["pan", "aadhaar", "bank.account_number"]}, ip=client_ip(request))
     out = present(doc, do_reveal)
+    from services.kyc_files import annotate, completeness, files_for
+    await annotate(out["co_applicants"])
+    out["kyc_completeness"] = completeness(out["co_applicants"], {c["id"]: c["kyc"] for c in out["co_applicants"] if c.get("id")} or await files_for([]))
     out["bookings"] = await db.bookings.find({"$or": [{"customer_id": customer_id}, {"co_applicant_customer_ids": customer_id}]}, {"_id": 0, "id": 1, "booking_number": 1, "status": 1, "flat_snapshot": 1, "project_id": 1, "agreement_value_paise": 1, "summary": 1, "booking_date": 1, "payment_plan_snapshot": 1, "block_id": 1, "cash_agreed_paise": 1, "account_agreed_paise": 1}).to_list(50)
     out["bookings"] = present_money(out["bookings"])
     from services.dues_engine import schedule

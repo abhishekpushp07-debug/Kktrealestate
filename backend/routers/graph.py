@@ -13,20 +13,20 @@ from services.money import present_money
 from utils import ApiError, get_or_404
 
 router = APIRouter(prefix="/graph", tags=["graph"])
-Entity = Literal["project", "block", "tower", "flat", "customer", "booking", "stage_plan", "payment_plan", "demand", "payment", "document"]
+Entity = Literal["project", "block", "tower", "flat", "customer", "booking", "stage_plan", "payment_plan", "demand", "payment", "document", "kyc_file"]
 LIMIT = 25
 P = {"project": "masters.project.view", "block": "masters.project.view", "flat": "masters.flat.view", "customer": "sales.customer.view", "booking": "sales.booking.view",
-     "stage_plan": "masters.stage_plan.view", "payment_plan": "masters.payment_plan.view", "demand": "demands.register.view", "payment": "finance.payment.view", "document": "documents.document.view"}
+     "stage_plan": "masters.stage_plan.view", "payment_plan": "masters.payment_plan.view", "demand": "demands.register.view", "payment": "finance.payment.view", "document": "documents.document.view", "kyc_file": "sales.customer.view"}
 COLL = {"project": db.projects, "block": db.blocks, "flat": db.flats, "customer": db.customers, "booking": db.bookings, "stage_plan": db.construction_stage_plans,
-        "payment_plan": db.payment_plans, "demand": db.demands, "payment": db.payments, "document": db.documents}
+        "payment_plan": db.payment_plans, "demand": db.demands, "payment": db.payments, "document": db.documents, "kyc_file": db.files}
 ROUTE = {"project": "/projects/{id}", "block": "/blocks/{id}", "flat": "/blocks/{block_id}?flat={id}", "customer": "/customers/{id}", "booking": "/bookings/{id}", "stage_plan": "/master/stage-plans?project_id={project_id}",
-         "payment_plan": "/master/payment-plans?project_id={project_id}", "demand": "/demands?booking_id={booking_id}", "payment": "/payments?q={id}", "document": "/documents?entity_type={entity_type}&entity_id={entity_id}"}
-LABEL = {"project": "name", "block": "name", "flat": "flat_number", "customer": "full_name", "booking": "booking_number", "stage_plan": "name", "payment_plan": "name", "demand": "demand_number", "payment": "receipt_number", "document": "file_name"}
+         "payment_plan": "/master/payment-plans?project_id={project_id}", "demand": "/demands?booking_id={booking_id}", "payment": "/payments?q={id}", "document": "/documents?entity_type={entity_type}&entity_id={entity_id}", "kyc_file": "/customers/{customer_id}?tab=coapplicants"}
+LABEL = {"project": "name", "block": "name", "flat": "flat_number", "customer": "full_name", "booking": "booking_number", "stage_plan": "name", "payment_plan": "name", "demand": "demand_number", "payment": "receipt_number", "document": "file_name", "kyc_file": "filename"}
 
 
 def _node(kind: str, d: dict) -> dict:
     return {"kind": kind, "id": d["id"], "label": d.get(LABEL[kind]) or d.get("name") or d.get("customer_code") or d["id"][:8], "status": d.get("status"),
-            "to": ROUTE[kind].format(id=d["id"], block_id=d.get("block_id"), project_id=d.get("project_id") or "", booking_id=d.get("booking_id") or "", entity_type=d.get("entity_type") or "", entity_id=d.get("entity_id") or "")}
+            "to": ROUTE[kind].format(id=d["id"], block_id=d.get("block_id"), project_id=d.get("project_id") or "", booking_id=d.get("booking_id") or "", entity_type=d.get("entity_type") or "", entity_id=d.get("entity_id") or "", customer_id=d.get("customer_id") or "")}
 
 
 async def _section(kind: str, user: dict, q: dict, extra_fields: tuple = (), sort=None) -> dict | None:
@@ -87,11 +87,11 @@ async def graph(entity: Entity, entity_id: str, user: dict = Depends(require_any
             jobs.update({"bookings": S("booking", {"flat_id": d["id"]}), "demands": S("demand", {"flat_id": d["id"]}), "payments": S("payment", {"flat_id": d["id"]})})
     elif kind == "customer":
         jobs = {"bookings": S("booking", {"$or": [{"customer_id": d["id"]}, {"co_applicant_customer_ids": d["id"]}]}), "demands": S("demand", {"customer_id": d["id"]}), "payments": S("payment", {"customer_id": d["id"]}),
-                "documents": S("document", {"entity_type": "customer", "entity_id": d["id"]})}
+                "documents": S("document", {"entity_type": "customer", "entity_id": d["id"]}), "kyc_files": S("kyc_file", {"entity_type": "co_applicant", "customer_id": d["id"], "is_active": True})}
     elif kind == "booking":
         jobs = {"customer": S("customer", {"id": {"$in": [d.get("customer_id"), *(d.get("co_applicant_customer_ids") or [])]}}), "project": S("project", {"id": pid}), "tower": S("block", {"id": bid}), "flat": S("flat", {"id": d.get("flat_id")}),
                 "payment_plan": S("payment_plan", {"id": (d.get("payment_plan_snapshot") or {}).get("payment_plan_id") or d.get("payment_plan_id")}), "demands": S("demand", {"booking_id": d["id"]}, sort=[("due_date", 1)]), "payments": S("payment", {"booking_id": d["id"]}, sort=[("payment_date", -1)]),
-                "documents": S("document", {"entity_type": "booking", "entity_id": d["id"]})}
+                "documents": S("document", {"entity_type": "booking", "entity_id": d["id"]}), "kyc_files": S("kyc_file", {"entity_type": "co_applicant", "booking_id": d["id"], "is_active": True})}
     elif kind == "stage_plan":
         jobs = {"project": S("project", {"id": pid}), "towers": S("block", {"id": bid} if bid else {"project_id": pid, "is_active": True}), "payment_plans": S("payment_plan", {"stage_plan_id": d["id"]})}
     elif kind == "payment_plan":

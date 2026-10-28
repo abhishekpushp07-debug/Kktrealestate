@@ -1931,6 +1931,9 @@
      "is_active": {
       "title": "Is Active"
      },
+     "kyc_completeness": {
+      "title": "Kyc Completeness"
+     },
      "lead_id": {
       "title": "Lead Id"
      },
@@ -2610,6 +2613,17 @@
        }
       ],
       "title": "Aadhaar"
+     },
+     "id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Id"
      },
      "name": {
       "maxLength": 120,
@@ -4238,6 +4252,9 @@
      },
      "is_active": {
       "title": "Is Active"
+     },
+     "kyc_completeness": {
+      "title": "Kyc Completeness"
      },
      "kyc_status": {
       "title": "Kyc Status"
@@ -22294,6 +22311,22 @@
      },
      {
       "in": "query",
+      "name": "customer_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Customer Id"
+      }
+     },
+     {
+      "in": "query",
       "name": "cursor",
       "required": false,
       "schema": {
@@ -23192,7 +23225,8 @@
         "payment_plan",
         "demand",
         "payment",
-        "document"
+        "document",
+        "kyc_file"
        ],
        "title": "Entity",
        "type": "string"

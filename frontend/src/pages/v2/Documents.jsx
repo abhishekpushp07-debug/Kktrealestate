@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Download, Link2, Printer, Send } from "lucide-react";
 import { toast } from "sonner";
 import api, { errMsg, BASE_PATH } from "@/lib/api";
@@ -8,6 +8,27 @@ import { cn } from "@/lib/utils";
 import { fmtDate, fmtDateTime, inr } from "@/lib/format";
 import { Card, EmptyState, Skeleton } from "@/components/v2";
 import { HistoryButton } from "@/components/common/HistoryTimeline";
+
+const KYC_LABEL = { kyc_pan: "PAN", kyc_aadhaar: "Aadhaar", kyc_other: "Other ID" };
+
+/** Z.2 — co-applicant KYC files (files pipeline, kind kyc_*). Locked rows = viewer may not open them. */
+function KycFiles() {
+  const [kind, setKind] = useState("kyc");
+  const [rows, setRows] = useState(null);
+  useEffect(() => { api.get("/files", { params: { kind, limit: 200 } }).then((r) => setRows(r.data.items)).catch((e) => toast.error(errMsg(e))); }, [kind]);
+  const open = async (id) => { try { const r = await api.get(`/files/${id}/url`); window.open(r.data.url, "_blank", "noopener"); } catch (e) { toast.error(errMsg(e)); } };
+  return (
+    <Card testId="docs-kyc">
+      <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-display text-lg">KYC files</h3>
+        <select className="input !h-9 w-40 text-sm" value={kind} onChange={(e) => setKind(e.target.value)} data-testid="docs-kyc-kind"><option value="kyc">All KYC</option>{Object.entries(KYC_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></div>
+      {!rows ? <Skeleton className="mt-3 h-24" /> : rows.length === 0 ? <p className="mt-3 text-sm text-txt-muted">No KYC files yet — upload from the Booking Wizard or Customer 360 → Co-applicants.</p> : (
+        <table className="mt-3 w-full text-sm" data-testid="docs-kyc-table"><thead><tr className="text-left text-xs uppercase tracking-wide text-txt-muted"><th className="py-2 pr-3">Type</th><th className="pr-3">File</th><th className="pr-3">Customer</th><th className="pr-3">Booking</th><th className="pr-3">Uploaded</th><th /></tr></thead>
+          <tbody>{rows.map((f) => <tr key={f.id} className="border-t border-warm-100" data-testid={`docs-kyc-row-${f.id}`}><td className="py-1.5 pr-3 font-medium">{KYC_LABEL[f.kind] || f.kind}</td><td className="pr-3">{f.locked ? <span className="text-txt-muted">Masked</span> : f.filename}</td>
+            <td className="pr-3">{f.customer_id ? <Link to={`/customers/${f.customer_id}?tab=coapplicants`} className="hover:underline">Customer 360</Link> : "—"}</td><td className="pr-3">{f.booking_id ? <Link to={`/bookings/${f.booking_id}`} className="hover:underline">Booking</Link> : "—"}</td>
+            <td className="pr-3 text-txt-secondary">{fmtDateTime(f.created_at)}</td><td className="text-right">{!f.locked && <button className="btn btn-ghost btn-sm" onClick={() => open(f.id)} data-testid={`docs-kyc-open-${f.id}`}>Open</button>}</td></tr>)}</tbody></table>)}
+    </Card>
+  );
+}
 
 const Sel = ({ value, onChange, children, testId, disabled }) => <select className="input !h-9 text-sm" value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} data-testid={testId}>{children}</select>;
 const Kpi = ({ label, value, testId }) => <div className="rounded-2xl border border-warm-200 bg-white px-4 py-3" data-testid={testId}><p className="text-[11px] font-semibold uppercase text-txt-muted">{label}</p><p className="font-display text-[22px] tabular-nums text-ink-950">{value ?? "—"}</p></div>;
@@ -22,11 +43,12 @@ export default function Documents() {
   return (
     <div className="space-y-5" data-testid="documents-page">
       <div className="flex flex-wrap items-end justify-between gap-3"><div><h1 className="font-display text-2xl text-ink-950">Documents</h1><p className="text-xs text-txt-secondary">Receipts, demand letters, statements and letters — deterministic PDFs, registered and re-downloadable forever.</p></div>
-        <div className="flex rounded-full border border-warm-200 bg-white p-0.5 text-sm" data-testid="documents-mode">{[["generate", "Generate"], ["bulk", "Bulk"], ["register", "Register"]].map(([k, l]) => <button key={k} onClick={() => { setMode(k); const n = new URLSearchParams(sp); n.set("mode", k); setSp(n, { replace: true }); }} className={cn("rounded-full px-4 py-1.5 font-semibold", mode === k ? "bg-ink-950 text-warm-50" : "text-txt-secondary")} data-testid={`docs-mode-${k}`}>{l}</button>)}</div></div>
+        <div className="flex rounded-full border border-warm-200 bg-white p-0.5 text-sm" data-testid="documents-mode">{[["generate", "Generate"], ["bulk", "Bulk"], ["register", "Register"], ["kyc", "KYC"]].map(([k, l]) => <button key={k} onClick={() => { setMode(k); const n = new URLSearchParams(sp); n.set("mode", k); setSp(n, { replace: true }); }} className={cn("rounded-full px-4 py-1.5 font-semibold", mode === k ? "bg-ink-950 text-warm-50" : "text-txt-secondary")} data-testid={`docs-mode-${k}`}>{l}</button>)}</div></div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4" data-testid="docs-kpis"><Kpi label="Generated today" value={reg?.kpis.today} testId="kpi-today" /><Kpi label="This month" value={reg?.kpis.month} testId="kpi-month" /><Kpi label="Awaiting send" value={reg?.kpis.unsent} testId="kpi-unsent" /><Kpi label="Active share links" value={reg?.kpis.active_links} testId="kpi-links" /></div>
       {mode === "generate" && <Generate sp={sp} can={can} onGenerated={loadReg} />}
       {mode === "bulk" && <Bulk can={can} onDone={loadReg} />}
       {mode === "register" && <Register reg={reg} can={can} reload={loadReg} />}
+      {mode === "kyc" && <KycFiles />}
     </div>
   );
 }

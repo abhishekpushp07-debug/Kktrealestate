@@ -27,6 +27,7 @@ import { RefundsTab, TransferDialog } from "@/components/common/BookingOps";
 import { ContextActions } from "@/components/common/ContextActions";
 import { SendReminderButton } from "@/components/common/SendReminderButton";
 import { ConnectedTo } from "@/components/common/ConnectedTo";
+import { KycBadge } from "@/components/common/KycSlots";
 
 const TABS = ["overview", "ledgers", "schedule", "ledger", "demands", "payments", "charges", "refunds", "documents", "revisions", "history"];
 
@@ -71,7 +72,7 @@ export default function BookingDetail() {
             <Avatar name={b.customer_name} size={64} />
             <div className="min-w-0">
               <h1 className="font-display text-3xl text-ink-950 md:text-[36px]"><Link to={`/customers/${b.customer_id}`} className="hover:text-gold" data-testid="hero-customer-link">{b.customer_name}</Link></h1>
-              <div className="mt-2 flex flex-wrap items-center gap-1.5"><StatusPill status={b.status} /><span className="pill bg-ink-950 text-warm-50">{b.flat_snapshot.flat_number}</span><span className="pill bg-warm-100 text-txt-secondary">{b.project_name} · {b.block_name}</span><span className="pill bg-warm-100 text-txt-secondary">{b.flat_snapshot.flat_type_code}</span>{b.payment_plan_name && <span className="pill bg-gold-light text-[#8a6d12]">{b.payment_plan_name}</span>}</div>
+              <div className="mt-2 flex flex-wrap items-center gap-1.5"><StatusPill status={b.status} /><KycBadge k={b.kyc_completeness} testId="booking-kyc-badge" /><span className="pill bg-ink-950 text-warm-50">{b.flat_snapshot.flat_number}</span><span className="pill bg-warm-100 text-txt-secondary">{b.project_name} · {b.block_name}</span><span className="pill bg-warm-100 text-txt-secondary">{b.flat_snapshot.flat_type_code}</span>{b.payment_plan_name && <span className="pill bg-gold-light text-[#8a6d12]">{b.payment_plan_name}</span>}</div>
               <p className="mt-3 text-sm text-txt-secondary">{b.booking_number} · booked {fmtDate(b.booking_date)} · {b.construction_percent}% constructed</p>
             </div>
           </div>
