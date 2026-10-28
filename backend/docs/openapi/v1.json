@@ -5101,6 +5101,17 @@
       ],
       "title": "Flat Type Id"
      },
+     "is_active": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Is Active"
+     },
      "notes": {
       "anyOf": [
        {
