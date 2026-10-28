@@ -18,6 +18,7 @@ import { useUnsavedGuard } from "@/hooks/useUnsavedGuard";
 import { cn } from "@/lib/utils";
 import { QuickAddButton, useQuickCreate } from "@/components/common/QuickCreate";
 import { useRowKeys } from "@/hooks/useRowKeys";
+import { useBookingDraft } from "@/hooks/useBookingDraft";
 import { KycSlots } from "@/components/common/KycSlots";
 import { useCatalogues } from "@/hooks/useCatalogues";
 import { Select } from "@/components/v2/Select";
@@ -68,11 +69,20 @@ export default function BookingWizard() {
   const plan = plans?.find((p) => p.id === planId);
   const [busy, setBusy] = useState(false);
   const draftKey = `kkt:booking-draft:${user?.id || "anon"}`;
-  // localStorage: unsaved wizard draft (ids + step, no credentials) — non-sensitive (CR-7)
-  const [draft, setDraft] = useState(() => { try { const d = JSON.parse(localStorage.getItem(draftKey) || "null"); return d && d.step > 0 ? d : null; } catch { return null; } });
-  useEffect(() => { if (step === 0 && !projectId) return; localStorage.setItem(draftKey, JSON.stringify({ step, projectId, blockId, flat, customer, agr, charges, slots, bookingDate, remarks, planId, acceptMode, saved_at: Date.now() })); }, [step, projectId, blockId, flat, customer, agr, charges, slots, bookingDate, remarks, planId, acceptMode, draftKey]);
-  const resume = () => { const d = draft; setStep(d.step); setProjectId(d.projectId); setBlockId(d.blockId); setFlat(d.flat); setCustomer(d.customer); setAgr(d.agr); setCharges(d.charges || []); setSlots(d.slots || []); setBookingDate(d.bookingDate); setRemarks(d.remarks || ""); setPlanId(d.planId || ""); setAcceptMode(d.acceptMode || "In person"); setDraft(null); };
-  const discard = () => { localStorage.removeItem(draftKey); setDraft(null); };
+  // sessionStorage draft (CR-2 A3): ids + step + scalar fields only — no customer object / names / phones; debounced; cleared on success or discard
+  const draftSlice = useMemo(() => ({ step, projectId, blockId, flatId: flat?.id || null, customerId: customer?.id || null, agr, charges, slots, bookingDate, remarks, planId, acceptMode }), [step, projectId, blockId, flat?.id, customer?.id, agr, charges, slots, bookingDate, remarks, planId, acceptMode]);
+  const { draft, clear: clearDraft, dismiss: dismissDraft } = useBookingDraft(draftKey, draftSlice, step > 0 || Boolean(projectId));
+  const resume = async () => {
+    const d = draft; dismissDraft();
+    setProjectId(d.projectId); setBlockId(d.blockId); setAgr(d.agr); setCharges(d.charges || []); setSlots(d.slots || []); setBookingDate(d.bookingDate); setRemarks(d.remarks || ""); setPlanId(d.planId || ""); setAcceptMode(d.acceptMode || "In person");
+    try {
+      const [f, c] = await Promise.all([d.flatId ? api.get(`/flats/${d.flatId}`) : null, d.customerId ? api.get(`/customers/${d.customerId}`) : null]);
+      if (f) setFlat(f.data);
+      if (c) setCustomer(c.data);
+    } catch (e) { toast.error(errMsg(e)); }
+    setStep(d.step);
+  };
+  const discard = () => clearDraft();
   useUnsavedGuard(step > 0 && !busy, "Your booking draft is saved locally, but unsent changes will be lost if you leave. Continue?");
   const { data: projects, reload: reloadProjects } = useFetch("/projects?page_size=50");
   const { data: blocks, reload: reloadBlocks } = useFetch(projectId ? `/blocks?project_id=${projectId}&page_size=50` : null, [projectId]);
@@ -107,8 +117,8 @@ export default function BookingWizard() {
       const body = { flat_id: flat.id, customer_id: customer.id, lead_id: leadId || null, booking_date: bookingDate, agreement_value: total, cash_agreed: cash, account_agreed: account, remarks: remarks || null, parking_slot_ids: slots, payment_plan_id: planId || null, plan_acceptance_mode: acceptMode,
         other_charges: selCharges.map((c) => ({ charge_type_id: c.charge_type_id, amount: Number(c.amount), gst_percent: c.gst_percent || 0, demand_at: c.demand_at })),
         co_applicants: coApps.filter((c) => c.name.trim()).map((c) => ({ id: c.id, name: c.name.trim(), relation: label("relation", c.relation_id) || null, phone: c.phone.replace(/\D/g, "") || null })) };
-      localStorage.removeItem(draftKey);
       const r = await api.post("/bookings", body);
+      clearDraft();
       toast.success(`Booking ${r.data.booking_number} created`); nav(`/bookings/${r.data.id}`);
     } catch (e) { toast.error(fe.capture(e), { duration: 8000 }); } finally { setBusy(false); }
   };

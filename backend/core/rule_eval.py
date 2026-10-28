@@ -3,7 +3,8 @@
 Grammar (whitelist, checked once at load via compile_rule): BoolOp and/or · not · Compare (== != < <= > >= is / is not / in / not in)
 · arithmetic + - * / % · unary - · Constant · Name `snap` · snap['key'] subscripts with constant keys · snap.key attribute
 · calls to len/abs/min/max only. Anything else (other names, calls, lambdas, comprehensions, f-strings, attribute access on
-non-snap values, dunder) raises RuleSyntaxError at compile time."""
+non-snap values, dunder) raises RuleSyntaxError at compile time.
+CR-2: table-driven — one checker and one evaluator per node type (`_CHECKERS` / `_EVALUATORS`)."""
 import ast
 import operator
 
@@ -12,76 +13,135 @@ _CMP = {ast.Eq: operator.eq, ast.NotEq: operator.ne, ast.Lt: operator.lt, ast.Lt
         ast.Is: operator.is_, ast.IsNot: operator.is_not, ast.In: lambda a, b: a in b, ast.NotIn: lambda a, b: a not in b}
 _FUNCS = {"len": len, "abs": abs, "min": min, "max": max}
 _ROOT = "snap"
+_CONST_TYPES = (int, float, str, bool, type(None))
 
 
 class RuleSyntaxError(ValueError):
     pass
 
 
+# ---- whitelist check (compile time) --------------------------------------------------------------
+def _bad(node):
+    raise RuleSyntaxError(f"disallowed expression element: {type(node).__name__}")
+
+
+def _chk_boolop(n):
+    if not isinstance(n.op, (ast.And, ast.Or)):
+        _bad(n)
+    for v in n.values:
+        _check(v)
+
+
+def _chk_unary(n):
+    if not isinstance(n.op, (ast.Not, ast.USub)):
+        _bad(n)
+    _check(n.operand)
+
+
+def _chk_binop(n):
+    if type(n.op) not in _BIN:
+        _bad(n)
+    _check(n.left)
+    _check(n.right)
+
+
+def _chk_compare(n):
+    if not all(type(o) in _CMP for o in n.ops):
+        _bad(n)
+    _check(n.left)
+    for c in n.comparators:
+        _check(c)
+
+
+def _chk_constant(n):
+    if not isinstance(n.value, _CONST_TYPES):
+        _bad(n)
+
+
+def _chk_name(n):
+    if n.id != _ROOT:
+        _bad(n)
+
+
+def _chk_subscript(n):
+    if not (isinstance(n.slice, ast.Constant) and isinstance(n.slice.value, (str, int))):
+        _bad(n)
+    _check(n.value)
+
+
+def _chk_attribute(n):
+    if n.attr.startswith("_"):
+        _bad(n)
+    _check(n.value)
+
+
+def _chk_call(n):
+    if not (isinstance(n.func, ast.Name) and n.func.id in _FUNCS and not n.keywords):
+        _bad(n)
+    for a in n.args:
+        _check(a)
+
+
+_CHECKERS = {ast.BoolOp: _chk_boolop, ast.UnaryOp: _chk_unary, ast.BinOp: _chk_binop, ast.Compare: _chk_compare, ast.Constant: _chk_constant,
+             ast.Name: _chk_name, ast.Subscript: _chk_subscript, ast.Attribute: _chk_attribute, ast.Call: _chk_call}
+
+
 def _check(node: ast.AST) -> None:
-    if isinstance(node, ast.BoolOp) and isinstance(node.op, (ast.And, ast.Or)):
-        for v in node.values:
-            _check(v)
-    elif isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.Not, ast.USub)):
-        _check(node.operand)
-    elif isinstance(node, ast.BinOp) and type(node.op) in _BIN:
-        _check(node.left)
-        _check(node.right)
-    elif isinstance(node, ast.Compare) and all(type(o) in _CMP for o in node.ops):
-        _check(node.left)
-        for c in node.comparators:
-            _check(c)
-    elif isinstance(node, ast.Constant) and isinstance(node.value, (int, float, str, bool, type(None))) or isinstance(node, ast.Name) and node.id == _ROOT:
-        pass
-    elif isinstance(node, ast.Subscript) and isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, (str, int)) or isinstance(node, ast.Attribute) and not node.attr.startswith("_"):
-        _check(node.value)
-    elif isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in _FUNCS and not node.keywords:
-        for a in node.args:
-            _check(a)
-    else:
-        raise RuleSyntaxError(f"disallowed expression element: {type(node).__name__}")
+    handler = _CHECKERS.get(type(node))
+    if handler is None:
+        _bad(node)
+    handler(node)
+
+
+# ---- evaluation (run time) ------------------------------------------------------------------------
+def _ev_boolop(n, snap):
+    is_and = isinstance(n.op, ast.And)
+    res = is_and
+    for v in n.values:
+        res = _ev(v, snap)
+        if bool(res) != is_and:  # and: stop on first falsy · or: stop on first truthy
+            return res
+    return res
+
+
+def _ev_unary(n, snap):
+    v = _ev(n.operand, snap)
+    return (not v) if isinstance(n.op, ast.Not) else -v
+
+
+def _ev_compare(n, snap):
+    left = _ev(n.left, snap)
+    for op, comp in zip(n.ops, n.comparators):
+        right = _ev(comp, snap)
+        if not _CMP[type(op)](left, right):
+            return False
+        left = right
+    return True
+
+
+def _ev_attribute(n, snap):
+    base = _ev(n.value, snap)
+    return base[n.attr] if isinstance(base, dict) else getattr(base, n.attr)
+
+
+_EVALUATORS = {
+    ast.BoolOp: _ev_boolop,
+    ast.UnaryOp: _ev_unary,
+    ast.BinOp: lambda n, s: _BIN[type(n.op)](_ev(n.left, s), _ev(n.right, s)),
+    ast.Compare: _ev_compare,
+    ast.Constant: lambda n, s: n.value,
+    ast.Name: lambda n, s: s,
+    ast.Subscript: lambda n, s: _ev(n.value, s)[n.slice.value],
+    ast.Attribute: _ev_attribute,
+    ast.Call: lambda n, s: _FUNCS[n.func.id](*[_ev(a, s) for a in n.args]),
+}
 
 
 def _ev(node: ast.AST, snap: dict):
-    if isinstance(node, ast.BoolOp):
-        if isinstance(node.op, ast.And):
-            res = True
-            for v in node.values:
-                res = _ev(v, snap)
-                if not res:
-                    return res
-            return res
-        res = False
-        for v in node.values:
-            res = _ev(v, snap)
-            if res:
-                return res
-        return res
-    if isinstance(node, ast.UnaryOp):
-        v = _ev(node.operand, snap)
-        return (not v) if isinstance(node.op, ast.Not) else -v
-    if isinstance(node, ast.BinOp):
-        return _BIN[type(node.op)](_ev(node.left, snap), _ev(node.right, snap))
-    if isinstance(node, ast.Compare):
-        left = _ev(node.left, snap)
-        for op, comp in zip(node.ops, node.comparators):
-            right = _ev(comp, snap)
-            if not _CMP[type(op)](left, right):
-                return False
-            left = right
-        return True
-    if isinstance(node, ast.Constant):
-        return node.value
-    if isinstance(node, ast.Name):
-        return snap
-    if isinstance(node, ast.Subscript):
-        return _ev(node.value, snap)[node.slice.value]
-    if isinstance(node, ast.Attribute):
-        base = _ev(node.value, snap)
-        return base[node.attr] if isinstance(base, dict) else getattr(base, node.attr)
-    if isinstance(node, ast.Call):
-        return _FUNCS[node.func.id](*[_ev(a, snap) for a in node.args])
-    raise RuleSyntaxError(type(node).__name__)  # unreachable after _check
+    handler = _EVALUATORS.get(type(node))
+    if handler is None:
+        raise RuleSyntaxError(type(node).__name__)  # unreachable after _check
+    return handler(node, snap)
 
 
 def compile_rule(expr: str):
