@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Check, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import api, { errMsg } from "@/lib/api";
 import { FieldError, useFieldErrors } from "@/lib/formErrors";
@@ -17,6 +17,9 @@ import { inr, num, fmtRelative } from "@/lib/format";
 import { useUnsavedGuard } from "@/hooks/useUnsavedGuard";
 import { cn } from "@/lib/utils";
 import { QuickAddButton, useQuickCreate } from "@/components/common/QuickCreate";
+import { useRowKeys } from "@/hooks/useRowKeys";
+import { useCatalogues } from "@/hooks/useCatalogues";
+import { Select } from "@/components/v2/Select";
 
 const CustomerForm = lazy(() => import("@/components/v2/QuickCustomerSheet"));
 const SchedulePreview = lazy(() => import("@/components/common/PaymentSchedule").then((m) => ({ default: m.SchedulePreview })));
@@ -36,6 +39,9 @@ export default function BookingWizard() {
   const [flat, setFlat] = useState(null);
   const [flatQ, setFlatQ] = useState("");
   const [customer, setCustomer] = useState(null);
+  const [coApps, setCoApps] = useState([]);
+  const { label } = useCatalogues();
+  const coRows = useRowKeys(coApps);
   useEffect(() => {  // prefill from ?flat=&customer_id= (Customer 360 "New booking", Flat drawer "Convert hold → booking")
     const fid = sp.get("flat"), cid = sp.get("customer_id");
     if (cid) api.get(`/customers/${cid}`).then((r) => setCustomer(r.data)).catch(() => {});
@@ -98,7 +104,8 @@ export default function BookingWizard() {
     setBusy(true);
     try {
       const body = { flat_id: flat.id, customer_id: customer.id, lead_id: leadId || null, booking_date: bookingDate, agreement_value: total, cash_agreed: cash, account_agreed: account, remarks: remarks || null, parking_slot_ids: slots, payment_plan_id: planId || null, plan_acceptance_mode: acceptMode,
-        other_charges: selCharges.map((c) => ({ charge_type_id: c.charge_type_id, amount: Number(c.amount), gst_percent: c.gst_percent || 0, demand_at: c.demand_at })) };
+        other_charges: selCharges.map((c) => ({ charge_type_id: c.charge_type_id, amount: Number(c.amount), gst_percent: c.gst_percent || 0, demand_at: c.demand_at })),
+        co_applicants: coApps.filter((c) => c.name.trim()).map((c) => ({ name: c.name.trim(), relation: label("relation", c.relation_id) || null, phone: c.phone.replace(/\D/g, "") || null })) };
       localStorage.removeItem(draftKey);
       const r = await api.post("/bookings", body);
       toast.success(`Booking ${r.data.booking_number} created`); nav(`/bookings/${r.data.id}`);
@@ -126,6 +133,16 @@ export default function BookingWizard() {
           <div className="flex flex-col gap-2 sm:flex-row"><input value={custSearch} onChange={(e) => setCustSearch(e.target.value)} placeholder="Search by phone, name or code…" className="input sm:max-w-md" data-testid="wiz-customer-search" />{can("sales.customer.edit") && <button type="button" className="btn btn-secondary" onClick={() => setNewCust(true)} data-testid="wiz-new-customer"><Plus className="h-4 w-4" />New customer</button>}</div>
           <div className="mt-4 grid gap-3 md:grid-cols-2">{custResults.map((c) => <button key={c.id} onClick={() => setCustomer(c)} className={cn("card card-hover flex items-center gap-3 !p-4 text-left", customer?.id === c.id && "!border-ink-950 ring-1 ring-ink-950")} data-testid={`wiz-customer-${c.customer_code}`}><Avatar name={c.full_name} size={36} /><div className="min-w-0"><p className="truncate text-sm font-semibold text-ink-950">{c.salutation} {c.full_name}</p><p className="truncate text-xs text-txt-secondary">{c.customer_code} · {c.phone} · KYC {c.kyc_status}</p></div></button>)}</div>
           {customer && <p className="mt-4 text-sm text-txt-secondary">Selected: <b className="text-ink-950">{customer.full_name}</b> ({customer.customer_code})</p>}
+          {customer && can("sales.customer.edit") && <div className="mt-4 rounded-2xl border border-warm-200 bg-white/70 p-4" data-testid="wiz-coapplicants">
+            <div className="flex items-center justify-between"><div><h3 className="font-display text-lg">Co-applicants <span className="text-sm font-normal text-txt-muted">(optional)</span></h3><p className="text-xs text-txt-muted">Saved on {customer.full_name}'s profile with this booking — same fields as Customer 360.</p></div>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setCoApps([...coApps, { name: "", relation_id: null, phone: "" }])} data-testid="wiz-coapp-add"><Plus className="h-3.5 w-3.5" />Add co-applicant</button></div>
+            {(customer.co_applicants || []).length > 0 && <p className="mt-2 text-xs text-txt-secondary">Already on file: {customer.co_applicants.map((c) => c.name).join(", ")}</p>}
+            {coRows.map(({ k, row: c }, i) => <div key={k} className="mt-3 grid grid-cols-[1fr_1fr_1fr_auto] items-end gap-2" data-testid={`wiz-coapp-${i}`}>
+              <Field label="Relation"><Select type="relation" value={c.relation_id} onChange={(v) => setCoApps(coApps.map((x, j) => (j === i ? { ...x, relation_id: v } : x)))} testId={`wiz-coapp-relation-${i}`} /></Field>
+              <Field label="Name" required><input className="input" value={c.name} onChange={(e) => setCoApps(coApps.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} data-testid={`wiz-coapp-name-${i}`} /></Field>
+              <Field label="Phone"><input className="input" value={c.phone} onChange={(e) => setCoApps(coApps.map((x, j) => (j === i ? { ...x, phone: e.target.value } : x)))} data-testid={`wiz-coapp-phone-${i}`} /></Field>
+              <button type="button" onClick={() => setCoApps(coApps.filter((_, j) => j !== i))} className="btn btn-ghost !h-10 !w-10 !px-0 text-brick" aria-label="Remove" data-testid={`wiz-coapp-remove-${i}`}><X className="h-4 w-4" /></button></div>)}
+          </div>}
           {customer && <div className="mt-3 max-w-md"><Field label="Lead this booking converts" hint="Keeps the sales funnel truthful. Walk-in creates a Converted lead with source Walk-in."><select className="input" value={leadId} onChange={(e) => setLeadId(e.target.value)} data-testid="wiz-lead"><option value="">No lead / walk-in</option>{leads.map((l) => <option key={l.id} value={l.id}>{l.lead_number} · {l.status} · {l.source || ""}</option>)}</select></Field></div>}
           {newCust && <Suspense fallback={null}><CustomerForm open={newCust} onOpenChange={setNewCust} onSaved={(c) => { setCustomer(c); setCustResults([c]); }} /></Suspense>}
         </div>}
@@ -167,7 +184,7 @@ export default function BookingWizard() {
             <div className="flex max-h-64 flex-wrap gap-1.5 overflow-y-auto">{freeSlots.map((s) => <button key={s.id} onClick={() => setSlots(slots.includes(s.id) ? slots.filter((x) => x !== s.id) : [...slots, s.id])} className={cn("pill border transition-colors", slots.includes(s.id) ? "border-ink-950 bg-ink-950 text-warm-50" : "border-warm-200 bg-white text-txt-secondary hover:border-gold")} title={`${s.type} · ${s.level || ""}`} data-testid={`wiz-slot-${s.number}`}>{s.number}</button>)}</div></div>
         </div>}
         {step === 6 && <div className="grid gap-4 md:grid-cols-2">
-          <div><KV label="Unit" value={`${flat?.flat_number} · ${flat?.flat_type_code} · ${num(flat?.super_builtup_sqft)} sq.ft`} /><KV label="Customer" value={`${customer?.full_name} (${customer?.customer_code})`} /><KV label="Booking date" value={bookingDate} /><KV label="Agreement" value={inr(total)} /><KV label="Cash / Account" value={`${inr(cash)} / ${inr(account)}`} /></div>
+          <div><KV label="Unit" value={`${flat?.flat_number} · ${flat?.flat_type_code} · ${num(flat?.super_builtup_sqft)} sq.ft`} /><KV label="Customer" value={`${customer?.full_name} (${customer?.customer_code})`} /><KV label="Co-applicants" value={coApps.filter((c) => c.name.trim()).length ? coApps.filter((c) => c.name.trim()).map((c) => c.name.trim()).join(", ") : "None"} /><KV label="Booking date" value={bookingDate} /><KV label="Agreement" value={inr(total)} /><KV label="Cash / Account" value={`${inr(cash)} / ${inr(account)}`} /></div>
           <div><KV label="Other charges" value={selCharges.length ? selCharges.map((c) => c.name).join(", ") : "None"} /><KV label="Charges total" value={inr(chargeTotal)} /><KV label="Parking" value={slots.length ? `${slots.length} slot(s)` : "None"} /><KV label="Construction" value={`${grid?.block.construction_percent ?? 0}% — demands raised on confirm`} /><Field label="Remarks"><Input value={remarks} onChange={(e) => setRemarks(e.target.value)} className="input" data-testid="wiz-remarks" /></Field></div>
         </div>}
         <div className="sticky bottom-0 z-20 -mx-5 mt-6 flex justify-between gap-3 border-t border-warm-100 bg-white/95 px-5 py-3 backdrop-blur sm:-mx-6 sm:px-6" data-testid="wiz-footer">

@@ -6,11 +6,12 @@ from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import JSONResponse
 from pymongo import ReturnDocument
 
-from services import clock, definitions
 from db import db
 from deps import ensure_project_access, project_scope_filter, require
-from services.money import amount_in_words, present_money
+from services import clock, definitions
 from services import pdf as _pdf
+from services.budgets import REPORT_MS  # Phase K.8
+from services.money import amount_in_words, present_money
 from utils import (
     ApiError,
     StrictModel,
@@ -18,11 +19,8 @@ from utils import (
     client_ip,
     get_or_404,
     now_iso,
-    to_csv,
     write_audit,
 )
-
-from services.budgets import REPORT_MS  # Phase K.8
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 REPORTS = [
@@ -196,7 +194,6 @@ async def collections(request: Request, from_date: str | None = None, to_date: s
 
 
 # ---------- 2. Outstanding & ageing ----------
-from services.definitions import ageing_for_bookings  # noqa: E402
 
 
 @router.get("/outstanding")
@@ -204,10 +201,11 @@ async def outstanding(request: Request, project_id: str | None = None, block_id:
     _strict_params(request, {'block_id', 'group_by', 'project_id', 'date_from', 'date_to'})
     q = {**_scope(user, project_id, block_id), "status": {"$in": ["Active", "Completed"]}}
     today = date.fromisoformat(date_to) if date_to else clock.today()
-    from services import ttlcache
     import hashlib
     import heapq
     import json
+
+    from services import ttlcache
     REPORT_VIEW_MAX = int(os.environ.get("REPORT_VIEW_MAX", "2000"))
     KEYS = ("raised_paise", "paid_paise", "cash_due_paise", "account_due_paise", "other_due_paise", "due_paise", "overdue_paise")
 
@@ -467,7 +465,9 @@ async def activity(request: Request, from_date: str | None = None, to_date: str 
 async def _booking_bundle(booking_id: str, user: dict):
     b = await get_or_404(db.bookings, booking_id, "Booking", {"company_id": user["company_id"]})
     ensure_project_access(user, b["project_id"])
-    customer = await db.customers.find_one({"id": b["customer_id"]}, {"_id": 0, "full_name": 1, "salutation": 1, "address_current": 1, "phone": 1, "email": 1, "customer_code": 1})
+    customer = await db.customers.find_one({"id": b["customer_id"]}, {"_id": 0, "full_name": 1, "salutation": 1, "address_current": 1, "phone": 1, "email": 1, "customer_code": 1, "co_applicants": 1})
+    if customer:
+        customer["co_applicants"] = [{"name": c.get("name"), "relation": c.get("relation")} for c in customer.pop("co_applicants", None) or []]
     demands = await db.demands.find({"booking_id": booking_id, "voided": False}, {"_id": 0}).sort("milestone_seq", 1).to_list(None)
     payments = await db.payments.find({"booking_id": booking_id}, {"_id": 0}).sort("payment_date", 1).to_list(None)
     ledger = await db.ledger_entries.find({"booking_id": booking_id}, {"_id": 0}).sort("seq", 1).to_list(None)
@@ -560,6 +560,8 @@ async def build_allotment_pdf(booking_id: str, user: dict) -> tuple[bytes, str]:
     d = _pdf.BrandedDoc("Allotment Letter & Payment Schedule", company, number=b["booking_number"], date=b["booking_date"], verify=code, subtitle="Provisional allotment")
     fs = b.get("flat_snapshot") or {}
     d.p(f"To,<br/><b>{customer.get('salutation') or ''} {customer['full_name']}</b><br/>{_addr(customer.get('address_current'))}<br/>Phone: {customer.get('phone') or '-'}")
+    if customer.get("co_applicants"):
+        d.p("Co-applicant(s): " + ", ".join("<b>%s</b>%s" % (c["name"], " (%s)" % c["relation"] if c.get("relation") else "") for c in customer["co_applicants"]))
     d.spacer(3)
     d.p(f"<b>Subject: Provisional allotment of Unit {fs.get('flat_number')} in {b['block_name']}, {b['project_name']}</b>")
     d.spacer(2)

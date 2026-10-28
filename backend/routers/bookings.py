@@ -1,13 +1,14 @@
-from datetime import UTC, date, datetime
+from datetime import date
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Request, Response
 from pydantic import Field, model_validator
 
 from db import db
-from services import clock
-from models_out import BookingsOut, BookingsOutPage
 from deps import ensure_project_access, project_scope_filter, require
+from models_out import BookingsOut, BookingsOutPage
+from routers.customers import CoApplicant
+from services import clock
 from services.counters import apply_status_delta
 from services.ledger import raise_other_charges, rebuild
 from services.money import pct_of, present_money, to_paise
@@ -40,6 +41,7 @@ class OtherChargeIn(StrictModel):
 
 
 class BookingIn(StrictModel):
+    co_applicants: list["CoApplicant"] = []  # Y.2: embedded co-applicants appended to the customer (same model/sealing as Customer 360)
     payment_plan_id: str | None = None
     plan_acceptance_mode: str = "In person"
     flat_id: str
@@ -117,6 +119,19 @@ async def list_bookings(params: ListParams = Depends(), project_id: str | None =
     return res
 
 
+def _merge_co_applicants(existing: list[dict], incoming: list) -> list[dict] | None:
+    """Append only co-applicants not already on the customer (same name + phone) — idempotent on wizard retries."""
+    seen = {((c.get("name") or "").strip().lower(), c.get("phone") or None) for c in existing}
+    out = []
+    for c in incoming:
+        d = c.model_dump()
+        k = (d["name"].strip().lower(), d.get("phone") or None)
+        if k not in seen:
+            seen.add(k)
+            out.append(d)
+    return out or None
+
+
 @router.post("", status_code=201)
 async def create_booking(body: BookingIn, request: Request, user: dict = Depends(require("sales.booking.create"))):
     flat = await get_or_404(db.flats, body.flat_id, "Flat")
@@ -138,6 +153,7 @@ async def create_booking(body: BookingIn, request: Request, user: dict = Depends
         raise ApiError(400, "Unknown co-applicant customer", "INVALID_CO_APPLICANT")
     block = await get_or_404(db.blocks, flat["block_id"], "Block")
     project = await get_or_404(db.projects, flat["project_id"], "Project")
+    new_co = _merge_co_applicants(customer.get("co_applicants") or [], body.co_applicants)
     company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0})
     milestones = block.get("milestones") or []
     if not milestones:
@@ -188,6 +204,12 @@ async def create_booking(body: BookingIn, request: Request, user: dict = Depends
             uow.on_rollback(lambda: db.parking_slots.update_many({"id": {"$in": body.parking_slot_ids}}, {"$set": {"status": "Available", "booking_id": None, "customer_id": None}}))
         await db.bookings.insert_one(doc, **uow.kw())
         uow.on_rollback(lambda: db.bookings.delete_one({"id": doc["id"]}))
+        if new_co is not None:
+            from services.kyc import seal
+            prev_co = customer.get("co_applicants") or []
+            await db.customers.update_one({"id": customer["id"]}, {"$set": {"co_applicants": prev_co + [seal(c) for c in new_co], "updated_at": now_iso()}, "$inc": {"version": 1}}, **uow.kw())
+            uow.on_rollback(lambda: db.customers.update_one({"id": customer["id"]}, {"$set": {"co_applicants": prev_co}}))
+            await write_audit(user, "customer.update", "customer", customer["id"], before={"co_applicants": [c.get("name") for c in prev_co]}, after={"co_applicants": [c.get("name") for c in prev_co] + [c["name"] for c in new_co], "via": "booking_wizard"}, ip=client_ip(request))
         doc.pop("_id", None)
         lines = raise_other_charges(doc, "on_booking", posted_at)
         if lines:
@@ -222,7 +244,7 @@ async def get_booking(booking_id: str, user: dict = Depends(require("sales.booki
     b = await _load(booking_id, user)
     import asyncio
     b["customer"], b["co_applicants"], b["parking_slots"], b["demands"], b["payments"], blk = await asyncio.gather(
-        db.customers.find_one({"id": b["customer_id"]}, {"_id": 0, "id": 1, "customer_code": 1, "full_name": 1, "phone": 1, "email": 1, "address_current": 1, "kyc_status": 1}),
+        db.customers.find_one({"id": b["customer_id"]}, {"_id": 0, "id": 1, "customer_code": 1, "full_name": 1, "phone": 1, "email": 1, "address_current": 1, "kyc_status": 1, "co_applicants": 1}),
         db.customers.find({"id": {"$in": b.get("co_applicant_customer_ids") or []}}, {"_id": 0, "id": 1, "customer_code": 1, "full_name": 1, "phone": 1}).to_list(10),
         db.parking_slots.find({"id": {"$in": b.get("parking_slot_ids") or []}}, {"_id": 0, "id": 1, "number": 1, "type": 1, "level": 1, "status": 1}).to_list(20),
         db.demands.find({"booking_id": booking_id}, {"_id": 0}).sort("posted_at", 1).to_list(100),

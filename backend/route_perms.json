@@ -2825,6 +2825,15 @@
     "masters.project.view"
    ]
   },
+  "structure:GET /projects/{project_id}/tower-sales": {
+   "codes": [
+    "masters.project.view"
+   ],
+   "fn": "tower_sales",
+   "legacy": [
+    "masters.project.view"
+   ]
+  },
   "structure:POST /blocks/{block_id}/flats": {
    "codes": [
     "masters.flat.create"

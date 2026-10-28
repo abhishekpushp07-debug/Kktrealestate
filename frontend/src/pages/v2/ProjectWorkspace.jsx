@@ -11,6 +11,7 @@ import { PaymentPlanMatrix } from "@/components/common/PaymentPlanMatrix";
 import { RateCardsTab, ParkingTab } from "@/components/common/ProjectTabs";
 import { cn } from "@/lib/utils";
 import { ContextActions } from "@/components/common/ContextActions";
+import { TowerSalesChart } from "@/components/common/TowerSalesChart";
 import { ConnectedTo } from "@/components/common/ConnectedTo";
 import { QuickAddButton, useQuickCreate } from "@/components/common/QuickCreate";
 
@@ -35,6 +36,7 @@ function Overview({ s, p }) {
   return (
     <div className="grid gap-6 xl:grid-cols-3">
       <div className="space-y-6 xl:col-span-2">
+        <Card testId="project-tower-sales"><h3 className="font-display text-xl">Tower sales progress</h3><TowerSalesChart projectId={p.id} className="mt-3" /></Card>
         <div><h3 className="mb-4 font-display text-xl">Towers</h3><div className="grid gap-6 md:grid-cols-2">{s.towers.map((t) => <TowerCard key={t.id} t={t} pid={p.id} />)}</div></div>
       </div>
       <div className="space-y-6">

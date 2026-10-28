@@ -19,14 +19,14 @@ def test_default_then_save_then_isolation_then_reset():
     S = _hdr("sales@kkt.in", "SALES_PASSWORD")
     requests.delete(f"{BASE}/api/me/home-layout", headers=A, timeout=30)
     g = requests.get(f"{BASE}/api/me/home-layout", headers=A, timeout=30).json()
-    assert g["is_default"] and [w["id"] for w in g["widgets"]] == ["today", "trends", "projects", "collections_chart", "ageing", "attention", "activity"]
+    assert g["is_default"] and [w["id"] for w in g["widgets"]] == ["today", "trends", "projects", "collections_chart", "ageing", "attention", "activity", "tower_sales"]
     before_sales = requests.get(f"{BASE}/api/me/home-layout", headers=S, timeout=30).json()
     new = [{"id": "attention", "size": "L", "visible": True}, {"id": "today", "size": "S", "visible": True}, {"id": "projects", "size": "M", "visible": False}]
     p = requests.put(f"{BASE}/api/me/home-layout", json={"widgets": new, "version": g["version"]}, headers=A, timeout=30)
     assert p.status_code == 200, p.text
     j = p.json()
     assert not j["is_default"] and j["version"] == g["version"] + 1 and [w["id"] for w in j["widgets"]][:3] == ["attention", "today", "projects"]
-    assert j["widgets"][2]["visible"] is False and len(j["widgets"]) == 7  # unmentioned widgets are appended
+    assert j["widgets"][2]["visible"] is False and len(j["widgets"]) == 8  # unmentioned widgets are appended
     again = requests.get(f"{BASE}/api/me/home-layout", headers=A, timeout=30).json()
     assert again["widgets"] == j["widgets"]
     # other user unaffected

@@ -79,6 +79,52 @@ async def project_structure(project_id: str, user: dict = Depends(require("maste
             "readiness": {"ready": ready, "project_checks": project_checks, "open_items": len(project_checks) + sum(len(t["checks"]) for t in towers)}}
 
 
+SALES_FIELDS = {"_id": 0, "id": 1, "block_id": 1, "status": 1, "display_state": 1, "display_override": 1, "allocation_category_code": 1, "bookable": 1, "is_active": 1}
+REAL_CATS = ("sold", "available", "hold", "landowner", "blocked")
+DISPLAY_CATS = ("sold", "available", "hold")
+
+
+def _real_cat(f: dict) -> str:
+    if f.get("allocation_category_code") == "LANDOWNER":
+        return "landowner"
+    if f.get("bookable") is False or f.get("status") == "Blocked":
+        return "blocked"
+    return {"Booked": "sold", "Sold": "sold", "Hold": "hold"}.get(f.get("status"), "available")
+
+
+@router.get("/projects/{project_id}/tower-sales")
+async def tower_sales(project_id: str, view: str = "display", user: dict = Depends(require("masters.project.view"))):
+    """Y.1 — one row per active tower: Sold / Available / Hold (+ Landowner / Blocked in the real view). `view=real` only for
+    users with inventory.real_status.view; everyone else gets display-status categories (held / show-as-sold count as Sold)."""
+    ensure_project_access(user, project_id)
+    real = view == "real" and inv.can_see_real(user)
+    blocks, flats = await asyncio.gather(
+        db.blocks.find({"project_id": project_id, "is_active": True}, {"_id": 0, "id": 1, "name": 1, "code": 1}).sort("name", 1).to_list(200),
+        db.flats.find({"project_id": project_id, "is_active": True}, SALES_FIELDS).to_list(20000))
+    cats = REAL_CATS if real else DISPLAY_CATS
+    per: dict[str, dict] = {b["id"]: {"block_id": b["id"], "tower": b["name"], "code": b["code"], **{c: 0 for c in cats}} for b in blocks}
+    for f in flats:
+        row = per.get(f["block_id"])
+        if row is None:
+            continue
+        if real:
+            cat = _real_cat(f)
+        else:
+            shaped = inv.shape(f, user)
+            if shaped is None:
+                continue
+            cat = {"Sold": "sold", "Booked": "sold", "Hold": "hold"}.get(shaped["status"], "available")
+        row[cat] += 1
+    rows = list(per.values())
+    for r in rows:
+        r["total"] = sum(r[c] for c in cats)
+        r["sold_pct"] = round(100 * r["sold"] / r["total"], 1) if r["total"] else 0
+    total = {c: sum(r[c] for r in rows) for c in cats}
+    total["total"] = sum(total[c] for c in cats)
+    total["sold_pct"] = round(100 * total["sold"] / total["total"], 1) if total["total"] else 0
+    return {"project_id": project_id, "view": "real" if real else "display", "can_toggle": inv.can_see_real(user), "categories": list(cats), "towers": rows, "total": total}
+
+
 class FloorsPreviewIn(StrictModel):
     count: int = Field(ge=1, le=50)
     floor_plan_template_id: str | None = None

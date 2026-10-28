@@ -5,6 +5,7 @@ import { useFetch } from "@/hooks/useList";
 import { fmtDate, fmtRelative, inr, inrShort } from "@/lib/format";
 import { Card, EmptyState, EntityCard, IconTile, Num, SegmentBar, Skeleton, SkeletonCards, StatTile, Timeline } from "@/components/v2";
 import { TrendSpark, monthLabel } from "@/components/common/TrendSpark";
+import { TowerSalesWidget } from "@/components/common/TowerSalesChart";
 
 const tip = { contentStyle: { borderRadius: 12, border: "1px solid #EAE4D8", boxShadow: "0 8px 24px rgba(20,16,8,.08)", fontSize: 12 }, formatter: (v) => inr(v) };
 
@@ -25,6 +26,7 @@ function Attention({ a }) {
 
 
 const W = {
+  tower_sales: ({ data }) => <TowerSalesWidget projects={data?.projects || []} />,
   today: ({ data, loading, c, t }) => (
       <section className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4" data-testid="today-row">
         {loading ? Array.from({ length: 4 }, (_, n) => n).map((n) => <Skeleton key={n} className="h-28 rounded-2xl" />) : <>

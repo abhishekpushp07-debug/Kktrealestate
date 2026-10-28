@@ -15,8 +15,9 @@ Size = Literal["S", "M", "L"]
 # id → (label, required permission or None, default size)
 WIDGETS = {"today": ("Today", None, "L"), "trends": ("12-month trends", "reports.collections.view", "L"), "projects": ("Projects", "masters.project.view", "L"),
            "collections_chart": ("Collections · last 12 months", "finance.payment.view", "M"), "ageing": ("Due ageing", "demands.register.view", "S"),
-           "attention": ("Needs attention", None, "M"), "activity": ("Recent activity", "admin.audit.view", "S")}
-DEFAULT_ORDER = ["today", "trends", "projects", "collections_chart", "ageing", "attention", "activity"]
+           "attention": ("Needs attention", None, "M"), "activity": ("Recent activity", "admin.audit.view", "S"),
+           "tower_sales": ("Tower sales progress", "masters.project.view", "M")}
+DEFAULT_ORDER = ["today", "trends", "projects", "collections_chart", "ageing", "attention", "activity", "tower_sales"]
 
 
 class Widget(StrictModel):
