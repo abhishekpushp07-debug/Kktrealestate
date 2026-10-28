@@ -1719,6 +1719,14 @@
       "title": "Co Applicant Customer Ids",
       "type": "array"
      },
+     "co_applicants": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/CoApplicant"
+      },
+      "title": "Co Applicants",
+      "type": "array"
+     },
      "customer_id": {
       "title": "Customer Id",
       "type": "string"
@@ -39610,6 +39618,62 @@
     "summary": "Project Summary",
     "tags": [
      "bootstrap"
+    ]
+   }
+  },
+  "/api/projects/{project_id}/tower-sales": {
+   "get": {
+    "description": "Y.1 \u2014 one row per active tower: Sold / Available / Hold (+ Landowner / Blocked in the real view). `view=real` only for\nusers with inventory.real_status.view; everyone else gets display-status categories (held / show-as-sold count as Sold).",
+    "operationId": "tower_sales_api_projects__project_id__tower_sales_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "project_id",
+      "required": true,
+      "schema": {
+       "title": "Project Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "view",
+      "required": false,
+      "schema": {
+       "default": "display",
+       "title": "View",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Tower Sales",
+    "tags": [
+     "structure"
     ]
    }
   },

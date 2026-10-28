@@ -39,7 +39,9 @@ def test_tower_sales_real_vs_display_masking():
 def test_wizard_co_applicants_linked_on_letter_and_idempotent():
     A = _hdr("admin@kkt.in")
     pid = _sgh(A)
-    flat = next(f for f in requests.get(f"{BASE}/api/flats?project_id={pid}&status=Available&page_size=50", headers=A, timeout=30).json()["items"] if f.get("bookable") is not False)
+    sold_blocks = {t["block_id"] for t in requests.get(f"{BASE}/api/projects/{pid}/tower-sales", params={"view": "real"}, headers=A, timeout=60).json()["towers"] if t["sold"] > 0}
+    flats = requests.get(f"{BASE}/api/flats?project_id={pid}&status=Available&page_size=200", headers=A, timeout=30).json()["items"]
+    flat = next(f for f in flats if f.get("bookable") is not False and f["block_id"] in sold_blocks)  # a tower that already sells → no side effects on setup/plan tests
     tag = uuid.uuid4().hex[:6]
     cust = requests.post(f"{BASE}/api/customers", json={"full_name": f"Y2 Buyer {tag}", "phone": f"9{tag.encode().hex()[:9]}"}, headers=A, timeout=30)
     assert cust.status_code == 201, cust.text

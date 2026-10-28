@@ -638,6 +638,9 @@
  "GET /api/projects/{project_id}/summary": [
   "masters.project.view"
  ],
+ "GET /api/projects/{project_id}/tower-sales": [
+  "masters.project.view"
+ ],
  "GET /api/public/brochure/{doc_id}": [
   "<public>"
  ],
