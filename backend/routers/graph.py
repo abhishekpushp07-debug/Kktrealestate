@@ -21,11 +21,11 @@ COLL = {"project": db.projects, "block": db.blocks, "flat": db.flats, "customer"
         "payment_plan": db.payment_plans, "demand": db.demands, "payment": db.payments, "document": db.documents}
 ROUTE = {"project": "/projects/{id}", "block": "/blocks/{id}", "flat": "/blocks/{block_id}?flat={id}", "customer": "/customers/{id}", "booking": "/bookings/{id}", "stage_plan": "/master/stage-plans?project_id={project_id}",
          "payment_plan": "/master/payment-plans?project_id={project_id}", "demand": "/demands?booking_id={booking_id}", "payment": "/payments?q={id}", "document": "/documents?entity_type={entity_type}&entity_id={entity_id}"}
-LABEL = {"project": "name", "block": "name", "flat": "flat_number", "customer": "name", "booking": "booking_number", "stage_plan": "name", "payment_plan": "name", "demand": "demand_number", "payment": "receipt_number", "document": "file_name"}
+LABEL = {"project": "name", "block": "name", "flat": "flat_number", "customer": "full_name", "booking": "booking_number", "stage_plan": "name", "payment_plan": "name", "demand": "demand_number", "payment": "receipt_number", "document": "file_name"}
 
 
 def _node(kind: str, d: dict) -> dict:
-    return {"kind": kind, "id": d["id"], "label": d.get(LABEL[kind]) or d.get("name") or d["id"][:8], "status": d.get("status"),
+    return {"kind": kind, "id": d["id"], "label": d.get(LABEL[kind]) or d.get("name") or d.get("customer_code") or d["id"][:8], "status": d.get("status"),
             "to": ROUTE[kind].format(id=d["id"], block_id=d.get("block_id"), project_id=d.get("project_id") or "", booking_id=d.get("booking_id") or "", entity_type=d.get("entity_type") or "", entity_id=d.get("entity_id") or "")}
 
 
