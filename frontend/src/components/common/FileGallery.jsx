@@ -25,6 +25,39 @@ function LazyThumb({ f, onOpen }) {
   );
 }
 
+function DocList({ docs, canEdit, download, hold, remove }) {
+  return (
+    <ul className="mt-3 divide-y rounded-lg border" data-testid="file-list">
+      {docs.map((f) => (
+        <li key={f.id} className="flex items-center gap-3 px-3 py-2 text-sm" data-testid={`file-row-${f.id}`}>
+          <FileText className="h-4 w-4 text-txt-muted" /><span className="flex-1 truncate">{f.filename}</span><span className="text-xs text-txt-muted">{fmt(f.size)}</span>
+          {f.legal_hold && <Lock className="h-3.5 w-3.5 text-amber-600" />}
+          <button type="button" onClick={() => download(f)} className="text-gold" data-testid={`file-download-${f.id}`}><Download className="h-4 w-4" /></button>
+          {canEdit && <button type="button" onClick={() => hold(f)} className="text-xs" data-testid={`file-hold-${f.id}`}>{f.legal_hold ? "Release hold" : "Legal hold"}</button>}
+          {canEdit && <button type="button" onClick={() => remove(f)} className="text-red-600" data-testid={`file-delete-${f.id}`}><Trash2 className="h-4 w-4" /></button>}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function Lightbox({ open, setOpen, large, setLarge, canEdit, download, hold, remove }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6" onClick={() => setOpen(null)} data-testid="gallery-lightbox">
+      <div className="max-h-full max-w-5xl" onClick={(e) => e.stopPropagation()}>
+        {open.variants?.medium && <img src={`${API}${large ? open.variants.large : open.variants.medium}`} alt={open.caption || open.filename} className="max-h-[80vh] rounded-lg object-contain" data-testid="gallery-lightbox-img" data-size={large ? "large" : "medium"} />}
+        <div className="mt-2 flex items-center gap-3 text-xs text-white">
+          <span className="flex-1 truncate">{open.caption || open.filename} · {fmt(open.size)}</span>
+          {open.variants?.large && <button type="button" onClick={() => setLarge(true)} className="underline" data-testid="gallery-open-large">Open large (2048)</button>}
+          <button type="button" onClick={() => download(open)} className="underline" data-testid="gallery-download-original">Download original</button>
+          {canEdit && <button type="button" onClick={() => { hold(open); setOpen(null); }} className="underline" data-testid="gallery-toggle-hold">{open.legal_hold ? "Release hold" : "Legal hold"}</button>}
+          {canEdit && <button type="button" onClick={() => { remove(open); setOpen(null); }} className="text-red-300 underline" data-testid="gallery-delete">Delete</button>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function FileGallery({ query, canEdit, columns = 6, pageSize = 60, refreshKey }) {
   const [items, setItems] = useState([]);
   const [cursor, setCursor] = useState(null);
@@ -47,42 +80,18 @@ export function FileGallery({ query, canEdit, columns = 6, pageSize = 60, refres
     return () => clearTimeout(t);
   }, [items, load]);
   const download = async (f) => { const r = await api.get(`/files/${f.id}/url`); window.open(`${API}${r.data.url}`, "_blank"); };
-  const del = async (f) => { if (!window.confirm("Delete file?")) return; try { await api.delete(`/files/${f.id}`); load(true); } catch (e) { toast.error(errMsg(e)); } };
+  const remove = async (f) => { if (!window.confirm("Delete file?")) return; try { await api.delete(`/files/${f.id}`); load(true); } catch (e) { toast.error(errMsg(e)); } };
   const hold = async (f) => { try { await api.patch(`/files/${f.id}`, { legal_hold: !f.legal_hold }); load(true); } catch (e) { toast.error(errMsg(e)); } };
   const images = items.filter((f) => f.is_image);
   const docs = items.filter((f) => !f.is_image);
+  const actions = { canEdit, download, hold, remove };
   return (
     <div data-testid="file-gallery" data-count={items.length}>
       {images.length > 0 && <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>{images.map((f) => <LazyThumb key={f.id} f={f} onOpen={(x) => { setOpen(x); setLarge(false); }} />)}</div>}
-      {docs.length > 0 && (
-        <ul className="mt-3 divide-y rounded-lg border" data-testid="file-list">
-          {docs.map((f) => (
-            <li key={f.id} className="flex items-center gap-3 px-3 py-2 text-sm" data-testid={`file-row-${f.id}`}>
-              <FileText className="h-4 w-4 text-txt-muted" /><span className="flex-1 truncate">{f.filename}</span><span className="text-xs text-txt-muted">{fmt(f.size)}</span>
-              {f.legal_hold && <Lock className="h-3.5 w-3.5 text-amber-600" />}
-              <button type="button" onClick={() => download(f)} className="text-gold" data-testid={`file-download-${f.id}`}><Download className="h-4 w-4" /></button>
-              {canEdit && <button type="button" onClick={() => hold(f)} className="text-xs" data-testid={`file-hold-${f.id}`}>{f.legal_hold ? "Release hold" : "Legal hold"}</button>}
-              {canEdit && <button type="button" onClick={() => del(f)} className="text-red-600" data-testid={`file-delete-${f.id}`}><Trash2 className="h-4 w-4" /></button>}
-            </li>
-          ))}
-        </ul>
-      )}
+      {docs.length > 0 && <DocList docs={docs} {...actions} />}
       {items.length === 0 && <p className="text-sm text-txt-muted" data-testid="file-gallery-empty">No files yet.</p>}
       {cursor && <button type="button" className="btn-secondary mt-3 h-8 text-xs" onClick={() => load(false)} data-testid="file-gallery-more">Load more</button>}
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6" onClick={() => setOpen(null)} data-testid="gallery-lightbox">
-          <div className="max-h-full max-w-5xl" onClick={(e) => e.stopPropagation()}>
-            {open.variants?.medium && <img src={`${API}${large ? open.variants.large : open.variants.medium}`} alt={open.caption || open.filename} className="max-h-[80vh] rounded-lg object-contain" data-testid="gallery-lightbox-img" data-size={large ? "large" : "medium"} />}
-            <div className="mt-2 flex items-center gap-3 text-xs text-white">
-              <span className="flex-1 truncate">{open.caption || open.filename} · {fmt(open.size)}</span>
-              {open.variants?.large && <button type="button" onClick={() => setLarge(true)} className="underline" data-testid="gallery-open-large">Open large (2048)</button>}
-              <button type="button" onClick={() => download(open)} className="underline" data-testid="gallery-download-original">Download original</button>
-              {canEdit && <button type="button" onClick={() => { hold(open); setOpen(null); }} className="underline" data-testid="gallery-toggle-hold">{open.legal_hold ? "Release hold" : "Legal hold"}</button>}
-              {canEdit && <button type="button" onClick={() => { del(open); setOpen(null); }} className="text-red-300 underline" data-testid="gallery-delete">Delete</button>}
-            </div>
-          </div>
-        </div>
-      )}
+      {open && <Lightbox open={open} setOpen={setOpen} large={large} setLarge={setLarge} {...actions} />}
     </div>
   );
 }
