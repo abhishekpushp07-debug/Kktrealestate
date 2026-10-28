@@ -10,6 +10,10 @@ import { Select } from "@/components/v2/Select";
 import { cn } from "@/lib/utils";
 import { useRowKeys } from "@/hooks/useRowKeys";
 
+const DEDUCTION_TYPES = [{ value: "percent", label: "% of agreement value" }, { value: "fixed", label: "Fixed ₹" }];
+const GST_OPTS = [{ value: "no", label: "No" }, { value: "yes", label: "Yes (18%)" }];
+const BOUNCE_OPTS = [{ value: "on", label: "On — raise Other-charge demand on bounce" }, { value: "off", label: "Off" }];
+
 const STEPS = ["Basics", "Towers", "Floor plans", "Stages", "Payment plans", "Pricing", "Review"];
 const PATTERNS = [["{block}-{floor}{pos2}", "A-1201"], ["{floor}{pos2}", "1201"], ["{block}{seq}", "A017"]];
 const FACINGS = ["N", "S", "E", "W", "NE", "NW", "SE", "SW"].map((f) => ({ value: f, label: f }));
@@ -36,11 +40,11 @@ function Basics({ p, setP, cats }) {
       <Field label="Default cash share %" hint="Pre-fills the Cash/Account split in the booking wizard"><input type="number" min="0" max="100" step="0.5" className="input" value={p.default_cash_percent ?? 0} onChange={(e) => setP({ ...p, default_cash_percent: Number(e.target.value) || 0 })} data-testid="setup-cash-percent" /></Field>
     </FormSection>
     <FormSection title="Cancellation & bounce policy" helper="Drives refund payable on cancellation and the auto-raised bounce charge (see Settings → Definitions).">
-      <Field label="Deduction type"><Select options={[{ value: "percent", label: "% of agreement value" }, { value: "fixed", label: "Fixed ₹" }]} value={p.cancellation_policy?.deduction_type || "percent"} onChange={(v) => setP({ ...p, cancellation_policy: { ...(p.cancellation_policy || {}), deduction_type: v } })} clearable={false} testId="setup-ded-type" /></Field>
+      <Field label="Deduction type"><Select options={DEDUCTION_TYPES} value={p.cancellation_policy?.deduction_type || "percent"} onChange={(v) => setP({ ...p, cancellation_policy: { ...(p.cancellation_policy || {}), deduction_type: v } })} clearable={false} testId="setup-ded-type" /></Field>
       <Field label="Deduction value"><input type="number" min="0" className="input" value={p.cancellation_policy?.deduction_value ?? 10} onChange={(e) => setP({ ...p, cancellation_policy: { ...(p.cancellation_policy || {}), deduction_value: Number(e.target.value) } })} data-testid="setup-ded-value" /></Field>
-      <Field label="GST on deduction"><Select options={[{ value: "no", label: "No" }, { value: "yes", label: "Yes (18%)" }]} value={p.cancellation_policy?.gst_on_deduction ? "yes" : "no"} onChange={(v) => setP({ ...p, cancellation_policy: { ...(p.cancellation_policy || {}), gst_on_deduction: v === "yes" } })} clearable={false} testId="setup-ded-gst" /></Field>
+      <Field label="GST on deduction"><Select options={GST_OPTS} value={p.cancellation_policy?.gst_on_deduction ? "yes" : "no"} onChange={(v) => setP({ ...p, cancellation_policy: { ...(p.cancellation_policy || {}), gst_on_deduction: v === "yes" } })} clearable={false} testId="setup-ded-gst" /></Field>
       <Field label="Refund SLA (days)"><input type="number" min="0" className="input" value={p.cancellation_policy?.refund_sla_days ?? 45} onChange={(e) => setP({ ...p, cancellation_policy: { ...(p.cancellation_policy || {}), refund_sla_days: Number(e.target.value) } })} data-testid="setup-refund-sla" /></Field>
-      <Field label="Auto bounce charge"><Select options={[{ value: "on", label: "On — raise Other-charge demand on bounce" }, { value: "off", label: "Off" }]} value={p.bounce_policy?.enabled === false ? "off" : "on"} onChange={(v) => setP({ ...p, bounce_policy: { ...(p.bounce_policy || {}), enabled: v === "on" } })} clearable={false} testId="setup-bounce-enabled" /></Field>
+      <Field label="Auto bounce charge"><Select options={BOUNCE_OPTS} value={p.bounce_policy?.enabled === false ? "off" : "on"} onChange={(v) => setP({ ...p, bounce_policy: { ...(p.bounce_policy || {}), enabled: v === "on" } })} clearable={false} testId="setup-bounce-enabled" /></Field>
       <Field label="Bounce charge ₹"><input type="number" min="0" className="input" value={p.bounce_policy?.amount ?? 500} onChange={(e) => setP({ ...p, bounce_policy: { ...(p.bounce_policy || {}), amount: Number(e.target.value) } })} data-testid="setup-bounce-amount" /></Field>
     </FormSection>
   </>);

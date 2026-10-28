@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Smartphone, ShieldCheck, LogOut, Upload } from "lucide-react";
 import api, { errMsg } from "@/lib/api";
@@ -55,6 +55,7 @@ export function ImportCenter() {
   const [projectId, setProjectId] = useState("");
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
+  const previewRows = useMemo(() => (preview?.rows || []).slice(0, 200), [preview]);
   useEffect(() => { api.get("/projects?page_size=100").then((r) => { setProjects(r.data.items); setProjectId(r.data.items[0]?.id || ""); }).catch(() => {}); }, []);
   const needsProject = kind === "flat-pricing" || kind === "parking-slots";
   const download = async () => { const r = await api.get(`/imports/template/${kind}`, { responseType: "blob" }); const a = document.createElement("a"); a.href = URL.createObjectURL(r.data); a.download = `${kind}-template.csv`; a.click(); };
@@ -76,7 +77,7 @@ export function ImportCenter() {
       <div className="flex gap-2"><Button size="sm" variant="outline" onClick={download} data-testid="import-template-btn">Download template</Button><Button size="sm" onClick={run} disabled={!file} className="bg-ink-950 hover:bg-ink-800" data-testid="import-preview-btn">Validate & preview</Button></div>
       {preview && <div className="rounded-md border" data-testid="import-preview">
         <div className="flex items-center justify-between border-b bg-warm-50 px-3 py-2 text-sm"><span><b>{preview.total}</b> rows · <span className="text-sage">{preview.valid} valid</span> · <span className="text-brick">{preview.invalid} invalid</span></span>{preview.confirm_token && <Button size="sm" onClick={confirm} className="bg-gold text-ink-950 hover:bg-gold-hover" data-testid="import-confirm-btn">Confirm import</Button>}</div>
-        <div className="max-h-64 overflow-auto"><table className="w-full text-xs"><tbody>{preview.rows.slice(0, 200).map((r) => <tr key={r.row} className={r.errors.length ? "bg-brick-50" : ""} data-testid={`import-row-${r.row}`}><td className="w-12 px-2 py-1 text-txt-muted">#{r.row}</td><td className="px-2 py-1 font-mono">{Object.entries(r.data).filter(([k]) => !["rooms", "areas", "flat_id"].includes(k)).map(([k, v]) => `${k}=${v ?? ""}`).join("  ")}</td><td className="px-2 py-1 text-brick">{r.errors.join("; ")}</td></tr>)}</tbody></table></div>
+        <div className="max-h-64 overflow-auto"><table className="w-full text-xs"><tbody>{previewRows.map((r) => <tr key={r.row} className={r.errors.length ? "bg-brick-50" : ""} data-testid={`import-row-${r.row}`}><td className="w-12 px-2 py-1 text-txt-muted">#{r.row}</td><td className="px-2 py-1 font-mono">{Object.entries(r.data).filter(([k]) => !["rooms", "areas", "flat_id"].includes(k)).map(([k, v]) => `${k}=${v ?? ""}`).join("  ")}</td><td className="px-2 py-1 text-brick">{r.errors.join("; ")}</td></tr>)}</tbody></table></div>
       </div>}
     </div>
   );

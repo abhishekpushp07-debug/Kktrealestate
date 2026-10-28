@@ -1,5 +1,5 @@
 import { HistoryButton } from "@/components/common/HistoryTimeline";
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowUpRight, Building2, Pencil } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -93,11 +93,13 @@ export default function ProjectWorkspace() {
   const qcTower = useQuickCreate("tower", { project_id: id }, () => reload());
   const { data: s } = useFetch(`/projects/${id}/setup`);
   const { data: sum } = useFetch(`/projects/${id}/summary`);
+  const crumbs = useMemo(() => [{ label: "Projects", to: "/projects" }, { label: p?.name }], [p?.name]);
+  const fixedInventory = useMemo(() => ({ project_id: id }), [id]);
   if (loading || !p || !s) return <div className="space-y-6"><Skeleton className="h-64 rounded-2xl" /><Skeleton className="h-10 w-1/2" /><Skeleton className="h-80 rounded-2xl" /></div>;
   const units = sum?.units;
   return (
     <div className="space-y-6" data-testid="project-workspace">
-      <PageHero cover={p.cover_image_url} crumbs={[{ label: "Projects", to: "/projects" }, { label: p.name }]} eyebrow={p.project_type} title={p.name} subtitle={[p.address?.line1, p.address?.city].filter(Boolean).join(", ")} ring={sum?.progress_pct ?? 0}
+      <PageHero cover={p.cover_image_url} crumbs={crumbs} eyebrow={p.project_type} title={p.name} subtitle={[p.address?.line1, p.address?.city].filter(Boolean).join(", ")} ring={sum?.progress_pct ?? 0}
         chips={<>{p.rera_number && <span className="pill pill-hero">RERA {p.rera_number}</span>}<HistoryButton entityType="project" entityId={p.id} label={p.code} /><span className="pill pill-hero">{s.towers.length} towers</span><StatusPill status={p.status} /></>}
         actions={<>{can("masters.project.edit") && <Link to={`/projects/${id}/setup`} className="btn btn-secondary !border-white/15 !bg-ink-800 !text-warm-50 hover:!bg-ink-700" data-testid="edit-setup-btn"><Pencil className="h-4 w-4" strokeWidth={1.75} />Edit setup</Link>}{can("sales.booking.create") && <Link to={`/bookings/new?project_id=${id}`} className="btn btn-gold" data-testid="new-booking-btn">New booking <ArrowUpRight className="h-4 w-4" strokeWidth={1.75} /></Link>}</>}
         stats={[{ label: "Units sold", value: `${(units?.by_status?.Booked || 0) + (units?.by_status?.Sold || 0)} / ${units?.total ?? "—"}`, hint: `${units?.available ?? "—"} available` }, { label: "Collected", value: inrShort((sum?.paid_paise || 0) / 100), hint: `${inrShort((sum?.collections_mtd_paise || 0) / 100)} this month` }, { label: "Outstanding", value: inrShort((sum?.outstanding?.total_paise || 0) / 100), hint: `${sum?.overdue?.count || 0} overdue`, tone: sum?.outstanding?.total_paise ? undefined : "sage" }, { label: "Upcoming stage", value: s.towers.map((t) => t.construction.next).find(Boolean) || "—", hint: s.towers.map((t) => `${t.name} ${t.construction.percent}%`).join(" · ") }]} testId="project-hero" />
@@ -116,7 +118,7 @@ export default function ProjectWorkspace() {
       <Suspense fallback={<Skeleton className="h-80 rounded-2xl" />}>
         {tab === "overview" && <><Overview s={s} p={p} /><ConnectedTo entity="project" id={id} /></>}
         {tab === "towers" && <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">{s.towers.map((t) => <TowerCard key={t.id} t={t} pid={id} />)}</div>}
-        {tab === "inventory" && <Card className="!p-4"><FlatsTable fixed={{ project_id: id }} blocks={p.blocks} /></Card>}
+        {tab === "inventory" && <Card className="!p-4"><FlatsTable fixed={fixedInventory} blocks={p.blocks} /></Card>}
         {tab === "construction" && <Construction s={s} />}
         {tab === "plans" && <Card><PaymentPlanMatrix projectId={id} blocks={s.towers.map((t) => ({ id: t.id, name: t.name }))} /></Card>}
         {tab === "pricing" && <div className="space-y-6"><RateCardsTab projectId={id} onApplied={reload} /><ParkingTab projectId={id} /></div>}

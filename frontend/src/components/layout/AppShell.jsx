@@ -1,5 +1,5 @@
 import monogram from "@/assets/kkt-monogram.svg";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Send, BarChart3, Building2, ChevronLeft, ChevronRight, Database, Files, FileSignature, FileText, Funnel, Globe, HardHat, Home, KeyRound, LifeBuoy, LogOut, Menu, Plus, Receipt, Search, Settings, UserRound, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -41,6 +41,7 @@ const CRUMB = { dashboard: "Home", projects: "Projects", customers: "Customers",
 
 function Sidebar({ collapsed, setCollapsed, mobile, onClose }) {
   const { can, company, user, surfaces } = useAuth();
+  const navItems = useMemo(() => NAV.filter((n) => can(n.perm) && (!n.surface || surfaces?.[n.surface])), [can, surfaces]);
   const loc = useLocation();
   return (
     <aside className={cn("flex h-full flex-col bg-ink-950 text-warm-50", collapsed ? "w-[72px]" : "w-[260px]")} data-testid="sidebar">
@@ -51,7 +52,7 @@ function Sidebar({ collapsed, setCollapsed, mobile, onClose }) {
       </div>
       <div className="hero-hair mx-5" />
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-5">
-        {NAV.filter((n) => can(n.perm) && (!n.surface || surfaces?.[n.surface])).map((n) => {
+        {navItems.map((n) => {
           const active = loc.pathname.startsWith(n.to) || (n.match || []).some((m) => loc.pathname.startsWith(m));
           return <NavLink key={n.to} to={n.to} onClick={onClose} onMouseEnter={() => prefetchRoute(n.to)} onFocus={() => prefetchRoute(n.to)} className={cn("sb-item", active && "active", collapsed && "justify-center px-0")} data-testid={`nav-${n.label.toLowerCase().replace(/[^a-z]+/g, "-")}`} title={n.label}><n.icon className="h-5 w-5 shrink-0" strokeWidth={1.75} />{!collapsed && <span>{n.label}</span>}</NavLink>;
         })}
@@ -78,6 +79,7 @@ function Crumbs() {
 
 function TopBar({ onMenu }) {
   const { user, logout, can } = useAuth();
+  const quickItems = useMemo(() => QUICK.filter((q) => can(q[2])), [can]);
   const navigate = useNavigate();
   const [pwOpen, setPwOpen] = useState(false);
   return (
@@ -88,7 +90,7 @@ function TopBar({ onMenu }) {
         <button onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))} className="hidden h-10 w-64 items-center gap-2 rounded-[10px] border border-warm-200 bg-warm-100 px-3.5 text-sm text-txt-secondary transition-colors hover:border-gold hover:bg-white md:flex" data-testid="search-pill"><Search className="h-4 w-4" strokeWidth={1.75} /><span className="flex-1 text-left">Search…</span><kbd className="rounded-md border border-warm-200 bg-white px-1.5 py-0.5 font-sans text-[10px] font-semibold text-txt-secondary">⌘K</kbd></button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild><button className="btn btn-primary h-10 !px-4" data-testid="quick-new"><Plus className="h-4 w-4" /><span className="hidden sm:inline">New</span></button></DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="grid w-[420px] grid-cols-2 gap-0.5 rounded-xl p-2" data-testid="quick-new-menu">{QUICK.filter((q) => can(q[2])).map(([l, to]) => <DropdownMenuItem key={l} onClick={() => navigate(to)} data-testid={`quick-${l.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}>{l}</DropdownMenuItem>)}</DropdownMenuContent>
+          <DropdownMenuContent align="end" className="grid w-[420px] grid-cols-2 gap-0.5 rounded-xl p-2" data-testid="quick-new-menu">{quickItems.map(([l, to]) => <DropdownMenuItem key={l} onClick={() => navigate(to)} data-testid={`quick-${l.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}>{l}</DropdownMenuItem>)}</DropdownMenuContent>
         </DropdownMenu>
         <NotificationBell />
         <DropdownMenu>

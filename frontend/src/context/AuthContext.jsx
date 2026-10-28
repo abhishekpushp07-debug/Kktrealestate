@@ -66,11 +66,11 @@ export function AuthProvider({ children }) {
     return () => { clearInterval(t); window.removeEventListener("focus", refreshMe); setPermissionDeniedHandler(null); };
   }, [!!user, refreshMe]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const value = useMemo(() => ({
-    user, company, surfaces, loading, login, loginMfa, logout, setCompany, refreshMe,
-    can: (perm) => !!user?.is_super_admin || (perm.endsWith(".*") ? !!user?.permissions?.some((c) => c.startsWith(perm.slice(0, -1))) : !!user?.permissions?.includes(canonical(perm))),
-    canAny: (...perms) => !!user?.is_super_admin || perms.some((p) => user?.permissions?.includes(canonical(p))),
-  }), [user, company, surfaces, loading, login, loginMfa, logout, refreshMe]);
+  // CR-2 B5: permission helpers are stable callbacks keyed on the user's permission set; the context value is composed from small memos
+  const can = useCallback((perm) => !!user?.is_super_admin || (perm.endsWith(".*") ? !!user?.permissions?.some((c) => c.startsWith(perm.slice(0, -1))) : !!user?.permissions?.includes(canonical(perm))), [user]);
+  const canAny = useCallback((...perms) => !!user?.is_super_admin || perms.some((p) => user?.permissions?.includes(canonical(p))), [user]);
+  const actions = useMemo(() => ({ login, loginMfa, logout, setCompany, refreshMe, can, canAny }), [login, loginMfa, logout, refreshMe, can, canAny]);
+  const value = useMemo(() => ({ user, company, surfaces, loading, ...actions }), [user, company, surfaces, loading, actions]);
 
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
 }

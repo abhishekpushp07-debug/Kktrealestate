@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Eye, EyeOff, FileText, Lock, Printer, Receipt } from "lucide-react";
 import { useFetch } from "@/hooks/useList";
@@ -53,7 +53,7 @@ export function BookingRich({ b, plan, can, onPay }) {
 export function DemandsTab({ items, loading, can }) {
   const today = new Date().toISOString().slice(0, 10);
   const [q, setQ] = useState("");
-  const rows = items.filter((d) => !q || `${d.demand_number} ${d.installment_name} ${d.milestone_name} ${d.booking_number}`.toLowerCase().includes(q.toLowerCase()));
+  const rows = useMemo(() => items.filter((d) => !q || `${d.demand_number} ${d.installment_name} ${d.milestone_name} ${d.booking_number}`.toLowerCase().includes(q.toLowerCase())), [items, q]);
   if (loading && items.length === 0) return <Skeleton className="h-64" />;
   if (items.length === 0) return <EmptyState title="No demands yet" description="Demands are raised automatically from the payment plan as stages complete." testId="demands-empty" />;
   return (
@@ -79,17 +79,19 @@ export function ReceiptsDocsTab({ receipts, docs, can, kyc }) {
 }
 
 export function ConstructionTab({ items, photos }) {
+  const photosByBlock = useMemo(() => { const m = {}; for (const p of photos || []) (m[p.entity_id] ||= []).push(p); return m; }, [photos]);
   if (items.length === 0) return <EmptyState title="No towers" description="Construction appears here once the customer has a booking." />;
   return (
     <div className="grid gap-5 lg:grid-cols-2" data-testid="construction-tab">
       {items.map((t) => <Card key={t.block_id} testId={`construction-${t.block_name}`}><div className="flex items-center justify-between"><h3 className="font-display text-lg">{t.block_name}</h3><span className="font-display text-xl text-ink-950">{t.construction_percent}%</span></div><p className="text-xs text-txt-secondary">{t.stage_plan_name || "Stage plan"}{t.planned_completion ? ` · planned ${fmtDate(t.planned_completion)}` : ""}</p><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-warm-100"><span className="block h-full bg-gold" style={{ width: `${t.construction_percent}%` }} /></div><ul className="mt-3 space-y-1 text-xs">{t.stages.map((s) => <li key={s.name || s.stage_id} className="flex items-center justify-between"><span className={cn(s.status === "Completed" ? "text-ink-950" : "text-txt-secondary")}>{s.name}</span><span className="text-txt-muted">{s.status === "Completed" ? fmtDate(s.completed_on) : s.planned_on ? `planned ${fmtDate(s.planned_on)}` : s.status}</span></li>)}</ul>
-        <div className="mt-3 grid grid-cols-4 gap-1.5">{photos.filter((p) => p.entity_id === t.block_id).slice(0, 4).map((p) => <img key={p.id} src={`${BASE_PATH}/api/files/variants/${p.id}-thumb.webp`} alt={p.caption || ""} className="aspect-square rounded-lg object-cover" loading="lazy" />)}</div></Card>)}
+        <div className="mt-3 grid grid-cols-4 gap-1.5">{(photosByBlock[t.block_id] || []).slice(0, 4).map((p) => <img key={p.id} src={`${BASE_PATH}/api/files/variants/${p.id}-thumb.webp`} alt={p.caption || ""} className="aspect-square rounded-lg object-cover" loading="lazy" />)}</div></Card>)}
     </div>
   );
 }
 
 export function ProfileTab({ c, reveal, onReveal, can, label, onKyc, portal }) {
   const kv = (k) => (reveal ? c[k] : c[`${k}_masked`]) || "—";
+  const profileRows = useMemo(() => [["Occupation", c.occupation], ["Company", c.company_name], ["Income band", c.annual_income_band], ["Source", c.source], ["Residency", label("residency", c.residency_id)], ["Address", [c.address_current?.line1, c.address_current?.city, c.address_current?.state, c.address_current?.pincode].filter(Boolean).join(", ")]].filter(([, v]) => v), [c, label]);
   return (
     <div className="grid gap-5 lg:grid-cols-3">
       <Card testId="kyc-card"><div className="flex items-center justify-between"><h3 className="font-display text-lg">KYC</h3><StatusPill status={c.kyc_status} /></div>
@@ -97,7 +99,7 @@ export function ProfileTab({ c, reveal, onReveal, can, label, onKyc, portal }) {
         <div className="mt-4 flex flex-wrap items-center gap-2">{can("sales.kyc.reveal") && <button onClick={onReveal} className="btn btn-secondary btn-sm" data-testid="kyc-reveal-btn">{reveal ? <><EyeOff className="h-3.5 w-3.5" />Hide</> : <><Eye className="h-3.5 w-3.5" />Reveal</>}</button>}{reveal && <span className="text-[11px] text-amber2">Reveal is audit-logged</span>}{can("sales.kyc.reveal") && <select value={c.kyc_status} onChange={(e) => onKyc(e.target.value)} className="input !h-8 !w-auto !text-xs" data-testid="kyc-status-select">{["Pending", "Submitted", "Verified", "Rejected"].map((k) => <option key={k}>{k}</option>)}</select>}</div></Card>
       <Card testId="profile-card"><div className="flex items-center justify-between"><h3 className="font-display text-lg">Profile</h3>{can("sales.customer.edit") && <Link to={`/customers/${c.id}/edit`} className="btn btn-secondary btn-sm" data-testid="profile-edit">Edit</Link>}</div>
         <div className="mt-3 flex flex-wrap gap-1.5">{(c.preferences?.bhk_ids || []).map((b) => <span key={b} className="pill bg-warm-100 text-txt-secondary">{label("bhk_preference", b)}</span>)}{(c.preferences?.facing_ids || []).map((b) => <span key={b} className="pill bg-warm-100 text-txt-secondary">{label("facing", b)} facing</span>)}{c.preferences?.budget_band_id && <span className="pill bg-gold-light text-[#8a6d12]">{label("budget_band", c.preferences.budget_band_id)}</span>}</div>
-        <dl className="mt-4 space-y-2 text-sm">{[["Occupation", c.occupation], ["Company", c.company_name], ["Income band", c.annual_income_band], ["Source", c.source], ["Residency", label("residency", c.residency_id)], ["Address", [c.address_current?.line1, c.address_current?.city, c.address_current?.state, c.address_current?.pincode].filter(Boolean).join(", ")]].filter(([, v]) => v).map(([k, v]) => <div key={k} className="flex justify-between gap-4"><dt className="text-txt-secondary">{k}</dt><dd className="text-right font-medium text-ink-950">{v}</dd></div>)}</dl></Card>
+        <dl className="mt-4 space-y-2 text-sm">{profileRows.map(([k, v]) => <div key={k} className="flex justify-between gap-4"><dt className="text-txt-secondary">{k}</dt><dd className="text-right font-medium text-ink-950">{v}</dd></div>)}</dl></Card>
       <div>{portal}</div>
     </div>
   );
