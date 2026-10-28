@@ -19,7 +19,7 @@ async def gate(user: dict, f: dict, ip: str = ""):
     """Raise 403 for users who may not open KYC files; otherwise record an audited kyc.view."""
     if not can_open(user):
         raise ApiError(403, "KYC document: sales.kyc.reveal required", "FORBIDDEN")
-    await write_audit(user, "kyc.view", "file", f["id"], after={"kind": f.get("kind"), "co_applicant_id": f.get("entity_id"), "customer_id": f.get("customer_id")}, ip=ip)
+    await write_audit(user, "kyc.file_reveal", "file", f["id"], after={"kind": f.get("kind"), "co_applicant_id": f.get("entity_id"), "customer_id": f.get("customer_id")}, ip=ip)
 
 
 async def files_for(co_applicant_ids: list[str]) -> dict[str, dict]:
