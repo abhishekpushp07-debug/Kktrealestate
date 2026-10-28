@@ -105,13 +105,13 @@ async def collections_v2(request: Request, from_date: str | None = None, to_date
     totals["pending_paise"] = pend[0]["amt"] if pend else 0
     label = {"day": "Day", "week": "Week", "month": "Month", "project": "Project", "block": "Tower", "bucket": "Ledger", "mode": "Mode", "bank": "Bank account", "rm": "Relationship manager", "receipt": "Receipt"}.get(group_by, "Group")
     cols = [("group", label, "str", 1.4)] + ([("date", "Date", "date"), ("customer_name", "Customer", "str", 1.3), ("booking_number", "Booking", "str"), ("tag", "Tag", "str", 1.2)] if group_by == "receipt" else []) + \
-        [("count", "Rows", "num", 0.6), ("cash_paise", "Cash (Jama)", "money"), ("account_paise", "Account (Jama)", "money"), ("other_paise", "Other charges (Jama)", "money"), ("reversal_paise", "Reversals", "money"), ("total_paise", "Net Jama", "money")]
+        [("count", "Rows", "num", 0.6), ("cash_paise", "Cash received", "money"), ("account_paise", "Account received", "money"), ("other_paise", "Other charges received", "money"), ("reversal_paise", "Reversals", "money"), ("total_paise", "Net received", "money")]
     basis_text = "Date basis: receipt date" if date_basis == "receipt" else "Date basis: clearance date"
-    payload = {"purpose": "What money came in (Jama side), sliced any way you need. Cleared receipts only; reversals appear negative on the reversal date.", "from_date": f, "to_date": t, "group_by": group_by, "date_basis": date_basis, "basis_text": basis_text, "as_of": clock.today().isoformat(),
+    payload = {"purpose": "What money came in (Received side), sliced any way you need. Cleared receipts only; reversals appear negative on the reversal date.", "from_date": f, "to_date": t, "group_by": group_by, "date_basis": date_basis, "basis_text": basis_text, "as_of": clock.today().isoformat(),
                "filters_text": f"{_pdf.fmt_date(f)} – {_pdf.fmt_date(t)} · grouped by {label.lower()}", "group_options": ["day", "week", "month", "project", "block", "bucket", "mode", "bank", "rm", "receipt"],
-               "kpis": [{"label": "Net Jama", "value_paise": totals["total_paise"], "kind": "money", "hint": f"{totals['count']} rows · {basis_text.lower()}"}, {"label": "Cash (Jama)", "value_paise": totals["cash_paise"], "kind": "money"}, {"label": "Account (Jama)", "value_paise": totals["account_paise"], "kind": "money"},
+               "kpis": [{"label": "Net received", "value_paise": totals["total_paise"], "kind": "money", "hint": f"{totals['count']} rows · {basis_text.lower()}"}, {"label": "Cash received", "value_paise": totals["cash_paise"], "kind": "money"}, {"label": "Account received", "value_paise": totals["account_paise"], "kind": "money"},
                         {"label": "Pending instruments", "value_paise": totals["pending_paise"], "kind": "money", "hint": f"{totals['pending_instruments']} not yet cleared (excluded)", "tone": "brick" if totals["pending_paise"] else None}]}
-    return etag_respond(request, await respond(request, format, payload, "Collections (Jama)", await _company(user), cols, out, totals, "collections-v2", landscape=True))
+    return etag_respond(request, await respond(request, format, payload, "Collections (Received)", await _company(user), cols, out, totals, "collections-v2", landscape=True))
 
 
 # ---------- 2b. Outstanding & ageing (Udhar − Jama) with advance + bands from definitions ----------
@@ -148,11 +148,11 @@ async def outstanding_v2(request: Request, project_id: str | None = None, block_
     totals = {k: sum(r[k] for r in rows) for k in keys}
     totals["bookings"] = len(bks)
     cols = [("group", {"booking": "Booking", "customer": "Customer", "project": "Project", "block": "Tower"}[group_by if group_by in ("booking", "customer", "project", "block") else "booking"], "str", 1.2)] + ([("customer_name", "Customer", "str", 1.3), ("unit", "Unit", "str", 0.9)] if group_by == "booking" else [("bookings", "Bookings", "num", 0.6)]) + \
-        [("udhar_paise", "Udhar", "money"), ("jama_paise", "Jama", "money"), ("outstanding_paise", "Outstanding", "money"), ("advance_paise", "Advance held", "money"), ("net_balance_paise", "Net balance", "money")] + [(f"band_{b}", b, "money", 0.8) for b in bands] + [("overdue_paise", "Overdue", "money")] + ([("promise", "Promise to pay", "str", 1)] if group_by == "booking" else [])
-    payload = {"purpose": "Law: Outstanding (due now) = Σ bucket max(0, raised − paid); Advance held = Σ bucket max(0, paid − raised); Net balance = Outstanding − Advance = Σ Udhar − Σ Jama. Ageing bands split the Outstanding.", "as_of": today.isoformat(), "group_by": group_by, "group_options": ["booking", "customer", "project", "block"],
+        [("udhar_paise", "Bill raised", "money"), ("jama_paise", "Received", "money"), ("outstanding_paise", "Outstanding", "money"), ("advance_paise", "Advance held", "money"), ("net_balance_paise", "Net balance", "money")] + [(f"band_{b}", b, "money", 0.8) for b in bands] + [("overdue_paise", "Overdue", "money")] + ([("promise", "Promise to pay", "str", 1)] if group_by == "booking" else [])
+    payload = {"purpose": "Law: Outstanding (due now) = Σ bucket max(0, raised − paid); Advance held = Σ bucket max(0, paid − raised); Net balance = Outstanding − Advance = Σ bill raised − Σ received. Ageing bands split the Outstanding.", "as_of": today.isoformat(), "group_by": group_by, "group_options": ["booking", "customer", "project", "block"],
                "ageing": [{"bucket": k, "amount_paise": v} for k, v in ageing.items()], "filters_text": f"As of {_pdf.fmt_date(today.isoformat())} · grouped by {group_by}",
                "kpis": [{"label": "Outstanding", "value_paise": totals["outstanding_paise"], "kind": "money", "hint": f"{totals['bookings']} live bookings", "tone": "brick" if totals["outstanding_paise"] else "sage"}, {"label": "Advance held", "value_paise": totals["advance_paise"], "kind": "money", "tone": "sage"},
-                        {"label": "Net balance", "value_paise": totals["net_balance_paise"], "kind": "money", "hint": "Σ Udhar − Σ Jama"}, {"label": "Overdue", "value_paise": totals["overdue_paise"], "kind": "money", "tone": "brick" if totals["overdue_paise"] else None}]}
+                        {"label": "Net balance", "value_paise": totals["net_balance_paise"], "kind": "money", "hint": "Σ bill raised − Σ received"}, {"label": "Overdue", "value_paise": totals["overdue_paise"], "kind": "money", "tone": "brick" if totals["overdue_paise"] else None}]}
     return etag_respond(request, await respond(request, format, payload, "Outstanding & Ageing", await _company(user), cols, rows, totals, "outstanding-v2", landscape=True))
 
 
@@ -272,8 +272,8 @@ async def receivables_forecast(request: Request, project_id: str | None = None, 
     cols = ([("group", "Installment", "str", 1.3), ("booking_number", "Booking", "str"), ("customer_name", "Customer", "str", 1.2), ("expected_on", "Expected on", "date"), ("basis", "Basis", "str", 0.8)] if group_by == "booking" else
             [("group", "Tower · stage", "str", 1.6), ("month", "Expected", "str", 0.9), ("bookings", "Bookings", "num", 0.7), ("lines", "Installments", "num", 0.7)] if group_by == "stage" else
             [("group", {"month": "Month", "project": "Project", "block": "Tower"}.get(group_by, "Group"), "str", 1.3), ("bookings", "Bookings", "num", 0.7), ("lines", "Installments", "num", 0.7)]) + \
-        [("cash_paise", "Expected Cash (Udhar)", "money"), ("account_paise", "Expected Account (Udhar)", "money"), ("expected_paise", "Expected total", "money")]
-    payload = {"purpose": "Udhar still to be raised per booking = agreement − raised, spread over pending plan installments; stage-linked lines take the tower's planned date (Construction → Planned dates) else 'On completion'.", "as_of": today.isoformat(),
+        [("cash_paise", "Expected cash bill", "money"), ("account_paise", "Expected account bill", "money"), ("expected_paise", "Expected total", "money")]
+    payload = {"purpose": "Bills still to be raised per booking = agreement − raised, spread over pending plan installments; stage-linked lines take the tower's planned date (Construction → Planned dates) else 'On completion'.", "as_of": today.isoformat(),
                "group_by": group_by, "group_options": ["stage", "month", "project", "block", "booking"], "per_booking": per_booking, "filters_text": f"As of {_pdf.fmt_date(today.isoformat())} · Σ forecast + Σ raised == Σ agreement" + ("" if any_dated else " · no planned dates set — grouped tower → stage"),
                "kpis": [{"label": "Still to raise", "value_paise": totals["expected_paise"], "kind": "money", "hint": "Σ forecast"}, {"label": "Expected Cash", "value_paise": totals["cash_paise"], "kind": "money"}, {"label": "Expected Account", "value_paise": totals["account_paise"], "kind": "money"},
                         {"label": "Agreement total", "value_paise": totals["agreement_paise"], "kind": "money", "hint": f"raised {_pdf.inr(totals['raised_paise'])} · forecast + raised = agreement", "tone": "sage"}]}
@@ -298,7 +298,7 @@ async def other_charges(request: Request, project_id: str | None = None, block_i
     totals = {k: sum(r[k] for r in rows) for k in ("lines", "agreed_paise", "demanded_paise", "collected_paise", "balance_paise")}
     totals["pct_collected"] = round(100 * totals["collected_paise"] / totals["demanded_paise"], 1) if totals["demanded_paise"] else 0
     cols = [("group", {"charge": "Charge type", "project": "Project", "booking": "Booking"}.get(group_by, "Group"), "str", 1.4)] + ([("customer_name", "Customer", "str", 1.2)] if group_by == "booking" else []) + \
-        [("lines", "Lines", "num", 0.6), ("agreed_paise", "Agreed", "money"), ("demanded_paise", "Demanded (Udhar)", "money"), ("collected_paise", "Collected (Jama)", "money"), ("balance_paise", "Balance", "money"), ("pct_collected", "% collected", "pct", 0.7)]
+        [("lines", "Lines", "num", 0.6), ("agreed_paise", "Agreed", "money"), ("demanded_paise", "Bill raised", "money"), ("collected_paise", "Received", "money"), ("balance_paise", "Balance", "money"), ("pct_collected", "% collected", "pct", 0.7)]
     payload = {"purpose": "Maintenance, registration, parking, bounce and other charges: demanded vs collected per charge type (Other-charges ledger).", "as_of": clock.today().isoformat(), "group_by": group_by, "group_options": ["charge", "project", "booking"]}
     return etag_respond(request, await respond(request, format, payload, "Other Charges", await _company(user), cols, rows, totals, "other-charges"))
 
@@ -417,7 +417,7 @@ async def sales_team(request: Request, from_date: str | None = None, to_date: st
             row(ids[bid])["overdue_paise"] += definitions.overdue_of(bands)
     rows = sorted(g.values(), key=lambda r: -r["sold_paise"])
     totals = {k: sum(r[k] for r in rows) for k in ("leads", "visits", "bookings", "sold_paise", "collected_paise", "overdue_paise")}
-    cols = [("group", "Relationship manager", "str", 1.5), ("leads", "Leads", "num"), ("visits", "Visits done", "num"), ("bookings", "Bookings", "num"), ("sold_paise", "Sold value", "money"), ("collected_paise", "Collections (Jama)", "money"), ("overdue_paise", "Overdue of their customers", "money")]
+    cols = [("group", "Relationship manager", "str", 1.5), ("leads", "Leads", "num"), ("visits", "Visits done", "num"), ("bookings", "Bookings", "num"), ("sold_paise", "Sold value", "money"), ("collected_paise", "Collections (Received)", "money"), ("overdue_paise", "Overdue of their customers", "money")]
     payload = {"purpose": "Per RM: leads taken, visits completed, bookings & sold value in the period, collections received, and overdue across all their live bookings.", "from_date": f, "to_date": t, "filters_text": f"{_pdf.fmt_date(f)} – {_pdf.fmt_date(t)}"}
     return etag_respond(request, await respond(request, format, payload, "Sales Team Performance", await _company(user), cols, rows, totals, "sales-team"))
 
@@ -462,10 +462,10 @@ async def construction_vs_plan(request: Request, project_id: str | None = None, 
     totals["towers"] = towers
     nxt_exp = sum(r["expected_paise"] for r in rows if not r.get("_subtotal") and r["stage"].endswith("← next"))
     cols = [("group", "Tower", "str", 1.1), ("stage", "Stage", "str", 1.4), ("status", "Status", "str", 0.7), ("completed_on", "Completed", "date", 0.8), ("planned_on", "Planned", "date", 0.8), ("bookings", "Bookings", "num", 0.6),
-            ("demanded_paise", "Demands raised (Udhar)", "money"), ("collected_paise", "Collected (Jama)", "money"), ("balance_paise", "Balance", "money"), ("expected_paise", "Expected Udhar (pending)", "money"), ("expected_note", "Note", "str", 0.9)]
-    payload = {"purpose": "Per tower, per stage: status and dates, stage-linked demands raised vs collected, and the Udhar each pending stage will raise from live bookings' plan snapshots (tower subtotals).", "as_of": clock.today().isoformat(),
-               "kpis": [{"label": "Towers", "value": towers, "kind": "num"}, {"label": "Stage demands (Udhar)", "value_paise": totals["demanded_paise"], "kind": "money", "hint": f"collected {_pdf.inr(totals['collected_paise'])}"}, {"label": "Stage balance", "value_paise": totals["balance_paise"], "kind": "money", "tone": "brick" if totals["balance_paise"] else "sage"},
-                        {"label": "Next-stage expected Udhar", "value_paise": nxt_exp, "kind": "money", "hint": "across towers' next pending stage"}]}
+            ("demanded_paise", "Bills raised", "money"), ("collected_paise", "Received", "money"), ("balance_paise", "Balance", "money"), ("expected_paise", "Expected bill (pending)", "money"), ("expected_note", "Note", "str", 0.9)]
+    payload = {"purpose": "Per tower, per stage: status and dates, stage-linked demands raised vs collected, and the bill each pending stage will raise from live bookings' plan snapshots (tower subtotals).", "as_of": clock.today().isoformat(),
+               "kpis": [{"label": "Towers", "value": towers, "kind": "num"}, {"label": "Stage bills raised", "value_paise": totals["demanded_paise"], "kind": "money", "hint": f"collected {_pdf.inr(totals['collected_paise'])}"}, {"label": "Stage balance", "value_paise": totals["balance_paise"], "kind": "money", "tone": "brick" if totals["balance_paise"] else "sage"},
+                        {"label": "Next-stage expected bill", "value_paise": nxt_exp, "kind": "money", "hint": "across towers' next pending stage"}]}
     return etag_respond(request, await respond(request, format, payload, "Construction vs Plan", await _company(user), cols, rows, totals, "construction-vs-plan", landscape=True))
 
 

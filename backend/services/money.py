@@ -24,13 +24,33 @@ def pct_of(paise: int, percent: float) -> int:
     return rupees_whole(Decimal(paise) * Decimal(str(percent)) / 100)
 
 
+_LEGACY = (("udhar", "bill_raised"), ("jama", "received"))  # legacy key stems → English (one-release compatibility aliases)
+
+
+def _english_aliases(d: dict) -> dict:
+    """Legacy ledger keys (udhar_*/jama_*) stay for one release; English twins (bill_raised_*/received_*) are added, plus the signed
+    balance (received − bill raised) and its status whenever both totals are present (see definitions.two_sided)."""
+    extra = {}
+    for k, v in d.items():
+        for old, new in _LEGACY:
+            if old in k and isinstance(v, int):
+                extra[k.replace(old, new)] = v
+    tu, tj = d.get("total_udhar_paise", d.get("udhar_paise")), d.get("total_jama_paise", d.get("jama_paise"))
+    if isinstance(tu, int) and isinstance(tj, int) and "seq" not in d:
+        bal = tj - tu
+        extra["balance_signed_paise"] = bal
+        extra["balance_status"] = "due" if bal < 0 else "advance" if bal > 0 else "settled"
+    return extra
+
+
 def present_money(obj):
-    """Recursively add rupee twins for every *_paise key (amount_paise -> amount)."""
+    """Recursively add rupee twins for every *_paise key (amount_paise -> amount) and English ledger aliases."""
     if isinstance(obj, list):
         return [present_money(x) for x in obj]
     if isinstance(obj, dict):
+        src = {**obj, **_english_aliases(obj)}
         out = {}
-        for k, v in obj.items():
+        for k, v in src.items():
             out[k] = present_money(v)
             if k.endswith("_paise") and isinstance(v, int):
                 out[k[:-6]] = to_rupees(v)

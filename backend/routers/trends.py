@@ -12,7 +12,7 @@ router = APIRouter(prefix="/trends", tags=["trends"])
 @router.get("")
 async def get_trends(scope: str = Query("company", pattern="^(company|project|customer)$"), id: str | None = None, months: int = Query(12, ge=3, le=36),
                      user: dict = Depends(require_any("reports.collections.view", "sales.customer.view"))):
-    """Per-month: collections (Jama cleared), demands (Udhar raised), outstanding_eom, bookings. Σ collections == Collections report for the same range."""
+    """Per-month: collections (received cleared), demands (bills raised), outstanding_eom, bookings. Σ collections == Collections report for the same range."""
     if scope != "company" and not id:
         raise ApiError(422, "id is required for project/customer scope", "VALIDATION_ERROR")
     if scope == "project":

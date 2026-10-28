@@ -27,12 +27,12 @@ from services.budgets import REPORT_MS  # Phase K.8
 router = APIRouter(prefix="/reports", tags=["reports"])
 REPORTS = [
     # Finance
-    {"key": "collections-v2", "name": "Collections (Jama)", "group": "Finance", "purpose": "What came in: by period, project, tower, ledger, mode, bank, RM or receipt — reversals negative."},
-    {"key": "outstanding-v2", "name": "Outstanding & Ageing", "group": "Finance", "purpose": "Udhar − Jama per booking / customer / project / tower with ageing bands and advance held."},
-    {"key": "demand-vs-collection", "name": "Demand vs Collection", "group": "Finance", "purpose": "Demanded (Udhar) vs collected (Jama) per stage / installment per tower."},
+    {"key": "collections-v2", "name": "Collections (Received)", "group": "Finance", "purpose": "What came in: by period, project, tower, ledger, mode, bank, RM or receipt — reversals negative."},
+    {"key": "outstanding-v2", "name": "Outstanding & Ageing", "group": "Finance", "purpose": "Bill raised − Received per booking / customer / project / tower with ageing bands and advance held."},
+    {"key": "demand-vs-collection", "name": "Demand vs Collection", "group": "Finance", "purpose": "Bill raised vs collected per stage / installment per tower."},
     {"key": "cash-vs-account", "name": "Cash vs Account Split", "group": "Finance", "purpose": "Agreed vs raised vs received vs balance per bucket, with variance flags."},
     {"key": "cheques", "name": "Cheque / Instrument Register", "group": "Finance", "purpose": "Every cheque / DD with status, bank, dates and bounce follow-up."},
-    {"key": "receivables-forecast", "name": "Receivables Forecast", "group": "Finance", "purpose": "Udhar still to be raised per booking, by month / project / tower."},
+    {"key": "receivables-forecast", "name": "Receivables Forecast", "group": "Finance", "purpose": "Bills still to be raised per booking, by month / project / tower."},
     {"key": "cancellations", "name": "Cancellations & Refunds", "group": "Finance", "purpose": "Cancelled bookings, deductions, refund payable / paid / pending."},
     {"key": "bank-receipts", "name": "Bank-wise Receipts & Deposits", "group": "Finance", "purpose": "Receipts per bank account, cleared vs pending clearance."},
     {"key": "other-charges", "name": "Other Charges", "group": "Finance", "purpose": "Maintenance / registration / parking / bounce: demanded vs collected per charge type."},
@@ -52,7 +52,7 @@ REPORTS = [
     {"key": "hold-register", "name": "Hold Register", "group": "Sales", "purpose": "Active / expiring (< 48 h) / expired holds with reason, customer, RM and countdown; hold → booking conversion rate."},
     {"key": "masked-inventory", "name": "Masked Inventory", "group": "Sales", "purpose": "Units whose displayed status differs from the real one (Show as Sold / Hidden overrides) with reason, who and since when. Requires real-status permission."},
     # Construction
-    {"key": "construction-vs-plan", "name": "Construction vs Plan", "group": "Construction", "purpose": "Stage-plan progress per tower, stage demands vs collected, next stage expected Udhar."},
+    {"key": "construction-vs-plan", "name": "Construction vs Plan", "group": "Construction", "purpose": "Stage-plan progress per tower, stage demands vs collected, next stage expected bill raised."},
     {"key": "construction-progress", "name": "Construction progress (towers)", "group": "Construction", "purpose": "Per-tower stage status, photos and demands per stage."},
     # Operations
     {"key": "service-sla", "name": "Service SLA", "group": "Operations", "purpose": "Tickets by category / status, SLA met vs breached, ageing, ratings."},
@@ -506,14 +506,14 @@ async def build_statement_pdf(booking_id: str, user: dict) -> tuple[bytes, str]:
     d.table(["#", "Milestone", "Cum %", "Cash demand", "Account demand", "Total", "Due date", "Paid", "Balance", "Status"],
             [[x.get("milestone_seq") or x.get("installment_seq") or "", x.get("milestone_name") or x.get("installment_name") or "", f"{x['cumulative_percent']}%" if x.get("percent") is not None or x.get("cumulative_percent") is not None else "—", _pdf.inr(x["cash_demand_paise"]), _pdf.inr(x["account_demand_paise"]), _pdf.inr(x["total_demand_paise"]), _pdf.fmt_date(x["due_date"]), _pdf.inr(x.get("paid_paise", 0)), _pdf.inr(x["total_demand_paise"] - x.get("paid_paise", 0)), x["status"]] for x in demands],
             widths=[0.4, 1.6, 0.6, 1, 1, 1, 0.9, 1, 1, 0.8], align_right=[3, 4, 5, 7, 8])
-    d.h2("Ledger (Udhar / Jama)")
+    d.h2("Ledger (Bill raised / Received)")
     rows = [[_pdf.fmt_date(e["date"]), f"{e['type'].replace('_', ' ').title()} — {e.get('note') or ''}" + (f" [{e['tag']}]" if e.get("tag") else "") + (f" · {e['ref']}" if e.get("ref") else ""),
              _pdf.inr(e.get("udhar_paise", 0)) if e.get("udhar_paise") else "", _pdf.inr(e.get("jama_paise", 0)) if e.get("jama_paise") else "",
              " ".join(x for x in [(e.get("mode") if e.get("mode") != "Due" else None), e.get("instrument")] if x), _pdf.inr(e.get("balance_paise", 0))] for e in ledger]
     tu, tj = sum(e.get("udhar_paise", 0) for e in ledger), sum(e.get("jama_paise", 0) for e in ledger)
     rows.append(["", "Totals", _pdf.inr(tu), _pdf.inr(tj), "", _pdf.inr(tu - tj)])
-    d.table(["Date", "Particulars", "Udhar", "Jama", "Mode / Instrument", "Balance"], rows, widths=[0.9, 3.2, 1.1, 1.1, 1.4, 1.1], align_right=[2, 3, 5])
-    d.totals([("Total Udhar", _pdf.inr(tu)), ("Total Jama", _pdf.inr(tj)), ("Balance (Udhar − Jama)", _pdf.inr(tu - tj)), ("Advance held", _pdf.inr(s.get("advance_paise", 0)))])
+    d.table(["Date", "Particulars", "Bill raised", "Received", "Mode / Instrument", "Balance"], rows, widths=[0.9, 3.2, 1.1, 1.1, 1.4, 1.1], align_right=[2, 3, 5])
+    d.totals([("Total bill raised", _pdf.inr(tu)), ("Total received", _pdf.inr(tj)), ("Balance (Received − Bill raised)", _pdf.inr(tj - tu) + (" Due" if tj < tu else " Advance" if tj > tu else " Settled")), ("Advance held", _pdf.inr(s.get("advance_paise", 0)))])
     if b.get("other_charges"):
         d.h2("Other charges")
         d.table(["Charge", "Amount", "GST", "Total", "Demanded", "Paid", "Due"], [[c["name"], _pdf.inr(c["amount_paise"]), _pdf.inr(c.get("gst_paise", 0)), _pdf.inr(c["total_paise"]), _pdf.inr(c.get("demanded_paise", 0)), _pdf.inr(c.get("paid_paise", 0)), _pdf.inr(c.get("demanded_paise", 0) - c.get("paid_paise", 0))] for c in b["other_charges"]], align_right=[1, 2, 3, 4, 5, 6])
@@ -573,12 +573,12 @@ async def build_allotment_pdf(booking_id: str, user: dict) -> tuple[bytes, str]:
     led = await db.ledger_entries.find({"booking_id": b["id"]}, {"_id": 0}).sort("seq", 1).to_list(None)
     if led:
         tu, tj = sum(e.get("udhar_paise", 0) for e in led), sum(e.get("jama_paise", 0) for e in led)
-        d.h2("Account position as on date (Udhar / Jama)")
-        d.table(["Date", "Particulars", "Udhar", "Jama", "Mode / Instrument", "Balance"],
+        d.h2("Account position as on date (Bill raised / Received)")
+        d.table(["Date", "Particulars", "Bill raised", "Received", "Mode / Instrument", "Balance"],
                 [[_pdf.fmt_date(e["date"]), f"{e['type'].replace('_', ' ').title()} — {e.get('note') or ''}", _pdf.inr(e["udhar_paise"]) if e.get("udhar_paise") else "", _pdf.inr(e["jama_paise"]) if e.get("jama_paise") else "",
                   " ".join(x for x in [(e.get("mode") if e.get("mode") != "Due" else None), e.get("instrument")] if x), _pdf.inr(e.get("balance_paise", 0))] for e in led] + [["", "Totals", _pdf.inr(tu), _pdf.inr(tj), "", _pdf.inr(tu - tj)]],
                 widths=[0.9, 3.2, 1.1, 1.1, 1.4, 1.1], align_right=[2, 3, 5])
-        d.totals([("Total Udhar", _pdf.inr(tu)), ("Total Jama", _pdf.inr(tj)), ("Balance (Udhar − Jama)", _pdf.inr(tu - tj)), ("Advance held", _pdf.inr((b.get("summary") or {}).get("advance_paise", 0)))])
+        d.totals([("Total bill raised", _pdf.inr(tu)), ("Total received", _pdf.inr(tj)), ("Balance (Received − Bill raised)", _pdf.inr(tj - tu) + (" Due" if tj < tu else " Advance" if tj > tu else " Settled")), ("Advance held", _pdf.inr((b.get("summary") or {}).get("advance_paise", 0)))])
     d.h2("Terms & conditions")
     for line in terms.split("\n"):
         d.p(line, _pdf.SMALL)

@@ -1,4 +1,4 @@
-"""Phase Q trends read model: monthly buckets per scope (company | project | customer) — collections (Jama cleared), demands raised (Udhar), outstanding at month end, bookings.
+"""Phase Q trends read model: monthly buckets per scope (company | project | customer) — collections (received cleared), demands raised (Udhar), outstanding at month end, bookings.
 Buckets are recomputed from source on read-model flush (dirty events) and backfilled once by a watermarked migration; the API serves buckets only."""
 from datetime import date
 

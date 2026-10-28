@@ -49,8 +49,17 @@ def advance(summary: dict) -> int:
     return s["advance_paise"] if "advance_paise" in s else sum(max(-s.get(k, 0), 0) for k in ("cash_due_paise", "account_due_paise", "other_charges_due_paise"))
 
 
+def two_sided(bill_raised_paise: int, received_paise: int) -> dict:
+    """English two-sided view used by API, CSV and PDF alike. Sign convention: balance = received − bill raised;
+    negative → "due" (shown red with minus), positive → "advance" (green), zero → "settled". Bill raised = Udhar side (demands,
+    other-charge demands, agreement increases); Received = Jama side (cleared receipts; reversals/refunds negative)."""
+    bal = received_paise - bill_raised_paise
+    return {"bill_raised_paise": bill_raised_paise, "received_paise": received_paise, "balance_signed_paise": bal,
+            "balance_status": "due" if bal < 0 else "advance" if bal > 0 else "settled"}
+
+
 def net_balance(summary: dict) -> int:
-    """Net balance = Outstanding − Advance held = Σ Udhar − Σ Jama (the single two-sided ledger figure)."""
+    """Net balance = Outstanding − Advance held = Σ bill raised − Σ received (the single two-sided ledger figure; positive = due)."""
     s = summary or {}
     return s["net_balance_paise"] if "net_balance_paise" in s else outstanding(s)["total_paise"] - advance(s)
 

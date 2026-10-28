@@ -250,7 +250,7 @@ async def manual_demand(body: ManualDemandIn, request: Request, user: dict = Dep
     if body.kind not in ("manual", "other_charge", "bounce"):
         raise ApiError(422, "kind must be manual | other_charge | bounce", "VALIDATION_ERROR")
     s = b.get("summary") or {}
-    effect = {"udhar_delta_paise": cash + acct, "balance_before_paise": s.get("balance_paise"), "balance_after_paise": (s.get("balance_paise") or 0) + cash + acct, "booking_number": b["booking_number"], "customer_name": b.get("customer_name")}
+    effect = {"udhar_delta_paise": cash + acct, "bill_raised_delta_paise": cash + acct, "balance_before_paise": s.get("balance_paise"), "balance_after_paise": (s.get("balance_paise") or 0) + cash + acct, "booking_number": b["booking_number"], "customer_name": b.get("customer_name")}
     if body.preview:
         return {"preview": True, "effect": effect}
     co = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0})
@@ -292,10 +292,10 @@ async def void_demand(demand_id: str, body: VoidIn, request: Request, user: dict
     L = (await booking_ledgers(b))["combined"]["summary"] if b else {}
     delta = L.get("total_udhar_paise", 0) - udhar_before  # real ledger delta: 0 when the ledger never carried it (e.g. demand already Cancelled)
     ttlcache.invalidate(f"dreg:{user['company_id']}")
-    after = {"demand_number": d["demand_number"], "status": "Voided", "reason": body.reason, "udhar_delta_paise": delta, "ledger_held_it": delta != 0}
+    after = {"demand_number": d["demand_number"], "status": "Voided", "reason": body.reason, "udhar_delta_paise": delta, "bill_raised_delta_paise": delta, "ledger_held_it": delta != 0}
     await write_audit(user, "demand.void", "booking", d["booking_id"], before={"demand_number": d["demand_number"], "status": d["status"], "total_paise": d["total_demand_paise"]}, after=after, ip=client_ip(request))
     await write_audit(user, "demand.void", "demand", demand_id, before={"status": d["status"], "total_paise": d["total_demand_paise"]}, after=after, ip=client_ip(request))
-    return {"ok": True, "demand_number": d["demand_number"], "udhar_delta_paise": delta, "ledger_held_it": delta != 0, "balance_after_paise": L.get("balance_paise"), "booking_number": (b or {}).get("booking_number")}
+    return {"ok": True, "demand_number": d["demand_number"], "udhar_delta_paise": delta, "bill_raised_delta_paise": delta, "ledger_held_it": delta != 0, "balance_after_paise": L.get("balance_paise"), "booking_number": (b or {}).get("booking_number")}
 
 
 @router.post("/{demand_id}/unvoid")

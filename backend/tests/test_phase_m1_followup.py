@@ -46,7 +46,7 @@ def test_statement_pdf_two_sided():
     r = requests.get(f"{API}/bookings/{b['id']}/statement.pdf", headers=h, timeout=60)
     assert r.status_code == 200 and r.content.startswith(b"%PDF")
     t = "".join(p.extract_text() for p in PdfReader(BytesIO(r.content)).pages)
-    for needle in ("Ledger (Udhar / Jama)", "Udhar", "Jama", "Mode / Instrument", "Balance", "Total Udhar", "Total Jama", "Advance held"):
+    for needle in ("Ledger (Bill raised / Received)", "Bill raised", "Received", "Mode / Instrument", "Balance", "Total bill raised", "Total received", "Advance held"):
         assert needle in t, needle
     r2 = requests.get(f"{API}/bookings/{b['id']}/statement.pdf", headers=h, timeout=60)
     assert r.content == r2.content  # deterministic bytes
@@ -62,6 +62,6 @@ def test_allotment_pdf_two_sided_position():
     r = requests.get(f"{API}/reports/allotment/{b['id']}?format=pdf", headers=h, timeout=60)
     assert r.status_code == 200 and r.content.startswith(b"%PDF")
     t = "".join(p.extract_text() for p in PdfReader(BytesIO(r.content)).pages)
-    for needle in ("Account position", "Udhar", "Jama", "Total Udhar", "Total Jama", "Advance held"):
+    for needle in ("Account position", "Bill raised", "Received", "Total bill raised", "Total received", "Advance held"):
         assert needle in t, needle
     assert r.content == requests.get(f"{API}/reports/allotment/{b['id']}?format=pdf", headers=h, timeout=60).content
