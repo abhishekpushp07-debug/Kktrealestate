@@ -13,6 +13,7 @@ import { Segmented } from "@/components/v2/CustomerBits";
 import { DateInput } from "@/components/common/DateInput";
 import { cn } from "@/lib/utils";
 import { FILTERS, permFor, GROUP_LABEL, GROUP_ORDER } from "@/lib/reportsMeta";
+import { BalanceCell } from "@/components/common/BalanceCell";
 const GROUP_ICON = { Finance: Receipt, Sales: Users, Construction: Building2, Operations: Wrench, Admin: Activity };
 
 const COLORS = ["#0A0C10", "#C9A227", "#5B7F6A", "#B8573E", "#8E95A3", "#2A313C"];
@@ -31,6 +32,7 @@ const PRESET_DATES = {
 
 function cell(col, v) {
   if (v == null || v === "") return "—";
+  if (col.key === "balance_signed_paise") return <BalanceCell balance={v / 100} chip={false} />;
   if (col.type === "money") return inr(v / 100);
   if (col.type === "pct") return `${v}%`;
   if (col.type === "date") return fmtDate(v);
@@ -129,6 +131,7 @@ export default function Reports() {
               {has("from_date") && <Segmented options={Object.keys(PRESET_DATES).map((k) => ({ value: k, label: k }))} value={range} onChange={(v) => { setRange(v); setActivePreset(null); setF((p) => ({ ...p, ...PRESET_DATES[v]() })); }} testId="rf-range" />}
               {has("from_date") && range === "Custom" && <><DateInput value={f.from_date || ""} onChange={set("from_date")} className="input !h-10 w-40" data-testid="rf-from" /><span className="text-txt-muted">→</span><DateInput value={f.to_date || ""} onChange={set("to_date")} className="input !h-10 w-40" data-testid="rf-to" /></>}
               {has("from_date") && range !== "Custom" && <span className="text-sm text-txt-secondary" data-testid="rf-range-text">{fmtDate(f.from_date)} – {fmtDate(f.to_date)}</span>}
+              {has("as_of") && <input type="date" className="input h-9" value={f.as_of || ""} onChange={set("as_of")} data-testid="rf-as-of" aria-label="As of" />}
               {has("project_id") && <Sel value={f.project_id || ""} onChange={set("project_id")} testId="rf-project"><option value="">All projects</option>{(projects?.items || []).map((p) => <option key={p.id} value={p.id}>{p.code} · {p.name}</option>)}</Sel>}
               {has("mode") && <Sel value={f.mode || ""} onChange={set("mode")} testId="rf-mode"><option value="">All modes</option>{["CASH", "UPI", "NEFT_RTGS", "CHEQUE", "DD", "LOAN_DISBURSEMENT"].map((m) => <option key={m}>{m}</option>)}</Sel>}
               {has("category") && <Sel value={f.category || ""} onChange={set("category")} testId="rf-category"><option value="">All ledgers</option>{["Cash", "Account", "Other charges"].map((m) => <option key={m}>{m}</option>)}</Sel>}

@@ -756,6 +756,9 @@
  "GET /api/reports/presets": [
   "reports.collections.view"
  ],
+ "GET /api/reports/project-statement": [
+  "reports.project_statement.view"
+ ],
  "GET /api/reports/receivables-forecast": [
   "reports.receivables_forecast.view"
  ],

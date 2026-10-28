@@ -53,6 +53,7 @@ REPORTS = [
     {"key": "masked-inventory", "name": "Masked Inventory", "group": "Sales", "purpose": "Units whose displayed status differs from the real one (Show as Sold / Hidden overrides) with reason, who and since when. Requires real-status permission."},
     # Construction
     {"key": "construction-vs-plan", "name": "Construction vs Plan", "group": "Construction", "purpose": "Stage-plan progress per tower, stage demands vs collected, next stage expected bill raised."},
+    {"key": "project-statement", "name": "Project Statement", "group": "Finance", "purpose": "Per tower: every customer with bill raised, received and balance (Due / Advance); then tower-wise sales & inventory summary with grand totals."},
     {"key": "construction-progress", "name": "Construction progress (towers)", "group": "Construction", "purpose": "Per-tower stage status, photos and demands per stage."},
     # Operations
     {"key": "service-sla", "name": "Service SLA", "group": "Operations", "purpose": "Tickets by category / status, SLA met vs breached, ageing, ratings."},

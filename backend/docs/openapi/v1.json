@@ -42710,6 +42710,116 @@
     ]
    }
   },
+  "/api/reports/project-statement": {
+   "get": {
+    "operationId": "project_statement_api_reports_project_statement_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "project_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Project Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "block_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Block Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "as_of",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "As Of"
+      }
+     },
+     {
+      "in": "query",
+      "name": "format",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Format"
+      }
+     },
+     {
+      "in": "query",
+      "name": "download",
+      "required": false,
+      "schema": {
+       "default": 0,
+       "title": "Download",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Project Statement",
+    "tags": [
+     "reports"
+    ]
+   }
+  },
   "/api/reports/receivables-forecast": {
    "get": {
     "operationId": "receivables_forecast_api_reports_receivables_forecast_get",
@@ -46155,7 +46265,7 @@
   },
   "/api/trends": {
    "get": {
-    "description": "Per-month: collections (Jama cleared), demands (Udhar raised), outstanding_eom, bookings. \u03a3 collections == Collections report for the same range.",
+    "description": "Per-month: collections (received cleared), demands (bills raised), outstanding_eom, bookings. \u03a3 collections == Collections report for the same range.",
     "operationId": "get_trends_api_trends_get",
     "parameters": [
      {

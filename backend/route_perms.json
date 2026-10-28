@@ -2208,6 +2208,15 @@
     "masters.project.edit"
    ]
   },
+  "project_statement:GET /project-statement": {
+   "codes": [
+    "reports.project_statement.view"
+   ],
+   "fn": "project_statement",
+   "legacy": [
+    "reports.project_statement.view"
+   ]
+  },
   "projects:GET ": {
    "codes": [
     "masters.project.view"

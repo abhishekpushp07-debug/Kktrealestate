@@ -482,6 +482,7 @@ async def metrics(user: dict = Depends(require("admin.system_health.view"))):
 
 
 from routers import ops as _ops
+from routers import project_statement as _project_statement
 from routers import reports_i as _reports_i
 from routers import reports_n as _reports_n
 from routers import docgen as _docgen
@@ -497,7 +498,7 @@ from routers import access as _access
 for r in (_ops.router, _access.router, _exports.router, _files.router, _inventory.router, auth.router, users.router, roles.router, master.router, projects.router, rate_cards.router, blocks.router, masters_plus.router, flats.router, parking.router,
           settings.router, audit.router, dashboard.router, search.router, imports.router,
           customers.router, leads.router, documents.router, bookings.router, milestones.router, payments.router, roznamcha.router, admin.router, cms.router, public.router, reports.router, notifications.router, pdfs.router, dashboard_widgets.router, portal.router, portal.mgmt, support.router, construction.router, visits.pub, visits.router,
-          catalogues.router, project_setup.router, crm.router, bootstrap.router, home.router, propagation.router, _reports_i.router, _reports_n.router, _docgen.router, _demand_register.router, _messaging.router, _trends.router, _load_test.router):
+          catalogues.router, project_setup.router, crm.router, bootstrap.router, home.router, propagation.router, _reports_i.router, _project_statement.router, _reports_n.router, _docgen.router, _demand_register.router, _messaging.router, _trends.router, _load_test.router):
     api_router.include_router(r)
 
 app.include_router(api_router)
