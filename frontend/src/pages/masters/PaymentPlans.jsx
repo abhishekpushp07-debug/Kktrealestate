@@ -11,6 +11,7 @@ import { HistoryButton } from "@/components/common/HistoryTimeline";
 import { WhereUsedButton } from "./WhereUsed";
 import { useProjectTowers } from "./useProjectTowers";
 import { useRowKeys } from "@/hooks/useRowKeys";
+import { QuickAddButton, useQuickCreate } from "@/components/common/QuickCreate";
 
 export default function PaymentPlans() {
   const { can } = useAuth();
@@ -40,9 +41,9 @@ export default function PaymentPlans() {
   );
 }
 
-function PaymentPlanForm({ onClose, onSaved }) {
+export function PaymentPlanForm({ onClose, onSaved, initial }) {
   const [name, setName] = useState("");
-  const { projects, towers, projectId, setProjectId, blockId, setBlockId } = useProjectTowers();
+  const { projects, towers, projectId, setProjectId, blockId, setBlockId, addProject, addTower } = useProjectTowers(initial?.project_id, initial?.block_id);
   const [stagePlans, setStagePlans] = useState([]);
   const [spId, setSpId] = useState("");
   const [rows, setRows] = useState([]);
@@ -62,16 +63,16 @@ function PaymentPlanForm({ onClose, onSaved }) {
   const valid = name.trim().length >= 2 && projectId && blockId && spId && rows.length > 0 && total === 100 && dupes.length === 0;
   const save = async () => {
     setErr(null);
-    try { const r = await api.post("/payment-plans/structured", { name: name.trim(), project_id: projectId, block_id: blockId, stage_plan_id: spId, rows: rows.map((x) => ({ stage_id: x.stage_id, percent: parseFloat(x.percent) || 0 })), advanced: advanced.map((a) => ({ ...a, percent: parseFloat(a.percent) || 0, trigger_days: a.trigger_days ? Number(a.trigger_days) : null })) }); toast.success(`Payment plan "${r.data.name}" saved — available in the booking wizard for this tower`); onSaved(); }
+    try { const r = await api.post("/payment-plans/structured", { name: name.trim(), project_id: projectId, block_id: blockId, stage_plan_id: spId, rows: rows.map((x) => ({ stage_id: x.stage_id, percent: parseFloat(x.percent) || 0 })), advanced: advanced.map((a) => ({ ...a, percent: parseFloat(a.percent) || 0, trigger_days: a.trigger_days ? Number(a.trigger_days) : null })) }); toast.success(`Payment plan "${r.data.name}" saved — available in the booking wizard for this tower`); onSaved(r.data); }
     catch (e) { setErr(errMsg(e)); }
   };
   return (
     <div className="card space-y-4 !p-5" data-testid="payment-plan-form">
       <div className="grid gap-3 md:grid-cols-4">
         <label className="block text-sm"><span className="label-xs">Plan name *</span><Input value={name} onChange={(e) => { setName(e.target.value); setTouched(true); }} onBlur={() => setTouched(true)} placeholder="Construction Linked Plan - 10x10" data-testid="pp-name" />{touched && name.trim().length < 2 && <p className="mt-1 text-[11px] font-semibold text-brick" data-testid="pp-name-error">Name is required</p>}</label>
-        <label className="block text-sm"><span className="label-xs">Project *</span><select className="h-10 w-full rounded-md border px-3 text-sm" value={projectId} onChange={(e) => { setProjectId(e.target.value); setBlockId(""); setTouched(true); }} data-testid="pp-project"><option value="">Select project…</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>{touched && !projectId && <p className="mt-1 text-[11px] font-semibold text-brick" data-testid="pp-project-error">Project is required</p>}</label>
-        <label className="block text-sm"><span className="label-xs">Tower *</span><select className="h-10 w-full rounded-md border px-3 text-sm" value={blockId} onChange={(e) => setBlockId(e.target.value)} disabled={!projectId} data-testid="pp-tower"><option value="">Select tower…</option>{towers.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>{touched && projectId && !blockId && <p className="mt-1 text-[11px] font-semibold text-brick" data-testid="pp-tower-error">Tower is required</p>}</label>
-        <label className="block text-sm"><span className="label-xs">Construction Stage Plan *</span><select className="h-10 w-full rounded-md border px-3 text-sm" value={spId} onChange={(e) => setSpId(e.target.value)} disabled={!blockId} data-testid="pp-stage-plan"><option value="">{blockId && !stagePlans.length ? "No stage plan for this tower — create one first" : "Select…"}</option>{stagePlans.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>{touched && blockId && !spId && <p className="mt-1 text-[11px] font-semibold text-brick" data-testid="pp-stage-plan-error">Stage plan is required</p>}</label>
+        <label className="block text-sm"><span className="label-xs">Project *</span><select className="h-10 w-full rounded-md border px-3 text-sm" value={projectId} onChange={(e) => { setProjectId(e.target.value); setBlockId(""); setTouched(true); }} data-testid="pp-project"><option value="">Select project…</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select><QuickAddButton kind="project" onCreated={addProject} testId="pp-quick-add-project" />{touched && !projectId && <p className="mt-1 text-[11px] font-semibold text-brick" data-testid="pp-project-error">Project is required</p>}</label>
+        <label className="block text-sm"><span className="label-xs">Tower *</span><select className="h-10 w-full rounded-md border px-3 text-sm" value={blockId} onChange={(e) => setBlockId(e.target.value)} disabled={!projectId} data-testid="pp-tower"><option value="">Select tower…</option>{towers.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select><QuickAddButton kind="tower" prefill={{ project_id: projectId }} disabled={!projectId} onCreated={addTower} testId="pp-quick-add-tower" />{touched && projectId && !blockId && <p className="mt-1 text-[11px] font-semibold text-brick" data-testid="pp-tower-error">Tower is required</p>}</label>
+        <label className="block text-sm"><span className="label-xs">Construction Stage Plan *</span><select className="h-10 w-full rounded-md border px-3 text-sm" value={spId} onChange={(e) => setSpId(e.target.value)} disabled={!blockId} data-testid="pp-stage-plan"><option value="">{blockId && !stagePlans.length ? "No stage plan for this tower — create one first" : "Select…"}</option>{stagePlans.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select><QuickAddButton kind="stage_plan" prefill={{ project_id: projectId, block_id: blockId }} disabled={!blockId} onCreated={(p) => { setStagePlans((a) => [...a, p]); setSpId(p.id); }} testId="pp-quick-add-stage-plan" />{touched && blockId && !spId && <p className="mt-1 text-[11px] font-semibold text-brick" data-testid="pp-stage-plan-error">Stage plan is required</p>}</label>
       </div>
       {!touched && <p className="text-xs text-txt-secondary" data-testid="pp-required-hint">Name, Project, Tower and Stage plan are required.</p>}
       {sp && <div data-testid="pp-rows">

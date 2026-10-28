@@ -39,7 +39,7 @@ export default function Towers() {
   );
 }
 
-function TowerForm({ tower, projects, onClose, onSaved }) {
+export function TowerForm({ tower, projects, onClose, onSaved }) {
   const isNew = !tower.id;
   const [f, setF] = useState({ project_id: tower.project_id || "", name: tower.name || "", code: tower.code || "", block_type_id: tower.block_type_id || "", floors: tower.floors || 4, flats_per_floor: tower.flats_per_floor || 4, floor_start: tower.floor_start ?? 1, numbering_pattern: tower.numbering_pattern || "{block}-{floor}{pos2}", rate_per_sqft: tower.rate_per_sqft ?? "", default_cash_percent: tower.default_cash_percent ?? "", stage_plan_id: "" });
   const [types, setTypes] = useState([]);
@@ -61,6 +61,7 @@ function TowerForm({ tower, projects, onClose, onSaved }) {
         const r = await api.post("/blocks", body);
         if (f.stage_plan_id) await api.post(`/stage-plans/${f.stage_plan_id}/copy`, { block_ids: [r.data.id] });
         toast.success(`Tower ${r.data.name} created — ${r.data.flats_count ?? r.data.total_flats ?? ""} flats generated`);
+        onSaved(r.data); return;
       } else {
         await api.patch(`/blocks/${tower.id}`, { name: f.name.trim(), block_type_id: f.block_type_id, ...(f.rate_per_sqft !== "" ? { rate_per_sqft: Number(f.rate_per_sqft) } : {}), ...(f.default_cash_percent !== "" ? { default_cash_percent: Number(f.default_cash_percent) } : {}) });
         toast.success("Tower updated");

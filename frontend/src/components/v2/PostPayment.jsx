@@ -13,6 +13,7 @@ import { Field, Money, Num, Skeleton, StatusPill } from "@/components/v2";
 import { Select } from "@/components/v2/Select";
 import { Avatar, Segmented, usePeople } from "@/components/v2/CustomerBits";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { QuickAddButton, useQuickCreate } from "@/components/common/QuickCreate";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
@@ -33,6 +34,7 @@ function BookingPicker({ value, onChange, customerId }) {
   return (
     <div>
       <label className="relative block"><Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-txt-muted" /><input autoFocus className="input !pl-10" placeholder="Customer name, phone, flat or booking no…" value={q} onChange={(e) => setQ(e.target.value)} data-testid="pp-booking-search" /></label>
+      <div className="mt-2 flex items-center gap-2 text-xs text-txt-muted"><QuickAddButton kind="customer" onCreated={(c) => { setQ(c.phone || c.full_name || ""); toast.info("Customer created — a booking is needed before a payment can be posted"); }} testId="pp-quick-add-customer" /><Link to="/bookings/new" className="btn btn-ghost btn-sm" data-testid="pp-new-booking-link">New booking →</Link><span>A payment needs a booking; bookings are created in the wizard.</span></div>
       <ul className="mt-2 max-h-64 divide-y divide-warm-100 overflow-y-auto rounded-xl border border-warm-200 bg-white" data-testid="pp-booking-results">{items.map((b) => <li key={b.id}><button type="button" onClick={() => onChange(b)} className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-warm-50" data-testid={`pp-pick-${b.booking_number}`}><Avatar name={b.customer_name} size={30} /><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-ink-950">{b.customer_name}</p><p className="truncate text-xs text-txt-secondary">{b.booking_number} · {b.project_code} {b.flat_snapshot?.flat_number}</p></div><Money value={Math.max(b.summary?.due_paise || 0, 0) / 100} short className="text-sm text-brick" /></button></li>)}{items.length === 0 && <li className="px-3 py-6 text-center text-xs text-txt-muted">No active bookings match.</li>}</ul>
     </div>
   );

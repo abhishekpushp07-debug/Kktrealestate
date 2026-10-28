@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { HistoryButton } from "@/components/common/HistoryTimeline";
 import { WhereUsedButton } from "./WhereUsed";
 import { useProjectTowers } from "./useProjectTowers";
+import { QuickAddButton, useQuickCreate } from "@/components/common/QuickCreate";
 
 export default function StagePlans() {
   const { can } = useAuth();
@@ -43,9 +44,9 @@ export default function StagePlans() {
   );
 }
 
-function StagePlanForm({ plan, stages, onClose, onSaved, onStageAdded }) {
+export function StagePlanForm({ plan, stages, onClose, onSaved, onStageAdded }) {
   const [name, setName] = useState(plan.name || "");
-  const { projects, towers, projectId, setProjectId, blockId, setBlockId } = useProjectTowers(plan.project_id, plan.block_id);
+  const { projects, towers, projectId, setProjectId, blockId, setBlockId, addProject, addTower } = useProjectTowers(plan.project_id, plan.block_id);
   const [sel, setSel] = useState(plan.stage_ids || []);
   const [newStage, setNewStage] = useState("");
   const [copyOpen, setCopyOpen] = useState(false);
@@ -56,7 +57,7 @@ function StagePlanForm({ plan, stages, onClose, onSaved, onStageAdded }) {
   const addStage = async () => { if (!newStage.trim()) return; try { const r = await api.post("/master/construction-stages", { name: newStage.trim(), code: newStage.trim().toUpperCase().replace(/[^A-Z0-9]+/g, "_").slice(0, 20), seq_hint: 50 }); toast.success(`Stage "${r.data.name}" added to the master`); setNewStage(""); await onStageAdded(); setSel((s) => [...s, r.data.id]); } catch (e) { toast.error(errMsg(e)); } };
   const save = async () => {
     setErr(null);
-    try { const body = { name, project_id: projectId, block_id: blockId, stage_ids: sel }; if (plan.id) await api.patch(`/stage-plans/${plan.id}`, body); else await api.post("/stage-plans", body); toast.success(`Stage plan "${name}" saved — tower sequence updated`); onSaved(); }
+    try { const body = { name, project_id: projectId, block_id: blockId, stage_ids: sel }; const r = plan.id ? await api.patch(`/stage-plans/${plan.id}`, body) : await api.post("/stage-plans", body); toast.success(`Stage plan "${name}" saved — tower sequence updated`); onSaved(r.data); }
     catch (e) { setErr(errMsg(e)); }
   };
   const copyTo = async (ids) => { try { const r = await api.post(`/stage-plans/${plan.id}/copy`, { block_ids: ids }); toast.success(`Copied to ${r.data.copied} tower(s)`); setCopyOpen(false); onSaved(); } catch (e) { toast.error(errMsg(e)); } };
@@ -64,8 +65,8 @@ function StagePlanForm({ plan, stages, onClose, onSaved, onStageAdded }) {
     <div className="card space-y-4 !p-5" data-testid="stage-plan-form">
       <div className="grid gap-3 md:grid-cols-3">
         <label className="block text-sm"><span className="label-xs">Plan name *</span><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. zed" data-testid="stage-plan-name" /></label>
-        <label className="block text-sm"><span className="label-xs">Project *</span><select className="h-10 w-full rounded-md border px-3 text-sm" value={projectId} onChange={(e) => { setProjectId(e.target.value); setBlockId(""); }} disabled={!!plan.id} data-testid="stage-plan-project"><option value="">Select project…</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
-        <label className="block text-sm"><span className="label-xs">Tower *</span><select className="h-10 w-full rounded-md border px-3 text-sm" value={blockId} onChange={(e) => setBlockId(e.target.value)} disabled={!projectId || !!plan.id} data-testid="stage-plan-tower"><option value="">Select tower…</option>{towers.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
+        <label className="block text-sm"><span className="label-xs">Project *</span><select className="h-10 w-full rounded-md border px-3 text-sm" value={projectId} onChange={(e) => { setProjectId(e.target.value); setBlockId(""); }} disabled={!!plan.id} data-testid="stage-plan-project"><option value="">Select project…</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>{!plan.id && <QuickAddButton kind="project" onCreated={addProject} testId="stage-plan-quick-add-project" />}</label>
+        <label className="block text-sm"><span className="label-xs">Tower *</span><select className="h-10 w-full rounded-md border px-3 text-sm" value={blockId} onChange={(e) => setBlockId(e.target.value)} disabled={!projectId || !!plan.id} data-testid="stage-plan-tower"><option value="">Select tower…</option>{towers.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>{!plan.id && <QuickAddButton kind="tower" prefill={{ project_id: projectId }} disabled={!projectId} onCreated={addTower} testId="stage-plan-quick-add-tower" />}</label>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         <div><p className="label-xs mb-1">Stages (multi-select from Stage master)</p>

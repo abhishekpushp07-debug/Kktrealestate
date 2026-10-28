@@ -27,7 +27,7 @@ export default function ProjectsMaster() {
   );
 }
 
-function ProjectForm({ project, onClose, onSaved }) {
+export function ProjectForm({ project, onClose, onSaved }) {
   const isNew = !project.id;
   const [f, setF] = useState({ name: project.name || "", code: project.code || "", project_type: project.project_type || "Residential", description: project.description || "", rera_number: project.rera_number || "", city: project.address?.city || "" });
   const [err, setErr] = useState(null);
@@ -35,7 +35,7 @@ function ProjectForm({ project, onClose, onSaved }) {
   const save = async () => {
     setErr(null);
     const body = { name: f.name.trim(), project_type: f.project_type, description: f.description || null, rera_number: f.rera_number || null, address: { ...(project.address || {}), city: f.city || null } };
-    try { if (isNew) await api.post("/projects", { ...body, code: f.code.trim().toUpperCase() }); else await api.patch(`/projects/${project.id}`, { ...body, version: project.version }); toast.success("Project saved"); onSaved(); } catch (e) { setErr(errMsg(e)); }
+    try { const r = isNew ? await api.post("/projects", { ...body, code: f.code.trim().toUpperCase() }) : await api.patch(`/projects/${project.id}`, { ...body, version: project.version }); toast.success("Project saved"); onSaved(r.data); } catch (e) { setErr(errMsg(e)); }
   };
   return (
     <div className="card space-y-3 !p-5" data-testid="project-form">

@@ -16,6 +16,7 @@ import { Link } from "react-router-dom";
 import { inr, num, fmtRelative } from "@/lib/format";
 import { useUnsavedGuard } from "@/hooks/useUnsavedGuard";
 import { cn } from "@/lib/utils";
+import { QuickAddButton, useQuickCreate } from "@/components/common/QuickCreate";
 
 const CustomerForm = lazy(() => import("@/components/v2/QuickCustomerSheet"));
 const SchedulePreview = lazy(() => import("@/components/common/PaymentSchedule").then((m) => ({ default: m.SchedulePreview })));
@@ -66,9 +67,11 @@ export default function BookingWizard() {
   const resume = () => { const d = draft; setStep(d.step); setProjectId(d.projectId); setBlockId(d.blockId); setFlat(d.flat); setCustomer(d.customer); setAgr(d.agr); setCharges(d.charges || []); setSlots(d.slots || []); setBookingDate(d.bookingDate); setRemarks(d.remarks || ""); setPlanId(d.planId || ""); setAcceptMode(d.acceptMode || "In person"); setDraft(null); };
   const discard = () => { localStorage.removeItem(draftKey); setDraft(null); };
   useUnsavedGuard(step > 0 && !busy, "Your booking draft is saved locally, but unsent changes will be lost if you leave. Continue?");
-  const { data: projects } = useFetch("/projects?page_size=50");
-  const { data: blocks } = useFetch(projectId ? `/blocks?project_id=${projectId}&page_size=50` : null, [projectId]);
-  const { data: grid } = useFetch(blockId ? `/blocks/${blockId}/grid?bookable_for=${encodeURIComponent(customer?.id || "")}` : null, [blockId, customer?.id]);
+  const { data: projects, reload: reloadProjects } = useFetch("/projects?page_size=50");
+  const { data: blocks, reload: reloadBlocks } = useFetch(projectId ? `/blocks?project_id=${projectId}&page_size=50` : null, [projectId]);
+  const { data: grid, reload: reloadGrid } = useFetch(blockId ? `/blocks/${blockId}/grid?bookable_for=${encodeURIComponent(customer?.id || "")}` : null, [blockId, customer?.id]);
+  const qcProject = useQuickCreate("project", {}, async (p) => { await reloadProjects(); setProjectId(p.id); setBlockId(null); setFlat(null); });
+  const qcTower = useQuickCreate("tower", { project_id: projectId }, async (t) => { await reloadBlocks(); setBlockId(t.id); setFlat(null); });
   const { data: parking } = useFetch(projectId ? `/parking?project_id=${projectId}&page_size=100` : null, [projectId]);
   const { items: chargeTypes } = useMasterOptions("charge-types");
   const { data: company } = useFetch("/settings/company");
@@ -115,10 +118,10 @@ export default function BookingWizard() {
       <Card className="min-w-0 !p-5 sm:!p-6">
         <div className="mb-5"><p className="label">Step {step + 1}</p><h2 className="mt-1 font-display text-2xl text-ink-950">{STEPS[step]}</h2><p className="mt-1 text-sm text-txt-secondary">{STEP_DESC[step]}</p></div>
         {step === 0 && <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Project" required><Combobox options={(projects?.items || []).map((p) => ({ value: p.id, label: p.name, sub: p.code }))} value={projectId} onChange={(v) => { setProjectId(v); setBlockId(null); setFlat(null); }} allowAdd={false} testId="wiz-project" /></Field>
-          <Field label="Tower" required><Combobox options={(blocks?.items || []).map((b) => ({ value: b.id, label: b.name, sub: `${b.inventory?.Available ?? 0} available · ${b.construction_percent}%` }))} value={blockId} onChange={(v) => { setBlockId(v); setFlat(null); }} disabled={!projectId} allowAdd={false} testId="wiz-block" /></Field>
+          <Field label="Project" required><Combobox options={(projects?.items || []).map((p) => ({ value: p.id, label: p.name, sub: p.code }))} value={projectId} onChange={(v) => { setProjectId(v); setBlockId(null); setFlat(null); }} allowAdd={false} testId="wiz-project" onCreateNew={qcProject.onCreateNew} createLabel={qcProject.createLabel} />{qcProject.node}</Field>
+          <Field label="Tower" required><Combobox options={(blocks?.items || []).map((b) => ({ value: b.id, label: b.name, sub: `${b.inventory?.Available ?? 0} available · ${b.construction_percent}%` }))} value={blockId} onChange={(v) => { setBlockId(v); setFlat(null); }} disabled={!projectId} allowAdd={false} testId="wiz-block" onCreateNew={projectId ? qcTower.onCreateNew : undefined} createLabel={qcTower.createLabel} />{qcTower.node}</Field>
         </div>}
-        {step === 1 && <Suspense fallback={<p className="text-sm text-txt-muted">Loading grid…</p>}><UnitGrid grid={grid} flat={flat} setFlat={setFlat} flatQ={flatQ} setFlatQ={setFlatQ} /></Suspense>}
+        {step === 1 && <div><div className="mb-2 flex justify-end"><QuickAddButton kind="flat" prefill={{ project_id: projectId, block_id: blockId }} onCreated={async (f) => { await reloadGrid(); setFlat(f); }} testId="wiz-quick-add-flat" className="btn btn-secondary btn-sm" /></div><Suspense fallback={<p className="text-sm text-txt-muted">Loading grid…</p>}><UnitGrid grid={grid} flat={flat} setFlat={setFlat} flatQ={flatQ} setFlatQ={setFlatQ} /></Suspense></div>}
         {step === 2 && <div>
           <div className="flex flex-col gap-2 sm:flex-row"><input value={custSearch} onChange={(e) => setCustSearch(e.target.value)} placeholder="Search by phone, name or code…" className="input sm:max-w-md" data-testid="wiz-customer-search" />{can("sales.customer.edit") && <button type="button" className="btn btn-secondary" onClick={() => setNewCust(true)} data-testid="wiz-new-customer"><Plus className="h-4 w-4" />New customer</button>}</div>
           <div className="mt-4 grid gap-3 md:grid-cols-2">{custResults.map((c) => <button key={c.id} onClick={() => setCustomer(c)} className={cn("card card-hover flex items-center gap-3 !p-4 text-left", customer?.id === c.id && "!border-ink-950 ring-1 ring-ink-950")} data-testid={`wiz-customer-${c.customer_code}`}><Avatar name={c.full_name} size={36} /><div className="min-w-0"><p className="truncate text-sm font-semibold text-ink-950">{c.salutation} {c.full_name}</p><p className="truncate text-xs text-txt-secondary">{c.customer_code} · {c.phone} · KYC {c.kyc_status}</p></div></button>)}</div>
@@ -149,6 +152,7 @@ export default function BookingWizard() {
           <Field label="Booking date" required><DateInput value={bookingDate} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setBookingDate(e.target.value)} data-testid="wiz-date" /></Field>
         </div>}
         {step === 4 && <div data-testid="wiz-plan-step">
+          <div className="mb-2 flex justify-end"><QuickAddButton kind="payment_plan" prefill={{ project_id: projectId, block_id: blockId }} onCreated={(p) => api.get(`/projects/${projectId}/blocks/${blockId}/payment-plans`).then((r) => { setPlans(r.data.items); setPlanId(p.id); })} testId="wiz-quick-add-plan" className="btn btn-secondary btn-sm" /></div>
           <FieldError name="payment_plan_id" fields={fe.fields} />
           {plans === null ? <p className="text-sm text-txt-muted">Loading plans…</p> : plans.length === 0 ? <div className="rounded-xl bg-amber2-50 px-4 py-3 text-sm text-amber2" data-testid="wiz-plan-none">No payment plan assigned to this tower — assign one under Project → Setup → Payment plans. Booking will proceed without a plan (no automatic dues).</div> : <div className="grid min-w-0 gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
             <div className="space-y-3" data-testid="wiz-plan-list">{plans.map((p) => <button type="button" key={p.id} onClick={() => setPlanId(p.id)} className={cn("card card-hover w-full !p-4 text-left", planId === p.id && "!border-ink-950 ring-1 ring-ink-950")} data-testid={`wiz-plan-${p.code}`}><div className="flex items-start justify-between gap-2"><p className="font-display text-base font-semibold text-ink-950">{p.name}</p>{p.is_default && <span className="pill bg-gold-light text-[#8a6d12]">Default</span>}</div><p className="mt-1 text-xs text-txt-secondary">{p.stage_plan_name ? <span className="rounded-full bg-gold-light px-2 py-0.5 text-[10px] font-bold text-[#8a6d12]" data-testid={`wiz-plan-${p.code}-stage-plan`}>Stage plan: {p.stage_plan_name}</span> : p.plan_type} · {p.installments.map((i) => `${i.name} ${i.percent}%`).join(" + ")}</p>{p.description && <p className="mt-1 text-xs text-txt-muted">{p.description}</p>}</button>)}</div>

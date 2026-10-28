@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { Check, ChevronsUpDown } from "lucide-react";
+import { Check, ChevronsUpDown, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
-export function Combobox({ options = [], value, onChange, placeholder = "Select…", testId, disabled, className, ariaLabel }) {
+export function Combobox({ options = [], value, onChange, placeholder = "Select…", testId, disabled, className, ariaLabel, onCreateNew, createLabel = "Create new…" }) {
   const [open, setOpen] = useState(false);
   const selected = options.find((o) => o.value === value);
   return (
@@ -32,6 +32,7 @@ export function Combobox({ options = [], value, onChange, placeholder = "Select�
                 </CommandItem>
               ))}
             </CommandGroup>
+            {onCreateNew && <CommandGroup><CommandItem value="__create_new__" onSelect={() => { setOpen(false); onCreateNew(); }} data-testid={testId ? `${testId}-create-new` : "combobox-create-new"} className="font-semibold text-ink-950"><Plus className="mr-2 h-4 w-4 text-gold" />{createLabel}</CommandItem></CommandGroup>}
           </CommandList>
         </Command>
       </PopoverContent>

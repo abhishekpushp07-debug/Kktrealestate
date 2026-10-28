@@ -43,8 +43,8 @@ export function GenericMasterForm({ cfg, item, open, onOpenChange, onSaved, exis
       payload[f.name] = v;
     });
     try {
-      item ? await api.patch(`/master/${cfg.kind}/${item.id}`, payload) : await api.post(`/master/${cfg.kind}`, payload);
-      toast.success(item ? "Updated" : addAnother ? `Created · ${payload[nameKey] || ""} — add the next one` : "Created"); onSaved();
+      const r = item ? await api.patch(`/master/${cfg.kind}/${item.id}`, payload) : await api.post(`/master/${cfg.kind}`, payload);
+      toast.success(item ? "Updated" : addAnother ? `Created · ${payload[nameKey] || ""} — add the next one` : "Created"); onSaved(r.data);
       if (addAnother) { setForm(init); setSaved((n) => n + 1); document.querySelector('[data-testid="master-form-sheet"] input')?.focus(); } else onOpenChange(false);
     } catch (err) { toast.error(errMsg(err)); } finally { setBusy(false); }
   };

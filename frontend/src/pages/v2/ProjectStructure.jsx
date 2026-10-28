@@ -10,6 +10,7 @@ import { TowerNode } from "@/components/structure/TowerNode";
 import { AddFloorsSheet, AddFlatSheet } from "@/components/structure/StructureSheets";
 import { cn } from "@/lib/utils";
 import { ConnectedTo } from "@/components/common/ConnectedTo";
+import { QuickAddButton, useQuickCreate } from "@/components/common/QuickCreate";
 
 function Checklist({ r, towers, onFix }) {
   const items = [...r.project_checks.map((c) => ({ ...c, scope: "Project" })), ...towers.flatMap((t) => t.checks.map((c) => ({ ...c, scope: t.name, block_id: t.id })))];
@@ -33,6 +34,7 @@ export default function ProjectStructure() {
   const { can } = useAuth();
   const { data, loading, reload } = useFetch(`/projects/${id}/structure`);
   const [sheet, setSheet] = useState(null); // {kind:"floors"|"flat", tower, floor?}
+  const qcTower = useQuickCreate("tower", { project_id: id }, () => reload());
   const onFix = (fix) => { const t = data.towers.find((x) => x.id === fix.block_id); if (t) setSheet({ kind: "floors", tower: t }); };
   if (loading || !data) return <div className="space-y-4" data-testid="structure-loading"><Skeleton className="h-24 rounded-2xl" /><Skeleton className="h-96 rounded-2xl" /></div>;
   const p = data.project;
@@ -46,7 +48,7 @@ export default function ProjectStructure() {
         <StatusPill status={p.status} />
       </header>
       <ContextActions testId="structure-context-actions" items={[
-        { label: "Add tower", to: `/projects/${id}/setup?section=towers`, perm: "masters.tower.create", primary: true, icon: Building2 },
+        { label: "Add tower", onClick: qcTower.onCreateNew, perm: "masters.tower.create", primary: true, icon: Building2 },
         data.towers[0] ? { label: "Add floors", onClick: () => setSheet({ kind: "floors", tower: data.towers[0] }), perm: "masters.tower.edit", icon: Layers } : null,
         data.towers[0] ? { label: "Add flat", onClick: () => setSheet({ kind: "flat", tower: data.towers[0] }), perm: "masters.flat.create", icon: Plus } : null,
         { label: "Stage plans", to: `/projects/${id}/setup?section=stages`, perm: "masters.stage_plan.view" },
@@ -60,6 +62,7 @@ export default function ProjectStructure() {
         </div>
         <div className="space-y-6"><Checklist r={data.readiness} towers={data.towers} onFix={onFix} /><ConnectedTo entity="project" id={id} /></div>
       </div>
+      {qcTower.node}
       {sheet?.kind === "floors" && <AddFloorsSheet tower={sheet.tower} onClose={() => setSheet(null)} onSaved={(n) => { toast.success(`${n} flat(s) generated`); setSheet(null); reload(); }} />}
       {sheet?.kind === "flat" && <AddFlatSheet tower={sheet.tower} floor={sheet.floor} onClose={() => setSheet(null)} onSaved={(f) => { toast.success(`Flat ${f.flat_number} added`); setSheet(null); reload(); }} />}
     </div>

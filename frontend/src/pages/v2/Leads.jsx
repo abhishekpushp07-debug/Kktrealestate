@@ -18,6 +18,7 @@ import { Calendar, LeadVisits, NewVisit, VisitActions } from "@/pages/SiteVisits
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ContextActions } from "@/components/common/ContextActions";
+import { QuickAddButton, useQuickCreate } from "@/components/common/QuickCreate";
 
 const SOURCES = ["Walk-in", "Website", "Referral", "Broker", "Campaign", "Brochure", "Site Visit"];
 const BANDS = [["Under ₹50 L", 0, 5000000], ["₹50 L – ₹1 Cr", 5000000, 10000000], ["₹1 – 1.5 Cr", 10000000, 15000000], ["₹1.5 – 2.5 Cr", 15000000, 25000000], ["Above ₹2.5 Cr", 25000000, null]];
@@ -27,7 +28,8 @@ const todayIso = () => new Date().toISOString().slice(0, 10);
 function LeadForm({ open, onOpenChange, onSaved, initial }) {
   const { user } = useAuth();
   const people = usePeople();
-  const { data: projects } = useFetch("/projects?page_size=50");
+  const { data: projects, reload: reloadProjects } = useFetch("/projects?page_size=50");
+  const qcProject = useQuickCreate("project", {}, async (p) => { await reloadProjects(); setF((x) => ({ ...x, project_id: p.id, flat_type_id: null })); });
   const { data: flatTypes } = useFetch("/master/flat-types?page_size=100");
   const [f, setF] = useState({ name: "", phone: "", email: "", project_id: null, flat_type_id: null, band: null, source: "Walk-in", assigned_to: user?.id || null, city_id: null, notes: "", ...initial });
   const [busy, setBusy] = useState(false);
@@ -42,7 +44,7 @@ function LeadForm({ open, onOpenChange, onSaved, initial }) {
       <form onSubmit={submit} className="mt-6 space-y-4">
         <Field label="Name" required><input className="input" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} required data-testid="lead-name" /></Field>
         <div className="grid grid-cols-2 gap-4"><Field label="Mobile" required><input className="input" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} required data-testid="lead-phone" /></Field><Field label="Email"><input type="email" className="input" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} data-testid="lead-email" /></Field></div>
-        <div className="grid grid-cols-2 gap-4"><Field label="Project"><Select options={(projects?.items || []).map((p) => ({ value: p.id, label: p.name, sub: p.code }))} value={f.project_id} onChange={(v) => setF({ ...f, project_id: v })} allowAdd={false} testId="lead-project" /></Field><Field label="Flat type"><QuickCreateSelect kind="flat_type" options={(flatTypes?.items || []).filter((t) => !f.project_id || t.project_id === f.project_id).map((t) => ({ value: t.id, label: t.name, sub: t.code }))} value={f.flat_type_id} onChange={(v) => setF({ ...f, flat_type_id: v })} allowAdd={false} testId="lead-flat-type" /></Field></div>
+        <div className="grid grid-cols-2 gap-4"><Field label="Project"><Select onCreateNew={qcProject.onCreateNew} createLabel={qcProject.createLabel} options={(projects?.items || []).map((p) => ({ value: p.id, label: p.name, sub: p.code }))} value={f.project_id} onChange={(v) => setF({ ...f, project_id: v })} allowAdd={false} testId="lead-project" />{qcProject.node}</Field><Field label="Flat type"><QuickCreateSelect kind="flat_type" options={(flatTypes?.items || []).filter((t) => !f.project_id || t.project_id === f.project_id).map((t) => ({ value: t.id, label: t.name, sub: t.code }))} value={f.flat_type_id} onChange={(v) => setF({ ...f, flat_type_id: v })} allowAdd={false} testId="lead-flat-type" /></Field></div>
         <div className="grid grid-cols-2 gap-4"><Field label="Budget band"><Select options={BANDS.map((b) => ({ value: b[0], label: b[0] }))} value={f.band} onChange={(v) => setF({ ...f, band: v })} allowAdd={false} testId="lead-budget" /></Field><Field label="Source" required><Select options={SOURCES.map((s) => ({ value: s, label: s }))} value={f.source} onChange={(v) => setF({ ...f, source: v || "Walk-in" })} allowAdd={false} clearable={false} testId="lead-source" /></Field></div>
         <div className="grid grid-cols-2 gap-4"><Field label="Relationship manager"><Select options={people} value={f.assigned_to} onChange={(v) => setF({ ...f, assigned_to: v })} allowAdd={false} testId="lead-rm" /></Field><Field label="City"><Select type="city" value={f.city_id} onChange={(v) => setF({ ...f, city_id: v })} testId="lead-city" /></Field></div>
         <Field label="Notes"><textarea className="input !h-20 py-2" value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} data-testid="lead-notes" /></Field>

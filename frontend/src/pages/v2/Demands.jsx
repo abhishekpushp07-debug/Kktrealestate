@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { HistoryButton } from "@/components/common/HistoryTimeline";
 import { SendReminderButton } from "@/components/common/SendReminderButton";
 import { useSearchParams } from "react-router-dom";
+import { QuickAddButton, useQuickCreate } from "@/components/common/QuickCreate";
 
 const Sel = ({ value, onChange, children, testId, disabled }) => <select className="input !h-9 !w-auto text-sm" value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} data-testid={testId}>{children}</select>;
 const Kpi = ({ label, value, hint, tone, testId }) => <div className={cn("rounded-2xl border border-warm-200 bg-white px-4 py-3", tone === "brick" && "border-brick/30 bg-brick/5")} data-testid={testId}><p className="text-[11px] font-semibold uppercase text-txt-muted">{label}</p><p className={cn("font-display text-[22px] tabular-nums text-ink-950", tone === "brick" && "text-brick")}>{value ?? "—"}</p>{hint && <p className="text-[11px] text-txt-secondary">{hint}</p>}</div>;
@@ -106,6 +107,7 @@ function ManualSheet({ open, onOpenChange, opts, onSaved, initial }) {
   const [bk, setBk] = useState([]);
   const [effect, setEffect] = useState(null);
   const [towers, setTowers] = useState([]);
+  const [extra, setExtra] = useState({ projects: [] });
   useEffect(() => { if (!f.project_id) return; api.get("/docgen/options", { params: { project_id: f.project_id, block_id: f.block_id || undefined } }).then((r) => { setTowers(r.data.towers); setBk(r.data.bookings.filter((b) => b.status === "Active")); }); }, [f.project_id, f.block_id]);
   const body = { booking_id: f.booking_id, kind: f.kind, name: f.name, cash_amount: Number(f.cash_amount) || 0, account_amount: Number(f.account_amount) || 0, due_date: f.due_date, note: f.note || null };
   useEffect(() => { if (!f.booking_id || !(body.cash_amount + body.account_amount) || !f.due_date || f.name.length < 2) { setEffect(null); return; } api.post("/demands/manual", { ...body, preview: true }).then((r) => setEffect(r.data.effect)).catch(() => setEffect(null)); }, [f]); // eslint-disable-line
@@ -113,9 +115,9 @@ function ManualSheet({ open, onOpenChange, opts, onSaved, initial }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}><SheetContent className="w-[420px] overflow-y-auto sm:max-w-[420px]" data-testid="manual-demand-sheet"><SheetHeader><SheetTitle>Manual demand</SheetTitle></SheetHeader>
       <div className="mt-4 grid gap-2 text-sm">
-        <Sel value={f.project_id} onChange={(v) => setF({ ...f, project_id: v, block_id: "", booking_id: "" })} testId="md-project"><option value="">Project…</option>{opts.projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Sel>
-        <Sel value={f.block_id} onChange={(v) => setF({ ...f, block_id: v, booking_id: "" })} disabled={!f.project_id} testId="md-tower"><option value="">Tower…</option>{towers.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</Sel>
-        <Sel value={f.booking_id} onChange={(v) => setF({ ...f, booking_id: v })} disabled={!f.project_id} testId="md-booking"><option value="">Booking…</option>{bk.map((b) => <option key={b.id} value={b.id}>{b.customer_name} · {b.booking_number} · {b.flat_snapshot?.flat_number}</option>)}</Sel>
+        <Sel value={f.project_id} onChange={(v) => setF({ ...f, project_id: v, block_id: "", booking_id: "" })} testId="md-project"><option value="">Project…</option>{[...opts.projects, ...extra.projects].map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Sel><QuickAddButton kind="project" onCreated={(p) => { setExtra((x) => ({ ...x, projects: [...x.projects, p] })); setF({ ...f, project_id: p.id, block_id: "", booking_id: "" }); }} testId="md-quick-add-project" />
+        <Sel value={f.block_id} onChange={(v) => setF({ ...f, block_id: v, booking_id: "" })} disabled={!f.project_id} testId="md-tower"><option value="">Tower…</option>{towers.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</Sel><QuickAddButton kind="tower" prefill={{ project_id: f.project_id }} disabled={!f.project_id} onCreated={(t) => { setTowers((a) => [...a, t]); setF({ ...f, block_id: t.id, booking_id: "" }); }} testId="md-quick-add-tower" />
+        <Sel value={f.booking_id} onChange={(v) => setF({ ...f, booking_id: v })} disabled={!f.project_id} testId="md-booking"><option value="">Booking…</option>{bk.map((b) => <option key={b.id} value={b.id}>{b.customer_name} · {b.booking_number} · {b.flat_snapshot?.flat_number}</option>)}</Sel><Link to={`/bookings/new?project=${f.project_id}${f.block_id ? `&block=${f.block_id}` : ""}`} className="btn btn-ghost btn-sm" data-testid="md-new-booking-link">New booking →</Link>
         <Sel value={f.kind} onChange={(v) => setF({ ...f, kind: v })} testId="md-kind"><option value="manual">Manual</option><option value="other_charge">Other charge</option><option value="bounce">Bounce charge</option></Sel>
         <input className="input !h-9" placeholder="Charge / installment name" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} data-testid="md-name" />
         <div className="grid grid-cols-2 gap-2"><input type="number" className="input !h-9" placeholder="Cash ₹" value={f.cash_amount} onChange={(e) => setF({ ...f, cash_amount: e.target.value })} data-testid="md-cash" /><input type="number" className="input !h-9" placeholder="Account ₹" value={f.account_amount} onChange={(e) => setF({ ...f, account_amount: e.target.value })} data-testid="md-account" /></div>

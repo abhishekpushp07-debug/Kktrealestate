@@ -12,6 +12,7 @@ import { RateCardsTab, ParkingTab } from "@/components/common/ProjectTabs";
 import { cn } from "@/lib/utils";
 import { ContextActions } from "@/components/common/ContextActions";
 import { ConnectedTo } from "@/components/common/ConnectedTo";
+import { QuickAddButton, useQuickCreate } from "@/components/common/QuickCreate";
 
 const ProjectWebsiteTab = lazy(() => import("@/pages/cms/ProjectWebsiteTab").then((m) => ({ default: m.ProjectWebsiteTab })));
 const FlatsTable = lazy(() => import("@/components/common/FlatsTable"));
@@ -87,6 +88,7 @@ export default function ProjectWorkspace() {
   const tab = sp.get("tab") || "overview";
   const { can } = useAuth();
   const { data: p, loading, reload } = useFetch(`/projects/${id}`);
+  const qcTower = useQuickCreate("tower", { project_id: id }, () => reload());
   const { data: s } = useFetch(`/projects/${id}/setup`);
   const { data: sum } = useFetch(`/projects/${id}/summary`);
   if (loading || !p || !s) return <div className="space-y-6"><Skeleton className="h-64 rounded-2xl" /><Skeleton className="h-10 w-1/2" /><Skeleton className="h-80 rounded-2xl" /></div>;
@@ -99,7 +101,7 @@ export default function ProjectWorkspace() {
         stats={[{ label: "Units sold", value: `${(units?.by_status?.Booked || 0) + (units?.by_status?.Sold || 0)} / ${units?.total ?? "—"}`, hint: `${units?.available ?? "—"} available` }, { label: "Collected", value: inrShort((sum?.paid_paise || 0) / 100), hint: `${inrShort((sum?.collections_mtd_paise || 0) / 100)} this month` }, { label: "Outstanding", value: inrShort((sum?.outstanding?.total_paise || 0) / 100), hint: `${sum?.overdue?.count || 0} overdue`, tone: sum?.outstanding?.total_paise ? undefined : "sage" }, { label: "Upcoming stage", value: s.towers.map((t) => t.construction.next).find(Boolean) || "—", hint: s.towers.map((t) => `${t.name} ${t.construction.percent}%`).join(" · ") }]} testId="project-hero" />
       <ContextActions testId="project-context-actions" items={[
         { label: "Structure builder", to: `/projects/${id}/structure`, perm: "masters.project.view", primary: true },
-        { label: "Add tower", to: `/projects/${id}/setup?section=towers`, perm: "masters.project.edit" },
+        { label: "Add tower", onClick: qcTower.onCreateNew, perm: "masters.tower.create" },
         { label: "Stage plan", to: `/master/stage-plans?project_id=${id}`, perm: "masters.stage_plan.view" },
         { label: "Payment plan", to: `/projects/${id}?tab=plans`, perm: "masters.payment_plan.view" },
         { label: "Construction update", to: `/construction?project=${id}`, perm: "construction.stage.update" },
@@ -107,6 +109,7 @@ export default function ProjectWorkspace() {
         { label: "New lead", to: `/leads?new=1&project_id=${id}`, perm: "sales.lead.create" },
         { label: "Project Statement", to: `/reports/project-statement?project_id=${id}`, perm: "reports.project_statement.view" },
       ]} />
+      {qcTower.node}
       <Tabs tabs={TABS.map(([v, l]) => ({ value: v, label: l }))} value={tab} onChange={(v) => setSp({ tab: v })} testId="project-tabs" />
       <Suspense fallback={<Skeleton className="h-80 rounded-2xl" />}>
         {tab === "overview" && <><Overview s={s} p={p} /><ConnectedTo entity="project" id={id} /></>}
