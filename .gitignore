@@ -107,3 +107,4 @@ backups/kkt_scale-20261027T011157Z.archive.gz
 backups/kkt_scale-20261027T015009Z.archive.gz
 memory/qa/phase_x/logs/
 memory/qa/phase_y/suite.log
+memory/qa/phase_z/suite.log
