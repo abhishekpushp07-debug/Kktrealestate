@@ -105,3 +105,4 @@ backups/
 exports/
 backups/kkt_scale-20261027T011157Z.archive.gz
 backups/kkt_scale-20261027T015009Z.archive.gz
+memory/qa/phase_x/logs/
