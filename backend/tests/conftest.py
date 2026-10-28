@@ -73,7 +73,7 @@ def _start_private_backend():
     import atexit
     import subprocess
     global _server_proc
-    env = {**os.environ, "DB_NAME": TEST_DB, "LOGIN_RATE_LIMIT_BYPASS_TOKEN": BYPASS_TOKEN, "SEEDER_AS_OF_ENABLED": "true", "KKT_ROLE": "test", "KKT_SELF_BASE": f"http://127.0.0.1:{TEST_PORT}"}
+    env = {**os.environ, "DB_NAME": TEST_DB, "LOGIN_RATE_LIMIT_BYPASS_TOKEN": BYPASS_TOKEN, "SEEDER_AS_OF_ENABLED": "true", "KKT_ROLE": "test", "KKT_SELF_BASE": f"http://127.0.0.1:{TEST_PORT}", "BACKUP_ENABLED": "0"}  # test servers never mongodump (filled the shared volume once)
     log = open("/tmp/kkt_test_backend.log", "w")
     _server_proc = subprocess.Popen([sys.executable, "-m", "uvicorn", "server:app", "--host", "127.0.0.1", "--port", str(TEST_PORT), "--log-level", "warning", "--timeout-keep-alive", "120"], cwd=os.path.join(os.path.dirname(__file__), ".."), env=env, stdout=log, stderr=subprocess.STDOUT)
     atexit.register(lambda: _server_proc and _server_proc.kill())
