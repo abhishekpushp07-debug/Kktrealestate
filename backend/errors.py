@@ -28,6 +28,8 @@ ERRORS: dict[str, tuple[int, ...]] = {
     "DUPLICATE_SLUG": (409,),
     "EMPTY_CSV": (422,),
     "FLATS_NOT_AVAILABLE": (409,),
+    "DUPLICATE_FLAT": (409,),
+    "FLOOR_OUT_OF_RANGE": (422,),
     "FLAT_HELD_BY_OTHER": (409,),
     "FLAT_NOT_AVAILABLE": (409,),
     "FLOOR_PLAN_GAP": (422,),

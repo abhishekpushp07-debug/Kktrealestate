@@ -1,0 +1,194 @@
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [ 10%]
+........................................................................ [ 21%]
+........................................................................ [ 32%]
+....................................................................F... [ 43%]
+......................s................................................F [ 54%]
+........................................................................ [ 65%]
+........................................................................ [ 76%]
+........................................................................ [ 87%]
+.......F............F...F.................s.F........................... [ 98%]
+.......                                                                  [100%]
+=================================== FAILURES ===================================
+_______________________ test_matrix_file_matches_runtime _______________________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-0/popen-gw1/test_matrix_file_matches_runti0')
+
+    def test_matrix_file_matches_runtime(tmp_path):
+        """Write the derived matrix next to the code so reviewers can diff it; fail if a tracked copy exists and differs."""
+        import json
+        target = os.path.join(os.path.dirname(__file__), "..", "security", "permission_matrix.json")
+        doc = {f"{m} {p}": sorted(v["perms"]) if v["perms"] else (["<portal>"] if v["portal"] else (["<authenticated>"] if v["authed"] else ["<public>"])) for (m, p), v in sorted(MATRIX.items())}
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        if os.path.exists(target):
+>           assert json.load(open(target)) == doc, "security/permission_matrix.json is stale — regenerate by deleting it and re-running this test"
+E           AssertionError: security/permission_matrix.json is stale — regenerate by deleting it and re-running this test
+E           assert {'DELETE /api...cated>'], ...} == {'DELETE /api...cated>'], ...}
+E             
+E             Omitting 533 identical items, use -vv to show
+E             Right contains 7 more items:
+E             {'DELETE /api/me/home-layout': ['masters.project.view'],
+E              'GET /api/graph/{entity}/{entity_id}': ['demands.register.view',
+E                                                      'documents.document.view',
+E                                                      'finance.payment.view',...
+E             
+E             ...Full output truncated (12 lines hidden), use '-vv' to show
+
+tests/test_permission_matrix.py:86: AssertionError
+_____________ test_every_mutation_route_writes_audit_or_is_exempt ______________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+    def test_every_mutation_route_writes_audit_or_is_exempt():
+        """Static walk of every router: each POST/PATCH/PUT/DELETE handler must call write_audit (directly or via an auditing service helper) or be an exempt non-record route."""
+        helpers = set()
+        for p in (ROUTERS.parent / "services").glob("*.py"):
+            tree = ast.parse(p.read_text())
+            for fn in [n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]:
+                if _audits(fn, set()):
+                    helpers.add(fn.name)
+        for _ in range(2):  # transitive: router-local helpers that call auditing helpers
+            for p in ROUTERS.glob("*.py"):
+                for fn in [n for n in ast.walk(ast.parse(p.read_text())) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]:
+                    if _audits(fn, helpers):
+                        helpers.add(fn.name)
+        missing = []
+        for p in sorted(ROUTERS.glob("*.py")):
+            if p.name in EXEMPT_FILES:
+                continue
+            for fn in [n for n in ast.walk(ast.parse(p.read_text())) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]:
+                methods = [d.func.attr for d in fn.decorator_list if isinstance(d, ast.Call) and isinstance(d.func, ast.Attribute) and d.func.attr in ("post", "patch", "put", "delete")]
+                if not methods or fn.name in EXEMPT_ROUTES.get(p.name, set()):
+                    continue
+                if not _audits(fn, helpers):
+                    missing.append(f"{p.name}:{fn.name}")
+>       assert not missing, missing
+E       AssertionError: ['home_layout.py:put_layout', 'home_layout.py:reset_layout', 'structure.py:floors_preview']
+E       assert not ['home_layout.py:put_layout', 'home_layout.py:reset_layout', 'structure.py:floors_preview']
+
+tests/test_audit_history.py:95: AssertionError
+_______________ test_every_code_registered_with_matching_status ________________
+[gw0] linux -- Python 3.11.17 /root/.venv/bin/python
+
+    def test_every_code_registered_with_matching_status():
+        found = _scan()
+        assert found, "scanner found nothing — pattern broken"
+        unregistered = sorted(c for c in found if c not in ERRORS)
+        mismatched = sorted(f"{c}: used {sorted(found[c])} registered {ERRORS[c]}" for c in found if c in ERRORS and not found[c] <= set(ERRORS[c]))
+>       assert not unregistered, f"unregistered error codes: {unregistered} (add to errors.py)"
+E       AssertionError: unregistered error codes: ['DUPLICATE_FLAT', 'FLOOR_OUT_OF_RANGE'] (add to errors.py)
+E       assert not ['DUPLICATE_FLAT', 'FLOOR_OUT_OF_RANGE']
+
+tests/test_error_registry.py:26: AssertionError
+_______________________ test_demo_password_not_in_source _______________________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+    def test_demo_password_not_in_source():
+        pw = os.environ["DEMO_PASSWORD"]
+        hits = []
+        for base in SCAN:
+            for dp, dn, fn in os.walk(os.path.join(ROOT, base)):
+                dn[:] = [d for d in dn if d not in SKIP]
+                for f in fn:
+                    if f.endswith(EXT) and f != ".env":
+                        p = os.path.join(dp, f)
+                        with open(p, errors="ignore") as fh:
+                            if pw in fh.read():
+                                hits.append(os.path.relpath(p, ROOT))
+>       assert hits == [], hits
+E       AssertionError: ['backend/tests/test_graph.py', 'backend/tests/test_home_layout.py', 'backend/tests/test_structure_builder.py']
+E       assert ['backend/tes...e_builder.py'] == []
+E         
+E         Left contains 3 more items, first extra item: 'backend/tests/test_graph.py'
+E         Use -v to get more diff
+
+tests/test_no_hardcoded_credentials.py:22: AssertionError
+______________________ test_snapshot_exists_and_not_stale ______________________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+    def test_snapshot_exists_and_not_stale():
+        assert os.path.exists(PATH), "missing backend/docs/openapi/v1.json — run: python -m tools.openapi_snapshot --write"
+        old, live = json.load(open(PATH)), _live()
+        assert not breaking_diff(old, live), breaking_diff(old, live)
+>       assert not stale(old, live), "OpenAPI snapshot stale — run: cd /app/backend && python -m tools.openapi_snapshot --write"
+E       AssertionError: OpenAPI snapshot stale — run: cd /app/backend && python -m tools.openapi_snapshot --write
+E       assert not True
+E        +  where True = stale({'components': {'schemas': {'AccessUpdate': {'additionalProperties': False, 'properties': {'direct': {'default': [], '...tent': {...}, 'description': 'Successful Response'}}, 'security': [{'HTTPBearer': []}], 'summary': 'Tree', ...}}, ...}}, {'openapi': '3.1.0', 'info': {'title': 'KKT Real Estate ERP', 'version': '11.0.0'}, 'paths': {'/api/health': {'get': {..., 'title': 'AllocationCategoryUpdate'}, ...}, 'securitySchemes': {'HTTPBearer': {'type': 'http', 'scheme': 'bearer'}}}})
+
+tests/test_openapi_snapshot.py:24: AssertionError
+_________________ test_mutation_buttons_are_permission_guarded _________________
+[gw1] linux -- Python 3.11.17 /root/.venv/bin/python
+
+    def test_mutation_buttons_are_permission_guarded():
+        unguarded = []
+        for p in list(SRC.glob("pages/**/*.jsx")) + list(SRC.glob("components/**/*.jsx")):
+            rel = str(p.relative_to(SRC))
+            if rel.startswith("components/ui/") or rel in ROUTE_GUARDED:
+                continue
+            text = p.read_text()
+            has_can = "can(" in text or "canAny(" in text
+            for line in text.splitlines():
+                for tid in PATTERN.findall(line):
+                    if tid in EXCEPTIONS:
+                        continue
+                    if not ("can(" in line or "canAny(" in line) and not has_can:
+                        unguarded.append(f"{rel}: {tid}")
+>       assert not unguarded, unguarded
+E       AssertionError: ['components/structure/StructureSheets.jsx: add-floors-sheet', 'components/structure/StructureSheets.jsx: add-flat-sheet']
+E       assert not ['components/structure/StructureSheets.jsx: add-floors-sheet', 'components/structure/StructureSheets.jsx: add-flat-sheet']
+
+tests/test_frontend_guard_scan.py:31: AssertionError
+=============================== warnings summary ===============================
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+  /root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+tests/test_phase_k_p1.py::test_loadshed_sheds_with_prebuilt_503_and_exempts_probes
+  /root/.venv/lib/python3.11/site-packages/starlette/testclient.py:41: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    [], typing.ContextManager[anyio.abc.BlockingPortal]
+
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+  /root/.venv/lib/python3.11/site-packages/pypdf/_page.py:1368: DeprecationWarning: Calling `PageObject.replace_contents()` for pages not assigned to a writer is deprecated and will be removed in pypdf 7.0.0. Attach the page to the writer first or use `PdfWriter(clone_from=...)` directly. The existing approach has proved being unreliable.
+    self.replace_contents(ContentStream(new_content_array, self.pdf))
+
+tests/test_kkt_erp.py::TestBlock::test_create_block_and_generation
+tests/test_kkt_erp.py::TestFlatType::test_create_flat_type_auto_area
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+  /root/.venv/lib/python3.11/site-packages/_pytest/fixtures.py:1313: PytestRemovedIn10Warning: Class-scoped fixture defined as instance method is deprecated.
+  Instance attributes set in this fixture will NOT be visible to test methods,
+  as each test gets a new instance while the fixture runs only once per class.
+  Use @classmethod decorator and set attributes on cls instead.
+  See https://docs.pytest.org/en/stable/deprecations.html#class-scoped-fixture-as-instance-method
+    fixturefunc = resolve_fixture_function(fixturedef, request)
+
+tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources
+  /root/.venv/lib/python3.11/site-packages/_pytest/python.py:171: PytestReturnNotNoneWarning: Test functions should return None, but tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources returned <class 'str'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_permission_matrix.py::test_matrix_file_matches_runtime - As...
+FAILED tests/test_audit_history.py::test_every_mutation_route_writes_audit_or_is_exempt
+FAILED tests/test_error_registry.py::test_every_code_registered_with_matching_status
+FAILED tests/test_no_hardcoded_credentials.py::test_demo_password_not_in_source
+FAILED tests/test_openapi_snapshot.py::test_snapshot_exists_and_not_stale - A...
+FAILED tests/test_frontend_guard_scan.py::test_mutation_buttons_are_permission_guarded
+6 failed, 647 passed, 2 skipped, 18 warnings in 534.33s (0:08:54)

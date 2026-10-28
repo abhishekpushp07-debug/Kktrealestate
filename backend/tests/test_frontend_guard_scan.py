@@ -10,7 +10,7 @@ ROUTE_GUARDED = {"pages/Exports.jsx": "reports.*", "components/common/FileGaller
                  "pages/master/PaymentPlanForm.jsx": "master.read", "pages/cms/ProjectWebsiteTab.jsx": "cms.read", "pages/AccessControl.jsx": "users.manage", "pages/AuditLog.jsx": "audit.view", "pages/Roles.jsx": "roles.manage",
                  "components/forms/BlockForm.jsx": "block.write", "components/forms/ProjectForm.jsx": "project.write", "components/common/PaymentPlanMatrix.jsx": "master.read"}
 # Non-mutation ids that merely match the vocabulary (inputs, containers, dialogs opened by a guarded button, auth flows).
-EXCEPTIONS = {"new-password-input", "flat-edit-section", "flat-edit-notes", "flat-edit-price", "flat-edit-rate", "stage-sequence-editor", "project-address-input", "quick-new", "post-payment-sheet", "role-editor",
+EXCEPTIONS = {"new-password-input", "add-floors-sheet", "add-flat-sheet", "flat-edit-section", "flat-edit-notes", "flat-edit-price", "flat-edit-rate", "stage-sequence-editor", "project-address-input", "quick-new", "post-payment-sheet", "role-editor",
               "add-floors-dialog", "add-floors-count", "cancel-dialog", "visit-create-dialog", "vs-address", "cat-import", "more-edit", "add-floor-plan-range", "pw-add-hero"}
 
 

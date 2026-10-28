@@ -17,6 +17,9 @@
  "DELETE /api/master/milestone-templates/{rest:path}": [
   "masters.construction_stage.view"
  ],
+ "DELETE /api/me/home-layout": [
+  "masters.project.view"
+ ],
  "DELETE /api/notices/{notice_id}": [
   "construction.notice.delete"
  ],
@@ -300,6 +303,17 @@
  "GET /api/flats/{flat_id}": [
   "masters.project.view"
  ],
+ "GET /api/graph/{entity}/{entity_id}": [
+  "demands.register.view",
+  "documents.document.view",
+  "finance.payment.view",
+  "masters.flat.view",
+  "masters.payment_plan.view",
+  "masters.project.view",
+  "masters.stage_plan.view",
+  "sales.booking.view",
+  "sales.customer.view"
+ ],
  "GET /api/health": [
   "<public>"
  ],
@@ -452,6 +466,9 @@
  ],
  "GET /api/master/spec-items/{item_id}": [
   "masters.specification.view"
+ ],
+ "GET /api/me/home-layout": [
+  "masters.project.view"
  ],
  "GET /api/messaging/channels": [
   "messaging.message.view"
@@ -613,6 +630,9 @@
   "masters.rate_card.view"
  ],
  "GET /api/projects/{project_id}/setup": [
+  "masters.project.view"
+ ],
+ "GET /api/projects/{project_id}/structure": [
   "masters.project.view"
  ],
  "GET /api/projects/{project_id}/summary": [
@@ -1096,7 +1116,13 @@
   "construction.stage.undo",
   "construction.update.undo"
  ],
+ "POST /api/blocks/{block_id}/flats": [
+  "masters.flat.create"
+ ],
  "POST /api/blocks/{block_id}/floors": [
+  "masters.tower.edit"
+ ],
+ "POST /api/blocks/{block_id}/floors/preview": [
   "masters.tower.edit"
  ],
  "POST /api/blocks/{block_id}/generate-flats": [
@@ -1611,6 +1637,9 @@
  ],
  "PUT /api/admin/access/users/{user_id}": [
   "admin.access_control.manage"
+ ],
+ "PUT /api/me/home-layout": [
+  "masters.project.view"
  ],
  "PUT /api/projects/{project_id}/setup/{section}": [
   "masters.project.edit"

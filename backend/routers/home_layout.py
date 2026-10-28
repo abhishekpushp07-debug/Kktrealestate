@@ -2,12 +2,12 @@
 widgets the user cannot see are neither returned as available nor accepted in a layout. Default = today's Home order."""
 from typing import Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import Field, field_validator
 
 from db import db
 from deps import require
-from utils import ApiError, StrictModel, now_iso
+from utils import ApiError, StrictModel, client_ip, now_iso, write_audit
 
 router = APIRouter(prefix="/me", tags=["me"])
 SCHEMA_VERSION = 1
@@ -66,7 +66,7 @@ async def get_layout(user: dict = Depends(require("masters.project.view"))):
 
 
 @router.put("/home-layout")
-async def put_layout(body: LayoutIn, user: dict = Depends(require("masters.project.view"))):
+async def put_layout(body: LayoutIn, request: Request, user: dict = Depends(require("masters.project.view"))):
     allowed = set(_allowed(user))
     denied = [w.id for w in body.widgets if w.id not in allowed]
     if denied:
@@ -75,11 +75,17 @@ async def put_layout(body: LayoutIn, user: dict = Depends(require("masters.proje
     cur = await db.user_home_layouts.find_one(key, {"_id": 0, "version": 1})
     if body.version is not None and cur and cur.get("version") != body.version:
         raise ApiError(409, "Layout changed elsewhere — reload and try again", "VERSION_CONFLICT")
+    before = await db.user_home_layouts.find_one(key, {"_id": 0, "widgets": 1})
     await db.user_home_layouts.update_one(key, {"$set": {**key, "schema_version": SCHEMA_VERSION, "widgets": [w.model_dump() for w in body.widgets], "updated_at": now_iso()}, "$inc": {"version": 1}}, upsert=True)
-    return _present(await db.user_home_layouts.find_one(key, {"_id": 0}), user)
+    after = await db.user_home_layouts.find_one(key, {"_id": 0})
+    await write_audit(user, "home_layout.update", "user", user["id"], before=before, after={"widgets": after["widgets"], "version": after["version"]}, ip=client_ip(request))
+    return _present(after, user)
 
 
 @router.delete("/home-layout")
-async def reset_layout(user: dict = Depends(require("masters.project.view"))):
-    await db.user_home_layouts.delete_one({"user_id": user["id"], "company_id": user["company_id"]})  # user's own preference row only (not business data)
+async def reset_layout(request: Request, user: dict = Depends(require("masters.project.view"))):
+    key = {"user_id": user["id"], "company_id": user["company_id"]}
+    before = await db.user_home_layouts.find_one(key, {"_id": 0, "widgets": 1})
+    await db.user_home_layouts.delete_one(key)  # user's own preference row only (not business data)
+    await write_audit(user, "home_layout.reset", "user", user["id"], before=before, after=None, ip=client_ip(request))
     return _present(None, user)

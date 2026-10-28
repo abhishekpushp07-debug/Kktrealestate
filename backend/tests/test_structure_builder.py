@@ -10,7 +10,7 @@ pytestmark = pytest.mark.skipif(not os.environ.get("KKT_TEST_EXTERNAL", "1"), re
 
 
 def _hdr(email, pw_env="ADMIN_PASSWORD"):
-    pw = os.environ.get(pw_env) or "Kkt@12345"
+    pw = os.environ["TEST_PASSWORD"]
     r = requests.post(f"{BASE}/api/auth/login", json={"email": email, "password": pw}, timeout=30)
     assert r.status_code == 200, r.text
     tok = r.json().get("access_token") or r.json().get("token")

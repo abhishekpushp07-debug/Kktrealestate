@@ -60,6 +60,30 @@
       "title": "Count",
       "type": "integer"
      },
+     "flat_type_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Flat Type Id"
+     },
+     "flats_per_floor": {
+      "anyOf": [
+       {
+        "maximum": 50.0,
+        "minimum": 1.0,
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Flats Per Floor"
+     },
      "floor_plan_template_id": {
       "anyOf": [
        {
@@ -5053,6 +5077,19 @@
       ],
       "title": "Facing"
      },
+     "flat_number": {
+      "anyOf": [
+       {
+        "maxLength": 20,
+        "minLength": 1,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Flat Number"
+     },
      "flat_type_id": {
       "anyOf": [
        {
@@ -5546,6 +5583,57 @@
      }
     },
     "title": "FloorPlanTemplateUpdate",
+    "type": "object"
+   },
+   "FloorsPreviewIn": {
+    "additionalProperties": false,
+    "properties": {
+     "count": {
+      "maximum": 50.0,
+      "minimum": 1.0,
+      "title": "Count",
+      "type": "integer"
+     },
+     "flat_type_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Flat Type Id"
+     },
+     "flats_per_floor": {
+      "anyOf": [
+       {
+        "maximum": 50.0,
+        "minimum": 1.0,
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Flats Per Floor"
+     },
+     "floor_plan_template_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Floor Plan Template Id"
+     }
+    },
+    "required": [
+     "count"
+    ],
+    "title": "FloorsPreviewIn",
     "type": "object"
    },
    "FollowUpIn": {
@@ -6143,6 +6231,36 @@
      "distance_km"
     ],
     "title": "Landmark",
+    "type": "object"
+   },
+   "LayoutIn": {
+    "additionalProperties": false,
+    "properties": {
+     "version": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Version"
+     },
+     "widgets": {
+      "items": {
+       "$ref": "#/components/schemas/Widget"
+      },
+      "maxItems": 20,
+      "minItems": 1,
+      "title": "Widgets",
+      "type": "array"
+     }
+    },
+    "required": [
+     "widgets"
+    ],
+    "title": "LayoutIn",
     "type": "object"
    },
    "LeadIn": {
@@ -10025,6 +10143,46 @@
     "title": "ShareIn",
     "type": "object"
    },
+   "SingleFlatIn": {
+    "additionalProperties": false,
+    "properties": {
+     "flat_number": {
+      "anyOf": [
+       {
+        "maxLength": 20,
+        "minLength": 1,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Flat Number"
+     },
+     "flat_type_id": {
+      "title": "Flat Type Id",
+      "type": "string"
+     },
+     "floor": {
+      "minimum": 0.0,
+      "title": "Floor",
+      "type": "integer"
+     },
+     "position": {
+      "maximum": 50.0,
+      "minimum": 1.0,
+      "title": "Position",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "floor",
+     "position",
+     "flat_type_id"
+    ],
+    "title": "SingleFlatIn",
+    "type": "object"
+   },
    "SiteSettingsIn": {
     "additionalProperties": false,
     "properties": {
@@ -11549,6 +11707,35 @@
      "reason"
     ],
     "title": "VoidIn",
+    "type": "object"
+   },
+   "Widget": {
+    "additionalProperties": false,
+    "properties": {
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "size": {
+      "default": "M",
+      "enum": [
+       "S",
+       "M",
+       "L"
+      ],
+      "title": "Size",
+      "type": "string"
+     },
+     "visible": {
+      "default": true,
+      "title": "Visible",
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "id"
+    ],
+    "title": "Widget",
     "type": "object"
    },
    "routers__auth__LoginIn": {
@@ -15754,6 +15941,61 @@
     ]
    }
   },
+  "/api/blocks/{block_id}/flats": {
+   "post": {
+    "operationId": "add_single_flat_api_blocks__block_id__flats_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "block_id",
+      "required": true,
+      "schema": {
+       "title": "Block Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SingleFlatIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Add Single Flat",
+    "tags": [
+     "structure"
+    ]
+   }
+  },
   "/api/blocks/{block_id}/floors": {
    "post": {
     "operationId": "add_floors_api_blocks__block_id__floors_post",
@@ -15806,6 +16048,62 @@
     "summary": "Add Floors",
     "tags": [
      "blocks"
+    ]
+   }
+  },
+  "/api/blocks/{block_id}/floors/preview": {
+   "post": {
+    "description": "Dry run: which floors/flat numbers `POST /blocks/{id}/floors` would create (no writes).",
+    "operationId": "floors_preview_api_blocks__block_id__floors_preview_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "block_id",
+      "required": true,
+      "schema": {
+       "title": "Block Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/FloorsPreviewIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Floors Preview",
+    "tags": [
+     "structure"
     ]
    }
   },
@@ -22827,6 +23125,73 @@
     "summary": "Change Status",
     "tags": [
      "flats"
+    ]
+   }
+  },
+  "/api/graph/{entity}/{entity_id}": {
+   "get": {
+    "operationId": "graph_api_graph__entity___entity_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "entity",
+      "required": true,
+      "schema": {
+       "enum": [
+        "project",
+        "block",
+        "tower",
+        "flat",
+        "customer",
+        "booking",
+        "stage_plan",
+        "payment_plan",
+        "demand",
+        "payment",
+        "document"
+       ],
+       "title": "Entity",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "entity_id",
+      "required": true,
+      "schema": {
+       "title": "Entity Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Graph",
+    "tags": [
+     "graph"
     ]
    }
   },
@@ -33048,6 +33413,94 @@
     ]
    }
   },
+  "/api/me/home-layout": {
+   "delete": {
+    "operationId": "reset_layout_api_me_home_layout_delete",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Reset Layout",
+    "tags": [
+     "me"
+    ]
+   },
+   "get": {
+    "operationId": "get_layout_api_me_home_layout_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Get Layout",
+    "tags": [
+     "me"
+    ]
+   },
+   "put": {
+    "operationId": "put_layout_api_me_home_layout_put",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/LayoutIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Put Layout",
+    "tags": [
+     "me"
+    ]
+   }
+  },
   "/api/messaging/channels": {
    "get": {
     "description": "Each channel is either really configured or says so \u2014 the UI renders 'Connect provider' with the fields it needs.",
@@ -39056,6 +39509,51 @@
     "summary": "Set Project Sequence",
     "tags": [
      "construction"
+    ]
+   }
+  },
+  "/api/projects/{project_id}/structure": {
+   "get": {
+    "operationId": "project_structure_api_projects__project_id__structure_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "project_id",
+      "required": true,
+      "schema": {
+       "title": "Project Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Project Structure",
+    "tags": [
+     "structure"
     ]
    }
   },
