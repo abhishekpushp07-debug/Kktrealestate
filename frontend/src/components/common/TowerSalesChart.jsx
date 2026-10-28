@@ -9,13 +9,13 @@ const CAT = { sold: ["Sold / Booked", UNIT_COLORS.Sold, "Booked"], available: ["
 function Row({ r, cats, projectId }) {
   const total = r.total || 1;
   return (
-    <div className="grid grid-cols-[120px_1fr_96px] items-center gap-3 text-sm" data-testid={`tower-sales-row-${r.code}`}>
+    <div className="grid grid-cols-[120px_1fr_150px] items-center gap-3 text-sm" data-testid={`tower-sales-row-${r.code}`}>
       <Link to={`/blocks/${r.block_id}`} className="truncate font-semibold text-ink-950 hover:text-gold">{r.tower}</Link>
       <div className="flex h-6 w-full gap-px overflow-hidden rounded-md bg-warm-100">
         {cats.filter((c) => r[c]).map((c) => (
           <Link key={c} to={`/flats?project_id=${projectId}&block_id=${r.block_id}&status=${CAT[c][2]}`} style={{ width: `${(r[c] / total) * 100}%`, background: CAT[c][1] }} className="flex items-center justify-center text-[11px] font-semibold text-white/95 transition-opacity hover:opacity-80" title={`${CAT[c][0]}: ${r[c]}`} data-testid={`tower-sales-seg-${r.code}-${c}`}>{r[c] / total > 0.08 ? r[c] : ""}</Link>))}
       </div>
-      <span className="text-right tabular-nums text-txt-secondary" data-testid={`tower-sales-pct-${r.code}`}>Sold <b className="text-ink-950">{r.sold_pct}%</b> · {r.total} units</span>
+      <span className="whitespace-nowrap text-right tabular-nums text-txt-secondary" data-testid={`tower-sales-pct-${r.code}`}>Sold <b className="text-ink-950">{r.sold_pct}%</b> · {r.total} units</span>
     </div>
   );
 }
