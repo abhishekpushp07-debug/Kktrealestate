@@ -25,7 +25,7 @@ def test_rows_tie_out_to_booking_summaries_and_sign_convention():
     H = _hdr("admin@kkt.in")
     pid = _project(H)
     j = requests.get(f"{BASE}/api/reports/project-statement", params={"project_id": pid}, headers=H, timeout=60).json()
-    assert j["rows"] and j["columns"][3]["label"] == "Total bill raised" and j["columns"][4]["label"] == "Total payment received"
+    assert j["rows"] and j["columns"][3]["label"] == "Bill raised" and j["columns"][4]["label"] == "Received"
     live = []
     for st in ("Active", "Completed"):
         page = 1
@@ -56,11 +56,25 @@ def test_csv_totals_equal_json_totals():
     r = requests.get(f"{BASE}/api/reports/project-statement", params={"project_id": pid, "format": "csv", "async": "0"}, headers=H, timeout=60)
     assert r.status_code == 200
     lines = r.text.splitlines()
-    assert lines[0].startswith("# Project Statement") and "Udhar" not in r.text and "Jama" not in r.text and "paise" not in r.text.lower()
+    assert "Project Statement" in lines[0] and "Udhar" not in r.text and "Jama" not in r.text and "paise" not in r.text.lower()
     rows = list(csv.reader(io.StringIO("\n".join(lines[1:]))))
     hdr, total = rows[0], rows[-1]
-    assert hdr[3] == "Total bill raised ₹" and hdr[4] == "Total payment received ₹" and hdr[5] == "Balance ₹"
+    assert hdr[3] == "Bill raised ₹" and hdr[4] == "Received ₹" and hdr[5] == "Balance ₹"
     assert total[0] == "TOTAL" and round(float(total[3]) * 100) == j["totals"]["bill_raised_paise"] and round(float(total[5]) * 100) == j["totals"]["balance_signed_paise"]
+    subs = {r[0].removeprefix("SUBTOTAL "): r for r in rows if r[0].startswith("SUBTOTAL ")}
+    assert len(subs) == len(j["tower_subtotals"]) > 0
+    for t in j["tower_subtotals"]:
+        sr = subs[t["tower"]]
+        assert round(float(sr[3]) * 100) == t["bill_raised_paise"] and round(float(sr[4]) * 100) == t["received_paise"] and round(float(sr[5]) * 100) == t["balance_signed_paise"]
+    detail = [r for r in rows[1:] if not r[0].startswith(("SUBTOTAL", "TOTAL"))]
+    assert len(detail) == len(j["rows"])
+
+
+def test_unknown_query_param_is_400():
+    H = _hdr("admin@kkt.in")
+    pid = _project(H)
+    r = requests.get(f"{BASE}/api/reports/project-statement", params={"project_id": pid, "fmt": "csv"}, headers=H, timeout=60)
+    assert r.status_code == 400 and r.json()["code"] == "UNKNOWN_PARAM"
 
 
 def test_pdf_renders_and_is_logged_and_zero_access_is_403():

@@ -2,11 +2,11 @@
 tower subtotals, project grand total; then (new page) tower-wise sales & inventory summary. Figures = booking ledger summaries
 (services/ledger rebuild) — the same numbers Customer 360 / Outstanding use; sign convention from definitions.two_sided.
 Section B "Sold" = flat has a live booking (real association) → shown only to users with inventory.real_status.view."""
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response
 
 from db import db
 from deps import ensure_project_access, require
-from routers.reports import _company, respond
+from routers.reports import _company, _strict_params, respond
 from services import pdf as _pdf
 from services.definitions import live_bookings_match, two_sided
 from services.inventory import can_see_real
@@ -14,7 +14,7 @@ from utils import ApiError, base_doc, now_iso
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 COLS = [("tower", "Tower", "str", 1.1), ("customer", "Customer name", "str", 2.2), ("flat_number", "Flat number", "str", 0.9),
-        ("bill_raised_paise", "Total bill raised", "money"), ("received_paise", "Total payment received", "money"), ("balance_signed_paise", "Balance", "money"), ("balance_status", "Status", "str", 0.7)]
+        ("bill_raised_paise", "Bill raised", "money"), ("received_paise", "Received", "money"), ("balance_signed_paise", "Balance", "money"), ("balance_status", "Status", "str", 0.7)]
 INV_COLS = [("tower", "Tower", "str"), ("total", "Total flats", "num"), ("sold", "Sold", "num"), ("available", "Available", "num"), ("hold", "Hold", "num"), ("landowner", "Landowner", "num"),
             ("blocked", "Blocked/Other", "num"), ("sold_pct", "Sold %", "pct"), ("bill_raised_paise", "Total bill raised", "money"), ("received_paise", "Total received", "money"), ("balance_signed_paise", "Balance", "money")]
 
@@ -113,6 +113,7 @@ def _pdf_bytes(data: dict, company: dict, user: dict) -> bytes:
 @router.get("/project-statement")
 async def project_statement(request: Request, project_id: str | None = None, block_id: str | None = None, as_of: str | None = None, format: str | None = None, download: int = 0,
                             user: dict = Depends(require("reports.project_statement.view"))):
+    _strict_params(request, {"project_id", "block_id", "as_of", "download", "async"})
     if not project_id:
         return {"rows": [], "columns": [{"key": c[0], "label": c[1], "type": c[2]} for c in COLS], "needs_project": True, "purpose": "Pick a project to generate its statement."}
     data = await build_project_statement(project_id, user, block_id.split(",") if block_id else None, as_of)
@@ -132,4 +133,34 @@ async def project_statement(request: Request, project_id: str | None = None, blo
                "inventory": data["inventory"], "legend": data["legend"], "filters_text": f"Project: {data['project']['name']}" + (f" · Towers: {block_id}" if block_id else ""),
                "kpis": [{"label": "Bill raised", "value_paise": totals["bill_raised_paise"], "kind": "money"}, {"label": "Received", "value_paise": totals["received_paise"], "kind": "money"},
                         {"label": "Balance", "value_paise": totals["balance_signed_paise"], "kind": "money", "hint": totals["balance_status"]}, {"label": "Bookings", "value": len(rows), "kind": "num"}]}
+    if format == "csv":
+        if "reports.project_statement.export" not in request.state.perms:
+            raise ApiError(403, "Missing permission: reports.project_statement.export", "PERMISSION_DENIED")
+        return _csv_response(data, company, rows, totals)
     return await respond(request, format, payload, "Project Statement", company, COLS, rows, totals, filename="project-statement", landscape=True)
+
+
+def _csv_response(data: dict, company: dict, rows: list[dict], totals: dict) -> Response:
+    """CSV mirrors PDF Section A: detail rows, a `SUBTOTAL <tower>` line per tower, then the grand TOTAL line."""
+    import csv as _csv
+    import io
+
+    from utils import csv_safe
+
+    def val(c, v):
+        return ("" if v is None else round(v / 100, 2)) if c[2] == "money" else ("" if v is None else csv_safe(v))
+
+    def line(label, t):
+        return [label if i == 0 else val(c, t.get(c[0])) if c[0] in t else "" for i, c in enumerate(COLS)]
+
+    buf = io.StringIO()
+    buf.write(f"# {company.get('name', '')} · Project Statement · {data['project']['name']} · as of {data['as_of']}\n")
+    w = _csv.writer(buf)
+    w.writerow([f"{c[1]} ₹" if c[2] == "money" else c[1] for c in COLS])
+    for t in data["towers"]:
+        for r in rows:
+            if r["tower"] == t["tower"]:
+                w.writerow([val(c, r.get(c[0])) for c in COLS])
+        w.writerow(line(f"SUBTOTAL {t['tower']}", {**t["subtotal"], "balance_status": _status_word(t["subtotal"]["balance_signed_paise"])}))
+    w.writerow(line("TOTAL", totals))
+    return Response(content=buf.getvalue(), media_type="text/csv", headers={"Content-Disposition": 'attachment; filename="project-statement.csv"', "X-Export-Total": str(len(rows)), "X-Export-Rows": str(len(rows)), "X-Export-Truncated": "false"})
