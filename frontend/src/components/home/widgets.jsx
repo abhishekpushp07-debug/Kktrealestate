@@ -26,7 +26,7 @@ function Attention({ a }) {
 
 
 const W = {
-  tower_sales: ({ data }) => <TowerSalesWidget projects={data?.projects || []} />,
+  tower_sales: ({ data, size }) => <TowerSalesWidget projects={data?.projects || []} size={size} />,
   today: ({ data, loading, c, t }) => (
       <section className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4" data-testid="today-row">
         {loading ? Array.from({ length: 4 }, (_, n) => n).map((n) => <Skeleton key={n} className="h-28 rounded-2xl" />) : <>

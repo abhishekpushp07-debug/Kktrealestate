@@ -39682,7 +39682,7 @@
   },
   "/api/projects/{project_id}/tower-sales": {
    "get": {
-    "description": "Y.1 \u2014 one row per active tower: Sold / Available / Hold (+ Landowner / Blocked in the real view). `view=real` only for\nusers with inventory.real_status.view; everyone else gets display-status categories (held / show-as-sold count as Sold).",
+    "description": "Y.1 \u2014 one row per active tower: Sold / Available / Hold (+ Landowner / Blocked in the real view). `view=real` only for\nusers with inventory.real_status.view; everyone else gets display-status categories (held / show-as-sold count as Sold).\nZ.3 \u2014 per-tower weekly sold series over `weeks` ISO weeks (real: active bookings by booking date; display: shaped by display rules).",
     "operationId": "tower_sales_api_projects__project_id__tower_sales_get",
     "parameters": [
      {
@@ -39702,6 +39702,16 @@
        "default": "display",
        "title": "View",
        "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "weeks",
+      "required": false,
+      "schema": {
+       "default": 12,
+       "title": "Weeks",
+       "type": "integer"
       }
      }
     ],

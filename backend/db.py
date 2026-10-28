@@ -96,6 +96,7 @@ async def ensure_indexes():
         ("bookings", [("customer_id", ASCENDING), ("booking_date", DESCENDING)], "c360_bookings"),
         ("bookings", [("company_id", ASCENDING), ("status", ASCENDING), ("project_id", ASCENDING)], "active_by_project"),
         ("bookings", [("project_id", ASCENDING), ("status", ASCENDING), ("block_id", ASCENDING)], "project_block_summary"),
+        ("bookings", [("project_id", ASCENDING), ("status", ASCENDING), ("booking_date", DESCENDING)], "tower_sales_pace"),
         ("payments", [("booking_id", ASCENDING), ("payment_date", DESCENDING)], "booking_payments"),
         ("payments", [("company_id", ASCENDING), ("status", ASCENDING), ("payment_date", ASCENDING)], "status_date"),
         ("payments", [("company_id", ASCENDING), ("status", ASCENDING), ("project_id", ASCENDING), ("payment_date", ASCENDING)], "status_project_date"),

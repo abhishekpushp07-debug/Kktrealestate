@@ -90,4 +90,4 @@ def test_kyc_files_linked_on_booking_idempotent_and_gated():
     audit = requests.get(f"{BASE}/api/audit-logs", params={"entity_type": "file", "entity_id": aad["id"], "page_size": 20}, headers=A, timeout=30)
     if audit.status_code == 200:
         assert any(a.get("action") == "kyc.view" for a in audit.json().get("items", []))
-    requests.post(f"{BASE}/api/bookings/{bid}/cancel", json={"reason": "Z.2 test artefact", "refund_amount": 0}, headers={**A, "Idempotency-Key": str(uuid.uuid4())}, timeout=60)
+    requests.post(f"{BASE}/api/bookings/{bid}/cancel", json={"reason": "Z.2 test artefact", "deduction": 0, "refund": 0}, headers={**A, "Idempotency-Key": str(uuid.uuid4())}, timeout=60)

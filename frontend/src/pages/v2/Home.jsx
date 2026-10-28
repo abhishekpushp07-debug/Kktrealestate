@@ -34,7 +34,7 @@ export default function Home() {
       {data && (c?.projects ?? 1) === 0 && <Card className="!border-gold/50 !bg-gold-light/40" testId="home-first-run"><p className="label text-[#6b5410]">Welcome</p><h2 className="mt-1 font-display text-2xl text-ink-950">Set up your first project</h2><p className="mt-2 max-w-xl text-sm text-txt-secondary">Add towers, floor plans, construction stages and payment plans once — bookings, demands and the customer portal all flow from it.</p><div className="mt-4 flex flex-wrap gap-2"><Link to="/projects/new" className="btn btn-primary" data-testid="first-run-project">Start project setup</Link><Link to="/settings/catalogues" className="btn btn-secondary" data-testid="first-run-catalogues">Review catalogues</Link></div></Card>}
       {!layout && <div className="grid gap-6 xl:grid-cols-6" data-testid="home-layout-loading">{[1, 2, 3].map((i) => <div key={i} className="h-28 animate-pulse rounded-2xl bg-warm-100 xl:col-span-2" />)}</div>}
       <div className="grid gap-6 xl:grid-cols-6" data-testid="home-widget-grid">
-        {widgets.map((w) => <div key={w.id} className={cn("min-w-0", SIZE_CLASS[w.size] || SIZE_CLASS.M)} id={w.id === "attention" ? "attention" : undefined} data-testid={`home-slot-${w.id}`} data-size={w.size}><HomeWidget id={w.id} data={data} loading={loading} trends={trends} c={c} t={t} /></div>)}
+        {widgets.map((w) => <div key={w.id} className={cn("min-w-0", SIZE_CLASS[w.size] || SIZE_CLASS.M)} id={w.id === "attention" ? "attention" : undefined} data-testid={`home-slot-${w.id}`} data-size={w.size}><HomeWidget id={w.id} size={w.size} data={data} loading={loading} trends={trends} c={c} t={t} /></div>)}
       </div>
     </div>
   );

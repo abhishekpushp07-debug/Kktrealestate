@@ -1,6 +1,7 @@
 """Phase X.3 — Project Structure Builder: one composite read (tree + readiness) and single-flat add.
 Flat generation reuses services.flat_generation (same numbering, snapshots, pricing); duplicates → 409."""
 import asyncio
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, Request
 from pydantic import Field
@@ -10,6 +11,7 @@ from deps import ensure_project_access, require
 from routers.construction import ensure_block_stages
 from routers.project_setup import _active_assignments
 from services import inventory as inv
+from services import clock
 from services.flat_generation import (
     build_flat,
     flat_number,
@@ -93,16 +95,31 @@ def _real_cat(f: dict) -> str:
 
 
 @router.get("/projects/{project_id}/tower-sales")
-async def tower_sales(project_id: str, view: str = "display", user: dict = Depends(require("masters.project.view"))):
+async def tower_sales(project_id: str, view: str = "display", weeks: int = 12, user: dict = Depends(require("masters.project.view"))):
     """Y.1 — one row per active tower: Sold / Available / Hold (+ Landowner / Blocked in the real view). `view=real` only for
-    users with inventory.real_status.view; everyone else gets display-status categories (held / show-as-sold count as Sold)."""
+    users with inventory.real_status.view; everyone else gets display-status categories (held / show-as-sold count as Sold).
+    Z.3 — per-tower weekly sold series over `weeks` ISO weeks (real: active bookings by booking date; display: shaped by display rules)."""
     ensure_project_access(user, project_id)
     real = view == "real" and inv.can_see_real(user)
-    blocks, flats = await asyncio.gather(
+    weeks = max(1, min(weeks, 52))
+    today = clock.today()
+    week_keys = [(today - timedelta(weeks=weeks - 1 - i)).isocalendar() for i in range(weeks)]
+    week_labels = [f"{y}-W{w:02d}" for y, w, _ in week_keys]
+    week_idx = {(y, w): i for i, (y, w, _) in enumerate(week_keys)}
+    start = (today - timedelta(weeks=weeks)).isoformat()
+    blocks, flats, bookings = await asyncio.gather(
         db.blocks.find({"project_id": project_id, "is_active": True}, {"_id": 0, "id": 1, "name": 1, "code": 1}).sort("name", 1).to_list(200),
-        db.flats.find({"project_id": project_id, "is_active": True}, SALES_FIELDS).to_list(20000))
+        db.flats.find({"project_id": project_id, "is_active": True}, {**SALES_FIELDS, "display_set_at": 1, "booking_id": 1}).to_list(20000),
+        db.bookings.find({"project_id": project_id, "status": {"$ne": "Cancelled"}, "booking_date": {"$gte": start}}, {"_id": 0, "id": 1, "flat_id": 1, "block_id": 1, "booking_date": 1}).to_list(50000))
     cats = REAL_CATS if real else DISPLAY_CATS
-    per: dict[str, dict] = {b["id"]: {"block_id": b["id"], "tower": b["name"], "code": b["code"], **{c: 0 for c in cats}} for b in blocks}
+    per: dict[str, dict] = {b["id"]: {"block_id": b["id"], "tower": b["name"], "code": b["code"], **{c: 0 for c in cats}, "series": [0] * weeks} for b in blocks}
+
+    def _wk(iso: str | None):
+        if not iso:
+            return None
+        y, w, _ = date.fromisoformat(iso[:10]).isocalendar()
+        return week_idx.get((y, w))
+    booked_week = {b["flat_id"]: _wk(b["booking_date"]) for b in bookings}  # transfers keep one booking doc → never double counted
     for f in flats:
         row = per.get(f["block_id"])
         if row is None:
@@ -111,14 +128,26 @@ async def tower_sales(project_id: str, view: str = "display", user: dict = Depen
         if cat is None:
             continue
         row[cat] += 1
+        if cat == "sold":
+            wk = booked_week.get(f["id"]) if (real or f.get("booking_id") or not f.get("display_override")) else _wk(f.get("display_set_at"))  # show-as-sold override → week it was set; no date → not in series
+            if wk is not None:
+                row["series"][wk] += 1
     rows = list(per.values())
     for r in rows:
         r["total"] = sum(r[c] for c in cats)
         r["sold_pct"] = round(100 * r["sold"] / r["total"], 1) if r["total"] else 0
+        r["last4"] = sum(r["series"][-4:])
+    median = sorted(r["last4"] for r in rows if r["available"] > 0 or r["last4"] > 0)
+    med = (median[len(median) // 2] if median else 0)
+    for r in rows:
+        r["pace"] = "slow" if r["last4"] == 0 and r["available"] > 0 else "fast" if r["last4"] > med and r["last4"] > 0 else "steady"
     total = {c: sum(r[c] for r in rows) for c in cats}
     total["total"] = sum(total[c] for c in cats)
     total["sold_pct"] = round(100 * total["sold"] / total["total"], 1) if total["total"] else 0
-    return {"project_id": project_id, "view": "real" if real else "display", "can_toggle": inv.can_see_real(user), "categories": list(cats), "towers": rows, "total": total}
+    total["series"] = [sum(r["series"][i] for r in rows) for i in range(weeks)]
+    total["last4"] = sum(total["series"][-4:])
+    return {"project_id": project_id, "view": "real" if real else "display", "can_toggle": inv.can_see_real(user), "categories": list(cats), "towers": rows, "total": total,
+            "weeks": week_labels, "pace_median_last4": med}
 
 
 class FloorsPreviewIn(StrictModel):

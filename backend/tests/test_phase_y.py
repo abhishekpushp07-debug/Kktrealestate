@@ -73,4 +73,4 @@ def test_wizard_co_applicants_linked_on_letter_and_idempotent():
     assert len(requests.get(f"{BASE}/api/customers/{cid}", headers=A, timeout=30).json()["co_applicants"]) == 2
     g = requests.get(f"{BASE}/api/graph/customer/{cid}", headers=A, timeout=30).json()
     assert g["sections"]["bookings"]["total"] == 1
-    requests.post(f"{BASE}/api/bookings/{bid}/cancel", json={"reason": "Y.2 test artefact", "refund_amount": 0}, headers={**A, "Idempotency-Key": str(uuid.uuid4())}, timeout=60)
+    requests.post(f"{BASE}/api/bookings/{bid}/cancel", json={"reason": "Y.2 test artefact", "deduction": 0, "refund": 0}, headers={**A, "Idempotency-Key": str(uuid.uuid4())}, timeout=60)
