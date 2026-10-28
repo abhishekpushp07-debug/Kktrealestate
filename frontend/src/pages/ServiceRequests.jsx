@@ -1,5 +1,5 @@
 import { HistoryButton } from "@/components/common/HistoryTimeline";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AlertTriangle, LifeBuoy, Lock, Paperclip, Send, UserRound } from "lucide-react";
 import { toast } from "sonner";
@@ -38,8 +38,9 @@ function Detail({ id }) {
   const [users, setUsers] = useState([]);
   const [msg, setMsg] = useState("");
   const [internal, setInternal] = useState(false);
-  const load = () => api.get(`/service-requests/${id}`).then((r) => setSr(r.data)).catch((e) => toast.error(errMsg(e)));
-  useEffect(() => { load(); if (can("service.ticket.assign")) api.get("/users?page_size=100").then((r) => setUsers(r.data.items)).catch(() => {}); }, [id]); // eslint-disable-line
+  const load = useCallback(() => api.get(`/service-requests/${id}`).then((r) => setSr(r.data)).catch((e) => toast.error(errMsg(e))), [id]);
+  const canAssign = can("service.ticket.assign");
+  useEffect(() => { load(); if (canAssign) api.get("/users?page_size=100").then((r) => setUsers(r.data.items)).catch(() => {}); }, [load, canAssign]);
   const [filesKey, setFilesKey] = useState(0);
   const post = async (path, body, ok) => { try { await api.post(`/service-requests/${id}/${path}`, body); toast.success(ok); setMsg(""); load(); } catch (e) { toast.error(errMsg(e)); } };
   const openAttachment = async (idx, name) => { try { const { data } = await api.get(`/service-requests/${id}/attachments/${idx}`, { responseType: "blob" }); const url = URL.createObjectURL(data); const a = document.createElement("a"); a.href = url; a.download = name; a.target = "_blank"; a.click(); setTimeout(() => URL.revokeObjectURL(url), 5000); } catch (e) { toast.error(errMsg(e)); } };
@@ -84,8 +85,8 @@ export default function ServiceRequests() {
   const [prompt, setPrompt] = useState(null);
   const [note, setNote] = useState("");
   const narrow = useNarrow();
-  const load = () => { const p = new URLSearchParams({ page_size: 200 }); if (f.status !== "all") p.set("status", f.status); if (f.priority !== "all") p.set("priority", f.priority); if (f.overdue) p.set("overdue", "true"); return api.get(`/service-requests?${p}`).then((r) => setData(r.data)).catch((e) => toast.error(errMsg(e))); };
-  useEffect(() => { if (!id) load(); }, [id, f]); // eslint-disable-line
+  const load = useCallback(() => { const p = new URLSearchParams({ page_size: 200 }); if (f.status !== "all") p.set("status", f.status); if (f.priority !== "all") p.set("priority", f.priority); if (f.overdue) p.set("overdue", "true"); return api.get(`/service-requests?${p}`).then((r) => setData(r.data)).catch((e) => toast.error(errMsg(e))); }, [f]);
+  useEffect(() => { if (!id) load(); }, [id, load]);
   if (id) return <Detail id={id} />;
   const cols = f.status === "all" ? SR_STATUSES : [f.status];
   const items = data?.items || [], nowIso = new Date().toISOString();

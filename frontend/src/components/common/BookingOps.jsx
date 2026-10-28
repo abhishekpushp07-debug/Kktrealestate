@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
 import api, { errMsg } from "@/lib/api";
 import { useTransferValidation } from "./booking-ops/useTransferValidation";
@@ -19,8 +19,8 @@ export function RefundsTab({ bookingId, canPay, onChanged }) {
   const [items, setItems] = useState(null);
   const [pay, setPay] = useState(null);
   const { options: banks } = useMasterOptions("bank-accounts", (b) => ({ value: b.id, label: `${b.bank_name} · ${b.account_name}` }));
-  const load = () => api.get(`/bookings/${bookingId}/refunds`).then((r) => setItems(r.data.items)).catch(() => setItems([]));
-  useEffect(() => { load(); }, [bookingId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const load = useCallback(() => api.get(`/bookings/${bookingId}/refunds`).then((r) => setItems(r.data.items)).catch(() => setItems([])), [bookingId]);
+  useEffect(() => { load(); }, [load]);
   const submit = async () => {
     try { await api.post(`/refunds/${pay.id}/pay`, { paid_date: pay.paid_date, mode: pay.mode, bank_account_id: pay.mode === "CASH" ? null : pay.bank_account_id || null, reference: pay.reference || null }); toast.success("Refund paid — contra posted to ledger and Roznamcha"); setPay(null); load(); onChanged?.(); }
     catch (e) { toast.error(errMsg(e), { duration: 8000 }); }

@@ -23,7 +23,7 @@ export default function Catalogues() {
   const [edit, setEdit] = useState(null);
   const write = can("masters.catalogue.create");
   const load = (t) => api.get(`/catalogues/${t}?include_inactive=true`).then((r) => setItems(r.data.items)).catch((e) => toast.error(errMsg(e)));
-  useMemo(() => { setItems(null); load(type); }, [type]); // eslint-disable-line react-hooks/exhaustive-deps
+  useMemo(() => { setItems(null); load(type); }, [type]);
   const act = async (fn, msg) => { try { await fn(); await invalidateCatalogues(); await load(type); msg && toast.success(msg); } catch (e) { toast.error(errMsg(e)); } };
   const parents = catalogues?.types?.[type === "city" ? "state" : type === "locality" ? "city" : ""] || [];
   const list = (items || []).filter((i) => !q || i.label.toLowerCase().includes(q.toLowerCase()));

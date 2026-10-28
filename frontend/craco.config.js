@@ -105,6 +105,9 @@ let webpackConfig = {
         "react/no-array-index-key": "error",
         "no-undef": "error",
       },
+      overrides: [
+        { files: ["src/components/common/**"], rules: { complexity: ["error", 20] } },
+      ],
     },
   },
   webpack: {

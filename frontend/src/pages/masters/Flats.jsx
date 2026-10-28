@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { RefreshCw } from "lucide-react";
 import { toast } from "sonner";
@@ -18,9 +18,10 @@ export default function Flats() {
   const [total, setTotal] = useState(0);
   const [flt, setFlt] = useState({ ...EMPTY_FILTERS, category: sp.get("category") || "" });
   const [showReal, setShowReal] = useState(true);
-  const load = () => { if (!blockId) { setItems([]); return; } api.get(`/flats?block_id=${blockId}&page_size=200`).then((r) => { setItems(r.data.items); setTotal(r.data.total ?? r.data.items.length); }).catch((e) => toast.error(errMsg(e))); };
-  useEffect(() => { load(); }, [blockId]); // eslint-disable-line
-  useEffect(() => { if (!projectId && blockId) api.get(`/blocks/${blockId}`).then((r) => setProjectId(r.data.project_id)).catch(() => {}); }, [blockId]); // eslint-disable-line
+  const load = useCallback(() => { if (!blockId) { setItems([]); return; } api.get(`/flats?block_id=${blockId}&page_size=200`).then((r) => { setItems(r.data.items); setTotal(r.data.total ?? r.data.items.length); }).catch((e) => toast.error(errMsg(e))); }, [blockId]);
+  useEffect(() => { load(); }, [load]);
+  const needProject = !projectId && !!blockId;
+  useEffect(() => { if (needProject) api.get(`/blocks/${blockId}`).then((r) => setProjectId(r.data.project_id)).catch(() => {}); }, [needProject, blockId, setProjectId]);
   const gen = async () => { if (!window.confirm("Regenerate flats for this tower? Only allowed while every flat is Available.")) return; try { const r = await api.post(`/blocks/${blockId}/generate-flats`); toast.success(`${r.data.generated} flats generated`); load(); } catch (e) { toast.error(errMsg(e)); } };
   const rows = items.filter((f) => matchesInventoryFilters(f, flt));
   const hoursLeft = (f) => (f.hold?.expires_at ? `${Math.max(0, Math.round((new Date(f.hold.expires_at) - Date.now()) / 36e5))} h` : "");

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
 import api, { errMsg } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -17,8 +17,8 @@ export default function Templates() {
   const [prev, setPrev] = useState(null);
   const [bk, setBk] = useState("");
   const [bookings, setBookings] = useState([]);
-  const load = () => api.get("/messaging/templates").then((r) => { setList(r.data); if (!sel && r.data.items[0]) setSel(r.data.items[0]); }).catch((e) => toast.error(errMsg(e)));
-  useEffect(() => { load(); api.get("/bookings", { params: { status: "Active", page_size: 20 } }).then((r) => { setBookings(r.data.items); if (r.data.items[0]) setBk(r.data.items[0].id); }).catch(() => {}); }, []); // eslint-disable-line
+  const load = useCallback(() => api.get("/messaging/templates").then((r) => { setList(r.data); setSel((cur) => cur || r.data.items[0] || cur); }).catch((e) => toast.error(errMsg(e))), []);
+  useEffect(() => { load(); api.get("/bookings", { params: { status: "Active", page_size: 20 } }).then((r) => { setBookings(r.data.items); if (r.data.items[0]) setBk(r.data.items[0].id); }).catch(() => {}); }, [load]);
   const set = (k, v) => setSel({ ...sel, [lang]: { ...(sel[lang] || {}), [k]: v } });
   const save = async () => { try { const r = await api.patch(`/messaging/templates/${sel.id}`, { code: sel.code, name: sel.name, en: sel.en, hi: sel.hi, version: sel.version }); setSel(r.data); toast.success("Template saved"); load(); } catch (e) { toast.error(errMsg(e)); } };
   const preview = async () => { try { const r = await api.get(`/messaging/templates/${sel.code}/preview`, { params: { booking_id: bk, lang } }); setPrev(r.data); } catch (e) { toast.error(errMsg(e)); } };

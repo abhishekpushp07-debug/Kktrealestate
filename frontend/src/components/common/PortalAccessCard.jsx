@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Copy, KeyRound, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 import api, { errMsg, portalHref } from "@/lib/api";
@@ -13,8 +13,9 @@ export function PortalAccessCard({ customerId }) {
   const [busy, setBusy] = useState(false);
   const [portalUrl, setPortalUrl] = useState(portalHref(null));
   useEffect(() => { api.get("/public/site").then((r) => setPortalUrl(portalHref(r.data.portal_url))).catch(() => {}); }, []);
-  const load = () => api.get(`/customers/${customerId}/portal`).then((r) => setSt(r.data)).catch(() => setSt({ enabled: false }));
-  useEffect(() => { if (can("service.portal.manage")) load(); }, [customerId]); // eslint-disable-line
+  const load = useCallback(() => api.get(`/customers/${customerId}/portal`).then((r) => setSt(r.data)).catch(() => setSt({ enabled: false })), [customerId]);
+  const allowed = can("service.portal.manage");
+  useEffect(() => { if (allowed) load(); }, [allowed, load]);
   if (!can("service.portal.manage") || !st) return null;
   const run = async (fn, ok) => { setBusy(true); try { const r = await fn(); if (r?.data?.temporary_password) setTemp(r.data); toast.success(ok); load(); } catch (e) { toast.error(errMsg(e)); } finally { setBusy(false); } };
   const copy = () => { navigator.clipboard?.writeText(`Login: ${temp.login_phone}\nTemporary password: ${temp.temporary_password}`); toast.success("Copied"); };

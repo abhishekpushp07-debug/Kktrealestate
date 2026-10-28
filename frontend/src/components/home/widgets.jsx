@@ -1,7 +1,6 @@
 import { Link } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AlertTriangle, ArrowRight, CalendarDays, FileWarning, PhoneCall, Receipt, Wallet } from "lucide-react";
-import { useFetch } from "@/hooks/useList";
 import { fmtDate, fmtRelative, inr, inrShort } from "@/lib/format";
 import { Card, EmptyState, EntityCard, IconTile, Num, SegmentBar, Skeleton, SkeletonCards, StatTile, Timeline } from "@/components/v2";
 import { TrendSpark, monthLabel } from "@/components/common/TrendSpark";

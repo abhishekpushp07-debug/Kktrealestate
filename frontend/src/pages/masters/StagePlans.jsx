@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { HistoryButton } from "@/components/common/HistoryTimeline";
 import { WhereUsedButton } from "./WhereUsed";
 import { useProjectTowers } from "./useProjectTowers";
-import { QuickAddButton, useQuickCreate } from "@/components/common/QuickCreate";
+import { QuickAddButton } from "@/components/common/QuickCreate";
 
 export default function StagePlans() {
   const { can } = useAuth();

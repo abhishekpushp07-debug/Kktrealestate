@@ -18,11 +18,12 @@ export function AddFloorsSheet({ tower: t, onClose, onSaved }) {
   const [busy, setBusy] = useState(false);
   const body = { count: Number(f.count) || 1, ...(f.mode === "template" ? { floor_plan_template_id: f.floor_plan_template_id || null } : f.mode === "simple" ? { flats_per_floor: Number(f.flats_per_floor) || 1, flat_type_id: f.flat_type_id || null } : {}) };
   const ready = body.count >= 1 && (f.mode === "same" || (f.mode === "template" && body.floor_plan_template_id) || (f.mode === "simple" && body.flat_type_id));
+  const bodyKey = JSON.stringify(body);
   useEffect(() => {
     if (!ready) { setPreview(null); return; }
-    const h = setTimeout(() => api.post(`/blocks/${t.id}/floors/preview`, body).then((r) => { setPreview(r.data); setErr(null); }).catch((e) => { setPreview(null); setErr(errMsg(e)); }), 250);
+    const h = setTimeout(() => api.post(`/blocks/${t.id}/floors/preview`, JSON.parse(bodyKey)).then((r) => { setPreview(r.data); setErr(null); }).catch((e) => { setPreview(null); setErr(errMsg(e)); }), 250);
     return () => clearTimeout(h);
-  }, [JSON.stringify(body), ready, t.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [bodyKey, ready, t.id]);
   const save = async () => {
     setBusy(true);
     try { const r = await api.post(`/blocks/${t.id}/floors`, body); onSaved(r.data.flats_added); } catch (e) { setErr(errMsg(e)); toast.error(errMsg(e)); } finally { setBusy(false); }

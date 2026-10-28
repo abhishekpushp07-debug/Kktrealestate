@@ -12,6 +12,6 @@ export function useTableState({ columns, items, sort, setSort, testId, denseDefa
   const labelled = useMemo(() => columns.filter((c) => c.label), [columns]);
   const toggleSort = (key) => { if (setSort) setSort(sort === key ? `-${key}` : key); };
   const onScroll = () => { const el = scrollRef.current; if (el) setAtEnd(el.scrollWidth - el.clientWidth - el.scrollLeft < 4); };
-  useEffect(() => { onScroll(); }, [items, cols.length]); // eslint-disable-line
+  useEffect(() => { onScroll(); }, [items, cols.length]);
   return { dense, setDense, hidden, toggleCol, cols, labelled, toggleSort, scrollRef, atEnd, onScroll };
 }

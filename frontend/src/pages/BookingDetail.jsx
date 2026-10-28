@@ -48,12 +48,14 @@ export default function BookingDetail() {
   const [cancel, setCancel] = useState(null);
   const [transfer, setTransfer] = useState(false);
   const [preview, setPreview] = useState(null);
-  useEffect(() => { if (!cancel) { setPreview(null); return; } const t = setTimeout(() => api.get(`/bookings/${id}/cancellation-preview`, { params: cancel.deduction !== "" && cancel.deduction != null ? { deduction: Number(cancel.deduction) } : {} }).then((r) => setPreview(r.data)).catch(() => setPreview(null)), 250); return () => clearTimeout(t); }, [cancel?.deduction, !!cancel, id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const cancelOpen = !!cancel, deduction = cancel?.deduction;
+  useEffect(() => { if (!cancelOpen) { setPreview(null); return; } const t = setTimeout(() => api.get(`/bookings/${id}/cancellation-preview`, { params: deduction !== "" && deduction != null ? { deduction: Number(deduction) } : {} }).then((r) => setPreview(r.data)).catch(() => setPreview(null)), 250); return () => clearTimeout(t); }, [deduction, cancelOpen, id]);
   const [tab, setTab] = useState("overview");
   const load = useCallback(() => Promise.all([api.get(`/bookings/${id}`), api.get(`/bookings/${id}/ledger`)]).then(([r1, r2]) => { setB(r1.data); setLedger(r2.data.rows); }).catch((e) => toast.error(errMsg(e))), [id]);
   useEffect(() => { load(); }, [load]);
   const [sp] = useSearchParams();
-  useEffect(() => { if (b && sp.get("revise") === "1" && b.status === "Active" && can("sales.agreement.revise") && !rev) setRev({ cash: b.cash_agreed, account: b.account_agreed, reason: "" }); }, [b, sp]); // eslint-disable-line
+  const canRevise = can("sales.agreement.revise");
+  useEffect(() => { if (b && sp.get("revise") === "1" && b.status === "Active" && canRevise) setRev((cur) => cur || { cash: b.cash_agreed, account: b.account_agreed, reason: "" }); }, [b, sp, canRevise]);
   if (!b) return <Skeleton className="h-96" />;
   const s = b.summary || {};
   const act = async (path, body, msg) => { try { await api.post(path, body); toast.success(msg); load(); } catch (e) { toast.error(errMsg(e), { duration: 8000 }); } };

@@ -13,7 +13,7 @@ import { Field, Money, Num, Skeleton, StatusPill } from "@/components/v2";
 import { Select } from "@/components/v2/Select";
 import { Avatar, Segmented, usePeople } from "@/components/v2/CustomerBits";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { QuickAddButton, useQuickCreate } from "@/components/common/QuickCreate";
+import { QuickAddButton } from "@/components/common/QuickCreate";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);

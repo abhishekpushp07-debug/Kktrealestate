@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
 import { ExternalLink } from "lucide-react";
 import api from "@/lib/api";
@@ -47,8 +47,8 @@ export function ProjectWebsiteTab({ projectId, slugDefault }) {
   const [d, setD] = useState(null);
   const heroRows = useRowKeys(d?.hero_images);
   const [busy, setBusy] = useState(false);
-  const load = () => api.get(`/cms/projects/${projectId}/website`).then((r) => setD({ ...r.data.website, version: r.data.version, faqsText: JSON.stringify(r.data.website.faqs || [], null, 2) }));
-  useEffect(() => { load(); }, [projectId]); // eslint-disable-line
+  const load = useCallback(() => api.get(`/cms/projects/${projectId}/website`).then((r) => setD({ ...r.data.website, version: r.data.version, faqsText: JSON.stringify(r.data.website.faqs || [], null, 2) })), [projectId]);
+  useEffect(() => { load(); }, [load]);
   if (!d) return <div className="card p-5 text-sm text-txt-secondary">Loading…</div>;
   const set = (k) => (v) => setD((p) => ({ ...p, [k]: v }));
   const save = async () => {

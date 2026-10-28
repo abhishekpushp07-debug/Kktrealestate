@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api, { errMsg } from "@/lib/api";
 import { toast } from "sonner";
@@ -25,9 +25,10 @@ export function useList(path, extra = {}, { pageSize: ps0 = 20, sort = "name" } 
 
 export function useFetch(path, deps = []) {
   const qc = useQueryClient();
-  const key = ["fetch", path, ...deps];
+  const depsKey = JSON.stringify(deps);
+  const key = useMemo(() => ["fetch", path, ...JSON.parse(depsKey)], [path, depsKey]);
   const q = useQuery({ queryKey: key, queryFn: () => api.get(path).then((r) => r.data), enabled: !!path, staleTime: 15_000 });
-  const setData = useCallback((updater) => qc.setQueryData(key, (old) => (typeof updater === "function" ? updater(old) : updater)), [qc, path]); // eslint-disable-line
+  const setData = useCallback((updater) => qc.setQueryData(key, (old) => (typeof updater === "function" ? updater(old) : updater)), [qc, key]);
   return { data: q.data ?? null, loading: q.isPending && !!path, error: q.error, reload: () => qc.invalidateQueries({ queryKey: key }), setData };
 }
 

@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Building2, Grid3X3, Layers, LayoutDashboard, Database, Users, History, Settings, ShieldCheck, Home, Clock, Plus, IndianRupee, PhoneCall, Hammer, Receipt, UserPlus, Keyboard, LifeBuoy, BarChart3 } from "lucide-react";
+import { Building2, Grid3X3, LayoutDashboard, Database, Users, History, Settings, ShieldCheck, Plus, IndianRupee, PhoneCall, Hammer, Receipt, UserPlus, Keyboard, LifeBuoy, BarChart3 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { inrShort } from "@/lib/format";
 import { CommandDialog, CommandEmpty, CommandInput, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { GO, useKeyboardNav, usePaletteSearch } from "./palette/usePaletteHooks";

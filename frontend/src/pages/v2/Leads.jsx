@@ -18,7 +18,7 @@ import { Calendar, LeadVisits, NewVisit, VisitActions } from "@/pages/SiteVisits
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ContextActions } from "@/components/common/ContextActions";
-import { QuickAddButton, useQuickCreate } from "@/components/common/QuickCreate";
+import { useQuickCreate } from "@/components/common/QuickCreate";
 
 const SOURCES = ["Walk-in", "Website", "Referral", "Broker", "Campaign", "Brochure", "Site Visit"];
 const BANDS = [["Under ₹50 L", 0, 5000000], ["₹50 L – ₹1 Cr", 5000000, 10000000], ["₹1 – 1.5 Cr", 10000000, 15000000], ["₹1.5 – 2.5 Cr", 15000000, 25000000], ["Above ₹2.5 Cr", 25000000, null]];

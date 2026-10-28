@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { ChevronDown, ChevronRight, Plus, Printer } from "lucide-react";
 import { toast } from "sonner";
@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { HistoryButton } from "@/components/common/HistoryTimeline";
 import { SendReminderButton } from "@/components/common/SendReminderButton";
 import { useSearchParams } from "react-router-dom";
-import { QuickAddButton, useQuickCreate } from "@/components/common/QuickCreate";
+import { QuickAddButton } from "@/components/common/QuickCreate";
 
 const Sel = ({ value, onChange, children, testId, disabled }) => <select className="input !h-9 !w-auto text-sm" value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} data-testid={testId}>{children}</select>;
 const Kpi = ({ label, value, hint, tone, testId }) => <div className={cn("rounded-2xl border border-warm-200 bg-white px-4 py-3", tone === "brick" && "border-brick/30 bg-brick/5")} data-testid={testId}><p className="text-[11px] font-semibold uppercase text-txt-muted">{label}</p><p className={cn("font-display text-[22px] tabular-nums text-ink-950", tone === "brick" && "text-brick")}>{value ?? "—"}</p>{hint && <p className="text-[11px] text-txt-secondary">{hint}</p>}</div>;
@@ -35,8 +35,8 @@ export default function Demands() {
   const [manualInit] = useState({ project_id: qs.get("project_id") || "", block_id: qs.get("block_id") || "", booking_id: qs.get("booking_id") || "" });
   const [voidRow, setVoidRow] = useState(null);
   const params = useMemo(() => ({ basis, ...Object.fromEntries(Object.entries(f).filter(([, v]) => v)) }), [basis, f]);
-  const load = () => { api.get("/demands/register", { params }).then((r) => { setData(r.data); setOpen((o) => Object.keys(o).length ? o : Object.fromEntries(r.data.groups.slice(0, 1).map((g) => [g.date, true]))); }).catch((e) => toast.error(errMsg(e))); api.get("/demands/kpis", { params: { project_id: f.project_id || undefined, block_id: f.block_id || undefined } }).then((r) => setKpis(r.data)); };
-  useEffect(() => { load(); }, [params]); // eslint-disable-line
+  const load = useCallback(() => { api.get("/demands/register", { params }).then((r) => { setData(r.data); setOpen((o) => Object.keys(o).length ? o : Object.fromEntries(r.data.groups.slice(0, 1).map((g) => [g.date, true]))); }).catch((e) => toast.error(errMsg(e))); api.get("/demands/kpis", { params: { project_id: f.project_id || undefined, block_id: f.block_id || undefined } }).then((r) => setKpis(r.data)); }, [params, f.project_id, f.block_id]);
+  useEffect(() => { load(); }, [load]);
   useEffect(() => { api.get("/demands/calendar", { params: { month, basis, project_id: f.project_id || undefined, block_id: f.block_id || undefined } }).then((r) => setCal(r.data)); }, [month, basis, f.project_id, f.block_id]);
   useEffect(() => { api.get("/docgen/options", { params: { project_id: f.project_id || undefined } }).then((r) => setOpts(r.data)).catch(() => {}); }, [f.project_id]);
   const preset = (k) => { const t = new Date(); if (k === "month") setF({ ...f, date_from: t.toISOString().slice(0, 8) + "01", date_to: t.toISOString().slice(0, 10) }); else setF({ ...f, date_from: new Date(Date.now() - PRESETS[k] * 864e5).toISOString().slice(0, 10), date_to: t.toISOString().slice(0, 10) }); };
@@ -109,8 +109,8 @@ function ManualSheet({ open, onOpenChange, opts, onSaved, initial }) {
   const [towers, setTowers] = useState([]);
   const [extra, setExtra] = useState({ projects: [] });
   useEffect(() => { if (!f.project_id) return; api.get("/docgen/options", { params: { project_id: f.project_id, block_id: f.block_id || undefined } }).then((r) => { setTowers(r.data.towers); setBk(r.data.bookings.filter((b) => b.status === "Active")); }); }, [f.project_id, f.block_id]);
-  const body = { booking_id: f.booking_id, kind: f.kind, name: f.name, cash_amount: Number(f.cash_amount) || 0, account_amount: Number(f.account_amount) || 0, due_date: f.due_date, note: f.note || null };
-  useEffect(() => { if (!f.booking_id || !(body.cash_amount + body.account_amount) || !f.due_date || f.name.length < 2) { setEffect(null); return; } api.post("/demands/manual", { ...body, preview: true }).then((r) => setEffect(r.data.effect)).catch(() => setEffect(null)); }, [f]); // eslint-disable-line
+  const body = useMemo(() => ({ booking_id: f.booking_id, kind: f.kind, name: f.name, cash_amount: Number(f.cash_amount) || 0, account_amount: Number(f.account_amount) || 0, due_date: f.due_date, note: f.note || null }), [f]);
+  useEffect(() => { if (!body.booking_id || !(body.cash_amount + body.account_amount) || !body.due_date || body.name.length < 2) { setEffect(null); return; } api.post("/demands/manual", { ...body, preview: true }).then((r) => setEffect(r.data.effect)).catch(() => setEffect(null)); }, [body]);
   const save = async () => { try { const r = await api.post("/demands/manual", body); toast.success(`${r.data.demand_number} raised · Bill raised +${inr(r.data.effect.bill_raised_delta_paise / 100)}`); onOpenChange(false); onSaved(); } catch (e) { toast.error(errMsg(e)); } };
   return (
     <Sheet open={open} onOpenChange={onOpenChange}><SheetContent className="w-[420px] overflow-y-auto sm:max-w-[420px]" data-testid="manual-demand-sheet"><SheetHeader><SheetTitle>Manual demand</SheetTitle></SheetHeader>

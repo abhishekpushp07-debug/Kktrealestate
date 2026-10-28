@@ -10,7 +10,7 @@ import { TowerNode } from "@/components/structure/TowerNode";
 import { AddFloorsSheet, AddFlatSheet } from "@/components/structure/StructureSheets";
 import { cn } from "@/lib/utils";
 import { ConnectedTo } from "@/components/common/ConnectedTo";
-import { QuickAddButton, useQuickCreate } from "@/components/common/QuickCreate";
+import { useQuickCreate } from "@/components/common/QuickCreate";
 
 function Checklist({ r, towers, onFix }) {
   const items = [...r.project_checks.map((c) => ({ ...c, scope: "Project" })), ...towers.flatMap((t) => t.checks.map((c) => ({ ...c, scope: t.name, block_id: t.id })))];

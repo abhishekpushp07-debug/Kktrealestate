@@ -47,7 +47,7 @@ export default function ProjectDetail() {
         actions={<>
           <Pill tone={p.status === "Ready" ? "green" : p.status === "Under Construction" ? "amber" : "slate"} className="px-3 py-1 text-xs">{p.status}</Pill>
           {can("masters.project.edit") && <button type="button" className="btn btn-secondary" onClick={() => setEditOpen(true)} data-testid="edit-project-btn"><Pencil className="mr-1.5 h-4 w-4" />Edit</button>}
-          {can("masters.tower.create") && <button type="button" className="btn btn-primary" onClick={() => setBlockOpen(true)} className="bg-ink-950 hover:bg-ink-800" data-testid="new-block-btn"><Plus className="mr-1.5 h-4 w-4" />Add block</button>}
+          {can("masters.tower.create") && <button type="button" onClick={() => setBlockOpen(true)} className="bg-ink-950 hover:bg-ink-800" data-testid="new-block-btn"><Plus className="mr-1.5 h-4 w-4" />Add block</button>}
         </>} />
       <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard label="Total units" value={inv.total} testId="project-stat-total" />

@@ -17,7 +17,7 @@ export function AuthProvider({ children }) {
     try { if (tokens.access) await api.post("/auth/logout", {}, { headers: csrfHeaders() }); } catch (e) { /* ignore */ }
     tokens.clear();
     setUser(null);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     setLogoutHandler(() => { tokens.clear(); setUser(null); });
@@ -29,7 +29,7 @@ export function AuthProvider({ children }) {
       .catch(() => tokens.clear())
       .finally(() => setLoading(false));
     });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [qc]);
 
   const login = useCallback(async (email, password) => {
     const { data } = await api.post("/auth/login", { email, password });
@@ -41,7 +41,7 @@ export function AuthProvider({ children }) {
     setCompany(c.data);
     loadBootstrap(true).then((b) => b?.surfaces && setSurfaces(b.surfaces)).catch(() => {});
     return data;
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [qc]);
 
   const loginMfa = useCallback(async (mfa_token, code) => {
     const { data } = await api.post("/auth/login/mfa", { mfa_token, code });
@@ -52,19 +52,20 @@ export function AuthProvider({ children }) {
     setCompany(c.data);
     loadBootstrap(true).then((b) => b?.surfaces && setSurfaces(b.surfaces)).catch(() => {});
     return data;
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [qc]);
 
   const refreshMe = useCallback(async () => {
     try { const { data } = await api.get("/auth/me"); qc.setQueryData(["fetch", "/auth/me"], data); setUser((u) => (u && JSON.stringify(u.permissions) === JSON.stringify(data.permissions) ? u : data)); } catch { /* ignore */ }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [qc]);
 
+  const signedIn = !!user;
   useEffect(() => {
-    if (!user) return undefined;
+    if (!signedIn) return undefined;
     setPermissionDeniedHandler(refreshMe);
     const t = setInterval(refreshMe, 30_000);
     window.addEventListener("focus", refreshMe);
     return () => { clearInterval(t); window.removeEventListener("focus", refreshMe); setPermissionDeniedHandler(null); };
-  }, [!!user, refreshMe]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [signedIn, refreshMe]);
 
   // CR-2 B5: permission helpers are stable callbacks keyed on the user's permission set; the context value is composed from small memos
   const can = useCallback((perm) => !!user?.is_super_admin || (perm.endsWith(".*") ? !!user?.permissions?.some((c) => c.startsWith(perm.slice(0, -1))) : !!user?.permissions?.includes(canonical(perm))), [user]);

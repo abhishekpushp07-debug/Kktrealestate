@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Search, Save, ShieldCheck, ShieldOff, Copy, Users as UsersIcon } from "lucide-react";
@@ -54,8 +54,8 @@ function UserAccess({ userId, tree, roles, projects, onSaved }) {
   const [direct, setDirect] = useState([]);
   const [busy, setBusy] = useState(false);
   const [conflict, setConflict] = useState(null);
-  const load = () => api.get(`/admin/access/users/${userId}`).then((r) => { setAcc(r.data); setRoleIds(r.data.role_ids); setScope(r.data.user.project_scope || ["*"]); setDirect(r.data.direct.map((d) => ({ code: d.code, effect: d.effect, reason: d.reason }))); });
-  useEffect(() => { load(); }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const load = useCallback(() => api.get(`/admin/access/users/${userId}`).then((r) => { setAcc(r.data); setRoleIds(r.data.role_ids); setScope(r.data.user.project_scope || ["*"]); setDirect(r.data.direct.map((d) => ({ code: d.code, effect: d.effect, reason: d.reason }))); }), [userId]);
+  useEffect(() => { load(); }, [load]);
   const roleById = useMemo(() => Object.fromEntries((roles || []).map((r) => [r.id, r])), [roles]);
   const isSuper = roleIds.some((id) => roleById[id]?.name === "Super Admin");
   const fromRoles = useMemo(() => new Set(roleIds.flatMap((id) => roleById[id]?.permissions || [])), [roleIds, roleById]);

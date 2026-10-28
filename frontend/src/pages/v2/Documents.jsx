@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Download, Link2, Printer, Send } from "lucide-react";
 import { toast } from "sonner";
@@ -39,7 +39,7 @@ export default function Documents() {
   const [mode, setMode] = useState(sp.get("mode") || "generate");
   const [reg, setReg] = useState(null);
   const loadReg = () => api.get("/docgen/register", { params: { limit: 200 } }).then((r) => setReg(r.data)).catch((e) => toast.error(errMsg(e)));
-  useEffect(() => { loadReg(); }, []); // eslint-disable-line
+  useEffect(() => { loadReg(); }, []);
   return (
     <div className="space-y-5" data-testid="documents-page">
       <div className="flex flex-wrap items-end justify-between gap-3"><div><h1 className="font-display text-2xl text-ink-950">Documents</h1><p className="text-xs text-txt-secondary">Receipts, demand letters, statements and letters — deterministic PDFs, registered and re-downloadable forever.</p></div>
@@ -123,8 +123,8 @@ function Bulk({ can, onDone }) {
   const [rows, setRows] = useState(null);
   const [sel, setSel] = useState(new Set());
   useEffect(() => { api.get("/docgen/options", { params: { project_id: f.project_id || undefined } }).then((r) => setOpts(r.data)); }, [f.project_id]);
-  const load = () => api.get("/demands/register", { params: { basis: "raised", project_id: f.project_id || undefined, block_id: f.block_id || undefined, date_from: f.date_from || undefined, date_to: f.date_to || undefined, status: f.status || undefined, per_group: 500 } }).then((r) => setRows(r.data.groups.flatMap((g) => g.projects.flatMap((p) => p.towers.flatMap((t) => t.rows))))).catch((e) => toast.error(errMsg(e)));
-  useEffect(() => { load(); }, [f]); // eslint-disable-line
+  const load = useCallback(() => api.get("/demands/register", { params: { basis: "raised", project_id: f.project_id || undefined, block_id: f.block_id || undefined, date_from: f.date_from || undefined, date_to: f.date_to || undefined, status: f.status || undefined, per_group: 500 } }).then((r) => setRows(r.data.groups.flatMap((g) => g.projects.flatMap((p) => p.towers.flatMap((t) => t.rows))))).catch((e) => toast.error(errMsg(e))), [f]);
+  useEffect(() => { load(); }, [load]);
   const run = async (mode) => {
     try {
       const r = await api.post("/docgen/bulk", { demand_ids: [...sel], mode }, { responseType: "blob" });

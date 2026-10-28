@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { Layers, RefreshCw, IndianRupee, ArrowUpFromLine, Printer, History, Milestone } from "lucide-react";
 import { ConstructionStatusPanel } from "@/components/common/ConstructionStatusPanel";
@@ -8,7 +8,7 @@ import { useFetch } from "@/hooks/useList";
 import { useAuth } from "@/context/AuthContext";
 import { inrShort, num } from "@/lib/format";
 import { PageHeader, KV, Field } from "@/components/common/Bits";
-import { StatusChip, STATUS_STYLES } from "@/components/common/StatusChip";
+import { STATUS_STYLES } from "@/components/common/StatusChip";
 import { FlatDrawer } from "@/components/common/FlatDrawer";
 import { InventoryActions } from "@/components/common/InventoryActions";
 import { InventoryFilters, InventoryLegend, EMPTY_FILTERS, matchesInventoryFilters } from "@/components/common/InventoryFilters";
@@ -29,8 +29,8 @@ function BulkPriceDialog({ block, open, onOpenChange, onDone }) {
   const [form, setForm] = useState({ mode: "rate", rate_per_sqft: block.rate_per_sqft ?? "", floor_rise_per_sqft: block.floor_rise_per_sqft ?? "", price: "", floors: "", only_available: true, include_non_saleable: false });
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState(null);
-  const base = () => ({ only_available: form.only_available, include_non_saleable: form.include_non_saleable, floors: form.floors ? form.floors.split(",").map((s) => Number(s.trim())).filter((n) => !isNaN(n)) : null });
-  useEffect(() => { api.post(`/blocks/${block.id}/bulk-price`, { ...base(), rate_per_sqft: 0, preview: true }).then((r) => setPreview(r.data)).catch(() => setPreview(null)); }, [form.only_available, form.include_non_saleable, form.floors]); // eslint-disable-line
+  const base = useCallback(() => ({ only_available: form.only_available, include_non_saleable: form.include_non_saleable, floors: form.floors ? form.floors.split(",").map((s) => Number(s.trim())).filter((n) => !isNaN(n)) : null }), [form.only_available, form.include_non_saleable, form.floors]);
+  useEffect(() => { api.post(`/blocks/${block.id}/bulk-price`, { ...base(), rate_per_sqft: 0, preview: true }).then((r) => setPreview(r.data)).catch(() => setPreview(null)); }, [base, block.id]);
   const submit = async () => {
     setBusy(true);
     const payload = base();
@@ -82,9 +82,6 @@ export default function BlockDetail() {
   };
   const addFloors = async () => {
     try { const r = await api.post(`/blocks/${id}/floors`, { count: Number(floorCount) }); toast.success(`${r.data.flats_added} flats added · now ${r.data.floors} floors`); setFloorsOpen(false); refresh(); } catch (e) { toast.error(errMsg(e)); }
-  };
-  const bulkStatus = async (status) => {
-    try { const r = await api.post(`/blocks/${id}/bulk-status`, { flat_ids: [...multi], status }); toast.success(`${r.data.flats_updated} flats → ${status}${r.data.skipped ? ` · ${r.data.skipped} skipped` : ""}`); setMulti(new Set()); refresh(); } catch (e) { toast.error(errMsg(e)); }
   };
   const toggleMulti = (fid, shift) => {
     const n = new Set(multi);

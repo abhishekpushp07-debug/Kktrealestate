@@ -36,7 +36,7 @@ export function JourneyPanel({ entityType, entityId, open, onOpenChange, initial
   const [entries, setEntries] = useState([]);
   const [sel, setSel] = useState(initialAuditId || null);
   const [j, setJ] = useState(null);
-  useEffect(() => { if (!open || !entityId) return; api.get(`/journey/entity/${entityType}/${entityId}`).then((r) => { setEntries(r.data.items); if (!sel && r.data.items[0]) setSel(r.data.items[0].id); }).catch(() => setEntries([])); }, [open, entityType, entityId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!open || !entityId) return; api.get(`/journey/entity/${entityType}/${entityId}`).then((r) => { setEntries(r.data.items); setSel((cur) => cur || r.data.items[0]?.id || cur); }).catch(() => setEntries([])); }, [open, entityType, entityId]);
   useEffect(() => { if (!sel) return; setJ(null); api.get(`/journey/${sel}`).then((r) => setJ(r.data)).catch(() => setJ(null)); }, [sel]);
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

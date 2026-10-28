@@ -4,7 +4,7 @@ import { HardHat } from "lucide-react";
 import api from "@/lib/api";
 import { ConstructionStatusPanel } from "@/components/common/ConstructionStatusPanel";
 import { useProjectTowers } from "./masters/useProjectTowers";
-import { QuickAddButton, useQuickCreate } from "@/components/common/QuickCreate";
+import { QuickAddButton } from "@/components/common/QuickCreate";
 
 export default function ConstructionUpdate() {
   const [sp, setSp] = useSearchParams();

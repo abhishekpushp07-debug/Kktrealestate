@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -19,8 +19,8 @@ export default function Towers() {
   const [items, setItems] = useState([]);
   const [qs] = useSearchParams();
   const [editing, setEditing] = useState(qs.get("new") === "1" ? {} : null);
-  const load = () => api.get(`/blocks?page_size=200${projectId ? `&project_id=${projectId}` : ""}`).then((r) => setItems(r.data.items)).catch((e) => toast.error(errMsg(e)));
-  useEffect(() => { load(); }, [projectId]); // eslint-disable-line
+  const load = useCallback(() => api.get(`/blocks?page_size=200${projectId ? `&project_id=${projectId}` : ""}`).then((r) => setItems(r.data.items)).catch((e) => toast.error(errMsg(e))), [projectId]);
+  useEffect(() => { load(); }, [load]);
   return (
     <div className="space-y-4" data-testid="towers-master-page">
       <div className="flex flex-wrap items-center gap-3">

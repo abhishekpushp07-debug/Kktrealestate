@@ -69,7 +69,8 @@ export function RateCardsTab({ projectId, onApplied }) {
   const [inclNS, setInclNS] = useState(false);
   const [preview, setPreview] = useState(null);
   const active = (data?.items || []).find((rc) => rc.status === "Active");
-  useEffect(() => { if (!active) return; api.post(`/projects/${projectId}/rate-cards/${active.id}/apply`, null, { params: { preview: true, include_non_saleable: inclNS } }).then((r) => setPreview(r.data)).catch(() => setPreview(null)); }, [active?.id, inclNS, projectId]); // eslint-disable-line
+  const activeId = active?.id;
+  useEffect(() => { if (!activeId) return; api.post(`/projects/${projectId}/rate-cards/${activeId}/apply`, null, { params: { preview: true, include_non_saleable: inclNS } }).then((r) => setPreview(r.data)).catch(() => setPreview(null)); }, [activeId, inclNS, projectId]);
   const act = async (rc, action) => {
     try { const r = await api.post(`/projects/${projectId}/rate-cards/${rc.id}/${action}`, null, action === "apply" ? { params: { include_non_saleable: inclNS } } : undefined); toast.success(action === "apply" ? `${r.data.flats_updated} Available flats re-priced · ${r.data.untouched_non_available} on Hold/Blocked untouched${inclNS ? " · non-saleable included" : ""}` : "Rate card activated"); reload(); onApplied?.(); } catch (e) { toast.error(errMsg(e)); }
   };

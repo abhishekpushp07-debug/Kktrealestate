@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -11,7 +11,7 @@ import { HistoryButton } from "@/components/common/HistoryTimeline";
 import { WhereUsedButton } from "./WhereUsed";
 import { useProjectTowers } from "./useProjectTowers";
 import { useRowKeys } from "@/hooks/useRowKeys";
-import { QuickAddButton, useQuickCreate } from "@/components/common/QuickCreate";
+import { QuickAddButton } from "@/components/common/QuickCreate";
 
 export default function PaymentPlans() {
   const { can } = useAuth();
@@ -56,7 +56,6 @@ export function PaymentPlanForm({ onClose, onSaved, initial }) {
   useEffect(() => { if (!blockId) { setStagePlans([]); setSpId(""); return; } api.get(`/stage-plans?block_id=${blockId}`).then((r) => { const act = r.data.items.filter((p) => p.is_active); setStagePlans(act); setSpId(act[0]?.id || ""); }); }, [blockId]);
   const sp = stagePlans.find((p) => p.id === spId);
   useEffect(() => { setRows(sp ? sp.stages.map((s) => ({ stage_id: s.stage_id, percent: "" })) : []); }, [sp]);
-  const stageName = useMemo(() => Object.fromEntries((sp?.stages || []).map((s) => [s.stage_id, s.name])), [sp]);
   const total = Math.round((rows.reduce((s, r) => s + (parseFloat(r.percent) || 0), 0) + advanced.reduce((s, a) => s + (parseFloat(a.percent) || 0), 0)) * 100) / 100;
   const dupes = rows.map((r) => r.stage_id).filter((id, i, a) => a.indexOf(id) !== i);
   const unused = (sp?.stages || []).filter((s) => !rows.some((r) => r.stage_id === s.stage_id));

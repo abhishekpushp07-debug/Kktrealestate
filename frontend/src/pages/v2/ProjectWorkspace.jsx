@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { ContextActions } from "@/components/common/ContextActions";
 import { TowerSalesChart } from "@/components/common/TowerSalesChart";
 import { ConnectedTo } from "@/components/common/ConnectedTo";
-import { QuickAddButton, useQuickCreate } from "@/components/common/QuickCreate";
+import { useQuickCreate } from "@/components/common/QuickCreate";
 
 const ProjectWebsiteTab = lazy(() => import("@/pages/cms/ProjectWebsiteTab").then((m) => ({ default: m.ProjectWebsiteTab })));
 const FlatsTable = lazy(() => import("@/components/common/FlatsTable"));

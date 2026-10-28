@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Download, Trash2, Lock, FileText } from "lucide-react";
 import api, { errMsg } from "../../lib/api";
 import { toast } from "sonner";
@@ -30,19 +30,22 @@ export function FileGallery({ query, canEdit, columns = 6, pageSize = 60, refres
   const [cursor, setCursor] = useState(null);
   const [open, setOpen] = useState(null);
   const [large, setLarge] = useState(false);
-  const load = async (reset) => {
+  const queryKey = JSON.stringify(query);
+  const cursorRef = useRef(null);
+  cursorRef.current = cursor;
+  const load = useCallback(async (reset) => {
     try {
-      const r = await api.get("/files", { params: { ...query, limit: pageSize, cursor: reset ? undefined : cursor } });
+      const r = await api.get("/files", { params: { ...JSON.parse(queryKey), limit: pageSize, cursor: reset ? undefined : cursorRef.current } });
       setItems((prev) => (reset ? r.data.items : [...prev, ...r.data.items]));
       setCursor(r.data.next_cursor);
     } catch (e) { toast.error(errMsg(e)); }
-  };
-  useEffect(() => { load(true); }, [JSON.stringify(query), refreshKey]); // eslint-disable-line
+  }, [queryKey, pageSize]);
+  useEffect(() => { load(true); }, [load, refreshKey]);
   useEffect(() => {
     if (!items.some((f) => f.is_image && f.variants_state === "pending")) return;
     const t = setTimeout(() => load(true), 2000);
     return () => clearTimeout(t);
-  }, [items]); // eslint-disable-line
+  }, [items, load]);
   const download = async (f) => { const r = await api.get(`/files/${f.id}/url`); window.open(`${API}${r.data.url}`, "_blank"); };
   const del = async (f) => { if (!window.confirm("Delete file?")) return; try { await api.delete(`/files/${f.id}`); load(true); } catch (e) { toast.error(errMsg(e)); } };
   const hold = async (f) => { try { await api.patch(`/files/${f.id}`, { legal_hold: !f.legal_hold }); load(true); } catch (e) { toast.error(errMsg(e)); } };

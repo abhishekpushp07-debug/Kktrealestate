@@ -48,10 +48,11 @@ export default function BookingWizard() {
     const fid = sp.get("flat"), cid = sp.get("customer_id");
     if (cid) api.get(`/customers/${cid}`).then((r) => setCustomer(r.data)).catch(() => {});
     if (fid) api.get(`/flats/${fid}`).then((r) => { const f = r.data; setProjectId(f.project_id); setBlockId(f.block_id); setFlat(f); setStep(cid ? 3 : 2); }).catch((e) => toast.error(errMsg(e)));
-  }, []); // eslint-disable-line
+  }, [sp]);
   const [leads, setLeads] = useState([]);
   const [leadId, setLeadId] = useState("");
-  useEffect(() => { if (!customer?.phone) { setLeads([]); setLeadId(""); return; } api.get("/leads", { params: { search: customer.phone, page_size: 20 } }).then((r) => { const open = (r.data.items || []).filter((l) => !["Converted", "Lost"].includes(l.status)); setLeads(open); setLeadId(open[0]?.id || ""); }).catch(() => setLeads([])); }, [customer?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const customerPhone = customer?.phone;
+  useEffect(() => { if (!customerPhone) { setLeads([]); setLeadId(""); return; } api.get("/leads", { params: { search: customerPhone, page_size: 20 } }).then((r) => { const open = (r.data.items || []).filter((l) => !["Converted", "Lost"].includes(l.status)); setLeads(open); setLeadId(open[0]?.id || ""); }).catch(() => setLeads([])); }, [customerPhone]);
   const [custSearch, setCustSearch] = useState("");
   const [custResults, setCustResults] = useState([]);
   const [newCust, setNewCust] = useState(false);
@@ -98,7 +99,7 @@ export default function BookingWizard() {
   const tower = (blocks?.items || []).find((b) => b.id === blockId);
   const defaultCashPct = tower?.default_cash_percent != null ? Number(tower.default_cash_percent) : Number((projects?.items || []).find((p) => p.id === projectId)?.default_cash_percent) || 0;
   const listPrice = flat?.price ? Math.round(flat.price) : 0;
-  useEffect(() => { if (!listPrice) return; const t = Math.max(listPrice - (Math.round(Number(discount)) || 0), 0); if (String(t) === agr.total) return; const pct = Number(agr.cashPct) || defaultCashPct; const c = Math.round(t * pct / 100); setAgr((a) => ({ ...a, total: String(t), cash: String(c), account: String(t - c), cashPct: String(pct), mode: "percent" })); }, [listPrice, discount, defaultCashPct]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!listPrice) return; const t = Math.max(listPrice - (Math.round(Number(discount)) || 0), 0); setAgr((a) => { if (String(t) === a.total) return a; const pct = Number(a.cashPct) || defaultCashPct; const c = Math.round(t * pct / 100); return { ...a, total: String(t), cash: String(c), account: String(t - c), cashPct: String(pct), mode: "percent" }; }); }, [listPrice, discount, defaultCashPct]);
   useEffect(() => { if (chargeTypes.length && charges.length === 0) setCharges(chargeTypes.filter((c) => c.default_amount).map((c) => ({ charge_type_id: c.id, name: c.name, amount: c.default_amount, is_taxable: c.is_taxable, gst_percent: c.is_taxable ? gst : 0, demand_at: "on_booking", on: ["PARKING", "CLUB"].includes(c.code) }))); }, [chargeTypes, charges.length, gst]);
 
   const total = Number(agr.total) || 0, cash = Number(agr.cash) || 0, account = Number(agr.account) || 0;

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Camera, Eye, EyeOff, Globe, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import api, { errMsg } from "@/lib/api";
@@ -16,8 +16,8 @@ export function ConstructionPhotos({ blockId, milestones, projectId }) {
   const [note, setNote] = useState("");
   const [galleryKey, setGalleryKey] = useState(0);
   const fileRef = useRef();
-  const load = () => api.get(`/blocks/${blockId}/photos`).then((r) => setPhotos(r.data.items)).catch(() => {});
-  useEffect(() => { load(); }, [blockId]); // eslint-disable-line
+  const load = useCallback(() => api.get(`/blocks/${blockId}/photos`).then((r) => setPhotos(r.data.items)).catch(() => {}), [blockId]);
+  useEffect(() => { load(); }, [load]);
   const done = (milestones || []).filter((m) => m.status === "Completed");
   const upload = async (files) => {
     if (!files.length || seq == null) return;
