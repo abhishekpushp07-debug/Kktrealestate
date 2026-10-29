@@ -109,3 +109,5 @@ memory/qa/phase_x/logs/
 memory/qa/phase_y/suite.log
 memory/qa/phase_z/suite.log
 backend/tests/.load_sensitive.lock
+.env
+*.env
