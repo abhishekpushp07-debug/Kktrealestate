@@ -19,18 +19,13 @@ SRC, DST, PORT = os.environ["DB_NAME"], "kkt_medium", 8002
 
 
 def copy():
-    c = MongoClient(os.environ["MONGO_URL"])
-    c.drop_database(DST)
-    src, dst = c[SRC], c[DST]
-    for name in src.list_collection_names():
-        docs = list(src[name].find({}))
-        if docs:
-            dst[name].insert_many(docs)
-        for ix in src[name].list_indexes():
-            if ix["name"] != "_id_":
-                opts = {k: v for k, v in ix.items() if k not in ("key", "v", "ns")}
-                dst[name].create_index(list(ix["key"].items()), **opts)
-    print("copied", SRC, "→", DST, len(src.list_collection_names()), "collections")
+    """Streams mongodump → mongorestore (the old find()-into-RAM copy died on 400k audit rows and left a partial DB)."""
+    url = os.environ["MONGO_URL"]
+    MongoClient(url).drop_database(DST)
+    dump = subprocess.Popen(["mongodump", f"--uri={url}", f"--db={SRC}", "--archive", "--quiet"], stdout=subprocess.PIPE)
+    subprocess.run(["mongorestore", f"--uri={url}", "--archive", f"--nsFrom={SRC}.*", f"--nsTo={DST}.*", "--quiet"], stdin=dump.stdout, check=True)
+    dump.wait()
+    print("copied", SRC, "→", DST, len(MongoClient(url)[DST].list_collection_names()), "collections")
 
 
 def main():
